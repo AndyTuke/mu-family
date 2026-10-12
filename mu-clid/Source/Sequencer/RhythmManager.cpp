@@ -97,6 +97,9 @@ void RhythmManager::remove(int index)
     for (int r = 0; r < SequencerEngine::MaxRhythms; ++r)
         proc.hotSwapStager.cancelPendingIfAny(r);
 
+    // The removed slot's retired tails are dropped; declared before the lock so they destruct after it.
+    std::array<std::unique_ptr<VoiceEngine>, mu_limits::kMaxRetiredVoiceEngines> droppedTails;
+
     // suspendProcessing ensures no in-progress processBlock holds a stale
     // numActiveRhythms snapshot and reads rhythms[r] while we erase and shift.
     proc.suspendProcessing(true);
@@ -114,6 +117,25 @@ void RhythmManager::remove(int index)
             proc.midiEngines[i]  = std::move(proc.midiEngines[i + 1]);
             proc.mixerEngine.channels[i].copyFrom(proc.mixerEngine.channels[i + 1]);
         }
+
+        // A retired tail renders into the channel of the slot that holds it, so each slot's tails (and
+        // their drained flags) move down with the rhythm whose swap left them; the removed slot's tails
+        // are dropped and the vacated top slot is left empty.
+        constexpr int K = mu_limits::kMaxRetiredVoiceEngines;
+        for (int k = 0; k < K; ++k)
+            droppedTails[(size_t) k] = std::move(proc.retiredVoiceEngines[(size_t) index][(size_t) k]);
+        for (int i = index; i < newN; ++i)
+            for (int k = 0; k < K; ++k)
+            {
+                auto& dst = proc.retiredVoiceEngines[(size_t) i][(size_t) k];
+                dst = std::move(proc.retiredVoiceEngines[(size_t) i + 1][(size_t) k]);
+                if (dst) dst->insertProc.setSlotIndex(i);
+                proc.retiredReadyForCleanup[(size_t) i][(size_t) k].store(
+                    proc.retiredReadyForCleanup[(size_t) i + 1][(size_t) k].load(std::memory_order_acquire),
+                    std::memory_order_release);
+            }
+        for (int k = 0; k < K; ++k)
+            proc.retiredReadyForCleanup[(size_t) newN][(size_t) k].store(false, std::memory_order_release);
         proc.voiceEngines[newN].reset();
         proc.midiEngines[newN] = MidiOutputEngine{};
         proc.mixerEngine.channels[newN].reset();

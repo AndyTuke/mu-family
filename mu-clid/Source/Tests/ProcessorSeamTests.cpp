@@ -4,11 +4,13 @@
 
 #include "Plugin/PluginProcessor.h"
 #include "Tests/ProcessorSeamHelpers.h"
+#include "Audio/InsertSlotConfig.h"
 
 #include <cstdlib>
 #include <new>
 #include <random>
 #include <thread>
+#include <vector>
 
 // Allocation counter: counts operator new calls made while the calling thread has counting switched on.
 namespace alloc_count {
@@ -101,6 +103,8 @@ struct MuClidProcessorSeamTests : juce::UnitTest
         swapCommitVersusProcessBlock();
         parameterChangedFromAudioThread();
         rhythmEditsKeepApvtsInStep();
+        removeShiftsRetiredTails();
+        removeReseedsShiftedEngines();
     }
 
     // Reads a parameter's plain value.
@@ -150,6 +154,91 @@ struct MuClidProcessorSeamTests : juce::UnitTest
         expectEquals((int) plain(p.apvts, "r0_fltType"), defaultFilter);
         p.forceSyncRhythmFromApvts(0);
         expectEquals((int) p.getRhythm(0).voiceParams.filterType, defaultFilter);
+    }
+
+    // A retired engine's tail renders into the channel of the slot that holds it, so remove() must shift
+    // the retired engines (and their drained flags) down with their slot, and drop the removed slot's.
+    void removeShiftsRetiredTails()
+    {
+        beginTest("remove shifts each slot's retired tails and drained flags down with it, and drops the removed slot's");
+        TempStorage storage;
+        ExposedPluginProcessor p;
+        p.prepareToPlay(48000.0, 256);
+        p.rhythms.add(mu_clid::Rhythm());
+        p.rhythms.add(mu_clid::Rhythm());
+        expectEquals(p.getNumRhythms(), 3);
+
+        // One tail on each slot (two on slot 1), the drained flag raised on slot 2's.
+        auto put = [&](int slot, int i) { p.retiredVoiceEngines[(size_t) slot][(size_t) i] = std::make_unique<VoiceEngine>(); return p.retiredVoiceEngines[(size_t) slot][(size_t) i].get(); };
+        auto* t0   = put(0, 0);
+        auto* t1a  = put(1, 0);
+        auto* t1b  = put(1, 1);
+        auto* t2   = put(2, 0);
+        p.retiredReadyForCleanup[2][0].store(true);
+        juce::ignoreUnused(t0);
+
+        p.rhythms.remove(0);
+        expectEquals(p.getNumRhythms(), 2);
+
+        expect(p.retiredVoiceEngines[0][0].get() == t1a && p.retiredVoiceEngines[0][1].get() == t1b,
+               "slot 1's tails now sit on slot 0 (the channel their rhythm moved to)");
+        expect(p.retiredVoiceEngines[1][0].get() == t2 && p.retiredVoiceEngines[1][1] == nullptr,
+               "slot 2's tail now sits on slot 1");
+        expect(p.retiredVoiceEngines[2][0] == nullptr && p.retiredVoiceEngines[2][1] == nullptr,
+               "the vacated top slot holds no tail");
+        expect(! p.retiredReadyForCleanup[0][0].load() && p.retiredReadyForCleanup[1][0].load() && ! p.retiredReadyForCleanup[2][0].load(),
+               "the drained flag moved with its engine");
+
+        // Removing the last slot drops its tails and leaves the others alone.
+        p.rhythms.remove(1);
+        expect(p.retiredVoiceEngines[0][0].get() == t1a, "the lower slot keeps its tail");
+        expect(p.retiredVoiceEngines[1][0] == nullptr && ! p.retiredReadyForCleanup[1][0].load(), "the removed last slot holds no tail and no flag");
+    }
+
+    // The noise inserts seed from the slot index, so a rhythm shifted down by remove() must sound as a
+    // fresh engine at its new index would.
+    void removeReseedsShiftedEngines()
+    {
+        beginTest("remove gives a shifted engine the same noise seed as a fresh engine at its new index");
+        TempStorage storage;
+        ExposedPluginProcessor p;
+        p.prepareToPlay(48000.0, 256);
+        p.rhythms.add(mu_clid::Rhythm());
+        p.rhythms.add(mu_clid::Rhythm());
+
+        // Full dither on a 2-bit crusher: with a DC input on the threshold the noise alone picks the output.
+        VoiceParams vp;
+        vp.insertAlgo = 4;
+        auto setSlot = [&](int slot, float actual) { vp.insertParam[slot] = mu_ui::actualToNorm(actual, vp.insertAlgo, slot); };
+        setSlot(0, 2.0f);
+        setSlot(1, 48000.0f);
+        setSlot(2, 100.0f);
+
+        constexpr int kLen = 4096;
+        auto render = [&](InsertProcessor& ip)
+        {
+            juce::AudioBuffer<float> buf(2, kLen);
+            for (int ch = 0; ch < 2; ++ch)
+                for (int i = 0; i < kLen; ++i) buf.setSample(ch, i, 0.25f);
+            ip.process(buf, kLen, 2, vp);
+            return std::vector<float>(buf.getReadPointer(0), buf.getReadPointer(0) + kLen);
+        };
+        auto freshAt = [&](int slot)
+        {
+            InsertProcessor ip;
+            ip.prepare(48000.0, kLen);
+            ip.setSlotIndex(slot);
+            return render(ip);
+        };
+
+        // The engine at slot 2 moves to slot 1 when slot 0 goes; prepare it for the block size first.
+        p.voiceEngines[2]->prepareToPlay(48000.0, kLen);
+        p.rhythms.remove(0);
+        expectEquals(p.getNumRhythms(), 2);
+
+        const auto shifted = render(p.voiceEngines[1]->insertProc);
+        expect(shifted == freshAt(1), "the shifted engine renders like a fresh engine at its new index");
+        expect(shifted != freshAt(2), "and not like one at its old index");
     }
 
     void constructsAndOwnsItsRhythm()
