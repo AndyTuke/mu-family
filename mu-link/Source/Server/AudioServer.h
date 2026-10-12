@@ -96,8 +96,8 @@ public:
     // Live levels for the GUI meters (linear peak, 0–1).
     float clientPeak(int slot) const noexcept { return engine.clientPeak(slot); }
     float masterPeak()         const noexcept { return engine.masterPeak(); }
-    std::atomic<float>& clientPeakMeter(int slot) noexcept { return engine.clientPeakMeter(slot); }
-    std::atomic<float>& masterPeakMeter() noexcept { return engine.masterPeakMeter(); }
+    const std::atomic<float>& clientPeakMeter(int slot) const noexcept { return engine.clientPeakMeter(slot); }
+    const std::atomic<float>& masterPeakMeter() const noexcept { return engine.masterPeakMeter(); }
 
     // Per-client mixer strip + master, driven by the GUI.
     void setClientGain(int slot, float g) noexcept { engine.setClientGain(slot, g); }

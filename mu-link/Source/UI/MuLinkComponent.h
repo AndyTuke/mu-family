@@ -11,7 +11,7 @@
 #include "LinkShellBackend.h"
 #include "MixerPanel.h"
 #include "ScenesPanel.h"
-#include "HoverStatus.h"
+#include "UI/Components/HoverStatus.h"
 
 // MuLinkComponent - the mu-link window content (docs/mu-link/design-ui.md).
 //
@@ -100,7 +100,7 @@ private:
 
     ClockSourceSection clockSource;
     MainPage           page;
-    mu_link::HoverStatus hover;   // after the components it watches
+    mu_ui::HoverStatus hover;   // after the components it watches
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MuLinkComponent)
 };

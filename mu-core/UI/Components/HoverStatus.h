@@ -7,7 +7,7 @@
 // HoverStatus — reports a short name and value to the status bar while the pointer is over a
 // component that has no status line of its own (a segment control, a number field). The owner
 // declares it after the components it watches, so it is destroyed first and detaches cleanly.
-namespace mu_link
+namespace mu_ui
 {
 
 class HoverStatus : private juce::MouseListener
@@ -59,4 +59,4 @@ private:
     std::vector<Watched> watched;
 };
 
-} // namespace mu_link
+} // namespace mu_ui

@@ -8,7 +8,7 @@
 #include "UI/MasterInsertPanel.h"
 #include "UI/Components/SegmentControl.h"
 #include "ClientColumns.h"
-#include "HoverStatus.h"
+#include "UI/Components/HoverStatus.h"
 
 namespace mu_link
 {
@@ -68,7 +68,7 @@ private:
 
     std::array<juce::String, kClients> shownNames;
     std::array<int, kClients> shownActive;
-    HoverStatus hover;   // after the components it watches
+    mu_ui::HoverStatus hover;   // after the components it watches
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MixerPanel)
 };

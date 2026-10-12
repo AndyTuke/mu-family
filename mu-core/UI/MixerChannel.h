@@ -91,7 +91,7 @@ public:
     void setClientEq(ClientEq band, float actual);
     void setClientMuteSolo(bool muted, bool soloed);
     // The meter reads this peak (0..1 linear per block), like the other strips.
-    void bindClientMeter(std::atomic<float>& peak);
+    void bindClientMeter(const std::atomic<float>& peak);
     KnobWithLabel& getClientEqKnob(ClientEq band) { return clientEq[(size_t) band]; }
     // Fader readout: one decimal, no unit ("0.0", "-6.0", "+3.5", "-inf").
     static juce::String formatClientDb(float linearLevel);
@@ -104,7 +104,7 @@ public:
     std::function<void(float linearLevel)> onMasterLevel;   // 0 .. kClientFaderMax, unity 1
     void useCallbackMaster();                               // switch this Master to callback mode
     void setMasterLevel(float linear);
-    void bindMasterMeter(std::atomic<float>& peak) { bindClientMeter(peak); }
+    void bindMasterMeter(const std::atomic<float>& peak) { bindClientMeter(peak); }
     // Show or hide the built-in insert panel (Master only; default shown, as the plugins use it).
     void setShowInsertPanel(bool show);
     // Top of the fader, in this strip's pixels, so the master fader lines up with the Client faders.

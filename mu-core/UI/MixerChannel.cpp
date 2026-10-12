@@ -545,7 +545,7 @@ void MixerChannel::setClientMuteSolo(bool muted, bool soloed)
     soloBtn.setToggleState(soloed, juce::dontSendNotification);
 }
 
-void MixerChannel::bindClientMeter(std::atomic<float>& peak)
+void MixerChannel::bindClientMeter(const std::atomic<float>& peak)
 {
     vuMeter.getLevel = [&peak] { return peak.load(); };
 }

@@ -8,7 +8,7 @@
 #include "UI/Components/SegmentControl.h"
 #include "UI/Components/SlideSwitch.h"
 #include "UI/Components/NudgeInput.h"
-#include "HoverStatus.h"
+#include "UI/Components/HoverStatus.h"
 
 namespace mu_link
 {
@@ -83,7 +83,7 @@ private:
     SegmentControl sceneButtons { { "1", "2", "3", "4", "5", "6", "7", "8" },
                                   SegmentControl::ActiveStyle::Warning, SegmentControl::DrawStyle::Pills };
     std::array<CellUi, kNumClients> cells;
-    HoverStatus hover;   // after the components it watches
+    mu_ui::HoverStatus hover;   // after the components it watches
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ScenesPanel)
 };
