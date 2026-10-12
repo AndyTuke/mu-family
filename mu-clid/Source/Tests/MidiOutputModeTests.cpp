@@ -92,6 +92,7 @@ struct MidiOutputModeTests : juce::UnitTest
         velocityMapping();
         renderMidiMode();
         renderSampleModeUnchanged();
+        teardownSendsNoteOff();
         presetRoundTrips();
     }
 
@@ -303,6 +304,78 @@ struct MidiOutputModeTests : juce::UnitTest
         const auto two = renderBlocks(q, 190);   // rhythm 0 has no sample: silent either way
         expect(two.count(true) >= 3, "rhythm 1 sends notes");
         for (const auto& n : two.notes) expectEquals(n.note, 60);
+    }
+
+    //==========================================================================
+    // A MIDI-mode slot torn down inside its 20 ms hold must still send its note-off.
+    static bool everyNoteOnHasOff(const Render& a, const Render& b)
+    {
+        std::vector<SeenNote> all = a.notes;
+        all.insert(all.end(), b.notes.begin(), b.notes.end());
+        for (size_t i = 0; i < all.size(); ++i)
+            if (all[i].on)
+            {
+                bool matched = false;
+                for (size_t j = i + 1; j < all.size() && ! matched; ++j)
+                    matched = ! all[j].on && all[j].note == all[i].note && all[j].channel == all[i].channel;
+                if (! matched) return false;
+            }
+        return true;
+    }
+
+    void teardownSendsNoteOff()
+    {
+        beginTest("Removing a MIDI-mode slot inside its 20 ms hold still sends the note-off (note and channel match)");
+        {
+            ExposedMidiOutProcessor p;
+            p.prepareToPlay(48000.0, 512);
+            p.rhythms.add(mu_clid::Rhythm());
+            p.applyDefaultRhythm(1);
+            setParam(p.apvts, "r1_stepsA", 16.0f);
+            setParam(p.apvts, "r1_hitsA", 4.0f);
+            setParam(p.apvts, "r1_outMode", 1.0f);
+            setParam(p.apvts, "r1_midiNote", 61.0f);
+            setParam(p.apvts, "r1_midiChan", 5.0f);
+            p.drainDeferredWork();
+
+            const auto first = renderBlocks(p, 1);   // the hit at beat 0: note-on, its off is 960 samples away
+            expectEquals(first.count(true), 1);
+            expectEquals(first.count(false), 0);
+            p.rhythms.remove(1);
+            expectEquals(p.getNumRhythms(), 1);
+            const auto second = renderBlocks(p, 1);
+            expect(everyNoteOnHasOff(first, second), "the removed slot's note-on got its note-off");
+            expectEquals(second.count(false), 1);
+            expectEquals(second.notes.empty() ? -1 : second.notes[0].offset, 0);
+        }
+
+        beginTest("A session restore that shrinks the rhythm count inside the hold still sends the note-off");
+        {
+            juce::MemoryBlock oneRhythm;
+            {
+                ExposedMidiOutProcessor src;
+                src.prepareToPlay(48000.0, 512);
+                src.getStateInformation(oneRhythm);
+            }
+            ExposedMidiOutProcessor p;
+            p.prepareToPlay(48000.0, 512);
+            p.rhythms.add(mu_clid::Rhythm());
+            p.applyDefaultRhythm(1);
+            setParam(p.apvts, "r1_stepsA", 16.0f);
+            setParam(p.apvts, "r1_hitsA", 4.0f);
+            setParam(p.apvts, "r1_outMode", 1.0f);
+            setParam(p.apvts, "r1_midiNote", 62.0f);
+            setParam(p.apvts, "r1_midiChan", 9.0f);
+            p.drainDeferredWork();
+
+            const auto first = renderBlocks(p, 1);
+            expectEquals(first.count(true), 1);
+            p.setStateInformation(oneRhythm.getData(), (int) oneRhythm.getSize());
+            p.drainDeferredWork();
+            expectEquals(p.getNumRhythms(), 1);
+            const auto second = renderBlocks(p, 1);
+            expect(everyNoteOnHasOff(first, second), "the shrunk slot's note-on got its note-off");
+        }
     }
 
     //==========================================================================

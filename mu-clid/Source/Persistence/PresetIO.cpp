@@ -862,6 +862,7 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     for (int i = n; i < oldN; ++i)
     {
         shrunkEngines[(size_t) i] = std::move(proc.voiceEngines[(size_t) i]);
+        proc.parkPendingMidiOff(i);   // keep the owed note-off; the audio thread no longer visits this slot
         proc.midiEngines[(size_t) i] = MidiOutputEngine{};
         proc.mixerEngine.channels[(size_t) i].reset();
     }

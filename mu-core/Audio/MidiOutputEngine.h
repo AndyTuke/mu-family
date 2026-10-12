@@ -13,6 +13,16 @@ public:
 
     void processBlock(juce::MidiBuffer& midiOut, int blockSize);
 
+    // Hands over the note whose note-off is still owed (if any) and clears it, so a caller that is
+    // about to discard or overwrite this engine can send that note-off itself. No allocation.
+    bool takePending(int& note, int& channel)
+    {
+        if (activeNote < 0) return false;
+        note = activeNote;  channel = activeChannel;
+        activeNote = -1;    noteOffCountdown = -1;
+        return true;
+    }
+
 private:
     double sampleRate            = 44100.0;
     int    noteDurationSamples   = 882;   // 20ms at 44100

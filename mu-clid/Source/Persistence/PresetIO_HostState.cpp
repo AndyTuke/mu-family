@@ -140,6 +140,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
         for (int i = n; i < oldN; ++i)
         {
             proc.voiceEngines[i].reset();
+            proc.parkPendingMidiOff(i);   // keep the owed note-off (under rhythmsLock, held above)
             proc.midiEngines[i] = MidiOutputEngine{};
         }
     }

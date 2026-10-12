@@ -158,6 +158,21 @@ public:
     std::array<std::unique_ptr<VoiceEngine>, SequencerEngine::MaxRhythms> voiceEngines;
     std::array<MidiOutputEngine,             SequencerEngine::MaxRhythms> midiEngines;
     std::atomic<int> numActiveRhythms { 0 };
+
+    // Note-offs owed by MIDI-mode slots that were torn down inside their 20 ms hold. Written only
+    // under rhythmsLock (message thread, audio excluded); the audio thread drains it at the top of
+    // the next block under its rhythmsLock try-lock. Fixed size, so nothing allocates.
+    static constexpr int kMaxOrphanOffs = 16;
+    struct OrphanOff { int note = 0; int channel = 1; };
+    std::array<OrphanOff, kMaxOrphanOffs> orphanOffs;
+    int numOrphanOffs = 0;
+    // Call under rhythmsLock before a slot's MidiOutputEngine is overwritten, moved over or reset.
+    void parkPendingMidiOff(int slot)
+    {
+        int note = 0, chan = 1;
+        if (midiEngines[(size_t) slot].takePending(note, chan) && numOrphanOffs < kMaxOrphanOffs)
+            orphanOffs[(size_t) numOrphanOffs++] = { note, chan };
+    }
     // fxChain and mixerEngine are inherited from ProcessorBase.
 
     // Stage 34: per-rhythm retired voice engines that continue rendering their

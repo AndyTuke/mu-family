@@ -231,6 +231,7 @@ Row 2 (envelope):          Row 2 (envelope):            Row 2 (envelope):    Row
 - **Mixer:** a MIDI-mode rhythm's strip is drawn inactive (`MixerChannel::setActive(false)`, through the `MixerOverlay::isChannelSilent` hook set in the mu-Clid editor) and its sends and voice controls are ignored; it makes no audio.
 - **Sidebar and header:** unchanged (the mini-circle still pulses on hits; a small "MIDI" tag is not added).
 - **Fit:** the section is 144 px tall in the 144 px band (same as the voice band) and 324 px wide, well inside the 1088 px panel.
+- **Shared note:** two rhythms set to the same note and channel share one downstream voice, so one rhythm's 20 ms note-off cuts the other's note; this is by design.
 - **Token review (2026-10-12):** every dimension is derived from family tokens (`kVoiceUnitW`, `kVoiceSubH`, `kVoiceLabelH`, `kKnobSize2H`, `kDropdownEdgeGap`, `kStripDisplayH`, `kScrewedPanelInset`, `kSpaceXS`); 324 px is not a token and should not become one (it is 6 columns). Two residuals are product-local magic numbers: `kOutputSelectorW = 112` and `MidiOutSection::kCaptionH = 14` (+2 gap). Brief: add `MuLookAndFeel::kLcdSegmentW = 56` (one LCD segment window) and set the selector width to `2 * kLcdSegmentW`, and set `kCaptionH = kVoiceLabelH` (the same 14 px name-plate band) with the 2 px gap as `kSpaceXS / 2`. Low priority; no on-screen change.
 
 ### ModulatorPanel (Stage 7)

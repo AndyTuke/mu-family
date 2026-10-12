@@ -107,6 +107,7 @@ void RhythmManager::remove(int index)
         const juce::ScopedLock sl(proc.rhythmsLock);
         proc.numActiveRhythms.store(newN, std::memory_order_release);
         proc.sequencer.removeRhythm(index);
+        proc.parkPendingMidiOff(index);   // the removed slot's engine is overwritten below; keep its owed note-off
         // The strips above shift down, so re-point every sidechain source first: a strip that ducked
         // from the deleted rhythm now ducks from nothing; the rest follow their rhythm down.
         proc.mixerEngine.renumberSidechainsAfterRemove(index);

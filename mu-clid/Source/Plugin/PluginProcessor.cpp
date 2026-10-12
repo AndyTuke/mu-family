@@ -220,6 +220,11 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     // out of bounds (MSVC _ITERATOR_DEBUG_LEVEL → abort()).
     const int numRhythms = numActiveRhythms.load(std::memory_order_acquire);
 
+    // Send the note-offs owed by slots torn down since the last block, ahead of any new hit.
+    for (int i = 0; i < numOrphanOffs; ++i)
+        midiMessages.addEvent(juce::MidiMessage::noteOff(orphanOffs[(size_t) i].channel, orphanOffs[(size_t) i].note), 0);
+    numOrphanOffs = 0;
+
     if (playing)
         advanceSequencer(numRhythms, beatPos, midiMessages);
 
