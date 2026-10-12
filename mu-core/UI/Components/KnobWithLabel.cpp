@@ -47,6 +47,12 @@ void KnobWithLabel::setRange(double min, double max, double step)
     // "absorb current step" snapshot logic then drops audible hits while the user
     // drags the steps knob. Suppress the callback here — the owning panel reloads
     // its values from the canonical APVTS state right after.
+    // A collapsed range (max <= min, e.g. a pad with no room left) is invalid for JUCE's
+    // NormalisableRange and divides by zero in its 0..1 mapping, so keep a one-step range;
+    // the owning panel's layout clamp pulls any value above the real maximum back.
+    if (max <= min)
+        max = min + (step > 0.0 ? step : 1.0);
+
     settingRange = true;
     slider.setRange(min, max, step);
     settingRange = false;
