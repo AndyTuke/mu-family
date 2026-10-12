@@ -187,14 +187,9 @@ void MixerPanel::paint(juce::Graphics& g)
     LF::drawNamePlate(g, { (float) cols.x0, plateY, plateW, plateH }, "Clients");
 
     // An engraved groove between the client strips and the master column.
-    const auto& L = LF::lighting();
     const int stripY = inset + s(LF::kMixerHeaderH) + s(kHeaderGap);
     const int y1 = stripY + s(4), y2 = getHeight() - inset - s(4);
-    const int gx = cols.dividerX + s(LF::kMixerDivW) / 2;
-    g.setColour(juce::Colours::black.withAlpha(L.shadow(L.grooveShade)));
-    g.fillRect(gx, y1, 1, y2 - y1);
-    g.setColour(juce::Colours::white.withAlpha(L.highlight(L.grooveLight)));
-    g.fillRect(gx + 1, y1, 1, y2 - y1);
+    LF::drawGroove(g, { cols.dividerX + s(LF::kMixerDivW) / 2, y1 }, y2 - y1, true);
 }
 
 void MixerPanel::paintOverChildren(juce::Graphics& g)

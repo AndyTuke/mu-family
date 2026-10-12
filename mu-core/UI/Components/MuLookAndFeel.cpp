@@ -717,6 +717,17 @@ static void drawCornerScrews(juce::Graphics& g, juce::Rectangle<float> r, float 
         MuLookAndFeel::drawScrew(g, corners[i], d, angles[i]);
 }
 
+void MuLookAndFeel::drawGroove(juce::Graphics& g, juce::Point<int> start, int length, bool vertical)
+{
+    const auto& L = lighting();
+    const int w = vertical ? 1 : length, h = vertical ? length : 1;
+    const int dx = vertical ? 1 : 0, dy = vertical ? 0 : 1;
+    g.setColour(juce::Colours::black.withAlpha(L.shadow(L.grooveShade)));
+    g.fillRect(start.x, start.y, w, h);
+    g.setColour(juce::Colours::white.withAlpha(L.highlight(L.grooveLight)));
+    g.fillRect(start.x + dx, start.y + dy, w, h);
+}
+
 void MuLookAndFeel::drawPanelScrews(juce::Graphics& g, juce::Rectangle<float> panel)
 {
     drawCornerScrews(g, panel, mu_ui::sf((float) kPanelScrewD), mu_ui::sf((float) kPanelScrewInset));

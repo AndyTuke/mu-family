@@ -643,23 +643,6 @@ void MixerOverlay::paintMetal(juce::Graphics& g)
     for (auto r : { stripsPanelR, fxPanelR })
         MuLookAndFeel::drawAccentPanel(g, r.reduced(2).toFloat(), accent);
 
-    // An engraved groove: a dark line with a light one just below / right of it.
-    const auto& L = MuLookAndFeel::lighting();
-    auto grooveH = [&](int y, int x1, int x2)
-    {
-        g.setColour(juce::Colours::black.withAlpha(L.shadow(L.ringTrack)));
-        g.fillRect(x1, y, x2 - x1, 1);
-        g.setColour(juce::Colours::white.withAlpha(L.highlight(L.lampHot) * 0.3f));
-        g.fillRect(x1, y + 1, x2 - x1, 1);
-    };
-    auto grooveV = [&](int x, int y1, int y2)
-    {
-        g.setColour(juce::Colours::black.withAlpha(L.shadow(L.ringTrack)));
-        g.fillRect(x, y1, 1, y2 - y1);
-        g.setColour(juce::Colours::white.withAlpha(L.highlight(L.lampHot) * 0.3f));
-        g.fillRect(x + 1, y1, 1, y2 - y1);
-    };
-
     // Strip sections: labels engraved on the label panel, a groove across the strips above each.
     if (! rhythmChannels.empty())
     {
@@ -671,7 +654,7 @@ void MixerOverlay::paintMetal(juce::Graphics& g)
         auto section = [&](const juce::String& text, juce::Rectangle<int> b)
         {
             if (b.isEmpty()) return;
-            grooveH(chY + b.getY(), lw, x2);
+            MuLookAndFeel::drawGroove(g, { lw, chY + b.getY() }, x2 - lw, false);
             if (b.getHeight() < 14) return;
             // Label rotated 90° CCW, centred in its band.
             const juce::Rectangle<int> r { 0, chY + b.getY(), lw, b.getHeight() };
@@ -693,8 +676,8 @@ void MixerOverlay::paintMetal(juce::Graphics& g)
 
     // Grooves between the channels, the returns and the master.
     const int y1 = stripsPanelR.getY() + s(4), y2 = stripsPanelR.getBottom() - s(4);
-    grooveV(lastDivX1 + s(kDivW) / 2, y1, y2);
-    grooveV(lastDivX2 + s(kDivW) / 2, y1, y2);
+    MuLookAndFeel::drawGroove(g, { lastDivX1 + s(kDivW) / 2, y1 }, y2 - y1, true);
+    MuLookAndFeel::drawGroove(g, { lastDivX2 + s(kDivW) / 2, y1 }, y2 - y1, true);
 
     // FX rows: raised boxes (shadows first, then faces), with corner screws.
     for (const auto& b : fxRowBoxR)

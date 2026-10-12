@@ -229,6 +229,10 @@ public:
     // A thin strip panel (too short for four): one screw at each end, vertically centred.
     static void drawStripScrews(juce::Graphics&, juce::Rectangle<float> strip);
 
+    // An engraved groove of `length` pixels from `start`: a dark line on the start edge and a light
+    // one a pixel to the right (vertical) or below (horizontal). The one definition of a groove.
+    static void drawGroove(juce::Graphics&, juce::Point<int> start, int length, bool vertical);
+
     // Lamps: a lit indicator behind a dark lens. lampColour mixes `clr` into the opaque lamp
     // base by `lit` (Lighting lampOff / lampDim / lampOn); drawLamp fills `shape` with that lens,
     // brighter at `centre` where the light sits behind it.
