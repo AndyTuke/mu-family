@@ -168,13 +168,14 @@ names. They are modal pop-ups, not `OverlayHost` screens, so the `Overlay` role 
   variables (`startFxParamSync`, `bindStripToApvts`, `getBpm`, `Midi…`).
 
 ### Saved-data names (change only with a migration)
-Parameter-id prefixes (`r0_`, `v0_`, `k_ b_ h_ s_ r_`), preset extensions (`.muRhythm`, `.muPattern`,
+Parameter-id prefixes (`r0_`, `v0_`, `a0_`, `t0_`), preset extensions (`.muRhythm`, `.muPattern`,
 `.muArp`, `.muTrack`), content folders, state identifiers (`Mu<Product>State`) and plugin codes
 (`MCld MTnt MTni MuOn`) are *data*: renaming them touches presets and DAW sessions. The composed
 slot state already stores ids without their prefix, so layer data is prefix-agnostic on disk.
 
 **Ruled 2026-10-11 (architecture-steward, backlog #1263; the owner scheduled this ahead of variable
-layers).** What changes, and what deliberately does not:
+layers).** What changes, and what deliberately does not. **Status 2026-10-12: the prefix renames are done
+(steps 0-2 below); only the optional `Voices/` to `Patterns/` folder move remains, and it is on hold.**
 
 | Name | Today | Becomes | Why |
 |---|---|---|---|
@@ -183,7 +184,7 @@ layers).** What changes, and what deliberately does not:
 | mu-Clid `r0_`, mu-Tant `v0_` | — | **unchanged** | Live products (1.1). The ids are DAW automation targets and MIDI-map keys, nothing in the code needs them to change, and the registry holds a prefix per type (`Pattern` keeps `v`, a named legacy letter). Do not rename them without a reason that outweighs breaking users' automation lanes. |
 | Mixer / FX ids `ch{N}_`, `mstr_`, ... | — | unchanged | Already one family scheme. |
 | Layer-preset extensions | `.muRhythm .muPattern .muArp .muTrack` | unchanged | Each already is `.mu<LayerType>`. |
-| Layer-preset folder, mu-Tant | `Voices/` | `Patterns/` | The only folder that disagrees (`Rhythms`, `Patterns`, `Arps`, `Tracks`). |
+| Layer-preset folder, mu-Tant | `Voices/` | `Patterns/` | The only folder that disagrees (`Rhythms`, `Patterns`, `Arps`, `Tracks`). **Dropped for now (2026-10-12): optional, cosmetic, on hold pending Andy's confirmation; nothing depends on it.** |
 | Plugin codes `MCld MTnt MTni MuOn`, `MCLt` | — | **unchanged** | `MuOn` breaks the pattern but changing it only re-identifies the plugin to every host; no code needs it. |
 | State ids `Mu<Product>State` | — | unchanged | Already consistent. |
 
@@ -200,20 +201,28 @@ layers).** What changes, and what deliberately does not:
   parameter silently goes dead.
 - *Host automation* on a renamed id is lost; no code can migrate it. This is why only the two pre-release
   products change, and why it is done once, before they ship publicly.
+
+**User-visible effect of the done renames (2026-10-12).** In mu-Toni and mu-On, automation lanes recorded
+against the old ids (`v0_...`, `k_...`) no longer find their parameter and must be re-assigned. Everything else
+migrates: full presets, layer presets and host sessions (prefix-free rows), old APVTS dumps (legacy prefix
+list) and MIDI control maps (rewritten on load, saved once). mu-Clid and mu-Tant are untouched.
 - *Folder move* (`Voices/` to `Patterns/`): in `ensureContentFolders`, if `Voices/` exists and `Patterns/` does
   not, `moveFileTo`; then rewrite the program-change map entries (`midiPresetMap` stores file paths) whose
   path lies under the old folder. If the move fails, leave the folder and keep reading it.
 
 **Order (each step one product, a Debug build, unit tests and `*_roundtrip` between steps):**
-0. *No data change, do first:* one `layerParamPrefix(i)` / `layerParamId(i, suffix)` per product replaces every
+0. **Done (148083a).** *No data change, do first:* one `layerParamPrefix(i)` / `layerParamId(i, suffix)` per product replaces every
    literal (`"v" + String(i) + "_"` in mu-Toni's `PluginProcessor.cpp`, `PluginProcessor_Preset.cpp` and
    `EnginePanel.cpp`; `kLanePrefix` and the `"k_..."` literals in mu-On's processor, `GrooveVoices.h`,
    `MuOnModDest.h`, `EnginePanel.cpp`). After this a prefix rename is one constant. (Test files may keep
    literals; they are the check.)
-1. mu-Toni `v` to `a` with its legacy list and the MIDI-map rename.
-2. mu-On `k b h s r` to `t{N}` likewise.
-3. mu-Tant `Voices/` to `Patterns/`.
-Then #1241 (mu-On variable layers) and the registry (stage 8) can rely on index prefixes everywhere but
+   Infrastructure that landed with step 1 (34151a1): `LayerLayout::addLegacyPrefixes`,
+   `MidiControlMap::setIdPrefixRenames`, and the legacy list passed through `ProcessorBase::initLayerState`.
+1. **Done (34151a1 infrastructure, ccbd3b3 rename).** mu-Toni `v` to `a` with its legacy list and the MIDI-map rename.
+2. **Done (f703570).** mu-On `k b h s r` to `t{N}` likewise.
+3. **Dropped for now, on hold (2026-10-12; Andy to confirm).** mu-Tant `Voices/` to `Patterns/`. Optional and
+   cosmetic; if revived, follow the folder-move rule in the migration contract.
+#1241 (mu-On variable layers) and the registry (stage 8) can now rely on index prefixes everywhere but
 the two named legacy ones.
 
 **Product renames are display-only.** A product's name, slug, folder and namespace may change; its plugin
@@ -249,7 +258,7 @@ unique", legitimate because the type is one `mu-core` class (§1).
 | Enums | plain `enum` in mu-Toni (3), mu-On (3), mu-Tant (2). |
 | Folders | Done at build 1187: mu-Clid now has all eight (`SamplePreview` + `SampleLibrary` in `Audio/`, `RhythmManager` in `Sequencer/`, `PresetIO` + `PresetIO_HostState` in `Persistence/`, `ModulationSkew` in `Modulation/`, `LiteEditor` in `UI/`; `HotSwapStager` / `HotSwapBoundary` stay in `Plugin/` like mu-Tant's stager). Still open: mu-On has no `License` or `Persistence`; mu-Tant and mu-Toni `Persistence/` hold only `.gitkeep`. |
 | Products | mu-Clid Lite is still a second target in `mu-clid/` (`MUCLID_LITE_BUILD`, about 60 `#if` sites, `LiteEditor` in mu-Clid's `UI/`, namespace `mu_clid`). Owner made it a separate product on 2026-10-11: it is named mu-Clid MIDI (2026-10-11) and gets `mu-clid-midi/` and `mu_clid_midi` by the staged plan in the family doc (stage 1 identity first; stage 2 moved the pure generators to `mu-core/Sequencer/`). The product exists and compiles nothing from `mu-clid/`: `Rhythm`, `SequencerEngine`, `EuclideanPanel` and `RhythmCircle` moved to `mu-core` (Stage 2b of the family doc, done; the known exception is closed, backlog #1411). |
-| Saved data | Four param-id schemes (mu-On's is by lane type, mu-Toni's `v` clashes with mu-Tant's); mu-Tant's folder `Voices/` disagrees with its `.muPattern`. Ruled 2026-10-11, see §3 "Saved-data names"; nothing renamed yet. |
+| Saved data | Parameter-id prefixes done 2026-10-12: one index scheme per layer type (`r0_` Rhythm, `v0_` Pattern, `a0_` Arp, `t0_` Track), each product via `layerParamPrefix` / `layerParamId`. Open (optional, on hold): mu-Tant's folder `Voices/` disagrees with its `.muPattern`. See §3 "Saved-data names". |
 
 ---
 
@@ -299,7 +308,7 @@ C++ identifier changes never touch saved files; the data renames at the end do.
    `RhythmPlayState` / the param table / `EuclideanPanel` / `RhythmCircle` into `mu-core` (Stage 2b in that
    section, ruled 2026-10-11, **before** stage 7: the class is pure today, and stage 7 then derives
    `mu_clid::Rhythm` from `mu_core::Rhythm` instead of moving the shared class again).
-6. **Saved-data names** — ruled 2026-10-11, now ahead of variable layers: the exact changes, the migration contract and the order are in §3 "Saved-data names". Backlog #1263.
+6. **Saved-data names** — ruled 2026-10-11; prefix renames done 2026-10-12 (the mu-Tant folder move is dropped, on hold): the exact changes, the migration contract and the order are in §3 "Saved-data names". Backlog #1263.
 
 Separately, the **standard `Source/` layout** (eight folders in every instrument product): folders created
 and mu-Clid's misplaced files moved (build 1187); mu-On's missing folders remain. Backlog #1268.

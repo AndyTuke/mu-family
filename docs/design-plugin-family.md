@@ -101,7 +101,7 @@ The standard mu platform is everything in `mu-core/`. New products link `mu-core
 - `Persistence/PresetMeta.h` (`mu_pp::readPresetMeta`) — a preset's root tag + root attributes (category, description, embed flag, e.g. mu-On's `lane`) read from the opening tag only, never the body. It understands both file shapes (the wrapper's `category` / `description` attributes and mu-Clid's `presetCategory` / `presetDescription`). Every preset list reads files through it — never `parseXML` a whole folder.
 - `UI/StandardSettingsOverlay::addProgramChangeSection(layerTable, fullTable)` — the shared MIDI Program Change section (buttons opening the shared program-change tables). Every product with presets calls it; MIDI program changes are queued on the audio thread (`scanMidiProgramChanges` → `requestDeferredWork()`) and loaded in `runDeferredWork` on the message thread (`drainPendingMidiProgramChanges`).
 - `UI/Voice/VoiceBand` — the shared voice band (mu-Clid's layout): Pitch | Filter | Amp | Effects in raised boxes, the FX sends right-aligned in the Effects box beside a narrowed insert dropdown. Products supply the four section components (binding stays product-side); `VoiceBandSection` builds a section from controls a product already owns (two Size-2 rows, `place(control, row, col, span, dropdown)`). Used by mu-Clid (`VoiceSection` subclasses it) and mu-Toni (`EnginePanel`); mu-Tant's voice panel is a different structure and stays product-side.
-- `UI/Voice/InsertSubsection` — the shared insert-effect voice subsection (algorithm dropdown + 4 generic slot knobs), bound to a channel via a constructor prefix (`"r"` / `"v"`); optional product hooks for mod-arc indicators, the Comp/Limiter GR meter, and the algo-switch bulk-write wrapper. Part of the voice section (engine → insert → mixer).
+- `UI/Voice/InsertSubsection` — the shared insert-effect voice subsection (algorithm dropdown + 4 generic slot knobs), bound to a channel via a constructor prefix (`"r"` / `"v"` / `"a"` / `"t"` for Rhythm / Pattern / Arp / Track layers); optional product hooks for mod-arc indicators, the Comp/Limiter GR meter, and the algo-switch bulk-write wrapper. Part of the voice section (engine → insert → mixer).
 
 **The swap-out point:**
 
@@ -185,6 +185,9 @@ three small rules, no new class and no `ProcessorBase` split:
    under `<root>/settings/` and `getContentDir()` defaults to `<root>/content/<name>`, so constructing a
    processor never reads or writes the user's real `TDP` settings, presets or licence folder. The override
    is a process-wide function-local `juce::File`; production code never sets it.
+   Implementation detail: because `createEditor()` now lives in `PluginEditor.cpp`, each product's test target
+   (which does not link the editor) defines a one-line `createEditor` stand-in in its `ProcessorSeamTests.cpp`
+   (returns `nullptr`).
 3. **Product test targets build the real processor from a shared source list.** A console target cannot
    link the INTERFACE `mu-core`, so the list of `mu-core` `.cpp`s behind `ProcessorBase` (today the block
    under "Sources behind ProcessorBase" in `mu-core/Tests/CMakeLists.txt`) moves to one file,
@@ -489,10 +492,10 @@ Stages 1-3 are order-independent between products (any product can go first). Fr
 
 ### Owner decisions for Stage 6
 
-- **mu-On (#1241):** its parameters are prefixed by *lane type* (`k_ b_ h_ s_ r_`), not by index. A variable
-  count with a per-layer engine selector needs index-based prefixes, which is a saved-data rename (#1263, on
-  hold). Options: (a) mu-On stays five fixed lanes and only gains `Track` and the clip bank (no migration;
-  recommended until #1263); (b) index prefixes with a migration, done with #1263. The stage 5 edit code works
+- **mu-On (#1241):** its parameters were prefixed by *lane type* (`k_ b_ h_ s_ r_`); since 2026-10-12 they are
+  index-based (`t0_` ... `t4_`, #1263 step 2, with legacy-state and MIDI-map migration), which a variable
+  count with a per-layer engine selector needs. The remaining choice: (a) mu-On stays five fixed lanes and only
+  gains `Track` and the clip bank; (b) variable lane count on the index prefixes. The stage 5 edit code works
   for both.
 - **mu-Toni (#1240):** `kNumChannels` is 4 today. Going to 8 adds layers 5-8 parameters (additive, old sessions
   load with the new layers at defaults) and changes the host's automation list; confirm the default count for a
