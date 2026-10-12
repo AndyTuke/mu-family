@@ -1090,7 +1090,7 @@ signing (the Apple side of #99).
 
 ### Build-number policy (owner rules, [cmake/IncrementBuildNumber.cmake](../cmake/IncrementBuildNumber.cmake))
 
-1. A code change → a **Debug** build only. Every Debug build **increments the number by
+1. A build is a **Debug** build unless the owner asks for Release (when to build: CLAUDE.md, "Keep working until a build is worth it"). Every full Debug build **increments the number by
    exactly 1** — no time/session throttle. Each Debug build is a distinct testable artefact.
 2. **Release** builds happen only when the owner explicitly says so. A Release rebuilds
    only the Release artefacts (Debug untouched) and is stamped with the **same number as
@@ -1098,6 +1098,14 @@ signing (the Apple side of #99).
 3. **Release ≤ last Debug, always.** A Release coming out *higher* than the last Debug
    means the counter advanced without a Debug build → the build **stops with a
    FATAL_ERROR**; surface it to the owner, don't work around it.
+
+### JUCE version policy
+
+Owner rule, 2026-10-09. The family tracks the latest stable JUCE release rather than staying on an old one. The version is pinned in **one place**, [juce-version.txt](juce-version.txt): every CI workflow checks out that tag and configure fails if the local `JUCE_PATH` checkout differs, so a bump is a one-line edit and local builds cannot drift from CI. To bump: read JUCE's `BREAKING_CHANGES.md` between the old and new version, grep the tree for each affected API, bump the pin, then run the unit tests, the round-trip listening tests and pluginval on the build PC. When writing code, use current JUCE APIs and do not build on deprecated ones. Version in use: JUCE 9.0.3 today. `pwsh tests/scripts/check-juce-version.ps1` reports how far the pin is behind the latest release.
+
+### Version numbering
+
+The live products (mu-Clid, mu-Tant, mu-link, mu-Clid MIDI) use [version.txt](version.txt), currently 1.1 (the UI rework, build 972). The pre-release products (mu-On, mu-Toni) use [version-pre.txt](version-pre.txt), currently 0.1 (the .1 marks the metal-panel design upgrade, Andy 2026-10-11). Plugins show `v1.1.0.NNN` / `v0.1.0.NNN`, commits `v1.1.NNN`. The build number never resets on a major/minor change (the Release ≤ Debug guard and the in-plugin update check rely on it). Change a base **only** by editing its file, and only when Andy says so.
 
 ### Shipping a Release (three ways, every time)
 
