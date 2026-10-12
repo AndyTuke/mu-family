@@ -151,17 +151,22 @@ void HotSwapStager::processSwaps()
                    RhythmSequencer::MaxRhythms * mu_limits::kMaxRetiredVoiceEngines> orphans;
         int orphanCount = 0;
         proc.suspendProcessing(true);
-        for (int r = 0; r < (int)proc.retiredReadyForCleanup.size(); ++r)
         {
-            for (int i = 0; i < mu_limits::kMaxRetiredVoiceEngines; ++i)
+            // layersLock as for an install: suspend is no barrier in every host, and a structural edit
+            // moves these tail slots under the same lock.
+            const juce::ScopedLock sl(proc.layersLock);
+            for (int r = 0; r < (int)proc.retiredReadyForCleanup.size(); ++r)
             {
-                if (!proc.retiredReadyForCleanup[(size_t)r][(size_t)i]
-                        .load(std::memory_order_acquire))
-                    continue;
-                orphans[(size_t)orphanCount++] =
-                    std::move(proc.retiredVoiceEngines[(size_t)r][(size_t)i]);
-                proc.retiredReadyForCleanup[(size_t)r][(size_t)i]
-                    .store(false, std::memory_order_release);
+                for (int i = 0; i < mu_limits::kMaxRetiredVoiceEngines; ++i)
+                {
+                    if (!proc.retiredReadyForCleanup[(size_t)r][(size_t)i]
+                            .load(std::memory_order_acquire))
+                        continue;
+                    orphans[(size_t)orphanCount++] =
+                        std::move(proc.retiredVoiceEngines[(size_t)r][(size_t)i]);
+                    proc.retiredReadyForCleanup[(size_t)r][(size_t)i]
+                        .store(false, std::memory_order_release);
+                }
             }
         }
         proc.suspendProcessing(false);
