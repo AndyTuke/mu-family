@@ -8,7 +8,8 @@ SegmentControl::SegmentControl(std::initializer_list<juce::String> labels,
 
 void SegmentControl::setSelectedIndex(int index, bool notify)
 {
-    if (index == selectedIndex) return;
+    const bool same = (index == selectedIndex);
+    if (same && ! (firesOnReselect && notify)) return;   // re-selecting only notifies when opted in
     selectedIndex = index;
     repaint();
     if (notify && onChange) onChange(selectedIndex);

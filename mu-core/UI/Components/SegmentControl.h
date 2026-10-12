@@ -21,6 +21,10 @@ public:
     void setSelectedIndex(int index, bool notify = false);
     int  getSelectedIndex() const noexcept { return selectedIndex; }
     void setDrawStyle(DrawStyle d) { drawStyle = d; repaint(); }
+    // Opt in to onChange firing when the already-selected segment is chosen again (e.g. a scene
+    // row where a second click recalls the scene afresh). Default false: re-selecting is a no-op.
+    void setFiresOnReselect(bool fires) noexcept { firesOnReselect = fires; }
+    bool getFiresOnReselect() const noexcept { return firesOnReselect; }
 
     void paint(juce::Graphics& g) override;
     void mouseDown(const juce::MouseEvent& e) override;
@@ -28,6 +32,7 @@ public:
 private:
     std::vector<juce::String> options;
     int selectedIndex = 0;
+    bool firesOnReselect = false;
     ActiveStyle style;
     DrawStyle   drawStyle;
 
