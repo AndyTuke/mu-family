@@ -28,6 +28,7 @@ public:
     void setValue(double v, juce::NotificationType n = juce::dontSendNotification);
     double getValue() const;
     void setLabel(const juce::String& newLabel);
+    const juce::String& getLabel() const noexcept { return labelText; }
 
     // Modulation indicator. setIsModulated draws a static tinted ring
     // around the knob whenever any modulation assignment targets this destination.

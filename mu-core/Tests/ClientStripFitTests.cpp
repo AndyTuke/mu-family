@@ -1,4 +1,5 @@
 #include "UI/MixerChannel.h"
+#include "UI/InsertSlotUi.h"
 
 #include <vector>
 
@@ -114,6 +115,39 @@ struct ClientStripFitTests : juce::UnitTest
             expectEquals(range(Eq::MidHz).getEnd(), 8000.0);
             expectEquals(strip.getClientEqKnob(Eq::MidHz).getValue(), 1000.0);   // flat default
             expectEquals(strip.getClientEqKnob(Eq::High).getValue(), 0.0);
+        }
+
+        beginTest("EQ labels carry no units and never change");
+        {
+            MixerChannel strip(MixerChannel::Type::Client, "", juce::Colours::red);
+            using Eq = MixerChannel::ClientEq;
+            const std::pair<Eq, const char*> expected[] = { { Eq::High, "High" }, { Eq::MidHz, "Mid Hz" },
+                                                            { Eq::Mid, "Mid" }, { Eq::Low, "Low" } };
+            for (auto& [band, text] : expected)
+                expectEquals(strip.getClientEqKnob(band).getLabel(), juce::String(text));
+
+            strip.getClientEqKnob(Eq::MidHz).getSlider().setValue(4000.0, juce::sendNotificationSync);
+            strip.getClientEqKnob(Eq::High).getSlider().setValue(6.0, juce::sendNotificationSync);
+            for (auto& [band, text] : expected)
+                expectEquals(strip.getClientEqKnob(band).getLabel(), juce::String(text));
+        }
+
+        beginTest("a dynamic-unit slot label stays put across 1000, and Suffix still flips it");
+        {
+            constexpr int kSoftClip = 1, kLpf = 3;   // LPF is a dynamicUnit Hz slot
+            KnobWithLabel plain("", MuLookAndFeel::knobInsertPad), suffixed("", MuLookAndFeel::knobInsertPad);
+            mu_ui::configureKnobFromSlot(plain, kSoftClip, kLpf, 0.2f, [](float) {});
+            mu_ui::configureKnobFromSlot(suffixed, kSoftClip, kLpf, 0.2f, [](float) {},
+                                         mu_ui::SlotLabelUnits::Suffix);
+            expectEquals(plain.getLabel(), juce::String("LPF"));
+            plain.getSlider().setValue(500.0, juce::sendNotificationSync);
+            plain.getSlider().setValue(5000.0, juce::sendNotificationSync);
+            expectEquals(plain.getLabel(), juce::String("LPF"));
+
+            suffixed.getSlider().setValue(500.0, juce::sendNotificationSync);
+            expectEquals(suffixed.getLabel(), juce::String("LPF (Hz)"));
+            suffixed.getSlider().setValue(5000.0, juce::sendNotificationSync);
+            expectEquals(suffixed.getLabel(), juce::String("LPF (kHz)"));
         }
 
         beginTest("controls call back with the right band, level, mute and solo");

@@ -70,6 +70,11 @@ inline juce::String composeSlotLabel(const SlotConfig& cfg, double currentActual
     return label + " (" + cfg.unitSuffix + ")";
 }
 
+// Whether the knob label carries the unit suffix. None (the family rule) keeps
+// the plain label fixed; Suffix appends the unit and re-composes it on every
+// value change so dynamicUnit knobs flip Hz/kHz live.
+enum class SlotLabelUnits { None, Suffix };
+
 // Configure one slot knob from the per-algo config table. `onWriteNorm` is
 // invoked with the NEW NORMALISED value whenever the user moves the knob,
 // so the caller can route to its preferred APVTS write path (apvtsSet for
@@ -78,7 +83,8 @@ inline void configureKnobFromSlot(KnobWithLabel& k,
                                   int algoIndex,
                                   int slotIndex,
                                   float currentNorm,
-                                  std::function<void(float /*newNorm*/)> onWriteNorm)
+                                  std::function<void(float /*newNorm*/)> onWriteNorm,
+                                  SlotLabelUnits labelUnits = SlotLabelUnits::None)
 {
     if (algoIndex < 0 || algoIndex >= kInsertAlgoCount || slotIndex < 0 || slotIndex >= kInsertSlotCount)
     {
@@ -121,14 +127,17 @@ inline void configureKnobFromSlot(KnobWithLabel& k,
     // Snap the value (actual scale).
     const double actual = (double) normToActual(currentNorm, algoIndex, slotIndex);
     k.setValue(actual, juce::dontSendNotification);
-    k.setLabel(composeSlotLabel(cfg, actual));
+    const bool suffix = (labelUnits == SlotLabelUnits::Suffix);
+    k.setLabel(suffix ? composeSlotLabel(cfg, actual) : juce::String(cfg.label));
 
-    // onValueChanged: convert back to normalised + tell caller. Also refreshes
-    // the label so dynamicUnit Hz→kHz flips track the slider live.
-    k.onValueChanged = [&k, cfg, algoIndex, slotIndex, onWriteNorm](double v)
+    // onValueChanged: convert back to normalised + tell caller. With unit
+    // suffixes the label is also refreshed so dynamicUnit Hz->kHz flips track
+    // the slider live; plain labels are set once above and never rewritten.
+    k.onValueChanged = [&k, cfg, algoIndex, slotIndex, onWriteNorm, suffix](double v)
     {
         onWriteNorm(actualToNorm((float) v, algoIndex, slotIndex));
-        k.setLabel(composeSlotLabel(cfg, v));
+        if (suffix)
+            k.setLabel(composeSlotLabel(cfg, v));
     };
 }
 
