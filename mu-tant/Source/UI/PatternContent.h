@@ -56,7 +56,7 @@ public:
     // Rebind every per-voice attachment to the v{idx}_* family. Shared params
     // (root, scale) are unaffected.
     void setLayer(int layerIndex);
-    int  getLayer() const noexcept { return currentVoice; }
+    int  getLayer() const noexcept { return currentLayer; }
 
     // The insert algorithm changed: the editor re-labels the modulators' insert destinations.
     std::function<void(int)> onInsertAlgorithmChanged;
@@ -81,7 +81,7 @@ public:
 
 private:
     PluginProcessor& proc;
-    int currentVoice = 0;
+    int currentLayer = 0;
 
     using APVTS = juce::AudioProcessorValueTreeState;
 

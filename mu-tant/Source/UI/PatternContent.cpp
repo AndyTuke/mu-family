@@ -165,11 +165,11 @@ void PatternContent::setupSourceControls()
     addAndMakeVisible(phaseModeCtrl);
     addAndMakeVisible(ampModeCtrl);
     phaseModeCtrl.onChange = [this](int idx) {
-        if (auto* p = proc.apvts.getParameter(PluginProcessor::voiceParamId(currentVoice, "xmod_phaseMode")))
+        if (auto* p = proc.apvts.getParameter(PluginProcessor::voiceParamId(currentLayer, "xmod_phaseMode")))
             p->setValueNotifyingHost(p->convertTo0to1((float) idx));
     };
     ampModeCtrl.onChange = [this](int idx) {
-        if (auto* p = proc.apvts.getParameter(PluginProcessor::voiceParamId(currentVoice, "xmod_ampMode")))
+        if (auto* p = proc.apvts.getParameter(PluginProcessor::voiceParamId(currentLayer, "xmod_ampMode")))
             p->setValueNotifyingHost(p->convertTo0to1((float) idx));
         bindAmpDepthKnob(idx == 2);   // SSB → bind Depth knob to the shift param
     };
@@ -221,7 +221,7 @@ void PatternContent::setupGateAndInsert()
     addAndMakeVisible(insertSub);
     insertSub.isPlaying   = [this] { return proc.isInternalPlaying(); };
     insertSub.getInsertGR = [this]() -> const std::atomic<float>* {
-        return proc.getInsertGR(currentVoice);
+        return proc.getInsertGR(currentLayer);
     };
     // Re-label the insert modulation destinations to the active algo's slot names
     // (mirrors mu-clid) so the dropdown shows e.g. "Drive"/"Tone" instead of P1..P4.
@@ -243,7 +243,7 @@ void PatternContent::timerCallback()
     // for the gating-grid playhead. Pattern length may be 1..16 bars.
     const bool   playing = proc.isInternalPlaying();
     const double beat    = proc.getInternalBeatPos();
-    const auto* gPat = &proc.getPattern(currentVoice).gate;
+    const auto* gPat = &proc.getPattern(currentLayer).gate;
     const double patBeats = (double) gPat->patternLengthBars * 4.0;
     const double beat01  = (patBeats > 0.0) ? std::fmod(beat, patBeats) / patBeats : 0.0;
     gatingDesigner.setPlayhead(beat01, playing);
@@ -269,7 +269,7 @@ void PatternContent::timerCallback()
     const int maxWt = juce::jmax(0, WavetableBank::factoryTableNames().size() - 1);
     auto syncWt = [&](DropdownSelect& dd, int osc, std::atomic<float>* raw)
     {
-        if (proc.userWavetablePath(currentVoice, osc).isNotEmpty()) return;
+        if (proc.userWavetablePath(currentLayer, osc).isNotEmpty()) return;
         if (raw != nullptr)
         {
             const int idx = juce::jlimit(0, maxWt, (int) raw->load());
@@ -287,11 +287,11 @@ void PatternContent::setLayer(int voiceIndex)
     // Rebuild the APVTS attachments only when the voice actually changes (or on
     // the very first bind). The pattern + modulator-slot pointers are (re)bound
     // unconditionally below — otherwise the initial setLayer(0) call would skip
-    // them (currentVoice already 0, attachments already built in the ctor),
+    // them (currentLayer already 0, attachments already built in the ctor),
     // leaving the gate editor unbound so the pencil draws nothing.
-    if (voiceIndex != currentVoice || o1OctAttachment == nullptr)
+    if (voiceIndex != currentLayer || o1OctAttachment == nullptr)
     {
-        currentVoice = voiceIndex;
+        currentLayer = voiceIndex;
         rebindAttachments();
     }
 
@@ -301,10 +301,10 @@ void PatternContent::setLayer(int voiceIndex)
     // knob arc bindings unset for voice 0 unless we re-bind here every time.
     bindModulationIndicators();
 
-    gatingDesigner.setPattern(&proc.getPattern(currentVoice).gate);
-    gatingDesigner.setFilterPattern(&proc.getPattern(currentVoice).filterGate);
-    gatingDesigner.setPitchPattern(&proc.getPattern(currentVoice).pitchGate);
-    insertSub.setChannel(currentVoice);   // reloads algo + slot knobs from APVTS
+    gatingDesigner.setPattern(&proc.getPattern(currentLayer).gate);
+    gatingDesigner.setFilterPattern(&proc.getPattern(currentLayer).filterGate);
+    gatingDesigner.setPitchPattern(&proc.getPattern(currentLayer).pitchGate);
+    insertSub.setChannel(currentLayer);   // reloads algo + slot knobs from APVTS
     // setChannel → configureInsertAlgorithm fires insertSub.onInsertAlgorithmChanged,
     // which re-labels the modulator insert destinations for this voice's algo.
     // Unconditional — a preset load calls setLayer(0) while already on voice 0, so
@@ -316,14 +316,14 @@ void PatternContent::setLayer(int voiceIndex)
 
 void PatternContent::rebindAttachments()
 {
-    fltTypeParam  = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentVoice, "flt_type"));
-    flt2TypeParam = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentVoice, "flt2_type"));
-    o1WtParam     = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentVoice, "o1_wt"));
-    o2WtParam     = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentVoice, "o2_wt"));
+    fltTypeParam  = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentLayer, "flt_type"));
+    flt2TypeParam = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentLayer, "flt2_type"));
+    o1WtParam     = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentLayer, "o1_wt"));
+    o2WtParam     = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentLayer, "o2_wt"));
 
     auto& apvts = proc.apvts;
     auto id = [this](const char* base) {
-        return PluginProcessor::voiceParamId(currentVoice, base);
+        return PluginProcessor::voiceParamId(currentLayer, base);
     };
 
     // Destroy previous attachments first — the JUCE attachment dtor unhooks
@@ -435,13 +435,13 @@ void PatternContent::bindAmpDepthKnob(bool ssbMode)
     currentAmpMode = ssbMode ? 1 : 0;
     xmodDepthAttachment = nullptr;
     xmodDepthAttachment = std::make_unique<APVTS::SliderAttachment>(
-        proc.apvts, PluginProcessor::voiceParamId(currentVoice, ssbMode ? "xmod_ssb" : "xmod_depth"),
+        proc.apvts, PluginProcessor::voiceParamId(currentLayer, ssbMode ? "xmod_ssb" : "xmod_depth"),
         xmodDepthKnob.getSlider());
 }
 
 void PatternContent::bindModulationIndicators()
 {
-    const int vi = currentVoice;
+    const int vi = currentLayer;
     const auto* mx = &proc.getPattern(vi).modulationMatrix;
     static const float kNaN = std::numeric_limits<float>::quiet_NaN();
 
@@ -745,7 +745,7 @@ void PatternContent::refreshWavetableDropdowns()
             dd.addItem(wtFolderFiles[(size_t) i].getFileNameWithoutExtension(), kWtFolderBase + i);
         }
 
-        const auto path = proc.userWavetablePath(currentVoice, osc);
+        const auto path = proc.userWavetablePath(currentLayer, osc);
 
         // Find the scanned-folder item for the loaded table (anywhere under the root,
         // sub-folders included). A table loaded from OUTSIDE the tree gets its own item.
@@ -757,7 +757,7 @@ void PatternContent::refreshWavetableDropdowns()
         if (path.isNotEmpty() && folderId < 0)
         {
             const juce::String fn = juce::File(path).getFileNameWithoutExtension();
-            dd.addItem(proc.userWavetableMissing(currentVoice, osc) ? ("! " + fn) : fn, kWtUserItemId);
+            dd.addItem(proc.userWavetableMissing(currentLayer, osc) ? ("! " + fn) : fn, kWtUserItemId);
         }
         dd.addItem(juce::String::fromUTF8("Load .wav\xe2\x80\xa6"), kWtLoadItemId);
 
@@ -769,7 +769,7 @@ void PatternContent::refreshWavetableDropdowns()
         else
         {
             int idx = 0;
-            if (auto* raw = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentVoice, pid)))
+            if (auto* raw = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentLayer, pid)))
                 idx = juce::jlimit(0, names.size() - 1, (int) raw->load());
             dd.setSelectedId(idx + 1, false);
         }
@@ -784,7 +784,7 @@ void PatternContent::handleWtSelection(int oscIndex, int itemId)
 
     if (itemId == kWtLoadItemId)
     {
-        const int v = currentVoice;        // freeze target voice for the async callback
+        const int v = currentLayer;        // freeze target voice for the async callback
         wtChooser = std::make_unique<juce::FileChooser>("Load wavetable (.wav)", proc.getWavetablesDir(), "*.wav");
         auto safe = juce::Component::SafePointer<PatternContent>(this);
         wtChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
@@ -802,14 +802,14 @@ void PatternContent::handleWtSelection(int oscIndex, int itemId)
     {
         const int fi = itemId - kWtFolderBase;
         if (fi >= 0 && fi < (int) wtFolderFiles.size())
-            proc.loadUserWavetable(currentVoice, oscIndex, wtFolderFiles[(size_t) fi]);
+            proc.loadUserWavetable(currentLayer, oscIndex, wtFolderFiles[(size_t) fi]);
         refreshWavetableDropdowns();
         return;
     }
 
     // Factory item (1..N): clear any user table for this osc, set the APVTS index.
-    proc.clearUserWavetable(currentVoice, oscIndex);
-    if (auto* p = proc.apvts.getParameter(PluginProcessor::voiceParamId(currentVoice, oscIndex == 0 ? "o1_wt" : "o2_wt")))
+    proc.clearUserWavetable(currentLayer, oscIndex);
+    if (auto* p = proc.apvts.getParameter(PluginProcessor::voiceParamId(currentLayer, oscIndex == 0 ? "o1_wt" : "o2_wt")))
         p->setValueNotifyingHost(p->convertTo0to1((float) (itemId - 1)));
     refreshWavetableDropdowns();
 }
