@@ -166,7 +166,7 @@ public:
 
     // The "SWP" badges and the cancel read the shared ProcessorBase::layerSwapper.
 
-    // ── Per-voice param IDs (used by VoicePanel for SliderAttachment binding) ──
+    // ── Per-voice param IDs (used by PatternContent for SliderAttachment binding) ──
     // Family rule: per-voice params are subtree-scoped via `v{N}_` prefix so a
     // ValueTree restore round-trips cleanly + presets can target a specific
     // voice without name collisions across the 8 slots.
@@ -180,7 +180,7 @@ public:
     // processor — pure static factory, no state.
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
-    // Modulation snapshot accessor for VoicePanel knob live-arc indicators.
+    // Modulation snapshot accessor for PatternContent knob live-arc indicators.
     float getTantSnap(int voice, int snapIndex) const noexcept
     {
         if (voice < 0 || voice >= mu_limits::kMaxLayers) return 0.0f;
@@ -271,14 +271,14 @@ private:
 
 public:
     // Voice `i`'s Pattern (modulators, gate / filter / pitch envelopes, user wavetables, level tap),
-    // valid for every slot 0..kMaxLayers-1. Public so the UI (ModulatorPanel, VoicePanel) can point
+    // valid for every slot 0..kMaxLayers-1. Public so the UI (ModulatorPanel, PatternContent) can point
     // at the currently-edited voice.
     Pattern&       getPattern(int i) noexcept       { return layerAs<Pattern>(i); }
     const Pattern& getPattern(int i) const noexcept { return layerAs<Pattern>(i); }
 
 private:
     // Per-voice modulated-value snapshots — written by the audio thread in
-    // renderVoice() after the matrix runs; read by VoicePanel at ~30 Hz via
+    // renderVoice() after the matrix runs; read by PatternContent at ~30 Hz via
     // getTantSnap() to drive live-arc indicators on bound knobs.
     std::array<std::atomic<float>, mu_tant::kTantSnapCount> voiceSnap[mu_limits::kMaxLayers];
 

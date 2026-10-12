@@ -7,7 +7,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     : EditorShellBase(p),
       proc(p),
       sidebar(p, "Voice"),
-      voicePanel(p),
+      patternContent(p),
+      layerPanel(p, "Voice"),
       mixerOverlay(p, p.mixerEngine),
       settingsOverlay(p),
       masterLoop(p)
@@ -39,14 +40,14 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     proc.onLayerPresetCommitted = [this](int v)
     {
         sidebar.refreshItems();              // glyph / colour may have changed
-        if (voicePanel.getVoice() == v)
-            voicePanel.setVoice(v);               // re-read knobs + wavetable dropdowns
+        if (layerPanel.getLayer() == v)
+            layerPanel.setLayer(v);               // re-read knobs + wavetable dropdowns
     };
 
     // Main area + mixer overlay (Stage A3 — channel strip lvl/pan/mute/solo
     // bound via apvts; FX send / sidechain knobs are visible but inert until
     // MixerEngine accepts a per-voice render callback).
-    setMainArea(&sidebar, &voicePanel);
+    setMainArea(&sidebar, &layerPanel);
     setMixerOverlay(&mixerOverlay);
 
     // Per-voice spectrum glyph; its level pulse flashes the sidebar item.
@@ -60,8 +61,23 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     };
     sidebar.refreshItems();
 
+    // The shared layer panel: the pattern content band in the middle, mu-Tant's modulation
+    // destinations; a layer change rebinds the content's attachments.
+    layerPanel.setContent(&patternContent);
+    layerPanel.setDestProvider(&modDestProvider);
+    layerPanel.setDefaultPresetName([](int v) { return "Voice " + juce::String(v + 1); });
+    layerPanel.onLayerChanged = [this](int layer) { patternContent.setLayer(layer); };
+    // Re-label the modulators' insert destinations to the active algorithm's slot names.
+    patternContent.onInsertAlgorithmChanged = [this](int charId)
+    {
+        layerPanel.getModulatorPanel().setInsertAlgorithm(charId);
+    };
+    // A modulator edit (assignment/mode/dest change) may flip whether a Stepped CS drives
+    // pitch — refresh the processor's cached flags for the shown voice (message thread).
+    layerPanel.getModulatorPanel().onChange = [this] { proc.refreshPitchQuantFlags(layerPanel.getLayer()); };
+
     // Sidebar select / add / delete / reorder — same UX as mu-clid's rhythms.
-    sidebar.onLayerSelected = [this](int idx) { voicePanel.setVoice(idx); };
+    sidebar.onLayerSelected = [this](int idx) { layerPanel.setLayer(idx); };
 
     sidebar.onAddLayer = [this]
     {
@@ -69,35 +85,27 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         if (idx < 0) return;                       // already at the 8-voice max
         sidebar.refreshItems();
         sidebar.setSelectedIndex(idx);
-        voicePanel.setVoice(idx);
+        layerPanel.setLayer(idx);
     };
 
     sidebar.onLayersReordered = [this](int newSelected)
     {
-        voicePanel.setVoice(newSelected);
+        layerPanel.setLayer(newSelected);
     };
 
-    voicePanel.onDeleteVoice = [this]
+    // Delete: confirm first, then remove the shown voice (never the last).
+    layerPanel.getHeader().onDelete = [this]
     {
-        if (proc.getNumVoices() <= 1) return;      // never delete the last voice
-        const int idx = voicePanel.getVoice();
-        // Unbind everything that points into the voice's Pattern before it is destroyed (the edit
-        // moves the Pattern pointers and frees the removed one), so no timer or paint callback can
-        // dereference it in the window before setVoice rebinds.
-        voicePanel.clearModulatorSlot();
-        voicePanel.clearAllModBindings();
-        voicePanel.clearPatternBindings();
-        proc.removeLayer(idx);
-        const int newIndex = juce::jlimit(0, proc.getNumVoices() - 1, idx);
-        sidebar.refreshItems();
-        sidebar.setSelectedIndex(newIndex);
-        voicePanel.setVoice(newIndex);
+        if (proc.getNumVoices() <= 1) return;
+        const juce::String name = proc.getChannelName(layerPanel.getLayer());
+        mu_ui::confirmAsync(&layerPanel, "Delete Voice", "Delete \"" + name + "\"?\nThis cannot be undone.",
+                            "Delete", [this] { deleteShownVoice(); });
     };
 
     // Forward mixer status updates to the shared StatusBar.
 
     sidebar.setSelectedIndex(0);
-    voicePanel.setVoice(0);
+    layerPanel.setLayer(0);
     mixerOverlay.loadFromApvts();
     clearPresetDirty();
 
@@ -106,7 +114,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     setScrews(true);
 
     // Every control on the main panel shows its name + value on the status bar.
-    forwardKnobStatus(voicePanel);
+    forwardKnobStatus(layerPanel);
 }
 
 PluginEditor::~PluginEditor()
@@ -116,11 +124,28 @@ PluginEditor::~PluginEditor()
     proc.onLayerPresetCommitted = nullptr;
 }
 
+// Remove the shown voice. Everything that points into the voice's Pattern is unbound first (the
+// edit moves the Pattern pointers and frees the removed one), so no timer or paint callback can
+// dereference it in the window before setLayer rebinds.
+void PluginEditor::deleteShownVoice()
+{
+    if (proc.getNumVoices() <= 1) return;
+    const int idx = layerPanel.getLayer();
+    layerPanel.getModulatorPanel().setVoiceSlot(nullptr);
+    patternContent.clearAllModBindings();
+    patternContent.clearPatternBindings();
+    proc.removeLayer(idx);
+    const int newIndex = juce::jlimit(0, proc.getNumVoices() - 1, idx);
+    sidebar.refreshItems();
+    sidebar.setSelectedIndex(newIndex);
+    layerPanel.setLayer(newIndex);
+}
+
 void PluginEditor::onPresetLoaded(const juce::File&)
 {
     sidebar.refreshItems();
     sidebar.setSelectedIndex(0);
-    voicePanel.setVoice(0);         // re-reads insert algo + slot knobs from APVTS
+    layerPanel.setLayer(0);         // re-reads insert algo + slot knobs from APVTS
     mixerOverlay.loadFromApvts();
 }
 
@@ -128,7 +153,7 @@ void PluginEditor::onPresetNew()
 {
     sidebar.refreshItems();
     sidebar.setSelectedIndex(0);
-    voicePanel.setVoice(0);
+    layerPanel.setLayer(0);
     mixerOverlay.loadFromApvts();
 }
 

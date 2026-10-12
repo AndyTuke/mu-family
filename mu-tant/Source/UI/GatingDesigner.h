@@ -30,7 +30,7 @@ private:
 //   Grid        (kGridH): envelope drawing area — always shows kViewBars bars
 //   Scrollbar   (kScrollH): smooth horizontal scroll through longer patterns
 //
-// Gap rotary and Bypass button live here; VoicePanel binds APVTS attachments
+// Gap rotary and Bypass button live here; PatternContent binds APVTS attachments
 // via the public `gapSlider` and `bypassButton` members.
 class GatingDesigner : public juce::Component,
                        private juce::ScrollBar::Listener
@@ -62,7 +62,7 @@ public:
 
     static constexpr int kViewBars = 2;    // bars visible at once (public for tests)
 
-    // Public: VoicePanel binds APVTS attachments to these.
+    // Public: PatternContent binds APVTS attachments to these.
     juce::Slider     gapSlider;
     juce::TextButton bypassButton { "Bypass" };
 
@@ -136,6 +136,7 @@ private:
 
     // ── Grid geometry ─────────────────────────────────────────────────────────
     int cellCount() const noexcept;
+    int gridHeight() const noexcept;   // grid area height: kGridH, or more when the editor is taller
     juce::Rectangle<float> gridBounds() const noexcept;
     float viewCellW() const noexcept;
     int cellAtX(float x) const noexcept;

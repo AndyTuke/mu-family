@@ -1,4 +1,4 @@
-﻿#include "VoicePanel.h"
+﻿#include "PatternContent.h"
 #include "Persistence/PresetFiles.h"   // mu_pp::listPresetFiles
 #include "Plugin/PluginProcessor.h"
 #include "Audio/Scales.h"
@@ -89,20 +89,18 @@ namespace
     }
 }
 
-VoicePanel::VoicePanel(PluginProcessor& p)
+PatternContent::PatternContent(PluginProcessor& p)
     : proc(p),
-      insertSub(p, "v"),
-      modDestProvider(makeModDestProvider())
+      insertSub(p, "v")
 {
-    setupHeader();
     setupTonalCentre();
     setupSourceControls();
     setupFilterControls();
-    setupGateInsertAndModulators();
+    setupGateAndInsert();
 }
 
 // A right-aligned field label in the panel's label font.
-void VoicePanel::addLabel(juce::Label& l, const juce::String& text)
+void PatternContent::addLabel(juce::Label& l, const juce::String& text)
 {
     l.setText(text, juce::dontSendNotification);
     l.setJustificationType(juce::Justification::centredRight);
@@ -110,29 +108,8 @@ void VoicePanel::addLabel(juce::Label& l, const juce::String& text)
     addAndMakeVisible(l);
 }
 
-// The shared header bar: delete / reset (confirmed first), preset load and save.
-void VoicePanel::setupHeader()
-{
-    // ── Shared per-layer header bar (name / reset / delete / preset / save) ──
-    // Reset + delete confirm first (shared mu-core dialog), matching mu-clid.
-    headerBar.onDelete = [this]
-    {
-        if (proc.getNumVoices() <= 1) return;   // can't delete the last voice
-        const juce::String name = proc.getChannelName(currentVoice);
-        mu_ui::confirmAsync(this, "Delete Voice", "Delete \"" + name + "\"?\nThis cannot be undone.",
-                            "Delete", [this] { if (onDeleteVoice) onDeleteVoice(); });
-    };
-    // Reset / preset load / save: the shared per-slot wiring (mu-core LayerPresetHeader).
-    mu_ui::wireSlotPresetHeader(headerBar, *this, proc,
-        { "Voice",
-          [this] { return currentVoice; },
-          [this] { setVoice(currentVoice); },                                 // re-sync knobs / gate / modulators
-          [](int v) { return "Voice " + juce::String(v + 1); } });
-    addAndMakeVisible(headerBar);
-}
-
 // Root + scale: global parameters, bound once.
-void VoicePanel::setupTonalCentre()
+void PatternContent::setupTonalCentre()
 {
     auto& apvts = proc.apvts;
 
@@ -148,7 +125,7 @@ void VoicePanel::setupTonalCentre()
 }
 
 // Oscillator, X-Mod and level controls — added once, rebound per voice in rebindAttachments.
-void VoicePanel::setupSourceControls()
+void PatternContent::setupSourceControls()
 {
     // ── Per-voice controls (added once, rebound per-voice) ──────────────────
     for (auto* k : { &o1OctKnob, &o1SemiKnob, &o1FineKnob, &o1PosKnob, &o1PenvDepthKnob,
@@ -182,7 +159,7 @@ void VoicePanel::setupSourceControls()
     addAndMakeVisible(fdbkButton);
 
     // X-Mod mode switches — manually wired to the choice params (item index = choice
-    // index) in setVoice(); the amp-mode change also rebinds the Depth knob's target.
+    // index) in setLayer(); the amp-mode change also rebinds the Depth knob's target.
     xmodDepthKnob.getSlider().setDoubleClickReturnValue(true, 0.0);
     addAndMakeVisible(phaseModeCtrl);
     addAndMakeVisible(ampModeCtrl);
@@ -198,7 +175,7 @@ void VoicePanel::setupSourceControls()
 }
 
 // Noise type and the two filters (type selectors wired manually, see rebindAttachments).
-void VoicePanel::setupFilterControls()
+void PatternContent::setupFilterControls()
 {
     auto& apvts = proc.apvts;
 
@@ -228,11 +205,11 @@ void VoicePanel::setupFilterControls()
 }
 
 // Gate editor, insert effect, modulators; then the first bind and the UI timer.
-void VoicePanel::setupGateInsertAndModulators()
+void PatternContent::setupGateAndInsert()
 {
     // ── Gating designer (Gap slider + Bypass button are inside it) ──────────
     // The GatingDesigner owns the Gap slider and Bypass button as children;
-    // VoicePanel just creates the APVTS attachments per-voice in rebindAttachments.
+    // PatternContent just creates the APVTS attachments per-voice in rebindAttachments.
     addAndMakeVisible(gatingDesigner);
 
     // ── Insert effect (shared mu-core panel) ────────────────────────────────
@@ -249,26 +226,17 @@ void VoicePanel::setupGateInsertAndModulators()
     // (mirrors mu-clid) so the dropdown shows e.g. "Drive"/"Tone" instead of P1..P4.
     insertSub.onInsertAlgorithmChanged = [this](int charId)
     {
-        modulatorPanel.setInsertAlgorithm(charId);
+        if (onInsertAlgorithmChanged) onInsertAlgorithmChanged(charId);
     };
 
-    // ── Modulator panel ─────────────────────────────────────────────────────
-    addAndMakeVisible(modulatorPanel);
-    modulatorPanel.setDestProvider(&modDestProvider);
-    // A modulator edit (assignment/mode/dest change) may flip whether a Stepped CS drives
-    // pitch — refresh the processor's cached flags for the active voice (message thread).
-    modulatorPanel.onChange = [this] { proc.refreshPitchQuantFlags(currentVoice); };
-
     rebindAttachments();
-    refreshVoicePresetList();   // initial scan; onSave will re-scan after any save
-    refreshHeader();
 
     startTimerHz(mu_ui::kUiRefreshHz);
 }
 
-VoicePanel::~VoicePanel() { stopTimer(); }
+PatternContent::~PatternContent() { stopTimer(); }
 
-void VoicePanel::timerCallback()
+void PatternContent::timerCallback()
 {
     // Normalise the transport beat to 0..1 across the current pattern length
     // for the gating-grid playhead. Pattern length may be 1..16 bars.
@@ -278,7 +246,6 @@ void VoicePanel::timerCallback()
     const double patBeats = (double) gPat->patternLengthBars * 4.0;
     const double beat01  = (patBeats > 0.0) ? std::fmod(beat, patBeats) / patBeats : 0.0;
     gatingDesigner.setPlayhead(beat01, playing);
-    modulatorPanel.setPlayheadBeat(beat);
 
     // Sync filter-type dropdown from APVTS so DAW automation is reflected in the UI.
     // The dropdown uses manual wiring (no ComboBoxAttachment) so there is no automatic
@@ -312,13 +279,13 @@ void VoicePanel::timerCallback()
     syncWt(osc2WaveDropdown, 1, o2WtParam);
 }
 
-void VoicePanel::setVoice(int voiceIndex)
+void PatternContent::setLayer(int voiceIndex)
 {
     voiceIndex = juce::jlimit(0, mu_limits::kMaxLayers - 1, voiceIndex);
 
     // Rebuild the APVTS attachments only when the voice actually changes (or on
     // the very first bind). The pattern + modulator-slot pointers are (re)bound
-    // unconditionally below — otherwise the initial setVoice(0) call would skip
+    // unconditionally below — otherwise the initial setLayer(0) call would skip
     // them (currentVoice already 0, attachments already built in the ctor),
     // leaving the gate editor unbound so the pencil draws nothing.
     if (voiceIndex != currentVoice || o1OctAttachment == nullptr)
@@ -327,28 +294,26 @@ void VoicePanel::setVoice(int voiceIndex)
         rebindAttachments();
     }
 
-    // Re-bind unconditionally — same reason as modulatorPanel / gatingDesigner below:
+    // Re-bind unconditionally — same reason as gatingDesigner below:
     // the ctor calls rebindAttachments() directly, so o1OctAttachment != nullptr when
-    // setVoice(0) first fires and the if-guard above is false, which would leave the
+    // setLayer(0) first fires and the if-guard above is false, which would leave the
     // knob arc bindings unset for voice 0 unless we re-bind here every time.
     bindModulationIndicators();
 
-    modulatorPanel.setVoiceSlot(&proc.getPattern(currentVoice));
     gatingDesigner.setPattern(&proc.getPattern(currentVoice).gate);
     gatingDesigner.setFilterPattern(&proc.getPattern(currentVoice).filterGate);
     gatingDesigner.setPitchPattern(&proc.getPattern(currentVoice).pitchGate);
     insertSub.setChannel(currentVoice);   // reloads algo + slot knobs from APVTS
     // setChannel → configureInsertAlgorithm fires insertSub.onInsertAlgorithmChanged,
     // which re-labels the modulator insert destinations for this voice's algo.
-    // Unconditional — a preset load calls setVoice(0) while already on voice 0, so
+    // Unconditional — a preset load calls setLayer(0) while already on voice 0, so
     // the rebindAttachments() guard above is skipped; the wavetable dropdowns are
     // not APVTS attachments, so they must be rebuilt here to reflect the loaded table.
     refreshWavetableDropdowns();
-    refreshHeader();
     repaint();   // sub-panel borders + section titles paint in the active voice's palette colour
 }
 
-void VoicePanel::rebindAttachments()
+void PatternContent::rebindAttachments()
 {
     fltTypeParam  = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentVoice, "flt_type"));
     flt2TypeParam = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentVoice, "flt2_type"));
@@ -462,7 +427,7 @@ void VoicePanel::rebindAttachments()
     gatingDesigner.setGap((float)(gatingDesigner.gapSlider.getValue() / 100.0));
 }
 
-void VoicePanel::bindAmpDepthKnob(bool ssbMode)
+void PatternContent::bindAmpDepthKnob(bool ssbMode)
 {
     // The single Depth knob drives xmod_depth (Mult) or xmod_ssb (SSB) — swap the
     // attachment (and thus the slider's range) to whichever the active mode uses.
@@ -473,7 +438,7 @@ void VoicePanel::bindAmpDepthKnob(bool ssbMode)
         xmodDepthKnob.getSlider());
 }
 
-void VoicePanel::bindModulationIndicators()
+void PatternContent::bindModulationIndicators()
 {
     const int vi = currentVoice;
     const auto* mx = &proc.getPattern(vi).modulationMatrix;
@@ -504,7 +469,7 @@ void VoicePanel::bindModulationIndicators()
     bind(levelKnob,      "level",             mu_tant::kTantSnapLevel);
 }
 
-void VoicePanel::clearAllModBindings()
+void PatternContent::clearAllModBindings()
 {
     o1OctKnob.clearModBinding();
     o1SemiKnob.clearModBinding();
@@ -527,91 +492,40 @@ void VoicePanel::clearAllModBindings()
     insertSub.clearGRSource();   // the meter reads an atomic inside the voice's Pattern
 }
 
-void VoicePanel::refreshHeader()
+// The band's two panels, each a metal panel painted in the app colour; the voice's sections in
+// raised boxes, each named on a plate above it.
+void PatternContent::paint(juce::Graphics& g)
 {
-    headerBar.setLayerName(proc.getChannelName(currentVoice));
-    headerBar.setColour(MuLookAndFeel::channelPalette[
-        (size_t)(proc.getChannelColourIndex(currentVoice) % MuLookAndFeel::kChannelPaletteSize)]);
-    // Preset list is NOT rescanned here — it doesn't change on voice switch,
-    // only after a save. refreshVoicePresetList() is called from the ctor and
-    // from the onSave callback instead.
+    const auto accent = MuLookAndFeel::appAccent(*this);
+    for (auto r : { voiceR, gateR })
+        MuLookAndFeel::drawAccentPanel(g, r.reduced(2).toFloat(), accent);
+    MuLookAndFeel::drawSections(g, *this, { { osc1PanelR, "OSC 1" }, { osc2PanelR, "OSC 2" }, { noisePanelR, "NOISE" },
+                                            { modNoisePanelR, "X-MOD" }, { filterPanelR, "FILTER" },
+                                            { insertPanelR, "EFFECTS" } }, accent);
 }
 
-void VoicePanel::refreshVoicePresetList()
-{
-    mu_ui::refreshSlotPresetList(headerBar, proc, currentVoice);
-}
-
-void VoicePanel::paint(juce::Graphics& g)
-{
-    using Id = MuLookAndFeel::ColourIds;
-    using mu_ui::s;
-    using mu_ui::sf;
-    g.fillAll(MuLookAndFeel::colour(Id::panelBackground));
-
-    const auto voiceCol = MuLookAndFeel::channelPalette[
-        (size_t)(proc.getChannelColourIndex(currentVoice) % MuLookAndFeel::kChannelPaletteSize)];
-    const auto muted = MuLookAndFeel::colour(Id::mutedText);
-
-    // Metal style: the preset strip, the voice, the gate editor and the modulators each on a
-    // metal panel painted in the app colour (the header bar lights its displays in the voice
-    // colour); the voice's sections in raised boxes, each named on a plate above it.
-    if (MuLookAndFeel::isMetal(*this))
-    {
-        const auto accent = MuLookAndFeel::appAccent(*this);
-        for (auto r : { headerStripR, voiceR, gateR, modR })
-            MuLookAndFeel::drawAccentPanel(g, r.reduced(2).toFloat(), accent);
-        MuLookAndFeel::drawSections(g, *this, { { osc1PanelR, "OSC 1" }, { osc2PanelR, "OSC 2" }, { noisePanelR, "NOISE" },
-                                                { modNoisePanelR, "X-MOD" }, { filterPanelR, "FILTER" },
-                                                { insertPanelR, "EFFECTS" } }, accent);
-        return;
-    }
-
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.0f))));
-
-    // Panel styling: 2px rounded border in the per-voice palette colour, small
-    // uppercase muted title in the top-left corner of every sub-panel.
-    auto panel = [&](const juce::Rectangle<int>& r, const juce::String& title)
-    {
-        if (r.isEmpty()) return;
-        g.setColour(voiceCol);
-        g.drawRoundedRectangle(r.toFloat().reduced(1.0f), sf(6.0f), sf(2.0f));
-        g.setColour(muted);
-        g.drawText(title, r.getX() + s(8), r.getY() + s(4), s(50), s(12),
-                   juce::Justification::centredLeft, false);
-    };
-    panel(osc1PanelR,     "OSC 1");
-    panel(osc2PanelR,     "OSC 2");
-    panel(noisePanelR,    "NOISE");
-    panel(modNoisePanelR, "X-MOD");
-    panel(filterPanelR,   "FILTER");
-    panel(insertPanelR,   "INSERT");
-}
-
-void VoicePanel::paintOverChildren(juce::Graphics& g)
+void PatternContent::paintOverChildren(juce::Graphics& g)
 {
     if (! MuLookAndFeel::hasScrews(*this)) return;
-    for (auto r : { voiceR, gateR, modR })
+    for (auto r : { voiceR, gateR })
         MuLookAndFeel::drawPanelScrews(g, r.reduced(2).toFloat());
-    MuLookAndFeel::drawStripScrews(g, headerStripR.reduced(2).toFloat());   // the thin preset strip
 }
 
-// The measures every layout helper shares. Metal style lays the voice out as mu-Clid does:
-// panels edge to edge, content inset clear of their corner screws, each section a raised box
-// with its name plate in a band above it.
-VoicePanel::Grid VoicePanel::layoutGrid() const
+// The measures every layout helper shares: panels edge to edge, content inset clear of their
+// corner screws, each section a raised box with its name plate in a band above it.
+PatternContent::Grid PatternContent::layoutGrid() const
 {
     using mu_ui::s;
     using LF = MuLookAndFeel;
     Grid g;
-    g.metal    = LF::isMetal(*this);
+    g.metal    = true;
     g.screwed  = LF::hasScrews(*this);
     g.w        = getWidth();
     g.h        = getHeight();
-    g.pad      = g.metal ? s(LF::kScrewedPanelInset) : s(12);
-    g.inset    = g.metal ? s(LF::kChannelInset) : 0;                 // content in from a panel's top / bottom
-    g.plateH   = g.metal ? s(LF::kSectionPlateH) + s(2) : 0;       // name plate band above each box
-    g.boxClear = g.metal ? s(LF::kSubPanelScrewClear) : s(6);      // content in from a box's sides
+    g.pad      = s(LF::kScrewedPanelInset);
+    g.inset    = s(LF::kChannelInset);                  // content in from a panel's top / bottom
+    g.plateH   = s(LF::kSectionPlateH) + s(2);          // name plate band above each box
+    g.boxClear = s(LF::kSubPanelScrewClear);            // content in from a box's sides
     g.gap      = s(8);
     g.ddH      = s(24);
     g.s2W      = s(LF::kKnobSize2W);   // 54
@@ -620,50 +534,42 @@ VoicePanel::Grid VoicePanel::layoutGrid() const
     return g;
 }
 
-void VoicePanel::resized()
+// Row A (Osc 1 | Osc 2 | Noise) at natural knob height and Row B (X-Mod | Filter | Effects) at the
+// family voice-section height (two filter rows of Size-2 knobs); the gate editor is the flex panel.
+void PatternContent::resized()
 {
     using mu_ui::s;
     const auto g = layoutGrid();
 
-    // Row A (Osc 1 | Osc 2 | Noise) at natural knob height; Row B (X-Mod | Filter | Effects)
-    // tall enough for the two filter rows.
-    const int contentTop = layoutHeader(g);
-    const int rowAH = g.s2H + s(8);       // 64
-    const int rowBH = 2 * g.s2H + s(32);  // 144
+    const int contentTop = layoutTonal(g);
+    const int rowAH = g.s2H + s(8);                      // 64
+    const int rowBH = s(MuLookAndFeel::kVoiceSubH);      // 116 = two Size-2 knob rows + the family gap
     layoutSourceRow(g, contentTop, rowAH);
-    const int rowBY = contentTop + rowAH + (g.metal ? g.plateH : g.gap);
+    const int rowBY = contentTop + rowAH + g.plateH;
     layoutShapingRow(g, rowBY, rowBH);
 
-    voiceR = { 0, headerStripR.getBottom(), g.w, rowBY + rowBH + g.inset - headerStripR.getBottom() };
-    layoutGateAndModulators(g, rowBY + rowBH + (g.metal ? g.inset : g.gap));
+    voiceR = { 0, 0, g.w, rowBY + rowBH + g.inset };
+    layoutGate(g, voiceR.getBottom());
 }
 
-// The shared header bar (in its own preset strip in metal style, a screw at each end) and the
-// Root / Scale row under it. Returns the top of the section boxes.
-int VoicePanel::layoutHeader(const Grid& g)
+// The Root / Scale row at the top of the band. Returns the top of the section boxes.
+int PatternContent::layoutTonal(const Grid& g)
 {
     using mu_ui::s;
-    using LF = MuLookAndFeel;
-    const int barH = s(ChannelHeaderBar::kHeight);   // 28
-    const int hdrX = g.screwed ? s(LF::kScrewedPanelInset) : g.metal ? s(4) : 0;
-    const int hdrY = g.metal ? s(2) : 0;
-    headerStripR = { 0, 0, g.w, barH + 2 * hdrY };
-    headerBar.setBounds(hdrX, hdrY, g.w - 2 * hdrX, barH);
-
-    const int tonalY = headerStripR.getBottom() + (g.metal ? g.inset : s(2));
+    const int tonalY = g.inset;
     const int labelW = s(44);
     int x = g.pad;
     rootLabel    .setBounds(x, tonalY, labelW, g.ddH);   x += labelW + s(4);
     rootDropdown .setBounds(x, tonalY, s(56),   g.ddH);  x += s(56)  + s(12);
     scaleLabel   .setBounds(x, tonalY, labelW, g.ddH);   x += labelW + s(4);
     scaleDropdown.setBounds(x, tonalY, s(100),  g.ddH);
-    return tonalY + g.ddH + (g.metal ? g.plateH : g.gap);
+    return tonalY + g.ddH + g.plateH;
 }
 
 // Row A: Osc 1 | Osc 2 | Noise side by side across the full width. Each osc box right-aligns its
 // five pitch / scan knobs and its level, the wavetable selector taking the space to their left;
 // the noise box is a short type selector with its level knob to the right.
-void VoicePanel::layoutSourceRow(const Grid& g, int top, int rowH)
+void PatternContent::layoutSourceRow(const Grid& g, int top, int rowH)
 {
     using mu_ui::s;
     const int pad = g.pad, gap = g.gap, ddH = g.ddH, s2W = g.s2W, s2H = g.s2H, boxClear = g.boxClear;
@@ -700,7 +606,7 @@ void VoicePanel::layoutSourceRow(const Grid& g, int top, int rowH)
 }
 
 // Row B: X-Mod | Filter | Effects (the insert, at the right edge).
-void VoicePanel::layoutShapingRow(const Grid& g, int top, int rowH)
+void PatternContent::layoutShapingRow(const Grid& g, int top, int rowH)
 {
     using mu_ui::s;
     const int insSubW = s(4 * MuLookAndFeel::kKnobSize2W);                               // 216
@@ -722,7 +628,7 @@ void VoicePanel::layoutShapingRow(const Grid& g, int top, int rowH)
 
 // X-Mod: two lanes, one per row — Lane A: Index knob, phase mode, Sync + Feedback; Lane B: Depth
 // knob, amp mode.
-void VoicePanel::layoutXMod(const Grid& g, juce::Rectangle<int> box)
+void PatternContent::layoutXMod(const Grid& g, juce::Rectangle<int> box)
 {
     using mu_ui::s;
     modNoisePanelR = box;
@@ -751,14 +657,14 @@ void VoicePanel::layoutXMod(const Grid& g, juce::Rectangle<int> box)
 
 // Filter: the Series / Parallel button at the left edge, then two rows (Filter 1, Filter 2) of
 // type selector + five knobs, the selector taking the remaining width.
-void VoicePanel::layoutFilter(const Grid& g, juce::Rectangle<int> box)
+void PatternContent::layoutFilter(const Grid& g, juce::Rectangle<int> box)
 {
     using mu_ui::s;
     filterPanelR = box;
     const int rowH       = g.s2H;
-    const int twoRowsH   = 2 * rowH + s(8);
+    const int twoRowsH   = 2 * rowH + s(4);   // the family voice gap: the two rows fill the box
     const int row1Y      = box.getY() + (box.getHeight() - twoRowsH) / 2;   // rows centred in the box
-    const int row2Y      = row1Y + rowH + s(8);
+    const int row2Y      = row1Y + rowH + s(4);
 
     const int serBtnD = s(30);
     const int serBtnX = box.getX() + s(8);
@@ -782,25 +688,11 @@ void VoicePanel::layoutFilter(const Grid& g, juce::Rectangle<int> box)
     layoutRow(row2Y, flt2TypeDropdown, { &flt2DrvKnob, &flt2CutKnob, &flt2ResKnob, &flt2EnvDepthKnob, &flt2LoCutKnob });
 }
 
-// The gate editor (full width, fixed height) and the modulators filling the rest (metal style
-// shows one target at a time, so the modulators fit a shorter minimum).
-void VoicePanel::layoutGateAndModulators(const Grid& g, int y)
+// The gate editor: the flex panel, full width, taking the rest of the band (its grid grows with it).
+void PatternContent::layoutGate(const Grid& g, int y)
 {
-    using mu_ui::s;
-    const int gateH = s(38 + 134 + 10 + 4);   // 186 — kHdr1H + kGridH + kScrollH + border
-    gateR = { 0, y, g.w, gateH + 2 * g.inset };
-    gatingDesigner.setBounds(g.metal ? gateR.reduced(g.pad, g.inset)
-                                     : juce::Rectangle<int>(g.pad, y, g.w - 2 * g.pad, gateH));
-    y = g.metal ? gateR.getBottom() : y + gateH + g.gap;
-
-    const int modMinH = g.metal ? s(280) : s(332);
-    if (g.metal)
-    {
-        modR = { 0, y, g.w, juce::jmax(modMinH + 2 * g.inset, g.h - y) };
-        modulatorPanel.setBounds(modR.reduced(g.pad, g.inset));
-    }
-    else
-        modulatorPanel.setBounds(g.pad, y, g.w - 2 * g.pad, juce::jmax(modMinH, g.h - y - g.pad));
+    gateR = { 0, y, g.w, juce::jmax(0, g.h - y) };
+    gatingDesigner.setBounds(gateR.reduced(g.pad, g.inset));
 }
 
 // Item-ID ranges. Factory tables use 1..N (= APVTS index + 1). The Wavetables/
@@ -809,7 +701,7 @@ static constexpr int kWtUserItemId = 901;   // active table loaded from OUTSIDE 
 static constexpr int kWtLoadItemId = 902;   // "Load .wav…" browse action
 static constexpr int kWtFolderBase = 1000;  // first Wavetables/ folder file
 
-void VoicePanel::refreshWavetableDropdowns()
+void PatternContent::refreshWavetableDropdowns()
 {
     const auto& names = WavetableBank::factoryTableNames();
     const auto  root  = proc.getWavetablesDir();
@@ -888,7 +780,7 @@ void VoicePanel::refreshWavetableDropdowns()
     rebuild(osc2WaveDropdown, 1, "o2_wt");
 }
 
-void VoicePanel::handleWtSelection(int oscIndex, int itemId)
+void PatternContent::handleWtSelection(int oscIndex, int itemId)
 {
     if (itemId == kWtUserItemId) return;   // already on the loaded user table
 
@@ -896,7 +788,7 @@ void VoicePanel::handleWtSelection(int oscIndex, int itemId)
     {
         const int v = currentVoice;        // freeze target voice for the async callback
         wtChooser = std::make_unique<juce::FileChooser>("Load wavetable (.wav)", proc.getWavetablesDir(), "*.wav");
-        auto safe = juce::Component::SafePointer<VoicePanel>(this);
+        auto safe = juce::Component::SafePointer<PatternContent>(this);
         wtChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
             [safe, oscIndex, v](const juce::FileChooser& fc)
             {

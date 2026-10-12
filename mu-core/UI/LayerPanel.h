@@ -30,6 +30,9 @@ public:
     // Where the modulator playhead reads the song beat from (default: the internal beat).
     void setBeatSource(std::function<double()> source) { beatSource = std::move(source); }
 
+    // Suggested name in the Save dialog (default: the layer's own name).
+    void setDefaultPresetName(std::function<juce::String(int)> fn) { presetNameFn = std::move(fn); }
+
     // Products whose layer set is fixed show neither delete nor rename on the header.
     void setFixedLayers(bool fixed);
 
@@ -65,6 +68,7 @@ private:
     ModulatorPanel   modulatorPanel;
     juce::Component* content = nullptr;
     std::function<double()> beatSource;
+    std::function<juce::String(int)> presetNameFn;
 
     juce::Rectangle<int> headerR, modR;   // the two panels the shell paints (the content paints its own)
 

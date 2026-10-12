@@ -6,10 +6,7 @@
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/SegmentControl.h"
-#include "UI/ChannelHeaderBar.h"
-#include "UI/ModulatorPanel.h"
 #include "UI/Voice/InsertSubsection.h"   // shared mu-core insert panel
-#include "Modulation/MuTantModDest.h"
 #include "UI/GatingDesigner.h"
 
 #include <vector>
@@ -43,31 +40,26 @@ private:
 
 class PluginProcessor;
 
-// Voice editor page — same layout shape as mu-clid's RhythmPanel (header strip /
-// central wavetable synth UI / bottom row of PITCH-equivalent FILTER LEVEL knobs).
-// `setVoice(idx)` rebinds every APVTS attachment to the v{idx}_* param family so
-// clicking a different voice in the sidebar swaps the editor's target slot.
-// Root + scale are shared (global APVTS params) and stay bound across voice
-// changes.
-class VoicePanel : public juce::Component,
+// μ-Tant's content band inside the shared LayerPanel (kLayerContentH tall): Root / Scale, the
+// oscillator / noise row, the X-Mod / Filter / Effects row and the gate editor, which is the flex
+// panel and takes the height the rows leave. The header strip and modulators belong to the
+// LayerPanel. `setLayer(idx)` rebinds every APVTS attachment to the v{idx}_* param family so
+// clicking a different voice in the sidebar swaps the editor's target slot. Root + scale are
+// shared (global APVTS params) and stay bound across voice changes.
+class PatternContent : public juce::Component,
                    private juce::Timer
 {
 public:
-    explicit VoicePanel(PluginProcessor& proc);
-    ~VoicePanel() override;
+    explicit PatternContent(PluginProcessor& proc);
+    ~PatternContent() override;
 
     // Rebind every per-voice attachment to the v{idx}_* family. Shared params
     // (root, scale) are unaffected.
-    void setVoice(int voiceIndex);
-    int  getVoice() const noexcept { return currentVoice; }
+    void setLayer(int layerIndex);
+    int  getLayer() const noexcept { return currentVoice; }
 
-    // Fired when the header Delete button is clicked (editor removes the voice).
-    // Mirrors mu-clid's RhythmPanel delete affordance.
-    std::function<void()> onDeleteVoice;
-
-    // Null out the modulator slot pointer so no timer or paint callback can
-    // dereference it during the voice-remove → setVoice rebind window.
-    void clearModulatorSlot() { modulatorPanel.setVoiceSlot(nullptr); }
+    // The insert algorithm changed: the editor re-labels the modulators' insert destinations.
+    std::function<void(int)> onInsertAlgorithmChanged;
 
     // Same for the gate editor's three envelope patterns, which belong to the voice's Pattern.
     void clearPatternBindings()
@@ -197,7 +189,7 @@ private:
     std::unique_ptr<APVTS::SliderAttachment> levelAttachment;
 
     // ── Insert effect (shared mu-core InsertSubsection, "v" prefix) ──────────
-    // Identical UI to mu-clid; rebound to the active voice in setVoice(). Sits in
+    // Identical UI to mu-clid; rebound to the active voice in setLayer(). Sits in
     // the voice section: synth engine → insert → mixer (family signal flow).
     // Constructed in the .cpp init list — needs PluginProcessor's complete type
     // for the derived→ProcessorBase& conversion (only forward-declared here).
@@ -208,24 +200,12 @@ private:
     std::unique_ptr<APVTS::SliderAttachment> gapAttachment;
     std::unique_ptr<APVTS::ButtonAttachment> gateBypassAttachment;
 
-    // ── Modulator section (mu-core ModulatorPanel + mu-tant destinations) ──
-    // Rebound to the current voice's Layer whenever setVoice() runs.
-    ::ModulatorPanel modulatorPanel;
-    ModDestProvider  modDestProvider;
-
-    // Shared per-layer header bar (name / reset / delete / preset / save) —
-    // identical across mu-products. Replaces the bespoke voice tag + Delete btn.
-    ChannelHeaderBar headerBar;
-    void refreshHeader();              // name + colour + preset list for the active voice
-    void refreshVoicePresetList();
-
     // The constructor in parts, top of the panel to bottom.
     void addLabel(juce::Label& l, const juce::String& text);
-    void setupHeader();
     void setupTonalCentre();
     void setupSourceControls();
     void setupFilterControls();
-    void setupGateInsertAndModulators();
+    void setupGateAndInsert();
 
     void rebindAttachments();
 
@@ -244,27 +224,26 @@ private:
     std::unique_ptr<juce::FileChooser> wtChooser;   // kept alive during async load
     std::vector<juce::File> wtFolderFiles;          // dropdown id (kWtFolderBase+i) → Wavetables/ file
 
-    // 30 Hz timer — drives the gating-grid playhead + modulator playhead from
-    // the processor's transport beat position.
+    // 30 Hz timer — drives the gating-grid playhead from the processor's transport beat position.
     void timerCallback() override;
 
     // Sub-panel geometry — populated by resized(), consumed by paint() for the
     // bordered sub-panels + their titles so layout + decoration stay in sync.
     juce::Rectangle<int> osc1PanelR, osc2PanelR, modNoisePanelR, filterPanelR, noisePanelR, insertPanelR;
-    // Metal style: the panels — preset strip, voice (sections + Root / Scale), gate editor, modulators.
-    juce::Rectangle<int> headerStripR, voiceR, gateR, modR;
+    // The two metal panels filling the band: the voice (sections + Root / Scale) and the gate editor.
+    juce::Rectangle<int> voiceR, gateR;
 
     // resized() in parts: the shared measures, then each band top to bottom.
     struct Grid { bool metal, screwed; int w, h, pad, inset, plateH, boxClear, gap, ddH, s2W, s2H, right; };
     Grid layoutGrid() const;
-    int  layoutHeader(const Grid& g);                                  // returns the section boxes' top
+    int  layoutTonal(const Grid& g);                                   // Root / Scale; returns the section boxes' top
     void layoutSourceRow(const Grid& g, int top, int rowH);            // Osc 1 | Osc 2 | Noise
     void layoutShapingRow(const Grid& g, int top, int rowH);           // X-Mod | Filter | Effects
     void layoutXMod(const Grid& g, juce::Rectangle<int> box);
     void layoutFilter(const Grid& g, juce::Rectangle<int> box);
-    void layoutGateAndModulators(const Grid& g, int top);
+    void layoutGate(const Grid& g, int top);
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VoicePanel)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PatternContent)
 };
 
 } // namespace mu_tant

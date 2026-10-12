@@ -11,7 +11,7 @@ LayerPanel::LayerPanel(ProcessorBase& processor, const juce::String& noun)
         { noun,
           [this] { return currentLayer; },
           [this] { setLayer(currentLayer); },   // rebind so the content and modulators show the new state
-          {} });
+          [this](int slot) { return presetNameFn ? presetNameFn(slot) : proc.getChannelName(slot); } });
     addAndMakeVisible(header);
     addAndMakeVisible(modulatorPanel);
 
