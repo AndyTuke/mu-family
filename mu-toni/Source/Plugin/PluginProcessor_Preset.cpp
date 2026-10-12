@@ -15,13 +15,13 @@ namespace
 
 }
 
-// Describe the layers once (ctor): each layer's v{N}_ param prefix (its modulators save through Arp). Every layer
+// Describe the layers once (ctor): each layer's a{N}_ param prefix (its modulators save through Arp). Every layer
 // preset, full preset and host session is built and applied from this.
 void PluginProcessor::setupLayerState()
 {
     juce::StringArray prefixes;
     for (int l = 0; l < kNumChannels; ++l) prefixes.add(layerParamPrefix(l));
-    initLayerState(prefixes);
+    initLayerState(prefixes, legacyLayerParamPrefixes(kNumChannels));   // older APVTS dumps used "v{N}_"
 }
 
 // Any saved state (host session or full preset, either format) in the composed shape. Sessions

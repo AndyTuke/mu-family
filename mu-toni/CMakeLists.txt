@@ -123,6 +123,7 @@ target_sources(mu-toni-tests PRIVATE
     Source/Tests/ToniVoiceTests.cpp     # T2 — wavetable voice + X-Mod render
     Source/Tests/ArpRunnerTests.cpp     # T3 — arp step timing (beat grid / MIDI trigger)
     Source/Tests/ProcessorSeamTests.cpp  # the real PluginProcessor, headless (layer ownership)
+    Source/Tests/PrefixMigrationTests.cpp   # data saved before the v -> a id-prefix rename still loads
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp

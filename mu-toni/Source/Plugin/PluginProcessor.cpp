@@ -50,7 +50,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         mu_mixfx::addChannelStripParams(layout, c, n);
     }
 
-    // ── Per-voice arpeggiator + analogue voice + envelopes (v{N}_*) ───────────
+    // ── Per-voice arpeggiator + analogue voice + envelopes (a{N}_*) ───────────
     // A time range (seconds) skewed so short attacks/decays get resolution.
     auto tf = []
     {
@@ -188,6 +188,8 @@ PluginProcessor::PluginProcessor()
         else buf.clear();
     };
 
+    // A saved MIDI map written under the old "v{N}_" ids is renamed as it loads (set before initAppSettings loads it).
+    getMidiControlMap().setIdPrefixRenames(layerParamPrefixRenames(mu_limits::kMaxLayers));
     initAppSettings("muToni");   // settings file + saved UI size / MIDI clock (ProcessorBase)
 
     // The shared wavetable bank (procedural factory set), read by every voice's oscillators.

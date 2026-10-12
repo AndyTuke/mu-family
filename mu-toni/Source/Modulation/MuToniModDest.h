@@ -18,7 +18,7 @@
 namespace mu_toni
 {
 
-// One row per target: id, dropdown label, section, per-voice parameter (without the "v{N}_"
+// One row per target: id, dropdown label, section, per-voice parameter (without the "a{N}_"
 // prefix). The family-standard row — see mu-core Modulation/ModTarget.h.
 using ModDest = mu_mod::ModTarget;
 

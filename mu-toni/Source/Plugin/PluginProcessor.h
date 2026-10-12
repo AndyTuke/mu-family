@@ -85,7 +85,7 @@ public:
     juce::ValueTree captureFullPreset() override { return captureState(); }
     void            useLoadedFullPreset(juce::ValueTree state) override;
 
-    // Per-layer presets (ProcessorBase slot API) — the layer's v{N}_ params + its modulators
+    // Per-layer presets (ProcessorBase slot API) — the layer's a{N}_ params + its modulators
     // (loadable into any layer), and a reset back to defaults.
     void saveLayerPreset(int layer, const juce::String& name) override;
     void loadLayerPreset(int layer, const juce::File& file) override;
