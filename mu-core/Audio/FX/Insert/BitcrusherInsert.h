@@ -22,7 +22,12 @@ public:
         bitAaFilter[1].reset();
         cnt [0] = cnt [1] = 0.0f;
         held[0] = held[1] = 0.0f;
-        rng.setSeed(kDitherSeed);   // a fixed seed keeps the dither repeatable, so a reset slot equals a fresh one
+        rng.setSeed(seedFor(slotIndexSeed));   // a per-slot fixed seed keeps the dither repeatable, so a reset slot equals a fresh one of the same index
+    }
+    void setSlotIndex(int slotIndex) override
+    {
+        slotIndexSeed = slotIndex;
+        rng.setSeed(seedFor(slotIndexSeed));
     }
 
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh,
@@ -72,5 +77,7 @@ private:
     float        cnt [2] = {};
     float        held[2] = {};
     static constexpr juce::int64 kDitherSeed = 0x6D75426974;
+    static juce::int64 seedFor(int slot) noexcept { return kDitherSeed ^ (juce::int64) slot; }
+    int slotIndexSeed = 0;
     juce::Random rng { kDitherSeed };
 };

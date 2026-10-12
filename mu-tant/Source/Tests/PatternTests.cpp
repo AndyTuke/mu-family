@@ -3,6 +3,7 @@
 
 #include <juce_core/juce_core.h>
 #include "Sequencer/Pattern.h"
+#include "Sequencer/GatePatternSerialise.h"
 #include <atomic>
 #include <memory>
 #include <thread>
@@ -149,6 +150,41 @@ public:
             expect(live.gate.subdivision == GatePattern::Subdivision::Sixteenth, "the grid should be the default");
             expectEquals(live.gate.gateLevel, 0.0f);
             expect(! live.gate.editLock.load(), "the fallback must not leave the lock taken");
+        }
+
+        beginTest("a reset equals a fresh Pattern while another thread keeps deserialising into the gate");
+        {
+            // A preset load (deserialiseGate) takes editLock around its rebuild, so a reset taking the
+            // same lock must never overlap it. The writer stops before the final reset; that reset must
+            // then leave exactly the default state.
+            Pattern live;
+            GatePattern source;
+            for (int i = 0; i < 12; ++i) source.addEnvelope({ i * 2, 2, 0.0f, 0.0f, 0.0f, false });
+            const auto tree = serialiseGate(source, "Gate");
+
+            std::atomic<bool> stop { false };
+            std::thread writer([&]
+            {
+                while (! stop.load())
+                    deserialiseGate(tree, live.gate);
+            });
+            for (int i = 0; i < 300; ++i)
+            {
+                auto fresh = std::make_unique<Pattern>();
+                live.adoptDefaults(*fresh);
+            }
+            stop.store(true);
+            writer.join();
+
+            auto fresh = std::make_unique<Pattern>();
+            live.adoptDefaults(*fresh);
+            const Pattern reference;
+            expect(live.gate.envelopes.empty() && live.filterGate.envelopes.empty() && live.pitchGate.envelopes.empty(),
+                   "the final reset should leave no envelopes");
+            expect(! live.gate.hasEnvelopes.load(), "the lock-free flag must follow the clear");
+            expect(live.gate.subdivision == reference.gate.subdivision, "the grid should be the default");
+            expectEquals(live.gate.patternLengthBars.load(), reference.gate.patternLengthBars.load());
+            expect(! live.gate.editLock.load(), "no lock may be left taken");
         }
 
         beginTest("copyDataFrom holds the destination's lock and skips the copy when it stays busy");

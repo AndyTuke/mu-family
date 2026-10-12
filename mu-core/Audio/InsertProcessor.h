@@ -33,6 +33,9 @@ public:
     void prepare(double sampleRate, int blockSize);
     void reset();
 
+    // Which slot (layer) this processor serves; seeds the noise inserts per slot. Setup only.
+    void setSlotIndex(int slotIndex);
+
     // Apply the selected insert effect (insertAlgo dispatch + post-drive tone
     // filter for cases 0–5) in place.
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh, const VoiceParams& p);

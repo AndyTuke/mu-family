@@ -13,6 +13,7 @@
 #include <juce_core/juce_core.h>
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <cmath>
+#include <vector>
 #include "Audio/FX/Insert/NoneInsert.h"
 #include "Audio/FX/Insert/SoftClipInsert.h"
 #include "Audio/FX/Insert/HardClipInsert.h"
@@ -152,6 +153,51 @@ public:
             float gr = 0.0f;
             v.process(buf, kNs, 2, p, gr);
             expect (!hasNaN(buf, 2, kNs), "VocoderSt produced NaN/Inf");
+        }
+
+        // ── Noise carriers are seeded per slot ───────────────────────────────
+        beginTest ("Vocoder white-noise carrier: slots 0 and 1 decorrelate, equal indices match, reset equals fresh");
+        {
+            constexpr int kLen = 8192;
+            VoiceParams p;
+            p.insertAlgo = 12;
+            setSlot(p, 0, 2.0f);   // Wave: White noise
+
+            // Renders kLen samples of a fixed two-sine modulator through a vocoder serving `slot`.
+            auto render = [&](VocoderInsert& v, int slot, bool resetFirst)
+            {
+                v.prepare(kSR, kLen);
+                v.setSlotIndex(slot);
+                if (resetFirst) { juce::AudioBuffer<float> junk(2, 256); junk.clear(); float g = 0.0f; v.process(junk, 256, 2, p, g); v.reset(); }
+                juce::AudioBuffer<float> buf(2, kLen);
+                for (int ch = 0; ch < 2; ++ch)
+                    for (int i = 0; i < kLen; ++i)
+                        buf.setSample(ch, i, 0.4f * std::sin(0.031f * (float) i) + 0.3f * std::sin(0.173f * (float) i));
+                float gr = 0.0f;
+                v.process(buf, kLen, 2, p, gr);
+                std::vector<float> out((size_t) kLen);
+                for (int i = 0; i < kLen; ++i) out[(size_t) i] = buf.getSample(0, i);
+                return out;
+            };
+
+            VocoderInsert a(false), b(false), c(false), d(false);
+            const auto s0  = render(a, 0, false);
+            const auto s1  = render(b, 1, false);
+            const auto s0b = render(c, 0, false);
+            const auto s0r = render(d, 0, true);
+
+            double dot = 0.0, na = 0.0, nb = 0.0;
+            for (int i = 0; i < kLen; ++i)
+            {
+                dot += (double) s0[(size_t) i] * s1[(size_t) i];
+                na  += (double) s0[(size_t) i] * s0[(size_t) i];
+                nb  += (double) s1[(size_t) i] * s1[(size_t) i];
+            }
+            const double corr = dot / std::sqrt(juce::jmax(1.0e-30, na * nb));
+            expect (na > 1.0e-6 && nb > 1.0e-6, "the vocoder rendered silence");
+            expect (std::abs(corr) < 0.5, "slots 0 and 1 produce correlated noise carriers (corr=" + juce::String(corr) + ")");
+            expect (s0 == s0b, "two slots of the same index must render identically");
+            expect (s0 == s0r, "a reset slot must render like a fresh slot of the same index");
         }
     }
 };

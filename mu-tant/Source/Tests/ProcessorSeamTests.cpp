@@ -113,7 +113,9 @@ namespace
     struct ResetResult { float maxDiff = 0.0f, peak = 0.0f, snapDiff = 0.0f; };
 
     // Seeds voice 0 of `seeded` with filter, insert and snapshot state, resets it, patches it and a
-    // brand-new processor identically, and compares what both render at block size `n`.
+    // brand-new processor identically, and compares what both render at block size `n`. Both are slot 0,
+    // so the per-slot noise seeds of the Bitcrusher and Vocoder inserts match (a reset slot equals a
+    // fresh slot of the SAME index).
     ResetResult resetVersusFresh(ExposedPluginProcessor& seeded, const juce::File& dcTable, int n, int insertAlgo)
     {
         ExposedPluginProcessor fresh;

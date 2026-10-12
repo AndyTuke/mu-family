@@ -61,6 +61,12 @@ void InsertProcessor::prepare(double sampleRate, int blockSize)
     postDriveTone[1].reset();
 }
 
+void InsertProcessor::setSlotIndex(int slotIndex)
+{
+    for (auto& a : owned)
+        if (a) a->setSlotIndex(slotIndex);
+}
+
 void InsertProcessor::reset()
 {
     for (auto& a : owned)

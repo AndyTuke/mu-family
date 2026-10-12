@@ -57,11 +57,9 @@ struct Pattern : Layer
         Layer::adoptDefaults(fresh);
         jassert(dynamic_cast<Pattern*>(&fresh) != nullptr);
         auto& f = static_cast<Pattern&>(fresh);
-        // adoptDataFrom skips the exchange when the envelope's lock stays busy; the reset must still
-        // empty the envelopes, so that one falls back to clearing in place (the audio is excluded).
-        if (! gate.adoptDataFrom(f.gate))             gate.resetInPlaceTo(f.gate);
-        if (! filterGate.adoptDataFrom(f.filterGate)) filterGate.resetInPlaceTo(f.filterGate);
-        if (! pitchGate.adoptDataFrom(f.pitchGate))   pitchGate.resetInPlaceTo(f.pitchGate);
+        adoptGate(gate, f.gate);
+        adoptGate(filterGate, f.filterGate);
+        adoptGate(pitchGate, f.pitchGate);
         osc1UserPath.swapWith(f.osc1UserPath);
         osc2UserPath.swapWith(f.osc2UserPath);
         osc1UserIndex.store(f.osc1UserIndex.load());
@@ -71,6 +69,20 @@ struct Pattern : Layer
     }
 
 private:
+    // Takes `fresh`'s gate data into `live`. adoptDataFrom skips the exchange when the envelope's lock
+    // stays busy, so it is retried a bounded number of times (each attempt is itself a capped spin);
+    // only if every attempt fails does the reset fall back to clearing in place, which is unlocked. The
+    // fallback is safe on the assumption that every writer of a gate pattern (editor edits, preset
+    // load via deserialiseGate) runs on the message thread, the same thread as this reset, so none can
+    // be mid-edit here; the audio thread is excluded by the caller.
+    static void adoptGate(GatePattern& live, GatePattern& fresh) noexcept
+    {
+        constexpr int kAdoptAttempts = 8;
+        for (int attempt = 0; attempt < kAdoptAttempts; ++attempt)
+            if (live.adoptDataFrom(fresh)) return;
+        live.resetInPlaceTo(fresh);
+    }
+
     void copyVoiceData(const Pattern& o)
     {
         // A skipped copy (the source envelope was being edited for too long) would leave stale data.

@@ -100,6 +100,7 @@ PluginProcessor::PluginProcessor()
     {
         voices[(size_t) v] = std::make_unique<VoiceEngine>();
         voices[(size_t) v]->setBank(&bank);
+        inserts[(size_t) v].setSlotIndex(v);   // per-slot noise seed: layers do not share one sequence
     }
 
     cacheParamPointers();        // resolve all APVTS atomics once (audio thread reads these)

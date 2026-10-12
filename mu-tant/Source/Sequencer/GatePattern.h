@@ -200,8 +200,10 @@ public:
     // Fallback for a reset when adoptDataFrom could not take editLock (it stayed busy): clears the
     // envelopes in place and takes the grid and length of `defaults`, without the lock. Allocates and
     // frees nothing (clear() keeps the buffer). Only for a caller that already excludes the audio
-    // thread (the processor's layers lock with processing suspended), so the only thing it can race
-    // with is a stale edit that is itself being discarded.
+    // thread (the processor's layers lock with processing suspended). It also assumes every writer of
+    // the envelopes (editor edits, deserialiseGate) runs on the message thread, the thread that resets;
+    // a writer on another thread could be mid-rebuild here. Pattern::adoptDefaults retries
+    // adoptDataFrom first, so this runs only when the lock stayed busy through every attempt.
     void resetInPlaceTo(const GatePattern& defaults) noexcept
     {
         envelopes.clear();

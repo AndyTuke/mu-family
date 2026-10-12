@@ -86,7 +86,13 @@ public:
         lastNoteIndex = -1;
         lastOctave  = -1;
         lastUnison  = -1;
-        rng.setSeed(kNoiseSeed);   // a fixed seed keeps the noise carrier repeatable, so a reset slot equals a fresh one
+        rng.setSeed(seedFor(slotIndexSeed));   // a per-slot fixed seed keeps the noise carrier repeatable, so a reset slot equals a fresh one of the same index
+    }
+
+    void setSlotIndex(int slotIndex) override
+    {
+        slotIndexSeed = slotIndex;
+        rng.setSeed(seedFor(slotIndexSeed));
     }
 
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh,
@@ -307,6 +313,8 @@ private:
     std::array<float, kMaxUnisonVoices> voiceGainSmooth { };
     float                                pinkState[7] = { };
     static constexpr juce::int64         kNoiseSeed = 0x6D75566F63;
+    static juce::int64                   seedFor(int slot) noexcept { return kNoiseSeed ^ (juce::int64) slot; }
+    int                                  slotIndexSeed = 0;
     juce::Random                         rng { kNoiseSeed };
 
     // Change-detection so coefficient recomputes don't run every block.

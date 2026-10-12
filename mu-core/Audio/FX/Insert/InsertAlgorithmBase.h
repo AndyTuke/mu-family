@@ -36,6 +36,11 @@ public:
 
     virtual void prepare(double sampleRate, int blockSize) = 0;
 
+    // Tells the algorithm which slot (layer) it serves, so a noise source can seed per slot and two
+    // layers do not produce the same sequence. Called at setup, never on the audio thread. A reset
+    // slot still equals a fresh slot of the same index. Default: nothing to seed.
+    virtual void setSlotIndex(int slotIndex) { juce::ignoreUnused(slotIndex); }
+
     // Clear all DSP state (delay lines, envelope followers, DC blockers, etc.)
     // without re-allocating. Called from InsertProcessor::reset() — should be
     // safe to invoke from the audio thread under suspendProcessing.
