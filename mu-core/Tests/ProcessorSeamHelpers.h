@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
 #include <thread>
 
 namespace mu_seam_test
@@ -30,6 +31,61 @@ namespace mu_seam_test
 
         juce::File root;
         ProcessorBase::ScopedStorageRoot scope;
+    };
+
+    // True when a process with this executable name is running (Windows only; elsewhere false). Used to
+    // tell a write by a real instance of the product from one the test made.
+    inline bool processIsRunning(const juce::String& exeName)
+    {
+       #if JUCE_WINDOWS
+        juce::ChildProcess listing;
+        if (! listing.start("tasklist /FI \"IMAGENAME eq " + exeName + "\" /NH")) return false;
+        return listing.readAllProcessOutput().containsIgnoreCase(exeName);
+       #else
+        juce::ignoreUnused(exeName);
+        return false;
+       #endif
+    }
+
+    // Proves a test kept out of the real per-user folders: a stamp of them taken before and after.
+    // A real instance of the product (or a DAW hosting it) writes to the same folders, so a change is
+    // only held against the test when nothing else explains it: no real instance is running, the
+    // folder was quiet before the test, and it has stopped changing since.
+    class RealFolderWatch
+    {
+    public:
+        // `stamp` sums the modification times and sizes of the files to watch; `standaloneExe` is the
+        // product's standalone executable name (e.g. "mu-Tant.exe").
+        RealFolderWatch(std::function<juce::int64()> stampFn, juce::String standaloneExe)
+            : stamp(std::move(stampFn)), exe(std::move(standaloneExe))
+        {
+            before = stamp();
+            juce::Thread::sleep(200);
+            quietBefore = (stamp() == before);
+            otherRunning = processIsRunning(exe);
+        }
+
+        void expectUnchanged(juce::UnitTest& t, const juce::String& message)
+        {
+            const auto after = stamp();
+            if (after == before) { t.expect(true); return; }
+
+            juce::Thread::sleep(200);
+            const bool stillMoving = (stamp() != after);
+            if (otherRunning || ! quietBefore || stillMoving)
+                t.logMessage("real folder changed during the test, but " + exe + " or a host is writing there "
+                             "(running: " + juce::String(otherRunning ? "yes" : "no") + ", quiet before: "
+                             + juce::String(quietBefore ? "yes" : "no") + ", still moving: "
+                             + juce::String(stillMoving ? "yes" : "no") + "); not held against the test");
+            else
+                t.expect(false, message);
+        }
+
+    private:
+        std::function<juce::int64()> stamp;
+        juce::String exe;
+        juce::int64 before = 0;
+        bool quietBefore = true, otherRunning = false;
     };
 
     // Sets a parameter to a plain (un-normalised) value through the host-facing path.

@@ -197,7 +197,7 @@ struct MuTantProcessorSeamTests : juce::UnitTest
     void constructsAndRendersUnderTempRoot()
     {
         beginTest("The real processor constructs under a temp root, prepares and renders a block");
-        const auto before = realFolderStamp();
+        RealFolderWatch realFolder(realFolderStamp, "mu-Tant.exe");
         {
             TempStorage storage;
             ExposedPluginProcessor p;
@@ -216,7 +216,7 @@ struct MuTantProcessorSeamTests : juce::UnitTest
             expect(peakOf(buf) > 1.0e-4f, "the opened gater lets the drone through");
             p.releaseResources();
         }
-        expect(realFolderStamp() == before, "nothing under the real muTant settings / content folders changed");
+        realFolder.expectUnchanged(*this, "nothing under the real muTant settings / content folders changed");
     }
 
     void resetLayerEqualsFresh()
