@@ -62,6 +62,7 @@ target_sources(mu-clid
         Source/UI/Voice/FilterSubsection.cpp
         Source/UI/Voice/AmpSubsection.cpp
         Source/UI/RhythmPanel.cpp
+        Source/UI/MidiOutSection.cpp
         Source/UI/SampleBrowser.cpp
         Source/UI/SettingsOverlay.cpp
         # Offline-license verifier lives in mu-core (shared); compiled here + monocypher.c.
@@ -243,6 +244,7 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/EmbeddedSampleTests.cpp       # preset samples: FLAC round trip is sample-identical
     Source/Tests/SequencerEngineWrapTests.cpp  # master-loop wrap detection
     Source/Tests/SwapCommitTimingTests.cpp     # a delayed swap commit still starts the new pattern on the next step
+    Source/Tests/MidiOutputModeTests.cpp       # per-rhythm Sample / MIDI output: table, presets, render through the real processor
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/SequencerEngine.cpp"        # under test by the wrap tests
     Source/Persistence/PresetMigrations.cpp    # under test by C1/C2
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/Rhythm.cpp"                 # SequencerEngine builds patterns through it

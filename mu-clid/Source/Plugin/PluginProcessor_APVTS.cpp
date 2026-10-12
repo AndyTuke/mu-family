@@ -65,7 +65,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
                 })));
     };
 
-    // ── Per-rhythm parameters (47 × 8 = 376) ─────────────────────────────────
+    // ── Per-rhythm parameters (one set per rhythm slot) ─────────────────────────────────
     // Rhythms 0..kAutomatedRhythms-1 use full "Rhythm N " names so DAW automation
     // lanes show them clearly. Remaining rhythms use short "RN " names.
     for (int i = 0; i < SequencerEngine::MaxRhythms; ++i)
@@ -135,6 +135,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addF(p+"insP2",   n+"Insert P2",   0.0f, 1.0f, 0.0f);
         addF(p+"insP3",   n+"Insert P3",   0.0f, 1.0f, 0.0f);
         addF(p+"insP4",   n+"Insert P4",   0.0f, 1.0f, 0.0f);
+        // Output mode (0 Sample, 1 MIDI) and the MIDI-output settings used in MIDI mode. Velocity and
+        // Accent are percentages; Accent has the meaning of mu-Clid MIDI's Accent knob.
+        addI(p+"outMode",    n+"Output Mode",   0, 1,   0);
+        addI(p+"midiNote",   n+"MIDI Note",     0, 127, 36);
+        addI(p+"midiChan",   n+"MIDI Channel",  1, 16,  1);
+        addI(p+"midiVel",    n+"MIDI Velocity", 1, 100, 100);
+        addI(p+"midiAccent", n+"MIDI Accent",   0, 100, 0);
     }
 
     // ── Shared global FX + return + master layout (mu-core) ───────────────────

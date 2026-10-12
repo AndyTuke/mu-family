@@ -103,6 +103,7 @@ struct MuClidProcessorSeamTests : juce::UnitTest
         rhythmEditsVersusProcessBlock();
         swapCommitVersusProcessBlock();
         parameterChangedFromAudioThread();
+        midiOutputRenderAllocatesNothing();
         rhythmEditsKeepApvtsInStep();
         removeShiftsRetiredTails();
         removeVersusProcessBlockWithTails();
@@ -422,6 +423,40 @@ struct MuClidProcessorSeamTests : juce::UnitTest
             p.setPlayHead(nullptr);
             expect(! renderer.sawInsaneOutput(), "block size " + juce::String(n) + ": output stayed finite and bounded");
         }
+    }
+
+    // A rhythm in MIDI output mode turns each hit into a note-on / note-off on the audio thread: that path
+    // (and the Sample-mode hit beside it) must not allocate once the host's MIDI buffer has its room.
+    void midiOutputRenderAllocatesNothing()
+    {
+        beginTest("processBlock in MIDI output mode allocates nothing");
+        TempStorage storage;
+        ExposedPluginProcessor p;
+        p.prepareToPlay(48000.0, 256);
+        p.rhythms.add(mu_clid::Rhythm());   // a second rhythm, so both modes run in the same block
+        setParam(p.apvts, "r0_outMode", 1.0f);
+        setParam(p.apvts, "r0_midiAccent", 50.0f);
+        p.drainDeferredWork();
+
+        RunningPlayHead host(48000.0, 256);
+        p.setPlayHead(&host);
+        juce::AudioBuffer<float> block(2, 256);
+        juce::MidiBuffer midi;
+        midi.ensureSize(4096);   // the host owns this buffer's room; the processor must not need more
+        for (int i = 0; i < 8; ++i) { block.clear(); midi.clear(); p.processBlock(block, midi); }   // warm-up, uncounted
+
+        int notes = 0;
+        alloc_count::count = 0; alloc_count::counting = true;
+        for (int i = 0; i < 400; ++i)
+        {
+            block.clear(); midi.clear();
+            p.processBlock(block, midi);
+            notes += midi.getNumEvents();
+        }
+        alloc_count::counting = false;
+        p.setPlayHead(nullptr);
+        expect(notes > 0, "the rhythm sent notes during the counted blocks");
+        expectEquals(alloc_count::count, 0);
     }
 
     // Automation can call parameterChanged on the audio thread. It must then allocate nothing, leave

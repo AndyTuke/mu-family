@@ -35,6 +35,10 @@ public:
     // section's Amp "Effect" send knob label.
     std::function<void(const juce::String& algorithmName)> onEffectAlgorithmNameChanged;
 
+    // Optional: true when channel `r` makes no audio at the moment (for example mu-Clid's MIDI output
+    // mode), so its strip is drawn inactive like an empty slot. Asked when strips are built or reloaded.
+    std::function<bool(int channel)> isChannelSilent;
+
     // Rebuild channel strips to match the current rhythm count.
     void refresh();
 

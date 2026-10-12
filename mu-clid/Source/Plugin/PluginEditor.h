@@ -54,6 +54,7 @@ private:
     // when the mixer overlay is hidden.
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     void syncVoiceEffectSendLabel();
+    bool isRhythmMidiOutput(int r) const;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };

@@ -7,6 +7,7 @@
 #include "Sequencer/GeneratorAliases.h"
 #include "Audio/VoiceEngine.h"
 #include "Audio/MidiOutputEngine.h"
+#include "Audio/MidiOutputMapping.h"   // mu-core: velocity + note names for the MIDI output mode
 #include "Audio/FX/Slots/FXChain.h"
 #include "Audio/MixerEngine.h"
 #include "License/LicenseKey.h"       // product: mu-Clid id + filename + public key
@@ -293,9 +294,10 @@ private:
     // transport, reset the wrap detector on a stop->start edge, and publish
     // sequencerPlaying + lastBeatPos.
     BlockTransport deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages);
-    // Step the sequencer, fire voice triggers, check hot-swap boundaries, and
+    // Step the sequencer, fire voice triggers (or MIDI notes for rhythms in MIDI output mode, into
+    // midiMessages), check hot-swap boundaries, and
     // publish per-rhythm UI play-state. Called only while playing.
-    void advanceSequencer(int numRhythms, double beatPos);
+    void advanceSequencer(int numRhythms, double beatPos, juce::MidiBuffer& midiMessages);
     // Modulation pass for one rhythm: snapshot voiceParams, run the matrix,
     // snapshot for the UI live-arc, write modulated values + euclid overrides back.
     void applyRhythmModulation(int r, double beatPos);

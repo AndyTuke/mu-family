@@ -2,10 +2,12 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "EuclidPanelAliases.h"
 #include "VoiceSection.h"
+#include "MidiOutSection.h"
 #include "UI/ChannelHeaderBar.h"
 #include "UI/ModulatorPanel.h"
 #include "Modulation/MuClidModDest.h"
 #include "UI/Components/DropdownSelect.h"
+#include "UI/Components/SegmentControl.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/SaveDialog.h"
 #include "Plugin/PluginProcessor.h"
@@ -13,7 +15,8 @@
 namespace mu_clid {
 
 // Full rhythm editor panel. Layout (top to bottom):
-//   Header bar | Sample bar | [RhythmCircle | EuclideanPanel] | VoiceSection | ModulatorPanel
+//   Header bar | Sample bar (+ Sample / MIDI output selector) | [RhythmCircle | EuclideanPanel]
+//   | VoiceSection (or, in MIDI output mode, MidiOutSection) | ModulatorPanel
 class RhythmPanel : public juce::Component,
                     public juce::FileDragAndDropTarget,
                     public juce::AudioProcessorValueTreeState::Listener,
@@ -34,13 +37,20 @@ public:
                        const juce::String& value,
                        juce::Colour rhythmColour)> onStatusUpdate;
 
+    // Fired when the shown rhythm's output mode (Sample / MIDI) changes, so the mixer can show its strip
+    // active or inactive.
+    std::function<void()>    onOutputModeChanged;
+
     std::function<void()>    onRhythmRenamed;
     std::function<void(int)> onRhythmDeleted;
 
     void paint(juce::Graphics&) override;
     void paintOverChildren(juce::Graphics&) override;
     juce::Rectangle<int> headerRect() const;          // the rhythm header strip
-    juce::Rectangle<int> sampleDisplayRect() const;   // the sample LCD inside its strip
+    juce::Rectangle<int> sampleDisplayRect() const;   // the sample LCD inside its strip (left of the output selector)
+    juce::Rectangle<int> outputSelectorRect() const;  // the Sample / MIDI selector at the strip's right end
+    bool isMidiOutputMode() const;
+    int  outputInsetX() const;                        // the selector's distance from the strip's right edge                    // the shown rhythm is in MIDI output mode
     void lookAndFeelChanged() override { resized(); repaint(); }   // screws style moves some content in
     void resized() override;
     void mouseDown(const juce::MouseEvent&) override;
@@ -65,6 +75,9 @@ private:
     RhythmCircle    circle;
     EuclideanPanel  euclidPanel;
     VoiceSection    voiceSection;
+    MidiOutSection  midiOutSection;
+    // Per-rhythm output: Sample plays the loaded sample, MIDI sends notes. Lives in the sample strip.
+    SegmentControl  outputCtrl { { "Sample", "MIDI" }, SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Lcd };
     ModulatorPanel  modulatorPanel;
     // mu-clid-specific destination provider — wraps the mu-clid kTable +
     // populate logic and is passed into modulatorPanel so the mu-core panel
@@ -92,6 +105,7 @@ private:
     static constexpr int kVoiceH       = 144;
     static constexpr int kPanelPad     = MuLookAndFeel::kPanelPad;
     static constexpr int kModeSelectorW = 80;
+    static constexpr int kOutputSelectorW = 112;   // the Sample / MIDI selector (two LCD windows) in the sample strip
     static constexpr int kIconBtnW     = 22;
     static constexpr int kPresetBtnW   = 38;
 
@@ -101,6 +115,7 @@ private:
     juce::Rectangle<int> sampleRect, circleRect, euclidRect, voiceRect, modRect;
 
     void loadSample();
+    void updateOutputModeUi();   // show the voice band or the MIDI Out section, and the selector, for the shown rhythm
     void refreshRhythmPresets();
     void saveRhythmPreset();
     void refreshCircle();

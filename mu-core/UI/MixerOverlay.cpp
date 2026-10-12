@@ -130,7 +130,7 @@ void MixerOverlay::buildChannels()
         const juce::String prefix = "ch" + juce::String(r) + "_";
         ch->bindChannel(mixer.channels[r], mixer.channelPeaks[r], &proc, prefix,
                        &mixer.sidechainGR[r]);
-        if (!hasRhythm) ch->setActive(false);
+        if (!hasRhythm || (isChannelSilent && isChannelSilent(r))) ch->setActive(false);
         // forward status updates to the global StatusBar via PluginEditor.
         ch->onStatusUpdate = [this](const juce::String& n, const juce::String& v, juce::Colour c) {
             if (onStatusUpdate) onStatusUpdate(n, v, c);
@@ -449,7 +449,7 @@ void MixerOverlay::loadFromApvts()
     for (int r = 0; r < (int)rhythmChannels.size(); ++r)
     {
         const bool hasRhythm = r < numActive;
-        rhythmChannels[r]->setActive(hasRhythm);
+        rhythmChannels[r]->setActive(hasRhythm && ! (isChannelSilent && isChannelSilent(r)));
         rhythmChannels[r]->setChannelName(hasRhythm ? juce::String(proc.getChannelName(r)) : "-");
         rhythmChannels[r]->setChannelColour(
             hasRhythm ? palette[proc.getChannelColourIndex(r) % MuLookAndFeel::kChannelPaletteSize]

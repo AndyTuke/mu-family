@@ -54,6 +54,9 @@ const char* const kVoiceSuffixes[] = {
     "drvChar", "drvDrv", "drvOut", "drvDit", "drvTon", "eqMidGain", "drvBits", "drvRate"
 };
 
+// Output mode + MIDI-output params shown in the sample strip and the MIDI Out section (r{ri}_ prefix).
+const char* const kOutputSuffixes[] = { "outMode", "midiNote", "midiChan", "midiVel", "midiAccent" };
+
 // Mixer-strip params shown in the voice band (FX sends + pan) — ch{ri}_ prefix, shared with
 // the mixer channel strip.
 const char* const kSendSuffixes[] = { "sendEff", "sendDly", "sendRev", "pan" };
@@ -62,7 +65,7 @@ const char* const kSendSuffixes[] = { "sendEff", "sendDly", "sendRev", "pan" };
 
 //==============================================================================
 RhythmPanel::RhythmPanel(PluginProcessor& p)
-    : proc(p), euclidPanel(p), voiceSection(p),
+    : proc(p), euclidPanel(p), voiceSection(p), midiOutSection(p),
       modDestProvider(mu_clid::makeModDestProvider([this] { return effectSendName; }))
 {
     startTimerHz(mu_ui::kUiRefreshHz);
@@ -71,6 +74,8 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     // Logic sits in the circle panel's corner, drawn over the circle's empty corner area.
     addAndMakeVisible(euclidPanel.getLogicControl());
     addAndMakeVisible(voiceSection);
+    addChildComponent(midiOutSection);   // shown instead of the voice band in MIDI output mode
+    addAndMakeVisible(outputCtrl);
     addAndMakeVisible(modulatorPanel);
     modulatorPanel.setDestProvider(&modDestProvider);
 
@@ -203,6 +208,22 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     {
         if (onStatusUpdate) onStatusUpdate(name, val, currentColour());
     };
+    midiOutSection.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
+    {
+        if (onStatusUpdate) onStatusUpdate(name, val, currentColour());
+    };
+
+    // The output selector writes r{N}_outMode and switches this panel's view at once.
+    outputCtrl.onChange = [this](int idx)
+    {
+        if (currentRhythmIndex < 0) return;
+        if (auto* prm = proc.apvts.getParameter("r" + juce::String(currentRhythmIndex) + "_outMode"))
+            prm->setValueNotifyingHost(prm->convertTo0to1((float) idx));
+        updateOutputModeUi();
+        if (onStatusUpdate)
+            onStatusUpdate("Output", idx == 1 ? "MIDI (sends notes, no audio from this rhythm)"
+                                              : "Sample (plays the loaded sample)", currentColour());
+    };
 
     voiceSection.onInsertAlgorithmChanged = [this](int charId)
     {
@@ -225,6 +246,8 @@ void RhythmPanel::registerRhythmListeners(int ri)
         proc.apvts.addParameterListener(rPfx + s, this);
     for (auto* s : kVoiceSuffixes)
         proc.apvts.addParameterListener(rPfx + s, this);
+    for (auto* s : kOutputSuffixes)
+        proc.apvts.addParameterListener(rPfx + s, this);
     for (auto* s : kSendSuffixes)
         proc.apvts.addParameterListener(chPfx + s, this);
 }
@@ -237,6 +260,8 @@ void RhythmPanel::deregisterRhythmListeners(int ri)
     for (auto* s : kEuclidSuffixes)
         proc.apvts.removeParameterListener(rPfx + s, this);
     for (auto* s : kVoiceSuffixes)
+        proc.apvts.removeParameterListener(rPfx + s, this);
+    for (auto* s : kOutputSuffixes)
         proc.apvts.removeParameterListener(rPfx + s, this);
     for (auto* s : kSendSuffixes)
         proc.apvts.removeParameterListener(chPfx + s, this);
@@ -267,6 +292,14 @@ void RhythmPanel::parameterChanged(const juce::String& parameterID, float /*newV
             {
                 self->euclidPanel.refreshSuffix(suffix);
                 self->refreshCircle();
+            }
+            else if (suffix == "outMode")
+            {
+                self->updateOutputModeUi();
+            }
+            else if (suffix.startsWith("midi"))
+            {
+                self->midiOutSection.refreshSuffix(suffix);
             }
             else
             {
@@ -308,6 +341,8 @@ void RhythmPanel::setRhythm(int index)
         // concat throws std::bad_alloc.
         modulatorPanel.setVoiceSlot(&proc.getRhythm(index));
         voiceSection.setRhythm(index);
+        midiOutSection.setRhythm(index);
+        updateOutputModeUi();
         refreshCircle();
     }
     else
@@ -346,8 +381,31 @@ juce::Colour RhythmPanel::currentColour() const
     return juce::Colours::transparentBlack;
 }
 
+// True when the shown rhythm sends MIDI notes instead of playing its sample. Reads the parameter itself
+// (not the Rhythm) so it is right the moment the parameter changes, whichever listener runs first.
+bool RhythmPanel::isMidiOutputMode() const
+{
+    if (currentRhythmIndex < 0) return false;
+    if (auto* raw = proc.apvts.getRawParameterValue("r" + juce::String(currentRhythmIndex) + "_outMode"))
+        return raw->load() > 0.5f;
+    return false;
+}
+
+// Output mode for the shown rhythm: the selector, which of the voice band / MIDI Out section is
+// visible, and the sample LCD's wording. Message thread.
+void RhythmPanel::updateOutputModeUi()
+{
+    const bool midi = isMidiOutputMode();
+    outputCtrl.setSelectedIndex(midi ? 1 : 0, false);
+    voiceSection.setVisible(! midi);
+    midiOutSection.setVisible(midi);
+    repaint();
+    if (onOutputModeChanged) onOutputModeChanged();
+}
+
 bool RhythmPanel::isInterestedInFileDrag(const juce::StringArray& files)
 {
+    if (isMidiOutputMode()) return false;   // a MIDI rhythm has no sample to load
     for (auto& f : files)
     {
         auto ext = juce::File(f).getFileExtension().toLowerCase();
@@ -462,7 +520,7 @@ void RhythmPanel::mouseDown(const juce::MouseEvent& e)
 {
     // Name editing is handled by nameLabel (a child component); we no longer need
     // the manual nameRect hit-test here.
-    if (sampleRect.contains(e.getPosition()))   // the laid-out (scaled) sample strip
+    if (! isMidiOutputMode() && sampleDisplayRect().contains(e.getPosition()))   // the sample LCD (not the output selector)
         loadSample();
 }
 
@@ -495,6 +553,14 @@ void RhythmPanel::paint(juce::Graphics& g)
         g.setFont(MuLookAndFeel::lcdFont(mu_ui::sf((float) MuLookAndFeel::kLcdTextH)));
         const auto textR = inner.toNearestInt().withTrimmedLeft(s(MuLookAndFeel::kLcdTextPadX))
                                                     .withTrimmedRight(s(MuLookAndFeel::kLcdBrowseW + MuLookAndFeel::kSpaceXS));
+        if (isMidiOutputMode())
+        {
+            // MIDI output: no sample to show, so the LCD only names the mode, unlit, with no browse mark.
+            g.setColour(lit.withAlpha(L.lcdGhost));
+            g.drawText("MIDI output", textR, juce::Justification::centredLeft, true);
+            MuLookAndFeel::drawLcdFront(g, inner);
+            return;
+        }
         if (missing)
         {
             g.setColour(MuLookAndFeel::colour(MuLookAndFeel::sampleBarMissingWarning));
@@ -518,10 +584,18 @@ void RhythmPanel::paint(juce::Graphics& g)
         return;
     }
     {
-        const auto inner = sampleRect.reduced(3);
+        const auto inner = sampleDisplayRect();
         g.setColour(MuLookAndFeel::colour(Id::sampleBarBackground));
         g.fillRect(inner);
 
+        if (isMidiOutputMode())
+        {
+            g.setColour(MuLookAndFeel::colour(Id::sampleBarNoSample));
+            g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f).withStyle("Italic")));
+            g.drawText("MIDI output", inner.getX() + 5, inner.getY(), inner.getWidth() - 10, inner.getHeight(),
+                       juce::Justification::centredLeft, true);
+            return;
+        }
         if (missing)
         {
             // Linked sample referenced by a preset could not be found at its recorded
@@ -602,6 +676,8 @@ void RhythmPanel::resized()
                                                 circleRect.getBottom() - m - lh, lw, lh);
     }
     voiceSection.setBounds  (voiceRect.reduced(rhythmInset));
+    midiOutSection.setBounds(voiceRect.reduced(rhythmInset));   // the same band, shown instead in MIDI output mode
+    outputCtrl.setBounds(outputSelectorRect());
     // With screws the modulator section is a little narrower, so its tabs and boxes clear
     // the panel's corner screws.
     const int modInsetX = MuLookAndFeel::hasScrews(*this) ? s(MuLookAndFeel::kScrewedPanelInset) : rhythmInset;
@@ -702,14 +778,33 @@ juce::Rectangle<int> RhythmPanel::headerRect() const
     return { 0, 0, getWidth(), mu_ui::s(kHeaderH) };
 }
 
-// The sample display inside its strip: with screws, narrower so a screw fits at each end.
+// The sample display inside its strip: with screws, narrower so a screw fits at each end; the
+// Sample / MIDI selector takes the right end, so the display stops short of it.
 juce::Rectangle<int> RhythmPanel::sampleDisplayRect() const
 {
     using mu_ui::s;
     const int insetX = MuLookAndFeel::hasScrews(*this) ? s(MuLookAndFeel::kScrewedPanelInset + MuLookAndFeel::kSpaceXS) : 3;
     // As tall as the header's displays, centred in the strip.
-    return sampleRect.reduced(insetX, 0).withSizeKeepingCentre(sampleRect.getWidth() - 2 * insetX,
-                                                                 s(MuLookAndFeel::kStripDisplayH));
+    auto r = sampleRect.reduced(insetX, 0).withSizeKeepingCentre(sampleRect.getWidth() - 2 * insetX,
+                                                                  s(MuLookAndFeel::kStripDisplayH));
+    return r.withTrimmedRight(outputSelectorRect().getWidth() + s(MuLookAndFeel::kSpaceXS) + (outputInsetX() - insetX));
+}
+
+// The strip's right-end inset for the selector: clear of the corner screw (screws style).
+int RhythmPanel::outputInsetX() const
+{
+    using mu_ui::s;
+    return MuLookAndFeel::hasScrews(*this) ? s(MuLookAndFeel::kScrewedPanelInset) : s(kHeaderInsetX);
+}
+
+// The Sample / MIDI selector: at the right end of the sample strip, as tall as the strip's displays,
+// centred, and kept clear of the corner screw.
+juce::Rectangle<int> RhythmPanel::outputSelectorRect() const
+{
+    using mu_ui::s;
+    const int w = s(kOutputSelectorW);
+    const int h = s(MuLookAndFeel::kStripDisplayH);
+    return { sampleRect.getRight() - outputInsetX() - w, sampleRect.getY() + (sampleRect.getHeight() - h) / 2, w, h };
 }
 
 void RhythmPanel::setVoiceEffectSendLabel(const juce::String& name)

@@ -221,7 +221,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     const int numRhythms = numActiveRhythms.load(std::memory_order_acquire);
 
     if (playing)
-        advanceSequencer(numRhythms, beatPos);
+        advanceSequencer(numRhythms, beatPos, midiMessages);
 
     // Apply modulation: compute per-rhythm modulated VoiceParams from the modulation matrix.
     // Uses a try-lock so the audio thread never blocks on the message thread.
@@ -338,11 +338,20 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
     return { playing, beatPos, bpm };
 }
 
-void PluginProcessor::advanceSequencer(int numRhythms, double beatPos)
+void PluginProcessor::advanceSequencer(int numRhythms, double beatPos, juce::MidiBuffer& midiMessages)
 {
     const auto blockResult = sequencer.processBlock(beatPos);
+    // Phase 1: a fired hit plays the rhythm's sample, or (MIDI output mode) becomes one MIDI note-on and
+    // never reaches the voice. The settings are relaxed atomics on the Rhythm; nothing here allocates.
     for (int r = 0; r < numRhythms; ++r)
-        if ((blockResult.firedMask & (1 << r)) && voiceEngines[r])
+        if ((blockResult.firedMask & (1 << r)) && sequencer.getRhythm(r).outputMode.load() == (int) mu_core::OutputMode::Midi)
+        {
+            const Rhythm& rhy = sequencer.getRhythm(r);
+            const bool accented = (blockResult.accentMask & (1 << r)) != 0;
+            midiEngines[r].trigger(midiMessages, 0, rhy.midiNote.load(), rhy.midiChannel.load(),
+                                   mu_core::midiOutVelocity(rhy.midiVelocity.load(), (float) rhy.midiAccent.load(), accented));
+        }
+        else if ((blockResult.firedMask & (1 << r)) && voiceEngines[r])
         {
             // pattern-legato gating — tiedMask is always populated by
             // the sequencer; the per-rhythm patternLegato flag decides

@@ -198,6 +198,20 @@ inline const RhythmParamDef kRhythmParamDefs[] = {
                    [](const Rhythm& r) -> float { return r.voiceParams.insertParam[2]; } },
     { "insP4",     [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.insertParam[3] = v; vd = true; },
                    [](const Rhythm& r) -> float { return r.voiceParams.insertParam[3]; } },
+
+    // -- Output mode (Sample / MIDI) and the MIDI-output settings ---------------
+    // Read by the audio thread at each hit straight from the Rhythm (RelaxedInt), so no engine sync.
+    // A product without the parameters (mu-Clid MIDI) never applies them.
+    { "outMode",    [](float v, Rhythm& r, bool&, bool&)  { r.outputMode.store(juce::jlimit(0, 1, (int)v)); },
+                    [](const Rhythm& r) -> float { return (float) r.outputMode.load(); },    ParamKind::Int },
+    { "midiNote",   [](float v, Rhythm& r, bool&, bool&)  { r.midiNote.store(juce::jlimit(0, 127, (int)v)); },
+                    [](const Rhythm& r) -> float { return (float) r.midiNote.load(); },      ParamKind::Int },
+    { "midiChan",   [](float v, Rhythm& r, bool&, bool&)  { r.midiChannel.store(juce::jlimit(1, 16, (int)v)); },
+                    [](const Rhythm& r) -> float { return (float) r.midiChannel.load(); },   ParamKind::Int },
+    { "midiVel",    [](float v, Rhythm& r, bool&, bool&)  { r.midiVelocity.store(juce::jlimit(1, 100, (int)v)); },
+                    [](const Rhythm& r) -> float { return (float) r.midiVelocity.load(); },  ParamKind::Int },
+    { "midiAccent", [](float v, Rhythm& r, bool&, bool&)  { r.midiAccent.store(juce::jlimit(0, 100, (int)v)); },
+                    [](const Rhythm& r) -> float { return (float) r.midiAccent.load(); },    ParamKind::Int },
 };
 
 inline constexpr int kRhythmParamCount = (int)(sizeof(kRhythmParamDefs) / sizeof(kRhythmParamDefs[0]));

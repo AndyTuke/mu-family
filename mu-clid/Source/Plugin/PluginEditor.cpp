@@ -92,6 +92,13 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     };
     proc.apvts.addParameterListener("eff_algo", this);
 
+    // A rhythm in MIDI output mode makes no audio, so its mixer strip is drawn inactive. The strip is
+    // refreshed when the shown rhythm's mode changes and, for host automation of any rhythm, below.
+    mixerOverlay.isChannelSilent = [this](int r) { return isRhythmMidiOutput(r); };
+    rhythmPanel.onOutputModeChanged = [this] { if (isMixerVisible()) mixerOverlay.loadFromApvts(); };
+    for (int i = 0; i < SequencerEngine::MaxRhythms; ++i)
+        proc.apvts.addParameterListener("r" + juce::String(i) + "_outMode", this);
+
     rhythmPanel.onRhythmRenamed = [this]
     {
         sidebar.repaintItems();
@@ -148,6 +155,8 @@ PluginEditor::~PluginEditor()
     // Clear product-owned processor callbacks before teardown — same UAF
     // contract as the shell base's destructor.
     proc.apvts.removeParameterListener("eff_algo", this);
+    for (int i = 0; i < SequencerEngine::MaxRhythms; ++i)
+        proc.apvts.removeParameterListener("r" + juce::String(i) + "_outMode", this);
     proc.onLayerPresetCommitted = nullptr;
 }
 
@@ -199,6 +208,16 @@ void PluginEditor::onCategoriesRefreshed(const juce::StringArray& merged)
 // fires from any thread. Marshal to the message thread before touching the UI.
 void PluginEditor::parameterChanged(const juce::String& parameterID, float)
 {
+    // A rhythm's output mode (Sample / MIDI) decides whether its mixer strip is drawn active.
+    if (parameterID.endsWith("_outMode"))
+    {
+        juce::Component::SafePointer<PluginEditor> safeThis(this);
+        juce::MessageManager::callAsync([safeThis]
+        {
+            if (safeThis && safeThis->isMixerVisible()) safeThis->mixerOverlay.loadFromApvts();
+        });
+        return;
+    }
     if (parameterID != "eff_algo") return;
 
     juce::Component::SafePointer<PluginEditor> safeThis(this);
@@ -206,6 +225,14 @@ void PluginEditor::parameterChanged(const juce::String& parameterID, float)
     {
         if (safeThis) safeThis->syncVoiceEffectSendLabel();
     });
+}
+
+// True when rhythm `r` is set to send MIDI notes instead of playing its sample.
+bool PluginEditor::isRhythmMidiOutput(int r) const
+{
+    if (auto* raw = proc.apvts.getRawParameterValue("r" + juce::String(r) + "_outMode"))
+        return raw->load() > 0.5f;
+    return false;
 }
 
 void PluginEditor::syncVoiceEffectSendLabel()
