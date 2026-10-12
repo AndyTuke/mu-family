@@ -312,6 +312,7 @@ void VoiceEngine::setParams(const VoiceParams& p)
     {
         juce::SpinLock::ScopedLockType sl(pendingLock);
         pendingParams = p;
+        if (auto* hook = setParamsHoldHook.load(std::memory_order_relaxed)) hook();   // test seam, null in production
     }
     paramsDirty.store(true, std::memory_order_release);
 }
@@ -329,7 +330,14 @@ void VoiceEngine::applyPendingParams()
     if (!paramsDirty.exchange(false, std::memory_order_acquire))
         return;
     {
-        juce::SpinLock::ScopedLockType sl(pendingLock);
+        // Never wait for the message thread: if setParams holds the lock, keep the old params for this
+        // block and leave the flag raised so the next block picks the new ones up.
+        juce::SpinLock::ScopedTryLockType sl(pendingLock);
+        if (! sl.isLocked())
+        {
+            paramsDirty.store(true, std::memory_order_release);
+            return;
+        }
         params = pendingParams;
     }
     // Reset activeParams to base params — modulation reapplies each block.

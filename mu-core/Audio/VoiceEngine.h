@@ -36,6 +36,13 @@ public:
     // Called from message thread. Stores params; audio thread picks them up in process().
     void setParams(const VoiceParams& p);
 
+    // The base params the audio thread last applied (audio thread, or a test with no audio running).
+    const VoiceParams& getAppliedParams() const noexcept { return params; }
+
+    // Test seam: called by setParams while it holds the pending-params lock, so a test can hold the
+    // lock open and check the audio thread neither blocks nor loses the update. Null in production.
+    static inline std::atomic<void (*)()> setParamsHoldHook { nullptr };
+
     // Called from audio thread only (PluginProcessor::processBlock).
     // Applies a fully-computed modulated VoiceParams for this block, bypassing the
     // message-thread pending mechanism.  Must be called before process().
