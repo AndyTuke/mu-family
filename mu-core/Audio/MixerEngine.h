@@ -273,9 +273,18 @@ public:
             r.sidechainSource.store(mu_mix::sidechainAfterSwap(r.sidechainSource.load(std::memory_order_relaxed), a, b, MaxChannels), std::memory_order_relaxed);
     }
 
-    // Read / seed one strip's follower (state inspection for the layer-edit tests).
-    float getSidechainEnv(int channelIndex) const noexcept { return scEnv[channelIndex]; }
-    void  setSidechainEnv(int channelIndex, float v) noexcept { scEnv[channelIndex] = v; }
+    // Read / seed one strip's follower (state inspection for the layer-edit tests only: never call
+    // these while audio is running, the follower is plain audio-thread state).
+    float getSidechainEnv(int channelIndex) const noexcept
+    {
+        jassert(channelIndex >= 0 && channelIndex < MaxChannels);
+        return scEnv[channelIndex];
+    }
+    void setSidechainEnv(int channelIndex, float v) noexcept
+    {
+        jassert(channelIndex >= 0 && channelIndex < MaxChannels);
+        scEnv[channelIndex] = v;
+    }
 
     // Carry one strip's sidechain follower to another slot (a remove shifts the strips down).
     void moveSidechainEnv(int from, int to) noexcept { scEnv[to] = scEnv[from]; }

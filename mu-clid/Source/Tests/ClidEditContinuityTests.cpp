@@ -49,7 +49,7 @@ namespace
         return {};
     }
 
-    // A long, steady tone: every hit sustains, so a silent block can only mean a dropped block.
+    // A long, steady tone: every hit sustains for seconds, so a hit never leaves a gap by itself.
     void writeSample(EditProcessor& p, const juce::String& name, double freq)
     {
         auto f = p.getSamplesDir().getChildFile(name);
@@ -201,8 +201,12 @@ struct ClidEditContinuityTests : juce::UnitTest
         p.loadPreset(presets.getChildFile("A3_filter.muClid"));
         p.addLayer();
         p.addLayer();
+        // Slot 0 is the guard: T13 sounds without a gap (its notes overlap, the mix never falls below about
+        // 0.4 while it plays), and no edit below touches slot 0. So the whole mix can only go quiet if an
+        // edit silences it. The other slots rest between hits (T11) or are new and empty (no sample yet),
+        // so they are the ones the edits move, delete and reset.
+        p.applyRhythmPreset(presets.getChildFile("T13.muRhythm"), 0);
         p.applyRhythmPreset(presets.getChildFile("T11.muRhythm"), 1);
-        p.applyRhythmPreset(presets.getChildFile("T13.muRhythm"), 2);
 
         SlowHostListener hostListener;
         for (auto* prm : p.getParameters()) prm->addListener(&hostListener);
@@ -222,12 +226,12 @@ struct ClidEditContinuityTests : juce::UnitTest
             settle();
         };
         timed([&] { p.addLayer(); });                  // add
-        timed([&] { p.swapLayers(0, 2); });            // reorder
-        timed([&] { p.removeLayer(1); });              // delete
-        timed([&] { p.resetLayer(0); });               // reset
+        timed([&] { p.swapLayers(1, 3); });            // reorder
+        timed([&] { p.removeLayer(2); });              // delete
+        timed([&] { p.resetLayer(2); });               // reset
         timed([&] { p.addLayer(); });
         timed([&] { p.swapLayers(1, 3); });
-        timed([&] { p.removeLayer(0); });
+        timed([&] { p.removeLayer(1); });
         timed([&] { p.addLayer(); });
         r.waitBlocks(20);
         const int editsTo = r.blocks();
@@ -250,8 +254,11 @@ struct ClidEditContinuityTests : juce::UnitTest
                    + juce::String(1000.0 * kBlock / 48000.0, 2) + " ms)");
 
         expect(editsTo - editsFrom > 80, "the worker kept rendering through the edits");
-        expect(natural < 4, "the steady tones leave no natural gap, so a silent block is a dropped one");
-        expect(during <= natural + 3, "no run of silent blocks longer than a few blocks during the edits");
+        expect(natural < 4, "the guard slot leaves no natural gap, so a silent block is a dropped one");
+        expect(during <= natural + 2, "no run of silent blocks longer than the locked phase during the edits");
+        // The locked phase is microseconds; a flag held through the parameter push (ms) shows as many flagged blocks.
+        expect(flaggedBlocks <= 1, "almost no block begins with the in-flight flag up");
+        expect(widest < 1000.0 * kBlock / 48000.0, "the flag window is shorter than one block");
     }
 
     static void setUpModulated(EditProcessor& p, int slot)
