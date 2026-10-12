@@ -35,7 +35,7 @@ target_sources(mu-core-tests PRIVATE
     ShellChromeTests.cpp
     TestShellBackend.h
     ClientStripFitTests.cpp
-    ../UI/MixerChannel.cpp
+    MasterColumnFitTests.cpp
     ../UI/MixerChannel_Bindings.cpp
     ../UI/MixerChannel_Insert.cpp
     # Sources behind ProcessorBase + the settings page (shared list, see ProcessorTestSources.cmake).

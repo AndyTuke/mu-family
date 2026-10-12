@@ -97,6 +97,22 @@ public:
     static juce::String formatClientDb(float linearLevel);
     void setMeterMode(VUMeter::MeterMode m) { vuMeter.setMode(m); }
 
+    // ─── Callback-driven Master (Type::Master only; no processor) ───────────
+    // mu-link's master column: the 80 px strip alone (name, fader, VU, dB readout; no pan, mute or
+    // solo). The owner wires onMasterLevel and pushes state in with setMasterLevel, which never
+    // fires it. The plugins' mixer keeps bindMaster and the built-in insert panel.
+    std::function<void(float linearLevel)> onMasterLevel;   // 0 .. kClientFaderMax, unity 1
+    void useCallbackMaster();                               // switch this Master to callback mode
+    void setMasterLevel(float linear);
+    void bindMasterMeter(std::atomic<float>& peak) { bindClientMeter(peak); }
+    // Show or hide the built-in insert panel (Master only; default shown, as the plugins use it).
+    void setShowInsertPanel(bool show);
+    // Top of the fader, in this strip's pixels, so the master fader lines up with the Client faders.
+    // A negative value (the default) puts it just under the name.
+    void setFaderTop(int topPx) { faderTopPx = topPx; resized(); }
+    // Where the Client strips' faders start (scaled pixels), for the owner to pass to setFaderTop.
+    static int clientFaderTop();
+
     void resized() override;
     void paint(juce::Graphics&) override;
 
@@ -109,6 +125,7 @@ private:
     void layoutFaderAndButtons(int stripW, int faderY);
     void layoutInsertPanel(int stripW, int insW, int nameBottom);
     void layoutClient();
+    void layoutCallbackMaster();
     void addClientControls();
     void paintClientName(juce::Graphics& g) const;
 
@@ -134,6 +151,9 @@ private:
                                             KnobWithLabel("Mid",    Id::knobInsertPad),
                                             KnobWithLabel("Low",    Id::knobInsertPad) };
     bool clientMuted = false, clientSoloed = false;
+    bool callbackMaster  = false;   // Master driven by onMasterLevel, not bindMaster
+    bool showInsertPanel = true;    // Master: the built-in insert column
+    int  faderTopPx      = -1;      // callback Master: fader top, -1 = under the name
 
     juce::Slider      fader;
     VUMeter           vuMeter;
@@ -195,6 +215,7 @@ private:
                                              || channelType == Type::ReverbReturn; }
     bool hasOutputBus()        const { return channelType == Type::Channel; }
     bool hasInsert()           const { return channelType == Type::Master; }
+    bool insertShown()         const { return hasInsert() && showInsertPanel; }
 
     void updateDbLabel(float level);
 

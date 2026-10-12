@@ -49,7 +49,6 @@ target_sources(mu-core INTERFACE
     # Shared mixer/FX panels
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/FXRow.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/DelayRow.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/MixerChannel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MixerChannel_Bindings.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MixerChannel_Insert.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MixerOverlay.cpp"

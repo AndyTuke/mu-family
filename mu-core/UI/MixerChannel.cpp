@@ -6,7 +6,6 @@
 #include "MixerChannel.h"
 #include "Audio/AlgorithmNames.h"   // mu-core: insert-algorithm selector list
 #include "UI/InsertSlotUi.h"        // configureKnobFromSlot (client EQ stack)
-#include "Plugin/ProcessorBase.h"
 #include <cmath>
 
 MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
@@ -136,6 +135,7 @@ void MixerChannel::updateDbLabel(float level)
 void MixerChannel::resized()
 {
     if (isClient()) { layoutClient(); return; }
+    if (callbackMaster) { layoutCallbackMaster(); return; }
 
     // Every literal/constant in setBounds wrapped in mu_ui::s(). The parent
     // (MixerOverlay) is expected to pass already-scaled width/height — i.e.
@@ -152,7 +152,7 @@ void MixerChannel::resized()
     using mu_ui::s;
 
     // Master: right portion is the insert panel; everything else uses the strip width.
-    const int insW   = hasInsert() ? s(kInsertPanelW) : 0;
+    const int insW   = insertShown() ? s(kInsertPanelW) : 0;
     const int stripW = getWidth() - insW;
 
     // Name area total Y: top padding + name pill + bottom padding (equal room round the pill).
@@ -161,7 +161,7 @@ void MixerChannel::resized()
     const int scH    = layoutSidechain(stripW, nameBottom);
     const int faderY = layoutSends(stripW, nameBottom + scH);
     layoutFaderAndButtons(stripW, faderY);
-    if (hasInsert())
+    if (insertShown())
         layoutInsertPanel(stripW, insW, nameBottom);
 }
 
@@ -377,7 +377,7 @@ void MixerChannel::paint(juce::Graphics& g)
     // name area. kNamePadding gives equal breathing room on all four sides
     // of the kNameH-tall pill so the rhythm-colour border doesn't sit on
     // the strip edge.
-    const int stripW = w - (hasInsert() ? kInsertPanelW : 0);
+    const int stripW = w - (insertShown() ? kInsertPanelW : 0);
 
     g.setColour(active ? MuLookAndFeel::colour(Id::headingText)
                        : MuLookAndFeel::colour(Id::mutedText));
@@ -418,7 +418,7 @@ void MixerChannel::paint(juce::Graphics& g)
                    12, 10, juce::Justification::centredRight, false);
 
     // ── Insert panel (Master: right portion) ─────────────────────────────────
-    if (hasInsert())
+    if (insertShown())
     {
         // Vertical separator between strip and insert panel
         g.setColour(borderCol.withAlpha(0.6f));
@@ -612,4 +612,81 @@ void MixerChannel::paintClientName(juce::Graphics& g) const
         g.drawText("-", text, juce::Justification::centred, true);
     }
     MuLookAndFeel::drawLcdFront(g, r.toFloat());
+}
+
+//==============================================================================
+// Callback-driven Master (mu-link): the 80 px strip alone, no processor behind it.
+
+void MixerChannel::useCallbackMaster()
+{
+    if (channelType != Type::Master) return;
+    callbackMaster = true;
+    setShowInsertPanel(false);
+    panKnob.setVisible(false);
+
+    // Same fader as a Client strip: 0 .. kClientFaderMax linear gain, double-click to unity.
+    fader.setRange(0.0, (double) MuLookAndFeel::kClientFaderMax, 0.001);
+    fader.setValue((double) MuLookAndFeel::kClientFaderUnity, juce::dontSendNotification);
+    fader.setDoubleClickReturnValue(true, (double) MuLookAndFeel::kClientFaderUnity);
+    fader.onValueChange = [this]
+    {
+        const auto v = (float) fader.getValue();
+        dbLabel.setText(formatClientDb(v), juce::dontSendNotification);
+        if (onMasterLevel) onMasterLevel(v);
+    };
+    dbLabel.setText(formatClientDb(MuLookAndFeel::kClientFaderUnity), juce::dontSendNotification);
+    dbLabel.setColour(juce::Label::textColourId, MuLookAndFeel::colour(Id::labelText));
+    resized();
+}
+
+void MixerChannel::setMasterLevel(float linear)
+{
+    fader.setValue((double) linear, juce::dontSendNotification);
+    dbLabel.setText(formatClientDb((float) fader.getValue()), juce::dontSendNotification);
+}
+
+void MixerChannel::setShowInsertPanel(bool show)
+{
+    if (! hasInsert()) return;
+    showInsertPanel = show;
+
+    // The insert controls exist from construction; hiding them keeps them out of the strip entirely.
+    // Knob visibility on show again is re-derived by the next algorithm configure.
+    insCharBox.setVisible(show);
+    insCharBox2.setVisible(show);
+    for (auto* k : { &insParam1, &insParam2, &insParam3, &insParam4,
+                     &insParam1_2, &insParam2_2, &insParam3_2, &insParam4_2 })
+        k->setVisible(show);
+    resized();
+    repaint();
+}
+
+int MixerChannel::clientFaderTop()
+{
+    using LF = MuLookAndFeel;
+    using mu_ui::s;
+    return s(kNamePadding) + s(LF::kClientNameH) + s(LF::kClientGap)
+         + 4 * s(LF::kMixerStripKnobH) + s(LF::kClientGap);
+}
+
+// Name at the top, then the fader + VU from faderTopPx down to the dB readout, which sits where the
+// Client strips' readouts do (their mute / solo row stays empty).
+void MixerChannel::layoutCallbackMaster()
+{
+    using mu_ui::s;
+    using LF = MuLookAndFeel;
+    const int w = getWidth(), h = getHeight();
+
+    const int top = faderTopPx >= 0 ? faderTopPx : s(kNamePadding * 2 + kNameH);
+    const int dbY = h - s(LF::kClientBottomGap) - s(LF::kClientButtonH) - s(LF::kClientDbGap) - s(LF::kClientDbH);
+    const int faderH = juce::jmax(s(LF::kClientFaderMinH), dbY - top);
+
+    const int vuW = s(kVUW);
+    fader  .setBounds(0,       top, w - vuW, faderH);
+    vuMeter.setBounds(w - vuW, top, vuW,     faderH);
+    dbLabel.setBounds(0, dbY, w, s(LF::kClientDbH));
+
+    sidechainPaneBounds = {};
+    sendsPaneBounds     = {};
+    faderPaneBounds     = { 1, top - 2, w - 2, h - top + 1 };
 }
