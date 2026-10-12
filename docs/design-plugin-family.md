@@ -463,7 +463,15 @@ throughout; the stages marked **O** also wait for owner decisions on behaviour o
    4. Under `layersLock`: pointer moves (`std::swap` / shift down by `std::move`), the mixer-channel state
       move (`swapChannelState` / `copyFrom` / `reset`), the **sidechain-source re-translation on every
       structural edit** (today only `RhythmManager::swap` does it; check that `remove` and the other
-      products do), `resetSidechainEnv` for moved slots, `numLayers`, then `Layer::onMoved` for each moved layer.
+      products do), the follower state moved with the strip (`scEnv`, see below; `resetSidechainEnv` only for new or cleared strips), `numLayers`, then `Layer::onMoved` for each moved layer.
+   **Ruled 2026-10-13 (#1318):** the sidechain follower (`MixerEngine::scEnv`, the ducking-gain state) belongs to the
+   *strip*, not the slot index: it travels with the strip on swap (exchanged) and remove (copied in the shift), so a
+   ducked strip never un-ducks for ~90 ms when it lands on another ducked strip's slot. It is zeroed only where the
+   strip itself is new or cleared: `addLayer`, `resetLayer`, and the vacated top slot after a remove.
+   **Reset layer** (`resetLayer`) means "back to a freshly added layer in this slot": layer data, parameters **and the
+   mixer strip** (level, pan, sends, mute/solo, sidechain, output bus) all return to defaults, family-wide, as
+   `addLayer` already does. The "mixer state stays with the slot" wording applies only to loading or saving a *layer
+   preset* (`.muRhythm` etc.), which never touches the strip; it does not describe reset.
    `layersMoved(first, last)` fires here, under the lock.
    5. Unlock, then move the **parameter values** by slot, inside the `ScopedApvtsLoading` guard and still
       suspended, so no block ever pairs a moved layer with unmoved parameters. For products where the APVTS
