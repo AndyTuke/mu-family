@@ -160,6 +160,53 @@ public:
             root.deleteRecursively();
         }
 
+        beginTest("the clock lamp reports Drifting while the phase servo is off its grid, then Locked; Lost wins");
+        {
+            using S = MidiClockSync::ClockState;
+            const auto root = freshRoot();
+            AudioServer server;
+            expect(server.startHeadless(48000.0, 250, 120.0), "bus failed");
+            LinkShellBackend shell(server, root);
+            double fakeNow = 1000.0;
+            shell.nowMs = [&fakeNow] { return fakeNow; };
+            Renderer r(server, 250);                      // a pulse every 4 blocks at 120 BPM
+
+            shell.setMidiSyncEnabled(true);
+            auto& est = server.midiClockEstimator();
+            est.onStart();
+            double tm = 0.0;
+            auto pulses = [&](int n)
+            {
+                for (int p = 0; p < n; ++p)
+                {
+                    est.onClockPulse(tm); tm += 0.5 / 24.0;
+                    for (int b = 0; b < 4; ++b) r.block();
+                }
+            };
+            pulses(200);
+            expect(shell.getMidiClockState() == S::Locked, "steady clock is Locked");
+
+            for (int p = 0; p < 6; ++p) { est.onClockPulse(tm); tm += 0.5 / 24.0; }   // jump a quarter beat ahead
+            bool drifted = false;
+            for (int p = 0; p < 10 && ! drifted; ++p)     // the averaged error builds up over a few pulses
+            {
+                pulses(1);
+                drifted = shell.getMidiClockState() == S::Drifting;
+            }
+            expect(drifted, "off the grid is Drifting");
+
+            pulses(400);
+            expect(shell.getMidiClockState() == S::Locked, "re-aligned is Locked again");
+
+            // Lost takes precedence: the pulses stop while the servo was last reported drifting.
+            for (int p = 0; p < 6; ++p) { est.onClockPulse(tm); tm += 0.5 / 24.0; }
+            for (int p = 0; p < 10; ++p) pulses(1);
+            expect(shell.getMidiClockState() == S::Drifting);
+            fakeNow += LinkShellBackend::kClockLostMs + 1.0;
+            expect(shell.getMidiClockState() == S::Lost, "no pulses for the watchdog time is Lost, not Drifting");
+            root.deleteRecursively();
+        }
+
         beginTest("the sync offset reaches the server, is clamped and survives a restart");
         {
             const auto root = freshRoot();

@@ -4,6 +4,7 @@
 #include "Link/AudioRing.h"
 #include "../Ipc/MuLinkServerMemory.h"
 #include "../Clock/TransportClock.h"
+#include "../Clock/ClockLock.h"
 #include "../Clock/MidiClockEstimator.h"
 #include "Audio/FX/Insert/EqInsert.h"   // mu-core: shared 3-band EQ insert (per-client strip)
 #include "Audio/InsertProcessor.h"      // mu-core: full insert-FX rack (two master-bus inserts)
@@ -201,6 +202,12 @@ public:
     ClockSource clockSourceMode()       const noexcept { return clockSource.load(std::memory_order_relaxed); }
     void        attachMidiClock(MidiClockEstimator* e) noexcept { midiClock = e; }
 
+
+    // The servo's remaining phase error in beats (absolute) and whether it counts as drifting, for
+    // the clock lamp. Written by the audio thread each block; 0 / false while not servoing.
+    float externalPhaseErrorBeats() const noexcept { return phaseErrorBeats.load(std::memory_order_relaxed); }
+    bool  externalDrifting()        const noexcept { return clockDrifting.load(std::memory_order_relaxed) != 0u; }
+
     // Latest per-block peak (linear, 0–1) for metering. Per active client and the summed
     // master; the GUI reads these on the message thread and applies its own ballistics.
     float clientPeak(int slot) const noexcept { return validSlot(slot) ? clientPeakLevel[slot].load(std::memory_order_relaxed) : 0.0f; }
@@ -263,18 +270,36 @@ public:
             // clock is on average half a pulse old when read, so aim half a pulse past it. The step
             // per block is capped well under the beat the block advances, so the beat stays monotone.
             const std::int64_t songPulse = midiClock->songPulse();
+            bool servoed = false;
             if (extRunning && extAlive && extBpm > 0.0 && songPulse >= 0 && clock.isPlaying() && ! rewoundInBlock)
             {
+                servoed = true;
                 const double target = ((double) songPulse + 0.5) / 24.0;
                 const double err    = target - clock.beats();
-                if (std::abs(err) > 1.0)
+                const double gain = 1.0 - std::exp(-(double) numFrames / (kPhaseServoSeconds * sr));
+                // The error for the lamp: the clock count arrives in whole pulses, so the raw error
+                // saws through about +/- half a pulse even on a perfect lock. A one-pole average at
+                // the servo's own time constant keeps what is really off the grid and drops that saw.
+                const bool jump = std::abs(err) > 1.0;
+                errorAverage = jump ? err : errorAverage + gain * (err - errorAverage);
+                servoDrifting = nextDriftingState(servoDrifting, std::abs(errorAverage));
+                phaseErrorBeats.store((float) std::abs(errorAverage), std::memory_order_relaxed);
+                clockDrifting.store(servoDrifting ? 1u : 0u, std::memory_order_relaxed);
+                if (jump)
                     clock.locate(target);                           // far off (a missed locate): jump
                 else
                 {
                     const double blockBeats = clock.tempo() / 60.0 * (double) numFrames / sr;
-                    const double gain       = 1.0 - std::exp(-(double) numFrames / (kPhaseServoSeconds * sr));
                     clock.nudge(std::clamp(gain * err, -0.1 * blockBeats, 0.1 * blockBeats));
                 }
+            }
+            if (! servoed)
+            {
+                // Not servoing (stopped, waiting for the first clock, or lost): nothing is off its grid.
+                servoDrifting = false;
+                errorAverage  = 0.0;
+                phaseErrorBeats.store(0.0f, std::memory_order_relaxed);
+                clockDrifting.store(0u, std::memory_order_relaxed);
             }
         }
         else
@@ -513,6 +538,11 @@ private:
     double              sr = 48000.0;
     int                 maxBlockFrames = 0;   // de-interleave scratch capacity (frames)
     std::vector<float>  scratch;   // de-interleave buffer, allocated in prepare()
+
+    std::atomic<float>         phaseErrorBeats { 0.0f };   // audio thread → UI: servo error (abs, beats)
+    std::atomic<std::uint32_t> clockDrifting   { 0u };     // audio thread → UI: 1 = drifting
+    bool                       servoDrifting   = false;    // audio thread only: the hysteresis state
+    double                     errorAverage    = 0.0;      // audio thread only: averaged signed servo error (beats)
 
     std::atomic<ClockSource> clockSource { ClockSource::Internal };
     MidiClockEstimator*      midiClock = nullptr;   // not owned (lives in AudioServer)

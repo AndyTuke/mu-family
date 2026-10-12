@@ -9,6 +9,7 @@
 #include "../Server/ServerEngine.h"
 #include "../Ipc/MuLinkServerMemory.h"
 #include "../Clock/MidiClockEstimator.h"
+#include "../Clock/ClockLock.h"
 #include "../Clock/MidiClockOut.h"
 #include "Link/MuLinkSharedMemory.h"
 #include "Plugin/MidiClockSync.h"   // mu-core: the receiver the round-trip test feeds
@@ -700,6 +701,87 @@ public:
             for (int i = 0; i < 4; ++i) { est.onClockPulse(t); t += 0.5 / 24.0; }
             engine.renderBlock(out.data(), 2, 512);
             expectWithinAbsoluteError(readTransport(mem.transport()).ppqPosition, 4.0, 1.0e-9, "Continue resumes from the locate");
+        }
+
+        beginTest("clock lamp hysteresis: Drifting above 1/48 beat, Locked again only below 1/96 beat");
+        {
+            expect(! nextDriftingState(false, 0.0), "locked at zero error");
+            expect(! nextDriftingState(false, kDriftThresholdBeats), "exactly 1/48 beat is still locked");
+            expect(nextDriftingState(false, kDriftThresholdBeats + 1.0e-6), "just above 1/48 drifts");
+            // Between the two thresholds the state holds, whichever side it came from.
+            const double between = 0.5 * (kDriftThresholdBeats + kRelockThresholdBeats);
+            expect(! nextDriftingState(false, between), "a locked grid between the thresholds stays locked");
+            expect(nextDriftingState(true, between), "a drifting grid between the thresholds stays drifting");
+            expect(nextDriftingState(true, kRelockThresholdBeats), "exactly 1/96 beat is not yet below it");
+            expect(! nextDriftingState(true, kRelockThresholdBeats - 1.0e-6), "below 1/96 beat re-locks");
+            expectWithinAbsoluteError(kDriftThresholdBeats, 1.0 / 48.0, 1.0e-12);
+            expectWithinAbsoluteError(kRelockThresholdBeats, 1.0 / 96.0, 1.0e-12);
+
+            // A sequence that crosses both thresholds and wobbles near each of them.
+            const double errors[] = { 0.0, 0.015, 0.020, 0.022, 0.019, 0.012, 0.0105, 0.0100, 0.011, 0.020, 0.0215, 0.005 };
+            const bool   expected[] = { false, false, false, true, true, true, true, false, false, false, true, false };
+            bool state = false;
+            for (std::size_t i = 0; i < std::size(errors); ++i)
+            {
+                state = nextDriftingState(state, errors[i]);
+                expect(state == expected[i], "sequence step " + juce::String((int) i));
+            }
+        }
+
+        beginTest("external clock: the phase error is published, Drifting after a jump and Locked once re-aligned");
+        {
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            MidiClockEstimator est;
+            engine.attachMidiClock(&est);
+            engine.setClockSource(ClockSource::ExternalMidi);
+            constexpr int blockFrames = 250;                  // 120 BPM at 48 kHz: a pulse every 1000 frames = 4 blocks
+            engine.prepare(48000.0, blockFrames, 120.0);
+            OutputBuffers out(2, blockFrames);
+
+            expect(! engine.externalDrifting(), "not drifting before any clock");
+            est.onStart();
+            double tm = 0.0;
+            auto runPulses = [&](int numPulses, bool& sawDrifting)
+            {
+                for (int p = 0; p < numPulses; ++p)
+                {
+                    est.onClockPulse(tm); tm += 0.5 / 24.0;
+                    for (int b = 0; b < 4; ++b)
+                    {
+                        engine.renderBlock(out.data(), 2, blockFrames);
+                        sawDrifting = sawDrifting || engine.externalDrifting();
+                    }
+                }
+            };
+
+            bool sawDrifting = false;
+            runPulses(200, sawDrifting);                       // steady clock: the grid settles
+            expect(! engine.externalDrifting(), "locked on a steady clock");
+            expect(engine.externalPhaseErrorBeats() < (float) kRelockThresholdBeats, "small error when locked");
+
+            // The source jumps ahead by six pulses (a quarter beat): the servo is far off its grid.
+            sawDrifting = false;
+            for (int p = 0; p < 6; ++p) { est.onClockPulse(tm); tm += 0.5 / 24.0; }
+            float peakError = 0.0f;
+            for (int p = 0; p < 10; ++p)                       // a few pulses on: the averaged error builds up
+            {
+                runPulses(1, sawDrifting);
+                peakError = std::max(peakError, engine.externalPhaseErrorBeats());
+            }
+            expect(sawDrifting, "drifting after the jump");
+            expect(peakError > (float) kDriftThresholdBeats, "the published error rose above the tolerance");
+
+            runPulses(400, sawDrifting);                       // the servo pulls the grid back
+            expect(! engine.externalDrifting(), "locked again once re-aligned");
+
+            // A stopped transport has nothing to be off.
+            est.onStop();
+            engine.renderBlock(out.data(), 2, blockFrames);
+            expect(! engine.externalDrifting(), "not drifting while stopped");
+            expectEquals(engine.externalPhaseErrorBeats(), 0.0f);
         }
     }
 };

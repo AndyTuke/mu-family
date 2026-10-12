@@ -131,6 +131,9 @@ public:
     double      externalBpm()           const noexcept { return midiClockInput.estimator().bpm(); }
     bool        externalRunning()       const noexcept { return midiClockInput.estimator().isRunning(); }
     std::uint64_t externalPulseCount()  const noexcept { return midiClockInput.estimator().pulseCount(); }
+    // The phase servo's remaining error (beats, absolute) and its Drifting verdict, for the clock lamp.
+    float externalPhaseErrorBeats() const noexcept { return engine.externalPhaseErrorBeats(); }
+    bool  externalDrifting()        const noexcept { return engine.externalDrifting(); }
     // The estimator the MIDI input feeds; a test feeds it pulses directly.
     MidiClockEstimator& midiClockEstimator() noexcept { return midiClockInput.estimator(); }
 

@@ -110,8 +110,8 @@ public:
     double getMidiClockBpm()    const noexcept override { return server.externalBpm(); }
     bool   isMidiClockPlaying() const noexcept override { return server.externalRunning(); }
 
-    // Waiting until a pulse is heard, Locked while pulses arrive, Lost once they stop. (Drifting needs
-    // the server's phase error, which the server does not publish yet.)
+    // Waiting until a pulse is heard, Locked while pulses arrive and the beat grid is on the clock's,
+    // Drifting while the server's phase servo is still pulling it back, Lost once the pulses stop.
     MidiClockSync::ClockState getMidiClockState() const noexcept override
     {
         using S = MidiClockSync::ClockState;
@@ -121,7 +121,8 @@ public:
         const double now = nowMs();
         if (count != lastPulseCount) { lastPulseCount = count; lastPulseMs = now; }
         if (count == 0) return S::Waiting;
-        return (now - lastPulseMs > kClockLostMs) ? S::Lost : S::Locked;
+        if (now - lastPulseMs > kClockLostMs) return S::Lost;
+        return server.externalDrifting() ? S::Drifting : S::Locked;
     }
 
     int  getSyncOffsetMs() const noexcept override { return server.syncOffsetMs(); }
