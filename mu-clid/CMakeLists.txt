@@ -130,6 +130,7 @@ target_sources(mu-clid_Standalone PRIVATE
 # Counter file + header live in family-shared space so every product shares one number.
 add_custom_target(increment_build_number ALL
     COMMAND ${CMAKE_COMMAND} -DBUILD_CONFIG=$<CONFIG>
+            "-DFOCUSED_BUILD=${MUFAMILY_FOCUSED_BUILD}"
             "-DMUFAMILY_COPYRIGHT=${MUFAMILY_COPYRIGHT}"
             "-DRC1_IN=${CMAKE_SOURCE_DIR}/mu-clid/resources/versioninfo.rc.in"
             "-DRC1_OUT=${CMAKE_BINARY_DIR}/mu-clid/versioninfo.rc"

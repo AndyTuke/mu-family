@@ -4,13 +4,14 @@ Build the mu-family. Default to **Debug** (a normal code change). Build **Releas
 
 0. **Source checks first:** `pwsh tests/scripts/check-comment-refs.ps1 -Quiet` (no backlog numbers in source comments). A FAIL is fixed before building — reword the comment, keep the reason, drop the number.
 1. **Reconfigure first, always:** `cmake -B build` (fast ~2s; regenerates icon.ico, versioninfo.rc, and the build-number RC bake — skipping it ships stale artefacts).
-2. **Debug** (any code change, all products): `cmake --build build --config Debug`
+2. **Focused Debug** (normal work on one or two apps — owner rule 2026-10-12): `cmake -B build -DMUFAMILY_FOCUSED_BUILD=ON`, then build only those apps' targets (e.g. `cmake --build build --config Debug --target mu-tant_Standalone mu-tant-tests`; add `mu-core-tests` when shared code changed). The number is **not** incremented. Build and test only when really required.
+2b. **Stage-boundary Debug** (a ruled stage closing, or when Andy says so; all products): `cmake -B build -DMUFAMILY_FOCUSED_BUILD=OFF`, then `cmake --build build --config Debug`. This increments the number by exactly 1; build every test target explicitly too (`mu-clid-tests` and the others are not in ALL).
 3. **Full build** (only if asked — "full" or "release"): `cmake --build build --config Debug && cmake --build build --config Release`
    - Release deploys to OneDrive **only** when configured with `-DMUFAMILY_DEPLOY_TESTERS=ON`. Without the flag it stays local. Debug never deploys.
 
 ## Build-number policy (owner rules — do not work around)
 
-- **Every Debug build increments the number by exactly 1.** No time/session throttle.
+- **Every full (stage-boundary) Debug build increments the number by exactly 1.** No time/session throttle. A focused build (`-DMUFAMILY_FOCUSED_BUILD=ON`) reuses the current number and never increments.
 - **Release never increments** — it reuses the last Debug number and rebuilds only Release artefacts (Debug untouched).
 - **Release ≤ last Debug, always.** A Release coming out *higher* than the last Debug means `IncrementBuildNumber.cmake` aborts with FATAL_ERROR — surface it to the owner, don't bypass.
 - **Never bump `build_number.txt` manually.**

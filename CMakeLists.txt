@@ -62,6 +62,11 @@ message(STATUS "JUCE ${MUFAMILY_JUCE_FOUND} (matches juce-version.txt)")
 # The per-plugin OneDrive POST_BUILD deploy steps are guarded by this option.
 option(MUFAMILY_DEPLOY_TESTERS "Deploy Release artefacts to the OneDrive tester share" OFF)
 
+# Focused builds: while working on one or two apps, configure with -DMUFAMILY_FOCUSED_BUILD=ON and build
+# just those targets; the build number is read but not incremented. The full Debug build of every app at
+# a stage boundary uses the default OFF, which increments the number by exactly 1.
+option(MUFAMILY_FOCUSED_BUILD "Build without incrementing the build number (focused work on 1-2 apps)" OFF)
+
 # ── Family-wide version metadata ────────────────────────────────────────────
 # Read the current build number at configure time so PLUGIN_VERSION in every
 # juce_add_plugin call reflects the real release number rather than the cmake

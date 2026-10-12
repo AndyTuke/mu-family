@@ -40,6 +40,10 @@ if(BUILD_CONFIG STREQUAL "Release")
         endif()
     endif()
     set(BUMP_NOTE "release — reusing #${BUILD_NUMBER}")
+elseif(FOCUSED_BUILD)
+    # Focused work on one or two apps: keep the current number (no bump, no witness update). The
+    # full Debug build at a stage boundary (option OFF) is what increments it.
+    set(BUMP_NOTE "focused debug — reusing #${BUILD_NUMBER}")
 else()
     math(EXPR BUILD_NUMBER "${BUILD_NUMBER} + 1")
     file(WRITE "${COUNTER_FILE}"   "${BUILD_NUMBER}")
