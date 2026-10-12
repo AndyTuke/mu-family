@@ -256,6 +256,7 @@ target_sources(mu-clid-tests PRIVATE
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked), its
     # collaborators and the licence glue, so tests construct the product class itself.
     Source/Tests/ProcessorSeamTests.cpp
+    Source/Tests/ClidScriptedEditRenderTests.cpp
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_APVTS.cpp
     Source/Plugin/PluginProcessor_Modulation.cpp
