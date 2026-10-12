@@ -34,7 +34,7 @@ Left to right, standard widths from the shared bar: `[logo "μ-link", kLogoW 88]
 | Preset dropdown, New, Save | the shared ones. They replace the old Save / Presets buttons and the preset-name label. Browsing the folder is the shared dropdown's own "Browse" entry (the `PresetBrowser` overlay). **New** restores the defaults (120.0 BPM, all gains unity, EQ flat, both inserts None, scenes cleared) |
 | Mixer button | hidden (`setShowMixerToggle(false)`): the mixer is the main area |
 | Gear | opens the Settings overlay (section 5); it replaces the old "Options" button |
-| Tap, Nudge | not present in mu-link (family section 6.5 stands): hide them with a shared bar option, not a local copy |
+| Tap, Nudge | not present in mu-link (family section 6.5 stands): hidden with `TransportBar::setShowTapAndNudge(false)` (done), not a local copy. The Internal / MIDI In segment re-fires on re-select via `SegmentControl::setFiresOnReselect` (done); the Client strip is `MixerChannel::Type::Client` (done) |
 
 ## 3. Mixer panel (1170 x 662)
 
@@ -48,12 +48,12 @@ One metal panel. Contents, top to bottom, using the strip anatomy of the family 
 | Part | Spec |
 |---|---|
 | Name | an LCD text field (`drawLcdGlass` / `lcdFont(kLcdTextH)`) one line, ellipsised. Connected: the app name or preset name lit in the **voice colour `channelPalette[slotIndex]`** (slot 1 = Red ... slot 8 = Copper; fixed by slot position, so a slot keeps its colour). Empty slot: unlit ghost lettering "-" (`Lighting::lcdGhost`) |
-| EQ stack | four `KnobWithLabel`, `knobInsertPad`, size `kMixerStripKnobW` x `kMixerStripKnobH` (73 x 46), top to bottom **High, Mid Hz, Mid, Low** (desk order, as today). Configured with `mu_ui::configureKnobFromSlot` for the 3-Band EQ algorithm so labels, ranges and value text are the products' own ("Low", "Mid", "Mid Hz", "High"; dB and Hz formatters). The old raw sliders and the abbreviated "Hz" label go. Double-click or Ctrl+click resets to flat |
-| Fader + VU | the family fader and `VUMeter` (10 px, right-adjacent, no gap). **The fader takes all the height left in the strip** (the 200 px `kFaderMaxH` cap is for strips that also carry sends and sidechain; a Client strip has neither, so the cap does not apply). Range 0 to 1.5 linear, unity 1.0, double-click returns to unity |
+| EQ stack | four `KnobWithLabel`, `knobInsertPad`, size `kMixerStripKnobW` x `kMixerStripKnobH` (73 x 46), top to bottom **High, Mid Hz, Mid, Low** (desk order, as today). Configured with `mu_ui::configureKnobFromSlot` for the 3-Band EQ algorithm so ranges and value text are the products' own (dB and Hz formatters); labels are the full words **"High", "Mid Hz", "Mid", "Low" with no unit** (family rule, §3.5; `configureKnobFromSlot` default `SlotLabelUnits::None`). The old raw sliders and the abbreviated "Hz" label go. Double-click or Ctrl+click resets to flat |
+| Fader + VU | the family fader and `VUMeter` (10 px, right-adjacent, no gap). **The fader takes all the height left in the strip** (the 200 px cap belongs to overlay strips that also carry sends and sidechain; a Client strip has neither, so it does not apply; minimum `kClientFaderMinH` 40). Range 0 to `kClientFaderMax` (1.5) linear, unity `kClientFaderUnity` (1.0), double-click returns to unity |
 | dB readout | 9 pt `labelText` under the fader, one decimal (`0.0`, `-6.0`, `+3.5`); the status bar shows `Client 3 level` / `-6.0 dB` |
 | Mute, Solo | the family M / S buttons (`vuMeterClip` red when muted, `knobLevel` amber when soloed, as in the mixer overlay) |
 
-Budget, per strip, Medium: inner height 662 - 2 x `kChannelInset`(7) - header 22 - plate/gap 4 = 622. Parts: name 18 + gap 6 + EQ 4 x 46 = 184 + gap 6 + dB 18 + gap 4 + mute/solo 24 + `kLabelGap` 6 = 266. Fader = 622 - 266 = **356** (the minimum is 40). Fits with the knob grid and the strips' widths.
+Budget, per strip, Medium: inner height 662 - 2 x `kChannelInset`(7) - header 22 - plate/gap 4 = 622. Parts: name `kClientNameH` 18 + `kClientGap` 6 + EQ 4 x 46 = 184 + `kClientGap` 6 + dB `kClientDbH` 18 + `kClientDbGap` 4 + mute/solo `kClientButtonH` 24 + `kClientBottomGap` 6 = 266. Fader = 622 - 266 = **356** (the minimum is 40). Fits with the knob grid and the strips' widths.
 
 An **empty slot** is drawn inactive (`MixerChannel::setActive(false)`: dimmed) but stays operable, so a level or EQ can be set before the app connects. A slot's mute / solo / EQ state is kept as today.
 

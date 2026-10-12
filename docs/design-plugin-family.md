@@ -671,6 +671,30 @@ layer-swap commit (`commitDeferredWork`), MIDI program changes and the control r
 render) drains the mailbox synchronously. Any new audio-to-message hand-off uses this mailbox; never `AsyncUpdater`,
 `MessageManager::callAsync` or a `Timer` start from the audio thread. Each destructor stops the poll first.
 
+**Host requirement: a running JUCE message loop (decided 2026-10-12, documented, no fallback drain added).** The `SwapPoll` timer
+(`MidiControlRouter::kDeferredWorkPollHz` = 100 Hz) is a `juce::Timer`, so it only fires while the host runs the JUCE message loop.
+Everything that goes through the mailbox depends on it: queued parameter changes from the control router, MIDI program changes,
+and the commit of staged hot-swaps (`commitDeferredWork`). A host that never runs a message loop (some headless or offline
+renderers and command-line batch hosts) never drains the mailbox, so until a loop runs:
+
+- a control-surface or MIDI-mapped parameter change is queued and not applied;
+- a MIDI program change does not load its preset;
+- a per-slot or full-preset load made while playing is staged but never committed at its loop boundary, so the old pattern
+  keeps playing.
+
+A load while stopped, and anything applied directly on the message thread, is unaffected. Workaround: render with a message loop
+(pump the JUCE `MessageManager`, or use a host that does), or load through the full-preset path while stopped, which applies at
+once. A fallback drain from `processBlock` was rejected: it would put message-thread work (ValueTree edits, allocation, locks)
+on the audio thread, against the mailbox rule above. Offline render inside the products is covered by
+`flushPendingAsyncUpdates()`.
+
+User-facing wording (for the Linux release notes and the manuals, via `/notes` and the `user-documentation-author`):
+
+> mu plugins need the host to run its normal event loop, as every ordinary DAW does. A few headless or offline-only renderers
+> do not. In those, changes made by MIDI or a controller, MIDI program changes, and preset loads made while playing may not take
+> effect until the host runs its event loop. If you hit this, load presets while the transport is stopped, or render with a host
+> that runs its event loop.
+
 **Open design issue (2026-10-11, being fixed):** the commit is polled, so it lands up to about 10 ms after the boundary the audio
 thread flagged. The new pattern then starts from its own step 0 at the wrong phase relative to the loop that just wrapped.
 The fix must make the commit phase-correct (carry the elapsed offset into the new state, or commit on the audio thread's

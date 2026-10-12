@@ -150,7 +150,7 @@ JUCE font. No external typeface dependency.
 | `StatusBar` | full width | 20px | Bottom chrome |
 | `TransportBar` | full width | 36px | Top chrome |
 | `StatusLamp` (lamp + label) | lamp `kStatusLampD` 8px + `kSpaceXS` + label width | lamp centred in the row | Label 11pt (row label). In the TransportBar its slot is `TransportBar::kClockW` 44px |
-| Mixer fader cap | — | 200px max | `kFaderMaxH`; minimum 40px |
+| Mixer fader cap | — | 200px max | Overlay `MixerChannel` strips only (computed in `MixerOverlay` layout, no token); minimum 40px. A Client strip (mu-link) has no cap: its fader takes the remaining height, minimum `kClientFaderMinH` (40) |
 | Mixer channel strip / sends / FX rows | proportional | proportional | Sizes are computed from the available `MixerOverlay` bounds in `resized()` rather than fixed pixel constants (Stage 32). Send knob height tracks pan knob height; channel widths scale to fit 8 rhythm + 3 return + master within the strip area. |
 
 ### Per-layer panel stack (every instrument product)
@@ -177,11 +177,11 @@ Ruled 2026-10-11 so the four instruments share one vertical structure (the owner
 
 **Control label gap (mandatory).** A control label (the text under a
 `KnobWithLabel`, a dropdown caption, etc.) must **never touch or overflow the
-panel border** — always leave a small gap (≥6px, `kLabelGap`) between the lowest
+panel border** — always leave a small gap (≥6px, `kPanelPad`) between the lowest
 label and the enclosing panel's bottom edge. When a boxed section holds a row of
 knob cells, size the box to fully contain the cell height (`kKnobSize2H`) **plus**
 the label gap plus the inner padding, and reserve that gap at the bottom in
-`resized()` (e.g. `inner.removeFromBottom(s(kLabelGap))`) so a label can never
+`resized()` (e.g. `inner.removeFromBottom(s(kPanelPad))`) so a label can never
 render against the border. A label jammed against the frame reads as a layout
 bug — this is the family standard that prevents it.
 
@@ -203,7 +203,7 @@ The page is **two columns** in the 1088 wide overlay: column width `(min(w - 2 x
 ### Overlay and dialog fit rules
 
 - **Mixer.** `MixerOverlay` keeps the FX rack at `kMixerFXAreaH` and gives the channel strips the rest: strip height = `getHeight()` - header - FX area, never the fixed `kMixerStripH`. Every strip section must still fit at the 774 worst case (fader at least 40 px). The master insert column is laid out as a **2 x 2 knob grid for every algorithm including EQ** (order Low, Mid / Mid Hz, High); the stacked four-high EQ layout needs 534 px and overflows the 531 px strip. Insert panel width is at least `2 x kKnobSize2W` plus label and padding (`kInsertPanelW` 136).
-- **Strip sections** end at least `kLabelGap` above their pane border (the Side Chain Attack / Release knobs end exactly on it today).
+- **Strip sections** end at least `kPanelPad` above their pane border (a Client strip uses `kClientBottomGap`) (the Side Chain Attack / Release knobs end exactly on it today).
 - **MIDI program-change panels** (`MidiPresetListPanel`): header 36 px holds a Close button that fits wholly inside it (`kCloseBtnH` 26 centred), and every list-row dimension and font goes through `s()` / `sf()` so Large matches Medium. The 128-row list scrolls (open-ended list).
 - **Dialog button rows** (`ModalDialog`): the row of buttons (`max(72, text + 28)` each, 8 gap) must fit the card's inner width with at least `kPad` spare; a dialog with more or longer buttons is shortened in wording, not widened per call. The support prompt measures about 325 of 360 px.
 - **About card** (400 x 300): header block ends at y=114, credits are 17 px each (five today, room for eight), bottom button row at y=260. The supporter thank-you shares the bottom row left of Close in 132 px and has about 12 px spare; if the wording grows it moves to its own line above the row.
@@ -217,7 +217,7 @@ The page is **two columns** in the 1088 wide overlay: column width `(min(w - 2 x
 The primary parameter control. Rotary knob drawn by `MuLookAndFeel::drawRotarySlider`, label below.
 
 - **Knob colour**: pass the appropriate `ColourIds` token at construction — the LookAndFeel maps it to the knob arc colour
-- **Label**: always a full word, rendered in `labelText` colour
+- **Label**: always a full word, rendered in `labelText` colour, **never with a unit** ("Mid Hz", "High", "Time"; not "High (dB)"). The unit belongs to the value text (`textFromValueFunction`, shown in the StatusBar and on edit). The label is set once and never rewritten on value change. A control whose label needs the unit to be understood is renamed, not suffixed. Slot-driven knobs follow this through `mu_ui::configureKnobFromSlot` (`SlotLabelUnits::None` default; see the ruling of 2026-10-12)
 - **Value display**: `textFromValueFunction` must be set for any non-trivial unit (Hz/kHz formatting, percentage, dB)
 - **Hz params**: use the family-standard formatter (see §6.4)
 - **Callbacks**: use `onValueChanged(double)` for data binding — never override `getSlider().onValueChange` directly
@@ -450,6 +450,8 @@ setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appYellow));   // mu-On
 
 ## Design rulings
 
+- 2026-10-12 — `configureKnobFromSlot` puts units on labels ("High (dB)", "Mid Hz (Hz)") and rewrites the label on every value change; allowed? No: the family rule is full words, no units on labels. The helper takes a trailing parameter `SlotLabelUnits labelUnits = SlotLabelUnits::None` (enum `{ None, Suffix }`); `None` sets `cfg.label` once and the `onValueChanged` lambda no longer calls `setLabel`; `Suffix` keeps today's `composeSlotLabel` behaviour and exists only as an escape hatch (no caller uses it). The dynamic Hz/kHz and ms/s flip stays in `formatSlotValue` (value text). Affects every caller (InsertSubsection, MixerChannel_Insert x2, MixerChannel client EQ, mu-link master inserts): all lose label units, which is the intent. Changed §3.5 KnobWithLabel.
+- 2026-10-12 — Docs named tokens that do not exist (`kLabelGap`, `kFaderMaxH`)? Replaced by `kPanelPad` (6, the label gap) and the real `kClient*` tokens in `MuLookAndFeel`; the 200 px mixer-overlay fader cap has no token and the docs now say so. Changed §3 sizing table, "Control label gap", "Overlay and dialog fit rules", mu-link/design-ui.md sections 2 and 3.
 - 2026-10-11 — mu-link adopts the mu-core UI? Yes: standard 1170 x 870 window, shared TransportBar (NudgeInput BPM, clock lamp, Internal / MIDI In segment in the loop slot, preset dropdown, gear), a Mixer panel of eight `MixerChannel`-anatomy client strips plus the master column, a Scenes panel (pill `SegmentControl` + per-client cells), shared Settings overlay (Display size, device button, Sync offset). Supersedes "mu-link has no settings overlay". App colour is Andy's call (steel until then). New: `docs/mu-link/design-ui.md`; changed §6 SegmentControl (`setFiresOnReselect`), §6.4, §11.
 - 2026-10-11 — mu-link Locked / Drifting clock indicator? The shared `StatusLamp` in the transport bar's clock slot with a fourth state, Drifting (amber, `lampOn`), tolerance 1/48 beat with 1/96 hysteresis. Changed §3.5; detail in mu-link/design-ui.md section 4.
 - 2026-10-11 — Shared layer sidebar and panel, and matching panel sizing across apps? One `LayerSidebar` with no product subclasses (mini-visual only; swap and pending hooks come from the processor's layer virtuals) and one `LayerPanel` shell; every instrument uses header strip 32 / content 464 / modulator 318 (`kLayerHeaderStripH`, `kLayerContentH`, `kLayerModulatorH`), modulator panel absorbing banner loss. Changed §5 (new "Per-layer panel stack"), §9.
