@@ -136,7 +136,10 @@ The `mu-core` INTERFACE library (introduced in Stage 33) holds everything shared
 | `FXChain` + slots | `mu-core/Audio/FX/` | Generic send / return / insert chain |
 | `ModulationMatrix`, `ControlSequence`, `ModulatorSerialise` | `mu-core/Modulation/`, `mu-core/Sequencer/` | Modulation system + shared (de)serialise; product's slot inherits `Layer` |
 | UI widgets | `mu-core/UI/Components/` | Knob, dropdown, segment, step / LFO editor, VU, status bar, `MuLookAndFeel` |
-| `MixerChannel`, `MixerOverlay`, `FXRow`, `DelayRow` | `mu-core/UI/` | Shared mixer + FX panels |
+| `MixerChannel`, `MixerOverlay`, `FXRow`, `DelayRow` | `mu-core/UI/` | Shared mixer + FX panels. `MixerChannel` is callback-driven: `isMaster()` replaces the old `hasInsert()` / `insertShown()`, and `setShowInsertPanel` is gone (the master strip never hosts an insert; the panel is a separate component). `MixerOverlay` owns the panel and the binder |
+| `MasterInsertPanel`, `InsertSlotConfig.h` | `mu-core/UI/` | The one master insert layout in the family (callback-only; used by the plugins and mu-link). `SlotConfig::disabledFromP1` plus `insertSlotEnabled()` give the Vocoder / VocoderSt grey-out (P2 to P4 off when P1, the Wave, is 2 or more) inside the panel; `setGainReductionSource(slot, const std::atomic<float>*)` feeds the Compressor / Limiter GR meter |
+| `MasterInsertBinding` | `mu-core/UI/MasterInsertBinding.{h,cpp}` | **Plugin-only** (takes `ProcessorBase&` and `MasterInsertPanel&`; not on the chrome list). Writes the `mst_ins*` / `mst_ins2*` APVTS parameters from the panel's callbacks and refreshes the panel from `mixerEngine` on `MixerOverlay`'s deferred apvts-dirty flush |
+| `HoverStatus` | `mu-core/UI/Components/HoverStatus.h` | Header-only `mu_ui` mouse listener that reports a name and value to the status bar; not on the chrome `.cpp` list |
 | `ChannelSidebar` + `SidebarItem` | `mu-core/UI/` | Shared layers sidebar (product injects the mini-graphic) |
 | `ChannelHeaderBar` | `mu-core/UI/` | Shared per-layer header (name / reset / delete / preset / save) |
 | `VoiceBand` / `VoiceBandSection` | `mu-core/UI/Voice/` | Shared voice band layout + drawing (Pitch / Filter / Amp / Effects) |
@@ -558,8 +561,9 @@ compile. Every current call site `TransportBar(proc)`, `StandardSettingsOverlay(
 takes `ProcessorBase&` to a shared-chrome class: it brings the `ProcessorBase.h` include back and the seam is lost.
 
 **What stays plugin-only** (takes `ProcessorBase&` on purpose): `ActivationOverlay`, `MidiPresetsOverlay`,
-`MidiFullPresetsOverlay`, `MixerOverlay`, `ChannelSidebar`, `LayerPresetHeader`, `ParamKnobGrid`, the master-insert and APVTS
-binding half of `MixerChannel` (`MixerChannel_Bindings.cpp`, `MixerChannel_Insert.cpp`), `InsertSubsection`. **Rule:** a file in the
+`MidiFullPresetsOverlay`, `MixerOverlay`, `ChannelSidebar`, `LayerPresetHeader`, `ParamKnobGrid`, the APVTS binding half of `MixerChannel`
+(`MixerChannel_Bindings.cpp`), `MasterInsertBinding` (the master-insert binder; `MixerChannel_Insert.cpp` was deleted
+2026-10-12), `InsertSubsection`. **Rule:** a file in the
 shared chrome list below never includes `Plugin/ProcessorBase.h`, `Plugin/ProcessorCore.h` or `UI/EditorShellBase.h`
 (checked by `check-core-boundary.ps1`).
 
@@ -609,9 +613,12 @@ Source is Internal; default false). The master-volume row appears when `hasMaste
 - **`HoverStatus`**: generic (a mouse listener that reports a name and value to the status bar; nothing about mu-link), so it moves to `mu-core/UI/Components/HoverStatus.h`, namespace `mu_ui`, header-only; `mu-link` includes it from there. Decide the side before the second copy: any plugin panel with a segment control or number field and no status line will want it. Not on the chrome `.cpp` list (header-only).
 - **`ClientColumns`**: stays in `mu-link` (`mu_link::ClientColumns`). It places eight *client* columns, a divider and the master column for two mu-link panels; it is mu-link's concept (the plugins' `MixerOverlay` lays out channels, returns and a master by its own constants). Generalise it to a neutral `ColumnLayout` in `mu-core` only when a second place needs the same calculation.
 - **`mu-link-tests` build**: correct as done. `UIChromeSources.cmake` is the one source list (include moved above the tests so both targets use it); `JUCE_MODAL_LOOPS_PERMITTED=1` and `ScopedJuceInitialiser_GUI` match `mu-core-tests` and the other products' `TestMain`; the extra `juce_audio_utils`, `juce_gui_extra` and `juce_data_structures` links are what the window needs. Recompiling `MuLinkComponent.cpp` and the panels into the test target is the accepted cost of testing the window without the app target.
-- **Peak accessors** (`ServerEngine` / `AudioServer` `clientPeakMeter`, `masterPeakMeter`): accepted. They are `noexcept`, allocate nothing, and exist because `MixerChannel::bindClientMeter` takes `std::atomic<float>&`. Minor follow-up, not blocking: make the accessors and `bindClientMeter` take `const std::atomic<float>&` so the GUI cannot write the engine's meter. (An out-of-range slot falls back to slot 0; the GUI only passes 0 to 7.)
+- **Peak accessors** (`ServerEngine` / `AudioServer` `clientPeakMeter`, `masterPeakMeter`): accepted. They are `noexcept`, allocate nothing, and exist because `MixerChannel::bindClientMeter` takes `std::atomic<float>&`. Follow-up done (2026-10-12): `clientPeakMeter` / `masterPeakMeter` return `const std::atomic<float>&` so the GUI cannot write the engine's meter, and an invalid slot now asserts instead of falling back to slot 0.
+- **`HoverStatus`** moved to `mu-core/UI/Components/HoverStatus.h` (done 2026-10-12); the groove helper `MuLookAndFeel::drawGroove` is in and used by the mixers (done).
 
-### One master insert panel for the family (ruled 2026-10-12)
+### One master insert panel for the family (ruled 2026-10-12; done 2026-10-12)
+
+**Status: steps 1 to 4 are done** (commits c1f428e and 1a1126e). What exists now: `MasterInsertPanel` carries the Vocoder grey-out (`SlotConfig::disabledFromP1`, `insertSlotEnabled()` in `InsertSlotConfig.h`) and a GR-meter hook (`setGainReductionSource(slot, const std::atomic<float>*)` for Compressor / Limiter; the old panel did show one); `MasterInsertBinding.{h,cpp}` (plugin-only) is the binder; `MixerOverlay` owns panel and binder; `MixerChannel_Insert.cpp` and the built-in insert controls are deleted; `MixerChannel::hasInsert()` / `insertShown()` became `isMaster()` and `setShowInsertPanel` was removed. Step 5 (Andy's on-screen check of one plugin's master column and a Vocoder insert) remains. The text below is the original ruling, kept for the reasoning.
 
 **Direction confirmed: one copy.** `mu_ui::MasterInsertPanel` is the only master insert layout in the family. The plugins' built-in panel in `MixerChannel` (the `ins*` knobs, `addInsertControls`, `layoutInsertPanel`, `configureInsertAlgorithm`, the `insertSnapshots*` arrays, and `MixerChannel_Insert.cpp`) is deleted once the plugins use the shared one. The panel stays callback-only; the plugin half becomes a small binder in the plugin-only files (it takes `ProcessorBase&`, so it never goes on the chrome list).
 
