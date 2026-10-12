@@ -326,6 +326,7 @@ The shared visual identity (`MuLookAndFeel`) ensures a consistent look across al
 - **ModulationMatrix is the single reader** — unchanged; still the only path from ControlSequence → VoiceParams.
 - **Everything in APVTS** — each plugin defines its own APVTS layout; `ProcessorBase` provides helpers for the common subset (voice params, mixer params, FX params).
 - **VoiceSlots are fully self-contained** — no cross-slot modulation. Same rule as current per-rhythm constraint.
+- **GPU-backed image caches are heap-allocated and never destroyed** (ruled 2026-10-12) — a function-static or global cache of `juce::Image` under the Direct2D renderer is held by a leaked `new` pointer, not a static object. A static destructor runs at plugin-DLL unload under the loader lock, where releasing the Direct3D device hangs the graphics driver (found with Debug pluginval on mu-Clid; fixed in the `MuLookAndFeel` brushed-grain cache). Clearing such a cache at a size cap is safe only on the message thread, and only if every caller uses the returned reference immediately and never keeps it.
 
 ---
 
