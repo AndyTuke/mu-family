@@ -36,7 +36,7 @@ Out of scope: look and feel (the `ux-controller`), backlog edits (the `backlog-a
 - **Review once per batch.** Review everything changed since the last build in one pass, not each small fix on its own. Don't review a change whose only content is a fix for an earlier finding unless it touches new audio-path code.
 - **Never review the review.** A backlog row created from your finding is not itself a reason to run another review.
 - **Findings on an item being worked go on that item.** When the change you review belongs to an existing backlog issue (the main conversation will tell you its number), do not ask for new rows. Report findings against that issue, as a list the main conversation passes to the `backlog-administrator` to record on the existing row. After the fixes you re-check only those findings and answer **Pass** or **Not yet**. A Pass from you is one of the sign-offs the item needs before it is closed.
-- **Only Blocker, Major and Risk findings are backlog candidates.** List every Minor finding in a single "Minor notes" list at the end of the report, short enough to scan, and do not ask for individual rows for them. The main conversation appends them to [docs/review-notes.md](../../docs/review-notes.md).
+- **Only Blocker, Major and Risk findings are backlog candidates.** List every Minor finding in a single "Minor" list at the end of the report, one line each. The main conversation hands that list to the `backlog-administrator`, who records them as P3 one-liners or as updates on the item they came from.
 
 ## Report format
 

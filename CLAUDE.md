@@ -76,7 +76,7 @@ Seven agents each own one area and are the final word in it; none edits another'
 - `backlog-administrator`: any backlog change, any task hand-over, after every build and response (batch the changes into one call).
 - `ux-controller`: once before a batch of related UI work, and for any design question the docs don't settle.
 - `architecture-steward`: once before a batch of structural, cross-plugin or naming work.
-- `dsp-controller`: once per batch of new or changed audio-path code, before the build or commit that covers it. Only Blocker, Major and Risk findings become backlog rows; Minor findings go to [docs/review-notes.md](docs/review-notes.md). A review never triggers another review (owner rule, 2026-10-12).
+- `dsp-controller`: once per batch of new or changed audio-path code, before the build or commit that covers it. Only Blocker, Major and Risk findings become backlog rows; Minor findings become P3 one-liners (or updates on the item they came from) in the backlog; there is no separate review list. A review never triggers another review (owner rule, 2026-10-12).
 - `test-steward`: when a fix, feature or DSP finding needs a test, and before a release.
 - `user-documentation-author`: after a batch of user-facing changes.
 - `web-designer`: when the site, pricing or licensing wording, or a release-notes page needs a change.
@@ -103,6 +103,8 @@ Version: v1.1.972
 ## Backlog handling
 
 The backlog in `backlog.md` must always be grouped: **Open → On Hold → Closed**. Within **On Hold** and **Closed**, items are ordered by issue number **descending** (highest first). **Open is in recommended development order** (owner rule, 2026-10-09): work from the top; a new item goes on the top until it is ranked into its place, and the note under the Open heading names the stages. Every backlog update must preserve this ordering. A backlog row is for owner-visible work, defects and Risks; a small change that belongs to an open item is recorded on that item's row, and a trivial internal tidy-up needs only its commit message (the git log is the full development history).
+
+**Open rows carry a few fields, kept short** (owner rule, 2026-10-12). The backlog keeps its four columns (`check-backlog.ps1` enforces them); inside the Description cell an Open row reads: `**[area] Title.** P1/P2/P3 · logged by <who> · Details (one to three sentences) · Updates: dated one-liners, newest last · Needs: reviewers still to sign off, or the blocker`. The Status cell carries the status. **P1** = blocks work or breaks something users hit, **P2** = normal, **P3** = minor, one line, merged with same-area P3s; P3 rows sit at the bottom of Open. Review findings on an item are added to its Updates, not to new rows. The `backlog-administrator` maintains these fields and trims rows that grow past a few lines. Existing rows are converted as they are touched, not in one sweep.
 
 The single resolved status is **`✅ Closed`** — never `Fixed` / `Audited` / `Verified` / `Done` or any other variant, whether the item was fixed, verified as already correct, or resolved by design. Structure is enforced by [tests/scripts/check-backlog.ps1](tests/scripts/check-backlog.ps1); run it after editing the backlog.
 
