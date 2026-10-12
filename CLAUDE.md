@@ -75,7 +75,7 @@ Six agents each own one area and are the final word in it; none edits another's 
 - `backlog-administrator`: any backlog change, any task hand-over, after every build and response (batch the changes into one call).
 - `ux-controller`: before UI work and for any design question the docs don't settle.
 - `architecture-steward`: before structural, cross-plugin or naming decisions.
-- `dsp-controller`: once per batch of new or changed audio-path code, before the build or commit that covers it. Only Blocker, Major and Risk findings become backlog rows; Minor findings go to [docs/review-notes.md](docs/review-notes.md). A review never triggers another review (owner rule, 2026-10-12).
+- `dsp-controller`: once per batch of new or changed audio-path code, before the build or commit that covers it. Only Blocker, Major and Risk findings become backlog rows; Minor findings go to [docs/review-notes.md](docs/review-notes.md). A review never triggers another review (owner rule, 2026-10-12). **Reviews update the item, they don't spawn new ones** (owner rule, 2026-10-12): when a change belongs to a backlog issue, the main conversation passes each reviewer's findings to the `backlog-administrator`, who records them on that row; the fixes are made; each reviewer re-checks and answers Pass; and only when every applicable reviewer has passed does the main conversation ask the `backlog-administrator` to close the row. A genuinely separate defect still gets its own row.
 - `test-steward`: when a fix, feature or DSP finding needs a test, and before a release.
 - `user-documentation-author`: after any user-facing change.
 

@@ -48,3 +48,7 @@ Short:
 - **Needs tracking:** items for the backlog.
 
 If the change had no user-facing effect, say so plainly and change nothing.
+
+## Sign-off on a backlog item
+
+When asked to review work that belongs to an existing backlog issue, report findings against that issue (the main conversation hands them to the `backlog-administrator` to record on the existing row); do not ask for new rows. After the fixes, re-check only those findings and answer **Pass** or **Not yet**. Your Pass is one of the sign-offs the item needs before it is closed.
