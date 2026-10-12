@@ -30,7 +30,7 @@ target_sources(mu-toni
         Source/Plugin/PluginProcessor_Preset.cpp
         Source/Plugin/PluginEditor.cpp
         Source/UI/SettingsOverlay.cpp
-        Source/UI/EnginePanel.cpp
+        Source/UI/ArpContent.cpp
 )
 
 target_include_directories(mu-toni

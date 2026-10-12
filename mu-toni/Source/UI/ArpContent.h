@@ -5,14 +5,11 @@
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/DropdownSelect.h"
-#include "UI/ModulatorPanel.h"
-#include "UI/ChannelHeaderBar.h"          // mu-core: shared per-layer header (name / reset / presets / save)
 #include "UI/Components/StepEditor.h"     // mu-core: the accent pattern cells
 #include "UI/ConfirmDialog.h"             // mu-core: shared confirm / name dialogs
 #include "Persistence/PresetFiles.h"      // mu-core: listPresetFiles
 #include "UI/Voice/InsertSubsection.h"
 #include "UI/Voice/VoiceBand.h"            // mu-core: shared voice band (mu-Clid layout)
-#include "Modulation/MuToniModDest.h"
 #include "Audio/Scales.h"
 #include "Audio/Chords.h"
 #include "Audio/Wavetable/WavetableBank.h"   // mu-core: the wavetable names
@@ -23,31 +20,24 @@
 namespace mu_toni
 {
 
-// μ-Toni engine panel. The shared per-layer header bar sits on top (layer presets + reset).
-// The Pitch·Filter·Amp·Effects voice band is the shared mu-core VoiceBand (mu-Clid's layout),
-// its sections built from this panel's controls. Oscillator 1/2/Mix (mu-toni's two-osc
-// source) sits above; the Appergater band + shared modulator section below. All sizes come
-// from MuLookAndFeel / VoiceBand — no arbitrary values.
-class EnginePanel : public juce::Component,
-                    private juce::Timer
+// μ-Toni's content band inside the shared LayerPanel (kLayerContentH tall): Oscillator 1/2/
+// X-Mod/Mix (the two-osc source) on top, the shared mu-core VoiceBand (mu-Clid's layout,
+// Pitch·Filter·Amp·Effects) in the middle, and the Appergater below, which takes whatever
+// height the other two leave. The header strip and modulators belong to the LayerPanel.
+// All sizes come from MuLookAndFeel / VoiceBand — no arbitrary values.
+class ArpContent : public juce::Component,
+                   private juce::Timer
 {
 public:
     enum Group { G_OSC1, G_OSC2, G_XMOD, G_MIX, G_PITCH, G_FILTER, G_AMP, G_INSERT, G_ARP, G_COUNT };
 
-    explicit EnginePanel(PluginProcessor& processor);
+    explicit ArpContent(PluginProcessor& processor);
 
-    ~EnginePanel() override
-    {
-        stopTimer();
-        modulatorPanel.setVoiceSlot(nullptr);
-    }
+    ~ArpContent() override { stopTimer(); }
 
     void setLayer(int idx);
 
     int getLayer() const noexcept { return currentLayer; }
-
-    // Rescan the layer-preset folder into the header's preset list (after a save).
-    void refreshPresetList();
 
     void lookAndFeelChanged() override { resized(); repaint(); }   // metal style / screws change the layout
 
@@ -65,7 +55,6 @@ private:
     void setAccentStep(int step, bool on);   // write one accent cell into the layer's pattern
     void refreshAccentSteps();               // show the layer's pattern + the arp's place in it
     void buildVoiceBand();
-    void setupHeaderAndModulators();
 
     static constexpr Group kSourceGroups[4] = { G_OSC1, G_OSC2, G_XMOD, G_MIX };
 
@@ -77,10 +66,6 @@ private:
     // equal share of what's left.
     void layoutSourceRow(juce::Rectangle<int> row, int gap);
 
-    // Metal style, as mu-Clid: panels edge to edge — preset strip, source (Osc 1 / Osc 2 / Mix),
-    // voice band, Appergater, modulators — content inset clear of the panels' corner screws,
-    // each section a raised box with its name plate in the band above it.
-    void layoutMetal();
 
     // Layout constants (unscaled; wrap in mu_ui::s at use). kDropdownH is the
     // family-standard dropdown height; kLabelGap keeps a control label off the
@@ -147,11 +132,9 @@ private:
     std::vector<ComboDef>  combos;
     std::vector<ToggleDef> toggles;
     std::array<juce::Rectangle<int>, 4> oscR;   // Osc 1, Osc 2, X-Mod, Mix
-    juce::Rectangle<int> voiceR, arpR, headerR;
-    // Metal style: the panels.
-    juce::Rectangle<int> srcR, voicePanelR, arpPanelR, modR;
-
-    ChannelHeaderBar header;
+    juce::Rectangle<int> voiceR, arpR;
+    // The three metal panels filling the band: source, voice band, Appergater.
+    juce::Rectangle<int> srcR, voicePanelR, arpPanelR;
 
     StepEditor accentSteps;                       // the Appergater's accent pattern (on/off cells)
     int shownAccentLen = -1, shownAccentPat = -1; // what accentSteps shows (redrawn on change)
@@ -166,10 +149,8 @@ private:
     VoiceBandSection filterBox { 6, VoiceBand::kFilterColW };
     VoiceBandSection ampBox    { 4, VoiceBand::kCols };
     VoiceBand        voiceBand;
-    ::ModulatorPanel modulatorPanel;
-    ModDestProvider  modDestProvider = makeModDestProvider();
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EnginePanel)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ArpContent)
 };
 
 } // namespace mu_toni

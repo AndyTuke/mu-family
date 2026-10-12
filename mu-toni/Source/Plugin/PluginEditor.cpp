@@ -36,7 +36,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     : EditorShellBase(p),
       proc(p),
       sidebar(p, "Layer"),
-      enginePanel(p),
+      arpContent(p),
+      layerPanel(p, "Layer"),
       mixerOverlay(p, p.mixerEngine),
       settingsOverlay(p)
 {
@@ -51,17 +52,24 @@ PluginEditor::PluginEditor(PluginProcessor& p)
             (size_t) (p.getChannelColourIndex(i) % MuLookAndFeel::kChannelPaletteSize)];
         return std::make_unique<LayerGlyph>(col, i);
     };
-    sidebar.onLayerSelected = [this](int idx) { enginePanel.setLayer(idx); };
+    sidebar.onLayerSelected = [this](int idx) { layerPanel.setLayer(idx); };
     sidebar.refreshItems();
 
-    // Engine-panel knob hovers/changes → shared StatusBar.
-    enginePanel.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
+    // The shared layer panel: fixed layers, the arp content band in the middle, mu-Toni's
+    // modulation destinations; a layer change rebinds the content's controls.
+    layerPanel.setFixedLayers(true);
+    layerPanel.setContent(&arpContent);
+    layerPanel.setDestProvider(&modDestProvider);
+    layerPanel.onLayerChanged = [this](int layer) { arpContent.setLayer(layer); };
+
+    // Content-band knob hovers/changes → shared StatusBar.
+    arpContent.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
     {
         getStatusBar().showParam(name, val, MuLookAndFeel::colour(MuLookAndFeel::knobEuclidean));
     };
 
     // Main area (sidebar + blank engine panel) + shared mixer overlay.
-    setMainArea(&sidebar, &enginePanel);
+    setMainArea(&sidebar, &layerPanel);
     setMixerOverlay(&mixerOverlay);
 
     // Settings page (master vol + UI size + BPM + standalone MIDI Clock) behind the
@@ -71,13 +79,13 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // A program change loaded a layer preset → refresh that layer if it's on screen.
     proc.onLayerPresetCommitted = [this](int layer)
     {
-        if (enginePanel.getLayer() == layer) enginePanel.setLayer(layer);
+        if (layerPanel.getLayer() == layer) layerPanel.setLayer(layer);
     };
 
     // Forward mixer status updates to the shared StatusBar.
 
     sidebar.setSelectedIndex(0);
-    enginePanel.setLayer(0);
+    layerPanel.setLayer(0);
     mixerOverlay.loadFromApvts();
     clearPresetDirty();
 
@@ -86,7 +94,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     setScrews(true);
 
     // Every control on the main panel shows its name + value on the status bar.
-    forwardKnobStatus(enginePanel);
+    forwardKnobStatus(layerPanel);
 }
 
 PluginEditor::~PluginEditor()
@@ -97,7 +105,7 @@ PluginEditor::~PluginEditor()
 void PluginEditor::onPresetLoaded(const juce::File&)
 {
     sidebar.refreshItems();
-    enginePanel.setLayer(enginePanel.getLayer());   // rebind knobs + modulators to the loaded state
+    layerPanel.setLayer(layerPanel.getLayer());   // rebind knobs + modulators to the loaded state
     mixerOverlay.loadFromApvts();
 }
 

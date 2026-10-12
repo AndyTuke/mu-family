@@ -1,21 +1,22 @@
-#include "EnginePanel.h"
-#include "UI/LayerPresetHeader.h"   // mu-core: shared per-slot preset header wiring
+#include "ArpContent.h"
 
 namespace mu_toni
 {
 
-EnginePanel::EnginePanel(PluginProcessor& processor)
+ArpContent::ArpContent(PluginProcessor& processor)
     : proc(processor), insertSub(processor, kLayerParamLetter)
 {
     addSourceControls();
     addVoiceControls();
     addArpControls();
     buildVoiceBand();
-    setupHeaderAndModulators();
+
+    setLayer(0);
+    startTimerHz(mu_ui::kUiRefreshHz);
 }
 
 // The source section: Osc 1 / Osc 2 wavetables, X-Mod and the Mix levels.
-void EnginePanel::addSourceControls()
+void ArpContent::addSourceControls()
 {
     using LF = MuLookAndFeel;
 
@@ -44,7 +45,7 @@ void EnginePanel::addSourceControls()
 }
 
 // The voice controls: pitch, filter and amp (its sends bind to the ch{N}_ mixer params).
-void EnginePanel::addVoiceControls()
+void ArpContent::addVoiceControls()
 {
     using LF = MuLookAndFeel;
 
@@ -80,7 +81,7 @@ void EnginePanel::addVoiceControls()
 }
 
 // The Appergater (arpeggiator) controls.
-void EnginePanel::addArpControls()
+void ArpContent::addArpControls()
 {
     using LF = MuLookAndFeel;
 
@@ -110,7 +111,7 @@ void EnginePanel::addArpControls()
 }
 
 // Turn accent step `step` on / off in the current layer's pattern.
-void EnginePanel::setAccentStep(int step, bool on)
+void ArpContent::setAccentStep(int step, bool on)
 {
     if (step < 0 || step >= ArpAccent::kMaxSteps) return;
     auto* p = proc.apvts.getParameter(layerParamId(currentLayer, "accPat"));
@@ -124,7 +125,7 @@ void EnginePanel::setAccentStep(int step, bool on)
 }
 
 // Show the current layer's accent pattern (only when it changed) and where the arp is in it.
-void EnginePanel::refreshAccentSteps()
+void ArpContent::refreshAccentSteps()
 {
     // Look the layer's parameters up once per layer, not every tick.
     if (accentParamsLayer != currentLayer)
@@ -153,7 +154,7 @@ void EnginePanel::refreshAccentSteps()
 }
 
 // The shared voice band (mu-Clid's layout), its sections built from the controls above.
-void EnginePanel::buildVoiceBand()
+void ArpContent::buildVoiceBand()
 {
     // ── Voice band: mu-Clid's layout, the sections built from the controls above ──
     // Pitch: target over two columns, Depth above R; A / D / S / R below.
@@ -179,31 +180,9 @@ void EnginePanel::buildVoiceBand()
     insertSub.getInsertGR = [this] { return proc.getInsertGR(currentLayer); };
     insertSub.onStatusUpdate = [this](const juce::String& n, const juce::String& val)
     { if (onStatusUpdate) onStatusUpdate(n, val); };
-
-    addAndMakeVisible(modulatorPanel);
-    modulatorPanel.setDestProvider(&modDestProvider);
 }
 
-// The shared per-layer header (fixed layers: reset + layer presets), the modulators and the first bind.
-void EnginePanel::setupHeaderAndModulators()
-{
-    // ── Shared per-layer header: fixed layers (no rename / delete), reset + layer presets ──
-    header.setShowDelete(false);
-    header.setNameEditable(false);
-    // Reset / preset load / save: the shared per-slot wiring (mu-core LayerPresetHeader).
-    mu_ui::wireSlotPresetHeader(header, *this, proc,
-        { "Layer",
-          [this] { return currentLayer; },
-          [this] { setLayer(currentLayer); },   // rebind so the modulators show the loaded state
-          {} });
-    addAndMakeVisible(header);
-    refreshPresetList();
-
-    setLayer(0);
-    startTimerHz(mu_ui::kUiRefreshHz);
-}
-
-void EnginePanel::setLayer(int idx)
+void ArpContent::setLayer(int idx)
 {
     currentLayer = juce::jmax(0, idx);
 
@@ -226,106 +205,64 @@ void EnginePanel::setLayer(int idx)
     insertSub.setChannel(currentLayer);
     shownAccentLen = shownAccentPat = -1;   // redraw the new layer's accent pattern
     refreshAccentSteps();
-    modulatorPanel.setVoiceSlot(&proc.getArp(currentLayer));
-
-    header.setLayerName(proc.getChannelName(currentLayer));
-    header.setColour(layerColour());
-    header.setSelectedPresetId(0);
     repaint();
 }
 
-// Rescan the layer-preset folder into the header's preset list (after a save).
-void EnginePanel::refreshPresetList()
-{
-    mu_ui::refreshSlotPresetList(header, proc, currentLayer);
-}
-
-void EnginePanel::paintOverChildren(juce::Graphics& g)
+void ArpContent::paintOverChildren(juce::Graphics& g)
 {
     if (! MuLookAndFeel::hasScrews(*this)) return;
-    for (auto r : { srcR, voicePanelR, arpPanelR, modR })
+    for (auto r : { srcR, voicePanelR, arpPanelR })
         MuLookAndFeel::drawPanelScrews(g, r.reduced(2).toFloat());
-    MuLookAndFeel::drawStripScrews(g, headerR.reduced(2).toFloat());   // the thin preset strip
 }
 
-void EnginePanel::paint(juce::Graphics& g)
+// The band's three panels, each a metal panel with its sections in raised boxes under name plates.
+void ArpContent::paint(juce::Graphics& g)
 {
-    using Id = MuLookAndFeel::ColourIds;
-    using LF = MuLookAndFeel;
-    using mu_ui::s;
-    g.fillAll(MuLookAndFeel::colour(Id::panelBackground));
-
-    // Metal style: the preset strip, source, voice band, Appergater and modulators each on
-    // a metal panel (the header bar lights its displays in the layer colour); every section
-    // in a raised box with its name plate above it.
-    if (MuLookAndFeel::isMetal(*this))
-    {
-        const auto accent = MuLookAndFeel::appAccent(*this);
-        for (auto r : { headerR, srcR, voicePanelR, arpPanelR, modR })
-            MuLookAndFeel::drawAccentPanel(g, r.reduced(2).toFloat(), accent);
-        // (the voice band draws its own section boxes)
-        MuLookAndFeel::drawSections(g, *this, { { oscR[0], "OSCILLATOR 1" }, { oscR[1], "OSCILLATOR 2" },
-                                                { oscR[2], "X-MOD" }, { oscR[3], "MIX" },
-                                                { arpR, "APPERGATER" } }, accent);
-        return;
-    }
-
-    // Boxed sections (Osc 1/2, X-Mod, Mix + Appergater).
-    static const char* const boxTitles[] = { "Oscillator 1", "Oscillator 2", "X-Mod", "Mix" };
-    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
-    for (int i = 0; i < 4; ++i) g.drawRoundedRectangle(oscR[(size_t) i].toFloat().reduced(1.0f), 5.0f, 1.0f);
-    g.drawRoundedRectangle(arpR.toFloat().reduced(1.0f), 5.0f, 1.0f);
-    g.setColour(MuLookAndFeel::colour(Id::labelText));
-    g.setFont(juce::Font(juce::FontOptions(12.0f, juce::Font::bold)));
-    for (int i = 0; i < 4; ++i)
-        g.drawText(boxTitles[i], oscR[(size_t) i].reduced(8, 4).removeFromTop(15), juce::Justification::topLeft, false);
-    g.drawText("Appergater", arpR.reduced(8, 4).removeFromTop(15), juce::Justification::topLeft, false);
-
+    const auto accent = MuLookAndFeel::appAccent(*this);
+    for (auto r : { srcR, voicePanelR, arpPanelR })
+        MuLookAndFeel::drawAccentPanel(g, r.reduced(2).toFloat(), accent);
+    // (the voice band draws its own section boxes)
+    MuLookAndFeel::drawSections(g, *this, { { oscR[0], "OSCILLATOR 1" }, { oscR[1], "OSCILLATOR 2" },
+                                            { oscR[2], "X-MOD" }, { oscR[3], "MIX" },
+                                            { arpR, "APPERGATER" } }, accent);
 }
 
-void EnginePanel::resized()
+// Source (Osc 1 / Osc 2 / X-Mod / Mix) and voice band at their natural heights; the Appergater
+// panel is the flex panel and takes the rest of the band, so the band is always fully tiled.
+void ArpContent::resized()
 {
-    if (MuLookAndFeel::isMetal(*this)) { layoutMetal(); return; }
-
     using LF = MuLookAndFeel;
     using mu_ui::s;
-    const int pad = s(8);
-    const int gap = MuLookAndFeel::isMetal(*this) ? s(10) : s(6);   // metal: room for the painted borders
-    auto area = getLocalBounds().reduced(pad);
-    area.removeFromBottom(pad);
+    const int w = getWidth(), h = getHeight();
+    const int padX   = s(LF::kScrewedPanelInset);   // content in from a panel's sides
+    const int padY   = s(LF::kChannelInset);        //   … and from its top / bottom
+    const int plateH = s(LF::kSectionPlateH);       // name plate band above each box
+    const int boxGap = s(LF::kVoiceDivW);
 
-    // Shared per-layer header bar on top (inside its own metal panel in the metal style).
-    const bool metal = MuLookAndFeel::isMetal(*this);
-    headerR = area.removeFromTop(s(ChannelHeaderBar::kHeight) + (metal ? s(4) : 0));
-    header.setBounds(metal ? headerR.reduced(s(4), s(2)) : headerR);
-    area.removeFromTop(gap);
+    // Source and Appergater boxes: a dropdown row over a Size-2 knob row.
+    const int boxH = s(2 * kBoxPad + kDropdownH + LF::kVoiceGap + LF::kKnobSize2H + kLabelGap);
 
-    // Osc row (boxed): box pad + title + dropdown + gap + one Size-2 knob row +
-    // a label gap so the knob label never touches the panel border, + box pad.
-    const int oscRowH = s(kBoxPad + LF::kVoiceLabelH + kDropdownH + LF::kVoiceGap
-                        + LF::kKnobSize2H + kLabelGap + kBoxPad);
-    auto oscRow = area.removeFromTop(oscRowH);
-    layoutSourceRow(oscRow, gap);
-    area.removeFromTop(gap);
+    // Source: Osc 1 | Osc 2 | X-Mod | Mix, each sized to its controls.
+    srcR = { 0, 0, w, padY + plateH + boxH + padY };
+    layoutSourceRow({ padX, srcR.getY() + padY + plateH, w - 2 * padX, boxH }, boxGap);
 
-    // Voice band (the shared mu-Clid geometry).
-    voiceR = area.removeFromTop(s(VoiceBand::kHeight));
+    // Voice band (the shared mu-Clid band, inside the standard channel inset as in mu-Clid).
+    voicePanelR = { 0, srcR.getBottom(), w, padY + s(VoiceBand::kHeight) + padY };
+    voiceR      = voicePanelR.reduced(s(LF::kChannelInset));
     voiceBand.setBounds(voiceR);
-    area.removeFromTop(gap);
 
-    // Modulator at the bottom; Appergater fills the middle.
-    const int modH = juce::jmax(s(190), area.getHeight() * 42 / 100);
-    modulatorPanel.setBounds(area.removeFromBottom(modH));
-    area.removeFromBottom(gap);
-    arpR = area;
+    // Appergater: one box filling the remaining height.
+    arpPanelR = { 0, voicePanelR.getBottom(), w, juce::jmax(0, h - voicePanelR.getBottom()) };
+    arpR      = { padX, arpPanelR.getY() + padY + plateH, w - 2 * padX,
+                  juce::jmax(boxH, arpPanelR.getHeight() - 2 * padY - plateH) };
 
     for (int i = 0; i < 4; ++i) layoutBox(kSourceGroups[i], oscR[(size_t) i]);
-    layoutBox(G_ARP,  arpR);
+    layoutBox(G_ARP, arpR);
 }
 
 // Unscaled width a boxed section's controls need: its top row (dropdowns + toggles) or its
 // knob row, whichever is wider (the widths layoutBox uses).
-int EnginePanel::sourceContentW(int group) const
+int ArpContent::sourceContentW(int group) const
 {
     int top = 0, row = 0;
     for (auto& c : combos)  if (c.group == group) top += kBoxComboW  + kBoxGap;
@@ -336,10 +273,10 @@ int EnginePanel::sourceContentW(int group) const
 
 // The source row: Osc 1 | Osc 2 | X-Mod | Mix, each as wide as its controls need plus an
 // equal share of what's left.
-void EnginePanel::layoutSourceRow(juce::Rectangle<int> row, int gap)
+void ArpContent::layoutSourceRow(juce::Rectangle<int> row, int gap)
 {
     using mu_ui::s;
-    const int pad = MuLookAndFeel::isMetal(*this) ? MuLookAndFeel::kSubPanelScrewClear : kBoxPad;
+    const int pad = MuLookAndFeel::kSubPanelScrewClear;
     int need[4], total = 0;
     for (int i = 0; i < 4; ++i) { need[i] = s(sourceContentW(kSourceGroups[i]) + 2 * pad); total += need[i]; }
     const int spare = juce::jmax(0, row.getWidth() - total - 3 * gap) / 4;
@@ -350,64 +287,20 @@ void EnginePanel::layoutSourceRow(juce::Rectangle<int> row, int gap)
     }
 }
 
-// Metal style, as mu-Clid: panels edge to edge — preset strip, source (Osc 1 / Osc 2 / Mix),
-// voice band, Appergater, modulators — content inset clear of the panels' corner screws,
-// each section a raised box with its name plate in the band above it.
-void EnginePanel::layoutMetal()
-{
-    using LF = MuLookAndFeel;
-    using mu_ui::s;
-    const int w = getWidth(), h = getHeight();
-    const int padX   = s(LF::kScrewedPanelInset);   // content in from a panel's sides
-    const int padY   = s(LF::kChannelInset);        //   … and from its top / bottom
-    const int plateH = s(LF::kSectionPlateH);       // name plate band above each box
-    const int boxGap = s(LF::kVoiceDivW);
-
-    // Preset strip — with screws the header is narrower, leaving a screw at each end.
-    headerR = { 0, 0, w, s(ChannelHeaderBar::kHeight) + s(4) };
-    header.setBounds(headerR.reduced(LF::hasScrews(*this) ? padX : s(4), s(2)));
-
-    // Source boxes and the Appergater box: a dropdown row over a Size-2 knob row.
-    const int boxH = s(2 * kBoxPad + kDropdownH + LF::kVoiceGap + LF::kKnobSize2H + kLabelGap);
-
-    // Source: Osc 1 | Osc 2 | X-Mod | Mix, each sized to its controls.
-    srcR = { 0, headerR.getBottom(), w, padY + plateH + boxH + padY };
-    layoutSourceRow({ padX, srcR.getY() + padY + plateH, w - 2 * padX, boxH }, boxGap);
-
-    // Voice band (the shared mu-Clid band, inside the standard channel inset as in mu-Clid).
-    voicePanelR = { 0, srcR.getBottom(), w, padY + s(VoiceBand::kHeight) + padY };
-    voiceR      = voicePanelR.reduced(s(LF::kChannelInset));
-    voiceBand.setBounds(voiceR);
-
-    // Appergater, one box.
-    arpPanelR = { 0, voicePanelR.getBottom(), w, padY + plateH + boxH + padY };
-    arpR      = { padX, arpPanelR.getY() + padY + plateH, w - 2 * padX, boxH };
-
-    // Modulators take the rest.
-    modR = { 0, arpPanelR.getBottom(), w, juce::jmax(s(190) + 2 * padY, h - arpPanelR.getBottom()) };
-    modulatorPanel.setBounds(modR.reduced(padX, padY));
-
-    for (int i = 0; i < 4; ++i) layoutBox(kSourceGroups[i], oscR[(size_t) i]);
-    layoutBox(G_ARP,  arpR);
-}
-
-juce::Colour EnginePanel::layerColour() const
+juce::Colour ArpContent::layerColour() const
 {
     return MuLookAndFeel::channelPalette[(size_t) (proc.getChannelColourIndex(currentLayer)
                                                    % MuLookAndFeel::kChannelPaletteSize)];
 }
 
 // Boxed section (Osc 1/2/Mix, Appergater): dropdowns/toggles on top, Size-2 knobs flow.
-void EnginePanel::layoutBox(int group, juce::Rectangle<int> rect)
+void ArpContent::layoutBox(int group, juce::Rectangle<int> rect)
 {
     using LF = MuLookAndFeel;
     using mu_ui::s;
-    // Metal style: the title sits on a plate above the box and content keeps clear of the
-    // box's corner screws; flat: the title is drawn inside.
-    const bool metal = MuLookAndFeel::isMetal(*this);
-    auto inner = metal ? rect.reduced(s(LF::kSubPanelScrewClear), s(kBoxPad)) : rect.reduced(s(kBoxPad));
+    // The title sits on a plate above the box and content keeps clear of the box's corner screws.
+    auto inner = rect.reduced(s(LF::kSubPanelScrewClear), s(kBoxPad));
     inner.removeFromBottom(s(kLabelGap));   // keep control labels off the panel border
-    if (! metal) inner.removeFromTop(s(LF::kVoiceLabelH));
 
     int nCombos = 0, nToggles = 0, nKnobs = 0;
     for (auto& c : combos)  if (c.group == group) ++nCombos;
@@ -439,10 +332,11 @@ void EnginePanel::layoutBox(int group, juce::Rectangle<int> rect)
 
     // The Appergater's accent pattern takes the rest of its knob row.
     if (group == G_ARP)
-        accentSteps.setBounds(x + gap, y, juce::jmax(0, inner.getRight() - x - gap), kH - s(kLabelGap));
+        accentSteps.setBounds(x + gap, y, juce::jmax(0, inner.getRight() - x - gap),
+                              juce::jmax(kH - s(kLabelGap), inner.getBottom() - y));   // uses the flex height
 }
 
-void EnginePanel::addCombo(int group, const char* suffix, const juce::StringArray& items)
+void ArpContent::addCombo(int group, const char* suffix, const juce::StringArray& items)
 {
     ComboDef d;
     d.comp = std::make_unique<DropdownSelect>();
@@ -452,7 +346,7 @@ void EnginePanel::addCombo(int group, const char* suffix, const juce::StringArra
     combos.push_back(std::move(d));
 }
 
-void EnginePanel::addToggle(int group, const char* suffix, const juce::String& label)
+void ArpContent::addToggle(int group, const char* suffix, const juce::String& label)
 {
     ToggleDef d;
     d.comp = std::make_unique<juce::ToggleButton>(label);
@@ -461,11 +355,9 @@ void EnginePanel::addToggle(int group, const char* suffix, const juce::String& l
     toggles.push_back(std::move(d));
 }
 
-void EnginePanel::timerCallback()
+void ArpContent::timerCallback()
 {
-    modulatorPanel.setPlayheadBeat(proc.getInternalBeatPos());
     refreshAccentSteps();
-    header.setStagingBadge(proc.hasPendingSwap(currentLayer));   // "SWP" while a layer preset waits for the bar line
 }
 
 } // namespace mu_toni
