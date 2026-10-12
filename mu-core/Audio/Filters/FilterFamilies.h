@@ -57,6 +57,16 @@ public:
     }
     void reset() override { ladder.reset(); lastCutoffHz = -1.0f; lastResonance = -1.0f; }
 
+    // Back to the state prepare() leaves: the ladder's own cutoff and resonance smoothers are snapped to
+    // JUCE's start values (200 Hz, resonance 0), not left at the previous owner's target, so the next
+    // process ramps in as a fresh filter would. Allocation-free.
+    void resetToPrepared() noexcept
+    {
+        ladder.setCutoffFrequencyHz(200.0f);
+        ladder.setResonance(0.0f);
+        reset();
+    }
+
     void process(juce::AudioBuffer<float>& buf, int numSamples, int numChannels,
                  float cutoffHz, float resonance) override
     {

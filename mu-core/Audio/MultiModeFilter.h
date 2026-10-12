@@ -47,9 +47,10 @@ public:
 
     void prepare(double sampleRate, int blockSize, int numChannels);
     void reset();
-    // Drive and low-cut smoothers back to their prepared state (0, no ramp), for a filter that moves to a
-    // new owner (a voice slot reused after an add / remove / reset). Separate from reset(), which a
-    // product also calls on transport stop and which keeps the current targets. Allocation-free.
+    // Drive and low-cut smoothers (and the low-cut ladder's own cutoff ramp) back to their prepared
+    // state (0, no ramp), for a filter that moves to a new owner (a voice slot reused after an
+    // add / remove / reset). Separate from reset(), which a product also calls on transport stop and
+    // which keeps the current targets. Allocation-free.
     void resetSmoothers() noexcept;
 
     // Set filter type by integer code (matches APVTS values 0..15).

@@ -241,32 +241,16 @@ struct MuTantProcessorSeamTests : juce::UnitTest
 
         beginTest("resetLayer leaves voice 0 rendering exactly like a fresh voice, for each insert algorithm");
         {
-            // Not comparable: these draw from a time-seeded random generator, so even two fresh slots differ.
-            //   4 Bitcrusher (TPDF dither)   12, 13 Vocoder (noise carrier)
-            const std::set<int> randomised { 4, 12, 13 };
             // A constant input folds to nothing, so there is no signal to compare.
             const std::set<int> silentOnConstantInput { 3 };
-            // reset() does not clear all their state (reported, not hidden):
-            //   9 RingModInsert::reset() zeroes the carrier phase but not the frequency smoother, so a
-            //   reset slot starts the carrier at full speed while a fresh one ramps up from 0 Hz; the
-            //   two carriers keep a constant phase offset (benign to the ear, but not equal to fresh).
-            const std::set<int> knownResetGaps { 9 };
 
             for (int algo = 0; algo < 14; ++algo)
             {
-                if (randomised.count(algo) != 0) continue;
                 const auto r = resetVersusFresh(seeded, dc, 512, algo);
                 const auto where = "insert algo " + juce::String(algo);
                 if (silentOnConstantInput.count(algo) == 0)
                     expect(r.peak > 1.0e-4f, where + ": the compared render is not silent");
-                if (knownResetGaps.count(algo) != 0)
-                {
-                    logMessage("KNOWN RESET GAP: " + where + " renders differently after resetLayer (max difference "
-                               + juce::String(r.maxDiff) + "); not asserted, see the test source");
-                    expect(r.maxDiff > 0.0f, where + ": the known gap has closed, remove it from knownResetGaps");
-                }
-                else
-                    expectEquals(r.maxDiff, 0.0f, where + ": reset slot renders differently from a fresh one");
+                expectEquals(r.maxDiff, 0.0f, where + ": reset slot renders differently from a fresh one");
             }
         }
     }

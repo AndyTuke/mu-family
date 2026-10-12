@@ -22,6 +22,7 @@ public:
         bitAaFilter[1].reset();
         cnt [0] = cnt [1] = 0.0f;
         held[0] = held[1] = 0.0f;
+        rng.setSeed(kDitherSeed);   // a fixed seed keeps the dither repeatable, so a reset slot equals a fresh one
     }
 
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh,
@@ -70,5 +71,6 @@ private:
     OnePoleLP    bitAaFilter[2];
     float        cnt [2] = {};
     float        held[2] = {};
-    juce::Random rng;
+    static constexpr juce::int64 kDitherSeed = 0x6D75426974;
+    juce::Random rng { kDitherSeed };
 };

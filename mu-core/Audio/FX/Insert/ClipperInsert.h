@@ -14,7 +14,12 @@ public:
         smoothedThresh .reset(sampleRate, 0.015);  smoothedThresh .setCurrentAndTargetValue(1.0f);
         smoothedOutGain.reset(sampleRate, 0.015);  smoothedOutGain.setCurrentAndTargetValue(1.0f);
     }
-    void reset() override {}
+    void reset() override
+    {
+        // Snap the smoothers to their prepare() values so a reset slot ramps in exactly as a fresh one.
+        smoothedThresh .setCurrentAndTargetValue(1.0f);
+        smoothedOutGain.setCurrentAndTargetValue(1.0f);
+    }
 
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh,
                  const VoiceParams& p, float& /*grOut*/) override

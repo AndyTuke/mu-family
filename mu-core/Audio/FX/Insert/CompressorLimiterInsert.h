@@ -25,7 +25,15 @@ public:
         smoothedOut   .setCurrentAndTargetValue(1.0f);
         reset();
     }
-    void reset() override { envelope[0] = envelope[1] = 0.0f; }
+    void reset() override
+    {
+        envelope[0] = envelope[1] = 0.0f;
+        // Snap the smoothers to their prepare() values so a reset slot ramps in exactly as a fresh one.
+        smoothedAtt   .setCurrentAndTargetValue(1.0f);
+        smoothedRel   .setCurrentAndTargetValue(1.0f);
+        smoothedThresh.setCurrentAndTargetValue(1.0f);
+        smoothedOut   .setCurrentAndTargetValue(1.0f);
+    }
 
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh,
                  const VoiceParams& p, float& grOut) override

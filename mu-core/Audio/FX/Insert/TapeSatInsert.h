@@ -24,6 +24,9 @@ public:
         toneFilter[1].reset();
         dcIn [0] = dcIn [1] = 0.0f;
         dcOut[0] = dcOut[1] = 0.0f;
+        // Snap the gain smoothers to their prepare() values so a reset slot ramps in exactly as a fresh one.
+        smoothedPreGain.setCurrentAndTargetValue(1.0f);
+        smoothedOutGain.setCurrentAndTargetValue(1.0f);
     }
 
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh,

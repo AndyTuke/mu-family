@@ -18,7 +18,14 @@ public:
         smoothedMix  .reset(sampleRate, 0.015);  smoothedMix  .setCurrentAndTargetValue(0.0f);
         reset();
     }
-    void reset() override { phase[0] = phase[1] = 0.0f; }
+    void reset() override
+    {
+        phase[0] = phase[1] = 0.0f;
+        // Snap the smoothers to their prepare() values: a fresh voice ramps the carrier up from 0 Hz,
+        // so a reset one must too, or the two carriers keep a constant phase offset.
+        smoothedPhInc.setCurrentAndTargetValue(0.0f);
+        smoothedMix  .setCurrentAndTargetValue(0.0f);
+    }
 
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh,
                  const VoiceParams& p, float& /*grOut*/) override

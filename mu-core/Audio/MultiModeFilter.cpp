@@ -68,6 +68,7 @@ void MultiModeFilter::resetSmoothers() noexcept
 {
     smoothedDrive.setCurrentAndTargetValue(0.0f);
     smoothedLowCutHz.setCurrentAndTargetValue(0.0f);
+    lowCutFilter.resetToPrepared();   // the low-cut ladder keeps its own 50 ms cutoff ramp
 }
 
 void MultiModeFilter::process(juce::AudioBuffer<float>& buffer,

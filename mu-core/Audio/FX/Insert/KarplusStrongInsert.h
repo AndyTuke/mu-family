@@ -66,6 +66,9 @@ public:
             writePos[ch] = 0;
             lpState[ch] = 0.0f;
         }
+        // Snap the smoothers to their prepare() values so a reset slot ramps in exactly as a fresh one.
+        smoothedFreq.setCurrentAndTargetValue(110.0f);
+        smoothedGain.setCurrentAndTargetValue(0.0f);
     }
 
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh,

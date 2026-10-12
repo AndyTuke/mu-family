@@ -86,6 +86,7 @@ public:
         lastNoteIndex = -1;
         lastOctave  = -1;
         lastUnison  = -1;
+        rng.setSeed(kNoiseSeed);   // a fixed seed keeps the noise carrier repeatable, so a reset slot equals a fresh one
     }
 
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh,
@@ -305,7 +306,8 @@ private:
     // over ~5 ms (kEntryRampMs) so Unison-up doesn't pop.
     std::array<float, kMaxUnisonVoices> voiceGainSmooth { };
     float                                pinkState[7] = { };
-    juce::Random                         rng;
+    static constexpr juce::int64         kNoiseSeed = 0x6D75566F63;
+    juce::Random                         rng { kNoiseSeed };
 
     // Change-detection so coefficient recomputes don't run every block.
     int lastNoteIndex = -1;

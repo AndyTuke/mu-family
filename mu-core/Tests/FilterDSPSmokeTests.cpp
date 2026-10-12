@@ -150,6 +150,44 @@ public:
             expectLessThan(maxDiff, 1.0e-6f, "a reused filter must not carry the old drive / low-cut ramp");
         }
 
+        beginTest ("MultiModeFilter: a reused filter with the low-cut on renders like a fresh one");
+        {
+            const double sr = 48000.0; const int ns = 512;
+            juce::Random rng(12);
+            juce::AudioBuffer<float> in(1, ns);
+            for (int i = 0; i < ns; ++i) in.setSample(0, i, rng.nextFloat() * 0.8f - 0.4f);
+
+            auto configure = [](MultiModeFilter& f, float drive, float lowCut)
+            {
+                f.setType(0); f.setCutoff(2000.0f); f.setResonance(0.2f);
+                f.setDrive(drive); f.setLowCut(lowCut);
+            };
+
+            // The previous tenant ran the low-cut at a high setting until its smoothers settled there.
+            MultiModeFilter used;  used.prepare(sr, ns, 1);
+            configure(used, 1.0f, 2500.0f);
+            for (int b = 0; b < 16; ++b) { juce::AudioBuffer<float> t(in); used.process(t, ns, 1); }
+
+            used.reset();
+            used.resetSmoothers();
+
+            // The new tenant also uses the low-cut, so the ladder's own cutoff ramp (50 ms) is audible.
+            MultiModeFilter fresh; fresh.prepare(sr, ns, 1);
+            configure(used, 0.3f, 150.0f);
+            configure(fresh, 0.3f, 150.0f);
+
+            float maxDiff = 0.0f;
+            for (int b = 0; b < 8; ++b)   // 8 x 512 samples = 85 ms, past the ladder's ramp
+            {
+                juce::AudioBuffer<float> a(in), c(in);
+                used.process(a, ns, 1);
+                fresh.process(c, ns, 1);
+                for (int i = 0; i < ns; ++i) maxDiff = juce::jmax(maxDiff, std::abs(a.getSample(0, i) - c.getSample(0, i)));
+            }
+            logMessage("low-cut reused-vs-fresh max difference: " + juce::String(maxDiff));
+            expectLessThan(maxDiff, 1.0e-6f, "a reused filter must not carry the old low-cut ladder cutoff ramp");
+        }
+
         beginTest ("Lp12Filter: low cutoff (20 Hz) - no crash, no NaN");
         { Lp12Filter f; smokeFilter(f, "Lp12Filter-LowCut", 20.0f, 0.3f); }
 
