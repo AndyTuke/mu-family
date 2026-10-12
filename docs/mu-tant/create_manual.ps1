@@ -16,14 +16,29 @@ function P($t)   { $sel.Style = $doc.Styles("Normal");      $sel.TypeText($t); $
 function Br()    { $sel.InsertBreak(7) }   # wdPageBreak
 function Bullet($t) { $sel.Style = $doc.Styles("List Bullet"); $sel.TypeText($t); $sel.TypeParagraph() }
 
-# Screenshot placeholder — italic, centred, distinct so screenshots can be
-# located via Find ("[Screenshot:") and replaced by the artwork at release time.
-function Pic($caption) {
+# Screenshot: when an image file is given and exists in the images folder next to this script, it is
+# inserted (full text width) with its caption underneath. Otherwise an italic, centred placeholder
+# is written, distinct so it can be located via Find ("[Screenshot:") and replaced by artwork later.
+function Pic($caption, $image = "") {
+    $path = ""
+    if ($image) { $path = Join-Path $PSScriptRoot ("images\" + $image) }
     $sel.Style = $doc.Styles("Normal")
     $sel.ParagraphFormat.Alignment = 1   # wdAlignParagraphCenter
-    $sel.Font.Italic = $true
-    $sel.TypeText("[Screenshot: $caption]")
-    $sel.Font.Italic = $false
+    if ($path -and (Test-Path $path)) {
+        $shape = $sel.InlineShapes.AddPicture($path, $false, $true)
+        $shape.LockAspectRatio = -1
+        if ($shape.Width -gt 432) { $shape.Width = 432 }     # text width in points (6 inches)
+        if ($shape.Height -gt 340) { $shape.Height = 340 }   # keep tall crops on the page
+        $sel.EndKey(5) | Out-Null   # wdLine: move past the picture
+        $sel.TypeParagraph()
+        $sel.Font.Italic = $true
+        $sel.TypeText($caption)
+        $sel.Font.Italic = $false
+    } else {
+        $sel.Font.Italic = $true
+        $sel.TypeText("[Screenshot: $caption]")
+        $sel.Font.Italic = $false
+    }
     $sel.ParagraphFormat.Alignment = 0   # wdAlignParagraphLeft
     $sel.TypeParagraph()
 }
@@ -38,6 +53,8 @@ $sel.TypeParagraph()
 $sel.Style = $doc.Styles("Normal")
 $sel.TypeText("User Manual")
 $sel.TypeParagraph()
+$sel.TypeText("Version 1.1")
+$sel.TypeParagraph()
 $sel.TypeText("Transwarp Development Project")
 $sel.TypeParagraph()
 Br
@@ -47,11 +64,12 @@ H1 "1. Introduction"
 P "mu-Tant is a wavetable drone synthesiser from Transwarp Development Project. It runs as a VST3 plug-in, a CLAP plug-in, and a standalone application."
 P "mu-Tant is a drone instrument, not a note instrument. Each of up to eight independent voices runs two wavetable oscillators continuously - the oscillators never start or stop. Instead of triggering notes, you sculpt a continuously evolving tone: a drawable gate pattern chops rhythmic bursts out of the drone, dual multi-mode filters shape it, and a per-voice modulator bank warps pitch, timbre, and filter over time."
 P "mu-Tant shares its interface shell, modulator engine, mixer, and FX rack with its sibling mu-Clid. The difference is the engine: where mu-Clid triggers samples on Euclidean hits, mu-Tant sustains wavetable drones shaped by a drawn gate."
+P "mu-Tant is free to use. Every feature is available to everyone: all eight voices, the full gate editor and preset saving. If you find it useful you can pay what you like to support it (see Supporting mu-Tant)."
 
 H2 "Who Is This For?"
 P "mu-Tant is for sound designers and producers who work with evolving pads, drones, textures, and generative ambient material. It is equally at home in a DAW session - fully automatable and synchronised to host transport - or as a standalone instrument for live performance and sketching."
 
-Pic "Full plugin window with voice sidebar, voice editor, gate editor, and modulator panel visible."
+Pic "The mu-Tant window: transport bar, voice sidebar, voice editor, gate editor and modulator panel." "main-window.png"
 
 # ── 2. What is a Drone Synth? ────────────────────────────────────────────────
 H1 "2. The Drone Concept"
@@ -70,17 +88,17 @@ Bullet "CLAP  —  copy mu-Tant.clap to %ProgramFiles%\Common Files\CLAP\"
 Bullet "Standalone  —  run mu-Tant.exe from any location"
 
 H2 "Content Folder"
-P "On first launch mu-Tant creates a content folder at %USERPROFILE%\Documents\TDP\muTant\ with two sub-folders: Presets (full preset files, .muTant) and Voices (single-voice preset files, .muPattern)."
+P "On first launch mu-Tant creates a content folder at %USERPROFILE%\Documents\TDP\muTant\ with sub-folders for presets (full preset files, .muTant), voices (single-voice preset files, .muPattern) and your own wavetables. You can ask mu-Tant to start from your own preset: tick Save as Default in the Save window, and that preset is loaded when mu-Tant starts and whenever you press New."
 
 H2 "Supporting mu-Tant"
-P "mu-Tant is free to use, and you can pay what you like to support it. If you have not entered a licence key, a polite 'Support mu-Tant' window appears once per session, the first time you open mu-Tant after starting your DAW or the app. It has three buttons:"
+P "mu-Tant is free to use and nothing is locked. If you find it useful, you can pay what you like to support it. A copy that has not been given a thank-you key shows a polite 'Support mu-Tant' window once per session, the first time you open mu-Tant after starting your DAW or the app. It has three buttons:"
 Bullet "Maybe later  —  closes the window and carries on."
 Bullet "Enter licence key  —  opens the About panel so you can type in your key."
-Bullet "Pay what you like  —  opens the checkout page in your web browser. The suggested amount is £20, but £0 is fine. You receive a licence key either way."
+Bullet "Pay what you like  —  opens the checkout page in your web browser. The suggested amount is £20, but £0 is fine. You receive a key either way."
 P "Tick 'Don't show this again' to stop the window appearing. You can still support mu-Tant at any time from the Support link at the right of the status bar, or from the Support button in the About panel."
-P "To enter a licence key, click the mu-Tant logo to open the About panel, click Enter a key, and paste in your key, then click Activate. If you do not have a key yet, click Get a key beside Activate to open the pay-what-you-like page in your web browser. Once a key is accepted, the About panel shows 'Thank you for your support' and the Support prompt no longer appears."
+P "To enter a key, click the mu-Tant logo to open the About panel, click Enter a key, paste in your key, then click Activate. If you do not have a key yet, click Get a key beside Activate to open the pay-what-you-like page in your web browser. Once a key is accepted, the About panel shows 'Thank you for your support' and the Support prompt no longer appears. The key changes nothing else: mu-Tant works the same with or without it."
 
-Pic "Support mu-Tant window with its three buttons and the Don't show this again tick box."
+Pic "Support mu-Tant window with its three buttons and the Don't show this again tick box." "support-prompt.png"
 Pic "About panel showing the Support and Enter a key buttons."
 
 # ── 4. Interface Overview ─────────────────────────────────────────────────────
@@ -88,68 +106,72 @@ H1 "4. Interface Overview"
 P "The mu-Tant window is divided into four regions:"
 Bullet "Transport Bar (top) — playback, BPM, presets, mixer, and settings"
 Bullet "Voice Sidebar (left) — one item per active voice, plus an Add button"
-Bullet "Voice Editor (centre) — oscillators, cross-mod, filters, insert, gate editor, and modulators for the selected voice"
+Bullet "Voice Editor (centre) — oscillators, noise, cross-mod, filters, effects, gate editor, and modulators for the selected voice"
 Bullet "Mixer overlay — opened from the transport bar, replacing the editor"
-P "The window is resizable and all elements scale proportionally."
+Bullet "Status Bar (bottom) — the name and value of the control you last touched, with a small Support link at the right-hand end"
+P "The window has two sizes, Medium and Large, chosen in Settings (Display, Size). Everything scales with it. In the standalone application an Options button at the top left of the window opens the audio and MIDI device settings."
 
-Pic "Annotated full-window view showing the voice editor regions."
+Pic "The voice editor regions." "main-window.png"
 
 # ── 5. Transport Bar ──────────────────────────────────────────────────────────
 H1 "5. Transport Bar"
 P "Controls from left to right:"
-Bullet "mu-Tant logo  —  click to open the About panel, where you can also support mu-Tant or enter a licence key"
+Bullet "mu-Tant logo  —  click to open the About panel, where you can also support mu-Tant or enter a key"
 Bullet "Play / Stop  —  in DAW mode follows the host transport and BPM, even while the plug-in is bypassed; in standalone starts and stops playback. Locked while an external MIDI clock controls play (see MIDI Clock Sync). While stopped, the gate is closed (silent); press Play to hear the gated drone, or use the gate Bypass to audition the raw tone."
 Bullet "BPM display  —  read-only in DAW mode; editable in standalone. Tempo runs from 20.0 to 300.0 BPM with one decimal (for example 127.5; whole tempos show .0). Click the up or down arrow to step one whole BPM and keep the fraction (127.5 becomes 128.5); Shift+click steps a tenth. Double-click to type a value such as 127.5 or 127,5; a value outside the range is clamped to it. The same field appears in Settings. Locked, and showing the clock's tempo to a tenth, while an external MIDI clock sets the tempo. The clock drives both the gate patterns and the modulators."
 Bullet "Clock lamp  —  standalone only. Replaces the Tap button and sits between the BPM display and the Position readout, and appears only while MIDI clock sync is on with Messages set to Clock only or Clock + Transport (it is hidden with Transport only, and when Source is Internal). Dim amber means waiting for clock, green means locked to the clock, red means the clock was lost and the transport has stopped. The lamp stays steady; it never blinks. Hover over it to read its state in the status bar. See MIDI Clock Sync."
 Bullet "Tap button  —  standalone only. Takes the place of the Clock lamp whenever the lamp is not shown (the internal clock, or MIDI clock sync set to Transport only), so you see Tap or the lamp, never both. Tap it in time with the beat to set the tempo: it needs two taps, averages your last four intervals, and starts a new count if you pause for more than two seconds. The result is rounded to a tenth of a BPM, kept within 20 to 300, and written into the BPM field."
 Bullet "Nudge buttons (− and +)  —  standalone only. Two small buttons just right of the Position readout. Hold − to run the groove 4 % slower, or + to run it 4 % faster, to line up with another player by ear. Let go and the set tempo returns exactly; the BPM field never changes. Under an external MIDI clock, holding a button shifts the groove against the clock by that amount, and the shift stays until the next Start."
 Bullet "Position  —  bar, beat, and sixteenth readout (e.g. 3.2.1). In DAW mode it follows the host's position, even while the plug-in is bypassed, and counts in the host's time signature: in 3/4 a bar has three beats, in 7/8 it has seven eighth-note beats, and the last number is the sixteenth within the beat. Bar 1 starts where the host's bar 1 starts, so a pickup bar is counted correctly. The standalone counts in the time signature chosen in Settings (4/4 by default). The time signature only changes the readout; mu-Tant's gate patterns and modulator loop lengths still treat a bar as four beats."
-Bullet "Preset dropdown / New / Save  —  load and save full .muTant presets."
-Bullet "Mixer button  —  opens the mixer overlay."
+Bullet "Loop dropdown  —  the master loop. Choices are the infinity symbol (none) or 16 to 256 steps in steps of 16. A counter beside it shows the current step and the loop length, for example 1 / 64. When Hot-swap Timing in Settings is On master loop, a staged preset change takes effect at the end of this loop."
+Bullet "Preset dropdown / New / Save  —  load and save full .muTant presets. New loads your default preset (see Content Folder) after asking whether to discard unsaved changes."
 Bullet "Settings (gear) icon  —  opens the Settings overlay."
+Bullet "Mixer button  —  opens the mixer overlay. The label changes to Sequencer while the mixer is open."
 
-Pic "Transport Bar — full width view."
+Pic "Transport Bar — full width view." "transport-bar.png"
 
 # ── 6. Voice Sidebar ──────────────────────────────────────────────────────────
 H1 "6. Voice Sidebar"
 P "The sidebar shows one item per active voice (up to eight). Each item displays a miniature spectrum animation driven by the voice's post-insert audio, the voice colour, and the voice name. Click an item to select that voice for editing."
-P "The Add (+ Voice) button at the bottom creates a new voice with default settings and the next unused palette colour. Voices can be reordered by dragging. To remove a voice use the Delete (X) button in the voice header - a confirmation is required, and the last voice cannot be removed."
+P "The + Voice button at the bottom creates a new voice with default settings and the next unused palette colour (maximum eight; the button is disabled at eight). Voices can be reordered by dragging. To remove a voice use the Delete (×) button in the voice header - a confirmation is required, and the last voice cannot be removed."
 P "Each voice automatically receives a distinct palette colour that appears on its sidebar item, header bar, and the sub-panel borders inside the editor, and follows the voice through reorder and delete operations."
 
-Pic "Voice Sidebar with three voices, one selected."
+Pic "Voice Sidebar with a voice selected." "sidebar.png"
 
 # ── 7. Voice Header and Tonal Centre ──────────────────────────────────────────
 H1 "7. Voice Header"
 P "At the top of the voice editor:"
-Bullet "Name — double-click to rename the voice."
-Bullet "Reset (circular arrow) / Delete (X) — reset to defaults / remove the voice (both confirm first)."
-Bullet "Root and Scale — the shared tonal centre for this voice (see Oscillators)."
-Bullet "Voice preset dropdown / Save — load and save a single voice as a .muPattern file in the Voices folder."
+Bullet "Name — click the name to rename the voice."
+Bullet "Voice preset dropdown — load a single voice from a .muPattern file in the Voices folder."
+Bullet "Save — saves this voice as a .muPattern file."
+Bullet "Reset (circular arrow) / Delete (×) — reset to defaults / remove the voice (both confirm first)."
+P "Just below the header, the Root and Scale dropdowns set the shared tonal centre for this voice (see Oscillators)."
 
 # ── 8. Oscillators ────────────────────────────────────────────────────────────
 H1 "8. Oscillators (OSC 1 and OSC 2)"
 P "Both oscillators run simultaneously and are free-running - their phases never reset. The result is a continuously evolving tone rather than a triggered note."
 
 H2 "Shared Tonal Centre"
-P "Both oscillators share the same Root (C to B) and Scale, set in the voice header. The available scales are Major, Minor, Dorian, Phrygian, Lydian, Mixolydian, Locrian, Harmonic Minor, Pentatonic Major, Pentatonic Minor, Blues, and Chromatic. The root and scale define the harmonic space both oscillators move within."
+P "Both oscillators share the same Root (C to B) and Scale, set in the two dropdowns under the voice header. The available scales are Major, Minor, Dorian, Phrygian, Lydian, Mixolydian, Locrian, Harmonic Minor, Pentatonic Major, Pentatonic Minor, Blues, and Chromatic. The root and scale define the harmonic space both oscillators move within."
 
 H2 "Per-Oscillator Controls"
-P "Each oscillator has a wavetable selector plus five knobs:"
+P "Each oscillator has a wavetable selector plus six knobs:"
 Bullet "Oct (-3 to +3 octaves) — octave offset from the base note"
 Bullet "Semi (-12 to +12) — scale-degree offset (integer steps through the scale)"
 Bullet "Fine (plus or minus 100 cents) — off-scale detune"
-Bullet "Pos (0 to 255) — wavetable frame position; morphs through the table"
 Bullet "PEnv (plus or minus 24 semitones) — pitch-envelope depth: how far the gate editor's PITCH layer shifts this oscillator's pitch"
+Bullet "Pos (0 to 255) — wavetable frame position; morphs through the table"
+Bullet "Level — how loud this oscillator is going into the filters (see Source Levels)"
 P "Modulating Semi with a stepped modulator snaps cleanly between scale notes (integer jumps). Modulating Semi with a smooth modulator glides through frequency space, passing through off-scale pitches for a glissando effect."
 
 H2 "Wavetables"
 P "Each oscillator's wavetable selector chooses the waveform set it morphs through with the Pos knob. mu-Tant uses the Serum/Vital 2048-samples-per-frame format internally, and offers three sources in the dropdown:"
-Bullet "Built-in tables — a set of procedural factory tables, automatable by index."
+Bullet "Built-in tables — a set of procedural factory tables, automatable by index. Their names are short so they fit the selector, for example Basic and Pulse."
 Bullet "Wavetables folder — drop .wav wavetables into Documents\TDP\muTant\Wavetables (sub-folders become categories) and they appear under their own headings; selected by path so they survive preset reload."
 Bullet "Load .wav… — import any Serum/Vital-format wavetable .wav from disk; the path is saved with the preset."
 P "The Pos knob (and its modulation) sweeps smoothly through the frames of whichever table is selected."
 
-Pic "OSC 1 and OSC 2 panels showing the wavetable selector and the five knobs."
+Pic "OSC 1 and OSC 2 panels showing the wavetable selector and the six knobs, with the Root and Scale dropdowns above." "oscillators.png"
 
 # ── 9. Cross-Modulation and Noise ─────────────────────────────────────────────
 H1 "9. Cross-Modulation (X-MOD) and Noise"
@@ -170,8 +192,8 @@ P "Switching a lane's mode keeps the knob value, so you can audition FM/PM/TZFM 
 H2 "Noise"
 P "A separate noise source (White or Pink) mixes in via the NOISE panel. The NOISE panel holds the noise type dropdown and, to its right, the noise Level knob."
 
-# ── 10. Source Mixer ──────────────────────────────────────────────────────────
-H1 "10. Source Mixer"
+# ── 10. Source Levels ──────────────────────────────────────────────────────────
+H1 "10. Source Levels"
 P "Each sound source has its own Level knob at the right-hand end of its panel, setting the balance before the filters:"
 Bullet "OSC 1 Level — level of oscillator 1 (dB)"
 Bullet "OSC 2 Level — level of oscillator 2 (dB)"
@@ -194,11 +216,11 @@ Bullet "Two horizontal lines — Parallel: both filters process the input and th
 Bullet "Two vertical lines — Series: the signal passes through Filter 1, then into Filter 2 (one chain)"
 P "A freshly added second filter defaults to an 8 kHz cutoff so it is audible immediately. To hear Filter 2's effect over a dark Filter 1 tone, set its cutoff below Filter 1's content."
 
-Pic "Filter section showing the two filter rows and the series/parallel routing toggle."
+Pic "X-MOD, Filter and Effects boxes: the two filter rows, the series/parallel routing button and the insert effect." "filter-xmod.png"
 
 # ── 12. Insert Effect ─────────────────────────────────────────────────────────
 H1 "12. Insert Effect"
-P "The INSERT panel is the per-voice insert effect, placed after the gate (oscillators, then filters, then gate, then insert, then mixer). Select an algorithm from the dropdown; its four parameter knobs relabel to match. Available algorithms: None, Soft Clip, Hard Clip, Fold, Bitcrusher, Clipper, 3-Band EQ, Compressor, Limiter, Ring Mod, Tape Saturation, Karplus, Vocoder, and Vocoder Stereo. Insert parameters P1 to P4 are available as modulation destinations."
+P "The EFFECTS box is the per-voice insert effect, placed after the gate (oscillators, then filters, then gate, then insert, then mixer). Select an algorithm from the dropdown; its four parameter knobs relabel to match. Available algorithms: None, Soft Clip, Hard Clip, Fold, Bitcrusher, Clipper, 3-Band EQ, Compressor, Limiter, Ring Mod, Tape Saturation, Karplus, Vocoder, and Vocoder Stereo. Insert parameters P1 to P4 are available as modulation destinations."
 
 # ── 13. Gate Editor ───────────────────────────────────────────────────────────
 H1 "13. Gate Editor"
@@ -218,10 +240,9 @@ Bullet "Grid — the cell subdivision: 1/4, 1/8, 1/16 (default), or 1/32."
 Bullet "Gap — forces a silence tail at the end of every envelope region. At 0 percent the envelope fills the full region; at 50 percent it completes in the first half and the second half is silent."
 
 H2 "Toolbox"
-P "Four tools in the header:"
+P "Three tools in the header, drawn as small icons:"
 Bullet "Pencil — click an empty cell to draw a one-cell envelope; drag the start/end grab handles (bottom corners) to extend a region"
 Bullet "Eraser — click an envelope to delete it"
-Bullet "Glue — merge adjacent envelopes into one continuous region"
 Bullet "Reverse — click an envelope to flip its attack and decay"
 
 H2 "Envelope Shape"
@@ -237,40 +258,48 @@ Bullet "Playing, empty pattern — silent (nothing drawn passes)"
 Bullet "Playing, has envelopes — per-sample envelope evaluation"
 Bullet "Bypass on — raw drone passes regardless of play state"
 
-Pic "Gate editor showing the GATE layer with several attack/decay envelopes and the FILT ghost behind."
+Pic "Gate editor with the GATE layer selected." "gate-editor.png"
 
 # ── 14. Modulators ────────────────────────────────────────────────────────────
 H1 "14. Modulators"
 P "Each voice has eight independent modulators (Mod A through Mod H) plus a Matrix tab - the same shared engine as mu-Clid. Each voice has its own modulator bank."
-P "Each modulator has a Mode toggle (Stepped bar-graph or Smooth drawable curve), a Polarity toggle (Unipolar 0 to +1, or Bipolar -1 to +1), and a loop length (a note-value dropdown times an integer multiplier, independent of any pattern length). A playhead line shows the current loop position. In Smooth mode, click to add a node, drag to move, ALT-click a segment to bend it, right-click to remove. In Stepped mode, drag bars up or down. A dice button randomises the current modulator's values without changing its shape."
-P "Add destinations with the Add Target button; each assignment has a bipolar depth (-100 to +100 percent) and a source-side curve. mu-Tant modulation destinations include: Osc 1/2 Octave, Semi, Fine, Position, and Pitch Env; Osc 1/2 and Noise levels; Filter 1 and Filter 2, each with Cutoff, Resonance, Drive, Low Cut, and Env Depth; the voice Level; X-Mod Index, Depth, and SSB shift; and Insert P1 to P4. When a knob is a destination, an arc around it shows the live modulated value."
+P "Each modulator has a Mode dropdown (Stepped bar-graph or Smooth drawable curve), a Polarity switch (Uni 0 to +1, or Bi -1 to +1), and a loop length (a note-value dropdown times an integer multiplier, independent of any pattern length). A playhead line shows the current loop position. In Smooth mode, click to add a node, drag to move, ALT-click a segment to bend it, right-click to remove. In Stepped mode, drag bars up or down. A dice button randomises the current modulator's values without changing its shape."
+P "Add destinations with the + Target button; the assignments are shown one at a time, so step through them with the up and down arrows and the counter at the right; each assignment has a bipolar depth (-100 to +100 percent) and a source-side curve. mu-Tant modulation destinations include: Osc 1/2 Octave, Semi, Fine, Position, and Pitch Env; Osc 1/2 and Noise levels; Filter 1 and Filter 2, each with Cutoff, Resonance, Drive, Low Cut, and Env Depth; the voice Level; X-Mod Index, Depth, and SSB shift; and Insert P1 to P4. When a knob is a destination, an arc around it shows the live modulated value."
 P "The Matrix tab lists every assignment across all eight modulators in one table."
 
-Pic "Modulator panel with the Stepped editor and several destination targets."
+Pic "Modulator panel with the Stepped editor and the target list." "modulators.png"
 
 # ── 15. Mixer ─────────────────────────────────────────────────────────────────
 H1 "15. Mixer"
 P "Click the Mixer button in the transport bar to open the mixer overlay. Each voice occupies one channel strip; to the right are the Effect, Delay, and Reverb return channels and the Master strip. This is the same shared mixer and FX rack as mu-Clid."
-P "Each voice strip has a fader with VU metering, pan, mute and solo, sidechain ducking (source, amount, attack, release), and Effect / Delay / Reverb sends. The sidechain source dropdown includes all other voice channels plus an External option — duck any voice from any other, or from a signal fed in through the host's sidechain bus (VST3 / CLAP). The FX return strips carry intra-FX routing (Effect to Delay, Effect to Reverb, Delay to Reverb), and the master strip carries a master insert. The three FX unit rows (Effect / Delay / Reverb) sit below the strips with algorithm selectors and inline parameters."
+P "Each voice strip has a fader with VU metering, pan, mute and solo, sidechain ducking (source, amount, attack, release), and Effect / Delay / Reverb sends. The sidechain source dropdown includes all other voice channels plus an External option — duck any voice from any other, or from a signal fed in through the host's sidechain bus (VST3 / CLAP). The FX return strips carry intra-FX routing (Effect to Delay, Effect to Reverb, Delay to Reverb), and the master strip has two inserts, Insert 1 and Insert 2, that the summed output passes through in that order. A row of buttons at the top right (Peak, VU, K-12, K-14) chooses the metering standard. The Effect send is named after the effect currently chosen (for example Chorus). The three FX unit rows (Effect / Delay / Reverb) sit below the strips with algorithm selectors and inline parameters."
 
-Pic "Mixer overlay with voice channels, FX returns, and master."
+Pic "Mixer overlay with voice channels, FX returns, and master." "mixer.png"
 
 # ── 16. Presets ───────────────────────────────────────────────────────────────
 H1 "16. Presets"
 H2 "Full Presets (.muTant)"
-P "Full presets save the entire plugin state - all voices, modulators, gate patterns, mixer, and FX - to Documents\TDP\muTant\Presets. Load from the transport dropdown; save with the Save button (name, description, and category)."
+P "Full presets save the entire plugin state - all voices, modulators, gate patterns, mixer, and FX - to Documents\TDP\muTant\Presets. Load from the transport dropdown, which is grouped by category; the preset browser shows each preset's category and description. Save with the Save button: enter a name, an optional description and a category, and tick Save as Default to make it the preset that loads at startup and when you press New. If saving fails (for example a full disk) mu-Tant shows an error message and never leaves a half-written preset.
+P "Presets and saved DAW projects store each setting's real value, and choices by name, so a future update that changes a knob's range cannot change a saved sound. When a preset, a voice preset or a saved session is loaded, any setting it does not contain is set to its default.""
 H2 "Per-Voice Presets (.muPattern)"
 P "Each voice can be saved and loaded independently to Documents\TDP\muTant\Voices, including its oscillator, filter, insert, and level settings, all three gate layers (GATE / FILT / PITCH), and modulator assignments. Use the voice header dropdown and Save button."
 
 # ── 17. Settings ──────────────────────────────────────────────────────────────
 H1 "17. Settings"
-P "Click the gear icon to open the Settings overlay. Settings are arranged in two columns:"
-Bullet "Master Volume — overall output level"
-Bullet "UI Size — Medium or Large window"
-Bullet "Tempo (BPM) — internal clock, 20.0 to 300.0 with one decimal, also editable from the transport BPM field"
-Bullet "MIDI Clock — standalone only: follow an external MIDI clock, with a Sync Offset to compensate for audio latency (see below)."
+P "Click the gear icon to open the Settings overlay. Everything fits on one screen, in two columns, under two headings. Click Close to return."
+P "General (left column):"
+Bullet "Audio, Master Vol — overall output level"
+Bullet "Display, Size — Medium or Large window. Reopen the app for the label fonts to rescale fully."
+Bullet "Transport, Tempo — internal clock, 20.0 to 300.0 BPM with one decimal, also editable from the transport BPM field"
 Bullet "Time Signature (standalone) — in Settings under General, Transport: 2/4, 3/4, 4/4, 5/4, 6/4, 7/4, 5/8, 6/8, 7/8, 9/8 or 12/8; default 4/4. It changes how the bar.beat.sixteenth Position readout counts (a beat is a quarter note in x/4 and an eighth note in x/8). Patterns still run in four-beat bars."
-Bullet "MIDI Prog. Change — open the Voice Presets and Full Presets tables to map incoming program-change messages to presets (see below)."
+P "MIDI (right column):"
+Bullet "Hot-swap, Timing — On master loop or On voice loop: when a staged preset change takes effect."
+Bullet "MIDI Clock, Source (standalone) — Internal, or MIDI In to follow an external MIDI clock, with a Sync Offset to compensate for audio latency (see below)."
+Bullet "Note Mode, Mode — Free or Note (see Note Mode)."
+Bullet "MIDI Program Change — the Voice Presets and Full Presets buttons open the tables that map incoming program-change messages to presets (see below)."
+P "A Contact Support link at the bottom of the page is there when you need help."
+
+Pic "Settings overlay open over the main window." "settings.png"
 
 H2 "MIDI Clock Sync (Standalone)"
 P "When running as a standalone application, mu-Tant can follow an external MIDI clock from a drum machine, groovebox, or DAW. First choose the MIDI input that carries the clock in the standalone's MIDI settings. Selecting the input does not turn sync on by itself. To follow the clock, open Settings and, in the MIDI Clock section, set Source to MIDI In; set it back to Internal to turn sync off and ignore any incoming clock. A Messages choice appears, which decides what mu-Tant takes from the clock:"
@@ -286,8 +315,11 @@ P "The lamp is hidden with Transport only, because the clock's ticks are not use
 P "Sync Offset  —  with Source set to MIDI In, a Sync Offset field appears in the MIDI Clock section of Settings. It runs from −50 to +250 ms (the label reads simply Sync offset) and defaults to 0. The value is shown with a sign, for example +25. The arrows step 1 ms; Shift+click steps 10 ms. A positive value makes mu-Tant play earlier than the clock says. Enter your audio output latency here (about 20 to 40 ms on Windows WASAPI) so the sound lands on the beat of a hardware master. mu-Tant remembers the setting between sessions."
 Pic "Transport bar with the Clock lamp lit green (locked) between the BPM display and the Position readout."
 
+H2 "Note Mode"
+P "By default (Free) mu-Tant ignores MIDI notes: the drone plays all the time and the gate follows the transport. Setting Note Mode, Mode to Note turns mu-Tant into a keyboard instrument: the drone is silent until you hold a key, and fades out (in about 8 milliseconds) when you release the last one. While a key is held, every voice is transposed so its tonal centre (the Root) sits on the note you are holding, and the scale, oscillator and modulation settings still apply on top. With several keys held, the most recently pressed one sounds. The gate pattern keeps running on the transport as usual."
+
 H2 "MIDI Program Change to Preset"
-P "mu-Tant can load presets from incoming MIDI program-change messages. On channels 1 to 8 a program change loads the matching .muPattern into that voice slot; on channel 9 it loads a full .muTant preset. While playing, the change is staged and applied seamlessly at the next loop boundary (hot-swap). Configure the mappings from the MIDI Prog. Change row in Settings."
+P "mu-Tant can load presets from incoming MIDI program-change messages. On channels 1 to 8 a program change loads the matching .muPattern into that voice slot; on channel 9 it loads a full .muTant preset. While playing, the change is staged and applied seamlessly at the next loop boundary (hot-swap). Configure the mappings with the Voice Presets and Full Presets buttons in Settings, under MIDI Program Change."
 
 # ── 18. Connecting to mu-link ─────────────────────────────────────────────────
 H1 "18. Connecting to mu-link"
@@ -327,10 +359,13 @@ Bullet "Modulators per voice: 8 (smooth LFO or stepped), plus a matrix view"
 Bullet "Full preset format: .muTant (XML). Per-voice preset format: .muPattern (XML)"
 Bullet "Third-party libraries: JUCE, Signalsmith Reverb (MIT), Monocypher (BSD-2-Clause), clap-juce-extensions (MIT)"
 
+H2 "Hosts That Do Not Run an Event Loop"
+P "mu plugins need the host to run its normal event loop, as every ordinary DAW does. A few headless or offline-only renderers do not. In those, changes made by MIDI or a controller, MIDI program changes, and preset loads made while playing may not take effect until the host runs its event loop. If you hit this, load presets while the transport is stopped, or render with a host that runs its event loop."
+
 # ── 22. Not in mu-Tant ────────────────────────────────────────────────────────
 H1 "22. Design Decisions (Not in mu-Tant)"
 Bullet "No amplitude envelope - the gate stage does this job."
-Bullet "No played notes - oscillators run continuously; MIDI note-on / note-off is not used (MIDI program change is, for preset loading - see Settings)."
+Bullet "No triggered notes - oscillators run continuously and a key press never restarts them. MIDI notes only matter in Note Mode, where a held key opens the drone and sets its pitch (see Note Mode). MIDI program change loads presets - see Settings."
 Bullet "No user audio samples - oscillators use wavetables only, though you can import your own Serum/Vital-format wavetable .wav files (see Wavetables)."
 Bullet "No granular - pure wavetable synthesis."
 
