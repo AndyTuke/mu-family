@@ -12,6 +12,7 @@
 
 #include "BuildNumber.h"
 #include "Server/AudioServer.h"
+#include "UI/Components/MuLookAndFeel.h"
 #include "UI/MuLinkComponent.h"
 
 class MuLinkApplication : public juce::JUCEApplication
@@ -49,13 +50,13 @@ private:
     public:
         MainWindow(const juce::String& name, mu_link::AudioServer& server)
             : DocumentWindow(name,
-                             juce::Colour(0xff1c1c1b),
+                             MuLookAndFeel::colour(MuLookAndFeel::windowBackground),
                              DocumentWindow::allButtons)
         {
             setUsingNativeTitleBar(true);
+            // Fixed at the family size; the window follows the content when the display size changes.
             setContentOwned(new MuLinkComponent(server), true);
-            setResizable(true, true);
-            setResizeLimits(760, 460, 1600, 1000);
+            setResizable(false, false);
             centreWithSize(getWidth(), getHeight());
             setVisible(true);
         }

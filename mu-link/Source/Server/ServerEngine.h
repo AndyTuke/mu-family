@@ -204,6 +204,9 @@ public:
     // master; the GUI reads these on the message thread and applies its own ballistics.
     float clientPeak(int slot) const noexcept { return validSlot(slot) ? clientPeakLevel[slot].load(std::memory_order_relaxed) : 0.0f; }
     float masterPeak()         const noexcept { return masterPeakLevel.load(std::memory_order_relaxed); }
+    // The peak atomics themselves, for a meter that polls them (the mixer strips' VU).
+    std::atomic<float>& clientPeakMeter(int slot) noexcept { return clientPeakLevel[validSlot(slot) ? slot : 0]; }
+    std::atomic<float>& masterPeakMeter() noexcept { return masterPeakLevel; }
 
     // Render one block into `output` (per-channel device buffers, numChannels ≤ kMaxChannels).
     // Audio-thread, lock-free, no allocation. Returns per-block stats for logging/metering.

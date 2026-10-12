@@ -333,6 +333,12 @@ void TransportBar::refreshPresets()
     populatePresetDropdown();
 }
 
+void TransportBar::refreshTempo()
+{
+    if (isStandalone)
+        bpmInput.setValueD(proc.getInternalBpm());
+}
+
 void TransportBar::setLoadedPreset(const juce::File& file)
 {
     // select the dropdown item whose stored File matches the loaded one

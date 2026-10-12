@@ -52,6 +52,8 @@ public:
     void setLoopSection(juce::Component* component, int width);
 
     void refreshPresets();
+    // Re-reads the internal tempo into the BPM field (after the app set it from a preset); standalone only.
+    void refreshTempo();
     // keep dropdown displaying the loaded preset's name. Pass an invalid
     // File to revert to the "<unnamed preset>" placeholder.
     void setLoadedPreset(const juce::File& file);

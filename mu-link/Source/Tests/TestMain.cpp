@@ -8,6 +8,7 @@
 //         linked here (they arrive in later increments).
 
 #include <juce_core/juce_core.h>
+#include <juce_events/juce_events.h>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
@@ -55,6 +56,8 @@ int main(int argc, char** argv)
         if (std::strcmp(argv[i], "--shm-child") == 0)
             return mu_link_test::runShmChild();
 #endif
+
+    juce::ScopedJuceInitialiser_GUI gui;   // a message loop for the window tests
 
     StdoutLogger logger;
     juce::Logger::setCurrentLogger(&logger);

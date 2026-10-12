@@ -15,6 +15,10 @@
 #   • mu-link        — the GUI app (device picker, client meters, master transport).
 set(MU_CORE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../mu-core")
 
+# The processor-free mu-core UI: one shared list (also used by the plugins and mu-core-tests). Never
+# add a hand-picked mu-core UI .cpp here; if a file needs ProcessorBase it does not belong in the list.
+include("${MU_CORE_DIR}/UIChromeSources.cmake")
+
 # ── mu-link-tests — console UnitTests over the IPC foundation + engine + client ──
 juce_add_console_app(mu-link-tests PRODUCT_NAME "mu-link-tests")
 
@@ -25,6 +29,12 @@ target_sources(mu-link-tests PRIVATE
     Source/Tests/ServerTests.cpp
     Source/Tests/ClientTests.cpp
     Source/Tests/LinkShellBackendTests.cpp
+    Source/Tests/MuLinkWindowTests.cpp
+    # The window under test: its own parts and the shared processor-free chrome it is built on.
+    Source/UI/MuLinkComponent.cpp
+    Source/UI/MixerPanel.cpp
+    Source/UI/ScenesPanel.cpp
+    ${MU_CORE_CHROME_SOURCES}
     "${MU_CORE_DIR}/Audio/InsertProcessor.cpp"   # ServerEngine embeds two master-bus inserts
 )
 
@@ -40,11 +50,15 @@ target_link_libraries(mu-link-tests PRIVATE
     juce::juce_audio_basics   # ServerEngine now embeds the mu-core EqInsert (AudioBuffer/SmoothedValue)
     juce::juce_audio_devices  # MidiClockOut (the sample-accurate MIDI clock sender)
     juce::juce_graphics       # the shell seam headers pull juce_audio_processors, which needs Colour
+    juce::juce_audio_utils    # the window tests build MuLinkComponent (device selector, shared chrome)
+    juce::juce_gui_extra
+    juce::juce_data_structures
     juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags
 )
 
-target_compile_definitions(mu-link-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+# MODAL_LOOPS: the window tests pump the message loop for a moment so the bar's refresh timer ticks.
+target_compile_definitions(mu-link-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0 JUCE_MODAL_LOOPS_PERMITTED=1)
 
 # ── mu-link-server — runnable headless audio server (owns the HW device) ──────
 juce_add_console_app(mu-link-server PRODUCT_NAME "mu-link-server")
@@ -130,13 +144,11 @@ juce_add_gui_app(mu-link PRODUCT_NAME "mu-link"
     ICON_BIG   "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png"
     ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png")
 
-# The processor-free mu-core UI: one shared list (also used by the plugins and mu-core-tests). Never
-# add a hand-picked mu-core UI .cpp here; if a file needs ProcessorBase it does not belong in the list.
-include("${MU_CORE_DIR}/UIChromeSources.cmake")
-
 target_sources(mu-link PRIVATE
     Source/Plugin/Main.cpp
     Source/UI/MuLinkComponent.cpp
+    Source/UI/MixerPanel.cpp
+    Source/UI/ScenesPanel.cpp
     ${MU_CORE_CHROME_SOURCES}
     "${MU_CORE_DIR}/Audio/InsertProcessor.cpp"         # ServerEngine master-bus inserts
 )

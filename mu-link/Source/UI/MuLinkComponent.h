@@ -2,141 +2,92 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <array>
+#include <functional>
 
 #include "Server/AudioServer.h"
-#include "UI/Components/MuLookAndFeel.h"
-#include "UI/Components/VUMeter.h"
-#include "UI/Components/KnobWithLabel.h"
-#include "UI/Components/DropdownSelect.h"
-#include "UI/SaveDialog.h"
-#include "UI/PresetBrowser.h"
+#include "UI/ShellChrome.h"
+#include "UI/Components/SegmentControl.h"
+#include "LinkShellBackend.h"
+#include "MixerPanel.h"
+#include "ScenesPanel.h"
+#include "HoverStatus.h"
 
-// MuLinkComponent — the mu-link window content (Stage L3).
+// MuLinkComponent - the mu-link window content (docs/mu-link/design-ui.md).
 //
-// mu-link is a server app, not a plugin, so it does NOT use the plugin EditorShellBase
-// (which is a juce::AudioProcessorEditor bound to ProcessorBase). Instead it composes a
-// bespoke window from the shared mu-family design system — MuLookAndFeel for the palette
-// and VUMeter for the level meters — so it looks like a member of the family without
-// pulling in the plugin shell. (Documented deviation per the family-consistency rule.)
-//
-// Layout: the master transport (play/stop + tempo — mu-link is always tempo master) above a
-// full-width mixer strip of the eight client slots (fader + VU + 3-band EQ) plus the summed
-// master. The runtime WASAPI/ASIO picker + MIDI-clock-out port lives behind an Options button
-// (a dialog, like the synth standalones). A timer polls the registry for live attach/detach.
-class MuLinkComponent : public juce::Component,
-                        private juce::Timer
+// mu-link is a server app, not a plugin, so it has no AudioProcessor and no EditorShellBase. It uses
+// the same chrome as the products through the app seam: a mu_ui::ShellChrome over a
+// mu_link::LinkShellBackend gives it the shared transport bar, status bar, About, Save and preset
+// browser overlays and the family look. The main area is the Mixer panel (eight client strips and the
+// master column) above the Scenes panel; there is no sidebar. The window owns the app state that a
+// preset captures (mixer and scenes) and hands it to the backend through two hooks.
+class MuLinkComponent : public juce::Component
 {
 public:
-    explicit MuLinkComponent(mu_link::AudioServer& serverToShow);
+    // `dataRoot` is where mu-link keeps its files (Presets, settings, scenes.json); the default is
+    // Documents/TDP/muLink.
+    explicit MuLinkComponent(mu_link::AudioServer& serverToShow,
+                             juce::File dataRoot = mu_link::LinkShellBackend::defaultRoot());
     ~MuLinkComponent() override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
 
+    // The parts, for the window's owner and the tests.
+    mu_ui::ShellChrome&       getChrome()  { return chrome; }
+    mu_link::LinkShellBackend& getBackend() { return backend; }
+    mu_link::MixerPanel&      getMixer()   { return page.mixer; }
+    mu_link::ScenesPanel&     getScenes()  { return page.scenes; }
+    SegmentControl&           getClockSourceControl() { return clockSource.segment; }
+
+    // Recall scene `scene`: each enabled, connected client is sent its program change.
+    void triggerScene(int scene);
+
+    // The whole app state as one tree (tempo, mixer, master inserts, scenes), and back.
+    juce::ValueTree captureState() const;
+    void            applyState(const juce::ValueTree& state);
+    void            resetToDefaults();   // 120.0 BPM, unity gains, flat EQ, inserts None, scenes cleared
+
 private:
-    // Construction and layout in parts.
-    void addHeaderControls();
-    void addTransportControls();
-    void addClientStrips();
-    void addMasterSection();
-    void addSceneControls();
-    void addPresetOverlays();
-    void layoutHeaderAndTransport(juce::Rectangle<int>& area);
-    void layoutScenes(juce::Rectangle<int> band);
-    void layoutMixer(juce::Rectangle<int> meters);
-    void layoutMasterInserts(juce::Rectangle<int> col);
-    void layoutClientStrips(juce::Rectangle<int> meters);
-
-    void timerCallback() override;
-    void togglePlay();
-    void showOptions();        // opens the audio/MIDI device picker in a dialog
-
-    // ── Presets — full app state (mixer + scenes) saved as a .muLink XML preset ──
-    // Reuses the shared SaveDialog + PresetBrowser overlays for identical layout/display to
-    // the products. A preset captures everything: tempo, per-client gain/mute/solo + EQ,
-    // master gain, both master inserts, and all 8 scenes.
-    juce::ValueTree captureState() const;          // current UI/server/scene state → tree
-    void            applyState(const juce::ValueTree& state);   // tree → UI/server/scenes
-    juce::File      presetsDir() const;            // Documents/TDP/muLink/Presets
-    void            doSavePreset(const juce::String& name, const juce::String& desc,
-                                 const juce::String& category);
-    void            loadPresetFile(const juce::File& file);
-    void            showSaveDialog(bool show);
-    void            showPresetBrowser(bool show);
-
-    mu_link::AudioServer& server;
-    MuLookAndFeel         lnf;
-
-    juce::Label   titleLabel, subtitleLabel, clientsHeading;
-    juce::TextButton optionsButton { "Options" };
-    juce::TextButton labelModeButton { "Show: Names" };   // toggles strip labels Names ⇄ Presets
-    bool showPresetNames = false;
-    juce::TextButton playButton { "Play" };
-    juce::TextButton clockSourceButton { "Clock: Internal" };
-    juce::TextButton saveButton { "Save" };
-    juce::TextButton browseButton { "Presets" };
-    juce::Label   presetNameLabel;        // shows the currently-loaded preset name
-    juce::Slider  tempoSlider;
-    VUMeter       masterMeter;
-    juce::Label   masterLabel;
-    juce::Slider  masterGain;
-
-    // Two master-bus insert effects (like mu-clid / mu-tant): an algorithm dropdown + four
-    // self-relabelling slot knobs (driven by mu_ui::configureKnobFromSlot from the shared
-    // per-algo config table), wired to the server's master-insert atomics.
-    struct MasterInsert
+    // The clock source switch that sits in the transport bar's loop-section slot.
+    struct ClockSourceSection : juce::Component
     {
-        juce::Label    title;
-        DropdownSelect algo;
-        KnobWithLabel  p[4] { { "P1", MuLookAndFeel::knobInsertPad },
-                              { "P2", MuLookAndFeel::knobInsertPad },
-                              { "P3", MuLookAndFeel::knobInsertPad },
-                              { "P4", MuLookAndFeel::knobInsertPad } };
+        ClockSourceSection();
+        void resized() override;
+        SegmentControl segment { { "Internal", "MIDI In" } };
     };
-    std::array<MasterInsert, 2> masterIns;
-    void configureMasterInsert(int which);   // (re)bind the 4 knobs to the selected algorithm
 
-    // One mixer strip per client slot: meter + name + gain knob + mute/solo, plus the
-    // selected scene's per-client cell editor (enable + program + channel).
-    struct ClientStrip
+    // The main area: the Mixer panel above the Scenes panel.
+    struct MainPage : juce::Component
     {
-        VUMeter        meter;
-        juce::Label    name;
-        juce::Slider   gain;
-        juce::Slider   eq[4];          // 3-band EQ insert: Low / Mid / Mid-Hz / High (vertical)
-        juce::Label    eqLabel[4];
-        juce::TextButton mute { "M" }, solo { "S" };
-        juce::ToggleButton sceneOn;        // is this client targeted by the selected scene?
-        juce::Label        scenePc;        // editable program number 0-127
-        juce::Label        sceneCh;        // editable MIDI channel 1-16 (9 = full preset)
+        explicit MainPage(mu_link::AudioServer& server) : mixer(server)
+        {
+            addAndMakeVisible(mixer);
+            addAndMakeVisible(scenes);
+        }
+        void resized() override;
+        mu_link::MixerPanel  mixer;
+        mu_link::ScenesPanel scenes;
     };
-    std::array<ClientStrip, mu_link::kMaxClients> clients;
 
-    // ── Scenes ───────────────────────────────────────────────────────────────
-    // A scene is a set of per-client program changes (each with its own MIDI channel, so a
-    // scene can mix full-preset recalls (Ch 9) with per-layer swaps (Ch 1-8)). Triggering a
-    // scene sends each enabled client its program change via mu_link::sendProgramChange.
-    static constexpr int kNumScenes = 8;
-    struct SceneCell { bool enabled = false; int program = 0; int channel = 9; };
-    std::array<std::array<SceneCell, mu_link::kMaxClients>, kNumScenes> scenes {};
-    int editScene = 0;   // which scene the per-client cell editors are bound to
+    void wireTransportBar();
+    void wirePresets();
+    void showClockSourceStatus();
+    juce::String clockSourceText() const;
 
-    juce::Label                                  scenesHeading;
-    std::array<juce::TextButton, kNumScenes>     sceneButtons;
+    juce::File scenesFile() const;
+    void       loadScenes();
+    void       saveScenes() const;
 
-    void triggerScene(int s);          // send each enabled client its program change
-    void selectScene(int s);           // bind the cell editors to scene s (and highlight it)
-    void refreshSceneEditors();        // reload the editors from scenes[editScene]
-    juce::File scenesFile() const;     // Documents/TDP/muLink/scenes.json
-    void loadScenes();
-    void saveScenes() const;
+    void doSavePreset(const juce::String& name, const juce::String& desc, const juce::String& category);
+    void loadPresetFile(const juce::File& file);
 
-    bool playing = false;
+    mu_link::AudioServer&     server;
+    mu_link::LinkShellBackend backend;
+    mu_ui::ShellChrome        chrome;   // declared first among the children: destroyed last
 
-    // Preset overlays (shared mu-core components → identical layout to the products).
-    SaveDialog    saveDialog;
-    PresetBrowser presetBrowser;
-    juce::String  currentPresetName;
+    ClockSourceSection clockSource;
+    MainPage           page;
+    mu_link::HoverStatus hover;   // after the components it watches
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MuLinkComponent)
 };

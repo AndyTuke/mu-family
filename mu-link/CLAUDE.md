@@ -88,8 +88,8 @@ are never called). `MuLinkComponent` holds a `ShellChrome`, the Mixer panel and 
 The GUI target still does **not** link the mu-core INTERFACE library (which would drag in the plugin stack). It adds
 `${MU_CORE_CHROME_SOURCES}` from `mu-core/UIChromeSources.cmake`, the one list of mu-core `.cpp` files that need no
 processor (the INTERFACE library includes the same list), plus `Audio/InsertProcessor.cpp`. Never add a hand-picked
-mu-core UI `.cpp` to mu-link's CMake; if it needs `ProcessorBase` it does not belong in the chrome list. Until stages S1
-to S7 land, the current `MuLinkComponent` and its hand-picked list stay as they are.
+mu-core UI `.cpp` to mu-link's CMake; if it needs `ProcessorBase` it does not belong in the chrome list. The `MuLinkComponent`
+rewrite on this seam (S7) has landed, so the old hand-picked list is gone.
 
 Client-side bus glue (attach / push audio / read transport / fallback) now lives in **`mu-core/Link/MuLinkClient`** (L4), shared by every product. The IPC contract (`mu-core/Link/MuLinkProtocol.h`) is the single source of truth for both sides. L5 wires the first product (mu-clid **standalone only**) onto `MuLinkClient`.
 
