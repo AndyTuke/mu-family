@@ -612,6 +612,17 @@ public:
     // than the Size 3 bucket. Height stays at Size 3 H.
     static constexpr int kMixerStripKnobW = kMixerChanW;   // 73
     static constexpr int kMixerStripKnobH = kKnobSize3H;   // 46
+
+    // Client strip (MixerChannel::Type::Client: name LCD, four-knob EQ, uncapped fader, no sends).
+    static constexpr int kClientNameH     = 18;   // name LCD
+    static constexpr int kClientGap       = 6;    // between the name LCD, the EQ stack and the fader
+    static constexpr int kClientDbH       = 18;   // dB readout under the fader
+    static constexpr int kClientDbGap     = 4;    // dB readout to the mute / solo row
+    static constexpr int kClientButtonH   = 24;   // mute / solo row
+    static constexpr int kClientBottomGap = 6;    // keeps the mute / solo row off the panel border
+    static constexpr int kClientFaderMinH = 40;
+    static constexpr float kClientFaderMax   = 1.5f;   // linear gain at the top of the travel
+    static constexpr float kClientFaderUnity = 1.0f;
     static constexpr int kNamePlateH = 11;
     // Cross-head screws in panel / sub-panel corners (screws style): head diameter and
     // the distance from the panel edge to the screw's centre.

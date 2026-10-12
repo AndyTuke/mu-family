@@ -5,6 +5,7 @@
 
 #include "MixerChannel.h"
 #include "Audio/AlgorithmNames.h"   // mu-core: insert-algorithm selector list
+#include "UI/InsertSlotUi.h"        // configureKnobFromSlot (client EQ stack)
 #include "Plugin/ProcessorBase.h"
 #include <cmath>
 
@@ -23,7 +24,8 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
     panKnob.setRange(-1.0, 1.0, 0.01);
     panKnob.setValue(0.0);
     panKnob.getSlider().textFromValueFunction = [](double) { return juce::String(); };
-    addAndMakeVisible(panKnob);
+    if (! isClient())   // a client strip has no pan
+        addAndMakeVisible(panKnob);
 
     if (hasSends())
     {
@@ -68,6 +70,9 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
 
     if (hasInsert())
         addInsertControls();
+
+    if (isClient())
+        addClientControls();
 }
 
 // The sidechain source selector and amount / attack / release knobs (values show in the status bar).
@@ -130,6 +135,8 @@ void MixerChannel::updateDbLabel(float level)
 
 void MixerChannel::resized()
 {
+    if (isClient()) { layoutClient(); return; }
+
     // Every literal/constant in setBounds wrapped in mu_ui::s(). The parent
     // (MixerOverlay) is expected to pass already-scaled width/height — i.e.
     // we treat `w` and `h` as physical pixels, then scale Medium-baseline
@@ -349,6 +356,23 @@ void MixerChannel::paint(juce::Graphics& g)
     const int w = getWidth();
     const int h = getHeight();
 
+    if (isClient())
+    {
+        paintClientName(g);
+        if (! faderPaneBounds.isEmpty())
+        {
+            g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder).withAlpha(0.45f));
+            g.drawRoundedRectangle(faderPaneBounds.toFloat(), 2.0f, 1.0f);
+        }
+        if (! active)   // an empty slot: dimmed below the name, still operable
+        {
+            const int nameEnd = mu_ui::s(kNamePadding * 2 + MuLookAndFeel::kClientNameH);
+            g.setColour(MuLookAndFeel::colour(MuLookAndFeel::backgroundMixerStripDim));
+            g.fillRect(0, nameEnd, w, h - nameEnd);
+        }
+        return;
+    }
+
     // Rhythm colour goes JUST around the name — a rounded outline framing the
     // name area. kNamePadding gives equal breathing room on all four sides
     // of the kNameH-tall pill so the rhythm-colour border doesn't sit on
@@ -447,4 +471,145 @@ void MixerChannel::paint(juce::Graphics& g)
         g.setColour(MuLookAndFeel::colour(MuLookAndFeel::backgroundMixerStripDim));
         g.fillRect(0, nameAreaEnd, w, h - nameAreaEnd);
     }
+}
+
+//==============================================================================
+// Client strip (mu-link): name LCD, EQ stack, fader + VU, dB readout, mute / solo.
+
+// The four EQ knobs are the 3-Band EQ insert's own slots (Low, Mid, Mid Hz, High) shown top to
+// bottom as High, Mid Hz, Mid, Low; their labels, ranges and value text come from that table.
+void MixerChannel::addClientControls()
+{
+    constexpr int kEqAlgo = 6;                       // the EQ row of mu_ui::kInsertAlgoSlots
+    constexpr int kSlotOf[4] = { 3, 2, 1, 0 };       // ClientEq (High, Mid Hz, Mid, Low) -> table slot
+    for (size_t i = 0; i < clientEq.size(); ++i)
+    {
+        const int slot = kSlotOf[i];
+        const float flat = mu_ui::kInsertAlgoDefaults[kEqAlgo][slot];
+        auto& k = clientEq[i];
+        mu_ui::configureKnobFromSlot(k, kEqAlgo, slot, mu_ui::actualToNorm(flat, kEqAlgo, slot),
+            [this, i](float) { if (onClientEq) onClientEq((ClientEq) i, (float) clientEq[i].getValue()); });
+        // Ctrl+click returns the knob to flat (a plain double-click types a value, as everywhere).
+        k.getSlider().setDoubleClickReturnValue(true, (double) flat, juce::ModifierKeys::ctrlModifier);
+        addAndMakeVisible(k);
+    }
+
+    // The fader runs 0 .. kClientFaderMax linear gain; double-click returns to unity.
+    fader.setRange(0.0, (double) MuLookAndFeel::kClientFaderMax, 0.001);
+    fader.setValue((double) MuLookAndFeel::kClientFaderUnity, juce::dontSendNotification);
+    fader.setDoubleClickReturnValue(true, (double) MuLookAndFeel::kClientFaderUnity);
+    fader.onValueChange = [this]
+    {
+        const auto v = (float) fader.getValue();
+        dbLabel.setText(formatClientDb(v), juce::dontSendNotification);
+        if (onClientLevel) onClientLevel(v);
+    };
+    dbLabel.setText(formatClientDb(MuLookAndFeel::kClientFaderUnity), juce::dontSendNotification);
+    dbLabel.setColour(juce::Label::textColourId, MuLookAndFeel::colour(Id::labelText));
+
+    muteBtn.onClick = [this] { clientMuted  = muteBtn.getToggleState(); if (onClientMute) onClientMute(clientMuted); };
+    soloBtn.onClick = [this] { clientSoloed = soloBtn.getToggleState(); if (onClientSolo) onClientSolo(clientSoloed); };
+}
+
+juce::String MixerChannel::formatClientDb(float linearLevel)
+{
+    if (linearLevel <= 0.0f) return "-inf";
+    const float db = std::round(20.0f * std::log10(linearLevel) * 10.0f) / 10.0f;   // to one decimal
+    if (db == 0.0f) return "0.0";
+    return (db > 0.0f ? "+" : "") + juce::String(db, 1);
+}
+
+void MixerChannel::setClientSlot(int slotIndex)
+{
+    const int n = MuLookAndFeel::kChannelPaletteSize;
+    channelColour = MuLookAndFeel::channelPalette[((slotIndex % n) + n) % n];
+    repaint();
+}
+
+void MixerChannel::setClientLevel(float linear)
+{
+    fader.setValue((double) linear, juce::dontSendNotification);
+    dbLabel.setText(formatClientDb((float) fader.getValue()), juce::dontSendNotification);
+}
+
+void MixerChannel::setClientEq(ClientEq band, float actual)
+{
+    clientEq[(size_t) band].setValue((double) actual, juce::dontSendNotification);
+}
+
+void MixerChannel::setClientMuteSolo(bool muted, bool soloed)
+{
+    clientMuted = muted;
+    clientSoloed = soloed;
+    muteBtn.setToggleState(muted,  juce::dontSendNotification);
+    soloBtn.setToggleState(soloed, juce::dontSendNotification);
+}
+
+void MixerChannel::bindClientMeter(std::atomic<float>& peak)
+{
+    vuMeter.getLevel = [&peak] { return peak.load(); };
+}
+
+// Top to bottom: name LCD, EQ stack, fader + VU taking all the height left (no cap), dB readout,
+// mute / solo. The fixed parts are top- and bottom-anchored, so the fader absorbs the strip height.
+void MixerChannel::layoutClient()
+{
+    using mu_ui::s;
+    using LF = MuLookAndFeel;
+    const int w = getWidth(), h = getHeight();
+
+    const int pad = s(kNamePadding);
+    int y = pad + s(LF::kClientNameH) + s(LF::kClientGap);
+
+    const int kw = s(LF::kMixerStripKnobW), kh = s(LF::kMixerStripKnobH);
+    for (auto& k : clientEq)
+    {
+        k.setBounds((w - kw) / 2, y, kw, kh);
+        y += kh;
+    }
+    y += s(LF::kClientGap);
+
+    const int muteY = h - s(LF::kClientBottomGap) - s(LF::kClientButtonH);
+    const int dbY   = muteY - s(LF::kClientDbGap) - s(LF::kClientDbH);
+    const int faderH = juce::jmax(s(LF::kClientFaderMinH), dbY - y);
+
+    const int vuW = s(kVUW);
+    fader  .setBounds(0,       y, w - vuW, faderH);
+    vuMeter.setBounds(w - vuW, y, vuW,     faderH);
+    dbLabel.setBounds(0, dbY, w, s(LF::kClientDbH));
+
+    const int hw = w / 2;
+    muteBtn.setBounds(0,  muteY, hw,     s(LF::kClientButtonH));
+    soloBtn.setBounds(hw, muteY, w - hw, s(LF::kClientButtonH));
+
+    faderPaneBounds = { 1, y - 2, w - 2, h - y + 1 };
+}
+
+// The name LCD: lit in the slot's colour when connected, an unlit ghost "-" when empty.
+void MixerChannel::paintClientName(juce::Graphics& g) const
+{
+    using mu_ui::s;
+    const auto& L = MuLookAndFeel::lighting();
+    const int pad = s(kNamePadding);
+    const juce::Rectangle<int> r(pad, pad, getWidth() - 2 * pad, s(MuLookAndFeel::kClientNameH));
+    const bool connected = channelName.isNotEmpty();
+
+    MuLookAndFeel::drawLcdGlass(g, r.toFloat(), channelColour, connected);
+
+    g.setFont(MuLookAndFeel::lcdFont(mu_ui::sf((float) MuLookAndFeel::kLcdTextH)));
+    const auto text = r.reduced(s(MuLookAndFeel::kLcdTextPadX), 0);
+    if (connected)
+    {
+        g.setColour(channelColour.withAlpha(L.highlight(L.lcdGlow)));   // soft glow round the lit lettering
+        for (auto off : { juce::Point<int>(-1, 0), juce::Point<int>(1, 0), juce::Point<int>(0, -1), juce::Point<int>(0, 1) })
+            g.drawText(channelName, text.translated(off.x, off.y), juce::Justification::centred, true);
+        g.setColour(channelColour.brighter(0.6f));
+        g.drawText(channelName, text, juce::Justification::centred, true);
+    }
+    else
+    {
+        g.setColour(channelColour.withAlpha(L.lcdGhost));
+        g.drawText("-", text, juce::Justification::centred, true);
+    }
+    MuLookAndFeel::drawLcdFront(g, r.toFloat());
 }

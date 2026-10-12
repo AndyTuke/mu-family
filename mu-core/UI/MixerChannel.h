@@ -1,6 +1,9 @@
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <array>
+#include <atomic>
+#include <functional>
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/VUMeter.h"
 #include "UI/Components/GRMeter.h"
@@ -18,7 +21,8 @@ class MixerChannel : public juce::Component
 public:
     // A per-layer channel strip (Channel) vs the FX-return / master strips. The
     // product's layer is a rhythm in mu-clid, a voice in mu-tant.
-    enum class Type { Channel, EffectReturn, DelayReturn, ReverbReturn, Master };
+    // Client is an external-app strip (mu-link): name LCD, four-knob EQ, fader, no sends or sidechain.
+    enum class Type { Channel, EffectReturn, DelayReturn, ReverbReturn, Master, Client };
 
     // Width of the insert panel drawn to the right of the Master strip.
     // Both inserts share this width, stacked vertically (top = INS 1, bottom = INS 2).
@@ -71,6 +75,26 @@ public:
     void setChannelName(const juce::String& n) { channelName = n; repaint(); }
     void setChannelColour(juce::Colour c) { channelColour = c; repaint(); }
     void setActive(bool a) { active = a; repaint(); }
+
+    // ─── Client strip (Type::Client only) ───────────────────────────────────
+    // The strip is pure UI: the owner wires the callbacks and pushes state in with the setters
+    // (which never fire a callback). An empty name shows the ghost "-" of an empty slot.
+    enum class ClientEq { High, MidHz, Mid, Low };   // top to bottom, desk order
+    std::function<void(float linearLevel)>       onClientLevel;   // 0 .. kClientFaderMax, unity 1
+    std::function<void(ClientEq, float actual)>  onClientEq;      // dB, or Hz for MidHz
+    std::function<void(bool muted)>              onClientMute;
+    std::function<void(bool soloed)>             onClientSolo;
+
+    // Slot position 0..7: the name LCD is lit in that slot's voice colour.
+    void setClientSlot(int slotIndex);
+    void setClientLevel(float linear);
+    void setClientEq(ClientEq band, float actual);
+    void setClientMuteSolo(bool muted, bool soloed);
+    // The meter reads this peak (0..1 linear per block), like the other strips.
+    void bindClientMeter(std::atomic<float>& peak);
+    KnobWithLabel& getClientEqKnob(ClientEq band) { return clientEq[(size_t) band]; }
+    // Fader readout: one decimal, no unit ("0.0", "-6.0", "+3.5", "-inf").
+    static juce::String formatClientDb(float linearLevel);
     void setMeterMode(VUMeter::MeterMode m) { vuMeter.setMode(m); }
 
     void resized() override;
@@ -84,6 +108,9 @@ private:
     int  layoutSends(int stripW, int sendY);             // returns the fader's top
     void layoutFaderAndButtons(int stripW, int faderY);
     void layoutInsertPanel(int stripW, int insW, int nameBottom);
+    void layoutClient();
+    void addClientControls();
+    void paintClientName(juce::Graphics& g) const;
 
     // Shared by bindChannel / bindReturn: level, pan, mute, solo + sidechain controls.
     void bindStripToApvts(ProcessorBase* proc, const juce::String& prefix);
@@ -100,6 +127,13 @@ private:
     KnobWithLabel sendDelay  { "Delay",  Id::knobFxSend };
     KnobWithLabel sendReverb { "Reverb", Id::knobFxSend };
     KnobWithLabel panKnob    { "Pan",    Id::knobPan    };
+
+    // Client strip: the four EQ knobs, indexed by ClientEq (High, Mid Hz, Mid, Low).
+    std::array<KnobWithLabel, 4> clientEq { KnobWithLabel("High",   Id::knobInsertPad),
+                                            KnobWithLabel("Mid Hz", Id::knobInsertPad),
+                                            KnobWithLabel("Mid",    Id::knobInsertPad),
+                                            KnobWithLabel("Low",    Id::knobInsertPad) };
+    bool clientMuted = false, clientSoloed = false;
 
     juce::Slider      fader;
     VUMeter           vuMeter;
@@ -153,6 +187,7 @@ private:
     bool hasSends()            const { return channelType == Type::Channel
                                              || channelType == Type::EffectReturn
                                              || channelType == Type::DelayReturn; }
+    bool isClient()            const { return channelType == Type::Client; }
     bool hasMuteSolo()         const { return channelType != Type::Master; }
     bool hasSidechainControls() const { return channelType == Type::Channel
                                              || channelType == Type::EffectReturn
