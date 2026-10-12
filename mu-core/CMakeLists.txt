@@ -15,10 +15,15 @@
 
 add_library(mu-core INTERFACE)
 
+# The processor-free UI sources (components, TransportBar, dialogs): one list, shared with mu-link
+# and mu-core-tests. Defines MU_CORE_CHROME_SOURCES.
+include("${CMAKE_CURRENT_SOURCE_DIR}/UIChromeSources.cmake")
+
 # Pin C++ standard explicitly so a future JUCE bump cannot silently change it.
 target_compile_features(mu-core INTERFACE cxx_std_17)
 
 target_sources(mu-core INTERFACE
+    ${MU_CORE_CHROME_SOURCES}
     # Modulation
     "${CMAKE_CURRENT_SOURCE_DIR}/Modulation/ModulationMatrix.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Sequencer/ControlSequence.cpp"
@@ -41,21 +46,6 @@ target_sources(mu-core INTERFACE
     # Shared UI components
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/EuclideanPanel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/RhythmCircle.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/MuLookAndFeel.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/MuTheme.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/BipolarSliderRow.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/KnobWithLabel.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/SegmentControl.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/SlideSwitch.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/NudgeInput.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/StatusLamp.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/NoteLengthControl.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/DropdownSelect.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/StepEditor.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/LFOEditor.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/AddButton.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/StatusBar.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/VUMeter.cpp"
     # Shared mixer/FX panels
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/FXRow.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/DelayRow.cpp"
@@ -78,21 +68,14 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiPresetListPanel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiPresetsOverlay.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiFullPresetsOverlay.cpp"
-    # Shared settings-overlay framework — header bar, content column, group/section headers.
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/SettingsOverlayBase.cpp"
+    # Shared settings page (the framework base is in the chrome list).
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/StandardSettingsOverlay.cpp"
     # Shared transport "Master Loop" sub-pane — driven by ProcessorBase virtuals + mstrLoop param.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MasterLoopSection.cpp"
-    # Shared modal overlays — product chrome supplied via setters.
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/AboutOverlay.cpp"
+    # Shared modal overlays that need the processor.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/ActivationOverlay.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/SaveDialog.cpp"
-    # Shared themed modal dialog (replaces juce::AlertWindow) + its convenience builders.
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/ModalDialog.cpp"
     # Shared spec-driven wrapping grid of APVTS-bound knobs/combos (engine surface).
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/ParamKnobGrid.cpp"
-    # Shared transport bar — product slots in its own loop section + logo text.
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/TransportBar.cpp"
     # Shared editor shell — chrome / overlay state machine / main-area layout.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/EditorShellBase.cpp"
     # Shared modulator panels — product supplies its destination provider.

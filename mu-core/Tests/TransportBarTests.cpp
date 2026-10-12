@@ -1,4 +1,5 @@
 #include "TestProcessorBase.h"
+#include "TestShellBackend.h"
 #include "UI/TransportBar.h"
 
 // Layout checks for the shared transport bar's Tap / Nudge option (design-ui mu-link section 2).
@@ -59,3 +60,69 @@ struct TransportBarTests : juce::UnitTest
 };
 
 static TransportBarTests transportBarTests;
+
+// The bar over a ShellBackend that is not a processor: the seam an app without an AudioProcessor uses.
+struct TransportBarBackendTests : juce::UnitTest
+{
+    TransportBarBackendTests() : juce::UnitTest("TransportBar over a ShellBackend", "mu-core") {}
+
+    void runTest() override
+    {
+        ScaleGuard guard;
+        mu_ui::scale = 1.0f;
+        const juce::String playText = juce::String(juce::CharPointer_UTF8("\xe2\x96\xb6"));
+        const juce::String stopText = juce::String(juce::CharPointer_UTF8("\xe2\x96\xa0"));
+
+        beginTest("standalone backend: Play toggles the internal transport and the BPM field writes the tempo");
+        {
+            TestShellBackend fake(true);
+            fake.bpm = 97.0;
+            TransportBar bar(fake);
+            bar.setBounds(0, 0, mu_ui::s(MuLookAndFeel::kWindowWidth), mu_ui::s(MuLookAndFeel::kTransportBarH));
+            auto* play = findButton(bar, playText);
+            expect(play != nullptr, "play button exists");
+            if (play == nullptr) return;
+            play->onClick();
+            expect(fake.playing, "click started the internal transport");
+            play->onClick();
+            expect(! fake.playing, "second click stopped it");
+            expect(findButton(bar, "Tap") != nullptr && findButton(bar, "+") != nullptr, "Tap and Nudge are built");
+        }
+
+        beginTest("plugin backend: Play is display-only and mirrors the host");
+        {
+            TestShellBackend fake(false);
+            fake.hostPlay = true;
+            TransportBar bar(fake);
+            bar.setBounds(0, 0, mu_ui::s(MuLookAndFeel::kWindowWidth), mu_ui::s(MuLookAndFeel::kTransportBarH));
+            expect(findButton(bar, "Tap") == nullptr && findButton(bar, "+") == nullptr, "no Tap or Nudge in a plugin");
+            auto* stop = findButton(bar, stopText);
+            expect(stop != nullptr, "shows Stop while the host plays");
+            if (stop != nullptr) stop->onClick();
+            expect(! fake.playing, "the click does not touch the internal transport");
+        }
+
+        beginTest("a bar clears a held nudge when destroyed");
+        {
+            TestShellBackend fake(true);
+            fake.nudge = 1;
+            { TransportBar bar(fake); }
+            expect(fake.nudge == 0, "nudge released");
+        }
+
+        beginTest("host reads default to no host");
+        {
+            MinimalShellBackend none(false);
+            double ppq = 5.0;
+            int n = 0, d = 0;
+            expect(! none.isHostPlaying(), "not playing");
+            expect(! none.getHostPpqPosition(ppq), "no position");
+            expect(! none.getHostBarStartPpq(ppq), "no bar start");
+            none.getHostTimeSignature(n, d);
+            expect(n == 4 && d == 4, "4/4");
+            expect(! none.hasPendingFullPreset(), "no pending preset");
+        }
+    }
+};
+
+static TransportBarBackendTests transportBarBackendTests;

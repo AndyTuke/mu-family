@@ -31,16 +31,30 @@ target_sources(mu-core-tests PRIVATE
     LegacyPrefixTests.cpp
     SegmentControlTests.cpp
     TransportBarTests.cpp
-    ../UI/TransportBar.cpp
-    ../UI/Components/StatusLamp.cpp
+    TestShellBackend.h
     ClientStripFitTests.cpp
     ../UI/MixerChannel.cpp
     ../UI/MixerChannel_Bindings.cpp
     ../UI/MixerChannel_Insert.cpp
-    ../UI/Components/VUMeter.cpp
     # Sources behind ProcessorBase + the settings page (shared list, see ProcessorTestSources.cmake).
     ${MU_CORE_PROCESSOR_TEST_SOURCES}
 )
+
+# The processor-free UI sources (UIChromeSources.cmake, defined by the parent). The settings-page
+# set above already compiles some of them, so only the remainder is added here.
+set(_chrome_extra "")
+set(_have "")
+foreach(_f ${MU_CORE_PROCESSOR_TEST_SOURCES})
+    get_filename_component(_n "${_f}" REALPATH)
+    list(APPEND _have "${_n}")
+endforeach()
+foreach(_f ${MU_CORE_CHROME_SOURCES})
+    get_filename_component(_n "${_f}" REALPATH)
+    if(NOT _n IN_LIST _have)
+        list(APPEND _chrome_extra "${_n}")
+    endif()
+endforeach()
+target_sources(mu-core-tests PRIVATE ${_chrome_extra})
 
 target_compile_features(mu-core-tests PRIVATE cxx_std_17)
 

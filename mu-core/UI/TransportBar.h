@@ -1,6 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "Plugin/ProcessorBase.h"
+#include "Plugin/ShellBackend.h"
 #include "UI/Components/NudgeInput.h"
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/MuLookAndFeel.h"
@@ -9,8 +9,8 @@
 #include "Plugin/TransportResolver.h"   // kNudgeBendPercent
 
 // Shared mu-family transport bar — play / BPM / position / preset dropdown /
-// new / save / gear / mixer toggle. Plugin-agnostic: takes ProcessorBase, reads
-// transport + preset + license through its virtual surface (Phase 2).
+// new / save / gear / mixer toggle. Plugin-agnostic: takes a mu_core::ShellBackend and reads
+// transport + clock + preset state through that interface (a ProcessorBase is one).
 //
 // The bar reserves a central "loop section" slot between the transport pane
 // and the preset dropdown that a product can fill with its own component
@@ -20,7 +20,7 @@ class TransportBar : public juce::Component,
                      private juce::Timer
 {
 public:
-    explicit TransportBar(ProcessorBase& proc);
+    explicit TransportBar(mu_core::ShellBackend& backend);
     ~TransportBar() override;
 
     std::function<void()>                      onMixerToggle;
@@ -67,7 +67,7 @@ public:
     void mouseDown(const juce::MouseEvent& e) override;
 
 private:
-    ProcessorBase& proc;
+    mu_core::ShellBackend& proc;
     const bool isStandalone;
 
     juce::String     logoText;

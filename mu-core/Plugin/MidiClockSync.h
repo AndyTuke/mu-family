@@ -58,7 +58,7 @@ public:
     // Clock health for the UI: Waiting = sync on but no pulse heard yet; Locked = pulses arriving;
     // Lost = pulses stopped (cable pulled, master gone) — the transport is held stopped until
     // they return. Only judged while the ticks drive (Messages = Clock only / Clock + Transport).
-    enum class ClockState { Off, Waiting, Locked, Lost };
+    enum class ClockState { Off, Waiting, Locked, Lost, Drifting };   // Drifting: only mu-link's adapter reports it
     ClockState getClockState() const { return (ClockState) clockState.load(std::memory_order_relaxed); }
 
     // ── Audio thread ─────────────────────────────────────────────────────

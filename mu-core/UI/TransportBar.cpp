@@ -5,9 +5,9 @@ static const juce::String kPlay = juce::String(juce::CharPointer_UTF8("\xe2\x96\
 static const juce::String kStop = juce::String(juce::CharPointer_UTF8("\xe2\x96\xa0"));
 static const juce::String kGear = juce::String(juce::CharPointer_UTF8("\xe2\x9a\x99"));
 
-TransportBar::TransportBar(ProcessorBase& p)
-    : proc(p),
-      isStandalone(p.wrapperType == juce::AudioProcessor::wrapperType_Standalone)
+TransportBar::TransportBar(mu_core::ShellBackend& backend)
+    : proc(backend),
+      isStandalone(backend.isStandaloneApp())
 {
     playBtn.onClick = [this]
     {
@@ -225,6 +225,10 @@ void TransportBar::refreshClockLamp()
         case State::Lost:
             clockLamp.setState(MuLookAndFeel::colour(Id::indicatorFault), juce::jmin(1.0f, L.lampOn + L.lampPlayhead));
             status = "Lost, transport stopped";
+            break;
+        case State::Drifting:
+            clockLamp.setState(MuLookAndFeel::colour(Id::segmentWarningBorder), L.lampOn);   // amber, brighter than Waiting
+            status = "Drifting, re-aligning";
             break;
         case State::Waiting:
         case State::Off:

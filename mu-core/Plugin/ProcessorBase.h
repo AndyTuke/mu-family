@@ -29,6 +29,7 @@
 #include "Sequencer/Layer.h"
 #include "Plugin/ProcessorCore.h"   // layer accessors + published host transport
 #include "Plugin/MidiClockSync.h"
+#include "Plugin/ShellBackend.h"   // the interface the shared shell chrome consumes
 #include "License/MachineFingerprint.h"
 #include "License/OnlineActivation.h"   // OnlineActivationOutcome (decls only; .cpp is per-licensed-product)
 #include "License/SupportPromptPolicy.h"   // isSupporter / when the support prompt shows
@@ -55,7 +56,8 @@
 // plugin's concrete `PluginProcessor` type — eliminates the layering
 // violation that previously had mu-core including mu-clid headers.
 class ProcessorBase : public ProcessorCore,
-                      public mu_core::ControlSink    // performs the family control actions (MIDI map, surfaces)
+                      public mu_core::ShellBackend,   // what the shared shell chrome reads from the app
+                      public mu_core::ControlSink     // performs the family control actions (MIDI map, surfaces)
 #if MU_CORE_HAS_CLAP
                     , public clap_juce_extensions::clap_juce_audio_processor_capabilities
 #endif
@@ -93,7 +95,7 @@ public:
     virtual juce::File   getLayerPresetDir()       const = 0;
     virtual juce::String getLayerPresetExtension() const = 0;
     virtual juce::File   getFullPresetDir()          const { return getPresetsDir(); }
-    virtual juce::String getFullPresetExtension()    const = 0;
+    juce::String getFullPresetExtension()    const override = 0;
 
     // ─── Structural layer edits (message thread only) ─────────────────────────
     // The one routine every product's add / delete / reorder / reset goes through, in the order
@@ -135,18 +137,26 @@ public:
 
     // Internal transport (TransportBar play / BPM controls): a free-running clock each product
     // advances in processBlock while no host / MIDI clock drives it. Stopping resets the beat.
-    virtual bool   isInternalPlaying()      const { return internalPlaying.load(std::memory_order_relaxed); }
-    virtual void   toggleInternalPlay()
+    bool   isInternalPlaying()      const override { return internalPlaying.load(std::memory_order_relaxed); }
+    void   toggleInternalPlay() override
     {
         const bool now = ! internalPlaying.load(std::memory_order_relaxed);
         internalPlaying.store(now, std::memory_order_relaxed);
         if (! now) internalBeatPos.store(0.0, std::memory_order_relaxed);   // restart patterns cleanly
     }
-    virtual double getInternalBpm()         const { return internalBpm.load(std::memory_order_relaxed); }
-    virtual void   setInternalBpm(double bpm)     { internalBpm.store(juce::jlimit(20.0, 300.0, bpm), std::memory_order_relaxed); }
-    virtual double getInternalBeatPos()     const { return internalBeatPos.load(std::memory_order_relaxed); }
+    double getInternalBpm()         const override { return internalBpm.load(std::memory_order_relaxed); }
+    void   setInternalBpm(double bpm) override     { internalBpm.store(juce::jlimit(20.0, 300.0, bpm), std::memory_order_relaxed); }
+    double getInternalBeatPos()     const override { return internalBeatPos.load(std::memory_order_relaxed); }
 
-    // The host transport readers and the bypass override live in ProcessorCore.
+    // The standalone wrapper owns the transport; a plugin mirrors the host's.
+    bool isStandaloneApp() const override { return wrapperType == wrapperType_Standalone; }
+
+    // The host transport readers live in ProcessorCore (non-virtual there); these forward to them so
+    // the shell chrome reads them through the ShellBackend interface.
+    bool isHostPlaying() const override { return ProcessorCore::isHostPlaying(); }
+    void getHostTimeSignature(int& numerator, int& denominator) const override { ProcessorCore::getHostTimeSignature(numerator, denominator); }
+    bool getHostBarStartPpq(double& ppq) const override { return ProcessorCore::getHostBarStartPpq(ppq); }
+    bool getHostPpqPosition(double& ppq) const override { return ProcessorCore::getHostPpqPosition(ppq); }
 
     // The family bus layout: at most one sidechain input (stereo or disabled) and a stereo
     // main output. Products with extra output buses (mu-Clid's multi-out) override it.
@@ -162,31 +172,31 @@ public:
 
     // MIDI clock sync (standalone) — shared by every product; the enable / messages choices
     // are saved in the app settings file.
-    bool   getMidiSyncEnabled()  const { return midiClockSync.isEnabled(); }
-    int    getMidiSyncMessages() const { return midiClockSync.getMessages(); }
-    double getMidiClockBpm()     const { return midiClockSync.getBpm(); }
-    bool   isMidiClockPlaying()  const { return midiClockSync.isPlaying(); }
-    MidiClockSync::ClockState getMidiClockState() const { return midiClockSync.getClockState(); }
-    void   setMidiSyncEnabled(bool on);
-    void   setMidiSyncMessages(int mode);
+    bool   getMidiSyncEnabled()  const override { return midiClockSync.isEnabled(); }
+    int    getMidiSyncMessages() const override { return midiClockSync.getMessages(); }
+    double getMidiClockBpm()     const override { return midiClockSync.getBpm(); }
+    bool   isMidiClockPlaying()  const override { return midiClockSync.isPlaying(); }
+    MidiClockSync::ClockState getMidiClockState() const override { return midiClockSync.getClockState(); }
+    void   setMidiSyncEnabled(bool on) override;
+    void   setMidiSyncMessages(int mode) override;
 
     // Sync offset (standalone, saved in the app settings): how many ms the app plays EARLIER than the
     // external clock says, to cancel the audio output latency. Applied to the resolved beat under MIDI clock.
-    static constexpr int kSyncOffsetMinMs = -50, kSyncOffsetMaxMs = 250;
-    int    getSyncOffsetMs() const { return syncOffsetMs.load(std::memory_order_relaxed); }
-    void   setSyncOffsetMs(int ms);
+    // The range (kSyncOffsetMinMs / MaxMs) is declared on ShellBackend.
+    int    getSyncOffsetMs() const override { return syncOffsetMs.load(std::memory_order_relaxed); }
+    void   setSyncOffsetMs(int ms) override;
 
     // The standalone transport's meter (saved): changes the displayed bar.beat.sixteenth only, patterns
     // stay four beats a bar. A plugin reads the host's meter instead.
-    void   getTimeSignature(int& numerator, int& denominator) const
+    void   getTimeSignature(int& numerator, int& denominator) const override
     {
         const int packed = timeSignature.load(std::memory_order_relaxed);
         numerator = packed >> 8;  denominator = packed & 0xFF;
     }
-    void   setTimeSignature(int numerator, int denominator);
+    void   setTimeSignature(int numerator, int denominator) override;
 
     // Nudge buttons (standalone): -1 slower, +1 faster while held, 0 released (both held = 0).
-    void   setNudgeDirection(int direction) { nudgeDirection.store(juce::jlimit(-1, 1, direction), std::memory_order_relaxed); }
+    void   setNudgeDirection(int direction) override { nudgeDirection.store(juce::jlimit(-1, 1, direction), std::memory_order_relaxed); }
     // Sets MIDI clock sync for this process only, without saving it (the headless render uses it so
     // a render never depends on the user's saved choice).
     void   setMidiSyncForSession(bool on, int mode) { midiClockSync.setMessages(mode); midiClockSync.setEnabled(on); }
@@ -198,7 +208,7 @@ public:
     // playing, apply it while stopped) and publishes the name. With no tag these do nothing and
     // the product overrides them (mu-Clid's PresetIO).
     // Full presets live in <content dir>/Presets in every product.
-    virtual juce::File         getPresetsDir()                                     const;
+    juce::File                 getPresetsDir()                                     const override;
     virtual void               loadPreset(const juce::File& file);
     virtual void               savePreset(const juce::String& name,
                                            const juce::String& desc,
@@ -209,7 +219,7 @@ public:
     virtual juce::ValueTree    captureFullPreset()                                       { return apvts.copyState(); }
     virtual void               useLoadedFullPreset(juce::ValueTree /*state*/)            {}
     virtual void               ensureCategoryInList(const juce::String& /*cat*/)         {}
-    virtual bool               hasPendingFullPreset()                              const { return layerSwapper.hasFullPending(); }
+    bool                       hasPendingFullPreset()                              const override { return layerSwapper.hasFullPending(); }
     // Write the current state as a full preset at exactly `file` (headless render --save-preset).
     // Default: the standard wrapped preset; false (after onLoadError) when it can't be written.
     virtual bool               saveFullPresetTo(const juce::File& file);
@@ -313,19 +323,13 @@ public:
     // Storage lives on the base so every plugin inherits the same scale handling; the choice
     // is saved in the app settings file (saved before the change is announced, so a listener
     // that re-reads the file sees the new value).
-    static constexpr float kUiScaleMedium = 1.0f;
-    static constexpr float kUiScaleLarge  = 1.25f;
-    float getUiScale() const noexcept { return uiScale; }
-    void  setUiScale(float scale);
+    // kUiScaleMedium / kUiScaleLarge are declared on ShellBackend.
+    float getUiScale() const noexcept override { return uiScale; }
+    void  setUiScale(float scale) override;
 
-    // ─── Shell callbacks (message-thread, registered by the editor) ──────────
-    // Editor MUST clear these in its dtor — processor can outlive the editor
-    // when a DAW keeps the plugin loaded after closing the window. Any deferred
-    // invocation into a destroyed editor is a UAF.
-    std::function<void(std::function<void()>)>       onSaveAndQuit;
-    std::function<void(const juce::String& message)> onLoadError;
-    std::function<void()>                            onPresetSwapCommitted;
-    std::function<void(float)>                       onUiScaleChanged;
+    // The shell callbacks (onSaveAndQuit, onLoadError, onPresetSwapCommitted, onUiScaleChanged) are
+    // members of ShellBackend. The editor MUST clear them in its dtor: the processor can outlive
+    // the editor when a DAW keeps the plugin loaded after closing the window.
 
     // Audio-thread: call once per processBlock, before the engine reads the MIDI. Queues the
     // block's program changes (scanMidiProgramChanges) and the CC / notes the control map claims
