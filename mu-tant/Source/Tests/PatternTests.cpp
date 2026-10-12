@@ -53,6 +53,20 @@ public:
             expectEquals(dst.ring.writeHead.load(), 123);   // the level tap keeps running
         }
 
+        beginTest("an assignment and an adoptDefaults leave the destination's insert alone");
+        {
+            Pattern src, dst;
+            const InsertProcessor* kept = &*dst.insert;
+            dst.insert->grReduction.store(0.5f);
+            src.insert->grReduction.store(0.9f);
+            dst = src;
+            expect(&*dst.insert == kept, "the insert object stays with its slot");
+            expectEquals(dst.insert->grReduction.load(), 0.5f);   // the source's meter is not copied
+            dst.adoptDefaults(src);
+            expectEquals(dst.insert->grReduction.load(), 0.5f);
+            expect(dst.insertGainReduction() == &dst.insert->grReduction, "the layer reports its own insert's meter");
+        }
+
         beginTest("a default Pattern is the reset state");
         {
             Pattern p;

@@ -79,7 +79,7 @@ public:
 
     // Clear raw ModulationMatrix pointers from all KnobWithLabel mod-binding arcs.
     // Call before removeLayer destroys the Layer so the
-    // 30 Hz timer cannot dereference freed matrix memory.
+    // 30 Hz timers cannot dereference freed matrix or insert-meter memory.
     void clearAllModBindings();
 
     void paint(juce::Graphics& g) override;

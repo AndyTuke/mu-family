@@ -180,14 +180,6 @@ public:
     // processor — pure static factory, no state.
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
-    // GR-meter source for the shared InsertSubsection (Compressor / Limiter P2).
-    // Points at the per-voice insert's atomic reduction value; null when oob.
-    const std::atomic<float>* getInsertGRPtr(int voice) const noexcept
-    {
-        if (voice < 0 || voice >= mu_limits::kMaxLayers) return nullptr;
-        return &inserts[(size_t) voice].grReduction;
-    }
-
     // Modulation snapshot accessor for VoicePanel knob live-arc indicators.
     float getTantSnap(int voice, int snapIndex) const noexcept
     {
@@ -255,10 +247,8 @@ private:
 
     WavetableBank                                          bank;
     std::array<std::unique_ptr<VoiceEngine>, mu_limits::kMaxLayers>   voices;
-    // Per-voice insert effect (shared mu-core InsertProcessor) — runs after the
-    // gate, before the pan/sum into the mixer (engine → insert → mixer, the
-    // family-wide signal flow). Mirrors mu-clid's per-rhythm insert.
-    std::array<InsertProcessor,              mu_limits::kMaxLayers>   inserts;
+    // The per-voice insert effect (shared mu-core InsertProcessor) is Pattern::insert — it runs after
+    // the gate, before the pan/sum into the mixer (engine → insert → mixer, the family-wide signal flow).
 
     // ── Retire-tail for count-reducing full-preset swaps ──────────────────────
     // A committed full preset with fewer voices would hard-cut the dropped voices
@@ -343,6 +333,7 @@ private:
     // when enabled + playing, processBlock slaves the beat/tempo to it.
     // Written in prepareToPlay (host suspends the audio thread first) — no atomic needed.
     double currentSampleRate = 44100.0;
+    int    currentBlockSize  = 512;    // with the rate, how a new Pattern's insert is prepared
 
     // The voice count (ProcessorCore::numLayers) and the per-voice data shift during add/remove
     // are guarded against the audio thread by ProcessorCore::layersLock; processBlock takes a

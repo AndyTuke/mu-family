@@ -3,6 +3,7 @@
 #include "Sequencer/Layer.h"          // mu-core: name, colour, modulation
 #include "Sequencer/GatePattern.h"    // the drawable gate / filter / pitch envelopes
 #include "Audio/VoiceRingBuffer.h"    // audio -> UI level tap for the sidebar glyph
+#include "Audio/InsertProcessor.h"    // mu-core: shared per-voice insert FX
 
 #include <atomic>
 
@@ -43,6 +44,12 @@ struct Pattern : Layer
     std::atomic<bool> osc1SemiStepped { false }, osc2SemiStepped { false };
 
     VoiceRingBuffer ring;      // mono tap of the voice's output for the sidebar animation
+
+    // The voice's insert effect and its delay lines. It belongs to the slot, not to the data, so a
+    // copy or adoptDefaults leaves it alone; a pointer move carries it, and the processor re-seeds
+    // and clears it for the new slot (layersMoved).
+    SlotBound<InsertProcessor> insert;
+    const std::atomic<float>* insertGainReduction() const override { return &insert->grReduction; }
 
     OwnerLink<PluginProcessor> owner;
     void writeExtras(juce::ValueTree& node) const override;

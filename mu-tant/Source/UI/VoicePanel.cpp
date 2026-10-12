@@ -243,7 +243,7 @@ void VoicePanel::setupGateInsertAndModulators()
     addAndMakeVisible(insertSub);
     insertSub.isPlaying   = [this] { return proc.isInternalPlaying(); };
     insertSub.getInsertGR = [this]() -> const std::atomic<float>* {
-        return proc.getInsertGRPtr(currentVoice);
+        return proc.getInsertGR(currentVoice);
     };
     // Re-label the insert modulation destinations to the active algo's slot names
     // (mirrors mu-clid) so the dropdown shows e.g. "Drive"/"Tone" instead of P1..P4.
@@ -524,6 +524,7 @@ void VoicePanel::clearAllModBindings()
     flt2CutKnob.clearModBinding();
     flt2ResKnob.clearModBinding();
     levelKnob.clearModBinding();
+    insertSub.clearGRSource();   // the meter reads an atomic inside the voice's Pattern
 }
 
 void VoicePanel::refreshHeader()

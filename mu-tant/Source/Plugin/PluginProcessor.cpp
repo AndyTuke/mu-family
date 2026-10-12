@@ -100,7 +100,6 @@ PluginProcessor::PluginProcessor()
     {
         voices[(size_t) v] = std::make_unique<VoiceEngine>();
         voices[(size_t) v]->setBank(&bank);
-        inserts[(size_t) v].setSlotIndex(v);   // per-slot noise seed: layers do not share one sequence
     }
 
     cacheParamPointers();        // resolve all APVTS atomics once (audio thread reads these)
@@ -142,11 +141,16 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     resetSwapPlayState();   // no processBlock is running yet: loads apply at once, not staged
     currentSampleRate = sampleRate;
+    currentBlockSize  = samplesPerBlock;
     for (auto& v : voices)
         if (v) v->prepare(sampleRate, samplesPerBlock);
 
-    for (auto& ins : inserts)
-        ins.prepare(sampleRate, samplesPerBlock);
+    {
+        // Every slot's insert, spares included; under the layers lock because a structural edit moves the Patterns.
+        const juce::ScopedLock sl(layersLock);
+        for (int v = 0; v < mu_limits::kMaxLayers; ++v)
+            getPattern(v).insert->prepare(sampleRate, samplesPerBlock);
+    }
 
     mixerEngine.prepare(sampleRate, samplesPerBlock);
     fxChain.prepare(sampleRate, samplesPerBlock);   // shared Effect/Delay/Reverb rack
@@ -596,7 +600,7 @@ void PluginProcessor::renderVoice(int v, juce::AudioBuffer<float>& buf, int numS
     ip.insertParam[1] = juce::jlimit(0.0f, 1.0f, modParamValues["insert.p2"]);
     ip.insertParam[2] = juce::jlimit(0.0f, 1.0f, modParamValues["insert.p3"]);
     ip.insertParam[3] = juce::jlimit(0.0f, 1.0f, modParamValues["insert.p4"]);
-    inserts[(size_t) v].process(buf, numSamples, buf.getNumChannels(), ip);
+    getPattern(v).insert->process(buf, numSamples, buf.getNumChannels(), ip);
 
     // Feed the sidebar spectrum glyph — capture post-insert audio on the audio thread.
     getPattern(v).ring.write(buf, numSamples);
@@ -631,7 +635,7 @@ void PluginProcessor::renderRetiringVoice(int v, juce::AudioBuffer<float>& buf, 
     ip.insertParam[1] = r.insP[1];
     ip.insertParam[2] = r.insP[2];
     ip.insertParam[3] = r.insP[3];
-    inserts[(size_t) v].process(buf, numSamples, buf.getNumChannels(), ip);
+    getPattern(v).insert->process(buf, numSamples, buf.getNumChannels(), ip);
 
     r.samplesLeft.store(juce::jmax(0, left - numSamples), std::memory_order_release);
 }
@@ -655,22 +659,28 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
 // ── Dynamic voice management ─────────────────────────────────────────────────
 // A fresh default Pattern, linked to this processor. Built before a structural edit locks, so the
 // edit under the lock only moves pointers.
-std::unique_ptr<Layer> PluginProcessor::createLayer(int)
+std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
 {
     auto p = std::make_unique<Pattern>();
     p->owner.ptr = this;
+    // The insert allocates its delay lines here, off the audio thread and outside any lock; the
+    // per-slot noise seed makes layers not share one sequence.
+    p->insert->setSlotIndex(slot);
+    p->insert->prepare(currentSampleRate, currentBlockSize);
     return p;
 }
 
 // Slots whose Pattern changed lose the previous tenant's filter, oscillator-modulation and insert
-// memory, any fade-out tail and the live-arc snapshot; the mixer strip and its ducking envelope are
+// memory (the insert travels with its Pattern, so it is re-seeded for the new slot and cleared), any fade-out tail and the live-arc snapshot; the mixer strip and its ducking envelope are
 // reset by the edit itself. Allocation-free resets only.
 void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
 {
     for (int d = juce::jmax(0, firstIndex); d <= juce::jmin(lastIndex, mu_limits::kMaxLayers - 1); ++d)
     {
         if (voices[(size_t) d] != nullptr) voices[(size_t) d]->reset();
-        inserts[(size_t) d].reset();
+        auto& ins = *getPattern(d).insert;   // the Pattern now in slot d brings its own insert along
+        ins.setSlotIndex(d);
+        ins.reset();
         retiring[(size_t) d].samplesLeft.store(0, std::memory_order_relaxed);
         for (auto& v : voiceSnap[d]) v.store(0.0f, std::memory_order_relaxed);
     }

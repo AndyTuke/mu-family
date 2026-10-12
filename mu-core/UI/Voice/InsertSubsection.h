@@ -30,6 +30,8 @@ public:
     ~InsertSubsection() override { stopTimer(); }
 
     void setChannel(int idx);
+    // Drops the gain-reduction meter source. Call before the layer it points into is removed.
+    void clearGRSource() { insertParam2.setGRSource(nullptr); }
     void loadFromChannel();
     void refreshSuffix(const juce::String& suffix);
     void refreshModulatedIndicators();
