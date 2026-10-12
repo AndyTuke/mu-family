@@ -451,6 +451,22 @@ struct LayerOwnershipTests : juce::UnitTest
             expectEquals(p.mixerEngine.channels[0].sidechainSource.load(), -1);
         }
 
+        beginTest("a ducked strip keeps its sidechain follower when a remove or a swap moves it");
+        {
+            EditableProcessor p(true);
+            for (int i = 1; i < 4; ++i) p.addLayer();
+            for (int i = 0; i < 4; ++i) p.mixerEngine.setSidechainEnv(i, 0.1f * (float) (i + 1));
+            expect(p.removeLayer(1));
+            expectNear(p.mixerEngine.getSidechainEnv(0), 0.1f);
+            expectNear(p.mixerEngine.getSidechainEnv(1), 0.3f);
+            expectNear(p.mixerEngine.getSidechainEnv(2), 0.4f);
+            expectNear(p.mixerEngine.getSidechainEnv(3), 0.0f);
+            expect(p.swapLayers(0, 2));
+            expectNear(p.mixerEngine.getSidechainEnv(0), 0.4f);
+            expectNear(p.mixerEngine.getSidechainEnv(2), 0.1f);
+            expectNear(p.mixerEngine.getSidechainEnv(1), 0.3f);
+        }
+
         beginTest("removeLayer refuses the last layer and a bad index");
         {
             EditableProcessor p(true);

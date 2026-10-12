@@ -132,7 +132,7 @@ struct ClidScriptedEditRenderTests : juce::UnitTest
 
     // Two strips duck from layer 0; the middle layer is deleted mid-play, so the second ducked strip lands in the
     // slot of the first (whose follower state is its own, not the strip's). Returns the samples either side of the edit.
-    static std::vector<float> renderDuckedMove(const juce::File& presets)
+    static std::vector<float> renderDuckedMove(const juce::File& presets, float* maxGrStep = nullptr)
     {
         TempStorage storage;
         ScriptedProcessor p;
@@ -159,6 +159,7 @@ struct ClidScriptedEditRenderTests : juce::UnitTest
         std::vector<float> out;
         juce::AudioBuffer<float> buf(2, kBlock);
         juce::MidiBuffer midi;
+        float prevGr = 0.0f;
         for (int b = 0; b < kBlocks; ++b)
         {
             if (b == 70) editRemove(p, 1);
@@ -166,6 +167,10 @@ struct ClidScriptedEditRenderTests : juce::UnitTest
             midi.clear();
             p.processBlock(buf, midi);
             p.drainDeferredWork();
+            // The moved strip (now slot 1) reports its gain reduction per block; a lost follower shows as a jump.
+            const float gr = p.mixerEngine.sidechainGR[1].load();
+            if (maxGrStep != nullptr && b >= 68 && b <= 74) *maxGrStep = std::max(*maxGrStep, std::abs(gr - prevGr));
+            prevGr = gr;
             for (int i = 0; i < kBlock; ++i) { out.push_back(buf.getSample(0, i)); out.push_back(buf.getSample(1, i)); }
         }
         p.setPlayHead(nullptr);
@@ -184,6 +189,19 @@ struct ClidScriptedEditRenderTests : juce::UnitTest
             if (auto os = f.createOutputStream())
                 os->write(d.data(), d.size() * sizeof(float));
             logMessage("wrote ducked-move render " + f.getFullPathName());
+        }
+
+        beginTest("a ducked strip moved by a delete keeps its follower: no jump at the edit");
+        {
+            const auto presets2 = presetsDir();
+            expect(presets2.isDirectory(), "tests/presets found");
+            if (presets2.isDirectory())
+            {
+                float maxGrStep = 0.0f;
+                renderDuckedMove(presets2, &maxGrStep);
+                logMessage("ducked-move max block-to-block gain-reduction step around the delete: " + juce::String(maxGrStep, 5));
+                expect(maxGrStep < 0.1f, "the moved strip does not jump when its slot changes");
+            }
         }
 
         beginTest("the scripted add / reorder / reset / delete render is audible, sane and repeatable");

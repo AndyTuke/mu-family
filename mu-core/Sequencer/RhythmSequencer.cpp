@@ -75,7 +75,7 @@ void RhythmSequencer::removeSlotState(int index)
     {
         cachedPatterns[(size_t) i]  = std::move(cachedPatterns[(size_t) i + 1]);
         cachedCPatterns[(size_t) i] = std::move(cachedCPatterns[(size_t) i + 1]);
-        patternUpdated[(size_t) i]  = patternUpdated[(size_t) i + 1];
+        patternUpdated[(size_t) i]  = true;   // a shifted slot gets a fresh base-restoring pass
         // Copied, not moved: a moved-from vector gives up its reserved capacity, and the audio thread's
         // next assign() into that slot would then allocate.
         safePatterns[i].assign(safePatterns[i + 1].begin(), safePatterns[i + 1].end());

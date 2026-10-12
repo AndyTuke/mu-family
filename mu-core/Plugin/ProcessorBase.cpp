@@ -730,7 +730,7 @@ bool ProcessorBase::removeLayer(int idx)
         for (int d = idx; d < n - 1; ++d)
         {
             mixerEngine.channels[(size_t) d].copyFrom(mixerEngine.channels[(size_t) (d + 1)]);
-            mixerEngine.resetSidechainEnv(d);
+            mixerEngine.moveSidechainEnv(d + 1, d);   // the follower moves with its strip
             layers[(size_t) d]->onMoved(d);
         }
         mixerEngine.channels[(size_t) (n - 1)].reset();
@@ -773,8 +773,6 @@ bool ProcessorBase::swapLayers(int a, int b)
         mixerEngine.renumberSidechainsAfterSwap(a, b);
         swapLayersLocked(a, b);
         mixerEngine.swapChannelState(a, b);
-        mixerEngine.resetSidechainEnv(a);   // the previous tenant's ducking envelope must not bleed in
-        mixerEngine.resetSidechainEnv(b);
         layers[(size_t) a]->onMoved(a);
         layers[(size_t) b]->onMoved(b);
         layersReordered(LayerEdit::Swap, a, b);

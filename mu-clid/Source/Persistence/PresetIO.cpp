@@ -366,7 +366,7 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFil
 
     // Rhythm presets store ONLY proc.sequencer-page state (Euclidean params, voice chain,
     // envelopes, insert effect). Mixer-page state (channel level/pan/sends/sidechain/
-    // output bus) intentionally stays with the slot, not with the rhythm.
+    // output bus) is not part of a layer preset (.muRhythm); the strip is not carried by it.
     // Stage 35: v2 writes actual values + algorithm-name strings via
     // writeParamPropertyV2. Ints / bools / algorithm selectors get their
     // natural representation in XML; floats get raw actual values.
@@ -399,7 +399,7 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFil
 
 // Load a .muRhythm into a slot at once: the same prepared rhythm and the same install as the
 // loop-boundary swap, then the rhythm pushed to APVTS so the knobs follow. Only sequencer-page
-// state loads — the slot's mixer settings stay with the slot.
+// state loads: a layer preset (.muRhythm) does not carry the mixer strip, so the slot's strip is left as it is.
 bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIndex, bool keepIdentity)
 {
     if (targetIndex < 0 || targetIndex >= proc.sequencer.getNumRhythms()) return false;

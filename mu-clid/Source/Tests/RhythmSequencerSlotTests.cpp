@@ -101,6 +101,18 @@ public:
             expectEquals(e.getPatternLength(1), 0, "the vacated top slot is empty");
         }
 
+        beginTest("a delete of a lower slot leaves the shifted rhythm re-snapshotted, without a replay or a missed hit");
+        {
+            TestSequencer e;
+            e.addRhythm(rhythmOf(0, 8));
+            e.addRhythm(hitOnZero());
+            e.addRhythm(rhythmOf(0, 8));
+            for (int s = 0; s < 9; ++s) e.processBlock(beat(s));
+            e.removeRhythm(0);                             // slot 1 moves to slot 0; its pattern is marked for a fresh pass
+            expect(! fired(e.processBlock(beat(9) + 0.05), 0), "no replay of the step already played");
+            expect(fired(e.processBlock(beat(16)), 0), "and its next hit still fires");
+        }
+
         beginTest("removeSlotState carries a swap start that is still waiting");
         {
             TestSequencer e;
