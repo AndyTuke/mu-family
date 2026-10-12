@@ -463,6 +463,8 @@ setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appYellow));   // mu-On
 
 ## Design rulings
 
+- 2026-10-12 — Built 464 fit sums recorded per product (mu-Clid 32+288+144; mu-Tant 47+64+16+116+7 + gate flex 214; mu-Toni Appergater flex). OSC wave dropdown truncates "Basic Shapes"? Ellipsis on a table name is not accepted, and the noise selector and knobs are not shrunk; shorten the factory table name to "Basic" (names stay full words, no abbreviations), provided tables are persisted by index; if by name, drop the knob gap in the osc box instead. Changed mu-clid, mu-tant (new design-ui.md), mu-toni docs.
+
 - 2026-10-12 — Built sizes of mu-Clid's Sample | MIDI selector and "MIDI Out" section (112 px selector, 324 px box, captioned dropdowns, 128-note popup, dimmed mixer strip) acceptable? Yes: all derived from family tokens; 324 px stays derived (6 x `kVoiceUnitW`). Two small residuals (selector 112, caption band 14) to become `kLcdSegmentW` and `kVoiceLabelH` references. Changed mu-clid/design-ui.md "Output mode".
 
 - 2026-10-12 — Plugins' mixer master column now the shared `MasterInsertPanel` (rotated "Main Insert N" labels and the separator line gone; Master strip narrower with the 136 px panel to its right; strip right-edge divider at the strip edge); acceptable? Yes. Named plates "Insert 1 / Insert 2" replace the rotated labels (the family rule is plates for names, engraved rotated text only for the strip section labels Side Chain / Sends / Levels / Output); the old separator is superseded by the panel's own boxes; separators between strips are `drawGroove`. The Master strip may be wider than 80 because it absorbs the spare width (`masterActualW`); its content stays centred. Changed §11 (new Groove and Master insert panel rows).

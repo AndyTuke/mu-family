@@ -72,6 +72,8 @@ VoiceSection      144px
 ModulatorPanel    332px
 ```
 
+**Built fit of the 464 content band (RhythmContent, 2026-10-12).** The sample bar, circle row and voice band tile the band exactly: 32 sample bar + 288 circle row + 144 voice band = 464 (`kLayerContentH`), with no flex panel. The constants block above is the older Medium baseline; the band token wins.
+
 ### Header Bar
 
 - Left 4px: solid fill in rhythm colour (accent strip)

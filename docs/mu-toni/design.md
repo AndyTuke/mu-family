@@ -198,6 +198,10 @@ Fine-tuning only remains — see [design-sequencer.md](design-sequencer.md)
 
 ---
 
+## Layer content band fit (464)
+
+Built 2026-10-12: source panel + voice band + Appergater tile the 464 `kLayerContentH` band. The Appergater is the flex panel: its box (102 px) grows to fill the remainder and the accent step editor takes the extra height. No new per-product height constants.
+
 ## Design-standards alignment
 
 Checked against the family "Critical architectural rules" ([/CLAUDE.md](../../CLAUDE.md))
