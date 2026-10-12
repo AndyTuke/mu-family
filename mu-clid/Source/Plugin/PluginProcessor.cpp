@@ -59,6 +59,20 @@ PluginProcessor::PluginProcessor()
                     mu_clid::kLicensePublicKey, "muclid.activation", mu_clid::kCheckoutUrl });
     sequencer.setStepCap(HitGenerator::kMaxSteps);
 
+    // Resolve each rhythm parameter once (its raw value pointer for the drain) and build the sorted
+    // suffix table the listener searches, before any listener can fire.
+    for (int ri = 0; ri < SequencerEngine::MaxRhythms; ++ri)
+    {
+        const juce::String prefix = "r" + juce::String(ri) + "_";
+        for (int i = 0; i < kRhythmParamCount; ++i)
+            rawParams[(size_t) ri][(size_t) i] = apvts.getRawParameterValue(prefix + kRhythmParamDefs[i].suffix);
+    }
+    for (int i = 0; i < kRhythmParamCount; ++i)
+        if (rawParams[0][(size_t) i] != nullptr)
+            suffixIndex[(size_t) suffixIndexCount++] = { kRhythmParamDefs[i].suffix, i };
+    std::sort(suffixIndex.begin(), suffixIndex.begin() + suffixIndexCount,
+              [](const SuffixIndex& a, const SuffixIndex& b) { return std::strcmp(a.suffix, b.suffix) < 0; });
+
     // Listen to the product parameters (rhythm + mstrLoop); mixer / FX ids are synced by ProcessorBase.
     for (auto* param : getParameters())
         if (auto* p = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
@@ -482,6 +496,9 @@ bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 //==============================================================================
 void PluginProcessor::commitDeferredWork()
 {
+    // Apply the rhythm parameter changes that arrived off the message thread (VST3 automation).
+    servicePendingRhythmParams();
+
     // Drain retired engines + commit pending swaps (both sides of the hot-swap lifecycle).
     // ProcessorBase then drains the MIDI program-change queue.
     hotSwapStager.processSwaps();

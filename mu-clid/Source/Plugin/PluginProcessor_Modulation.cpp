@@ -373,15 +373,6 @@ void PluginProcessor::writeBackModulation(int r, const Rhythm& rhythm, VoicePara
 void PluginProcessor::applyRhythmModulation(int r, double beatPos)
 {
     Rhythm& rhythm = sequencer.getRhythm(r);
-    // Snapshot voiceParams under voiceParamsLock so a concurrent
-    // message-thread apply (syncRhythmParam / forceSyncRhythmFromApvts)
-    // can't interleave a torn write. Held for ~struct-copy time only.
-    VoiceParams modParams;
-    {
-        mu_core::spinLock(rhythm.voiceParamsLock);
-        modParams = rhythm.voiceParams;
-        mu_core::spinUnlock(rhythm.voiceParamsLock);
-    }
 
     // gate the modulation pass on "matrix has assignments now, OR had
     // assignments last block". The first half is the normal case. The second half
@@ -393,7 +384,22 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
     // modulated values, freezing the pattern.
     const bool matrixHasAssignments = !rhythm.modulationMatrix.getAssignments().empty();
     const bool runModulationPass    = matrixHasAssignments || prevMatrixHadAssignments[r];
-    prevMatrixHadAssignments[r]     = matrixHasAssignments;
+
+    // Snapshot voiceParams under voiceParamsLock so a concurrent message-thread apply
+    // (applyPendingRhythmParams / forceSyncRhythmFromApvts) can't interleave a torn write. Only
+    // taken when the pass needs it, and only tried: the message thread holds it for one field apply,
+    // so a busy lock means that apply is in flight. Then this block keeps last block's modulated
+    // values (the engine's active params, the strip modulation) and the pass runs next block, instead
+    // of the audio thread spinning behind a message thread that may have been descheduled.
+    VoiceParams modParams;
+    if (runModulationPass)
+    {
+        if (! mu_core::trySpinLock(rhythm.voiceParamsLock))
+            return;
+        modParams = rhythm.voiceParams;
+        mu_core::spinUnlock(rhythm.voiceParamsLock);
+    }
+    prevMatrixHadAssignments[r] = matrixHasAssignments;
 
     if (runModulationPass)
     {

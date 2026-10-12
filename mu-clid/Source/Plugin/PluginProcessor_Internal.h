@@ -44,7 +44,7 @@ inline const char* const kChannelSuffixes[] = {
 
 // Applies a rhythm parameter suffix + display-scale value to a Rhythm struct.
 // Returns patternDirty (true) or voiceDirty (false) via the out-params.
-// Called from syncRhythmParam (APVTS TU) and stageRhythmPreset (Preset TU).
+// Called from stageRhythmPreset (Preset TU); the parameter queue drain applies the table entries directly.
 
 // Current preset-file schema version. v2 (Stage 35) is the only format the
 // loader accepts: actual de-normalised values + string algorithm names

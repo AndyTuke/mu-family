@@ -20,6 +20,7 @@
 #include "HotSwapStager.h"
 
 #include <memory>
+#include <thread>
 #include <vector>
 #include <unordered_map>
 
@@ -253,7 +254,7 @@ public:
 private:
 
     // now atomic — listeners can fire on the audio thread when a DAW runs
-    // host automation, so the cross-thread read in syncRhythmParam needs proper
+    // host automation, so the cross-thread read in the rhythm-parameter drain needs proper
     // ordering. All set/clear pairs go through `mu_core::ScopedApvtsLoading` so
     // an exception inside the bulk push can't latch the flag at true.
     std::atomic<bool> apvtsLoading { false };
@@ -353,7 +354,40 @@ private:
     std::array<bool, SequencerEngine::MaxRhythms> prevMatrixHadAssignments {};
 
     void parameterChanged(const juce::String& parameterID, float newValue) override;
-    void syncRhythmParam(int ri, const juce::String& suffix, float v);
+
+    // Rhythm parameter changes, queued from any thread and applied on the message thread. A host can
+    // call parameterChanged on the audio thread (VST3 automation), where the apply (Rhythm field
+    // writes, a pattern rebuild that allocates, the voice-engine hand-over) must not run. The
+    // listener therefore does only atomic stores: one dirty flag per (rhythm, suffix of
+    // kRhythmParamDefs) plus one per rhythm so a drain skips quiet rhythms. The value is not queued:
+    // the drain reads the parameter's own atomic, so it can never apply something older than the
+    // parameter, and a burst on one suffix coalesces into one apply. On the message thread the apply
+    // happens at once (a knob drag, a preset load); otherwise the shared deferred-work poll
+    // (commitDeferredWork, 100 Hz) does it, up to about 10 ms later. Only the message thread writes
+    // the Rhythm fields and rebuilds patterns.
+    void markRhythmParamDirty(int ri, const char* suffix) noexcept;
+    int  findRhythmParamIndex(const char* suffix) const noexcept;
+    bool isMessageThread() const noexcept;
+    void servicePendingRhythmParams();            // message thread: apply every queued change
+    void applyPendingRhythmParams(int ri);        // message thread: one rhythm
+    void dropPendingRhythmParams(int ri) noexcept;
+
+    std::array<std::array<std::atomic<bool>, kRhythmParamCount>, SequencerEngine::MaxRhythms> pendingDirty {};
+    std::array<std::atomic<bool>, SequencerEngine::MaxRhythms> rhythmHasPending {};
+
+    // Per (rhythm, kRhythmParamDefs entry), the parameter's raw value (null if it has none); resolved
+    // once in the constructor so the drain does no lookup by id.
+    std::array<std::array<std::atomic<float>*, kRhythmParamCount>, SequencerEngine::MaxRhythms> rawParams {};
+
+    // Suffix to index in kRhythmParamDefs, sorted by suffix, for the listener's lookup by binary
+    // search (no String, no allocation). Built in the constructor and never changed.
+    struct SuffixIndex { const char* suffix; int index; };
+    std::array<SuffixIndex, kRhythmParamCount> suffixIndex {};
+    int suffixIndexCount = 0;
+
+    // Where no MessageManager exists (a headless test), the thread that built the processor.
+    std::thread::id ownerThread { std::this_thread::get_id() };
+
     // FX / return / master / channel-strip params route to the shared
     // ProcessorBase::syncGlobalFxParam (mu-core) — see the backlog.
     void pushRhythmToApvts(int ri);

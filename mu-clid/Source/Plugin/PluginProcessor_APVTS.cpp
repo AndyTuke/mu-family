@@ -1,7 +1,7 @@
 // partial-class TU split from PluginProcessor.cpp. Contains:
 // - createParameterLayout (the big APVTS layout factory)
-// - parameterChanged dispatcher
-// - syncRhythmParam / forceSyncRhythmFromApvts (FX/mixer route to mu-core's
+// - parameterChanged dispatcher (allocation-free; queues rhythm changes for the message thread)
+// - the rhythm-parameter queue drain / forceSyncRhythmFromApvts (FX/mixer route to mu-core's
 //   ProcessorBase::syncGlobalFxParam — see the backlog)
 // - pushRhythmToApvts / pushMixerChannelToApvts / swapApvtsForRhythms
 //
@@ -17,6 +17,10 @@
 #include "Plugin/MixerFxParams.h"
 #include "ValueFormat.h"   // mu-core: shared value text
 #include "Sequencer/EuclidParamLayout.h"   // mu-core: the Euclid parameter set
+
+#include <algorithm>
+#include <cstring>
+#include <thread>
 
 namespace mu_clid {
 
@@ -165,15 +169,19 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
 //==============================================================================
 void PluginProcessor::parameterChanged(const juce::String& id, float v)
 {
+    // Raw characters throughout: this can run on the audio thread (VST3 automation), where building a
+    // juce::String would allocate. Only atomic stores happen here; see markRhythmParamDirty.
+    const char* raw = id.toRawUTF8();
+
     // Rhythm params: r{0-7}_{suffix}
-    if (id.length() >= 4 && id[0] == 'r' && id[1] >= '0' && id[1] <= '7' && id[2] == '_')
+    if (raw[0] == 'r' && raw[1] >= '0' && raw[1] < '0' + SequencerEngine::MaxRhythms && raw[2] == '_' && raw[3] != '\0')
     {
-        syncRhythmParam(id[1] - '0', id.substring(3), v);
+        markRhythmParamDirty(raw[1] - '0', raw + 3);
         return;
     }
     // (Mixer / global-FX ids never reach here: ProcessorBase's own listener syncs them.)
-    // Master loop length
-    if (id == "mstrLoop")
+    // Master loop length (a relaxed atomic in the sequencer, so safe from any thread)
+    if (std::strcmp(raw, "mstrLoop") == 0)
     {
         sequencer.setMasterLoopSteps(juce::jmin((int)v * 16, 256));   // 0 = free
         return;
@@ -181,22 +189,84 @@ void PluginProcessor::parameterChanged(const juce::String& id, float v)
 }
 
 //==============================================================================
-void PluginProcessor::syncRhythmParam(int ri, const juce::String& suffix, float v)
+// True on the message thread. With no MessageManager (a headless run) it is the thread that built the
+// processor, so a test cannot silently take the message-thread path from its "audio" thread.
+bool PluginProcessor::isMessageThread() const noexcept
+{
+    const auto* mm = juce::MessageManager::getInstanceWithoutCreating();
+    return mm != nullptr ? mm->isThisTheMessageThread() : std::this_thread::get_id() == ownerThread;
+}
+
+// Binary search over the sorted suffix table, on raw characters; -1 if the suffix is unknown.
+int PluginProcessor::findRhythmParamIndex(const char* suffix) const noexcept
+{
+    const auto* begin = suffixIndex.data();
+    const auto* end   = begin + suffixIndexCount;
+    const auto* it = std::lower_bound(begin, end, suffix,
+                                      [](const SuffixIndex& e, const char* s) { return std::strcmp(e.suffix, s) < 0; });
+    return (it != end && std::strcmp(it->suffix, suffix) == 0) ? it->index : -1;
+}
+
+// Listener side, any thread: raise the dirty flags (suffix flag first, then the rhythm flag, so a drain
+// that clears the rhythm flag and scans always finds the suffix flag). On the message thread apply at
+// once; elsewhere ask for the message-thread deferred-work pass (one atomic store, no allocation).
+void PluginProcessor::markRhythmParamDirty(int ri, const char* suffix) noexcept
 {
     if (ri < 0 || ri >= SequencerEngine::MaxRhythms) return;
-    if (ri >= sequencer.getNumRhythms()) return;
+    const int index = findRhythmParamIndex(suffix);
+    if (index < 0) return;
+
+    pendingDirty[(size_t) ri][(size_t) index].store(true, std::memory_order_release);
+    rhythmHasPending[(size_t) ri].store(true, std::memory_order_release);
+
+    if (isMessageThread())
+        servicePendingRhythmParams();
+    else
+        requestDeferredWork();
+}
+
+void PluginProcessor::servicePendingRhythmParams()
+{
+    for (int ri = 0; ri < SequencerEngine::MaxRhythms; ++ri)
+        if (rhythmHasPending[(size_t) ri].exchange(false, std::memory_order_acq_rel))
+            applyPendingRhythmParams(ri);
+}
+
+// Forget every queued change of one rhythm (the caller is about to apply all of its parameters).
+void PluginProcessor::dropPendingRhythmParams(int ri) noexcept
+{
+    rhythmHasPending[(size_t) ri].store(false, std::memory_order_release);
+    for (auto& dirty : pendingDirty[(size_t) ri])
+        dirty.store(false, std::memory_order_release);
+}
+
+// Message thread. Applies the changed suffixes of one rhythm from the parameters' own values, then
+// rebuilds the pattern and hands the voice parameters to the engine (unless a bulk load is running:
+// its orchestrator does the full resync afterwards).
+void PluginProcessor::applyPendingRhythmParams(int ri)
+{
+    if (ri >= sequencer.getNumRhythms())
+    {
+        dropPendingRhythmParams(ri);   // no rhythm to apply to
+        return;
+    }
 
     Rhythm& r = sequencer.getRhythm(ri);
     bool patternDirty = false;
     bool voiceDirty   = false;
 
-    // Hold voiceParamsLock for the field mutation so the audio-thread
-    // modulation seed copy can't observe a torn write. Spin until acquired
-    // (audio side holds it for nanoseconds at a time).
+    // Clear each flag first, then read the parameter: a change that lands after the clear re-raises it.
+    // voiceParamsLock is held per field so the audio thread's brief seed-copy can slip in between;
+    // the audio thread only tries it, and the message thread (this one) is the only writer.
+    for (int i = 0; i < kRhythmParamCount; ++i)
     {
-        mu_core::spinLock(r.voiceParamsLock);
-        applyRhythmSuffix(suffix, v, r, patternDirty, voiceDirty);
-        mu_core::spinUnlock(r.voiceParamsLock);
+        if (pendingDirty[(size_t) ri][(size_t) i].exchange(false, std::memory_order_acq_rel)
+            && rawParams[(size_t) ri][(size_t) i] != nullptr)
+        {
+            mu_core::spinLock(r.voiceParamsLock);
+            kRhythmParamDefs[i].apply(rawParams[(size_t) ri][(size_t) i]->load(), r, patternDirty, voiceDirty);
+            mu_core::spinUnlock(r.voiceParamsLock);
+        }
     }
 
     if (!apvtsLoading.load(std::memory_order_acquire))
@@ -223,6 +293,8 @@ void PluginProcessor::forceSyncRhythmFromApvts(int ri)
 
     bool patternDirty = false;
     bool voiceDirty   = false;
+    // Every parameter is applied below, so changes queued for this rhythm would only repeat it.
+    dropPendingRhythmParams(ri);
     // Acquire/release per-field so the audio thread can squeeze its (very
     // brief) seed-copy lock window in between our writes. Holding the lock
     // across the whole bulk apply (~52 entries) would starve the audio thread
@@ -233,7 +305,7 @@ void PluginProcessor::forceSyncRhythmFromApvts(int ri)
         if (auto* raw = apvts.getRawParameterValue(prefix + kRhythmParamDefs[j].suffix))
         {
             mu_core::spinLock(r.voiceParamsLock);
-            applyRhythmSuffix(kRhythmParamDefs[j].suffix, raw->load(), r, patternDirty, voiceDirty);
+            kRhythmParamDefs[j].apply(raw->load(), r, patternDirty, voiceDirty);
             mu_core::spinUnlock(r.voiceParamsLock);
         }
     }
