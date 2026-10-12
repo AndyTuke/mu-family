@@ -201,7 +201,6 @@ void RhythmContent::attachHeader(LayerHeaderBar& bar)
     headerBar = &bar;
     bar.setPresetPlaceholder(juce::String::fromUTF8("rhythm preset\xe2\x80\xa6"));
     bar.onReset       = [this] { confirmReset();  };
-    bar.onDelete      = [this] { confirmDelete(); };
     bar.onSave        = [this] { saveRhythmPreset(); };
     bar.onNameChanged = [this](juce::String n) { commitNameFromLabel(n); };
     bar.onPresetSelected = [this](int id)
@@ -615,9 +614,8 @@ void RhythmContent::commitNameFromLabel(const juce::String& rawName)
         if (headerBar != nullptr) headerBar->setLayerName(newName);
     }
 
-    // route through RhythmManager::rename so the write happens under
-    // rhythmsLock instead of a raw message-thread mutation of the Rhythm struct.
-    proc.rhythms.rename(currentRhythmIndex, newName);
+    // renameRhythm writes the name under the layer lock instead of a raw message-thread mutation of the Rhythm struct.
+    proc.renameRhythm(currentRhythmIndex, newName);
     if (onRhythmRenamed) onRhythmRenamed();
 }
 
@@ -634,28 +632,10 @@ void RhythmContent::confirmReset()
         {
             if (safeThis != nullptr && idx >= 0 && idx < safeThis->proc.getNumRhythms())
             {
-                // RhythmManager::reset owns the concurrency dance
-                // (suspendProcessing + rhythmsLock). No more UI-thread spin on modLock.
-                safeThis->proc.rhythms.reset(idx);
+                // resetLayer owns the concurrency dance (suspendProcessing + layersLock).
+                safeThis->proc.resetLayer(idx);
                 if (safeThis->requestRebind) safeThis->requestRebind(idx);
             }
-        });
-}
-
-void RhythmContent::confirmDelete()
-{
-    if (currentRhythmIndex < 0 || currentRhythmIndex >= proc.getNumRhythms()) return;
-    if (proc.getNumRhythms() <= 1) return; // cannot delete last rhythm
-    const int idx = currentRhythmIndex;
-    const juce::String name(proc.getRhythm(idx).name);
-
-    juce::Component::SafePointer<RhythmContent> safeThis(this);
-    mu_ui::confirmAsync(this, "Delete Rhythm",
-                        "Delete \"" + name + "\"?\nThis cannot be undone.", "Delete",
-        [safeThis, idx]
-        {
-            if (safeThis != nullptr && safeThis->onRhythmDeleted)
-                safeThis->onRhythmDeleted(idx);
         });
 }
 

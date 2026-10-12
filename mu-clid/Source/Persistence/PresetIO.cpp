@@ -411,7 +411,7 @@ bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIndex, bool k
     std::unique_ptr<VoiceEngine> cutVictim;
     proc.suspendProcessing(true);
     {
-        const juce::ScopedLock sl(proc.rhythmsLock);
+        const juce::ScopedLock sl(proc.layersLock);
         proc.hotSwapStager.installRhythm(targetIndex, std::move(prepared.rhythm), std::move(prepared.voice),
                                           prepared.samplePath, 0, RhythmSequencer::kAnyFrameEpoch, &cutVictim);
     }
@@ -811,7 +811,7 @@ void PresetIO::loadPreset(const juce::File& file)
     // boundary commit); when stopped, flip immediately (commitStagedFullPreset). Same
     // build + same commit code — only the trigger differs, so stopped and playing loads
     // are identical by construction (no divergent second path) and the stopped
-    // load is glitch-free with its sample disk I/O done off the rhythmsLock.
+    // load is glitch-free with its sample disk I/O done off the layersLock.
     auto prepared = prepareFullPreset(root);
     if (proc.sequencerPlaying.load())
         proc.hotSwapStager.stageFullPreset(std::move(prepared));
@@ -823,10 +823,10 @@ void PresetIO::loadPreset(const juce::File& file)
 void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepared, int originEff, uint32_t frameEpoch)
 {
     const int n    = prepared.numRhythms;
-    const int oldN = proc.numActiveRhythms.load(std::memory_order_acquire);
+    const int oldN = proc.numLayers.load(std::memory_order_acquire);
 
-    // ── Install the pre-built voices + rhythms under suspend + rhythmsLock ─────
-    // suspendProcessing stops FUTURE processBlock calls; rhythmsLock serialises with
+    // ── Install the pre-built voices + rhythms under suspend + layersLock ─────
+    // suspendProcessing stops FUTURE processBlock calls; layersLock serialises with
     // any IN-FLIGHT one (suspend alone doesn't block it). Everything here is
     // in-memory (no parse, no disk I/O — done at stage time), so the lock is held for
     // microseconds and the swap stays glitch-free. The lock is released before the
@@ -836,12 +836,12 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     std::array<std::unique_ptr<VoiceEngine>, RhythmSequencer::MaxRhythms> cutVictims, shrunkEngines;
     proc.suspendProcessing(true);
     {
-        const juce::ScopedLock sl(proc.rhythmsLock);
+        const juce::ScopedLock sl(proc.layersLock);
 
     proc.setRhythmCount(n);
 
     if (n < oldN)
-        proc.numActiveRhythms.store(n, std::memory_order_release);  // shrink: drop count first
+        proc.numLayers.store(n, std::memory_order_release);  // shrink: drop count first
 
     for (int i = 0; i < n; ++i)
     {
@@ -868,8 +868,8 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     }
 
     if (n > oldN)
-        proc.numActiveRhythms.store(n, std::memory_order_release);  // grow: publish after slots ready
-    }   // release rhythmsLock before resuming
+        proc.numLayers.store(n, std::memory_order_release);  // grow: publish after slots ready
+    }   // release layersLock before resuming
     proc.suspendProcessing(false);
 
     for (int i = n; i < oldN; ++i)

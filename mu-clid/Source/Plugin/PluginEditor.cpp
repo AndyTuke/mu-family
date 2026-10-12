@@ -11,6 +11,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
       sidebar(p, "Rhythm"),
       rhythmContent(p),
       layerPanel(p, "Rhythm"),
+      layerEdit(p, sidebar, layerPanel,
+                { [this] { rhythmContent.setLayer(-1); },   // nothing stays bound into a layer that is about to move
+                  [this](int idx) { selectRhythmAndRefresh(idx, /*fullSidebarRefresh=*/false, MixerRefresh::FullReload); } }),
       mixerOverlay(p, p.mixerEngine),
       settingsOverlay(p)
 {
@@ -66,37 +69,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         }
     };
 
-    sidebar.onLayersReordered = [this](int newSelected)
-    {
-        selectRhythmAndRefresh(newSelected, /*fullSidebarRefresh=*/false, MixerRefresh::FullReload);
-    };
-
-    sidebar.onAddLayer = [this]
-    {
-        if (proc.getNumRhythms() >= RhythmSequencer::MaxRhythms) return;
-        Rhythm r;
-        r.name        = ("Rhythm " + juce::String(proc.getNumRhythms() + 1)).toStdString();   // the slot keeps it through the default-rhythm load
-        // Pick the first palette index not already used by an existing rhythm.
-        {
-            constexpr int N = MuLookAndFeel::kChannelPaletteSize;
-            std::array<bool, N> used{};
-            const int nExisting = proc.getNumRhythms();
-            for (int i = 0; i < nExisting; ++i)
-                used[(size_t) (proc.getRhythm(i).colourIndex % N)] = true;
-            const int startProbe = nExisting % N;
-            int chosen = startProbe;
-            for (int i = 0; i < N; ++i)
-            {
-                const int candidate = (startProbe + i) % N;
-                if (! used[(size_t) candidate]) { chosen = candidate; break; }
-            }
-            r.colourIndex = chosen;
-        }
-        proc.rhythms.add(r);
-        const int newIndex = proc.getNumRhythms() - 1;
-        proc.applyDefaultRhythm(newIndex);
-        selectRhythmAndRefresh(newIndex, /*fullSidebarRefresh=*/true, MixerRefresh::RefreshOnly);
-    };
+    // Add, delete and reorder are wired by layerEdit (the shared LayerEditController).
 
     // ── RhythmContent callbacks ─────────────────────────────────────────────
     rhythmContent.onStatusUpdate = [this](const juce::String& name,
@@ -139,29 +112,10 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         if (isMixerVisible()) mixerOverlay.refresh();
     };
 
-    rhythmContent.onRhythmDeleted = [this](int idx)
-    {
-        proc.rhythms.remove(idx);
-        const int newIndex = juce::jmax(0, juce::jmin(idx, proc.getNumRhythms() - 1));
-        sidebar.refreshItems();
-        sidebar.setSelectedIndex(newIndex);
-        layerPanel.setLayer(newIndex);
-        if (isMixerVisible()) mixerOverlay.refresh();
-    };
-
     // ── Settings overlay ────────────────────────────────────────────────────
     settingsOverlay.onContentDirChanged = [this] { getTransportBar().refreshPresets(); };
 
     // ── Startup ─────────────────────────────────────────────────────────────
-    if (proc.getNumRhythms() == 0)
-    {
-        Rhythm r;
-        r.name        = "Rhythm 1";
-        r.colourIndex = 0;
-        proc.rhythms.add(r);
-        sidebar.refreshItems();
-    }
-
     layerPanel.setLayer(0);
     sidebar.setSelectedIndex(0);
 

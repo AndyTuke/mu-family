@@ -71,7 +71,7 @@ public:
     // Install a prepared rhythm into slot `r`: the outgoing engine retires (it keeps rendering its
     // sample tail / amp release from a retired slot), the rhythm, engine and sample path move in and
     // the pattern rebuilds. The one swap behind the loop-boundary commit, the stopped load and the
-    // full-preset commit. Caller holds suspendProcessing (and rhythmsLock where needed); the
+    // full-preset commit. Caller holds suspendProcessing (and layersLock where needed); the
     // APVTS push follows outside the suspend.
     // originEff / frameEpoch say where the new pattern's step 0 falls (see RhythmSequencer::requestSwapStart);
     // the defaults start it on the step counter's own phase, for a load that has no boundary.

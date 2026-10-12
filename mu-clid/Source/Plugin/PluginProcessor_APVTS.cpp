@@ -379,17 +379,4 @@ void PluginProcessor::pushMixerChannelToApvts(int idx)
     set(px+"outBus",  (float)ch.outputBus);
 }
 
-void PluginProcessor::swapApvtsForRhythms(int i, int j)
-{
-    mu_core::ScopedApvtsLoading guard(apvtsLoading);
-    pushRhythmToApvts(i);
-    pushRhythmToApvts(j);
-    // Push every active channel: not just i and j, because sidechain source
-    // indices on OTHER channels may have been re-translated by the swap
-    // (any channel pointing at i now points at j, and vice versa).
-    const int n = numActiveRhythms.load(std::memory_order_acquire);
-    for (int c = 0; c < n; ++c)
-        pushMixerChannelToApvts(c);
-}
-
 } // namespace mu_clid

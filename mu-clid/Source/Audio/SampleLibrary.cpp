@@ -12,7 +12,7 @@ SampleLibrary::SampleLibrary(PluginProcessor& p) : proc(p)
 
 void SampleLibrary::load(int rhythmIndex, const juce::File& file)
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.numActiveRhythms.load(std::memory_order_acquire)) return;
+    if (rhythmIndex < 0 || rhythmIndex >= proc.numLayers.load(std::memory_order_acquire)) return;
     proc.voiceEngines[(size_t) rhythmIndex]->loadFile(file);
     samplePaths.set(rhythmIndex, file.getFullPathName());
 }
@@ -22,6 +22,12 @@ void SampleLibrary::swapPaths(int i, int j)
     const juce::String tmp = samplePaths[i];
     samplePaths.set(i, samplePaths[j]);
     samplePaths.set(j, tmp);
+}
+
+void SampleLibrary::shiftPathsDown(int index, int count)
+{
+    for (int d = index; d < count - 1; ++d)
+        swapPaths(d, d + 1);
 }
 
 juce::String SampleLibrary::getSampleName(int rhythmIndex) const

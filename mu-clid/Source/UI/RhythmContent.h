@@ -56,7 +56,6 @@ public:
     std::function<void()>    onOutputModeChanged;
 
     std::function<void()>    onRhythmRenamed;
-    std::function<void(int)> onRhythmDeleted;
 
     void paint(juce::Graphics&) override;
     void paintOverChildren(juce::Graphics&) override;
@@ -127,7 +126,6 @@ private:
     juce::Colour currentColour() const;
     void commitNameFromLabel(const juce::String& rawName);
     void confirmReset();
-    void confirmDelete();
     void timerCallback() override;
 
     // juce::AudioProcessorValueTreeState::Listener — syncs knobs + circle on DAW automation

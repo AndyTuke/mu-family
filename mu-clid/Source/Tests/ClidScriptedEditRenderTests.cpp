@@ -35,7 +35,11 @@ namespace
         auto f = p.getSamplesDir().getChildFile(name);
         f.deleteFile();
         juce::WavAudioFormat wav;
-        std::unique_ptr<juce::AudioFormatWriter> w(wav.createWriterFor(f.createOutputStream().release(), 44100.0, 1, 16, {}, 0));
+        std::unique_ptr<juce::OutputStream> out = f.createOutputStream();
+        if (out == nullptr) return;
+        auto w = wav.createWriterFor(out, juce::AudioFormatWriterOptions{}.withSampleRate(44100.0)
+                                                                          .withNumChannels(1)
+                                                                          .withBitsPerSample(16));
         if (w == nullptr) return;
         juce::AudioBuffer<float> b(1, 22050);
         for (int i = 0; i < b.getNumSamples(); ++i)
@@ -43,23 +47,11 @@ namespace
         w->writeFromAudioSampleBuffer(b, 0, b.getNumSamples());
     }
 
-    // The editor's Add flow: a named rhythm in the first free palette colour, then the default rhythm load.
-    void editAdd(ScriptedProcessor& p)
-    {
-        mu_clid::Rhythm r;
-        r.name = ("Rhythm " + juce::String(p.getNumRhythms() + 1)).toStdString();
-        std::array<bool, 8> used {};
-        for (int i = 0; i < p.getNumRhythms(); ++i) used[(size_t) (p.getRhythm(i).colourIndex % 8)] = true;
-        int chosen = p.getNumRhythms() % 8;
-        for (int i = 0; i < 8; ++i)
-            if (! used[(size_t) ((p.getNumRhythms() + i) % 8)]) { chosen = (p.getNumRhythms() + i) % 8; break; }
-        r.colourIndex = chosen;
-        p.rhythms.add(r);
-        p.applyDefaultRhythm(p.getNumRhythms() - 1);
-    }
-    void editSwap(ScriptedProcessor& p, int a, int b)  { p.rhythms.swap(a, b); }
-    void editReset(ScriptedProcessor& p, int i)        { p.rhythms.reset(i); }
-    void editRemove(ScriptedProcessor& p, int i)       { p.rhythms.remove(i); }
+    // The editor's Add: ProcessorBase::addLayer (the new slot's default rhythm is applied by layerAdded).
+    void editAdd(ScriptedProcessor& p)                 { p.addLayer(); }
+    void editSwap(ScriptedProcessor& p, int a, int b)  { p.swapLayers(a, b); }
+    void editReset(ScriptedProcessor& p, int i)        { p.resetLayer(i); }
+    void editRemove(ScriptedProcessor& p, int i)       { p.removeLayer(i); }
 }
 
 struct ClidScriptedEditRenderTests : juce::UnitTest
@@ -103,7 +95,7 @@ struct ClidScriptedEditRenderTests : juce::UnitTest
             {
                 case  60: editAdd(p); p.applyRhythmPreset(presets.getChildFile("T12.muRhythm"), 3); break;
                 case 110: editSwap(p, 0, 2); break;
-                case 150: editReset(p, 1); break;
+                case 150: editReset(p, 1); setParam(p.apvts, "ch1_pan", 0.6f); break;   // a reset also returns the strip to its defaults
                 case 190: p.applyRhythmPreset(presets.getChildFile("T13.muRhythm"), 1); break;   // retires slot 1's engine into a tail
                 case 200: editRemove(p, 0); break;
                 case 260: editSwap(p, 1, 2); break;

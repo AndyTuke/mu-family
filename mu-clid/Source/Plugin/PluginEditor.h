@@ -6,6 +6,7 @@
 #include "UI/LayerSidebar.h"
 #include "UI/RhythmMiniVisual.h"
 #include "UI/LayerPanel.h"        // mu-core shared per-layer panel shell
+#include "UI/LayerEditController.h"
 #include "UI/RhythmContent.h"
 #include "Modulation/MuClidModDest.h"
 #include "UI/MixerOverlay.h"
@@ -43,6 +44,7 @@ private:
     ModDestProvider    modDestProvider = mu_clid::makeModDestProvider([this] { return effectSendName; });
     RhythmContent      rhythmContent;
     LayerPanel         layerPanel;
+    mu_ui::LayerEditController layerEdit;   // add / delete / reorder glue; after the sidebar and the panel
     MixerOverlay       mixerOverlay;
     SettingsOverlay    settingsOverlay;
 

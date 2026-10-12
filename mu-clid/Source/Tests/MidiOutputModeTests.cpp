@@ -294,7 +294,7 @@ struct MidiOutputModeTests : juce::UnitTest
         TempStorage storage2;
         ExposedMidiOutProcessor q;
         q.prepareToPlay(48000.0, 512);
-        q.rhythms.add(mu_clid::Rhythm());
+        q.addLayer();
         q.applyDefaultRhythm(1);
         setParam(q.apvts, "r1_stepsA", 16.0f);   // a new rhythm starts with no hits
         setParam(q.apvts, "r1_hitsA", 4.0f);
@@ -329,7 +329,7 @@ struct MidiOutputModeTests : juce::UnitTest
         {
             ExposedMidiOutProcessor p;
             p.prepareToPlay(48000.0, 512);
-            p.rhythms.add(mu_clid::Rhythm());
+            p.addLayer();
             p.applyDefaultRhythm(1);
             setParam(p.apvts, "r1_stepsA", 16.0f);
             setParam(p.apvts, "r1_hitsA", 4.0f);
@@ -341,7 +341,7 @@ struct MidiOutputModeTests : juce::UnitTest
             const auto first = renderBlocks(p, 1);   // the hit at beat 0: note-on, its off is 960 samples away
             expectEquals(first.count(true), 1);
             expectEquals(first.count(false), 0);
-            p.rhythms.remove(1);
+            p.removeLayer(1);
             expectEquals(p.getNumRhythms(), 1);
             const auto second = renderBlocks(p, 1);
             expect(everyNoteOnHasOff(first, second), "the removed slot's note-on got its note-off");
@@ -359,7 +359,7 @@ struct MidiOutputModeTests : juce::UnitTest
             }
             ExposedMidiOutProcessor p;
             p.prepareToPlay(48000.0, 512);
-            p.rhythms.add(mu_clid::Rhythm());
+            p.addLayer();
             p.applyDefaultRhythm(1);
             setParam(p.apvts, "r1_stepsA", 16.0f);
             setParam(p.apvts, "r1_hitsA", 4.0f);
@@ -451,7 +451,7 @@ struct MidiOutputModeTests : juce::UnitTest
                 TempStorage storage;
                 ExposedMidiOutProcessor p;
                 p.prepareToPlay(48000.0, 512);
-                p.rhythms.add(mu_clid::Rhythm());
+                p.addLayer();
                 p.applyDefaultRhythm(1);
                 setParam(p.apvts, "r0_outMode", 1.0f);
                 setParam(p.apvts, "r0_midiNote", 45.0f);

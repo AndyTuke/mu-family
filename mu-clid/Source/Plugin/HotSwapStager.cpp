@@ -170,7 +170,7 @@ void HotSwapStager::processSwaps()
 
     // Two-pass to suspend audio ONCE per call: collect all ready slots, then swap
     // them under one suspend, then do post-commit APVTS push + UI callback outside it.
-    const int n = proc.numActiveRhythms.load(std::memory_order_acquire);
+    const int n = proc.numLayers.load(std::memory_order_acquire);
     std::array<int, RhythmSequencer::MaxRhythms> readyRhythms {};
     int readyCount = 0;
     for (int r = 0; r < n; ++r)
@@ -188,9 +188,9 @@ void HotSwapStager::processSwaps()
         proc.suspendProcessing(true);
         {
             // suspendProcessing alone does not stop an in-flight callback in hosts that ignore it
-            // (CLAP); rhythmsLock is what the audio thread try-locks, so the engine and sample moves
+            // (CLAP); layersLock is what the audio thread try-locks, so the engine and sample moves
             // below cannot overlap a block. Released before the APVTS push.
-            const juce::ScopedLock sl(proc.rhythmsLock);
+            const juce::ScopedLock sl(proc.layersLock);
             for (int idx = 0; idx < readyCount; ++idx)
             {
                 const int r = readyRhythms[(size_t)idx];

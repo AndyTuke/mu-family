@@ -61,7 +61,7 @@ public:
     // project state and goes straight to restoreStateFromTree.
     void loadPreset(const juce::File& file);
 
-    // Commit a pre-built full preset into live state under suspend + rhythmsLock, then
+    // Commit a pre-built full preset into live state under suspend + layersLock, then
     // finalise APVTS / mixer / global params. Called from loadPreset (stopped, immediate)
     // and from HotSwapStager::processSwaps (playing, at the loop boundary). `prepared`
     // is consumed (voices moved out).
