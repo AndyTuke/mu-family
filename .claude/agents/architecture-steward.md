@@ -51,4 +51,4 @@ Short:
 - **Do not:** the tempting wrong approach.
 - **Docs updated:** which files.
 - **Owner decisions needed:** any.
-- **Needs tracking:** follow-ups for the backlog, for the main conversation to hand to the `backlog-administrator`.
+- **Needs tracking:** follow-ups for the backlog, for the main conversation to hand to the `backlog-administrator`. Only list a follow-up that changes structure or blocks other work; tidy-ups and wording nits go in one "Minor" list, which the `backlog-administrator` records as P3 one-liners or as updates on the item they came from. Never raise a follow-up whose only cause is an earlier review. When reviewing a change that belongs to an existing backlog issue, report your findings against that issue, not as new rows, then re-check them after the fixes and answer **Pass** or **Not yet**; your Pass is one of the sign-offs the item needs before it is closed.

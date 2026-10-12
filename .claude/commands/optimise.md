@@ -37,4 +37,4 @@ Audio-thread safety and DSP efficiency are not checked here. If any changed file
 
 Focus on files changed since the last commit (`git diff --name-only HEAD~1 HEAD`). If a changed file calls into an unchanged file and you spot a problem there, note it but don't fix it — keep the diff minimal.
 
-After completing all fixes, build the project (`cmake --build build --config Debug`) and resolve any new warnings or errors introduced by your changes. Then summarise: what you fixed, what you flagged for discussion, the `dsp-controller` verdict (if it ran), and whether the build is clean. Do not edit `backlog.md`; hand anything that needs logging to the `backlog-administrator` agent.
+After completing all fixes, summarise: what you fixed, what you flagged for discussion and the `dsp-controller` verdict (if it ran). Do not build on your own: the main conversation decides when a build is worth it (CLAUDE.md, "Keep working until a build is worth it") and fixes any new warnings or errors then. Do not edit `backlog.md`; hand anything that needs logging to the `backlog-administrator` agent.

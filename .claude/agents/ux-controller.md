@@ -57,3 +57,7 @@ When asked to review a UI change, compare the code and the rendered result descr
 ## Report format
 
 Short: the ruling or review result, the docs changed, and any owner decisions needed.
+
+## Sign-off on a backlog item
+
+When asked to review work that belongs to an existing backlog issue, report findings against that issue (the main conversation hands them to the `backlog-administrator` to record on the existing row); do not ask for new rows. After the fixes, re-check only those findings and answer **Pass** or **Not yet**. Your Pass is one of the sign-offs the item needs before it is closed.

@@ -33,24 +33,24 @@ $env:JUCE_PATH = "D:\JUCE"
 **Procedure lives in the `/build` and `/release` skills** ([.claude/commands/build.md](.claude/commands/build.md), [.claude/commands/release.md](.claude/commands/release.md)); full reference detail (plugin formats, deploy, artefact paths, three-way ship) is in [docs/design-plugin-family.md](docs/design-plugin-family.md#build--packaging-reference). The invariants that hold on every build:
 
 - **Always reconfigure first** (`cmake -B build`) — generated files (icon, versioninfo.rc, build-number bake) go stale otherwise.
-- **A code change → a Debug build only.** Work on **one or two apps at a time** (owner rule, 2026-10-12): configure with `-DMUFAMILY_FOCUSED_BUILD=ON`, build and test just those apps (plus `mu-core-tests` when shared code changed) — a focused build **does not increment the number**. At a **stage boundary** (a ruled stage closing, or when Andy says so) reconfigure with the option OFF and do the **full Debug build of all products**: that build **increments the number by exactly 1**. Build and test only when really required. **Never bump `build_number.txt` manually.**
+- **When a build is wanted → a Debug build only** (see "Keep working until a build is worth it" below), all products. Every full Debug build **increments the number by exactly 1**. While working on **one or two apps**, `-DMUFAMILY_FOCUSED_BUILD=ON` builds just those targets without incrementing the number (owner, 2026-10-12); the full Debug build of all products at a stage boundary is the one that increments it. **Never bump `build_number.txt` manually.**
 - **Release builds only when the owner says so** — reuses the last Debug number, never increments; **Release ≤ last Debug** (a higher Release aborts with FATAL_ERROR — surface it, don't work around).
 - **Report the number read from `mu-core/BuildNumber.h` *after* the final build** — never an intermediate log value.
 - **Version = `<major>.<minor>` + the shared build number.** The live products (mu-Clid, mu-Tant, mu-link, mu-Clid MIDI) use [version.txt](version.txt), currently 1.1 (the UI rework, build 972). The pre-release products (mu-On, mu-Toni) use [version-pre.txt](version-pre.txt), currently 0.1 (the .1 marks the metal-panel design upgrade, Andy 2026-10-11). Plugins show `v1.1.0.NNN` / `v0.1.0.NNN`, commits `v1.1.NNN`. The build number never resets on a major/minor change (the Release ≤ Debug guard and the in-plugin update check rely on it). Change a base **only** by editing its file, and only when Andy says so.
 - **No GitHub Actions workflow runs on push — ever.** All workflows are `workflow_dispatch`-only; never re-add `push:`/`pull_request:` triggers, and nothing runs as a side-effect of a plain build/commit/push. **`release.yml` is the exception that IS dispatched as a standard step of every release** (`/release` step b) — the repo is public so Linux CI minutes are free, so a release always publishes a full cross-platform (Windows + Linux) GitHub release. `ci.yml` + `mac-validate.yml` still run only on explicit owner request.
 - **macOS is on hold for the foreseeable future** (owner decision, 2026-10-02) — without an Apple code-signing certificate the builds can't be notarized, so nothing ships for Mac. Keep the existing `APPLE`/AU code paths compiling-in-principle (don't delete them), but don't build, ship, advertise or spend effort on macOS until the owner lifts the hold.
 
-**Release notes on EVERY build (not just releases):** whenever a build fixes or improves anything **user-facing**, run `/notes` ([.claude/commands/notes.md](.claude/commands/notes.md)) to add a plain-English one-liner to the **"Next release · In testing"** section of each affected product's release-notes page, then commit + push the site. The In-Testing section is public and must always be current so users can see what's coming in the next version.
+**Release notes per batch of user-facing changes:** whenever the work since the last `/notes` fixes or improves anything **user-facing**, run `/notes` once for the whole batch ([.claude/commands/notes.md](.claude/commands/notes.md)) to add a plain-English one-liner to the **"Next release · In testing"** section of each affected product's release-notes page, then commit + push the site. The In-Testing section is public and must always be current so users can see what's coming in the next version.
 
 **The `backlog-administrator` agent ([.claude/agents/backlog-administrator.md](.claude/agents/backlog-administrator.md)) is the only writer of [backlog.md](backlog.md)** (owner rule, 2026-10-09). Nothing else — the main conversation, other agents, slash commands, hooks — edits it directly; they hand the change to the agent, which applies the ordering and format rules and runs `check-backlog.ps1`. It also hands tasks out: ask it for the next task (or a named issue) and it returns a brief with the steps, files, docs to read, blockers and done criteria.
 
-After every build, ask the `backlog-administrator` for the open issues and fix them immediately, without asking, up to a maximum of 10 issues. Prioritise issues related to the current stage.
+**Keep working until a build is worth it** (owner rule, 2026-10-12; replaces the fixed issue cap). After a build, ask the `backlog-administrator` for the next task and keep fixing issues from the top of Open without asking, prioritising the current stage. There is no fixed number per round: stop and build when a build is the sensible next step, which is when one of these is true: (1) the next change can't be checked or built on without it, (2) a group of related changes is complete and ready to verify together, (3) the risk of an unbuilt compile error or a hard-to-find failure has grown (many files, `mu-core` touched, several products affected), (4) the change must be heard or seen to judge it, or (5) the owner asks. Don't build after each small fix just because it's finished, and don't keep going past the point where a failed build would be hard to trace. Say in one line why you are building.
 
-After every response, if any issues in `backlog.md` have changed status or new issues have been added, hand the changes to the `backlog-administrator` immediately so the file reflects the current state and stays correctly ordered.
+When issues in `backlog.md` change status or new ones are needed, hand the changes to the `backlog-administrator` as one batched call at the end of the round (not after every small step), so the file reflects the current state and stays correctly ordered.
 
 New feature ideas live in [docs/design-future.md](docs/design-future.md) under **Unscheduled Ideas**. Ask the user before implementing any of them.
 
-**Standing check on ALL work (owner rule):** before and while making any change — code, design, docs, backlog — read [docs/design-future.md](docs/design-future.md) and ask *"am I making these ideas easier or harder?"* — in particular the one-framework / one-instance direction (shared `mu-core`, only the sound engine and sequencer differ per product) and the standard UI sizing. Prefer the change that moves toward them (generic code in `mu-core`, no new per-product copies of shared behaviour, no new per-product layout constants); if a change must make one harder, say so and why before doing it.
+**Standing check on ALL work (owner rule):** before and while making any change — code, design, docs, backlog — read [docs/design-future.md](docs/design-future.md) (once per session or batch of related work, and again whenever the change is structural) and ask *"am I making these ideas easier or harder?"* — in particular the one-framework / one-instance direction (shared `mu-core`, only the sound engine and sequencer differ per product) and the standard UI sizing. Prefer the change that moves toward them (generic code in `mu-core`, no new per-product copies of shared behaviour, no new per-product layout constants); if a change must make one harder, say so and why before doing it.
 
 **The `user-documentation-author` agent ([.claude/agents/user-documentation-author.md](.claude/agents/user-documentation-author.md)) owns the user manuals** (`docs/<product>/create_manual.ps1` and the `.docx` it generates) and keeps them current (owner rule, 2026-10-09). After any user-facing change, hand it what changed so the manual is updated in the same commit as the code. It is separate from `/notes`, which owns the release-notes pages.
 
@@ -58,7 +58,7 @@ New feature ideas live in [docs/design-future.md](docs/design-future.md) under *
 
 ### Agent precedence
 
-Six agents each own one area and are the final word in it; none edits another's files:
+Seven agents each own one area and are the final word in it; none edits another's files:
 
 | Agent | Final say on | Writes |
 |---|---|---|
@@ -68,16 +68,20 @@ Six agents each own one area and are the final word in it; none edits another's 
 | `dsp-controller` | real-time safety and DSP correctness (a **Blocked** verdict stops the change) | nothing (read-only) |
 | `test-steward` | what is tested and its recorded status | tests, `tests/**`, `tests.md` |
 | `user-documentation-author` | user manuals | manual scripts and `.docx` |
+| `web-designer` | the website, its copy and release-notes pages | `site/**` |
 | main conversation | the code, and the owner's instructions | source |
 
 **Call the agents without asking** (owner rule, 2026-10-09). The main conversation invokes them on its own whenever their trigger applies, and does not ask the owner for permission first:
 
 - `backlog-administrator`: any backlog change, any task hand-over, after every build and response (batch the changes into one call).
-- `ux-controller`: before UI work and for any design question the docs don't settle.
-- `architecture-steward`: before structural, cross-plugin or naming decisions.
-- `dsp-controller`: on every new or changed audio-path code, before building or committing.
+- `ux-controller`: once before a batch of related UI work, and for any design question the docs don't settle.
+- `architecture-steward`: once before a batch of structural, cross-plugin or naming work.
+- `dsp-controller`: once per batch of new or changed audio-path code, before the build or commit that covers it. Only Blocker, Major and Risk findings become backlog rows; Minor findings become P3 one-liners (or updates on the item they came from) in the backlog; there is no separate review list. A review never triggers another review (owner rule, 2026-10-12).
 - `test-steward`: when a fix, feature or DSP finding needs a test, and before a release.
-- `user-documentation-author`: after any user-facing change.
+- `user-documentation-author`: after a batch of user-facing changes.
+- `web-designer`: when the site, pricing or licensing wording, or a release-notes page needs a change.
+
+**Reviews update the item, they don't spawn new ones** (owner rule, 2026-10-12), for all reviewers (`dsp-controller`, `architecture-steward`, `test-steward`, `ux-controller`, `user-documentation-author`): when a change belongs to a backlog issue, the main conversation passes each reviewer's findings to the `backlog-administrator`, who records them on that row; the fixes are made; each reviewer re-checks and answers Pass; and only when every applicable reviewer has passed does the main conversation ask the `backlog-administrator` to close the row. A genuinely separate defect still gets its own row. A review never triggers another review.
 
 Run independent agents in parallel. Report their outcomes to the owner briefly; only owner decisions an agent hands up are asked about.
 
@@ -98,7 +102,9 @@ Version: v1.1.972
 
 ## Backlog handling
 
-The backlog in `backlog.md` must always be grouped: **Open → On Hold → Closed**. Within **On Hold** and **Closed**, items are ordered by issue number **descending** (highest first). **Open is in recommended development order** (owner rule, 2026-10-09): work from the top; a new item goes on the top until it is ranked into its place, and the note under the Open heading names the stages. Every backlog update must preserve this ordering. All code changes must be logged as backlog entries to maintain a complete development history.
+The backlog in `backlog.md` must always be grouped: **Open → On Hold → Closed**. Within **On Hold** and **Closed**, items are ordered by issue number **descending** (highest first). **Open is in recommended development order** (owner rule, 2026-10-09): work from the top; a new item goes on the top until it is ranked into its place, and the note under the Open heading names the stages. Every backlog update must preserve this ordering. A backlog row is for owner-visible work, defects and Risks; a small change that belongs to an open item is recorded on that item's row, and a trivial internal tidy-up needs only its commit message (the git log is the full development history).
+
+**Open rows carry a few fields, kept short** (owner rule, 2026-10-12). The backlog keeps its four columns (`check-backlog.ps1` enforces them); inside the Description cell an Open row reads: `**[area] Title.** P1/P2/P3 · logged by <who> · Details (one to three sentences) · Updates: dated one-liners, newest last · Needs: reviewers still to sign off, or the blocker`. The Status cell carries the status. **P1** = blocks work or breaks something users hit, **P2** = normal, **P3** = minor, one line, merged with same-area P3s; P3 rows sit at the bottom of Open. Review findings on an item are added to its Updates, not to new rows. The `backlog-administrator` maintains these fields and trims rows that grow past a few lines. Existing rows are converted as they are touched, not in one sweep.
 
 The single resolved status is **`✅ Closed`** — never `Fixed` / `Audited` / `Verified` / `Done` or any other variant, whether the item was fixed, verified as already correct, or resolved by design. Structure is enforced by [tests/scripts/check-backlog.ps1](tests/scripts/check-backlog.ps1); run it after editing the backlog.
 

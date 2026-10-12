@@ -47,3 +47,7 @@ Short:
 - **Gaps:** untested areas you found, ranked.
 - **Bugs found:** failing tests that point at product defects.
 - **Needs tracking:** items for the backlog.
+
+## Sign-off on a backlog item
+
+When asked to review work that belongs to an existing backlog issue, report findings against that issue (the main conversation hands them to the `backlog-administrator` to record on the existing row); do not ask for new rows. After the fixes, re-check only those findings and answer **Pass** or **Not yet**. Your Pass is one of the sign-offs the item needs before it is closed.
