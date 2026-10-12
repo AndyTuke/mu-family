@@ -63,16 +63,16 @@ void ModulatorPanel::setPlayheadBeat(double beat)
         editors[activeTab].setPlayheadBeat(beat);
 }
 
-void ModulatorPanel::setVoiceSlot(Layer* slot)
+void ModulatorPanel::setLayer(Layer* slot)
 {
-    voiceSlot = slot;
+    layer = slot;
     if (!slot)
     {
         // Clear stale pointers in the editors and matrix panel — otherwise their
         // ControlSequence*/ModulationMatrix* still point inside a destroyed Layer.
         for (int i = 0; i < kNumMods; ++i)
             editors[i].setData(nullptr, nullptr, modColour(i), i, nullptr);
-        matrixPanel.setVoiceSlot(nullptr);
+        matrixPanel.setLayer(nullptr);
         return;
     }
 
@@ -82,7 +82,7 @@ void ModulatorPanel::setVoiceSlot(Layer* slot)
                             modColour(i), i, &slot->modLock.v);
         editors[i].onChange = [this] { if (onChange) onChange(); };
     }
-    matrixPanel.setVoiceSlot(slot);
+    matrixPanel.setLayer(slot);
     matrixPanel.onChange = [this] { if (onChange) onChange(); };
 }
 

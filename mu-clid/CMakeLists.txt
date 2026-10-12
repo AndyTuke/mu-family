@@ -241,12 +241,12 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/ModulationSkewTests.cpp       # C5 (proportion-space skew round-trips)
     Source/Tests/NoDemoCapsTests.cpp          # unlicensed is fully functional: 8 layers, 64 steps, saves
     Source/Tests/EmbeddedSampleTests.cpp       # preset samples: FLAC round trip is sample-identical
-    Source/Tests/SequencerEngineWrapTests.cpp  # master-loop wrap detection
+    Source/Tests/RhythmSequencerWrapTests.cpp  # master-loop wrap detection
     Source/Tests/SwapCommitTimingTests.cpp     # a delayed swap commit still starts the new pattern on the next step
     Source/Tests/MidiOutputModeTests.cpp       # per-rhythm Sample / MIDI output: table, presets, render through the real processor
-    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/SequencerEngine.cpp"        # under test by the wrap tests
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/RhythmSequencer.cpp"        # under test by the wrap tests
     Source/Persistence/PresetMigrations.cpp    # under test by C1/C2
-    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/Rhythm.cpp"                 # SequencerEngine builds patterns through it
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/Rhythm.cpp"                 # RhythmSequencer builds patterns through it
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/HitGenerator.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/EuclideanGenerator.cpp"
     # Pull in mu-core .cpp's the tests need (they can't link mu-core directly

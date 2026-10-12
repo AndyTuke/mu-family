@@ -13,7 +13,7 @@ class ModMatrixPanel : public juce::Component
 public:
     ModMatrixPanel();
 
-    void setVoiceSlot(Layer* slot);
+    void setLayer(Layer* slot);
     void setInsertAlgorithm(int driveChar);
     void setDestProvider(const ModDestProvider* p);
     void refresh();
@@ -33,7 +33,7 @@ public:
     }
 
 private:
-    Layer*             voiceSlot    = nullptr;
+    Layer*             layer        = nullptr;
     const ModDestProvider* destProvider = nullptr;
 
     struct MatrixRow : public juce::Component

@@ -413,7 +413,7 @@ bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIndex, bool k
     {
         const juce::ScopedLock sl(proc.rhythmsLock);
         proc.hotSwapStager.installRhythm(targetIndex, std::move(prepared.rhythm), std::move(prepared.voice),
-                                          prepared.samplePath, 0, SequencerEngine::kAnyFrameEpoch, &cutVictim);
+                                          prepared.samplePath, 0, RhythmSequencer::kAnyFrameEpoch, &cutVictim);
     }
     proc.suspendProcessing(false);
 
@@ -756,7 +756,7 @@ buildPreparedFullPreset(const juce::ValueTree& root, double sampleRate, int bloc
     int n = 0;
     for (int ci = 0; ci < root.getNumChildren(); ++ci)
         if (root.getChild(ci).getType() == juce::Identifier("Rhythm")) ++n;
-    n = juce::jlimit(1, juce::jmin(maxRhythms, (int) SequencerEngine::MaxRhythms), n);
+    n = juce::jlimit(1, juce::jmin(maxRhythms, (int) RhythmSequencer::MaxRhythms), n);
     out.numRhythms = n;
 
     // Prepare each <Rhythm> child into its slot.
@@ -779,7 +779,7 @@ HotSwapStager::PreparedFullPreset PresetIO::prepareFullPreset(const juce::ValueT
 {
     return buildPreparedFullPreset(root, proc.currentSampleRate, proc.currentBlockSize, proc.getSamplesDir(),
                                    proc.onLoadError,
-                                   (int) SequencerEngine::MaxRhythms);
+                                   (int) RhythmSequencer::MaxRhythms);
 }
 
 void PresetIO::loadPreset(const juce::File& file)
@@ -833,7 +833,7 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     // APVTS finalize below so that (post-resume) work doesn't bail the audio thread.
     // Engines that must not destruct under the lock (force-cut victims, shrunk slots) land here and
     // free after it is released.
-    std::array<std::unique_ptr<VoiceEngine>, SequencerEngine::MaxRhythms> cutVictims, shrunkEngines;
+    std::array<std::unique_ptr<VoiceEngine>, RhythmSequencer::MaxRhythms> cutVictims, shrunkEngines;
     proc.suspendProcessing(true);
     {
         const juce::ScopedLock sl(proc.rhythmsLock);

@@ -36,12 +36,12 @@ Third independent euclidean layer dedicated to accents. No logic relationship wi
 | Insert mode | Mute / Pad | Same semantics as A/B |
 | Mute | On/Off | Exclude from combined result |
 
-**Accent detection:** A step is accented when Ring C fires a hit on the same step as a Ring A+B combined hit. The `isAccented` flag is passed from `SequencerEngine` to `VoiceEngine` with each trigger event. The accent boost amount is a per-rhythm parameter in `VoiceParams` (`accentDb`, 0–12 dB), controlled by the Accent knob in the VoiceSection Amp panel. See design-voice.md for the full accent signal path.
+**Accent detection:** A step is accented when Ring C fires a hit on the same step as a Ring A+B combined hit. The `isAccented` flag is passed from `RhythmSequencer` to `VoiceEngine` with each trigger event. The accent boost amount is a per-rhythm parameter in `VoiceParams` (`accentDb`, 0–12 dB), controlled by the Accent knob in the VoiceSection Amp panel. See design-voice.md for the full accent signal path.
 
 ## DAW Position Sync
 
 - Step position = `(host_ppq / step_length_beats) % step_count`
-- `step_length_beats = 0.25` (one 1/16th note) — global constant in `SequencerEngine::StepLengthBeats`
+- `step_length_beats = 0.25` (one 1/16th note) — global constant in `RhythmSequencer::StepLengthBeats`
 - Uses global song timeline from DAW (not clip-relative)
 - Formula recalculates from absolute position every block — handles tempo automation
 - Scrubbing: position updates silently, no triggers

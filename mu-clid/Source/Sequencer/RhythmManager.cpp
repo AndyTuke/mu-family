@@ -10,7 +10,7 @@ namespace mu_clid {
 void RhythmManager::add(const Rhythm& r)
 {
     int ri = proc.sequencer.getNumRhythms();
-    if (ri >= SequencerEngine::MaxRhythms) return;
+    if (ri >= RhythmSequencer::MaxRhythms) return;
     proc.hotSwapStager.cancelPendingIfAny(ri);          // the new slot must carry no stale staged swap
     proc.voiceEngines[ri] = std::make_unique<VoiceEngine>();
     proc.voiceEngines[ri]->insertProc.setSlotIndex(ri);   // per-slot noise seed
@@ -30,7 +30,7 @@ void RhythmManager::add(const Rhythm& r)
 
 void RhythmManager::resetPlayState(int idx)
 {
-    if (idx < 0 || idx >= SequencerEngine::MaxRhythms) return;
+    if (idx < 0 || idx >= RhythmSequencer::MaxRhythms) return;
     auto& s = proc.rhythmPlayState[idx];
     s.currentStep  .store(0);
     s.patternLength.store(1);
@@ -94,7 +94,7 @@ void RhythmManager::remove(int index)
     // The down-shift renumbers every rhythm from `index` upward, so any pending
     // per-rhythm staged swap (keyed by index) would land on the wrong slot — drop
     // them all. A staged full preset is index-independent, so it is left to win.
-    for (int r = 0; r < SequencerEngine::MaxRhythms; ++r)
+    for (int r = 0; r < RhythmSequencer::MaxRhythms; ++r)
         proc.hotSwapStager.cancelPendingIfAny(r);
 
     // The removed slot's retired tails are dropped; declared before the lock so they destruct after it.

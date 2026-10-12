@@ -6,7 +6,7 @@
 #include "Sequencer/HitGenerator.h"
 #include "Sequencer/Rhythm.h"
 #include "Sequencer/RhythmPlayState.h"
-#include "Sequencer/SequencerEngine.h"
+#include "Sequencer/RhythmSequencer.h"
 #include "Persistence/RhythmParamTable.h"
 #include "Persistence/RhythmPresetHelpers.h"
 
@@ -21,7 +21,7 @@ using mu_core::Rhythm;
 using mu_core::Logic;
 using mu_core::EuclidOverrides;
 using mu_core::RhythmPlayState;
-using mu_core::SequencerEngine;
+using mu_core::RhythmSequencer;
 using mu_core::BlockResult;
 using mu_core::ParamKind;
 using mu_core::RhythmParamDef;

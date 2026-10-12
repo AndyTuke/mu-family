@@ -52,7 +52,7 @@ More than three generators per rhythm (currently `genA`, `genB`, `genC`). Useful
 
 ### 🟢 Longer sequences (mu-clid)
 
-Step counts above 64 per ring. The sequencer engine is not the bottleneck — `SequencerEngine` uses `std::vector<bool>` patterns with no hard cap. Only constraint is the UI range in `EuclideanPanel` (1–64), trivially widened.
+Step counts above 64 per ring. The sequencer engine is not the bottleneck — `RhythmSequencer` uses `std::vector<bool>` patterns with no hard cap. Only constraint is the UI range in `EuclideanPanel` (1–64), trivially widened.
 
 ### 🟡 Sample-accurate MIDI timing (mu-Clid MIDI)
 

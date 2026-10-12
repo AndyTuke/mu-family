@@ -196,7 +196,7 @@ RhythmContent::RhythmContent(PluginProcessor& p)
 }
 
 // Wire the shared header bar to this band's rhythm-specific behaviour.
-void RhythmContent::attachHeader(ChannelHeaderBar& bar)
+void RhythmContent::attachHeader(LayerHeaderBar& bar)
 {
     headerBar = &bar;
     bar.setPresetPlaceholder(juce::String::fromUTF8("rhythm preset\xe2\x80\xa6"));
@@ -568,7 +568,7 @@ void RhythmContent::resized()
     using mu_ui::s;
     const int w = getWidth();
 
-    topH    = s(MuLookAndFeel::kChannelTopH);
+    topH    = s(MuLookAndFeel::kCircleSize);
     circleW = s(MuLookAndFeel::kCircleSize);
 
     const int sbH  = s(kSampleBarH);

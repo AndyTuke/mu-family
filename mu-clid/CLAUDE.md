@@ -20,7 +20,7 @@ mu-clid/Source/
 ├── Plugin/           PluginProcessor (+ _APVTS / _Content / _Modulation / _Internal), PluginEditor
 │                     (extends EditorShellBase), HotSwapStager + HotSwapBoundary, StandaloneApp
 ├── Audio/            SampleLibrary + SamplePreview (proc.samples)
-├── Sequencer/        Rhythm, HitGenerator, SequencerEngine, EuclideanGenerator,
+├── Sequencer/        Rhythm, HitGenerator, RhythmSequencer, EuclideanGenerator,
 │                     RhythmManager (proc.rhythms)
 ├── Modulation/       ModulationDestinations (ModDest::kTable), ModulationSnapshot, ModulationSkew
 ├── UI/               Euclidean panels + VoiceSection (Pitch/Filter/Amp
@@ -37,7 +37,7 @@ All mu-Clid code is in namespace `mu_clid` (migrations in `mu_clid::migrate`); o
 
 The editor shell (TransportBar, About, Save, PresetBrowser, MIDI-preset panels, StatusBar, overlay state machine, layout, keybindings) lives in `mu-core/UI/EditorShellBase.h` — `PluginEditor` extends it and supplies the shared sidebar (`LayerSidebar`) + main panel (the shared `LayerPanel` holding `RhythmContent`) + mixer overlay + settings overlay.
 
-**Shared with mu-Clid MIDI.** `Sequencer/Rhythm`, `Sequencer/SequencerEngine`, `Sequencer/RhythmPlayState.h`, `Persistence/RhythmParamTable.h`, `Persistence/PresetHelpers.h`, `UI/EuclideanPanel` and `UI/RhythmCircle` are also compiled into [mu-clid-midi](../mu-clid-midi/CLAUDE.md) (a recorded exception until they move to mu-core). They must not include `Plugin/PluginProcessor.h`; `EuclideanPanel` takes a `ProcessorBase&`, and the live modulation arcs reach it through its `modulationSnapshot` callback.
+**Shared with mu-Clid MIDI.** `Sequencer/Rhythm`, `Sequencer/RhythmSequencer`, `Sequencer/RhythmPlayState.h`, `Persistence/RhythmParamTable.h`, `Persistence/PresetHelpers.h`, `UI/EuclideanPanel` and `UI/RhythmCircle` are also compiled into [mu-clid-midi](../mu-clid-midi/CLAUDE.md) (a recorded exception until they move to mu-core). They must not include `Plugin/PluginProcessor.h`; `EuclideanPanel` takes a `ProcessorBase&`, and the live modulation arcs reach it through its `modulationSnapshot` callback.
 
 ## Design documents
 

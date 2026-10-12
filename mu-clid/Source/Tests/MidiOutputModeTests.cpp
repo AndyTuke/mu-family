@@ -145,7 +145,7 @@ struct MidiOutputModeTests : juce::UnitTest
         beginTest("Every rhythm slot declares the output parameters with the default Sample / C1 / ch 1 / 100 % / 0 %");
         TempStorage storage;
         ExposedMidiOutProcessor p;
-        for (int ri = 0; ri < mu_clid::SequencerEngine::MaxRhythms; ++ri)
+        for (int ri = 0; ri < mu_clid::RhythmSequencer::MaxRhythms; ++ri)
         {
             const auto prefix = "r" + juce::String(ri) + "_";
             for (const char* s : kOutputSuffixes)

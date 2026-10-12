@@ -18,7 +18,7 @@ public:
     ModulatorPanel();
 
     // Bind to a voice slot. Pointer ownership stays with the caller.
-    void setVoiceSlot(Layer* slot);
+    void setLayer(Layer* slot);
     // For products that switch the per-voice insert algorithm dynamically (mu-clid).
     // Products that don't have algo-switching just leave this at 0.
     void setInsertAlgorithm(int driveChar);
@@ -46,7 +46,7 @@ public:
 private:
     bool fillBackground = true;
     bool metal          = false;
-    Layer*             voiceSlot     = nullptr;
+    Layer*             layer         = nullptr;
     const ModDestProvider* destProvider  = nullptr;
 
     SegmentControl tabBar { {"A","B","C","D","E","F","G","H","Matrix"},

@@ -104,7 +104,7 @@ void PluginEditor::engineChanged()
     const int idx = layerPanel.getLayer();
     useDestinationsOf(idx);
     layerPanel.refreshHeader();
-    layerPanel.getModulatorPanel().setVoiceSlot(proc.getLayer(idx));   // rebind: list the new engine's assignments
+    layerPanel.getModulatorPanel().setLayer(proc.getLayer(idx));   // rebind: list the new engine's assignments
 }
 
 void PluginEditor::useDestinationsOf(int idx)

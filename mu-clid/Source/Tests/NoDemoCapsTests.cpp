@@ -54,7 +54,7 @@ public:
         beginTest ("limits: eight layers and 64 steps are the family maximums");
         {
             expectEquals (mu_limits::kMaxLayers, 8);
-            expectEquals ((int) SequencerEngine::MaxRhythms, 8);
+            expectEquals ((int) RhythmSequencer::MaxRhythms, 8);
             expectEquals ((int) HitGenerator::kMaxSteps, 64);
         }
 

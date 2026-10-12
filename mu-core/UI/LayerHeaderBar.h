@@ -10,10 +10,10 @@
 // reset / delete / preset-load / save / rename semantics, so behaviour
 // (hot-swap staging in mu-clid, voice-preset I/O in mu-tant, etc.) stays product
 // side while the look + UX are one shared implementation.
-class ChannelHeaderBar : public juce::Component
+class LayerHeaderBar : public juce::Component
 {
 public:
-    ChannelHeaderBar();
+    LayerHeaderBar();
 
     void setLayerName(const juce::String& n);
     void setColour(juce::Colour c);
@@ -72,5 +72,5 @@ private:
     static constexpr int kDotX       = 10;
     static constexpr int kNameX      = 26;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ChannelHeaderBar)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LayerHeaderBar)
 };

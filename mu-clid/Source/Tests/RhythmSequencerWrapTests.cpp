@@ -6,19 +6,19 @@
 
 using namespace mu_clid;
 
-class SequencerEngineWrapTest : public juce::UnitTest
+class RhythmSequencerWrapTest : public juce::UnitTest
 {
 public:
-    SequencerEngineWrapTest() : juce::UnitTest("Sequencer master-loop wrap", "SequencerEngine") {}
+    RhythmSequencerWrapTest() : juce::UnitTest("Sequencer master-loop wrap", "RhythmSequencer") {}
 
     void runTest() override
     {
         // Beat position of the start of 16th-note step `s`.
-        auto beat = [](int s) { return s * SequencerEngine::StepLengthBeats; };
+        auto beat = [](int s) { return s * RhythmSequencer::StepLengthBeats; };
 
         beginTest("A genuine wrap is reported once");
         {
-            SequencerEngine e;
+            RhythmSequencer e;
             e.addRhythm(Rhythm{});
             e.setMasterLoopSteps(16);
             expect(! e.processBlock(beat(14)).masterLoopWrapped);
@@ -29,7 +29,7 @@ public:
 
         beginTest("Changing the loop length between blocks gives no false wrap");
         {
-            SequencerEngine e;
+            RhythmSequencer e;
             e.addRhythm(Rhythm{});
             e.setMasterLoopSteps(32);
             e.processBlock(beat(20));                        // effective step 20
@@ -41,7 +41,7 @@ public:
 
         beginTest("Setting the same loop length keeps the wrap history");
         {
-            SequencerEngine e;
+            RhythmSequencer e;
             e.addRhythm(Rhythm{});
             e.setMasterLoopSteps(16);
             e.processBlock(beat(15));
@@ -51,7 +51,7 @@ public:
 
         beginTest("A reset request drops the history for the next block only");
         {
-            SequencerEngine e;
+            RhythmSequencer e;
             e.addRhythm(Rhythm{});
             e.setMasterLoopSteps(16);
             e.processBlock(beat(15));
@@ -63,4 +63,4 @@ public:
     }
 };
 
-static SequencerEngineWrapTest sequencerEngineWrapTest;
+static RhythmSequencerWrapTest sequencerEngineWrapTest;

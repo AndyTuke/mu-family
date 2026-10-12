@@ -27,13 +27,13 @@ struct BlockResult
     bool masterLoopWrapped  = false; // master loop counter reset this block
 };
 
-class SequencerEngine : public juce::ChangeBroadcaster
+class RhythmSequencer : public juce::ChangeBroadcaster
 {
 public:
     static constexpr int    MaxRhythms      = mu_limits::kMaxLayers;
     static constexpr double StepLengthBeats = 0.25; // 1/16th note default
 
-    SequencerEngine();
+    RhythmSequencer();
 
     // Rhythm management — call from the message thread only.
     // removeRhythm and swapRhythmSlots write audio-owned per-slot state (phase, step history) under

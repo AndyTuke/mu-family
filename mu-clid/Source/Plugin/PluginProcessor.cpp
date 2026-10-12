@@ -61,7 +61,7 @@ PluginProcessor::PluginProcessor()
 
     // Resolve each rhythm parameter once (its raw value pointer for the drain) and build the sorted
     // suffix table the listener searches, before any listener can fire.
-    for (int ri = 0; ri < SequencerEngine::MaxRhythms; ++ri)
+    for (int ri = 0; ri < RhythmSequencer::MaxRhythms; ++ri)
     {
         const juce::String prefix = "r" + juce::String(ri) + "_";
         for (int i = 0; i < kRhythmParamCount; ++i)
@@ -330,8 +330,8 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
     {
         // A running transport that dips back less than a step is held in place rather than reset; a real
         // backward jump resets the detector so it cannot read as a master-loop wrap and commit a staged
-        // hot-swap early (see SequencerEngine::resolveBlockBeat).
-        const auto resolved = SequencerEngine::resolveBlockBeat(lastBeatPos.load(), beatPos, playing,
+        // hot-swap early (see RhythmSequencer::resolveBlockBeat).
+        const auto resolved = RhythmSequencer::resolveBlockBeat(lastBeatPos.load(), beatPos, playing,
                                                                 sequencerPlaying.load(), sequencer.getMasterLoopSteps());
         beatPos = resolved.beat;
         if (resolved.resetWrap)
@@ -374,7 +374,7 @@ void PluginProcessor::advanceSequencer(int numRhythms, double beatPos, juce::Mid
 
     // Update UI play-state atomics.
     const float frac = static_cast<float>(
-        std::fmod(beatPos / SequencerEngine::StepLengthBeats, 1.0));
+        std::fmod(beatPos / RhythmSequencer::StepLengthBeats, 1.0));
     beatFraction.store(frac);
     for (int r = 0; r < numRhythms; ++r)
     {

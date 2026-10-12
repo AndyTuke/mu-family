@@ -356,7 +356,7 @@ public:
     // a 32 px preset strip, a 464 px product content band, and the 318 px modulator panel.
     static constexpr int kChannelPanelW    = kWindowWidth - kSidebarW;                          // 1088
     static constexpr int kChannelPanelH    = kWindowHeight - kTransportBarH - kStatusBarH;      // 814
-    static constexpr int kLayerHeaderStripH = 32;    // preset strip holding the 28 px ChannelHeaderBar
+    static constexpr int kLayerHeaderStripH = 32;    // preset strip holding the 28 px LayerHeaderBar
     static constexpr int kLayerModulatorH   = 318;   // the shared ModulatorPanel
     static constexpr int kLayerContentH     = kChannelPanelH - kLayerHeaderStripH - kLayerModulatorH;   // 464
     static_assert(kLayerHeaderStripH + kLayerContentH + kLayerModulatorH == kChannelPanelH,
@@ -364,13 +364,11 @@ public:
 
     // mu-Clid's content band: sample bar (the strip height) + circle row + voice band = 464.
     static constexpr int kVoiceSectionH   = 144;
-    static constexpr int kChannelTopH      = kLayerContentH - kLayerHeaderStripH - kVoiceSectionH;   // 288
-    static constexpr int kCircleSize      = kChannelTopH;                                       // square
+    static constexpr int kCircleSize      = kLayerContentH - kLayerHeaderStripH - kVoiceSectionH;   // 288
     static constexpr int kEuclidPanelW    = kChannelPanelW - kCircleSize;                       // 800
-    static constexpr int kEuclidPanelH    = kChannelTopH;                                       // 288
+    static constexpr int kEuclidPanelH    = kCircleSize;                                        // 288
     static constexpr int kVoiceSectionW   = kChannelPanelW;                                     // 1088
     static constexpr int kModulatorPanelW = kChannelPanelW;                                     // 1088
-    static constexpr int kModulatorPanelH = kLayerModulatorH;                                   // 318
 
     // ── Spacing scale ─────────────────────────────────────────────────────
     // Gaps and padding belong to the design system rather than to whichever panel
@@ -404,7 +402,7 @@ public:
     static constexpr int kVoiceInnerW     = kVoiceSectionW  - 2 * kChannelInset;                // 1074
     static constexpr int kVoiceInnerH     = kVoiceSectionH  - 2 * kChannelInset;                // 130
     static constexpr int kModulatorInnerW = kModulatorPanelW - 2 * kChannelInset;               // 1074
-    static constexpr int kModulatorInnerH = kModulatorPanelH - 2 * kChannelInset;               // 304
+    static constexpr int kModulatorInnerH = kLayerModulatorH - 2 * kChannelInset;               // 304
 
     // ── VoiceSection sub-panel widths ─────────────────────────────────────
     // mu-Clid's VoiceSection lays out its own variant (see VoiceSection.h); these are the

@@ -73,7 +73,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     sidebar.onAddLayer = [this]
     {
-        if (proc.getNumRhythms() >= SequencerEngine::MaxRhythms) return;
+        if (proc.getNumRhythms() >= RhythmSequencer::MaxRhythms) return;
         Rhythm r;
         r.name        = ("Rhythm " + juce::String(proc.getNumRhythms() + 1)).toStdString();   // the slot keeps it through the default-rhythm load
         // Pick the first palette index not already used by an existing rhythm.
@@ -122,7 +122,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // refreshed when the shown rhythm's mode changes and, for host automation of any rhythm, below.
     mixerOverlay.isChannelSilent = [this](int r) { return isRhythmMidiOutput(r); };
     rhythmContent.onOutputModeChanged = [this] { if (isMixerVisible()) mixerOverlay.loadFromApvts(); };
-    for (int i = 0; i < SequencerEngine::MaxRhythms; ++i)
+    for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
         proc.apvts.addParameterListener("r" + juce::String(i) + "_outMode", this);
 
     rhythmContent.onRhythmRenamed = [this]
@@ -181,7 +181,7 @@ PluginEditor::~PluginEditor()
     // Clear product-owned processor callbacks before teardown — same UAF
     // contract as the shell base's destructor.
     proc.apvts.removeParameterListener("eff_algo", this);
-    for (int i = 0; i < SequencerEngine::MaxRhythms; ++i)
+    for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
         proc.apvts.removeParameterListener("r" + juce::String(i) + "_outMode", this);
     proc.onLayerPresetCommitted = nullptr;
 }

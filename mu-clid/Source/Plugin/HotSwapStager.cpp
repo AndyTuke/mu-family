@@ -22,13 +22,13 @@ void HotSwapStager::stage(int rhythmIndex, Rhythm&& rhythm,
 
 void HotSwapStager::cancelStagedSwap(int rhythmIndex)
 {
-    if (rhythmIndex < 0 || rhythmIndex >= SequencerEngine::MaxRhythms) return;
+    if (rhythmIndex < 0 || rhythmIndex >= RhythmSequencer::MaxRhythms) return;
     cancelPendingIfAny(rhythmIndex);
 }
 
 bool HotSwapStager::hasPendingSwap(int rhythmIndex) const
 {
-    if (rhythmIndex < 0 || rhythmIndex >= SequencerEngine::MaxRhythms) return false;
+    if (rhythmIndex < 0 || rhythmIndex >= RhythmSequencer::MaxRhythms) return false;
     return stager.hasPending(rhythmIndex);
 }
 
@@ -148,7 +148,7 @@ void HotSwapStager::processSwaps()
     if (anyCleanupNeeded)
     {
         std::array<std::unique_ptr<VoiceEngine>,
-                   SequencerEngine::MaxRhythms * mu_limits::kMaxRetiredVoiceEngines> orphans;
+                   RhythmSequencer::MaxRhythms * mu_limits::kMaxRetiredVoiceEngines> orphans;
         int orphanCount = 0;
         proc.suspendProcessing(true);
         for (int r = 0; r < (int)proc.retiredReadyForCleanup.size(); ++r)
@@ -171,7 +171,7 @@ void HotSwapStager::processSwaps()
     // Two-pass to suspend audio ONCE per call: collect all ready slots, then swap
     // them under one suspend, then do post-commit APVTS push + UI callback outside it.
     const int n = proc.numActiveRhythms.load(std::memory_order_acquire);
-    std::array<int, SequencerEngine::MaxRhythms> readyRhythms {};
+    std::array<int, RhythmSequencer::MaxRhythms> readyRhythms {};
     int readyCount = 0;
     for (int r = 0; r < n; ++r)
         if (stager.isFlagged(r))   // (a swap cancelled after it was flagged is skipped)
@@ -180,11 +180,11 @@ void HotSwapStager::processSwaps()
     if (readyCount > 0)
     {
         // Which slots consume actually applied: a swap cancelled between the scan and here is skipped.
-        std::array<bool, SequencerEngine::MaxRhythms> applied {};
+        std::array<bool, RhythmSequencer::MaxRhythms> applied {};
         // Everything the commit retires or empties lives out here, so its destructors run after the
         // lock and the suspend are released, not inside them.
-        std::array<PendingRhythm, SequencerEngine::MaxRhythms>            spent;
-        std::array<std::unique_ptr<VoiceEngine>, SequencerEngine::MaxRhythms> cutVictims;
+        std::array<PendingRhythm, RhythmSequencer::MaxRhythms>            spent;
+        std::array<std::unique_ptr<VoiceEngine>, RhythmSequencer::MaxRhythms> cutVictims;
         proc.suspendProcessing(true);
         {
             // suspendProcessing alone does not stop an in-flight callback in hosts that ignore it

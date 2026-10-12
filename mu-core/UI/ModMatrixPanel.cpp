@@ -92,13 +92,13 @@ ModMatrixPanel::ModMatrixPanel()
 
     addBtn.onClick = [this]
     {
-        if (!voiceSlot) return;
+        if (!layer) return;
         juce::PopupMenu menu;
         for (int i = 0; i < Layer::MaxControlSequences; ++i)
             menu.addItem(i + 1, "Mod " + juce::String::charToString('A' + i));
         menu.showMenuAsync(juce::PopupMenu::Options{}, [this](int result)
         {
-            if (result < 1 || !voiceSlot) return;
+            if (result < 1 || !layer) return;
             const int csIndex = result - 1;
             ModulationAssignment a;
             a.id            = "cs" + std::to_string(csIndex) + "_assign_" +
@@ -108,10 +108,10 @@ ModMatrixPanel::ModMatrixPanel()
                                   ? destProvider->resolveId(1)
                                   : std::string{};
             a.depth         = 0.0f;
-            if (lockMods(*voiceSlot))
+            if (lockMods(*layer))
             {
-                voiceSlot->modulationMatrix.addAssignment(a);
-                unlockMods(*voiceSlot);
+                layer->modulationMatrix.addAssignment(a);
+                unlockMods(*layer);
             }
             rebuildRows();
             resized();
@@ -121,9 +121,9 @@ ModMatrixPanel::ModMatrixPanel()
     };
 }
 
-void ModMatrixPanel::setVoiceSlot(Layer* slot)
+void ModMatrixPanel::setLayer(Layer* slot)
 {
-    voiceSlot = slot;
+    layer = slot;
     rebuildRows();
     resized();
     repaint();
@@ -204,13 +204,13 @@ void ModMatrixPanel::rebuildRows()
     for (auto& row : matrixRows) removeChildComponent(row.get());
     matrixRows.clear();
     matPage = 0;
-    if (!voiceSlot) return;
+    if (!layer) return;
 
-    for (const auto& a : voiceSlot->modulationMatrix.getAssignments())
+    for (const auto& a : layer->modulationMatrix.getAssignments())
     {
         const int csIndex = csIndexFromSourceId(a.sourceId);
         // A row's source modulator may be Stepped or Smooth; Smooth omits stepped-only dests.
-        const auto& seqs = voiceSlot->controlSequences;
+        const auto& seqs = layer->controlSequences;
         const bool steppedMode = (csIndex >= 0 && csIndex < (int) seqs.size())
                                  ? (seqs[(size_t) csIndex].mode == ControlSequence::Mode::Stepped)
                                  : true;
@@ -222,10 +222,10 @@ void ModMatrixPanel::rebuildRows()
 
         row->onRemove = [this, rowId]
         {
-            if (lockMods(*voiceSlot))
+            if (lockMods(*layer))
             {
-                voiceSlot->modulationMatrix.removeAssignment(rowId);
-                unlockMods(*voiceSlot);
+                layer->modulationMatrix.removeAssignment(rowId);
+                unlockMods(*layer);
             }
             if (onChange) onChange();
             juce::Component::SafePointer<ModMatrixPanel> safe(this);
@@ -237,21 +237,21 @@ void ModMatrixPanel::rebuildRows()
         };
         row->onDestChange = [this, rowId, sourceId](const std::string& dest)
         {
-            if (lockMods(*voiceSlot))
+            if (lockMods(*layer))
             {
                 float d = 0.0f;
                 float c = 0.0f;
-                for (const auto& a2 : voiceSlot->modulationMatrix.getAssignments())
+                for (const auto& a2 : layer->modulationMatrix.getAssignments())
                     if (a2.id == rowId) { d = a2.depth; c = a2.curve; break; }
-                voiceSlot->modulationMatrix.removeAssignment(rowId);
+                layer->modulationMatrix.removeAssignment(rowId);
                 ModulationAssignment na;
                 na.id            = rowId;
                 na.sourceId      = sourceId;
                 na.destinationId = dest;
                 na.depth         = d;
                 na.curve         = c;
-                voiceSlot->modulationMatrix.addAssignment(na);
-                unlockMods(*voiceSlot);
+                layer->modulationMatrix.addAssignment(na);
+                unlockMods(*layer);
             }
             if (onChange) onChange();
             juce::Component::SafePointer<ModMatrixPanel> safe(this);
@@ -263,19 +263,19 @@ void ModMatrixPanel::rebuildRows()
         };
         row->onDepthChange = [this, rowId](float d)
         {
-            if (lockMods(*voiceSlot))
+            if (lockMods(*layer))
             {
-                voiceSlot->modulationMatrix.setDepth(rowId, d);
-                unlockMods(*voiceSlot);
+                layer->modulationMatrix.setDepth(rowId, d);
+                unlockMods(*layer);
             }
             if (onChange) onChange();
         };
         row->onCurveChange = [this, rowId](float c)
         {
-            if (lockMods(*voiceSlot))
+            if (lockMods(*layer))
             {
-                voiceSlot->modulationMatrix.setCurve(rowId, c);
-                unlockMods(*voiceSlot);
+                layer->modulationMatrix.setCurve(rowId, c);
+                unlockMods(*layer);
             }
             if (onChange) onChange();
         };

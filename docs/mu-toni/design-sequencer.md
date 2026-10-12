@@ -577,7 +577,7 @@ Per the family rule "never build a one-off version of a standard control":
 | **Pitch Env Depth** (bipolar) | **`BipolarSliderRow`** | `knobEuclidean` |
 | **Inversion** (bipolar ±n) | **`BipolarSliderRow`** | `knobEuclidean` |
 | Modulator section | `ModulatorPanel` / `ModMatrixPanel` | (shared) |
-| Per-slot header (preset save/load) | `ChannelHeaderBar` | (shared) |
+| Per-slot header (preset save/load) | `LayerHeaderBar` | (shared) |
 | Sidebar (voice select/add/reorder) | `LayerSidebar` (subclass, as mu-tant's `LayerSidebar`) | (shared) |
 
 Layout follows the mu-tant `VoicePanel` band structure: Osc row · Filter+Insert

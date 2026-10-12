@@ -59,7 +59,7 @@ kRhythmTopH    = 288;  // RhythmCircle + EuclideanPanel row height
 kCircleSize    = 288;  // RhythmCircle is square — width = kRhythmTopH
 kVoiceSectionH = 144;  // VoiceSection height
 kPanelPad      = 6;    // inset applied to each panel region
-// kModulatorPanelH = kRhythmPanelH - kRhythmHeaderH - kSampleBarH
+// kLayerModulatorH = kRhythmPanelH - kRhythmHeaderH - kSampleBarH
 //                   - kRhythmTopH  - kVoiceSectionH                // 332
 ```
 
@@ -224,7 +224,7 @@ Row 2 (envelope):          Row 2 (envelope):            Row 2 (envelope):    Row
 - Character = None passes audio through unity.
 - Character switch is message-thread only (same constraint as `EffectSlot::setAlgorithm`).
 
-**Output mode (Sample / MIDI), ruled 2026-10-11.** The earlier idea of a header-bar dropdown is dropped: the header bar is the shared `ChannelHeaderBar` (dot, name, reset, delete, preset, Save), identical in every product, and has no room or place for a product control. The selector lives in mu-Clid's own content band, in the **sample bar** strip (32 px, the first row under the header strip):
+**Output mode (Sample / MIDI), ruled 2026-10-11.** The earlier idea of a header-bar dropdown is dropped: the header bar is the shared `LayerHeaderBar` (dot, name, reset, delete, preset, Save), identical in every product, and has no room or place for a product control. The selector lives in mu-Clid's own content band, in the **sample bar** strip (32 px, the first row under the header strip):
 
 - **Selector:** a `SegmentControl`, `DrawStyle::Lcd`, `ActiveStyle::General`, items **Sample** and **MIDI**, at the right end of the sample bar, **112 px wide** (2 x 56, `RhythmPanel::kOutputSelectorW`) and `kStripDisplayH` (20 px) tall, vertically centred, its right edge `kScrewedPanelInset` (9 px) from the strip end so it clears the corner screw (non-screw style: `kHeaderInsetX`). The sample LCD takes the rest of the strip and stops `kSpaceXS` (4 px) short of the selector. Per rhythm; param `r{N}_outMode` (0 Sample, 1 MIDI), default Sample. Status bar: `Output` / `Sample (plays the loaded sample)` or `MIDI (sends notes, no audio from this rhythm)`.
 - **Sample mode:** unchanged.

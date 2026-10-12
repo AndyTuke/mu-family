@@ -19,7 +19,7 @@ in [../mu-clid/design-hotswap.md](../mu-clid/design-hotswap.md). This doc covers
 | Flavour | Trigger | Boundary | Entry point |
 |---|---|---|---|
 | **Full preset** (`.muTant`) | preset dropdown / MIDI PC ch 9 | **voice 0's** gate-pattern wrap | `PluginProcessor::loadPreset` |
-| **Per-voice** (`.muPattern`) | `ChannelHeaderBar` / MIDI PC ch 1-8 | **that voice's own** gate-pattern wrap | `PluginProcessor::loadLayerPreset` |
+| **Per-voice** (`.muPattern`) | `LayerHeaderBar` / MIDI PC ch 1-8 | **that voice's own** gate-pattern wrap | `PluginProcessor::loadLayerPreset` |
 
 Stopped → applied immediately. Playing → staged + committed at the boundary.
 Same apply code for both triggers (`applyFullPresetTree` / `applyVoicePresetTree`).

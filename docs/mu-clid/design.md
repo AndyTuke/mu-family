@@ -71,7 +71,7 @@ mu-clid/
 
 │ ├── Rhythm.h/.cpp
 
-│ └── SequencerEngine.h/.cpp
+│ └── RhythmSequencer.h/.cpp
 
 ├── Audio/
 
@@ -352,7 +352,7 @@ virtual void process(juce::AudioBuffer\<float\>& buffer) = 0;
                                                  Self-contained --- no        
                                                  cross-rhythm dependencies.   
 
-  SequencerEngine      juce::ChangeBroadcaster   Manages all rhythms. Reads   Moderate --- use
+  RhythmSequencer      juce::ChangeBroadcaster   Manages all rhythms. Reads   Moderate --- use
                                                  DAW position. Calculates     atomic pointer for
                                                  combined hits per block      hot-swap from day
                                                                               one
@@ -1584,7 +1584,7 @@ for that rhythm.
               algorithm, padding,    
               accent                 
 
-  2           DAW sync and step      SequencerEngine, PluginProcessor
+  2           DAW sync and step      RhythmSequencer, PluginProcessor
               triggering             
 
   3           Sample playback engine SamplePlayer, TimeStretcherBase,

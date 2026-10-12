@@ -1,6 +1,6 @@
-#include "ChannelHeaderBar.h"
+#include "LayerHeaderBar.h"
 
-ChannelHeaderBar::ChannelHeaderBar()
+LayerHeaderBar::LayerHeaderBar()
 {
     nameLabel.setJustificationType(juce::Justification::centredLeft);
     nameLabel.setEditable(true, true, false);    // single- or double-click to rename (matches mu-clid)
@@ -26,15 +26,15 @@ ChannelHeaderBar::ChannelHeaderBar()
     addAndMakeVisible(presetDD);
 }
 
-void ChannelHeaderBar::setNoun(const juce::String& n)
+void LayerHeaderBar::setNoun(const juce::String& n)
 {
     noun = n.toLowerCase();
     resetBtn.setTooltip("Reset this " + noun + " to defaults");
     deleteBtn.setTooltip(deleteBtn.isEnabled() ? "Delete this " + noun : "The last " + noun + " cannot be deleted");
 }
 
-void ChannelHeaderBar::setLayerName(const juce::String& n) { nameLabel.setText(n, juce::dontSendNotification); }
-void ChannelHeaderBar::setColour(juce::Colour c)
+void LayerHeaderBar::setLayerName(const juce::String& n) { nameLabel.setText(n, juce::dontSendNotification); }
+void LayerHeaderBar::setColour(juce::Colour c)
 {
     colour = c;
     presetDD.setLcdColour(c);   // the preset selector lights in the layer colour
@@ -42,7 +42,7 @@ void ChannelHeaderBar::setColour(juce::Colour c)
     repaint();
 }
 
-void ChannelHeaderBar::lookAndFeelChanged()
+void LayerHeaderBar::lookAndFeelChanged()
 {
     // Metal: the name is an LCD lit in the layer colour; flat: plain heading text.
     const bool metal = MuLookAndFeel::isMetal(*this);
@@ -53,14 +53,14 @@ void ChannelHeaderBar::lookAndFeelChanged()
     repaint();
 }
 
-void ChannelHeaderBar::setPresetItems(const juce::StringArray& names)
+void LayerHeaderBar::setPresetItems(const juce::StringArray& names)
 {
     presetDD.clear();
     for (int i = 0; i < names.size(); ++i)
         presetDD.addItem(names[i], i + 1);   // 1-based ids
 }
 
-void ChannelHeaderBar::setPresetFiles(const juce::Array<juce::File>& files)
+void LayerHeaderBar::setPresetFiles(const juce::Array<juce::File>& files)
 {
     presetFiles = files;
     juce::StringArray names;
@@ -68,45 +68,45 @@ void ChannelHeaderBar::setPresetFiles(const juce::Array<juce::File>& files)
     setPresetItems(names);
 }
 
-void ChannelHeaderBar::showPresetFile(const juce::File& file)
+void LayerHeaderBar::showPresetFile(const juce::File& file)
 {
     presetDD.setSelectedId(presetFiles.indexOf(file) + 1, false);   // not in the list → 0 = none
 }
 
-void ChannelHeaderBar::setNameEditable(bool editable) { nameLabel.setEditable(editable, editable, false); }
+void LayerHeaderBar::setNameEditable(bool editable) { nameLabel.setEditable(editable, editable, false); }
 
-void ChannelHeaderBar::setSelectedPresetId(int id)             { presetDD.setSelectedId(id, false); }
-void ChannelHeaderBar::setPresetPlaceholder(const juce::String& t) { presetDD.setPlaceholderText(t); }
-void ChannelHeaderBar::setStagingBadge(bool show)             { if (staging != show) { staging = show; repaint(); } }
+void LayerHeaderBar::setSelectedPresetId(int id)             { presetDD.setSelectedId(id, false); }
+void LayerHeaderBar::setPresetPlaceholder(const juce::String& t) { presetDD.setPlaceholderText(t); }
+void LayerHeaderBar::setStagingBadge(bool show)             { if (staging != show) { staging = show; repaint(); } }
 
-void ChannelHeaderBar::setShowReset(bool show)
+void LayerHeaderBar::setShowReset(bool show)
 {
     showReset = show;
     resetBtn.setVisible(show);
     resized();
 }
 
-void ChannelHeaderBar::setShowDelete(bool show)
+void LayerHeaderBar::setShowDelete(bool show)
 {
     showDelete = show;
     deleteBtn.setVisible(show);
     resized();
 }
 
-void ChannelHeaderBar::setDeleteEnabled(bool enabled)
+void LayerHeaderBar::setDeleteEnabled(bool enabled)
 {
     if (deleteBtn.isEnabled() == enabled) return;
     deleteBtn.setEnabled(enabled);
     deleteBtn.setTooltip(enabled ? "Delete this " + noun : "The last " + noun + " cannot be deleted");
 }
 
-void ChannelHeaderBar::commitNameEdit()
+void LayerHeaderBar::commitNameEdit()
 {
     if (nameLabel.getCurrentTextEditor() != nullptr)
         nameLabel.hideEditor(false);   // discardChanges = false → commits the text
 }
 
-void ChannelHeaderBar::resized()
+void LayerHeaderBar::resized()
 {
     using mu_ui::s;
     const int h         = getHeight();
@@ -128,7 +128,7 @@ void ChannelHeaderBar::resized()
     nameLabel.setBounds(s(kNameX), btnY, nameW, btnH);   // same row as the preset selector
 }
 
-void ChannelHeaderBar::paint(juce::Graphics& g)
+void LayerHeaderBar::paint(juce::Graphics& g)
 {
     using Id = MuLookAndFeel::ColourIds;
     using mu_ui::s; using mu_ui::sf;
@@ -157,14 +157,14 @@ void ChannelHeaderBar::paint(juce::Graphics& g)
     }
 }
 
-juce::Rectangle<float> ChannelHeaderBar::nameDisplayBounds() const
+juce::Rectangle<float> LayerHeaderBar::nameDisplayBounds() const
 {
     // Same height and row as the preset selector, so the two displays line up.
     return nameLabel.getBounds().toFloat().withY((float) presetDD.getY())
                                          .withHeight((float) presetDD.getHeight());
 }
 
-void ChannelHeaderBar::paintOverChildren(juce::Graphics& g)
+void LayerHeaderBar::paintOverChildren(juce::Graphics& g)
 {
     if (MuLookAndFeel::isMetal(*this))
         MuLookAndFeel::drawLcdFront(g, nameDisplayBounds());

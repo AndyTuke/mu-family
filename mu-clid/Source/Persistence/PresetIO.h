@@ -66,7 +66,7 @@ public:
     // and from HotSwapStager::processSwaps (playing, at the loop boundary). `prepared`
     // is consumed (voices moved out).
     void commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepared, int originEff = 0,
-                                uint32_t frameEpoch = SequencerEngine::kAnyFrameEpoch);
+                                uint32_t frameEpoch = RhythmSequencer::kAnyFrameEpoch);
 
     // JUCE AudioProcessor state (called from PluginProcessor's overrides).
     void getStateInformation(juce::MemoryBlock& destData);

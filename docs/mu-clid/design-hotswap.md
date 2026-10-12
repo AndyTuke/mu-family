@@ -56,7 +56,7 @@ short `suspendProcessing` window.
 | [mu-clid/Source/Plugin/HotSwapBoundary.h](../../mu-clid/Source/Plugin/HotSwapBoundary.h) | **Pure** loop-boundary predicates (no processor dependency) so the defer decision is unit-testable. |
 | [mu-clid/Source/Persistence/PresetIO.cpp](../../mu-clid/Source/Persistence/PresetIO.cpp) | `stageRhythmPreset`, `loadPreset`, `buildPreparedFullPreset`, `commitStagedFullPreset` — the build + apply bodies. |
 | [mu-clid/Source/Plugin/PluginProcessor.cpp](../../mu-clid/Source/Plugin/PluginProcessor.cpp) | Boundary detection in `advanceSequencer` → `checkBoundaries` → `requestDeferredWork()`; `runDeferredWork` (100 Hz message-thread poll) → `processSwaps`. |
-| [mu-clid/Source/Sequencer/SequencerEngine.h](../../mu-clid/Source/Sequencer/SequencerEngine.h) | Emits `BlockResult { rhythmLoopWrapMask, masterLoopWrapped }` and owns the wrap detector. |
+| [mu-clid/Source/Sequencer/RhythmSequencer.h](../../mu-clid/Source/Sequencer/RhythmSequencer.h) | Emits `BlockResult { rhythmLoopWrapMask, masterLoopWrapped }` and owns the wrap detector. |
 | [mu-core/Audio/MixerEngine.cpp](../../mu-core/Audio/MixerEngine.cpp) | Renders **retired** voice engines (the swap tail) + flags them drained. |
 
 ---
@@ -105,7 +105,7 @@ SwapPoll timer (100 Hz) → runDeferredWork()
 
 ## 5. Boundary detection
 
-`SequencerEngine::processBlock(beatPos)` returns a `BlockResult`:
+`RhythmSequencer::processBlock(beatPos)` returns a `BlockResult`:
 
 - `rhythmLoopWrapMask` — bit *N* set = rhythm *N*'s step index wrapped to 0 this block.
 - `masterLoopWrapped` — the master-loop counter reset this block.

@@ -1,12 +1,12 @@
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
-#include "Sequencer/SequencerEngine.h"
+#include "Sequencer/RhythmSequencer.h"
 
 #include <algorithm>
 #include <cmath>
 
 namespace mu_core {
 
-SequencerEngine::SequencerEngine()
+RhythmSequencer::RhythmSequencer()
 {
     lastStepIndex.fill(-1);
     lastAccentStepIndex.fill(0);
@@ -37,7 +37,7 @@ SequencerEngine::SequencerEngine()
 }
 
 //==============================================================================
-void SequencerEngine::addRhythm(const Rhythm& r)
+void RhythmSequencer::addRhythm(const Rhythm& r)
 {
     if ((int)rhythms.size() >= MaxRhythms) return;
     rhythms.push_back(r);
@@ -51,7 +51,7 @@ void SequencerEngine::addRhythm(const Rhythm& r)
 // Lock contract: the caller holds the processor's rhythmsLock with processing suspended. The audio-owned
 // arrays below are written under patternLock only, which the audio thread merely try-locks, so without
 // that outer exclusion they would race processBlock.
-void SequencerEngine::removeRhythm(int index)
+void RhythmSequencer::removeRhythm(int index)
 {
     if (index < 0 || index >= (int)rhythms.size()) return;
 
@@ -107,19 +107,19 @@ void SequencerEngine::removeRhythm(int index)
     mu_core::spinUnlock(patternLock);
 }
 
-Rhythm& SequencerEngine::getRhythm(int index)
+Rhythm& RhythmSequencer::getRhythm(int index)
 {
     jassert(index >= 0 && index < (int)rhythms.size());
     return rhythms[index];
 }
 
-const Rhythm& SequencerEngine::getRhythm(int index) const
+const Rhythm& RhythmSequencer::getRhythm(int index) const
 {
     jassert(index >= 0 && index < (int)rhythms.size());
     return rhythms[index];
 }
 
-void SequencerEngine::setNumRhythms(int n)
+void RhythmSequencer::setNumRhythms(int n)
 {
     n = juce::jlimit(0, MaxRhythms, n);
     const int current = (int)rhythms.size();
@@ -159,7 +159,7 @@ void SequencerEngine::setNumRhythms(int n)
 }
 
 // Lock contract as removeRhythm: callers hold rhythmsLock with processing suspended.
-void SequencerEngine::swapRhythmSlots(int i, int j)
+void RhythmSequencer::swapRhythmSlots(int i, int j)
 {
     if (i == j) return;
     const int n = (int)rhythms.size();
@@ -195,7 +195,7 @@ void SequencerEngine::swapRhythmSlots(int i, int j)
     mu_core::spinUnlock(patternLock);
 }
 
-void SequencerEngine::rebuildCachedLocked(int index)
+void RhythmSequencer::rebuildCachedLocked(int index)
 {
     // Demo cap: no generator is built with more steps than the cap allows.
     const int cap = stepCap.load(std::memory_order_relaxed);
@@ -208,14 +208,14 @@ void SequencerEngine::rebuildCachedLocked(int index)
     patternUpdated[index]  = true;
 }
 
-void SequencerEngine::updatePattern(int index)
+void RhythmSequencer::updatePattern(int index)
 {
     mu_core::spinLock(patternLock);
     rebuildCachedLocked(index);   // lastStepIndex preserved: processBlock absorbs the current step without firing
     mu_core::spinUnlock(patternLock);
 }
 
-void SequencerEngine::requestSwapStart(int r, int originEff, uint32_t epoch)
+void RhythmSequencer::requestSwapStart(int r, int originEff, uint32_t epoch)
 {
     if (r < 0 || r >= (int) rhythms.size()) return;
 
@@ -227,7 +227,7 @@ void SequencerEngine::requestSwapStart(int r, int originEff, uint32_t epoch)
     mu_core::spinUnlock(patternLock);
 }
 
-bool SequencerEngine::tryUpdatePatternFromModulation(int index, const EuclidOverrides& ov)
+bool RhythmSequencer::tryUpdatePatternFromModulation(int index, const EuclidOverrides& ov)
 {
     // Stage B: audio-thread pattern recompute. Writes directly into safePatterns/
     // safeCPatterns (already reserved to 256 in ctor) — bypasses cachedPatterns so a
@@ -271,7 +271,7 @@ bool SequencerEngine::tryUpdatePatternFromModulation(int index, const EuclidOver
 }
 
 //==============================================================================
-BlockResult SequencerEngine::processBlock(double beatPosition)
+BlockResult RhythmSequencer::processBlock(double beatPosition)
 {
     const int numRhythms = (int)rhythms.size();
     if (numRhythms == 0)

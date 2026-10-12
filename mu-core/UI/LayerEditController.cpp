@@ -72,7 +72,7 @@ void LayerEditController::deleteShownLayer()
     const int idx = panel.getLayer();
 
     // Everything that points into a layer's data is released first (see Hooks::unbindAll).
-    panel.getModulatorPanel().setVoiceSlot(nullptr);
+    panel.getModulatorPanel().setLayer(nullptr);
     if (hooks.unbindAll) hooks.unbindAll();
 
     proc.removeLayer(idx);

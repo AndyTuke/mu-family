@@ -68,7 +68,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     // ── Per-rhythm parameters (one set per rhythm slot) ─────────────────────────────────
     // Rhythms 0..kAutomatedRhythms-1 use full "Rhythm N " names so DAW automation
     // lanes show them clearly. Remaining rhythms use short "RN " names.
-    for (int i = 0; i < SequencerEngine::MaxRhythms; ++i)
+    for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
     {
         const juce::String p = "r" + juce::String(i) + "_";
         const juce::String n = (i < kAutomatedRhythms)
@@ -152,7 +152,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     mu_mixfx::addGlobalFxParams(layout);
 
     // ── Rhythm channel strips (11 × 8 = 88) ──────────────────────────────────
-    for (int i = 0; i < SequencerEngine::MaxRhythms; ++i)
+    for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
     {
         const juce::String c = "ch" + juce::String(i) + "_";
         const juce::String n = (i < kAutomatedRhythms)
@@ -181,7 +181,7 @@ void PluginProcessor::parameterChanged(const juce::String& id, float v)
     const char* raw = id.toRawUTF8();
 
     // Rhythm params: r{0-7}_{suffix}
-    if (raw[0] == 'r' && raw[1] >= '0' && raw[1] < '0' + SequencerEngine::MaxRhythms && raw[2] == '_' && raw[3] != '\0')
+    if (raw[0] == 'r' && raw[1] >= '0' && raw[1] < '0' + RhythmSequencer::MaxRhythms && raw[2] == '_' && raw[3] != '\0')
     {
         markRhythmParamDirty(raw[1] - '0', raw + 3);
         return;
@@ -219,7 +219,7 @@ int PluginProcessor::findRhythmParamIndex(const char* suffix) const noexcept
 // once; elsewhere ask for the message-thread deferred-work pass (one atomic store, no allocation).
 void PluginProcessor::markRhythmParamDirty(int ri, const char* suffix) noexcept
 {
-    if (ri < 0 || ri >= SequencerEngine::MaxRhythms) return;
+    if (ri < 0 || ri >= RhythmSequencer::MaxRhythms) return;
     const int index = findRhythmParamIndex(suffix);
     if (index < 0) return;
 
@@ -234,7 +234,7 @@ void PluginProcessor::markRhythmParamDirty(int ri, const char* suffix) noexcept
 
 void PluginProcessor::servicePendingRhythmParams()
 {
-    for (int ri = 0; ri < SequencerEngine::MaxRhythms; ++ri)
+    for (int ri = 0; ri < RhythmSequencer::MaxRhythms; ++ri)
         if (rhythmHasPending[(size_t) ri].exchange(false, std::memory_order_acq_rel))
             applyPendingRhythmParams(ri);
 }
@@ -292,7 +292,7 @@ void PluginProcessor::applyPendingRhythmParams(int ri)
 // default voice params.
 void PluginProcessor::forceSyncRhythmFromApvts(int ri)
 {
-    if (ri < 0 || ri >= SequencerEngine::MaxRhythms) return;
+    if (ri < 0 || ri >= RhythmSequencer::MaxRhythms) return;
     if (ri >= sequencer.getNumRhythms()) return;
 
     Rhythm& r = sequencer.getRhythm(ri);
@@ -352,7 +352,7 @@ void PluginProcessor::pushRhythmToApvts(int ri)
 
 void PluginProcessor::pushMixerChannelToApvts(int idx)
 {
-    if (idx < 0 || idx >= SequencerEngine::MaxRhythms) return;
+    if (idx < 0 || idx >= RhythmSequencer::MaxRhythms) return;
     const auto& ch = mixerEngine.channels[idx];
     const juce::String px = "ch" + juce::String(idx) + "_";
 

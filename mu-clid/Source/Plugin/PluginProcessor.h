@@ -154,12 +154,12 @@ public:
     void loadDefaultPreset() override            { presetIO.loadDefaultPreset(); }
 
 
-    SequencerEngine sequencer;
+    RhythmSequencer sequencer;
     // Fixed-size arrays so the audio thread never races with a vector reallocation
     // caused by RhythmManager add / remove on the message thread.  numActiveRhythms is
     // the authoritative count; processBlock reads it atomically once per block.
-    std::array<std::unique_ptr<VoiceEngine>, SequencerEngine::MaxRhythms> voiceEngines;
-    std::array<MidiOutputEngine,             SequencerEngine::MaxRhythms> midiEngines;
+    std::array<std::unique_ptr<VoiceEngine>, RhythmSequencer::MaxRhythms> voiceEngines;
+    std::array<MidiOutputEngine,             RhythmSequencer::MaxRhythms> midiEngines;
     std::atomic<int> numActiveRhythms { 0 };
 
     // Note-offs owed by MIDI-mode slots that were torn down inside their 20 ms hold. Written only
@@ -188,13 +188,13 @@ public:
     // suspendProcessing and destroys the engine off the RT thread.
     static constexpr int kMaxRetiredEngines = mu_limits::kMaxRetiredVoiceEngines;
     std::array<std::array<std::unique_ptr<VoiceEngine>, kMaxRetiredEngines>,
-               SequencerEngine::MaxRhythms> retiredVoiceEngines;
+               RhythmSequencer::MaxRhythms> retiredVoiceEngines;
     std::array<std::array<std::atomic<bool>, kMaxRetiredEngines>,
-               SequencerEngine::MaxRhythms> retiredReadyForCleanup;
+               RhythmSequencer::MaxRhythms> retiredReadyForCleanup;
 
     // Play-state atomics: written by audio thread, read by UI at 30 Hz.
     using RhythmPlayState = mu_clid::RhythmPlayState;
-    std::array<RhythmPlayState, SequencerEngine::MaxRhythms> rhythmPlayState;
+    std::array<RhythmPlayState, RhythmSequencer::MaxRhythms> rhythmPlayState;
     std::atomic<float>  beatFraction     { 0.0f }; // fractional position within the current 1/16 step
     std::atomic<bool>   sequencerPlaying { false };
     std::atomic<double> lastBeatPos      { 0.0 };  // most recent beat position (for UI playhead)
@@ -248,7 +248,7 @@ public:
     }
 
 private:
-    std::array<std::atomic<float>, kSnapCount> modSnapshot[SequencerEngine::MaxRhythms];
+    std::array<std::atomic<float>, kSnapCount> modSnapshot[RhythmSequencer::MaxRhythms];
 
     std::atomic<int> swapModeAtomic { 0 }; // 0 = OnMasterLoop, 1 = OnRhythmLoop; read by HotSwapStager
 
@@ -362,16 +362,16 @@ private:
     // (Stage B) and the UI live-arc indicator (Stage C). Values are integer-rounded so
     // change-detection skips no-op recomputes. Struct definitions live in Rhythm.h /
     // HitGenerator.h so Sequencer-layer code can reuse them.
-    std::array<EuclidOverrides, SequencerEngine::MaxRhythms> lastEuclidOverrides;
+    std::array<EuclidOverrides, RhythmSequencer::MaxRhythms> lastEuclidOverrides;
     // Previous block's overrides per rhythm — Stage B compares against this to skip
     // pattern recomputes when nothing crossed an integer boundary.
-    std::array<EuclidOverrides, SequencerEngine::MaxRhythms> prevEuclidOverrides;
+    std::array<EuclidOverrides, RhythmSequencer::MaxRhythms> prevEuclidOverrides;
     // tracks whether the rhythm's modulation matrix had any assignments LAST block.
     // The modulation pass is gated on (matrix non-empty || transition-to-empty), so we
     // skip the seed + matrix.process + write-back work for never-modulated rhythms but
     // still run one final reset pass after assignment removal to flush lastEuclidOverrides
     // back to base values, which Stage B then picks up via change-detection.
-    std::array<bool, SequencerEngine::MaxRhythms> prevMatrixHadAssignments {};
+    std::array<bool, RhythmSequencer::MaxRhythms> prevMatrixHadAssignments {};
 
     void parameterChanged(const juce::String& parameterID, float newValue) override;
 
@@ -392,12 +392,12 @@ private:
     void applyPendingRhythmParams(int ri);        // message thread: one rhythm
     void dropPendingRhythmParams(int ri) noexcept;
 
-    std::array<std::array<std::atomic<bool>, kRhythmParamCount>, SequencerEngine::MaxRhythms> pendingDirty {};
-    std::array<std::atomic<bool>, SequencerEngine::MaxRhythms> rhythmHasPending {};
+    std::array<std::array<std::atomic<bool>, kRhythmParamCount>, RhythmSequencer::MaxRhythms> pendingDirty {};
+    std::array<std::atomic<bool>, RhythmSequencer::MaxRhythms> rhythmHasPending {};
 
     // Per (rhythm, kRhythmParamDefs entry), the parameter's raw value (null if it has none); resolved
     // once in the constructor so the drain does no lookup by id.
-    std::array<std::array<std::atomic<float>*, kRhythmParamCount>, SequencerEngine::MaxRhythms> rawParams {};
+    std::array<std::array<std::atomic<float>*, kRhythmParamCount>, RhythmSequencer::MaxRhythms> rawParams {};
 
     // Suffix to index in kRhythmParamDefs, sorted by suffix, for the listener's lookup by binary
     // search (no String, no allocation). Built in the constructor and never changed.

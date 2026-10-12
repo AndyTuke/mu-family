@@ -12,7 +12,7 @@ class PluginProcessor;
 // user's primary sample-library folder. Owned by PluginProcessor as `samples`.
 //
 // Threading: everything here is message-thread except mixPreviewInto (audio thread).
-// Path slots are indexed by rhythm and stay sized to SequencerEngine::MaxRhythms.
+// Path slots are indexed by rhythm and stay sized to RhythmSequencer::MaxRhythms.
 class SampleLibrary
 {
 public:

@@ -97,7 +97,7 @@ void MidiRhythmCore::advanceSequencer(bool playing, double beatPos, juce::MidiBu
         }
 
         // Phase 2: publish the play position for the editor's circle.
-        beatFraction.store(static_cast<float>(std::fmod(beatPos / SequencerEngine::StepLengthBeats, 1.0)));
+        beatFraction.store(static_cast<float>(std::fmod(beatPos / RhythmSequencer::StepLengthBeats, 1.0)));
         rhythmPlayState.currentStep  .store(sequencer.getLastStepIndex(0));
         rhythmPlayState.currentStepC .store(sequencer.getLastAccentStepIndex(0));
         rhythmPlayState.patternLength.store(sequencer.getPatternLength(0));

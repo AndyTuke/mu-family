@@ -23,7 +23,7 @@ LayerPanel::LayerPanel(ProcessorBase& processor, const juce::String& layerNoun)
 LayerPanel::~LayerPanel()
 {
     stopTimer();
-    modulatorPanel.setVoiceSlot(nullptr);   // the layer can outlive the panel
+    modulatorPanel.setLayer(nullptr);   // the layer can outlive the panel
 }
 
 void LayerPanel::setContent(juce::Component* c)
@@ -46,7 +46,7 @@ void LayerPanel::setLayer(int idx)
     header.commitNameEdit();   // a rename in progress belongs to the layer being left
     currentLayer = juce::jmax(0, idx);
 
-    modulatorPanel.setVoiceSlot(proc.getLayer(currentLayer));
+    modulatorPanel.setLayer(proc.getLayer(currentLayer));
     refreshHeader();
     refreshPresetList();
     if (onLayerChanged) onLayerChanged(currentLayer);

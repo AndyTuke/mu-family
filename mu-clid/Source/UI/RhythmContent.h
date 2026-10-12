@@ -3,7 +3,7 @@
 #include "EuclidPanelAliases.h"
 #include "VoiceSection.h"
 #include "MidiOutSection.h"
-#include "UI/ChannelHeaderBar.h"
+#include "UI/LayerHeaderBar.h"
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/SegmentControl.h"
 #include "UI/Components/MuLookAndFeel.h"
@@ -32,7 +32,7 @@ public:
 
     // Wire the shared header bar's rhythm-specific behaviour (rename, preset list / load / save,
     // reset, delete). The LayerPanel owns the bar; this band only supplies what the buttons do.
-    void attachHeader(ChannelHeaderBar& bar);
+    void attachHeader(LayerHeaderBar& bar);
 
     // Ask the owner to rebind the whole layer (header, modulators, this band) after a reset or load.
     std::function<void(int)> requestRebind;
@@ -93,7 +93,7 @@ private:
     SegmentControl  outputCtrl { { "Sample", "MIDI" }, SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Lcd };
 
     // The LayerPanel's header bar (attachHeader); `rhythmPresetDropdown()` is the bar's dropdown.
-    ChannelHeaderBar* headerBar = nullptr;
+    LayerHeaderBar* headerBar = nullptr;
     DropdownSelect&   rhythmPresetDropdown() { return headerBar->getPresetDropdown(); }
     juce::File lastBrowseDir;
     SaveDialog          saveDialog;   // mu-core: the shared save card
@@ -106,7 +106,7 @@ private:
     static constexpr int kHeaderInsetX = 4;
     static constexpr int kSampleBarH   = MuLookAndFeel::kLayerHeaderStripH;   // the same strip as the header, so the sample LCD reads like the preset display
     static constexpr int kVoiceH       = 144;
-    static_assert(kSampleBarH + MuLookAndFeel::kChannelTopH + kVoiceH == MuLookAndFeel::kLayerContentH,
+    static_assert(kSampleBarH + MuLookAndFeel::kCircleSize + kVoiceH == MuLookAndFeel::kLayerContentH,
                   "sample bar + circle + voice band must tile the layer content band");
     static constexpr int kPanelPad     = MuLookAndFeel::kPanelPad;
     static constexpr int kModeSelectorW = 80;

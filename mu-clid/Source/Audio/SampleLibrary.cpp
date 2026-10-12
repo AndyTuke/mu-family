@@ -6,7 +6,7 @@ namespace mu_clid {
 SampleLibrary::SampleLibrary(PluginProcessor& p) : proc(p)
 {
     // One path slot per possible rhythm, so index writes never grow the array.
-    for (int i = 0; i < SequencerEngine::MaxRhythms; ++i)
+    for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
         samplePaths.add(juce::String());
 }
 

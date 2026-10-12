@@ -1,13 +1,13 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Plugin/ProcessorBase.h"
-#include "UI/ChannelHeaderBar.h"
+#include "UI/LayerHeaderBar.h"
 #include "UI/ModulatorPanel.h"
 #include "UI/Components/MuLookAndFeel.h"
 
 // Shared per-layer panel for every mu-product: the main area to the right of the LayerSidebar.
 // Three bands, top to bottom (design-ui-family §5 "Per-layer panel stack"):
-//   header strip   kLayerHeaderStripH  the shared ChannelHeaderBar on its own metal strip
+//   header strip   kLayerHeaderStripH  the shared LayerHeaderBar on its own metal strip
 //   content        kLayerContentH      the product's sound / sequencer panels (setContent)
 //   modulators     the rest           the shared ModulatorPanel, bound to the shown layer
 // The shell owns the preset wiring (reset / load / save through the processor's layer-preset
@@ -57,7 +57,7 @@ public:
     // Re-read the name, colour and preset selection (after a preset load that changed them).
     void refreshHeader();
 
-    ChannelHeaderBar& getHeader() noexcept          { return header; }
+    LayerHeaderBar& getHeader() noexcept          { return header; }
     ModulatorPanel&   getModulatorPanel() noexcept  { return modulatorPanel; }
 
     std::function<void(int)> onLayerChanged;   // the shown layer changed: rebind the content
@@ -75,7 +75,7 @@ private:
     juce::String   noun;
     int currentLayer = 0;
 
-    ChannelHeaderBar header;
+    LayerHeaderBar header;
     ModulatorPanel   modulatorPanel;
     juce::Component* content = nullptr;
     std::function<double()> beatSource;

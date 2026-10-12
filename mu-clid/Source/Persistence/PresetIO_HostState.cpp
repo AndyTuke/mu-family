@@ -79,7 +79,7 @@ void PresetIO::restoreSession(const juce::ValueTree& root)
 
 void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
 {
-    int n = juce::jlimit(1, SequencerEngine::MaxRhythms,
+    int n = juce::jlimit(1, RhythmSequencer::MaxRhythms,
                          (int)state.getProperty("numRhythms", 1));
 
     // Guard the live-state mutation below (sequencer resize, voiceEngine
@@ -94,7 +94,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     const juce::ScopedLock sl(proc.rhythmsLock);
 
     // Expand to MaxRhythms so parameterChanged can write to all 8 rhythm slots.
-    proc.sequencer.setNumRhythms(SequencerEngine::MaxRhythms);
+    proc.sequencer.setNumRhythms(RhythmSequencer::MaxRhythms);
 
     // migrate legacy state in-place before pushing it into APVTS so the
     // new 0..10 s ADSR ranges don't clamp old 0..100 values to absurd attacks.
