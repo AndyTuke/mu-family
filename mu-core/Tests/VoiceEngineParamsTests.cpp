@@ -116,6 +116,51 @@ struct VoiceEngineParamsTests : juce::UnitTest
             expect(maxMs < 15.0, "an audio block waited for the lock: " + juce::String(maxMs, 3) + " ms");
             expectEquals(ve.getAppliedParams().filterCutoff, 1000.0f + (float) kSets);
         }
+
+        beginTest("setParams on other threads racing process() with no hold: the last value written always lands");
+        {
+            // Unhindered writers against a free-running audio loop, many rounds, so the try-lock miss and the
+            // flag re-raise happen at random points. After the writers stop one more block must apply the last value.
+            for (int round = 0; round < 40; ++round)
+            {
+                VoiceEngine ve;
+                ve.prepareToPlay(48000.0, kBlock);
+                juce::AudioBuffer<float> block(2, kBlock);
+                block.clear();
+
+                constexpr int kWrites = 2000;
+                std::atomic<bool> go { false };
+                std::atomic<int> writersDone { 0 };
+                auto writer = [&](float base)
+                {
+                    while (! go.load()) std::this_thread::yield();
+                    for (int i = 1; i <= kWrites; ++i)
+                    {
+                        VoiceParams p; p.filterCutoff = base + (float) i;
+                        ve.setParams(p);
+                    }
+                    writersDone.fetch_add(1);
+                };
+
+                // One writer in even rounds, two in odd rounds (then either writer's final value may win).
+                const int numWriters = 1 + (round & 1);
+                std::thread w1(writer, 1000.0f);
+                std::thread w2;
+                if (numWriters == 2) w2 = std::thread(writer, 5000.0f);
+                go.store(true);
+                while (writersDone.load() < numWriters)
+                    ve.process(block, kBlock);
+                w1.join();
+                if (w2.joinable()) w2.join();
+                ve.process(block, kBlock);
+
+                const float got = ve.getAppliedParams().filterCutoff;
+                const float lastA = 1000.0f + (float) kWrites, lastB = 5000.0f + (float) kWrites;
+                const bool ok = numWriters == 1 ? got == lastA : (got == lastA || got == lastB);
+                if (! ok) { expect(false, "round " + juce::String(round) + ": applied " + juce::String(got) + " is not a final written value"); break; }
+            }
+            expect(true);
+        }
     }
 };
 
