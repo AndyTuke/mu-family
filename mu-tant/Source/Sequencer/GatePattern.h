@@ -142,7 +142,8 @@ public:
     // to guard against a concurrent GatingDesigner edit on the source pattern
     // (e.g. user drawing on voice N while voice N is being removed). GatePattern
     // can't be copy/move-assigned directly because of the embedded std::atomic
-    // editLock.
+    // editLock. Reached only through Pattern's copy (structural edits move whole Patterns by
+    // pointer, so no live code path copies one); the levels and cache are written inside the lock.
     bool copyDataFrom(const GatePattern& other) noexcept
     {
         if (this == &other) return true;
@@ -162,12 +163,13 @@ public:
         patternLengthBars.store(other.patternLengthBars.load());
         envelopes         = other.envelopes;
         hasEnvelopes.store(!envelopes.empty(), std::memory_order_relaxed);
-        mu_core::spinUnlock(editLock);
-        mu_core::spinUnlock(other.editLock);
-
+        // The slew levels and the gate cache are audio-thread state; writing them inside the lock
+        // keeps them out of the audio thread's gate pass, which only runs while it holds editLock.
         gateLevel   = 0.0f;
         filterLevel = 1.0f;
         resetGateCache();
+        mu_core::spinUnlock(editLock);
+        mu_core::spinUnlock(other.editLock);
         return true;
     }
 
@@ -188,12 +190,27 @@ public:
         envelopes.swap(fresh.envelopes);
         hasEnvelopes.store(!envelopes.empty(), std::memory_order_relaxed);
         fresh.hasEnvelopes.store(!fresh.envelopes.empty(), std::memory_order_relaxed);
+        gateLevel   = 0.0f;       // audio-thread state, written inside the lock (see copyDataFrom)
+        filterLevel = 1.0f;
+        resetGateCache();
         mu_core::spinUnlock(editLock);
+        return true;
+    }
 
+    // Fallback for a reset when adoptDataFrom could not take editLock (it stayed busy): clears the
+    // envelopes in place and takes the grid and length of `defaults`, without the lock. Allocates and
+    // frees nothing (clear() keeps the buffer). Only for a caller that already excludes the audio
+    // thread (the processor's layers lock with processing suspended), so the only thing it can race
+    // with is a stale edit that is itself being discarded.
+    void resetInPlaceTo(const GatePattern& defaults) noexcept
+    {
+        envelopes.clear();
+        subdivision = defaults.subdivision;
+        patternLengthBars.store(defaults.patternLengthBars.load());
+        hasEnvelopes.store(false, std::memory_order_relaxed);
         gateLevel   = 0.0f;
         filterLevel = 1.0f;
         resetGateCache();
-        return true;
     }
 
     // Spin-lock guarding envelope mutation (UI thread) vs gate reads (audio

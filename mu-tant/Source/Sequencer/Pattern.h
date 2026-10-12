@@ -57,11 +57,11 @@ struct Pattern : Layer
         Layer::adoptDefaults(fresh);
         jassert(dynamic_cast<Pattern*>(&fresh) != nullptr);
         auto& f = static_cast<Pattern&>(fresh);
-        // A skipped exchange (the envelope's lock stayed busy) would leave stale data.
-        [[maybe_unused]] const bool adopted = gate.adoptDataFrom(f.gate)
-                                            & filterGate.adoptDataFrom(f.filterGate)
-                                            & pitchGate.adoptDataFrom(f.pitchGate);
-        jassert(adopted);
+        // adoptDataFrom skips the exchange when the envelope's lock stays busy; the reset must still
+        // empty the envelopes, so that one falls back to clearing in place (the audio is excluded).
+        if (! gate.adoptDataFrom(f.gate))             gate.resetInPlaceTo(f.gate);
+        if (! filterGate.adoptDataFrom(f.filterGate)) filterGate.resetInPlaceTo(f.filterGate);
+        if (! pitchGate.adoptDataFrom(f.pitchGate))   pitchGate.resetInPlaceTo(f.pitchGate);
         osc1UserPath.swapWith(f.osc1UserPath);
         osc2UserPath.swapWith(f.osc2UserPath);
         osc1UserIndex.store(f.osc1UserIndex.load());

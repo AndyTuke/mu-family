@@ -3,7 +3,9 @@
 
 #include <juce_core/juce_core.h>
 #include "Sequencer/Pattern.h"
+#include <atomic>
 #include <memory>
+#include <thread>
 
 class PatternTest : public juce::UnitTest
 {
@@ -113,6 +115,40 @@ public:
                    && fresh->pitchGate.envelopes.data() == pitchBuf,
                    "the envelope buffers should move to the discarded default, not be copied");
             expect(fresh->osc1UserPath.getCharPointer() == pathBuf, "the path string should move, not be copied");
+        }
+
+        beginTest("a reset empties the envelopes even when an envelope's edit lock stays busy");
+        {
+            Pattern live;
+            live.gate.addEnvelope({ 0, 3, 0.0f, 0.0f, 0.0f, false });
+            live.filterGate.addEnvelope({ 1, 2, 0.0f, 0.0f, 0.0f, false });
+            live.pitchGate.addEnvelope({ 2, 1, 0.0f, 0.0f, 0.0f, false });
+            live.gate.subdivision = GatePattern::Subdivision::ThirtySecond;
+            live.gate.gateLevel   = 0.7f;
+
+            // A helper thread holds the gate's lock for the whole reset, as an edit that never ends would.
+            std::atomic<bool> held { false }, release { false };
+            std::thread editor([&]
+            {
+                while (! mu_core::spinLockFor(live.gate.editLock, 1000)) {}
+                held.store(true);
+                while (! release.load()) std::this_thread::yield();
+                mu_core::spinUnlock(live.gate.editLock);
+            });
+            while (! held.load()) std::this_thread::yield();
+
+            auto fresh = std::make_unique<Pattern>();
+            live.adoptDefaults(*fresh);   // what resetLayer calls, with the audio excluded
+
+            release.store(true);
+            editor.join();
+
+            expect(live.gate.envelopes.empty() && live.filterGate.envelopes.empty() && live.pitchGate.envelopes.empty(),
+                   "every envelope should be cleared, including the one whose lock was busy");
+            expect(! live.gate.hasEnvelopes.load(), "the lock-free flag must follow the clear");
+            expect(live.gate.subdivision == GatePattern::Subdivision::Sixteenth, "the grid should be the default");
+            expectEquals(live.gate.gateLevel, 0.0f);
+            expect(! live.gate.editLock.load(), "the fallback must not leave the lock taken");
         }
 
         beginTest("copyDataFrom holds the destination's lock and skips the copy when it stays busy");

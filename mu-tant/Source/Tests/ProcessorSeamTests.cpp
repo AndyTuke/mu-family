@@ -5,8 +5,10 @@
 #include "Plugin/PluginProcessor.h"
 #include "Tests/ProcessorSeamHelpers.h"
 
+#include <atomic>
 #include <random>
 #include <set>
+#include <thread>
 
 // The product class names its editor in a virtual, defined in PluginEditor.cpp, which this headless
 // target does not link (see "Headless product processors" in design-plugin-family.md). No test opens
@@ -186,6 +188,7 @@ struct MuTantProcessorSeamTests : juce::UnitTest
         constructsAndRendersUnderTempRoot();
         resetLayerEqualsFresh();
         resetLayerFromSecondThread();
+        resetLayerWithBusyEnvelopeLock();
         layerEditInFlightSkipsRender();
         structuralEditsVersusProcessBlock();
         wavetableImportVersusProcessBlock();
@@ -295,6 +298,33 @@ struct MuTantProcessorSeamTests : juce::UnitTest
             expect(! renderer.sawInsaneOutput(), "block size " + juce::String(n) + ": output stayed finite and bounded");
             expectEquals(p.numLayers.load(), 1);
         }
+    }
+
+    void resetLayerWithBusyEnvelopeLock()
+    {
+        beginTest("resetLayer empties the envelopes even while a helper thread holds the gate's edit lock");
+        TempStorage storage;
+        ExposedPluginProcessor p;
+        p.prepareToPlay(48000.0, 256);
+        auto& pat = p.getPattern(0);
+        pat.gate.addEnvelope({ 0, 4, 0.0f, 0.0f, 0.0f, false });
+        pat.filterGate.addEnvelope({ 0, 4, 0.0f, 0.0f, 0.0f, false });
+
+        std::atomic<bool> held { false }, release { false };
+        std::thread editor([&]
+        {
+            while (! mu_core::spinLockFor(pat.gate.editLock, 1000)) {}
+            held.store(true);
+            while (! release.load()) std::this_thread::yield();
+            mu_core::spinUnlock(pat.gate.editLock);
+        });
+        while (! held.load()) std::this_thread::yield();
+        p.resetLayer(0);
+        release.store(true);
+        editor.join();
+
+        expect(pat.gate.envelopes.empty() && pat.filterGate.envelopes.empty(), "the reset left stale envelopes behind");
+        expect(! pat.gate.hasEnvelopes.load(), "the lock-free flag must be cleared");
     }
 
     void layerEditInFlightSkipsRender()
