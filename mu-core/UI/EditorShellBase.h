@@ -99,11 +99,9 @@ public:
     void parentHierarchyChanged() override;
 
     // Preset-dirty tracking — set whenever the APVTS tree changes; cleared
-    // by the product after a successful load / save / new.
-    // Atomic because JUCE can invoke ValueTree listeners on the audio thread
-    // (DAW automation writes APVTS on the audio thread); read on message thread.
-    bool isPresetDirty() const noexcept { return presetDirty.load(std::memory_order_relaxed); }
-    void clearPresetDirty() noexcept   { presetDirty.store(false, std::memory_order_relaxed); }
+    // by the chrome after a successful load / save / new, or by the product.
+    bool isPresetDirty() const noexcept { return chrome.isDirty(); }
+    void clearPresetDirty() noexcept   { chrome.clearDirty(); }
 
     // ─── Product hooks (override to refresh product-specific UI) ─────────────
     // Fired after a preset is loaded from the browser, transport dropdown, or
@@ -147,30 +145,15 @@ protected:
     void refreshSupportAffordances();
     void maybeShowSupportPromptOnStart();
 
-    bool isStandalone   = false;
-    bool needsFocusGrab = false;
-    std::atomic<bool> presetDirty { false };
-    std::function<void()> pendingQuitCallback;
-    juce::KeyPress keybindPlayStop { juce::KeyPress::spaceKey };
-    void loadKeybindings();
-
-    // juce::ValueTree::Listener — tracks preset-dirty state.
-    void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override { presetDirty.store(true, std::memory_order_relaxed); }
-    void valueTreeChildAdded    (juce::ValueTree&, juce::ValueTree&)          override { presetDirty.store(true, std::memory_order_relaxed); }
-    void valueTreeChildRemoved  (juce::ValueTree&, juce::ValueTree&, int)     override { presetDirty.store(true, std::memory_order_relaxed); }
+    // juce::ValueTree::Listener — feeds the chrome's preset-dirty flag. JUCE can invoke these on
+    // the audio thread (DAW automation writes APVTS there); the flag is atomic.
+    void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override { chrome.markDirty(); }
+    void valueTreeChildAdded    (juce::ValueTree&, juce::ValueTree&)          override { chrome.markDirty(); }
+    void valueTreeChildRemoved  (juce::ValueTree&, juce::ValueTree&, int)     override { chrome.markDirty(); }
 
 private:
     // The constructor in parts.
-    void wireTransportBar();
+    void wirePresetHooks();
     void wireOverlays();
     void setupBanners();
-    void fillSaveDialog();
-    void loadPresetFromUi(const juce::File& f);
-
-    // Internal: actually run the save against the processor + refresh chrome.
-    void doSavePreset(const juce::String& name, const juce::String& desc,
-                      const juce::String& category, bool embedSamples);
-    void doNewPreset();
-    // The full-preset file the processor writes for `name` (shared name-cleaning rule).
-    juce::File fullPresetFileFor(const juce::String& name) const;
 };

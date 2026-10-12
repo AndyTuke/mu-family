@@ -62,6 +62,22 @@ struct TestShellBackend : mu_core::ShellBackend
     juce::File   getPresetsDir() const override { return presetsDir; }
     juce::String getFullPresetExtension() const override { return presetExt; }
     bool         hasPendingFullPreset() const override { return pendingFull; }
+
+    // Presets: every operation is recorded so a test can check the order and the arguments.
+    juce::StringArray categories;
+    juce::File        defaultPreset, contentDir;
+    juce::StringArray log;                 // "load:<file name>", "save:<name>", "ensure:<category>"
+    juce::File        lastLoaded;
+    void              loadPreset(const juce::File& f) override { lastLoaded = f; log.add("load:" + f.getFileName()); }
+    void              savePreset(const juce::String& name, const juce::String&, const juce::String&, bool) override
+    {
+        log.add("save:" + name);
+        presetsDir.getChildFile(name + "." + presetExt).replaceWithText("<Preset/>");
+    }
+    juce::StringArray loadCategoryList() const override { return categories; }
+    void              ensureCategoryInList(const juce::String& c) override { log.add("ensure:" + c); }
+    juce::File        getDefaultPresetFile() const override { return defaultPreset; }
+    juce::File        getContentDir() const override { return contentDir; }
 };
 
 // A bare backend that overrides none of the defaulted members, to prove their "no host" defaults.

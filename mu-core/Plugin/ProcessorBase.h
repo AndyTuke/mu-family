@@ -209,16 +209,16 @@ public:
     // the product overrides them (mu-Clid's PresetIO).
     // Full presets live in <content dir>/Presets in every product.
     juce::File                 getPresetsDir()                                     const override;
-    virtual void               loadPreset(const juce::File& file);
-    virtual void               savePreset(const juce::String& name,
+    void                       loadPreset(const juce::File& file) override;
+    void                       savePreset(const juce::String& name,
                                            const juce::String& desc,
                                            const juce::String& cat,
-                                           bool embedSamples);
-    virtual juce::StringArray  loadCategoryList()                                  const;
+                                           bool embedSamples) override;
+    juce::StringArray          loadCategoryList()                                  const override;
     virtual const char*        getFullPresetTag()                                  const { return nullptr; }
     virtual juce::ValueTree    captureFullPreset()                                       { return apvts.copyState(); }
     virtual void               useLoadedFullPreset(juce::ValueTree /*state*/)            {}
-    virtual void               ensureCategoryInList(const juce::String& /*cat*/)         {}
+    void                       ensureCategoryInList(const juce::String& /*cat*/)         override {}
     bool                       hasPendingFullPreset()                              const override { return layerSwapper.hasFullPending(); }
     // Write the current state as a full preset at exactly `file` (headless render --save-preset).
     // Default: the standard wrapped preset; false (after onLoadError) when it can't be written.
@@ -233,7 +233,7 @@ public:
     // product calls loadStartupDefault() at the end of its constructor so a saved default is
     // restored on launch (a host session restore then replaces it). Render mode sets
     // skipAutoLoadDefault first so headless renders start from the factory state.
-    juce::File         getDefaultPresetFile() const;
+    juce::File         getDefaultPresetFile() const override;
     virtual void       loadDefaultPreset();
     void               loadStartupDefault() { if (! skipAutoLoadDefault) loadDefaultPreset(); }
     inline static bool skipAutoLoadDefault = false;
@@ -263,7 +263,7 @@ public:
     // Content directory — where preset / sample-library / keybindings folders live:
     // Documents/TDP/<appName> (the name given to initAppSettings), or a folder the user
     // picked (saved as "contentDir"). Invalid before initAppSettings; the shell tolerates that.
-    virtual juce::File getContentDir() const;
+    juce::File getContentDir() const override;
 
     // Tests only (message thread): while one is alive, initAppSettings puts the settings file and the
     // *_midiControl.json map under <root>/settings/ and getContentDir() defaults to

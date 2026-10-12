@@ -2,11 +2,9 @@
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Voice/InsertSubsection.h"
 #include "UI/ParamKnobGrid.h"
-#include "BuildNumber.h"        // BUILD_NUMBER — local version for the upgrade check
-#include "UI/ConfirmDialog.h"   // shared themed confirm/prompt dialogs (mu_ui::confirmAsync)
 #include "UI/StandardSettingsOverlay.h" // wires its program-change buttons
 #include "UI/MixerOverlay.h"            // forwards its status messages
-#include "Persistence/PresetFiles.h" // mu_pp::safePresetFileName (the processors' name rule), readPresetMeta
+#include "UI/ModalDialog.h"             // the support prompt
 
 EditorShellBase::EditorShellBase(ProcessorBase& proc)
     : AudioProcessorEditor(&proc),
@@ -28,67 +26,29 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
     chrome.addExtraScreen(midiPresetsOverlay,     mu_ui::ShellChrome::ExtraKind::Page,  &statusBar);
     chrome.addExtraScreen(midiFullPresetsOverlay, mu_ui::ShellChrome::ExtraKind::Page,  &statusBar);
 
-    wireTransportBar();
+    wirePresetHooks();
     wireOverlays();
     setupBanners();
     chrome.applyWindowSize();
 
-    isStandalone = processorRef.wrapperType == juce::AudioProcessor::wrapperType_Standalone;
-    loadKeybindings();
-    if (isStandalone)
-    {
-        setWantsKeyboardFocus(true);
-        addKeyListener(this);
-        needsFocusGrab = true;
-    }
-
     processorRef.apvts.state.addListener(this);
-    presetDirty = false;
+    chrome.clearDirty();
 
     chrome.startVersionCheck();
 }
 
-// A full preset chosen in the transport selector or the preset browser: load it and show it.
-void EditorShellBase::loadPresetFromUi(const juce::File& f)
+// The product's reactions to the chrome's preset flow, fired at the moments the chrome reaches them.
+void EditorShellBase::wirePresetHooks()
 {
-    processorRef.loadPreset(f);
-    transportBar.setLoadedPreset(f);
-    presetDirty = false;
-    onPresetLoaded(f);
+    chrome.onPresetLoaded        = [this](const juce::File& f) { onPresetLoaded(f); };
+    chrome.onPresetSaved         = [this](const juce::File& f) { onPresetSaved(f); };
+    chrome.onPresetNew           = [this] { onPresetNew(); };
+    chrome.getProductCategories  = [this] { return getProductKnownCategories(); };
+    chrome.onCategoriesRefreshed = [this](const juce::StringArray& merged) { onCategoriesRefreshed(merged); };
 }
 
-// Transport bar: mixer / settings / about toggles, preset select / save / new, status.
-void EditorShellBase::wireTransportBar()
-{
-    // ── TransportBar callbacks (mixer / settings / about / status are the chrome's) ──
-    transportBar.onPresetSelected = [this](const juce::File& f) { loadPresetFromUi(f); };
-
-    transportBar.onSavePreset = [this]
-    {
-        showSaveDialog(true);
-    };
-
-    transportBar.onNewPreset = [this]
-    {
-        if (presetDirty)
-        {
-            juce::Component::SafePointer<EditorShellBase> safeThis(this);
-            mu_ui::confirmAsync(this, "New Preset", "Discard unsaved changes?", "Discard",
-                [safeThis] { if (safeThis) safeThis->doNewPreset(); });
-            return;
-        }
-        doNewPreset();
-    };
-
-    processorRef.onSaveAndQuit = [this](std::function<void()> quitCallback)
-    {
-        pendingQuitCallback = std::move(quitCallback);
-        showSaveDialog(true);
-    };
-}
-
-// The overlays (About, Activation, Save, preset browser, MIDI panels) and the processor's
-// load-error / swap-committed notifications.
+// The overlays only a processor-backed editor has (About's support state, Activation, the MIDI
+// program-change tables) and the settings page links to them.
 void EditorShellBase::wireOverlays()
 {
     // ── About panel ─────────────────────────────────────────────────────────
@@ -113,41 +73,7 @@ void EditorShellBase::wireOverlays()
         repaint();
     };
 
-    // ── Save dialog ─────────────────────────────────────────────────────────
-    saveDialog.onSave = [this](const juce::String& name,
-                               const juce::String& desc,
-                               const juce::String& category,
-                               bool embedSamples)
-    {
-        // "Save as Default" — overwrite _default unconditionally.
-        if (saveDialog.isSaveAsDefault())
-        {
-            doSavePreset("_default", desc, category, embedSamples);
-            return;
-        }
-
-        const juce::File destFile = fullPresetFileFor(name);
-
-        if (destFile.existsAsFile())
-        {
-            juce::Component::SafePointer<EditorShellBase> safeThis(this);
-            mu_ui::confirmAsync(this, "Overwrite Preset", "Overwrite \"" + name + "\"?", "Overwrite",
-                [safeThis, n = name, d = desc, c = category, e = embedSamples]
-                { if (safeThis) safeThis->doSavePreset(n, d, c, e); });
-            return;
-        }
-        doSavePreset(name, desc, category, embedSamples);
-    };
-    saveDialog.onCancel = [this]
-    {
-        pendingQuitCallback = nullptr;
-        showSaveDialog(false);
-    };
-
-    // ── Preset browser ──────────────────────────────────────────────────────
-    chrome.onSaveDialogOpening = [this] { fillSaveDialog(); };
-    presetBrowser.onLoadPreset = [this](const juce::File& f) { loadPresetFromUi(f); };
-
+    // The Save card, the preset browser and the processor's load / swap notifications are the chrome's.
     midiPresetsOverlay.onClose     = [this] { showMidiPresets(false);     showSettings(true); };
     midiFullPresetsOverlay.onClose = [this] { showMidiFullPresets(false); showSettings(true); };
 
@@ -170,13 +96,9 @@ EditorShellBase::~EditorShellBase()
     // Clear every processor callback before teardown — processor outlives the
     // editor in DAW close-window-keep-plugin scenarios; any deferred invocation
     // into a destroyed editor is a UAF. All lambdas captured raw [this]. (The chrome clears
-    // the ones it owns, and releases the look and feel, in its own destructor.)
+    // the ones it owns, removes its key listener and releases the look and feel in its own
+    // destructor.)
     processorRef.apvts.state.removeListener(this);
-    processorRef.onPresetSwapCommitted = nullptr;
-    processorRef.onSaveAndQuit         = nullptr;
-
-    if (isStandalone)
-        removeKeyListener(this);
 }
 
 void EditorShellBase::setMainArea(juce::Component* newSidebar, juce::Component* newMainPanel)
@@ -252,59 +174,19 @@ void EditorShellBase::setSettingsOverlay(juce::Component* overlay)
     }
 }
 
-void EditorShellBase::loadKeybindings()
+bool EditorShellBase::keyPressed(const juce::KeyPress& key, juce::Component* originator)
 {
-    const juce::File bindingsFile = processorRef.getContentDir().getChildFile("keybindings.json");
-
-    if (!bindingsFile.existsAsFile())
-    {
-        // Try to seed defaults — only possible if the content dir exists.
-        if (bindingsFile.getParentDirectory().exists())
-            bindingsFile.replaceWithText("{\n  \"play_stop\": \"space\"\n}\n");
-        return;
-    }
-
-    const auto json = juce::JSON::parse(bindingsFile.loadFileAsString());
-    if (auto* obj = json.getDynamicObject())
-    {
-        auto parseKey = [](const juce::String& s) -> juce::KeyPress
-        {
-            if (s.equalsIgnoreCase("space"))   return juce::KeyPress(juce::KeyPress::spaceKey);
-            if (s.equalsIgnoreCase("return"))  return juce::KeyPress(juce::KeyPress::returnKey);
-            if (s.equalsIgnoreCase("escape"))  return juce::KeyPress(juce::KeyPress::escapeKey);
-            if (s.length() == 1)               return juce::KeyPress((int)s[0]);
-            return {};
-        };
-
-        if (obj->hasProperty("play_stop"))
-            keybindPlayStop = parseKey(obj->getProperty("play_stop").toString());
-    }
+    return chrome.keyPressed(key, originator);
 }
 
-bool EditorShellBase::keyPressed(const juce::KeyPress& key, juce::Component*)
+bool EditorShellBase::keyStateChanged(bool isKeyDown, juce::Component* originator)
 {
-    // Don't intercept when a text editor has focus — it needs the key for input.
-    auto* focused = juce::Component::getCurrentlyFocusedComponent();
-    if (dynamic_cast<juce::TextEditor*>(focused)) return false;
-
-    if (key == keybindPlayStop)
-    {
-        processorRef.toggleInternalPlay();
-        return true;
-    }
-    return false;
+    return chrome.keyStateChanged(isKeyDown, originator);
 }
-
-bool EditorShellBase::keyStateChanged(bool, juce::Component*) { return false; }
 
 void EditorShellBase::parentHierarchyChanged()
 {
-    // Grab focus once on first show so Space works from launch without needing a mouse click.
-    if (needsFocusGrab && isShowing())
-    {
-        needsFocusGrab = false;
-        grabKeyboardFocus();
-    }
+    chrome.parentHierarchyChanged();
 
     // Offer the support prompt once the editor is first on screen.
     if (! supportPromptChecked && isShowing())
@@ -403,75 +285,6 @@ void EditorShellBase::showPresetBrowser(bool show) { chrome.showPresetBrowser(sh
 void EditorShellBase::showSettings(bool show)      { chrome.showSettings(show); }
 void EditorShellBase::showMidiPresets(bool show)   { chrome.showExtraScreen(midiPresetsOverlay, show); }
 void EditorShellBase::showMidiFullPresets(bool show) { chrome.showExtraScreen(midiFullPresetsOverlay, show); }
-
-// Fills the save card as it opens: the known categories (browser + shared list + product panels)
-// and the name / category / embed of the currently loaded preset.
-void EditorShellBase::fillSaveDialog()
-{
-    presetBrowser.refresh(processorRef.getPresetsDir());
-    // Merge categories from the browser + shared category list + product panels.
-    juce::StringArray merged = presetBrowser.getCategories();
-    for (const auto& c : processorRef.loadCategoryList())
-        if (!merged.contains(c, false)) merged.add(c);
-    for (const auto& c : getProductKnownCategories())
-        if (!merged.contains(c, false)) merged.add(c);
-    merged.sort(false);
-    saveDialog.setKnownCategories(merged);
-    onCategoriesRefreshed(merged);
-
-    // Pre-fill name, category, and embed from the currently loaded preset.
-    const juce::File loaded = transportBar.getLoadedPresetFile();
-    if (loaded.existsAsFile())
-    {
-        saveDialog.setDefaultName(loaded.getFileNameWithoutExtension());
-        const auto meta = mu_pp::readPresetMeta(loaded);
-        saveDialog.setDefaultCategory(meta.category);
-        saveDialog.setDefaultEmbed   (meta.embedSamples);
-    }
-}
-
-juce::File EditorShellBase::fullPresetFileFor(const juce::String& name) const
-{
-    return processorRef.getPresetsDir().getChildFile(mu_pp::safePresetFileName(name, "Preset")
-                                                     + "." + processorRef.getFullPresetExtension());
-}
-
-void EditorShellBase::doSavePreset(const juce::String& name, const juce::String& desc,
-                                   const juce::String& category, bool embedSamples)
-{
-    processorRef.savePreset(name, desc, category, embedSamples);
-    processorRef.ensureCategoryInList(category);
-    transportBar.refreshPresets();
-    const juce::File saved = fullPresetFileFor(name);
-    transportBar.setLoadedPreset(saved);
-    presetDirty = false;
-    onCategoriesRefreshed(processorRef.loadCategoryList());
-    onPresetSaved(saved);
-    showSaveDialog(false);
-    if (pendingQuitCallback)
-    {
-        auto cb = std::move(pendingQuitCallback);
-        pendingQuitCallback = nullptr;
-        cb();
-    }
-}
-
-void EditorShellBase::doNewPreset()
-{
-    const juce::File defaultFile = processorRef.getDefaultPresetFile();
-    if (!defaultFile.existsAsFile())
-    {
-        statusBar.showParam("New", "No default preset saved \xe2\x80\x94 use Save \xe2\x86\x92 Save as Default first",
-                            MuLookAndFeel::colour(MuLookAndFeel::knobLevel));
-        onPresetNew();
-        return;
-    }
-    processorRef.loadPreset(defaultFile);
-    transportBar.setLoadedPreset({});
-    presetDirty = false;
-    onPresetLoaded(defaultFile);
-    onPresetNew();
-}
 
 void EditorShellBase::paint(juce::Graphics& g)
 {

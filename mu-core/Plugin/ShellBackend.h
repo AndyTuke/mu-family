@@ -81,6 +81,20 @@ public:
     // True while a full preset is staged for the next loop point.
     virtual bool         hasPendingFullPreset()   const { return false; }
 
+    // What the shell's Load / Save / New flow drives. loadPreset reports failures through
+    // onLoadError; savePreset writes <presets dir>/<name>.<extension>; the category list is the
+    // shared one the Save card offers; the default preset is the file "Save as Default" writes
+    // and "New" restores.
+    virtual void              loadPreset(const juce::File& file) = 0;
+    virtual void              savePreset(const juce::String& name, const juce::String& desc,
+                                         const juce::String& category, bool embedSamples) = 0;
+    virtual juce::StringArray loadCategoryList() const = 0;
+    virtual void              ensureCategoryInList(const juce::String& category) = 0;
+    virtual juce::File        getDefaultPresetFile() const = 0;
+
+    // Where the app keeps its presets, samples and keybindings.json.
+    virtual juce::File        getContentDir() const = 0;
+
     // ─── Shell callbacks (message thread, set by the shell) ──────────────────
     // The shell MUST clear these in its destructor: the backend can outlive it, and a deferred
     // call into a destroyed shell is a use-after-free.

@@ -1,6 +1,8 @@
 #include "ShellChrome.h"
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/SettingsOverlayBase.h"
+#include "UI/ConfirmDialog.h"           // shared themed confirm dialogs (mu_ui::confirmAsync)
+#include "Persistence/PresetFiles.h"    // mu_pp::safePresetFileName, readPresetMeta
 #include "BuildNumber.h"        // BUILD_NUMBER, MU_VERSION_STRING: local version for the upgrade check
 
 namespace mu_ui
@@ -21,14 +23,19 @@ ShellChrome::ShellChrome(juce::Component& hostComponent, mu_core::ShellBackend& 
       tooltipWindow(&hostComponent, 700)
 {
     wireBuiltIns();
+    wirePresetFlow();
+    installKeys();
 }
 
 ShellChrome::~ShellChrome()
 {
     // The backend can outlive the host (a DAW closes the window and keeps the plugin), so no
     // callback into this object may survive it.
-    backend.onLoadError      = nullptr;
-    backend.onUiScaleChanged = nullptr;
+    backend.onLoadError           = nullptr;
+    backend.onUiScaleChanged      = nullptr;
+    backend.onSaveAndQuit         = nullptr;
+    backend.onPresetSwapCommitted = nullptr;
+    host.removeKeyListener(this);
     host.setLookAndFeel(nullptr);
 }
 
@@ -373,10 +380,221 @@ void ShellChrome::showAbout(bool show)
 void ShellChrome::showSaveDialog(bool show)
 {
     saveVisible = show;
-    if (show && onSaveDialogOpening)
-        onSaveDialogOpening();
+    if (show)
+        fillSaveDialog();
     saveDialog.setVisible(show);
     saveDialog.toFront(false);
+}
+
+// ─── Preset flow ─────────────────────────────────────────────────────────────
+
+// Transport selector, Save card, browser and the backend's deferred-swap / save-and-quit calls.
+void ShellChrome::wirePresetFlow()
+{
+    transportBar.onPresetSelected = [this](const juce::File& f) { loadPresetFromUi(f); };
+    transportBar.onSavePreset     = [this] { showSaveDialog(true); };
+
+    transportBar.onNewPreset = [this]
+    {
+        if (isDirty())
+        {
+            juce::WeakReference<ShellChrome> safeThis(this);
+            mu_ui::confirmAsync(&host, "New Preset", "Discard unsaved changes?", "Discard",
+                [safeThis] { if (safeThis != nullptr) safeThis->doNewPreset(); });
+            return;
+        }
+        doNewPreset();
+    };
+
+    backend.onSaveAndQuit = [this](std::function<void()> quitCallback)
+    {
+        pendingQuitCallback = std::move(quitCallback);
+        showSaveDialog(true);
+    };
+
+    saveDialog.onSave = [this](const juce::String& name,
+                               const juce::String& desc,
+                               const juce::String& category,
+                               bool embedSamples)
+    {
+        // "Save as Default": overwrite _default unconditionally.
+        if (saveDialog.isSaveAsDefault())
+        {
+            doSavePreset("_default", desc, category, embedSamples);
+            return;
+        }
+
+        if (fullPresetFileFor(name).existsAsFile())
+        {
+            juce::WeakReference<ShellChrome> safeThis(this);
+            mu_ui::confirmAsync(&host, "Overwrite Preset", "Overwrite \"" + name + "\"?", "Overwrite",
+                [safeThis, n = name, d = desc, c = category, e = embedSamples]
+                { if (safeThis != nullptr) safeThis->doSavePreset(n, d, c, e); });
+            return;
+        }
+        doSavePreset(name, desc, category, embedSamples);
+    };
+    saveDialog.onCancel = [this]
+    {
+        pendingQuitCallback = nullptr;
+        showSaveDialog(false);
+    };
+
+    presetBrowser.onLoadPreset = [this](const juce::File& f) { loadPresetFromUi(f); };
+
+    // Deferred full-preset swaps commit at the loop boundary: tell the host once they land.
+    backend.onPresetSwapCommitted = [this]
+    {
+        if (onPresetLoaded) onPresetLoaded(transportBar.getLoadedPresetFile());
+    };
+}
+
+// Fills the Save card as it opens: the known categories (browser + shared list + host panels)
+// and the name / category / embed of the currently loaded preset.
+void ShellChrome::fillSaveDialog()
+{
+    presetBrowser.refresh(backend.getPresetsDir());
+    juce::StringArray merged = presetBrowser.getCategories();
+    for (const auto& c : backend.loadCategoryList())
+        if (! merged.contains(c, false)) merged.add(c);
+    if (getProductCategories)
+        for (const auto& c : getProductCategories())
+            if (! merged.contains(c, false)) merged.add(c);
+    merged.sort(false);
+    saveDialog.setKnownCategories(merged);
+    if (onCategoriesRefreshed) onCategoriesRefreshed(merged);
+
+    // Pre-fill name, category, and embed from the currently loaded preset.
+    const juce::File loaded = transportBar.getLoadedPresetFile();
+    if (loaded.existsAsFile())
+    {
+        saveDialog.setDefaultName(loaded.getFileNameWithoutExtension());
+        const auto meta = mu_pp::readPresetMeta(loaded);
+        saveDialog.setDefaultCategory(meta.category);
+        saveDialog.setDefaultEmbed   (meta.embedSamples);
+    }
+}
+
+// A full preset chosen in the transport selector or the preset browser: load it and show it.
+void ShellChrome::loadPresetFromUi(const juce::File& f)
+{
+    backend.loadPreset(f);
+    transportBar.setLoadedPreset(f);
+    clearDirty();
+    if (onPresetLoaded) onPresetLoaded(f);
+}
+
+// The full-preset file the backend writes for `name` (shared name-cleaning rule).
+juce::File ShellChrome::fullPresetFileFor(const juce::String& name) const
+{
+    return backend.getPresetsDir().getChildFile(mu_pp::safePresetFileName(name, "Preset")
+                                                + "." + backend.getFullPresetExtension());
+}
+
+void ShellChrome::doSavePreset(const juce::String& name, const juce::String& desc,
+                               const juce::String& category, bool embedSamples)
+{
+    backend.savePreset(name, desc, category, embedSamples);
+    backend.ensureCategoryInList(category);
+    transportBar.refreshPresets();
+    const juce::File saved = fullPresetFileFor(name);
+    transportBar.setLoadedPreset(saved);
+    clearDirty();
+    if (onCategoriesRefreshed) onCategoriesRefreshed(backend.loadCategoryList());
+    if (onPresetSaved) onPresetSaved(saved);
+    showSaveDialog(false);
+    if (pendingQuitCallback)
+    {
+        auto cb = std::move(pendingQuitCallback);
+        pendingQuitCallback = nullptr;
+        cb();
+    }
+}
+
+void ShellChrome::doNewPreset()
+{
+    const juce::File defaultFile = backend.getDefaultPresetFile();
+    if (! defaultFile.existsAsFile())
+    {
+        statusBar.showParam("New", "No default preset saved \xe2\x80\x94 use Save \xe2\x86\x92 Save as Default first",
+                            MuLookAndFeel::colour(MuLookAndFeel::knobLevel));
+        if (onPresetNew) onPresetNew();
+        return;
+    }
+    backend.loadPreset(defaultFile);
+    transportBar.setLoadedPreset({});
+    clearDirty();
+    if (onPresetLoaded) onPresetLoaded(defaultFile);
+    if (onPresetNew) onPresetNew();
+}
+
+// ─── Keys ────────────────────────────────────────────────────────────────────
+
+// Standalone: the play / stop key works from launch (the host grabs focus when first shown).
+void ShellChrome::installKeys()
+{
+    loadKeybindings();
+    if (backend.isStandaloneApp())
+    {
+        host.setWantsKeyboardFocus(true);
+        host.addKeyListener(this);
+        needsFocusGrab = true;
+    }
+}
+
+void ShellChrome::loadKeybindings()
+{
+    const juce::File bindingsFile = backend.getContentDir().getChildFile("keybindings.json");
+
+    if (! bindingsFile.existsAsFile())
+    {
+        // Try to seed defaults, only possible if the content dir exists.
+        if (bindingsFile.getParentDirectory().exists())
+            bindingsFile.replaceWithText("{\n  \"play_stop\": \"space\"\n}\n");
+        return;
+    }
+
+    const auto json = juce::JSON::parse(bindingsFile.loadFileAsString());
+    if (auto* obj = json.getDynamicObject())
+    {
+        auto parseKey = [](const juce::String& s) -> juce::KeyPress
+        {
+            if (s.equalsIgnoreCase("space"))   return juce::KeyPress(juce::KeyPress::spaceKey);
+            if (s.equalsIgnoreCase("return"))  return juce::KeyPress(juce::KeyPress::returnKey);
+            if (s.equalsIgnoreCase("escape"))  return juce::KeyPress(juce::KeyPress::escapeKey);
+            if (s.length() == 1)               return juce::KeyPress((int) s[0]);
+            return {};
+        };
+
+        if (obj->hasProperty("play_stop"))
+            keybindPlayStop = parseKey(obj->getProperty("play_stop").toString());
+    }
+}
+
+bool ShellChrome::keyPressed(const juce::KeyPress& key, juce::Component*)
+{
+    // Don't intercept when a text editor has focus: it needs the key for input.
+    auto* focused = juce::Component::getCurrentlyFocusedComponent();
+    if (dynamic_cast<juce::TextEditor*>(focused)) return false;
+
+    if (key == keybindPlayStop)
+    {
+        backend.toggleInternalPlay();
+        return true;
+    }
+    return false;
+}
+
+bool ShellChrome::keyStateChanged(bool, juce::Component*) { return false; }
+
+void ShellChrome::parentHierarchyChanged()
+{
+    // Grab focus once on first show so the play key works from launch without a mouse click.
+    if (needsFocusGrab && host.isShowing())
+    {
+        needsFocusGrab = false;
+        host.grabKeyboardFocus();
+    }
 }
 
 void ShellChrome::showPresetBrowser(bool show)

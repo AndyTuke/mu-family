@@ -24,9 +24,13 @@ namespace mu_ui
 // version check. EditorShellBase (a plugin editor) and an app window both use it; it never
 // includes a processor header.
 //
-// The host forwards its resized() to resized() and decides what else it needs (its own overlays
-// are registered with addExtraScreen so they join the state machine and the layout).
-class ShellChrome : private juce::MouseListener
+// It also runs the preset flow (load, save with an overwrite confirm, new with a discard confirm,
+// the dirty flag) over the backend, and the play / stop key. The host forwards its resized() and
+// parentHierarchyChanged() and decides what else it needs (its own overlays are registered with
+// addExtraScreen so they join the state machine and the layout; its preset reactions are the
+// on...() hooks below).
+class ShellChrome : private juce::MouseListener,
+                    public juce::KeyListener
 {
 public:
     ShellChrome(juce::Component& hostComponent, mu_core::ShellBackend& shellBackend);
@@ -77,10 +81,32 @@ public:
     // True while any overlay (built-in or extra) is up.
     bool anyOverlayVisible() const noexcept;
 
-    // Called just before the About panel / Save dialog is made visible, so the host can fill them
-    // (support state, category list).
+    // Called just before the About panel is made visible, so the host can fill it (support state).
     std::function<void()> onAboutOpening;
-    std::function<void()> onSaveDialogOpening;
+
+    // ─── Preset flow ─────────────────────────────────────────────────────────
+    // Set whenever the preset's state changes (the host's listener calls markDirty); cleared by
+    // a load, save or New. Atomic: a host may flag it from the audio thread (DAW automation).
+    void markDirty() noexcept       { presetDirty.store(true,  std::memory_order_relaxed); }
+    void clearDirty() noexcept      { presetDirty.store(false, std::memory_order_relaxed); }
+    bool isDirty() const noexcept   { return presetDirty.load(std::memory_order_relaxed); }
+
+    // The host's reactions, fired at the moment each step completes: after a preset is loaded
+    // (browser, transport dropdown, New's default restore, a staged swap landing), after a
+    // successful save, and when New was chosen. getProductCategories adds the host's own
+    // categories to the Save card; onCategoriesRefreshed hands back the merged list.
+    std::function<void(const juce::File&)>        onPresetLoaded;
+    std::function<void(const juce::File&)>        onPresetSaved;
+    std::function<void()>                         onPresetNew;
+    std::function<juce::StringArray()>            getProductCategories;
+    std::function<void(const juce::StringArray&)> onCategoriesRefreshed;
+
+    // ─── Keys ────────────────────────────────────────────────────────────────
+    // Standalone only: the play / stop key (space unless keybindings.json says otherwise).
+    // The host forwards parentHierarchyChanged() so the first show grabs keyboard focus.
+    bool keyPressed(const juce::KeyPress& key, juce::Component* originator) override;
+    bool keyStateChanged(bool isKeyDown, juce::Component* originator) override;
+    void parentHierarchyChanged();
 
     // ─── Look ────────────────────────────────────────────────────────────────
     // The family's metal look; `appAccent` is the product's colour (transparent keeps globalAccent).
@@ -153,6 +179,20 @@ private:
     static constexpr const char* kDownloadUrl = "https://transwarp.me/download";
 
     void wireBuiltIns();
+    void wirePresetFlow();
+    void installKeys();
+    void fillSaveDialog();
+    void loadPresetFromUi(const juce::File& f);
+    void doSavePreset(const juce::String& name, const juce::String& desc,
+                      const juce::String& category, bool embedSamples);
+    void doNewPreset();
+    juce::File fullPresetFileFor(const juce::String& name) const;
+    void loadKeybindings();
+
+    std::atomic<bool> presetDirty { false };
+    std::function<void()> pendingQuitCallback;   // set by a save-and-quit request, run after the save
+    bool needsFocusGrab = false;
+    juce::KeyPress keybindPlayStop { juce::KeyPress::spaceKey };
 };
 
 } // namespace mu_ui
