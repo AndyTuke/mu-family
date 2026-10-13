@@ -75,7 +75,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     }
 
     // ── Shared global FX rack + returns + master (mu-core) ────────────────────
-    mu_mixfx::addGlobalFxParams(layout);
+    mu_mixfx::addGlobalFxParams(layout, 2);   // no loop of its own: swaps land on the bar
 
     return layout;
 }

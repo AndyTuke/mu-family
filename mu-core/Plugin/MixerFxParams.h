@@ -14,7 +14,9 @@
 // The matching engine sync is ProcessorBase::syncGlobalFxParam().
 namespace mu_mixfx {
 
-inline void addGlobalFxParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout)
+// `swapTimingDefault` is the product's hot-swap timing (mu_hotswap::SwapTiming as an int): OnMasterLoop (0)
+// for the looping products, OnBar (2) for those with no loop of their own.
+inline void addGlobalFxParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int swapTimingDefault = 0)
 {
     auto addF = [&](const juce::String& id, const juce::String& name, float mn, float mx, float def)
     { layout.add(std::make_unique<juce::AudioParameterFloat>(id, name, juce::NormalisableRange<float>(mn, mx), def)); };
@@ -97,6 +99,9 @@ inline void addGlobalFxParams(juce::AudioProcessorValueTreeState::ParameterLayou
     // ── Master + master inserts ───────────────────────────────────────────────
     addF("mstr_lvl",    "Master Level",     0.0f,    1.0f,     1.0f);
     addF3("mstr_pan",   "Master Pan",      -1.0f,    1.0f,     0.0f);
+    // Where a staged preset swap lands (mu_hotswap::SwapTiming; the order is saved data, append only).
+    layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID { "mstr_swap", 1 }, "Swap Timing",
+                   juce::StringArray { "On master loop", "On layer loop", "On bar" }, swapTimingDefault));
     addI("mst_insChar", "Mst Insert Algo", 0, mu_audio::kInsertAlgorithmCount - 1, 0);
     addF("mst_insP1",   "Mst Insert P1",   0.0f, 1.0f, 0.0f);
     addF("mst_insP2",   "Mst Insert P2",   0.0f, 1.0f, 0.0f);

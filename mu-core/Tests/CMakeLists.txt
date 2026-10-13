@@ -36,6 +36,7 @@ target_sources(mu-core-tests PRIVATE
     UIScalingConsistencyTests.cpp
     MidiFullPresetMapTests.cpp
     PerformanceFileTests.cpp
+    SwapTimingTests.cpp
     LegacyPrefixTests.cpp
     SegmentControlTests.cpp
     TransportBarTests.cpp

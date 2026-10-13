@@ -39,6 +39,50 @@ inline bool boundaryReached(bool playing, bool wasPlaying,
     return false;
 }
 
+// ── Per-preset swap timing (one family setting, saved with the preset) ─────────────────────────
+// WHERE a staged swap lands. The integers are saved data (the `mstr_swap` choice index): append only.
+//   OnMasterLoop  the master loop point (falls back to the layer's own loop when no master loop is set)
+//   OnLayerLoop   the layer's own loop wrap
+//   OnBar         the 4/4 bar line (kBarBeats), for an app with no loop of its own
+// "Layer" is the neutral word for a rhythm / voice / pattern.
+enum class SwapTiming : int { OnMasterLoop = 0, OnLayerLoop = 1, OnBar = 2 };
+inline constexpr int kNumSwapTimings = 3;
+
+// A saved or host-supplied index as a SwapTiming; anything out of range reads as OnMasterLoop.
+inline SwapTiming swapTimingFromIndex(int index) noexcept
+{
+    return (index >= 0 && index < kNumSwapTimings) ? static_cast<SwapTiming>(index) : SwapTiming::OnMasterLoop;
+}
+
+// True when a layer's swap waits on the master loop point: the setting is OnMasterLoop AND a master
+// loop is actually set. With no master loop (free-running) there is no master wrap to wait for, so the
+// swap uses the layer's own loop instead.
+inline bool usesMasterLoop(SwapTiming timing, bool hasMasterLoop) noexcept
+{
+    return timing == SwapTiming::OnMasterLoop && hasMasterLoop;
+}
+
+// A per-layer staged swap. OnBar defers to the bar line; otherwise the master loop point when
+// usesMasterLoop(), else this layer's own loop wrap (bit `layerIndex` of the mask). `barWrapped` is
+// loopWrapped(oldPos, newPos, kBarBeats) for the block.
+inline bool layerBoundaryReached(SwapTiming timing, bool hasMasterLoop, int layerIndex,
+                                 bool masterLoopWrapped, int layerLoopWrapMask, bool barWrapped) noexcept
+{
+    if (timing == SwapTiming::OnBar) return barWrapped;
+    return usesMasterLoop(timing, hasMasterLoop) ? masterLoopWrapped
+                                                  : ((layerLoopWrapMask & (1 << layerIndex)) != 0);
+}
+
+// A full-preset swap spans every layer, so the master loop is the musical boundary whenever one is
+// set; free-running, layer 0's loop stands in (waiting for a master wrap that never comes would hang
+// the swap). OnBar defers to the bar line instead.
+inline bool fullPresetBoundaryReached(SwapTiming timing, bool hasMasterLoop,
+                                      bool masterLoopWrapped, int layerLoopWrapMask, bool barWrapped) noexcept
+{
+    if (timing == SwapTiming::OnBar) return barWrapped;
+    return hasMasterLoop ? masterLoopWrapped : ((layerLoopWrapMask & 1) != 0);
+}
+
 // The audio thread's "a swap was flagged, commit it" note to the message thread. A plain atomic
 // instead of AsyncUpdater::triggerAsyncUpdate(), which allocates a message and so must not be
 // called from the audio thread; the message thread polls it on a short timer and drains it.
