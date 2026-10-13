@@ -220,7 +220,7 @@ void TrackContent::resized()
     // the knob band, then the knob grid.
     const bool rumble  = shownEngine == EngineType::Rumble;
     const int boxH     = s(mu_ui::ParamKnobGrid::kCellH + 2 * LF::kSpaceS);
-    const int dropW    = s(kDropdownW);
+    const int dropW    = s(MuLookAndFeel::kDropdownW);
     const int leftW    = dropW + (rumble ? gap + dropW : 0);
     engineR    = { 0, 0, w, padY + plateH + boxH + padY };
     const int boxW = juce::jmin(w - 2 * padX, 2 * clear + leftW + gap + grid.getPreferredWidth());
@@ -235,7 +235,7 @@ void TrackContent::resized()
     {
         caption.setFont(captionFont);
         caption.setBounds(x, inner.getY(), dropW, labelH);
-        dropdown.setBounds(x, inner.getY() + labelH + (bandH - s(kDropdownH)) / 2, dropW, s(kDropdownH));
+        dropdown.setBounds(x, inner.getY() + labelH + (bandH - s(MuLookAndFeel::kDropdownH)) / 2, dropW, s(MuLookAndFeel::kDropdownH));
     };
     place(engineCaption, engineSelect, inner.getX());
     if (rumble) place(sourceCaption, sourceSelect, inner.getX() + dropW + gap);
@@ -245,7 +245,8 @@ void TrackContent::resized()
     slotR = { 0, engineR.getBottom(), w, juce::jmax(0, h - engineR.getBottom()) };
     const int boxesY = slotR.getY() + padY + plateH;
     const int boxesH = juce::jmax(0, slotR.getHeight() - 2 * padY - plateH);
-    grooveBoxR = { padX, boxesY, s(kGrooveBoxW), boxesH };
+    // The left box of the second panel is as wide for Swing / Accent as for the Rumble envelope.
+    grooveBoxR = { padX, boxesY, s(MuLookAndFeel::kGrooveBoxW), boxesH };
     const int stepsX = grooveBoxR.getRight() + s(LF::kVoiceDivW);
     stepsBoxR  = { stepsX, boxesY, juce::jmax(0, w - padX - stepsX), boxesH };
     rows.setBounds(stepsBoxR.reduced(clear, s(LF::kSpaceS)));

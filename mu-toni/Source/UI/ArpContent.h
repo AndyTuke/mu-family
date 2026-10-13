@@ -67,11 +67,9 @@ private:
     void layoutSourceRow(juce::Rectangle<int> row, int gap);
 
 
-    // Layout constants (unscaled; wrap in mu_ui::s at use). kDropdownH is the
-    // family-standard dropdown height; kLabelGap keeps a control label off the
+    // Layout constants (unscaled; wrap in mu_ui::s at use). kLabelGap keeps a control label off the
     // panel border (design-ui-family §"Control label gap").
     static constexpr int kBoxPad    = MuLookAndFeel::kSpaceS;
-    static constexpr int kDropdownH = 24;
     static constexpr int kLabelGap  = MuLookAndFeel::kSpaceS;
     // A boxed section's top row: dropdown / toggle widths and the gap after each.
     static constexpr int kBoxComboW  = 108;

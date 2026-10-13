@@ -222,16 +222,16 @@ void DelayRow::resized()
         // Dropdown and modifier stacked vertically in the same column
         const int colH = s(24 + kPad + 24);
         const int colY = (h - colH) / 2;
-        modeDropdown   .setBounds(x, colY,                 s(kDropdownW), s(24));
-        modifierSegment.setBounds(x, colY + s(24 + kPad),  s(kDropdownW), s(24));
-        x += s(kDropdownW + kPad);
+        modeDropdown   .setBounds(x, colY,                 s(MuLookAndFeel::kDropdownW), s(MuLookAndFeel::kDropdownH));
+        modifierSegment.setBounds(x, colY + s(MuLookAndFeel::kDropdownH + kPad),  s(MuLookAndFeel::kDropdownW), s(MuLookAndFeel::kDropdownH));
+        x += s(MuLookAndFeel::kDropdownW + kPad);
         multipleKnob   .setBounds(x, knobY, knobW, knobH);
         x += knobW + s(kPad);
     }
     else
     {
-        modeDropdown.setBounds(x, (h - s(24)) / 2, s(kDropdownW), s(24));
-        x += s(kDropdownW + kPad);
+        modeDropdown.setBounds(x, (h - s(MuLookAndFeel::kDropdownH)) / 2, s(MuLookAndFeel::kDropdownW), s(MuLookAndFeel::kDropdownH));
+        x += s(MuLookAndFeel::kDropdownW + kPad);
         msKnob.setBounds(x, knobY, knobW, knobH);
         x += knobW + s(kPad);
     }

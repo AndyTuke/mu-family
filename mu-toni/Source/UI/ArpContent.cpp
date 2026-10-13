@@ -240,7 +240,7 @@ void ArpContent::resized()
     const int boxGap = s(LF::kVoiceDivW);
 
     // Source and Appergater boxes: a dropdown row over a Size-2 knob row.
-    const int boxH = s(2 * kBoxPad + kDropdownH + LF::kVoiceGap + LF::kKnobSize2H + kLabelGap);
+    const int boxH = s(2 * kBoxPad + LF::kDropdownH + LF::kVoiceGap + LF::kKnobSize2H + kLabelGap);
 
     // Source: Osc 1 | Osc 2 | X-Mod | Mix, each sized to its controls.
     srcR = { 0, 0, w, padY + plateH + boxH + padY };
@@ -312,7 +312,7 @@ void ArpContent::layoutBox(int group, juce::Rectangle<int> rect)
         const int comboW = (nCombos == 1 && nToggles == 0)
                          ? juce::jmax(kBoxComboW, nKnobs * (LF::kKnobSize2W + LF::kVoiceGap) - LF::kVoiceGap)
                          : kBoxComboW;
-        auto top = inner.removeFromTop(s(kDropdownH));
+        auto top = inner.removeFromTop(s(LF::kDropdownH));
         for (auto& c : combos)
             if (c.group == group) { c.comp->setBounds(top.removeFromLeft(s(comboW)).reduced(1)); top.removeFromLeft(s(kBoxGap)); }
         for (auto& t : toggles)

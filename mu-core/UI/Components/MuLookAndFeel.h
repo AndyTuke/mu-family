@@ -397,6 +397,9 @@ public:
     // big inner panels — these are the actual usable widths for layout math.
     static constexpr int kPanelPad        = kSpaceS;
     static constexpr int kDropdownEdgeGap = kSpaceS;   // space between a dropdown and the edge of its box / panel
+    static constexpr int kDropdownW       = 120;       // family-standard dropdown (selector) width
+    static constexpr int kDropdownH       = 24;        // family-standard dropdown height
+    static constexpr int kGrooveBoxW      = 300;       // fixed width of a two-knob / envelope-editor box, so its layout never jumps
     // The Root / Scale row (mu-Tant's tonal centre): label, root and scale selector widths and the gap between pairs.
     static constexpr int kTonalLabelW = 44;
     static constexpr int kTonalRootW  = 56;

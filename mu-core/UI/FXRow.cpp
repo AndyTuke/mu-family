@@ -112,8 +112,8 @@ void FXRow::resized()
     // Name label area is painted, not a component — advance x past it.
     x += s(kNameW + kPadding);
 
-    algorithmDropdown.setBounds(x, (h - s(24)) / 2, s(kDropdownW), s(24));
-    x += s(kDropdownW + kPadding);
+    algorithmDropdown.setBounds(x, (h - s(MuLookAndFeel::kDropdownH)) / 2, s(MuLookAndFeel::kDropdownW), s(MuLookAndFeel::kDropdownH));
+    x += s(MuLookAndFeel::kDropdownW + kPadding);
 
     // Knob size is fixed (Size 1) — both width AND height. Never derived from
     // the row's getHeight() so the visible circle stays the same regardless

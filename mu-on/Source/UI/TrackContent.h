@@ -40,12 +40,6 @@ public:
     // refreshes everything that depends on it (sidebar names, modulation destinations).
     std::function<void()> onEngineChanged;
 
-    // Unscaled sizes. The engine box holds the dropdown column and the knobs; the left box of the second
-    // panel is as wide for Swing / Accent as for the Rumble envelope, so the layout never jumps.
-    static constexpr int kDropdownW   = 120;
-    static constexpr int kDropdownH   = 24;
-    static constexpr int kGrooveBoxW  = 300;
-
     void paint(juce::Graphics&) override;
     void paintOverChildren(juce::Graphics&) override;
     void resized() override;

@@ -142,7 +142,7 @@ JUCE font. No external typeface dependency.
 | Control | Width | Height | Notes |
 |---|---|---|---|
 | `KnobWithLabel` (knob + label below) | 64px | row height | Width is the canonical unit |
-| `DropdownSelect` (algorithm) | 120px | 24px | Standard row dropdown |
+| `DropdownSelect` (algorithm) | 120px (`MuLookAndFeel::kDropdownW`) | 24px (`kDropdownH`) | Standard row dropdown; FXRow, DelayRow, mu-Toni's boxed dropdown rows and mu-On's Engine / Source dropdowns all use these tokens, never a local copy |
 | `SegmentControl` (bar style) | fits content | 22–24px | |
 | `SegmentControl` (pills style) | fits content | varies | pill height = component height − 4px |
 | `TextButton` (on/off toggle) | 36px | 22px | Standard enable toggle in FX rows |
@@ -480,6 +480,8 @@ setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appYellow));   // mu-On
 ---
 
 ## Design rulings
+
+- 2026-10-13 — Standard dropdown size and mu-On's Groove box width as shared tokens? Yes: `kDropdownW` 120, `kDropdownH` 24 and `kGrooveBoxW` 300 live in `MuLookAndFeel` beside `kDropdownEdgeGap`; FXRow, DelayRow, mu-Toni ArpContent and mu-On TrackContent use them, the four local copies and bare `s(24)` are gone; values unchanged. Changed §5 standard control sizes, mu-on/design-ui.md "As built".
 
 - 2026-10-13 — Warning icon missing in Delete / Reset dialogs, and their buttons using the product accent? (1) Icons are vectors drawn by `ModalDialog`, not font glyphs: Warning triangle + "!" in amber (`segmentWarningBorder`, replacing the off-token `knobLevel`), Info circle + "i" in `globalAccent` (it renders today only by font luck, so it is converted too); Question "?" is ASCII and stays; no Error icon exists. (2) Red is intended: the doc was right, the code never applied it. A Warning-icon dialog's primary button is the red destructive button (new `buttonDangerBg`, existing `indicatorFault`); the accent stays for non-destructive dialogs. Changed §5 (new "Dialog icons and the destructive button", Delete wording), §7 table (Delete rhythm row).
 - 2026-10-13 — `buttonDangerBg` `#7A2220` under `indicatorFault` text fails contrast (about 2.6:1); accept the coder's `#2B0E0D` (about 4.56:1)? Accepted: only the fill token changes, border and text stay `indicatorFault` so the red is one family colour; a lighter label token would add a second red. Verified in the mu-Clid, mu-Tant and mu-On Delete dialogs. Changed §5 ("Dialog icons and the destructive button").
