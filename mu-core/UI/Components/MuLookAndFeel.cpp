@@ -484,7 +484,7 @@ void MuLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, int width,
     g.drawLine(groove.getX() + lipInset, groove.getBottom() + 0.5f,
                groove.getRight() - lipInset, groove.getBottom() + 0.5f, 1.0f);
 
-    g.setColour(accent.withAlpha(L.highlight(L.switchTrackGlow)));
+    g.setColour(accent.withAlpha(L.highlight(L.faderTrackFill)));
     if (horizontal)
         g.drawLine(span.first, groove.getCentreY(), span.second, groove.getCentreY(), tw * 0.5f);
     else

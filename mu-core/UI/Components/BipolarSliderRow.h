@@ -25,7 +25,7 @@ public:
     std::function<void(float)> onCurveChange;
 
     // Column widths used by parents to lay out depth + curve + neighbouring controls.
-    static constexpr int kDepthWidth = 130;
+    static constexpr int kDepthWidth = 160;
     static constexpr int kCurveWidth = 70;
 
     void resized() override;

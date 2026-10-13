@@ -43,6 +43,6 @@ void AddButton::enablementChanged()
 {
     setMouseCursor(isEnabled() ? juce::MouseCursor::PointingHandCursor
                                : juce::MouseCursor::NormalCursor);
-    setAlpha(isEnabled() ? 1.0f : 0.35f);   // reads as inactive in both styles
+    setAlpha(isEnabled() ? 1.0f : MuLookAndFeel::kDisabledAlpha);   // reads as inactive in both styles
     juce::TextButton::enablementChanged();
 }

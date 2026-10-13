@@ -225,6 +225,7 @@ struct MuTheme
         float switchTrackShadow  = 0.6f;    // recessed track's edge
         float switchTrackLip     = 0.07f;   // light catching the track's lower lip
         float switchTrackGlow    = 0.18f;   // accent line down the track
+        float faderTrackFill     = 0.5f;    // accent fill along a fader's groove
         float switchRingGlow     = 0.14f;   // disc ring glow (resting)
         float switchRingGlowHover= 0.22f;   //   … and when hovered
 
