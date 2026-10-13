@@ -119,7 +119,7 @@ public:
                     for (;; ++n)
                     {
                         const int j = jitter == 0 ? 0 : (int) ((n * 7919) % (2 * jitter + 1)) - jitter;
-                        const juce::int64 at = juce::jmax<juce::int64>(0, (juce::int64) std::llround((double) n * tick) + j);
+                        const juce::int64 at = juce::jmax((juce::int64) 0, (juce::int64) std::llround((double) n * tick) + j);
                         if (at >= blockStart + kBlock) break;
                         midi.addEvent(juce::MidiMessage((juce::uint8) 0xF8), (int) (at - blockStart));
                     }

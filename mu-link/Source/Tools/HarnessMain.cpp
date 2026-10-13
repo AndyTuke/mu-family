@@ -215,7 +215,7 @@ int main(int argc, char** argv)
     for (auto* kid : kids) kid->kill();
 
     // 7. Report which clients were seen + the measurements.
-    const double rms = std::sqrt(sumSq / juce::jmax<std::int64_t>(1, samplesAnalysed));
+    const double rms = std::sqrt(sumSq / std::max<std::int64_t>(1, samplesAnalysed));
     std::cout << "\n=== mu-link-harness report ===\n";
     std::cout << "captured " << args.seconds << " s @ " << args.rate << " Hz, block " << args.block << "\n";
     {

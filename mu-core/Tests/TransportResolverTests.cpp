@@ -268,9 +268,9 @@ public:
                     for (;; ++n)
                     {
                         const int j = (int) ((n * 7919) % 81) - 40;       // +/- 40 samples of jitter
-                        const juce::int64 at = juce::jmax<juce::int64>(0, (juce::int64) (n * tick) + j);
+                        const juce::int64 at = juce::jmax((juce::int64) 0, (juce::int64) (n * tick) + j);
                         if (at >= start + blockSize) break;
-                        midi.addEvent(juce::MidiMessage((juce::uint8) 0xF8), (int) juce::jmax<juce::int64>(0, at - start));
+                        midi.addEvent(juce::MidiMessage((juce::uint8) 0xF8), (int) juce::jmax((juce::int64) 0, at - start));
                     }
                     const double s = clock.process(midi, blockSize, kSr);
                     if (b > 60)

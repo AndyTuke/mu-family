@@ -266,7 +266,7 @@ namespace mu_core::render_mode
         {
             const int j = args.midiClockJitter == 0 ? 0
                         : (int) ((n * 7919) % (2 * args.midiClockJitter + 1)) - args.midiClockJitter;
-            return juce::jmax<juce::int64>(0, (juce::int64) std::llround((double) n * tickSamples) + j);
+            return juce::jmax((juce::int64) 0, (juce::int64) std::llround((double) n * tickSamples) + j);
         };
         if (midiClock)
             log("MIDI clock " + juce::String(args.midiClockBpm, 2) + " BPM, Start", (int) pulseAt(startPulse));
