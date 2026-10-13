@@ -38,7 +38,7 @@ public:
     juce::String                  name;
     juce::String                  description;
     std::array<Item, kMaxItems>   items;
-    int                           ignoredItems = 0;   // items past kMaxItems or with a bad idx in the file read last
+    int                           ignoredItems = 0;   // items in the file read last that were not loaded: bad, repeated or past-the-end idx
 
     // Parse a file or XML text into `out` (replacing it). A file whose format is newer than kFormat is refused,
     // not guessed at. Items beyond kMaxItems, or with a bad or repeated idx, are not loaded and are counted.

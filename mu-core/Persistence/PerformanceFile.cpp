@@ -1,4 +1,5 @@
 #include "PerformanceFile.h"
+#include "Persistence/PresetFiles.h"   // replaceFileAtomically: a gig list must never be left half-written
 
 namespace mu_pp
 {
@@ -63,9 +64,7 @@ juce::String PerformanceFile::toXml() const
 
 bool PerformanceFile::save(const juce::File& file) const
 {
-    if (! file.getParentDirectory().createDirectory())
-        return false;
-    return file.replaceWithText(toXml());
+    return replaceFileAtomically(file, toXml());
 }
 
 juce::String PerformanceFile::storedPath(const juce::File& preset, const juce::File& presetFolder)
