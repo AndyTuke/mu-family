@@ -61,6 +61,7 @@ target_sources(mu-core INTERFACE
     # MIDI control mapping (CC / note -> family actions): the saved map + the audio-thread router.
     "${CMAKE_CURRENT_SOURCE_DIR}/Control/MidiControlMap.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Control/MidiControlRouter.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Control/LiveState.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Persistence/MidiFullPresetMap.cpp"
     # Performance file: a list of full-preset pointers for the controller top row.
     "${CMAKE_CURRENT_SOURCE_DIR}/Persistence/PerformanceFile.cpp"

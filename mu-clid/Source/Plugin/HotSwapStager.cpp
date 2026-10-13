@@ -43,6 +43,11 @@ bool HotSwapStager::hasPendingFullPreset() const
     return stager.hasFullPending();
 }
 
+void HotSwapStager::cancelStagedFullPreset()
+{
+    stager.cancelFull();
+}
+
 //==============================================================================
 bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
                                     int rhythmLoopWrapMask)
@@ -230,13 +235,16 @@ void HotSwapStager::processSwaps()
     // lifting (parse, voice build, sample load) happened at stage time, so the
     // commit is just fast in-memory moves under suspend + an APVTS finalize.
     // (consumeFull releases the pre-built voices + tree afterwards.)
-    if (stager.consumeFull([this](PreparedFullPreset& p)
-        {
-            proc.presetIO.commitStagedFullPreset(p, fullFlaggedOrigin.load(std::memory_order_relaxed),
-                                                 fullFlaggedEpoch.load(std::memory_order_relaxed));
-        })
-        && proc.onPresetSwapCommitted)
-        proc.onPresetSwapCommitted();
+    const bool committed = stager.consumeFull([this](PreparedFullPreset& p)
+    {
+        proc.presetIO.commitStagedFullPreset(p, fullFlaggedOrigin.load(std::memory_order_relaxed),
+                                             fullFlaggedEpoch.load(std::memory_order_relaxed));
+    });
+    if (committed)
+    {
+        proc.getLiveState().fullPresetCommitted();   // the queued performance item becomes current
+        if (proc.onPresetSwapCommitted) proc.onPresetSwapCommitted();
+    }
 }
 
 } // namespace mu_clid

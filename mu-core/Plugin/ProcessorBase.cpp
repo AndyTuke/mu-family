@@ -14,7 +14,25 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
                              const juce::Identifier& stateTreeType)
     : ProcessorCore(props),
       apvts(*this, nullptr, stateTreeType, std::move(layout))
-{}
+{
+    // Performance mode's live state: how a performance item is staged and cancelled is this processor's
+    // own full-preset path, so the state itself never names a product or the hot-swap machinery.
+    mu_core::LiveState::Callbacks cb;
+    cb.supportsPerformanceMode = [this] { return isStandaloneApp(); };
+    cb.canLoad = [this](int item)
+    {
+        return liveState.getPerformance().status(item, getFullPresetDir(), apvts.state.getType().toString())
+                   == mu_pp::PerformanceFile::ItemStatus::Ok;
+    };
+    cb.stageItem = [this](int item)
+    {
+        applyFullMidiPreset(liveState.getPerformance().resolve(item, getFullPresetDir()));
+        return ! hasPendingFullPreset();   // nothing left staged: it was applied at once (transport stopped)
+    };
+    cb.cancelItem = [this] { cancelPendingFullPreset(); };
+    cb.layerCount = [this] { return getNumLayers(); };
+    liveState.setCallbacks(std::move(cb));
+}
 
 bool ProcessorBase::scanMidiProgramChanges(const juce::MidiBuffer& midi)
 {
@@ -126,7 +144,13 @@ bool ProcessorBase::perform(const mu_core::ControlAction& a)
             if (isInternalPlaying() != (a.type == T::TransportPlay))
                 toggleInternalPlay();
             return true;
-        default:                 return false;   // select layer, clips, presets, panic: later
+        case T::SelectLayer:
+        case T::PerformanceMode:
+        case T::PerformanceItem:
+        case T::PerformancePrev:
+        case T::PerformanceNext:
+            return liveState.perform(a);
+        default:                 return false;   // clips, presets, panic: later
     }
 }
 

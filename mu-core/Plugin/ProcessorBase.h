@@ -22,6 +22,7 @@
 #include "Persistence/MidiPresetMap.h"
 #include "Persistence/MidiFullPresetMap.h"
 #include "Control/MidiControlRouter.h"   // MIDI CC / note -> actions (map, learn, audio hand-off)
+#include "Control/LiveState.h"          // Performance mode: the live state this instance owns
 #include "Control/ParamGestureHold.h"
 #include "Persistence/LayerState.h"   // composed slot / full / host state (format 2)
 #include "MuLimits.h"
@@ -291,6 +292,12 @@ public:
     virtual void saveLayerPreset(int /*slot*/, const juce::String& /*name*/) {}
     virtual void loadLayerPreset(int /*slot*/, const juce::File& /*file*/)   {}
     virtual bool hasPendingSwap(int slot) const                             { return layerSwapper.hasPending(slot); }
+    // Drops the staged (not yet committed) full-preset swap, if any (Performance mode cancelling a queued item).
+    virtual void cancelPendingFullPreset()                                  { layerSwapper.cancelFull(); }
+
+    // Performance mode's live state (message thread only): read through the view, changed through perform().
+    mu_core::LiveState&       getLiveState() noexcept       { return liveState; }
+    const mu_core::LiveView&  getLiveView() const noexcept  { return liveState; }
     // Drops the staged (not yet committed) per-layer swap for `slot`, if any. A structural edit
     // calls it for every layer it renumbers or clears, because a staged swap is keyed by index and
     // would otherwise land on the wrong layer. A staged full preset is left to win.
@@ -525,8 +532,11 @@ protected:
     // control actions.
     void runDeferredWork()
     {
-        if (layerSwapper.commit() && onPresetSwapCommitted)
-            onPresetSwapCommitted();
+        if (layerSwapper.commit())
+        {
+            liveState.fullPresetCommitted();   // before the editor refresh, so it reads the settled state
+            if (onPresetSwapCommitted) onPresetSwapCommitted();
+        }
         commitDeferredWork();
         drainPendingMidiProgramChanges();
         // Left queued by a table edit in progress: ask for another pass so it is not stranded.
@@ -545,6 +555,7 @@ protected:
     // runDeferredWork. A product with its own stager (mu-Clid) overrides the three swap queries.
     // Audio-thread flagging uses atomics only; the appliers run on the message thread.
     mu_hotswap::LayerSwapper<juce::ValueTree, mu_limits::kMaxLayers> layerSwapper;
+    mu_core::LiveState liveState;   // Performance mode (message thread only; never read on the audio thread)
 
     // The audio thread's deferred-work request and the message-thread timer (100 Hz, one relaxed exchange per tick) that drains it.
     // The timer does nothing but check the flag. Nothing here uses AsyncUpdater: its trigger

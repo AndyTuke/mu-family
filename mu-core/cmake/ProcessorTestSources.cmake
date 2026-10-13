@@ -21,6 +21,8 @@ set(MU_CORE_PROCESSOR_TEST_SOURCES
     "${_mu_core_dir}/Persistence/MidiFullPresetMap.cpp"
     "${_mu_core_dir}/Control/MidiControlMap.cpp"
     "${_mu_core_dir}/Control/MidiControlRouter.cpp"
+    "${_mu_core_dir}/Control/LiveState.cpp"             # Performance mode state (ProcessorBase owns one)
+    "${_mu_core_dir}/Persistence/PerformanceFile.cpp"   # the list LiveState holds
     "${_mu_core_dir}/UI/SettingsOverlayBase.cpp"
     "${_mu_core_dir}/UI/StandardSettingsOverlay.cpp"
     "${_mu_core_dir}/UI/Components/MuLookAndFeel.cpp"

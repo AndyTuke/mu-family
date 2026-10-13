@@ -18,11 +18,15 @@ enum class ControlActionType
     TransportStop,
     MuteLayer,         // toggle a layer strip's mute
     SoloLayer,         // toggle a layer strip's solo
-    SelectLayer,       // declared for the surface drivers; not performed yet
+    SelectLayer,       // select a layer (Performance mode: the screen follows the surface)
     LaunchClip,
     PresetNext,
     PresetPrev,
-    Panic
+    Panic,
+    PerformanceMode,   // enter / leave Performance mode (`value` 1 on, 0 off, negative toggles; `layer` seeds the selection)
+    PerformanceItem,   // switch to performance item `index` (0..7)
+    PerformancePrev,   // the previous loadable item, wrapping
+    PerformanceNext    // the next loadable item, wrapping
 };
 
 // When an action that changes what is heard lands: Default follows the app-wide setting.
@@ -32,6 +36,7 @@ struct ControlAction
 {
     ControlActionType type     = ControlActionType::None;
     int               layer    = 0;        // MuteLayer / SoloLayer / SelectLayer: the layer index
+    int               index    = -1;       // PerformanceItem: the item index; clips later
     juce::String      paramId;             // Parameter: the APVTS parameter id
     float             value    = 0.0f;     // Parameter: normalised 0..1
     Quantise          quantise = Quantise::Default;
@@ -53,6 +58,10 @@ inline const char* actionName(ControlActionType t) noexcept
         case ControlActionType::PresetNext:      return "presetNext";
         case ControlActionType::PresetPrev:      return "presetPrev";
         case ControlActionType::Panic:           return "panic";
+        case ControlActionType::PerformanceMode: return "performanceMode";
+        case ControlActionType::PerformanceItem: return "performanceItem";
+        case ControlActionType::PerformancePrev: return "performancePrev";
+        case ControlActionType::PerformanceNext: return "performanceNext";
         case ControlActionType::None:            break;
     }
     return "none";
@@ -63,7 +72,8 @@ inline ControlActionType actionFromName(const juce::String& n) noexcept
     for (auto t : { ControlActionType::Parameter, ControlActionType::TransportToggle, ControlActionType::TransportPlay,
                     ControlActionType::TransportStop, ControlActionType::MuteLayer, ControlActionType::SoloLayer,
                     ControlActionType::SelectLayer, ControlActionType::LaunchClip, ControlActionType::PresetNext,
-                    ControlActionType::PresetPrev, ControlActionType::Panic })
+                    ControlActionType::PresetPrev, ControlActionType::Panic, ControlActionType::PerformanceMode,
+                    ControlActionType::PerformanceItem, ControlActionType::PerformancePrev, ControlActionType::PerformanceNext })
         if (n == actionName(t)) return t;
     return ControlActionType::None;
 }
