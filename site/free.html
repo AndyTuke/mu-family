@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Free Products — μ-clid LITE &amp; μ-link | Transwarp Development Project</title>
-  <meta name="description" content="Free products from Transwarp Development Project. μ-clid LITE — permanent single-track euclidean sequencer. μ-link — BPM and transport sync hub for the μ-series.">
+  <title>μ-link | Transwarp Development Project</title>
+  <meta name="description" content="μ-link is the free sync hub and performance mixer for the μ-series. Every μ-series app is free and fully functional; pay what you like to support them.">
   <link rel="canonical" href="https://transwarp.me/free">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://transwarp.me/free">
-  <meta property="og:title" content="Free Products — μ-clid LITE &amp; μ-link | Transwarp Development Project">
-  <meta property="og:description" content="Free products from Transwarp Development Project. μ-clid LITE — permanent single-track euclidean sequencer. μ-link — BPM and transport sync hub for the μ-series.">
+  <meta property="og:title" content="μ-link | Transwarp Development Project">
+  <meta property="og:description" content="μ-link is the free sync hub and performance mixer for the μ-series. Every μ-series app is free and fully functional; pay what you like to support them.">
   <meta property="og:image" content="https://transwarp.me/mu-clid%20Release.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -239,12 +239,12 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     .free-info {}
     .free-eyebrow { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
     .free-eyebrow::before { content:''; display:block; width:24px; height:1px; }
-    .clid-lite .free-eyebrow { color: var(--accent-b); }
-    .clid-lite .free-eyebrow::before { background: var(--accent-b); }
+    .clid-midi .free-eyebrow { color: var(--accent-b); }
+    .clid-midi .free-eyebrow::before { background: var(--accent-b); }
     .mu-link .free-eyebrow { color: var(--cyan-b); }
     .mu-link .free-eyebrow::before { background: var(--cyan-b); }
     .free-title { font-family: var(--ff-disp); font-size: clamp(34px,4vw,52px); font-weight: 800; letter-spacing: -0.025em; margin-bottom: 8px; }
-    .clid-lite .free-title .mu { color: var(--accent-b); }
+    .clid-midi .free-title .mu { color: var(--accent-b); }
     .mu-link .free-title .mu { color: var(--cyan-b); }
     .free-subtitle { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text2); margin-bottom: 20px; }
     .free-desc { font-size: 15px; font-weight: 300; color: var(--text2); line-height: 1.75; margin-bottom: 28px; }
@@ -252,7 +252,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     .free-features { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-bottom: 32px; }
     .free-features li { display: flex; align-items: flex-start; gap: 12px; font-size: 14px; color: var(--text2); }
     .free-features li .ffi { width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
-    .clid-lite .free-features li .ffi { background: rgba(107,95,228,0.15); }
+    .clid-midi .free-features li .ffi { background: rgba(107,95,228,0.15); }
     .mu-link .free-features li .ffi { background: rgba(60,184,212,0.15); }
     .free-features li .ffi svg { width: 10px; height: 10px; }
     .free-cta-block {}
@@ -267,24 +267,8 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     .free-visual.placeholder { aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center; }
     .free-visual.placeholder svg { opacity: 0.2; }
 
-    .comparison-strip { margin-top: 60px; padding: 40px; background: var(--bg2); border: 1px solid var(--border2); border-radius: 8px; }
-    .comparison-strip h3 { font-family: var(--ff-disp); font-size: 20px; font-weight: 800; letter-spacing: -0.015em; margin-bottom: 28px; }
-    /* Row-based grid: items flow left→right so each row auto-equalises height. */
-    .comparison-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; background: var(--border); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-    .cg-cell { background: var(--bg3); padding: 12px 18px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text2); display: flex; align-items: center; gap: 8px; }
-    .cg-cell.cg-header { padding: 14px 18px; border-bottom: 2px solid var(--border2); flex-direction: column; align-items: flex-start; gap: 3px; }
-    .cg-cell.cg-header .cg-name { font-family: var(--ff-disp); font-size: 16px; font-weight: 800; letter-spacing: -0.01em; color: var(--text); }
-    .cg-cell.cg-header .cg-free { font-family: var(--ff-mono); font-size: 9px; color: var(--teal); letter-spacing: 0.12em; text-transform: uppercase; }
-    .cg-cell.cg-header .cg-paid { font-family: var(--ff-mono); font-size: 9px; color: var(--accent-b); letter-spacing: 0.12em; text-transform: uppercase; }
-    .cg-cell.cg-label { color: var(--text2); font-size: 13px; }
-    .cg-cell.featured { background: var(--bg2); }
-    .cg-cell.featured.cg-header { background: rgba(107,95,228,0.1); }
-    .cg-cell .tick { color: var(--teal); }
-    .cg-cell .cross { color: var(--text3); }
-
     @media (max-width: 900px) {
       .free-section-inner { grid-template-columns: 1fr; }
-      .comparison-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -297,10 +281,11 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     <div class="nav-links">
       <a href="mu-clid.html" class="nav-clid"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid</a>
       <a href="mu-tant.html" class="nav-tant"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-tant</a>
-      <a href="free.html" class="nav-free active">Free</a>
+      <a href="mu-clid-midi.html" class="nav-clid"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid MIDI</a>
+      <a href="free.html" class="nav-free active">μ-link</a>
       <a href="download.html">Download</a>
       <a href="index.html#community">Community</a>
-      <a href="mu-clid.html#pricing" class="nav-cta">Shop</a>
+      <a href="index.html#pricing" class="nav-cta">Pay what you like</a>
     </div>
   </nav>
 
@@ -310,38 +295,31 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
         <svg viewBox="0 0 12 12" fill="none" width="10" height="10"><circle cx="6" cy="6" r="5" stroke="#1DB880" stroke-width="1.2"/><path d="M3.5 6L5.2 7.7L8.5 4.3" stroke="#1DB880" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Free from Transwarp
       </div>
-      <h1 class="page-title fade-2">Free. Forever.</h1>
-      <p class="page-sub fade-3">Two free products to get you started with the μ-series — a permanent single-track sequencer and a sync hub for the whole family.</p>
+      <h1 class="page-title fade-2">Free. Pay if you like.</h1>
+      <p class="page-sub fade-3">Every μ-series app is free and fully functional, and the source is open (GPLv3). This page is home to μ-link, the sync hub for the whole family. Looking for the single-rhythm MIDI effect? It has its own page.</p>
     </div>
   </section>
 
-  <!-- ── μ-clid LITE ── -->
-  <section class="free-section clid-lite" id="mu-clid-lite">
+  <!-- ── μ-clid MIDI pointer (old #mu-clid-lite links still land here) ── -->
+  <section class="free-section clid-midi" id="mu-clid-midi">
+    <span id="mu-clid-lite"></span>
     <div class="container">
       <div class="free-section-inner">
         <div class="free-info">
-          <div class="free-eyebrow">Free forever · No time limit</div>
-          <div class="free-title"><span class="mu">μ</span>-clid LITE</div>
-          <div class="free-subtitle">Single-Track Euclidean Sequencer · VST3 · CLAP · Standalone · Windows</div>
+          <div class="free-eyebrow">Free · Separate product</div>
+          <div class="free-title"><span class="mu">μ</span>-clid MIDI</div>
+          <div class="free-subtitle">Single-Rhythm Euclidean MIDI Effect · VST3 · CLAP · Windows · Linux beta</div>
           <div class="free-desc">
-            <p>μ-clid LITE gives you one complete rhythm track — the full euclidean algorithm, MIDI output, and the complete workflow — permanently free. No expiry date, no save restrictions.</p>
-            <p>It's a MIDI effect, not a cut-down sequencer: it plays any instrument in your DAW. It shares its rhythms with μ-clid, which adds eight tracks and a built-in sampler. Both are free, and you can pay what you like if you want to support the project.</p>
+            <p>The plugin you may know as μ-clid Lite is now <strong>μ-clid MIDI</strong>. It is a MIDI effect in its own right: one Euclidean rhythm that plays any instrument in your DAW. It is free, has no support message, and needs no key.</p>
           </div>
-          <ul class="free-features">
-            <li><div class="ffi"><svg viewBox="0 0 10 10" fill="none"><path d="M2 5L4 7L8 3" stroke="#8B80F0" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Single rhythm track — fully featured</li>
-            <li><div class="ffi"><svg viewBox="0 0 10 10" fill="none"><path d="M2 5L4 7L8 3" stroke="#8B80F0" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Full euclidean algorithm (steps, hits, rotate)</li>
-            <li><div class="ffi"><svg viewBox="0 0 10 10" fill="none"><path d="M2 5L4 7L8 3" stroke="#8B80F0" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>MIDI note output — works with any DAW instrument</li>
-            <li><div class="ffi"><svg viewBox="0 0 10 10" fill="none"><path d="M2 5L4 7L8 3" stroke="#8B80F0" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>VST3 · CLAP · Standalone · Windows</li>
-            <li><div class="ffi"><svg viewBox="0 0 10 10" fill="none"><path d="M2 5L4 7L8 3" stroke="#8B80F0" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>No time limit · Permanent install · No registration required</li>
-          </ul>
           <div class="free-cta-block">
-            <a href="download.html" class="btn-free-clid">Download — Windows ↓</a>
-            <div class="coming-note">VST3 · CLAP · Windows 10/11 · No registration required</div>
+            <a href="mu-clid-midi.html" class="btn-free-clid">About μ-clid MIDI →</a>
+            <div class="coming-note"><a href="download.html#mu-clid-midi" style="text-decoration:underline">Go to the download</a></div>
           </div>
         </div>
         <div>
           <div class="free-visual">
-            <img src="Circles.png" alt="μ-clid pattern ring">
+            <img src="Circles.png" alt="A μ-clid rhythm ring showing a Euclidean pattern">
           </div>
         </div>
       </div>
@@ -353,9 +331,9 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     <div class="container">
       <div class="free-section-inner">
         <div class="free-info">
-          <div class="free-eyebrow">Free forever · Standalone app · Windows</div>
+          <div class="free-eyebrow">Free · Standalone app · Windows</div>
           <div class="free-title"><span class="mu">μ</span>-link</div>
-          <div class="free-subtitle">Mixer · Master Clock · Performance Hub · Standalone · Windows · Free</div>
+          <div class="free-subtitle">Mixer · Master Clock · Performance Hub · Standalone · Windows</div>
           <div class="free-desc">
             <p>μ-link is the hub that ties your μ-series instruments into one instrument. Run μ-clid and μ-tant side by side as standalone apps — μ-link receives their audio over a local bus, sums it to a single output device, and keeps every instance locked to one master clock and transport.</p>
             <p>It's a full performance mixer, not just a clock: a channel strip per connected instrument with fader, level meter, mute/solo and a 3-band EQ, two master-bus insert effects, and <strong>scenes</strong> that recall presets across every connected instrument at once — switch your whole rig with one click. No DAW required.</p>
@@ -368,7 +346,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
             <li><div class="ffi"><svg viewBox="0 0 10 10" fill="none"><path d="M2 5L4 7L8 3" stroke="#3CB8D4" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Master clock — shared BPM &amp; transport across every connected app</li>
             <li><div class="ffi"><svg viewBox="0 0 10 10" fill="none"><path d="M2 5L4 7L8 3" stroke="#3CB8D4" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>MIDI clock out to outboard gear · sync to external MIDI clock</li>
             <li><div class="ffi"><svg viewBox="0 0 10 10" fill="none"><path d="M2 5L4 7L8 3" stroke="#3CB8D4" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Save &amp; recall your whole setup — mixer and scenes — as presets</li>
-            <li><div class="ffi"><svg viewBox="0 0 10 10" fill="none"><path d="M2 5L4 7L8 3" stroke="#3CB8D4" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Windows · Free forever</div></li>
+            <li><div class="ffi"><svg viewBox="0 0 10 10" fill="none"><path d="M2 5L4 7L8 3" stroke="#3CB8D4" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Windows · Free</li>
           </ul>
           <div class="free-cta-block">
             <a href="index.html#community" class="btn-free-link">Notify Me When Available ↓</a>
@@ -392,13 +370,14 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     <div class="container">
       <div class="footer-inner">
         <div class="footer-brand"><div class="fb-logo">Transwarp</div><div class="fb-sub">Development Project</div><p>Indie audio plugin development from Bath, UK.</p></div>
-        <div class="footer-col"><h4><span style="text-transform:none">μ</span>-clid</h4><ul><li><a href="mu-clid.html#pricing">Pricing</a></li><li><a href="#mu-clid-lite">LITE (Free)</a></li><li><a href="#">Documentation</a></li><li><a href="#">System Requirements</a></li></ul></div>
-        <div class="footer-col"><h4><span style="text-transform:none">μ</span>-tant</h4><ul><li><a href="mu-tant.html#pricing">Pricing</a></li><li><a href="download.html">Download</a></li><li><a href="#">Documentation</a></li><li><a href="#">System Requirements</a></li></ul></div>
-        <div class="footer-col"><h4>Company</h4><ul><li><a href="index.html#community">Community</a></li><li><a href="contact.html">Contact</a></li><li><a href="#">EULA</a></li><li><a href="mailto:info@transwarp.me">info@transwarp.me</a></li></ul></div>
+        <div class="footer-col"><h4><span style="text-transform:none">μ</span>-clid</h4><ul><li><a href="mu-clid.html#pricing">Pay what you like</a></li><li><a href="mu-clid-releases.html">Release notes</a></li><li><a href="download.html">Download</a></li></ul></div>
+        <div class="footer-col"><h4><span style="text-transform:none">μ</span>-tant</h4><ul><li><a href="mu-tant.html#pricing">Pay what you like</a></li><li><a href="mu-tant-releases.html">Release notes</a></li><li><a href="download.html">Download</a></li></ul></div>
+        <div class="footer-col"><h4><span style="text-transform:none">μ</span>-clid MIDI</h4><ul><li><a href="mu-clid-midi.html">About</a></li><li><a href="mu-clid-midi-releases.html">Release notes</a></li><li><a href="download.html#mu-clid-midi">Download</a></li></ul></div>
+        <div class="footer-col"><h4>Company</h4><ul><li><a href="index.html#community">Community</a></li><li><a href="contact.html">Contact</a></li><li><a href="https://github.com/AndyTuke/mu-family">Source (GPLv3)</a></li><li><a href="mailto:info@transwarp.me">info@transwarp.me</a></li></ul></div>
       </div>
       <div class="footer-bottom">
         <span class="copy">© 2026 Transwarp Development Project · transwarp.me · Bath, UK</span>
-        <div class="footer-social"><a href="#">YouTube</a><a href="#">X / Twitter</a><a href="#">GitHub</a><a href="#">KVR Audio</a></div>
+        <div class="footer-social"><a href="#">YouTube</a><a href="#">X / Twitter</a><a href="https://github.com/AndyTuke/mu-family">GitHub</a><a href="#">KVR Audio</a></div>
       </div>
     </div>
   </footer>
