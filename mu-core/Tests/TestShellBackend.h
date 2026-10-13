@@ -80,6 +80,8 @@ struct TestShellBackend : mu_core::ShellBackend
     void   setUiScale(float s) override { uiScale = s; ++uiScaleSets; if (onUiScaleChanged) onUiScaleChanged(s); }
 
     juce::File   getPresetsDir() const override { return presetsDir; }
+    juce::File   fullPresetDir;            // unset: same folder as the presets, as for most products
+    juce::File   getFullPresetDir() const override { return fullPresetDir != juce::File() ? fullPresetDir : presetsDir; }
     juce::String getFullPresetExtension() const override { return presetExt; }
     bool         hasPendingFullPreset() const override { return pendingFull; }
 

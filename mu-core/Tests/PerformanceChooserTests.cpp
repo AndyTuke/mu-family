@@ -605,8 +605,102 @@ struct PerformanceChooserTests : juce::UnitTest
         }
     }
 
+    void overwriteThenUse()
+    {
+        beginTest("actions: Use on an unsaved list whose name is taken asks to overwrite, then saves and uses it");
+        {
+            ScaleGuard g;
+            Rig r;
+            r.chrome->showPerformanceChooser();
+            auto& m = r.chooser().getModel();
+            m.setItem(0, r.folders.preset("Alpha"));
+            m.save("First", "");
+            r.chooser().actionNew();
+            m.setItem(0, r.folders.preset("Bravo"));
+            r.chooser().refresh();
+            r.chooser().actionUse();
+            r.chooser().getSaveDialog().onSave("First", "", "", false);
+            expectEquals(dialogCount(r.host), 1);
+            expect(r.live.getPerformance().count() == 0, "nothing used while the question is open");
+            expect(answerDialog(r.host, "Overwrite"), "confirmed");
+            expectEquals(r.live.getPerformance().count(), 1);
+            expect(r.live.getPerformance().resolve(0, r.folders.presets) == r.folders.preset("Bravo"), "the new list is the one in use");
+            expect(! r.chooser().isVisible(), "chooser closed after the use");
+            expect(r.status.contains("Performance|First saved and loaded"), "told so");
+        }
+
+        beginTest("actions: declining the overwrite uses nothing and a later plain Save does not use");
+        {
+            ScaleGuard g;
+            Rig r;
+            r.chrome->showPerformanceChooser();
+            auto& m = r.chooser().getModel();
+            m.setItem(0, r.folders.preset("Alpha"));
+            m.save("First", "");
+            r.chooser().actionNew();
+            m.setItem(0, r.folders.preset("Bravo"));
+            r.chooser().refresh();
+            r.chooser().actionUse();
+            r.chooser().getSaveDialog().onSave("First", "", "", false);
+            expect(answerDialog(r.host, "Cancel"), "declined");
+            expect(r.live.getPerformance().count() == 0 && r.chooser().isVisible(), "nothing used, still open");
+            r.chooser().getSaveDialog().onCancel();   // the Save card is closed, which also drops the pending use
+            r.chooser().actionSave();
+            r.chooser().getSaveDialog().onSave("Second", "", "", false);
+            expect(r.live.getPerformance().count() == 0 && r.chooser().isVisible(), "a plain Save afterwards only saves");
+        }
+    }
+
+    void presetFolderSplit()
+    {
+        beginTest("folders: a backend whose full-preset folder differs still picks, uses and resolves items");
+        {
+            ScaleGuard g;
+            Folders f;
+            TestShellBackend b(true);
+            mu_core::LiveState live;
+            mu_core::LiveState::Callbacks cb;
+            cb.supportsPerformanceMode = [] { return true; };
+            cb.canLoad    = [](int) { return true; };
+            cb.stageItem  = [](int) { return mu_core::LiveState::Stage::Applied; };
+            cb.cancelItem = [] {};
+            cb.layerCount = [] { return 4; };
+            cb.fullPending = [] { return false; };
+            cb.stageSerial = [] { return (uint32_t) 0; };
+            live.setCallbacks(cb);
+            Sink sink { live };
+            b.live = &live; b.sink = &sink; b.performanceSupported = true; b.loadTarget = &live;
+            b.presetsDir = f.presets; b.contentDir = f.content;
+            b.fullPresetDir = f.root;   // a different folder from the one the browser lists
+            expect(b.getFullPresetDir() != b.getPresetsDir(), "the two folders differ");
+
+            Host host; Panel sidebar, mainPanel;
+            mu_ui::ShellChrome chrome(host, b);
+            host.chrome = &chrome;
+            chrome.setMainArea(&sidebar, &mainPanel);
+            chrome.applyWindowSize();
+            host.setVisible(true);
+
+            chrome.showPerformanceChooser();
+            chrome.getPerformanceChooser().actionPick(0);
+            chrome.getPresetBrowser().chooseRow(1);   // Bravo, listed from the presets folder
+            auto& m = chrome.getPerformanceChooser().getModel();
+            expect(m.isUsed(0) && m.itemName(0) == "Bravo", "the picked preset is in row 0");
+            expect(m.status(0) == mu_pp::PerformanceFile::ItemStatus::Ok, "and it resolves");
+            m.save("Split", "");
+            chrome.getPerformanceChooser().refresh();
+            chrome.getPerformanceChooser().actionUse();
+            expect(live.getPerformance().resolve(0, b.getFullPresetDir()) == f.preset("Bravo"), "the live item resolves against the full-preset folder");
+            expect(live.getPerformance().status(0, b.getFullPresetDir(), "MuTantState") == mu_pp::PerformanceFile::ItemStatus::Ok, "and is playable");
+
+            host.chrome = nullptr;
+        }
+    }
+
     void runTest() override
     {
+        overwriteThenUse();
+        presetFolderSplit();
         modelItems();
         modelFiles();
         modelUse();
