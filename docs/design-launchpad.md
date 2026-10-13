@@ -203,8 +203,9 @@ A surface with no edge buttons, or a smaller grid, gets fewer actions at once or
 with "slot", which the code already uses for FX / insert slots (`FXSlotBase`, `DelaySlot`), the composed `LayerState`,
 `Layer` (the layer base, renamed by backlog #1265) and the per-layer index inside the hot-swap `Stager`; those keep
 the word. No code type called `Clip` exists today (the only hits are the clipper insert and the VU clip indicator, which
-are unrelated); the `Layer` and `Clip` names should be settled together when #1265 is done. A *clip* is a stored state
-of one layer, so it is not an audio clip.
+are unrelated); `Layer` settled in #1265 and `Clip` is its own concept (ruled 2026-10-13: `mu_core::ClipBank`, held by
+`Layer`, see [design-plugin-family.md, Clip bank](design-plugin-family.md#clip-bank--family-standard-ruled-2026-10-13-backlog-1277)).
+A *clip* is a stored state of one layer, so it is not an audio clip.
 
 ### 3.2c The Performance file (architecture ruling, 2026-10-12; backlog #1279)
 

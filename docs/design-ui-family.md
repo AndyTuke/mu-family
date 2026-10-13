@@ -551,7 +551,7 @@ A pure indicator (no buttons, no clicks) for "n of N with a lamp per item"; the 
 
 - The 8x8 grid is row = layer, column = one of the layer's 8 stored layer presets (clips). **Pressing a pad makes the PC display switch immediately to that layer** (the sidebar outline moves and the main panel shows that layer, exactly as a sidebar click would), showing the layer's **currently playing** layer preset. If the pressed clip is waiting for its boundary, the layer's header bar shows the same "SWP" queued badge and the status bar reads `Queued: <layer> clip 5 (<when>)`; the panel content changes when the swap commits. Selecting a layer from the right-hand column behaves the same.
 - In Performance mode the sidebar's Add slot (same box as `AddButton`) becomes a read-only **layer indicator**: a small LCD `Layer 3/5` (the `StepIndicator` without lamps), because the sidebar already lists every layer and outlines the selected one. No stepper buttons.
-- The layer's clip row (8 stored presets) uses the same `StepIndicator` in the layer header strip once the clip bank (#1277) exists: playing bright, stored dim, queued pulsing, empty off, a muted layer's playing lamp flashing. Not specified further until the bank exists.
+- The layer's clip row (8 stored layer states) is the shared `ClipStrip` in the layer header bar, specified in [section 13](#13-clip-bank-the-per-layer-clip-strip-ruled-2026-10-13-backlog-1277) (it supersedes the earlier "StepIndicator in the header strip" note: the strip must also take clicks off Performance mode, which `StepIndicator` by design cannot). In Performance mode the shield makes it read-only and it follows the surface like every other indicator.
 
 ### 12.4 One path, no screen actions
 
@@ -590,13 +590,133 @@ Sections 12.1 to 12.5 settle the toggle (slot, size, accent lit), the indication
 - **Choosing (as built).** The "Performances" button in the Preset Browser footer is final, not interim: it opens the chooser (the `FileChooser` stopgap is gone). It is hidden while the browser is in pick mode. Its width is `kPerfBrowserBtnW` 110.
 - **Exit hold.** Press on the lit Perf button starts a 30 Hz timer; the face fills left to right in the app accent over `kPerfExitHoldMs`, drawn by the shared metal button helper from a `0..1` progress property (no per-product drawing), and the status text reads `Hold to leave Performance mode` while held. Release, or dragging the pointer off the button, cancels and resets the fill. Completion ends the mode (no confirm), restores the preset group, lifts the shield and the lock and clears the rim. A plain click on the lit button does nothing.
 - **Editor follows the surface.** While on, the layer selection comes from `LiveView.selectedLayer` (clamped to the layer count); outside the mode the sidebar selection stays local. On entry the current editor selection seeds it (plan section 4), so nothing jumps.
-- **Status lines (as built, reviewed 2026-10-13).** Each is a name + value pair: `Performance` / `Choose a performance first` (3 s), `Performance` / `Hold to leave Performance mode` (**cleared on release, drag-off and completion**), `Queued` / `4 Acid Line (at the next swap point)`. The fixed "at the next swap point" is accepted until the live view exposes the preset's swap timing; then `<when>` is per 12.2. The exit hold's `muFill` property is a literal key like `muDanger`, accepted by that precedent.- **Where it is not specified further:** the mixer strip, header-bar badges and the clip row follow 12.3 and are #1277 work.
+- **Status lines (as built, reviewed 2026-10-13).** Each is a name + value pair: `Performance` / `Choose a performance first` (3 s), `Performance` / `Hold to leave Performance mode` (**cleared on release, drag-off and completion**), `Queued` / `4 Acid Line (at the next swap point)`. The fixed "at the next swap point" is accepted until the live view exposes the preset's swap timing; then `<when>` is per 12.2. The exit hold's `muFill` property is a literal key like `muDanger`, accepted by that precedent.
+- **Where it is not specified further:** the clip row is section 13 (#1277); the mixer strip and header-bar badges follow 12.3.
 
 **Future (not now, owner):** several apps in a mu-link rig with one app "in focus" on the Launchpad. Nothing here closes it off: the lock, the indicators and the `ControlSink` are all per app.
 
 ---
 
+## 13. Clip bank: the per-layer clip strip (ruled 2026-10-13; backlog #1277)
+
+Data and pad rules: [design-launchpad.md](design-launchpad.md) section 3.2 (pad behaviour, owner 2026-10-09) and [design-plugin-family.md](design-plugin-family.md) (Performance mode, `LaunchClip`, `LiveView`). A **clip** is a stored state of one layer; a layer has up to 8; launching one is a staged layer swap through the shared `Stager`; **a pad never writes a clip** (the surface only recalls, mutes and cancels). Everything in this section is the screen half, and it is one behaviour in every instrument product.
+
+**Principle: the clip strip is the on-screen twin of that layer's row of pads.** Same eight states, same colour, same meaning of a press; the screen can additionally store and clear, because only the PC edits. Outside Performance mode it is a normal control; in Performance mode the shield (12.6) makes it read-only and it shows what the surface did.
+
+### 13.1 Where it lives
+
+- **In the shared `LayerHeaderBar`** (the layer's 32 px header strip), not in the sidebar and not in the content band. Why: the strip is the one place that already means "this layer's stored states" (layer preset dropdown, Save, Reset, the SWP badge), it is identical in all four products, and it costs no height (the header strip and the 464 content band are fixed). The sidebar stays a layer list (a mini-visual per layer, 82 px wide: eight pads do not fit and would repeat for every layer).
+- **New shared component `ClipStrip`** (`mu-core/UI/ClipStrip.{h,cpp}`), a child of `LayerHeaderBar`, opt-in like Reset and Delete: `setShowClips(bool)` (default false). It reuses the `StepIndicator::Lamp` states and its `litFor` lighting function (hoist both into a small shared header both include); it does **not** extend `StepIndicator`, which is a display with no click handling and is an exempt rectangle of the shield. No per-product clip drawing, no product subclass.
+- **Order in the header bar, left to right:** colour dot, name LCD, SWP badge (existing), preset dropdown (the flex item), **ClipStrip**, Save, Reset, Delete. The strip sits next to the preset controls it relates to, right of the dropdown. Spare width at Medium (1088): the strip takes about 251, and the dropdown keeps about 600; the dropdown's existing 80 px floor is untouched.
+- **Which layer.** The strip always shows the layer the panel shows. Selecting another layer (sidebar, or the surface's right column in Performance mode) rebinds it.
+
+### 13.2 The strip: eight pads
+
+`[ Clip ][ 1 ][ 2 ][ 3 ][ 4 ][ 5 ][ 6 ][ 7 ][ 8 ]` left to right = the Launchpad's columns 1 to 8.
+
+- **Caption** "Clip" engraved (the metal engraved-label helper, 11 pt row-label size) in a `kClipLabelW` slot, so a user who does not know the term reads it at once. Hover on the caption: nothing (it is a label).
+- **Pad** = a small rounded-rectangle lamp (`drawLamp` with a rounded-rect shape, the same lens as every other lamp) `kClipPadW` wide by `kStripDisplayH` high, with the clip number engraved on it in `mutedText` on an off or dim lens and in the engraved-label dark colour on a lit lens, so it stays readable (the coder picks the existing colour ids; no new colour). Pads are fixed, never wider or narrower, and keep `kClipPadGap` between them. Pad colour is the **layer's palette colour** (the dot colour, the same hue the surface shows, design-launchpad 3.2b), not the app accent: a clip is part of a layer. This is the one place the layer colour is used for lamps; 12.2's preset lamps stay app accent because an item there is a whole preset.
+- **States** (the on-screen twin of the pad lights; lit amounts are existing `Lighting` fields, no new alpha):
+
+| State | Pad light | On screen |
+|---|---|---|
+| Playing (this layer's current clip) | bright | `lampOn`, steady, layer colour |
+| Available (stored, not playing) | dim | `lampDim` |
+| Empty (nothing stored) | off | bare `lampBase()`, number still engraved so the pad reads as a place to store |
+| Queued for the next boundary | pulsing | smooth pulse between `lampDim` and `lampOn + lampPlayhead` at `queuedPulseHz` (2 Hz), as 12.2 |
+| Playing clip of a **muted** layer | flashing | **square-wave** flash between `lampOn` and `lampDim` at `Lighting::clipMutedFlashHz` (1.0), 50 % duty. A flash (hard on / off) is deliberately unlike the smooth queued pulse so the two never read alike; the dim half is never `lampOff`, so a muted playing clip never looks empty |
+| Just became playing | bright flash | `lampOn + lampPlayhead` for `stepFlashMs` (150), then steady, as 12.2 |
+
+  A muted layer that also has a queued clip shows both: the playing pad flashes and the queued pad pulses. If no clip is playing (see 13.6, none has been launched since load) no pad is bright; stored pads are dim.
+- **Hover** (status bar, name + value): `Clip 3` / `Kick: stored`, `Clip 3` / `Kick: playing`, `Clip 3` / `Kick: playing, muted`, `Clip 3` / `Kick: queued (<when>)`, `Clip 3` / `Kick: empty, click to store`. `<when>` follows the preset's swap timing (12.2 / 6.6; "now" when stopped); until the live view exposes it, the fixed "at the next swap point" (12.6) is accepted. Tooltips (sparingly, 700 ms): on a stored pad "Play clip 3 (click again to mute)", on an empty pad "Store this <noun> here"; the noun is the product's lower-case layer noun.
+- **Disabled**: none. A strip is hidden (`setShowClips(false)`) in a product or build that has no clip bank; it is never shown dead (no hot-swap, no strip: mu-Clid MIDI, see 13.7).
+
+### 13.3 Gestures (one path, the same meaning as the surface)
+
+A press on the screen calls the same `ControlAction`s the surface does (`LaunchClip`, `MuteLayer`, and the store / clear actions below) through the shell's `ControlSink`; the strip contains no switching logic of its own, and the state it shows is derived from `LiveView`, never from who pressed.
+
+| Gesture | Pad is | Result |
+|---|---|---|
+| Click | Stored, not playing | **Launch**: queue the clip; it lands at the preset's swap timing (immediately when stopped). The pad pulses until it commits. A previously queued clip on this layer is replaced. |
+| Click | Playing, nothing else queued | **Mute** the layer; click again to **unmute** (owner-approved). Quantised like every mute (design-launchpad 3.3). The pad flashes while muted. |
+| Click | Playing, another clip queued | **Cancel the queue** (the clip keeps playing, the queued pad returns to dim). Same rule as the preset indicator (12.2): pressing what is playing cancels the wait; to mute, press again. |
+| Click | Queued | No change (it is already queued). |
+| Click | Empty | **Store** the layer's current state here, no confirm (nothing is lost). The pad becomes the playing clip and flashes once. |
+| Shift + click | Any | **Store** the layer's current state here. On a stored clip other than the playing one, ask first (`confirmAsync`, title "Replace Clip", message `Replace clip 3 of "Kick" with its current state?` newline `This cannot be undone.`, button "Replace"; red destructive button, as Delete). On the playing clip (updating it after a tweak, the normal workflow) no confirm. |
+| Right-click (or Ctrl + click) | Any | A small menu: "Store here" (as Shift + click), "Clear" (enabled only when stored). "Clear" asks first (`confirmAsync`, title "Clear Clip", message `Clear clip 3 of "Kick"?` newline `This cannot be undone.`, button "Clear"). Clearing the playing clip leaves the layer playing as it is (the pad goes off, no pad is playing). |
+
+- **Edits are not clips.** Turning a knob changes the live layer only; the playing pad stays bright and the stored clip is unchanged until Store. Recalling another clip replaces the live edits without asking (the same as loading a layer preset today). Whether the playing pad should show "modified" is an open question (13.8), not built in the first version.
+- **Store / recall, wording of the stored state.** What is stored is the layer's composed state, exactly what the layer preset file holds for that layer (engine, sequencer, voice parameters, its modulators); not its mixer strip (level, pan, sends, mute, FX sends), which is the mixer's. This keeps a clip launch from moving a fader mid-song. (Assumption, to confirm by the architecture-steward: the layer preset file already excludes the strip. If it does not, the clip follows whatever the layer preset holds, minus the strip.)
+- **Status lines** (name + value, cleared after `kPerfStatusMs` 3 s unless stated): `Clip` / `Stored Kick clip 3`; `Clip` / `Cleared Kick clip 3`; `Queued` / `Kick clip 5 (at the next swap point)` (stays while waiting, clears on commit or cancel, as 12.2); `Mute` / `Kick muted` and `Kick unmuted`.
+- **Keyboard.** None. No new binding (the family has no per-layer clip keys, and Performance mode forbids performance keys, 12.4). Shift and right-click are the only modifiers.
+- **Do not.** Make a click on a dim pad store instead of launch; write a clip from the surface; offer "Launch" and "Store" as separate on-screen buttons; add an auto-advance or chain (dropped by the owner); put a clip's number or name in the sidebar; draw the pads in the app accent.
+
+### 13.4 With Performance mode and the Swap timing
+
+- **Performance mode on.** The strip is under the shield: it ignores every click, Shift and right-click, but keeps animating. It is **not** an exempt rectangle (it has no hover in the mode; the layer's name and clip state are read from the lamps and the status line). The sidebar layer indicator and `StepIndicator` stay the only exempt displays. A surface press selects the layer (the screen follows, 12.3), the strip shows that layer's pads, and the queued pad pulses until it commits, with the existing SWP badge in the header and the `Queued` status line. Store, Clear and the confirm dialogs are unreachable (the lock); nothing a clip does can write data on stage.
+- **Entering the mode closes any open clip menu or Replace / Clear dialog as a cancel** (12.6 already closes every overlay and dialog; the pad menu is a popup menu and is dismissed by the same call).
+- **Swap timing.** A clip launch is a layer swap, so it lands at the preset's `mstr_swap` choice (6.6): master loop, this layer's loop, or the bar; immediately when stopped. One setting, no second clip-specific quantise. Mute and unmute use the launch-quantise rule of design-launchpad 3.3, not the swap timing. A **full-preset switch** (a performance item) drops every pending clip launch (the stager's existing behaviour): the queued pads stop pulsing, and at the commit the strip shows the new preset's bank.
+- **The preset dropdown and SWP badge.** A queued clip shows the existing SWP badge (`setStagingBadge`) in the header, exactly as a queued layer preset does. After a clip commits, the preset dropdown shows the placeholder `Clip 3` (`setPresetPlaceholder`) because the layer no longer matches a file; loading a file from the dropdown clears the playing clip.
+
+### 13.5 Tokens
+
+All in `MuLookAndFeel.h` unless stated; every one is scaled with `s()`.
+
+| Token | Value | Use |
+|---|---|---|
+| `kClipPadW` | 24 | Pad width |
+| `kClipPadH` | `kStripDisplayH` (20) | Pad height (a derived reference, not a new number) |
+| `kClipPadGap` | 3 | Gap between pads |
+| `kClipLabelW` | 30 | Engraved "Clip" caption slot |
+| `kClipStripGap` | 8 | Gap between the strip and the dropdown |
+| `MuTheme::Lighting::clipMutedFlashHz` | 1.0 | Muted-playing square flash (new, in `MuTheme.h`) |
+
+Strip width at Medium = 30 + 8 x 24 + 7 x 3 + 8 = 251. Reused, not new: `queuedPulseHz`, `stepFlashMs`, `lampOff / lampDim / lampOn / lampPlayhead`, `kPerfStatusMs`, `kStatusLampD`-style lamp lens. Large scales everything together; the dropdown flex absorbs the rest. No product-specific layout constant exists.
+
+### 13.6 The bank and the loaded preset (decisions for Andy are marked)
+
+- **After a preset load or New**, the bank is whatever the file holds; **no clip is playing** until one is launched, unless the file says which was active (decision A below). Pads then read: stored dim, empty off.
+- **Reset layer** returns the layer to defaults and **clears its bank**; the reset confirm gains one line only when the bank is non-empty: `This also clears its clips.` (inserted before `This cannot be undone.`; the one shared `LayerHeaderBar::resetConfirmMessage` takes a clip count). **Delete layer** takes its bank with it, no extra wording.
+- **Layer preset files** (`.muRhythm`, `.muPattern`, `.muArp`, `.muTrack`): see decision B.
+- **Clip numbering** is fixed 1 to 8 and matches the pad columns; there are no names (a stored clip is identified by its number and, in the tooltip, nothing else).
+
+**Decisions that are Andy's (the file format is his):**
+
+- **A. Do full presets remember which clip was playing?** Recommendation: yes, one small value per layer (`activeClip`, -1 for none) saved with the preset, so the Launchpad lights up correctly the moment a preset commits on stage, and a clip-based set-up reopens as left. Without it every pad is dim after a load and the player must launch a clip before anything shows bright. Cost: one integer per layer in the layer node; old files omit it and load with none playing.
+- **B. Does a layer preset file carry its clip bank?** Recommendation: **no**. A layer preset is one state (a sound, a pattern) that you load into a layer; the bank belongs to the layer's place in a performance, inside the full preset. Loading a layer preset replaces the live state and leaves the bank alone; loading a full preset replaces everything including banks. Consequence: you cannot share a bank between presets except by copying the full preset. The alternative (the bank travels with the layer preset) makes each layer preset up to 8 times larger and makes "load this layer preset" ambiguous (does it overwrite the 8 clips you built?).
+- **C. Full-preset file format impact (decision for the record).** Each layer node gains an optional `<Clips>` child holding up to 8 composed states (the same node a layer preset saves) and the `activeClip` value from A. Old files load with empty banks; a new file opened in an older build ignores the children. No version bump is needed if the loader ignores unknown children, which the architecture-steward must confirm; if not, a one-step format bump. Size: up to 64 layer states per preset beyond today's 8, text XML, still small (sample and wavetable data are references, not embedded). Recommendation: accept.
+
+### 13.7 What the user can do, per product
+
+The strip is the same shared component with the product's layer noun in tooltips and dialogs (Rhythm, Voice, Layer, Track). It needs the hot-swap `Stager`, so it appears wherever a product has one.
+
+| Product | Noun | Strip on screen | Surface (standalone, Performance mode) | Swap timing choices |
+|---|---|---|---|---|
+| mu-Clid | Rhythm | Yes, every rhythm (up to 8) | Rows 1 to 8 = rhythms | Master loop, rhythm loop (6.6) |
+| mu-Tant | Voice | Yes, every voice (8) | Rows = voices | Master loop, voice loop, bar |
+| mu-Toni | Layer | Yes, every existing layer (1 to 8); rows with no layer stay off | Rows = existing layers | None shown: every timing is the bar |
+| mu-On | Track | Yes, every track (1 to 8); a clip may change the track's engine, as loading a `.muTrack` does | Rows = tracks | None shown: every timing is the bar |
+| mu-Clid MIDI | Rhythm | **No** (no hot-swap, no `mstr_swap`; a strip would be a dead control, as with the Trig / Leg switches). Shown later if it gains a stager | None | None |
+
+The Launchpad and Performance mode are standalone only for now (12, availability), so in a plugin build the strip is on screen only: click to launch, mute, store, clear, with the same quantise rules; no surface lights.
+
+### 13.8 Open questions
+
+1. **Decisions A and B above** (Andy).
+2. **Show "modified" on the playing pad?** After tweaking a recalled clip, a small mark (for example an engraved dot on the playing pad) would warn that Store has not been pressed. Recommendation: not in the first version; add if testing shows lost tweaks. It needs the stored clip compared with the live state, which costs a comparison the architecture-steward should size.
+3. **Mute vs cancel on the playing pad** (13.3): the cancel-first rule adds a press to mute while a clip is queued. Recommendation: keep, for parity with the preset rule; revisit on hardware.
+4. **Should the surface get a "store" gesture later?** Owner ruled no (a pad never writes a preset); not planned.
+5. **Does the strip appear in mu-Clid MIDI later?** Only if it gets a stager (design-future "one instance" direction); nothing in the strip closes that off.
+6. **Large display on a pad-heavy gig**: the 20 px pad height is the family strip display height; if a touch screen is used, Large (1.25) is advised, no touch-specific size (12.4).
+7. **Row direction** (design-launchpad open question: rows = layers, columns = clips) is taken as settled by 12.3; the strip's left to right order is the columns.
+
+Follow-ups for the coder / backlog (not edited by the UX controller): (a) `LiveView` gains per layer `clipOccupied(i)`, `playingClip`, `queuedClip` and `isLayerMuted`, and `ClipStrip` reads only that; (b) hoist `StepIndicator::Lamp` and `litFor` to a shared header and add the muted-flash state; (c) new `ControlAction`s `StoreClip(layer, index)` and `ClearClip(layer, index)` beside `LaunchClip` (screen-only, refused by the surface mapping); (d) `LayerHeaderBar::resetConfirmMessage` takes the clip count; (e) tests: lamp state per row of the 13.2 table, the gesture table of 13.3 against a fake sink, the 251 px width and dropdown floor, strip hidden in mu-Clid MIDI, and the shield making the strip read-only.
+
+---
+
 ## Design rulings
+
+- 2026-10-13 - Clip bank UI (#1277): where and how do clips show on screen? A shared `ClipStrip` in the layer header bar (right of the preset dropdown), 8 layer-coloured lamp pads numbered 1 to 8 with the pad states as on-screen twins (playing bright, available dim, empty off, queued smooth pulse, muted playing clip hard 1 Hz flash); click launches / mutes / cancels, click on empty or Shift + click stores, right-click menu stores or clears with confirms; lands at the preset swap timing; read-only under the Performance shield; hidden in mu-Clid MIDI. New tokens `kClipPad*`, `kClipLabelW`, `kClipStripGap`, `Lighting::clipMutedFlashHz`. Preset-file impact (active clip, layer-preset bank) left to Andy. Changed new section 13, 12.3, 12.6.
 
 - 2026-10-13 - Review of the Performance chooser build (#1597), by code (no paint grabbed). Settled: the footer "Performances" button is final, Use saves first and closes, discard prompts, pick mode, name-only Save card, kPerf* tokens. Changed 12.5, 12.6. Not yet: see the review changes (status cue in pick mode, single "saved and loaded" line, discard wording, tooltips).
 

@@ -422,8 +422,8 @@ throughout; the stages marked **O** also wait for owner decisions on behaviour o
    parameter prefix list are the same index.
 4. **`Layer` stays data-light.** Its members stay `voiceParams`, `controlSequences`, `modulationMatrix`,
    `modLock`, `voiceParamsLock`, `name`, `colourIndex`; it gains the virtuals above and a message-thread-only
-   clip bank (`std::array<juce::ValueTree, 8>`, one composed slot node each, never read by the audio
-   thread; the clip-launch design is #1277). It does **not** hold `InsertProcessor`: `Rhythm` is copied by
+   clip bank (**amended 2026-10-13:** `SlotBound<mu_core::ClipBank> clips`, never read by the audio thread;
+   the design is "Clip bank" below). It does **not** hold `InsertProcessor`: `Rhythm` is copied by
    value today and mu-Clid's insert lives in its `VoiceEngine` so a retired engine keeps its tail. mu-Tant
    and mu-Toni hold the insert as a plain member of `Pattern` / `Arp` (`InsertProcessor insert`, as `Arp`
    already does; replacing the `inserts` array). **Amended 2026-10-12:** the planned `mu_core::InsertStage`
@@ -511,7 +511,7 @@ on the build PC), O = needs the owner.
 | 3 | M | Persistence virtuals | `Layer::writeExtras` / `applyExtras` (base: modulators); each product's `LayerExtras` lambdas become the virtual overrides on `Pattern` / `Arp` / `Track`; `initLayerState(prefixes)` builds the `LayerExtras` that calls `getLayer(slot)`. mu-Clid keeps `PresetIO` shapes and gains nothing here. | `MuTantPersistTests`, `ModulatorSerialiseTests`, `PresetRoundTripTests`, `PresetXMLRoundTripTests`, `TONI_roundtrip`, `ON_roundtrip`, `TANT_roundtrip` |
 | 4 | S | Ownership moves to `ProcessorBase` | The `layers` array, `numLayers`, `layersLock`, `createLayer`, `layerAs<T>`; Tant first (its `numVoices` / `voicesLock` become these, `bankLock` split out), then Toni and On at a constant count (4 / 5) with the try-lock added so a later edit is safe; the product's `addVoice` etc. still exist and now move pointers instead of copying data. | as stage 3, plus a new `LayerOwnershipTests` (construct, publish, destroy off-lock) and a listening render with structural edits scripted mid-play |
 | 5 | S | Central edits and the generic stager. **Part 1 done (commit a41c5fd):** `addLayer` / `removeLayer` / `swapLayers` / `resetLayer` in `ProcessorBase` with the hooks `createLayer`, `canEditLayers`, `cancelPendingSwap`, `Layer::onMoved`; mu-Tant adopted (its `addVoice` / `removeVoice` / `swapVoices` / `resetVoice` are gone). Deviations: mu-Tant keeps all 8 `Pattern`s allocated (add / remove reset and re-use a slot rather than creating / destroying one); no `typeId` yet (stage 8); no `onLayersChanged` hook; mu-Clid adopts with stage 7 (`RhythmManager` stays until then). **Part 2 done (commit 8a8be28, ruled 2026-10-11):** the stager storage `mu_hotswap::Stager` stays a template in `mu-core/Plugin/HotSwap.h`; the generic piece is `mu_hotswap::LayerSwapper<Payload, N>` (the old `BarLineSwapper` generalised: the boundary rule is a callable giving the loop length in beats per slot), held by `ProcessorBase` as `layerSwapper` (a `ValueTree` instance, `N = kMaxLayers = 8`) with default `hasPendingSwap` / `hasPendingFullPreset` / `cancelPendingSwap` over it and `flagSwapBoundaries` for the audio thread. mu-Tant's `VoiceHotSwapStager` is deleted and the Toni / On `BarLineSwapper` members are dropped (they now call `flagSwapBoundaries` with the default bar rule); mu-Tant's boundary rule is `mu_tant::swapLoopBeats`; mu-Clid keeps its `PendingRhythm` stager until stage 7. Deviations: (a) N is 8 in Toni and On too (was 4 / 5), so the stager is one size family-wide; (b) `onPresetSwapCommitted` now fires once, after all applies in a commit, rather than between them; (c) mu-Tant decided stage-or-apply itself on `isInternalPlaying()` at first; it now follows the family rule through `useFull` / `useSlot` (see the Hot-swap section). || new `LayerStructureTests`: fill to 8, remove the middle, swap ends, reset; assert parameter values, colour, mixer channel, sidechain source and pending-swap cancel all follow; a two-thread stress test (message thread edits while a loop calls `processBlock`, no allocation, no crash); every `*_roundtrip` and the hot-swap listening tests (`swap`, `slot swap`) |
-| 6 | O | Variable layers in mu-Toni (#1240) and mu-On (#1241); the clip bank (#1277) | See owner decisions below. The clip bank is `Layer::clips`: a clip is a composed slot node (Stage 3 makes a layer loadable from one), launching it is a staged layer swap (Stage 5), and a pad never writes a preset. | tests per feature, written with the decisions |
+| 6 | O | Variable layers in mu-Toni (#1240) and mu-On (#1241); the clip bank (#1277) | See owner decisions below. The clip bank is `Layer::clips`: a clip is a stored layer-preset tree, launching it is a staged layer swap (Stage 5), and a pad never writes a preset. Ruled and staged in "Clip bank" below. | tests per feature, written with the decisions |
 | 7 | S | mu-Clid into the container | **Amended 2026-10-12 (Architecture Steward): the ordered plan is "Stage 7 implementation plan (#1318)" below; read that, not this cell.** In short: `mu_core::Rhythm` is used directly (no `mu_clid::Rhythm`, no engine members in the layer, `Rhythm` stays a copyable value); the voice / MIDI engines, retired tails, play state, sample paths and modulation previous-state stay processor-side keyed by slot and move in a `ProcessorBase` hook; `RhythmSequencer` stops owning the rhythms and binds `Rhythm*` per slot; `rhythmsLock` becomes `layersLock`; `RhythmManager` is deleted. Highest risk of the plan (about 1580 uses, the retire-tail), so four steps, each its own commit. | `mu-clid-tests` (build the target explicitly, it is not in ALL), `mu-clid-midi-tests`, `CLID_roundtrip`, the retire-tail and hot-swap listening tests, a scripted structural-edit render |
 | 8 | O | Registry and `Layer::render` | With the combined instance. The saved-data renames it waited for (#1263) are done. Until the owner schedules the combined instance the mixer's `RenderChannelFn` stays product-side, and nothing is built for this stage; see "Stage 8: what the owner decides (#1319)". | with that work |
 
@@ -1265,7 +1265,7 @@ loop and clock (mu-link). Nothing here needs to change for it, provided the mana
 | 2 | `LiveState`, `LiveView`, the actions, `perform`, `supportsPerformanceMode`, persistence, tests with fake callbacks | step 1; `stageItem` is the existing `stageFullPreset`. This is the #1328 work for `SelectLayer`, the performance actions and `PresetNext/Prev`. **Not** #1276. **2a built 2026-10-13 (1b4bf08); 2b and the review fixes built 2026-10-13 (a0fd6ec):** `PerformanceMode` takes `index` (-1 toggle, 0 off, 1 on), `MidiControlMap` saves and loads `index` with a round-trip test, `ProcessorBase::saveLiveState / restoreLiveState` are called by all four session products (mu-Clid parses first and skips the `_default.muClid` auto-load when `LiveState::modeSaved`), and the queue identity is the stage serial plus `reconcile`. architecture-steward re-check 2026-10-13: **Pass** (placement, boundary script, persistence wiring as ruled). Step 3 may start |
 | 3 | `ShellBackend` accessors, the input shield, the indication and mode toggle, editor following `selectedLayer` | step 2 and the `ux-controller` ruling. **Built 2026-10-13 (570ee8e); architecture-steward review 2026-10-13: Pass** on structure (accessors, `ShellChrome::InputShield` and entry order, `StepIndicator` in `UI/Components`, pure `PerformanceIndication` in `UI/` under `mu_ui::perf`, `LayerSidebar` wired once by `EditorShellBase::setMainArea`, no product symbol, no state in the editor). Toggle order right to left: Mixer, Perf, gear. The interim header-only `UI/PerformanceChooser.h` and the `FileChooser` in `EditorShellBase` are gone: the chooser is a `ShellChrome` page (`UI/PerformanceChooser` component over `UI/PerformanceChooserModel`, logic in `mu_ui::perf::ChooserModel`, no display), loading through the neutral `ShellBackend::getProductStateId()` / `loadPerformance()` hooks, picking presets through `PresetBrowser::beginPick` and naming through `SaveDialog::setNameAndDescriptionOnly` (architecture-steward review 2026-10-13: Pass, boundary checker clean). The "Queued" status says "(at the next swap point)" until `LiveView` exposes the preset's `SwapTiming`; the ux wording of "when" is a follow-up, not a structural one |
 | 4 | `mu-control` surface model reads `LiveView`: top row = `PerformanceItem(n)`, right column = `SelectLayer`, grid = `LaunchClip` | #1276, step 2; the grid needs 5 |
-| 5 | `LaunchClip`, `ClipNext/Prev`, the clip bank and per-layer clip fields in `LiveState` | #1277 (this part of #1328) |
+| 5 | `LaunchClip`, `ClipNext/Prev`, the clip bank and per-layer clip fields in `LiveState` | #1277 (this part of #1328); the bank and launch path are steps C1 to C4 of [Clip bank](#clip-bank--family-standard-ruled-2026-10-13-backlog-1277), the `LiveState` part is its C5 |
 
 With steps 1 to 3 the mode can be driven by the MIDI map before `mu-control` exists. #1278 (live preset switch) is the same staging path, so step 2
 reuses it; its hardware checks (FX tails, largest-preset load time, neighbour pre-load, loading state) do not block steps 1 to 3 but must pass
@@ -1275,6 +1275,146 @@ Do not: keep a performance flag, selected layer or queued item in the editor; gi
 keyboard step actions while locked; make product panels lock themselves (the chrome shield does it); quantise item switches or clip launches
 in `perform`; keep a second copy of the swap timing or its predicates in a product; let the audio thread read or write `LiveState`; put
 `LiveState` in `mu-control`; let the controller manager name `ProcessorBase` or an editor; save the mode in the preset or APVTS.
+
+## Clip bank — family standard (ruled 2026-10-13; backlog #1277)
+
+Eight stored states per layer that a controller pad launches, as in Ableton Live and Bitwig. Owner decisions already made are in
+[design-launchpad.md §3.2](design-launchpad.md#32-four-levels-of-what-is-playing-owner-2026-10-09) (what a pad does and how it lights) and are not
+repeated. This section is the structure. Items marked **Andy** are file-format or behaviour commitments the architecture does not decide; each
+carries a recommendation and the build assumes it until he answers.
+
+**1. Names.** `Layer` settled in #1265 as the parent class; `Clip` is the launchable thing ([design-naming.md §1](design-naming.md#1-the-vocabulary), owner).
+They do not clash: no type called `Clip` exists, `Layer` is the container, `Clip` is one stored state of it. "Slot" stays for FX / insert slots and
+the stager's index. New names: `mu_core::ClipBank` (the store), `mu_limits::kClipsPerLayer = 8` (beside `kMaxLayers` in `MuLimits.h`), XML tags
+`Clips` / `Clip`, actions `LaunchClip` / `ClipNext` / `ClipPrev` (already declared, `ControlAction.h`), and in the UI a `ClipRow` (for the
+`ux-controller`). A product never adds `<Type>Clip`: a clip is the product's *layer preset* and has no type of its own.
+
+**2. What a clip is.** One clip = **exactly what that product's layer preset carries**, no more: the layer's parameters, sequencer data, engine
+selection and modulators; **not** the mixer strip, not the name or colour (the layer keeps its own on launch). It is stored as the tree the product's
+`loadLayerPreset` consumes after parsing (the root tag is the product's own: `MuTantVoice`, `MuClidRhythm`, ...), so a clip and a `.muPattern` /
+`.muRhythm` are the same shape and one code path reads both. mu-core treats the payload as opaque. An empty clip is an invalid `ValueTree`.
+
+**3. Where the store lives: on `Layer`, as `SlotBound<mu_core::ClipBank> clips`.** `mu-core/Sequencer/ClipBank.h`, header-only, namespace
+`mu_core`: `std::array<juce::ValueTree, kClipsPerLayer>` plus a per-clip name, with `set(i, tree, name)`, `get(i)`, `clear(i)`, `clearAll()`,
+`occupancy()` (an 8-bit mask) and the persistence pair below. Why this and not the alternatives:
+- **On the layer, not a processor-side array by slot.** Clips are layer data: when `removeLayer` / `swapLayers` move the `unique_ptr<Layer>` the bank
+  must go with its layer, exactly as the layer's sequencer data does. A slot-keyed array would need its own move logic in every structural edit.
+- **`SlotBound`, not a plain member.** mu-Clid's `Rhythm` is a copyable value and a staged layer preset reaches the slot by assigning a freshly prepared
+  `Rhythm` (`installRhythm`); `adoptDefaults` also copies. A plain member would be wiped by every layer-preset load or reset. `SlotBound` makes copy and
+  assignment do nothing, so loading a layer preset, launching a clip and `adoptDefaults` never touch the bank, and the bank still travels with the pointer
+  move. (Same reason the insert uses it; the word "slot" in the name is the old layer-position meaning and is not renamed.)
+- **`ClipBank` is a class, not a bare `std::array<ValueTree, 8>`:** `ValueTree` copies share their data, so an unguarded copy would alias two layers'
+  clips. The class owns `createCopy()` on every store and read-out, so no caller can alias a stored tree.
+- **Not on `ProcessorBase`/`LiveState`:** `LiveState` holds *what is playing and queued* (volatile, unsaved); the bank is *saved data*.
+- **Message thread only.** The audio thread never reads it (no allocation, no lock, no atomics needed). Every access is on the message thread, which
+  is also where layers are created and destroyed, so a `Layer*` taken inside one message-thread call cannot dangle.
+- **Structural edits.** The bank follows its layer on swap and remove (pointer move). Because `adoptDefaults` does not touch a `SlotBound`, the base
+  `addLayer`, `resetLayer` (see Andy 3) and the vacated top slot after `removeLayer` call `clearAll()` **explicitly, after `layersLock` is released**
+  (freeing eight trees is not a microsecond job). Under `keepSpareLayers` the spare layer is re-used, so this is not optional.
+
+**4. Actions: data on `Layer`, behaviour on `ProcessorBase`.** The backlog row asked for generic launch / mute / store actions on the parent `Layer`.
+Ruled otherwise: `Layer` gains **no new virtuals** (a launch needs the swapper, the parameter layout and the control sink, none of which a `Layer`
+can see). `ProcessorBase` gets, all message-thread, all non-virtual:
+- `bool storeClip(int layer, int clip, const juce::String& name = {})`: capture the live layer into the bank (the same capture `saveLayerPreset` uses, below).
+- `bool clearClip(int layer, int clip)`, `bool loadClipFromFile(int layer, int clip, const juce::File& layerPreset)` (a layer-preset file read into a clip, validated by the same tag check as a load).
+- `bool launchClip(int layer, int clip)`: false when the layer or clip is out of range, the clip is empty, or **a full preset is staged** (`layerSwapper.hasFullPending()`; Andy 4).
+  Otherwise it deep-copies the stored tree and hands it to the product's stage hook with `keepIdentity = true`.
+  This is what `LiveState`'s `stageClip(layer, index)` callback calls.
+- `uint8_t clipMask(int layer) const`.
+Pad *mute on press of the playing clip* is not a bank concern: `perform` sets the layer's mixer mute parameter through the control router, like any mapped mute.
+
+**5. Capture and apply through the Stager: one new pair of hooks, no second path.** Today each product's `saveLayerPreset` builds a tree and writes a
+file; `loadLayerPreset` parses a file, migrates it, preloads assets and calls `layerSwapper.useSlot` (mu-Clid: `stageRhythmPreset` builds a prepared
+`PendingRhythm` and stages it in its own stager until a later step unifies it). Split each at the tree:
+
+| Hook (virtual on `ProcessorBase`, default empty/false) | Meaning | Today's equivalent per product |
+|---|---|---|
+| `juce::ValueTree captureLayerPresetTree(int layer)` | the tree `saveLayerPreset` would write, without the file | mu-Tant/Toni/On: `captureLayerNode(layer, tag)`; mu-Clid: the body of `PresetIO::saveRhythmPresetToFile` |
+| `void stageLayerPresetTree(int layer, juce::ValueTree tree, bool keepIdentity)` | everything `loadLayerPreset` does after the parse: migrate, preload, then `useSlot` (or mu-Clid's prepare + stage) | the tail of each `loadLayerPreset`; mu-Clid: `prepareRhythm` + `hotSwapStager.stage` or `applyRhythmPreset` |
+
+`saveLayerPreset` becomes `write(captureLayerPresetTree)`, `loadLayerPreset` becomes `parse` then `stageLayerPresetTree`, `storeClip` is
+`bank.set(captureLayerPresetTree)`, `launchClip` is `stageLayerPresetTree(bank.get().createCopy())`. The copy matters: the migration step mutates the tree it is
+given. Everything the Hot-swap section requires then holds with no new rule: stopped means apply at once, playing means stage and commit at the preset's
+`SwapTiming` boundary, heavy work (wavetable and sample preloads) at stage time, readiness gate, `onLayerPresetCommitted(layer)` after the commit, a structural
+edit cancels the pending swap, and `layerSwapper.useSlot` lands a pending full preset first. The commit never touches the bank (the apply is `applyLayerNode`,
+which has no bank code, and `SlotBound` protects the mu-Clid assignment).
+
+**6. Clip state in `LiveState`** (the Performance mode section's `playingClip` / `queuedClip`, made precise):
+- Per layer: `playingClip` (-1 = none), `queuedClip` (-1 = none), `clipMask`. Message thread, unsaved, as the rest of `LiveState`. After any preset load, reset
+  or full-preset commit `playingClip` is **none** (no pad is bright: the layer plays its saved live state, which is not necessarily one of its clips). A launch
+  sets it at the commit, never before.
+- **Queue identity.** A clip launch must not be mistaken for a different swap on the same layer (a layer-preset file loaded after the launch replaces the
+  pending payload; the commit then fires `onLayerPresetCommitted` for a payload that is not the clip). Mirror the full-preset rule: `LayerSwapper` gains
+  `slotStageSerial(i)` (bumped by `stage` and `cancel` per slot, as `fullStageSerial` is), `LiveState` records it at the launch, and the commit callback
+  and `reconcile()` treat a mismatch as "the queued clip was superseded or cancelled" (clear `queuedClip`, do not move `playingClip`). Any non-clip
+  `stageLayerPresetTree` clears that layer's `queuedClip` and `playingClip` through `ProcessorBase`, the one choke point.
+- **Structural edits.** `LiveState` gains `remapLayers(oldToNew)`, called from the same place as `remapLayerReferences` (phase 3 of `removeLayer` / `swapLayers`, same
+  functor): `playingClip` follows its layer, `queuedClip` of an affected layer is cleared (the swap was cancelled), a gone layer is dropped.
+- **Mask.** `ProcessorBase` pushes `clipMask` into `LiveState` from one helper (`publishClipMasks()`) at every point the bank changes: store, clear, file load,
+  full-preset commit, structural edit. `LiveView` gains `getPlayingClip(layer)`, `getQueuedClip(layer)`, `getClipMask(layer)` and `isLayerMuted(layer)`
+  (the last read from the mixer mute parameter by `ProcessorBase`, so `mu-control` can flash a muted playing clip without naming a product).
+- **`ClipNext` / `ClipPrev`** act on `selectedLayer`: from the queued clip (else the playing one, else none) step to the next **non-empty** clip, wrapping;
+  false when no other non-empty clip exists. They do not mute.
+
+**7. Preset-file impact** (all additive; **Andy 1** to confirm). Clips are saved in **full presets and host sessions only**, never in a layer preset (a
+layer preset is one clip's worth of state; carrying a bank would make loading it overwrite the bank, and nest banks).
+- *Composed products (mu-Tant, mu-Toni, mu-On):* each `<Slot idx>` node of the composed state gains one optional child
+  `<Clips><Clip idx="0..7" name=""> <MuTantVoice ...>...</MuTantVoice> </Clip> ...</Clips>`: `idx` is the position, `name` is optional and may be empty,
+  the single child is the stored layer-preset tree, and an empty clip has no `<Clip>` element. Written and read **once, centrally**, by
+  `captureComposedState` / `applyComposedState` through `ClipBank::writeTo(node)` / `readFrom(node)`; no product code. `readFrom` of an absent or invalid
+  node clears the bank, which is how a slot the state lacks is emptied. The `format` property stays 2.
+- *mu-Clid:* each `<Rhythm>` child of `MuClidPreset` (and of a host session) gains the same `<Clips>` child, with `MuClidRhythm`-shaped payloads, written and
+  read in `PresetIO::buildFullPresetTree` and the full-preset prepare/commit using the same `ClipBank` functions; the prepared full-preset payload carries
+  each rhythm's bank and the commit sets it (the `SlotBound` assignment would not). Clip payloads reference a sample by path only (**Andy 2**).
+- *Layer presets (`.muRhythm .muPattern .muArp .muTrack`):* unchanged. *Performance files:* unchanged (pointers to presets). *Extensions:* no new one. *MIDI map:* `LaunchClip`
+  already serialises by name with `index`; nothing new.
+- **Backwards compatibility.** A file without `<Clips>` loads with eight empty clips, no migration code. An older build opening a file with clips ignores the unknown
+  child and, if it re-saves, drops the clips (accepted: no loss of anything the older build understood; stated in the release notes of the release that adds the feature).
+  The only fixtures needed are a pre-feature state per product, which already exist as the round-trip test files.
+- **Size.** A full preset grows by up to eight layer-preset trees per layer. No cap beyond the 8 x 8.
+
+**8. Staged build order.** Each step: one product at a time after C1, a Debug build, that product's suite plus `mu-core-tests`, and `check-core-boundary`
+(mu-core names no product). `dsp-controller` reviews C3 and C4 only (the stage and commit paths, reused unchanged); C1, C2 and C5 never touch the audio thread.
+
+| Step | Kind | Work | Tests (written with the step) |
+|---|---|---|---|
+| C1 | M | `MuLimits.h` `kClipsPerLayer`; `ClipBank` (+ `SlotBound` member on `Layer`, `clearAll()` calls in `addLayer` / `resetLayer` / `removeLayer`); `writeTo` / `readFrom`; no product code | `mu-core-tests` `ClipBankTests`: set / get / clear / mask; deep-copy (editing a returned tree never changes the stored one); XML round trip incl. names and an empty middle clip; absent node clears; `idx` out of range, duplicate and 9th clip ignored; `SlotBound` survives `Layer` copy, assignment and `adoptDefaults`; travels with a `unique_ptr` move |
+| C2 | M | `ProcessorBase::captureComposedState` / `applyComposedState` write and read the banks (Tant, Toni, On). Structural-edit rules from item 3 | Per product, an old composed fixture loads with empty banks; a state with banks round-trips (full preset and host session); extend `LayerStructureTests`: add gives an empty bank, remove-middle shifts banks with their layers and empties the vacated top, swap exchanges banks, reset empties it (Andy 3); a count-reducing full preset empties banks past the new count; the `*_roundtrip` listening tests unchanged and sample-identical |
+| C3 | M/S | `captureLayerPresetTree` / `stageLayerPresetTree` split for Tant first, then Toni, On; `storeClip` / `clearClip` / `loadClipFromFile` / `launchClip`; no `LiveState` yet | Per product: store then change parameters then launch (stopped) restores them, mixer strip, name and colour untouched; launch while playing is pending (`hasPendingSwap`) and applies only at the boundary, firing `onLayerPresetCommitted`; empty clip, out-of-range index and launch while a full preset is staged return false and change nothing; launching leaves the bank unchanged; a structural edit cancels a pending launch; a layer-preset file load after a launch supersedes it; the `swap` / `slot swap` hot-swap listening tests |
+| C4 | S | mu-Clid: the same two hooks over `PresetIO`; `<Clips>` in `buildFullPresetTree`, the prepare and commit of a full preset, host session; sample-path-only rule; mu-Clid MIDI compiles and ignores the bank (Open question 5) | `mu-clid-tests` (build the target explicitly) and `mu-clid-midi-tests`: full-preset and session round trip with clips; an old `.muClid` loads empty; a staged full preset carries its banks and sets them at the commit; launch (stopped and staged) equals loading the same `.muRhythm`; the existing `HotSwapCancelTests` shape for a cancelled launch; `CLID_roundtrip` and the retire-tail listening test |
+| C5 | M | `LiveState` / `LiveView` clip fields, `slotStageSerial`, `remapLayers`, `publishClipMasks`, `LaunchClip` / `ClipNext` / `ClipPrev` in `perform` | `mu-core-tests` with fake callbacks, as the performance step 2: launch queues and commit moves `playingClip`; superseded and cancelled launches clear `queuedClip`; full-preset commit clears all clip state; remap on remove and swap; `ClipNext` / `ClipPrev` wrap and skip empties; mode off returns false; `perform` mute on the playing clip |
+| C6 | UX | `ClipRow` in the layer header, store / clear commands, wording; then the `mu-control` grid mapping (performance step 4) | `ux-controller` ruling first; the grid is the controller tests of #1276 |
+
+C1 and C2 can ship with no visible change. C3 and C4 give the feature a screen-driven path (a menu or button calling `launchClip`) before any hardware exists,
+so each is demonstrable on its own.
+
+**9. Standing check (design-future).** Easier. The bank is generic `mu-core` data with an opaque per-product payload, so the combined instance (a clip is
+a layer preset of that layer's type; the node already carries the product's root tag) and the layer-type registry need nothing new; the Performance
+level, the launch surface and the screen share one path; no product gets a copy of the store.
+
+**Open questions.** Andy:
+1. **File format (Andy).** The `<Clips>`/`<Clip idx name>` shape, as an additive child of each layer node, `format` unchanged, clips in full presets and sessions
+   only. Recommend as written. It becomes a commitment the day a build with it ships (live products are 1.1). Whether the per-clip `name` attribute is kept
+   now is part of the same decision (recommend yes: adding it later is a second format change).
+2. **Samples in mu-Clid clips (Andy).** Path only (relative to the Samples folder when inside it), a missing sample reported as for a layer preset; embedded sample
+   data is never stored in a clip, even when the full preset embeds its rhythms' samples. Recommend path only (an embed would multiply file size by up to nine and
+   duplicate the same bytes per clip). Consequence: a preset moved to another machine without its sample folder has silent clips there.
+3. **Does Reset layer empty the bank (Andy).** The standing definition of reset is "back to a freshly added layer", which empties it; but it destroys user data
+   that a sound reset in mu-On currently does not. Recommend empty it, guarded by the existing reset confirmation; the alternative is a bank that survives a
+   reset and only `Clear` removes. The build follows the answer; C2's test pins it.
+4. **Launch while a full preset is staged.** Recommend `launchClip` returns false: the clips on screen are about to be replaced by the new preset's, and
+   applying an old clip on top of the new layer would be wrong. For `ux-controller`: show the pads as not launchable.
+5. **mu-Clid MIDI.** It shares `Rhythm` and so gets an (empty, unused) bank for free. Does it need to keep a `<Clips>` child it did not write when it loads and re-saves a
+   mu-Clid file? Recommend it preserves nothing and says so; check at C4 which full-preset code path it uses.
+6. **Pressing the playing clip while another is queued on that layer** (`ux-controller` / Andy): mute (the design-launchpad rule as written) or cancel the queued
+   launch (what `PerformanceItem` does for the current item). Recommend cancel, then mute on the next press; the surface semantics stay one rule.
+7. **A bank as a shareable file** (`.muClips`, eight clips for one layer): not scheduled; nothing here closes it off (the container is already self-contained).
+
+Do not: put the bank on `ProcessorBase`, `LiveState` or in the editor; store it as a plain `std::array<ValueTree, 8>` or a plain member of a copyable `Rhythm`;
+give clips their own file type or a per-product clip class; make `launchClip` a second load path beside `loadLayerPreset`; write a clip from the audio thread or
+read the bank there; let a pad, a launch or a layer-preset load write the bank (only the screen's store / clear / load-into-clip do); let a clip carry the mixer
+strip, name or colour; clear banks under `layersLock`; store embedded sample bytes in a clip; add a `Clip` suffix type per product; edit the Layer virtuals
+for this.
 
 ## Hot-swap (staged preset / layer swaps) — family pattern
 

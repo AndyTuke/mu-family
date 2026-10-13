@@ -27,7 +27,7 @@ Related: the family consistency rule in [CLAUDE.md](../CLAUDE.md), and the platf
 | **Preset** | A saved full state of one product: up to 8 layers with their mixer, FX and modulation (`.muClid`, `.muTant`, ...). | a layer preset |
 | **Layer preset** | One layer's saved state (`.muRhythm`, `.muPattern`, ...). | a full preset |
 | **Performance** (built 2026-10-13) | A list of up to 8 pointers to presets for a gig; the new top level (backlog #1279). ✔ owner. File `.muPerformance`, folder `Performances/`, type `mu_pp::PerformanceFile` (ruled 2026-10-12, [design-launchpad.md §3.2c](design-launchpad.md)). | a preset |
-| **Clip** ✔ owner | One of 8 stored states of a layer that a controller pad launches, as in Ableton Live and Bitwig; plays until another is chosen; pads never write presets (backlog #1277). "Slot" stays for FX / insert slots only. | an audio clip, an FX slot |
+| **Clip** ✔ owner | One of 8 stored states of a layer that a controller pad launches, as in Ableton Live and Bitwig; plays until another is chosen; pads never write presets (backlog #1277). Stored in `mu_core::ClipBank` (`Layer::clips`), saved as `<Clips>` / `<Clip>`; a clip has no per-product type, it is the product's layer preset. "Slot" stays for FX / insert slots only. | an audio clip, an FX slot |
 
 ### Derived layer types ✔ owner (2026-10-09)
 
