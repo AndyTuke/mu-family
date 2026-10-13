@@ -110,7 +110,9 @@ void VoiceEngine::trigger(bool isAccented, bool tied)
     // breathe past the step length. The per-envelope legato flags still
     // apply on UNtied hits (i.e. when the user transitions from rest → hit, or
     // when patternLegato is disabled at the sequencer level).
-    if (tied)
+    // The exception is an idle amp envelope (the engine was released, e.g. by a layer reset): there is
+    // no running tail to carry, so the tied hit starts the envelopes like an untied one.
+    if (tied && ampEnv.isActive())
         return;
 
     // Engine-level amp envelope (single ADSR for the whole engine, not per-voice).

@@ -85,7 +85,15 @@ void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
 {
     // An edit that did not reorder (add, reset) rebuilds the new rhythm's pattern after the unlock.
     if (reorderLastSlot < 0)
+    {
         rebuildSlot = firstIndex;
+
+        // A reset slot keeps its engine, whose last hit would otherwise sit at the envelope's sustain
+        // until the next trigger. Done here, under the lock and before the new pattern exists, so a
+        // fresh hit can never be released; nothing is allocated or freed.
+        if (auto& engine = voiceEngines[(size_t) firstIndex])
+            engine->releaseHeldNote();
+    }
 
     sequencer.setNumRhythms(numLayers.load(std::memory_order_relaxed));
     for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
@@ -192,12 +200,6 @@ void PluginProcessor::syncSlotParams(int slot)
         if (voiceEngines[(size_t) slot])
         {
             voiceEngines[(size_t) slot]->setParams(getRhythm(slot).voiceParams);
-
-            // A reset slot keeps its engine, whose last hit would otherwise sit at the envelope's sustain
-            // until the next trigger. layersLock excludes the audio block (it try-locks it) while the
-            // envelopes are told to release; nothing is allocated or freed here.
-            const juce::ScopedLock sl(layersLock);
-            voiceEngines[(size_t) slot]->releaseHeldNote();
         }
     }
 

@@ -202,68 +202,115 @@ struct ClidLayerStructureTests : juce::UnitTest
             }
     }
 
+    // What a held-note scenario does around the reset of slot 1.
+    struct HeldCase
+    {
+        bool reset      = false;   // reset slot 1 once the note is held
+        bool relToEnd   = false;   // the engine plays the sample through instead of releasing
+        bool running    = false;   // a host transport runs after the reset, so the new rhythm hits
+        bool tiedAfter  = false;   // after the blocks, fire a tied (pattern-legato) hit by hand
+    };
+
+    struct HeldResult { float peak = 0.0f; float maxPeak = 0.0f; int audioAllocs = 0; };
+
     // A hit's amp envelope sits at sustain until the next trigger, so a held sample note keeps sounding
-    // through a reset (the engine stays) unless the reset tells it to release.
+    // through a reset (the engine stays) unless the reset tells it to release. Runs `blocks` blocks after
+    // the reset and returns slot 1's peak at the end, the largest peak seen, and the audio-thread allocations.
+    HeldResult heldNote(const HeldCase& c, int blocks)
+    {
+        constexpr int    kBlock = 256;
+        constexpr double kRate  = 48000.0;
+        HeldResult res;
+
+        TempStorage storage;
+        StructureProcessor p;
+        p.prepareToPlay(kRate, kBlock);
+        p.addLayer();
+
+        // A steady 4 s tone in slot 1's engine, triggered by hand; without a running transport no other hit lands.
+        auto f = p.getSamplesDir().getChildFile("Held 01.wav");
+        p.getSamplesDir().createDirectory();
+        f.deleteFile();
+        {
+            juce::WavAudioFormat wav;
+            std::unique_ptr<juce::OutputStream> out = f.createOutputStream();
+            auto w = wav.createWriterFor(out, juce::AudioFormatWriterOptions{}.withSampleRate(44100.0)
+                                                                              .withNumChannels(1)
+                                                                              .withBitsPerSample(16));
+            juce::AudioBuffer<float> b(1, 44100 * 4);
+            for (int i = 0; i < b.getNumSamples(); ++i)
+                b.setSample(0, i, 0.4f * (float) std::sin(juce::MathConstants<double>::twoPi * 220.0 * i / 44100.0));
+            if (w != nullptr) w->writeFromAudioSampleBuffer(b, 0, b.getNumSamples());
+        }
+        p.getRhythm(1).voiceParams.ampRelToEnd = c.relToEnd;
+        p.voiceEngines[1]->setParams(p.getRhythm(1).voiceParams);   // the engine takes the flag at its next trigger
+        p.voiceEngines[1]->loadFile(f);
+        p.voiceEngines[1]->trigger(false, false);
+
+        juce::AudioBuffer<float> block(2, kBlock);
+        juce::MidiBuffer midi;
+        mu_seam_test::RunningPlayHead host(kRate, kBlock);
+        auto run = [&](int n)
+        {
+            for (int i = 0; i < n; ++i)
+            {
+                block.clear(); midi.clear(); p.processBlock(block, midi);
+                res.maxPeak = juce::jmax(res.maxPeak, p.mixerEngine.channelPeaks[1].load());
+            }
+        };
+        run(20);
+        expect(p.mixerEngine.channelPeaks[1].load() > 0.05f, "the held note sounds before the reset");
+
+        if (c.reset) p.resetLayer(1);
+        if (c.running) p.setPlayHead(&host);
+
+        res.maxPeak = 0.0f;
+        alloc_count::count = 0;
+        alloc_count::counting = true;
+        run(blocks);
+        alloc_count::counting = false;
+        res.audioAllocs = alloc_count::count;
+        p.setPlayHead(nullptr);
+
+        if (c.tiedAfter)
+        {
+            p.voiceEngines[1]->trigger(false, true);
+            res.maxPeak = 0.0f;
+            run(20);
+        }
+        res.peak = p.mixerEngine.channelPeaks[1].load();
+        return res;
+    }
+
     void resetReleasesHeldNote()
     {
         beginTest("reset a sounding rhythm: its held sample note releases within the release time, allocating nothing");
-        constexpr int   kBlock = 256;
-        constexpr double kRate = 48000.0;
-
-        // Returns the slot-1 peak after `blocks` blocks of a held note, with or without a reset first.
-        auto peakAfter = [&](bool reset, int blocks, int& audioAllocs)
-        {
-            TempStorage storage;
-            StructureProcessor p;
-            p.prepareToPlay(kRate, kBlock);
-            p.addLayer();
-
-            // A steady 4 s tone in slot 1's engine, triggered by hand; no transport runs, so no other hit lands.
-            auto f = p.getSamplesDir().getChildFile("Held 01.wav");
-            p.getSamplesDir().createDirectory();
-            f.deleteFile();
-            {
-                juce::WavAudioFormat wav;
-                std::unique_ptr<juce::OutputStream> out = f.createOutputStream();
-                auto w = wav.createWriterFor(out, juce::AudioFormatWriterOptions{}.withSampleRate(44100.0)
-                                                                                  .withNumChannels(1)
-                                                                                  .withBitsPerSample(16));
-                juce::AudioBuffer<float> b(1, 44100 * 4);
-                for (int i = 0; i < b.getNumSamples(); ++i)
-                    b.setSample(0, i, 0.4f * (float) std::sin(juce::MathConstants<double>::twoPi * 220.0 * i / 44100.0));
-                if (w != nullptr) w->writeFromAudioSampleBuffer(b, 0, b.getNumSamples());
-            }
-            p.voiceEngines[1]->loadFile(f);
-            p.voiceEngines[1]->trigger(false, false);
-
-            juce::AudioBuffer<float> block(2, kBlock);
-            juce::MidiBuffer midi;
-            auto run = [&](int n)
-            {
-                for (int i = 0; i < n; ++i) { block.clear(); midi.clear(); p.processBlock(block, midi); }
-            };
-            run(20);
-            const float held = p.mixerEngine.channelPeaks[1].load();
-            expect(held > 0.05f, "the held note sounds before the reset (peak " + juce::String(held, 3) + ")");
-
-            if (reset) p.resetLayer(1);
-
-            alloc_count::count = 0;
-            alloc_count::counting = true;
-            run(blocks);
-            alloc_count::counting = false;
-            audioAllocs = alloc_count::count;
-            return p.mixerEngine.channelPeaks[1].load();
-        };
 
         // The default release is 0.5 s (94 blocks of 256 at 48 kHz); allow 1.5 times that.
         constexpr int kBlocks = 140;
-        int allocs = 0, controlAllocs = 0;
-        const float released = peakAfter(true,  kBlocks, allocs);
-        const float control  = peakAfter(false, kBlocks, controlAllocs);
-        expect(control > 0.05f, "without a reset the note is still held after the same time (peak " + juce::String(control, 3) + ")");
-        expect(released < 1.0e-3f, "after a reset the slot has decayed to silence (peak " + juce::String(released, 5) + ")");
-        expectEquals(allocs, 0, "the audio thread allocated nothing while the note released");
+        HeldCase reset;   reset.reset = true;
+        const auto released = heldNote(reset, kBlocks);
+        const auto control  = heldNote(HeldCase{}, kBlocks);
+        expect(control.peak > 0.05f, "without a reset the note is still held after the same time (peak " + juce::String(control.peak, 3) + ")");
+        expect(released.peak < 1.0e-3f, "after a reset the slot has decayed to silence (peak " + juce::String(released.peak, 5) + ")");
+        expectEquals(released.audioAllocs, 0, "the audio thread allocated nothing while the note released");
+
+        beginTest("reset with the transport running: the new rhythm's own hits are not released");
+        HeldCase running;   running.reset = true; running.running = true;
+        const auto live = heldNote(running, kBlocks);
+        expect(live.maxPeak > 0.05f, "a fresh hit after the reset sounds (largest peak " + juce::String(live.maxPeak, 3) + ")");
+        expectEquals(live.audioAllocs, 0, "and the audio thread allocated nothing");
+
+        beginTest("reset a release-to-end slot: the note plays through, as the setting asks");
+        HeldCase toEnd;   toEnd.reset = true; toEnd.relToEnd = true;
+        const auto played = heldNote(toEnd, kBlocks);
+        expect(played.peak > 0.05f, "the sample is not cut by the reset (peak " + juce::String(played.peak, 3) + ")");
+        expectEquals(played.audioAllocs, 0, "and the audio thread allocated nothing");
+
+        beginTest("after a reset released the envelope, the first tied (legato) hit still sounds");
+        HeldCase tied;   tied.reset = true; tied.tiedAfter = true;
+        const auto tiedHit = heldNote(tied, kBlocks);
+        expect(tiedHit.maxPeak > 0.05f, "the tied hit starts the envelope (largest peak " + juce::String(tiedHit.maxPeak, 3) + ")");
     }
 
     void lastLayerStays()
