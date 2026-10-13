@@ -124,7 +124,8 @@ public:
     // pointer resolved once. mu-Clid has no bar-line rule, so OnBar behaves as OnLayerLoop.
     mu_hotswap::SwapTiming swapTiming() const noexcept
     {
-        const auto t = mu_hotswap::swapTimingFromIndex(swapTimingParam != nullptr ? (int) std::lround(swapTimingParam->load(std::memory_order_relaxed)) : 0);
+        const float raw = swapTimingParam != nullptr ? swapTimingParam->load(std::memory_order_relaxed) : 0.0f;
+        const auto  t   = mu_hotswap::swapTimingFromIndex(std::isfinite(raw) ? (int) std::lround(raw) : 0);
         return t == mu_hotswap::SwapTiming::OnBar ? mu_hotswap::SwapTiming::OnLayerLoop : t;
     }
 

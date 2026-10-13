@@ -355,8 +355,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     //   • full preset: master loop when one is defined, else voice 0's gate boundary.
     const int    mlSteps         = mstrLoopPtr ? juce::jmin((int) mstrLoopPtr->load() * 16, 256) : 0;
     const double masterLoopBeats = mlSteps > 0 ? (double) mlSteps / 4.0 : 0.0;
-    const auto   swapTiming      = mu_hotswap::swapTimingFromIndex(
-                                       swapTimingPtr != nullptr ? (int) std::lround(swapTimingPtr->load(std::memory_order_relaxed)) : 0);
+    const float  swapRaw         = swapTimingPtr != nullptr ? swapTimingPtr->load(std::memory_order_relaxed) : 0.0f;
+    const auto   swapTiming      = mu_hotswap::swapTimingFromIndex(std::isfinite(swapRaw) ? (int) std::lround(swapRaw) : 0);
 
     const int numActive = numLayers.load(std::memory_order_relaxed);
     flagSwapBoundaries(blkPlaying, oldPos, transport.blockBeats,

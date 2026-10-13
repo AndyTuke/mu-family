@@ -47,7 +47,7 @@ bool HotSwapStager::hasPendingFullPreset() const
 bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
                                     int rhythmLoopWrapMask)
 {
-    // Per-rhythm swaps: the master loop point, or each rhythm's own loop (Hot-swap timing). With no
+    // Per-rhythm swaps: the master loop point, or each rhythm's own loop (the `mstr_swap` timing). With no
     // master loop set there is no master wrap, so the own loop is used whatever the timing says.
     const auto timing = proc.swapTiming();
     const bool hasMasterLoop = proc.sequencer.getMasterLoopSteps() > 0;

@@ -88,8 +88,6 @@ public:
         return juce::jlimit(0, steps - 1, (int) (pos * 4.0));
     }
 
-    // Hot-swap timing (mirrors mu-clid). OnVoiceLoop = the per-voice gate boundary.
-
     // MIDI Note mode (plugin DAW notes + standalone keyboard). Free = the drone runs
     // continuously (default). Note = gate + pitch-track — the drone sounds only while
     // a MIDI note is held, and the held note (last-note priority) sets the tonal centre.
