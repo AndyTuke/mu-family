@@ -481,12 +481,87 @@ setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appYellow));   // mu-On
 
 ---
 
+## 12. Performance mode (ruled 2026-10-12, revised 2026-10-13 with the owner's decisions; backlog #1279)
+
+Data model and pad behaviour: [design-launchpad.md](design-launchpad.md) sections 3.2 and 3.2c (a performance = up to 8 pointers to presets, each up to 8 layers, each layer 8 stored layer presets, called clips; switching is a staged hot-swap). This section is the screen half.
+
+**Principle: in Performance mode the PC screen is the normal screen of the playing preset, locked and read-only, and only the control surface acts. Performance mode adds no panel, no height and no per-product layout; it changes only shell chrome that already exists (the TransportBar's preset group and the layer sidebar's Add slot). The screen follows the surface and shows what it did; it never acts.** The surface can disconnect mid-gig, so the Perf toggle stays the one live PC control, with a deliberate exit gesture.
+
+**Availability (owner).** Standalone only for now, but not closed off: `EditorShellBase::setPerformanceModeEnabled(bool)` (default false). The standalone app turns it on; while false there is no Perf toggle, no stepper, no lock and no rim, and nothing else in the shell assumes standalone, so a plugin build can enable it later by that one call.
+
+### 12.1 "Performance mode is on" (shell chrome, `EditorShellBase` / `TransportBar`)
+
+All shell-owned, none product-drawn; the cue colour is the app accent (owner):
+
+1. **Perf toggle** - a `juce::TextButton` "Perf" (metal button helper, `kPerfBtnW` 44, button height) in the TransportBar right group, left of Mixer; lit in the app accent when on. **Enter** = a single click (or Ctrl+P). **Exit** = press and hold, see 12.5.
+2. **Preset group replaced** by the `StepIndicator` (12.2); the Preset dropdown, New and Save are hidden, not disabled.
+3. **Rim** - a lit line along the bottom edge of the TransportBar, full width, `kPerfRimH` 2 px, app accent at `Lighting::performanceRim`.
+4. **PC lock** - the whole PC UI is read-only: knobs, buttons, sidebar, header bar, modulator panel, the Mixer and Settings buttons, the preset browser and the chooser ignore clicks, drags, wheel and keys. **The screen must not dim or change colour** (it looks like the normal screen; knobs, meters, lamps and the playhead keep animating, so a surface or modulation change is visible). The mechanism (a shell-owned input shield above the content, or per-component interception) is the coder's choice; the Perf toggle and its exit hold are the only live controls. What the surface may change beyond preset and layer switching is undecided; until it is, the surface does only what design-launchpad lists.
+5. No New / Save / Add / Delete / reorder is reachable (the lock covers them), so nothing structural can change on stage.
+
+### 12.2 Preset indicator - the shared `StepIndicator` (new, `mu-core/UI/Components/StepIndicator.{h,cpp}`)
+
+A pure indicator (no buttons, no clicks) for "n of N with a lamp per item"; the same class serves presets now and layer presets (clips) later. At Medium it fills the 332 px the preset group used, via `s()`, no per-product constant: `[ LCD ][ 8 lamps ]` = LCD 240 + gap 4 + lamps 88 (8 x `kStepLampPitch` 11).
+
+- **LCD** - `drawLcdGlass` / `drawLcdFront`, `lcdFont(kLcdTextH)`. Lit lettering (`lcdLitColour`, app accent) `3/8 Bassline` (position, cached name, ellipsised, never less than 60 % of the width); to its right in ghost lettering (`Lighting::lcdGhost`) the **next** item: `> Acid Line` (omitted at the last playable item). The previous item is not drawn: the position and the lamps show that it exists.
+- **Lamps** (`drawLamp`, diameter `kStatusLampD`), the on-screen twin of the top-row pads:
+
+| Item state | Lamp | Pads |
+|---|---|---|
+| Current (playing) | `lampOn`, app accent | bright |
+| Available | `lampDim`, app accent | dim |
+| Queued for the next boundary | pulsing between `lampDim` and `lampPlayhead` at `Lighting::queuedPulseHz` (2 Hz, the pad rate) | pulsing |
+| Empty (no item at that index) | bare `lampBase()` | off |
+| Missing file / other product | `lampDim` in `indicatorFault`, steady | dim red |
+
+  Every lamp uses the **app accent**, not the layer palette (an item is a whole preset). Hover status text (hover still reports; it is not a click): `Performance "Gig" - preset 3 of 8: Bassline`; on a missing lamp `Preset 5 missing: <name>`.
+- **Queued** - while a switch waits for its boundary the queued lamp pulses, the existing "SWP" badge (`presetStagingBadge`) shows, the LCD keeps showing the **playing** preset but its ghost part becomes `-> 4 Acid Line` pulsing at `queuedPulseHz`, and the status bar reads `Queued: 4 Acid Line (<when>)` where `<when>` follows the preset's swap setting (the family-wide per-preset swap mode, today mu-Clid's `swapMode`; "now" when stopped). The content changes only when the swap commits: the new lamp takes `lampOn` and flashes to `lampPlayhead` for `Lighting::stepFlashMs` (150), the LCD updates and the main page shows the new preset. Pressing the **current** item on the surface cancels the queue; pressing another item replaces it.
+- **Surface previous / next** wrap at the ends and skip empty and missing items (owner); the screen shows the result as an ordinary item change. The screen has no previous / next control.
+- **Empty states** - no performance chosen: LCD ghost `No performance`, lamps off. Loaded preset not in the performance: `-/8  <loaded preset name>`, no lamp current.
+
+### 12.3 Layers and clips (the screen follows the surface)
+
+- The 8x8 grid is row = layer, column = one of the layer's 8 stored layer presets (clips). **Pressing a pad makes the PC display switch immediately to that layer** (the sidebar outline moves and the main panel shows that layer, exactly as a sidebar click would), showing the layer's **currently playing** layer preset. If the pressed clip is waiting for its boundary, the layer's header bar shows the same "SWP" queued badge and the status bar reads `Queued: <layer> clip 5 (<when>)`; the panel content changes when the swap commits. Selecting a layer from the right-hand column behaves the same.
+- In Performance mode the sidebar's Add slot (same box as `AddButton`) becomes a read-only **layer indicator**: a small LCD `Layer 3/5` (the `StepIndicator` without lamps), because the sidebar already lists every layer and outlines the selected one. No stepper buttons.
+- The layer's clip row (8 stored presets) uses the same `StepIndicator` in the layer header strip once the clip bank (#1277) exists: playing bright, stored dim, queued pulsing, empty off, a muted layer's playing lamp flashing. Not specified further until the bank exists.
+
+### 12.4 One path, no screen actions
+
+- Because the PC is locked there are no on-screen performance buttons and **no performance keys** (no 1-8, PageUp / PageDown or arrow keys). The only key is `performanceToggle` Ctrl+P, which **enters** only; it is ignored while the mode is on (exit is the deliberate gesture below).
+- The surface's actions arrive as `ControlAction`s (`PerformanceItem(n)`, `PerformancePrev / Next`, select-layer, clip launch) through the shell's `ControlSink`. The screen is **derived from processor state, never from who acted**: the shell reads the "what to show" interface (current item, queued item, selected layer, queued clip, performance list) on the message-thread timer and repaints, so the screen and the surface cannot disagree. Every performance action also writes one status-bar line that clears after 3 s.
+- No separate touch mode (owner). Large display size is advisable on a touch screen.
+
+### 12.5 Entering, leaving, choosing, editing
+
+- **Enter** - click Perf (or Ctrl+P). The current preset keeps playing; if it matches an item that lamp is current, otherwise none. If no performance is chosen yet, entering opens the chooser first.
+- **Exit - recommendation: press and hold the Perf button for `kPerfExitHoldMs` (1000 ms).** While held, the button face fills left to right in the app accent (progress, drawn by the shared button helper) and the status text reads `Hold to leave Performance mode`; releasing early cancels; on completion the mode ends. Why: one deliberate action with no modal to read, works with a mouse or touch, cannot happen by a stray click, and needs no surface. Rejected: a confirm dialog (a modal on stage; the second click can be as accidental as the first), double-click (too easy to do by accident), Escape (closes overlays).
+- Leaving restores the Preset dropdown, New, Save and the Add button and lifts the lock. The mode flag and the current performance are **session state**, not stored in any preset.
+- **Choose / edit** - a **Performance chooser**, its own `OverlayHost` screen (not a tab in the Preset Browser), reachable only with the mode off (the PC is locked in it): from a "Performances" button in the Preset Browser footer, and automatically on first entry with none chosen. Layout in the overlay area (1088 x 814, worst case 774): left a list of saved performances (`kPerfListW` 300, scrolls), right the 8 item rows (`kPerfItemRowH` 40, 320) with header 36 and footer 40 = 396 of 774. Row: number lamp, name LCD, product label, up / down reorder (drag is an extra), remove. An empty row shows "+ Preset" (opens the Preset Browser in pick mode; other products' presets are visible but not pickable until the one-instance rig). A missing row stays with the fault lamp and "missing", replaceable or removable. New / Save / Rename use the shared `SaveDialog` (name and description only); delete asks `confirmAsync`. "Use" loads the list; it does not switch preset.
+- **Sizing** - no new window, panel or height. New `MuLookAndFeel` tokens: `kPerfBtnW` 44, `kPerfRimH` 2, `kPerfExitHoldMs` 1000, `kStepLampPitch` 11, `kPerfItemRowH` 40, `kPerfListW` 300. New `MuTheme::Lighting`: `performanceRim` (rim alpha), `queuedPulseHz` 2.0, `stepFlashMs` 150. The Perf toggle needs 50 px in the TransportBar right group (standalone only): the coder checks the arithmetic at 1170 for mu-Clid (widest loop section) with `kPad` spare; if it does not fit, shrink `kPresetW` for all products, never hide the toggle.
+
+```text
+Transport [mu-Clid][> 120.0 Tap 1.2.3 -+][loop] [ 3/8 Bassline  > Acid Line ][o O o o . . . .] [Perf*][Mixer][gear]
+          ======== 2 px accent rim, full width ========
++--------+------------------------------------------------------------+
+|Kick    | normal main page of the playing preset (locked, not dimmed)|
+|Bass  # | (the pressed layer is shown; header shows SWP if a clip    |
+|Lead    |  is queued)                                                |
+|Layer3/5|                                                            |
++--------+------------------------------------------------------------+
+Status: Queued: Acid Line (next bar)    (lamp 4 pulsing, SWP badge, ghost "-> 4 Acid Line" pulsing)
+```
+
+**Future (not now, owner):** several apps in a mu-link rig with one app "in focus" on the Launchpad. Nothing here closes it off: the lock, the indicators and the `ControlSink` are all per app.
+
+---
+
 ## Design rulings
 
 - 2026-10-13 — #1594 review; do plugin strips need real stereo peaks now? Not a gate at the time (mono mirrored was accepted); superseded 2026-10-13, all plugin strips (channels, returns, master) now bind real L/R peaks and are true stereo, layout and tokens unchanged; narrow-strip right clamp and the empty GR slot gap accepted. Changed §3.5.
 - 2026-10-13 — mu-link VU meters hard against the strip's right edge; stereo? (1) Family-wide: the fader slot (`kMixerFaderW` 20) is centred on the strip axis and the meter sits immediately to its right, replacing "fader fills width minus 10, meter at the edge" in all three layouts (overlay, Client, Master), one placement helper. (2) All strip meters are stereo: two bars L / R in one `VUMeter` (`getLevelR`; every strip now supplies real L and R peaks), per-bar ballistics and peak-hold, existing colour tokens. (3) New tokens `kVUBarW` 6, `kVUBarGap` 2, `kMixerFaderW` 20 in `MixerChannel.h` beside `kVUW`, which becomes 14 (derived). Data: a second peak atomic per strip in every engine. Changed §3.5, §5 table, mu-link/design-ui.md.
 
 - 2026-10-13 — Standard dropdown size and mu-On's Groove box width as shared tokens? Yes: `kDropdownW` 120, `kDropdownH` 24 and `kGrooveBoxW` 300 live in `MuLookAndFeel` beside `kDropdownEdgeGap`; FXRow, DelayRow, mu-Toni ArpContent and mu-On TrackContent use them, the four local copies and bare `s(24)` are gone; values unchanged. Changed §5 standard control sizes, mu-on/design-ui.md "As built".
+- 2026-10-13 — Performance mode UI (#1279), revised with the owner's decisions: standalone only for now (`setPerformanceModeEnabled`), PC UI locked and read-only (no on-screen step buttons or performance keys), the Perf toggle the one live control with a press-and-hold exit (1 s, recommended), cue colour the app accent, no touch mode, the screen follows the surface (a pad press switches the display to that layer, queued shown until the swap commits), surface prev / next wrap, pressing the current item cancels a queue. Main screen unchanged; the preset group becomes a read-only `StepIndicator` (LCD "n/N name > next" + 8 lamps matching the pads), a lit 2 px rim, the sidebar Add slot a layer indicator; the chooser is its own overlay, reachable with the mode off. Added §12; tokens listed there. Future: several apps in a mu-link rig with one in focus.
 
 - 2026-10-13 — Warning icon missing in Delete / Reset dialogs, and their buttons using the product accent? (1) Icons are vectors drawn by `ModalDialog`, not font glyphs: Warning triangle + "!" in amber (`segmentWarningBorder`, replacing the off-token `knobLevel`), Info circle + "i" in `globalAccent` (it renders today only by font luck, so it is converted too); Question "?" is ASCII and stays; no Error icon exists. (2) Red is intended: the doc was right, the code never applied it. A Warning-icon dialog's primary button is the red destructive button (new `buttonDangerBg`, existing `indicatorFault`); the accent stays for non-destructive dialogs. Changed §5 (new "Dialog icons and the destructive button", Delete wording), §7 table (Delete rhythm row).
 - 2026-10-13 — `buttonDangerBg` `#7A2220` under `indicatorFault` text fails contrast (about 2.6:1); accept the coder's `#2B0E0D` (about 4.56:1)? Accepted: only the fill token changes, border and text stay `indicatorFault` so the red is one family colour; a lighter label token would add a second red. Verified in the mu-Clid, mu-Tant and mu-On Delete dialogs. Changed §5 ("Dialog icons and the destructive button").

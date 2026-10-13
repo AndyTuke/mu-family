@@ -230,9 +230,18 @@ The architecture half. The look of the browser is for the `ux-controller` (list 
   (`stageFullPreset`, #1278), so the boundary rule and audio-thread contract are unchanged. The `ControlAction` vocabulary in
   `mu-core/Control/` gains `PerformanceItem(n)` and `PerformancePrev / Next`; the driver mapping (top row = items 1-8)
   lives in `mu-control`. A product loads only items of its own `product`.
+- **Performance mode (ruled 2026-10-12, revised 2026-10-13):** standalone only for now; the PC screen is locked and only the surface acts.
+  The live state (mode, current and queued item, selected layer, playing and queued clips), the actions and the per-preset swap timing
+  that sets when a pad launch lands are in
+  [design-plugin-family.md, Performance mode and live state](design-plugin-family.md#performance-mode-and-live-state--family-standard-ruled-2026-10-12-revised-2026-10-13-for-the-owners-decisions-backlog-1279).
+  Pad semantics: grid row = layer, column = one of that layer's eight stored layer presets (clips), top row = presets 1-8; a press queues,
+  the swap lands at the preset's swap timing, and the PC selects that layer at once. `PerformancePrev / Next` step the items of the loaded
+  performance and wrap, skipping empty and missing items; pressing the current item cancels a queued switch. They are not "previous / next
+  performance" (the second-page entry in §3.2 for that is not scheduled).
 - **Readiness:** the file type with its tests can be built at any time. The browser waits on the `ux-controller`; the
   actions and pad mapping wait on #1276 (mu-control), #1278 and the clip bank (#1277); nothing consumes the file earlier.
-- **For the `ux-controller` to rule:** where the performance is chosen (a tab in the preset browser, or its own
+- **Ruled by the `ux-controller` (2026-10-12): see [design-ui-family.md section 12](design-ui-family.md#12-performance-mode-ruled-2026-10-12-backlog-1279)** (standalone only for now; the PC UI is locked and read-only while the mode is on and only the surface acts; chooser is its own `OverlayHost` screen reachable with the mode off; items use the app accent; a read-only `StepIndicator` in the TransportBar; press-and-hold exit; the screen follows pad presses; surface previous / next wrap; sizing). The list below is the original question set, kept for reference.
+- **Was for the `ux-controller` to rule:** where the performance is chosen (a tab in the preset browser, or its own
   `OverlayHost` screen); the 8-item editor (add from the preset list, drag to reorder, remove, rename, a missing-file
   state); how the current item and a queued item show on screen to match the pad lights (current bright, queued
   pulsing); whether the item colours come from the layer palette or a neutral set; how a performance is saved (the shared

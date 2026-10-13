@@ -1141,6 +1141,117 @@ is true.
 Do not: add a MIDI-learn table per product; write parameters from `processBlock`; store the map in the preset; give an action
 its own persistence integer; put the map in `mu-control` (it needs no device).
 
+## Performance mode and live state — family standard (ruled 2026-10-12, revised 2026-10-13 for the owner's decisions; backlog #1279)
+
+Performance mode is the gig view: the normal main preset screen for the preset now playing, **locked (read-only)**, with an
+indication of the mode, driven only by a control surface. The screen is a display derived from the live state; it never
+acts. This section is structure only; the look is the `ux-controller`'s. The file is in
+[design-launchpad.md §3.2c](design-launchpad.md#32c-the-performance-file-architecture-ruling-2026-10-12-backlog-1279).
+
+**0. Scope (owner, 2026-10-13): standalone only for now, plugins not closed off.** `ShellBackend` gains a defaulted
+`supportsPerformanceMode()` (false); `ProcessorBase` returns `isStandaloneApp()`. That one app-level switch hides the mode toggle and
+makes every performance action return false in a plugin, so VST3 and CLAP behave exactly as today. The state and actions still live in
+the processor and in `mu-core`, so turning plugins on later is changing that return value and nothing else. Hardware pads in a plugin
+with no editor open: **no** (confirmed). The `mu-control` controller manager is created by the standalone shell and takes only a
+`ControlSink&` and a `LiveView&` (never `ProcessorBase`, an editor or a window), so it can move to a hub later (item 7).
+
+**1. Where the state lives: `mu_core::LiveState`, owned by the instance, not by the editor or the shell.**
+`mu-core/Control/LiveState.{h,cpp}`, namespace `mu_core`; plain class, no `ProcessorBase` dependency, **message-thread only**
+(no atomics, no locks; the audio thread never touches it). It holds: `performanceMode`, the loaded performance (`mu_pp::PerformanceFile`
+and its path), `currentItem`, `queuedItem` (or none), `selectedLayer`, per layer the `playingClip` and `queuedClip` (#1277), and a `revision` counter
+bumped on every change. It is wired by callbacks the owner supplies: `canLoad(item)` (item's `product` is this product's state
+identifier and the file exists), `stageItem(item)` (the existing `stageFullPreset`), `cancelItem()` (cancels the staged full preset), and
+for clips `stageClip(layer, index)` (the per-layer path of the Stager). `ProcessorBase` owns one and implements `ControlSink::perform`
+over it; a future hub or one-instance host owns its own. Why not the others: the editor is wrong because a pad press needs the state with
+no window and a plugin editor closes; `ShellBackend` is an interface (what the chrome reads), not storage; a `PerformanceController` would be a
+second owner of "what is selected / queued" beside `LiveState`, the screen-vs-surface disagreement to avoid. **Persistence:** the performance
+path, `currentItem` and `performanceMode` are root properties of the product state in the host session (§3.2c), mode off on a fresh instance,
+restored on reload so a standalone restart returns to the gig. `selectedLayer`, queued and playing clips are not saved. Nothing goes in the
+preset or the APVTS (not a musical parameter, must not be automatable).
+
+**2. How the shell reads it without a product dependency.** `mu-core/Control/LiveView.h`: read-only getters of the above plus
+`addListener / removeListener` with `Listener::liveStateChanged()` (message thread). `ShellBackend` gains defaulted `getLiveView()` and
+`getControlSink()` (nullptr by default; `ProcessorBase` returns its `LiveState` and `this`). `ShellChrome` shows the indication only when
+`supportsPerformanceMode()` and both pointers are set (mu-link: nothing changes). No product symbol is named.
+
+**3. The lock lives in `ShellChrome`, once.** While `performanceMode` is true the chrome puts an input shield over the content area
+(sidebar, main panel, overlays, transport bar): it swallows mouse and key events, so **no product panel needs any code** to be read-only.
+The mode toggle (the way out) sits above the shield, and the host window's own close button is unaffected. The shield is a shared chrome
+component; its look and the toggle's place are for the `ux-controller`. Consequence: **there are no on-screen or keyboard step actions**.
+Surface and MIDI map are the only inputs while locked; the keyboard table keeps only the mode toggle.
+
+**4. The screen follows the surface.** In mode, the editor sets its layer selection from `LiveView.selectedLayer` (one way; outside the
+mode the sidebar selection stays local editor state, as today). Entering the mode is `perform({PerformanceMode, layer = the editor's
+current selection})`, which seeds `selectedLayer`. A pad press selects that layer **at once** (before the commit), so the screen shows
+the playing layer preset plus the queued one; the content changes at the commit. A full-preset switch shows the queued item on
+the lamps and the strip, and changes the display at the commit (the editor refresh is the existing `onPresetSwapCommitted`).
+
+**5. Actions (stable string names; `ControlAction` gains `int index`; `layer` keeps meaning a layer).** `PerformanceMode` (`value` 1 on,
+0 off, toggled if unset; refuses when no performance is loaded or `supportsPerformanceMode()` is false), `PerformanceItem` (`index`
+0..7), `PerformancePrev`, `PerformanceNext`, `SelectLayer` (absolute), `LaunchClip` (`layer`, `index`), and for the second page
+`ClipNext`, `ClipPrev` (selected layer). `LayerNext / LayerPrev` are not added (the right column is absolute); they can be if the second page needs
+them. Every action except `PerformanceMode` returns false when the mode is off. Rules inside `perform`:
+- `PerformanceItem(n)`: item `n` not loadable returns false. `n` equals `currentItem` and an item is queued: **cancel the queued switch**
+  (`cancelItem()`, clear `queuedItem`). `n` equals `currentItem` and nothing queued: true, no change. Otherwise `stageItem`, `queuedItem = n`;
+  `currentItem` moves only at the commit (or at once when stopped).
+- `PerformancePrev / Next` **wrap** (revised), skipping empty, missing and other-product items, stepping from the target (queued item if any, else
+  current), so two presses before the commit land two items on. With no other loadable item they return false.
+- `LaunchClip(layer, c)`: `selectedLayer = layer` now, `stageClip`, `queuedClip[layer] = c`; `playingClip` moves at `onLayerPresetCommitted`. A full-preset
+  commit clears all clip state and takes the new preset's. Pressing the playing clip is mute / unmute, as in design-launchpad §3.2.
+- **Timing.** `perform` does not quantise item switches or clip launches (MIDI control mapping §4 stands). The boundary is the Stager's,
+  and it is set by the **preset's swap timing** (below), so a pad launch lands at the loop or bar the preset says, never twice-quantised.
+- `PresetNext / PresetPrev` stay "next file in the browser list" and are not used in performance mode. Loading a performance file is a
+  screen-only call on `LiveState` made before the mode is entered; switching between performances from a pad is out of scope.
+
+**6. Per-preset swap timing, one definition in `mu-core` (owner, 2026-10-13).** Today mu-Clid (`SwapMode`: OnMasterLoop, OnRhythmLoop,
+a processor atomic read by `HotSwapStager`) and mu-Tant (`SwapMode`: OnMasterLoop, OnVoiceLoop) each have a "Timing" setting, with the
+predicates in `mu_clid::hotswap` (`HotSwapBoundary.h`) and mu-Tant's `swapLoopBeats`; mu-Toni and mu-On have the fixed bar rule. It becomes a
+family setting saved **with the preset**:
+- **Type:** `mu_hotswap::SwapTiming { OnMasterLoop = 0, OnLayerLoop = 1, OnBar = 2 }` in `mu-core/Plugin/HotSwap.h`, beside `loopWrapped` / `boundaryReached`.
+  "Layer" is the neutral word for rhythm / voice / pattern. The integers are saved data: append only.
+- **Parameter:** one APVTS choice parameter in the shared master section of the layout, id `mstr_swap` (confirm against the design-naming
+  parameter-id rules before adding), so it is in the preset, the full-preset file and the session with no new persistence code. Defaults supplied
+  by the product: mu-Clid and mu-Tant `OnMasterLoop` (today's value, so old presets and sessions that lack the parameter behave as now),
+  mu-Toni and mu-On `OnBar`. The audio thread reads its raw value; nothing else changes on the audio path.
+- **Predicates:** `usesMasterLoop(timing, hasMasterLoop)`, `layerBoundaryReached(...)` and `fullPresetBoundaryReached(...)` move to `mu_hotswap`
+  with their behaviour unchanged, including the fallback when `OnMasterLoop` is chosen but no master loop is set (use the layer's own loop; the full
+  preset uses layer 0's). `OnBar` uses `kBarBeats`. A layer's own loop length in beats stays supplied by the product (shared principle 2): for
+  mu-Toni and mu-On "own loop" is the bar, so `OnLayerLoop` and `OnBar` agree there.
+- **Migration:** (a) add `SwapTiming`, the predicates and the parameter, with the `HotSwapBoundaryTests` and `SwapCommitTimingTests` cases moved
+  into `mu-core-tests` and extended for `OnBar`; (b) switch mu-Clid and mu-Tant to the shared type and parameter, delete both product `SwapMode`
+  enums, `swapModeAtomic` and `mu_clid::hotswap` (thin forwarders for one build at most); where the old value was stored outside the preset
+  (app settings), read it once to seed the default for presets without the parameter; (c) mu-Toni and mu-On pass `OnBar` default and gain the control;
+  (d) the "Timing" dropdown leaves the two products' `SettingsOverlay` for a preset-level control in the shared `MasterLoopSection` (the `ux-controller`
+  places it, as it is preset data now, not an app setting). Each stage is a Debug build of all products and the unit tests.
+- **Standing check:** easier. One definition and one parameter replace two enums and two predicate sets, the other products gain the choice
+  without a copy, and the pad launch needs nothing new.
+
+**7. Future (recorded only, not scheduled).** A multi-app rig through mu-link, with one app "in focus" on the pad. A MIDI device is
+typically opened by one program, so a hub (mu-link) likely owns the pad and forwards the same device-independent `ControlAction`s to the focused
+instance, with new `FocusApp(index)`, `FocusNext`, `FocusPrev` actions. **Verify the Windows MIDI exclusivity claim before relying on it**
+(classic drivers are generally single-client per port; Windows MIDI Services is said to allow several; unchecked). A mixed-engine rig needs a shared master
+loop and clock (mu-link). Nothing here needs to change for it, provided the manager keeps depending only on `ControlSink` and `LiveView` and the actions stay serialisable by name.
+
+**8. Order (each step buildable alone; Debug builds, tests in `mu-core-tests`).**
+
+| Step | Work | Needs |
+|---|---|---|
+| 1 | `PerformanceFile` + tests (#1279) | nothing; can start now |
+| 1b | Swap timing in `mu-core` (item 6, stages a to d) | nothing from this feature; best before step 4 so launches use the final setting |
+| 2 | `LiveState`, `LiveView`, the actions, `perform`, `supportsPerformanceMode`, persistence, tests with fake callbacks | step 1; `stageItem` is the existing `stageFullPreset`. This is the #1328 work for `SelectLayer`, the performance actions and `PresetNext/Prev`. **Not** #1276 |
+| 3 | `ShellBackend` accessors, the input shield, the indication and mode toggle, editor following `selectedLayer` | step 2 and the `ux-controller` ruling |
+| 4 | `mu-control` surface model reads `LiveView`: top row = `PerformanceItem(n)`, right column = `SelectLayer`, grid = `LaunchClip` | #1276, step 2; the grid needs 5 |
+| 5 | `LaunchClip`, `ClipNext/Prev`, the clip bank and per-layer clip fields in `LiveState` | #1277 (this part of #1328) |
+
+With steps 1 to 3 the mode can be driven by the MIDI map before `mu-control` exists. #1278 (live preset switch) is the same staging path, so step 2
+reuses it; its hardware checks (FX tails, largest-preset load time, neighbour pre-load, loading state) do not block steps 1 to 3 but must pass
+before a gig-ready claim. Panic stays with #1276.
+
+Do not: keep a performance flag, selected layer or queued item in the editor; give the surface its own copy of the state; add on-screen or
+keyboard step actions while locked; make product panels lock themselves (the chrome shield does it); quantise item switches or clip launches
+in `perform`; keep a second copy of the swap timing or its predicates in a product; let the audio thread read or write `LiveState`; put
+`LiveState` in `mu-control`; let the controller manager name `ProcessorBase` or an editor; save the mode in the preset or APVTS.
+
 ## Hot-swap (staged preset / layer swaps) — family pattern
 
 Every product loads presets *while playing* without an audible glitch by **staging**
@@ -1157,8 +1268,10 @@ message thread; the audio thread touches only the flags. `mu_hotswap::loopWrappe
 `boundaryReached` are the shared loop-wrap predicates (commit on the wrap, or at once on
 the playing→stopped edge); `kBarBeats` is one 4/4 bar. A load while stopped applies at once.
 
-**Product-side:** the payload (what is pre-built at stage time), which loop is the
-boundary, and the apply.
+**Product-side:** the payload (what is pre-built at stage time), the layer's own loop
+length, and the apply. **Which boundary applies** (master loop, layer loop or bar) is the per-preset
+`SwapTiming` setting defined once in `mu-core` (see Performance mode, item 6; the per-product tables below describe today's code
+until that migration is done).
 
 **Deferred-work mailbox (family rule, 2026-10-11): the audio thread never posts messages.** `ProcessorBase` is no longer a
 `juce::AsyncUpdater` (no `triggerAsyncUpdate` / `handleAsyncUpdate`). The audio thread calls `requestDeferredWork()`, which only
