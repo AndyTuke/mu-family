@@ -216,6 +216,12 @@ void PresetIO::setStateInformation(const void* data, int sizeInBytes)
     {
         // Sessions are .muClid trees; older ones (the APVTS dump + r{i}_ properties) keep their reader.
         auto state = juce::ValueTree::fromXml(*xml);
+
+        // A host restore applies at once, for either format: anything staged while the transport played
+        // must not land on top of it. Runs on the message thread, like the rest of the restore.
+        if (state.isValid())
+            proc.hotSwapStager.cancelAllStaged();
+
         if (state.hasType("MuClidPreset"))
             restoreSession(state);
         else if (state.isValid())
