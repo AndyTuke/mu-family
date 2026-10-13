@@ -33,7 +33,7 @@ arpeggiator was an *arpeggiator* — an Italian word — Tony always called them
 **"appagators"**. A gentle soul; the name is an affectionate nod to him. The
 **Settings screen carries his line verbatim** as a small credit:
 
-> *Its an appagator, is it a powerful tool?*
+> *Has it got an appagator, is it a powerful tool?*
 
 Keep it **exactly** as written — **"appagator" is Tony's word and the whole point;
 never "correct" it to "arpeggiator".** It renders as an italic quote line on the

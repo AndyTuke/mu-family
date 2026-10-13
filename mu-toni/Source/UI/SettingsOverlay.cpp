@@ -28,7 +28,7 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
     {
         g.setColour(MuLookAndFeel::colour(MuLookAndFeel::mutedText));
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(12.0f)).withStyle("Italic")));
-        g.drawText(juce::String(juce::CharPointer_UTF8("\xe2\x80\x9cIts an appagator, is it a powerful tool?\xe2\x80\x9d")),
+        g.drawText(juce::String(juce::CharPointer_UTF8("\xe2\x80\x9cHas it got an appagator, is it a powerful tool?\xe2\x80\x9d")),
                    r.area, juce::Justification::centredLeft, false);
     } });
 }

@@ -70,7 +70,8 @@ H2 "Who Is This For?"
 P "mu-Toni is for producers and performers who want movement without programming notes: pulsing basslines, bright generative leads, slow chord arpeggios and 303-style slides. It works in a DAW session, fully automatable and synchronised to the host transport, or as a standalone instrument for live performance and sketching."
 
 H2 "Where the Name Comes From"
-P "The name comes from Tony. However many times he was told that an arpeggiator was an arpeggiator, an Italian word, Tony always called them 'appagators'. The Settings page carries his line: Its an appagator, is it a powerful tool?"
+P "The name comes from a customer of a music shop where I used to work in Bristol, his name was Tony. No matter how many times he was told that an arpeggiator was called an arpeggiator, an Italian word, Tony always called them 'appagators'. The Settings page carries his often asked question: Has it got an appagator, is it a powerful tool? "
+P "Bless him, he was a bit special. I wonder what became of him."
 
 Pic "The mu-Toni window: transport bar, layer sidebar, sound sections and the Appergater." "main-window.png"
 
@@ -285,7 +286,7 @@ P "MIDI (right column):"
 Bullet "MIDI In, Notes In — Omni or channel 1 to 16: which notes drive the arpeggios (see Playing with a Keyboard)."
 Bullet "MIDI Clock, Source (standalone) — Internal, or MIDI In to follow an external MIDI clock, with a Sync Offset to compensate for audio latency (see below)."
 Bullet "MIDI Program Change — the Layer Presets and Full Presets buttons open the tables that map incoming program-change messages to presets."
-P "Tony's line, Its an appagator, is it a powerful tool?, and a Contact Support link sit at the bottom of the page."
+P "Tony's often asked question, Has it got an appagator, is it a powerful tool?, and a Contact Support link sit at the bottom of the page."
 
 Pic "Settings overlay open over the main window." "settings.png"
 
