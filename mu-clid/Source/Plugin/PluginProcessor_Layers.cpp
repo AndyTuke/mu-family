@@ -189,7 +189,16 @@ void PluginProcessor::syncSlotParams(int slot)
     {
         rebuildSlot = -1;
         sequencer.updatePattern(slot);
-        if (voiceEngines[(size_t) slot]) voiceEngines[(size_t) slot]->setParams(getRhythm(slot).voiceParams);
+        if (voiceEngines[(size_t) slot])
+        {
+            voiceEngines[(size_t) slot]->setParams(getRhythm(slot).voiceParams);
+
+            // A reset slot keeps its engine, whose last hit would otherwise sit at the envelope's sustain
+            // until the next trigger. layersLock excludes the audio block (it try-locks it) while the
+            // envelopes are told to release; nothing is allocated or freed here.
+            const juce::ScopedLock sl(layersLock);
+            voiceEngines[(size_t) slot]->releaseHeldNote();
+        }
     }
 
     if (slot == reorderLastSlot)

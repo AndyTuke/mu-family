@@ -82,6 +82,13 @@ public:
     //      amp env never reaches idle).
     void markRetired() noexcept;
 
+    // Lets the held note of a LIVE engine go: the envelopes enter release (the amp env otherwise sits at
+    // sustain until the next trigger) and the sample voices finish on their own. Unlike markRetired it
+    // does not freeze the engine or reset the filter / insert state. The caller must exclude the audio
+    // thread (hold the product's layer lock, which the audio block try-locks); allocates nothing.
+    // With ampRelToEnd the sample is meant to play through at its level, so the amp envelope is left.
+    void releaseHeldNote() noexcept;
+
 private:
     juce::AudioFormatManager formatManager;
 

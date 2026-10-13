@@ -9,6 +9,12 @@
 #include <array>
 #include <vector>
 
+// The allocation counter that ProcessorSeamTests.cpp's global operator new feeds (one shared inline variable).
+namespace alloc_count {
+inline thread_local bool counting = false;
+inline thread_local int  count    = 0;
+}
+
 namespace
 {
     using namespace mu_seam_test;
@@ -80,6 +86,7 @@ struct ClidLayerStructureTests : juce::UnitTest
         fillAndRemoveMiddle();
         swapEnds();
         resetKeepsIdentity();
+        resetReleasesHeldNote();
         lastLayerStays();
         removedSlotsOwedNoteOff();
         editsCancelPendingSwaps();
@@ -193,6 +200,70 @@ struct ClidLayerStructureTests : juce::UnitTest
                 expectEquals(after.steps[(size_t) i], before.steps[(size_t) i], "other slots are untouched");
                 expect(after.engine[(size_t) i] == before.engine[(size_t) i]);
             }
+    }
+
+    // A hit's amp envelope sits at sustain until the next trigger, so a held sample note keeps sounding
+    // through a reset (the engine stays) unless the reset tells it to release.
+    void resetReleasesHeldNote()
+    {
+        beginTest("reset a sounding rhythm: its held sample note releases within the release time, allocating nothing");
+        constexpr int   kBlock = 256;
+        constexpr double kRate = 48000.0;
+
+        // Returns the slot-1 peak after `blocks` blocks of a held note, with or without a reset first.
+        auto peakAfter = [&](bool reset, int blocks, int& audioAllocs)
+        {
+            TempStorage storage;
+            StructureProcessor p;
+            p.prepareToPlay(kRate, kBlock);
+            p.addLayer();
+
+            // A steady 4 s tone in slot 1's engine, triggered by hand; no transport runs, so no other hit lands.
+            auto f = p.getSamplesDir().getChildFile("Held 01.wav");
+            p.getSamplesDir().createDirectory();
+            f.deleteFile();
+            {
+                juce::WavAudioFormat wav;
+                std::unique_ptr<juce::OutputStream> out = f.createOutputStream();
+                auto w = wav.createWriterFor(out, juce::AudioFormatWriterOptions{}.withSampleRate(44100.0)
+                                                                                  .withNumChannels(1)
+                                                                                  .withBitsPerSample(16));
+                juce::AudioBuffer<float> b(1, 44100 * 4);
+                for (int i = 0; i < b.getNumSamples(); ++i)
+                    b.setSample(0, i, 0.4f * (float) std::sin(juce::MathConstants<double>::twoPi * 220.0 * i / 44100.0));
+                if (w != nullptr) w->writeFromAudioSampleBuffer(b, 0, b.getNumSamples());
+            }
+            p.voiceEngines[1]->loadFile(f);
+            p.voiceEngines[1]->trigger(false, false);
+
+            juce::AudioBuffer<float> block(2, kBlock);
+            juce::MidiBuffer midi;
+            auto run = [&](int n)
+            {
+                for (int i = 0; i < n; ++i) { block.clear(); midi.clear(); p.processBlock(block, midi); }
+            };
+            run(20);
+            const float held = p.mixerEngine.channelPeaks[1].load();
+            expect(held > 0.05f, "the held note sounds before the reset (peak " + juce::String(held, 3) + ")");
+
+            if (reset) p.resetLayer(1);
+
+            alloc_count::count = 0;
+            alloc_count::counting = true;
+            run(blocks);
+            alloc_count::counting = false;
+            audioAllocs = alloc_count::count;
+            return p.mixerEngine.channelPeaks[1].load();
+        };
+
+        // The default release is 0.5 s (94 blocks of 256 at 48 kHz); allow 1.5 times that.
+        constexpr int kBlocks = 140;
+        int allocs = 0, controlAllocs = 0;
+        const float released = peakAfter(true,  kBlocks, allocs);
+        const float control  = peakAfter(false, kBlocks, controlAllocs);
+        expect(control > 0.05f, "without a reset the note is still held after the same time (peak " + juce::String(control, 3) + ")");
+        expect(released < 1.0e-3f, "after a reset the slot has decayed to silence (peak " + juce::String(released, 5) + ")");
+        expectEquals(allocs, 0, "the audio thread allocated nothing while the note released");
     }
 
     void lastLayerStays()

@@ -275,6 +275,15 @@ void VoiceEngine::markRetired() noexcept
     retired = true;
 }
 
+void VoiceEngine::releaseHeldNote() noexcept
+{
+    // Same envelope release as markRetired; the engine stays live, so no retired flag or drain timer.
+    if (! activeParams.ampRelToEnd)
+        ampEnv.noteOff();
+    filterEnv.noteOff();
+    pitchEnv.noteOff();
+}
+
 bool VoiceEngine::isFullyDrained() const noexcept
 {
     // SamplePlayer::isActive() == (playPos >= 0 || triggered) — a "pending trigger
