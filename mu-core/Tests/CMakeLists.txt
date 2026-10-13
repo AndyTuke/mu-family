@@ -41,6 +41,7 @@ target_sources(mu-core-tests PRIVATE
     SegmentControlTests.cpp
     FaderThumbGeometryTests.cpp
     BipolarSliderRowTests.cpp
+    FaderThumbRenderTests.cpp
     ../UI/Components/BipolarSliderRow.cpp
     TransportBarTests.cpp
     ShellChromeTests.cpp
