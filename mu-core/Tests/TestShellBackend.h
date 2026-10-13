@@ -62,6 +62,14 @@ struct TestShellBackend : mu_core::ShellBackend
     bool   isHostPlaying() const noexcept override { ++reads; return hostPlay; }
     bool   getHostPpqPosition(double& ppq) const noexcept override { ++reads; if (! hostHasPpq) return false; ppq = hostPpq; return true; }
 
+    // Performance mode: a test points these at a live state and a sink and turns support on.
+    const mu_core::LiveView* live = nullptr;
+    mu_core::ControlSink*    sink = nullptr;
+    bool                     performanceSupported = false;
+    const mu_core::LiveView* getLiveView() const override { return live; }
+    mu_core::ControlSink*    getControlSink() override { return sink; }
+    bool                     supportsPerformanceMode() const override { return performanceSupported; }
+
     float  getUiScale() const override { return uiScale; }
     void   setUiScale(float s) override { uiScale = s; ++uiScaleSets; if (onUiScaleChanged) onUiScaleChanged(s); }
 

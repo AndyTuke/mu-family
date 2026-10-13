@@ -4,6 +4,8 @@
 #include "UI/SidebarItem.h"
 #include "UI/Components/AddButton.h"
 #include "UI/Components/MuLookAndFeel.h"
+#include "UI/Components/StepIndicator.h"
+#include "Control/LiveView.h"
 
 // Shared left sidebar for every mu-product. Renders one SidebarItem per
 // "channel" (layer) from ProcessorBase's channel metadata, an Add button at the
@@ -11,13 +13,21 @@
 // per-layer mini-graphic (and its animation) is product-specific, injected via
 // the createMiniVisual hook. Reorder and the pending-swap badge come from the processor's
 // layer API (canReorderLayers / swapLayers / hasPendingSwap / cancelPendingSwap).
-class LayerSidebar : public juce::Component, private juce::Timer
+class LayerSidebar : public juce::Component, private juce::Timer, private mu_core::LiveView::Listener
 {
 public:
     static constexpr int kWidth = 82;
 
     LayerSidebar(ProcessorBase& processor, const juce::String& addButtonLabel);
-    ~LayerSidebar() override { stopTimer(); }
+    ~LayerSidebar() override { setLiveView(nullptr); stopTimer(); }
+
+    // Performance mode: while the live state is in the mode, the selection follows its selected layer
+    // (kept inside the layer count) and the Add slot becomes a read-only "Layer n/N" indicator.
+    // Outside the mode the selection stays local. nullptr (the default) never follows.
+    void setLiveView(const mu_core::LiveView* view);
+    // The read-only indicator, so the shell can let the pointer reach it through its input shield.
+    juce::Component& getLayerIndicator() noexcept { return layerIndicator; }
+    bool isFollowingLiveState() const noexcept { return live != nullptr && live->isPerformanceMode(); }
 
     void refreshItems();
     void repaintItems();
@@ -64,6 +74,11 @@ private:
     bool            metal = false;
     std::vector<std::unique_ptr<SidebarItem>> items;
     AddButton addButton;
+    StepIndicator layerIndicator;               // replaces the Add slot in Performance mode
+    const mu_core::LiveView* live = nullptr;
+    bool shownFollowing = false;                // the Add slot currently shows the indicator
+    void liveStateChanged() override { followLiveState(); }
+    void followLiveState();                     // selection + indicator from the live state
     juce::ComponentAnimator animator;
 
     int selectedIndex = 0;

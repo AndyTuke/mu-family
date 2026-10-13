@@ -5,6 +5,7 @@
 #include "UI/StandardSettingsOverlay.h" // wires its program-change buttons
 #include "UI/MixerOverlay.h"            // forwards its status messages
 #include "UI/ModalDialog.h"             // the support prompt
+#include "UI/PerformanceChooser.h"      // the Preset Browser's interim Performances button
 
 EditorShellBase::EditorShellBase(ProcessorBase& proc)
     : AudioProcessorEditor(&proc),
@@ -28,6 +29,7 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
 
     wirePresetHooks();
     wireOverlays();
+    wirePerformanceChooser();
     setupBanners();
     chrome.applyWindowSize();
 
@@ -85,6 +87,20 @@ void EditorShellBase::wireOverlays()
     };
 }
 
+// The Preset Browser's interim "Performances" button (only where Performance mode is supported).
+void EditorShellBase::wirePerformanceChooser()
+{
+    if (! processorRef.supportsPerformanceMode()) return;
+    juce::Component::SafePointer<EditorShellBase> safe(this);
+    presetBrowser.onChoosePerformance = [this, safe]
+    {
+        mu_ui::perf::launchPerformanceChooser(performanceChooser, processorRef.getContentDir(), processorRef.getLiveState(),
+            [safe](const juce::String& name, const juce::String& value)
+            { if (safe != nullptr) safe->statusBar.showParam(name, value); });
+    };
+    presetBrowser.refreshFooter();
+}
+
 // The status-bar Support link (unlicensed copies only).
 void EditorShellBase::setupBanners()
 {
@@ -104,6 +120,16 @@ EditorShellBase::~EditorShellBase()
 void EditorShellBase::setMainArea(juce::Component* newSidebar, juce::Component* newMainPanel)
 {
     chrome.setMainArea(newSidebar, newMainPanel);
+
+    // Performance mode: the shared sidebar follows the live layer, and its layer indicator stays
+    // reachable through the shield; the mode takes the editor's current layer as its starting point.
+    if (auto* shared = dynamic_cast<LayerSidebar*>(newSidebar))
+    {
+        layerSidebar = shared;
+        shared->setLiveView(processorRef.supportsPerformanceMode() ? processorRef.getLiveView() : nullptr);
+        chrome.addShieldExemption(shared->getLayerIndicator());
+        transportBar.getEditorLayer = [this] { return layerSidebar != nullptr ? layerSidebar->getSelectedIndex() : 0; };
+    }
 }
 
 void EditorShellBase::forwardKnobStatus(juce::Component& root)

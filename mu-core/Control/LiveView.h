@@ -29,10 +29,12 @@ public:
     virtual int                           getCurrentItem()    const noexcept = 0;   // -1 = none yet
     virtual int                           getQueuedItem()     const noexcept = 0;   // -1 = nothing queued
     virtual int                           getSelectedLayer()  const noexcept = 0;
+    virtual bool                          isItemPlayable(int item) const = 0;           // this product's, and its file exists
     virtual uint32_t                      getRevision()       const noexcept = 0;   // bumped on every change
 
-    virtual void addListener(Listener* l)    = 0;
-    virtual void removeListener(Listener* l) = 0;
+    // Listening is not a change of the state, so a holder of the read-only view may register.
+    virtual void addListener(Listener* l)    const = 0;
+    virtual void removeListener(Listener* l) const = 0;
 };
 
 } // namespace mu_core

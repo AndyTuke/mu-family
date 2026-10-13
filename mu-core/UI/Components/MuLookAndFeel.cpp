@@ -962,8 +962,25 @@ void MuLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& button
         borderColour = colour(indicatorFault);
     }
 
+    // Progress fill (a press-and-hold button, e.g. leaving Performance mode): the face shows its
+    // resting colour and the lit colour fills it from the left as the "muFill" property rises 0..1.
+    const float fill = juce::jlimit(0.0f, 1.0f, (float) button.getProperties().getWithDefault("muFill", 0.0f));
+    if (fill > 0.0f)
+    {
+        bgColour = button.findColour(juce::TextButton::buttonColourId);
+        if (isDown) bgColour = bgColour.brighter(0.15f);
+        else if (isOver) bgColour = bgColour.brighter(0.08f);
+    }
+
     g.setColour(bgColour);
     g.fillRoundedRectangle(bounds, 3.0f);
+    if (fill > 0.0f)
+    {
+        juce::Graphics::ScopedSaveState state(g);
+        g.reduceClipRegion(bounds.withWidth(bounds.getWidth() * fill).getSmallestIntegerContainer());
+        g.setColour(button.findColour(juce::TextButton::buttonOnColourId));
+        g.fillRoundedRectangle(bounds, 3.0f);
+    }
     g.setColour(borderColour);
     g.drawRoundedRectangle(bounds, 3.0f, 1.0f);
 }

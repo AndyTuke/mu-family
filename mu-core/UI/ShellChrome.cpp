@@ -2,6 +2,7 @@
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/SettingsOverlayBase.h"
 #include "UI/ConfirmDialog.h"           // shared themed confirm dialogs (mu_ui::confirmAsync)
+#include "UI/ModalDialog.h"
 #include "Persistence/PresetFiles.h"    // mu_pp::safePresetFileName, readPresetMeta
 #include "BuildNumber.h"        // BUILD_NUMBER, MU_VERSION_STRING: local version for the upgrade check
 
@@ -25,10 +26,22 @@ ShellChrome::ShellChrome(juce::Component& hostComponent, mu_core::ShellBackend& 
     wireBuiltIns();
     wirePresetFlow();
     installKeys();
+
+    // Performance mode: the shield goes above everything; the toggle and the preset indicator stay
+    // reachable through it. The live view is watched whenever the backend has one, and the mode is
+    // acted on only when the backend supports it.
+    host.addChildComponent(shield);
+    shield.addExempt(transportBar.getPerformToggle());
+    shield.addExempt(transportBar.getStepIndicator());
+    liveView = shellBackend.getLiveView();
+    if (liveView != nullptr) liveView->addListener(this);
+    syncPerformanceMode();
 }
 
 ShellChrome::~ShellChrome()
 {
+    if (liveView != nullptr) liveView->removeListener(this);
+
     // The backend can outlive the host (a DAW closes the window and keeps the plugin), so no
     // callback into this object may survive it.
     backend.onLoadError           = nullptr;
@@ -191,6 +204,7 @@ void ShellChrome::setMainArea(juce::Component* newSidebar, juce::Component* newM
     if (mainPanel != nullptr) host.addAndMakeVisible(*mainPanel);
     // The main page's knobs take the app colour (the mixer and other overlays keep theirs).
     if (mainPanel != nullptr) MuLookAndFeel::useAppColourKnobs(*mainPanel);
+    raiseShield();
     host.resized();
 }
 
@@ -207,6 +221,7 @@ void ShellChrome::setMixerOverlay(juce::Component* overlay)
     {
         transportBar.setShowMixerToggle(false);
     }
+    raiseShield();
     host.resized();
 }
 
@@ -220,6 +235,7 @@ void ShellChrome::setSettingsOverlay(juce::Component* overlay)
     // Standard overlay chrome: close returns to the main view.
     if (auto* base = dynamic_cast<SettingsOverlayBase*>(overlay))
         base->onClose = [this] { showSettings(false); };
+    raiseShield();
     host.resized();
 }
 
@@ -243,6 +259,7 @@ void ShellChrome::addExtraScreen(juce::Component& screen, ExtraKind kind, juce::
     extras.push_back({ &screen, kind, false });
     const int index = insertBefore != nullptr ? host.getIndexOfChildComponent(insertBefore) : -1;
     host.addChildComponent(screen, index);
+    raiseShield();
 }
 
 bool ShellChrome::isExtraScreenVisible(const juce::Component& screen) const
@@ -537,9 +554,11 @@ void ShellChrome::installKeys()
     if (backend.isStandaloneApp())
     {
         host.setWantsKeyboardFocus(true);
-        host.addKeyListener(this);
         needsFocusGrab = true;
     }
+    // The listener also serves Ctrl+P and the lock's key swallowing where the mode is supported.
+    if (backend.isStandaloneApp() || backend.supportsPerformanceMode())
+        host.addKeyListener(this);
 }
 
 void ShellChrome::loadKeybindings()
@@ -571,13 +590,31 @@ void ShellChrome::loadKeybindings()
     }
 }
 
+bool ShellChrome::isPerformanceKey(const juce::KeyPress& key) noexcept
+{
+    const auto m = key.getModifiers();
+    const int code = key.getKeyCode();   // letters arrive in either case depending on the platform
+    return (m.isCtrlDown() || m.isCommandDown()) && ! m.isShiftDown() && ! m.isAltDown()
+        && (code == 'p' || code == 'P');
+}
+
 bool ShellChrome::keyPressed(const juce::KeyPress& key, juce::Component*)
 {
+    // Performance mode locks the keyboard too: every key, the play key and Ctrl+P included, does nothing.
+    if (shieldUp) return true;
+
     // Don't intercept when a text editor has focus: it needs the key for input.
     auto* focused = juce::Component::getCurrentlyFocusedComponent();
     if (dynamic_cast<juce::TextEditor*>(focused)) return false;
 
-    if (key == keybindPlayStop)
+    // Ctrl+P enters Performance mode (or says to choose a performance first); it never leaves it.
+    if (isPerformanceKey(key) && transportBar.isPerformanceAvailable())
+    {
+        transportBar.enterPerformanceMode();
+        return true;
+    }
+
+    if (backend.isStandaloneApp() && key == keybindPlayStop)
     {
         backend.toggleInternalPlay();
         return true;
@@ -595,6 +632,76 @@ void ShellChrome::parentHierarchyChanged()
         needsFocusGrab = false;
         host.grabKeyboardFocus();
     }
+}
+
+// ─── Performance mode: the input shield ──────────────────────────────────────
+
+ShellChrome::InputShield::InputShield()
+{
+    setInterceptsMouseClicks(true, false);   // it takes the events itself; nothing is drawn
+    setWantsKeyboardFocus(true);
+    setMouseClickGrabsKeyboardFocus(false);
+}
+
+void ShellChrome::InputShield::addExempt(juce::Component& c)
+{
+    exempt.emplace_back(&c);
+}
+
+// False over an exempt component, so the pointer reaches what is underneath there.
+bool ShellChrome::InputShield::hitTest(int x, int y)
+{
+    for (auto& p : exempt)
+        if (auto* c = p.getComponent())
+            if (c->isVisible() && getLocalArea(c, c->getLocalBounds()).contains(x, y))
+                return false;
+    return true;
+}
+
+void ShellChrome::raiseShield()
+{
+    if (shieldUp) shield.toFront(false);
+}
+
+// Reads the live state and raises or lowers the shield to match; the bar and sidebar follow the same state.
+void ShellChrome::syncPerformanceMode()
+{
+    const bool on = backend.supportsPerformanceMode() && liveView != nullptr
+                    && backend.getControlSink() != nullptr && liveView->isPerformanceMode();
+    transportBar.syncPerformance();
+    if (on == shieldUp) return;
+
+    shieldUp = on;
+    if (on) enterLock(); else leaveLock();
+}
+
+// Entering: everything open is closed as a cancel first (an overlay left under an invisible shield
+// would be a frozen screen), then text focus is released, then the shield goes up and takes the keyboard.
+void ShellChrome::enterLock()
+{
+    // Phase 1: dismiss themed dialogs (confirm, support prompt) as a cancel.
+    std::vector<juce::Component::SafePointer<mu_ui::ModalDialog>> dialogs;
+    for (auto* c : host.getChildren())
+        if (auto* d = dynamic_cast<mu_ui::ModalDialog*>(c)) dialogs.emplace_back(d);
+    for (auto& d : dialogs)
+        if (d != nullptr) d->cancel();
+
+    // Phase 2: close the overlays; a pending save-and-quit is cancelled with the Save card.
+    if (saveVisible) pendingQuitCallback = nullptr;
+    hideAllOverlays();
+
+    // Phase 3: release focus, then raise the shield.
+    juce::Component::unfocusAllComponents();
+    shield.setBounds(host.getLocalBounds());
+    shield.setVisible(true);
+    shield.toFront(false);
+    shield.grabKeyboardFocus();
+}
+
+void ShellChrome::leaveLock()
+{
+    shield.setVisible(false);
+    host.grabKeyboardFocus();   // the play key works again
 }
 
 void ShellChrome::showPresetBrowser(bool show)
@@ -712,6 +819,7 @@ void ShellChrome::resized()
     if (upgradeH > 0) upgradeBanner.setBounds(0, by, w, upgradeH);
 
     statusBar.setBounds(0, h - statusH, w, statusH);
+    shield.setBounds(host.getLocalBounds());
 }
 
 } // namespace mu_ui

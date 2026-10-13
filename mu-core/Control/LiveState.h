@@ -43,9 +43,10 @@ public:
     int                           getCurrentItem()    const noexcept override { return currentItem; }
     int                           getQueuedItem()     const noexcept override { return queuedItem; }
     int                           getSelectedLayer()  const noexcept override { return selectedLayer; }
+    bool                          isItemPlayable(int item) const override    { return itemLoadable(item); }
     uint32_t                      getRevision()       const noexcept override { return revision; }
-    void addListener(Listener* l) override    { listeners.add(l); }
-    void removeListener(Listener* l) override { listeners.remove(l); }
+    void addListener(Listener* l) const override    { listeners.add(l); }
+    void removeListener(Listener* l) const override { listeners.remove(l); }
 
     // ── Loading a performance (a screen-only call, made before the mode is entered) ──
     // Replaces the loaded list and forgets which item played. Refused while the mode is on.
@@ -92,7 +93,7 @@ private:
     int                    selectedLayer   = 0;
     uint32_t               queuedSerial    = 0;   // the stage serial when the queued item was staged
     uint32_t               revision        = 0;
-    juce::ListenerList<Listener> listeners;
+    mutable juce::ListenerList<Listener> listeners;
 };
 
 } // namespace mu_core

@@ -21,6 +21,14 @@ PresetBrowser::PresetBrowser()
     closeBtn.onClick = [this] { if (onClose) onClose(); };
     addAndMakeVisible(loadBtn);
     addAndMakeVisible(closeBtn);
+
+    performancesBtn.onClick = [this] { if (onChoosePerformance) onChoosePerformance(); };
+    addChildComponent(performancesBtn);
+}
+
+void PresetBrowser::refreshFooter()
+{
+    performancesBtn.setVisible(static_cast<bool>(onChoosePerformance));
 }
 
 void PresetBrowser::refresh(const juce::File& dir)
@@ -186,6 +194,8 @@ void PresetBrowser::resized()
     const int btnW = s(80);
     closeBtn.setBounds(pad, h - botH + pad, btnW, botH - pad * 2);
     loadBtn .setBounds(w - pad - btnW, h - botH + pad, btnW, botH - pad * 2);
+    const int perfW = s(110);
+    performancesBtn.setBounds((w - perfW) / 2, h - botH + pad, perfW, botH - pad * 2);
 
     // List box fills the middle
     listBox.setBounds(0, topH, w, h - topH - botH);

@@ -9,6 +9,9 @@
 namespace mu_core
 {
 
+class LiveView;      // Control/LiveView.h
+class ControlSink;   // Control/ControlSink.h
+
 // Everything the shared shell chrome (TransportBar, the settings page, ...) reads from or tells
 // the app. The chrome depends on this small interface, never on an AudioProcessor, so a product
 // processor (ProcessorBase implements it) and an app with no processor (mu-link) drive the same
@@ -96,6 +99,13 @@ public:
 
     // Where the app keeps its presets, samples and keybindings.json.
     virtual juce::File        getContentDir() const = 0;
+
+    // ─── Performance mode (defaulted: an app without it changes nothing) ─────
+    // What the chrome reads and drives for the gig view. The chrome shows the mode only when
+    // supportsPerformanceMode() is true and both pointers are set; the pointees outlive the shell.
+    virtual const LiveView* getLiveView()    const { return nullptr; }
+    virtual ControlSink*    getControlSink()       { return nullptr; }
+    virtual bool            supportsPerformanceMode() const { return false; }
 
     // ─── Shell callbacks (message thread, set by the shell) ──────────────────
     // The shell MUST clear these in its destructor: the backend can outlive it, and a deferred

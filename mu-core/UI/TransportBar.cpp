@@ -75,6 +75,11 @@ TransportBar::TransportBar(mu_core::ShellBackend& backend)
     posLabel.setText("1.1.1", juce::dontSendNotification);
     addAndMakeVisible(posLabel);
 
+    // Performance mode: the indicator replaces the preset group while the mode is on (added before the
+    // staging badge so the badge sits on top of it).
+    stepIndicator.onStatusUpdate = [this](const juce::String& n, const juce::String& v) { if (onStatusUpdate) onStatusUpdate(n, v); };
+    addChildComponent(stepIndicator);
+
     presetDropdown.setPlaceholderText("<unnamed preset>");
     presetDropdown.onChange = [this](int id)
     {
@@ -114,8 +119,16 @@ TransportBar::TransportBar(mu_core::ShellBackend& backend)
     gearBtn.onClick = [this] { if (onSettingsToggle) onSettingsToggle(); };
     addAndMakeVisible(gearBtn);
 
+    // The Perf toggle: hidden unless the backend supports Performance mode (syncPerformance shows it).
+    perfBtn.setTooltip("Performance mode (Ctrl+P)");
+    perfBtn.onClick       = [this] { if (! perfBtn.suppressClick && ! modeShown) enterPerformanceMode(); };
+    perfBtn.onHoldPress   = [this] { beginExitHold(juce::Time::getMillisecondCounterHiRes()); };
+    perfBtn.onHoldCancel  = [this] { cancelExitHold(); };
+    addChildComponent(perfBtn);
+
     populatePresetDropdown();
     refreshPlayBtn();
+    syncPerformance();
     startTimerHz(mu_ui::kUiRefreshHz);
 }
 
@@ -123,6 +136,163 @@ TransportBar::~TransportBar()
 {
     proc.setNudgeDirection(0);   // a held nudge must not outlive the bar
     stopTimer();
+}
+
+// ─── Performance mode ────────────────────────────────────────────────────────
+
+void TransportBar::PerfToggle::mouseDown(const juce::MouseEvent& e)
+{
+    juce::TextButton::mouseDown(e);
+    if (getToggleState() && onHoldPress) onHoldPress();   // lit: the press starts the exit hold
+}
+
+void TransportBar::PerfToggle::mouseUp(const juce::MouseEvent& e)
+{
+    juce::TextButton::mouseUp(e);   // a click on the off button fires onClick here
+    if (onHoldCancel) onHoldCancel();
+    suppressClick = false;
+}
+
+void TransportBar::PerfToggle::mouseDrag(const juce::MouseEvent& e)
+{
+    juce::TextButton::mouseDrag(e);
+    if (! reallyContains(e.getPosition(), false) && onHoldCancel) onHoldCancel();   // dragging off cancels
+}
+
+bool TransportBar::isPerformanceAvailable() const
+{
+    return proc.supportsPerformanceMode() && proc.getLiveView() != nullptr && proc.getControlSink() != nullptr;
+}
+
+void TransportBar::showTimedStatus(const juce::String& name, const juce::String& value)
+{
+    if (! onStatusUpdate) return;
+    onStatusUpdate(name, value);
+
+    // Clear it after a few seconds, unless a newer timed line has replaced it.
+    const int serial = ++statusSerial;
+    juce::Component::SafePointer<TransportBar> safe(this);
+    juce::Timer::callAfterDelay(MuLookAndFeel::kPerfStatusMs, [safe, serial]
+    {
+        if (auto* bar = safe.getComponent())
+            if (bar->statusSerial == serial && bar->onStatusUpdate) bar->onStatusUpdate({}, {});
+    });
+}
+
+bool TransportBar::enterPerformanceMode()
+{
+    if (! isPerformanceAvailable() || proc.getLiveView()->isPerformanceMode()) return false;
+    if (proc.getLiveView()->getPerformance().count() == 0)
+    {
+        showTimedStatus("Performance", "Choose a performance first");
+        return false;
+    }
+
+    // The editor's current layer seeds the live selection so nothing jumps on entry.
+    mu_core::ControlAction action;
+    action.type  = mu_core::ControlActionType::PerformanceMode;
+    action.index = 1;
+    action.layer = getEditorLayer ? getEditorLayer() : 0;
+    const bool done = proc.getControlSink()->perform(action);
+    syncPerformance();
+    return done;
+}
+
+void TransportBar::beginExitHold(double nowMs)
+{
+    if (! modeShown) return;
+    exitHold.press(nowMs);
+    if (onStatusUpdate) onStatusUpdate("Performance", "Hold to leave Performance mode");
+}
+
+void TransportBar::setExitFill(float progress)
+{
+    perfBtn.getProperties().set("muFill", progress);
+    perfBtn.repaint();
+}
+
+void TransportBar::cancelExitHold()
+{
+    if (! exitHold.isHolding()) return;
+    exitHold.cancel();
+    setExitFill(0.0f);
+}
+
+// Advances the hold: the face fills with the elapsed fraction; at the end the mode is left with no confirm.
+void TransportBar::tickExitHold(double nowMs)
+{
+    if (! exitHold.isHolding()) return;
+    if (! exitHold.finished(nowMs))
+    {
+        setExitFill(exitHold.progress(nowMs));
+        return;
+    }
+
+    exitHold.cancel();
+    setExitFill(0.0f);
+    perfBtn.suppressClick = true;   // the release that follows must not enter again
+    if (isPerformanceAvailable())
+    {
+        mu_core::ControlAction action;
+        action.type  = mu_core::ControlActionType::PerformanceMode;
+        action.index = 0;
+        proc.getControlSink()->perform(action);
+    }
+    syncPerformance();
+}
+
+void TransportBar::updatePresetGroupVisibility()
+{
+    const bool show = showPresetControls && ! modeShown;
+    presetDropdown.setVisible(show);
+    newBtn        .setVisible(show);
+    saveBtn       .setVisible(show);
+    stepIndicator .setVisible(showPresetControls && modeShown);
+}
+
+// Brings the toggle, the preset group and the indicator in step with the live state.
+void TransportBar::syncPerformance()
+{
+    const bool available = isPerformanceAvailable();
+    const bool on        = available && proc.getLiveView()->isPerformanceMode();
+    bool relayout = false;
+
+    if (available != availableShown)
+    {
+        availableShown = available;
+        perfBtn.setVisible(available);
+        relayout = true;
+    }
+    if (on != modeShown)
+    {
+        modeShown = on;
+        if (! on) { cancelExitHold(); shownQueued = {}; }
+        perfBtn.setToggleState(on, juce::dontSendNotification);
+        perfBtn.setTooltip(on ? "Hold to leave Performance mode" : "Performance mode (Ctrl+P)");
+        updatePresetGroupVisibility();
+        relayout = true;
+        repaint();
+    }
+    if (relayout) resized();
+    if (modeShown) refreshIndication();
+}
+
+// The indicator's lettering and lamps from the live state, plus the status line for a queued switch.
+void TransportBar::refreshIndication()
+{
+    const auto ind = mu_ui::perf::buildIndication(*proc.getLiveView(),
+                                                  getLoadedPresetFile().getFileNameWithoutExtension());
+    stepIndicator.setText(ind.lit, ind.ghost, ind.ghostPulses);
+    stepIndicator.setLamps(ind.lamps);
+    stepIndicator.setHint(ind.hint.first, ind.hint.second);
+    for (size_t i = 0; i < ind.hints.size(); ++i)
+        stepIndicator.setLampHint((int) i, ind.hints[i].first, ind.hints[i].second);
+
+    if (ind.queuedValue != shownQueued)
+    {
+        shownQueued = ind.queuedValue;
+        if (shownQueued.isNotEmpty() && onStatusUpdate) onStatusUpdate("Queued", shownQueued);
+    }
 }
 
 void TransportBar::setLogoText(const juce::String& text)
@@ -134,9 +304,7 @@ void TransportBar::setLogoText(const juce::String& text)
 void TransportBar::setShowPresetControls(bool show)
 {
     showPresetControls = show;
-    presetDropdown.setVisible(show);
-    newBtn        .setVisible(show);
-    saveBtn       .setVisible(show);
+    updatePresetGroupVisibility();   // in Performance mode the indicator takes the group's place instead
     if (!show) presetStagingBadge.setVisible(false);
     resized();
 }
@@ -197,6 +365,9 @@ void TransportBar::timerCallback()
         tapBtn.setVisible(showTapAndNudge && ! clockShown);
         if (clockShown) refreshClockLamp();
     }
+
+    syncPerformance();
+    if (exitHold.isHolding()) tickExitHold(juce::Time::getMillisecondCounterHiRes());
 
     // Show the staging badge while a full-preset hot-swap is queued for the loop point.
     if (showPresetControls)
@@ -403,6 +574,13 @@ void TransportBar::paint(juce::Graphics& g)
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(14.0f))));
     g.drawText(logoText, mu_ui::s(8), 0, mu_ui::s(kLogoW - 8), getHeight(),
                juce::Justification::centredLeft, false);
+
+    // Performance mode: a lit line in the app accent along the bar's bottom edge.
+    if (modeShown)
+    {
+        g.setColour(MuLookAndFeel::appAccent(*this).withAlpha(MuLookAndFeel::lighting().performanceRim));
+        g.fillRect(0, getHeight() - mu_ui::s(MuLookAndFeel::kPerfRimH), getWidth(), mu_ui::s(MuLookAndFeel::kPerfRimH));
+    }
 }
 
 void TransportBar::resized()
@@ -470,6 +648,12 @@ void TransportBar::resized()
         rightEdge -= s(kMixerW) + gap;
     }
 
+    if (availableShown)   // Performance mode's toggle, left of Mixer
+    {
+        perfBtn.setBounds(rightEdge - s(MuLookAndFeel::kPerfBtnW), btnY, s(MuLookAndFeel::kPerfBtnW), btnH);
+        rightEdge -= s(MuLookAndFeel::kPerfBtnW) + gap;
+    }
+
     if (showSettingsButton)
     {
         gearBtn.setBounds(rightEdge - s(kGearW), btnY, s(kGearW), btnH);
@@ -478,6 +662,7 @@ void TransportBar::resized()
 
     if (showPresetControls)
     {
+        const int groupRight = rightEdge;   // the preset group's right edge, where the indicator ends too
         saveBtn.setBounds(rightEdge - s(kSaveW), btnY, s(kSaveW), btnH);
         rightEdge -= s(kSaveW) + gap;
 
@@ -487,11 +672,12 @@ void TransportBar::resized()
         const int presetLeft = (loopPaneBounds.isEmpty() ? transportPaneBounds.getRight()
                                                           : loopPaneBounds.getRight()) + gap;
         presetDropdown.setBounds(presetLeft, btnY, rightEdge - presetLeft, btnH);
+        stepIndicator.setBounds(presetLeft, btnY, groupRight - presetLeft, btnH);
 
-        // Staging badge: small pill at the top-right of the preset dropdown.
+        // Staging badge: small pill at the top-right of the preset dropdown (the indicator in Performance mode).
         const int badgeW = s(28);
         const int badgeH = s(11);
-        presetStagingBadge.setBounds(presetDropdown.getRight() - badgeW - s(4),
-                                     presetDropdown.getY() + s(2), badgeW, badgeH);
+        const auto& host = modeShown ? static_cast<juce::Component&>(stepIndicator) : presetDropdown;
+        presetStagingBadge.setBounds(host.getRight() - badgeW - s(4), host.getY() + s(2), badgeW, badgeH);
     }
 }

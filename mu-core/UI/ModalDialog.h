@@ -49,6 +49,8 @@ public:
     // Programmatically dismiss with a result (used by injected content, e.g. a prompt's
     // Return/Esc handlers).
     void close(int result) { finish(result); }
+    // Dismiss it as if the user cancelled (Esc): nothing is confirmed.
+    void cancel() { finish(cancelResultId); }
     // The injected content component (e.g. for grabbing focus), or nullptr.
     juce::Component* contentComponent() const noexcept { return contentComp.get(); }
 

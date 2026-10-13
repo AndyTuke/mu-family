@@ -306,7 +306,10 @@ public:
     // Performance mode tells that apart from a load that succeeded with warnings.
     void noteFullPresetLoadFailed() noexcept                { fullPresetLoadFailed = true; }
     void restoreLiveState(const juce::ValueTree& root)      { liveState.restoreFrom(root); }
-    const mu_core::LiveView&  getLiveView() const noexcept  { return liveState; }
+    // The ShellBackend's Performance mode accessors: the shell reads the live state and performs actions through this instance.
+    const mu_core::LiveView*  getLiveView() const override  { return &liveState; }
+    mu_core::ControlSink*     getControlSink() override     { return this; }
+    bool                      supportsPerformanceMode() const override { return isStandaloneApp(); }
     // Drops the staged (not yet committed) per-layer swap for `slot`, if any. A structural edit
     // calls it for every layer it renumbers or clears, because a staged swap is keyed by index and
     // would otherwise land on the wrong layer. A staged full preset is left to win.

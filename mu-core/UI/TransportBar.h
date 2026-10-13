@@ -7,6 +7,10 @@
 #include "UI/Components/StatusLamp.h"
 #include "Plugin/TapTempo.h"
 #include "Plugin/TransportResolver.h"   // kNudgeBendPercent
+#include "Control/ControlSink.h"
+#include "Control/LiveView.h"
+#include "UI/Components/StepIndicator.h"
+#include "UI/PerformanceIndication.h"   // HoldTracker
 
 // Shared mu-family transport bar — play / BPM / position / preset dropdown /
 // new / save / gear / mixer toggle. Plugin-agnostic: takes a mu_core::ShellBackend and reads
@@ -64,6 +68,27 @@ public:
     int getPresetDropdownLeft() const noexcept;
     void setMixerActive(bool active);
 
+    // ─── Performance mode (standalone; docs/design-ui-family.md section 12) ─────
+    // Shown only when the backend supports the mode and has both a live view and a control sink.
+    // In the mode the preset group is replaced by the StepIndicator, the Perf toggle is lit and a
+    // rim runs along the bar's bottom edge. The mode itself lives in the live state; the bar only
+    // asks for changes through the sink and re-reads the result.
+    std::function<int()> getEditorLayer;   // the editor's current layer selection; seeds the mode on entry
+    bool isPerformanceAvailable() const;
+    bool isPerformanceMode() const noexcept { return modeShown; }
+    // A click on Perf (or Ctrl+P) while the mode is off: enters it, or says to choose a performance first.
+    bool enterPerformanceMode();
+    // Leaving: press and hold the lit Perf button for kPerfExitHoldMs. The caller supplies the clock;
+    // the bar's timer ticks it at the UI refresh rate and release or drag-off cancels.
+    void beginExitHold(double nowMs);
+    void cancelExitHold();
+    void tickExitHold(double nowMs);
+    bool isExitHolding() const noexcept { return exitHold.isHolding(); }
+    // Re-reads the live state and updates the toggle, the preset group and the indicator.
+    void syncPerformance();
+    StepIndicator&   getStepIndicator()  noexcept { return stepIndicator; }
+    juce::Component& getPerformToggle()  noexcept { return perfBtn; }
+
     void paint(juce::Graphics& g) override;
     void resized() override;
     void mouseDown(const juce::MouseEvent& e) override;
@@ -99,6 +124,30 @@ private:
     juce::TextButton saveBtn  { "Save" };
     juce::TextButton gearBtn;
     juce::TextButton mixerBtn { "Mixer" };
+
+    // The Perf toggle: a click enters; while lit, a press starts the exit hold, and release or
+    // dragging off the button cancels it.
+    struct PerfToggle : juce::TextButton
+    {
+        PerfToggle() : juce::TextButton("Perf") { setWantsKeyboardFocus(false); }
+        std::function<void()> onHoldPress, onHoldCancel;
+        bool suppressClick = false;   // set when the hold completed: the release must not re-enter
+        void mouseDown(const juce::MouseEvent& e) override;
+        void mouseUp(const juce::MouseEvent& e) override;
+        void mouseDrag(const juce::MouseEvent& e) override;
+    };
+    PerfToggle       perfBtn;
+    StepIndicator    stepIndicator;
+    mu_ui::perf::HoldTracker exitHold { (double) MuLookAndFeel::kPerfExitHoldMs };
+    bool             availableShown = false;
+    bool             modeShown      = false;
+    int              statusSerial   = 0;
+    juce::String     shownQueued;
+
+    void setExitFill(float progress);
+    void refreshIndication();
+    void showTimedStatus(const juce::String& name, const juce::String& value);
+    void updatePresetGroupVisibility();
 
     static constexpr int kLogoW      = 88;
     static constexpr int kPlayW      = 36;   // wider for clarity

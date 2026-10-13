@@ -674,6 +674,16 @@ public:
     static constexpr float kLampCurveW     = 1.8f;
     static constexpr int   kStatusLampD    = 8;      // StatusLamp disc diameter
 
+    // Performance mode (docs/design-ui-family.md section 12): the Perf toggle, the accent rim under the
+    // transport bar, the exit hold, the indicator's lamp spacing and gap, and how long a performance
+    // status line stays up.
+    static constexpr int kPerfBtnW       = 44;
+    static constexpr int kPerfRimH       = 2;
+    static constexpr int kPerfExitHoldMs = 1000;
+    static constexpr int kPerfStatusMs   = 3000;
+    static constexpr int kStepLampPitch  = 11;
+    static constexpr int kStepGap        = 4;
+
     // Tempo (BPM) fields: one decimal everywhere; an arrow click steps a whole BPM, Shift a tenth.
     static constexpr int    kBpmDecimals = 1;
     static constexpr double kBpmStep     = 1.0;

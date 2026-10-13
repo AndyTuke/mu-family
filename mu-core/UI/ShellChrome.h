@@ -5,6 +5,7 @@
 #include <vector>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Plugin/ShellBackend.h"
+#include "Control/LiveView.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/StatusBar.h"
 #include "UI/TransportBar.h"
@@ -30,11 +31,45 @@ namespace mu_ui
 // addExtraScreen so they join the state machine and the layout; its preset reactions are the
 // on...() hooks below).
 class ShellChrome : private juce::MouseListener,
-                    public juce::KeyListener
+                    public juce::KeyListener,
+                    private mu_core::LiveView::Listener
 {
 public:
     ShellChrome(juce::Component& hostComponent, mu_core::ShellBackend& shellBackend);
     ~ShellChrome() override;
+
+    // ─── Performance mode: the input shield ──────────────────────────────────
+    // While the live state is in Performance mode a transparent component sits over the whole host
+    // and swallows mouse, wheel and key events, so no panel needs any code to be read-only. It paints
+    // nothing. Its hit test lets the pointer through over the exempt components (the Perf toggle, the
+    // preset indicator, the sidebar's layer indicator), which have no click handling of their own and
+    // must still get hover for their status text. The host window's frame and close button are native
+    // and unaffected.
+    class InputShield : public juce::Component
+    {
+    public:
+        InputShield();
+        void addExempt(juce::Component& c);
+        bool hitTest(int x, int y) override;
+        void mouseDown(const juce::MouseEvent&) override {}
+        void mouseUp(const juce::MouseEvent&) override {}
+        void mouseDrag(const juce::MouseEvent&) override {}
+        void mouseDoubleClick(const juce::MouseEvent&) override {}
+        void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override {}   // the default forwards to the parent
+        void mouseMagnify(const juce::MouseEvent&, float) override {}
+        bool keyPressed(const juce::KeyPress&) override { return true; }
+    private:
+        std::vector<juce::Component::SafePointer<juce::Component>> exempt;
+    };
+
+    InputShield& getInputShield() noexcept { return shield; }
+    bool isPerformanceLocked() const noexcept { return shieldUp; }
+    // Lets the pointer through the shield over `c` (the sidebar's layer indicator).
+    void addShieldExemption(juce::Component& c) { shield.addExempt(c); }
+    // Re-reads the live state and raises or lowers the shield. Called on every live-state change.
+    void syncPerformanceMode();
+    // The key that enters the mode (Ctrl+P); it never leaves it.
+    static bool isPerformanceKey(const juce::KeyPress& key) noexcept;
 
     // ─── Pieces, for the product to wire ─────────────────────────────────────
     MuLookAndFeel&        getLookAndFeel()  { return lookAndFeel; }
@@ -172,6 +207,14 @@ private:
     juce::ComponentAnimator animator;
     juce::TooltipWindow     tooltipWindow;   // parents itself to the host in its constructor
     void fadeSwitch(juce::Component* outgoing, juce::Component* incoming, int durationMs = 80);
+
+    InputShield shield;
+    bool        shieldUp = false;
+    const mu_core::LiveView* liveView = nullptr;
+    void liveStateChanged() override { syncPerformanceMode(); }
+    void enterLock();     // closes everything open as a cancel, releases text focus, raises the shield
+    void leaveLock();
+    void raiseShield();   // back on top after a child was added above it
 
     std::atomic<bool> upgradeAvailable { false };
     void showUpgradeAvailable(const juce::String& latestTag);

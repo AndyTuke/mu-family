@@ -11,8 +11,14 @@ class PresetBrowser : public juce::Component,
 public:
     std::function<void(const juce::File&)> onLoadPreset;
     std::function<void()>                  onClose;
+    // Interim way to choose a Performance (the chooser overlay replaces it): a "Performances" button
+    // in the footer, shown only while this is set.
+    std::function<void()>                  onChoosePerformance;
 
     PresetBrowser();
+
+    // Call after setting or clearing onChoosePerformance.
+    void refreshFooter();
 
     // file extension to scan for (without the dot). Call BEFORE refresh().
     // Consumers should always set this explicitly — the empty default scans
@@ -52,6 +58,7 @@ private:
     juce::ListBox     listBox;
     juce::TextButton  loadBtn   { "Load" };
     juce::TextButton  closeBtn  { "Close" };
+    juce::TextButton  performancesBtn { "Performances" };
 
     std::vector<PresetInfo> allPresets;
     std::vector<int>        filteredIndices;

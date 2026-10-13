@@ -15,6 +15,7 @@ set(MU_CORE_CHROME_SOURCES
     "${_mu_core_dir}/UI/Components/SlideSwitch.cpp"
     "${_mu_core_dir}/UI/Components/NudgeInput.cpp"
     "${_mu_core_dir}/UI/Components/StatusLamp.cpp"
+    "${_mu_core_dir}/UI/Components/StepIndicator.cpp"
     "${_mu_core_dir}/UI/Components/NoteLengthControl.cpp"
     "${_mu_core_dir}/UI/Components/DropdownSelect.cpp"
     "${_mu_core_dir}/UI/Components/StepEditor.cpp"
@@ -34,5 +35,8 @@ set(MU_CORE_CHROME_SOURCES
     "${_mu_core_dir}/UI/ModalDialog.cpp"
     "${_mu_core_dir}/UI/PresetBrowser.cpp"
     "${_mu_core_dir}/UI/ShellChrome.cpp"
+    "${_mu_core_dir}/UI/PerformanceIndication.cpp"
+    # The performance list the chrome reads (juce_core only), compiled with the chrome so mu-link links it too
+    "${_mu_core_dir}/Persistence/PerformanceFile.cpp"
 )
 unset(_mu_core_dir)

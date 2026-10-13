@@ -306,6 +306,12 @@ struct MuTheme
         float lampGapDarken      = 0.6f;    // lamp displays (step editor): gaps between lenses, base darkened by this
         float lampHotSpotReach   = 0.60f;   // lamp displays: hot-spot radius, fraction of the lit lens's longer side
 
+        // Performance mode: the rim along the transport bar's bottom edge (app accent), the queued
+        // item's pulse rate (the pad rate) and how long a newly current item's lamp flashes.
+        float performanceRim     = 0.85f;
+        float queuedPulseHz      = 2.0f;
+        float stepFlashMs        = 150.0f;
+
         // Engraved grooves (a divider cut into a metal panel: a dark line and a light one beside it)
         float grooveShade        = 0.45f;   // the dark line
         float grooveLight        = 0.09f;   // the light line

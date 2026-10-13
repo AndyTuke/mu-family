@@ -1,4 +1,5 @@
 #include "LayerSidebar.h"
+#include "UI/PerformanceIndication.h"
 
 LayerSidebar::LayerSidebar(ProcessorBase& processor, const juce::String& addButtonLabel)
     : proc(processor), noun(addButtonLabel), addButton(addButtonLabel)
@@ -7,6 +8,7 @@ LayerSidebar::LayerSidebar(ProcessorBase& processor, const juce::String& addButt
     viewport.setScrollBarsShown(true, false);
     addAndMakeVisible(viewport);
     addAndMakeVisible(addButton);
+    addChildComponent(layerIndicator);
 
     addButton.onClick = [this] { if (onAddLayer) onAddLayer(); };
 
@@ -75,6 +77,37 @@ void LayerSidebar::refreshItems()
     // Animate a freshly-added item sliding in (skip on initial construction).
     if (n > prevCount && prevCount > 0)
         layoutItems(true, n - 1);
+}
+
+void LayerSidebar::setLiveView(const mu_core::LiveView* view)
+{
+    if (live == view) return;
+    if (live != nullptr) live->removeListener(this);
+    live = view;
+    if (live != nullptr) live->addListener(this);
+    followLiveState();
+}
+
+// In Performance mode: select the live layer (the editor shows it through onLayerSelected) and keep
+// the "Layer n/N" text current; on a change of mode swap the Add slot.
+void LayerSidebar::followLiveState()
+{
+    const bool on = isFollowingLiveState();
+    if (on != shownFollowing)
+    {
+        shownFollowing = on;
+        resized();
+    }
+    if (! on) return;
+
+    const int layers = proc.getNumLayers();
+    const int layer  = mu_ui::perf::followedLayer(live->getSelectedLayer(), layers);
+    if (layer != selectedIndex)
+    {
+        setSelectedIndex(layer);
+        if (onLayerSelected) onLayerSelected(layer);
+    }
+    layerIndicator.setText(mu_ui::perf::layerIndicatorText(layer, layers), {}, false);
 }
 
 void LayerSidebar::updateAddEnabled()
@@ -287,8 +320,11 @@ void LayerSidebar::resized()
     // Hide the Add button (and expand the viewport to fill) when the product
     // hasn't wired onAddLayer — avoids a visible, interactive control that
     // does nothing (e.g. mu-toni with no engine yet defined).
-    const bool showAdd = static_cast<bool>(onAddLayer);
-    addButton.setVisible(showAdd);
+    // In Performance mode the slot holds the read-only layer indicator instead, even with no Add.
+    const bool following = shownFollowing;
+    const bool showAdd   = static_cast<bool>(onAddLayer) || following;
+    addButton.setVisible(static_cast<bool>(onAddLayer) && ! following);
+    layerIndicator.setVisible(following);
 
     // Metal style keeps the items and the Add button clear of the painted border, and
     // with screws, clear of the corner screws above the first item / below the Add button.
@@ -302,6 +338,7 @@ void LayerSidebar::resized()
     {
         const int addBtnY = h - ah - edgeY;
         addButton.setBounds(edgeX, addBtnY, w - 2 * edgeX, ah);
+        layerIndicator.setBounds(addButton.getBounds());
         viewport.setBounds(0, top, w, addBtnY - s(2) - top);
     }
     else
@@ -339,7 +376,8 @@ void LayerSidebar::timerCallback()
 
     // Sync Add button visibility in case onAddLayer was wired (or cleared)
     // after the last resized() call.
-    if (addButton.isVisible() != static_cast<bool>(onAddLayer))
+    followLiveState();
+    if (addButton.isVisible() != (static_cast<bool>(onAddLayer) && ! shownFollowing))
         resized();
 
     // Show the staging badge on every layer whose preset swap is waiting for its boundary.
