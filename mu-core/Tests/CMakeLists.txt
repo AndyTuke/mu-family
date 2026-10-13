@@ -15,6 +15,7 @@ target_sources(mu-core-tests PRIVATE
     ../Sequencer/EuclideanGenerator.cpp
     ScopedStorageRootTests.cpp
     ChannelStateResetTests.cpp
+    MixerStereoPeakTests.cpp
     SupportPromptPolicyTests.cpp
     SettingsOverlayFitTests.cpp
     SettingsOverlayBackendTests.cpp

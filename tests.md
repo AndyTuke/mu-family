@@ -66,8 +66,9 @@ cmake --build build --target mu-clid-tests --config Release && build/mu-clid/mu-
 | Transport position into the engine (`SwapCommitTimingTests.cpp`): a host position that creeps backward 0.002 beat per block is held for under a step then followed (hold bounded, never forward while the host reverses, afterwards each step plays its own pattern slot with no drift or repeat); a jittery ramp (up to 0.04 beat either way) keeps a monotonic engine position, no wrap-detector reset beyond the transport start, one trigger per step reached; the modulation recompute (`tryUpdatePatternFromModulation`) pads steps 1 and 2 with 0 and 1 hits to at least 2 steps and the walk carries on. Mutation checks: removing the hold, or making it unbounded, or dropping the minimum-length pad in the recompute, each fails these tests | `SwapCommitTimingTests.cpp` |
 | Modulation skew (proportion ↔ display) | `ModulationSkewTests.cpp` |
 | No demo caps (unlicensed is fully functional): 8 layers, 64-step rhythms and 8-rhythm full-preset / per-layer files survive save/load as XML text; limits stay 8 / 64. Data-layer only; the processor-level numRhythms clamp is not reachable from this target. **Pass (build 1255)** | `NoDemoCapsTests.cpp` |
+| Layer structure, held-note release: a reset releases a held sample note within the release time without allocating; a tied hit 20 blocks into the release adds no attack (level at most 2.1 times the pre-tie peak, since the tied hit adds a second voice under the same envelope) and the release still reaches silence, which fails if the envelope retriggered (it would hold at sustain); the strip's left / right peaks follow the pan (hard left leaves the right side silent, a centred mono source gives equal sides, the combined peak is the larger side) | `ClidLayerStructureTests.cpp` |
 
-**Current status:** 140/140 tests pass at v1.0.708.
+**Current status:** 140/140 tests pass at v1.0.708.  Layer-structure suite re-run: 179 results, 0 failures (Debug, build 1409), including the tied-mid-release and stereo-peak tests.
 
 ---
 
@@ -132,6 +133,7 @@ cmake --build build --target mu-core-tests --config Debug && build/mu-core/Tests
 | MP3 samples open and decode | `mu-core/Tests/Mp3FormatTests.cpp` | Pass (moved from mu-clid, Debug) |
 | `ProcessorBase::ScopedStorageRoot`: with a root set, settings and content sit under it and nothing is written to the real `TDP` folders; the default is restored (and nests) | `mu-core/Tests/ScopedStorageRootTests.cpp` | Pass (build 1306) |
 | `ChannelState::reset()` equals the APVTS default of every `ch{N}_` parameter from the shared strip layout (`addChannelStripParams`), for all `kMaxLayers` strips, with default options and with mu-Clid's options; also fails if the strip gains a parameter the test does not know. mu-On's Bass / Rumble sidechain defaults are product options and are not covered (they differ from `reset()` by design; `resetLayerParams` follows with the real defaults) | `mu-core/Tests/ChannelStateResetTests.cpp` | Pass (2 tests, build 1271) |
+| Stereo peaks (`MixerEngine::processBlock` driven through the render hook): master L / R follow the master pan (hard left leaves R silent, centred equal, combined = larger side), a mono output buffer reports its one channel as both sides, the reverb return L / R follow the return pan and an unused return reads zero on all three peaks. Mutation check not run | `mu-core/Tests/MixerStereoPeakTests.cpp` | Pass (3 tests; suite 283 results, 0 failures, Debug build 1409) |
 
 Note: the real product processors are built headless in each product's test target (the seam in [design-plugin-family.md](docs/design-plugin-family.md), "Headless product processors": `createEditor()` lives in `PluginEditor.cpp`, tests supply a one-line stand-in, `ProcessorBase::ScopedStorageRoot`, shared source list `mu-core/cmake/ProcessorTestSources.cmake`). Run one product's real-processor tests with `<exe> mu-<product>-processor`. Real-processor tests: mu-Tant `mu-tant/Source/Tests/ProcessorSeamTests.cpp` (construction, `resetLayer` equals a fresh voice across block sizes and insert algorithms, add / remove / swap / reset and `loadUserWavetable` against `processBlock` on a worker thread, `layerEditInFlight` skip), mu-Toni and mu-On `Source/Tests/ProcessorSeamTests.cpp` (layer ownership: `getLayer(i) == &getArp(i)`, `laneOf(voiceSlot(i)) == i`), mu-Clid `mu-clid/Source/Tests/ProcessorSeamTests.cpp` (rhythm edits and the loop-boundary swap commit against `processBlock`). Known gap logged by the mu-Tant test: `RingModInsert::reset()` leaves its frequency smoother. Known behaviour: a staged per-rhythm swap with "On master loop" timing and no master loop never commits. Status: Pass (build 1306).
 
@@ -179,6 +181,44 @@ The render tests drive `MidiRhythmCore` (the audio path `PluginProcessor` delega
 | Parameter change off the message thread: the listener allocates nothing (operator new counted on that thread against the host-notification baseline), the field is written at once, the pattern rebuild waits for the message thread, `mstrLoop` set | `MidiRenderTests.cpp` |
 
 **Current status:** Pass, 78 results, 0 failures (Debug, build 1300). Mutation check: removing the lock-skip flush, or rebuilding the pattern on the calling thread, makes the render tests fail.
+
+---
+
+## C++ unit tests — mu-link
+
+Console target `mu-link-tests`:
+
+```
+cmake --build build --target mu-link-tests --config Debug && build/mu-link/mu-link-tests_artefacts/Debug/mu-link-tests.exe
+```
+
+| Coverage | File |
+|---|---|
+| Server engine: client rings and mixing, `underrunFrames` per block and in the shared registry, left / right peaks per client and master (a stereo source gives different sides and the combined peak is the larger; a mono device reports one channel as both sides), output latency published in the transport, `requestClientDepth` writes the slot's `requestedDepthFrames` (negative clamps to 0, out-of-range slot ignored) | `mu-link/Source/Tests/ServerTests.cpp` |
+| Client: the server can request a depth and the client follows it (a withdrawn request returns to the client's own depth), default depth, depth clamps (ring maximum, floor of one render chunk, negatives), underrun count and output latency read back, a depth sweep | `mu-link/Source/Tests/ClientTests.cpp` |
+| Window: Latency Low / Normal / High asks every connected slot for 2048 / 0 (the app's own default) / 8192 and is remembered with the settings; the Dropouts lamp goes red on an underrun, latches amber, and clears on a click or a Latency change | `mu-link/Source/Tests/MuLinkWindowTests.cpp` |
+
+**Current status:** Pass, 81 results, 0 failures (Debug, build 1409).
+
+**Latency coverage and gaps:** covered are the three choices, the protocol-v4 request field, the underrun counter, the client following the server depth, depth clamps and the lamp. Not covered: the MIDI due-time compensation and listening re-validation of each Latency setting on real devices (hardware items), and the literal value 4096 (the test compares the client default with `kDefaultTargetDepthFrames`, which is defined as `kDefaultClientDepthFrames`, so changing the constant would not fail a test).
+
+---
+
+## CLAP validation (clap-validator)
+
+Tool: clap-validator 0.4.1, currently at `C:\Users\andyt\AppData\Local\Temp\claude\d--Dev-mu\622d17e1-0a58-4a44-b939-6ac3ddfcacac\scratchpad\clap-validator\clap-validator.exe` (a session scratchpad copy; fetch it again if that folder is gone).
+
+**Debug builds:** the validator's process tests activate a plugin twice, which trips an assertion dialog in the clap-helpers wrapper in Debug (`plugin.hxx:375`, `!_isActive`). Against a Debug `.clap` run only the filters `state-`, `param-`, `features` and `audio-ports` (`-t <filter>`); run the full suite only against Release builds.
+
+| Product | Result |
+|---|---|
+| All products, `state-*` | 4 pass, 0 fail |
+| All products, `param-conversions` | Pass |
+| mu-Tant, mu-Clid, `param-default-values` | Fails by design: the user's saved `_default` preset is loaded at startup, so values differ from the declared defaults. Not a defect |
+| mu-On, full suite | 33 pass, 0 fail |
+| mu-Tant, mu-Clid, full suite | 32 pass, 1 fail (the case above) |
+
+Recorded as reported by the main conversation; not re-run by the test steward.
 
 ---
 
