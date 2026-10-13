@@ -125,6 +125,7 @@ Bullet "Stereo meter — two bars beside the fader show the left and right level
 Bullet "Mute (M) — silences that app in the mix."
 Bullet "Solo (S) — hears only the soloed app(s); everything else is muted while any Solo is active."
 Bullet "Master — a fader and stereo meter for the summed output. Click its meter to clear the clip marker."
+P "The faders use a rectangular cap like a small knob, with a pointer line across its middle that marks the level, running in a groove that lights up from the bottom to the cap. Every fader in the mixer looks and works the same way."
 P "The master output is protected by a safety limiter, so the summed mix can never harshly clip the soundcard no matter how hot the connected apps run. Normal levels pass through untouched."
 
 Pic "Mixer strips with faders, stereo meters, M, S and the Master strip." "main-window.png"

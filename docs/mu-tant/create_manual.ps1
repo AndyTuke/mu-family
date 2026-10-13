@@ -123,9 +123,11 @@ Bullet "Clock lamp  —  standalone only. Replaces the Tap button and sits betwe
 Bullet "Tap button  —  standalone only. Takes the place of the Clock lamp whenever the lamp is not shown (the internal clock, or MIDI clock sync set to Transport only), so you see Tap or the lamp, never both. Tap it in time with the beat to set the tempo: it needs two taps, averages your last four intervals, and starts a new count if you pause for more than two seconds. The result is rounded to a tenth of a BPM, kept within 20 to 300, and written into the BPM field."
 Bullet "Nudge buttons (− and +)  —  standalone only. Two small buttons just right of the Position readout. Hold − to run the groove 4 % slower, or + to run it 4 % faster, to line up with another player by ear. Let go and the set tempo returns exactly; the BPM field never changes. Under an external MIDI clock, holding a button shifts the groove against the clock by that amount, and the shift stays until the next Start."
 Bullet "Position  —  bar, beat, and sixteenth readout (e.g. 3.2.1). In DAW mode it follows the host's position, even while the plug-in is bypassed, and counts in the host's time signature: in 3/4 a bar has three beats, in 7/8 it has seven eighth-note beats, and the last number is the sixteenth within the beat. Bar 1 starts where the host's bar 1 starts, so a pickup bar is counted correctly. The standalone counts in the time signature chosen in Settings (4/4 by default). The time signature only changes the readout; mu-Tant's gate patterns and modulator loop lengths still treat a bar as four beats."
-Bullet "Loop dropdown  —  the master loop. Choices are the infinity symbol (none) or 16 to 256 steps in steps of 16. A counter beside it shows the current step and the loop length, for example 1 / 64. When Hot-swap Timing in Settings is On master loop, a staged preset change takes effect at the end of this loop."
+Bullet "Loop dropdown  —  the master loop. Choices are the infinity symbol (none) or 16 to 256 steps in steps of 16. A counter beside it shows the current step and the loop length, for example 1 / 64."
+Bullet "Swap dropdown  —  beside the Loop group, labelled Swap:. Chooses when a queued preset change takes effect: Master loop (at the end of the master loop), Voice loop (at the end of the voice's own loop) or Bar (at the next bar line). It is saved with the preset. Hover over it to read its description in the status bar."
 Bullet "Preset dropdown / New / Save  —  load and save full .muTant presets. New loads your default preset (see Content Folder) after asking whether to discard unsaved changes."
 Bullet "Settings (gear) icon  —  opens the Settings overlay."
+Bullet "Perf button  —  standalone only. Sits between the Settings icon and the Mixer button and turns on Performance mode (also Ctrl+P). See Performance Mode in the Presets chapter."
 Bullet "Mixer button  —  opens the mixer overlay. The label changes to Sequencer while the mixer is open."
 
 Pic "Transport Bar — full width view." "transport-bar.png"
@@ -274,7 +276,9 @@ H1 "15. Mixer"
 P "Click the Mixer button in the transport bar to open the mixer overlay. Each voice occupies one channel strip; to the right are the Effect, Delay, and Reverb return channels and the Master strip. This is the same shared mixer and FX rack as mu-Clid."
 P "Each voice strip has a fader with VU metering, pan, mute and solo, sidechain ducking (source, amount, attack, release), and Effect / Delay / Reverb sends. The sidechain source dropdown includes all other voice channels plus an External option — duck any voice from any other, or from a signal fed in through the host's sidechain bus (VST3 / CLAP). The FX return strips carry intra-FX routing (Effect to Delay, Effect to Reverb, Delay to Reverb), and the master strip has two inserts, Insert 1 and Insert 2, that the summed output passes through in that order. A row of buttons at the top right (Peak, VU, K-12, K-14) chooses the metering standard. The Effect send is named after the effect currently chosen (for example Chorus). The three FX unit rows (Effect / Delay / Reverb) sit below the strips with algorithm selectors and inline parameters."
 
+P "The faders use a rectangular cap like a small knob, with a pointer line across its middle that marks the level, running in a groove that lights up from the bottom to the cap. Every fader in the mixer looks and works the same way."
 Pic "Mixer overlay with voice channels, FX returns, and master." "mixer.png"
+Pic "Mixer fader with the knob-style cap and lit groove." ""
 
 # ── 16. Presets ───────────────────────────────────────────────────────────────
 H1 "16. Presets"
@@ -283,6 +287,22 @@ P "Full presets save the entire plugin state - all voices, modulators, gate patt
 P "Presets and saved DAW projects store each setting's real value, and choices by name, so a future update that changes a knob's range cannot change a saved sound. When a preset, a voice preset or a saved session is loaded, any setting it does not contain is set to its default.""
 H2 "Per-Voice Presets (.muPattern)"
 P "Each voice can be saved and loaded independently to Documents\TDP\muTant\Voices, including its oscillator, filter, insert, and level settings, all three gate layers (GATE / FILT / PITCH), and modulator assignments. Use the voice header dropdown and Save button."
+
+H2 "Performance Mode (Standalone)"
+P "Performance mode turns the standalone app into a locked gig view. The screen shows the preset that is playing, exactly as normal, but you cannot change anything with the mouse or keyboard. Only a connected control surface (set up through MIDI mapping) switches presets and voices. Performance mode is not available in the VST3 or CLAP plug-in."
+P "Performance mode plays a performance: a saved list of up to eight full presets, stored as a .muPerformance file in the Performances folder inside your content folder. Creating and editing performances inside the app is not available yet. To choose one, open the Preset Browser and click Performances, then pick the file."
+H3 "Entering"
+P "Click the Perf button (or press Ctrl+P). The preset that is playing carries on. Any open window, such as the Preset Browser, Mixer or Settings, closes without saving. If no performance has been chosen yet, the status bar says Choose a performance first and the mode stays off."
+H3 "What You See"
+Bullet "The Perf button lights in the app colour, and a thin lit line runs along the bottom of the Transport Bar."
+Bullet "The preset dropdown, New and Save are replaced by a step indicator: a display showing the position and name of the playing preset (for example 3/8 Bassline), followed by a dimmed next preset when there is room, and a row of eight lamps. A bright lamp is the playing preset, a dim lamp is an available preset, a pulsing lamp is the preset queued to start, and an unlit lamp is an empty place. A red lamp marks a preset whose file is missing."
+Bullet "When the control surface queues a switch, the playing preset stays on screen until the switch lands. The queued lamp pulses, an orange SWP badge appears, the display shows the queued preset in pulsing text, and the status bar reads Queued followed by the preset. All of this clears when the switch happens or is cancelled. The switch lands at the point set by the Swap dropdown."
+Bullet "In the sidebar, the Add button is replaced by a read-only indicator such as Layer 3/5. The screen follows the control surface: selecting a voice on the surface shows that voice on screen."
+Bullet "Nothing dims or changes colour; knobs, meters and the playhead keep moving, so you can see what the surface is doing."
+H3 "Leaving"
+P "Press and hold the Perf button for one second. The button fills from left to right while you hold, and the status bar reads Hold to leave Performance mode. Let go early to stay in the mode. A plain click does nothing, so you cannot leave by accident. When you leave, the normal controls come back."
+Pic "Transport Bar in Performance mode: lit Perf button, step indicator with eight lamps, and the lit line along the bottom edge." ""
+
 
 # ── 17. Settings ──────────────────────────────────────────────────────────────
 H1 "17. Settings"
@@ -293,7 +313,6 @@ Bullet "Display, Size — Medium or Large window. Reopen the app for the label f
 Bullet "Transport, Tempo — internal clock, 20.0 to 300.0 BPM with one decimal, also editable from the transport BPM field"
 Bullet "Time Signature (standalone) — in Settings under General, Transport: 2/4, 3/4, 4/4, 5/4, 6/4, 7/4, 5/8, 6/8, 7/8, 9/8 or 12/8; default 4/4. It changes how the bar.beat.sixteenth Position readout counts (a beat is a quarter note in x/4 and an eighth note in x/8). Patterns still run in four-beat bars."
 P "MIDI (right column):"
-Bullet "Hot-swap, Timing — On master loop or On voice loop: when a staged preset change takes effect."
 Bullet "MIDI Clock, Source (standalone) — Internal, or MIDI In to follow an external MIDI clock, with a Sync Offset to compensate for audio latency (see below)."
 Bullet "Note Mode, Mode — Free or Note (see Note Mode)."
 Bullet "MIDI Program Change — the Voice Presets and Full Presets buttons open the tables that map incoming program-change messages to presets (see below)."
