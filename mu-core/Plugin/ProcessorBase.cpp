@@ -26,13 +26,11 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
     };
     cb.stageItem = [this](int item)
     {
-        // A failed load reports through onLoadError and stages nothing: catch that so it is not taken for "applied at once".
-        bool failed = false;
-        auto previous = onLoadError;
-        onLoadError = [&failed, previous](const juce::String& message) { failed = true; if (previous) previous(message); };
+        // A load that could not read the file stages nothing and says so through noteFullPresetLoadFailed();
+        // warnings on a load that did succeed (a missing sample, dropped modulators) are not failures.
+        fullPresetLoadFailed = false;
         applyFullMidiPreset(liveState.getPerformance().resolve(item, getFullPresetDir()));
-        onLoadError = std::move(previous);
-        if (failed) return mu_core::LiveState::Stage::Failed;
+        if (fullPresetLoadFailed) return mu_core::LiveState::Stage::Failed;
         return hasPendingFullPreset() ? mu_core::LiveState::Stage::Queued   // waiting for its boundary
                                       : mu_core::LiveState::Stage::Applied; // nothing left staged: applied at once (stopped)
     };
@@ -514,11 +512,12 @@ void ProcessorBase::loadDefaultPreset()
 void ProcessorBase::loadPreset(const juce::File& file)
 {
     const char* tag = getFullPresetTag();
-    if (tag == nullptr || ! file.existsAsFile()) return;
+    if (tag == nullptr || ! file.existsAsFile()) { noteFullPresetLoadFailed(); return; }
     juce::String error;
     auto state = mu_pp::readFullPreset(file, tag, apvts.state.getType(), error);
     if (! state.isValid())
     {
+        noteFullPresetLoadFailed();
         if (onLoadError) onLoadError(error);
         return;
     }

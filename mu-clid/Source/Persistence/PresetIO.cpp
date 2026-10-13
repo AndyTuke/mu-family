@@ -787,12 +787,14 @@ void PresetIO::loadPreset(const juce::File& file)
     auto xml = juce::parseXML(file);
     if (! xml)
     {
+        proc.noteFullPresetLoadFailed();
         if (proc.onLoadError) proc.onLoadError("Could not parse: " + file.getFileName());
         return;
     }
     auto root = juce::ValueTree::fromXml(*xml);
     if (! root.isValid())
     {
+        proc.noteFullPresetLoadFailed();
         if (proc.onLoadError) proc.onLoadError("Invalid preset: " + file.getFileName());
         return;
     }
@@ -816,7 +818,12 @@ void PresetIO::loadPreset(const juce::File& file)
     if (proc.sequencerPlaying.load())
         proc.hotSwapStager.stageFullPreset(std::move(prepared));
     else
+    {
+        // Applied at once: an earlier full preset still staged from while the transport played must not
+        // land on top of this one at the stop edge.
+        proc.hotSwapStager.cancelStagedFullPreset();
         commitStagedFullPreset(prepared);
+    }
 }
 
 //==============================================================================
