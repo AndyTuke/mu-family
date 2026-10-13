@@ -13,6 +13,7 @@ target_sources(mu-core-tests PRIVATE
     ../Sequencer/Rhythm.cpp
     ../Sequencer/HitGenerator.cpp
     ../Sequencer/EuclideanGenerator.cpp
+    ../Persistence/PerformanceFile.cpp
     ScopedStorageRootTests.cpp
     ChannelStateResetTests.cpp
     MixerStereoPeakTests.cpp
@@ -34,6 +35,7 @@ target_sources(mu-core-tests PRIVATE
     TransportResolverTests.cpp
     UIScalingConsistencyTests.cpp
     MidiFullPresetMapTests.cpp
+    PerformanceFileTests.cpp
     LegacyPrefixTests.cpp
     SegmentControlTests.cpp
     TransportBarTests.cpp

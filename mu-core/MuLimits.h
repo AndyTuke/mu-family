@@ -42,4 +42,7 @@ namespace mu_limits
     // automation lanes are readable; remaining channels use short "N " names.
     // Raise (up to kMaxLayers) to expose more channels with full names.
     inline constexpr int kMaxAutomatedChannels = 3;
+
+    // Items in one Performance file (a list of full-preset pointers a controller's top row switches between).
+    inline constexpr int kMaxPerformanceItems = 8;
 }

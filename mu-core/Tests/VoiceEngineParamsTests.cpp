@@ -112,7 +112,9 @@ struct VoiceEngineParamsTests : juce::UnitTest
             ve.process(block, kBlock);
 
             logMessage("audio blocks: " + juce::String(blocks) + ", max block time: " + juce::String(maxMs, 3) + " ms");
-            expect(blocks > 100, "the audio loop ran throughout (" + juce::String(blocks) + " blocks)");
+            // A loop blocked on the lock would manage about one block per set (kSets); the 1 ms pacing sleep is
+            // ~15 ms at the default Windows timer resolution (about 50 blocks) and ~1 ms when another app raised it.
+            expect(blocks > 2 * kSets, "the audio loop ran throughout (" + juce::String(blocks) + " blocks)");
             expect(maxMs < 15.0, "an audio block waited for the lock: " + juce::String(maxMs, 3) + " ms");
             expectEquals(ve.getAppliedParams().filterCutoff, 1000.0f + (float) kSets);
         }
