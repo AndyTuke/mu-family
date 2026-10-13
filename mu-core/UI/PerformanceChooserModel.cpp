@@ -50,7 +50,7 @@ bool PerformanceChooserModel::deleteFile(const juce::File& file)
 void PerformanceChooserModel::startNew()
 {
     current     = {};
-    currentFile = {};
+    currentFile = juce::File();   // (`= {}` is ambiguous between File's copy and move assignment on GCC)
     dirty       = false;
 }
 
