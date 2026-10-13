@@ -42,6 +42,19 @@ public:
     void updateNames();
     bool showsPresetNames() const noexcept { return labels.getSelectedIndex() == 1; }
 
+    // The render-ahead depth asked of every client (frames; 0 = each client's own default). Sent again on each
+    // timer tick while a slot is active, so a client that connects later gets it too. Changing it clears the
+    // Dropouts lamps, since the old count no longer describes the new depth.
+    void setLatencyFrames(int frames);
+    int  getLatencyFrames() const noexcept { return latencyFrames; }
+    int  getDropoutState(int slot) const noexcept { return dropouts[(size_t) slot].state; }   // 0 clean, 1 active, 2 latched
+    void updateLatencyAndDropouts();   // runs on the timer; public so a test can step it
+
+    // How long after a dropout the lamp stays red before it latches amber (ms).
+    static constexpr int kDropoutHoldMs = 2000;
+    // Underruns in this long after a slot connects are the empty ring filling, not a dropout (ms).
+    static constexpr int kDropoutWarmupMs = 1000;
+
     MixerChannel&           getStrip(int slot)  { return *strips[(size_t) slot]; }
     MixerChannel&           getMaster()         { return master; }
     mu_ui::MasterInsertPanel& getInserts()      { return inserts; }
@@ -56,7 +69,8 @@ public:
     void paintOverChildren(juce::Graphics&) override;
 
 private:
-    void timerCallback() override { updateNames(); }
+    void timerCallback() override { updateNames(); updateLatencyAndDropouts(); }
+    void clearDropout(int slot);
     void report(const juce::String& name, const juce::String& value, juce::Colour tag);
 
     AudioServer& server;
@@ -68,6 +82,9 @@ private:
 
     std::array<juce::String, kClients> shownNames;
     std::array<int, kClients> shownActive;
+    int latencyFrames = 0;
+    struct DropoutTrack { std::uint64_t seen = 0; juce::int64 lastMs = 0, graceUntilMs = 0; bool wasActive = false; int state = 0; };
+    std::array<DropoutTrack, kClients> dropouts;
     mu_ui::HoverStatus hover;   // after the components it watches
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MixerPanel)

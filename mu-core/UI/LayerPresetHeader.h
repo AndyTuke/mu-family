@@ -1,10 +1,10 @@
 #pragma once
 
-#include "UI/ChannelHeaderBar.h"
+#include "UI/LayerHeaderBar.h"
 #include "UI/ConfirmDialog.h"
 #include "Plugin/ProcessorBase.h"
 
-// Wires a ChannelHeaderBar's reset / preset dropdown / Save to the processor's per-slot preset
+// Wires a LayerHeaderBar's reset / preset dropdown / Save to the processor's per-slot preset
 // API (ProcessorBase::resetLayer / loadLayerPreset / saveLayerPreset / slotPresetFiles), so every
 // product's layer panel behaves the same: Reset asks first, a chosen preset loads (staged while
 // playing) and shows as selected, Save prompts for a name and re-lists the slot's presets.
@@ -20,12 +20,12 @@ struct SlotPresetHeaderConfig
 };
 
 // Fill the header's preset dropdown with the slot's presets.
-inline void refreshSlotPresetList(ChannelHeaderBar& header, const ProcessorBase& proc, int slot)
+inline void refreshSlotPresetList(LayerHeaderBar& header, const ProcessorBase& proc, int slot)
 {
     header.setPresetFiles(proc.slotPresetFiles(slot));
 }
 
-inline void wireSlotPresetHeader(ChannelHeaderBar& header, juce::Component& owner,
+inline void wireSlotPresetHeader(LayerHeaderBar& header, juce::Component& owner,
                                  ProcessorBase& proc, SlotPresetHeaderConfig cfg)
 {
     auto* hdr = &header;
@@ -37,7 +37,7 @@ inline void wireSlotPresetHeader(ChannelHeaderBar& header, juce::Component& owne
         if (safe == nullptr) return;
         const int slot = cfg.currentSlot();
         confirmAsync(safe.getComponent(), "Reset " + cfg.noun,
-                     "Reset \"" + p->getChannelName(slot) + "\" to defaults?\nThis cannot be undone.",
+                     LayerHeaderBar::resetConfirmMessage(p->getLayerName(slot)),
                      "Reset", [safe, p, cfg, slot]
                      {
                          if (safe == nullptr) return;
@@ -58,7 +58,7 @@ inline void wireSlotPresetHeader(ChannelHeaderBar& header, juce::Component& owne
         if (safe == nullptr) return;
         const int slot = cfg.currentSlot();
         promptTextAsync(safe.getComponent(), "Save " + cfg.noun + " Preset", "Preset name:",
-                        cfg.defaultName ? cfg.defaultName(slot) : p->getChannelName(slot), "Save",
+                        cfg.defaultName ? cfg.defaultName(slot) : p->getLayerName(slot), "Save",
             [safe, hdr, p, slot](const juce::String& name)
             {
                 if (safe == nullptr || name.isEmpty()) return;

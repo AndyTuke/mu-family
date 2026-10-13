@@ -111,12 +111,12 @@ GatingDesigner::GatingDesigner()
     addAndMakeVisible(filterLayerBtn);
     addAndMakeVisible(pitchLayerBtn);
 
-    // ── Bypass (public, VoicePanel binds the APVTS attachment) ───────────────
+    // ── Bypass (public, PatternContent binds the APVTS attachment) ───────────────
     bypassButton.setClickingTogglesState(true);
     bypassButton.setTooltip("Bypass the gater so the drone passes through");
     addAndMakeVisible(bypassButton);
 
-    // ── Gap rotary (public, VoicePanel binds the APVTS attachment) ──────────
+    // ── Gap rotary (public, PatternContent binds the APVTS attachment) ──────────
     gapSlider.setRange(0.0, 100.0, 1.0);
     gapSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     MuLookAndFeel::applyRotarySweep(gapSlider);
@@ -348,10 +348,18 @@ int GatingDesigner::cellCount() const noexcept
     return kViewBars * subdivisionDenom;
 }
 
+// The grid takes whatever height the header row and scrollbar leave (never less than kGridH), so
+// the editor can be the flex panel of its content band.
+int GatingDesigner::gridHeight() const noexcept
+{
+    using mu_ui::s;
+    return juce::jmax(s(kGridH), getHeight() - s(kHdr1H) - s(kScrollH) - s(4));
+}
+
 juce::Rectangle<float> GatingDesigner::gridBounds() const noexcept
 {
     using mu_ui::s;
-    return { 0.0f, (float)s(kHdr1H), (float)getWidth(), (float)s(kGridH) };
+    return { 0.0f, (float)s(kHdr1H), (float)getWidth(), (float) gridHeight() };
 }
 
 // Pixel width of one cell in the view (based on viewCellCount = kViewBars * subdivisionDenom).
@@ -860,7 +868,7 @@ void GatingDesigner::resized()
     const int w      = getWidth();
     const int hdrH   = s(kHdr1H);
     const int gridY  = hdrH;
-    const int gridH  = s(kGridH);
+    const int gridH  = gridHeight();
     const int scrollY = gridY + gridH;
     // Metal: the controls sit inside the header's raised box, clear of its corner screws.
     const bool metal  = MuLookAndFeel::isMetal(*this);

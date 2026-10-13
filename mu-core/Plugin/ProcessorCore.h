@@ -28,18 +28,18 @@ public:
     // dropdowns, etc., without needing to know what a channel actually IS.
     // Defaults read the owned layer storage below; a product that has not moved its layers
     // into it yet overrides both.
-    virtual int         getNumChannels()              const { return numLayers.load(std::memory_order_relaxed); }
+    virtual int         getNumLayers()              const { return numLayers.load(std::memory_order_relaxed); }
     // Layer `i` (name, colour, modulation) or nullptr when `i` is out of range. Message thread only.
     virtual Layer*       getLayer(int i)
     {
-        return (i >= 0 && i < getNumChannels()) ? layers[(size_t) i].get() : nullptr;
+        return (i >= 0 && i < getNumLayers()) ? layers[(size_t) i].get() : nullptr;
     }
     const Layer*         getLayer(int i) const { return const_cast<ProcessorCore*>(this)->getLayer(i); }
     // The most channels the product can ever have (1..8) — sizes the program-change
     // channel table. Products with a fixed layer count return that count.
-    virtual int         getMaxChannels()              const { return 8; }
-    virtual juce::String getChannelName(int idx)       const = 0;
-    virtual int         getChannelColourIndex(int idx) const = 0;
+    virtual int         getMaxLayers()              const { return 8; }
+    virtual juce::String getLayerName(int idx)       const = 0;
+    virtual int         getLayerColourIndex(int idx) const = 0;
 
     // Host transport as last seen by processBlock, for the UI (TransportBar). The UI must never
     // call getPlayHead() itself: the playhead is only valid on the audio thread during a block.
@@ -100,8 +100,10 @@ protected:
     std::atomic<int>      numLayers { 0 };
 public:
     // True for the whole of a structural layer edit (pointer moves and the parameter moves after
-    // them). A product's audio thread skips rendering while it is set, so hosts whose wrapper does
-    // not honour suspendProcessing (CLAP) never play a moved layer with half-shifted parameters.
+    // them); a product whose layer data is the parameter truth (layerHoldsParamTruth) gets it lowered
+    // before the parameter push. A product's audio thread skips rendering while it is set, so hosts
+    // whose wrapper does not honour suspendProcessing (CLAP) never play a moved layer with
+    // half-shifted parameters. A flag, not a counter: edits never nest.
     std::atomic<bool>     layerEditInFlight { false };
 protected:
     juce::CriticalSection layersLock;

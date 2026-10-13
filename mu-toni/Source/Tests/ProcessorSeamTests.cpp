@@ -27,24 +27,21 @@ struct MuToniProcessorSeamTests : juce::UnitTest
     void runTest() override
     {
         using namespace mu_seam_test;
-        beginTest("Layers exist after construction and getLayer(i) is getArp(i)");
+        beginTest("A fresh instance has one layer; every slot's Arp exists and getLayer(i) is getArp(i)");
         TempStorage storage;
         ExposedPluginProcessor p;
-        const int n = p.numLayers.load();
-        expectEquals(n, 4, "four live arps");
-        expectEquals(p.getNumChannels(), 4);
-        expect(p.getLayer(4) == nullptr && p.getLayer(-1) == nullptr, "no layer above the live count or below zero");
-        for (int i = 4; i < mu_limits::kMaxLayers; ++i)
-            expect(p.layers[(size_t) i] != nullptr, "spare slot " + juce::String(i) + " stays allocated");
+        expectEquals(p.numLayers.load(), 1, "a fresh instance starts with one layer");
+        expectEquals(p.getNumLayers(), 1);
+        expect(p.getLayer(1) == nullptr && p.getLayer(-1) == nullptr, "no layer above the live count or below zero");
         std::set<const void*> seen;
-        for (int i = 0; i < juce::jmin(n, 4); ++i)
+        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
         {
-            expect(p.layers[(size_t) i] != nullptr, "layer " + juce::String(i) + " is filled");
-            expect(p.getLayer(i) == &p.getArp(i), "getLayer(" + juce::String(i) + ") is getArp(" + juce::String(i) + ")");
+            expect(p.layers[(size_t) i] != nullptr, "slot " + juce::String(i) + " is allocated");
             expect(&p.getArp(i) == p.layers[(size_t) i].get(), "getArp(" + juce::String(i) + ") is layer " + juce::String(i));
             seen.insert(&p.getArp(i));
         }
-        expectEquals((int) seen.size(), juce::jmin(n, 4), "distinct arps");
+        expect(p.getLayer(0) == &p.getArp(0), "getLayer(0) is getArp(0)");
+        expectEquals((int) seen.size(), mu_limits::kMaxLayers, "distinct arps");
 
         beginTest("prepareToPlay and a processBlock run under the temp root");
         p.prepareToPlay(48000.0, 256);
@@ -54,6 +51,41 @@ struct MuToniProcessorSeamTests : juce::UnitTest
         expect(bufferIsSane(buf), "output is finite");
         expectEquals(p.getContentDir().getFullPathName(),
                      storage.root.getChildFile("content").getChildFile("muToni").getFullPathName());
+
+        beginTest("a slot that goes live starts from silence, not from the last tenant's voice");
+        {
+            ExposedPluginProcessor q;
+            q.prepareToPlay(48000.0, 256);
+            mu_toni::ArpContext ctx; ctx.playing = true; ctx.sampleRate = 48000.0; ctx.beatsPerSample = 120.0 / 60.0 / 48000.0;
+            juce::AudioBuffer<float> blk(2, 256);
+            auto& spare = q.getArp(1).runner;                 // a spare slot above the live count
+            for (int b = 0; b < 40; ++b) { ctx.startBeat = b * 256 * ctx.beatsPerSample; spare.render(blk, 256, ctx); }
+            expect(spare.isActive(), "the spare slot's voice is sounding");
+            q.numLayers.store(2);                              // the slot goes live
+            juce::MidiBuffer noMidi;
+            q.processBlock(blk, noMidi);
+            expect(! q.getArp(1).runner.isActive(), "its voice was reset when it went live");
+        }
+
+        // Add / remove / swap on this thread while a worker renders, at every block size.
+        // A running host transport makes the arp sound (it is silent while stopped).
+        RunningPlayHead playHead(48000.0, 512);
+        ExposedPluginProcessor stress;
+        stress.setPlayHead(&playHead);
+        runStructuralEditStress(*this, stress,
+            [&](int layer) { juce::ignoreUnused(layer); },   // every layer sounds at its defaults once the transport runs
+            [&](const juce::String& where)
+            {
+                const int n = stress.numLayers.load();
+                expect(n >= 1 && n <= mu_limits::kMaxLayers, where + ": count in range");
+                std::set<const void*> distinct;
+                for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+                {
+                    expect(stress.layers[(size_t) i] != nullptr, where + ": slot " + juce::String(i) + " is filled");
+                    distinct.insert(stress.layers[(size_t) i].get());
+                }
+                expectEquals((int) distinct.size(), mu_limits::kMaxLayers, where + ": no layer appears twice");
+            });
     }
 };
 

@@ -61,7 +61,7 @@ PluginProcessor::PluginProcessor()
 
     // Resolve each rhythm parameter once (its raw value pointer for the drain) and build the sorted
     // suffix table the listener searches, before any listener can fire.
-    for (int ri = 0; ri < SequencerEngine::MaxRhythms; ++ri)
+    for (int ri = 0; ri < RhythmSequencer::MaxRhythms; ++ri)
     {
         const juce::String prefix = "r" + juce::String(ri) + "_";
         for (int i = 0; i < kRhythmParamCount; ++i)
@@ -108,11 +108,20 @@ PluginProcessor::PluginProcessor()
             modSlot[(size_t) i] = &value;
 
     // Add default rhythm (16 steps, 4 hits) and sync its state to APVTS.
-    Rhythm defaultRhythm;
+    // All eight rhythms exist for the processor's lifetime (a restored state writes into slots above
+    // the live count before it sets the count); the sequencer binds to them.
+    keepSpareLayers = true;
+    for (int ri = 0; ri < RhythmSequencer::MaxRhythms; ++ri)
+    {
+        layers[(size_t) ri] = makeRhythm(ri);
+        sequencer.bindRhythm(ri, &layerAs<Rhythm>(ri));
+    }
+    Rhythm& defaultRhythm = layerAs<Rhythm>(0);
     defaultRhythm.name       = "<unnamed>";
     defaultRhythm.genA.steps = 16;
     defaultRhythm.genA.hits  = 4;
-    sequencer.addRhythm(defaultRhythm);
+    sequencer.setNumRhythms(1);
+    sequencer.updatePattern(0);
     voiceEngines[0] = std::make_unique<VoiceEngine>();
     voiceEngines[0]->insertProc.setSlotIndex(0);   // per-slot noise seed: layers do not share one sequence
     // Stage 34 Step 2: C++17 std::atomic<bool> default ctor leaves the value
@@ -122,7 +131,7 @@ PluginProcessor::PluginProcessor()
     for (auto& slotArr : retiredReadyForCleanup)
         for (auto& flag : slotArr)
             flag.store(false, std::memory_order_relaxed);
-    numActiveRhythms.store(1, std::memory_order_release);
+    numLayers.store(1, std::memory_order_release);
 
     {
         mu_core::ScopedApvtsLoading guard(apvtsLoading);
@@ -170,7 +179,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     currentSampleRate = sampleRate;
     currentBlockSize  = samplesPerBlock;
-    const int n = numActiveRhythms.load(std::memory_order_acquire);
+    const int n = numLayers.load(std::memory_order_acquire);
     for (int i = 0; i < n; ++i)
     {
         voiceEngines[i]->prepareToPlay(sampleRate, samplesPerBlock);
@@ -208,17 +217,19 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     const bool   playing = transport.playing;
     const double beatPos = transport.beatPos;
 
-    const juce::ScopedTryLock rLock(rhythmsLock);
-    if (!rLock.isLocked())
+    // layersLock is the barrier against a structural edit (suspendProcessing is not one in every host);
+    // layerEditInFlight additionally covers the edit's parameter moves after the lock is dropped. Either
+    // way the block is silent and nothing here advances, as on any missed lock.
+    const juce::ScopedTryLock rLock(layersLock);
+    if (!rLock.isLocked() || layerEditInFlight.load(std::memory_order_acquire))
     {
         buffer.clear();
         return;
     }
 
-    // Must read numActiveRhythms AFTER acquiring rhythmsLock — otherwise the snapshot
-    // can be stale relative to the vector state and `sequencer.getRhythm(r)` indexes
-    // out of bounds (MSVC _ITERATOR_DEBUG_LEVEL → abort()).
-    const int numRhythms = numActiveRhythms.load(std::memory_order_acquire);
+    // Must read the layer count AFTER acquiring layersLock — otherwise the snapshot
+    // can be stale relative to the layer set and `sequencer.getRhythm(r)` indexes out of range.
+    const int numRhythms = numLayers.load(std::memory_order_acquire);
 
     // Send the note-offs owed by slots torn down since the last block, ahead of any new hit.
     for (int i = 0; i < numOrphanOffs; ++i)
@@ -238,7 +249,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
 //==============================================================================
 // processBlock phases. Behaviour-preserving extraction of the full-build
-// audio-thread path; called in order from processBlock under its rhythmsLock.
+// audio-thread path; called in order from processBlock under its layersLock.
 //==============================================================================
 PluginProcessor::BlockTransport
 PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
@@ -330,8 +341,8 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
     {
         // A running transport that dips back less than a step is held in place rather than reset; a real
         // backward jump resets the detector so it cannot read as a master-loop wrap and commit a staged
-        // hot-swap early (see SequencerEngine::resolveBlockBeat).
-        const auto resolved = SequencerEngine::resolveBlockBeat(lastBeatPos.load(), beatPos, playing,
+        // hot-swap early (see RhythmSequencer::resolveBlockBeat).
+        const auto resolved = RhythmSequencer::resolveBlockBeat(lastBeatPos.load(), beatPos, playing,
                                                                 sequencerPlaying.load(), sequencer.getMasterLoopSteps());
         beatPos = resolved.beat;
         if (resolved.resetWrap)
@@ -374,7 +385,7 @@ void PluginProcessor::advanceSequencer(int numRhythms, double beatPos, juce::Mid
 
     // Update UI play-state atomics.
     const float frac = static_cast<float>(
-        std::fmod(beatPos / SequencerEngine::StepLengthBeats, 1.0));
+        std::fmod(beatPos / RhythmSequencer::StepLengthBeats, 1.0));
     beatFraction.store(frac);
     for (int r = 0; r < numRhythms; ++r)
     {

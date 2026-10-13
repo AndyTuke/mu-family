@@ -113,8 +113,13 @@ public:
     void setMasterGain(float g)           noexcept { engine.setMasterGain(g); }
     float clientGainValue(int slot) const noexcept { return engine.clientGainValue(slot); }
     bool  clientMuted    (int slot) const noexcept { return engine.clientMuted(slot); }
+    double sampleRate() const noexcept { return deviceSampleRate; }   // the device's current rate (UI: Latency in ms)
     bool  clientSoloed   (int slot) const noexcept { return engine.clientSoloed(slot); }
     float masterGainValue()         const noexcept { return engine.masterGainValue(); }
+
+    // Render-ahead depth the clients are asked for (0 = each client's own default), and the per-client dropout count.
+    void requestClientDepth(int slot, int frames) noexcept { engine.requestClientDepth(slot, frames); }
+    std::uint64_t clientUnderrunFrames(int slot) const noexcept { return engine.clientUnderrunFrames(slot); }
 
     void setTempo(double bpm) noexcept           { engineTempo = bpm; engine.setTempo(bpm); }   // kept for a re-prepare
     void setPlaying(bool shouldPlay) noexcept    { engine.setPlaying(shouldPlay); }
@@ -147,6 +152,7 @@ private:
         // MIDI clock out follows the picker's default output. The device manager only swaps that
         // port between audioDeviceStopped() and here, so this is the safe point to pick it up.
         midiClock.setOutput(deviceManager.getDefaultMidiOutput());
+        engine.setOutputLatencyFrames(device->getOutputLatencyInSamples());   // clients time MIDI to land with the audio
         // Opening (or re-opening) a device must not dictate transport state — the
         // app starts stopped and a device change mid-session preserves play/stop.
     }

@@ -250,6 +250,7 @@ public:
         swapF(a.sidechainAttackMs,  b.sidechainAttackMs);
         swapF(a.sidechainReleaseMs, b.sidechainReleaseMs);
         swapI(a.outputBus,          b.outputBus);
+        std::swap(scEnv[i], scEnv[j]);   // the ducking follower belongs to the strip and moves with it
     }
 
     // A layer was removed at `removed` and the ones above are about to shift down: re-point every
@@ -272,9 +273,24 @@ public:
             r.sidechainSource.store(mu_mix::sidechainAfterSwap(r.sidechainSource.load(std::memory_order_relaxed), a, b, MaxChannels), std::memory_order_relaxed);
     }
 
-    // Reset the sidechain envelope follower state for one channel slot. Called
-    // by PluginProcessor::swapRhythms so the previous tenant's ducking envelope
-    // does not bleed into the freshly arrived rhythm.
+    // Read / seed one strip's follower (state inspection for the layer-edit tests only: never call
+    // these while audio is running, the follower is plain audio-thread state).
+    float getSidechainEnv(int channelIndex) const noexcept
+    {
+        jassert(channelIndex >= 0 && channelIndex < MaxChannels);
+        return scEnv[channelIndex];
+    }
+    void setSidechainEnv(int channelIndex, float v) noexcept
+    {
+        jassert(channelIndex >= 0 && channelIndex < MaxChannels);
+        scEnv[channelIndex] = v;
+    }
+
+    // Carry one strip's sidechain follower to another slot (a remove shifts the strips down).
+    void moveSidechainEnv(int from, int to) noexcept { scEnv[to] = scEnv[from]; }
+
+    // Reset the sidechain envelope follower for one channel slot: used when a slot gets a fresh strip
+    // (add, reset, the vacated top slot after a remove), so no old ducking envelope carries over.
     void resetSidechainEnv(int channelIndex) noexcept
     {
         if (channelIndex >= 0 && channelIndex < MaxChannels)

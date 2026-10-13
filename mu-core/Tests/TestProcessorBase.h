@@ -22,10 +22,10 @@ struct TestProcessorBase : ProcessorBase
         return {};
     }
 
-    int getNumChannels() const override { return 0; }
+    int getNumLayers() const override { return 0; }
     Layer* getLayer(int) override { return nullptr; }
-    juce::String getChannelName(int) const override { return {}; }
-    int getChannelColourIndex(int) const override { return 0; }
+    juce::String getLayerName(int) const override { return {}; }
+    int getLayerColourIndex(int) const override { return 0; }
 
     juce::File   getLayerPresetDir()       const override { return {}; }
     juce::String getLayerPresetExtension() const override { return ".muTest"; }

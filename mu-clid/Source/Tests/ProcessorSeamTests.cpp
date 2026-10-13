@@ -7,6 +7,8 @@
 #include "Audio/InsertSlotConfig.h"
 
 #include <array>
+#include <atomic>
+#include <chrono>
 #include <cstdlib>
 #include <new>
 #include <random>
@@ -108,6 +110,7 @@ struct MuClidProcessorSeamTests : juce::UnitTest
         removeShiftsRetiredTails();
         removeVersusProcessBlockWithTails();
         removeReseedsShiftedEngines();
+        layerEditsAllocateNothingOnTheAudioThread();
     }
 
     // Reads a parameter's plain value.
@@ -125,8 +128,8 @@ struct MuClidProcessorSeamTests : juce::UnitTest
         TempStorage storage;
         ExposedPluginProcessor p;
         p.prepareToPlay(48000.0, 256);
-        p.rhythms.add(mu_clid::Rhythm());
-        p.rhythms.add(mu_clid::Rhythm());
+        p.addLayer();
+        p.addLayer();
         expectEquals(p.getNumRhythms(), 3);
 
         setParam(p.apvts, "r0_stepsA", 9.0f);
@@ -135,7 +138,7 @@ struct MuClidProcessorSeamTests : juce::UnitTest
         setParam(p.apvts, "ch1_lvl", 0.25f);
         expectEquals(p.getRhythm(1).genA.steps, 12);
 
-        p.rhythms.remove(0);
+        p.removeLayer(0);
         expectEquals(p.getNumRhythms(), 2);
         expectEquals(p.getRhythm(0).genA.steps, 12);
         expectEquals(p.getRhythm(1).genA.steps, 7);
@@ -151,7 +154,7 @@ struct MuClidProcessorSeamTests : juce::UnitTest
         const int defaultFilter = (int) mu_clid::Rhythm().voiceParams.filterType;
         setParam(p.apvts, "r0_fltType", 3.0f);
         expectEquals((int) p.getRhythm(0).voiceParams.filterType, 3);
-        p.rhythms.reset(0);
+        p.resetLayer(0);
         expectEquals(p.getRhythm(0).genA.steps, defaultSteps);
         expectEquals((int) plain(p.apvts, "r0_stepsA"), defaultSteps);
         expectEquals((int) plain(p.apvts, "r0_fltType"), defaultFilter);
@@ -167,8 +170,8 @@ struct MuClidProcessorSeamTests : juce::UnitTest
         TempStorage storage;
         ExposedPluginProcessor p;
         p.prepareToPlay(48000.0, 256);
-        p.rhythms.add(mu_clid::Rhythm());
-        p.rhythms.add(mu_clid::Rhythm());
+        p.addLayer();
+        p.addLayer();
         expectEquals(p.getNumRhythms(), 3);
 
         // One tail on each slot (two on slot 1), the drained flag raised on slot 2's.
@@ -180,7 +183,7 @@ struct MuClidProcessorSeamTests : juce::UnitTest
         p.retiredReadyForCleanup[2][0].store(true);
         juce::ignoreUnused(t0);
 
-        p.rhythms.remove(0);
+        p.removeLayer(0);
         expectEquals(p.getNumRhythms(), 2);
 
         expect(p.retiredVoiceEngines[0][0].get() == t1a && p.retiredVoiceEngines[0][1].get() == t1b,
@@ -193,12 +196,12 @@ struct MuClidProcessorSeamTests : juce::UnitTest
                "the drained flag moved with its engine");
 
         // Removing the last slot drops its tails and leaves the others alone.
-        p.rhythms.remove(1);
+        p.removeLayer(1);
         expect(p.retiredVoiceEngines[0][0].get() == t1a, "the lower slot keeps its tail");
         expect(p.retiredVoiceEngines[1][0] == nullptr && ! p.retiredReadyForCleanup[1][0].load(), "the removed last slot holds no tail and no flag");
     }
 
-    // remove() shifts tails, drained flags and channel strips under rhythmsLock while processBlock renders
+    // remove() shifts tails, drained flags and channel strips under layersLock while processBlock renders
     // those tails under its try-lock; each slot's tail identity and raised flag must land on the slot below.
     void removeVersusProcessBlockWithTails()
     {
@@ -213,7 +216,7 @@ struct MuClidProcessorSeamTests : juce::UnitTest
         for (int round = 0; round < 3; ++round)
         {
             // Fill the slots (stopped, so the test is the only writer): two prepared tails per slot, slot s's first flagged.
-            while (p.getNumRhythms() < 4) p.rhythms.add(mu_clid::Rhythm());
+            while (p.getNumRhythms() < 4) p.addLayer();
             const int n = p.getNumRhythms();
             std::vector<std::array<VoiceEngine*, kTails>> expected((size_t) n);
             for (int s = 0; s < n; ++s)
@@ -234,7 +237,7 @@ struct MuClidProcessorSeamTests : juce::UnitTest
             // Remove the bottom slot while it runs; the tails of every later slot must shift down one.
             while (p.getNumRhythms() > 1)
             {
-                p.rhythms.remove(0);
+                p.removeLayer(0);
                 expect(renderer.waitForBlocks(1), "the audio thread was not stalled by the remove");
                 expected.erase(expected.begin());
             }
@@ -263,8 +266,8 @@ struct MuClidProcessorSeamTests : juce::UnitTest
         TempStorage storage;
         ExposedPluginProcessor p;
         p.prepareToPlay(48000.0, 256);
-        p.rhythms.add(mu_clid::Rhythm());
-        p.rhythms.add(mu_clid::Rhythm());
+        p.addLayer();
+        p.addLayer();
 
         // Full dither on a 2-bit crusher: with a DC input on the threshold the noise alone picks the output.
         VoiceParams vp;
@@ -293,12 +296,69 @@ struct MuClidProcessorSeamTests : juce::UnitTest
 
         // The engine at slot 2 moves to slot 1 when slot 0 goes; prepare it for the block size first.
         p.voiceEngines[2]->prepareToPlay(48000.0, kLen);
-        p.rhythms.remove(0);
+        p.removeLayer(0);
         expectEquals(p.getNumRhythms(), 2);
 
         const auto shifted = render(p.voiceEngines[1]->insertProc);
         expect(shifted == freshAt(1), "the shifted engine renders like a fresh engine at its new index");
         expect(shifted != freshAt(2), "and not like one at its old index");
+    }
+
+    // The message thread adds, reorders, resets and removes layers while a worker runs processBlock with its
+    // allocation counter on: the edits take the layer lock and move pointers, and the audio path must neither
+    // allocate nor wait on them, whichever way the try-lock falls.
+    void layerEditsAllocateNothingOnTheAudioThread()
+    {
+        beginTest("structural edits vs processBlock: the audio thread allocates nothing");
+        TempStorage storage;
+        ExposedPluginProcessor p;
+        constexpr int kBlock = 256;
+        p.prepareToPlay(48000.0, kBlock);
+        RunningPlayHead host(48000.0, kBlock);
+        p.setPlayHead(&host);
+
+        std::atomic<bool> stop { false }, ready { false };
+        std::atomic<int>  blocks { 0 }, allocs { 0 };
+        std::thread worker([&]
+        {
+            juce::AudioBuffer<float> buf(2, kBlock);
+            juce::MidiBuffer midi;
+            midi.ensureSize(4096);
+            for (int i = 0; i < 8; ++i) { buf.clear(); midi.clear(); p.processBlock(buf, midi); }   // warm-up, uncounted
+            alloc_count::count = 0; alloc_count::counting = true;
+            ready.store(true);
+            while (! stop.load())
+            {
+                buf.clear(); midi.clear();
+                p.processBlock(buf, midi);
+                blocks.fetch_add(1);
+            }
+            alloc_count::counting = false;
+            allocs.store(alloc_count::count);
+        });
+        while (! ready.load()) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+        std::mt19937 rng(4242u);
+        for (int round = 0; round < 6; ++round)
+        {
+            while (p.getNumRhythms() < mu_limits::kMaxLayers)
+            {
+                p.addLayer();
+                const int live = p.getNumRhythms();
+                p.swapLayers((int) (rng() % (unsigned) live), (int) (rng() % (unsigned) live));
+                p.resetLayer((int) (rng() % (unsigned) live));
+            }
+            while (p.getNumRhythms() > 1)
+                p.removeLayer((int) (rng() % (unsigned) p.getNumRhythms()));
+        }
+        const int before = blocks.load();
+        for (int i = 0; i < 4000 && blocks.load() < before + 2; ++i) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        stop.store(true);
+        worker.join();
+        p.setPlayHead(nullptr);
+
+        expect(blocks.load() > before, "the audio thread kept running through the edits");
+        expectEquals(allocs.load(), 0, "and allocated nothing");
     }
 
     void constructsAndOwnsItsRhythm()
@@ -346,14 +406,14 @@ struct MuClidProcessorSeamTests : juce::UnitTest
             {
                 while (p.getNumRhythms() < mu_limits::kMaxLayers)
                 {
-                    p.rhythms.add(mu_clid::Rhythm());
+                    p.addLayer();
                     const int live = p.getNumRhythms();
-                    if (live > 1) p.rhythms.swap((int) (rng() % (unsigned) live), (int) (rng() % (unsigned) live));
-                    p.rhythms.reset((int) (rng() % (unsigned) live));
+                    if (live > 1) p.swapLayers((int) (rng() % (unsigned) live), (int) (rng() % (unsigned) live));
+                    p.resetLayer((int) (rng() % (unsigned) live));
                 }
                 expectEquals(p.getNumRhythms(), (int) mu_limits::kMaxLayers);
                 while (p.getNumRhythms() > 1)
-                    p.rhythms.remove((int) (rng() % (unsigned) p.getNumRhythms()));
+                    p.removeLayer((int) (rng() % (unsigned) p.getNumRhythms()));
                 expectEquals(p.getNumRhythms(), 1);
             }
 
@@ -365,7 +425,7 @@ struct MuClidProcessorSeamTests : juce::UnitTest
     }
 
     // Stages a preset while the sequencer runs; the audio thread flags it at a loop boundary and the
-    // deferred-work drain commits it (suspend plus rhythmsLock) while processBlock keeps running.
+    // deferred-work drain commits it (suspend plus layersLock) while processBlock keeps running.
     void swapCommitVersusProcessBlock()
     {
         beginTest("A staged rhythm swap commits at a loop boundary while processBlock runs on a worker, across block sizes");
@@ -433,7 +493,7 @@ struct MuClidProcessorSeamTests : juce::UnitTest
         TempStorage storage;
         ExposedPluginProcessor p;
         p.prepareToPlay(48000.0, 256);
-        p.rhythms.add(mu_clid::Rhythm());   // a second rhythm, so both modes run in the same block
+        p.addLayer();   // a second rhythm, so both modes run in the same block
         setParam(p.apvts, "r0_outMode", 1.0f);
         setParam(p.apvts, "r0_midiAccent", 50.0f);
         p.drainDeferredWork();

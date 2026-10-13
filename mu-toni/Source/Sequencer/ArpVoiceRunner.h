@@ -67,6 +67,17 @@ public:
         voice.prepare(sr, blockSize);
     }
 
+    // Back to the silent, not-started state: voice memory, held note, tie and step position. Used when
+    // a structural edit hands the slot to a different layer. Allocation-free.
+    void reset()
+    {
+        voice.reset();
+        noteHeld = tiedOut = prevTied = wasRunning = false;
+        stepIndex = stepCounter = gateCounter = 0;
+        nextStep = 0;
+        gridStepBeats = expectedBeat = 0.0;
+    }
+
     void setVoiceParams(const ToniVoiceParams& p) { voice.setParams(p); legatoOn = p.legato; }
     void setBank(const mu_wavetable::WavetableBank* b) noexcept { voice.setBank(b); }
     void setArp(const ArpParams& p)               { arp = p; }

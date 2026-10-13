@@ -40,10 +40,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     AudioProcessorValueTreeState::ParameterLayout layout;
     auto f = [](float lo, float hi, float step) { return NormalisableRange<float>(lo, hi, step); };
 
-    // ── Mixer channel strips (one per placeholder layer) — shared `ch{N}_`
+    // ── Mixer channel strips (one per layer slot, all eight) — shared `ch{N}_`
     //    binding the MixerChannel / MixerOverlay use: level/pan/mute/solo + FX
     //    sends + sidechain + output bus. Synced via ProcessorBase::syncGlobalFxParam.
-    for (int i = 0; i < kNumChannels; ++i)
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
     {
         const String c = "ch" + String(i) + "_";
         const String n = "Layer " + String(i + 1) + " Ch ";
@@ -61,12 +61,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     NormalisableRange<float> cutR(20.0f, 18000.0f, 1.0f);
     cutR.setSkewForCentre(1200.0f);
 
-    for (int i = 0; i < kNumChannels; ++i)
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
     {
         const String v = layerParamPrefix(i);
         auto pid = [&](const char* s) { return ParameterID{ v + s, 1 }; };
         auto lbl = [&](const char* s) { return "V" + String(i + 1) + " " + s; };
-        const bool aud = (i == 0);   // only voice 1 audible on a fresh patch
 
         // Arp
         layout.add(std::make_unique<AudioParameterInt>  (pid("scale"), lbl("Scale"), 0, 11, 1));      // Minor
@@ -95,13 +94,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         layout.add(std::make_unique<AudioParameterInt>  (pid("o1o"),    lbl("Osc1 Octave"), -3, 3, 0));
         layout.add(std::make_unique<AudioParameterFloat>(pid("o1f"),    lbl("Osc1 Fine"), f(-100.0f, 100.0f, 1.0f), 0.0f));
         layout.add(std::make_unique<AudioParameterInt>  (pid("o1_pos"), lbl("Osc1 Position"), 0, 255, kSawPosition));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("o1l"),    lbl("Osc1 Level"), f(-60.0f, 6.0f, 0.1f), aud ? 0.0f : -60.0f));
+        layout.add(std::make_unique<AudioParameterFloat>(pid("o1l"),    lbl("Osc1 Level"), f(-60.0f, 6.0f, 0.1f), 0.0f));
         layout.add(std::make_unique<AudioParameterInt>  (pid("o2_wt"),  lbl("Osc2 Wavetable"), 0, maxWt, 0));
         layout.add(std::make_unique<AudioParameterInt>  (pid("o2o"),    lbl("Osc2 Octave"), -3, 3, 0));
         layout.add(std::make_unique<AudioParameterInt>  (pid("o2s"),    lbl("Osc2 Semi"), -12, 12, 0));
         layout.add(std::make_unique<AudioParameterFloat>(pid("o2f"),    lbl("Osc2 Fine"), f(-100.0f, 100.0f, 1.0f), 7.0f));
         layout.add(std::make_unique<AudioParameterInt>  (pid("o2_pos"), lbl("Osc2 Position"), 0, 255, kSawPosition));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("o2l"),    lbl("Osc2 Level"), f(-60.0f, 6.0f, 0.1f), aud ? -3.0f : -60.0f));
+        layout.add(std::make_unique<AudioParameterFloat>(pid("o2l"),    lbl("Osc2 Level"), f(-60.0f, 6.0f, 0.1f), -3.0f));
 
         // Cross-mod — mu-Tant's 2-lane model (same ids + ranges): Lane A index + mode + Sync +
         // Feedback; Lane B bipolar depth + mode, with the SSB shift in Hz.
@@ -172,17 +171,23 @@ PluginProcessor::PluginProcessor()
                     juce::Identifier("MuToniState"))
 {
     // All eight Arps exist for the processor's lifetime (capacity is fixed, only the count is
-    // runtime); mu-Toni's count is fixed at kNumChannels for now.
-    for (auto& l : layers) l = std::make_unique<Arp>();
+    // runtime), so a preset can fill a slot above the live count before the count grows.
+    keepSpareLayers = true;
     for (int i = 0; i < mu_limits::kMaxLayers; ++i)
-        getArp(i).insert->setSlotIndex(i);   // per-slot noise seed: layers do not share one sequence
-    numLayers.store(kNumChannels, std::memory_order_relaxed);   // fixed for now, so layers are read lock-free
+    {
+        layers[(size_t) i] = createLayer(i);
+        layers[(size_t) i]->colourIndex = i;   // each layer starts on its own palette colour
+        jassert(dynamic_cast<Arp*>(layers[(size_t) i].get()) != nullptr);   // the one type check; layerAs only casts
+    }
+    numLayers.store(1, std::memory_order_relaxed);   // a fresh instance starts with one layer
+    unsavedLayerCount = 4;                           // a state saved before layers were editable held four
 
     // Per-channel render: each channel runs its own arpeggiator voice into the
-    // buffer; the shared mixer applies the strip + master mix downstream.
+    // buffer; the shared mixer applies the strip + master mix downstream. Only called for the
+    // live layers, under the try-locked layersLock.
     renderChannelCb = [this](int ch, juce::AudioBuffer<float>& buf, int n)
     {
-        if (ch >= 0 && ch < kNumChannels)   // only these channels are prepared
+        if (ch >= 0 && ch < mu_limits::kMaxLayers)
         {
             getArp(ch).runner.render(buf, n, arpCtx);
             getArp(ch).insert->process(buf, n, buf.getNumChannels(), getArp(ch).insertCfg);   // engine → insert → mixer
@@ -196,7 +201,6 @@ PluginProcessor::PluginProcessor()
 
     // The shared wavetable bank (procedural factory set), read by every voice's oscillators.
     bank.loadFactoryBank();
-    for (auto& l : layers) static_cast<Arp&>(*l).runner.setBank(&bank);
     midiInChParam = apvts.getRawParameterValue("midiInCh");
 
     cacheVoiceParamPointers();
@@ -230,7 +234,7 @@ void PluginProcessor::cacheVoiceParamPointers()
         for (int k = 0; k < kNumVoiceParams; ++k)
         {
             const juce::String id = layerParamId(i, vpi::suffix[k]);
-            vp[(size_t) i][(size_t) k] = (i < kNumChannels) ? apvts.getRawParameterValue(id) : nullptr;
+            vp[(size_t) i][(size_t) k] = apvts.getRawParameterValue(id);
         }
 
     // Modulation-resolve inputs: ids + ranges (voice-independent) + per-voice atoms.
@@ -239,8 +243,7 @@ void PluginProcessor::cacheVoiceParamPointers()
         modDestIds[(size_t) k]    = kModDestTable[k].id;
         modDestRanges[(size_t) k] = apvts.getParameterRange(layerParamId(0, kModDestTable[k].param));
         for (int i = 0; i < mu_limits::kMaxLayers; ++i)
-            modDestAtoms[(size_t) i][(size_t) k] = (i < kNumChannels) ? vp[(size_t) i][(size_t) vpSlotFor(kModDestTable[k].param)]
-                                                                      : nullptr;
+            modDestAtoms[(size_t) i][(size_t) k] = vp[(size_t) i][(size_t) vpSlotFor(kModDestTable[k].param)];
         modParamValues[kModDestTable[k].id] = 0.0f;   // pre-size the map (no audio-thread alloc)
     }
 }
@@ -343,10 +346,16 @@ void PluginProcessor::updateHeldNotes(const juce::MidiBuffer& midi, bool& noteOn
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     resetSwapPlayState();   // no processBlock is running yet: loads apply at once, not staged
-    currentSampleRate = sampleRate;
+    currentSampleRate.store(sampleRate, std::memory_order_relaxed);
+    currentBlockSize.store(samplesPerBlock, std::memory_order_relaxed);
     mixerEngine.prepare(sampleRate, samplesPerBlock);
     fxChain.prepare(sampleRate, samplesPerBlock);
-    for (int i = 0; i < kNumChannels; ++i)
+
+    // Every slot's runner and insert, spares included; under the layers lock because a structural
+    // edit moves the Arps.
+    const juce::ScopedLock sl(layersLock);
+    runnersLive = 0;   // every runner is reset as its slot goes live
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
     {
         getArp(i).runner.prepare(sampleRate, samplesPerBlock);
         getArp(i).insert->prepare(sampleRate, samplesPerBlock);
@@ -362,19 +371,19 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // channels with the output, so a bare clear would wipe it).
     captureSidechainAndClear(buffer);
 
-    // MIDI program change → preset load: queue matching PCs (Ch 1-4 layer, Ch 9 full) for
+    // MIDI program change → preset load: queue matching PCs (Ch 1-8 layer, Ch 9 full) for
     // runDeferredWork to load on the message thread.
     queueMidiProgramChanges(midiMessages);
 
     // This block's transport — the family rule (mu-core TransportResolver): the host / mu-link
     // position, else (standalone) external MIDI clock, else the own transport. The arp steps and
     // the modulators both run on its beat.
-    const double midiClockBeat = midiClockSync.process(midiMessages, numSamples, currentSampleRate);
+    const double midiClockBeat = midiClockSync.process(midiMessages, numSamples, currentSampleRate.load(std::memory_order_relaxed));
     const auto   transport     = mu_core::resolveTransport(pollHostTransport(),
                                                            wrapperType == wrapperType_Standalone,
                                                            midiClockSync, midiClockBeat,
                                                            { internalPlaying, internalBpm, internalBeatPos, &nudgePhaseBeats, &nudgeDirection, &appliedSyncOffsetBeats },
-                                                           numSamples, currentSampleRate, 0.0, getSyncOffsetMs());
+                                                           numSamples, currentSampleRate.load(std::memory_order_relaxed), 0.0, getSyncOffsetMs());
     noteBlockTransport(transport);   // lets the next block's quantised control actions find the beat
     const double bpm       = transport.bpm;
     const bool   isPlaying = transport.playing;
@@ -385,7 +394,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
 
     // Per-block arp context (read by the render callback for every voice).
     arpCtx.playing          = isPlaying;
-    arpCtx.sampleRate       = currentSampleRate;
+    arpCtx.sampleRate       = currentSampleRate.load(std::memory_order_relaxed);
     arpCtx.bpm              = bpm;
     arpCtx.anyNoteHeld      = heldCount > 0;
     arpCtx.rootOverrideMidi = heldCount > 0 ? heldStack[(size_t) (heldCount - 1)] : -1;
@@ -396,25 +405,69 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // Beat position for the modulation matrix (control-sequence playhead).
     modBeat = transport.startBeat;
 
-    // Push current parameters into each voice's arp runner.
-    for (int i = 0; i < kNumChannels; ++i)
+    // Push parameters into each live layer's runner and render it through the shared path (engine
+    // -> insert -> mixer). Guarded by a try-lock against a structural edit moving the Arps (the message
+    // thread holds layersLock for those); on contention, or while an edit is still moving parameter
+    // values, the block is left silent: a sub-ms gap during an edit.
     {
-        ArpParams ap; ToniVoiceParams tv; int rateIdx = 6; float gate01 = 0.5f; bool midiTrig = false;
-        ArpAccent accent;
-        readVoice(i, ap, tv, rateIdx, gate01, midiTrig, accent);
-        getArp(i).runner.setAccent(accent);
-        getArp(i).runner.setArp(ap);
-        getArp(i).runner.setVoiceParams(tv);
-        getArp(i).runner.setStep(rateIdx, gate01, midiTrig);
-    }
+        const juce::ScopedTryLock layersTryLock(layersLock);
+        if (layersTryLock.isLocked() && ! layerEditInFlight.load(std::memory_order_acquire))
+        {
+            const int numActive = numLayers.load(std::memory_order_relaxed);
 
-    // Render each arp voice → mixer through the shared path (engine → insert →
-    // mixer): the render hook fills each channel, the mixer owns strip + master.
-    processCoreBlock(buffer, nullptr, kNumChannels, numSamples, bpm,
-                     nullptr, nullptr, nullptr, &renderChannelCb);
+            // A slot that has just gone live starts from silence: a deleted layer's held note or
+            // voice tail never resumes in the new one.
+            for (int i = runnersLive; i < numActive; ++i) getArp(i).runner.reset();
+            runnersLive = numActive;
+
+            for (int i = 0; i < numActive; ++i)
+            {
+                ArpParams ap; ToniVoiceParams tv; int rateIdx = 6; float gate01 = 0.5f; bool midiTrig = false;
+                ArpAccent accent;
+                readVoice(i, ap, tv, rateIdx, gate01, midiTrig, accent);
+                getArp(i).runner.setAccent(accent);
+                getArp(i).runner.setArp(ap);
+                getArp(i).runner.setVoiceParams(tv);
+                getArp(i).runner.setStep(rateIdx, gate01, midiTrig);
+            }
+
+            // The render hook fills each channel; the mixer owns strip + master.
+            processCoreBlock(buffer, nullptr, numActive, numSamples, bpm,
+                             nullptr, nullptr, nullptr, &renderChannelCb);
+        }
+    }
 
     // Hot-swap: flag staged presets whose bar line passed in this block (or the transport stopped).
     flagSwapBoundaries(isPlaying, transport.startBeat, transport.beatsPerSample * (double) numSamples);
+}
+
+// ── Dynamic layer management ─────────────────────────────────────────────────
+// A fresh default Arp for slot `slot`. Built and prepared before a structural edit locks, so the
+// edit under the lock only moves pointers (the insert and the voice allocate here).
+std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
+{
+    auto a = std::make_unique<Arp>();
+    a->runner.setBank(&bank);
+    const double sr = currentSampleRate.load(std::memory_order_relaxed);
+    const int    bs = currentBlockSize.load(std::memory_order_relaxed);
+    a->runner.prepare(sr, bs);
+    a->insert->setSlotIndex(slot);   // per-slot noise seed: layers do not share one sequence
+    a->insert->prepare(sr, bs);
+    return a;
+}
+
+// Slots whose Arp changed lose the previous tenant's voice, step position and insert memory (the
+// insert travels with its Arp, so it is re-seeded for the new slot and cleared). The mixer strip and
+// its ducking envelope are reset by the edit itself. Allocation-free resets only.
+void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
+{
+    for (int d = juce::jmax(0, firstIndex); d <= juce::jmin(lastIndex, mu_limits::kMaxLayers - 1); ++d)
+    {
+        auto& arp = getArp(d);
+        arp.runner.reset();
+        arp.insert->setSlotIndex(d);
+        arp.insert->reset();
+    }
 }
 
 void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)

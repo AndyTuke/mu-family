@@ -4,39 +4,15 @@
 namespace mu_toni
 {
 
-namespace
-{
-    // Placeholder per-layer mini-graphic for the shared sidebar — a coloured disc
-    // with the layer number. The real product visual (engine/sequencer glyph +
-    // animation) is injected here later via createMiniVisual, same as mu-clid's
-    // RhythmCircle / mu-tant's voice glyph.
-    class LayerGlyph : public juce::Component
-    {
-    public:
-        LayerGlyph(juce::Colour c, int index) : colour(c), idx(index) {}
-
-        void paint(juce::Graphics& g) override
-        {
-            auto r = getLocalBounds().toFloat().reduced(2.0f);
-            g.setColour(colour.withAlpha(0.16f));
-            g.fillEllipse(r);
-            g.setColour(colour);
-            g.drawEllipse(r, 1.5f);
-            g.setFont(juce::Font(juce::FontOptions(r.getHeight() * 0.42f, juce::Font::bold)));
-            g.drawText(juce::String(idx + 1), getLocalBounds(), juce::Justification::centred, false);
-        }
-
-    private:
-        juce::Colour colour;
-        int idx;
-    };
-}
-
 PluginEditor::PluginEditor(PluginProcessor& p)
     : EditorShellBase(p),
       proc(p),
       sidebar(p, "Layer"),
-      enginePanel(p),
+      arpContent(p),
+      layerPanel(p, "Layer"),
+      // ArpContent binds only APVTS parameters, never a layer's own data, so there is nothing to
+      // release before a removal.
+      layerEdit(p, sidebar, layerPanel, { {}, [this](int idx) { layerPanel.setLayer(idx); } }),
       mixerOverlay(p, p.mixerEngine),
       settingsOverlay(p)
 {
@@ -48,20 +24,29 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     sidebar.createMiniVisual = [&p](int i, std::function<void()>) -> std::unique_ptr<juce::Component>
     {
         const auto col = MuLookAndFeel::channelPalette[
-            (size_t) (p.getChannelColourIndex(i) % MuLookAndFeel::kChannelPaletteSize)];
-        return std::make_unique<LayerGlyph>(col, i);
+            (size_t) (p.getLayerColourIndex(i) % MuLookAndFeel::kChannelPaletteSize)];
+        return std::make_unique<ArpMiniVisual>(col, i);
     };
-    sidebar.onLayerSelected = [this](int idx) { enginePanel.setLayer(idx); };
+    sidebar.onLayerSelected = [this](int idx) { layerPanel.setLayer(idx); };
     sidebar.refreshItems();
 
-    // Engine-panel knob hovers/changes → shared StatusBar.
-    enginePanel.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
+    // The shared layer panel: the arp content band in the middle, mu-Toni's modulation destinations;
+    // a layer change rebinds the content's controls. The layer count is variable (1 to 8): the
+    // controller wires the sidebar Add button, reorder and the header's delete.
+    layerEdit.setFixedLayers(false);
+    layerPanel.getHeader().setNameEditable(false);   // a layer is named after its index
+    layerPanel.setContent(&arpContent);
+    layerPanel.setDestProvider(&modDestProvider);
+    layerPanel.onLayerChanged = [this](int layer) { arpContent.setLayer(layer); };
+
+    // Content-band knob hovers/changes → shared StatusBar.
+    arpContent.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
     {
         getStatusBar().showParam(name, val, MuLookAndFeel::colour(MuLookAndFeel::knobEuclidean));
     };
 
     // Main area (sidebar + blank engine panel) + shared mixer overlay.
-    setMainArea(&sidebar, &enginePanel);
+    setMainArea(&sidebar, &layerPanel);
     setMixerOverlay(&mixerOverlay);
 
     // Settings page (master vol + UI size + BPM + standalone MIDI Clock) behind the
@@ -71,13 +56,13 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // A program change loaded a layer preset → refresh that layer if it's on screen.
     proc.onLayerPresetCommitted = [this](int layer)
     {
-        if (enginePanel.getLayer() == layer) enginePanel.setLayer(layer);
+        if (layerPanel.getLayer() == layer) layerPanel.setLayer(layer);
     };
 
     // Forward mixer status updates to the shared StatusBar.
 
     sidebar.setSelectedIndex(0);
-    enginePanel.setLayer(0);
+    layerPanel.setLayer(0);
     mixerOverlay.loadFromApvts();
     clearPresetDirty();
 
@@ -86,7 +71,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     setScrews(true);
 
     // Every control on the main panel shows its name + value on the status bar.
-    forwardKnobStatus(enginePanel);
+    forwardKnobStatus(layerPanel);
 }
 
 PluginEditor::~PluginEditor()
@@ -96,8 +81,7 @@ PluginEditor::~PluginEditor()
 
 void PluginEditor::onPresetLoaded(const juce::File&)
 {
-    sidebar.refreshItems();
-    enginePanel.setLayer(enginePanel.getLayer());   // rebind knobs + modulators to the loaded state
+    layerEdit.refreshAfterPresetLoad();   // rebuild the sidebar (the count may have changed), rebind knobs + modulators
     mixerOverlay.loadFromApvts();
 }
 

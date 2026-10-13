@@ -9,7 +9,11 @@ PluginEditor::PluginEditor(PluginProcessor& p)
       proc(p),
       masterLoop(p),
       sidebar(p, "Rhythm"),
-      rhythmPanel(p),
+      rhythmContent(p),
+      layerPanel(p, "Rhythm"),
+      layerEdit(p, sidebar, layerPanel,
+                { [this] { rhythmContent.setLayer(-1); },   // nothing stays bound into a layer that is about to move
+                  [this](int idx) { selectRhythmAndRefresh(idx, /*fullSidebarRefresh=*/false, MixerRefresh::FullReload); } }),
       mixerOverlay(p, p.mixerEngine),
       settingsOverlay(p)
 {
@@ -25,9 +29,25 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     };
 
     // ── Product main area + overlays ────────────────────────────────────────
-    setMainArea(&sidebar, &rhythmPanel);
+    setMainArea(&sidebar, &layerPanel);
     setMixerOverlay(&mixerOverlay);
     setSettingsOverlay(&settingsOverlay);
+
+    // ── The shared layer panel: header strip + the rhythm band + modulators ──
+    // mu-Clid keeps its own categorised preset list and save card in the header, so the shell's
+    // list is off; a layer change rebinds the band, and a reset / preset load asks for a full rebind.
+    layerPanel.setOwnsPresetList(false);
+    layerPanel.setContent(&rhythmContent);
+    layerPanel.setDestProvider(&modDestProvider);
+    layerPanel.setBeatSource([this] { return proc.lastBeatPos.load(); });
+    layerPanel.addOverlay(rhythmContent.getSaveDialog());
+    rhythmContent.attachHeader(layerPanel.getHeader());
+    layerPanel.onLayerChanged = [this](int idx) { rhythmContent.setLayer(idx); };
+    rhythmContent.requestRebind = [this](int idx) { layerPanel.setLayer(idx); };
+    rhythmContent.onInsertAlgorithmChanged = [this](int charId)
+    {
+        layerPanel.getModulatorPanel().setInsertAlgorithm(charId);
+    };
 
     // ── Sidebar callbacks ───────────────────────────────────────────────────
     // Per-rhythm mini-graphic: a RhythmCircle whose step hit flashes the sidebar item.
@@ -41,48 +61,18 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     sidebar.onLayerSelected = [this](int idx)
     {
-        rhythmPanel.setRhythm(idx);
+        layerPanel.setLayer(idx);
         if (!isMixerVisible())
         {
             hideAllOverlays();
-            rhythmPanel.setVisible(true);
+            layerPanel.setVisible(true);
         }
     };
 
-    sidebar.onLayersReordered = [this](int newSelected)
-    {
-        selectRhythmAndRefresh(newSelected, /*fullSidebarRefresh=*/false, MixerRefresh::FullReload);
-    };
+    // Add, delete and reorder are wired by layerEdit (the shared LayerEditController).
 
-    sidebar.onAddLayer = [this]
-    {
-        if (proc.getNumRhythms() >= SequencerEngine::MaxRhythms) return;
-        Rhythm r;
-        r.name        = ("Rhythm " + juce::String(proc.getNumRhythms() + 1)).toStdString();   // the slot keeps it through the default-rhythm load
-        // Pick the first palette index not already used by an existing rhythm.
-        {
-            constexpr int N = MuLookAndFeel::kChannelPaletteSize;
-            std::array<bool, N> used{};
-            const int nExisting = proc.getNumRhythms();
-            for (int i = 0; i < nExisting; ++i)
-                used[(size_t) (proc.getRhythm(i).colourIndex % N)] = true;
-            const int startProbe = nExisting % N;
-            int chosen = startProbe;
-            for (int i = 0; i < N; ++i)
-            {
-                const int candidate = (startProbe + i) % N;
-                if (! used[(size_t) candidate]) { chosen = candidate; break; }
-            }
-            r.colourIndex = chosen;
-        }
-        proc.rhythms.add(r);
-        const int newIndex = proc.getNumRhythms() - 1;
-        proc.applyDefaultRhythm(newIndex);
-        selectRhythmAndRefresh(newIndex, /*fullSidebarRefresh=*/true, MixerRefresh::RefreshOnly);
-    };
-
-    // ── RhythmPanel callbacks ───────────────────────────────────────────────
-    rhythmPanel.onStatusUpdate = [this](const juce::String& name,
+    // ── RhythmContent callbacks ─────────────────────────────────────────────
+    rhythmContent.onStatusUpdate = [this](const juce::String& name,
                                         const juce::String& val,
                                         juce::Colour col)
     {
@@ -97,18 +87,18 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // regardless of mixer visibility).
     mixerOverlay.onEffectAlgorithmNameChanged = [this](const juce::String& name)
     {
-        rhythmPanel.setVoiceEffectSendLabel(name);
+        applyEffectSendLabel(name);
     };
     proc.apvts.addParameterListener("eff_algo", this);
 
     // A rhythm in MIDI output mode makes no audio, so its mixer strip is drawn inactive. The strip is
     // refreshed when the shown rhythm's mode changes and, for host automation of any rhythm, below.
     mixerOverlay.isChannelSilent = [this](int r) { return isRhythmMidiOutput(r); };
-    rhythmPanel.onOutputModeChanged = [this] { if (isMixerVisible()) mixerOverlay.loadFromApvts(); };
-    for (int i = 0; i < SequencerEngine::MaxRhythms; ++i)
+    rhythmContent.onOutputModeChanged = [this] { if (isMixerVisible()) mixerOverlay.loadFromApvts(); };
+    for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
         proc.apvts.addParameterListener("r" + juce::String(i) + "_outMode", this);
 
-    rhythmPanel.onRhythmRenamed = [this]
+    rhythmContent.onRhythmRenamed = [this]
     {
         sidebar.repaintItems();
         if (isMixerVisible()) mixerOverlay.refresh();
@@ -116,19 +106,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     proc.onLayerPresetCommitted = [this](int r)
     {
-        if (r == rhythmPanel.getCurrentRhythmIndex())
-            rhythmPanel.setRhythm(r);
+        if (r == layerPanel.getLayer())
+            layerPanel.setLayer(r);
         sidebar.repaintItems();
-        if (isMixerVisible()) mixerOverlay.refresh();
-    };
-
-    rhythmPanel.onRhythmDeleted = [this](int idx)
-    {
-        proc.rhythms.remove(idx);
-        const int newIndex = juce::jmax(0, juce::jmin(idx, proc.getNumRhythms() - 1));
-        sidebar.refreshItems();
-        sidebar.setSelectedIndex(newIndex);
-        rhythmPanel.setRhythm(newIndex);
         if (isMixerVisible()) mixerOverlay.refresh();
     };
 
@@ -136,16 +116,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     settingsOverlay.onContentDirChanged = [this] { getTransportBar().refreshPresets(); };
 
     // ── Startup ─────────────────────────────────────────────────────────────
-    if (proc.getNumRhythms() == 0)
-    {
-        Rhythm r;
-        r.name        = "Rhythm 1";
-        r.colourIndex = 0;
-        proc.rhythms.add(r);
-        sidebar.refreshItems();
-    }
-
-    rhythmPanel.setRhythm(0);
+    layerPanel.setLayer(0);
     sidebar.setSelectedIndex(0);
 
     // Sync mixer UI from APVTS — in standalone, state is restored before the editor
@@ -164,7 +135,7 @@ PluginEditor::~PluginEditor()
     // Clear product-owned processor callbacks before teardown — same UAF
     // contract as the shell base's destructor.
     proc.apvts.removeParameterListener("eff_algo", this);
-    for (int i = 0; i < SequencerEngine::MaxRhythms; ++i)
+    for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
         proc.apvts.removeParameterListener("r" + juce::String(i) + "_outMode", this);
     proc.onLayerPresetCommitted = nullptr;
 }
@@ -176,7 +147,7 @@ void PluginEditor::selectRhythmAndRefresh(int idx,
     if (fullSidebarRefresh)
         sidebar.refreshItems();
     sidebar.setSelectedIndex(idx);
-    rhythmPanel.setRhythm(idx);
+    layerPanel.setLayer(idx);
     if (isMixerVisible())
     {
         if (mixerRefresh != MixerRefresh::Skip)
@@ -205,12 +176,12 @@ void PluginEditor::onPresetNew()
 
 juce::StringArray PluginEditor::getProductKnownCategories() const
 {
-    return rhythmPanel.getKnownCategories();
+    return rhythmContent.getKnownCategories();
 }
 
 void PluginEditor::onCategoriesRefreshed(const juce::StringArray& merged)
 {
-    rhythmPanel.setKnownCategories(merged);
+    rhythmContent.setKnownCategories(merged);
 }
 
 // ── APVTS listener — host automation of eff_algo ────────────────────────────
@@ -251,7 +222,17 @@ void PluginEditor::syncVoiceEffectSendLabel()
     const juce::String name = (ai >= 0 && ai < (int) algos.size())
                               ? algos[(size_t) ai].name
                               : juce::String("Effect");
-    rhythmPanel.setVoiceEffectSendLabel(name);
+    applyEffectSendLabel(name);
+}
+
+// The voice band's Amp "Effect" send label, and the effect-send modulation target's name (the
+// destination dropdowns are rebuilt so the target carries the new name).
+void PluginEditor::applyEffectSendLabel(const juce::String& name)
+{
+    rhythmContent.setVoiceEffectSendLabel(name);
+    if (name == effectSendName) return;
+    effectSendName = name;
+    layerPanel.setDestProvider(&modDestProvider);
 }
 
 juce::AudioProcessorEditor* PluginProcessor::createEditor()

@@ -71,7 +71,22 @@ namespace
         using ProcessorCore::layers;
         using ProcessorCore::layersLock;
         using ProcessorBase::layerSwapper;
-        bool canEditLayers() const override { return true; }
+        using ProcessorBase::captureComposedState;
+        using ProcessorBase::applyComposedState;
+        using ProcessorBase::savedLayerCount;
+        using ProcessorBase::unsavedLayerCount;
+        bool editable = true;
+        bool canEditLayers() const override { return editable; }
+
+        // A fake product's layer references (like mu-On's Rumble source): refs[k] names a layer.
+        std::vector<int> refs;
+        void remapLayerReferences(const std::function<int(int)>& oldToNew) override
+        {
+            ++remapCalls;
+            for (auto& r : refs) r = oldToNew(r);
+        }
+        int remapCalls = 0;
+
         std::unique_ptr<Layer> createLayer(int) override
         {
             return std::make_unique<ProbeLayer>(layersLock, destroyed, underLock, resets);
@@ -81,7 +96,32 @@ namespace
         {
             moved.push_back({ first, last });
             movedHoldingLock.push_back(lockHeldByOtherThread() ? 1 : 0);
+            order.push_back("moved");
         }
+
+        // A product whose layer data is the parameters' truth (mu-Clid's Rhythm): the edits hand it the slots
+        // to push instead of copying values in the tree. layersReordered tells it where data came from.
+        bool truth = false;
+        bool layerHoldsParamTruth() const override { return truth; }
+        void syncSlotParams(int slot) override
+        {
+            synced.push_back(slot);
+            syncedFlagUp.push_back(layerEditInFlight.load() ? 1 : 0);
+            syncedSuspended.push_back(isSuspended() ? 1 : 0);
+            syncedHoldingLock.push_back(lockHeldByOtherThread() ? 1 : 0);
+            order.push_back("synced");
+        }
+        struct Reorder { LayerEdit kind; int a, b; };
+        void layersReordered(LayerEdit kind, int a, int b) override
+        {
+            reordered.push_back({ kind, a, b });
+            reorderedHoldingLock.push_back(lockHeldByOtherThread() ? 1 : 0);
+            order.push_back("reordered");
+        }
+        std::vector<int> synced, syncedHoldingLock, reorderedHoldingLock, syncedFlagUp, syncedSuspended, addedFlagUp;
+        std::vector<Reorder> reordered;
+        std::vector<juce::String> order;          // layersReordered / layersMoved / syncSlotParams, in call order
+        void clearLogs() { syncedFlagUp.clear(); syncedSuspended.clear(); addedFlagUp.clear(); synced.clear(); syncedHoldingLock.clear(); reordered.clear(); reorderedHoldingLock.clear(); order.clear(); }
         // A critical section is re-entrant for its owner, so only a second thread can tell it is held.
         bool lockHeldByOtherThread()
         {
@@ -90,6 +130,9 @@ namespace
             probeThread.join();
             return ! acquired;
         }
+
+        // layerAdded(index): the new layer's own starting point, after its parameters are at defaults.
+        void layerAdded(int index) override { added.push_back(index); addedFlagUp.push_back(layerEditInFlight.load() ? 1 : 0); addedHoldingLock.push_back(lockHeldByOtherThread() ? 1 : 0); }
 
         float param(const juce::String& id) const
         {
@@ -107,9 +150,10 @@ namespace
         std::vector<int> cancelled;
         std::vector<std::pair<int, int>> moved;   // layersMoved(first, last) calls, in order
         std::vector<int> movedHoldingLock;        // 1 when the call came with layersLock held
+        std::vector<int> added, addedHoldingLock; // layerAdded(index) calls; 1 when layersLock was held
 
-        juce::String getChannelName(int) const override { return {}; }
-        int getChannelColourIndex(int i) const override { return layers[(size_t) i] ? layers[(size_t) i]->colourIndex : 0; }
+        juce::String getLayerName(int) const override { return {}; }
+        int getLayerColourIndex(int i) const override { return layers[(size_t) i] ? layers[(size_t) i]->colourIndex : 0; }
         juce::File   getLayerPresetDir()       const override { return {}; }
         juce::String getLayerPresetExtension() const override { return ".muTest"; }
         juce::String getFullPresetExtension()  const override { return ".muTest"; }
@@ -169,7 +213,7 @@ struct LayerOwnershipTests : juce::UnitTest
                 const juce::ScopedLock sl(p.layersLock);
                 p.numLayers.store(3, std::memory_order_release);
             }
-            expectEquals(p.getNumChannels(), 3);
+            expectEquals(p.getNumLayers(), 3);
             expect(p.getLayer(2) == p.layers[2].get());
         }
 
@@ -204,6 +248,7 @@ struct LayerOwnershipTests : juce::UnitTest
 
         runStoragePrimitiveTests();
         runStructuralEditTests();
+        runParamTruthTests();
     }
 
     // Parameter values go through a normalised round trip, so compare to a tolerance, not exactly.
@@ -225,7 +270,7 @@ struct LayerOwnershipTests : juce::UnitTest
                 const juce::ScopedLock sl(p.layersLock);
                 replaced = p.publishLayerLocked(std::move(fresh));
             }
-            expectEquals(p.getNumChannels(), 3);
+            expectEquals(p.getNumLayers(), 3);
             expect(p.getLayer(2) == freshPtr);
             expect(replaced.get() == spare);
             expectEquals(destroyed, 0, "the caller releases the spare, not the primitive");
@@ -251,7 +296,7 @@ struct LayerOwnershipTests : juce::UnitTest
                 const juce::ScopedLock sl(p.layersLock);
                 removed = p.unpublishLayerLocked(1, std::move(spare));
             }
-            expectEquals(p.getNumChannels(), 3);
+            expectEquals(p.getNumLayers(), 3);
             expect(removed.get() == ptr[1]);
             expect(p.layers[0].get() == ptr[0]);
             expect(p.layers[1].get() == ptr[2], "the layer above moved down, not copied");
@@ -273,7 +318,7 @@ struct LayerOwnershipTests : juce::UnitTest
                 const juce::ScopedLock sl(p.layersLock);
                 removed = p.unpublishLayerLocked(2, nullptr);
             }
-            expectEquals(p.getNumChannels(), 2);
+            expectEquals(p.getNumLayers(), 2);
             expect(p.layers[2] == nullptr);
         }
 
@@ -288,7 +333,7 @@ struct LayerOwnershipTests : juce::UnitTest
             }
             expect(p.layers[0].get() == c);
             expect(p.layers[2].get() == a);
-            expectEquals(p.getNumChannels(), 3);
+            expectEquals(p.getNumLayers(), 3);
         }
     }
 
@@ -301,6 +346,13 @@ struct LayerOwnershipTests : juce::UnitTest
             expectEquals(p.addLayer(), -1);
             expect(! p.removeLayer(0));
             expect(! p.swapLayers(0, 1));
+            expect(! p.canReorderLayers());   // the sidebar offers no drag-reorder without layer editing
+        }
+
+        beginTest("a product with editable layers lets the sidebar reorder by default");
+        {
+            EditableProcessor p(false);
+            expect(p.canReorderLayers());
         }
 
         beginTest("addLayer fills the slots in order, each with a distinct colour, and refuses past the maximum");
@@ -314,7 +366,7 @@ struct LayerOwnershipTests : juce::UnitTest
                 expectEquals((int) p.cancelled.size(), 1, "one staged swap cancelled");
                 expectEquals(p.cancelled[0], i, "the new slot's");
             }
-            expectEquals(p.getNumChannels(), mu_limits::kMaxLayers);
+            expectEquals(p.getNumLayers(), mu_limits::kMaxLayers);
             expectEquals(p.addLayer(), -1);
             std::array<bool, mu_limits::kMaxLayers> seen {};
             for (int i = 0; i < mu_limits::kMaxLayers; ++i) seen[(size_t) p.getLayer(i)->colourIndex] = true;
@@ -324,6 +376,12 @@ struct LayerOwnershipTests : juce::UnitTest
             expect(p.moved.front() == std::make_pair(1, 1) && p.moved.back() == std::make_pair(mu_limits::kMaxLayers - 1, mu_limits::kMaxLayers - 1),
                    "the new slot only");
             for (int h : p.movedHoldingLock) expectEquals(h, 1, "called under layersLock");
+            expectEquals((int) p.added.size(), mu_limits::kMaxLayers - 1, "one layerAdded per add");
+            expectEquals(p.added.front(), 1);
+            expectEquals(p.added.back(), mu_limits::kMaxLayers - 1);
+            for (int h : p.addedHoldingLock) expectEquals(h, 0, "layerAdded runs outside layersLock");
+            p.removeLayer(0); p.swapLayers(0, 1); p.resetLayer(0);
+            expectEquals((int) p.added.size(), mu_limits::kMaxLayers - 1, "delete, reorder and reset do not call layerAdded");
         }
 
         beginTest("addLayer replaces a spare, destroys it outside the lock, and gives the slot default values");
@@ -340,7 +398,7 @@ struct LayerOwnershipTests : juce::UnitTest
             expectNear(p.param("v1_a"), 0.25f);
             expectNear(p.param("ch1_lvl"), 1.0f);
             expectNear(p.mixerEngine.channels[1].level.load(), 1.0f);
-            expectEquals(p.getNumChannels(), 2);
+            expectEquals(p.getNumLayers(), 2);
         }
 
         beginTest("removeLayer moves the layers above down by pointer, with their parameters and strip state");
@@ -366,7 +424,7 @@ struct LayerOwnershipTests : juce::UnitTest
 
             expect(p.removeLayer(1));
 
-            expectEquals(p.getNumChannels(), 3);
+            expectEquals(p.getNumLayers(), 3);
             expect(p.layers[0].get() == ptr[0]);
             expect(p.layers[1].get() == ptr[2], "layer 2 moved to slot 1 by pointer");
             expect(p.layers[2].get() == ptr[3]);
@@ -393,6 +451,22 @@ struct LayerOwnershipTests : juce::UnitTest
             expectEquals(p.mixerEngine.channels[0].sidechainSource.load(), -1);
         }
 
+        beginTest("a ducked strip keeps its sidechain follower when a remove or a swap moves it");
+        {
+            EditableProcessor p(true);
+            for (int i = 1; i < 4; ++i) p.addLayer();
+            for (int i = 0; i < 4; ++i) p.mixerEngine.setSidechainEnv(i, 0.1f * (float) (i + 1));
+            expect(p.removeLayer(1));
+            expectNear(p.mixerEngine.getSidechainEnv(0), 0.1f);
+            expectNear(p.mixerEngine.getSidechainEnv(1), 0.3f);
+            expectNear(p.mixerEngine.getSidechainEnv(2), 0.4f);
+            expectNear(p.mixerEngine.getSidechainEnv(3), 0.0f);
+            expect(p.swapLayers(0, 2));
+            expectNear(p.mixerEngine.getSidechainEnv(0), 0.4f);
+            expectNear(p.mixerEngine.getSidechainEnv(2), 0.1f);
+            expectNear(p.mixerEngine.getSidechainEnv(1), 0.3f);
+        }
+
         beginTest("removeLayer refuses the last layer and a bad index");
         {
             EditableProcessor p(true);
@@ -400,7 +474,7 @@ struct LayerOwnershipTests : juce::UnitTest
             p.addLayer();
             expect(! p.removeLayer(2));
             expect(! p.removeLayer(-1));
-            expectEquals(p.getNumChannels(), 2);
+            expectEquals(p.getNumLayers(), 2);
         }
 
         beginTest("removeLayer without spares leaves the vacated slot empty");
@@ -410,7 +484,7 @@ struct LayerOwnershipTests : juce::UnitTest
             p.destroyed = 0;
             expect(p.removeLayer(0));
             expect(p.layers[2] == nullptr);
-            expectEquals(p.getNumChannels(), 2);
+            expectEquals(p.getNumLayers(), 2);
             expectEquals(p.destroyed, 1);
             expectEquals(p.underLock, 0);
         }
@@ -481,6 +555,62 @@ struct LayerOwnershipTests : juce::UnitTest
             expectEquals((int) p.moved.size(), 1);
         }
 
+        beginTest("layer references follow their layer through removeLayer and swapLayers; a gone layer maps to -1");
+        {
+            EditableProcessor p(true);
+            p.addLayer(); p.addLayer();   // three layers
+            p.refs = { 0, 1, 2 };         // reference k names layer k
+            expect(p.removeLayer(1));
+            expectEquals(p.remapCalls, 1);
+            expectEquals(p.refs[0], 0, "a reference below the removed layer is unchanged");
+            expectEquals(p.refs[1], -1, "a reference to the removed layer maps to -1");
+            expectEquals(p.refs[2], 1, "a reference above the removed layer follows it down");
+
+            p.refs = { 0, 1 };
+            expect(p.swapLayers(0, 1));
+            expectEquals(p.remapCalls, 2);
+            expectEquals(p.refs[0], 1, "a reference follows its layer to the swapped slot");
+            expectEquals(p.refs[1], 0);
+
+            p.addLayer(); p.resetLayer(0);
+            expectEquals(p.remapCalls, 2, "addLayer and resetLayer do not remap references");
+        }
+
+        beginTest("the layer count and colours save with the composed state and a missing count uses unsavedLayerCount");
+        {
+            EditableProcessor src(true);
+            src.addLayer(); src.addLayer();
+            src.layers[1]->colourIndex = 5;
+            auto state = src.captureComposedState();
+            expectEquals((int) state.getProperty("numVoices"), 3);
+            expect(state.getProperty("voiceColours").toString().startsWith("0,5,"), "colours are saved per slot");
+
+            EditableProcessor dst(true);
+            expectEquals(dst.savedLayerCount(state), 3);
+            dst.applyComposedState(state);
+            expectEquals(dst.getNumLayers(), 3, "the count is restored");
+            expectEquals(dst.layers[1]->colourIndex, 5, "the colours are restored");
+
+            state.removeProperty("numVoices", nullptr);
+            state.removeProperty("voiceColours", nullptr);
+            expectEquals(dst.savedLayerCount(state), 1, "unsavedLayerCount defaults to 1");
+            dst.unsavedLayerCount = 4;
+            dst.applyComposedState(state);
+            expectEquals(dst.getNumLayers(), 4, "a state without a count loads with the product's legacy count");
+            expectEquals(dst.layers[1]->colourIndex, 5, "a state without colours keeps the current ones");
+
+            state.setProperty("numVoices", 99, nullptr);
+            expectEquals(dst.savedLayerCount(state), mu_limits::kMaxLayers, "the count is clamped");
+            state.setProperty("numVoices", 0, nullptr);
+            expectEquals(dst.savedLayerCount(state), 1);
+
+            EditableProcessor fixed(false);
+            fixed.editable = false;
+            auto fixedState = fixed.captureComposedState();
+            expect(! fixedState.hasProperty("numVoices") && ! fixedState.hasProperty("voiceColours"),
+                   "a fixed-count product saves neither");
+        }
+
         beginTest("structural edits cancel exactly the staged swaps they would misdirect");
         {
             auto stage = [](EditableProcessor& p, std::initializer_list<int> slots, bool full)
@@ -518,6 +648,118 @@ struct LayerOwnershipTests : juce::UnitTest
             expect(rst.hasPendingSwap(0), "another layer's swap is kept");
             expect(! rst.hasPendingSwap(1), "the reset slot's swap would re-fill it, so it is cancelled");
             expect(rst.hasPendingFullPreset(), "the full preset is left to win");
+        }
+    }
+
+    // layersReordered and the param-truth hooks (layerHoldsParamTruth / syncSlotParams), driven by a fake product.
+    void runParamTruthTests()
+    {
+        beginTest("layersReordered fires once per remove or swap, under the lock, before layersMoved");
+        {
+            EditableProcessor p(true);
+            p.addLayer(); p.addLayer(); p.addLayer();
+            p.clearLogs(); p.moved.clear();
+
+            expect(p.removeLayer(1));
+            expectEquals((int) p.reordered.size(), 1);
+            expect(p.reordered[0].kind == ProcessorBase::LayerEdit::Remove && p.reordered[0].a == 1 && p.reordered[0].b == -1);
+            expectEquals(p.reorderedHoldingLock[0], 1, "called under layersLock");
+            expect(p.order.size() >= 2 && p.order[0] == "reordered" && p.order[1] == "moved", "before layersMoved");
+            expect(p.synced.empty(), "a product whose parameters are the truth is not asked to sync");
+
+            p.clearLogs();
+            expect(p.swapLayers(0, 2));
+            expectEquals((int) p.reordered.size(), 1, "one call for the swap, not one per slot");
+            expect(p.reordered[0].kind == ProcessorBase::LayerEdit::Swap && p.reordered[0].a == 0 && p.reordered[0].b == 2);
+            expectEquals(p.reorderedHoldingLock[0], 1);
+            expect(p.order.size() == 3 && p.order[0] == "reordered" && p.order[1] == "moved" && p.order[2] == "moved",
+                   "before both layersMoved calls");
+
+            p.clearLogs();
+            p.resetLayer(1); p.addLayer();
+            expect(p.reordered.empty(), "reset and add reorder nothing");
+        }
+
+        beginTest("layerHoldsParamTruth: removeLayer syncs the shifted and the vacated slots instead of copying values");
+        {
+            EditableProcessor p(true);
+            p.truth = true;
+            p.addLayer(); p.addLayer(); p.addLayer();
+            p.setParam("v1_a", 0.1f); p.setParam("v2_a", 0.2f); p.setParam("v3_a", 0.3f);
+            p.setParam("ch2_pan", 0.5f);
+            p.clearLogs();
+
+            expect(p.removeLayer(1));
+            expect((p.synced == std::vector<int> { 1, 2, 3 }), "the removed index and every slot above it, the vacated top one included");
+            for (int h : p.syncedHoldingLock) expectEquals(h, 0, "outside layersLock");
+            expect(p.order.back() == "synced", "after the pointer moves");
+            expectNear(p.param("v1_a"), 0.1f); expectNear(p.param("v2_a"), 0.2f); expectNear(p.param("v3_a"), 0.3f);
+            expectNear(p.param("ch2_pan"), 0.5f);   // the product's sync moves values; the base leaves the tree alone
+            expectEquals(p.layerEditInFlight.load() ? 1 : 0, 0, "the edit flag is down again");
+            for (int f : p.syncedFlagUp)    expectEquals(f, 0, "the sync runs with the in-flight flag already down, so the mix is not silenced");
+            for (int s : p.syncedSuspended) expectEquals(s, 0, "and with processing already resumed");
+        }
+
+        beginTest("layerHoldsParamTruth: swap, reset and add also push with the flag down; layerAdded runs outside the flag");
+        {
+            EditableProcessor p(true);
+            p.truth = true;
+            p.addLayer(); p.addLayer();
+            p.clearLogs();
+            p.swapLayers(0, 1); p.resetLayer(1); p.addLayer();
+            expect(p.syncedFlagUp.size() == 4);
+            for (int f : p.syncedFlagUp)    expectEquals(f, 0);
+            for (int s : p.syncedSuspended) expectEquals(s, 0);
+            expect(p.addedFlagUp.size() == 1 && p.addedFlagUp[0] == 0, "layerAdded (file work in mu-Clid) is outside the flag");
+        }
+
+        beginTest("without layerHoldsParamTruth the flag stays up through layerAdded");
+        {
+            EditableProcessor p(true);
+            p.addLayer();
+            p.clearLogs();
+            p.addLayer();
+            expect(p.addedFlagUp.size() == 1 && p.addedFlagUp[0] == 1, "products whose audio reads the parameters keep the flag through the edit");
+        }
+
+        beginTest("layerHoldsParamTruth: swapLayers, resetLayer and addLayer sync exactly the touched slots");
+        {
+            EditableProcessor p(true);
+            p.truth = true;
+            p.addLayer(); p.addLayer();
+            p.setParam("v0_a", 0.8f); p.setParam("v2_a", 0.9f);
+            p.clearLogs();
+
+            expect(p.swapLayers(0, 2));
+            expect((p.synced == std::vector<int> { 0, 2 }), "both exchanged slots and not the one between");
+            expectNear(p.param("v0_a"), 0.8f); expectNear(p.param("v2_a"), 0.9f);
+
+            p.clearLogs();
+            p.resetLayer(1);
+            expect((p.synced == std::vector<int> { 1 }));
+
+            p.clearLogs();
+            p.setParam("v3_a", 0.7f);                 // a stale value in the spare slot the add is about to use
+            expectEquals(p.addLayer(), 3);
+            expect((p.synced == std::vector<int> { 3 }), "the new slot");
+            expectNear(p.param("v3_a"), 0.7f);
+            expect(p.order.back() == "synced", "the sync is the last hook before layerAdded");
+            for (int h : p.syncedHoldingLock) expectEquals(h, 0);
+        }
+
+        beginTest("without layerHoldsParamTruth the edits move the values themselves and never call syncSlotParams");
+        {
+            EditableProcessor p(true);
+            p.addLayer(); p.addLayer();
+            p.setParam("v1_a", 0.4f); p.setParam("v2_a", 0.6f);
+            p.clearLogs();
+            expect(p.removeLayer(1));
+            expect(p.synced.empty());
+            expectNear(p.param("v1_a"), 0.6f);
+            expectNear(p.param("v2_a"), 0.25f);
+            expect(p.swapLayers(0, 1));
+            p.resetLayer(0);
+            expect(p.synced.empty());
         }
     }
 };

@@ -9,25 +9,25 @@ Product-specific guidance for working in `mu-clid/`. Read alongside the family-w
 ## Build targets
 
 - `mu-clid` — full plugin (VST3 + CLAP + Standalone)
-- `mu-clid-tests` — console UnitTest runner; **`EXCLUDE_FROM_ALL TRUE`**, built on demand via `cmake --build build --target mu-clid-tests`. **Deliberate divergence from mu-tant-tests** (which builds every default build): mu-clid's Release build deploys to testers via OneDrive, and compiling the heavy 140-test suite (links `juce_audio_processors` + many cpps) on every tester-deploy build costs time for no deploy benefit. mu-tant is small + Debug-only/local, so building its tests every time is cheap. This is a build-speed concession, not family-consistency drift — keep the split unless the deploy-build cost stops mattering.
+- `mu-clid-tests` — console UnitTest runner; **`EXCLUDE_FROM_ALL TRUE`**, built on demand via `cmake --build build --target mu-clid-tests`. **Deliberate divergence from mu-tant-tests** (which builds every default build): compiling the heavy 140-test suite (links `juce_audio_processors` + many cpps) on every Release build costs time for no benefit. mu-tant is small + Debug-only/local, so building its tests every time is cheap. This is a build-speed concession, not family-consistency drift — keep the split unless the deploy-build cost stops mattering.
 
-Release build of `mu-clid_Standalone` triggers the OneDrive post-build deploy to `MUFAMILY_WIN_DIST`. Debug skips deploy. The installer requires Inno Setup.
+Release builds stay local. The installer requires Inno Setup.
 
 ## Source layout
 
 ```
 mu-clid/Source/
-├── Plugin/           PluginProcessor (+ _APVTS / _Content / _Modulation / _Internal), PluginEditor
+├── Plugin/           PluginProcessor (+ _APVTS / _Content / _Layers / _Modulation / _Internal), PluginEditor
 │                     (extends EditorShellBase), HotSwapStager + HotSwapBoundary, StandaloneApp
 ├── Audio/            SampleLibrary + SamplePreview (proc.samples)
-├── Sequencer/        Rhythm, HitGenerator, SequencerEngine, EuclideanGenerator,
-│                     RhythmManager (proc.rhythms)
+├── Sequencer/        HitGenerator, EuclideanGenerator, GeneratorAliases.h (Rhythm and
+│                     RhythmSequencer are shared from mu-core)
 ├── Modulation/       ModulationDestinations (ModDest::kTable), ModulationSnapshot, ModulationSkew
 ├── UI/               Euclidean panels + VoiceSection (Pitch/Filter/Amp
 │                     subsections; the Insert subsection + the ModulatorPanel /
 │                     ModMatrixPanel / ModulatorEditor / MixerOverlay are shared
-│                     from mu-core), RhythmCircle, RhythmMiniVisual, RhythmSidebar,
-│                     RhythmPanel, SampleBrowser, SettingsOverlay, MasterLoopSection
+│                     from mu-core), RhythmCircle, RhythmMiniVisual,
+│                     RhythmContent, SampleBrowser, SettingsOverlay, MasterLoopSection
 ├── Persistence/      PresetIO + PresetIO_HostState, PresetMigrations, RhythmParamTable + helpers
 ├── License/          LicenseChecker
 └── Tests/            juce::UnitTest suite
@@ -35,9 +35,9 @@ mu-clid/Source/
 
 All mu-Clid code is in namespace `mu_clid` (migrations in `mu_clid::migrate`); only `createPluginFilter` and `StandaloneApp.cpp` glue are global. `ScopedApvtsLoading` lives in `mu-core/Persistence` (`mu_core`).
 
-The editor shell (TransportBar, About, Save, PresetBrowser, MIDI-preset panels, StatusBar, overlay state machine, layout, keybindings) lives in `mu-core/UI/EditorShellBase.h` — `PluginEditor` extends it and supplies sidebar (`RhythmSidebar`) + main panel (`RhythmPanel`) + mixer overlay + settings overlay.
+The editor shell (TransportBar, About, Save, PresetBrowser, MIDI-preset panels, StatusBar, overlay state machine, layout, keybindings) lives in `mu-core/UI/EditorShellBase.h` — `PluginEditor` extends it and supplies the shared sidebar (`LayerSidebar`) + main panel (the shared `LayerPanel` holding `RhythmContent`) + mixer overlay + settings overlay.
 
-**Shared with mu-Clid MIDI.** `Sequencer/Rhythm`, `Sequencer/SequencerEngine`, `Sequencer/RhythmPlayState.h`, `Persistence/RhythmParamTable.h`, `Persistence/PresetHelpers.h`, `UI/EuclideanPanel` and `UI/RhythmCircle` are also compiled into [mu-clid-midi](../mu-clid-midi/CLAUDE.md) (a recorded exception until they move to mu-core). They must not include `Plugin/PluginProcessor.h`; `EuclideanPanel` takes a `ProcessorBase&`, and the live modulation arcs reach it through its `modulationSnapshot` callback.
+**Shared with mu-Clid MIDI.** `Sequencer/Rhythm`, `Sequencer/RhythmSequencer`, `Sequencer/RhythmPlayState.h`, `Persistence/RhythmParamTable.h`, `Persistence/PresetHelpers.h`, `UI/EuclideanPanel` and `UI/RhythmCircle` are also compiled into [mu-clid-midi](../mu-clid-midi/CLAUDE.md) (a recorded exception until they move to mu-core). They must not include `Plugin/PluginProcessor.h`; `EuclideanPanel` takes a `ProcessorBase&`, and the live modulation arcs reach it through its `modulationSnapshot` callback.
 
 ## Design documents
 
@@ -64,13 +64,15 @@ No stages are scheduled — mu-clid is feature-complete through Stage 34. New wo
 
 - **Each rhythm is its own APVTS subtree** — preset save/load + per-rhythm hot-swap rely on the subtree structure.
 - **Hot-swap uses `suspendProcessing` + `std::move`** — new `Rhythm` + `VoiceEngine` are staged on the message thread (`stageRhythmPreset`), committed atomically at the next loop boundary under a single suspend per `runDeferredWork` call (multi-rhythm bursts batch into one suspend). The "atomic pointer hot-swap" pattern (lock-free pointer exchange + message-thread cleanup queue for the old engine) is a v2 candidate if perceptible suspend-gap clicks become a complaint — current single-block silence gap (~1.33 ms at 48k/64) is short enough to be inaudible on percussive material, occasionally audible on sustained pads.
-- **RhythmSidebar item order supports variable ordering from day one** — required for v2 drag-to-reorder.
+- **LayerSidebar item order supports variable ordering from day one** — required for v2 drag-to-reorder.
 - **mu-link integration is STANDALONE-ONLY** — the bridge is the **shared header-only `mu-core/Link/MuLinkBridge.h`** (promoted from mu-clid in #902), `#include`d only by `StandaloneApp.cpp`, so VST3/CLAP never compile it and a plugin can never attach (the host owns the clock + device). It slaves the sequencer by handing the processor a `mu_link::MuLinkPlayHead`, so the existing `deriveTransport()`/`getPlayHead()` path follows mu-link with **no `processBlock` change**; when attached it detaches the processor from the local `AudioProcessorPlayer` and lets `MuLinkClient` drive it; on mu-link quit it reattaches the local device. Never add mu-link hooks to the shared `PluginProcessor` — keep them in the standalone TU. See [docs/mu-link/design-mulink.md](../docs/mu-link/design-mulink.md) §3.3.
 
 ## Key mu-clid patterns
 
-### PluginProcessor default rhythm
-`PluginProcessor` constructor always creates one default rhythm (16 steps, 4 hits). Never add a rhythm unconditionally in `PluginEditor` — check `getNumRhythms() == 0` first (the sidebar constructor calls `refreshItems()` which also reads the existing rhythm).
+### Rhythms are layers on the shared container
+The rhythms are `mu_core::Rhythm` layers owned by `ProcessorBase` (`keepSpareLayers`: all eight are built in the constructor, `numLayers` is the live count, `layersLock` guards the structural edits). There is no `RhythmManager`: add, delete, reorder and reset run in `ProcessorBase` / `LayerEditController`, exactly as in the other products, and the editor calls them through `LayerEditController` (its hooks unbind the modulator panel and `RhythmContent` before the layer changes). `RhythmSequencer` only binds a `Rhythm*` per slot and keeps the per-slot audio state; it does not own rhythms.
+
+What mu-Clid keeps per slot on the processor side (voice and MIDI engines, retired tails and their drained flags, play state, sample paths, previous-state flags) is moved by the hooks in `Plugin/PluginProcessor_Layers.cpp`, in the order the old locked sections used: `createLayer` (builds the slot's engines before any lock), `layersReordered` (remove and swap move the per-slot state under the lock), `layersMoved` (count and `Rhythm*` bindings), and `syncSlotParams` (after the unlock: APVTS push, pattern rebuild, engine params, freeing parked engines). Nothing is constructed or freed under `layersLock`. The constructor creates one default rhythm (16 steps, 4 hits); the editor never adds one.
 
 ### RhythmCircle sizing
 All ring radii are computed proportionally from `min(width, height) / 2 - margin`. Ring A outer = maxR, width = `maxR * 0.20`. Ring B starts at `ring_A_inner - gap`. Same for ring C (dashed). This makes the circle look correct at both the large (200px) panel size and the small (sidebar ~50px) size.

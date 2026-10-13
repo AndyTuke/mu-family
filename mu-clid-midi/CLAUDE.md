@@ -32,13 +32,13 @@ All code is in namespace `mu_clid_midi`; only `createPluginFilter` is global.
 
 ## Shared sequencer code (no longer an exception)
 
-`Rhythm`, `SequencerEngine`, `RhythmPlayState`, `RhythmParamTable` / `RhythmPresetHelpers`, `EuclideanPanel` and `RhythmCircle` live in `mu-core` (Stage 2b, done). This product compiles nothing from `mu-clid/` and `mu-clid/Source` is not on its include path, so its own `Plugin/PluginProcessor.h` is the only one in scope. Do not add a `mu-clid/` include or compile-in; if mu-Clid has code this product needs, it moves to `mu-core` first.
+`Rhythm`, `RhythmSequencer`, `RhythmPlayState`, `RhythmParamTable` / `RhythmPresetHelpers`, `EuclideanPanel` and `RhythmCircle` live in `mu-core` (Stage 2b, done). This product compiles nothing from `mu-clid/` and `mu-clid/Source` is not on its include path, so its own `Plugin/PluginProcessor.h` is the only one in scope. Do not add a `mu-clid/` include or compile-in; if mu-Clid has code this product needs, it moves to `mu-core` first.
 
 ## Product rules
 
 - **Layer type stays `Rhythm`, extension `.muRhythm`**, shared with mu-Clid (the one named exception to unique layer-type names).
 - **No licensing glue** (never `initLicensing`), **no modulation targets** (so no `mu_mod::ModTarget` table; `check-mod-targets.ps1` lists the product as modulation-free).
-- **One rhythm, slot 0.** The processor owns a `SequencerEngine` with exactly one `Rhythm`; there is no sidebar, voice section, mixer or preset browser.
+- **One rhythm, slot 0.** The processor owns a `RhythmSequencer` with exactly one `Rhythm`; there is no sidebar, voice section, mixer or preset browser.
 - **Audio-thread rules** as everywhere: `processBlock` allocates nothing, takes no lock (only a block that starts during a session restore is skipped; a skipped or bypassed block still flushes a pending note-off), and reads the two MIDI parameters through cached pointers. `parameterChanged` can run on the audio thread (VST3 automation): it only raises the parameter's dirty flag (found by binary search over a table built in the constructor); the message thread (a 30 Hz timer in `PluginProcessor`) reads the parameter's own raw value, writes the rhythm fields and rebuilds the pattern. `rhythmsLock` only serialises those message-thread writers; `voiceParamsLock` is not used here.
 - **New audio-path code goes in `MidiRhythmCore`**, not `PluginProcessor`, so the render tests cover it.
 - The host-session and state-restore code runs on the message thread under `suspendProcessing` + `rhythmsLock`.

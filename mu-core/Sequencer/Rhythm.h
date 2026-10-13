@@ -59,6 +59,12 @@ public:
     RelaxedInt          midiVelocity { 100 };   // 1..100 %
     RelaxedInt          midiAccent   { 0 };     // 0..100 %, as mu-Clid MIDI's Accent
 
+    // Resets this rhythm in place to the data of `fresh` (a default Rhythm the caller built before
+    // locking): the Euclid generators, logic, reset steps, legato and output settings are exchanged
+    // with it, then the base takes the voice parameters and modulators. Name and colour stay, and
+    // so does the address of every ControlSequence (the base exchanges those one by one).
+    void adoptDefaults(Layer& fresh) override;
+
     // Returns the combined hit pattern for one full cycle.
     // Length is resetSteps if set, otherwise the LCM of A and B step counts.
     std::vector<bool> getCombinedPattern() const;

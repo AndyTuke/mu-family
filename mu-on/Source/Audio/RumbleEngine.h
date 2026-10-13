@@ -35,6 +35,8 @@ public:
         delayBuf.setSize(2, juce::jmax(1, maxDelay));
         delayBuf.clear();
         writePos = 0;
+        dirty = false;
+        tailLeft = 0;
 
         filter.prepare(sampleRate, maxBlockSize, 2);
         filter.setType(0);   // LP12 final filter
@@ -71,21 +73,42 @@ public:
     // caller (GrooveVoices) at the current bar phase.
     void setBarEnvLevel(float v) noexcept { envLevel = juce::jlimit(0.0f, 1.0f, v); }
 
-    // Clear the delay line + filter state (e.g. on transport stop). The reverb tail decays.
-    void reset()
+    // Silence the engine: delay line, filters and reverb tail (transport stop, a slot changing hands).
+    // Costs nothing when the engine has not rendered since its last reset, so the processor can call
+    // it for every slot on a transport stop without clearing ~1 MB per idle slot.
+    void reset() noexcept
     {
-        delayBuf.clear();
-        writePos = 0;
-        filter.reset();
-        revLp.reset();
+        if (! dirty) return;
+        clearState();
+        dirty = false;
+        tailLeft = 0;
     }
 
     // Add the rumble produced from the kick feed `in` into `out` (both stereo, n samples).
-    void render(const juce::AudioBuffer<float>& in, juce::AudioBuffer<float>& out, int n)
+    // `inputIsSilence` marks a feed that is not a real source: once the delay taps and the reverb
+    // have had time to die away, the whole chain is skipped until a real feed returns.
+    void render(const juce::AudioBuffer<float>& in, juce::AudioBuffer<float>& out, int n, bool inputIsSilence = false)
     {
         const int ch = juce::jmin(2, juce::jmin(out.getNumChannels(), in.getNumChannels()));
         if (ch <= 0 || n <= 0) return;
         const int ns = juce::jmin(n, maxBlockSize);
+
+        // Tail bookkeeping: a real feed keeps the tail budget full; silence spends it, and the
+        // engine goes idle (state cleared once) when it is gone.
+        if (! inputIsSilence)
+            tailLeft = tailSamples();
+        else
+        {
+            if (tailLeft <= 0) return;
+            tailLeft -= ns;
+            if (tailLeft <= 0)
+            {
+                clearState();
+                dirty = false;
+                return;
+            }
+        }
+        dirty = true;
 
         // 1. Input drive (MultiModeFilter valve: 1+drv²·5 pre-gain, asymmetric soft-clip, √makeup).
         for (int c = 0; c < ch; ++c)
@@ -159,12 +182,26 @@ public:
     }
 
 private:
+    void clearState() noexcept
+    {
+        delayBuf.clear();
+        writePos = 0;
+        filter.reset();
+        revLp.reset();
+        reverb.reset();
+    }
+
+    // How long after the feed stops the delay taps (up to 3/16 of a bar at the slowest tempo) and the
+    // reverb tail can still be audible; a generous fixed bound.
+    int tailSamples() const noexcept { return (int) (sampleRate * 8.0); }
+
     MultiModeFilter filter, revLp;
     ReverbSlot      reverb;
     juce::AudioBuffer<float> delayBuf, scratch, revWet;
 
     double sampleRate = 44100.0, bpm = 120.0;
-    int    maxBlockSize = 512, writePos = 0;
+    int    maxBlockSize = 512, writePos = 0, tailLeft = 0;
+    bool   dirty = false;   // rendered since the last reset
     float  drv = 0.0f, lvl1 = 0.0f, lvl2 = 0.0f, lvl3 = 0.0f, revMix = 0.5f, envLevel = 1.0f;
 };
 

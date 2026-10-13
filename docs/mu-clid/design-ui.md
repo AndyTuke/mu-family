@@ -4,7 +4,7 @@
 
 ```
 TransportBar     36px  (top) — Stage 10
-RhythmSidebar   82px  (left, always visible)
+LayerSidebar   82px  (left, always visible)
 RhythmPanel or MixerOverlay  (remaining area)
 StatusBar        20px  (bottom, full width)
 ```
@@ -44,53 +44,39 @@ kAddBtnH = 34;   // add button at bottom
 - Hit pulse: sidebar item circle pulses with rhythm colour on each hit
 - Add rhythm button at bottom: dashed border, "+" prefix, always visible, disabled at 8 rhythms
 - Scrollable via `juce::Viewport` if more items than fit (unlikely with max 8)
-- Drag-to-reorder: fully implemented. `RhythmSidebar` supports variable item order.
+- Drag-to-reorder: fully implemented. `LayerSidebar` supports variable item order.
 - Deleted rhythm: item removed immediately, no placeholders
 - Right border line drawn in `paint()` to visually separate from main panel
 
 ## Rhythm Panel (main editing surface)
 
-Fixed vertical stacking. All values are Medium-baseline constants in `MuLookAndFeel.h`:
+The main panel is the family's shared `LayerPanel` stack ([design-ui-family.md section 5](../design-ui-family.md), "Per-layer panel stack"); mu-Clid supplies the 464 px content band (`RhythmContent`). All values are `MuLookAndFeel` tokens:
 
-```cpp
-kRhythmHeaderH = 28;   // header bar
-kSampleBarH    = 22;   // sample file bar
-kRhythmTopH    = 288;  // RhythmCircle + EuclideanPanel row height
-kCircleSize    = 288;  // RhythmCircle is square — width = kRhythmTopH
-kVoiceSectionH = 144;  // VoiceSection height
-kPanelPad      = 6;    // inset applied to each panel region
-// kModulatorPanelH = kRhythmPanelH - kRhythmHeaderH - kSampleBarH
-//                   - kRhythmTopH  - kVoiceSectionH                // 332
+```
+Header strip        32  (kLayerHeaderStripH) shared LayerHeaderBar: dot, name, preset dropdown, Save, Reset, Delete
+Content band       464  (kLayerContentH), RhythmContent:
+    Sample bar      32    sample LCD + Sample | MIDI selector (the same strip height as the header)
+    Circle row     288    RhythmCircle (kCircleSize, square) | EuclideanPanel (800 wide)
+    Voice band     144    VoiceSection (or, in MIDI output mode, the MIDI Out section)
+Modulator panel    318  (kLayerModulatorH) shared ModulatorPanel, absorbs banner loss
 ```
 
-Layout:
-```
-Header bar         28px — 4px colour accent strip | colour dot | rhythm name
-Sample bar         22px — placeholder text or filename. Drag+drop target. "..." browse icon right.
-[RhythmCircle 288 | EuclideanPanel 800]  top row, 288px high
-VoiceSection      144px
-ModulatorPanel    332px
-```
+The sample bar, circle row and voice band tile the content band exactly (32 + 288 + 144 = 464, `static_assert`ed in `RhythmContent.h`) with no flex panel.
 
 ### Header Bar
 
-- Left 4px: solid fill in rhythm colour (accent strip)
-- 10px colour dot at x=10, vertically centred
-- Rhythm name at x=26, font 13pt, `headingText` colour
-- Separator line at bottom (0.5px, `segmentInactiveBorder`)
-- *(Stage 10: + mute M, solo S, delete X buttons right-aligned; double-click name to rename; colour dot click opens palette)*
+The shared `LayerHeaderBar`, identical in every product (not described again here): colour dot (click opens the palette), layer name (click to rename), preset dropdown listing `.muRhythm` files, Save, Reset (circular arrow, confirms) and Delete (x, confirms). Mute and solo are on the mixer channel strip, not the header.
 
 ### Sample Bar
 
-- Background: `sampleBarBackground`
-- No sample state: italic "drop sample here or click to browse", colour `sampleBarNoSample`
-- Loaded state: filename, colour `#999` normal weight
-- Missing state: "sample missing — click to locate", colour amber `#EF9F27`
-- Right edge: "..." browse indicator (24px wide)
-- Click anywhere in bar → opens `juce::FileChooser`
-- Drag+drop: accepts `.wav .aiff .aif .mp3 .flac`
-- Separator line at bottom (0.5px)
-- *(Stage 10: + clear button, folder icon)*
+A 32 px strip holding the **sample LCD** (left, fills the strip) and the **Sample | MIDI** output selector (right end; see "Output mode" below).
+
+- No sample: ghost lettering "drop sample here or click to browse"
+- Loaded: the file name on the LCD
+- Missing: amber "Missing: <name> - click to find"; clicking locates a replacement
+- Browse mark at the LCD's right edge; click anywhere on the LCD opens `juce::FileChooser`
+- Drag and drop accepts `.wav .aiff .aif .mp3 .flac`
+- MIDI output mode: ghost lettering "MIDI output", browse mark hidden
 
 ### RhythmCircle
 
@@ -123,45 +109,39 @@ This lets the user see at a glance which gaps in the ring were created by which 
 
 ### EuclideanPanel
 
-Three knob rows (A, B, C) plus a 24px logic bar between A and B. One row per sequence, all controls in that row.
+The shared `mu_ui::EuclideanPanel` (mu-core, also used by mu-Clid MIDI). Three identical rows named by name plates, **Euclid A**, **Euclid B** and **Accent** (the Accent row is Euclid C, shaped exactly like A and B). Each row is three raised boxes plus, on the far right of the panel, one shared switch column:
 
-```cpp
-kLogicH = 24;                    // logic selector bar height
-// Rows A and B: Size 1 knobs (kKnobSize1W × kKnobSize1H = 88 × 70) — Steps,
-//   Hits, Rotate; then Size 3 knobs (kKnobSize3W × kKnobSize3H = 75 × 46) —
-//   Pre Pad, Post Pad, Insert Start, Insert Length, Insert Mode.
-// Row C: 3 × Size 1 knobs (Steps, Hits, Rotate only — no padding/insert).
+```
+[ Euclid box ] [ Pad box ] [ Insert box ]                      Trig | Leg
+ Steps Hits Rotate  PrePad[sw] PostPad[sw]  InsStart InsLen [sw]   Poly | Mono
 ```
 
-**All knob labels use full words — no abbreviations.**
+All knobs are Size 1 (`kKnobSize1W` x `kKnobSize1H` = 68 x 70). **All knob labels use full words, no abbreviations, no units.**
 
-**Euclid A — single row** (8 controls):
-1. Steps `1–64` — purple (`knobEuclidean`)
-2. Hits `0–steps` — purple (`knobEuclidean`)
-3. Rotate `0–(steps-1)` — purple (`knobEuclidean`)
-4. Pre Pad `0–12` — cyan-teal (`knobPrePad`)
-5. Post Pad `0–12` — teal (`knobPostPad`)
-6. Insert Start `0–(steps-1)` — pink (`knobInsertPad`)
-7. Insert Length `0–8` — pink (`knobInsertPad`)
-8. Insert Mode toggle `Pad / Mute` — pink (`Warning` style), centred vertically in cell
+| Box | Controls | Colour |
+|---|---|---|
+| Euclid | Steps `1-64`, Hits `0-steps`, Rotate `0-(steps-1)` | `knobEuclidean` purple (Accent row: `knobLevel` amber) |
+| Pad | Pre Pad `0-12`, Post Pad `0-12`, each with its own **Pad / Mute** `SlideSwitch` beside the knob | `knobPrePad` cyan-teal, `knobPostPad` teal |
+| Insert | Insert Start `0-(steps-1)` (shown from 1), Insert Length `0-8`, one shared **Pad / Mute** switch to their right | `knobInsertPad` pink |
 
-**Logic bar** (24px, full width, Pills style):
-- Five pills: `OR  AND  XOR  A Only  B Only`
-- Maps to `Logic::OR, AND, XOR, AOnly, BOnly`
+The Accent row has the same Pad and Insert boxes as A and B (it is not reduced to three knobs). Row geometry (box heights, gaps, plate size, switch gaps) comes from `EuclideanPanel` constants derived from `MuLookAndFeel` tokens; the Euclid, Pad and Insert box widths are what is left of the 786 px inner width after the switch column (`kModeColW`).
 
-**Euclid B — single row**: identical layout and colour coding to A row.
+**Pad | Mute:** Pad takes the silent steps out of the pattern and spreads the hits over the rest; Mute keeps the pattern spread over every step and silences the hits that land in the silent steps. The status bar spells out the current setting.
 
-**Euclid C (Accent) — single row** (3 controls):
-- Steps `1–64` — amber (`knobLevel`)
-- Hits `0–steps` — amber (`knobLevel`)
-- Rotate `0–(steps-1)` — amber (`knobLevel`)
-- No padding or insert controls — accent shapes hit emphasis, not timing
+**Logic selector.** One `DropdownSelect` (`getLogicControl()`, `kLogicDropW` x `kLogicDropH`) placed by `RhythmContent` in the bottom-right corner of the circle panel, just inside its border, over the circle's empty corner. `kLogicDropW` 64 x `kLogicDropH` 15. Five choices shown as logic symbols (the status bar spells each out): `A ∨ B` (OR), `A ∧ B` (AND), `A ⊕ B` (XOR), `A∧¬B` (A not B), `B∧¬A` (B not A); param `r{N}_logic`. It is not in the panel's own bounds.
 
-The accent pattern marks which hits are accented (higher velocity / emphasis). Steps where A or B coincide with a C hit are treated as accented. The C ring displays as dashed amber between ring B and the mod rings.
+**Trig | Leg and Poly | Mono.** Two `SlideSwitch`es stacked in the right-hand column (`legatoCtrl` over `monoCtrl`, centred on the panel height, `kModeSwGap` apart).
+- **Trig | Leg** (`r{N}_patLeg`, Pattern Legato): Trig retriggers the pitch, filter and amp envelopes on every hit; Leg lets back-to-back hits skip the retrigger so the envelopes ride through them as one note.
+- **Poly | Mono** (`r{N}_vMono`): Poly gives each hit its own voice; Mono lets each hit cut off the one before.
+- Both are **voice-engine switches**: they act on the sample voice, so they are meaningful only where there is a voice. See "Shared switches in mu-Clid MIDI" below.
 
-Ranges update dynamically: when Steps changes, Hits max, Rotate range, and Insert Start max all clamp to the new steps value.
+**Accent (Euclid C).** Marks which hits are accented: a step where the combined A and B pattern fires at the same time as a C hit is accented. The accent gain is the Accent knob of the Amp box (sample mode) or of the MIDI Out section (MIDI mode). The C ring is the dashed amber ring between ring B and the mod rings.
 
-*(Stage 10: + mute toggles per section)*
+Ranges update dynamically: when Steps changes, Hits max, Rotate range and Insert Start max clamp to the new value, and the pads and insert can never use more steps than the pattern has.
+
+### Shared switches in mu-Clid MIDI (ruled 2026-10-12)
+
+mu-Clid MIDI has no voice, so **Trig | Leg and Poly | Mono do nothing there** (its `MidiRhythmCore` never reads `patternLegato` or `voiceMono`; every hit is one fixed-length note, 20 ms). They are hidden in mu-Clid MIDI, not relabelled and not kept: a control that changes nothing is a lie in a product whose whole interface is its sequencer. The `patLeg` and `vMono` parameters stay in the parameter layout and in saved state (so `.muRhythm` presets and old sessions stay compatible and the ids never change); only the controls are hidden. The switch column is left empty (the panel layout does not reflow), so the Pad and Insert boxes line up with mu-Clid's. If MIDI ever gains a gate length, Leg (tie to a held note) and Mono (cut the last note) would become meaningful and the switches return, with a status-bar wording about notes rather than envelopes; that is a new ruling, not a revert.
 
 ### Pad Colour System
 
@@ -177,57 +157,52 @@ The existing `knobPadding` ColourId is retained as a legacy alias for `knobPostP
 
 ### VoiceSection
 
-Four-column panel, 144px tall. Three 6px dividers separate the columns. A 14px label row names each column; the remaining height splits into two equal rows (config row + envelope row) with a 4px gap.
+The shared `VoiceBand` (mu-core) filled with mu-Clid's subsections: 144 px tall, four raised boxes **Pitch | Filter | Amp | Effects** with name plates in a 14 px plate band (`kVoiceLabelH`) and a 6 px divider (`kVoiceDivW`) between boxes; below the plates, two Size 2 knob rows (`kKnobSize2H` 56) 4 px apart (`kVoiceGap`), 116 px tall (`kVoiceSubH`). The band starts `kLeftGap` (7) in so the Pitch box clears the panel's corner screw.
 
 ```
-kVoiceUnitW = 55      // Size 2 knob width — drives every voice cell
-kVoiceDivW  = 6       // divider between sub-panels
-kVoicePitchW = kVoiceFilterW = kVoiceAmpW = 5 × kVoiceUnitW   // 275 each
-kVoiceInsertW = 4 × kVoiceUnitW                               // 220
+kVoiceUnitW = 54       // Size 2 knob cell width (= kKnobSize2W)
+kVoiceFilterColW = 50  // Filter's narrower column
+Pitch   4 x 54  = 216      Filter  6 x 50 = 300      Amp  4 x 54 = 216
+Effects = 308 (324 less kLeftGap; the three sends are right-aligned in its top row)
 ```
 
-**Column layout:**
+**Column layout (as built):**
 
 ```
-PITCH (5 kW)               FILTER (5 kW)                AMP (5 kW)           INSERT (4 kW)
-────────────────────────   ──────────────────────────   ──────────────────   ──────────────────
-Row 1 (config):            Row 1 (config):              Row 1 (config):      Row 1 (config):
-  Octave | Semi | Fine       Type(2) | Cutoff | Res       Level | SendEff | SendDly | SendRev | Accent   Character (full-width dropdown)
-Row 2 (envelope):          Row 2 (envelope):            Row 2 (envelope):    Row 2 (config):
-  Atk|Dec|Sus|Rel|Depth      Atk|Dec|Sus|Rel|Depth        Atk|Dec|Sus|Rel     Drive | Output (or Rate in Bitcrusher mode) | LPF
+PITCH (4 cols)               FILTER (6 cols)                      AMP (4 cols)               EFFECTS
+Row 1:                       Row 1:                               Row 1:                     Row 1:
+  Octave|Semitone|Fine|Depth   Type (2 cols)|Drive|Cutoff|Res|Low Cut   Level|Accent|(gap)|Pan   Insert dropdown | Effect | Delay | Reverb sends
+Row 2 (envelope):            Row 2 (envelope):                    Row 2 (envelope):          Row 2:
+  Atk|Dec|Sus|Rel              Atk|Dec|Sus|Rel|Depth                Atk|Dec|Sus|Rel            4 insert slot knobs
 ```
 
-**All knob labels use full words — no abbreviations.**
+**All knob labels use full words, no abbreviations, no units** (units appear in the status bar). The Pitch envelope Depth sits in row 1 above Release, so Pitch needs only four columns.
 
 **Pitch** (purple, `knobEuclidean`):
-- Config: Octave −4..+4 (step 1), Semitones −12..+12 (step 1), Fine −100..+100 cents (step 0.1)
-- Envelope: Attack 0.001–5s, Decay 0.001–5s, Sustain 0–1, Release 0.001–10s, Depth 0–24 semitones
+- Octave -3..+3 (step 1), Semitone -12..+12 (step 1), Fine -100..+100 cents (step 1)
+- Envelope: Attack, Decay, Release 0-10 s (skew 0.3), Sustain 0-100, Depth 0-24 semitones (row 1, column 4)
 
 **Filter** (teal, `knobPostPad`):
-- Config: Type selector (`DropdownSelect`, 1 kW — 16 modes: LP 6 / LP 12 / LP 24 / BP 12 / BP 24 / HP 6 / HP 12 / HP 24 / Notch / Notch 24 / AP 12 / Comb + / Comb − / Peak / Lo Shf / Hi Shf), Cutoff 20–20000Hz (2 kW), Resonance 0–0.99 (2 kW)
-- Envelope: Attack 0.001–5s, Decay 0.001–5s, Sustain 0–1, Release 0.001–10s, Depth 0–12 semitones of cutoff sweep (#334)
+- Row 1: Type (`DropdownSelect`, 2 cols, half row height, `kDropdownEdgeGap` off the box edge; 16 modes in the canonical `populateFilterTypeDropdown` order: LP 6 / LP 12 / LP 24 / BP 12 / BP 24 / HP 6 / HP 12 / HP 24 / Notch / Notch 24 / AP 12 / Comb + / Comb - / Peak / Lo Shf / Hi Shf), Drive 0-100, Cutoff 20-20000 Hz (mid-point skew 640 Hz), Resonance 0-0.99 (shown 0-100), Low Cut 0-1000 Hz (0 reads Off)
+- Envelope: Attack, Decay, Release 0-10 s, Sustain 0-100, Depth 0-48 semitones of cutoff sweep
 
 **Amp** (amber, `knobLevel`):
-- Config: Level 0–2, Accent 0–+12 dB
-- Envelope: Attack 0.001–5s, Decay 0.001–5s, Sustain 0–1, Release 0.001–10s
+- Row 1: Level -60..+6 dB (bottom reads -inf), Accent 0..+12 dB, Pan -1..+1 (column 4, no value text on the knob; the same pan as the mixer strip)
+- Envelope: Attack, Decay, Release 0-10 s (Release at 10 reads End), Sustain 0-100
 
-**Accent** — when a step is accented (Ring C fires coincident with a Ring A+B hit), the amplitude of that step is boosted by this amount above the base Level. 0 dB = no accent effect. Amber (`knobLevel`), sits immediately right of Level in the config row.
+**Accent.** When a step is accented (Ring C fires with a Ring A+B hit), that step's amplitude is boosted by the Accent amount above Level. 0 dB = no accent effect. The Accent knob sits immediately right of Level.
 
-*(Stage 13: + FX send knobs on Amp config row — Effect, Delay, Reverb; will require Amp column to expand to 5 kW, adjusting the 18-unit grid)*
+**Effects** (`knobInsertPad` pink; the shared `InsertSubsection` plus the three sends):
+- Row 1: Insert Character dropdown (narrowed so the sends fit; `setAlgoWidth`) and the three FX sends **Effect, Delay, Reverb** (0-100, `knobFxSend` coral; the Effect send is relabelled with the mixer's current effect name, for example "Phaser"). They are the same sends as on the mixer channel strip, 51 px wide (`kSendColW`), right-aligned so the box ends short of the panel's corner screw.
+- Row 2: 4 slot knobs whose labels, ranges and meaning are set per algorithm by the shared `kInsertAlgoSlots` table (e.g. Drive / Output / Dither / LPF for Soft Clip; Bits / Rate / Dither / LPF for Bitcrusher; Threshold / Ratio / Attack / Release for Compressor; Low / Mid / Mid Hz / High for 3-Band EQ). Per-algorithm values are cached so switching algorithms restores the last values for each.
+- 14 algorithms, alphabetised after None: None / 3-Band EQ / Bitcrusher / Clipper / Compressor / Fold / Hard Clip / Karplus-Strong / Limiter / Ring Mod / Soft Clip / Tape Sat / Vocoder / Vocoder St. None passes audio through at unity. Character switch is message-thread only.
 
-**INSERT** (`knobInsertPad` pink — same colour family as the insert pad to signal it is a per-voice insert effect):
-- Config row 1: Character (`DropdownSelect`, full-width) — 14 algorithms, alphabetised in the dropdown: None / 3-Band EQ / Bitcrusher / Clipper / Compressor / Fold / Hard Clip / Karplus-Strong / Limiter / Ring Mod / Soft Clip / Tape Sat / Vocoder / Vocoder St.
-- Config row 2: 4 knobs whose labels, ranges and meaning are reconfigured per-algorithm by `configureInsertAlgorithm()` (e.g. Drive / Output / Dither / LPF for Soft Clip; Bits / Rate / Dither / LPF for Bitcrusher; Threshold / Ratio / Attack / Release for Compressor; Low 200 / Mid dB / Mid Hz / High 8k for 3-Band EQ, etc.). Per-algorithm knob snapshots are cached in `insertSnapshots[14]` so switching algorithms restores the user's last values for that algorithm.
-- No envelope row (Insert has no ADSR). Bottom row is blank — drawn as empty space so the section border still frames correctly.
-- Character = None passes audio through unity.
-- Character switch is message-thread only (same constraint as `EffectSlot::setAlgorithm`).
-
-**Output mode (Sample / MIDI), ruled 2026-10-11.** The earlier idea of a header-bar dropdown is dropped: the header bar is the shared `ChannelHeaderBar` (dot, name, reset, delete, preset, Save), identical in every product, and has no room or place for a product control. The selector lives in mu-Clid's own content band, in the **sample bar** strip (32 px, the first row under the header strip):
+**Output mode (Sample / MIDI), ruled 2026-10-11.** The earlier idea of a header-bar dropdown is dropped: the header bar is the shared `LayerHeaderBar` (dot, name, reset, delete, preset, Save), identical in every product, and has no room or place for a product control. The selector lives in mu-Clid's own content band, in the **sample bar** strip (32 px, the first row under the header strip):
 
 - **Selector:** a `SegmentControl`, `DrawStyle::Lcd`, `ActiveStyle::General`, items **Sample** and **MIDI**, at the right end of the sample bar, **112 px wide** (2 x 56, `RhythmPanel::kOutputSelectorW`) and `kStripDisplayH` (20 px) tall, vertically centred, its right edge `kScrewedPanelInset` (9 px) from the strip end so it clears the corner screw (non-screw style: `kHeaderInsetX`). The sample LCD takes the rest of the strip and stops `kSpaceXS` (4 px) short of the selector. Per rhythm; param `r{N}_outMode` (0 Sample, 1 MIDI), default Sample. Status bar: `Output` / `Sample (plays the loaded sample)` or `MIDI (sends notes, no audio from this rhythm)`.
 - **Sample mode:** unchanged.
 - **MIDI mode:** the sample LCD shows ghost lettering "MIDI output" and its browse mark is hidden; the 144 px voice band is replaced by **one raised section "MIDI Out"** (`drawSections`, name plate) of the same 144 px height, holding, left to right: **Note** (`DropdownSelect` of note names, the same list as mu-Clid MIDI's note selector, default 36), **Channel** (`DropdownSelect` 1 to 16, default 1), **Velocity** (`KnobWithLabel`, `knobLevel`, 1 to 100 %, default 100), **Accent** (`KnobWithLabel`, `knobLevel`, 0 to 100 %, default 0; adds to the velocity of accented hits, as mu-Clid MIDI's Accent knob does). Param ids `r{N}_midiNote`, `r{N}_midiChan`, `r{N}_midiVel`, `r{N}_midiAccent`; none is a modulation target in this first version (a target would be one appended `ModTarget` row later).
-- **Built sizes (commit 7a83b42, `MidiOutSection.h`).** Box: x = `VoiceBand::kLeftGap` (7, where the Pitch box starts), y = `kVoiceLabelH` (14), **324 px wide** (6 x `kVoiceUnitW` 54: Note 2 cols = 108, Channel 2 cols = 108, Velocity 1 col = 54, Accent 1 col = 54), `kVoiceSubH` (116) tall; it is wider than the 216 px Pitch box and ends inside the Effects box edge (static_assert). One control row of `kKnobSize2H` (56) centred in the box. Each dropdown cell: engraved caption ("Note" / "Channel", `kKnobLabelFont` 10, `labelText`) in a 14 px band, then the `DropdownSelect` 2 px below it, 28 px tall (`kKnobSize2H / 2`), kept `kDropdownEdgeGap` (6) off each side of its cell, so 96 px wide. The Note popup lists all 128 notes (C-2 style names from `midiNoteName`, id = note + 1); Channel lists 1 to 16.
+- **Built sizes (commit 7a83b42, `MidiOutSection.h`).** Box: x = `VoiceBand::kLeftGap` (7, where the Pitch box starts), y = `kVoiceLabelH` (14), **324 px wide** (6 x `kVoiceUnitW` 54: Note 2 cols = 108, Channel 2 cols = 108, Velocity 1 col = 54, Accent 1 col = 54), `kVoiceSubH` (116) tall; it is wider than the 216 px Pitch box and ends inside the Effects box edge (static_assert). One control row of `kKnobSize2H` (56) centred in the box. Each dropdown cell: engraved caption ("Note" / "Channel", `kKnobLabelFont` 10, `labelText`) in a 14 px band, then the `DropdownSelect` 2 px below it, 28 px tall (`kKnobSize2H / 2`), kept `kDropdownEdgeGap` (6) off each side of its cell, so 96 px wide. The Note popup lists all 128 notes named C-1 to G9 by `mu_core::midiNoteName` (middle C = note 60 = C4, so the default note 36 is C2; id = note + 1); Channel lists 1 to 16.
 - **Mixer:** a MIDI-mode rhythm's strip is drawn inactive (`MixerChannel::setActive(false)`, through the `MixerOverlay::isChannelSilent` hook set in the mu-Clid editor) and its sends and voice controls are ignored; it makes no audio.
 - **Sidebar and header:** unchanged (the mini-circle still pulses on hits; a small "MIDI" tag is not added).
 - **Fit:** the section is 144 px tall in the 144 px band (same as the voice band) and 324 px wide, well inside the 1088 px panel.

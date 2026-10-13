@@ -5,8 +5,12 @@
 #include "UI/MixerOverlay.h"
 #include "UI/MasterLoopSection.h"
 #include "Plugin/PluginProcessor.h"
-#include "UI/VoicePanel.h"
+#include "UI/LayerPanel.h"        // mu-core shared per-layer panel shell
+#include "UI/ConfirmDialog.h"
+#include "UI/PatternContent.h"
+#include "Modulation/MuTantModDest.h"
 #include "UI/LayerSidebar.h"
+#include "UI/LayerEditController.h"
 #include "UI/PatternMiniVisual.h"
 #include "UI/SettingsOverlay.h"
 
@@ -29,7 +33,10 @@ public:
 private:
     PluginProcessor&  proc;
     LayerSidebar      sidebar;
-    VoicePanel        voicePanel;
+    ModDestProvider   modDestProvider = makeModDestProvider();
+    PatternContent    patternContent;
+    LayerPanel        layerPanel;
+    mu_ui::LayerEditController layerEdit;   // add / delete / reorder glue; after the sidebar and panel
     MixerOverlay      mixerOverlay;
     SettingsOverlay   settingsOverlay;
     MasterLoopSection masterLoop;

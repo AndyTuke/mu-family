@@ -180,6 +180,9 @@ public:
 
         // Status lamps: a fault (e.g. MIDI clock lost) — its own red, not the VU clip red.
         indicatorFault          = 0x100000d7,
+        // Destructive dialog button (Warning-icon ModalDialog primary): dark red fill;
+        // its border and text use indicatorFault.
+        buttonDangerBg          = 0x100000d8,
 
         // ── Modulator label colours A–H ───────────────────────────────────
         // Named tokens for the per-modulator label palette so that all colour
@@ -351,33 +354,29 @@ public:
     static constexpr int kStatusBarH    = 20;
     static constexpr int kSidebarW      = 82;   // the shared LayerSidebar width
 
-    // ── RhythmPanel regions (derived from the window minus chrome) ────────
-    // Main area: 1088 × 814 at default. RhythmPanel internal headers consume
-    // 28 (rhythm header) + 22 (sample bar) + 144 (voice section row) = 194
-    // px of vertical space before the dynamic top half / mod half split.
+    // ── Layer panel bands (derived from the window minus chrome) ──────────
+    // Main area: 1088 × 814 at default, tiled by the shared LayerPanel into three bands:
+    // a 32 px preset strip, a 464 px product content band, and the 318 px modulator panel.
     static constexpr int kChannelPanelW    = kWindowWidth - kSidebarW;                          // 1088
     static constexpr int kChannelPanelH    = kWindowHeight - kTransportBarH - kStatusBarH;      // 814
-    static constexpr int kChannelHeaderH   = 28;
-    static constexpr int kSampleBarH      = 22;
-    static constexpr int kVoiceSectionH   = 144;
-    // contentH = 814 - 28 - 22 - 144 = 620. Top half locks to 288 because
-    // the modulator minimum of 332 px takes the rest (avail = contentH - 332 = 288;
-    // raw 0.55 × contentH = 341 → clamped to avail).
-    static constexpr int kChannelTopH      = 288;
-    static constexpr int kCircleSize      = kChannelTopH;                                       // square
-    static constexpr int kEuclidPanelW    = kChannelPanelW - kCircleSize;                       // 800
-    static constexpr int kEuclidPanelH    = kChannelTopH;                                       // 288
-    static constexpr int kVoiceSectionW   = kChannelPanelW;                                     // 1088
-    static constexpr int kModulatorPanelW = kChannelPanelW;                                     // 1088
-    static constexpr int kModulatorPanelH = kChannelPanelH - kChannelHeaderH
-                                          - kSampleBarH - kChannelTopH - kVoiceSectionH;        // 332
-
-    // ── Shared per-layer panel bands (LayerPanel): header strip + product content + modulator ──
-    static constexpr int kLayerHeaderStripH = 32;    // preset strip holding the 28 px ChannelHeaderBar
+    static constexpr int kLayerHeaderStripH = 32;    // preset strip holding the 28 px LayerHeaderBar
     static constexpr int kLayerModulatorH   = 318;   // the shared ModulatorPanel
     static constexpr int kLayerContentH     = kChannelPanelH - kLayerHeaderStripH - kLayerModulatorH;   // 464
     static_assert(kLayerHeaderStripH + kLayerContentH + kLayerModulatorH == kChannelPanelH,
                   "layer panel bands must fill the channel panel");
+
+    // ModalDialog header icon (design-ui-family section 5): vector box, gap to the title, stroke.
+    static constexpr int   kDialogIconSize   = 26;
+    static constexpr int   kDialogIconGap    = 6;
+    static constexpr float kDialogIconStroke = 1.6f;
+
+    // mu-Clid's content band: sample bar (the strip height) + circle row + voice band = 464.
+    static constexpr int kVoiceSectionH   = 144;
+    static constexpr int kCircleSize      = kLayerContentH - kLayerHeaderStripH - kVoiceSectionH;   // 288
+    static constexpr int kEuclidPanelW    = kChannelPanelW - kCircleSize;                       // 800
+    static constexpr int kEuclidPanelH    = kCircleSize;                                        // 288
+    static constexpr int kVoiceSectionW   = kChannelPanelW;                                     // 1088
+    static constexpr int kModulatorPanelW = kChannelPanelW;                                     // 1088
 
     // ── Spacing scale ─────────────────────────────────────────────────────
     // Gaps and padding belong to the design system rather than to whichever panel
@@ -398,6 +397,11 @@ public:
     // big inner panels — these are the actual usable widths for layout math.
     static constexpr int kPanelPad        = kSpaceS;
     static constexpr int kDropdownEdgeGap = kSpaceS;   // space between a dropdown and the edge of its box / panel
+    // The Root / Scale row (mu-Tant's tonal centre): label, root and scale selector widths and the gap between pairs.
+    static constexpr int kTonalLabelW = 44;
+    static constexpr int kTonalRootW  = 56;
+    static constexpr int kTonalScaleW = 100;
+    static constexpr int kTonalGap    = 12;
     static constexpr int kAddButtonW      = 110;       // "+ Target" / "+ Assignment" (metal: a normal button, centred)
     static constexpr int kChannelInset     = kPanelPad + 1;                                     // 7
     static constexpr int kCircleInnerSize = kCircleSize     - 2 * kChannelInset;                // 274
@@ -406,7 +410,7 @@ public:
     static constexpr int kVoiceInnerW     = kVoiceSectionW  - 2 * kChannelInset;                // 1074
     static constexpr int kVoiceInnerH     = kVoiceSectionH  - 2 * kChannelInset;                // 130
     static constexpr int kModulatorInnerW = kModulatorPanelW - 2 * kChannelInset;               // 1074
-    static constexpr int kModulatorInnerH = kModulatorPanelH - 2 * kChannelInset;               // 318
+    static constexpr int kModulatorInnerH = kLayerModulatorH - 2 * kChannelInset;               // 304
 
     // ── VoiceSection sub-panel widths ─────────────────────────────────────
     // mu-Clid's VoiceSection lays out its own variant (see VoiceSection.h); these are the
@@ -630,6 +634,7 @@ public:
     static constexpr int kClientDbH       = 18;   // dB readout under the fader
     static constexpr int kClientDbGap     = 4;    // dB readout to the mute / solo row
     static constexpr int kClientButtonH   = 24;   // mute / solo row
+    static constexpr int kClientLampH     = 14;   // the Dropouts lamp row under mute / solo (plus kClientDbGap above it)
     static constexpr int kClientBottomGap = 6;    // keeps the mute / solo row off the panel border
     static constexpr int kClientFaderMinH = 40;
     static constexpr float kClientFaderMax   = 1.5f;   // linear gain at the top of the travel

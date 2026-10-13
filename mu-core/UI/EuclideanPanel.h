@@ -58,6 +58,14 @@ public:
     // its own child and sizes it to kLogicDropW x kLogicDropH.
     DropdownSelect& getLogicControl() noexcept { return logicCtrl; }
 
+    // Show or hide the Trig|Leg and Poly|Mono switches. A MIDI-only product hides them: the
+    // controls do nothing there, and the column stays empty so the Pad / Insert boxes still line up.
+    void setVoiceModeSwitchesVisible(bool visible)
+    {
+        legatoCtrl.setVisible(visible);
+        monoCtrl.setVisible(visible);
+    }
+
     // Logic dropdown size: the narrowest that still fits the widest item ("B not A")
     // beside the ComboBox chrome (6 px left pad + arrow, 24 px in all).
     // Logic modes (APVTS "logic" index order) as logic symbols: A∨B, A∧B, A⊕B, A∧¬B, B∧¬A.

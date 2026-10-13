@@ -66,7 +66,7 @@ void ProcessorBase::drainPendingMidiProgramChanges()
 
     int start1, size1, start2, size2;
     pcFifo.prepareToRead(ready, start1, size1, start2, size2);
-    const int activeChannels = getNumActiveChannels();
+    const int activeChannels = getNumActiveLayers();
 
     auto handle = [this, activeChannels](const ProgramChangeEvent& ev)
     {
@@ -98,7 +98,7 @@ bool ProcessorBase::perform(const mu_core::ControlAction& a)
     // The layer strip's own mute / solo parameter, flipped.
     auto flipStrip = [this, &a](const char* rest)
     {
-        if (a.layer < 0 || a.layer >= getNumChannels()) return false;
+        if (a.layer < 0 || a.layer >= getNumLayers()) return false;
         auto* p = apvts.getParameter("ch" + juce::String(a.layer) + "_" + rest);
         if (p == nullptr) return false;
         gestureHold.set(*p, p->getValue() > 0.5f ? 0.0f : 1.0f);
@@ -510,23 +510,33 @@ namespace
     // layersLock protects the pointer moves in every host. layerEditInFlight additionally tells a
     // product's audio thread to skip rendering until the parameter moves have finished, so no
     // block plays a moved layer with half-shifted parameters.
+    // layerEditInFlight is a flag, not a counter: edits never nest (all run on the message thread,
+    // one at a time), and a nested guard would lower the flag early. release() ends the guard
+    // early for a product whose audio never reads the moved parameters (layerHoldsParamTruth).
     struct ScopedSuspend
     {
         explicit ScopedSuspend(ProcessorBase& p) : proc(p), wasSuspended(p.isSuspended())
         {
+            jassert(! proc.layerEditInFlight.load(std::memory_order_relaxed));   // edits do not nest
             proc.layerEditInFlight.store(true, std::memory_order_release);
             proc.suspendProcessing(true);
         }
-        ~ScopedSuspend()
-        {
-            proc.suspendProcessing(wasSuspended);
-            proc.layerEditInFlight.store(false, std::memory_order_release);
-        }
+        ~ScopedSuspend() { release(); }
         ScopedSuspend(const ScopedSuspend&)            = delete;
         ScopedSuspend& operator=(const ScopedSuspend&) = delete;
 
+        // Resumes processing and lowers the flag; a second call does nothing.
+        void release()
+        {
+            if (released) return;
+            released = true;
+            proc.suspendProcessing(wasSuspended);
+            proc.layerEditInFlight.store(false, std::memory_order_release);
+        }
+
         ProcessorBase& proc;
         const bool     wasSuspended;
+        bool           released = false;
     };
 
     // Calls fn(param, idSuffix) for every ranged parameter whose id starts with `prefix`.
@@ -602,6 +612,39 @@ void ProcessorBase::remapSidechainSources(const std::function<int(int)>& remap)
         remapOne(ret);
 }
 
+juce::ValueTree ProcessorBase::captureComposedState()
+{
+    auto state = mu_pp::captureState(apvts.state.getType(), layerLayout, layerExtras);
+    if (canEditLayers())
+    {
+        // The colour is a slot's identity, not part of its sound, so it lives on the full state, not in a layer node.
+        juce::StringArray colours;
+        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            colours.add(juce::String(layers[(size_t) i] != nullptr ? layers[(size_t) i]->colourIndex : i));
+        state.setProperty("numVoices", numLayers.load(std::memory_order_relaxed), nullptr);
+        state.setProperty("voiceColours", colours.joinIntoString(","), nullptr);
+    }
+    return state;
+}
+
+void ProcessorBase::applyComposedState(const juce::ValueTree& state)
+{
+    mu_pp::applyState(state, layerLayout, layerExtras);
+    if (! canEditLayers()) return;
+
+    // Count last, so the audio thread never sees a count ahead of the data; then the colours (a state without colours keeps the current ones).
+    numLayers.store(savedLayerCount(state));
+    const auto toks = juce::StringArray::fromTokens(state.getProperty("voiceColours", "").toString(), ",", "");
+    for (int i = 0; i < mu_limits::kMaxLayers && i < toks.size(); ++i)
+        if (layers[(size_t) i] != nullptr)
+            layers[(size_t) i]->colourIndex = juce::jlimit(0, mu_limits::kMaxLayers - 1, toks[i].getIntValue());
+}
+
+int ProcessorBase::savedLayerCount(const juce::ValueTree& state) const
+{
+    return juce::jlimit(1, mu_limits::kMaxLayers, (int) state.getProperty("numVoices", unsavedLayerCount));
+}
+
 int ProcessorBase::firstUnusedColourIndex() const
 {
     std::array<bool, mu_limits::kMaxLayers> used {};
@@ -642,7 +685,19 @@ int ProcessorBase::addLayer()
     }
 
     // Phase 3: the slot's parameters back to defaults, still suspended so no block sees stale values.
-    resetLayerParams(n);
+    // Where the layer data is the truth the audio never reads these parameters, so processing resumes
+    // first: the product's push runs beside live audio, as any edit of its own parameters does, and
+    // layerAdded (which may read files) runs outside the edit's scope too.
+    if (layerHoldsParamTruth())
+    {
+        suspend.release();
+        syncSlotParams(n);
+    }
+    else
+    {
+        resetLayerParams(n);
+    }
+    layerAdded(n);
     return n;
 }
 
@@ -675,19 +730,29 @@ bool ProcessorBase::removeLayer(int idx)
         for (int d = idx; d < n - 1; ++d)
         {
             mixerEngine.channels[(size_t) d].copyFrom(mixerEngine.channels[(size_t) (d + 1)]);
-            mixerEngine.resetSidechainEnv(d);
+            mixerEngine.moveSidechainEnv(d + 1, d);   // the follower moves with its strip
             layers[(size_t) d]->onMoved(d);
         }
         mixerEngine.channels[(size_t) (n - 1)].reset();
         mixerEngine.resetSidechainEnv(n - 1);
+        layersReordered(LayerEdit::Remove, idx, -1);
         layersMoved(idx, n - 1);                // the shifted slots and the vacated top one
     }
 
     // Phase 3: parameter values. Strips that ducked from the removed layer now duck from nothing and
     // the others follow their layer down (translated before the values shift).
     remapSidechainSources([idx](int v) { return mu_mix::sidechainParamAfterRemove(v, idx, mu_limits::kMaxLayers); });
-    for (int d = idx; d < n - 1; ++d) copyLayerParams(d + 1, d);
-    resetLayerParams(n - 1);                    // the vacated top slot
+    remapLayerReferences([idx](int i) { return mu_mix::sidechainAfterRemove(i, idx, mu_limits::kMaxLayers); });
+    if (layerHoldsParamTruth())
+    {
+        suspend.release();                                 // the audio never reads these parameters: resume first
+        for (int d = idx; d < n; ++d) syncSlotParams(d);   // the shifted slots and the vacated top one
+    }
+    else
+    {
+        for (int d = idx; d < n - 1; ++d) copyLayerParams(d + 1, d);
+        resetLayerParams(n - 1);                // the vacated top slot
+    }
     return true;
 }
 
@@ -708,10 +773,9 @@ bool ProcessorBase::swapLayers(int a, int b)
         mixerEngine.renumberSidechainsAfterSwap(a, b);
         swapLayersLocked(a, b);
         mixerEngine.swapChannelState(a, b);
-        mixerEngine.resetSidechainEnv(a);   // the previous tenant's ducking envelope must not bleed in
-        mixerEngine.resetSidechainEnv(b);
         layers[(size_t) a]->onMoved(a);
         layers[(size_t) b]->onMoved(b);
+        layersReordered(LayerEdit::Swap, a, b);
         layersMoved(a, a);                      // only the two exchanged slots, not those between
         layersMoved(b, b);
     }
@@ -719,7 +783,15 @@ bool ProcessorBase::swapLayers(int a, int b)
     // Phase 3: parameter values. A strip that ducked from one swapped layer now ducks from the other
     // (translated before the values swap, so each strip's own source moves with it).
     remapSidechainSources([a, b](int v) { return mu_mix::sidechainParamAfterSwap(v, a, b, mu_limits::kMaxLayers); });
-    swapLayerParams(a, b);
+    remapLayerReferences([a, b](int i) { return mu_mix::sidechainAfterSwap(i, a, b, mu_limits::kMaxLayers); });
+    if (layerHoldsParamTruth())
+    {
+        suspend.release();                                 // the audio never reads these parameters: resume first
+        syncSlotParams(a);
+        syncSlotParams(b);
+    }
+    else
+        swapLayerParams(a, b);
     return true;
 }
 
@@ -742,5 +814,13 @@ void ProcessorBase::resetLayer(int idx)
         mixerEngine.resetSidechainEnv(idx);
         layersMoved(idx, idx);
     }
-    resetLayerParams(idx);
+    if (layerHoldsParamTruth())
+    {
+        suspend.release();                                 // the audio never reads these parameters: resume first
+        syncSlotParams(idx);
+    }
+    else
+    {
+        resetLayerParams(idx);
+    }
 }

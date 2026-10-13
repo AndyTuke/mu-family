@@ -226,6 +226,24 @@ public:
     }
     const std::atomic<float>& masterPeakMeter() const noexcept { return masterPeakLevel; }
 
+    // The hardware device's output latency in frames (any thread; published to every client in the
+    // transport so MIDI can be timed to land with the audio). 0 = unknown.
+    void setOutputLatencyFrames(int frames) noexcept { outputLatency.store(frames, std::memory_order_relaxed); }
+
+    // Ask client `slot` to keep its ring filled `frames` ahead (0 = its own default). Any thread.
+    void requestClientDepth(int slot, int frames) noexcept
+    {
+        if (mem != nullptr && slot >= 0 && slot < kMaxClients)
+            mem->registry().slots[slot].requestedDepthFrames.store((std::uint32_t) juce::jmax(0, frames), std::memory_order_relaxed);
+    }
+
+    // Cumulative frames client `slot`'s ring was short by since it attached (UI poll).
+    std::uint64_t clientUnderrunFrames(int slot) const noexcept
+    {
+        return (mem != nullptr && slot >= 0 && slot < kMaxClients)
+                   ? mem->registry().slots[slot].underrunFrames.load(std::memory_order_relaxed) : 0;
+    }
+
     // Render one block into `output` (per-channel device buffers, numChannels ≤ kMaxChannels).
     // Audio-thread, lock-free, no allocation. Returns per-block stats for logging/metering.
     BlockStats renderBlock(float* const* output, int numChannels, int numFrames) noexcept
@@ -441,6 +459,8 @@ public:
                 const int got  = ring.readFrames(tmp, want);          // ≤ want; short = underrun
                 if (got < numFrames)
                     stats.underrunFrames += (numFrames - got);
+                if (got < want)   // a block larger than the prepared maximum is clipped by us, not a client underrun
+                    reg.slots[slot].underrunFrames.fetch_add((std::uint64_t) (want - got), std::memory_order_relaxed);   // per client, for the UI
 
                 // Mixer strip: mute / solo gate, then gain + linear stereo balance.
                 const bool  muted   = clientMute[slot].load(std::memory_order_relaxed) != 0;
@@ -564,6 +584,7 @@ private:
         s.sampleRate  = (std::uint32_t) sr;
         s.playing     = clock.isPlaying() ? 1u : 0u;
         s.blockSize   = numFrames;
+        s.outputLatencyFrames = (std::uint32_t) juce::jmax(0, outputLatency.load(std::memory_order_relaxed));
         return s;
     }
 
@@ -581,6 +602,7 @@ private:
     MuLinkServerMemory* mem = nullptr;
     TransportClock      clock;
     double              sr = 48000.0;
+    std::atomic<int>    outputLatency { 0 };   // device output latency, frames (see setOutputLatencyFrames)
     int                 maxBlockFrames = 0;   // de-interleave scratch capacity (frames)
     std::vector<float>  scratch;   // de-interleave buffer, allocated in prepare()
 

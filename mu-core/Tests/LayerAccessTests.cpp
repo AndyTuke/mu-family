@@ -10,7 +10,7 @@ struct LayerAccessTests : juce::UnitTest
         beginTest("a valid index returns that layer");
         {
             TestProcessorCore p;
-            for (int i = 0; i < p.getNumChannels(); ++i)
+            for (int i = 0; i < p.getNumLayers(); ++i)
                 expect(p.getLayer(i) == p.layers[(size_t) i].get());
         }
 
@@ -18,7 +18,7 @@ struct LayerAccessTests : juce::UnitTest
         {
             TestProcessorCore p;
             expect(p.getLayer(-1) == nullptr);
-            expect(p.getLayer(p.getNumChannels()) == nullptr);
+            expect(p.getLayer(p.getNumLayers()) == nullptr);
         }
 
         beginTest("the const overload returns the same layer");
@@ -34,8 +34,8 @@ struct LayerAccessTests : juce::UnitTest
             TestProcessorCore p;
             p.getLayer(2)->name = "Snare";
             p.getLayer(2)->colourIndex = 5;
-            expectEquals(p.getChannelName(2), juce::String("Snare"));
-            expectEquals(p.getChannelColourIndex(2), 5);
+            expectEquals(p.getLayerName(2), juce::String("Snare"));
+            expectEquals(p.getLayerColourIndex(2), 5);
         }
 
         beginTest("a layer reports no insert gain-reduction meter unless it overrides it");

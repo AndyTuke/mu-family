@@ -54,12 +54,12 @@ static constexpr int kMaxRetiredEngines = 4;
 // Per-rhythm slots for retired-but-still-draining engines.
 // All start nullptr — populated by Step 3 when retire-on-swap is wired.
 std::array<std::array<std::unique_ptr<VoiceEngine>, kMaxRetiredEngines>,
-           SequencerEngine::MaxRhythms> retiredVoiceEngines;
+           RhythmSequencer::MaxRhythms> retiredVoiceEngines;
 
 // Audio thread sets true when isFullyDrained() returns on the matching slot.
 // Message thread (handleAsyncUpdate) clears the slot when flagged.
 std::array<std::array<std::atomic<bool>, kMaxRetiredEngines>,
-           SequencerEngine::MaxRhythms> retiredReadyForCleanup;
+           RhythmSequencer::MaxRhythms> retiredReadyForCleanup;
 ```
 
 In the voice-rendering path (currently `voiceEngines[r]->process(channelBuf, ns)` inside `processCoreBlock`), after rendering the active engine, iterate the retired array for that rhythm and call `process()` on each non-null engine, mixing into the same channel buffer. After each retired render, check `isFullyDrained()` — if true, set the cleanup flag.

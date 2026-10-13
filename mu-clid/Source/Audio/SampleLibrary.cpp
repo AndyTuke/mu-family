@@ -6,22 +6,31 @@ namespace mu_clid {
 SampleLibrary::SampleLibrary(PluginProcessor& p) : proc(p)
 {
     // One path slot per possible rhythm, so index writes never grow the array.
-    for (int i = 0; i < SequencerEngine::MaxRhythms; ++i)
+    for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
         samplePaths.add(juce::String());
 }
 
 void SampleLibrary::load(int rhythmIndex, const juce::File& file)
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.numActiveRhythms.load(std::memory_order_acquire)) return;
+    if (rhythmIndex < 0 || rhythmIndex >= proc.numLayers.load(std::memory_order_acquire)) return;
     proc.voiceEngines[(size_t) rhythmIndex]->loadFile(file);
     samplePaths.set(rhythmIndex, file.getFullPathName());
 }
 
 void SampleLibrary::swapPaths(int i, int j)
 {
+    // Called under layersLock: never grow the array there (the constructor sized it to every slot).
+    jassert(i >= 0 && j >= 0 && i < samplePaths.size() && j < samplePaths.size());
+    if (i < 0 || j < 0 || i >= samplePaths.size() || j >= samplePaths.size()) return;
     const juce::String tmp = samplePaths[i];
     samplePaths.set(i, samplePaths[j]);
     samplePaths.set(j, tmp);
+}
+
+void SampleLibrary::shiftPathsDown(int index, int count)
+{
+    for (int d = index; d < count - 1; ++d)
+        swapPaths(d, d + 1);
 }
 
 juce::String SampleLibrary::getSampleName(int rhythmIndex) const

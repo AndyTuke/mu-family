@@ -46,7 +46,7 @@ target_sources(mu-clid
         Source/Plugin/PluginProcessor.cpp
         Source/Plugin/PluginProcessor_APVTS.cpp
         Source/Plugin/PluginProcessor_Modulation.cpp
-        Source/Sequencer/RhythmManager.cpp
+        Source/Plugin/PluginProcessor_Layers.cpp
         Source/Plugin/PluginProcessor_Content.cpp
         Source/Persistence/PresetIO.cpp
         Source/Persistence/PresetIO_HostState.cpp
@@ -60,7 +60,7 @@ target_sources(mu-clid
         Source/UI/Voice/PitchSubsection.cpp
         Source/UI/Voice/FilterSubsection.cpp
         Source/UI/Voice/AmpSubsection.cpp
-        Source/UI/RhythmPanel.cpp
+        Source/UI/RhythmContent.cpp
         Source/UI/MidiOutSection.cpp
         Source/UI/SampleBrowser.cpp
         Source/UI/SettingsOverlay.cpp
@@ -241,12 +241,13 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/ModulationSkewTests.cpp       # C5 (proportion-space skew round-trips)
     Source/Tests/NoDemoCapsTests.cpp          # unlicensed is fully functional: 8 layers, 64 steps, saves
     Source/Tests/EmbeddedSampleTests.cpp       # preset samples: FLAC round trip is sample-identical
-    Source/Tests/SequencerEngineWrapTests.cpp  # master-loop wrap detection
+    Source/Tests/RhythmSequencerWrapTests.cpp  # master-loop wrap detection
     Source/Tests/SwapCommitTimingTests.cpp     # a delayed swap commit still starts the new pattern on the next step
+    Source/Tests/RhythmSequencerSlotTests.cpp  # slot binding and per-slot state moves
     Source/Tests/MidiOutputModeTests.cpp       # per-rhythm Sample / MIDI output: table, presets, render through the real processor
-    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/SequencerEngine.cpp"        # under test by the wrap tests
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/RhythmSequencer.cpp"        # under test by the wrap tests
     Source/Persistence/PresetMigrations.cpp    # under test by C1/C2
-    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/Rhythm.cpp"                 # SequencerEngine builds patterns through it
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/Rhythm.cpp"                 # RhythmSequencer builds patterns through it
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/HitGenerator.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/EuclideanGenerator.cpp"
     # Pull in mu-core .cpp's the tests need (they can't link mu-core directly
@@ -255,11 +256,14 @@ target_sources(mu-clid-tests PRIVATE
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked), its
     # collaborators and the licence glue, so tests construct the product class itself.
     Source/Tests/ProcessorSeamTests.cpp
+    Source/Tests/ClidScriptedEditRenderTests.cpp
+    Source/Tests/ClidLayerStructureTests.cpp
+    Source/Tests/ClidEditContinuityTests.cpp
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_APVTS.cpp
     Source/Plugin/PluginProcessor_Modulation.cpp
     Source/Plugin/PluginProcessor_Content.cpp
-    Source/Sequencer/RhythmManager.cpp
+    Source/Plugin/PluginProcessor_Layers.cpp
     Source/Persistence/PresetIO.cpp
     Source/Persistence/PresetIO_HostState.cpp
     Source/Plugin/HotSwapStager.cpp

@@ -26,6 +26,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     addAndMakeVisible(transportBar);
     addAndMakeVisible(rhythmCircle);
     addAndMakeVisible(euclidPanel);
+    euclidPanel.setVoiceModeSwitchesVisible(false);   // a MIDI effect has no voice mode or legato
     addAndMakeVisible(statusBar);
 
     aboutOverlay.setProductInfo(

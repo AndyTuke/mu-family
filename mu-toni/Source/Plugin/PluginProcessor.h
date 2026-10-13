@@ -17,20 +17,18 @@
 // mu-Toni — generative arpeggiator mono-synth.
 //
 // The ProcessorBase subclass owning the arp + voice engine and the shared
-// platform: the APVTS mixer/FX layout, the MixerEngine + FXChain, and a fixed set
-// of "layer" channels for the shared sidebar + MixerOverlay. Each layer runs an
-// independent mono arp (ArpVoiceRunner → ToniVoice), rendered through the shared
-// mixer via the processCoreBlock hook (engine→insert→mixer path).
+// platform: the APVTS mixer/FX layout, the MixerEngine + FXChain, and 1..8 "layer"
+// channels for the shared sidebar + MixerOverlay. Each layer runs an independent mono arp
+// (ArpVoiceRunner → ToniVoice), rendered through the shared mixer via the processCoreBlock hook
+// (engine→insert→mixer path). All eight layers' parameters and objects exist for the processor's
+// lifetime; only the count (`numLayers`) is runtime, and add / delete / reorder go through the
+// shared ProcessorBase structural edits.
 namespace mu_toni
 {
 
 class PluginProcessor : public ProcessorBase
 {
 public:
-    // Family parity: up to 8 channels/layers. A fixed set ships for now; dynamic
-    // add/delete/reorder is still unwired (no addVoice/removeVoice).
-    static constexpr int kNumChannels = 4;   // placeholder layers shown in the shell
-
     PluginProcessor();
     ~PluginProcessor() override;
 
@@ -61,16 +59,25 @@ public:
     void setStateInformation(const void* data, int sizeInBytes) override;
 
     // ── ProcessorBase channel metadata (drives sidebar + mixer) ───────────────
-    // getNumChannels / getLayer are the base defaults over the owned layer storage.
-    int          getMaxChannels()              const override { return kNumChannels; }
-    juce::String getChannelName(int idx)       const override
+    // getNumLayers / getLayer are the base defaults over the owned layer storage (the count is
+    // `numLayers`, 1..kMaxLayers).
+    juce::String getLayerName(int idx)       const override
     {
-        return (idx >= 0 && idx < kNumChannels) ? "Layer " + juce::String(idx + 1) : juce::String();
+        return (idx >= 0 && idx < mu_limits::kMaxLayers) ? "Layer " + juce::String(idx + 1) : juce::String();
     }
-    int          getChannelColourIndex(int idx) const override
+    // The palette colour is allocated per layer and follows it through delete / reorder.
+    int          getLayerColourIndex(int idx) const override
     {
-        return (idx >= 0 && idx < mu_limits::kMaxLayers) ? idx : 0;
+        return (idx >= 0 && idx < mu_limits::kMaxLayers) ? layers[(size_t) idx]->colourIndex : 0;
     }
+
+    // Add / delete / reorder / reset are ProcessorBase::addLayer / removeLayer / swapLayers /
+    // resetLayer; this product supplies createLayer and layersMoved. The edits move the Arp
+    // pointers under `layersLock`, which processBlock tryLocks.
+    bool canEditLayers() const override { return true; }
+    // The audio state of a slot stays put while its Arp moves, so it is cleared for the new tenant
+    // (called under layersLock; allocation-free).
+    void layersMoved(int firstIndex, int lastIndex) override;
 
     // ── Presets (per family file-format rule) ─────────────────────────────────
     // Full = .muToni (the whole state); per-layer = .muArp (one layer's arp + voice).
@@ -89,20 +96,22 @@ public:
     // (loadable into any layer), and a reset back to defaults.
     void saveLayerPreset(int layer, const juce::String& name) override;
     void loadLayerPreset(int layer, const juce::File& file) override;
-    void resetLayer(int layer) override;
 
     // Hot-swap: a preset loaded while the transport runs is staged and applied at the next bar
     // line (or at once when playback stops); loaded while stopped, it applies at once.
     // (The staging itself is ProcessorBase::layerSwapper.)
 
 protected:
-    // MIDI program change (drained on the message thread): Ch 1-4 → that layer's preset,
+    // MIDI program change (drained on the message thread): Ch 1-8 → that layer's preset,
     // Ch 9 → full preset, each through the same hot-swap path as a load from the UI.
     void applyFullMidiPreset(const juce::File& f) override
     {
         loadPreset(f);
         if (! layerSwapper.hasFullPending() && onPresetSwapCommitted) onPresetSwapCommitted();
     }
+
+    // A default Arp for slot `slot`, built and prepared before a structural edit takes the lock.
+    std::unique_ptr<Layer> createLayer(int slot) override;
 
     // ── Arp/voice parameter cache (index into vp[voice][slot]) ────────────────
     // Enum + suffix table live in the .cpp; count is needed here for the array.
@@ -158,7 +167,10 @@ private:
 
     // Hot-swap: parsed preset trees per layer + one full preset, committed at the bar line.
     void applyLayerTree(int layer, const juce::ValueTree& tree);
-    double currentSampleRate = 44100.0;
+    // Written by prepareToPlay, read by createLayer on the message thread and by processBlock.
+    std::atomic<double> currentSampleRate { 44100.0 };
+    std::atomic<int>    currentBlockSize  { 512 };
+    int                 runnersLive = 0;   // audio thread: layers whose runner has run since it was last reset
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };

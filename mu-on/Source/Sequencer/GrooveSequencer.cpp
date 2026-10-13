@@ -33,7 +33,7 @@ void GrooveSequencer::processSpan(double beatStart, int numSamples, double beats
                                        + StepPattern::kNumSteps) % StepPattern::kNumSteps);
             const int sampleOffset = juce::jlimit(0, numSamples - 1,
                                                   (int) std::round((t - beatStart) / beatsPerSample));
-            for (int tr = 0; tr < StepPattern::kNumTracks; ++tr)
+            for (int tr = 0; tr < activeTracks; ++tr)
                 if (pattern.isOn(tr, local))
                     fire(tr, pattern.isAccent(tr, local) ? accentVel : normalVel, sampleOffset);
         }

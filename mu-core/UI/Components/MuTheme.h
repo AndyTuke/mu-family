@@ -164,6 +164,7 @@ struct MuTheme
         juce::Colour grMeterBg         { 0xff111111 };  // GRMeter strip background
         juce::Colour grMeterBar        { 0xaa7799cc };  // semi-transparent blue-grey bar
         juce::Colour fault             { 0xffE24B4A };  // status lamp: a fault (clock lost)
+        juce::Colour buttonDangerBg    { 0xff2B0E0D };  // destructive dialog button fill (4.5:1 under fault text) (border/text use fault)
     } indicators;
 
     // ── Mixer overlay extras ──────────────────────────────────────────────
@@ -308,6 +309,12 @@ struct MuTheme
         // Engraved grooves (a divider cut into a metal panel: a dark line and a light one beside it)
         float grooveShade        = 0.45f;   // the dark line
         float grooveLight        = 0.09f;   // the light line
+
+        // Round routing toggle (mu-Tant's filter Series / Parallel button)
+        float routingFill        = 0.90f;   // disc fill, as a fraction of the app colour
+        float routingHover       = 0.25f;   // brighter disc while hovered
+        float routingRim         = 0.40f;   // brighter rim ring
+        float routingGlyph       = 0.95f;   // the two-line glyph
 
         // Step ring (mu-Clid's RhythmCircle)
         float ringTrack          = 0.45f;   // recessed track under each ring

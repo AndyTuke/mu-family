@@ -110,14 +110,16 @@ void VoiceEngine::trigger(bool isAccented, bool tied)
     // breathe past the step length. The per-envelope legato flags still
     // apply on UNtied hits (i.e. when the user transitions from rest → hit, or
     // when patternLegato is disabled at the sequencer level).
-    if (tied)
+    // The exception is an idle amp envelope (the engine was released, e.g. by a layer reset): there is
+    // no running tail to carry, so the tied hit starts the envelopes like an untied one.
+    if (tied && ampEnv.isActive())
         return;
 
     // Engine-level amp envelope (single ADSR for the whole engine, not per-voice).
     // Untied retrigger resets to zero and noteOns; the voice slot's sample audio
     // mixes into tempBuffer and the env multiplies the post-filter signal before
-    // the insert. Tied hits already returned above so env state carries across
-    // contiguous pattern hits (pattern legato unchanged).
+    // the insert. Tied hits on an active amp envelope already returned above so env state
+    // carries across contiguous pattern hits (pattern legato unchanged).
     (void) claimedIndex;  // slot index no longer needed for env routing
     ampEnv.reset();
     ampEnv.noteOn();
@@ -273,6 +275,15 @@ void VoiceEngine::markRetired() noexcept
     retireDrainBlocks = (int) (2.0 * currentSampleRate / (double) blockSize);
 
     retired = true;
+}
+
+void VoiceEngine::releaseHeldNote() noexcept
+{
+    // Same envelope release as markRetired; the engine stays live, so no retired flag or drain timer.
+    if (! activeParams.ampRelToEnd)
+        ampEnv.noteOff();
+    filterEnv.noteOff();
+    pitchEnv.noteOff();
 }
 
 bool VoiceEngine::isFullyDrained() const noexcept

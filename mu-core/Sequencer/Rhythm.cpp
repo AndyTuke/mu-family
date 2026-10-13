@@ -5,6 +5,26 @@
 
 namespace mu_core {
 
+void Rhythm::adoptDefaults(Layer& fresh)
+{
+    // A layer of another type has no Euclid data to take; the base handles what is shared.
+    if (auto* other = dynamic_cast<Rhythm*>(&fresh))
+    {
+        std::swap(genA, other->genA);
+        std::swap(genB, other->genB);
+        std::swap(genC, other->genC);
+        std::swap(logic, other->logic);
+        std::swap(resetSteps, other->resetSteps);
+        std::swap(patternLegato, other->patternLegato);
+        std::swap(outputMode, other->outputMode);
+        std::swap(midiNote, other->midiNote);
+        std::swap(midiChannel, other->midiChannel);
+        std::swap(midiVelocity, other->midiVelocity);
+        std::swap(midiAccent, other->midiAccent);
+    }
+    Layer::adoptDefaults(fresh);
+}
+
 std::vector<bool> Rhythm::getCombinedPattern() const
 {
     auto patA = genA.getPattern();

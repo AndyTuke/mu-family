@@ -160,7 +160,7 @@ target_sources(mu-clid-midi-tests PRIVATE
     # The audio path under test, as the plugin compiles it.
     Source/Sequencer/MidiRhythmCore.cpp
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/Rhythm.cpp"
-    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/SequencerEngine.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/RhythmSequencer.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/MidiOutputEngine.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/HitGenerator.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/EuclideanGenerator.cpp"

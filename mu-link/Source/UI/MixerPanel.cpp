@@ -64,6 +64,10 @@ MixerPanel::MixerPanel(AudioServer& serverToDrive)
             st.getClientEqKnob(band).onStatusUpdate = [this, who, tag](const juce::String& n, const juce::String& v)
             { report(who + " " + n, v, tag); };
 
+        // The Dropouts lamp: hover text to the status bar, a click clears a latched dropout.
+        st.getDropoutLamp().onStatusUpdate = [this, i](const juce::String& n, const juce::String& v) { report(n, v, MuLookAndFeel::channelPalette[i]); };
+        st.onClientDropoutClear = [this, i] { clearDropout(i); };
+
         addAndMakeVisible(st);
         strips[(size_t) i] = std::move(strip);
     }
@@ -94,6 +98,72 @@ MixerPanel::MixerPanel(AudioServer& serverToDrive)
 MixerPanel::~MixerPanel()
 {
     stopTimer();
+}
+
+void MixerPanel::setLatencyFrames(int frames)
+{
+    latencyFrames = juce::jmax(0, frames);
+    for (int i = 0; i < kClients; ++i) clearDropout(i);   // the old count described the old depth
+    updateLatencyAndDropouts();
+}
+
+// Per active slot: send the chosen depth again (a client that attached later asks for nothing itself), and
+// turn a rise in its underrun count into the lamp states. A dropout lights the lamp red for kDropoutHoldMs after
+// the last one, then it latches amber until clicked; the first kDropoutWarmupMs after a connect is ignored.
+void MixerPanel::updateLatencyAndDropouts()
+{
+    if (! server.hasBus())
+        return;
+    auto& reg = server.registry();
+    const auto now = juce::Time::getMillisecondCounter();
+    for (int i = 0; i < kClients; ++i)
+    {
+        auto& d = dropouts[(size_t) i];
+        const bool active = reg.slots[i].active.load(std::memory_order_acquire) != 0;
+        if (! active)
+        {
+            if (d.wasActive || d.state != 0) clearDropout(i);   // a disconnect clears the lamp
+            d.wasActive = false;
+            continue;
+        }
+        if (! d.wasActive)   // just connected: start counting after the ring has filled
+        {
+            d.wasActive = true;
+            d.seen = server.clientUnderrunFrames(i);
+            d.graceUntilMs = (juce::int64) now + kDropoutWarmupMs;
+        }
+        server.requestClientDepth(i, latencyFrames);
+
+        const std::uint64_t count = server.clientUnderrunFrames(i);
+        if ((juce::int64) now < d.graceUntilMs)
+        {
+            d.seen = count;
+            continue;
+        }
+        int next = d.state;
+        if (count > d.seen)
+        {
+            d.seen = count;
+            d.lastMs = (juce::int64) now;
+            next = 1;                                  // active
+        }
+        else if (d.state == 1 && (juce::int64) now - d.lastMs >= kDropoutHoldMs)
+            next = 2;                                  // latched
+        if (next != d.state)
+        {
+            d.state = next;
+            strips[(size_t) i]->setClientDropout(next == 1 ? MixerChannel::Dropout::Active : MixerChannel::Dropout::Latched);
+            if (next == 1) report("Dropouts", "Dropouts: raise Latency in Settings", MuLookAndFeel::channelPalette[i]);
+        }
+    }
+}
+
+void MixerPanel::clearDropout(int slot)
+{
+    auto& d = dropouts[(size_t) slot];
+    d.state = 0;
+    d.seen = server.hasBus() ? server.clientUnderrunFrames(slot) : 0;
+    strips[(size_t) slot]->setClientDropout(MixerChannel::Dropout::Clean);
 }
 
 void MixerPanel::report(const juce::String& name, const juce::String& value, juce::Colour tag)

@@ -281,7 +281,7 @@ public:
             expect(chrome.isSettingsVisible() && settings.isVisible(), "gear opens the page");
             expect(! w.getMixer().getParentComponent()->isVisible(), "the page replaces the main area");
 
-            // Visible controls: Display size, the sync offset, the devices button; no tempo, meter or source rows.
+            // Visible controls: Display size, Latency, the sync offset, the devices button; no tempo, meter or source rows.
             int nudges = 0, dropdowns = 0, segments = 0;
             NudgeInput* offset = nullptr;
             SegmentControl* size = nullptr;
@@ -290,11 +290,11 @@ public:
                 if (! c->isVisible()) continue;
                 if (auto* n = dynamic_cast<NudgeInput*>(c)) { ++nudges; offset = n; }
                 if (dynamic_cast<DropdownSelect*>(c) != nullptr) ++dropdowns;
-                if (auto* sc = dynamic_cast<SegmentControl*>(c)) { ++segments; size = sc; }
+                if (auto* sc = dynamic_cast<SegmentControl*>(c)) { ++segments; if (sc != &w.getLatencyControl()) size = sc; }
             }
             expectEquals(nudges, 1);
             expectEquals(dropdowns, 0);
-            expectEquals(segments, 1);
+            expectEquals(segments, 2);   // Display size and Latency
             expect(w.getChooseDevicesButton().isVisible(), "Choose devices button shown");
             expect(w.getChooseDevicesButton().getButtonText() == "Choose devices...", "its wording");
 
@@ -334,6 +334,59 @@ public:
             chrome.getTransportBar().onSettingsToggle();
             expect(! chrome.isSettingsVisible(), "gear closes it");
             mu_ui::scale = 1.0f;
+        }
+
+        beginTest("Latency asks every connected app for its render-ahead depth and is kept with the settings");
+        {
+            Rig rig;
+            expect(rig.ok, "bus failed");
+            auto& w = *rig.window;
+            MuLinkClientMemory app;
+            expect(app.open(), "client failed to attach");
+            expectEquals(app.claimSlot("app", 2), 0);
+
+            expectEquals(w.getBackend().getLatencyIndex(), 1);                 // Normal by default
+            expectEquals(w.getMixer().getLatencyFrames(), 0);                   // 0 = the app's own default
+            w.getLatencyControl().setSelectedIndex(0, true);                    // Low
+            expectEquals(w.getMixer().getLatencyFrames(), 2048);
+            expectEquals((int) app.registry().slots[0].requestedDepthFrames.load(), 2048);
+            w.getLatencyControl().setSelectedIndex(2, true);                    // High
+            expectEquals((int) app.registry().slots[0].requestedDepthFrames.load(), 8192);
+            expectEquals(w.getBackend().getLatencyIndex(), 2);                  // remembered
+            w.getLatencyControl().setSelectedIndex(1, true);                    // Normal withdraws the request
+            expectEquals((int) app.registry().slots[0].requestedDepthFrames.load(), 0);
+        }
+
+        beginTest("a dropout lights the strip's lamp red, latches it amber, and a click or a Latency change clears it");
+        {
+            Rig rig;
+            expect(rig.ok, "bus failed");
+            auto& w = *rig.window;
+            auto& mixer = w.getMixer();
+            auto& lamp = mixer.getStrip(0).getDropoutLamp();
+            MuLinkClientMemory app;
+            expect(app.open(), "client failed to attach");
+            expectEquals(app.claimSlot("app", 2), 0);
+
+            // Past the warm-up, a rise in the slot's underrun count turns the lamp active, then latched.
+            mixer.setLatencyFrames(0);
+            rig.server.requestClientDepth(0, 0);
+            juce::Thread::sleep(MixerPanel::kDropoutWarmupMs + 200);
+            mixer.updateLatencyAndDropouts();
+            app.registry().slots[0].underrunFrames.fetch_add(64, std::memory_order_relaxed);
+            mixer.updateLatencyAndDropouts();
+            expectEquals((int) mixer.getDropoutState(0), 1);                    // active
+            juce::Thread::sleep(MixerPanel::kDropoutHoldMs + 200);
+            mixer.updateLatencyAndDropouts();
+            expectEquals((int) mixer.getDropoutState(0), 2);                    // latched
+            lamp.onClick();
+            expectEquals((int) mixer.getDropoutState(0), 0);                    // a click clears it
+
+            app.registry().slots[0].underrunFrames.fetch_add(64, std::memory_order_relaxed);
+            mixer.updateLatencyAndDropouts();
+            expectEquals((int) mixer.getDropoutState(0), 1);
+            mixer.setLatencyFrames(2048);                                       // a new depth: the old count no longer applies
+            expectEquals((int) mixer.getDropoutState(0), 0);
         }
 
         beginTest("the bar keeps Tap, Nudge and the Mixer button out");

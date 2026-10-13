@@ -139,7 +139,48 @@ void MuLinkComponent::wireSettings()
         chooseDevicesButton.setBounds(r.labelX, r.area.getY(), mu_ui::s(180), r.rowH);
     };
     settings.addSection(mu_ui::StandardSettingsOverlay::Where::General, std::move(devices));
+
+    // Clients: one Latency choice for every app (how far ahead each renders), with a hint under it.
+    settings.makeFieldLabel(latencyLabel, "Latency");
+    settings.addAndMakeVisible(latencyLabel);
+    latencyChoice.setSelectedIndex(backend.getLatencyIndex(), false);
+    latencyChoice.onChange = [this](int index) { applyLatency(index, true); };
+    settings.addAndMakeVisible(latencyChoice);
+    hover.watch(latencyChoice, "Latency", {});
+    mu_ui::StandardSettingsOverlay::Section clients;
+    clients.heightPx = 2 * mu_ui::StandardSettingsOverlay::kRowH + mu_ui::StandardSettingsOverlay::kRowGap;
+    clients.place = [this](const mu_ui::StandardSettingsOverlay::Rows& r)
+    {
+        latencyLabel .setBounds(r.labelX, r.area.getY(), r.labelW, r.rowH);
+        latencyChoice.setBounds(r.ctrlX,  r.area.getY(), r.ctrlW,  r.rowH);
+    };
+    clients.paint = [this](juce::Graphics& g, const mu_ui::StandardSettingsOverlay::Rows& r)
+    {
+        settings.drawHint(g, r.area.getY() + r.rowH + mu_ui::s(mu_ui::StandardSettingsOverlay::kRowGap) / 2 + r.rowH / 2,
+                          "Render-ahead per app. Low is fastest; raise it if the Dropouts lamps light.",
+                          r.ctrlX, r.area.getRight() - r.ctrlX);
+    };
+    settings.addSection(mu_ui::StandardSettingsOverlay::Where::Group, std::move(clients), "Clients");
+    applyLatency(backend.getLatencyIndex(), false);
     chrome.setSettingsOverlay(&settings);
+}
+
+// Low / Normal / High: ask every app to render 2048 / its own default (4096) / 8192 frames ahead. The panel
+// sends it to each connected app, and again to any that connects later.
+void MuLinkComponent::applyLatency(int index, bool announce)
+{
+    static constexpr int kDepthFrames[3] = { 2048, 0, 8192 };   // 0 = the app's own default
+    static const char* const kNames[3] = { "Low", "Normal", "High" };
+    index = juce::jlimit(0, 2, index);
+    backend.setLatencyIndex(index);
+    page.mixer.setLatencyFrames(kDepthFrames[index]);
+    if (announce)
+    {
+        const int frames = kDepthFrames[index] != 0 ? kDepthFrames[index] : mu_link::kDefaultClientDepthFrames;
+        const double sr = server.sampleRate() > 0.0 ? server.sampleRate() : 48000.0;
+        chrome.getStatusBar().showParam("Latency", juce::String(kNames[index]) + ", about "
+                                        + juce::String(juce::roundToInt(frames * 1000.0 / sr)) + " ms");
+    }
 }
 
 // The audio / MIDI device picker in a dialog; it binds to the live device manager, so changes apply at once.

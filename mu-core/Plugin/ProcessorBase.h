@@ -76,7 +76,7 @@ public:
     FXChain     fxChain;
     MixerEngine mixerEngine;
 
-    // Channel metadata for the shared mixer UI (getNumChannels, getLayer, getChannelName, ...)
+    // Channel metadata for the shared mixer UI (getNumLayers, getLayer, getLayerName, ...)
     // is declared in ProcessorCore.
 
     // The gain-reduction meter of layer `i`'s insert effect (null when it has none or `i` is out of
@@ -137,6 +137,38 @@ public:
     // (a product that edits layers try-locks layersLock per block), so it must only reset, not
     // allocate or wait.
     virtual void layersMoved(int firstIndex, int lastIndex) { juce::ignoreUnused(firstIndex, lastIndex); }
+
+    // Which structural edit is reordering layers, for layersReordered.
+    enum class LayerEdit { Remove, Swap };
+
+    // Called by removeLayer and swapLayers, immediately before layersMoved, under layersLock with
+    // processing suspended, after the layer pointers, strip state and onMoved calls are done. It tells
+    // a product what layersMoved(first, last) cannot: where the data at a slot came from. Remove: `a`
+    // is the index removed (every slot above it moved down one, and `b` is -1). Swap: slots `a` and
+    // `b` exchanged. A product that keeps per-slot state of its own (engines, tails, play state)
+    // moves it here; like layersMoved it must only move and reset, never allocate or wait.
+    virtual void layersReordered(LayerEdit kind, int a, int b) { juce::ignoreUnused(kind, a, b); }
+
+    // True when the product's own layer data, not the parameter tree, is the truth for the slot's
+    // sound (mu-Clid's Rhythm, where the parameters mirror it). The edits then do not copy parameter
+    // values between slots in the tree: they call syncSlotParams for every slot the edit touched
+    // (add: the new slot; remove: the removed index and every slot above it, the vacated top one
+    // included; swap: both slots; reset: that slot), and the product pushes that slot's layer data,
+    // and its mixer strip state, into the parameters.
+    virtual bool layerHoldsParamTruth() const { return false; }
+
+    // Message thread, not under layersLock, after the pointer moves. Only called when
+    // layerHoldsParamTruth() is true, and then processing has already resumed and layerEditInFlight is
+    // down (the audio never reads these parameters, so the push must not silence the mix); a slot
+    // that is live meanwhile must therefore already be safe to render. A product also frees here
+    // whatever it parked under the lock.
+    virtual void syncSlotParams(int slot) { juce::ignoreUnused(slot); }
+
+    // Called by addLayer last, on the message thread, not under layersLock, with the new layer's
+    // parameters at their defaults, so a product can give the new layer its own starting point (a
+    // product with per-layer engine types picks the engine). Processing is still suspended unless
+    // layerHoldsParamTruth() is true, where it has resumed: that product may do file work here.
+    virtual void layerAdded(int index) { juce::ignoreUnused(index); }
 
     // ─── Shell-facing API (overridden by each plugin) ────────────────────────
     // These are the surfaces the family's editor shell + TransportBar consume.
@@ -421,8 +453,20 @@ protected:
         layerExtras = { [this](int slot, juce::ValueTree& node)       { if (auto* l = slotLayer(slot)) l->writeExtras(node); },
                        [this](int slot, const juce::ValueTree& node) { if (auto* l = slotLayer(slot)) l->applyExtras(node); } };
     }
-    juce::ValueTree captureComposedState()           { return mu_pp::captureState(apvts.state.getType(), layerLayout, layerExtras); }
-    void            applyComposedState(const juce::ValueTree& state) { mu_pp::applyState(state, layerLayout, layerExtras); }
+    // A product whose canEditLayers() is true also saves the live layer count (`numVoices`) and the
+    // palette colour of each slot (`voiceColours`, 8 comma-separated indices) as root properties; the
+    // names are legacy saved data and do not change. A layer preset never carries them.
+    juce::ValueTree captureComposedState();
+    // Applies the parameters and extras, then (canEditLayers only) stores the count last and restores
+    // the colours, so the audio thread never sees a count ahead of the data.
+    void            applyComposedState(const juce::ValueTree& state);
+    // The live layer count a composed state carries, clamped to 1..kMaxLayers; `unsavedLayerCount`
+    // when the state has none (an older file). A product that must act on the old and the new count
+    // before the apply reads it here.
+    int             savedLayerCount(const juce::ValueTree& state) const;
+    // The count a state without `numVoices` loads with: the product's count before layers were
+    // editable. Set once in the product's constructor.
+    int unsavedLayerCount = 1;
     juce::ValueTree captureLayerNode(int slot, const juce::Identifier& type) { return mu_pp::captureLayer(layerLayout, layerExtras, slot, type); }
     void            applyLayerNode(int slot, const juce::ValueTree& node)    { mu_pp::applyLayer(layerLayout, layerExtras, slot, node); }
     // A state in the composed shape: an older APVTS-dump state is rebuilt (`otherChild` receives
@@ -439,6 +483,13 @@ protected:
     // strips) through `remap(paramValue)`. The parameter is 0 = off, 1..8 = channel 0..7, 9 = the
     // external bus; a structural edit renumbers the layers, so a strip must follow its source's new slot.
     void remapSidechainSources(const std::function<int(int)>& remap);
+
+    // A parameter whose value names another layer (such as a processing layer's source layer) must follow its layer
+    // through removeLayer and swapLayers, like the sidechain sources. Called in phase 3 of both, with
+    // processing suspended and before the parameter values shift; `oldToNew` maps a layer index as it
+    // was to the index it has now, or -1 when that layer is gone. The product rewrites its own
+    // parameters through it. Default: nothing to rewrite. addLayer and resetLayer do not call it.
+    virtual void remapLayerReferences(const std::function<int(int)>& oldToNew) { juce::ignoreUnused(oldToNew); }
 
 protected:
     // Internal transport state. Written by the UI (play / BPM) and the audio thread (beat
@@ -521,7 +572,7 @@ protected:
     // processBlock, so the swapper must not believe the transport still runs (loads apply at once).
     void resetSwapPlayState() noexcept { layerSwapper.resetPlayState(); }
 
-    // The 4/4 bar-line rule (mu-Toni, mu-On).
+    // The 4/4 bar-line rule shared by the products that step through layer presets.
     void flagSwapBoundaries(bool isPlaying, double blockStartBeat, double blockBeats) noexcept
     {
         if (layerSwapper.flagBoundaries(isPlaying, blockStartBeat, blockBeats))
@@ -542,10 +593,9 @@ protected:
 
     // Number of active "channels" (rhythms / voices / whatever) — used to
     // gate per-slot PCs so we don't try to load into an inactive slot.
-    // Default: getNumChannels(). Derived can override if the active count
-    // differs from the total (e.g. mu-clid's `numActiveRhythms` atomic
-    // tracks runtime-active rhythms separately from the static channel count).
-    virtual int getNumActiveChannels() const { return getNumChannels(); }
+    // Default: getNumLayers(). Derived can override if the active count
+    // differs from the total.
+    virtual int getNumActiveLayers() const { return getNumLayers(); }
 
 
     // Sets the host BPM on the FX chain (tempo-synced FX) then calls

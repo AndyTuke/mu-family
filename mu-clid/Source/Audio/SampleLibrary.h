@@ -12,7 +12,7 @@ class PluginProcessor;
 // user's primary sample-library folder. Owned by PluginProcessor as `samples`.
 //
 // Threading: everything here is message-thread except mixPreviewInto (audio thread).
-// Path slots are indexed by rhythm and stay sized to SequencerEngine::MaxRhythms.
+// Path slots are indexed by rhythm and stay sized to RhythmSequencer::MaxRhythms.
 class SampleLibrary
 {
 public:
@@ -26,13 +26,16 @@ public:
     void                     setPath (int rhythmIndex, const juce::String& p) { samplePaths.set(rhythmIndex, p); }
     void                     clearPath(int rhythmIndex) { samplePaths.set(rhythmIndex, juce::String()); }
     void                     swapPaths(int i, int j);
+    // Removing slot `index` of `count` live slots: every path above it moves down one and the removed
+    // path lands in the vacated top slot (by exchanges, so nothing is freed; the caller clears it later).
+    void                     shiftPathsDown(int index, int count);
     const juce::StringArray& paths() const noexcept { return samplePaths; }
 
     // File name of the rhythm's sample, or empty when none is assigned.
     juce::String getSampleName(int rhythmIndex) const;
 
     // True when the rhythm has a sample path recorded but the voice engine couldn't
-    // load it (e.g. a linked sample later moved or deleted). The RhythmPanel sample bar
+    // load it (e.g. a linked sample later moved or deleted). The RhythmContent sample bar
     // shows a "missing — click to find" affordance instead of silently leaving it empty.
     bool isSampleMissing(int rhythmIndex) const;
 

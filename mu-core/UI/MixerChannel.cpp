@@ -371,6 +371,35 @@ void MixerChannel::addClientControls()
 
     muteBtn.onClick = [this] { clientMuted  = muteBtn.getToggleState(); if (onClientMute) onClientMute(clientMuted); };
     soloBtn.onClick = [this] { clientSoloed = soloBtn.getToggleState(); if (onClientSolo) onClientSolo(clientSoloed); };
+
+    // The Dropouts lamp under mute / solo; a click clears a latched dropout.
+    dropoutLamp.setLabel("Dropouts");
+    dropoutLamp.onClick = [this] { if (onClientDropoutClear) onClientDropoutClear(); };
+    addAndMakeVisible(dropoutLamp);
+    setClientDropout(Dropout::Clean);
+}
+
+// Clean: unlit. Active: red and bright. Latched: amber and dim, until the lamp is clicked. The status text
+// says what to do, never colour alone.
+void MixerChannel::setClientDropout(Dropout state)
+{
+    using LF = MuLookAndFeel;
+    const auto& L = LF::lighting();
+    switch (state)
+    {
+        case Dropout::Clean:
+            dropoutLamp.setState(LF::colour(Id::indicatorFault), L.lampOff);
+            dropoutLamp.setStatus("Dropouts", "No dropouts");
+            break;
+        case Dropout::Active:
+            dropoutLamp.setState(LF::colour(Id::indicatorFault), L.lampOn + L.lampPlayhead);
+            dropoutLamp.setStatus("Dropouts", "Dropouts: raise Latency in Settings");
+            break;
+        case Dropout::Latched:
+            dropoutLamp.setState(LF::colour(Id::segmentWarningBorder), L.lampDim);
+            dropoutLamp.setStatus("Dropouts", "Dropped out earlier: raise Latency in Settings (click to clear)");
+            break;
+    }
 }
 
 juce::String MixerChannel::formatClientDb(float linearLevel)
@@ -431,7 +460,9 @@ void MixerChannel::layoutClient()
     }
     y += s(LF::kClientGap);
 
-    const int muteY = h - s(LF::kClientBottomGap) - s(LF::kClientButtonH);
+    // Bottom row: the Dropouts lamp, then mute / solo above it, then the dB readout, then the fader.
+    const int lampY = h - s(LF::kClientBottomGap) - s(LF::kClientLampH);
+    const int muteY = lampY - s(LF::kClientDbGap) - s(LF::kClientButtonH);
     const int dbY   = muteY - s(LF::kClientDbGap) - s(LF::kClientDbH);
     const int faderH = juce::jmax(s(LF::kClientFaderMinH), dbY - y);
 
@@ -443,6 +474,7 @@ void MixerChannel::layoutClient()
     const int hw = w / 2;
     muteBtn.setBounds(0,  muteY, hw,     s(LF::kClientButtonH));
     soloBtn.setBounds(hw, muteY, w - hw, s(LF::kClientButtonH));
+    dropoutLamp.setBounds(s(LF::kClientBottomGap), lampY, w - 2 * s(LF::kClientBottomGap), s(LF::kClientLampH));
 
     faderPaneBounds = { 1, y - 2, w - 2, h - y + 1 };
 }
@@ -523,7 +555,8 @@ void MixerChannel::layoutCallbackMaster()
     const int w = getWidth(), h = getHeight();
 
     const int top = faderTopPx >= 0 ? faderTopPx : s(kNamePadding * 2 + kNameH);
-    const int dbY = h - s(LF::kClientBottomGap) - s(LF::kClientButtonH) - s(LF::kClientDbGap) - s(LF::kClientDbH);
+    const int dbY = h - s(LF::kClientBottomGap) - s(LF::kClientLampH) - s(LF::kClientDbGap) - s(LF::kClientButtonH)
+                  - s(LF::kClientDbGap) - s(LF::kClientDbH);   // where the Client strips' readouts sit
     const int faderH = juce::jmax(s(LF::kClientFaderMinH), dbY - top);
 
     const int vuW = s(kVUW);

@@ -1,0 +1,288 @@
+﻿$ErrorActionPreference = "Stop"
+$word = New-Object -ComObject Word.Application
+$word.Visible = $false
+$doc = $word.Documents.Add()
+$doc.PageSetup.TopMargin    = $word.InchesToPoints(1.0)
+$doc.PageSetup.BottomMargin = $word.InchesToPoints(1.0)
+$doc.PageSetup.LeftMargin   = $word.InchesToPoints(1.25)
+$doc.PageSetup.RightMargin  = $word.InchesToPoints(1.25)
+
+$sel = $word.Selection
+
+function H1($t)  { $sel.Style = $doc.Styles("Heading 1");  $sel.TypeText($t); $sel.TypeParagraph() }
+function H2($t)  { $sel.Style = $doc.Styles("Heading 2");  $sel.TypeText($t); $sel.TypeParagraph() }
+function H3($t)  { $sel.Style = $doc.Styles("Heading 3");  $sel.TypeText($t); $sel.TypeParagraph() }
+function P($t)   { $sel.Style = $doc.Styles("Normal");      $sel.TypeText($t); $sel.TypeParagraph() }
+function Br()    { $sel.InsertBreak(7) }   # wdPageBreak
+function Bullet($t) { $sel.Style = $doc.Styles("List Bullet"); $sel.TypeText($t); $sel.TypeParagraph() }
+
+# Screenshot: when an image file is given and exists in the images folder next to this script, it is
+# inserted (full text width) with its caption underneath. Otherwise an italic, centred placeholder
+# is written, distinct so it can be located via Find ("[Screenshot:") and replaced by artwork later.
+function Pic($caption, $image = "") {
+    $path = ""
+    if ($image) { $path = Join-Path $PSScriptRoot ("images\" + $image) }
+    $sel.Style = $doc.Styles("Normal")
+    $sel.ParagraphFormat.Alignment = 1   # wdAlignParagraphCenter
+    if ($path -and (Test-Path $path)) {
+        $shape = $sel.InlineShapes.AddPicture($path, $false, $true)
+        $shape.LockAspectRatio = -1
+        if ($shape.Width -gt 432) { $shape.Width = 432 }     # text width in points (6 inches)
+        if ($shape.Height -gt 340) { $shape.Height = 340 }   # keep tall crops on the page
+        $sel.EndKey(5) | Out-Null   # wdLine: move past the picture
+        $sel.TypeParagraph()
+        $sel.Font.Italic = $true
+        $sel.TypeText($caption)
+        $sel.Font.Italic = $false
+    } else {
+        $sel.Font.Italic = $true
+        $sel.TypeText("[Screenshot: $caption]")
+        $sel.Font.Italic = $false
+    }
+    $sel.ParagraphFormat.Alignment = 0   # wdAlignParagraphLeft
+    $sel.TypeParagraph()
+}
+
+# ── Title page ──────────────────────────────────────────────────────────────
+$sel.Style = $doc.Styles("Title")
+$sel.TypeText("mu-On")
+$sel.TypeParagraph()
+$sel.Style = $doc.Styles("Subtitle")
+$sel.TypeText("Groove Sequencer")
+$sel.TypeParagraph()
+$sel.Style = $doc.Styles("Normal")
+$sel.TypeText("User Manual")
+$sel.TypeParagraph()
+$sel.TypeText("Version 0.1 (pre-release)")
+$sel.TypeParagraph()
+$sel.TypeText("Transwarp Development Project")
+$sel.TypeParagraph()
+Br
+
+# ── 1. Introduction ──────────────────────────────────────────────────────────
+H1 "1. Introduction"
+P "mu-On is a 909-style groove sequencer from Transwarp Development Project. It runs as a VST3 plug-in, a CLAP plug-in, and a standalone application."
+P "mu-On is built from tracks, one to eight of them. Every track has a row of sixteen steps and a sound engine that plays them: Kick and Bass are synthesised, Hat and Snare are built-in drum sounds, and Rumble is a special engine that does not play steps at all but turns another track's sound into the long, dark reverb tail of techno. You switch a track's engine at any time with the Engine dropdown, and the track keeps each engine's settings."
+P "Around the tracks is the family you may know from mu-Clid and mu-Tant: eight modulators per track, a mixer with sidechain ducking, shared effects, presets and the transport bar. In the mixer you can make the bass duck from the kick, for the classic pumping groove."
+P "mu-On is free. There is no licence key, no support window and no limit on any feature."
+
+H2 "Who Is This For?"
+P "mu-On is for producers who want a quick, hands-on groove box inside their DAW or on its own: four-on-the-floor kicks, off-beat basslines, hats, snares and a rumble, all with one click per step. It is fully automatable and synchronised to the host transport, or runs standalone for live performance and sketching."
+
+Pic "The mu-On window: transport bar, track sidebar, engine box, groove box and step rows." "main-window.png"
+
+# ── 2. Installation ──────────────────────────────────────────────────────────
+H1 "2. Installation"
+H2 "Plug-in Files"
+P "mu-On ships in three formats:"
+Bullet "VST3  —  copy mu-On.vst3 to %ProgramFiles%\Common Files\VST3\"
+Bullet "CLAP  —  copy mu-On.clap to %ProgramFiles%\Common Files\CLAP\"
+Bullet "Standalone  —  run mu-On.exe from any location"
+
+H2 "Content Folder"
+P "On first launch mu-On creates a content folder at %USERPROFILE%\Documents\TDP\muOn\ with sub-folders for presets (full preset files, .muOn) and tracks (single-track preset files, .muTrack)."
+
+H2 "Free to Use"
+P "mu-On is free. It needs no licence key and never asks for payment."
+
+# ── 3. Interface Overview ─────────────────────────────────────────────────────
+H1 "3. Interface Overview"
+P "The mu-On window is divided into four regions:"
+Bullet "Transport Bar (top) — playback, BPM, presets, mixer, and settings"
+Bullet "Track Sidebar (left) — one item per track, plus an Add button"
+Bullet "Track Editor (centre) — the engine, the groove controls and the step rows, with the modulators below, for the selected track"
+Bullet "Mixer overlay — opened from the transport bar, replacing the editor"
+Bullet "Status Bar (bottom) — the name and value of the control you last touched"
+P "The window has two sizes, Medium and Large, chosen in Settings (Display, Size). Everything scales with it. In the standalone application an Options button at the top left of the window opens the audio and MIDI device settings."
+
+# ── 4. Transport Bar ──────────────────────────────────────────────────────────
+H1 "4. Transport Bar"
+P "Controls from left to right:"
+Bullet "mu-On logo  —  click to open the About panel"
+Bullet "Play / Stop  —  in DAW mode follows the host transport and BPM, even while the plug-in is bypassed; in standalone starts and stops playback. Locked while an external MIDI clock controls play (see MIDI Clock Sync)."
+Bullet "BPM display  —  read-only in DAW mode; editable in standalone. Tempo runs from 20.0 to 300.0 BPM with one decimal (for example 127.5; whole tempos show .0). Click the up or down arrow to step one whole BPM and keep the fraction (127.5 becomes 128.5); Shift+click steps a tenth. Double-click to type a value such as 127.5 or 127,5; a value outside the range is clamped to it. The same field appears in Settings. Locked, and showing the clock's tempo to a tenth, while an external MIDI clock sets the tempo. The clock drives the step sequencer and the modulators."
+Bullet "Clock lamp  —  standalone only. Replaces the Tap button and sits between the BPM display and the Position readout, and appears only while MIDI clock sync is on with Messages set to Clock only or Clock + Transport (it is hidden with Transport only, and when Source is Internal). Dim amber means waiting for clock, green means locked to the clock, red means the clock was lost and the transport has stopped. The lamp stays steady; it never blinks. Hover over it to read its state in the status bar. See MIDI Clock Sync."
+Bullet "Tap button  —  standalone only. Takes the place of the Clock lamp whenever the lamp is not shown (the internal clock, or MIDI clock sync set to Transport only), so you see Tap or the lamp, never both. Tap it in time with the beat to set the tempo: it needs two taps, averages your last four intervals, and starts a new count if you pause for more than two seconds. The result is rounded to a tenth of a BPM, kept within 20 to 300, and written into the BPM field."
+Bullet "Nudge buttons (− and +)  —  standalone only. Two small buttons just right of the Position readout. Hold − to run the groove 4 % slower, or + to run it 4 % faster, to line up with another player by ear. Let go and the set tempo returns exactly; the BPM field never changes. Under an external MIDI clock, holding a button shifts the groove against the clock by that amount, and the shift stays until the next Start."
+Bullet "Position  —  bar, beat, and sixteenth readout (e.g. 3.2.1). In DAW mode it follows the host's position, even while the plug-in is bypassed, and counts in the host's time signature: in 3/4 a bar has three beats, in 7/8 it has seven eighth-note beats, and the last number is the sixteenth within the beat. Bar 1 starts where the host's bar 1 starts, so a pickup bar is counted correctly. The standalone counts in the time signature chosen in Settings (4/4 by default). The time signature only changes the readout; mu-On's step rows and modulator loop lengths still treat a bar as four beats."
+Bullet "Preset dropdown / New / Save  —  load and save full .muOn presets. New loads your default preset (tick Save as Default when saving) after asking whether to discard unsaved changes."
+Bullet "Settings (gear) icon  —  opens the Settings overlay."
+Bullet "Mixer button  —  opens the mixer overlay. The label changes to Sequencer while the mixer is open."
+
+Pic "Transport Bar — full width view." "transport-bar.png"
+
+# ── 5. Track Sidebar ──────────────────────────────────────────────────────────
+H1 "5. Track Sidebar"
+P "The sidebar shows one item per track, each with a letter for its engine (K for Kick, B for Bass, H for Hat, S for Snare, R for Rumble), its colour and its name. Click an item to select that track for editing."
+Bullet "Add  —  the + Track button at the bottom adds a track (maximum eight; the button is disabled at eight). A new mu-On starts with one Kick track. A new track takes the first engine of Kick, Bass, Hat, Snare and Rumble that no track is using yet (or Kick if all five are in use), with that engine's starting groove."
+Bullet "Delete  —  the Delete (×) button in the track header removes the selected track, after a confirmation. The last remaining track cannot be deleted."
+Bullet "Reorder  —  drag an item up or down. A track keeps its settings, steps and colour when it moves."
+P "A track is named after its engine and the name cannot be edited, so two Kick tracks are both called Kick. Presets saved by the earlier five-lane version of mu-On, which had fixed Kick, Bass, Hat, Snare and Rumble lanes, open as five tracks."
+
+Pic "Track Sidebar with five tracks, the Rumble selected." "sidebar.png"
+
+# ── 6. Track Header ───────────────────────────────────────────────────────────
+H1 "6. Track Header"
+P "At the top of the track editor:"
+Bullet "Track name and colour dot."
+Bullet "Track preset dropdown — load a single track from a .muTrack file in the Tracks folder."
+Bullet "Save — saves this track as a .muTrack file."
+Bullet "Reset (circular arrow) / Delete (×) — reset to defaults / remove the track (both confirm first)."
+
+# ── 7. Engines ────────────────────────────────────────────────────────────────
+H1 "7. Engines"
+P "The Engine box sits at the top of the track editor. Its first control is the Engine dropdown: Kick, Bass, Hat, Snare or Rumble. The knobs next to it belong to the chosen engine. Changing the engine asks no questions: every engine remembers its own settings on that track, so you can switch away and back without losing a sound. The track is renamed to the new engine's name. Knob labels are fixed words with no units; the Status Bar shows the value and its units as you hover or turn."
+
+H2 "Kick"
+P "A synthesised kick: a sine body with a fast pitch drop for the thump, and a drive stage for click and punch."
+Bullet "Tune (30 to 120 Hz, default 50) — the body's resting pitch."
+Bullet "Pitch (0 to 600, default 220) — how far the pitch sweeps above Tune at the start of the hit."
+Bullet "P.Dec (5 to 200 ms, default 50) — how quickly the pitch drops back to Tune."
+Bullet "Decay (20 to 800 ms, default 180) — the length of the body."
+Bullet "Drive (0 to 1, default 0.2) — saturation for punch and click."
+
+H2 "Bass"
+P "A deep synthesised bass, the engine with the most to play with: a main oscillator and a sub oscillator an octave below, a low-pass filter with its own decay envelope, and drive."
+Bullet "Wave — Sine, Saw or Square for the main oscillator."
+Bullet "Tune (20 to 120 Hz, default 41.2) — the bass note (41.2 Hz is the low E)."
+Bullet "Sub (0 to 1, default 0.5) — level of the sub oscillator."
+Bullet "Cutoff (40 to 4000 Hz, default 600) and Reso (0 to 1, default 0.2) — the low-pass filter."
+Bullet "F.Env (0 to 1, default 0.4) — how far each hit opens the filter."
+Bullet "E.Dec (10 to 1000 ms, default 180) — how quickly the filter closes again."
+Bullet "Atk (0.5 to 200 ms, default 2), Dec (20 to 1500 ms, default 200) and Sus (0 to 1, default 0) — the volume envelope of each note."
+Bullet "Drive (0 to 1, default 0.2) — warm saturation. Raise Sub, Drive and Reso for a gritty rumble."
+P "Every step of the bass plays the same note (Tune). The step row decides when the bass plays, not what it plays."
+
+H2 "Hat and Snare"
+P "Hat and Snare are built-in drum sounds (a bright noise hat, and a snare made of noise and a body tone). They play in one shot on each step. You cannot load your own samples into them."
+Bullet "Tune (-12 to +12 semitones) — pitch of the sound."
+Bullet "Decay — how long the sound lasts: 10 to 400 ms for the Hat (default 60), 20 to 600 ms for the Snare (default 160)."
+
+H2 "Rumble"
+P "Rumble is not a drum you step. It is the classic techno rumble: it takes the sound of another track, the Source, and runs it through a drive stage, three tempo-synced delay taps, a dark reverb, a volume envelope you draw, and a filter. Its step row is dimmed and ignored."
+Bullet "Source dropdown — which track to process. It lists the other tracks by number and name, for example 1 Kick, and starts on the first Kick. A Rumble whose source is missing, silent or another Rumble makes no sound."
+Bullet "Drive (0 to 1, default 0.4) — saturation on the incoming sound."
+Bullet "1/16, 2/16, 3/16 (0 to 1) — the level of three delay taps, one, two and three sixteenth notes behind the source."
+Bullet "Rv Size (0 to 1, default 0.7), Rv Mix (0 to 1, default 0.5) and Rv LP (200 Hz to 18 kHz, default 1.2 kHz) — the reverb's size, how much of it you hear, and how dark it is."
+Bullet "Cutoff (20 Hz to 20 kHz, default 800) and Reso (0 to 1, default 0.2) — the final filter."
+P "While a Rumble is selected, the Groove box shows the Envelope instead: a drawable curve that shapes the volume of the rumble over its loop. A Loop control above the curve sets the loop length as a note value times a multiplier (1/4 x 4 is one bar by default). Click on the curve to add a point, drag to move it, right-click to remove."
+
+Pic "A Rumble track: the Engine box with the Source dropdown, the Envelope editor and the step rows." "rumble-track.png"
+
+# ── 8. Steps and Groove ───────────────────────────────────────────────────────
+H1 "8. Steps and Groove"
+H2 "Step Rows"
+P "The Steps box shows one row of sixteen steps for every track, in the sidebar order and in each track's colour. Sixteen steps make one bar; each step is a sixteenth note."
+Bullet "Left-click a step to switch it on or off."
+Bullet "Right-click a step to switch its accent on or off. An accented step is drawn with a hotter centre and plays harder."
+Bullet "Click anywhere in a row to select that track. The selected track's row is outlined in its colour."
+Bullet "A playhead line runs through the rows with the transport. Every four steps (one beat) are tinted slightly differently so you can count."
+P "Every engine starts with its own groove: four-on-the-floor for the kick, off-beat for the bass, straight eighths for the hat, a backbeat for the snare and nothing for the rumble. A track keeps its row when you change its engine."
+
+H2 "Groove Box"
+P "Two controls on the left of the Steps panel apply to the whole pattern:"
+Bullet "Swing (default 0) — pushes every second sixteenth later, up to half a step, for a shuffle. 0 is straight."
+Bullet "Accent (default maximum) — how hard accented steps are played. Plain steps always play at a lower fixed level; lower Accent to make the accented steps less prominent."
+P "With a Rumble selected, the Groove box shows the Rumble's Envelope instead (see Rumble)."
+
+# ── 9. Modulators ─────────────────────────────────────────────────────────────
+H1 "9. Modulators"
+P "Each track has eight independent modulators (Mod A through Mod H) plus a Matrix tab - the same shared engine as mu-Clid and mu-Tant. Each track has its own modulator bank."
+P "Each modulator has a Mode dropdown (Stepped bar-graph or Smooth drawable curve), a Polarity switch (Uni 0 to +1, or Bi -1 to +1), and a loop length (a note-value dropdown times an integer multiplier). A playhead line shows the current loop position. In Smooth mode, click to add a node, drag to move, ALT-click a segment to bend it, right-click to remove. In Stepped mode, drag bars up or down. A dice button randomises the current modulator's values without changing its shape."
+P "Add destinations with the + Target button; the assignments are shown one at a time, so step through them with the up and down arrows and the counter at the right. Each assignment has a bipolar depth (-100 to +100 percent) and a source-side curve. The destinations are the controls of the track's engine. If you change a track's engine, the assignments for the old engine stay in place but do nothing until you switch back. When a knob is a destination, an arc around it shows the live modulated value."
+P "The Matrix tab lists every assignment across all eight modulators in one table."
+
+Pic "Modulator panel with the Stepped editor and the target list." "modulators.png"
+
+# ── 10. Mixer ─────────────────────────────────────────────────────────────────
+H1 "10. Mixer"
+P "Click the Mixer button in the transport bar to open the mixer overlay. Each track occupies one channel strip (the mixer always shows eight, with unused ones dimmed); to the right are the Effect, Delay, and Reverb return channels and the Master strip. This is the same shared mixer and FX rack as mu-Clid and mu-Tant."
+P "Each track strip has a fader with VU metering, pan, mute and solo, sidechain ducking (source, amount, attack, release), and Effect / Delay / Reverb sends. Ducking is set up here and nothing is wired in advance: to make the bass duck from the kick, open the bass track's sidechain source dropdown, choose the kick track, and raise Amount. The sidechain source dropdown includes all other track channels plus an External option — duck any track from any other, or from a signal fed in through the host's sidechain bus (VST3 / CLAP). The sources follow their tracks when you delete or reorder tracks. The FX return strips carry intra-FX routing (Effect to Delay, Effect to Reverb, Delay to Reverb), and the master strip has two inserts, Insert 1 and Insert 2, that the summed output passes through in that order. A row of buttons at the top right (Peak, VU, K-12, K-14) chooses the metering standard. The three FX rows (Effect / Delay / Reverb) sit below the strips with algorithm selectors and inline parameters."
+
+H2 "Effects"
+Bullet "Effect — Chorus (Rate, Depth, Voices, Spread), Flanger (Rate, Depth, Feedback), Phaser (Rate, Depth, Stages, Feedback) or Echo (Time, Feedback, Spread). The Effect is a pure send, like the Reverb, so it has no Mix knob; use each track's Effect send."
+Bullet "Delay — a Time dropdown (Free, 1/32, 1/16, 1/8 or 1/4). With a note value, a Straight | Dotted | Triplet switch and a Multiple knob (1 to 8) set the time; in Free mode a Time knob sets it in milliseconds. Feedback, Spread and Dirt complete it."
+Bullet "Reverb — Room, Hall, Plate or Spring, with Size, Pre-delay, Diffusion, Damp, Mod and Dirt. Reverb is a pure send."
+
+Pic "Mixer overlay with track channels, FX returns, and master." "mixer.png"
+
+# ── 11. Presets ───────────────────────────────────────────────────────────────
+H1 "11. Presets"
+H2 "Full Presets (.muOn)"
+P "Full presets save the entire plugin state - all tracks, step rows, modulators, mixer, and FX - to Documents\TDP\muOn\Presets. Load from the transport dropdown, which is grouped by category. Save with the Save button: enter a name, an optional description and a category, and tick Save as Default to make it the preset that loads at startup and when you press New. If saving fails (for example a full disk) mu-On shows an error message and never leaves a half-written preset."
+H2 "Per-Track Presets (.muTrack)"
+P "Each track can be saved and loaded independently to Documents\TDP\muOn\Tracks, including its engine, every engine's settings, its step row and its modulator assignments. Use the track header dropdown and Save button."
+P "Full presets saved by the earlier five-lane version of mu-On still load, as five tracks. When a preset, a track preset or a saved session is loaded, any setting it does not contain is set to its default."
+
+# ── 12. Settings ──────────────────────────────────────────────────────────────
+H1 "12. Settings"
+P "Click the gear icon to open the Settings overlay. Everything fits on one screen, in two columns, under two headings. Click Close to return."
+P "General (left column):"
+Bullet "Audio, Master Vol — overall output level"
+Bullet "Display, Size — Medium or Large window. Reopen the app for the label fonts to rescale fully."
+Bullet "Transport, Tempo — internal clock, 20.0 to 300.0 BPM with one decimal, also editable from the transport BPM field"
+Bullet "Transport, Time signature (standalone) — 2/4, 3/4, 4/4, 5/4, 6/4, 7/4, 5/8, 6/8, 7/8, 9/8 or 12/8; default 4/4. It changes how the bar.beat.sixteenth Position readout counts (a beat is a quarter note in x/4 and an eighth note in x/8). The step rows still run in four-beat bars."
+P "MIDI (right column):"
+Bullet "MIDI Clock, Source (standalone) — Internal, or MIDI In to follow an external MIDI clock, with a Sync Offset to compensate for audio latency (see below)."
+Bullet "MIDI Program Change — the Track Presets and Full Presets buttons open the tables that map incoming program-change messages to presets."
+P "A Contact Support link at the bottom of the page is there when you need help."
+
+Pic "Settings overlay open over the main window." "settings.png"
+
+H2 "MIDI Clock Sync (Standalone)"
+P "When running as a standalone application, mu-On can follow an external MIDI clock from a drum machine, groovebox, or DAW. First choose the MIDI input that carries the clock in the standalone's MIDI settings. Selecting the input does not turn sync on by itself. To follow the clock, open Settings and, in the MIDI Clock section, set Source to MIDI In; set it back to Internal to turn sync off and ignore any incoming clock. A Messages choice appears, which decides what mu-On takes from the clock:"
+Bullet "Clock only  —  you start and stop mu-On with its own Play button, but the tempo and beat follow the clock's ticks. The BPM field is locked and shows the clock's tempo. The clock's Start and Stop messages are ignored."
+Bullet "Transport only  —  the clock's Start, Continue, and Stop messages control playback (Start restarts from bar 1, Continue carries on from where it stopped), but mu-On plays at the tempo in its own BPM field and ignores the clock's ticks. The Play button is locked."
+Bullet "Clock + Transport  —  the clock runs everything. Its Start, Continue, and Stop messages start and stop playback, and its ticks set the tempo and the beat. The first clock after Start counts as the downbeat, so your steps line up closely with the external device. The Play button and BPM field are locked."
+P "With Clock + Transport or Transport only, mu-On also follows Song Position Pointer messages. If you stop the external sequencer, move its playhead, and press Continue, mu-On picks up from the new position instead of where it stopped."
+P "With Clock only or Clock + Transport, a Clock lamp appears in the transport bar, between the BPM display and the Position readout. It shows the state of the incoming clock and stays steady in every state; it never blinks:"
+Bullet "Dim amber  —  Waiting for clock. Sync is on, but no clock pulses have arrived yet, or the master device is stopped and sending nothing."
+Bullet "Green  —  Locked. mu-On is following the clock. Hover over the lamp and the status bar shows the tempo, for example `"Locked at 120 BPM`"."
+Bullet "Red  —  Lost. The clock pulses stopped arriving for about a quarter of a second while the master was playing, for example because a cable came loose or the master device was switched off. mu-On stops the transport, and the status bar shows `"MIDI Clock: Lost, transport stopped`" once, without you having to hover. When the pulses come back, mu-On carries on by itself."
+P "The lamp is hidden with Transport only, because the clock's ticks are not used, and whenever Source is Internal. The BPM display works as before: it is locked and shows the clock's tempo while the clock sets the tempo."
+P "Sync Offset  —  with Source set to MIDI In, a Sync Offset field appears in the MIDI Clock section of Settings. It runs from −50 to +250 ms (the label reads simply Sync offset) and defaults to 0. The value is shown with a sign, for example +25. The arrows step 1 ms; Shift+click steps 10 ms. A positive value makes mu-On play earlier than the clock says. Enter your audio output latency here (about 20 to 40 ms on Windows WASAPI) so the sound lands on the beat of a hardware master. mu-On remembers the setting between sessions."
+Pic "Transport bar with the Clock lamp lit green (locked) between the BPM display and the Position readout."
+
+H2 "MIDI Program Change to Preset"
+P "mu-On can load presets from incoming MIDI program-change messages. On channels 1 to 8 a program change loads the matching .muTrack into that track; on channel 9 it loads a full .muOn preset. While playing, the change is staged and applied seamlessly (hot-swap). Configure the mappings with the Track Presets and Full Presets buttons in Settings, under MIDI Program Change."
+
+# ── 13. Connecting to mu-link ─────────────────────────────────────────────────
+H1 "13. Connecting to mu-link"
+P "mu-link is a companion application from Transwarp Development Project: a local audio hub and master clock for the mu family. When mu-link is running, the mu-On standalone application connects to it automatically — mu-On's audio is summed into mu-link's mix and its transport locks to mu-link's master clock. The plug-in versions are unaffected; only the standalone connects, because in a DAW the host already owns the clock and audio device."
+H2 "How to Connect"
+Bullet "Launch mu-link, then launch mu-On standalone — in either order. Within about a second the mu-On title bar shows 'mu-link connected'."
+Bullet "mu-On's audio now plays through mu-link's output device, summed with any other connected mu apps, and appears as a channel in mu-link's client strip with its own level, pan, mute, and solo."
+Bullet "mu-On's step rows and modulators follow mu-link's clock: mu-link is the tempo master, and its Play/Stop and tempo drive mu-On. Use mu-link's transport (not mu-On's) while connected."
+Bullet "Quit mu-link and mu-On instantly reverts to its own audio device and internal transport — no restart needed."
+Bullet "MIDI in  —  the controllers you enabled in the standalone's MIDI settings still reach mu-On while it is connected, so program changes still load presets. For now they arrive roughly 85 milliseconds late, which is under a tenth of a second. Incoming MIDI clock is not followed while connected, because mu-link sets the tempo; to sync to external gear, connect its clock to mu-link instead."
+P "This lets you run mu-On, mu-Clid, mu-Tant and other mu standalones together, perfectly in sync and mixed to a single output — and lets mu-link slave the whole rig to an external MIDI clock. See the mu-link User Manual for the full picture."
+
+# ── 14. Tips and Workflow ─────────────────────────────────────────────────────
+H1 "14. Tips and Workflow"
+Bullet "Starting out: press Play. The first track is a Kick playing four on the floor."
+Bullet "Techno basics: add a Bass, a Hat and a Snare track with the + Track button, and a Rumble that takes the Kick as its Source."
+Bullet "Pumping bass: in the Mixer, set the bass track's sidechain source to the kick, with Amount around 60 to 80 percent, a fast attack and a slow release."
+Bullet "Off-beat groove: raise Swing a little and switch on accents on the off-beat hats with a right-click."
+Bullet "Gritty bass: raise Sub, Drive and Reso, and give F.Env a slower E.Dec."
+Bullet "Sounds that move: add a slow smooth modulator to the Bass Cutoff or the Kick Decay."
+Bullet "Rumble shape: draw a curve in the Rumble envelope that dips on each beat so the tail swells between the kicks."
+
+# ── 15. Technical Specifications ──────────────────────────────────────────────
+H1 "15. Technical Specifications"
+Bullet "Formats: VST3, CLAP, Standalone (Windows)"
+Bullet "Tracks: 1 to 8 (default 1), each with one of five engines and a 16-step row"
+Bullet "Engines: Kick (synthesis), Bass (synthesis), Hat and Snare (built-in sounds), Rumble (processes another track)"
+Bullet "Modulators per track: 8 (smooth LFO or stepped), plus a matrix view"
+Bullet "Full preset format: .muOn (XML). Per-track preset format: .muTrack (XML)"
+Bullet "Third-party libraries: JUCE, Signalsmith Reverb (MIT), clap-juce-extensions (MIT)"
+
+H2 "Hosts That Do Not Run an Event Loop"
+P "mu plugins need the host to run its normal event loop, as every ordinary DAW does. A few headless or offline-only renderers do not. In those, changes made by MIDI or a controller, MIDI program changes, and preset loads made while playing may not take effect until the host runs its event loop. If you hit this, load presets while the transport is stopped, or render with a host that runs its event loop."
+
+# ── Save ──────────────────────────────────────────────────────────────────────
+$outPath = "d:\Dev\mu\docs\mu-on\mu-On User Manual.docx"
+$doc.SaveAs([ref]$outPath, [ref]16)
+$doc.Close()
+$word.Quit()
+[System.Runtime.InteropServices.Marshal]::ReleaseComObject($word) | Out-Null
+Write-Host "Saved: $outPath"

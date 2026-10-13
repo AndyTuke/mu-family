@@ -87,6 +87,52 @@ public:
             expectEquals((int) mem.registry().slots[0].active.load(), 0);   // slot freed
         }
 
+        beginTest("the server can request a client's depth, and read its underrun count and the output latency");
+        {
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            engine.setOutputLatencyFrames(960);
+            MuLinkClient client;
+            client.onRender([] (float* const*, int, int, const TransportSnapshot&) {});
+            expect(client.attach("asked", 2), "attach failed");
+            client.setTargetDepthFrames(2048);
+            expect(waitForFrames(mem, 0, 2048, 3000), "never reached the target depth");
+
+            engine.requestClientDepth(client.slotIndex(), 4096);   // the server asks for more
+            expect(waitForFrames(mem, 0, 4096, 3000), "never followed the server's depth request");
+            juce::Thread::sleep(120);
+            expectEquals(mem.ring(0).readAvailable(), 4096);
+            expectEquals(client.getTargetDepthFrames(), 4096);
+
+            expectEquals((int) client.underrunFrames(), 0);        // nothing has been consumed short
+            expectEquals(client.outputLatencyFrames(), 0);         // nothing published until a block renders
+            client.detach();
+        }
+
+        beginTest("a depth request made right after attach survives, and withdrawing it restores the client's depth");
+        {
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            MuLinkClient client;
+            client.onRender([] (float* const*, int, int, const TransportSnapshot&) {});
+            client.setTargetDepthFrames(4096);
+            expect(client.attach("race", 2, false), "attach failed");
+            engine.requestClientDepth(client.slotIndex(), 2048);   // the server asks as the slot goes active
+            client.start();
+            expect(waitForFrames(mem, 0, 2048, 3000), "the request made at attach time was lost");
+            juce::Thread::sleep(120);
+            expectEquals(client.getTargetDepthFrames(), 2048);
+
+            engine.requestClientDepth(client.slotIndex(), 0);      // withdrawn: back to the client's own 4096
+            expect(waitForFrames(mem, 0, 4096, 3000), "withdrawing the request did not restore the client's depth");
+            expectEquals(client.getTargetDepthFrames(), 4096);
+            client.detach();
+        }
+
         beginTest("the producer holds its target depth instead of filling the ring");
         {
             MuLinkServerMemory mem;

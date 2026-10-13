@@ -132,6 +132,11 @@ public:
         saveSettings();
     }
 
+    // ─── Latency ─────────────────────────────────────────────────────────────
+    // How far ahead each app renders: 0 Low, 1 Normal, 2 High. Kept with the settings, not the presets.
+    int  getLatencyIndex() const noexcept { return latencyIndex; }
+    void setLatencyIndex(int index) { latencyIndex = std::clamp(index, 0, 2); saveSettings(); }
+
     // ─── Display ─────────────────────────────────────────────────────────────
     float getUiScale() const override { return uiScale; }
     void  setUiScale(float scale) override
@@ -189,6 +194,7 @@ private:
         {
             uiScale = (float) xml->getDoubleAttribute("uiScale", (double) kUiScaleMedium);
             server.setSyncOffsetMs(std::clamp(xml->getIntAttribute("syncOffsetMs", 0), kSyncOffsetMinMs, kSyncOffsetMaxMs));
+            latencyIndex = std::clamp(xml->getIntAttribute("latency", 1), 0, 2);
         }
     }
 
@@ -197,6 +203,7 @@ private:
         juce::XmlElement xml("MuLinkSettings");
         xml.setAttribute("uiScale", (double) uiScale);
         xml.setAttribute("syncOffsetMs", server.syncOffsetMs());
+        xml.setAttribute("latency", latencyIndex);
         rootDir.createDirectory();
         xml.writeTo(settingsFile);
     }
@@ -208,6 +215,7 @@ private:
     double bpmRequested  = 120.0;
     int    nudge         = 0;
     float  uiScale       = kUiScaleMedium;
+    int    latencyIndex  = 1;   // Low / Normal / High: how far ahead each app renders (kept with the settings, not the presets)
 
     // Lamp bookkeeping, updated by the const state query.
     mutable std::uint64_t lastPulseCount = 0;

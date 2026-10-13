@@ -5,14 +5,17 @@
 #include "UI/MasterLoopSection.h"
 #include "UI/LayerSidebar.h"
 #include "UI/RhythmMiniVisual.h"
-#include "UI/RhythmPanel.h"
+#include "UI/LayerPanel.h"        // mu-core shared per-layer panel shell
+#include "UI/LayerEditController.h"
+#include "UI/RhythmContent.h"
+#include "Modulation/MuClidModDest.h"
 #include "UI/MixerOverlay.h"
 #include "UI/SettingsOverlay.h"
 
 namespace mu_clid {
 
 // μ-Clid editor: extends the shared mu-core shell with rhythm-specific
-// components (sidebar, RhythmPanel, MixerOverlay, SettingsOverlay) and the
+// components (sidebar, RhythmContent in the shared LayerPanel, MixerOverlay, SettingsOverlay) and the
 // rhythm-set refresh wiring that drives them after preset loads / hot-swaps.
 class PluginEditor : public EditorShellBase,
                      private juce::AudioProcessorValueTreeState::Listener
@@ -35,7 +38,13 @@ private:
     // setMainArea / setMixerOverlay / setSettingsOverlay in the ctor.
     MasterLoopSection  masterLoop;
     LayerSidebar       sidebar;
-    RhythmPanel        rhythmPanel;
+    juce::String       effectSendName;   // mixer effect bus's current effect — names the effect-send target
+    // mu-clid's modulation destinations, wrapping the kTable + populate logic; the LayerPanel's
+    // shared modulator panel stays product-agnostic.
+    ModDestProvider    modDestProvider = mu_clid::makeModDestProvider([this] { return effectSendName; });
+    RhythmContent      rhythmContent;
+    LayerPanel         layerPanel;
+    mu_ui::LayerEditController layerEdit;   // add / delete / reorder glue; after the sidebar and the panel
     MixerOverlay       mixerOverlay;
     SettingsOverlay    settingsOverlay;
 
@@ -55,6 +64,7 @@ private:
     // when the mixer overlay is hidden.
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     void syncVoiceEffectSendLabel();
+    void applyEffectSendLabel(const juce::String& name);   // voice band label + the effect-send mod target
     bool isRhythmMidiOutput(int r) const;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)

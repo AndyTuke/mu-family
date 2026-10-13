@@ -28,16 +28,43 @@ namespace {
         return (int) std::ceil(ga.getBoundingBox(0, -1, true).getWidth());
     }
 
-    // Glyph + accent colour for each icon kind (empty = no icon).
+    // Text glyph for the icon kinds drawn as text (Question only; Warning and Info are vectors).
     juce::String iconGlyph(ModalDialog::Icon i)
     {
-        switch (i)
+        return i == ModalDialog::Icon::Question ? juce::String("?") : juce::String();
+    }
+
+    // Vector Warning (rounded triangle + '!') or Info (circle + 'i') icon in `box`.
+    void drawVectorIcon(juce::Graphics& g, ModalDialog::Icon i, juce::Rectangle<float> box,
+                        juce::Colour colour)
+    {
+        const float stroke = mu_ui::sf(MuLookAndFeel::kDialogIconStroke);
+        const auto  cap    = juce::PathStrokeType(stroke, juce::PathStrokeType::curved,
+                                                  juce::PathStrokeType::rounded);
+        const float u      = box.getHeight();
+        const float cx     = box.getCentreX();
+        g.setColour(colour);
+
+        // Outline: triangle with rounded corners (Warning) or circle (Info).
+        juce::Path outline;
+        const bool warn = i == ModalDialog::Icon::Warning;
+        if (warn)
         {
-            case ModalDialog::Icon::Warning:  return juce::String::fromUTF8("\xe2\x9a\xa0"); // ⚠
-            case ModalDialog::Icon::Question: return "?";
-            case ModalDialog::Icon::Info:     return juce::String::fromUTF8("\xe2\x93\x98"); // ⓘ
-            default:                          return {};
+            const auto b = box.reduced(stroke);
+            juce::Path tri;
+            tri.addTriangle(b.getCentreX(), b.getY(), b.getRight(), b.getBottom(), b.getX(), b.getBottom());
+            outline = tri.createPathWithRoundedCorners(u * 0.14f);
         }
+        else
+            outline.addEllipse(box.reduced(stroke));
+        g.strokePath(outline, cap);
+
+        // Glyph: Warning '!' sits low in the triangle; Info 'i' (dot over stem) is centred in the circle.
+        const float top  = box.getY() + u * (warn ? 0.40f : 0.44f);
+        const float bot  = box.getY() + u * (warn ? 0.66f : 0.72f);
+        const float dotY = box.getY() + u * (warn ? 0.79f : 0.29f);
+        g.drawLine(cx, top, cx, bot, stroke);
+        g.fillEllipse(cx - stroke * 0.8f, dotY - stroke * 0.8f, stroke * 1.6f, stroke * 1.6f);
     }
 
     // Build the message body as an AttributedString so measure + draw stay identical.
@@ -135,6 +162,8 @@ void ModalDialog::show(juce::Component* anchor)
             // primary the "active" look (accent bg/border/text) so the default action stands out.
             b->setClickingTogglesState(false);
             b->setToggleState(true, juce::dontSendNotification);
+            // A Warning dialog's primary is the destructive action: MuLookAndFeel draws it red.
+            if (iconType == Icon::Warning) b->getProperties().set("muDanger", true);
         }
         const int r = spec.result;
         b->onClick = [this, r] { finish(r); };
@@ -231,18 +260,25 @@ void ModalDialog::paint(juce::Graphics& g)
     const int pad = s(20);
     const auto inner = card.reduced(pad);
 
-    // Header: optional icon glyph + title.
+    // Header: optional icon (vector for Warning/Info, text for Question) + title.
     int titleX = inner.getX();
-    const auto glyph = iconGlyph(iconType);
-    if (glyph.isNotEmpty())
+    if (iconType != Icon::None)
     {
-        const auto accent = iconType == Icon::Warning
-            ? MuLookAndFeel::colour(Id::knobLevel)            // amber for warnings
-            : MuLookAndFeel::colour(Id::globalAccent);
-        g.setColour(accent);
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(20.0f)).withStyle("Bold")));
-        g.drawText(glyph, inner.getX(), inner.getY(), s(26), s(26), juce::Justification::centredLeft, false);
-        titleX += s(32);
+        const int iconSize = s(MuLookAndFeel::kDialogIconSize);
+        const juce::Rectangle<int> iconBox(inner.getX(), inner.getY(), iconSize, iconSize);
+        if (iconType == Icon::Question)
+        {
+            g.setColour(MuLookAndFeel::colour(Id::globalAccent));
+            g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(20.0f)).withStyle("Bold")));
+            g.drawText(iconGlyph(iconType), iconBox, juce::Justification::centredLeft, false);
+        }
+        else
+        {
+            drawVectorIcon(g, iconType, iconBox.toFloat(),
+                MuLookAndFeel::colour(iconType == Icon::Warning ? Id::segmentWarningBorder
+                                                                : Id::globalAccent));
+        }
+        titleX += iconSize + s(MuLookAndFeel::kDialogIconGap);
     }
     g.setColour(MuLookAndFeel::colour(Id::headingText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(15.0f)).withStyle("Bold")));

@@ -27,7 +27,7 @@ namespace
         }
         DeferredProcessor() : TestProcessorBase(WrapperType::wrapperType_Undefined, makeLayout()) {}
 
-        int getNumChannels() const override { return 2; }
+        int getNumLayers() const override { return 2; }
         void applyFullMidiPreset(const juce::File& f) override { fullLoads.add(f.getFileName()); }
         void applyMidiPresetLayer(int slot, const juce::File& f) override
         {

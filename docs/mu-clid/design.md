@@ -71,7 +71,7 @@ mu-clid/
 
 │ ├── Rhythm.h/.cpp
 
-│ └── SequencerEngine.h/.cpp
+│ └── RhythmSequencer.h/.cpp
 
 ├── Audio/
 
@@ -188,7 +188,7 @@ mu-clid/
 - TimeStretcherBase interface wraps SoundTouch --- enables Rubber Band
   swap in v2 without refactoring
 
-- RhythmSidebar item order must support variable ordering from day one
+- LayerSidebar item order must support variable ordering from day one
   --- required for v2 drag-to-reorder feature
 
 - Modulator output values and modulator depth values are named string
@@ -352,7 +352,7 @@ virtual void process(juce::AudioBuffer\<float\>& buffer) = 0;
                                                  Self-contained --- no        
                                                  cross-rhythm dependencies.   
 
-  SequencerEngine      juce::ChangeBroadcaster   Manages all rhythms. Reads   Moderate --- use
+  RhythmSequencer      juce::ChangeBroadcaster   Manages all rhythms. Reads   Moderate --- use
                                                  DAW position. Calculates     atomic pointer for
                                                  combined hits per block      hot-swap from day
                                                                               one
@@ -529,7 +529,7 @@ virtual void process(juce::AudioBuffer\<float\>& buffer) = 0;
                                                       RhythmPanel (large) and
                                                       SidebarItem (small).
 
-  RhythmSidebar         juce::Component               Left sidebar. Fixed width
+  LayerSidebar         juce::Component               Left sidebar. Fixed width
                                                       \~82px. Contains one
                                                       SidebarItem per active rhythm
                                                       in order. Add rhythm button at
@@ -623,7 +623,7 @@ virtual void process(juce::AudioBuffer\<float\>& buffer) = 0;
                                                       logo.
 
   PluginEditor          juce::AudioProcessorEditor    Root editor. TransportBar +
-                                                      \[RhythmSidebar \| RhythmPanel
+                                                      \[LayerSidebar \| RhythmPanel
                                                       or MixerOverlay\] + StatusBar.
   --------------------- ----------------------------- ------------------------------
 
@@ -1422,7 +1422,7 @@ setResizeLimits(780, 580, 2400, 1600);
 - Sidebar is scrollable if more rhythms than fit at minimum window
   height (unlikely with max 8 rhythms).
 
-- Drag-to-reorder sidebar items: v2 feature. RhythmSidebar must support
+- Drag-to-reorder sidebar items: v2 feature. LayerSidebar must support
   variable item ordering from day one.
 
 **10.7 Mixer Overlay**
@@ -1584,7 +1584,7 @@ for that rhythm.
               algorithm, padding,    
               accent                 
 
-  2           DAW sync and step      SequencerEngine, PluginProcessor
+  2           DAW sync and step      RhythmSequencer, PluginProcessor
               triggering             
 
   3           Sample playback engine SamplePlayer, TimeStretcherBase,
@@ -1596,7 +1596,7 @@ for that rhythm.
   5           UI component library   All UI/Components/ files,
                                      MuClidLookAndFeel, StepEditor, LFOEditor
 
-  6           Sidebar and rhythm     RhythmSidebar, SidebarItem, RhythmPanel,
+  6           Sidebar and rhythm     LayerSidebar, SidebarItem, RhythmPanel,
               panel                  RhythmCircle, EuclideanPanel,
                                      VoiceSection, AccentHitGenerator
 
@@ -2256,7 +2256,7 @@ for that rhythm.
                         supported (string     the feature later.
                         IDs). UI in v2.       
 
-  Sidebar item order    Creation order.       Simple for v1, RhythmSidebar
+  Sidebar item order    Creation order.       Simple for v1, LayerSidebar
                         Drag-to-reorder in    architected for reorder from
                         v2.                   day one.
 
@@ -3014,7 +3014,7 @@ visibleWhen:{paramId:\"tone_mode\", notValue:0}} \] }
 - Item order: creation order top to bottom. Drag-to-reorder is v2
   feature.
 
-- RhythmSidebar must support variable item ordering from day one
+- LayerSidebar must support variable item ordering from day one
 
 - Add rhythm button at bottom: dashed border, + symbol. Disabled when 8
   rhythms active.

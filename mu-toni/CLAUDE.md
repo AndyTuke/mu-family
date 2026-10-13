@@ -18,10 +18,11 @@ The editor inherits `mu-core/UI/EditorShellBase.h`, so TransportBar, StatusBar, 
 - **Arp engine** — [Sequencer/ArpSequencer.h](Source/Sequencer/ArpSequencer.h) (pool derivation + skewed-triangle scan, pure and unit-tested) and [Sequencer/ArpVoiceRunner.h](Source/Sequencer/ArpVoiceRunner.h) (arp clock → voice note-on/off). Tables in [Audio/Scales.h](Source/Audio/Scales.h) and [Audio/Chords.h](Source/Audio/Chords.h) (~35 chords, absolute intervals, tier-grouped).
 - **Voice** — [Audio/ToniVoice.h](Source/Audio/ToniVoice.h): mu-Tant's wavetable oscillators + 2-lane X-Mod + sync, shared from mu-core ([Audio/Wavetable/](../mu-core/Audio/Wavetable/) — `WavetableBank`, `XModOscPair`).
 - **Per-voice modulation** — `Layer` (8 control sequences + `ModulationMatrix`) with the shared mu-core `ModulatorPanel` as the engine panel's bottom band; [Modulation/MuToniModDest.h](Source/Modulation/MuToniModDest.h) registers 20 arp/voice/env destinations, resolved per block through `mu_mod::resolveLane`. Persists in the APVTS state as the `MuToniMods` child.
-- **`mu_toni::PluginEditor : EditorShellBase`** — shared shell + `ChannelSidebar` + a populated [UI/EnginePanel.h](Source/UI/EnginePanel.h) (arp / osc / filter / env / insert, APVTS-attached shared widgets) + `MixerOverlay`. No bespoke shell or mixer code.
+- **`mu_toni::PluginEditor : EditorShellBase`** — shared shell + `LayerSidebar` + the shared `LayerPanel` around a populated [UI/ArpContent.h](Source/UI/ArpContent.h) (arp / osc / filter / env / insert, APVTS-attached shared widgets) + `MixerOverlay`. No bespoke shell or mixer code.
 - **MIDI note input** — root note selectable by played note (latest note-on wins, held-note fallback stack); Loop vs MIDI-triggered run mode. μ-Toni is the first family member to consume played notes.
 - **mu-link** — standalone bridge via the shared `MuLinkBridge.h` one-liner in [Source/Plugin/StandaloneApp.cpp](Source/Plugin/StandaloneApp.cpp), identity "mu-Toni"; arp clock slaves to the master clock when attached.
 - **Standalone quit prompt** via the shared `mu_ui::confirmQuitAsync`.
+- **1–8 layers** — a fresh instance has one; the sidebar Add button, header delete (with confirm) and drag-reorder go through the shared `ProcessorBase::addLayer` / `removeLayer` / `swapLayers` and `mu_ui::LayerEditController`. All eight layers' parameters (`a{N}_`, `ch{N}_`), `Arp`s and mixer strips exist from construction (`keepSpareLayers`); `processBlock` try-locks `layersLock` and renders the live layers only. The count and palette colours save as `numVoices` / `voiceColours` (not APVTS parameters); a state without them (saved when the count was fixed at four) loads as four layers. No cap (freeware).
 - **`mu-toni-tests`** — arp engine, oscillator, and global-FX APVTS layout coverage; builds every default build.
 - **Presets** — dirs + extensions wired: full = `.muToni`, per-slot = `.muArp`.
 
@@ -31,7 +32,6 @@ The editor inherits `mu-core/UI/EditorShellBase.h`, so TransportBar, StatusBar, 
 
 ### Current placeholders / not yet wired
 
-- **Fixed 4 "Layer" channels** — `kNumChannels = 4` of `kMaxChannels = 8` ([PluginProcessor.h:35-36](Source/Plugin/PluginProcessor.h#L35)). Dynamic add/delete/reorder is unwired (the central `ProcessorBase::addLayer`/`removeLayer` are not yet adopted), so **the sidebar Add button is inert**; the design calls for 1–8 independent mono arps, default 1.
 - **Preset save/load chrome** — the extensions and directories exist and loads go through the shared `ProcessorBase::layerSwapper` (stage while the resolved transport plays, commit on the next bar line; apply at once when stopped), but the browser chrome may still be disabled in the editor. DAW state via the APVTS works.
 - **MIDI-PC preset hooks stubbed** — `applyMidiPresetLayer` / `applyFullMidiPreset` are empty overrides.
 - **Oscillators are mu-Tant's wavetables** (procedural factory bank, no shipped content) with the same 2-lane X-Mod + sync, via the shared mu-core `XModOscPair`; param ids match mu-Tant's (`o1_wt`, `o1_pos`, `xmod_*`, `sync`).

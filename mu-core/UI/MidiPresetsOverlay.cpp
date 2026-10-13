@@ -5,7 +5,7 @@ static_assert(MidiPresetMap::NumSlots == 128, "the list shows one row per MIDI p
 
 namespace
 {
-    int channelCount(const ProcessorBase& p) { return juce::jlimit(1, 8, p.getMaxChannels()); }
+    int channelCount(const ProcessorBase& p) { return juce::jlimit(1, 8, p.getMaxLayers()); }
 }
 
 MidiPresetsOverlay::MidiPresetsOverlay(ProcessorBase& p)

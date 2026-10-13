@@ -49,7 +49,7 @@ WavetableBank::WavetableBank()
 const juce::StringArray& WavetableBank::factoryTableNames()
 {
     static const juce::StringArray names {
-        "Basic Shapes", "Saw Morph", "Square PWM", "FM Stack", "Formant", "Additive"
+        "Basic", "Saw Morph", "Pulse", "FM Stack", "Formant", "Additive"
     };
     return names;
 }

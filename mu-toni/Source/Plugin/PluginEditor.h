@@ -2,9 +2,13 @@
 
 #include "UI/EditorShellBase.h"
 #include "UI/LayerSidebar.h"     // mu-core shared sidebar (select/add/delete/reorder)
+#include "UI/LayerEditController.h"   // mu-core: add / delete / reorder glue
 #include "UI/MixerOverlay.h"       // mu-core shared mixer
 #include "Plugin/PluginProcessor.h"
-#include "UI/EnginePanel.h"
+#include "UI/LayerPanel.h"        // mu-core shared per-layer panel shell
+#include "UI/ArpContent.h"
+#include "UI/ArpMiniVisual.h"
+#include "Modulation/MuToniModDest.h"
 #include "UI/SettingsOverlay.h"
 
 namespace mu_toni
@@ -12,9 +16,9 @@ namespace mu_toni
 
 // mu-Toni editor: the shared mu-core shell (TransportBar / StatusBar / About /
 // overlays / window sizing / MuLookAndFeel) + the shared LayerSidebar + shared
-// MixerOverlay, around the EnginePanel carrying the arp / osc / filter / env /
-// insert controls and the modulation band. No bespoke shell or mixer code — the
-// product supplies only the sidebar visual and the engine panel.
+// MixerOverlay, around the shared LayerPanel (preset strip + modulators) holding the
+// ArpContent band (arp / osc / filter / env / insert controls). No bespoke shell or mixer
+// code — the product supplies only the sidebar visual and the content band.
 class PluginEditor : public EditorShellBase
 {
 public:
@@ -29,7 +33,10 @@ protected:
 private:
     PluginProcessor& proc;
     LayerSidebar   sidebar;
-    EnginePanel      enginePanel;
+    ModDestProvider  modDestProvider = makeModDestProvider();
+    ArpContent       arpContent;
+    LayerPanel       layerPanel;
+    mu_ui::LayerEditController layerEdit;   // add / delete / reorder glue; after the sidebar and panel
     MixerOverlay     mixerOverlay;
     SettingsOverlay  settingsOverlay;
 

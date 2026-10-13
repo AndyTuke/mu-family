@@ -60,6 +60,14 @@ void ReverbSlot::prepare(double sampleRate, int blockSize)
     updateReverb();
 }
 
+void ReverbSlot::reset()
+{
+    impl->reverb.reset();
+    std::fill(preDelayBufL.begin(), preDelayBufL.end(), 0.0f);
+    std::fill(preDelayBufR.begin(), preDelayBufR.end(), 0.0f);
+    preDelayWrite = 0;
+}
+
 void ReverbSlot::runPreDelay(const juce::AudioBuffer<float>& src, int numSamples)
 {
     const int numCh = src.getNumChannels();

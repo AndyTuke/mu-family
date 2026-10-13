@@ -30,7 +30,7 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Sequencer/EuclideanGenerator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Sequencer/HitGenerator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Sequencer/Rhythm.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Sequencer/SequencerEngine.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Sequencer/RhythmSequencer.cpp"
     # Audio
     "${CMAKE_CURRENT_SOURCE_DIR}/Audio/VoiceEngine.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Audio/InsertProcessor.cpp"
@@ -83,7 +83,11 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/SidebarItem.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/LayerSidebar.cpp"
     # Shared per-layer header bar (name / reset / delete / preset / save).
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/ChannelHeaderBar.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/LayerHeaderBar.cpp"
+    # Shared per-layer panel shell (header strip + product content + modulators).
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/LayerPanel.cpp"
+    # Shared add / delete / reorder editor glue for products with variable layers.
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/LayerEditController.cpp"
     # Shared insert-effect voice subsection (algo dropdown + 4 slot knobs).
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/Voice/InsertSubsection.cpp"
     # Shared voice band (Pitch / Filter / Amp / Effects layout + drawing) and its cell-grid section.

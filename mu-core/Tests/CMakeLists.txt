@@ -9,6 +9,10 @@ target_sources(mu-core-tests PRIVATE
     HostTransportPublishTests.cpp
     LayerAccessTests.cpp
     LayerOwnershipTests.cpp
+    RhythmAdoptDefaultsTests.cpp
+    ../Sequencer/Rhythm.cpp
+    ../Sequencer/HitGenerator.cpp
+    ../Sequencer/EuclideanGenerator.cpp
     ScopedStorageRootTests.cpp
     ChannelStateResetTests.cpp
     SupportPromptPolicyTests.cpp

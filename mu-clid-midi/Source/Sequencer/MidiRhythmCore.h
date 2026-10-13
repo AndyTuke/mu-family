@@ -2,7 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Audio/MidiOutputEngine.h"
-#include "Sequencer/SequencerEngine.h"
+#include "Sequencer/RhythmSequencer.h"
 #include "Persistence/RhythmParamTable.h"   // kRhythmParamCount for the pending slots
 #include "Sequencer/RhythmPlayState.h"    // shared with RhythmCircle (mu-core)
 
@@ -14,7 +14,7 @@ namespace mu_clid_midi {
 
 using mu_core::Rhythm;
 using mu_core::RhythmPlayState;
-using mu_core::SequencerEngine;
+using mu_core::RhythmSequencer;
 
 // Everything mu-Clid MIDI does between the host block and its MIDI output, with no AudioProcessor
 // around it: the one rhythm, the note engine, the parameter sync and the lock that keeps the message
@@ -55,7 +55,9 @@ public:
     // thread never takes it; exposed so a test can hold it from a second thread and see no block skip.
     juce::CriticalSection& getRhythmLock() noexcept { return rhythmsLock; }
 
-    SequencerEngine sequencer;
+    // The one rhythm, owned here and bound to the sequencer's slot 0 (the sequencer does not own rhythms).
+    Rhythm          rhythm;
+    RhythmSequencer sequencer;
 
     // UI play state: written by the audio thread, read by the editor at 30 Hz.
     RhythmPlayState     rhythmPlayState;

@@ -98,6 +98,7 @@ edits](design-plugin-family.md#layer-ownership-and-structural-edits--family-stan
 - **What stays product-side:** the sequencer data, the engine, the product's `ModTarget` table, its
   param table and prefixes, its editor panels, and (until a second type shares an instance) the typed
   accessor (`getRhythm(i)`, `getPattern(i)`).
+- **`ProcessorBase` layer accessors (done):** `getNumLayers`, `getLayer(i)`, `getMaxLayers`, `getNumActiveLayers`, `getLayerName(i)`, `getLayerColourIndex(i)`. They replaced `getNumChannels`, `getMaxChannels`, `getNumActiveChannels`, `getChannelName` and `getChannelColourIndex`; mu-Tant's duplicate `getNumVoices` was removed in favour of `getNumLayers`. `juce::AudioBuffer::getNumChannels` is an audio-channel count and keeps its name. Saved identifiers (`numVoices`, `voiceColours`) are unchanged.
 
 ---
 
@@ -173,7 +174,11 @@ names. They are modal pop-ups, not `OverlayHost` screens, so the `Overlay` role 
 Parameter-id prefixes (`r0_`, `v0_`, `a0_`, `t0_`), preset extensions (`.muRhythm`, `.muPattern`,
 `.muArp`, `.muTrack`), content folders, state identifiers (`Mu<Product>State`) and plugin codes
 (`MCld MTnt MTni MuOn`) are *data*: renaming them touches presets and DAW sessions. The composed
-slot state already stores ids without their prefix, so layer data is prefix-agnostic on disk.
+slot state already stores ids without their prefix, so layer data is prefix-agnostic on disk. The
+composed state's root properties `numVoices` (live layer count) and `voiceColours` (8 palette indices) are
+saved data too: they keep their names in every product (mu-Tant today; mu-Toni and mu-On with #1240 / #1241,
+read and written by `ProcessorBase`), even though "voice" is the retired layer word. A state without
+`numVoices` means the product's legacy count (mu-Tant 1, mu-Toni 4, mu-On 5).
 
 **Ruled 2026-10-11 (architecture-steward, backlog #1263; the owner scheduled this ahead of variable
 layers).** What changes, and what deliberately does not. **Status 2026-10-12: the prefix renames are done
@@ -250,16 +255,16 @@ unique", legitimate because the type is one `mu-core` class (§1).
 | Parent class | Only `Rhythm` derives from `Layer`; the others use parallel arrays (§2). |
 | mu-core vocabulary | `kMaxChannels` is the layer cap; core types say both `Voice*` and `Channel*`; "Slot" has three meanings (11 types). |
 | Namespaces | Done at build 1190: mu-Clid is entirely in `mu_clid` (the Rhythm modulator adapters, preset and param tables and `PluginProcessor_Internal` helpers left `mu_pp`; `mu_pp_migrate` is `mu_clid::migrate`; `md` and `ModDest` nest in `mu_clid`). Only `createPluginFilter` and `StandaloneApp.cpp` stay global. |
-| Overlay vs Panel | Done at build 1172: `AboutOverlay`, `ActivationOverlay`, `MidiPresetsOverlay`, `MidiFullPresetsOverlay` (were `…Panel`). **`SaveDialog` and `PresetBrowser` stay as named exceptions ✔ owner (2026-10-10):** they are modal pop-ups owned by the shell, not `OverlayHost` screens, and their names are already stable across the family; do not rename them. Still open: the shared `LayerPanel` / `LayerSidebar`, now ruled (2026-10-12, family doc "Shared layer sidebar and layer panel"): `ChannelSidebar` is renamed `LayerSidebar`, `SidebarItem` keeps its name, `ChannelHeaderBar` becomes `LayerHeaderBar` in a later tidy, no product subclasses. |
+| Overlay vs Panel | Done at build 1172: `AboutOverlay`, `ActivationOverlay`, `MidiPresetsOverlay`, `MidiFullPresetsOverlay` (were `…Panel`). **`SaveDialog` and `PresetBrowser` stay as named exceptions ✔ owner (2026-10-10):** they are modal pop-ups owned by the shell, not `OverlayHost` screens, and their names are already stable across the family; do not rename them. Still open: the shared `LayerPanel` / `LayerSidebar`, now ruled (2026-10-12, family doc "Shared layer sidebar and layer panel"): `ChannelSidebar` is renamed `LayerSidebar`, `SidebarItem` keeps its name, `ChannelHeaderBar` became `LayerHeaderBar` (done 2026-10-12), no product subclasses. |
 | Main sound panel | `VoiceSection` (mu-Clid), `VoicePanel` (mu-Tant), `EnginePanel` (mu-Toni, mu-On), `VoiceBand` (core). **Ruled 2026-10-12:** the per-layer stack is the shared `LayerPanel`; the product's band inside it is `<Type>Content` (`RhythmContent`, `PatternContent`, `ArpContent`, `TrackContent`), which replaces `EnginePanel` as the planned family name; `VoiceBand` stays as a shared section inside a content band. Mini-graphics are `<Type>MiniVisual`. |
-| Sequencer names | `SequencerEngine`, `GatePattern`, `Arpeggiator` + `ArpVoiceRunner`, `GrooveSequencer` — no shared role. **Ruled 2026-10-12:** `Arpeggiator` to `ArpSequencer` now; `SequencerEngine` to `RhythmSequencer` with layer stage 7; `GrooveSequencer` conforms; `GatePattern` is data and stays. Main sound panel: `<Type>Content` inside the shared `LayerPanel` (superseding the earlier `EnginePanel` choice), done with #1505 / #1506 (see the family doc, "Shared layer sidebar and layer panel"). |
-| Capacity constants | mu-Clid's `kMaxRhythms` alias is gone (build 1195). mu-Tant's two `kMaxVoices` and mu-Toni / mu-On's `kMaxChannels` read `mu_limits::kMaxLayers` (build 1171) but are still redeclared product-side; replace with `mu_limits::kMaxLayers` directly (mu-On's is unused, delete it). The `kMaxChannels` in `mu-core/Link/` is the stereo ring width, an unrelated constant: leave it. |
+| Sequencer names | `RhythmSequencer` (was `SequencerEngine`; renamed 2026-10-12, file and class together), `GatePattern`, `ArpSequencer` + `ArpVoiceRunner`, `GrooveSequencer`. **Ruled 2026-10-12:** `Arpeggiator` to `ArpSequencer` (done); `GrooveSequencer` conforms; `GatePattern` is data and stays. Main sound panel: `<Type>Content` inside the shared `LayerPanel` (superseding the earlier `EnginePanel` choice), done with #1505 / #1506 (see the family doc, "Shared layer sidebar and layer panel"). |
+| Capacity constants | (Done 2026-10-12 with #1240 / #1241: mu-Toni's and mu-On's `kNumChannels` are deleted; mu-On's `EngineType`, `TrackParams.h`, `getTrack` and the engine-qualified suffixes are built as ruled in §5 step 6.) mu-Clid's `kMaxRhythms` alias is gone (build 1195). mu-Tant's two `kMaxVoices` and mu-Toni / mu-On's `kMaxChannels` read `mu_limits::kMaxLayers` (build 1171) but are still redeclared product-side; replace with `mu_limits::kMaxLayers` directly (mu-On's is unused, delete it). The `kMaxChannels` in `mu-core/Link/` is the stereo ring width, an unrelated constant: leave it. |
 | `Slot` in layer APIs | `ProcessorBase` and `mu_pp` use "slot" for a layer (`initSlotState`, `slotLayer`, `saveSlotPreset`, `voiceSlots`, ...). Rename to `Layer` per §1; the XML tags `Slots` / `Slot` and `idx` are saved data and stay. Plan: see the rename list under migration step 5. |
 | Acronyms | `…APVTS` function names in mu-Clid vs `…Apvts` elsewhere. |
 | Members | Trailing `_` in seven classes (mu-Clid helpers, `MidiClockSync`, `VocoderInsert`). |
 | Enums | plain `enum` in mu-Toni (3), mu-On (3), mu-Tant (2). |
-| Folders | Done at build 1187: mu-Clid now has all eight (`SamplePreview` + `SampleLibrary` in `Audio/`, `RhythmManager` in `Sequencer/`, `PresetIO` + `PresetIO_HostState` in `Persistence/`, `ModulationSkew` in `Modulation/`, `LiteEditor` in `UI/`; `HotSwapStager` / `HotSwapBoundary` stay in `Plugin/` like mu-Tant's stager). Still open: mu-On has no `License` or `Persistence`; mu-Tant and mu-Toni `Persistence/` hold only `.gitkeep`. |
-| Products | mu-Clid Lite is still a second target in `mu-clid/` (`MUCLID_LITE_BUILD`, about 60 `#if` sites, `LiteEditor` in mu-Clid's `UI/`, namespace `mu_clid`). Owner made it a separate product on 2026-10-11: it is named mu-Clid MIDI (2026-10-11) and gets `mu-clid-midi/` and `mu_clid_midi` by the staged plan in the family doc (stage 1 identity first; stage 2 moved the pure generators to `mu-core/Sequencer/`). The product exists and compiles nothing from `mu-clid/`: `Rhythm`, `SequencerEngine`, `EuclideanPanel` and `RhythmCircle` moved to `mu-core` (Stage 2b of the family doc, done; the known exception is closed, backlog #1411). |
+| Folders | Done at build 1187: mu-Clid now has all eight (`RhythmManager` was deleted by the stage 7 container move; `SamplePreview` + `SampleLibrary` in `Audio/`, `PresetIO` + `PresetIO_HostState` in `Persistence/`, `ModulationSkew` in `Modulation/`, `LiteEditor` in `UI/`; `HotSwapStager` / `HotSwapBoundary` stay in `Plugin/` like mu-Tant's stager). Still open: mu-On has no `License` or `Persistence`; mu-Tant and mu-Toni `Persistence/` hold only `.gitkeep`. |
+| Products | mu-Clid Lite is still a second target in `mu-clid/` (`MUCLID_LITE_BUILD`, about 60 `#if` sites, `LiteEditor` in mu-Clid's `UI/`, namespace `mu_clid`). Owner made it a separate product on 2026-10-11: it is named mu-Clid MIDI (2026-10-11) and gets `mu-clid-midi/` and `mu_clid_midi` by the staged plan in the family doc (stage 1 identity first; stage 2 moved the pure generators to `mu-core/Sequencer/`). The product exists and compiles nothing from `mu-clid/`: `Rhythm`, `RhythmSequencer`, `EuclideanPanel` and `RhythmCircle` moved to `mu-core` (Stage 2b of the family doc, done; the known exception is closed, backlog #1411). |
 | Saved data | Parameter-id prefixes done 2026-10-12: one index scheme per layer type (`r0_` Rhythm, `v0_` Pattern, `a0_` Arp, `t0_` Track), each product via `layerParamPrefix` / `layerParamId`. Open (optional, on hold): mu-Tant's folder `Voices/` disagrees with its `.muPattern`. See §3 "Saved-data names". |
 
 ---
@@ -287,7 +292,17 @@ C++ identifier changes never touch saved files; the data renames at the end do.
    3. **M** persistence virtuals `writeExtras` / `applyExtras`; `initSlotState` takes only the prefixes.
    4. **S** ownership moves into `ProcessorBase` (array of `unique_ptr<Layer>`, count, `layersLock`).
    5. **S** central `addLayer` / `removeLayer` / `swapLayers` / `resetLayer`; generic hot-swap stager. **Done** (part 1 commit a41c5fd; part 2 commit 8a8be28, `LayerSwapper` in `ProcessorBase`; mu-Clid's own stager remains until stage 7).
-   6. **O** variable layer count in mu-Toni (backlog #1240) and mu-On (#1241), the clip bank (#1277).
+   6. **O** variable layer count in mu-Toni (backlog #1240) and mu-On (#1241), the clip bank (#1277). Order, saved
+      shape and per-product recipe: design-plugin-family "Stage 6 build rulings". Names ruled 2026-10-12 (apply
+      with the work, so each file is touched once): mu-Toni and mu-On delete their `kNumChannels` (use
+      `mu_limits::kMaxLayers`); mu-On's `enum Channel { Kick .. Rumble, kNumChannels }` becomes `enum class EngineType : int
+      { Kick = 0, Bass, Hat, Snare, Rumble }` plus `kNumEngineTypes` (the values are the saved `t{N}_eng` choice index,
+      so they are fixed), `MuOnChannels.h` is renamed `TrackParams.h` (file = what it holds; it stays where mu-Toni keeps its
+      equivalent prefix helpers, to mirror), `voiceSlot(lane)` becomes `getTrack(i)`, and "lane" / "channel" in identifiers becomes
+      "track" for the layer and "engine" for the sound type; `laneOf` goes (the engine is a parameter, not an identity);
+      mu-On's engine-qualified parameter suffixes are `kick_`, `bass_`, `hat_`, `snare_`, `rumble_` (the engine's lower-case
+      name, as in the family doc). The processor entry points are the base's `addLayer` / `removeLayer` / `swapLayers` /
+      `resetLayer`; no product adds `addTrack` / `addArp` wrappers.
    7. **S** mu-Clid's `Rhythm` takes its engine, MIDI engine, play state and samples as members and moves into the container.
    8. **O**, with the combined instance and #1263: the layer-type registry and `Layer::render`.
    **"Slot" to "Layer" in C++ APIs (Architecture Steward, 2026-10-10).** Do now (pure identifiers, word-bounded
@@ -306,10 +321,11 @@ C++ identifier changes never touch saved files; the data renames at the end do.
    names `captureState` / `applyState` are taken by the products' own wrappers, and renaming onto them makes
    mu-Toni and mu-On recurse into themselves).
    Related and interlocking: the **MIDI-effect product split** (family doc, "The MIDI-effect product")
-   extracts mu-Clid's Euclidean generators (done) and then `Rhythm` / `SequencerEngine` /
+   extracts mu-Clid's Euclidean generators (done) and then `Rhythm` / `RhythmSequencer` /
    `RhythmPlayState` / the param table / `EuclideanPanel` / `RhythmCircle` into `mu-core` (Stage 2b in that
-   section, ruled 2026-10-11, **before** stage 7: the class is pure today, and stage 7 then derives
-   `mu_clid::Rhythm` from `mu_core::Rhythm` instead of moving the shared class again).
+   section, ruled 2026-10-11, **before** stage 7: the class is pure today, and stage 7 then uses
+   `mu_core::Rhythm` directly instead of moving the shared class again; amended 2026-10-12: no derived `mu_clid::Rhythm`, see
+   design-plugin-family "Stage 7 implementation plan").
 6. **Saved-data names** — ruled 2026-10-11; prefix renames done 2026-10-12 (the mu-Tant folder move is dropped, on hold): the exact changes, the migration contract and the order are in §3 "Saved-data names". Backlog #1263.
 
 Separately, the **standard `Source/` layout** (eight folders in every instrument product): folders created

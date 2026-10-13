@@ -199,7 +199,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
             <div>
               <div class="dl-name"><span class="mu">μ</span>-clid<span class="dl-tag demo">Free</span></div>
               <div class="dl-formats">8-track euclidean rhythm sequencer + sampler · VST3 · CLAP · Standalone · Windows · Linux</div>
-              <div class="dl-meta"><span>Version <b data-version>v1.0.0.971</b></span><span data-asset="mu-Clid-Windows.zip">11.8 MB</span><span>Free and fully functional. Add your licence key to unlock all 8 tracks and saving.</span></div>
+              <div class="dl-meta"><span>Version <b data-version>v1.0.0.971</b></span><span data-asset="mu-Clid-Windows.zip">11.8 MB</span><span>Free and fully functional, with all 8 tracks and saving. Pay what you like if you want to support it.</span></div>
             </div>
             <div class="dl-actions">
               <a class="btn-dl clid" href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Clid-Windows.zip">Download — Windows ↓</a>
@@ -227,7 +227,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
             <div>
               <div class="dl-name"><span class="mu">μ</span>-tant<span class="dl-tag demo">Free</span></div>
               <div class="dl-formats">Wavetable drone synth · VST3 · CLAP · Standalone · Windows · Linux</div>
-              <div class="dl-meta"><span>Version <b data-version>v1.0.0.971</b></span><span data-asset="mu-Tant-Windows.zip">11.0 MB</span><span>Free and fully functional. Add your licence key to unlock all 8 voices and saving.</span></div>
+              <div class="dl-meta"><span>Version <b data-version>v1.0.0.971</b></span><span data-asset="mu-Tant-Windows.zip">11.0 MB</span><span>Free and fully functional, with all 8 voices and saving. Pay what you like if you want to support it.</span></div>
             </div>
             <div class="dl-actions">
               <a class="btn-dl tant" href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Tant-Windows.zip">Download — Windows ↓</a>
@@ -243,7 +243,12 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
           <p style="margin:0;"><strong style="color: var(--amber-b);">Linux is Beta.</strong> The Linux builds are listed under each product above. They're new, so please report anything you hit — email <a href="mailto:support@transwarp.me">support@transwarp.me</a>.</p>
         </div>
 
-        <p class="dl-help">All downloads are <code>.zip</code> archives containing the VST3, CLAP (and Standalone where applicable). Unzip and copy the plugin into your system plugin folder. Already bought a licence? Open the plugin, click the demo banner, and paste your key to activate. Trouble installing? <a href="contact.html">Contact support</a>.</p>
+        <div class="dl-note" id="linux-host">
+          <p style="margin:0 0 8px;"><strong style="color: var(--amber-b);">Linux: your host needs its normal event loop.</strong></p>
+          <p style="margin:0;">mu plugins need the host to run its normal event loop, as every ordinary DAW does. A few headless or offline-only renderers do not. In those, changes made by MIDI or a controller, MIDI program changes, and preset loads made while playing may not take effect until the host runs its event loop. If you hit this, load presets while the transport is stopped, or render with a host that runs its event loop.</p>
+        </div>
+
+        <p class="dl-help">All downloads are <code>.zip</code> archives containing the VST3, CLAP (and Standalone where applicable). Unzip and copy the plugin into your system plugin folder. Already have a licence key? Open the plugin, choose About, click Enter a key and paste it. Trouble installing? <a href="contact.html">Contact support</a>.</p>
       </div>
     </section>
   </main>

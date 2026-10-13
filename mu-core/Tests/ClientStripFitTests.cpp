@@ -65,7 +65,7 @@ struct ClientStripFitTests : juce::UnitTest
             if (dynamic_cast<KnobWithLabel*>(c) != nullptr) ++knobs;
         }
         expectEquals(knobs, 4);                            // the EQ stack only: no sends, pan or sidechain
-        expectEquals((int) items.size(), 4 + 2 + 2);       // + fader and VU, mute and solo; no combo boxes
+        expectEquals((int) items.size(), 4 + 2 + 2 + 1);   // + fader and VU, mute and solo, the Dropouts lamp; no combo boxes
 
         // No two blocks overlap.
         for (size_t i = 0; i < items.size(); ++i)
@@ -82,6 +82,15 @@ struct ClientStripFitTests : juce::UnitTest
             expect(k.getY() >= lastBottom, tag + "EQ knobs stack in order");
             expectEquals(k.getHeight(), mu_ui::s(MuLookAndFeel::kMixerStripKnobH));
             lastBottom = k.getBottom();
+        }
+
+        // The Dropouts lamp is the bottom row, under mute / solo, inside the strip.
+        {
+            auto& lamp = strip.getDropoutLamp();
+            expect(lamp.isVisible() && lamp.getBottom() <= bounds.getBottom(), tag + "lamp inside the strip");
+            for (auto* c : items)
+                if (auto* b = dynamic_cast<juce::TextButton*>(c))
+                    expect(lamp.getY() >= b->getBottom(), tag + "the lamp sits under mute / solo");
         }
 
         // The fader takes all the height left: far above the 200 px cap other strips use, never under 40.

@@ -115,6 +115,22 @@ if(MSVC)
     add_compile_options(/utf-8)
 endif()
 
+# JUCE builds each VST3 manifest helper as its own sub-project at build time, so add_compile_options
+# above never reaches it and the helper compiles the µ in JucePlugin_Name under code page 1252 (C4566).
+# MSBuild imports a Directory.Build.props found above a project, so one placed over the helper build
+# directories gives only those projects /utf-8.
+if(MSVC AND CMAKE_GENERATOR MATCHES "Visual Studio")
+    file(WRITE "${CMAKE_BINARY_DIR}/vst3_helpers/Directory.Build.props"
+"<Project>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>
+")
+endif()
+
 # ── Family plugin formats ───────────────────────────────────────────────────
 # AU (Audio Unit v2) is macOS-only — the JUCE wrapper needs Apple's AudioUnit /
 # CoreAudio SDK, so it can only be built on a Mac. Expose it as one variable every

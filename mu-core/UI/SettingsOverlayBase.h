@@ -53,9 +53,14 @@ protected:
     void drawGroupHeader  (juce::Graphics&, int y, const juce::String& title, int x = -1, int w = -1) const;
     // Section sub-header — smaller font + thin divider (a section within a group).
     void drawSectionHeader(juce::Graphics&, int y, const juce::String& title, int x = -1, int w = -1) const;
+
+public:   // a product section's paint callback uses the hint helper and the standard row metrics
     // Secondary annotation drawn vertically centred on yCentre, within [x, x+w).
     void drawHint         (juce::Graphics&, int yCentre, const juce::String& text,
                            int x, int w) const;
+    static constexpr int kRowH   = 26;
+    static constexpr int kRowGap = 8;
+protected:
 
     // ── Shared layout constants (unscaled; pass through mu_ui::s) ──────────────
     static constexpr int kHeaderH      = 44;   // top "Settings" bar
@@ -64,8 +69,6 @@ protected:
     static constexpr int kGroupGap     = 16;   // vertical gap between sub-panels
     static constexpr int kSectionGap   = 10;   // vertical gap between sections within a sub-panel
     static constexpr int kSectionHeadH = 22;   // section header band height
-    static constexpr int kRowH         = 26;
-    static constexpr int kRowGap       = 8;
     static constexpr int kRowIndent    = 16;   // rows indented this far in from the section headings
     static constexpr int kLabelW       = 90;   // left-aligned row label column
     static constexpr int kControlW     = 220;

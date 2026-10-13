@@ -55,7 +55,7 @@ public:
     // Measured (ClientTests, MU_LATENCY_MEASURE=1): a depth rides out a render stall about as long as
     // itself — 1024 fails a 30 ms stall, 2048 a 60 ms one, 4096 survives both. 4096 (≈ 85 ms at 48 kHz,
     // half the old full-ring lead) is the safe default until mu-link offers a Latency choice.
-    static constexpr int kDefaultTargetDepthFrames = 4096;
+    static constexpr int kDefaultTargetDepthFrames = kDefaultClientDepthFrames;
     void setTargetDepthFrames(int frames) noexcept
     {
         targetDepth.store(juce::jlimit(kRenderChunk, kRingCapacityFrames - kRenderChunk, frames), std::memory_order_relaxed);
@@ -82,6 +82,8 @@ public:
         }
         ringChannels = juce::jlimit(1, kMaxChannels, mem.ring().numChannels());
         lastPcEpoch  = 0;   // claimSlot reset the slot's pcEpoch to 0 — match it so no stale fire
+        lastDepthRequest = 0;   // a request from before this attach is re-read and applied afresh
+        defaultDepth = 0;
         attached = true;
         if (startRendering)
             start();
@@ -123,6 +125,17 @@ public:
         std::memcpy(dst, utf8, (size_t) n);
         dst[n] = '\0';
     }
+
+    // Frames the server reports this client's ring was short by since attach (underruns); a rising
+    // count means the depth is too low. 0 when detached. Message thread (it reads the attach state).
+    std::uint64_t underrunFrames() const noexcept
+    {
+        const int slot = attached ? mem.claimedSlotIndex() : -1;
+        return slot >= 0 ? mem.registry().slots[slot].underrunFrames.load(std::memory_order_relaxed) : 0;
+    }
+
+    // The hardware output latency mu-link reports, in frames (0 = unknown or detached). Message thread.
+    int outputLatencyFrames() const noexcept { return attached ? (int) mem.transport().outputLatencyFrames.load(std::memory_order_relaxed) : 0; }
 
     // The current master transport snapshot — for slaving the product's transport. Zeroed
     // when not attached.
@@ -186,6 +199,9 @@ private:
             {
                 if (threadShouldExit()) break;
 
+                // The server may ask for a different depth (a Latency choice in mu-link); 0 = keep ours.
+                pollRequestedDepth();
+
                 // The depth to hold: the requested target, but at least two server blocks (it
                 // reads a block at a time) and never more than the ring holds.
                 TransportSnapshot snap = readTransport(mem.transport());
@@ -230,6 +246,24 @@ private:
         }
     }
 
+    // Apply a changed depth request from the server (producer thread; lock-free).
+    void pollRequestedDepth() noexcept
+    {
+        const int slot = mem.claimedSlotIndex();
+        if (slot < 0) return;
+        const std::uint32_t req = mem.registry().slots[slot].requestedDepthFrames.load(std::memory_order_relaxed);
+        if (req == lastDepthRequest)
+            return;
+        if (req != 0)
+        {
+            if (lastDepthRequest == 0) defaultDepth = getTargetDepthFrames();   // remember our own choice to go back to
+            setTargetDepthFrames((int) juce::jmin(req, (std::uint32_t) kRingCapacityFrames));
+        }
+        else if (defaultDepth != 0)
+            setTargetDepthFrames(defaultDepth);   // the request was withdrawn: back to the client's own depth
+        lastDepthRequest = req;
+    }
+
     MuLinkClientMemory mem;
     RenderCallback     renderCb;
     int                currentLead  = 0;   // producer thread: frames queued ahead of the block in render
@@ -237,6 +271,8 @@ private:
     bool               attached     = false;
     int                ringChannels = kMaxChannels;
     std::uint32_t      lastPcEpoch  = 0;   // last scene PC epoch seen (pollProgramChange)
+    std::uint32_t      lastDepthRequest = 0;   // last depth request seen (producer thread)
+    int                defaultDepth     = 0;   // the depth to return to when a request is withdrawn (0 = none yet)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MuLinkClient)
 };

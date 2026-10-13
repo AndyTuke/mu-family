@@ -10,7 +10,7 @@
 //
 // Naming is plugin-agnostic ("channel" / "layer" / "slot"), since mu-core is
 // shared. Each product may re-export a domain alias (e.g. mu-clid's
-// `SequencerEngine::MaxRhythms = mu_limits::kMaxLayers`) pointing here.
+// `RhythmSequencer::MaxRhythms = mu_limits::kMaxLayers`) pointing here.
 namespace mu_limits
 {
     // Maximum simultaneous channels (layers). The mixer strip count and

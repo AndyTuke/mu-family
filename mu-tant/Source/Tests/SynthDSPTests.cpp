@@ -44,7 +44,7 @@ public:
             constexpr int    nSamp   = (int) sr;   // 1 second
 
             WavetableBank bank;
-            bank.loadFactoryBank();                // table 0 "Basic Shapes", frame 0 = sine
+            bank.loadFactoryBank();                // table 0 "Basic", frame 0 = sine
 
             WavetableOscillator osc;
             osc.setBank (&bank);

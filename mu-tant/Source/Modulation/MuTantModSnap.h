@@ -2,7 +2,7 @@
 
 // Per-destination modulated-value snapshot indices for mu-tant.
 // Written by the audio thread (PluginProcessor::renderVoice) after
-// ModulationMatrix::process(); read by VoicePanel at ~30 Hz via
+// ModulationMatrix::process(); read by PatternContent at ~30 Hz via
 // getTantSnap() to drive the live-arc modulation indicator on each knob.
 // Values are actual display units (Hz, dB, semitones, 0..1 normalised
 // fractions), matching the order in MuTantModDest::kModDestTable.

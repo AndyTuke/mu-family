@@ -119,13 +119,13 @@ void MixerOverlay::buildChannels()
     rhythmChannels.clear();
 
     const auto& palette = MuLookAndFeel::channelPalette;
-    const int numActive = proc.getNumChannels();
+    const int numActive = proc.getNumLayers();
     for (int r = 0; r < MixerEngine::MaxChannels; ++r)
     {
         bool hasRhythm = r < numActive;
-        juce::Colour col = hasRhythm ? palette[proc.getChannelColourIndex(r) % MuLookAndFeel::kChannelPaletteSize]
+        juce::Colour col = hasRhythm ? palette[proc.getLayerColourIndex(r) % MuLookAndFeel::kChannelPaletteSize]
                                      : MuLookAndFeel::colour(MuLookAndFeel::mixerInactiveNameBg);
-        juce::String name = hasRhythm ? juce::String(proc.getChannelName(r)) : "-";
+        juce::String name = hasRhythm ? juce::String(proc.getLayerName(r)) : "-";
         auto ch = std::make_unique<MixerChannel>(MixerChannel::Type::Channel, name, col);
         const juce::String prefix = "ch" + juce::String(r) + "_";
         ch->bindChannel(mixer.channels[r], mixer.channelPeaks[r], &proc, prefix,
@@ -144,9 +144,9 @@ void MixerOverlay::buildChannels()
 void MixerOverlay::refreshSidechainSources()
 {
     juce::StringArray names;
-    const int numActive = proc.getNumChannels();
+    const int numActive = proc.getNumLayers();
     for (int r = 0; r < MixerEngine::MaxChannels; ++r)
-        names.add((r < numActive) ? juce::String(proc.getChannelName(r)) : juce::String());
+        names.add((r < numActive) ? juce::String(proc.getLayerName(r)) : juce::String());
     for (int r = 0; r < (int)rhythmChannels.size(); ++r)
         rhythmChannels[r]->setSidechainSources(r, names);
     // Return channels can sidechain from any rhythm channel (no self-exclusion, pass -1).
@@ -437,7 +437,7 @@ void MixerOverlay::loadFromApvts()
     auto& apvts = proc.apvts;
 
     // Reload rhythm channel UI (only active channels have APVTS params).
-    const int numActive = proc.getNumChannels();
+    const int numActive = proc.getNumLayers();
 
     // Keep each strip's active/name/colour in sync with the live channel count.
     // buildChannels() (which sets these) only runs on refresh(), gated on mixer
@@ -450,9 +450,9 @@ void MixerOverlay::loadFromApvts()
     {
         const bool hasRhythm = r < numActive;
         rhythmChannels[r]->setActive(hasRhythm && ! (isChannelSilent && isChannelSilent(r)));
-        rhythmChannels[r]->setChannelName(hasRhythm ? juce::String(proc.getChannelName(r)) : "-");
+        rhythmChannels[r]->setChannelName(hasRhythm ? juce::String(proc.getLayerName(r)) : "-");
         rhythmChannels[r]->setChannelColour(
-            hasRhythm ? palette[proc.getChannelColourIndex(r) % MuLookAndFeel::kChannelPaletteSize]
+            hasRhythm ? palette[proc.getLayerColourIndex(r) % MuLookAndFeel::kChannelPaletteSize]
                       : MuLookAndFeel::colour(MuLookAndFeel::mixerInactiveNameBg));
     }
 

@@ -79,22 +79,22 @@ void PresetIO::restoreSession(const juce::ValueTree& root)
 
 void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
 {
-    int n = juce::jlimit(1, SequencerEngine::MaxRhythms,
+    int n = juce::jlimit(1, RhythmSequencer::MaxRhythms,
                          (int)state.getProperty("numRhythms", 1));
 
     // Guard the live-state mutation below (sequencer resize, voiceEngine
     // rebuild, per-rhythm sample swaps + pattern rebuilds) with suspendProcessing +
-    // rhythmsLock, matching SampleLibrary::load / RhythmManager::swap / the prestaged commit.
+    // layersLock, matching SampleLibrary::load / ProcessorBase::swapLayers / the prestaged commit.
     // Without it the audio thread can tear-read voiceEngines or a half-swapped sample
     // buffer when a host restores project state on a live plugin. suspendProcessing
-    // alone is not enough — it doesn't block an in-flight processBlock; rhythmsLock
+    // alone is not enough — it doesn't block an in-flight processBlock; layersLock
     // does (the audio thread's ScopedTryLock bails while we hold it). The lock is held
     // for the rest of the function (RAII) and released on return.
     proc.suspendProcessing(true);
-    const juce::ScopedLock sl(proc.rhythmsLock);
+    const juce::ScopedLock sl(proc.layersLock);
 
     // Expand to MaxRhythms so parameterChanged can write to all 8 rhythm slots.
-    proc.sequencer.setNumRhythms(SequencerEngine::MaxRhythms);
+    proc.setRhythmCount(RhythmSequencer::MaxRhythms);
 
     // migrate legacy state in-place before pushing it into APVTS so the
     // new 0..10 s ADSR ranges don't clamp old 0..100 values to absurd attacks.
@@ -107,7 +107,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     }
 
     // Trim to actual active count.
-    proc.sequencer.setNumRhythms(n);
+    proc.setRhythmCount(n);
 
     // restore per-rhythm modulator state from the Modulators children.
     // Each child carries a rhythmIndex property so we apply to the right slot
@@ -133,14 +133,14 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     // excess slots so the audio thread can't access a slot being reset.  When expanding,
     // create and prepare slots BEFORE incrementing the count so the audio thread never
     // sees an uninitialised slot.
-    const int oldN = proc.numActiveRhythms.load(std::memory_order_acquire);
+    const int oldN = proc.numLayers.load(std::memory_order_acquire);
     if (n < oldN)
     {
-        proc.numActiveRhythms.store(n, std::memory_order_release);  // decrement first
+        proc.numLayers.store(n, std::memory_order_release);  // decrement first
         for (int i = n; i < oldN; ++i)
         {
             proc.voiceEngines[i].reset();
-            proc.parkPendingMidiOff(i);   // keep the owed note-off (under rhythmsLock, held above)
+            proc.parkPendingMidiOff(i);   // keep the owed note-off (under layersLock, held above)
             proc.midiEngines[i] = MidiOutputEngine{};
         }
     }
@@ -156,7 +156,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
                 proc.midiEngines[i].prepare(proc.currentSampleRate, proc.currentBlockSize);
             }
         }
-        proc.numActiveRhythms.store(n, std::memory_order_release);  // increment after slots ready
+        proc.numLayers.store(n, std::memory_order_release);  // increment after slots ready
     }
 
     // Restore non-APVTS properties and refresh engines.
@@ -183,7 +183,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
                              slotPrefix + "sampleName");
     }
 
-    proc.suspendProcessing(false);   // rhythmsLock (sl) releases on return
+    proc.suspendProcessing(false);   // layersLock (sl) releases on return
 }
 
 void PresetIO::setStateInformation(const void* data, int sizeInBytes)

@@ -104,8 +104,8 @@ public:
     // mu-tant manages a dynamic set of voices ("layers") exactly like mu-clid's
     // rhythms — there are no inactive voices, only the ones that exist. The
     // count is `numLayers` (1..mu_limits::kMaxLayers, owned by ProcessorCore, which also supplies
-    // getNumChannels / getLayer over its layer storage); add/delete adjust it.
-    juce::String getChannelName(int idx)       const override
+    // getNumLayers / getLayer over its layer storage); add/delete adjust it.
+    juce::String getLayerName(int idx)       const override
     {
         return (idx >= 0 && idx < mu_limits::kMaxLayers) ? juce::String("Voice ") + juce::String(idx + 1)
                                               : juce::String();
@@ -113,7 +113,7 @@ public:
     // Each voice carries an allocated palette-colour index (mu-clid's rule:
     // assigned first-unused on add, follows the voice through delete/reorder),
     // so layers are distinctly + stably coloured. It lives on the Layer, so it moves with the voice.
-    int          getChannelColourIndex(int idx) const override
+    int          getLayerColourIndex(int idx) const override
     {
         return (idx >= 0 && idx < mu_limits::kMaxLayers) ? layers[(size_t) idx]->colourIndex : 0;
     }
@@ -122,7 +122,6 @@ public:
     // Adding, deleting, reordering and resetting a voice are ProcessorBase::addLayer / removeLayer /
     // swapLayers / resetLayer; this product supplies createLayer and cancelPendingSwap. The edits
     // move the Pattern pointers under `layersLock`, which processBlock tryLocks.
-    int  getNumVoices() const noexcept { return numLayers.load(std::memory_order_relaxed); }
     bool canEditLayers() const override { return true; }
     // The engine state of a slot stays put while its Pattern moves, so the slot is cleared for the
     // new tenant (called under layersLock; the render only runs under it).
@@ -166,7 +165,7 @@ public:
 
     // The "SWP" badges and the cancel read the shared ProcessorBase::layerSwapper.
 
-    // ── Per-voice param IDs (used by VoicePanel for SliderAttachment binding) ──
+    // ── Per-voice param IDs (used by PatternContent for SliderAttachment binding) ──
     // Family rule: per-voice params are subtree-scoped via `v{N}_` prefix so a
     // ValueTree restore round-trips cleanly + presets can target a specific
     // voice without name collisions across the 8 slots.
@@ -180,7 +179,7 @@ public:
     // processor — pure static factory, no state.
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
-    // Modulation snapshot accessor for VoicePanel knob live-arc indicators.
+    // Modulation snapshot accessor for PatternContent knob live-arc indicators.
     float getTantSnap(int voice, int snapIndex) const noexcept
     {
         if (voice < 0 || voice >= mu_limits::kMaxLayers) return 0.0f;
@@ -271,14 +270,14 @@ private:
 
 public:
     // Voice `i`'s Pattern (modulators, gate / filter / pitch envelopes, user wavetables, level tap),
-    // valid for every slot 0..kMaxLayers-1. Public so the UI (ModulatorPanel, VoicePanel) can point
+    // valid for every slot 0..kMaxLayers-1. Public so the UI (ModulatorPanel, PatternContent) can point
     // at the currently-edited voice.
     Pattern&       getPattern(int i) noexcept       { return layerAs<Pattern>(i); }
     const Pattern& getPattern(int i) const noexcept { return layerAs<Pattern>(i); }
 
 private:
     // Per-voice modulated-value snapshots — written by the audio thread in
-    // renderVoice() after the matrix runs; read by VoicePanel at ~30 Hz via
+    // renderVoice() after the matrix runs; read by PatternContent at ~30 Hz via
     // getTantSnap() to drive live-arc indicators on bound knobs.
     std::array<std::atomic<float>, mu_tant::kTantSnapCount> voiceSnap[mu_limits::kMaxLayers];
 
@@ -342,11 +341,6 @@ private:
     // Guards the wavetable bank append against the audio render (which reads the bank), kept apart
     // from layersLock so an import never blocks a layer edit and the reverse.
     juce::CriticalSection bankLock;
-
-    // Per-voice colour allocation persistence (stored on the APVTS state tree
-    // alongside the voice count, so colours round-trip with full + per-... presets).
-    juce::String serialiseVoiceColours() const;
-    void         restoreVoiceColours(const juce::String& csv);
 
     friend struct Pattern;   // its persistence hooks hand over to the voice-extras members below
     // Composed state (mu-core LayerState): the voice layout every save / load uses, a voice's

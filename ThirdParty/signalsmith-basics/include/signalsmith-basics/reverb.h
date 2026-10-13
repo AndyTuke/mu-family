@@ -126,6 +126,7 @@ struct ReverbSTFX : public BaseEffect {
 		delay1.reset();
 		delay2.reset();
 		delay3.reset();
+		delay4.reset();   // mu patch: upstream omits this one, so a reset left its last output behind
 		delayFeedback.reset();
 		delayEarly.reset();
 		

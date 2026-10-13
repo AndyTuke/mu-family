@@ -16,7 +16,6 @@ void ParamKnobGrid::setSpecs(const std::vector<Spec>& specs)
 
         ctl->name.setText(spec.label, juce::dontSendNotification);
         ctl->name.setJustificationType(juce::Justification::centred);
-        ctl->name.setFont(juce::Font(juce::FontOptions(11.0f)));
         addAndMakeVisible(ctl->name);
 
         // Choice params get a combo box; everything else a rotary knob.
@@ -59,6 +58,7 @@ int ParamKnobGrid::getPreferredWidth() const
 void ParamKnobGrid::resized()
 {
     using mu_ui::s;
+    using mu_ui::sf;
     auto area = getLocalBounds();
     if (controls.empty()) return;
 
@@ -81,6 +81,7 @@ void ParamKnobGrid::resized()
         if (x > area.getX() && x + cw > area.getRight()) { x = area.getX(); y += cellH; }
         juce::Rectangle<int> cell(x, y, cw, cellH);
         x += cw;
+        ctl->name.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuLookAndFeel::kKnobLabelFont))));   // the knobs' own label size
         ctl->name.setBounds(cell.removeFromTop(labelH));
         // Centre the standard-size control in the remaining cell.
         if (ctl->combo)

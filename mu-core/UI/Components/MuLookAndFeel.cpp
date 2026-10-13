@@ -118,6 +118,7 @@ juce::Colour MuLookAndFeel::colour(ColourIds id) noexcept
         case appBlue:                 return t.apps.blue;
         case appYellow:               return t.apps.yellow;
         case indicatorFault:          return t.indicators.fault;
+        case buttonDangerBg:          return t.indicators.buttonDangerBg;
         // Modulator label colours A–H (reuse the ring/knob theme fields by intent)
         case modLabelA:               return t.rings.modA;
         case modLabelB:               return t.rings.modB;
@@ -493,10 +494,16 @@ void MuLookAndFeel::drawSlideSwitch(juce::Graphics& g, juce::Rectangle<float> bo
 // Brushed-metal grain: fine horizontal streaks with a per-scanline tone, generated once
 // per size from a fixed seed (same grain every run) and cached — panels behind animated
 // components repaint every frame, so the texture must not be rebuilt each time.
+// The cache is heap-allocated and never destroyed: its images are GPU-backed (Direct2D), and
+// destroying them from a static destructor at plugin-DLL unload releases the Direct3D device
+// under the loader lock, which hangs inside the graphics driver.
 static const juce::Image& brushedGrain(int w, int h)
 {
-    static std::map<std::pair<int, int>, juce::Image> cache;
-    auto& img = cache[{ w, h }];
+    static auto* const cache = new std::map<std::pair<int, int>, juce::Image>();
+    constexpr size_t kMaxSizes = 64;   // panels resize freely; bound the cache so it cannot grow forever
+    if (cache->size() >= kMaxSizes && cache->find({ w, h }) == cache->end())
+        cache->clear();
+    auto& img = (*cache)[{ w, h }];
     if (img.isNull() && w > 0 && h > 0)
     {
         img = juce::Image(juce::Image::ARGB, w, h, true);
@@ -946,6 +953,15 @@ void MuLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& button
 
     auto borderColour = on ? colour(segmentActiveBorder) : colour(segmentInactiveBorder);
 
+    // Destructive button (Warning-icon dialog primary): red fill and border, same hover lift.
+    if (on && button.getProperties().contains("muDanger"))
+    {
+        bgColour = colour(buttonDangerBg);
+        if (isDown) bgColour = bgColour.brighter(0.15f);
+        else if (isOver) bgColour = bgColour.brighter(0.08f);
+        borderColour = colour(indicatorFault);
+    }
+
     g.setColour(bgColour);
     g.fillRoundedRectangle(bounds, 3.0f);
     g.setColour(borderColour);
@@ -957,8 +973,9 @@ void MuLookAndFeel::drawButtonText(juce::Graphics& g, juce::TextButton& button,
 {
     const bool on = button.getToggleState();
     // Respect per-button text colour overrides (e.g. playBtn.setColour(textColourOffId, ...)).
-    g.setColour(on ? button.findColour(juce::TextButton::textColourOnId)
-                   : button.findColour(juce::TextButton::textColourOffId));
+    g.setColour(on && button.getProperties().contains("muDanger") ? colour(indicatorFault)
+                : on ? button.findColour(juce::TextButton::textColourOnId)
+                     : button.findColour(juce::TextButton::textColourOffId));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(12.0f)));
     g.drawText(button.getButtonText(), button.getLocalBounds(),
                juce::Justification::centred, true);
