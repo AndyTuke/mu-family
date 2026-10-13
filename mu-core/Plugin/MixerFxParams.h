@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Plugin/ParamText.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Audio/AlgorithmNames.h"   // mu_audio::kInsertAlgorithmCount
 
@@ -17,6 +18,13 @@ inline void addGlobalFxParams(juce::AudioProcessorValueTreeState::ParameterLayou
 {
     auto addF = [&](const juce::String& id, const juce::String& name, float mn, float mx, float def)
     { layout.add(std::make_unique<juce::AudioParameterFloat>(id, name, juce::NormalisableRange<float>(mn, mx), def)); };
+    // A 0..1 or -1..1 amount shown to three decimals, so the host's text round-trips exactly.
+    auto addF3 = [&](const juce::String& id, const juce::String& name, float mn, float mx, float def)
+    {
+        const juce::NormalisableRange<float> r(mn, mx);
+        layout.add(std::make_unique<juce::AudioParameterFloat>(id, name, r, def,
+                       mu_fmt::floatText(r, [](float v, int) { return juce::String(v, 3); })));
+    };
     auto addB = [&](const juce::String& id, const juce::String& name, bool def)
     { layout.add(std::make_unique<juce::AudioParameterBool>(id, name, def)); };
     auto addI = [&](const juce::String& id, const juce::String& name, int mn, int mx, int def)
@@ -76,8 +84,8 @@ inline void addGlobalFxParams(juce::AudioProcessorValueTreeState::ParameterLayou
     {
         const juce::String q  = juce::String("ret_") + ret + "_";
         const juce::String nm = juce::String("Ret ") + ret + " ";
-        addF(q+"lvl",   nm+"Level",    0.0f,    1.0f,    0.75f);
-        addF(q+"pan",   nm+"Pan",     -1.0f,    1.0f,    0.0f);
+        addF3(q+"lvl",  nm+"Level",    0.0f,    1.0f,    0.75f);
+        addF3(q+"pan",  nm+"Pan",     -1.0f,    1.0f,    0.0f);
         addB(q+"mute",  nm+"Mute",    false);
         addB(q+"solo",  nm+"Solo",    false);
         addI(q+"scSrc", nm+"SC Src",  0,        9,       0);  // 0=off, 1-8=ch0-ch7, 9=ext DAW bus
@@ -88,7 +96,7 @@ inline void addGlobalFxParams(juce::AudioProcessorValueTreeState::ParameterLayou
 
     // ── Master + master inserts ───────────────────────────────────────────────
     addF("mstr_lvl",    "Master Level",     0.0f,    1.0f,     1.0f);
-    addF("mstr_pan",    "Master Pan",      -1.0f,    1.0f,     0.0f);
+    addF3("mstr_pan",   "Master Pan",      -1.0f,    1.0f,     0.0f);
     addI("mst_insChar", "Mst Insert Algo", 0, mu_audio::kInsertAlgorithmCount - 1, 0);
     addF("mst_insP1",   "Mst Insert P1",   0.0f, 1.0f, 0.0f);
     addF("mst_insP2",   "Mst Insert P2",   0.0f, 1.0f, 0.0f);
@@ -133,8 +141,13 @@ inline void addChannelStripParams(juce::AudioProcessorValueTreeState::ParameterL
     auto range = [&o](float lo, float hi, float step)
     { return juce::NormalisableRange<float>(lo, hi, o.continuous ? 0.0f : step); };
     auto addF = [&](const char* id, const char* name, float lo, float hi, float step, float def)
-    { layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID { prefix + id, o.versionHint },
-                                                             namePrefix + name, range(lo, hi, step), def)); };
+    {
+        // Three decimals to match the 0.001 steps, so the host's text round-trips exactly.
+        const auto r = range(lo, hi, step);
+        layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID { prefix + id, o.versionHint },
+                                                               namePrefix + name, r, def,
+                                                               mu_fmt::floatText(r, [](float v, int) { return juce::String(v, 3); })));
+    };
     auto addB = [&](const char* id, const char* name)
     { layout.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID { prefix + id, o.versionHint },
                                                             namePrefix + name, false)); };

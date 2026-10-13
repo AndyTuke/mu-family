@@ -6,6 +6,7 @@
 // PluginProcessor_APVTS.cpp split.
 
 #include "ValueFormat.h"   // mu-core: shared value text
+#include "Plugin/ParamText.h"   // mu-core: float parameter text in both directions
 #include "Plugin/PluginProcessor.h"
 #include "Audio/Scales.h"        // kScales (scaleNames)
 #include "Audio/AlgorithmNames.h" // mu-core: kFilterTypeNames (shared canonical list)
@@ -69,7 +70,7 @@ namespace
         layout.add(std::make_unique<AudioParameterChoice>(ParameterID{id("xmod_ampMode"),   1}, label("X-Mod Amp Mode"), StringArray{ "AM", "RM", "SSB" }, 0));
         layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("xmod_depth"),     1}, label("X-Mod Depth"),     f(-100.0f, 100.0f, 1.0f), 0.0f));
         layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("xmod_ssb"),       1}, label("X-Mod SSB Shift"), f(-2000.0f, 2000.0f, 1.0f), 0.0f,
-                    AudioParameterFloatAttributes().withStringFromValueFunction(
+                    mu_fmt::floatText(f(-2000.0f, 2000.0f, 1.0f),
                         [](float v, int) -> juce::String { return juce::String((int) std::round(v)) + " Hz"; })));
 
         // Per-source levels (replace the old osc-balance "mix").
@@ -95,15 +96,15 @@ namespace
         // of the algorithm table order — matching mu-clid's FilterSubsection pattern.
         layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("flt_type"), 1}, label("Filter Type"), 0, 15, 0));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_cut"), 1},  label("Cutoff"), cutoff, 8000.0f,
-                    AudioParameterFloatAttributes().withStringFromValueFunction(cutoffText)));
+                    mu_fmt::floatText(cutoff, cutoffText)));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_res"), 1},  label("Resonance"), f(0.0f, 0.99f, 0.001f), 0.2f,
-                    AudioParameterFloatAttributes().withStringFromValueFunction(resText)));
+                    mu_fmt::floatText(f(0.0f, 0.99f, 0.001f), resText)));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_drv"), 1}, label("Filter Drive"), f(0.0f, 1.0f, 0.01f), 0.0f,
-                    AudioParameterFloatAttributes().withStringFromValueFunction(
+                    mu_fmt::floatText(f(0.0f, 1.0f, 0.01f),
                         [](float v, int) { return mu_fmt::percent(v); })));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_lo_cut"), 1}, label("Low Cut"),
                     juce::NormalisableRange<float>(0.0f, 1000.0f, 0.0f, 0.35f), 0.0f,
-                    AudioParameterFloatAttributes().withStringFromValueFunction(
+                    mu_fmt::floatText(juce::NormalisableRange<float>(0.0f, 1000.0f, 0.0f, 0.35f),
                         [](float v, int) { return mu_fmt::lowCut(v); })));
 
         // Filter 1 envelope depth.
@@ -113,15 +114,15 @@ namespace
         // Filter 1) so adding a second filter is audible out of the box, not transparent.
         layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("flt2_type"), 1}, label("Filter2 Type"), 0, 15, 0));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt2_cut"), 1},  label("F2 Cutoff"), cutoff, 8000.0f,
-                    AudioParameterFloatAttributes().withStringFromValueFunction(cutoffText)));
+                    mu_fmt::floatText(cutoff, cutoffText)));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt2_res"), 1},  label("F2 Resonance"), f(0.0f, 0.99f, 0.001f), 0.0f,
-                    AudioParameterFloatAttributes().withStringFromValueFunction(resText)));
+                    mu_fmt::floatText(f(0.0f, 0.99f, 0.001f), resText)));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt2_drv"), 1}, label("F2 Drive"), f(0.0f, 1.0f, 0.01f), 0.0f,
-                    AudioParameterFloatAttributes().withStringFromValueFunction(
+                    mu_fmt::floatText(f(0.0f, 1.0f, 0.01f),
                         [](float v, int) { return mu_fmt::percent(v); })));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt2_lo_cut"), 1}, label("F2 Low Cut"),
                     juce::NormalisableRange<float>(0.0f, 1000.0f, 0.0f, 0.35f), 0.0f,
-                    AudioParameterFloatAttributes().withStringFromValueFunction(
+                    mu_fmt::floatText(juce::NormalisableRange<float>(0.0f, 1000.0f, 0.0f, 0.35f),
                         [](float v, int) { return mu_fmt::lowCut(v); })));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt2_env_depth"), 1}, label("F2 Env Depth"), f(-1.0f, 1.0f, 0.01f), 0.0f));
 
@@ -134,9 +135,9 @@ namespace
             return String(v, 1) + " st";
         };
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("o1_penv_depth"), 1}, label("Osc1 Pitch Env"),
-            f(-24.0f, 24.0f, 0.5f), 0.0f, AudioParameterFloatAttributes().withStringFromValueFunction(penvText)));
+            f(-24.0f, 24.0f, 0.5f), 0.0f, mu_fmt::floatText(f(-24.0f, 24.0f, 0.5f), penvText)));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("o2_penv_depth"), 1}, label("Osc2 Pitch Env"),
-            f(-24.0f, 24.0f, 0.5f), 0.0f, AudioParameterFloatAttributes().withStringFromValueFunction(penvText)));
+            f(-24.0f, 24.0f, 0.5f), 0.0f, mu_fmt::floatText(f(-24.0f, 24.0f, 0.5f), penvText)));
 
         // Per-voice slot output level — distinct from the mixer fader (engine-level
         // trim before the channel strip; the mixer adds its own per-channel level
@@ -147,7 +148,7 @@ namespace
         // at its end, for a cleaner gate. Integer 0..100 %; consumed as /100.
         auto gapText = [](float v, int) -> String { return String((int) std::round(v)) + " %"; };
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("gate_gap"), 1}, label("Gate Gap"), f(0.0f, 100.0f, 1.0f), 0.0f,
-                    AudioParameterFloatAttributes().withStringFromValueFunction(gapText)));
+                    mu_fmt::floatText(f(0.0f, 100.0f, 1.0f), gapText)));
 
         // Gater bypass — when on, the gate stage is skipped (raw drone passes,
         // for audition / configuration).

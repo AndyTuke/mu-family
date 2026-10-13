@@ -46,4 +46,16 @@ inline juce::String percent(double v01)
     return juce::String((int) std::round(v01 * 100.0));
 }
 
+// The size of a displayed value, for ordering: "1.00 kHz" -> 1000, "47 ms" -> 0.047, "10.00 s" -> 10,
+// "Off" -> 0; any other text is its leading number ("-12 dB", "5 %", "0.3 st").
+inline double displayMagnitude(const juce::String& text)
+{
+    const auto t = text.trim().toLowerCase();
+    if (t == "off") return 0.0;
+    const double n = t.getDoubleValue();
+    if (t.endsWith("khz")) return n * 1000.0;
+    if (t.endsWith("ms"))  return n / 1000.0;
+    return n;
+}
+
 } // namespace mu_fmt

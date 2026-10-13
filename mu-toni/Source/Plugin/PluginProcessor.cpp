@@ -2,6 +2,7 @@
 #include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
 #include "Plugin/HostTransport.h"          // mu-core: DAW / mu-link transport read
 #include "Modulation/ModulatorSerialise.h" // mu-core: modulator state save/load
+#include "Plugin/ParamText.h"           // mu-core: float parameter text in both directions
 
 namespace mu_toni
 {
@@ -111,7 +112,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         layout.add(std::make_unique<AudioParameterChoice>(pid("xmod_ampMode"),   lbl("X-Mod Amp Mode"), StringArray{ "AM", "RM", "SSB" }, 0));
         layout.add(std::make_unique<AudioParameterFloat> (pid("xmod_depth"),     lbl("X-Mod Depth"), f(-100.0f, 100.0f, 1.0f), 0.0f));
         layout.add(std::make_unique<AudioParameterFloat> (pid("xmod_ssb"),       lbl("X-Mod SSB Shift"), f(-2000.0f, 2000.0f, 1.0f), 0.0f,
-                    AudioParameterFloatAttributes().withStringFromValueFunction(
+                    mu_fmt::floatText(f(-2000.0f, 2000.0f, 1.0f),
                         [](float v, int) -> juce::String { return juce::String((int) std::round(v)) + " Hz"; })));
 
         // Noise / filter

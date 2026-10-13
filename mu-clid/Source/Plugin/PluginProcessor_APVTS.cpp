@@ -16,6 +16,7 @@
 #include "Audio/FX/Slots/FXAlgorithmDef.h"
 #include "Plugin/MixerFxParams.h"
 #include "ValueFormat.h"   // mu-core: shared value text
+#include "Plugin/ParamText.h"   // mu-core: float parameter text in both directions
 #include "Sequencer/EuclidParamLayout.h"   // mu-core: the Euclid parameter set
 
 #include <algorithm>
@@ -56,13 +57,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     // each step independently revertable (a → amp, then filter, then pitch).
     auto addAdsrT = [&](const juce::String& id, const juce::String& name, float def)
     {
+        const juce::NormalisableRange<float> range(0.0f, 10.0f, 0.0f, 0.3f);
         layout.add(std::make_unique<juce::AudioParameterFloat>(
-            id, name, juce::NormalisableRange<float>(0.0f, 10.0f, 0.0f, 0.3f), def,
-            juce::AudioParameterFloatAttributes().withStringFromValueFunction(
-                [](float v, int) -> juce::String {
-                    if (v >= 1.0f) return juce::String(v, 2) + " s";
-                    return juce::String((int)std::round(v * 1000.0f)) + " ms";
-                })));
+            id, name, range, def,
+            mu_fmt::floatText(range, [](float v, int) -> juce::String {
+                if (v >= 1.0f) return juce::String(v, 2) + " s";
+                return juce::String((int)std::round(v * 1000.0f)) + " ms";
+            })));
     };
 
     // ── Per-rhythm parameters (one set per rhythm slot) ─────────────────────────────────
@@ -92,14 +93,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         // log-skewed range. Skew 0.25 puts ~1.3 kHz at slider centre and
         // gives the sub-bass / midrange the resolution they need. Without this,
         // 20–200 Hz lived in ~1% of knob travel.
+        const juce::NormalisableRange<float> cutRange(20.0f, 20000.0f, 0.0f, 0.25f);
         layout.add(std::make_unique<juce::AudioParameterFloat>(
-            p+"fltCut", n+"Filter Cut",
-            juce::NormalisableRange<float>(20.0f, 20000.0f, 0.0f, 0.25f), 8000.0f,
-            juce::AudioParameterFloatAttributes().withStringFromValueFunction(
-                [](float v, int) -> juce::String {
-                    if (v < 1000.0f) return juce::String(v, 1) + " Hz";
-                    return juce::String(v / 1000.0f, 1) + " kHz";
-                })));
+            p+"fltCut", n+"Filter Cut", cutRange, 8000.0f,
+            mu_fmt::floatText(cutRange, [](float v, int) -> juce::String {
+                if (v < 1000.0f) return juce::String(v, 1) + " Hz";
+                return juce::String(v / 1000.0f, 1) + " kHz";
+            })));
         addF(p+"fltRes",  n+"Filter Res",   mu_clid::mod_skew::kResonance.lo, mu_clid::mod_skew::kResonance.hi, 0.2f);
         addAdsrT(p+"fEnvAtk", n+"F Env Atk", 0.03f);   // seconds (≈ legacy 1.0 × 0.03)
         addAdsrT(p+"fEnvDec", n+"F Env Dec", 0.09f);   //         (≈ legacy 3.0 × 0.03)
@@ -108,11 +108,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addF(p+"fEnvDep", n+"F Env Dep",  mu_clid::mod_skew::kFenvDepth.lo, mu_clid::mod_skew::kFenvDepth.hi, 0.0f);
         // 4-pole high-pass that sits inline with the main filter. Skewed so most
         // of the knob travel lives in the audible low-end region (0–200 Hz).
+        const juce::NormalisableRange<float> loCutRange(0.0f, 1000.0f, 0.0f, 0.35f);
         layout.add(std::make_unique<juce::AudioParameterFloat>(
-            p+"fltLoCut", n+"Filter Low Cut",
-            juce::NormalisableRange<float>(0.0f, 1000.0f, 0.0f, 0.35f), 0.0f,
-            juce::AudioParameterFloatAttributes().withStringFromValueFunction(
-                [](float v, int) { return mu_fmt::lowCut(v); })));
+            p+"fltLoCut", n+"Filter Low Cut", loCutRange, 0.0f,
+            mu_fmt::floatText(loCutRange, [](float v, int) { return mu_fmt::lowCut(v); })));
         // Pre-filter valve saturation depth. 0 = bypass, 1 = full warmth.
         addF(p+"fltDrv", n+"Filter Drive", 0.0f, 1.0f, 0.0f);
         // Amp — level stored in dB (-60..+6), engine converts to gain at read.
