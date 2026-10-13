@@ -192,8 +192,8 @@ void MixerChannel::bindMaster(MixerEngine& engine, ProcessorBase* proc)
         panKnob.onValueChanged = [&engine](double v) { engine.masterPan.store((float)v, std::memory_order_relaxed); };
     }
 
-    vuMeter.getLevel  = [&engine] { return engine.masterPeak.load(); };
-    vuMeter.getLevelR = nullptr;
+    vuMeter.getLevel  = [&engine] { return engine.masterPeakL.load(); };
+    vuMeter.getLevelR = [&engine] { return engine.masterPeakR.load(); };
     updateDbLabel(engine.masterLevel.load(std::memory_order_relaxed));
 }
 

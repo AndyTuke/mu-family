@@ -124,6 +124,40 @@ public:
             expect(ok, "summed master does not match A+B");
         }
 
+        beginTest("the meters publish left and right peaks per client and for the master; the combined peak is the larger");
+        {
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            engine.prepare(48000.0, 64, 120.0);
+            engine.setPlaying(true);
+
+            MuLinkClientMemory a;
+            expect(a.open(), "client failed to attach");
+            expectEquals(a.claimSlot("a", 2), 0);
+
+            // Left carries 0.30, right 0.10 (sub-knee, so the master soft-clip leaves them alone).
+            produce(a, 64, [](int, int c) { return c == 0 ? 0.30f : 0.10f; });
+            OutputBuffers out(2, 64);
+            engine.renderBlock(out.data(), 2, 64);
+
+            expectWithinAbsoluteError(engine.clientPeakMeterL(0).load(), 0.30f, 1.0e-4f);
+            expectWithinAbsoluteError(engine.clientPeakMeterR(0).load(), 0.10f, 1.0e-4f);
+            expectWithinAbsoluteError(engine.clientPeak(0), 0.30f, 1.0e-4f);   // the combined peak is the larger
+            expectWithinAbsoluteError(engine.masterPeakMeterL().load(), 0.30f, 1.0e-3f);
+            expectWithinAbsoluteError(engine.masterPeakMeterR().load(), 0.10f, 1.0e-3f);
+            expectWithinAbsoluteError(engine.masterPeak(), engine.masterPeakMeterL().load(), 1.0e-6f);
+
+            // A mono output device: both bars show the one channel.
+            produce(a, 64, [](int, int) { return 0.20f; });
+            OutputBuffers mono(1, 64);
+            engine.renderBlock(mono.data(), 1, 64);
+            expectWithinAbsoluteError(engine.clientPeakMeterR(0).load(), engine.clientPeakMeterL(0).load(), 1.0e-6f);
+            expectWithinAbsoluteError(engine.masterPeakMeterR().load(), engine.masterPeakMeterL().load(), 1.0e-6f);
+            expect(engine.clientPeakMeterL(0).load() > 0.1f, "the mono output still meters the client");
+        }
+
         beginTest("underrun zero-fills the missing tail and is counted, never clicks");
         {
             MuLinkServerMemory mem;

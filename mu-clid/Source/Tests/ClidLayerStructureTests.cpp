@@ -210,9 +210,10 @@ struct ClidLayerStructureTests : juce::UnitTest
         bool running    = false;   // a host transport runs after the reset, so the new rhythm hits
         bool tiedAfter  = false;   // after the blocks, fire a tied (pattern-legato) hit by hand
         bool tiedMid    = false;   // fire the tied hit 20 blocks into the release instead
+        bool panLeft    = false;   // pan slot 1 hard left before the held note is measured
     };
 
-    struct HeldResult { float peak = 0.0f; float maxPeak = 0.0f; int audioAllocs = 0; float beforeTie = 0.0f; float afterTie = 0.0f; };
+    struct HeldResult { float peak = 0.0f; float maxPeak = 0.0f; int audioAllocs = 0; float beforeTie = 0.0f; float afterTie = 0.0f; float peakL = 0.0f; float peakR = 0.0f; float peakBoth = 0.0f; };
 
     // A hit's amp envelope sits at sustain until the next trigger, so a held sample note keeps sounding
     // through a reset (the engine stays) unless the reset tells it to release. Runs `blocks` blocks after
@@ -259,8 +260,12 @@ struct ClidLayerStructureTests : juce::UnitTest
                 res.maxPeak = juce::jmax(res.maxPeak, p.mixerEngine.channelPeaks[1].load());
             }
         };
+        if (c.panLeft) p.mixerEngine.channels[1].pan.store(-1.0f, std::memory_order_relaxed);
         run(20);
         expect(p.mixerEngine.channelPeaks[1].load() > 0.05f, "the held note sounds before the reset");
+        res.peakL    = p.mixerEngine.channelPeaksL[1].load();
+        res.peakR    = p.mixerEngine.channelPeaksR[1].load();
+        res.peakBoth = p.mixerEngine.channelPeaks[1].load();
 
         if (c.reset) p.resetLayer(1);
         if (c.running) p.setPlayHead(&host);
@@ -323,6 +328,14 @@ struct ClidLayerStructureTests : juce::UnitTest
         HeldCase tied;   tied.reset = true; tied.tiedAfter = true;
         const auto tiedHit = heldNote(tied, kBlocks);
         expect(tiedHit.maxPeak > 0.05f, "the tied hit starts the envelope (largest peak " + juce::String(tiedHit.maxPeak, 3) + ")");
+
+        beginTest("the strip's stereo peaks follow the pan: hard left leaves the right bar silent");
+        HeldCase panned;   panned.panLeft = true;
+        const auto pan = heldNote(panned, 1);
+        const auto centre = heldNote(HeldCase{}, 1);
+        expect(pan.peakL > 0.05f && pan.peakR < 1.0e-3f, "hard left: L " + juce::String(pan.peakL, 3) + ", R " + juce::String(pan.peakR, 5));
+        expect(centre.peakL > 0.05f && std::abs(centre.peakL - centre.peakR) < 1.0e-3f, "centred mono source: both sides equal");
+        expectWithinAbsoluteError(pan.peakBoth, juce::jmax(pan.peakL, pan.peakR), 1.0e-6f);
 
         beginTest("a tied hit 20 blocks into the release keeps decaying: no new attack");
         HeldCase mid;   mid.reset = true; mid.tiedMid = true;

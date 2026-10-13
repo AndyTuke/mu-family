@@ -8,6 +8,12 @@ MixerEngine::MixerEngine()
     for (auto& p : channelPeaks)       p.store(0.0f);
     for (auto& p : returnPeaks)        p.store(0.0f);
     masterPeak.store(0.0f);
+    for (auto& p : channelPeaksL)      p.store(0.0f);
+    for (auto& p : channelPeaksR)      p.store(0.0f);
+    for (auto& p : returnPeaksL)       p.store(0.0f);
+    for (auto& p : returnPeaksR)       p.store(0.0f);
+    masterPeakL.store(0.0f);
+    masterPeakR.store(0.0f);
     for (auto& g : sidechainGR)        g.store(0.0f);
     for (auto& g : returnSidechainGR)  g.store(0.0f);
 }
@@ -40,6 +46,28 @@ float MixerEngine::peakOf(const juce::AudioBuffer<float>& buf, int numSamples)
     for (int c = 0; c < buf.getNumChannels(); ++c)
         p = juce::jmax(p, buf.getMagnitude(c, 0, numSamples));
     return p;
+}
+
+void MixerEngine::storePeak(const juce::AudioBuffer<float>& buf, int numSamples,
+                            std::atomic<float>& both, std::atomic<float>& left, std::atomic<float>& right)
+{
+    const int   chans = buf.getNumChannels();
+    const float pl    = chans > 0 ? buf.getMagnitude(0, 0, numSamples) : 0.0f;
+    const float pr    = chans > 1 ? buf.getMagnitude(1, 0, numSamples) : pl;
+    // The combined peak covers every channel: reuse the two scans above, then any channels past the pair.
+    float all = juce::jmax(pl, pr);
+    for (int c = 2; c < chans; ++c)
+        all = juce::jmax(all, buf.getMagnitude(c, 0, numSamples));
+    both .store(all);
+    left .store(pl);
+    right.store(pr);
+}
+
+void MixerEngine::clearPeak(std::atomic<float>& both, std::atomic<float>& left, std::atomic<float>& right)
+{
+    both.store(0.0f);
+    left.store(0.0f);
+    right.store(0.0f);
 }
 
 bool MixerEngine::hasSignal(const juce::AudioBuffer<float>& buf, int numSamples)
@@ -125,7 +153,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     // inactive slot's GR meter.
     for (int r = numActiveChannels; r < MaxChannels; ++r)
     {
-        channelPeaks[r].store(0.0f);
+        clearPeak(channelPeaks[r], channelPeaksL[r], channelPeaksR[r]);
         sidechainGR  [r].store(0.0f);
     }
 
@@ -217,13 +245,13 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
 
         if (hardMute)
         {
-            channelPeaks[r].store(0.0f);
+            clearPeak(channelPeaks[r], channelPeaksL[r], channelPeaksR[r]);
             continue;
         }
 
         applyPanGain(buf, ch.level.load(std::memory_order_relaxed),
                           ChannelState::effective(ch.pan, ch.panMod), numSamples);
-        channelPeaks[r].store(peakOf(buf, numSamples));
+        storePeak(buf, numSamples, channelPeaks[r], channelPeaksL[r], channelPeaksR[r]);
 
         const int bus = ch.outputBus.load(std::memory_order_relaxed);  // 0 = master, 1..8 = direct out
         if (bus == 0)
@@ -330,14 +358,14 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
         if (!returns[0].mute.load(std::memory_order_relaxed)
             && !(anyReturnSolo && !returns[0].solo.load(std::memory_order_relaxed)))
         {
-            returnPeaks[0].store(peakOf(effectSendBuf, numSamples));
+            storePeak(effectSendBuf, numSamples, returnPeaks[0], returnPeaksL[0], returnPeaksR[0]);
             for (int c = 0; c < numOutCh; ++c)
                 output.addFrom(c, 0, effectSendBuf, c, 0, numSamples);
             fanOutToFxReturns(effectSendBuf);
         }
-        else { returnPeaks[0].store(0.0f); }
+        else { clearPeak(returnPeaks[0], returnPeaksL[0], returnPeaksR[0]); }
     }
-    else { returnPeaks[0].store(0.0f); }
+    else { clearPeak(returnPeaks[0], returnPeaksL[0], returnPeaksR[0]); }
 
     if (hasSignal(delaySendBuf, numSamples))
     {
@@ -346,14 +374,14 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
         if (!returns[1].mute.load(std::memory_order_relaxed)
             && !(anyReturnSolo && !returns[1].solo.load(std::memory_order_relaxed)))
         {
-            returnPeaks[1].store(peakOf(delaySendBuf, numSamples));
+            storePeak(delaySendBuf, numSamples, returnPeaks[1], returnPeaksL[1], returnPeaksR[1]);
             for (int c = 0; c < numOutCh; ++c)
                 output.addFrom(c, 0, delaySendBuf, c, 0, numSamples);
             fanOutToFxReturns(delaySendBuf);
         }
-        else { returnPeaks[1].store(0.0f); }
+        else { clearPeak(returnPeaks[1], returnPeaksL[1], returnPeaksR[1]); }
     }
-    else { returnPeaks[1].store(0.0f); }
+    else { clearPeak(returnPeaks[1], returnPeaksL[1], returnPeaksR[1]); }
 
     // Re-check after processSends: intra-FX routing (delay→reverb, effect→reverb) may have
     // added signal to reverbSendBuf even when no channels had a direct reverb send.
@@ -364,14 +392,14 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
         if (!returns[2].mute.load(std::memory_order_relaxed)
             && !(anyReturnSolo && !returns[2].solo.load(std::memory_order_relaxed)))
         {
-            returnPeaks[2].store(peakOf(reverbSendBuf, numSamples));
+            storePeak(reverbSendBuf, numSamples, returnPeaks[2], returnPeaksL[2], returnPeaksR[2]);
             for (int c = 0; c < numOutCh; ++c)
                 output.addFrom(c, 0, reverbSendBuf, c, 0, numSamples);
             fanOutToFxReturns(reverbSendBuf);
         }
-        else { returnPeaks[2].store(0.0f); }
+        else { clearPeak(returnPeaks[2], returnPeaksL[2], returnPeaksR[2]); }
     }
-    else { returnPeaks[2].store(0.0f); }
+    else { clearPeak(returnPeaks[2], returnPeaksL[2], returnPeaksR[2]); }
 
     // Master inserts — run on the summed bus BEFORE the fader/meter (standard master-bus
     // processing, so a master compressor/limiter sees a consistent pre-fader level), chained
@@ -392,5 +420,5 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     // post-insert, post-fader output that actually leaves the mixer.
     applyPanGain(output, masterLevel.load(std::memory_order_relaxed),
                          masterPan.load(std::memory_order_relaxed), numSamples);
-    masterPeak.store(peakOf(output, numSamples));
+    storePeak(output, numSamples, masterPeak, masterPeakL, masterPeakR);
 }

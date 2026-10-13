@@ -169,9 +169,14 @@ public:
     InsertProcessor    masterInsert2;
 
     // Peak levels written from the audio thread, read by the UI at 30 Hz.
+    // The combined peak (larger of left and right) plus the left / right peaks behind the stereo VU
+    // meters, all post-fader and post-pan.
     std::atomic<float> channelPeaks[MaxChannels];
     std::atomic<float> returnPeaks[3];
     std::atomic<float> masterPeak;
+    std::atomic<float> channelPeaksL[MaxChannels], channelPeaksR[MaxChannels];
+    std::atomic<float> returnPeaksL[3], returnPeaksR[3];
+    std::atomic<float> masterPeakL, masterPeakR;
     // Per-channel peak gain-reduction (0 = no duck, 1 = full duck), written each block.
     std::atomic<float> sidechainGR[MaxChannels];
     // Per-return peak gain-reduction for sidechain ducking.
@@ -340,6 +345,11 @@ private:
 
     bool         hasSolo(int numActive) const;
     static float peakOf(const juce::AudioBuffer<float>& buf, int numSamples);
+    // Publish a buffer's combined, left and right peaks / silence them. A mono buffer reports its one
+    // channel as both sides.
+    static void storePeak(const juce::AudioBuffer<float>& buf, int numSamples,
+                          std::atomic<float>& both, std::atomic<float>& left, std::atomic<float>& right);
+    static void clearPeak(std::atomic<float>& both, std::atomic<float>& left, std::atomic<float>& right);
     static bool  hasSignal(const juce::AudioBuffer<float>& buf, int numSamples);
     static void  applyPanGain(juce::AudioBuffer<float>& buf,
                               float level, float pan, int numSamples);

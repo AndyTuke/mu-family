@@ -130,6 +130,7 @@ void MixerOverlay::buildChannels()
         const juce::String prefix = "ch" + juce::String(r) + "_";
         ch->bindChannel(mixer.channels[r], mixer.channelPeaks[r], &proc, prefix,
                        &mixer.sidechainGR[r]);
+        ch->bindClientMeter(mixer.channelPeaksL[r], mixer.channelPeaksR[r]);   // stereo bars
         if (!hasRhythm || (isChannelSilent && isChannelSilent(r))) ch->setActive(false);
         // forward status updates to the global StatusBar via PluginEditor.
         ch->onStatusUpdate = [this](const juce::String& n, const juce::String& v, juce::Colour c) {
@@ -159,14 +160,17 @@ void MixerOverlay::wireReturns()
 {
     effectReturn.bindReturn(mixer.returns[0], mixer.returnPeaks[0], &proc, "ret_eff_",
                             &mixer.returnSidechainGR[0]);
+    effectReturn.bindClientMeter(mixer.returnPeaksL[0], mixer.returnPeaksR[0]);
     effectReturn.bindReturnSends(proc.apvts, "eff2dly", "eff2rev");
 
     delayReturn .bindReturn(mixer.returns[1], mixer.returnPeaks[1], &proc, "ret_dly_",
                             &mixer.returnSidechainGR[1]);
+    delayReturn .bindClientMeter(mixer.returnPeaksL[1], mixer.returnPeaksR[1]);
     delayReturn .bindReturnSends(proc.apvts, "", "dly2rev");
 
     reverbReturn.bindReturn(mixer.returns[2], mixer.returnPeaks[2], &proc, "ret_rev_",
                             &mixer.returnSidechainGR[2]);
+    reverbReturn.bindClientMeter(mixer.returnPeaksL[2], mixer.returnPeaksR[2]);
     masterChannel.bindMaster(mixer, &proc);
 
     // forward status updates from return channels to the StatusBar via PluginEditor.
