@@ -142,6 +142,57 @@ public:
             expect(got.fullId == 4 && ! sw.hasFullPending(), "applied at once, nothing pending");
         }
 
+        // OnBar through the swapper: a staged swap waits for the 4-beat bar line, not the voice's 8-beat
+        // loop nor a 16-beat master loop, and a full preset follows the same rule.
+        auto flagBar = [](Swapper& sw, double start, double beats, double master,
+                          const std::array<double, mu_limits::kMaxLayers>& pat)
+        {
+            return sw.flagBoundaries(true, start, beats, [&](int slot) noexcept
+                                     { return swapLoopBeats(slot, 2, SwapTiming::OnBar, master, pat.data()); });
+        };
+
+        for (const double master : { 0.0, 16.0 })   // free-running, then with a master loop
+        {
+            const juce::String mode = master > 0.0 ? " (master loop set)" : " (free-running)";
+
+            beginTest("Swapper OnBar: a voice swap commits on the bar line, not the voice loop" + mode);
+            {
+                Swapper sw; Applied got; wire(sw, got);
+                flagBar(sw, 0.0, 0.5, master, eight);                       // establish playing
+                juce::ValueTree v("Voice"); v.setProperty("id", 5, nullptr);
+                sw.stageSlot(1, std::move(v));
+                expect(! flagBar(sw, 1.0, 1.0, master, eight), "mid-bar: wait");
+                expect(  flagBar(sw, 3.9, 0.2, master, eight), "the bar line (beat 4) flags it, well before the 8-beat loop");
+                sw.commit();
+                expect(got.slots.size() == 1 && got.slots[0].first == 1 && got.slots[0].second == 5, "voice 1 committed");
+            }
+
+            beginTest("Swapper OnBar: a full preset commits on the bar line" + mode);
+            {
+                Swapper sw; Applied got; wire(sw, got);
+                flagBar(sw, 0.0, 0.5, master, eight);
+                juce::ValueTree f("Full"); f.setProperty("id", 9, nullptr);
+                sw.stageFull(std::move(f));
+                expect(! flagBar(sw, 4.1, 3.0, master, eight), "no wrap between beat 4.1 and 7.1");
+                expect(  flagBar(sw, 7.9, 0.2, master, eight), "the next bar line (beat 8) flags it");
+                sw.commit();
+                expectEquals(got.fullId, 9);
+                expect(! sw.hasFullPending(), "cleared after commit");
+            }
+        }
+
+        beginTest("Swapper OnBar: a voice pattern not yet locked (length 0) still commits on the bar");
+        {
+            Swapper sw; Applied got; wire(sw, got);
+            std::array<double, mu_limits::kMaxLayers> unlocked {};
+            flagBar(sw, 0.0, 0.5, 0.0, unlocked);
+            juce::ValueTree v("Voice"); v.setProperty("id", 6, nullptr);
+            sw.stageSlot(0, std::move(v));
+            expect(flagBar(sw, 3.9, 0.2, 0.0, unlocked), "bar line flags it without a locked length");
+            sw.commit();
+            expect(got.slots.size() == 1 && got.slots[0].second == 6);
+        }
+
         beginTest("swapLoopBeats: the mu-tant boundary rule");
         {
             std::array<double, mu_limits::kMaxLayers> pat {}; pat.fill(8.0); pat[0] = 12.0; pat[1] = 4.0;
