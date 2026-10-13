@@ -40,7 +40,9 @@ public:
     static Layout computeLayout(juce::Rectangle<int> bounds, int numLamps);
     // How the LCD's width is shared between the lit lettering and its ghost: both whole when they fit,
     // else the lit part keeps at least 60 % of the width and the ghost gets what is left.
-    static void splitText(float avail, float litMeasured, float ghostMeasured, float gap, float& litW, float& ghostW);
+    // `minGhostW`: when less than this is left for the ghost it is omitted and the lit text takes the width (no stub).
+    static void splitText(float avail, float litMeasured, float ghostMeasured, float gap, float& litW, float& ghostW,
+                          float minGhostW = 0.0f);
     // A smooth 0..1 pulse at `hz` for a time in milliseconds (0 at t = 0).
     static float pulse(double timeMs, float hz) noexcept;
     // The lit amount (Lighting lampOff .. lampOn + lampPlayhead) a lamp shows now; `flash` adds the

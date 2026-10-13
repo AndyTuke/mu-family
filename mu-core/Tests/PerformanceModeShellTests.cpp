@@ -114,6 +114,11 @@ struct PerformanceModeShellTests : juce::UnitTest
             expectWithinAbsoluteError(lit, 30.0f, 0.01f);   expectWithinAbsoluteError(ghost, 66.0f, 0.01f);
             StepIndicator::splitText(100.0f, 140.0f, 0.0f, 4.0f, lit, ghost);
             expectWithinAbsoluteError(lit, 100.0f, 0.01f);  expectEquals(ghost, 0.0f);
+            // Too little room left for a readable ghost (36 here, minimum 40): it is dropped, not drawn as a stub.
+            StepIndicator::splitText(100.0f, 90.0f, 50.0f, 4.0f, lit, ghost, 40.0f);
+            expectWithinAbsoluteError(lit, 90.0f, 0.01f);   expectEquals(ghost, 0.0f);
+            StepIndicator::splitText(100.0f, 90.0f, 50.0f, 4.0f, lit, ghost, 30.0f);
+            expectWithinAbsoluteError(ghost, 36.0f, 0.01f);   // enough room: kept
         }
 
         beginTest("StepIndicator: layout is LCD 240 + gap 4 + 8 lamps of 11 in the 332 px group");
@@ -327,13 +332,17 @@ struct PerformanceModeShellTests : juce::UnitTest
             expect(lines.contains("Performance|Hold to leave Performance mode"), "status text while held");
             bar.tickExitHold(1500.0);
             expectWithinAbsoluteError(fill(), 0.5f, 0.001f);
+            lines.clear();
             bar.cancelExitHold();
             expect(! bar.isExitHolding() && fill() == 0.0f && bar.isPerformanceMode(), "release cancels and resets the fill");
+            expect(lines.contains("|"), "and the 'Hold to leave' status line is taken down");
 
             bar.beginExitHold(2000.0);
             bar.tickExitHold(2999.0);
             expect(bar.isPerformanceMode() && fill() > 0.99f, "not done a millisecond early");
+            lines.clear();
             bar.tickExitHold(3000.0);
+            expect(lines.contains("|"), "completion also takes the status line down");
             expect(! bar.isPerformanceMode() && ! rig.live.isPerformanceMode(), "completion leaves the mode");
             expect(sink.seen.back().type == ControlActionType::PerformanceMode && sink.seen.back().index == 0, "asked to leave");
             expect(fill() == 0.0f && ! bar.isExitHolding(), "fill reset");

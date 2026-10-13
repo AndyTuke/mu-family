@@ -67,12 +67,14 @@ StepIndicator::Layout StepIndicator::computeLayout(juce::Rectangle<int> bounds, 
     return out;
 }
 
-void StepIndicator::splitText(float avail, float litMeasured, float ghostMeasured, float gap, float& litW, float& ghostW)
+void StepIndicator::splitText(float avail, float litMeasured, float ghostMeasured, float gap, float& litW, float& ghostW,
+                              float minGhostW)
 {
     if (ghostMeasured <= 0.0f)                       { litW = juce::jmin(litMeasured, avail); ghostW = 0.0f; return; }
     if (litMeasured + gap + ghostMeasured <= avail)  { litW = litMeasured; ghostW = ghostMeasured; return; }
     litW   = juce::jmin(litMeasured, juce::jmax(0.6f * avail, avail - ghostMeasured - gap));
     ghostW = juce::jmax(0.0f, avail - litW - gap);
+    if (ghostW < minGhostW) { litW = juce::jmin(litMeasured, avail); ghostW = 0.0f; }   // not enough for a readable ghost
 }
 
 float StepIndicator::pulse(double timeMs, float hz) noexcept
@@ -129,7 +131,8 @@ void StepIndicator::paint(juce::Graphics& g)
         const float gap = (float) s(MuLookAndFeel::kLcdTextPadX);
         float litW = 0.0f, ghostW = 0.0f;
         splitText((float) area.getWidth(), juce::GlyphArrangement::getStringWidth(font, litText),
-                  juce::GlyphArrangement::getStringWidth(font, ghostText), gap, litW, ghostW);
+                  juce::GlyphArrangement::getStringWidth(font, ghostText), gap, litW, ghostW,
+                  (float) s(MuLookAndFeel::kStepGhostMinW));
 
         const auto lit = MuLookAndFeel::lcdLitColour(*this);
         g.setFont(font);

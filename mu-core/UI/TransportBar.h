@@ -82,6 +82,7 @@ public:
     // the bar's timer ticks it at the UI refresh rate and release or drag-off cancels.
     void beginExitHold(double nowMs);
     void cancelExitHold();
+    void clearHoldLine();   // takes the 'Hold to leave' status line down
     void tickExitHold(double nowMs);
     bool isExitHolding() const noexcept { return exitHold.isHolding(); }
     // Re-reads the live state and updates the toggle, the preset group and the indicator.
@@ -143,6 +144,9 @@ private:
     bool             modeShown      = false;
     int              statusSerial   = 0;
     juce::String     shownQueued;
+    bool             holdLineShown  = false;   // the 'Hold to leave' status line is up
+    uint32_t         shownRevision  = 0xffffffffu;   // the live revision and preset name the indicator was last built from
+    juce::String     shownPresetName;
 
     void setExitFill(float progress);
     void refreshIndication();

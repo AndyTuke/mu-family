@@ -202,7 +202,18 @@ void TransportBar::beginExitHold(double nowMs)
 {
     if (! modeShown) return;
     exitHold.press(nowMs);
+    ++statusSerial;   // a pending timed clear must not wipe this line
+    holdLineShown = true;
     if (onStatusUpdate) onStatusUpdate("Performance", "Hold to leave Performance mode");
+}
+
+// Takes the 'Hold to leave' line down when the hold ends (released, dragged off or completed).
+void TransportBar::clearHoldLine()
+{
+    if (! holdLineShown) return;
+    holdLineShown = false;
+    ++statusSerial;
+    if (onStatusUpdate) onStatusUpdate({}, {});
 }
 
 void TransportBar::setExitFill(float progress)
@@ -216,6 +227,7 @@ void TransportBar::cancelExitHold()
     if (! exitHold.isHolding()) return;
     exitHold.cancel();
     setExitFill(0.0f);
+    clearHoldLine();
 }
 
 // Advances the hold: the face fills with the elapsed fraction; at the end the mode is left with no confirm.
@@ -230,6 +242,7 @@ void TransportBar::tickExitHold(double nowMs)
 
     exitHold.cancel();
     setExitFill(0.0f);
+    clearHoldLine();
     perfBtn.suppressClick = true;   // the release that follows must not enter again
     if (isPerformanceAvailable())
     {
@@ -266,7 +279,8 @@ void TransportBar::syncPerformance()
     if (on != modeShown)
     {
         modeShown = on;
-        if (! on) { cancelExitHold(); shownQueued = {}; }
+        if (! on) { cancelExitHold(); shownQueued = {}; shownRevision = 0xffffffffu; }
+        else      { shownRevision = 0xffffffffu; }   // rebuild the indicator on entry
         perfBtn.setToggleState(on, juce::dontSendNotification);
         perfBtn.setTooltip(on ? "Hold to leave Performance mode" : "Performance mode (Ctrl+P)");
         updatePresetGroupVisibility();
@@ -280,8 +294,14 @@ void TransportBar::syncPerformance()
 // The indicator's lettering and lamps from the live state, plus the status line for a queued switch.
 void TransportBar::refreshIndication()
 {
-    const auto ind = mu_ui::perf::buildIndication(*proc.getLiveView(),
-                                                  getLoadedPresetFile().getFileNameWithoutExtension());
+    // Rebuilt only when the live state or the loaded preset's name changed: the build stats up to eight
+    // preset files, which must not happen on every refresh tick.
+    const auto presetName = getLoadedPresetFile().getFileNameWithoutExtension();
+    if (proc.getLiveView()->getRevision() == shownRevision && presetName == shownPresetName) return;
+    shownRevision   = proc.getLiveView()->getRevision();
+    shownPresetName = presetName;
+
+    const auto ind = mu_ui::perf::buildIndication(*proc.getLiveView(), presetName);
     stepIndicator.setText(ind.lit, ind.ghost, ind.ghostPulses);
     stepIndicator.setLamps(ind.lamps);
     stepIndicator.setHint(ind.hint.first, ind.hint.second);
@@ -291,7 +311,12 @@ void TransportBar::refreshIndication()
     if (ind.queuedValue != shownQueued)
     {
         shownQueued = ind.queuedValue;
-        if (shownQueued.isNotEmpty() && onStatusUpdate) onStatusUpdate("Queued", shownQueued);
+        ++statusSerial;   // supersedes a pending timed clear
+        if (onStatusUpdate)
+        {
+            if (shownQueued.isNotEmpty()) onStatusUpdate("Queued", shownQueued);
+            else                          onStatusUpdate({}, {});   // committed or cancelled: the line goes
+        }
     }
 }
 
