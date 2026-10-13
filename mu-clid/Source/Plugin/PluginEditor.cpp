@@ -23,8 +23,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     getSaveDialog().setLogoImage(juce::ImageCache::getFromMemory(BinaryData::muclid_png,
                                                                   BinaryData::muclid_pngSize));
     // mu-Clid has no bar-line rule, so it offers the two loop rules only.
-    masterLoop.setSwapTimingChoices({ { mu_hotswap::SwapTiming::OnMasterLoop, "On master loop" },
-                                      { mu_hotswap::SwapTiming::OnLayerLoop,  "On rhythm loop" } });
+    masterLoop.setSwapTimingChoices({ { mu_hotswap::SwapTiming::OnMasterLoop, "Master loop" },
+                                      { mu_hotswap::SwapTiming::OnLayerLoop,  "Rhythm loop" } });
     getTransportBar().setLoopSection(&masterLoop, masterLoop.getPreferredWidth());
     masterLoop.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
     {

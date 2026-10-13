@@ -81,6 +81,18 @@ public:
             expect(! fullPresetBoundaryReached(SwapTiming::OnBar, false, true,  1, false));
         }
 
+        beginTest("staging or cancelling a full preset changes the stage serial (a cancelled payload cannot be taken for current)");
+        {
+            Stager<int, int, 1> stager;
+            const auto s0 = stager.fullStageSerial();
+            stager.stageFull(7);
+            const auto s1 = stager.fullStageSerial();
+            expect(s1 != s0, "staging changes it");
+            stager.cancelFull();
+            expect(stager.fullStageSerial() != s1, "cancelling changes it too");
+            expect(! stager.hasFullPending());
+        }
+
         beginTest("the bar rule: a bar wraps every four beats, including across a block");
         {
             expect(  loopWrapped(3.9, 4.1, kBarBeats));

@@ -171,7 +171,8 @@ public:
         clear(slots[(size_t) i]);
     }
 
-    void cancelFull() { clear(full); }
+    // A cancel changes the serial like a stage does: whoever queued the cancelled payload can then see that it is gone.
+    void cancelFull() { clear(full); ++fullSerial; }
 
     // Staged and not yet taken: ready or flagged.
     bool hasPending(int i) const noexcept
