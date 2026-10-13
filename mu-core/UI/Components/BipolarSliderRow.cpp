@@ -4,6 +4,9 @@ BipolarSliderRow::BipolarSliderRow()
 {
     using mu_ui::s;
     // Depth: horizontal bar with text box on the right. Bipolar -100..+100.
+    // Modulation controls take the modulation knob colour (the default would be Euclidean purple).
+    depthSlider.setColour(juce::Slider::rotarySliderFillColourId, MuLookAndFeel::colour(MuLookAndFeel::knobModulation));
+    curveSlider.setColour(juce::Slider::rotarySliderFillColourId, MuLookAndFeel::colour(MuLookAndFeel::knobModulation));
     depthSlider.setSliderStyle(juce::Slider::LinearHorizontal);
     depthSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, s(44), s(18));
     depthSlider.setRange(-100.0, 100.0, 0.1);

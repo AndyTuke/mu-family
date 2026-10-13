@@ -622,8 +622,8 @@ void MuLookAndFeel::drawSlideSwitch(juce::Graphics& g, juce::Rectangle<float> bo
         .drawForPath(g, disc);
 
     juce::ColourGradient face(juce::Colour(0xff4a3a58), cx + thR * 0.45f, cy - thR * 0.45f,
-                              juce::Colour(0xff100c16), cx - thR * 0.8f,  cy + thR * 0.9f, true);
-    face.addColour(0.4, juce::Colour(0xff2d2238));
+                              knobFaceDark, cx - thR * 0.8f,  cy + thR * 0.9f, true);
+    face.addColour(0.4, knobFaceUpper);
     g.setGradientFill(face);
     g.fillPath(disc);
 
