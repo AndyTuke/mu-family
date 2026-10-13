@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Driver/DevicePorts.h"
 #include "Surface/SurfaceDescription.h"
 #include "Surface/SurfaceEvent.h"
 #include <functional>
@@ -18,9 +19,9 @@ public:
 
     virtual const SurfaceDescription& describe() const = 0;
 
-    // Open puts the device into its host-controlled mode; close restores the device's own mode and is harmless
-    // when already closed. (The byte pipe, DevicePorts, joins open() with the first real driver.)
-    virtual bool open()  = 0;
+    // Open puts the device into its host-controlled mode over the given byte pipe, which must outlive the open
+    // driver; close restores the device's own mode and is harmless when already closed.
+    virtual bool open(DevicePorts& ports) = 0;
     virtual void close() = 0;
     virtual bool isOpen() const = 0;
 

@@ -1,5 +1,6 @@
 # mu-control-tests - console UnitTests for the device-independent surface layer (description, mapping, model),
-# run against both a Launchpad-style description and the mock grid. Mirrors mu-core-tests: compiles the library
+# run against both a Launchpad-style description and the mock grid, plus the Launchpad X protocol and driver
+# against fake ports. Mirrors mu-core-tests: compiles the library
 # sources directly and links no product and no ProcessorBase.
 juce_add_console_app(mu-control-tests PRODUCT_NAME "mu-control-tests")
 
@@ -8,12 +9,18 @@ target_sources(mu-control-tests PRIVATE
     SurfaceDescriptionTests.cpp
     SurfaceMappingTests.cpp
     SurfaceModelTests.cpp
+    LaunchpadXProtocolTests.cpp
+    LaunchpadXDriverTests.cpp
     TestDescriptions.h
     MockGridDriver.h
     FakeLiveView.h
     FakeControlSink.h
+    FakeDevicePorts.h
     ../Surface/SurfaceMapping.cpp
     ../Surface/SurfaceModel.cpp
+    ../Devices/LaunchpadX/LaunchpadXProtocol.cpp
+    ../Devices/LaunchpadX/LaunchpadXDriver.cpp
+    ../Driver/JuceDevicePorts.cpp
     # LiveView.h needs the performance list.
     ../../mu-core/Persistence/PerformanceFile.cpp
 )

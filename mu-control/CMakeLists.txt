@@ -11,6 +11,9 @@ target_compile_features(mu-control INTERFACE cxx_std_17)
 target_sources(mu-control INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Surface/SurfaceMapping.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Surface/SurfaceModel.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Devices/LaunchpadX/LaunchpadXProtocol.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Devices/LaunchpadX/LaunchpadXDriver.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Driver/JuceDevicePorts.cpp"
 )
 
 target_include_directories(mu-control INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")

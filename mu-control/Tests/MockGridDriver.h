@@ -15,7 +15,7 @@ class MockGridDriver : public SurfaceDriver
 public:
     const SurfaceDescription& describe() const override { return description; }
 
-    bool open() override  { opened = true; return true; }
+    bool open(DevicePorts&) override { opened = true; return true; }
     void close() override { opened = false; }
     bool isOpen() const override { return opened; }
 

@@ -1433,15 +1433,20 @@ and nothing else of the family; the only `mu-core` types it names are `ControlAc
 | Folder | Holds |
 |---|---|
 | `Surface/` | The device-independent half: `SurfaceDescription.h`, `SurfaceEvent.h` (control id, press/release/value event, LED state), `SurfaceMapping.{h,cpp}`, `SurfaceModel.{h,cpp}` (including the blink animation) |
-| `Driver/` | The port-facing half: `SurfaceDriver.h` (the interface), `DevicePorts.h` (the byte pipe the driver talks to; M2), `JuceDevicePorts.{h,cpp}` (the real ports, M3) |
+| `Driver/` | The port-facing half: `SurfaceDriver.h` (the interface), `DevicePorts.h` (the byte pipe the driver talks to), `JuceDevicePorts.{h,cpp}` (the real ports over `juce::MidiInput` / `MidiOutput`; the only place a JUCE MIDI port type appears) |
 | `Devices/<Device>/` | One folder per device family. `Devices/LaunchpadX/`: `LaunchpadXProtocol.{h,cpp}` (pure byte encode and decode, no ports), `LaunchpadXPalette.h` (hue name to bright and dim colour), `LaunchpadXDriver.{h,cpp}` |
 | `Manager/` | `ControllerManager.{h,cpp}` (discovery, hot-plug, lifetime, the refresh timer; implements `mu_core::ControlAttachment`) and `ControlRegistration.cpp` (item 4) |
-| `Tests/` | `mu-control-tests` and its test-only helpers (`MockGridDriver.h`, `FakeDevicePorts.h` (M2), `FakeLiveView.h`, `FakeControlSink.h`) |
+| `Tests/` | `mu-control-tests` and its test-only helpers (`MockGridDriver.h`, `FakeDevicePorts.h`, `FakeLiveView.h`, `FakeControlSink.h`) |
 
 File = class; the four parts of design-launchpad §3.1 are named **`SurfaceDriver`, `SurfaceDescription`, `SurfaceMapping`, `SurfaceModel`** (`Surface` is
 reserved for this library, [design-naming.md](design-naming.md)); a device driver is `<Device>Driver` (`LaunchpadXDriver`, later `LaunchpadMiniDriver`,
 `PushDriver`). Everything under `Surface/` and `Driver/SurfaceDriver.h` knows no device bytes and no product; everything under `Devices/` knows no
-`ControlAction`, `LiveView` or mapping (a driver turns bytes into `SurfaceEvent`s and `LedState`s, nothing else).
+`ControlAction`, `LiveView` or mapping (a driver turns bytes into `SurfaceEvent`s and `LedState`s, nothing else). **Driver contract (settled 2026-10-13, M2):** `SurfaceDriver::open(DevicePorts&)` — the
+driver owns open and close of the given ports (by its own `PortSpec` of case-insensitive wildcard names), enters the device's host mode on open and restores the device's own mode on
+close **and in its destructor**; it sends only the lights that changed (delta lighting) while remembering the whole last frame; it watches `DevicePorts::isConnected()` /
+`onConnectionChanged` and, on a replug, repeats its setup and the whole frame; and it holds no port type, only `DevicePorts`. Callbacks (`onBytes`, `onConnectionChanged`)
+arrive on a MIDI or hot-plug thread; a driver is not internally synchronised, so the manager serialises everything onto one thread (the threads rule). The boundary check
+(`Surface/` and `Manager/` never include `Devices/`; `Devices/` never includes `SurfaceMapping` / `SurfaceModel`) is in `check-core-boundary.ps1`.
 
 **3. Build.**
 - Root `CMakeLists.txt` always `add_subdirectory(mu-control)` (before the products), so the library is compiled and its tests built in every

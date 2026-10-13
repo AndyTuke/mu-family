@@ -1,6 +1,7 @@
 // SurfaceDescription and the control list: geometry counts, which controls exist, and the mock grid driver
 // translating its own bottom-right numbering into the surface top-left coordinates.
 
+#include "FakeDevicePorts.h"
 #include "MockGridDriver.h"
 #include "Surface/SurfaceMapping.h"
 #include <set>
@@ -57,7 +58,8 @@ public:
             drv.devicePad(0, 0, true);   // not open yet: nothing is reported
             expect(got.empty(), "a closed driver reports nothing");
 
-            expect(drv.open() && drv.isOpen());
+            FakeDevicePorts ports;
+            expect(drv.open(ports) && drv.isOpen());
             drv.devicePad(0, 0, true);   // device origin = bottom-right
             drv.devicePad(3, 3, false);  // device far corner = top-left
             drv.deviceTop(0, true);      // the rightmost top button

@@ -60,6 +60,8 @@ $includeShell   = [regex]'#\s*include\s*[<"][^">]*\b(ProcessorBase|ProcessorCore
 $includeCoreUi  = [regex]'#\s*include\s*[<"](mu-core/)?UI/'
 # A device folder (Devices/) turns bytes into SurfaceEvents and LedStates and knows nothing of mappings or the model.
 $includeSurfaceBrain = [regex]'#\s*include\s*[<"][^">]*\bSurface(Mapping|Model)\.h'
+# ... and the other way round: the surface layer and the manager reach a device only through SurfaceDriver, never by including Devices/.
+$includeDevice = [regex]'#\s*include\s*[<"][^">]*\bDevices/'
 
 # Blank a block comment but keep its newlines, so line numbers after it stay accurate.
 $blankBlock = [System.Text.RegularExpressions.MatchEvaluator] {
@@ -96,6 +98,7 @@ foreach ($root in $roots) {
         # Devices/ is judged relative to the library root, so a fixture tree behaves like the real one.
         $relToRoot = $file.FullName.Substring((Resolve-Path -LiteralPath $root.Dir).Path.TrimEnd([char]92, '/').Length).Replace([string][char]92, '/')
         $isDevice = $root.IsControl -and $relToRoot -match '^/Devices/'
+        $isDeviceBlind = $root.IsControl -and $relToRoot -match '^/(Surface|Manager)/'
 
         $lineNo = 0
         foreach ($line in ($cleaned -split "\r?\n")) {
@@ -118,6 +121,10 @@ foreach ($root in $roots) {
                 }
                 if ($isDevice -and $includeSurfaceBrain.IsMatch($line)) {
                     if (-not $Quiet) { Write-Host "  [FAIL] ${rel}:${lineNo} — a Devices/ file includes the mapping or the model (a driver knows wire bytes only): $snippet" }
+                    $fails++
+                }
+                if ($isDeviceBlind -and $includeDevice.IsMatch($line)) {
+                    if (-not $Quiet) { Write-Host "  [FAIL] ${rel}:${lineNo} — a Surface/ or Manager/ file includes a Devices/ header (go through SurfaceDriver): $snippet" }
                     $fails++
                 }
             }
