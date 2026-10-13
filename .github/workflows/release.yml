@@ -91,8 +91,8 @@ jobs:
           Compress-Archive -Path staging\mu-Clid\* -DestinationPath dist\mu-Clid-Windows.zip
           # mu-Clid MIDI (VST3 + CLAP)
           New-Item -ItemType Directory -Path "staging\mu-Clid MIDI" -Force | Out-Null
-          Copy-Item "$r\mu-clid\mu-clid-lite_artefacts\Release\VST3\mu-Clid MIDI.vst3" "staging\mu-Clid MIDI\" -Recurse
-          Copy-Item "$r\mu-clid\mu-clid-lite_artefacts\Release\CLAP\mu-Clid MIDI.clap" "staging\mu-Clid MIDI\"
+          Copy-Item "$r\mu-clid-midi\mu-clid-midi_artefacts\Release\VST3\mu-Clid MIDI.vst3" "staging\mu-Clid MIDI\" -Recurse
+          Copy-Item "$r\mu-clid-midi\mu-clid-midi_artefacts\Release\CLAP\mu-Clid MIDI.clap" "staging\mu-Clid MIDI\"
           Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Clid MIDI\"
           Compress-Archive -Path "staging\mu-Clid MIDI\*" -DestinationPath dist\mu-Clid-MIDI-Windows.zip
           # mu-Tant (VST3 + CLAP + Standalone)
