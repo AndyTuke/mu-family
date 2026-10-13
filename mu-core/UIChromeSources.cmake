@@ -36,6 +36,8 @@ set(MU_CORE_CHROME_SOURCES
     "${_mu_core_dir}/UI/PresetBrowser.cpp"
     "${_mu_core_dir}/UI/ShellChrome.cpp"
     "${_mu_core_dir}/UI/PerformanceIndication.cpp"
+    "${_mu_core_dir}/UI/PerformanceChooserModel.cpp"
+    "${_mu_core_dir}/UI/PerformanceChooser.cpp"
     # The performance list the chrome reads (juce_core only), compiled with the chrome so mu-link links it too
     "${_mu_core_dir}/Persistence/PerformanceFile.cpp"
 )

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Plugin/ShellBackend.h"
+#include "Control/LiveState.h"
 
 #include <atomic>
 
@@ -69,6 +70,11 @@ struct TestShellBackend : mu_core::ShellBackend
     const mu_core::LiveView* getLiveView() const override { return live; }
     mu_core::ControlSink*    getControlSink() override { return sink; }
     bool                     supportsPerformanceMode() const override { return performanceSupported; }
+    juce::String             productId { "MuTantState" };
+    mu_core::LiveState*      loadTarget = nullptr;   // where loadPerformance sends the list
+    juce::String             getProductStateId() const override { return productId; }
+    bool loadPerformance(mu_pp::PerformanceFile f, const juce::File& where) override
+    { return loadTarget != nullptr && loadTarget->loadPerformance(std::move(f), where); }
 
     float  getUiScale() const override { return uiScale; }
     void   setUiScale(float s) override { uiScale = s; ++uiScaleSets; if (onUiScaleChanged) onUiScaleChanged(s); }

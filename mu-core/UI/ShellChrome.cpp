@@ -4,6 +4,7 @@
 #include "UI/ConfirmDialog.h"           // shared themed confirm dialogs (mu_ui::confirmAsync)
 #include "UI/ModalDialog.h"
 #include "Persistence/PresetFiles.h"    // mu_pp::safePresetFileName, readPresetMeta
+#include "UI/PerformanceChooserModel.h" // perf::performancesDir
 #include "BuildNumber.h"        // BUILD_NUMBER, MU_VERSION_STRING: local version for the upgrade check
 
 namespace mu_ui
@@ -24,6 +25,7 @@ ShellChrome::ShellChrome(juce::Component& hostComponent, mu_core::ShellBackend& 
       tooltipWindow(&hostComponent, 700)
 {
     wireBuiltIns();
+    wirePerformanceChooser();
     wirePresetFlow();
     installKeys();
 
@@ -75,7 +77,13 @@ void ShellChrome::wireBuiltIns()
     aboutOverlay.onDismiss = [this] { showAbout(false); };
 
     presetBrowser.setFileExtension(backend.getFullPresetExtension());
-    presetBrowser.onClose = [this] { showPresetBrowser(false); };
+    // Closing the browser after a pick (or a cancelled pick) goes back to the chooser that asked.
+    presetBrowser.onClose = [this]
+    {
+        const bool backToChooser = returnToChooser;
+        showPresetBrowser(false);
+        if (backToChooser) showExtraScreen(performanceChooser, true);
+    };
 
     // Surface preset / state-load failures to the user.
     backend.onLoadError = [this](const juce::String& msg)
@@ -97,6 +105,58 @@ void ShellChrome::wireBuiltIns()
         upgradeBanner.addMouseListener(this, false);
         upgradeBanner.setMouseCursor(juce::MouseCursor::PointingHandCursor);
     }
+}
+
+// The Performance chooser joins the state machine as a page over the main area, and its entry points
+// are wired where the mode is supported.
+void ShellChrome::wirePerformanceChooser()
+{
+    addExtraScreen(performanceChooser, ExtraKind::Page, &statusBar);
+
+    performanceChooser.onClose  = [this] { showExtraScreen(performanceChooser, false); };
+    performanceChooser.onStatus = [this](const juce::String& name, const juce::String& value)
+    {
+        statusBar.showParam(name, value);
+    };
+    performanceChooser.onPickPreset = [this](std::function<void(const juce::File&)> picked)
+    {
+        pickPresetForChooser(std::move(picked));
+    };
+    performanceChooser.onUse = [this](mu_pp::PerformanceFile list, const juce::File& where)
+    {
+        return backend.loadPerformance(std::move(list), where);
+    };
+
+    if (! backend.supportsPerformanceMode()) return;
+    presetBrowser.onChoosePerformance = [this] { showPerformanceChooser(); };
+    presetBrowser.refreshFooter();
+    transportBar.onChoosePerformance = [this] { showPerformanceChooser(); };
+}
+
+void ShellChrome::showPerformanceChooser()
+{
+    if (! backend.supportsPerformanceMode()) return;
+    if (liveView != nullptr && liveView->isPerformanceMode()) return;   // the PC is locked in the mode
+    if (isExtraScreenVisible(performanceChooser)) return;               // already editing: keep the session
+
+    showExtraScreen(performanceChooser, true);
+
+    // The session starts from the list in use, or a new one when none is chosen.
+    const mu_pp::PerformanceFile none;
+    performanceChooser.beginSession(perf::performancesDir(backend.getContentDir()), backend.getFullPresetDir(),
+                                    backend.getProductStateId(),
+                                    liveView != nullptr ? liveView->getPerformance() : none,
+                                    liveView != nullptr ? liveView->getPerformanceFile() : juce::File());
+}
+
+// The chooser asked for a preset: show the browser in pick mode. Hiding the chooser to do so keeps
+// its edits (they live in the chooser's model); the browser's close returns to it.
+void ShellChrome::pickPresetForChooser(std::function<void(const juce::File&)> picked)
+{
+    showPresetBrowser(true);
+    returnToChooser = true;
+    presetBrowser.beginPick(std::move(picked));
+    statusBar.showParam("Performance", "Pick a preset");
 }
 
 // Fixed window size from the UI scale, re-applied when the scale changes in settings.
@@ -308,6 +368,7 @@ bool ShellChrome::anyOverlayVisible() const noexcept
 
 void ShellChrome::hideAllOverlays()
 {
+    returnToChooser = false;
     // Cancel any in-progress fade animations before forcing visibility states.
     if (mainPanel)         animator.cancelAnimation(mainPanel, true);
     if (mixerOverlay)      animator.cancelAnimation(mixerOverlay, true);

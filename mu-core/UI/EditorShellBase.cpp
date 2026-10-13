@@ -5,7 +5,6 @@
 #include "UI/StandardSettingsOverlay.h" // wires its program-change buttons
 #include "UI/MixerOverlay.h"            // forwards its status messages
 #include "UI/ModalDialog.h"             // the support prompt
-#include "UI/PerformanceChooser.h"      // the Preset Browser's interim Performances button
 
 EditorShellBase::EditorShellBase(ProcessorBase& proc)
     : AudioProcessorEditor(&proc),
@@ -29,7 +28,6 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
 
     wirePresetHooks();
     wireOverlays();
-    wirePerformanceChooser();
     setupBanners();
     chrome.applyWindowSize();
 
@@ -85,20 +83,6 @@ void EditorShellBase::wireOverlays()
     {
         onPresetLoaded(transportBar.getLoadedPresetFile());
     };
-}
-
-// The Preset Browser's interim "Performances" button (only where Performance mode is supported).
-void EditorShellBase::wirePerformanceChooser()
-{
-    if (! processorRef.supportsPerformanceMode()) return;
-    juce::Component::SafePointer<EditorShellBase> safe(this);
-    presetBrowser.onChoosePerformance = [this, safe]
-    {
-        mu_ui::perf::launchPerformanceChooser(performanceChooser, processorRef.getContentDir(), processorRef.getLiveState(),
-            [safe](const juce::String& name, const juce::String& value)
-            { if (safe != nullptr) safe->statusBar.showParam(name, value); });
-    };
-    presetBrowser.refreshFooter();
 }
 
 // The status-bar Support link (unlicensed copies only).

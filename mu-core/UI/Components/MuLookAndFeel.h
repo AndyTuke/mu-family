@@ -719,6 +719,18 @@ public:
     static constexpr int kStepGap        = 4;
     static constexpr int kStepGhostMinW  = 36;   // narrower than this the ghost text is left out, not shown as a stub
 
+    // The Performance chooser screen (section 12.5): the saved-performances list on the left, the item
+    // rows on the right, with a header and a footer band.
+    static constexpr int kPerfListW      = 300;
+    static constexpr int kPerfItemRowH   = 40;
+    static constexpr int kPerfListRowH   = 28;   // a row of the saved-performances list
+    static constexpr int kPerfHeaderH    = 36;
+    static constexpr int kPerfFooterH    = 40;
+    static constexpr int kPerfNumW       = 44;   // an item row's number lamp and number
+    static constexpr int kPerfProductW   = 110;  // an item row's product / status label
+    static constexpr int kPerfRowBtnW    = 64;   // an item row's, header's and footer's buttons
+    static constexpr int kPerfBrowserBtnW = 110; // the Preset Browser footer's "Performances" button
+
     // Tempo (BPM) fields: one decimal everywhere; an arrow click steps a whole BPM, Shift a tenth.
     static constexpr int    kBpmDecimals = 1;
     static constexpr double kBpmStep     = 1.0;

@@ -134,9 +134,8 @@ protected:
     StatusBar&      statusBar;
 
     // Performance mode: the shared sidebar (when the product mounts one), whose selection the mode
-    // seeds and follows, and the interim "Performances" file chooser.
+    // seeds and follows.
     juce::Component::SafePointer<LayerSidebar> layerSidebar;
-    std::unique_ptr<juce::FileChooser>         performanceChooser;
 
     // The plugin-only screens, registered with the chrome as extra screens.
     ActivationOverlay      activationOverlay;
@@ -161,6 +160,5 @@ private:
     // The constructor in parts.
     void wirePresetHooks();
     void wireOverlays();
-    void wirePerformanceChooser();
     void setupBanners();
 };

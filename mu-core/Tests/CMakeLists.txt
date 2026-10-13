@@ -46,6 +46,7 @@ target_sources(mu-core-tests PRIVATE
     TransportBarTests.cpp
     ShellChromeTests.cpp
     PerformanceModeShellTests.cpp
+    PerformanceChooserTests.cpp
     VoiceEngineParamsTests.cpp
     TestShellBackend.h
     ClientStripFitTests.cpp

@@ -22,6 +22,9 @@ public:
     void setShowEmbedSamples(bool show);
     void setTitle(const juce::String& t)       { title = t; repaint(); }            // default "Save Preset"
     void setEmbedLabel(const juce::String& t)  { embedSamplesToggle.setButtonText(t); }
+    // A name-and-description card (no category, embed or Save-as-Default): used to name a performance.
+    // `nameHint` is the empty name field's placeholder.
+    void setNameAndDescriptionOnly(bool only, const juce::String& nameHint = "Preset name");
 
     // Call before showing to populate the category dropdown with known categories.
     void setKnownCategories(const juce::StringArray& cats);
@@ -56,6 +59,7 @@ private:
     juce::String       pendingDefaultCategory;
     bool               pendingDefaultEmbed = false;
     bool               showEmbedSamples = true;
+    bool               nameDescOnly = false;
     juce::Image        logoImage;
 
     void updateDefaultModeState();
@@ -68,4 +72,5 @@ private:
     static constexpr int kCardH = 360;
     static constexpr int kLogoBandH  = 116;   // header band holding the 96 px logo + padding
     static constexpr int kTitleBandH = 44;    // header band holding just the title (no logo)
+    static constexpr int kCompactCardH = 188; // the name-and-description card (title band, two fields, buttons)
 };

@@ -478,7 +478,8 @@ struct PerformanceModeShellTests : juce::UnitTest
             juce::StringArray lines;
             chrome.getTransportBar().onStatusUpdate = [&](const juce::String& n, const juce::String& v) { lines.add(n + "|" + v); };
             expect(chrome.keyPressed(ctrlP, nullptr) && ! chrome.isPerformanceLocked(), "handled, still unlocked");
-            expect(lines.contains("Performance|Choose a performance first"), "told to choose a performance first");
+            expect(chrome.isPerformanceChooserVisible(), "the chooser opens instead");
+            expect(! lines.contains("Performance|Choose a performance first"), "so no status line is needed");
 
             host.chrome = nullptr;
         }
@@ -487,7 +488,7 @@ struct PerformanceModeShellTests : juce::UnitTest
 
     void chooserLoad()
     {
-        beginTest("interim chooser: a performance file loads into the live state; bad files report why");
+        beginTest("chooser: a saved performance opens into the model and loads into the live state; bad files report why");
         {
             const auto dir = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("mu-perf-chooser");
             dir.deleteRecursively();
@@ -500,18 +501,22 @@ struct PerformanceModeShellTests : juce::UnitTest
             const auto good = dir.getChildFile("Friday.muPerformance");
             dir.createDirectory();
             expect(p.save(good), "saved");
-            expect(mu_ui::perf::loadPerformanceFile(rig.live, good).isEmpty(), "loads");
+
+            mu_ui::perf::PerformanceChooserModel model;
+            expect(model.open(good).isEmpty(), "opens");
+            expect(model.use([&](mu_pp::PerformanceFile f, const juce::File& w) { return rig.live.loadPerformance(std::move(f), w); }), "loads");
             expectEquals(rig.live.getPerformance().name, juce::String("Friday"));
             expect(rig.live.getPerformanceFile() == good, "remembers the file");
 
-            expectEquals(mu_ui::perf::loadPerformanceFile(rig.live, dir.getChildFile("none.muPerformance")), juce::String("file not found"));
+            expectEquals(model.open(dir.getChildFile("none.muPerformance")), juce::String("file not found"));
             const auto junk = dir.getChildFile("junk.muPerformance");
             junk.replaceWithText("not xml");
-            expectEquals(mu_ui::perf::loadPerformanceFile(rig.live, junk), juce::String("not a performance file"));
-            expectEquals(rig.live.getPerformance().name, juce::String("Friday"));   // a failed load changes nothing
+            expectEquals(model.open(junk), juce::String("not a performance file"));
+            expectEquals(model.working().name, juce::String("Friday"));   // a failed open changes nothing
 
             rig.live.perform(act(ControlActionType::PerformanceMode, 0, 1));
-            expectEquals(mu_ui::perf::loadPerformanceFile(rig.live, good), juce::String("leave Performance mode first"));
+            expect(! model.use([&](mu_pp::PerformanceFile f, const juce::File& w) { return rig.live.loadPerformance(std::move(f), w); }),
+                   "refused while the mode is on");
             dir.deleteRecursively();
         }
     }

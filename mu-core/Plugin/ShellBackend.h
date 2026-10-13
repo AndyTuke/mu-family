@@ -3,6 +3,7 @@
 #include <juce_core/juce_core.h>
 
 #include "Plugin/MidiClockSync.h"   // MidiClockSync::ClockState
+#include "Persistence/PerformanceFile.h"
 
 #include <functional>
 
@@ -82,6 +83,8 @@ public:
 
     // ─── Presets (what the transport bar's preset dropdown reads) ────────────
     virtual juce::File   getPresetsDir()          const = 0;
+    // Where full presets live and performance items resolve against; the presets folder unless a product splits them.
+    virtual juce::File   getFullPresetDir()       const { return getPresetsDir(); }
     virtual juce::String getFullPresetExtension() const = 0;
     // True while a full preset is staged for the next loop point.
     virtual bool         hasPendingFullPreset()   const { return false; }
@@ -106,6 +109,14 @@ public:
     virtual const LiveView* getLiveView()    const { return nullptr; }
     virtual ControlSink*    getControlSink()       { return nullptr; }
     virtual bool            supportsPerformanceMode() const { return false; }
+    // The state identifier of this product's presets (the performance list marks other products' items),
+    // and the screen-only call that loads a performance list (refused, false, while the mode is on).
+    virtual juce::String    getProductStateId() const { return {}; }
+    virtual bool            loadPerformance(mu_pp::PerformanceFile file, const juce::File& where)
+    {
+        juce::ignoreUnused(file, where);
+        return false;
+    }
 
     // ─── Shell callbacks (message thread, set by the shell) ──────────────────
     // The shell MUST clear these in its destructor: the backend can outlive it, and a deferred

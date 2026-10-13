@@ -78,6 +78,8 @@ public:
     bool isPerformanceMode() const noexcept { return modeShown; }
     // A click on Perf (or Ctrl+P) while the mode is off: enters it, or says to choose a performance first.
     bool enterPerformanceMode();
+    // Set by the shell: with no performance chosen, entering opens the chooser instead of saying so.
+    std::function<void()> onChoosePerformance;
     // Leaving: press and hold the lit Perf button for kPerfExitHoldMs. The caller supplies the clock;
     // the bar's timer ticks it at the UI refresh rate and release or drag-off cancels.
     void beginExitHold(double nowMs);

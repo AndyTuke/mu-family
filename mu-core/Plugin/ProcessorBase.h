@@ -103,7 +103,7 @@ public:
 
     virtual juce::File   getLayerPresetDir()       const = 0;
     virtual juce::String getLayerPresetExtension() const = 0;
-    virtual juce::File   getFullPresetDir()          const { return getPresetsDir(); }
+    juce::File           getFullPresetDir()          const override { return getPresetsDir(); }
     juce::String getFullPresetExtension()    const override = 0;
 
     // ─── Structural layer edits (message thread only) ─────────────────────────
@@ -310,6 +310,9 @@ public:
     const mu_core::LiveView*  getLiveView() const override  { return &liveState; }
     mu_core::ControlSink*     getControlSink() override     { return this; }
     bool                      supportsPerformanceMode() const override { return isStandaloneApp(); }
+    juce::String              getProductStateId() const override { return apvts.state.getType().toString(); }
+    bool                      loadPerformance(mu_pp::PerformanceFile file, const juce::File& where) override
+    { return liveState.loadPerformance(std::move(file), where); }
     // Drops the staged (not yet committed) per-layer swap for `slot`, if any. A structural edit
     // calls it for every layer it renumbers or clears, because a staged swap is keyed by index and
     // would otherwise land on the wrong layer. A staged full preset is left to win.

@@ -12,6 +12,7 @@
 #include "UI/AboutOverlay.h"
 #include "UI/SaveDialog.h"
 #include "UI/PresetBrowser.h"
+#include "UI/PerformanceChooser.h"
 
 namespace mu_ui
 {
@@ -78,6 +79,7 @@ public:
     AboutOverlay&         getAboutOverlay() { return aboutOverlay; }
     SaveDialog&           getSaveDialog()   { return saveDialog; }
     PresetBrowser&        getPresetBrowser(){ return presetBrowser; }
+    PerformanceChooser&   getPerformanceChooser() { return performanceChooser; }
     juce::ComponentAnimator& getAnimator()  { return animator; }
 
     // ─── Main area ───────────────────────────────────────────────────────────
@@ -118,6 +120,14 @@ public:
 
     // Called just before the About panel is made visible, so the host can fill it (support state).
     std::function<void()> onAboutOpening;
+
+    // ─── Performance chooser ─────────────────────────────────────────────────
+    // The screen for choosing and editing a performance (docs/design-ui-family.md 12.5): a page over the
+    // main area, reachable only with Performance mode off. Opening starts an editing session from the
+    // list in use; the Preset Browser's "Performances" button, the Perf toggle and Ctrl+P with none
+    // chosen all come here. A no-op where the backend does not support the mode.
+    void showPerformanceChooser();
+    bool isPerformanceChooserVisible() const { return isExtraScreenVisible(performanceChooser); }
 
     // ─── Preset flow ─────────────────────────────────────────────────────────
     // Set whenever the preset's state changes (the host's listener calls markDirty); cleared by
@@ -185,6 +195,7 @@ private:
     AboutOverlay        aboutOverlay;
     SaveDialog          saveDialog;
     PresetBrowser       presetBrowser;
+    PerformanceChooser  performanceChooser;
     StatusBar           statusBar;
     juce::Label         upgradeBanner;   // shown when a newer release is available online
 
@@ -221,6 +232,10 @@ private:
     void mouseDown(const juce::MouseEvent& e) override;
     static constexpr const char* kDownloadUrl = "https://transwarp.me/download";
 
+    // Opens the Preset Browser in pick mode for the chooser; closing it (picked or not) returns to the chooser.
+    void pickPresetForChooser(std::function<void(const juce::File&)> picked);
+    bool returnToChooser = false;
+    void wirePerformanceChooser();
     void wireBuiltIns();
     void wirePresetFlow();
     void installKeys();

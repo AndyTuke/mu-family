@@ -18,7 +18,7 @@ PresetBrowser::PresetBrowser()
     addAndMakeVisible(listBox);
 
     loadBtn.onClick  = [this] { loadSelectedPreset(); };
-    closeBtn.onClick = [this] { if (onClose) onClose(); };
+    closeBtn.onClick = [this] { endPick(); if (onClose) onClose(); };
     addAndMakeVisible(loadBtn);
     addAndMakeVisible(closeBtn);
 
@@ -28,7 +28,26 @@ PresetBrowser::PresetBrowser()
 
 void PresetBrowser::refreshFooter()
 {
-    performancesBtn.setVisible(static_cast<bool>(onChoosePerformance));
+    performancesBtn.setVisible(static_cast<bool>(onChoosePerformance) && ! pickCallback);
+}
+
+void PresetBrowser::beginPick(std::function<void(const juce::File&)> picked)
+{
+    pickCallback = std::move(picked);
+    loadBtn.setButtonText(pickCallback ? "Pick" : "Load");
+    refreshFooter();
+}
+
+void PresetBrowser::endPick()
+{
+    pickCallback = nullptr;
+    loadBtn.setButtonText("Load");
+    refreshFooter();
+}
+
+void PresetBrowser::visibilityChanged()
+{
+    if (! isVisible()) endPick();   // closed any way at all: a later Load must load
 }
 
 void PresetBrowser::refresh(const juce::File& dir)
@@ -107,9 +126,16 @@ void PresetBrowser::applyFilter()
 void PresetBrowser::loadSelectedPreset()
 {
     if (selectedRow < 0 || selectedRow >= (int)filteredIndices.size()) return;
-    const auto& info = allPresets[filteredIndices[selectedRow]];
-    if (onLoadPreset) onLoadPreset(info.file);
-    if (onClose)      onClose();
+    const auto file = allPresets[filteredIndices[selectedRow]].file;
+    if (pickCallback)
+    {
+        auto picked = std::move(pickCallback);
+        endPick();
+        picked(file);
+    }
+    else if (onLoadPreset)
+        onLoadPreset(file);
+    if (onClose) onClose();
 }
 
 // ── ListBoxModel ─────────────────────────────────────────────────────────────
@@ -166,7 +192,9 @@ void PresetBrowser::listBoxItemClicked(int row, const juce::MouseEvent& e)
     }
 }
 
-void PresetBrowser::listBoxItemDoubleClicked(int row, const juce::MouseEvent&)
+void PresetBrowser::listBoxItemDoubleClicked(int row, const juce::MouseEvent&) { chooseRow(row); }
+
+void PresetBrowser::chooseRow(int row)
 {
     selectedRow = row;
     loadSelectedPreset();
@@ -194,7 +222,7 @@ void PresetBrowser::resized()
     const int btnW = s(80);
     closeBtn.setBounds(pad, h - botH + pad, btnW, botH - pad * 2);
     loadBtn .setBounds(w - pad - btnW, h - botH + pad, btnW, botH - pad * 2);
-    const int perfW = s(110);
+    const int perfW = s(MuLookAndFeel::kPerfBrowserBtnW);
     performancesBtn.setBounds((w - perfW) / 2, h - botH + pad, perfW, botH - pad * 2);
 
     // List box fills the middle

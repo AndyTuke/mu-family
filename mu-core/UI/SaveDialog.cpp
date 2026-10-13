@@ -61,8 +61,20 @@ void SaveDialog::setLogoImage(const juce::Image& image)
 void SaveDialog::setShowEmbedSamples(bool show)
 {
     showEmbedSamples = show;
-    embedSamplesToggle.setVisible(show);
+    embedSamplesToggle.setVisible(show && ! nameDescOnly);
     resized();
+}
+
+void SaveDialog::setNameAndDescriptionOnly(bool only, const juce::String& nameHint)
+{
+    nameDescOnly = only;
+    nameEditor.setTextToShowWhenEmpty(nameHint, juce::Colours::grey);
+    categoryDropdown   .setVisible(! only);
+    embedSamplesToggle .setVisible(! only && showEmbedSamples);
+    saveAsDefaultToggle.setVisible(! only);
+    newCategoryEditor.setVisible(false);
+    resized();
+    repaint();
 }
 
 void SaveDialog::setKnownCategories(const juce::StringArray& cats)
@@ -146,7 +158,8 @@ juce::Rectangle<int> SaveDialog::cardBounds() const
 {
     using mu_ui::s;
     const int cardW = s(kCardW);
-    const int cardH = s(kCardH) - (logoImage.isValid() ? 0 : s(kLogoBandH - kTitleBandH));
+    const int cardH = nameDescOnly ? s(kCompactCardH)
+                                   : s(kCardH) - (logoImage.isValid() ? 0 : s(kLogoBandH - kTitleBandH));
     return { (getWidth() - cardW) / 2, (getHeight() - cardH) / 2, cardW, cardH };
 }
 
@@ -170,9 +183,12 @@ void SaveDialog::resized()
 
     nameEditor    .setBounds(fieldX, y, fieldW, s(28));  y += s(36);
     descEditor    .setBounds(fieldX, y, fieldW, s(28));  y += s(36);
-    categoryDropdown.setBounds(fieldX, y, fieldW, s(28)); y += s(34);
+    if (! nameDescOnly)
+    {
+        categoryDropdown.setBounds(fieldX, y, fieldW, s(28)); y += s(34);
+    }
 
-    if (newCategoryEditor.isVisible() && !isDefault)
+    if (newCategoryEditor.isVisible() && !isDefault && ! nameDescOnly)
     {
         newCategoryEditor.setBounds(fieldX, y, fieldW, s(24));
         y += s(30);
@@ -180,7 +196,11 @@ void SaveDialog::resized()
 
     // When the product has no embed-samples concept, the toggle is hidden and
     // the "Save as Default" button gets the full row width.
-    if (showEmbedSamples)
+    if (nameDescOnly)
+    {
+        // no toggles on this card
+    }
+    else if (showEmbedSamples)
     {
         embedSamplesToggle .setBounds(fieldX, y, fieldW / 2, s(24));
         saveAsDefaultToggle.setBounds(fieldX + fieldW / 2, y, fieldW / 2, s(24));

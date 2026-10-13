@@ -184,7 +184,9 @@ bool TransportBar::enterPerformanceMode()
     if (! isPerformanceAvailable() || proc.getLiveView()->isPerformanceMode()) return false;
     if (proc.getLiveView()->getPerformance().count() == 0)
     {
-        showTimedStatus("Performance", "Choose a performance first");
+        // The shell opens the chooser; a bar on its own just says so.
+        if (onChoosePerformance) onChoosePerformance();
+        else                     showTimedStatus("Performance", "Choose a performance first");
         return false;
     }
 
