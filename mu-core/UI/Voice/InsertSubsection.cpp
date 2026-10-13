@@ -30,7 +30,7 @@ juce::String InsertSubsection::paramFullId(const char* suffix) const
 
 bool InsertSubsection::validChannel() const
 {
-    return channelIndex >= 0 && channelIndex < proc.getNumChannels();
+    return channelIndex >= 0 && channelIndex < proc.getNumLayers();
 }
 
 float InsertSubsection::readSlot(int slot) const

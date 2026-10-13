@@ -44,7 +44,7 @@ struct MuOnProcessorSeamTests : juce::UnitTest
         TempStorage storage;
         ExposedPluginProcessor p;
         expectEquals(p.numLayers.load(), 1, "a fresh instance starts with one layer");
-        expectEquals(p.getNumChannels(), 1);
+        expectEquals(p.getNumLayers(), 1);
         expectEquals(p.unsavedLayerCount, 5, "an older state without a layer count held five lanes");
         expect(p.getLayer(1) == nullptr && p.getLayer(-1) == nullptr, "no layer above the live count or below zero");
         std::set<const void*> seen;
@@ -58,7 +58,7 @@ struct MuOnProcessorSeamTests : juce::UnitTest
         expect(p.getLayer(0) == &p.getTrack(0), "getLayer(0) is getTrack(0)");
         expectEquals((int) seen.size(), mu_limits::kMaxLayers, "distinct tracks");
         expect(p.engineOf(0) == EngineType::Kick, "the fresh track is a Kick");
-        expectEquals(p.getChannelName(0), juce::String("Kick"), "a track is named after its engine");
+        expectEquals(p.getLayerName(0), juce::String("Kick"), "a track is named after its engine");
         for (int s = 0; s < 16; ++s)
             expect(p.pattern().isOn(0, s) == (s % 4 == 0), "four on the floor, step " + juce::String(s));
         expect(p.pattern().isAccent(0, 0), "the downbeat is accented");
@@ -116,7 +116,7 @@ struct MuOnProcessorSeamTests : juce::UnitTest
             {
                 expectEquals(p.addLayer(), i, "addLayer appends");
                 expectEquals(engineIndex(p, i), expectedEngines[i], "track " + juce::String(i) + " engine");
-                expectEquals(p.getChannelName(i), juce::String(mu_on::engineName(mu_on::engineFromIndex(expectedEngines[i]))));
+                expectEquals(p.getLayerName(i), juce::String(mu_on::engineName(mu_on::engineFromIndex(expectedEngines[i]))));
             }
             expectEquals(p.addLayer(), -1, "no ninth track");
             expect(p.pattern().isOn(1, 2) && ! p.pattern().isOn(1, 0), "the Bass track starts off the kick");
@@ -134,17 +134,17 @@ struct MuOnProcessorSeamTests : juce::UnitTest
             TempStorage storage;
             ExposedPluginProcessor p;
             for (int i = 1; i < 5; ++i) p.addLayer();                       // Kick, Bass, Hat, Snare, Rumble
-            const int hatColour = p.getChannelColourIndex(2);
+            const int hatColour = p.getLayerColourIndex(2);
             p.pattern().setOn(2, 7, true);                                  // a mark on the Hat row
             setParam(p.apvts, mu_on::layerParamId(4, "src"), 2.0f);         // the Rumble processes the Hat
 
             expect(p.removeLayer(1), "delete the Bass");                    // Kick, Hat, Snare, Rumble
-            expectEquals(p.getNumChannels(), 4);
+            expectEquals(p.getNumLayers(), 4);
             expectEquals(engineIndex(p, 1), toIndex(EngineType::Hat), "the Hat moved down");
             expectEquals(engineIndex(p, 3), toIndex(EngineType::Rumble), "the Rumble moved down");
             expectEquals(rumbleSource(p, 3), 1, "the Rumble still processes the Hat");
             expect(p.pattern().isOn(1, 7), "the Hat's row moved with it");
-            expectEquals(p.getChannelColourIndex(1), hatColour, "and its colour");
+            expectEquals(p.getLayerColourIndex(1), hatColour, "and its colour");
             expectEquals(p.getTrack(1).slot, 1, "the Track knows its new slot");
 
             expect(p.swapLayers(0, 1), "swap the Kick and the Hat");        // Hat, Kick, Snare, Rumble
@@ -171,7 +171,7 @@ struct MuOnProcessorSeamTests : juce::UnitTest
 
             p.selectEngine(0, EngineType::Bass);
             expect(p.engineOf(0) == EngineType::Bass);
-            expectEquals(p.getChannelName(0), juce::String("Bass"));
+            expectEquals(p.getLayerName(0), juce::String("Bass"));
             expectWithinAbsoluteError(getParam(p.apvts, "t0_kick_tune"), 77.0f, 0.05f);
             expectWithinAbsoluteError(getParam(p.apvts, "t0_bass_cut"), 1500.0f, 0.5f);
             expect(p.pattern().isOn(0, 4), "the row stays when the engine changes");

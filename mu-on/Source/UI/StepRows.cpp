@@ -35,7 +35,7 @@ juce::Rectangle<int> StepRows::cellsArea(int row) const
 juce::Colour StepRows::layerColour(int row) const
 {
     return MuLookAndFeel::channelPalette[
-        (size_t) juce::jlimit(0, MuLookAndFeel::kChannelPaletteSize - 1, proc.getChannelColourIndex(row))];
+        (size_t) juce::jlimit(0, MuLookAndFeel::kChannelPaletteSize - 1, proc.getLayerColourIndex(row))];
 }
 
 bool StepRows::cellAt(juce::Point<int> p, int& row, int& step) const
@@ -43,7 +43,7 @@ bool StepRows::cellAt(juce::Point<int> p, int& row, int& step) const
     const int rh = rowHeight();
     if (rh <= 0) return false;
     row = p.y / rh;
-    if (row < 0 || row >= proc.getNumChannels()) return false;
+    if (row < 0 || row >= proc.getNumLayers()) return false;
     const auto cells = cellsArea(row);
     if (! cells.contains(p)) return false;
     step = juce::jlimit(0, StepPattern::kNumSteps - 1, (int) ((p.x - cells.getX()) / (cells.getWidth() / (float) StepPattern::kNumSteps)));
@@ -53,15 +53,15 @@ bool StepRows::cellAt(juce::Point<int> p, int& row, int& step) const
 juce::uint64 StepRows::signature() const
 {
     // Count, then each live row's colour and engine, folded into one number.
-    juce::uint64 h = (juce::uint64) proc.getNumChannels();
-    for (int i = 0; i < proc.getNumChannels(); ++i)
-        h = h * 131u + (juce::uint64) (proc.getChannelColourIndex(i) * 8 + toIndex(proc.engineOf(i)));
+    juce::uint64 h = (juce::uint64) proc.getNumLayers();
+    for (int i = 0; i < proc.getNumLayers(); ++i)
+        h = h * 131u + (juce::uint64) (proc.getLayerColourIndex(i) * 8 + toIndex(proc.engineOf(i)));
     return h;
 }
 
 void StepRows::paint(juce::Graphics& g)
 {
-    for (int row = 0; row < proc.getNumChannels(); ++row)
+    for (int row = 0; row < proc.getNumLayers(); ++row)
         paintRow(g, row);
 }
 
@@ -80,7 +80,7 @@ void StepRows::paintRow(juce::Graphics& g, int row)
 
     // Name gutter: "1  Kick" in the layer's colour.
     g.setFont(juce::Font(juce::FontOptions(mu_ui::sf(11.0f), juce::Font::bold)));
-    const auto label = juce::String(row + 1) + "  " + proc.getChannelName(row);
+    const auto label = juce::String(row + 1) + "  " + proc.getLayerName(row);
     MuLookAndFeel::drawEngravedText(g, label, area.withWidth(mu_ui::s(kLabelW)).reduced(mu_ui::s(2), 0),
                                     juce::Justification::centredLeft, col, false);
 
@@ -137,7 +137,7 @@ void StepRows::mouseDown(const juce::MouseEvent& e)
     const int rh = rowHeight();
     if (rh <= 0) return;
     const int row = e.getPosition().y / rh;
-    if (row < 0 || row >= proc.getNumChannels()) return;
+    if (row < 0 || row >= proc.getNumLayers()) return;
     if (onRowClicked) onRowClicked(row);
 
     // A Rumble row is not editable; a click on a cell of any other row edits it.

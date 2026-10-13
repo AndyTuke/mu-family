@@ -59,14 +59,14 @@ public:
     void setStateInformation(const void* data, int sizeInBytes) override;
 
     // ── ProcessorBase channel metadata (drives sidebar + mixer) ───────────────
-    // getNumChannels / getLayer are the base defaults over the owned layer storage (the count is
+    // getNumLayers / getLayer are the base defaults over the owned layer storage (the count is
     // `numLayers`, 1..kMaxLayers).
-    juce::String getChannelName(int idx)       const override
+    juce::String getLayerName(int idx)       const override
     {
         return (idx >= 0 && idx < mu_limits::kMaxLayers) ? "Layer " + juce::String(idx + 1) : juce::String();
     }
     // The palette colour is allocated per layer and follows it through delete / reorder.
-    int          getChannelColourIndex(int idx) const override
+    int          getLayerColourIndex(int idx) const override
     {
         return (idx >= 0 && idx < mu_limits::kMaxLayers) ? layers[(size_t) idx]->colourIndex : 0;
     }

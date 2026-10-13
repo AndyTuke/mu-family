@@ -37,7 +37,7 @@ inline void wireSlotPresetHeader(LayerHeaderBar& header, juce::Component& owner,
         if (safe == nullptr) return;
         const int slot = cfg.currentSlot();
         confirmAsync(safe.getComponent(), "Reset " + cfg.noun,
-                     LayerHeaderBar::resetConfirmMessage(p->getChannelName(slot)),
+                     LayerHeaderBar::resetConfirmMessage(p->getLayerName(slot)),
                      "Reset", [safe, p, cfg, slot]
                      {
                          if (safe == nullptr) return;
@@ -58,7 +58,7 @@ inline void wireSlotPresetHeader(LayerHeaderBar& header, juce::Component& owner,
         if (safe == nullptr) return;
         const int slot = cfg.currentSlot();
         promptTextAsync(safe.getComponent(), "Save " + cfg.noun + " Preset", "Preset name:",
-                        cfg.defaultName ? cfg.defaultName(slot) : p->getChannelName(slot), "Save",
+                        cfg.defaultName ? cfg.defaultName(slot) : p->getLayerName(slot), "Save",
             [safe, hdr, p, slot](const juce::String& name)
             {
                 if (safe == nullptr || name.isEmpty()) return;

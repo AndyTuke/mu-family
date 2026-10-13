@@ -76,7 +76,7 @@ public:
     FXChain     fxChain;
     MixerEngine mixerEngine;
 
-    // Channel metadata for the shared mixer UI (getNumChannels, getLayer, getChannelName, ...)
+    // Channel metadata for the shared mixer UI (getNumLayers, getLayer, getLayerName, ...)
     // is declared in ProcessorCore.
 
     // The gain-reduction meter of layer `i`'s insert effect (null when it has none or `i` is out of
@@ -593,9 +593,9 @@ protected:
 
     // Number of active "channels" (rhythms / voices / whatever) — used to
     // gate per-slot PCs so we don't try to load into an inactive slot.
-    // Default: getNumChannels(). Derived can override if the active count
+    // Default: getNumLayers(). Derived can override if the active count
     // differs from the total.
-    virtual int getNumActiveChannels() const { return getNumChannels(); }
+    virtual int getNumActiveLayers() const { return getNumLayers(); }
 
 
     // Sets the host BPM on the FX chain (tempo-synced FX) then calls

@@ -24,7 +24,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     sidebar.createMiniVisual = [&p](int i, std::function<void()>) -> std::unique_ptr<juce::Component>
     {
         const auto col = MuLookAndFeel::channelPalette[
-            (size_t) (p.getChannelColourIndex(i) % MuLookAndFeel::kChannelPaletteSize)];
+            (size_t) (p.getLayerColourIndex(i) % MuLookAndFeel::kChannelPaletteSize)];
         return std::make_unique<ArpMiniVisual>(col, i);
     };
     sidebar.onLayerSelected = [this](int idx) { layerPanel.setLayer(idx); };

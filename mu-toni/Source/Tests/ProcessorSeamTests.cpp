@@ -31,7 +31,7 @@ struct MuToniProcessorSeamTests : juce::UnitTest
         TempStorage storage;
         ExposedPluginProcessor p;
         expectEquals(p.numLayers.load(), 1, "a fresh instance starts with one layer");
-        expectEquals(p.getNumChannels(), 1);
+        expectEquals(p.getNumLayers(), 1);
         expect(p.getLayer(1) == nullptr && p.getLayer(-1) == nullptr, "no layer above the live count or below zero");
         std::set<const void*> seen;
         for (int i = 0; i < mu_limits::kMaxLayers; ++i)

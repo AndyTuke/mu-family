@@ -289,7 +289,7 @@ void ArpContent::layoutSourceRow(juce::Rectangle<int> row, int gap)
 
 juce::Colour ArpContent::layerColour() const
 {
-    return MuLookAndFeel::channelPalette[(size_t) (proc.getChannelColourIndex(currentLayer)
+    return MuLookAndFeel::channelPalette[(size_t) (proc.getLayerColourIndex(currentLayer)
                                                    % MuLookAndFeel::kChannelPaletteSize)];
 }
 

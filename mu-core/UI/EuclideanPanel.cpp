@@ -70,7 +70,7 @@ void EuclideanPanel::apvtsSet(const char* suffix, float v)
 
 const mu_core::Rhythm* EuclideanPanel::currentRhythm() const
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumChannels()) return nullptr;
+    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumLayers()) return nullptr;
     return static_cast<const mu_core::Rhythm*>(proc.getLayer(rhythmIndex));   // every layer of a Euclid product is a Rhythm
 }
 

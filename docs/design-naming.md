@@ -98,6 +98,7 @@ edits](design-plugin-family.md#layer-ownership-and-structural-edits--family-stan
 - **What stays product-side:** the sequencer data, the engine, the product's `ModTarget` table, its
   param table and prefixes, its editor panels, and (until a second type shares an instance) the typed
   accessor (`getRhythm(i)`, `getPattern(i)`).
+- **`ProcessorBase` layer accessors (done):** `getNumLayers`, `getLayer(i)`, `getMaxLayers`, `getNumActiveLayers`, `getLayerName(i)`, `getLayerColourIndex(i)`. They replaced `getNumChannels`, `getMaxChannels`, `getNumActiveChannels`, `getChannelName` and `getChannelColourIndex`; mu-Tant's duplicate `getNumVoices` was removed in favour of `getNumLayers`. `juce::AudioBuffer::getNumChannels` is an audio-channel count and keeps its name. Saved identifiers (`numVoices`, `voiceColours`) are unchanged.
 
 ---
 

@@ -104,8 +104,8 @@ public:
     // mu-tant manages a dynamic set of voices ("layers") exactly like mu-clid's
     // rhythms — there are no inactive voices, only the ones that exist. The
     // count is `numLayers` (1..mu_limits::kMaxLayers, owned by ProcessorCore, which also supplies
-    // getNumChannels / getLayer over its layer storage); add/delete adjust it.
-    juce::String getChannelName(int idx)       const override
+    // getNumLayers / getLayer over its layer storage); add/delete adjust it.
+    juce::String getLayerName(int idx)       const override
     {
         return (idx >= 0 && idx < mu_limits::kMaxLayers) ? juce::String("Voice ") + juce::String(idx + 1)
                                               : juce::String();
@@ -113,7 +113,7 @@ public:
     // Each voice carries an allocated palette-colour index (mu-clid's rule:
     // assigned first-unused on add, follows the voice through delete/reorder),
     // so layers are distinctly + stably coloured. It lives on the Layer, so it moves with the voice.
-    int          getChannelColourIndex(int idx) const override
+    int          getLayerColourIndex(int idx) const override
     {
         return (idx >= 0 && idx < mu_limits::kMaxLayers) ? layers[(size_t) idx]->colourIndex : 0;
     }
@@ -122,7 +122,6 @@ public:
     // Adding, deleting, reordering and resetting a voice are ProcessorBase::addLayer / removeLayer /
     // swapLayers / resetLayer; this product supplies createLayer and cancelPendingSwap. The edits
     // move the Pattern pointers under `layersLock`, which processBlock tryLocks.
-    int  getNumVoices() const noexcept { return numLayers.load(std::memory_order_relaxed); }
     bool canEditLayers() const override { return true; }
     // The engine state of a slot stays put while its Pattern moves, so the slot is cleared for the
     // new tenant (called under layersLock; the render only runs under it).

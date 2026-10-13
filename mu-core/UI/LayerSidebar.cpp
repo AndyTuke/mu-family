@@ -31,7 +31,7 @@ LayerSidebar::LayerSidebar(ProcessorBase& processor, const juce::String& addButt
 
 juce::Colour LayerSidebar::colourFor(int i) const
 {
-    const int idx = proc.getChannelColourIndex(i);
+    const int idx = proc.getLayerColourIndex(i);
     return MuLookAndFeel::channelPalette[(size_t) (idx % MuLookAndFeel::kChannelPaletteSize)];
 }
 
@@ -43,11 +43,11 @@ void LayerSidebar::refreshItems()
         itemContainer.removeChildComponent(item.get());
     items.clear();
 
-    const int n = proc.getNumChannels();
+    const int n = proc.getNumLayers();
     for (int i = 0; i < n; ++i)
     {
         auto item = std::make_unique<SidebarItem>(i);
-        item->setName(proc.getChannelName(i));
+        item->setName(proc.getLayerName(i));
         item->setColour(colourFor(i));
         item->setSelected(i == selectedIndex);
         item->setMetalStyle(metal);
@@ -79,7 +79,7 @@ void LayerSidebar::refreshItems()
 
 void LayerSidebar::updateAddEnabled()
 {
-    const bool room = proc.getNumChannels() < mu_limits::kMaxLayers;
+    const bool room = proc.getNumLayers() < mu_limits::kMaxLayers;
     if (addButton.isEnabled() == room) return;
     addButton.setEnabled(room);
     addButton.setTooltip(room ? juce::String() : "Maximum of " + juce::String(mu_limits::kMaxLayers) + " " + noun + "s");
@@ -332,7 +332,7 @@ void LayerSidebar::timerCallback()
 {
     // Re-sync if the channel count changed outside the editor (e.g. host
     // setStateInformation after the editor opened).
-    if (proc.getNumChannels() != (int) items.size())
+    if (proc.getNumLayers() != (int) items.size())
         refreshItems();
 
     updateAddEnabled();   // the count can change outside the editor (host state restore)

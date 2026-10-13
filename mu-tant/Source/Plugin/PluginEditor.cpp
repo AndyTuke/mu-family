@@ -57,7 +57,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     sidebar.createMiniVisual = [this](int i, std::function<void()> pulse) -> std::unique_ptr<juce::Component>
     {
         const auto col = MuLookAndFeel::channelPalette[
-            (size_t) (proc.getChannelColourIndex(i) % MuLookAndFeel::kChannelPaletteSize)];
+            (size_t) (proc.getLayerColourIndex(i) % MuLookAndFeel::kChannelPaletteSize)];
         auto glyph = std::make_unique<PatternMiniVisual>(col, &proc.getPattern(i).ring);
         glyph->onPulse = std::move(pulse);
         return glyph;

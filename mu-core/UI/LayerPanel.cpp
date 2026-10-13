@@ -11,7 +11,7 @@ LayerPanel::LayerPanel(ProcessorBase& processor, const juce::String& layerNoun)
         { layerNoun,
           [this] { return currentLayer; },
           [this] { setLayer(currentLayer); },   // rebind so the content and modulators show the new state
-          [this](int slot) { return presetNameFn ? presetNameFn(slot) : proc.getChannelName(slot); } });
+          [this](int slot) { return presetNameFn ? presetNameFn(slot) : proc.getLayerName(slot); } });
     header.setNoun(noun);
     addAndMakeVisible(header);
     addAndMakeVisible(modulatorPanel);
@@ -55,7 +55,7 @@ void LayerPanel::setLayer(int idx)
 
 void LayerPanel::refreshHeader()
 {
-    header.setLayerName(proc.getChannelName(currentLayer));
+    header.setLayerName(proc.getLayerName(currentLayer));
     header.setColour(layerColour());
     header.setSelectedPresetId(0);
 }
@@ -74,14 +74,14 @@ void LayerPanel::addOverlay(juce::Component& overlay)
 
 juce::Colour LayerPanel::layerColour() const
 {
-    return MuLookAndFeel::channelPalette[(size_t) (proc.getChannelColourIndex(currentLayer)
+    return MuLookAndFeel::channelPalette[(size_t) (proc.getLayerColourIndex(currentLayer)
                                                    % MuLookAndFeel::kChannelPaletteSize)];
 }
 
 void LayerPanel::timerCallback()
 {
     modulatorPanel.setPlayheadBeat(beatSource());
-    header.setDeleteEnabled(proc.getNumChannels() > 1);   // the last layer cannot be deleted: grey, not a silent no-op
+    header.setDeleteEnabled(proc.getNumLayers() > 1);   // the last layer cannot be deleted: grey, not a silent no-op
     header.setStagingBadge(proc.hasPendingSwap(currentLayer));   // "SWP" while a layer preset waits for its boundary
 }
 

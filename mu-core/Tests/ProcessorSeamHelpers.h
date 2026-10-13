@@ -260,24 +260,24 @@ namespace mu_seam_test
             for (int r = 0; r < rounds; ++r)
             {
                 // Grow to the maximum, shuffling as we go.
-                while (p.getNumChannels() < mu_limits::kMaxLayers)
+                while (p.getNumLayers() < mu_limits::kMaxLayers)
                 {
                     const int idx = p.addLayer();
                     t.expect(idx >= 0, "addLayer succeeds below the limit");
                     if (idx < 0) break;
                     openLayer(idx);
-                    const int live = p.getNumChannels();
+                    const int live = p.getNumLayers();
                     if (live > 1) p.swapLayers((int) (rng() % (unsigned) live), (int) (rng() % (unsigned) live));
                 }
                 checkLayers("grown, block size " + juce::String(n));
 
                 // Shrink back to one, removing from random positions.
-                while (p.getNumChannels() > 1)
+                while (p.getNumLayers() > 1)
                 {
-                    const bool removed = p.removeLayer((int) (rng() % (unsigned) p.getNumChannels()));
+                    const bool removed = p.removeLayer((int) (rng() % (unsigned) p.getNumLayers()));
                     t.expect(removed, "removeLayer succeeds above one layer");
                     if (! removed) break;
-                    const int live = p.getNumChannels();
+                    const int live = p.getNumLayers();
                     if (live > 1) p.swapLayers(0, live - 1);
                 }
                 checkLayers("shrunk, block size " + juce::String(n));

@@ -98,7 +98,7 @@ TrackContent::TrackContent(PluginProcessor& processor)
 juce::Colour TrackContent::layerColour() const
 {
     return MuLookAndFeel::channelPalette[
-        (size_t) (proc.getChannelColourIndex(currentLayer) % MuLookAndFeel::kChannelPaletteSize)];
+        (size_t) (proc.getLayerColourIndex(currentLayer) % MuLookAndFeel::kChannelPaletteSize)];
 }
 
 void TrackContent::setLayer(int idx)
@@ -147,12 +147,12 @@ void TrackContent::rebuild()
 void TrackContent::refreshSourceList()
 {
     sourceSelect.clear();
-    juce::uint64 sig = (juce::uint64) proc.getNumChannels();
-    for (int i = 0; i < proc.getNumChannels(); ++i)
+    juce::uint64 sig = (juce::uint64) proc.getNumLayers();
+    for (int i = 0; i < proc.getNumLayers(); ++i)
     {
         sig = sig * 131u + (juce::uint64) toIndex(proc.engineOf(i));
         if (i != currentLayer)
-            sourceSelect.addItem(juce::String(i + 1) + "  " + proc.getChannelName(i), i + 1);
+            sourceSelect.addItem(juce::String(i + 1) + "  " + proc.getLayerName(i), i + 1);
     }
     shownLayerSignature = sig;
     refreshSourceSelection();
@@ -161,7 +161,7 @@ void TrackContent::refreshSourceList()
 void TrackContent::refreshSourceSelection()
 {
     const int src = (int) std::lround(proc.apvts.getRawParameterValue(layerParamId(currentLayer, "src"))->load());
-    const bool usable = src >= 0 && src < proc.getNumChannels() && src != currentLayer;
+    const bool usable = src >= 0 && src < proc.getNumLayers() && src != currentLayer;
     sourceSelect.setSelectedId(usable ? src + 1 : 0, false);
 }
 
@@ -179,7 +179,7 @@ void TrackContent::sourceChosen(int id)
 
 void TrackContent::timerCallback()
 {
-    if (currentLayer >= proc.getNumChannels()) return;   // between a delete and the editor reselecting
+    if (currentLayer >= proc.getNumLayers()) return;   // between a delete and the editor reselecting
 
     // The engine changed underneath us (host automation, a preset): show the new one.
     if (proc.engineOf(currentLayer) != shownEngine)
@@ -191,8 +191,8 @@ void TrackContent::timerCallback()
     if (shownEngine != EngineType::Rumble) return;
 
     // Keep the Source list current (layers added, deleted, re-engined) and the envelope's playhead moving.
-    juce::uint64 sig = (juce::uint64) proc.getNumChannels();
-    for (int i = 0; i < proc.getNumChannels(); ++i) sig = sig * 131u + (juce::uint64) toIndex(proc.engineOf(i));
+    juce::uint64 sig = (juce::uint64) proc.getNumLayers();
+    for (int i = 0; i < proc.getNumLayers(); ++i) sig = sig * 131u + (juce::uint64) toIndex(proc.engineOf(i));
     if (sig != shownLayerSignature) refreshSourceList();
     else                            refreshSourceSelection();
 

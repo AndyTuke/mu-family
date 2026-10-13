@@ -50,12 +50,12 @@ public:
     // The one rhythm. EuclideanPanel reads it through the ProcessorBase layer accessors.
     Rhythm&       getRhythm()       { return core.sequencer.getRhythm(0); }
     const Rhythm& getRhythm() const { return core.sequencer.getRhythm(0); }
-    int          getNumChannels() const override { return 1; }
+    int          getNumLayers() const override { return 1; }
     Layer*       getLayer(int i) override { return i == 0 ? &getRhythm() : nullptr; }
     using ProcessorBase::getLayer;
-    int          getMaxChannels() const override { return 1; }
-    juce::String getChannelName(int idx) const override { return idx == 0 ? juce::String(getRhythm().name) : juce::String(); }
-    int          getChannelColourIndex(int idx) const override { return idx == 0 ? getRhythm().colourIndex : 0; }
+    int          getMaxLayers() const override { return 1; }
+    juce::String getLayerName(int idx) const override { return idx == 0 ? juce::String(getRhythm().name) : juce::String(); }
+    int          getLayerColourIndex(int idx) const override { return idx == 0 ? getRhythm().colourIndex : 0; }
 
     // Master loop: the shared MasterLoopSection reads these.
     int getMasterLoopSteps() const override       { return core.sequencer.getMasterLoopSteps(); }

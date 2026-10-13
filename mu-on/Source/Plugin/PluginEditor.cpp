@@ -25,8 +25,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     sidebar.createMiniVisual = [&p](int i, std::function<void()>) -> std::unique_ptr<juce::Component>
     {
         const auto col = MuLookAndFeel::channelPalette[
-            (size_t) (p.getChannelColourIndex(i) % MuLookAndFeel::kChannelPaletteSize)];
-        const juce::String name = p.getChannelName(i);
+            (size_t) (p.getLayerColourIndex(i) % MuLookAndFeel::kChannelPaletteSize)];
+        const juce::String name = p.getLayerName(i);
         return std::make_unique<TrackMiniVisual>(col, name.substring(0, 1));
     };
     sidebar.onLayerSelected = [this](int idx) { showTrack(idx); };
@@ -34,7 +34,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // 30 Hz playhead is the primary timing feedback).
     sidebar.onAnimationTick = [this]
     {
-        for (int ch = 0; ch < proc.getNumChannels(); ++ch)
+        for (int ch = 0; ch < proc.getNumLayers(); ++ch)
         {
             const int c = proc.triggerCount(ch);
             if (c != lastTriggers[(size_t) ch]) { lastTriggers[(size_t) ch] = c; sidebar.pulseItem(ch); }

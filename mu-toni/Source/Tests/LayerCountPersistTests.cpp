@@ -50,7 +50,7 @@ struct MuToniLayerCountPersistTests : juce::UnitTest
     // Gives each live layer a distinct cutoff and mixer level, so a move of the data can be seen.
     static void stamp(ExposedPluginProcessor& p)
     {
-        for (int i = 0; i < p.getNumChannels(); ++i)
+        for (int i = 0; i < p.getNumLayers(); ++i)
         {
             mu_seam_test::setParam(p.apvts, "a" + juce::String(i) + "_cut", 1000.0f + 100.0f * (float) i);
             mu_seam_test::setParam(p.apvts, "ch" + juce::String(i) + "_lvl", 0.1f + 0.1f * (float) i);
@@ -63,7 +63,7 @@ struct MuToniLayerCountPersistTests : juce::UnitTest
         using namespace mu_seam_test;
         expectWithinAbsoluteError(getParam(p.apvts, "a" + juce::String(slot) + "_cut"), 1000.0f + 100.0f * (float) origin, 0.5f);
         expectWithinAbsoluteError(getParam(p.apvts, "ch" + juce::String(slot) + "_lvl"), 0.1f + 0.1f * (float) origin, 2e-3f);
-        expectEquals(p.getChannelColourIndex(slot), originColour, what + ": colour of slot " + juce::String(slot));
+        expectEquals(p.getLayerColourIndex(slot), originColour, what + ": colour of slot " + juce::String(slot));
     }
 
     void runTest() override
@@ -75,11 +75,11 @@ struct MuToniLayerCountPersistTests : juce::UnitTest
             TempStorage storage;
             ExposedPluginProcessor p;
             expectEquals(p.numLayers.load(), 1);
-            expectEquals(p.getNumChannels(), 1);
+            expectEquals(p.getNumLayers(), 1);
             for (int i = 0; i < mu_limits::kMaxLayers; ++i)
             {
                 expect(p.layers[(size_t) i] != nullptr, "slot " + juce::String(i) + " is allocated");
-                expectEquals(p.getChannelColourIndex(i), i, "slot " + juce::String(i) + " starts on palette colour " + juce::String(i));
+                expectEquals(p.getLayerColourIndex(i), i, "slot " + juce::String(i) + " starts on palette colour " + juce::String(i));
             }
             expectWithinAbsoluteError(getParam(p.apvts, "a1_o1l"), 0.0f, 0.01f);   // not the old -60 dB
             expect(p.apvts.getParameter("a7_cut") != nullptr && p.apvts.getParameter("ch7_lvl") != nullptr, "layer 8 parameters exist");
@@ -93,7 +93,7 @@ struct MuToniLayerCountPersistTests : juce::UnitTest
             expectEquals(p.numLayers.load(), 4);
             expectWithinAbsoluteError(getParam(p.apvts, "a0_cut"), 777.0f, 0.5f);
             expectEquals((int) getParam(p.apvts, "a3_leg"), 1);
-            for (int i = 0; i < 4; ++i) expectEquals(p.getChannelColourIndex(i), i, "colours stay on the constructor allocation");
+            for (int i = 0; i < 4; ++i) expectEquals(p.getLayerColourIndex(i), i, "colours stay on the constructor allocation");
         }
 
         beginTest("an old APVTS dump loads as four layers");
@@ -135,7 +135,7 @@ struct MuToniLayerCountPersistTests : juce::UnitTest
         {
             TempStorage storage;
             ExposedPluginProcessor p;
-            while (p.getNumChannels() < mu_limits::kMaxLayers) expect(p.addLayer() >= 0, "addLayer below the limit");
+            while (p.getNumLayers() < mu_limits::kMaxLayers) expect(p.addLayer() >= 0, "addLayer below the limit");
             expectEquals(p.addLayer(), -1, "addLayer at eight is refused");
             const int colours[8] = { 4, 1, 6, 2, 7, 0, 3, 5 };
             for (int i = 0; i < 8; ++i) p.layers[(size_t) i]->colourIndex = colours[i];
@@ -143,16 +143,16 @@ struct MuToniLayerCountPersistTests : juce::UnitTest
 
             // Remove layer 3: the ones above shift down one slot.
             expect(p.removeLayer(3), "removeLayer succeeds");
-            expectEquals(p.getNumChannels(), 7);
+            expectEquals(p.getNumLayers(), 7);
             for (int i = 0; i < 3; ++i) expectCarries(p, i, i, colours[i], "after remove");
             for (int i = 3; i < 7; ++i) expectCarries(p, i, i + 1, colours[i + 1], "after remove");
 
             // Swap 0 and 5: each takes the other's data.
-            const int c0 = p.getChannelColourIndex(0), c5 = p.getChannelColourIndex(5);
+            const int c0 = p.getLayerColourIndex(0), c5 = p.getLayerColourIndex(5);
             expect(p.swapLayers(0, 5), "swapLayers succeeds");
             expectCarries(p, 0, 6, c5, "after swap");   // slot 5 held original layer 6
             expectCarries(p, 5, 0, c0, "after swap");
-            expectEquals(p.getNumChannels(), 7);
+            expectEquals(p.getNumLayers(), 7);
             expect(! p.layerEditInFlight.load(), "no edit left the in-flight flag set");
 
             // A removed-then-re-added layer starts at defaults, not at the old tenant's data.

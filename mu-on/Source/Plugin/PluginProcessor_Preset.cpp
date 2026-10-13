@@ -240,9 +240,9 @@ void PluginProcessor::saveLayerPreset(int track, const juce::String& name)
 {
     if (track < 0 || track >= numLayers.load(std::memory_order_relaxed)) return;
     auto node = captureLayerNode(track, kTrackPresetTag);
-    node.setProperty("engine", getChannelName(track), nullptr);
+    node.setProperty("engine", getLayerName(track), nullptr);
     if (auto xml = node.createXml())
-        mu_pp::writeXmlAtomically(*xml, getLayerPresetDir().getChildFile(mu_pp::safePresetFileName(name, getChannelName(track))
+        mu_pp::writeXmlAtomically(*xml, getLayerPresetDir().getChildFile(mu_pp::safePresetFileName(name, getLayerName(track))
                                                                            + "." + getLayerPresetExtension()),
                                   onLoadError);
 }

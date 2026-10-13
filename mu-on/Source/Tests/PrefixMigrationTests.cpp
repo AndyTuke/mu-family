@@ -85,7 +85,7 @@ struct MuOnPrefixMigrationTests : juce::UnitTest
             expect(p.apvts.getParameter(old) == nullptr, juce::String("the old id no longer exists: ") + old);
 
         // Five lanes become five layers, layer i running engine i.
-        expectEquals(p.getNumChannels(), 5);
+        expectEquals(p.getNumLayers(), 5);
         for (int i = 0; i < 5; ++i)
             expectEquals((int) getParam(p.apvts, "t" + juce::String(i) + "_eng"), i);
     }

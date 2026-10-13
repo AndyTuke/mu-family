@@ -203,7 +203,7 @@ struct MuTantProcessorSeamTests : juce::UnitTest
         {
             TempStorage storage;
             ExposedPluginProcessor p;
-            expectEquals(p.getNumVoices(), 1);
+            expectEquals(p.getNumLayers(), 1);
             expectEquals(p.numLayers.load(), 1);
             for (int i = 0; i < mu_limits::kMaxLayers; ++i)
                 expect(p.layers[(size_t) i] != nullptr, "all eight voice slots exist from construction");

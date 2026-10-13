@@ -32,7 +32,7 @@ struct TestProcessorCore : ProcessorCore
         }
     };
 
-    // Three live layers in the base-owned storage; getNumChannels / getLayer are the base defaults.
+    // Three live layers in the base-owned storage; getNumLayers / getLayer are the base defaults.
     static constexpr int kLayers = 3;
     TestProcessorCore() : TestProcessorCore(kLayers) {}
     explicit TestProcessorCore(int liveLayers)
@@ -48,12 +48,12 @@ struct TestProcessorCore : ProcessorCore
     using ProcessorCore::publishLayerLocked;
     using ProcessorCore::unpublishLayerLocked;
     using ProcessorCore::swapLayersLocked;
-    juce::String getChannelName(int i) const override
+    juce::String getLayerName(int i) const override
     {
         const auto* l = getLayer(i);
         return l != nullptr ? juce::String(l->name) : juce::String();
     }
-    int getChannelColourIndex(int i) const override
+    int getLayerColourIndex(int i) const override
     {
         const auto* l = getLayer(i);
         return l != nullptr ? l->colourIndex : 0;

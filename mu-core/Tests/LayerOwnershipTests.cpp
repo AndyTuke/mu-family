@@ -152,8 +152,8 @@ namespace
         std::vector<int> movedHoldingLock;        // 1 when the call came with layersLock held
         std::vector<int> added, addedHoldingLock; // layerAdded(index) calls; 1 when layersLock was held
 
-        juce::String getChannelName(int) const override { return {}; }
-        int getChannelColourIndex(int i) const override { return layers[(size_t) i] ? layers[(size_t) i]->colourIndex : 0; }
+        juce::String getLayerName(int) const override { return {}; }
+        int getLayerColourIndex(int i) const override { return layers[(size_t) i] ? layers[(size_t) i]->colourIndex : 0; }
         juce::File   getLayerPresetDir()       const override { return {}; }
         juce::String getLayerPresetExtension() const override { return ".muTest"; }
         juce::String getFullPresetExtension()  const override { return ".muTest"; }
@@ -213,7 +213,7 @@ struct LayerOwnershipTests : juce::UnitTest
                 const juce::ScopedLock sl(p.layersLock);
                 p.numLayers.store(3, std::memory_order_release);
             }
-            expectEquals(p.getNumChannels(), 3);
+            expectEquals(p.getNumLayers(), 3);
             expect(p.getLayer(2) == p.layers[2].get());
         }
 
@@ -270,7 +270,7 @@ struct LayerOwnershipTests : juce::UnitTest
                 const juce::ScopedLock sl(p.layersLock);
                 replaced = p.publishLayerLocked(std::move(fresh));
             }
-            expectEquals(p.getNumChannels(), 3);
+            expectEquals(p.getNumLayers(), 3);
             expect(p.getLayer(2) == freshPtr);
             expect(replaced.get() == spare);
             expectEquals(destroyed, 0, "the caller releases the spare, not the primitive");
@@ -296,7 +296,7 @@ struct LayerOwnershipTests : juce::UnitTest
                 const juce::ScopedLock sl(p.layersLock);
                 removed = p.unpublishLayerLocked(1, std::move(spare));
             }
-            expectEquals(p.getNumChannels(), 3);
+            expectEquals(p.getNumLayers(), 3);
             expect(removed.get() == ptr[1]);
             expect(p.layers[0].get() == ptr[0]);
             expect(p.layers[1].get() == ptr[2], "the layer above moved down, not copied");
@@ -318,7 +318,7 @@ struct LayerOwnershipTests : juce::UnitTest
                 const juce::ScopedLock sl(p.layersLock);
                 removed = p.unpublishLayerLocked(2, nullptr);
             }
-            expectEquals(p.getNumChannels(), 2);
+            expectEquals(p.getNumLayers(), 2);
             expect(p.layers[2] == nullptr);
         }
 
@@ -333,7 +333,7 @@ struct LayerOwnershipTests : juce::UnitTest
             }
             expect(p.layers[0].get() == c);
             expect(p.layers[2].get() == a);
-            expectEquals(p.getNumChannels(), 3);
+            expectEquals(p.getNumLayers(), 3);
         }
     }
 
@@ -366,7 +366,7 @@ struct LayerOwnershipTests : juce::UnitTest
                 expectEquals((int) p.cancelled.size(), 1, "one staged swap cancelled");
                 expectEquals(p.cancelled[0], i, "the new slot's");
             }
-            expectEquals(p.getNumChannels(), mu_limits::kMaxLayers);
+            expectEquals(p.getNumLayers(), mu_limits::kMaxLayers);
             expectEquals(p.addLayer(), -1);
             std::array<bool, mu_limits::kMaxLayers> seen {};
             for (int i = 0; i < mu_limits::kMaxLayers; ++i) seen[(size_t) p.getLayer(i)->colourIndex] = true;
@@ -398,7 +398,7 @@ struct LayerOwnershipTests : juce::UnitTest
             expectNear(p.param("v1_a"), 0.25f);
             expectNear(p.param("ch1_lvl"), 1.0f);
             expectNear(p.mixerEngine.channels[1].level.load(), 1.0f);
-            expectEquals(p.getNumChannels(), 2);
+            expectEquals(p.getNumLayers(), 2);
         }
 
         beginTest("removeLayer moves the layers above down by pointer, with their parameters and strip state");
@@ -424,7 +424,7 @@ struct LayerOwnershipTests : juce::UnitTest
 
             expect(p.removeLayer(1));
 
-            expectEquals(p.getNumChannels(), 3);
+            expectEquals(p.getNumLayers(), 3);
             expect(p.layers[0].get() == ptr[0]);
             expect(p.layers[1].get() == ptr[2], "layer 2 moved to slot 1 by pointer");
             expect(p.layers[2].get() == ptr[3]);
@@ -474,7 +474,7 @@ struct LayerOwnershipTests : juce::UnitTest
             p.addLayer();
             expect(! p.removeLayer(2));
             expect(! p.removeLayer(-1));
-            expectEquals(p.getNumChannels(), 2);
+            expectEquals(p.getNumLayers(), 2);
         }
 
         beginTest("removeLayer without spares leaves the vacated slot empty");
@@ -484,7 +484,7 @@ struct LayerOwnershipTests : juce::UnitTest
             p.destroyed = 0;
             expect(p.removeLayer(0));
             expect(p.layers[2] == nullptr);
-            expectEquals(p.getNumChannels(), 2);
+            expectEquals(p.getNumLayers(), 2);
             expectEquals(p.destroyed, 1);
             expectEquals(p.underLock, 0);
         }
@@ -588,7 +588,7 @@ struct LayerOwnershipTests : juce::UnitTest
             EditableProcessor dst(true);
             expectEquals(dst.savedLayerCount(state), 3);
             dst.applyComposedState(state);
-            expectEquals(dst.getNumChannels(), 3, "the count is restored");
+            expectEquals(dst.getNumLayers(), 3, "the count is restored");
             expectEquals(dst.layers[1]->colourIndex, 5, "the colours are restored");
 
             state.removeProperty("numVoices", nullptr);
@@ -596,7 +596,7 @@ struct LayerOwnershipTests : juce::UnitTest
             expectEquals(dst.savedLayerCount(state), 1, "unsavedLayerCount defaults to 1");
             dst.unsavedLayerCount = 4;
             dst.applyComposedState(state);
-            expectEquals(dst.getNumChannels(), 4, "a state without a count loads with the product's legacy count");
+            expectEquals(dst.getNumLayers(), 4, "a state without a count loads with the product's legacy count");
             expectEquals(dst.layers[1]->colourIndex, 5, "a state without colours keeps the current ones");
 
             state.setProperty("numVoices", 99, nullptr);

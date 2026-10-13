@@ -66,7 +66,7 @@ void ProcessorBase::drainPendingMidiProgramChanges()
 
     int start1, size1, start2, size2;
     pcFifo.prepareToRead(ready, start1, size1, start2, size2);
-    const int activeChannels = getNumActiveChannels();
+    const int activeChannels = getNumActiveLayers();
 
     auto handle = [this, activeChannels](const ProgramChangeEvent& ev)
     {
@@ -98,7 +98,7 @@ bool ProcessorBase::perform(const mu_core::ControlAction& a)
     // The layer strip's own mute / solo parameter, flipped.
     auto flipStrip = [this, &a](const char* rest)
     {
-        if (a.layer < 0 || a.layer >= getNumChannels()) return false;
+        if (a.layer < 0 || a.layer >= getNumLayers()) return false;
         auto* p = apvts.getParameter("ch" + juce::String(a.layer) + "_" + rest);
         if (p == nullptr) return false;
         gestureHold.set(*p, p->getValue() > 0.5f ? 0.0f : 1.0f);

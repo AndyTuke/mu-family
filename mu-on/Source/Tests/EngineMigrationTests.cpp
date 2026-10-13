@@ -112,7 +112,7 @@ struct MuOnEngineMigrationTests : juce::UnitTest
     void checkFiveLanes(PluginProcessor& p, const juce::String& what)
     {
         using namespace mu_seam_test;
-        expectEquals(p.getNumChannels(), 5, what + ": five layers");
+        expectEquals(p.getNumLayers(), 5, what + ": five layers");
 
         // Layer i runs engine i, named for it, in the colour the lane had.
         const char* names[] = { "Kick", "Bass", "Hat", "Snare", "Rumble" };
@@ -120,8 +120,8 @@ struct MuOnEngineMigrationTests : juce::UnitTest
         for (int i = 0; i < 5; ++i)
         {
             expectEquals((int) getParam(p.apvts, layerParamId(i, "eng")), i, what + ": engine of layer " + juce::String(i));
-            expectEquals(p.getChannelName(i), juce::String(names[i]), what + ": name of layer " + juce::String(i));
-            expectEquals(p.getChannelColourIndex(i), colours[i], what + ": colour of layer " + juce::String(i));
+            expectEquals(p.getLayerName(i), juce::String(names[i]), what + ": name of layer " + juce::String(i));
+            expectEquals(p.getLayerColourIndex(i), colours[i], what + ": colour of layer " + juce::String(i));
         }
         expectEquals((int) getParam(p.apvts, "t4_src"), 0, what + ": the Rumble processes the first Kick");
 
@@ -185,12 +185,12 @@ struct MuOnEngineMigrationTests : juce::UnitTest
 
             PluginProcessor b;
             b.setStateInformation(block.getData(), (int) block.getSize());
-            expectEquals(b.getNumChannels(), 6, "six layers saved, six loaded");
+            expectEquals(b.getNumLayers(), 6, "six layers saved, six loaded");
             checkFiveLanesParams(b);
             expectEquals((int) getParam(b.apvts, "t5_eng"), 0);
             expectWithinAbsoluteError(getParam(b.apvts, "t5_kick_tune"), 44.0f, 0.05f);
             for (int i = 0; i < 6; ++i)
-                expectEquals(b.getChannelColourIndex(i), a.getChannelColourIndex(i), "colour of layer " + juce::String(i));
+                expectEquals(b.getLayerColourIndex(i), a.getLayerColourIndex(i), "colour of layer " + juce::String(i));
         }
 
         beginTest("an APVTS dump with the old root <Pattern> and <RumbleEnv> (written before format 2) loads the same way");
@@ -215,7 +215,7 @@ struct MuOnEngineMigrationTests : juce::UnitTest
             juce::AudioProcessor::copyXmlToBinary(*juce::XmlDocument::parse(dump), block);
             p.setStateInformation(block.getData(), (int) block.getSize());
 
-            expectEquals(p.getNumChannels(), 5);
+            expectEquals(p.getNumLayers(), 5);
             expectWithinAbsoluteError(getParam(p.apvts, "t0_kick_tune"), 60.0f, 0.05f);
             expectEquals((int) getParam(p.apvts, "t1_bass_wave"), 2);
             expectWithinAbsoluteError(getParam(p.apvts, "t1_bass_tune"), 55.0f, 0.05f);
@@ -244,7 +244,7 @@ struct MuOnEngineMigrationTests : juce::UnitTest
             expect(p.slotPresetFiles(0).contains(file), "every track lists the preset");
             p.loadLayerPreset(0, file);                           // track 0 is a Kick; the preset is a Bass
             expectEquals((int) getParam(p.apvts, "t0_eng"), 1, "the preset sets the engine");
-            expectEquals(p.getChannelName(0), juce::String("Bass"));
+            expectEquals(p.getLayerName(0), juce::String("Bass"));
             expectEquals((int) getParam(p.apvts, "t0_bass_wave"), 1);
             expectWithinAbsoluteError(getParam(p.apvts, "t0_bass_cut"), 900.0f, 0.5f);
             expect(p.pattern().isOn(0, 2) && ! p.pattern().isOn(0, 0), "the preset's row replaces the track's");

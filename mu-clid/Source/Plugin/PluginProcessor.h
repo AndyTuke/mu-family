@@ -95,11 +95,11 @@ public:
 
     // ProcessorBase channel-metadata interface — mu-clid maps "channel" → "rhythm"; the count and
     // getLayer come from the layer container.
-    juce::String getChannelName(int idx)      const override
+    juce::String getLayerName(int idx)      const override
     {
         return (idx >= 0 && idx < getNumRhythms()) ? juce::String(getRhythm(idx).name) : juce::String();
     }
-    int          getChannelColourIndex(int idx) const override
+    int          getLayerColourIndex(int idx) const override
     {
         return (idx >= 0 && idx < getNumRhythms()) ? getRhythm(idx).colourIndex : 0;
     }
