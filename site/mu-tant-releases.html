@@ -121,6 +121,8 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <div class="rn-group new">
           <h3>New</h3>
           <ul>
+            <li>New Swap choice in the Master Loop pane: pick when a swapped-in preset takes effect, at the end of the Master loop, the Voice loop or the Bar. <span class="ref">(1596)</span></li>
+            <li>New Performance mode (standalone): the Perf button locks the screen for live use and shows a step indicator with your queued switches. Hold Perf for one second to leave it. <span class="ref">(1328)</span></li>
             <li>No more demo limits: every copy has all eight tracks, full step counts and preset saving, with or without a licence key. <span class="ref">(1348)</span></li>
             <li>The activation window has a Get a key button that opens the pay-what-you-like page. <span class="ref">(1355)</span></li>
             <li>mu-Tant is now free to use, pay what you like. Copies without a licence key show a polite support message once per session (with a "don't show this again" option), a Support link in the status bar, and Support and Enter a key buttons in About. <span class="ref">(1164, 1347)</span></li>
@@ -129,6 +131,9 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <div class="rn-group improved">
           <h3>Improved</h3>
           <ul>
+            <li>Mixer faders now have a knob-style cap with a lit groove, instead of a small white dot. <span class="ref">(1599)</span></li>
+            <li>The modulation depth and curve controls on the Matrix and the modulator editor now use the modulation colour. <span class="ref">(1599)</span></li>
+            <li>The level meters in the plugin mixer are now stereo. <span class="ref">(1595)</span></li>
             <li>The voice page now shares one layout with the other apps: the gate editor grows to use the spare height, the filter rows sit closer together, and the wavetable names fit their selectors ("Basic" and "Pulse" replace "Basic Shapes" and "Square PWM"; saved sounds are unchanged). <span class="ref">(1505, 1506)</span></li>
             <li>Knob labels stay put: they no longer show units and no longer change when you turn a knob (the status bar shows the value and units as you turn). <span class="ref">(1526)</span></li>
             <li>Settings now uses two columns, so every option fits on screen without cutting off. <span class="ref">(1352)</span></li>
@@ -170,6 +175,7 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <div class="rn-group fixed">
           <h3>Fixed</h3>
           <ul>
+            <li>In CLAP hosts, the plug-in&rsquo;s parameters now refresh correctly after a preset or session loads. <span class="ref">(1590)</span></li>
             <li>Fixed a hang when the plugin was unloaded, and a knob whose range shrank to nothing (for example an insert with no room to move) no longer trips a warning in test builds. <span class="ref">(1322)</span></li>
             <li>Deleting or re-ordering rhythms (mu-Clid) or voices (mu-Tant) no longer leaves a channel ducking from the wrong one: sidechain sources now follow their rhythm / voice, and a channel that ducked from a deleted one stops ducking. <span class="ref">(1308)</span></li>
             <li>MIDI clock sync in the standalone: with Messages set to &ldquo;Clock only&rdquo; the Play button now starts the app (it used to stay stopped), and with &ldquo;Transport only&rdquo; the app now plays at its own BPM instead of sitting on the first step. <span class="ref">(1261)</span></li>
