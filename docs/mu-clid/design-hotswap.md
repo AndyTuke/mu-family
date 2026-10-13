@@ -53,7 +53,7 @@ short `suspendProcessing` window.
 | File | Role |
 |---|---|
 | [mu-clid/Source/Plugin/HotSwapStager.h/.cpp](../../mu-clid/Source/Plugin/HotSwapStager.h) | The staging state machine: per-rhythm pending slots + one full-preset pending slot, the store-release/load-acquire handshake, `checkBoundaries` (audio thread) and `processSwaps` (message thread). |
-| [mu-clid/Source/Plugin/HotSwapBoundary.h](../../mu-clid/Source/Plugin/HotSwapBoundary.h) | **Pure** loop-boundary predicates (no processor dependency) so the defer decision is unit-testable. |
+| [mu-core/Plugin/HotSwap.h](../../mu-core/Plugin/HotSwap.h) | The shared **pure** boundary predicates and `SwapTiming` (tested in `mu-core/Tests/SwapTimingTests.cpp`); `mu_clid::hotswap` / `HotSwapBoundary.h` were removed 2026-10-13. |
 | [mu-clid/Source/Persistence/PresetIO.cpp](../../mu-clid/Source/Persistence/PresetIO.cpp) | `stageRhythmPreset`, `loadPreset`, `buildPreparedFullPreset`, `commitStagedFullPreset` — the build + apply bodies. |
 | [mu-clid/Source/Plugin/PluginProcessor.cpp](../../mu-clid/Source/Plugin/PluginProcessor.cpp) | Boundary detection in `advanceSequencer` → `checkBoundaries` → `requestDeferredWork()`; `runDeferredWork` (100 Hz message-thread poll) → `processSwaps`. |
 | [mu-clid/Source/Sequencer/RhythmSequencer.h](../../mu-clid/Source/Sequencer/RhythmSequencer.h) | Emits `BlockResult { rhythmLoopWrapMask, masterLoopWrapped }` and owns the wrap detector. |
@@ -114,23 +114,21 @@ SwapPoll timer (100 Hz) → runDeferredWork()
 
 `PluginProcessor::advanceSequencer` feeds those to
 `hotSwapStager.checkBoundaries(numRhythms, masterLoopWrapped, rhythmLoopWrapMask)`,
-which consults the **pure predicates** in `HotSwapBoundary.h`:
+which consults the shared **pure predicates** in `mu-core/Plugin/HotSwap.h` with the preset's `SwapTiming` (the `mstr_swap` parameter):
 
 ```cpp
-// Per-rhythm swap. swapMode 0 (master mode) WITH a master loop set → every rhythm defers
-// to the master loop point; otherwise (own-loop mode, or no master loop to wait for, the
-// free-running default) each rhythm defers to its OWN loop wrap (bit r).
-perRhythmBoundaryReached(swapMode, hasMasterLoop, r, masterLoopWrapped, rhythmLoopWrapMask)
+// Per-rhythm swap. OnMasterLoop WITH a master loop set → every rhythm defers to the master
+// loop point; otherwise (OnLayerLoop, or no master loop to wait for, the free-running default)
+// each rhythm defers to its OWN loop wrap (bit r).
+layerBoundaryReached(timing, hasMasterLoop, r, masterLoopWrapped, rhythmLoopWrapMask, /*barWrapped*/ false)
 
-// Full preset. Defers to the master loop when one is defined (a preset spans every
-// rhythm, so the master loop is the musical boundary). FREE-RUNNING (mstrLoop = 0,
-// the default) has no master wrap, so fall back to rhythm 0's loop — without this
-// the swap waits forever for a boundary that never comes (#653).
-fullPresetBoundaryReached(hasMasterLoop, masterLoopWrapped, rhythmLoopWrapMask)
+// Full preset. Defers to the master loop when one is defined; FREE-RUNNING (mstrLoop = 0,
+// the default) has no master wrap, so fall back to rhythm 0's loop (the old free-running hang).
+fullPresetBoundaryReached(timing, hasMasterLoop, masterLoopWrapped, rhythmLoopWrapMask, /*barWrapped*/ false)
 ```
 
-`swapMode` is user-settable (`PluginProcessor::setSwapMode`, a `SwapMode` atomic) and
-decides whether per-rhythm swaps wait for the master loop or each rhythm's own loop.
+`timing` is the shared `mstr_swap` parameter, saved with the preset (`PluginProcessor::swapTiming()`, read on the audio
+thread). mu-Clid has no bar-line rule, so a stored `OnBar` is read as `OnLayerLoop`.
 
 **Wrap-detector resets** (all guard against a *false* wrap firing a premature commit):
 - transport **stop→start** edge → `resetWrapDetector()` (`lastEffectiveStep = -1`) so the first block after restart can't emit a stale wrap.

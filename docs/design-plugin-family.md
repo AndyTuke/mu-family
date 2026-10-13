@@ -1203,26 +1203,36 @@ them. Every action except `PerformanceMode` returns false when the mode is off. 
 - `PresetNext / PresetPrev` stay "next file in the browser list" and are not used in performance mode. Loading a performance file is a
   screen-only call on `LiveState` made before the mode is entered; switching between performances from a pad is out of scope.
 
-**6. Per-preset swap timing, one definition in `mu-core` (owner, 2026-10-13).** Today mu-Clid (`SwapMode`: OnMasterLoop, OnRhythmLoop,
-a processor atomic read by `HotSwapStager`) and mu-Tant (`SwapMode`: OnMasterLoop, OnVoiceLoop) each have a "Timing" setting, with the
-predicates in `mu_clid::hotswap` (`HotSwapBoundary.h`) and mu-Tant's `swapLoopBeats`; mu-Toni and mu-On have the fixed bar rule. It becomes a
+**6. Per-preset swap timing, one definition in `mu-core` (owner, 2026-10-13).** Before this, mu-Clid (`SwapMode`: OnMasterLoop, OnRhythmLoop,
+a processor atomic read by `HotSwapStager`) and mu-Tant (`SwapMode`: OnMasterLoop, OnVoiceLoop) each had a runtime-only "Timing" setting, with the
+predicates in `mu_clid::hotswap` and mu-Tant's `swapLoopBeats`; mu-Toni and mu-On have the fixed bar rule. It is now a
 family setting saved **with the preset**:
 - **Type:** `mu_hotswap::SwapTiming { OnMasterLoop = 0, OnLayerLoop = 1, OnBar = 2 }` in `mu-core/Plugin/HotSwap.h`, beside `loopWrapped` / `boundaryReached`.
   "Layer" is the neutral word for rhythm / voice / pattern. The integers are saved data: append only.
-- **Parameter:** one APVTS choice parameter in the shared master section of the layout, id `mstr_swap` (confirm against the design-naming
-  parameter-id rules before adding), so it is in the preset, the full-preset file and the session with no new persistence code. Defaults supplied
+- **Parameter:** one APVTS choice parameter in the shared master section of the layout, id `mstr_swap` (checked 2026-10-13: fits the
+  design-naming "Mixer / FX ids `mstr_`" scheme, beside `mstr_lvl` / `mstr_pan`), so it is in the preset, the full-preset file and the session with no new persistence code. Defaults supplied
   by the product: mu-Clid and mu-Tant `OnMasterLoop` (today's value, so old presets and sessions that lack the parameter behave as now),
   mu-Toni and mu-On `OnBar`. The audio thread reads its raw value; nothing else changes on the audio path.
 - **Predicates:** `usesMasterLoop(timing, hasMasterLoop)`, `layerBoundaryReached(...)` and `fullPresetBoundaryReached(...)` move to `mu_hotswap`
   with their behaviour unchanged, including the fallback when `OnMasterLoop` is chosen but no master loop is set (use the layer's own loop; the full
   preset uses layer 0's). `OnBar` uses `kBarBeats`. A layer's own loop length in beats stays supplied by the product (shared principle 2): for
   mu-Toni and mu-On "own loop" is the bar, so `OnLayerLoop` and `OnBar` agree there.
-- **Migration:** (a) add `SwapTiming`, the predicates and the parameter, with the `HotSwapBoundaryTests` and `SwapCommitTimingTests` cases moved
-  into `mu-core-tests` and extended for `OnBar`; (b) switch mu-Clid and mu-Tant to the shared type and parameter, delete both product `SwapMode`
-  enums, `swapModeAtomic` and `mu_clid::hotswap` (thin forwarders for one build at most); where the old value was stored outside the preset
-  (app settings), read it once to seed the default for presets without the parameter; (c) mu-Toni and mu-On pass `OnBar` default and gain the control;
+- **Migration:** (a) **built 2026-10-13, architecture-steward Pass:** `SwapTiming`, `swapTimingFromIndex`, the predicates and the parameter
+  (`mstr_swap`, "Swap Timing", choices "On master loop" / "On layer loop" / "On bar"; `addGlobalFxParams(layout, swapTimingDefault)`, mu-Toni and
+  mu-On pass 2) are in `mu-core`, covered by `mu-core/Tests/SwapTimingTests.cpp` (including `OnBar`). The product tests `HotSwapBoundaryTests` and
+  `SwapCommitTimingTests` stay in mu-Clid until (b): they test the product predicates and `HotSwapStager`, which (b) rewrites, so moving them now
+  would be done twice. In (b) the cases are ported, not dropped: boundary cases not already in `SwapTimingTests` go to `mu-core-tests`; the stager
+  commit-timing cases stay with `HotSwapStager` in mu-Clid, retargeted to the shared type. `mstr_swap` is deliberately **not** in
+  `isGlobalFxParamId` (the engine does not sync it; the audio thread reads the raw value). It must be added to mu-Clid's `kGlobalParamDefs`
+  (mu-Tant has no such table: its full preset writes every non-layer APVTS parameter through `LayerLayout`, so `mstr_swap` is carried already) in (b),
+  because that table decides what a full-preset file carries (`mstrLoop` is listed there the same way);
+  (b) **built 2026-10-13 (commit 7727cdb), architecture-steward Pass:** mu-Clid and mu-Tant read the shared type and parameter; both product `SwapMode`
+  enums, `swapModeAtomic`, `mu_clid::hotswap` and `HotSwapBoundary.h` are deleted (no forwarders); `mstr_swap` is in mu-Clid's `kGlobalParamDefs`; both
+  Settings "Timing" dropdowns write the parameter; the old value was never persisted (runtime-only atomic), so there is nothing to seed from. mu-Clid has no
+  bar-line rule, so `OnBar` reads as `OnLayerLoop` there (accepted; (c) and (d) must not offer or display `OnBar` for a product without the rule, see (d));
+  (c) mu-Toni and mu-On pass `OnBar` default and gain the control;
   (d) the "Timing" dropdown leaves the two products' `SettingsOverlay` for a preset-level control in the shared `MasterLoopSection` (the `ux-controller`
-  places it, as it is preset data now, not an app setting). Each stage is a Debug build of all products and the unit tests.
+  places it, as it is preset data now, not an app setting; the control offers only the values the product supports, so mu-Clid shows two and a stored `OnBar` is shown as the layer loop). Each stage is a Debug build of all products and the unit tests.
 - **Standing check:** easier. One definition and one parameter replace two enums and two predicate sets, the other products gain the choice
   without a copy, and the pad launch needs nothing new.
 
@@ -1270,8 +1280,7 @@ the playing→stopped edge); `kBarBeats` is one 4/4 bar. A load while stopped ap
 
 **Product-side:** the payload (what is pre-built at stage time), the layer's own loop
 length, and the apply. **Which boundary applies** (master loop, layer loop or bar) is the per-preset
-`SwapTiming` setting defined once in `mu-core` (see Performance mode, item 6; the per-product tables below describe today's code
-until that migration is done).
+`SwapTiming` setting (`mstr_swap`) defined once in `mu-core` (see Performance mode, item 6).
 
 **Deferred-work mailbox (family rule, 2026-10-11): the audio thread never posts messages.** `ProcessorBase` is no longer a
 `juce::AsyncUpdater` (no `triggerAsyncUpdate` / `handleAsyncUpdate`). The audio thread calls `requestDeferredWork()`, which only
@@ -1313,8 +1322,8 @@ boundary); until then a swap can start late by up to one poll interval.
 |---|---|---|---|---|
 | Deep-dive doc | [mu-clid/design-hotswap.md](mu-clid/design-hotswap.md) | — (this section) | — | — |
 | Stager | `HotSwapStager` → `Stager<PendingRhythm, PreparedFullPreset, 8>` (`Rhythm` + `VoiceEngine` + sample path) | `ProcessorBase::layerSwapper` (`LayerSwapper<ValueTree, 8>`) | same | same |
-| Boundary predicates | `HotSwapBoundary.h` (`mu_clid::hotswap`) | shared `loopWrapped` / `boundaryReached` through `mu_tant::swapLoopBeats` | shared (default bar rule, `kBarBeats`) | shared (default bar rule, `kBarBeats`) |
-| Reference boundary | master loop / per-rhythm wrap (`swapMode`) | full preset → voice 0's gate-pattern wrap (master loop when set); per-voice → that voice's own wrap (master loop when set) | every bar (the arp has no loop of its own) | the 16-step pattern wrap = every bar |
+| Boundary predicates | shared `mu_hotswap::layerBoundaryReached` / `fullPresetBoundaryReached` (`mstr_swap`) | shared `loopWrapped` / `boundaryReached` through `mu_tant::swapLoopBeats` | shared (default bar rule, `kBarBeats`) | shared (default bar rule, `kBarBeats`) |
+| Reference boundary | master loop / per-rhythm wrap (`mstr_swap`; no bar rule, `OnBar` reads as the rhythm loop) | full preset → voice 0's gate-pattern wrap (master loop when set); per-voice → that voice's own wrap (master loop when set) | every bar (the arp has no loop of its own) | the 16-step pattern wrap = every bar |
 | Staged when | sequencer playing | the audio thread's resolved play state (host, MIDI clock or internal), via `layerSwapper.useFull` / `useSlot` | the audio thread's resolved play state (host, MIDI clock or internal) | the audio thread's resolved play state (host, MIDI clock or internal) |
 | Commit isolation | `suspendProcessing` + `rhythmsLock`, microseconds (heavy work pre-built at stage) | **no blanket lock** — relies on the audio render's existing fine-grained locks | same as mu-tant | same as mu-tant |
 

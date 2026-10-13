@@ -36,7 +36,7 @@ mu-tant is **APVTS-centric**, not engine-object-centric:
 | Commit mechanism | `std::move` engine into slot + retire old (`installRhythm`) | apply the composed state / voice node (`applyComposedState` / `applyLayerNode`, mu-core LayerState) |
 | Commit isolation | `suspendProcessing` + `rhythmsLock` (µs, work pre-built) | **no blanket lock** — relies on the audio render's existing fine-grained locks |
 | Outgoing-voice tail | **retire-then-swap**: old `VoiceEngine` plays out its sample/release tail | **none** — oscillators are continuous (free-running drones), there is no note tail to preserve, so the new params simply take over |
-| Boundary | master loop / per-rhythm wrap (`swapMode`) | full → voice 0's gate wrap; per-voice → that voice's gate wrap |
+| Boundary | master loop / per-rhythm wrap (shared `mstr_swap`) | full → voice 0's gate wrap; per-voice → that voice's gate wrap |
 
 **Why no `suspendProcessing` / blanket lock in mu-tant.** mu-clid suspends for a
 microsecond because its commit is a pointer swap. mu-tant's commit mutates APVTS
@@ -61,7 +61,7 @@ across a swap, mu-clid's retire-then-swap (see its doc §8) is the pattern to po
 | [Source/Plugin/PluginProcessor.cpp](../../mu-tant/Source/Plugin/PluginProcessor.cpp) | `swapLoopBeats` (the mu-tant boundary rule), `layerSwapper.setAppliers` (commit bodies `applyFullPresetTree` / `applyVoicePresetTree`), `runDeferredWork` (commit drain), boundary flagging in `processBlock`. |
 | [Source/Plugin/PluginProcessor_Preset.cpp](../../mu-tant/Source/Plugin/PluginProcessor_Preset.cpp) | `loadPreset` / `loadLayerPreset` (`layerSwapper.useFull` / `useSlot` make the stage-or-apply call on the resolved transport; `layerSwapper.isRunning()` gates the wavetable preload), `preloadWavetablesFrom*`. |
 | [Source/Audio/WavetableBank.{h,cpp}](../../mu-core/Audio/Wavetable/WavetableBank.h) | `findByPath` (lock-free resolve), `decodeFile` (off-lock decode) + `appendTable` (locked append) — the two-phase load that keeps the swap real-time-safe. |
-| [Source/Tests/HotSwapBoundaryTests.cpp](../../mu-tant/Source/Tests/HotSwapBoundaryTests.cpp) | Predicate + stager handshake tests. |
+| [Source/Tests/HotSwapBoundaryTests.cpp](../../mu-tant/Source/Tests/HotSwapBoundaryTests.cpp) | Swap loop-length rule (`swapLoopBeats`, all three `SwapTiming` values) + stager handshake tests. |
 
 The audio thread calls `requestDeferredWork()` (an atomic mailbox flag; `ProcessorBase` is no longer a
 `juce::AsyncUpdater`) and the 100 Hz `SwapPoll` timer runs `runDeferredWork()`, which commits on the message thread.
