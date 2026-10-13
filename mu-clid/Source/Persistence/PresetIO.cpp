@@ -819,9 +819,9 @@ void PresetIO::loadPreset(const juce::File& file)
         proc.hotSwapStager.stageFullPreset(std::move(prepared));
     else
     {
-        // Applied at once: an earlier full preset still staged from while the transport played must not
-        // land on top of this one at the stop edge.
-        proc.hotSwapStager.cancelStagedFullPreset();
+        // Applied at once: an earlier full preset or per-rhythm swap still staged from while the transport
+        // played must not land on top of this one at the stop edge.
+        proc.hotSwapStager.cancelAllStaged();
         commitStagedFullPreset(prepared);
     }
 }

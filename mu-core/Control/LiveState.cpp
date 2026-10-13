@@ -77,7 +77,7 @@ bool LiveState::selectItem(int item)
 
     const auto result = cb.stageItem ? cb.stageItem(item) : Stage::Failed;
     if (result == Stage::Failed) return false;   // it did not load: nothing is staged, nothing changes
-    if (result == Stage::Applied) { currentItem = item; queuedItem = -1; }
+    if (result == Stage::Applied) { currentItem = item; queuedItem = -1; clampSelectedLayer(); }   // the new preset may have fewer layers
     else                          { queuedItem = item; queuedSerial = cb.stageSerial ? cb.stageSerial() : 0; }
     changed();
     return true;

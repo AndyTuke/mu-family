@@ -48,6 +48,13 @@ void HotSwapStager::cancelStagedFullPreset()
     stager.cancelFull();
 }
 
+void HotSwapStager::cancelAllStaged()
+{
+    // Drop every per-rhythm swap, then the full preset: a full preset applied at once overwrites every slot.
+    for (int r = 0; r < RhythmSequencer::MaxRhythms; ++r) stager.cancel(r);
+    stager.cancelFull();
+}
+
 //==============================================================================
 bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
                                     int rhythmLoopWrapMask)

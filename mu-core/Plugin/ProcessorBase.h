@@ -304,7 +304,7 @@ public:
     void saveLiveState(juce::ValueTree& root) const         { liveState.saveTo(root); }
     // A full-preset load that could not read its file calls this (and reports through onLoadError as before):
     // Performance mode tells that apart from a load that succeeded with warnings.
-    void noteFullPresetLoadFailed() noexcept                { fullPresetLoadFailed = true; }
+    void noteFullPresetLoadFailed() noexcept                { fullPresetLoadFailed.store(true, std::memory_order_relaxed); }
     void restoreLiveState(const juce::ValueTree& root)      { liveState.restoreFrom(root); }
     // The ShellBackend's Performance mode accessors: the shell reads the live state and performs actions through this instance.
     const mu_core::LiveView*  getLiveView() const override  { return &liveState; }
@@ -569,7 +569,7 @@ protected:
     // Audio-thread flagging uses atomics only; the appliers run on the message thread.
     mu_hotswap::LayerSwapper<juce::ValueTree, mu_limits::kMaxLayers> layerSwapper;
     mu_core::LiveState liveState;   // Performance mode (message thread only; never read on the audio thread)
-    bool fullPresetLoadFailed = false;   // set by a load that could not read its file; message thread only
+    std::atomic<bool> fullPresetLoadFailed { false };   // set by a load that could not read its file
 
     // The audio thread's deferred-work request and the message-thread timer (100 Hz, one relaxed exchange per tick) that drains it.
     // The timer does nothing but check the flag. Nothing here uses AsyncUpdater: its trigger

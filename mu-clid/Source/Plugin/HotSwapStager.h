@@ -64,6 +64,7 @@ public:
     // Message-thread: true if a full-preset swap is staged but not yet committed.
     bool hasPendingFullPreset() const;
     void cancelStagedFullPreset();   // message thread: drop the staged full preset, if any
+    void cancelAllStaged();          // message thread: drop the staged full preset and every staged per-rhythm swap
     uint32_t fullStageSerial() const noexcept { return stager.fullStageSerial(); }
 
     // Audio-thread: scan all pending swaps and flag any that have reached a loop boundary.

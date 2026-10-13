@@ -28,9 +28,9 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
     {
         // A load that could not read the file stages nothing and says so through noteFullPresetLoadFailed();
         // warnings on a load that did succeed (a missing sample, dropped modulators) are not failures.
-        fullPresetLoadFailed = false;
+        fullPresetLoadFailed.store(false, std::memory_order_relaxed);
         applyFullMidiPreset(liveState.getPerformance().resolve(item, getFullPresetDir()));
-        if (fullPresetLoadFailed) return mu_core::LiveState::Stage::Failed;
+        if (fullPresetLoadFailed.load(std::memory_order_relaxed)) return mu_core::LiveState::Stage::Failed;
         return hasPendingFullPreset() ? mu_core::LiveState::Stage::Queued   // waiting for its boundary
                                       : mu_core::LiveState::Stage::Applied; // nothing left staged: applied at once (stopped)
     };
