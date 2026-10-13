@@ -198,7 +198,7 @@ void MuLinkComponent::showDeviceDialog()
 
     juce::DialogWindow::LaunchOptions opts;
     opts.content.setOwned(selector.release());
-    opts.dialogTitle                  = kProductName + juce::String(juce::CharPointer_UTF8(" â Audio / MIDI Options"));
+    opts.dialogTitle                  = kProductName + juce::String(juce::CharPointer_UTF8(" \xe2\x80\x94" "Audio / MIDI Options"));
     opts.dialogBackgroundColour       = MuLookAndFeel::colour(MuLookAndFeel::windowBackground);
     opts.escapeKeyTriggersCloseButton = true;
     opts.useNativeTitleBar            = true;
