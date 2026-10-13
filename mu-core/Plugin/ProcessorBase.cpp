@@ -38,6 +38,7 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
     cb.stageSerial = [this] { return fullStageSerial(); };
     cb.cancelItem = [this] { cancelPendingFullPreset(); };
     cb.layerCount = [this] { return getNumLayers(); };
+    cb.layerColourIndex = [this](int layer) { return layer >= 0 && layer < getNumLayers() ? getLayerColourIndex(layer) : 0; };
     liveState.setCallbacks(std::move(cb));
 }
 

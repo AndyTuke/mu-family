@@ -30,6 +30,7 @@ public:
         std::function<Stage(int)>  stageItem;                 // stage item n's full preset
         std::function<void()>      cancelItem;                // drop the staged full preset
         std::function<int()>       layerCount;                // how many layers are live (bounds SelectLayer)
+        std::function<int(int)>    layerColourIndex;          // layer n's index into the shared layer palette
         std::function<bool()>      fullPending;               // some full preset is staged and not yet committed
         std::function<uint32_t()>  stageSerial;               // changes whenever ANY full preset is staged (identity)
     };
@@ -43,6 +44,9 @@ public:
     int                           getCurrentItem()    const noexcept override { return currentItem; }
     int                           getQueuedItem()     const noexcept override { return queuedItem; }
     int                           getSelectedLayer()  const noexcept override { return selectedLayer; }
+    int                           getLayerCount()     const override       { return cb.layerCount ? cb.layerCount() : 1; }
+    int                           getLayerColourIndex(int layer) const override
+    { return cb.layerColourIndex ? cb.layerColourIndex(layer) : (layer < 0 ? 0 : layer % 8); }
     bool                          isItemPlayable(int item) const override    { return itemLoadable(item); }
     uint32_t                      getRevision()       const noexcept override { return revision; }
     void addListener(Listener* l) const override    { listeners.add(l); }

@@ -143,8 +143,32 @@ cmake --build build --target mu-core-tests --config Debug && build/mu-core/Tests
 | `ProcessorBase::ScopedStorageRoot`: with a root set, settings and content sit under it and nothing is written to the real `TDP` folders; the default is restored (and nests) | `mu-core/Tests/ScopedStorageRootTests.cpp` | Pass (build 1306) |
 | `ChannelState::reset()` equals the APVTS default of every `ch{N}_` parameter from the shared strip layout (`addChannelStripParams`), for all `kMaxLayers` strips, with default options and with mu-Clid's options; also fails if the strip gains a parameter the test does not know. mu-On's Bass / Rumble sidechain defaults are product options and are not covered (they differ from `reset()` by design; `resetLayerParams` follows with the real defaults) | `mu-core/Tests/ChannelStateResetTests.cpp` | Pass (2 tests, build 1271) |
 | Stereo peaks (`MixerEngine::processBlock` driven through the render hook): master L / R follow the master pan (hard left leaves R silent, centred equal, combined = larger side), a mono output buffer reports its one channel as both sides, the reverb return L / R follow the return pan and an unused return reads zero on all three peaks. Mutation check not run | `mu-core/Tests/MixerStereoPeakTests.cpp` | Pass (3 tests; suite 283 results, 0 failures, Debug build 1409) |
+| `LiveState` layer callbacks (`LiveStateTests.cpp`): `getLayerCount` / `getLayerColourIndex` come from the owner's callbacks and are read live; with none supplied one layer and the palette in order, wrapping at 8, negative index to 0 | `mu-core/Tests/LiveStateTests.cpp` | Pass (build 1410) |
+| `ControlAttachment` seam: the factory slot is empty by default and is one object; a registered factory receives sink, view, `SurfaceLook` and folder and builds an attachment; status listeners are told on release and connect, also through a const reference, and not after removal | `mu-core/Tests/ControlAttachmentTests.cpp` | Pass (build 1410; 391 results, 0 failures) |
 
 Note: the real product processors are built headless in each product's test target (the seam in [design-plugin-family.md](docs/design-plugin-family.md), "Headless product processors": `createEditor()` lives in `PluginEditor.cpp`, tests supply a one-line stand-in, `ProcessorBase::ScopedStorageRoot`, shared source list `mu-core/cmake/ProcessorTestSources.cmake`). Run one product's real-processor tests with `<exe> mu-<product>-processor`. Real-processor tests: mu-Tant `mu-tant/Source/Tests/ProcessorSeamTests.cpp` (construction, `resetLayer` equals a fresh voice across block sizes and insert algorithms, add / remove / swap / reset and `loadUserWavetable` against `processBlock` on a worker thread, `layerEditInFlight` skip), mu-Toni and mu-On `Source/Tests/ProcessorSeamTests.cpp` (layer ownership: `getLayer(i) == &getArp(i)`, `laneOf(voiceSlot(i)) == i`), mu-Clid `mu-clid/Source/Tests/ProcessorSeamTests.cpp` (rhythm edits and the loop-boundary swap commit against `processBlock`). Known gap logged by the mu-Tant test: `RingModInsert::reset()` leaves its frequency smoother. Known behaviour: a staged per-rhythm swap with "On master loop" timing and no master loop never commits. Status: Pass (build 1306).
+
+---
+
+## C++ unit tests — mu-control (device-independent controller layer)
+
+Built as part of **ALL_BUILD** (no hardware, no product, no `ProcessorBase`; compiles the library sources directly). Build command:
+
+```
+cmake --build build --target mu-control-tests --config Debug && build/mu-control/Tests/mu-control-tests_artefacts/Debug/mu-control-tests.exe
+```
+
+Every surface case runs on three descriptions: Launchpad-shaped (8 x 8, side column, RGB), the mock grid (4 x 4, no side buttons, palette only, no blink, origin bottom-right) and a native-blink surface; the same model and mapping must serve all of them.
+
+| Coverage | File | Status |
+|---|---|---|
+| Surface description: button counts and control list match the geometry; every listed control exists once, off-surface ids do not; `MockGridDriver` reports in surface coordinates despite its bottom-right origin, a closed driver reports and sends nothing | `mu-control/Tests/SurfaceDescriptionTests.cpp` | Pass (build 1410) |
+| Surface mapping: default for both descriptions (top = items, side = layers bottom to top, grid row = layer), override replace / unbind / refuse off-surface, XML round trip of every action field, version and surface id, unknown action name dropped, other surface / newer or missing version / bad text / off-surface entries ignored, restore replaces earlier overrides | `mu-control/Tests/SurfaceMappingTests.cpp` | Pass (build 1410) |
+| Surface model: top / side / grid presses perform the right `ControlAction`, release and value do nothing, rows past the layer count dark and unpressable, handle result is the sink answer, one light per control and all dark outside Performance mode, item and layer light states, dim = `dimScale` x bright, queued pulse (animated RGB, native, steady middle level) from an injected clock, animation timer only while an RGB light pulses, refused press changes no light, `LiveView` change re-renders, listener lifetime, a user override changes both press and light. Not yet covered (arrive with later stages): the flash phase and the clip-grid light states (M5), `FakeDevicePorts` and the driver tests (M2) | `mu-control/Tests/SurfaceModelTests.cpp` | Pass (build 1410) |
+
+**Current status:** 27/27 results pass at build 1410 (Debug).
+
+Boundary self-test: `pwsh tests/scripts/test-check-core-boundary.ps1` also covers the mu-control rules (a processor or shell header, a mu-core UI header, a plugin namespace, a `Devices/` file including the mapping or model, mu-core including mu-control, and clean controls) through `check-core-boundary.ps1 -ControlPath`. 8 cases pass.
 
 ---
 

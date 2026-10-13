@@ -330,6 +330,25 @@ public:
             LiveState w; w.saveTo(empty);
             expect(! empty.hasProperty("performancePath"), "no performance: the properties are cleared");
         }
+
+        beginTest("layer count and layer colour come through the owner's callbacks, with defaults when none are supplied");
+        {
+            LiveState bare;
+            expectEquals(bare.getLayerCount(), 1, "no callback: one layer");
+            expectEquals(bare.getLayerColourIndex(3), 3, "no callback: the palette in order");
+            expectEquals(bare.getLayerColourIndex(11), 3, "no callback: wraps at 8");
+            expectEquals(bare.getLayerColourIndex(-1), 0);
+
+            Fake f; f.layers = 5;
+            auto cb = f.callbacks();
+            cb.layerColourIndex = [](int layer) { return 7 - layer; };
+            LiveState s; s.setCallbacks(cb);
+            expectEquals(s.getLayerCount(), 5);
+            expectEquals(s.getLayerColourIndex(0), 7);
+            expectEquals(s.getLayerColourIndex(2), 5);
+            f.layers = 2;
+            expectEquals(s.getLayerCount(), 2, "the count is read live, not cached");
+        }
     }
 };
 

@@ -37,6 +37,7 @@ target_sources(mu-core-tests PRIVATE
     MidiFullPresetMapTests.cpp
     PerformanceFileTests.cpp
     LiveStateTests.cpp
+    ControlAttachmentTests.cpp
     SwapTimingTests.cpp
     LegacyPrefixTests.cpp
     SegmentControlTests.cpp

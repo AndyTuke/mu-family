@@ -22,6 +22,7 @@
 param(
     [string]$Path,
     [string]$ChromeList,
+    [string]$ControlPath,
     [switch]$Quiet
 )
 
@@ -52,6 +53,13 @@ $includePlugin  = [regex]'#\s*include\s*[<"][^">]*\bmu-(clid-midi|clid|tant|toni
 $pluginNs       = [regex]'\bmu_(clid_midi|clid|tant|toni|on)::'
 $includeControl = [regex]'#\s*include\s*[<"][^">]*\bmu-control\b'
 $blockComment   = [regex]'(?s)/\*.*?\*/'
+# mu-control is the device layer above mu-core: it may use the control interfaces (ControlAction, ControlSink,
+# LiveView, ControlAttachment, SurfaceLook) but never the processor, the editor shell, the shell backend or any
+# mu-core UI header, so a manager can run over any sink and view (a hub, a one-instance host).
+$includeShell   = [regex]'#\s*include\s*[<"][^">]*\b(ProcessorBase|ProcessorCore|EditorShellBase|ShellBackend)\.h'
+$includeCoreUi  = [regex]'#\s*include\s*[<"](mu-core/)?UI/'
+# A device folder (Devices/) turns bytes into SurfaceEvents and LedStates and knows nothing of mappings or the model.
+$includeSurfaceBrain = [regex]'#\s*include\s*[<"][^">]*\bSurface(Mapping|Model)\.h'
 
 # Blank a block comment but keep its newlines, so line numbers after it stay accurate.
 $blankBlock = [System.Text.RegularExpressions.MatchEvaluator] {
@@ -59,15 +67,19 @@ $blankBlock = [System.Text.RegularExpressions.MatchEvaluator] {
     $m.Value -replace '[^\r\n]+', ''
 }
 
-# Libraries to guard. mu-control (controller drivers, planned) sits above mu-core: it may use mu-core
-# but, like mu-core, must not depend on a plugin; mu-core must never depend on it. It is scanned
+# Libraries to guard. mu-control (controller drivers) sits above mu-core: it may use mu-core
+# but, like mu-core, must not depend on a plugin, a processor, the shell or mu-core UI; mu-core must never depend on it. It is scanned
 # only once the folder exists, and never when -Path points at one tree.
-$roots = @(@{ Name = 'mu-core'; Dir = $Path; ForbidControl = $true })
+$roots = @(@{ Name = 'mu-core'; Dir = $Path; ForbidControl = $true; IsControl = $false })
 if ($PSBoundParameters.ContainsKey('Path') -eq $false) {
     $controlDir = Join-Path $repoRoot 'mu-control'
     if (Test-Path -LiteralPath $controlDir -PathType Container) {
-        $roots += @{ Name = 'mu-control'; Dir = $controlDir; ForbidControl = $false }
+        $roots += @{ Name = 'mu-control'; Dir = $controlDir; ForbidControl = $false; IsControl = $true }
     }
+}
+# -ControlPath scans another tree as mu-control (the self-test uses it, with -Path on a fixture mu-core).
+if ($ControlPath) {
+    $roots += @{ Name = 'mu-control'; Dir = $ControlPath; ForbidControl = $false; IsControl = $true }
 }
 
 $total = 0
@@ -81,6 +93,9 @@ foreach ($root in $roots) {
         $text    = [System.IO.File]::ReadAllText($file.FullName)
         $cleaned = $blockComment.Replace($text, $blankBlock) -replace '//.*', ''
         $rel     = Get-RepoRelativePath $file.FullName
+        # Devices/ is judged relative to the library root, so a fixture tree behaves like the real one.
+        $relToRoot = $file.FullName.Substring((Resolve-Path -LiteralPath $root.Dir).Path.TrimEnd([char]92, '/').Length).Replace([string][char]92, '/')
+        $isDevice = $root.IsControl -and $relToRoot -match '^/Devices/'
 
         $lineNo = 0
         foreach ($line in ($cleaned -split "\r?\n")) {
@@ -95,6 +110,16 @@ foreach ($root in $roots) {
             if ($pluginNs.IsMatch($line)) {
                 if (-not $Quiet) { Write-Host "  [FAIL] ${rel}:${lineNo} — $($root.Name) references a plugin namespace: $snippet" }
                 $fails++
+            }
+            if ($root.IsControl) {
+                if ($includeShell.IsMatch($line) -or $includeCoreUi.IsMatch($line)) {
+                    if (-not $Quiet) { Write-Host "  [FAIL] ${rel}:${lineNo} — mu-control includes a processor, shell or mu-core UI header: $snippet" }
+                    $fails++
+                }
+                if ($isDevice -and $includeSurfaceBrain.IsMatch($line)) {
+                    if (-not $Quiet) { Write-Host "  [FAIL] ${rel}:${lineNo} — a Devices/ file includes the mapping or the model (a driver knows wire bytes only): $snippet" }
+                    $fails++
+                }
             }
             if ($root.ForbidControl -and $includeControl.IsMatch($line)) {
                 if (-not $Quiet) { Write-Host "  [FAIL] ${rel}:${lineNo} — mu-core includes mu-control (the dependency must be mu-control -> mu-core): $snippet" }

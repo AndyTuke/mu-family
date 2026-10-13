@@ -1433,10 +1433,10 @@ and nothing else of the family; the only `mu-core` types it names are `ControlAc
 | Folder | Holds |
 |---|---|
 | `Surface/` | The device-independent half: `SurfaceDescription.h`, `SurfaceEvent.h` (control id, press/release/value event, LED state), `SurfaceMapping.{h,cpp}`, `SurfaceModel.{h,cpp}` (including the blink animation) |
-| `Driver/` | The port-facing half: `SurfaceDriver.h` (the interface), `DevicePorts.h` (the byte pipe the driver talks to), `JuceDevicePorts.{h,cpp}` (the real ports, M3) |
+| `Driver/` | The port-facing half: `SurfaceDriver.h` (the interface), `DevicePorts.h` (the byte pipe the driver talks to; M2), `JuceDevicePorts.{h,cpp}` (the real ports, M3) |
 | `Devices/<Device>/` | One folder per device family. `Devices/LaunchpadX/`: `LaunchpadXProtocol.{h,cpp}` (pure byte encode and decode, no ports), `LaunchpadXPalette.h` (hue name to bright and dim colour), `LaunchpadXDriver.{h,cpp}` |
 | `Manager/` | `ControllerManager.{h,cpp}` (discovery, hot-plug, lifetime, the refresh timer; implements `mu_core::ControlAttachment`) and `ControlRegistration.cpp` (item 4) |
-| `Tests/` | `mu-control-tests` and its test-only helpers (`MockGridDriver.h`, `FakeDevicePorts.h`, `FakeLiveView.h`, `FakeControlSink.h`) |
+| `Tests/` | `mu-control-tests` and its test-only helpers (`MockGridDriver.h`, `FakeDevicePorts.h` (M2), `FakeLiveView.h`, `FakeControlSink.h`) |
 
 File = class; the four parts of design-launchpad §3.1 are named **`SurfaceDriver`, `SurfaceDescription`, `SurfaceMapping`, `SurfaceModel`** (`Surface` is
 reserved for this library, [design-naming.md](design-naming.md)); a device driver is `<Device>Driver` (`LaunchpadXDriver`, later `LaunchpadMiniDriver`,
@@ -1463,7 +1463,7 @@ a controller. So `mu-core` owns the **slot** and `mu-control` fills it:
   `using ControlAttachmentFactory = std::function<std::unique_ptr<ControlAttachment>(ControlSink&, const LiveView&, const SurfaceLook&, const juce::File& settingsFolder)>;`
   with `ControlAttachmentFactory& controlAttachmentFactory()` (a function-local static, empty by default, so there is no initialisation-order hazard).
 - `mu-core/Control/SurfaceLook.h` (new, plain data, no UI include): the colours and timings a surface needs, filled by the shell from the same tokens the screen uses
-  (`MuLookAndFeel::layerPalette`, the app accent, `indicatorFault`, `Lighting::padDimScale`, `queuedPulseHz`, `clipMutedFlashHz`, `stepFlashMs`): `{ std::array<uint32_t, 8> layerRgb; uint32_t accentRgb, faultRgb; float dimScale, pulseHz, flashHz; int stepFlashMs; }`.
+  (`MuLookAndFeel::layerPalette`, the app accent, `indicatorFault`, `Lighting::padDimScale`, `queuedPulseHz`, `clipMutedFlashHz` (added to `MuTheme` with the muted light in M5; `SurfaceLook::flashHz` is plain data until then), `stepFlashMs`): `{ std::array<uint32_t, 8> layerRgb; uint32_t accentRgb, faultRgb; float dimScale, pulseHz, flashHz; int stepFlashMs; }`.
   This is how `mu-control` gets screen colours with **no `mu-core/UI` include** and the pad stays the same colour as its layer on screen (design-launchpad §3.2b).
 - The processor holds a **non-owning** `ControlAttachment*` (`ProcessorBase::setControlAttachment`, cleared before the attachment is destroyed) and `ShellBackend`
   gains a defaulted `ControlAttachment* getControlAttachment() const` (nullptr), so `StandardSettingsOverlay` shows the "Controller" group (§14) when it is non-null.
@@ -1502,7 +1502,7 @@ Hot-plug uses `juce::MidiDeviceListConnection`. `release()` closes the session a
 Performance mode is already on, reopens. A crash leaves the device in Programmer mode until it is unplugged (accepted, R1).
 
 **7. Boundary, enforced.** `check-core-boundary.ps1` already scans `mu-control/` for plugin includes and plugin namespaces, and `mu-core` for `mu-control`
-includes. Add (test-steward / coder): a `mu-control` file must not include `ProcessorBase.h`, `ProcessorCore.h`, `EditorShellBase.h`, `ShellBackend.h` or any
+includes. Done in `check-core-boundary.ps1` 2026-10-13 except the `Surface/`/`Manager/` to `Devices/` rule, which lands with the first `Devices/` file (M2). The rules: a `mu-control` file must not include `ProcessorBase.h`, `ProcessorCore.h`, `EditorShellBase.h`, `ShellBackend.h` or any
 `mu-core/UI/` header, so "depends only on `ControlSink` and `LiveView`" is checked, not remembered; and a file under `Surface/` or `Manager/` must not include
 anything under `Devices/`, while `Devices/` must not include `Surface/SurfaceMapping.h` or `SurfaceModel.h`.
 

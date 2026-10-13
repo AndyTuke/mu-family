@@ -67,6 +67,10 @@ option(MUFAMILY_DEPLOY_TESTERS "Deploy Release artefacts to the OneDrive tester 
 # a stage boundary uses the default OFF, which increments the number by exactly 1.
 option(MUFAMILY_FOCUSED_BUILD "Build without incrementing the build number (focused work on 1-2 apps)" OFF)
 
+# Controller support (mu-control). The library and its tests are always built; this only decides whether the
+# standalone apps link it (via mu_control_attach). OFF until the Launchpad X is accepted on the hardware.
+option(MUFAMILY_WITH_CONTROL "Link mu-control (hardware controller support) into the standalone apps" OFF)
+
 # ── Family-wide version metadata ────────────────────────────────────────────
 # Read the current build number at configure time so PLUGIN_VERSION in every
 # juce_add_plugin call reflects the real release number rather than the cmake
@@ -148,6 +152,7 @@ endif()
 
 # ── Subdirectories ──────────────────────────────────────────────────────────
 add_subdirectory(mu-core)
+add_subdirectory(mu-control)   # controller drivers, mapping and surface model (INTERFACE library + tests); depends on mu-core only
 add_subdirectory(mu-clid)
 add_subdirectory(mu-clid-midi) # mu-Clid MIDI: Euclidean MIDI effect (VST3 + CLAP); needs mu-clid's increment_build_number target
 add_subdirectory(mu-tant)     # wavetable drone synth (Standalone + VST3 + CLAP)
