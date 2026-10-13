@@ -9,7 +9,7 @@
 
 // The Performance chooser screen (docs/design-ui-family.md 12.5): the saved performances on the left,
 // the working copy's eight item rows on the right (number lamp, name, product, Replace / Up / Down /
-// Remove, or "+ Preset" on an empty row), New / Save / Rename / Delete in the header and Close / Use in
+// Remove, or "+ Preset" on an empty row), New / Save / Rename / Delete in the header and Close / Load in
 // the footer. It edits through mu_ui::perf::PerformanceChooserModel; the owner (ShellChrome) shows it as a page,
 // opens the Preset Browser in pick mode when asked for a preset, and puts the list into use. Reachable
 // only with Performance mode off. Processor-free.
@@ -96,7 +96,7 @@ private:
     juce::ListBox      listBox;
     std::array<std::unique_ptr<Row>, perf::PerformanceChooserModel::kItems> rows;
     juce::TextButton   newBtn { "New" }, saveBtn { "Save" }, renameBtn { "Rename" }, deleteBtn { "Delete" };
-    juce::TextButton   closeBtn { "Close" }, useBtn { "Use" };
+    juce::TextButton   closeBtn { "Close" }, useBtn { "Load" };
     SaveDialog         saveDialog;
     bool               useAfterSave = false;   // the Save card was opened by Use on an unsaved list
 };

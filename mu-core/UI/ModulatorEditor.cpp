@@ -35,7 +35,7 @@ void ModulatorEditor::AssignmentRow::resized()
     const int numW = s(20), removeW = s(22);
     // The destination selector stops growing at a readable width; the amount slider and curve knob take the rest.
     const int minPairW = s(BipolarSliderRow::kDepthWidth) + s(2) + s(BipolarSliderRow::kCurveWidth);
-    const int destW = juce::jmin(s(MuLookAndFeel::kModDestMaxW), w - numW - minPairW - removeW - s(8));
+    const int destW = juce::jmax(0, juce::jmin(s(MuLookAndFeel::kModDestMaxW), w - numW - minPairW - removeW - s(8)));
     const int pairW = w - numW - destW - removeW - s(8);
     destCombo  .setBounds(numW + s(2),                                 0, destW,  h);
     bipolarPair.setBounds(numW + s(2) + destW + s(2),                  0, pairW,  h);

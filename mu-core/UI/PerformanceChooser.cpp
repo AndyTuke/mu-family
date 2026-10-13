@@ -110,6 +110,7 @@ void PerformanceChooser::Row::paint(juce::Graphics& g)
 PerformanceChooser::PerformanceChooser()
 {
     listBox.setModel(this);
+    listBox.setTooltip("Saved performances: click one to open it, then press Load to use it in Performance mode");
     listBox.setRowHeight(mu_ui::s(MuLookAndFeel::kPerfListRowH));
     listBox.setColour(juce::ListBox::backgroundColourId, MuLookAndFeel::colour(Id::panelBackground));
     addAndMakeVisible(listBox);

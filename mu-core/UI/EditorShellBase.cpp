@@ -245,35 +245,24 @@ void EditorShellBase::showSupportPrompt(bool userRequested)
 
     supportDialogOpen = true;
 
-    // "Don't show this again" row: only on the automatic prompt. A user-requested reopen
-    // omits it, since they came here on purpose.
+    // There is no way to switch the prompt off for good: Maybe later only dismisses it for this session.
     enum { maybeLater = 0, enterKey = 1, pay = 2 };
     auto* dlg = new mu_ui::ModalDialog();
-    juce::ToggleButton* hideTick = nullptr;
     dlg->width(400)
         .title("Support " + productDisplayName)
         .message(productDisplayName + " is free to use, with every feature. If it's useful to you, "
                  "you can pay what you like (suggested \xC2\xA3" "20, \xC2\xA3" "0 is fine). You'll get "
                  "a licence key, and it helps me keep building these.")
         .icon(mu_ui::ModalDialog::Icon::Info);
-    if (! userRequested)
-    {
-        auto tick = std::make_unique<juce::ToggleButton>("Don't show this again");
-        hideTick = tick.get();
-        dlg->content(std::move(tick), 20);
-    }
     dlg->button("Maybe later", maybeLater).button("Enter licence key", enterKey)
         .button("Pay what you like", pay, true).cancelResult(maybeLater);
 
     juce::Component::SafePointer<EditorShellBase> safe(this);
-    juce::Component::SafePointer<juce::ToggleButton> safeTick(hideTick);
-    dlg->onResult = [safe, safeTick](int result)
+    dlg->onResult = [safe](int result)
     {
         auto* shell = safe.getComponent();
         if (shell == nullptr) return;
         shell->supportDialogOpen = false;
-        if (safeTick != nullptr && safeTick->getToggleState())
-            shell->processorRef.setSupportPromptHidden(true);   // on any button, per the ruling
         if (result == enterKey)
             shell->showActivation(true);
         else if (result == pay)
