@@ -209,9 +209,10 @@ struct ClidLayerStructureTests : juce::UnitTest
         bool relToEnd   = false;   // the engine plays the sample through instead of releasing
         bool running    = false;   // a host transport runs after the reset, so the new rhythm hits
         bool tiedAfter  = false;   // after the blocks, fire a tied (pattern-legato) hit by hand
+        bool tiedMid    = false;   // fire the tied hit 20 blocks into the release instead
     };
 
-    struct HeldResult { float peak = 0.0f; float maxPeak = 0.0f; int audioAllocs = 0; };
+    struct HeldResult { float peak = 0.0f; float maxPeak = 0.0f; int audioAllocs = 0; float beforeTie = 0.0f; float afterTie = 0.0f; };
 
     // A hit's amp envelope sits at sustain until the next trigger, so a held sample note keeps sounding
     // through a reset (the engine stays) unless the reset tells it to release. Runs `blocks` blocks after
@@ -267,7 +268,18 @@ struct ClidLayerStructureTests : juce::UnitTest
         res.maxPeak = 0.0f;
         alloc_count::count = 0;
         alloc_count::counting = true;
-        run(blocks);
+        if (c.tiedMid)
+        {
+            // Mid-release: a tied hit must neither retrigger the envelope nor lift the level.
+            run(20);
+            res.beforeTie = p.mixerEngine.channelPeaks[1].load();
+            p.voiceEngines[1]->trigger(false, true);
+            run(1);
+            res.afterTie = p.mixerEngine.channelPeaks[1].load();
+            run(blocks - 21);
+        }
+        else
+            run(blocks);
         alloc_count::counting = false;
         res.audioAllocs = alloc_count::count;
         p.setPlayHead(nullptr);
@@ -311,6 +323,15 @@ struct ClidLayerStructureTests : juce::UnitTest
         HeldCase tied;   tied.reset = true; tied.tiedAfter = true;
         const auto tiedHit = heldNote(tied, kBlocks);
         expect(tiedHit.maxPeak > 0.05f, "the tied hit starts the envelope (largest peak " + juce::String(tiedHit.maxPeak, 3) + ")");
+
+        beginTest("a tied hit 20 blocks into the release keeps decaying: no new attack");
+        HeldCase mid;   mid.reset = true; mid.tiedMid = true;
+        const auto midHit = heldNote(mid, kBlocks);
+        expect(midHit.beforeTie > 0.0f && midHit.beforeTie < 0.4f, "the note is part-way through its release (peak " + juce::String(midHit.beforeTie, 3) + ")");
+        // The tied hit adds a second sample voice under the same decaying envelope, so at most twice the level;
+        // a retriggered envelope would instead stop decaying, which the final check catches.
+        expect(midHit.afterTie <= 2.1f * midHit.beforeTie, "the tied hit adds no attack (" + juce::String(midHit.beforeTie, 3) + " to " + juce::String(midHit.afterTie, 3) + ")");
+        expect(midHit.peak < 1.0e-3f, "the release still runs to silence (peak " + juce::String(midHit.peak, 5) + ")");
     }
 
     void lastLayerStays()
