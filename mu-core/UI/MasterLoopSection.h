@@ -28,11 +28,11 @@ public:
     static constexpr int kPad        = 6;
     static constexpr int kLabelGap   = 2;
     static constexpr int kLoopLabelW = 30;
-    static constexpr int kLoopDropW  = 76;
+    static constexpr int kLoopDropW  = 92;   // fits "256 steps"
     static constexpr int kLoopCountW = 50;
     static constexpr int kGroupGap   = 6;
-    static constexpr int kSwapLabelW = 32;
-    static constexpr int kSwapDropW  = 96;
+    static constexpr int kSwapLabelW = 38;   // fits "Swap:"
+    static constexpr int kSwapDropW  = 116;  // fits "On master loop" / "On rhythm loop"
 
     // One timing the product offers, with its own wording ("On rhythm loop" in mu-Clid, "On voice loop" in mu-Tant).
     struct SwapChoice { mu_hotswap::SwapTiming timing; juce::String text; };
