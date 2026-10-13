@@ -180,6 +180,9 @@ public:
 
         // Status lamps: a fault (e.g. MIDI clock lost) — its own red, not the VU clip red.
         indicatorFault          = 0x100000d7,
+        // Destructive dialog button (Warning-icon ModalDialog primary): dark red fill;
+        // its border and text use indicatorFault.
+        buttonDangerBg          = 0x100000d8,
 
         // ── Modulator label colours A–H ───────────────────────────────────
         // Named tokens for the per-modulator label palette so that all colour
@@ -361,6 +364,11 @@ public:
     static constexpr int kLayerContentH     = kChannelPanelH - kLayerHeaderStripH - kLayerModulatorH;   // 464
     static_assert(kLayerHeaderStripH + kLayerContentH + kLayerModulatorH == kChannelPanelH,
                   "layer panel bands must fill the channel panel");
+
+    // ModalDialog header icon (design-ui-family section 5): vector box, gap to the title, stroke.
+    static constexpr int   kDialogIconSize   = 26;
+    static constexpr int   kDialogIconGap    = 6;
+    static constexpr float kDialogIconStroke = 1.6f;
 
     // mu-Clid's content band: sample bar (the strip height) + circle row + voice band = 464.
     static constexpr int kVoiceSectionH   = 144;

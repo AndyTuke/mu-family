@@ -164,6 +164,7 @@ struct MuTheme
         juce::Colour grMeterBg         { 0xff111111 };  // GRMeter strip background
         juce::Colour grMeterBar        { 0xaa7799cc };  // semi-transparent blue-grey bar
         juce::Colour fault             { 0xffE24B4A };  // status lamp: a fault (clock lost)
+        juce::Colour buttonDangerBg    { 0xff2B0E0D };  // destructive dialog button fill (4.5:1 under fault text) (border/text use fault)
     } indicators;
 
     // ── Mixer overlay extras ──────────────────────────────────────────────
