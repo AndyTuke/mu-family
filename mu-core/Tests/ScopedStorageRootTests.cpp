@@ -9,15 +9,15 @@ namespace
     struct StorageProcessor : TestProcessorBase
     {
         StorageProcessor() : TestProcessorBase(WrapperType::wrapperType_Undefined) {}
-        void init(const juce::String& name) { initAppSettings(name); }
+        void init(const juce::String& probeName) { initAppSettings(probeName); }
         void saveSomething() { appSettings->setValue("probe", 1); appSettings->saveIfNeeded(); }
     };
 
     // Where initAppSettings would write without a root: the real per-user settings file.
-    juce::File realSettingsFile(const juce::String& name)
+    juce::File realSettingsFile(const juce::String& probeName)
     {
         juce::PropertiesFile::Options opts;
-        opts.applicationName     = name;
+        opts.applicationName     = probeName;
         opts.filenameSuffix      = "xml";
         opts.folderName          = "TDP";
         opts.osxLibrarySubFolder = "Application Support";
@@ -31,8 +31,8 @@ struct ScopedStorageRootTests : juce::UnitTest
 
     void runTest() override
     {
-        const juce::String name = "mu-test-storage-root";
-        const auto real = realSettingsFile(name);
+        const juce::String probeName = "mu-test-storage-root";
+        const auto real = realSettingsFile(probeName);
         const auto root = juce::File::getSpecialLocation(juce::File::tempDirectory)
                               .getChildFile("mu-storage-root-test-" + juce::String::toHexString(juce::Random().nextInt64()));
 
@@ -42,19 +42,19 @@ struct ScopedStorageRootTests : juce::UnitTest
             StorageProcessor p;
             {
                 ProcessorBase::ScopedStorageRoot scope(root);
-                p.init(name);
+                p.init(probeName);
                 p.saveSomething();
-                expect(root.getChildFile("settings").getChildFile(name + ".xml").existsAsFile(),
+                expect(root.getChildFile("settings").getChildFile(probeName + ".xml").existsAsFile(),
                        "settings file is under <root>/settings");
                 expectEquals(p.getContentDir().getFullPathName(),
-                             root.getChildFile("content").getChildFile(name).getFullPathName());
+                             root.getChildFile("content").getChildFile(probeName).getFullPathName());
                 expect(! real.existsAsFile(), "the real settings file was not created");
             }
 
             beginTest("After the root is destroyed the default content dir is restored");
             expectEquals(p.getContentDir().getFullPathName(),
                          juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
-                             .getChildFile("TDP").getChildFile(name).getFullPathName());
+                             .getChildFile("TDP").getChildFile(probeName).getFullPathName());
             expect(! real.existsAsFile(), "still no real settings file");
         }
 
