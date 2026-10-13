@@ -68,8 +68,10 @@ void ModMatrixPanel::MatrixRow::resized()
     using mu_ui::s;
     const int w = getWidth(), h = getHeight();
     const int removeW = s(22), srcW = s(46);
-    const int pairW = s(BipolarSliderRow::kDepthWidth) + s(2) + s(BipolarSliderRow::kCurveWidth);
-    const int destW = w - srcW - pairW - removeW - s(8);
+    // The destination selector stops growing at a readable width; the amount slider and curve knob take the rest.
+    const int minPairW = s(BipolarSliderRow::kDepthWidth) + s(2) + s(BipolarSliderRow::kCurveWidth);
+    const int destW = juce::jmin(s(MuLookAndFeel::kModDestMaxW), w - srcW - minPairW - removeW - s(8));
+    const int pairW = w - srcW - destW - removeW - s(8);
     sourceLabel.setBounds(0,                                          0, srcW,  h);
     destCombo  .setBounds(srcW + s(2),                                   0, destW, h);
     bipolarPair.setBounds(srcW + s(2) + destW + s(2),                       0, pairW, h);

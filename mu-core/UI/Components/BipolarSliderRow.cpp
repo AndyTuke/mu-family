@@ -48,8 +48,8 @@ void BipolarSliderRow::resized()
 {
     using mu_ui::s;
     const int h = getHeight();
-    const int dW = s(kDepthWidth);
     const int cW = s(kCurveWidth);
+    const int dW = juce::jmax(s(kDepthWidth), getWidth() - cW - s(2));   // the amount slider takes whatever the row offers
     depthSlider.setBounds(0,        0, dW, h);
     curveSlider.setBounds(dW + s(2), 0, cW, h);
 }

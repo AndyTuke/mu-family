@@ -33,8 +33,10 @@ void ModulatorEditor::AssignmentRow::resized()
     using mu_ui::s;
     const int w = getWidth(), h = getHeight();
     const int numW = s(20), removeW = s(22);
-    const int pairW = s(BipolarSliderRow::kDepthWidth) + s(2) + s(BipolarSliderRow::kCurveWidth);
-    const int destW = w - numW - pairW - removeW - s(8);
+    // The destination selector stops growing at a readable width; the amount slider and curve knob take the rest.
+    const int minPairW = s(BipolarSliderRow::kDepthWidth) + s(2) + s(BipolarSliderRow::kCurveWidth);
+    const int destW = juce::jmin(s(MuLookAndFeel::kModDestMaxW), w - numW - minPairW - removeW - s(8));
+    const int pairW = w - numW - destW - removeW - s(8);
     destCombo  .setBounds(numW + s(2),                                 0, destW,  h);
     bipolarPair.setBounds(numW + s(2) + destW + s(2),                  0, pairW,  h);
     removeBtn  .setBounds(w - removeW, (h - s(18)) / 2, removeW, s(18));

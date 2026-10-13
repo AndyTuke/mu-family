@@ -152,7 +152,10 @@ private:
 
     void setExitFill(float progress);
     void refreshIndication();
-    void showTimedStatus(const juce::String& name, const juce::String& value);
+    void showTimedStatus(const juce::String& name, const juce::String& value, int ms = MuLookAndFeel::kPerfStatusMs);
+
+    // Dropdown id of the "Performances..." entry (preset ids are positions in the file list, far below this).
+    static constexpr int kPerformancesItemId = 100000;
     void updatePresetGroupVisibility();
 
     static constexpr int kLogoW      = 88;

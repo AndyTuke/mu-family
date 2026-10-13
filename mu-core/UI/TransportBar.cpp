@@ -83,6 +83,13 @@ TransportBar::TransportBar(mu_core::ShellBackend& backend)
     presetDropdown.setPlaceholderText("<unnamed preset>");
     presetDropdown.onChange = [this](int id)
     {
+        // The last item opens the Performance chooser; the dropdown keeps showing the loaded preset.
+        if (id == kPerformancesItemId)
+        {
+            setLoadedPreset(getLoadedPresetFile());
+            if (onChoosePerformance) onChoosePerformance();
+            return;
+        }
         int idx = id - 1;
         if (idx >= 0 && idx < (int)presetFiles.size())
         {
@@ -123,7 +130,14 @@ TransportBar::TransportBar(mu_core::ShellBackend& backend)
     perfBtn.setTooltip("Performance mode (Ctrl+P)");
     perfBtn.onClick       = [this] { if (! perfBtn.suppressClick && ! modeShown) enterPerformanceMode(); };
     perfBtn.onHoldPress   = [this] { beginExitHold(juce::Time::getMillisecondCounterHiRes()); };
-    perfBtn.onHoldCancel  = [this] { cancelExitHold(); };
+    perfBtn.onHoldCancel  = [this]
+    {
+        const bool wasHolding = exitHold.isHolding();
+        cancelExitHold();
+        // A release before the hold completed is the usual first try: say how leaving works, for longer than a glance.
+        if (wasHolding && modeShown)
+            showTimedStatus("Performance", "Keep the Perf button pressed for a full second to leave", MuLookAndFeel::kPerfHintMs);
+    };
     addChildComponent(perfBtn);
 
     populatePresetDropdown();
@@ -164,7 +178,7 @@ bool TransportBar::isPerformanceAvailable() const
     return proc.supportsPerformanceMode() && proc.getLiveView() != nullptr && proc.getControlSink() != nullptr;
 }
 
-void TransportBar::showTimedStatus(const juce::String& name, const juce::String& value)
+void TransportBar::showTimedStatus(const juce::String& name, const juce::String& value, int ms)
 {
     if (! onStatusUpdate) return;
     onStatusUpdate(name, value);
@@ -172,7 +186,7 @@ void TransportBar::showTimedStatus(const juce::String& name, const juce::String&
     // Clear it after a few seconds, unless a newer timed line has replaced it.
     const int serial = ++statusSerial;
     juce::Component::SafePointer<TransportBar> safe(this);
-    juce::Timer::callAfterDelay(MuLookAndFeel::kPerfStatusMs, [safe, serial]
+    juce::Timer::callAfterDelay(ms, [safe, serial]
     {
         if (auto* bar = safe.getComponent())
             if (bar->statusSerial == serial && bar->onStatusUpdate) bar->onStatusUpdate({}, {});
@@ -197,6 +211,7 @@ bool TransportBar::enterPerformanceMode()
     action.layer = getEditorLayer ? getEditorLayer() : 0;
     const bool done = proc.getControlSink()->perform(action);
     syncPerformance();
+    if (done) showTimedStatus("Performance", "Hold the Perf button for 1 second to leave", MuLookAndFeel::kPerfHintMs);
     return done;
 }
 
@@ -524,6 +539,13 @@ void TransportBar::populatePresetDropdown()
 {
     mu_ui::fillPresetDropdown(presetDropdown, presetFiles,
                               mu_pp::listPresetsByCategory(proc.getPresetsDir(), proc.getFullPresetExtension()));
+
+    // Where the Performance chooser is reached from: the same entry in every product's dropdown.
+    if (isPerformanceAvailable() && onChoosePerformance)
+    {
+        presetDropdown.addSectionHeading("Performance");
+        presetDropdown.addItem("Performances...", kPerformancesItemId);
+    }
 }
 
 void TransportBar::refreshPresets()

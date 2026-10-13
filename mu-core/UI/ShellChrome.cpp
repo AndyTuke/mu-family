@@ -131,6 +131,7 @@ void ShellChrome::wirePerformanceChooser()
     presetBrowser.onChoosePerformance = [this] { showPerformanceChooser(); };
     presetBrowser.refreshFooter();
     transportBar.onChoosePerformance = [this] { showPerformanceChooser(); };
+    transportBar.refreshPresets();   // the dropdown gains its "Performances..." entry
 }
 
 void ShellChrome::showPerformanceChooser()

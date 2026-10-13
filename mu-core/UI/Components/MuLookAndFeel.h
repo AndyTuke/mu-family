@@ -715,6 +715,8 @@ public:
     static constexpr int kPerfRimH       = 2;
     static constexpr int kPerfExitHoldMs = 1000;
     static constexpr int kPerfStatusMs   = 3000;
+    static constexpr int kModDestMaxW    = 240;    // widest a modulation row's destination selector grows; the amount slider takes the rest
+    static constexpr int kPerfHintMs     = 8000;   // how long the 'how to leave' hint stays on the status line
     static constexpr int kStepLampPitch  = 11;
     static constexpr int kStepGap        = 4;
     static constexpr int kStepGhostMinW  = 36;   // narrower than this the ghost text is left out, not shown as a stub
