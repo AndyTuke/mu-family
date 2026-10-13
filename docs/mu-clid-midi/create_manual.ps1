@@ -66,7 +66,7 @@ P "mu-Clid MIDI is free, with no licence key and no limits. It is the new name o
 P "mu-Clid MIDI has its own icon, a glowing orange-red ring around a horned alien face, so you can tell it from mu-Clid at a glance in your plug-in list."
 P "It plays one rhythm. For up to eight rhythms, each with its own sample and synth voice, mixer and effects, see mu-Clid. The two use the same Euclidean engine, so a rhythm sounds the same pattern in either."
 
-Pic "The mu-Clid MIDI window: transport bar, rhythm circle, Euclidean panel and the Accent, MIDI Note and Logic controls."
+Pic "The mu-Clid MIDI window: transport bar, rhythm circle, Euclidean panel and the Accent, MIDI Note and Logic controls." "main-window.png"
 
 # ── 2. What is Euclidean Sequencing? ─────────────────────────────────────────
 H1 "2. What is Euclidean Sequencing?"
@@ -98,7 +98,7 @@ Bullet "mu-Clid MIDI logo  —  click it to open the About panel."
 Bullet "Play, BPM and Position  —  show your DAW's play state, tempo and bar position. They follow the host and cannot be edited here."
 Bullet "Loop dropdown  —  the master loop: how many steps the entire pattern runs before it starts again. Choices are the infinity symbol (free-running) or 16 to 256 steps in steps of 16. A counter beside it shows the current step and the loop length."
 
-Pic "Transport bar."
+Pic "Transport bar." "transport-bar.png"
 
 H2 "Rhythm Circle"
 P "The Rhythm Circle shows concentric rings, one per generator: Ring A (outermost, purple), Ring B (coral) and the accent ring (amber, dashed). While your DAW plays, the rings rotate so the current step is at the top. Filled steps are hits. Padded steps are drawn in their own colours, so you can see at a glance where a gap came from."
@@ -130,7 +130,7 @@ Bullet "B∧¬A (B not A) — fires when B fires and A does not"
 H2 "Accent Layer"
 P "The Accent row has no logic relationship with A or B. When the accent ring fires on the same step as a combined A and B hit, that hit is accented, and is sent with a higher velocity (see MIDI Output)."
 
-Pic "The Euclidean panel with its three rows."
+Pic "The Euclidean panel with its three rows." "euclid-panel.png"
 
 # ── 7. MIDI Output ───────────────────────────────────────────────────────────
 H1 "7. MIDI Output"

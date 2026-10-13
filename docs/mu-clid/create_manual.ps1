@@ -104,8 +104,8 @@ Bullet "Pay what you like  —  opens the checkout page in your web browser. The
 P "Tick 'Don't show this again' to stop the window appearing. You can still support mu-Clid at any time from the Support link at the right of the Status Bar, or from the Support button in the About panel."
 P "To enter a key, click the mu-Clid logo to open the About panel, click Enter a key, paste in your key, then click Activate. If you do not have a key yet, click Get a key beside Activate to open the pay-what-you-like page in your web browser. Once a key is accepted, the About panel shows 'Thank you for your support' and the Support prompt no longer appears. The key changes nothing else: mu-Clid works the same with or without it."
 
-Pic "Support mu-Clid window with its three buttons and the Don't show this again tick box."
-Pic "About panel showing the Support and Enter a key buttons."
+Pic "Support mu-Clid window with its three buttons and the Don't show this again tick box." "support-prompt.png"
+Pic "About panel showing the Support and Enter a key buttons." "about-panel.png"
 
 # ── 4. Interface Overview ─────────────────────────────────────────────────────
 H1 "4. Interface Overview"
