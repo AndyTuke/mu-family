@@ -59,6 +59,8 @@ short `suspendProcessing` window.
 | [mu-clid/Source/Sequencer/RhythmSequencer.h](../../mu-clid/Source/Sequencer/RhythmSequencer.h) | Emits `BlockResult { rhythmLoopWrapMask, masterLoopWrapped }` and owns the wrap detector. |
 | [mu-core/Audio/MixerEngine.cpp](../../mu-core/Audio/MixerEngine.cpp) | Renders **retired** voice engines (the swap tail) + flags them drained. |
 
+**`HotSwapStager` deliberately stays on `mu_hotswap::Stager`** (decided 2026-10-13). mu-Clid's staged payload is a prebuilt `Rhythm` + `VoiceEngine` plus a full-preset slot, committed with engine install and retire tails; the shared `ProcessorBase::layerSwapper` (`LayerSwapper<ValueTree, 8>`) used by mu-Tant, mu-Toni and mu-On is the APVTS-apply driver and is not a fit. The shared handshake and loop-wrap predicates already come from `mu-core/Plugin/HotSwap.h`, so nothing is duplicated. Do not migrate it to `layerSwapper`; reasoning in [../design-plugin-family.md](../design-plugin-family.md) (stage 7, step 5).
+
 ---
 
 ## 4. Threading contract
