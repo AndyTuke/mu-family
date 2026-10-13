@@ -172,8 +172,12 @@ public:
         eqScratch.setSize(kMaxChannels, maxBlockFrames, false, false, true);
         eqScratch.clear();
         for (auto& mi : masterInsert) mi.prepare(sr, maxBlockFrames);
-        for (auto& p : clientPeakLevel) p.store(0.0f, std::memory_order_relaxed);
+        for (auto& p : clientPeakLevel)  p.store(0.0f, std::memory_order_relaxed);
+        for (auto& p : clientPeakLevelL) p.store(0.0f, std::memory_order_relaxed);
+        for (auto& p : clientPeakLevelR) p.store(0.0f, std::memory_order_relaxed);
         masterPeakLevel.store(0.0f, std::memory_order_relaxed);
+        masterPeakLevelL.store(0.0f, std::memory_order_relaxed);
+        masterPeakLevelR.store(0.0f, std::memory_order_relaxed);
 
         // A live client bumps its heartbeat every render-loop pass (sub-millisecond); if a
         // slot's heartbeat is frozen for this many frames it has died without detaching and
@@ -225,6 +229,11 @@ public:
         return clientPeakLevel[slot];
     }
     const std::atomic<float>& masterPeakMeter() const noexcept { return masterPeakLevel; }
+    // The left / right peaks behind the stereo meters (the combined peak above is the larger of the two).
+    const std::atomic<float>& clientPeakMeterL(int slot) const noexcept { assert(validSlot(slot)); return clientPeakLevelL[slot]; }
+    const std::atomic<float>& clientPeakMeterR(int slot) const noexcept { assert(validSlot(slot)); return clientPeakLevelR[slot]; }
+    const std::atomic<float>& masterPeakMeterL() const noexcept { return masterPeakLevelL; }
+    const std::atomic<float>& masterPeakMeterR() const noexcept { return masterPeakLevelR; }
 
     // The hardware device's output latency in frames (any thread; published to every client in the
     // transport so MIDI can be timed to land with the audio). 0 = unknown.
@@ -422,6 +431,8 @@ public:
                 if (reg.slots[slot].active.load(std::memory_order_acquire) == 0)
                 {
                     clientPeakLevel[slot].store(0.0f, std::memory_order_relaxed);   // freed slot meter falls
+                    clientPeakLevelL[slot].store(0.0f, std::memory_order_relaxed);
+                    clientPeakLevelR[slot].store(0.0f, std::memory_order_relaxed);
                     lastHeartbeat[slot] = 0;
                     staleFrames[slot]   = 0;
                     continue;
@@ -442,6 +453,8 @@ public:
                     {
                         reg.slots[slot].active.store(0, std::memory_order_release);   // reap
                         clientPeakLevel[slot].store(0.0f, std::memory_order_relaxed);
+                        clientPeakLevelL[slot].store(0.0f, std::memory_order_relaxed);
+                        clientPeakLevelR[slot].store(0.0f, std::memory_order_relaxed);
                         lastHeartbeat[slot] = 0;
                         staleFrames[slot]   = 0;
                         ++stats.reapedClients;
@@ -476,7 +489,7 @@ public:
                 // channel; otherwise map channel-for-channel (clamped). ch1 = R, else L.
                 // Per-channel constants (source index + gain) are hoisted out of the sample
                 // loop — the inner loop is then a tight multiply-add on the audio thread.
-                float clientPk = 0.0f;
+                float chPk[2] = { 0.0f, 0.0f };   // post-fader peak per output channel (L, R) for the stereo meter
                 if (clientEqActive[slot].load(std::memory_order_relaxed) != 0 && got > 0)
                 {
                     // Armed EQ: de-interleave the client's frames (mono ring feeds every
@@ -503,7 +516,7 @@ public:
                         {
                             const float v = src[i] * g;
                             outCh[i] += v;
-                            clientPk = std::max(clientPk, std::fabs(v));
+                            if (ch < 2) chPk[ch] = std::max(chPk[ch], std::fabs(v));
                         }
                     }
                 }
@@ -519,11 +532,14 @@ public:
                         {
                             const float v = tmp[(std::size_t) i * (std::size_t) rc + (std::size_t) rch] * g;
                             outCh[i] += v;
-                            clientPk = std::max(clientPk, std::fabs(v));
+                            if (ch < 2) chPk[ch] = std::max(chPk[ch], std::fabs(v));
                         }
                     }
                 }
-                clientPeakLevel[slot].store(clientPk, std::memory_order_relaxed);
+                if (chans == 1) chPk[1] = chPk[0];   // a mono device: both bars show the one channel
+                clientPeakLevel[slot] .store(std::max(chPk[0], chPk[1]), std::memory_order_relaxed);
+                clientPeakLevelL[slot].store(chPk[0], std::memory_order_relaxed);
+                clientPeakLevelR[slot].store(chPk[1], std::memory_order_relaxed);
             }
         }
 
@@ -545,15 +561,18 @@ public:
 
         // Apply the master gain + safety soft-clip, then take the block peak for the meter.
         const float masterGain = masterGainLevel.load(std::memory_order_relaxed);
-        float masterPk = 0.0f;
+        float masterPkCh[2] = { 0.0f, 0.0f };   // per output channel (L, R) for the stereo meter
         for (int ch = 0; ch < chans; ++ch)
             for (int i = 0; i < numFrames; ++i)
             {
                 const float v = masterSoftClip(output[ch][i] * masterGain);
                 output[ch][i] = v;
-                masterPk = std::max(masterPk, std::fabs(v));
+                if (ch < 2) masterPkCh[ch] = std::max(masterPkCh[ch], std::fabs(v));
             }
-        masterPeakLevel.store(masterPk, std::memory_order_relaxed);
+        if (chans == 1) masterPkCh[1] = masterPkCh[0];
+        masterPeakLevel .store(std::max(masterPkCh[0], masterPkCh[1]), std::memory_order_relaxed);
+        masterPeakLevelL.store(masterPkCh[0], std::memory_order_relaxed);
+        masterPeakLevelR.store(masterPkCh[1], std::memory_order_relaxed);
 
         // Advance the master by this block and report how many MIDI-clock pulses it crossed, and
         // where: the beat runs linearly across the block, so pulse k lands at the first frame whose
@@ -631,6 +650,10 @@ private:
     std::uint64_t extStaleThresholdFrames = 0;
     std::atomic<float>  clientPeakLevel[kMaxClients];   // latest per-block peak, per slot
     std::atomic<float>  masterPeakLevel { 0.0f };       // latest per-block summed peak
+    std::atomic<float>  clientPeakLevelL[kMaxClients];  // the same, left channel only
+    std::atomic<float>  clientPeakLevelR[kMaxClients];  // and right
+    std::atomic<float>  masterPeakLevelL { 0.0f };
+    std::atomic<float>  masterPeakLevelR { 0.0f };
 
     // Liveness tracking (audio-thread only). A frozen heartbeat for reapThresholdFrames
     // means the client died without detaching → reap its slot.

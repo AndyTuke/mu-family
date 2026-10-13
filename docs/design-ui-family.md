@@ -104,6 +104,8 @@ Three states: **General** (default), **Positive** (confirmation/on), **Warning**
 | `vuMeterPeakHold` | `#FFFFFF` |
 | `vuMeterBackground` | `#111110` |
 
+**Stereo, family-wide.** Every mixer strip's meter (Client, Master, plugin channel, return) is one `VUMeter` drawing two thin bars, L then R, each with its own ballistics, colour zones (same tokens, same scale) and peak-hold tick; one latched clip indicator per bar, a click clears both. `VUMeter` gets a second source `getLevelR`; when it is unset the one source is drawn on both bars, so a mono source needs no special look and the strip layout never changes. The strip meter is a post-fader, post-pan signal, so it is stereo wherever the strip is. Stereo data is a pair of peak atomics per strip (L, R). Bar and slot sizes: `kVUBarW`, `kVUBarGap`, `kVUW` in the Mixer sizing tokens (section 5).
+
 **Status lamps** (`StatusLamp`, §11) — a state is told by colour and lamp strength, never by colour alone (the status bar names it):
 
 | State meaning | Colour token | Lamp strength (`MuTheme::Lighting`) |
@@ -146,7 +148,7 @@ JUCE font. No external typeface dependency.
 | `SegmentControl` (bar style) | fits content | 22–24px | |
 | `SegmentControl` (pills style) | fits content | varies | pill height = component height − 4px |
 | `TextButton` (on/off toggle) | 36px | 22px | Standard enable toggle in FX rows |
-| `VUMeter` | 10px | fills fader height | Always right-adjacent to fader, no gap |
+| `VUMeter` (stereo, two bars) | `kVUW` 14px (2 x `kVUBarW` 6 + `kVUBarGap` 2) | fills fader height | **Beside the fader, not at the strip edge.** The fader slot is `kMixerFaderW` 20px, centred on the strip's vertical axis (the knob column's axis); the meter starts at the slot's right edge, no gap. On strips with a GR meter (`kGRW` 8) the order is fader, GR, VU. One helper in `MixerChannel` places the group for every strip type (overlay, Client, Master); no per-layout copy. If the strip is narrower than the group needs, the fader slot shrinks, never the meter |
 | `StatusBar` | full width | 20px | Bottom chrome |
 | `TransportBar` | full width | 36px | Top chrome |
 | `StatusLamp` (lamp + label) | lamp `kStatusLampD` 8px + `kSpaceXS` + label width | lamp centred in the row | Label 11pt (row label). In the TransportBar its slot is `TransportBar::kClockW` 44px |
@@ -480,6 +482,8 @@ setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appYellow));   // mu-On
 ---
 
 ## Design rulings
+
+- 2026-10-13 — mu-link VU meters hard against the strip's right edge; stereo? (1) Family-wide: the fader slot (`kMixerFaderW` 20) is centred on the strip axis and the meter sits immediately to its right, replacing "fader fills width minus 10, meter at the edge" in all three layouts (overlay, Client, Master), one placement helper. (2) All strip meters are stereo: two bars L / R in one `VUMeter` (`getLevelR`, mono source mirrored), per-bar ballistics and peak-hold, existing colour tokens. (3) New tokens `kVUBarW` 6, `kVUBarGap` 2, `kMixerFaderW` 20 in `MixerChannel.h` beside `kVUW`, which becomes 14 (derived). Data: a second peak atomic per strip in every engine. Changed §3.5, §5 table, mu-link/design-ui.md.
 
 - 2026-10-13 — Standard dropdown size and mu-On's Groove box width as shared tokens? Yes: `kDropdownW` 120, `kDropdownH` 24 and `kGrooveBoxW` 300 live in `MuLookAndFeel` beside `kDropdownEdgeGap`; FXRow, DelayRow, mu-Toni ArpContent and mu-On TrackContent use them, the four local copies and bare `s(24)` are gone; values unchanged. Changed §5 standard control sizes, mu-on/design-ui.md "As built".
 

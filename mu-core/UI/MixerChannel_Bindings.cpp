@@ -125,7 +125,8 @@ void MixerChannel::bindChannel(MixerEngine::ChannelState& state, std::atomic<flo
         }
     }
 
-    vuMeter.getLevel = [&peak] { return peak.load(); };
+    vuMeter.getLevel  = [&peak] { return peak.load(); };
+    vuMeter.getLevelR = nullptr;   // one source drives both bars
     if (grAtomic)
         grMeter.getGR = [grAtomic] { return grAtomic->load(); };
     updateDbLabel(state.level);
@@ -156,7 +157,8 @@ void MixerChannel::bindReturn(MixerEngine::ReturnState& state, std::atomic<float
         bindStripToState(state);
     }
 
-    vuMeter.getLevel = [&peak] { return peak.load(); };
+    vuMeter.getLevel  = [&peak] { return peak.load(); };
+    vuMeter.getLevelR = nullptr;   // one source drives both bars
     if (grAtomic)
         grMeter.getGR = [grAtomic] { return grAtomic->load(); };
     updateDbLabel(state.level);
@@ -190,7 +192,8 @@ void MixerChannel::bindMaster(MixerEngine& engine, ProcessorBase* proc)
         panKnob.onValueChanged = [&engine](double v) { engine.masterPan.store((float)v, std::memory_order_relaxed); };
     }
 
-    vuMeter.getLevel = [&engine] { return engine.masterPeak.load(); };
+    vuMeter.getLevel  = [&engine] { return engine.masterPeak.load(); };
+    vuMeter.getLevelR = nullptr;
     updateDbLabel(engine.masterLevel.load(std::memory_order_relaxed));
 }
 

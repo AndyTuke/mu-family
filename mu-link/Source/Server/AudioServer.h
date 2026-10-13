@@ -98,6 +98,10 @@ public:
     float masterPeak()         const noexcept { return engine.masterPeak(); }
     const std::atomic<float>& clientPeakMeter(int slot) const noexcept { return engine.clientPeakMeter(slot); }
     const std::atomic<float>& masterPeakMeter() const noexcept { return engine.masterPeakMeter(); }
+    const std::atomic<float>& clientPeakMeterL(int slot) const noexcept { return engine.clientPeakMeterL(slot); }
+    const std::atomic<float>& clientPeakMeterR(int slot) const noexcept { return engine.clientPeakMeterR(slot); }
+    const std::atomic<float>& masterPeakMeterL() const noexcept { return engine.masterPeakMeterL(); }
+    const std::atomic<float>& masterPeakMeterR() const noexcept { return engine.masterPeakMeterR(); }
 
     // Per-client mixer strip + master, driven by the GUI.
     void setClientGain(int slot, float g) noexcept { engine.setClientGain(slot, g); }

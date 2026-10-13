@@ -89,6 +89,8 @@ public:
     void setClientMuteSolo(bool muted, bool soloed);
     // The meter reads this peak (0..1 linear per block), like the other strips.
     void bindClientMeter(const std::atomic<float>& peak);
+    // Stereo form: left and right peaks drive the two bars.
+    void bindClientMeter(const std::atomic<float>& peakL, const std::atomic<float>& peakR);
     KnobWithLabel& getClientEqKnob(ClientEq band) { return clientEq[(size_t) band]; }
     // Fader readout: one decimal, no unit ("0.0", "-6.0", "+3.5", "-inf").
     static juce::String formatClientDb(float linearLevel);
@@ -109,6 +111,7 @@ public:
     void useCallbackMaster();                               // switch this Master to callback mode
     void setMasterLevel(float linear);
     void bindMasterMeter(const std::atomic<float>& peak) { bindClientMeter(peak); }
+    void bindMasterMeter(const std::atomic<float>& peakL, const std::atomic<float>& peakR) { bindClientMeter(peakL, peakR); }
     // Top of the fader, in this strip's pixels, so the master fader lines up with the Client faders.
     // A negative value (the default) puts it just under the name.
     void setFaderTop(int topPx) { faderTopPx = topPx; resized(); }
@@ -156,6 +159,11 @@ private:
 
     juce::Slider      fader;
     VUMeter           vuMeter;
+
+    // Places the fader slot (centred on the strip's axis), the optional GR meter and the stereo VU
+    // meter beside it, over [y, y+h). One rule for the Rhythm, Client and Master layouts. When the
+    // group is wider than the strip the fader slot shrinks, never the meters.
+    void placeFaderAndMeters(int stripW, int y, int h, bool withGR);
     GRMeter           grMeter;
     juce::Label       dbLabel;
     juce::TextButton  muteBtn { "M" };
@@ -195,7 +203,11 @@ private:
     static constexpr int kOutBusH    = 18;   // Out dropdown row (Rhythm channels only)
     static constexpr int kDbH        = 14;
     static constexpr int kButtonH    = 22;
-    static constexpr int kVUW        = 10;
+    // The stereo meter (two bars) sits directly beside a fader slot centred on the strip's axis.
+    static constexpr int kVUBarW     = 6;
+    static constexpr int kVUBarGap   = VUMeter::kBarGap;
+    static constexpr int kVUW        = 2 * kVUBarW + kVUBarGap;
+    static constexpr int kMixerFaderW = 20;   // fader slot width
     static constexpr int kGRW        = 8;   // GR meter width (Rhythm channels only)
     // Sidechain section heights at Medium baseline. Previously these were the
     // floor on a proportional `h * 0.20f` calculation; now the section is

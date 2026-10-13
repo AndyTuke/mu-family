@@ -42,7 +42,7 @@ MixerPanel::MixerPanel(AudioServer& serverToDrive)
         auto& st = *strip;
         st.setClientSlot(i);
         st.setActive(false);
-        st.bindClientMeter(server.clientPeakMeter(i));
+        st.bindClientMeter(server.clientPeakMeterL(i), server.clientPeakMeterR(i));
 
         const juce::String who = "Client " + juce::String(i + 1);
         const auto tag = MuLookAndFeel::channelPalette[i];
@@ -75,7 +75,7 @@ MixerPanel::MixerPanel(AudioServer& serverToDrive)
     // Master column: the callback Master strip with its fader level to the client faders, then the inserts.
     master.useCallbackMaster();
     master.setFaderTop(MixerChannel::clientFaderTop());
-    master.bindMasterMeter(server.masterPeakMeter());
+    master.bindMasterMeter(server.masterPeakMeterL(), server.masterPeakMeterR());
     master.onMasterLevel = [this](float v)
     {
         server.setMasterGain(v);

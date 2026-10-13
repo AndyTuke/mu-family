@@ -229,12 +229,7 @@ void MixerChannel::layoutFaderAndButtons(int stripW, int faderY)
     const int faderEnd = busY - 2;
     const int faderH  = juce::jmax(s(40), faderEnd - faderY);
 
-    const int vuW = s(kVUW);
-    const int grW = hasSidechainControls() ? s(kGRW) : 0;
-    fader.setBounds  (0,                       faderY, stripW - vuW - grW, faderH);
-    if (hasSidechainControls())
-        grMeter.setBounds(stripW - vuW - grW,  faderY, grW,                faderH);
-    vuMeter.setBounds(stripW - vuW,            faderY, vuW,                faderH);
+    placeFaderAndMeters(stripW, faderY, faderH, hasSidechainControls());
 
     outBusBox.setVisible(hasOutputBus());
     if (hasOutputBus())
@@ -438,7 +433,28 @@ void MixerChannel::setClientMuteSolo(bool muted, bool soloed)
 
 void MixerChannel::bindClientMeter(const std::atomic<float>& peak)
 {
-    vuMeter.getLevel = [&peak] { return peak.load(); };
+    vuMeter.getLevel  = [&peak] { return peak.load(); };
+    vuMeter.getLevelR = nullptr;   // a single source drives both bars
+}
+
+void MixerChannel::bindClientMeter(const std::atomic<float>& peakL, const std::atomic<float>& peakR)
+{
+    vuMeter.getLevel  = [&peakL] { return peakL.load(); };
+    vuMeter.getLevelR = [&peakR] { return peakR.load(); };
+}
+
+void MixerChannel::placeFaderAndMeters(int stripW, int y, int h, bool withGR)
+{
+    using mu_ui::s;
+    const int vuW = s(kVUW);
+    const int grW = withGR ? s(kGRW) : 0;
+    const int faderW = juce::jlimit(1, s(kMixerFaderW), stripW - vuW - grW);
+    // Centre the fader slot on the strip's axis; keep the whole group inside the strip.
+    const int x0 = juce::jlimit(0, juce::jmax(0, stripW - (faderW + grW + vuW)), (stripW - faderW) / 2);
+    fader.setBounds(x0, y, faderW, h);
+    if (withGR)
+        grMeter.setBounds(x0 + faderW, y, grW, h);
+    vuMeter.setBounds(x0 + faderW + grW, y, vuW, h);
 }
 
 // Top to bottom: name LCD, EQ stack, fader + VU taking all the height left (no cap), dB readout,
@@ -466,9 +482,7 @@ void MixerChannel::layoutClient()
     const int dbY   = muteY - s(LF::kClientDbGap) - s(LF::kClientDbH);
     const int faderH = juce::jmax(s(LF::kClientFaderMinH), dbY - y);
 
-    const int vuW = s(kVUW);
-    fader  .setBounds(0,       y, w - vuW, faderH);
-    vuMeter.setBounds(w - vuW, y, vuW,     faderH);
+    placeFaderAndMeters(w, y, faderH, false);
     dbLabel.setBounds(0, dbY, w, s(LF::kClientDbH));
 
     const int hw = w / 2;
@@ -559,9 +573,7 @@ void MixerChannel::layoutCallbackMaster()
                   - s(LF::kClientDbGap) - s(LF::kClientDbH);   // where the Client strips' readouts sit
     const int faderH = juce::jmax(s(LF::kClientFaderMinH), dbY - top);
 
-    const int vuW = s(kVUW);
-    fader  .setBounds(0,       top, w - vuW, faderH);
-    vuMeter.setBounds(w - vuW, top, vuW,     faderH);
+    placeFaderAndMeters(w, top, faderH, false);
     dbLabel.setBounds(0, dbY, w, s(LF::kClientDbH));
 
     sidechainPaneBounds = {};
