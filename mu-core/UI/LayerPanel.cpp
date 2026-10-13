@@ -74,8 +74,8 @@ void LayerPanel::addOverlay(juce::Component& overlay)
 
 juce::Colour LayerPanel::layerColour() const
 {
-    return MuLookAndFeel::channelPalette[(size_t) (proc.getLayerColourIndex(currentLayer)
-                                                   % MuLookAndFeel::kChannelPaletteSize)];
+    return MuLookAndFeel::layerPalette[(size_t) (proc.getLayerColourIndex(currentLayer)
+                                                   % MuLookAndFeel::kLayerPaletteSize)];
 }
 
 void LayerPanel::timerCallback()

@@ -23,8 +23,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // visual is designed). Reorder/add stay unwired — the layer set is fixed.
     sidebar.createMiniVisual = [&p](int i, std::function<void()>) -> std::unique_ptr<juce::Component>
     {
-        const auto col = MuLookAndFeel::channelPalette[
-            (size_t) (p.getLayerColourIndex(i) % MuLookAndFeel::kChannelPaletteSize)];
+        const auto col = MuLookAndFeel::layerPalette[
+            (size_t) (p.getLayerColourIndex(i) % MuLookAndFeel::kLayerPaletteSize)];
         return std::make_unique<ArpMiniVisual>(col, i);
     };
     sidebar.onLayerSelected = [this](int idx) { layerPanel.setLayer(idx); };

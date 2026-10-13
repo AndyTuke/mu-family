@@ -14,7 +14,7 @@
 #include "Plugin/PluginProcessor_Internal.h"
 #include "Persistence/ModulatorSerialise.h" // serialiseModulators, deserialiseModulators, clearModulators
 #include "Persistence/PresetMigrations.h"   // migrateLegacyHostState
-#include "UI/Components/MuLookAndFeel.h" // kChannelPaletteSize
+#include "UI/Components/MuLookAndFeel.h" // kLayerPaletteSize
 #include "Persistence/PresetHelpers.h"   // kGlobalParamDefs
 #include "Persistence/RhythmParamTable.h"   // kRhythmParamDefs
 #include <set>
@@ -167,7 +167,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
 
         r.name        = state.getProperty(slotPrefix + "name",
                                           "Rhythm " + juce::String(i + 1)).toString().toStdString();
-        r.colourIndex = (int)state.getProperty(slotPrefix + "colour", i % MuLookAndFeel::kChannelPaletteSize);
+        r.colourIndex = (int)state.getProperty(slotPrefix + "colour", i % MuLookAndFeel::kLayerPaletteSize);
 
         // force-sync APVTS → Rhythm so shrink/grow cycles (preset A → B → A)
         // repopulate freshly-defaulted Rhythm fields even when JUCE skips listener

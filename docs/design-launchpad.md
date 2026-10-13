@@ -268,7 +268,7 @@ The pad for a layer must be the same colour as that layer on screen. The owner's
 the colours the controller can show, and stick to common hues** so most other pad controllers are covered too (some
 will not match exactly; a common hue still degrades gracefully).
 
-**Today:** the family has one shared 8-colour layer palette, `MuLookAndFeel::channelPalette` (Red, Cyan, Orange,
+**Today:** the family has one shared 8-colour layer palette, `MuLookAndFeel::layerPalette` (Red, Cyan, Orange,
 Magenta, Lime, Rose, Silver, Copper), used by all four products and documented in
 [design-ui-family.md](design-ui-family.md). The Launchpad X palette (128 fixed colours, sampled from the manual's
 picture; the picture's RGB is an illustration, **not** a measurement of the real LEDs) gives these matches:

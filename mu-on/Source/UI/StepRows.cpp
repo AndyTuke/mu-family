@@ -34,8 +34,8 @@ juce::Rectangle<int> StepRows::cellsArea(int row) const
 
 juce::Colour StepRows::layerColour(int row) const
 {
-    return MuLookAndFeel::channelPalette[
-        (size_t) juce::jlimit(0, MuLookAndFeel::kChannelPaletteSize - 1, proc.getLayerColourIndex(row))];
+    return MuLookAndFeel::layerPalette[
+        (size_t) juce::jlimit(0, MuLookAndFeel::kLayerPaletteSize - 1, proc.getLayerColourIndex(row))];
 }
 
 bool StepRows::cellAt(juce::Point<int> p, int& row, int& step) const

@@ -6,7 +6,7 @@
 #include "Persistence/ModulatorSerialise.h" // serialiseModulators, deserialiseModulators, clearModulators
 #include "Persistence/PresetFiles.h"        // mu_pp::safePresetFileName + replaceFileAtomically
 #include "Persistence/EmbeddedSample.h"     // embedded samples: FLAC or raw file bytes
-#include "UI/Components/MuLookAndFeel.h" // kChannelPaletteSize
+#include "UI/Components/MuLookAndFeel.h" // kLayerPaletteSize
 #include <limits>               // std::numeric_limits for NaN sentinel
 
 namespace mu_clid {

@@ -18,7 +18,7 @@ std::unique_ptr<Layer> PluginProcessor::makeRhythm(int slot) const
 {
     auto r = std::make_unique<Rhythm>();
     r->name        = ("Rhythm " + juce::String(slot + 1)).toStdString();
-    r->colourIndex = slot % MuLookAndFeel::kChannelPaletteSize;
+    r->colourIndex = slot % MuLookAndFeel::kLayerPaletteSize;
     return r;
 }
 

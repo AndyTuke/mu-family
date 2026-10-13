@@ -97,8 +97,8 @@ TrackContent::TrackContent(PluginProcessor& processor)
 
 juce::Colour TrackContent::layerColour() const
 {
-    return MuLookAndFeel::channelPalette[
-        (size_t) (proc.getLayerColourIndex(currentLayer) % MuLookAndFeel::kChannelPaletteSize)];
+    return MuLookAndFeel::layerPalette[
+        (size_t) (proc.getLayerColourIndex(currentLayer) % MuLookAndFeel::kLayerPaletteSize)];
 }
 
 void TrackContent::setLayer(int idx)

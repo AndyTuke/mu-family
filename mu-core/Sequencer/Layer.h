@@ -100,7 +100,7 @@ struct Layer
     mutable CopyableSpinLock voiceParamsLock;
 
     std::string name        = "<unnamed>";
-    int         colourIndex = 0;   // index into MuLookAndFeel::channelPalette (8 colours)
+    int         colourIndex = 0;   // index into MuLookAndFeel::layerPalette (8 colours)
 
     // Persistence hooks (message thread; defined in Modulation/ModulatorSerialise.h). `writeExtras`
     // adds the layer's non-parameter data to its slot node; `applyExtras` restores it, clearing

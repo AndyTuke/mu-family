@@ -289,8 +289,8 @@ void ArpContent::layoutSourceRow(juce::Rectangle<int> row, int gap)
 
 juce::Colour ArpContent::layerColour() const
 {
-    return MuLookAndFeel::channelPalette[(size_t) (proc.getLayerColourIndex(currentLayer)
-                                                   % MuLookAndFeel::kChannelPaletteSize)];
+    return MuLookAndFeel::layerPalette[(size_t) (proc.getLayerColourIndex(currentLayer)
+                                                   % MuLookAndFeel::kLayerPaletteSize)];
 }
 
 // Boxed section (Osc 1/2/Mix, Appergater): dropdowns/toggles on top, Size-2 knobs flow.

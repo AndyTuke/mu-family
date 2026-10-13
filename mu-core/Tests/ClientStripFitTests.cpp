@@ -53,7 +53,7 @@ struct ClientStripFitTests : juce::UnitTest
         mu_ui::scale = scale;
         const juce::String tag = "scale " + juce::String(scale, 2) + ": ";
 
-        MixerChannel strip(MixerChannel::Type::Client, "Synth", MuLookAndFeel::channelPalette[2]);
+        MixerChannel strip(MixerChannel::Type::Client, "Synth", MuLookAndFeel::layerPalette[2]);
         strip.setBounds(stripBounds());
 
         const auto bounds = strip.getLocalBounds();

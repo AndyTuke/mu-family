@@ -356,7 +356,7 @@ juce::Colour RhythmContent::currentColour() const
     if (currentRhythmIndex >= 0 && currentRhythmIndex < proc.getNumRhythms())
     {
         const Rhythm& r = proc.getRhythm(currentRhythmIndex);
-        return MuLookAndFeel::channelPalette[r.colourIndex % MuLookAndFeel::kChannelPaletteSize];
+        return MuLookAndFeel::layerPalette[r.colourIndex % MuLookAndFeel::kLayerPaletteSize];
     }
     return juce::Colours::transparentBlack;
 }

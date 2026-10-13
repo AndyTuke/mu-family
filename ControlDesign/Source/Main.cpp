@@ -144,7 +144,7 @@ public:
 
         // Sub-panel borders, in the channel's own colour at half alpha — the blue a
         // fresh two-rhythm patch picks.
-        g.setColour(MuLookAndFeel::channelPalette[1].withAlpha(0.5f));
+        g.setColour(MuLookAndFeel::layerPalette[1].withAlpha(0.5f));
 
         for (int rowY : rowOffsets)
         {

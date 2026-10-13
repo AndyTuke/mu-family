@@ -137,7 +137,7 @@ juce::Colour MuLookAndFeel::colour(ColourIds id) noexcept
 // Fixed 8-colour voice palette indexed by channel (rhythm / voice / layer / track).
 // The four app primaries (purple, green, blue, yellow — MuTheme::AppPrimaries) are left
 // out, so a voice's highlight never blends into its app's painted panels.
-const juce::Colour MuLookAndFeel::channelPalette[MuLookAndFeel::kChannelPaletteSize] = {
+const juce::Colour MuLookAndFeel::layerPalette[MuLookAndFeel::kLayerPaletteSize] = {
     juce::Colour(0xffE5484D),   // 0 Red
     juce::Colour(0xff2EC4C9),   // 1 Cyan
     juce::Colour(0xffF28C28),   // 2 Orange

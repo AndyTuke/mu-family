@@ -330,8 +330,8 @@ public:
     // Fixed 8-colour voice palette (Red / Cyan / Orange / Magenta / Lime / Rose / Silver /
     // Copper), index = the voice's colour index. The app primaries (appPurple / appGreen /
     // appBlue / appYellow) are kept out of it so a voice highlight never matches the paint.
-    static constexpr int kChannelPaletteSize = 8;
-    static const juce::Colour channelPalette[kChannelPaletteSize];
+    static constexpr int kLayerPaletteSize = 8;
+    static const juce::Colour layerPalette[kLayerPaletteSize];
 
     // ──────────────────────────────────────────────────────────────────────
     // Medium-baseline sizing constants. Single source of truth — change the

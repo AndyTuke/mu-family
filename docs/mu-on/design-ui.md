@@ -16,7 +16,7 @@ The earlier **Lane Rack** proposal (all five lanes' strips with no sidebar, a MO
 - **All five lanes' ENGINE boxes are visible at once** in one metal panel under the header.
 - Each box is as wide as its controls need (`ParamKnobGrid::getPreferredWidth`), never stretched.
 - Boxes flow left to right in sidebar order and wrap to the next row when the next box would overrun the panel. At the 1088 px panel width this gives three rows: Kick / Bass / Hat + Snare + Rumble.
-- The **selected lane's box is outlined in its lane colour** (`channelPalette`). Clicking any ENGINE box selects that lane and the sidebar follows.
+- The **selected lane's box is outlined in its lane colour** (`layerPalette`). Clicking any ENGINE box selects that lane and the sidebar follows.
 - Box chrome is the family's (`drawSections`, plate band `kSectionPlateH`, `kVoiceDivW` gaps); main-page knobs use the app colour.
 
 ### With variable layers (built; ruled 2026-10-12, one point awaiting Andy)

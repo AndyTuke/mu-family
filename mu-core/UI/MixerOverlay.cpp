@@ -118,12 +118,12 @@ void MixerOverlay::buildChannels()
         removeChildComponent(ch.get());
     rhythmChannels.clear();
 
-    const auto& palette = MuLookAndFeel::channelPalette;
+    const auto& palette = MuLookAndFeel::layerPalette;
     const int numActive = proc.getNumLayers();
     for (int r = 0; r < MixerEngine::MaxChannels; ++r)
     {
         bool hasRhythm = r < numActive;
-        juce::Colour col = hasRhythm ? palette[proc.getLayerColourIndex(r) % MuLookAndFeel::kChannelPaletteSize]
+        juce::Colour col = hasRhythm ? palette[proc.getLayerColourIndex(r) % MuLookAndFeel::kLayerPaletteSize]
                                      : MuLookAndFeel::colour(MuLookAndFeel::mixerInactiveNameBg);
         juce::String name = hasRhythm ? juce::String(proc.getLayerName(r)) : "-";
         auto ch = std::make_unique<MixerChannel>(MixerChannel::Type::Channel, name, col);
@@ -449,14 +449,14 @@ void MixerOverlay::loadFromApvts()
     // while the mixer is hidden would leave stale dim overlays + names when it's
     // next shown. loadFromApvts runs on visibilityChanged + preset reload, so
     // refreshing here makes the colouring track the count regardless of when it changed.
-    const auto& palette = MuLookAndFeel::channelPalette;
+    const auto& palette = MuLookAndFeel::layerPalette;
     for (int r = 0; r < (int)rhythmChannels.size(); ++r)
     {
         const bool hasRhythm = r < numActive;
         rhythmChannels[r]->setActive(hasRhythm && ! (isChannelSilent && isChannelSilent(r)));
         rhythmChannels[r]->setChannelName(hasRhythm ? juce::String(proc.getLayerName(r)) : "-");
         rhythmChannels[r]->setChannelColour(
-            hasRhythm ? palette[proc.getLayerColourIndex(r) % MuLookAndFeel::kChannelPaletteSize]
+            hasRhythm ? palette[proc.getLayerColourIndex(r) % MuLookAndFeel::kLayerPaletteSize]
                       : MuLookAndFeel::colour(MuLookAndFeel::mixerInactiveNameBg));
     }
 

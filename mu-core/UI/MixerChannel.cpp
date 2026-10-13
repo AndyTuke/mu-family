@@ -407,8 +407,8 @@ juce::String MixerChannel::formatClientDb(float linearLevel)
 
 void MixerChannel::setClientSlot(int slotIndex)
 {
-    const int n = MuLookAndFeel::kChannelPaletteSize;
-    channelColour = MuLookAndFeel::channelPalette[((slotIndex % n) + n) % n];
+    const int n = MuLookAndFeel::kLayerPaletteSize;
+    channelColour = MuLookAndFeel::layerPalette[((slotIndex % n) + n) % n];
     repaint();
 }
 

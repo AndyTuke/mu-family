@@ -56,8 +56,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // Per-voice spectrum glyph; its level pulse flashes the sidebar item.
     sidebar.createMiniVisual = [this](int i, std::function<void()> pulse) -> std::unique_ptr<juce::Component>
     {
-        const auto col = MuLookAndFeel::channelPalette[
-            (size_t) (proc.getLayerColourIndex(i) % MuLookAndFeel::kChannelPaletteSize)];
+        const auto col = MuLookAndFeel::layerPalette[
+            (size_t) (proc.getLayerColourIndex(i) % MuLookAndFeel::kLayerPaletteSize)];
         auto glyph = std::make_unique<PatternMiniVisual>(col, &proc.getPattern(i).ring);
         glyph->onPulse = std::move(pulse);
         return glyph;

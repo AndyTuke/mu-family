@@ -24,8 +24,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // Per-track sidebar glyph (the engine's initial in the track colour).
     sidebar.createMiniVisual = [&p](int i, std::function<void()>) -> std::unique_ptr<juce::Component>
     {
-        const auto col = MuLookAndFeel::channelPalette[
-            (size_t) (p.getLayerColourIndex(i) % MuLookAndFeel::kChannelPaletteSize)];
+        const auto col = MuLookAndFeel::layerPalette[
+            (size_t) (p.getLayerColourIndex(i) % MuLookAndFeel::kLayerPaletteSize)];
         const juce::String name = p.getLayerName(i);
         return std::make_unique<TrackMiniVisual>(col, name.substring(0, 1));
     };

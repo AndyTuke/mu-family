@@ -32,7 +32,7 @@ LayerSidebar::LayerSidebar(ProcessorBase& processor, const juce::String& addButt
 juce::Colour LayerSidebar::colourFor(int i) const
 {
     const int idx = proc.getLayerColourIndex(i);
-    return MuLookAndFeel::channelPalette[(size_t) (idx % MuLookAndFeel::kChannelPaletteSize)];
+    return MuLookAndFeel::layerPalette[(size_t) (idx % MuLookAndFeel::kLayerPaletteSize)];
 }
 
 void LayerSidebar::refreshItems()

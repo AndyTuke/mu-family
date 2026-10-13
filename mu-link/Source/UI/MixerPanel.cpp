@@ -38,14 +38,14 @@ MixerPanel::MixerPanel(AudioServer& serverToDrive)
     // Eight client strips: each control writes straight to the server.
     for (int i = 0; i < kClients; ++i)
     {
-        auto strip = std::make_unique<MixerChannel>(MixerChannel::Type::Client, "", MuLookAndFeel::channelPalette[i]);
+        auto strip = std::make_unique<MixerChannel>(MixerChannel::Type::Client, "", MuLookAndFeel::layerPalette[i]);
         auto& st = *strip;
         st.setClientSlot(i);
         st.setActive(false);
         st.bindClientMeter(server.clientPeakMeterL(i), server.clientPeakMeterR(i));
 
         const juce::String who = "Client " + juce::String(i + 1);
-        const auto tag = MuLookAndFeel::channelPalette[i];
+        const auto tag = MuLookAndFeel::layerPalette[i];
         st.onClientLevel = [this, i, who, tag](float v)
         {
             server.setClientGain(i, v);
@@ -65,7 +65,7 @@ MixerPanel::MixerPanel(AudioServer& serverToDrive)
             { report(who + " " + n, v, tag); };
 
         // The Dropouts lamp: hover text to the status bar, a click clears a latched dropout.
-        st.getDropoutLamp().onStatusUpdate = [this, i](const juce::String& n, const juce::String& v) { report(n, v, MuLookAndFeel::channelPalette[i]); };
+        st.getDropoutLamp().onStatusUpdate = [this, i](const juce::String& n, const juce::String& v) { report(n, v, MuLookAndFeel::layerPalette[i]); };
         st.onClientDropoutClear = [this, i] { clearDropout(i); };
 
         addAndMakeVisible(st);
@@ -153,7 +153,7 @@ void MixerPanel::updateLatencyAndDropouts()
         {
             d.state = next;
             strips[(size_t) i]->setClientDropout(next == 1 ? MixerChannel::Dropout::Active : MixerChannel::Dropout::Latched);
-            if (next == 1) report("Dropouts", "raise Latency in Settings", MuLookAndFeel::channelPalette[i]);
+            if (next == 1) report("Dropouts", "raise Latency in Settings", MuLookAndFeel::layerPalette[i]);
         }
     }
 }

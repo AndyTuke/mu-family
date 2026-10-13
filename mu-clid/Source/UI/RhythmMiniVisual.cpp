@@ -8,8 +8,8 @@ RhythmMiniVisual::RhythmMiniVisual(PluginProcessor& p, int index)
     addAndMakeVisible(miniCircle);
     miniCircle.setInterceptsMouseClicks(false, false);
 
-    const auto colour = MuLookAndFeel::channelPalette[
-        proc.getRhythm(rhythmIndex).colourIndex % MuLookAndFeel::kChannelPaletteSize];
+    const auto colour = MuLookAndFeel::layerPalette[
+        proc.getRhythm(rhythmIndex).colourIndex % MuLookAndFeel::kLayerPaletteSize];
 
     const Rhythm& r = proc.getRhythm(rhythmIndex);
     miniCircle.setPatterns(r.genA.getStepTypes(), r.genB.getStepTypes(), r.genC.getStepTypes());
