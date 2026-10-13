@@ -85,7 +85,7 @@ add_dependencies(mu-clid-midi increment_build_number)
 
 clap_juce_extensions_plugin(TARGET mu-clid-midi
     CLAP_ID "com.transwarp.mu-clid-lite"
-    CLAP_FEATURES midi-effect)
+    CLAP_FEATURES note-effect)
 
 # ── Installer (Release only, requires Inno Setup) ───────────────────────────
 if(ISCC_EXE)
