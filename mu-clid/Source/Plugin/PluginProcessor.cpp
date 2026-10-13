@@ -181,6 +181,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     currentSampleRate = sampleRate;
     currentBlockSize  = samplesPerBlock;
+    sequencerPlaying.store(false);   // no block has been processed since this prepare: a load now applies at once
     const int n = numLayers.load(std::memory_order_acquire);
     for (int i = 0; i < n; ++i)
     {
@@ -202,6 +203,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
 void PluginProcessor::releaseResources()
 {
+    sequencerPlaying.store(false);   // the host stopped calling processBlock: nothing will flag a staged swap
     samples.releaseResources();
 }
 
