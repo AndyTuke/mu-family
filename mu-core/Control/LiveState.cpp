@@ -186,7 +186,7 @@ void LiveState::restoreFrom(const juce::ValueTree& state)
     performanceMode = false;
     currentItem = queuedItem = -1;
     performance = {};
-    performanceFile = {};
+    performanceFile = juce::File();
 
     const juce::File file(state.getProperty(kPerformancePath).toString());
     if (file != juce::File())
