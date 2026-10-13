@@ -1,5 +1,6 @@
 #include "MasterLoopSection.h"
 #include "UI/Components/MuLookAndFeel.h"
+#include <cmath>
 
 MasterLoopSection::MasterLoopSection(ProcessorBase& p)
     : proc(p)
@@ -29,6 +30,15 @@ MasterLoopSection::MasterLoopSection(ProcessorBase& p)
     syncLoopDropdownFromApvts();
     addAndMakeVisible(loopStepLabel);
 
+    // The Swap group stays hidden until the product lists the timings it offers.
+    swapLabel.setText("Swap:", juce::dontSendNotification);
+    swapLabel.setJustificationType(juce::Justification::centredRight);
+    swapLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+    swapLabel.setTooltip("When a queued preset change takes effect");
+    swapDropdown.getComboBox().setTooltip("When a queued preset change takes effect");
+    addChildComponent(swapLabel);
+    addChildComponent(swapDropdown);
+
     // Catch host automation of mstrLoop so the dropdown / step label stay in
     // sync with the DAW state.
     proc.apvts.addParameterListener("mstrLoop", this);
@@ -38,7 +48,66 @@ MasterLoopSection::MasterLoopSection(ProcessorBase& p)
 MasterLoopSection::~MasterLoopSection()
 {
     proc.apvts.removeParameterListener("mstrLoop", this);
+    if (! swapChoices.empty())
+        proc.apvts.removeParameterListener(mu_hotswap::kSwapTimingParamId, this);
     stopTimer();
+}
+
+void MasterLoopSection::setSwapTimingChoices(std::vector<SwapChoice> choices)
+{
+    const bool hadChoices = ! swapChoices.empty();
+    swapChoices = std::move(choices);
+
+    swapDropdown.clear();
+    for (const auto& c : swapChoices)
+        swapDropdown.addItem(c.text, (int) c.timing + 1);   // the item id is the SwapTiming integer + 1
+    swapDropdown.onChange = [this](int id)
+    {
+        if (auto* param = proc.apvts.getParameter(mu_hotswap::kSwapTimingParamId))
+            param->setValueNotifyingHost(param->convertTo0to1((float) (id - 1)));
+        if (onStatusUpdate) onStatusUpdate("Swap Timing", swapDropdown.getText());
+    };
+
+    const bool show = ! swapChoices.empty();
+    swapLabel.setVisible(show);
+    swapDropdown.setVisible(show);
+    if (show && ! hadChoices)
+        proc.apvts.addParameterListener(mu_hotswap::kSwapTimingParamId, this);
+    if (! show && hadChoices)
+        proc.apvts.removeParameterListener(mu_hotswap::kSwapTimingParamId, this);
+    syncSwapDropdownFromApvts();
+    resized();
+}
+
+int MasterLoopSection::getPreferredWidth() const noexcept
+{
+    int w = kPad + kLoopLabelW + kLabelGap + kLoopDropW + kLabelGap + kLoopCountW + kPad;
+    if (! swapChoices.empty())
+        w += kGroupGap + kSwapLabelW + kLabelGap + kSwapDropW;
+    return w;
+}
+
+int MasterLoopSection::swapIdFor(mu_hotswap::SwapTiming stored) const
+{
+    using T = mu_hotswap::SwapTiming;
+    auto offered = [this](T t) { for (const auto& c : swapChoices) if (c.timing == t) return true; return false; };
+    if (offered(stored)) return (int) stored + 1;
+    // The nearest timing the product offers: a bar is nearest a layer loop, a loop nearest the other loop.
+    const T order[3][2] = { { T::OnLayerLoop, T::OnBar }, { T::OnBar, T::OnMasterLoop }, { T::OnLayerLoop, T::OnMasterLoop } };
+    const int row = stored == T::OnMasterLoop ? 0 : (stored == T::OnLayerLoop ? 1 : 2);
+    for (const T t : order[row])
+        if (offered(t)) return (int) t + 1;
+    return swapChoices.empty() ? 0 : (int) swapChoices.front().timing + 1;
+}
+
+void MasterLoopSection::syncSwapDropdownFromApvts()
+{
+    if (swapChoices.empty()) return;
+    const auto* raw = proc.apvts.getRawParameterValue(mu_hotswap::kSwapTimingParamId);
+    const float v   = raw != nullptr ? raw->load() : 0.0f;
+    const int   id  = swapIdFor(mu_hotswap::swapTimingFromIndex(std::isfinite(v) ? (int) std::lround(v) : 0));
+    if (swapDropdown.getSelectedId() != id)
+        swapDropdown.setSelectedId(id, false);
 }
 
 void MasterLoopSection::syncLoopDropdownFromApvts()
@@ -50,12 +119,21 @@ void MasterLoopSection::syncLoopDropdownFromApvts()
 
 void MasterLoopSection::parameterChanged(const juce::String& parameterID, float /*newValue*/)
 {
-    if (parameterID != "mstrLoop") return;
+    const bool loop = parameterID == "mstrLoop";
+    const bool swap = parameterID == mu_hotswap::kSwapTimingParamId;
+    if (! loop && ! swap) return;
 
     // host automation can fire on the audio thread; juce::Slider / DropdownSelect
     // state isn't safe to mutate off the message thread.
     juce::Component::SafePointer<MasterLoopSection> safe(this);
-    auto refresh = [safe] { if (auto* self = safe.getComponent()) self->syncLoopDropdownFromApvts(); };
+    auto refresh = [safe, loop]
+    {
+        if (auto* self = safe.getComponent())
+        {
+            if (loop) self->syncLoopDropdownFromApvts();
+            else      self->syncSwapDropdownFromApvts();
+        }
+    };
     if (juce::MessageManager::getInstance()->isThisTheMessageThread())
         refresh();
     else
@@ -74,6 +152,7 @@ void MasterLoopSection::timerCallback()
         if (loopDropdown.getSelectedId() != paramVal + 1)
             syncLoopDropdownFromApvts();
     }
+    syncSwapDropdownFromApvts();   // the same self-healing for the swap timing
 
     if (loopStepLabel.isVisible())
     {
@@ -98,10 +177,15 @@ void MasterLoopSection::resized()
     const int pad  = s(3);
     const int btnH = h - 2 * pad;
     const int btnY = pad;
-    const int innerPad = s(6);
 
-    int x = innerPad;
-    loopLabel.setBounds(x, btnY, s(36), btnH); x += s(36) + s(2);
-    loopDropdown.setBounds(x, btnY, s(100), btnH); x += s(100) + s(2);
-    loopStepLabel.setBounds(x, btnY, s(56), btnH);
+    int x = s(kPad);
+    loopLabel.setBounds(x, btnY, s(kLoopLabelW), btnH);    x += s(kLoopLabelW) + s(kLabelGap);
+    loopDropdown.setBounds(x, btnY, s(kLoopDropW), btnH);  x += s(kLoopDropW) + s(kLabelGap);
+    loopStepLabel.setBounds(x, btnY, s(kLoopCountW), btnH); x += s(kLoopCountW) + s(kGroupGap);
+
+    if (! swapChoices.empty())
+    {
+        swapLabel.setBounds(x, btnY, s(kSwapLabelW), btnH);    x += s(kSwapLabelW) + s(kLabelGap);
+        swapDropdown.setBounds(x, btnY, s(kSwapDropW), btnH);
+    }
 }

@@ -18,7 +18,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // Keep the master-loop section but drop the preset / mixer chrome (a MIDI effect has no
     // preset library and no mixer overlay).
     transportBar.setLogoText(juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid MIDI")));
-    transportBar.setLoopSection(&masterLoop, MasterLoopSection::kWidth);
+    transportBar.setLoopSection(&masterLoop, masterLoop.getPreferredWidth());
     transportBar.setShowPresetControls(false);
     transportBar.setShowMixerToggle(false);
     transportBar.setShowSettingsButton(false);

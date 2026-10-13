@@ -73,7 +73,7 @@ PluginProcessor::PluginProcessor()
     std::sort(suffixIndex.begin(), suffixIndex.begin() + suffixIndexCount,
               [](const SuffixIndex& a, const SuffixIndex& b) { return std::strcmp(a.suffix, b.suffix) < 0; });
 
-    swapTimingParam = apvts.getRawParameterValue("mstr_swap");
+    swapTimingParam = apvts.getRawParameterValue(mu_hotswap::kSwapTimingParamId);
 
     // Listen to the product parameters (rhythm + mstrLoop); mixer / FX ids are synced by ProcessorBase.
     for (auto* param : getParameters())

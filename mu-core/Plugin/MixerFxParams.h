@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Plugin/ParamText.h"
+#include "Plugin/HotSwap.h"   // mu_hotswap::kSwapTimingParamId
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Audio/AlgorithmNames.h"   // mu_audio::kInsertAlgorithmCount
 
@@ -100,7 +101,7 @@ inline void addGlobalFxParams(juce::AudioProcessorValueTreeState::ParameterLayou
     addF("mstr_lvl",    "Master Level",     0.0f,    1.0f,     1.0f);
     addF3("mstr_pan",   "Master Pan",      -1.0f,    1.0f,     0.0f);
     // Where a staged preset swap lands (mu_hotswap::SwapTiming; the order is saved data, append only).
-    layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID { "mstr_swap", 1 }, "Swap Timing",
+    layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID { mu_hotswap::kSwapTimingParamId, 1 }, "Swap Timing",
                    juce::StringArray { "On master loop", "On layer loop", "On bar" }, swapTimingDefault));
     addI("mst_insChar", "Mst Insert Algo", 0, mu_audio::kInsertAlgorithmCount - 1, 0);
     addF("mst_insP1",   "Mst Insert P1",   0.0f, 1.0f, 0.0f);

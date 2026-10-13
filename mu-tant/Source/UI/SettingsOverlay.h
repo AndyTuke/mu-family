@@ -19,8 +19,6 @@ private:
     PluginProcessor& product;
 
     // Hot-swap — when a staged preset / program-change swap commits.
-    juce::Label    swapModeLabel;
-    DropdownSelect swapModeDropdown;
 
     // Note mode (Free / Note) — shown in standalone and plugin (it works from a keyboard too).
     juce::Label    noteModeLabel;

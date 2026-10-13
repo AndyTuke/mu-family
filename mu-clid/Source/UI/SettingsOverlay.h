@@ -25,8 +25,6 @@ private:
     juce::ToggleButton multiBusToggle { "Multi-bus output" };
 
     // Hot-swap timing.
-    juce::Label    swapModeLabel;
-    DropdownSelect swapModeDropdown;
 
     // MIDI Note mode (plugin only): Free = host transport, Note = Note On/Off gated.
     juce::Label    midiModeLabel;

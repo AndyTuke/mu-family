@@ -46,6 +46,7 @@ inline bool boundaryReached(bool playing, bool wasPlaying,
 //   OnBar         the 4/4 bar line (kBarBeats), for an app with no loop of its own
 // "Layer" is the neutral word for a rhythm / voice / pattern.
 enum class SwapTiming : int { OnMasterLoop = 0, OnLayerLoop = 1, OnBar = 2 };
+inline constexpr const char* kSwapTimingParamId = "mstr_swap";   // the APVTS choice holding it, saved with the preset
 inline constexpr int kNumSwapTimings = 3;
 
 // A saved or host-supplied index as a SwapTiming; anything out of range reads as OnMasterLoop.

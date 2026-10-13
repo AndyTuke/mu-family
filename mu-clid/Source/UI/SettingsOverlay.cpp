@@ -17,23 +17,6 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
             drawHint(g, r.area.getY() + r.rowH / 2, "(rescan host to apply)",
                      hintX, r.area.getRight() - hintX); } });
 
-    // ── Hot-swap timing ────────────────────────────────────────────────────────
-    makeFieldLabel(swapModeLabel, "Timing");
-    swapModeDropdown.addItem("On master loop", 1);
-    swapModeDropdown.addItem("On rhythm loop", 2);
-    // The setting is the shared `mstr_swap` parameter (saved with the preset); mu-Clid offers the two
-    // loop rules, and a bar-line value set elsewhere reads as the rhythm loop.
-    auto* swapParam = product.apvts.getParameter("mstr_swap");
-    swapModeDropdown.setSelectedId(juce::jmin(1, (int) std::lround(swapParam->convertFrom0to1(swapParam->getValue()))) + 1, false);
-    swapModeDropdown.onChange = [swapParam](int id)
-    {
-        swapParam->setValueNotifyingHost(swapParam->convertTo0to1((float) (id - 1)));
-    };
-    addAndMakeVisible(swapModeDropdown);
-    addSection(Where::MidiBeforeClock, { "Hot-swap", kRowH, [this](const Rows& r) {
-        swapModeLabel   .setBounds(r.labelX, r.area.getY(), r.labelW, r.rowH);
-        swapModeDropdown.setBounds(r.ctrlX,  r.area.getY(), r.ctrlW,  r.rowH); } });
-
     // ── MIDI Mode (plugin only) ────────────────────────────────────────────────
     if (! isStandalone)
     {

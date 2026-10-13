@@ -22,7 +22,10 @@ PluginEditor::PluginEditor(PluginProcessor& p)
                        juce::StringArray { juce::String(juce::CharPointer_UTF8("Bj\xc3\xb6rklund algorithm \xe2\x80\x94 public domain")) });
     getSaveDialog().setLogoImage(juce::ImageCache::getFromMemory(BinaryData::muclid_png,
                                                                   BinaryData::muclid_pngSize));
-    getTransportBar().setLoopSection(&masterLoop, MasterLoopSection::kWidth);
+    // mu-Clid has no bar-line rule, so it offers the two loop rules only.
+    masterLoop.setSwapTimingChoices({ { mu_hotswap::SwapTiming::OnMasterLoop, "On master loop" },
+                                      { mu_hotswap::SwapTiming::OnLayerLoop,  "On rhythm loop" } });
+    getTransportBar().setLoopSection(&masterLoop, masterLoop.getPreferredWidth());
     masterLoop.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
     {
         getStatusBar().showParam(name, val);

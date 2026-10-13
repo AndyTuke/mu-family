@@ -7,23 +7,6 @@ namespace mu_tant
 SettingsOverlay::SettingsOverlay(PluginProcessor& p)
     : StandardSettingsOverlay(p), product(p)
 {
-    // ── Hot-swap timing — when a staged preset / program-change swap commits ───
-    makeFieldLabel(swapModeLabel, "Timing");
-    swapModeDropdown.addItem("On master loop", 1);
-    swapModeDropdown.addItem("On voice loop",  2);
-    swapModeDropdown.addItem("On bar",         3);
-    // The setting is the shared `mstr_swap` parameter, saved with the preset.
-    auto* swapParam = product.apvts.getParameter("mstr_swap");
-    swapModeDropdown.setSelectedId((int) std::lround(swapParam->convertFrom0to1(swapParam->getValue())) + 1, false);
-    swapModeDropdown.onChange = [swapParam](int id)
-    {
-        swapParam->setValueNotifyingHost(swapParam->convertTo0to1((float) (id - 1)));
-    };
-    addAndMakeVisible(swapModeDropdown);
-    addSection(Where::MidiBeforeClock, { "Hot-swap", kRowH, [this](const Rows& r) {
-        swapModeLabel   .setBounds(r.labelX, r.area.getY(), r.labelW, r.rowH);
-        swapModeDropdown.setBounds(r.ctrlX,  r.area.getY(), r.ctrlW,  r.rowH); } });
-
     // ── Note mode (Free / Note) — gate + pitch-track the drone from notes ──────
     makeFieldLabel(noteModeLabel, "Mode");
     noteModeDropdown.addItem("Free", 1);

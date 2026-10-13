@@ -22,7 +22,10 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     // Master-loop sub-pane in the transport (shared mu-core MasterLoopSection):
     // Loop-length dropdown + step counter driven by the mstrLoop param + beat pos.
-    getTransportBar().setLoopSection(&masterLoop, MasterLoopSection::kWidth);
+    masterLoop.setSwapTimingChoices({ { mu_hotswap::SwapTiming::OnMasterLoop, "On master loop" },
+                                      { mu_hotswap::SwapTiming::OnLayerLoop,  "On voice loop" },
+                                      { mu_hotswap::SwapTiming::OnBar,        "On bar" } });
+    getTransportBar().setLoopSection(&masterLoop, masterLoop.getPreferredWidth());
     masterLoop.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
     {
         getStatusBar().showParam(name, val);

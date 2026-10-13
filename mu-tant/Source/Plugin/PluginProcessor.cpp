@@ -166,7 +166,7 @@ void PluginProcessor::cacheParamPointers()
     globalPtrs.root    = P("root");
     globalPtrs.scale   = P("scale");
     mstrLoopPtr        = P("mstrLoop");   // master-loop length, read RT-safely in processBlock
-    swapTimingPtr      = P("mstr_swap");  // hot-swap timing (mu_hotswap::SwapTiming)
+    swapTimingPtr      = P(mu_hotswap::kSwapTimingParamId);  // hot-swap timing (mu_hotswap::SwapTiming)
 
     for (int v = 0; v < mu_limits::kMaxLayers; ++v)
     {
