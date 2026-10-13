@@ -15,6 +15,13 @@ class LayerHeaderBar : public juce::Component
 public:
     LayerHeaderBar();
 
+    // The Reset confirm's message, one wording for every product: a reset also returns the layer's
+    // mixer strip (level, pan, sends) to defaults, so the dialog says so.
+    static juce::String resetConfirmMessage(const juce::String& layerName)
+    {
+        return "Reset \"" + layerName + "\" to defaults?\nThis also resets its mixer strip.\nThis cannot be undone.";
+    }
+
     void setLayerName(const juce::String& n);
     void setColour(juce::Colour c);
     // Populate the preset dropdown. `items` may contain section headings via the

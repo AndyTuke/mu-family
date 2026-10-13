@@ -627,7 +627,7 @@ void RhythmContent::confirmReset()
 
     juce::Component::SafePointer<RhythmContent> safeThis(this);
     mu_ui::confirmAsync(this, "Reset Rhythm",
-                        "Reset \"" + name + "\" to defaults?\nThis cannot be undone.", "Reset",
+                        LayerHeaderBar::resetConfirmMessage(name), "Reset",
         [safeThis, idx]
         {
             if (safeThis != nullptr && idx >= 0 && idx < safeThis->proc.getNumRhythms())
