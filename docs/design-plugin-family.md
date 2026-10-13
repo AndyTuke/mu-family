@@ -1236,7 +1236,7 @@ loop and clock (mu-link). Nothing here needs to change for it, provided the mana
 
 | Step | Work | Needs |
 |---|---|---|
-| 1 | `PerformanceFile` + tests (#1279) | nothing; can start now |
+| 1 | `PerformanceFile` + tests (#1279) | **Done 2026-10-13** (`mu-core/Persistence/PerformanceFile`, saves via `replaceFileAtomically`, tests in `mu-core-tests`) |
 | 1b | Swap timing in `mu-core` (item 6, stages a to d) | nothing from this feature; best before step 4 so launches use the final setting |
 | 2 | `LiveState`, `LiveView`, the actions, `perform`, `supportsPerformanceMode`, persistence, tests with fake callbacks | step 1; `stageItem` is the existing `stageFullPreset`. This is the #1328 work for `SelectLayer`, the performance actions and `PresetNext/Prev`. **Not** #1276 |
 | 3 | `ShellBackend` accessors, the input shield, the indication and mode toggle, editor following `selectedLayer` | step 2 and the `ux-controller` ruling |
