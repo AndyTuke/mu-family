@@ -138,6 +138,7 @@ void MidiControlMap::load()
                 m.number          = juce::jlimit(0, 127, (int) v.getProperty("number", 0));
                 m.action.type     = actionFromName(v.getProperty("action", "").toString());
                 m.action.layer    = (int) v.getProperty("layer", 0);
+                m.action.index    = (int) v.getProperty("index", -1);
                 m.action.paramId  = v.getProperty("param", "").toString();
                 m.action.quantise = quantiseFromName(v.getProperty("quantise", "default").toString());
 
@@ -184,6 +185,7 @@ void MidiControlMap::save() const
             r->setProperty("number",   m.number);
             r->setProperty("action",   actionName(m.action.type));
             r->setProperty("layer",    m.action.layer);
+            r->setProperty("index",    m.action.index);
             r->setProperty("param",    m.action.paramId);
             r->setProperty("quantise", quantiseName(m.action.quantise));
             rows.add(juce::var(r));

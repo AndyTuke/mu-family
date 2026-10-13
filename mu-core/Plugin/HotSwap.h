@@ -158,7 +158,12 @@ public:
     {
         for (int i = 0; i < N; ++i) cancel(i);
         put(full, std::move(payload));
+        ++fullSerial;
     }
+
+    // Changes every time a full preset is staged (message thread): lets the owner tell its own staging
+    // from someone else's.
+    uint32_t fullStageSerial() const noexcept { return fullSerial; }
 
     void cancel(int i)
     {
@@ -310,6 +315,7 @@ private:
 
     std::array<Slot<SlotPayload>, (size_t) N> slots;
     Slot<FullPayload>                         full;
+    uint32_t                                  fullSerial = 0;   // message thread only
 };
 
 // Slot argument the boundary callable receives when asked about the full preset rather than a layer.
@@ -388,6 +394,7 @@ public:
     void stageSlot(int i, Payload&& p)    { stager.stage(i, std::move(p)); }
 
     void cancelFull()                     { stager.cancelFull(); }
+    uint32_t fullSerial() const noexcept  { return stager.fullStageSerial(); }
     void cancel(int i)                    { stager.cancel(i); }
     bool hasPending(int i) const noexcept { return stager.hasPending(i); }
     bool hasFullPending() const noexcept  { return stager.hasFullPending(); }

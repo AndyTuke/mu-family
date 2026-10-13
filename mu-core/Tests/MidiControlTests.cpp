@@ -153,6 +153,29 @@ public:
             file.deleteFile();
         }
 
+        beginTest("map: a mapped performance item keeps its item index through save / load");
+        {
+            const auto file = juce::File::createTempFile(".json");
+            file.deleteFile();
+            {
+                MidiControlMap map;
+                map.setStorageFile(file);
+                ControlAction item;  item.type = ControlActionType::PerformanceItem; item.index = 5;
+                ControlAction mode;  mode.type = ControlActionType::PerformanceMode;   // index -1: toggle
+                map.add(note(1, 60, item));
+                map.add(note(1, 61, mode));
+            }
+            MidiControlMap loaded;
+            loaded.setStorageFile(file);
+            loaded.load();
+            const int i = loaded.find(true, 1, 60);
+            expect(i >= 0 && loaded.get(i).action.type == ControlActionType::PerformanceItem, "item mapping lost");
+            if (i >= 0) expectEquals(loaded.get(i).action.index, 5);
+            const int j = loaded.find(true, 1, 61);
+            expect(j >= 0 && loaded.get(j).action.index == -1, "the toggle's unset index is kept");
+            file.deleteFile();
+        }
+
         beginTest("router: a CC sweep coalesces to the latest value; the CC leaves the block");
         {
             MidiControlMap map; map.add(cc(1, 21, param("p")));

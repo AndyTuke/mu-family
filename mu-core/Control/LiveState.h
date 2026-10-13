@@ -20,13 +20,18 @@ namespace mu_core
 class LiveState : public LiveView
 {
 public:
+    // What staging an item did: it failed to load, it is waiting for its boundary, or it was applied at once.
+    enum class Stage { Failed, Queued, Applied };
+
     struct Callbacks
     {
-        std::function<bool()>     supportsPerformanceMode;   // this product and build allow the mode
-        std::function<bool(int)>  canLoad;                   // item n is this product's and its file exists
-        std::function<bool(int)>  stageItem;                 // stage item n's full preset; true = applied at once (stopped)
-        std::function<void()>     cancelItem;                // drop the staged full preset
-        std::function<int()>      layerCount;                // how many layers are live (bounds SelectLayer)
+        std::function<bool()>      supportsPerformanceMode;   // this product and build allow the mode
+        std::function<bool(int)>   canLoad;                   // item n is this product's and its file exists
+        std::function<Stage(int)>  stageItem;                 // stage item n's full preset
+        std::function<void()>      cancelItem;                // drop the staged full preset
+        std::function<int()>       layerCount;                // how many layers are live (bounds SelectLayer)
+        std::function<bool()>      fullPending;               // some full preset is staged and not yet committed
+        std::function<uint32_t()>  stageSerial;               // changes whenever ANY full preset is staged (identity)
     };
 
     void setCallbacks(Callbacks c) { cb = std::move(c); }
@@ -51,20 +56,28 @@ public:
     static bool handles(ControlActionType t) noexcept;
 
     // Performs one of those. Every one but PerformanceMode returns false while the mode is off.
-    // PerformanceMode: `value` 1 = on, 0 = off, negative = toggle; refused when the product does not support
-    // the mode or no performance is loaded; turning it on takes `layer` as the selected layer.
+    // PerformanceMode: `index` 1 = on, 0 = off, -1 (the default) = toggle; refused when the product does not
+    // support the mode or no performance is loaded; turning it on takes `layer` as the selected layer.
     bool perform(const ControlAction& action);
 
-    // The owner's "a full-preset swap just committed" hook (message thread): the queued item becomes current.
+    // The owner's "a full-preset swap just committed" hook (message thread): the queued item becomes
+    // current when the preset that landed is the one this class staged; a preset loaded some other way
+    // (browser, MIDI program change) leaves no item current.
     void fullPresetCommitted();
+
+    // The owner calls this after every deferred-work pass (message thread): settles the queue when the
+    // staged preset was superseded by another load, or applied early without a commit hook.
+    void reconcile();
 
     // ── Persistence (host session): the performance path, current item and mode ──
     // Not the selected layer, the queue or any clip state. Not in the preset or the APVTS.
     void saveTo(juce::ValueTree& state) const;
     void restoreFrom(const juce::ValueTree& state);   // reloads the file; the mode comes back only if it loads
+    static bool modeSaved(const juce::ValueTree& state);   // did this session leave Performance mode on?
 
 private:
     bool setMode(bool on, int seedLayer);
+    void clampSelectedLayer();
     bool selectItem(int item);
     bool stepItem(int direction);
     bool itemLoadable(int item) const;
@@ -77,6 +90,7 @@ private:
     int                    currentItem     = -1;
     int                    queuedItem      = -1;
     int                    selectedLayer   = 0;
+    uint32_t               queuedSerial    = 0;   // the stage serial when the queued item was staged
     uint32_t               revision        = 0;
     juce::ListenerList<Listener> listeners;
 };

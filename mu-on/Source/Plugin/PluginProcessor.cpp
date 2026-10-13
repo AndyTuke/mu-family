@@ -325,7 +325,9 @@ void PluginProcessor::remapLayerReferences(const std::function<int(int)>& oldToN
 
 void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
-    if (auto xml = captureState().createXml())
+    auto state = captureState();
+    saveLiveState(state);   // the host session also keeps the Performance (path, current item, mode)
+    if (auto xml = state.createXml())
         copyXmlToBinary(*xml, destData);
 }
 
@@ -333,7 +335,11 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary(data, sizeInBytes))
         if (xml->hasTagName(apvts.state.getType()))
-            applyStateTree(toLayerState(juce::ValueTree::fromXml(*xml)));   // host restore — always immediate
+        {
+            const auto tree = juce::ValueTree::fromXml(*xml);
+            applyStateTree(toLayerState(tree));   // host restore — always immediate
+            restoreLiveState(tree);               // after the preset: it names the item that is playing
+        }
     notifyHostStateRestored();
 }
 

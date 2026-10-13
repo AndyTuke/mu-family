@@ -294,9 +294,15 @@ public:
     virtual bool hasPendingSwap(int slot) const                             { return layerSwapper.hasPending(slot); }
     // Drops the staged (not yet committed) full-preset swap, if any (Performance mode cancelling a queued item).
     virtual void cancelPendingFullPreset()                                  { layerSwapper.cancelFull(); }
+    // Changes whenever any full preset is staged (Performance mode tells its own staging from another load).
+    virtual uint32_t fullStageSerial() const                                { return layerSwapper.fullSerial(); }
 
     // Performance mode's live state (message thread only): read through the view, changed through perform().
     mu_core::LiveState&       getLiveState() noexcept       { return liveState; }
+    // Host-session persistence: the products call these on the root they already save and load (the session
+    // only: never a preset file, never the APVTS). Restore AFTER the session's preset is applied.
+    void saveLiveState(juce::ValueTree& root) const         { liveState.saveTo(root); }
+    void restoreLiveState(const juce::ValueTree& root)      { liveState.restoreFrom(root); }
     const mu_core::LiveView&  getLiveView() const noexcept  { return liveState; }
     // Drops the staged (not yet committed) per-layer swap for `slot`, if any. A structural edit
     // calls it for every layer it renumbers or clears, because a staged swap is keyed by index and
@@ -537,6 +543,7 @@ protected:
             liveState.fullPresetCommitted();   // before the editor refresh, so it reads the settled state
             if (onPresetSwapCommitted) onPresetSwapCommitted();
         }
+        liveState.reconcile();   // settles a queued item that was superseded or applied without a commit
         commitDeferredWork();
         drainPendingMidiProgramChanges();
         // Left queued by a table edit in progress: ask for another pass so it is not stranded.

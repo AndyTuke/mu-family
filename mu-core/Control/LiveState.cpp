@@ -26,6 +26,7 @@ void LiveState::changed()
 bool LiveState::loadPerformance(mu_pp::PerformanceFile file, const juce::File& where)
 {
     if (performanceMode) return false;   // the list is fixed while the screen is locked
+    if (queuedItem >= 0 && cb.cancelItem) cb.cancelItem();
     performance     = std::move(file);
     performanceFile = where;
     currentItem     = -1;
@@ -74,9 +75,10 @@ bool LiveState::selectItem(int item)
     }
     if (item == queuedItem) return true;   // already on its way
 
-    const bool appliedNow = cb.stageItem && cb.stageItem(item);
-    if (appliedNow) { currentItem = item; queuedItem = -1; }
-    else            { queuedItem = item; }
+    const auto result = cb.stageItem ? cb.stageItem(item) : Stage::Failed;
+    if (result == Stage::Failed) return false;   // it did not load: nothing is staged, nothing changes
+    if (result == Stage::Applied) { currentItem = item; queuedItem = -1; }
+    else                          { queuedItem = item; queuedSerial = cb.stageSerial ? cb.stageSerial() : 0; }
     changed();
     return true;
 }
@@ -103,7 +105,7 @@ bool LiveState::perform(const ControlAction& a)
     switch (a.type)
     {
         case T::PerformanceMode:
-            return setMode(a.value < 0.0f ? ! performanceMode : a.value >= 0.5f, a.layer);
+            return setMode(a.index < 0 ? ! performanceMode : a.index != 0, a.layer);   // `index` (a mapped button's value is the message's)
         default: break;
     }
 
@@ -125,12 +127,38 @@ bool LiveState::perform(const ControlAction& a)
     }
 }
 
+void LiveState::clampSelectedLayer()
+{
+    const int layers = cb.layerCount ? cb.layerCount() : 1;
+    selectedLayer = juce::jlimit(0, juce::jmax(0, layers - 1), selectedLayer);   // a commit can shrink the layer count
+}
+
 void LiveState::fullPresetCommitted()
 {
-    if (queuedItem < 0) return;   // a preset that was not ours
-    currentItem = queuedItem;
-    queuedItem  = -1;
-    changed();
+    if (queuedItem >= 0) { reconcile(); return; }
+    // A preset that was not one of this performance's items took over.
+    const int before = selectedLayer;
+    clampSelectedLayer();
+    if (currentItem >= 0 || selectedLayer != before) { currentItem = -1; changed(); }
+}
+
+void LiveState::reconcile()
+{
+    if (queuedItem < 0) return;
+    const bool pending = cb.fullPending && cb.fullPending();
+    const bool ours    = cb.stageSerial && cb.stageSerial() == queuedSerial;
+    if (pending && ! ours)
+    {
+        queuedItem = -1;   // another load replaced the staged preset: our item is no longer on its way
+        changed();
+    }
+    else if (! pending)
+    {
+        currentItem = ours ? queuedItem : -1;   // it landed (or another preset did): settle
+        queuedItem  = -1;
+        clampSelectedLayer();
+        changed();
+    }
 }
 
 void LiveState::saveTo(juce::ValueTree& state) const
@@ -147,8 +175,14 @@ void LiveState::saveTo(juce::ValueTree& state) const
     state.setProperty(kPerformanceMode, performanceMode, nullptr);
 }
 
+bool LiveState::modeSaved(const juce::ValueTree& state)
+{
+    return state.isValid() && (bool) state.getProperty(kPerformanceMode, false);
+}
+
 void LiveState::restoreFrom(const juce::ValueTree& state)
 {
+    if (queuedItem >= 0 && cb.cancelItem) cb.cancelItem();
     performanceMode = false;
     currentItem = queuedItem = -1;
     performance = {};

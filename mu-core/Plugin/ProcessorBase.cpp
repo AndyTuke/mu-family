@@ -26,9 +26,18 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
     };
     cb.stageItem = [this](int item)
     {
+        // A failed load reports through onLoadError and stages nothing: catch that so it is not taken for "applied at once".
+        bool failed = false;
+        auto previous = onLoadError;
+        onLoadError = [&failed, previous](const juce::String& message) { failed = true; if (previous) previous(message); };
         applyFullMidiPreset(liveState.getPerformance().resolve(item, getFullPresetDir()));
-        return ! hasPendingFullPreset();   // nothing left staged: it was applied at once (transport stopped)
+        onLoadError = std::move(previous);
+        if (failed) return mu_core::LiveState::Stage::Failed;
+        return hasPendingFullPreset() ? mu_core::LiveState::Stage::Queued   // waiting for its boundary
+                                      : mu_core::LiveState::Stage::Applied; // nothing left staged: applied at once (stopped)
     };
+    cb.fullPending = [this] { return hasPendingFullPreset(); };
+    cb.stageSerial = [this] { return fullStageSerial(); };
     cb.cancelItem = [this] { cancelPendingFullPreset(); };
     cb.layerCount = [this] { return getNumLayers(); };
     liveState.setCallbacks(std::move(cb));

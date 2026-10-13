@@ -112,6 +112,7 @@ public:
     bool hasPendingSwap  (int ri) const override         { return hotSwapStager.hasPendingSwap(ri); }
     bool hasPendingFullPreset() const override            { return hotSwapStager.hasPendingFullPreset(); }
     void cancelPendingFullPreset() override               { hotSwapStager.cancelStagedFullPreset(); }
+    uint32_t fullStageSerial() const override             { return hotSwapStager.fullStageSerial(); }
     int  getMasterLoopSteps() const override              { return sequencer.getMasterLoopSteps(); }
     int  getMasterLoopCurrentStep() const override        { return sequencer.getMasterLoopCurrentStep(); }
 

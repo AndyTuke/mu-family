@@ -54,6 +54,7 @@ void PresetIO::getStateInformation(juce::MemoryBlock& destData)
 {
     auto root = buildFullPresetTree({}, {}, {}, false, true);
     root.appendChild(uncoveredParamRows(proc, proc.sequencer.getNumRhythms()), nullptr);
+    proc.saveLiveState(root);   // the session also keeps the Performance (path, current item, mode)
     juce::MemoryOutputStream(destData, true).writeString(root.toXmlString());
 }
 
@@ -188,11 +189,16 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
 
 void PresetIO::setStateInformation(const void* data, int sizeInBytes)
 {
+    // Parsed first: a session that left Performance mode on must win over `_default`, because the live
+    // state names the performance item that was playing, and that is the session's, not the default's.
+    const auto xml = juce::parseXML(juce::String::fromUTF8((const char*)data, sizeInBytes));
+    const bool performing = xml != nullptr && mu_core::LiveState::modeSaved(juce::ValueTree::fromXml(*xml));
+
     // in standalone, the user's saved `_default.muClid` is authoritative
     // on every launch — JUCE's auto-saved "filterState" should NOT override it.
     // The host (DAW) path still needs setStateInformation to restore project
     // state, so this override only fires when running standalone.
-    if (proc.wrapperType == juce::AudioProcessor::wrapperType_Standalone && ! ProcessorBase::skipAutoLoadDefault)
+    if (proc.wrapperType == juce::AudioProcessor::wrapperType_Standalone && ! ProcessorBase::skipAutoLoadDefault && ! performing)
     {
         const juce::File defaultPreset = proc.getPresetsDir().getChildFile("_default.muClid");
         if (defaultPreset.existsAsFile())
@@ -203,7 +209,7 @@ void PresetIO::setStateInformation(const void* data, int sizeInBytes)
         // No default preset saved — fall through to JUCE's auto-restore.
     }
 
-    if (auto xml = juce::parseXML(juce::String::fromUTF8((const char*)data, sizeInBytes)))
+    if (xml != nullptr)
     {
         // Sessions are .muClid trees; older ones (the APVTS dump + r{i}_ properties) keep their reader.
         auto state = juce::ValueTree::fromXml(*xml);
@@ -213,6 +219,8 @@ void PresetIO::setStateInformation(const void* data, int sizeInBytes)
             restoreStateFromTree(state);
         else if (proc.onLoadError)
             proc.onLoadError("Host state restore failed: invalid tree");
+        if (state.isValid())
+            proc.restoreLiveState(state);   // after the preset: it names the item that is playing
     }
     else if (proc.onLoadError)
     {

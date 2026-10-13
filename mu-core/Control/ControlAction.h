@@ -23,7 +23,7 @@ enum class ControlActionType
     PresetNext,
     PresetPrev,
     Panic,
-    PerformanceMode,   // enter / leave Performance mode (`value` 1 on, 0 off, negative toggles; `layer` seeds the selection)
+    PerformanceMode,   // enter / leave Performance mode (`index`: -1 toggles, 0 off, 1 on; `layer` seeds the selection)
     PerformanceItem,   // switch to performance item `index` (0..7)
     PerformancePrev,   // the previous loadable item, wrapping
     PerformanceNext    // the next loadable item, wrapping
@@ -36,7 +36,7 @@ struct ControlAction
 {
     ControlActionType type     = ControlActionType::None;
     int               layer    = 0;        // MuteLayer / SoloLayer / SelectLayer: the layer index
-    int               index    = -1;       // PerformanceItem: the item index; clips later
+    int               index    = -1;       // PerformanceItem: the item index; PerformanceMode: -1 toggle, 0 off, 1 on; clips later
     juce::String      paramId;             // Parameter: the APVTS parameter id
     float             value    = 0.0f;     // Parameter: normalised 0..1
     Quantise          quantise = Quantise::Default;
