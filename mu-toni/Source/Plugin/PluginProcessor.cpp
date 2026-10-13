@@ -481,6 +481,7 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
     if (auto xml = getXmlFromBinary(data, sizeInBytes))
         if (xml->hasTagName(apvts.state.getType()))
             applyStateTree(toLayerState(juce::ValueTree::fromXml(*xml)));   // host restore — always immediate
+    notifyHostStateRestored();
 }
 
 } // namespace mu_toni

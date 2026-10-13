@@ -654,6 +654,7 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
     if (auto xml = getXmlFromBinary(data, sizeInBytes))
         if (xml->hasTagName(apvts.state.getType()))
             applyFullPresetTree(toVoiceState(juce::ValueTree::fromXml(*xml)));   // host state restore — always immediate
+    notifyHostStateRestored();
 }
 
 // ── Dynamic voice management ─────────────────────────────────────────────────

@@ -384,6 +384,14 @@ public:
             param->setValueNotifyingHost(param->convertTo0to1(level));
     }
 
+    // Call at the end of a host state restore (setStateInformation, message thread): the restore changed
+    // parameter values behind the host's back, so tell it to re-read them. The CLAP wrapper turns this
+    // into a values rescan, which the CLAP spec requires after a state load.
+    void notifyHostStateRestored()
+    {
+        updateHostDisplay(ChangeDetails().withProgramChanged(true));
+    }
+
     // The shell callbacks (onSaveAndQuit, onLoadError, onPresetSwapCommitted, onUiScaleChanged) are
     // members of ShellBackend. The editor MUST clear them in its dtor: the processor can outlive
     // the editor when a DAW keeps the plugin loaded after closing the window.

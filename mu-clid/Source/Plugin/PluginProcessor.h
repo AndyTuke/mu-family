@@ -65,7 +65,7 @@ public:
     void changeProgramName(int index, const juce::String& newName) override;
 
     void getStateInformation(juce::MemoryBlock& d) override { presetIO.getStateInformation(d); }
-    void setStateInformation(const void* d, int s) override { presetIO.setStateInformation(d, s); }
+    void setStateInformation(const void* d, int s) override { presetIO.setStateInformation(d, s); notifyHostStateRestored(); }
 
 
     // Multi-bus output (DAW only). Toggle is read at host scan-time; toggling at runtime

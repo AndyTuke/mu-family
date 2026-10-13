@@ -98,6 +98,7 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
 
     if (! ok && onLoadError)
         onLoadError(error);
+    notifyHostStateRestored();
 }
 
 } // namespace mu_clid_midi
