@@ -17,11 +17,11 @@ Release builds stay local. The installer requires Inno Setup.
 
 ```
 mu-clid/Source/
-├── Plugin/           PluginProcessor (+ _APVTS / _Content / _Modulation / _Internal), PluginEditor
+├── Plugin/           PluginProcessor (+ _APVTS / _Content / _Layers / _Modulation / _Internal), PluginEditor
 │                     (extends EditorShellBase), HotSwapStager + HotSwapBoundary, StandaloneApp
 ├── Audio/            SampleLibrary + SamplePreview (proc.samples)
-├── Sequencer/        Rhythm, HitGenerator, RhythmSequencer, EuclideanGenerator,
-│                     RhythmManager (proc.rhythms)
+├── Sequencer/        HitGenerator, EuclideanGenerator, GeneratorAliases.h (Rhythm and
+│                     RhythmSequencer are shared from mu-core)
 ├── Modulation/       ModulationDestinations (ModDest::kTable), ModulationSnapshot, ModulationSkew
 ├── UI/               Euclidean panels + VoiceSection (Pitch/Filter/Amp
 │                     subsections; the Insert subsection + the ModulatorPanel /
@@ -69,8 +69,10 @@ No stages are scheduled — mu-clid is feature-complete through Stage 34. New wo
 
 ## Key mu-clid patterns
 
-### PluginProcessor default rhythm
-`PluginProcessor` constructor always creates one default rhythm (16 steps, 4 hits). Never add a rhythm unconditionally in `PluginEditor` — check `getNumRhythms() == 0` first (the sidebar constructor calls `refreshItems()` which also reads the existing rhythm).
+### Rhythms are layers on the shared container
+The rhythms are `mu_core::Rhythm` layers owned by `ProcessorBase` (`keepSpareLayers`: all eight are built in the constructor, `numLayers` is the live count, `layersLock` guards the structural edits). There is no `RhythmManager`: add, delete, reorder and reset run in `ProcessorBase` / `LayerEditController`, exactly as in the other products, and the editor calls them through `LayerEditController` (its hooks unbind the modulator panel and `RhythmContent` before the layer changes). `RhythmSequencer` only binds a `Rhythm*` per slot and keeps the per-slot audio state; it does not own rhythms.
+
+What mu-Clid keeps per slot on the processor side (voice and MIDI engines, retired tails and their drained flags, play state, sample paths, previous-state flags) is moved by the hooks in `Plugin/PluginProcessor_Layers.cpp`, in the order the old locked sections used: `createLayer` (builds the slot's engines before any lock), `layersReordered` (remove and swap move the per-slot state under the lock), `layersMoved` (count and `Rhythm*` bindings), and `syncSlotParams` (after the unlock: APVTS push, pattern rebuild, engine params, freeing parked engines). Nothing is constructed or freed under `layersLock`. The constructor creates one default rhythm (16 steps, 4 hits); the editor never adds one.
 
 ### RhythmCircle sizing
 All ring radii are computed proportionally from `min(width, height) / 2 - margin`. Ring A outer = maxR, width = `maxR * 0.20`. Ring B starts at `ring_A_inner - gap`. Same for ring C (dashed). This makes the circle look correct at both the large (200px) panel size and the small (sidebar ~50px) size.

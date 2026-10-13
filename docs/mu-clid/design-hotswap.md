@@ -39,7 +39,7 @@ short `suspendProcessing` window.
   **including sample disk I/O**, deserialise modulators. Nothing the audio thread
   touches is mutated yet.
 - **Commit** (message thread, at the boundary, under `suspendProcessing` +
-  `rhythmsLock`): move the pre-built `Rhythm` + `VoiceEngine` into the live slots,
+  `layersLock`): move the pre-built `Rhythm` + `VoiceEngine` into the live slots,
   update the pattern cache. Held for *microseconds*.
 
 > **Never do parse / disk I/O / allocation inside the commit.** That is the single
@@ -77,7 +77,7 @@ stage() / stageFullPreset()
                               ◄───────── requestDeferredWork()  (atomic mailbox flag only)
 SwapPoll timer (100 Hz) → runDeferredWork()
   processSwaps()
-    suspendProcessing(true) + rhythmsLock
+    suspendProcessing(true) + layersLock
     std::move pending → live slots
     suspendProcessing(false)
     pushRhythmToApvts + onCommitted cb
@@ -97,7 +97,7 @@ SwapPoll timer (100 Hz) → runDeferredWork()
   (This is why the build can safely move to a background thread in future: the gate
   already handles "not ready at cutover".)
 - `processSwaps()` is the only place the live slots change, under
-  `suspendProcessing` (stops future blocks) **+** `rhythmsLock` (serialises with any
+  `suspendProcessing` (stops future blocks) **+** `layersLock` (serialises with any
   in-flight block — suspend alone does not block an already-running `processBlock`,
   #663).
 
@@ -140,7 +140,7 @@ decides whether per-rhythm swaps wait for the master loop or each rhythm's own l
 ## 6. Per-rhythm swap walk-through (`stageRhythmPreset`)
 
 1. Not playing → `applyRhythmPreset(file, r)`: the same prepared rhythm installed at once
-   (`installRhythm` under suspend + `rhythmsLock`, then `pushRhythmToApvts`), return.
+   (`installRhythm` under suspend + `layersLock`, then `pushRhythmToApvts`), return.
 2. Parse + validate the `.muRhythm` (`requireSupportedPresetVersion` — **v2 only**;
    legacy v0/v1 are refused with a clear `onLoadError`).
 3. `prepareRhythm(state, "r0_", …)` — the one rhythm build, shared with the full preset:
@@ -166,14 +166,14 @@ decides whether per-rhythm swaps wait for the master loop or each rhythm's own l
    `commitStagedFullPreset(prepared)` immediately.
 
 `commitStagedFullPreset` (the commit, identical for stopped + boundary paths):
-- `suspendProcessing(true)` + `rhythmsLock`.
+- `suspendProcessing(true)` + `layersLock`.
 - `setNumRhythms(n)`. **Shrink → drop the active count first; grow → publish the
   count last (after the new slots are populated).**
 - Per slot: **retire-then-swap** (§8), move in the pre-built `Rhythm`, set sample
   path, prepare MIDI engines for newly-grown slots, `updatePattern`,
   `resetStepTrackingForSwap`.
 - Tear down slots no longer active (shrink).
-- Release `rhythmsLock`, `suspendProcessing(false)`.
+- Release `layersLock`, `suspendProcessing(false)`.
 - **APVTS finalize** outside the suspend, under `ScopedApvtsLoading` (so the
   `parameterChanged` listener skips the engine re-sync and can't clobber the
   freshly-installed voice): `pushRhythmToApvts` per rhythm + channel / global params
@@ -252,8 +252,8 @@ normally, so they don't need this.)
 
 - **Cancel race:** a swap cancelled between the audio thread setting `boundaryReached`
   and `processSwaps` running is skipped (the `isReady`-cleared check).
-- **Structural rhythm edits cancel pending per-rhythm swaps.** `RhythmManager::add` /
-  `remove` / `swap` / `reset` (`proc.rhythms`) renumber or clear slots by index, so
+- **Structural rhythm edits cancel pending per-rhythm swaps.** the layer edits (`ProcessorBase` add /
+  remove / swap / reset) renumber or clear slots by index, so
   a staged per-rhythm swap (keyed by index) would land on the wrong slot — they call
   `hotSwapStager.cancelPendingIfAny(...)` for the affected slots (`remove`
   cancels all, since the down-shift renumbers everything). A staged **full** preset is

@@ -594,8 +594,7 @@ protected:
     // Number of active "channels" (rhythms / voices / whatever) — used to
     // gate per-slot PCs so we don't try to load into an inactive slot.
     // Default: getNumChannels(). Derived can override if the active count
-    // differs from the total (e.g. mu-clid's `numActiveRhythms` atomic
-    // tracks runtime-active rhythms separately from the static channel count).
+    // differs from the total.
     virtual int getNumActiveChannels() const { return getNumChannels(); }
 
 

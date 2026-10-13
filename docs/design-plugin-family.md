@@ -702,6 +702,13 @@ Builds on stage 6 as committed (29bb55d): mu-Tant, mu-Toni and mu-On run on `Pro
 edit routine (`RhythmManager`, `proc.rhythms.*`), its own storage (`RhythmSequencer` holds `std::vector<Rhythm>`),
 its own count (`numActiveRhythms`) and its own lock (`rhythmsLock`).
 
+**Status (built, build 1407).** Steps 0 to 4 are done; step 5 is not done and stays optional. As built: `RhythmManager` is gone; mu-Clid's
+rhythms are `mu_core::Rhythm` layers on the shared container (`keepSpareLayers`, `numLayers`, `layersLock`); `RhythmSequencer` binds `Rhythm*` per slot and
+keeps only per-slot audio state; the processor-side per-slot state is moved by the hooks in `mu-clid/Source/Plugin/PluginProcessor_Layers.cpp`
+(`createLayer`, `layersReordered`, `layersMoved`, `syncSlotParams`); `numActiveRhythms`, `rhythmStore` and the `swapLayers` / `resetLayer` /
+`canReorderLayers` overrides are deleted. `kAutomatedRhythms` stays: it is the count of rhythms with full "Rhythm N" automation names, not a live count.
+The MIDI product keeps its own `rhythmsLock` for its one fixed rhythm (ruling 4). The text below is the plan as ruled and is kept for the reasoning.
+
 **Rulings that change the earlier stage 7 text.**
 
 1. **No `mu_clid::Rhythm`.** mu-Clid uses `mu_core::Rhythm` (the `GeneratorAliases.h` alias stays), as the MIDI product does.
