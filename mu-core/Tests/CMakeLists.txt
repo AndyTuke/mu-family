@@ -8,6 +8,7 @@ target_sources(mu-core-tests PRIVATE
     TestMain.cpp
     HostTransportPublishTests.cpp
     LayerAccessTests.cpp
+    ClipBankTests.cpp
     LayerOwnershipTests.cpp
     RhythmAdoptDefaultsTests.cpp
     ../Sequencer/Rhythm.cpp

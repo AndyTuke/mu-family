@@ -19,6 +19,9 @@ namespace mu_limits
     // mu-clid, a voice in mu-tant.
     inline constexpr int kMaxLayers = 8;
 
+    // Stored clips per layer (the clip bank a controller pad launches from).
+    inline constexpr int kClipsPerLayer = 8;
+
     // Per-channel modulator (ControlSequence) count. The UI tab count in
     // ModulatorPanel mirrors this; the two must stay equal.
     inline constexpr int kMaxControlSequences = 8;

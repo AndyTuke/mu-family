@@ -3,6 +3,7 @@
 #include "Sequencer/ControlSequence.h"
 #include "Modulation/ModulationMatrix.h"
 #include "Audio/VoiceParams.h"
+#include "Sequencer/ClipBank.h"
 #include "MuLimits.h"
 
 #include <juce_data_structures/juce_data_structures.h>
@@ -98,6 +99,10 @@ struct Layer
     // accident but UB at the C++ level. Held for nanoseconds either side,
     // so contention is essentially zero.
     mutable CopyableSpinLock voiceParamsLock;
+
+    // The layer's stored clips. SlotBound so a layer-preset load, a clip launch and adoptDefaults never
+    // overwrite the bank; it still travels with the layer when the layer pointer moves.
+    SlotBound<mu_core::ClipBank> clips;
 
     std::string name        = "<unnamed>";
     int         colourIndex = 0;   // index into MuLookAndFeel::layerPalette (8 colours)
