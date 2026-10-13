@@ -13,6 +13,8 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
     fader.setSliderStyle(juce::Slider::LinearVertical);
     fader.setRange(0.0, 1.0, 0.001);
     fader.setValue(0.75, juce::dontSendNotification);
+    // The family level colour for every strip: the shared linear-slider drawing reads the knob colour.
+    fader.setColour(juce::Slider::rotarySliderFillColourId, MuLookAndFeel::colour(MuLookAndFeel::knobLevel));
     fader.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     addAndMakeVisible(fader);
     addAndMakeVisible(vuMeter);

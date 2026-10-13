@@ -3,6 +3,7 @@
 #include <memory>
 #include <tuple>
 #include "MuTheme.h"
+#include "FaderThumbGeometry.h"
 
 // every colour now lives in the MuTheme singleton (grouped by category for
 // the future Theme Editor). This switch just maps the legacy ColourIds tokens to
@@ -346,10 +347,10 @@ void MuLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int
                       (int) juce::jmax(2.0f, outerR * 0.18f),
                       { -(int) (outerR * 0.06f), (int) (outerR * 0.09f) });
 
-    juce::ColourGradient faceGrad(juce::Colour(0xff3b2d47), cx + faceR * 0.42f, cy - faceR * 0.42f,
-                                  juce::Colour(0xff100c16), cx - faceR * 0.75f, cy + faceR * 0.85f, true);
-    faceGrad.addColour(0.35, juce::Colour(0xff2d2238));
-    faceGrad.addColour(0.70, juce::Colour(0xff1b1423));
+    juce::ColourGradient faceGrad(knobFaceLit,  cx + faceR * 0.42f, cy - faceR * 0.42f,
+                                  knobFaceDark, cx - faceR * 0.75f, cy + faceR * 0.85f, true);
+    faceGrad.addColour(0.35, knobFaceUpper);
+    faceGrad.addColour(0.70, knobFaceLower);
     g.setGradientFill(faceGrad);
     g.fillPath(discPath);
 
@@ -411,6 +412,169 @@ void MuLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int
     g.fillEllipse(dotX - dotR, dotY - dotR, dotR * 2.0f, dotR * 2.0f);
 }
 
+// The cap's size for a slider: the nominal fader cap, clamped to the slider's cross axis.
+// Shared by the thumb radius and the drawing so the two always agree.
+static mu_ui::fader::CapSize faderCapSizeFor(const juce::Slider& slider)
+{
+    using mu_ui::sf;
+    const float cross = (float) (slider.isHorizontal() ? slider.getHeight() : slider.getWidth());
+    return mu_ui::fader::capSize(sf(MuLookAndFeel::kFaderCapW), sf(MuLookAndFeel::kFaderCapH), cross,
+                                 MuLookAndFeel::kFaderCapMargin, MuLookAndFeel::kFaderCapAspect);
+}
+
+static bool isLinearFaderStyle(juce::Slider::SliderStyle style) noexcept
+{
+    return style == juce::Slider::LinearVertical || style == juce::Slider::LinearHorizontal;
+}
+
+int MuLookAndFeel::getSliderThumbRadius(juce::Slider& slider)
+{
+    if (! isLinearFaderStyle(slider.getSliderStyle()))
+        return juce::LookAndFeel_V4::getSliderThumbRadius(slider);
+    return (int) std::ceil(mu_ui::fader::thumbRadius(faderCapSizeFor(slider)));
+}
+
+// A recessed groove with an accent fill, and a rectangular cap lit like the knob disc
+// (cast shadow, face gradient, specular, occlusion) carrying a haloed accent pointer.
+void MuLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, int width, int height,
+                                     float sliderPos, float /*minSliderPos*/, float /*maxSliderPos*/,
+                                     juce::Slider::SliderStyle style, juce::Slider& slider)
+{
+    if (! isLinearFaderStyle(style))
+    {
+        juce::LookAndFeel_V4::drawLinearSlider(g, x, y, width, height, sliderPos, 0.0f, 0.0f, style, slider);
+        return;
+    }
+
+    using mu_ui::sf;
+    namespace fd = mu_ui::fader;
+    const auto& L = lighting();
+
+    const bool horizontal = style == juce::Slider::LinearHorizontal;
+    const bool enabled    = slider.isEnabled();
+    const bool dragging   = enabled && slider.isMouseButtonDown();
+    const bool hovered    = enabled && slider.isMouseOverOrDragging();
+    const auto accent     = knobColour(slider);
+
+    // Phase 1: geometry from the pure helpers (travel ends, groove, cap, fill span).
+    const juce::Rectangle<float> area((float) x, (float) y, (float) width, (float) height);
+    const auto  size  = faderCapSizeFor(slider);
+    const auto  ends  = fd::travelEnds(area, horizontal, fd::thumbRadius(size));
+    const float tw    = sf(kFaderTrackW);
+    const auto  groove = fd::grooveRect(area, horizontal, tw, ends);
+    const auto  cap    = fd::capRect(area, horizontal, sliderPos, size);
+    const bool  bipolar = fd::isBipolar(slider.getMinimum(), slider.getMaximum());
+    const float zeroPos = fd::positionForProportion(ends, (float) slider.valueToProportionOfLength(0.0));
+    const auto  span    = fd::fillSpan(ends.first, zeroPos, sliderPos, bipolar);
+
+    // A disabled slider is drawn whole at reduced alpha, with no ring or halo.
+    if (! enabled)
+        g.beginTransparencyLayer(kDisabledAlpha);
+
+    // Phase 2: groove, drawn like the slide-switch track, then the accent fill up to the cap.
+    juce::Path track;
+    track.addRoundedRectangle(groove, tw * 0.5f);
+    g.setGradientFill(juce::ColourGradient(switchTrackDark,  groove.getCentreX(), groove.getY(),
+                                           switchTrackLight, groove.getCentreX(), groove.getBottom(), false));
+    g.fillPath(track);
+    g.setColour(juce::Colours::black.withAlpha(L.shadow(L.switchTrackShadow)));
+    g.strokePath(track, juce::PathStrokeType(1.0f));
+    g.setColour(juce::Colours::white.withAlpha(L.highlight(L.switchTrackLip)));
+    const float lipInset = horizontal ? tw * 0.5f : tw * 0.2f;
+    g.drawLine(groove.getX() + lipInset, groove.getBottom() + 0.5f,
+               groove.getRight() - lipInset, groove.getBottom() + 0.5f, 1.0f);
+
+    g.setColour(accent.withAlpha(L.highlight(L.switchTrackGlow)));
+    if (horizontal)
+        g.drawLine(span.first, groove.getCentreY(), span.second, groove.getCentreY(), tw * 0.5f);
+    else
+        g.drawLine(groove.getCentreX(), span.first, groove.getCentreX(), span.second, tw * 0.5f);
+
+    // Phase 3: the cap's cast shadows, falling down-left away from the top-right light.
+    const float r      = size.thickness * 0.5f;
+    const float corner = sf(kFaderCapCorner);
+    juce::Path capPath;
+    capPath.addRoundedRectangle(cap, corner);
+    juce::DropShadow(juce::Colours::black.withAlpha(L.shadow(L.knobCastShadow)),
+                     (int) juce::jmax(2.0f, r * L.knobCastBlur),
+                     { -(int) juce::jmax(2.0f, r * L.knobCastOffset), (int) juce::jmax(2.0f, r * L.knobCastOffset) })
+        .drawForPath(g, capPath);
+    juce::DropShadow(juce::Colours::black.withAlpha(L.shadow(L.knobDiscShadow)),
+                     (int) juce::jmax(2.0f, r * 0.18f),
+                     { -(int) (r * 0.06f), (int) juce::jmax(1.0f, r * 0.09f) })
+        .drawForPath(g, capPath);
+
+    // Phase 4: face gradient shared with the knob disc, then specular, occlusion and the
+    // pointer halo as radial gradients clipped to the cap.
+    const auto  c  = cap.getCentre();
+    const float hw = cap.getWidth() * 0.5f, hh = cap.getHeight() * 0.5f, hm = juce::jmax(hw, hh);
+
+    juce::ColourGradient face(knobFaceLit,  c.x + hw * 0.42f, c.y - hh * 0.42f,
+                              knobFaceDark, c.x - hw * 0.75f, c.y + hh * 0.85f, true);
+    face.addColour(0.35, knobFaceUpper);
+    face.addColour(0.70, knobFaceLower);
+    g.setGradientFill(face);
+    g.fillPath(capPath);
+
+    {
+        const juce::Graphics::ScopedSaveState state(g);
+        g.reduceClipRegion(capPath);
+
+        const float litX = c.x + hw * 0.50f, litY = c.y - hh * 0.50f, litR = hm * 1.05f;
+        juce::ColourGradient spec(juce::Colours::white.withAlpha(L.highlight(L.knobSpecular)), litX, litY,
+                                  juce::Colours::white.withAlpha(0.0f), litX + litR, litY, true);
+        spec.addColour(0.45, juce::Colours::white.withAlpha(L.highlight(L.knobSpecularMid)));
+        g.setGradientFill(spec);
+        g.fillEllipse(litX - litR, litY - litR, litR * 2.0f, litR * 2.0f);
+
+        const float shX = c.x - hw * 0.45f, shY = c.y + hh * 0.52f, shR = hm * 0.95f;
+        juce::ColourGradient occl(juce::Colours::black.withAlpha(L.shadow(L.knobOcclusion)), shX, shY,
+                                  juce::Colours::black.withAlpha(0.0f), shX + shR, shY, true);
+        g.setGradientFill(occl);
+        g.fillEllipse(shX - shR, shY - shR, shR * 2.0f, shR * 2.0f);
+
+        // Pointer halo: full strength while dragging, the mid strength at rest.
+        if (enabled)
+        {
+            const float haloR = size.thickness * 0.7f;
+            const float inner = L.highlight(dragging ? L.knobDotHalo : L.knobDotHaloMid);
+            const float mid   = L.highlight(L.knobDotHaloMid) * (dragging ? 1.0f : L.knobDotHaloMid / L.knobDotHalo);
+            juce::ColourGradient halo(accent.withAlpha(inner), c.x, c.y, accent.withAlpha(0.0f), c.x + haloR, c.y, true);
+            halo.addColour(0.35, accent.withAlpha(mid));
+            g.setGradientFill(halo);
+            g.fillEllipse(c.x - haloR, c.y - haloR, haloR * 2.0f, haloR * 2.0f);
+        }
+    }
+
+    // Phase 5: accent ring just inside the cap's edge, as on the slide-switch disc (not when disabled).
+    if (enabled)
+    {
+        const float inset = size.thickness * 0.11f;
+        juce::Path ring;
+        ring.addRoundedRectangle(cap.reduced(inset), juce::jmax(0.0f, corner - inset));
+        const float glow = L.highlight(hovered ? L.switchRingGlowHover : L.switchRingGlow);
+        for (float i = 3.0f; i >= 1.0f; i -= 1.0f)
+        {
+            g.setColour(accent.withAlpha(glow));
+            g.strokePath(ring, juce::PathStrokeType(i * inset));
+        }
+        g.setColour(accent);
+        g.strokePath(ring, juce::PathStrokeType(juce::jmax(1.0f, inset * 0.6f)));
+    }
+
+    // Phase 6: the pointer, across the cap's middle at right angles to the travel.
+    const float pw  = sf(kFaderPointerW);
+    const float pin = size.thickness * 0.2f;
+    g.setColour(accent);
+    if (horizontal)
+        g.drawLine(c.x, cap.getY() + pin, c.x, cap.getBottom() - pin, pw);
+    else
+        g.drawLine(cap.getX() + pin, c.y, cap.getRight() - pin, c.y, pw);
+
+    if (! enabled)
+        g.endTransparencyLayer();
+}
+
 // Slide switch in the knob's language: a pill sunk into the panel, a small raised disc
 // in the knob-face purple, and the accent on the disc's ring and the active label.
 void MuLookAndFeel::drawSlideSwitch(juce::Graphics& g, juce::Rectangle<float> bounds,
@@ -435,8 +599,8 @@ void MuLookAndFeel::drawSlideSwitch(juce::Graphics& g, juce::Rectangle<float> bo
     // lower edge, plus a thin accent line so it reads as part of the same control.
     juce::Path track;
     track.addRoundedRectangle(tr, tw * 0.5f);
-    g.setGradientFill(juce::ColourGradient(juce::Colour(0xff07050a), cx, tr.getY(),
-                                           juce::Colour(0xff17121d), cx, tr.getBottom(), false));
+    g.setGradientFill(juce::ColourGradient(switchTrackDark,  cx, tr.getY(),
+                                           switchTrackLight, cx, tr.getBottom(), false));
     g.fillPath(track);
     g.setColour(juce::Colours::black.withAlpha(L.shadow(L.switchTrackShadow)));
     g.strokePath(track, juce::PathStrokeType(1.0f));

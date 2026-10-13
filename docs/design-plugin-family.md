@@ -1177,9 +1177,14 @@ restore live state, then branch); with the mode restored on, the session wins ov
 not playing). mu-Clid MIDI has no standalone and no audio: it does nothing.
 
 **2. How the shell reads it without a product dependency.** `mu-core/Control/LiveView.h`: read-only getters of the above plus
-`addListener / removeListener` with `Listener::liveStateChanged()` (message thread). `ShellBackend` gains defaulted `getLiveView()` and
-`getControlSink()` (nullptr by default; `ProcessorBase` returns its `LiveState` and `this`). `ShellChrome` shows the indication only when
-`supportsPerformanceMode()` and both pointers are set (mu-link: nothing changes). No product symbol is named.
+`isItemPlayable(item)` (this product's item and its file exists, so the indicator tells an available lamp from a fault lamp without a
+product symbol) and `addListener / removeListener` with `Listener::liveStateChanged()` (message thread). The listener calls are `const`: listening is
+not a change of the state, so a holder of the read-only view may register. `ShellBackend` gains three defaulted accessors, as built:
+`const LiveView* getLiveView() const` and `ControlSink* getControlSink()` (both nullptr by default; pointers, not references, so "none" is
+expressible and mu-link needs no stub) and `bool supportsPerformanceMode() const` (false); `ProcessorBase` overrides them to return `&liveState`,
+`this` and `isStandaloneApp()`. `ShellChrome` and `TransportBar` show the mode only when `supportsPerformanceMode()` and both pointers are set
+(mu-link: nothing changes). No product symbol is named; `PerformanceFile.cpp` (juce_core only, which `LiveView::getPerformance` needs) is compiled
+with the chrome list in `UIChromeSources.cmake`, so mu-link links the chrome without `LiveState`.
 
 **3. The lock lives in `ShellChrome`, once.** While `performanceMode` is true the chrome puts an input shield over the content area
 (sidebar, main panel, overlays, transport bar): it swallows mouse and key events, so **no product panel needs any code** to be read-only.
@@ -1258,7 +1263,7 @@ loop and clock (mu-link). Nothing here needs to change for it, provided the mana
 | 1 | `PerformanceFile` + tests (#1279) | **Done 2026-10-13** (`mu-core/Persistence/PerformanceFile`, saves via `replaceFileAtomically`, tests in `mu-core-tests`) |
 | 1b | Swap timing in `mu-core` (item 6, stages a to d) | nothing from this feature; best before step 4 so launches use the final setting |
 | 2 | `LiveState`, `LiveView`, the actions, `perform`, `supportsPerformanceMode`, persistence, tests with fake callbacks | step 1; `stageItem` is the existing `stageFullPreset`. This is the #1328 work for `SelectLayer`, the performance actions and `PresetNext/Prev`. **Not** #1276. **2a built 2026-10-13 (1b4bf08); 2b and the review fixes built 2026-10-13 (a0fd6ec):** `PerformanceMode` takes `index` (-1 toggle, 0 off, 1 on), `MidiControlMap` saves and loads `index` with a round-trip test, `ProcessorBase::saveLiveState / restoreLiveState` are called by all four session products (mu-Clid parses first and skips the `_default.muClid` auto-load when `LiveState::modeSaved`), and the queue identity is the stage serial plus `reconcile`. architecture-steward re-check 2026-10-13: **Pass** (placement, boundary script, persistence wiring as ruled). Step 3 may start |
-| 3 | `ShellBackend` accessors, the input shield, the indication and mode toggle, editor following `selectedLayer` | step 2 and the `ux-controller` ruling |
+| 3 | `ShellBackend` accessors, the input shield, the indication and mode toggle, editor following `selectedLayer` | step 2 and the `ux-controller` ruling. **Built 2026-10-13 (570ee8e); architecture-steward review 2026-10-13: Pass** on structure (accessors, `ShellChrome::InputShield` and entry order, `StepIndicator` in `UI/Components`, pure `PerformanceIndication` in `UI/` under `mu_ui::perf`, `LayerSidebar` wired once by `EditorShellBase::setMainArea`, no product symbol, no state in the editor). Toggle order right to left: Mixer, Perf, gear. Interim `UI/PerformanceChooser.h` (header-only, loads into `LiveState`) is replaced by the chooser overlay, and the file goes then. The "Queued" status says "(at the next swap point)" until `LiveView` exposes the preset's `SwapTiming`; the ux wording of "when" is a follow-up, not a structural one |
 | 4 | `mu-control` surface model reads `LiveView`: top row = `PerformanceItem(n)`, right column = `SelectLayer`, grid = `LaunchClip` | #1276, step 2; the grid needs 5 |
 | 5 | `LaunchClip`, `ClipNext/Prev`, the clip bank and per-layer clip fields in `LiveState` | #1277 (this part of #1328) |
 

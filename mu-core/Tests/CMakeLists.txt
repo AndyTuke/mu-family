@@ -39,6 +39,7 @@ target_sources(mu-core-tests PRIVATE
     SwapTimingTests.cpp
     LegacyPrefixTests.cpp
     SegmentControlTests.cpp
+    FaderThumbGeometryTests.cpp
     TransportBarTests.cpp
     ShellChromeTests.cpp
     PerformanceModeShellTests.cpp

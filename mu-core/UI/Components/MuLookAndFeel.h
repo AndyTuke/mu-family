@@ -262,6 +262,14 @@ public:
                           float sliderPos, float startAngle, float endAngle,
                           juce::Slider&) override;
 
+    // Linear sliders (mixer faders, depth slider): a rectangular cap lit like the knob disc,
+    // on a recessed groove with an accent fill. The thumb radius is half the cap length so
+    // the slider's travel keeps the cap inside its bounds.
+    void drawLinearSlider(juce::Graphics&, int x, int y, int width, int height,
+                          float sliderPos, float minSliderPos, float maxSliderPos,
+                          juce::Slider::SliderStyle, juce::Slider&) override;
+    int getSliderThumbRadius(juce::Slider&) override;
+
     // Vertical two-position slide switch (SlideSwitch). position runs 0 = top to
     // 1 = bottom and may sit between while the disc animates; selected is the end the
     // switch is committed to, whose label lights in the accent.
@@ -576,6 +584,32 @@ public:
     static constexpr int   kSlideSwitchH      = 44;
     static constexpr float kSlideSwitchTrackW = 9.0f;
 
+    // Fader cap and groove (linear sliders), at the medium size; scale with sf() at the call site.
+    // The cap is kFaderCapW across the travel and kFaderCapH along it; on a thin slider the
+    // thickness clamps to the cross axis minus kFaderCapMargin and the length follows at
+    // kFaderCapAspect x thickness.
+    static constexpr float kFaderCapW      = 16.0f;
+    static constexpr float kFaderCapH      = 26.0f;
+    static constexpr float kFaderCapCorner = 3.0f;
+    static constexpr float kFaderTrackW    = 4.0f;
+    static constexpr float kFaderPointerW  = 2.0f;
+    static constexpr float kFaderCapMargin = 2.0f;
+    static constexpr float kFaderCapAspect = 1.6f;
+
+    // The knob face's fixed colours, lit crown to shadowed rim; the knob disc and the fader
+    // cap share them so both read as the same material.
+    static inline const juce::Colour knobFaceLit    { 0xff3b2d47 };
+    static inline const juce::Colour knobFaceUpper  { 0xff2d2238 };   // gradient stop at 0.35
+    static inline const juce::Colour knobFaceLower  { 0xff1b1423 };   // gradient stop at 0.70
+    static inline const juce::Colour knobFaceDark   { 0xff100c16 };
+
+    // The recessed groove of the slide switch and the fader: dark at the top lip, lighter below.
+    static inline const juce::Colour switchTrackDark  { 0xff07050a };
+    static inline const juce::Colour switchTrackLight { 0xff17121d };
+
+    // Alpha a disabled fader is drawn at.
+    static constexpr float kDisabledAlpha = 0.4f;
+
     // Point a plain juce::Slider's drag at the sweep the knob is drawn to. Without it
     // the slider keeps JUCE's own defaults, so the angle it maps the mouse through
     // disagrees with the ring the user sees. KnobWithLabel calls this for itself;
@@ -683,6 +717,7 @@ public:
     static constexpr int kPerfStatusMs   = 3000;
     static constexpr int kStepLampPitch  = 11;
     static constexpr int kStepGap        = 4;
+    static constexpr int kStepGhostMinW  = 36;   // narrower than this the ghost text is left out, not shown as a stub
 
     // Tempo (BPM) fields: one decimal everywhere; an arrow click steps a whole BPM, Shift a tenth.
     static constexpr int    kBpmDecimals = 1;
