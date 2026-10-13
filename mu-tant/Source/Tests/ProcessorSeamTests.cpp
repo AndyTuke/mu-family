@@ -185,8 +185,21 @@ struct MuTantProcessorSeamTests : juce::UnitTest
 {
     MuTantProcessorSeamTests() : juce::UnitTest("mu-Tant real PluginProcessor", "mu-tant-processor") {}
 
+    // The shared swap-timing parameter exists in every product, with that product's default.
+    void swapTimingDefault()
+    {
+        beginTest("mstr_swap exists and defaults to OnMasterLoop in mu-Tant");
+        mu_seam_test::TempStorage storage;
+        ExposedPluginProcessor p;
+        auto* swap = p.apvts.getParameter("mstr_swap");
+        expect(swap != nullptr, "the swap timing parameter is declared");
+        if (swap != nullptr)
+            expectEquals((int) std::lround(swap->convertFrom0to1(swap->getDefaultValue())), 0);
+    }
+
     void runTest() override
     {
+        swapTimingDefault();
         constructsAndRendersUnderTempRoot();
         resetLayerEqualsFresh();
         resetLayerFromSecondThread();

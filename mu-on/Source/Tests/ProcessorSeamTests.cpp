@@ -37,8 +37,21 @@ struct MuOnProcessorSeamTests : juce::UnitTest
 {
     MuOnProcessorSeamTests() : juce::UnitTest("mu-On real PluginProcessor", "mu-on-processor") {}
 
+    // The shared swap-timing parameter exists in every product, with that product's default.
+    void swapTimingDefault()
+    {
+        beginTest("mstr_swap exists and defaults to OnBar in mu-On");
+        mu_seam_test::TempStorage storage;
+        ExposedPluginProcessor p;
+        auto* swap = p.apvts.getParameter("mstr_swap");
+        expect(swap != nullptr, "the swap timing parameter is declared");
+        if (swap != nullptr)
+            expectEquals((int) std::lround(swap->convertFrom0to1(swap->getDefaultValue())), 2);
+    }
+
     void runTest() override
     {
+        swapTimingDefault();
         using namespace mu_seam_test;
         beginTest("A fresh instance is one Kick track with the four-on-the-floor row; every slot's Track exists and getTrack(i) is layer i");
         TempStorage storage;

@@ -69,8 +69,10 @@ inline bool layerBoundaryReached(SwapTiming timing, bool hasMasterLoop, int laye
                                  bool masterLoopWrapped, int layerLoopWrapMask, bool barWrapped) noexcept
 {
     if (timing == SwapTiming::OnBar) return barWrapped;
-    return usesMasterLoop(timing, hasMasterLoop) ? masterLoopWrapped
-                                                  : ((layerLoopWrapMask & (1 << layerIndex)) != 0);
+    if (usesMasterLoop(timing, hasMasterLoop)) return masterLoopWrapped;
+    // `1 << layerIndex` is only defined inside the mask; the kFullPreset sentinel (-1) must go through
+    // fullPresetBoundaryReached, never here.
+    return layerIndex >= 0 && layerIndex < 31 && (layerLoopWrapMask & (1 << layerIndex)) != 0;
 }
 
 // A full-preset swap spans every layer, so the master loop is the musical boundary whenever one is

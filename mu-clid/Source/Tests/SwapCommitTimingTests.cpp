@@ -11,7 +11,7 @@
 #include "Sequencer/GeneratorAliases.h"
 #include "SequencerTestHarness.h"
 #include "Plugin/HotSwap.h"
-#include "Plugin/HotSwapBoundary.h"
+#include "Plugin/HotSwap.h"
 
 using namespace mu_clid;
 
@@ -121,9 +121,10 @@ public:
         {
             if (s == 3) stager.stage(0, 7);
             const auto r = e.processBlock(beat(s));
-            const bool atBoundary = mu_clid::hotswap::perRhythmBoundaryReached(
-                swapMode, e.getMasterLoopSteps() > 0, 0, r.masterLoopWrapped, r.rhythmLoopWrapMask);
-            const int origin = mu_clid::hotswap::perRhythmUsesMasterLoop(swapMode, e.getMasterLoopSteps() > 0)
+            const auto timing = mu_hotswap::swapTimingFromIndex(swapMode);
+            const bool atBoundary = mu_hotswap::layerBoundaryReached(
+                timing, e.getMasterLoopSteps() > 0, 0, r.masterLoopWrapped, r.rhythmLoopWrapMask, false);
+            const int origin = mu_hotswap::usesMasterLoop(timing, e.getMasterLoopSteps() > 0)
                                    ? 0 : e.getBoundaryEff(0);
             stager.flagIfReady(0, stager.pendingToken(0), atBoundary);
             if (stager.consume(0, [&](int&) { commits.push_back(s); if (originOut != nullptr) *originOut = origin; })) {}

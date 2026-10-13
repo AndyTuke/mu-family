@@ -58,6 +58,16 @@ public:
             expect(! layerBoundaryReached(t, true,  1, true,  0b010, false), "a loop wrap is not the bar line");
         }
 
+        beginTest("a layer swap: every layer index 0..7 reads its own bit, and an index outside the mask never fires");
+        {
+            for (int layer = 0; layer < 8; ++layer)
+                for (int other = 0; other < 8; ++other)
+                    expect(layerBoundaryReached(SwapTiming::OnLayerLoop, true, layer, false, 1 << other, false) == (layer == other),
+                           "layer " + juce::String(layer) + " mask bit " + juce::String(other));
+            expect(! layerBoundaryReached(SwapTiming::OnLayerLoop, true, kFullPreset, false, -1, false), "the full-preset sentinel is not a layer");
+            expect(! layerBoundaryReached(SwapTiming::OnLayerLoop, true, 40, false, -1, false), "an index past the mask never fires");
+        }
+
         beginTest("a full-preset swap: the master loop when set, else layer 0's loop; OnBar the bar line");
         {
             for (const auto t : { SwapTiming::OnMasterLoop, SwapTiming::OnLayerLoop })

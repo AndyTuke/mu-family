@@ -237,7 +237,6 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/RhythmParamBoundaryTests.cpp
     Source/Tests/PresetXMLRoundTripTests.cpp
     Source/Tests/PresetMigrationTests.cpp      # C1 + C2 (format migrations)
-    Source/Tests/HotSwapBoundaryTests.cpp      # C3 (swap loop-boundary predicates)
     Source/Tests/ModulationSkewTests.cpp       # C5 (proportion-space skew round-trips)
     Source/Tests/NoDemoCapsTests.cpp          # unlicensed is fully functional: 8 layers, 64 steps, saves
     Source/Tests/EmbeddedSampleTests.cpp       # preset samples: FLAC round trip is sample-identical

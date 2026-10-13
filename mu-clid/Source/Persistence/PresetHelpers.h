@@ -70,6 +70,7 @@ inline const GlobalParamDef kGlobalParamDefs[] = {
     // ── Master ──────────────────────────────────────────────────────────
     { "mstr_lvl" }, { "mstr_pan" },
     { "mstrLoop",      ParamKind::Int    },
+    { "mstr_swap",     ParamKind::Int    },   // swap timing (mu_hotswap::SwapTiming), saved with the preset
     // ── Master insert 1 ─────────────────────────────────────────────────
     // Stage 36: 4 generic Param slots (normalised 0..1) replace the prior 9
     // named master-insert fields. Single algo selector + algo-aware UI.

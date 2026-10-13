@@ -99,8 +99,21 @@ struct MuClidProcessorSeamTests : juce::UnitTest
 {
     MuClidProcessorSeamTests() : juce::UnitTest("mu-Clid real PluginProcessor", "mu-clid-processor") {}
 
+    // The shared swap-timing parameter exists in every product, with that product's default.
+    void swapTimingDefault()
+    {
+        beginTest("mstr_swap exists and defaults to OnMasterLoop in mu-Clid");
+        mu_seam_test::TempStorage storage;
+        ExposedPluginProcessor p;
+        auto* swap = p.apvts.getParameter("mstr_swap");
+        expect(swap != nullptr, "the swap timing parameter is declared");
+        if (swap != nullptr)
+            expectEquals((int) std::lround(swap->convertFrom0to1(swap->getDefaultValue())), 0);
+    }
+
     void runTest() override
     {
+        swapTimingDefault();
         constructsAndOwnsItsRhythm();
         rhythmEditsVersusProcessBlock();
         swapCommitVersusProcessBlock();

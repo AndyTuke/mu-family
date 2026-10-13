@@ -64,7 +64,8 @@ public:
                        bool onMaster, double master, const std::array<double, mu_limits::kMaxLayers>& pat)
         {
             return sw.flagBoundaries(playing, start, beats, [&](int slot) noexcept
-                                     { return swapLoopBeats(slot, numActive, onMaster, master, pat.data()); });
+                                     { return swapLoopBeats(slot, numActive, onMaster ? SwapTiming::OnMasterLoop : SwapTiming::OnLayerLoop,
+                                                            master, pat.data()); });
         };
         std::array<double, mu_limits::kMaxLayers> eight {}; eight.fill(8.0);
 
@@ -144,13 +145,19 @@ public:
         beginTest("swapLoopBeats: the mu-tant boundary rule");
         {
             std::array<double, mu_limits::kMaxLayers> pat {}; pat.fill(8.0); pat[0] = 12.0; pat[1] = 4.0;
-            expectEquals(swapLoopBeats(kFullPreset, 2, false, 0.0, pat.data()), 12.0, "full: voice 0 with no master loop");
-            expectEquals(swapLoopBeats(kFullPreset, 2, false, 16.0, pat.data()), 16.0, "full: the master loop when one is set");
-            expectEquals(swapLoopBeats(1, 2, false, 16.0, pat.data()), 4.0, "voice: its own length");
-            expectEquals(swapLoopBeats(1, 2, true, 16.0, pat.data()), 16.0, "voice: the master loop when OnMasterLoop");
-            expect(swapLoopBeats(2, 2, false, 0.0, pat.data()) < 0.0, "an inactive voice never commits");
+            const auto master = SwapTiming::OnMasterLoop, own = SwapTiming::OnLayerLoop, bar = SwapTiming::OnBar;
+            expectEquals(swapLoopBeats(kFullPreset, 2, own, 0.0, pat.data()), 12.0, "full: voice 0 with no master loop");
+            expectEquals(swapLoopBeats(kFullPreset, 2, own, 16.0, pat.data()), 16.0, "full: the master loop when one is set");
+            expectEquals(swapLoopBeats(1, 2, own, 16.0, pat.data()), 4.0, "voice: its own length");
+            expectEquals(swapLoopBeats(1, 2, master, 16.0, pat.data()), 16.0, "voice: the master loop when OnMasterLoop");
+            expectEquals(swapLoopBeats(1, 2, master, 0.0, pat.data()), 4.0, "voice: OnMasterLoop with no master loop uses its own");
+            expect(swapLoopBeats(2, 2, own, 0.0, pat.data()) < 0.0, "an inactive voice never commits");
+            expect(swapLoopBeats(2, 2, bar, 0.0, pat.data()) < 0.0, "an inactive voice never commits on a bar either");
             std::array<double, mu_limits::kMaxLayers> unlocked {};
-            expectEquals(swapLoopBeats(0, 1, false, 0.0, unlocked.data()), 0.0, "length 0 before the first locked block: stop edge only");
+            expectEquals(swapLoopBeats(0, 1, own, 0.0, unlocked.data()), 0.0, "length 0 before the first locked block: stop edge only");
+            expectEquals(swapLoopBeats(1, 2, bar, 16.0, pat.data()), kBarBeats, "OnBar: a voice swap lands on the bar line");
+            expectEquals(swapLoopBeats(kFullPreset, 2, bar, 16.0, pat.data()), kBarBeats, "OnBar: a full preset lands on the bar line");
+            expectEquals(swapLoopBeats(0, 1, bar, 0.0, unlocked.data()), kBarBeats, "OnBar needs no locked pattern length");
         }
     }
 };

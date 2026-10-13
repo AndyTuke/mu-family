@@ -11,11 +11,13 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
     makeFieldLabel(swapModeLabel, "Timing");
     swapModeDropdown.addItem("On master loop", 1);
     swapModeDropdown.addItem("On voice loop",  2);
-    swapModeDropdown.setSelectedId((int) product.getSwapMode() + 1, false);
-    swapModeDropdown.onChange = [this](int id)
+    swapModeDropdown.addItem("On bar",         3);
+    // The setting is the shared `mstr_swap` parameter, saved with the preset.
+    auto* swapParam = product.apvts.getParameter("mstr_swap");
+    swapModeDropdown.setSelectedId((int) std::lround(swapParam->convertFrom0to1(swapParam->getValue())) + 1, false);
+    swapModeDropdown.onChange = [swapParam](int id)
     {
-        product.setSwapMode(id == 2 ? PluginProcessor::SwapMode::OnVoiceLoop
-                                    : PluginProcessor::SwapMode::OnMasterLoop);
+        swapParam->setValueNotifyingHost(swapParam->convertTo0to1((float) (id - 1)));
     };
     addAndMakeVisible(swapModeDropdown);
     addSection(Where::MidiBeforeClock, { "Hot-swap", kRowH, [this](const Rows& r) {

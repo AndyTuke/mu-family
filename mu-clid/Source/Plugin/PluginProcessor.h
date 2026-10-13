@@ -30,9 +30,6 @@ class PluginProcessor : public ProcessorBase,
                         private juce::AudioProcessorValueTreeState::Listener
 {
 public:
-    // Controls when a staged rhythm preset is committed to the live slot.
-    enum class SwapMode { OnMasterLoop = 0, OnRhythmLoop = 1 };
-
     // `apvts` lives on ProcessorBase (mu-core) — every mu-family plugin shares
     // one. Layout is supplied via createParameterLayout() when the base ctor
     // runs. PluginProcessor's own members below may reference apvts; they
@@ -123,8 +120,13 @@ public:
     // ProcessorBase slot-preset API: a rhythm preset into rhythm `ri`.
     void saveLayerPreset(int ri, const juce::String& name) override;
     void loadLayerPreset(int ri, const juce::File& f) override { stageRhythmPreset(ri, f); }
-    void setSwapMode(SwapMode m) { swapModeAtomic.store((int)m, std::memory_order_relaxed); }
-    SwapMode getSwapMode() const { return static_cast<SwapMode>(swapModeAtomic.load(std::memory_order_relaxed)); }
+    // Where a staged swap lands: the shared `mstr_swap` parameter, read here on the audio thread from a
+    // pointer resolved once. mu-Clid has no bar-line rule, so OnBar behaves as OnLayerLoop.
+    mu_hotswap::SwapTiming swapTiming() const noexcept
+    {
+        const auto t = mu_hotswap::swapTimingFromIndex(swapTimingParam != nullptr ? (int) std::lround(swapTimingParam->load(std::memory_order_relaxed)) : 0);
+        return t == mu_hotswap::SwapTiming::OnBar ? mu_hotswap::SwapTiming::OnLayerLoop : t;
+    }
 
     juce::File getRhythmsDir() const;
     juce::File getSamplesDir() const;
@@ -244,7 +246,7 @@ public:
 private:
     std::array<std::atomic<float>, kSnapCount> modSnapshot[RhythmSequencer::MaxRhythms];
 
-    std::atomic<int> swapModeAtomic { 0 }; // 0 = OnMasterLoop, 1 = OnRhythmLoop; read by HotSwapStager
+    const std::atomic<float>* swapTimingParam { nullptr };   // `mstr_swap`, resolved once in the constructor
 
     void commitDeferredWork() override;   // hot-swap engine retire + swap commits
 

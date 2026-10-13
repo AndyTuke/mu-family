@@ -166,6 +166,7 @@ void PluginProcessor::cacheParamPointers()
     globalPtrs.root    = P("root");
     globalPtrs.scale   = P("scale");
     mstrLoopPtr        = P("mstrLoop");   // master-loop length, read RT-safely in processBlock
+    swapTimingPtr      = P("mstr_swap");  // hot-swap timing (mu_hotswap::SwapTiming)
 
     for (int v = 0; v < mu_limits::kMaxLayers; ++v)
     {
@@ -347,21 +348,21 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // Hot-swap boundary check: a staged preset commits when its reference loop wraps
     // (or on the playing→stopped edge). Uses the RAW pre-ceiling position so the
     // loop-index test holds for lengths that don't divide 64. The reference loop
-    // depends on the Hot-swap timing (SwapMode) + the master loop:
+    // depends on the swap timing (`mstr_swap`) + the master loop:
     //   • master-loop length in beats = mstrLoop steps / 4 (4 steps/beat); 0 = off.
     //   • per-voice swap: OnMasterLoop (+ a loop set) → master loop; else the voice's
     //     own gate-pattern boundary (so a swap can't hang when no master loop exists).
     //   • full preset: master loop when one is defined, else voice 0's gate boundary.
     const int    mlSteps         = mstrLoopPtr ? juce::jmin((int) mstrLoopPtr->load() * 16, 256) : 0;
     const double masterLoopBeats = mlSteps > 0 ? (double) mlSteps / 4.0 : 0.0;
-    const bool   onMasterLoop    = (swapModeAtomic.load(std::memory_order_relaxed) == 0)
-                                   && masterLoopBeats > 0.0;
+    const auto   swapTiming      = mu_hotswap::swapTimingFromIndex(
+                                       swapTimingPtr != nullptr ? (int) std::lround(swapTimingPtr->load(std::memory_order_relaxed)) : 0);
 
     const int numActive = numLayers.load(std::memory_order_relaxed);
     flagSwapBoundaries(blkPlaying, oldPos, transport.blockBeats,
                        [&](int slot) noexcept
                        {
-                           return swapLoopBeats(slot, numActive, onMasterLoop, masterLoopBeats, blkPatternBeats.data());
+                           return swapLoopBeats(slot, numActive, swapTiming, masterLoopBeats, blkPatternBeats.data());
                        });
 }
 

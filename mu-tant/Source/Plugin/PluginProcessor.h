@@ -89,9 +89,6 @@ public:
     }
 
     // Hot-swap timing (mirrors mu-clid). OnVoiceLoop = the per-voice gate boundary.
-    enum class SwapMode { OnMasterLoop = 0, OnVoiceLoop = 1 };
-    SwapMode getSwapMode() const { return (SwapMode) swapModeAtomic.load(std::memory_order_relaxed); }
-    void     setSwapMode(SwapMode m) { swapModeAtomic.store((int) m, std::memory_order_relaxed); }
 
     // MIDI Note mode (plugin DAW notes + standalone keyboard). Free = the drone runs
     // continuously (default). Note = gate + pitch-track — the drone sounds only while
@@ -304,11 +301,10 @@ private:
     // Master-loop length param pointer, cached for RT-safe reads (no per-block
     // string lookup) in processBlock. Set in cacheParamPointers().
     const std::atomic<float>* mstrLoopPtr { nullptr };
-    // Hot-swap timing: which loop a staged preset / program-change swap commits on.
-    // 0 = OnMasterLoop (default) — commit at the master-loop wrap when a loop is set;
-    // 1 = OnVoiceLoop — commit at the per-voice gate-pattern boundary. A full preset
-    // always uses the master loop when one is defined, else voice 0's gate boundary.
-    std::atomic<int> swapModeAtomic { 0 };
+    // Hot-swap timing: where a staged preset / program-change swap commits (the shared `mstr_swap`
+    // parameter; mu_hotswap::SwapTiming). A full preset always uses the master loop when one is
+    // defined, else voice 0's gate boundary. Resolved once in cacheParamPointers().
+    const std::atomic<float>* swapTimingPtr { nullptr };
 
     // ── MIDI Note mode (gate + pitch-track) ──────────────────────────────────
     // 0 = Free, 1 = Note. Set from the Settings overlay (message thread), read on

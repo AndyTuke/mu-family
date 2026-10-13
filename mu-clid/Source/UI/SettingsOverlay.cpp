@@ -21,11 +21,13 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
     makeFieldLabel(swapModeLabel, "Timing");
     swapModeDropdown.addItem("On master loop", 1);
     swapModeDropdown.addItem("On rhythm loop", 2);
-    swapModeDropdown.setSelectedId((int) product.getSwapMode() + 1, false);
-    swapModeDropdown.onChange = [this](int id)
+    // The setting is the shared `mstr_swap` parameter (saved with the preset); mu-Clid offers the two
+    // loop rules, and a bar-line value set elsewhere reads as the rhythm loop.
+    auto* swapParam = product.apvts.getParameter("mstr_swap");
+    swapModeDropdown.setSelectedId(juce::jmin(1, (int) std::lround(swapParam->convertFrom0to1(swapParam->getValue()))) + 1, false);
+    swapModeDropdown.onChange = [swapParam](int id)
     {
-        product.setSwapMode(id == 2 ? PluginProcessor::SwapMode::OnRhythmLoop
-                                    : PluginProcessor::SwapMode::OnMasterLoop);
+        swapParam->setValueNotifyingHost(swapParam->convertTo0to1((float) (id - 1)));
     };
     addAndMakeVisible(swapModeDropdown);
     addSection(Where::MidiBeforeClock, { "Hot-swap", kRowH, [this](const Rows& r) {
