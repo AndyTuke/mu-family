@@ -115,7 +115,7 @@ P "mu-link's own MIDI output, chosen in the Audio / MIDI devices dialog, carries
 P "Only the STANDALONE version of each app connects. The VST3 and CLAP plug-in versions are never affected — inside a DAW the host already owns the clock and audio device, so a plug-in never attaches to mu-link."
 P "Up to eight apps can be connected at once. If an app is closed or crashes, mu-link automatically frees its strip after a moment."
 
-Pic "Two connected apps (mu-Clid and mu-Tant) shown as named strips with live meters."
+Pic "Two connected apps (mu-Clid and mu-Tant) shown as named strips with live meters." "connected-apps.png"
 
 # ── 7. The Mixer ──────────────────────────────────────────────────────────────
 H1 "7. The Mixer"
