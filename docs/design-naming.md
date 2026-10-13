@@ -130,6 +130,7 @@ edits](design-plugin-family.md#layer-ownership-and-structural-edits--family-stan
 | `Sidebar` / `Section` / `Subsection` / `Row` / `Bar` | as their names say |
 | `Engine` / `Sequencer` | the two halves of a layer |
 | `Backend` | the interface an app implements for the shared chrome (`mu_core::ShellBackend`; `ProcessorBase` and mu-link's `LinkShellBackend` implement it). Not `Surface`: that word is the controller surface of `mu-control` |
+| `Driver` / `Manager` | `mu-control` only: a `<Device>Driver` speaks one device family's wire protocol and nothing else (`LaunchpadXDriver`, behind the `SurfaceDriver` interface); a `Manager` owns the lifetime of a set of drivers and their model (`ControllerManager`). The four parts are `SurfaceDriver`, `SurfaceDescription`, `SurfaceMapping`, `SurfaceModel` |
 | `Chrome` | a processor-free helper that owns the shared window furniture for a host component (`mu_ui::ShellChrome`) |
 
 New layer UI is `LayerPanel` / `LayerSidebar` in `mu-core`; a product supplies content (`<Type>Content`) and
@@ -154,6 +155,10 @@ names. They are modal pop-ups, not `OverlayHost` screens, so the `Overlay` role 
   its names follow the standard (file = class, `mu_core` namespace, neutral terms, no product names).
   Remark: the struct `mu_core::Mapping` in `MidiControlMap.h` is too generic for a namespace shared by
   the whole core; rename it `MidiMapping` the next time that file is touched.
+- `mu-control/` (ruled 2026-10-13; namespace `mu_control`, device helpers nest as `mu_control::launchpadx`) has folders by role, none of which may repeat a
+  `mu-core` path: `Surface, Driver, Devices/<Device>, Manager, Tests`. Full list and file names in
+  [design-plugin-family.md, Controller library](design-plugin-family.md#controller-library-mu-control--family-standard-ruled-2026-10-13-backlog-1276).
+  The target is `mu-control` (INTERFACE) and its tests `mu-control-tests`; the build option is `MUFAMILY_WITH_CONTROL`.
 - `Plugin/` holds only the processor (and its `PluginProcessor_<Aspect>.cpp` parts), the editor and the
   standalone entry. Engine, sampler and preset code belongs in `Audio/` and `Persistence/`. The
   top-level `PluginEditor.{h,cpp}` (the `EditorShellBase` subclass) is in `Plugin/` in every product

@@ -1416,6 +1416,103 @@ read the bank there; let a pad, a launch or a layer-preset load write the bank (
 strip, name or colour; clear banks under `layersLock`; store embedded sample bytes in a clip; add a `Clip` suffix type per product; edit the Layer virtuals
 for this.
 
+## Controller library (`mu-control`) — family standard (ruled 2026-10-13; backlog #1276)
+
+Structure of the library that holds controller drivers (the Launchpad X first). What the device does, the lights, the staged build order and the
+tests per stage are in [design-launchpad.md §3.2d](design-launchpad.md#32d-building-mu-control-ruled-2026-10-13-backlog-1276). This section is the shape
+every future driver, and the one-instance rig, relies on.
+
+**1. Kind, name, namespace.** `mu-control/` is a sibling library of `mu-core`, an **INTERFACE library** exactly like it (sources are compiled in the
+consuming target, where the JUCE modules are already set up). Namespace **`mu_control`** (one namespace for the whole library; sub-areas nest only
+when a device needs private helpers, `mu_control::launchpadx`). Include root is `mu-control/`; because the Standalone target has both include roots, **no
+folder or file path under `mu-control/` may equal a path under `mu-core/`** (the folder names below are chosen for that). It uses `mu-core` headers
+and nothing else of the family; the only `mu-core` types it names are `ControlAction`, `ControlSink`, `LiveView` and the attachment seam of item 4.
+
+**2. Folders (by role, like `mu-core`; the eight-folder product layout is for instrument products and does not apply).**
+
+| Folder | Holds |
+|---|---|
+| `Surface/` | The device-independent half: `SurfaceDescription.h`, `SurfaceEvent.h` (control id, press/release/value event, LED state), `SurfaceMapping.{h,cpp}`, `SurfaceModel.{h,cpp}` (including the blink animation) |
+| `Driver/` | The port-facing half: `SurfaceDriver.h` (the interface), `DevicePorts.h` (the byte pipe the driver talks to), `JuceDevicePorts.{h,cpp}` (the real ports, M3) |
+| `Devices/<Device>/` | One folder per device family. `Devices/LaunchpadX/`: `LaunchpadXProtocol.{h,cpp}` (pure byte encode and decode, no ports), `LaunchpadXPalette.h` (hue name to bright and dim colour), `LaunchpadXDriver.{h,cpp}` |
+| `Manager/` | `ControllerManager.{h,cpp}` (discovery, hot-plug, lifetime, the refresh timer; implements `mu_core::ControlAttachment`) and `ControlRegistration.cpp` (item 4) |
+| `Tests/` | `mu-control-tests` and its test-only helpers (`MockGridDriver.h`, `FakeDevicePorts.h`, `FakeLiveView.h`, `FakeControlSink.h`) |
+
+File = class; the four parts of design-launchpad §3.1 are named **`SurfaceDriver`, `SurfaceDescription`, `SurfaceMapping`, `SurfaceModel`** (`Surface` is
+reserved for this library, [design-naming.md](design-naming.md)); a device driver is `<Device>Driver` (`LaunchpadXDriver`, later `LaunchpadMiniDriver`,
+`PushDriver`). Everything under `Surface/` and `Driver/SurfaceDriver.h` knows no device bytes and no product; everything under `Devices/` knows no
+`ControlAction`, `LiveView` or mapping (a driver turns bytes into `SurfaceEvent`s and `LedState`s, nothing else).
+
+**3. Build.**
+- Root `CMakeLists.txt` always `add_subdirectory(mu-control)` (before the products), so the library is compiled and its tests built in every
+  configuration; **what the option decides is whether the apps link it.**
+- Option **`MUFAMILY_WITH_CONTROL`** (root, beside `MUFAMILY_FOCUSED_BUILD`; **OFF** until M4 is accepted on the hardware, then Andy decides the default). When ON,
+  a product's CMake calls `mu_control_attach(<product>_Standalone)` (a function `mu-control/CMakeLists.txt` defines; a no-op when the option is OFF),
+  which links `mu-control` to the **Standalone target only**, never the plugin's shared-code target, so VST3 and CLAP carry none of it (the Performance
+  mode scope rule, above). mu-Clid, mu-Tant, mu-Toni and mu-On call it; mu-Clid MIDI has no standalone and does not; mu-link does not.
+- `mu-control-tests` is a `juce_add_console_app` in `mu-control/Tests/CMakeLists.txt`, built in `ALL_BUILD`, mirroring `mu-core-tests` (compiles the library
+  sources directly, includes `mu-core` for the headers, links `juce_core`, `juce_audio_devices`, `juce_data_structures`, `juce_events`; it also compiles
+  `mu-core/Persistence/PerformanceFile.cpp`, which `LiveView.h` needs). Its sources link no product and no `ProcessorBase`.
+
+**4. The seam: how the standalone shell gets a manager without knowing `mu-control`.** `mu-core` cannot include `mu-control` and `ProcessorBase` must not own
+a controller. So `mu-core` owns the **slot** and `mu-control` fills it:
+- `mu-core/Control/ControlAttachment.h` (new): the **device-neutral handle** the shell and Settings page see.
+  `enum class ControlStatus { NotFound, Found, InUse, Released, Lost }` (the lamp states of [design-ui-family.md §14](design-ui-family.md#14-controller-status-and-release-ruled-2026-10-13-backlog-1276));
+  `struct ControlAttachment { virtual ControlStatus getStatus() const = 0; virtual juce::String getDeviceLabel() const = 0; virtual void release() = 0; virtual void connect() = 0; addListener / removeListener (Listener::controlStatusChanged(), message thread); virtual ~ControlAttachment(); }`
+  (device name and status text only; no driver type is visible), and
+  `using ControlAttachmentFactory = std::function<std::unique_ptr<ControlAttachment>(ControlSink&, const LiveView&, const SurfaceLook&, const juce::File& settingsFolder)>;`
+  with `ControlAttachmentFactory& controlAttachmentFactory()` (a function-local static, empty by default, so there is no initialisation-order hazard).
+- `mu-core/Control/SurfaceLook.h` (new, plain data, no UI include): the colours and timings a surface needs, filled by the shell from the same tokens the screen uses
+  (`MuLookAndFeel::layerPalette`, the app accent, `indicatorFault`, `Lighting::padDimScale`, `queuedPulseHz`, `clipMutedFlashHz`, `stepFlashMs`): `{ std::array<uint32_t, 8> layerRgb; uint32_t accentRgb, faultRgb; float dimScale, pulseHz, flashHz; int stepFlashMs; }`.
+  This is how `mu-control` gets screen colours with **no `mu-core/UI` include** and the pad stays the same colour as its layer on screen (design-launchpad §3.2b).
+- The processor holds a **non-owning** `ControlAttachment*` (`ProcessorBase::setControlAttachment`, cleared before the attachment is destroyed) and `ShellBackend`
+  gains a defaulted `ControlAttachment* getControlAttachment() const` (nullptr), so `StandardSettingsOverlay` shows the "Controller" group (§14) when it is non-null.
+  `ProcessorBase` does not own, create or know the manager: it holds an observer of a `mu-core` interface, like `getControlSink()`.
+- `mu-control/Manager/ControlRegistration.cpp` sets that factory from a namespace-scope initialiser. It is compiled **into the Standalone executable** (INTERFACE
+  sources, not a static library, so the linker cannot drop it). Linking `mu-control` is therefore the whole switch: no `#if`, no product line, no `mu-core`
+  include of `mu-control`.
+- `mu-core/Plugin/StandaloneShell.h` `App::initialise`, in the **windowed branch only** (never the `--render` branch, which must not touch a MIDI port), after the
+  window is up: if the factory is set and the processor's `ShellBackend` returns a non-null `getControlSink()` and `getLiveView()` and
+  `supportsPerformanceMode()` is true, it stores `controlAttachment = factory(*sink, *view, SurfaceLook::fromTheme(), settingsFolder)` and calls
+  `processor.setControlAttachment(controlAttachment.get())`. `App::shutdown` clears the processor's pointer and resets `controlAttachment`
+  **first**, before the preset-name hook, the bridge and the plugin holder, because the manager holds references into the processor and must restore the
+  device before the window goes.
+- The manager's constructor takes **only `ControlSink&`, `const LiveView&` and the settings folder.** It names no `ProcessorBase`, `ShellBackend`, editor, window
+  or product. This is what lets a mu-link hub or a one-instance host create one over its own sink and view later (Performance mode item 7); a hub supplies a
+  sink that forwards to the focused instance and changes nothing in `mu-control`.
+- Rejected: a product `StandaloneApp.cpp` line under `#if` (four copies of the same wiring, and the option would have to be repeated in each product); an
+  `#include` of a `mu-control` header from `StandaloneShell.h` (a `mu-core` to `mu-control` dependency, even if guarded); `ProcessorBase` owning the manager (it
+  is built in plugins and headless renders).
+
+**5. Threads.** Everything in `mu-control` is message-thread or MIDI-input-thread; **it never touches the audio thread** and needs no `dsp-controller` review
+unless that changes. A driver's input callback runs on the MIDI thread: it decodes into `SurfaceEvent`s, pushes them onto a fixed-size lock-free FIFO and
+triggers an `AsyncUpdater`; the manager drains on the message thread, runs the mapping and calls `ControlSink::perform` there (the `ControlSink` contract). LED
+output is built and sent on the message thread (the model diffs against the last frame and sends only the changes, batched into one lighting message).
+`LiveView` listeners are told on the message thread; the model re-renders from the listener. Blinking is the driver side's own animation (design-launchpad §3.6): one
+`juce::Timer` (about 30 Hz) that runs **only while some pad is pulsing or flashing**, recomputing those pads' colours from the clock and sending the changed ones; a
+slow timer (about 1 Hz) rescans for a missing device and nothing else runs while idle.
+
+**6. Device ownership (consistent with [Device MIDI output](#device-midi-output--family-standard)).** A driver owns its ports and opens them **only while
+Performance mode is on**, and puts the device into its host-controlled mode (Programmer mode) at the same moment; leaving the mode, quitting, a window close, an
+OS-requested quit, a disabled controller, a device change and manager destruction all close the session by restoring the device's own mode first. Outside Performance
+mode the app holds no controller port and the device behaves as bought, so a DAW, another app or the on-device Setup menu is never blocked by a mu app that is idle
+(design-launchpad R1, R2). **Detection is by name only:** the manager matches `MidiInput::getAvailableDevices()` / `MidiOutput::getAvailableDevices()` against each registered
+driver's name patterns without opening anything, which is what makes the Settings lamp read `Found`; the device inquiry happens when the ports are opened at entry.
+Hot-plug uses `juce::MidiDeviceListConnection`. `release()` closes the session as above and parks the manager (`Released`) until `connect()`; `connect()` rescans and, if
+Performance mode is already on, reopens. A crash leaves the device in Programmer mode until it is unplugged (accepted, R1).
+
+**7. Boundary, enforced.** `check-core-boundary.ps1` already scans `mu-control/` for plugin includes and plugin namespaces, and `mu-core` for `mu-control`
+includes. Add (test-steward / coder): a `mu-control` file must not include `ProcessorBase.h`, `ProcessorCore.h`, `EditorShellBase.h`, `ShellBackend.h` or any
+`mu-core/UI/` header, so "depends only on `ControlSink` and `LiveView`" is checked, not remembered; and a file under `Surface/` or `Manager/` must not include
+anything under `Devices/`, while `Devices/` must not include `Surface/SurfaceMapping.h` or `SurfaceModel.h`.
+
+**8. Standing check (design-future).** Easier. A new device is one folder under `Devices/` plus a registration line in its driver list; the manager, mapping,
+model, seam and tests are shared; the same four parts serve any grid surface; and the hub or the combined instance reuses the manager unchanged (item 4).
+
+Do not: give `ProcessorBase` or the editor a manager; add `#if` wiring or a `mu-control` include to `mu-core`; link `mu-control` to a plugin's shared-code target; open a
+port in `--render` or outside Performance mode; let a driver call `ControlSink`, read `LiveView` or write a parameter; let the model or mapping hold device bytes; copy
+`MidiControlMap` into `mu-control`; name a product in `mu-control`.
+
 ## Hot-swap (staged preset / layer swaps) — family pattern
 
 Every product loads presets *while playing* without an audible glitch by **staging**

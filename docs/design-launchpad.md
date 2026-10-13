@@ -1,13 +1,13 @@
 # μ Family — Playing Live from a Novation Launchpad X
 
-**Status: research and plan, 2026-10-09. Nothing built, nothing tried on hardware** (work laptop, no device).
+**Status: research and plan, 2026-10-09; hardware probed 2026-10-10 (§3.5); `mu-control` build ruled 2026-10-13 (§3.2d), nothing of it built yet.**
 Part 1 is read from Novation's *Launchpad X Programmer's reference manual*
 ([the PDF](reference/Launchpad-X-Programmers-Reference-Manual.pdf), converted to text and read in full, including the
 two pad-layout and colour-palette pictures). Part 2 is our proposal and is not decided.
 
 Why it matters: playing live with other musicians means hands on pads, not a mouse. The Launchpad X is the
 owner's controller. It also fits the one-framework direction in [design-future.md](design-future.md): the
-controller code goes **once into `mu-core`** as a device-independent controller layer, so other surfaces slot in with one driver and every app gets them (§3).
+controller code is written **once** as a device-independent layer (the action vocabulary in `mu-core`, the surface layer in the `mu-control` library, §3.2a), so other surfaces slot in with one driver and every app gets them (§3).
 
 ---
 
@@ -187,7 +187,7 @@ the stager), so the pads show the new preset's clips once it commits.
 - An automatic chain (play clip 3 for two loops, then 5, ...) was in the earlier draft and is **dropped** by this
   decision; it can come back later as an option on top of the clip bank without changing it.
 
-**Edge buttons** (a Launchpad X has only 16 plus the logo, so the rest go on a second page behind shift; a surface
+**Edge buttons.** *Superseded for version 1 by [section 3.6](#36-surface-mapping-defaults-for-the-launchpad-x-ruled-2026-10-13-backlog-1276): no shift, no second page, no transport or panic pad. The table below is the later-version idea.* (A Launchpad X has only 16 plus the logo, so the rest go on a second page behind shift; a surface
 with more buttons uses fewer pages):
 
 | Control | Action |
@@ -252,7 +252,9 @@ The architecture half. The look of the browser is for the `ux-controller` (list 
 ### 3.2a Where the code lives: a separate `mu-control` library (owner deferred to this recommendation, 2026-10-09)
 
 Controller code goes in a new **`mu-control`** library, a sibling of `mu-core` (a library, not a product). It is created
-when #1276 starts, not before, so there is no empty target.
+at stage M1 of #1276 (§3.2d), not before, so there is no empty target. Its structure (folders, namespace, build option, the
+standalone seam, threads, device ownership) is ruled in
+[design-plugin-family.md, Controller library](design-plugin-family.md#controller-library-mu-control--family-standard-ruled-2026-10-13-backlog-1276).
 
 | In `mu-core` (small, stable, no devices) | In `mu-control` (devices) |
 |---|---|
@@ -316,6 +318,63 @@ committing to it.
 Everything above is from the manual's picture and reading; the real LED colours, how distinct neighbouring hues look
 in a dim room or on stage, and the dim levels all need checking on the device (backlog #1274).
 
+### 3.2d Building `mu-control` (ruled 2026-10-13; backlog #1276)
+
+Structure (folders, `mu_control`, `MUFAMILY_WITH_CONTROL`, `mu_control_attach`, the `ControlAttachment` seam, threads, ownership, boundary rules) is in
+[design-plugin-family.md, Controller library](design-plugin-family.md#controller-library-mu-control--family-standard-ruled-2026-10-13-backlog-1276). This
+section is what the four parts contain, what the first device maps, and the order to build them in. **Settled by Andy 2026-10-13: grid rows = layers,
+columns = clips 1 to 8** (this closes the old open question in §5).
+
+**The four parts (§3.1) and their supporting types, as data (shapes, not final signatures).**
+
+| Part | File | Shape |
+|---|---|---|
+| Description | `Surface/SurfaceDescription.h` | `struct SurfaceDescription { juce::String id, name; int gridWidth, gridHeight; std::vector<SurfaceButtonGroup> buttons; ColourSupport colour (None, Palette, Rgb); bool canFlash, canPulse, hasPressure; }`. A button group is `{ kind: Top / Side / Special, count, label }`. The Launchpad X: 8 x 8, Top 8, Side 8, Special 1 (logo), `Rgb`, flash, pulse. Pure data, no behaviour. |
+| Event and LED | `Surface/SurfaceEvent.h` | `SurfaceControlId { kind (Pad, Top, Side, Special), x, y }` with y counted from the **top** of the surface so the model and mapping never see a device's numbering; `SurfaceEvent { id, Press / Release / Value, float value }`; `LedState { id, uint32 rgb (final: dim scale and blink phase already applied), Mode (Static, Flash, Pulse) }`. With RGB the model animates (own timer, §3.6) and always sends `Static` colours; `Mode` is the intent a driver without RGB maps to its native flash or pulse. Colours come from `SurfaceLook` (design-plugin-family, item 4), so `mu-control` includes no UI header. The driver converts to and from its own bytes and numbering. |
+| Driver | `Driver/SurfaceDriver.h` | `describe()`; `open(DevicePorts&)` / `close()` (close restores the device's own mode); `setLeds(span<const LedState>)` (one batched send); `onEvent` callback (MIDI thread, see the threads rule); `isOpen()`. No `ControlAction`, no `LiveView`. |
+| Ports | `Driver/DevicePorts.h` | The byte pipe: `send(bytes, size)`, `onBytes` callback, `portNames()`. `JuceDevicePorts` is the real one (M3); `FakeDevicePorts` records sends and injects input (M2). Drivers never include a JUCE MIDI port type directly, so they test with no hardware. |
+| Mapping | `Surface/SurfaceMapping.{h,cpp}` | `SurfaceControlId -> ControlAction` rules plus the inverse for lights; the default is generated from the `SurfaceDescription` in code; only **user overrides** are saved, in `<settingsDir>/<appName>_surface.json` with a `version`, keyed by the description `id` (global per user and not in the preset, for the same reasons as `MidiControlMap`; actions saved by their stable names). |
+| Model | `Surface/SurfaceModel.{h,cpp}` | Takes `ControlSink&`, `const LiveView&`, a `SurfaceDescription` and a `SurfaceMapping`. `handle(SurfaceEvent)` maps and performs; `render()` returns the `LedState` frame from `LiveView` and is diffed by the manager. Device independent: it asks the description what is possible and degrades (no flash: a muted playing clip shows as dim static; a narrower or shorter grid shows what fits). |
+| Manager | `Manager/ControllerManager.{h,cpp}` | Finds a matching driver among the registered ones (by port-name pattern then device inquiry, with a user override of the port), opens it on entering Performance mode, closes it on leaving, drives the model from `LiveView` changes, retries on hot-plug. Implements `mu_core::ControlAttachment`. |
+
+**`LiveView` additions (mu-core, M1).** The model needs three things `LiveView` does not yet give: `getLayerCount()`, `getLayerColourIndex(layer)` (the
+index into the shared layer palette; the driver's `LaunchpadXPalette` turns it into a hue and the colour, §3.2b) and, with the clip bank's C5,
+`isLayerMuted(layer)`, `getPlayingClip(layer)`, `getQueuedClip(layer)`, `getClipMask(layer)`. `LiveState` gets the first two through callbacks the owner supplies
+(`layerCount()`, `layerColourIndex(i)`, the same pattern as `canLoad`), so it stays free of `ProcessorBase`; `ProcessorBase` wires them to `ProcessorCore`.
+They are plain getters; nothing here changes how the screen works.
+
+**Default mapping and lights for the Launchpad X** are ruled in §3.6 (top row = `PerformanceItem`, right column bottom to top = layers 1 to 8 = `SelectLayer`, grid row = layer and
+column = clip = `LaunchClip`, no second page and no transport or Panic in version 1) and are not repeated. The default is generated in code by `SurfaceMapping` from the
+`SurfaceDescription` (description coordinates, y from the top, so layer 1 is the bottom row, `y = gridHeight - 1`); the driver owns the Launchpad's own numbering. The
+"Controller" Settings group and the sticky `Lost` status line of design-ui-family §14 read `ControlAttachment` (status, device label, `release()`, `connect()`).
+
+**Mock grid driver (the second-driver proof).** `Tests/MockGridDriver.h`, header-only and test-only: a 4 x 4 grid, 4 top buttons, **no side buttons, no flash or
+pulse, palette colour only**, a different id and a different coordinate order (origin bottom-right) from the Launchpad X. It implements `SurfaceDriver` against
+`FakeDevicePorts`. If the same `SurfaceModel` and `SurfaceMapping` drive both with no `if (device)` anywhere in `Surface/`, the layer is device independent;
+`SurfaceModelTests` runs every case against both descriptions. This is the acceptance test of the architecture, not a convenience.
+
+**Staged build order.** Each stage is one reviewable batch with its tests written in the same stage (test-steward owns the catalogue entry); all
+tests are in `mu-control-tests` unless stated; every stage ends with `check-core-boundary.ps1` clean and a Debug build of `mu-control-tests` plus
+`mu-core-tests` where `mu-core` changed. Hardware work (M3, M4) is run on the build PC with the Launchpad connected and recorded in §3.5.
+
+| Stage | Work | Tests |
+|---|---|---|
+| **M1** library, description, mock, model (no hardware, no app changes) | Create `mu-control/` (CMake, `mu_control_attach`, `MUFAMILY_WITH_CONTROL` OFF, `mu-control-tests` in `ALL_BUILD`); `SurfaceDescription`, `SurfaceEvent`, `SurfaceDriver`, `DevicePorts`, `SurfaceMapping` (default generation + JSON round trip), `SurfaceModel` (top row to `PerformanceItem`, side column to `SelectLayer`, lights and their blink animation from a `SurfaceLook`); `MockGridDriver`, `FakeDevicePorts`, `FakeLiveView`, `FakeControlSink`. In `mu-core`: `ControlAttachment.h`, `SurfaceLook.h`, the `LiveView` additions with `LiveState` callbacks and `ProcessorBase` wiring. Extend `check-core-boundary` (item 7 of the structure section). | `SurfaceDescriptionTests`; `SurfaceMappingTests` (default for both descriptions, override round trip, unknown action name and unknown description id ignored, version field); `SurfaceModelTests` on **both** descriptions (press maps to the right `ControlAction`, release does nothing, rows past `getLayerCount()` dark, lit item states, queued pulses or degrades per `canPulse`, listener change re-renders, a press with the sink returning false changes no light, dim = `dimScale` x bright, pulse and flash phases at the look's rates from an injected clock, blink animation only while something blinks); `mu-core-tests`: `LiveState` layer-count and colour callbacks, `ControlAttachment` factory default empty |
+| **M2** `LaunchpadXProtocol` and `LaunchpadXDriver` against fake ports | `LaunchpadXProtocol` (numbering `10 * row + col` and CC 19..89 / 91..98 to `SurfaceControlId` and back; lighting messages; the batched lighting SysEx up to 81 entries; Programmer / Live / aftertouch-off / LED-feedback messages; device-inquiry reply recognition); `LaunchpadXPalette` (nearest palette index for a colour, used only when RGB lighting is unavailable; dim scale comes from `SurfaceLook`, not from here); `LaunchpadXDriver` over `DevicePorts`. | `LaunchpadXProtocolTests`: every pad and button round trip; note-on velocity 0 is a release; CC 127 / 0; exact bytes of every message above, including the §3.5 recorded ones (inquiry reply, `...0C 00` read, `...0E 01` / `00`, `...0B 02 01`); a 82nd lighting entry splits into a second message; malformed, short and foreign SysEx ignored. `LaunchpadXDriverTests` (fake ports): open sends Programmer mode then aftertouch off, close sends Live mode, input bytes become `SurfaceEvent`s with y from the top, `setLeds` sends only what changed, a closed driver sends nothing, a second `close()` is harmless |
+| **M3** real device I/O, Programmer and Live on every exit path | `JuceDevicePorts` (first output pair for commands and lights, second input pair for pads, match by name pattern with override, §3.5); `ControllerManager` without the shell (a test and a small probe harness call it); hot-plug; `ControlStatus` (`NotFound`, `Found`, `InUse`, `Released`, `Lost`), `release()` and `connect()`; the connect sequence read back; all-pad lighting SysEx and RGB tried on the device; logo press behaviour and button up values recorded. Programmer mode **only while Performance mode is on**; detection is by port name with nothing opened. | `ControllerManagerTests` with fake ports and a fake hot-plug source: status follows plug, unplug, enter, leave, release and connect (`Lost` only when in use and the device vanished; `Found` opens nothing); no port opened until `isPerformanceMode()` turns true; leaving the mode, destroying the manager, disabling it, an unplug-replug and a driver swap each send Live exactly once when open; nothing sent on a manager built and destroyed with the mode off; an event during teardown is dropped, never delivered to a destroyed sink. **Hardware (recorded in §3.5):** the connect and Live restore on quit, window close and OS-requested quit; RGB and batch lighting; the logo; two processes sharing the ports |
+| **M4** the shell, top row, right column | `ControlRegistration.cpp`; the `StandaloneShell.h` hook, `SurfaceLook` fill and shutdown order; `ProcessorBase::setControlAttachment` and `ShellBackend::getControlAttachment`; the "Controller" Settings group and sticky `Lost` line of design-ui-family §14 (the `ux-controller` ruling is in; the build is the coder's, shared code in `mu-core/UI`); `mu_control_attach` calls in mu-Clid, mu-Tant, mu-Toni, mu-On; Launchpad X default mapping of §3.6; lights for the top row and the side column. The first thing Andy can play. | `mu-core-tests`: the shell creates an attachment only with the factory set, a non-null sink and view, `supportsPerformanceMode()` true and not in `--render`, and destroys it before the processor; the "Controller" Settings group exists only with an attachment and its Release / Connect call through (fake attachment). `ControllerManagerTests` end to end with `MockGridDriver` and a real `LiveState` (press top 3 queues item 2 through `ControlSink`; pressing the current item cancels a queued switch; a side press selects the layer and the lights follow). Hardware: top row switches presets in a real performance, side column selects layers, the screen follows, Live restored on exit |
+| **M5** the clip grid (after the clip bank's C5) | Grid mapping to `LaunchClip`; playing, stored, empty, queued and muted lights; press on the playing clip mutes (and the queued-launch rule once Andy answers the clip bank's open question 6). | `SurfaceModelTests` on both descriptions for each pad light state and the mute press; a mock without flash shows muted as dim static; an unlaunchable state (full preset staged) shows pads dark; `LiveState` integration with fake callbacks |
+| **M6** beyond version 1 (not scheduled; each item needs Andy, §3.6 and §5) | Transport on the logo, `Panic` (`ProcessorBase` performs it), a second page with `ClipNext` / `ClipPrev`, the logo heartbeat and the MIDI clock out ([Device MIDI output](design-plugin-family.md#device-midi-output--family-standard)). | When scheduled |
+
+**Andy's decisions (each with the build assumption until he answers).** The pad order and the version 1 button set are already ruled in §3.6 (layer 1 is the bottom row, no
+shift, no second page, no transport or Panic); the layer order is therefore not asked again.
+1. **`MUFAMILY_WITH_CONTROL` default and whether released apps contain it.** Recommend OFF now, ON in the dev configuration after M4 passes on the hardware, and a release
+   decision made then (the apps still never touch a port outside Performance mode).
+2. **Programmer-mode lifetime is §5 question 2.** The build assumes the recommendation there (ports opened and Programmer mode entered only while Performance mode is on). Architecture
+   consequence if Andy chooses the alternative (at app start): the manager opens the ports at construction instead of entry, `Release` becomes the only escape, and nothing else changes.
+3. **Two apps in Performance mode at once** both receive the pad (the ports are shared, §3.5). Recommend leaving it until the mu-link focus idea (Performance mode item 7), and
+   playing one app at a time meanwhile.
+
 ### 3.3 Things that matter on stage
 
 - **Launch quantise.** A mute or clip change should land on the next bar, not when the finger lands (a clip launch
@@ -356,13 +415,46 @@ From a throwaway JUCE 9.0.3 probe on Windows 11 with Windows MIDI Services runni
 
 **Recommendation:** the `LaunchpadXDriver` opens the first output pair for commands and lighting, listens on the second input for pads and buttons (match by name, let the user override), sends Programmer mode and aftertouch-off on connect, and Live on clean exit.
 
+### 3.6 Surface mapping defaults for the Launchpad X (ruled 2026-10-13; backlog #1276)
+
+**Settled by Andy (2026-10-13):** grid rows = layers, columns = clips 1 to 8; top row of round buttons (CC 91-98) = `PerformanceItem(1..8)`; right column (CC 19..89, bottom to top = layers 1..8) = `SelectLayer`. This is the default mapping in `mu-control`; it produces the same `ControlAction`s as the screen, so every rule below is the on-surface twin of [design-ui-family.md sections 12 and 13](design-ui-family.md#12-performance-mode-ruled-2026-10-12-revised-2026-10-13-with-the-owners-decisions-backlog-1279). The screen half (Settings group, status line) is [section 14](design-ui-family.md#14-controller-status-and-release-ruled-2026-10-13-backlog-1276).
+
+**Colour source and method.** Layer colours are `MuLookAndFeel::layerPalette` (hue names, 3.2b); item colours are the app accent. The driver sends **RGB** (lighting SysEx type 3, batched, changed pads only); the palette index through the hue table is the fallback for a surface without RGB. **Bright** = the token colour; **dim** = the colour scaled by new `MuTheme::Lighting::padDimScale` **0.30** (the 25 to 35 % of 3.2b; check on the pad, R8). **Blink is driven by the driver's own timer, not the device's flash/pulse modes**, so the pads match the screen exactly and do not depend on a MIDI clock being sent: pulse = smooth between dim and bright at `queuedPulseHz` (2 Hz); flash = square 50 % between bright and dim at `clipMutedFlashHz` (1 Hz). The device's native modes are the fallback for a driver that cannot send RGB.
+
+| Control | State | Light |
+|---|---|---|
+| Grid pad (layer row, clip column) | Playing clip | Bright, layer colour |
+| | Stored, not playing | Dim, layer colour |
+| | Empty | Off |
+| | Queued | Pulsing, layer colour |
+| | Playing clip of a muted layer | Flashing bright / dim, layer colour (the pad never goes off, so it never reads empty) |
+| | Just became playing | One bright flash of `stepFlashMs` (150), then steady (as the screen) |
+| | Row with no layer | Whole row off |
+| Top row (item n) | Current | Bright, app accent |
+| | Available | Dim, app accent |
+| | Queued **or loading** | Pulsing, app accent |
+| | Empty item | Off |
+| | Missing file / other product | Dim, `indicatorFault` red, steady (the pad twin of the fault lamp, 12.2) |
+| Right column (layer n) | The selected layer | Bright, that layer's colour |
+| | Any other existing layer | Dim, that layer's colour |
+| | No layer | Off |
+
+- **Loading is not a separate state in v1.** From the press until the swap commits the top-row pad pulses; that covers waiting for the boundary and parsing the preset off the audio thread (both end at the commit). A distinct "parsing" cue is deferred until the largest preset's load time is measured on the build PC (R6, R7); see question 5.
+- **Pressing the current item cancels a queued switch; pressing another replaces it** (12.2). Pressing the playing clip mutes, pressing it again unmutes; with another clip queued on that layer it cancels the queue (13.3). Pressing an empty pad does nothing (a pad never writes). A press on an off pad or an absent layer does nothing and shows no light.
+- **Muted layers on the right column** are not shown (the column shows selection only; the grid shows mute).
+- **No shift, no modifier, no second page in version 1.** All 16 edge buttons and all 64 pads are used by the settled mapping, and the screen is locked in Performance mode, so nothing else is reachable and nothing can go wrong with a half-pressed modifier.
+- **Transport pad and Panic: not in version 1.** The play / stop state is set on the PC before Performance mode is entered (the clock owner, host or MIDI clock, is unaffected). If Andy wants transport on the surface later, the recommendation is the **logo button (CC 99)** as one play / stop toggle, subject to the hardware check that it sends a press (3.5, still open): lit green while running, dim green stopped, and when a host or MIDI clock owns the clock a **static dim white, press ignored** (the "visibly greyed" rule of 3.3: grey is the one colour no state uses; it never pulses). Panic has no pad (a stray press on stage that kills the sound is worse than the problem it solves); a stuck note is cleared from the PC after leaving the mode. Both are Andy's call, question 1.
+- **The logo stays unlit in version 1** (the beat heartbeat of 3.2 waits for the clock-out fixes).
+- **Disconnect or lost device:** the pads go dark by themselves; the app shows the sticky status line of design-ui-family 14. Reconnect (the port reappears) re-sends Programmer mode, aftertouch off and a full light refresh.
+- **Programmer mode lifetime** is question 2; the recommendation is that the device is in Programmer mode **only while Performance mode is on**, and Live mode is sent on leaving it, on release, on device removal where possible, and on clean exit (R1).
+
 ## 4. Order of work (all on the build PC; the owner said nothing is coded today)
 
 1. **Hardware check** (§3.4): list the port names, try the Programmer-mode switch and a lighting SysEx from a small
    console test, confirm button up values, power-cycle behaviour and whether two apps can open it.
 2. **MIDI input mapping in `mu-core`** (CC / note to parameter or action, learn, saved), which the Launchpad and any
    other controller will use.
-3. **The controller layer, in a new `mu-control` library** (§3.2a) (driver interface, surface description, mapping, surface model) with the `LaunchpadXDriver`: lights out, the clip grid, layer select / mute, transport. Test in mu-On or mu-Clid first. A second driver (any other grid) is the proof the layer is device-independent.
+3. **The controller layer, in a new `mu-control` library** (§3.2a) (driver interface, surface description, mapping, surface model) with the `LaunchpadXDriver`: lights out, the clip grid, layer select / mute, transport. Built in stages M1 to M6 (§3.2d). The mock grid driver is the second driver and the proof the layer is device-independent.
 4. **The per-layer clip bank** (eight clips a pad can address, saved with the preset) and the generic launch actions on the parent `Layer`, as it and its derived types land.
 5. **Live full-preset switch** through the existing full-preset hot-swap (check that FX tails and held voices survive the commit; measure first, R6) and the **Performance** level above it (a list of eight preset pointers, R7).
 6. **Clock out** to the device for flashing / pulsing (after the clock-out fixes).
@@ -375,7 +467,14 @@ existing **hot-swap**; pad lights are playing = bright, available = dim, empty =
 
 **Still open:**
 
-- Standalone only to start, or a plugin in a DAW too (R2)?
-- Rows = layers and columns = clips, or the other way round?
+**Decided (owner, 2026-10-13):** standalone only to start; rows = layers, columns = clips; top row = performance items, right column = select layer (3.6).
+
+**Open from the 3.6 ruling (Andy):**
+
+1. **Transport and Panic on the surface?** Recommendation: neither in version 1 (3.6). If wanted: the logo button as play / stop, greyed when a clock owns the tempo; Panic never on a pad.
+2. **When does the device enter Programmer mode?** Recommendation: only while Performance mode is on (the device is a normal Launchpad the rest of the time and a crash cannot strand it in our mode, R1). The alternative is at app start whenever a device is found, so the pads light before you enter the mode; it needs the Release button to be the real escape.
+3. **Dim level 0.30 and own-timer blink** are by-eye choices; confirm or adjust on the pad (R8, #1274).
+4. **Top-row colour:** the app accent (as the screen lamps). On the pad the app accent of mu-Clid (teal) and the layer colour cyan can look alike; if so on the real LEDs, say so and the top row moves to white (palette 3 / RGB neutral) for all apps.
+5. **A distinct "parsing" cue** on a top-row pad (for a slow preset load) is not in version 1; revisit after the load-time measurement (R6, R7).
 - Which other actions matter live besides clip launch and mute: tempo, a filter sweep on a pad?
 - Which other controllers do you have or plan (so the first second driver is a real one)?
