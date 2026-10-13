@@ -16,14 +16,29 @@ function P($t)   { $sel.Style = $doc.Styles("Normal");      $sel.TypeText($t); $
 function Br()    { $sel.InsertBreak(7) }   # wdPageBreak
 function Bullet($t) { $sel.Style = $doc.Styles("List Bullet"); $sel.TypeText($t); $sel.TypeParagraph() }
 
-# Screenshot placeholder — italic, centred, distinct so screenshots can be
-# located via Find ("[Screenshot:") and replaced by the artwork at release time.
-function Pic($caption) {
+# Screenshot: when an image file is given and exists in the images folder next to this script, it is
+# inserted (full text width) with its caption underneath. Otherwise an italic, centred placeholder
+# is written, distinct so it can be located via Find ("[Screenshot:") and replaced by artwork later.
+function Pic($caption, $image = "") {
+    $path = ""
+    if ($image) { $path = Join-Path $PSScriptRoot ("images\" + $image) }
     $sel.Style = $doc.Styles("Normal")
     $sel.ParagraphFormat.Alignment = 1   # wdAlignParagraphCenter
-    $sel.Font.Italic = $true
-    $sel.TypeText("[Screenshot: $caption]")
-    $sel.Font.Italic = $false
+    if ($path -and (Test-Path $path)) {
+        $shape = $sel.InlineShapes.AddPicture($path, $false, $true)
+        $shape.LockAspectRatio = -1
+        if ($shape.Width -gt 432) { $shape.Width = 432 }     # text width in points (6 inches)
+        if ($shape.Height -gt 340) { $shape.Height = 340 }   # keep tall crops on the page
+        $sel.EndKey(5) | Out-Null   # wdLine: move past the picture
+        $sel.TypeParagraph()
+        $sel.Font.Italic = $true
+        $sel.TypeText($caption)
+        $sel.Font.Italic = $false
+    } else {
+        $sel.Font.Italic = $true
+        $sel.TypeText("[Screenshot: $caption]")
+        $sel.Font.Italic = $false
+    }
     $sel.ParagraphFormat.Alignment = 0   # wdAlignParagraphLeft
     $sel.TypeParagraph()
 }
@@ -50,7 +65,7 @@ P "mu-link is a standalone application only — there is no plug-in version. It 
 H2 "Who Is This For?"
 P "mu-link is for performers and producers who want to run more than one mu instrument at once — for example a rhythmic mu-Clid alongside an evolving mu-Tant drone — locked tightly together and mixed to a single output, without a DAW. It is built for the stage: it can also slave the whole rig to an external MIDI clock from a drum machine, groovebox, or DAW, and send MIDI clock out to outboard gear."
 
-Pic "mu-link window: transport bar with the clock-source switch along the top, the Clients mixer strips, and the Scenes panel below."
+Pic "mu-link window: transport bar with the clock-source switch along the top, the Clients mixer strips, and the Scenes panel below." "main-window.png"
 
 # ── 2. The Concept ───────────────────────────────────────────────────────────
 H1 "2. How It Works"
@@ -71,7 +86,7 @@ Bullet "Clients mixer (middle) — one strip for each connected app, plus the Ma
 Bullet "Scenes panel (bottom) — eight scenes that send program changes to your connected apps."
 P "Audio and MIDI devices are not chosen in the main window. Click the gear to open the Settings page; the Audio / MIDI devices button on that page opens the device dialog (see Choosing an Audio Device)."
 
-Pic "Annotated window showing the transport bar, the Clients mixer, and the Scenes panel."
+Pic "The window showing the transport bar, the Clients mixer, and the Scenes panel." "window-overview.png"
 
 # ── 5. Choosing an Audio Device ───────────────────────────────────────────────
 H1 "5. Choosing an Audio Device"
@@ -82,8 +97,8 @@ Bullet "MIDI input — enable the port carrying MIDI clock if you want mu-link t
 Bullet "MIDI output — choose a port to send MIDI clock out to outboard gear (see MIDI Clock Out)."
 P "If no device opens at launch (for example the default is in use), just pick a working one in the device dialog — mu-link starts driving the bus as soon as a device opens; no restart is needed."
 
-Pic "Settings page, General group, with the Choose devices... button."
-Pic "Audio / MIDI device dialog with an output device and a MIDI input selected."
+Pic "Settings page, General group, with the Choose devices... button." "settings-general.png"
+Pic "Audio / MIDI device dialog with an output device and a MIDI input selected." "device-dialog.png"
 
 # ── 6. Connecting Your mu Apps ────────────────────────────────────────────────
 H1 "6. Connecting Your mu Apps"
@@ -125,8 +140,8 @@ Bullet "Amber — a dropout happened a little while ago and the lamp is holding 
 P "A dropout in the first second after an app connects is normal and does not light the lamp. Changing Latency clears the lamps, because the old warnings no longer apply. Hover over a lit lamp and the status bar suggests raising Latency."
 P "One caution: if your audio device uses a very large buffer, Normal leaves the apps little safety margin. If an app still drops out with a large buffer, choose High."
 
-Pic "Settings page, Clients section, showing the Latency choice."
-Pic "Mixer strip with the Dropouts lamp lit amber."
+Pic "Settings page, Clients section, showing the Latency choice." "settings-latency.png"
+Pic "Mixer strips with the Dropouts lamp on the first app latched amber after a dropout." "dropouts-lamp-amber.png"
 
 # ── 8. The Master Clock ───────────────────────────────────────────────────────
 H1 "8. The Master Clock"

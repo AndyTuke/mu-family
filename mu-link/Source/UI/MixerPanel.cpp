@@ -153,7 +153,7 @@ void MixerPanel::updateLatencyAndDropouts()
         {
             d.state = next;
             strips[(size_t) i]->setClientDropout(next == 1 ? MixerChannel::Dropout::Active : MixerChannel::Dropout::Latched);
-            if (next == 1) report("Dropouts", "Dropouts: raise Latency in Settings", MuLookAndFeel::channelPalette[i]);
+            if (next == 1) report("Dropouts", "raise Latency in Settings", MuLookAndFeel::channelPalette[i]);
         }
     }
 }
