@@ -48,6 +48,11 @@ void HotSwapStager::cancelStagedFullPreset()
     stager.cancelFull();
 }
 
+bool HotSwapStager::takeStagedFullPreset(PreparedFullPreset& out)
+{
+    return stager.consumeFullNow([&out](PreparedFullPreset& staged) { out = std::move(staged); });
+}
+
 void HotSwapStager::cancelAllStaged()
 {
     // Drop every per-rhythm swap, then the full preset: a full preset applied at once overwrites every slot.

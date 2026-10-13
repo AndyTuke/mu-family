@@ -80,6 +80,9 @@ void PresetIO::restoreSession(const juce::ValueTree& root)
 
 void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
 {
+    // Applied at once: anything staged while the transport played must not land on top of the restored state.
+    proc.hotSwapStager.cancelAllStaged();
+
     int n = juce::jlimit(1, RhythmSequencer::MaxRhythms,
                          (int)state.getProperty("numRhythms", 1));
 

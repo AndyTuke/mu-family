@@ -59,7 +59,8 @@ public:
     // commitStagedFullPreset — deferred to the next loop point when playing, applied
     // immediately when stopped (one unified path). A non-MuClidPreset root is host /
     // project state and goes straight to restoreStateFromTree.
-    void loadPreset(const juce::File& file);
+    // Returns false when the file could not be read (nothing was loaded or staged).
+    bool loadPreset(const juce::File& file);
 
     // Commit a pre-built full preset into live state under suspend + layersLock, then
     // finalise APVTS / mixer / global params. Called from loadPreset (stopped, immediate)

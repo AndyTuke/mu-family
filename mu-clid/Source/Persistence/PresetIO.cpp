@@ -782,21 +782,21 @@ HotSwapStager::PreparedFullPreset PresetIO::prepareFullPreset(const juce::ValueT
                                    (int) RhythmSequencer::MaxRhythms);
 }
 
-void PresetIO::loadPreset(const juce::File& file)
+bool PresetIO::loadPreset(const juce::File& file)
 {
     auto xml = juce::parseXML(file);
     if (! xml)
     {
         proc.noteFullPresetLoadFailed();
         if (proc.onLoadError) proc.onLoadError("Could not parse: " + file.getFileName());
-        return;
+        return false;
     }
     auto root = juce::ValueTree::fromXml(*xml);
     if (! root.isValid())
     {
         proc.noteFullPresetLoadFailed();
         if (proc.onLoadError) proc.onLoadError("Invalid preset: " + file.getFileName());
-        return;
+        return false;
     }
 
     // A non-MuClidPreset root is host / project state (the getStateInformation
@@ -804,7 +804,7 @@ void PresetIO::loadPreset(const juce::File& file)
     if (root.getType() != juce::Identifier("MuClidPreset"))
     {
         restoreStateFromTree(root);
-        return;
+        return true;
     }
 
     // Full .muclid preset — ONE unified path. Pre-build every Rhythm + VoiceEngine +
@@ -816,7 +816,20 @@ void PresetIO::loadPreset(const juce::File& file)
     // load is glitch-free with its sample disk I/O done off the layersLock.
     auto prepared = prepareFullPreset(root);
     if (proc.sequencerPlaying.load())
+    {
         proc.hotSwapStager.stageFullPreset(std::move(prepared));
+
+        // The transport may have stopped between the read and the staging; the stop edge could already
+        // have passed, so nothing would ever flag the payload. Re-read after a fence (as LayerSwapper::useFull
+        // does) and, if stopped, take the payload back and apply it here.
+        std::atomic_thread_fence(std::memory_order_seq_cst);
+        if (! proc.sequencerPlaying.load())
+        {
+            HotSwapStager::PreparedFullPreset takenBack;
+            if (proc.hotSwapStager.takeStagedFullPreset(takenBack))
+                commitStagedFullPreset(takenBack);
+        }
+    }
     else
     {
         // Applied at once: an earlier full preset or per-rhythm swap still staged from while the transport
@@ -824,6 +837,7 @@ void PresetIO::loadPreset(const juce::File& file)
         proc.hotSwapStager.cancelAllStaged();
         commitStagedFullPreset(prepared);
     }
+    return true;
 }
 
 //==============================================================================
