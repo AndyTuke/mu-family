@@ -40,6 +40,8 @@ target_sources(mu-core-tests PRIVATE
     LegacyPrefixTests.cpp
     SegmentControlTests.cpp
     FaderThumbGeometryTests.cpp
+    BipolarSliderRowTests.cpp
+    ../UI/Components/BipolarSliderRow.cpp
     TransportBarTests.cpp
     ShellChromeTests.cpp
     PerformanceModeShellTests.cpp
