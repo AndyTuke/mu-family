@@ -118,8 +118,8 @@ void VoiceEngine::trigger(bool isAccented, bool tied)
     // Engine-level amp envelope (single ADSR for the whole engine, not per-voice).
     // Untied retrigger resets to zero and noteOns; the voice slot's sample audio
     // mixes into tempBuffer and the env multiplies the post-filter signal before
-    // the insert. Tied hits already returned above so env state carries across
-    // contiguous pattern hits (pattern legato unchanged).
+    // the insert. Tied hits on an active amp envelope already returned above so env state
+    // carries across contiguous pattern hits (pattern legato unchanged).
     (void) claimedIndex;  // slot index no longer needed for env routing
     ampEnv.reset();
     ampEnv.noteOn();
