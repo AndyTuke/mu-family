@@ -1167,7 +1167,14 @@ no window and a plugin editor closes; `ShellBackend` is an interface (what the c
 second owner of "what is selected / queued" beside `LiveState`, the screen-vs-surface disagreement to avoid. **Persistence:** the performance
 path, `currentItem` and `performanceMode` are root properties of the product state in the host session (§3.2c), mode off on a fresh instance,
 restored on reload so a standalone restart returns to the gig. `selectedLayer`, queued and playing clips are not saved. Nothing goes in the
-preset or the APVTS (not a musical parameter, must not be automatable).
+preset or the APVTS (not a musical parameter, must not be automatable). **Wiring (ruled 2026-10-13):** `ProcessorBase` gains two non-virtual
+helpers, `saveLiveState(ValueTree& root) const` and `restoreLiveState(const ValueTree& root)`, thin calls to `LiveState::saveTo / restoreFrom`;
+each product calls them on the root it already assembles in `getStateInformation` / `setStateInformation` (mu-Clid: the session `MuClidPreset`
+root built in `PresetIO::getStateInformation`; mu-Tant, mu-Toni, mu-On: the `captureFullPreset()` / state tree root, same properties). Restore
+runs after the preset restore, because `restoreFrom` sets `currentItem` without staging anything. mu-Clid standalone returns early to the
+`_default.muClid` auto-load before it reads the session, so the live state must be restored from the parsed root on that path too (parse first,
+restore live state, then branch); with the mode restored on, the session wins over `_default` (otherwise `currentItem` names a preset that is
+not playing). mu-Clid MIDI has no standalone and no audio: it does nothing.
 
 **2. How the shell reads it without a product dependency.** `mu-core/Control/LiveView.h`: read-only getters of the above plus
 `addListener / removeListener` with `Listener::liveStateChanged()` (message thread). `ShellBackend` gains defaulted `getLiveView()` and
@@ -1186,8 +1193,10 @@ current selection})`, which seeds `selectedLayer`. A pad press selects that laye
 the playing layer preset plus the queued one; the content changes at the commit. A full-preset switch shows the queued item on
 the lamps and the strip, and changes the display at the commit (the editor refresh is the existing `onPresetSwapCommitted`).
 
-**5. Actions (stable string names; `ControlAction` gains `int index`; `layer` keeps meaning a layer).** `PerformanceMode` (`value` 1 on,
-0 off, toggled if unset; refuses when no performance is loaded or `supportsPerformanceMode()` is false), `PerformanceItem` (`index`
+**5. Actions (stable string names; `ControlAction` gains `int index`; `layer` keeps meaning a layer).** `PerformanceMode` (**`index`**
+-1 toggles (the default, so an unset action toggles), 0 off, 1 on; ruled 2026-10-13 after the step 2 review: the MIDI router overwrites `value`
+with the incoming 0..1 on every dispatch, so a `value` encoding can never toggle from a mapped button, while `index` is left alone;
+refuses when no performance is loaded or `supportsPerformanceMode()` is false), `PerformanceItem` (`index`
 0..7), `PerformancePrev`, `PerformanceNext`, `SelectLayer` (absolute), `LaunchClip` (`layer`, `index`), and for the second page
 `ClipNext`, `ClipPrev` (selected layer). `LayerNext / LayerPrev` are not added (the right column is absolute); they can be if the second page needs
 them. Every action except `PerformanceMode` returns false when the mode is off. Rules inside `perform`:
@@ -1248,7 +1257,7 @@ loop and clock (mu-link). Nothing here needs to change for it, provided the mana
 |---|---|---|
 | 1 | `PerformanceFile` + tests (#1279) | **Done 2026-10-13** (`mu-core/Persistence/PerformanceFile`, saves via `replaceFileAtomically`, tests in `mu-core-tests`) |
 | 1b | Swap timing in `mu-core` (item 6, stages a to d) | nothing from this feature; best before step 4 so launches use the final setting |
-| 2 | `LiveState`, `LiveView`, the actions, `perform`, `supportsPerformanceMode`, persistence, tests with fake callbacks | step 1; `stageItem` is the existing `stageFullPreset`. This is the #1328 work for `SelectLayer`, the performance actions and `PresetNext/Prev`. **Not** #1276 |
+| 2 | `LiveState`, `LiveView`, the actions, `perform`, `supportsPerformanceMode`, persistence, tests with fake callbacks | step 1; `stageItem` is the existing `stageFullPreset`. This is the #1328 work for `SelectLayer`, the performance actions and `PresetNext/Prev`. **Not** #1276. **2a built 2026-10-13 (1b4bf08); 2b and the review fixes built 2026-10-13 (a0fd6ec):** `PerformanceMode` takes `index` (-1 toggle, 0 off, 1 on), `MidiControlMap` saves and loads `index` with a round-trip test, `ProcessorBase::saveLiveState / restoreLiveState` are called by all four session products (mu-Clid parses first and skips the `_default.muClid` auto-load when `LiveState::modeSaved`), and the queue identity is the stage serial plus `reconcile`. architecture-steward re-check 2026-10-13: **Pass** (placement, boundary script, persistence wiring as ruled). Step 3 may start |
 | 3 | `ShellBackend` accessors, the input shield, the indication and mode toggle, editor following `selectedLayer` | step 2 and the `ux-controller` ruling |
 | 4 | `mu-control` surface model reads `LiveView`: top row = `PerformanceItem(n)`, right column = `SelectLayer`, grid = `LaunchClip` | #1276, step 2; the grid needs 5 |
 | 5 | `LaunchClip`, `ClipNext/Prev`, the clip bank and per-layer clip fields in `LiveState` | #1277 (this part of #1328) |
