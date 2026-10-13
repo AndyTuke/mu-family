@@ -111,6 +111,21 @@ P "The master output is protected by a safety limiter, so the summed mix can nev
 
 Pic "Meter strip with several app channels (gain, M, S) and the Master strip."
 
+H2 "Latency and the Dropouts Lamp"
+P "Each connected app renders its audio a little ahead of time, so that a momentary slowdown in one app never glitches the mix. The Latency setting decides how far ahead. A shorter lead means less delay between an app and what you hear; a longer lead gives the apps more safety margin."
+P "To change it, open Settings (the gear button) and look in the Clients section."
+Bullet "Latency — Low, Normal or High. Low is about 43 milliseconds at 48 kHz, Normal about 85 milliseconds, High about 171 milliseconds (2048, 4096 and 8192 frames). Default: Normal. The setting applies to every connected app at once, and to any app that connects later. mu-link remembers it between sessions."
+P "Start with Normal. If you want the tightest response and your computer copes, try Low. If you hear dropouts or clicks from an app, raise Latency to High."
+P "Each app's strip also has a Dropouts lamp. It tells you when that app could not keep up and mu-link had to fill the gap with silence."
+Bullet "Dark — no dropouts."
+Bullet "Red — a dropout has just happened."
+Bullet "Amber — a dropout happened a little while ago and the lamp is holding the warning. Click the lamp to clear it."
+P "A dropout in the first second after an app connects is normal and does not light the lamp. Changing Latency clears the lamps, because the old warnings no longer apply. Hover over a lit lamp and the status bar suggests raising Latency."
+P "One caution: if your audio device uses a very large buffer, Normal leaves the apps little safety margin. If an app still drops out with a large buffer, choose High."
+
+Pic "Settings page, Clients section, showing the Latency choice."
+Pic "Mixer strip with the Dropouts lamp lit amber."
+
 # ── 8. The Master Clock ───────────────────────────────────────────────────────
 H1 "8. The Master Clock"
 P "mu-link is the tempo master for everything connected to it. Its Play / Stop button and tempo drive every connected app's sequencer, gate, and modulators in lockstep."
@@ -154,6 +169,7 @@ H1 "12. Troubleshooting"
 Bullet "An app does not connect — make sure mu-link is running and has an open audio device (pick one in Audio Setup). Apps only attach once mu-link has a working output. Also confirm you are running the STANDALONE app, not the plug-in."
 Bullet "No sound — check the output device in Audio Setup, the Master gain, and that the connected app is actually producing sound (and is not muted in its strip)."
 Bullet "External clock not followed — confirm the correct MIDI input is enabled, the clock-source toggle is set to Ext MIDI, and the external device is sending clock (start it playing)."
+Bullet "An app crackles or drops out — look at its Dropouts lamp. If it lights, open Settings, go to Clients and raise Latency (Low, Normal, High). Use High if your audio device uses a very large buffer."
 Bullet "Nothing happens / conflict — make sure only one audio server is running. Two at once share the same connection points and will conflict."
 
 # ── 13. Technical Specifications ──────────────────────────────────────────────
@@ -164,6 +180,7 @@ Bullet "Audio: stereo per app, summed to one stereo hardware output; one shared 
 Bullet "Clock: sample-accurate master derived from the audio device; Internal (master) or External MIDI (slave) source."
 Bullet "MIDI: clock input (slave) with tempo smoothing and Song Position Pointer; sample-accurate 24-ppqn clock output with Start, Stop, Continue, and Song Position Pointer."
 Bullet "Mixer: per-app gain, mute, solo; master gain with a safety limiter; live metering per app and on the master."
+Bullet "Latency: Low 2048, Normal 4096 (default) or High 8192 frames of render-ahead per app; a Dropouts lamp on each app strip."
 Bullet "Connection: local shared-memory bus (same machine); no virtual audio driver, no network."
 Bullet "Third-party libraries: JUCE."
 
