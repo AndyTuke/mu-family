@@ -584,7 +584,7 @@ Status: Queued: Acid Line (next bar)    (lamp 4 pulsing, SWP badge, ghost "-> 4 
 
 Sections 12.1 to 12.5 settle the toggle (slot, size, accent lit), the indication (preset group becomes the `StepIndicator`, rim, SWP badge, status line), tokens and the keyboard; there is no banner and no new colour. What they left open is ruled here.
 
-- **Shield visuals: none** (the frame and LIVE cue above are separate, non-input chrome). The shield is an invisible shared `ShellChrome` component over the whole editor (sidebar, main panel, overlays, transport bar). It paints nothing, no dim, no cursor change, no tooltip text of its own. It swallows mouse down, up, drag, wheel and double-click, and key presses (it takes keyboard focus on entry and returns true from `keyPressed`, so Escape, Tab, arrows and Ctrl+P all do nothing while on). It sits below the Perf toggle: the shield's `hitTest` returns false over the **exempt rectangles**: the Perf toggle, the `StepIndicator` and the sidebar layer indicator (the last two have no click handling, and hover must still reach them for their status text, 12.2). The shield's size is the editor's; the host window frame, title bar and close button are native and untouched.
+- **Shield visuals: none** (the frame and LIVE cue above are separate, non-input chrome). The shield is an invisible shared `ShellChrome` component over the whole editor (sidebar, main panel, overlays, transport bar). It paints nothing, no dim, no cursor change, no tooltip text of its own. It swallows mouse down, up, drag, wheel and double-click, and key presses (it takes keyboard focus on entry and returns true from `keyPressed`, so Escape, Tab, arrows and Ctrl+P all do nothing while on). It sits below the exempt controls (revised 2026-10-14, [12.7](#127-which-controls-stay-live-in-performance-mode-ruled-2026-10-14-andy-amends-the-principle-backlog-1279): a registry, Play first): the shield's `hitTest` returns false over the **registered exempt components**: Play / Stop, the Perf toggle, the `StepIndicator` and the sidebar layer indicator (the last two have no click handling, and hover must still reach them for their status text, 12.2). The shield's size is the editor's; the host window frame, title bar and close button are native and untouched.
 - **Entering closes everything open.** On entry the shell first closes every overlay and modal (Preset Browser, Mixer, Settings, About, Save, chooser, `confirmAsync` dialogs) as a cancel: nothing is saved, deleted or applied by the closing, then it releases text-editor focus, then the shield goes up. Settings changes are already live, so nothing is lost. Reason: an overlay left open under an invisible shield would be a frozen screen with no way to dismiss it.
 - **Toggle states.** Off: normal metal button "Perf", tooltip `Performance mode (Ctrl+P)`. On: lit in the app accent (`lampOn` accent, as a lit metal button), tooltip `Hold to leave Performance mode`. Same width in both states (`kPerfBtnW`).
 - **Entering with no performance chosen (as built, 2026-10-13).** The toggle and Ctrl+P open the Performance chooser (12.5) and stay off; only a bar with no shell wired says `Choose a performance first` (3 s). The restored session performance (persistence, step 2) also counts as chosen. The MIDI map's `PerformanceMode` action still refuses with none loaded.
@@ -599,6 +599,40 @@ Sections 12.1 to 12.5 settle the toggle (slot, size, accent lit), the indication
 - **Editor follows the surface.** While on, the layer selection comes from `LiveView.selectedLayer` (clamped to the layer count); outside the mode the sidebar selection stays local. On entry the current editor selection seeds it (plan section 4), so nothing jumps.
 - **Status lines (as built, reviewed 2026-10-13).** Each is a name + value pair: `Performance` / `Choose a performance first` (3 s), `Performance` / `Hold to leave Performance mode` (**cleared on release, drag-off and completion**), `Queued` / `4 Acid Line (at the next swap point)`. The fixed "at the next swap point" is accepted until the live view exposes the preset's swap timing; then `<when>` is per 12.2. The exit hold's `muFill` property is a literal key like `muDanger`, accepted by that precedent.
 - **Where it is not specified further:** the clip row is section 13 (#1277); the mixer strip and header-bar badges follow 12.3.
+
+### 12.7 Which controls stay live in Performance mode (ruled 2026-10-14; Andy amends the principle; backlog #1279)
+
+**Amended principle (Andy, 2026-10-14, after testing with a Launchpad: Play was dead and he could not start the transport).** The screen is the normal screen of the playing preset, locked and read-only, **except a short list of exempt controls**. Transport essentials (Play / Stop) must work from the screen; the surface can disconnect, and a performance cannot start without a way to run the clock. Everything not in the Active rows below stays locked. 12.1 item 4 and the "Perf toggle is the one live PC control" wording in this section's principle are read with this exception.
+
+| Control (every product, shell-owned) | State | Reason |
+|---|---|---|
+| Transport **Play / Stop** | **Active** | Amendment: the transport must be startable from the screen. It goes through `mu_core::resolveTransport` as always, so with a host, MIDI clock or Link owning the clock it is greyed, exactly as outside the mode. First to be made exempt. |
+| **Perf / LIVE** toggle (hold 1 s to exit) | **Active** | The one exit; unchanged (12.5). |
+| `StepIndicator`, sidebar layer indicator | **Read-only** (hover status still works) | Indicators, no click handling (12.2, 12.3). |
+| **Tap** tempo | Locked | One stray tap on stage rewrites the tempo. Tempo is set before the gig. (Andy: no, see decisions.) |
+| **Tempo** field / drag | Locked, shows value live | Same; it still animates when a clock changes it. |
+| **Loop / Swap** dropdowns (incl. Swap timing, 6.6) | Locked | Set in the preset; the surface launches within them. |
+| **Preset** dropdown, New, Save | Hidden (replaced by `StepIndicator`) | 12.1 item 2. |
+| **Clip strip** pads | Locked, follows the surface | 13.4; launching is the surface's job. |
+| **Layer** selection (sidebar), Add, Delete, Reset, reorder | Locked | Layer selection follows the surface (12.3); nothing structural on stage. |
+| **Mute** buttons (header bar, mixer) | Locked | Quantised mute is the surface's action (design-launchpad 3.3). |
+| **Mixer** button and overlay | Locked | Opening an overlay under the shield would need every overlay control exempt; a frozen overlay is the failure 12.6 already guards against. |
+| **Settings** (gear), About | Locked | Device and sync setup is done with the mode off (14). |
+| **Master volume** | Locked | Owner decision 1 below. |
+| **Panic / all-notes-off** | Not on screen | None exists; **Stop** is the on-screen recovery (the engine releases held notes on stop). A Panic control stays out until M6 (design-launchpad). |
+| All knobs, faders, dropdowns, preset browser, chooser, keyboard | Locked | 12.1 item 4; no performance keys (12.4), and that includes Space for Play: the shield still swallows all keys. |
+
+**Mechanism: an exempt-controls registry in the shell, not per-product code.** `ShellChrome` (the shield, 12.6) owns `registerExempt(juce::Component&)` / `unregisterExempt(juce::Component&)`, holding `juce::Component::SafePointer`s. The shield's `hitTest` returns false at any point inside a registered, visible, enabled component (tested in the shield's coordinates through `getLocalArea`), so mouse events reach the control itself and everything else is swallowed. Each exempt control is exempt **by registering itself**: `TransportBar` registers Play and the Perf toggle; `StepIndicator` and the layer indicator register themselves; this **replaces** the fixed list of "exempt rectangles" in 12.6. Rules: (1) the shield still swallows **all keys**; an exempt button must have `setWantsKeyboardFocus(false)` so a click never moves focus and Space / Enter do nothing. (2) Registering is a mu-core decision; a product cannot register anything (the registry is not exposed through `EditorShellBase`'s product-facing API). Adding a control to the Active list later is a ruling here plus one `registerExempt` call. (3) The exemption is unconditional on the mode: when the mode is off the shield is down and the registry is unused. Do not use `setInterceptsMouseClicks` on the whole tree, and do not disable-and-re-enable controls.
+
+Play looks and sounds as normal: no extra cue, the existing Play lamp / lit face. It is not a per-product constant; the Active rows are the same in every product.
+
+**Launchpad Play / Stop pad: recommend revisit.** The earlier ruling (no transport and no Panic in version 1, design-launchpad 3.6) stands for version 1, but with screen Play now active the objection (a dead transport) has gone away and the remaining case is a performer whose hands are on the pads. Recommendation: **yes, add Play / Stop on the logo button** (design-launchpad M6, already sketched there: greyed when a clock owns the tempo), scheduled, not a v1 blocker. **Panic never on a pad** (an accidental press must not cut the sound).
+
+**Decisions for Andy (yes / no; recommendation first):**
+1. Tap tempo active in Performance mode? **No** (a stray tap rewrites the tempo; set it before the gig).
+2. Master volume fader active in Performance mode? **No** (an accidental drag is louder than a missing fader on stage; use the host or interface). Say yes if you want a screen level trim.
+3. Launchpad logo button as Play / Stop (M6, not v1)? **Yes.**
+4. Space bar as Play / Stop in the mode? **No** (12.4: no performance keys).
 
 **Future (not now, owner):** several apps in a mu-link rig with one app "in focus" on the Launchpad. Nothing here closes it off: the lock, the indicators and the `ControlSink` are all per app.
 
@@ -739,6 +773,7 @@ The screen half of the Launchpad surface mapping ([design-launchpad.md section 3
 
 ## Design rulings
 
+- 2026-10-14 - Performance mode: Play / Stop must work from the screen (Andy; #1279). Ruled: the principle gains an exempt list (Play / Stop and the Perf toggle active; everything else locked), implemented as a registry in the shield (`registerExempt`), not per-product code; Tap, master volume and Space stay locked (decisions pending); Launchpad logo as Play / Stop recommended for M6. Changed §12.6, new §12.7.
 - 2026-10-14 - Performance mode "is it on?" cue revisited (#1279; Andy could not tell the mode was on: Perf looked like the selected Mixer button). Ruled: a 3 px accent window frame (replaces the 2 px bar rim), the Perf label reads LIVE when on, and the Perf face is a lit-lamp accent face with a glow, not the shared selected-toggle look. New tokens `kPerfFrameW` 3, `kPerfGlowR` 4, `Lighting::performanceGlow` 0.45; `kPerfRimH` retired. Changed §12.1, §12.6.
 - 2026-10-14 - Clip bank decisions A, B, C (#1277) decided by Andy as recommended: A yes (full presets remember the playing clip, `activeClip` per layer); B no (layer preset files do not carry the bank; loading one leaves the bank alone and clears the playing marker); C yes (full-preset format gains an optional `<Clips>` child per layer plus `activeClip`, no version bump). Already implemented. Changed §13.6, §13.8.
 
