@@ -130,8 +130,8 @@ private:
 // Colours ------------------------------------------------------------------------------------------------
 
 // The family layer palette (MuLookAndFeel::layerPalette), copied so the probe needs no UI header.
-constexpr uint32_t kLayerRgb[8] = { 0xE5484D, 0x2EC4C9, 0xF28C28, 0xD04FC8, 0xA6D63A, 0xF07CA6, 0xC9CCD1, 0xB87445 };
-constexpr const char* kLayerName[8] = { "red", "cyan", "orange", "magenta", "lime", "rose", "silver", "copper" };
+constexpr uint32_t kLayerRgb[8] = { 0xE5484D, 0x2EC4C9, 0xF28C28, 0xD04FC8, 0xA6D63A, 0xF07CA6, 0xC9CCD1, 0x2B3FD6 };
+constexpr const char* kLayerName[8] = { "red", "cyan", "orange", "magenta", "lime", "rose", "silver", "navy" };
 
 uint32_t scale(uint32_t rgb, float s)
 {
@@ -274,7 +274,7 @@ void stepHues(double holdSeconds)
     if (! s.open()) return;
 
     Frame f;
-    say("Columns = the 8 layer colours (red cyan orange magenta lime rose silver copper). Rows from the bottom:");
+    say("Columns = the 8 layer colours (red cyan orange magenta lime rose silver navy). Rows from the bottom:");
     say("   1 bright RGB   2 dim x0.45   3 dim x0.30 (the planned level)   4 dim x0.20   5 palette-picture bright   6 palette-picture dim");
     for (int layer = 0; layer < 8; ++layer)
     {
@@ -406,6 +406,31 @@ void stepColourLab(double seconds)
 
     say("\nFinal layer colours (bright) and dim scale ", dimScale, ":");
     for (int i = 0; i < 8; ++i) say("   layer ", i + 1, " ", kLayerName[i], ": ", rgbText(colours[i]), "   dim ", rgbText(scale(colours[i], dimScale)));
+}
+
+// 7: the "Surface colours" window on the pad (colour-corrected by the driver), row for row: layer colours bright, layer dim, app accents bright, app dim
+// (each accent two pads wide). Compare the pad with that window.
+void stepSwatch(double seconds)
+{
+    say("\n== Step 7: surface colour swatch (", seconds, " s) ==");
+    Session s;
+    if (! s.open()) return;
+
+    constexpr uint32_t kAppRgb[4] = { 0x7F77DD, 0x4ADC8E, 0x3D8BEB, 0xF2C53D };
+    // The screen colours go to the driver as the app sends them; the driver applies the pad correction
+    // (LaunchpadXColourMap.h), and dim is the screen colour scaled, which it corrects in pad space.
+    constexpr float dimScale = 0.20f;
+    Frame f;
+    for (int x = 0; x < 8; ++x)
+    {
+        f.pad(x, 0, kLayerRgb[x]);
+        f.pad(x, 1, scale(kLayerRgb[x], dimScale));
+        f.pad(x, 2, kAppRgb[x / 2]);
+        f.pad(x, 3, scale(kAppRgb[x / 2], dimScale));
+    }
+    s.show(f);
+    say("Rows, top to bottom: layer colours 1-8 bright, layer colours dim, app accents (purple, green, blue, yellow; two pads each) bright, app accents dim.");
+    waitFor(seconds);
 }
 
 // A LiveView with settable fields for the demo.
@@ -545,6 +570,7 @@ void usage()
     say("  4  input echo (30 s): decoded presses and raw logo CC 99");
     say("  5  manager demo with 4 layers and 4 items (30 s)");
     say("  6  colour lab: pick a layer colour, nudge RGB and the dim level by eye (300 s)");
+    say("  7  surface colour swatch: the Surface colours window on the pad, row for row (300 s)");
     say("Every step ends with the pads dark and Live mode restored; Ctrl+C does the same.");
 }
 }
@@ -564,7 +590,7 @@ int main(int argc, char** argv)
     {
         const juce::String arg(argv[i]);
         if (arg == "--seconds" && i + 1 < argc) seconds = juce::String(argv[++i]).getDoubleValue();
-        else if (arg.containsOnly("123456") && arg.length() == 1) steps.push_back(arg.getIntValue());
+        else if (arg.containsOnly("1234567") && arg.length() == 1) steps.push_back(arg.getIntValue());
         else if (arg != "--list") { say("Unknown argument: ", arg); usage(); return 2; }
     }
 
@@ -582,6 +608,7 @@ int main(int argc, char** argv)
             case 4: stepInput(seconds > 0 ? seconds : 30.0); break;
             case 5: stepManager(seconds > 0 ? seconds : 30.0); break;
             case 6: stepColourLab(seconds > 0 ? seconds : 300.0); break;
+            case 7: stepSwatch(seconds > 0 ? seconds : 300.0); break;
             default: break;
         }
     }

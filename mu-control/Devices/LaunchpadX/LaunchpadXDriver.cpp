@@ -1,4 +1,5 @@
 #include "Devices/LaunchpadX/LaunchpadXDriver.h"
+#include "Devices/LaunchpadX/LaunchpadXColourMap.h"
 #include "Devices/LaunchpadX/LaunchpadXProtocol.h"
 
 namespace mu_control
@@ -86,7 +87,7 @@ bool LaunchpadXDriver::sendLights(const std::vector<LedState>& leds)
     std::vector<launchpadx::PadLight> lights;
     for (const auto& l : leds)
         if (const auto index = launchpadx::indexOf(l.id))   // the logo has no index and stays unlit
-            lights.push_back({ *index, l.mode, l.rgb });
+            lights.push_back({ *index, l.mode, rgb ? launchpadx::padRgbFor(l.rgb) : l.rgb });   // RGB lighting gets the pad's colour correction
     if (lights.empty()) return true;
 
     bool ok = true;

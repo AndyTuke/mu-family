@@ -202,7 +202,7 @@ struct ControllerShellTests : juce::UnitTest
             const auto look = mu_ui::makeSurfaceLook();
             const auto& light = MuLookAndFeel::lighting();
             expectEquals(look.layerRgb[0], (uint32_t) 0xE5484D);   // the first layer colour of the palette
-            expectEquals(look.layerRgb[7], (uint32_t) 0xB87445);
+            expectEquals(look.layerRgb[7], (uint32_t) 0x2B3FD6);
             expectEquals(look.faultRgb, (uint32_t) (MuLookAndFeel::colour(MuLookAndFeel::indicatorFault).getARGB() & 0xffffffu));
             expectEquals(look.accentRgb, (uint32_t) (MuTheme::current().global.accent.getARGB() & 0xffffffu));
             expectWithinAbsoluteError(look.dimScale, light.padDimScale, 0.0001f);

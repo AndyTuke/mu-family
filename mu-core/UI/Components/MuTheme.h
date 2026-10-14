@@ -313,7 +313,7 @@ struct MuTheme
         float queuedPulseHz      = 2.0f;
         float stepFlashMs        = 150.0f;
         float clipMutedFlashHz   = 1.0f;    // a muted layer's playing clip: square bright / dim flash rate (pad and screen)
-        float padDimScale        = 0.45f;   // a controller pad's dim state: the bright colour scaled by this (chosen by eye on a real Launchpad X)
+        float padDimScale        = 0.20f;   // a controller pad's dim state: the colour-corrected bright pad colour scaled by this (chosen by eye on a real Launchpad X)
 
         // Engraved grooves (a divider cut into a metal panel: a dark line and a light one beside it)
         float grooveShade        = 0.45f;   // the dark line

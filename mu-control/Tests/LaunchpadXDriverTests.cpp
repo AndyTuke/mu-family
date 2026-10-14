@@ -2,6 +2,7 @@
 // bytes, and unplug / replug. No hardware.
 
 #include "Devices/LaunchpadX/LaunchpadXDriver.h"
+#include "Devices/LaunchpadX/LaunchpadXColourMap.h"
 #include "Devices/LaunchpadX/LaunchpadXProtocol.h"
 #include "FakeDevicePorts.h"
 
@@ -25,6 +26,14 @@ std::vector<LedState> fullFrame(uint32_t rgb, LedMode mode = LedMode::Static)
     for (int i = 0; i < 8; ++i) f.push_back({ { ControlKind::Side, 0, i }, rgb, mode });
     f.push_back({ { ControlKind::Special, 0, 0 }, rgb, mode });
     return f;
+}
+
+// The lighting entry the driver sends for a pad index and a screen colour: the colour corrected for the pad, then 7-bit.
+Bytes entryFor(uint8_t index, uint32_t screenRgb)
+{
+    const uint32_t pad = launchpadx::padRgbFor(screenRgb);
+    const auto to7 = [](uint32_t c) { return (uint8_t) ((c * 127u + 127u) / 255u); };
+    return { 0x03, index, to7((pad >> 16) & 0xFFu), to7((pad >> 8) & 0xFFu), to7(pad & 0xFFu) };
 }
 
 // Number of lighting entries in a type 3 message of the given entry width.
@@ -133,9 +142,9 @@ public:
                 expectEquals(entriesIn(m, 5), 80);
                 expect(Bytes(m.begin(), m.begin() + 7) == Bytes { 0xF0, 0x00, 0x20, 0x29, 0x02, 0x0C, 0x03 });
                 expect(m.back() == 0xF7);
-                expect(Bytes(m.begin() + 7, m.begin() + 12) == Bytes { 0x03, 81, 127, 64, 0 });             // pad row 8 col 1
-                expect(Bytes(m.begin() + 7 + 56 * 5, m.begin() + 12 + 56 * 5) == Bytes { 0x03, 11, 38, 19, 0 });   // dim orange
-                expect(Bytes(m.begin() + 7 + 64 * 5, m.begin() + 12 + 64 * 5) == Bytes { 0x03, 91, 0, 0, 127 });
+                expect(Bytes(m.begin() + 7, m.begin() + 12) == entryFor(81, 0xFF8000));   // pad row 8 col 1, colour-corrected
+                expect(Bytes(m.begin() + 7 + 56 * 5, m.begin() + 12 + 56 * 5) == entryFor(11, 0x4D2600));   // dim orange
+                expect(Bytes(m.begin() + 7 + 64 * 5, m.begin() + 12 + 64 * 5) == entryFor(91, 0x0000FF));
             }
         }
 
@@ -155,7 +164,7 @@ public:
             if (ports.sent.size() == 1)
             {
                 expectEquals(entriesIn(ports.sent[0], 5), 1);
-                expect(Bytes(ports.sent[0].begin() + 7, ports.sent[0].begin() + 12) == Bytes { 0x03, 84, 32, 40, 48 });
+                expect(Bytes(ports.sent[0].begin() + 7, ports.sent[0].begin() + 12) == entryFor(84, 0x405060));
             }
         }
 
@@ -168,7 +177,13 @@ public:
             d.setLeds({ { { ControlKind::Pad, 0, 7 }, 0x808080, LedMode::Pulse } });
             expectEquals((int) ports.sent.size(), 1);
             if (! ports.sent.empty())
-                expect(ports.sent[0] == Bytes { 0xF0, 0x00, 0x20, 0x29, 0x02, 0x0C, 0x03, 0x03, 11, 64, 64, 64, 0xF7 });
+                {
+                Bytes expected { 0xF0, 0x00, 0x20, 0x29, 0x02, 0x0C, 0x03 };
+                const auto entry = entryFor(11, 0x808080);   // corrected like any colour, never sent as a blink
+                expected.insert(expected.end(), entry.begin(), entry.end());
+                expected.push_back(0xF7);
+                expect(ports.sent[0] == expected);
+            }
         }
 
         beginTest("a palette driver sends the device's own static, flash and pulse forms");
@@ -283,7 +298,13 @@ public:
             ports.replug();
             expectEquals((int) ports.sent.size(), 3);
             if (ports.sent.size() == 3)
-                expect(ports.sent[2] == Bytes { 0xF0, 0x00, 0x20, 0x29, 0x02, 0x0C, 0x03, 0x03, 11, 127, 64, 0, 0xF7 });
+            {
+                Bytes expected { 0xF0, 0x00, 0x20, 0x29, 0x02, 0x0C, 0x03 };
+                const auto entry = entryFor(11, 0xFF8000);
+                expected.insert(expected.end(), entry.begin(), entry.end());
+                expected.push_back(0xF7);
+                expect(ports.sent[2] == expected);
+            }
         }
 
         beginTest("closing while unplugged sends nothing and still releases the ports");

@@ -146,7 +146,7 @@ const juce::Colour MuLookAndFeel::layerPalette[MuLookAndFeel::kLayerPaletteSize]
     juce::Colour(0xffA6D63A),   // 4 Lime
     juce::Colour(0xffF07CA6),   // 5 Rose
     juce::Colour(0xffC9CCD1),   // 6 Silver
-    juce::Colour(0xffB87445),   // 7 Copper
+    juce::Colour(0xff2B3FD6),   // 7 Navy
 };
 
 namespace

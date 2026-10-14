@@ -11,6 +11,7 @@ target_sources(mu-control-tests PRIVATE
     SurfaceModelTests.cpp
     LaunchpadXProtocolTests.cpp
     LaunchpadXDriverTests.cpp
+    LaunchpadXColourMapTests.cpp
     ControllerManagerTests.cpp
     TestDescriptions.h
     MockGridDriver.h
@@ -19,6 +20,7 @@ target_sources(mu-control-tests PRIVATE
     FakeDevicePorts.h
     ../Surface/SurfaceMapping.cpp
     ../Surface/SurfaceModel.cpp
+    ../Devices/LaunchpadX/LaunchpadXColourMap.h
     ../Devices/LaunchpadX/LaunchpadXProtocol.cpp
     ../Devices/LaunchpadX/LaunchpadXDriver.cpp
     ../Devices/LaunchpadX/LaunchpadXBackend.cpp
