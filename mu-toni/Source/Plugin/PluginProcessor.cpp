@@ -262,6 +262,10 @@ void PluginProcessor::readVoice(int v, ArpParams& ap, ToniVoiceParams& tv,
                         modDestIds.data(), modDestAtoms[(size_t) v].data(),
                         modDestRanges.data(), modParamValues, out);
 
+    // Publish the post-matrix values for the knobs' live modulation arcs.
+    for (int k = 0; k < kNumModDests; ++k)
+        modLive[(size_t) v][(size_t) k].store(out[k], std::memory_order_relaxed);
+
     // Arp (integer dests round; direction/gate/porta continuous).
     ap.scale        = (int) g(vpi::scale);                  // not modulated
     ap.rootNote     = juce::roundToInt(out[D_root]);

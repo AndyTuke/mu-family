@@ -1,5 +1,7 @@
 #include "ArpContent.h"
 
+#include <limits>
+
 namespace mu_toni
 {
 
@@ -202,10 +204,30 @@ void ArpContent::setLayer(int idx)
         t.att = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
             proc.apvts, layerParamId(currentLayer, t.suffix), *t.comp);
 
+    bindModulationArcs();
     insertSub.setChannel(currentLayer);
     shownAccentLen = shownAccentPat = -1;   // redraw the new layer's accent pattern
     refreshAccentSteps();
     repaint();
+}
+
+// Give every knob that has a row in the modulation target table its live modulation arc, driven
+// by the current layer's matrix and the value the audio thread published for that target.
+void ArpContent::bindModulationArcs()
+{
+    static const float kNaN = std::numeric_limits<float>::quiet_NaN();
+    const auto* matrix = &proc.getArp(currentLayer).modulationMatrix;
+    const int layer = currentLayer;
+
+    for (auto& k : knobs)
+    {
+        // Only the layer's own a{N}_ parameters are targets (the FX sends are mixer params).
+        const int dest = (k.prefix == kLayerParamLetter) ? mu_mod::indexOfParam(kModDestTable, k.suffix.toStdString()) : -1;
+        if (dest < 0) { k.comp->clearModBinding(); continue; }
+
+        k.comp->bindModulation(kModDestTable[dest].id, matrix,
+            [this, layer, dest]() -> float { return proc.isInternalPlaying() ? proc.getModLive(layer, dest) : kNaN; });
+    }
 }
 
 void ArpContent::paintOverChildren(juce::Graphics& g)

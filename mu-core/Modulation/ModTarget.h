@@ -41,6 +41,16 @@ constexpr const ModTarget* findTarget(const ModTarget (&table)[N], std::string_v
     return nullptr;
 }
 
+// Index of the row driving parameter `param` (its id without the per-channel prefix), or -1.
+// The UI uses it to find the target a knob shows a live modulation arc for.
+template <std::size_t N>
+constexpr int indexOfParam(const ModTarget (&table)[N], std::string_view param) noexcept
+{
+    for (std::size_t i = 0; i < N; ++i)
+        if (table[i].param != nullptr && param == table[i].param) return (int) i;
+    return -1;
+}
+
 // True if `id` names a live (non-reserved) target in the table.
 template <std::size_t N>
 constexpr bool isValidTarget(const ModTarget (&table)[N], std::string_view id) noexcept

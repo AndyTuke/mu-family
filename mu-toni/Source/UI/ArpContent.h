@@ -55,6 +55,7 @@ private:
     void setAccentStep(int step, bool on);   // write one accent cell into the layer's pattern
     void refreshAccentSteps();               // show the layer's pattern + the arp's place in it
     void buildVoiceBand();
+    void bindModulationArcs();               // live modulation arcs on the knobs the target table drives
 
     static constexpr Group kSourceGroups[4] = { G_OSC1, G_OSC2, G_XMOD, G_MIX };
 
