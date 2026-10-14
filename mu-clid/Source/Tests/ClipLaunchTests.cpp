@@ -93,6 +93,7 @@ struct MuClidClipLaunchTests : juce::UnitTest
     void runTest() override
     {
         storeAndLaunch();
+        clipsHoldDifferentPresets();
         samplePathOnly();
         launchEqualsFileLoad();
         nonClipLoadClearsActiveClip();
@@ -141,6 +142,53 @@ struct MuClidClipLaunchTests : juce::UnitTest
         p.saveRhythmPresetToFile(0, file);
         expect(p.applyRhythmPreset(file, 0));
         expectEquals((int) p.clipMask(0), 1 << 3, "a direct layer-preset load leaves the bank");
+    }
+
+    void clipsHoldDifferentPresets()
+    {
+        beginTest("layer presets loaded then stored into different clips stay different, stopped and playing");
+        TempStorage storage;
+        mu_clid::PluginProcessor p;
+        setParam(p.apvts, kParam, 3.0f);  p.saveLayerPreset(0, "presetA");
+        setParam(p.apvts, kParam, 7.0f);  p.saveLayerPreset(0, "presetB");
+        juce::File fileA, fileB;
+        for (const auto& f : p.slotPresetFiles(0))
+        {
+            if (f.getFileNameWithoutExtension() == "presetA") fileA = f;
+            if (f.getFileNameWithoutExtension() == "presetB") fileB = f;
+        }
+        expect(fileA.existsAsFile() && fileB.existsAsFile());
+
+        for (const bool playing : { false, true })
+        {
+            p.clearClip(0, 0); p.clearClip(0, 1);
+            p.sequencerPlaying.store(playing);
+
+            // Each load is followed at once by a store, as the strip does; a playing load is still pending then.
+            p.loadLayerPreset(0, fileA);
+            expect(p.storeClip(0, 0), "store A");
+            p.loadLayerPreset(0, fileB);
+            expect(p.storeClip(0, 1), "store B");
+            expect(! p.getLayer(0)->clips->get(0).isEquivalentTo(p.getLayer(0)->clips->get(1)), "the two clips differ");
+            expectWithinAbsoluteError((float) (double) p.getLayer(0)->clips->get(0).getProperty(kParam), 3.0f, 0.01f);
+            expectWithinAbsoluteError((float) (double) p.getLayer(0)->clips->get(1).getProperty(kParam), 7.0f, 0.01f);
+
+            // The stored preset still lands, and launching each clip shows its own state.
+            if (playing)
+            {
+                expect(p.hasPendingSwap(0), "the store left the chosen preset staged");
+                Probe::scan(p); Probe::commit(p);
+            }
+            expectWithinAbsoluteError(getParam(p.apvts, kParam), 7.0f, 0.01f);
+            for (const int clip : { 0, 1 })
+            {
+                expect(p.launchClip(0, clip));
+                if (playing) { Probe::scan(p); Probe::commit(p); }
+                expectWithinAbsoluteError(getParam(p.apvts, kParam), clip == 0 ? 3.0f : 7.0f, 0.01f,
+                                          "launch clip " + juce::String(clip));
+            }
+        }
+        p.sequencerPlaying.store(false);
     }
 
     void samplePathOnly()

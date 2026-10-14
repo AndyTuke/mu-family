@@ -615,6 +615,9 @@ protected:
     mu_core::ControlAttachment* controlAttachment = nullptr;   // message thread only
     mu_core::LiveState liveState;   // Performance mode (message thread only; never read on the audio thread)
     uint32_t productFullCommits = 0;                       // full presets applied outside layerSwapper (message thread only)
+    // The tree of each layer's last non-clip stage that is still waiting for its boundary (invalid when none).
+    // A store captures it instead of the live layer, which does not show that preset yet.
+    std::array<juce::ValueTree, mu_limits::kMaxLayers> pendingPresetTree;
     std::atomic<bool> muteChanged { false };               // a strip mute parameter changed on some thread; the poll tells the live state
     std::array<juce::RangedAudioParameter*, mu_limits::kMaxLayers> muteParams {};   // ch{N}_mute, cached (null = none)
     std::atomic<bool> fullPresetLoadFailed { false };   // set by a load that could not read its file
@@ -687,8 +690,15 @@ protected:
     {
         if (! isClip)
             noteNonClipStage(slot);
+        // Deep copy: the stage may migrate or consume its tree, and a store needs it as loaded.
+        const auto staged = isClip ? juce::ValueTree() : tree.createCopy();
         stageLayerPresetTree(slot, std::move(tree), keepIdentity);
+        notePendingPresetTree(slot, staged);
     }
+
+    // Remembers a non-clip tree that is now waiting for its boundary (an invalid tree, a clip launch or an
+    // at-once apply leaves nothing remembered).
+    void notePendingPresetTree(int slot, const juce::ValueTree& staged);
 
     // Empties a layer's clip bank and activeClip, and forgets its live playing / queued clip (null-safe). The
     // shared structural edits call it; a product that overrides resetLayer without the shared reset calls it too.

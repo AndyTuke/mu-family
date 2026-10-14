@@ -181,6 +181,33 @@ struct ClipLaunchTests : juce::UnitTest
             expectEquals(committed, 0);
         }
 
+        beginTest("storing right after a playing preset load keeps that preset in the clip and lets it land");
+        {
+            ClipProcessor src;
+            src.setParam("v0_a", 0.9f);
+            const auto presetA = src.captureLayerPresetTree(0);
+            src.setParam("v0_a", 0.6f);
+            const auto presetB = src.captureLayerPresetTree(0);
+
+            ClipProcessor p;
+            p.setParam("v0_a", 0.1f);
+            p.startPlaying();
+            p.stageNonClip(0, presetA);
+            expect(p.storeClip(0, 0));
+            p.stageNonClip(0, presetB);
+            expect(p.storeClip(0, 1));
+            expect(p.hasPendingSwap(0), "the store left the chosen preset staged");
+            expect(! p.layers[0]->clips->get(0).isEquivalentTo(p.layers[0]->clips->get(1)), "the clips differ");
+
+            expect(p.layerSwapper.flagBoundaries(true, 3.95, 0.2));
+            p.layerSwapper.commit();
+            expectWithinAbsoluteError(p.param("v0_a"), 0.6f, 0.01f);
+            expect(p.launchClip(0, 0));
+            expect(p.layerSwapper.flagBoundaries(true, 7.95, 0.2));
+            p.layerSwapper.commit();
+            expectWithinAbsoluteError(p.param("v0_a"), 0.9f, 0.01f);
+        }
+
         beginTest("a launch equals loading the same layer preset file directly");
         {
             auto dir = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("mu-clip-launch-test");
@@ -326,7 +353,7 @@ struct ClipLaunchTests : juce::UnitTest
             dir.deleteRecursively();
         }
 
-        beginTest("a store is authoritative over a staged swap, and is refused while a full preset is staged");
+        beginTest("a store keeps a staged preset and holds it, and is refused while a full preset is staged");
         {
             using T = mu_core::ControlActionType;
             const auto act = [](T type, int layer, int index)
@@ -336,7 +363,8 @@ struct ClipLaunchTests : juce::UnitTest
                 return a;
             };
 
-            // A staged non-clip layer preset is cancelled by the store: what is stored is what stays.
+            // A staged non-clip layer preset is what the store captures, and it still lands: the clip, the layer
+            // and the lit pad all agree.
             {
                 ClipProcessor p;
                 p.setParam("v0_a", 0.3f);
@@ -346,10 +374,11 @@ struct ClipLaunchTests : juce::UnitTest
                 p.stageNonClip(0, older);
                 expect(p.hasPendingSwap(0), "the plain preset is staged");
                 expect(p.perform(act(T::StoreClip, 0, 3)), "store");
-                expect(! p.hasPendingSwap(0), "the staged preset is cancelled");
+                expect(p.hasPendingSwap(0), "the staged preset is kept");
+                expect(p.layers[0]->clips->get(3).isEquivalentTo(older), "the clip holds the staged preset, not the live layer");
                 p.layerSwapper.flagBoundaries(true, 3.95, 0.2);
                 p.layerSwapper.commit();
-                expectWithinAbsoluteError(p.param("v0_a"), 0.7f, 0.01f);
+                expectWithinAbsoluteError(p.param("v0_a"), 0.3f, 0.01f);
                 expectEquals(p.getLiveState().getPlayingClip(0), 3, "the stored pad is the playing one");
                 expectEquals(p.getLiveState().getQueuedClip(0), -1);
                 expect(p.layers[0]->clips->isOccupied(3), "and the clip is stored");

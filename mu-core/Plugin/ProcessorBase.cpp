@@ -974,6 +974,12 @@ void ProcessorBase::noteNonClipStage(int slot)
     liveState.clearLayerClips(slot);   // a plain layer-preset load also supersedes a queued clip
 }
 
+void ProcessorBase::notePendingPresetTree(int slot, const juce::ValueTree& staged)
+{
+    if (slot < 0 || slot >= mu_limits::kMaxLayers) return;
+    pendingPresetTree[(size_t) slot] = hasPendingSwap(slot) ? staged : juce::ValueTree();
+}
+
 void ProcessorBase::publishClipMasks()
 {
     for (int i = 0; i < mu_limits::kMaxLayers; ++i)
@@ -986,16 +992,20 @@ bool ProcessorBase::storeClip(int slot, int clip, const juce::String& name)
     auto* layer = getLayer(slot);
     if (layer == nullptr || ! mu_core::ClipBank::isValidIndex(clip)) return false;
 
-    // The store is authoritative: a staged swap (a non-clip preset or another queued clip) would land over
-    // what is stored and shown, so drop it and the lamps that followed it before capturing.
-    if (hasPendingSwap(slot))
+    // A preset still waiting for its boundary is what the layer is about to be, but the live layer does not
+    // show it yet: store that preset, and let it land as chosen.
+    juce::ValueTree tree;
+    if (hasPendingSwap(slot) && pendingPresetTree[(size_t) slot].isValid())
+        tree = pendingPresetTree[(size_t) slot];
+    else if (hasPendingSwap(slot))
     {
+        // A queued clip launch: the store is authoritative, so drop it and the lamps that followed it.
         cancelPendingSwap(slot);
         layer->activeClip = -1;
         liveState.clearLayerClips(slot);
     }
-
-    const auto tree = captureLayerPresetTree(slot);
+    if (! tree.isValid())
+        tree = captureLayerPresetTree(slot);
     if (! tree.isValid()) return false;
 
     layer->clips->store(clip, tree, name);   // store deep-copies, so the capture is not aliased
