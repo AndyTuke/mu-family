@@ -357,12 +357,12 @@ public:
             stager.stageFull(std::move(p));
             std::atomic_thread_fence(std::memory_order_seq_cst);   // order the staging before the re-read
             if (! isRunning())
-                stager.consumeFullNow([this](Payload& staged) { if (applyFull) applyFull(staged); });
+                applyPendingFullNow();
             return;
         }
         stager.cancelFull();
         for (int i = 0; i < N; ++i) stager.cancel(i);
-        if (applyFull) applyFull(p);
+        runApplyFull(p);
     }
 
     void useSlot(int i, Payload&& p)
@@ -404,6 +404,10 @@ public:
 
     void cancelFull()                     { stager.cancelFull(); }
     uint32_t fullSerial() const noexcept  { return stager.fullStageSerial(); }
+    // Counts the full presets actually applied (committed at a boundary or applied at once), never staged or
+    // cancelled ones: an observer tells "the layers were replaced" from "a staged preset went away" by it.
+    // Message thread only.
+    uint32_t fullCommitCount() const noexcept { return fullCommits; }
     uint32_t slotSerial(int i) const noexcept { return stager.slotStageSerial(i); }
     void cancel(int i)                    { stager.cancel(i); }
     bool hasPending(int i) const noexcept { return stager.hasPending(i); }
@@ -413,7 +417,7 @@ public:
     // each flagged slot. Returns true when a full preset was committed.
     bool commit()
     {
-        const bool full = stager.consumeFull([this](Payload& p) { if (applyFull) applyFull(p); });
+        const bool full = stager.consumeFull([this](Payload& p) { runApplyFull(p); });
         for (int i = 0; i < N; ++i)
             stager.consume(i, [this, i](Payload& p) { if (applySlot) applySlot(i, p); });
         return full;
@@ -463,12 +467,20 @@ public:
 private:
     void applyPendingFullNow()
     {
-        stager.consumeFullNow([this](Payload& staged) { if (applyFull) applyFull(staged); });
+        stager.consumeFullNow([this](Payload& staged) { runApplyFull(staged); });
+    }
+
+    // The one place a full preset is applied, so the commit count cannot miss a path.
+    void runApplyFull(Payload& p)
+    {
+        ++fullCommits;
+        if (applyFull) applyFull(p);
     }
 
     Stager<Payload, Payload, N> stager;
     ApplyFull                   applyFull;
     ApplySlot                   applySlot;
+    uint32_t                    fullCommits = 0;        // message thread only
     std::atomic<bool>           running    { false };   // audio thread's play state, read when a load decides
     bool                        wasPlaying = false;     // audio thread only — the play→stop edge
 };

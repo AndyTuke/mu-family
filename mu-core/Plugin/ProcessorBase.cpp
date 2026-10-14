@@ -36,6 +36,7 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
     };
     cb.fullPending = [this] { return hasPendingFullPreset(); };
     cb.stageSerial = [this] { return fullStageSerial(); };
+    cb.fullCommitCount = [this] { return fullCommitCount(); };
     cb.cancelItem = [this] { cancelPendingFullPreset(); };
     cb.layerCount = [this] { return getNumLayers(); };
     cb.layerColourIndex = [this](int layer) { return layer >= 0 && layer < getNumLayers() ? getLayerColourIndex(layer) : 0; };
@@ -52,10 +53,17 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
         mute.layer = layer;
         return perform(mute);
     };
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+        muteParams[(size_t) i] = apvts.getParameter("ch" + juce::String(i) + "_mute");   // cached: the lamps ask per pad per frame
     cb.layerMuted   = [this](int layer)
     {
-        const auto* p = apvts.getParameter("ch" + juce::String(layer) + "_mute");
+        const auto* p = layer >= 0 && layer < mu_limits::kMaxLayers ? muteParams[(size_t) layer] : nullptr;
         return p != nullptr && p->getValue() > 0.5f;
+    };
+    cb.savedClip    = [this](int layer)
+    {
+        const auto* l = getLayer(layer);
+        return l != nullptr && l->clips->isOccupied(l->activeClip) ? l->activeClip : -1;
     };
     cb.clipPlaying  = [this](int layer, int clip)
     {
@@ -293,6 +301,14 @@ void ProcessorBase::setTimeSignature(int numerator, int denominator)
 bool ProcessorBase::isFxParamId(const juce::String& id)
 {
     return id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id);
+}
+
+void ProcessorBase::onFxParamChanged(const juce::String& id, float v)
+{
+    syncGlobalFxParam(id, v);
+    // ch{0-7}_mute: a flag for the message-thread poll (the lamps follow a mute made anywhere); alloc-free.
+    if (id.length() == 8 && id[0] == 'c' && id[1] == 'h' && id[3] == '_' && std::strcmp(id.toRawUTF8() + 4, "mute") == 0)
+        muteChanged.store(true, std::memory_order_relaxed);
 }
 
 ProcessorBase::~ProcessorBase()
@@ -827,12 +843,6 @@ bool ProcessorBase::removeLayer(int idx)
         layersMoved(idx, n - 1);                // the shifted slots and the vacated top one
     }
 
-    // The banks moved with their layers (the pointer shift), and so do the live playing clips; the vacated
-    // top slot holds a spare or nothing and must start empty. Remap first: the clear below names the new index.
-    // Outside layersLock, like every clip-bank clear.
-    liveState.remapLayers([idx](int i) { return mu_mix::sidechainAfterRemove(i, idx, mu_limits::kMaxLayers); });
-    clearLayerClips(n - 1);
-
     // Phase 3: parameter values. Strips that ducked from the removed layer now duck from nothing and
     // the others follow their layer down (translated before the values shift).
     remapSidechainSources([idx](int v) { return mu_mix::sidechainParamAfterRemove(v, idx, mu_limits::kMaxLayers); });
@@ -847,6 +857,13 @@ bool ProcessorBase::removeLayer(int idx)
         for (int d = idx; d < n - 1; ++d) copyLayerParams(d + 1, d);
         resetLayerParams(n - 1);                // the vacated top slot
     }
+
+    // The banks moved with their layers (the pointer shift), and so do the live playing clips; the vacated
+    // top slot holds a spare or nothing and must start empty. Last, with processing resumed and the parameters
+    // shifted, so the notification a surface acts on sees the finished edit. Remap first: the clear names the new index.
+    suspend.release();
+    liveState.remapLayers([idx](int i) { return mu_mix::sidechainAfterRemove(i, idx, mu_limits::kMaxLayers); });
+    clearLayerClips(n - 1);
     return true;
 }
 
@@ -878,8 +895,6 @@ bool ProcessorBase::swapLayers(int a, int b)
     // (translated before the values swap, so each strip's own source moves with it).
     remapSidechainSources([a, b](int v) { return mu_mix::sidechainParamAfterSwap(v, a, b, mu_limits::kMaxLayers); });
     remapLayerReferences([a, b](int i) { return mu_mix::sidechainAfterSwap(i, a, b, mu_limits::kMaxLayers); });
-    liveState.remapLayers([a, b](int i) { return mu_mix::sidechainAfterSwap(i, a, b, mu_limits::kMaxLayers); });
-    publishClipMasks();   // the banks swapped with their layers
     if (layerHoldsParamTruth())
     {
         suspend.release();                                 // the audio never reads these parameters: resume first
@@ -888,6 +903,12 @@ bool ProcessorBase::swapLayers(int a, int b)
     }
     else
         swapLayerParams(a, b);
+
+    // The banks and playing clips swapped with their layers. Last, after the parameters moved and processing
+    // resumed, so the notification a surface acts on sees the finished edit.
+    suspend.release();
+    liveState.remapLayers([a, b](int i) { return mu_mix::sidechainAfterSwap(i, a, b, mu_limits::kMaxLayers); });
+    publishClipMasks();
     return true;
 }
 
@@ -936,6 +957,7 @@ void ProcessorBase::clearLayerClips(int slot)
 
 void ProcessorBase::noteNonClipStage(int slot)
 {
+    cancelPendingSwap(slot);   // even if this stage is then aborted, an earlier queued clip must not land unlit
     if (slot >= 0 && slot < mu_limits::kMaxLayers && layers[(size_t) slot] != nullptr)
         layers[(size_t) slot]->activeClip = -1;
     liveState.clearLayerClips(slot);   // a plain layer-preset load also supersedes a queued clip
@@ -1008,8 +1030,11 @@ bool ProcessorBase::launchClip(int slot, int clip)
 
     // The same stage path as a layer-preset load; get() deep-copies, so the stage can migrate the
     // copy and the bank is never written.
+    // A hook that could not build the clip stages nothing and leaves the serial alone; a stage, and the
+    // stopped path's apply-at-once (which cancels first), both move it.
+    const auto serialBefore = slotStageSerial(slot);
     stageLayerPreset(slot, layer->clips->get(clip), true, true);
-    return true;
+    return slotStageSerial(slot) != serialBefore;
 }
 
 uint8_t ProcessorBase::clipMask(int slot) const

@@ -135,6 +135,43 @@ namespace mu_clip_test
             t.expect(! p->perform(act(Type::LaunchClip, 0, 1)), "a launch is refused while a full preset is staged");
         }
 
+        t.beginTest("live clips: cancelling a staged full preset from outside the live state leaves the playing clip; a mute made outside the pad refreshes the lamps");
+        {
+            TempStorage storage;
+            auto p = makeLive(storage);
+            const auto* view = p->getLiveView();
+            p->storeClip(0, 1); p->storeClip(0, 2);
+            t.expect(p->perform(act(Type::LaunchClip, 0, 1)));
+            t.expectEquals(view->getPlayingClip(0), 1);
+
+            p->layerSwapper.stageFull(juce::ValueTree("Full"));
+            p->getLiveState().reconcile();
+            p->cancelPendingFullPreset();             // the UI, a MIDI path or a stop-edge path, not the live state
+            p->getLiveState().reconcile();
+            t.expectEquals(view->getPlayingClip(0), 1, "the layers were never replaced");
+            t.expect(p->perform(act(Type::LaunchClip, 0, 2)), "and a launch still works");
+
+            struct Counter : mu_core::LiveView::Listener
+            {
+                int calls = 0;
+                void liveStateChanged() override { ++calls; }
+            } counter;
+            view->addListener(&counter);
+            if (auto* mute = p->apvts.getParameter("ch0_mute"))
+            {
+                mute->setValueNotifyingHost(1.0f);      // the on-screen strip, automation or MIDI learn
+                p->flushPendingAsyncUpdates();           // the message-thread poll
+                t.expect(counter.calls > 0, "the lamps are told with no other event");
+                t.expect(view->isLayerMuted(0));
+                const int before = counter.calls;
+                p->flushPendingAsyncUpdates();
+                t.expectEquals(counter.calls, before, "told once per change");
+            }
+            else
+                t.expect(false, "ch0_mute exists");
+            view->removeListener(&counter);
+        }
+
         t.beginTest("live clips: removing and swapping layers carries the playing clip and the mask with the layer");
         {
             TempStorage storage;

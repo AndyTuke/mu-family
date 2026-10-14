@@ -39,6 +39,7 @@ public:
         std::function<int(int)>    layerColourIndex;          // layer n's index into the shared layer palette
         std::function<bool()>      fullPending;               // some full preset is staged and not yet committed
         std::function<uint32_t()>  stageSerial;               // changes whenever ANY full preset is staged (identity)
+        std::function<uint32_t()>  fullCommitCount;           // changes whenever a full preset is actually applied (never on a stage or cancel)
 
         // The clip bank. All optional: without them every clip action is refused.
         std::function<bool(int, int)> launchClip;            // stage clip c on layer n (false = refused, nothing staged)
@@ -48,6 +49,7 @@ public:
         std::function<bool(int)>      muteLayer;             // flip layer n's strip mute (the MuteLayer path)
         std::function<bool(int)>      layerMuted;            // is layer n's strip muted
         std::function<void(int, int)> clipPlaying;           // layer n now plays clip c (the owner records it with the layer)
+        std::function<int(int)>       savedClip;             // the clip layer n was saved playing (-1 = none, or it is not stored any more)
     };
 
     void setCallbacks(Callbacks c) { cb = std::move(c); }
@@ -92,8 +94,13 @@ public:
 
     // The owner's "a full-preset swap just committed" hook (message thread): the queued item becomes
     // current when the preset that landed is the one this class staged; a preset loaded some other way
-    // (browser, MIDI program change) leaves no item current.
+    // (browser, MIDI program change) leaves no item current. The clip state restarts from what the new layers
+    // carry as their saved playing clip.
     void fullPresetCommitted();
+
+    // A layer's strip mute changed some way other than a pad (on-screen strip, host automation, MIDI learn):
+    // the lamps that flash for a muted layer must follow. Message thread; the owner marshals from any thread.
+    void notifyMuteChanged() { changed(); }
 
     // The owner calls this after every deferred-work pass (message thread): settles the queue when the
     // staged preset was superseded by another load, or applied early without a commit hook.
@@ -141,9 +148,11 @@ private:
     bool stepClip(int direction);
     void setPlaying(int layer, int clip);
     bool dropClipState();           // forgets every layer's playing and queued clip; true when something was set
+    bool seedClipsFromLayers();     // each layer's saved playing clip becomes its playing clip; true when any did
+    bool resetClips();              // drop, then seed: the state after the layers were replaced
+    void syncFullCommits();         // takes the current full-commit count as already accounted for
     void reconcileItem();
     void cancelQueuedItem();      // drops the staged full preset of a queued item
-    void syncFullSerial();        // takes the current full-preset serial as already accounted for
     void reconcileClips();
 
     Callbacks              cb;
@@ -156,7 +165,7 @@ private:
     uint32_t               queuedSerial    = 0;   // the stage serial when the queued item was staged
     uint32_t               revision        = 0;
     std::array<ClipState, (size_t) mu_limits::kMaxLayers> clipState {};
-    uint32_t               seenFullSerial  = 0;   // the full-preset stage serial the clip state was last settled against
+    uint32_t               seenFullCommits = 0;   // the full-preset commit count the clip state was last settled against
     mutable juce::ListenerList<Listener> listeners;
 };
 

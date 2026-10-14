@@ -1,4 +1,5 @@
 #include "LiveState.h"
+#include <algorithm>
 
 namespace mu_core
 {
@@ -70,7 +71,6 @@ bool LiveState::selectItem(int item)
     {
         if (queuedItem < 0) return true;   // already playing it: nothing to do
         if (cb.cancelItem) cb.cancelItem();   // pressing the playing item while another is queued cancels the switch
-        syncFullSerial();
         queuedItem = -1;
         changed();
         return true;
@@ -135,13 +135,12 @@ bool LiveState::perform(const ControlAction& a)
 void LiveState::cancelQueuedItem()
 {
     if (queuedItem < 0 || ! cb.cancelItem) return;
-    cb.cancelItem();
-    syncFullSerial();   // our own cancel is not a full preset landing
+    cb.cancelItem();   // a cancel never moves the full-commit count, so it cannot read as a landing
 }
 
-void LiveState::syncFullSerial()
+void LiveState::syncFullCommits()
 {
-    seenFullSerial = cb.stageSerial ? cb.stageSerial() : 0;
+    seenFullCommits = cb.fullCommitCount ? cb.fullCommitCount() : 0;
 }
 
 void LiveState::clampSelectedLayer()
@@ -152,9 +151,10 @@ void LiveState::clampSelectedLayer()
 
 void LiveState::fullPresetCommitted()
 {
-    // A full preset replaced every layer, so no pad plays and no launch is still on its way.
-    const bool hadClips = dropClipState();
-    syncFullSerial();
+    // A full preset replaced every layer, so no launch is still on its way and the pads show only what the
+    // new layers saved as playing.
+    const bool hadClips = resetClips();
+    syncFullCommits();
     if (queuedItem >= 0) { reconcileItem(); if (hadClips) changed(); return; }
     // A preset that was not one of this performance's items took over.
     const int before = selectedLayer;
@@ -213,6 +213,27 @@ bool LiveState::dropClipState()
         c.playing = c.queued = -1;
     }
     return any;
+}
+
+bool LiveState::seedClipsFromLayers()
+{
+    if (! cb.savedClip) return false;
+    bool any = false;
+    const int layers = std::min(getLayerCount(), (int) mu_limits::kMaxLayers);
+    for (int layer = 0; layer < layers; ++layer)
+    {
+        const int clip = cb.savedClip(layer);
+        if (clip < 0 || clip >= mu_limits::kClipsPerLayer) continue;
+        clipState[(size_t) layer].playing = clip;   // the owner already holds it; no clipPlaying call
+        any = true;
+    }
+    return any;
+}
+
+bool LiveState::resetClips()
+{
+    const bool dropped = dropClipState();
+    return seedClipsFromLayers() || dropped;
 }
 
 bool LiveState::startClip(int layer, int clip)
@@ -277,12 +298,12 @@ void LiveState::reconcileClips()
 {
     bool dirty = false;
 
-    // A full preset that landed (or was applied at once) replaced the layers, so no pad plays. A staged one
-    // changes nothing until it lands; our own performance cancel re-syncs the serial and is not read as a landing.
-    if (cb.stageSerial && cb.stageSerial() != seenFullSerial && ! (cb.fullPending && cb.fullPending()))
+    // A full preset that landed (or was applied at once) replaced the layers, so the pads restart from what
+    // they saved. Staging one, or cancelling a staged one from anywhere, moves no count and changes nothing.
+    if (cb.fullCommitCount && cb.fullCommitCount() != seenFullCommits)
     {
-        dirty |= dropClipState();
-        syncFullSerial();
+        dirty |= resetClips();
+        syncFullCommits();
     }
 
     // A queued clip: still staged and still ours = waiting; gone with our serial = it landed; otherwise
@@ -378,8 +399,11 @@ void LiveState::restoreFrom(const juce::ValueTree& state)
     cancelQueuedItem();
     performanceMode = false;
     currentItem = queuedItem = -1;
-    dropClipState();   // a restored session replaced the layers: no pad plays
-    syncFullSerial();
+    // A launch staged before the restore would land on the restored layers unlit.
+    if (cb.cancelSlot)
+        for (int layer = 0; layer < mu_limits::kMaxLayers; ++layer) cb.cancelSlot(layer);
+    resetClips();   // a restored session replaced the layers: the pads show the clips it saved as playing
+    syncFullCommits();
     performance = {};
     performanceFile = juce::File();
 

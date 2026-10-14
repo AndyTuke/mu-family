@@ -30,6 +30,16 @@ namespace
         using mu_clid::PluginProcessor::applyMidiPresetLayer;
     };
 
+    // A processor whose layer-preset stage can be made to abort without staging, as a failed load would.
+    struct RefusingProcessor : mu_clid::PluginProcessor
+    {
+        bool refuse = false;
+        void stageLayerPresetTree(int slot, juce::ValueTree tree, bool keepIdentity) override
+        {
+            if (! refuse) mu_clid::PluginProcessor::stageLayerPresetTree(slot, std::move(tree), keepIdentity);
+        }
+    };
+
     const char* const kParam = "r0_hitsA";
 
     juce::File presetsDir()
@@ -90,6 +100,7 @@ struct MuClidClipLaunchTests : juce::UnitTest
         launchWhilePlaying();
         cancelledLaunch();
         liveClips();
+        launchThatCannotBeBuilt();
         bankFollowsStructuralEdits();
         fullPresetAndSessionRoundTrip();
         stagedFullPresetCarriesBanks();
@@ -377,11 +388,94 @@ struct MuClidClipLaunchTests : juce::UnitTest
         expect(p.perform(act(Type::LaunchClip, 0, 1)));
         expectEquals(view->getPlayingClip(0), 1);
         const auto full = storage.root.getChildFile("live.muClid");
-        p.saveFullPresetTo(full);
+        p.saveFullPresetTo(full);                   // saved with clip 1 playing
+        expect(p.perform(act(Type::LaunchClip, 0, 2)));
+        expectEquals(view->getPlayingClip(0), 2);
         p.loadPreset(full);
         p.getLiveState().reconcile();
-        expectEquals(view->getPlayingClip(0), -1, "a full preset forgets the playing clip");
+        expectEquals(view->getPlayingClip(0), 1, "a full preset replaces the playing clip with the one it saved");
+        expectEquals(p.getLayer(0)->activeClip, 1);
         expectEquals((int) view->getClipMask(0), 0b110, "and publishes its own bank");
+
+        // A staged full preset that is cancelled from outside the live state never replaced the layers.
+        expect(p.perform(act(Type::LaunchClip, 0, 2)));
+        p.sequencerPlaying.store(true);
+        p.loadPreset(full);
+        expect(p.hasPendingFullPreset());
+        p.getLiveState().reconcile();
+        p.cancelPendingFullPreset();
+        p.getLiveState().reconcile();
+        expectEquals(view->getPlayingClip(0), 2, "a cancel leaves the playing clip alone");
+
+        // Staged again, it lands at the boundary: mu-Clid's own commit path moves the count.
+        p.loadPreset(full);
+        expect(Probe::scan(p));
+        Probe::commit(p);
+        p.sequencerPlaying.store(false);
+        expectEquals(view->getPlayingClip(0), 1, "a full preset landing drops the clip state and shows the saved clip");
+
+        // A strip mute made outside the pad reaches the lamps with no other event.
+        struct Counter : mu_core::LiveView::Listener
+        {
+            int calls = 0;
+            void liveStateChanged() override { ++calls; }
+        } counter;
+        view->addListener(&counter);
+        p.apvts.getParameter("ch0_mute")->setValueNotifyingHost(1.0f);
+        p.flushPendingAsyncUpdates();
+        expect(counter.calls > 0, "the lamps follow a mute made on the strip");
+        expect(view->isLayerMuted(0));
+        view->removeListener(&counter);
+    }
+
+    void launchThatCannotBeBuilt()
+    {
+        beginTest("a launch whose stage hook staged nothing is refused: no queue, no playing clip, nothing staged");
+        TempStorage storage;
+        juce::AudioProcessor::setTypeOfNextNewPlugin(juce::AudioProcessor::wrapperType_Standalone);
+        RefusingProcessor p;
+        juce::AudioProcessor::setTypeOfNextNewPlugin(juce::AudioProcessor::wrapperType_Undefined);
+
+        using Type = mu_core::ControlActionType;
+        const auto act = [](Type type, int layer = 0, int index = -1)
+        {
+            mu_core::ControlAction a;
+            a.type = type; a.layer = layer; a.index = index;
+            return a;
+        };
+        mu_pp::PerformanceFile list;
+        list.setItem(0, p.getProductStateId(), storage.root.getChildFile("p.preset"), storage.root, "P");
+        p.loadPerformance(list, storage.root.getChildFile("live.muPerformance"));
+        expect(p.perform(act(Type::PerformanceMode, 0, 1)));
+        const auto* view = p.getLiveView();
+        p.storeClip(0, 1); p.storeClip(0, 2);
+
+        p.refuse = true;
+        expect(! p.launchClip(0, 1), "stopped: nothing was applied");
+        expect(! p.perform(act(Type::LaunchClip, 0, 1)));
+        expectEquals(view->getPlayingClip(0), -1);
+        expectEquals(view->getQueuedClip(0), -1);
+        expectEquals(p.getLayer(0)->activeClip, -1);
+
+        p.sequencerPlaying.store(true);
+        expect(! p.perform(act(Type::LaunchClip, 0, 2)), "playing: nothing was staged");
+        expectEquals(view->getQueuedClip(0), -1);
+        expect(! p.hasPendingSwap(0));
+
+        // A real launch queued first, then an aborted non-clip stage: the earlier launch must not land unlit.
+        p.refuse = false;
+        expect(p.perform(act(Type::LaunchClip, 0, 1)));
+        expectEquals(view->getQueuedClip(0), 1);
+        expect(p.hasPendingSwap(0));
+        p.saveLayerPreset(0, "plain");
+        const auto file = p.slotPresetFiles(0).getFirst();
+        p.refuse = true;
+        p.loadLayerPreset(0, file);
+        expect(! p.hasPendingSwap(0), "the aborted stage cancelled the earlier queued clip");
+        p.getLiveState().reconcile();
+        expectEquals(view->getQueuedClip(0), -1);
+        expectEquals(view->getPlayingClip(0), -1);
+        p.sequencerPlaying.store(false);
     }
 
     void cancelledLaunch()

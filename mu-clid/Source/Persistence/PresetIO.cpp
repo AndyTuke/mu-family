@@ -1007,6 +1007,7 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     for (int i = n; i < oldN; ++i)
         proc.clearLayerClips(i);
     proc.publishClipMasks();
+    proc.noteFullPresetApplied();   // every apply path (boundary, stopped, host restore) goes through here: the live state drops its clips on this count
 
     // ── APVTS / mixer / global finalize (message-thread, no I/O) ───────────────
     // The Rhythm + VoiceEngine are already live. Push the moved-in Rhythm into

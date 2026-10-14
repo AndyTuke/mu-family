@@ -25,6 +25,7 @@ struct Fake
     int  cancels = 0;
     bool pending = false;
     uint32_t serial = 0;
+    uint32_t commits = 0;                 // full presets actually applied (a stage or a cancel never moves it)
 
     // The clip bank's owner side: a launch stages on the layer (pending unless the transport is stopped) under
     // a new per-layer serial, as the hot-swap stager does; a commit consumes without touching the serial.
@@ -34,6 +35,7 @@ struct Fake
     std::array<uint32_t, 8> slotSer {};
     std::array<bool, 8>     muted {};
     std::array<int, 8>      recorded { -1, -1, -1, -1, -1, -1, -1, -1 };
+    std::array<int, 8>      saved    { -1, -1, -1, -1, -1, -1, -1, -1 };   // each layer's saved playing clip
     int mutes = 0;
     int slotCancels = 0;
 
@@ -55,6 +57,7 @@ struct Fake
         cb.layerCount  = [this] { return layers; };
         cb.fullPending = [this] { return pending; };
         cb.stageSerial = [this] { return serial; };
+        cb.fullCommitCount = [this] { return commits; };
         cb.launchClip  = [this](int l, int c)
         {
             if (refuseLaunch) return false;
@@ -69,13 +72,16 @@ struct Fake
         cb.muteLayer   = [this](int l) { ++mutes; muted[(size_t) l] = ! muted[(size_t) l]; return true; };
         cb.layerMuted  = [this](int l) { return muted[(size_t) l]; };
         cb.clipPlaying = [this](int l, int c) { recorded[(size_t) l] = c; };
+        cb.savedClip   = [this](int l) { return saved[(size_t) l]; };
         return cb;
     }
 
     // Another full preset (browser, MIDI program change) staged over whatever was waiting.
     void foreignStage() { ++serial; pending = true; }
     // The staged preset reaches its boundary and lands.
-    void commit(LiveState& s) { pending = false; s.fullPresetCommitted(); }
+    void commit(LiveState& s) { pending = false; ++commits; s.fullPresetCommitted(); }
+    // The staged full preset went away without landing (the browser, a MIDI load or a stop-edge path cancelled it).
+    void cancelFullFromElsewhere() { ++serial; pending = false; }
     // The staged layer preset reaches its boundary and lands (the owner then runs its deferred pass).
     void slotCommit(LiveState& s, int layer) { slotPend[(size_t) layer] = false; s.reconcile(); }
     // Another layer-preset load replaced the staged payload; or an edit cancelled it.
@@ -521,13 +527,64 @@ public:
 
             s.perform(launch(0, 1)); f.slotCommit(s, 0);
             expectEquals(s.getPlayingClip(0), 1);
-            ++f.serial;                              // a stopped load applied a full preset with no commit hook
+            ++f.commits;                             // a stopped load applied a full preset with no commit hook
             s.reconcile();
             expectEquals(s.getPlayingClip(0), -1, "the next reconcile notices");
 
             s.perform(launch(0, 1)); f.slotCommit(s, 0);
             s.reconcile();
-            expectEquals(s.getPlayingClip(0), 1, "an unchanged serial leaves the clips alone");
+            expectEquals(s.getPlayingClip(0), 1, "an unchanged commit count leaves the clips alone");
+        }
+
+        beginTest("a staged full preset cancelled from outside the live state leaves the clips alone");
+        {
+            Fake f; LiveState s; ready(f, s);
+            s.setClipMask(0, 0b11);
+            s.perform(launch(0, 1)); f.slotCommit(s, 0);
+            f.foreignStage();                       // the browser stages a full preset
+            s.reconcile();
+            f.cancelFullFromElsewhere();            // and it is cancelled by the UI, a MIDI path or cancelAllStaged
+            s.reconcile();
+            expectEquals(s.getPlayingClip(0), 1, "the layers were never replaced");
+            s.perform(launch(0, 0));
+            expectEquals(s.getQueuedClip(0), 0, "and a launch still works");
+        }
+
+        beginTest("a full preset landing, or a restored session, shows the clips the layers saved as playing");
+        {
+            Fake f; LiveState s; ready(f, s);
+            s.setClipMask(0, 0b101);
+            s.perform(launch(0, 0)); f.slotCommit(s, 0);
+            f.saved[0] = 2;                         // the new layers carry clip 2 as playing
+            f.saved[1] = -1;                        // layer 1 saved none (the owner also reports none for a clip that is not stored)
+            f.foreignStage();
+            f.commit(s);
+            expectEquals(s.getPlayingClip(0), 2, "seeded from the layer");
+            expectEquals(s.getPlayingClip(1), -1);
+            expectEquals(f.recorded[0], 0, "seeding does not write back to the owner");
+
+            s.perform(launch(0, 0));                // a launch waiting before the restore
+            expectEquals(s.getQueuedClip(0), 0);
+            juce::ValueTree state("MuTantState");
+            s.saveTo(state);
+            const int cancelsBefore = f.slotCancels;
+            s.restoreFrom(state);
+            expect(f.slotCancels > cancelsBefore, "staged launches are cancelled on restore");
+            expectEquals(s.getQueuedClip(0), -1);
+            expectEquals(s.getPlayingClip(0), 2, "the restored layers' saved clip shows");
+        }
+
+        beginTest("a mute changed outside the pad refreshes the lamps with no other event");
+        {
+            Fake f; LiveState s; ready(f, s);
+            CountingListener l; s.addListener(&l);
+            const auto rev = s.getRevision();
+            f.muted[0] = true;                      // the strip, host automation or MIDI learn flipped it
+            s.notifyMuteChanged();
+            expectEquals(l.calls, 1);
+            expect(s.getRevision() != rev);
+            expect(s.isLayerMuted(0));
+            s.removeListener(&l);
         }
 
         beginTest("a performance item cancelled by the performer does not read as a full preset landing");

@@ -271,7 +271,7 @@ public:
     // Headless render: the render loop never returns to the message loop, so neither the swap poll
     // swap poll timer is serviced. Call after each processBlock so deferred work (hot-swap commits, MIDI
     // program changes, control actions) runs on the calling thread. No-op when nothing is pending.
-    void flushPendingAsyncUpdates() { drainDeferredWork(); }
+    void flushPendingAsyncUpdates() { drainDeferredWork(); consumeMuteChange(); }
 
     // Default preset: <presets>/_default.<ext>, written by the shell's "Save as Default". Each
     // product calls loadStartupDefault() at the end of its constructor so a saved default is
@@ -305,8 +305,9 @@ public:
     // Reads a layer-preset file into a clip. Refuses (onLoadError, bank unchanged) a file that cannot
     // be read or whose root tag is not this product's layer-preset tag.
     bool    loadClipFromFile(int slot, int clip, const juce::File& layerPreset);
-    // False (nothing changed) when the layer or clip is out of range, the clip is empty, or a full
-    // preset is staged.
+    // False (nothing changed) when the layer or clip is out of range, the clip is empty, a full
+    // preset is staged, or the stage hook staged nothing (a clip that cannot be built). The hook must change
+    // slotStageSerial(slot) whenever it stages or applies a payload, as every stage path does.
     bool    launchClip(int slot, int clip);
     uint8_t clipMask(int slot) const;
 
@@ -315,6 +316,12 @@ public:
     virtual void cancelPendingFullPreset()                                  { layerSwapper.cancelFull(); }
     // Changes whenever any full preset is staged (Performance mode tells its own staging from another load).
     virtual uint32_t fullStageSerial() const                                { return layerSwapper.fullSerial(); }
+    // Changes whenever a full preset is actually applied (committed at its boundary or applied at once), never
+    // when one is only staged or cancelled: the live state drops its clip state on this, not on a stage.
+    uint32_t fullCommitCount() const noexcept                               { return layerSwapper.fullCommitCount() + productFullCommits; }
+    // For a product that applies full presets itself, not through layerSwapper (mu-Clid): call it at
+    // each apply, message thread.
+    void noteFullPresetApplied() noexcept                                   { ++productFullCommits; }
     // Changes whenever layer `slot` is staged or cancelled, never when its swap commits (the live state tells a
     // clip launch from a later layer-preset load on the same layer).
     virtual uint32_t slotStageSerial(int slot) const                        { return layerSwapper.slotSerial(slot); }
@@ -598,6 +605,9 @@ protected:
     mu_hotswap::LayerSwapper<juce::ValueTree, mu_limits::kMaxLayers> layerSwapper;
     mu_core::ControlAttachment* controlAttachment = nullptr;   // message thread only
     mu_core::LiveState liveState;   // Performance mode (message thread only; never read on the audio thread)
+    uint32_t productFullCommits = 0;                       // full presets applied outside layerSwapper (message thread only)
+    std::atomic<bool> muteChanged { false };               // a strip mute parameter changed on some thread; the poll tells the live state
+    std::array<juce::RangedAudioParameter*, mu_limits::kMaxLayers> muteParams {};   // ch{N}_mute, cached (null = none)
     std::atomic<bool> fullPresetLoadFailed { false };   // set by a load that could not read its file
 
     // The audio thread's deferred-work request and the message-thread timer (100 Hz, one relaxed exchange per tick) that drains it.
@@ -613,6 +623,7 @@ protected:
         void timerCallback() override
         {
             owner.drainDeferredWork();
+            owner.consumeMuteChange();
             if (owner.liveState.needsSettling())
                 owner.settleLiveState();   // also catches a stopped-transport load, which never raises the mailbox
         }
@@ -680,6 +691,8 @@ protected:
     void publishClipMasks();
     // Message thread: the masks, then the settle of whatever the live state is waiting for.
     void settleLiveState() { publishClipMasks(); liveState.reconcile(); }
+    // Message thread: tells the live state about a strip mute that changed since the last call (any thread may have changed it).
+    void consumeMuteChange() { if (muteChanged.exchange(false, std::memory_order_relaxed)) liveState.notifyMuteChanged(); }
 
     virtual void applyMidiPresetLayer(int slot, const juce::File& f) { loadLayerPreset(slot, f); }
     virtual void applyFullMidiPreset(const juce::File& f)            = 0;
@@ -839,10 +852,13 @@ private:
     struct FxParamListener : juce::AudioProcessorValueTreeState::Listener
     {
         explicit FxParamListener(ProcessorBase& o) : owner(o) {}
-        void parameterChanged(const juce::String& id, float v) override { owner.syncGlobalFxParam(id, v); }
+        void parameterChanged(const juce::String& id, float v) override { owner.onFxParamChanged(id, v); }
         ProcessorBase& owner;
     };
     std::unique_ptr<FxParamListener> fxParamListener;
+    // The listener's one entry (any thread, audio thread included): the engine sync, plus a flag for the
+    // message thread when a strip mute moved. No allocation.
+    void onFxParamChanged(const juce::String& id, float v);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ProcessorBase)
 };
