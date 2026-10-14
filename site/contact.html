@@ -48,7 +48,7 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px;
 
 /* ── FOOTER ── */
 footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
-.footer-inner { display: grid; grid-template-columns: 200px 1fr 1fr 1fr 1fr; gap: 30px; margin-bottom: 40px; }
+.footer-inner { display: grid; grid-template-columns: 200px repeat(5,1fr); gap: 30px; margin-bottom: 40px; }
 .footer-brand .fb-logo { font-family: var(--ff-disp); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
 .footer-brand .fb-sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.16em; color: var(--text3); text-transform: uppercase; margin-bottom: 14px; }
 .footer-brand p { font-size: 12px; color: var(--text3); line-height: 1.65; }
@@ -71,6 +71,10 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
   .footer-inner { grid-template-columns: 1fr; }
 }
 </style>
+  <style>
+    [aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.4); }
+    [aria-disabled="true"]:hover { box-shadow: none !important; transform: none !important; }
+  </style>
 </head>
 <body>
 
@@ -82,11 +86,13 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     <div class="nav-links">
       <a href="mu-clid.html" class="nav-clid"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid</a>
       <a href="mu-tant.html" class="nav-tant"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-tant</a>
+      <a href="mu-toni.html" style="color:var(--teal-b);text-transform:none"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-toni</a>
+      <a href="mu-on.html" style="color:#E0C568;text-transform:none"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-on</a>
       <a href="mu-clid-midi.html" class="nav-clid"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid MIDI</a>
       <a href="free.html" class="nav-free">μ-link</a>
       <a href="download.html">Download</a>
       <a href="index.html#community">Community</a>
-      <a href="index.html#pricing" class="nav-cta">Pay what you like</a>
+      <a href="index.html#pricing" class="nav-cta">Pay what you want</a>
     </div>
   </nav>
 
@@ -132,9 +138,10 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     <div class="container">
       <div class="footer-inner">
         <div class="footer-brand"><div class="fb-logo">Transwarp</div><div class="fb-sub">Development Project</div><p>Indie audio plugin development from Bath, UK.</p></div>
-        <div class="footer-col"><h4><span style="text-transform:none">μ</span>-clid</h4><ul><li><a href="mu-clid.html#pricing">Pay what you like</a></li><li><a href="mu-clid-releases.html">Release notes</a></li><li><a href="download.html">Download</a></li></ul></div>
-        <div class="footer-col"><h4><span style="text-transform:none">μ</span>-tant</h4><ul><li><a href="mu-tant.html#pricing">Pay what you like</a></li><li><a href="mu-tant-releases.html">Release notes</a></li><li><a href="download.html">Download</a></li></ul></div>
+        <div class="footer-col"><h4><span style="text-transform:none">μ</span>-clid</h4><ul><li><a href="mu-clid.html#pricing">Pay what you want</a></li><li><a href="mu-clid-releases.html">Release notes</a></li><li><a href="download.html">Download</a></li></ul></div>
+        <div class="footer-col"><h4><span style="text-transform:none">μ</span>-tant</h4><ul><li><a href="mu-tant.html#pricing">Pay what you want</a></li><li><a href="mu-tant-releases.html">Release notes</a></li><li><a href="download.html">Download</a></li></ul></div>
         <div class="footer-col"><h4><span style="text-transform:none">μ</span>-clid MIDI</h4><ul><li><a href="mu-clid-midi.html">About</a></li><li><a href="mu-clid-midi-releases.html">Release notes</a></li><li><a href="download.html#mu-clid-midi">Download</a></li></ul></div>
+        <div class="footer-col"><h4>In development</h4><ul><li><a href="mu-toni.html"><span style="text-transform:none">μ</span>-toni</a></li><li><a href="mu-on.html"><span style="text-transform:none">μ</span>-on</a></li></ul></div>
         <div class="footer-col"><h4>Company</h4><ul><li><a href="index.html#community">Community</a></li><li><a href="contact.html" class="active">Contact</a></li><li><a href="https://github.com/AndyTuke/mu-family">Source (GPLv3)</a></li><li><a href="mailto:info@transwarp.me">info@transwarp.me</a></li></ul></div>
       </div>
       <div class="footer-bottom">

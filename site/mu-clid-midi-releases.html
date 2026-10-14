@@ -78,6 +78,10 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
 .footer-social a { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--text3); text-transform: uppercase; }
 @media (max-width: 600px) { .container { padding: 0 20px; } nav { padding: 0 20px; } .nav-links { gap: 16px; } }
 </style>
+  <style>
+    [aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.4); }
+    [aria-disabled="true"]:hover { box-shadow: none !important; transform: none !important; }
+  </style>
 </head>
 <body>
 
@@ -89,11 +93,13 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
     <div class="nav-links">
       <a href="mu-clid.html" class="nav-clid"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid</a>
       <a href="mu-tant.html" class="nav-tant"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-tant</a>
+      <a href="mu-toni.html" style="color:var(--teal-b);text-transform:none"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-toni</a>
+      <a href="mu-on.html" style="color:#E0C568;text-transform:none"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-on</a>
       <a href="mu-clid-midi.html" class="nav-clid active"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid MIDI</a>
       <a href="free.html" class="nav-free">μ-link</a>
       <a href="download.html">Download</a>
       <a href="index.html#community">Community</a>
-      <a href="index.html#pricing" class="nav-cta">Pay what you like</a>
+      <a href="index.html#pricing" class="nav-cta">Pay what you want</a>
     </div>
   </nav>
 

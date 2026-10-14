@@ -187,7 +187,7 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px;
 
 /* ── FOOTER ── */
 footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
-.footer-inner { display: grid; grid-template-columns: 200px 1fr 1fr 1fr 1fr; gap: 30px; margin-bottom: 40px; }
+.footer-inner { display: grid; grid-template-columns: 200px repeat(5,1fr); gap: 30px; margin-bottom: 40px; }
 .footer-brand .fb-logo { font-family: var(--ff-disp); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
 .footer-brand .fb-sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.16em; color: var(--text3); text-transform: uppercase; margin-bottom: 14px; }
 .footer-brand p { font-size: 12px; color: var(--text3); line-height: 1.65; }
@@ -255,6 +255,10 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     .pricing-card.featured { position: relative; top: -10px; }
     @media (max-width: 900px) { .hero-inner { grid-template-columns: 1fr; } }
   </style>
+  <style>
+    [aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.4); }
+    [aria-disabled="true"]:hover { box-shadow: none !important; transform: none !important; }
+  </style>
 </head>
 <body>
   <nav>
@@ -265,11 +269,13 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     <div class="nav-links">
       <a href="mu-clid.html" class="nav-clid"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid</a>
       <a href="mu-tant.html" class="nav-tant active"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-tant</a>
+      <a href="mu-toni.html" style="color:var(--teal-b);text-transform:none"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-toni</a>
+      <a href="mu-on.html" style="color:#E0C568;text-transform:none"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-on</a>
       <a href="mu-clid-midi.html" class="nav-clid"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid MIDI</a>
       <a href="free.html" class="nav-free">μ-link</a>
       <a href="download.html">Download</a>
       <a href="index.html#community">Community</a>
-      <a href="https://transwarp.lemonsqueezy.com/checkout/buy/b2dd23a7-cd2c-48b2-baa5-8fdda3aa7576" class="nav-cta" target="_blank" rel="noopener">Get μ-tant · pay what you like</a>
+      <a class="nav-cta" aria-disabled="true" role="link" tabindex="0" title="Checkout link coming soon" data-ls="mu-tant">Get μ-tant · pay what you want</a>
     </div>
   </nav>
 
@@ -288,7 +294,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
             <span class="pill">Windows</span>
           </div>
           <div class="hero-ctas fade-5">
-            <a href="https://transwarp.lemonsqueezy.com/checkout/buy/b2dd23a7-cd2c-48b2-baa5-8fdda3aa7576" class="btn-primary btn-amber" target="_blank" rel="noopener">Get It <span class="btn-price">· pay what you like</span></a>
+            <a class="btn-primary btn-amber" aria-disabled="true" role="link" tabindex="0" title="Checkout link coming soon" data-ls="mu-tant">Get It <span class="btn-price">· pay what you want</span></a>
             <a href="download.html" class="btn-secondary" style="border-color:rgba(212,137,92,0.3);color:var(--amber-b)">Download ↓</a>
           </div>
         </div>
@@ -383,42 +389,42 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
   <section id="pricing">
     <div class="container">
       <div class="pricing-header">
-        <div class="section-label amber">Pay what you like</div>
-        <h2 class="section-heading">Free to use. Pay if you like it.</h2>
-        <p class="section-sub">μ-tant is free and fully functional. If it earns a place in your music, pay what you like (suggested £20) and get a key to say thanks. The source is open under GPLv3.</p>
+        <div class="section-label amber">Pay what you want</div>
+        <h2 class="section-heading">Pay what you want. Start at £0.</h2>
+        <p class="section-sub">μ-tant is pay what you want, from £0, with £20 suggested (GBP). You get a licence key even for £0. The key removes the support prompt shown when the app starts. Nothing is limited without one. The source is open under GPLv3.</p>
       </div>
       <div class="pricing-grid" style="grid-template-columns:1fr 1fr;max-width:700px;margin:0 auto;">
         <div class="pricing-card">
           <div class="pricing-head">
-            <div class="pricing-tier">No Key Needed</div>
-            <div class="pricing-name" style="color:var(--text)"><span style="color:var(--amber-b)">μ</span>-tant Free Download</div>
+            <div class="pricing-tier">Without a key</div>
+            <div class="pricing-name" style="color:var(--text)"><span style="color:var(--amber-b)">μ</span>-tant without a key</div>
             <div class="pricing-price-block"><span class="price-main">£0</span></div>
             <div class="pricing-divider"></div>
           </div>
           <ul class="pricing-features">
             <li class="hi">Every feature, nothing locked</li>
             <li>All 8 voices and saving included</li>
-            <li>A polite support message once a session</li>
+            <li>A polite support prompt when the app starts, once a session</li>
             <li>No time limit</li>
           </ul>
           <div class="pricing-cta"><a href="download.html" class="btn-full ghost">Download — Windows ↓</a></div>
         </div>
         <div class="pricing-card featured tant-feat" style="top:0;">
           <div class="pricing-head">
-            <div class="pricing-tier">Pay What You Like</div>
-            <div class="pricing-name" style="color:var(--text)"><span style="color:var(--amber-b)">μ</span>-tant supporter key</div>
+            <div class="pricing-tier">Pay What You Want</div>
+            <div class="pricing-name" style="color:var(--text)"><span style="color:var(--amber-b)">μ</span>-tant licence key</div>
             <div class="pricing-price-block"><span class="price-main">£20</span></div>
-            <div class="price-note" style="color:var(--amber)">Suggested &middot; you choose the amount, from £0</div><br>
+            <div class="price-note" style="color:var(--amber)">Suggested &middot; pay what you want, from £0</div><br>
             <div class="pricing-divider"></div>
           </div>
           <ul class="pricing-features" style="--hi-color:var(--amber-b)">
-            <li class="hi">Marks your copy as a supporter</li>
-            <li class="hi">No more support message</li>
+            <li class="hi">Issued even for £0</li>
+            <li class="hi">Removes the support prompt</li>
             <li class="hi">Helps me keep building the μ-series</li>
             <li>Through Lemon Squeezy</li>
             <li>Free updates within v1.x</li>
           </ul>
-          <div class="pricing-cta"><a href="https://transwarp.lemonsqueezy.com/checkout/buy/b2dd23a7-cd2c-48b2-baa5-8fdda3aa7576" class="btn-full tant-p" target="_blank" rel="noopener">Get μ-tant — pay what you like</a></div>
+          <div class="pricing-cta"><!-- LS-URL-TODO: mu-tant --><a class="btn-full tant-p" aria-disabled="true" role="link" tabindex="0" title="Checkout link coming soon" data-ls="mu-tant">Get μ-tant — pay what you want</a></div>
         </div>
       </div>
       <p class="pricing-fine">All prices in GBP. VST3, CLAP &amp; Standalone for Windows, with Linux in beta.<br>macOS is on hold for the foreseeable future — without an Apple code-signing certificate the plugins can't be properly signed for Mac.</p>
@@ -429,9 +435,10 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     <div class="container">
       <div class="footer-inner">
         <div class="footer-brand"><div class="fb-logo">Transwarp</div><div class="fb-sub">Development Project</div><p>Indie audio plugin development from Bath, UK.</p></div>
-        <div class="footer-col"><h4><span style="text-transform:none">μ</span>-clid</h4><ul><li><a href="mu-clid.html#pricing">Pay what you like</a></li><li><a href="mu-clid-releases.html">Release notes</a></li><li><a href="download.html">Download</a></li></ul></div>
-        <div class="footer-col"><h4><span style="text-transform:none">μ</span>-tant</h4><ul><li><a href="#pricing">Pay what you like</a></li><li><a href="mu-tant-releases.html">Release notes</a></li><li><a href="download.html">Download</a></li></ul></div>
+        <div class="footer-col"><h4><span style="text-transform:none">μ</span>-clid</h4><ul><li><a href="mu-clid.html#pricing">Pay what you want</a></li><li><a href="mu-clid-releases.html">Release notes</a></li><li><a href="download.html">Download</a></li></ul></div>
+        <div class="footer-col"><h4><span style="text-transform:none">μ</span>-tant</h4><ul><li><a href="#pricing">Pay what you want</a></li><li><a href="mu-tant-releases.html">Release notes</a></li><li><a href="download.html">Download</a></li></ul></div>
         <div class="footer-col"><h4><span style="text-transform:none">μ</span>-clid MIDI</h4><ul><li><a href="mu-clid-midi.html">About</a></li><li><a href="mu-clid-midi-releases.html">Release notes</a></li><li><a href="download.html#mu-clid-midi">Download</a></li></ul></div>
+        <div class="footer-col"><h4>In development</h4><ul><li><a href="mu-toni.html"><span style="text-transform:none">μ</span>-toni</a></li><li><a href="mu-on.html"><span style="text-transform:none">μ</span>-on</a></li></ul></div>
         <div class="footer-col"><h4>Company</h4><ul><li><a href="index.html#community">Community</a></li><li><a href="contact.html">Contact</a></li><li><a href="https://github.com/AndyTuke/mu-family">Source (GPLv3)</a></li><li><a href="mailto:info@transwarp.me">info@transwarp.me</a></li></ul></div>
       </div>
       <div class="footer-bottom">

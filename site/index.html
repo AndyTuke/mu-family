@@ -187,7 +187,7 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px;
 
 /* ── FOOTER ── */
 footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
-.footer-inner { display: grid; grid-template-columns: 200px 1fr 1fr 1fr 1fr; gap: 30px; margin-bottom: 40px; }
+.footer-inner { display: grid; grid-template-columns: 200px repeat(5,1fr); gap: 30px; margin-bottom: 40px; }
 .footer-brand .fb-logo { font-family: var(--ff-disp); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
 .footer-brand .fb-sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.16em; color: var(--text3); text-transform: uppercase; margin-bottom: 14px; }
 .footer-brand p { font-size: 12px; color: var(--text3); line-height: 1.65; }
@@ -259,6 +259,22 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     .pc-accent-bar { height: 3px; }
     .clid .pc-accent-bar { background: linear-gradient(90deg, var(--accent), var(--teal)); }
     .tant .pc-accent-bar { background: linear-gradient(90deg, var(--amber), #E4C460); }
+    .toni .pc-accent-bar { background: linear-gradient(90deg, var(--teal), var(--cyan)); }
+    .on .pc-accent-bar { background: linear-gradient(90deg, #C9A94A, #E0C568); }
+    .toni .pc-label { color: var(--teal-b); }
+    .on .pc-label { color: #E0C568; }
+    .toni .pc-name .mu { color: var(--teal-b); }
+    .on .pc-name .mu { color: #E0C568; }
+    .toni .pc-price .price-note { color: var(--teal); }
+    .on .pc-price .price-note { color: #C9A94A; }
+    .toni .btn-pc-buy { background: var(--teal); color: #06120E; }
+    .toni .btn-pc-buy:hover { background: var(--teal-b); }
+    .on .btn-pc-buy { background: #C9A94A; color: #14100A; }
+    .on .btn-pc-buy:hover { background: #E0C568; }
+    .toni .btn-pc-outline { color: var(--teal-b); border: 1px solid rgba(29,184,128,0.35); }
+    .on .btn-pc-outline { color: #E0C568; border: 1px solid rgba(201,169,74,0.4); }
+    .product-card.toni:hover { box-shadow: 0 8px 48px rgba(29,184,128,0.18); }
+    .product-card.on:hover { box-shadow: 0 8px 48px rgba(201,169,74,0.18); }
     .link-card .pc-accent-bar { background: linear-gradient(90deg, var(--cyan), #3DE8C0); }
     .pc-body { padding: 28px; }
     .pc-body.link-body { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; }
@@ -328,6 +344,10 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     }
     @media (max-width: 600px) { .hero-ctas { flex-direction: column; } }
   </style>
+  <style>
+    [aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.4); }
+    [aria-disabled="true"]:hover { box-shadow: none !important; transform: none !important; }
+  </style>
 </head>
 <body>
 
@@ -339,11 +359,13 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     <div class="nav-links">
       <a href="mu-clid.html" class="nav-clid"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid</a>
       <a href="mu-tant.html" class="nav-tant"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-tant</a>
+      <a href="mu-toni.html" style="color:var(--teal-b);text-transform:none"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-toni</a>
+      <a href="mu-on.html" style="color:#E0C568;text-transform:none"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-on</a>
       <a href="mu-clid-midi.html" class="nav-clid"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid MIDI</a>
       <a href="free.html" class="nav-free">μ-link</a>
       <a href="download.html">Download</a>
       <a href="#community">Community</a>
-      <a href="#pricing" class="nav-cta">Pay what you like</a>
+      <a href="#pricing" class="nav-cta">Pay what you want</a>
     </div>
   </nav>
 
@@ -353,20 +375,22 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
         <div>
           <div class="hero-eyebrow fade-1">Transwarp Development Project</div>
           <h1 class="hero-title fade-2">The <span class="mu">μ</span>-series.<span class="tagline">Instruments for electronic music.</span></h1>
-          <p class="hero-sub fade-3">A growing family of creative tools for rhythm, synthesis and live performance. Every one is free and fully functional. If you like it, pay what you like (we suggest £20) to say thanks. The source is open (GPLv3).</p>
+          <p class="hero-sub fade-3">A growing family of creative tools for rhythm, synthesis and live performance. μ-clid MIDI and μ-link are freeware. The rest are pay what you want, from £0, with £20 suggested. Nothing is ever limited. The source is open (GPLv3).</p>
           <div class="hero-pills fade-4">
             <span class="pill purple">μ-clid</span>
             <span class="pill amber">μ-tant</span>
+            <span class="pill teal">μ-toni · in development</span>
+            <span class="pill amber">μ-on · in development</span>
             <span class="pill purple">μ-clid MIDI</span>
             <span class="pill cyan">μ-link</span>
-            <span class="pill teal">Free · pay what you like</span>
+            <span class="pill teal">Pay what you want · from £0</span>
             <span class="pill">VST3 &amp; CLAP</span>
             <span class="pill">Windows · Linux beta</span>
           </div>
           <div class="hero-ctas fade-5">
-            <a href="mu-clid.html" class="btn-primary">Explore μ-clid <span class="btn-price">· free</span></a>
-            <a href="mu-tant.html" class="btn-primary btn-amber">Explore μ-tant <span class="btn-price">· free</span></a>
-            <a href="download.html" class="btn-secondary">Download free ↓</a>
+            <a href="mu-clid.html" class="btn-primary">Explore μ-clid <span class="btn-price">· pay what you want</span></a>
+            <a href="mu-tant.html" class="btn-primary btn-amber">Explore μ-tant <span class="btn-price">· pay what you want</span></a>
+            <a href="download.html" class="btn-secondary">Download ↓</a>
           </div>
         </div>
         <div class="hero-canvas-wrap">
@@ -381,7 +405,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     <div class="container">
       <div class="products-header">
         <div class="section-label teal">The μ-series</div>
-        <h2 class="section-heading">Free instruments. One family.</h2>
+        <h2 class="section-heading">Instruments for electronic music. One family.</h2>
         <p class="section-sub">Download any of them and use it as long as you like. Nothing is locked and there is no time limit. The engines are different. The workflow is the same.</p>
       </div>
 
@@ -394,8 +418,8 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
             <div class="pc-subtitle">Sample Trigger · 8 Tracks · VST3 · CLAP · Standalone</div>
             <p class="pc-desc">Drive samples with mathematical precision. Three independent euclidean layers per track combine through boolean logic gates to produce hits that no human would programme.</p>
             <div class="pc-price">
-              <span class="price-num">Free</span>
-              <div><div class="price-note">Free &middot; pay what you like (suggested £20)</div></div>
+              <span class="price-num" style="font-size:20px">Pay what you want</span>
+              <div><div class="price-note">From £0 &middot; suggested £20</div></div>
             </div>
             <div class="pc-ctas">
               <a href="mu-clid.html" class="btn-pc btn-pc-buy">Learn More</a>
@@ -412,12 +436,50 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
             <div class="pc-subtitle">Wavetable Drone · 8 Tracks · VST3 · CLAP · Standalone</div>
             <p class="pc-desc">Dual-oscillator wavetable drone with FM and ring modulation, sculpted by an envelope gate sequencer. Per-step control of gate, filter, and pitch across up to 16 bars.</p>
             <div class="pc-price">
-              <span class="price-num">Free</span>
-              <div><div class="price-note">Free &middot; pay what you like (suggested £20)</div></div>
+              <span class="price-num" style="font-size:20px">Pay what you want</span>
+              <div><div class="price-note">From £0 &middot; suggested £20</div></div>
             </div>
             <div class="pc-ctas">
               <a href="mu-tant.html" class="btn-pc btn-pc-buy">Learn More</a>
               <a href="download.html" class="btn-pc-outline">Download</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="products-top">
+        <div class="product-card toni">
+          <div class="pc-accent-bar"></div>
+          <div class="pc-body">
+            <div class="pc-label">Generative Arpeggiator <span class="soon-badge" style="color:var(--amber-b);border-color:rgba(212,137,92,0.4)">In development</span></div>
+            <div class="pc-name"><span class="mu">μ</span>-toni</div>
+            <div class="pc-subtitle">Arpeggiator Mono-Synth · VST3 · CLAP · Standalone</div>
+            <p class="pc-desc">Pick a scale and a chord and it plays the notes through a two-oscillator wavetable synth. Every control can be modulated, so the arpeggio never has to stand still.</p>
+            <div class="pc-price">
+              <span class="price-num" style="font-size:20px">Pay what you want</span>
+              <div><div class="price-note">From £0 &middot; suggested £20</div></div>
+            </div>
+            <div class="pc-ctas">
+              <a href="mu-toni.html" class="btn-pc btn-pc-buy">Learn More</a>
+              <a href="download.html#mu-toni" class="btn-pc-outline">Download</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-card on">
+          <div class="pc-accent-bar"></div>
+          <div class="pc-body">
+            <div class="pc-label">Groove Sequencer <span class="soon-badge" style="color:var(--amber-b);border-color:rgba(212,137,92,0.4)">In development</span></div>
+            <div class="pc-name"><span class="mu">μ</span>-on</div>
+            <div class="pc-subtitle">909-Style · Kick, Bass, Hat, Snare · VST3 · CLAP · Standalone</div>
+            <p class="pc-desc">A hands-on groove box. Build a beat on a 16-step grid, add a techno rumble, and let the bass duck from the kick for a pumping groove.</p>
+            <div class="pc-price">
+              <span class="price-num" style="font-size:20px">Pay what you want</span>
+              <div><div class="price-note">From £0 &middot; suggested £20</div></div>
+            </div>
+            <div class="pc-ctas">
+              <a href="mu-on.html" class="btn-pc btn-pc-buy">Learn More</a>
+              <a href="download.html#mu-on" class="btn-pc-outline">Download</a>
             </div>
           </div>
         </div>
@@ -430,7 +492,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
             <div class="pc-label">MIDI Effect</div>
             <div class="pc-name"><img class="prod-icon" src="mu-clid-midi-icon.png" alt="mu-Clid MIDI" width="40" height="40" style="width:40px;height:40px;border-radius:8px;vertical-align:middle;margin-right:12px"><span class="mu">μ</span>-clid MIDI</div>
             <div class="pc-subtitle">Single-rhythm Euclidean MIDI effect · VST3 · CLAP · Windows · Linux beta</div>
-            <p class="pc-desc">One Euclidean rhythm that sends MIDI notes to any instrument in your DAW. Free, with no support message and nothing to unlock. It is a product of its own, and it shares rhythm presets with μ-clid.</p>
+            <p class="pc-desc">One Euclidean rhythm that sends MIDI notes to any instrument in your DAW. Freeware, with no support prompt and nothing to unlock. It is a product of its own, and it shares rhythm presets with μ-clid.</p>
           </div>
           <div class="pc-ctas" style="flex-direction:column;align-items:stretch;text-align:center;flex-shrink:0;">
             <a href="mu-clid-midi.html" class="btn-pc btn-pc-buy">Learn More</a>
@@ -445,11 +507,11 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
           <div>
             <div class="link-free-badge">
               <svg viewBox="0 0 12 12" fill="none" width="10" height="10"><circle cx="6" cy="6" r="5" stroke="#3CB8D4" stroke-width="1.2"/><path d="M4 6 L5.5 7.5 L8 4.5" stroke="#3CB8D4" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              Free forever
+              Freeware
             </div>
             <div class="pc-label">Sync &amp; Audio Hub</div>
             <div class="pc-name"><span class="mu">μ</span>-link</div>
-            <div class="pc-subtitle">Standalone App · Windows · Free</div>
+            <div class="pc-subtitle">Standalone App · Windows · Freeware</div>
             <p class="pc-desc">Connect multiple μ-series instances into a single performance tool. μ-link syncs BPM and transport across all running μ products — keeping μ-clid and μ-tant locked together in real time.</p>
           </div>
           <div style="text-align:center;flex-shrink:0;">
@@ -466,22 +528,24 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     <div class="container">
       <div class="pay-inner">
         <div>
-          <div class="section-label teal">Free, pay what you like</div>
-          <h2 class="section-heading">Use it first. Pay if you want to.</h2>
-          <p class="section-sub">Every μ-series app is free and does everything. There is no trial and no locked feature. If it earns a place in your music, pay what you like (we suggest £20) and help me keep building them. Thank you, Andy.</p>
+          <div class="section-label teal">Pay what you want</div>
+          <h2 class="section-heading">Pay what you want. Start at £0.</h2>
+          <p class="section-sub">μ-clid, μ-tant, μ-toni and μ-on are pay what you want, from £0, with £20 suggested. Every one does everything, with no locked feature. If it earns a place in your music, pay what you want and help me keep building them. Thank you, Andy.</p>
         </div>
         <ul class="pay-list">
-          <li><strong>Free to download.</strong> All features, all the time.</li>
-          <li><strong>Pay what you like.</strong> Suggested £20, through Lemon Squeezy. You can also pay £0 and still get a key.</li>
-          <li><strong>A key marks you as a supporter.</strong> Copies without a key show a polite support message once per session. "Maybe later" hides it for that session, and it comes back next time.</li>
+          <li><strong>Nothing is limited.</strong> All features, all the time.</li>
+          <li><strong>Pay what you want.</strong> From £0, suggested £20 (GBP), through Lemon Squeezy. You get a licence key even for £0.</li>
+          <li><strong>A key removes the support prompt.</strong> Copies without a key show a polite prompt when the app starts, once per session. "Maybe later" hides it for that session, and it comes back next time.</li>
           <li><strong>Open source.</strong> The source is GPLv3 on <a href="https://github.com/AndyTuke/mu-family">GitHub</a>.</li>
-          <li><strong>μ-clid MIDI</strong> has no support message and no key at all.</li>
+          <li><strong>μ-clid MIDI and μ-link</strong> are freeware, with no support prompt and no key at all.</li>
         </ul>
       </div>
       <div class="pay-ctas">
         <a href="mu-clid.html#pricing" class="btn-primary">Support μ-clid</a>
         <a href="mu-tant.html#pricing" class="btn-primary btn-amber">Support μ-tant</a>
-        <a href="download.html" class="btn-secondary">Download free ↓</a>
+        <a href="mu-toni.html#download" class="btn-primary" style="background:var(--teal);color:#06120E">μ-toni · in development</a>
+        <a href="mu-on.html#download" class="btn-primary" style="background:#C9A94A;color:#14100A">μ-on · in development</a>
+        <a href="download.html" class="btn-secondary">Download ↓</a>
       </div>
       <p class="pay-fine">All prices in GBP. Windows is current, Linux is in beta, and macOS is on hold.</p>
     </div>
@@ -599,9 +663,10 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
           <div class="fb-sub">Development Project</div>
           <p>Indie audio plugin development from Bath, UK. Building the μ-series — creative instruments for electronic music producers.</p>
         </div>
-        <div class="footer-col"><h4><span style="text-transform:none">μ</span>-clid</h4><ul><li><a href="mu-clid.html#pricing">Pay what you like</a></li><li><a href="mu-clid-releases.html">Release notes</a></li><li><a href="download.html">Download</a></li></ul></div>
-        <div class="footer-col"><h4><span style="text-transform:none">μ</span>-tant</h4><ul><li><a href="mu-tant.html#pricing">Pay what you like</a></li><li><a href="mu-tant-releases.html">Release notes</a></li><li><a href="download.html">Download</a></li></ul></div>
+        <div class="footer-col"><h4><span style="text-transform:none">μ</span>-clid</h4><ul><li><a href="mu-clid.html#pricing">Pay what you want</a></li><li><a href="mu-clid-releases.html">Release notes</a></li><li><a href="download.html">Download</a></li></ul></div>
+        <div class="footer-col"><h4><span style="text-transform:none">μ</span>-tant</h4><ul><li><a href="mu-tant.html#pricing">Pay what you want</a></li><li><a href="mu-tant-releases.html">Release notes</a></li><li><a href="download.html">Download</a></li></ul></div>
         <div class="footer-col"><h4><span style="text-transform:none">μ</span>-clid MIDI</h4><ul><li><a href="mu-clid-midi.html">About</a></li><li><a href="mu-clid-midi-releases.html">Release notes</a></li><li><a href="download.html#mu-clid-midi">Download</a></li></ul></div>
+        <div class="footer-col"><h4>In development</h4><ul><li><a href="mu-toni.html"><span style="text-transform:none">μ</span>-toni</a></li><li><a href="mu-on.html"><span style="text-transform:none">μ</span>-on</a></li></ul></div>
         <div class="footer-col"><h4>Company</h4><ul><li><a href="#community">Community</a></li><li><a href="contact.html">Contact</a></li><li><a href="https://github.com/AndyTuke/mu-family">Source (GPLv3)</a></li><li><a href="mailto:info@transwarp.me">info@transwarp.me</a></li></ul></div>
       </div>
       <div class="footer-bottom">
