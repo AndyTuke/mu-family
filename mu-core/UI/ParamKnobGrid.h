@@ -12,7 +12,7 @@
 // of {paramId, label} specs and the grid builds the widgets, attaches them to APVTS, and
 // lays them out in a grid that fits as many columns as the width allows, then wraps.
 //
-// Lifted from mu-on's EnginePanel so any product can build its engine / parameter surface
+// Lifted from mu-on's engine panel (now TrackContent) so any product can build its engine / parameter surface
 // from one shared widget (the family-reuse rule). Plugin-agnostic — the product owns the
 // {id,label} list; this owns the build + attachment + layout.
 namespace mu_ui {
