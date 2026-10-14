@@ -1,5 +1,7 @@
 ﻿# Issues
 
+**Tally (updated 2026-10-14): Open 8 · On Hold 13 · Closed 1522 · Total 1543**
+
 
 
 **Status key:** ✅ Closed &nbsp;|&nbsp; 🔴 Open &nbsp;|&nbsp; 🟡 On Hold (deferred, blocked, or pending external action)
