@@ -111,6 +111,31 @@ public:
             expectEquals(p.count(), 0);
         }
 
+        beginTest("saving over an existing file replaces it whole and leaves no stray files; an impossible path fails");
+        {
+            const auto file = root.getChildFile("Over").getChildFile("Set.muPerformance");
+            PerformanceFile first;
+            first.name = "first";
+            first.setItem(0, "MuTantState", inside, presets, "A");
+            first.setItem(1, "MuTantState", inside, presets, "B");
+            expect(first.save(file));
+
+            PerformanceFile second;
+            second.name = "second";
+            second.setItem(0, "MuTantState", inside, presets, "A");
+            expect(second.save(file));
+
+            PerformanceFile loaded;
+            expect(PerformanceFile::load(file, loaded) == PerformanceFile::LoadResult::Ok);
+            expectEquals(loaded.name, juce::String("second"));
+            expectEquals(loaded.count(), 1);   // nothing of the first save is left behind
+            expectEquals(file.getParentDirectory().getNumberOfChildFiles(juce::File::findFiles), 1,
+                         "the temp file used for the swap is gone");
+
+            // A file that cannot be created (its parent is an existing file) reports failure.
+            expect(! second.save(inside.getChildFile("cannot.muPerformance")));
+        }
+
         root.deleteRecursively();
     }
 };
