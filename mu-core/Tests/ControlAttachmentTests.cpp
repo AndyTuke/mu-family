@@ -15,12 +15,15 @@ struct FakeAttachment : ControlAttachment
     juce::String  getDeviceLabel() const override { return "Fake"; }
     void release() override { status = ControlStatus::Released; notifyStatusChanged(); }
     void connect() override { status = ControlStatus::InUse; notifyStatusChanged(); }
+    void closeNow() override { status = ControlStatus::Released; }
 };
 
 struct CountingListener : ControlAttachment::Listener
 {
     int calls = 0;
     void controlStatusChanged() override { ++calls; }
+    void controlAttachmentDestroyed() override { ++destroyed; }
+    int destroyed = 0;
 };
 
 struct NullSink : ControlSink { bool perform(const ControlAction&) override { return false; } };
@@ -69,6 +72,16 @@ public:
             readOnly.removeListener(&l);
             a.release();
             expectEquals(l.calls, 2);
+        }
+
+        beginTest("listeners are told when the attachment is destroyed, so a watcher never holds a stale pointer");
+        {
+            CountingListener l;
+            {
+                FakeAttachment a;
+                a.addListener(&l);
+            }
+            expectEquals(l.destroyed, 1);
         }
     }
 };

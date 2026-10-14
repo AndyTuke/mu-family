@@ -15,6 +15,9 @@
 #include "Plugin/ProductRender.h"        // mu-core: the shared headless --render mode
 #include "Link/MuLinkStandalone.h"        // mu-core: makeStandaloneBridge (header-only)
 #include "UI/ConfirmDialog.h"             // mu-core: mu_ui::confirmQuitAsync (themed dialog)
+#include "Plugin/QuitFlow.h"            // mu-core: the quit answers, in a testable order
+#include "Control/ControlHost.h"          // mu-core: owns the controller attachment and its give-back order
+#include "UI/SurfaceLookFromTheme.h"      // mu-core: the pad colours, read from the screen's tokens
 
 #include <juce_audio_utils/juce_audio_utils.h>   // AudioDeviceSelectorComponent — StandaloneFilterWindow needs it in scope
 #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
@@ -36,6 +39,10 @@ public:
           displayName (std::move (productDisplayName))
     {}
 
+    // Runs first on the Close and Save answers, before the quit or the save: the standalone gives a control
+    // surface back here so a slow save never leaves it in its host mode. Not run on Cancel.
+    std::function<void()> onQuitConfirmed;
+
     void closeButtonPressed() override
     {
         if (dialogOpen) return;
@@ -45,23 +52,15 @@ public:
         mu_ui::confirmQuitAsync (this, displayName,
             [self]   // Close — quit without an explicit save
             {
-                if (self != nullptr) self->dialogOpen = false;
-                juce::JUCEApplication::getInstance()->quit();
+                if (self == nullptr) { juce::JUCEApplication::getInstance()->quit(); return; }
+                self->dialogOpen = false;
+                self->makeQuitFlow().close();
             },
             [self]   // Save — defer to the processor's save+quit, else save state then quit
             {
                 if (self == nullptr) return;
                 self->dialogOpen = false;
-                auto* proc = self->pluginHolder
-                    ? dynamic_cast<ProcessorBase*> (self->pluginHolder->processor.get())
-                    : nullptr;
-                if (proc != nullptr && proc->onSaveAndQuit)
-                    proc->onSaveAndQuit ([] { juce::JUCEApplication::getInstance()->quit(); });
-                else
-                {
-                    if (self->pluginHolder != nullptr) self->pluginHolder->savePluginState();
-                    juce::JUCEApplication::getInstance()->quit();
-                }
+                self->makeQuitFlow().save();
             },
             [self]   // Cancel — let the window be closeable again
             {
@@ -70,6 +69,17 @@ public:
     }
 
 private:
+    QuitFlow makeQuitFlow()
+    {
+        QuitFlow flow;
+        flow.giveBackDevices = onQuitConfirmed;
+        flow.quit = [] { juce::JUCEApplication::getInstance()->quit(); };
+        auto* proc = pluginHolder ? dynamic_cast<ProcessorBase*> (pluginHolder->processor.get()) : nullptr;
+        if (proc != nullptr && proc->onSaveAndQuit) flow.saveAndQuit = proc->onSaveAndQuit;
+        flow.saveState = [this] { if (pluginHolder != nullptr) pluginHolder->savePluginState(); };
+        return flow;
+    }
+
     juce::String displayName;
     bool dialogOpen = false;
 };
@@ -148,6 +158,15 @@ public:
 
         mainWindow->setVisible (true);
 
+        // Windowed runs only (the --render branch above returned): a control surface, when mu-control is linked
+        // into this executable. Built after the editor, so the pad colours see the app's accent.
+        if (auto* holderPtr = mainWindow->pluginHolder.get())
+            if (auto* pb = dynamic_cast<ProcessorBase*> (holderPtr->processor.get()))
+                controlHost.start (*pb, mu_ui::makeSurfaceLook(),
+                                   appProperties.getUserSettings()->getFile().getParentDirectory(),
+                                   [pb] (mu_core::ControlAttachment* a) { pb->setControlAttachment (a); });
+        mainWindow->onQuitConfirmed = [this] { controlHost.closeNow(); };
+
         // Standalone-only mu-link bridge: route audio to mu-link's bus + slave the transport
         // when it's running; absent → the product runs normally on its own device. Skipped
         // when the product hasn't opted into mu-link (empty muLinkName).
@@ -168,6 +187,10 @@ public:
 
     void shutdown() override
     {
+        // First: the control surface goes back to its own mode before anything else can be slow or fail, then the
+        // processor forgets it and it is destroyed (it holds references into the processor).
+        controlHost.shutdown();
+
         // Drop the preset-name hook before the bridge so a late preset load can't call a
         // dangling bridge pointer during teardown.
         if (mainWindow != nullptr && mainWindow->pluginHolder != nullptr)
@@ -218,6 +241,7 @@ private:
 
     Config config;
     juce::ApplicationProperties             appProperties;
+    mu_core::ControlHost                    controlHost;
     std::unique_ptr<CloseConfirmWindow>     mainWindow;
     std::unique_ptr<mu_link::MuLinkBridge>  muLinkBridge;
 };

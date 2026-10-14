@@ -8,6 +8,7 @@
 #include "Plugin/TapTempo.h"
 #include "Plugin/TransportResolver.h"   // kNudgeBendPercent
 #include "Control/ControlSink.h"
+#include "Control/AttachmentWatch.h"
 #include "Control/LiveView.h"
 #include "UI/Components/StepIndicator.h"
 #include "UI/PerformanceIndication.h"   // HoldTracker
@@ -26,6 +27,10 @@ class TransportBar : public juce::Component,
 public:
     explicit TransportBar(mu_core::ShellBackend& backend);
     ~TransportBar() override;
+
+    // Follows the shell's controller attachment (attached after the editor is built) and puts its status on the
+    // status line: Connected and Released for a few seconds, Lost until it clears. The refresh timer calls this.
+    void syncController();
 
     std::function<void()>                      onMixerToggle;
     std::function<void()>                      onLogoClicked;
@@ -146,6 +151,11 @@ private:
     bool             modeShown      = false;
     int              statusSerial   = 0;
     juce::String     shownQueued;
+    mu_core::AttachmentWatch controllerWatch;
+    mu_core::ControlStatus   shownControl = mu_core::ControlStatus::NotFound;
+    bool             controlLostShown = false;   // the sticky 'Lost' status line is up
+    void controllerStatusChanged();
+    void clearLostLine();
     bool             holdLineShown  = false;   // the 'Hold to leave' status line is up
     uint32_t         shownRevision  = 0xffffffffu;   // the live revision and preset name the indicator was last built from
     juce::String     shownPresetName;

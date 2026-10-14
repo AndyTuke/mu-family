@@ -38,6 +38,7 @@ target_sources(mu-core-tests PRIVATE
     PerformanceFileTests.cpp
     LiveStateTests.cpp
     ControlAttachmentTests.cpp
+    ControllerShellTests.cpp
     SwapTimingTests.cpp
     LegacyPrefixTests.cpp
     SegmentControlTests.cpp

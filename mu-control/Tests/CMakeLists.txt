@@ -26,6 +26,8 @@ target_sources(mu-control-tests PRIVATE
     ../Driver/JuceDevicePorts.cpp
     # LiveView.h needs the performance list.
     ../../mu-core/Persistence/PerformanceFile.cpp
+    # The end-to-end Performance test drives a real LiveState.
+    ../../mu-core/Control/LiveState.cpp
 )
 
 target_compile_features(mu-control-tests PRIVATE cxx_std_17)

@@ -11,7 +11,7 @@
 // Runs one control surface for the standalone shell: finds the device by port name without opening it, puts it
 // in its host mode only while Performance mode is on, keeps its lights in step with the LiveView, turns pad
 // presses into ControlActions for the sink, and gives the device back (own mode, pads dark) on every way out:
-// leaving the mode, Release, destruction and closeAllNow(). Message thread only; the MIDI and hot-plug threads
+// leaving the mode, Release, destruction and closeNow(). Message thread only; the MIDI and hot-plug threads
 // reach it only through ManagedPorts. It names no processor, editor or product.
 namespace mu_control
 {
@@ -31,14 +31,11 @@ public:
     juce::String           getDeviceLabel() const override { return deviceLabel; }
     void                   release() override;
     void                   connect() override;
+    void                   closeNow() override;
 
     // Looks at the port lists again (the 1 Hz timer calls this while the device is not in use) and opens the
     // device if Performance mode is on and it has appeared.
     void rescan();
-
-    // The app-quit hook: puts every live manager's device back in its own mode and keeps it closed. The shell
-    // calls it from its shutdown and quit-request paths, ahead of destroying anything.
-    static void closeAllNow();
 
     // For tests: which timers run.
     bool isBlinkTimerRunning() const { return blinkTick.isTimerRunning(); }

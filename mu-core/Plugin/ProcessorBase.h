@@ -310,6 +310,9 @@ public:
     const mu_core::LiveView*  getLiveView() const override  { return &liveState; }
     mu_core::ControlSink*     getControlSink() override     { return this; }
     bool                      supportsPerformanceMode() const override { return isStandaloneApp(); }
+    // The standalone shell's controller handle (non-owning; the shell clears it before it destroys the attachment).
+    mu_core::ControlAttachment* getControlAttachment() const override { return controlAttachment; }
+    void                      setControlAttachment(mu_core::ControlAttachment* a) noexcept { controlAttachment = a; }
     juce::String              getProductStateId() const override { return apvts.state.getType().toString(); }
     bool                      loadPerformance(mu_pp::PerformanceFile file, const juce::File& where) override
     { return liveState.loadPerformance(std::move(file), where); }
@@ -571,6 +574,7 @@ protected:
     // runDeferredWork. A product with its own stager (mu-Clid) overrides the three swap queries.
     // Audio-thread flagging uses atomics only; the appliers run on the message thread.
     mu_hotswap::LayerSwapper<juce::ValueTree, mu_limits::kMaxLayers> layerSwapper;
+    mu_core::ControlAttachment* controlAttachment = nullptr;   // message thread only
     mu_core::LiveState liveState;   // Performance mode (message thread only; never read on the audio thread)
     std::atomic<bool> fullPresetLoadFailed { false };   // set by a load that could not read its file
 

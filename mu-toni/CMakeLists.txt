@@ -69,6 +69,9 @@ target_compile_definitions(mu-toni_Standalone PRIVATE JUCE_USE_CUSTOM_PLUGIN_STA
 target_sources(mu-toni_Standalone PRIVATE
     Source/Plugin/StandaloneApp.cpp)
 
+# Hardware controller support (mu-control) in this Standalone only; a no-op unless MUFAMILY_WITH_CONTROL is ON.
+mu_control_attach(mu-toni_Standalone)
+
 # CLAP format via clap-juce-extensions (mirrors mu-clid / mu-tant). Creates mu-toni_CLAP.
 clap_juce_extensions_plugin(TARGET mu-toni
     CLAP_ID "com.transwarp.mu-toni"

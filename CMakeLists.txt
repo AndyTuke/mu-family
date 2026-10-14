@@ -68,7 +68,9 @@ option(MUFAMILY_DEPLOY_TESTERS "Deploy Release artefacts to the OneDrive tester 
 option(MUFAMILY_FOCUSED_BUILD "Build without incrementing the build number (focused work on 1-2 apps)" OFF)
 
 # Controller support (mu-control). The library and its tests are always built; this only decides whether the
-# standalone apps link it (via mu_control_attach). OFF until the Launchpad X is accepted on the hardware.
+# standalone apps link it (via mu_control_attach). OFF until the Launchpad X is accepted on the hardware, so the
+# release build and CI stay without it. For hardware testing configure the dev build with it ON:
+#   cmake -B build -DMUFAMILY_WITH_CONTROL=ON      (add -DMUFAMILY_FOCUSED_BUILD=ON to keep the build number)
 option(MUFAMILY_WITH_CONTROL "Link mu-control (hardware controller support) into the standalone apps" OFF)
 
 # ── Family-wide version metadata ────────────────────────────────────────────

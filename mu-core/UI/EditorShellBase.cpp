@@ -181,6 +181,8 @@ void EditorShellBase::setSettingsOverlay(juce::Component* overlay)
     {
         standard->onMidiPresetsClicked = [this] { showSettings(false); showMidiPresets(true); };
         standard->onFullPresetsClicked = [this] { showSettings(false); showMidiFullPresets(true); };
+        standard->onStatusUpdate = [this](const juce::String& name, const juce::String& value)
+        { if (transportBar.onStatusUpdate) transportBar.onStatusUpdate(name, value); };
     }
 }
 

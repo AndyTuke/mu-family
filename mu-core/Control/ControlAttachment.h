@@ -16,6 +16,20 @@ namespace mu_core
 // The lamp states of the Controller group (docs/design-ui-family.md, "Controller status and release").
 enum class ControlStatus { NotFound, Found, InUse, Released, Lost };
 
+// The read-only text beside the lamp.
+inline juce::String controlStatusText(ControlStatus s)
+{
+    switch (s)
+    {
+        case ControlStatus::Found:    return "Found";
+        case ControlStatus::InUse:    return "In use";
+        case ControlStatus::Released: return "Released";
+        case ControlStatus::Lost:     return "Lost";
+        case ControlStatus::NotFound:
+        default:                      return "Not found";
+    }
+}
+
 class ControlAttachment
 {
 public:
@@ -24,14 +38,21 @@ public:
     public:
         virtual ~Listener() = default;
         virtual void controlStatusChanged() = 0;   // message thread
+        // The attachment is being destroyed: forget the pointer. The shell destroys it before the editor, so a
+        // watcher in the editor must not call removeListener afterwards.
+        virtual void controlAttachmentDestroyed() {}
     };
 
-    virtual ~ControlAttachment() = default;
+    virtual ~ControlAttachment() { listeners.call([](Listener& l) { l.controlAttachmentDestroyed(); }); }
 
     virtual ControlStatus getStatus() const = 0;
     virtual juce::String  getDeviceLabel() const = 0;   // the device's name, or empty when none
     virtual void          release() = 0;                // give the device back to the system
     virtual void          connect() = 0;                // take it again
+
+    // The quit hook: give the device back at once (pads dark, its own mode) and stay closed. Harmless when
+    // repeated, and the destructor does the same. The shell calls it ahead of anything slow on the way out.
+    virtual void          closeNow() = 0;
 
     // Listening is not a change, so a holder of a const handle may register.
     void addListener(Listener* l) const    { listeners.add(l); }

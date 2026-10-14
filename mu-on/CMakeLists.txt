@@ -72,6 +72,9 @@ target_compile_definitions(mu-on_Standalone PRIVATE JUCE_USE_CUSTOM_PLUGIN_STAND
 target_sources(mu-on_Standalone PRIVATE
     Source/Plugin/StandaloneApp.cpp)
 
+# Hardware controller support (mu-control) in this Standalone only; a no-op unless MUFAMILY_WITH_CONTROL is ON.
+mu_control_attach(mu-on_Standalone)
+
 # CLAP format via clap-juce-extensions (mirrors the family). Creates mu-on_CLAP.
 clap_juce_extensions_plugin(TARGET mu-on
     CLAP_ID "com.transwarp.mu-on"

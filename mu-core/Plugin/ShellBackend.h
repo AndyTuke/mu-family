@@ -12,6 +12,7 @@ namespace mu_core
 
 class LiveView;      // Control/LiveView.h
 class ControlSink;   // Control/ControlSink.h
+class ControlAttachment;   // Control/ControlAttachment.h
 
 // Everything the shared shell chrome (TransportBar, the settings page, ...) reads from or tells
 // the app. The chrome depends on this small interface, never on an AudioProcessor, so a product
@@ -109,6 +110,10 @@ public:
     virtual const LiveView* getLiveView()    const { return nullptr; }
     virtual ControlSink*    getControlSink()       { return nullptr; }
     virtual bool            supportsPerformanceMode() const { return false; }
+    // The controller handle the standalone shell attached (non-owning, null when none): the settings page shows the
+    // "Controller" group and the transport bar the status line only when this is set. Re-read on every use, because
+    // the shell attaches it after the editor is built and clears it before the editor goes.
+    virtual ControlAttachment* getControlAttachment() const { return nullptr; }
     // The state identifier of this product's presets (the performance list marks other products' items),
     // and the screen-only call that loads a performance list (refused, false, while the mode is on).
     virtual juce::String    getProductStateId() const { return {}; }

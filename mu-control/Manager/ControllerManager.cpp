@@ -1,5 +1,4 @@
 #include "Manager/ControllerManager.h"
-#include <algorithm>
 
 namespace mu_control
 {
@@ -8,13 +7,6 @@ namespace
 {
 constexpr int kScanMs  = 1000;   // looking for an absent device
 constexpr int kBlinkMs = 33;     // about 30 Hz while a pad pulses
-
-// Every live manager, so the quit hook can reach them. Message thread only.
-std::vector<ControllerManager*>& liveManagers()
-{
-    static std::vector<ControllerManager*> list;
-    return list;
-}
 
 // The first name matching a wildcard, or empty.
 juce::String firstMatch(const juce::StringArray& names, const juce::String& pattern)
@@ -29,7 +21,7 @@ SurfaceMapping mappingFor(const ControllerBackend& b, const juce::File& settings
     SurfaceMapping mapping(b.driver->describe());
     if (settingsFolder != juce::File())
     {
-        const auto file = settingsFolder.getChildFile("controller-mapping.xml");
+        const auto file = settingsFolder.getChildFile("mu-controller-mapping.xml");
         if (file.existsAsFile()) mapping.restoreFromXml(file.loadFileAsString());
     }
     return mapping;
@@ -41,8 +33,6 @@ ControllerManager::ControllerManager(mu_core::ControlSink& s, const mu_core::Liv
     : sink(s), view(v), backend(backendFactory()), ports(*backend.ports),
       model(s, v, mappingFor(backend, settingsFolder), look)
 {
-    liveManagers().push_back(this);
-
     // Decoded presses arrive on the message thread (ManagedPorts moved them there) and go to the sink.
     backend.driver->onEvent = [this](const SurfaceEvent& e) { if (backend.driver->isOpen()) model.handle(e); };
     ports.connectionObserver = [this](bool connected) { onConnection(connected); };
@@ -63,22 +53,16 @@ ControllerManager::~ControllerManager()
     scanTick.stopTimer();
     blinkTick.stopTimer();
     closeDevice();   // own mode back whatever state we were in
-    auto& list = liveManagers();
-    list.erase(std::remove(list.begin(), list.end(), this), list.end());
 }
 
-void ControllerManager::closeAllNow()
+void ControllerManager::closeNow()
 {
-    // Walk a copy so closing never depends on the list staying put.
-    const auto managers = liveManagers();
-    for (auto* m : managers)
-    {
-        m->quitting = true;
-        m->scanTick.stopTimer();
-        m->blinkTick.stopTimer();
-        m->closeDevice();
-        m->publish();
-    }
+    // The quit hook: pads dark and the device's own mode back, then nothing may reopen it.
+    quitting = true;
+    scanTick.stopTimer();
+    blinkTick.stopTimer();
+    closeDevice();
+    publish();
 }
 
 mu_core::ControlStatus ControllerManager::getStatus() const
@@ -174,7 +158,9 @@ void ControllerManager::release()
 
 void ControllerManager::connect()
 {
-    if (quitting) return;
+    // An explicit Connect undoes an earlier closeNow(): a quit that was started and then cancelled (the Save dialog) must not
+    // leave the pad dead until restart.
+    quitting = false;
     released = false;
     if (backend.driver->isOpen() && lost) closeDevice();   // a dead link: start over
     detect();

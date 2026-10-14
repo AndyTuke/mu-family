@@ -141,6 +141,89 @@ StandardSettingsOverlay::StandardSettingsOverlay(mu_core::ShellBackend& backend,
             syncOffsetLabel     .setBounds(r.labelX, y3,            r.labelW, r.rowH);
             syncOffsetInput     .setBounds(r.ctrlX,  y3,            s(90),    r.rowH); } });
     }
+
+    // ── Controller — a control surface the standalone shell attached (appears once it does).
+    if (isStandalone) setUpControllerGroup();
+}
+
+StandardSettingsOverlay::ControllerLook StandardSettingsOverlay::controllerLook(mu_core::ControlStatus status)
+{
+    using Id = MuLookAndFeel::ColourIds;
+    using S  = mu_core::ControlStatus;
+    const auto& L = MuLookAndFeel::lighting();
+    const float bright = juce::jmin(1.0f, L.lampOn + L.lampPlayhead);
+    const auto text = mu_core::controlStatusText(status);
+
+    switch (status)
+    {
+        case S::Found:    return { MuLookAndFeel::colour(Id::segmentPositiveBorder), L.lampOn, text, "Release" };
+        case S::InUse:    return { MuLookAndFeel::colour(Id::segmentPositiveBorder), bright,   text, "Release" };
+        case S::Released: return { MuLookAndFeel::colour(Id::segmentPositiveBorder), L.lampOff, text, "Connect" };   // unlit: the bare lamp base
+        case S::Lost:     return { MuLookAndFeel::colour(Id::indicatorFault),        bright,   text, "Connect" };
+        case S::NotFound:
+        default:          return { MuLookAndFeel::colour(Id::segmentWarningBorder),  L.lampDim, text, "Connect" };
+    }
+}
+
+void StandardSettingsOverlay::setUpControllerGroup()
+{
+    makeFieldLabel(controllerLampLabel, "Launchpad");
+    makeFieldLabel(controllerButtonLabel, "Controller");
+    addChildComponent(controllerLamp);
+    addChildComponent(controllerBtn);
+    controllerLampLabel.setVisible(false);
+    controllerButtonLabel.setVisible(false);
+
+    controllerLamp.onStatusUpdate = [this](const juce::String& n, const juce::String& v) { if (onStatusUpdate) onStatusUpdate(n, v); };
+    controllerBtn.onClick = [this]
+    {
+        auto* a = controllerWatch.get();
+        if (a == nullptr) return;
+        const auto st = a->getStatus();
+        if (st == mu_core::ControlStatus::Found || st == mu_core::ControlStatus::InUse) a->release();
+        else                                                                            a->connect();
+    };
+    controllerWatch.onChange = [this] { refreshController(); };
+
+    addSection(Where::Group, { "", 2 * kRowH + kRowGap, [this](const Rows& r) {
+        const int y2 = r.area.getY() + r.rowH + s(kRowGap);
+        controllerLampLabel  .setBounds(r.labelX, r.area.getY(), r.labelW, r.rowH);
+        controllerLamp       .setBounds(r.ctrlX,  r.area.getY(), r.ctrlW,  r.rowH);
+        controllerButtonLabel.setBounds(r.labelX, y2,            r.labelW, r.rowH);
+        controllerBtn        .setBounds(r.ctrlX,  y2,            juce::jmin(r.ctrlW, s(MuLookAndFeel::kDropdownW)), r.rowH); },
+        nullptr, [this] { return controllerShown(); } }, "Controller");
+    refreshController();
+}
+
+// Follows the shell's attachment and brings the lamp, the text and the button in step with its status.
+void StandardSettingsOverlay::refreshController()
+{
+    const bool wasShown = controllerShown();
+    controllerWatch.update(proc.getControlAttachment());
+    const bool show = controllerShown();
+
+    for (auto* c : std::initializer_list<juce::Component*> { &controllerLampLabel, &controllerButtonLabel, &controllerLamp, &controllerBtn })
+        c->setVisible(show);
+
+    if (show)
+    {
+        const auto look = controllerLook(controllerWatch.get()->getStatus());
+        const auto device = controllerWatch.get()->getDeviceLabel();
+        controllerLamp.setState(look.colour, look.lit);
+        controllerLamp.setLabel(look.text);
+        controllerLamp.setStatus("Launchpad", look.text == "Not found" ? juce::String("Not found: check the USB cable")
+                                                                        : (device.isNotEmpty() ? device + ": " : juce::String()) + look.text);
+        controllerBtn.setButtonText(look.button);
+    }
+
+    // The group appears or goes as a whole, so the page is laid out again.
+    if (show != wasShown && getWidth() > 0 && getHeight() > 0) resized();
+    repaint();
+}
+
+void StandardSettingsOverlay::visibilityChanged()
+{
+    if (isVisible()) refreshController();
 }
 
 void StandardSettingsOverlay::makeFieldLabel(juce::Label& lbl, const juce::String& text)
@@ -231,7 +314,7 @@ void StandardSettingsOverlay::layoutContent()
     auto ptrs = [](const std::vector<Section>& v)
     {
         std::vector<const Section*> out;
-        for (const auto& sct : v) out.push_back(&sct);
+        for (const auto& sct : v) if (! sct.shown || sct.shown()) out.push_back(&sct);
         return out;
     };
 
@@ -248,7 +331,8 @@ void StandardSettingsOverlay::layoutContent()
     for (const auto& name : order)
     {
         std::vector<const Section*> secs;
-        for (const auto& gs : extraGroups) if (gs.group == name) secs.push_back(&gs.section);
+        for (const auto& gs : extraGroups)
+            if (gs.group == name && (! gs.section.shown || gs.section.shown())) secs.push_back(&gs.section);
         emitGroup(name, secs);
     }
 

@@ -140,6 +140,8 @@ TransportBar::TransportBar(mu_core::ShellBackend& backend)
     };
     addChildComponent(perfBtn);
 
+    controllerWatch.onChange = [this] { controllerStatusChanged(); };
+
     populatePresetDropdown();
     refreshPlayBtn();
     syncPerformance();
@@ -296,7 +298,7 @@ void TransportBar::syncPerformance()
     if (on != modeShown)
     {
         modeShown = on;
-        if (! on) { cancelExitHold(); shownQueued = {}; shownRevision = 0xffffffffu; }
+        if (! on) { cancelExitHold(); shownQueued = {}; shownRevision = 0xffffffffu; clearLostLine(); }
         else      { shownRevision = 0xffffffffu; }   // rebuild the indicator on entry
         perfBtn.setToggleState(on, juce::dontSendNotification);
         perfBtn.setTooltip(on ? "Hold to leave Performance mode" : "Performance mode (Ctrl+P)");
@@ -386,8 +388,56 @@ void TransportBar::setLoopSection(juce::Component* component, int width)
     resized();
 }
 
+// The controller's status on the status line (docs/design-ui-family.md section 14). Lost is sticky because the
+// PC is locked on stage and this is the only warning; it goes on reconnect, or when the mode ends and the
+// manager lets go of the dead link.
+void TransportBar::controllerStatusChanged()
+{
+    using S = mu_core::ControlStatus;
+    auto* attached = controllerWatch.get();
+    const S status = attached != nullptr ? attached->getStatus() : S::NotFound;
+    const S before = shownControl;
+    shownControl = status;
+
+    if (attached != nullptr && status == S::Lost)
+    {
+        if (controlLostShown) return;
+        controlLostShown = true;
+        ++statusSerial;   // supersedes a pending timed clear
+        if (onStatusUpdate) onStatusUpdate("Launchpad", "Lost: unplugged or in use elsewhere");
+        return;
+    }
+
+    clearLostLine();
+    if (attached == nullptr || status == before) return;
+
+    if (status == S::Released)
+        showTimedStatus("Launchpad", "Released");
+    else if ((status == S::Found || status == S::InUse) && (before == S::NotFound || before == S::Released || before == S::Lost))
+        showTimedStatus("Launchpad", "Connected");
+}
+
+void TransportBar::clearLostLine()
+{
+    if (! controlLostShown) return;
+    controlLostShown = false;
+    ++statusSerial;
+    if (onStatusUpdate) onStatusUpdate({}, {});
+}
+
+void TransportBar::syncController()
+{
+    if (controllerWatch.update(proc.getControlAttachment()))
+    {
+        // Newly attached (or gone): take its state as the baseline, announcing nothing.
+        shownControl = controllerWatch.get() != nullptr ? controllerWatch.get()->getStatus() : mu_core::ControlStatus::NotFound;
+        if (shownControl != mu_core::ControlStatus::Lost) clearLostLine();
+    }
+}
+
 void TransportBar::timerCallback()
 {
+    syncController();
     refreshPlayBtn();
     updatePositionLabel();
 

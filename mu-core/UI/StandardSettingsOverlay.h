@@ -6,7 +6,9 @@
 #include "UI/Components/SegmentControl.h"
 #include "UI/Components/NudgeInput.h"
 #include "UI/Components/DropdownSelect.h"
+#include "UI/Components/StatusLamp.h"
 #include "Plugin/ShellBackend.h"
+#include "Control/AttachmentWatch.h"
 
 #include <vector>
 
@@ -17,6 +19,7 @@ namespace mu_ui
 //   General: Audio (master volume, when the backend has one), Display (UI size), Transport
 //            (internal BPM and meter, each optional)
 //   MIDI:    MIDI Clock (standalone only)
+//   Controller: the control-surface lamp and Release / Connect (only while the shell has attached a controller)
 // — laid out with the shared group / section styling. A product adds its own sections at
 // named places (extra General sections, MIDI sections before / after MIDI Clock, or whole
 // extra groups such as mu-Clid's Locations) with addSection; the page stacks them with the
@@ -54,6 +57,7 @@ public:
         int heightPx = kRowH;                                       // unscaled height of the rows
         std::function<void(const Rows&)> place;                     // position the section's controls
         std::function<void(juce::Graphics&, const Rows&)> paint;    // optional extra drawing
+        std::function<bool()> shown;                                // optional: false leaves the section (and an emptied group) out
     };
 
     enum class Where { General, MidiBeforeClock, MidiAfterClock, Group };
@@ -72,6 +76,16 @@ public:
     std::function<void()> onMidiPresetsClicked;   // the editor opens showMidiPresets
     std::function<void()> onFullPresetsClicked;   // the editor opens showMidiFullPresets
 
+    // The status-bar line for the controller lamp on hover (name, value); the editor shell forwards it.
+    std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
+
+    // How the Controller group shows a status: the lamp colour and brightness, the read-only text and the button
+    // label (the action it performs). Pure, so the mapping can be tested without a display.
+    struct ControllerLook { juce::Colour colour; float lit; juce::String text; juce::String button; };
+    static ControllerLook controllerLook(mu_core::ControlStatus status);
+
+    void visibilityChanged() override;
+
 protected:
     mu_core::ShellBackend& proc;
     const bool isStandalone;
@@ -89,6 +103,16 @@ private:
     DropdownSelect timeSigDropdown;
     DropdownSelect clockSourceDropdown, midiMessagesDropdown;
     void updateMidiSyncVisibility();
+
+    // Controller group (standalone, only while the shell has attached a controller): re-read on show and on every
+    // status change, because the shell attaches it after the editor is built.
+    juce::Label       controllerLampLabel, controllerButtonLabel;
+    StatusLamp        controllerLamp;
+    juce::TextButton  controllerBtn;
+    mu_core::AttachmentWatch controllerWatch;
+    void setUpControllerGroup();
+    void refreshController();
+    bool controllerShown() const { return controllerWatch.get() != nullptr; }
     juce::TextButton midiPresetsBtn, fullPresetsBtn;   // program-change tables (added on request)
 
     std::vector<Section> general, midiBefore, midiClock, midiAfter;

@@ -123,6 +123,8 @@ target_compile_definitions(mu-clid_Standalone PRIVATE JUCE_USE_CUSTOM_PLUGIN_STA
 target_sources(mu-clid_Standalone PRIVATE
     Source/Plugin/StandaloneApp.cpp
 )
+# Hardware controller support (mu-control) in this Standalone only; a no-op unless MUFAMILY_WITH_CONTROL is ON.
+mu_control_attach(mu-clid_Standalone)
 
 # ── Build-number increment (runs every build; Debug bumps, Release reuses) ────
 # Writes mu-core/BuildNumber.h (About panel) AND regenerates the Windows version

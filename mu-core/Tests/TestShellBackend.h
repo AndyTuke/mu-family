@@ -2,6 +2,7 @@
 
 #include "Plugin/ShellBackend.h"
 #include "Control/LiveState.h"
+#include "Control/ControlAttachment.h"
 
 #include <atomic>
 
@@ -70,6 +71,8 @@ struct TestShellBackend : mu_core::ShellBackend
     const mu_core::LiveView* getLiveView() const override { return live; }
     mu_core::ControlSink*    getControlSink() override { return sink; }
     bool                     supportsPerformanceMode() const override { return performanceSupported; }
+    mu_core::ControlAttachment* controller = nullptr;   // the shell's controller handle, when a test attaches one
+    mu_core::ControlAttachment* getControlAttachment() const override { return controller; }
     juce::String             productId { "MuTantState" };
     mu_core::LiveState*      loadTarget = nullptr;   // where loadPerformance sends the list
     juce::String             getProductStateId() const override { return productId; }

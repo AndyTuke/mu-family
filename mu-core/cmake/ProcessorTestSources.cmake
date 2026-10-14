@@ -31,6 +31,7 @@ set(MU_CORE_PROCESSOR_TEST_SOURCES
     "${_mu_core_dir}/UI/Components/SegmentControl.cpp"
     "${_mu_core_dir}/UI/Components/NudgeInput.cpp"
     "${_mu_core_dir}/UI/Components/DropdownSelect.cpp"
+    "${_mu_core_dir}/UI/Components/StatusLamp.cpp"      # the settings page's Controller lamp
     "${_mu_core_dir}/Modulation/ModulationMatrix.cpp"   # pulled in by Layer.h
     "${_mu_core_dir}/Sequencer/ControlSequence.cpp"     # pulled in by Layer.h
 )
