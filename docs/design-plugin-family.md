@@ -1250,11 +1250,10 @@ family setting saved **with the preset**:
 - **Standing check:** easier. One definition and one parameter replace two enums and two predicate sets, the other products gain the choice
   without a copy, and the pad launch needs nothing new.
 
-**7. Future (recorded only, not scheduled).** A multi-app rig through mu-link, with one app "in focus" on the pad. A MIDI device is
-typically opened by one program, so a hub (mu-link) likely owns the pad and forwards the same device-independent `ControlAction`s to the focused
-instance, with new `FocusApp(index)`, `FocusNext`, `FocusPrev` actions. **Verify the Windows MIDI exclusivity claim before relying on it**
-(classic drivers are generally single-client per port; Windows MIDI Services is said to allow several; unchecked). A mixed-engine rig needs a shared master
-loop and clock (mu-link). Nothing here needs to change for it, provided the manager keeps depending only on `ControlSink` and `LiveView` and the actions stay serialisable by name.
+**7. Several apps, one pad (ruled 2026-10-14, replaces the earlier "hub through mu-link" note).** Ruled in
+[Several apps, one pad](#several-apps-one-pad-ruled-2026-10-14): a shared-file focus registry between the apps, no hub process; the pad is owned by one app
+at a time and top buttons 1 and 2 hand it over. Hardware finding (design-launchpad 3.5): on this machine two processes opened the same port pair at once, so
+the exclusivity claim is not assumed either way; the registry works with both. A mixed-engine rig's shared master loop and clock stay with mu-link.
 
 **8. Order (each step buildable alone; Debug builds, tests in `mu-core-tests`).**
 
@@ -1592,6 +1591,86 @@ model, seam and tests are shared; the same four parts serve any grid surface; an
 Do not: give `ProcessorBase` or the editor a manager; add `#if` wiring or a `mu-control` include to `mu-core`; link `mu-control` to a plugin's shared-code target; open a
 port in `--render` or outside Performance mode; let a driver call `ControlSink`, read `LiveView` or write a parameter; let the model or mapping hold device bytes; copy
 `MidiControlMap` into `mu-control`; name a product in `mu-control`.
+
+### Several apps, one pad (ruled 2026-10-14; Andy's request: top buttons 1 and 2 switch between mu apps; not built, staged after M4/M5 acceptance)
+
+**The problem.** One physical pad, several mu processes (mu-Clid, mu-Tant, mu-Toni, mu-On; standalones, possibly two of the same product, later plugins in a
+DAW). Each app's manager opens the ports only in Performance mode (item 6), so today the second app in Performance mode fights the first: both
+receive every press and both write lights (design-launchpad 3.2d decision 3). Exclusive ports are only half of it; **arbitration is needed even where ports
+are shared** (design-launchpad 3.5 found two processes can open the pair together). So the answer is "who owns the pad now", not only "who may open it".
+
+**Options evaluated** (criteria: one framework, nothing on the audio thread, standalone + plugin, same-process instances, unplug and replug, Linux/macOS, effort).
+
+| Option | Verdict |
+|---|---|
+| (a) Surface hub process owning the pad, brokering over a pipe or socket | Right shape only if the pad must work while **no** app owns it, or for DAW-hosted plugins that cannot open ports. Costs a new process family members must install, start and supervise; a hub crash kills the pad for everyone; a second IPC stack beside mu-link's; it must stream every app's `LiveView` (or lighting) to be useful. Not for v1; kept as the last stage (F3). |
+| (b) mu-link as the hub | Rejected for the pad. mu-link is the optional audio and clock server (mu-link CLAUDE.md: standalone-only, "zero config", the clock is sacred); making app switching depend on a running audio server couples two unrelated things, the free apps would need it, and its `ClientRegistry` (8 slots, 32-char name) is built for audio clients with no accent, focus or Performance state. mu-link may later **display** the focus; it does not own the pad. |
+| (c) One app owns the pad; hand-over by a handshake | **Chosen, generalised**: the handshake runs through a small shared registry file every app maps, not through the pad owner knowing the others (item below). Works across processes **and** in the same process (a shared file is seen by both, which a static singleton in a plugin module is not), with no extra process. |
+| (d) No cross-app switching | The v1 behaviour until F1 is built; costs nothing and closes nothing. |
+
+**Ruling: (c), as a focus registry in `mu-core`; no process.** Build in stages; the app-side seam is small and sits where the existing ones do.
+
+1. **`mu-core/Control/SurfaceFocus.h` (new, device-neutral interface) and `mu-core/Control/SharedSurfaceFocus.{h,cpp}` (its implementation).** Names no
+   device, product or `mu-control` type. A `juce::MemoryMappedFile` on a fixed file in the per-user temp folder (portable to Windows, Linux and macOS; no Win32
+   shared-memory API, unlike mu-link's `SharedMemoryRegion`, which is not reused so the pad works without mu-link). Layout: a versioned header
+   (`version`, `focusSlot`, `focusGeneration`, `padHeldBy`) and 8 slots `{ appKey (product id + start sequence), name[32], accentRgb, flags (performanceOn),
+   heartbeat }`. Written and read on the **message thread only**; fields are plain atomics, no locks; a version mismatch or a stale heartbeat (older than
+   about 3 s) is ignored, never trusted. A crash leaves a stale slot that ages out (R1 is unchanged: the pad stays in Programmer mode until unplugged).
+2. **`ControlAttachmentFactory` gains one argument**, `SurfaceFocus&` (the shell passes the one `SharedSurfaceFocus`; tests pass a fake), and `ControlHost::start`
+   takes it. `ControllerManager`'s constructor then takes `ControlSink&`, `const LiveView&`, the settings folder and `SurfaceFocus&`; it still names no
+   `ProcessorBase`, editor or product. `wantOpen()` gains one condition, "this app holds the focus"; everything else (open, close, Live on every exit path,
+   hot-plug) is unchanged. Item 4's "hub supplies a sink" sentence stands for a later F3 hub.
+3. **`ControlStatus` gains `Standby`** ("another mu app has the pad"; the lamp and wording are the `ux-controller`'s, design-ui-family 14). Not `InUse` (a foreign
+   program) and not `Released` (the user let go): `Standby` is the normal state of every app but one and needs no action. The manager still reads port names for
+   `Found` while on standby.
+4. **`ControlAction` gains `FocusNext` and `FocusPrev`** (stable names, serialisable like the others). `SurfaceModel` maps the two buttons; the **manager handles them
+   itself through `SurfaceFocus`** and the sink never sees them (they are not an app action). Order of the ring: product order mu-Clid, mu-Tant, mu-Toni, mu-On, then
+   start sequence; only apps with Performance mode on and a fresh heartbeat are in it. Up = previous, down = next.
+5. **Hand-over** (all steps on the message threads, driven by a 10 Hz poll that runs only while Performance mode is on): the owner A presses a button, picks the
+   target B, writes `focusSlot = B` and `focusGeneration + 1`, runs its normal `closeDevice()` (pads dark; the ports and Live mode as today), then clears
+   `padHeldBy`. B sees `focusSlot == me`, waits for `padHeldBy` to clear (or 300 ms), and opens as if Performance mode had just been entered. Result: a short
+   dark moment, no overlap on either port model. **Entering Performance mode takes the focus** (the latest deliberate act wins); **leaving it, quitting
+   (`closeNow()`), or a stale heartbeat gives the focus to the next ring member**, or leaves it free. An app that is not in the ring never opens a port.
+6. **Lights.** With two or more apps in the ring, top buttons 1 and 2 show the current app's accent (bright), via `SurfaceLook::accentRgb`; with one they are dark
+   and inert (below). The exact colours and whether one of them shows the neighbouring app's accent are the `ux-controller`'s.
+7. **The mapping conflict (needs Andy).** Version 1 uses all eight top buttons for `PerformanceItem(1..8)` (design-launchpad 3.6, settled 2026-10-13), so buttons 1
+   and 2 are items 1 and 2. A rig profile must therefore be **opt-in and static**, never an automatic remap when a second app appears (a mid-gig launch would change
+   what a pad means): a "Share the pad between apps" setting, stored once for the device in `mu-controller-mapping.xml` (it describes the pad, not an app),
+   default **off**. When on: top 1 and 2 = `FocusPrev` / `FocusNext` (dark and inert while alone in the ring), top 3 to 8 = items 1 to 6. `SurfaceMapping` generates
+   this as a second default from the same `SurfaceDescription`; no `if (device)` in `Surface/`.
+
+**What v1 does with buttons 1 and 2.** Nothing new: they stay items 1 and 2 (as built in M4). No reservation, no dark buttons, no registry file is written or read while the
+setting is off, so a single-app user sees no change.
+
+**Stages** (each ends with `check-core-boundary.ps1` clean and tests; all on the message thread, so no `dsp-controller` review unless that changes).
+
+| Stage | Work | Tests |
+|---|---|---|
+| F0 | Nothing (v1 as built). Hardware check recorded in design-launchpad 3.5: two standalones in Performance mode at once, and a DAW holding the ports. | |
+| F1 | `SurfaceFocus` interface, `SharedSurfaceFocus`, factory and `ControlHost` argument, `Standby`, `FocusNext/Prev`, the manager conditions, the rig mapping profile and setting | `mu-core-tests`: registry round trip, stale and version-mismatch slots, ring order, take-on-enter; `ControllerManagerTests` with two managers over one fake registry and `FakeDevicePorts` (hand-over order, no overlap, Live once, an unplugged pad, a quitting owner, a vanished owner); `SurfaceModelTests` on both descriptions |
+| F2 | Settings group line "pad: mu-Tant" and the accent lamp; `ux-controller` ruling first | UI checks |
+| F3 | **Only if needed**: a hub that owns `DevicePorts` and the driver, for plugins in a DAW or to light the pad with no owner. Protocol (below). | When scheduled |
+
+**If F3 is ever built, the protocol carries surface events and lighting frames, not `ControlAction`s.** Down to the app: `SurfaceEvent`s (device-independent ids,
+y from the top). Up to the hub: the `LedState` frame (final RGB, already dimmed and blinked, delta-able). Also per app: app key, name, accent, Performance on,
+heartbeat; transport state only if the logo transport of M6 is built. This keeps `SurfaceModel`, `SurfaceMapping` and `LiveView` in the app (the hub needs none of
+them), makes the hub a dumb pipe plus the driver, and means an app cannot tell a hub from the F1 registry's direct driver. Forwarding `ControlAction`s would force the
+hub to know each app's `LiveView` to render lights, which is the expensive half. The transport would be a named pipe or loopback socket through
+`juce::InterprocessConnection`.
+
+**Risks.** (1) A frozen app that holds an exclusive port keeps it; others cannot take over (accepted; the heartbeat only frees the focus, it cannot close another process's
+port). (2) Brief dark and a Live/Programmer flip on every hand-over; if it is seen on the pad, add a hand-over close that skips the Live message (a driver
+option, not a protocol change). (3) The registry file in the temp folder: an antivirus lock, a different user's session, or a cleaned temp folder; the code treats an
+unmappable file as "alone in the ring", so the pad behaves as in v1. (4) A layout change between app versions: the version field. (5) Plugins in a DAW do not
+link `mu-control` (Standalone-only link, item 3) so they are outside the ring until F3. (6) Two instances of one product share a settings folder and mapping file; the
+start sequence in the app key keeps their slots apart.
+
+**Standing check (design-future).** Easier. One interface in `mu-core`, no new process, the manager and the mapping unchanged apart from a focus condition and two actions;
+and if the one-instance rig (all engines in one app) arrives the registry simply holds one entry and the feature dissolves, which a hub would not.
+
+Do not: add a hub process, a socket or a pipe for v1; use a static singleton in a module as the registry (it is per process); let `mu-core` include `mu-control`
+or name an app in the registry; remap the top row automatically when a second app appears; take the focus for an app that is not in Performance mode; let the
+audio thread touch the registry; make mu-link a prerequisite of pad switching.
 
 ## Hot-swap (staged preset / layer swaps) — family pattern
 
