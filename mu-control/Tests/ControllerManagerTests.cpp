@@ -475,7 +475,7 @@ public:
             expectEquals(cancels, 1);
 
             const auto beforeLayer = ports->sent.size();
-            press(ControlKind::Side, 0, 6);  // y counts from the top, so row 6 of 8 is layer 2 (bottom = layer 1)
+            press(ControlKind::Side, 0, 1);  // y counts from the top, so row 1 is layer 2 (top = layer 1)
             expectEquals(live.getSelectedLayer(), 1);
             expect(ports->sent.size() > beforeLayer, "the lights were rewritten to show the new layer");
             expect(ports->sent.size() >= sentBefore);

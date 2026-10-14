@@ -14,20 +14,20 @@ public:
         using namespace mu_control::test;
         using T = mu_core::ControlActionType;
 
-        beginTest("default mapping, Launchpad-shaped: top = items, side = layers bottom to top, grid row = layer");
+        beginTest("default mapping, Launchpad-shaped: top = items, side = layers top to bottom, grid row = layer");
         {
             const SurfaceMapping m(launchpadStyle());
             const auto top = m.actionFor({ ControlKind::Top, 2, 0 });
             expect(top && top->type == T::PerformanceItem && top->index == 2);
 
-            const auto bottomSide = m.actionFor({ ControlKind::Side, 0, 7 });
-            expect(bottomSide && bottomSide->type == T::SelectLayer && bottomSide->layer == 0, "the bottom button is layer 1");
             const auto topSide = m.actionFor({ ControlKind::Side, 0, 0 });
-            expect(topSide && topSide->layer == 7);
+            expect(topSide && topSide->type == T::SelectLayer && topSide->layer == 0, "the top button is layer 1");
+            const auto bottomSide = m.actionFor({ ControlKind::Side, 0, 7 });
+            expect(bottomSide && bottomSide->layer == 7);
 
-            const auto pad = m.actionFor({ ControlKind::Pad, 5, 7 });
-            expect(pad && pad->type == T::LaunchClip && pad->layer == 0 && pad->index == 5, "bottom row, column 6 = layer 1 clip 6");
-            const auto padTop = m.actionFor({ ControlKind::Pad, 0, 0 });
+            const auto pad = m.actionFor({ ControlKind::Pad, 5, 0 });
+            expect(pad && pad->type == T::LaunchClip && pad->layer == 0 && pad->index == 5, "top row, column 6 = layer 1 clip 6");
+            const auto padTop = m.actionFor({ ControlKind::Pad, 0, 7 });
             expect(padTop && padTop->layer == 7 && padTop->index == 0);
 
             expect(! m.actionFor({ ControlKind::Special, 0, 0 }), "no logo action in version 1");
@@ -38,7 +38,7 @@ public:
         beginTest("default mapping, mock grid: a 4 x 4 surface with no side buttons");
         {
             const SurfaceMapping m(mockGrid());
-            const auto pad = m.actionFor({ ControlKind::Pad, 3, 3 });
+            const auto pad = m.actionFor({ ControlKind::Pad, 3, 0 });
             expect(pad && pad->type == T::LaunchClip && pad->layer == 0 && pad->index == 3);
             const auto top = m.actionFor({ ControlKind::Top, 3, 0 });
             expect(top && top->type == T::PerformanceItem && top->index == 3);

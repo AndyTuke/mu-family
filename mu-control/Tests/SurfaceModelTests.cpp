@@ -69,7 +69,7 @@ public:
             expect(r.sink.performed[0].type == T::PerformanceItem && r.sink.performed[0].index == 2, d.name);
         }
 
-        beginTest("a side press performs SelectLayer, bottom to top, only where the surface has side buttons");
+        beginTest("a side press performs SelectLayer, top to bottom, only where the surface has side buttons");
         for (const auto& d : allSurfaces())
         {
             Rig r(d);
@@ -79,21 +79,20 @@ public:
                 expect(r.sink.performed.empty());
                 continue;
             }
-            expect(r.model.handle(Rig::press({ ControlKind::Side, 0, 7 })));   // bottom button
-            expect(r.model.handle(Rig::press({ ControlKind::Side, 0, 4 })));
+            expect(r.model.handle(Rig::press({ ControlKind::Side, 0, 0 })));   // top button
+            expect(r.model.handle(Rig::press({ ControlKind::Side, 0, 3 })));
             expectEquals(r.sink.performed[0].layer, 0);
             expectEquals(r.sink.performed[1].layer, 3);
             expect(r.sink.performed[1].type == T::SelectLayer);
         }
 
-        beginTest("a grid press performs LaunchClip(layer, clip) with layer 1 on the bottom row");
+        beginTest("a grid press performs LaunchClip(layer, clip) with layer 1 on the top row");
         for (const auto& d : allSurfaces())
         {
             Rig r(d);
-            const int bottom = d.gridHeight - 1;
-            expect(r.model.handle(Rig::press({ ControlKind::Pad, 1, bottom })), d.name);
+            expect(r.model.handle(Rig::press({ ControlKind::Pad, 1, 0 })), d.name);
             expect(r.sink.performed[0].type == T::LaunchClip && r.sink.performed[0].layer == 0 && r.sink.performed[0].index == 1, d.name);
-            expect(r.model.handle(Rig::press({ ControlKind::Pad, 2, bottom - 3 })), d.name);
+            expect(r.model.handle(Rig::press({ ControlKind::Pad, 2, 3 })), d.name);
             expect(r.sink.performed[1].layer == 3 && r.sink.performed[1].index == 2, d.name);
         }
 
@@ -104,11 +103,11 @@ public:
             expect(! r.model.handle({ { ControlKind::Top, 1, 0 }, SurfaceEventType::Release, 0.0f }), d.name);
             expect(! r.model.handle({ { ControlKind::Top, 1, 0 }, SurfaceEventType::Value, 0.5f }), d.name);
             r.view.layers = 2;
-            expect(! r.model.handle(Rig::press({ ControlKind::Pad, 0, 0 })), d.name + ": a row past the layer count");
+            expect(! r.model.handle(Rig::press({ ControlKind::Pad, 0, d.gridHeight - 1 })), d.name + ": a row past the layer count");
             expect(r.sink.performed.empty(), d.name);
             if (d.buttonCount(ButtonKind::Side) > 0)
             {
-                expect(! r.model.handle(Rig::press({ ControlKind::Side, 0, 0 })));   // layer 8 of 2
+                expect(! r.model.handle(Rig::press({ ControlKind::Side, 0, 7 })));   // layer 8 of 2
                 expect(r.sink.performed.empty());
             }
         }
@@ -152,8 +151,8 @@ public:
             const auto dim    = r.led({ ControlKind::Top, 1, 0 }).rgb;
             expectEquals(dim, scaled(bright, look.dimScale), d.name);
             if (d.buttonCount(ButtonKind::Side) == 0) continue;
-            const auto selected = r.led({ ControlKind::Side, 0, 6 }).rgb;   // layer 2 is selected
-            const auto other    = r.led({ ControlKind::Side, 0, 7 }).rgb;   // layer 1
+            const auto selected = r.led({ ControlKind::Side, 0, 1 }).rgb;   // layer 2 is selected
+            const auto other    = r.led({ ControlKind::Side, 0, 0 }).rgb;   // layer 1
             expectEquals(selected, look.layerRgb[1]);
             expectEquals(other, scaled(look.layerRgb[0], look.dimScale));
         }
@@ -166,10 +165,10 @@ public:
             r.view.colourIndex = { 5, 4, 3, 2, 1, 0, 7, 6 };
             r.view.layers = 3;
             r.view.selected = 2;
-            expectEquals(r.led({ ControlKind::Side, 0, 5 }).rgb, look.layerRgb[3], "layer 3 selected: its colour index 3");
-            expectEquals(r.led({ ControlKind::Side, 0, 6 }).rgb, scaled(look.layerRgb[4], look.dimScale), "layer 2 dim");
-            expectEquals((int) r.led({ ControlKind::Side, 0, 4 }).rgb, 0, "layer 4 does not exist");
-            expectEquals((int) r.led({ ControlKind::Side, 0, 0 }).rgb, 0, "layer 8 does not exist");
+            expectEquals(r.led({ ControlKind::Side, 0, 2 }).rgb, look.layerRgb[3], "layer 3 selected: its colour index 3");
+            expectEquals(r.led({ ControlKind::Side, 0, 1 }).rgb, scaled(look.layerRgb[4], look.dimScale), "layer 2 dim");
+            expectEquals((int) r.led({ ControlKind::Side, 0, 3 }).rgb, 0, "layer 4 does not exist");
+            expectEquals((int) r.led({ ControlKind::Side, 0, 7 }).rgb, 0, "layer 8 does not exist");
         }
 
         beginTest("the grid is dark while no clip is stored");
@@ -180,7 +179,7 @@ public:
                 if (l.id.kind == ControlKind::Pad) expectEquals((int) l.rgb, 0, d.name);
         }
 
-        beginTest("grid: playing bright, stored dim, empty off, in the layer colour; layer 1 is the bottom row");
+        beginTest("grid: playing bright, stored dim, empty off, in the layer colour; layer 1 is the top row");
         for (const auto& d : allSurfaces())
         {
             Rig r(d);
@@ -188,13 +187,13 @@ public:
             r.view.clipMask[0] = 0b0111;          // layer 1: clips 1 to 3 stored
             r.view.playingClip[0] = 1;
             r.view.clipMask[2] = 0b0001;          // layer 3: clip 1 stored, none playing
-            const int bottom = d.gridHeight - 1;
+            const int bottom = 0;   // layer 1's row
             expectEquals(r.led({ ControlKind::Pad, 1, bottom }).rgb, look.layerRgb[5], d.name + ": playing");
             expectEquals(r.led({ ControlKind::Pad, 0, bottom }).rgb, scaled(look.layerRgb[5], look.dimScale), d.name + ": stored");
             expectEquals(r.led({ ControlKind::Pad, 2, bottom }).rgb, scaled(look.layerRgb[5], look.dimScale), d.name + ": stored");
             expectEquals((int) r.led({ ControlKind::Pad, 3, bottom }).rgb, 0, d.name + ": empty");
-            expectEquals(r.led({ ControlKind::Pad, 0, bottom - 2 }).rgb, scaled(look.layerRgb[3], look.dimScale), d.name + ": layer 3, nothing playing");
-            expectEquals((int) r.led({ ControlKind::Pad, 0, bottom - 1 }).rgb, 0, d.name + ": layer 2 has no clips");
+            expectEquals(r.led({ ControlKind::Pad, 0, bottom + 2 }).rgb, scaled(look.layerRgb[3], look.dimScale), d.name + ": layer 3, nothing playing");
+            expectEquals((int) r.led({ ControlKind::Pad, 0, bottom + 1 }).rgb, 0, d.name + ": layer 2 has no clips");
         }
 
         beginTest("grid: a row with no layer is off even if clip state is stale");
@@ -203,7 +202,7 @@ public:
             Rig r(d);
             r.view.layers = 2;
             r.view.clipMask[2] = 0xFF; r.view.playingClip[2] = 0;
-            const int row = d.gridHeight - 1 - 2;
+            const int row = 2;
             for (int x = 0; x < d.gridWidth; ++x) expectEquals((int) r.led({ ControlKind::Pad, x, row }).rgb, 0, d.name);
         }
 
@@ -212,7 +211,7 @@ public:
             double now = 0.0;
             Rig lp(launchpadStyle(), &now);
             lp.view.clipMask[0] = 0b0011; lp.view.playingClip[0] = 0; lp.view.queuedClip[0] = 1;
-            const SurfaceControlId queuedPad { ControlKind::Pad, 1, 7 }, playingPad { ControlKind::Pad, 0, 7 };
+            const SurfaceControlId queuedPad { ControlKind::Pad, 1, 0 }, playingPad { ControlKind::Pad, 0, 0 };
             lp.led(playingPad);                           // first sighting of the playing clip
             expectEquals(lp.led(queuedPad).rgb, scaled(look.layerRgb[0], look.dimScale), "pulse starts dim");
             expect(lp.model.isAnimating(), "a pulsing pad needs the blink timer");
@@ -222,10 +221,10 @@ public:
 
             Rig nb(nativeBlink());
             nb.view.clipMask[0] = 0b11; nb.view.playingClip[0] = 0; nb.view.queuedClip[0] = 1;
-            expect(nb.led({ ControlKind::Pad, 1, 3 }).mode == LedMode::Pulse, "no RGB but a native pulse");
+            expect(nb.led({ ControlKind::Pad, 1, 0 }).mode == LedMode::Pulse, "no RGB but a native pulse");
             Rig mock(mockGrid());
             mock.view.clipMask[0] = 0b11; mock.view.playingClip[0] = 0; mock.view.queuedClip[0] = 1;
-            expect(mock.led({ ControlKind::Pad, 1, 3 }).mode == LedMode::Static, "no pulse: steady");
+            expect(mock.led({ ControlKind::Pad, 1, 0 }).mode == LedMode::Static, "no pulse: steady");
             expect(! mock.model.isAnimating());
         }
 
@@ -234,7 +233,7 @@ public:
             double now = 0.0;
             Rig lp(launchpadStyle(), &now);
             lp.view.clipMask[0] = 0b0011; lp.view.playingClip[0] = 0; lp.view.muted[0] = true;
-            const SurfaceControlId playingPad { ControlKind::Pad, 0, 7 };
+            const SurfaceControlId playingPad { ControlKind::Pad, 0, 0 };
             expectEquals(lp.led(playingPad).rgb, look.layerRgb[0], "first half of the period: bright");
             expect(lp.model.isAnimating());
             now = 499.0;
@@ -249,10 +248,10 @@ public:
 
             Rig nb(nativeBlink());
             nb.view.clipMask[0] = 0b1; nb.view.playingClip[0] = 0; nb.view.muted[0] = true;
-            expect(nb.led({ ControlKind::Pad, 0, 3 }).mode == LedMode::Flash, "no RGB but a native flash");
+            expect(nb.led({ ControlKind::Pad, 0, 0 }).mode == LedMode::Flash, "no RGB but a native flash");
             Rig mock(mockGrid());
             mock.view.clipMask[0] = 0b1; mock.view.playingClip[0] = 0; mock.view.muted[0] = true;
-            const auto m = mock.led({ ControlKind::Pad, 0, 3 });
+            const auto m = mock.led({ ControlKind::Pad, 0, 0 });
             expect(m.mode == LedMode::Static && m.rgb != 0, "no flash at all: steady and lit");
         }
 
@@ -261,7 +260,7 @@ public:
             double now = 1000.0;
             Rig lp(launchpadStyle(), &now);
             lp.view.clipMask[0] = 0b0011;
-            const SurfaceControlId pad { ControlKind::Pad, 1, 7 };
+            const SurfaceControlId pad { ControlKind::Pad, 1, 0 };
             lp.led(pad);                                  // first sighting: nothing playing yet
             lp.view.playingClip[0] = 1;
             expect(lp.led(pad).rgb != look.layerRgb[0], "the change starts a burst");
@@ -276,9 +275,9 @@ public:
 
             Rig mock(mockGrid());
             mock.view.clipMask[0] = 0b1;
-            mock.led({ ControlKind::Pad, 0, 3 });
+            mock.led({ ControlKind::Pad, 0, 0 });
             mock.view.playingClip[0] = 0;
-            expectEquals(mock.led({ ControlKind::Pad, 0, 3 }).rgb, look.layerRgb[0], "a palette pad has no burst");
+            expectEquals(mock.led({ ControlKind::Pad, 0, 0 }).rgb, look.layerRgb[0], "a palette pad has no burst");
             expect(! mock.model.isAnimating());
         }
 
@@ -287,7 +286,7 @@ public:
             double now = 0.0;
             Rig lp(launchpadStyle(), &now);
             lp.view.clipMask[0] = 0b1; lp.view.playingClip[0] = 0;
-            expectEquals(lp.led({ ControlKind::Pad, 0, 7 }).rgb, look.layerRgb[0]);
+            expectEquals(lp.led({ ControlKind::Pad, 0, 0 }).rgb, look.layerRgb[0]);
             expect(! lp.model.isAnimating());
         }
 

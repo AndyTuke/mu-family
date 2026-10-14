@@ -21,7 +21,7 @@ struct PadLight
     uint32_t rgb   = 0;                    // 0xRRGGBB, 0 = off
 };
 
-// Numbering. Surface y counts from the top, so layer 1 (bottom row) is y = 7. Special (the logo) has no index.
+// Numbering. Surface y counts from the top, so the bottom row is y = 7 (the mapping puts layer 1 on y = 0). Special (the logo) has no index.
 std::optional<int>              indexOf(const SurfaceControlId& id);
 std::optional<SurfaceControlId> controlOf(int index, bool isCc);
 

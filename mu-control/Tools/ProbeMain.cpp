@@ -227,12 +227,12 @@ void stepRgb(double holdSeconds)
     s.show(a);
     if (! waitFor(3.0)) return;
 
-    // Part B: the eight layer colours, one per row (row 1 = bottom is layer 1); left half bright, right half dim.
-    say("Part B (", holdSeconds, " s): one row per layer colour, bottom row = layer 1. Columns 1-4 BRIGHT, columns 5-8 DIM (x0.45). Side buttons = the layer colour bright.");
+    // Part B: the eight layer colours, one per row (the top row is layer 1); left half bright, right half dim.
+    say("Part B (", holdSeconds, " s): one row per layer colour, top row = layer 1. Columns 1-4 BRIGHT, columns 5-8 DIM (x0.45). Side buttons = the layer colour bright.");
     Frame b;
     for (int layer = 0; layer < 8; ++layer)
     {
-        const int y = 7 - layer;
+        const int y = layer;   // the same convention as the surface mapping: layer 1 on the top row
         for (int x = 0; x < 8; ++x) b.pad(x, y, x < 4 ? kLayerRgb[layer] : scale(kLayerRgb[layer], 0.45f));
         b.side(y, kLayerRgb[layer]);
         say("   layer ", layer + 1, " ", kLayerName[layer], ": bright ", rgbText(kLayerRgb[layer]), "  dim ", rgbText(scale(kLayerRgb[layer], 0.45f)));
@@ -351,7 +351,7 @@ void stepColourLab(double seconds)
     float dimScale = 0.45f;
     int layer = 0;
 
-    say("Right-hand buttons (bottom = layer 1 ... top = layer 8) pick the colour. The pad shows it: top four rows bright, bottom four rows dim.");
+    say("Right-hand buttons (top = layer 1 ... bottom = layer 8) pick the colour. The pad shows it: top four rows bright, bottom four rows dim.");
     say("Top buttons, left to right: red -, red +, green -, green +, blue -, blue +, dim -, dim +.");
 
     auto channel = [&](int c) -> int { return (int) ((colours[layer] >> (16 - 8 * c)) & 0xFFu); };
@@ -367,7 +367,7 @@ void stepColourLab(double seconds)
         const uint32_t bright = colours[layer], dim = scale(colours[layer], dimScale);
         for (int y = 0; y < 8; ++y)
             for (int x = 0; x < 8; ++x) f.pad(x, y, y < 4 ? bright : dim);
-        for (int i = 0; i < 8; ++i) f.side(7 - i, i == layer ? 0xFFFFFF : colours[i]);
+        for (int i = 0; i < 8; ++i) f.side(i, i == layer ? 0xFFFFFF : colours[i]);
         for (int i = 0; i < 6; ++i) { const uint32_t ch = i % 2 == 0 ? 0x400000u >> (i / 2 * 8) : 0xFF0000u >> (i / 2 * 8); f.top(i, ch); }
         f.top(6, 0x303030); f.top(7, 0xA0A0A0);
         s.show(f);
@@ -390,7 +390,7 @@ void stepColourLab(double seconds)
         for (const auto& e : events)
         {
             if (e.type != SurfaceEventType::Press) continue;
-            if (e.id.kind == ControlKind::Side) { layer = 7 - e.id.y; changed = true; }
+            if (e.id.kind == ControlKind::Side) { layer = e.id.y; changed = true; }
             else if (e.id.kind == ControlKind::Top)
             {
                 const int i = e.id.x;
@@ -519,7 +519,7 @@ struct StatusPrinter : mu_core::ControlAttachment::Listener
 void stepManager(double seconds)
 {
     say("\n== Step 5: full manager demo (", seconds, " s) ==");
-    say("A pretend performance: 4 layers, 4 items, item 1 playing. Top row: item 1 bright, items 2-4 dim. Right column: layer 1 bright, layers 2-4 dim (rows 5-8 dark).");
+    say("A pretend performance: 4 layers, 4 items, item 1 playing. Top row: item 1 bright, items 2-4 dim. Right column: layer 1 bright, layers 2-4 dim (rows 5-8 dark), layer 1 at the top.");
     say("Press a top button: that item PULSES (queued), and becomes the bright one after 2 s. Press a right-hand button to select a layer.");
 
     DemoView view;

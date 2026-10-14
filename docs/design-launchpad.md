@@ -359,9 +359,9 @@ index into the shared layer palette; the driver's `LaunchpadXPalette` turns it i
 (`layerCount()`, `layerColourIndex(i)`, the same pattern as `canLoad`), so it stays free of `ProcessorBase`; `ProcessorBase` wires them to `ProcessorCore`.
 They are plain getters; nothing here changes how the screen works.
 
-**Default mapping and lights for the Launchpad X** are ruled in §3.6 (top row = `PerformanceItem`, right column bottom to top = layers 1 to 8 = `SelectLayer`, grid row = layer and
+**Default mapping and lights for the Launchpad X** are ruled in §3.6 (top row = `PerformanceItem`, right column top to bottom = layers 1 to 8 = `SelectLayer`, grid row = layer and
 column = clip = `LaunchClip`, no second page and no transport or Panic in version 1) and are not repeated. The default is generated in code by `SurfaceMapping` from the
-`SurfaceDescription` (description coordinates, y from the top, so layer 1 is the bottom row, `y = gridHeight - 1`); the driver owns the Launchpad's own numbering. The
+`SurfaceDescription` (description coordinates, y from the top, so layer 1 is the top row, `y = 0`, via `layerToRow` / `rowToLayer` in `SurfaceMapping.h`; flipped 2026-10-14 after Andy's pad test so the pad matches the on-screen order); the driver owns the Launchpad's own numbering. The
 "Controller" Settings group and the sticky `Lost` status line of design-ui-family §14 read `ControlAttachment` (status, device label, `release()`, `connect()`).
 
 **Mock grid driver (the second-driver proof).** `Tests/MockGridDriver.h`, header-only and test-only: a 4 x 4 grid, 4 top buttons, **no side buttons, no flash or
@@ -397,7 +397,7 @@ tests are in `mu-control-tests` unless stated; every stage ends with `check-core
 - **Mapping file:** `<settings folder>/mu-controller-mapping.xml`, see the Mapping row in 3.2d.
 - **Still to do for M4 acceptance:** run the four apps with the option ON on the real pad (attach, Release / Connect, hot-plug, Close and Save quit).
 
-**Andy's decisions (each with the build assumption until he answers).** The pad order and the version 1 button set are already ruled in §3.6 (layer 1 is the bottom row, no
+**Andy's decisions (each with the build assumption until he answers).** The pad order and the version 1 button set are already ruled in §3.6 (layer 1 is the top row, no
 shift, no second page, no transport or Panic); the layer order is therefore not asked again.
 1. **`MUFAMILY_WITH_CONTROL` default and whether released apps contain it.** Recommend OFF now, ON in the dev configuration after M4 passes on the hardware, and a release
    decision made then (the apps still never touch a port outside Performance mode).
@@ -455,7 +455,7 @@ From a throwaway JUCE 9.0.3 probe on Windows 11 with Windows MIDI Services runni
 
 ### 3.6 Surface mapping defaults for the Launchpad X (ruled 2026-10-13; backlog #1276)
 
-**Settled by Andy (2026-10-13):** grid rows = layers, columns = clips 1 to 8; top row of round buttons (CC 91-98) = `PerformanceItem(1..8)`; right column (CC 19..89, bottom to top = layers 1..8) = `SelectLayer`. This is the default mapping in `mu-control`; it produces the same `ControlAction`s as the screen, so every rule below is the on-surface twin of [design-ui-family.md sections 12 and 13](design-ui-family.md#12-performance-mode-ruled-2026-10-12-revised-2026-10-13-with-the-owners-decisions-backlog-1279). The screen half (Settings group, status line) is [section 14](design-ui-family.md#14-controller-status-and-release-ruled-2026-10-13-backlog-1276).
+**Settled by Andy (2026-10-13):** grid rows = layers, columns = clips 1 to 8; top row of round buttons (CC 91-98) = `PerformanceItem(1..8)`; right column (CC 89..19, top to bottom = layers 1..8; flipped 2026-10-14 from bottom-up to match the screen) = `SelectLayer`. This is the default mapping in `mu-control`; it produces the same `ControlAction`s as the screen, so every rule below is the on-surface twin of [design-ui-family.md sections 12 and 13](design-ui-family.md#12-performance-mode-ruled-2026-10-12-revised-2026-10-13-with-the-owners-decisions-backlog-1279). The screen half (Settings group, status line) is [section 14](design-ui-family.md#14-controller-status-and-release-ruled-2026-10-13-backlog-1276).
 
 **Colour source and method.** Layer colours are `MuLookAndFeel::layerPalette` (hue names, 3.2b); item colours are the app accent. The driver sends **RGB** (lighting SysEx type 3, batched, changed pads only); the palette index through the hue table is the fallback for a surface without RGB. **Bright** = the token colour; **dim** = the colour scaled by new `MuTheme::Lighting::padDimScale` **0.45** (chosen by eye on the real pad 2026-10-14; 0.30, the 25 to 35 % of 3.2b, was too dark). **Blink is driven by the driver's own timer, not the device's flash/pulse modes**, so the pads match the screen exactly and do not depend on a MIDI clock being sent: pulse = smooth between dim and bright at `queuedPulseHz` (2 Hz); flash = square 50 % between bright and dim at `clipMutedFlashHz` (1 Hz). The device's native modes are the fallback for a driver that cannot send RGB.
 

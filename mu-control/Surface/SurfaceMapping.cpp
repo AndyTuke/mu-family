@@ -64,13 +64,13 @@ std::optional<mu_core::ControlAction> SurfaceMapping::defaultAction(const Surfac
             a.type = mu_core::ControlActionType::PerformanceItem;
             a.index = id.x;
             return a;
-        case ControlKind::Side:  // the side column selects layers, bottom to top
+        case ControlKind::Side:  // the side column selects layers, top to bottom
             a.type = mu_core::ControlActionType::SelectLayer;
-            a.layer = description.buttonCount(ButtonKind::Side) - 1 - id.y;
+            a.layer = rowToLayer(id.y);
             return a;
-        case ControlKind::Pad:   // rows are layers (layer 1 on the bottom row), columns are clips
+        case ControlKind::Pad:   // rows are layers (layer 1 on the top row), columns are clips
             a.type = mu_core::ControlActionType::LaunchClip;
-            a.layer = description.gridHeight - 1 - id.y;
+            a.layer = rowToLayer(id.y);
             a.index = id.x;
             return a;
         case ControlKind::Special:

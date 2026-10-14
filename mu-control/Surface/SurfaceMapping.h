@@ -9,11 +9,17 @@
 #include <vector>
 
 // Which surface control means which ControlAction. The default is generated from the SurfaceDescription alone
-// (top row = performance items, side column = layer select, grid = clip launch, layer 1 on the bottom row);
+// (top row = performance items, side column = layer select, grid = clip launch, layer 1 on the top row);
 // only the overrides a user made are saved, as a ValueTree / XML keyed by the description id. No device bytes
 // and no product: actions are saved by their stable names.
 namespace mu_control
 {
+
+// The one place the layer/row convention lives: layer N (0-based) is surface row N counted from the top, on the
+// grid and on the side column alike, matching the on-screen layer order. Lights and presses both go through the
+// mapping, so they cannot disagree. Change the order here only.
+constexpr int layerToRow(int layer) noexcept { return layer; }
+constexpr int rowToLayer(int row) noexcept   { return row; }
 
 // Every control the description has, in a fixed order: pads row by row from the top, then Top, Side, Special.
 std::vector<SurfaceControlId> controlsOf(const SurfaceDescription& d);
