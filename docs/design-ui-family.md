@@ -676,18 +676,18 @@ All in `MuLookAndFeel.h` unless stated; every one is scaled with `s()`.
 
 Strip width at Medium = 30 + 8 x 24 + 7 x 3 + 8 = 251. Reused, not new: `queuedPulseHz`, `stepFlashMs`, `lampOff / lampDim / lampOn / lampPlayhead`, `kPerfStatusMs`, `kStatusLampD`-style lamp lens. Large scales everything together; the dropdown flex absorbs the rest. No product-specific layout constant exists.
 
-### 13.6 The bank and the loaded preset (decisions for Andy are marked)
+### 13.6 The bank and the loaded preset (decided by Andy, 2026-10-14)
 
 - **After a preset load or New**, the bank is whatever the file holds; **no clip is playing** until one is launched, unless the file says which was active (decision A below). Pads then read: stored dim, empty off.
 - **Reset layer** returns the layer to defaults and **clears its bank**; the reset confirm gains one line only when the bank is non-empty: `This also clears its clips.` (inserted before `This cannot be undone.`; the one shared `LayerHeaderBar::resetConfirmMessage` takes a clip count). **Delete layer** takes its bank with it, no extra wording.
-- **Layer preset files** (`.muRhythm`, `.muPattern`, `.muArp`, `.muTrack`): see decision B.
+- **Layer preset files** (`.muRhythm`, `.muPattern`, `.muArp`, `.muTrack`): never carry the bank (decision B). Loading one leaves the layer's bank alone but clears the playing-clip marker and any queued clip, because the live state no longer matches a stored clip.
 - **Clip numbering** is fixed 1 to 8 and matches the pad columns; there are no names (a stored clip is identified by its number and, in the tooltip, nothing else).
 
-**Decisions that are Andy's (the file format is his):**
+**Decisions (Andy, 2026-10-14, all as recommended). The code already implements them; tests are the clip persistence round trips in mu-Clid `ClipLaunchTests` and `LayerOwnershipTests`.**
 
-- **A. Do full presets remember which clip was playing?** Recommendation: yes, one small value per layer (`activeClip`, -1 for none) saved with the preset, so the Launchpad lights up correctly the moment a preset commits on stage, and a clip-based set-up reopens as left. Without it every pad is dim after a load and the player must launch a clip before anything shows bright. Cost: one integer per layer in the layer node; old files omit it and load with none playing.
-- **B. Does a layer preset file carry its clip bank?** Recommendation: **no**. A layer preset is one state (a sound, a pattern) that you load into a layer; the bank belongs to the layer's place in a performance, inside the full preset. Loading a layer preset replaces the live state and leaves the bank alone; loading a full preset replaces everything including banks. Consequence: you cannot share a bank between presets except by copying the full preset. The alternative (the bank travels with the layer preset) makes each layer preset up to 8 times larger and makes "load this layer preset" ambiguous (does it overwrite the 8 clips you built?).
-- **C. Full-preset file format impact (decision for the record).** Each layer node gains an optional `<Clips>` child holding up to 8 composed states (the same node a layer preset saves) and the `activeClip` value from A. Old files load with empty banks; a new file opened in an older build ignores the children. No version bump is needed if the loader ignores unknown children, which the architecture-steward must confirm; if not, a one-step format bump. Size: up to 64 layer states per preset beyond today's 8, text XML, still small (sample and wavetable data are references, not embedded). Recommendation: accept.
+- **A. Yes: full presets remember which clip was playing.** One small value per layer (`activeClip`, -1 for none) saved with the preset, so the Launchpad lights up correctly the moment a preset commits on stage, and a clip-based set-up reopens as left. Old files omit it and load with none playing.
+- **B. No: a layer preset file does not carry the clip bank.** A layer preset is one state (a sound, a pattern) loaded into a layer; the bank belongs to the layer's place in a performance, inside the full preset. Loading a layer preset replaces the live state and leaves the bank alone; loading a full preset replaces everything including banks. Consequence: a bank is shared only by copying the full preset.
+- **C. Yes: the full-preset format carries the bank.** Each layer node gains an optional `<Clips>` child holding up to 8 composed states (the same node a layer preset saves) plus the `activeClip` value from A. Old files load with empty banks; a new file opened in an older build ignores the children. No version bump, because unknown children are ignored. Size: up to 64 layer states per preset beyond today's 8, text XML, still small (sample and wavetable data are references, not embedded).
 
 ### 13.7 What the user can do, per product
 
@@ -705,7 +705,7 @@ The Launchpad and Performance mode are standalone only for now (12, availability
 
 ### 13.8 Open questions
 
-1. **Decisions A and B above** (Andy).
+1. **Decisions A, B and C**: settled (13.6).
 2. **Show "modified" on the playing pad?** After tweaking a recalled clip, a small mark (for example an engraved dot on the playing pad) would warn that Store has not been pressed. Recommendation: not in the first version; add if testing shows lost tweaks. It needs the stored clip compared with the live state, which costs a comparison the architecture-steward should size.
 3. **Mute vs cancel on the playing pad** (13.3): the cancel-first rule adds a press to mute while a clip is queued. Recommendation: keep, for parity with the preset rule; revisit on hardware.
 4. **Should the surface get a "store" gesture later?** Owner ruled no (a pad never writes a preset); not planned.
@@ -733,6 +733,8 @@ The screen half of the Launchpad surface mapping ([design-launchpad.md section 3
 ---
 
 ## Design rulings
+
+- 2026-10-14 - Clip bank decisions A, B, C (#1277) decided by Andy as recommended: A yes (full presets remember the playing clip, `activeClip` per layer); B no (layer preset files do not carry the bank; loading one leaves the bank alone and clears the playing marker); C yes (full-preset format gains an optional `<Clips>` child per layer plus `activeClip`, no version bump). Already implemented. Changed §13.6, §13.8.
 
 - 2026-10-14 - Layer-naming leftovers (#1588), decided by the UX controller on Andy's delegation. (1) Add button: the rule already in the layer-sidebar section stands unchanged and the code matches it (`LayerSidebar::resized` / `timerCallback`): shown whenever the product wires `onAddLayer`, hidden only in Performance mode where the "n/N" indicator takes its slot, disabled (never hidden) at `mu_limits::kMaxLayers` with the tooltip "Maximum of 8 <noun>s". No per-product exceptions. (2) Class names: `EnginePanel` is retired and no class by that name remains; the product band is `<Type>Content` (`RhythmContent`, `PatternContent`, `ArpContent`, `TrackContent`). mu-Clid's `VoiceSection` stays: it is the product's subclass of the shared `VoiceBand` (a section inside `RhythmContent`, not the main panel), and its name matches the `kVoiceSectionH` token; renaming it buys nothing and churns tokens and docs. No UI change. Changed this entry only.
 
