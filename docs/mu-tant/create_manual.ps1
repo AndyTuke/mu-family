@@ -95,10 +95,10 @@ P "mu-Tant is free to use and nothing is locked. If you find it useful, you can 
 Bullet "Maybe later  —  closes the window and carries on."
 Bullet "Enter licence key  —  opens the About panel so you can type in your key."
 Bullet "Pay what you like  —  opens the checkout page in your web browser. The suggested amount is £20, but £0 is fine. You receive a key either way."
-P "Tick 'Don't show this again' to stop the window appearing. You can still support mu-Tant at any time from the Support link at the right of the status bar, or from the Support button in the About panel."
+P "The window cannot be switched off for good. You can support mu-Tant at any time from the Support link at the right of the status bar, or from the Support button in the About panel."
 P "To enter a key, click the mu-Tant logo to open the About panel, click Enter a key, paste in your key, then click Activate. If you do not have a key yet, click Get a key beside Activate to open the pay-what-you-like page in your web browser. Once a key is accepted, the About panel shows 'Thank you for your support' and the Support prompt no longer appears. The key changes nothing else: mu-Tant works the same with or without it."
 
-Pic "Support mu-Tant window with its three buttons and the Don't show this again tick box." "support-prompt.png"
+Pic "Support mu-Tant window with its three buttons." "support-prompt.png"
 Pic "About panel showing the Support and Enter a key buttons." "about-panel.png"
 
 # ── 4. Interface Overview ─────────────────────────────────────────────────────
@@ -292,7 +292,7 @@ H2 "Performance Mode (Standalone)"
 P "Performance mode turns the standalone app into a locked gig view. The screen shows the preset that is playing, exactly as normal, but you cannot change anything with the mouse or keyboard. Only a connected control surface (set up through MIDI mapping) switches presets and voices. Performance mode is not available in the VST3 or CLAP plug-in."
 P "Performance mode plays a performance: a saved list of up to eight full presets, stored as a .muPerformance file in the Performances folder inside your content folder. You make, edit and choose performances in the Performance chooser."
 H3 "The Performance Chooser"
-P "Open the chooser from the Performances button in the footer of the Preset Browser, or by clicking the Perf button (or pressing Ctrl+P) when no performance has been chosen yet. You can only open it while Performance mode is off."
+P "Open the chooser from the Performances entry at the bottom of the preset dropdown in the Transport Bar, from the Performances button in the footer of the Preset Browser, or by clicking the Perf button (or pressing Ctrl+P) when no performance has been chosen yet. You can only open it while Performance mode is off."
 Bullet "On the left is the list of your saved performances. Click one to open it. The list scrolls."
 Bullet "On the right are the eight places in the performance. Each row shows its number, the preset name, which product the preset is for, and buttons. An empty row has a + Preset button. A filled row has Replace, Up, Down and Remove: Replace picks a different preset, Up and Down move the preset in the order, and Remove empties the place."
 Bullet "A preset whose file can no longer be found stays in its place with a red lamp and the word missing. Replace it or remove it."
