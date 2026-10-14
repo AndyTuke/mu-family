@@ -183,6 +183,8 @@ public:
         // Destructive dialog button (Warning-icon ModalDialog primary): dark red fill;
         // its border and text use indicatorFault.
         buttonDangerBg          = 0x100000d8,
+        // Lettering of a name that is queued, not yet playing (the header's preset box while a clip waits).
+        queuedText              = 0x100000d9,
 
         // ── Modulator label colours A–H ───────────────────────────────────
         // Named tokens for the per-modulator label palette so that all colour

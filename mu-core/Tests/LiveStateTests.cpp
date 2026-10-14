@@ -631,6 +631,33 @@ public:
             expectEquals((int) t.getClipMask(2), 0b01);
         }
 
+        beginTest("clip names: published per clip, notify only on a change, follow their layer through a remap");
+        {
+            Fake f; LiveState s; ready(f, s);
+            struct Count : LiveView::Listener
+            {
+                int n = 0;
+                void liveStateChanged() override { ++n; }
+            } count;
+            s.addListener(&count);
+
+            expectEquals(s.getClipName(0, 3), juce::String(), "unnamed by default");
+            s.setClipName(0, 3, "Intro");
+            expectEquals(s.getClipName(0, 3), juce::String("Intro"));
+            expectEquals(count.n, 1);
+            s.setClipName(0, 3, "Intro");
+            expectEquals(count.n, 1, "the same name is not a change");
+            s.setClipName(9, 0, "x"); s.setClipName(0, 8, "x"); s.setClipName(0, -1, "x");
+            expectEquals(count.n, 1, "out of range is ignored");
+            expectEquals(s.getClipName(9, 0), juce::String());
+            expectEquals(s.getClipName(0, 8), juce::String());
+
+            s.remapLayers([](int i) { return i == 0 ? 2 : (i == 2 ? 0 : i); });
+            expectEquals(s.getClipName(2, 3), juce::String("Intro"), "the names moved with their layer");
+            expectEquals(s.getClipName(0, 3), juce::String());
+            s.removeListener(&count);
+        }
+
         beginTest("clearing a clip: the playing one stops being playing, a queued one has its launch cancelled");
         {
             Fake f; LiveState s; ready(f, s);

@@ -28,6 +28,7 @@ void ClipStrip::bind(const mu_core::LiveView* v, mu_core::ControlSink* s)
     sink = s;
     if (view != nullptr) view->addListener(this);
     haveBaseline = false;
+    haveDisplay  = false;
     refresh();
 }
 
@@ -36,6 +37,7 @@ void ClipStrip::setLayer(int layerIndex)
     if (layerIndex == layer && haveBaseline) return;
     layer = layerIndex;
     haveBaseline = false;   // a different layer's pads are a new picture, not a change: nothing flashes
+    haveDisplay  = false;
     refresh();
 }
 
@@ -53,6 +55,20 @@ ClipStrip::Lamp ClipStrip::lampFor(int pad, int playing, int queued, uint8_t sto
     if (pad == queued)  return Lamp::Queued;
     if (pad >= 0 && pad < kPads && ((storedMask >> pad) & 1) != 0) return Lamp::Available;
     return Lamp::Empty;
+}
+
+ClipStrip::DisplayName ClipStrip::displayNameFor(const mu_core::LiveView& view, int layer)
+{
+    const int queued = view.getQueuedClip(layer);
+    if (queued >= 0)
+    {
+        const auto name = view.getClipName(layer, queued);
+        return { name.isNotEmpty() ? name : "clip " + juce::String(queued + 1), true };
+    }
+    const int playing = view.getPlayingClip(layer);
+    if (playing >= 0)
+        return { view.getClipName(layer, playing), false };
+    return {};
 }
 
 int ClipStrip::stripWidth()
@@ -117,6 +133,18 @@ void ClipStrip::refresh()
     }
     lamps = next;
     haveBaseline = true;
+
+    // Tell the header's preset box what to name, only when that changed (so a file pick is not overridden again).
+    if (onDisplayName)
+    {
+        const DisplayName shown = view != nullptr ? displayNameFor(*view, layer) : DisplayName {};
+        if (! haveDisplay || shown != lastDisplay)
+        {
+            lastDisplay = shown;
+            haveDisplay = true;
+            onDisplayName(shown.text, shown.queued);
+        }
+    }
 
     // Entering Performance mode cancels any clip menu that is open (a late pick is refused anyway).
     if (isReadOnly()) juce::PopupMenu::dismissAllActiveMenus();

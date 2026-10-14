@@ -25,6 +25,9 @@ LayerHeaderBar::LayerHeaderBar()
     };
     addAndMakeVisible(presetDD);
     addChildComponent(clipStrip);   // hidden until a product with a clip bank asks for it
+
+    // The preset box names the clip: the queued one in the queued colour, else the playing one.
+    clipStrip.onDisplayName = [this](const juce::String& text, bool queued) { presetDD.setDisplayOverride(text, queued); };
 }
 
 void LayerHeaderBar::setNoun(const juce::String& n)

@@ -886,6 +886,7 @@ bool ProcessorBase::removeLayer(int idx)
     // shifted, so the notification a surface acts on sees the finished edit. Remap first: the clear names the new index.
     suspend.release();
     liveState.remapLayers([idx](int i) { return mu_mix::sidechainAfterRemove(i, idx, mu_limits::kMaxLayers); });
+    for (int d = idx; d < n - 1; ++d) presetLabels[(size_t) d] = presetLabels[(size_t) (d + 1)];   // labels follow their layer down
     clearLayerClips(n - 1);
     return true;
 }
@@ -931,6 +932,7 @@ bool ProcessorBase::swapLayers(int a, int b)
     // resumed, so the notification a surface acts on sees the finished edit.
     suspend.release();
     liveState.remapLayers([a, b](int i) { return mu_mix::sidechainAfterSwap(i, a, b, mu_limits::kMaxLayers); });
+    std::swap(presetLabels[(size_t) a], presetLabels[(size_t) b]);
     publishClipMasks();
     return true;
 }
@@ -974,6 +976,7 @@ void ProcessorBase::clearLayerClips(int slot)
     if (slot < 0 || slot >= mu_limits::kMaxLayers || layers[(size_t) slot] == nullptr) return;
     layers[(size_t) slot]->clips->clearAll();
     layers[(size_t) slot]->activeClip = -1;
+    presetLabels[(size_t) slot] = juce::String();   // a fresh or reset layer came from no preset
     liveState.clearLayerClips(slot);
     publishClipMasks();
 }
@@ -982,7 +985,10 @@ void ProcessorBase::noteNonClipStage(int slot)
 {
     cancelPendingSwap(slot);   // even if this stage is then aborted, an earlier queued clip must not land unlit
     if (slot >= 0 && slot < mu_limits::kMaxLayers && layers[(size_t) slot] != nullptr)
+    {
         layers[(size_t) slot]->activeClip = -1;
+        presetLabels[(size_t) slot] = juce::String();   // the product re-notes the new preset's label after staging it
+    }
     liveState.clearLayerClips(slot);   // a plain layer-preset load also supersedes a queued clip
 }
 
@@ -995,7 +1001,25 @@ void ProcessorBase::notePendingPresetTree(int slot, const juce::ValueTree& stage
 void ProcessorBase::publishClipMasks()
 {
     for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    {
         liveState.setClipMask(i, clipMask(i));
+        const auto* layer = getLayer(i);
+        for (int c = 0; c < mu_limits::kClipsPerLayer; ++c)
+            liveState.setClipName(i, c, layer != nullptr ? layer->clips->getName(c) : juce::String());
+    }
+}
+
+juce::String ProcessorBase::clipLabel(int slot) const
+{
+    if (slot >= 0 && slot < mu_limits::kMaxLayers && presetLabels[(size_t) slot].isNotEmpty())
+        return presetLabels[(size_t) slot];
+    return getLayerName(slot);
+}
+
+void ProcessorBase::noteLayerPresetLabel(int slot, const juce::String& label)
+{
+    if (slot >= 0 && slot < mu_limits::kMaxLayers)
+        presetLabels[(size_t) slot] = label;
 }
 
 bool ProcessorBase::storeClip(int slot, int clip, const juce::String& name)
@@ -1020,7 +1044,10 @@ bool ProcessorBase::storeClip(int slot, int clip, const juce::String& name)
         tree = captureLayerPresetTree(slot);
     if (! tree.isValid()) return false;
 
-    layer->clips->store(clip, tree, name);   // store deep-copies, so the capture is not aliased
+    // Named after the preset the layer came from unless the caller names it; the layer then carries that name.
+    const juce::String stored = name.isNotEmpty() ? name : clipLabel(slot);
+    layer->clips->store(clip, tree, stored);   // store deep-copies, so the capture is not aliased
+    noteLayerPresetLabel(slot, stored);
     publishClipMasks();
     return true;
 }
@@ -1058,7 +1085,7 @@ bool ProcessorBase::loadClipFromFile(int slot, int clip, const juce::File& layer
     }
 
     // Stored as read: any migration runs at launch, on a copy.
-    layer->clips->store(clip, juce::ValueTree::fromXml(*xml), {});
+    layer->clips->store(clip, juce::ValueTree::fromXml(*xml), layerPreset.getFileNameWithoutExtension());
     publishClipMasks();
     return true;
 }
@@ -1076,7 +1103,10 @@ bool ProcessorBase::launchClip(int slot, int clip)
     // stopped path's apply-at-once (which cancels first), both move it.
     const auto serialBefore = slotStageSerial(slot);
     stageLayerPreset(slot, layer->clips->get(clip), true, true);
-    return slotStageSerial(slot) != serialBefore;
+    const bool staged = slotStageSerial(slot) != serialBefore;
+    if (staged)
+        noteLayerPresetLabel(slot, layer->clips->getName(clip));   // the layer is now that clip: a re-store keeps its name
+    return staged;
 }
 
 uint8_t ProcessorBase::clipMask(int slot) const

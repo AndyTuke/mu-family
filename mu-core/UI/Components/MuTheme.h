@@ -137,6 +137,7 @@ struct MuTheme
         juce::Colour muted             { 0xff555554 };
         juce::Colour bright            { 0xffeeeeee };  // transport-btn active text
         juce::Colour disabledButton    { 0xff666666 };  // transport-btn disabled text
+        juce::Colour queued            { 0xffffcc00 };  // a name waiting for its boundary (the header's queued clip)
     } text;
 
     // ── Buttons (non-state-driven extras) ─────────────────────────────────

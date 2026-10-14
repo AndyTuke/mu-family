@@ -39,6 +39,8 @@ public:
     virtual int                           getQueuedClip(int layer)  const = 0;   // -1 = nothing waiting for its boundary
     virtual uint8_t                       getClipMask(int layer)    const = 0;   // bit n set = clip n is stored
     virtual bool                          isLayerMuted(int layer)   const = 0;   // the layer strip's mute
+    // The name a clip was stored under (empty = unnamed, empty, or out of range). Defaults suit a view with no names.
+    virtual juce::String                  getClipName(int layer, int clip) const { juce::ignoreUnused(layer, clip); return {}; }
 
     // The transport as the surface lights it. Defaults suit a view with no transport (stopped, owned by nobody).
     virtual bool                          isTransportPlaying() const        { return false; }   // the internal clock runs

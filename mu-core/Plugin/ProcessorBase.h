@@ -300,7 +300,13 @@ public:
     // launching one is a layer-preset load from that tree, so a stopped transport applies it now and a
     // playing one commits it at the layer's swap boundary. The bank is saved with full presets and
     // sessions only (see captureComposedState).
+    // An empty `name` is replaced by clipLabel(slot): a clip is named after the preset it was stored from.
     bool    storeClip(int slot, int clip, const juce::String& name = {});
+    // The name a clip stored from `slot` gets: the preset the layer last came from, else the layer's own name.
+    // A product with a richer notion of "the preset" overrides it.
+    virtual juce::String clipLabel(int slot) const;
+    // A product calls this once a layer-preset file is loaded into, or saved from, `slot` (stem, no extension).
+    void    noteLayerPresetLabel(int slot, const juce::String& label);
     bool    clearClip(int slot, int clip);
     // Reads a layer-preset file into a clip. Refuses (onLoadError, bank unchanged) a file that cannot
     // be read or whose root tag is not this product's layer-preset tag.
@@ -618,6 +624,9 @@ protected:
     // The tree of each layer's last non-clip stage that is still waiting for its boundary (invalid when none).
     // A store captures it instead of the live layer, which does not show that preset yet.
     std::array<juce::ValueTree, mu_limits::kMaxLayers> pendingPresetTree;
+    // Per slot, the preset (file stem or clip name) the layer's state last came from; empty = none known.
+    // Message thread only; follows its layer through remove / swap, and is forgotten by a non-clip stage and a reset.
+    std::array<juce::String, mu_limits::kMaxLayers> presetLabels;
     int lastTransportState = 0;                            // message thread: the transport state the live state was last told about
     std::atomic<bool> muteChanged { false };               // a strip mute parameter changed on some thread; the poll tells the live state
     std::array<juce::RangedAudioParameter*, mu_limits::kMaxLayers> muteParams {};   // ch{N}_mute, cached (null = none)
