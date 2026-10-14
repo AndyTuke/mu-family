@@ -5,7 +5,8 @@ namespace mu_control
 
 namespace
 {
-constexpr int kWatchMs = 500;   // how often the opened device's presence is checked
+constexpr int kWatchMs  = 500;    // how often the opened device's presence is checked
+constexpr int kSettleMs = 1000;   // after a replug the pad needs a moment to boot before it accepts setup messages
 }
 
 juce::StringArray JuceDevicePorts::outputNames() const
@@ -70,11 +71,18 @@ void JuceDevicePorts::timerCallback()
     };
     const bool present = listed(juce::MidiOutput::getAvailableDevices(), outputId)
                       && listed(juce::MidiInput::getAvailableDevices(), inputId);
+    if (! present) settleUntilMs = 0;   // gone again before it settled
     if (present == attached) return;
 
     if (present)
     {
-        // Back again: the old handles are dead, so open a fresh pair before saying so (retry on the next tick if it fails).
+        // It is in the lists as soon as USB enumerates, but a Launchpad ignores setup messages while it boots: wait first.
+        const auto now = juce::Time::getMillisecondCounter();
+        if (settleUntilMs == 0) { settleUntilMs = (juce::int64) now + kSettleMs; return; }
+        if ((juce::int64) now < settleUntilMs) return;
+        settleUntilMs = 0;
+
+        // Settled: the old handles are dead, so open a fresh pair before saying so (retry on the next tick if it fails).
         closePorts();
         if (! openPorts(openSpec)) return;
     }

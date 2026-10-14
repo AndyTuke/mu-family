@@ -344,6 +344,61 @@ public:
             expectEquals(count(r.finalLog, kProgrammerOff), 1);
         }
 
+        beginTest("an unplug and replug followed by destruction still sends Live exactly once");
+        {
+            Rig r(true);
+            r.ports->unplug();
+            pump();
+            r.ports->replug();
+            pump();
+            expect(r.status() == ControlStatus::InUse);
+            r.destroy();
+            expectEquals(count(r.finalLog, kProgrammerOn), 2);    // opened, then repeated on replug
+            expectEquals(count(r.finalLog, kProgrammerOff), 1);   // given back once, at the end
+            expect(r.finalLog.back() == kProgrammerOff);
+        }
+
+        beginTest("destroying the manager while the device is Lost sends no Live (the pad is gone)");
+        {
+            Rig r(true);
+            r.ports->unplug();
+            pump();
+            expect(r.status() == ControlStatus::Lost);
+            r.destroy();
+            expectEquals(count(r.finalLog, kProgrammerOff), 0);
+        }
+
+        beginTest("connect on a Lost link starts over: Found while the pad is gone, InUse once it is back");
+        {
+            Rig r(true);
+            r.ports->unplug();
+            pump();
+            r.manager->connect();
+            expect(r.status() == ControlStatus::Found);   // the open fails while unplugged
+            r.ports->replug();
+            r.manager->rescan();
+            expect(r.status() == ControlStatus::InUse);
+        }
+
+        beginTest("release while Lost frees the ports without sending Live, and reports Released");
+        {
+            Rig r(true);
+            r.ports->unplug();
+            pump();
+            r.manager->release();
+            expect(r.status() == ControlStatus::Released);
+            expectEquals(count(r.ports->sent, kProgrammerOff), 0);
+        }
+
+        beginTest("the quit hook with the mode off sends nothing and still marks the device Released");
+        {
+            Rig r(false);
+            ControllerManager::closeAllNow();
+            expect(r.status() == ControlStatus::Released);
+            expect(r.ports->sent.empty());
+            expect(! r.manager->isScanTimerRunning());
+        }
+
         beginTest("listeners hear each status change once");
         {
             Rig r(false);

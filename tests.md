@@ -167,8 +167,24 @@ Every surface case runs on three descriptions: Launchpad-shaped (8 x 8, side col
 | Surface model: top / side / grid presses perform the right `ControlAction`, release and value do nothing, rows past the layer count dark and unpressable, handle result is the sink answer, one light per control and all dark outside Performance mode, item and layer light states, dim = `dimScale` x bright, queued pulse (animated RGB, native, steady middle level) from an injected clock, animation timer only while an RGB light pulses, refused press changes no light, `LiveView` change re-renders, listener lifetime, a user override changes both press and light. Not yet covered (arrive with later stages): the flash phase and the clip-grid light states (M5) | `mu-control/Tests/SurfaceModelTests.cpp` | Pass (build 1410) |
 | Launchpad X protocol: recorded setup bytes (Programmer / Live, aftertouch off, layout read, inquiry), inquiry reply recognition (maker, family, short, any channel), `10 * row + col` numbering and CC buttons, every pad and button round trip, velocity 0 / note-off / CC 0 release, ignored input (logo, aftertouch, SysEx incl. unterminated, strays, truncated), any MIDI channel, several messages in one buffer, RGB lighting bytes and 7-bit scaling, 81-entry batch split, palette static / flash / pulse forms, nearest palette entry | `mu-control/Tests/LaunchpadXProtocolTests.cpp` | Pass (build 1410) |
 | Launchpad X driver over `FakeDevicePorts`: description, open sequence and port patterns, failed open sends nothing, input to `SurfaceEvent` with y from the top, one batched lighting SysEx, only changes sent, RGB ignores blink mode, palette driver forms, close (pads off, Live, ports released), destructor, unplug / replug refresh with the latest frame, close while unplugged | `mu-control/Tests/LaunchpadXDriverTests.cpp` | Pass (build 1410) |
+| Controller manager over `FakeDevicePorts` / `FakeLiveView`: detection by name with nothing opened, NotFound to Found on appearance, open only when the mode turns on and Live back when it turns off, built-with-mode-on, device listed but unopenable retried, release / connect (mode on and off, no device), unplug = Lost (sticky across scan ticks) and replug repeats setup, leaving the mode while Lost, MIDI-thread press delivered on the message thread and dropped when queued at mode end or after destruction, blink timer only while a pad pulses, delta lighting, quit hook (once, stays closed, also with the mode off), Live exactly once on destroy (also after unplug / replug) and none while Lost, connect and release while Lost, listeners notified once per status change | `mu-control/Tests/ControllerManagerTests.cpp` | Pass (build 1410) |
 
-**Current status:** 55/55 results pass at build 1410 (Debug).
+**Current status:** 78/78 results pass at build 1410 (Debug). Not covered: a driver swap and a user port override (neither exists in the manager yet), and `JuceDevicePorts` itself (real MIDI ports; hardware only, below).
+
+**Hardware checks (Launchpad X, build PC; the fake-port tests cannot see these):** run by Andy with the M3 probe harness; findings belong in design-launchpad.md §3.5.
+
+| Check | Status |
+|---|---|
+| Probe step 1: Programmer mode on, RGB batch lighting (`...0C 03 <03 idx r g b>...`) of the pads | Verified on the real pad (Andy, M3) |
+| Probe step 3: pad / button input decode (note and CC numbering, velocity) | Verified on the real pad |
+| Probe step 4: batch lighting of all pads in one message | Verified on the real pad |
+| Probe step 5: `ControllerManager` demo (open on mode, lights follow, Live restored on release) | Verified on the real pad |
+| Unplug and replug while in use: Lost, then refresh of setup and frame | **Not verified** (fake-port tests only; the real `JuceDevicePorts` raises no connection event until the hot-plug watcher sees it, so this needs a real run) |
+| Logo press (CC 99) value and whether it needs Programmer mode | **Not verified** (driver ignores it; behaviour unrecorded) |
+| Live mode restored on quit, window close and OS-requested quit | **Not verified** (needs the shell hook, M4) |
+| Palette fallback forms (static / flash / pulse) and `LaunchpadXPalette` RGB values on the pad | **Not verified** (RGB path only was tried) |
+| Pads and buttons dark after `close` on the real pad | **Not verified** as a separate step (seen implicitly in the demo only if Andy watched; confirm) |
+| Two processes sharing the ports | **Not verified** |
 
 Boundary self-test: `pwsh tests/scripts/test-check-core-boundary.ps1` also covers the mu-control rules (a processor or shell header, a mu-core UI header, a plugin namespace, a `Devices/` file including the mapping or model, a `Surface/` or `Manager/` file including a `Devices/` header, mu-core including mu-control, and clean controls) through `check-core-boundary.ps1 -ControlPath`. 10 cases pass (whole fixture set).
 

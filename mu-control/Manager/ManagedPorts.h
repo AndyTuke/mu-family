@@ -101,8 +101,11 @@ private:
                 }
             }
             if (! haveConnection) break;
-            if (onConnectionChanged) onConnectionChanged(connected);
-            if (connectionObserver) connectionObserver(connected);
+            // Copies: a handler may close the ports, which clears these members while it is still running.
+            const auto changed = onConnectionChanged;
+            const auto observer = connectionObserver;
+            if (changed) changed(connected);
+            if (observer) observer(connected);
         }
 
         for (;;)
@@ -113,7 +116,8 @@ private:
                 if (r.blockSize1 == 0) break;
                 slot = slots[(size_t) r.startIndex1];
             }
-            if (onBytes) onBytes(slot.bytes.data(), slot.size);
+            const auto handler = onBytes;   // a copy, for the same reason
+            if (handler) handler(slot.bytes.data(), slot.size);
         }
     }
 

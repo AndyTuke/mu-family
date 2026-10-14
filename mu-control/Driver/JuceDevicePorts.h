@@ -37,6 +37,7 @@ private:
     PortSpec                          openSpec;
     juce::String                      outputId, inputId;   // identifiers of the opened pair, for the presence check
     bool                              attached = false;
+    juce::int64                       settleUntilMs = 0;   // after a replug: when the device may be trusted again (0 = not waiting)
     std::unique_ptr<juce::MidiOutput> output;
     std::unique_ptr<juce::MidiInput>  input;
 };

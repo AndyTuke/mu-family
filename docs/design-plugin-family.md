@@ -1433,9 +1433,10 @@ and nothing else of the family; the only `mu-core` types it names are `ControlAc
 | Folder | Holds |
 |---|---|
 | `Surface/` | The device-independent half: `SurfaceDescription.h`, `SurfaceEvent.h` (control id, press/release/value event, LED state), `SurfaceMapping.{h,cpp}`, `SurfaceModel.{h,cpp}` (including the blink animation) |
-| `Driver/` | The port-facing half: `SurfaceDriver.h` (the interface), `DevicePorts.h` (the byte pipe the driver talks to), `JuceDevicePorts.{h,cpp}` (the real ports over `juce::MidiInput` / `MidiOutput`; the only place a JUCE MIDI port type appears) |
+| `Driver/` | The port-facing half: `SurfaceDriver.h` (the interface), `DevicePorts.h` (the byte pipe the driver talks to), `JuceDevicePorts.{h,cpp}` (the real ports over `juce::MidiInput` / `MidiOutput`; the only place a JUCE MIDI port type appears; includes the 500 ms hot-plug watcher), `ControllerBackend.h` (`ControllerBackend { ports, driver, detect PortSpec }`, `ControllerBackendFactory`, the declaration of `makeDefaultBackend()` that a `Devices/` file defines: the seam that keeps `Manager/` from including `Devices/`) |
 | `Devices/<Device>/` | One folder per device family. `Devices/LaunchpadX/`: `LaunchpadXProtocol.{h,cpp}` (pure byte encode and decode, no ports), `LaunchpadXPalette.h` (hue name to bright and dim colour), `LaunchpadXDriver.{h,cpp}` |
-| `Manager/` | `ControllerManager.{h,cpp}` (discovery, hot-plug, lifetime, the refresh timer; implements `mu_core::ControlAttachment`) and `ControlRegistration.cpp` (item 4) |
+| `Manager/` | `ControllerManager.{h,cpp}` (discovery, hot-plug, lifetime, the refresh timer; implements `mu_core::ControlAttachment`), `ManagedPorts.h` (the wrapper that moves MIDI-thread bytes and connection changes onto the message thread, item 5) and `ControlRegistration.cpp` (item 4) |
+| `Tools/` | `mu-control-probe`: a developer console app for the real pad (port list, lighting and input steps, manager demo, colour lab); `EXCLUDE_FROM_ALL`, never built by a normal build nor shipped. It compiles the library sources it needs directly, so a new source file in `mu-control/` that the probe uses must be added to `Tools/CMakeLists.txt` too |
 | `Tests/` | `mu-control-tests` and its test-only helpers (`MockGridDriver.h`, `FakeDevicePorts.h`, `FakeLiveView.h`, `FakeControlSink.h`) |
 
 File = class; the four parts of design-launchpad §3.1 are named **`SurfaceDriver`, `SurfaceDescription`, `SurfaceMapping`, `SurfaceModel`** (`Surface` is
@@ -1482,6 +1483,16 @@ a controller. So `mu-core` owns the **slot** and `mu-control` fills it:
   `processor.setControlAttachment(controlAttachment.get())`. `App::shutdown` clears the processor's pointer and resets `controlAttachment`
   **first**, before the preset-name hook, the bridge and the plugin holder, because the manager holds references into the processor and must restore the
   device before the window goes.
+- **The quit hook (ruled 2026-10-14, M3 review).** The manager's static `ControllerManager::closeAllNow()` cannot be called from `mu-core` (it names a `mu_control`
+  class), so the hook is a **virtual on the seam**: `ControlAttachment::closeNow()` (pure virtual; give the device back at once, pads dark and its own mode, and stay
+  closed; harmless when repeated and from the destructor). The manager implements it with the body `closeAllNow` has today; the static `closeAllNow` and the
+  `liveManagers()` registry are then removed (nothing in `mu-core` can reach them, and the shell holds the one attachment). The shell calls `closeNow()` at exactly
+  these points, in `StandaloneShell.h`: (1) **first line of `App::shutdown`**, before the preset-name hook, then `setControlAttachment(nullptr)` and reset (the
+  destructor is the backstop); (2) in `CloseConfirmWindow::closeButtonPressed`, in the **Close and Save branches before `quit()` / `onSaveAndQuit`** (through an
+  `onQuitConfirmed` callback the `App` sets on the window; the window does not hold the attachment), so a slow save never keeps the pad in Programmer mode; **not**
+  in the Cancel branch and **not** in `systemRequestedQuit` itself (it only opens the same confirm dialog). A `--render` run has no attachment. A crash or kill is the
+  accepted R1 case. `ControllerManagerTests` covers `closeNow()` (Live sent once, nothing reopens, status `Released`); `mu-core-tests` covers the shell calling it
+  through a fake attachment on both confirm branches and on shutdown.
 - The manager's constructor takes **only `ControlSink&`, `const LiveView&` and the settings folder.** It names no `ProcessorBase`, `ShellBackend`, editor, window
   or product. This is what lets a mu-link hub or a one-instance host create one over its own sink and view later (Performance mode item 7); a hub supplies a
   sink that forwards to the focused instance and changes nothing in `mu-control`.
@@ -1491,7 +1502,7 @@ a controller. So `mu-core` owns the **slot** and `mu-control` fills it:
 
 **5. Threads.** Everything in `mu-control` is message-thread or MIDI-input-thread; **it never touches the audio thread** and needs no `dsp-controller` review
 unless that changes. A driver's input callback runs on the MIDI thread: it decodes into `SurfaceEvent`s, pushes them onto a fixed-size lock-free FIFO and
-triggers an `AsyncUpdater`; the manager drains on the message thread, runs the mapping and calls `ControlSink::perform` there (the `ControlSink` contract). LED
+triggers an `AsyncUpdater` (built as `ManagedPorts`, which wraps the driver's ports so the driver and model only ever run on the message thread; connection changes from the hot-plug watcher take the same route); the manager drains on the message thread, runs the mapping and calls `ControlSink::perform` there (the `ControlSink` contract). LED
 output is built and sent on the message thread (the model diffs against the last frame and sends only the changes, batched into one lighting message).
 `LiveView` listeners are told on the message thread; the model re-renders from the listener. Blinking is the driver side's own animation (design-launchpad §3.6): one
 `juce::Timer` (about 30 Hz) that runs **only while some pad is pulsing or flashing**, recomputing those pads' colours from the clock and sending the changed ones; a
@@ -1503,11 +1514,11 @@ OS-requested quit, a disabled controller, a device change and manager destructio
 mode the app holds no controller port and the device behaves as bought, so a DAW, another app or the on-device Setup menu is never blocked by a mu app that is idle
 (design-launchpad R1, R2). **Detection is by name only:** the manager matches `MidiInput::getAvailableDevices()` / `MidiOutput::getAvailableDevices()` against each registered
 driver's name patterns without opening anything, which is what makes the Settings lamp read `Found`; the device inquiry happens when the ports are opened at entry.
-Hot-plug uses `juce::MidiDeviceListConnection`. `release()` closes the session as above and parks the manager (`Released`) until `connect()`; `connect()` rescans and, if
+Hot-plug (as built, M3, replacing the `juce::MidiDeviceListConnection` plan): an absent device is found by the manager's 1 Hz name scan; an opened one is watched by `JuceDevicePorts` itself, which polls the port lists every 500 ms and reports a vanish and a return (reopening a fresh pair on return). `release()` closes the session as above and parks the manager (`Released`) until `connect()`; `connect()` rescans and, if
 Performance mode is already on, reopens. A crash leaves the device in Programmer mode until it is unplugged (accepted, R1).
 
 **7. Boundary, enforced.** `check-core-boundary.ps1` already scans `mu-control/` for plugin includes and plugin namespaces, and `mu-core` for `mu-control`
-includes. Done in `check-core-boundary.ps1` 2026-10-13 except the `Surface/`/`Manager/` to `Devices/` rule, which lands with the first `Devices/` file (M2). The rules: a `mu-control` file must not include `ProcessorBase.h`, `ProcessorCore.h`, `EditorShellBase.h`, `ShellBackend.h` or any
+includes. All done in `check-core-boundary.ps1` (the `Surface/`/`Manager/` to `Devices/` rule landed with M2 and is clean at M3). The rules: a `mu-control` file must not include `ProcessorBase.h`, `ProcessorCore.h`, `EditorShellBase.h`, `ShellBackend.h` or any
 `mu-core/UI/` header, so "depends only on `ControlSink` and `LiveView`" is checked, not remembered; and a file under `Surface/` or `Manager/` must not include
 anything under `Devices/`, while `Devices/` must not include `Surface/SurfaceMapping.h` or `SurfaceModel.h`.
 
