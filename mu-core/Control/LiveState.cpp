@@ -16,7 +16,8 @@ bool LiveState::handles(ControlActionType t) noexcept
     return t == ControlActionType::PerformanceMode || t == ControlActionType::PerformanceItem
         || t == ControlActionType::PerformancePrev || t == ControlActionType::PerformanceNext
         || t == ControlActionType::SelectLayer || t == ControlActionType::LaunchClip
-        || t == ControlActionType::ClipNext || t == ControlActionType::ClipPrev;
+        || t == ControlActionType::ClipNext || t == ControlActionType::ClipPrev
+        || t == ControlActionType::AppPrev || t == ControlActionType::AppNext;
 }
 
 void LiveState::changed()
@@ -126,6 +127,8 @@ bool LiveState::perform(const ControlAction& a)
             if (a.layer != selectedLayer) { selectedLayer = a.layer; changed(); }
             return true;
         }
+        case T::AppPrev:
+        case T::AppNext:         return false;   // not available: there is no multi-app hub to switch to
         case T::ClipNext:        return stepClip(+1);
         case T::ClipPrev:        return stepClip(-1);
         default: return false;

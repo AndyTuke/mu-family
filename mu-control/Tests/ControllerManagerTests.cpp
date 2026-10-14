@@ -55,6 +55,8 @@ struct Rig
         view.useItem(1);
         look.accentRgb = 0x40A0FF;
         look.faultRgb  = 0xFF3030;
+        look.goRgb     = 0x30D070;
+        look.whiteRgb  = 0xFFFFFF;
         for (size_t i = 0; i < look.layerRgb.size(); ++i) look.layerRgb[i] = 0x202020u * (uint32_t) (i + 1);
         present = devicePresent;
         build();
@@ -264,8 +266,7 @@ public:
             expectEquals((int) r.sink.performed.size(), 1);
             if (! r.sink.performed.empty())
             {
-                expect(r.sink.performed[0].type == mu_core::ControlActionType::PerformanceItem);
-                expectEquals(r.sink.performed[0].index, 1);
+                expect(r.sink.performed[0].type == mu_core::ControlActionType::AppNext);   // the second top button
             }
             expect(r.sink.performedOn == std::this_thread::get_id());
         }
@@ -296,19 +297,19 @@ public:
         beginTest("the blink timer runs only while a pad pulses");
         {
             Rig r(true);
-            r.view.current = 0;
+            r.view.clipMask[0] = 0b11;   // nothing playing, so no start-of-clip burst muddies the timer
             r.view.notify();
             expect(! r.manager->isBlinkTimerRunning());
 
-            r.view.queued = 1;
+            r.view.queuedClip[0] = 1;   // a queued clip pulses
             r.view.notify();
             expect(r.manager->isBlinkTimerRunning());
 
-            r.view.queued = -1;
+            r.view.queuedClip[0] = -1;
             r.view.notify();
             expect(! r.manager->isBlinkTimerRunning());
 
-            r.view.queued = 1;
+            r.view.queuedClip[0] = 1;
             r.view.notify();
             expect(r.manager->isBlinkTimerRunning());
             r.setMode(false);   // closing stops it too
@@ -410,7 +411,7 @@ public:
             expect(! r.manager->isScanTimerRunning());
         }
 
-        beginTest("end to end: pad presses drive a real LiveState and the lights follow (top row = items, side = layers)");
+        beginTest("end to end: pad presses drive a real LiveState and the lights follow (top row = arrows, side = layers)");
         {
             // A real LiveState behind the manager, staging against a pretend transport (as LiveStateTests does).
             struct Adapter : mu_core::ControlSink
@@ -460,20 +461,20 @@ public:
                 pump();
             };
 
-            press(ControlKind::Top, 2, 0);   // the third top button = item 2
-            expectEquals(live.getQueuedItem(), 2);
-            expectEquals(staged, 2);
+            press(ControlKind::Top, 3, 0);   // the fourth top button = next preset: item 0 (nothing played yet)
+            expectEquals(live.getQueuedItem(), 0);
+            expectEquals(staged, 0);
 
             const auto sentBefore = ports->sent.size();
-            press(ControlKind::Top, 2, 0);   // pressing the queued item again is already on its way
-            expectEquals(live.getQueuedItem(), 2);
+            press(ControlKind::Top, 3, 0);   // next again steps from the queued item
+            expectEquals(live.getQueuedItem(), 1);
             expectEquals(cancels, 0);
 
             pending = false; live.fullPresetCommitted();
-            expectEquals(live.getCurrentItem(), 2);
-            press(ControlKind::Top, 0, 0);   // queue item 0 ...
-            expectEquals(live.getQueuedItem(), 0);
-            press(ControlKind::Top, 2, 0);   // ... the playing item cancels the switch
+            expectEquals(live.getCurrentItem(), 1);
+            press(ControlKind::Top, 3, 0);   // queue item 2 ...
+            expectEquals(live.getQueuedItem(), 2);
+            press(ControlKind::Top, 2, 0);   // ... previous from the queued item is the playing one: it cancels the switch
             expectEquals(live.getQueuedItem(), -1);
             expectEquals(cancels, 1);
 

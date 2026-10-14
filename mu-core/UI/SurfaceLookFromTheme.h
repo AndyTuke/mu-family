@@ -19,6 +19,8 @@ inline mu_core::SurfaceLook makeSurfaceLook()
         look.layerRgb[i] = rgb(MuLookAndFeel::layerPalette[i % (size_t) MuLookAndFeel::kLayerPaletteSize]);
     look.accentRgb   = rgb(MuTheme::current().global.accent);
     look.faultRgb    = rgb(MuLookAndFeel::colour(Id::indicatorFault));
+    look.goRgb       = rgb(MuTheme::current().surface.go);
+    look.whiteRgb    = rgb(MuTheme::current().surface.white);
     look.dimScale    = light.padDimScale;
     look.pulseHz     = light.queuedPulseHz;
     look.stepFlashMs = (int) light.stepFlashMs;

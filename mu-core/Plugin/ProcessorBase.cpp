@@ -69,6 +69,8 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
     {
         if (auto* l = getLayer(layer)) l->activeClip = clip;   // the saved shadow of the live playing clip
     };
+    cb.transportPlaying = [this] { return isInternalPlaying(); };
+    cb.transportOutside = [this] { return midiControlRouter.playIsOutside(); };
     liveState.setCallbacks(std::move(cb));
 }
 
@@ -171,6 +173,14 @@ bool ProcessorBase::perform(const mu_core::ControlAction& a)
             return true;
         }
         case T::MuteLayer:       return flipStrip("mute");
+        case T::MuteSelectedLayer:
+        {
+            // The same mute as pressing the layer's strip, on whichever layer Performance mode has selected.
+            auto mute = a;
+            mute.type  = T::MuteLayer;
+            mute.layer = liveState.getSelectedLayer();
+            return perform(mute);
+        }
         case T::SoloLayer:       return flipStrip("solo");
         case T::TransportToggle:
             if (midiControlRouter.playIsOutside()) return false;   // the host / clock owns play
@@ -187,6 +197,8 @@ bool ProcessorBase::perform(const mu_core::ControlAction& a)
         case T::PerformanceItem:
         case T::PerformancePrev:
         case T::PerformanceNext:
+        case T::AppPrev:
+        case T::AppNext:
         case T::LaunchClip:
         case T::ClipNext:
         case T::ClipPrev:

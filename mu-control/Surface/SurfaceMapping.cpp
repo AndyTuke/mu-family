@@ -60,10 +60,15 @@ std::optional<mu_core::ControlAction> SurfaceMapping::defaultAction(const Surfac
     mu_core::ControlAction a;
     switch (id.kind)
     {
-        case ControlKind::Top:   // the top row switches performance items, left to right
-            a.type = mu_core::ControlActionType::PerformanceItem;
-            a.index = id.x;
+        case ControlKind::Top:   // the top row, left to right: app arrows, preset arrows, clip arrows, mute, play / stop
+        {
+            using T = mu_core::ControlActionType;
+            static constexpr T kTop[] = { T::AppPrev, T::AppNext, T::PerformancePrev, T::PerformanceNext,
+                                          T::ClipPrev, T::ClipNext, T::MuteSelectedLayer, T::TransportToggle };
+            if (id.x < 0 || id.x >= (int) (sizeof(kTop) / sizeof(kTop[0]))) return std::nullopt;
+            a.type = kTop[id.x];
             return a;
+        }
         case ControlKind::Side:  // the side column selects layers, top to bottom
             a.type = mu_core::ControlActionType::SelectLayer;
             a.layer = rowToLayer(id.y);

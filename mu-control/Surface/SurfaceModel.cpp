@@ -32,6 +32,26 @@ uint32_t toWhite(uint32_t rgb, float amount) noexcept
     return (ch(16) << 16) | (ch(8) << 8) | ch(0);
 }
 
+// The arrows' resting white: below full so the white flash of a press stands out against it. Untuned on a real pad.
+constexpr float kArrowRestScale = 0.75f;
+
+// How many performance items can be played now; the preset arrows are dark with fewer than two.
+int playableItems(const mu_core::LiveView& view) noexcept
+{
+    int n = 0;
+    const auto& items = view.getPerformance().items;
+    for (size_t i = 0; i < items.size(); ++i)
+        if (items[i].used && view.isItemPlayable((int) i)) ++n;
+    return n;
+}
+
+int countBits(unsigned v) noexcept
+{
+    int n = 0;
+    for (; v != 0; v &= v - 1) ++n;
+    return n;
+}
+
 // Smooth 0..1 pulse at `hz`: starts at 0 (dim), peaks half a period later.
 float pulsePhase(double nowMs, float hz) noexcept
 {
@@ -46,6 +66,7 @@ SurfaceModel::SurfaceModel(mu_core::ControlSink& s, const mu_core::LiveView& v, 
 {
     lastPlaying.fill(-2);
     burstStartMs.fill(-1.0e12);
+    arrowFlashMs.fill(-1.0e12);
     if (! clock) clock = [] { return juce::Time::getMillisecondCounterHiRes(); };
     view.addListener(this);
 }
@@ -77,7 +98,82 @@ bool SurfaceModel::handle(const SurfaceEvent& event)
         && (action->layer < 0 || action->layer >= view.getLayerCount()))
         return false;
 
-    return sink.perform(*action);
+    // A host, MIDI clock or Link owns play: the transport button is inert and shows it.
+    if (action->type == T::TransportToggle && view.isTransportOwnedOutside()) return false;
+
+    const bool accepted = sink.perform(*action);
+
+    // An accepted arrow press flashes its button; a preset arrow also pulses until the switch it queued commits.
+    const int arrow = arrowSlot(action->type);
+    if (accepted && arrow >= 0)
+    {
+        arrowFlashMs[(size_t) arrow] = clock();
+        if (arrow >= 2) pulsingArrow = arrow;
+        if (onChanged) onChanged();   // the lights now differ from the frame drawn while the sink performed
+    }
+    return accepted;
+}
+
+int SurfaceModel::arrowSlot(mu_core::ControlActionType type) const noexcept
+{
+    using T = mu_core::ControlActionType;
+    switch (type)
+    {
+        case T::AppPrev:         return 0;
+        case T::AppNext:         return 1;
+        case T::PerformancePrev: return 2;
+        case T::PerformanceNext: return 3;
+        default:                 return -1;
+    }
+}
+
+SurfaceModel::Light SurfaceModel::topLight(mu_core::ControlActionType type, double nowMs) const
+{
+    using T = mu_core::ControlActionType;
+
+    // Phase 1: the steady light this button has when nothing was just pressed.
+    Light steady;
+    switch (type)
+    {
+        case T::AppPrev:
+        case T::AppNext:   // the app accent, only when another app could take the surface
+            if (view.isOtherAppAvailable()) steady = { Level::Bright, look.accentRgb };
+            break;
+        case T::PerformancePrev:
+        case T::PerformanceNext:   // white, dark when there is nothing to step to
+            if (playableItems(view) >= 2) steady = { Level::Bright, scaleRgb(look.whiteRgb, kArrowRestScale) };
+            break;
+        case T::ClipPrev:
+        case T::ClipNext:   // dim white when the selected layer has two stored clips to step between
+        {
+            const int sel = view.getSelectedLayer();
+            if (sel >= 0 && sel < view.getLayerCount() && countBits(view.getClipMask(sel)) >= 2)
+                steady = { Level::Dim, look.whiteRgb };
+            break;
+        }
+        case T::MuteSelectedLayer:   // the selected layer's colour: dim = playing, flashing = muted
+        {
+            const int sel = view.getSelectedLayer();
+            if (sel >= 0 && sel < view.getLayerCount())
+                steady = { view.isLayerMuted(sel) ? Level::Flash : Level::Dim, layerRgb(sel) };
+            break;
+        }
+        case T::TransportToggle:   // the light shows what a press does; static dim white when the transport is owned elsewhere
+            if (view.isTransportOwnedOutside())    steady = { Level::Dim, look.whiteRgb };
+            else if (view.isTransportPlaying())    steady = { Level::Bright, look.faultRgb };
+            else                                   steady = { Level::Bright, look.goRgb };
+            break;
+        default: break;
+    }
+
+    // Phase 2: an arrow shows a just-accepted press (white flash) or its queued switch (white pulse).
+    const int arrow = arrowSlot(type);
+    if (steady.level == Level::Off || arrow < 0) return steady;
+    const double since = nowMs - arrowFlashMs[(size_t) arrow];
+    if (since >= 0.0 && since < (double) look.stepFlashMs) return { Level::Burst, look.whiteRgb, false };
+    if (arrow >= 2 && pulsingArrow == arrow && view.getQueuedItem() >= 0) return { Level::Pulse, look.whiteRgb, false };
+    steady.settle = since >= 0.0 && since < (double) look.stepFlashMs + kBurstTailMs;
+    return steady;
 }
 
 uint32_t SurfaceModel::layerRgb(int layer) const
@@ -104,17 +200,15 @@ SurfaceModel::Light SurfaceModel::lightFor(const mu_core::ControlAction& a, doub
     using T = mu_core::ControlActionType;
     switch (a.type)
     {
-        case T::PerformanceItem:
-        {
-            // Top row: current bright, queued pulsing, available dim, a missing or foreign item dim red, empty off.
-            const int n = a.index;
-            if (n < 0 || n >= (int) view.getPerformance().items.size() || ! view.getPerformance().items[(size_t) n].used)
-                return {};
-            if (view.getCurrentItem() == n)  return { Level::Bright, look.accentRgb };
-            if (view.getQueuedItem() == n)   return { Level::Pulse, look.accentRgb };
-            if (view.isItemPlayable(n))      return { Level::Dim, look.accentRgb };
-            return { Level::Dim, look.faultRgb };
-        }
+        case T::AppPrev:
+        case T::AppNext:
+        case T::PerformancePrev:
+        case T::PerformanceNext:
+        case T::ClipPrev:
+        case T::ClipNext:
+        case T::MuteSelectedLayer:
+        case T::TransportToggle:
+            return topLight(a.type, nowMs);   // the top row (PerformanceItem has no light: it is for MIDI mapping only)
         case T::SelectLayer:
         {
             // Side column: the selected layer bright, every other existing layer dim, no layer off.
@@ -151,6 +245,7 @@ std::vector<LedState> SurfaceModel::frame(double nowMs, bool* animating) const
     for (const auto& id : controlsOf(d)) out.push_back({ id, 0, LedMode::Static });
     if (animating != nullptr) *animating = false;
     trackPlayingClips(nowMs);                     // before the mode test, so entering the mode does not burst every pad
+    if (view.getQueuedItem() < 0) pulsingArrow = -1;   // the switch landed or was cancelled: the arrow stops pulsing
     if (! view.isPerformanceMode()) return out;   // outside the mode the surface is dark
 
     for (const auto& b : bindings)

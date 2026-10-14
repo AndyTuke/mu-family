@@ -23,6 +23,9 @@ struct FakeLiveView : mu_core::LiveView
     std::array<int, 8>     queuedClip    { -1, -1, -1, -1, -1, -1, -1, -1 };
     std::array<uint8_t, 8> clipMask      {};
     std::array<bool, 8>    muted         {};
+    bool                   playing       = false;   // the internal clock runs
+    bool                   outside       = false;   // a host / clock owns play
+    bool                   otherApp      = false;   // another mu app could take the surface
 
     // Item n is in use (a preset of this product).
     void useItem(int n)
@@ -48,6 +51,9 @@ struct FakeLiveView : mu_core::LiveView
     int  getQueuedClip(int layer) const override { return layer >= 0 && layer < 8 ? queuedClip[(size_t) layer] : -1; }
     uint8_t getClipMask(int layer) const override { return layer >= 0 && layer < 8 ? clipMask[(size_t) layer] : (uint8_t) 0; }
     bool isLayerMuted(int layer) const override { return layer >= 0 && layer < 8 && muted[(size_t) layer]; }
+    bool isTransportPlaying() const override { return playing; }
+    bool isTransportOwnedOutside() const override { return outside; }
+    bool isOtherAppAvailable() const override { return otherApp; }
     void addListener(Listener* l) const override    { listeners.add(l); }
     void removeListener(Listener* l) const override { listeners.remove(l); }
 

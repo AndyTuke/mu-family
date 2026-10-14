@@ -428,6 +428,35 @@ struct ClipLaunchTests : juce::UnitTest
             p.setParam("v0_a", 0.9f);
             expect(p.layers[0]->clips->get(0).isEquivalentTo(stored), "the stored tree does not alias the live layer");
         }
+
+        beginTest("MuteSelectedLayer flips the selected layer's strip mute; AppPrev and AppNext are refused");
+        {
+            using T = mu_core::ControlActionType;
+            mu_core::ControlAction mute; mute.type = T::MuteSelectedLayer;
+            ClipProcessor p;
+            expectEquals(p.getLiveState().getSelectedLayer(), 0);
+            expect(! p.getLiveState().isLayerMuted(0));
+            expect(p.perform(mute), "mute");
+            expect(p.getLiveState().isLayerMuted(0), "the live view sees the strip mute");
+            expect(p.perform(mute), "and unmute");
+            expect(! p.getLiveState().isLayerMuted(0));
+            mu_core::ControlAction up; up.type = T::AppPrev;
+            mu_core::ControlAction down; down.type = T::AppNext;
+            expect(! p.perform(up) && ! p.perform(down), "no multi-app hub: refused");
+        }
+
+        beginTest("TransportToggle plays and stops the internal clock, and the live view reports it");
+        {
+            using T = mu_core::ControlActionType;
+            mu_core::ControlAction toggle; toggle.type = T::TransportToggle;
+            ClipProcessor p;
+            const mu_core::LiveView& view = *p.getLiveView();
+            expect(! view.isTransportPlaying() && ! view.isTransportOwnedOutside());
+            expect(p.perform(toggle));
+            expect(view.isTransportPlaying(), "playing");
+            expect(p.perform(toggle));
+            expect(! view.isTransportPlaying(), "stopped again");
+        }
     }
 };
 

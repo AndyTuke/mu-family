@@ -23,8 +23,10 @@ struct KnownColour
     const char* name;
 };
 
-// Layers 1-8 (MuLookAndFeel::layerPalette) then the four app accents (purple, green, blue, yellow). Adjust here.
-inline constexpr KnownColour kKnownColours[12] = {
+// Layers 1-8 (MuLookAndFeel::layerPalette), the four app accents (purple, green, blue, yellow), then the
+// control-surface colours (transport go green, fault red, white). Adjust here.
+inline constexpr int kKnownColourCount = 15;
+inline constexpr KnownColour kKnownColours[kKnownColourCount] = {
     { 0xE5484D, { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },    0,          "red" },
     { 0x2EC4C9, { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },    0,          "cyan" },
     { 0xF28C28, { 1.0f, 1.0f, 1.35f, 1.0f, 1.0f },   0,          "orange" },       // more green so it leans yellow
@@ -37,6 +39,9 @@ inline constexpr KnownColour kKnownColours[12] = {
     { 0x4ADC8E, { 1.0f, 1.0f, 1.0f, 0.10f, 1.0f },   0x0150FF00, "app green" },    // some red against the pad's blue-ish green
     { 0x3D8BEB, { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },    0x011028FF, "app blue" },     // a little green, not so much it is cyan
     { 0xF2C53D, { 1.0f, 1.0f, 1.6f, 1.0f, 1.0f },    0,          "app yellow" },   // more green so it is yellow, not orange
+    { 0x3CD070, { 1.0f, 1.0f, 1.0f, 0.10f, 1.0f },   0,          "go green" },     // untuned: blue trimmed hard so the pad's blue-ish green reads pure
+    { 0xE24B4A, { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },    0,          "fault red" },    // untuned: the same correction as the layer red
+    { 0xFFFFFF, { 0.0f, 0.70f, 0.85f, 0.75f, 0.70f }, 0x01B39A6D, "white" },       // untuned: the pad value silver gets, which reads as white on the pad
 };
 
 // Fixed white balance of the pad's strong green and blue LEDs.
@@ -84,7 +89,7 @@ inline uint32_t padRgbFor(uint32_t rgb) noexcept
     if (m == 0) return 0;
 
     int best = -1, bestDist = kMatchTolerance + 1;
-    for (int i = 0; i < 12; ++i)
+    for (int i = 0; i < kKnownColourCount; ++i)
     {
         const uint32_t ref = kKnownColours[i].screenRgb;
         const int refMax = detail::maxChan(ref);

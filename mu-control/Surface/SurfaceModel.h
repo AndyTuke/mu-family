@@ -62,6 +62,8 @@ private:
     Light    lightFor(const mu_core::ControlAction& action, double nowMs) const;
     void     trackPlayingClips(double nowMs) const;
     uint32_t layerRgb(int layer) const;
+    Light    topLight(mu_core::ControlActionType type, double nowMs) const;
+    int      arrowSlot(mu_core::ControlActionType type) const noexcept;
     std::vector<LedState> frame(double nowMs, bool* animating) const;
 
     mu_core::ControlSink&       sink;
@@ -75,6 +77,12 @@ private:
     // (message thread only), hence mutable. lastPlaying -2 = not seen yet, so the first frame does not burst.
     mutable std::array<int, (size_t) mu_limits::kMaxLayers>    lastPlaying;
     mutable std::array<double, (size_t) mu_limits::kMaxLayers> burstStartMs;
+
+    // The four arrow buttons (AppPrev, AppNext, PerformancePrev, PerformanceNext): when an accepted press last
+    // flashed each, and which preset arrow was pressed last (it pulses while its switch is queued).
+    static constexpr int kArrows = 4;
+    std::array<double, kArrows>  arrowFlashMs;
+    mutable int                  pulsingArrow = -1;   // arrow slot, -1 = none; cleared once no switch is queued
 };
 
 } // namespace mu_control

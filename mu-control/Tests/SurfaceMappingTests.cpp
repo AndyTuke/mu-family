@@ -14,11 +14,19 @@ public:
         using namespace mu_control::test;
         using T = mu_core::ControlActionType;
 
-        beginTest("default mapping, Launchpad-shaped: top = items, side = layers top to bottom, grid row = layer");
+        beginTest("default mapping, Launchpad-shaped: top = arrows and transport, side = layers top to bottom, grid row = layer");
         {
             const SurfaceMapping m(launchpadStyle());
-            const auto top = m.actionFor({ ControlKind::Top, 2, 0 });
-            expect(top && top->type == T::PerformanceItem && top->index == 2);
+            // The top row, left to right (docs/design-launchpad.md 3.6).
+            const T expectedTop[8] = { T::AppPrev, T::AppNext, T::PerformancePrev, T::PerformanceNext,
+                                       T::ClipPrev, T::ClipNext, T::MuteSelectedLayer, T::TransportToggle };
+            for (int i = 0; i < 8; ++i)
+            {
+                const auto top = m.actionFor({ ControlKind::Top, i, 0 });
+                expect(top && top->type == expectedTop[i], "top button " + juce::String(i + 1));
+            }
+            for (int i = 0; i < 8; ++i)   // no top button, nothing on the surface, names PerformanceItem
+                expect(m.actionFor({ ControlKind::Top, i, 0 })->type != T::PerformanceItem);
 
             const auto topSide = m.actionFor({ ControlKind::Side, 0, 0 });
             expect(topSide && topSide->type == T::SelectLayer && topSide->layer == 0, "the top button is layer 1");
@@ -41,7 +49,7 @@ public:
             const auto pad = m.actionFor({ ControlKind::Pad, 3, 0 });
             expect(pad && pad->type == T::LaunchClip && pad->layer == 0 && pad->index == 3);
             const auto top = m.actionFor({ ControlKind::Top, 3, 0 });
-            expect(top && top->type == T::PerformanceItem && top->index == 3);
+            expect(top && top->type == T::PerformanceNext, "four top buttons carry the first four of the table");
             expect(! m.actionFor({ ControlKind::Side, 0, 0 }), "there is no side column to map");
             expect(! m.actionFor({ ControlKind::Pad, 4, 0 }), "a control off the surface has no action");
             expectEquals((int) m.bindings().size(), 16 + 4);
@@ -61,6 +69,22 @@ public:
             expect(! m.setOverride({ ControlKind::Pad, 9, 9 }, a), "no such control");
             m.clearOverride({ ControlKind::Top, 0, 0 });
             expect(m.actionFor({ ControlKind::Top, 0, 0 }).has_value(), "clearing returns the default");
+        }
+
+        beginTest("the new actions are saved and read back by name, and PerformanceItem stays mappable");
+        {
+            for (const auto t : { T::AppPrev, T::AppNext, T::MuteSelectedLayer, T::ClipPrev, T::ClipNext, T::TransportToggle, T::PerformanceItem })
+                expect(mu_core::actionFromName(mu_core::actionName(t)) == t, mu_core::actionName(t));
+            expectEquals(juce::String(mu_core::actionName(T::AppPrev)), juce::String("appPrev"));
+            expect(mu_core::actionFromName("muteSelectedLayer") == T::MuteSelectedLayer);
+
+            SurfaceMapping m(launchpadStyle());
+            mu_core::ControlAction item; item.type = T::PerformanceItem; item.index = 5;
+            m.setOverride({ ControlKind::Pad, 7, 7 }, item);
+            SurfaceMapping r(launchpadStyle());
+            expectEquals(r.restoreFromXml(m.toXml()), 1);
+            const auto got = r.actionFor({ ControlKind::Pad, 7, 7 });
+            expect(got && got->type == T::PerformanceItem && got->index == 5);
         }
 
         beginTest("overrides survive an XML round trip, including every action field");

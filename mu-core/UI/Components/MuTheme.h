@@ -194,6 +194,15 @@ struct MuTheme
         juce::Colour yellow            { 0xffF2C53D };
     } apps;
 
+    // ── Control-surface colours ─────────────────────────────────────────
+    // Colours a controller pad shows that are not an app accent, layer colour or fault red
+    // (read by SurfaceLookFromTheme). Untuned on a real pad.
+    struct SurfaceColours
+    {
+        juce::Colour go                { 0xff3CD070 };  // the transport button when stopped: a press will play
+        juce::Colour white             { 0xffFFFFFF };  // navigation arrows and the "owned elsewhere" transport
+    } surface;
+
     // ── Lighting ──────────────────────────────────────────────────────────
     // Every shadow, highlight and tint the family draws, in one place. The light comes
     // from the top right. The two master amounts scale everything below them: raise

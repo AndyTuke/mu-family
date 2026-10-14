@@ -721,6 +721,50 @@ public:
             expect(actionFromName(actionName(ControlActionType::ClipNext)) == ControlActionType::ClipNext);
             expect(actionFromName(actionName(ControlActionType::ClipPrev)) == ControlActionType::ClipPrev);
         }
+
+        beginTest("AppPrev and AppNext are owned by the live state and refused, with the mode on or off");
+        {
+            Fake f; LiveState s; ready(f, s);
+            expect(LiveState::handles(ControlActionType::AppPrev) && LiveState::handles(ControlActionType::AppNext));
+            CountingListener l; s.addListener(&l);
+            expect(! s.perform(act(ControlActionType::AppPrev)), "mode on: no hub to switch to");
+            expect(! s.perform(act(ControlActionType::AppNext)));
+            s.perform(mode(0));
+            const int calls = l.calls;
+            expect(! s.perform(act(ControlActionType::AppPrev)), "mode off");
+            expect(! s.perform(act(ControlActionType::AppNext)));
+            expectEquals(l.calls, calls, "a refused action changes nothing");
+            expect(actionFromName(actionName(ControlActionType::AppPrev)) == ControlActionType::AppPrev);
+            expect(actionFromName("appNext") == ControlActionType::AppNext);
+            expect(! s.isOtherAppAvailable(), "the view reports no other app until a hub exists");
+            s.removeListener(&l);
+        }
+
+        beginTest("the transport state comes through the owner's callbacks; a change outside the pad refreshes the lamps");
+        {
+            LiveState bare;
+            expect(! bare.isTransportPlaying() && ! bare.isTransportOwnedOutside(), "no callbacks: stopped, owned by nobody");
+
+            Fake f; LiveState s; ready(f, s);
+            bool playing = false, outside = false;
+            auto cb = f.callbacks();
+            cb.transportPlaying = [&] { return playing; };
+            cb.transportOutside = [&] { return outside; };
+            s.setCallbacks(cb);
+            expect(! s.isTransportPlaying() && ! s.isTransportOwnedOutside());
+            CountingListener l; s.addListener(&l);
+            const auto rev = s.getRevision();
+            playing = true;
+            s.notifyTransportChanged();
+            expect(s.isTransportPlaying());
+            expectEquals(l.calls, 1);
+            expect(s.getRevision() != rev);
+            outside = true;
+            s.notifyTransportChanged();
+            expect(s.isTransportOwnedOutside());
+            expectEquals(l.calls, 2);
+            s.removeListener(&l);
+        }
     }
 };
 

@@ -40,6 +40,12 @@ public:
     virtual uint8_t                       getClipMask(int layer)    const = 0;   // bit n set = clip n is stored
     virtual bool                          isLayerMuted(int layer)   const = 0;   // the layer strip's mute
 
+    // The transport as the surface lights it. Defaults suit a view with no transport (stopped, owned by nobody).
+    virtual bool                          isTransportPlaying() const        { return false; }   // the internal clock runs
+    virtual bool                          isTransportOwnedOutside() const   { return false; }   // a host, MIDI clock or Link owns play: the Play button is inert
+    // Another mu app could take the surface (the AppPrev / AppNext arrows). No multi-app hub exists yet.
+    virtual bool                          isOtherAppAvailable() const       { return false; }
+
     // Listening is not a change of the state, so a holder of the read-only view may register.
     virtual void addListener(Listener* l)    const = 0;
     virtual void removeListener(Listener* l) const = 0;

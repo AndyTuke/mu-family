@@ -54,6 +54,19 @@ public:
         for (int i = 0; i < 12; ++i)
             expectEquals(launchpadx::kKnownColours[i].screenRgb, known[i].screen);
 
+        beginTest("the control-surface colours are known: go green and fault red read pure, white is neutral-bright (untuned)");
+        {
+            expect(launchpadx::kKnownColourCount == 15);
+            const uint32_t go = launchpadx::padRgbFor(0x3CD070), red = launchpadx::padRgbFor(0xE24B4A), white = launchpadx::padRgbFor(0xFFFFFF);
+            expect(chan(go, 16) < 24 && chan(go, 8) == 255 && chan(go, 0) < 24, "go green: green only, got " + juce::String::toHexString((int) go));
+            expect(chan(red, 16) == 255 && chan(red, 8) < 24 && chan(red, 0) < 24, "red: red only, got " + juce::String::toHexString((int) red));
+            expectEquals(white, launchpadx::padRgbFor(0xC9CCD1), "white gets the value silver gets");
+            expectEquals(white, (uint32_t) 0xB39A6D);
+            const uint32_t dimWhite = launchpadx::padRgbFor(scaled(0xFFFFFF, 0.45f));
+            expect(largestGap(dimWhite, scaled(white, 0.45f)) <= 4 && maxOf(dimWhite) < maxOf(white), "a dim white stays white, only lower");
+            expect(maxOf(launchpadx::padRgbFor(scaled(0xFFFFFF, 0.75f))) < maxOf(white), "the arrows' resting white is below the press flash");
+        }
+
         beginTest("dim is applied after the correction, in pad space");
         for (const auto& e : known)
         {

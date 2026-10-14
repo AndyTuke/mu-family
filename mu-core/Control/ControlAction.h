@@ -30,7 +30,10 @@ enum class ControlActionType
     PerformanceMode,   // enter / leave Performance mode (`index`: -1 toggles, 0 off, 1 on; `layer` seeds the selection)
     PerformanceItem,   // switch to performance item `index` (0..7)
     PerformancePrev,   // the previous loadable item, wrapping
-    PerformanceNext    // the next loadable item, wrapping
+    PerformanceNext,   // the next loadable item, wrapping
+    MuteSelectedLayer, // toggle the mute of the layer Performance mode has selected
+    AppPrev,           // switch the surface to the previous mu app (no multi-app hub yet: always refused)
+    AppNext            // switch the surface to the next mu app (as AppPrev)
 };
 
 // When an action that changes what is heard lands: Default follows the app-wide setting.
@@ -70,6 +73,9 @@ inline const char* actionName(ControlActionType t) noexcept
         case ControlActionType::PerformanceItem: return "performanceItem";
         case ControlActionType::PerformancePrev: return "performancePrev";
         case ControlActionType::PerformanceNext: return "performanceNext";
+        case ControlActionType::MuteSelectedLayer: return "muteSelectedLayer";
+        case ControlActionType::AppPrev:         return "appPrev";
+        case ControlActionType::AppNext:         return "appNext";
         case ControlActionType::None:            break;
     }
     return "none";
@@ -84,7 +90,8 @@ inline ControlActionType actionFromName(const juce::String& n) noexcept
                     ControlActionType::SelectLayer, ControlActionType::LaunchClip, ControlActionType::ClipNext,
                     ControlActionType::ClipPrev, ControlActionType::PresetNext,
                     ControlActionType::PresetPrev, ControlActionType::Panic, ControlActionType::PerformanceMode,
-                    ControlActionType::PerformanceItem, ControlActionType::PerformancePrev, ControlActionType::PerformanceNext })
+                    ControlActionType::PerformanceItem, ControlActionType::PerformancePrev, ControlActionType::PerformanceNext,
+                    ControlActionType::MuteSelectedLayer, ControlActionType::AppPrev, ControlActionType::AppNext })
         if (n == actionName(t)) return t;
     return ControlActionType::None;
 }
@@ -106,7 +113,7 @@ inline Quantise quantiseFromName(const juce::String& n) noexcept
 // abruptly); parameters, starting playback and preset changes never wait for a boundary.
 inline bool isQuantisable(ControlActionType t) noexcept
 {
-    return t == ControlActionType::MuteLayer || t == ControlActionType::SoloLayer || t == ControlActionType::TransportStop;
+    return t == ControlActionType::MuteLayer || t == ControlActionType::MuteSelectedLayer || t == ControlActionType::SoloLayer || t == ControlActionType::TransportStop;
 }
 
 } // namespace mu_core

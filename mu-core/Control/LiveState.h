@@ -16,7 +16,7 @@
 // which are stored (the bank itself lives on the Layer; docs/design-plugin-family.md "Clip bank").
 //
 // It performs the actions that change that state (PerformanceMode / Item / Prev / Next, SelectLayer,
-// LaunchClip / ClipNext / ClipPrev).
+// LaunchClip / ClipNext / ClipPrev) and refuses AppPrev / AppNext (no multi-app hub yet; the hub will hook in here).
 // How a preset is actually staged or cancelled is supplied by the owner as callbacks, so this class
 // never names a product, a processor or the hot-swap machinery. `perform` never quantises: the swap
 // lands at the boundary the preset's swap timing sets, never twice-quantised.
@@ -49,6 +49,8 @@ public:
         std::function<bool(int)>      muteLayer;             // flip layer n's strip mute (the MuteLayer path)
         std::function<bool(int)>      layerMuted;            // is layer n's strip muted
         std::function<void(int, int)> clipPlaying;           // layer n now plays clip c (the owner records it with the layer)
+        std::function<bool()>         transportPlaying;      // the internal clock runs (optional)
+        std::function<bool()>         transportOutside;      // a host / MIDI clock / Link owns play (optional)
         std::function<int(int)>       savedClip;             // the clip layer n was saved playing (-1 = none, or it is not stored any more)
     };
 
@@ -71,6 +73,8 @@ public:
     uint8_t                       getClipMask(int layer)    const override { return inRange(layer) ? clipState[(size_t) layer].mask : (uint8_t) 0; }
     bool                          isLayerMuted(int layer)   const override
     { return layer >= 0 && layer < getLayerCount() && cb.layerMuted && cb.layerMuted(layer); }
+    bool isTransportPlaying() const override      { return cb.transportPlaying && cb.transportPlaying(); }
+    bool isTransportOwnedOutside() const override { return cb.transportOutside && cb.transportOutside(); }
     void addListener(Listener* l) const override    { listeners.add(l); }
     void removeListener(Listener* l) const override { listeners.remove(l); }
 
@@ -102,6 +106,10 @@ public:
     // A layer's strip mute changed some way other than a pad (on-screen strip, host automation, MIDI learn):
     // the lamps that flash for a muted layer must follow. Message thread; the owner marshals from any thread.
     void notifyMuteChanged() { changed(); }
+
+    // The transport started, stopped or changed owner some way other than a pad (Play button, host, clock): the
+    // transport button's light must follow. Message thread; the owner polls and calls this on a change.
+    void notifyTransportChanged() { changed(); }
 
     // The owner calls this after every deferred-work pass (message thread): settles the queue when the
     // staged preset was superseded by another load, or applied early without a commit hook.

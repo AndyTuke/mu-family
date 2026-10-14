@@ -10,6 +10,8 @@
 
 namespace
 {
+int chan(uint32_t rgb, int shift) { return (int) ((rgb >> shift) & 0xFFu); }
+
 using namespace mu_control;
 using namespace mu_control::test;
 using T = mu_core::ControlActionType;
@@ -60,13 +62,19 @@ public:
     {
         const auto look = testLook();
 
-        beginTest("a top press performs PerformanceItem(n) on every surface");
+        beginTest("a top press performs its table action on every surface (a smaller surface has the first buttons)");
         for (const auto& d : allSurfaces())
         {
+            const T table[8] = { T::AppPrev, T::AppNext, T::PerformancePrev, T::PerformanceNext,
+                                 T::ClipPrev, T::ClipNext, T::MuteSelectedLayer, T::TransportToggle };
             Rig r(d);
-            expect(r.model.handle(Rig::press({ ControlKind::Top, 2, 0 })), d.name);
-            expectEquals((int) r.sink.performed.size(), 1);
-            expect(r.sink.performed[0].type == T::PerformanceItem && r.sink.performed[0].index == 2, d.name);
+            const int n = d.buttonCount(ButtonKind::Top);
+            for (int i = 0; i < n; ++i)
+            {
+                expect(r.model.handle(Rig::press({ ControlKind::Top, i, 0 })), d.name);
+                expect(r.sink.performed.back().type == table[i], d.name + ": button " + juce::String(i + 1));
+            }
+            expectEquals((int) r.sink.performed.size(), n);
         }
 
         beginTest("a side press performs SelectLayer, top to bottom, only where the surface has side buttons");
@@ -130,26 +138,184 @@ public:
             for (const auto& l : r.model.render()) expectEquals((int) l.rgb, 0, d.name);
         }
 
-        beginTest("top row: current bright, available dim, missing dim red, queued pulsing, empty off");
+        beginTest("app arrows: dark and inert with no other app, the app accent when one is available");
         for (const auto& d : allSurfaces())
         {
             Rig r(d);
-            r.view.queued = 3;
-            const int n = d.buttonCount(ButtonKind::Top);
-            expectEquals(r.led({ ControlKind::Top, 0, 0 }).rgb, look.accentRgb, d.name + ": current");
-            expectEquals(r.led({ ControlKind::Top, 1, 0 }).rgb, scaled(look.accentRgb, look.dimScale), d.name + ": available");
-            expectEquals(r.led({ ControlKind::Top, 2, 0 }).rgb, scaled(look.faultRgb, look.dimScale), d.name + ": missing file");
-            expect(r.led({ ControlKind::Top, 3, 0 }).rgb != 0, d.name + ": queued is lit");
-            if (n > 4) expectEquals((int) r.led({ ControlKind::Top, 4, 0 }).rgb, 0, d.name + ": empty item");
+            expectEquals((int) r.led({ ControlKind::Top, 0, 0 }).rgb, 0, d.name + ": AppPrev dark");
+            expectEquals((int) r.led({ ControlKind::Top, 1, 0 }).rgb, 0, d.name + ": AppNext dark");
+            r.sink.accept = false;   // the sink refuses AppPrev / AppNext while no hub exists
+            const auto before = r.model.render();
+            expect(! r.model.handle(Rig::press({ ControlKind::Top, 0, 0 })), d.name);
+            expect(before == r.model.render(), d.name + ": a refused press changes no light");
+
+            r.view.otherApp = true;
+            expectEquals(r.led({ ControlKind::Top, 0, 0 }).rgb, look.accentRgb, d.name + ": lit in the app accent");
+            expectEquals(r.led({ ControlKind::Top, 1, 0 }).rgb, look.accentRgb, d.name);
         }
 
-        beginTest("dim is exactly dimScale times bright, for the item and the layer colours");
+        beginTest("preset arrows: neutral white below full, off with fewer than two playable items");
+        for (const auto& d : allSurfaces())
+        {
+            Rig r(d);   // items 1, 2 and 4 are playable
+            const auto prev = r.led({ ControlKind::Top, 2, 0 }), next = r.led({ ControlKind::Top, 3, 0 });
+            expect(prev.rgb != 0 && prev.rgb == next.rgb, d.name + ": both lit alike");
+            expect(chan(prev.rgb, 16) == chan(prev.rgb, 8) && chan(prev.rgb, 8) == chan(prev.rgb, 0), d.name + ": neutral white");
+            expect(prev.rgb < look.whiteRgb, d.name + ": at rest below full white, so the press flash shows");
+
+            r.view.playable = { true, false, false, false, false, false, false, false };   // one playable item
+            expectEquals((int) r.led({ ControlKind::Top, 2, 0 }).rgb, 0, d.name + ": one item: off");
+            expectEquals((int) r.led({ ControlKind::Top, 3, 0 }).rgb, 0, d.name + ": one item: off");
+            r.view.playable = { true, true, false, false, false, false, false, false };
+            expect(r.led({ ControlKind::Top, 3, 0 }).rgb != 0, d.name + ": two items: lit");
+            r.view.mode = false;
+            expectEquals((int) r.led({ ControlKind::Top, 3, 0 }).rgb, 0, d.name + ": dark outside the mode");
+        }
+
+        beginTest("an accepted press on an arrow flashes it white for stepFlashMs, a refused one changes nothing");
+        {
+            double now = 1000.0;
+            Rig lp(launchpadStyle(), &now);
+            const SurfaceControlId next { ControlKind::Top, 3, 0 };
+            const auto rest = lp.led(next).rgb;
+            int renders = 0;
+            lp.model.onChanged = [&] { ++renders; };
+            expect(lp.model.handle(Rig::press(next)));
+            expect(renders >= 1, "the accepted press asks for a render, so the flash is drawn");
+            expectEquals(lp.led(next).rgb, look.whiteRgb, "white at once");
+            expect(lp.model.isAnimating());
+            now = 1149.0;
+            expectEquals(lp.led(next).rgb, look.whiteRgb, "still flashing");
+            now = 1160.0;
+            expectEquals(lp.led(next).rgb, rest, "back to its steady light");
+            expect(lp.model.isAnimating(), "the timer runs a moment longer so the steady frame is sent");
+            now = 1400.0;
+            expect(! lp.model.isAnimating());
+
+            // The app arrows flash too (white over the accent) once another app exists and the sink takes the press.
+            lp.view.otherApp = true;
+            expect(lp.model.handle(Rig::press({ ControlKind::Top, 0, 0 })));
+            expectEquals(lp.led({ ControlKind::Top, 0, 0 }).rgb, look.whiteRgb);
+
+            Rig refused(launchpadStyle(), &now);
+            refused.sink.accept = false;
+            const auto before = refused.model.render();
+            expect(! refused.model.handle(Rig::press(next)));
+            expect(before == refused.model.render(), "a refused press: no flash");
+            expect(! refused.model.isAnimating());
+        }
+
+        beginTest("a preset arrow pulses white from its press until the switch commits or is cancelled");
+        {
+            double now = 0.0;
+            Rig lp(launchpadStyle(), &now);
+            const SurfaceControlId next { ControlKind::Top, 3, 0 }, prev { ControlKind::Top, 2, 0 };
+            const auto rest = lp.led(next).rgb;
+            lp.view.queued = 1;                       // the switch the press queues
+            expect(lp.model.handle(Rig::press(next)));
+            now = 500.0;                              // past the flash, a whole pulse period on: dim
+            expectEquals(lp.led(next).rgb, scaled(look.whiteRgb, look.dimScale), "pulse at its dim end");
+            now = 750.0;
+            expectEquals(lp.led(next).rgb, look.whiteRgb, "and its bright end");
+            expect(lp.model.isAnimating());
+            expectEquals(lp.led(prev).rgb, rest, "only the pressed arrow pulses");
+            lp.view.queued = -1;                      // committed or cancelled
+            expectEquals(lp.led(next).rgb, rest, "steady again");
+            lp.view.queued = 2;                       // a later queue (from the screen) is not this arrow's
+            expectEquals(lp.led(next).rgb, rest);
+
+            Rig nb(nativeBlink());                    // no RGB, native pulse: the device blinks it
+            nb.view.queued = 1;
+            nb.model.handle(Rig::press({ ControlKind::Top, 3, 0 }));
+            Rig mock(mockGrid());
+            mock.view.queued = 1;
+            mock.model.handle(Rig::press({ ControlKind::Top, 3, 0 }));
+            expect(! mock.model.isAnimating(), "a palette surface has no timer");
+        }
+
+        beginTest("clip arrows: dim white when the selected layer stores two or more clips, else off");
+        for (const auto& d : allSurfaces())
+        {
+            if (d.buttonCount(ButtonKind::Top) < 6) continue;
+            Rig r(d);
+            r.view.selected = 1;
+            r.view.clipMask[1] = 0b0101;
+            expectEquals(r.led({ ControlKind::Top, 4, 0 }).rgb, scaled(look.whiteRgb, look.dimScale), d.name);
+            expectEquals(r.led({ ControlKind::Top, 5, 0 }).rgb, scaled(look.whiteRgb, look.dimScale), d.name);
+            r.view.clipMask[1] = 0b0100;
+            expectEquals((int) r.led({ ControlKind::Top, 4, 0 }).rgb, 0, d.name + ": one clip: off");
+            r.view.clipMask[1] = 0;
+            r.view.clipMask[0] = 0xFF;   // another layer's clips do not count
+            expectEquals((int) r.led({ ControlKind::Top, 5, 0 }).rgb, 0, d.name + ": only the selected layer counts");
+            r.view.selected = 0;
+            expect(r.led({ ControlKind::Top, 5, 0 }).rgb != 0, d.name + ": the lights follow the selection");
+            r.view.selected = 6;   // no such layer (4 live)
+            expectEquals((int) r.led({ ControlKind::Top, 5, 0 }).rgb, 0, d.name + ": no layer: off");
+            r.view.selected = 0;
+            r.view.mode = false;
+            expectEquals((int) r.led({ ControlKind::Top, 5, 0 }).rgb, 0, d.name + ": dark outside the mode");
+        }
+
+        beginTest("mute button: the selected layer's colour, dim when unmuted, flashing when muted");
+        {
+            double now = 0.0;
+            Rig lp(launchpadStyle(), &now);
+            const SurfaceControlId mute { ControlKind::Top, 6, 0 };
+            lp.view.selected = 1;
+            expectEquals(lp.led(mute).rgb, scaled(look.layerRgb[1], look.dimScale), "unmuted: dim");
+            expect(! lp.model.isAnimating());
+            lp.view.muted[1] = true;
+            expectEquals(lp.led(mute).rgb, look.layerRgb[1], "muted: bright half");
+            expect(lp.model.isAnimating());
+            now = 500.0;
+            expectEquals(lp.led(mute).rgb, scaled(look.layerRgb[1], look.dimScale), "muted: dim half, never dark");
+            lp.view.selected = 2;
+            expectEquals(lp.led(mute).rgb, scaled(look.layerRgb[2], look.dimScale), "follows the selection");
+            lp.view.selected = 5;
+            expectEquals((int) lp.led(mute).rgb, 0, "no such layer: off");
+            lp.view.selected = 1;
+            expect(lp.model.handle(Rig::press(mute)));
+            expect(lp.sink.performed.back().type == T::MuteSelectedLayer);
+        }
+
+        beginTest("transport button: green when stopped, red when playing, static dim white when a clock owns it");
+        for (const auto& d : allSurfaces())
+        {
+            if (d.buttonCount(ButtonKind::Top) < 8) continue;
+            Rig r(d);
+            const SurfaceControlId play { ControlKind::Top, 7, 0 };
+            expectEquals(r.led(play).rgb, look.goRgb, d.name + ": stopped");
+            expect(r.led(play).mode == LedMode::Static, d.name);
+            r.view.playing = true;
+            r.view.notify();
+            expectEquals(r.led(play).rgb, look.faultRgb, d.name + ": playing");
+            expect(r.model.handle(Rig::press(play)), d.name);
+            expect(r.sink.performed.back().type == T::TransportToggle, d.name);
+            expect(! r.model.isAnimating(), d.name + ": a transport press needs no flash");
+
+            r.view.outside = true;
+            r.sink.performed.clear();
+            expectEquals(r.led(play).rgb, scaled(look.whiteRgb, look.dimScale), d.name + ": owned elsewhere: dim white");
+            expect(! r.model.isAnimating(), d.name + ": static, not blinking");
+            const auto before = r.model.render();
+            expect(! r.model.handle(Rig::press(play)), d.name + ": the press is ignored");
+            expect(r.sink.performed.empty(), d.name + ": and never reaches the sink");
+            expect(before == r.model.render(), d.name);
+            r.view.playing = false;   // owned: the clock decides, the internal flag is irrelevant
+            expectEquals(r.led(play).rgb, scaled(look.whiteRgb, look.dimScale), d.name);
+
+            // A press the sink refuses changes no light either.
+            r.view.outside = false;
+            r.sink.accept = false;
+            const auto stopped = r.model.render();
+            expect(! r.model.handle(Rig::press(play)), d.name);
+            expect(stopped == r.model.render(), d.name);
+        }
+
+        beginTest("dim is exactly dimScale times bright, for the layer colours");
         for (const auto& d : allSurfaces())
         {
             Rig r(d);
-            const auto bright = r.led({ ControlKind::Top, 0, 0 }).rgb;
-            const auto dim    = r.led({ ControlKind::Top, 1, 0 }).rgb;
-            expectEquals(dim, scaled(bright, look.dimScale), d.name);
             if (d.buttonCount(ButtonKind::Side) == 0) continue;
             const auto selected = r.led({ ControlKind::Side, 0, 1 }).rgb;   // layer 2 is selected
             const auto other    = r.led({ ControlKind::Side, 0, 0 }).rgb;   // layer 1
@@ -296,7 +462,8 @@ public:
             Rig r(d);
             const auto before = r.model.render();
             r.sink.accept = false;
-            r.model.handle(Rig::press({ ControlKind::Top, 1, 0 }));
+            r.model.handle(Rig::press({ ControlKind::Top, 3, 0 }));
+            r.model.handle(Rig::press({ ControlKind::Pad, 0, 0 }));
             expect(before == r.model.render(), d.name);
         }
 
@@ -306,11 +473,10 @@ public:
             Rig r(d);
             int calls = 0;
             r.model.onChanged = [&] { ++calls; };
-            r.view.current = 1;
+            r.view.otherApp = true;
             r.view.notify();
             expectEquals(calls, 1, d.name);
-            expectEquals(r.led({ ControlKind::Top, 1, 0 }).rgb, look.accentRgb, d.name);
-            expectEquals(r.led({ ControlKind::Top, 0, 0 }).rgb, scaled(look.accentRgb, look.dimScale), d.name);
+            expectEquals(r.led({ ControlKind::Top, 0, 0 }).rgb, look.accentRgb, d.name);
             r.model.setMapping(SurfaceMapping(d));
             expectEquals(calls, 2, d.name + ": a new mapping also asks for a render");
         }
@@ -326,64 +492,7 @@ public:
             expectEquals(view.listenerCount(), 0);
         }
 
-        beginTest("queued pulses by the surface: animated colours (RGB), native mode, or a steady middle level");
-        {
-            double now = 0.0;
-            Rig lp(launchpadStyle(), &now);
-            lp.view.queued = 1;
-            const auto dim = scaled(look.accentRgb, look.dimScale);
-            expectEquals(lp.led({ ControlKind::Top, 1, 0 }).rgb, dim, "RGB pulse starts at dim");
-            now = 250.0;   // half a period at 2 Hz
-            expectEquals(lp.led({ ControlKind::Top, 1, 0 }).rgb, look.accentRgb, "and peaks at bright");
-            expect(lp.led({ ControlKind::Top, 1, 0 }).mode == LedMode::Static, "RGB surfaces always get static colours");
-            now = 125.0;   // quarter period: halfway
-            const auto mid = lp.led({ ControlKind::Top, 1, 0 }).rgb;
-            expectEquals(mid, scaled(look.accentRgb, look.dimScale + (1.0f - look.dimScale) * 0.5f));
-            now = 500.0;   // a full period later: back at dim
-            expectEquals(lp.led({ ControlKind::Top, 1, 0 }).rgb, dim);
-
-            Rig nb(nativeBlink());
-            nb.view.queued = 1;
-            const auto l = nb.led({ ControlKind::Top, 1, 0 });
-            expect(l.mode == LedMode::Pulse && l.rgb == look.accentRgb, "no RGB but a native pulse: the device blinks it");
-
-            Rig mock(mockGrid());
-            mock.view.queued = 1;
-            const auto m = mock.led({ ControlKind::Top, 1, 0 });
-            expect(m.mode == LedMode::Static, "no pulse at all: steady");
-            expectEquals(m.rgb, scaled(look.accentRgb, 0.5f * (1.0f + look.dimScale)));
-            expect(m.rgb != look.accentRgb && m.rgb != scaled(look.accentRgb, look.dimScale), "distinct from current and available");
-        }
-
-        beginTest("the blink animation runs only while an RGB light pulses");
-        {
-            Rig lp(launchpadStyle());
-            expect(! lp.model.isAnimating(), "nothing queued");
-            lp.view.queued = 2;
-            expect(lp.model.isAnimating(), "a queued item pulses");
-            lp.view.queued = -1;
-            expect(! lp.model.isAnimating());
-            lp.view.queued = 2;
-            lp.view.mode = false;
-            expect(! lp.model.isAnimating(), "dark outside the mode");
-
-            Rig nb(nativeBlink());
-            nb.view.queued = 1;
-            expect(! nb.model.isAnimating(), "the device animates natively, so no timer is needed");
-            Rig mock(mockGrid());
-            mock.view.queued = 1;
-            expect(! mock.model.isAnimating());
-        }
-
-        beginTest("a queued slot that holds no item lights nothing");
-        {
-            Rig r(launchpadStyle());
-            r.view.queued = 5;   // slots 4 to 7 are empty
-            expectEquals((int) r.led({ ControlKind::Top, 5, 0 }).rgb, 0);
-            expect(! r.model.isAnimating(), "an unlit queue does not start the blink timer");
-        }
-
-        beginTest("no device is named in the shared code: a user override changes both the press and the light");
+        beginTest("no device is named in the shared code: a user override changes the press, and PerformanceItem has no light");
         for (const auto& d : allSurfaces())
         {
             Rig r(d);
@@ -393,7 +502,7 @@ public:
             r.model.setMapping(m);
             r.model.handle(Rig::press({ ControlKind::Top, 0, 0 }));
             expectEquals(r.sink.performed[0].index, 1, d.name);
-            expectEquals(r.led({ ControlKind::Top, 0, 0 }).rgb, scaled(look.accentRgb, look.dimScale), d.name + ": it lights as item 2 (available)");
+            expectEquals((int) r.led({ ControlKind::Top, 0, 0 }).rgb, 0, d.name + ": PerformanceItem is dark on the surface");
         }
     }
 };

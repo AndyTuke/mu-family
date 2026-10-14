@@ -618,6 +618,7 @@ protected:
     // The tree of each layer's last non-clip stage that is still waiting for its boundary (invalid when none).
     // A store captures it instead of the live layer, which does not show that preset yet.
     std::array<juce::ValueTree, mu_limits::kMaxLayers> pendingPresetTree;
+    int lastTransportState = 0;                            // message thread: the transport state the live state was last told about
     std::atomic<bool> muteChanged { false };               // a strip mute parameter changed on some thread; the poll tells the live state
     std::array<juce::RangedAudioParameter*, mu_limits::kMaxLayers> muteParams {};   // ch{N}_mute, cached (null = none)
     std::atomic<bool> fullPresetLoadFailed { false };   // set by a load that could not read its file
@@ -636,6 +637,7 @@ protected:
         {
             owner.drainDeferredWork();
             owner.consumeMuteChange();
+            owner.consumeTransportChange();
             if (owner.liveState.needsSettling())
                 owner.settleLiveState();   // also catches a stopped-transport load, which never raises the mailbox
         }
@@ -711,6 +713,14 @@ protected:
     // Message thread: the masks, then the settle of whatever the live state is waiting for.
     void settleLiveState() { publishClipMasks(); liveState.reconcile(); }
     // Message thread: tells the live state about a strip mute that changed since the last call (any thread may have changed it).
+    // Message thread: tells the live state when the transport started, stopped or changed owner (Play button, host, clock).
+    void consumeTransportChange()
+    {
+        const int state = (isInternalPlaying() ? 1 : 0) | (midiControlRouter.playIsOutside() ? 2 : 0);
+        if (state == lastTransportState) return;
+        lastTransportState = state;
+        liveState.notifyTransportChanged();
+    }
     void consumeMuteChange() { if (muteChanged.exchange(false, std::memory_order_relaxed)) liveState.notifyMuteChanged(); }
 
     virtual void applyMidiPresetLayer(int slot, const juce::File& f) { loadLayerPreset(slot, f); }

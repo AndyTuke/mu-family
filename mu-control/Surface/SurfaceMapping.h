@@ -9,7 +9,8 @@
 #include <vector>
 
 // Which surface control means which ControlAction. The default is generated from the SurfaceDescription alone
-// (top row = performance items, side column = layer select, grid = clip launch, layer 1 on the top row);
+// (top row = app / preset / clip arrows, layer mute and play / stop, side column = layer select, grid = clip
+// launch, layer 1 on the top row);
 // only the overrides a user made are saved, as a ValueTree / XML keyed by the description id. No device bytes
 // and no product: actions are saved by their stable names.
 namespace mu_control

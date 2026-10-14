@@ -46,6 +46,8 @@ inline mu_core::SurfaceLook testLook()
         l.layerRgb[i] = 0x200000u + (uint32_t) i * 0x101010u;   // distinct per palette index
     l.accentRgb = 0xFF8000;
     l.faultRgb  = 0xFF0000;
+    l.goRgb     = 0x00FF00;
+    l.whiteRgb  = 0xFFFFFF;
     l.dimScale  = 0.30f;
     l.pulseHz   = 2.0f;
     l.flashHz   = 1.0f;
