@@ -205,6 +205,7 @@ struct MuTantProcessorSeamTests : juce::UnitTest
         resetLayerFromSecondThread();
         resetLayerWithBusyEnvelopeLock();
         layerEditInFlightSkipsRender();
+        clipBankSurvivesStateRoundTrip();
         structuralEditsVersusProcessBlock();
         wavetableImportVersusProcessBlock();
     }
@@ -346,6 +347,35 @@ struct MuTantProcessorSeamTests : juce::UnitTest
 
         p.addLayer();
         expect(! p.layerEditInFlight.load(), "a completed structural edit clears the flag");
+    }
+
+    void clipBankSurvivesStateRoundTrip()
+    {
+        beginTest("a host session carries each voice's clip bank and playing clip; reset and remove move or empty it");
+        TempStorage storage;
+        ExposedPluginProcessor p;
+        p.addLayer();
+        juce::ValueTree payload("MuTantVoice");
+        payload.setProperty("tag", 3, nullptr);
+        p.layers[0]->clips->store(1, payload, "swell");
+        p.layers[1]->clips->store(4, payload);
+        p.layers[1]->activeClip = 4;
+
+        juce::MemoryBlock block;
+        p.getStateInformation(block);
+
+        ExposedPluginProcessor q;
+        q.layers[0]->clips->store(6, payload);   // stale data the load must replace
+        q.setStateInformation(block.getData(), (int) block.getSize());
+        expect(q.layers[0]->clips->get(1).isEquivalentTo(payload));
+        expectEquals(q.layers[0]->clips->getName(1), juce::String("swell"));
+        expect(! q.layers[0]->clips->isOccupied(6), "the stale clip is gone");
+        expectEquals(q.layers[1]->activeClip, 4);
+
+        expect(q.removeLayer(0));
+        expect(q.layers[0]->clips->isOccupied(4), "voice 1's bank moved down with it");
+        q.resetLayer(0);
+        expect(q.layers[0]->clips->isEmpty() && q.layers[0]->activeClip == -1, "reset empties the bank");
     }
 
     // Layer invariants that must hold whenever the message thread is not mid-edit.

@@ -303,6 +303,13 @@ void PluginProcessor::resetLayer(int track)
             mu_pp::appendParamRow(keep, *p, id);
     layerLayout.applyParams(keep, track);
     mu_pp::clearModulators(getTrack(track));
+
+    // Reset empties the clip bank as in the shared reset (this override replaces that one).
+    if (layers[(size_t) track] != nullptr)
+    {
+        layers[(size_t) track]->clips->clearAll();
+        layers[(size_t) track]->activeClip = -1;
+    }
 }
 
 } // namespace mu_on

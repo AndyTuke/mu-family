@@ -249,6 +249,7 @@ struct LayerOwnershipTests : juce::UnitTest
         runStoragePrimitiveTests();
         runStructuralEditTests();
         runParamTruthTests();
+        runClipBankTests();
     }
 
     // Parameter values go through a normalised round trip, so compare to a tolerance, not exactly.
@@ -760,6 +761,156 @@ struct LayerOwnershipTests : juce::UnitTest
             expect(p.swapLayers(0, 1));
             p.resetLayer(0);
             expect(p.synced.empty());
+        }
+    }
+
+    // The clip bank through the structural edits and the composed state.
+    static juce::ValueTree clipPayload(int tag)
+    {
+        juce::ValueTree t("Payload");
+        t.setProperty("tag", tag, nullptr);
+        return t;
+    }
+    static int payloadTag(const juce::ValueTree& t) { return t.isValid() ? (int) t.getProperty("tag", -1) : -1; }
+
+    void runClipBankTests()
+    {
+        beginTest("clips: addLayer starts empty, even in a re-used spare that holds a stale bank");
+        {
+            EditableProcessor p(true);
+            p.layers[1]->clips->store(2, clipPayload(99), "stale");   // the spare slot 1 is about to be used
+            p.layers[1]->activeClip = 2;
+            expectEquals(p.addLayer(), 1);
+            expect(p.layers[1]->clips->isEmpty(), "the new layer has no clips");
+            expectEquals(p.layers[1]->activeClip, -1);
+        }
+
+        beginTest("clips: removeLayer moves the banks down with their layers and empties the vacated top");
+        for (const bool spares : { true, false })
+        {
+            EditableProcessor p(spares);
+            p.addLayer(); p.addLayer();
+            for (int i = 0; i < 3; ++i)
+            {
+                p.layers[(size_t) i]->clips->store(i, clipPayload(10 + i), "n" + juce::String(i));
+                p.layers[(size_t) i]->activeClip = i;
+            }
+            expect(p.removeLayer(1));
+            expectEquals(payloadTag(p.layers[0]->clips->get(0)), 10);
+            expectEquals(payloadTag(p.layers[1]->clips->get(2)), 12, "layer 2's bank followed it down");
+            expectEquals(p.layers[1]->clips->getName(2), juce::String("n2"));
+            expectEquals(p.layers[1]->activeClip, 2, "the playing clip follows its layer");
+            expect(! p.layers[1]->clips->isOccupied(1), "the removed layer's bank is gone");
+            if (spares)
+            {
+                expect(p.layers[2]->clips->isEmpty(), "the vacated top slot is empty");
+                expectEquals(p.layers[2]->activeClip, -1);
+            }
+            else
+                expect(p.layers[2] == nullptr);
+        }
+
+        beginTest("clips: swapLayers carries each bank with its layer");
+        {
+            EditableProcessor p(true);
+            p.addLayer(); p.addLayer();
+            p.layers[0]->clips->store(0, clipPayload(1), "a");
+            p.layers[2]->clips->store(5, clipPayload(2), "b");
+            p.layers[2]->activeClip = 5;
+            expect(p.swapLayers(0, 2));
+            expectEquals(payloadTag(p.layers[2]->clips->get(0)), 1);
+            expectEquals(payloadTag(p.layers[0]->clips->get(5)), 2);
+            expectEquals(p.layers[0]->clips->getName(5), juce::String("b"));
+            expectEquals(p.layers[0]->activeClip, 5);
+            expect(! p.layers[0]->clips->isOccupied(0) && ! p.layers[2]->clips->isOccupied(5));
+        }
+
+        beginTest("clips: resetLayer empties the bank and clears the playing clip, other layers untouched");
+        {
+            EditableProcessor p(true);
+            p.addLayer();
+            p.layers[0]->clips->store(3, clipPayload(7));
+            p.layers[1]->clips->store(3, clipPayload(8));
+            p.layers[0]->activeClip = 3;
+            p.resetLayer(0);
+            expect(p.layers[0]->clips->isEmpty());
+            expectEquals(p.layers[0]->activeClip, -1);
+            expectEquals(payloadTag(p.layers[1]->clips->get(3)), 8);
+        }
+
+        beginTest("clips: the composed state round-trips banks, names and the playing clip");
+        {
+            EditableProcessor src(true);
+            src.addLayer(); src.addLayer();
+            src.layers[0]->clips->store(0, clipPayload(1), "one");
+            src.layers[0]->clips->store(7, clipPayload(2));
+            src.layers[2]->clips->store(4, clipPayload(3), "three");
+            src.layers[2]->activeClip = 4;
+            src.layers[0]->activeClip = 6;   // names an empty clip: not restorable
+
+            const auto state = src.captureComposedState();
+            expect(mu_pp::findLayerNode(state, 1).getChildWithName("Clips").isValid() == false,
+                   "an empty bank writes no <Clips> child");
+            expect(mu_pp::findLayerNode(state, 0).getChildWithName("Clips").isValid());
+
+            EditableProcessor dst(true);
+            dst.addLayer(); dst.addLayer();
+            dst.layers[1]->clips->store(1, clipPayload(55));   // stale data the load must remove
+            dst.applyComposedState(state);
+            for (int l = 0; l < 3; ++l)
+                for (int c = 0; c < mu_core::ClipBank::kCount; ++c)
+                {
+                    const auto a = src.layers[(size_t) l]->clips->get(c), b = dst.layers[(size_t) l]->clips->get(c);
+                    expect(a.isValid() == b.isValid() && (! a.isValid() || a.isEquivalentTo(b)), "clip equal");
+                    expectEquals(src.layers[(size_t) l]->clips->getName(c), dst.layers[(size_t) l]->clips->getName(c));
+                }
+            expectEquals(dst.layers[2]->activeClip, 4);
+            expectEquals(dst.layers[0]->activeClip, -1, "an active clip that is empty loads as none");
+            expect(dst.layers[1]->clips->isEmpty());
+
+            // Through XML text, as a file or host session carries it.
+            const auto reparsed = juce::ValueTree::fromXml(*state.createXml());
+            EditableProcessor viaXml(true);
+            viaXml.addLayer(); viaXml.addLayer();
+            viaXml.applyComposedState(reparsed);
+            expectEquals(viaXml.layers[0]->clips->getName(0), juce::String("one"));
+            expectEquals(payloadTag(viaXml.layers[2]->clips->get(4)), 3);
+        }
+
+        beginTest("clips: a state without <Clips> loads empty, extra children are ignored, a smaller state empties the rest");
+        {
+            EditableProcessor src(true);
+            src.addLayer();
+            src.layers[0]->clips->store(0, clipPayload(1));
+            auto state = src.captureComposedState();
+            for (int s = 0; s < mu_limits::kMaxLayers; ++s)
+                if (auto node = mu_pp::findLayerNode(state, s); node.isValid())
+                {
+                    node.removeChild(node.getChildWithName("Clips"), nullptr);
+                    node.removeProperty("activeClip", nullptr);
+                    node.appendChild(juce::ValueTree("FutureThing"), nullptr);
+                }
+
+            EditableProcessor dst(true);
+            dst.addLayer();
+            dst.layers[0]->clips->store(2, clipPayload(5));
+            dst.layers[1]->clips->store(2, clipPayload(6));
+            dst.layers[0]->activeClip = 2;
+            dst.applyComposedState(state);
+            expect(dst.layers[0]->clips->isEmpty() && dst.layers[1]->clips->isEmpty(), "an old state gives empty banks");
+            expectEquals(dst.layers[0]->activeClip, -1);
+
+            // A state with one layer applied to a processor holding banks past that count.
+            EditableProcessor one(true);
+            one.layers[0]->clips->store(1, clipPayload(1));
+            auto small = one.captureComposedState();
+            small.getChildWithName(mu_pp::kLayersTag).removeChild(mu_pp::findLayerNode(small, 2), nullptr);
+            EditableProcessor many(true);
+            many.addLayer(); many.addLayer();
+            many.layers[2]->clips->store(1, clipPayload(9));
+            many.applyComposedState(small);
+            expect(many.layers[2]->clips->isEmpty(), "a slot the state lacks is emptied");
+            expectEquals(payloadTag(many.layers[0]->clips->get(1)), 1);
         }
     }
 };

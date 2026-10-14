@@ -131,6 +131,32 @@ struct MuToniLayerCountPersistTests : juce::UnitTest
             for (int i = 0; i < 6; ++i) expectCarries(q, i, i, colours[i], "round trip");
         }
 
+        beginTest("a host session carries each layer's clip bank and playing clip; an old state loads empty banks");
+        {
+            TempStorage storage;
+            ExposedPluginProcessor p;
+            p.addLayer();
+            juce::ValueTree payload("MuToniArp");
+            payload.setProperty("tag", 42, nullptr);
+            p.layers[0]->clips->store(3, payload, "bright");
+            p.layers[1]->clips->store(0, payload);
+            p.layers[1]->activeClip = 0;
+
+            juce::MemoryBlock block;
+            p.getStateInformation(block);
+
+            ExposedPluginProcessor q;
+            q.layers[0]->clips->store(5, payload);   // stale data the load must replace
+            q.setStateInformation(block.getData(), (int) block.getSize());
+            expectEquals(q.layers[0]->clips->getName(3), juce::String("bright"));
+            expect(q.layers[0]->clips->get(3).isEquivalentTo(payload) && ! q.layers[0]->clips->isOccupied(5));
+            expect(q.layers[1]->clips->isOccupied(0));
+            expectEquals(q.layers[1]->activeClip, 0);
+
+            loadSession(q, kOldComposedState);
+            expect(q.layers[0]->clips->isEmpty() && q.layers[1]->clips->isEmpty(), "an old state has no clips");
+        }
+
         beginTest("fill to eight, remove the middle, swap: parameters, colour and mixer strip follow the layer");
         {
             TempStorage storage;

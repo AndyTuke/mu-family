@@ -193,6 +193,33 @@ struct MuOnEngineMigrationTests : juce::UnitTest
                 expectEquals(b.getLayerColourIndex(i), a.getLayerColourIndex(i), "colour of layer " + juce::String(i));
         }
 
+        beginTest("clips: a saved state carries each track's bank and playing clip, an old state loads empty, reset empties");
+        {
+            TempStorage storage;
+            PluginProcessor a;
+            load(a, legacyFormat2());
+            juce::ValueTree payload("MuOnTrack");
+            payload.setProperty("tag", 7, nullptr);
+            a.getTrack(1).clips->store(2, payload, "fill");
+            a.getTrack(1).activeClip = 2;
+            juce::MemoryBlock block;
+            a.getStateInformation(block);
+
+            PluginProcessor b;
+            b.getTrack(0).clips->store(6, payload);   // stale data the load must replace
+            b.setStateInformation(block.getData(), (int) block.getSize());
+            expect(b.getTrack(1).clips->get(2).isEquivalentTo(payload));
+            expectEquals(b.getTrack(1).clips->getName(2), juce::String("fill"));
+            expectEquals(b.getTrack(1).activeClip, 2);
+            expect(b.getTrack(0).clips->isEmpty(), "the stale clip is gone");
+
+            load(b, legacyFormat2());   // a state written before clips existed
+            expect(b.getTrack(1).clips->isEmpty() && b.getTrack(1).activeClip == -1, "an old state has no clips");
+
+            a.resetLayer(1);
+            expect(a.getTrack(1).clips->isEmpty() && a.getTrack(1).activeClip == -1, "reset empties the bank");
+        }
+
         beginTest("an APVTS dump with the old root <Pattern> and <RumbleEnv> (written before format 2) loads the same way");
         {
             // Old ids by lane type, the grid as one root <Pattern>, the envelope at the root.

@@ -104,6 +104,12 @@ struct Layer
     // overwrite the bank; it still travels with the layer when the layer pointer moves.
     SlotBound<mu_core::ClipBank> clips;
 
+    // The clip this layer was playing when its state was last saved or loaded (-1 = none). Only the
+    // composed-state save and load read and write it; the performance state that tracks the playing
+    // clip owns the live value. A plain member, so it follows the layer on a move and a layer-preset
+    // load (which copies a fresh layer over this one) correctly resets it to none.
+    int activeClip = -1;
+
     std::string name        = "<unnamed>";
     int         colourIndex = 0;   // index into MuLookAndFeel::layerPalette (8 colours)
 

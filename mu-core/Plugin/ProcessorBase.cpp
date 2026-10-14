@@ -648,6 +648,18 @@ void ProcessorBase::remapSidechainSources(const std::function<int(int)>& remap)
 juce::ValueTree ProcessorBase::captureComposedState()
 {
     auto state = mu_pp::captureState(apvts.state.getType(), layerLayout, layerExtras);
+
+    // Each slot node gains its layer's clip bank and playing clip. Not part of captureLayer, so a layer
+    // preset never carries a bank. An empty bank writes nothing, keeping a clip-free file unchanged.
+    for (int i = 0; i < layerLayout.numLayers() && i < mu_limits::kMaxLayers; ++i)
+        if (layers[(size_t) i] != nullptr)
+            if (auto node = mu_pp::findLayerNode(state, i); node.isValid())
+            {
+                layers[(size_t) i]->clips->writeTo(node);
+                if (layers[(size_t) i]->activeClip >= 0)
+                    node.setProperty("activeClip", layers[(size_t) i]->activeClip, nullptr);
+            }
+
     if (canEditLayers())
     {
         // The colour is a slot's identity, not part of its sound, so it lives on the full state, not in a layer node.
@@ -663,6 +675,19 @@ juce::ValueTree ProcessorBase::captureComposedState()
 void ProcessorBase::applyComposedState(const juce::ValueTree& state)
 {
     mu_pp::applyState(state, layerLayout, layerExtras);
+
+    // Every slot takes its node's clips: a node without a <Clips> child (an older file, or a slot the
+    // state lacks) empties the bank, so a smaller state leaves no stale clips past its layer count.
+    for (int i = 0; i < layerLayout.numLayers() && i < mu_limits::kMaxLayers; ++i)
+        if (layers[(size_t) i] != nullptr)
+        {
+            const auto node = mu_pp::findLayerNode(state, i);
+            auto& layer = *layers[(size_t) i];
+            layer.clips->readFrom(node);
+            const int active = (int) node.getProperty("activeClip", -1);
+            layer.activeClip = layer.clips->isOccupied(active) ? active : -1;
+        }
+
     if (! canEditLayers()) return;
 
     // Count last, so the audio thread never sees a count ahead of the data; then the colours (a state without colours keeps the current ones).
@@ -717,6 +742,11 @@ int ProcessorBase::addLayer()
         layersMoved(n, n);
     }
 
+    // A new layer starts with no clips. Explicit and outside layersLock: freeing trees is not a
+    // microsecond job, and a re-used spare must not keep an old bank.
+    layers[(size_t) n]->clips->clearAll();
+    layers[(size_t) n]->activeClip = -1;
+
     // Phase 3: the slot's parameters back to defaults, still suspended so no block sees stale values.
     // Where the layer data is the truth the audio never reads these parameters, so processing resumes
     // first: the product's push runs beside live audio, as any edit of its own parameters does, and
@@ -770,6 +800,14 @@ bool ProcessorBase::removeLayer(int idx)
         mixerEngine.resetSidechainEnv(n - 1);
         layersReordered(LayerEdit::Remove, idx, -1);
         layersMoved(idx, n - 1);                // the shifted slots and the vacated top one
+    }
+
+    // The banks moved with their layers (the pointer shift); the vacated top slot holds a spare or
+    // nothing and must start empty. Outside layersLock, like every clip-bank clear.
+    if (layers[(size_t) (n - 1)] != nullptr)
+    {
+        layers[(size_t) (n - 1)]->clips->clearAll();
+        layers[(size_t) (n - 1)]->activeClip = -1;
     }
 
     // Phase 3: parameter values. Strips that ducked from the removed layer now duck from nothing and
@@ -847,6 +885,11 @@ void ProcessorBase::resetLayer(int idx)
         mixerEngine.resetSidechainEnv(idx);
         layersMoved(idx, idx);
     }
+
+    // Reset means back to a freshly added layer, so the bank empties too (adoptDefaults leaves it alone).
+    layers[(size_t) idx]->clips->clearAll();
+    layers[(size_t) idx]->activeClip = -1;
+
     if (layerHoldsParamTruth())
     {
         suspend.release();                                 // the audio never reads these parameters: resume first
