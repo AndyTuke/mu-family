@@ -313,9 +313,10 @@ public:
     // How many clips layer `slot` stores (0 for no such layer).
     int     clipCount(int slot) const
     {
+        const unsigned mask = clipMask(slot);
         int n = 0;
         for (int i = 0; i < mu_limits::kClipsPerLayer; ++i)
-            n += (clipMask(slot) >> i) & 1;
+            n += (int) ((mask >> i) & 1u);
         return n;
     }
 

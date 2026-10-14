@@ -79,6 +79,8 @@ namespace
         }
         // Pretend the transport runs (a block was seen playing), so loads stage instead of applying.
         void startPlaying()  { layerSwapper.flagBoundaries(true, 0.0, 0.1); }
+        // Stage a plain (non-clip) layer-preset load from `tree`.
+        void stageNonClip(int slot, juce::ValueTree tree) { stageLayerPreset(slot, std::move(tree), false, false); }
 
         juce::String getLayerName(int) const override { return {}; }
         int getLayerColourIndex(int i) const override { return layers[(size_t) i] ? layers[(size_t) i]->colourIndex : 0; }
@@ -322,6 +324,70 @@ struct ClipLaunchTests : juce::UnitTest
             expect(! p.perform(act(T::StoreClip, 0, 3)) && ! p.perform(act(T::ClearClip, 0, 1)), "locked: the screen-only writes are refused");
             expectEquals((int) p.clipMask(0), 1 << 1, "the bank is unchanged");
             dir.deleteRecursively();
+        }
+
+        beginTest("a store is authoritative over a staged swap, and is refused while a full preset is staged");
+        {
+            using T = mu_core::ControlActionType;
+            const auto act = [](T type, int layer, int index)
+            {
+                mu_core::ControlAction a;
+                a.type = type; a.layer = layer; a.index = index;
+                return a;
+            };
+
+            // A staged non-clip layer preset is cancelled by the store: what is stored is what stays.
+            {
+                ClipProcessor p;
+                p.setParam("v0_a", 0.3f);
+                const auto older = p.captureLayerPresetTree(0);
+                p.setParam("v0_a", 0.7f);
+                p.startPlaying();
+                p.stageNonClip(0, older);
+                expect(p.hasPendingSwap(0), "the plain preset is staged");
+                expect(p.perform(act(T::StoreClip, 0, 3)), "store");
+                expect(! p.hasPendingSwap(0), "the staged preset is cancelled");
+                p.layerSwapper.flagBoundaries(true, 3.95, 0.2);
+                p.layerSwapper.commit();
+                expectWithinAbsoluteError(p.param("v0_a"), 0.7f, 0.01f);
+                expectEquals(p.getLiveState().getPlayingClip(0), 3, "the stored pad is the playing one");
+                expectEquals(p.getLiveState().getQueuedClip(0), -1);
+                expect(p.layers[0]->clips->isOccupied(3), "and the clip is stored");
+            }
+
+            // A staged full preset refuses both writes and leaves the bank alone.
+            {
+                ClipProcessor p;
+                p.storeClip(0, 1);
+                p.layerSwapper.stageFull(juce::ValueTree("Full"));
+                expect(! p.perform(act(T::StoreClip, 0, 2)) && ! p.perform(act(T::ClearClip, 0, 1)), "refused");
+                expectEquals((int) p.clipMask(0), 1 << 1, "the bank is unchanged");
+            }
+
+            // Another clip queued: storing into a different pad drops that launch and lights the stored pad.
+            {
+                ClipProcessor p;
+                p.setParam("v0_a", 0.9f);  p.storeClip(0, 1);
+                p.setParam("v0_a", 0.2f);
+                p.startPlaying();
+                expect(p.perform(act(T::LaunchClip, 0, 1)), "launch A");
+                expectEquals(p.getLiveState().getQueuedClip(0), 1);
+                expect(p.perform(act(T::StoreClip, 0, 2)), "store B");
+                expectEquals(p.getLiveState().getQueuedClip(0), -1, "A's queue is cancelled");
+                expectEquals(p.getLiveState().getPlayingClip(0), 2, "B is lit");
+                expect(! p.hasPendingSwap(0));
+                expectWithinAbsoluteError(p.param("v0_a"), 0.2f, 0.01f);
+            }
+
+            // A mapped LaunchClip needs no Performance mode.
+            {
+                ClipProcessor p;
+                p.setParam("v0_a", 0.8f);  p.storeClip(0, 0);
+                p.setParam("v0_a", 0.1f);
+                expect(! p.getLiveState().isPerformanceMode());
+                expect(p.perform(act(T::LaunchClip, 0, 0)), "launch with the mode off");
+                expectWithinAbsoluteError(p.param("v0_a"), 0.8f, 0.01f);
+            }
         }
 
         beginTest("a clip survives the layer's own parameter edits and is independent of the live layer");

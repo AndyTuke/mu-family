@@ -196,6 +196,7 @@ bool ProcessorBase::perform(const mu_core::ControlAction& a)
         {
             // Screen only: these write the bank, so the locked Performance mode refuses them and no map can name them.
             if (liveState.isPerformanceMode()) return false;
+            if (hasPendingFullPreset()) return false;   // a staged full preset replaces the layers and their banks
             if (a.type == T::ClearClip) return clearClip(a.layer, a.index);
             if (! storeClip(a.layer, a.index)) return false;
             liveState.clipStored(a.layer, a.index);
@@ -984,6 +985,15 @@ bool ProcessorBase::storeClip(int slot, int clip, const juce::String& name)
     mu_hotswap::assertMessageThread();   // the clip bank is message-thread only (a controller callback must marshal first)
     auto* layer = getLayer(slot);
     if (layer == nullptr || ! mu_core::ClipBank::isValidIndex(clip)) return false;
+
+    // The store is authoritative: a staged swap (a non-clip preset or another queued clip) would land over
+    // what is stored and shown, so drop it and the lamps that followed it before capturing.
+    if (hasPendingSwap(slot))
+    {
+        cancelPendingSwap(slot);
+        layer->activeClip = -1;
+        liveState.clearLayerClips(slot);
+    }
 
     const auto tree = captureLayerPresetTree(slot);
     if (! tree.isValid()) return false;

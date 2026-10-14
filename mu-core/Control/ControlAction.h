@@ -19,9 +19,9 @@ enum class ControlActionType
     MuteLayer,         // toggle a layer strip's mute
     SoloLayer,         // toggle a layer strip's solo
     SelectLayer,       // select a layer (Performance mode: the screen follows the surface)
-    LaunchClip,        // launch clip `index` on `layer` (Performance mode)
-    ClipNext,          // the selected layer's next stored clip, wrapping (Performance mode)
-    ClipPrev,          // the selected layer's previous stored clip, wrapping (Performance mode)
+    LaunchClip,        // launch clip `index` on `layer` (allowed with Performance mode off, also when mapped to MIDI)
+    ClipNext,          // the selected layer's next stored clip, wrapping
+    ClipPrev,          // the selected layer's previous stored clip, wrapping
     StoreClip,         // store `layer`'s current state as clip `index` (screen only: never mapped, refused in Performance mode)
     ClearClip,         // empty clip `index` of `layer` (screen only, as StoreClip)
     PresetNext,

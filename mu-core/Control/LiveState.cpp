@@ -325,6 +325,7 @@ void LiveState::reconcileClips()
 void LiveState::clipStored(int layer, int clip)
 {
     if (! inRange(layer) || clip < 0 || clip >= mu_limits::kClipsPerLayer) return;
+    reconcileClips();   // settle a landed or replaced launch before judging what is queued
     auto& c = clipState[(size_t) layer];
     if (c.queued == clip)   // the staged launch would land the clip's old contents
     {
