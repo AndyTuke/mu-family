@@ -534,6 +534,79 @@ struct PerformanceChooserTests : juce::UnitTest
             expect(r.status.contains("Performance|Add at least one preset first"), "told why");
         }
 
+        beginTest("model: a saved performance file loads back with its items");
+        {
+            Folders f;
+            auto a = makeModel(f);
+            a.setItem(0, f.preset("Alpha"));
+            a.setItem(1, f.preset("Charlie"));
+            expect(a.save("Gig", "notes"), "saved");
+            auto b = makeModel(f);
+            expectEquals(b.open(a.workingFile()), juce::String());
+            expectEquals(b.working().count(), 2);
+            expectEquals(b.itemName(0), juce::String("Alpha"));
+            expectEquals(b.itemName(1), juce::String("Charlie"));
+            expectEquals(b.working().description, juce::String("notes"));
+            expect(b.hasFile() && ! b.isDirty(), "a clean, saved list");
+            expect(b.open(f.root.getChildFile("none.muPerformance")).isNotEmpty(), "a gone file is refused");
+        }
+
+        beginTest("actions: Load is in the header row, asks for a file in the performances folder, opens it and never saves");
+        {
+            ScaleGuard g;
+            Rig r;
+            r.chrome->showPerformanceChooser();
+            auto& m = r.chooser().getModel();
+            m.setItem(0, r.folders.preset("Alpha"));
+            m.setItem(1, r.folders.preset("Bravo"));
+            m.save("Saved", "");
+            const auto savedFile = m.workingFile();
+            m.startNew();
+            r.chooser().refresh();
+
+            auto* load = findButton(r.chooser(), "Load");
+            auto* save = findButton(r.chooser(), "Save");
+            auto* use  = findButton(r.chooser(), "Use");
+            expect(load != nullptr && save != nullptr && use != nullptr, "buttons found");
+            expect(load->getY() == save->getY() && load->getHeight() == save->getHeight() && load->getWidth() == save->getWidth(),
+                   "Load sits in the header row at the Save button's size");
+            expect(use->getY() > load->getY(), "the footer button is Use, not Load");
+
+            juce::File askedIn;
+            r.chooser().onChooseFile = [&](const juce::File& startIn, std::function<void(const juce::File&)> chosen)
+            {
+                askedIn = startIn;
+                chosen(savedFile);
+            };
+            load->onClick();
+            expect(askedIn == r.folders.performances(), "the chooser starts in the performances folder");
+            expect(! r.chooser().getSaveDialog().isVisible(), "no Save card");
+            expectEquals(m.working().count(), 2);
+            expect(m.workingFile() == savedFile && ! m.isDirty(), "the file's list is now the working copy");
+            expect(r.live.getPerformance().count() == 0, "Load does not put it into use");
+            expect(r.chooser().isVisible(), "chooser stays open");
+        }
+
+        beginTest("actions: Load on a changed list asks before replacing it; declining keeps the edits");
+        {
+            ScaleGuard g;
+            Rig r;
+            r.chrome->showPerformanceChooser();
+            auto& m = r.chooser().getModel();
+            m.setItem(0, r.folders.preset("Alpha"));
+            m.save("One", "");
+            const auto oneFile = m.workingFile();
+            m.setItem(1, r.folders.preset("Bravo"));
+            r.chooser().refresh();
+            r.chooser().onChooseFile = [&](const juce::File&, std::function<void(const juce::File&)> chosen) { chosen(oneFile); };
+            r.chooser().actionLoad();
+            expectEquals(dialogCount(r.host), 1);
+            expect(m.working().count() == 2 && m.isDirty(), "nothing happens until answered");
+            expect(answerDialog(r.host, "Discard"), "confirm shown");
+            expect(m.working().count() == 1 && ! m.isDirty(), "replaced by the file's list");
+            expect(! r.chooser().getSaveDialog().isVisible(), "never saved");
+        }
+
         beginTest("actions: a changed list asks before it is thrown away (New, Close, opening another)");
         {
             ScaleGuard g;

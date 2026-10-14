@@ -121,15 +121,17 @@ PerformanceChooser::PerformanceChooser()
         addAndMakeVisible(*rows[(size_t) i]);
     }
 
-    for (auto* b : { &newBtn, &saveBtn, &renameBtn, &deleteBtn, &closeBtn, &useBtn })
+    for (auto* b : { &newBtn, &loadBtn, &saveBtn, &renameBtn, &deleteBtn, &closeBtn, &useBtn })
         addAndMakeVisible(*b);
     newBtn   .onClick = [this] { actionNew(); };
+    loadBtn  .onClick = [this] { actionLoad(); };
+    loadBtn  .setTooltip("Open a performance file into the list");
     saveBtn  .onClick = [this] { actionSave(); };
     renameBtn.onClick = [this] { actionRename(); };
     deleteBtn.onClick = [this] { actionDelete(); };
     closeBtn .onClick = [this] { actionClose(); };
     useBtn   .onClick = [this] { actionUse(); };
-    useBtn   .setTooltip("Load this list for Performance mode");
+    useBtn   .setTooltip("Use this list in Performance mode");
     renameBtn.setTooltip("Rename this performance (save or discard edits first)");
 
     // The Save card names or renames a performance: name and description only.
@@ -174,7 +176,7 @@ void PerformanceChooser::refresh()
     renameBtn.setEnabled(model.hasFile() && ! model.isDirty());   // rename only renames: edits are saved with Save
     deleteBtn.setEnabled(model.hasFile());
     useBtn   .setEnabled(model.canUse());
-    useBtn   .setTooltip(model.canUse() ? juce::String("Load this list for Performance mode")
+    useBtn   .setTooltip(model.canUse() ? juce::String("Use this list in Performance mode")
                                         : juce::String("Add at least one preset first"));
     repaint();
 }
@@ -228,6 +230,32 @@ void PerformanceChooser::actionOpenSaved(int libraryRow)
             safe->say("Performance", "could not open " + file.getFileName() + ": " + problem);
         safe->refresh();
     });
+}
+
+// Opens a chosen performance file into the list, asking first if the current list has unsaved edits.
+void PerformanceChooser::actionLoad()
+{
+    juce::Component::SafePointer<PerformanceChooser> safe(this);
+    auto openChosen = [safe](const juce::File& file)
+    {
+        if (safe == nullptr || file == juce::File()) return;
+        safe->guardDirty([safe, file]
+        {
+            if (safe == nullptr) return;
+            const auto problem = safe->model.open(file);
+            if (problem.isNotEmpty())
+                safe->say("Performance", "could not open " + file.getFileName() + ": " + problem);
+            safe->refresh();
+        });
+    };
+
+    const auto startIn = model.performancesFolder();
+    if (onChooseFile) { onChooseFile(startIn, openChosen); return; }
+
+    // Native open dialog (open mode, files only), starting in the performances folder.
+    fileChooser = std::make_unique<juce::FileChooser>("Load Performance", startIn, "*.muPerformance");
+    fileChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                             [openChosen](const juce::FileChooser& fc) { openChosen(fc.getResult()); });
 }
 
 void PerformanceChooser::openSaveDialog()
@@ -378,9 +406,9 @@ void PerformanceChooser::resized()
     for (size_t i = 0; i < rows.size(); ++i)
         rows[i]->setBounds(lay.rows[i]);
 
-    // Header buttons from the right: Delete, Rename, Save, New.
+    // Header buttons from the right: Delete, Rename, Save, Load, New.
     int x = lay.header.getRight();
-    for (auto* b : { &deleteBtn, &renameBtn, &saveBtn, &newBtn })
+    for (auto* b : { &deleteBtn, &renameBtn, &saveBtn, &loadBtn, &newBtn })
     {
         x -= btnW;
         b->setBounds(x, lay.header.getY() + pad, btnW, lay.header.getHeight() - pad * 2);

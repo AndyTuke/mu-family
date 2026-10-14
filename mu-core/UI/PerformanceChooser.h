@@ -9,7 +9,7 @@
 
 // The Performance chooser screen (docs/design-ui-family.md 12.5): the saved performances on the left,
 // the working copy's eight item rows on the right (number lamp, name, product, Replace / Up / Down /
-// Remove, or "+ Preset" on an empty row), New / Save / Rename / Delete in the header and Close / Load in
+// Remove, or "+ Preset" on an empty row), New / Load / Save / Rename / Delete in the header and Close / Use in
 // the footer. It edits through mu_ui::perf::PerformanceChooserModel; the owner (ShellChrome) shows it as a page,
 // opens the Preset Browser in pick mode when asked for a preset, and puts the list into use. Reachable
 // only with Performance mode off. Processor-free.
@@ -29,6 +29,9 @@ public:
     // Puts a saved list into use (the live state's load); false when it is refused.
     std::function<bool(mu_pp::PerformanceFile list, const juce::File& where)> onUse;
     std::function<void()>                                                      onClose;
+    // Asks for a performance file to open, starting in `startIn`; empty = the native open dialog.
+    // Injectable so the Load action is tested without a dialog.
+    std::function<void(const juce::File& startIn, std::function<void(const juce::File&)> chosen)> onChooseFile;
     std::function<void(const juce::String& name, const juce::String& value)>   onStatus;
 
     // Starts an editing session: the folders and product, and the list now in use (empty = start a new one).
@@ -47,6 +50,7 @@ public:
     void actionRename();
     void actionDelete();
     void actionUse();
+    void actionLoad();   // header "Load": pick a .muPerformance file and open it in the list; never saves
     void actionClose();
     void actionOpenSaved(int libraryRow);
     void actionPick(int row);   // "+ Preset" / "Replace" on a row
@@ -95,8 +99,9 @@ private:
     perf::PerformanceChooserModel model;
     juce::ListBox      listBox;
     std::array<std::unique_ptr<Row>, perf::PerformanceChooserModel::kItems> rows;
-    juce::TextButton   newBtn { "New" }, saveBtn { "Save" }, renameBtn { "Rename" }, deleteBtn { "Delete" };
-    juce::TextButton   closeBtn { "Close" }, useBtn { "Load" };
+    juce::TextButton   newBtn { "New" }, loadBtn { "Load" }, saveBtn { "Save" }, renameBtn { "Rename" }, deleteBtn { "Delete" };
+    juce::TextButton   closeBtn { "Close" }, useBtn { "Use" };
+    std::unique_ptr<juce::FileChooser> fileChooser;
     SaveDialog         saveDialog;
     bool               useAfterSave = false;   // the Save card was opened by Use on an unsaved list
 };

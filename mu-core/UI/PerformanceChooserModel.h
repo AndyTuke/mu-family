@@ -30,6 +30,7 @@ public:
     // Re-reads the folder: every .muPerformance file, sorted by name. A file that is not a performance
     // is still listed (by its file name) so it can be deleted.
     void rescan();
+    const juce::File& performancesFolder() const noexcept { return folder; }
     const std::vector<Entry>& library() const noexcept { return entries; }
     // The library row of the working copy's file, or -1 (a new or unsaved performance).
     int libraryRowOfWorking() const;
