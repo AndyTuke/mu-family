@@ -13,6 +13,9 @@ target_sources(mu-control INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Surface/SurfaceModel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Devices/LaunchpadX/LaunchpadXProtocol.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Devices/LaunchpadX/LaunchpadXDriver.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Devices/LaunchpadX/LaunchpadXBackend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Manager/ControllerManager.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Manager/ControlRegistration.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Driver/JuceDevicePorts.cpp"
 )
 
@@ -27,3 +30,4 @@ function(mu_control_attach target)
 endfunction()
 
 add_subdirectory(Tests)
+add_subdirectory(Tools)

@@ -3,6 +3,11 @@
 namespace mu_control
 {
 
+namespace
+{
+constexpr int kWatchMs = 500;   // how often the opened device's presence is checked
+}
+
 juce::StringArray JuceDevicePorts::outputNames() const
 {
     juce::StringArray names;
@@ -17,32 +22,69 @@ juce::StringArray JuceDevicePorts::inputNames() const
     return names;
 }
 
-bool JuceDevicePorts::open(const PortSpec& spec)
+bool JuceDevicePorts::openPorts(const PortSpec& spec)
 {
-    close();
-
     // First port whose name matches each pattern.
     for (const auto& d : juce::MidiOutput::getAvailableDevices())
-        if (d.name.matchesWildcard(spec.outputPattern, true)) { output = juce::MidiOutput::openDevice(d.identifier); break; }
+        if (d.name.matchesWildcard(spec.outputPattern, true)) { output = juce::MidiOutput::openDevice(d.identifier); outputId = d.identifier; break; }
 
     for (const auto& d : juce::MidiInput::getAvailableDevices())
-        if (d.name.matchesWildcard(spec.inputPattern, true)) { input = juce::MidiInput::openDevice(d.identifier, this); break; }
+        if (d.name.matchesWildcard(spec.inputPattern, true)) { input = juce::MidiInput::openDevice(d.identifier, this); inputId = d.identifier; break; }
 
-    if (! isOpen()) { close(); return false; }
+    if (! isOpen()) { closePorts(); return false; }
     input->start();
     return true;
 }
 
-void JuceDevicePorts::close()
+void JuceDevicePorts::closePorts()
 {
     if (input != nullptr) input->stop();
     input.reset();
     output.reset();
 }
 
+bool JuceDevicePorts::open(const PortSpec& spec)
+{
+    close();
+    if (! openPorts(spec)) return false;
+    openSpec = spec;
+    attached = true;
+    startTimer(kWatchMs);
+    return true;
+}
+
+void JuceDevicePorts::close()
+{
+    stopTimer();
+    closePorts();
+    attached = false;
+}
+
+void JuceDevicePorts::timerCallback()
+{
+    // Is the opened pair still in the system's lists?
+    const auto listed = [](const auto& devices, const juce::String& id)
+    {
+        for (const auto& d : devices) if (d.identifier == id) return true;
+        return false;
+    };
+    const bool present = listed(juce::MidiOutput::getAvailableDevices(), outputId)
+                      && listed(juce::MidiInput::getAvailableDevices(), inputId);
+    if (present == attached) return;
+
+    if (present)
+    {
+        // Back again: the old handles are dead, so open a fresh pair before saying so (retry on the next tick if it fails).
+        closePorts();
+        if (! openPorts(openSpec)) return;
+    }
+    attached = present;
+    if (onConnectionChanged) onConnectionChanged(present);
+}
+
 bool JuceDevicePorts::send(const uint8_t* data, size_t size)
 {
-    if (output == nullptr || data == nullptr || size == 0) return false;
+    if (output == nullptr || ! attached || data == nullptr || size == 0) return false;
     output->sendMessageNow(juce::MidiMessage(data, (int) size));
     return true;
 }

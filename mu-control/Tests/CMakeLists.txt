@@ -11,6 +11,7 @@ target_sources(mu-control-tests PRIVATE
     SurfaceModelTests.cpp
     LaunchpadXProtocolTests.cpp
     LaunchpadXDriverTests.cpp
+    ControllerManagerTests.cpp
     TestDescriptions.h
     MockGridDriver.h
     FakeLiveView.h
@@ -20,6 +21,8 @@ target_sources(mu-control-tests PRIVATE
     ../Surface/SurfaceModel.cpp
     ../Devices/LaunchpadX/LaunchpadXProtocol.cpp
     ../Devices/LaunchpadX/LaunchpadXDriver.cpp
+    ../Devices/LaunchpadX/LaunchpadXBackend.cpp
+    ../Manager/ControllerManager.cpp
     ../Driver/JuceDevicePorts.cpp
     # LiveView.h needs the performance list.
     ../../mu-core/Persistence/PerformanceFile.cpp
@@ -47,4 +50,4 @@ target_link_libraries(mu-control-tests PRIVATE
     juce::juce_recommended_warning_flags
 )
 
-target_compile_definitions(mu-control-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+target_compile_definitions(mu-control-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0 JUCE_MODAL_LOOPS_PERMITTED=1)

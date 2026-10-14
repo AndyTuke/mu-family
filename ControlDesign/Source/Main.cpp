@@ -322,6 +322,75 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ControlDesignPanel)
 };
 
+// The colours a controller surface has to match: the eight layer colours and the four app accents, each bright and dim
+// (the dim scale is the one the pad uses), with the hex value under every patch. Put the pad beside the screen and compare.
+class SurfaceColourPanel : public juce::Component
+{
+public:
+    SurfaceColourPanel()
+    {
+        setLookAndFeel(&lookAndFeel);
+        setSize(kMargin * 2 + kLabelW + 8 * kCell, kMargin * 2 + kHeaderH + kBlockH * 2 + kGap);
+    }
+
+    ~SurfaceColourPanel() override { setLookAndFeel(nullptr); }
+
+    void paint(juce::Graphics& g) override
+    {
+        g.fillAll(MuLookAndFeel::colour(MuLookAndFeel::windowBackground));
+        const float dim = MuLookAndFeel::lighting().padDimScale;
+
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::mutedText));
+        g.setFont(juce::Font(juce::FontOptions(12.0f)));
+        g.drawText("Colours a Launchpad pad has to match. Top patch = bright, lower patch = dim (x" + juce::String(dim, 2)
+                       + "). Layer colours first (rows of the pad), then the app accents (top row).",
+                   kMargin, kMargin, getWidth() - kMargin * 2, kHeaderH, juce::Justification::centredLeft, false);
+
+        static const char* layerNames[8] = { "1 red", "2 cyan", "3 orange", "4 magenta", "5 lime", "6 rose", "7 silver", "8 copper" };
+        int y = kMargin + kHeaderH;
+        drawBlock(g, y, "Layer colours", MuLookAndFeel::kLayerPaletteSize,
+                  [](int i) { return MuLookAndFeel::layerPalette[i]; }, layerNames, dim);
+
+        static const char* appNames[4] = { "purple (mu-Clid)", "green (mu-Tant)", "blue (mu-On)", "yellow (mu-Toni)" };
+        const auto& apps = MuTheme::current().apps;
+        const juce::Colour appColours[4] = { apps.purple, apps.green, apps.blue, apps.yellow };
+        drawBlock(g, y + kBlockH + kGap, "App accents", 4, [&](int i) { return appColours[i]; }, appNames, dim);
+    }
+
+private:
+    static constexpr int kMargin = 16, kHeaderH = 36, kLabelW = 96, kCell = 112, kBlockH = 200, kGap = 12, kPatchH = 72;
+
+    template <typename ColourAt>
+    void drawBlock(juce::Graphics& g, int y, const juce::String& title, int count, ColourAt colourAt, const char* const* names, float dim)
+    {
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::mutedText));
+        g.setFont(juce::Font(juce::FontOptions(12.0f)));
+        g.drawText(title, kMargin, y, kLabelW, 16, juce::Justification::centredLeft, false);
+
+        for (int i = 0; i < count; ++i)
+        {
+            const int x = kMargin + kLabelW + i * kCell;
+            const juce::Colour bright = colourAt(i);
+
+            g.setColour(bright);
+            g.fillRoundedRectangle((float) x, (float) y + 20.0f, (float) kCell - 8.0f, (float) kPatchH, 6.0f);
+            const juce::Colour d((juce::uint8) (bright.getRed() * dim), (juce::uint8) (bright.getGreen() * dim), (juce::uint8) (bright.getBlue() * dim));   // per-channel, like the pad
+            g.setColour(d);
+            g.fillRoundedRectangle((float) x, (float) y + 20.0f + kPatchH + 6.0f, (float) kCell - 8.0f, (float) kPatchH, 6.0f);
+
+            g.setColour(MuLookAndFeel::colour(MuLookAndFeel::mutedText));
+            g.setFont(juce::Font(juce::FontOptions(11.0f)));
+            g.drawText(juce::String(names[i]), x, y + 20 + kPatchH * 2 + 10, kCell - 8, 14, juce::Justification::centredLeft, false);
+            g.drawText("#" + bright.toDisplayString(false) + "  dim #" + d.toDisplayString(false), x, y + 20 + kPatchH * 2 + 24, kCell, 14,
+                       juce::Justification::centredLeft, false);
+        }
+    }
+
+    MuLookAndFeel lookAndFeel;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SurfaceColourPanel)
+};
+
 class ControlDesignApplication : public juce::JUCEApplication
 {
 public:
@@ -332,8 +401,9 @@ public:
     void initialise(const juce::String&) override
     {
         mainWindow = std::make_unique<MainWindow>(getApplicationName());
+        colourWindow = std::make_unique<ColourWindow>();
     }
-    void shutdown() override { mainWindow = nullptr; }
+    void shutdown() override { colourWindow = nullptr; mainWindow = nullptr; }
     void systemRequestedQuit() override { quit(); }
 
 private:
@@ -357,7 +427,28 @@ private:
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainWindow)
     };
 
+    class ColourWindow : public juce::DocumentWindow
+    {
+    public:
+        ColourWindow()
+            : DocumentWindow("Surface colours", juce::Colour(0xff1c1c1b), DocumentWindow::minimiseButton | DocumentWindow::closeButton)
+        {
+            setUsingNativeTitleBar(true);
+            setContentOwned(new SurfaceColourPanel(), true);
+            setResizable(false, false);
+            centreWithSize(getWidth(), getHeight());
+            setTopLeftPosition(getX() + 40, getY() + 40);
+            setVisible(true);
+        }
+
+        void closeButtonPressed() override { setVisible(false); }
+
+    private:
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ColourWindow)
+    };
+
     std::unique_ptr<MainWindow> mainWindow;
+    std::unique_ptr<ColourWindow> colourWindow;
 };
 
 START_JUCE_APPLICATION(ControlDesignApplication)

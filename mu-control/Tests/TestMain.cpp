@@ -6,6 +6,7 @@
 // Scope:  the device-independent surface layer (description, mapping, model); no device, no processor.
 
 #include <juce_core/juce_core.h>
+#include <juce_events/juce_events.h>
 #include <cstdio>
 #include <iostream>
 
@@ -17,6 +18,9 @@ public:
 
 int main(int, char**)
 {
+    // The manager tests need a message loop for the MIDI-thread hand-off; this thread becomes the message thread.
+    juce::ScopedJuceInitialiser_GUI juceInit;
+
     StdoutLogger logger;
     juce::Logger::setCurrentLogger(&logger);
 

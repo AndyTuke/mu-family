@@ -15,7 +15,7 @@ struct SurfaceLook
     std::array<uint32_t, 8> layerRgb {};          // layer colour by palette index (LiveView::getLayerColourIndex)
     uint32_t                accentRgb = 0;        // the app accent: performance items
     uint32_t                faultRgb  = 0;        // a missing or foreign item
-    float                   dimScale  = 0.30f;    // dim state = bright colour x this
+    float                   dimScale  = 0.45f;    // dim state = bright colour x this (chosen by eye on a real Launchpad X)
     float                   pulseHz   = 2.0f;     // queued: smooth dim to bright
     float                   flashHz   = 1.0f;     // muted playing clip: square bright / dim
     int                     stepFlashMs = 150;    // a newly playing clip's one bright flash
