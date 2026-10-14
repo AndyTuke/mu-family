@@ -1320,7 +1320,8 @@ selection and modulators; **not** the mixer strip, not the name or colour (the l
   by `applyComposedState` (an empty or out-of-range clip loads as -1). It is a **hand-off to C5, not the live truth**: nothing sets it before C5. At C5 `ProcessorBase` writes
   `LiveState`'s `playingClip` into it at each launch commit (and `-1` at every non-clip `stageLayerPresetTree`, the choke point below), so a host session saved mid-performance
   restores the lit pad. Because a layer-preset load in the composed products goes through `applyLayerNode`, which does not touch the `Layer`, the plain member is **not** reset by
-  a load by itself (only mu-Clid's `Rhythm` assignment resets it); the choke point must do it. A **full preset** commit restores the saved `activeClip` into the layer but
+  a load by itself; the choke point must do it. (Corrected 2026-10-14 at C4: mu-Clid's `installRhythm` does **not** reset it either; it carries the slot's value across the `Rhythm`
+swap, because a clip launch goes through the same install and must keep it. See "As built (C4)".) A **full preset** commit restores the saved `activeClip` into the layer but
   `LiveState` still reports `playingClip = none` (item 6), so the pad is dark until a launch; C5 decides whether a session restore (only) re-lights it, default: no.
 
 **4. Actions: data on `Layer`, behaviour on `ProcessorBase`.** The backlog row asked for generic launch / mute / store actions on the parent `Layer`.
@@ -1427,6 +1428,25 @@ layer preset is one clip's worth of state; carrying a bank would make loading it
 - `loadClipFromFile` stores an **empty name** (the file name is not a clip name); the clip name is for `storeClip` and the C6 UI to set.
 - `launchClip` leaves `activeClip` untouched (it is the clip path, so the non-clip choke point is skipped); setting it at the commit is C5's job. Products declare the override with a
   `protected:` / `public:` pair beside the other layer-preset declarations; mu-Clid and mu-Clid MIDI are untouched until C4.
+
+**As built (C4, 2026-10-14).** mu-Clid follows the brief; rulings on what the build settled:
+- **Hooks over `PresetIO`.** `buildRhythmPresetTree(index, embedSample, forFile, ...)` is the one body: `saveRhythmPresetToFile` calls it with `forFile` true (metadata, `r0_name`, `r0_colour`),
+  `captureRhythmPresetTree` with false (a clip: no metadata, no identity, never audio). `PluginProcessor` overrides `captureLayerPresetTree` (public) and `stageLayerPresetTree` (protected) to call
+  `captureRhythmPresetTree` / `stageRhythmPresetTree`. Every `.muRhythm` load (`loadLayerPreset`, `stageRhythmPreset`, the MIDI program change, the default-rhythm reset) reaches
+  `ProcessorBase::stageLayerPreset(..., isClip false)`, the one choke point; the direct `PresetIO::applyRhythmPreset` (no staging) clears `activeClip` itself. The shared tail is
+  `stageRhythmPresetTree` (stopped: `applyRhythmPresetTree`; playing: `prepareRhythmPresetTree` + `hotSwapStager.stage`). `loadSource` carries the file name into load messages for a file load only.
+- **`activeClip` and `installRhythm` (ruling, replaces the `Layer.h` C2 comment).** `installRhythm` saves the slot's `activeClip` before the `Rhythm` swap and restores it after, so a clip launch
+  (which installs through it) keeps what C5 will have recorded. Clearing is the choke point's job (non-clip stage), not the install's. The bank is untouched by every install (`SlotBound`).
+- **Persistence.** Each `<Rhythm>` node of a full preset and a session gets the shared `ClipBank::writeTo` child and an `activeClip` property (only when it names an occupied clip), via `writeRhythmClips`.
+  A preset (not a session) blanks a clip `r0_sample` pointing into the embedded-decode temp folder, as it does for the rhythm's own. The full-preset prepare reads each bank once, drops any clip whose root
+  is not `MuClidRhythm`, and validates `activeClip`; the commit moves banks and `activeClip` onto the live layers **after the install and outside the lock** (`ClipBank` gained move operations
+  for this), and empties banks of rhythms past the new count. The legacy session reader clears every bank first. A file without `<Clips>` loads with empty banks.
+- **Root tag leniency (ruling).** `.muRhythm` loads stay **lenient about the root tag**: `readRhythmPresetFile` and `prepareRhythm` read properties and do not test the tag, and the shipped
+  and hand-converted files must keep loading (there is no migration path; see `PluginProcessor_Internal.h`). Only clip **storage** is strict: `loadClipFromFile` and the full-preset prepare require
+  `MuClidRhythm`, because a bank must hold one shape. So a file with another root can be loaded but not stored as a clip; accepted, and reported through `onLoadError`.
+- **mu-Clid MIDI (Open question 5, resolved).** `Rhythm` is the shared mu-core type, so MIDI carries an unused bank, but its session reader takes only the `<Rhythm>` attributes it knows and never
+  names `<Clips>` or `activeClip`: nothing to handle, nothing written. Opening a mu-Clid file with clips in MIDI and re-saving drops them (accepted, as stated for older builds); it preserves nothing.
+- **Open for C5.** `activeClip` is saved and restored but still not written by a launch commit; the staged-commit test pins that the commit leaves it.
 
 C1 and C2 can ship with no visible change. C3 and C4 give the feature a screen-driven path (a menu or button calling `launchClip`) before any hardware exists,
 so each is demonstrable on its own.

@@ -139,8 +139,11 @@ void HotSwapStager::installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceE
     }
 
     // Swap rather than assign: the outgoing rhythm ends up in the caller's object, which the caller
-    // destroys after releasing its locks.
+    // destroys after releasing its locks. The clip bank stays with the slot (SlotBound); the playing
+    // clip is the slot's too, so a clip launch keeps it and a non-clip load clears it before it gets here.
+    const int activeClip = proc.sequencer.getRhythm(r).activeClip;
     std::swap(proc.sequencer.getRhythm(r), rhythm);
+    proc.sequencer.getRhythm(r).activeClip = activeClip;
     proc.samples.setPath(r, samplePath);
     // Rebuilds the pattern and hands the audio thread its start position in one step.
     proc.sequencer.requestSwapStart(r, originEff, frameEpoch);

@@ -261,6 +261,7 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/ClidLayerStructureTests.cpp
     Source/Tests/ClidEditContinuityTests.cpp
     Source/Tests/HotSwapCancelTests.cpp        # staged swaps vs take-back, failed load, host restore, stopped load
+    Source/Tests/ClipLaunchTests.cpp           # clip bank: store / launch / persistence on the real processor
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_APVTS.cpp
     Source/Plugin/PluginProcessor_Modulation.cpp

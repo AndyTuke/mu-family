@@ -46,6 +46,13 @@ public:
                                 const juce::String& category = {},
                                 const juce::String& description = {});
     bool applyRhythmPreset(const juce::File& file, int rhythmIndex, bool keepIdentity = false);
+
+    // Layer-preset tree hooks behind ProcessorBase's clip API. The capture is the rhythm as a layer
+    // preset holds it minus file metadata, name and colour, with the sample by path only; the stage is
+    // everything a .muRhythm load does after the parse (installs at once when stopped, else commits
+    // at the rhythm's boundary). Callers go through ProcessorBase::stageLayerPreset, not this directly.
+    juce::ValueTree captureRhythmPresetTree(int rhythmIndex);
+    void stageRhythmPresetTree(int rhythmIndex, const juce::ValueTree& state, bool keepIdentity);
     bool applyDefaultRhythm(int rhythmIndex);
     void loadDefaultPreset();
 
@@ -77,7 +84,14 @@ public:
 private:
     // Shared by the stopped (applyRhythmPreset) and playing (stageRhythmPreset) rhythm-preset loads.
     juce::ValueTree readRhythmPresetFile(const juce::File& file) const;
-    PreparedRhythm  prepareRhythmPreset(const juce::File& file, int rhythmIndex, bool keepIdentity);
+    PreparedRhythm  prepareRhythmPresetTree(const juce::ValueTree& state, int rhythmIndex, bool keepIdentity,
+                                            const juce::String& source);
+    bool            applyRhythmPresetTree(const juce::ValueTree& state, int targetIndex, bool keepIdentity,
+                                          const juce::String& source);
+    // The .muRhythm tree: a file (forFile) adds its metadata, name and colour; a clip does not.
+    juce::ValueTree buildRhythmPresetTree(int rhythmIndex, bool embedSample, bool forFile,
+                                          const juce::String& presetName, const juce::String& category,
+                                          const juce::String& description);
     HotSwapStager::PreparedFullPreset prepareFullPreset(const juce::ValueTree& root) const;
 
     // The .muClid tree (shared by preset files and the host session) and its atomic write.
@@ -91,6 +105,9 @@ private:
     static void     applyPresetIdentity(const juce::ValueTree& state, Rhythm& r);
 
     PluginProcessor& proc;
+
+    // The file name of the .muRhythm being staged, so load messages can name it; empty for a clip.
+    juce::String loadSource;
 
     // Helpers extracted from loadPreset / applyRhythmPreset / restoreStateFromTree
     // so each top-level function reads as a sequence of named steps. All run on

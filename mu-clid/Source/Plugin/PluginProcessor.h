@@ -122,6 +122,13 @@ public:
     // ProcessorBase slot-preset API: a rhythm preset into rhythm `ri`.
     void saveLayerPreset(int ri, const juce::String& name) override;
     void loadLayerPreset(int ri, const juce::File& f) override { stageRhythmPreset(ri, f); }
+    // The clip hooks: the tree a .muRhythm holds (without file metadata, name, colour) and the tail of a
+    // .muRhythm load. Clips reach the sample by path only.
+    juce::ValueTree captureLayerPresetTree(int ri) override { return presetIO.captureRhythmPresetTree(ri); }
+protected:
+    void stageLayerPresetTree(int ri, juce::ValueTree tree, bool keepIdentity) override
+        { presetIO.stageRhythmPresetTree(ri, tree, keepIdentity); }
+public:
     // Where a staged swap lands: the shared `mstr_swap` parameter, read here on the audio thread from a
     // pointer resolved once. mu-Clid has no bar-line rule, so OnBar behaves as OnLayerLoop.
     mu_hotswap::SwapTiming swapTiming() const noexcept
@@ -451,6 +458,7 @@ private:
     friend class PresetIO;
     friend class HotSwapStager;
     friend class SampleLibrary;
+    friend struct ClipCommitProbe;         // tests drive the boundary scan and commit of a staged launch
     friend struct ModulationMemoryProbe;   // tests read the per-slot modulation change-detection state
 
     // atomic for safe cross-thread access (audio writes, UI reads + clears).

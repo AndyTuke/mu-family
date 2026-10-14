@@ -255,30 +255,46 @@ void PresetIO::applyPresetIdentity(const juce::ValueTree& state, Rhythm& r)
 }
 
 //==============================================================================
+// A .muRhythm load: the file is read here, then it goes through ProcessorBase's one layer-preset
+// stage entry (which leaves no clip active) into stageRhythmPresetTree below.
 void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file, bool keepIdentity)
 {
     if (rhythmIndex < 0 || rhythmIndex >= proc.sequencer.getNumRhythms()) return;
 
-    // Stopped: install at once. Playing: the same prepared rhythm waits for its loop boundary.
+    const auto state = readRhythmPresetFile(file);
+    if (! state.isValid()) return;
+
+    loadSource = file.getFileName();   // names the file in load messages; the tree stage has no file
+    proc.stageLayerPreset(rhythmIndex, state, keepIdentity, false);
+    loadSource = juce::String();
+}
+
+// Everything a layer-preset load does after the parse (file or clip). Stopped: install at once.
+// Playing: the same prepared rhythm waits for its loop boundary.
+void PresetIO::stageRhythmPresetTree(int rhythmIndex, const juce::ValueTree& state, bool keepIdentity)
+{
+    if (rhythmIndex < 0 || rhythmIndex >= proc.sequencer.getNumRhythms() || ! state.isValid()) return;
+
+    const juce::String source = loadSource.isNotEmpty() ? loadSource : juce::String("layer preset");
     if (! proc.sequencerPlaying.load())
     {
-        applyRhythmPreset(file, rhythmIndex, keepIdentity);
+        applyRhythmPresetTree(state, rhythmIndex, keepIdentity, source);
         return;
     }
-    auto prepared = prepareRhythmPreset(file, rhythmIndex, keepIdentity);
+    auto prepared = prepareRhythmPresetTree(state, rhythmIndex, keepIdentity, source);
     if (! prepared.voice) return;
     proc.hotSwapStager.cancelPendingIfAny(rhythmIndex);   // a newer swap supersedes a pending one
     proc.hotSwapStager.stage(rhythmIndex, std::move(prepared.rhythm), std::move(prepared.voice), prepared.samplePath);
 }
 
-// A .muRhythm prepared for slot `rhythmIndex` (no voice when the file can't be read).
-// keepIdentity: the slot keeps its own name + colour (a settings reset, not a named preset).
-PresetIO::PreparedRhythm PresetIO::prepareRhythmPreset(const juce::File& file, int rhythmIndex, bool keepIdentity)
+// A layer-preset tree prepared for slot `rhythmIndex` (no voice when the tree can't be built).
+// keepIdentity: the slot keeps its own name + colour (a settings reset or a clip launch, not a named preset).
+PresetIO::PreparedRhythm PresetIO::prepareRhythmPresetTree(const juce::ValueTree& state, int rhythmIndex,
+                                                           bool keepIdentity, const juce::String& source)
 {
-    const auto state = readRhythmPresetFile(file);
     if (! state.isValid()) return {};
     auto prepared = prepareRhythm(state, "r0_", proc.currentSampleRate, proc.currentBlockSize,
-                                  proc.getSamplesDir(), proc.onLoadError, file.getFileName());
+                                  proc.getSamplesDir(), proc.onLoadError, source);
     if (keepIdentity)
     {
         const Rhythm& current = proc.sequencer.getRhythm(rhythmIndex);
@@ -331,33 +347,30 @@ void PresetIO::ensureCategoryInList(const juce::String& cat)
     }
 }
 
-void PresetIO::saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFile,
-                                             bool embedSample, const juce::String& category,
-                                             const juce::String& description)
+// The rhythm's layer-preset tree: its sequencer-page parameters, voice chain, envelopes, insert
+// effect, modulators and sample reference. A file (.muRhythm) also carries its preset metadata and
+// the rhythm's name + colour; a clip (forFile false) carries neither, and always the sample path
+// only, never the audio.
+juce::ValueTree PresetIO::buildRhythmPresetTree(int rhythmIndex, bool embedSample, bool forFile,
+                                                const juce::String& presetName, const juce::String& category,
+                                                const juce::String& description)
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.sequencer.getNumRhythms()) return;
-
-    // if the current sample comes from an embedded-sample decode (path
-    // points into %TEMP%/muClid_samples/), force-embed so we never write the
-    // ephemeral temp path as `r0_sample`. The temp file would not survive an
-    // OS reboot, so any later load would lose the sample.
-    if (isEmbeddedSampleTempPath(proc.samples.path(rhythmIndex)) && ! embedSample)
+    juce::ValueTree state("MuClidRhythm");
+    if (forFile)
     {
-        embedSample = true;
-        if (proc.onLoadError)
-            proc.onLoadError("Sample originated from embedded data; saving with embed forced on.");
+        state.setProperty("presetName",         presetName,                nullptr);
+        state.setProperty("presetCategory",     category,                  nullptr);
+        state.setProperty("presetDescription",  description,               nullptr);
+        state.setProperty("presetEmbedSamples", embedSample ? 1 : 0,       nullptr);
+        // presetVersion property dropped: not distributing yet, current-build-only.
     }
 
-    juce::ValueTree state("MuClidRhythm");
-    state.setProperty("presetName",         destFile.getFileNameWithoutExtension(), nullptr);
-    state.setProperty("presetCategory",     category,                               nullptr);
-    state.setProperty("presetDescription",  description,                            nullptr);
-    state.setProperty("presetEmbedSamples", embedSample ? 1 : 0,                   nullptr);
-    // presetVersion property dropped: not distributing yet, current-build-only.
-
     const Rhythm& r = proc.sequencer.getRhythm(rhythmIndex);
-    state.setProperty("r0_name",   juce::String(r.name),        nullptr);
-    state.setProperty("r0_colour", r.colourIndex,                nullptr);
+    if (forFile)
+    {
+        state.setProperty("r0_name",   juce::String(r.name), nullptr);
+        state.setProperty("r0_colour", r.colourIndex,        nullptr);
+    }
     state.setProperty("r0_sample",
                       embedSample
                           ? juce::String()
@@ -379,7 +392,7 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFil
                                  kRhythmParamDefs[i]);
 
     // serialise modulators (ControlSequences + ModulationMatrix assignments).
-    state.addChild(serialiseModulators(proc.sequencer.getRhythm(rhythmIndex)), -1, nullptr);
+    state.addChild(serialiseModulators(r), -1, nullptr);
 
     if (embedSample)
     {
@@ -393,17 +406,60 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFil
             }
         }
     }
+    return state;
+}
 
+// What a clip stores: the rhythm as a layer-preset file would hold it, minus the file metadata and
+// identity. An invalid tree when the slot is out of range.
+juce::ValueTree PresetIO::captureRhythmPresetTree(int rhythmIndex)
+{
+    if (rhythmIndex < 0 || rhythmIndex >= proc.sequencer.getNumRhythms()) return {};
+    return buildRhythmPresetTree(rhythmIndex, false, false, {}, {}, {});
+}
+
+void PresetIO::saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFile,
+                                             bool embedSample, const juce::String& category,
+                                             const juce::String& description)
+{
+    if (rhythmIndex < 0 || rhythmIndex >= proc.sequencer.getNumRhythms()) return;
+
+    // if the current sample comes from an embedded-sample decode (path
+    // points into %TEMP%/muClid_samples/), force-embed so we never write the
+    // ephemeral temp path as `r0_sample`. The temp file would not survive an
+    // OS reboot, so any later load would lose the sample.
+    if (isEmbeddedSampleTempPath(proc.samples.path(rhythmIndex)) && ! embedSample)
+    {
+        embedSample = true;
+        if (proc.onLoadError)
+            proc.onLoadError("Sample originated from embedded data; saving with embed forced on.");
+    }
+
+    const auto state = buildRhythmPresetTree(rhythmIndex, embedSample, true,
+                                             destFile.getFileNameWithoutExtension(), category, description);
     mu_pp::replaceFileAtomically(destFile, state.toXmlString(), proc.onLoadError);
 }
 
-// Load a .muRhythm into a slot at once: the same prepared rhythm and the same install as the
-// loop-boundary swap, then the rhythm pushed to APVTS so the knobs follow. Only sequencer-page
-// state loads: a layer preset (.muRhythm) does not carry the mixer strip, so the slot's strip is left as it is.
+// Load a .muRhythm into a slot at once, whatever the transport is doing. Only sequencer-page state
+// loads: a layer preset (.muRhythm) does not carry the mixer strip, so the slot's strip is left as it is.
 bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIndex, bool keepIdentity)
 {
     if (targetIndex < 0 || targetIndex >= proc.sequencer.getNumRhythms()) return false;
-    auto prepared = prepareRhythmPreset(file, targetIndex, keepIdentity);
+    const auto state = readRhythmPresetFile(file);
+    if (! state.isValid()) return false;
+    if (! applyRhythmPresetTree(state, targetIndex, keepIdentity, file.getFileName())) return false;
+
+    // A direct load is not a clip launch: the install keeps the slot's activeClip, so clear it here.
+    proc.sequencer.getRhythm(targetIndex).activeClip = -1;
+    return true;
+}
+
+// The same prepared rhythm and the same install as the loop-boundary swap, then the rhythm pushed to
+// APVTS so the knobs follow.
+bool PresetIO::applyRhythmPresetTree(const juce::ValueTree& state, int targetIndex, bool keepIdentity,
+                                     const juce::String& source)
+{
+    if (targetIndex < 0 || targetIndex >= proc.sequencer.getNumRhythms()) return false;
+    auto prepared = prepareRhythmPresetTree(state, targetIndex, keepIdentity, source);
     if (! prepared.voice) return false;
 
     proc.hotSwapStager.cancelPendingIfAny(targetIndex);
@@ -517,6 +573,27 @@ bool PresetIO::writeFullPresetFile(const juce::File& file, const juce::String& n
                                         proc.onLoadError);
 }
 
+// The rhythm's clip bank and playing clip onto its <Rhythm> node. Clips are sample-path-only, so a
+// preset (not a session) blanks a path into the ephemeral embedded-decode folder, as it does for the
+// rhythm's own sample. An empty bank writes nothing.
+static void writeRhythmClips(juce::ValueTree& rTree, const Rhythm& r, bool forSession)
+{
+    mu_core::ClipBank bank = *r.clips;
+    if (! forSession)
+        for (int c = 0; c < mu_core::ClipBank::kCount; ++c)
+        {
+            auto clip = bank.get(c);
+            if (clip.isValid() && isEmbeddedSampleTempPath(clip.getProperty("r0_sample").toString()))
+            {
+                clip.setProperty("r0_sample", juce::String(), nullptr);
+                bank.store(c, clip, bank.getName(c));
+            }
+        }
+    bank.writeTo(rTree);
+    if (r.activeClip >= 0 && bank.isOccupied(r.activeClip))
+        rTree.setProperty("activeClip", r.activeClip, nullptr);
+}
+
 // The .muClid tree: every active rhythm (its sequencer-page params, name, colour, sample, mixer
 // strip and modulators) plus the global FX / mixer state. A session (forSession) is the same
 // tree, keeping temp-dir sample paths.
@@ -563,6 +640,7 @@ juce::ValueTree PresetIO::buildFullPresetTree(const juce::String& name, const ju
 
         // serialise modulators per rhythm.
         rTree.addChild(serialiseModulators(r), -1, nullptr);
+        writeRhythmClips(rTree, r, forSession);
 
         if (embedSamples)
         {
@@ -771,6 +849,16 @@ buildPreparedFullPreset(const juce::ValueTree& root, double sampleRate, int bloc
         out.rhythms[(size_t) i]     = std::move(prepared.rhythm);
         out.voices[(size_t) i]      = std::move(prepared.voice);
         out.samplePaths[(size_t) i] = prepared.samplePath;
+
+        // The slot's clip bank, read once here; the commit hands it to the live layer. Only a rhythm-shaped
+        // payload is kept, and a playing clip must name a stored one.
+        auto& bank = out.clipBanks[(size_t) i];
+        bank.readFrom(rTree);
+        for (int c = 0; c < mu_core::ClipBank::kCount; ++c)
+            if (bank.isOccupied(c) && bank.get(c).getType() != juce::Identifier("MuClidRhythm"))
+                bank.clear(c);
+        const int active = (int) rTree.getProperty("activeClip", -1);
+        out.activeClips[(size_t) i] = bank.isOccupied(active) ? active : -1;
     }
     return out;
 }
@@ -895,6 +983,18 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
 
     for (int i = n; i < oldN; ++i)
         proc.samples.clearPath(i);
+
+    // Clip banks follow the preset: a live slot takes the bank its node carried (assigning a Rhythm
+    // leaves the slot's bank alone, so the install above did not), a slot that dropped out empties.
+    // After the lock: freeing trees is not a microsecond job.
+    for (int i = 0; i < n; ++i)
+    {
+        Rhythm& r = proc.sequencer.getRhythm(i);
+        *r.clips      = std::move(prepared.clipBanks[(size_t) i]);
+        r.activeClip  = prepared.activeClips[(size_t) i];
+    }
+    for (int i = n; i < oldN; ++i)
+        proc.clearLayerClips(i);
 
     // ── APVTS / mixer / global finalize (message-thread, no I/O) ───────────────
     // The Rhythm + VoiceEngine are already live. Push the moved-in Rhythm into

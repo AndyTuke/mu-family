@@ -83,6 +83,11 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     // Applied at once: anything staged while the transport played must not land on top of the restored state.
     proc.hotSwapStager.cancelAllStaged();
 
+    // A session in this format predates clips, so every bank empties. Done before the lock below:
+    // freeing trees is not a microsecond job.
+    for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
+        proc.clearLayerClips(i);
+
     int n = juce::jlimit(1, RhythmSequencer::MaxRhythms,
                          (int)state.getProperty("numRhythms", 1));
 

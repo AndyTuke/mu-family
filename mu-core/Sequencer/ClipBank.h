@@ -31,6 +31,10 @@ public:
         return *this;
     }
 
+    // Moves hand the trees over without a deep copy (a prepared full preset hands its bank to the layer).
+    ClipBank(ClipBank&&) noexcept = default;
+    ClipBank& operator=(ClipBank&&) noexcept = default;
+
     static bool isValidIndex(int index) noexcept { return index >= 0 && index < kCount; }
 
     // Stores a deep copy of `payload` in clip `index`. An invalid tree empties the clip instead.

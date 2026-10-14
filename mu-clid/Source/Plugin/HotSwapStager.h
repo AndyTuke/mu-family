@@ -37,6 +37,10 @@ public:
         std::array<Rhythm, mu_limits::kMaxLayers>                       rhythms     {};
         std::array<std::unique_ptr<VoiceEngine>, mu_limits::kMaxLayers> voices      {};
         std::array<juce::String, mu_limits::kMaxLayers>                 samplePaths {};
+        // Each rhythm's clip bank and playing clip as the preset's nodes carried them. Read at stage
+        // time; the commit moves them onto the live layers (the Rhythm install leaves a layer's bank alone).
+        std::array<mu_core::ClipBank, mu_limits::kMaxLayers>            clipBanks   {};
+        std::array<int, mu_limits::kMaxLayers>                          activeClips {};
         juce::ValueTree                                       tree;
     };
 
