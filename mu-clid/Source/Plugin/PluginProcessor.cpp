@@ -231,6 +231,13 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         return;
     }
 
+    // An offline render applies the queued parameter changes here, at a block boundary, so the same
+    // automation lands on the same block every time instead of whenever the 100 Hz poll runs. It runs
+    // under layersLock because it writes Rhythm and VoiceEngine slots that structural edits and hot-swap
+    // commits replace. It may allocate and wait (bounded): nothing is playing in real time.
+    if (isNonRealtime())
+        servicePendingRhythmParams(true);
+
     // Must read the layer count AFTER acquiring layersLock — otherwise the snapshot
     // can be stale relative to the layer set and `sequencer.getRhythm(r)` indexes out of range.
     const int numRhythms = numLayers.load(std::memory_order_acquire);

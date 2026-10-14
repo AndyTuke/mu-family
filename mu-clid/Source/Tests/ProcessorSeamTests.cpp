@@ -14,6 +14,7 @@
 #include <random>
 #include <thread>
 #include <vector>
+#include <vector>
 
 // Allocation counter: counts operator new calls made while the calling thread has counting switched on.
 namespace alloc_count {
@@ -621,6 +622,42 @@ struct MuClidProcessorSeamTests : juce::UnitTest
             expectEquals(p.getRhythm(0).genA.steps, 11);
             expectEquals(p.getRhythm(0).genA.hits, 3);
             expect(p.getRhythm(0).genA.hits <= p.getRhythm(0).genA.steps, "the rhythm stayed consistent");
+        }
+
+        beginTest("Offline render: queued automation is applied by processBlock itself, the same block on every run");
+        {
+            // Automation set from another thread, then three offline blocks. Without the drain in
+            // processBlock it would wait for the 100 Hz poll (never called here); with it, the
+            // pattern is rebuilt before the first block, so two runs agree exactly.
+            auto render = [this](std::vector<float>& out, int& stepsAfter)
+            {
+                TempStorage storage;
+                ExposedPluginProcessor p;
+                p.prepareToPlay(48000.0, 256);
+                p.setNonRealtime(true);
+                RunningPlayHead host(48000.0, 256);
+                p.setPlayHead(&host);
+                std::thread audio([&] { setParam(p.apvts, "r0_stepsA", 9.0f); setParam(p.apvts, "r0_hitsA", 5.0f); });
+                audio.join();
+                juce::AudioBuffer<float> block(2, 256);
+                juce::MidiBuffer midi;
+                for (int i = 0; i < 3; ++i)
+                {
+                    block.clear(); midi.clear();
+                    p.processBlock(block, midi);
+                    if (i == 0) stepsAfter = p.getRhythm(0).genA.steps;
+                    for (int c = 0; c < 2; ++c)
+                        for (int n = 0; n < 256; ++n) out.push_back(block.getSample(c, n));
+                }
+                p.setPlayHead(nullptr);
+            };
+            std::vector<float> a1, a2;
+            int steps1 = 0, steps2 = 0;
+            render(a1, steps1);
+            render(a2, steps2);
+            expectEquals(steps1, 9, "applied by the first offline block, no poll needed");
+            expectEquals(steps2, 9);
+            expect(a1 == a2, "two offline renders of the same automation are identical");
         }
     }
 };

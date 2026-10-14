@@ -225,17 +225,31 @@ void PluginProcessor::markRhythmParamDirty(int ri, const char* suffix) noexcept
     pendingDirty[(size_t) ri][(size_t) index].store(true, std::memory_order_release);
     rhythmHasPending[(size_t) ri].store(true, std::memory_order_release);
 
-    if (isMessageThread())
-        servicePendingRhythmParams();
-    else
+    // If an offline render holds the apply, hand the change to the deferred-work pass instead of stranding it.
+    if (! isMessageThread() || ! servicePendingRhythmParams())
         requestDeferredWork();
 }
 
-void PluginProcessor::servicePendingRhythmParams()
+// Returns false when another thread held the apply and this call did not wait it out (the caller then
+// asks for a later pass); true once this call has applied everything queued.
+bool PluginProcessor::servicePendingRhythmParams(bool waitForOtherApply)
 {
+    // One applier at a time: an offline render drains from its own thread while the message thread's
+    // poll may do the same. The render waits its turn (bounded, so a misreported offline flag cannot
+    // stall a live callback for long); the poll just leaves the work to whoever holds the flag.
+    constexpr int kMaxWaitYields = 2000;
+    int yields = 0;
+    while (applyingRhythmParams.test_and_set(std::memory_order_acquire))
+    {
+        if (! waitForOtherApply || ++yields > kMaxWaitYields)
+            return false;
+        std::this_thread::yield();
+    }
     for (int ri = 0; ri < RhythmSequencer::MaxRhythms; ++ri)
         if (rhythmHasPending[(size_t) ri].exchange(false, std::memory_order_acq_rel))
             applyPendingRhythmParams(ri);
+    applyingRhythmParams.clear(std::memory_order_release);
+    return true;
 }
 
 // Forget every queued change of one rhythm (the caller is about to apply all of its parameters).
