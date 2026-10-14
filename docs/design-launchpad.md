@@ -457,13 +457,15 @@ From a throwaway JUCE 9.0.3 probe on Windows 11 with Windows MIDI Services runni
 
 **Top row of round buttons (CC 91-98), settled by Andy 2026-10-14; replaces the earlier "top row = `PerformanceItem(1..8)`" and the purple Performance-mode / item-prev / item-next buttons.** Left to right:
 
-| # | Action | Light (RGB; bright = token colour, dim = `padDimScale` 0.45) |
+| # | Action | Light (RGB; bright = token colour, dim = `padDimScale` 0.20) |
 |---|---|---|
-| 1 | Up arrow: previous mu app (`AppPrev`) | The **current app's accent** (`MuTheme::AppPrimaries`, as the screen lamps): bright when another app is available, dim and press ignored when this is the only app |
+| 1 | Up arrow: previous mu app (`AppPrev`) | The **current app's accent** (`MuTheme::AppPrimaries`, as the screen lamps): bright when another app is available; **fully off (dark) and the press ignored** when this is the only app (ruled 2026-10-14: dark, as Andy said; the earlier "dim" is dropped) |
 | 2 | Down arrow: next app (`AppNext`) | Same colour as 1, same rule |
-| 3 | Left arrow: previous preset (`PerformancePrev`) | Bright white; off when fewer than two playable items |
+| 3 | Left arrow: previous preset (`PerformancePrev`) | **Rest: white x `kArrowRestScale` 0.75** (untuned, may be revisited by eye); flash and queued-pulse peak are full white; off when fewer than two playable items |
 | 4 | Right arrow: next preset (`PerformanceNext`) | Same as 3 |
-| 5, 6, 7 | To be decided (candidates below) | **Off** until decided |
+| 5 | Previous clip (`ClipPrev`), **provisional, awaiting Andy** | Layer-less neutral per the build; not yet confirmed |
+| 6 | Next clip (`ClipNext`), **provisional, awaiting Andy** | As 5 |
+| 7 | Mute selected layer (`MuteSelectedLayer`), **provisional, awaiting Andy** | The selected layer's colour: **dim = unmuted, flashing at `clipMutedFlashHz` = muted** |
 | 8 | Play / Stop toggle (`TransportToggle`) | **Green when stopped** (a press will play), **red when playing** (a press will stop): the light shows what pressing does |
 
 The multi-app switching mechanism (what "another app is available" means, how the switch is made) is ruled in [design-plugin-family.md](design-plugin-family.md); this table is only the surface's half.
@@ -472,7 +474,11 @@ The multi-app switching mechanism (what "another app is available" means, how th
 - **Arrows 3 and 4 wrap, as the screen does (12.2): previous from the first goes to the last playable item, empty and missing items are skipped.** They do not dim at the ends (a performance is a loop on stage; a dark button at the end reads as broken). They are off only when there is nothing to go to (under two playable items).
 - **Press feel.** An accepted press on 1 to 4 flashes the button white for one `stepFlashMs` (150) and returns to its steady light; a press the sink refuses (no other app, mode off) changes no light, as everywhere else (3.6 rule). While a preset switch is queued or loading, the button that was pressed (3 or 4) pulses at `queuedPulseHz` in white, the on-pad twin of the queued lamp and SWP badge. Button 8 needs no flash: its colour changes at once when the transport changes, which is the confirmation.
 - **Arrows 3 and 4 while a switch is queued step from the queued item**, so two presses skip two; the press that returns to the playing item cancels the queue (this replaces "press the current item to cancel", which had a pad for each item). The status line is unchanged (`Queued` / `4 Acid Line (...)`).
-- **Direct jump to preset n is gone** (the eight item pads are replaced by two arrows; Andy's table). The screen's `StepIndicator` still shows all eight lamps. `PerformanceItem(n)` stays in the `ControlAction` vocabulary for MIDI mapping; the Launchpad default no longer uses it.
+- **Rest light of 3 and 4 is not full white** (ruled 2026-10-14): a bright-white rest would hide a white press flash, so rest is white x 0.75 (`kArrowRestScale`) and the flash and queued pulse go to full white.
+- **Multi-app arrows 1 and 2 stay dark and inert until stage F1** of the architecture ruling ([design-plugin-family.md, Several apps, one pad](design-plugin-family.md)); until then only one app exists for the pad, so the "only app" rule above always applies.
+- **Provisional, awaiting Andy:** buttons 5 to 7 above, the loss of direct jump to item n, and Performance-mode entry and exit being screen-only. Andy has not adopted any of them yet.
+- **Probe demo.** `ProbeMain.cpp` still shows the old top row; it is stale and the coder should update it to this table.
+- **Direct jump to preset n is gone** (provisional; the eight item pads are replaced by two arrows; Andy's table). The screen's `StepIndicator` still shows all eight lamps. `PerformanceItem(n)` stays in the `ControlAction` vocabulary for MIDI mapping; the Launchpad default no longer uses it.
 - **Play / Stop and a clock owner.** Button 8 goes through `mu_core::resolveTransport` like the screen Play (12.7). When a host, MIDI clock or Link owns the transport, button 8 is a **static dim white and the press is ignored** (no flash, no action); grey is the one colour no other state uses. In the Standalone with the internal clock it is always green or red.
 - **Where Performance mode is entered and left.** Not on the pad. The device is in Programmer mode only while the mode is on (3.5, question 2), so there is no lit pad to press before the mode starts, and an exit by a stray pad press on stage is the failure the 1 s hold on the screen exists to prevent. **Enter and exit stay on the screen** (the Perf button, Ctrl+P, the hold to exit, design-ui-family 12.5). The old purple Performance-mode button is removed with no replacement.
 - **The logo (CC 99) stays unlit and has no action in version 1** (its press is still unverified on hardware, 3.5). The earlier logo-as-Play/Stop plan is superseded by button 8. The logo is the one remaining candidate for a "hold to leave Performance mode" later; not recommended (point above).
