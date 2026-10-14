@@ -32,12 +32,12 @@ ShellChrome::ShellChrome(juce::Component& hostComponent, mu_core::ShellBackend& 
     // Performance mode: the shield goes above everything; the toggle and the preset indicator stay
     // reachable through it. The live view is watched whenever the backend has one, and the mode is
     // acted on only when the backend supports it.
+    host.addChildComponent(frame);
     host.addChildComponent(shield);
     shield.addExempt(transportBar.getPerformToggle());
     shield.addExempt(transportBar.getStepIndicator());
-    // Play/Stop stays live in the mode, by pointer and by its key.
+    // Play/Stop stays live in the mode by pointer only; the keyboard is fully locked.
     shield.addExempt(transportBar.getPlayButton());
-    shield.onExemptKey = [this](const juce::KeyPress& k) { return handlePlayKey(k); };
     liveView = shellBackend.getLiveView();
     if (liveView != nullptr) liveView->addListener(this);
     syncPerformanceMode();
@@ -665,8 +665,8 @@ bool ShellChrome::isPerformanceKey(const juce::KeyPress& key) noexcept
 
 bool ShellChrome::keyPressed(const juce::KeyPress& key, juce::Component*)
 {
-    // Performance mode locks the keyboard too; only the play key still works, as the Play button does.
-    if (shieldUp) { handlePlayKey(key); return true; }
+    // Performance mode locks the whole keyboard (no performance keys, the play key included).
+    if (shieldUp) return true;
 
     // Don't intercept when a text editor has focus: it needs the key for input.
     auto* focused = juce::Component::getCurrentlyFocusedComponent();
@@ -685,14 +685,6 @@ bool ShellChrome::keyPressed(const juce::KeyPress& key, juce::Component*)
         return true;
     }
     return false;
-}
-
-// The play key, standalone only, same as the Play button; true when it was the play key.
-bool ShellChrome::handlePlayKey(const juce::KeyPress& key)
-{
-    if (! backend.isStandaloneApp() || key != keybindPlayStop) return false;
-    backend.toggleInternalPlay();
-    return true;
 }
 
 bool ShellChrome::keyStateChanged(bool, juce::Component*) { return false; }
@@ -737,9 +729,17 @@ bool ShellChrome::InputShield::hitTest(int x, int y)
     return true;
 }
 
+void ShellChrome::PerformanceFrame::paint(juce::Graphics& g)
+{
+    g.setColour(MuLookAndFeel::appAccent(*this).withAlpha(MuLookAndFeel::lighting().performanceRim));
+    g.drawRect(getLocalBounds(), mu_ui::s(MuLookAndFeel::kPerfFrameW));
+}
+
 void ShellChrome::raiseShield()
 {
-    if (shieldUp) shield.toFront(false);
+    if (! shieldUp) return;
+    frame.toFront(false);    // the frame sits just under the (invisible) shield, over every panel
+    shield.toFront(false);
 }
 
 // Reads the live state and raises or lowers the shield to match; the bar and sidebar follow the same state.
@@ -772,14 +772,17 @@ void ShellChrome::enterLock()
     // Phase 3: release focus, then raise the shield.
     juce::Component::unfocusAllComponents();
     shield.setBounds(host.getLocalBounds());
+    frame.setBounds(host.getLocalBounds());
     shield.setVisible(true);
-    shield.toFront(false);
+    frame.setVisible(true);
+    raiseShield();
     shield.grabKeyboardFocus();
 }
 
 void ShellChrome::leaveLock()
 {
     shield.setVisible(false);
+    frame.setVisible(false);
     host.grabKeyboardFocus();   // the play key works again
 }
 
@@ -899,6 +902,7 @@ void ShellChrome::resized()
 
     statusBar.setBounds(0, h - statusH, w, statusH);
     shield.setBounds(host.getLocalBounds());
+    frame.setBounds(host.getLocalBounds());
 }
 
 } // namespace mu_ui

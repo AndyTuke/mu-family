@@ -307,8 +307,8 @@ struct MuTheme
         float lampGapDarken      = 0.6f;    // lamp displays (step editor): gaps between lenses, base darkened by this
         float lampHotSpotReach   = 0.60f;   // lamp displays: hot-spot radius, fraction of the lit lens's longer side
 
-        // Performance mode: the rim along the transport bar's bottom edge (app accent), the queued
-        // item's pulse rate (the pad rate) and how long a newly current item's lamp flashes.
+        // Performance mode: the window frame's alpha (app accent), the lit Perf button's glow alpha, the
+        // queued item's pulse rate (the pad rate) and how long a newly current item's lamp flashes.
         float performanceRim     = 0.85f;
         float queuedPulseHz      = 2.0f;
         float stepFlashMs        = 150.0f;
@@ -319,6 +319,7 @@ struct MuTheme
         float grooveShade        = 0.45f;   // the dark line
         float grooveLight        = 0.09f;   // the light line
 
+        float performanceGlow    = 0.45f;
         // Round routing toggle (mu-Tant's filter Series / Parallel button)
         float routingFill        = 0.90f;   // disc fill, as a fraction of the app colour
         float routingHover       = 0.25f;   // brighter disc while hovered

@@ -38,6 +38,7 @@ int PerformanceChooserModel::libraryRowOfWorking() const
 
 bool PerformanceChooserModel::deleteFile(const juce::File& file)
 {
+    if (! isInFolder(file)) return false;   // only the performances folder is ever touched
     const bool wasWorking = (file == currentFile);
     if (! file.deleteFile()) return false;
     if (wasWorking) startNew();
@@ -51,13 +52,20 @@ void PerformanceChooserModel::startNew()
 {
     current     = {};
     currentFile = juce::File();   // (`= {}` is ambiguous between File's copy and move assignment on GCC)
+    importFile  = juce::File();
     dirty       = false;
+}
+
+bool PerformanceChooserModel::isInFolder(const juce::File& file) const
+{
+    return folder == juce::File() || file.getParentDirectory() == folder;
 }
 
 void PerformanceChooserModel::adopt(const mu_pp::PerformanceFile& list, const juce::File& where)
 {
     current     = list;
     currentFile = where;
+    importFile  = juce::File();
     dirty       = false;
 }
 
@@ -72,7 +80,14 @@ juce::String PerformanceChooserModel::open(const juce::File& file)
         case Result::UnknownFormat: return "made by a newer version";
         case Result::Invalid:       return "not a performance file";
     }
-    adopt(loaded, file);
+
+    // A file from outside the performances folder is an import: the list is a new, unsaved one, so Save
+    // writes a copy into the folder and the original is never modified, renamed or deleted.
+    if (isInFolder(file)) { adopt(loaded, file); return {}; }
+    current     = loaded;
+    currentFile = juce::File();
+    importFile  = file;
+    dirty       = true;
     return {};
 }
 
@@ -175,6 +190,7 @@ bool PerformanceChooserModel::save(const juce::String& name, const juce::String&
     const auto old = currentFile;
     current     = toWrite;
     currentFile = target;
+    importFile  = juce::File();   // now a saved copy in the folder
     dirty       = false;
     if (old != juce::File() && old != target) old.deleteFile();
     rescan();

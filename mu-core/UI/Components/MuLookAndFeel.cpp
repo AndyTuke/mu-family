@@ -1126,9 +1126,33 @@ void MuLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& button
         borderColour = colour(indicatorFault);
     }
 
+    // Lit-lamp face (the Perf toggle while Performance mode is on): app accent at full strength with a
+    // lampBase border. A rising "muFill" wipes it dark from the right, so the lit part shrinks as the
+    // exit hold progresses.
+    const float fill = juce::jlimit(0.0f, 1.0f, (float) button.getProperties().getWithDefault("muFill", 0.0f));
+    if (on && (bool) button.getProperties().getWithDefault("muLit", false))
+    {
+        auto dark = button.findColour(juce::TextButton::buttonColourId);
+        if (isDown) dark = dark.brighter(0.15f);
+        else if (isOver) dark = dark.brighter(0.08f);
+        g.setColour(dark);
+        g.fillRoundedRectangle(bounds, 3.0f);
+        {
+            juce::Graphics::ScopedSaveState state(g);
+            g.reduceClipRegion(bounds.withWidth(bounds.getWidth() * (1.0f - fill)).getSmallestIntegerContainer());
+            auto lit = appAccent(button);
+            if (isDown) lit = lit.brighter(0.15f);
+            else if (isOver) lit = lit.brighter(0.08f);
+            g.setColour(lit);
+            g.fillRoundedRectangle(bounds, 3.0f);
+        }
+        g.setColour(lampBase());
+        g.drawRoundedRectangle(bounds, 3.0f, 1.0f);
+        return;
+    }
+
     // Progress fill (a press-and-hold button, e.g. leaving Performance mode): the face shows its
     // resting colour and the lit colour fills it from the left as the "muFill" property rises 0..1.
-    const float fill = juce::jlimit(0.0f, 1.0f, (float) button.getProperties().getWithDefault("muFill", 0.0f));
     if (fill > 0.0f)
     {
         bgColour = button.findColour(juce::TextButton::buttonColourId);
@@ -1149,12 +1173,21 @@ void MuLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& button
     g.drawRoundedRectangle(bounds, 3.0f, 1.0f);
 }
 
+// Halo around a lit control, drawn behind it by its parent (a button cannot paint outside its own bounds).
+void MuLookAndFeel::drawLitGlow(juce::Graphics& g, juce::Rectangle<int> r, juce::Colour accent, int radius)
+{
+    juce::DropShadow(accent.withAlpha(lighting().performanceGlow), radius, {}).drawForRectangle(g, r);
+}
+
 void MuLookAndFeel::drawButtonText(juce::Graphics& g, juce::TextButton& button,
                                     bool /*isOver*/, bool /*isDown*/)
 {
     const bool on = button.getToggleState();
     // Respect per-button text colour overrides (e.g. playBtn.setColour(textColourOffId, ...)).
-    g.setColour(on && button.getProperties().contains("muDanger") ? colour(indicatorFault)
+    const bool lit = on && (bool) button.getProperties().getWithDefault("muLit", false);
+    const float wipe = (float) button.getProperties().getWithDefault("muFill", 0.0f);
+    g.setColour(lit ? (wipe < 0.5f ? lampBase() : button.findColour(juce::TextButton::textColourOnId))   // dark text on the lit part, normal on the wiped part
+                : on && button.getProperties().contains("muDanger") ? colour(indicatorFault)
                 : on ? button.findColour(juce::TextButton::textColourOnId)
                      : button.findColour(juce::TextButton::textColourOffId));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(12.0f)));

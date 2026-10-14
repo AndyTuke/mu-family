@@ -299,6 +299,9 @@ struct PerformanceModeShellTests : juce::UnitTest
             expectEquals(sink.seen[0].layer, 2);
             expectEquals(rig.live.getSelectedLayer(), 2);
             expect(perf->getToggleState(), "the toggle is lit");
+            expectEquals(perf->getButtonText(), juce::String("LIVE"));
+            expect((bool) perf->getProperties().getWithDefault("muLit", false), "the lit face is asked for");
+            expectEquals(perf->getWidth(), mu_ui::s(MuLookAndFeel::kPerfBtnW));
             expect(! newBtn->isVisible() && ! saveBtn->isVisible() && bar.getStepIndicator().isVisible(), "indicator replaces the group");
             expect(bar.getStepIndicator().getWidth() > 0 && bar.getStepIndicator().getRight() <= perf->getX(), "indicator sits left of Perf");
             expectEquals(bar.getStepIndicator().getNumLamps(), 8);
@@ -347,6 +350,8 @@ struct PerformanceModeShellTests : juce::UnitTest
             expect(sink.seen.back().type == ControlActionType::PerformanceMode && sink.seen.back().index == 0, "asked to leave");
             expect(fill() == 0.0f && ! bar.isExitHolding(), "fill reset");
             expect(! perf->getToggleState() && findButton(bar, "New")->isVisible() && ! bar.getStepIndicator().isVisible(), "preset group is back");
+            expectEquals(perf->getButtonText(), juce::String("Perf"));
+            expect(! (bool) perf->getProperties().getWithDefault("muLit", false), "no longer lit");
 
             perf->onClick();   // the release that ends the hold must not enter again
             expect(! bar.isPerformanceMode(), "the click after a completed hold is ignored");
@@ -445,6 +450,23 @@ struct PerformanceModeShellTests : juce::UnitTest
             expect(shieldOnTop(), "still topmost");
             chrome.setMainArea(&sidebar, &mainPanel);
 
+            expect(chrome.getPerformanceFrame().isVisible() && chrome.getPerformanceFrame().getBounds() == host.getLocalBounds(),
+                   "the frame covers the editor edge");
+            expect(! chrome.getPerformanceFrame().hitTest(1, 1) && ! chrome.getPerformanceFrame().hitTest(host.getWidth() / 2, 1),
+                   "and takes no input");
+            {
+                // The frame paints the edge in the accent and leaves the middle alone.
+                mu_ui::ShellChrome::PerformanceFrame probe;
+                probe.setBounds(0, 0, 200, 120);
+                juce::Image img(juce::Image::ARGB, 200, 120, true);
+                { juce::Graphics g(img); probe.paint(g); }   // the context is released before the pixels are read
+                const int fw = mu_ui::s(MuLookAndFeel::kPerfFrameW);
+                expect(img.getPixelAt(0, 60).getAlpha() > 0, "the edge is painted");
+                expect(img.getPixelAt(fw - 1, 60).getAlpha() > 0, "3 px wide");
+                expect(img.getPixelAt(fw + 1, 60).getAlpha() == 0, "and no wider");
+                expect(img.getPixelAt(100, 60).getAlpha() == 0, "the middle is clear");
+            }
+
             beginTest("shield: hit testing lets only the exempt components through");
             auto centreOf = [&](juce::Component& c) { return host.getLocalPoint(&c, c.getLocalBounds().getCentre()); };
             const auto mainCentre = host.getLocalPoint(&mainPanel, mainPanel.getLocalBounds().getCentre());
@@ -482,11 +504,11 @@ struct PerformanceModeShellTests : juce::UnitTest
             play.setVisible(true);
             expect(host.getComponentAt(centreOf(play)) == &play, "visible again: live");
 
-            beginTest("shield: every key does nothing while on, the play key and Ctrl+P included");
+            beginTest("shield: every key does nothing while on, Space and Ctrl+P included");
             const juce::KeyPress space(juce::KeyPress::spaceKey), ctrlP('p', juce::ModifierKeys::ctrlModifier, 0);
             const bool playing0 = b.playing;
-            expect(chrome.keyPressed(space, nullptr) && b.playing != playing0, "space still plays and stops, like the Play button");
-            expect(chrome.getInputShield().keyPressed(space) && b.playing == playing0, "the focused shield passes it on too");
+            expect(chrome.keyPressed(space, nullptr) && b.playing == playing0, "space is swallowed: no performance keys");
+            expect(chrome.getInputShield().keyPressed(space) && b.playing == playing0, "the focused shield swallows it too");
             expect(chrome.keyPressed(juce::KeyPress('x'), nullptr) && b.playing == playing0, "other keys do nothing");
             expect(chrome.keyPressed(ctrlP, nullptr) && chrome.isPerformanceLocked(), "Ctrl+P is swallowed and does not leave");
             expect(chrome.keyPressed(juce::KeyPress(juce::KeyPress::escapeKey), nullptr), "Escape is swallowed");
@@ -496,6 +518,7 @@ struct PerformanceModeShellTests : juce::UnitTest
             rig.live.perform(act(ControlActionType::PerformanceMode, 0, 0));
             expect(! chrome.isPerformanceLocked() && ! chrome.getInputShield().isVisible(), "unlocked");
             expect(host.getComponentAt(mainCentre) != &chrome.getInputShield(), "the panel gets the pointer again");
+            expect(! chrome.getPerformanceFrame().isVisible(), "the frame is gone");
             b.playing = false;
             expect(chrome.keyPressed(space, nullptr) && b.playing, "space plays");
 

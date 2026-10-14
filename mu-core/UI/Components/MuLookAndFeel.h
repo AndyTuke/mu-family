@@ -240,6 +240,8 @@ public:
     // base by `lit` (Lighting lampOff / lampDim / lampOn); drawLamp fills `shape` with that lens,
     // brighter at `centre` where the light sits behind it.
     static juce::Colour lampBase();
+    // The accent halo behind a lit control (Lighting::performanceGlow), `radius` px wide.
+    static void drawLitGlow(juce::Graphics& g, juce::Rectangle<int> r, juce::Colour accent, int radius);
     static juce::Colour lampColour(juce::Colour clr, float lit);
     static void drawLamp(juce::Graphics&, const juce::Path& shape, const juce::AffineTransform&,
                          juce::Colour lens, juce::Point<float> centre, float hotRadius);
@@ -708,11 +710,12 @@ public:
     static constexpr float kLampCurveW     = 1.8f;
     static constexpr int   kStatusLampD    = 8;      // StatusLamp disc diameter
 
-    // Performance mode (docs/design-ui-family.md section 12): the Perf toggle, the accent rim under the
-    // transport bar, the exit hold, the indicator's lamp spacing and gap, and how long a performance
+    // Performance mode (docs/design-ui-family.md section 12): the Perf toggle, the accent frame round the
+    // editor and the lit Perf button's glow, the exit hold, the indicator's lamp spacing and gap, and how long a performance
     // status line stays up.
     static constexpr int kPerfBtnW       = 44;
-    static constexpr int kPerfRimH       = 2;
+    static constexpr int kPerfFrameW     = 3;      // the window frame's width (scaled)
+    static constexpr int kPerfGlowR      = 4;      // the lit Perf button's glow radius (scaled)
     static constexpr int kPerfExitHoldMs = 1000;
     static constexpr int kPerfStatusMs   = 3000;
     static constexpr int kModDestMaxW    = 240;    // widest a modulation row's destination selector grows; the amount slider takes the rest

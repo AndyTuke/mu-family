@@ -58,13 +58,23 @@ public:
         void mouseDoubleClick(const juce::MouseEvent&) override {}
         void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override {}   // the default forwards to the parent
         void mouseMagnify(const juce::MouseEvent&, float) override {}
-        // Every key is swallowed; the one a product exempts (the play key) is offered to this first.
-        bool keyPressed(const juce::KeyPress& key) override { if (onExemptKey) onExemptKey(key); return true; }
-        std::function<bool(const juce::KeyPress&)> onExemptKey;
+        // Every key is swallowed, with no exception.
+        bool keyPressed(const juce::KeyPress&) override { return true; }
     private:
         std::vector<juce::Component::SafePointer<juce::Component>> exempt;
     };
 
+    // The steady accent frame round the editor edge while the mode is on. It paints over everything but
+    // takes no input (hitTest false), so it is not part of the shield and changes no layout.
+    class PerformanceFrame : public juce::Component
+    {
+    public:
+        PerformanceFrame() { setInterceptsMouseClicks(false, false); }
+        bool hitTest(int, int) override { return false; }
+        void paint(juce::Graphics& g) override;
+    };
+
+    PerformanceFrame& getPerformanceFrame() noexcept { return frame; }
     InputShield& getInputShield() noexcept { return shield; }
     bool isPerformanceLocked() const noexcept { return shieldUp; }
     // Lets the pointer through the shield over `c` (the Play button, the sidebar's layer indicator).
@@ -221,13 +231,13 @@ private:
     juce::TooltipWindow     tooltipWindow;   // parents itself to the host in its constructor
     void fadeSwitch(juce::Component* outgoing, juce::Component* incoming, int durationMs = 80);
 
-    InputShield shield;
-    bool        shieldUp = false;
+    InputShield      shield;
+    PerformanceFrame frame;
+    bool             shieldUp = false;
     const mu_core::LiveView* liveView = nullptr;
     void liveStateChanged() override { syncPerformanceMode(); }
     void enterLock();     // closes everything open as a cancel, releases text focus, raises the shield
     void leaveLock();
-    bool handlePlayKey(const juce::KeyPress& key);
     void raiseShield();   // back on top after a child was added above it
 
     std::atomic<bool> upgradeAvailable { false };

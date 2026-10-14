@@ -301,6 +301,8 @@ void TransportBar::syncPerformance()
         if (! on) { cancelExitHold(); shownQueued = {}; shownRevision = 0xffffffffu; clearLostLine(); }
         else      { shownRevision = 0xffffffffu; }   // rebuild the indicator on entry
         perfBtn.setToggleState(on, juce::dontSendNotification);
+        perfBtn.setButtonText(on ? "LIVE" : "Perf");
+        perfBtn.getProperties().set("muLit", on);
         perfBtn.setTooltip(on ? "Hold to leave Performance mode" : "Performance mode (Ctrl+P)");
         updatePresetGroupVisibility();
         relayout = true;
@@ -674,12 +676,9 @@ void TransportBar::paint(juce::Graphics& g)
     g.drawText(logoText, mu_ui::s(8), 0, mu_ui::s(kLogoW - 8), getHeight(),
                juce::Justification::centredLeft, false);
 
-    // Performance mode: a lit line in the app accent along the bar's bottom edge.
-    if (modeShown)
-    {
-        g.setColour(MuLookAndFeel::appAccent(*this).withAlpha(MuLookAndFeel::lighting().performanceRim));
-        g.fillRect(0, getHeight() - mu_ui::s(MuLookAndFeel::kPerfRimH), getWidth(), mu_ui::s(MuLookAndFeel::kPerfRimH));
-    }
+    // Performance mode: the lit Perf button's glow, behind the button and clipped to the bar.
+    if (modeShown && perfBtn.isVisible())
+        MuLookAndFeel::drawLitGlow(g, perfBtn.getBounds(), MuLookAndFeel::appAccent(*this), mu_ui::s(MuLookAndFeel::kPerfGlowR));
 }
 
 void TransportBar::resized()

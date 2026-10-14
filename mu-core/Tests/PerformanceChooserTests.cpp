@@ -657,6 +657,50 @@ struct PerformanceChooserTests : juce::UnitTest
             expect(! file.existsAsFile() && ! m.hasFile(), "deleted, list is new again");
         }
 
+        beginTest("import: a file from outside the performances folder loads as an unsaved list; Save writes a copy, the original is untouched");
+        {
+            ScaleGuard g;
+            Rig r;
+            r.chrome->showPerformanceChooser();
+            auto& m = r.chooser().getModel();
+
+            // A performance saved outside the folder (a model whose folder is elsewhere).
+            const auto elsewhere = r.folders.root.getChildFile("Elsewhere");
+            PerformanceChooserModel ext;
+            ext.setContext(elsewhere, r.folders.presets, "MuTantState");
+            ext.startNew();
+            ext.setItem(0, r.folders.preset("Alpha"));
+            expect(ext.save("Outside", "d"), "saved outside");
+            const auto original = ext.workingFile();
+            const auto before = original.loadFileAsString();
+
+            r.chooser().onChooseFile = [&](const juce::File&, std::function<void(const juce::File&)> chosen) { chosen(original); };
+            r.chooser().actionLoad();
+            expect(m.isImport() && ! m.hasFile() && m.isDirty(), "an unsaved import, no file of its own");
+            expectEquals(m.working().count(), 1);
+            expect(m.importSource() == original, "remembers where it came from");
+            expect(! findButton(r.chooser(), "Rename")->isEnabled() && ! findButton(r.chooser(), "Delete")->isEnabled(),
+                   "Rename and Delete have nothing to touch");
+            expect(! m.deleteFile(original) && original.existsAsFile(), "a file outside the folder is never deleted");
+
+            r.chooser().actionSave();
+            expect(r.chooser().getSaveDialog().isVisible(), "Save asks for a name for the copy");
+            r.chooser().getSaveDialog().onSave("Outside", "d", "", false);
+            expect(dialogCount(r.host) == 0 && m.hasFile() && ! m.isImport() && ! m.isDirty(), "saved");
+            expect(m.workingFile() == r.folders.performances().getChildFile("Outside.muPerformance"), "the copy is in the folder");
+            expect(m.workingFile().existsAsFile() && original.loadFileAsString() == before, "original unchanged");
+            expect(m.workingFile() != original, "and not the working file");
+
+            // The same import again: the name is taken in the folder, so Save asks to overwrite.
+            r.chooser().actionLoad();
+            expect(m.isImport(), "imported again");
+            r.chooser().actionSave();
+            r.chooser().getSaveDialog().onSave("Outside", "d", "", false);
+            expectEquals(dialogCount(r.host), 1);
+            expect(answerDialog(r.host, "Overwrite"), "overwrite prompt on a name clash");
+            expect(original.loadFileAsString() == before, "original still unchanged");
+        }
+
         beginTest("actions: saving over another performance's name asks to overwrite");
         {
             ScaleGuard g;

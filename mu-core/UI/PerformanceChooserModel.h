@@ -36,16 +36,22 @@ public:
     int libraryRowOfWorking() const;
     // Deletes a saved performance's file; if it is the working copy's file the working copy becomes a new one.
     bool deleteFile(const juce::File& file);
+    // True when `file` lives in the performances folder (or no folder is set).
+    bool isInFolder(const juce::File& file) const;
 
     // ─── The working copy ────────────────────────────────────────────────────
     const mu_pp::PerformanceFile& working() const noexcept     { return current; }
     const juce::File&             workingFile() const noexcept { return currentFile; }
     bool                          isDirty() const noexcept     { return dirty; }
     bool                          hasFile() const noexcept     { return currentFile != juce::File(); }
+    // True while the list was loaded from outside the performances folder and not yet saved into it.
+    bool                          isImport() const noexcept    { return importFile != juce::File(); }
+    const juce::File&             importSource() const noexcept { return importFile; }
 
     void startNew();                                                  // an empty, unsaved list
     void adopt(const mu_pp::PerformanceFile& list, const juce::File& where);   // the list already in use, as saved
-    juce::String open(const juce::File& file);                       // loads a saved one; "" or why not
+    // Loads a saved one; "" or why not. A file outside the performances folder is an import (isImport()).
+    juce::String open(const juce::File& file);
 
     // ─── Items ───────────────────────────────────────────────────────────────
     bool isUsed(int row) const noexcept;
@@ -81,6 +87,7 @@ private:
     std::vector<Entry>     entries;
     mu_pp::PerformanceFile current;
     juce::File             currentFile;
+    juce::File             importFile;   // the outside file an import came from (never written)
     bool                   dirty = false;
 };
 
