@@ -26,6 +26,10 @@ The web host limits how much deploy work we can use. So:
 3. Publish only when the owner or the main conversation says to, as **one batched push** that includes every pending site change. Before pushing, check the whole site: links, no stale pricing or demo wording (`grep -rn -i "£25\|demo\|proprietary" site/`), pages load without console errors if you can check, and a quick look at mobile width.
 4. A push to the repo's main branch may trigger a host deploy for code-only commits too. If the host has no "skip unless `site/` changed" rule, say so and ask the owner to add an ignore rule (a `netlify.toml` build `ignore` command) rather than relying on pushing less.
 
+## Local preview (owner, 2026-10-14)
+
+Deploys cost credits, so look at the site locally first. Run `pwsh tests/scripts/serve-site.ps1` from the repo root, open http://localhost:8080, and check the changed pages (and mobile width) there. Ctrl+C stops it. Publish only on Andy's word. Never put preview tooling inside `site/`, because everything there deploys.
+
 ## Method
 
 - Read the page and its neighbours before editing; reuse existing classes and components, don't fork styles.
