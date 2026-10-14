@@ -38,6 +38,8 @@ public:
         return true;
     }
 
+    void flush() override { ++flushCalls; sentAtFlush = sent.size(); closesAtFlush = closeCalls; }
+
     void inject(const std::vector<uint8_t>& bytes) { if (opened && onBytes) onBytes(bytes.data(), bytes.size()); }
 
     void unplug()
@@ -57,7 +59,9 @@ public:
     juce::StringArray inputs  { "LPX MIDI", "MIDIIN2 (LPX MIDI)" };
     std::vector<std::vector<uint8_t>> sent;
     PortSpec lastSpec;
-    int  openCalls = 0, closeCalls = 0;
+    int  openCalls = 0, closeCalls = 0, flushCalls = 0;
+    size_t sentAtFlush = 0;    // messages sent when flush() ran
+    int    closesAtFlush = 0;  // closes already done when flush() ran (must be 0: flush comes before close)
     bool connected = true;
 
 private:

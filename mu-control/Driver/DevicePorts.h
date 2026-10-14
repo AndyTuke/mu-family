@@ -39,6 +39,10 @@ public:
     virtual bool send(const uint8_t* data, size_t size) = 0;
     bool sendMessage(const std::vector<uint8_t>& bytes) { return send(bytes.data(), bytes.size()); }
 
+    // Blocks until messages already sent have left for the device; a driver calls it before close() so a final message
+    // (the return to the device's own mode) is not lost to the port being torn down. Nothing to wait for by default.
+    virtual void flush() {}
+
     // Raw bytes of one received message, called on the MIDI thread.
     std::function<void(const uint8_t* data, size_t size)> onBytes;
 

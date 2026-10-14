@@ -27,6 +27,7 @@ public:
     bool isConnected() const override { return isOpen() && attached; }
 
     bool send(const uint8_t* data, size_t size) override;
+    void flush() override;
 
 private:
     bool openPorts(const PortSpec& spec);

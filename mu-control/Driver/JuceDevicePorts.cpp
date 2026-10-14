@@ -6,6 +6,7 @@ namespace mu_control
 namespace
 {
 constexpr int kWatchMs  = 500;    // how often the opened device's presence is checked
+constexpr int kFlushMs  = 60;     // let the OS deliver a final SysEx before the port handle is destroyed
 constexpr int kSettleMs = 1000;   // after a replug the pad needs a moment to boot before it accepts setup messages
 }
 
@@ -95,6 +96,13 @@ bool JuceDevicePorts::send(const uint8_t* data, size_t size)
     if (output == nullptr || ! attached || data == nullptr || size == 0) return false;
     output->sendMessageNow(juce::MidiMessage(data, (int) size));
     return true;
+}
+
+void JuceDevicePorts::flush()
+{
+    // sendMessageNow returns once the driver has the bytes, not once the device has them; closing straight after
+    // can drop the last message (Windows MIDI services hand SysEx on asynchronously). Only used on the way out.
+    if (output != nullptr && attached) juce::Thread::sleep(kFlushMs);
 }
 
 void JuceDevicePorts::handleIncomingMidiMessage(juce::MidiInput*, const juce::MidiMessage& message)

@@ -223,6 +223,9 @@ public:
                 expect(ports.sent[1] == kProgrammerOff);
             }
             expectEquals(ports.closeCalls, 1);
+            expectEquals(ports.flushCalls, 1);
+            expectEquals((int) ports.sentAtFlush, 2);   // both messages were out when flushed
+            expectEquals(ports.closesAtFlush, 0);        // and the flush came before the ports closed
             expect(! ports.onBytes && ! ports.onConnectionChanged, "callbacks released");
 
             ports.sent.clear();

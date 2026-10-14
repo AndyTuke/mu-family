@@ -334,6 +334,9 @@ public:
             expect(r.status() == ControlStatus::Released);
             expect(r.ports->sent.back() == kProgrammerOff);
             expectEquals(count(r.ports->sent, kProgrammerOff), 1);
+            expectEquals(r.ports->flushCalls, 1);          // flushed once, before the ports closed
+            expectEquals(r.ports->closesAtFlush, 0);
+            expectEquals((int) r.ports->sentAtFlush, (int) r.ports->sent.size());
 
             r.manager->closeNow();   // repeating it (the shell calls it on more than one path) changes nothing
             expectEquals(count(r.ports->sent, kProgrammerOff), 1);

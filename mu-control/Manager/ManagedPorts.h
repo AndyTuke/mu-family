@@ -46,6 +46,7 @@ public:
     bool isOpen() const override      { return inner.isOpen(); }
     bool isConnected() const override { return inner.isConnected(); }
     bool send(const uint8_t* data, size_t size) override { return inner.send(data, size); }
+    void flush() override { inner.flush(); }
 
     // Called on the message thread after the driver has seen a connection change (the driver's own
     // onConnectionChanged runs first).

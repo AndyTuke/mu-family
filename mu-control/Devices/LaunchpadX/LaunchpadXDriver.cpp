@@ -63,6 +63,7 @@ void LaunchpadXDriver::close()
         for (int i = 0; i < 8; ++i) off.push_back({ { ControlKind::Side, 0, i }, 0, LedMode::Static });
         sendLights(off);
         ports->sendMessage(launchpadx::programmerMode(false));
+        ports->flush();   // the Live-mode message must reach the pad before the port is torn down
     }
 
     // Close first (it stops the input thread), then drop the callbacks: clearing them while the MIDI thread
