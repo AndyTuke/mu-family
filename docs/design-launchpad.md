@@ -281,7 +281,7 @@ the colours the controller can show, and stick to common hues** so most other pa
 will not match exactly; a common hue still degrades gracefully).
 
 **Today:** the family has one shared 8-colour layer palette, `MuLookAndFeel::layerPalette` (Red, Cyan, Orange,
-Magenta, Lime, Rose, Silver, Copper), used by all four products and documented in
+Magenta, Lime, Rose, Silver, Navy; Navy replaced Copper, see the decision below), used by all four products and documented in
 [design-ui-family.md](design-ui-family.md). The Launchpad X palette (128 fixed colours, sampled from the manual's
 picture; the picture's RGB is an illustration, **not** a measurement of the real LEDs) gives these matches:
 
@@ -294,14 +294,30 @@ picture; the picture's RGB is an illustration, **not** a measurement of the real
 | Lime `#A6D63A` | 75 (`#C7FE6D`) | Good. |
 | Rose `#F07CA6` | 57 (`#FF5EC5`) | Good; keep distinct from Magenta on the pad. |
 | Silver `#C9CCD1` | 2 (`#DDDDDD`) | Fair (a grey LED reads as white). |
-| **Copper** `#B87445` | 11 (`#B4765D`) | **Poor**: brown does not exist on an LED pad; it would look like a dim orange, next to Orange. |
+| ~~Copper `#B87445`~~ (replaced) | 11 (`#B4765D`) | **Poor**: brown does not exist on an LED pad; it looked like a dim orange, next to Orange. |
 
-**Recommendation:** keep the shared palette, but **re-pick each colour so its on-screen value is exactly a Launchpad
-palette entry**, and **replace Copper with Blue** (entry 45, `#5B5DFD`), a hue every RGB pad has. Seven of the eight keep
-their hue, so saved colour indices keep meaning (a voice saved with index 7 just becomes blue). Open check: blue and
-three other common hues are also the **app primary** colours the palette was built to avoid (so a layer highlight
-does not blend into its app's paint, see `MuTheme::AppPrimaries`); try the new set on screen on the build PC before
-committing to it.
+**Decided (2026-10-14, Andy, tuned by eye on the real pad):**
+- **Layer 8 is Navy `#2B3FD6`** (`layerPalette[7]`), replacing Copper; the other seven keep their hue and on-screen value, so saved colour indices keep meaning (a voice saved with index 7 just becomes navy). The earlier plan to re-pick every screen colour to a palette entry and use Blue is dropped: the screen colours stay as designed and the **device corrects them instead**.
+- **Device colour correction.** `mu-control/Devices/LaunchpadX/LaunchpadXColourMap.h` maps a screen colour to a tuned pad RGB (the pad's LEDs are not the screen's colours); the **dim level is applied after the correction**. Colours not in the table pass through unchanged. The correction belongs to the Launchpad X driver, never to `mu-core`.
+- **Dim level is `MuTheme::Lighting::padDimScale` = 0.20** (was 0.45, then 0.30 proposed; the correction makes the dim read brighter on the pad, so a lower scale is right).
+- The table below was tuned by eye by Andy on the real pad and approved; he may revisit it once control works. Screen colour, pad RGB (bright), pad RGB at dim 0.20:
+
+| Colour | Screen | Pad (bright) | Pad (dim) |
+|---|---|---|---|
+| Red | `E5484D` | `FF0004` | `330001` |
+| Cyan | `2EC4C9` | `00FFCF` | `003329` |
+| Orange | `F28C28` | `FF7700` | `331800` |
+| Magenta | `D04FC8` | `FF0084` | `33001A` |
+| Lime | `A6D63A` | `8BFF00` | `1C3300` |
+| Rose | `F07CA6` | `FF4656` | `330E11` |
+| Silver | `C9CCD1` | `B39A6D` | `241F16` |
+| Navy | `2B3FD6` | `0000B4` | `000024` |
+| Purple (mu-Tant primary) | `7F77DD` | `2400FF` | `070033` |
+| Green (mu-Clid primary) | `4ADC8E` | `50FF00` | `103300` |
+| Blue (mu-On primary) | `3D8BEB` | `1028FF` | `030833` |
+| Yellow (mu-Toni primary) | `F2C53D` | `FFD700` | `332B00` |
+
+The four app primaries are in the table because the top row and the app-accent pads use them. Open check, kept: the layer colours must stay distinct from the app primaries on screen (`MuTheme::AppPrimaries`); Navy against the Blue primary differs by lightness (see the design-ui-family §8 note).
 
 **Where the mapping lives (one-framework rule):**
 - `mu-core` keeps the layer palette and gives each entry a **hue name** (red, orange, lime, cyan, blue, magenta, rose,
@@ -371,7 +387,7 @@ tests are in `mu-control-tests` unless stated; every stage ends with `check-core
 - **`ManagedPorts`** (`Manager/ManagedPorts.h`) wraps the driver's `DevicePorts`: the MIDI thread writes each message (3 bytes; longer ones such as SysEx replies are dropped) into a 256-slot lock-free FIFO and triggers an `AsyncUpdater`; connection changes use a short locked list; the message thread delivers connection changes first, then bytes, in order. `close()` stops the input first and drops everything pending, so nothing reaches a closed driver. This is the serialisation M2 asked of the manager: the driver and model run on the message thread only.
 - **Lifetime.** `ControllerManager` opens the device only while `wantOpen()` (Performance mode on, not released, not quitting); a 1 Hz scan runs only while the device is not in use and reads port names without opening; the blink timer (about 30 Hz) runs only while a pad pulses. Release, leaving the mode, destruction and the quit hook all end in `closeDevice()`: pads dark, Live mode, ports closed. `Lost` is reported only for a device that was open and vanished.
 - **Probe.** `mu-control-probe` (`mu-control/Tools/`, `EXCLUDE_FROM_ALL`, a developer console app, never shipped): port listing, numbered lighting and input steps, a manager demo and a colour lab, run by hand with the pad connected.
-- **Dim level.** Chosen by eye on the pad: **0.45** (`MuTheme::Lighting::padDimScale` and the `SurfaceLook::dimScale` default); 0.30 was too dark to read.
+- **Dim level.** Chosen by eye on the pad: first 0.45 (0.30 was too dark to read on the uncorrected colours); **superseded 2026-10-14: 0.20** (`MuTheme::Lighting::padDimScale` and the `SurfaceLook::dimScale` default), applied after the device colour correction (§3.2b).
 - **The quit hook** was ruled 2026-10-14 (design-plugin-family, Controller library item 4) and is built in M4.
 
 **M4 as built (2026-10-14; architecture review Pass with minors, hardware acceptance pending).**
@@ -429,7 +445,7 @@ From a throwaway JUCE 9.0.3 probe on Windows 11 with Windows MIDI Services runni
 - **RGB lighting layout** `F0 00 20 29 02 0C 03 <03 idx r g b>... F7` works, including a full **80-entry batch** in one message (64 pads, 8 top, 8 side); all-pads-off before Live mode leaves the pads dark.
 - **Input decode** of pads (note 10*row + col), top row (CC 91-98) and side column (CC 19..89) matches the driver's numbering; press and release values as recorded above (pad release is velocity 0, buttons 127 / 0).
 - **Live mode is restored** on every exit path the manager has (leave Performance mode, Release, destruction, quit hook).
-- **Dim level:** 0.45 chosen by eye (0.30 too dark).
+- **Dim level:** 0.45 chosen by eye at that time (0.30 too dark); now 0.20 after the colour correction, see §3.2b.
 - **Not yet recorded:** the logo press (CC 99) value, the palette fallback forms (static, flashing, pulsing in RGB-less mode), a DAW holding the ports, and the screen-versus-pad colour match (judged by eye with the probe colour lab and ControlDesign's Surface colours window).
 - **Sharing (R2, R5).** Two processes opened the same input and output pair at once without failure, so a plugin-hosted driver beside a standalone one is feasible here. A WinMM-only machine was not tested.
 
@@ -495,7 +511,7 @@ existing **hot-swap**; pad lights are playing = bright, available = dim, empty =
 
 1. **Transport and Panic on the surface?** Recommendation: neither in version 1 (3.6). If wanted: the logo button as play / stop, greyed when a clock owns the tempo; Panic never on a pad.
 2. **When does the device enter Programmer mode?** Recommendation: only while Performance mode is on (the device is a normal Launchpad the rest of the time and a crash cannot strand it in our mode, R1). The alternative is at app start whenever a device is found, so the pads light before you enter the mode; it needs the Release button to be the real escape.
-3. **Dim level 0.30 and own-timer blink** are by-eye choices; confirm or adjust on the pad (R8, #1274).
+3. **Dim level (now 0.20, see §3.2b) and own-timer blink** are by-eye choices; confirm or adjust on the pad (R8, #1274).
 4. **Top-row colour:** the app accent (as the screen lamps). On the pad the app accent of mu-Clid (teal) and the layer colour cyan can look alike; if so on the real LEDs, say so and the top row moves to white (palette 3 / RGB neutral) for all apps.
 5. **A distinct "parsing" cue** on a top-row pad (for a slow preset load) is not in version 1; revisit after the load-time measurement (R6, R7).
 - Which other actions matter live besides clip launch and mute: tempo, a filter sweep on a pad?
