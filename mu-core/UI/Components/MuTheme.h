@@ -194,7 +194,7 @@ struct MuTheme
         juce::Colour yellow            { 0xffF2C53D };
     } apps;
 
-    // ── Control-surface colours ─────────────────────────────────────────
+    // ── Control-surface colours ───────────────────────────────────────────
     // Colours a controller pad shows that are not an app accent, layer colour or fault red
     // (read by SurfaceLookFromTheme). Untuned on a real pad.
     struct SurfaceColours
@@ -319,6 +319,7 @@ struct MuTheme
         // Performance mode: the window frame's alpha (app accent), the lit Perf button's glow alpha, the
         // queued item's pulse rate (the pad rate) and how long a newly current item's lamp flashes.
         float performanceRim     = 0.85f;
+        float performanceGlow    = 0.45f;
         float queuedPulseHz      = 2.0f;
         float stepFlashMs        = 150.0f;
         float clipMutedFlashHz   = 1.0f;    // a muted layer's playing clip: square bright / dim flash rate (pad and screen)
@@ -328,7 +329,6 @@ struct MuTheme
         float grooveShade        = 0.45f;   // the dark line
         float grooveLight        = 0.09f;   // the light line
 
-        float performanceGlow    = 0.45f;
         // Round routing toggle (mu-Tant's filter Series / Parallel button)
         float routingFill        = 0.90f;   // disc fill, as a fraction of the app colour
         float routingHover       = 0.25f;   // brighter disc while hovered
