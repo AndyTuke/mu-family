@@ -97,6 +97,11 @@ public:
     void saveLayerPreset(int layer, const juce::String& name) override;
     void loadLayerPreset(int layer, const juce::File& file) override;
 
+    juce::ValueTree captureLayerPresetTree(int layer) override;
+protected:
+    void stageLayerPresetTree(int layer, juce::ValueTree tree, bool keepIdentity) override;
+public:
+
     // Hot-swap: a preset loaded while the transport runs is staged and applied at the next bar
     // line (or at once when playback stops); loaded while stopped, it applies at once.
     // (The staging itself is ProcessorBase::layerSwapper.)

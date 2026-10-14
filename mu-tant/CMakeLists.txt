@@ -190,6 +190,7 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/NoDemoCapsTests.cpp      # unlicensed is fully functional: 8 voices, long gates, saves
     Source/Tests/ProcessorSeamTests.cpp    # the real PluginProcessor, headless (ScopedStorageRoot, worker-thread processBlock)
     Source/Tests/NudgeInputTests.cpp       # shared mu-core NudgeInput: whole numbers and the BPM decimals mode
+    Source/Tests/ClipLaunchTests.cpp   # clip store / launch on the real processor
     Source/UI/GatingDesigner.cpp
     Source/Sequencer/GatePattern.cpp
     Source/Audio/SynthVoice.cpp

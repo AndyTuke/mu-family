@@ -136,6 +136,11 @@ public:
     // and modulators; loadable into any track. (ProcessorBase layer API.)
     void                    saveLayerPreset(int track, const juce::String& name) override;
     void                    loadLayerPreset(int track, const juce::File& file) override;
+
+    juce::ValueTree captureLayerPresetTree(int track) override;
+protected:
+    void stageLayerPresetTree(int track, juce::ValueTree tree, bool keepIdentity) override;
+public:
     juce::Array<juce::File> slotPresetFiles(int track) const override;
     void                    resetLayer(int track) override;   // the engine's params → defaults, modulators cleared; the engine, source, steps and envelope stay
 

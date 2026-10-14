@@ -236,12 +236,17 @@ void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
 
 // A track preset: the track's node (engine, every engine's param rows, step row, Rumble envelope,
 // modulators). It carries its engine, so it loads into any track.
-void PluginProcessor::saveLayerPreset(int track, const juce::String& name)
+juce::ValueTree PluginProcessor::captureLayerPresetTree(int track)
 {
-    if (track < 0 || track >= numLayers.load(std::memory_order_relaxed)) return;
+    if (track < 0 || track >= numLayers.load(std::memory_order_relaxed)) return {};
     auto node = captureLayerNode(track, kTrackPresetTag);
     node.setProperty("engine", getLayerName(track), nullptr);
-    if (auto xml = node.createXml())
+    return node;
+}
+
+void PluginProcessor::saveLayerPreset(int track, const juce::String& name)
+{
+    if (auto xml = captureLayerPresetTree(track).createXml())
         mu_pp::writeXmlAtomically(*xml, getLayerPresetDir().getChildFile(mu_pp::safePresetFileName(name, getLayerName(track))
                                                                            + "." + getLayerPresetExtension()),
                                   onLoadError);
@@ -257,8 +262,16 @@ void PluginProcessor::loadLayerPreset(int track, const juce::File& file)
         return;
     }
 
+    stageLayerPreset(track, juce::ValueTree::fromXml(*xml), false, false);
+}
+
+// Everything a track-preset load does after the parse (file or clip).
+void PluginProcessor::stageLayerPresetTree(int track, juce::ValueTree node, bool keepIdentity)
+{
+    juce::ignoreUnused(keepIdentity);   // a track node carries no name or colour
+    if (track < 0 || track >= numLayers.load(std::memory_order_relaxed) || ! node.isValid()) return;
+
     // A preset saved when the lanes were fixed has unqualified rows and names its instrument as "lane".
-    auto node = juce::ValueTree::fromXml(*xml);
     if (! hasEngineRow(node))
     {
         const int e = engineNames().indexOf(node.getProperty("lane").toString());
@@ -305,11 +318,7 @@ void PluginProcessor::resetLayer(int track)
     mu_pp::clearModulators(getTrack(track));
 
     // Reset empties the clip bank as in the shared reset (this override replaces that one).
-    if (layers[(size_t) track] != nullptr)
-    {
-        layers[(size_t) track]->clips->clearAll();
-        layers[(size_t) track]->activeClip = -1;
-    }
+    clearLayerClips(track);
 }
 
 } // namespace mu_on

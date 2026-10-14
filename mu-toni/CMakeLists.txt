@@ -128,6 +128,7 @@ target_sources(mu-toni-tests PRIVATE
     Source/Tests/ProcessorSeamTests.cpp  # the real PluginProcessor, headless (layer ownership)
     Source/Tests/LayerCountPersistTests.cpp   # layer count default / persistence / add-remove-swap carry
     Source/Tests/PrefixMigrationTests.cpp   # data saved before the v -> a id-prefix rename still loads
+    Source/Tests/ClipLaunchTests.cpp   # clip store / launch on the real processor
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp

@@ -106,8 +106,10 @@ struct Layer
 
     // The clip this layer was playing when its state was last saved or loaded (-1 = none). Only the
     // composed-state save and load read and write it; the performance state that tracks the playing
-    // clip owns the live value. A plain member, so it follows the layer on a move and a layer-preset
-    // load (which copies a fresh layer over this one) correctly resets it to none.
+    // clip owns the live value. A plain member, so it follows the layer on a move. A layer-preset load
+    // does not reset it by itself: in the composed products the load only applies a layer node, so
+    // ProcessorBase's non-clip stage choke point clears it; mu-Clid's installRhythm resets it by
+    // assigning a fresh Rhythm.
     int activeClip = -1;
 
     std::string name        = "<unnamed>";

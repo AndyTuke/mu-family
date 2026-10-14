@@ -58,10 +58,15 @@ void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
 }
 
 // A layer preset: the layer's node (prefix-free param rows + modulators), so it loads into any layer.
+juce::ValueTree PluginProcessor::captureLayerPresetTree(int layer)
+{
+    if (layer < 0 || layer >= mu_limits::kMaxLayers) return {};
+    return captureLayerNode(layer, kLayerPresetTag);
+}
+
 void PluginProcessor::saveLayerPreset(int layer, const juce::String& name)
 {
-    if (layer < 0 || layer >= mu_limits::kMaxLayers) return;
-    if (auto xml = captureLayerNode(layer, kLayerPresetTag).createXml())
+    if (auto xml = captureLayerPresetTree(layer).createXml())
         mu_pp::writeXmlAtomically(*xml, getLayerPresetDir().getChildFile(mu_pp::safePresetFileName(name, "Layer")
                                                                            + "." + getLayerPresetExtension()),
                                   onLoadError);
@@ -76,8 +81,16 @@ void PluginProcessor::loadLayerPreset(int layer, const juce::File& file)
         if (onLoadError) onLoadError("Could not read \"" + file.getFileName() + "\"");
         return;
     }
-    // While playing, stage it for the next bar line (the shared swapper commit); while stopped, apply now.
-    layerSwapper.useSlot(layer, juce::ValueTree::fromXml(*xml));
+    stageLayerPreset(layer, juce::ValueTree::fromXml(*xml), false, false);
+}
+
+// Everything a layer-preset load does after the parse (file or clip). While playing, stage it for the
+// next bar line (the shared swapper commit); while stopped, apply now.
+void PluginProcessor::stageLayerPresetTree(int layer, juce::ValueTree tree, bool keepIdentity)
+{
+    juce::ignoreUnused(keepIdentity);   // a layer node carries no name or colour
+    if (layer < 0 || layer >= mu_limits::kMaxLayers || ! tree.isValid()) return;
+    layerSwapper.useSlot(layer, std::move(tree));
 }
 
 // Apply a layer node (the stopped load and the bar-line commit), then tell the editor.

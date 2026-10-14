@@ -1311,6 +1311,17 @@ selection and modulators; **not** the mixer strip, not the name or colour (the l
 - **Structural edits.** The bank follows its layer on swap and remove (pointer move). Because `adoptDefaults` does not touch a `SlotBound`, the base
   `addLayer`, `resetLayer` (see Andy 3) and the vacated top slot after `removeLayer` call `clearAll()` **explicitly, after `layersLock` is released**
   (freeing eight trees is not a microsecond job). Under `keepSpareLayers` the spare layer is re-used, so this is not optional.
+- **As built (C2, 2026-10-14).** `addLayer`, `removeLayer` (the vacated top slot) and `resetLayer` clear `clips` and `activeClip` after the lock block. mu-On
+  overrides `resetLayer` (a sound reset that keeps the engine, step row and envelope, so it cannot use `createLayer` + `adoptDefaults`) and so cannot reach the
+  shared clear. **Ruling: one protected non-virtual `ProcessorBase::clearLayerClips(int layer)` (clears the bank and sets `activeClip = -1`, null-safe)**, called by the three
+  base functions and by the mu-On override; the four hand-written copies of the two lines go. Any later product override of `resetLayer` calls it too. No new hook:
+  a virtual would only move the same call.
+- **`Layer::activeClip` (as built).** A plain `int` on `Layer` (-1 = none), written by `captureComposedState` as an optional `activeClip` property of the `<Slot>` node and read back
+  by `applyComposedState` (an empty or out-of-range clip loads as -1). It is a **hand-off to C5, not the live truth**: nothing sets it before C5. At C5 `ProcessorBase` writes
+  `LiveState`'s `playingClip` into it at each launch commit (and `-1` at every non-clip `stageLayerPresetTree`, the choke point below), so a host session saved mid-performance
+  restores the lit pad. Because a layer-preset load in the composed products goes through `applyLayerNode`, which does not touch the `Layer`, the plain member is **not** reset by
+  a load by itself (only mu-Clid's `Rhythm` assignment resets it); the choke point must do it. A **full preset** commit restores the saved `activeClip` into the layer but
+  `LiveState` still reports `playingClip = none` (item 6), so the pad is dark until a launch; C5 decides whether a session restore (only) re-lights it, default: no.
 
 **4. Actions: data on `Layer`, behaviour on `ProcessorBase`.** The backlog row asked for generic launch / mute / store actions on the parent `Layer`.
 Ruled otherwise: `Layer` gains **no new virtuals** (a launch needs the swapper, the parameter layout and the control sink, none of which a `Layer`
@@ -1343,6 +1354,7 @@ which has no bank code, and `SlotBound` protects the mu-Clid assignment).
 - Per layer: `playingClip` (-1 = none), `queuedClip` (-1 = none), `clipMask`. Message thread, unsaved, as the rest of `LiveState`. After any preset load, reset
   or full-preset commit `playingClip` is **none** (no pad is bright: the layer plays its saved live state, which is not necessarily one of its clips). A launch
   sets it at the commit, never before.
+  (`Layer::activeClip` is the saved shadow of this, see item 3; it never drives the lamps by itself.)
 - **Queue identity.** A clip launch must not be mistaken for a different swap on the same layer (a layer-preset file loaded after the launch replaces the
   pending payload; the commit then fires `onLayerPresetCommitted` for a payload that is not the clip). Mirror the full-preset rule: `LayerSwapper` gains
   `slotStageSerial(i)` (bumped by `stage` and `cancel` per slot, as `fullStageSerial` is), `LiveState` records it at the launch, and the commit callback
@@ -1363,6 +1375,7 @@ layer preset is one clip's worth of state; carrying a bank would make loading it
   the single child is the stored layer-preset tree, and an empty clip has no `<Clip>` element. Written and read **once, centrally**, by
   `captureComposedState` / `applyComposedState` through `ClipBank::writeTo(node)` / `readFrom(node)`; no product code. `readFrom` of an absent or invalid
   node clears the bank, which is how a slot the state lacks is emptied. The `format` property stays 2.
+  As built (C2) the `<Slot>` node also gains an optional `activeClip="n"` property, written only when a clip is active; it is part of the same **Andy 1** commitment.
 - *mu-Clid:* each `<Rhythm>` child of `MuClidPreset` (and of a host session) gains the same `<Clips>` child, with `MuClidRhythm`-shaped payloads, written and
   read in `PresetIO::buildFullPresetTree` and the full-preset prepare/commit using the same `ClipBank` functions; the prepared full-preset payload carries
   each rhythm's bank and the commit sets it (the `SlotBound` assignment would not). Clip payloads reference a sample by path only (**Andy 2**).
@@ -1384,6 +1397,36 @@ layer preset is one clip's worth of state; carrying a bank would make loading it
 | C4 | S | mu-Clid: the same two hooks over `PresetIO`; `<Clips>` in `buildFullPresetTree`, the prepare and commit of a full preset, host session; sample-path-only rule; mu-Clid MIDI compiles and ignores the bank (Open question 5) | `mu-clid-tests` (build the target explicitly) and `mu-clid-midi-tests`: full-preset and session round trip with clips; an old `.muClid` loads empty; a staged full preset carries its banks and sets them at the commit; launch (stopped and staged) equals loading the same `.muRhythm`; the existing `HotSwapCancelTests` shape for a cancelled launch; `CLID_roundtrip` and the retire-tail listening test |
 | C5 | M | `LiveState` / `LiveView` clip fields, `slotStageSerial`, `remapLayers`, `publishClipMasks`, `LaunchClip` / `ClipNext` / `ClipPrev` in `perform` | `mu-core-tests` with fake callbacks, as the performance step 2: launch queues and commit moves `playingClip`; superseded and cancelled launches clear `queuedClip`; full-preset commit clears all clip state; remap on remove and swap; `ClipNext` / `ClipPrev` wrap and skip empties; mode off returns false; `perform` mute on the playing clip |
 | C6 | UX | `ClipRow` in the layer header, store / clear commands, wording; then the `mu-control` grid mapping (performance step 4) | `ux-controller` ruling first; the grid is the controller tests of #1276 |
+
+**C3 brief (confirmed 2026-10-14, for the coder).** Reading the three composed products' `saveLayerPreset` / `loadLayerPreset`, the split in item 5 is exact; fixed details:
+- `ProcessorBase` virtuals (default empty): `juce::ValueTree captureLayerPresetTree(int layer)` and `void stageLayerPresetTree(int layer, juce::ValueTree tree, bool keepIdentity)`.
+  Non-virtual, message thread: `storeClip`, `clearClip`, `loadClipFromFile`, `launchClip`, `uint8_t clipMask(int) const`, and a private `publishClipMasks()` stub until C5. All range-check the layer
+  against `numLayers` and the clip against `kClipsPerLayer`. `loadClipFromFile` parses the file, requires the root tag to equal `captureLayerPresetTree(layer).getType()` (so a mu-Tant clip
+  never holds a `.muArp`), and stores the parsed tree unmigrated (migration runs at launch, on a copy).
+- Per product `captureLayerPresetTree` is `captureLayerNode(layer, tag)`; mu-On adds `node.setProperty("engine", getLayerName(layer), nullptr)` (so a clip carries its engine, as the file does).
+  `saveLayerPreset` shrinks to `write(captureLayerPresetTree(...))`.
+- Per product `stageLayerPresetTree` is everything after the parse: Tant `migrateXModVoice` + `preloadWavetablesFromVoiceTree` + `useSlot`; Toni `useSlot`; On the legacy
+  `hasEngineRow` / `qualifyLegacyNode` step + `useSlot`. `loadLayerPreset` becomes tag check, `ValueTree::fromXml`, `stageLayerPresetTree(slot, tree, false)`. The commit callbacks
+  (`applyVoicePresetTree`, `applyLayerTree`, `applyTrackTree`) and `onLayerPresetCommitted` stay as they are.
+- `keepIdentity`: in the composed products a layer node carries no name or colour, so the flag is accepted and ignored (`juce::ignoreUnused`); it exists for mu-Clid in C4, whose
+  `MuClidRhythm` file carries them. Do not add per-product branching for it in C3.
+- **One choke point.** The base-class non-virtual wrapper does the shared work, so no product repeats it: `loadLayerPreset` callers go through the virtual as today, but `launchClip` and every
+  non-clip stage first call a private `noteNonClipStage(layer)` which sets `layers[layer]->activeClip = -1` (and at C5 clears the `LiveState` queued/playing clip). To keep it in one place the products'
+  `loadLayerPreset` end in `stageLayerPresetTree`, and `ProcessorBase` exposes `final`-style non-virtual `stageLayerPreset(layer, tree, keepIdentity, isClip)` that calls `noteNonClipStage` when
+  `!isClip`, then the virtual. Callers (`loadLayerPreset`, `launchClip`, `applyMidiPresetLayer`) use the wrapper, never the virtual directly.
+- `launchClip`: `stageLayerPreset(layer, bank.get(i).createCopy(), true, true)` after the checks in item 4; it must not touch `clips` (test: bank identical before and after).
+- `LayerSwapper::slotStageSerial(i)` is **C5, not C3**: add it with `LiveState`, in `HotSwap.h` `HotSwapStager` beside `fullSerial` (per-slot array of `uint32_t`, bumped by `stage` and `cancel`, never by `consume`),
+  surfaced as `HotSwapper::slotSerial(i)`. C3 has nothing to compare it with.
+- Tests are those in the table, plus: after a non-clip layer-preset load `activeClip` is -1; after `launchClip` (stopped) the bank is unchanged; `loadClipFromFile` rejects a wrong tag and an
+  unreadable file (`onLoadError` raised, bank unchanged); a `.muPattern` stored via `loadClipFromFile` then launched equals loading the file directly (state compare).
+
+**As built (C3, 2026-10-14).** The brief stands as written; the rulings on the three points the build raised:
+- `captureLayerPresetTree` is **public** (not protected like `stageLayerPresetTree`): it is a read-only capture of what `saveLayerPreset` writes, `storeClip` and `loadClipFromFile` (tag
+  check) are base callers, and tests and the UI may want the tree. Writes stay behind the base's `stageLayerPreset` wrapper, so exposing the read costs nothing.
+- `clearClip` also sets `activeClip = -1` when it clears the clip `activeClip` names (a cleared clip cannot be the remembered one). C5 extends the same place to the live playing clip.
+- `loadClipFromFile` stores an **empty name** (the file name is not a clip name); the clip name is for `storeClip` and the C6 UI to set.
+- `launchClip` leaves `activeClip` untouched (it is the clip path, so the non-clip choke point is skipped); setting it at the commit is C5's job. Products declare the override with a
+  `protected:` / `public:` pair beside the other layer-preset declarations; mu-Clid and mu-Clid MIDI are untouched until C4.
 
 C1 and C2 can ship with no visible change. C3 and C4 give the feature a screen-driven path (a menu or button calling `launchClip`) before any hardware exists,
 so each is demonstrable on its own.

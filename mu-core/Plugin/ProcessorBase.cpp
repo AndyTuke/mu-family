@@ -744,8 +744,7 @@ int ProcessorBase::addLayer()
 
     // A new layer starts with no clips. Explicit and outside layersLock: freeing trees is not a
     // microsecond job, and a re-used spare must not keep an old bank.
-    layers[(size_t) n]->clips->clearAll();
-    layers[(size_t) n]->activeClip = -1;
+    clearLayerClips(n);
 
     // Phase 3: the slot's parameters back to defaults, still suspended so no block sees stale values.
     // Where the layer data is the truth the audio never reads these parameters, so processing resumes
@@ -804,11 +803,7 @@ bool ProcessorBase::removeLayer(int idx)
 
     // The banks moved with their layers (the pointer shift); the vacated top slot holds a spare or
     // nothing and must start empty. Outside layersLock, like every clip-bank clear.
-    if (layers[(size_t) (n - 1)] != nullptr)
-    {
-        layers[(size_t) (n - 1)]->clips->clearAll();
-        layers[(size_t) (n - 1)]->activeClip = -1;
-    }
+    clearLayerClips(n - 1);
 
     // Phase 3: parameter values. Strips that ducked from the removed layer now duck from nothing and
     // the others follow their layer down (translated before the values shift).
@@ -887,8 +882,7 @@ void ProcessorBase::resetLayer(int idx)
     }
 
     // Reset means back to a freshly added layer, so the bank empties too (adoptDefaults leaves it alone).
-    layers[(size_t) idx]->clips->clearAll();
-    layers[(size_t) idx]->activeClip = -1;
+    clearLayerClips(idx);
 
     if (layerHoldsParamTruth())
     {
@@ -899,4 +893,86 @@ void ProcessorBase::resetLayer(int idx)
     {
         resetLayerParams(idx);
     }
+}
+
+void ProcessorBase::clearLayerClips(int slot)
+{
+    if (slot < 0 || slot >= mu_limits::kMaxLayers || layers[(size_t) slot] == nullptr) return;
+    layers[(size_t) slot]->clips->clearAll();
+    layers[(size_t) slot]->activeClip = -1;
+}
+
+void ProcessorBase::noteNonClipStage(int slot)
+{
+    if (slot >= 0 && slot < mu_limits::kMaxLayers && layers[(size_t) slot] != nullptr)
+        layers[(size_t) slot]->activeClip = -1;
+}
+
+bool ProcessorBase::storeClip(int slot, int clip, const juce::String& name)
+{
+    mu_hotswap::assertMessageThread();   // the clip bank is message-thread only (a controller callback must marshal first)
+    auto* layer = getLayer(slot);
+    if (layer == nullptr || ! mu_core::ClipBank::isValidIndex(clip)) return false;
+
+    const auto tree = captureLayerPresetTree(slot);
+    if (! tree.isValid()) return false;
+
+    layer->clips->store(clip, tree, name);   // store deep-copies, so the capture is not aliased
+    publishClipMasks();
+    return true;
+}
+
+bool ProcessorBase::clearClip(int slot, int clip)
+{
+    mu_hotswap::assertMessageThread();   // the clip bank is message-thread only (a controller callback must marshal first)
+    auto* layer = getLayer(slot);
+    if (layer == nullptr || ! layer->clips->clear(clip)) return false;
+
+    // The cleared clip can no longer be the one this layer is remembered as playing.
+    if (layer->activeClip == clip)
+        layer->activeClip = -1;
+    publishClipMasks();
+    return true;
+}
+
+bool ProcessorBase::loadClipFromFile(int slot, int clip, const juce::File& layerPreset)
+{
+    mu_hotswap::assertMessageThread();   // the clip bank is message-thread only (a controller callback must marshal first)
+    auto* layer = getLayer(slot);
+    if (layer == nullptr || ! mu_core::ClipBank::isValidIndex(clip)) return false;
+
+    // The file must be this product's layer preset: its root tag is the tag a capture would write.
+    const auto expectedTag = captureLayerPresetTree(slot).getType();
+    std::unique_ptr<juce::XmlElement> xml;
+    if (layerPreset.existsAsFile())
+        xml = juce::XmlDocument::parse(layerPreset);
+    if (xml == nullptr || expectedTag.toString().isEmpty() || ! xml->hasTagName(expectedTag.toString()))
+    {
+        if (onLoadError) onLoadError("Could not read \"" + layerPreset.getFileName() + "\"");
+        return false;
+    }
+
+    // Stored as read: any migration runs at launch, on a copy.
+    layer->clips->store(clip, juce::ValueTree::fromXml(*xml), {});
+    publishClipMasks();
+    return true;
+}
+
+bool ProcessorBase::launchClip(int slot, int clip)
+{
+    mu_hotswap::assertMessageThread();   // the clip bank is message-thread only (a controller callback must marshal first)
+    auto* layer = getLayer(slot);
+    if (layer == nullptr || ! layer->clips->isOccupied(clip)) return false;
+    if (hasPendingFullPreset()) return false;   // a staged full preset lands first and replaces the layers
+
+    // The same stage path as a layer-preset load; get() deep-copies, so the stage can migrate the
+    // copy and the bank is never written.
+    stageLayerPreset(slot, layer->clips->get(clip), true, true);
+    return true;
+}
+
+uint8_t ProcessorBase::clipMask(int slot) const
+{
+    const auto* layer = getLayer(slot);
+    return layer != nullptr ? layer->clips->mask() : (uint8_t) 0;
 }

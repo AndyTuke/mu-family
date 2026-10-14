@@ -133,6 +133,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/PrefixMigrationTests.cpp   # data saved before the k/b/h/s/r -> t{N} id-prefix rename still loads
     Source/Tests/GrooveVoicesTests.cpp   # renderAll block sizes, the Rumble's tail handling
     Source/Tests/EngineMigrationTests.cpp   # five-lane states and track presets load as engine-qualified layers
+    Source/Tests/ClipLaunchTests.cpp   # clip store / launch on the real processor
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp

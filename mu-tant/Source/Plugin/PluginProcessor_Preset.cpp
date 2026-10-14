@@ -175,10 +175,15 @@ juce::ValueTree PluginProcessor::toVoiceState(const juce::ValueTree& tree) const
 }
 
 // A .muPattern: the voice's node (prefix-free param rows + its extras), so it loads into any voice.
+juce::ValueTree PluginProcessor::captureLayerPresetTree(int voice)
+{
+    if (voice < 0 || voice >= mu_limits::kMaxLayers) return {};
+    return captureLayerNode(voice, "MuTantVoice");
+}
+
 void PluginProcessor::saveLayerPreset(int voice, const juce::String& name)
 {
-    if (voice < 0 || voice >= mu_limits::kMaxLayers) return;
-    if (auto xml = captureLayerNode(voice, "MuTantVoice").createXml())
+    if (auto xml = captureLayerPresetTree(voice).createXml())
         mu_pp::writeXmlAtomically(*xml, getLayerPresetDir().getChildFile(mu_pp::safePresetFileName(name, "Voice")
                                                                            + "." + getLayerPresetExtension()),
                                   onLoadError);
@@ -193,7 +198,14 @@ void PluginProcessor::loadLayerPreset(int voice, const juce::File& file)
         if (onLoadError) onLoadError("Could not read \"" + file.getFileName() + "\"");
         return;
     }
-    auto tree = juce::ValueTree::fromXml(*xml);
+    stageLayerPreset(voice, juce::ValueTree::fromXml(*xml), false, false);
+}
+
+// Everything a voice-preset load does after the parse (file or clip): migrate, pre-load, stage.
+void PluginProcessor::stageLayerPresetTree(int voice, juce::ValueTree tree, bool keepIdentity)
+{
+    juce::ignoreUnused(keepIdentity);   // a voice node carries no name or colour
+    if (voice < 0 || voice >= mu_limits::kMaxLayers || ! tree.isValid()) return;
     migrateXModVoice(tree);
 
     // Hot-swap: while the resolved transport plays (host, MIDI clock or internal), stage and commit

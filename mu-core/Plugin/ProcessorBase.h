@@ -291,6 +291,25 @@ public:
     virtual juce::Array<juce::File> slotPresetFiles(int slot) const;   // default: every file in the per-slot dir
     virtual void saveLayerPreset(int /*slot*/, const juce::String& /*name*/) {}
     virtual void loadLayerPreset(int /*slot*/, const juce::File& /*file*/)   {}
+
+    // The layer's state as the tree its layer-preset file holds (root tag included), without the file.
+    // A clip is exactly this tree. Default: an invalid tree (the product has no clips).
+    virtual juce::ValueTree captureLayerPresetTree(int /*slot*/)             { return {}; }
+
+    // Clip bank (message thread only). A clip is a layer-preset tree kept in the layer's ClipBank;
+    // launching one is a layer-preset load from that tree, so a stopped transport applies it now and a
+    // playing one commits it at the layer's swap boundary. The bank is saved with full presets and
+    // sessions only (see captureComposedState).
+    bool    storeClip(int slot, int clip, const juce::String& name = {});
+    bool    clearClip(int slot, int clip);
+    // Reads a layer-preset file into a clip. Refuses (onLoadError, bank unchanged) a file that cannot
+    // be read or whose root tag is not this product's layer-preset tag.
+    bool    loadClipFromFile(int slot, int clip, const juce::File& layerPreset);
+    // False (nothing changed) when the layer or clip is out of range, the clip is empty, or a full
+    // preset is staged.
+    bool    launchClip(int slot, int clip);
+    uint8_t clipMask(int slot) const;
+
     virtual bool hasPendingSwap(int slot) const                             { return layerSwapper.hasPending(slot); }
     // Drops the staged (not yet committed) full-preset swap, if any (Performance mode cancelling a queued item).
     virtual void cancelPendingFullPreset()                                  { layerSwapper.cancelFull(); }
@@ -628,6 +647,25 @@ protected:
     // the lock, so nothing may be left to allocate). Null when the product's layer count is fixed.
     virtual std::unique_ptr<Layer> createLayer(int /*slot*/) { return nullptr; }
 
+    // Everything a layer-preset load does after the file is parsed: migrate, preload assets, then hand
+    // the tree to layerSwapper.useSlot (applies now when stopped, commits at the boundary when playing).
+    // `keepIdentity` is for products whose preset carries the layer's name and colour (mu-Clid).
+    // Default: nothing. Callers use stageLayerPreset, never this directly.
+    virtual void stageLayerPresetTree(int slot, juce::ValueTree tree, bool keepIdentity)
+    { juce::ignoreUnused(slot, tree, keepIdentity); }
+
+    // The one entry to the virtual above: a stage that is not a clip launch leaves no clip active.
+    void stageLayerPreset(int slot, juce::ValueTree tree, bool keepIdentity, bool isClip)
+    {
+        if (! isClip)
+            noteNonClipStage(slot);
+        stageLayerPresetTree(slot, std::move(tree), keepIdentity);
+    }
+
+    // Empties a layer's clip bank and activeClip (null-safe). The shared structural edits call it; a
+    // product that overrides resetLayer without the shared reset calls it too.
+    void clearLayerClips(int slot);
+
     virtual void applyMidiPresetLayer(int slot, const juce::File& f) { loadLayerPreset(slot, f); }
     virtual void applyFullMidiPreset(const juce::File& f)            = 0;
 
@@ -750,6 +788,11 @@ public:
 #endif
 
 private:
+    // A non-clip layer-preset stage leaves no clip active. C5 also clears the live queued/playing clip here.
+    void noteNonClipStage(int slot);
+    // Pushes each layer's clip occupancy to the live state; a stub until the live state carries it.
+    void publishClipMasks() {}
+
     // Parameter values of one layer slot, which sit under two prefixes: the product's own (from the
     // layer layout, e.g. v3_) and the mixer strip's (ch3_). Moving them is what makes the audible
     // strip and the knobs follow a moved layer; message thread only.

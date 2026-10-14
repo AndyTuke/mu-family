@@ -133,6 +133,11 @@ public:
     void saveLayerPreset(int voice, const juce::String& name) override;
     void loadLayerPreset(int voice, const juce::File& file) override;
 
+    juce::ValueTree captureLayerPresetTree(int voice) override;
+protected:
+    void stageLayerPresetTree(int voice, juce::ValueTree tree, bool keepIdentity) override;
+public:
+
     // ── User wavetable import (per oscillator) ───────────────────────────────
     // Load a Serum/Vital .wav into the shared bank (dedup by path) and point the
     // given voice's oscillator at it; clear reverts to the factory selection.
