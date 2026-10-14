@@ -41,6 +41,10 @@ public:
     // Size-2 dimensions and wrap to fit the width.
     void setSpecs(const std::vector<Spec>& specs);
 
+    // Drop every knob's modulation binding (matrix pointer + live-value callback), so no timer tick
+    // can reach a layer's data while a structural edit moves or frees it. setSpecs rebinds.
+    void clearModBindings();
+
     // The width (pixels) the controls need on a single row — a selector takes two cells.
     int getPreferredWidth() const;
 

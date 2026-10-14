@@ -48,6 +48,12 @@ void ParamKnobGrid::setSpecs(const std::vector<Spec>& specs)
     resized();
 }
 
+void ParamKnobGrid::clearModBindings()
+{
+    for (auto& ctl : controls)
+        if (ctl->knob != nullptr) ctl->knob->clearModBinding();
+}
+
 int ParamKnobGrid::getPreferredWidth() const
 {
     const int cellW = mu_ui::s(MuLookAndFeel::kKnobSize2W) + mu_ui::s(6);

@@ -10,9 +10,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
       sidebar(p, "Layer"),
       arpContent(p),
       layerPanel(p, "Layer"),
-      // ArpContent binds only APVTS parameters, never a layer's own data, so there is nothing to
-      // release before a removal.
-      layerEdit(p, sidebar, layerPanel, { {}, [this](int idx) { layerPanel.setLayer(idx); } }),
+      // The knobs' live modulation arcs hold a layer's matrix: release them before a removal frees it.
+      layerEdit(p, sidebar, layerPanel, { [this] { arpContent.releaseModulationArcs(); },
+                                          [this](int idx) { layerPanel.setLayer(idx); } }),
       mixerOverlay(p, p.mixerEngine),
       settingsOverlay(p)
 {

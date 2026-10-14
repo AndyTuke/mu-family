@@ -34,6 +34,10 @@ public:
     // Show track `idx`: its engine's controls, its Rumble source and envelope, its row selected.
     void setLayer(int idx);
 
+    // Let go of every knob's modulation binding; called before a track is removed or moved, because the
+    // arcs hold the track's matrix. setLayer rebinds.
+    void releaseModulationArcs() { grid.clearModBindings(); }
+
     // A click in a step row selected another track.
     std::function<void(int)> onRowClicked;
     // The shown track's engine changed (the user picked one, or it changed underneath): the editor

@@ -156,6 +156,119 @@ struct StepPatternTests : juce::UnitTest
             expectGreaterThan(peak, 0.01f);
         }
 
+        beginTest("a rest cuts a held note whose gate outlived a tempo change (60 -> 240 BPM mid-gate)");
+        {
+            ArpAccent a; a.length = 2; a.stepMask = 0b01;   // step 0 On, step 1 Off
+            Rig r(a, false, 0.9f);
+            auto ctxAt = [&](double bpm) { auto c = playingAt(r.beat); c.bpm = bpm; c.beatsPerSample = bpm / 60.0 / kSr; return c; };
+            auto renderAt = [&](double bpm)
+            {
+                r.runner.render(r.buf, kBlock, ctxAt(bpm));
+                r.beat += bpm / 60.0 / kSr * kBlock;
+            };
+            renderAt(60.0);   // step 0 fires at 60 BPM: a 0.9 gate of 12000 samples
+            expect(r.runner.isActive());
+            // At 240 BPM the step-1 boundary (beat 0.25) comes ~2900 samples on, well inside that gate.
+            int blocks = 0;
+            while (r.beat + 240.0 / 60.0 / kSr * kBlock < 0.25 && blocks++ < 100) renderAt(240.0);
+            expect(r.runner.isActive());   // still inside the old gate, before the boundary block
+            renderAt(240.0); renderAt(240.0);   // the boundary block fires the rest, the next lets the release run out
+            expectEquals(r.runner.lastStep(), 1);
+            expect(! r.runner.isActive());   // the rest cut the note: gone within its release
+        }
+
+        beginTest("stop then start with Legato ties: step 0 is a fresh pluck, not a glide from a silent voice");
+        {
+            ArpAccent a; a.length = 4;
+            Rig r(a, true, 1.0f);
+            r.runTo((long long) (1.5 * kStepSamples));   // a tie is held and primed to glide
+            expect(r.runner.isActive());
+            auto stopped = playingAt(r.beat); stopped.playing = false;
+            for (int i = 0; i < 4; ++i) r.runner.render(r.buf, kBlock, stopped);
+            expect(! r.runner.isActive());
+            r.beat = 0.0;   // transport restarts from the top
+            float peak = 0.0f;
+            for (int i = 0; i < 4; ++i) peak = juce::jmax(peak, r.block());
+            expectGreaterThan(peak, 0.01f);
+        }
+
+        beginTest("MIDI mode: a rest at step 0 on a fresh key press releases the held tie, nothing hangs");
+        {
+            ArpAccent a; a.length = 2; a.stepMask = 0b10;   // step 0 Off, step 1 On
+            Rig r(a, true, 1.0f);
+            r.runner.setStep(kRate16th, 1.0f, true);
+            auto held = [&](bool edge) { auto c = playingAt(r.beat); c.anyNoteHeld = true; c.noteOnEdge = edge; return c; };
+            r.runner.render(r.buf, kBlock, held(true));   // key press: step 0 rests
+            while (r.sample < (long long) (kStepSamples * 1.5))
+            { r.runner.render(r.buf, kBlock, held(false)); r.sample += kBlock; }
+            expect(r.runner.isActive());                  // step 1 is tied and sounding
+            r.runner.render(r.buf, kBlock, held(true));   // a second key press restarts at the resting step 0
+            r.runner.render(r.buf, kBlock, held(false));
+            expect(! r.runner.isActive());
+        }
+
+        beginTest("Legato with a rest as the very first step: silent, then a fresh pluck, then a glide");
+        {
+            ArpAccent a; a.length = 3; a.stepMask = 0b110;   // step 0 Off
+            Rig r(a, true, 1.0f);
+            r.runTo((long long) (kStepSamples * 0.5));
+            expect(! r.runner.isActive());
+            float peak = 0.0f;
+            r.runTo((long long) kStepSamples);
+            while (r.sample < (long long) (kStepSamples * 1.6)) peak = juce::jmax(peak, r.block());
+            expectGreaterThan(peak, 0.01f);
+            r.runTo((long long) (kStepSamples * 2.5));
+            expect(r.runner.isActive());   // the tie carries into step 2
+        }
+
+        beginTest("block size does not change which steps fire or which sound (1, 64, 512, 4096)");
+        {
+            ArpAccent a; a.length = 4; a.stepMask = 0b1101; a.pattern = 0b1000; a.amount = 0.7f;
+            std::vector<std::vector<int>> sounding;
+            for (int bs : { 1, 64, 512, 4096 })
+            {
+                mu_wavetable::WavetableBank bank; bank.loadFactoryBank();
+                ArpVoiceRunner arpRunner; ToniVoiceParams tv; tv.ampR = 0.001f;
+                arpRunner.setBank(&bank); arpRunner.prepare(kSr, bs);
+                arpRunner.setVoiceParams(tv); arpRunner.setAccent(a); arpRunner.setStep(kRate16th, 0.5f, false);
+                juce::AudioBuffer<float> buf(2, bs);
+                std::vector<int> seq;
+                int fired = 0;
+                for (long long s = 0; s < 60000; s += bs)
+                {
+                    arpRunner.render(buf, bs, playingAt(kBps * (double) s));
+                    if (arpRunner.stepsFired() != fired)
+                    {
+                        fired = arpRunner.stepsFired();
+                        if (a.isOn(arpRunner.lastStep())) seq.push_back(arpRunner.lastStep());   // only the steps that sound
+                    }
+                }
+                seq.resize(juce::jmin((size_t) 7, seq.size()));   // steps 0..9 all fire before 60000 in every size
+                sounding.push_back(seq);
+            }
+            for (size_t i = 1; i < sounding.size(); ++i) expect(sounding[i] == sounding[0]);
+            expectEquals((int) sounding[0].size(), 7);
+        }
+
+        beginTest("changing Steps mid-pattern ignores the hidden cells, and raising it brings them back");
+        {
+            ArpAccent a; a.length = 4; a.stepMask = 0b0101; a.pattern = 0b0100; a.amount = 1.0f;   // 0 On, 1 Off, 2 Accented, 3 Off
+            Rig r(a, false, 0.5f);
+            r.runTo((long long) (kStepSamples * 3.0) + 1500);
+            auto shorter = a; shorter.length = 2;   // cells 0 and 1 only
+            r.runner.setAccent(shorter);
+            expectEquals(shorter.stepMask, 0b0101u);   // the hidden cells are untouched
+            r.runTo((long long) (kStepSamples * 4.0) + 1500);
+            expect(r.runner.isActive());               // step 4 = cell 0, On
+            r.runTo((long long) (kStepSamples * 5.0) + 1500);
+            expect(! r.runner.isActive());             // step 5 = cell 1, Off
+            r.runner.setAccent(a);                     // Steps back to 4
+            r.runTo((long long) (kStepSamples * 6.0) + 1500);
+            expect(r.runner.isActive());               // step 6 = cell 2, On again
+            r.runTo((long long) (kStepSamples * 7.0) + 1500);
+            expect(! r.runner.isActive());             // step 7 = cell 3, Off
+        }
+
         beginTest("a layer without stepMask loads with every step On; a saved value survives a state round trip");
         {
             mu_seam_test::TempStorage storage;

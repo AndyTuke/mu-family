@@ -162,7 +162,9 @@ public:
     {
         if (slot < 0 || slot >= kSlots || dest < 0 || dest >= kMaxDests)
             return std::numeric_limits<float>::quiet_NaN();
-        if (modLiveEngine[(size_t) slot].load(std::memory_order_relaxed) != toIndex(engine))
+        // Acquire pairs with the release store of the tag in resolve(), so the values read below are at
+        // least as new as the block that published this engine.
+        if (modLiveEngine[(size_t) slot].load(std::memory_order_acquire) != toIndex(engine))
             return std::numeric_limits<float>::quiet_NaN();
         return modLive[(size_t) slot][(size_t) dest].load(std::memory_order_relaxed);
     }
@@ -231,6 +233,9 @@ private:
     // Cached modulation data for one slot + engine: the destination ids (proportion-space keys),
     // their backing APVTS atomics + ranges, and the reusable seed/result map.
     static constexpr int kMaxDests = 16;   // the most targets any engine's table holds (Bass: 10)
+    static_assert(std::size(kKickDests) <= kMaxDests && std::size(kBassDests) <= kMaxDests
+                  && std::size(kHatDests) <= kMaxDests && std::size(kSnareDests) <= kMaxDests
+                  && std::size(kRumbleDests) <= kMaxDests, "an engine's mod table outgrew GrooveVoices::kMaxDests");
 
     struct EngineMod
     {
@@ -269,7 +274,7 @@ private:
         // Publish the post-matrix values for the knobs' live modulation arcs.
         for (int k = 0; k < L.count; ++k)
             modLive[(size_t) s][(size_t) k].store(outValues[k], std::memory_order_relaxed);
-        modLiveEngine[(size_t) s].store(e, std::memory_order_relaxed);
+        modLiveEngine[(size_t) s].store(e, std::memory_order_release);   // after the values: the tag publishes them
     }
 
     // The Rumble envelope level (0..1) at `beat`, evaluated under its try-lock; on contention with a

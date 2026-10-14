@@ -116,6 +116,7 @@ public:
         if (! run)
         {
             if (noteHeld) { voice.noteOff(); noteHeld = false; }
+            tiedOut = prevTied = false;   // a Legato start must not glide from the silent voice
             voice.process(buf, n);   // the release tail
             return;
         }
@@ -211,22 +212,23 @@ private:
             p.rootOctave = juce::jlimit(0, 8, m / 12 - 1);
         }
 
-        const int midi = stepMidi(p, stepIndex);
         lastFiredStep = stepIndex;
         ++firedCount;
         ++stepIndex;
 
-        // An Off step is a rest: nothing sounds, but the scan and the clock have moved on. A tied note ends at
-        // this step boundary, and the next note after the rest starts fresh (no glide from before it).
+        // An Off step is a rest: nothing sounds, but the scan and the clock have moved on. Whatever is held
+        // ends at this step boundary (a tie, or a gate that outlived a tempo change), and the next note after
+        // the rest starts fresh (no glide from before it).
         if (! accent.isOn(lastFiredStep))
         {
-            if (noteHeld && tiedOut) { voice.noteOff(); noteHeld = false; }
+            if (noteHeld) { voice.noteOff(); noteHeld = false; }
             tiedOut  = false;
             prevTied = false;
             return;
         }
 
-        const bool tie   = legatoOn && gateLen >= 0.99f;   // 100 % gate + legato → tie/slide
+        const int midi = stepMidi(p, lastFiredStep);
+        const bool tie  = legatoOn && gateLen >= 0.99f;   // 100 % gate + legato → tie/slide
         const bool glide = legatoOn && prevTied;
         voice.setAccent(accent.at(lastFiredStep), glide);
         if (glide) voice.noteOnLegato(midi);   // glide, no retrigger

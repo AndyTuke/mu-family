@@ -12,7 +12,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
       layerPanel(p, "Track"),
       // The content binds only APVTS parameters and reads tracks by index, never holding a pointer into
       // a layer's data, so there is nothing to release before a removal.
-      layerEdit(p, sidebar, layerPanel, { {}, [this](int idx) { showTrack(idx); } }),
+      // The knobs' live modulation arcs hold a track's matrix: release them before a removal frees it.
+      layerEdit(p, sidebar, layerPanel, { [this] { trackContent.releaseModulationArcs(); },
+                                          [this](int idx) { showTrack(idx); } }),
       mixerOverlay(p, p.mixerEngine),
       settingsOverlay(p)
 {

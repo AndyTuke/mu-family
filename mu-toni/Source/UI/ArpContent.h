@@ -37,6 +37,10 @@ public:
 
     void setLayer(int idx);
 
+    // Let go of every knob's modulation binding; called before a layer is removed or moved, because the
+    // arcs hold the layer's matrix. setLayer rebinds.
+    void releaseModulationArcs() { for (auto& k : knobs) k.comp->clearModBinding(); }
+
     int getLayer() const noexcept { return currentLayer; }
 
     void lookAndFeelChanged() override { resized(); repaint(); }   // metal style / screws change the layout
