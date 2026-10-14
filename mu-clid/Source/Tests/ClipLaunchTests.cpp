@@ -94,6 +94,7 @@ struct MuClidClipLaunchTests : juce::UnitTest
     {
         storeAndLaunch();
         clipsHoldDifferentPresets();
+        dropdownThenStripGestures();
         samplePathOnly();
         launchEqualsFileLoad();
         nonClipLoadClearsActiveClip();
@@ -189,6 +190,85 @@ struct MuClidClipLaunchTests : juce::UnitTest
             }
         }
         p.sequencerPlaying.store(false);
+    }
+
+    // The entry points the layer header's preset dropdown and the clip strip call, with real rhythm files that
+    // differ in their pattern: choose (stageRhythmPreset) -> store pad (StoreClip action) for each, then launch
+    // each pad (LaunchClip action) and check the live Rhythm.
+    void dropdownThenStripGestures()
+    {
+        beginTest("dropdown preset then strip store, per pad: banks differ and each launch shows its own rhythm, stopped and playing");
+        const auto dir = presetsDir();
+        const juce::File files[] = { dir.getChildFile("T11.muRhythm"), dir.getChildFile("T13.muRhythm"),
+                                     dir.getChildFile("A9_hat.muRhythm") };
+        struct Shape { int steps, hits, rot; juce::String sample; };
+        Shape want[3];
+        for (int i = 0; i < 3; ++i)
+        {
+            expect(files[i].existsAsFile(), files[i].getFullPathName());
+            const auto t = juce::ValueTree::fromXml(files[i].loadFileAsString());
+            want[i] = { (int) t.getProperty("r0_stepsA"), (int) t.getProperty("r0_hitsA"), (int) t.getProperty("r0_rotA"),
+                        t.getProperty("r0_sample").toString() };
+        }
+        expect(want[0].hits != want[1].hits, "the fixtures differ in hits");
+
+        using Type = mu_core::ControlActionType;
+        const auto act = [](Type type, int index)
+        {
+            mu_core::ControlAction a;
+            a.type = type; a.layer = 0; a.index = index;
+            return a;
+        };
+
+        for (const bool playing : { false, true })
+        {
+            TempStorage storage;
+            mu_clid::PluginProcessor p;
+            p.sequencerPlaying.store(playing);
+            const auto* view = p.getLiveView();
+            std::vector<int> rebinds;   // what the editor re-binds its panel on
+            p.onLayerPresetCommitted = [&rebinds](int slot) { rebinds.push_back(slot); };
+            const auto settle = [&]
+            {
+                if (playing) { Probe::scan(p); Probe::commit(p); }
+                p.getLiveState().reconcile();
+            };
+
+            for (int i = 0; i < 3; ++i)
+            {
+                p.stageRhythmPreset(0, files[i]);                       // the dropdown's call
+                expect(p.perform(act(Type::StoreClip, i)), "store pad " + juce::String(i));
+            }
+            settle();
+
+            const auto stateOf = [&](int i)
+            {
+                const auto t = p.getLayer(0)->clips->get(i);
+                return juce::String((int) t.getProperty("r0_stepsA")) + "/" + juce::String((int) t.getProperty("r0_hitsA"))
+                     + "/" + juce::String((int) t.getProperty("r0_rotA")) + "/" + t.getProperty("r0_sample").toString();
+            };
+            for (int i = 0; i < 3; ++i)
+                for (int j = i + 1; j < 3; ++j)
+                    expect(stateOf(i) != stateOf(j), "bank payloads " + juce::String(i) + " and " + juce::String(j) + " differ: "
+                                                       + stateOf(i) + " vs " + stateOf(j));
+
+            // Launch in an order that starts away from the pad the last store left playing.
+            for (const int pad : { 0, 1, 0, 2, 1 })
+            {
+                const auto label = juce::String(playing ? "playing" : "stopped") + ", pad " + juce::String(pad);
+                rebinds.clear();
+                expect(p.perform(act(Type::LaunchClip, pad)), "launch pad " + juce::String(pad));
+                settle();
+                expect(rebinds == std::vector<int> { 0 }, label + ": the editor is told to re-bind exactly once");
+                const auto& g = p.getRhythm(0).genA;
+                expectEquals(g.hits, want[pad].hits, label + " hits");
+                expectEquals(g.steps, want[pad].steps, label + " steps");
+                expectEquals(g.rotate, want[pad].rot, label + " rotate");
+                expectEquals(view->getPlayingClip(0), pad, label + " lamp");
+                expectWithinAbsoluteError(getParam(p.apvts, kParam), (float) want[pad].hits, 0.01f, label + " APVTS");
+                expect(juce::File(p.samples.path(0)).getFileName() == want[pad].sample, label + " sample " + p.samples.path(0));
+            }
+        }
     }
 
     void samplePathOnly()

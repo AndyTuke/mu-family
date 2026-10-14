@@ -213,7 +213,8 @@ void RhythmContent::attachHeader(LayerHeaderBar& bar)
             loadedRhythmPresetFile = presetFile;
             if (!proc.sequencerPlaying.load())
             {
-                if (requestRebind) requestRebind(currentRhythmIndex);   // refreshes rhythmPresetFiles, clears dropdown
+                // The stopped load has already re-bound the panel (onLayerPresetCommitted), which refreshed
+                // rhythmPresetFiles and cleared the dropdown.
                 repaint();
                 // Re-select the just-loaded preset (refreshRhythmPresets cleared the selection).
                 for (int i = 0; i < (int)rhythmPresetFiles.size(); ++i)

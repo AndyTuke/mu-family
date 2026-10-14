@@ -222,6 +222,8 @@ void ClipStrip::clickPad(int pad, bool shift)
     if (! send(mu_core::ControlActionType::LaunchClip, pad)) return;
     if (wasPlaying && ! hadQueue)
         say("Mute", layerName + (view->isLayerMuted(layer) ? " muted" : " unmuted"), true);
+    else if (! wasPlaying && view->getPlayingClip(layer) == pad)   // a stopped transport plays it at once
+        say("Clip", "Launched " + layerName + " " + clipText(pad), true);
 }
 
 void ClipStrip::storePad(int pad)

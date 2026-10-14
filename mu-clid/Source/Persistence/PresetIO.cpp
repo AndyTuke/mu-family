@@ -484,8 +484,15 @@ bool PresetIO::applyRhythmPresetTree(const juce::ValueTree& state, int targetInd
     }
     proc.suspendProcessing(false);
 
-    mu_core::ScopedApvtsLoading guard(proc.apvtsLoading);
-    proc.pushRhythmToApvts(targetIndex);
+    {
+        mu_core::ScopedApvtsLoading guard(proc.apvtsLoading);
+        proc.pushRhythmToApvts(targetIndex);
+    }
+
+    // The editor ignores the APVTS pushes above (they are a bulk load), so it re-binds on this callback, as it
+    // does for a boundary commit; without it a stopped clip launch changes the sound but not the screen.
+    if (proc.onLayerPresetCommitted)
+        proc.onLayerPresetCommitted(targetIndex);
     return true;
 }
 
