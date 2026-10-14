@@ -134,6 +134,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/GrooveVoicesTests.cpp   # renderAll block sizes, the Rumble's tail handling
     Source/Tests/EngineMigrationTests.cpp   # five-lane states and track presets load as engine-qualified layers
     Source/Tests/ClipLaunchTests.cpp   # clip store / launch on the real processor
+    Source/Tests/ModArcTests.cpp   # every mod target publishes its live value for the knob arcs
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp

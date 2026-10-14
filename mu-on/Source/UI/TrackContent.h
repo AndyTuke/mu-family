@@ -48,6 +48,7 @@ public:
 private:
     void timerCallback() override;
     void rebuild();                         // rebind every control to the shown track and engine
+    void bindModulationArcs(std::vector<mu_ui::ParamKnobGrid::Spec>& specs) const;   // live arcs on the knobs the target table drives
     void refreshSourceList();
     void refreshSourceSelection();
     void engineChosen(int id);

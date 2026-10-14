@@ -2,8 +2,11 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/MuLookAndFeel.h"
+#include "Modulation/ModulationMatrix.h"
 
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -20,7 +23,16 @@ namespace mu_ui {
 class ParamKnobGrid : public juce::Component
 {
 public:
-    struct Spec { juce::String id; juce::String label; };
+    // `modDestId` (with `modMatrix` and `modLive`) is optional: a float param that is a modulation
+    // target shows its live modulation arc, bound through KnobWithLabel::bindModulation.
+    struct Spec
+    {
+        juce::String            id;
+        juce::String            label;
+        const char*             modDestId = nullptr;
+        const ModulationMatrix* modMatrix = nullptr;
+        std::function<float()>  modLive;
+    };
 
     explicit ParamKnobGrid(juce::AudioProcessorValueTreeState& state);
 
@@ -46,7 +58,7 @@ private:
     struct Control
     {
         juce::String                    label;
-        std::unique_ptr<juce::Slider>   knob;
+        std::unique_ptr<KnobWithLabel>  knob;
         std::unique_ptr<juce::ComboBox> combo;
         juce::Label                     name;
         std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   knobAtt;

@@ -100,6 +100,11 @@ public:
         return engineFromIndex(p != nullptr ? juce::roundToInt(p->load(std::memory_order_relaxed)) : 0);
     }
 
+    // Post-matrix value of modulation target `dest` (a row of `engine`'s table) on track `i`, in the
+    // target knob's parameter units; NaN while the track runs another engine. Written each block by
+    // GrooveVoices; read by the knobs' live arcs.
+    float getModLive(int i, EngineType engine, int dest) const noexcept { return grooveVoices.getModLive(i, engine, dest); }
+
     // Switch track `i` to `engine`: every engine keeps its settings on the track, the step row and
     // envelope stay, and the track's modulation assignments that target another engine's parameters
     // are dropped. Message thread.

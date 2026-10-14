@@ -1,6 +1,8 @@
 #include "TrackContent.h"
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 
+#include <limits>
+
 namespace mu_on
 {
 
@@ -101,6 +103,31 @@ juce::Colour TrackContent::layerColour() const
         (size_t) (proc.getLayerColourIndex(currentLayer) % MuLookAndFeel::kLayerPaletteSize)];
 }
 
+// Give every knob that has a row in the shown engine's modulation target table its live arc, driven by
+// the track's matrix and the value the audio thread published for that target. Dropdowns have no
+// target; the arc is cleared (NaN) while the transport is stopped.
+void TrackContent::bindModulationArcs(std::vector<mu_ui::ParamKnobGrid::Spec>& specs) const
+{
+    static const float kNaN = std::numeric_limits<float>::quiet_NaN();
+    int count = 0;
+    const ModDestEntry* table = destsForEngine(shownEngine, count);
+    const auto* matrix = &proc.getTrack(currentLayer).modulationMatrix;
+    const juce::String prefix = layerParamPrefix(currentLayer);
+    const int layer = currentLayer;
+    const EngineType engine = shownEngine;
+
+    for (auto& spec : specs)
+    {
+        const int dest = mu_mod::indexOfParam(table, (std::size_t) count, spec.id.substring(prefix.length()).toStdString());
+        if (dest < 0) continue;
+
+        spec.modDestId = table[dest].id;
+        spec.modMatrix = matrix;
+        spec.modLive   = [this, layer, engine, dest]() -> float
+                         { return proc.isInternalPlaying() ? proc.getModLive(layer, engine, dest) : kNaN; };
+    }
+}
+
 void TrackContent::setLayer(int idx)
 {
     currentLayer = juce::jlimit(0, mu_limits::kMaxLayers - 1, idx);
@@ -113,7 +140,9 @@ void TrackContent::rebuild()
 {
     shownEngine = proc.engineOf(currentLayer);
     engineSelect.setSelectedId(toIndex(shownEngine) + 1, false);
-    grid.setSpecs(specsFor(currentLayer, shownEngine));
+    auto specs = specsFor(currentLayer, shownEngine);
+    bindModulationArcs(specs);
+    grid.setSpecs(specs);
 
     const bool rumble = shownEngine == EngineType::Rumble;
     sourceCaption.setVisible(rumble);
