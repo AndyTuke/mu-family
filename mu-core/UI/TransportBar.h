@@ -96,6 +96,7 @@ public:
     void syncPerformance();
     StepIndicator&   getStepIndicator()  noexcept { return stepIndicator; }
     juce::Component& getPerformToggle()  noexcept { return perfBtn; }
+    juce::Component& getPlayButton()     noexcept { return playBtn; }
 
     void paint(juce::Graphics& g) override;
     void resized() override;

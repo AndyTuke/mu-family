@@ -35,6 +35,9 @@ ShellChrome::ShellChrome(juce::Component& hostComponent, mu_core::ShellBackend& 
     host.addChildComponent(shield);
     shield.addExempt(transportBar.getPerformToggle());
     shield.addExempt(transportBar.getStepIndicator());
+    // Play/Stop stays live in the mode, by pointer and by its key.
+    shield.addExempt(transportBar.getPlayButton());
+    shield.onExemptKey = [this](const juce::KeyPress& k) { return handlePlayKey(k); };
     liveView = shellBackend.getLiveView();
     if (liveView != nullptr) liveView->addListener(this);
     syncPerformanceMode();
@@ -662,8 +665,8 @@ bool ShellChrome::isPerformanceKey(const juce::KeyPress& key) noexcept
 
 bool ShellChrome::keyPressed(const juce::KeyPress& key, juce::Component*)
 {
-    // Performance mode locks the keyboard too: every key, the play key and Ctrl+P included, does nothing.
-    if (shieldUp) return true;
+    // Performance mode locks the keyboard too; only the play key still works, as the Play button does.
+    if (shieldUp) { handlePlayKey(key); return true; }
 
     // Don't intercept when a text editor has focus: it needs the key for input.
     auto* focused = juce::Component::getCurrentlyFocusedComponent();
@@ -682,6 +685,14 @@ bool ShellChrome::keyPressed(const juce::KeyPress& key, juce::Component*)
         return true;
     }
     return false;
+}
+
+// The play key, standalone only, same as the Play button; true when it was the play key.
+bool ShellChrome::handlePlayKey(const juce::KeyPress& key)
+{
+    if (! backend.isStandaloneApp() || key != keybindPlayStop) return false;
+    backend.toggleInternalPlay();
+    return true;
 }
 
 bool ShellChrome::keyStateChanged(bool, juce::Component*) { return false; }
@@ -713,10 +724,16 @@ void ShellChrome::InputShield::addExempt(juce::Component& c)
 // False over an exempt component, so the pointer reaches what is underneath there.
 bool ShellChrome::InputShield::hitTest(int x, int y)
 {
+    // Bounds are read per call, so an exemption follows resizes; it only counts while it and its parents are visible.
     for (auto& p : exempt)
         if (auto* c = p.getComponent())
-            if (c->isVisible() && getLocalArea(c, c->getLocalBounds()).contains(x, y))
+        {
+            bool visible = true;
+            for (auto* a = c; a != nullptr && a != getParentComponent(); a = a->getParentComponent())
+                visible = visible && a->isVisible();
+            if (visible && getLocalArea(c, c->getLocalBounds()).contains(x, y))
                 return false;
+        }
     return true;
 }
 

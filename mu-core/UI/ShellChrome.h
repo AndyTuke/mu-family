@@ -58,14 +58,16 @@ public:
         void mouseDoubleClick(const juce::MouseEvent&) override {}
         void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override {}   // the default forwards to the parent
         void mouseMagnify(const juce::MouseEvent&, float) override {}
-        bool keyPressed(const juce::KeyPress&) override { return true; }
+        // Every key is swallowed; the one a product exempts (the play key) is offered to this first.
+        bool keyPressed(const juce::KeyPress& key) override { if (onExemptKey) onExemptKey(key); return true; }
+        std::function<bool(const juce::KeyPress&)> onExemptKey;
     private:
         std::vector<juce::Component::SafePointer<juce::Component>> exempt;
     };
 
     InputShield& getInputShield() noexcept { return shield; }
     bool isPerformanceLocked() const noexcept { return shieldUp; }
-    // Lets the pointer through the shield over `c` (the sidebar's layer indicator).
+    // Lets the pointer through the shield over `c` (the Play button, the sidebar's layer indicator).
     void addShieldExemption(juce::Component& c) { shield.addExempt(c); }
     // Re-reads the live state and raises or lowers the shield. Called on every live-state change.
     void syncPerformanceMode();
@@ -225,6 +227,7 @@ private:
     void liveStateChanged() override { syncPerformanceMode(); }
     void enterLock();     // closes everything open as a cancel, releases text focus, raises the shield
     void leaveLock();
+    bool handlePlayKey(const juce::KeyPress& key);
     void raiseShield();   // back on top after a child was added above it
 
     std::atomic<bool> upgradeAvailable { false };

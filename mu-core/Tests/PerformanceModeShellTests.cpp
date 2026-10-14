@@ -457,9 +457,37 @@ struct PerformanceModeShellTests : juce::UnitTest
                    "the preset indicator is reachable for hover");
             expect(host.getComponentAt(centreOf(layerIndicator)) == &layerIndicator, "the sidebar's layer indicator is reachable");
 
+            beginTest("shield: the Play button is reachable and toggles the transport; other bar controls stay locked");
+            auto& play = chrome.getTransportBar().getPlayButton();
+            auto* mixerBtn = findButton(chrome.getTransportBar(), "Mixer");
+            expect(mixerBtn != nullptr && mixerBtn->isVisible(), "the Mixer button is in the bar");
+            expect(host.getComponentAt(centreOf(play)) == &play, "a press at Play's centre reaches it");
+            expect(host.getComponentAt(centreOf(*mixerBtn)) == &chrome.getInputShield(), "the Mixer button is still swallowed");
+            const bool wasPlaying = b.playing;
+            expect(static_cast<juce::Button&>(play).isEnabled(), "Play is enabled");
+            static_cast<juce::Button&>(play).triggerClick();
+            pump(30);   // triggerClick posts the click
+            expect(b.playing != wasPlaying, "the press toggled the transport");
+
+            // The exemption follows the button's current bounds and visibility, never a stale rectangle.
+            const auto oldCentre = centreOf(play);
+            const auto oldBounds = play.getBounds();
+            play.setBounds(oldBounds.withWidth(oldBounds.getWidth() / 2));
+            const auto farRight = host.getLocalPoint(&chrome.getTransportBar(), juce::Point<int>(oldBounds.getRight() - 2, oldBounds.getCentreY()));
+            expect(host.getComponentAt(farRight) == &chrome.getInputShield(), "narrowed: the freed part is shielded again");
+            expect(host.getComponentAt(centreOf(play)) == &play, "and the new area is live");
+            play.setBounds(oldBounds);
+            play.setVisible(false);
+            expect(host.getComponentAt(oldCentre) == &chrome.getInputShield(), "hidden: nothing is let through");
+            play.setVisible(true);
+            expect(host.getComponentAt(centreOf(play)) == &play, "visible again: live");
+
             beginTest("shield: every key does nothing while on, the play key and Ctrl+P included");
             const juce::KeyPress space(juce::KeyPress::spaceKey), ctrlP('p', juce::ModifierKeys::ctrlModifier, 0);
-            expect(chrome.keyPressed(space, nullptr) && ! b.playing, "space is swallowed");
+            const bool playing0 = b.playing;
+            expect(chrome.keyPressed(space, nullptr) && b.playing != playing0, "space still plays and stops, like the Play button");
+            expect(chrome.getInputShield().keyPressed(space) && b.playing == playing0, "the focused shield passes it on too");
+            expect(chrome.keyPressed(juce::KeyPress('x'), nullptr) && b.playing == playing0, "other keys do nothing");
             expect(chrome.keyPressed(ctrlP, nullptr) && chrome.isPerformanceLocked(), "Ctrl+P is swallowed and does not leave");
             expect(chrome.keyPressed(juce::KeyPress(juce::KeyPress::escapeKey), nullptr), "Escape is swallowed");
             expect(chrome.getInputShield().keyPressed(juce::KeyPress('x')), "the shield itself returns true");
@@ -468,6 +496,7 @@ struct PerformanceModeShellTests : juce::UnitTest
             rig.live.perform(act(ControlActionType::PerformanceMode, 0, 0));
             expect(! chrome.isPerformanceLocked() && ! chrome.getInputShield().isVisible(), "unlocked");
             expect(host.getComponentAt(mainCentre) != &chrome.getInputShield(), "the panel gets the pointer again");
+            b.playing = false;
             expect(chrome.keyPressed(space, nullptr) && b.playing, "space plays");
 
             beginTest("shield: Ctrl+P enters; with no performance it only says so");
