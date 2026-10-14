@@ -20,7 +20,7 @@ namespace vpi
         noise, ntype, ft, cut, res, drv, locut,                                                  // noise + filter (7)
         aeA, aeD, aeS, aeR, aeL, feA, feD, feS, feR, feDep, peA, peD, peS, peR, peDep, ptgt,      // envs (16)
         drvChar, insP1, insP2, insP3, insP4,                                                     // insert (5)
-        acc, accLen, accPat,                                                                     // accent (3)
+        acc, accLen, accPat, stepMask,                                                           // accent + step pattern (4)
         COUNT
     };
     static const char* const suffix[COUNT] = {
@@ -30,9 +30,9 @@ namespace vpi
         "noise","ntype","ft","cut","res","drv","locut",
         "aeA","aeD","aeS","aeR","aeL","feA","feD","feS","feR","feDep","peA","peD","peS","peR","peDep","ptgt",
         "drvChar","insP1","insP2","insP3","insP4",
-        "acc","accLen","accPat",
+        "acc","accLen","accPat","stepMask",
     };
-    static_assert(COUNT == 62, "vpi slot count must equal PluginProcessor::kNumVoiceParams");
+    static_assert(COUNT == 63, "vpi slot count must equal PluginProcessor::kNumVoiceParams");
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParameterLayout()
@@ -85,8 +85,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         // Accent: a repeating on/off pattern over the arp's steps (bit i = step i+1 accented),
         // its length, and how much an accented step lifts (louder + a brighter filter).
         layout.add(std::make_unique<AudioParameterFloat>(pid("acc"),    lbl("Accent"), f(0.0f, 100.0f, 1.0f), 0.0f));
-        layout.add(std::make_unique<AudioParameterInt>  (pid("accLen"), lbl("Accent Steps"), 1, ArpAccent::kMaxSteps, 4));
+        layout.add(std::make_unique<AudioParameterInt>  (pid("accLen"), lbl("Pattern Steps"), 1, ArpAccent::kMaxSteps, 4));
         layout.add(std::make_unique<AudioParameterInt>  (pid("accPat"), lbl("Accent Pattern"), 0, (1 << ArpAccent::kMaxSteps) - 1, 1));
+        // Step pattern: bit i = step i+1 is On (clear = Off, a rest). Default all On, so layers saved
+        // before this existed play every step as before.
+        layout.add(std::make_unique<AudioParameterInt>  (pid("stepMask"), lbl("Step Mask"), 0, (1 << ArpAccent::kMaxSteps) - 1, (1 << ArpAccent::kMaxSteps) - 1));
 
         // Oscillators — mu-Tant's wavetable oscs: a table from the shared bank + its scan
         // position (frame 0..255), defaulting to Basic Shapes' saw.
@@ -307,6 +310,7 @@ void PluginProcessor::readVoice(int v, ArpParams& ap, ToniVoiceParams& tv,
     accent.amount  = out[D_acc] * 0.01f;
     accent.length  = (int) g(vpi::accLen);
     accent.pattern = (unsigned) juce::jmax(0, (int) g(vpi::accPat));
+    accent.stepMask = (unsigned) juce::jmax(0, (int) g(vpi::stepMask));
 
     // Insert config (applied post-VCA in the render callback).
     auto& ic = getArp(v).insertCfg;

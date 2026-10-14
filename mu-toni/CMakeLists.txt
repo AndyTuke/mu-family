@@ -131,6 +131,7 @@ target_sources(mu-toni-tests PRIVATE
     Source/Tests/ClipLaunchTests.cpp   # clip store / launch on the real processor
     Source/Tests/FxTailTests.cpp   # a full-preset commit keeps the FX tail
     Source/Tests/ModArcTests.cpp   # every mod target publishes its live value for the knob arcs
+    Source/Tests/StepPatternTests.cpp   # step pattern: rests, Legato tie end, defaults
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp

@@ -120,7 +120,7 @@ protected:
 
     // ── Arp/voice parameter cache (index into vp[voice][slot]) ────────────────
     // Enum + suffix table live in the .cpp; count is needed here for the array.
-    static constexpr int kNumVoiceParams = 62;
+    static constexpr int kNumVoiceParams = 63;
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();

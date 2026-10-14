@@ -312,6 +312,8 @@ struct MuTheme
         float lampOn             = 0.66f;   // lit, but not bright
         float lampHot            = 0.30f;   // brighter centre on a lit lamp (lens hot-spot)
         float lampPlayhead       = 0.25f;   // extra brightness on the playhead step
+        float lampAccent         = 1.0f;    // level-cell lamp displays: the top level (accented step), full strength
+        float lampPlayheadRing   = 0.6f;    // level-cell lamp displays: alpha of the thin ring marking the playhead cell
         float lampBeat           = 0.06f;   // unlit beat-group start: a hint of colour to mark the beat
         float lampGapDarken      = 0.6f;    // lamp displays (step editor): gaps between lenses, base darkened by this
         float lampHotSpotReach   = 0.60f;   // lamp displays: hot-spot radius, fraction of the lit lens's longer side
