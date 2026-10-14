@@ -31,12 +31,15 @@ public:
 
     // Audio thread, once per block: `transport` (numTransport bytes: FA / FB / FC, F2 lsb msb,
     // F8) at the block start, then one 0xF8 per pulse, due `frameOffsets[i]` frames after
-    // `blockStartMs`; pulses past numOffsets go at the block's last frame.
+    // `blockStartMs`; pulses past numOffsets go at the block's last frame. Everything is delayed
+    // by the device's output latency so the clock lands with the audio the block carries.
     void emit(double blockStartMs, const std::uint8_t* transport, int numTransport,
-              const int* frameOffsets, int numOffsets, int numPulses, int numFrames, double sampleRate)
+              const int* frameOffsets, int numOffsets, int numPulses, int numFrames, double sampleRate,
+              int outputLatencyFrames = 0)
     {
         if (! sender.isActive() || sampleRate <= 0.0)
             return;
+        blockStartMs = mu_core::midiDueStartMs(blockStartMs, 0, outputLatencyFrames, sampleRate);
         // Transport messages: Song Position Pointer is three bytes, everything else one.
         for (int i = 0; i < numTransport;)
         {

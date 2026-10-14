@@ -20,6 +20,17 @@
 namespace mu_core
 {
 
+// When MIDI rendered in a block should be sent: the block's audio is heard `leadFrames` of render
+// lead plus the device's published output latency after `nowMs`, so the MIDI goes out then too
+// and lands with the sound instead of ahead of it.
+inline double midiDueStartMs(double nowMs, int leadFrames, int outputLatencyFrames, double sampleRate) noexcept
+{
+    if (sampleRate <= 0.0)
+        return nowMs;
+    return nowMs + (double) (leadFrames > 0 ? leadFrames : 0) * 1000.0 / sampleRate
+                 + (double) (outputLatencyFrames > 0 ? outputLatencyFrames : 0) * 1000.0 / sampleRate;
+}
+
 class TimedMidiOut : private juce::Thread
 {
 public:

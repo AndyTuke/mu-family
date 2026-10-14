@@ -156,7 +156,8 @@ private:
         // MIDI clock out follows the picker's default output. The device manager only swaps that
         // port between audioDeviceStopped() and here, so this is the safe point to pick it up.
         midiClock.setOutput(deviceManager.getDefaultMidiOutput());
-        engine.setOutputLatencyFrames(device->getOutputLatencyInSamples());   // clients time MIDI to land with the audio
+        outputLatencyFrames = device->getOutputLatencyInSamples();
+        engine.setOutputLatencyFrames(outputLatencyFrames);   // clients time MIDI to land with the audio
         // Opening (or re-opening) a device must not dictate transport state — the
         // app starts stopped and a device change mid-session preserves play/stop.
     }
@@ -173,7 +174,7 @@ private:
         const BlockStats stats = engine.renderBlock(outputChannelData, numOutputChannels, numSamples);
         midiClock.emit(blockStartMs, stats.transportBytes, stats.numTransportBytes,
                        stats.pulseOffsets, stats.numPulseOffsets,
-                       (int) stats.midiPulsesInBlock, numSamples, deviceSampleRate);
+                       (int) stats.midiPulsesInBlock, numSamples, deviceSampleRate, outputLatencyFrames);
     }
 
     juce::AudioDeviceManager deviceManager;
@@ -183,6 +184,7 @@ private:
     MidiClockInput           midiClockInput;
     double                   engineTempo = 120.0;
     double                   deviceSampleRate = 48000.0;
+    int                      outputLatencyFrames = 0;   // device output latency, set before the callbacks start
     bool                     started     = false;
     bool                     busCreated  = false;
 };

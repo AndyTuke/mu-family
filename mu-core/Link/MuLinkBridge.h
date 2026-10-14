@@ -80,8 +80,10 @@ public:
             if (processor.producesMidi() && midiOut.isActive() && t.sampleRate != 0)
             {
                 const double sr = (double) t.sampleRate;
-                const double dueStartMs = juce::Time::getMillisecondCounterHiRes()
-                                        + client.renderLeadFrames() * 1000.0 / sr;
+                // Due when the block is heard: its render lead plus the device's output latency.
+                const double dueStartMs = mu_core::midiDueStartMs(juce::Time::getMillisecondCounterHiRes(),
+                                                                  client.renderLeadFrames(),
+                                                                  client.outputLatencyFrames(), sr);
                 for (const auto meta : scratchMidi)
                 {
                     if (meta.numBytes < 1 || meta.data[0] >= 0xF0) continue;

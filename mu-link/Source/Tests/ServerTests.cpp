@@ -11,6 +11,7 @@
 #include "../Clock/MidiClockEstimator.h"
 #include "../Clock/ClockLock.h"
 #include "../Clock/MidiClockOut.h"
+#include "../Clock/MidiClockInput.h"
 #include "Link/MuLinkSharedMemory.h"
 #include "Plugin/MidiClockSync.h"   // mu-core: the receiver the round-trip test feeds
 
@@ -270,6 +271,50 @@ public:
                 if (std::abs((at[i] - at[i - 1]) - 1000) > 1) ++uneven;
             expectEquals(uneven, 0, "pulse spacing off the 1000-frame grid");
             expect(std::abs(at.front() - 1000) <= 1, "first pulse one pulse period after start");
+        }
+
+        beginTest("MIDI clock in stamps pulses with the message timestamp, not the arrival time");
+        {
+            // Fake time: 120 BPM pulses 1/48 s apart carry exact capture timestamps while they all
+            // arrive back to back, so only the carried stamp can give the right tempo.
+            MidiClockInput in;
+            for (int i = 0; i < 100; ++i)
+            {
+                auto m = juce::MidiMessage::midiClock();
+                m.setTimeStamp(10.0 + i / 48.0);
+                in.handleIncomingMidiMessage(nullptr, m);
+            }
+            expectWithinAbsoluteError(in.estimator().bpm(), 120.0, 1.0e-6);
+            expectEquals((int) in.estimator().pulseCount(), 100);
+
+            auto stamped = juce::MidiMessage::midiClock();
+            stamped.setTimeStamp(3.25);
+            expectWithinAbsoluteError(MidiClockInput::pulseTimestamp(stamped, 99.0), 3.25, 1.0e-12);
+            expectWithinAbsoluteError(MidiClockInput::pulseTimestamp(juce::MidiMessage::midiClock(), 99.0), 99.0, 1.0e-12);
+        }
+
+        beginTest("MIDI due times include the published output latency");
+        {
+            expectWithinAbsoluteError(mu_core::midiDueStartMs(1000.0, 0, 0, 48000.0), 1000.0, 1.0e-9);
+            expectWithinAbsoluteError(mu_core::midiDueStartMs(1000.0, 4800, 2400, 48000.0), 1000.0 + 100.0 + 50.0, 1.0e-9);
+            expectWithinAbsoluteError(mu_core::midiDueStartMs(1000.0, 0, -5, 48000.0), 1000.0, 1.0e-9);   // negative = unknown
+            expectWithinAbsoluteError(mu_core::midiDueStartMs(1000.0, 100, 100, 0.0), 1000.0, 1.0e-9);
+
+            MidiClockOut clockOut(false);
+            clockOut.armForTest();
+            const int offsets[] = { 0, 480 };
+            clockOut.emit(100.0, nullptr, 0, offsets, 2, 2, 1024, 48000.0, 2400);   // 50 ms of latency
+            std::vector<double> sentAt;
+            auto sink = [&](const juce::MidiMessage&, double due) { sentAt.push_back(due); };
+            clockOut.sendDue(149.0, sink);
+            expect(sentAt.empty(), "held back by the latency");
+            clockOut.sendDue(1.0e12, sink);
+            expectEquals((int) sentAt.size(), 2);
+            if (sentAt.size() == 2)
+            {
+                expectWithinAbsoluteError(sentAt[0], 150.0, 1.0e-6);
+                expectWithinAbsoluteError(sentAt[1], 160.0, 1.0e-6);
+            }
         }
 
         beginTest("MIDI clock out sends each pulse when it is due, in order");
