@@ -285,6 +285,16 @@ void PresetIO::stageRhythmPresetTree(int rhythmIndex, const juce::ValueTree& sta
     if (! prepared.voice) return;
     proc.hotSwapStager.cancelPendingIfAny(rhythmIndex);   // a newer swap supersedes a pending one
     proc.hotSwapStager.stage(rhythmIndex, std::move(prepared.rhythm), std::move(prepared.voice), prepared.samplePath);
+
+    // The transport may have stopped while the rhythm was being prepared. A stopped transport raises no boundary, so
+    // nothing would ever commit the stage: re-read after a fence (as the full-preset path does) and, if stopped, drop the
+    // stage and apply the tree here instead.
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+    if (! proc.sequencerPlaying.load())
+    {
+        proc.hotSwapStager.cancelPendingIfAny(rhythmIndex);
+        applyRhythmPresetTree(state, rhythmIndex, keepIdentity, source);
+    }
 }
 
 // A layer-preset tree prepared for slot `rhythmIndex` (no voice when the tree can't be built).
