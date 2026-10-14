@@ -129,6 +129,7 @@ target_sources(mu-toni-tests PRIVATE
     Source/Tests/LayerCountPersistTests.cpp   # layer count default / persistence / add-remove-swap carry
     Source/Tests/PrefixMigrationTests.cpp   # data saved before the v -> a id-prefix rename still loads
     Source/Tests/ClipLaunchTests.cpp   # clip store / launch on the real processor
+    Source/Tests/FxTailTests.cpp   # a full-preset commit keeps the FX tail
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp
