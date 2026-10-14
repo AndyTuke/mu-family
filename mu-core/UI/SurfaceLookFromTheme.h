@@ -22,7 +22,8 @@ inline mu_core::SurfaceLook makeSurfaceLook()
     look.dimScale    = light.padDimScale;
     look.pulseHz     = light.queuedPulseHz;
     look.stepFlashMs = (int) light.stepFlashMs;
-    return look;   // flashHz keeps its default until the muted-clip light adds its theme token
+    look.flashHz     = light.clipMutedFlashHz;
+    return look;
 }
 
 } // namespace mu_ui

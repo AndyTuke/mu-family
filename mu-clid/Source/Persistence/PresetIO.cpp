@@ -460,6 +460,7 @@ bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIndex, bool k
 
     // A direct load is not a clip launch: the install keeps the slot's activeClip, so clear it here.
     proc.sequencer.getRhythm(targetIndex).activeClip = -1;
+    proc.getLiveState().clearLayerClips(targetIndex);
     return true;
 }
 
@@ -1005,6 +1006,7 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     }
     for (int i = n; i < oldN; ++i)
         proc.clearLayerClips(i);
+    proc.publishClipMasks();
 
     // ── APVTS / mixer / global finalize (message-thread, no I/O) ───────────────
     // The Rhythm + VoiceEngine are already live. Push the moved-in Rhythm into

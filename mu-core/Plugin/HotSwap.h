@@ -152,6 +152,7 @@ public:
     {
         if (! valid(i)) return;
         put(slots[(size_t) i], std::move(payload));
+        ++slotSerials[(size_t) i];
     }
 
     void stageFull(FullPayload&& payload)
@@ -165,10 +166,16 @@ public:
     // from someone else's.
     uint32_t fullStageSerial() const noexcept { return fullSerial; }
 
+    // Changes every time slot i is staged or cancelled, never when its swap is consumed (message thread):
+    // an owner that queued a payload on a slot sees "still ours" while the serial is unchanged, and
+    // "superseded or cancelled" once it moved. Whether it has landed is hasPending(i).
+    uint32_t slotStageSerial(int i) const noexcept { return valid(i) ? slotSerials[(size_t) i] : 0; }
+
     void cancel(int i)
     {
         if (! valid(i)) return;
         clear(slots[(size_t) i]);
+        ++slotSerials[(size_t) i];
     }
 
     // A cancel changes the serial like a stage does: whoever queued the cancelled payload can then see that it is gone.
@@ -317,6 +324,7 @@ private:
     std::array<Slot<SlotPayload>, (size_t) N> slots;
     Slot<FullPayload>                         full;
     uint32_t                                  fullSerial = 0;   // message thread only
+    std::array<uint32_t, (size_t) N>          slotSerials {};   // message thread only
 };
 
 // Slot argument the boundary callable receives when asked about the full preset rather than a layer.
@@ -396,6 +404,7 @@ public:
 
     void cancelFull()                     { stager.cancelFull(); }
     uint32_t fullSerial() const noexcept  { return stager.fullStageSerial(); }
+    uint32_t slotSerial(int i) const noexcept { return stager.slotStageSerial(i); }
     void cancel(int i)                    { stager.cancel(i); }
     bool hasPending(int i) const noexcept { return stager.hasPending(i); }
     bool hasFullPending() const noexcept  { return stager.hasFullPending(); }

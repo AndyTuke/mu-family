@@ -5,6 +5,8 @@
 #include "Control/SurfaceLook.h"
 #include "Surface/SurfaceEvent.h"
 #include "Surface/SurfaceMapping.h"
+#include "MuLimits.h"
+#include <array>
 #include <functional>
 #include <vector>
 
@@ -47,11 +49,18 @@ public:
     std::function<void()> onChanged;
 
 private:
-    enum class Level { Off, Dim, Bright, Pulse };
-    struct Light { Level level = Level::Off; uint32_t rgb = 0; };
+    // Flash: square bright / dim (a muted playing clip). Burst: the one brief flash of a clip that just started.
+    enum class Level { Off, Dim, Bright, Pulse, Flash, Burst };
+    struct Light
+    {
+        Level    level  = Level::Off;
+        uint32_t rgb    = 0;
+        bool     settle = false;   // Bright, but a burst ended a moment ago: one more frame must be sent
+    };
 
     void     liveStateChanged() override;
-    Light    lightFor(const mu_core::ControlAction& action) const;
+    Light    lightFor(const mu_core::ControlAction& action, double nowMs) const;
+    void     trackPlayingClips(double nowMs) const;
     uint32_t layerRgb(int layer) const;
     std::vector<LedState> frame(double nowMs, bool* animating) const;
 
@@ -61,6 +70,11 @@ private:
     std::vector<SurfaceMapping::Binding> bindings;
     mu_core::SurfaceLook        look;
     Clock                       clock;
+
+    // When each layer's playing clip last changed, to time the start-of-clip burst. Written while rendering
+    // (message thread only), hence mutable. lastPlaying -2 = not seen yet, so the first frame does not burst.
+    mutable std::array<int, (size_t) mu_limits::kMaxLayers>    lastPlaying;
+    mutable std::array<double, (size_t) mu_limits::kMaxLayers> burstStartMs;
 };
 
 } // namespace mu_control

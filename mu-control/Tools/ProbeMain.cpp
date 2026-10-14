@@ -430,6 +430,10 @@ struct DemoView : mu_core::LiveView
     int  getLayerColourIndex(int layer) const override { return layer; }
     bool isItemPlayable(int item) const override { return item >= 0 && item < 4; }
     uint32_t getRevision() const noexcept override { return revision; }
+    int  getPlayingClip(int) const override { return -1; }
+    int  getQueuedClip(int) const override { return -1; }
+    uint8_t getClipMask(int) const override { return 0; }
+    bool isLayerMuted(int) const override { return false; }
     void addListener(Listener* l) const override    { listeners.add(l); }
     void removeListener(Listener* l) const override { listeners.remove(l); }
 

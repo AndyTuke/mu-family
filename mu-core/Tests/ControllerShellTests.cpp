@@ -208,6 +208,7 @@ struct ControllerShellTests : juce::UnitTest
             expectWithinAbsoluteError(look.dimScale, light.padDimScale, 0.0001f);
             expectWithinAbsoluteError(look.pulseHz, light.queuedPulseHz, 0.0001f);
             expectEquals(look.stepFlashMs, (int) light.stepFlashMs);
+            expectWithinAbsoluteError(look.flashHz, light.clipMutedFlashHz, 0.0001f);
         }
     }
 

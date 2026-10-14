@@ -89,6 +89,7 @@ struct MuClidClipLaunchTests : juce::UnitTest
         rejectionsAndGuards();
         launchWhilePlaying();
         cancelledLaunch();
+        liveClips();
         bankFollowsStructuralEdits();
         fullPresetAndSessionRoundTrip();
         stagedFullPresetCarriesBanks();
@@ -286,6 +287,101 @@ struct MuClidClipLaunchTests : juce::UnitTest
         expect(sameBank(*p.getLayer(0)->clips, bank), "the commit left the bank");
         expectEquals(p.getLayer(0)->activeClip, 2, "and the slot's activeClip");
         p.sequencerPlaying.store(false);
+    }
+
+    // The live state over mu-Clid's own stager: pad actions launch, the commit lands them, a load or a
+    // full preset settles the lamps. Performance mode is standalone-only, so the processor is built as one.
+    void liveClips()
+    {
+        beginTest("live clips: a pad launch plays at once when stopped, queues and lands through mu-Clid's stager, and a load or full preset settles it");
+        TempStorage storage;
+        juce::AudioProcessor::setTypeOfNextNewPlugin(juce::AudioProcessor::wrapperType_Standalone);
+        mu_clid::PluginProcessor p;
+        juce::AudioProcessor::setTypeOfNextNewPlugin(juce::AudioProcessor::wrapperType_Undefined);
+
+        using Type = mu_core::ControlActionType;
+        const auto act = [](Type type, int layer = 0, int index = -1)
+        {
+            mu_core::ControlAction a;
+            a.type = type; a.layer = layer; a.index = index;
+            return a;
+        };
+        mu_pp::PerformanceFile list;
+        list.setItem(0, p.getProductStateId(), storage.root.getChildFile("p.preset"), storage.root, "P");
+        p.loadPerformance(list, storage.root.getChildFile("live.muPerformance"));
+        expect(p.perform(act(Type::PerformanceMode, 0, 1)), "Performance mode is on");
+        const auto* view = p.getLiveView();
+
+        setParam(p.apvts, kParam, 3.0f); p.storeClip(0, 1, "A");
+        setParam(p.apvts, kParam, 7.0f); p.storeClip(0, 2, "B");
+        expectEquals((int) view->getClipMask(0), 0b110, "storing publishes the mask");
+
+        expect(! p.perform(act(Type::LaunchClip, 0, 5)), "an empty pad does nothing");
+        expect(p.perform(act(Type::LaunchClip, 0, 1)));
+        expectEquals(view->getPlayingClip(0), 1, "stopped: playing at once");
+        expectEquals(p.getLayer(0)->activeClip, 1, "recorded with the rhythm for the session");
+        expectWithinAbsoluteError(getParam(p.apvts, kParam), 3.0f, 0.01f);
+
+        p.sequencerPlaying.store(true);
+        expect(p.perform(act(Type::LaunchClip, 0, 2)));
+        expectEquals(view->getQueuedClip(0), 2);
+        expectEquals(view->getPlayingClip(0), 1, "playing moves only at the commit");
+        expect(p.hasPendingSwap(0));
+        expect(Probe::scan(p), "the boundary flags it");
+        Probe::commit(p);
+        p.getLiveState().reconcile();
+        expectEquals(view->getPlayingClip(0), 2);
+        expectEquals(view->getQueuedClip(0), -1);
+        expectEquals(p.getLayer(0)->activeClip, 2);
+        expectWithinAbsoluteError(getParam(p.apvts, kParam), 7.0f, 0.01f);
+
+        // The playing pad mutes and unmutes; with another clip queued the first press cancels the queue.
+        expect(p.perform(act(Type::LaunchClip, 0, 2)));
+        expect(view->isLayerMuted(0));
+        expect(p.perform(act(Type::LaunchClip, 0, 2)));
+        expect(! view->isLayerMuted(0));
+        p.perform(act(Type::LaunchClip, 0, 1));
+        expectEquals(view->getQueuedClip(0), 1);
+        expect(p.perform(act(Type::LaunchClip, 0, 2)));
+        expectEquals(view->getQueuedClip(0), -1, "cancelled");
+        expect(! p.hasPendingSwap(0));
+        expect(! view->isLayerMuted(0), "and not muted");
+
+        // A rhythm preset loaded over a queued clip supersedes it and leaves no clip playing.
+        setParam(p.apvts, kParam, 9.0f);
+        p.saveLayerPreset(0, "later");
+        const auto file = p.slotPresetFiles(0).getFirst();
+        p.perform(act(Type::LaunchClip, 0, 1));
+        expectEquals(view->getQueuedClip(0), 1);
+        p.loadLayerPreset(0, file);
+        expectEquals(view->getQueuedClip(0), -1);
+        expectEquals(view->getPlayingClip(0), -1);
+        expectEquals(p.getLayer(0)->activeClip, -1);
+        Probe::scan(p); Probe::commit(p); p.getLiveState().reconcile();
+        expectEquals(view->getPlayingClip(0), -1, "the load that landed is not a clip");
+
+        // A cancel clears the lamp; clearing the queued clip cancels its launch.
+        p.perform(act(Type::LaunchClip, 0, 2));
+        p.cancelPendingSwap(0);
+        p.getLiveState().reconcile();
+        expectEquals(view->getQueuedClip(0), -1);
+        p.perform(act(Type::LaunchClip, 0, 1));
+        expect(p.clearClip(0, 1));
+        expectEquals(view->getQueuedClip(0), -1);
+        expect(! p.hasPendingSwap(0));
+        expectEquals((int) view->getClipMask(0), 0b100);
+        p.sequencerPlaying.store(false);
+
+        // A full preset applied while stopped replaces the layers: no pad plays afterwards, the bank is the preset's.
+        p.storeClip(0, 1, "A");
+        expect(p.perform(act(Type::LaunchClip, 0, 1)));
+        expectEquals(view->getPlayingClip(0), 1);
+        const auto full = storage.root.getChildFile("live.muClid");
+        p.saveFullPresetTo(full);
+        p.loadPreset(full);
+        p.getLiveState().reconcile();
+        expectEquals(view->getPlayingClip(0), -1, "a full preset forgets the playing clip");
+        expectEquals((int) view->getClipMask(0), 0b110, "and publishes its own bank");
     }
 
     void cancelledLaunch()

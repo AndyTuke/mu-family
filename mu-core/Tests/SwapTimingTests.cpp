@@ -93,6 +93,39 @@ public:
             expect(! stager.hasFullPending());
         }
 
+        beginTest("the slot stage serial changes on stage and cancel of that slot, never on a consume");
+        {
+            Stager<int, int, 2> stager;
+            const auto a0 = stager.slotStageSerial(0), b0 = stager.slotStageSerial(1);
+            stager.stage(0, 5);
+            const auto a1 = stager.slotStageSerial(0);
+            expect(a1 != a0, "staging changes it");
+            expect(stager.slotStageSerial(1) == b0, "and only that slot's");
+            stager.stage(0, 6);
+            const auto a2 = stager.slotStageSerial(0);
+            expect(a2 != a1, "a second stage supersedes: a new serial");
+            stager.flagIfReady(0, stager.pendingToken(0), true);
+            expect(stager.consume(0, [](int&) {}));
+            expect(stager.slotStageSerial(0) == a2, "consuming (the commit) leaves it");
+            expect(! stager.hasPending(0));
+            stager.stage(0, 7);
+            const auto a3 = stager.slotStageSerial(0);
+            stager.cancel(0);
+            expect(stager.slotStageSerial(0) != a3, "cancelling changes it");
+            const auto a4 = stager.slotStageSerial(0);
+            stager.stageFull(1);
+            expect(stager.slotStageSerial(0) != a4 && stager.slotStageSerial(1) != b0,
+                   "a full preset cancels every slot, so a slot payload staged before it is superseded");
+            expect(stager.slotStageSerial(-1) == 0 && stager.slotStageSerial(2) == 0, "out of range reads 0");
+
+            LayerSwapper<int, 2> swapper;
+            const auto s0 = swapper.slotSerial(1);
+            swapper.stageSlot(1, 3);
+            expect(swapper.slotSerial(1) != s0 && swapper.hasPending(1));
+            swapper.cancel(1);
+            expect(! swapper.hasPending(1));
+        }
+
         beginTest("the bar rule: a bar wraps every four beats, including across a block");
         {
             expect(  loopWrapped(3.9, 4.1, kBarBeats));

@@ -2,7 +2,9 @@
 
 #include "Control/ControlAction.h"
 #include "Control/LiveView.h"
+#include "MuLimits.h"
 #include <juce_data_structures/juce_data_structures.h>
+#include <array>
 #include <functional>
 
 // The live state behind Performance mode (docs/design-plugin-family.md, "Performance mode and live
@@ -10,7 +12,11 @@
 // the instance (ProcessorBase), so a pad press needs no window; plain class, no processor dependency,
 // MESSAGE THREAD ONLY (no atomics, no locks; the audio thread never touches it).
 //
-// It performs the actions that change that state (PerformanceMode / Item / Prev / Next, SelectLayer).
+// It also holds the clip bank's live half: per layer which clip plays, which waits for its boundary and
+// which are stored (the bank itself lives on the Layer; docs/design-plugin-family.md "Clip bank").
+//
+// It performs the actions that change that state (PerformanceMode / Item / Prev / Next, SelectLayer,
+// LaunchClip / ClipNext / ClipPrev).
 // How a preset is actually staged or cancelled is supplied by the owner as callbacks, so this class
 // never names a product, a processor or the hot-swap machinery. `perform` never quantises: the swap
 // lands at the boundary the preset's swap timing sets, never twice-quantised.
@@ -33,6 +39,15 @@ public:
         std::function<int(int)>    layerColourIndex;          // layer n's index into the shared layer palette
         std::function<bool()>      fullPending;               // some full preset is staged and not yet committed
         std::function<uint32_t()>  stageSerial;               // changes whenever ANY full preset is staged (identity)
+
+        // The clip bank. All optional: without them every clip action is refused.
+        std::function<bool(int, int)> launchClip;            // stage clip c on layer n (false = refused, nothing staged)
+        std::function<bool(int)>      slotPending;           // layer n has a staged layer preset not yet committed
+        std::function<uint32_t(int)>  slotSerial;            // changes whenever layer n is staged or cancelled (identity)
+        std::function<void(int)>      cancelSlot;            // drop layer n's staged layer preset
+        std::function<bool(int)>      muteLayer;             // flip layer n's strip mute (the MuteLayer path)
+        std::function<bool(int)>      layerMuted;            // is layer n's strip muted
+        std::function<void(int, int)> clipPlaying;           // layer n now plays clip c (the owner records it with the layer)
     };
 
     void setCallbacks(Callbacks c) { cb = std::move(c); }
@@ -49,6 +64,11 @@ public:
     { return cb.layerColourIndex ? cb.layerColourIndex(layer) : (layer < 0 ? 0 : layer % 8); }
     bool                          isItemPlayable(int item) const override    { return itemLoadable(item); }
     uint32_t                      getRevision()       const noexcept override { return revision; }
+    int                           getPlayingClip(int layer) const override { return inRange(layer) ? clipState[(size_t) layer].playing : -1; }
+    int                           getQueuedClip(int layer)  const override { return inRange(layer) ? clipState[(size_t) layer].queued : -1; }
+    uint8_t                       getClipMask(int layer)    const override { return inRange(layer) ? clipState[(size_t) layer].mask : (uint8_t) 0; }
+    bool                          isLayerMuted(int layer)   const override
+    { return layer >= 0 && layer < getLayerCount() && cb.layerMuted && cb.layerMuted(layer); }
     void addListener(Listener* l) const override    { listeners.add(l); }
     void removeListener(Listener* l) const override { listeners.remove(l); }
 
@@ -57,12 +77,17 @@ public:
     bool loadPerformance(mu_pp::PerformanceFile file, const juce::File& where);
 
     // ── Actions ──────────────────────────────────────────────────────────────
-    // True for the types this class owns: PerformanceMode, PerformanceItem, PerformancePrev, PerformanceNext, SelectLayer.
+    // True for the types this class owns: PerformanceMode, PerformanceItem, PerformancePrev, PerformanceNext, SelectLayer,
+    // LaunchClip, ClipNext, ClipPrev.
     static bool handles(ControlActionType t) noexcept;
 
     // Performs one of those. Every one but PerformanceMode returns false while the mode is off.
     // PerformanceMode: `index` 1 = on, 0 = off, -1 (the default) = toggle; refused when the product does not
     // support the mode or no performance is loaded; turning it on takes `layer` as the selected layer.
+    // LaunchClip(layer, index): the playing clip's pad cancels a queued launch on that layer, else toggles the
+    // layer's mute; an empty pad does nothing; any other stored clip launches (playing at once when the
+    // transport is stopped, queued until its commit otherwise). ClipNext / ClipPrev step the SELECTED layer
+    // to the next / previous stored clip, wrapping, and never mute.
     bool perform(const ControlAction& action);
 
     // The owner's "a full-preset swap just committed" hook (message thread): the queued item becomes
@@ -73,6 +98,22 @@ public:
     // The owner calls this after every deferred-work pass (message thread): settles the queue when the
     // staged preset was superseded by another load, or applied early without a commit hook.
     void reconcile();
+
+    // True while there is something for a periodic reconcile to settle: the mode is on, or a clip plays or waits.
+    // The owner's poll checks it first, so an idle instance (a plugin, or a processor still being constructed)
+    // never touches its layers from the timer.
+    bool needsSettling() const noexcept;
+
+    // ── The clip bank's live half (the owner calls these; message thread) ──
+    // Layer n's stored-clip mask changed (store, clear, load, structural edit).
+    void setClipMask(int layer, uint8_t mask);
+    // A layer preset that is not a clip was staged on, or the layer was added / reset: it plays no clip now.
+    void clearLayerClips(int layer);
+    // Clip c of layer n was cleared: if it was playing nothing plays; if it was queued the staged launch is cancelled.
+    void clipCleared(int layer, int clip);
+    // Layers were removed or swapped: playing clips and masks follow their layer (`oldToNew` gives the new index,
+    // or -1 when the layer is gone); a moved layer's queued launch is dropped (the edit cancelled it).
+    void remapLayers(const std::function<int(int)>& oldToNew);
 
     // ── Persistence (host session): the performance path, current item and mode ──
     // Not the selected layer, the queue or any clip state. Not in the preset or the APVTS.
@@ -88,6 +129,23 @@ private:
     bool itemLoadable(int item) const;
     void changed();
 
+    struct ClipState
+    {
+        int      playing      = -1;   // -1 = none
+        int      queued       = -1;   // -1 = nothing waiting
+        uint32_t queuedSerial = 0;    // the layer's stage serial when the queued clip was staged
+        uint8_t  mask         = 0;    // bit n = clip n is stored
+    };
+    static bool inRange(int layer) noexcept { return layer >= 0 && layer < mu_limits::kMaxLayers; }
+    bool startClip(int layer, int clip);
+    bool stepClip(int direction);
+    void setPlaying(int layer, int clip);
+    bool dropClipState();           // forgets every layer's playing and queued clip; true when something was set
+    void reconcileItem();
+    void cancelQueuedItem();      // drops the staged full preset of a queued item
+    void syncFullSerial();        // takes the current full-preset serial as already accounted for
+    void reconcileClips();
+
     Callbacks              cb;
     mu_pp::PerformanceFile performance;
     juce::File             performanceFile;
@@ -97,6 +155,8 @@ private:
     int                    selectedLayer   = 0;
     uint32_t               queuedSerial    = 0;   // the stage serial when the queued item was staged
     uint32_t               revision        = 0;
+    std::array<ClipState, (size_t) mu_limits::kMaxLayers> clipState {};
+    uint32_t               seenFullSerial  = 0;   // the full-preset stage serial the clip state was last settled against
     mutable juce::ListenerList<Listener> listeners;
 };
 

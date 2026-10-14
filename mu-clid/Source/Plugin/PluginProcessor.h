@@ -113,6 +113,7 @@ public:
     bool hasPendingFullPreset() const override            { return hotSwapStager.hasPendingFullPreset(); }
     void cancelPendingFullPreset() override               { hotSwapStager.cancelStagedFullPreset(); }
     uint32_t fullStageSerial() const override             { return hotSwapStager.fullStageSerial(); }
+    uint32_t slotStageSerial(int ri) const override       { return hotSwapStager.slotStageSerial(ri); }
     int  getMasterLoopSteps() const override              { return sequencer.getMasterLoopSteps(); }
     int  getMasterLoopCurrentStep() const override        { return sequencer.getMasterLoopCurrentStep(); }
 
@@ -386,7 +387,10 @@ private:
     void markRhythmParamDirty(int ri, const char* suffix) noexcept;
     int  findRhythmParamIndex(const char* suffix) const noexcept;
     bool isMessageThread() const noexcept;
-    void servicePendingRhythmParams();            // message thread: apply every queued change
+    // Apply every queued change: the message thread's poll, or an offline render's processBlock
+    // (which passes true to wait for a concurrent apply instead of leaving it).
+    bool servicePendingRhythmParams(bool waitForOtherApply = false);   // false: another thread held the apply and was not waited out
+    std::atomic_flag applyingRhythmParams = ATOMIC_FLAG_INIT;   // held while one thread applies
     void applyPendingRhythmParams(int ri);        // message thread: one rhythm
     void dropPendingRhythmParams(int ri) noexcept;
 

@@ -39,6 +39,28 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
     cb.cancelItem = [this] { cancelPendingFullPreset(); };
     cb.layerCount = [this] { return getNumLayers(); };
     cb.layerColourIndex = [this](int layer) { return layer >= 0 && layer < getNumLayers() ? getLayerColourIndex(layer) : 0; };
+
+    // The clip bank's live half: a launch is this processor's own launchClip, a mute the MuteLayer action.
+    cb.launchClip   = [this](int layer, int clip) { return launchClip(layer, clip); };
+    cb.slotPending  = [this](int layer) { return hasPendingSwap(layer); };
+    cb.slotSerial   = [this](int layer) { return slotStageSerial(layer); };
+    cb.cancelSlot   = [this](int layer) { cancelPendingSwap(layer); };
+    cb.muteLayer    = [this](int layer)
+    {
+        mu_core::ControlAction mute;
+        mute.type  = mu_core::ControlActionType::MuteLayer;
+        mute.layer = layer;
+        return perform(mute);
+    };
+    cb.layerMuted   = [this](int layer)
+    {
+        const auto* p = apvts.getParameter("ch" + juce::String(layer) + "_mute");
+        return p != nullptr && p->getValue() > 0.5f;
+    };
+    cb.clipPlaying  = [this](int layer, int clip)
+    {
+        if (auto* l = getLayer(layer)) l->activeClip = clip;   // the saved shadow of the live playing clip
+    };
     liveState.setCallbacks(std::move(cb));
 }
 
@@ -157,8 +179,11 @@ bool ProcessorBase::perform(const mu_core::ControlAction& a)
         case T::PerformanceItem:
         case T::PerformancePrev:
         case T::PerformanceNext:
+        case T::LaunchClip:
+        case T::ClipNext:
+        case T::ClipPrev:
             return liveState.perform(a);
-        default:                 return false;   // clips, presets, panic: later
+        default:                 return false;   // presets, panic: later
     }
 }
 
@@ -687,6 +712,7 @@ void ProcessorBase::applyComposedState(const juce::ValueTree& state)
             const int active = (int) node.getProperty("activeClip", -1);
             layer.activeClip = layer.clips->isOccupied(active) ? active : -1;
         }
+    publishClipMasks();
 
     if (! canEditLayers()) return;
 
@@ -801,8 +827,10 @@ bool ProcessorBase::removeLayer(int idx)
         layersMoved(idx, n - 1);                // the shifted slots and the vacated top one
     }
 
-    // The banks moved with their layers (the pointer shift); the vacated top slot holds a spare or
-    // nothing and must start empty. Outside layersLock, like every clip-bank clear.
+    // The banks moved with their layers (the pointer shift), and so do the live playing clips; the vacated
+    // top slot holds a spare or nothing and must start empty. Remap first: the clear below names the new index.
+    // Outside layersLock, like every clip-bank clear.
+    liveState.remapLayers([idx](int i) { return mu_mix::sidechainAfterRemove(i, idx, mu_limits::kMaxLayers); });
     clearLayerClips(n - 1);
 
     // Phase 3: parameter values. Strips that ducked from the removed layer now duck from nothing and
@@ -850,6 +878,8 @@ bool ProcessorBase::swapLayers(int a, int b)
     // (translated before the values swap, so each strip's own source moves with it).
     remapSidechainSources([a, b](int v) { return mu_mix::sidechainParamAfterSwap(v, a, b, mu_limits::kMaxLayers); });
     remapLayerReferences([a, b](int i) { return mu_mix::sidechainAfterSwap(i, a, b, mu_limits::kMaxLayers); });
+    liveState.remapLayers([a, b](int i) { return mu_mix::sidechainAfterSwap(i, a, b, mu_limits::kMaxLayers); });
+    publishClipMasks();   // the banks swapped with their layers
     if (layerHoldsParamTruth())
     {
         suspend.release();                                 // the audio never reads these parameters: resume first
@@ -900,12 +930,21 @@ void ProcessorBase::clearLayerClips(int slot)
     if (slot < 0 || slot >= mu_limits::kMaxLayers || layers[(size_t) slot] == nullptr) return;
     layers[(size_t) slot]->clips->clearAll();
     layers[(size_t) slot]->activeClip = -1;
+    liveState.clearLayerClips(slot);
+    publishClipMasks();
 }
 
 void ProcessorBase::noteNonClipStage(int slot)
 {
     if (slot >= 0 && slot < mu_limits::kMaxLayers && layers[(size_t) slot] != nullptr)
         layers[(size_t) slot]->activeClip = -1;
+    liveState.clearLayerClips(slot);   // a plain layer-preset load also supersedes a queued clip
+}
+
+void ProcessorBase::publishClipMasks()
+{
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+        liveState.setClipMask(i, clipMask(i));
 }
 
 bool ProcessorBase::storeClip(int slot, int clip, const juce::String& name)
@@ -928,9 +967,11 @@ bool ProcessorBase::clearClip(int slot, int clip)
     auto* layer = getLayer(slot);
     if (layer == nullptr || ! layer->clips->clear(clip)) return false;
 
-    // The cleared clip can no longer be the one this layer is remembered as playing.
+    // The cleared clip can no longer be the one this layer is remembered as playing; a launch of it still
+    // waiting for its boundary is cancelled (it would land a clip that no longer exists).
     if (layer->activeClip == clip)
         layer->activeClip = -1;
+    liveState.clipCleared(slot, clip);
     publishClipMasks();
     return true;
 }

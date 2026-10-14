@@ -18,6 +18,20 @@ uint32_t scaleRgb(uint32_t rgb, float s) noexcept
     return (ch(16) << 16) | (ch(8) << 8) | ch(0);
 }
 
+// How long past the burst the blink timer keeps running, so the steady frame after the flash is sent.
+constexpr double kBurstTailMs = 100.0;
+
+// Pulls a colour toward white by `amount` (0..1): the start-of-clip burst.
+uint32_t toWhite(uint32_t rgb, float amount) noexcept
+{
+    const auto ch = [&](int shift)
+    {
+        const float v = (float) ((rgb >> shift) & 0xFFu);
+        return (uint32_t) std::lround(v + (255.0f - v) * amount);
+    };
+    return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+}
+
 // Smooth 0..1 pulse at `hz`: starts at 0 (dim), peaks half a period later.
 float pulsePhase(double nowMs, float hz) noexcept
 {
@@ -30,6 +44,8 @@ SurfaceModel::SurfaceModel(mu_core::ControlSink& s, const mu_core::LiveView& v, 
                            const mu_core::SurfaceLook& l, Clock c)
     : sink(s), view(v), mapping(std::move(m)), bindings(mapping.bindings()), look(l), clock(std::move(c))
 {
+    lastPlaying.fill(-2);
+    burstStartMs.fill(-1.0e12);
     if (! clock) clock = [] { return juce::Time::getMillisecondCounterHiRes(); };
     view.addListener(this);
 }
@@ -69,7 +85,20 @@ uint32_t SurfaceModel::layerRgb(int layer) const
     return look.layerRgb[(size_t) idx];
 }
 
-SurfaceModel::Light SurfaceModel::lightFor(const mu_core::ControlAction& a) const
+void SurfaceModel::trackPlayingClips(double nowMs) const
+{
+    // A layer whose playing clip changed to a real clip starts a burst; the first sighting does not.
+    for (int layer = 0; layer < mu_limits::kMaxLayers; ++layer)
+    {
+        const int playing = view.getPlayingClip(layer);
+        auto& last = lastPlaying[(size_t) layer];
+        if (playing == last) continue;
+        if (last != -2 && playing >= 0) burstStartMs[(size_t) layer] = nowMs;
+        last = playing;
+    }
+}
+
+SurfaceModel::Light SurfaceModel::lightFor(const mu_core::ControlAction& a, double nowMs) const
 {
     using T = mu_core::ControlActionType;
     switch (a.type)
@@ -92,8 +121,23 @@ SurfaceModel::Light SurfaceModel::lightFor(const mu_core::ControlAction& a) cons
             return { view.getSelectedLayer() == a.layer ? Level::Bright : Level::Dim, layerRgb(a.layer) };
         }
         case T::LaunchClip:
-            // The clip getters arrive with the clip bank; until then the grid stays dark.
+        {
+            // Grid: a row is a layer, a column a clip. Playing bright (flashing when its layer is muted, a
+            // burst when it just started), queued pulsing, stored dim, empty off, no layer off.
+            const int layer = a.layer, clip = a.index;
+            if (layer < 0 || layer >= view.getLayerCount() || clip < 0 || clip >= mu_limits::kClipsPerLayer) return {};
+            const auto rgb = layerRgb(layer);
+            if (view.getPlayingClip(layer) == clip)
+            {
+                if (view.isLayerMuted(layer)) return { Level::Flash, rgb, false };
+                const double sinceStart = nowMs - burstStartMs[(size_t) layer];
+                if (sinceStart >= 0.0 && sinceStart < (double) look.stepFlashMs) return { Level::Burst, rgb, false };
+                return { Level::Bright, rgb, sinceStart >= 0.0 && sinceStart < (double) look.stepFlashMs + kBurstTailMs };
+            }
+            if (view.getQueuedClip(layer) == clip) return { Level::Pulse, rgb, false };
+            if ((view.getClipMask(layer) & (1u << clip)) != 0) return { Level::Dim, rgb, false };
             return {};
+        }
         default:
             return {};
     }
@@ -105,11 +149,12 @@ std::vector<LedState> SurfaceModel::frame(double nowMs, bool* animating) const
     std::vector<LedState> out;
     for (const auto& id : controlsOf(d)) out.push_back({ id, 0, LedMode::Static });
     if (animating != nullptr) *animating = false;
+    trackPlayingClips(nowMs);                     // before the mode test, so entering the mode does not burst every pad
     if (! view.isPerformanceMode()) return out;   // outside the mode the surface is dark
 
     for (const auto& b : bindings)
     {
-        const auto light = lightFor(b.action);
+        const auto light = lightFor(b.action, nowMs);
         if (light.level == Level::Off) continue;
 
         // Phase: pick the final colour and mode for what the surface can show.
@@ -130,8 +175,31 @@ std::vector<LedState> SurfaceModel::frame(double nowMs, bool* animating) const
                 else                                  // no pulse at all: a steady level between dim and bright
                     rgb = scaleRgb(rgb, 0.5f * (1.0f + look.dimScale));
                 break;
+            case Level::Flash:
+            {
+                const double turns  = nowMs * 0.001 * (double) look.flashHz;
+                const bool   bright = turns - std::floor(turns) < 0.5;   // square, 50 % duty; the dim half is never dark
+                if (d.colour == ColourSupport::Rgb)
+                {
+                    if (! bright) rgb = scaleRgb(rgb, look.dimScale);
+                    if (animating != nullptr) *animating = true;
+                }
+                else if (d.canFlash)                  // the device flashes natively
+                    mode = LedMode::Flash;
+                else                                  // no flash at all: a steady level between dim and bright
+                    rgb = scaleRgb(rgb, 0.5f * (1.0f + look.dimScale));
+                break;
+            }
+            case Level::Burst:
+                if (d.colour == ColourSupport::Rgb)   // only an RGB pad can show a brighter-than-bright flash
+                {
+                    rgb = toWhite(rgb, 0.6f);
+                    if (animating != nullptr) *animating = true;
+                }
+                break;
             case Level::Off: break;
         }
+        if (light.settle && d.colour == ColourSupport::Rgb && animating != nullptr) *animating = true;
 
         const auto it = std::find_if(out.begin(), out.end(), [&](const LedState& l) { return l.id == b.id; });
         if (it != out.end()) { it->rgb = rgb; it->mode = mode; }

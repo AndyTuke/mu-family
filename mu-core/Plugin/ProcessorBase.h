@@ -315,6 +315,9 @@ public:
     virtual void cancelPendingFullPreset()                                  { layerSwapper.cancelFull(); }
     // Changes whenever any full preset is staged (Performance mode tells its own staging from another load).
     virtual uint32_t fullStageSerial() const                                { return layerSwapper.fullSerial(); }
+    // Changes whenever layer `slot` is staged or cancelled, never when its swap commits (the live state tells a
+    // clip launch from a later layer-preset load on the same layer).
+    virtual uint32_t slotStageSerial(int slot) const                        { return layerSwapper.slotSerial(slot); }
 
     // Performance mode's live state (message thread only): read through the view, changed through perform().
     mu_core::LiveState&       getLiveState() noexcept       { return liveState; }
@@ -574,8 +577,8 @@ protected:
             liveState.fullPresetCommitted();   // before the editor refresh, so it reads the settled state
             if (onPresetSwapCommitted) onPresetSwapCommitted();
         }
-        liveState.reconcile();   // settles a queued item that was superseded or applied without a commit
         commitDeferredWork();
+        settleLiveState();   // after the product's commits: a queued item or clip that landed or was superseded
         drainPendingMidiProgramChanges();
         // Left queued by a table edit in progress: ask for another pass so it is not stranded.
         if (midiControlRouter.drain(*this))
@@ -607,7 +610,12 @@ protected:
         explicit SwapPoll(ProcessorBase& o) : owner(o) { startTimerHz(mu_core::MidiControlRouter::kDeferredWorkPollHz); }
         ~SwapPoll() override { stopTimer(); }
         void stop() { stopTimer(); }
-        void timerCallback() override { owner.drainDeferredWork(); }
+        void timerCallback() override
+        {
+            owner.drainDeferredWork();
+            if (owner.liveState.needsSettling())
+                owner.settleLiveState();   // also catches a stopped-transport load, which never raises the mailbox
+        }
         ProcessorBase& owner;
     } swapPoll { *this };
 
@@ -662,9 +670,16 @@ protected:
         stageLayerPresetTree(slot, std::move(tree), keepIdentity);
     }
 
-    // Empties a layer's clip bank and activeClip (null-safe). The shared structural edits call it; a
-    // product that overrides resetLayer without the shared reset calls it too.
+    // Empties a layer's clip bank and activeClip, and forgets its live playing / queued clip (null-safe). The
+    // shared structural edits call it; a product that overrides resetLayer without the shared reset calls it too.
     void clearLayerClips(int slot);
+
+    // A non-clip layer-preset stage leaves no clip active, in the layer and in the live state.
+    void noteNonClipStage(int slot);
+    // Pushes each layer's clip occupancy to the live state (store, clear, file load, full-preset commit, edit).
+    void publishClipMasks();
+    // Message thread: the masks, then the settle of whatever the live state is waiting for.
+    void settleLiveState() { publishClipMasks(); liveState.reconcile(); }
 
     virtual void applyMidiPresetLayer(int slot, const juce::File& f) { loadLayerPreset(slot, f); }
     virtual void applyFullMidiPreset(const juce::File& f)            = 0;
@@ -788,11 +803,6 @@ public:
 #endif
 
 private:
-    // A non-clip layer-preset stage leaves no clip active. C5 also clears the live queued/playing clip here.
-    void noteNonClipStage(int slot);
-    // Pushes each layer's clip occupancy to the live state; a stub until the live state carries it.
-    void publishClipMasks() {}
-
     // Parameter values of one layer slot, which sit under two prefixes: the product's own (from the
     // layer layout, e.g. v3_) and the mixer strip's (ch3_). Moving them is what makes the audible
     // strip and the knobs follow a moved layer; message thread only.

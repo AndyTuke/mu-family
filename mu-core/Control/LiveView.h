@@ -34,6 +34,12 @@ public:
     virtual bool                          isItemPlayable(int item) const = 0;           // this product's, and its file exists
     virtual uint32_t                      getRevision()       const noexcept = 0;   // bumped on every change
 
+    // The clip bank as the surface lights it. A layer outside 0..getLayerCount()-1 reads as none / empty / unmuted.
+    virtual int                           getPlayingClip(int layer) const = 0;   // -1 = none has been launched since the last load
+    virtual int                           getQueuedClip(int layer)  const = 0;   // -1 = nothing waiting for its boundary
+    virtual uint8_t                       getClipMask(int layer)    const = 0;   // bit n set = clip n is stored
+    virtual bool                          isLayerMuted(int layer)   const = 0;   // the layer strip's mute
+
     // Listening is not a change of the state, so a holder of the read-only view may register.
     virtual void addListener(Listener* l)    const = 0;
     virtual void removeListener(Listener* l) const = 0;

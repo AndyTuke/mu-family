@@ -19,7 +19,9 @@ enum class ControlActionType
     MuteLayer,         // toggle a layer strip's mute
     SoloLayer,         // toggle a layer strip's solo
     SelectLayer,       // select a layer (Performance mode: the screen follows the surface)
-    LaunchClip,
+    LaunchClip,        // launch clip `index` on `layer` (Performance mode)
+    ClipNext,          // the selected layer's next stored clip, wrapping (Performance mode)
+    ClipPrev,          // the selected layer's previous stored clip, wrapping (Performance mode)
     PresetNext,
     PresetPrev,
     Panic,
@@ -35,8 +37,8 @@ enum class Quantise { Default, Off, Beat, Bar };
 struct ControlAction
 {
     ControlActionType type     = ControlActionType::None;
-    int               layer    = 0;        // MuteLayer / SoloLayer / SelectLayer: the layer index
-    int               index    = -1;       // PerformanceItem: the item index; PerformanceMode: -1 toggle, 0 off, 1 on; clips later
+    int               layer    = 0;        // MuteLayer / SoloLayer / SelectLayer / LaunchClip: the layer index
+    int               index    = -1;       // PerformanceItem: the item index; PerformanceMode: -1 toggle, 0 off, 1 on; LaunchClip: the clip index (0..7)
     juce::String      paramId;             // Parameter: the APVTS parameter id
     float             value    = 0.0f;     // Parameter: normalised 0..1
     Quantise          quantise = Quantise::Default;
@@ -55,6 +57,8 @@ inline const char* actionName(ControlActionType t) noexcept
         case ControlActionType::SoloLayer:       return "soloLayer";
         case ControlActionType::SelectLayer:     return "selectLayer";
         case ControlActionType::LaunchClip:      return "launchClip";
+        case ControlActionType::ClipNext:        return "clipNext";
+        case ControlActionType::ClipPrev:        return "clipPrev";
         case ControlActionType::PresetNext:      return "presetNext";
         case ControlActionType::PresetPrev:      return "presetPrev";
         case ControlActionType::Panic:           return "panic";
@@ -71,7 +75,8 @@ inline ControlActionType actionFromName(const juce::String& n) noexcept
 {
     for (auto t : { ControlActionType::Parameter, ControlActionType::TransportToggle, ControlActionType::TransportPlay,
                     ControlActionType::TransportStop, ControlActionType::MuteLayer, ControlActionType::SoloLayer,
-                    ControlActionType::SelectLayer, ControlActionType::LaunchClip, ControlActionType::PresetNext,
+                    ControlActionType::SelectLayer, ControlActionType::LaunchClip, ControlActionType::ClipNext,
+                    ControlActionType::ClipPrev, ControlActionType::PresetNext,
                     ControlActionType::PresetPrev, ControlActionType::Panic, ControlActionType::PerformanceMode,
                     ControlActionType::PerformanceItem, ControlActionType::PerformancePrev, ControlActionType::PerformanceNext })
         if (n == actionName(t)) return t;

@@ -14,7 +14,8 @@ bool LiveState::handles(ControlActionType t) noexcept
 {
     return t == ControlActionType::PerformanceMode || t == ControlActionType::PerformanceItem
         || t == ControlActionType::PerformancePrev || t == ControlActionType::PerformanceNext
-        || t == ControlActionType::SelectLayer;
+        || t == ControlActionType::SelectLayer || t == ControlActionType::LaunchClip
+        || t == ControlActionType::ClipNext || t == ControlActionType::ClipPrev;
 }
 
 void LiveState::changed()
@@ -26,7 +27,7 @@ void LiveState::changed()
 bool LiveState::loadPerformance(mu_pp::PerformanceFile file, const juce::File& where)
 {
     if (performanceMode) return false;   // the list is fixed while the screen is locked
-    if (queuedItem >= 0 && cb.cancelItem) cb.cancelItem();
+    cancelQueuedItem();
     performance     = std::move(file);
     performanceFile = where;
     currentItem     = -1;
@@ -53,7 +54,7 @@ bool LiveState::setMode(bool on, int seedLayer)
     else
     {
         // Leaving the mode drops a queued item: nothing is left to land it, and the lamps would lie.
-        if (queuedItem >= 0 && cb.cancelItem) cb.cancelItem();
+        cancelQueuedItem();
         queuedItem = -1;
     }
     performanceMode = on;
@@ -69,6 +70,7 @@ bool LiveState::selectItem(int item)
     {
         if (queuedItem < 0) return true;   // already playing it: nothing to do
         if (cb.cancelItem) cb.cancelItem();   // pressing the playing item while another is queued cancels the switch
+        syncFullSerial();
         queuedItem = -1;
         changed();
         return true;
@@ -123,8 +125,23 @@ bool LiveState::perform(const ControlAction& a)
             if (a.layer != selectedLayer) { selectedLayer = a.layer; changed(); }
             return true;
         }
+        case T::LaunchClip:      return startClip(a.layer, a.index);
+        case T::ClipNext:        return stepClip(+1);
+        case T::ClipPrev:        return stepClip(-1);
         default: return false;
     }
+}
+
+void LiveState::cancelQueuedItem()
+{
+    if (queuedItem < 0 || ! cb.cancelItem) return;
+    cb.cancelItem();
+    syncFullSerial();   // our own cancel is not a full preset landing
+}
+
+void LiveState::syncFullSerial()
+{
+    seenFullSerial = cb.stageSerial ? cb.stageSerial() : 0;
 }
 
 void LiveState::clampSelectedLayer()
@@ -135,14 +152,32 @@ void LiveState::clampSelectedLayer()
 
 void LiveState::fullPresetCommitted()
 {
-    if (queuedItem >= 0) { reconcile(); return; }
+    // A full preset replaced every layer, so no pad plays and no launch is still on its way.
+    const bool hadClips = dropClipState();
+    syncFullSerial();
+    if (queuedItem >= 0) { reconcileItem(); if (hadClips) changed(); return; }
     // A preset that was not one of this performance's items took over.
     const int before = selectedLayer;
     clampSelectedLayer();
     if (currentItem >= 0 || selectedLayer != before) { currentItem = -1; changed(); }
+    else if (hadClips) changed();
+}
+
+bool LiveState::needsSettling() const noexcept
+{
+    if (performanceMode || queuedItem >= 0) return true;
+    for (const auto& c : clipState)
+        if (c.playing >= 0 || c.queued >= 0) return true;
+    return false;
 }
 
 void LiveState::reconcile()
+{
+    reconcileItem();
+    reconcileClips();
+}
+
+void LiveState::reconcileItem()
 {
     if (queuedItem < 0) return;
     const bool pending = cb.fullPending && cb.fullPending();
@@ -159,6 +194,164 @@ void LiveState::reconcile()
         clampSelectedLayer();
         changed();
     }
+}
+
+// ── The clip bank ────────────────────────────────────────────────────────────
+
+void LiveState::setPlaying(int layer, int clip)
+{
+    clipState[(size_t) layer].playing = clip;
+    if (cb.clipPlaying) cb.clipPlaying(layer, clip);
+}
+
+bool LiveState::dropClipState()
+{
+    bool any = false;
+    for (auto& c : clipState)
+    {
+        any |= c.playing >= 0 || c.queued >= 0;
+        c.playing = c.queued = -1;
+    }
+    return any;
+}
+
+bool LiveState::startClip(int layer, int clip)
+{
+    if (! inRange(layer) || layer >= getLayerCount() || clip < 0 || clip >= mu_limits::kClipsPerLayer) return false;
+    reconcileClips();   // first drop anything a full preset applied since the last settle has made stale
+    auto& c = clipState[(size_t) layer];
+
+    if (clip == c.playing)
+    {
+        if (c.queued >= 0)   // the playing pad with another clip waiting: the first press cancels the wait
+        {
+            if (cb.cancelSlot) cb.cancelSlot(layer);
+            c.queued = -1;
+            changed();
+            return true;
+        }
+        const bool muted = cb.muteLayer && cb.muteLayer(layer);   // the existing MuteLayer path
+        changed();   // the pad's flash follows the strip's mute, which this state does not own
+        return muted;
+    }
+    if (clip == c.queued) return true;                          // already on its way
+    if ((c.mask & (1u << clip)) == 0) return false;              // an empty pad does nothing
+    if (! cb.launchClip || ! cb.launchClip(layer, clip)) return false;   // e.g. a full preset is staged
+
+    // Stopped transport: the clip is applied inside launchClip and plays now. Otherwise it waits, and the
+    // stage serial identifies this launch until its commit (or a later load that replaces it).
+    if (cb.slotPending && cb.slotPending(layer))
+    {
+        c.queued       = clip;
+        c.queuedSerial = cb.slotSerial ? cb.slotSerial(layer) : 0;
+    }
+    else
+    {
+        c.queued = -1;
+        setPlaying(layer, clip);
+    }
+    changed();
+    return true;
+}
+
+bool LiveState::stepClip(int direction)
+{
+    if (! inRange(selectedLayer)) return false;
+    reconcileClips();
+    const auto& c = clipState[(size_t) selectedLayer];
+
+    // Step from where the layer is heading: the queued clip if any, else the playing one. Wraps; skips empty clips.
+    const int n      = mu_limits::kClipsPerLayer;
+    const int origin = c.queued >= 0 ? c.queued : c.playing;
+    for (int i = 1; i <= n; ++i)
+    {
+        const int candidate = origin < 0 ? (direction > 0 ? i - 1 : n - i)
+                                         : ((origin + direction * i) % n + n) % n;
+        if (candidate == origin) continue;   // no other stored clip
+        if (c.mask & (1u << candidate)) return startClip(selectedLayer, candidate);
+    }
+    return false;
+}
+
+void LiveState::reconcileClips()
+{
+    bool dirty = false;
+
+    // A full preset that landed (or was applied at once) replaced the layers, so no pad plays. A staged one
+    // changes nothing until it lands; our own performance cancel re-syncs the serial and is not read as a landing.
+    if (cb.stageSerial && cb.stageSerial() != seenFullSerial && ! (cb.fullPending && cb.fullPending()))
+    {
+        dirty |= dropClipState();
+        syncFullSerial();
+    }
+
+    // A queued clip: still staged and still ours = waiting; gone with our serial = it landed; otherwise
+    // another load or a cancel replaced it.
+    for (int layer = 0; layer < mu_limits::kMaxLayers; ++layer)
+    {
+        auto& c = clipState[(size_t) layer];
+        if (c.queued < 0) continue;
+        const bool pending = cb.slotPending && cb.slotPending(layer);
+        const bool ours    = cb.slotSerial && cb.slotSerial(layer) == c.queuedSerial;
+        if (pending && ours) continue;
+        if (! pending && ours) setPlaying(layer, c.queued);
+        c.queued = -1;
+        dirty = true;
+    }
+    if (dirty) changed();
+}
+
+void LiveState::setClipMask(int layer, uint8_t mask)
+{
+    if (! inRange(layer) || clipState[(size_t) layer].mask == mask) return;
+    clipState[(size_t) layer].mask = mask;
+    changed();
+}
+
+void LiveState::clearLayerClips(int layer)
+{
+    if (! inRange(layer)) return;
+    auto& c = clipState[(size_t) layer];
+    if (c.playing < 0 && c.queued < 0) return;
+    c.playing = c.queued = -1;
+    changed();
+}
+
+void LiveState::clipCleared(int layer, int clip)
+{
+    if (! inRange(layer)) return;
+    auto& c = clipState[(size_t) layer];
+    bool dirty = false;
+    if (c.playing == clip) { c.playing = -1; dirty = true; }
+    if (c.queued == clip)   // the staged launch would still land a clip that no longer exists
+    {
+        if (cb.cancelSlot) cb.cancelSlot(layer);
+        c.queued = -1;
+        dirty = true;
+    }
+    if (dirty) changed();
+}
+
+void LiveState::remapLayers(const std::function<int(int)>& oldToNew)
+{
+    std::array<ClipState, (size_t) mu_limits::kMaxLayers> moved {};
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    {
+        const int j = oldToNew(i);
+        if (! inRange(j)) continue;   // the layer is gone
+        const auto& from = clipState[(size_t) i];
+        auto& to = moved[(size_t) j];
+        to.playing = from.playing;
+        to.mask    = from.mask;
+        if (j == i) { to.queued = from.queued; to.queuedSerial = from.queuedSerial; }   // a layer that did not move keeps its wait
+    }
+
+    bool differs = false;
+    for (size_t i = 0; i < moved.size(); ++i)
+        differs |= moved[i].playing != clipState[i].playing || moved[i].queued != clipState[i].queued
+                || moved[i].mask != clipState[i].mask;
+    clipState = moved;
+    if (differs) changed();
 }
 
 void LiveState::saveTo(juce::ValueTree& state) const
@@ -182,9 +375,11 @@ bool LiveState::modeSaved(const juce::ValueTree& state)
 
 void LiveState::restoreFrom(const juce::ValueTree& state)
 {
-    if (queuedItem >= 0 && cb.cancelItem) cb.cancelItem();
+    cancelQueuedItem();
     performanceMode = false;
     currentItem = queuedItem = -1;
+    dropClipState();   // a restored session replaced the layers: no pad plays
+    syncFullSerial();
     performance = {};
     performanceFile = juce::File();
 

@@ -172,12 +172,123 @@ public:
             expectEquals((int) r.led({ ControlKind::Side, 0, 0 }).rgb, 0, "layer 8 does not exist");
         }
 
-        beginTest("the grid stays dark until the clip bank supplies clip state");
+        beginTest("the grid is dark while no clip is stored");
         for (const auto& d : allSurfaces())
         {
             Rig r(d);
             for (const auto& l : r.model.render())
                 if (l.id.kind == ControlKind::Pad) expectEquals((int) l.rgb, 0, d.name);
+        }
+
+        beginTest("grid: playing bright, stored dim, empty off, in the layer colour; layer 1 is the bottom row");
+        for (const auto& d : allSurfaces())
+        {
+            Rig r(d);
+            r.view.colourIndex = { 5, 4, 3, 2, 1, 0, 7, 6 };
+            r.view.clipMask[0] = 0b0111;          // layer 1: clips 1 to 3 stored
+            r.view.playingClip[0] = 1;
+            r.view.clipMask[2] = 0b0001;          // layer 3: clip 1 stored, none playing
+            const int bottom = d.gridHeight - 1;
+            expectEquals(r.led({ ControlKind::Pad, 1, bottom }).rgb, look.layerRgb[5], d.name + ": playing");
+            expectEquals(r.led({ ControlKind::Pad, 0, bottom }).rgb, scaled(look.layerRgb[5], look.dimScale), d.name + ": stored");
+            expectEquals(r.led({ ControlKind::Pad, 2, bottom }).rgb, scaled(look.layerRgb[5], look.dimScale), d.name + ": stored");
+            expectEquals((int) r.led({ ControlKind::Pad, 3, bottom }).rgb, 0, d.name + ": empty");
+            expectEquals(r.led({ ControlKind::Pad, 0, bottom - 2 }).rgb, scaled(look.layerRgb[3], look.dimScale), d.name + ": layer 3, nothing playing");
+            expectEquals((int) r.led({ ControlKind::Pad, 0, bottom - 1 }).rgb, 0, d.name + ": layer 2 has no clips");
+        }
+
+        beginTest("grid: a row with no layer is off even if clip state is stale");
+        for (const auto& d : allSurfaces())
+        {
+            Rig r(d);
+            r.view.layers = 2;
+            r.view.clipMask[2] = 0xFF; r.view.playingClip[2] = 0;
+            const int row = d.gridHeight - 1 - 2;
+            for (int x = 0; x < d.gridWidth; ++x) expectEquals((int) r.led({ ControlKind::Pad, x, row }).rgb, 0, d.name);
+        }
+
+        beginTest("grid: a queued clip pulses between dim and bright (RGB) and the playing one stays bright");
+        {
+            double now = 0.0;
+            Rig lp(launchpadStyle(), &now);
+            lp.view.clipMask[0] = 0b0011; lp.view.playingClip[0] = 0; lp.view.queuedClip[0] = 1;
+            const SurfaceControlId queuedPad { ControlKind::Pad, 1, 7 }, playingPad { ControlKind::Pad, 0, 7 };
+            lp.led(playingPad);                           // first sighting of the playing clip
+            expectEquals(lp.led(queuedPad).rgb, scaled(look.layerRgb[0], look.dimScale), "pulse starts dim");
+            expect(lp.model.isAnimating(), "a pulsing pad needs the blink timer");
+            now = 250.0;
+            expectEquals(lp.led(queuedPad).rgb, look.layerRgb[0], "and peaks bright");
+            expectEquals(lp.led(playingPad).rgb, look.layerRgb[0], "the playing pad is steady bright");
+
+            Rig nb(nativeBlink());
+            nb.view.clipMask[0] = 0b11; nb.view.playingClip[0] = 0; nb.view.queuedClip[0] = 1;
+            expect(nb.led({ ControlKind::Pad, 1, 3 }).mode == LedMode::Pulse, "no RGB but a native pulse");
+            Rig mock(mockGrid());
+            mock.view.clipMask[0] = 0b11; mock.view.playingClip[0] = 0; mock.view.queuedClip[0] = 1;
+            expect(mock.led({ ControlKind::Pad, 1, 3 }).mode == LedMode::Static, "no pulse: steady");
+            expect(! mock.model.isAnimating());
+        }
+
+        beginTest("grid: the playing clip of a muted layer flashes square between bright and dim, never dark");
+        {
+            double now = 0.0;
+            Rig lp(launchpadStyle(), &now);
+            lp.view.clipMask[0] = 0b0011; lp.view.playingClip[0] = 0; lp.view.muted[0] = true;
+            const SurfaceControlId playingPad { ControlKind::Pad, 0, 7 };
+            expectEquals(lp.led(playingPad).rgb, look.layerRgb[0], "first half of the period: bright");
+            expect(lp.model.isAnimating());
+            now = 499.0;
+            expectEquals(lp.led(playingPad).rgb, look.layerRgb[0], "still bright just before half");
+            now = 500.0;
+            expectEquals(lp.led(playingPad).rgb, scaled(look.layerRgb[0], look.dimScale), "second half: dim, not off");
+            now = 1000.0;
+            expectEquals(lp.led(playingPad).rgb, look.layerRgb[0], "and back");
+            lp.view.muted[0] = false;
+            now = 1600.0;
+            expectEquals(lp.led(playingPad).rgb, look.layerRgb[0], "unmuted: steady bright");
+
+            Rig nb(nativeBlink());
+            nb.view.clipMask[0] = 0b1; nb.view.playingClip[0] = 0; nb.view.muted[0] = true;
+            expect(nb.led({ ControlKind::Pad, 0, 3 }).mode == LedMode::Flash, "no RGB but a native flash");
+            Rig mock(mockGrid());
+            mock.view.clipMask[0] = 0b1; mock.view.playingClip[0] = 0; mock.view.muted[0] = true;
+            const auto m = mock.led({ ControlKind::Pad, 0, 3 });
+            expect(m.mode == LedMode::Static && m.rgb != 0, "no flash at all: steady and lit");
+        }
+
+        beginTest("grid: a clip that just started plays one brief burst, then settles to steady bright");
+        {
+            double now = 1000.0;
+            Rig lp(launchpadStyle(), &now);
+            lp.view.clipMask[0] = 0b0011;
+            const SurfaceControlId pad { ControlKind::Pad, 1, 7 };
+            lp.led(pad);                                  // first sighting: nothing playing yet
+            lp.view.playingClip[0] = 1;
+            expect(lp.led(pad).rgb != look.layerRgb[0], "the change starts a burst");
+            expect(lp.model.isAnimating());
+            now = 1149.0;
+            expect(lp.led(pad).rgb != look.layerRgb[0], "still in the burst");
+            now = 1160.0;
+            expectEquals(lp.led(pad).rgb, look.layerRgb[0], "steady after stepFlashMs");
+            expect(lp.model.isAnimating(), "the timer runs a moment longer so the steady frame is sent");
+            now = 1400.0;
+            expect(! lp.model.isAnimating(), "then stops");
+
+            Rig mock(mockGrid());
+            mock.view.clipMask[0] = 0b1;
+            mock.led({ ControlKind::Pad, 0, 3 });
+            mock.view.playingClip[0] = 0;
+            expectEquals(mock.led({ ControlKind::Pad, 0, 3 }).rgb, look.layerRgb[0], "a palette pad has no burst");
+            expect(! mock.model.isAnimating());
+        }
+
+        beginTest("grid: a surface that first sees a playing clip (entering the mode) does not burst");
+        {
+            double now = 0.0;
+            Rig lp(launchpadStyle(), &now);
+            lp.view.clipMask[0] = 0b1; lp.view.playingClip[0] = 0;
+            expectEquals(lp.led({ ControlKind::Pad, 0, 7 }).rgb, look.layerRgb[0]);
+            expect(! lp.model.isAnimating());
         }
 
         beginTest("a refused press changes no light");
