@@ -252,6 +252,78 @@ struct ClipLaunchTests : juce::UnitTest
             expectEquals((int) p.clipMask(9), 0);
         }
 
+        beginTest("the screen's StoreClip / ClearClip / LaunchClip actions: store plays the stored clip, a launch works with the mode off");
+        {
+            using T = mu_core::ControlActionType;
+            const auto act = [](T type, int layer, int index)
+            {
+                mu_core::ControlAction a;
+                a.type = type; a.layer = layer; a.index = index;
+                return a;
+            };
+            ClipProcessor p;
+            p.setParam("v0_a", 0.9f);
+            expect(p.perform(act(T::StoreClip, 0, 2)), "store");
+            expectEquals((int) p.clipMask(0), 1 << 2);
+            expectEquals(p.clipCount(0), 1);
+            expectEquals(p.getLiveState().getPlayingClip(0), 2, "what was stored is what plays");
+            expectEquals(p.layers[0]->activeClip, 2, "and is recorded with the layer");
+            expect(! p.perform(act(T::StoreClip, 0, 8)) && ! p.perform(act(T::StoreClip, 0, -1)), "clip out of range");
+            expect(! p.perform(act(T::StoreClip, 7, 0)) && ! p.perform(act(T::ClearClip, 7, 0)), "no such layer");
+
+            p.setParam("v0_a", 0.1f);
+            expect(p.perform(act(T::StoreClip, 0, 4)), "a second clip");
+            expectEquals(p.getLiveState().getPlayingClip(0), 4);
+            expectEquals(p.clipCount(0), 2);
+            expect(p.perform(act(T::LaunchClip, 0, 2)), "a launch needs no Performance mode");
+            expectWithinAbsoluteError(p.param("v0_a"), 0.9f, 0.01f);
+            expectEquals(p.getLiveState().getPlayingClip(0), 2);
+
+            expect(p.perform(act(T::ClearClip, 0, 2)), "clear");
+            expectEquals((int) p.clipMask(0), 1 << 4);
+            expectEquals(p.getLiveState().getPlayingClip(0), -1, "clearing the playing clip leaves none playing");
+
+            expect(mu_core::actionFromName(mu_core::actionName(T::StoreClip)) == T::None
+                   && mu_core::actionFromName(mu_core::actionName(T::ClearClip)) == T::None,
+                   "no saved map or surface mapping can name the writing actions");
+        }
+
+        beginTest("storing over a clip that is queued drops that launch; Performance mode refuses the writing actions");
+        {
+            using T = mu_core::ControlActionType;
+            const auto act = [](T type, int layer, int index)
+            {
+                mu_core::ControlAction a;
+                a.type = type; a.layer = layer; a.index = index;
+                return a;
+            };
+            const auto dir = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                                 .getChildFile("mu_clipstrip_" + juce::String(juce::Time::currentTimeMillis()));
+            dir.createDirectory();
+
+            juce::AudioProcessor::setTypeOfNextNewPlugin(juce::AudioProcessor::wrapperType_Standalone);
+            ClipProcessor p;
+            juce::AudioProcessor::setTypeOfNextNewPlugin(juce::AudioProcessor::wrapperType_Undefined);
+
+            p.setParam("v0_a", 0.9f);  p.storeClip(0, 1);
+            p.setParam("v0_a", 0.2f);
+            p.startPlaying();
+            expect(p.perform(act(T::LaunchClip, 0, 1)), "launch while the transport runs");
+            expectEquals(p.getLiveState().getQueuedClip(0), 1);
+            expect(p.perform(act(T::StoreClip, 0, 1)), "store over the queued clip");
+            expectEquals(p.getLiveState().getQueuedClip(0), -1, "the stale launch is gone");
+            expect(! p.hasPendingSwap(0), "and nothing is staged");
+            expectEquals(p.getLiveState().getPlayingClip(0), 1);
+
+            mu_pp::PerformanceFile list;
+            list.setItem(0, p.getProductStateId(), dir.getChildFile("p.preset"), dir, "P");
+            p.loadPerformance(list, dir.getChildFile("live.muPerformance"));
+            expect(p.perform(act(T::PerformanceMode, 0, 1)), "Performance mode on");
+            expect(! p.perform(act(T::StoreClip, 0, 3)) && ! p.perform(act(T::ClearClip, 0, 1)), "locked: the screen-only writes are refused");
+            expectEquals((int) p.clipMask(0), 1 << 1, "the bank is unchanged");
+            dir.deleteRecursively();
+        }
+
         beginTest("a clip survives the layer's own parameter edits and is independent of the live layer");
         {
             ClipProcessor p;

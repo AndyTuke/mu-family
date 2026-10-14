@@ -310,6 +310,14 @@ public:
     // slotStageSerial(slot) whenever it stages or applies a payload, as every stage path does.
     bool    launchClip(int slot, int clip);
     uint8_t clipMask(int slot) const;
+    // How many clips layer `slot` stores (0 for no such layer).
+    int     clipCount(int slot) const
+    {
+        int n = 0;
+        for (int i = 0; i < mu_limits::kClipsPerLayer; ++i)
+            n += (clipMask(slot) >> i) & 1;
+        return n;
+    }
 
     virtual bool hasPendingSwap(int slot) const                             { return layerSwapper.hasPending(slot); }
     // Drops the staged (not yet committed) full-preset swap, if any (Performance mode cancelling a queued item).

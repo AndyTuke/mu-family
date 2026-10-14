@@ -108,6 +108,7 @@ bool LiveState::perform(const ControlAction& a)
     {
         case T::PerformanceMode:
             return setMode(a.index < 0 ? ! performanceMode : a.index != 0, a.layer);   // `index` (a mapped button's value is the message's)
+        case T::LaunchClip:      return startClip(a.layer, a.index);   // the on-screen clip strip launches with the mode off too
         default: break;
     }
 
@@ -125,7 +126,6 @@ bool LiveState::perform(const ControlAction& a)
             if (a.layer != selectedLayer) { selectedLayer = a.layer; changed(); }
             return true;
         }
-        case T::LaunchClip:      return startClip(a.layer, a.index);
         case T::ClipNext:        return stepClip(+1);
         case T::ClipPrev:        return stepClip(-1);
         default: return false;
@@ -320,6 +320,19 @@ void LiveState::reconcileClips()
         dirty = true;
     }
     if (dirty) changed();
+}
+
+void LiveState::clipStored(int layer, int clip)
+{
+    if (! inRange(layer) || clip < 0 || clip >= mu_limits::kClipsPerLayer) return;
+    auto& c = clipState[(size_t) layer];
+    if (c.queued == clip)   // the staged launch would land the clip's old contents
+    {
+        if (cb.cancelSlot) cb.cancelSlot(layer);
+        c.queued = -1;
+    }
+    setPlaying(layer, clip);   // what was just stored is what the layer plays
+    changed();
 }
 
 void LiveState::setClipMask(int layer, uint8_t mask)

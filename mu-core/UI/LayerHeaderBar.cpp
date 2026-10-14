@@ -24,19 +24,26 @@ LayerHeaderBar::LayerHeaderBar()
         if (onPresetFileChosen && id >= 1 && id <= presetFiles.size()) onPresetFileChosen(presetFiles[id - 1]);
     };
     addAndMakeVisible(presetDD);
+    addChildComponent(clipStrip);   // hidden until a product with a clip bank asks for it
 }
 
 void LayerHeaderBar::setNoun(const juce::String& n)
 {
     noun = n.toLowerCase();
+    clipStrip.setNoun(noun);
     resetBtn.setTooltip("Reset this " + noun + " to defaults");
     deleteBtn.setTooltip(deleteBtn.isEnabled() ? "Delete this " + noun : "The last " + noun + " cannot be deleted");
 }
 
-void LayerHeaderBar::setLayerName(const juce::String& n) { nameLabel.setText(n, juce::dontSendNotification); }
+void LayerHeaderBar::setLayerName(const juce::String& n)
+{
+    nameLabel.setText(n, juce::dontSendNotification);
+    clipStrip.setLayerName(n);
+}
 void LayerHeaderBar::setColour(juce::Colour c)
 {
     colour = c;
+    clipStrip.setColour(c);   // the pads wear the layer's colour
     presetDD.setLcdColour(c);   // the preset selector lights in the layer colour
     lookAndFeelChanged();       // name display: lit lettering in metal style
     repaint();
@@ -86,6 +93,13 @@ void LayerHeaderBar::setShowReset(bool show)
     resized();
 }
 
+void LayerHeaderBar::setShowClips(bool show)
+{
+    showClips = show;
+    clipStrip.setVisible(show);
+    resized();
+}
+
 void LayerHeaderBar::setShowDelete(bool show)
 {
     showDelete = show;
@@ -121,10 +135,19 @@ void LayerHeaderBar::resized()
     if (showReset) { resetBtn.setBounds(x - iconW, btnY, iconW, btnH);  x -= iconW + s(4); }
     saveBtn.setBounds(x - presetW, btnY, presetW, btnH);  x -= presetW + s(4);
 
+    // The clip strip sits right of the preset dropdown it relates to, left of Save; the dropdown yields the width.
+    int ddRight = x - s(4);
+    if (showClips)
+    {
+        const int stripW = ClipStrip::stripWidth();
+        clipStrip.setBounds(ddRight - stripW, btnY, stripW, btnH);
+        ddRight -= stripW + s(MuLookAndFeel::kClipStripGap);
+    }
+
     // Name occupies a fixed left slot; the preset dropdown fills the gap between.
     const int nameW  = s(120);
     const int ddLeft = s(kNameX) + nameW + s(8);
-    presetDD.setBounds(ddLeft, btnY, juce::jmax(s(80), x - s(4) - ddLeft), btnH);
+    presetDD.setBounds(ddLeft, btnY, juce::jmax(s(80), ddRight - ddLeft), btnH);
     nameLabel.setBounds(s(kNameX), btnY, nameW, btnH);   // same row as the preset selector
 }
 

@@ -79,22 +79,12 @@ void StepIndicator::splitText(float avail, float litMeasured, float ghostMeasure
 
 float StepIndicator::pulse(double timeMs, float hz) noexcept
 {
-    return 0.5f - 0.5f * (float) std::cos(juce::MathConstants<double>::twoPi * (double) hz * timeMs / 1000.0);
+    return mu_ui::lampPulse(timeMs, hz);
 }
 
 float StepIndicator::litFor(Lamp state, double timeMs, bool flash) noexcept
 {
-    const auto& L = MuLookAndFeel::lighting();
-    const float bright = juce::jmin(1.0f, L.lampOn + L.lampPlayhead);
-    switch (state)
-    {
-        case Lamp::Empty:     return L.lampOff;
-        case Lamp::Available: return L.lampDim;
-        case Lamp::Current:   return flash ? bright : L.lampOn;
-        case Lamp::Queued:    return L.lampDim + (bright - L.lampDim) * pulse(timeMs, L.queuedPulseHz);
-        case Lamp::Fault:     return L.lampDim;
-    }
-    return L.lampOff;
+    return mu_ui::lampLit(state, timeMs, flash);
 }
 
 int StepIndicator::lampAt(juce::Point<int> p) const

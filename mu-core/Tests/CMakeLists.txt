@@ -50,6 +50,9 @@ target_sources(mu-core-tests PRIVATE
     TransportBarTests.cpp
     ShellChromeTests.cpp
     PerformanceModeShellTests.cpp
+    ClipStripTests.cpp
+    ../UI/ClipStrip.cpp
+    ../UI/LayerHeaderBar.cpp
     PerformanceChooserTests.cpp
     VoiceEngineParamsTests.cpp
     TestShellBackend.h

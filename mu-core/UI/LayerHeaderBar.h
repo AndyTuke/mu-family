@@ -1,5 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "UI/ClipStrip.h"
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/MuLookAndFeel.h"
 
@@ -16,10 +17,13 @@ public:
     LayerHeaderBar();
 
     // The Reset confirm's message, one wording for every product: a reset also returns the layer's
-    // mixer strip (level, pan, sends) to defaults, so the dialog says so.
-    static juce::String resetConfirmMessage(const juce::String& layerName)
+    // mixer strip (level, pan, sends) to defaults, so the dialog says so, and empties its clip bank,
+    // which it says only when there is something to lose.
+    static juce::String resetConfirmMessage(const juce::String& layerName, int clipCount = 0)
     {
-        return "Reset \"" + layerName + "\" to defaults?\nThis also resets its mixer strip.\nThis cannot be undone.";
+        return "Reset \"" + layerName + "\" to defaults?\nThis also resets its mixer strip."
+             + (clipCount > 0 ? juce::String("\nThis also clears its clips.") : juce::String())
+             + "\nThis cannot be undone.";
     }
 
     void setLayerName(const juce::String& n);
@@ -40,6 +44,13 @@ public:
     void setDeleteEnabled(bool enabled);              // greyed when only one layer remains
     void setNoun(const juce::String& n);              // the product's word for a layer (tooltips); lower-cased
     void setNameEditable(bool editable);              // fixed-name layers can't be renamed
+    // The layer's clip strip, between the preset dropdown and Save. Off by default: a product with no clip bank
+    // (no hot-swap, so nothing to launch into) never shows it. It adds no height.
+    void setShowClips(bool show);
+    bool getShowClips() const noexcept { return showClips; }
+    void bindClips(const mu_core::LiveView* view, mu_core::ControlSink* sink) { clipStrip.bind(view, sink); }
+    void setClipLayer(int layerIndex)                 { clipStrip.setLayer(layerIndex); }
+    ClipStrip& getClipStrip() noexcept                { return clipStrip; }
     void commitNameEdit();                            // commit any in-progress rename (call before switching layer)
 
     DropdownSelect& getPresetDropdown() noexcept { return presetDD; }
@@ -63,6 +74,7 @@ private:
     juce::TextButton resetBtn  { juce::String::charToString(0x21BA) };  // ↺
     juce::TextButton deleteBtn { juce::String::charToString(0x2715) };  // ✕
     DropdownSelect   presetDD;
+    ClipStrip        clipStrip;
     juce::TextButton saveBtn   { "Save" };
 
     juce::Rectangle<float> nameDisplayBounds() const;   // the name's LCD (metal style)
@@ -72,6 +84,7 @@ private:
     bool         staging   = false;
     bool         showReset = true;
     bool         showDelete = true;
+    bool         showClips  = false;
     juce::String noun { "layer" };
 
     static constexpr int kIconBtnW   = 22;

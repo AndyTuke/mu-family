@@ -2,6 +2,7 @@
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Voice/InsertSubsection.h"
 #include "UI/ParamKnobGrid.h"
+#include "UI/LayerPanel.h"              // its clip strip reports to the status bar
 #include "UI/StandardSettingsOverlay.h" // wires its program-change buttons
 #include "UI/MixerOverlay.h"            // forwards its status messages
 #include "UI/ModalDialog.h"             // the support prompt
@@ -114,6 +115,11 @@ void EditorShellBase::setMainArea(juce::Component* newSidebar, juce::Component* 
         chrome.addShieldExemption(shared->getLayerIndicator());
         transportBar.getEditorLayer = [this] { return layerSidebar != nullptr ? layerSidebar->getSelectedIndex() : 0; };
     }
+
+    // The layer panel's clip strip talks to the status bar (hover text, Stored / Cleared / Queued / Mute lines).
+    if (auto* panel = dynamic_cast<LayerPanel*>(newMainPanel))
+        panel->getHeader().getClipStrip().onStatusUpdate = [this](const juce::String& name, const juce::String& value)
+        { statusBar.showParam(name, value); };
 }
 
 void EditorShellBase::forwardKnobStatus(juce::Component& root)

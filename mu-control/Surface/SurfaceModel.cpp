@@ -72,6 +72,7 @@ bool SurfaceModel::handle(const SurfaceEvent& event)
 
     // A layer that does not exist is a dark pad: pressing it does nothing.
     using T = mu_core::ControlActionType;
+    if (action->type == T::StoreClip || action->type == T::ClearClip) return false;   // a pad never writes a clip
     if ((action->type == T::SelectLayer || action->type == T::LaunchClip)
         && (action->layer < 0 || action->layer >= view.getLayerCount()))
         return false;

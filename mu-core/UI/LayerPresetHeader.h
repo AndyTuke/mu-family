@@ -37,7 +37,7 @@ inline void wireSlotPresetHeader(LayerHeaderBar& header, juce::Component& owner,
         if (safe == nullptr) return;
         const int slot = cfg.currentSlot();
         confirmAsync(safe.getComponent(), "Reset " + cfg.noun,
-                     LayerHeaderBar::resetConfirmMessage(p->getLayerName(slot)),
+                     LayerHeaderBar::resetConfirmMessage(p->getLayerName(slot), p->clipCount(slot)),
                      "Reset", [safe, p, cfg, slot]
                      {
                          if (safe == nullptr) return;

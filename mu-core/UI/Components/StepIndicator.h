@@ -1,6 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "MuLookAndFeel.h"
+#include "LampState.h"
 #include <functional>
 #include <vector>
 
@@ -13,8 +14,8 @@ class StepIndicator : public juce::Component,
 {
 public:
     // Empty = no item there, Available = playable, Current = playing, Queued = waiting for its
-    // boundary (pulses), Fault = missing file or another product's item (steady red).
-    enum class Lamp { Empty, Available, Current, Queued, Fault };
+    // boundary (pulses), Fault = missing file or another product's item (steady red). Shared with ClipStrip.
+    using Lamp = mu_ui::LampState;
 
     StepIndicator();
     ~StepIndicator() override;

@@ -85,6 +85,8 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/LayerSidebar.cpp"
     # Shared per-layer header bar (name / reset / delete / preset / save).
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/LayerHeaderBar.cpp"
+    # Shared per-layer clip strip (eight lamp pads), a child of the header bar.
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/ClipStrip.cpp"
     # Shared per-layer panel shell (header strip + product content + modulators).
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/LayerPanel.cpp"
     # Shared add / delete / reorder editor glue for products with variable layers.

@@ -191,6 +191,16 @@ bool ProcessorBase::perform(const mu_core::ControlAction& a)
         case T::ClipNext:
         case T::ClipPrev:
             return liveState.perform(a);
+        case T::StoreClip:
+        case T::ClearClip:
+        {
+            // Screen only: these write the bank, so the locked Performance mode refuses them and no map can name them.
+            if (liveState.isPerformanceMode()) return false;
+            if (a.type == T::ClearClip) return clearClip(a.layer, a.index);
+            if (! storeClip(a.layer, a.index)) return false;
+            liveState.clipStored(a.layer, a.index);
+            return true;
+        }
         default:                 return false;   // presets, panic: later
     }
 }

@@ -745,6 +745,13 @@ public:
     static constexpr int kLcdBrowseW   = 24;
     static constexpr int kStripDisplayH = 20;   // a display / button in a thin strip (header bar, sample strip), centred
 
+    // The layer's clip strip in the header bar (docs/design-ui-family.md 13.5): eight pads after an engraved caption.
+    static constexpr int kClipPadW      = 24;
+    static constexpr int kClipPadH      = kStripDisplayH;
+    static constexpr int kClipPadGap    = 3;
+    static constexpr int kClipLabelW    = 30;   // the engraved "Clip" caption's slot
+    static constexpr int kClipStripGap  = 8;    // between the strip and the preset dropdown
+
     // Name plates (drawNamePlate): section and row names
 
 private:

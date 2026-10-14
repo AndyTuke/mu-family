@@ -83,7 +83,8 @@ public:
     // LaunchClip, ClipNext, ClipPrev.
     static bool handles(ControlActionType t) noexcept;
 
-    // Performs one of those. Every one but PerformanceMode returns false while the mode is off.
+    // Performs one of those. Every one but PerformanceMode and LaunchClip returns false while the mode is off
+    // (the on-screen clip strip launches outside the mode; the surface only exists inside it).
     // PerformanceMode: `index` 1 = on, 0 = off, -1 (the default) = toggle; refused when the product does not
     // support the mode or no performance is loaded; turning it on takes `layer` as the selected layer.
     // LaunchClip(layer, index): the playing clip's pad cancels a queued launch on that layer, else toggles the
@@ -112,6 +113,9 @@ public:
     bool needsSettling() const noexcept;
 
     // ── The clip bank's live half (the owner calls these; message thread) ──
+    // The layer's current state was just stored as clip c: that clip is now the one it plays (a launch of it still
+    // waiting is dropped). The mask arrives separately, through setClipMask.
+    void clipStored(int layer, int clip);
     // Layer n's stored-clip mask changed (store, clear, load, structural edit).
     void setClipMask(int layer, uint8_t mask);
     // A layer preset that is not a clip was staged on, or the layer was added / reset: it plays no clip now.

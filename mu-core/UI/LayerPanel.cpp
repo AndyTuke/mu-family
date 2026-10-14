@@ -13,6 +13,10 @@ LayerPanel::LayerPanel(ProcessorBase& processor, const juce::String& layerNoun)
           [this] { setLayer(currentLayer); },   // rebind so the content and modulators show the new state
           [this](int slot) { return presetNameFn ? presetNameFn(slot) : proc.getLayerName(slot); } });
     header.setNoun(noun);
+
+    // The clip strip is shown only where the product can capture a layer (the hook is the clip bank's gate).
+    header.bindClips(proc.getLiveView(), proc.getControlSink());
+    header.setShowClips(proc.getNumLayers() > 0 && proc.captureLayerPresetTree(0).isValid());
     addAndMakeVisible(header);
     addAndMakeVisible(modulatorPanel);
 
@@ -57,6 +61,7 @@ void LayerPanel::refreshHeader()
 {
     header.setLayerName(proc.getLayerName(currentLayer));
     header.setColour(layerColour());
+    header.setClipLayer(currentLayer);
     header.setSelectedPresetId(0);
 }
 

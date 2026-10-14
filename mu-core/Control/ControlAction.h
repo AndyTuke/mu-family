@@ -22,6 +22,8 @@ enum class ControlActionType
     LaunchClip,        // launch clip `index` on `layer` (Performance mode)
     ClipNext,          // the selected layer's next stored clip, wrapping (Performance mode)
     ClipPrev,          // the selected layer's previous stored clip, wrapping (Performance mode)
+    StoreClip,         // store `layer`'s current state as clip `index` (screen only: never mapped, refused in Performance mode)
+    ClearClip,         // empty clip `index` of `layer` (screen only, as StoreClip)
     PresetNext,
     PresetPrev,
     Panic,
@@ -37,8 +39,8 @@ enum class Quantise { Default, Off, Beat, Bar };
 struct ControlAction
 {
     ControlActionType type     = ControlActionType::None;
-    int               layer    = 0;        // MuteLayer / SoloLayer / SelectLayer / LaunchClip: the layer index
-    int               index    = -1;       // PerformanceItem: the item index; PerformanceMode: -1 toggle, 0 off, 1 on; LaunchClip: the clip index (0..7)
+    int               layer    = 0;        // MuteLayer / SoloLayer / SelectLayer / LaunchClip / StoreClip / ClearClip: the layer index
+    int               index    = -1;       // PerformanceItem: the item index; PerformanceMode: -1 toggle, 0 off, 1 on; LaunchClip / StoreClip / ClearClip: the clip index (0..7)
     juce::String      paramId;             // Parameter: the APVTS parameter id
     float             value    = 0.0f;     // Parameter: normalised 0..1
     Quantise          quantise = Quantise::Default;
@@ -59,6 +61,8 @@ inline const char* actionName(ControlActionType t) noexcept
         case ControlActionType::LaunchClip:      return "launchClip";
         case ControlActionType::ClipNext:        return "clipNext";
         case ControlActionType::ClipPrev:        return "clipPrev";
+        case ControlActionType::StoreClip:       return "storeClip";
+        case ControlActionType::ClearClip:       return "clearClip";
         case ControlActionType::PresetNext:      return "presetNext";
         case ControlActionType::PresetPrev:      return "presetPrev";
         case ControlActionType::Panic:           return "panic";
@@ -71,6 +75,8 @@ inline const char* actionName(ControlActionType t) noexcept
     return "none";
 }
 
+// StoreClip and ClearClip are deliberately absent from the list: they write data, so no saved map, surface
+// mapping or MIDI message can name them (a pad never writes a clip).
 inline ControlActionType actionFromName(const juce::String& n) noexcept
 {
     for (auto t : { ControlActionType::Parameter, ControlActionType::TransportToggle, ControlActionType::TransportPlay,

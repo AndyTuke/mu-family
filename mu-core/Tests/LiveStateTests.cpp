@@ -430,7 +430,7 @@ public:
             expectEquals(f.recorded[2], 3);
         }
 
-        beginTest("an empty pad, a bad index, a missing layer, the mode off and a refused launch change nothing");
+        beginTest("an empty pad, a bad index, a missing layer and a refused launch change nothing; with the mode off only a launch is allowed");
         {
             Fake f; LiveState s; ready(f, s);
             s.setClipMask(0, 0b0010);
@@ -444,8 +444,9 @@ public:
             expectEquals((int) f.launched.size(), 0);
             s.perform(mode(0));
             f.refuseLaunch = false;
-            expect(! s.perform(launch(0, 1)), "mode off");
-            expect(! s.perform(act(ControlActionType::ClipNext)) && ! s.perform(act(ControlActionType::ClipPrev)), "mode off: stepping too");
+            expect(! s.perform(act(ControlActionType::ClipNext)) && ! s.perform(act(ControlActionType::ClipPrev)), "mode off: stepping is refused");
+            expect(s.perform(launch(0, 1)), "mode off: the on-screen clip strip still launches");
+            expectEquals(s.getQueuedClip(0), 1, "and it queued");
         }
 
         beginTest("the playing pad mutes and unmutes; with another clip queued the first press cancels the queue");
