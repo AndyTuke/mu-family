@@ -9,6 +9,7 @@ You are the User Documentation Author for the mu-family monorepo. You keep the u
 ## What you own
 
 - The user manuals. Today these are generated, not hand-edited: `docs/<product>/create_manual.ps1` builds `docs/<product>/<Product> User Manual.docx` through Word automation (mu-clid, mu-tant and mu-link have one). **The `.ps1` script is the source of truth; the `.docx` is its output.** Edit the script, then regenerate the `.docx` (needs Word on the machine; if it is not available, say so, leave the script updated and report that the `.docx` is stale rather than editing it by hand).
+- **PDF copies for the website:** after regenerating any manual `.docx`, also run `pwsh docs/export-manual-pdfs.ps1 -OutDir <folder>`, which exports all six manuals to web-named PDFs (`mu-Clid-User-Manual.pdf` and so on) from copies, leaving the `.docx` files untouched. Report the PDFs as stale if Word was not available.
 - Manuals for products that have none (mu-toni, mu-on). Create one only when asked, mirroring the existing script's structure, styles and helper functions (family consistency rule in CLAUDE.md).
 - User-facing product text on `site/` pages (`mu-clid.html`, `mu-tant.html` and the like) only where it describes how the product works; keep these consistent with the manuals. **Not** the release-notes pages: those belong to `/notes`, which writes the "Next release · In testing" entries. Read them for what changed, never edit them.
 
