@@ -130,7 +130,9 @@ This section is the specification of record for E1. Subsections 2.1.2 to 2.1.5 a
 ([extraction-plan.md 2.1a](extraction-plan.md#21a-contract-requirements-from-the-real-time-review-c1-to-c18), written 2026-10-15 as stage E0d); C5 to C18
 stay in that table and bind this section too. **Status: specified 2026-10-15; `dsp-controller` round 1 (2026-10-15): C1 and C3 Pass with notes, C2 and
 C4 Not yet (R1 to R7), structure kept; this revision folds in R1 to R7, the binding notes N1 to N7, the accepted amendments and the open-point rulings (2.1.6).
-`dsp-controller` sign-off on C1 to C4: requested (round 2); no contract code before it.**
+Round 2 (2026-10-15): C1 and C2 Pass with notes, C3 Pass, C4 Not yet (F1, folded in with the R5 rule line and the round-2 binding notes on the packed word,
+lock order, eviction under `layersLock` and phase 4). `dsp-controller` sign-off: C1-C3 signed (round 2, with binding notes); C4 accepted once F1 and the R5
+rule line are in the doc (dsp-controller: no further round).** E1 may start on C1 to C3.
 
 New hooks (defaults do nothing; all called once per layer per block or per edit, never per sample). `Layer` gains a second base, the interface
 `mu_core::RetireTail` (2.1.3), so the bin can hold either a whole layer or a product's engine tail:
@@ -196,7 +198,7 @@ delivered on the next rendered block.
 | 1 | Priority-0 live layers in slot order: `ctx.slot = s`, `layer->render(ctx, scratch[s], n)`. An Empty layer is not called; its scratch is cleared. **Every slot below `mixCount` with no live layer gets a cleared scratch here** (R4), so an entry cut between phase 0 and phase 4 renders silence, not last block's samples. | `scratch[s]` |
 | 2 | Peer table: `peers[s] = { scratch[s] pointers, valid = 1 }` for each slot rendered in phase 1; every other entry `valid = 0`. | `PeerTap[kMaxLayers]` |
 | 3 | Priority-1 live layers, with `ctx.peers` set (C10: post-insert, pre-strip, and before any tail is added). | `scratch[s]` |
-| 4 | The bin (2.1.3), slot order then entry order: tails add into `scratch[s]` after the live layer, as mu-Clid's retired engines add after the live engine today. | `scratch[s]` |
+| 4 | The bin (2.1.3), rows `s < mixCount` only, slot order then entry order: tails add into `scratch[s]` after the live layer, as mu-Clid's retired engines add after the live engine today. | `scratch[s]` |
 | 5 (last chunk) | Cache `loopBeats()` per live slot; latch the rendered play/stop state and clear `jumpPending` (the continuity end beat is kept per host block, not here); publish nothing else. | caches |
 
 `processCoreBlock` gets a `RenderChannelFn` that copies `scratch[r]` into the mixer's channel buffer (an exact copy, so R11 holds) for `r < mixCount`. Scratch
@@ -311,8 +313,11 @@ muted. The boundary-exact timing of that switch (today's commit lands up to one 
 **What remains under `layersLock`.** In `TryLock` mode, everything it guards today, with today's hold (pointer moves, strip moves, microseconds; the lock
 probe of E0.8 measures it). In `Published` mode it becomes the **writers' mutex only**: structural edits, `setLayerType`, `prepareToPlay` /
 `releaseResources` (which may run on a host thread other than the message thread; they increment `prepareGeneration` under it, N1) take it; the audio
-thread never does. Its hold is the writer's own section; no writer holds it across a grace wait. The bin's message-side operations take the separate **bin
-mutex** in both modes (2.1.3, R2), never `layersLock`, so a free can never cause an audio try-lock miss.
+thread never does. Its hold is the writer's own section; no writer holds it across a grace wait, **with one exception**: a park under the writers' mutex
+that finds its row full evicts entry 0 and waits one bounded grace for it (2.1.3, Depth and overflow). The bin's message-side operations take the separate
+**bin mutex** in both modes (2.1.3, R2), nested inside `layersLock` when the caller already holds it (lock order `layoutWriteLock`, `layersLock`, `binMutex`;
+`prepareToPlay` / `releaseResources` call `cutAll` and `service` nested inside the writers' mutex, or release it before taking `binMutex`; nobody takes
+`layersLock` while holding `binMutex`); a free never needs `layersLock`, so it can never cause an audio try-lock miss.
 
 **Coexistence with `ScopedSuspend` structural edits** (`addLayer`, `removeLayer`, `swapLayers`, `resetLayer`, unchanged in what they do and in what they sound
 like). They keep `ScopedSuspend` (`layerEditInFlight` raised, processing suspended) because they move parameter values and edit layers in place
@@ -397,7 +402,8 @@ public:
     enum class CountPolicy : uint8_t { RenderPastCount, CutAtCount };   // R3: per product, set once at construction
 
     // Message or host thread; every one takes binMutex (both modes, R2). binMutex is never taken by the audio thread and is
-    // not layersLock. Lock order: layersLock, then binMutex (mu-Tant's layersMoved calls cutSlot under layersLock); never the reverse.
+    // not layersLock. Lock order: layoutWriteLock, layersLock, binMutex (mu-Tant's layersMoved calls cutSlot under layersLock);
+    // never the reverse. A RetireTail destructor (run under binMutex by service) takes no lock.
     void setPrepared(double sampleRate);     // prepareToPlay: stores the rate park converts with
     void park       (int slot, std::unique_ptr<RetireTail> owned, uint32_t activationSerial);  // owned; reads the rate under binMutex
     void parkInPlace(int slot, RetireTail& spare,                 uint32_t activationSerial);  // borrowed spare (mu-Tant); no-op if the row
@@ -466,9 +472,15 @@ new view renders it as a tail; there is no block with both and none with neither
   the high 32; `static_assert` lock-free), and **every** count store goes through it as one store that also advances the serial: the structural edits,
   `publishLayerLocked` / `unpublishLayerLocked`, and `applyComposedState`, which today stores the count with no lock (`ProcessorBase.cpp:759`). `numLayers`
   stays as a mirror for existing readers and is written from the same value. `LayerBlock` reads count and serial in one load. In `Published` mode the serial is
-  the view's.
+  the view's. **The serial advances by a read-modify-write** (a compare-exchange loop on `layout`, never a load then a store), and `nextSerial()` plus the
+  store that carries it run inside **one writer exclusion**, the **layout writer lock**: in `Published` mode the writers' mutex; in `TryLock` mode a separate
+  message/host-thread mutex `layoutWriteLock` (not `layersLock`, which the audio thread try-locks and which must stay short while a preset is applied between
+  the park and the store). Otherwise a host-thread `setStateInformation` running `applyComposedState` racing a message-thread edit can lose a serial or attach a
+  park to the wrong store, which breaks the same-block hand-over (a block with both live and tail). **Risk until implemented**; tested by the
+  `applyComposedState` race test run from a second thread. Lock order: `layoutWriteLock`, then `layersLock`, then `binMutex`.
 - **A park outside `layersLock`** (mu-Tant's count-reducing full preset, `setLayerType` step 5) uses `nextSerial()`, the serial the following count store or
-  publication will carry; until that store lands the entry does not render and the old layer still renders live.
+  publication will carry, under the layout writer lock held until that store; until the store lands the entry does not render and the old layer still
+  renders live.
 - **A park under `layersLock`** (mu-Clid's engine install) may use the current serial: the audio thread cannot start a block until the lock is released, and
   the first block after it renders the new engine live and the old one as a tail in the same slot, as today.
 - **A failed `LayerBlock`** never touches the bin: no transition, no `onRetireStart`, no ramp step.
@@ -499,11 +511,17 @@ snapshot resumes. The cut is accepted as the fix, with a signed golden update at
 
 mu-Clid's choice is made at E5 after pin P3 shows what today does when the count drops while tails ring and then regrows (whether the unrendered engines
 resume); if `CutAtCount` differs from it, the difference is a signed golden update at E5.4d. mu-Toni and mu-On park nothing, so the policy is moot;
-mu-Tronic's is chosen at T1 with its remove path.
+mu-Tronic's is chosen at T1 with its remove path. **Phase 4 renders bin rows only for `s < mixCount`** under either policy: under `CutAtCount` a Draining
+entry above the count must not render in the window between the count store and `cutAtOrAbove`.
 
-**Depth and overflow.** Placement is into the first Empty entry of the row. A full row evicts **entry 0** (mu-Clid's force-cut rule, kept for bit identity):
-under `binMutex` the message thread cuts it, then `waitFor(stamp, timeout)` its grace (one block at most; `binMutex` is held across this one bounded wait, and
-`layersLock` never is); on success it frees the entry and reuses it, on a timeout it **drops the incoming tail** (an owned tail goes to the reclaim list and is
+**Depth and overflow.** Placement is into the first Empty entry of the row. A full row evicts **entry 0** (mu-Clid's force-cut rule, kept for bit identity),
+under `binMutex`, in one of two ways:
+
+- **`TryLock` mode, park under `layersLock`** (mu-Clid's install): the audio thread cannot be inside the bin while the caller holds `layersLock`, so the
+  entry is cut and freed **at once, without a wait** (today's force-cut: bit-identical, and nothing is added to the lock hold).
+- **Otherwise** (a park outside `layersLock`, or under the writers' mutex in `Published` mode): the message thread cuts it, then `waitFor(stamp, timeout)` its
+  grace (one block at most; `binMutex`, and in `Published` mode the writers' mutex, are held across this one bounded wait, the exception named in 2.1.2;
+  `layersLock` in `TryLock` mode never is). On success it frees the entry and reuses it, on a timeout it **drops the incoming tail** (an owned tail goes to the reclaim list and is
 freed by `service` after its own grace; an in-place spare is simply not parked) and the evicted entry stays Done for `service` (N2). The evicted tail stops
 without a fade, as today; a fast declick on eviction is not adopted for the four products (it would change mu-Clid's spam-swap render) and is to be considered
 for mu-Tronic's own types at T1.
@@ -518,9 +536,10 @@ today, now fades out at 30 s. **Seconds, with one kept exception (amendment b):*
 `EngineTail` for bit identity; it is already block-size dependent today, which is recorded, not changed.
 
 **Who frees, on which thread.** Only `service()` frees, on the message thread (the 100 Hz poll, `runDeferredWork`, `flushPendingAsyncUpdates` for headless
-renders), under `binMutex` and outside `layersLock`; it never waits (an entry whose grace has not passed waits for the next pass). The audio thread's Done
-requests deferred work so the free is prompt. **Flush:** `prepareToPlay` and `releaseResources` call `setPrepared` (prepare only), `cutAll()` then `service()`
-under `binMutex`, so they serialise with a concurrent 100 Hz service on another thread (the host is not processing, the stamp is even, everything is freed at
+renders), under `binMutex` and outside `layersLock`; it never waits (an entry whose grace has not passed waits for the next pass). Because frees run under
+`binMutex`, **a `RetireTail` destructor takes no lock** (and so cannot invert the order). The audio thread's Done requests deferred work so the free is
+prompt. **Flush:** `prepareToPlay` and `releaseResources` call `setPrepared` (prepare only), `cutAll()` then `service()` under `binMutex`, nested inside the
+writers' mutex they already hold (or after releasing it; 2.1.2 lock order), so they serialise with a concurrent 100 Hz service on another thread (the host is not processing, the stamp is even, everything is freed at
 once); `prepareForDestruction()` does the same before any product member is destroyed. mu-Clid's flush at prepare (today it re-prepares retired engines and
 keeps them) is **accepted as a deliberate change** (open point 8). **Natural Done for mu-Tronic:** whether a `Natural` tail must also render one silent block
 before Done is to be considered for mu-Tronic's types at T1; mu-Clid stops at Done (open point 4).
@@ -549,7 +568,9 @@ its slot live, and on regrow (count first, then cut) no block has neither; a spa
 ringing spare); `swapRows` / `removeRow` cut in-place entries and move owned ones; `service`, a park and `cutAll` + `service` from a second "host" thread never
 overlap (`binMutex`, two-thread stress); `service` runs before the install in a deferred-work pass; both count policies (`RenderPastCount` renders above the count,
 `CutAtCount` cuts at the store); a failed `LayerBlock` changes no entry; an entry cut after phase 0 renders silence in its slot; every count store goes through the
-packed word (a `applyComposedState` race test).
+packed word and no serial is lost or misattached (the `applyComposedState` race test, run from a second thread against message-thread edits); under
+`CutAtCount` a Draining entry above a just-stored count does not render before `cutAtOrAbove`; a full-row eviction under `layersLock` in `TryLock` mode frees
+without a wait; a `RetireTail` destructor taking a lock is a Debug assert.
 
 **Failure modes considered.** Free while the audio thread is inside `renderRetiring` (the grace period); a tail started after it was cut (the audio
 compare-exchange); a tail rendered both live and as a tail (activation serial; for in-place entries also the `slotHasLive` skip); a block with neither (count
@@ -691,7 +712,7 @@ static_assert(std::is_standard_layout_v<RenderContext> && std::is_trivially_copy
 // forEachMidi(view, fn(const MidiEvent&, int frameInCall)) applies channelMask and the call's frame range (inline, not a callback).
 // The base asserts ctx.blockSize == n and ctx.frameOffset == ctx.midi.firstFrame on every call (the view stays self-contained for forEachMidi).
 
-// mu-core/Sequencer/BeatWrap.h: the one floor-wrap (R6), moved out of resolveTransport's lambda (TransportResolver.h:126-130)
+// mu-core/Sequencer/BeatWrap.h: the one floor-wrap (R6), moved out of resolveTransport's lambda (mu-core/Plugin/TransportResolver.h:126-130)
 inline double wrapBeat(double b, double wrap) noexcept
 {
     if (wrap <= 0.0) return b;                       // unbounded
@@ -703,17 +724,23 @@ inline double wrapBeat(double b, double wrap) noexcept
 
 On non-negative input `wrapBeat` is exactly today's lambda (`fmod` is exact), so every golden is unchanged; on a tiny negative input it returns the largest
 double below `wrap` where today's lambda returns `wrap` itself (an out-of-range gate index in an unbounded host). The resolver, every layer that wraps
-(`Pattern::render`) and the jump check below use it; no layer calls bare `fmod` on a beat.
+(`Pattern::render`) use it; no layer calls bare `fmod` on a beat. The jump check does **not** use it (it reduces a delta, below).
 
 **Edges (computed by the base; R5).** Two pieces of audio-thread state, both reset by `prepareToPlay`, with different update rules:
 
 - **Host continuity, every host block** (rendered, missed try-lock, `layerEditInFlight`, 0 frames), in step (1) of `renderAndMix` before `LayerBlock`:
   `host = { bool valid; bool playing; double endBeat; double beatsPerSecond; double blockSeconds; }`. If the previous host block and this one are both playing,
-  `d = startBeat - host.endBeat`, reduced with `wrapBeat` to the nearest multiple of `beatWrap` when the host bounds its beat space (so mu-Tant's own 64-beat
-  wrap is not a jump); `|d| > tol` sets the sticky **`jumpPending`**. A stop and restart that both fall inside unrendered blocks also sets it (the layers would
-  otherwise see neither edge). Then `host` is overwritten with this block's values.
+  `d = startBeat - host.endBeat`, reduced to the nearest multiple of `beatWrap` when the host bounds its beat space,
+  `if (beatWrap > 0) d -= beatWrap * std::round(d / beatWrap);` (so mu-Tant's own 64-beat wrap is not a jump; **not** `wrapBeat`, which maps into
+  `[0, wrap)` and would turn a delta of -0.0001 into 63.9999); `|d| > tol` sets the sticky **`jumpPending`**. **The stop rule, exactly:** any non-rendered
+  host block with `!playing` while the rendered latch `last.playing` is true sets `jumpPending` (a stop hidden in unrendered blocks; the layers would otherwise
+  see neither edge if play resumes). Then `host` is overwritten with this block's values.
 - **Play/stop latch, rendered blocks only** (phase 5, as now): `last = { bool playing; }`. `justStarted = playing && !last.playing`;
   `justStopped = !playing && last.playing`; `transportJumped = playing && last.playing && jumpPending`, and phase 5 clears `jumpPending`.
+
+What the three stop sequences give: a stop in an unrendered block, then a restart on the next rendered block: `transportJumped` once; a stop in an unrendered
+block, then the next rendered block stopped: `justStopped` fires and phase 5 clears the flag (no jump later); a pause and resume at the same position inside
+unrendered blocks: `transportJumped` once (the layers saw no stop, so the gap reaches them as a jump).
 
 **Why (the defect R5 fixes):** with the end beat latched only on rendered blocks, the block after an unrendered one (every structural edit in mu-Tant, mu-On and
 mu-Clid raises `layerEditInFlight`, and any try-lock miss) saw a delta of one block of beats and fired `transportJumped` during continuous play. Comparing
@@ -780,7 +807,8 @@ its events on the same absolute frames under a fixed 512 schedule and the ragged
 no double fire, no missed step. `startBeat` 1e6: positions within one frame. Edges: `justStarted` / `justStopped` once per edge; latched across a missed
 lock and a 0-frame block; `onTransportJump` exactly once per host locate, loop-back and clock snap, never on a contiguous block, **never on the block after a
 missed lock or a `layerEditInFlight` block during continuous play**, still once for a locate that happened inside an unrendered block, and never on mu-Tant's
-64-beat wrap. Negative beats: a fake layer started at `startBeat` -4 (pre-roll) fires on the same frames as its unwrapped reference and, with `beatWrap = 64`,
+64-beat wrap. Continuity unit test at `beatWrap = 64`: deltas of +-1e-4, +-1e-4 +- 64 and +-64 all give no jump. The three stop sequences above, each
+asserting its stated result. Negative beats: a fake layer started at `startBeat` -4 (pre-roll) fires on the same frames as its unwrapped reference and, with `beatWrap = 64`,
 never sees a wrapped beat outside `[0, 64)` (E1). MIDI: `dropped == 0` in all goldens; note-offs survive an overflow; a tail's note-offs reach the host buffer
 when live layers filled the non-reserved storage; the merge allocates nothing. Retire contexts carry no MIDI input and no peers, and a valid sink. Layout: no
 implicit padding (`offsetof` test, the reserved fields).
@@ -788,7 +816,7 @@ implicit padding (`offsetof` test, the reserved fields).
 **Failure modes considered.** A layer accumulating beats across blocks (drifts under tempo change, breaks on locate: the block-size and ramp tests); edges lost on a
 missed lock (latch, sticky `jumpPending`); a false jump after an unrendered block (host-block continuity, R5); a jump tolerance too tight for host jitter under
 tempo automation (false jumps) or too loose (missed small locates; layers keep their own detectors, so the flag is a hint): the tempo term and M1; the wrap of a
-bounded host read as a jump (`wrapBeat` to the nearest multiple); a negative pre-roll beat indexing out of range (`wrapBeat`, R6); a tail with an owed note and
+bounded host read as a jump (the delta reduced to the nearest multiple of `beatWrap` with `std::round`, not with `wrapBeat`); a negative pre-roll beat indexing out of range (`wrapBeat`, R6); a tail with an owed note and
 no sink (the reserve, R7); MIDI overflow stranding notes (reserve); an oversize block overrunning prepared buffers (chunking).
 
 **Rejected.** Passing `const juce::MidiBuffer&` (a JUCE type, against A14; a per-layer filtered copy would allocate); a callback for `peer(slot)` (a host
