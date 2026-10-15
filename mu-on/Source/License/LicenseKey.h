@@ -3,7 +3,7 @@
 
 // mu-On's license identity, passed to mu_core::LicenseManager::check. Kept product-side
 // (not in mu-core) so the shared verifier stays plugin-agnostic. The embedded value is the
-// PUBLIC key only — the private signing key never lives in the repo.
+// PUBLIC key only â€” the private signing key never lives in the repo.
 namespace mu_on
 {
     // Must match the `product=` field the signer writes + the Lemon Squeezy product
