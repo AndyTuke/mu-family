@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<MuPerformance format="1" name="Demo  Perf" description="">
+  <Item idx="0" product="MuClidState" path="Dubster.muClid" name="Dubster"/>
+  <Item idx="1" product="MuClidState" path="Simple Beat.muClid" name="Simple Beat"/>
+  <Item idx="2" product="MuClidState" path="Loving It.muClid" name="Loving It"/>
+  <Item idx="3" product="MuClidState" path="Well this is nice.muClid"
+        name="Well this is nice"/>
+</MuPerformance>

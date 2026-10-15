@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MuTantVoice>
+  <p id="o1_oct" v="0.5"/>
+  <p id="o1_semi" v="0.5"/>
+  <p id="o1_fine" v="0.5"/>
+  <p id="o1_pos" v="0.0"/>
+  <p id="o2_oct" v="0.5"/>
+  <p id="o2_semi" v="0.5833333333333334"/>
+  <p id="o2_fine" v="0.5"/>
+  <p id="o2_pos" v="0.0"/>
+  <p id="o1_wt" v="0.9166666666666666"/>
+  <p id="o2_wt" v="0.5"/>
+  <p id="xmod_phaseMode" v="0.5"/>
+  <p id="xmod_index" v="0.0"/>
+  <p id="sync" v="0.0"/>
+  <p id="xmod_fdbk" v="0.0"/>
+  <p id="xmod_ampMode" v="0.0"/>
+  <p id="xmod_depth" v="0.5"/>
+  <p id="xmod_ssb" v="0.5"/>
+  <p id="o1_lvl" v="0.9090909090909091"/>
+  <p id="o2_lvl" v="0.8181818181818182"/>
+  <p id="noise_lvl" v="0.0"/>
+  <p id="noise_type" v="0.0"/>
+  <p id="flt_type" v="0.13333333333333333"/>
+  <p id="flt_cut" v="0.6539890635122138"/>
+  <p id="flt_res" v="0.35353535353535354"/>
+  <p id="flt_drv" v="0.0"/>
+  <p id="flt_lo_cut" v="0.0"/>
+  <p id="flt_env_depth" v="1.0"/>
+  <p id="flt2_type" v="0.0"/>
+  <p id="flt2_cut" v="0.8326124408698826"/>
+  <p id="flt2_res" v="0.0"/>
+  <p id="flt2_drv" v="0.0"/>
+  <p id="flt2_lo_cut" v="0.0"/>
+  <p id="flt2_env_depth" v="0.5"/>
+  <p id="flt_series" v="1.0"/>
+  <p id="o1_penv_depth" v="0.5"/>
+  <p id="o2_penv_depth" v="0.5"/>
+  <p id="level" v="0.7878787878787878"/>
+  <p id="gate_gap" v="0.0"/>
+  <p id="gate_bypass" v="0.0"/>
+  <p id="drvChar" v="0.0"/>
+  <p id="insP1" v="0.0"/>
+  <p id="insP2" v="0.0"/>
+  <p id="insP3" v="0.0"/>
+  <p id="insP4" v="0.0"/>
+  <Modulators>
+    <Seq id="cs0" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Point x="0.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="0.25" y="1.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="0.5" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="0.75" y="-1.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="1.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+    </Seq>
+    <Seq id="cs1" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs2" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs3" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs4" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs5" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs6" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs7" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Asgn id="asg0" src="cs0" dest="osc1.fine" depth="0.05" curve="0.0"/>
+  </Modulators>
+  <Gate subdiv="16" bars="2">
+    <Env start="0" len="1" split="0.0" atk="0.0" dec="0.45" rev="0"/>
+    <Env start="6" len="1" split="0.0" atk="0.0" dec="0.45" rev="0"/>
+    <Env start="12" len="1" split="0.0" atk="0.0" dec="0.45" rev="0"/>
+    <Env start="18" len="1" split="0.0" atk="0.0" dec="0.45" rev="0"/>
+    <Env start="24" len="1" split="0.0" atk="0.0" dec="0.45" rev="0"/>
+  </Gate>
+  <FilterGate subdiv="16" bars="2"/>
+  <PitchGate subdiv="16" bars="2"/>
+</MuTantVoice>

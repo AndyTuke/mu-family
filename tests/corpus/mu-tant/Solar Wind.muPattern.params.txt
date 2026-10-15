@@ -1,0 +1,14 @@
+# frozen load result for fixture: Solar Wind.muPattern
+layers=1
+load_errors=0
+capture_bytes=3379
+capture_sha256=a486d2a4061b534d05c578eea5f1347e32b37cfe70923b93c7c221d23a075d82
+--- parameters differing from default (id=plain value)
+v0_flt_cut=2000
+v0_flt_res=0.4
+v0_flt_type=2
+v0_level=-10
+v0_o1_wt=2
+v0_o2_wt=4
+v0_xmod_ampMode=2
+v0_xmod_ssb=250

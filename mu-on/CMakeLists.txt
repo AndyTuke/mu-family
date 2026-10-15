@@ -143,6 +143,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/SlotStateTests.cpp
     Source/Sequencer/GrooveSequencer.cpp
     Source/Tests/ProcessorSeamTests.cpp  # the real PluginProcessor, headless (layer ownership)
+    Source/Tests/FrozenBaselineTests.cpp   # frozen parameter manifest + compat corpus on the real processor
     Source/Tests/PrefixMigrationTests.cpp   # data saved before the k/b/h/s/r -> t{N} id-prefix rename still loads
     Source/Tests/GrooveVoicesTests.cpp   # renderAll block sizes, the Rumble's tail handling
     Source/Tests/EngineMigrationTests.cpp   # five-lane states and track presets load as engine-qualified layers

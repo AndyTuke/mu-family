@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<MuClidRhythm presetName="Karplus Comb Buzz" presetCategory="Drones" presetDescription=""
+              presetEmbedSamples="0" r0_name="Karplus Comb Buzz" r0_colour="1"
+              r0_sample="Synth G 03.wav" r0_stepsA="8" r0_hitsA="3" r0_rotA="0"
+              r0_prePadA="0" r0_postPadA="0" r0_insStA="0" r0_insLenA="0" r0_insModeA="false"
+              r0_prePadModeA="false" r0_postPadModeA="false" r0_stepsB="16"
+              r0_hitsB="2" r0_rotB="0" r0_prePadB="0" r0_postPadB="0" r0_insStB="0"
+              r0_insLenB="0" r0_insModeB="false" r0_prePadModeB="false" r0_postPadModeB="false"
+              r0_stepsC="8" r0_hitsC="3" r0_rotC="0" r0_prePadC="0" r0_postPadC="0"
+              r0_insStC="0" r0_insLenC="0" r0_insModeC="false" r0_prePadModeC="false"
+              r0_postPadModeC="false" r0_logic="OR" r0_patLeg="true" r0_vMono="false"
+              r0_rstSt="-1" r0_pitchOct="0" r0_pitchSemi="0" r0_pitchFine="0"
+              r0_pEnvAtk="0.0" r0_pEnvDec="0.1000000908970833" r0_pEnvSus="0.0"
+              r0_pEnvRel="0.1000000908970833" r0_pEnvDep="0.0" r0_fltType="CombPlus"
+              r0_fltCut="274.9999389648438" r0_fltRes="0.7839999794960022"
+              r0_fEnvAtk="0.0" r0_fEnvDec="0.1330000162124634" r0_fEnvSus="0.0"
+              r0_fEnvRel="0.0390000008046627" r0_fEnvDep="18.23999977111816"
+              r0_fltLoCut="13.99999713897705" r0_ampLvl="0.699999988079071"
+              r0_aEnvAtk="0.0" r0_aEnvDec="0.7999999523162842" r0_aEnvSus="70.0"
+              r0_aEnvRel="4.000000476837158" r0_accentDb="5.880000114440918"
+              r0_drvChar="Karplus" r0_insP1="0.6363639831542969" r0_insP2="0.0"
+              r0_insP3="0.9200000166893005" r0_insP4="0.6968114376068115">
+  <Modulators>
+    <Seq id="cs0" mode="Smooth" polarity="Bipolar" loopNV="Whole" loopMod="None"
+         loopMult="2" stepNV="Eighth" stepMod="None" stepMult="1">
+      <Point x="0.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="0.25" y="1.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="0.5" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="0.75" y="-1.0" bez="0" hx="0.0" hy="0.0"/>
+    </Seq>
+    <Seq id="cs1" mode="Stepped" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+         loopMult="4" stepNV="Eighth" stepMod="None" stepMult="1">
+      <Step v="53.55282592773438"/>
+      <Step v="-56.38933181762695"/>
+      <Step v="-6.490242004394531"/>
+      <Step v="40.70039367675781"/>
+      <Step v="-10.67043304443359"/>
+      <Step v="40.50387573242188"/>
+      <Step v="-62.18902969360352"/>
+      <Step v="-59.27367401123047"/>
+    </Seq>
+    <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Quarter"
+         loopMod="None" loopMult="4" stepNV="Sixteenth" stepMod="None"
+         stepMult="1">
+      <Step v="100.0"/>
+      <Step v="0.0"/>
+      <Step v="50.0"/>
+      <Step v="0.0"/>
+      <Step v="75.0"/>
+      <Step v="25.0"/>
+      <Step v="100.0"/>
+      <Step v="0.0"/>
+      <Step v="0.0"/>
+      <Step v="0.0"/>
+      <Step v="0.0"/>
+      <Step v="0.0"/>
+      <Step v="0.0"/>
+      <Step v="0.0"/>
+      <Step v="0.0"/>
+      <Step v="0.0"/>
+    </Seq>
+    <Seq id="cs3" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+         loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Point x="0.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="1.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+    </Seq>
+    <Seq id="cs4" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+         loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Point x="0.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="1.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+    </Seq>
+    <Seq id="cs5" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+         loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Point x="0.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="1.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+    </Seq>
+    <Seq id="cs6" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+         loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Point x="0.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="1.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+    </Seq>
+    <Seq id="cs7" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+         loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Point x="0.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="1.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+    </Seq>
+    <Asgn id="asgn0" src="cs0_output" dest="filter.cutoff" depth="60.0"
+          curve="0.0"/>
+    <Asgn id="asgn1" src="cs1_output" dest="insert.p1" depth="80.0" curve="0.0"/>
+    <Asgn id="asgn2" src="cs2_output" dest="euclid.a.hits" depth="50.0"
+          curve="0.0"/>
+  </Modulators>
+</MuClidRhythm>

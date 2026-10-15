@@ -1,0 +1,721 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<MuTantPreset name="FACTORY_STATE" description="" category="">
+  <MuTantState format="2" numVoices="1" voiceColours="0,1,2,3,4,5,6,7">
+    <Globals>
+      <p id="root" x="0.0" c="C"/>
+      <p id="scale" x="0.0" c="Major"/>
+      <p id="mstrLoop" x="0.0"/>
+      <p id="ch0_lvl" x="1.0"/>
+      <p id="ch0_pan" x="0.0"/>
+      <p id="ch0_mute" x="0.0"/>
+      <p id="ch0_solo" x="0.0"/>
+      <p id="ch0_sendEff" x="0.0"/>
+      <p id="ch0_sendDly" x="0.0"/>
+      <p id="ch0_sendRev" x="0.0"/>
+      <p id="ch0_scSrc" x="0.0"/>
+      <p id="ch0_scAmt" x="0.0"/>
+      <p id="ch0_scAtk" x="5.0"/>
+      <p id="ch0_scRel" x="100.0"/>
+      <p id="ch0_outBus" x="0.0"/>
+      <p id="ch1_lvl" x="1.0"/>
+      <p id="ch1_pan" x="0.0"/>
+      <p id="ch1_mute" x="0.0"/>
+      <p id="ch1_solo" x="0.0"/>
+      <p id="ch1_sendEff" x="0.0"/>
+      <p id="ch1_sendDly" x="0.0"/>
+      <p id="ch1_sendRev" x="0.0"/>
+      <p id="ch1_scSrc" x="0.0"/>
+      <p id="ch1_scAmt" x="0.0"/>
+      <p id="ch1_scAtk" x="5.0"/>
+      <p id="ch1_scRel" x="100.0"/>
+      <p id="ch1_outBus" x="0.0"/>
+      <p id="ch2_lvl" x="1.0"/>
+      <p id="ch2_pan" x="0.0"/>
+      <p id="ch2_mute" x="0.0"/>
+      <p id="ch2_solo" x="0.0"/>
+      <p id="ch2_sendEff" x="0.0"/>
+      <p id="ch2_sendDly" x="0.0"/>
+      <p id="ch2_sendRev" x="0.0"/>
+      <p id="ch2_scSrc" x="0.0"/>
+      <p id="ch2_scAmt" x="0.0"/>
+      <p id="ch2_scAtk" x="5.0"/>
+      <p id="ch2_scRel" x="100.0"/>
+      <p id="ch2_outBus" x="0.0"/>
+      <p id="ch3_lvl" x="1.0"/>
+      <p id="ch3_pan" x="0.0"/>
+      <p id="ch3_mute" x="0.0"/>
+      <p id="ch3_solo" x="0.0"/>
+      <p id="ch3_sendEff" x="0.0"/>
+      <p id="ch3_sendDly" x="0.0"/>
+      <p id="ch3_sendRev" x="0.0"/>
+      <p id="ch3_scSrc" x="0.0"/>
+      <p id="ch3_scAmt" x="0.0"/>
+      <p id="ch3_scAtk" x="5.0"/>
+      <p id="ch3_scRel" x="100.0"/>
+      <p id="ch3_outBus" x="0.0"/>
+      <p id="ch4_lvl" x="1.0"/>
+      <p id="ch4_pan" x="0.0"/>
+      <p id="ch4_mute" x="0.0"/>
+      <p id="ch4_solo" x="0.0"/>
+      <p id="ch4_sendEff" x="0.0"/>
+      <p id="ch4_sendDly" x="0.0"/>
+      <p id="ch4_sendRev" x="0.0"/>
+      <p id="ch4_scSrc" x="0.0"/>
+      <p id="ch4_scAmt" x="0.0"/>
+      <p id="ch4_scAtk" x="5.0"/>
+      <p id="ch4_scRel" x="100.0"/>
+      <p id="ch4_outBus" x="0.0"/>
+      <p id="ch5_lvl" x="1.0"/>
+      <p id="ch5_pan" x="0.0"/>
+      <p id="ch5_mute" x="0.0"/>
+      <p id="ch5_solo" x="0.0"/>
+      <p id="ch5_sendEff" x="0.0"/>
+      <p id="ch5_sendDly" x="0.0"/>
+      <p id="ch5_sendRev" x="0.0"/>
+      <p id="ch5_scSrc" x="0.0"/>
+      <p id="ch5_scAmt" x="0.0"/>
+      <p id="ch5_scAtk" x="5.0"/>
+      <p id="ch5_scRel" x="100.0"/>
+      <p id="ch5_outBus" x="0.0"/>
+      <p id="ch6_lvl" x="1.0"/>
+      <p id="ch6_pan" x="0.0"/>
+      <p id="ch6_mute" x="0.0"/>
+      <p id="ch6_solo" x="0.0"/>
+      <p id="ch6_sendEff" x="0.0"/>
+      <p id="ch6_sendDly" x="0.0"/>
+      <p id="ch6_sendRev" x="0.0"/>
+      <p id="ch6_scSrc" x="0.0"/>
+      <p id="ch6_scAmt" x="0.0"/>
+      <p id="ch6_scAtk" x="5.0"/>
+      <p id="ch6_scRel" x="100.0"/>
+      <p id="ch6_outBus" x="0.0"/>
+      <p id="ch7_lvl" x="1.0"/>
+      <p id="ch7_pan" x="0.0"/>
+      <p id="ch7_mute" x="0.0"/>
+      <p id="ch7_solo" x="0.0"/>
+      <p id="ch7_sendEff" x="0.0"/>
+      <p id="ch7_sendDly" x="0.0"/>
+      <p id="ch7_sendRev" x="0.0"/>
+      <p id="ch7_scSrc" x="0.0"/>
+      <p id="ch7_scAmt" x="0.0"/>
+      <p id="ch7_scAtk" x="5.0"/>
+      <p id="ch7_scRel" x="100.0"/>
+      <p id="ch7_outBus" x="0.0"/>
+      <p id="eff_algo" x="0.0"/>
+      <p id="eff_en" x="1.0"/>
+      <p id="eff_p0" x="0.5"/>
+      <p id="eff_p1" x="0.5"/>
+      <p id="eff_p2" x="0.5"/>
+      <p id="eff_p3" x="0.5"/>
+      <p id="eff_p4" x="0.5"/>
+      <p id="dly_en" x="1.0"/>
+      <p id="dly_mode" x="1.0"/>
+      <p id="dly_ms" x="250.0"/>
+      <p id="dly_syncDenom" x="2.0"/>
+      <p id="dly_syncDot" x="1.0"/>
+      <p id="dly_syncTrip" x="0.0"/>
+      <p id="dly_count" x="1.0"/>
+      <p id="dly_fb" x="0.300000011920929"/>
+      <p id="dly_spread" x="0.0"/>
+      <p id="dly_dirt" x="0.0"/>
+      <p id="rev_algo" x="1.0"/>
+      <p id="rev_en" x="1.0"/>
+      <p id="rev_lvl" x="1.0"/>
+      <p id="rev_size" x="0.75"/>
+      <p id="rev_pre" x="25.0"/>
+      <p id="rev_diff" x="0.800000011920929"/>
+      <p id="rev_damp" x="0.300000011920929"/>
+      <p id="rev_mod" x="0.1500000059604645"/>
+      <p id="rev_dirt" x="0.0"/>
+      <p id="eff2dly" x="0.0"/>
+      <p id="eff2rev" x="0.0"/>
+      <p id="dly2rev" x="0.0"/>
+      <p id="echo_en" x="1.0"/>
+      <p id="echo_mode" x="0.0"/>
+      <p id="echo_ms" x="250.0"/>
+      <p id="echo_syncDenom" x="2.0"/>
+      <p id="echo_syncDot" x="0.0"/>
+      <p id="echo_syncTrip" x="0.0"/>
+      <p id="echo_count" x="1.0"/>
+      <p id="echo_fb" x="0.449999988079071"/>
+      <p id="echo_spread" x="0.0"/>
+      <p id="echo_dirt" x="0.0"/>
+      <p id="ret_eff_lvl" x="0.75"/>
+      <p id="ret_eff_pan" x="0.0"/>
+      <p id="ret_eff_mute" x="0.0"/>
+      <p id="ret_eff_solo" x="0.0"/>
+      <p id="ret_eff_scSrc" x="0.0"/>
+      <p id="ret_eff_scAmt" x="0.0"/>
+      <p id="ret_eff_scAtk" x="5.0"/>
+      <p id="ret_eff_scRel" x="100.0"/>
+      <p id="ret_dly_lvl" x="0.75"/>
+      <p id="ret_dly_pan" x="0.0"/>
+      <p id="ret_dly_mute" x="0.0"/>
+      <p id="ret_dly_solo" x="0.0"/>
+      <p id="ret_dly_scSrc" x="0.0"/>
+      <p id="ret_dly_scAmt" x="0.0"/>
+      <p id="ret_dly_scAtk" x="5.0"/>
+      <p id="ret_dly_scRel" x="100.0"/>
+      <p id="ret_rev_lvl" x="0.75"/>
+      <p id="ret_rev_pan" x="0.0"/>
+      <p id="ret_rev_mute" x="0.0"/>
+      <p id="ret_rev_solo" x="0.0"/>
+      <p id="ret_rev_scSrc" x="0.0"/>
+      <p id="ret_rev_scAmt" x="0.0"/>
+      <p id="ret_rev_scAtk" x="5.0"/>
+      <p id="ret_rev_scRel" x="100.0"/>
+      <p id="mstr_lvl" x="1.0"/>
+      <p id="mstr_pan" x="0.0"/>
+      <p id="mstr_swap" x="0.0" c="On master loop"/>
+      <p id="mst_insChar" x="0.0"/>
+      <p id="mst_insP1" x="0.0"/>
+      <p id="mst_insP2" x="0.0"/>
+      <p id="mst_insP3" x="0.0"/>
+      <p id="mst_insP4" x="0.0"/>
+      <p id="mst_ins2Char" x="0.0"/>
+      <p id="mst_ins2P1" x="0.0"/>
+      <p id="mst_ins2P2" x="0.0"/>
+      <p id="mst_ins2P3" x="0.0"/>
+      <p id="mst_ins2P4" x="0.0"/>
+    </Globals>
+    <Slots>
+      <Slot idx="0">
+        <p id="o1_oct" x="0.0"/>
+        <p id="o1_semi" x="0.0"/>
+        <p id="o1_fine" x="0.0"/>
+        <p id="o1_pos" x="0.0"/>
+        <p id="o2_oct" x="0.0"/>
+        <p id="o2_semi" x="2.0"/>
+        <p id="o2_fine" x="0.0"/>
+        <p id="o2_pos" x="0.0"/>
+        <p id="o1_wt" x="0.0"/>
+        <p id="o2_wt" x="0.0"/>
+        <p id="xmod_phaseMode" x="1.0" c="PM"/>
+        <p id="xmod_index" x="0.0"/>
+        <p id="sync" x="0.0"/>
+        <p id="xmod_fdbk" x="0.0"/>
+        <p id="xmod_ampMode" x="0.0" c="AM"/>
+        <p id="xmod_depth" x="0.0"/>
+        <p id="xmod_ssb" x="0.0"/>
+        <p id="o1_lvl" x="0.0"/>
+        <p id="o2_lvl" x="-6.0"/>
+        <p id="noise_lvl" x="-60.0"/>
+        <p id="noise_type" x="0.0" c="White"/>
+        <p id="flt_type" x="0.0"/>
+        <p id="flt_cut" x="8000.00048828125"/>
+        <p id="flt_res" x="0.2000000029802322"/>
+        <p id="flt_drv" x="0.0"/>
+        <p id="flt_lo_cut" x="0.0"/>
+        <p id="flt_env_depth" x="1.0"/>
+        <p id="flt2_type" x="0.0"/>
+        <p id="flt2_cut" x="8000.00048828125"/>
+        <p id="flt2_res" x="0.0"/>
+        <p id="flt2_drv" x="0.0"/>
+        <p id="flt2_lo_cut" x="0.0"/>
+        <p id="flt2_env_depth" x="0.0"/>
+        <p id="flt_series" x="1.0"/>
+        <p id="o1_penv_depth" x="0.0"/>
+        <p id="o2_penv_depth" x="0.0"/>
+        <p id="level" x="-6.0"/>
+        <p id="gate_gap" x="0.0"/>
+        <p id="gate_bypass" x="0.0"/>
+        <p id="drvChar" x="0.0"/>
+        <p id="insP1" x="0.0"/>
+        <p id="insP2" x="0.0"/>
+        <p id="insP3" x="0.0"/>
+        <p id="insP4" x="0.0"/>
+        <Modulators depthUnits="range">
+          <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+        </Modulators>
+        <Gate subdiv="16" bars="2"/>
+        <FilterGate subdiv="16" bars="2"/>
+        <PitchGate subdiv="16" bars="2"/>
+      </Slot>
+      <Slot idx="1">
+        <p id="o1_oct" x="0.0"/>
+        <p id="o1_semi" x="0.0"/>
+        <p id="o1_fine" x="0.0"/>
+        <p id="o1_pos" x="0.0"/>
+        <p id="o2_oct" x="0.0"/>
+        <p id="o2_semi" x="2.0"/>
+        <p id="o2_fine" x="0.0"/>
+        <p id="o2_pos" x="0.0"/>
+        <p id="o1_wt" x="0.0"/>
+        <p id="o2_wt" x="0.0"/>
+        <p id="xmod_phaseMode" x="1.0" c="PM"/>
+        <p id="xmod_index" x="0.0"/>
+        <p id="sync" x="0.0"/>
+        <p id="xmod_fdbk" x="0.0"/>
+        <p id="xmod_ampMode" x="0.0" c="AM"/>
+        <p id="xmod_depth" x="0.0"/>
+        <p id="xmod_ssb" x="0.0"/>
+        <p id="o1_lvl" x="0.0"/>
+        <p id="o2_lvl" x="-6.0"/>
+        <p id="noise_lvl" x="-60.0"/>
+        <p id="noise_type" x="0.0" c="White"/>
+        <p id="flt_type" x="0.0"/>
+        <p id="flt_cut" x="8000.00048828125"/>
+        <p id="flt_res" x="0.2000000029802322"/>
+        <p id="flt_drv" x="0.0"/>
+        <p id="flt_lo_cut" x="0.0"/>
+        <p id="flt_env_depth" x="1.0"/>
+        <p id="flt2_type" x="0.0"/>
+        <p id="flt2_cut" x="8000.00048828125"/>
+        <p id="flt2_res" x="0.0"/>
+        <p id="flt2_drv" x="0.0"/>
+        <p id="flt2_lo_cut" x="0.0"/>
+        <p id="flt2_env_depth" x="0.0"/>
+        <p id="flt_series" x="1.0"/>
+        <p id="o1_penv_depth" x="0.0"/>
+        <p id="o2_penv_depth" x="0.0"/>
+        <p id="level" x="-6.0"/>
+        <p id="gate_gap" x="0.0"/>
+        <p id="gate_bypass" x="0.0"/>
+        <p id="drvChar" x="0.0"/>
+        <p id="insP1" x="0.0"/>
+        <p id="insP2" x="0.0"/>
+        <p id="insP3" x="0.0"/>
+        <p id="insP4" x="0.0"/>
+        <Modulators depthUnits="range">
+          <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+        </Modulators>
+        <Gate subdiv="16" bars="2"/>
+        <FilterGate subdiv="16" bars="2"/>
+        <PitchGate subdiv="16" bars="2"/>
+      </Slot>
+      <Slot idx="2">
+        <p id="o1_oct" x="0.0"/>
+        <p id="o1_semi" x="0.0"/>
+        <p id="o1_fine" x="0.0"/>
+        <p id="o1_pos" x="0.0"/>
+        <p id="o2_oct" x="0.0"/>
+        <p id="o2_semi" x="2.0"/>
+        <p id="o2_fine" x="0.0"/>
+        <p id="o2_pos" x="0.0"/>
+        <p id="o1_wt" x="0.0"/>
+        <p id="o2_wt" x="0.0"/>
+        <p id="xmod_phaseMode" x="1.0" c="PM"/>
+        <p id="xmod_index" x="0.0"/>
+        <p id="sync" x="0.0"/>
+        <p id="xmod_fdbk" x="0.0"/>
+        <p id="xmod_ampMode" x="0.0" c="AM"/>
+        <p id="xmod_depth" x="0.0"/>
+        <p id="xmod_ssb" x="0.0"/>
+        <p id="o1_lvl" x="0.0"/>
+        <p id="o2_lvl" x="-6.0"/>
+        <p id="noise_lvl" x="-60.0"/>
+        <p id="noise_type" x="0.0" c="White"/>
+        <p id="flt_type" x="0.0"/>
+        <p id="flt_cut" x="8000.00048828125"/>
+        <p id="flt_res" x="0.2000000029802322"/>
+        <p id="flt_drv" x="0.0"/>
+        <p id="flt_lo_cut" x="0.0"/>
+        <p id="flt_env_depth" x="1.0"/>
+        <p id="flt2_type" x="0.0"/>
+        <p id="flt2_cut" x="8000.00048828125"/>
+        <p id="flt2_res" x="0.0"/>
+        <p id="flt2_drv" x="0.0"/>
+        <p id="flt2_lo_cut" x="0.0"/>
+        <p id="flt2_env_depth" x="0.0"/>
+        <p id="flt_series" x="1.0"/>
+        <p id="o1_penv_depth" x="0.0"/>
+        <p id="o2_penv_depth" x="0.0"/>
+        <p id="level" x="-6.0"/>
+        <p id="gate_gap" x="0.0"/>
+        <p id="gate_bypass" x="0.0"/>
+        <p id="drvChar" x="0.0"/>
+        <p id="insP1" x="0.0"/>
+        <p id="insP2" x="0.0"/>
+        <p id="insP3" x="0.0"/>
+        <p id="insP4" x="0.0"/>
+        <Modulators depthUnits="range">
+          <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+        </Modulators>
+        <Gate subdiv="16" bars="2"/>
+        <FilterGate subdiv="16" bars="2"/>
+        <PitchGate subdiv="16" bars="2"/>
+      </Slot>
+      <Slot idx="3">
+        <p id="o1_oct" x="0.0"/>
+        <p id="o1_semi" x="0.0"/>
+        <p id="o1_fine" x="0.0"/>
+        <p id="o1_pos" x="0.0"/>
+        <p id="o2_oct" x="0.0"/>
+        <p id="o2_semi" x="2.0"/>
+        <p id="o2_fine" x="0.0"/>
+        <p id="o2_pos" x="0.0"/>
+        <p id="o1_wt" x="0.0"/>
+        <p id="o2_wt" x="0.0"/>
+        <p id="xmod_phaseMode" x="1.0" c="PM"/>
+        <p id="xmod_index" x="0.0"/>
+        <p id="sync" x="0.0"/>
+        <p id="xmod_fdbk" x="0.0"/>
+        <p id="xmod_ampMode" x="0.0" c="AM"/>
+        <p id="xmod_depth" x="0.0"/>
+        <p id="xmod_ssb" x="0.0"/>
+        <p id="o1_lvl" x="0.0"/>
+        <p id="o2_lvl" x="-6.0"/>
+        <p id="noise_lvl" x="-60.0"/>
+        <p id="noise_type" x="0.0" c="White"/>
+        <p id="flt_type" x="0.0"/>
+        <p id="flt_cut" x="8000.00048828125"/>
+        <p id="flt_res" x="0.2000000029802322"/>
+        <p id="flt_drv" x="0.0"/>
+        <p id="flt_lo_cut" x="0.0"/>
+        <p id="flt_env_depth" x="1.0"/>
+        <p id="flt2_type" x="0.0"/>
+        <p id="flt2_cut" x="8000.00048828125"/>
+        <p id="flt2_res" x="0.0"/>
+        <p id="flt2_drv" x="0.0"/>
+        <p id="flt2_lo_cut" x="0.0"/>
+        <p id="flt2_env_depth" x="0.0"/>
+        <p id="flt_series" x="1.0"/>
+        <p id="o1_penv_depth" x="0.0"/>
+        <p id="o2_penv_depth" x="0.0"/>
+        <p id="level" x="-6.0"/>
+        <p id="gate_gap" x="0.0"/>
+        <p id="gate_bypass" x="0.0"/>
+        <p id="drvChar" x="0.0"/>
+        <p id="insP1" x="0.0"/>
+        <p id="insP2" x="0.0"/>
+        <p id="insP3" x="0.0"/>
+        <p id="insP4" x="0.0"/>
+        <Modulators depthUnits="range">
+          <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+        </Modulators>
+        <Gate subdiv="16" bars="2"/>
+        <FilterGate subdiv="16" bars="2"/>
+        <PitchGate subdiv="16" bars="2"/>
+      </Slot>
+      <Slot idx="4">
+        <p id="o1_oct" x="0.0"/>
+        <p id="o1_semi" x="0.0"/>
+        <p id="o1_fine" x="0.0"/>
+        <p id="o1_pos" x="0.0"/>
+        <p id="o2_oct" x="0.0"/>
+        <p id="o2_semi" x="2.0"/>
+        <p id="o2_fine" x="0.0"/>
+        <p id="o2_pos" x="0.0"/>
+        <p id="o1_wt" x="0.0"/>
+        <p id="o2_wt" x="0.0"/>
+        <p id="xmod_phaseMode" x="1.0" c="PM"/>
+        <p id="xmod_index" x="0.0"/>
+        <p id="sync" x="0.0"/>
+        <p id="xmod_fdbk" x="0.0"/>
+        <p id="xmod_ampMode" x="0.0" c="AM"/>
+        <p id="xmod_depth" x="0.0"/>
+        <p id="xmod_ssb" x="0.0"/>
+        <p id="o1_lvl" x="0.0"/>
+        <p id="o2_lvl" x="-6.0"/>
+        <p id="noise_lvl" x="-60.0"/>
+        <p id="noise_type" x="0.0" c="White"/>
+        <p id="flt_type" x="0.0"/>
+        <p id="flt_cut" x="8000.00048828125"/>
+        <p id="flt_res" x="0.2000000029802322"/>
+        <p id="flt_drv" x="0.0"/>
+        <p id="flt_lo_cut" x="0.0"/>
+        <p id="flt_env_depth" x="1.0"/>
+        <p id="flt2_type" x="0.0"/>
+        <p id="flt2_cut" x="8000.00048828125"/>
+        <p id="flt2_res" x="0.0"/>
+        <p id="flt2_drv" x="0.0"/>
+        <p id="flt2_lo_cut" x="0.0"/>
+        <p id="flt2_env_depth" x="0.0"/>
+        <p id="flt_series" x="1.0"/>
+        <p id="o1_penv_depth" x="0.0"/>
+        <p id="o2_penv_depth" x="0.0"/>
+        <p id="level" x="-6.0"/>
+        <p id="gate_gap" x="0.0"/>
+        <p id="gate_bypass" x="0.0"/>
+        <p id="drvChar" x="0.0"/>
+        <p id="insP1" x="0.0"/>
+        <p id="insP2" x="0.0"/>
+        <p id="insP3" x="0.0"/>
+        <p id="insP4" x="0.0"/>
+        <Modulators depthUnits="range">
+          <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+        </Modulators>
+        <Gate subdiv="16" bars="2"/>
+        <FilterGate subdiv="16" bars="2"/>
+        <PitchGate subdiv="16" bars="2"/>
+      </Slot>
+      <Slot idx="5">
+        <p id="o1_oct" x="0.0"/>
+        <p id="o1_semi" x="0.0"/>
+        <p id="o1_fine" x="0.0"/>
+        <p id="o1_pos" x="0.0"/>
+        <p id="o2_oct" x="0.0"/>
+        <p id="o2_semi" x="2.0"/>
+        <p id="o2_fine" x="0.0"/>
+        <p id="o2_pos" x="0.0"/>
+        <p id="o1_wt" x="0.0"/>
+        <p id="o2_wt" x="0.0"/>
+        <p id="xmod_phaseMode" x="1.0" c="PM"/>
+        <p id="xmod_index" x="0.0"/>
+        <p id="sync" x="0.0"/>
+        <p id="xmod_fdbk" x="0.0"/>
+        <p id="xmod_ampMode" x="0.0" c="AM"/>
+        <p id="xmod_depth" x="0.0"/>
+        <p id="xmod_ssb" x="0.0"/>
+        <p id="o1_lvl" x="0.0"/>
+        <p id="o2_lvl" x="-6.0"/>
+        <p id="noise_lvl" x="-60.0"/>
+        <p id="noise_type" x="0.0" c="White"/>
+        <p id="flt_type" x="0.0"/>
+        <p id="flt_cut" x="8000.00048828125"/>
+        <p id="flt_res" x="0.2000000029802322"/>
+        <p id="flt_drv" x="0.0"/>
+        <p id="flt_lo_cut" x="0.0"/>
+        <p id="flt_env_depth" x="1.0"/>
+        <p id="flt2_type" x="0.0"/>
+        <p id="flt2_cut" x="8000.00048828125"/>
+        <p id="flt2_res" x="0.0"/>
+        <p id="flt2_drv" x="0.0"/>
+        <p id="flt2_lo_cut" x="0.0"/>
+        <p id="flt2_env_depth" x="0.0"/>
+        <p id="flt_series" x="1.0"/>
+        <p id="o1_penv_depth" x="0.0"/>
+        <p id="o2_penv_depth" x="0.0"/>
+        <p id="level" x="-6.0"/>
+        <p id="gate_gap" x="0.0"/>
+        <p id="gate_bypass" x="0.0"/>
+        <p id="drvChar" x="0.0"/>
+        <p id="insP1" x="0.0"/>
+        <p id="insP2" x="0.0"/>
+        <p id="insP3" x="0.0"/>
+        <p id="insP4" x="0.0"/>
+        <Modulators depthUnits="range">
+          <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+        </Modulators>
+        <Gate subdiv="16" bars="2"/>
+        <FilterGate subdiv="16" bars="2"/>
+        <PitchGate subdiv="16" bars="2"/>
+      </Slot>
+      <Slot idx="6">
+        <p id="o1_oct" x="0.0"/>
+        <p id="o1_semi" x="0.0"/>
+        <p id="o1_fine" x="0.0"/>
+        <p id="o1_pos" x="0.0"/>
+        <p id="o2_oct" x="0.0"/>
+        <p id="o2_semi" x="2.0"/>
+        <p id="o2_fine" x="0.0"/>
+        <p id="o2_pos" x="0.0"/>
+        <p id="o1_wt" x="0.0"/>
+        <p id="o2_wt" x="0.0"/>
+        <p id="xmod_phaseMode" x="1.0" c="PM"/>
+        <p id="xmod_index" x="0.0"/>
+        <p id="sync" x="0.0"/>
+        <p id="xmod_fdbk" x="0.0"/>
+        <p id="xmod_ampMode" x="0.0" c="AM"/>
+        <p id="xmod_depth" x="0.0"/>
+        <p id="xmod_ssb" x="0.0"/>
+        <p id="o1_lvl" x="0.0"/>
+        <p id="o2_lvl" x="-6.0"/>
+        <p id="noise_lvl" x="-60.0"/>
+        <p id="noise_type" x="0.0" c="White"/>
+        <p id="flt_type" x="0.0"/>
+        <p id="flt_cut" x="8000.00048828125"/>
+        <p id="flt_res" x="0.2000000029802322"/>
+        <p id="flt_drv" x="0.0"/>
+        <p id="flt_lo_cut" x="0.0"/>
+        <p id="flt_env_depth" x="1.0"/>
+        <p id="flt2_type" x="0.0"/>
+        <p id="flt2_cut" x="8000.00048828125"/>
+        <p id="flt2_res" x="0.0"/>
+        <p id="flt2_drv" x="0.0"/>
+        <p id="flt2_lo_cut" x="0.0"/>
+        <p id="flt2_env_depth" x="0.0"/>
+        <p id="flt_series" x="1.0"/>
+        <p id="o1_penv_depth" x="0.0"/>
+        <p id="o2_penv_depth" x="0.0"/>
+        <p id="level" x="-6.0"/>
+        <p id="gate_gap" x="0.0"/>
+        <p id="gate_bypass" x="0.0"/>
+        <p id="drvChar" x="0.0"/>
+        <p id="insP1" x="0.0"/>
+        <p id="insP2" x="0.0"/>
+        <p id="insP3" x="0.0"/>
+        <p id="insP4" x="0.0"/>
+        <Modulators depthUnits="range">
+          <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+        </Modulators>
+        <Gate subdiv="16" bars="2"/>
+        <FilterGate subdiv="16" bars="2"/>
+        <PitchGate subdiv="16" bars="2"/>
+      </Slot>
+      <Slot idx="7">
+        <p id="o1_oct" x="0.0"/>
+        <p id="o1_semi" x="0.0"/>
+        <p id="o1_fine" x="0.0"/>
+        <p id="o1_pos" x="0.0"/>
+        <p id="o2_oct" x="0.0"/>
+        <p id="o2_semi" x="2.0"/>
+        <p id="o2_fine" x="0.0"/>
+        <p id="o2_pos" x="0.0"/>
+        <p id="o1_wt" x="0.0"/>
+        <p id="o2_wt" x="0.0"/>
+        <p id="xmod_phaseMode" x="1.0" c="PM"/>
+        <p id="xmod_index" x="0.0"/>
+        <p id="sync" x="0.0"/>
+        <p id="xmod_fdbk" x="0.0"/>
+        <p id="xmod_ampMode" x="0.0" c="AM"/>
+        <p id="xmod_depth" x="0.0"/>
+        <p id="xmod_ssb" x="0.0"/>
+        <p id="o1_lvl" x="0.0"/>
+        <p id="o2_lvl" x="-6.0"/>
+        <p id="noise_lvl" x="-60.0"/>
+        <p id="noise_type" x="0.0" c="White"/>
+        <p id="flt_type" x="0.0"/>
+        <p id="flt_cut" x="8000.00048828125"/>
+        <p id="flt_res" x="0.2000000029802322"/>
+        <p id="flt_drv" x="0.0"/>
+        <p id="flt_lo_cut" x="0.0"/>
+        <p id="flt_env_depth" x="1.0"/>
+        <p id="flt2_type" x="0.0"/>
+        <p id="flt2_cut" x="8000.00048828125"/>
+        <p id="flt2_res" x="0.0"/>
+        <p id="flt2_drv" x="0.0"/>
+        <p id="flt2_lo_cut" x="0.0"/>
+        <p id="flt2_env_depth" x="0.0"/>
+        <p id="flt_series" x="1.0"/>
+        <p id="o1_penv_depth" x="0.0"/>
+        <p id="o2_penv_depth" x="0.0"/>
+        <p id="level" x="-6.0"/>
+        <p id="gate_gap" x="0.0"/>
+        <p id="gate_bypass" x="0.0"/>
+        <p id="drvChar" x="0.0"/>
+        <p id="insP1" x="0.0"/>
+        <p id="insP2" x="0.0"/>
+        <p id="insP3" x="0.0"/>
+        <p id="insP4" x="0.0"/>
+        <Modulators depthUnits="range">
+          <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+               loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+        </Modulators>
+        <Gate subdiv="16" bars="2"/>
+        <FilterGate subdiv="16" bars="2"/>
+        <PitchGate subdiv="16" bars="2"/>
+      </Slot>
+    </Slots>
+  </MuTantState>
+</MuTantPreset>

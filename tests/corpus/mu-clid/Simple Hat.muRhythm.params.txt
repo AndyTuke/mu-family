@@ -1,0 +1,23 @@
+# frozen load result for fixture: Simple Hat.muRhythm
+layers=1
+load_errors=0
+capture_bytes=6090
+capture_sha256=d098c7096d89eba81fde0bc1dcafce25a6a0d0b4dbaa1edcd64808dcc4ee8d2b
+--- parameters differing from default (id=plain value)
+r0_aEnvAtk=5.48903e-09
+r0_aEnvDec=0.11
+r0_aEnvRel=0.0254778
+r0_aEnvSus=0
+r0_ampLvl=1
+r0_fEnvAtk=5.5326e-08
+r0_fEnvDec=0.00464159
+r0_fEnvRel=0.00464159
+r0_fltCut=4440
+r0_fltRes=0
+r0_fltType=11
+r0_hitsA=4
+r0_pEnvAtk=5.48903e-09
+r0_pEnvDec=0.000119196
+r0_pEnvRel=0.000119196
+r0_rotA=2
+r0_stepsA=16

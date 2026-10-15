@@ -1,0 +1,12 @@
+# frozen cross-product load behaviour of mu-on (each foreign file offered to layer 0 / as a full preset)
+mu-clid/A9_hat.muRhythm (layer): errors=1 first="Could not read "A9_hat.muRhythm"" params_sha256=e3b0c44298fc1c14
+mu-clid/Big and Bad.muRhythm (layer): errors=1 first="Could not read "Big and Bad.muRhythm"" params_sha256=e3b0c44298fc1c14
+mu-clid/A3_filter.muClid (full): errors=1 first="Preset has no saved state" params_sha256=e3b0c44298fc1c14
+mu-clid/A9_base.muClid (full): errors=1 first="Preset has no saved state" params_sha256=e3b0c44298fc1c14
+mu-tant/Abyssal Pad.muPattern (layer): errors=1 first="Could not read "Abyssal Pad.muPattern"" params_sha256=e3b0c44298fc1c14
+mu-tant/Aurora Pad.muPattern (layer): errors=1 first="Could not read "Aurora Pad.muPattern"" params_sha256=e3b0c44298fc1c14
+mu-tant/Cavern 3.muTant (full): errors=1 first="Preset has no saved state" params_sha256=e3b0c44298fc1c14
+mu-tant/Deep Current 4.muTant (full): errors=1 first="Preset has no saved state" params_sha256=e3b0c44298fc1c14
+mu-toni/TONI_mute_layer.muArp (layer): errors=1 first="Could not read "TONI_mute_layer.muArp"" params_sha256=e3b0c44298fc1c14
+mu-toni/TONI_legacy.muToni (full): errors=1 first="Preset has no saved state" params_sha256=e3b0c44298fc1c14
+mu-toni/TONI_silent.muToni (full): errors=1 first="Preset has no saved state" params_sha256=e3b0c44298fc1c14

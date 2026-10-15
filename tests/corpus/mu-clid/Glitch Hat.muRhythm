@@ -1,0 +1,63 @@
+<?xml version='1.0' encoding='utf-8'?>
+<MuClidRhythm presetVersion="2" presetName="Glitch Hat" presetCategory="Hats" presetEmbedSamples="0" r0_name="Glitch Hat" r0_colour="7" r0_sample="Hat 07.wav" r0_stepsA="16" r0_hitsA="13" r0_rotA="0" r0_prePadA="0" r0_postPadA="0" r0_insStA="0" r0_insLenA="0" r0_insModeA="false" r0_prePadModeA="false" r0_postPadModeA="false" r0_stepsB="16" r0_hitsB="0" r0_rotB="0" r0_prePadB="0" r0_postPadB="0" r0_insStB="0" r0_insLenB="0" r0_insModeB="false" r0_prePadModeB="false" r0_postPadModeB="false" r0_stepsC="16" r0_hitsC="0" r0_rotC="0" r0_prePadC="0" r0_postPadC="0" r0_insStC="0" r0_insLenC="0" r0_insModeC="false" r0_prePadModeC="false" r0_postPadModeC="false" r0_logic="OR" r0_patLeg="false" r0_vMono="false" r0_rstSt="-1" r0_pitchOct="0" r0_pitchSemi="0" r0_pitchFine="0" r0_pEnvAtk="0.005" r0_pEnvDec="0.1" r0_pEnvSus="0" r0_pEnvRel="0.1" r0_pEnvDep="0" r0_pEnvLeg="false" r0_fltType="HP12" r0_fltCut="3500" r0_fltRes="0.45" r0_fEnvAtk="0.001" r0_fEnvDec="0.1" r0_fEnvSus="0" r0_fEnvRel="0.1" r0_fEnvDep="6" r0_fEnvLeg="false" r0_fltLoCut="0" r0_ampLvl="0.85" r0_aEnvAtk="0" r0_aEnvDec="0.06" r0_aEnvSus="0" r0_aEnvRel="0.1" r0_aEnvLeg="false" r0_accentDb="2" r0_drvChar="Bitcrusher" r0_insP1="0.733333" r0_insP2="0.887727" r0_insP3="0.000000" r0_insP4="0.899657">
+  <Modulators>
+    <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Quarter" loopMod="None" loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Step v="100" />
+      <Step v="20" />
+      <Step v="100" />
+      <Step v="40" />
+      <Step v="0" />
+      <Step v="100" />
+      <Step v="60" />
+      <Step v="100" />
+      <Step v="20" />
+      <Step v="100" />
+      <Step v="0" />
+      <Step v="80" />
+      <Step v="100" />
+      <Step v="40" />
+      <Step v="100" />
+      <Step v="0" />
+    </Seq>
+    <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Quarter" loopMod="None" loopMult="4" stepNV="ThirtySecond" stepMod="None" stepMult="1">
+      <Step v="100" />
+      <Step v="50" />
+      <Step v="100" />
+      <Step v="0" />
+      <Step v="80" />
+      <Step v="100" />
+      <Step v="20" />
+      <Step v="60" />
+      <Step v="0" />
+      <Step v="100" />
+      <Step v="40" />
+      <Step v="100" />
+      <Step v="60" />
+      <Step v="0" />
+      <Step v="100" />
+      <Step v="80" />
+    </Seq>
+    <Seq id="cs2" mode="Smooth" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Point x="0" y="-1" bez="0" hx="0" hy="0" />
+      <Point x="0.5" y="1" bez="0" hx="0" hy="0" />
+    </Seq>
+    <Seq id="cs3" mode="Stepped" polarity="Bipolar" loopNV="Quarter" loopMod="None" loopMult="4" stepNV="Eighth" stepMod="None" stepMult="1">
+      <Step v="0" />
+      <Step v="-50" />
+      <Step v="100" />
+      <Step v="0" />
+      <Step v="-100" />
+      <Step v="33.3" />
+      <Step v="0" />
+      <Step v="-66.7" />
+    </Seq>
+    <Seq id="cs4" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None" loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+    <Seq id="cs5" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None" loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+    <Seq id="cs6" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None" loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+    <Seq id="cs7" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None" loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+    <Asgn id="asgn0" src="cs0_output" dest="amp.level" depth="0.4" curve="0" />
+    <Asgn id="asgn1" src="cs1_output" dest="insert.p2" depth="18000" curve="0" />
+    <Asgn id="asgn2" src="cs2_output" dest="filter.cutoff" depth="3000" curve="0" />
+    <Asgn id="asgn3" src="cs3_output" dest="pitch.semitones" depth="7" curve="0" />
+  </Modulators>
+</MuClidRhythm>

@@ -1,0 +1,21 @@
+# frozen load result for fixture: T11.muRhythm
+layers=1
+load_errors=1
+load_error=Sample 'Synth C 01.wav' missing from content folder — rhythm loaded without audio.
+capture_bytes=2887
+capture_sha256=85a456f1818636036885172441d1a594b18905304a5b46ab979948cbc30ef754
+--- parameters differing from default (id=plain value)
+r0_aEnvDec=4
+r0_aEnvSus=0
+r0_fEnvAtk=0
+r0_fEnvDec=0
+r0_fEnvRel=0
+r0_fltCut=800
+r0_fltRes=0.85
+r0_fltType=4
+r0_hitsA=2
+r0_pEnvDec=0
+r0_pEnvRel=0
+r0_stepsA=16
+r0_stepsB=16
+r0_stepsC=16

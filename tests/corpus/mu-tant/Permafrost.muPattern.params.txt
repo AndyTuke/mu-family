@@ -1,0 +1,13 @@
+# frozen load result for fixture: Permafrost.muPattern
+layers=1
+load_errors=0
+capture_bytes=3953
+capture_sha256=9207ff6c6ed96374fbbe2cc972b6acb844892729ae411c192f79a9855b3837db
+--- parameters differing from default (id=plain value)
+v0_flt_cut=2800
+v0_flt_res=0.15
+v0_level=-11
+v0_o1_oct=-1
+v0_o1_wt=4
+v0_o2_semi=12
+v0_o2_wt=4

@@ -1,0 +1,12 @@
+# frozen load result for fixture: Moonstone.muPattern
+layers=1
+load_errors=0
+capture_bytes=3912
+capture_sha256=e6734fbee48a4d9992e3f6f99cc53fbb79fd1aa8200dc7da7d6c3a5d342c7b9a
+--- parameters differing from default (id=plain value)
+v0_flt_cut=4200
+v0_flt_res=0.16
+v0_level=-8
+v0_o1_wt=4
+v0_o2_semi=7
+v0_o2_wt=4

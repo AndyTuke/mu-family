@@ -1,0 +1,13 @@
+# frozen load result for fixture: Singing Wire.muPattern
+layers=1
+load_errors=0
+capture_bytes=3513
+capture_sha256=da2ef928a4aae9125f9fce75f5846693b02fee0b00ff07458d6d01d4a56d7a0e
+--- parameters differing from default (id=plain value)
+v0_flt_cut=1300
+v0_flt_res=0.45
+v0_flt_type=2
+v0_level=-11
+v0_o1_wt=3
+v0_o2_oct=-1
+v0_o2_wt=3

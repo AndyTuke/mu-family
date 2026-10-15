@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<MuClidRhythm presetName="Crusher Perc" presetCategory="Perc" presetDescription="Bitcrushed percussion loop"
+              presetEmbedSamples="0" presetVersion="2" r0_name="Crusher Perc"
+              r0_colour="5" r0_sample="Perc 17.wav" r0_stepsA="16" r0_hitsA="9"
+              r0_rotA="1" r0_prePadA="0" r0_postPadA="0" r0_insStA="0" r0_insLenA="0"
+              r0_insModeA="false" r0_prePadModeA="false" r0_postPadModeA="false"
+              r0_stepsB="16" r0_hitsB="4" r0_rotB="8" r0_prePadB="0" r0_postPadB="0"
+              r0_insStB="0" r0_insLenB="0" r0_insModeB="false" r0_prePadModeB="false"
+              r0_postPadModeB="false" r0_stepsC="16" r0_hitsC="3" r0_rotC="0"
+              r0_prePadC="0" r0_postPadC="0" r0_insStC="0" r0_insLenC="0" r0_insModeC="false"
+              r0_prePadModeC="false" r0_postPadModeC="false" r0_logic="OR"
+              r0_patLeg="false" r0_vMono="false" r0_rstSt="-1" r0_pitchOct="0"
+              r0_pitchSemi="0" r0_pitchFine="0.0" r0_pEnvAtk="0.004999999888241291"
+              r0_pEnvDec="0.1000000908970833" r0_pEnvSus="0.0" r0_pEnvRel="0.1000000908970833"
+              r0_pEnvDep="0.0" r0_pEnvLeg="false" r0_fltType="LP12" r0_fltCut="4499.99951171875"
+              r0_fltRes="0.4000000059604645" r0_fEnvAtk="0.004999999888241291"
+              r0_fEnvDec="0.1799999922513962" r0_fEnvSus="0.0" r0_fEnvRel="0.2000000327825546"
+              r0_fEnvDep="12.0" r0_fEnvLeg="false" r0_fltLoCut="0.0" r0_ampLvl="1.995262384414673"
+              r0_aEnvAtk="0.0" r0_aEnvDec="0.1199999898672104" r0_aEnvSus="0.0"
+              r0_aEnvRel="0.1499999910593033" r0_aEnvLeg="false" r0_accentDb="3.0"
+              r0_drvChar="Bitcrusher" r0_drvDrv="0.0" r0_drvOut="0.0" r0_drvBits="16.0"
+              r0_drvRate="6298.0" r0_drvDit="0.0" r0_drvTon="20000.0" r0_eqMidGain="0.0"
+              r0_eqLowGain="0.0" r0_eqHighGain="0.0">
+  <Modulators>
+    <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Quarter"
+         loopMod="None" loopMult="4" stepNV="Sixteenth" stepMod="None"
+         stepMult="1">
+      <Step v="0.0"/>
+      <Step v="100.0"/>
+      <Step v="0.0"/>
+      <Step v="50.0"/>
+      <Step v="0.0"/>
+      <Step v="80.0"/>
+      <Step v="0.0"/>
+      <Step v="25.0"/>
+      <Step v="100.0"/>
+      <Step v="0.0"/>
+      <Step v="60.0"/>
+      <Step v="0.0"/>
+      <Step v="100.0"/>
+      <Step v="0.0"/>
+      <Step v="40.0"/>
+      <Step v="80.0"/>
+    </Seq>
+    <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Quarter"
+         loopMod="None" loopMult="4" stepNV="Eighth" stepMod="None" stepMult="1">
+      <Step v="0.0"/>
+      <Step v="100.0"/>
+      <Step v="50.0"/>
+      <Step v="0.0"/>
+      <Step v="75.0"/>
+      <Step v="0.0"/>
+      <Step v="25.0"/>
+      <Step v="100.0"/>
+    </Seq>
+    <Seq id="cs2" mode="Smooth" polarity="Bipolar" loopNV="Whole" loopMod="None"
+         loopMult="2" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Point x="0.0" y="-1.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="0.5" y="1.0" bez="0" hx="0.0" hy="0.0"/>
+    </Seq>
+    <Seq id="cs3" mode="Stepped" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+         loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Step v="0.0"/>
+      <Step v="0.0"/>
+      <Step v="-50.0"/>
+      <Step v="0.0"/>
+      <Step v="0.0"/>
+      <Step v="33.29999923706055"/>
+      <Step v="0.0"/>
+      <Step v="-66.69999694824219"/>
+      <Step v="50.0"/>
+      <Step v="0.0"/>
+      <Step v="0.0"/>
+      <Step v="-33.29999923706055"/>
+      <Step v="0.0"/>
+      <Step v="83.30000305175781"/>
+      <Step v="0.0"/>
+      <Step v="0.0"/>
+    </Seq>
+    <Seq id="cs4" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+         loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Point x="0.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="1.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+    </Seq>
+    <Seq id="cs5" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+         loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Point x="0.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="1.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+    </Seq>
+    <Seq id="cs6" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+         loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Point x="0.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="1.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+    </Seq>
+    <Seq id="cs7" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+         loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Point x="0.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="1.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+    </Seq>
+    <Asgn id="asgn2" src="cs2_output" dest="filter.cutoff" depth="2500.0"
+          curve="0.0"/>
+    <Asgn id="asgn3" src="cs3_output" dest="pitch.semitones" depth="5.0"
+          curve="0.0"/>
+  </Modulators>
+</MuClidRhythm>

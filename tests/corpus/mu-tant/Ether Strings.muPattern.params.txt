@@ -1,0 +1,14 @@
+# frozen load result for fixture: Ether Strings.muPattern
+layers=1
+load_errors=0
+capture_bytes=3818
+capture_sha256=bce915eac609ae2239c5eb81a2649e12fdf41d9b908f4020920855412e15f4f6
+--- parameters differing from default (id=plain value)
+v0_flt_cut=4400
+v0_flt_res=0.22
+v0_flt_type=4
+v0_level=-8
+v0_o1_wt=1
+v0_o2_oct=1
+v0_o2_semi=12
+v0_o2_wt=4
