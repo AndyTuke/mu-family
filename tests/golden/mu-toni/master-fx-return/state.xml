@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MuToniState format="2" numVoices="1" voiceColours="0,1,2,3,4,5,6,7">
+    <Globals>
+      <p id="ch0_sendDly" x="0.4"/>
+      <p id="ch0_sendEff" x="0.3"/>
+      <p id="ch0_sendRev" x="0.5"/>
+      <p id="eff_algo" x="3"/>
+      <p id="mst_insChar" x="1"/>
+      <p id="mst_insP1" x="0.4"/>
+      <p id="mstr_lvl" x="0.7"/>
+      <p id="mstr_pan" x="0.2"/>
+      <p id="ret_dly_lvl" x="0.8"/>
+      <p id="ret_eff_lvl" x="0.8"/>
+      <p id="ret_rev_lvl" x="0.8"/>
+    </Globals>
+    <Slots>
+      <Slot idx="0">
+        <p id="aeR" x="0.3"/>
+        <p id="chord" x="3"/>
+        <p id="gate" x="40"/>
+        <p id="rate" x="6"/>
+      </Slot>
+    </Slots>
+</MuToniState>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MuToniState format="2" numVoices="1" voiceColours="0,1,2,3,4,5,6,7">
+    <Globals>
+
+    </Globals>
+    <Slots>
+      <Slot idx="0">
+        <p id="acc" x="50"/>
+        <p id="accLen" x="3"/>
+        <p id="accPat" x="1"/>
+        <p id="chord" x="5"/>
+        <p id="gate" x="70"/>
+        <p id="rate" x="8"/>
+        <p id="root" x="4"/>
+      </Slot>
+    </Slots>
+</MuToniState>

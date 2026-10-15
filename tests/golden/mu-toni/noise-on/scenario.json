@@ -1,0 +1,13 @@
+{
+  "scenario": "noise-on",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 72000,
+  "tempoBpm": 120.0,
+  "startBeat": 0.0,
+  "numStems": 2,
+  "script": [
+    "Noise source on: layer 1 white at -10 dB over quiet oscillators, layer 2 pink at -12 dB with the oscillators off.",
+    "Repeatable only under MU_DETERMINISTIC_NOISE=1 (the test sets it)."
+  ]
+}

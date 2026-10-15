@@ -1,0 +1,13 @@
+{
+  "scenario": "master-fx-return",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 120000,
+  "tempoBpm": 120.0,
+  "startBeat": 0.0,
+  "numStems": 1,
+  "script": [
+    "One layer sending to the effect, delay and reverb returns; master level 0.7, pan 0.2 and a master soft-clip insert.",
+    "The stem has its sends at zero, so the master alone carries the FX return."
+  ]
+}
