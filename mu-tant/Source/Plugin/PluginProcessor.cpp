@@ -100,7 +100,7 @@ PluginProcessor::PluginProcessor()
     {
         voices[(size_t) v] = std::make_unique<VoiceEngine>();
         voices[(size_t) v]->setBank(&bank);
-        voices[(size_t) v]->setSlotIndex(v);
+        voices[(size_t) v]->setSlotIndex(v, noiseSeedSalt);
     }
 
     cacheParamPointers();        // resolve all APVTS atomics once (audio thread reads these)
@@ -686,7 +686,7 @@ void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
 {
     for (int d = juce::jmax(0, firstIndex); d <= juce::jmin(lastIndex, mu_limits::kMaxLayers - 1); ++d)
     {
-        if (voices[(size_t) d] != nullptr) { voices[(size_t) d]->setSlotIndex(d); voices[(size_t) d]->reset(); }
+        if (voices[(size_t) d] != nullptr) { voices[(size_t) d]->setSlotIndex(d, noiseSeedSalt); voices[(size_t) d]->reset(); }
         auto& ins = *getPattern(d).insert;   // the Pattern now in slot d brings its own insert along
         ins.setSlotIndex(d);
         ins.reset();

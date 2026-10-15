@@ -91,7 +91,7 @@ public:
 
     void setVoiceParams(const ToniVoiceParams& p) { voice.setParams(p); legatoOn = p.legato; }
     void setBank(const mu_wavetable::WavetableBank* b) noexcept { voice.setBank(b); }
-    void setSlotIndex(int slot) noexcept { voice.setSlotIndex(slot); }   // per-slot fixed noise seed
+    void setSlotIndex(int slot, juce::int64 salt = 0) noexcept { voice.setSlotIndex(slot, salt); }   // per-slot, per-instance noise seed
     void setArp(const ArpParams& p)               { arp = p; }
     void setAccent(const ArpAccent& a) noexcept { accent = a; }
 

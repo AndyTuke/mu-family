@@ -184,6 +184,8 @@ private:
     // Written by prepareToPlay, read by createLayer on the message thread and by processBlock.
     std::atomic<double> currentSampleRate { 44100.0 };
     std::atomic<int>    currentBlockSize  { 512 };
+    // Per-instance noise seed salt, taken before the constructor body builds the layers; 0 when MU_DETERMINISTIC_NOISE is set (golden renders).
+    const juce::int64   noiseSeedSalt = mu_core::makeNoiseSalt();
     int                 runnersLive = 0;   // audio thread: layers whose runner has run since it was last reset
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)

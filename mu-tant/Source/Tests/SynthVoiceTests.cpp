@@ -100,28 +100,59 @@ public:
             expectEquals(peakOf(out, N), 0.0f);
         }
 
-        beginTest("Noise is repeatable per slot: same slot identical, different slots differ");
+        beginTest("Noise: same slot and salt is bit-identical on both channels and across blocks; another slot differs");
         {
-            // Noise-only render of a fresh engine seeded for `slot`.
-            auto renderNoise = [&](int slot)
+            // Noise-only render of a fresh engine seeded for (slot, salt): two consecutive blocks, stereo.
+            auto renderNoise = [&](int slot, juce::int64 salt)
             {
-                VoiceEngine v; v.setBank(&bank); v.setSlotIndex(slot); v.prepare(sr, N);
+                VoiceEngine v; v.setBank(&bank); v.setSlotIndex(slot, salt); v.prepare(sr, N);
                 VoiceConfig c; c.osc1LevelDb = -60.0f; c.osc2LevelDb = -60.0f; c.noiseLevelDb = 0.0f; c.levelDb = 0.0f;
                 v.setConfig(c);
-                juce::AudioBuffer<float> buf(2, N); buf.clear();
-                v.process(buf, N);
-                return buf;
+                juce::AudioBuffer<float> out(2, 2 * N), blk(2, N);
+                for (int b = 0; b < 2; ++b)
+                {
+                    blk.clear();
+                    v.process(blk, N);
+                    for (int ch = 0; ch < 2; ++ch) out.copyFrom(ch, b * N, blk, ch, 0, N);
+                }
+                return out;
             };
-            const auto a = renderNoise(2), b = renderNoise(2), other = renderNoise(3);
-            bool same = true, differs = false;
-            for (int i = 0; i < N; ++i)
+            auto identical = [&](const juce::AudioBuffer<float>& x, const juce::AudioBuffer<float>& y, int from, int len)
             {
-                same    = same && a.getSample(0, i) == b.getSample(0, i);
-                differs = differs || a.getSample(0, i) != other.getSample(0, i);
-            }
-            expect(peakOf(a, N) > 0.0f, "noise is audible");
-            expect(same, "same slot gives bit-identical noise");
-            expect(differs, "different slots give different noise");
+                for (int ch = 0; ch < 2; ++ch)
+                    for (int i = from; i < from + len; ++i)
+                        if (x.getSample(ch, i) != y.getSample(ch, i)) return false;
+                return true;
+            };
+            const auto a = renderNoise(2, 0), b = renderNoise(2, 0), other = renderNoise(3, 0);
+            expect(a.getMagnitude(0, 0, N) > 0.0f && a.getMagnitude(1, 0, N) > 0.0f, "noise is audible on both channels");
+            expect(identical(a, b, 0, 2 * N), "same slot gives bit-identical noise, both channels, both blocks");
+            expect(! identical(a, other, 0, N), "different slots give different noise");
+            // The second block continues the stream rather than repeating the first.
+            bool repeats = true;
+            for (int i = 0; i < N; ++i) repeats = repeats && a.getSample(0, i) == a.getSample(0, N + i);
+            expect(! repeats, "the second block continues the sequence, it does not repeat the first");
+        }
+
+        beginTest("Noise: differing salts give different noise on the same slot, salt 0 is deterministic");
+        {
+            auto firstBlock = [&](int slot, juce::int64 salt)
+            {
+                VoiceEngine v; v.setBank(&bank); v.setSlotIndex(slot, salt); v.prepare(sr, N);
+                VoiceConfig c; c.osc1LevelDb = -60.0f; c.osc2LevelDb = -60.0f; c.noiseLevelDb = 0.0f; c.levelDb = 0.0f;
+                v.setConfig(c);
+                juce::AudioBuffer<float> blk(2, N); blk.clear();
+                v.process(blk, N);
+                return blk;
+            };
+            auto same = [&](const juce::AudioBuffer<float>& x, const juce::AudioBuffer<float>& y)
+            {
+                for (int i = 0; i < N; ++i)
+                    if (x.getSample(0, i) != y.getSample(0, i)) return false;
+                return true;
+            };
+            expect(! same(firstBlock(1, 111), firstBlock(1, 222)), "two instances (different salts) on one slot do not share noise");
+            expect(same(firstBlock(1, 111), firstBlock(1, 111)), "the same salt repeats");
         }
 
         beginTest("voice renders finite, non-silent output");

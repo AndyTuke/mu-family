@@ -17,6 +17,7 @@ namespace
     {
         using mu_toni::PluginProcessor::layers;
         using mu_toni::PluginProcessor::numLayers;
+        using mu_toni::PluginProcessor::layersMoved;
         // Performance mode is standalone-only; the test stands in for the standalone wrapper.
         bool isStandaloneApp() const noexcept override { return true; }
     };
@@ -36,6 +37,72 @@ struct MuToniProcessorSeamTests : juce::UnitTest
         expect(swap != nullptr, "the swap timing parameter is declared");
         if (swap != nullptr)
             expectEquals((int) std::lround(swap->convertFrom0to1(swap->getDefaultValue())), 2);
+    }
+
+    // Noise seeding through the real processor: MU_DETERMINISTIC_NOISE makes two instances render the same
+    // noise (the golden harness relies on it) and a moved / reset slot restart its noise from the slot's seed;
+    // without it two instances must not share noise (they would sum correlated in a DAW).
+    void noiseSeeding()
+    {
+        constexpr double kSr = 48000.0;
+        constexpr int    kBlock = 256;
+        constexpr double kBps = (120.0 / 60.0) / kSr;   // beats per sample at 120 bpm
+
+        // Renders `blocks` blocks of layer 0's runner playing a noise-only voice; returns the last four.
+        auto tail = [&](ExposedPluginProcessor& p, int blocks)
+        {
+            auto& runner = p.getArp(0).runner;
+            runner.prepare(kSr, kBlock);
+            mu_toni::ToniVoiceParams tv;
+            tv.osc1LevelDb = -60.0f;  tv.osc2LevelDb = -60.0f;  tv.noiseLevelDb = 0.0f;
+            runner.setVoiceParams(tv);
+            runner.setStep(6, 0.9f, false);
+            juce::AudioBuffer<float> buf(2, kBlock), out(2, 4 * kBlock);
+            double beat = 0.0;
+            for (int b = 0; b < blocks; ++b)
+            {
+                mu_toni::ArpContext ctx;
+                ctx.playing = true;  ctx.sampleRate = kSr;  ctx.bpm = 120.0;
+                ctx.startBeat = beat;  ctx.beatsPerSample = kBps;
+                buf.clear();
+                runner.render(buf, kBlock, ctx);
+                beat += kBps * kBlock;
+                if (b >= blocks - 4)
+                    for (int c = 0; c < 2; ++c) out.copyFrom(c, (b - (blocks - 4)) * kBlock, buf, c, 0, kBlock);
+            }
+            return out;
+        };
+        auto same = [&](const juce::AudioBuffer<float>& x, const juce::AudioBuffer<float>& y)
+        {
+            for (int c = 0; c < 2; ++c)
+                for (int i = 0; i < x.getNumSamples(); ++i)
+                    if (x.getSample(c, i) != y.getSample(c, i)) return false;
+            return true;
+        };
+
+        beginTest("Deterministic noise mode: two instances render identical noise; a moved slot restarts its noise like a fresh one");
+        {
+            mu_seam_test::TempStorage storage;
+            mu_seam_test::ScopedEnvVar deterministic("MU_DETERMINISTIC_NOISE", "1");
+            ExposedPluginProcessor a, b;
+            const auto ta = tail(a, 8), tb = tail(b, 8);
+            expect(ta.getMagnitude(0, 4 * kBlock) > 1.0e-3f, "the compared render carries noise");
+            expect(same(ta, tb), "two instances on the same slot render identical noise");
+
+            ExposedPluginProcessor moved, fresh;
+            tail(moved, 4);                           // advance the noise stream
+            moved.layersMoved(0, 0);                  // the slot is reset: its noise restarts from the slot's seed
+            const auto tm = tail(moved, 8), tf = tail(fresh, 8);
+            expect(same(tm, tf), "a reseeded slot renders the same noise as a fresh one of that index");
+        }
+
+        beginTest("Live noise mode: two instances on the same slot do not share noise");
+        {
+            mu_seam_test::TempStorage storage;
+            mu_seam_test::ScopedEnvVar live("MU_DETERMINISTIC_NOISE", "");
+            ExposedPluginProcessor a, b;
+            expect(! same(tail(a, 8), tail(b, 8)), "per-instance salts keep instances uncorrelated");
+        }
     }
 
     // Performance mode through the real wiring: a PerformanceFile of two saved presets, the mode entered and
@@ -106,6 +173,7 @@ struct MuToniProcessorSeamTests : juce::UnitTest
     void runTest() override
     {
         swapTimingDefault();
+        noiseSeeding();
         performanceItems();
         using namespace mu_seam_test;
         beginTest("A fresh instance has one layer; every slot's Arp exists and getLayer(i) is getArp(i)");

@@ -34,6 +34,33 @@ namespace mu_seam_test
         ProcessorBase::ScopedStorageRoot scope;
     };
 
+    // Sets an environment variable for its lifetime (empty value = unset) and restores the previous value.
+    // A processor reads MU_DETERMINISTIC_NOISE in its constructor, so scope this around the construction.
+    struct ScopedEnvVar
+    {
+        ScopedEnvVar(const char* varName, const char* value) : name(varName)
+        {
+            const auto old = juce::SystemStats::getEnvironmentVariable(name, {});
+            hadOld = old.isNotEmpty();
+            oldValue = old;
+            set(value);
+        }
+        ~ScopedEnvVar() { set(hadOld ? oldValue.toRawUTF8() : ""); }
+
+    private:
+        void set(const char* value)
+        {
+           #if JUCE_WINDOWS
+            _putenv_s(name, value);
+           #else
+            if (value[0] == 0) unsetenv(name); else setenv(name, value, 1);
+           #endif
+        }
+        const char* name;
+        bool hadOld = false;
+        juce::String oldValue;
+    };
+
     // True when a process with this executable name is running (Windows only; elsewhere false). Used to
     // tell a write by a real instance of the product from one the test made.
     inline bool processIsRunning(const juce::String& exeName)
