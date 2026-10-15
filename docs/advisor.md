@@ -95,3 +95,6 @@ Answers from the owner (2026-10-15):
 
 The advisor routines append a dated entry here for every suggestion they make, so the same thing is never reported twice. Format: `YYYY-MM-DD: short title (file or area): what was suggested, and the outcome if known.`
 
+2026-10-15: ci.yml coverage gap (.github/workflows/ci.yml): build mu-Toni and run every `*-tests` target (mu-toni, mu-core, mu-control, mu-clid-midi) plus all static checks; reported in issue #4.
+2026-10-15: pre-commit static checks hook (.claude/hooks/pre_commit_checks.ps1, .claude/settings.json): PreToolUse hook on `git commit` running the check-*.ps1 scripts; reported in issue #4.
+2026-10-15: permission guard rails (.claude/settings.json): deny force-push, reset --hard, --no-verify; ask before `gh workflow run`; reported in issue #4.
