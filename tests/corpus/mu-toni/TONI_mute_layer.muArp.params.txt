@@ -1,0 +1,8 @@
+# frozen load result for fixture: TONI_mute_layer.muArp
+layers=1
+load_errors=0
+capture_bytes=3254
+capture_sha256=61665cfb90c8843d74c8e43debdb462390db90b55a883b5e740447d5eee93589
+--- parameters differing from default (id=plain value)
+a0_o1l=-60
+a0_o2l=-60

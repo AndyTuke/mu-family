@@ -1,0 +1,6 @@
+# frozen load result for fixture: FACTORY_STATE.muToni
+layers=1
+load_errors=0
+resave_bytes=36118
+resave_sha256=2f079737a09bd6eea0f5b955c59e9ec9a61ef8e1f7b0186d9a0f2d75d34a2424
+--- parameters differing from default (id=plain value)
