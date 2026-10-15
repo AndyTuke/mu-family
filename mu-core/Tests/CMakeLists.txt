@@ -24,6 +24,7 @@ target_sources(mu-core-tests PRIVATE
     SettingsOverlayBackendTests.cpp
     AlgorithmNameTableTests.cpp
     BarPositionTests.cpp
+    RhythmPlayStateTests.cpp
     HotSwapTests.cpp
     DeferredWorkTests.cpp
     FilterDSPSmokeTests.cpp

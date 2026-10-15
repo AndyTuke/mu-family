@@ -13,7 +13,7 @@ RhythmMiniVisual::RhythmMiniVisual(PluginProcessor& p, int index)
 
     const Rhythm& r = proc.getRhythm(rhythmIndex);
     miniCircle.setPatterns(r.genA.getStepTypes(), r.genB.getStepTypes(), r.genC.getStepTypes());
-    miniCircle.setPlayState(&proc.rhythmPlayState[rhythmIndex], &proc.beatFraction,
+    miniCircle.setPlayState(&proc.rhythmPlayState[rhythmIndex],
                             &proc.sequencerPlaying, colour);
     miniCircle.setSingleColour(colour);   // the sidebar icon shows the rhythm's own colour
 
