@@ -9,11 +9,8 @@
 #include <array>
 #include <vector>
 
-// The allocation counter that ProcessorSeamTests.cpp's global operator new feeds (one shared inline variable).
-namespace alloc_count {
-inline thread_local bool counting = false;
-inline thread_local int  count    = 0;
-}
+// The allocation counter: ProcessorSeamTests.cpp carries the probe's global operator new (see AllocationProbe.h).
+#include "Tests/AllocationProbe.h"
 
 namespace
 {
@@ -271,8 +268,8 @@ struct ClidLayerStructureTests : juce::UnitTest
         if (c.running) p.setPlayHead(&host);
 
         res.maxPeak = 0.0f;
-        alloc_count::count = 0;
-        alloc_count::counting = true;
+        mu_alloc::tls.allocs = 0;
+        mu_alloc::tls.armed = true;
         if (c.tiedMid)
         {
             // Mid-release: a tied hit must neither retrigger the envelope nor lift the level.
@@ -285,8 +282,8 @@ struct ClidLayerStructureTests : juce::UnitTest
         }
         else
             run(blocks);
-        alloc_count::counting = false;
-        res.audioAllocs = alloc_count::count;
+        mu_alloc::tls.armed = false;
+        res.audioAllocs = mu_alloc::tls.allocs;
         p.setPlayHead(nullptr);
 
         if (c.tiedAfter)

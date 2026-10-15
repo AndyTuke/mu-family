@@ -7,6 +7,7 @@
 // the repo.
 
 #include "Plugin/PluginProcessor.h"
+#include "Tests/AllocationProbe.h"
 #include "Tests/ProcessorSeamHelpers.h"
 
 namespace mu_golden_rig
@@ -28,6 +29,7 @@ namespace mu_golden_rig
         void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) override
         {
             mu_clid::PluginProcessor::processBlock(buffer, midi);
+            mu_alloc::Paused messageThreadWork;   // the drain is the host's message-thread poll: not audio-thread work
             drainDeferredWork();
         }
         using mu_clid::PluginProcessor::drainDeferredWork;

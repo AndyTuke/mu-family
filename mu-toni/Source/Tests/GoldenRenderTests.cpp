@@ -12,7 +12,10 @@
 // and not wishes: when a stage changes one on purpose, the stage updates the number here in the same
 // commit and says why.
 
+// This translation unit carries the allocation probe's global operator new / delete (test executable only).
+#define MU_ALLOCATION_PROBE_DEFINE_OPERATORS
 #include "Plugin/PluginProcessor.h"
+#include "Tests/GoldenAllocationCheck.h"
 #include "Tests/GoldenRender.h"
 #include "Tests/ProcessorSeamHelpers.h"
 
@@ -22,6 +25,11 @@
 
 namespace
 {
+    // Blocks that allocate or free inside processBlock today, recorded with their exact counts (see
+    // GoldenAllocationCheck.h). Informational: reported on every run, never an approval to allocate.
+    const std::vector<mu_golden::KnownAllocation> kKnownAllocations = {
+    };
+
     using mu_golden::ScriptContext;
 
     constexpr const char* kProduct = "mu-toni";
@@ -205,7 +213,12 @@ struct MuToniGoldenRenderTests : juce::UnitTest
     {
         mu_seam_test::TempStorage storage;                                      // no real per-user folder is read or written
         mu_seam_test::ScopedEnvVar deterministic("MU_DETERMINISTIC_NOISE", "1");   // noise repeats run to run (set before any processor is built)
-        const auto store = mu_golden::GoldenStore::fromEnvironment();
+        beginTest("allocation probe sees heap use and ignores debug-STL proxies");
+        for (const auto& f : mu_golden::probeSelfTest()) expect(false, f);
+
+        auto store = mu_golden::GoldenStore::fromEnvironment();
+        mu_golden::AllocationProbeCounter allocProbe;
+        store.allocationCounter = &allocProbe;
 
         for (const auto& def : scenarioDefs())
         {
@@ -224,9 +237,18 @@ struct MuToniGoldenRenderTests : juce::UnitTest
                 expect(repeat.ok, repeat.message);
             }
 
+            allocProbe.setScenario(def.name);
             const auto result = store.verify(kProduct, sc, productFactory());
             if (! result.skipped) expect(result.ok, result.message);
             if (result.message.isNotEmpty()) logMessage(result.message);
+
+            // Heap activity inside processBlock: anything not listed in kKnownAllocations fails.
+            if (! result.skipped)
+            {
+                const auto v = mu_golden::judgeAllocations(def.name, allocProbe.take(), kKnownAllocations);
+                for (const auto& n : v.notes) logMessage(n);
+                for (const auto& f : v.failures) expect(false, f);
+            }
         }
     }
 };
