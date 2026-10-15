@@ -231,8 +231,8 @@ P "To slide only on some steps, modulate Gate up to 100 percent on those steps w
 H2 "Snap"
 P "With Snap on, every chord tone is moved to the nearest note of the chosen scale, so the arpeggio is always strictly in key. With Snap off (the default) the chord is played as named. In sparse scales, Snap can make two chord tones land on the same note."
 
-H2 "Accent"
-P "The row of cells at the right of the Appergater is the accent pattern. Acc Steps (1 to 16, default 4) sets how many cells it has, and you click a cell to switch that step's accent on or off. An accented step plays up to 6 dB louder, with the filter up to an octave brighter, scaled by the Accent knob (0 to 100 percent, default 0). A moving line shows which step the arpeggio is on. In Loop mode the pattern follows the beat, so accents stay locked to the bar; in MIDI mode it counts from each key press."
+H2 "Step Pattern and Accent"
+P "The row of cells at the right of the Appergater is the step pattern. Steps (1 to 16, default 4) sets how many cells it has. Each step is in one of three states: Off, On or Accented. Click a cell to cycle it from Off to On to Accented and back to Off; Shift+click goes the other way, and you can drag across cells to paint them. An Off step is a rest, so the arpeggio is silent on that step. An On step plays normally. An Accented step plays up to 6 dB louder, with the filter up to an octave brighter, scaled by the Accent knob (0 to 100 percent, default 0). Presets made before the Off state existed play exactly as they did, with every step On. A moving line shows which step the arpeggio is on. In Loop mode the pattern follows the beat, so accents stay locked to the bar; in MIDI mode it counts from each key press."
 
 H2 "Playing with a Keyboard"
 P "A MIDI keyboard can drive the arpeggio in either Trigger mode."
@@ -244,7 +244,7 @@ P "In Settings, Notes In chooses which MIDI channel's notes are used: Omni (ever
 H2 "Modulating the Arpeggio"
 P "Because the arpeggio is worked out fresh on every step, you can modulate almost everything about it: Direction, Octaves, Inversion, Chord, Root, Root Octave, Rate, Gate, Glide and Accent. A stepped modulator on Chord makes a chord progression; one on Root walks the key; a slow LFO on Direction makes the arpeggio breathe between falling, up-and-down and climbing."
 
-Pic "The Appergater: scale, chord, rate and trigger, the knob row and the accent pattern." "appergater.png"
+Pic "The Appergater: scale, chord, rate and trigger, the knob row and the step pattern." "appergater.png"
 
 # ── 11. Modulators ────────────────────────────────────────────────────────────
 H1 "11. Modulators"
@@ -368,7 +368,7 @@ H1 "16. Tips and Workflow"
 Bullet "Starting out: press Play. The default layer arpeggiates a minor triad over two octaves in sixteenth notes."
 Bullet "Bassline: set Octave to 2, Octaves to 1, Chord to Power (5th), Gate to 100 percent, Legato on and Glide to 60 ms for a sliding bass."
 Bullet "Chord progression: add a stepped modulator to Chord (and another to Root) and draw a few steps; each step re-voices the arpeggio, one chord per step."
-Bullet "Pulse and accent: set Acc Steps to 4, switch on the first and third cells and raise Accent to 60 percent for a driving accent pattern."
+Bullet "Pulse and accent: set Steps to 4, set the first and third cells to Accented and raise Accent to 60 percent for a driving accent pattern."
 Bullet "Layered arp: add a second layer, set its Octave higher and its Rate to 1/8, and the two layers interlock."
 Bullet "Play it live: set Trigger to MIDI and play single notes on a keyboard; the arpeggio starts on each key press and follows the note you hold."
 Bullet "Evolving patterns: put a slow smooth modulator on Direction or on the filter Cutoff."
