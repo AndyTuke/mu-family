@@ -1,6 +1,6 @@
 # Layer extraction programme — plan (2026-10-15)
 
-**Status:** plan only. No source, backlog or CLAUDE.md change is made by this document. Andy's answers to the section 7 decisions are recorded (2026-10-15); one question (A14, licence state, section 8) remains open and is to be ruled before E1. Written by the Architecture Steward after Andy re-prioritised
+**Status:** plan only. No source, backlog or CLAUDE.md change is made by this document. Andy's answers to the section 7 decisions are recorded (2026-10-15), **including A14 (licence state and engine loading, sections 8 and 9): decided 2026-10-15, static layer libraries, runtime engine modules not adopted.** No decision is open. Written by the Architecture Steward after Andy re-prioritised
 on 2026-10-15: *"mu-tronic won't do anything useful without the voices from the other 4, so the detachable voice change needs to be done first."*
 
 **What it supersedes.** [design.md](design.md) section 6 ("Order after Andy's timing answer"), risk 9, decision 5 and section 10 said the mu-Tant and
@@ -131,7 +131,7 @@ Design.md section 2.1 is the specification. E1 builds only what the products con
 | `mu-core/MuLimits.h` | `kMaxLayers = MU_MAX_LAYERS` (default 8), `kMaxBuses = MU_MAX_BUSES` (default 0) and `kBusInserts` (default 2) declared but **unused** until T2, `kLayersPerPage` (default 8). Compile-time only; the four products and `mu-core-tests` get the same constants as today. Add `mu-core-tests-16` (same sources, 16). |
 | `mu-core/Sequencer/LayerTypeInfo.h` (new) | `enum class LayerTypeId`, `LayerTypeInfo` (describe-only fields: id, name, group, `paramPrefixLetter`, `presetExtension`, `addLayerParams`, `create`). No registry list yet; each product declares its one `LayerTypeInfo` constant and uses `create`/`addLayerParams` itself. |
 | `mu-core/Sequencer/Layer.h` | New virtuals, all with do-nothing defaults: `typeId`, `prepare`, `beginRetire` (C3), `onTransportJump` (C4), `bindParams(apvts, slot)`, `render(const RenderContext&, AudioBuffer<float>&, int)`, `loopBeats`, `preloadStaged`, `onTransportStopped`, `renderPriority`, `tailBlocks`. `Layer` stays a copyable value; **engines are held in `SlotBound` / `unique_ptr` members that a copy leaves alone**, as `Arp::insert` and `Pattern::insert` already are. |
-| `mu-core/Sequencer/RenderContext.h` (new) | The POD of design 2.1 as amended by C4: `sampleRate`, actual `blockSize` (0 and 1 allowed), `playing`, `bpm`, unwrapped `double startBeat`, `beatsPerSample`, `justStarted`, `justStopped`, `transportJumped`, a filtered MIDI **view** (no copy), `slot`, `peer(slot)` (post-insert, pre-strip, C10). **This is settled before E2 so Toni's runner clock is reworked once.** |
+| `mu-core/Sequencer/RenderContext.h` (new) | The POD of design 2.1 as amended by C4: `sampleRate`, actual `blockSize` (0 and 1 allowed), `playing`, `bpm`, unwrapped `double startBeat`, `beatsPerSample`, `justStarted`, `justStopped`, `transportJumped`, a filtered MIDI **view** (no copy), `slot`, `peer(slot)` (post-insert, pre-strip, C10). **This is settled before E2 so Toni's runner clock is reworked once.** Also an E1 requirement (A14, section 9.6): the struct is exactly POD and mirrors a C struct (the MIDI view is pointer + count, no JUCE type), layer state in and out is text, and `render` makes no host callback. |
 | `mu-core/Plugin/ProcessorBase.{h,cpp}` | `renderLayers(const RenderContext&)`: owns `ScopedNoDenormals` (C11), chunks oversize blocks (C8), reads layer pointers once per block through **one accessor** (C1: today the existing `layersLock` try-lock and `layerEditInFlight` check, later a published array), then render priority-0 then priority-1 layers into per-slot scratch buffers (allocated in `prepareToPlay`), then supply the `MixerEngine::RenderChannelFn` as a copy from scratch. `RetireBin` as the C2 state machine (Empty/Parked/Draining/Done, release/acquire, epoch-delayed free, 16 to 32 entry ring, hard maximum lifetime, flushed at prepare/release; `beginRetire` snapshot, C3): `park(slot, unique_ptr<Layer>)`, audio thread renders parked layers under a gain ramp for `tailBlocks()`, sets a drained flag, message thread frees (the mu-Tant `retiring` / mu-Clid `retiredReadyForCleanup` pattern, once). A layer with `tailBlocks() == 0` is **not** parked, which keeps today's behaviour for products that currently drop the voice at once (check per product in its stage). |
 | `tests/scripts/check-layer-boundary.ps1` (new) + `test-check-layer-boundary.ps1` fixture | Rules of 4.5; wired into `/build` beside `check-core-boundary.ps1`. |
 | `mu-core/Tests/LayerRenderTests.cpp`, `RetireBinTests.cpp` | A fake heavy layer type: the C-list gates (allocation counter, stress thread, N-deep retire, `onMoved` rebinding, service lifetime, denormal cost, chunking), priority order, empty skipped, lock miss renders silence but transport and boundary detection still advance, retire fade then free off the audio thread, no allocation under the lock (counting allocator), Rumble-style `peer` read of a priority-0 layer. |
@@ -511,8 +511,8 @@ the product set is consistent.
 
 **Answered 2026-10-15:** A1 (a): no release is needed before E4/E5; the v1.1 tag is the rollback. A2 to A10 accepted as recommended, with A3 (a) chosen
 explicitly. A11: noise seeding is **per slot** (a fixed seed per layer slot, repeatable and different per layer). Also decided: the first mu-Tronic release
-waits for all four engines (A12), Rumble reads any layer type (design.md still-open item 3, closed), and the review grade (A13). The one open question is
-**A14 (licence state / engine loading), to be ruled before E1**; it is analysed in sections 8 and 9 (recommendation: static libraries, section 9.4). The rows below keep the options for the record, each marked with the answer.
+waits for all four engines (A12), Rumble reads any layer type (design.md still-open item 3, closed), and the review grade (A13). **A14 (licence state / engine loading) decided
+2026-10-15: "Go with the recommendation. Updates will be suite wide so mu-tronic will rebuild if the engine of an app does."** Analysis in sections 8 and 9. The rows below keep the options for the record, each marked with the answer.
 
 | # | Decision | Options | Recommendation |
 |---|---|---|---|
@@ -529,17 +529,22 @@ waits for all four engines (A12), Rumble reads any layer type (design.md still-o
 | **A10** | **Accepted as recommended.** Variation: do the pure steps for both live products early (E4.1, E4.2, E5.1, E5.2 right after M3) | yes / no | yes, optional, it shortens the audio steps and has no audible risk. |
 | **A12** | **Decided (Andy): "No, all four engines for launch. There's no rush, so we get each one ready."** First mu-Tronic release. | (a) ship early with Arp + mu-On types; (b) wait for all four products' layers. | (b). mu-Tronic launches only when all four layer libraries (including mu-Tant and mu-Clid) are ready, i.e. after M5 and T1/T2/T8a. The "useful after E3" point (M3) is an **internal checkpoint only**. The "ship before T5/T7" option is removed. |
 | **A13** | **Decided (Andy): review grade.** Who runs the contract and the Clid extraction. | | The contract design (E0d and E1) and the mu-Clid extraction (E5) run as **Opus-grade agents**; the main conversation coordinates. |
-| **A14** | **OPEN, to be ruled before E1.** Licence state in mu-Tronic: Andy, "I think mu-tronic will carry the license state of the engines it uses, to be confirmed." | Andy later: engines loaded at runtime from the installed apps, then "not committed, if not worth it then fine". Sections 8 and 9. | Section 9.4: static libraries (hybrid), licence follows the install via a manifest, no key code in mu-Tronic; the one question is 9.6. |
+| **A14** | **Decided (Andy, 2026-10-15): the recommendation, runtime engine modules NOT adopted.** Licence state in mu-Tronic: Andy, "I think mu-tronic will carry the license state of the engines it uses, to be confirmed." | Andy later: engines loaded at runtime from the installed apps, then "not committed, if not worth it then fine". Sections 8 and 9. | Static layer libraries compiled into mu-Tronic; engines need not update independently (suite-wide releases; mu-Tronic is rebuilt and released whenever an app's engine changes). The three zero-cost E1 constraints of 9.3(1) are adopted. Licence follows the install through a small per-app manifest; mu-Tronic has no key code. Whether it shows a Support prompt for an installed-but-unlicensed engine is a later T1 / `ux-controller` decision (9.6). |
 
 Also answered: **Rumble reads any layer type: yes** (design.md still-open item 3 closed).
 
 ---
 
-## 8. A14 — licence state in mu-Tronic (analysis, 2026-10-15; largely superseded by section 9)
+## 8. A14 — licence state in mu-Tronic (analysis, 2026-10-15; **decided 2026-10-15, see the ruling below**)
 
-**Superseded in part, 2026-10-15 (later): Andy clarified that mu-Tronic does not contain the engines; it requires the installed apps and loads their engines at
-runtime (section 9).** Options 1 to 5 below assumed compiled-in engines and are kept for the facts in 8.1 and 8.3. The licence question is now answered by
-section 9.5 ("licence follows the install"), which needs no licence code in mu-Tronic. Options 3 to 5 are withdrawn.
+**Ruling (Andy, 2026-10-15).** Licence state follows the install: each app writes a small manifest (supporter flag, checkout URL, content dir) at install and at
+every launch; mu-Tronic reads it and has **no key code, no `LicenseKey.h`, no `ActivationOverlay` and no Lemon Squeezy product of its own** (design.md 3.1,
+freeware, stands). Options 1 to 5 below are kept for the facts in 8.1 and 8.3 only; options 2 to 5 are **not adopted** (no `initLicensing` generalisation, no
+`LayerTypeInfo::licenceProductId`, no family key, no cross-reading of activation files). The manifest write is one small change per app, made when mu-Tronic T1
+starts (not an E-stage item). Whether mu-Tronic shows a generic Support prompt for an installed-but-unlicensed engine in use is a later T1 / `ux-controller` decision.
+
+**Earlier note (superseded).** Andy had clarified that mu-Tronic would load the engines at runtime from the installed apps (section 9); that model is not adopted,
+but the licence answer of 9.5 holds unchanged with static libraries.
 
 **Conflict.** design.md 3.1 assumes mu-Tronic is freeware: no `LicenseKey.h`, no Support prompt, no `ActivationOverlay`. Andy now thinks it will carry the licence
 state of the engines it uses. The two cannot both hold, so this is ruled before E1: it decides whether the contract has a licence hook in it.
@@ -612,11 +617,13 @@ track each engine separately (option 3)?" A "free, no prompt at all" answer is o
 
 ---
 
-## 9. Runtime engine modules (Andy, 2026-10-15 clarification; analysis, not yet ruled; Andy: "I'm not committed to that approach, so if it's not worth the effort then fine")
+## 9. Runtime engine modules (Andy, 2026-10-15 clarification; **ruled 2026-10-15: NOT adopted**; Andy: "I'm not committed to that approach, so if it's not worth the effort then fine")
 
-**Bottom line (9.4): runtime loading is not worth its cost over static libraries (C). Recommended: the hybrid of 9.4, which keeps this section's model as a later option.**
-Everything from "What this supersedes" to the end of 9.3 describes the module model *if* it were chosen; it is **not adopted**, and the supersessions listed there do **not**
-take effect unless Andy chooses it. design.md and section 8 stay as they were except where 9.4 says.
+**Decision (Andy, 2026-10-15): "Go with the recommendation. Updates will be suite wide so mu-tronic will rebuild if the engine of an app does."** Runtime loading is
+not adopted; the hybrid of 9.4 is the plan. This section is kept as the record of the analysis and as the starting point if a reason for modules ever appears
+(a third-party engine, a store requirement); the module model would then be stage M on top of the finished libraries.
+Everything from "What this supersedes" to the end of 9.3 describes the module model that was **not chosen**; its supersessions of design.md do **not** take effect.
+design.md 2.5, 3.2 and the stage list stand. What **is** adopted from this section: 9.3(1) (the three E1 constraints), 9.4 items 1 to 5, and 9.5 (licence follows the install, via the manifest).
 
 **What Andy first said.** mu-Tronic does **not** contain the engines. It requires the standalone app of any synth whose engine it uses (installed mu-Clid, mu-Tant,
 mu-Toni, mu-On) and **loads the engine at runtime from the installed apps**. Licence state follows from the app being installed (and activated).
@@ -730,7 +737,7 @@ extraction programme again, to save one extra mu-Tronic release per engine fix.
 **Is (B) better?** No. It is cheap and independent, but each hosted instance is a whole app with its own mixer and FX; it is a plugin rack, not "the voices of the
 other apps", and gives up scenes, buses, `peer()` and clip alignment.
 
-**Recommendation: do not adopt runtime loading. Choose the hybrid:**
+**Recommendation (adopted by Andy, 2026-10-15): do not adopt runtime loading. The hybrid:**
 
 1. **Keep E0 to E6 exactly as agreed.** They are needed by every option and valuable alone.
 2. **Static libraries compiled into mu-Tronic (C) behind the layer contract**, as design.md 2.5 and 3.2 say today. Nothing in design.md 2.5, 3.2 or the stage list is superseded.
@@ -763,12 +770,17 @@ prompt does not depend on the user opening the app itself; this is a `ux-control
 shows nothing and the users who never open the apps are never asked. Not installed: the type is not offered. **Freeware mu-Tronic (design 3.1) stays true**: it
 has no key, and design risk 10 (free product carries PWYW engines) is resolved, because the engines are not in it.
 
-### 9.6 The one question for Andy
+### 9.6 The question and its answer
 
-**Must the engines update independently of mu-Tronic (an engine fix reaching mu-Tronic when the user updates the app, with no mu-Tronic release)?** Recommended
-answer: **no**, mu-Tronic is rebuilt and released when an engine changes; this keeps static libraries, saves about 36 to 63 sessions, and loses nothing else. A yes
-means stage M and the larger estimate. (A follow-up small question, only if the answer is no: should mu-Tronic show a generic Support prompt based on the installed
-apps' manifests, or no prompt at all? That is a T1 decision, not needed before E1.)
+**Must the engines update independently of mu-Tronic?** **Answered by Andy, 2026-10-15: no.** Releases are suite-wide; mu-Tronic is rebuilt and released whenever an
+app's engine changes. Static libraries stand, about 36 to 63 sessions are saved, and nothing else is lost. Consequences recorded:
+
+- The three zero-cost E1 constraints of 9.3(1) are **adopted as E1 requirements**: `RenderContext` mirrors a C struct (POD, pointer-and-count, no JUCE type; the MIDI view is a
+  struct a C struct can mirror); layer state in and out is text (the existing ValueTree XML) and layer-created objects never escape; `render` makes no host callback.
+- No ABI header, loader, `ModuleProcessor`, `Plugin/EngineModule.*`, `check-module-abi.ps1` or stage M is built; R16 to R22 do not apply.
+- Release process: a release of any app's engine implies a mu-Tronic rebuild and release in the same suite release (a `/release` step to be added when mu-Tronic T9 is planned).
+- Licence: the per-app manifest (supporter flag, checkout URL, content dir) is written at install and at every launch; mu-Tronic has no key code (9.5). The small follow-up,
+  whether mu-Tronic shows a generic Support prompt for an installed-but-unlicensed engine in use or none at all, is **left to T1 and the `ux-controller`**; it is not needed before E1.
 
 ---
 
@@ -783,4 +795,4 @@ Both reviews are folded into the body (2026-10-15); this is the index.
 - **test-steward.** The safety net is tests.md "Layer extraction safety net"; this plan sequences it as E0.1 to E0.9, adopts `useLayerRender` (2.7a),
   the approved test-only channel tap, and the seed fix; dropped the earlier WAV/SHA matrix. About 12 to 13 working days of test work, about 6 before any
   code moves. Open: mu-Tant gate-probability generator location.
-- **architecture-steward re-check:** pending reviewers' sign-off on the merged text (Pass or Not yet).
+- **architecture-steward re-check:** pending reviewers' sign-off on the merged text (Pass or Not yet). (A14 ruling of 2026-10-15 recorded in sections 7 to 9; the footer stays pending.)

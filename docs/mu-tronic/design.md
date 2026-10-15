@@ -12,10 +12,12 @@ left as it is; the product refactors of mu-Clid and mu-Tant wait until after the
 **Decisions of 2026-10-15 (later), recorded in [extraction-plan.md](extraction-plan.md) section 7:** the first mu-Tronic release waits until **all four engines** are
 ready (Andy: "No, all four engines for launch. There's no rush, so we get each one ready"), so the earlier "useful after E3" point is an internal checkpoint only and the
 "ship before T5/T7" option is removed (decision 5 and still-open item 1 below are closed that way); Rumble may read any layer type (still-open item 3 closed); mu-Tant Note
-mode keeps its final-mix gate as a mu-Tant shell function (live product bit-identical); noise is seeded per layer slot. **Open (A14):** Andy suggested mu-Tronic loads engines
-at runtime from the installed apps and carries their licence state, then said he is not committed. The cost/benefit is in extraction-plan section 9; the recommendation is **not**
-to adopt runtime loading (static libraries as section 2.5 and 3.2 say, licence following the install through a per-app manifest, no key code in mu-Tronic). Until Andy
-answers, sections 2.5, 3.1 and 3.2 below stand unchanged.
+mode keeps its final-mix gate as a mu-Tant shell function (live product bit-identical); noise is seeded per layer slot. **Decided (A14, Andy, 2026-10-15: "Go with the recommendation. Updates will be suite wide so mu-tronic will rebuild if the engine of an app does."):**
+runtime engine loading is **not adopted**. Sections 2.5, 3.1 and 3.2 stand: static layer libraries compiled into mu-Tronic; engines do not update independently of mu-Tronic
+(suite-wide releases; mu-Tronic is rebuilt and released whenever an app's engine changes). Licence follows the install through a small per-app manifest (supporter flag,
+checkout URL, content dir) written at install and at launch; mu-Tronic has no key code of its own and stays freeware. Whether it shows a generic Support prompt for an
+installed-but-unlicensed engine is a later T1 / `ux-controller` decision. Three zero-cost constraints go into E1 (`RenderContext` mirrors a C struct, layer state is text, `render`
+makes no host callback) so a module ABI stays possible. Analysis: extraction-plan sections 8 and 9.
 
 **Andy's brief.** "An empty unit with the same mod, effects and mixer as all the other apps. The voices are empty slots, into which we can add a voice
 from any of mu-clid, mu-tant, mu-toni and mu-on. mu-tronic will hold up to 16 voices, with paging on the UI from 1-8 to 9-16. The voices of the other
@@ -593,7 +595,7 @@ Not "absorb" because that would copy mu-link's server, IPC and registry into a p
    changes saved data or parameter ids (prefixes and extensions stay).
 10. **Free product carries the engines of the Pay What You Want apps.** A free mu-Tronic gives away mu-Toni's and mu-On's engines (and later mu-Tant's and mu-Clid's)
     without a Support prompt. This follows from Andy's answers (freeware, every engine a layer) and the layer libraries contain no licence code; recorded so it is a
-    known consequence, not a surprise (still-open item 2: licence state, A14; extraction-plan sections 8 and 9).
+    known consequence, not a surprise. Resolved by A14 (2026-10-15): licence follows the install via a per-app manifest, no key code in mu-Tronic; whether a Support prompt is shown for installed-but-unlicensed engines is a T1 / `ux-controller` call (extraction-plan sections 8 and 9).
 11. **Layer count in the existing `getLayerName`/`getLayerColourIndex` overrides** (each product returns `"Voice N"`-style names): mu-Tronic names a layer from
     its type and slot (`Layer::name`), a default the base already provides.
 
@@ -603,7 +605,8 @@ Not "absorb" because that would copy mu-link's server, IPC and registry into a p
 |---|---|---|---|
 | 1 | Fifth product | Yes; the four apps continue | header, 0 |
 | 2 | Plugin formats | **Standalone only** ("a new performance framework that might make mu-link redundant"); no VST3/CLAP; parameter-count/pool work dropped | 3.1, 3.4 |
-| 3 | Licence / price | **Free**, freeware like mu-Link and mu-Clid MIDI; no key, no Support prompt, no Lemon Squeezy; site lists it as freeware | 3.1, 3.2 |
+| 3 | Licence / price | **Free**, freeware like mu-Link and mu-Clid MIDI; no key, no Lemon Squeezy; site lists it as freeware. A14 (2026-10-15): licence state of the engines follows the install via a per-app manifest, no key code in mu-Tronic; a Support prompt for unlicensed installed engines is a later T1 / `ux-controller` decision | 3.1, 3.2 |
+| 3a | Engine loading (A14) | **Static layer libraries**, not runtime modules; engines update with mu-Tronic (suite-wide releases) | 2.5, 3.2 |
 | 4 | Name | mu-Tronic (display), `mu-tronic` (slug), code `MTrn` (JUCE needs an upper-case letter) | 3.1 |
 | 5 | Timing | **Revised 2026-10-15: all four extractions first (E0 to E5 of extraction-plan.md), mu-Tronic product work after; the first release waits for all four engines (no early release).** Earlier: T5, T7 after next releases | extraction-plan.md, risk 9 |
 | 6 | mu-link | Leave as is; coexist; no freeze; revisit later | 8 |
@@ -617,10 +620,9 @@ Not "absorb" because that would copy mu-link's server, IPC and registry into a p
 ### Still open (Andy)
 
 1. **Closed (Andy, 2026-10-15): no early release.** mu-Tronic launches only when all four engines (all nine types) are ready.
-2. **Open (A14): free product, paid-app engines, and licence state.** Andy: "I think mu-tronic will carry the license state of the engines it uses, to be confirmed", then that mu-Tronic
-   might load the engines at runtime from the installed apps, then that he is not committed. Analysis and recommendation: [extraction-plan.md](extraction-plan.md) sections 8 and 9
-   (static libraries, licence follows the install via a per-app manifest, no key code in mu-Tronic; the one question is whether engines must update independently of mu-Tronic).
-   If runtime loading were chosen it would supersede 2.5 (libraries linked into mu-Tronic), 3.2 and the T4 to T7 wording, and add a module stage; none of that is adopted.
+2. **Closed (A14, Andy, 2026-10-15): static libraries, no runtime engine loading.** "Go with the recommendation. Updates will be suite wide so mu-tronic will rebuild if the engine of an app does."
+   Licence follows the install via a per-app manifest (supporter flag, checkout URL, content dir); mu-Tronic has no key code. Analysis: [extraction-plan.md](extraction-plan.md) sections 8 and 9.
+   Remaining small point, for T1 and the `ux-controller` (not Andy yet): does mu-Tronic show a generic Support prompt for an installed-but-unlicensed engine in use, or none.
 3. **Closed (Andy, 2026-10-15): Rumble reads any layer type.**
 4. **Launchpad scenes.** How a scene is fired on the pad (a modifier, a spare button, a column). Not needed until T8a; `ux-controller` proposes.
 5. **Later revisit of mu-link** (no date).

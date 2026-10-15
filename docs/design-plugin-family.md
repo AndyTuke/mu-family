@@ -859,6 +859,10 @@ each**; every mu-On engine (Kick, Bass, Hat, Snare, Rumble) is its own layer typ
   are generic actions in `mu-core/Control/`.
 - **Product shape:** Standalone-only, freeware product: `FORMATS Standalone`, an empty `License/` (`.gitkeep`), no `LicenseKey.h`. Plugin code `MTrn` (JUCE needs an
   upper-case letter).
+- **Static libraries, licence follows the install (Andy, 2026-10-15):** the layer libraries are compiled into mu-Tronic; engines are **not** loaded at runtime from the installed
+  apps and need not update independently (releases are suite-wide; mu-Tronic is rebuilt and released whenever an app's engine changes). Each app writes a small manifest
+  (supporter flag, checkout URL, content dir) at install and at every launch; mu-Tronic carries no key code. Three E1 constraints keep a module ABI possible at no cost:
+  `RenderContext` mirrors a C struct, layer state is text, `render` makes no host callback. Analysis: [mu-tronic/extraction-plan.md](mu-tronic/extraction-plan.md) sections 8 and 9.
 - **mu-link:** coexists, no freeze, revisit later (Andy: "leave it as is for now"); mu-Tronic is a mu-link client; no clock / MIDI-out code is duplicated.
 - **Timing:** all four extractions are scheduled before mu-Tronic product work, in the order Toni, On, Tant, Clid, behind a golden-render / compat / equivalence safety net ([mu-tronic/extraction-plan.md](mu-tronic/extraction-plan.md)).
 
