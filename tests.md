@@ -268,6 +268,177 @@ cmake --build build --target mu-link-tests --config Debug && build/mu-link/mu-li
 
 ---
 
+## Layer extraction safety net
+
+**Status: planned. Nothing in this section is written or run yet** (plan by the test steward, 2026-10-15, for the detachable-layer extraction of [docs/mu-tronic/design.md](docs/mu-tronic/design.md) stages T3 to T7; the stage order and file moves are in `docs/mu-tronic/extraction-plan.md`, owned by the architecture-steward). Andy's ruling: the extraction comes first and includes the live mu-Clid and mu-Tant. So the net must prove "no audible, saved or real-time change" for four products, two of them shipping. Counts below are from the last recorded runs (e4c58cf, Debug) and were not re-run for this plan.
+
+### 1. What already protects each product, and what it does not
+
+| Product | Protects today (suite size) | Does not protect (the extraction can break these unseen) |
+|---|---|---|
+| **mu-Clid** (`mu-clid-tests`, 199 results, ~219 test cases) | Parameter and preset round trips (`RhythmParamRoundTripTests`, `PresetXMLRoundTripTests`, `PresetMigrationTests`, `KindedPropertyRoundTripTests`), layout (`ApvtsLayoutTests`), sequencer timing (`RhythmSequencer*Tests`, `SwapCommitTimingTests`), hot swap and clips on the real processor (`HotSwapCancelTests`, `ProcessorSeamTests`, `ClipLaunchTests`), tails (`FxTailTests`, `ClidLayerStructureTests`), MIDI-out mode (`MidiOutputModeTests`), scripted edits (`ClidScriptedEditRenderTests`, `ClidEditContinuityTests`). Listening: `CLID_roundtrip`, `TS_swap`, `T11` to `T13`, `A1` to `A9`, `CLID_midi_clock`. | No test pins the **rendered sample values** of a full mixed block (engine, insert, sends, master) for any preset; the tests assert shapes (RMS windows, onset counts, centroid), so a gain-staging or summation-order change of a fraction of a dB passes. The per-block modulation glue (`PluginProcessor_Modulation.cpp`) is only seen through A3 to A7 thresholds. Retire-tail rendering is checked in one scenario. Sample loading at stage time (the `preloadStaged` move) has `EmbeddedSampleTests` only. No parameter-id manifest across the whole layout. |
+| **mu-Tant** (`mu-tant-tests`, 180 results, ~182 cases) | Gate shape and rules (`GatePatternTests`, `GateStageTests`), voice DSP smoke (`SynthVoiceTests`, `SynthDSPTests`), modulators, layout, persistence (`MuTantPersistTests`, `PresetRoundTripTests`), hot-swap boundary (`HotSwapBoundaryTests`), real-processor seam (`ProcessorSeamTests`: reset equals fresh, edits against `processBlock` on a worker thread, wavetable load), `ClipLaunchTests`. Listening: `TANT_preset`, `TANT_roundtrip`, `TANT_midi_clock`, `mutant_drone`. | **Note mode** (held-note stack, gate ramp on the final mix) has no direct test and design.md section 3.5 moves it per layer: the highest-risk behaviour change in the plan. The render chain that moves (`renderVoice`, filter and pitch envelopes, retire fade, dual filter, X-Mod) is covered by smoke tests (`SynthVoiceTests` asserts "makes sound / no NaN") not by values. Wavetable bank sharing (`bankLock`) has no concurrency test with two bank users. |
+| **mu-Toni** (`mu-toni-tests`, 42 results, ~57 cases) | `ArpRunnerTests`, `ArpSequencerTests`, `StepPatternTests`, `ToniVoiceTests`, `ModArcTests`, `PrefixMigrationTests`, `LayerCountPersistTests`, `ClipLaunchTests`, `FxTailTests`, seam. Listening: `TONI_roundtrip` (legacy dump to sample-identical re-render), `TONI_swap`, `TONI_slot_swap`, `TONI_host_lock`, `TONI_midi_clock`. | Smallest suite of the four, for the product that goes first (T4). `readVoice` (modulation resolve into `ToniVoiceParams`) and the global held-note stack / root-by-MIDI / MIDI-trigger mode that become per layer have no test. The voice `juce::Random` is default-constructed, so noise renders are not repeatable (section 2). |
+| **mu-On** (`mu-on-tests`, 61 results, ~65 cases) | `SequencerTests` (beat to step, swing, accent), `EngineTests` (Kick and Hat sound and decay only), `GrooveVoicesTests`, `ModulationTests` / `ModArcTests`, `EngineMigrationTests`, `PrefixMigrationTests`, `SlotStateTests`, `PresetTests`, `ClipLaunchTests`, seam. Listening: `ON_roundtrip`, `ON_swap`, `ON_midi_clock`. | Bass, Snare, Rumble engines have no sound test at all; no engine has a value-level test. The global swing and accent becoming per layer (T6) and the single shared grid becoming a per-track row are pinned by nothing. Rumble reading another layer's audio, and bass to kick sidechain, are untested. |
+| **mu-core** (`mu-core-tests`, 457 results, ~520 cases) | The contract pieces that stay: `LayerOwnershipTests`, `LayerAccessTests`, `HotSwapTests`, `SwapTimingTests`, `ClipBankTests`, `ClipLaunchTests`, `ChannelStateResetTests`, `SidechainRemapTests`, `MixerStereoPeakTests`, `TransportResolverTests`, `FxTailChecks.h`, `ProcessorSeamHelpers.h`. | No test renders a **block of mixed audio and checks values** through `MixerEngine` (peaks only). Nothing tests `Layer::render` yet (it does not exist). |
+| **mu-Clid MIDI** (`mu-clid-midi-tests`, 78 results) | Render matrix over `MidiRhythmCore` (the shared core `Rhythm`), session state. | Protects only the shared `mu_core::Rhythm` / `HitGenerator` / `RhythmSequencer`. It is the free canary: it must stay green and unchanged through T7. |
+| **Cross-product** | `ApvtsLayoutTests` per product; `ProcessorSeamTests` per product; the four `*_roundtrip` listening tests; pluginval (Windows); clap-validator. | **No** frozen manifest of parameter ids; **no** corpus of pre-refactor sessions re-saved and diffed; **no** automated real-time-safety check of `processBlock` beyond the seam tests' worker-thread runs; pluginval and the listening suite are run by hand, per release, not per stage. |
+
+Listening-suite facts that matter here: the four `*_roundtrip` tests already render twice (from the saved preset and from the saved host session) and require sample identity, which catches save/load asymmetry but **not** a refactor that changes both paths identically. That is the gap the golden harness fills.
+
+### 2. Golden-render harness (build FIRST, before any code moves)
+
+**What it is.** One shared header, `mu-core/Tests/GoldenRender.h` (reused by every product, per the family rule), plus one `GoldenRenderTests.cpp` per product test target. It builds the real headless processor (the `ProcessorSeamTests` pattern: `ProcessorBase::ScopedStorageRoot`, stand-in editor, `mu-core/cmake/ProcessorTestSources.cmake`), loads a scenario's state, drives `prepareToPlay` and `processBlock` directly, and fingerprints the output. In-process, not the `--render` CLI: it is faster (no process start), can capture MIDI out and per-channel peaks, and can use a ragged block schedule. The CLI path stays covered by the existing listening tests.
+
+**A scenario is** (all in `tests/golden/<product>/<name>/`): `state.xml` (a full preset tree or a host session, frozen; hand-built from `tests/presets` or a factory preset), `scenario.json` (sample rate 48000; block schedule; length; tempo and host start beat; scripted events: MIDI notes and CC with sample offsets, parameter sets, a staged swap or clip launch at a block index; which layers are soloed for stems), and `golden.json` (the reference). Scripted events go in at block indices, never at wall-clock times.
+
+**What is recorded (the reference).** For each of: master L/R, then each active layer's stem (soloed with all sends 0, master insert off, so the stem is that layer through its own insert and strip), and Clid MIDI-out events:
+- a 64-bit hash (FNV-1a over the raw IEEE-754 bit patterns of each channel) per fixed segment of 256 frames, plus the segment RMS in dBFS, so a mismatch names the first diverging segment and how loud;
+- a whole-render hash;
+- the end-of-render values of mixer peaks, per-channel and master, and `insertGainReduction` of each layer;
+- a hash of `getStateInformation` after the render (links to section 4).
+Nothing stores raw audio in the repo. On a mismatch the harness writes the actual render and the reference-build render (if available) as 24-bit WAVs to `tests/_out/golden/` for diffing.
+
+**Equality rule.**
+- **Same machine class, same config, same compiler (Windows x64, MSVC, Debug): bit-identical, tolerance 0.** A pure move of code must not change one bit; extraction stages move code and do not change arithmetic. This is the gate.
+- Different config or platform (Release vs Debug, Linux): goldens are recorded per `windows-x64-debug`, `windows-x64-release`, `linux-x64-release` (the CI config) in separate files (`golden.<config>.json`). Never compare Debug against Release, because MSVC float behaviour differs between them. Release and Linux goldens are recorded when first needed (the release gate) from the same baseline commit.
+- A per-scenario `tolerance_abs` field exists, **default 0**, and may only be set with a written reason in `scenario.json`. When set, the check is max per-sample absolute difference at or below the value (stored as 24-bit LSBs, like `run-listening-tests.py`), and the hash column is ignored. Intended use: none today. Not allowed: setting it to make a failing stage pass. If a stage legitimately reorders float arithmetic (summing layers in a different order, applying a gain before rather than after a sum), the right answer is to keep the old order; if that is impossible, the stage records a deliberate golden update (below) with the measured difference in dB, signed off by the dsp-controller.
+- **Known behaviour change that cannot be a tolerance:** moving mu-Tant Note mode from the final mix to a per-layer ramp (design.md 3.5) changes audio whenever an FX tail or a second layer is present (the old gate also gated the FX return). The Note-mode golden scenarios therefore split in two: the layer stem (must stay identical if the per-layer ramp matches the old ramp maths) and the final mix with FX (expected to change; a decision for Andy and the dsp-controller before T5, recorded as a deliberate update with an audible check). Pin the old behaviour in a new test first.
+
+**Randomness.**
+- Fixed-seed already: mu-On `SampleChannel` (0x4a7 / 0x5b2), `BitcrusherInsert` dither, `VocoderInsert` noise. Deterministic by construction.
+- **Not repeatable today (finding): mu-Tant `NoiseGen` (default-constructed `juce::Random`, seeded from the system clock) and mu-Toni `ToniVoice::rng`.** A scenario with the noise source on cannot be bit-identical across runs. Until the product code seeds them (a source change to request from the main conversation: construct with a fixed seed on `reset()`, which also makes retire/prepare repeatable), golden scenarios keep the noise level at 0, and the noise path gets a separate statistical test (RMS and spectral tilt within bounds, not a hash). Seeding them is itself a deliberate one-time golden update (it only affects noise-on scenarios, which are added after the seed fix).
+- mu-Tant gate probability and any other random playback rule: the harness must run with the rule's seed fixed or probability 0/1. Open check: find the generator for gate probability (the persistence file mentions it; the playback code was not located in this review) and list it in the scenario notes.
+- A harness self-test renders each scenario twice in one process and twice in two processes and requires identical hashes. A scenario that fails its own repeat test is not allowed into the set (this is how a hidden clock-seeded generator is found).
+
+**Wavetable bank, samples, time.**
+- Wavetable bank: scenarios use the factory (built-in) tables only, plus one small user wavetable checked into `tests/golden/fixtures/` and loaded by relative path under `ScopedStorageRoot`. The golden records a hash of the bank contents it rendered with, so a bank change is reported as a bank change, not an engine change. The user's content folder (`TDP/muTant/Wavetables`) is never read (not repeatable across machines).
+- Samples (mu-Clid, mu-On sample channels): fixtures only: the embedded samples and one or two short WAVs in `tests/golden/fixtures/`, referenced by relative path. No path under `TDP/muClid/Samples`.
+- Time: no wall clock anywhere. The transport is the explicit host position (the `--host-start-beat` mechanism, in-process), fixed tempo 120 and a second scenario at 93.7 BPM (non-integer samples per beat); sample rate 48000 and one 44100 scenario per product. Anything that polls a timer (UI timers, the rebuild timer) is not in a headless render; the harness asserts `Time::getMillisecondCounter` is not read on the audio path by the section 6 scan.
+- Block schedule: scenarios run twice, 512 fixed, and a ragged schedule (1, 7, 63, 64, 129, 512, 1024, 3 repeated) that includes 1-sample blocks and a block larger than the prepared size. Engines are not required to be block-size invariant, so each schedule has its own golden; the check is "same schedule, same hash".
+
+**Scenario set (about 10 per product, 1 to 4 seconds each; chosen so every moving piece is exercised).**
+- mu-Clid: factory state; `A3_filter` (modulation); `A8_tail` (insert tail) with stop mid-tail; a sample rhythm with the fixture WAV; an 8-rhythm full preset (all layers) with the sidechain and a send FX return; MIDI-out mode (events hashed); a full-preset hot swap (`TS1` to `TS2`) staged at block N under Bar timing; a layer swap and a clip launch; reset/remove/swap of a layer during play (hash of the following output); one 44.1 kHz. A `.muRhythm` from the content folder is copied into fixtures, never read in place.
+- mu-Tant: `To and Fro` and `Acid Cellar`; Note mode on with scripted held notes (stem and mix, see above); dual filter series and parallel; X-Mod; user wavetable; ring tap and insert; gate with a held tail across stop; hot swap; wavetable load during play (the bank lock).
+- mu-Toni: factory; `TONI_legacy`; MIDI-trigger mode with held notes and root-by-MIDI; modulation matrix; swap; 4 layers with different scales.
+- mu-On: factory groove; `ON_legacy` (the five-lane shape); each engine isolated (Kick, Bass, Hat, Snare, Rumble) so T6's per-engine equivalence has a reference; swing and accent non-default; bass to kick sidechain; Rumble reading a source layer; engine change mid-play.
+- mu-Clid MIDI: unchanged canary; its existing 78 results are the gate, plus one golden of the emitted MIDI for a fixed rhythm (cheap, protects the shared `Rhythm`).
+
+**Where goldens live, size, and how they change.**
+- `tests/golden/<product>/<scenario>/` in git. Each `golden.json` is about 750 segments x 2 channels x about 40 bytes, 30 to 100 KB for a 4 s scenario with stems; 40 scenarios total is a few MB. `state.xml` is the frozen input (a preset tree, 5 to 200 KB). Total under 10 MB. Large audio is not stored.
+- A golden is recorded **once, from the pre-refactor baseline commit** (the commit on which this section is signed off), by `pwsh tests/scripts/update-golden.ps1 -Product <p> -Scenario <s> -Reason "<text>"` (to be written). The script refuses to run on a dirty tree, refuses without a reason, writes the reason, baseline commit, build number, config and compiler string into the file, and prints the segment-by-segment diff against the old reference. There is no "update all" switch.
+- A deliberate update is a separate commit that only touches goldens, with a message saying what behaviour changed and why it is correct; the dsp-controller signs the reason before the commit (CLAUDE.md: never edit an expectation just to turn a run green). A stage may not change a golden in the same commit as the code move.
+- The harness refuses to run if the golden's recorded `schema` or scenario hash (state file + scenario.json) does not match the files, so a hand-edited state cannot silently pass.
+
+### 3. Layer-vs-processor equivalence test (works while both paths exist)
+
+Goal: the same state rendered through the old per-product processor path and through `Layer::render` (via the shared `renderLayers`) must match sample for sample. This is stronger than the golden because it is immune to compiler and config differences and needs no stored data.
+
+Design:
+1. **Two switchable paths in one binary during each stage.** Each stage that moves a product's render chain keeps the old chain callable beside the new one behind a processor-level switch (`useLayerRender`, test-controlled, default off until the stage gate), then deletes the old chain after the stage passes. This is a requirement on the coder for T4 to T7 (tell the architecture-steward so it is written into extraction-plan.md).
+2. **Harness.** `LayerEquivalence.h` in `mu-core/Tests/`. Build two identical processors A and B from the same scenario (section 2 files), set B's switch on, drive both with the same block schedule and the same scripted events, and compare per block: the master output, and each channel's pre-mixer output. For the pre-mixer comparison the harness needs a read-only tap on what each channel hands the mixer. If no such tap exists, ask the main conversation to approve one test-only accessor on `ProcessorBase` (per the test-steward rule: no test-only hooks in production headers without approval); without it, the per-channel check uses soloed stems (master with sends off), which is exact only if pan and fader are unity and the pan law is applied identically in both (it is, since the mixer is shared).
+3. **Equality:** bit-identical on the same binary (tolerance 0, no exceptions: both paths run the same compiled maths). Compare including the silent tail after stop, 1-sample blocks, and the first block after a swap.
+4. **Coverage:** every scenario of section 2, per product, per engine type for mu-On (Kick, Bass, Hat, Snare, Rumble), each at fixed and ragged schedules. Plus the cases the processor path hides: a layer rendered with an empty slot beside it; priority ordering (Rumble after its source); lock miss (the layer skipped silently, transport still advancing, state identical afterwards); a type change that parks a layer in the retire bin and checks the old layer's fade then the freed-off-thread flag.
+5. **After the stage:** the equivalence test is kept as the mu-Tronic test of design.md section 7: a mu-Tronic slot of type X, same parameters and MIDI, equals the product's own layer (built from the same code, so it passes by construction and fails the day the two diverge).
+
+### 4. Save/load compatibility corpus (collect now)
+
+Collect before any code moves, from the baseline commit, into `tests/golden/compat/<product>/` with a `MANIFEST.txt` of SHA-256 hashes (frozen; an edit to a file needs a reason in the same way as a golden).
+
+| Source | Take | Product |
+|---|---|---|
+| `tests/presets/` | `A1_master`, `A3_filter`, `A4_amp`, `A5_pitch`, `A6_pattern`, `A7_envelope`, `A8_tail`, `A9_base`, `A9_hat.muRhythm`, `T11` to `T13.muRhythm`, `TS1`, `TS2` | mu-Clid |
+| `tests/presets/` | `TONI_legacy`, `TONI_silent`, `TONI_mute_layer.muArp`; `ON_legacy`, `ON_silent` (the pre-format-2 shapes: a regression must still read them) | mu-Toni, mu-On |
+| `d:\OneDrive\Documents\TDP\muClid` | all 10 `.muClid` full presets, a spread of about 15 of the 63 `.muRhythm` (all with samples, inserts, MIDI-out, each modulator kind), 2 `.muPerformance` | mu-Clid |
+| `d:\OneDrive\Documents\TDP\muTant` | all 108 `.muTant`, about 20 of the 100 `.muPattern` (including Note-mode and user-wavetable ones), the performance files | mu-Tant |
+| `...\muToni`, `...\muOn`, `D:\Andy Tuke\Music - Music Software\TDP\Presets` | whatever exists (the factory content of these two is empty in the folders seen: the factory state lives in code, so save a factory-state full preset from the baseline build), each product's `_default` | mu-Toni, mu-On, any |
+| Host sessions | one `getStateInformation` blob per product per scenario of section 2 (`--save-state` from the baseline standalone, which is the exact bytes a DAW session holds) and, for mu-Clid and mu-Tant, an older-format session if one exists (pre-format-2 dump) | all four, plus mu-Clid MIDI (Lite session) |
+| Clips | a full preset and a session with a populated `<Clips>` bank and an active clip, per product | all four |
+
+Checks (one parameterised test per product, reusing `PresetMigrationTests` helpers):
+1. **Loads without error** (`onLoadError` silent), and every parameter value read back equals a stored `params.json` dump taken by the baseline build.
+2. **Re-save is byte-identical** to a stored `resaved.xml` produced by the baseline build (the saved text, not just the semantics), for full presets, layer presets, and sessions. Second save of the same instance is byte-identical to the first (idempotent). This is the strongest check that nothing in saved data changed (only mu-Tronic adds `type=`, and it is not in this corpus).
+3. **Load then render equals the golden of the same state** (ties the corpus to section 2).
+4. **Parameter manifest:** for each product, a frozen list of every parameter id, type, range, default and value-to-text sample from the baseline layout, asserted equal after each stage (catches a moved `addLayerParams` that drops, renames or re-types an id, including the shared `ch{N}_` strip and the `mstr_` globals). Cheap, runs in ms, highest value per line of test.
+5. **Cross-product references:** a layer preset saved by the baseline loads into the extracted layer and re-saves unchanged (`.muRhythm`, `.muPattern`, `.muArp`, `.muTrack`), including `.muTrack` with each engine id.
+
+### 5. Gates: pluginval, the listening suite, time cost
+
+Time costs are estimates from the pipeline design, **not measured**; the first run of each will replace them in this table.
+
+| Check | What it adds | Est. cost | Runs at |
+|---|---|---|---|
+| Static checkers (`tests/scripts/check-*.ps1`, plus the new `check-layer-boundary.ps1`) | boundary and include rules | seconds | every coding step |
+| Per-product unit suites + the new golden / compat / equivalence tests | semantics, values, saved data | mu-Toni and mu-On under a minute; mu-Tant and mu-Clid a few minutes; goldens add about 10 s per scenario in Debug (est.) | after each stage's code, before review |
+| `mu-core-tests` (and `mu-core-tests-16` from T0) | shared contract | about 2 min | every stage that touches mu-core, i.e. all |
+| Listening suite, `--product <p>` (the `*_roundtrip`, swap and midi-clock tests of the touched product) | CLI path, preset and session round trip, swap timing | tens of seconds per product | each stage gate, for the product(s) touched |
+| Listening suite, full (`run-listening-tests.py --config Debug`, 30 expectation files, Debug, 180 s timeout each) | all of the above, all four products | 10 to 20 min (est.) | before each commit of a stage that touches mu-core, and at the end of T4, T6, T5, T7; the audio-path rule in the test cadence applies (extraction is an audio-path change, so yes) |
+| pluginval, `run-pluginval.ps1` strictness 5 (-SkipGui for speed) | VST3 hosting, state restore identity, parameter fuzz, many rates and block sizes, multi-instance | 5 to 15 min for 5 VST3s (est.); Debug GUI run has hung once for 53 minutes (monitor it with a log file and a verified kill) | the gates that touch mu-Clid and mu-Tant (live VST3 products): T5, T7, and the first mu-core stage that edits mixer audio code (T2); strictness 8 once at T7; mu-Toni / mu-On at the end of T4 / T6 if their VST3 exists. Not needed for mu-Tronic itself (Standalone only) |
+| clap-validator (Release `.clap` only) | CLAP state and params | about 1 min each | T5, T7, release |
+| Performance: CPU timing (new, section 6) | a refactor did not make `processBlock` slower | about 1 min | each gate of T4 to T7; load-sensitive, so run alone and compare ratios, not absolute numbers |
+| Release build ± listening re-run | optimiser-dependent float differences | build minutes + the suite | only on Andy's release request |
+
+### 6. Automatable real-time-safety checks (the net under the dsp-controller)
+
+1. **Allocation counter.** The tests already count `operator new` on one thread (the mu-Clid MIDI parameter-listener test). Generalise it into `mu-core/Tests/AllocationProbe.h` (a global `operator new/delete` replacement in the test executable only, counting on the thread that sets an `AudioThreadScope`). Every golden and equivalence run asserts zero allocations and zero frees inside `processBlock`, `Layer::render` and `renderLayers`, including the first block after a swap, a type change and a stop. No production hook is needed.
+2. **Lock probe.** Count acquisitions of `layersLock` and the bank lock on the audio thread (spin-lock try only): assert the audio thread never blocks (a worker holds the lock, the audio call returns within one block, silent output, transport still advanced, state identical afterwards). Exists in pieces (mu-Clid MIDI lock-skip, mu-Tant seam); extend to every product's layer type.
+3. **Two-thread stress.** Layer edits (add, remove, swap, reset, type change, clip launch, staged swap, wavetable/sample load) from a worker against `processBlock` on the test thread for a fixed iteration count (not a time window), no crash, no NaN, no allocation, deterministic end state. Extends the `ProcessorSeamTests` pattern to the new `Layer::render` host. Run once under ThreadSanitizer where available (the existing build-PC item; Windows MSVC has AddressSanitizer only, so TSan runs in the Linux CI job).
+4. **Source scan, `tests/scripts/check-rt-safety.ps1`** (new, report-only first, then fail): in files reachable from `render`, `processBlock` and `renderLayers`, flag `new`, `std::vector::push_back/resize`, `juce::String` construction, `std::function` construction, `std::mutex`/`lock_guard`, `getParameter(...String...)`, `Time::` calls, `DBG`/`jassert` heavy formatting, `File`/`FileInputStream`, and a string-keyed APVTS lookup. It is a smell detector with an allow-list for audited lines (`rt-ok` marker with a reason), same style as `ref-ok` in `check-comment-refs.ps1`. It does not replace the dsp-controller.
+5. **Denormal / NaN / inf / DC sweep.** Every golden scenario also asserts no NaN or inf, and the final 10 ms after a stop has no DC offset beyond a threshold; plus silence in, parameter extremes (all knobs min, all max), and sample rates 44.1, 48, 96, 192 kHz with block 1 and 4096 smoke renders per layer type (no hash, just finiteness and bounded peak).
+6. **Retire bin / tail:** a type change or remove during a tail: old layer faded within `tailBlocks()`, output continuous (no step larger than 3x the control's, the `FxTailChecks.h` rule), the old layer freed on the message thread (asserted by a destructor-thread-id probe in a test layer type).
+7. **CPU budget:** 16 layers (T3 onward, fake and real types) and each single product's 8 layers, timed over 1000 blocks, asserted at or below `1.15 x` the baseline ratio of render time to the unextracted path in the same process (the switch of section 3 gives the comparison for free).
+
+### 7. Tests to write before the first extraction stage (T3/T4), in order
+
+Effort in focused work (test steward), including running them; builds are the main conversation's.
+
+| # | Test | Needs from the main conversation | Effort |
+|---|---|---|---|
+| 1 | **Parameter-id manifest** per product (section 4.4) + frozen dumps | baseline build (no source change) | 0.5 day |
+| 2 | **Compat corpus** collected, `MANIFEST.txt`, load + re-save byte-identical + values equal (section 4.1 and 4.2) | none | 1 day |
+| 3 | **GoldenRender.h** (scenario loader, fingerprint, equality rule, diff dump, self repeat test) and `update-golden.ps1` | none | 1.5 days |
+| 4 | **First goldens, mu-Toni then mu-On** (closest to the first stages): about 10 scenarios each, noise off, record at baseline | none | 1 day each |
+| 5 | **Goldens, mu-Tant then mu-Clid** (live products; needed before T5/T7 but cheap to record now while the baseline is clean) | none | 1.5 days each |
+| 6 | **AllocationProbe.h** and wiring it into the golden runs | none | 0.5 day |
+| 7 | **mu-On per-engine tests** (Bass, Snare, Rumble sound + decay, value-level Kick/Hat), global swing/accent, Rumble source read, bass-to-kick sidechain: pin the behaviour T6 changes | none | 1 day |
+| 8 | **mu-Toni `readVoice`, held-note, root-by-MIDI, MIDI-trigger** tests (pin what T4 moves per layer) | none | 0.5 day |
+| 9 | **mu-Tant Note-mode pin** (stem and with-FX final mix; documents the old behaviour before T5) | none | 0.5 day |
+| 10 | **LayerEquivalence.h** (section 3) | the `useLayerRender` switch and the channel tap decision | 1 day, after T3 exists |
+| 11 | **Mixer block-value test** in `mu-core-tests` (render a known source through `MixerEngine`; level, pan, sends, sidechain, mute/solo with exact expected values) | none | 1 day |
+| 12 | **Lock probe and two-thread stress** generalised (section 6.2 and 6.3) | none | 1 day |
+| 13 | `check-rt-safety.ps1` (report-only), `check-layer-boundary.ps1` fixture (the architecture-steward's checker needs a fixture set of its own, as `test-check-core-boundary.ps1` has) | the checker script | 0.5 day |
+| 14 | CPU budget test (section 6.7) | the switch of #10 | 0.5 day |
+| 15 | Seed fix request for mu-Tant `NoiseGen` and mu-Toni `rng` (source change, main conversation) then noise-on goldens + a statistical noise test | source change approved | 0.5 day after the change |
+
+Roughly 12 to 13 working days of test work; items 1 to 6 (about 6 days) are the minimum before **any** code moves; 7 to 9 before the stage they pin; 10 to 14 before the first gate. The suggested sequencing is items 1, 2, 3, 6, 4 (mu-Toni), 8, then T4 can start while 4 (mu-On), 7, 11 continue; T6 starts only after 7; T5 and T7 start only after 5, 9 and a clean full-suite baseline.
+
+**What the dsp-controller should focus on at each gate.**
+- **T3 (`Layer::render`, `RenderContext`, `renderLayers`, `RetireBin`):** the one try-lock round `layersLock`; scratch buffers sized in `prepareToPlay` and never grown; lock miss still advances transport and boundary detection; retire-bin handoff (atomic publish, free off the audio thread, no ABA on slot reuse); priority-1 order; empty layers skipped; no allocation under the lock; `RenderContext` is trivially copyable with no pointers outliving the block.
+- **T4 (mu-Toni):** `readVoice` atomic pointer table bound once on the message thread and not dangling after a layer move; held-note stack per layer is lock-free or audio-thread-only (the MIDI buffer is consumed on the audio thread); the engine inside the layer (a `unique_ptr`) and the pointer-move semantics; ToniVoice noise seeding; first block after swap.
+- **T6 (mu-On):** per-layer engine allocation and engine swap on the message thread with a staged, retired old engine (no engine allocated on the audio thread; the five-engine pool going means the old "all engines ready" guarantee goes); per-track grid and clocks derive from `RenderContext::startBeat` without drift; Rumble's read of another layer's output after it is rendered (render order, silent when the source is empty/removed/priority-1); bass to kick sidechain still reads the right envelope.
+- **T5 (mu-Tant, live):** the 300-line render chain's filter/pitch envelope state across the move; retire fade replaced by the shared bin (no tail difference: the golden); wavetable bank lock shared between two product users (no priority inversion, try-lock only on the audio thread); Note-mode gate ramp: where it multiplies, denormals, click on release; `swapLoopBeats` to `loopBeats` unchanged wrap detection including non-divisor lengths.
+- **T7 (mu-Clid, live, highest risk):** the Stage 7 proof list in full; `SampleRhythm` engine/MIDI engine/play state lifetime across hot-swap; sample I/O only in `preloadStaged`; retired-tail drain and cleanup flags; MIDI-out event ordering and orphan note-offs on stop and swap; modulation seed and write-back (the 444-line glue) per block with no string lookups; `HotSwapStager` timing equal to before.
+- **Every gate:** the first block after a swap or type change, the stop edge, 1-sample blocks, denormals in tails, and that no stage changed arithmetic order (the golden says so; the dsp-controller reads the diff for reordering the golden cannot see, e.g. at a different sample rate).
+
+### 8. Rules for the net itself
+
+- A stage is not closed while any golden, compat, equivalence or manifest test is red, unrun, or has had its reference edited in the same commit.
+- Unrun tests are recorded as **unrun** here, never as passing. Result counts are filled in below as the tests are written and run.
+- Baseline commit for all references: to be fixed when item 3 starts (must be a clean tree on a commit where all current suites pass; today HEAD d385df9 has uncommitted site changes only).
+
+| Item | Status |
+|---|---|
+| Parameter-id manifests | Planned, not written |
+| Compat corpus + re-save check | Planned, not collected |
+| `GoldenRender.h`, `update-golden.ps1` | Planned, not written |
+| Goldens: mu-Toni, mu-On, mu-Tant, mu-Clid, mu-Clid MIDI | Planned, not recorded |
+| `AllocationProbe.h`, lock probe, two-thread stress | Planned, not written |
+| `LayerEquivalence.h` | Planned (needs T3 and the path switch) |
+| mu-On engine, mu-Toni `readVoice`, mu-Tant Note-mode, mixer block-value pins | Planned, not written |
+| `check-rt-safety.ps1`, `check-layer-boundary.ps1` fixtures | Planned, not written |
+
+---
+
 ## CLAP validation (clap-validator)
 
 Tool: clap-validator 0.4.1, currently at `C:\Users\andyt\AppData\Local\Temp\claude\d--Dev-mu\622d17e1-0a58-4a44-b939-6ac3ddfcacac\scratchpad\clap-validator\clap-validator.exe` (a session scratchpad copy; fetch it again if that folder is gone).
