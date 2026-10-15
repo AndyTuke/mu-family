@@ -16,11 +16,18 @@
 // MIDI is still placed by block index, as the harness offers nothing else; under the ragged schedule a note
 // therefore sounds earlier than under fixed512, which is deterministic and still exercises the same code.
 
+// This translation unit carries the allocation probe's global operator new / delete (test executable only).
+#define MU_ALLOCATION_PROBE_DEFINE_OPERATORS
 #include "GoldenTestRig.h"
+#include "Tests/GoldenAllocationCheck.h"
 #include "Tests/GoldenRender.h"
 
 namespace
 {
+    // Blocks that allocate or free inside processBlock today, recorded with their exact counts (see
+    // GoldenAllocationCheck.h). Informational: reported on every run, never an approval to allocate.
+    const std::vector<mu_golden::KnownAllocation> kKnownAllocations = {
+    };
     using mu_golden_rig::OwnedProcessor;
     using mu_golden_rig::openGate;
     using mu_golden_rig::setParam;
@@ -545,6 +552,14 @@ struct MuTantGoldenRenderTests : juce::UnitTest
 {
     MuTantGoldenRenderTests() : juce::UnitTest("mu-Tant golden renders", "mu-tant-golden") {}
 
+    // Fails on heap activity that is not in kKnownAllocations; logs the listed ones.
+    void reportAllocations(const juce::String& scenario, const std::vector<mu_golden::AllocFinding>& found)
+    {
+        const auto v = mu_golden::judgeAllocations(scenario, found, kKnownAllocations);
+        for (const auto& n : v.notes) logMessage(n);
+        for (const auto& f : v.failures) expect(false, f);
+    }
+
     void runTest() override
     {
         const auto defs = makeDefs();
@@ -556,7 +571,12 @@ struct MuTantGoldenRenderTests : juce::UnitTest
             return;
         }
 
-        const auto store = mu_golden::GoldenStore::fromEnvironment();
+        beginTest("allocation probe sees heap use and ignores debug-STL proxies");
+        for (const auto& f : mu_golden::probeSelfTest()) expect(false, f);
+
+        auto store = mu_golden::GoldenStore::fromEnvironment();
+        mu_golden::AllocationProbeCounter allocProbe;
+        store.allocationCounter = &allocProbe;
         const mu_golden::ProcessorFactory factory = [] { return std::unique_ptr<ProcessorBase>(new OwnedProcessor()); };
 
         for (const auto& d : defs)
@@ -577,10 +597,14 @@ struct MuTantGoldenRenderTests : juce::UnitTest
             }
 
             beginTest(d.name + ": matches the golden");
+            allocProbe.setScenario(d.name);
             const auto out = store.verify("mu-tant", sc, factory);
             if (out.skipped) continue;
             expect(out.ok, out.message);
             if (out.message.isNotEmpty()) logMessage(out.message);
+
+            beginTest(d.name + ": no heap allocation or free inside processBlock");
+            reportAllocations(d.name, allocProbe.take());
         }
     }
 };

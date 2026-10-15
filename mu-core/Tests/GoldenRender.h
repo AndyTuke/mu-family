@@ -118,12 +118,16 @@ namespace mu_golden
         static Schedule ragged()   { return { "ragged", { 1, 7, 63, 64, 129, 512, 1024, 3 } }; }
     };
 
-    // Interface only: a test target that counts heap allocations installs one, and the harness calls
-    // it around each processBlock. The implementation (a global operator new hook) is a separate piece
-    // of work; with none installed the allocation count is reported as -1 (not measured).
+    // A test target that counts heap allocations installs one (GoldenAllocationCheck.h supplies it on top
+    // of AllocationProbe.h), and the harness calls it around each processBlock. With none installed the
+    // allocation count is reported as -1 (not measured).
     struct AllocationCounter
     {
         virtual ~AllocationCounter() = default;
+        // Called before beginBlock: which stream and block is about to render, and the labels of the
+        // scripted events that ran just before it (so a finding can say "first block after a swap").
+        virtual void setContext(const juce::String& /*stream*/, int /*block*/, juce::int64 /*frame*/,
+                                const juce::String& /*events*/) {}
         virtual void beginBlock() = 0;
         virtual juce::int64 endBlock() = 0;   // allocations since beginBlock
     };
@@ -242,8 +246,12 @@ namespace mu_golden
             host.timeInSamples = frame;
 
             ScriptContext ctx { proc, host, block, frame };
+            juce::String ranEvents;
             while (eventCursor < events.size() && events[eventCursor].block <= block)
+            {
+                ranEvents << (ranEvents.isEmpty() ? "" : "; ") << events[eventCursor].label;
                 events[eventCursor++].apply(ctx);
+            }
 
             midi.clear();
             for (const auto& m : sc.midi)
@@ -251,7 +259,7 @@ namespace mu_golden
 
             juce::AudioBuffer<float> view(work.getArrayOfWritePointers(), 2, n);
             view.clear();
-            if (counter != nullptr) counter->beginBlock();
+            if (counter != nullptr) { counter->setContext(prefix, block, frame, ranEvents); counter->beginBlock(); }
             proc.processBlock(view, midi);
             if (counter != nullptr) allocs += counter->endBlock();
 
@@ -449,7 +457,7 @@ namespace mu_golden
         bool updateMode = false;          // record instead of compare
         juce::String scenarioFilter;      // "product/scenario"; required in update mode (no update-all)
         juce::String reason, baseline;    // written into a recorded golden
-        AllocationCounter* allocationCounter = nullptr;   // hook only; E0.7 supplies one
+        AllocationCounter* allocationCounter = nullptr;   // GoldenAllocationCheck.h supplies one
 
         // MU_GOLDEN_ROOT / _DUMP / _UPDATE / _SCENARIO / _REASON / _BASELINE / _EXPECT_CONFIG override the
         // defaults; the repo root is found by walking up from the executable to the folder with CLAUDE.md.
