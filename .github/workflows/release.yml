@@ -68,6 +68,11 @@ jobs:
           mu-on_VST3 mu-on_CLAP mu-on_Standalone
           mu-toni_VST3 mu-toni_CLAP mu-toni_Standalone
 
+      # mu-link is a Windows desktop app (freeware); built and zipped on the Windows runner only.
+      - name: Build mu-link (Windows)
+        if: runner.os == 'Windows'
+        run: cmake --build build --config Release --target mu-link
+
       # AU is macOS-only (the _AU targets only exist in an APPLE configure — family rule).
       - name: Build AU (macOS only)
         if: runner.os == 'macOS'
@@ -116,6 +121,11 @@ jobs:
           Copy-Item "$r\mu-on\mu-on_artefacts\Release\Standalone\mu-On.exe" staging\mu-On\
           Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-On\"
           Compress-Archive -Path staging\mu-On\* -DestinationPath dist\mu-On-Windows.zip
+          # mu-Link (desktop app)
+          New-Item -ItemType Directory -Path staging\mu-Link -Force | Out-Null
+          Copy-Item "$r\mu-link\mu-link_artefacts\Release\mu-link.exe" staging\mu-Link\
+          Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Link\"
+          Compress-Archive -Path staging\mu-Link\* -DestinationPath dist\mu-Link-Windows.zip
 
       - name: Package demo zips (macOS — ditto preserves perms/signature)
         if: runner.os == 'macOS'

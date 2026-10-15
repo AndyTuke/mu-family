@@ -82,7 +82,7 @@ struct StepPatternTests : juce::UnitTest
             a.length = 2;
             expect(a.isOn(0)); expect(! a.isOn(1)); expect(a.isOn(2)); expectEquals(a.at(2), 0.0f);   // step 2 is cell 0 again
             a.length = 4;
-            expectEquals(a.stepMask, 0b0101u);         // the setting itself never changed
+            expectEquals((int) a.stepMask, 0b0101);         // the setting itself never changed
             expectEquals(a.at(2), 1.0f);               // the hidden accent is back
         }
 
@@ -90,7 +90,7 @@ struct StepPatternTests : juce::UnitTest
         {
             ArpAccent oldStyle; oldStyle.pattern = 0b0101; oldStyle.length = 4; oldStyle.amount = 0.8f;   // stepMask untouched
             ArpAccent explicitOn = oldStyle; explicitOn.stepMask = 0xFFFFu;
-            expectEquals(oldStyle.stepMask, 0xFFFFu);
+            expectEquals((int) oldStyle.stepMask, 0xFFFF);
             Rig a(oldStyle, false, 0.5f), b(explicitOn, false, 0.5f);
             bool same = true;
             for (int i = 0; i < 100; ++i)
@@ -257,7 +257,7 @@ struct StepPatternTests : juce::UnitTest
             r.runTo((long long) (kStepSamples * 3.0) + 1500);
             auto shorter = a; shorter.length = 2;   // cells 0 and 1 only
             r.runner.setAccent(shorter);
-            expectEquals(shorter.stepMask, 0b0101u);   // the hidden cells are untouched
+            expectEquals((int) shorter.stepMask, 0b0101);   // the hidden cells are untouched
             r.runTo((long long) (kStepSamples * 4.0) + 1500);
             expect(r.runner.isActive());               // step 4 = cell 0, On
             r.runTo((long long) (kStepSamples * 5.0) + 1500);
