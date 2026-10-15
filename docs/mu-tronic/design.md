@@ -128,7 +128,9 @@ Andy: every mu-On voice engine can be added as a mu-Tronic layer. So the registr
 Stage 8 of design-plugin-family waited for exactly this decision. Ruling: **dispatch stays virtual on `Layer`; a registry only creates and describes.**
 This section is the specification of record for E1. Subsections 2.1.2 to 2.1.5 are the four design fixes C1 to C4 of the real-time review
 ([extraction-plan.md 2.1a](extraction-plan.md#21a-contract-requirements-from-the-real-time-review-c1-to-c18), written 2026-10-15 as stage E0d); C5 to C18
-stay in that table and bind this section too. **Status: specified 2026-10-15; `dsp-controller` sign-off on C1 to C4 requested; no contract code before it.**
+stay in that table and bind this section too. **Status: specified 2026-10-15; `dsp-controller` round 1 (2026-10-15): C1 and C3 Pass with notes, C2 and
+C4 Not yet (R1 to R7), structure kept; this revision folds in R1 to R7, the binding notes N1 to N7, the accepted amendments and the open-point rulings (2.1.6).
+`dsp-controller` sign-off on C1 to C4: requested (round 2); no contract code before it.**
 
 New hooks (defaults do nothing; all called once per layer per block or per edit, never per sample). `Layer` gains a second base, the interface
 `mu_core::RetireTail` (2.1.3), so the bin can hold either a whole layer or a product's engine tail:
@@ -173,23 +175,29 @@ void mu_xxx::PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juc
 }
 ```
 
-`renderAndMix` (base, audio thread): (1) constructs a `LayerBlock` (2.1.2), which owns `juce::ScopedNoDenormals` for the whole render, bin and mixer (C11:
-held by the block object rather than by `renderLayers` alone, so the mixer and FX are covered too); a failed `LayerBlock` renders nothing, exactly as a
-missed try-lock today, while the transport (already resolved) and the boundary flagging (cached loop lengths) still advance. (2) Decodes `midi` once into the
-block's `MidiEvent` array (2.1.5). (3) **Chunks** a block longer than the prepared size into pieces of at most the prepared size and runs `renderLayers` then
-`processCoreBlock` per piece on a sub-buffer of `buffer` (C8; the chunking sits here and not inside `renderLayers` because `MixerEngine`'s channel buffers are
-sized at prepare too). (4) A host block of 0 frames renders nothing and calls no hook; its edges are delivered on the next rendered block.
+Each product keeps its own `juce::ScopedNoDenormals` at the top of `processBlock` (N7): mu-Tant's Note-mode gate and any other shell post-stage run outside
+`LayerBlock`. **Shell code reads no layer (N5):** in `Published` mode nothing on the audio thread outside `LayerBlock` may read `layers[]` or `layerAs<T>`;
+shell post-stages and `flagLayerSwapBoundaries` use values cached by `renderLayers` only (rule 6 of `check-layer-boundary.ps1`, extraction-plan 4.5).
+
+`renderAndMix` (base, audio thread, `noexcept`): (1) feeds the host-block continuity check of 2.1.5 (every host block, rendered or not), then constructs a
+`LayerBlock` (2.1.2), which owns `juce::ScopedNoDenormals` for the whole render, bin and mixer (C11: held by the block object rather than by `renderLayers`
+alone, so the mixer and FX are covered too); a failed `LayerBlock` renders nothing and **touches no bin entry** (R4), exactly as a missed try-lock today, while
+the transport (already resolved) and the boundary flagging (cached loop lengths) still advance. (2) Decodes `midi` once into the block's `MidiEvent` array
+(2.1.5). (3) **Chunks** a block longer than the prepared size into pieces of at most the prepared size and runs `renderLayers` then `processCoreBlock` per piece
+on a sub-buffer of `buffer` (C8; the chunking sits here and not inside `renderLayers` because `MixerEngine`'s channel buffers are sized at prepare too; today's
+truncation of an oversize block is a defect, open point 10). (4) A host block of 0 frames renders nothing and calls no hook; its play/stop edge and any jump are
+delivered on the next rendered block.
 
 `renderLayers(const LayerBlock&, const BlockTransport&, chunk)` (base, audio thread), in this order:
 
 | Phase | What | Result |
 |---|---|---|
-| 0 (first chunk) | Edges against the last *rendered* block (2.1.5); `onTransportStopped` / `onTransportJump` on every live layer in slot order. `mixCount = max(view.numLive, bin.highestActiveSlot(view.serial) + 1)`, taken **before** any tail renders (mu-Tant's `renderCount` rule). | base `RenderContext` template |
-| 1 | Priority-0 live layers in slot order: `ctx.slot = s`, `layer->render(ctx, scratch[s], n)`. An Empty layer is not called; its scratch is cleared. | `scratch[s]` |
+| 0 (first chunk) | Play/stop edges against the last *rendered* block, `transportJumped` from the sticky `jumpPending` (2.1.5); `onTransportStopped` / `onTransportJump` on every live layer in slot order. `mixCount` by the product's count policy (2.1.3, R3): `RenderPastCount` gives `max(view.numLive, bin.highestActiveSlot(view.serial) + 1)` (mu-Tant's `renderCount` rule), `CutAtCount` gives `view.numLive`; taken **before** any tail renders. | base `RenderContext` template |
+| 1 | Priority-0 live layers in slot order: `ctx.slot = s`, `layer->render(ctx, scratch[s], n)`. An Empty layer is not called; its scratch is cleared. **Every slot below `mixCount` with no live layer gets a cleared scratch here** (R4), so an entry cut between phase 0 and phase 4 renders silence, not last block's samples. | `scratch[s]` |
 | 2 | Peer table: `peers[s] = { scratch[s] pointers, valid = 1 }` for each slot rendered in phase 1; every other entry `valid = 0`. | `PeerTap[kMaxLayers]` |
 | 3 | Priority-1 live layers, with `ctx.peers` set (C10: post-insert, pre-strip, and before any tail is added). | `scratch[s]` |
 | 4 | The bin (2.1.3), slot order then entry order: tails add into `scratch[s]` after the live layer, as mu-Clid's retired engines add after the live engine today. | `scratch[s]` |
-| 5 (last chunk) | Cache `loopBeats()` per live slot; latch the edge state; publish nothing else. | caches |
+| 5 (last chunk) | Cache `loopBeats()` per live slot; latch the rendered play/stop state and clear `jumpPending` (the continuity end beat is kept per host block, not here); publish nothing else. | caches |
 
 `processCoreBlock` gets a `RenderChannelFn` that copies `scratch[r]` into the mixer's channel buffer (an exact copy, so R11 holds) for `r < mixCount`. Scratch
 buffers (`kMaxLayers` x 2 channels x prepared size) and the decoded MIDI array are allocated in `prepareToPlay` / at construction, never grown.
@@ -220,38 +228,65 @@ class LayerBlock                                    // audio thread, stack only,
 public:
     explicit LayerBlock(ProcessorBase& owner) noexcept;    // epoch.enter(); then TryLock or Published acquisition
     ~LayerBlock() noexcept;                                // releases the try-lock (TryLock mode); epoch.leave()
-    explicit operator bool() const noexcept;               // false: render nothing this block
+    explicit operator bool() const noexcept;               // false: render nothing this block, touch no bin entry
     const LayerView& view() const noexcept;
 private:
     juce::ScopedNoDenormals noDenormals;                   // C11
-    // TryLock: juce::ScopedTryLock + a local LayerView; Published: const LayerView* loaded once (seq_cst)
+    // TryLock: juce::ScopedTryLock + a local LayerView;
+    // Published: after enter(), layerEditInFlight.load(seq_cst) (N4), then const LayerView* loaded once (seq_cst)
 };
 
 // mu-core/Plugin/AudioEpoch.h: the grace period, single audio-thread writer (processBlock is never re-entered)
 class AudioEpoch
 {
 public:
-    void     enter() noexcept;                       // audio: e+1 (odd = inside a block), seq_cst; jassert(e was even)
-    void     leave() noexcept;                       // audio: e+1 (even), seq_cst
+    void     enter() noexcept;    // audio: r = e.fetch_add(1, seq_cst); r must be even (N4); Debug: records the thread id
+    void     leave() noexcept;    // audio: r = e.fetch_add(1, seq_cst); r must be odd; Debug: clears the thread id
     uint64_t stamp() const noexcept;                 // any: e, seq_cst
     bool     passed(uint64_t s) const noexcept;      // (s even) || (e != s): no block that could hold an old pointer is still running
-    void     waitFor(uint64_t s) const noexcept;     // message thread: yield until passed(s); bounded by one audio block
+    bool     waitFor(uint64_t s, int timeoutMs) const noexcept;   // non-audio thread: yield until passed(s) or timeout; false = timed out
+                                                     // Debug: jassert the caller is not the thread inside the block
+    bool     reclaimDisabled() const noexcept;       // sticky: an enter/leave saw the wrong parity (Release); true until destruction
+private:
+    std::atomic<uint64_t> e { 0 };                   // static_assert(std::atomic<uint64_t>::is_always_lock_free)
+    std::atomic<bool>     broken { false };
 };
 ```
 
+**Parity and a moved audio thread (N4).** `enter()` / `leave()` are `fetch_add(1, seq_cst)`, not a load and a store: the same cost as a seq_cst store on x64, and
+correct if the host moves `processBlock` to another thread between blocks. A wrong returned parity (two threads inside at once, outside the JUCE contract) is a
+`jassert` in Debug; in Release it sets the sticky `broken` flag, which **turns off all reclamation** (views, layers, tails are kept, not freed, until
+destruction): a leak, never a use-after-free. Before E4, M2 confirms with the assert in Debug pluginval runs of VST3, CLAP and Standalone plus an offline bounce
+while playing in Reaper and Bitwig (open point 2).
+
+**Waiting, and what each caller does on a timeout (N2).** No caller waits unboundedly; `waitFor` returns false after `timeoutMs` (proposed 50 ms), and each
+caller has its own fallback:
+
+| Caller | Waits? | On timeout |
+|---|---|---|
+| Bin frees (`service`) | never: it tests `passed` and defers to the next pass | n/a |
+| `setLayerType` step 6 | yes | proceed: worst case one block in which the old live layer reads a parameter mix; no memory is at risk (nothing is freed by step 7) |
+| Quiesce (`Published` mode structural edits) | yes | give up, lower the flag, retry on the next deferred-work pass; **never move strip state** without the grace |
+| Bin eviction (2.1.3) | yes | drop the **incoming** tail (freed later by `service` after its own grace); the evicted entry stays Done |
+| Quiesce in `TryLock` mode | **skipped**: the blocking `layersLock` already excludes the audio thread, and the four products' timing stays as today | n/a |
+
 The `LayerView` storage is a pool of `kLayerViewPool` (4) views owned by `ProcessorBase`; `published` is a `std::atomic<const LayerView*>`. A view is reused only after
-`epoch.passed(stamp)` for the stamp taken when it was replaced; if all four are in their grace period the writer calls `waitFor` (at most one block). No
-reference counting anywhere (C6): views, layers and tails are owned by `unique_ptr`s on the message thread and reached by raw pointer on the audio thread.
+`epoch.passed(stamp)` for the stamp taken when it was replaced. **No operation publishes twice without a grace wait in between** (asserted, N3); `setLayerType`
+and the scene commit wait between their two publications, so at most two views are in grace at once. If the pool is still exhausted, the writer allocates an
+**overflow view on the message thread** instead of waiting (it joins the reclaim list and is freed after its grace); the T1 stress test counts overflow
+allocations and expects none. No reference counting anywhere (C6): views, layers and tails are owned by `unique_ptr`s on the message thread and reached by raw
+pointer on the audio thread.
 
 **What the audio thread loads and never retains.** It loads the view once, in the `LayerBlock` constructor. `Layer*`, `LayerView*`, `RetireTail*` and scratch
 pointers are used only inside that block and never stored in a member that outlives it. State that survives blocks (edge latch, loop-length cache, peer
 validity) holds values, never addresses.
 
 **Memory orders and the proof.** Writer (message thread): `published.store(next, seq_cst)`, then `s = epoch.stamp()` (seq_cst); `prev` is reclaimable once
-`epoch.passed(s)`. Reader: `epoch.enter()` (seq_cst store), then `published.load(seq_cst)`, use, `epoch.leave()`. In the single total order of seq_cst operations,
-if `s` is even no block was running at the stamp, so every later block's load comes after the store and sees `next`; if `s` is odd the running block may hold
-`prev`, and `e != s` proves it ended. This is the Dekker (store, then load of the other variable) pattern, which is why these two variables are seq_cst rather than
-release/acquire; the cost is two seq_cst stores per block. The view's fields are plain data published by the pointer store (a seq_cst store is also a release).
+`epoch.passed(s)`. Reader: `epoch.enter()` (seq_cst read-modify-write), then `layerEditInFlight.load(seq_cst)`, then `published.load(seq_cst)`, use,
+`epoch.leave()`. In the single total order of seq_cst operations, if `s` is even no block was running at the stamp, so every later block's load comes after the
+store and sees `next`; if `s` is odd the running block may hold `prev`, and `e != s` proves it ended. This is the Dekker (write, then load of the other variable)
+pattern, which is why these variables are seq_cst rather than release/acquire (the flag load is seq_cst for the same reason against quiesce's flag store and
+stamp); the cost is two seq_cst read-modify-writes per block. The view's fields are plain data published by the pointer store (a seq_cst store is also a release).
 
 **Who builds, prepares, binds and defaults a new layer, in what order** (`setLayerType`, mu-Tronic, T1; message thread throughout; nothing suspended, nothing
 muted):
@@ -259,13 +294,13 @@ muted):
 | # | Step | Why here |
 |---|---|---|
 | 1 | Cancel the slot's staged swaps (as every edit does). | A staged payload of the old type must not land on the new one. |
-| 2 | `fresh = info.create(slot)`; `fresh->prepare(sr, bs)`. | All allocation before anything is visible. |
+| 2 | `g = prepareGeneration` (read under the writers' mutex); `fresh = info.create(slot)`; `fresh->prepare(sr, bs)` with that generation's rate and size. | All allocation before anything is visible. `prepareToPlay` may run on a host thread between here and step 8 (N1). |
 | 3 | Tear down the slot's `<Type>Content` and mini-visual (C16). | No UI pointer into the old layer survives into the bin. |
 | 4 | `old->beginRetire()` when `old->retirePolicy().kind != None` (2.1.4). | The last moment the old layer may read its parameters: none has changed yet. |
-| 5 | Publish view **V1** with the slot set to null (Empty) and `bin.park(slot, std::move(old), V1.serial, sr)` (or `None`: the old layer goes to the reclaim list). The bin entry is written before V1 is published (2.1.3, activation serial). | From V1 on, the old layer renders only as a tail. |
-| 6 | `epoch.waitFor(stampAfterV1)` (at most one block). | No block that still renders the old layer **live** (it reads the slot's parameters) can overlap step 7. |
+| 5 | Publish view **V1** with the slot set to null (Empty) and `bin.park(slot, std::move(old), V1.serial)` (or `None`: the old layer goes to the reclaim list). The bin entry is written before V1 is published (2.1.3, activation serial: a park outside `layersLock` uses the next serial, R4). | From V1 on, the old layer renders only as a tail. |
+| 6 | `epoch.waitFor(stampAfterV1, timeout)`; on timeout proceed (N2). | No block that still renders the old layer **live** (it reads the slot's parameters) can overlap step 7; a timeout costs at most one block of a parameter mix, no memory. |
 | 7 | Reset the new type's prefix of this slot to defaults, or apply `initial` (`applyLayerNode`), through the APVTS as any edit does; `fresh->bindParams(apvts, slot)`; the mixer strip `ch{N}_` is kept; request the follower reset for the strip (an atomic flag the audio thread consumes at block start, C17). | Nothing live reads these parameters now: the old layer is a tail reading its snapshot, the new one is not published. Same-prefix types (Kick to Bass, both `t{N}_`) are the reason. |
-| 8 | Publish view **V2** with `fresh` in the slot. | One atomic pointer store; the new layer's first block is the first block that loads V2. Parameter values are never moved after it. |
+| 8 | Under the writers' mutex: if `prepareGeneration != g`, `fresh->prepare(sr, bs)` again with the current values (N1); then publish view **V2** with `fresh` in the slot. | One atomic pointer store; the new layer's first block is the first block that loads V2, and it is prepared for that block's rate and size (a grown block size would otherwise overrun). Parameter values are never moved after it. |
 | 9 | V0 and V1 return to the pool after their grace; the old layer is freed by the bin (2.1.3) or the reclaim list, on the message thread. | |
 
 Two publications are always made, also when the prefixes differ, so there is one code path; the new layer starts one block later than the old one stops,
@@ -275,15 +310,18 @@ muted. The boundary-exact timing of that switch (today's commit lands up to one 
 
 **What remains under `layersLock`.** In `TryLock` mode, everything it guards today, with today's hold (pointer moves, strip moves, microseconds; the lock
 probe of E0.8 measures it). In `Published` mode it becomes the **writers' mutex only**: structural edits, `setLayerType`, `prepareToPlay` /
-`releaseResources` (which may run on a host thread other than the message thread) and the bin's message-side operations take it; the audio thread never does.
-Its hold is the writer's own section; no writer holds it across a grace wait.
+`releaseResources` (which may run on a host thread other than the message thread; they increment `prepareGeneration` under it, N1) take it; the audio
+thread never does. Its hold is the writer's own section; no writer holds it across a grace wait. The bin's message-side operations take the separate **bin
+mutex** in both modes (2.1.3, R2), never `layersLock`, so a free can never cause an audio try-lock miss.
 
 **Coexistence with `ScopedSuspend` structural edits** (`addLayer`, `removeLayer`, `swapLayers`, `resetLayer`, unchanged in what they do and in what they sound
 like). They keep `ScopedSuspend` (`layerEditInFlight` raised, processing suspended) because they move parameter values and edit layers in place
 (`adoptDefaults`), and a block between those moves must play nothing, as today. In `Published` mode their exclusion against the audio thread becomes
-**quiesce**: raise the flag (seq_cst), `epoch.waitFor(stamp)` (the block that may have started before the flag ends), then do every move. Until the last product has
-switched mode, every edit does both: quiesce, then `ScopedLock(layersLock)` around the moves, then publish a view, then the parameter phase, then lower the flag.
-Both mechanisms are then safe in one binary, whichever mode a processor runs.
+**quiesce**: raise the flag (seq_cst), `epoch.waitFor(stamp, timeout)` (the block that may have started before the flag ends), then do every move; on a
+timeout the edit lowers the flag and retries on the next pass, never moving strip state (N2). Until the last product has switched mode, every edit runs one
+code path: quiesce (whose wait is **skipped in `TryLock` mode**, where the blocking `layersLock` already gives the exclusion, so the four products' edit timing is
+unchanged), then `ScopedLock(layersLock)` around the moves, then publish a view, then the parameter phase, then lower the flag. Both mechanisms are then safe in
+one binary, whichever mode a processor runs.
 
 **Why it stays bit-identical for the four products.** They never call `setLayerType` and stay in `TryLock` mode through the programme, so their audio thread runs
 today's lock protocol. The golden harness renders single-threaded (edits between blocks), where both modes give the same blocks. A later switch to `Published`
@@ -294,13 +332,18 @@ asserts the sequence per block, also when V1 and V2 are published inside one blo
 to a run without it (the "does not mute" test). (3) No allocation or free on the audio thread during a publication (`AllocationProbe`). (4) A view, a layer or
 a tail is freed only after its grace period (ASan two-thread stress: the message thread hammering `setLayerType` and structural edits while blocks run).
 (5) In `Published` mode the audio thread never takes `layersLock` (lock probe). (6) No block runs while `layerEditInFlight` is up and strip state moves
-(stress, ThreadSanitizer). (7) Every golden of the four products unchanged at each of these commits.
+(stress, ThreadSanitizer). (7) Every golden of the four products unchanged at each of these commits. (8) A `prepareToPlay` with a larger block size between
+steps 2 and 8 leaves `fresh` prepared for the new size (generation test). (9) No operation publishes twice without a grace wait (assert); overflow views
+counted, zero expected in the T1 stress test. (10) `waitFor` timeouts take each caller's fallback (fake epoch that never advances).
 
 **Failure modes considered.** Pool reuse while a block still reads a view (ABA): solved by the grace period before reuse. The audio thread keeping a pointer
 across blocks: forbidden by construction (stack object), caught by ASan in the stress test. Writer starvation: there is always a gap between blocks, and
-`passed` also succeeds on any change of the counter, so a busy audio thread cannot starve it. Offline render on the message thread: the writer is never inside a
-block, the stamp is even, reclamation is immediate. A host that calls `processBlock` from two threads at once: outside the JUCE contract; `enter()` asserts it.
-`prepareToPlay` on a host thread during an edit: the writers' mutex. Destruction: `prepareForDestruction` empties the bin and the reclaim list before any product member goes.
+`passed` also succeeds on any change of the counter, so a busy audio thread cannot starve it; a block that stalls (a debugger break, a starved
+thread) is bounded by the timeouts. Offline render on the message thread: the writer is never inside a block, the stamp is even,
+reclamation is immediate; a writer waiting on its own thread's block is a Debug assert. A host that calls `processBlock` from two threads at once: outside the
+JUCE contract; the parity check asserts it in Debug and turns reclamation off in Release. A host that moves `processBlock` to another thread: correct
+(read-modify-write counter). `prepareToPlay` on a host thread during an edit: the writers' mutex plus the prepare generation. Destruction:
+`prepareForDestruction` empties the bin and the reclaim list before any product member goes.
 
 **Rejected.** (a) Keeping the try-lock and holding `layersLock` briefly for a type change: a miss silences every layer for a block, which C1 forbids.
 (b) `std::shared_ptr` views (or `std::atomic<std::shared_ptr>`): the last release can land on the audio thread (C6) and the atomic form may lock. (c) Hazard
@@ -312,7 +355,7 @@ per-publication message. (f) Running type changes through `ScopedSuspend`: it mu
 
 **Ruling: per-slot rows of `kRetireDepth` (4) entries, owned by `ProcessorBase`; each entry runs the four-state machine below; the message thread frees only
 after it saw Done and the grace period passed.** Per-slot rows rather than one global ring because a tail renders into its own slot's strip (level, sends,
-sidechain), a structural edit moves tails with their slot (mu-Clid's `layersReordered` does today), and mu-Clid's eviction is per slot. Depth 4 is mu-Clid's
+sidechain), a structural edit moves owned tails with their slot (mu-Clid's `layersReordered` does today; in-place entries are cut instead, R1), and mu-Clid's eviction is per slot. Depth 4 is mu-Clid's
 `kMaxRetiredVoiceEngines`, so two retargets inside 25 ms never drop, free early or block. A global budget, `kMaxLiveRetirees`, defaults to `kMaxLayers *
 kRetireDepth` (never binding in the four products); mu-Tronic sets it from the C18 measurements, and when it binds the oldest draining entry in the instance is
 evicted.
@@ -351,25 +394,33 @@ class RetireBin
 {
 public:
     enum State : uint8_t { Empty = 0, Parked, Draining, Done };
+    enum class CountPolicy : uint8_t { RenderPastCount, CutAtCount };   // R3: per product, set once at construction
 
-    // Message thread, under the writers' mutex (Published mode) or between blocks (TryLock mode).
-    void park       (int slot, std::unique_ptr<RetireTail> owned, uint32_t activationSerial, double sampleRate);  // owned
-    void parkInPlace(int slot, RetireTail& spare,                 uint32_t activationSerial, double sampleRate);  // borrowed spare (mu-Tant)
-    void cutSlot (int slot);                 // every entry of the slot to Done: a remove, or a live layer published into an in-place slot
-    void swapRows(int a, int b);  void removeRow(int index);   // structural edits, quiesced: tails follow their slot; the removed row is cut
+    // Message or host thread; every one takes binMutex (both modes, R2). binMutex is never taken by the audio thread and is
+    // not layersLock. Lock order: layersLock, then binMutex (mu-Tant's layersMoved calls cutSlot under layersLock); never the reverse.
+    void setPrepared(double sampleRate);     // prepareToPlay: stores the rate park converts with
+    void park       (int slot, std::unique_ptr<RetireTail> owned, uint32_t activationSerial);  // owned; reads the rate under binMutex
+    void parkInPlace(int slot, RetireTail& spare,                 uint32_t activationSerial);  // borrowed spare (mu-Tant); no-op if the row
+                                                                                               // already holds an active in-place entry (R1)
+    void cutSlot (int slot);                 // every entry of the slot to Done: a remove, a regrow into an in-place slot, before a spare dies
+    void cutAtOrAbove(int count);            // CutAtCount products: a count-reducing store cuts the rows it leaves
+    void swapRows(int a, int b);  void removeRow(int index);   // structural edits, quiesced: owned tails follow their slot;
+                                                               // in-place entries are CUT, never moved (R1); the removed row is cut
     void cutAll  ();                         // prepareToPlay, releaseResources, prepareForDestruction
-    int  service (const AudioEpoch&);        // free every Done entry whose grace passed (runDeferredWork and the 100 Hz poll)
+    int  service (const AudioEpoch&);        // free every Done entry whose grace passed; never waits
 
-    // Audio thread, inside a LayerBlock.
+    // Audio thread, inside a LayerBlock that succeeded (a failed one calls nothing here, R4).
     int  highestActiveSlot(uint32_t viewSerial) const noexcept;
     void render(int slot, RenderContext ctx, juce::AudioBuffer<float>& slotOut, int n,
-                uint32_t viewSerial, bool slotHasLive) noexcept;   // ctx.retiring = 1, empty MIDI, no peers
+                uint32_t viewSerial, bool slotHasLive) noexcept;   // ctx.retiring = 1, empty midi, valid midiOut (R7), no peers;
+                                                                   // skips in-place entries when slotHasLive (R1)
 
 private:
     struct Entry
     {
         std::atomic<uint8_t> state { Empty };
-        uint32_t     activation = 0;         // written while Empty, published by the Parked store
+        uint8_t      inPlace = 0;            // written while Empty, published by the Parked store
+        uint32_t     activation = 0;         // ditto; compared wrap-safely: (int32_t) (viewSerial - activation) >= 0
         RetireTail*  tail = nullptr;         // ditto
         RetireState  rs {};                  // ditto
         uint64_t     doneStamp = 0;          // message thread: epoch stamp taken when it first saw Done (0 = not yet)
@@ -377,8 +428,17 @@ private:
         std::unique_ptr<RetireTail> owned;   // message thread only; null for an in-place entry
     };
     std::array<std::array<Entry, mu_limits::kRetireDepth>, mu_limits::kMaxLayers> rows;
+    std::mutex binMutex;                     // message and host threads only
+    double     preparedRate = 0.0;           // guarded by binMutex
 };
 ```
+
+**Serialising the message side (R2).** Every message-side bin operation (`setPrepared`, `park`, `parkInPlace`, the cuts, `swapRows`, `removeRow`, `cutAll`,
+`service`) takes `binMutex`, in **both** modes: the 100 Hz service, a deferred-work pass and a host thread running `prepareToPlay` / `releaseResources` (which
+call `cutAll` then `service`) can otherwise overlap. It is not `layersLock`, so a free never makes the audio thread miss its try-lock; the audio thread never
+takes it. `park` reads the prepared rate under it, so a park racing a prepare converts with one consistent rate. In each deferred-work pass `service()` runs
+**before** the product's swap commit (mu-Clid's order today: free first, then install, `HotSwapStager.cpp:160`), so an install never finds a row full of Done
+entries it could have reused.
 
 **State machine (exact transitions).** Every operation on `state` is seq_cst (a store is also a release, a load also an acquire), for the grace proof of
 2.1.2; the payload fields are plain and are published by the store that leaves Empty.
@@ -386,10 +446,10 @@ private:
 | From | To | Thread | Operation | When |
 |---|---|---|---|---|
 | Empty | Parked | message | write `tail`, `rs`, `activation`, `owned`; then `state.store(Parked)` | `park`, `parkInPlace` |
-| Parked | Draining | audio | `compare_exchange(Parked, Draining)`; on success `onRetireStart(ctx)`, `rs.started = 1` | first block whose `view.serial >= activation` |
+| Parked | Draining | audio | `compare_exchange(Parked, Draining)`; on success `onRetireStart(ctx)`, `rs.started = 1` | first rendered block whose `(int32_t) (view.serial - activation) >= 0` and, for an in-place entry, whose view does not have the slot live |
 | Parked | Done | message | `compare_exchange(Parked, Done)` | cut before the audio thread started it |
 | Draining | Done | audio | `compare_exchange(Draining, Done)`, then `requestDeferredWork()` | `renderRetiring` returned false; `Fade` ramp spent (`samplesLeft == 0`); `samplesLived >= maxSamples` |
-| Draining | Done | message | `compare_exchange(Draining, Done)` | eviction, `cutSlot`, `removeRow`, `cutAll` |
+| Draining | Done | message | `compare_exchange(Draining, Done)` | eviction, `cutSlot`, `cutAtOrAbove`, `swapRows` / `removeRow` (in-place entries), `cutAll` |
 | Done | Empty | message | first sight: `doneStamp = epoch.stamp()`; when `epoch.passed(doneStamp)`: `owned.reset()`, `tail = nullptr`, `state.store(Empty)` | `service` |
 
 The audio thread never touches an Empty or Done entry and never writes `tail` or `owned`; the message thread never writes `rs` or `tail` of a non-Empty entry. A
@@ -398,27 +458,72 @@ every audio access to `tail` happens inside a block, after a load that read Park
 Done was observed, so the block that may still be inside `renderRetiring` has ended, and every later block reads Done (seq_cst order: the Done write precedes the
 stamp, the stamp precedes the next block's `enter()`, which precedes its load).
 
-**Same-block hand-over (activation serial).** An entry renders only in blocks whose view serial is at least its `activation`, and it is parked before that
-view is published. So the block that still sees the old view renders the old layer live and skips the entry; the first block that sees the new view renders
-it as a tail; there is no block with both and none with neither (C1 invariant 1). In `TryLock` mode the serial is the packed layout word that
-`ProcessorCore` stores with every count change (`numLayers` stays as its mirror for existing readers), so mu-Tant's count store and its tail arm stay coupled
-as they are today.
+**Same-block hand-over (activation serial, R4).** An entry renders only in blocks whose view serial is at least its `activation` (wrap-safe compare), and it is
+parked before that view is published. So the block that still sees the old view renders the old layer live and skips the entry; the first block that sees the
+new view renders it as a tail; there is no block with both and none with neither (C1 invariant 1). The rule that makes this hold:
 
-**Depth and overflow.** Placement is into the first Empty entry of the row. A full row evicts **entry 0** (mu-Clid's force-cut rule, kept for bit identity): the
-message thread cuts it, `waitFor`s its grace (one block at most), frees it and reuses the entry. The evicted tail stops without a fade, as today; a declick on
-eviction was considered and rejected for now (it would change mu-Clid's spam-swap render), to revisit at T1.
+- **One packed word.** In `TryLock` mode the serial lives in a single `std::atomic<uint64_t> layout` in `ProcessorCore` (count in the low 32 bits, serial in
+  the high 32; `static_assert` lock-free), and **every** count store goes through it as one store that also advances the serial: the structural edits,
+  `publishLayerLocked` / `unpublishLayerLocked`, and `applyComposedState`, which today stores the count with no lock (`ProcessorBase.cpp:759`). `numLayers`
+  stays as a mirror for existing readers and is written from the same value. `LayerBlock` reads count and serial in one load. In `Published` mode the serial is
+  the view's.
+- **A park outside `layersLock`** (mu-Tant's count-reducing full preset, `setLayerType` step 5) uses `nextSerial()`, the serial the following count store or
+  publication will carry; until that store lands the entry does not render and the old layer still renders live.
+- **A park under `layersLock`** (mu-Clid's engine install) may use the current serial: the audio thread cannot start a block until the lock is released, and
+  the first block after it renders the new engine live and the old one as a tail in the same slot, as today.
+- **A failed `LayerBlock`** never touches the bin: no transition, no `onRetireStart`, no ramp step.
+- **A cut between phase 0 and phase 4** (`mixCount` was taken with the entry active) renders silence: every slot below `mixCount` with no live layer has its
+  scratch cleared in phase 1 (2.1.1).
+
+**In-place entries (R1, mu-Tant).** An in-place entry borrows a spare that stays in `layers[slot]`, so its lifetime is tied to the slot, not to the bin:
+
+1. A row holds **at most one active** in-place entry; `parkInPlace` on a slot that already has one is a no-op (the running fade continues).
+2. An in-place entry **never renders in a block whose view has its slot live** (`render(..., slotHasLive)` skips it): the spare is then the live layer.
+3. **Regrow order:** publish the count first, then `cutSlot` the entry. Cutting first leaves one block with neither live nor tail; with the count first, the
+   block that sees the new count renders live and skips the entry (rule 2).
+4. A spare may be destroyed only **after** `cutSlot`, done under `layersLock` (`TryLock` mode) or followed by a grace period (`Published` mode).
+   `addLayer` destroys the spare it replaces (`ProcessorCore.h:129`, `publishLayerLocked` returns it), so mu-Tant's `layersMoved` must call `cutSlot` under the lock
+   before that spare is released.
+5. `swapRows` and `removeRow` **cut** in-place entries; they never move them (today mu-Tant zeroes the tails of moved slots, `PluginProcessor.cpp:692`). Owned
+   entries move with their slot.
+
+This also fixes a latent bug in today's mu-Tant (open point 3): a shrink then regrow leaves the stale tail armed, the next shrink skips the arm, and the old
+snapshot resumes. The cut is accepted as the fix, with a signed golden update at E4.6 after pin P1.
+
+**Tails past the live count (R3).** Per product, a `CountPolicy` set at construction:
+
+| Policy | `mixCount` | On a count-reducing store | Product |
+|---|---|---|---|
+| `RenderPastCount` | `max(view.numLive, highestActiveSlot + 1)` | tails above the count keep rendering into their strips | mu-Tant (today's `renderCount` rule) |
+| `CutAtCount` | `view.numLive` | `cutAtOrAbove(newCount)` under `binMutex`, after the count store | mu-Clid today renders retired engines only for slots below the active count (`MixerEngine.cpp:166-194`) |
+
+mu-Clid's choice is made at E5 after pin P3 shows what today does when the count drops while tails ring and then regrows (whether the unrendered engines
+resume); if `CutAtCount` differs from it, the difference is a signed golden update at E5.4d. mu-Toni and mu-On park nothing, so the policy is moot;
+mu-Tronic's is chosen at T1 with its remove path.
+
+**Depth and overflow.** Placement is into the first Empty entry of the row. A full row evicts **entry 0** (mu-Clid's force-cut rule, kept for bit identity):
+under `binMutex` the message thread cuts it, then `waitFor(stamp, timeout)` its grace (one block at most; `binMutex` is held across this one bounded wait, and
+`layersLock` never is); on success it frees the entry and reuses it, on a timeout it **drops the incoming tail** (an owned tail goes to the reclaim list and is
+freed by `service` after its own grace; an in-place spare is simply not parked) and the evicted entry stays Done for `service` (N2). The evicted tail stops
+without a fade, as today; a fast declick on eviction is not adopted for the four products (it would change mu-Clid's spam-swap render) and is to be considered
+for mu-Tronic's own types at T1.
 
 **Fade and lifetime.** The bin's ramp is a service the tail applies itself, at the point in its chain where today's product applies it (mu-Tant fades the engine
 *before* its insert): `mu_core::applyLinearFade(buf, n, rs)` uses exactly mu-Tant's expression, and the bin decrements `samplesLeft` by `n` after the call.
 Lengths are in seconds and are converted with the rate prepared when the entry is parked; a bin never crosses a prepare (below), so nothing needs rescaling.
 `maxSeconds` is clamped to `kRetireHardCapSeconds` (proposed 30 s); in an entry's last 10 ms of life the bin renders it into its own prepared scratch and applies a
-10 ms linear declick before adding it, then sets Done. No product's tail reaches that window in the golden set (mu-Tant 25 ms; mu-Clid's longest tail to be
-checked, open point 7).
+10 ms linear declick before adding it, then sets Done. The 30 s cap is accepted provided pin P4 shows no golden tail exceeds it (mu-Tant 25 ms; mu-Clid's
+amp release plus the 2 s drain, and `ampRelToEnd` samples); **recorded change:** a retired `ampRelToEnd` sample longer than 30 s, which plays to its end
+today, now fades out at 30 s. **Seconds, with one kept exception (amendment b):** policies are in seconds, but mu-Clid's drain stays block-counted inside
+`EngineTail` for bit identity; it is already block-size dependent today, which is recorded, not changed.
 
 **Who frees, on which thread.** Only `service()` frees, on the message thread (the 100 Hz poll, `runDeferredWork`, `flushPendingAsyncUpdates` for headless
-renders), outside every lock except the writers' mutex, which the free does not need. The audio thread's Done requests deferred work so the free is prompt.
-**Flush:** `prepareToPlay` and `releaseResources` call `cutAll()` then `service()` (the host is not processing, the stamp is even, everything is freed at once);
-`prepareForDestruction()` does the same before any product member is destroyed.
+renders), under `binMutex` and outside `layersLock`; it never waits (an entry whose grace has not passed waits for the next pass). The audio thread's Done
+requests deferred work so the free is prompt. **Flush:** `prepareToPlay` and `releaseResources` call `setPrepared` (prepare only), `cutAll()` then `service()`
+under `binMutex`, so they serialise with a concurrent 100 Hz service on another thread (the host is not processing, the stamp is even, everything is freed at
+once); `prepareForDestruction()` does the same before any product member is destroyed. mu-Clid's flush at prepare (today it re-prepares retired engines and
+keeps them) is **accepted as a deliberate change** (open point 8). **Natural Done for mu-Tronic:** whether a `Natural` tail must also render one silent block
+before Done is to be considered for mu-Tronic's types at T1; mu-Clid stops at Done (open point 4).
 
 **Service lifetime.** The wavetable bank and the sample library outlive every layer and every tail: in the four products they are product members, and every
 product destructor calls `prepareForDestruction()` first, which empties the bin; mu-Tronic's `LayerServices` (T1) are `ProcessorBase` members declared before
@@ -429,8 +534,8 @@ layer is reference counted (C6).
 
 | Product | Today | In the bin |
 |---|---|---|
-| mu-Tant (E4.6) | count-reducing full preset: `retiring[v]` fades the slot's own engine and insert for 25 ms with a message-thread snapshot, into channel `v` past the live count | `parkInPlace(v, pattern, ...)`: the spare `Pattern` stays in `layers[v]` and keeps its engine; `Fade`, 25 ms; `renderRetiring` writes (`exclusive`) as `renderRetiringVoice` does; `mixCount` covers the slot. A layer published live into that slot cuts the entry first. |
-| mu-Clid (E5.4d) | hot-swap retires the slot's `VoiceEngine` (not the `Rhythm`) into 4 per-slot entries; `markRetired` under suspend; drained by `isFullyDrained`; overflow force-cuts entry 0 | `park(r, std::make_unique<EngineTail>(std::move(oldEngine)), ...)` with `mu_clid::EngineTail : RetireTail` in the mu-Clid library; `Natural`; `markRetired` becomes `onRetireStart`; tail adds after the live engine; rows move in `layersReordered`. |
+| mu-Tant (E4.6) | count-reducing full preset: `retiring[v]` fades the slot's own engine and insert for 25 ms with a message-thread snapshot, into channel `v` past the live count | `RenderPastCount`; `parkInPlace(v, pattern, nextSerial())` outside `layersLock`, before the packed count store: the spare `Pattern` stays in `layers[v]` and keeps its engine; `Fade`, 25 ms; `renderRetiring` writes (`exclusive`) as `renderRetiringVoice` does; `mixCount` covers the slot. Regrow: count first, then `cutSlot` (R1 rule 3); `layersMoved` cuts under the lock before `addLayer` releases a spare (rule 4); swaps and removes cut (rule 5). |
+| mu-Clid (E5.4d) | hot-swap retires the slot's `VoiceEngine` (not the `Rhythm`) into 4 per-slot entries; `markRetired` under suspend; drained by `isFullyDrained`; overflow force-cuts entry 0; retired engines render only below the active count | `park(r, std::make_unique<EngineTail>(std::move(oldEngine)), currentSerial)` under `layersLock` in the install, after `service()` in the same pass; `mu_clid::EngineTail : RetireTail` in the mu-Clid library; `Natural` (drain block-counted, amendment b); `markRetired` becomes `onRetireStart`; tail adds after the live engine; owned rows move in `layersReordered`; count policy chosen at E5 after P3; stop at Done accepted after P2 (open point 4). |
 | mu-Toni, mu-On | a removed or replaced layer is reset or cut | `None`: not parked, freed after the grace period. |
 | mu-Tronic (T1) | | type change and remove park the whole layer (`park(slot, std::move(layer))`). |
 
@@ -438,12 +543,20 @@ layer is reference counted (C6).
 interleaving of park, cut, service against block start, render, finish); N-deep: four tails in one slot, a fifth evicts entry 0; two retargets inside 25 ms
 both sound to their end; nothing is freed before Done plus grace (fake epoch); `cutAll` at prepare and release frees everything; the hard lifetime ends a tail
 that never reports silence, with the declick; the ramp length at 44.1, 48, 96 and 192 kHz equals mu-Tant's `retireRampSamples()`; no allocation or free on the
-audio thread; the activation serial gives the same-block hand-over; destruction order (a fake service asserts no tail is alive when it dies); an in-place
-entry is cut when its slot goes live.
+audio thread; the activation serial gives the same-block hand-over, including across a serial wrap; destruction order (a fake service asserts no tail is
+alive when it dies). **R1 to R4 cases:** a second `parkInPlace` on an active in-place row is a no-op; an in-place entry is skipped in every block whose view has
+its slot live, and on regrow (count first, then cut) no block has neither; a spare is never destroyed before its `cutSlot` (destructor probe, `addLayer` over a
+ringing spare); `swapRows` / `removeRow` cut in-place entries and move owned ones; `service`, a park and `cutAll` + `service` from a second "host" thread never
+overlap (`binMutex`, two-thread stress); `service` runs before the install in a deferred-work pass; both count policies (`RenderPastCount` renders above the count,
+`CutAtCount` cuts at the store); a failed `LayerBlock` changes no entry; an entry cut after phase 0 renders silence in its slot; every count store goes through the
+packed word (a `applyComposedState` race test).
 
 **Failure modes considered.** Free while the audio thread is inside `renderRetiring` (the grace period); a tail started after it was cut (the audio
-compare-exchange); a tail rendered both live and as a tail (activation serial); eviction of an entry the audio thread is reading (cut, grace, then reuse); a
-prepare changing the rate under a ramp (flush); a tail outliving the bank (destruction order); an endless comb or reverb tail (hard lifetime); 16 slots of tails
+compare-exchange); a tail rendered both live and as a tail (activation serial; for in-place entries also the `slotHasLive` skip); a block with neither (count
+before cut on regrow; cleared scratch after a late cut); a spare destroyed under a ringing in-place entry (cut first, R1 rule 4); a stale in-place tail
+resuming after shrink, regrow, shrink (one active entry, cut on regrow); two message-side operations racing (`binMutex`); a count stored without the serial
+(the packed word); eviction of an entry the audio thread is reading (cut, grace, then reuse; drop the incoming tail on timeout); a prepare changing the rate
+under a ramp (flush, and the rate read under `binMutex`); a tail outliving the bank (destruction order); an endless comb or reverb tail (hard lifetime); 16 slots of tails
 (global budget, C18 numbers); `-0.0` versus `+0.0` in stems (tails add straight into the slot scratch, as today; the private scratch is used only in the declick window).
 
 **Rejected.** A global ring of 16 to 32 (slot numbers would need renumbering on every edit, and mu-Clid's per-slot eviction could not be kept); a fixed gain
@@ -455,7 +568,8 @@ owning only whole layers (mu-Clid retires an engine, not its `Rhythm`; mu-Tant k
 **Ruling.** A tail reads only (a) its own object's DSP state, (b) its declared snapshot, (c) the transport fields of the `RenderContext` it is given, and
 (d) a service through the same discipline as its live layer. It never reads: any APVTS atomic (bound or by id), its slot's or its own `ModulationMatrix`,
 `ControlSequence`s, `modLock`- or `voiceParamsLock`-guarded data, a peer (`ctx.peer()` returns null), the MIDI input (`ctx.midi` is empty), the `LayerView`, another layer, or
-`ProcessorBase`. Same-prefix types are the case that makes this necessary: a retired Kick and a new Bass in one slot share `t{N}_`.
+`ProcessorBase`. It may **write** MIDI: the tail context's `midiOut` is a valid sink drawn from the note-off reserve (2.1.5, R7), which is where
+`onRetireStart` emits owed note-offs. Same-prefix types are the case that makes this necessary: a retired Kick and a new Bass in one slot share `t{N}_`.
 
 **`beginRetire` contract (message thread).** The host calls it **before** any parameter of the slot changes and **before** the layer leaves the view (step 4 of
 2.1.2; mu-Tant's `applyFullPresetTree` already arms its tail before `applyComposedState`). It is the last time the layer may read its bound parameters. It copies
@@ -482,8 +596,10 @@ struct RetireSnapshot                    // a layer type with a tail holds one o
 
 The proof is behavioural and generic, so it needs nothing from the type but its registration: **`mu_core::testing::checkRetireIsolation(info)`** builds two
 identical instances of the type in slot 0 of a test processor, renders the same blocks, calls `beginRetire` on both and parks both, then on **one** of them
-scrambles every parameter under the slot's prefix (legal random values), replaces its modulation matrix and control sequences, and feeds garbage peers; the two
-tails must be bit-identical for their whole life. A second case puts a same-prefix type in the slot while the first rings (the E1 fake pair; mu-On Kick to Bass
+scrambles **every APVTS parameter of the processor** (legal random values; not only the slot's prefix, because a snapshot may hold globals: mu-Tant's includes
+the global root and scale through `globalPtrs`), replaces its modulation matrix and control sequences, and feeds garbage peers; the two tails must be
+bit-identical for their whole life, compared on the **tail's own output before the strip** (N6), so mixer and FX parameters scrambled on one side cannot mask
+or fake a difference. A second case puts a same-prefix type in the slot while the first rings (the E1 fake pair; mu-On Kick to Bass
 in E3). In Debug and test builds the `bindParams` cache is a `mu_core::ParamBinding` whose `load()` asserts that `onRetireStart` has not run, so an accidental
 read is a jassert in the first test that hits it, not a silent mix of two layers.
 
@@ -522,12 +638,14 @@ struct MidiView                  // the block's MIDI after the control router's 
     int32_t  firstFrame;         // this call covers host frames [firstFrame, firstFrame + blockSize)
     uint16_t channelMask;        // bit c = channel c+1 is this layer's (0xFFFF = omni; per-layer MIDI-in arrives at T8a)
     uint16_t dropped;            // events the decoder had no room for; 0 expected, asserted by tests
+    uint32_t reserved;           // explicit: no implicit padding (24 bytes)
 };
 
-struct MidiSink                  // the layer's MIDI output (mu-Clid MIDI mode, E5); events == nullptr: none
+struct MidiSink                  // the layer's MIDI output (mu-Clid MIDI mode, E5; tails: owed note-offs); events == nullptr: none
 {
     MidiEvent* events;
     int32_t    capacity;
+    int32_t    reserved;         // explicit: no implicit padding before `count`
     int32_t*   count;            // appended by the layer, frames relative to the host block
 };
 
@@ -548,15 +666,15 @@ struct RenderContext
     int32_t  frameOffset;        // where this call starts inside the host block (0 unless chunked)
     int32_t  slot;
     double   bpm;
-    double   startBeat;          // song beat at this call's first frame; never wrapped by the contract
+    double   startBeat;          // song beat at this call's first frame; never wrapped by the contract; may be NEGATIVE (pre-roll, count-in)
     double   beatsPerSample;     // the resolver's (under MIDI clock: span / frames); > 0 also while stopped
     double   callBeats;          // beats this call spans; 0 while stopped
     double   beatWrap;           // 0 = unbounded; > 0 = the HOST bounds its beat space to [0, beatWrap)
     uint8_t  playing;
     uint8_t  justStarted;        // playing, and not playing in the last RENDERED block
     uint8_t  justStopped;        // not playing, and playing in the last rendered block
-    uint8_t  transportJumped;    // playing in both, and startBeat is not where the last rendered block ended
-    uint8_t  retiring;           // 1 in renderRetiring (midi empty, no peers)
+    uint8_t  transportJumped;    // playing in both, and a host-block discontinuity since the last rendered block (sticky jumpPending)
+    uint8_t  retiring;           // 1 in renderRetiring (midi empty, midiOut valid from the note-off reserve, no peers)
     uint8_t  frozen;             // 1: render from the last resolved values, read no APVTS or matrix (C7 provision, C12 rule)
     uint8_t  reserved[2];
     MidiView midi;
@@ -571,16 +689,44 @@ struct RenderContext
 };
 static_assert(std::is_standard_layout_v<RenderContext> && std::is_trivially_copyable_v<RenderContext>);
 // forEachMidi(view, fn(const MidiEvent&, int frameInCall)) applies channelMask and the call's frame range (inline, not a callback).
+// The base asserts ctx.blockSize == n and ctx.frameOffset == ctx.midi.firstFrame on every call (the view stays self-contained for forEachMidi).
+
+// mu-core/Sequencer/BeatWrap.h: the one floor-wrap (R6), moved out of resolveTransport's lambda (TransportResolver.h:126-130)
+inline double wrapBeat(double b, double wrap) noexcept
+{
+    if (wrap <= 0.0) return b;                       // unbounded
+    b = std::fmod(b, wrap);
+    if (b < 0.0) b += wrap;                          // negative positions (pre-roll) wrap upward
+    return b < wrap ? b : std::nextafter(wrap, 0.0); // -1e-17 + 64 rounds to exactly 64.0: keep the result below wrap
+}
 ```
 
-**Edges (computed by the base, phase 0 of 2.1.1, against the last *rendered* block).** The base keeps, audio-thread only, `{ bool rendered; bool playing;
-double endBeat; }`, written in phase 5 and reset by `prepareToPlay`. `justStarted = playing && !last.playing`; `justStopped = !playing && last.playing`;
-`transportJumped = playing && last.playing && |d| > kJumpToleranceBeats`, with `d = startBeat - last.endBeat`, taken modulo `beatWrap` (to the nearest
-multiple) when the host bounds its beat space, so mu-Tant's own 64-beat wrap is not a jump. A locate while stopped is reported by `justStarted` alone. An
-unrendered block (missed try-lock, `layerEditInFlight`, a 0-frame block) does not update the latch, so its edge reaches the layers in the next rendered block:
-this is what mu-On's `wasPlaying` and mu-Toni's `wasRunning` already do, because both are written only inside the lock. `onTransportStopped` and
-`onTransportJump` are called in phase 0 of the block that carries the flag, before any render; the same flags are in the context so a layer whose order needs it
-can act inside `render` instead (a type uses one or the other, not both). Hooks are not called on tails; tails see the flags.
+On non-negative input `wrapBeat` is exactly today's lambda (`fmod` is exact), so every golden is unchanged; on a tiny negative input it returns the largest
+double below `wrap` where today's lambda returns `wrap` itself (an out-of-range gate index in an unbounded host). The resolver, every layer that wraps
+(`Pattern::render`) and the jump check below use it; no layer calls bare `fmod` on a beat.
+
+**Edges (computed by the base; R5).** Two pieces of audio-thread state, both reset by `prepareToPlay`, with different update rules:
+
+- **Host continuity, every host block** (rendered, missed try-lock, `layerEditInFlight`, 0 frames), in step (1) of `renderAndMix` before `LayerBlock`:
+  `host = { bool valid; bool playing; double endBeat; double beatsPerSecond; double blockSeconds; }`. If the previous host block and this one are both playing,
+  `d = startBeat - host.endBeat`, reduced with `wrapBeat` to the nearest multiple of `beatWrap` when the host bounds its beat space (so mu-Tant's own 64-beat
+  wrap is not a jump); `|d| > tol` sets the sticky **`jumpPending`**. A stop and restart that both fall inside unrendered blocks also sets it (the layers would
+  otherwise see neither edge). Then `host` is overwritten with this block's values.
+- **Play/stop latch, rendered blocks only** (phase 5, as now): `last = { bool playing; }`. `justStarted = playing && !last.playing`;
+  `justStopped = !playing && last.playing`; `transportJumped = playing && last.playing && jumpPending`, and phase 5 clears `jumpPending`.
+
+**Why (the defect R5 fixes):** with the end beat latched only on rendered blocks, the block after an unrendered one (every structural edit in mu-Tant, mu-On and
+mu-Clid raises `layerEditInFlight`, and any try-lock miss) saw a delta of one block of beats and fired `transportJumped` during continuous play. Comparing
+against the previous **host** block removes the false jump; making the result sticky still delivers a real locate that happened inside an unrendered block.
+Pin P6 records today's note state across a structural edit mid-play ("no note release"). A locate while stopped is reported by `justStarted` alone. The play/stop
+latch matches mu-On's `wasPlaying` and mu-Toni's `wasRunning`, which are written only inside the lock.
+
+**Tolerance (open point 1, ruled).** E1 codes `tol = 1/256 + |beatsPerSecond_now - beatsPerSecond_last| * lastBlockSeconds` (beats; the second term
+absorbs a tempo change between blocks under automation). It needs no measurement before E1; M1 (block-to-block host position deltas under fast tempo
+automation in Bitwig and Reaper, and under MIDI clock with the sync-offset ramp) is measured before the first consumer, at T1, and may only widen it.
+
+`onTransportStopped` and `onTransportJump` are called in phase 0 of the block that carries the flag, before any render; the same flags are in the context so a
+layer whose order needs it can act inside `render` instead (a type uses one or the other, not both). Hooks are not called on tails; tails see the flags.
 
 **State a layer may keep (the rule behind "no free-running phase").**
 
@@ -594,7 +740,15 @@ can act inside `render` instead (a type uses one or the other, not both). Hooks 
 them (its choice, documented per type); emit them on `onRetireStart`; and never let them depend on the block size. They may be held as an event-anchored frame
 countdown (mu-Toni's `gateCounter`, mu-Clid's `noteOffCountdown`) or as an end beat. **This amends C4's "beat-domain pending note-offs":** converting today's
 frame countdowns to beats changes the frame a note-off lands on by rounding, which breaks D7 for mu-Toni and mu-Clid; a frame countdown that starts at the
-note-on is not a transport phase, and the three release rules give the jump and stop behaviour C4 asks for. New layer types (mu-Tronic) may use either form.
+note-on is not a transport phase, and the three release rules give the jump and stop behaviour C4 asks for (accepted, amendment a). New layer types (mu-Tronic)
+may use either form, **with one caveat:** mu-Clid's `MidiOutputEngine` counts its countdown from the block start, not from the note-on frame, so no mu-Tronic
+type may reuse it for triggers inside a block; a new type counts from the event's own frame.
+
+**MIDI from a tail (R7).** The tail context has an **empty** `midi` view and a **valid** `midiOut` sink drawn from the note-off reserve (the last 256 entries of
+the block's event storage), so `onRetireStart` can emit its owed note-offs into `ctx.midiOut` even when live layers filled the rest. **Merging sinks into the
+host `MidiBuffer` never grows it on the audio thread:** the merge stays within the room the host buffer already has (today's rule, pinned by mu-Clid's
+`ProcessorSeamTests`, "the host owns this buffer's room; the processor must not need more"), note-offs first; the AllocationProbe covers it, and the exact
+mechanism is reviewed with E5.4c.
 
 **Tempo changes between blocks stay phase-continuous** by construction: the resolver makes each block start where the last one ended (internal and MIDI
 clock; a host supplies its own position), positions are functions of the beat, so a new tempo changes only the next block's `beatsPerSample`; event-anchored
@@ -605,12 +759,12 @@ modelled).
 
 | Product | Clock today | Kind | In the contract |
 |---|---|---|---|
-| mu-Toni loop mode (`ArpVoiceRunner::renderOnGrid`) | `nextStep = ceil(startBeat / stepBeats)`, cursor plus `expectedBeat`, re-find when off by more than half a step | transport-anchored cursor | Unchanged code; reads `ctx.startBeat`, `ctx.beatsPerSample`, `ctx.bpm`, `ctx.playing`. Keeps its own half-step tolerance. **No clock rework in E2**; only `ArpContext`'s source changes. |
+| mu-Toni loop mode (`ArpVoiceRunner::renderOnGrid`) | `nextStep = ceil(startBeat / stepBeats)`, cursor plus `expectedBeat`, re-find when off by more than half a step | transport-anchored cursor | Unchanged code; reads `ctx.startBeat`, `ctx.beatsPerSample`, `ctx.bpm`, `ctx.playing`. Keeps its own half-step tolerance. **No clock rework in E2** (accepted, amendment c); only `ArpContext`'s source changes. |
 | mu-Toni MIDI-trigger mode | `stepCounter` frames from the key press; `samplesPerStep` from `bpm` per block | event-anchored | Unchanged. `noteOnEdge`, `anyNoteHeld` and the root override come from the layer's own held-note scan of `ctx.midi` (E2.3). |
 | mu-Toni gate | `gateCounter` frames from the note-on; stop: `run == false` notes off inside `render` | event-anchored | Unchanged; stop handled inside `render` (flags form). `wasRunning` stays in the runner (it includes the MIDI-trigger gate). |
-| mu-On (`GrooveSequencer`) | one global `nextGlobalStep` cursor, resync beyond plus or minus one step; frame offset `round((t - start) / bps)`; stop edge `grooveVoices.reset()`; Rumble envelope at the beat | transport-anchored cursor | One cursor per track row with the same arithmetic (E3.4); stop edge as `onTransportStopped`; Rumble envelope at `ctx.startBeat`; tempo-synced taps from `ctx.bpm`. Order of `reset` against the parameter refresh is checked in E3 (open point 9). |
-| mu-Tant (`gateAt(beat)`, `resolveLane` at the beat) | absolute beat, wrapped to 64 beats by the resolver | transport-anchored, no cursor | The mu-Tant standalone keeps `wrapBeats = 64` as its host policy (`beatWrap = 64`), because an unwrapped counter reaches a different double after 64 beats of internal play; `Pattern::render` applies `fmod(startBeat, 64)` itself, which is exact on already-wrapped input, so mu-Tant stays bit-identical and the layer is correct in an unbounded host (mu-Tronic). |
-| mu-Clid (`RhythmSequencer`) | step from the beat (`stepAt`), `lastEffectiveStep` wrap detector, dip-hold `resolveBlockBeat`, block-granular triggers at frame 0; plugin Note mode runs its own beat counter | transport-anchored; the dip-hold and Note-mode counter are host transport policy | Dip-hold and the Note-mode counter stay host-side (they produce `startBeat`). The per-slot trigger source is open (open point 6): the context carries **no** product trigger field. MIDI note-off countdown: event-anchored. |
+| mu-On (`GrooveSequencer`) | one global `nextGlobalStep` cursor, resync beyond plus or minus one step; frame offset `round((t - start) / bps)`; stop edge `grooveVoices.reset()`; Rumble envelope at the beat | transport-anchored cursor | One cursor per track row with the same arithmetic (E3.4); stop edge as `onTransportStopped`; Rumble envelope at `ctx.startBeat`; tempo-synced taps from `ctx.bpm`. Order of `reset` against the parameter refresh: pin P5 first; if the hook order differs, mu-On uses the flags form inside `render` (open point 9). |
+| mu-Tant (`gateAt(beat)`, `resolveLane` at the beat) | absolute beat, wrapped to 64 beats by the resolver | transport-anchored, no cursor | The mu-Tant standalone keeps `wrapBeats = 64` as its host policy (`beatWrap = 64`), because an unwrapped counter reaches a different double after 64 beats of internal play; `Pattern::render` applies `wrapBeat(startBeat, 64)` itself (never bare `fmod`, which is negative on a pre-roll beat), which is exact on already-wrapped input, so mu-Tant stays bit-identical and the layer is correct in an unbounded host (mu-Tronic), including at negative beats. |
+| mu-Clid (`RhythmSequencer`) | step from the beat (`stepAt`), `lastEffectiveStep` wrap detector, dip-hold `resolveBlockBeat`, block-granular triggers at frame 0; plugin Note mode runs its own beat counter | transport-anchored; the dip-hold and Note-mode counter are host transport policy | Dip-hold and the Note-mode counter stay host-side (they produce `startBeat`). The context carries **no** product trigger field (accepted, amendment d); `SampleRhythm` runs its own cursor, which must reproduce `RhythmSequencer`'s wrap and swap-start arithmetic bit for bit (E5.5, own `dsp-controller` gate; open point 6). MIDI note-off countdown: event-anchored, counted from the block start (caveat above). |
 
 **What the three E1 constraints imply.** (1) *C-struct mirror:* fixed-width scalars, `uint8_t` flags, no reference, no JUCE or `std` type, `structSize` and
 `version` at the head, fields only appended; the MIDI view is a POD array the base decodes once per block into storage sized at construction
@@ -624,48 +778,50 @@ base's (the bin's Done), never a layer's.
 **Invariants a test can assert.** Layout: standard layout, trivially copyable, frozen size and offsets. Block-size invariance: a beat-driven fake layer fires
 its events on the same absolute frames under a fixed 512 schedule and the ragged schedule (1, 7, 63, ..., oversize). Tempo ramp: event beats exact to 1e-9,
 no double fire, no missed step. `startBeat` 1e6: positions within one frame. Edges: `justStarted` / `justStopped` once per edge; latched across a missed
-lock and a 0-frame block; `onTransportJump` exactly once per host locate, loop-back and clock snap, never on a contiguous block and never on mu-Tant's 64-beat
-wrap. MIDI: `dropped == 0` in all goldens; note-offs survive an overflow. Retire contexts carry no MIDI and no peers.
+lock and a 0-frame block; `onTransportJump` exactly once per host locate, loop-back and clock snap, never on a contiguous block, **never on the block after a
+missed lock or a `layerEditInFlight` block during continuous play**, still once for a locate that happened inside an unrendered block, and never on mu-Tant's
+64-beat wrap. Negative beats: a fake layer started at `startBeat` -4 (pre-roll) fires on the same frames as its unwrapped reference and, with `beatWrap = 64`,
+never sees a wrapped beat outside `[0, 64)` (E1). MIDI: `dropped == 0` in all goldens; note-offs survive an overflow; a tail's note-offs reach the host buffer
+when live layers filled the non-reserved storage; the merge allocates nothing. Retire contexts carry no MIDI input and no peers, and a valid sink. Layout: no
+implicit padding (`offsetof` test, the reserved fields).
 
 **Failure modes considered.** A layer accumulating beats across blocks (drifts under tempo change, breaks on locate: the block-size and ramp tests); edges lost on a
-missed lock (latch); a jump tolerance too tight for host jitter under tempo automation (false jumps) or too loose (missed small locates; layers keep their own
-detectors, so the flag is a hint): open point 1; the wrap of a bounded host read as a jump (modulo `beatWrap`); MIDI overflow stranding notes (reserve); an
-oversize block overrunning prepared buffers (chunking).
+missed lock (latch, sticky `jumpPending`); a false jump after an unrendered block (host-block continuity, R5); a jump tolerance too tight for host jitter under
+tempo automation (false jumps) or too loose (missed small locates; layers keep their own detectors, so the flag is a hint): the tempo term and M1; the wrap of a
+bounded host read as a jump (`wrapBeat` to the nearest multiple); a negative pre-roll beat indexing out of range (`wrapBeat`, R6); a tail with an owed note and
+no sink (the reserve, R7); MIDI overflow stranding notes (reserve); an oversize block overrunning prepared buffers (chunking).
 
 **Rejected.** Passing `const juce::MidiBuffer&` (a JUCE type, against A14; a per-layer filtered copy would allocate); a callback for `peer(slot)` (a host
 callback); a per-layer beat wrap inside the resolver (mu-Toni's dotted rates do not divide 64); unwrapping mu-Tant's transport now (breaks D7 after 64 beats);
 beat-domain note-offs for the existing products (above); a product trigger mask in the context (product vocabulary in core, and a field that mu-Tronic could
 never fill).
 
-#### 2.1.6 Open points for the `dsp-controller` (and the prototypes they need)
+#### 2.1.6 Open points: the `dsp-controller`'s rulings (round 1, 2026-10-15)
 
-Settled above unless listed here. Items 1 to 4 need a measurement or a spike before E1 code; the rest are decided at the stage named.
+None of the twelve blocks E1. The pins (P) and measurements (M) named here are listed in [extraction-plan.md](extraction-plan.md) step E0.6.
 
-1. **Jump tolerance** (`kJumpToleranceBeats`, proposed 1/256 beat): measure host position deltas between blocks under fast tempo automation (Bitwig, Reaper) and
-   under MIDI clock with the sync offset ramp; pick a value with margin on both sides. Prototype: a logging build of mu-Toni's runner detector.
-2. **Single-reader assumption** for `AudioEpoch`: confirm no supported host re-enters `processBlock` or calls it from a second thread (offline bounce while the
-   realtime thread stops). Prototype: the `enter()` assert in a pluginval run of each format.
-3. **mu-Tant in-place tail and regrow** (E4.6): today a count that grows back during a tail renders the slot live and leaves the tail counter armed; the bin cuts
-   the entry instead. Pin today's render of "shrink then regrow within 25 ms" first (E0.6), then decide whether the difference is acceptable.
-4. **mu-Clid drained-engine output** (E5.4d): today a drained retired engine is still rendered until some later deferred work frees it; the bin stops at Done. Pin that
-   its output after `isFullyDrained()` is exactly zero (Karplus inserts may still ring after the 2 s budget); if not, choose between "Done also requires a silent block"
-   and a signed golden update.
-5. **C11 placement**: `ScopedNoDenormals` in `LayerBlock` (render, bin and mixer), not in `renderLayers` alone.
-6. **mu-Clid trigger source** (E5.5): the plan said fired bits would reach `SampleRhythm` through the context. The context has no such field (it would put product
-   vocabulary in core and mu-Tronic could not fill it). Recommendation: `SampleRhythm` clocks its own step cursor with `RhythmSequencer`'s shared arithmetic, as
-   mu-On's tracks do in E3.4, and the master-loop wrap stays host-side for the swap boundary. To be designed with the E5 plan; it does not change this struct.
-7. **Hard lifetime cap** (`kRetireHardCapSeconds`, proposed 30 s) and mu-Clid's `maxSeconds`: check the longest tail in the golden set (amp release plus the 2 s
-   drain, and `ampRelToEnd` samples, which play to their end today).
-8. **mu-Clid flush at prepare** (E5.4d): today `prepareToPlay` re-prepares retired engines and keeps them; the bin drops them. A re-prepare is a device restart, so the
-   difference is inaudible in practice and in no golden; recorded as a deliberate change for the `dsp-controller` to accept.
-9. **mu-On stop order** (E3): today `applyParams` runs before `grooveVoices.reset()` on the stop edge, and a 0-frame stop block resets at once; with the hook the
-   reset runs first and a 0-frame block defers it. Pin both in E0.6; if either differs, mu-On uses the flags form inside `render`.
-10. **Oversize blocks** (C8): chunking changes today's truncating behaviour, so a golden segment with a block longer than the prepared size cannot stay
-    bit-identical when a product adopts the driver. Either that segment is re-recorded in a goldens-only commit signed by the `dsp-controller`, or it is kept out
-    of the tolerance-0 gate and covered by the chunking test.
-11. **mu-Tant bank-lock miss** (E4.5): today a missed `bankLock` skips the whole block (mixer and FX returns included); a layer-level try-lock silences only that
-    layer. Contention only, in no golden; C5 removes the lock later.
-12. **View pool size** (`kLayerViewPool` = 4) and the `waitFor` on exhaustion: confirm with the T1 stress test that a burst of type changes never waits more than one block.
+1. **Jump tolerance:** not needed before E1. E1 codes `tol = 1/256 + |beatsPerSecond_now - beatsPerSecond_last| * lastBlockSeconds` (2.1.5); M1 measures
+   block-to-block host position deltas under fast tempo automation (Bitwig, Reaper) and under MIDI clock with the sync-offset ramp before the first consumer (T1).
+2. **Single reader:** E1 codes N4 (read-modify-write parity, sticky reclaim-off, 2.1.2). Before E4, M2: Debug pluginval for VST3, CLAP and Standalone with the
+   assert, plus an offline bounce while playing in Reaper and Bitwig.
+3. **mu-Tant shrink then regrow:** today has a latent bug (the stale tail stays armed; on the next shrink the arm is skipped, so the old snapshot resumes). The
+   bin's cut (2.1.3, R1) is accepted as the fix, with a signed golden update at E4.6 after pin P1.
+4. **mu-Clid output after drain:** Karplus inserts can ring for minutes. "Stop at Done" is accepted, with a signed golden update at E5.4d if pin P2 shows
+   non-zero samples after `isFullyDrained()`.
+5. **C11 placement:** accepted with N7 (each product keeps its own top-of-`processBlock` `ScopedNoDenormals`, 2.1.1).
+6. **mu-Clid trigger source:** accepted as amendment (d): no trigger field; `SampleRhythm` runs its own cursor. E5.5 is re-opened with its own `dsp-controller`
+   gate: the per-layer cursor must reproduce `RhythmSequencer`'s wrap and swap-start arithmetic bit for bit.
+7. **Hard cap 30 s:** accepted if pin P4 shows no golden tail exceeds it; recorded that a retired `ampRelToEnd` sample longer than 30 s now fades at 30 s (2.1.3).
+8. **mu-Clid flush at prepare:** accepted as a deliberate change.
+9. **mu-On stop order:** pin first (P5: the stop edge with `applyParams` before `reset`, and a 0-frame stop block); if the hook order differs, mu-On uses the
+   flags form inside `render`.
+10. **Oversize blocks:** today's truncation is a defect. The oversize segment is re-recorded in a goldens-only commit the `dsp-controller` signs, then kept in the
+    tolerance-0 gate; the chunking test is the main evidence (pin P7 records today's segment per product first).
+11. **mu-Tant bank-lock miss:** accepted (only contention changes: a miss silences one layer, not all); a tail takes the same bank try-lock as its live layer.
+12. **View pool:** accepted with N3 (pool of 4, the publish-twice assert, an overflow view instead of a wait, counted in the T1 stress test).
+
+**Amendments accepted with caveats:** (a) frame countdowns for note-offs, but no mu-Tronic type reuses `MidiOutputEngine` for in-block triggers (2.1.5); (b)
+`retirePolicy()` in seconds, with mu-Clid's drain kept block-counted inside its tail (2.1.3); (c) no mu-Toni clock rework; (d) no trigger field, E5.5 re-opened.
 
 ### 2.2 The product UI stops depending on the product processor
 
