@@ -25,6 +25,10 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://transwarp.me/mu-link</loc>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://transwarp.me/free</loc>
     <priority>0.8</priority>
   </url>
@@ -47,6 +51,10 @@
   <url>
     <loc>https://transwarp.me/mu-toni-releases</loc>
     <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://transwarp.me/mu-link-releases</loc>
+    <priority>0.5</priority>
   </url>
   <url>
     <loc>https://transwarp.me/mu-on-releases</loc>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Download | Transwarp Development Project</title>
-  <meta name="description" content="Download μ-clid, μ-tant, μ-toni, μ-on and μ-clid MIDI. μ-clid MIDI is freeware, the rest are pay what you want. VST3, CLAP and Standalone for Windows, Linux in beta. Always the latest version.">
+  <meta name="description" content="Download μ-clid, μ-tant, μ-toni, μ-on, μ-clid MIDI and μ-link. μ-clid MIDI and μ-link are freeware, the rest are pay what you want. VST3, CLAP and Standalone for Windows, Linux in beta. Always the latest version.">
   <link rel="canonical" href="https://transwarp.me/download">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://transwarp.me/download">
@@ -64,7 +64,8 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px;
 .dl-card { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 26px 30px; transition: border-color .2s; }
 .dl-card:hover { border-color: var(--border2); }
 .dl-card.clid { border-left: 3px solid var(--accent); }
-.dl-card.midi { border-left: 3px solid var(--cyan); }
+.dl-card.midi { border-left: 3px solid var(--accent); }
+.dl-card.link { border-left: 3px solid var(--cyan); }
 .dl-card.tant { border-left: 3px solid var(--amber); }
 .dl-card.toni { border-left: 3px solid var(--teal); }
 .dl-card.on { border-left: 3px solid #C9A94A; }
@@ -75,7 +76,8 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px;
 .dl-name { font-family: var(--ff-disp); font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
 .dl-name .mu { font-weight: 800; }
 .dl-card.clid .dl-name .mu { color: var(--accent-b); }
-.dl-card.midi .dl-name .mu { color: var(--cyan-b); }
+.dl-card.midi .dl-name .mu { color: var(--accent-b); }
+.dl-card.link .dl-name .mu { color: var(--cyan-b); }
 .dl-card.tant .dl-name .mu { color: var(--amber-b); }
 .dl-tag { font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; padding: 3px 8px; border-radius: 3px; margin-left: 10px; vertical-align: middle; }
 .dl-tag.free { color: var(--cyan-b); border: 1px solid var(--cyan); }
@@ -88,8 +90,10 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px;
 .btn-dl:active { transform: translateY(1px); }
 .btn-dl.clid { background: var(--accent); color: #fff; }
 .btn-dl.clid:hover { box-shadow: 0 0 22px var(--glow); }
-.btn-dl.midi { background: var(--cyan); color: #06121A; }
-.btn-dl.midi:hover { box-shadow: 0 0 22px var(--cyan-glow); }
+.btn-dl.midi { background: var(--accent); color: #fff; }
+.btn-dl.midi:hover { box-shadow: 0 0 22px var(--glow); }
+.btn-dl.link { background: var(--cyan); color: #06121A; }
+.btn-dl.link:hover { box-shadow: 0 0 22px var(--cyan-glow); }
 .btn-dl.tant { background: var(--amber); color: #1A0E06; }
 .btn-dl.tant:hover { box-shadow: 0 0 22px var(--amber-glow); }
 .btn-dl.toni { background: var(--teal); color: #06120E; }
@@ -170,24 +174,32 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
     [aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.4); }
     [aria-disabled="true"]:hover { box-shadow: none !important; transform: none !important; }
   </style>
+  <link rel="stylesheet" href="site.css">
 </head>
 <body>
 
   <nav>
     <a href="index.html" class="nav-logo">
-      <span class="brand">Transwarp</span>
-      <span class="sub">Development Project</span>
+      <span class="brand"><span class="mu">μ</span>-series</span>
+      <span class="sub">Transwarp Development Project</span>
     </a>
-    <div class="nav-links">
-      <a href="mu-clid.html" class="nav-clid"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid</a>
-      <a href="mu-tant.html" class="nav-tant"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-tant</a>
-      <a href="mu-toni.html" style="color:var(--teal-b);text-transform:none"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-toni</a>
-      <a href="mu-on.html" style="color:#E0C568;text-transform:none"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-on</a>
-      <a href="mu-clid-midi.html" class="nav-clid"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid MIDI</a>
-      <a href="free.html" class="nav-free"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-link</a>
-      <a href="download.html" class="active">Download</a>
+    <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links"><span></span><span></span><span></span></button>
+    <div class="nav-links" id="nav-links">
+      <div class="nav-dd">
+        <button class="nav-dd-btn" type="button" aria-haspopup="true" aria-expanded="false">Products <span class="caret">▾</span></button>
+        <div class="nav-menu"><div class="nm-list">
+          <a href="mu-clid.html" class="nm nm-clid"><span class="nm-name"><span class="mu-d">μ</span>-clid</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">Euclidean rhythm sequencer</span></a>
+          <a href="mu-tant.html" class="nm nm-tant"><span class="nm-name"><span class="mu-d">μ</span>-tant</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">Wavetable drone sequencer</span></a>
+          <a href="mu-toni.html" class="nm nm-toni"><span class="nm-name"><span class="mu-d">μ</span>-toni</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">Generative arpeggiator</span></a>
+          <a href="mu-on.html" class="nm nm-on"><span class="nm-name"><span class="mu-d">μ</span>-on</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">909-style groove sequencer</span></a>
+          <a href="mu-clid-midi.html" class="nm nm-midi"><span class="nm-name"><span class="mu-d">μ</span>-clid MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Euclidean MIDI effect</span></a>
+          <a href="mu-link.html" class="nm nm-link"><span class="nm-name"><span class="mu-d">μ</span>-link</span><span class="nm-tag free">Free</span><span class="nm-desc">Sync hub and performance mixer</span></a>
+        </div></div>
+      </div>
+      <a href="index.html#live">Live</a>
+      <a href="index.html#pricing">Pricing</a>
       <a href="index.html#community">Community</a>
-      <a href="index.html#pricing" class="nav-cta">Pay what you want</a>
+      <a href="download.html" class="nav-cta active">Download</a>
     </div>
   </nav>
 
@@ -196,7 +208,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
       <div class="container">
         <div class="dl-eyebrow">Downloads</div>
         <h1>Get the plugins.</h1>
-        <p>μ-clid MIDI is freeware. μ-clid, μ-tant, μ-toni and μ-on are pay what you want, from £0, with £20 suggested. A licence key is issued even for £0 and removes the support prompt shown when the app starts. Nothing is limited without one. Every download is the current release. Windows VST3, CLAP and Standalone, with Linux in beta. macOS is on hold.</p>
+        <p>μ-clid MIDI and μ-link are freeware. μ-clid, μ-tant, μ-toni and μ-on are pay what you want, from £0, with £20 suggested. A licence key is issued even for £0 and removes the support prompt shown when the app starts. Nothing is limited without one. Every download is the current release. Windows VST3, CLAP and Standalone, with Linux in beta. macOS is on hold.</p>
         <div class="ver-banner">
           <span class="ver-dot"></span>
           <div>
@@ -212,7 +224,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
         <div class="dl-list">
 
           <!-- μ-clid (pay what you want) -->
-          <div class="dl-card clid">
+          <div class="dl-card clid" id="mu-clid">
             <div>
               <div class="dl-name"><span class="mu">μ</span>-clid<span class="dl-tag paid">Pay what you want</span></div>
               <div class="dl-formats">8-track euclidean rhythm sequencer + sampler · VST3 · CLAP · Standalone · Windows · Linux</div>
@@ -235,12 +247,25 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
             <div class="dl-actions">
               <a class="btn-dl midi" href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Clid-MIDI-Windows.zip">Download — Windows ↓</a>
               <div class="dl-os"><span class="beta">Beta</span><a href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Clid-MIDI-Linux.zip">Linux ↓</a></div>
-              <div class="dl-sub"><a href="mu-clid-midi.html" style="color:var(--cyan-b)">About</a> · <a href="mu-clid-midi-releases.html" style="color:var(--cyan-b)">Release notes</a></div>
+              <div class="dl-sub"><a href="mu-clid-midi.html" style="color:var(--accent-b)">About</a> · <a href="mu-clid-midi-releases.html" style="color:var(--accent-b)">Release notes</a></div>
+            </div>
+          </div>
+
+          <!-- μ-link (freeware desktop app, Windows only) -->
+          <div class="dl-card link" id="mu-link">
+            <div>
+              <div class="dl-name"><span class="mu">μ</span>-link<span class="dl-tag free">Freeware</span></div>
+              <div class="dl-formats">Sync hub and performance mixer · Desktop app, not a plug-in · Windows</div>
+              <div class="dl-meta"><span>Version <b data-version>v1.1.0.1411</b></span><span data-asset="mu-Link-Windows.zip">Windows zip</span><span>Freeware · No support prompt · No key needed</span></div>
+            </div>
+            <div class="dl-actions">
+              <a class="btn-dl link" href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Link-Windows.zip">Download — Windows ↓</a>
+              <div class="dl-sub"><a href="mu-link.html" style="color:var(--cyan-b)">About</a> · <a href="mu-link-releases.html" style="color:var(--cyan-b)">Release notes</a></div>
             </div>
           </div>
 
           <!-- μ-tant (pay what you want) -->
-          <div class="dl-card tant">
+          <div class="dl-card tant" id="mu-tant">
             <div>
               <div class="dl-name"><span class="mu">μ</span>-tant<span class="dl-tag paid">Pay what you want</span></div>
               <div class="dl-formats">Wavetable drone synth · VST3 · CLAP · Standalone · Windows · Linux</div>
@@ -327,10 +352,14 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
   <footer>
     <div class="container">
       <div class="footer-inner">
-        <div class="footer-brand"><div class="fb-logo">Transwarp</div><div class="fb-sub">Development Project</div><p>Indie audio plugin development from Bath, UK.</p></div>
-        <div class="footer-col"><h4>Products</h4><ul><li><a href="mu-clid.html"><span style="text-transform:none">μ</span>-clid</a></li><li><a href="mu-tant.html"><span style="text-transform:none">μ</span>-tant</a></li><li><a href="mu-toni.html"><span style="text-transform:none">μ</span>-toni</a></li><li><a href="mu-on.html"><span style="text-transform:none">μ</span>-on</a></li><li><a href="mu-clid-midi.html"><span style="text-transform:none">μ</span>-clid MIDI</a></li><li><a href="free.html"><span style="text-transform:none">μ</span>-link</a></li><li><a href="download.html">Download</a></li></ul></div>
-        <div class="footer-col"><h4>Resources</h4><ul><li><a href="index.html#community">Community</a></li><li><a href="index.html#pricing">Pay what you want</a></li><li><a href="mu-clid-releases.html">Release notes</a></li><li><a href="https://github.com/AndyTuke/mu-family">Source (GPLv3)</a></li></ul></div>
-        <div class="footer-col"><h4>Company</h4><ul><li><a href="contact.html">Contact</a></li><li><a href="mailto:support@transwarp.me">support@transwarp.me</a></li><li><a href="mailto:info@transwarp.me">info@transwarp.me</a></li><li><a href="https://github.com/AndyTuke/mu-family">Source (GPLv3)</a></li></ul></div>
+        <div class="footer-brand">
+          <div class="fb-logo">Transwarp</div>
+          <div class="fb-sub">Development Project</div>
+          <p>Indie audio plugin development from Bath, UK. Building the <span class="mu-d">μ</span>-series: creative instruments for electronic music producers, made for the DAW and for the stage.</p>
+        </div>
+        <div class="footer-col"><h4>Products</h4><ul><li><a href="mu-clid.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-clid-midi.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-link.html"><span class="mu-d">μ</span>-link</a></li></ul></div>
+        <div class="footer-col"><h4>Release notes</h4><ul><li><a href="mu-clid-releases.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant-releases.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni-releases.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on-releases.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-clid-midi-releases.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-link-releases.html"><span class="mu-d">μ</span>-link</a></li></ul></div>
+        <div class="footer-col"><h4>Company</h4><ul><li><a href="download.html">Download</a></li><li><a href="index.html#pricing">Pricing</a></li><li><a href="index.html#community">Community</a></li><li><a href="contact.html">Contact</a></li><li><a href="https://github.com/AndyTuke/mu-family">Source (GPLv3)</a></li><li><a href="mailto:info@transwarp.me">info@transwarp.me</a></li></ul></div>
       </div>
       <div class="footer-bottom">
         <span class="copy">© 2026 Transwarp Development Project · transwarp.me · Bath, UK</span>
@@ -381,8 +410,11 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
 
     function productName(url) {
       if (/MIDI/i.test(url)) return 'μ-clid MIDI download';
+      if (/Link/i.test(url)) return 'μ-link download';
       if (/Clid/i.test(url)) return 'μ-clid download';
       if (/Tant/i.test(url)) return 'μ-tant download';
+      if (/Toni/i.test(url)) return 'μ-toni download';
+      if (/-On-/i.test(url)) return 'μ-on download';
       return 'download';
     }
     function startDownload(url) {
@@ -435,5 +467,6 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
   <script src="https://groot.mailerlite.com/js/w/webforms.min.js?vb397d78ebaa8a0f631d35384c46d781b" type="text/javascript"></script>
   <script>fetch("https://assets.mailerlite.com/jsonp/2351946/forms/187565985782302067/takel")</script>
 
+  <script src="site.js"></script>
 </body>
 </html>

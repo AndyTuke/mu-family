@@ -82,24 +82,32 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
     [aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.4); }
     [aria-disabled="true"]:hover { box-shadow: none !important; transform: none !important; }
   </style>
+  <link rel="stylesheet" href="site.css">
 </head>
 <body>
 
   <nav>
     <a href="index.html" class="nav-logo">
-      <span class="brand">Transwarp</span>
-      <span class="sub">Development Project</span>
+      <span class="brand"><span class="mu">μ</span>-series</span>
+      <span class="sub">Transwarp Development Project</span>
     </a>
-    <div class="nav-links">
-      <a href="mu-clid.html" class="nav-clid"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid</a>
-      <a href="mu-tant.html" class="nav-tant"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-tant</a>
-      <a href="mu-toni.html" style="color:var(--teal-b);text-transform:none"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-toni</a>
-      <a href="mu-on.html" style="color:#E0C568;text-transform:none"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-on</a>
-      <a href="mu-clid-midi.html" class="nav-clid active"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid MIDI</a>
-      <a href="free.html" class="nav-free"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-link</a>
-      <a href="download.html">Download</a>
+    <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links"><span></span><span></span><span></span></button>
+    <div class="nav-links" id="nav-links">
+      <div class="nav-dd">
+        <button class="nav-dd-btn active" type="button" aria-haspopup="true" aria-expanded="false">Products <span class="caret">▾</span></button>
+        <div class="nav-menu"><div class="nm-list">
+          <a href="mu-clid.html" class="nm nm-clid"><span class="nm-name"><span class="mu-d">μ</span>-clid</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">Euclidean rhythm sequencer</span></a>
+          <a href="mu-tant.html" class="nm nm-tant"><span class="nm-name"><span class="mu-d">μ</span>-tant</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">Wavetable drone sequencer</span></a>
+          <a href="mu-toni.html" class="nm nm-toni"><span class="nm-name"><span class="mu-d">μ</span>-toni</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">Generative arpeggiator</span></a>
+          <a href="mu-on.html" class="nm nm-on"><span class="nm-name"><span class="mu-d">μ</span>-on</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">909-style groove sequencer</span></a>
+          <a href="mu-clid-midi.html" class="nm nm-midi active"><span class="nm-name"><span class="mu-d">μ</span>-clid MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Euclidean MIDI effect</span></a>
+          <a href="mu-link.html" class="nm nm-link"><span class="nm-name"><span class="mu-d">μ</span>-link</span><span class="nm-tag free">Free</span><span class="nm-desc">Sync hub and performance mixer</span></a>
+        </div></div>
+      </div>
+      <a href="index.html#live">Live</a>
+      <a href="index.html#pricing">Pricing</a>
       <a href="index.html#community">Community</a>
-      <a href="index.html#pricing" class="nav-cta">Pay what you want</a>
+      <a href="download.html" class="nav-cta">Download</a>
     </div>
   </nav>
 
@@ -174,10 +182,11 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
     <div class="container">
       <div class="footer-bottom">
         <span class="copy">© 2026 Transwarp Development Project · transwarp.me · Bath, UK</span>
-        <div class="footer-social"><a href="download.html#mu-clid-midi">Download</a><a href="mu-clid-releases.html">μ-clid notes</a><a href="mu-tant-releases.html">μ-tant notes</a><a href="mu-toni-releases.html">μ-toni notes</a><a href="mu-on-releases.html">μ-on notes</a><a href="contact.html">Contact</a><a href="https://github.com/AndyTuke/mu-family">GitHub</a></div>
+        <div class="footer-social"><a href="download.html">Download</a><a href="mu-clid-releases.html"><span class="mu-d">μ</span>-clid notes</a><a href="mu-tant-releases.html"><span class="mu-d">μ</span>-tant notes</a><a href="mu-toni-releases.html"><span class="mu-d">μ</span>-toni notes</a><a href="mu-on-releases.html"><span class="mu-d">μ</span>-on notes</a><a href="mu-link-releases.html"><span class="mu-d">μ</span>-link notes</a><a href="contact.html">Contact</a><a href="https://github.com/AndyTuke/mu-family">GitHub</a></div>
       </div>
     </div>
   </footer>
 
+  <script src="site.js"></script>
 </body>
 </html>
