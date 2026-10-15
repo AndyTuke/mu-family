@@ -1,5 +1,7 @@
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
+#include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
+#include "License/LicenseKey.h"
 #include "Plugin/HostTransport.h"          // mu-core: DAW / mu-link transport read
 #include "Modulation/ModulatorSerialise.h" // mu-core: modulator state save/load
 #include "Plugin/ParamText.h"           // mu-core: float parameter text in both directions
@@ -202,6 +204,9 @@ PluginProcessor::PluginProcessor()
     // A saved MIDI map written under the old "v{N}_" ids is renamed as it loads (set before initAppSettings loads it).
     getMidiControlMap().setIdPrefixRenames(layerParamPrefixRenames(mu_limits::kMaxLayers));
     initAppSettings("muToni");   // settings file + saved UI size / MIDI clock (ProcessorBase)
+
+    // Offline licence + online activation (shared; after initAppSettings for getContentDir).
+    initLicensing({ mu_toni::kLicenseProductId, mu_toni::kLicenseFilename, mu_toni::kLicensePublicKey, "mutoni.activation", mu_toni::kCheckoutUrl });
 
     // The shared wavetable bank (procedural factory set), read by every voice's oscillators.
     bank.loadFactoryBank();

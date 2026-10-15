@@ -1,5 +1,7 @@
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
+#include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
+#include "License/LicenseKey.h"
 #include "Plugin/HostTransport.h"          // mu-core: DAW / mu-link transport read
 #include "Modulation/MuOnModDest.h"
 #include "Modulation/ModulatorSerialise.h"   // mu-core: shared modulator (de)serialise
@@ -114,6 +116,9 @@ PluginProcessor::PluginProcessor()
     // A saved MIDI map written under the old "k_ b_ h_ s_ r_" ids is renamed as it loads (set before initAppSettings loads it).
     getMidiControlMap().setIdPrefixRenames(legacyLaneParamPrefixRenames());
     initAppSettings("muOn");   // settings file + saved UI size / MIDI clock (ProcessorBase)
+
+    // Offline licence + online activation (shared; after initAppSettings for getContentDir).
+    initLicensing({ mu_on::kLicenseProductId, mu_on::kLicenseFilename, mu_on::kLicensePublicKey, "muon.activation", mu_on::kCheckoutUrl });
 
     setupLayerState();      // the track layout every preset / session save and load uses
     layerSwapper.setAppliers([this](juce::ValueTree& t) { applyStateTree(t); },
