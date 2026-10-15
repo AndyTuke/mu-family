@@ -42,13 +42,13 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px;
 .nav-links a:hover, .nav-links a.active { color: var(--text); }
 .nav-links .nav-clid { color: var(--accent-b); text-transform: none; }
 .nav-links .nav-tant { color: var(--amber-b); text-transform: none; }
-.nav-links .nav-free { color: var(--cyan-b); }
+.nav-links .nav-free { color: var(--cyan-b); text-transform: none; }
 .nav-links .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 16px; border-radius: 4px; font-size: 11px; letter-spacing: 0.08em; text-transform: none; transition: background .2s, box-shadow .2s; }
 .nav-links .nav-cta:hover { background: var(--accent-b); box-shadow: 0 0 20px var(--glow); }
 
 /* ── FOOTER ── */
 footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
-.footer-inner { display: grid; grid-template-columns: 200px 1fr 1fr 1fr 1fr; gap: 30px; margin-bottom: 40px; }
+.footer-inner { display: grid; grid-template-columns: 200px repeat(6,1fr); gap: 30px; margin-bottom: 40px; }
 .footer-brand .fb-logo { font-family: var(--ff-disp); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
 .footer-brand .fb-sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.16em; color: var(--text3); text-transform: uppercase; margin-bottom: 14px; }
 .footer-brand p { font-size: 12px; color: var(--text3); line-height: 1.65; }
@@ -71,22 +71,36 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
   .footer-inner { grid-template-columns: 1fr; }
 }
 </style>
+  <style>
+    [aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.4); }
+    [aria-disabled="true"]:hover { box-shadow: none !important; transform: none !important; }
+  </style>
+  <link rel="stylesheet" href="site.css">
 </head>
 <body>
 
   <nav>
     <a href="index.html" class="nav-logo">
-      <span class="brand">Transwarp</span>
-      <span class="sub">Development Project</span>
+      <span class="brand"><span class="mu">μ</span>-series</span>
+      <span class="sub">Transwarp Development Project</span>
     </a>
-    <div class="nav-links">
-      <a href="mu-clid.html" class="nav-clid"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid</a>
-      <a href="mu-tant.html" class="nav-tant"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-tant</a>
-      <a href="mu-clid-midi.html" class="nav-clid"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid MIDI</a>
-      <a href="free.html" class="nav-free">μ-link</a>
-      <a href="download.html">Download</a>
+    <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links"><span></span><span></span><span></span></button>
+    <div class="nav-links" id="nav-links">
+      <div class="nav-dd">
+        <button class="nav-dd-btn" type="button" aria-haspopup="true" aria-expanded="false">Products <span class="caret">▾</span></button>
+        <div class="nav-menu"><div class="nm-list">
+          <a href="mu-clid.html" class="nm nm-clid"><span class="nm-name"><span class="mu-d">μ</span>-clid</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">Euclidean rhythm sequencer</span></a>
+          <a href="mu-tant.html" class="nm nm-tant"><span class="nm-name"><span class="mu-d">μ</span>-tant</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">Wavetable drone sequencer</span></a>
+          <a href="mu-toni.html" class="nm nm-toni"><span class="nm-name"><span class="mu-d">μ</span>-toni</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">Generative arpeggiator</span></a>
+          <a href="mu-on.html" class="nm nm-on"><span class="nm-name"><span class="mu-d">μ</span>-on</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">909-style groove sequencer</span></a>
+          <a href="mu-clid-midi.html" class="nm nm-midi"><span class="nm-name"><span class="mu-d">μ</span>-clid MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Euclidean MIDI effect</span></a>
+          <a href="mu-link.html" class="nm nm-link"><span class="nm-name"><span class="mu-d">μ</span>-link</span><span class="nm-tag free">Free</span><span class="nm-desc">Sync hub and performance mixer</span></a>
+        </div></div>
+      </div>
+      <a href="index.html#live">Live</a>
+      <a href="index.html#pricing">Pricing</a>
       <a href="index.html#community">Community</a>
-      <a href="index.html#pricing" class="nav-cta">Pay what you like</a>
+      <a href="download.html" class="nav-cta">Download</a>
     </div>
   </nav>
 
@@ -122,7 +136,9 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
           <a href="mu-clid.html" style="font-size: 14px; color: var(--accent-b); font-family: var(--ff-disp); font-weight: 700;">μ-clid</a>
           <a href="mu-tant.html" style="font-size: 14px; color: var(--amber-b); font-family: var(--ff-disp); font-weight: 700;">μ-tant</a>
           <a href="mu-clid-midi.html" style="font-size: 14px; color: var(--accent-b); font-family: var(--ff-disp); font-weight: 700;">μ-clid MIDI</a>
-          <a href="free.html" style="font-size: 14px; color: var(--cyan-b); font-family: var(--ff-disp); font-weight: 700;">μ-link</a>
+          <a href="mu-toni.html" style="font-size: 14px; color: var(--teal-b); font-family: var(--ff-disp); font-weight: 700;">μ-toni</a>
+          <a href="mu-on.html" style="font-size: 14px; color: #E0C568; font-family: var(--ff-disp); font-weight: 700;">μ-on</a>
+          <a href="mu-link.html" style="font-size: 14px; color: var(--cyan-b); font-family: var(--ff-disp); font-weight: 700;">μ-link</a>
         </div>
       </div>
     </div>
@@ -131,11 +147,14 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
   <footer>
     <div class="container">
       <div class="footer-inner">
-        <div class="footer-brand"><div class="fb-logo">Transwarp</div><div class="fb-sub">Development Project</div><p>Indie audio plugin development from Bath, UK.</p></div>
-        <div class="footer-col"><h4><span style="text-transform:none">μ</span>-clid</h4><ul><li><a href="mu-clid.html#pricing">Pay what you like</a></li><li><a href="mu-clid-releases.html">Release notes</a></li><li><a href="download.html">Download</a></li></ul></div>
-        <div class="footer-col"><h4><span style="text-transform:none">μ</span>-tant</h4><ul><li><a href="mu-tant.html#pricing">Pay what you like</a></li><li><a href="mu-tant-releases.html">Release notes</a></li><li><a href="download.html">Download</a></li></ul></div>
-        <div class="footer-col"><h4><span style="text-transform:none">μ</span>-clid MIDI</h4><ul><li><a href="mu-clid-midi.html">About</a></li><li><a href="mu-clid-midi-releases.html">Release notes</a></li><li><a href="download.html#mu-clid-midi">Download</a></li></ul></div>
-        <div class="footer-col"><h4>Company</h4><ul><li><a href="index.html#community">Community</a></li><li><a href="contact.html" class="active">Contact</a></li><li><a href="https://github.com/AndyTuke/mu-family">Source (GPLv3)</a></li><li><a href="mailto:info@transwarp.me">info@transwarp.me</a></li></ul></div>
+        <div class="footer-brand">
+          <div class="fb-logo">Transwarp</div>
+          <div class="fb-sub">Development Project</div>
+          <p>Indie audio plugin development from Bath, UK. Building the <span class="mu-d">μ</span>-series: creative instruments for electronic music producers, made for the DAW and for the stage.</p>
+        </div>
+        <div class="footer-col"><h4>Products</h4><ul><li><a href="mu-clid.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-clid-midi.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-link.html"><span class="mu-d">μ</span>-link</a></li></ul></div>
+        <div class="footer-col"><h4>Release notes</h4><ul><li><a href="mu-clid-releases.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant-releases.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni-releases.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on-releases.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-clid-midi-releases.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-link-releases.html"><span class="mu-d">μ</span>-link</a></li></ul></div>
+        <div class="footer-col"><h4>Company</h4><ul><li><a href="download.html">Download</a></li><li><a href="index.html#pricing">Pricing</a></li><li><a href="index.html#community">Community</a></li><li><a href="contact.html">Contact</a></li><li><a href="https://github.com/AndyTuke/mu-family">Source (GPLv3)</a></li><li><a href="mailto:info@transwarp.me">info@transwarp.me</a></li></ul></div>
       </div>
       <div class="footer-bottom">
         <span class="copy">© 2026 Transwarp Development Project · transwarp.me · Bath, UK</span>
@@ -144,5 +163,6 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     </div>
   </footer>
 
+  <script src="site.js"></script>
 </body>
 </html>

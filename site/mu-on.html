@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>μ-on: 909-Style Groove Sequencer | Transwarp Development Project</title>
+  <meta name="description" content="μ-on is a 909-style groove sequencer for Windows (Linux coming soon). Kick, bass, hat, snare and rumble tracks on a 16-step grid, with bass-to-kick sidechain. VST3, CLAP and Standalone. Pay what you want.">
+  <link rel="canonical" href="https://transwarp.me/mu-on">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://transwarp.me/mu-on">
+  <meta property="og:title" content="μ-on: 909-Style Groove Sequencer | Transwarp Development Project">
+  <meta property="og:description" content="μ-on is a 909-style groove sequencer for Windows (Linux coming soon). Kick, bass, hat, snare and rumble tracks on a 16-step grid, with bass-to-kick sidechain. VST3, CLAP and Standalone. Pay what you want.">
+  <meta property="og:image" content="https://transwarp.me/mu-on_full_screen.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+/* ── RESET & ROOT ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #07060E; --bg2: #0D0B18; --bg3: #131128; --bg4: #1A1834;
+  --accent: #6B5FE4; --accent-b: #8B80F0; --glow: rgba(107,95,228,0.35);
+  --teal: #1DB880; --teal-b: #2ECFA0; --glow2: rgba(29,184,128,0.25);
+  --amber: #D4895C; --amber-b: #E8A878; --amber-glow: rgba(212,137,92,0.3);
+  --cyan: #3CB8D4; --cyan-b: #5CCEE8; --cyan-glow: rgba(60,184,212,0.3);
+  --text: #E8E4D8; --text2: #7A758F; --text3: #4A4565;
+  --border: #1E1C32; --border2: #2A2745;
+  --ff-disp: 'Syne', sans-serif;
+  --ff-mono: 'Space Mono', monospace;
+  --ff-body: 'Outfit', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--ff-body); font-size: 16px; line-height: 1.6; overflow-x: hidden; }
+body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(ellipse 80% 50% at 20% 40%, rgba(107,95,228,0.07) 0%, transparent 70%), radial-gradient(ellipse 60% 40% at 80% 70%, rgba(29,184,128,0.04) 0%, transparent 70%); pointer-events: none; z-index: 0; }
+.container { max-width: 1160px; margin: 0 auto; padding: 0 32px; position: relative; }
+a { color: inherit; text-decoration: none; }
+section { position: relative; z-index: 1; }
+
+/* ── NAV ── */
+nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px; height: 60px; display: flex; align-items: center; justify-content: space-between; background: rgba(7,6,14,0.88); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+.nav-logo { display: flex; flex-direction: column; line-height: 1; gap: 2px; }
+.nav-logo .brand { font-family: var(--ff-disp); font-size: 17px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
+.nav-logo .brand .mu { color: var(--accent-b); }
+.nav-logo .sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.14em; color: var(--text3); text-transform: uppercase; }
+.nav-links { display: flex; align-items: center; gap: 26px; }
+.nav-links a { font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text2); text-transform: uppercase; transition: color .2s; }
+.nav-links a:hover, .nav-links a.active { color: var(--text); }
+.nav-links .nav-clid { color: var(--accent-b); text-transform: none; }
+.nav-links .nav-tant { color: var(--amber-b); text-transform: none; }
+.nav-links .nav-free { color: var(--cyan-b); text-transform: none; }
+.nav-links .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 16px; border-radius: 4px; font-size: 11px; letter-spacing: 0.08em; text-transform: none; transition: background .2s, box-shadow .2s; }
+.nav-links .nav-cta:hover { background: var(--accent-b); box-shadow: 0 0 20px var(--glow); }
+
+/* ── SHARED TYPOGRAPHY ── */
+.section-label { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.22em; color: var(--accent-b); text-transform: uppercase; margin-bottom: 12px; }
+.section-label.teal { color: var(--teal); }
+.section-label.amber { color: var(--amber-b); }
+.section-label.cyan { color: var(--cyan-b); }
+.section-heading { font-family: var(--ff-disp); font-size: clamp(28px,3.5vw,46px); font-weight: 800; line-height: 1.05; letter-spacing: -0.02em; margin-bottom: 16px; }
+.section-sub { font-size: 17px; font-weight: 300; color: var(--text2); max-width: 600px; line-height: 1.65; }
+.pill { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.12em; color: var(--text2); border: 1px solid var(--border2); border-radius: 2px; padding: 5px 10px; text-transform: uppercase; }
+.pill.teal   { color: var(--teal);    border-color: rgba(29,184,128,0.3); }
+.pill.amber  { color: var(--amber-b); border-color: rgba(212,137,92,0.3); }
+.pill.purple { color: var(--accent-b);border-color: rgba(107,95,228,0.3); }
+.pill.cyan   { color: var(--cyan-b);  border-color: rgba(60,184,212,0.3); }
+
+/* ── BUTTONS ── */
+.btn-primary { display: inline-flex; align-items: center; gap: 10px; background: var(--accent); color: #fff; font-family: var(--ff-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; padding: 13px 26px; border-radius: 4px; border: none; cursor: pointer; transition: all .2s; }
+.btn-primary:hover { background: var(--accent-b); box-shadow: 0 0 32px var(--glow); transform: translateY(-1px); }
+.btn-amber { background: var(--amber) !important; }
+.btn-amber:hover { background: var(--amber-b) !important; box-shadow: 0 0 32px var(--amber-glow) !important; }
+.btn-cyan { background: var(--cyan) !important; color: var(--bg) !important; }
+.btn-cyan:hover { background: var(--cyan-b) !important; box-shadow: 0 0 32px var(--cyan-glow) !important; }
+.btn-secondary { display: inline-flex; align-items: center; gap: 8px; background: transparent; color: var(--text); font-family: var(--ff-mono); font-size: 12px; letter-spacing: 0.08em; padding: 13px 22px; border-radius: 4px; border: 1px solid var(--border2); cursor: pointer; transition: all .2s; }
+.btn-secondary:hover { border-color: var(--teal); color: var(--teal-b); transform: translateY(-1px); }
+.btn-price { opacity: 0.7; font-size: 10px; }
+
+/* ── FEATURE GRID ── */
+.features-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.feature-card { background: var(--bg2); padding: 32px 28px; transition: background .25s; }
+.feature-card:hover { background: var(--bg3); }
+.feature-icon { width: 40px; height: 40px; border-radius: 7px; background: var(--bg4); border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; margin-bottom: 18px; }
+.feature-icon svg { width: 20px; height: 20px; }
+.feature-card h3 { font-family: var(--ff-disp); font-size: 16px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 8px; }
+.feature-card p { font-size: 13px; font-weight: 300; color: var(--text2); line-height: 1.65; }
+.feature-card .tag { display: inline-block; margin-top: 12px; font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; }
+.feature-card .tag.purple { color: var(--accent-b); }
+.feature-card .tag.teal   { color: var(--teal); }
+.feature-card .tag.amber  { color: var(--amber-b); }
+.feature-card .tag.cyan   { color: var(--cyan-b); }
+
+/* ── SCREENSHOTS ── */
+.screenshots-wrap { margin-top: 56px; }
+.screenshot-primary { display: grid; grid-template-columns: 1fr 300px; gap: 36px; align-items: center; margin-bottom: 20px; }
+.ss-placeholder { background: var(--bg2); border: 1px solid var(--border2); border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+.ss-placeholder img { width: 100%; height: auto; display: block; border-radius: 7px; }
+.ss-placeholder.ss-empty { aspect-ratio: 16/9; }
+.ss-inner { display: flex; flex-direction: column; align-items: center; gap: 10px; opacity: 0.3; padding: 40px; }
+.ss-inner span { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text2); text-transform: uppercase; text-align: center; }
+.ss-caption { padding: 4px 0; }
+.sc-label { font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 8px; }
+.clid-cap .sc-label { color: var(--accent-b); }
+.tant-cap .sc-label { color: var(--amber-b); }
+.ss-caption h3 { font-family: var(--ff-disp); font-size: 20px; font-weight: 800; letter-spacing: -0.015em; margin-bottom: 10px; }
+.ss-caption p { font-size: 14px; color: var(--text2); font-weight: 300; line-height: 1.65; }
+.screenshot-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+.ss-item .ss-placeholder.ss-empty { aspect-ratio: 4/3; }
+.ss-item-caption { padding: 12px 2px 0; }
+.ss-item-caption strong { font-size: 13px; font-weight: 600; display: block; margin-bottom: 3px; }
+.ss-item-caption p { font-size: 12px; color: var(--text2); line-height: 1.55; }
+
+/* ── PRICING ── */
+.coming-soon-banner { display: flex; align-items: center; gap: 12px; background: rgba(29,184,128,0.07); border: 1px solid rgba(29,184,128,0.25); border-radius: 6px; padding: 16px 22px; margin-bottom: 40px; font-size: 14px; color: var(--teal-b); }
+.coming-soon-banner svg { flex-shrink: 0; }
+.pricing-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; align-items: start; }
+.pricing-card { border: 1px solid var(--border2); border-radius: 8px; overflow: hidden; background: var(--bg2); transition: box-shadow .3s; }
+.pricing-card.featured.clid-feat { border-color: var(--accent); background: var(--bg3); box-shadow: 0 0 40px rgba(107,95,228,0.15); }
+.pricing-card.featured.tant-feat { border-color: var(--amber); background: var(--bg3); box-shadow: 0 0 40px rgba(212,137,92,0.15); }
+.pricing-badge { font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; text-align: center; padding: 7px; color: #fff; }
+.pricing-badge.clid-badge { background: var(--accent); }
+.pricing-badge.tant-badge { background: var(--amber); }
+.pricing-head { padding: 24px 24px 0; }
+.pricing-tier { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.18em; color: var(--text2); text-transform: uppercase; margin-bottom: 4px; }
+.pricing-name { font-family: var(--ff-disp); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 12px; }
+.pricing-name .mu { color: var(--accent-b); }
+.tant-col .pricing-name .mu { color: var(--amber-b); }
+.pricing-price-block { display: flex; align-items: baseline; gap: 8px; margin-bottom: 16px; }
+.price-main { font-family: var(--ff-disp); font-size: 36px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+.price-was { font-family: var(--ff-mono); font-size: 13px; color: var(--text3); text-decoration: line-through; }
+.price-note { font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.1em; color: var(--teal); margin-top: 2px; }
+.tant-col .price-note { color: var(--amber); }
+.pricing-divider { height: 1px; background: var(--border); margin: 0 24px; }
+.pricing-features { padding: 16px 24px 20px; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.pricing-features li { font-size: 13px; color: var(--text2); display: flex; align-items: flex-start; gap: 8px; padding: 3px 0; }
+.pricing-features li::before { content: '·'; font-size: 18px; line-height: 1; flex-shrink: 0; }
+.pricing-features li.hi::before { color: var(--accent-b); }
+.tant-col .pricing-features li.hi::before { color: var(--amber-b); }
+.pricing-cta { padding: 0 24px 20px; }
+.btn-full { display: block; width: 100%; text-align: center; font-family: var(--ff-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 12px; border-radius: 4px; cursor: pointer; border: none; transition: all .2s; }
+.btn-full.clid-p { background: var(--accent); color: #fff; }
+.btn-full.clid-p:hover { background: var(--accent-b); box-shadow: 0 0 24px var(--glow); }
+.btn-full.clid-s { background: transparent; color: var(--teal-b); border: 1px solid rgba(29,184,128,0.35); }
+.btn-full.clid-s:hover { background: rgba(29,184,128,0.07); }
+.btn-full.tant-p { background: var(--amber); color: #fff; }
+.btn-full.tant-p:hover { background: var(--amber-b); box-shadow: 0 0 24px var(--amber-glow); }
+.btn-full.tant-s { background: transparent; color: var(--amber-b); border: 1px solid rgba(212,137,92,0.35); }
+.btn-full.tant-s:hover { background: rgba(212,137,92,0.07); }
+.btn-full.ghost { background: transparent; color: var(--text2); border: 1px solid var(--border2); }
+.btn-full.ghost:hover { border-color: var(--text2); color: var(--text); }
+.pricing-fine { text-align: center; margin-top: 28px; font-size: 12px; color: var(--text3); font-family: var(--ff-mono); }
+
+/* ── HIGHLIGHTS STRIP ── */
+.highlights-strip { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; border: 1px solid var(--border2); border-radius: 8px; overflow: hidden; background: var(--bg2); }
+.highlight-item { padding: 30px 26px; display: flex; gap: 16px; align-items: flex-start; transition: background .2s; }
+.highlight-item:hover { background: var(--bg3); }
+.hi-icon { flex-shrink:0; width:38px; height:38px; border-radius:7px; background:var(--bg4); border:1px solid var(--border2); display:flex; align-items:center; justify-content:center; }
+.hi-icon svg { width:18px; height:18px; }
+.hi-body h4 { font-family: var(--ff-disp); font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+.hi-body p { font-size: 13px; color: var(--text2); font-weight: 300; line-height: 1.6; }
+.highlight-divider { width: 1px; background: var(--border2); }
+
+/* ── FORMATS ── */
+.formats-inner { display: flex; align-items: center; justify-content: space-between; gap: 40px; flex-wrap: wrap; }
+.formats-chips { display: flex; gap: 10px; flex-wrap: wrap; }
+.format-chip { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 16px 18px; border: 1px solid var(--border2); border-radius: 6px; background: var(--bg2); }
+.format-chip .fc-icon svg { width: 24px; height: 24px; }
+.format-chip .fc-label { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.14em; color: var(--text2); text-transform: uppercase; }
+.format-chip .fc-detail { font-family: var(--ff-mono); font-size: 8px; color: var(--text3); }
+.format-chip-soon { opacity: 0.45; }
+.fc-soon { color: var(--teal) !important; }
+
+/* ── COMMUNITY ── */
+.community-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: start; }
+.community-links { display: flex; flex-direction: column; gap: 10px; margin-top: 24px; }
+.community-link { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg2); transition: border-color .2s, background .2s; }
+.community-link:hover { border-color: var(--border2); background: var(--bg3); }
+.community-link .cl-icon { width: 28px; height: 28px; border-radius: 4px; background: var(--bg4); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.community-link .cl-icon svg { width: 14px; height: 14px; }
+.community-link .cl-name { font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.06em; color: var(--text); }
+.community-link .cl-desc { font-size: 11px; color: var(--text3); margin-top: 1px; }
+.community-link .cl-arrow { margin-left: auto; color: var(--text3); }
+.community-link-soon { opacity: 0.6; cursor: default; pointer-events: none; }
+.soon-badge { display: inline-block; font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--teal); border: 1px solid rgba(29,184,128,0.4); border-radius: 2px; padding: 1px 5px; margin-left: 6px; vertical-align: middle; }
+.email-signup { background: var(--bg3); border: 1px solid var(--border2); border-radius: 8px; padding: 30px 26px; }
+.email-signup h3 { font-family: var(--ff-disp); font-size: 20px; font-weight: 800; letter-spacing: -0.015em; margin-bottom: 8px; }
+.email-signup p { font-size: 14px; color: var(--text2); font-weight: 300; line-height: 1.65; margin-bottom: 20px; }
+.email-note { font-size: 11px !important; color: var(--text3) !important; margin-top: 10px !important; font-family: var(--ff-mono) !important; margin-bottom: 0 !important; }
+
+/* ── FOOTER ── */
+footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
+.footer-inner { display: grid; grid-template-columns: 200px repeat(6,1fr); gap: 30px; margin-bottom: 40px; }
+.footer-brand .fb-logo { font-family: var(--ff-disp); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
+.footer-brand .fb-sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.16em; color: var(--text3); text-transform: uppercase; margin-bottom: 14px; }
+.footer-brand p { font-size: 12px; color: var(--text3); line-height: 1.65; }
+.footer-col h4 { font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.18em; color: var(--text2); text-transform: uppercase; margin-bottom: 14px; }
+.footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 9px; }
+.footer-col li a { font-size: 13px; color: var(--text3); transition: color .2s; }
+.footer-col li a:hover { color: var(--text); }
+.footer-bottom { border-top: 1px solid var(--border); padding-top: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.footer-bottom .copy { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text3); }
+.footer-social { display: flex; gap: 16px; }
+.footer-social a { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.12em; color: var(--text3); text-transform: uppercase; transition: color .2s; }
+.footer-social a:hover { color: var(--teal-b); }
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+.fade-1 { animation: fadeUp .6s ease .1s both; }
+.fade-2 { animation: fadeUp .6s ease .25s both; }
+.fade-3 { animation: fadeUp .6s ease .4s both; }
+.fade-4 { animation: fadeUp .6s ease .5s both; }
+.fade-5 { animation: fadeUp .6s ease .6s both; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  .features-grid { grid-template-columns: 1fr 1fr; }
+  .screenshot-primary { grid-template-columns: 1fr; }
+  .community-inner { grid-template-columns: 1fr; }
+  .footer-inner { grid-template-columns: 1fr 1fr; }
+  .highlights-strip { grid-template-columns: 1fr; }
+  .highlight-divider { width: auto; height: 1px; }
+  .pricing-grid { grid-template-columns: 1fr; gap: 14px; }
+  .nav-links a:not(.nav-cta) { display: none; }
+}
+@media (max-width: 600px) {
+  .container { padding: 0 20px; }
+  nav { padding: 0 20px; }
+  .features-grid, .screenshot-grid { grid-template-columns: 1fr; }
+  .footer-inner { grid-template-columns: 1fr; }
+}
+
+</style>
+  <style>
+    :root { --prod: #C9A94A; --prod-b: #E0C568; --prod-glow: rgba(201,169,74,0.3); }
+    #hero { min-height: 80vh; display: flex; align-items: center; padding: 120px 0 80px; border-bottom: 1px solid var(--border); }
+    .hero-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
+    .hero-eyebrow { font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.2em; color: var(--prod-b); text-transform: uppercase; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+    .hero-eyebrow::before { content:''; display:block; width:30px; height:1px; background:var(--prod-b); }
+    .hero-title { font-family: var(--ff-disp); font-size: clamp(48px,6vw,80px); font-weight: 800; line-height: 0.9; letter-spacing: -0.03em; margin-bottom: 20px; }
+    .hero-title .mu { color: var(--prod-b); }
+    .hero-title .sub { display: block; font-size: clamp(14px,1.6vw,20px); font-weight: 700; color: var(--text2); margin-top: 12px; }
+    .hero-sub { font-size: 16px; font-weight: 300; color: var(--text2); margin-bottom: 28px; line-height: 1.7; }
+    .hero-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+    .hero-pills .pill.prod { color: var(--prod-b); border-color: var(--prod); }
+    .hero-ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+    .hero-visual { border-radius: 8px; overflow: hidden; border: 1px solid var(--prod); background: var(--bg2); }
+    .hero-visual img { width: 100%; height: auto; display: block; }
+    .dev-badge { display: inline-flex; align-items: center; gap: 8px; font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--amber-b); background: rgba(212,137,92,0.08); border: 1px solid rgba(212,137,92,0.35); border-radius: 3px; padding: 6px 14px; margin-bottom: 20px; }
+    .dev-badge::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--amber-b); }
+    .btn-prod { background: var(--prod) !important; color: #0A0A0A !important; }
+    .btn-prod:hover { background: var(--prod-b) !important; box-shadow: 0 0 32px var(--prod-glow) !important; }
+    .btn-soon { border-color: var(--prod); color: var(--prod-b); }
+    .dev-note { padding: 40px 0; border-bottom: 1px solid var(--border); }
+    .dev-note-inner { background: rgba(212,137,92,0.06); border: 1px solid rgba(212,137,92,0.3); border-radius: 8px; padding: 22px 26px; font-size: 14px; color: var(--text2); line-height: 1.7; }
+    .dev-note-inner strong { color: var(--amber-b); }
+    .product-section { padding: 100px 0; border-top: 1px solid var(--border); }
+    .product-section-header { margin-bottom: 52px; }
+    .section-label.prod { color: var(--prod-b); }
+    .prod-cap .sc-label { color: var(--prod-b); }
+    .story { max-width: 680px; }
+    .story p { font-size: 16px; font-weight: 300; color: var(--text2); line-height: 1.75; margin-bottom: 14px; }
+    .story blockquote { border-left: 3px solid var(--prod); padding: 6px 0 6px 18px; margin: 20px 0; font-family: var(--ff-disp); font-size: 20px; font-weight: 700; font-style: italic; color: var(--text); }
+    .req-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; }
+    .req-card { background: var(--bg2); border: 1px solid var(--border2); border-radius: 8px; padding: 22px 24px; }
+    .req-card h3 { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--prod-b); margin-bottom: 10px; }
+    .req-card p { font-size: 14px; color: var(--text2); line-height: 1.65; }
+    .dl-block { max-width: 760px; margin: 0 auto; background: var(--bg3); border: 1px solid var(--prod); border-radius: 10px; padding: 30px 32px; text-align: center; }
+    .dl-block h3 { font-family: var(--ff-disp); font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 10px; }
+    .dl-block p { font-size: 14px; color: var(--text2); line-height: 1.7; margin-bottom: 14px; }
+    .dl-block .pwyw { font-family: var(--ff-mono); font-size: 12px; letter-spacing: 0.06em; color: var(--prod-b); margin: 18px 0 6px; }
+    .dl-block .dl-fine { font-family: var(--ff-mono); font-size: 11px; color: var(--text3); margin-top: 12px; }
+    .btn-off { display: inline-block; font-family: var(--ff-mono); font-size: 12px; letter-spacing: 0.08em; padding: 13px 24px; border-radius: 4px; border: 1px dashed var(--border2); color: var(--text2); }
+    #download { padding: 100px 0; border-top: 1px solid var(--border); }
+    #requirements { padding: 80px 0; border-top: 1px solid var(--border); }
+    @media (max-width: 900px) { .hero-inner { grid-template-columns: 1fr; } .req-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 600px) { .dl-block { padding: 24px 20px; } }
+  </style>
+  <style>
+    [aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.4); }
+    [aria-disabled="true"]:hover { box-shadow: none !important; transform: none !important; }
+  </style>
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <nav>
+    <a href="index.html" class="nav-logo">
+      <span class="brand"><span class="mu">μ</span>-series</span>
+      <span class="sub">Transwarp Development Project</span>
+    </a>
+    <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links"><span></span><span></span><span></span></button>
+    <div class="nav-links" id="nav-links">
+      <div class="nav-dd">
+        <button class="nav-dd-btn active" type="button" aria-haspopup="true" aria-expanded="false">Products <span class="caret">▾</span></button>
+        <div class="nav-menu"><div class="nm-list">
+          <a href="mu-clid.html" class="nm nm-clid"><span class="nm-name"><span class="mu-d">μ</span>-clid</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">Euclidean rhythm sequencer</span></a>
+          <a href="mu-tant.html" class="nm nm-tant"><span class="nm-name"><span class="mu-d">μ</span>-tant</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">Wavetable drone sequencer</span></a>
+          <a href="mu-toni.html" class="nm nm-toni"><span class="nm-name"><span class="mu-d">μ</span>-toni</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">Generative arpeggiator</span></a>
+          <a href="mu-on.html" class="nm nm-on active" aria-current="page"><span class="nm-name"><span class="mu-d">μ</span>-on</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">909-style groove sequencer</span></a>
+          <a href="mu-clid-midi.html" class="nm nm-midi"><span class="nm-name"><span class="mu-d">μ</span>-clid MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Euclidean MIDI effect</span></a>
+          <a href="mu-link.html" class="nm nm-link"><span class="nm-name"><span class="mu-d">μ</span>-link</span><span class="nm-tag free">Free</span><span class="nm-desc">Sync hub and performance mixer</span></a>
+        </div></div>
+      </div>
+      <a href="index.html#live">Live</a>
+      <a href="index.html#pricing">Pricing</a>
+      <a href="index.html#community">Community</a>
+      <a href="download.html" class="nav-cta">Download</a>
+    </div>
+  </nav>
+
+  <section id="hero">
+    <div class="container">
+      <div class="hero-inner">
+        <div>
+          <div class="hero-eyebrow fade-1">909-Style Groove Sequencer</div>
+          <h1 class="hero-title fade-2"><span class="mu">μ</span>-on<span class="sub">One click per step.</span></h1>
+          <p class="hero-sub fade-3">A quick, hands-on groove box for your DAW or on its own. Build a beat from kick, bass, hat and snare tracks on a 16-step grid, add a dark techno rumble, and let the bass duck from the kick for the classic pumping groove.</p>
+          <div class="hero-pills fade-4">
+            <span class="pill prod">Kick · Bass · Hat · Snare</span>
+            <span class="pill prod">16-step grid</span>
+            <span class="pill prod">Bass-to-kick sidechain</span>
+            <span class="pill">VST3 &amp; CLAP &amp; Standalone</span>
+            <span class="pill">Windows</span>
+          </div>
+          <div class="hero-ctas fade-5">
+            <a href="#download" class="btn-primary btn-prod">Pay what you want <span class="btn-price">· from £0</span></a>
+            <a href="mu-on-releases.html" class="btn-secondary btn-soon">Release notes</a>
+          </div>
+        </div>
+        <div class="hero-visual fade-3"><img src="mu-on_full_screen.png" alt="The μ-on window: five tracks, the bass engine, the 16-step grid and the modulators" width="1172" height="898"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="dev-note">
+    <div class="container">
+      <div class="dev-note-inner"><strong>Good to know.</strong> Some things are not in μ-on yet: per-step pitch for the bass, loading your own samples, and pattern banks. Feedback is welcome on the <a href="contact.html" style="text-decoration:underline">contact page</a>.</div>
+    </div>
+  </section>
+
+  <section class="product-section">
+    <div class="container">
+      <div class="product-section-header">
+        <div class="section-label prod">What it does</div>
+        <h2 class="section-heading">A groove box,<br>built from tracks.</h2>
+        <p class="section-sub">Every track has a row of sixteen steps and a sound engine that plays them. Switch a track’s engine at any time and it keeps each engine’s settings.</p>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon"><svg viewBox="0 0 22 22" fill="none"><path d="M11 3 L20 8 L11 13 L2 8 Z" stroke="#E0C568" stroke-width="1.3" stroke-linejoin="round"/><path d="M2 12 L11 17 L20 12" stroke="#E0C568" stroke-width="1.3" stroke-linejoin="round" opacity=".6"/></svg></div>
+          <h3>One to eight tracks</h3>
+          <p>A new μ-on starts with one Kick track. Add tracks, reorder them by dragging, and each keeps its own settings, steps and colour.</p>
+          <span class="tag" style="color:#E0C568">Tracks</span>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><svg viewBox="0 0 22 22" fill="none"><rect x="2" y="5" width="18" height="12" rx="1.5" stroke="#E0C568" stroke-width="1.3"/><line x1="7" y1="5" x2="7" y2="17" stroke="#E0C568" opacity=".4"/><line x1="12" y1="5" x2="12" y2="17" stroke="#E0C568" opacity=".4"/><line x1="17" y1="5" x2="17" y2="17" stroke="#E0C568" opacity=".4"/><rect x="3.5" y="8" width="2.5" height="6" fill="#E0C568"/><rect x="13" y="8" width="2.5" height="6" fill="#E0C568" opacity=".7"/></svg></div>
+          <h3>Sixteen-step grid</h3>
+          <p>Left-click a step to switch it on or off, right-click to accent it. Swing pushes every second sixteenth later for a shuffle. Every engine starts with its own groove, such as four-on-the-floor for the kick.</p>
+          <span class="tag" style="color:#E0C568">Steps</span>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><svg viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="7" stroke="#E0C568" stroke-width="1.3"/><line x1="11" y1="11" x2="14.5" y2="7" stroke="#E0C568" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+          <h3>Kick and Bass engines</h3>
+          <p>A synthesised kick with a fast pitch drop and a drive stage. A deep bass with a sub oscillator, a filter with its own envelope, and drive. Raise Sub, Drive and Reso for a gritty rumble.</p>
+          <span class="tag" style="color:#E0C568">Synthesis</span>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><svg viewBox="0 0 22 22" fill="none"><path d="M2 11 Q4 5 6 11 Q8 17 10 11 Q12 5 14 11 Q16 17 18 11 Q19 8 20 11" stroke="#E0C568" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg></div>
+          <h3>Hat and Snare</h3>
+          <p>Built-in drum sounds that play one shot on each step, with tune and decay. You can’t load your own samples yet.</p>
+          <span class="tag" style="color:#E0C568">Drums</span>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><svg viewBox="0 0 22 22" fill="none"><path d="M2 11 Q4 5 6 11 Q8 17 10 11 Q12 5 14 11 Q16 17 18 11 Q19 8 20 11" stroke="#E0C568" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg></div>
+          <h3>Rumble</h3>
+          <p>Not a drum you step. Rumble takes the sound of another track and runs it through drive, three tempo-synced delay taps, a dark reverb, a volume envelope you draw, and a filter. The classic techno rumble.</p>
+          <span class="tag" style="color:#E0C568">Rumble</span>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><svg viewBox="0 0 22 22" fill="none"><line x1="6" y1="3" x2="6" y2="19" stroke="#E0C568" opacity=".5"/><line x1="11" y1="3" x2="11" y2="19" stroke="#E0C568" opacity=".5"/><line x1="16" y1="3" x2="16" y2="19" stroke="#E0C568" opacity=".5"/><rect x="4" y="12" width="4" height="3" rx=".6" fill="#E0C568"/><rect x="9" y="6" width="4" height="3" rx=".6" fill="#E0C568"/><rect x="14" y="9" width="4" height="3" rx=".6" fill="#E0C568"/></svg></div>
+          <h3>Sidechain, modulators and mixer</h3>
+          <p>Make the bass duck from the kick in the mixer. Eight modulators per track, the shared mixer and effects, and presets, the same as the rest of the μ-series.</p>
+          <span class="tag" style="color:#E0C568">Mixer &amp; mod</span>
+        </div>
+      </div>
+
+      <div class="screenshots-wrap">
+        <div class="screenshot-primary">
+          <div class="ss-placeholder"><img src="mu-on_full_screen.png" alt="The μ-on window: five tracks, the bass engine, the 16-step grid and the modulators" loading="lazy"></div>
+          <div class="ss-caption prod-cap">
+            <div class="sc-label"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-on interface</div>
+            <h3>Beats in a few clicks.</h3>
+            <p>Engine on top, groove and steps in the middle, eight modulators underneath. Here the Bass track is selected, with a modulator drawn for it.</p>
+          </div>
+        </div>
+        <div class="screenshot-grid">
+          <div class="ss-item"><div class="ss-placeholder"><img src="mu-on_steps.png" alt="The engine box, groove controls and step rows for five tracks" loading="lazy"></div><div class="ss-item-caption"><strong>Steps and engine</strong><p>One row of sixteen steps per track, in each track’s colour.</p></div></div>
+          <div class="ss-item"><div class="ss-placeholder"><img src="mu-on_rumble.png" alt="A Rumble track with its Source, effects knobs and drawable envelope" loading="lazy"></div><div class="ss-item-caption"><strong>Rumble track</strong><p>Rumble processes another track’s sound, shaped by an envelope you draw.</p></div></div>
+          <div class="ss-item"><div class="ss-placeholder"><img src="mu-on_mixer.png" alt="The mixer with five track channels, send effects and master" loading="lazy"></div><div class="ss-item-caption"><strong>Mixer</strong><p>Set up the bass-to-kick sidechain here, with the shared sends and master inserts.</p></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="requirements">
+    <div class="container">
+      <div class="section-label prod" style="margin-bottom:24px">System requirements</div>
+      <div class="req-grid">
+        <div class="req-card"><h3>System</h3><p>Windows 10 or 11, 64-bit. macOS is on hold, and Linux is coming soon.</p></div>
+        <div class="req-card"><h3>Formats</h3><p>VST3 and CLAP plug-ins for your DAW, plus a Standalone app that runs on its own.</p></div>
+        <div class="req-card"><h3>You will need</h3><p>A DAW that hosts VST3 or CLAP plug-ins (for the plug-in), or just an audio interface or sound card (for the Standalone).</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="download">
+    <div class="container">
+      <div class="dl-block">
+        <h3>Download and pay what you want</h3>
+        <p>Download μ-on below, free of charge. It comes with the VST3, CLAP and Standalone for Windows, and Linux is coming soon.</p>
+        <div class="pwyw">Pay what you want · from £0 · suggested £20 (GBP)</div>
+        <p style="margin-bottom:18px">Pay what you want, through Lemon Squeezy. A licence key is issued even for £0, and it removes the support prompt shown when the app starts. Nothing is limited without one, so download and use it first if you like. The source is open under GPLv3.</p>
+        <a class="btn-primary btn-prod" href="https://transwarp.lemonsqueezy.com/checkout/buy/3dd813d9-56a5-4e5b-99b4-09a14f48cf9b" target="_blank" rel="noopener" style="margin-bottom:12px">Pay what you want</a>
+        <p style="margin:0 0 14px"><a class="btn-secondary btn-soon" href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-On-Windows.zip">Download for Windows</a></p>
+        <p class="dl-fine" style="margin:0 0 6px">Linux: coming soon</p>
+        <div class="dl-fine">No registration needed. <a href="download.html#mu-on" style="text-decoration:underline">All downloads</a> · <a href="mu-on-releases.html" style="text-decoration:underline">Release notes</a></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <div class="fb-logo">Transwarp</div>
+          <div class="fb-sub">Development Project</div>
+          <p>Indie audio plugin development from Bath, UK. Building the <span class="mu-d">μ</span>-series: creative instruments for electronic music producers, made for the DAW and for the stage.</p>
+        </div>
+        <div class="footer-col"><h4>Products</h4><ul><li><a href="mu-clid.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-clid-midi.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-link.html"><span class="mu-d">μ</span>-link</a></li></ul></div>
+        <div class="footer-col"><h4>Release notes</h4><ul><li><a href="mu-clid-releases.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant-releases.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni-releases.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on-releases.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-clid-midi-releases.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-link-releases.html"><span class="mu-d">μ</span>-link</a></li></ul></div>
+        <div class="footer-col"><h4>Company</h4><ul><li><a href="download.html">Download</a></li><li><a href="index.html#pricing">Pricing</a></li><li><a href="index.html#community">Community</a></li><li><a href="contact.html">Contact</a></li><li><a href="https://github.com/AndyTuke/mu-family">Source (GPLv3)</a></li><li><a href="mailto:info@transwarp.me">info@transwarp.me</a></li></ul></div>
+      </div>
+      <div class="footer-bottom">
+        <span class="copy">© 2026 Transwarp Development Project · transwarp.me · Bath, UK</span>
+        <div class="footer-social"><a href="https://github.com/AndyTuke/mu-family">GitHub</a></div>
+      </div>
+    </div>
+  </footer>
+  <script src="site.js"></script>
+</body>
+</html>

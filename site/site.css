@@ -1,0 +1,56 @@
+/* Shared navigation and footer for every page. Loaded last so it wins over each page's own CSS. */
+
+/* ── mu rule: lower-case mu in the display font, never upper-cased ── */
+.mu-d { font-family: var(--ff-disp, 'Syne', sans-serif); text-transform: none; }
+
+/* ── NAV ── */
+nav .nav-links { display: flex; align-items: center; gap: 26px; }
+nav .nav-links > a, nav .nav-dd-btn { font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text2); text-transform: uppercase; transition: color .2s; }
+nav .nav-links > a:hover, nav .nav-links > a.active, nav .nav-dd-btn:hover, nav .nav-dd.open .nav-dd-btn, nav .nav-dd-btn.active { color: var(--text); }
+nav .nav-links > a.nav-cta { background: var(--accent); color: #fff; padding: 8px 16px; border-radius: 4px; font-size: 11px; letter-spacing: 0.08em; text-transform: none; transition: background .2s, box-shadow .2s; }
+nav .nav-links > a.nav-cta:hover { background: var(--accent-b); box-shadow: 0 0 20px var(--glow); }
+nav a:focus-visible, nav button:focus-visible { outline: 2px solid var(--accent-b); outline-offset: 3px; border-radius: 3px; }
+
+nav .nav-dd { position: relative; }
+nav .nav-dd-btn { background: none; border: none; cursor: pointer; padding: 6px 0; }
+nav .nav-dd-btn .caret { font-size: 9px; margin-left: 4px; }
+nav .nav-menu { display: none; position: absolute; top: 100%; left: -18px; padding-top: 16px; z-index: 110; }
+nav .nav-dd:hover .nav-menu, nav .nav-dd.open .nav-menu, nav .nav-dd:focus-within .nav-menu { display: block; }
+nav .nm-list { width: 360px; background: #0D0B18; border: 1px solid var(--border2); border-radius: 8px; padding: 8px; box-shadow: 0 16px 48px rgba(0,0,0,0.55); }
+nav .nm { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline; padding: 10px 12px; border-radius: 5px; text-transform: none; letter-spacing: 0; }
+nav .nm:hover, nav .nm.active { background: var(--bg3); }
+nav .nm-name { font-family: var(--ff-mono); font-size: 13px; color: var(--c, var(--text)); }
+nav .nm-desc { grid-column: 1; font-family: var(--ff-body); font-size: 12px; color: var(--text2); }
+nav .nm-tag { grid-column: 2; grid-row: 1; font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text2); border: 1px solid var(--border2); border-radius: 2px; padding: 2px 6px; white-space: nowrap; }
+nav .nm-tag.free { color: var(--cyan-b); border-color: rgba(60,184,212,0.35); }
+nav .nm-clid, nav .nm-midi { --c: #8B80F0; }
+nav .nm-tant { --c: #E8A878; }
+nav .nm-toni { --c: #2ECFA0; }
+nav .nm-on { --c: #E0C568; }
+nav .nm-link { --c: #5CCEE8; }
+
+nav .nav-toggle { display: none; background: none; border: 1px solid var(--border2); border-radius: 4px; width: 40px; height: 36px; cursor: pointer; padding: 0; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+nav .nav-toggle span { display: block; width: 18px; height: 2px; background: var(--text); border-radius: 1px; }
+
+@media (max-width: 900px) {
+  nav .nav-toggle { display: flex; margin-left: auto; }
+  nav .nav-links { display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: calc(100vh - 60px); overflow-y: auto; flex-direction: column; align-items: stretch; gap: 0; padding: 10px 20px 20px; background: #0A0914; border-bottom: 1px solid var(--border2); }
+  nav.open .nav-links { display: flex; }
+  nav .nav-links a:not(.nav-cta) { display: block; }
+  nav .nav-links a.nm { display: grid; }
+  nav .nav-links > a { padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  nav .nav-links > a.nav-cta { text-align: center; margin-top: 14px; padding: 12px 16px; border-bottom: none; }
+  nav .nav-dd-btn { display: block; width: 100%; text-align: left; padding: 12px 0 6px; cursor: default; color: var(--text3); pointer-events: none; }
+  nav .nav-dd-btn .caret { display: none; }
+  nav .nav-menu { display: block; position: static; padding: 0 0 8px; }
+  nav .nm-list { width: auto; background: none; border: none; box-shadow: none; padding: 0; }
+  nav .nm { padding: 10px 4px; border-bottom: 1px solid var(--border); border-radius: 0; }
+}
+
+/* ── FOOTER ── */
+footer .footer-inner { grid-template-columns: 1.3fr 1fr 1fr 1fr; gap: 36px; }
+footer .footer-col li a { display: inline-block; padding: 1px 0; }
+@media (max-width: 900px) { footer .footer-inner { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) { footer .footer-inner { grid-template-columns: 1fr; } }
+
+footer .footer-social { flex-wrap: wrap; gap: 8px 16px; }
