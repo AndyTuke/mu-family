@@ -31,7 +31,19 @@ target_sources(mu-toni
         Source/Plugin/PluginEditor.cpp
         Source/UI/SettingsOverlay.cpp
         Source/UI/ArpContent.cpp
+        # Offline-license verifier + online activation live in mu-core (shared); compiled here + monocypher.c.
+        "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
+        "${CMAKE_SOURCE_DIR}/mu-core/License/LemonSqueezyClient.cpp"
+        "${CMAKE_SOURCE_DIR}/mu-core/License/OnlineActivation.cpp"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
 )
+
+# monocypher is vendored third-party crypto; silence its benign MSVC C4244 at the build level.
+if(MSVC)
+    set_source_files_properties(
+        "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
+        PROPERTIES COMPILE_OPTIONS "/wd4244")
+endif()
 
 target_include_directories(mu-toni
     PRIVATE
@@ -39,6 +51,7 @@ target_include_directories(mu-toni
     SYSTEM PRIVATE
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher"   # LicenseManager
 )
 
 target_compile_definitions(mu-toni
@@ -130,10 +143,16 @@ target_sources(mu-toni-tests PRIVATE
     Source/Tests/PrefixMigrationTests.cpp   # data saved before the v -> a id-prefix rename still loads
     Source/Tests/ClipLaunchTests.cpp   # clip store / launch on the real processor
     Source/Tests/FxTailTests.cpp   # a full-preset commit keeps the FX tail
+    Source/Tests/ModArcTests.cpp   # every mod target publishes its live value for the knob arcs
+    Source/Tests/StepPatternTests.cpp   # step pattern: rests, Legato tie end, defaults
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/Wavetable/WavetableBank.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/License/LemonSqueezyClient.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/License/OnlineActivation.cpp"
+    "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
     # The mu-core .cpps behind ProcessorBase (the console target can't link mu-core directly).
     ${MU_CORE_PROCESSOR_TEST_SOURCES}
 )
@@ -146,6 +165,7 @@ target_include_directories(mu-toni-tests PRIVATE
     SYSTEM
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"   # ReverbSlot
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher"   # LicenseManager
 )
 
 target_link_libraries(mu-toni-tests PRIVATE

@@ -37,6 +37,10 @@ public:
 
     void setLayer(int idx);
 
+    // Let go of every knob's modulation binding; called before a layer is removed or moved, because the
+    // arcs hold the layer's matrix. setLayer rebinds.
+    void releaseModulationArcs() { for (auto& k : knobs) k.comp->clearModBinding(); }
+
     int getLayer() const noexcept { return currentLayer; }
 
     void lookAndFeelChanged() override { resized(); repaint(); }   // metal style / screws change the layout
@@ -52,9 +56,10 @@ private:
     void addSourceControls();
     void addVoiceControls();
     void addArpControls();
-    void setAccentStep(int step, bool on);   // write one accent cell into the layer's pattern
+    void setStepLevel(int step, int level);  // write one step's Off / On / Accented (0 / 1 / 2) into the layer's pattern
     void refreshAccentSteps();               // show the layer's pattern + the arp's place in it
     void buildVoiceBand();
+    void bindModulationArcs();               // live modulation arcs on the knobs the target table drives
 
     static constexpr Group kSourceGroups[4] = { G_OSC1, G_OSC2, G_XMOD, G_MIX };
 
@@ -134,11 +139,12 @@ private:
     // The three metal panels filling the band: source, voice band, Appergater.
     juce::Rectangle<int> srcR, voicePanelR, arpPanelR;
 
-    StepEditor accentSteps;                       // the Appergater's accent pattern (on/off cells)
-    int shownAccentLen = -1, shownAccentPat = -1; // what accentSteps shows (redrawn on change)
+    StepEditor accentSteps;                       // the Appergater's step pattern (Off / On / Accented cells)
+    int shownAccentLen = -1, shownAccentPat = -1, shownStepMask = -1; // what accentSteps shows (redrawn on change)
     int accentParamsLayer = -1;                    // layer the three pointers below were looked up for
     std::atomic<float>* accLenParam  = nullptr;
     std::atomic<float>* accPatParam  = nullptr;
+    std::atomic<float>* stepMaskParam = nullptr;
     std::atomic<float>* arpRateParam = nullptr;
 
     InsertSubsection insertSub;

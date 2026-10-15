@@ -120,7 +120,7 @@ protected:
 
     // ── Arp/voice parameter cache (index into vp[voice][slot]) ────────────────
     // Enum + suffix table live in the .cpp; count is needed here for the array.
-    static constexpr int kNumVoiceParams = 62;
+    static constexpr int kNumVoiceParams = 63;
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -153,7 +153,16 @@ public:
     // live in ProcessorCore; the UI ModulatorPanel binds to the active one through this.
     Arp&       getArp(int i) noexcept       { return layerAs<Arp>(i); }
     const Arp& getArp(int i) const noexcept { return layerAs<Arp>(i); }
+    // Post-matrix value of modulation target `dest` (a ModDestIndex) on layer `layer`, in the
+    // target knob's parameter units. Written each block by readVoice; read by the knobs' live arcs.
+    float getModLive(int layer, int dest) const noexcept
+    {
+        return modLive[(size_t) juce::jlimit(0, mu_limits::kMaxLayers - 1, layer)]
+                      [(size_t) juce::jlimit(0, kNumModDests - 1, dest)].load(std::memory_order_relaxed);
+    }
 private:
+    std::array<std::array<std::atomic<float>, kNumModDests>, mu_limits::kMaxLayers> modLive {};
+
     // Modulation-resolve inputs: parallel arrays for mu_mod::resolveLane.
     std::array<const char*, kNumModDests>                                         modDestIds {};
     std::array<juce::NormalisableRange<float>, kNumModDests>                       modDestRanges {};

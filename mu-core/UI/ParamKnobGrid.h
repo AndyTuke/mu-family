@@ -2,8 +2,11 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/MuLookAndFeel.h"
+#include "Modulation/ModulationMatrix.h"
 
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -20,7 +23,16 @@ namespace mu_ui {
 class ParamKnobGrid : public juce::Component
 {
 public:
-    struct Spec { juce::String id; juce::String label; };
+    // `modDestId` (with `modMatrix` and `modLive`) is optional: a float param that is a modulation
+    // target shows its live modulation arc, bound through KnobWithLabel::bindModulation.
+    struct Spec
+    {
+        juce::String            id;
+        juce::String            label;
+        const char*             modDestId = nullptr;
+        const ModulationMatrix* modMatrix = nullptr;
+        std::function<float()>  modLive;
+    };
 
     explicit ParamKnobGrid(juce::AudioProcessorValueTreeState& state);
 
@@ -28,6 +40,10 @@ public:
     // repeatedly, e.g. on lane / voice select. Knobs are drawn at the family's standard
     // Size-2 dimensions and wrap to fit the width.
     void setSpecs(const std::vector<Spec>& specs);
+
+    // Drop every knob's modulation binding (matrix pointer + live-value callback), so no timer tick
+    // can reach a layer's data while a structural edit moves or frees it. setSpecs rebinds.
+    void clearModBindings();
 
     // The width (pixels) the controls need on a single row — a selector takes two cells.
     int getPreferredWidth() const;
@@ -46,7 +62,7 @@ private:
     struct Control
     {
         juce::String                    label;
-        std::unique_ptr<juce::Slider>   knob;
+        std::unique_ptr<KnobWithLabel>  knob;
         std::unique_ptr<juce::ComboBox> combo;
         juce::Label                     name;
         std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   knobAtt;

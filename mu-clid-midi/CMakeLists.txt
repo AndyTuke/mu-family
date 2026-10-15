@@ -192,3 +192,50 @@ target_compile_definitions(mu-clid-midi-tests PRIVATE
 )
 
 set_target_properties(mu-clid-midi-tests PROPERTIES EXCLUDE_FROM_ALL TRUE)
+
+# ── mu-clid-midi-shot — renders the real editor to a PNG (site screenshots) ──
+# Test-only tool: not in ALL, not packaged, not run by CI. The plug-in has no Standalone, so this
+# builds the real processor and editor into a small console app and snapshots the editor headless.
+#   cmake --build build --config Release --target mu-clid-midi-shot
+#   build/mu-clid-midi/mu-clid-midi-shot_artefacts/Release/mu-clid-midi-shot.exe out.png
+juce_add_console_app(mu-clid-midi-shot
+    PRODUCT_NAME "mu-clid-midi-shot"
+)
+
+target_sources(mu-clid-midi-shot PRIVATE
+    Source/Tests/ShotMain.cpp
+    Source/Plugin/PluginProcessor.cpp
+    Source/Sequencer/MidiRhythmCore.cpp
+    Source/Plugin/PluginEditor.cpp
+    Source/Persistence/SessionState.cpp
+)
+
+target_include_directories(mu-clid-midi-shot
+    PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/Source"
+    SYSTEM PRIVATE
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+)
+
+target_compile_definitions(mu-clid-midi-shot
+    PUBLIC
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_USE_MP3AUDIOFORMAT=1
+)
+
+target_link_libraries(mu-clid-midi-shot
+    PRIVATE
+        mu-core
+        juce::juce_audio_utils
+        juce::juce_dsp
+        juce::juce_gui_basics
+        juce::juce_gui_extra
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags
+)
+
+set_target_properties(mu-clid-midi-shot PROPERTIES EXCLUDE_FROM_ALL TRUE)

@@ -346,6 +346,15 @@ void LiveState::setClipMask(int layer, uint8_t mask)
     changed();
 }
 
+void LiveState::setClipName(int layer, int clip, const juce::String& name)
+{
+    if (! inRange(layer) || clip < 0 || clip >= mu_limits::kClipsPerLayer) return;
+    auto& slot = clipState[(size_t) layer].names[(size_t) clip];
+    if (slot == name) return;
+    slot = name;
+    changed();
+}
+
 void LiveState::clearLayerClips(int layer)
 {
     if (! inRange(layer)) return;
@@ -381,13 +390,14 @@ void LiveState::remapLayers(const std::function<int(int)>& oldToNew)
         auto& to = moved[(size_t) j];
         to.playing = from.playing;
         to.mask    = from.mask;
+        to.names   = from.names;
         if (j == i) { to.queued = from.queued; to.queuedSerial = from.queuedSerial; }   // a layer that did not move keeps its wait
     }
 
     bool differs = false;
     for (size_t i = 0; i < moved.size(); ++i)
         differs |= moved[i].playing != clipState[i].playing || moved[i].queued != clipState[i].queued
-                || moved[i].mask != clipState[i].mask;
+                || moved[i].mask != clipState[i].mask || moved[i].names != clipState[i].names;
     clipState = moved;
     if (differs) changed();
 }

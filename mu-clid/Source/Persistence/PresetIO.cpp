@@ -267,6 +267,10 @@ void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file, bool k
     loadSource = file.getFileName();   // names the file in load messages; the tree stage has no file
     proc.stageLayerPreset(rhythmIndex, state, keepIdentity, false);
     loadSource = juce::String();
+
+    // A named preset load: a clip stored from this rhythm is named after the file. A settings reset is not one.
+    if (! keepIdentity)
+        proc.noteLayerPresetLabel(rhythmIndex, file.getFileNameWithoutExtension());
 }
 
 // Everything a layer-preset load does after the parse (file or clip). Stopped: install at once.
@@ -447,6 +451,10 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFil
     const auto state = buildRhythmPresetTree(rhythmIndex, embedSample, true,
                                              destFile.getFileNameWithoutExtension(), category, description);
     mu_pp::replaceFileAtomically(destFile, state.toXmlString(), proc.onLoadError);
+
+    // The rhythm is now that saved preset (the "_default" template is not a preset the user named).
+    if (! destFile.getFileName().startsWith("_"))
+        proc.noteLayerPresetLabel(rhythmIndex, destFile.getFileNameWithoutExtension());
 }
 
 // Load a .muRhythm into a slot at once, whatever the transport is doing. Only sequencer-page state
@@ -461,6 +469,7 @@ bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIndex, bool k
     // A direct load is not a clip launch: the install keeps the slot's activeClip, so clear it here.
     proc.sequencer.getRhythm(targetIndex).activeClip = -1;
     proc.getLiveState().clearLayerClips(targetIndex);
+    proc.noteLayerPresetLabel(targetIndex, keepIdentity ? juce::String() : file.getFileNameWithoutExtension());
     return true;
 }
 

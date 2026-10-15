@@ -13,6 +13,7 @@
 
 #include <array>
 #include <cmath>
+#include <limits>
 #include <string_view>
 #include <unordered_map>
 
@@ -154,6 +155,20 @@ public:
         }
     }
 
+    // Post-matrix value of modulation target `dest` (a row of the engine's table) on layer `slot`, in the
+    // target knob's parameter units, as the last block resolved it; NaN while the slot runs another
+    // engine than `engine`. Read by the knobs' live arcs (message thread).
+    float getModLive(int slot, EngineType engine, int dest) const noexcept
+    {
+        if (slot < 0 || slot >= kSlots || dest < 0 || dest >= kMaxDests)
+            return std::numeric_limits<float>::quiet_NaN();
+        // Acquire pairs with the release store of the tag in resolve(), so the values read below are at
+        // least as new as the block that published this engine.
+        if (modLiveEngine[(size_t) slot].load(std::memory_order_acquire) != toIndex(engine))
+            return std::numeric_limits<float>::quiet_NaN();
+        return modLive[(size_t) slot][(size_t) dest].load(std::memory_order_relaxed);
+    }
+
     // Fire layer `slot`'s engine (a Rumble layer does not step).
     void trigger(int slot, float velocity, int sampleOffset = 0)
     {
@@ -217,12 +232,17 @@ private:
 
     // Cached modulation data for one slot + engine: the destination ids (proportion-space keys),
     // their backing APVTS atomics + ranges, and the reusable seed/result map.
+    static constexpr int kMaxDests = 16;   // the most targets any engine's table holds (Bass: 10)
+    static_assert(std::size(kKickDests) <= kMaxDests && std::size(kBassDests) <= kMaxDests
+                  && std::size(kHatDests) <= kMaxDests && std::size(kSnareDests) <= kMaxDests
+                  && std::size(kRumbleDests) <= kMaxDests, "an engine's mod table outgrew GrooveVoices::kMaxDests");
+
     struct EngineMod
     {
         int count = 0;
-        std::array<const char*, 16>                       ids   {};
-        std::array<const std::atomic<float>*, 16>         atoms {};
-        std::array<juce::NormalisableRange<float>, 16>    ranges{};
+        std::array<const char*, kMaxDests>                       ids   {};
+        std::array<const std::atomic<float>*, kMaxDests>         atoms {};
+        std::array<juce::NormalisableRange<float>, kMaxDests>    ranges{};
         std::unordered_map<std::string_view, float>       map;
     };
 
@@ -250,6 +270,11 @@ private:
         auto& L = mods[(size_t) s][(size_t) e];
         mu_mod::resolveLane(snapshot[(size_t) s], blkBeat, L.count,
                             L.ids.data(), L.atoms.data(), L.ranges.data(), L.map, outValues);
+
+        // Publish the post-matrix values for the knobs' live modulation arcs.
+        for (int k = 0; k < L.count; ++k)
+            modLive[(size_t) s][(size_t) k].store(outValues[k], std::memory_order_relaxed);
+        modLiveEngine[(size_t) s].store(e, std::memory_order_release);   // after the values: the tag publishes them
     }
 
     // The Rumble envelope level (0..1) at `beat`, evaluated under its try-lock; on contention with a
@@ -289,6 +314,8 @@ private:
     std::array<juce::AudioBuffer<float>, kSlots>            out;           // each live layer's rendered block
     juce::AudioBuffer<float>                                silence;       // a Rumble with no source reads this
     std::array<std::array<EngineMod, kNumEngineTypes>, kSlots> mods;
+    std::array<std::array<std::atomic<float>, kMaxDests>, kSlots> modLive {};   // post-matrix target values (audio thread writes, UI reads)
+    std::array<std::atomic<int>, kSlots>                          modLiveEngine {};   // the engine those values belong to
 
     std::array<const std::atomic<float>*, kSlots> engineParam {}, srcParam {}, bassWave {};
     std::array<Track*, kSlots>                    snapshot {};              // this block's live layers (valid for one block)
@@ -298,7 +325,12 @@ private:
     double blkBeat     = 0.0;
 
 public:
-    GrooveVoices() { current.fill(-1); lastRumbleEnv.fill(1.0f); }
+    GrooveVoices()
+    {
+        current.fill(-1);
+        lastRumbleEnv.fill(1.0f);
+        for (auto& e : modLiveEngine) e.store(-1, std::memory_order_relaxed);   // no values published yet
+    }
 };
 
 } // namespace mu_on

@@ -2,14 +2,52 @@
   "permissions": {
     "allow": [
       "Bash",
-      "Bash(*)",
       "WebFetch",
       "WebSearch",
-      "PowerShell",
-      "PowerShell(*)"
+      "PowerShell"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f *)",
+      "Bash(git reset --hard*)",
+      "Bash(git commit*--no-verify*)",
+      "PowerShell(git push --force*)",
+      "PowerShell(git push -f *)",
+      "PowerShell(git reset --hard*)",
+      "PowerShell(git commit*--no-verify*)"
+    ],
+    "ask": [
+      "Bash(gh workflow run*)",
+      "PowerShell(gh workflow run*)"
     ]
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "if": "Bash(git commit *)",
+            "statusMessage": "Running static checks before commit...",
+            "command": "powershell -NonInteractive -File \"$env:CLAUDE_PROJECT_DIR\\.claude\\hooks\\pre_commit_checks.ps1\"; exit $LASTEXITCODE"
+          }
+        ]
+      },
+      {
+        "matcher": "PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "if": "PowerShell(git commit *)",
+            "statusMessage": "Running static checks before commit...",
+            "command": "powershell -NonInteractive -File \"$env:CLAUDE_PROJECT_DIR\\.claude\\hooks\\pre_commit_checks.ps1\"; exit $LASTEXITCODE"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Bash",

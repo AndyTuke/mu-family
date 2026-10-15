@@ -57,7 +57,7 @@ The arp is defined by a small parameter set. Confirmed so far:
 | **Gate Length** | 1 – 100 % of step — **modulation target** | How long each note holds before **note-off → ADSR Release**. `<100%` = staccato with a gap; **`100%` + Legato = tie/slide** (see "Articulation"). Mod dest `arp.gateLen` → per-step slides/accents. |
 | **Legato** | voice on/off — **modulation target** | When on, a **100%-gate** note **ties** to the next (no amp retrigger); this is also the only condition under which **glide is heard**. Synth-voice param, mod dest `arp.legato`. See "Articulation". |
 | **Portamento** (Glide) | 0 … ~500 ms — **modulation target** | Glide **time** (analogue-style ms) the pitch slews between tied notes. Heard **only** on legato (100%-gate) transitions. Mod dest `arp.portaTime`. See "Articulation". |
-| **Accent** (+ Acc Steps + the pattern row) | 0 – 100 % · 1 – 16 steps · one on/off cell per step — Accent is a **modulation target** (`arp.accent`) | A repeating accent pattern over the arp's steps: an accented step plays up to **+6 dB** louder with its filter up to **one octave** brighter (303-style), scaled by Accent. In Loop mode the pattern position follows the beat, so accents lock to the bar; in MIDI-trigger mode it counts from the key press. Params `a{N}_acc` / `accLen` / `accPat` (bit i = step i+1). |
+| **Accent** (+ Steps + the pattern row) | 0 – 100 % · 1 – 16 steps · one **Off / On / Accented** cell per step — Accent is a **modulation target** (`arp.accent`) | A repeating step pattern over the arp's steps (ruled 2026-10-14, see "Step pattern" below): an **Off** step is a rest, an **On** step plays normally, an **Accented** step plays up to **+6 dB** louder with its filter up to **one octave** brighter (303-style), scaled by Accent. In Loop mode the pattern position follows the beat, so it locks to the bar; in MIDI-trigger mode it counts from the key press. Params `a{N}_acc` / `accLen` / `accPat` (accent bit i = step i+1) / `stepMask` (On bit i = step i+1). |
 | _more_ | 🔲 TBD | Owner: further controls (candidates under "Anticipated further controls"). |
 
 All of the above are **APVTS parameters** and **modulation destinations**
@@ -273,6 +273,19 @@ So a **per-step slide** is made by **modulating Gate Length to 100 %** on the
 slide steps with Legato on — no separate "portamento on/off" flag exists. Glide
 is deliberately a *legato* behaviour (fingered-portamento style), which is why a
 plucked note never glides even with a Portamento time dialled in.
+
+### Step pattern — Off / On / Accented (ruled 2026-10-14)
+
+Each of the pattern's **Steps** (1 to 16, `accLen`) is in one of three states: **Off** (a rest), **On** (plays normally) or **Accented** (plays with the accent, scaled by the Accent knob). Look and gesture: [design-ui.md](design-ui.md#appergater-step-pattern).
+
+- **Rest.** An Off step triggers no note. The scan position **still advances** (the pool walk and the Rate clock are unchanged), so a rest is a rhythmic gap and the pattern stays locked to the bar. A note still sounding from the previous step is released at its gate; with **Legato on, a rest ends the tie** (the note off lands at the step boundary even at 100 % gate, and the next note after a rest is a fresh pluck: no glide from the note before the rest). A rest does not reset anything else (ADSR, filter envelope and glide state follow their normal release).
+- **Pattern position.** Step n of the arp uses pattern cell `n mod Steps`, exactly as the accent did: in Loop mode from the beat position, in MIDI-trigger mode counting from the key press.
+- **Accent on a rest.** Meaningless; the engine ignores the accent bit of an Off step. The editor clears the accent bit when a step goes Off, so the two never disagree on screen.
+- **Storage** (everything in APVTS, per layer, not modulation targets): `accPat` keeps its meaning (accent bit mask, bit i = step i+1) and a new `stepMask` (`AudioParameterInt`, 0 to 65535, **default 65535 = every step On**) holds the On / Off bits. State: Off = `stepMask` bit 0; On = `stepMask` bit 1, `accPat` bit 0; Accented = both 1. Bits at or above `Steps` are kept but ignored, so lowering and raising Steps loses nothing. 16-bit masks are exact in the float parameter.
+- **Backward compatibility.** A saved layer or preset without `stepMask` loads it at its default (all On): the old accent bits give On / Accented with no rests, so today's sound is unchanged.
+- **Audio thread.** The engine reads both masks as plain ints per step (no allocation, no new smoothing); a pattern edit takes effect at the next step.
+- **Modulation.** Only Accent (amount) stays a target. Steps, `accPat` and `stepMask` are not (a bit mask is not a knob; stepping it from a modulator would be noise).
+- **Family vocabulary.** mu-Tant's *gate pattern* is a pass / silence mask over a free-running drone; mu-Clid and mu-On's pattern rows are *hits*. μ-Toni already has a **Gate** knob (note length), so the pattern never says "gate" here: it is the **step pattern** with states Off / On / Accented. The shared look and gesture are the lamp-cell level mode of the family `StepEditor` ([design-ui-family.md](../design-ui-family.md)), not a copy of the mu-Tant designer.
 
 **Engine placement.** Portamento is a `juce::SmoothedValue`-style **slew on the
 pitch value** the arp writes into mu-tant's scale-quantised pitch input — pitch
@@ -523,7 +536,8 @@ as every other product.
 Placeholder list for the owner's "more to add" — to be confirmed, not yet
 designed:
 
-- **Swing / humanise**, **step probability**, **rest pattern**.
+- **Swing / humanise**, **step probability**.
+- ~~**Rest pattern**~~ — **done as the Off state of the step pattern** (owner decision 2026-10-14; "Step pattern" below).
 - ~~**Velocity / accent**~~ — **done as an accent pattern** (owner decision 2026-10-08; see the Accent row above). Played-note velocity and a separate velocity lane were not taken (Amp Level is already a modulation target).
 
 *Explicitly ruled out:* **strum / stack** (μ-Toni is strictly monophonic — the

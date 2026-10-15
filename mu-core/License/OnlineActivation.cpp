@@ -8,7 +8,7 @@ namespace mu_core
 
 // Offline grace: a machine that validated online may keep running for this long without a
 // successful re-validate (covers a user who's temporarily offline). After it lapses, a launch
-// with no network drops to Demo until the next successful validate.
+// with no network is treated as unlicensed until the next successful validate.
 static constexpr juce::int64 kGraceMs = (juce::int64) 30 * 24 * 60 * 60 * 1000;
 
 static juce::String nowMs() { return juce::String (juce::Time::getCurrentTime().toMilliseconds()); }
@@ -44,7 +44,7 @@ OnlineActivationOutcome OnlineActivation::activate (const juce::File&   contentD
     }
     else if (! res.networkError && o.message.isEmpty())
     {
-        o.message = "That license key could not be activated (limit reached, expired, or invalid).";
+        o.message = "That licence key could not be activated (limit reached, expired, or invalid).";
     }
     return o;
 }
@@ -81,7 +81,7 @@ OnlineActivationOutcome OnlineActivation::validateStored (const juce::File&   co
     {
         // Revoked / expired / refunded — stop trusting it.
         ActivationStore::clear (contentDir, activationFilename);
-        o.message = res.message.isNotEmpty() ? res.message : "License is no longer valid.";
+        o.message = res.message.isNotEmpty() ? res.message : "Licence is no longer valid.";
     }
     return o;
 }

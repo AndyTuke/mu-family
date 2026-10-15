@@ -107,6 +107,74 @@ struct MuClidClipLaunchTests : juce::UnitTest
         fullPresetAndSessionRoundTrip();
         stagedFullPresetCarriesBanks();
         oldFilesLoadEmpty();
+        clipNamesFollowPresets();
+    }
+
+    // A clip is named after the preset it was stored from; the live view carries the names with the queue.
+    void clipNamesFollowPresets()
+    {
+        beginTest("clip names: the loaded file's stem, else the rhythm's name; published to the view, kept on re-store and in full presets");
+        const auto dir = presetsDir();
+        const auto fileA = dir.getChildFile("T11.muRhythm");
+        const auto fileB = dir.getChildFile("T13.muRhythm");
+        expect(fileA.existsAsFile() && fileB.existsAsFile());
+
+        using Type = mu_core::ControlActionType;
+        const auto act = [](Type type, int index)
+        {
+            mu_core::ControlAction a;
+            a.type = type; a.layer = 0; a.index = index;
+            return a;
+        };
+
+        TempStorage storage;
+        mu_clid::PluginProcessor p;
+        const auto* view = p.getLiveView();
+        p.getRhythm(0).name = "Kick";
+
+        expect(p.perform(act(Type::StoreClip, 0)), "stored with no preset loaded");
+        expectEquals(view->getClipName(0, 0), juce::String("Kick"), "falls back to the rhythm's name");
+
+        p.stageRhythmPreset(0, fileA);
+        expect(p.perform(act(Type::StoreClip, 1)));
+        expectEquals(view->getClipName(0, 1), fileA.getFileNameWithoutExtension(), "the loaded file's stem");
+        p.stageRhythmPreset(0, fileB);
+        expect(p.perform(act(Type::StoreClip, 2)));
+        expectEquals(view->getClipName(0, 2), fileB.getFileNameWithoutExtension());
+        expectEquals(view->getClipName(0, 3), juce::String(), "an empty pad has no name");
+
+        // Launch a clip, then re-store it after a tweak: it keeps its own name, not the layer's.
+        expect(p.perform(act(Type::LaunchClip, 1)));
+        expectEquals(view->getPlayingClip(0), 1);
+        setParam(p.apvts, kParam, 9.0f);
+        expect(p.perform(act(Type::StoreClip, 1)));
+        expectEquals(view->getClipName(0, 1), fileA.getFileNameWithoutExtension(), "re-storing the playing clip keeps its name");
+
+        // While playing, a launch is queued and its name is already published.
+        p.sequencerPlaying.store(true);
+        expect(p.perform(act(Type::LaunchClip, 2)));
+        expectEquals(view->getQueuedClip(0), 2);
+        expectEquals(view->getClipName(0, view->getQueuedClip(0)), fileB.getFileNameWithoutExtension());
+        Probe::scan(p); Probe::commit(p);
+        p.getLiveState().reconcile();
+        expectEquals(view->getPlayingClip(0), 2);
+        p.sequencerPlaying.store(false);
+
+        // The names are part of the bank, so they survive a full-preset save and load.
+        const auto full = storage.root.getChildFile("names.muClid");
+        p.saveFullPresetTo(full);
+        mu_clid::PluginProcessor q;
+        q.loadPreset(full);
+        expectEquals(q.getLiveView()->getClipName(0, 0), juce::String("Kick"));
+        expectEquals(q.getLiveView()->getClipName(0, 1), fileA.getFileNameWithoutExtension());
+        expectEquals(q.getLiveView()->getClipName(0, 2), fileB.getFileNameWithoutExtension());
+
+        // A file load labels its layer; a reset forgets the label.
+        p.addLayer();
+        p.stageRhythmPreset(1, fileA);
+        expectEquals(p.clipLabel(1), fileA.getFileNameWithoutExtension());
+        p.resetLayer(1);
+        expectEquals(p.clipLabel(1), p.getLayerName(1), "reset forgets the file");
     }
 
     void storeAndLaunch()

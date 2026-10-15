@@ -19,6 +19,26 @@ void StepEditor::setStepCount(int count)
     repaint();
 }
 
+void StepEditor::setLevelCells(int n)
+{
+    n = (n >= 3) ? 3 : (n == 2 ? 2 : 0);
+    if (n == levelCells) return;
+    levelCells = n;
+    repaint();
+}
+
+int StepEditor::levelOfValue(float v) const noexcept
+{
+    if (levelCells < 2) return 0;
+    return juce::jlimit(0, levelCells - 1, (int) std::lround(v / 100.0f * (float) (levelCells - 1)));
+}
+
+float StepEditor::valueOfLevel(int level) const noexcept
+{
+    if (levelCells < 2) return 0.0f;
+    return 100.0f * (float) juce::jlimit(0, levelCells - 1, level) / (float) (levelCells - 1);
+}
+
 void StepEditor::setBarColour(juce::Colour c)
 {
     if (c == barColour) return;
@@ -102,6 +122,26 @@ float StepEditor::yToValue(int y) const
         v = juce::jlimit(lo, hi, v);
     }
     return v;
+}
+
+// Level-cell mode: write one cell's level (no-op when unchanged) and tell the owner.
+void StepEditor::setCellLevel(int idx, int level)
+{
+    if (idx < 0 || idx >= (int) steps.size()) return;
+    const float v = valueOfLevel(level);
+    if (levelOfValue(steps[(size_t) idx]) != level)
+    {
+        steps[(size_t) idx] = v;
+        repaint();
+        if (onStepChanged) onStepChanged(idx, v);
+    }
+}
+
+// Level-cell mode: tell the owner which cell the mouse is on and its level (for the status bar).
+void StepEditor::reportCell(int x)
+{
+    const int idx = hitStepIndex(x);
+    if (idx >= 0 && onCellStatus) onCellStatus(idx, levelOfValue(steps[(size_t) idx]));
 }
 
 void StepEditor::applyAt(int x, int y)
@@ -210,6 +250,26 @@ void StepEditor::paintLamps(juce::Graphics& g)
         g.setColour(MuLookAndFeel::lampColour(barColour, L.lampOff));
         g.fillRoundedRectangle(cell, corner);
 
+        // Level cells: the whole lens lit to the level's strength; the playhead a ring round the cell.
+        if (levelCells > 0)
+        {
+            const int level = levelOfValue(steps[(size_t) i]);
+            const float strength = level <= 0 ? L.lampOff : (level == 1 ? L.lampOn : L.lampAccent);
+            if (level > 0)
+            {
+                juce::Path lens;
+                lens.addRoundedRectangle(cell, corner);
+                MuLookAndFeel::drawLamp(g, lens, {}, MuLookAndFeel::lampColour(barColour, strength),
+                                        cell.getCentre(), juce::jmax(cell.getWidth(), cell.getHeight()) * L.lampHotSpotReach);
+            }
+            if (i == current)
+            {
+                g.setColour(juce::Colours::white.withAlpha(L.lampPlayheadRing));
+                g.drawRoundedRectangle(cell.reduced(0.5f), corner, juce::jmax(1.0f, mu_ui::sf(1.5f)));
+            }
+            continue;
+        }
+
         // Lit part: up from the bottom (unipolar) or out from the centre (bipolar).
         const float v = steps[(size_t)i];
         juce::Rectangle<float> lit;
@@ -244,10 +304,40 @@ void StepEditor::paintLamps(juce::Graphics& g)
 
 void StepEditor::mouseDown(const juce::MouseEvent& e)
 {
+    if (levelCells > 0)
+    {
+        // First click of a gesture: step the cell's level (back with Shift) and remember it to paint on.
+        const int idx = hitStepIndex(e.x);
+        if (idx < 0) return;
+        const int cur = levelOfValue(steps[(size_t) idx]);
+        paintLevel    = (cur + (e.mods.isShiftDown() ? levelCells - 1 : 1)) % levelCells;
+        lastPaintCell = idx;
+        setCellLevel(idx, paintLevel);
+        reportCell(e.x);
+        return;
+    }
     applyAt(e.x, e.y);
 }
 
 void StepEditor::mouseDrag(const juce::MouseEvent& e)
 {
+    if (levelCells > 0)
+    {
+        // Paint the same state into each new cell entered.
+        const int idx = hitStepIndex(e.x);
+        if (idx >= 0 && idx != lastPaintCell) { lastPaintCell = idx; setCellLevel(idx, paintLevel); }
+        reportCell(e.x);
+        return;
+    }
     applyAt(e.x, e.y);
+}
+
+void StepEditor::mouseMove(const juce::MouseEvent& e)
+{
+    if (levelCells > 0) reportCell(e.x);
+}
+
+void StepEditor::mouseUp(const juce::MouseEvent&)
+{
+    lastPaintCell = -1;
 }

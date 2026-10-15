@@ -26,22 +26,33 @@ inline double rateBeats(int idx) noexcept
     return b;
 }
 
-// A layer's accent: a repeating on/off pattern over the arp's steps (bit i = step i+1), its length
-// and how much an accented step lifts. In loop mode the pattern position follows the beat (so
-// accents lock to the bar); in MIDI-trigger mode it counts from the key press.
+// A layer's step pattern: a repeating pattern over the arp's steps (bit i = step i+1), its length and
+// how much an accented step lifts. Each step is Off (a rest: stepMask bit 0), On (stepMask bit 1,
+// pattern bit 0) or Accented (both 1); bits at or above `length` are kept but ignored. In loop mode the
+// pattern position follows the beat (so it locks to the bar); in MIDI-trigger mode it counts from the
+// key press.
 struct ArpAccent
 {
     static constexpr int kMaxSteps = 16;
-    unsigned pattern = 1;
-    int      length  = 4;
-    float    amount  = 0.0f;   // 0..1
+    unsigned pattern  = 1;
+    unsigned stepMask = 0xFFFFu;   // Off / On bits; all On by default
+    int      length   = 4;
+    float    amount   = 0.0f;   // 0..1
 
-    // The accent of step `step` (0 when that position of the pattern is off).
-    float at(int step) const noexcept
+    // The pattern cell step `step` falls on.
+    int cellOf(int step) const noexcept
     {
         const int len = length < 1 ? 1 : (length > kMaxSteps ? kMaxSteps : length);
-        const int pos = ((step % len) + len) % len;
-        return ((pattern >> pos) & 1u) != 0u ? amount : 0.0f;
+        return ((step % len) + len) % len;
+    }
+
+    // False when step `step` is a rest (its cell is Off).
+    bool isOn(int step) const noexcept { return ((stepMask >> cellOf(step)) & 1u) != 0u; }
+
+    // The accent of step `step` (0 when that cell is not accented; the accent bit of an Off step is ignored).
+    float at(int step) const noexcept
+    {
+        return isOn(step) && ((pattern >> cellOf(step)) & 1u) != 0u ? amount : 0.0f;
     }
 };
 
@@ -105,6 +116,7 @@ public:
         if (! run)
         {
             if (noteHeld) { voice.noteOff(); noteHeld = false; }
+            tiedOut = prevTied = false;   // a Legato start must not glide from the silent voice
             voice.process(buf, n);   // the release tail
             return;
         }
@@ -200,12 +212,23 @@ private:
             p.rootOctave = juce::jlimit(0, 8, m / 12 - 1);
         }
 
-        const int midi = stepMidi(p, stepIndex);
         lastFiredStep = stepIndex;
         ++firedCount;
         ++stepIndex;
 
-        const bool tie   = legatoOn && gateLen >= 0.99f;   // 100 % gate + legato → tie/slide
+        // An Off step is a rest: nothing sounds, but the scan and the clock have moved on. Whatever is held
+        // ends at this step boundary (a tie, or a gate that outlived a tempo change), and the next note after
+        // the rest starts fresh (no glide from before it).
+        if (! accent.isOn(lastFiredStep))
+        {
+            if (noteHeld) { voice.noteOff(); noteHeld = false; }
+            tiedOut  = false;
+            prevTied = false;
+            return;
+        }
+
+        const int midi = stepMidi(p, lastFiredStep);
+        const bool tie  = legatoOn && gateLen >= 0.99f;   // 100 % gate + legato → tie/slide
         const bool glide = legatoOn && prevTied;
         voice.setAccent(accent.at(lastFiredStep), glide);
         if (glide) voice.noteOnLegato(midi);   // glide, no retrigger

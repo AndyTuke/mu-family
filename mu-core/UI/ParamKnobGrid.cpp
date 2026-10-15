@@ -32,18 +32,26 @@ void ParamKnobGrid::setSpecs(const std::vector<Spec>& specs)
         }
         else
         {
-            ctl->knob = std::make_unique<juce::Slider>(juce::Slider::RotaryHorizontalVerticalDrag,
-                                                       juce::Slider::NoTextBox);
-            MuLookAndFeel::applyRotarySweep(*ctl->knob);
+            // The standard knob with an empty label (the grid's own name label sits above it), so the
+            // dial, value text and modulation rings are the family's; its bounds are set in resized().
+            ctl->knob = std::make_unique<KnobWithLabel>(juce::String());
             addAndMakeVisible(*ctl->knob);
             ctl->knobAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-                apvts, spec.id, *ctl->knob);
-            ctl->knob->onValueChange = [this, c = ctl.get()] { reportStatus(*c); };
-            ctl->knob->addMouseListener(this, false);
+                apvts, spec.id, ctl->knob->getSlider());
+            ctl->knob->onStatusUpdate = [this, c = ctl.get()](const juce::String&, const juce::String&) { reportStatus(*c); };
+            ctl->knob->onValueChanged = [this, c = ctl.get()](double) { reportStatus(*c); };
+            if (spec.modDestId != nullptr)
+                ctl->knob->bindModulation(spec.modDestId, spec.modMatrix, spec.modLive);
         }
         controls.push_back(std::move(ctl));
     }
     resized();
+}
+
+void ParamKnobGrid::clearModBindings()
+{
+    for (auto& ctl : controls)
+        if (ctl->knob != nullptr) ctl->knob->clearModBinding();
 }
 
 int ParamKnobGrid::getPreferredWidth() const
@@ -87,21 +95,27 @@ void ParamKnobGrid::resized()
         if (ctl->combo)
             ctl->combo->setBounds(cell.withSizeKeepingCentre(cw - 2 * s(MuLookAndFeel::kDropdownEdgeGap), comboH));
         else if (ctl->knob)
-            ctl->knob->setBounds(cell.withSizeKeepingCentre(knobW, knobH));
+        {
+            // The dial itself keeps the standard knob size; the knob component adds the band above
+            // and the (empty) label band below that it reserves around the dial.
+            const auto dial = cell.withSizeKeepingCentre(knobW, knobH);
+            ctl->knob->setBounds(dial.withTrimmedTop(-s(MuLookAndFeel::kKnobTopPad))
+                                     .withTrimmedBottom(-s(MuLookAndFeel::kKnobLabelH)));
+        }
     }
 }
 
 void ParamKnobGrid::mouseEnter(const juce::MouseEvent& e)
 {
     for (const auto& ctl : controls)
-        if (e.eventComponent == ctl->knob.get() || e.eventComponent == ctl->combo.get())
+        if (e.eventComponent == ctl->combo.get())
             reportStatus(*ctl);
 }
 
 void ParamKnobGrid::reportStatus(const Control& ctl) const
 {
     if (! onStatusUpdate) return;
-    if (ctl.knob)       onStatusUpdate(ctl.label, ctl.knob->getTextFromValue(ctl.knob->getValue()));
+    if (ctl.knob)       onStatusUpdate(ctl.label, ctl.knob->getSlider().getTextFromValue(ctl.knob->getValue()));
     else if (ctl.combo) onStatusUpdate(ctl.label, ctl.combo->getText());
 }
 

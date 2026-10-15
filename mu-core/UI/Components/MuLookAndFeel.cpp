@@ -120,6 +120,7 @@ juce::Colour MuLookAndFeel::colour(ColourIds id) noexcept
         case appYellow:               return t.apps.yellow;
         case indicatorFault:          return t.indicators.fault;
         case buttonDangerBg:          return t.indicators.buttonDangerBg;
+        case queuedText:              return t.text.queued;
         // Modulator label colours A–H (reuse the ring/knob theme fields by intent)
         case modLabelA:               return t.rings.modA;
         case modLabelB:               return t.rings.modB;
@@ -827,6 +828,9 @@ juce::Colour MuLookAndFeel::paintColour(juce::Colour accent)
 
 juce::Colour MuLookAndFeel::lcdLitColour(juce::Component& c)
 {
+    // A display showing a queued name (DropdownSelect::setDisplayOverride) lights in the queued colour.
+    if ((bool) c.getProperties()["muLcdQueued"])
+        return colour(queuedText);
     // A display lit in its own colour (DropdownSelect::setLcdColour) — e.g. a voice's.
     if (const auto* own = c.getProperties().getVarPointer("muLcdColour"))
         return juce::Colour((juce::uint32) (juce::int64) *own).brighter(lighting().lcdOwnLift);

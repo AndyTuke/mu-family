@@ -51,6 +51,7 @@ target_sources(mu-core-tests PRIVATE
     ShellChromeTests.cpp
     PerformanceModeShellTests.cpp
     ClipStripTests.cpp
+    StepEditorTests.cpp
     ../UI/ClipStrip.cpp
     ../UI/LayerHeaderBar.cpp
     PerformanceChooserTests.cpp

@@ -11,7 +11,7 @@ namespace mu_tant
     inline constexpr const char* kLicenseProductId = "mu-Tant";
 
     // Lemon Squeezy pay-what-you-want page the support prompt opens (the same link the website uses).
-    inline constexpr const char* kCheckoutUrl = "https://transwarp.lemonsqueezy.com/checkout/buy/b2dd23a7-cd2c-48b2-baa5-8fdda3aa7576";
+    inline constexpr const char* kCheckoutUrl = "https://transwarp.lemonsqueezy.com/checkout/buy/a0354b49-199b-411d-b505-0aee737afe3e";
 
     // License file the user drops into the content dir (getContentDir()).
     inline constexpr const char* kLicenseFilename  = "mutant.lic";

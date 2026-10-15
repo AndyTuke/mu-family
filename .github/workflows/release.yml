@@ -61,12 +61,17 @@ jobs:
 
       - name: Build Release plugins
         run: >
-          cmake --build build --config Release --target
+          cmake --build build --config Release --parallel --target
           mu-clid_VST3 mu-clid_CLAP mu-clid_Standalone
           mu-clid-midi_VST3 mu-clid-midi_CLAP
           mu-tant_VST3 mu-tant_CLAP mu-tant_Standalone
           mu-on_VST3 mu-on_CLAP mu-on_Standalone
           mu-toni_VST3 mu-toni_CLAP mu-toni_Standalone
+
+      # mu-link is a Windows desktop app (freeware); built and zipped on the Windows runner only.
+      - name: Build mu-link (Windows)
+        if: runner.os == 'Windows'
+        run: cmake --build build --config Release --parallel --target mu-link
 
       # AU is macOS-only (the _AU targets only exist in an APPLE configure — family rule).
       - name: Build AU (macOS only)
@@ -102,6 +107,25 @@ jobs:
           Copy-Item "$r\mu-tant\mu-tant_artefacts\Release\Standalone\mu-Tant.exe" staging\mu-Tant\
           Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Tant\"
           Compress-Archive -Path staging\mu-Tant\* -DestinationPath dist\mu-Tant-Windows.zip
+          # mu-Toni (VST3 + CLAP + Standalone)
+          New-Item -ItemType Directory -Path staging\mu-Toni -Force | Out-Null
+          Copy-Item "$r\mu-toni\mu-toni_artefacts\Release\VST3\mu-Toni.vst3" staging\mu-Toni\ -Recurse
+          Copy-Item "$r\mu-toni\mu-toni_artefacts\Release\CLAP\mu-Toni.clap" staging\mu-Toni\
+          Copy-Item "$r\mu-toni\mu-toni_artefacts\Release\Standalone\mu-Toni.exe" staging\mu-Toni\
+          Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Toni\"
+          Compress-Archive -Path staging\mu-Toni\* -DestinationPath dist\mu-Toni-Windows.zip
+          # mu-On (VST3 + CLAP + Standalone)
+          New-Item -ItemType Directory -Path staging\mu-On -Force | Out-Null
+          Copy-Item "$r\mu-on\mu-on_artefacts\Release\VST3\mu-On.vst3" staging\mu-On\ -Recurse
+          Copy-Item "$r\mu-on\mu-on_artefacts\Release\CLAP\mu-On.clap" staging\mu-On\
+          Copy-Item "$r\mu-on\mu-on_artefacts\Release\Standalone\mu-On.exe" staging\mu-On\
+          Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-On\"
+          Compress-Archive -Path staging\mu-On\* -DestinationPath dist\mu-On-Windows.zip
+          # mu-Link (desktop app)
+          New-Item -ItemType Directory -Path staging\mu-Link -Force | Out-Null
+          Copy-Item "$r\mu-link\mu-link_artefacts\Release\mu-link.exe" staging\mu-Link\
+          Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Link\"
+          Compress-Archive -Path staging\mu-Link\* -DestinationPath dist\mu-Link-Windows.zip
 
       - name: Package demo zips (macOS — ditto preserves perms/signature)
         if: runner.os == 'macOS'
@@ -162,6 +186,20 @@ jobs:
           cp -R "$R/mu-tant/mu-tant_artefacts/Release/Standalone/mu-Tant"     "staging/mu-Tant/" 2>/dev/null || true
           cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-Tant/"
           ( cd staging && zip -r -y "../dist/mu-Tant-Linux.zip" "mu-Tant" )
+          # mu-Toni (VST3 + CLAP + Standalone)
+          mkdir -p "staging/mu-Toni"
+          cp -R "$R/mu-toni/mu-toni_artefacts/Release/VST3/mu-Toni.vst3"      "staging/mu-Toni/"
+          cp -R "$R/mu-toni/mu-toni_artefacts/Release/CLAP/mu-Toni.clap"      "staging/mu-Toni/"
+          cp -R "$R/mu-toni/mu-toni_artefacts/Release/Standalone/mu-Toni"     "staging/mu-Toni/" 2>/dev/null || true
+          cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-Toni/"
+          ( cd staging && zip -r -y "../dist/mu-Toni-Linux.zip" "mu-Toni" )
+          # mu-On (VST3 + CLAP + Standalone)
+          mkdir -p "staging/mu-On"
+          cp -R "$R/mu-on/mu-on_artefacts/Release/VST3/mu-On.vst3"            "staging/mu-On/"
+          cp -R "$R/mu-on/mu-on_artefacts/Release/CLAP/mu-On.clap"            "staging/mu-On/"
+          cp -R "$R/mu-on/mu-on_artefacts/Release/Standalone/mu-On"           "staging/mu-On/" 2>/dev/null || true
+          cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-On/"
+          ( cd staging && zip -r -y "../dist/mu-On-Linux.zip" "mu-On" )
 
       - name: Upload platform release zips
         uses: actions/upload-artifact@v4

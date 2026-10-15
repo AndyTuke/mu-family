@@ -71,6 +71,8 @@ public:
     int                           getPlayingClip(int layer) const override { return inRange(layer) ? clipState[(size_t) layer].playing : -1; }
     int                           getQueuedClip(int layer)  const override { return inRange(layer) ? clipState[(size_t) layer].queued : -1; }
     uint8_t                       getClipMask(int layer)    const override { return inRange(layer) ? clipState[(size_t) layer].mask : (uint8_t) 0; }
+    juce::String                  getClipName(int layer, int clip) const override
+    { return inRange(layer) && clip >= 0 && clip < mu_limits::kClipsPerLayer ? clipState[(size_t) layer].names[(size_t) clip] : juce::String(); }
     bool                          isLayerMuted(int layer)   const override
     { return layer >= 0 && layer < getLayerCount() && cb.layerMuted && cb.layerMuted(layer); }
     bool isTransportPlaying() const override      { return cb.transportPlaying && cb.transportPlaying(); }
@@ -126,6 +128,8 @@ public:
     void clipStored(int layer, int clip);
     // Layer n's stored-clip mask changed (store, clear, load, structural edit).
     void setClipMask(int layer, uint8_t mask);
+    // Clip c of layer n is stored under this name (empty = unnamed). Published beside the mask.
+    void setClipName(int layer, int clip, const juce::String& name);
     // A layer preset that is not a clip was staged on, or the layer was added / reset: it plays no clip now.
     void clearLayerClips(int layer);
     // Clip c of layer n was cleared: if it was playing nothing plays; if it was queued the staged launch is cancelled.
@@ -154,6 +158,7 @@ private:
         int      queued       = -1;   // -1 = nothing waiting
         uint32_t queuedSerial = 0;    // the layer's stage serial when the queued clip was staged
         uint8_t  mask         = 0;    // bit n = clip n is stored
+        std::array<juce::String, mu_limits::kClipsPerLayer> names {};   // clip n's stored name
     };
     static bool inRange(int layer) noexcept { return layer >= 0 && layer < mu_limits::kMaxLayers; }
     bool startClip(int layer, int clip);

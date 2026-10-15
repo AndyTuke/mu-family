@@ -48,6 +48,9 @@ struct FakeView : LiveView
     int  getQueuedClip(int l) const override { return l >= 0 && l < kLayers ? queued[l] : -1; }
     uint8_t getClipMask(int l) const override { return l >= 0 && l < kLayers ? mask[l] : (uint8_t) 0; }
     bool isLayerMuted(int l) const override { return l >= 0 && l < kLayers && muted[l]; }
+    juce::String names[kLayers][8];
+    juce::String getClipName(int l, int c) const override
+    { return l >= 0 && l < kLayers && c >= 0 && c < 8 ? names[l][c] : juce::String(); }
     void addListener(Listener* l) const override { listeners.add(l); }
     void removeListener(Listener* l) const override { listeners.remove(l); }
     void changed() { listeners.call([](Listener& l) { l.liveStateChanged(); }); }
@@ -416,6 +419,67 @@ public:
             expectEquals(LayerHeaderBar::resetConfirmMessage("Kick", 0), LayerHeaderBar::resetConfirmMessage("Kick"));
             expectEquals(LayerHeaderBar::resetConfirmMessage("Kick", 3),
                          juce::String("Reset \"Kick\" to defaults?\nThis also resets its mixer strip.\nThis also clears its clips.\nThis cannot be undone."));
+        }
+
+        beginTest("display name: the queued clip's name (queued), else the playing clip's, else nothing");
+        {
+            FakeView v;
+            v.names[1][2] = "Intro"; v.names[1][5] = "Drop";
+            using DN = ClipStrip::DisplayName;
+            expect(ClipStrip::displayNameFor(v, 1) == DN {}, "nothing playing or queued");
+            v.playing[1] = 2;
+            expect(ClipStrip::displayNameFor(v, 1) == DN { "Intro", false }, "the playing clip, normal colour");
+            v.queued[1] = 5;
+            expect(ClipStrip::displayNameFor(v, 1) == DN { "Drop", true }, "the queued clip wins, flagged queued");
+            v.queued[1] = 6;
+            expect(ClipStrip::displayNameFor(v, 1) == DN { "clip 7", true }, "a queued clip with no name is still shown");
+            v.queued[1] = -1; v.playing[1] = 6;
+            expect(ClipStrip::displayNameFor(v, 1) == DN {}, "an unnamed playing clip leaves the box alone");
+            expect(ClipStrip::displayNameFor(v, 9) == DN {}, "a layer out of range");
+        }
+
+        beginTest("display name: the strip tells the box once per change, and the header's box shows it (queued in the queued colour)");
+        {
+            Rig r;
+            r.view.names[1][1] = "Intro"; r.view.names[1][3] = "Drop";
+            std::vector<std::pair<juce::String, bool>> told;
+            r.strip.onDisplayName = [&told](const juce::String& t, bool q) { told.push_back({ t, q }); };
+            r.set({ 1, 3 }, -1, -1);
+            told.clear();
+            r.strip.setLayer(0); r.strip.setLayer(1);   // a new picture is told once even when nothing changed
+            expectEquals((int) told.size(), 2);
+
+            told.clear();
+            r.set({ 1, 3 }, 1, -1);
+            r.set({ 1, 3 }, 1, -1);   // no change: silent
+            r.set({ 1, 3 }, 1, 3);
+            r.set({ 1, 3 }, 3, -1);   // the queued clip landed
+            expectEquals((int) told.size(), 3);
+            expectEquals(told[0].first, juce::String("Intro")); expect(! told[0].second);
+            expectEquals(told[1].first, juce::String("Drop"));  expect(told[1].second);
+            expectEquals(told[2].first, juce::String("Drop"));  expect(! told[2].second);
+
+            // The header bar wires the strip to its preset box.
+            LayerHeaderBar bar;
+            bar.setShowClips(true);
+            bar.bindClips(&r.view, &r.sink);
+            bar.setClipLayer(1);
+            bar.setPresetFiles({ juce::File("a.muRhythm"), juce::File("b.muRhythm") });
+            auto& dd = bar.getPresetDropdown();
+            r.set({ 1, 3 }, 3, -1);
+            expectEquals(dd.getText(), juce::String("Drop"));
+            expect(dd.hasDisplayOverride() && ! dd.isDisplayQueued(), "playing: normal colour");
+            r.set({ 1, 3 }, 3, 1);
+            expectEquals(dd.getText(), juce::String("Intro"));
+            expect(dd.isDisplayQueued(), "queued: the queued colour");
+            dd.setSelectedId(0);   // the panel clears the selection on a rebind
+            expectEquals(dd.getText(), juce::String("Intro"), "survives the panel's rebind");
+            dd.setSelectedId(2);   // a file picked in code takes over
+            expectEquals(dd.getText(), juce::String("b"));
+            expect(! dd.hasDisplayOverride());
+            r.set({ 1, 3 }, -1, -1);
+            expect(! dd.hasDisplayOverride(), "nothing to name: the box is its own again");
+            expectEquals(dd.getText(), juce::String("b"));
         }
 
         beginTest("painting: a playing pad is lit, an empty one is not, at both sizes");

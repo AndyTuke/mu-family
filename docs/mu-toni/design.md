@@ -76,7 +76,7 @@ modulation-destination provider (`Modulation/MuToniModDest.h`).
 | Note articulation | None (continuous drone; gate chops volume) | Per-step: **Gate Length** (%-of-step) → note-off → Release; **Legato** voice param ties 100%-gate notes |
 | MIDI note input | **None** — PC-only, no played notes | **Consumes played notes** — root selectable by MIDI note + a Loop / MIDI-triggered run mode (PC→preset unchanged). See [design-sequencer.md](design-sequencer.md) §"MIDI control". |
 | Pitch glide | None (drone; no note-to-note movement) | **Portamento** (ms) slew, **heard only on legato (100%-gate) notes** — 303-style slides driven by modulating Gate Length. Pitch-path addition, no shared-engine change. |
-| Licensing | Licensed (key + activation) | **Freeware** — no licence / activation / demo (see "Licensing / distribution") |
+| Licensing | Pay What You Want; key + activation removes the Support prompt | Same model (see "Licensing / distribution") |
 | Product identity | Evolving drone | Note-triggered arpeggiator / mono synth |
 
 Everything not in this table is identical to mu-tant.
@@ -156,28 +156,15 @@ integration notes for the reference implementation.
 
 ---
 
-## Licensing / distribution — freeware
+## Licensing / distribution — Pay What You Want
 
-**μ-Toni ships as freeware.** No purchase, **no licence key, no activation, no
-demo/limited mode** — the full plugin is freely distributed.
+**μ-Toni is Pay What You Want** (GBP 0 or more, suggested GBP 20), like mu-Clid, mu-Tant and mu-On. It is fully functional with no key and has no demo or limited mode. A key (issued even at GBP 0) only removes the Support prompt.
 
-- **Not used:** the mu-core **License** subsystem (`LicenseManager`,
-  `ActivationStore`, `OnlineActivation`, `LemonSqueezyClient`, `MachineFingerprint`)
-  and the shell's **Activation/licence UI** (`ActivationOverlay`). No Lemon Squeezy
-  product, no signing key, no `.muToni` licence gating.
-- μ-Toni ships **no** `Source/License/LicenseKey.h` (unlike mu-clid / mu-tant —
-  the folder holds only `.gitkeep`), and the demo-gate pattern from
-  design-future.md (`-DMU_<PRODUCT>_DEMO`) is **not applied**.
-- **About panel** shows the normal product/version/credits but **no licence
-  status / activate button**.
-- Everything else is standard: still builds Standalone + VST3 + CLAP, still ships
-  via the installer + the cross-platform GitHub release.
-  It just skips the paywall.
+- **Shared:** it uses the standard mu-core licensing (`initLicensing`, offline `.lic`, online activation, Support prompt, activation overlay); see "Licensing and the support prompt" in [design-plugin-family.md](../design-plugin-family.md).
+- **Product side:** `Source/License/LicenseKey.h` (`mu_toni`: product id `mu-Toni`, `mutoni.lic`, public key, checkout URL), one `initLicensing` call in `PluginProcessor`, and the three licence `.cpp`s in the CMake plugin and tests targets. The private key is outside the repo.
+- Builds Standalone + VST3 + CLAP and ships via the installer and the cross-platform GitHub release.
 
-This is the family's first freeware product — a deliberate difference from
-mu-clid/mu-tant (which are licensed). If a second freeware sibling appears, a
-shared `-DMU_<PRODUCT>_FREEWARE` switch that compiles out the licence/activation
-paths would be the clean generalisation.
+(Until 2026-10-15 this section described mu-Toni as freeware with no licensing; superseded when the pricing model was set.)
 
 ---
 
@@ -192,7 +179,7 @@ skewed-triangle scan** (deterministic, identical every loop); **articulation =
 Legato voice param + Gate Length** (glide only on tied notes, ms glide);
 **bipolar Inversion**; all chords ship (grouped); **diatonic-snap toggle**;
 **Rate = note values** (+dotted/triplet); **1–8 slots, default 1**; **Loop-mode
-default, sounds on play**; **freeware** (no licence/demo); per-slot `.muArp`.
+default, sounds on play**; **Pay What You Want** (key removes the Support prompt, nothing limited); per-slot `.muArp`.
 Fine-tuning only remains — see [design-sequencer.md](design-sequencer.md)
 §"Open questions".
 

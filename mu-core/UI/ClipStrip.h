@@ -35,6 +35,9 @@ public:
 
     // What the status bar shows (name + value); an empty pair clears the line.
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
+    // What the header's preset box should name, told whenever it changes (and once after a bind or layer change):
+    // the queued clip, else the playing one; empty text = nothing to name (the box shows its own selection).
+    std::function<void(const juce::String& text, bool queued)> onDisplayName;
     // Asks the user before a destructive step; the default is the shared themed dialog over this component.
     std::function<void(const juce::String& title, const juce::String& message, const juce::String& button,
                        std::function<void()> onConfirm)> askConfirm;
@@ -47,6 +50,16 @@ public:
     static Lamp lampFor(int pad, int playing, int queued, uint8_t storedMask, bool layerMuted) noexcept;
     struct Layout { juce::Rectangle<int> caption; std::array<juce::Rectangle<int>, kPads> pads; };
     static Layout computeLayout(juce::Rectangle<int> bounds);
+    // The preset box's text for a layer: the queued clip's name (queued = true; "clip N" when it has none),
+    // else the playing clip's name, else empty.
+    struct DisplayName
+    {
+        juce::String text;
+        bool         queued = false;
+        bool operator==(const DisplayName& o) const { return queued == o.queued && text == o.text; }
+        bool operator!=(const DisplayName& o) const { return ! (*this == o); }
+    };
+    static DisplayName displayNameFor(const mu_core::LiveView& view, int layer);
     static int    padAt(const Layout& layout, juce::Point<int> p);
     static int    stripWidth();      // caption + pads + gaps, at the current UI scale
     static int    widthWithGap();    // stripWidth plus the gap to the preset dropdown
@@ -89,6 +102,8 @@ private:
 
     std::array<Lamp, kPads>   lamps {};
     std::array<double, kPads> flashUntil {};
+    DisplayName  lastDisplay;            // what onDisplayName was last told
+    bool         haveDisplay  = false;   // false until told once after a (re)bind or layer change
     bool         haveBaseline = false;   // false until the first refresh after a (re)bind: that one flashes nothing
     juce::String queuedStatus;           // the Queued line currently on the status bar ("" = none)
     int          statusSerial = 0;

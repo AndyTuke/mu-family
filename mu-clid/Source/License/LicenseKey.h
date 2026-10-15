@@ -10,7 +10,7 @@ namespace mu_clid
     inline constexpr const char* kLicenseProductId = "mu-Clid";
 
     // Lemon Squeezy pay-what-you-want page the support prompt opens (the same link the website uses).
-    inline constexpr const char* kCheckoutUrl = "https://transwarp.lemonsqueezy.com/checkout/buy/ba9e6fba-f65d-4b09-87d8-5a6b295c84c2";
+    inline constexpr const char* kCheckoutUrl = "https://transwarp.lemonsqueezy.com/checkout/buy/12d18415-e76d-42f3-a034-0dd187b197ff";
 
     // License file the user drops into the content dir (getContentDir()).
     inline constexpr const char* kLicenseFilename  = "muclid.lic";

@@ -1,5 +1,7 @@
 #include "ArpContent.h"
 
+#include <limits>
+
 namespace mu_toni
 {
 
@@ -100,28 +102,39 @@ void ArpContent::addArpControls()
     addKnob  (G_ARP, "gate",  "Gate",      LF::knobEuclidean);
     addKnob  (G_ARP, "porta", "Glide",     LF::knobEuclidean);
     addKnob  (G_ARP, "acc",    "Accent",   LF::knobEuclidean);
-    addKnob  (G_ARP, "accLen", "Acc Steps", LF::knobEuclidean);
+    addKnob  (G_ARP, "accLen", "Steps", LF::knobEuclidean);
 
-    // The accent pattern: the shared step editor as on/off cells (two levels), one per step,
-    // written into the layer's accPat bits.
-    accentSteps.setUnipolar(true);
-    accentSteps.setQuantization(2);
-    accentSteps.onStepChanged = [this](int step, float value) { setAccentStep(step, value > 50.0f); };
+    // The step pattern: the shared step editor in its three-level cell mode (Off / On / Accented), one
+    // cell per step, written into the layer's stepMask and accPat bits.
+    accentSteps.setLevelCells(3);
+    accentSteps.setTooltip("Click: Off, On, Accented. Drag to paint. Shift+click goes back.");
+    accentSteps.onStepChanged = [this](int step, float value) { setStepLevel(step, accentSteps.levelOfValue(value)); };
+    accentSteps.onCellStatus = [this](int cell, int level)
+    {
+        static const char* const names[] = { "Off", "On", "Accented" };
+        if (onStatusUpdate) onStatusUpdate("Step " + juce::String(cell + 1), names[juce::jlimit(0, 2, level)]);
+    };
     addAndMakeVisible(accentSteps);
 }
 
-// Turn accent step `step` on / off in the current layer's pattern.
-void ArpContent::setAccentStep(int step, bool on)
+// Set step `step` of the current layer's pattern: Off = mask bit clear, On = mask set + accent clear,
+// Accented = both set (an Off step never keeps an accent bit).
+void ArpContent::setStepLevel(int step, int level)
 {
     if (step < 0 || step >= ArpAccent::kMaxSteps) return;
-    auto* p = proc.apvts.getParameter(layerParamId(currentLayer, "accPat"));
-    if (p == nullptr) return;
-    const int was = (int) p->convertFrom0to1(p->getValue());
-    const int now = on ? (was | (1 << step)) : (was & ~(1 << step));
-    if (now == was) return;
-    p->beginChangeGesture();
-    p->setValueNotifyingHost(p->convertTo0to1((float) now));
-    p->endChangeGesture();
+    auto writeBit = [&](const char* suffix, bool on)
+    {
+        auto* p = proc.apvts.getParameter(layerParamId(currentLayer, suffix));
+        if (p == nullptr) return;
+        const int was = (int) p->convertFrom0to1(p->getValue());
+        const int now = on ? (was | (1 << step)) : (was & ~(1 << step));
+        if (now == was) return;
+        p->beginChangeGesture();
+        p->setValueNotifyingHost(p->convertTo0to1((float) now));
+        p->endChangeGesture();
+    };
+    writeBit("stepMask", level >= 1);
+    writeBit("accPat",   level >= 2);
 }
 
 // Show the current layer's accent pattern (only when it changed) and where the arp is in it.
@@ -133,18 +146,23 @@ void ArpContent::refreshAccentSteps()
         const juce::String pre = layerParamPrefix(currentLayer);
         accLenParam  = proc.apvts.getRawParameterValue(pre + "accLen");
         accPatParam  = proc.apvts.getRawParameterValue(pre + "accPat");
+        stepMaskParam = proc.apvts.getRawParameterValue(pre + "stepMask");
         arpRateParam = proc.apvts.getRawParameterValue(pre + "rate");
         accentParamsLayer = currentLayer;
     }
     auto value = [](const std::atomic<float>* a) { return a != nullptr ? a->load() : 0.0f; };
     const int len = juce::jlimit(1, ArpAccent::kMaxSteps, (int) value(accLenParam));
-    const int pat = (int) value(accPatParam);
-    if (len != shownAccentLen || pat != shownAccentPat)
+    const int pat  = (int) value(accPatParam);
+    const int mask = (int) value(stepMaskParam);
+    if (len != shownAccentLen || pat != shownAccentPat || mask != shownStepMask)
     {
         shownAccentLen = len;
         shownAccentPat = pat;
+        shownStepMask  = mask;
+        // Off = 0, On = 50, Accented = 100; an Off step never shows its accent bit.
         std::vector<float> cells((size_t) len);
-        for (int i = 0; i < len; ++i) cells[(size_t) i] = ((pat >> i) & 1) != 0 ? 100.0f : 0.0f;
+        for (int i = 0; i < len; ++i)
+            cells[(size_t) i] = ((mask >> i) & 1) == 0 ? 0.0f : (((pat >> i) & 1) != 0 ? 100.0f : 50.0f);
         accentSteps.setSteps(cells);
     }
     // Loop mode: the arp's step follows the beat, so its place in the pattern does too.
@@ -202,10 +220,30 @@ void ArpContent::setLayer(int idx)
         t.att = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
             proc.apvts, layerParamId(currentLayer, t.suffix), *t.comp);
 
+    bindModulationArcs();
     insertSub.setChannel(currentLayer);
-    shownAccentLen = shownAccentPat = -1;   // redraw the new layer's accent pattern
+    shownAccentLen = shownAccentPat = shownStepMask = -1;   // redraw the new layer's accent pattern
     refreshAccentSteps();
     repaint();
+}
+
+// Give every knob that has a row in the modulation target table its live modulation arc, driven
+// by the current layer's matrix and the value the audio thread published for that target.
+void ArpContent::bindModulationArcs()
+{
+    static const float kNaN = std::numeric_limits<float>::quiet_NaN();
+    const auto* matrix = &proc.getArp(currentLayer).modulationMatrix;
+    const int layer = currentLayer;
+
+    for (auto& k : knobs)
+    {
+        // Only the layer's own a{N}_ parameters are targets (the FX sends are mixer params).
+        const int dest = (k.prefix == kLayerParamLetter) ? mu_mod::indexOfParam(kModDestTable, k.suffix.toStdString()) : -1;
+        if (dest < 0) { k.comp->clearModBinding(); continue; }
+
+        k.comp->bindModulation(kModDestTable[dest].id, matrix,
+            [this, layer, dest]() -> float { return proc.isInternalPlaying() ? proc.getModLive(layer, dest) : kNaN; });
+    }
 }
 
 void ArpContent::paintOverChildren(juce::Graphics& g)

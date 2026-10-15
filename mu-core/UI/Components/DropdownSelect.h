@@ -23,6 +23,12 @@ public:
     // voice's own colour on its preset selector. Transparent = back to the app colour.
     void setLcdColour(juce::Colour c);
 
+    // Shows `text` in place of the placeholder / selection, in the queued colour when `queued`. It survives
+    // clear() and setSelectedId(0); choosing an item (setSelectedId(id > 0) or a pick) takes over. Empty text clears it.
+    void setDisplayOverride(const juce::String& text, bool queued);
+    bool hasDisplayOverride() const noexcept { return overrideText.isNotEmpty(); }
+    bool isDisplayQueued() const noexcept { return overrideText.isNotEmpty() && overrideQueued; }
+
     // Returns the currently displayed item text (or empty if nothing selected).
     juce::String getText() const { return combo.getText(); }
 
@@ -33,5 +39,10 @@ public:
     void resized() override;
 
 private:
+    void applyOverride();
+    void refreshTextColour();
+
     juce::ComboBox combo;
+    juce::String   overrideText;
+    bool           overrideQueued = false;
 };
