@@ -1,0 +1,12 @@
+{
+  "name": "inserts-karplus-ring",
+  "notes": "Rhythm 0 Kick through a Karplus insert at 90 percent feedback (rings past the sample), rhythm 1 Hat through a Bitcrusher, rhythm 2 Synth C through a Compressor.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 192000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 3,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "events": []
+}

@@ -264,6 +264,8 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/HotSwapCancelTests.cpp        # staged swaps vs take-back, failed load, host restore, stopped load
     Source/Tests/ClipLaunchTests.cpp           # clip bank: store / launch / persistence on the real processor
     Source/Tests/FxTailTests.cpp               # a full-preset commit keeps the FX tail
+    Source/Tests/GoldenRenderTests.cpp         # golden renders of the real processor (tests/golden/mu-clid)
+    Source/Tests/ExtractionPinTests.cpp        # pins: drained tails, count policy, longest tail, edit mid-play, oversize, trigger source
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_APVTS.cpp
     Source/Plugin/PluginProcessor_Modulation.cpp

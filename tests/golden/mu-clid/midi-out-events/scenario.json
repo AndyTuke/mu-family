@@ -1,0 +1,12 @@
+{
+  "name": "midi-out-events",
+  "notes": "Rhythm 0 and 1 send MIDI (notes 36 and 42, channels 1 and 10, rhythm 0 accented), rhythm 2 plays a Hat; the host stops (block 60) and restarts (block 70); rhythm 1 is removed at block 100 while its note may still be held.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 144000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 0,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "events": [{ "block": 60, "label": "host stops" }, { "block": 70, "label": "host starts" }, { "block": 100, "label": "removeLayer(1)" }]
+}
