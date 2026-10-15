@@ -2,6 +2,8 @@
 
 #include <atomic>
 
+class RhythmPlayStateTest;   // test fixture that may reach the seqlock internals
+
 namespace mu_core {
 
 // One rhythm's live play state: written by the audio thread, read by the UI at 30 Hz. Its own
@@ -54,6 +56,8 @@ struct RhythmPlayState
         return lastGood;
     }
 
+    // stepsA/B/C stay OUTSIDE the snapshot: mu-clid-midi writes them from the message thread, and the seqlock
+    // allows exactly one writer (the audio thread). Do not add a second writer to the position fields.
     std::atomic<int>  patternLength { 1 };
     std::atomic<int>  stepsA        { 1 }; // individual ring step counts for per-ring rotation
     std::atomic<int>  stepsB        { 1 };
@@ -61,6 +65,12 @@ struct RhythmPlayState
     std::atomic<int>  hitCount      { 0 }; // monotonic counter - audio thread increments per hit, UI tracks lastSeen (avoids a one-shot-flag race between UI readers)
 
 private:
+    friend class ::RhythmPlayStateTest;   // forces the counter odd to exercise the reader's fallback
+
+    // A platform that locks inside these would put a lock on the audio path, so refuse to compile there.
+    static_assert(std::atomic<unsigned>::is_always_lock_free && std::atomic<int>::is_always_lock_free
+                  && std::atomic<float>::is_always_lock_free, "the position seqlock must be lock-free");
+
     std::atomic<unsigned> positionSeq { 0 };
     std::atomic<int>      posStep  { 0 };
     std::atomic<int>      posStepC { 0 };

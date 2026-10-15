@@ -36,6 +36,10 @@ public:
     void timerCallback() override;
 
 private:
+public:
+    int getDisplayedStep() const noexcept { return paintStep; }   // the step highlighted in paint(); for tests
+
+private:
     juce::Colour singleColour;   // transparent → per-ring colours
     juce::Colour ringColour(MuLookAndFeel::ColourIds id) const
     { return singleColour.isTransparent() ? MuLookAndFeel::colour(id) : singleColour; }

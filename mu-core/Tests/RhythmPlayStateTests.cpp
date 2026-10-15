@@ -60,9 +60,10 @@ public:
 
             mu_core::RhythmPlayState state;
             std::atomic<bool> stop { false };
+            std::atomic<long> publishes { 0 };
             std::thread writer ([&] {
                 int n = 0;
-                while (! stop.load()) state.publishPosition (positionFor (n++));
+                while (! stop.load()) { state.publishPosition (positionFor (n++)); publishes.fetch_add (1); }
             });
 
             const auto start = juce::Time::getMillisecondCounterHiRes();
@@ -73,11 +74,28 @@ public:
             stop.store (true);
             writer.join();
 
+            expect (publishes.load() > 0, "the writer was live while the reads ran");
             expectEquals ((int) torn, 0, "no torn reads against a free-running writer");
             expect (elapsed < 5000.0, "400k reads finished in " + juce::String (elapsed) + " ms");
         }
 
-        beginTest ("the old publish pattern (separate relaxed stores) does tear - the harness can see it");
+        beginTest ("when every retry straddles a publish the reader returns the last good snapshot");
+        {
+            mu_core::RhythmPlayState state;
+            state.publishPosition (positionFor (7));
+            const auto good = state.readPosition();   // becomes the last good snapshot
+
+            // Leave a publish "in progress" (odd counter) with half-written fields, as a stalled writer would.
+            state.positionSeq.store (state.positionSeq.load() + 1);
+            state.posStep.store (999);
+
+            const auto p = state.readPosition();
+            expect (p.step == good.step && p.stepC == good.stepC && p.frac == good.frac,
+                    "the fallback is the last consistent snapshot, not the half-written fields");
+            expect (isConsistent (p), "the fallback is itself consistent");
+        }
+
+        beginTest ("DIAGNOSTIC (asserts nothing): the old publish pattern of separate relaxed stores tears");
         {
             // Mirrors the pre-fix code: fraction stored first, then the step, as independent atomics.
             std::atomic<float> frac { 0.0f };

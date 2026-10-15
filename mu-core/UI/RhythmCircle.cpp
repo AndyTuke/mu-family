@@ -45,6 +45,10 @@ void RhythmCircle::setPlayState(mu_core::RhythmPlayState*  state,
     playState     = state;
     isPlayingAtom = playing;
     rhythmColour  = colour;
+
+    // Show the new rhythm's own step at once; while stopped the timer does not refresh it, so it
+    // would otherwise keep the previous rhythm's highlight.
+    paintStep = state ? state->readPosition().step : 0;
 }
 
 //==============================================================================
