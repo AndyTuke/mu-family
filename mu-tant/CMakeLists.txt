@@ -192,6 +192,8 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/FrozenBaselineTests.cpp   # frozen parameter manifest + compat corpus on the real processor
     Source/Tests/NudgeInputTests.cpp       # shared mu-core NudgeInput: whole numbers and the BPM decimals mode
     Source/Tests/ClipLaunchTests.cpp   # clip store / launch on the real processor
+    Source/Tests/GoldenRenderTests.cpp   # golden renders of the real processor (tests/golden/mu-tant)
+    Source/Tests/ExtractionPinTests.cpp   # pins: Note mode, retire fade and its stale tail, structural edit, oversize
     Source/UI/GatingDesigner.cpp
     Source/Sequencer/GatePattern.cpp
     Source/Audio/SynthVoice.cpp

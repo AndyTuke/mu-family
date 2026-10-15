@@ -1,0 +1,15 @@
+{
+  "name": "xmod-fm-pm-ring-ssb",
+  "notes": "Lane A FM (0 s), PM (0.5 s), TZFM (1 s); lane B AM, RM (1.5 s), SSB with a shift (2 s); sync and feedback on at 2.5 s.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 144000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 1,
+  "drainDeferredWorkEveryBlock": false,
+  "isolateStemsByMute": false,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "timedActions": [{ "frame": 24000, "label": "xmod_phaseMode = 1" }, { "frame": 24000, "label": "xmod_index = 70" }, { "frame": 48000, "label": "xmod_phaseMode = 2" }, { "frame": 72000, "label": "xmod_ampMode = 1" }, { "frame": 72000, "label": "xmod_depth = -50" }, { "frame": 96000, "label": "xmod_ampMode = 2" }, { "frame": 96000, "label": "xmod_depth = 80" }, { "frame": 96000, "label": "xmod_ssb = 137" }, { "frame": 120000, "label": "sync = 1" }, { "frame": 120000, "label": "xmod_fdbk = 1" }],
+  "midiByBlock": []
+}

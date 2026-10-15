@@ -1,0 +1,15 @@
+{
+  "name": "note-mode-fx-tail",
+  "notes": "Note mode on with reverb and delay sends: the note is released at block 40, so the stem (sends 0) ends there while the final mix is gated shut with the FX return still ringing; a second short note at block 120.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 144000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 1,
+  "drainDeferredWorkEveryBlock": false,
+  "isolateStemsByMute": false,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "timedActions": [{ "frame": 0, "label": "Note mode on" }],
+  "midiByBlock": [{ "block": 4, "offset": 0, "message": "noteOn 60" }, { "block": 40, "offset": 0, "message": "noteOff 60" }, { "block": 120, "offset": 0, "message": "noteOn 64" }, { "block": 125, "offset": 0, "message": "noteOff 64" }]
+}

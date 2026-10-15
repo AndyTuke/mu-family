@@ -1,0 +1,15 @@
+{
+  "name": "retire-regrow",
+  "notes": "Three drones (voices 1 and 2 through Karplus). A staged one-voice preset commits at the voice-0 loop (beat 4, 0.5 s) and retires voices 1 and 2; a restore with three voices regrows (1 s); restores with two, three and two voices again, the first two inside one fade (1.26 s), drop voice 2 twice.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 192000,
+  "tempoBpm": 120,
+  "startBeat": 3,
+  "numStems": 3,
+  "drainDeferredWorkEveryBlock": true,
+  "isolateStemsByMute": true,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "timedActions": [{ "frame": 6144, "label": "stage a full preset with 1 voices (commits at the loop)" }, { "frame": 48000, "label": "host restores a state with 3 voices" }, { "frame": 54000, "label": "o1_oct = 2" }, { "frame": 60416, "label": "host restores a state with 2 voices" }, { "frame": 60928, "label": "host restores a state with 3 voices" }, { "frame": 66000, "label": "o1_oct = -1" }, { "frame": 72192, "label": "host restores a state with 2 voices" }],
+  "midiByBlock": []
+}
