@@ -278,6 +278,50 @@ It scans the built VST3/CLAP/Standalone binaries (mu-clid + mu-Clid MIDI) for th
 `build_number.txt` against `BuildNumber.h`. Run it after a Release build before
 trusting a Release build.
 
+## Golden renders (bit-identical fingerprints)
+
+The golden-render harness ([mu-core/Tests/GoldenRender.h](../mu-core/Tests/GoldenRender.h)) drives a
+headless processor through a scripted scenario and reduces the output to a small text fingerprint:
+per 256-frame segment, an FNV-1a 64 hash of the float bits per channel, the RMS and the peak, for the
+master and for each layer soloed as a stem (through the mixer `ch{i}_solo`, sends 0), on a fixed-512
+and a ragged block schedule (1-sample blocks, a block above the prepared size). It also records the
+emitted-MIDI hash, end-of-render mixer peaks and insert gain reduction, and a hash of
+`getStateInformation`. The rule is bit-identical (tolerance 0) per config, so the goldens are separate
+files per config: `tests/golden/<product>/<scenario>/golden.<os>-<arch>-<debug|release>.txt`. Plain
+`key=value` lines, one per segment, so `git diff` shows the first segment that moved. The design and
+rationale are in [tests.md](../tests.md) ("Layer extraction safety net", section 2). The harness checks
+itself in `mu-core-tests` (`GoldenRenderHarnessTests.cpp`) on a fake processor.
+
+**Adding a scenario to a product** (in the product's `GoldenRenderTests.cpp`):
+
+1. Build a `mu_golden::Scenario`: `name` (the folder), `lengthFrames`, `tempoBpm`, `startBeat`,
+   `numStems` (layers to render as stems; 0 = master only), `loadState` (applies the frozen state,
+   e.g. a file under `tests/golden/<product>/<scenario>/state.xml`), `events` (run before a block
+   index: parameter sets, a staged swap, a tempo change or locate via `ctx.host`), `midi` (notes and
+   CC at a block index and sample offset). Time is only ever block indices and the host position,
+   never a wall clock. Set `inputHash = mu_golden::hashFiles({state.xml, ...})` so an edited input is
+   caught.
+2. Supply a `ProcessorFactory` that builds a fresh headless processor (the `ProcessorSeamTests`
+   pattern: `ScopedStorageRoot`, no editor). Seed anything random, or keep random sources off; the
+   repeat test below rejects a scenario that is not repeatable.
+3. In a `juce::UnitTest`, call `GoldenStore::fromEnvironment()`, then
+   `verifyRepeatable(scenario, factory)` (renders twice in-process) and `verify("<product>",
+   scenario, factory)`; expect `Outcome::ok` and log `Outcome::message`. In update mode `verify`
+   returns `skipped` for every scenario except the one named.
+4. Record it: `pwsh tests/scripts/update-golden.ps1 -Product <p> -Scenario <s> -Reason "..."` on a clean
+   tree. That is the only way a golden changes. It runs the test exe twice in separate processes and
+   rejects a result that differs (the cross-process repeat test), refuses to also change source, and
+   writes a commit-message template to `tests/_out/golden/`. Commit goldens alone, never inside a
+   commit that moves code, and with the `dsp-controller`'s sign-off on the reason.
+5. On a mismatch the run fails naming the first diverging key and segment (with its time and RMS) and
+   writes the golden, the actual fingerprint, the list of differences and a 24-bit WAV of each
+   differing stream to `tests/_out/golden/<product>/<scenario>/`.
+
+`Scenario::toleranceAbs` (24-bit LSBs on the stored per-segment peak, hash columns then ignored) is 0
+by default and needs a written `toleranceReason`; it is never a way to make a stage pass. An
+allocation counter plugs in through `GoldenStore::allocationCounter` (the interface is declared; the
+implementation belongs to the allocation-probe item).
+
 ## CI integration (future)
 
 The pipeline exits with non-zero status when any assertion fails, so
