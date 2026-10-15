@@ -79,7 +79,9 @@ The standard mu platform is everything in `mu-core/`. New products link `mu-core
     UI/                    Product-specific panels — sidebars, main panels, voice subsections.
                            Always built from mu-core/UI/Components/ widgets, never one-offs.
     Persistence/           Product-specific param tables, preset I/O
-    License/               LicenseChecker (Monocypher-based; same pattern as mu-clid)
+    License/               LicenseKey.h only (product id, licence filename, embedded PUBLIC key, checkout
+                           URL); the verifier, activation and prompt policy are shared in mu-core/License/.
+                           Empty (.gitkeep) only for the freeware products (mu-Clid MIDI, mu-Link)
     Tests/                 JUCE UnitTest subclasses for data-layer regressions
 ```
 
@@ -667,7 +669,7 @@ State of the tree: stages 1 to 3 and 5 are done for mu-Tant, mu-Toni and mu-On, 
    mu-On's lane / channel wording to `Track` is **folded into #1241**, which rewrites the same code (233 uses),
    not done on its own. The step grid and `GrooveVoices` stay in the processor until #1241 decides the per-layer engine selector.
 3. Stage 6 no longer waits on Andy: confirmed 2026-10-12, a fresh mu-Toni instance has 1 layer, old 4-layer states load
-   as 4, no demo cap (mu-Toni is freeware and the demo cap is retired). Order of work: "Order of work for #1240 and #1241" above.
+   as 4, no demo cap (the demo cap is retired; mu-Toni is a Pay What You Want product). Order of work: "Order of work for #1240 and #1241" above.
 
 #### Slot-keyed audio state stays processor-side (ruled 2026-10-12)
 
@@ -819,7 +821,7 @@ Options:
   product, reverses the processor-side engine ruling above, and cannot be finished honestly without the owner's answers on licensing and product shape.
 
 Question for Andy (one paragraph, for the morning): do you want the combined instance scheduled, and if so is it a fifth product or a mode of an existing one, and how do
-freeware layers (mu-Toni, mu-On while pre-release) sit inside a licensed instance? Until you answer, #1319 should stay parked (option A); the answer decides where the registry
+layers of the Pay What You Want products (mu-Toni, mu-On) and the freeware mu-Clid MIDI rhythm sit inside one licensed instance, and whose key covers it? Until you answer, #1319 should stay parked (option A); the answer decides where the registry
 lives (which product's processor hosts it), whether the plugin ID and licence of the combined instance are new, and so whether option B or C is next. No work on it is useful
 before that, and nothing that is done on stages 6 and 7 makes the answer harder.
 
@@ -1805,7 +1807,7 @@ product only has to override/​wire those.
 
 ## Licensing and the support prompt — family standard (ruled 2026-10-11)
 
-**Owner decision.** The source is GPLv3. The apps are free, pay-what-you-want on Lemon Squeezy (minimum £0, suggested £20). An unlicensed copy is **fully functional**: no track, step, save or preset limits, no demo banner, and no "Lite" free tier (the former mu-Clid Lite is now a separate MIDI-effect product, see "The MIDI-effect product" below). Instead it shows one polite support dialog per session. A licence key still exists and still activates (a key marks a supporter, and unlocks nothing). mu-Toni (freeware) and mu-On (no licensing) never call `initLicensing`, so they never show the dialog.
+**Owner decision.** The source is GPLv3. mu-Clid, mu-Tant, mu-Toni and mu-On are pay-what-you-want on Lemon Squeezy (minimum £0, suggested £20; a key is issued even at £0). mu-Clid MIDI and mu-Link are freeware. An unlicensed copy is **fully functional**: no track, step, save or preset limits, no demo banner, and no "Lite" free tier (the former mu-Clid Lite is now a separate MIDI-effect product, see "The MIDI-effect product" below). Instead it shows one polite support dialog per session. A licence key still exists and still activates (a key marks a supporter, removes the prompt, and unlocks nothing). The four Pay What You Want products call `initLicensing`; the freeware mu-Clid MIDI and mu-Link never do, so they never show the dialog.
 
 ### What is deleted, what is kept
 
@@ -1825,7 +1827,7 @@ product only has to override/​wire those.
 - **`mu-core/License/SupportPromptPolicy.h`**, juce_core-only and header-only, the testable decision: `shouldShow(hasLicensing, isSupporter, hiddenForever, shownThisProcess)`. It is true only for a licensing product, not a supporter, not hidden for ever, and not yet shown in this process.
 - **Once per session** means once per process: a function-local `inline std::atomic<bool>` in the policy header, set when the card is shown. A DAW project with twenty instances shows it once. The shell shows it from `parentHierarchyChanged()` the first time the editor is on screen (so a headless instance never prompts), deferred by a short `callAfterDelay` so it never competes with plugin load.
 - **Persistence of "don't show again":** the product's own settings file (`ProcessorBase::appSettings`, key `supportPromptHidden`, bool), through two small `ProcessorBase` accessors in the style of `setUiScale`: `bool isSupportPromptHidden() const` and `void setSupportPromptHidden(bool)` (writes and `saveIfNeeded()`). Per user and per product, not in APVTS, because it is a user preference and must not travel inside a preset or a project. A supporter never sees the prompt, so the key is only written by the tick box.
-- **Checkout URL plumbing:** a field on `ProcessorBase::LicensingConfig`, `const char* checkoutUrl`, supplied by each licensed product from its `Source/License/LicenseKey.h` (`kCheckoutUrl`), exposed as `ProcessorBase::getCheckoutUrl()`. This sits with the rest of the product's licensing identity and spares every editor an extra setter call; `ActivationOverlay` gets a "Get a key" link from the same accessor. Values today: mu-Clid `https://transwarp.lemonsqueezy.com/checkout/buy/ba9e6fba-f65d-4b09-87d8-5a6b295c84c2`, mu-Tant `https://transwarp.lemonsqueezy.com/checkout/buy/b2dd23a7-cd2c-48b2-baa5-8fdda3aa7576` (the same links the website uses). mu-core never names either.
+- **Checkout URL plumbing:** a field on `ProcessorBase::LicensingConfig`, `const char* checkoutUrl`, supplied by each licensed product from its `Source/License/LicenseKey.h` (`kCheckoutUrl`), exposed as `ProcessorBase::getCheckoutUrl()`. This sits with the rest of the product's licensing identity and spares every editor an extra setter call; `ActivationOverlay` gets a "Get a key" link from the same accessor. The values live only in each product's `LicenseKey.h` and match the website's buy links; mu-core names none of them.
 - **Link, not a payment form.** The button opens the checkout in the browser (`juce::URL::launchInDefaultBrowser`). The plugin handles no money and no card data.
 - A permanent entry point stays after the banner goes: the About panel shows "Support mu-X" and "Enter a key" buttons (supporters see "Thank you"), so the dialog is never the only route.
 
@@ -1849,6 +1851,25 @@ It no longer gates features, so its Debug-bypass meaning disappears. Remove it f
 6. **Docs and site.** Rewrite the licensing lines of both manuals (`user-documentation-author`), `/notes`, the site buy buttons and pricing (separate site task), and the CLAUDE.md wording below.
 
 Each stage ends in a Debug build and the unit tests; stages 3 and 4 also run the round-trip listening tests and pluginval on the build PC.
+
+### As built: shared core, thin product side (updated 2026-10-15)
+
+**Status.** Done for all four Pay What You Want products: mu-Clid, mu-Tant, and (commit bb19d29) mu-Toni and mu-On. The freeware mu-Clid MIDI and mu-Link have no licensing.
+
+**Shared, in `mu-core`:** `ProcessorBase::initLicensing(LicensingConfig)` (defined in `mu-core/License/ProductLicensing.h`, included only by a licensed product's processor), `LicenseManager` (offline Ed25519 `.lic`), `OnlineActivation` + `LemonSqueezyClient` + `ActivationStore` + `MachineFingerprint` (online activation), `SupportPromptPolicy`. `EditorShellBase` owns the Support prompt, the activation overlay and the status-bar Support link, so no product writes any licensing UI.
+
+**Product side, the whole of it:**
+
+1. `Source/License/LicenseKey.h` in namespace `mu_<product>`: `kLicenseProductId` (matches the `product=` the signer writes and the Lemon Squeezy product), `kLicenseFilename` (`muclid.lic`, `mutant.lic`, `mutoni.lic`, `muon.lic`), `kLicensePublicKey[32]` (PUBLIC key only), `kCheckoutUrl` (the Pay What You Want page, same link as the website).
+2. One call in the processor constructor: `initLicensing({ kLicenseProductId, kLicenseFilename, kLicensePublicKey, "<slug>.activation", kCheckoutUrl })`, with `#include "License/ProductLicensing.h"` in the processor `.cpp`.
+3. CMake: `mu-core/License/LicenseManager.cpp`, `LemonSqueezyClient.cpp` and `OnlineActivation.cpp` in the product's plugin target **and** in its tests target (mu-core is an INTERFACE library, so sources are listed per target).
+4. Nothing else: no feature gate, no licence branch in audio or editor code (the rule above).
+
+**Folder rule.** `License/` is one of the eight Source folders in every product. It holds `LicenseKey.h` in the four licensed products; it is a `.gitkeep` only in the freeware ones. A new paid product copies mu-Toni's `LicenseKey.h` and the steps above.
+
+**Keys.** Private signing keys (`muclid.key`, `mutant.key`, `mutoni.key`, `muon.key`) live in the OneDrive `secrets\keys` folder (cloud-backed), never in the repo; `MuLicenseTool` generates the pair and signs each `.lic`. Only the public key is embedded. The Lemon Squeezy API key is in OneDrive `secrets` too, never committed.
+
+**Ruling, 2026-10-15: online activation does not check the key's product, and that is accepted for now.** `OnlineActivation` / `LemonSqueezyClient` validate that the key is a good Lemon Squeezy licence key but do not compare the LS product id with the running product, so a mu-Clid key activates mu-Toni. Accepted because a key only removes the Support prompt and unlocks nothing, so crossing products costs no one anything. The offline `.lic` path is already product-bound (`LicenseManager::check` takes `productId` and the per-product public key). Revisit, as a small change in `mu-core` (add the LS product id to `LicensingConfig`, compare it in `OnlineActivation`, one value per `LicenseKey.h`), if a key ever gains a real entitlement (bundles, paid upgrades, a gated feature). Doing it later is cheap because the config already carries per-product identity.
 
 ---
 
@@ -1913,7 +1934,7 @@ Stages 2, 3 and 4 are independent of each other once stage 1 is in; run them in 
 
 - **Plugin IDs never change** (see the warning below): `PLUGIN_CODE MCLt`, `PLUGIN_MANUFACTURER_CODE TDP1`, `BUNDLE_ID com.transwarp.mu-clid-lite`, `CLAP_ID com.transwarp.mu-clid-lite`, and the processor state id `MuClidState`. They are saved data (design-naming §3); the product name is display only. The bundle's visible name changes, the identity does not.
 - **Layer type stays `Rhythm`** and the layer-preset extension stays `.muRhythm` (shared with mu-Clid so a rhythm made in either loads in the other; mu-Clid's sample binding is ignored by the MIDI product). This is the one named exception to "each product's layer type name is unique" (design-naming §1), because the type is one shared class in `mu-core`, not two.
-- **No licensing glue**, like mu-On: it never calls `initLicensing`, never shows the support prompt, and `License/` holds a `.gitkeep`. (Owner decided 2026-10-11: no prompt.)
+- **No licensing glue** (it is freeware, like mu-Link): it never calls `initLicensing`, never shows the support prompt, and `License/` holds a `.gitkeep`. (Owner decided 2026-10-11: no prompt.)
 - **No modulation targets**: it has no `ModulationMatrix` use today, so there is no `mu_mod::ModTarget` table and `Modulation/` is a `.gitkeep`; if it later gains modulation it adds one table like every product.
 - **Formats:** VST3 + CLAP only (owner, 2026-10-11; no AU, no Standalone), `IS_MIDI_EFFECT TRUE`. Free. Linux is built by `release.yml` as for mu-Clid today.
 
@@ -1947,7 +1968,7 @@ If the owner wants brand-new IDs anyway (a clean break), do it as its own decisi
 1. **Name:** display name **mu-Clid MIDI** (the descriptive-suffix exception for a deliberate sibling, design-naming §3). Slug **`mu-clid-midi`**, namespace **`mu_clid_midi`**, source folder `mu-clid-midi/`, docs folder `docs/mu-clid-midi/`, test target `mu-clid-midi-tests`, installer/zip names `mu-Clid-MIDI-*`. The names are display and layout only; the next item does not change.
 2. **Plugin IDs kept:** `MCLt`, `TDP1`, `com.transwarp.mu-clid-lite`, `MuClidState` all stay (the CMake target may be renamed in stage 3; the IDs inside it may not).
 3. **`.muRhythm` / `Rhythm` shared with mu-Clid:** yes (rule above).
-4. **Licensing:** no support prompt and no licensing glue. It is free.
+4. **Licensing:** no support prompt and no licensing glue. It is freeware.
 5. **Formats:** VST3 + CLAP only (no AU, no Standalone). Free, no price on the site.
 6. **Identity:** it keeps its own icon and its own site product page and release-notes page.
 7. **Extraction timing (stage 2):** extract the pure generators now (`EuclideanGenerator`, `HitGenerator` into `mu-core/Sequencer/`, namespace `mu_core`); `Rhythm` and `RhythmSequencer` follow with the layer-container stage (design-naming §5 step 5.7). Until then mu-Clid MIDI carries a thin `Rhythm` of its own, a recorded known exception, not to be extended. **Resequenced 2026-10-11:** they move now, as Stage 2b above, because the class is already pure and stage 7 is the last and riskiest of the plan; the owner is asked to confirm the new order.

@@ -15,7 +15,7 @@ default and noted in the docs.
 | **T2** | **Voice engine** | `Audio/AnalogueOsc.h` (PolyBLEP) + `Audio/ToniVoice.h` — 2 oscs + noise + `MultiModeFilter` + **Amp/Filter/Pitch `juce::ADSR`** + portamento slew + Legato. note-on/off + gate. `Tests/AnalogueOscTests.cpp`. | **✅ done** |
 | **T3** | **Plugin integration** | `PluginProcessor` APVTS layout (43 params × voice), `Sequencer/ArpVoiceRunner.h` (arp clock → voice), render hook via `processCoreBlock`, transport-driven step clock, **MIDI note-in** (root + trigger), default patch. | **✅ done** |
 | **T4** | **UI** | `EnginePanel` rebuilt as a rebindable arp/osc/filter/env control panel (shared `KnobWithLabel`/`DropdownSelect`/toggles, APVTS attachments), rebinds per sidebar layer. | **✅ done** |
-| **T5** | **Presets · freeware · mu-link · polish** | `.muArp`/`.muToni` extensions; **freeware** (no licence wired = default); mu-link bridge one-liner in `StandaloneApp`; host/mu-link transport sync in `processBlock`; settings easter-egg line. | **✅ done** |
+| **T5** | **Presets · freeware · mu-link · polish** | `.muArp`/`.muToni` extensions; licensing (shipped freeware at first; Pay What You Want from 2026-10-15); mu-link bridge one-liner in `StandaloneApp`; host/mu-link transport sync in `processBlock`; settings easter-egg line. | **✅ done** |
 
 ## Built — v1.0.943
 

@@ -63,7 +63,7 @@ void EditorShellBase::wireOverlays()
     aboutOverlay.onEnterKey = [this] { showAbout(false); showActivation(true); };
     statusBar.onSupportClicked = [this] { showSupportPrompt(true); };
 
-    // ── Activation overlay (non-blocking — Demo until activated) ──────────────
+    // ── Activation overlay (non-blocking — the Support link stays until activated) ──────────────
     activationOverlay.onDismiss   = [this] { showActivation(false); };
     activationOverlay.onActivated = [this]
     {
@@ -258,9 +258,9 @@ void EditorShellBase::showSupportPrompt(bool userRequested)
     auto* dlg = new mu_ui::ModalDialog();
     dlg->width(400)
         .title("Support " + productDisplayName)
-        .message(productDisplayName + " is free to use, with every feature. If it's useful to you, "
-                 "you can pay what you like (suggested \xC2\xA3" "20, \xC2\xA3" "0 is fine). You'll get "
-                 "a licence key, and it helps me keep building these.")
+        .message(productDisplayName + " is free, with every feature. If it's useful to you, pay what you "
+                 "like (suggested \xC2\xA3" "20, \xC2\xA3" "0 is fine) and you'll get a licence key that "
+                 "stops this reminder. Your support helps me keep building these.")
         .icon(mu_ui::ModalDialog::Icon::Info);
     dlg->button("Maybe later", maybeLater).button("Enter licence key", enterKey)
         .button("Pay what you like", pay, true).cancelResult(maybeLater);

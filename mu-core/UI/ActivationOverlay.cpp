@@ -5,7 +5,7 @@
 ActivationOverlay::ActivationOverlay (ProcessorBase& proc)
     : processorRef (proc)
 {
-    keyLabel.setText ("License key", juce::dontSendNotification);
+    keyLabel.setText ("Licence key", juce::dontSendNotification);
     addAndMakeVisible (keyLabel);
 
     keyEditor.setMultiLine (false);
@@ -47,7 +47,7 @@ void ActivationOverlay::setStatus (const juce::String& text, bool error)
 void ActivationOverlay::activatePressed()
 {
     const auto key = keyEditor.getText().trim();
-    if (key.isEmpty())          { setStatus ("Enter the license key from your purchase email.", true); return; }
+    if (key.isEmpty())          { setStatus ("Enter the licence key from your confirmation email.", true); return; }
     if (! processorRef.activateOnlineFn) { setStatus ("Online activation isn't available in this build.", true); return; }
 
     activateBtn.setEnabled (false);
@@ -65,7 +65,7 @@ void ActivationOverlay::activatePressed()
             safe->activateBtn.setEnabled (true);
             safe->setStatus (outcome.message, ! outcome.ok);
             if (outcome.ok && safe->onActivated)
-                safe->onActivated();                    // shell hides demo banner + relayouts
+                safe->onActivated();                    // shell refreshes the Support link
         });
     });
 }
@@ -111,20 +111,20 @@ void ActivationOverlay::paint (juce::Graphics& g)
     // Title.
     g.setColour (MuLookAndFeel::colour (Id::headingText));
     g.setFont (juce::Font (juce::FontOptions{}.withHeight (sf (22.0f))));
-    g.drawText ("Activate " + (productName.isNotEmpty() ? productName : juce::String ("mu")),
+    g.drawText ("Enter licence key" + (productName.isNotEmpty() ? " - " + productName : juce::String()),
                 tx, card.getY() + s (22), textW, s (28), juce::Justification::centredLeft, false);
 
     // Subtitle.
     g.setColour (MuLookAndFeel::colour (Id::mutedText));
     g.setFont (juce::Font (juce::FontOptions{}.withHeight (sf (11.0f))));
-    g.drawText ("Enter your license key to unlock all features.",
+    g.drawText ("Enter your licence key to remove the support reminder. Everything works either way.",
                 tx, card.getY() + s (48), textW, s (16), juce::Justification::centredLeft, false);
 
     // Offline fallback — the machine challenge code for an offline `.lic`.
     const int oy = statusLabel.getBottom() + s (8);
     g.setColour (MuLookAndFeel::colour (Id::mutedText));
     g.setFont (juce::Font (juce::FontOptions{}.withHeight (sf (10.0f))));
-    g.drawText ("No internet? Quote this machine code for an offline license file:",
+    g.drawText ("No internet? Quote this machine code for an offline licence file:",
                 tx, oy, textW, s (14), juce::Justification::centredLeft, false);
     g.setColour (MuLookAndFeel::colour (Id::headingText));
     g.setFont (juce::Font (juce::FontOptions{}.withName (juce::Font::getDefaultMonospacedFontName())
