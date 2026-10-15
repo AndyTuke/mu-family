@@ -114,6 +114,15 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px;
 .dl-note a { color: var(--accent-b); }
 .dl-help { margin-top: 36px; font-size: 13px; color: var(--text3); }
 .dl-help a { color: var(--accent-b); }
+.dl-manuals { margin-top: 40px; }
+.dl-manuals h2 { font-family: var(--ff-disp); font-size: 20px; font-weight: 700; margin-bottom: 6px; color: var(--text); }
+.dl-manuals > p { font-size: 13px; color: var(--text3); margin-bottom: 14px; }
+.dl-manuals ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.dl-manuals li { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; font-size: 14px; }
+.dl-manuals li a { color: var(--accent-b); }
+.dl-manuals li a:hover { text-decoration: underline; }
+.dl-manuals li a:focus-visible { outline: 2px solid var(--accent-b); outline-offset: 2px; }
+.dl-manuals li span { display: block; font-family: var(--ff-mono); font-size: 10px; color: var(--text3); margin-top: 2px; }
 
 /* ── FOOTER ── */
 footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 80px; }
@@ -234,7 +243,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
             <div class="dl-actions">
               <a class="btn-dl clid" href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Clid-Windows.zip">Download — Windows ↓</a>
               <div class="dl-os"><span class="soon">Linux · Coming soon</span></div>
-              <div class="dl-sub">No registration required · <a href="mu-clid-releases.html" style="color:var(--accent-b)">Release notes</a></div>
+              <div class="dl-sub">No registration required · <a href="mu-clid-releases.html" style="color:var(--accent-b)">Release notes</a> · <a href="manuals/mu-Clid-User-Manual.pdf" target="_blank" rel="noopener" style="color:var(--accent-b)">User manual (PDF)</a></div>
             </div>
           </div>
 
@@ -248,7 +257,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
             <div class="dl-actions">
               <a class="btn-dl midi" href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Clid-MIDI-Windows.zip">Download — Windows ↓</a>
               <div class="dl-os"><span class="soon">Linux · Coming soon</span></div>
-              <div class="dl-sub"><a href="mu-clid-midi.html" style="color:var(--accent-b)">About</a> · <a href="mu-clid-midi-releases.html" style="color:var(--accent-b)">Release notes</a></div>
+              <div class="dl-sub"><a href="mu-clid-midi.html" style="color:var(--accent-b)">About</a> · <a href="mu-clid-midi-releases.html" style="color:var(--accent-b)">Release notes</a> · <a href="manuals/mu-Clid-MIDI-User-Manual.pdf" target="_blank" rel="noopener" style="color:var(--accent-b)">User manual (PDF)</a></div>
             </div>
           </div>
 
@@ -261,7 +270,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
             </div>
             <div class="dl-actions">
               <a class="btn-dl link" href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Link-Windows.zip">Download — Windows ↓</a>
-              <div class="dl-sub"><a href="mu-link.html" style="color:var(--cyan-b)">About</a> · <a href="mu-link-releases.html" style="color:var(--cyan-b)">Release notes</a></div>
+              <div class="dl-sub"><a href="mu-link.html" style="color:var(--cyan-b)">About</a> · <a href="mu-link-releases.html" style="color:var(--cyan-b)">Release notes</a> · <a href="manuals/mu-Link-User-Manual.pdf" target="_blank" rel="noopener" style="color:var(--cyan-b)">User manual (PDF)</a></div>
             </div>
           </div>
 
@@ -275,7 +284,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
             <div class="dl-actions">
               <a class="btn-dl tant" href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Tant-Windows.zip">Download — Windows ↓</a>
               <div class="dl-os"><span class="soon">Linux · Coming soon</span></div>
-              <div class="dl-sub">No registration required · <a href="mu-tant-releases.html" style="color:var(--amber-b)">Release notes</a></div>
+              <div class="dl-sub">No registration required · <a href="mu-tant-releases.html" style="color:var(--amber-b)">Release notes</a> · <a href="manuals/mu-Tant-User-Manual.pdf" target="_blank" rel="noopener" style="color:var(--amber-b)">User manual (PDF)</a></div>
             </div>
           </div>
 
@@ -290,7 +299,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
             <div class="dl-actions">
               <a class="btn-dl toni" href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Toni-Windows.zip">Download — Windows ↓</a>
               <div class="dl-os"><span class="soon">Linux · Coming soon</span></div>
-              <div class="dl-sub">No registration required · <a href="mu-toni.html" style="color:var(--teal-b)">About</a> · <a href="mu-toni-releases.html" style="color:var(--teal-b)">Release notes</a></div>
+              <div class="dl-sub">No registration required · <a href="mu-toni.html" style="color:var(--teal-b)">About</a> · <a href="mu-toni-releases.html" style="color:var(--teal-b)">Release notes</a> · <a href="manuals/mu-Toni-User-Manual.pdf" target="_blank" rel="noopener" style="color:var(--teal-b)">User manual (PDF)</a></div>
             </div>
           </div>
 
@@ -304,7 +313,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
             <div class="dl-actions">
               <a class="btn-dl on" href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-On-Windows.zip">Download — Windows ↓</a>
               <div class="dl-os"><span class="soon">Linux · Coming soon</span></div>
-              <div class="dl-sub">No registration required · <a href="mu-on.html" style="color:#E0C568">About</a> · <a href="mu-on-releases.html" style="color:#E0C568">Release notes</a></div>
+              <div class="dl-sub">No registration required · <a href="mu-on.html" style="color:#E0C568">About</a> · <a href="mu-on-releases.html" style="color:#E0C568">Release notes</a> · <a href="manuals/mu-On-User-Manual.pdf" target="_blank" rel="noopener" style="color:#E0C568">User manual (PDF)</a></div>
             </div>
           </div>
 
@@ -316,6 +325,18 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
         </div>
 
         <p class="dl-help">All downloads are <code>.zip</code> archives containing the VST3, CLAP (and Standalone where applicable). Unzip and copy the plugin into your system plugin folder. Got a licence key? Open the plugin, choose Enter a key (in About, or from the support message) and paste it in. Trouble installing? <a href="contact.html">Contact support</a>.</p>
+        <div class="dl-manuals" id="manuals">
+          <h2>User manuals</h2>
+          <p>A PDF guide for each product. They open in a new tab.</p>
+          <ul>
+            <li><a href="manuals/mu-Clid-User-Manual.pdf" target="_blank" rel="noopener"><span class="mu">μ</span>-clid user manual</a><span>PDF · 30 pages · 1.0 MB</span></li>
+            <li><a href="manuals/mu-Tant-User-Manual.pdf" target="_blank" rel="noopener"><span class="mu">μ</span>-tant user manual</a><span>PDF · 23 pages · 0.9 MB</span></li>
+            <li><a href="manuals/mu-Toni-User-Manual.pdf" target="_blank" rel="noopener"><span class="mu">μ</span>-toni user manual</a><span>PDF · 21 pages · 0.7 MB</span></li>
+            <li><a href="manuals/mu-On-User-Manual.pdf" target="_blank" rel="noopener"><span class="mu">μ</span>-on user manual</a><span>PDF · 19 pages · 0.8 MB</span></li>
+            <li><a href="manuals/mu-Link-User-Manual.pdf" target="_blank" rel="noopener"><span class="mu">μ</span>-link user manual</a><span>PDF · 12 pages · 0.4 MB</span></li>
+            <li><a href="manuals/mu-Clid-MIDI-User-Manual.pdf" target="_blank" rel="noopener"><span class="mu">μ</span>-clid MIDI user manual</a><span>PDF · 6 pages · 0.2 MB</span></li>
+          </ul>
+        </div>
       </div>
     </section>
   </main>
