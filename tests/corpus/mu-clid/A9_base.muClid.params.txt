@@ -1,0 +1,24 @@
+# frozen load result for fixture: A9_base.muClid
+layers=1
+load_errors=1
+load_error=Sample 'Kick 01.wav' missing from content folder — rhythm loaded without audio.
+resave_bytes=4793
+resave_sha256=66af78eaab35ff6c2cbac298eed82113c9da88c4b4f0e0c656c769e8a5b9b04d
+--- parameters differing from default (id=plain value)
+ch0_lvl=0.85
+mstrLoop=1
+r0_aEnvAtk=0.001
+r0_aEnvDec=0.18
+r0_aEnvRel=0.08
+r0_aEnvSus=0
+r0_ampLvl=1
+r0_fEnvAtk=0.01
+r0_fEnvDec=0.3
+r0_fEnvRel=0.3
+r0_fltCut=20000
+r0_fltRes=0
+r0_hitsA=4
+r0_pEnvAtk=0.005
+r0_pEnvDec=0.1
+r0_pEnvRel=0.1
+r0_stepsA=16

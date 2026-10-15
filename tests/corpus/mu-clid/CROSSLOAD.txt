@@ -1,0 +1,10 @@
+# frozen cross-product load behaviour of mu-clid (each foreign file offered to layer 0 / as a full preset)
+mu-tant/Abyssal Pad.muPattern (layer): errors=1 first="Dropped 2 modulator assignment(s) from Abyssal Pad.muPattern: invalid source 'cs0'; invalid source 'cs1'" params_sha256=123958ce3b030c29
+mu-tant/Aurora Pad.muPattern (layer): errors=1 first="Dropped 1 modulator assignment(s) from Aurora Pad.muPattern: invalid source 'cs0'" params_sha256=123958ce3b030c29
+mu-tant/Cavern 3.muTant (full): errors=0 params_sha256=e3b0c44298fc1c14
+mu-tant/Deep Current 4.muTant (full): errors=0 params_sha256=e3b0c44298fc1c14
+mu-toni/TONI_mute_layer.muArp (layer): errors=0 params_sha256=123958ce3b030c29
+mu-toni/TONI_legacy.muToni (full): errors=0 params_sha256=e3b0c44298fc1c14
+mu-toni/TONI_silent.muToni (full): errors=0 params_sha256=e3b0c44298fc1c14
+mu-on/ON_legacy.muOn (full): errors=0 params_sha256=e3b0c44298fc1c14
+mu-on/ON_silent.muOn (full): errors=0 params_sha256=e3b0c44298fc1c14

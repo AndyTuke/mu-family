@@ -1,0 +1,8 @@
+# frozen load result for fixture: Test.muPerformance
+name=Test
+items=3
+ignored=0
+item0=Simple Beat.muClid | MuClidState | status 1
+item1=Well this is nice.muClid | MuClidState | status 1
+item2=Bish bash bosh.muClid | MuClidState | status 1
+resave_sha256=f08538070adc3111e3ed157825d4658226b3c6a492b836e56ef2c04c0ca1fe33

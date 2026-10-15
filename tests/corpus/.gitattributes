@@ -1,0 +1,2 @@
+# Fixtures are hashed byte for byte, so git must never convert their line endings.
+* -text

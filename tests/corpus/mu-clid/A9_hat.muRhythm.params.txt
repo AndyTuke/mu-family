@@ -1,0 +1,23 @@
+# frozen load result for fixture: A9_hat.muRhythm
+layers=1
+load_errors=1
+load_error=Sample 'Hat 01.wav' missing from content folder — rhythm loaded without audio.
+capture_bytes=2861
+capture_sha256=439ad65e106ff6a69987029c4add983a57690ffebe1e0e39771635d2fd59c185
+--- parameters differing from default (id=plain value)
+r0_aEnvAtk=0.001
+r0_aEnvDec=0.05
+r0_aEnvRel=0.03
+r0_aEnvSus=0
+r0_fEnvAtk=0
+r0_fEnvDec=0
+r0_fEnvRel=0
+r0_fltCut=3000
+r0_fltRes=0
+r0_fltType=1
+r0_hitsA=4
+r0_pEnvDec=0
+r0_pEnvRel=0
+r0_stepsA=16
+r0_stepsB=16
+r0_stepsC=16

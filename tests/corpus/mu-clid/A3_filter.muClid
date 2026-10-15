@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='utf-8'?>
+<MuClidPreset presetName="A3_filter" presetDescription="Modulation test A3: a Smooth bipolar LFO (1-bar loop) sweeps filter.cutoff on a sustained tonal synth hit on every beat. The rendered brightness (spectral centroid) must sweep across the render — proving the filter-cutoff modulation path (proportion-space cutoff skew + write-back)." presetCategory="test">
+  <Rhythm name="A3_filter" colour="2" sample="Hat 01.wav" stepsA="16" hitsA="16" rotA="0" prePadA="0" postPadA="0" insStA="0" insLenA="0" insModeA="false" prePadModeA="false" postPadModeA="false" stepsB="8" hitsB="0" rotB="0" prePadB="0" postPadB="0" insStB="0" insLenB="0" insModeB="false" prePadModeB="false" postPadModeB="false" stepsC="8" hitsC="0" rotC="0" prePadC="0" postPadC="0" insStC="0" insLenC="0" insModeC="false" prePadModeC="false" postPadModeC="false" logic="OR" pitchOct="0" pitchSemi="0" pitchFine="0" pEnvAtk="0.0001" pEnvDec="0.0001" pEnvSus="0" pEnvRel="0.0001" pEnvDep="0" pEnvLeg="false" fltType="LP24" fltCut="2000" fltRes="0.5" fEnvAtk="0.0001" fEnvDec="0.005" fEnvSus="0" fEnvRel="0.005" fEnvDep="0" fEnvLeg="false" ampLvl="1.0" aEnvAtk="0.001" aEnvDec="0.12" aEnvSus="0" aEnvRel="0.08" aEnvLeg="false" accentDb="0" drvChar="None" ch_lvl="0.85" ch_pan="0.5" ch_mute="0.0" ch_solo="0.0" ch_sendEff="0.0" ch_sendDly="0.0" ch_sendRev="0.0" ch_scSrc="0.0" ch_scAmt="0.0" ch_outBus="0.0">
+    <Modulators>
+      <Seq id="cs0" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+        <Step v="-100.0" />
+        <Step v="-75.0" />
+        <Step v="-50.0" />
+        <Step v="-25.0" />
+        <Step v="0.0" />
+        <Step v="25.0" />
+        <Step v="50.0" />
+        <Step v="75.0" />
+        <Step v="100.0" />
+        <Step v="75.0" />
+        <Step v="50.0" />
+        <Step v="25.0" />
+        <Step v="0.0" />
+        <Step v="-25.0" />
+        <Step v="-50.0" />
+        <Step v="-75.0" />
+      </Seq>
+      <Asgn id="cs0_assign_a3filter" src="cs0_output" dest="filter.cutoff" depth="100.0" curve="0.0" />
+    </Modulators>
+  </Rhythm>
+  <GlobalState/>
+</MuClidPreset>

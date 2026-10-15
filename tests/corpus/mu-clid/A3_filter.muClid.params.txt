@@ -1,0 +1,24 @@
+# frozen load result for fixture: A3_filter.muClid
+layers=1
+load_errors=1
+load_error=Sample 'Hat 01.wav' missing from content folder — rhythm loaded without audio.
+resave_bytes=5401
+resave_sha256=9ca1ac2115e245653f7eb9c126b93152fa0a06c43094265910aba8fe8a08c299
+--- parameters differing from default (id=plain value)
+ch0_lvl=0.85
+r0_aEnvAtk=0.001
+r0_aEnvDec=0.12
+r0_aEnvRel=0.08
+r0_aEnvSus=0
+r0_ampLvl=1
+r0_fEnvAtk=9.99999e-05
+r0_fEnvDec=0.005
+r0_fEnvRel=0.005
+r0_fltCut=2000
+r0_fltRes=0.5
+r0_fltType=4
+r0_hitsA=16
+r0_pEnvAtk=9.99999e-05
+r0_pEnvDec=9.99999e-05
+r0_pEnvRel=9.99999e-05
+r0_stepsA=16

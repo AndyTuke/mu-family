@@ -1,0 +1,25 @@
+# frozen load result for fixture: Big and Bad.muRhythm
+layers=1
+load_errors=0
+capture_bytes=5145
+capture_sha256=2362071704fc039c9a3f704ca82d942fa0946802a2ec168a2a619d713fcf3646
+--- parameters differing from default (id=plain value)
+r0_aEnvAtk=0
+r0_aEnvDec=1.25088
+r0_aEnvRel=10
+r0_aEnvSus=100
+r0_ampLvl=1
+r0_drvChar=11
+r0_fEnvAtk=0
+r0_fEnvDec=0
+r0_fEnvRel=0
+r0_fltCut=43
+r0_fltRes=0.336
+r0_fltType=15
+r0_hitsA=1
+r0_insP2=0.333333
+r0_insP3=0.044
+r0_insP4=0.680859
+r0_pEnvDec=0
+r0_pEnvRel=0
+r0_stepsA=16
