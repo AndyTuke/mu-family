@@ -24,6 +24,8 @@ target_sources(mu-core-tests PRIVATE
     SettingsOverlayBackendTests.cpp
     AlgorithmNameTableTests.cpp
     BarPositionTests.cpp
+    RhythmPlayStateTests.cpp
+    RhythmCircleStepTests.cpp
     HotSwapTests.cpp
     DeferredWorkTests.cpp
     FilterDSPSmokeTests.cpp
@@ -54,6 +56,7 @@ target_sources(mu-core-tests PRIVATE
     ClipStripTests.cpp
     StepEditorTests.cpp
     ../UI/ClipStrip.cpp
+    ../UI/RhythmCircle.cpp
     ../UI/LayerHeaderBar.cpp
     PerformanceChooserTests.cpp
     VoiceEngineParamsTests.cpp

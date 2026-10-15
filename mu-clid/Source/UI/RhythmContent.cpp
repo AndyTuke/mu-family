@@ -347,7 +347,6 @@ void RhythmContent::refreshCircle()
     circle.setPatterns(r.genA.getStepTypes(ov.a), r.genB.getStepTypes(ov.b), r.genC.getStepTypes(ov.c));
     lastCircleOverrides = ov;
     circle.setPlayState(&proc.rhythmPlayState[currentRhythmIndex],
-                        &proc.beatFraction,
                         &proc.sequencerPlaying,
                         currentColour());
 }

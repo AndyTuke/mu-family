@@ -25,7 +25,6 @@ public:
     // Connect to PluginProcessor play-state atomics for self-driven animation.
     // state is non-const so we can update lastHitCount tracking.
     void setPlayState(mu_core::RhythmPlayState*  state,
-                      const std::atomic<float>*          beatFrac,
                       const std::atomic<bool>*            playing,
                       juce::Colour                         colour);
 
@@ -37,6 +36,10 @@ public:
     void timerCallback() override;
 
 private:
+public:
+    int getDisplayedStep() const noexcept { return paintStep; }   // the step highlighted in paint(); for tests
+
+private:
     juce::Colour singleColour;   // transparent → per-ring colours
     juce::Colour ringColour(MuLookAndFeel::ColourIds id) const
     { return singleColour.isTransparent() ? MuLookAndFeel::colour(id) : singleColour; }
@@ -45,7 +48,6 @@ private:
 
     // Non-owning pointers to PluginProcessor atomics
     mu_core::RhythmPlayState*       playState     = nullptr;
-    const std::atomic<float>*              beatFracAtom  = nullptr;
     const std::atomic<bool>*               isPlayingAtom = nullptr;
     juce::Colour                            rhythmColour;
 
@@ -68,6 +70,7 @@ private:
     std::array<ArcPulse, kMaxPulses> arcPulses;
     int   nextPulse    = 0;
     float hubAlpha     = 0.0f;
+    int   paintStep    = 0;  // step from the timer's snapshot, so paint() agrees with the rotation
     int   lastHitCount = 0;  // edge-detect against playState->hitCount
 
     void triggerHitPulse(int combinedStep, int stepsA);

@@ -99,9 +99,11 @@ void MidiRhythmCore::advanceSequencer(bool playing, double beatPos, juce::MidiBu
         }
 
         // Phase 2: publish the play position for the editor's circle.
-        beatFraction.store(static_cast<float>(std::fmod(beatPos / RhythmSequencer::StepLengthBeats, 1.0)));
-        rhythmPlayState.currentStep  .store(sequencer.getLastStepIndex(0));
-        rhythmPlayState.currentStepC .store(sequencer.getLastAccentStepIndex(0));
+        const float frac = static_cast<float>(std::fmod(beatPos / RhythmSequencer::StepLengthBeats, 1.0));
+        beatFraction.store(frac);
+        // Step and fraction go out as one snapshot so the ring never pairs a new fraction with an old step.
+        rhythmPlayState.publishPosition({ sequencer.getLastStepIndex(0),
+                                          sequencer.getLastAccentStepIndex(0), frac });
         rhythmPlayState.patternLength.store(sequencer.getPatternLength(0));
         // The ring step counts are published by the message thread after each apply (publishStepCounts).
     }

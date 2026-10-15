@@ -400,8 +400,9 @@ void PluginProcessor::advanceSequencer(int numRhythms, double beatPos, juce::Mid
     beatFraction.store(frac);
     for (int r = 0; r < numRhythms; ++r)
     {
-        rhythmPlayState[r].currentStep  .store(sequencer.getLastStepIndex(r));
-        rhythmPlayState[r].currentStepC .store(sequencer.getLastAccentStepIndex(r));
+        // Step and fraction go out as one snapshot so the ring never pairs a new fraction with an old step.
+        rhythmPlayState[r].publishPosition({ sequencer.getLastStepIndex(r),
+                                             sequencer.getLastAccentStepIndex(r), frac });
         rhythmPlayState[r].patternLength.store(sequencer.getPatternLength(r));
         const Rhythm& rhy = sequencer.getRhythm(r);
         rhythmPlayState[r].stepsA.store(juce::jmax(1, rhy.genA.steps));

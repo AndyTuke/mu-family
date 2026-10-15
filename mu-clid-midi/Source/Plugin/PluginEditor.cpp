@@ -47,7 +47,6 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     {
         const juce::Colour colour { 0xff7F77DD };
         rhythmCircle.setPlayState(&proc.rhythmPlayState,
-                                  &proc.beatFraction,
                                   &proc.sequencerPlaying,
                                   colour);
         euclidPanel.setRhythm(0);
