@@ -1,7 +1,7 @@
 name: CI build
 
 # Cross-platform safety net: builds the mu-family plugins (VST3/CLAP/Standalone) + the unit
-# tests on Linux and Windows, and runs the test suites + the mu-core boundary check.
+# tests on Linux and Windows, and runs the test suites + the static checks.
 # Catches portability regressions early. No signing / installers / tester deploy here — those
 # stay on the local Windows release flow. mu-link (Win32 shared-memory bus) builds on Windows
 # only until the POSIX backend lands; off-Windows the standalone bridge is a no-op stub.
@@ -46,6 +46,21 @@ jobs:
           ref: ${{ steps.juce.outputs.version }}
           path: JUCE
 
+      # Static checks first: they take seconds and fail before the long build starts.
+      - name: Static checks
+        shell: pwsh
+        run: |
+          pwsh tests/scripts/check-core-boundary.ps1
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          pwsh tests/scripts/check-comment-refs.ps1 -Quiet
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          pwsh tests/scripts/check-juce-version.ps1
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          pwsh tests/scripts/check-mod-targets.ps1
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          pwsh tests/scripts/check-backlog.ps1
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -66,55 +81,38 @@ jobs:
 
       - name: Build plugins + Standalone + tests
         run: >
-          cmake --build build --config Debug --target
+          cmake --build build --config Debug --parallel --target
           mu-clid_VST3 mu-clid_CLAP mu-clid_Standalone mu-clid-midi_VST3
           mu-tant_VST3 mu-tant_CLAP mu-tant_Standalone
           mu-on_VST3 mu-on_CLAP mu-on_Standalone
-          mu-clid-tests mu-tant-tests mu-on-tests
+          mu-toni_VST3 mu-toni_CLAP mu-toni_Standalone
+          mu-core-tests mu-control-tests mu-clid-tests mu-clid-midi-tests
+          mu-tant-tests mu-on-tests mu-toni-tests
 
       - name: Build mu-link (Windows only)
         if: runner.os == 'Windows'
-        run: cmake --build build --config Debug --target mu-link mu-link-server mu-link-tone mu-link-harness mu-link-tests
+        run: cmake --build build --config Debug --parallel --target mu-link mu-link-server mu-link-tone mu-link-harness mu-link-tests
 
       # (macOS build + AU + universal lipo + auval + render evidence pack live in
       # mac-validate.yml — workflow_dispatch only, to avoid the 10x macOS runner cost.)
 
-      - name: Run mu-Clid tests
+      # Runs every *-tests executable the build produced, so a new test target needs no edit here.
+      - name: Run all unit tests
         shell: bash
         run: |
-          exe="build/mu-clid/mu-clid-tests_artefacts/Debug/mu-clid-tests"
-          [ -f "$exe.exe" ] && exe="$exe.exe"
-          "$exe"
-
-      - name: Run mu-Tant tests
-        shell: bash
-        run: |
-          exe="build/mu-tant/mu-tant-tests_artefacts/Debug/mu-tant-tests"
-          [ -f "$exe.exe" ] && exe="$exe.exe"
-          "$exe"
-
-      - name: Run mu-On tests
-        shell: bash
-        run: |
-          exe="build/mu-on/mu-on-tests_artefacts/Debug/mu-on-tests"
-          [ -f "$exe.exe" ] && exe="$exe.exe"
-          "$exe"
-
-      - name: Run mu-link tests (Windows only)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          exe="build/mu-link/mu-link-tests_artefacts/Debug/mu-link-tests"
-          [ -f "$exe.exe" ] && exe="$exe.exe"
-          "$exe"
-
-      - name: mu-core boundary check
-        run: pwsh tests/scripts/check-core-boundary.ps1
+          set -u
+          fails=0; ran=0
+          while IFS= read -r exe; do
+            echo "::group::$exe"
+            if "$exe"; then ran=$((ran+1)); else echo "FAILED: $exe"; fails=$((fails+1)); fi
+            echo "::endgroup::"
+          done < <(find build -path '*-tests_artefacts/Debug/*' -type f \( -name '*-tests' -o -name '*-tests.exe' \))
+          echo "ran=$ran failed=$fails"
+          [ "$ran" -gt 0 ] && [ "$fails" -eq 0 ]
 
       # Headless VST3 validation (pluginval). Phase 1: Windows only, hard gate at strictness 5.
       # The script auto-downloads pluginval and validates whatever product VST3s were built in
-      # the Debug step above (mu-clid / mu-tant / mu-on); mu-Clid MIDI/toni aren't built here and are
-      # skipped, not failed. CLAP/Standalone aren't covered by pluginval (separate phase).
+      # the Debug step above; CLAP/Standalone aren't covered by pluginval (separate phase).
       - name: Validate VST3 with pluginval (Windows only)
         if: runner.os == 'Windows'
         shell: pwsh
