@@ -7,6 +7,7 @@ juce_add_console_app(mu-core-tests PRODUCT_NAME "mu-core-tests")
 target_sources(mu-core-tests PRIVATE
     TestMain.cpp
     HostTransportPublishTests.cpp
+    GoldenRenderHarnessTests.cpp
     LayerAccessTests.cpp
     ClipBankTests.cpp
     ClipLaunchTests.cpp
