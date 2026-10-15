@@ -7,7 +7,7 @@ pushed. Only the short "still open" list in section 9 needs Andy; everything els
 
 **Settled by Andy, 2026-10-15 (the shape of the product):** a fifth product; **Standalone only** (no VST3, no CLAP); **freeware** (no licence key, no
 Support prompt); name mu-Tronic, plugin code `MTrn`; three buses with two inserts each; every mu-On engine is its own layer type; scenes; mu-link
-left as it is; the product refactors of mu-Clid and mu-Tant wait until after their next releases.
+left as it is; the product refactors of mu-Clid and mu-Tant wait until after their next releases. **Superseded later the same day:** Andy re-prioritised, so all four extractions come before any mu-Tronic product work; see [extraction-plan.md](extraction-plan.md), which replaces the ordering in section 6.
 
 **Andy's brief.** "An empty unit with the same mod, effects and mixer as all the other apps. The voices are empty slots, into which we can add a voice
 from any of mu-clid, mu-tant, mu-toni and mu-on. mu-tronic will hold up to 16 voices, with paging on the UI from 1-8 to 9-16. The voices of the other
@@ -149,6 +149,11 @@ when a slot's layer is replaced (type change, remove) the old `unique_ptr` is pa
 renders it under a falling gain for its `tailBlocks()` (25 ms default, longer for a reverb or comb insert) and sets a cleanup flag; the message thread
 frees it off the audio thread (the mu-Tant `retiring` and mu-Clid `retiredReadyForCleanup` pattern, generalised once). `Rhythm` stays a copyable value for mu-Clid MIDI;
 mu-Clid's engine-carrying type is the derived `mu_clid::SampleRhythm` (section 1.3), which is not copyable and which only `Layer::render` hosts use.
+
+**Real-time contract requirements (dsp-controller review, 2026-10-15).** Requirements C1 to C18 (atomic publication for type changes and scenes with no suspend
+and no muting, the `RetireBin` state machine and retiree snapshot, the `RenderContext` time model with `onTransportJump`, oversize-block chunking, `onMoved`
+rebinding, peer tap point, hold-last on a modulation-lock miss, sidechain tap, latency assertion, CPU measurement plan) are in
+[extraction-plan.md section 2.1a](extraction-plan.md#21a-contract-requirements-from-the-real-time-review-c1-to-c18) and bind this section; they are signed before any contract code (stage E0d).
 
 ### 2.2 The product UI stops depending on the product processor
 
@@ -484,6 +489,8 @@ ownership: M mechanical, S supervised (audio thread or lock), O needs Andy.
 | **T8b** | M | Importers for the products extracted later: `.muTant` and `.muClid` full presets (each lands with T5 / T7; `.muToni` and `.muOn` importers land with T8a). | mu-tronic | `TronicStateTests` import cases |
 | **T9** | O | Release stages: installer, manual, site page (listed as freeware), no licence work. The first release may ship before T5 and T7 (see "still open", section 9). | | |
 
+**Superseded 2026-10-15 (later): [extraction-plan.md](extraction-plan.md) now sets the order (E0 safety net, E1 contract, E2 Toni, E3 On, E4 Tant, E5 Clid, then T1, T2, T8a); Tant and Clid are extracted before mu-Tronic product work, not after their next releases. The paragraph below is kept for its reasoning.**
+
 **Order after Andy's timing answer (2026-10-15).** Run now: **T0, T1, T2, T3, T4, T6, T8a**, then T9 if Andy wants an early release. **Wait until after the next
 mu-Clid and mu-Tant releases: T5 and T7** (and T8b for those two). Concretely:
 
@@ -573,7 +580,7 @@ Not "absorb" because that would copy mu-link's server, IPC and registry into a p
 7. **Hot-swap of a type change** replaces an engine, not just data. Uses the shared `RetireBin` and `preloadStaged`; staged at the boundary like any swap;
    `LayerTypeSwapTests`.
 8. **Colour palette** has 8 colours for 16 layers (section 3.4). `ux-controller`.
-9. **Live-product impact.** mu-Clid and mu-Tant are shipping (1.1). **Answered by Andy, 2026-10-15: their extraction (T5, T7) happens after their next releases.**
+9. **Live-product impact.** mu-Clid and mu-Tant are shipping (1.1). **Superseded 2026-10-15: Andy ordered their extraction (T5, T7) before mu-Tronic product work**; safety is the golden / compat / equivalence net and the release rules of extraction-plan.md sections 3 and 4. (Earlier answer: after their next releases.)
    Before that only additive `mu-core` stages (T0 to T3) reach them, byte-identical or reverted; the release-cut rule is in section 6. None of the stages
    changes saved data or parameter ids (prefixes and extensions stay).
 10. **Free product carries the engines of the Pay What You Want apps.** A free mu-Tronic gives away mu-Toni's and mu-On's engines (and later mu-Tant's and mu-Clid's)
@@ -590,7 +597,7 @@ Not "absorb" because that would copy mu-link's server, IPC and registry into a p
 | 2 | Plugin formats | **Standalone only** ("a new performance framework that might make mu-link redundant"); no VST3/CLAP; parameter-count/pool work dropped | 3.1, 3.4 |
 | 3 | Licence / price | **Free**, freeware like mu-Link and mu-Clid MIDI; no key, no Support prompt, no Lemon Squeezy; site lists it as freeware | 3.1, 3.2 |
 | 4 | Name | mu-Tronic (display), `mu-tronic` (slug), code `MTrn` (JUCE needs an upper-case letter) | 3.1 |
-| 5 | Timing | T5, T7 (mu-Tant, mu-Clid extraction) after their next releases; T0 to T4, T6, T8a now | 6, risk 9 |
+| 5 | Timing | **Revised 2026-10-15: all four extractions first (E0 to E5 of extraction-plan.md), mu-Tronic product work after.** Earlier: T5, T7 after next releases | extraction-plan.md, risk 9 |
 | 6 | mu-link | Leave as is; coexist; no freeze; revisit later | 8 |
 | 7 | Buses | 3 buses, 2 inserts each, both compile-time (`MU_MAX_BUSES`, `MU_BUS_INSERTS`) | 5 |
 | 8-11 | UI | Ice-white accent; main area painted by layer-type colour; layer names editable and saved; Launchpad top-row 5 and 6 change page | 4, `design-ui.md` (ux-controller), design-launchpad §3.6 |
@@ -613,7 +620,7 @@ Not "absorb" because that would copy mu-link's server, IPC and registry into a p
 
 ## 10. Owner-visible effects of this plan on existing products
 
-None to the shipping products before their next releases. T0 to T3 add compile-time defaults and additive `mu-core` code only (no product source changes, no file
+**Revised 2026-10-15:** the shipping products are extracted before mu-Tronic product work, under the "nothing audible or saved changes" rule and the safety net of extraction-plan.md (one exception under decision: mu-Tant Note mode). Earlier text follows. None to the shipping products before their next releases. T0 to T3 add compile-time defaults and additive `mu-core` code only (no product source changes, no file
 renames). mu-Toni and mu-On (pre-release) are rebuilt on the shared render path from T4 and T6 and must be sample-identical; mu-Tant and mu-Clid follow after their
 next releases (T5, T7; the `Scales.h` renames happen then). No preset, parameter id, extension, plugin code or folder changes. mu-On's and mu-Toni's global swing/accent and held-note settings become per layer inside, with
 the same defaults and the same saved results (pinned by tests before the move).
