@@ -149,6 +149,8 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/EngineMigrationTests.cpp   # five-lane states and track presets load as engine-qualified layers
     Source/Tests/ClipLaunchTests.cpp   # clip store / launch on the real processor
     Source/Tests/ModArcTests.cpp   # every mod target publishes its live value for the knob arcs
+    Source/Tests/GoldenRenderTests.cpp   # golden renders of the real processor (tests/golden/mu-on)
+    Source/Tests/ExtractionPinTests.cpp   # pins: per-engine sound, swing/accent, Rumble source, sidechain, stop edge, edits, oversize
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp

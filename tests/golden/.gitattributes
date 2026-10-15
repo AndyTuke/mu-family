@@ -1,0 +1,2 @@
+# Scenario inputs are hashed byte for byte (Scenario::inputHash), so git must never convert their line endings.
+* -text
