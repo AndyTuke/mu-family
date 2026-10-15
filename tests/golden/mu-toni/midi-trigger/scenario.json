@@ -1,0 +1,13 @@
+{
+  "scenario": "midi-trigger",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 96000,
+  "tempoBpm": 120.0,
+  "startBeat": 0.0,
+  "numStems": 1,
+  "script": [
+    "MIDI-trigger mode: the arp runs only while a key is held, restarting its pattern at each note-on.",
+    "Four-step pattern with a rest at step 3. Notes: 60 on (block 3, offset 100), 64 on (10, 255), 64 off (30), 60 off (45, 17), 67 on (60), 67 off (80, 7)."
+  ]
+}

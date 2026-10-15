@@ -1,0 +1,3 @@
+# Scenario inputs are hashed byte for byte (GoldenRender.h inputHash), so they must check out the same on
+# every platform: LF only, never the autocrlf conversion.
+* text eol=lf

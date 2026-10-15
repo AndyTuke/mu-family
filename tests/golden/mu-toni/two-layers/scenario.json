@@ -1,0 +1,12 @@
+{
+  "scenario": "two-layers",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 96000,
+  "tempoBpm": 120.0,
+  "startBeat": 0.0,
+  "numStems": 2,
+  "script": [
+    "Two layers with different pools, rates, wavetables and filters, panned apart. A third default layer is added mid-play at block 80 (a structural edit)."
+  ]
+}

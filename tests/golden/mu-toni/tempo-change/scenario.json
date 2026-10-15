@@ -1,0 +1,12 @@
+{
+  "scenario": "tempo-change",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 96000,
+  "tempoBpm": 120.0,
+  "startBeat": 0.0,
+  "numStems": 1,
+  "script": [
+    "Loop mode, 1/16 triplet. Host tempo 120, then 90 at block 30, 150 at block 60 and 133.3 at block 90."
+  ]
+}

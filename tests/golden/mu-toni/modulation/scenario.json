@@ -1,0 +1,12 @@
+{
+  "scenario": "modulation",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 96000,
+  "tempoBpm": 120.0,
+  "startBeat": 0.0,
+  "numStems": 1,
+  "script": [
+    "Two stepped control sequences (cs0 sixteenth, cs1 eighth) feeding four assignments: cutoff 40, osc2 position 30, chord 20 (integer target, rounds) and accent 50 percent of range."
+  ]
+}

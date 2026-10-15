@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MuToniState format="2" numVoices="1" voiceColours="0,1,2,3,4,5,6,7">
+    <Globals>
+
+    </Globals>
+    <Slots>
+      <Slot idx="0">
+        <p id="acc" x="30"/>
+        <p id="accLen" x="4"/>
+        <p id="accPat" x="3"/>
+        <p id="chord" x="3"/>
+        <p id="cut" x="1500"/>
+        <p id="gate" x="60"/>
+        <p id="rate" x="6"/>
+        <Modulators depthUnits="range">
+          <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+            <Step v="0"/>
+            <Step v="80"/>
+            <Step v="30"/>
+            <Step v="100"/>
+          </Seq>
+          <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Eighth" stepMod="None" stepMult="1">
+            <Step v="100"/>
+            <Step v="20"/>
+            <Step v="60"/>
+          </Seq>
+          <Asgn id="a0" src="cs0_output" dest="flt.cutoff" depth="40" curve="0"/>
+          <Asgn id="a1" src="cs1_output" dest="osc2.pos" depth="30" curve="0"/>
+          <Asgn id="a2" src="cs0_output" dest="arp.chord" depth="20" curve="0"/>
+          <Asgn id="a3" src="cs1_output" dest="arp.accent" depth="50" curve="0"/>
+        </Modulators>
+      </Slot>
+    </Slots>
+</MuToniState>

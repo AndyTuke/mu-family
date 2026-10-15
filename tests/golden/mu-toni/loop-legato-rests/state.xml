@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MuToniState format="2" numVoices="1" voiceColours="0,1,2,3,4,5,6,7">
+    <Globals>
+
+    </Globals>
+    <Slots>
+      <Slot idx="0">
+        <p id="acc" x="50"/>
+        <p id="accLen" x="6"/>
+        <p id="accPat" x="5"/>
+        <p id="chord" x="2"/>
+        <p id="gate" x="100"/>
+        <p id="leg" x="1"/>
+        <p id="porta" x="60"/>
+        <p id="rate" x="3"/>
+        <p id="roct" x="3"/>
+        <p id="root" x="2"/>
+        <p id="scale" x="0"/>
+        <p id="stepMask" x="27"/>
+      </Slot>
+    </Slots>
+</MuToniState>

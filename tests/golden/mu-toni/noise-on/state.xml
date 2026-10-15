@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MuToniState format="2" numVoices="2" voiceColours="0,1,2,3,4,5,6,7">
+    <Globals>
+
+    </Globals>
+    <Slots>
+      <Slot idx="0">
+        <p id="chord" x="3"/>
+        <p id="gate" x="60"/>
+        <p id="noise" x="-10"/>
+        <p id="ntype" x="0"/>
+        <p id="o1l" x="-20"/>
+        <p id="o2l" x="-30"/>
+        <p id="rate" x="6"/>
+      </Slot>
+      <Slot idx="1">
+        <p id="chord" x="2"/>
+        <p id="gate" x="60"/>
+        <p id="noise" x="-12"/>
+        <p id="ntype" x="1"/>
+        <p id="o1l" x="-60"/>
+        <p id="o2l" x="-60"/>
+        <p id="rate" x="5"/>
+        <p id="root" x="7"/>
+      </Slot>
+    </Slots>
+</MuToniState>
