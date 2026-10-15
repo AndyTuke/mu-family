@@ -9,6 +9,14 @@ pushed. Only the short "still open" list in section 9 needs Andy; everything els
 Support prompt); name mu-Tronic, plugin code `MTrn`; three buses with two inserts each; every mu-On engine is its own layer type; scenes; mu-link
 left as it is; the product refactors of mu-Clid and mu-Tant wait until after their next releases. **Superseded later the same day:** Andy re-prioritised, so all four extractions come before any mu-Tronic product work; see [extraction-plan.md](extraction-plan.md), which replaces the ordering in section 6.
 
+**Decisions of 2026-10-15 (later), recorded in [extraction-plan.md](extraction-plan.md) section 7:** the first mu-Tronic release waits until **all four engines** are
+ready (Andy: "No, all four engines for launch. There's no rush, so we get each one ready"), so the earlier "useful after E3" point is an internal checkpoint only and the
+"ship before T5/T7" option is removed (decision 5 and still-open item 1 below are closed that way); Rumble may read any layer type (still-open item 3 closed); mu-Tant Note
+mode keeps its final-mix gate as a mu-Tant shell function (live product bit-identical); noise is seeded per layer slot. **Open (A14):** Andy suggested mu-Tronic loads engines
+at runtime from the installed apps and carries their licence state, then said he is not committed. The cost/benefit is in extraction-plan section 9; the recommendation is **not**
+to adopt runtime loading (static libraries as section 2.5 and 3.2 say, licence following the install through a per-app manifest, no key code in mu-Tronic). Until Andy
+answers, sections 2.5, 3.1 and 3.2 below stand unchanged.
+
 **Andy's brief.** "An empty unit with the same mod, effects and mixer as all the other apps. The voices are empty slots, into which we can add a voice
 from any of mu-clid, mu-tant, mu-toni and mu-on. mu-tronic will hold up to 16 voices, with paging on the UI from 1-8 to 9-16. The voices of the other
 apps will therefore need to be completely self contained in the code so they can be used in mu-tronic. We will have buses in the mixer so channels can
@@ -487,7 +495,7 @@ ownership: M mechanical, S supervised (audio thread or lock), O needs Andy.
 | **T7** | S, O | **mu-Clid layer. WAITS until after mu-Clid's next release (Andy).** `SampleRhythm` (engine, MIDI engine, play state, snapshot, retire tail, sample path), glue out of `PluginProcessor_Modulation.cpp`, `PresetIO` shapes onto the `Layer` hooks, `SampleLibrary` as a service, sample I/O in `preloadStaged`, `RhythmHost`. **The standalone mu-Clid adopts it** (the glue must not exist twice); its `HotSwapStager` is either kept for the standalone only (recommended until the swap timing tests prove equal timing) or replaced. Highest risk of the plan (Stage 7 of Layer ownership is the precedent and its proof list applies in full). | mu-clid, mu-tronic | `CLID_roundtrip`, `swap`, `slot swap`, retire-tail renders byte-identical; `SwapCommitTimingTests`; `mu-clid-midi-tests` (shared `Rhythm`); equivalence test |
 | **T8a** | S | Cross-type features that need only the types already extracted (**can go ahead after T4 and T6**): type-carrying clips, **scenes** (`launchScene`, `LaunchScene`, section 3.6), performance files for `MuTronicState`, per-layer MIDI in, **controller pages** (`PagePrev` / `PageNext`, Launchpad top-row 5 and 6) in `mu-control`, mu-link bridge for the standalone (the hook is one line), CPU meter on the transport bar. | mu-core, mu-control, mu-tronic | tests of section 7 |
 | **T8b** | M | Importers for the products extracted later: `.muTant` and `.muClid` full presets (each lands with T5 / T7; `.muToni` and `.muOn` importers land with T8a). | mu-tronic | `TronicStateTests` import cases |
-| **T9** | O | Release stages: installer, manual, site page (listed as freeware), no licence work. The first release may ship before T5 and T7 (see "still open", section 9). | | |
+| **T9** | O | Release stages: installer, manual, site page (listed as freeware), no licence work. **Launch only when all four engines are ready** (Andy, 2026-10-15); the earlier "ship before T5 and T7" option is removed. | | |
 
 **Superseded 2026-10-15 (later): [extraction-plan.md](extraction-plan.md) now sets the order (E0 safety net, E1 contract, E2 Toni, E3 On, E4 Tant, E5 Clid, then T1, T2, T8a); Tant and Clid are extracted before mu-Tronic product work, not after their next releases. The paragraph below is kept for its reasoning.**
 
@@ -585,7 +593,7 @@ Not "absorb" because that would copy mu-link's server, IPC and registry into a p
    changes saved data or parameter ids (prefixes and extensions stay).
 10. **Free product carries the engines of the Pay What You Want apps.** A free mu-Tronic gives away mu-Toni's and mu-On's engines (and later mu-Tant's and mu-Clid's)
     without a Support prompt. This follows from Andy's answers (freeware, every engine a layer) and the layer libraries contain no licence code; recorded so it is a
-    known consequence, not a surprise (still-open list).
+    known consequence, not a surprise (still-open item 2: licence state, A14; extraction-plan sections 8 and 9).
 11. **Layer count in the existing `getLayerName`/`getLayerColourIndex` overrides** (each product returns `"Voice N"`-style names): mu-Tronic names a layer from
     its type and slot (`Layer::name`), a default the base already provides.
 
@@ -597,7 +605,7 @@ Not "absorb" because that would copy mu-link's server, IPC and registry into a p
 | 2 | Plugin formats | **Standalone only** ("a new performance framework that might make mu-link redundant"); no VST3/CLAP; parameter-count/pool work dropped | 3.1, 3.4 |
 | 3 | Licence / price | **Free**, freeware like mu-Link and mu-Clid MIDI; no key, no Support prompt, no Lemon Squeezy; site lists it as freeware | 3.1, 3.2 |
 | 4 | Name | mu-Tronic (display), `mu-tronic` (slug), code `MTrn` (JUCE needs an upper-case letter) | 3.1 |
-| 5 | Timing | **Revised 2026-10-15: all four extractions first (E0 to E5 of extraction-plan.md), mu-Tronic product work after.** Earlier: T5, T7 after next releases | extraction-plan.md, risk 9 |
+| 5 | Timing | **Revised 2026-10-15: all four extractions first (E0 to E5 of extraction-plan.md), mu-Tronic product work after; the first release waits for all four engines (no early release).** Earlier: T5, T7 after next releases | extraction-plan.md, risk 9 |
 | 6 | mu-link | Leave as is; coexist; no freeze; revisit later | 8 |
 | 7 | Buses | 3 buses, 2 inserts each, both compile-time (`MU_MAX_BUSES`, `MU_BUS_INSERTS`) | 5 |
 | 8-11 | UI | Ice-white accent; main area painted by layer-type colour; layer names editable and saved; Launchpad top-row 5 and 6 change page | 4, `design-ui.md` (ux-controller), design-launchpad §3.6 |
@@ -608,11 +616,12 @@ Not "absorb" because that would copy mu-link's server, IPC and registry into a p
 
 ### Still open (Andy)
 
-1. **Early release?** mu-Tronic can ship before T5 and T7 with Arp + the five mu-On types (freeware, so low stakes). Recommendation: yes, once T8a gives it scenes and the
-   Launchpad pages, and add Pattern and Rhythm in an update. Alternative: hold the first release until all nine types exist.
-2. **Free product, paid-app engines.** Confirm it is intended that mu-Tronic (free, no Support prompt) carries mu-Toni's and mu-On's engines (and later mu-Tant's
-   and mu-Clid's). The doc assumes yes.
-3. **Rumble source across types.** Ruled (recommended) that Rumble may read any other priority-0 layer, of any type; confirm, or limit it to the mu-On types.
+1. **Closed (Andy, 2026-10-15): no early release.** mu-Tronic launches only when all four engines (all nine types) are ready.
+2. **Open (A14): free product, paid-app engines, and licence state.** Andy: "I think mu-tronic will carry the license state of the engines it uses, to be confirmed", then that mu-Tronic
+   might load the engines at runtime from the installed apps, then that he is not committed. Analysis and recommendation: [extraction-plan.md](extraction-plan.md) sections 8 and 9
+   (static libraries, licence follows the install via a per-app manifest, no key code in mu-Tronic; the one question is whether engines must update independently of mu-Tronic).
+   If runtime loading were chosen it would supersede 2.5 (libraries linked into mu-Tronic), 3.2 and the T4 to T7 wording, and add a module stage; none of that is adopted.
+3. **Closed (Andy, 2026-10-15): Rumble reads any layer type.**
 4. **Launchpad scenes.** How a scene is fired on the pad (a modifier, a spare button, a column). Not needed until T8a; `ux-controller` proposes.
 5. **Later revisit of mu-link** (no date).
 

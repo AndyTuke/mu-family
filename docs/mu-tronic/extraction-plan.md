@@ -1,6 +1,6 @@
 # Layer extraction programme — plan (2026-10-15)
 
-**Status:** plan only. No source, backlog or CLAUDE.md change is made by this document. Written by the Architecture Steward after Andy re-prioritised
+**Status:** plan only. No source, backlog or CLAUDE.md change is made by this document. Andy's answers to the section 7 decisions are recorded (2026-10-15); one question (A14, licence state, section 8) remains open and is to be ruled before E1. Written by the Architecture Steward after Andy re-prioritised
 on 2026-10-15: *"mu-tronic won't do anything useful without the voices from the other 4, so the detachable voice change needs to be done first."*
 
 **What it supersedes.** [design.md](design.md) section 6 ("Order after Andy's timing answer"), risk 9, decision 5 and section 10 said the mu-Tant and
@@ -77,7 +77,7 @@ against the programme. About 12 to 13 working days of test work in total; **item
 | Step | What | tests.md | Leaves green |
 |---|---|---|---|
 | E0.1 | Tag `pre-extract-all` on the shipped v1.1 commit; choose and record the **baseline commit** from which every golden is recorded (the commit on which tests.md section 2 is signed off; chosen when the harness item starts). Per-product tags `pre-extract-<toni\|on\|tant\|clid>` are set just before each product's first code-moving commit. | | n/a |
-| E0.2 | **Seed fix, its own tiny commit** (approved by the main conversation as Andy's delegate; `dsp-controller` signs): fixed seed for mu-Tant `NoiseGen` and mu-Toni `ToniVoice::rng` (both clock-seeded `juce::Random` today, so noise renders cannot repeat). This is the only live-product source touch before the contract exists; it changes noise from non-repeatable to repeatable and nothing else. Goldens are recorded **after** it. | #15 | all suites |
+| E0.2 | **Seed fix, its own tiny commit** (approved by the main conversation as Andy's delegate; `dsp-controller` signs): fixed seed **per layer slot** (Andy, A11) for mu-Tant `NoiseGen` and mu-Toni `ToniVoice::rng` (both clock-seeded `juce::Random` today, so noise renders cannot repeat). This is the only live-product source touch before the contract exists; it changes noise from non-repeatable to repeatable and nothing else. Goldens are recorded **after** it. | #15 | all suites |
 | E0.3 | **Parameter-id manifest** per product with frozen dumps (`ch{N}_`, `mstr_` and per-layer ids included). | #1 | per-product suites |
 | E0.4 | **Compat corpus** collected from the baseline, `MANIFEST.txt` of hashes; one parameterised test per product: loads clean, values equal, **re-save byte-identical**, idempotent second save, cross-product layer presets. | #2 | per-product suites |
 | E0.5 | **`GoldenRender.h` + `update-golden.ps1`**: scenario loader, FNV-1a fingerprint per 256-frame segment of master and per-layer stems, equality rule (bit-identical, tolerance 0, same machine class/config/compiler, separate files per config), self-repeat test (twice in-process, twice cross-process), diff dump to `tests/_out/golden/`. Goldens live in git under `tests/golden/<product>/<scenario>/`; only `update-golden.ps1` changes them, never in a code-moving commit. Per-product `GoldenRenderTests.cpp`. | #3 | harness self-test |
@@ -207,7 +207,7 @@ in total. Less glue than On, but a **live product** and the Note-mode global (mi
 | E4.0 | **Gate: pre-conditions of 3.1** (tag, goldens recorded, E0.6 Note-mode pin, release decision taken). | |
 | E4.1 | Parameter table: `createParameterLayout` per-voice part to `Persistence/PatternParams.{h,cpp}` as `addLayerParams`; `SwapBoundary.h` from `Plugin/` to `Sequencer/`. Pure moves. | manifest diff empty |
 | E4.2 | `PatternHost` interface; `PatternContent` (23 `proc.` uses of APVTS and the `PluginProcessor::` id helpers) onto `ProcessorBase&` + `PatternHost&`; the id helpers move to `Persistence/`. `Pattern.h` loses `OwnerLink<PluginProcessor>`. | editor builds |
-| E4.3 | **Note mode per layer** (D6). `midiNoteMode`, the held-note stack and the final-mix gate ramp (`applyNoteModeGate`) become `Pattern` state; the ramp applies to the layer's own output; the setting is saved per layer. **Behaviour risk:** today the gate is applied to the *master mix* after all voices and before... the mixer already ran (so after FX); per layer, the ramp acts before the strip, a different point in the chain. The pin from E0.8 decides: either the per-layer ramp is arithmetically equal for the single-layer case (then ship), or the master-mix gate is kept as a mu-Tant shell post-stage (decision A3: **the old gate also gated the FX return and any second layer, so per-layer changes the final mix with FX tails**). | pins; golden with a MIDI script in Note mode |
+| E4.3 | **Note mode per layer** (D6). `midiNoteMode`, the held-note stack and the final-mix gate ramp (`applyNoteModeGate`) become `Pattern` state; the ramp applies to the layer's own output; the setting is saved per layer. **Behaviour risk:** today the gate is applied to the *master mix* after all voices and before... the mixer already ran (so after FX); per layer, the ramp acts before the strip, a different point in the chain. The pin from E0.8 decides: either the per-layer ramp is arithmetically equal for the single-layer case (then ship), or the master-mix gate is kept as a mu-Tant shell post-stage (**decision A3, Andy 2026-10-15: option (a), the old final-mix gate stays as a mu-Tant shell function so the live product is bit-identical; the library layer carries a per-layer gate that the standalone leaves off**;  **the old gate also gated the FX return and any second layer, so per-layer changes the final mix with FX tails**). | pins; golden with a MIDI script in Note mode |
 | E4.4 | Cached atomic pointers (`voicePtrs`, `modDestAtoms`) to `Pattern::bindParams`; `voiceSnap` and the `MuTantModSnap` into `Pattern`; `readConfig`, `applyModulation`, `applyFilterEnvelope`, `applyPitchEnvelope` into `Pattern::render` (+ private helpers). The processor keeps `renderVoiceCb` as an adapter for this commit only (`useLayerRender` equivalence test). Beat wrap: the resolver's 64-beat wrap (`kMaxPatBeats`) becomes the layer wrapping its own `startBeat`; the arithmetic must yield the same value, golden over a long (more than 64 beats) render and a `--host-start-beat` case. | equivalence, golden |
 | E4.5 | Engine array and `bankLock` handling: the engine moves into `Pattern`; the wavetable bank stays processor-owned and is handed through `PatternHost` (not yet a `LayerServices`); the layer's try-lock on the bank is kept with the same acquire order as today (layersLock, then bankLock). Delete the processor-side render chain. | golden, `SynthDSPTests`, `GateStageTests` |
 | E4.6 | **Retire fade replaced by `RetireBin`**: today only a count-reducing swap fades a voice; make a removed `Pattern` park in the bin with the same fade length (the `retiring[]` ramp). Check: golden render of a count-reducing hot-swap (`TANT_preset`, `HotSwapBoundaryTests`) byte-identical. | those tests |
@@ -318,9 +318,9 @@ site or on documentation. Because every E4 commit is gated, the freeze is a labe
 E1 does not touch their audio path (additive `ProcessorBase` members, no mixer change). E2 and E3 do not touch their product source. The first stage that changes a
 live audio path is E4 (Tant) and E5 (Clid). The first release (v1.1) went live on 2026-10-15.
 
-**Recommendation:** no extra release solely for the programme, because the shipped v1.1 tree is already tagged and is the rollback point. Instead:
-(a) tag `pre-extract-all` now; (b) if any user-visible fix is pending for either live product, ship it **before E4.0 / E5.0 respectively**, from the
-baseline, so the next release carries the extraction on its own (one change type per release is easier to attribute); (c) the first release that
+**Decided (Andy, 2026-10-15, A1): no release is needed before E4/E5 start; the v1.1 tag is the rollback.** So:
+(a) tag `pre-extract-all` now; (b) a user-visible fix pending for a live product may still be shipped from the baseline first, at Andy's discretion, so the
+next release carries the extraction on its own (one change type per release is easier to attribute); (c) the first release that
 contains an extracted live product should be a **named patch release with release notes saying nothing audible changed** and a quiet changelog, after one
 full soak of the Debug and Release builds by Andy. Decision A1 below.
 
@@ -460,8 +460,8 @@ hard part of each stage is not the code that moves but the diff that does not co
 
 **Honest uncertainty.** The first estimate (29 to 46 sessions) is superseded: the real-time review added contract requirements (C1 to C18) and the test
 review added about 12 to 13 working days of safety-net work that the first draft treated as 1 to 2 sessions. The upper bound is "plan for it" (a session
-that ends in a non-zero golden diff costs the next session). **Review grade:** use the strongest available reviewer (Opus-grade) for the contract (E0d and E1) and
-for the mu-Clid extraction (E5); the middle stages can use the normal review. A reviewer's missed finding in the contract is repaid four times, once per product.
+that ends in a non-zero golden diff costs the next session). **Models (Andy, 2026-10-15, A13):** the contract design (E0d and E1) and the mu-Clid extraction (E5) run as **Opus-grade agents**, and the strongest
+available reviewer reviews them; the main conversation coordinates; the middle stages use the normal setup. A reviewer's missed finding in the contract is repaid four times, once per product.
 
 Reviewer rounds are inside these numbers. What is **a day or less**: E0.1, E0.2, E0.3, E1's limits and ids, E2.1/E2.2/E2.6, E3.1/E3.2, E4.1/E4.2, E5.1.
 What is **a week or more**: E5 as a whole, and E3.5/E3.6 and E5.4 as blocks (each is the equivalent of two to three sessions of tightly coupled changes that
@@ -474,9 +474,9 @@ cannot be split).
 | **M0** | E0 | Safety net exists (harness, goldens, corpus, manifests, probes), design fixes C1 to C4 signed; no code moved. | nothing visible |
 | **M1** | E1 | Contract proven on a fake type; checker live. | **T1 (empty unit) may start**, see 6.4 |
 | **M2** | E2 | Toni is a library; contract validated by a real type. | T1 can register `Arp`; the first real layer type exists |
-| **M3** | E3 | The five mu-On types exist. | **mu-Tronic becomes useful** (Arp + Kick/Bass/Hat/Snare/Rumble); T8a can start; T1 + T2 usable |
+| **M3** | E3 | The five mu-On types exist. | **Internal checkpoint only** (Arp + Kick/Bass/Hat/Snare/Rumble make mu-Tronic usable for Andy's own testing; **no release**, A12); T8a can start; T1 + T2 usable |
 | **M4** | E4 | Pattern exists. | Pattern registered; T8b Tant importer |
-| **M5** | E5 | Rhythm exists. | all nine types; T8b Clid importer; T9 release decision: one release with everything |
+| **M5** | E5 | Rhythm exists. | all nine types; T8b Clid importer; **the earliest point at which mu-Tronic may launch** (with T1/T2/T8a done): one release with all four engines |
 | **M6** | E6 | Docs, combined link test, boundary checker in `/build`. | T9 |
 
 ### 6.4 When can mu-Tronic T1 (the empty unit) start, and can it run in parallel?
@@ -497,31 +497,278 @@ Stages with a different constraint:
 | `setLayerType`, `LayerServices`, registry list (design T3 remainder) | with T1 | E1 |
 | T8a (scenes, pages, MIDI-in per layer, type-carrying clips) | M3 | E2, E3 + T1 |
 | T8b importers | each with its type: Toni and On at T8a, Tant at M4, Clid at M5 | E4, E5 |
-| T9 release | M5 + T1/T2/T8a (or earlier with Arp + On types, Andy's open question 1) | |
+| T9 release | M5 + T1/T2/T8a. Andy (2026-10-15): launch only with all four engines ready; no early release. | |
 
 ### 6.5 Suggested cadence
 
 Weeks 1-2: E0, E1, E2 (M2). Weeks 3-4: E3 (M3), T1 interleaved. Weeks 4-5: E4 (M4). Weeks 5-7: E5 (M5). Week 7-8: E6 (M6), T2. mu-Tronic
-becomes usable at M3 (week ~4) with 6 layer types; at M5 with all 9. If the schedule slips the order does not need to change: stop at any milestone and
+is usable internally at M3 (week ~4) with 6 layer types (a checkpoint, not a release); it can launch at M5 with all 9. If the schedule slips the order does not need to change: stop at any milestone and
 the product set is consistent.
 
 ---
 
-## 7. Decisions needed from Andy
+## 7. Decisions (Andy answered 2026-10-15)
+
+**Answered 2026-10-15:** A1 (a): no release is needed before E4/E5; the v1.1 tag is the rollback. A2 to A10 accepted as recommended, with A3 (a) chosen
+explicitly. A11: noise seeding is **per slot** (a fixed seed per layer slot, repeatable and different per layer). Also decided: the first mu-Tronic release
+waits for all four engines (A12), Rumble reads any layer type (design.md still-open item 3, closed), and the review grade (A13). The one open question is
+**A14 (licence state / engine loading), to be ruled before E1**; it is analysed in sections 8 and 9 (recommendation: static libraries, section 9.4). The rows below keep the options for the record, each marked with the answer.
 
 | # | Decision | Options | Recommendation |
 |---|---|---|---|
-| **A1** | Release before extracting the live apps? | (a) none, the shipped v1.1 tag is the rollback; (b) ship any pending fix for mu-Clid/mu-Tant first from baseline; (c) cut a mu-Clid and mu-Tant release purely as a clean baseline before E4/E5. | (b): ship pending fixes before E4.0 / E5.0 if there are any; otherwise (a). The first release containing extracted live code is a named patch release with "nothing audible changed" notes after Andy's own soak. |
-| **A2** | Pass criterion | (a) 0 differing samples at 24-bit; (b) <= 1 LSB (the existing roundtrip tolerance). | (a). A non-zero diff goes to Andy with the cause; the programme does not absorb it silently. |
-| **A3** | **Tant Note mode (decision for Andy, live product).** Today the Note-mode gate multiplies the **final mix**, so it also gates the FX return (delay and reverb tails stop with the note) and the sum of any second layer. Moving it per layer (design 3.5) gates only that layer's own signal before its strip: **with FX tails or a second layer the final mix changes**, so "nothing audible changed" (D7) would no longer hold for Note-mode sessions. | (a) **Preserve the old behaviour exactly**: the final-mix gate stays as a mu-Tant shell function (one documented exception to D3 for one function, the library layer has a per-layer gate that the standalone leaves off), final mix bit-identical, the live product unchanged; (b) **accept the change**: per-layer gate everywhere, a named behaviour change in release notes, golden updated by `update-golden.ps1` with Andy's sign-off, which affects existing Note-mode sessions (FX tails now ring on after the note ends). | (a) for mu-Tant's own app (a paying product, "nothing audible changed" is the promise of this programme), with (b) available later as a deliberate change. The E0.6 Note-mode pin (stem and with-FX final mix) decides how large the difference is before this is final. |
-| **A4** | Branch strategy for Clid | `main` incremental vs short-lived branch with fast-forward merge | branch for E5 only (3.2). |
-| **A5** | Is the "release freeze" rule acceptable? | release only from a gate-tagged commit while E4/E5 are in progress | yes. |
-| **A6** | T1 timing | after M1 vs after M2 vs after M3 | after M2, interleaved (6.4). |
-| **A7** | T2 (buses) slot | after M3 vs after M5 | after M5 (keeps E4/E5 diagnosis clean); after M3 if Andy wants buses in early mu-Tronic use. |
-| **A8** | Replace mu-Clid's `HotSwapStager`? | keep for the standalone (Stage 7 step 5 stands) vs fold into `layerSwapper` | keep; revisit only after a release of the extracted Clid. |
-| **A9** | Scope of "completely self contained": do the wavetable bank and `SampleLibrary` become `LayerServices` now, or are they handed through the host interface and unified at T1? | now vs at T1 | at T1 (keeps E2 to E5 about the layer, not about services; both standalones keep their own). |
-| **A11** | **Seed fix (E0.2), FYI/confirm.** Fixing the seed of mu-Tant `NoiseGen` and mu-Toni `ToniVoice::rng` makes noise identical on every note and run instead of different each time. Approved by the main conversation as Andy's delegate so goldens can be repeatable. | confirm; or seed per layer slot (differs per layer, still repeatable) | per-slot seed if the pin shows no problem, otherwise one fixed seed; dsp-controller signs. |
-| **A10** | Variation: do the pure steps for both live products early (E4.1, E4.2, E5.1, E5.2 right after M3) | yes / no | yes, optional, it shortens the audio steps and has no audible risk. |
+| **A1** | **Decided: (a), no release first.** Release before extracting the live apps? | (a) none, the shipped v1.1 tag is the rollback; (b) ship any pending fix for mu-Clid/mu-Tant first from baseline; (c) cut a mu-Clid and mu-Tant release purely as a clean baseline before E4/E5. | (b): ship pending fixes before E4.0 / E5.0 if there are any; otherwise (a). The first release containing extracted live code is a named patch release with "nothing audible changed" notes after Andy's own soak. |
+| **A2** | **Accepted as recommended.** Pass criterion | (a) 0 differing samples at 24-bit; (b) <= 1 LSB (the existing roundtrip tolerance). | (a). A non-zero diff goes to Andy with the cause; the programme does not absorb it silently. |
+| **A3** | **Decided: (a), keep the old final-mix gate as a mu-Tant shell function; the live product stays bit-identical.** **Tant Note mode (live product).** Today the Note-mode gate multiplies the **final mix**, so it also gates the FX return (delay and reverb tails stop with the note) and the sum of any second layer. Moving it per layer (design 3.5) gates only that layer's own signal before its strip: **with FX tails or a second layer the final mix changes**, so "nothing audible changed" (D7) would no longer hold for Note-mode sessions. | (a) **Preserve the old behaviour exactly**: the final-mix gate stays as a mu-Tant shell function (one documented exception to D3 for one function, the library layer has a per-layer gate that the standalone leaves off), final mix bit-identical, the live product unchanged; (b) **accept the change**: per-layer gate everywhere, a named behaviour change in release notes, golden updated by `update-golden.ps1` with Andy's sign-off, which affects existing Note-mode sessions (FX tails now ring on after the note ends). | (a) for mu-Tant's own app (a paying product, "nothing audible changed" is the promise of this programme), with (b) available later as a deliberate change. The E0.6 Note-mode pin (stem and with-FX final mix) decides how large the difference is before this is final. |
+| **A4** | **Accepted as recommended.** Branch strategy for Clid | `main` incremental vs short-lived branch with fast-forward merge | branch for E5 only (3.2). |
+| **A5** | **Accepted as recommended.** Is the "release freeze" rule acceptable? | release only from a gate-tagged commit while E4/E5 are in progress | yes. |
+| **A6** | **Accepted as recommended.** T1 timing | after M1 vs after M2 vs after M3 | after M2, interleaved (6.4). |
+| **A7** | **Accepted as recommended (after M5).** T2 (buses) slot | after M3 vs after M5 | after M5 (keeps E4/E5 diagnosis clean); after M3 if Andy wants buses in early mu-Tronic use. |
+| **A8** | **Accepted as recommended (keep).** Replace mu-Clid's `HotSwapStager`? | keep for the standalone (Stage 7 step 5 stands) vs fold into `layerSwapper` | keep; revisit only after a release of the extracted Clid. |
+| **A9** | **Accepted as recommended (services at T1).** Scope of "completely self contained": do the wavetable bank and `SampleLibrary` become `LayerServices` now, or are they handed through the host interface and unified at T1? | now vs at T1 | at T1 (keeps E2 to E5 about the layer, not about services; both standalones keep their own). |
+| **A11** | **Decided: per-slot seed (a fixed seed per layer slot).** **Seed fix (E0.2).** Fixing the seed of mu-Tant `NoiseGen` and mu-Toni `ToniVoice::rng` makes noise identical on every note and run instead of different each time. Approved by the main conversation as Andy's delegate so goldens can be repeatable. | confirm; or seed per layer slot (differs per layer, still repeatable) | per-slot seed if the pin shows no problem, otherwise one fixed seed; dsp-controller signs. |
+| **A10** | **Accepted as recommended.** Variation: do the pure steps for both live products early (E4.1, E4.2, E5.1, E5.2 right after M3) | yes / no | yes, optional, it shortens the audio steps and has no audible risk. |
+| **A12** | **Decided (Andy): "No, all four engines for launch. There's no rush, so we get each one ready."** First mu-Tronic release. | (a) ship early with Arp + mu-On types; (b) wait for all four products' layers. | (b). mu-Tronic launches only when all four layer libraries (including mu-Tant and mu-Clid) are ready, i.e. after M5 and T1/T2/T8a. The "useful after E3" point (M3) is an **internal checkpoint only**. The "ship before T5/T7" option is removed. |
+| **A13** | **Decided (Andy): review grade.** Who runs the contract and the Clid extraction. | | The contract design (E0d and E1) and the mu-Clid extraction (E5) run as **Opus-grade agents**; the main conversation coordinates. |
+| **A14** | **OPEN, to be ruled before E1.** Licence state in mu-Tronic: Andy, "I think mu-tronic will carry the license state of the engines it uses, to be confirmed." | Andy later: engines loaded at runtime from the installed apps, then "not committed, if not worth it then fine". Sections 8 and 9. | Section 9.4: static libraries (hybrid), licence follows the install via a manifest, no key code in mu-Tronic; the one question is 9.6. |
+
+Also answered: **Rumble reads any layer type: yes** (design.md still-open item 3 closed).
+
+---
+
+## 8. A14 — licence state in mu-Tronic (analysis, 2026-10-15; largely superseded by section 9)
+
+**Superseded in part, 2026-10-15 (later): Andy clarified that mu-Tronic does not contain the engines; it requires the installed apps and loads their engines at
+runtime (section 9).** Options 1 to 5 below assumed compiled-in engines and are kept for the facts in 8.1 and 8.3. The licence question is now answered by
+section 9.5 ("licence follows the install"), which needs no licence code in mu-Tronic. Options 3 to 5 are withdrawn.
+
+**Conflict.** design.md 3.1 assumes mu-Tronic is freeware: no `LicenseKey.h`, no Support prompt, no `ActivationOverlay`. Andy now thinks it will carry the licence
+state of the engines it uses. The two cannot both hold, so this is ruled before E1: it decides whether the contract has a licence hook in it.
+
+### 8.1 What the licence system is today (read from the code)
+
+- **Keys remove nothing but the Support prompt.** There are no feature limits ([ProcessorBase.h](../../mu-core/Plugin/ProcessorBase.h) "an unlicensed copy is fully
+  functional"). Pricing is Pay What You Want (2026-10-14), so a key means "supporter". `isSupporter()` is a pure function in `License/SupportPromptPolicy.h`.
+- **Licence state is per `ProcessorBase`, one bit.** `initLicensing(config)` (defined in `License/ProductLicensing.h`, included only in a licensed product's
+  processor) takes a `LicensingConfig` (product id, licence file, public key, activation file, checkout URL) and sets `licensingEnabled`, `offlineLicensed`,
+  `onlineActivated`. `isLicensed()` is `!licensingEnabled || offlineLicensed || online`. A processor holds **one** config.
+- **Offline `.lic`**: signed with Ed25519 per product; the product id is a field in the file and the public key is embedded per product, so a mu-Tant key
+  fails on mu-Toni offline. **Online activation** (Lemon Squeezy, `OnlineActivation`) is passed a content dir and a file name and **does not check the product id**:
+  any valid Lemon Squeezy key activates whichever product asks, and the result is stored in that product's own content folder. So today a purchase of one
+  product does not carry to another only because each stores its activation separately and the offline path checks the product.
+- **Boundary.** `License/` is in mu-core, and `check-layer-boundary.ps1` (D2) forbids a layer-library file including `Plugin/` or `License/`. A layer library
+  therefore cannot ask "am I licensed"; licence state lives in the host (the processor). That is already how it is: no engine, sequencer or `Layer` class
+  reads it. The conclusion holds for any option below: **the layer libraries stay licence-free and need no change**; the licence is a host concern and the
+  contract (E1) needs only an optional, generic, host-side lookup (8.3).
+
+### 8.2 Options
+
+| Option | What it means | Pros | Cons |
+|---|---|---|---|
+| **1. Freeware, no licence** (design.md today) | No licence code; no Support prompt. | Simplest; no `License/` in the product; matches mu-Link and mu-Clid MIDI. | Gives the PWYW engines away with no supporter path (design.md risk 10); contradicts Andy's thought. |
+| **2. mu-Tronic free, but one Support prompt, any product key counts** | `initLicensing` with a mu-Tronic config; a supporter is anyone with a valid key for **any** of the four products (checks each product's public key / activation file). | One prompt, one entry box; supporter of any engine is a supporter; no per-type UI. | A mu-Toni-only supporter silences the prompt for mu-Tant's engine too (acceptable: keys unlock nothing). Needs a "licensed by any of N configs" host feature. |
+| **3. Licence state per layer type (Andy's thought, literal)** | Each layer type shows/respects the licence of the product it comes from; the Support prompt names the unsupported engines in use. | Faithful to PWYW (support the engine you use). | Most work: N configs, per-type state, a prompt policy for "some engines supported". Because keys unlock nothing, per-type state has no function other than prompt text. UX is heavy for a free product. |
+| **4. One family key** | A single key (a new product id, e.g. `family`) supports everything; mu-Tronic and the apps accept it. | Cleanest model for "supporter". | New key type, new Lemon Squeezy product, changes the four live licensing paths and `OnlineActivation`'s lack of product check becomes a design issue; touches live products. Owner decision (pricing, store). |
+| **5. mu-Tronic free; each *product* unchanged; mu-Tronic reads the other apps' stored licences** | mu-Tronic checks the content folders of the installed products for their `.lic` / activation files. | No new keys. | Cross-product file coupling; breaks the "mu-Tronic is a separate install" idea; fragile. Not recommended. |
+
+### 8.3 What each needs in the shared code and how the boundary is kept
+
+- **Layer libraries: nothing, for every option.** They never include `License/`. The licence-per-type information is **data the registry carries** (option 3):
+  `LayerTypeInfo` (already in `mu-core/Sequencer/`, describe-only) would gain `const char* licenceProductId` (a string, no `License/` include), and the host
+  (mu-Tronic `Plugin/`, which may include `License/`) maps it to a `LicensingConfig`. That keeps `Sequencer/` and the libraries free of `License/`, and keeps
+  `mu-core` plugin-agnostic (the field is an opaque id, not a product symbol).
+- **`ProcessorBase`:** options 2 and 3 need `initLicensing` generalised from one config to a list (or a second entry point, `addLicensingConfig`), with
+  `isSupporter()` computed over the list; today it holds single `licensingEnabled / offlineLicensed / onlineActivated` booleans. That is a small `mu-core` change
+  but it touches the live products' licensing path, so it needs the same golden/behaviour pin as any live code and `SupportPromptPolicyTests`.
+- **Public keys:** per-product public keys live in each product's `License/LicenseKey.h` (product code). mu-Tronic would need all four in its own `License/`
+  folder (options 2, 3): a product-side copy of four keys, the one place the "unlicensed engine" fact is wired; no duplication of logic, only of constants.
+  Option 4 needs one new key pair (outside the repo, under the existing secrets rule).
+- **`OnlineActivation`:** no product id is checked, so option 2 needs only "activation exists in any of N stored files". For option 3 or 4 the missing
+  product check becomes a correctness issue (a mu-Tant key would mark mu-Toni's engine supported); add a product check in `OnlineActivation` first.
+- **Freeware today is also true in the code:** the product that never calls `initLicensing` always counts as licensed (`hasLicensing() == false`); option 1
+  needs nothing.
+
+### 8.4 UX impact (the `ux-controller`'s to design if chosen)
+
+- Option 1: none. Option 2: one Support prompt and one key entry (a settings section) in the multi-engine host, wording "any mu key"; the prompt policy
+  (`SupportPromptPolicy`) is unchanged. Option 3: the prompt and the key entry must say *which* engine, and the chooser may mark engines the user has not
+  supported; a per-engine key list in settings; the highest effort and the most confusing for a free product. Option 4: one entry box; needs pricing messaging.
+- Common risk to avoid: a Support prompt on a free product that names engines the user cannot "unlock" invites the question "what does the key do?"; the
+  existing answer (nothing; it thanks the author) has to be explicit.
+
+### 8.5 Recommendation and the minimal question for Andy
+
+**Recommendation: option 2 now, with the door kept open for 3.** Reasoning: keys unlock nothing, so a per-type licence state has no function except the
+prompt wording; a single "supporter of any mu product" state delivers what Andy wants (supporters are recognised, the prompt appears for people who have supported
+none of the engines), costs one generalisation of `initLicensing` and four embedded public keys, and does not touch any layer library or the contract. Keep
+`LayerTypeInfo` able to carry an optional `licenceProductId` string (cheap, added with E1 only if Andy chooses 3) so per-engine state can be added later without
+changing a layer. Do not choose option 4 without Andy's pricing/store decision; do not choose 5.
+
+**Effect on the plan.** Under option 1 or 2 nothing in E0 to E5 changes (the programme touches no licensing code); the licence work is a mu-Tronic T1
+item. Under option 3 E1 adds the optional `licenceProductId` field to `LayerTypeInfo` and `initLicensing` becomes list-based in a mu-core change that must be
+pinned on the four live products. So the answer is needed before E1 only to decide whether that one field is added.
+
+**Minimal question for Andy:** "Should mu-Tronic show the Support prompt, and if so should a key from *any* mu product silence it (option 2), or should it
+track each engine separately (option 3)?" A "free, no prompt at all" answer is option 1 and is also valid.
+
+---
+
+## 9. Runtime engine modules (Andy, 2026-10-15 clarification; analysis, not yet ruled; Andy: "I'm not committed to that approach, so if it's not worth the effort then fine")
+
+**Bottom line (9.4): runtime loading is not worth its cost over static libraries (C). Recommended: the hybrid of 9.4, which keeps this section's model as a later option.**
+Everything from "What this supersedes" to the end of 9.3 describes the module model *if* it were chosen; it is **not adopted**, and the supersessions listed there do **not**
+take effect unless Andy chooses it. design.md and section 8 stay as they were except where 9.4 says.
+
+**What Andy first said.** mu-Tronic does **not** contain the engines. It requires the standalone app of any synth whose engine it uses (installed mu-Clid, mu-Tant,
+mu-Toni, mu-On) and **loads the engine at runtime from the installed apps**. Licence state follows from the app being installed (and activated).
+
+**What this supersedes.** design.md 2.5 ("one CMake `INTERFACE` library per product, linked into mu-Tronic"), 3.2 (CMake links the layer libraries), the T4 to T7
+"mu-Tronic registers the type" wording, the equivalence test as "a mu-Tronic slot built from the same library", and design.md risk 10 / still-open items 1 and 2.
+It also changes D2 and D3 of section 1.2 in meaning (see 9.3). It does **not** change what E0 to E5 do to each product's own tree.
+
+### 9.1 The hard problems
+
+| Problem | Finding | Rule that follows |
+|---|---|---|
+| **ABI between independently released builds** | A module and mu-Tronic are built at different times from different commits. C++ across a DLL boundary (vtables, `std::` layouts, `juce::` classes, name mangling, MSVC vs GCC/Linux) breaks silently. | **A C ABI only**: `extern "C"` entry points, POD structs, a version number and a size field at the head of every struct, additive-only minor changes. No C++ class, virtual, exception, `std::` type or `juce::` type in the interface. |
+| **Separate heaps (`CMAKE_MSVC_RUNTIME_LIBRARY MultiThreaded`)** | Root `CMakeLists.txt` embeds the CRT statically, so host and each module have their own heap. Anything allocated in one and freed in the other, or held by value across (`std::string`, `std::vector`, `juce::String`, `juce::MidiBuffer`, `juce::AudioBuffer` that owns memory, `ValueTree`), is a crash. | The module that allocates frees: every object is an **opaque handle with a paired `destroy`**. Strings are UTF-8 `char*` into a **caller-provided buffer** (or a module-owned `const char*` valid until the next call). Audio is `float* const*` plus a frame count, host-owned memory the module only writes. MIDI is a POD event array (frame offset, 3 bytes). State is a UTF-8 XML string through a caller buffer (it is the ValueTree already). |
+| **Audio-thread contract** | `RenderContext` is already a POD (C4); the filtered MIDI view becomes a POD array pointer plus count; `peer(slot)` becomes `const float* const* peer` pointers (Rumble). The module must catch every exception and return a code; `render` is `noexcept` in effect. Denormal state is per thread, so `ScopedNoDenormals` in the host covers the module. | `render(handle, const MuRenderCtx*, float* const* out, int n)` and nothing else on the audio thread; no host callback during render. The `AllocationProbe` (E0.7) cannot see a module's own CRT heap, so each module carries a build-time probe hook and the module test asserts zero allocations itself. |
+| **What mu-core is** | `mu-core` is source, an `INTERFACE` library: every module compiles **its own copy** (`Layer`, `ModulationMatrix`, `InsertProcessor`, FX, wavetable code). Nothing needs to match between copies because only the C ABI crosses. The module owns the whole layer: engine, sequencer, modulators and the matrix (still the single reader, inside the module), the per-layer insert, clips, extras. The host keeps what is not the layer: mixer strip (`ch{N}_`), sends, buses, FX returns, master, transport, scenes. | **Common = the ABI header only** (`mu-core/Module/MuEngineApi.h`, pure C, no JUCE, no `std`). mu-core version skew between host and module is irrelevant. |
+| **Parameters and APVTS (everything in APVTS)** | The host cannot compile in a module's parameter table. The module exports **parameter descriptors** (id suffix, name, range, step, default, group) per slot; the host builds the 16-slot APVTS layout **after scanning the modules** (standalone only, so an app installed after launch needs a restart) and gives the module `const float*` to the live values (read relaxed-atomic, written by the host). Saved state stays host APVTS, so "if it isn't in the ValueTree it won't save" still holds. | `addLayerParams` becomes descriptor export. Parameter ids stay `r/v/a/t{N}_` (unchanged data). The module never calls `getRawParameterValue`; it has pointers. |
+| **UI content (JUCE components)** | A module's `RhythmContent`/`PatternContent`/`ArpContent`/`TrackContent` are JUCE `Component`s using the module's own JUCE copy, its own `MuLookAndFeel`, `MessageManager` singleton, typeface cache. Handing a module-created `Component*` to the host's component tree crosses two JUCE copies and two heaps: not viable. Three ways: **(i) native child window**: the module creates its own component in its own JUCE and attaches it to a host-supplied native parent handle (`HWND`/X11), exactly the VST3/CLAP GUI pattern; (ii) **host-drawn generic UI** from a parameter + control description (no module JUCE); (iii) one shared JUCE DLL (unsupported by JUCE, version-locked, contradicts static CRT). | Recommend (i). Costs: DPI scaling, focus and keyboard, overlay z-order (a native child window always paints over host overlays: the host's modals and drag-and-drop cannot cover it), resizing, and the module needs a working JUCE `MessageManager` hook in a loaded DLL (plugins already do this). (ii) loses `GatingDesigner`, the step grid, the sample browser and breaks the one-UX rule; it is the fallback only for a headless/simplified layer. |
+| **The module needs a processor** | After E1 to E5 the layer UI takes `ProcessorBase&` + `<Type>Host&` (D4) and the layer's `bindParams(apvts, slot)`. Across an ABI the module has no host `ProcessorBase`. | The module wrapper contains a **small headless processor** (`ModuleProcessor : ProcessorBase`, one slot, own APVTS mirror fed from the host's values, no mixer output used) so the unchanged content classes have a `ProcessorBase&`. This is the single largest cost of the model and it is not removed by E1 to E5; it is built on top of them. |
+| **Presets and clips** | Layer presets are files (`.muArp` etc.), already format-stable and shared folders (design 3.4). Clip = the type's layer preset (a string). | They cross as XML text. Unchanged. |
+| **Services (wavetable bank, `SampleLibrary`)** | Per-module and private (a heap and a JUCE copy each). No sharing between modules. | A9 ("services at T1") is moot; `LayerServices` does not cross the ABI. Memory duplication (two wavetable banks, Tant and Toni, as today) is accepted. |
+| **Lifetime, unload and the retire bin** | A module's code must outlive every object it created, including a retiree still draining in the `RetireBin`. Unloading while a retiring layer exists is a use-after-free in the audio thread. | **Never unload a module before process exit** (the simple, safe rule: modules stay loaded for the life of the process). The `RetireBin` holds `{handle, module->destroy}` and the module's load count is raised for every live handle; shutdown order: stop audio, flush the bin, destroy all handles, then unload. Hot reload of a module is explicitly not supported. |
+| **Discovery** | Apps are installed to different places (Documents\TDP\<app> is only the content folder, and `contentDir` is a user setting). | Each app's installer (and the app's first run) writes a small manifest in a fixed per-user location (`engines/<app>.json`: module path, engine id, API version, app version, content dir, supporter flag). mu-Tronic reads manifests at startup; it never scans the disk blindly. Modules are loaded only from a path an installer wrote and, on Windows, must be Authenticode-signed once signing exists (a user-writable folder + `LoadLibrary` is an injection vector; macOS signing is on hold). |
+| **Versioning and the compat range** | Apps ship on their own schedule. | `mu_engine_api_version()` (major.minor), `engine_version`, and `state_format_version`. mu-Tronic supports **its own major, any module minor >= the minimum it needs**. A major break is a new function name set (`..._v2`), the host keeps loading v1 for at least two releases. A module whose major is unknown is shown as "update <app>" and not offered. State newer than a module understands is refused with a message (existing "missing means default" covers older). An ABI snapshot test freezes struct sizes and offsets. |
+| **Debug vs Release, Linux** | Separate heaps make Debug/Release mixing harmless with a C ABI. Linux: `dlopen` with hidden visibility and only the exported C symbols; libstdc++ is shared, so the C ABI still applies. macOS on hold. | Same rule. |
+
+### 9.2 Alternatives compared
+
+| | (A) Engine modules, purpose-built C ABI | (B) Host the installed apps' VST3/CLAP plugins inside mu-Tronic | (C) Static libraries in mu-Tronic + licence check (not chosen; reference) |
+|---|---|---|---|
+| Idea | CLAP-like: version query, create layer, render, state, GUI. | `AudioPluginFormatManager`; each layer = a plugin instance of an installed product. | The plan up to this clarification. |
+| Fits "layer" (engine + sequencer + one mixer channel) | Yes: the module is exactly the layer; the mixer, buses, scenes, FX stay host. | **No.** Each instance is a full processor: its own mixer, FX sends/returns, master, transport, up to 8 layers, own editor. 16 instances mean 16 mixers and FX chains; mu-Tronic's strips, buses, scenes and clip alignment would sit on top of duplicates; per-layer sidebar/header integration is lost; a "layer" would be a whole app. | Yes. |
+| UI | Needs child-window embedding and a module processor (9.1). Large. | Free (the plugin editor in a window). | Free (same code). |
+| State, presets, params | Descriptor export + XML state, moderate. | Free (plugin state), but opaque: no cross-layer modulation, no `peer()` for Rumble, no per-layer clip/scene control except through automation. | Free. |
+| Licence | Module wrapper reports supporter flag (9.5). | Automatic (the plugin shows its own Support prompt in its own window). | Needs licence code in the host (section 8). |
+| Needs the extraction programme (E0 to E5) | **Yes**, then a module stage on top. | **No.** | **Yes.** |
+| Formats | Standalone-only mu-Tronic loads modules built from the app's tree; no VST3 needed. | Needs VST3 of every product present (mu-Toni/mu-On are VST3 + CLAP; fine) but couples to plugin-hosting limits (threading, one instance per process issues, host-in-host). | Standalone only. |
+| Effort | Highest of the three (below). | Lowest and available soonest, **but it is a different product** (a plugin rack), not "the voices of the other apps". | Medium (current plan). |
+| Independent release | Needs a stable C ABI discipline forever. | Free (VST3 is the ABI). | Not independent: mu-Tronic must be rebuilt for any engine fix. |
+
+### 9.3 Consequences for the extraction programme
+
+**E0 to E5 still hold, and are still first.** Extracting the layer into a self-contained library inside each product is a prerequisite for (A) and (C) and is
+valuable alone; nothing in this clarification argues for building an ABI before the layers are self-contained. Reasons not to put the ABI into E1:
+the ABI is the interface of the *finished* layer (parameters, state, render, UI), which only exists after a product is extracted; E2 (Toni) is the right place
+to find out what the C boundary really needs; building an ABI first would freeze guesses.
+
+What changes:
+
+1. **E1 stays the in-process contract** (`Layer::render`, `RenderContext`, `RetireBin`), with three added constraints at no cost: (a) `RenderContext` is an exactly-POD,
+   pointer-and-count struct with no JUCE type (C4 already says POD; make `const juce::MidiBuffer&` a view struct that a C struct can mirror); (b) layer state
+   in and out is text (the existing ValueTree XML) and layer-created objects never escape; (c) nothing in `render` calls the host. All three are good design anyway.
+2. **Stage M (module wrapper) exists only if Andy chooses the module model (9.4: not recommended)**; then it runs after E6 and before any mu-Tronic product work, one module per product, in this order: **M0 spike (Toni)**: C ABI header,
+   loader, one Arp layer in a mu-Tronic window with the **embedded native editor**, DPI/focus/overlay behaviour judged by Andy and the `ux-controller`, and a
+   golden equivalence against the app. **The spike is the gate for the whole model**: if the child-window editor is not acceptable, the answer is (C) or a
+   host-drawn UI, decided then. M1 On, M2 Tant, M3 Clid, then the shared pieces.
+3. **Gates added:** (a) `check-layer-boundary.ps1` rule: library files still include no `Plugin/`/`License/`; the **module wrapper** (new folder `Module/` is **not** allowed, since
+   the eight-folder rule stands: it lives in `Plugin/` as `Plugin/EngineModule.{h,cpp}` and the CMake target `mu-<product>-engine` (SHARED), which may include
+   `License/`); (b) `check-module-abi.ps1`: the exported symbols of each built module are exactly the ABI list (`dumpbin /exports`), no C++ in `MuEngineApi.h`;
+   (c) an ABI snapshot test; (d) a **version-skew test** with a frozen old module binary kept under `tests/` loaded by the current host; (e) golden equivalence
+   *through the module loader* (the same goldens, run through the C ABI, tolerance 0, with a per-module allocation probe); (f) a lifetime test (retiree outlives a
+   type change; shutdown order); (g) the loader fuzz case (missing, wrong version, truncated manifest).
+4. **D2/D3 amended:** D2 stays (the library is licence-free and processor-free); D3 becomes "the app runs the library **in-process, statically**; the module is a second
+   build of the same sources behind the C ABI". An app does **not** `dlopen` its own module (it would add a failure path to a live product for no gain); the golden
+   equivalence between the static and the module build is the proof they are the same code.
+5. **Contract shape (`mu-core/Module/MuEngineApi.h`, pure C).** Per module: `get_api_version`, `get_info` (id, display name, group, prefix letter, preset extension,
+   colour token, `engine_version`, `state_format_version`, supporter flag + checkout URL), `get_params(slot-independent descriptors)`, `create(slot, sr, block)` /
+   `destroy`, `bind_params(handle, const float* const* values)`, `render`, `loop_beats`, `preload_staged(handle, xml)`, `on_transport_stopped/jumped`,
+   `get_state/set_state` (XML into caller buffer), `begin_retire` / `tail_blocks`, `render_priority`, `gui_create(handle, native_parent, w, h)`, `gui_resize`, `gui_destroy`, `mod_live`
+   (the 30 Hz UI tables as plain float arrays). Everything has a `size` field and is additive.
+6. **Per-product build, installer, CI, Linux** (each of five products): CMake `mu-<product>-engine` SHARED target from the `mu-<product>-layer` sources + the wrapper;
+   the installer and the release zip add `engine/` plus the manifest write; `release.yml` builds and packages it for Windows and Linux (Linux: hidden visibility, `.so` in the
+   tarball, same manifest); `check-module-abi.ps1` and the loader tests in CI; mu-Tronic's installer **declares dependencies** (it works with zero apps installed: it
+   opens with an empty chooser and a "install an app to get its layers" message).
+7. **Every live app needs a release that contains its module before mu-Tronic can launch.** The earlier A1 answer (no release before E4/E5) still stands, but the first
+   mu-Tronic release is now blocked on a release of each of the four apps (a normal release; the module is additive). Pay-What-You-Want apps that do not yet have
+   the module simply do not appear in the chooser.
+
+**Revised estimate.** The 39 to 61 session range (about 49) covers E0 to E6 and is unchanged. The module model adds: ABI header, loader, manifest, versioning, its tests
+(6 to 10); the headless `ModuleProcessor` and descriptor export (5 to 8); embedded-editor spike (M0, Toni) including DPI, focus and message-loop work (6 to 10);
+three more module wrappers (3 to 6 each, 9 to 18); installer, `release.yml` and Linux packaging for five products (5 to 8); module golden/skew/lifetime tests and
+the allocation probe per module (5 to 9). **Added: about 36 to 63 sessions. New total about 75 to 124 (central about 95)**, more than double. Honest reading: this is
+a different, larger programme than "extract the layers", and the upper bound is dominated by the embedded editor.
+
+**New risks (added to the register as R16 to R22).** R16 child-window UI (overlay z-order, DPI, focus, drag-and-drop) may not meet the family look and feel
+(High/High; the spike exists to find out). R17 independent releases across a frozen ABI force a compatibility burden forever (Medium/High). R18 module + host each with
+their own JUCE message handling in one process (Medium/High). R19 four modules each carry full mu-core and a JUCE copy: memory and load time of 16 layers x private
+services (Medium/Medium). R20 DLL loading from user-writable folders is a security risk until signing exists (Medium/Medium). R21 a live app's release now carries
+a module build as well (Medium/Medium). R22 `AllocationProbe` and the lock probe cannot see across module heaps (Medium/Medium, mitigated per module).
+
+### 9.4 Cost/benefit and recommendation (a call, not an exercise in making loading work)
+
+**What Andy would gain from runtime loading, and how real each gain is:**
+
+| Gain | How much it is worth |
+|---|---|
+| Engine fixes reach mu-Tronic when the user updates the app, without a mu-Tronic release | Real but small. mu-Tronic is freeware with one developer and `release.yml` already builds and packages all products; with static libraries, an engine fix is one extra mu-Tronic build and release, and the code is the same library (no new test). The module model buys this by freezing a C ABI forever. |
+| Independent updates of engines | Same item. Also a liability: mu-Tronic must then run against engines it was never tested with (a skew matrix for ever). |
+| Licence follows the install | Achievable without loading anything: detect the installed apps' manifests/activation state (see 9.5, hybrid). Loading is not needed for it. |
+| Smaller mu-Tronic | Irrelevant for a desktop standalone; four statically linked engines are a few tens of MB at most. |
+| mu-Tronic does not redistribute the engines | A policy point, not an engineering one; the engines are Pay What You Want and the Support prompt is the only thing a key affects. |
+
+**What it costs:** the C ABI and a versioning/compat policy that must hold for every release of five products; the CRT/heap boundary (no `std::`/`juce::` types
+across; opaque handles everywhere); the UI problem, which is the real cliff (a module's JUCE components cannot join the host's tree, so an embedded native child
+window per layer, with overlay z-order, DPI, focus and a second `MessageManager`, or a host-drawn generic UI that abandons the family look); a headless
+`ModuleProcessor` in each module so the unchanged content classes have a `ProcessorBase&`; installer, `release.yml` and Linux packaging for five products; a signing
+question for DLLs loaded from user folders; and a release of every live app before mu-Tronic can launch. Revised estimate: **+36 to +63 sessions on top of the
+39 to 61, total about 75 to 124 (central about 95)**, with the embedded editor dominating the upper bound; new risks R16 to R22 (9.3). That is more than the whole
+extraction programme again, to save one extra mu-Tronic release per engine fix.
+
+**Is (B) better?** No. It is cheap and independent, but each hosted instance is a whole app with its own mixer and FX; it is a plugin rack, not "the voices of the
+other apps", and gives up scenes, buses, `peer()` and clip alignment.
+
+**Recommendation: do not adopt runtime loading. Choose the hybrid:**
+
+1. **Keep E0 to E6 exactly as agreed.** They are needed by every option and valuable alone.
+2. **Static libraries compiled into mu-Tronic (C) behind the layer contract**, as design.md 2.5 and 3.2 say today. Nothing in design.md 2.5, 3.2 or the stage list is superseded.
+3. **Keep a module ABI possible later at zero cost now**: the three constraints of 9.3(1) go into E1 (`RenderContext` mirrors a C struct; layer state in and out is text; no host
+   callback in `render`), plus: library code never returns or stores `juce::` types across its public layer interface where a plain pointer/string would do. No ABI
+   header, no loader, no `ModuleProcessor` is built. If a reason appears (a third-party engine, a store requirement), stage M of 9.3 can be done on top of the finished
+   libraries without redoing the extraction, because the library boundary (D2) is the module boundary.
+4. **Licence follows the install, without loading** (9.5): mu-Tronic detects which apps are installed and supporters from a small manifest each app writes at install and launch, and shows no
+   key entry of its own. This delivers "licence follows the install" and the Support-prompt answer for the cost of a manifest file per app, which is a T1/T9 item,
+   not an E-stage item.
+5. The A12 timing stands (launch when all four engines are ready). The hybrid adds no release dependency on the four apps beyond the ones they would have anyway; the
+   manifest write is one small change per app, made when mu-Tronic T1 starts.
+
+### 9.5 Licence: "follows the install" (answers A14; applies to the hybrid as well as to modules)
+
+Written for the module model; with the recommended hybrid the same holds except that the supporter flag is read from the manifest the **app** writes (the wrapper
+`Plugin/EngineModule.cpp` below becomes the app's own `Plugin/` manifest writer; the engines are linked into mu-Tronic and the layer libraries still contain no licence code).
+
+**Licence state is "the app is installed and activated", and mu-Tronic needs no licence code.** Reasons: keys unlock nothing (no feature limits), the engine is loaded
+from an installed app that Andy's own PWYW/Support flow governs, and a licence check in a host cannot be stronger than that. The licence code (`initLicensing`,
+`SupportPromptPolicy`, the product public key) stays **in the app and, for the supporter flag, in the module wrapper** (`Plugin/EngineModule.cpp` may include `License/`; the
+layer library may not, D2). Detection: the app writes its manifest at install and at every launch, including `supporter` (the result of `isSupporter()`), its
+checkout URL and its content dir (the content dir is user-overridable in app settings, so mu-Tronic must not guess `Documents/TDP/<app>`); mu-Tronic reads the
+manifest. Activation files (`mutant.activation`, `mutant.lic`) are read by the module (inside the app's code, in the app's content dir) so the host never parses them
+and `OnlineActivation`'s missing product-id check stays an app-internal matter (it does not become a cross-product trust issue).
+
+If the app is installed but unlicensed: the engine works fully (no limits). The Support prompt is a **UI element of the layer's app**; mu-Tronic shows one generic,
+low-key prompt per unsupported engine **that is in use** (text and URL from the manifest, policy from `SupportPromptPolicy`, which is pure and lives in mu-core), so the
+prompt does not depend on the user opening the app itself; this is a `ux-controller` decision. If Andy prefers that the prompt appears only inside the apps, mu-Tronic
+shows nothing and the users who never open the apps are never asked. Not installed: the type is not offered. **Freeware mu-Tronic (design 3.1) stays true**: it
+has no key, and design risk 10 (free product carries PWYW engines) is resolved, because the engines are not in it.
+
+### 9.6 The one question for Andy
+
+**Must the engines update independently of mu-Tronic (an engine fix reaching mu-Tronic when the user updates the app, with no mu-Tronic release)?** Recommended
+answer: **no**, mu-Tronic is rebuilt and released when an engine changes; this keeps static libraries, saves about 36 to 63 sessions, and loses nothing else. A yes
+means stage M and the larger estimate. (A follow-up small question, only if the answer is no: should mu-Tronic show a generic Support prompt based on the installed
+apps' manifests, or no prompt at all? That is a T1 decision, not needed before E1.)
 
 ---
 
