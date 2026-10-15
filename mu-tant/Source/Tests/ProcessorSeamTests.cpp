@@ -202,6 +202,7 @@ struct MuTantProcessorSeamTests : juce::UnitTest
         swapTimingDefault();
         constructsAndRendersUnderTempRoot();
         resetLayerEqualsFresh();
+        noiseSeeding();
         resetLayerFromSecondThread();
         resetLayerWithBusyEnvelopeLock();
         layerEditInFlightSkipsRender();
@@ -233,6 +234,65 @@ struct MuTantProcessorSeamTests : juce::UnitTest
             p.releaseResources();
         }
         realFolder.expectUnchanged(*this, "nothing under the real muTant settings / content folders changed");
+    }
+
+    // Noise seeding through the real processor: MU_DETERMINISTIC_NOISE makes two instances render the same
+    // noise (the golden harness relies on it) and a moved / reset slot restart its noise from the slot's seed;
+    // without it two instances must not share noise (they would sum correlated in a DAW).
+    void noiseSeeding()
+    {
+        TempStorage storage;
+        const auto dc = writeWavetable(storage.root, "dc", 0.0f);
+        const int n = 256;
+
+        // A constant oscillator plus full-level noise with the gate open, so noise is the only moving signal.
+        auto patch = [&](ExposedPluginProcessor& p)
+        {
+            patchDcThroughFilterAndInsert(p, dc, 0);
+            setParam(p.apvts, vp(0, "noise_lvl"), 0.0f);
+            bypassGate(p.apvts, 0);
+            p.prepareToPlay(48000.0, n);
+        };
+        // The last four of `blocks` blocks (earlier ones let the parameter smoothers settle).
+        auto tail = [&](ExposedPluginProcessor& p, int blocks)
+        {
+            auto all = renderRun(p, n, blocks);
+            juce::AudioBuffer<float> out(2, 4 * n);
+            for (int c = 0; c < 2; ++c) out.copyFrom(c, 0, all, c, (blocks - 4) * n, 4 * n);
+            return out;
+        };
+        auto same = [&](const juce::AudioBuffer<float>& x, const juce::AudioBuffer<float>& y)
+        {
+            for (int c = 0; c < 2; ++c)
+                for (int i = 0; i < x.getNumSamples(); ++i)
+                    if (x.getSample(c, i) != y.getSample(c, i)) return false;
+            return true;
+        };
+
+        beginTest("Deterministic noise mode: two instances render identical noise; a moved slot restarts its noise like a fresh one");
+        {
+            ScopedEnvVar deterministic("MU_DETERMINISTIC_NOISE", "1");
+            ExposedPluginProcessor a, b;
+            patch(a); patch(b);
+            const auto ta = tail(a, 12), tb = tail(b, 12);
+            expect(peakOf(ta) > 1.0e-3f, "the compared render carries noise");
+            expect(same(ta, tb), "two instances on the same slot render identical noise");
+
+            ExposedPluginProcessor moved, fresh;
+            patch(moved); patch(fresh);
+            renderRun(moved, n, 4);                   // advance the noise stream
+            moved.layersMoved(0, 0);                  // the slot is reset: its noise restarts from the slot's seed
+            const auto tm = tail(moved, 12), tf = tail(fresh, 12);
+            expect(same(tm, tf), "a reseeded slot renders the same noise as a fresh one of that index");
+        }
+
+        beginTest("Live noise mode: two instances on the same slot do not share noise");
+        {
+            ScopedEnvVar live("MU_DETERMINISTIC_NOISE", "");
+            ExposedPluginProcessor a, b;
+            patch(a); patch(b);
+            expect(! same(tail(a, 12), tail(b, 12)), "per-instance salts keep instances uncorrelated");
+        }
     }
 
     void resetLayerEqualsFresh()

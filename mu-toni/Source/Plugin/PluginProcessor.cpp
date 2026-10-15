@@ -462,6 +462,7 @@ std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
 {
     auto a = std::make_unique<Arp>();
     a->runner.setBank(&bank);
+    a->runner.setSlotIndex(slot, noiseSeedSalt);
     const double sr = currentSampleRate.load(std::memory_order_relaxed);
     const int    bs = currentBlockSize.load(std::memory_order_relaxed);
     a->runner.prepare(sr, bs);
@@ -478,6 +479,7 @@ void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
     for (int d = juce::jmax(0, firstIndex); d <= juce::jmin(lastIndex, mu_limits::kMaxLayers - 1); ++d)
     {
         auto& arp = getArp(d);
+        arp.runner.setSlotIndex(d, noiseSeedSalt);
         arp.runner.reset();
         arp.insert->setSlotIndex(d);
         arp.insert->reset();

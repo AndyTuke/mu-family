@@ -245,6 +245,8 @@ private:
     std::array<double, mu_limits::kMaxLayers> blkPatternBeats { 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0 };
 
     WavetableBank                                          bank;
+    // Per-instance noise seed salt, taken before the constructor body builds the voices; 0 when MU_DETERMINISTIC_NOISE is set (golden renders).
+    const juce::int64 noiseSeedSalt = mu_core::makeNoiseSalt();
     std::array<std::unique_ptr<VoiceEngine>, mu_limits::kMaxLayers>   voices;
     // The per-voice insert effect (shared mu-core InsertProcessor) is Pattern::insert — it runs after
     // the gate, before the pan/sum into the mixer (engine → insert → mixer, the family-wide signal flow).

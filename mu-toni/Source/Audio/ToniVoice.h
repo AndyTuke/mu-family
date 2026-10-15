@@ -2,6 +2,7 @@
 
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "Audio/MultiModeFilter.h"          // mu-core (reused unchanged)
+#include "Audio/NoiseSeed.h"               // mu-core: per-slot, per-instance noise seeding
 #include "Audio/Wavetable/XModOscPair.h"   // mu-core: wavetable oscs + 2-lane X-Mod (shared with mu-Tant)
 #include "Scales.h"                           // midiToFreq
 
@@ -61,6 +62,10 @@ class ToniVoice
 {
 public:
     void setBank(const mu_wavetable::WavetableBank* b) noexcept { oscs.setBank(b); }
+
+    // Restarts the noise from the seed for this slot under the instance salt: layers do not share one sequence,
+    // and salt 0 (deterministic mode) makes a slot's noise bit-repeatable.
+    void setSlotIndex(int slot, juce::int64 salt = 0) noexcept { rng.setSeed(mu_core::noiseSeedFor(kNoiseSeed, salt, slot)); }
 
     void prepare(double sampleRate, int blockSize)
     {
@@ -229,7 +234,8 @@ private:
     ToniVoiceParams params;
 
     mu_wavetable::XModOscPair oscs;   // Osc 1 (carrier) + Osc 2 (modulator)
-    juce::Random rng;
+    static constexpr juce::int64 kNoiseSeed = 0x6D75546F;   // "muTo"
+    juce::Random rng { mu_core::noiseSeedFor(kNoiseSeed, 0, 0) };
     MultiModeFilter filter;
     juce::ADSR ampEnv, filterEnv, pitchEnv;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> pitchGlide;
