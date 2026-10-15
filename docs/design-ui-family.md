@@ -253,6 +253,7 @@ The primary parameter control. Rotary knob drawn by `MuLookAndFeel::drawRotarySl
 - **Value display**: `textFromValueFunction` must be set for any non-trivial unit (Hz/kHz formatting, percentage, dB)
 - **Hz params**: use the family-standard formatter (see §6.4)
 - **Callbacks**: use `onValueChanged(double)` for data binding — never override `getSlider().onValueChange` directly
+- **Live modulation arc**: every knob that is a row of the product's `mu_mod::ModTarget` table shows the live arc, bound with `bindModulation(destId, matrix, liveFn)`; `liveFn` returns the post-matrix value in parameter units, or NaN for no arc (transport stopped, other engine). Knob grids build on `KnobWithLabel` (`ParamKnobGrid::Spec` carries the binding), never a bare `juce::Slider`. A new target row means its knob gets the arc.
 
 ### DropdownSelect
 
@@ -773,6 +774,8 @@ The screen half of the Launchpad surface mapping ([design-launchpad.md section 3
 ---
 
 ## Design rulings
+
+- 2026-10-15 - mu-On `ParamKnobGrid` knobs became `KnobWithLabel` (empty label) to carry the modulation arcs (ae91ca7). Ruled: Pass; every table-driven knob shows the live arc, no bare sliders in grids. Changed: §6 KnobWithLabel (Live modulation arc), mu-On design-ui ENGINE box.
 
 - 2026-10-14 - mu-Toni step pattern: the accent cells become Step Off / On / Accented (Andy). Ruled: the shared `StepEditor` gains a generic level-cell mode `setLevelCells(n)` (metal look: each cell a whole lamp lens whose strength is the level, Off `lampOff`, On `lampOn`, Accented new `Lighting::lampAccent` 1.0; playhead = thin ring at new `Lighting::lampPlayheadRing` 0.6 alpha, not extra brightness; gesture: click cycles, Shift+click back, drag paints the first cell's new state), not `setQuantization(3)` (that only snaps bar height). Label "Acc Steps" becomes "Steps". Rests, storage (`stepMask`, default all On) and engine rules in mu-toni/design-sequencer.md. Changed mu-toni/design-ui.md (new), mu-toni/design-sequencer.md, §11 Lamp display row.
 
