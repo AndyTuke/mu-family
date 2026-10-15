@@ -833,7 +833,10 @@ before that, and nothing that is done on stages 6 and 7 makes the answer harder.
 
 **Supersedes the "park" recommendation of Stage 8 above.** Andy asked for mu-Tronic: a fifth product with 16 empty layer slots (paged 1-8 / 9-16), each
 able to hold a layer of any of the four existing types, on the shared mixer, FX and modulation, with buses in the mixer. The full ruling, staged plan
-(T0 to T9) and the questions for Andy are in [mu-tronic/design.md](mu-tronic/design.md). The structural rulings that bind other work:
+(T0 to T9) and the short list still open are in [mu-tronic/design.md](mu-tronic/design.md). **Andy's answers, 2026-10-15:** a fifth product; **Standalone only** (no
+VST3 or CLAP, so no host parameter-list constraint); **freeware** (no licence key, no Support prompt); name mu-Tronic, code `MTrn`; **3 buses with 2 inserts
+each**; every mu-On engine (Kick, Bass, Hat, Snare, Rumble) is its own layer type; scenes; mu-link left as it is; the mu-Clid and mu-Tant extraction (T5, T7)
+waits until after their next releases while mu-Toni and mu-On (pre-release) go first. The structural rulings that bind other work:
 
 - **Layer = voice.** The code and docs keep *layer*; *voice* stays the polyphonic voice inside an engine. A layer is engine + sequencer + modulation + insert + parameters +
   presets / clips + UI content; the mixer strip and the transport are not part of it.
@@ -845,10 +848,19 @@ able to hold a layer of any of the four existing types, on the shared mixer, FX 
   (`tests/scripts/check-layer-boundary.ps1`, to be written in Stage T0). Each product's parameter table is `addLayerParams(layout, slot)` in its `Persistence/`.
 - **Each standalone product moves onto the shared render path** in the same stage in which its layer is extracted, so per-block glue exists once.
 - **Capacity:** `mu_limits::kMaxLayers` is a per-target compile-time constant (`MU_MAX_LAYERS`, default 8; mu-Tronic 16). One constant, one value per binary.
-- **Buses:** `MixerEngine::BusState` (a `ChannelState` plus the layer insert), opt-in count `MU_MAX_BUSES` (default 0, mu-Tronic 4), `ChannelState::busAssign`,
+- **Buses:** `MixerEngine::BusState` (a `ChannelState` plus a chain of `kBusInserts` layer inserts), opt-in compile-time counts `MU_MAX_BUSES` (default 0, mu-Tronic 3) and
+  `MU_BUS_INSERTS` (default 2), `ChannelState::busAssign`,
   graph channels -> buses -> returns -> master, no bus-to-bus, a channel's sidechain source is never a bus. The existing `outputBus` is the DAW direct out and is relabelled
-  "Out" in the UI. All of it is `mu-core`.
-- **mu-link:** coexists; mu-Tronic is a mu-link client; no clock / MIDI-out code is duplicated; retirement is decided after T8.
+  "Out" in the UI (not offered in mu-Tronic). All of it is `mu-core`.
+- **Layer types are finer than products:** the registry lists each mu-On engine (Kick, Bass, Hat, Snare, Rumble) as its own `LayerTypeId` over the one `Track` class
+  (engine locked in mu-Tronic); `LayerTypeInfo::group` names the product for the chooser and `typeFromPreset` picks the type from a preset file. Hence mu-On goes
+  per-layer (engine, step grid, swing/accent) in its own standalone too.
+- **Scenes:** `ProcessorBase::launchScene(n)` and `ControlAction::LaunchScene(n)` launch clip n on every layer in one staged batch; with `PagePrev` / `PageNext` they
+  are generic actions in `mu-core/Control/`.
+- **Product shape:** Standalone-only, freeware product: `FORMATS Standalone`, an empty `License/` (`.gitkeep`), no `LicenseKey.h`. Plugin code `MTrn` (JUCE needs an
+  upper-case letter).
+- **mu-link:** coexists, no freeze, revisit later (Andy: "leave it as is for now"); mu-Tronic is a mu-link client; no clock / MIDI-out code is duplicated.
+- **Timing:** `mu-Toni` and `mu-On` layer extraction may go ahead; `mu-Tant` and `mu-Clid` extraction waits until after their next releases.
 
 ### Shared layer sidebar and layer panel (ruled 2026-10-12, #1505 / #1506)
 

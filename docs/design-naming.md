@@ -31,7 +31,7 @@ Related: the family consistency rule in [CLAUDE.md](../CLAUDE.md), and the platf
 
 Added 2026-10-15 for mu-Tronic ([mu-tronic/design.md §1](mu-tronic/design.md)): Andy's word "voice" for a mu-Tronic slot is a **layer** in code and docs. New terms: **Empty layer**
 (a slot with no type; `LayerTypeId::Empty`), **Page** (eight layers, `kLayersPerPage`, UI and controller only), **Bus** (an internal group strip,
-`BusState`, `busAssign`, parameters `bus{B}_`) and **Direct out** (the DAW output routing `ChannelState::outputBus`, parameter `outBus`, relabelled "Out" in the UI so "bus" has one
+`BusState`, `busAssign`, parameters `bus{B}_`), **Scene** (clip n launched on every layer, `launchScene`) and **Direct out** (the DAW output routing `ChannelState::outputBus`, parameter `outBus`, relabelled "Out" in the UI so "bus" has one
 meaning). Library targets are `mu-<product>-layer`; a host interface for a layer's UI is `<Type>Host`; mu-Clid's engine-carrying layer is `mu_clid::SampleRhythm`.
 
 ### Derived layer types ✔ owner (2026-10-09)
@@ -153,7 +153,7 @@ names. They are modal pop-ups, not `OverlayHost` screens, so the `Overlay` role 
   infrastructure, not an instrument, and keeps its own layout.)
 - **Layer-library files (ruled 2026-10-15):** the files of a product's `Audio/ Sequencer/ Modulation/ Persistence/ UI/` (not `UI/SettingsOverlay.*`) form its
   `mu-<product>-layer` library, which mu-Tronic links. Their **relative path must be unique across `mu-core` and all products' libraries** (`Audio/Scales.h` existed in both
-  mu-Tant and mu-Toni: renamed `TantScales.h` / `ToniScales.h`), none may include a `Plugin/` or `License/` header, and a product's parameter table lives in
+  mu-Tant and mu-Toni: to be renamed `ToniScales.h` in the mu-Toni layer stage and `TantScales.h` in the mu-Tant stage, which waits for mu-Tant's next release), none may include a `Plugin/` or `License/` header, and a product's parameter table lives in
   `Persistence/` (`TrackParams.h` and `LayerParamIds.h` move there from `Plugin/`). Checked by `check-layer-boundary.ps1`.
 - **Capacity constants:** `mu_limits::kMaxLayers` is a per-target compile-time value (`MU_MAX_LAYERS`, default 8, mu-Tronic 16); a product still does not redeclare it.
 - What goes where: `Audio/` the engine (voices, samplers, DSP specific to the product); `Sequencer/` the
@@ -252,8 +252,13 @@ code, manufacturer code, bundle id, CLAP id and state identifier may not (existi
 plugin by them). The MIDI-effect product keeps `MCLt`, `com.transwarp.mu-clid-lite` and `MuClidState`
 under its name, **mu-Clid MIDI** (owner, 2026-10-11).
 
-**mu-Tronic (proposed 2026-10-15, name and plugin code `MTrn` await Andy):** slug `mu-tronic`, namespace `mu_tronic`, state `MuTronicState`, tag `MuTronicPreset`, extension
-`.muTronic`, docs `docs/mu-tronic/`. It has no layer type of its own; its slots hold `Rhythm`, `Pattern`, `Arp` or `Track` (or nothing), so no new layer extension.
+**mu-Tronic (ruled 2026-10-15 with Andy's answers):** display name **mu-Tronic** (the pattern `mu-<Name>` capitalises the name; Andy typed `mu-tronic`, which is the slug),
+slug `mu-tronic`, namespace `mu_tronic`, JUCE `PLUGIN_CODE` **`MTrn`** (JUCE requires four characters with at least one upper-case letter, so `mtrn` is invalid; the family
+codes are `MCld MTnt MTni MuOn MCLt`), manufacturer `TDP1`, bundle id `com.transwarp.mu-tronic`, state `MuTronicState`, tag `MuTronicPreset`, extension `.muTronic`, docs
+`docs/mu-tronic/`. **Standalone only** (`FORMATS Standalone`) and **freeware** (empty `License/`). The codes are now data: they may not change. It has no layer type of
+its own and no new layer extension; its slots hold `Rhythm`, `Pattern`, `Arp`, or one of mu-On's five engines `Kick`, `Bass`, `Hat`, `Snare`, `Rumble` (or nothing). The
+engine ids share `Track`'s prefix `t` and extension `.muTrack`; the `LayerTypeId` identifies the type, the saved engine selects it from a `.muTrack` file
+([mu-tronic/design.md §1.4](mu-tronic/design.md)). Bus parameters are `bus{B}_` with insert parameters `bus{B}_i{I}_`; capacity constants `MU_MAX_LAYERS`, `MU_MAX_BUSES`, `MU_BUS_INSERTS`.
 
 **Product naming pattern.** `mu-<Name>` in prose and artefacts (`mu-Clid`, `mu-Tant`), slug `mu-<name>` in
 folders and targets, namespace `mu_<name>`. A descriptive suffix (`mu-Clid MIDI`) is allowed only for a

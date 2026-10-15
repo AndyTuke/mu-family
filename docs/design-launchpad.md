@@ -476,6 +476,11 @@ The multi-app switching mechanism (what "another app is available" means, how th
 - **Arrows 3 and 4 while a switch is queued step from the queued item**, so two presses skip two; the press that returns to the playing item cancels the queue (this replaces "press the current item to cancel", which had a pad for each item). The status line is unchanged (`Queued` / `4 Acid Line (...)`).
 - **Rest light of 3 and 4 is not full white** (ruled 2026-10-14): a bright-white rest would hide a white press flash, so rest is white x 0.75 (`kArrowRestScale`) and the flash and queued pulse go to full white.
 - **Multi-app arrows 1 and 2 stay dark and inert until stage F1** of the architecture ruling ([design-plugin-family.md, Several apps, one pad](design-plugin-family.md)); until then only one app exists for the pad, so the "only app" rule above always applies.
+- **Pages in mu-Tronic (Andy, 2026-10-15: "the Launchpad will be important for this").** In a product whose layer count exceeds `kLayersPerPage` (mu-Tronic: 16 layers, pages of 8),
+  **buttons 5 and 6 are `PagePrev` / `PageNext`**, not `ClipPrev` / `ClipNext`; the grid rows and the right column then mean the layers of the current page. The rule is derived
+  from the page count (more than one page), never from the product name, so the surface description stays generic. The four existing apps (one page) keep 5 and 6 as in the
+  table. Clips are launched from the grid, so mu-Tronic loses nothing. `PagePrev` / `PageNext` are new device-independent `ControlAction`s ([mu-tronic/design.md §4](mu-tronic/design.md)); scene
+  launch (`LaunchScene(n)`) has no default pad yet, which `ux-controller` proposes (still open).
 - **Provisional, awaiting Andy:** buttons 5 to 7 above, the loss of direct jump to item n, and Performance-mode entry and exit being screen-only. Andy has not adopted any of them yet.
 - **Probe demo.** `ProbeMain.cpp` still shows the old top row; it is stale and the coder should update it to this table.
 - **Direct jump to preset n is gone** (provisional; the eight item pads are replaced by two arrows; Andy's table). The screen's `StepIndicator` still shows all eight lamps. `PerformanceItem(n)` stays in the `ControlAction` vocabulary for MIDI mapping; the Launchpad default no longer uses it.
