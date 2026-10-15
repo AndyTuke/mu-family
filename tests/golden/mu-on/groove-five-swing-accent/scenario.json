@@ -1,0 +1,12 @@
+{
+  "name": "groove-five-swing-accent",
+  "notes": "Kick, Bass, Hat, Snare, Rumble(source Kick); seq_swing 0.35 and seq_accent 0.55 apply to every row.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 96000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 5,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "events": []
+}

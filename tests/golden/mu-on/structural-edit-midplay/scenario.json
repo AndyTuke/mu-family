@@ -1,0 +1,12 @@
+{
+  "name": "structural-edit-midplay",
+  "notes": "Kick and Hat; a Bass track is added (block 40), tracks 0 and 2 swap (block 70), track 1 is removed (block 110).",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 144000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 0,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "events": [{ "block": 40, "label": "addLayer" }, { "block": 70, "label": "swapLayers(0, 2)" }, { "block": 110, "label": "removeLayer(1)" }]
+}

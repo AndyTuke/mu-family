@@ -1,0 +1,12 @@
+{
+  "name": "transport-stop-start-locate",
+  "notes": "Stop at block 40, start at block 55 (same position), locate to beat 9.5 at block 85.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 96000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 2,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "events": [{ "block": 40, "label": "host stops" }, { "block": 55, "label": "host starts" }, { "block": 85, "label": "locate to beat 9.5" }]
+}
