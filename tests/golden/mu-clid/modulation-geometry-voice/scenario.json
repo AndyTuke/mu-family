@@ -1,0 +1,12 @@
+{
+  "name": "modulation-geometry-voice",
+  "notes": "cs0/cs1/cs2 drive ring A hits, rotation and pre-pad of rhythm 0; the cutoff, insert slot 1 and level of rhythm 1; the accent, ring C hits, pan and reverb send of rhythm 2.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 192000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 3,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "events": []
+}

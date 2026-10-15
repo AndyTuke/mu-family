@@ -1,0 +1,12 @@
+{
+  "name": "eight-rhythms-polyrhythm",
+  "notes": "Eight rhythms of 16, 12, 10, 9, 7, 5, 13 and 11 steps on four samples with their own pitch, filter, pan and level; a 32-step master loop.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 200000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 8,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "events": []
+}

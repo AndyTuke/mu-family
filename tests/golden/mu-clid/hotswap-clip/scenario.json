@@ -1,0 +1,12 @@
+{
+  "name": "hotswap-clip",
+  "notes": "Kick and Hat with a stored clip on rhythm 0; the T11 preset is staged on rhythm 1 (block 20), clip 1 is launched on rhythm 0 (block 150), A9_hat is staged on rhythm 0 (block 260). Commits land at each rhythm's loop boundary.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 288000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 0,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "events": [{ "block": 20, "label": "stage T11 on rhythm 1" }, { "block": 150, "label": "launch clip 1 on rhythm 0" }, { "block": 260, "label": "stage A9_hat on rhythm 0" }]
+}

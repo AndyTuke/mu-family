@@ -1,0 +1,542 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<MuClidPreset presetName="" presetDescription="" presetEmbedSamples="0" presetCategory="">
+  <Rhythm name="&lt;unnamed&gt;" colour="0" sample="Kick 01.wav" stepsA="16"
+          hitsA="4" rotA="0" prePadA="0" postPadA="0" insStA="0" insLenA="0"
+          insModeA="false" prePadModeA="false" postPadModeA="false" stepsB="8"
+          hitsB="0" rotB="0" prePadB="0" postPadB="0" insStB="0" insLenB="0"
+          insModeB="false" prePadModeB="false" postPadModeB="false" stepsC="8"
+          hitsC="0" rotC="0" prePadC="0" postPadC="0" insStC="0" insLenC="0"
+          insModeC="false" prePadModeC="false" postPadModeC="false" logic="OR"
+          patLeg="false" vMono="false" rstSt="-1" pitchOct="0" pitchSemi="0"
+          pitchFine="0" pEnvAtk="0.004999999888241291" pEnvDec="0.1000000908970833"
+          pEnvSus="0.0" pEnvRel="0.1000000908970833" pEnvDep="0.0" fltType="LP12"
+          fltCut="8000.0009765625" fltRes="0.2000000029802322" fEnvAtk="0.009999999776482582"
+          fEnvDec="0.3000000417232513" fEnvSus="0.0" fEnvRel="0.3000000417232513"
+          fEnvDep="0.0" fltLoCut="0.0" fltDrv="0.0" ampLvl="0.0" aEnvAtk="0.004999999888241291"
+          aEnvDec="0.3000000417232513" aEnvSus="80.0" aEnvRel="0.4999999701976776"
+          accentDb="0.0" drvChar="None" insP1="0.0" insP2="0.0" insP3="0.0"
+          insP4="0.0" outMode="0" midiNote="36" midiChan="1" midiVel="100"
+          midiAccent="0" ch_lvl="1.0" ch_pan="0.5" ch_mute="0.0" ch_solo="0.0"
+          ch_sendEff="0.2000000029802322" ch_sendDly="0.0" ch_sendRev="0.0"
+          ch_scSrc="0.0" ch_scAmt="0.0" ch_scAtk="0.008016032166779041"
+          ch_scRel="0.04522613063454628" ch_outBus="0.0">
+    <Modulators depthUnits="range" padDepthUnits="knobMax">
+      <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    </Modulators>
+  </Rhythm>
+  <Rhythm name="Rhythm 2" colour="1" sample="Synth C 01.wav" stepsA="16"
+          hitsA="8" rotA="0" prePadA="0" postPadA="0" insStA="0" insLenA="0"
+          insModeA="false" prePadModeA="false" postPadModeA="false" stepsB="8"
+          hitsB="0" rotB="0" prePadB="0" postPadB="0" insStB="0" insLenB="0"
+          insModeB="false" prePadModeB="false" postPadModeB="false" stepsC="8"
+          hitsC="0" rotC="0" prePadC="0" postPadC="0" insStC="0" insLenC="0"
+          insModeC="false" prePadModeC="false" postPadModeC="false" logic="OR"
+          patLeg="false" vMono="false" rstSt="-1" pitchOct="0" pitchSemi="0"
+          pitchFine="0" pEnvAtk="0.004999999888241291" pEnvDec="0.1000000908970833"
+          pEnvSus="0.0" pEnvRel="0.1000000908970833" pEnvDep="0.0" fltType="LP12"
+          fltCut="8000.0009765625" fltRes="0.2000000029802322" fEnvAtk="0.009999999776482582"
+          fEnvDec="0.3000000417232513" fEnvSus="0.0" fEnvRel="0.3000000417232513"
+          fEnvDep="0.0" fltLoCut="0.0" fltDrv="0.0" ampLvl="0.0" aEnvAtk="0.004999999888241291"
+          aEnvDec="0.3000000417232513" aEnvSus="80.0" aEnvRel="0.9999999403953552"
+          accentDb="0.0" drvChar="None" insP1="0.0" insP2="0.0" insP3="0.0"
+          insP4="0.0" outMode="0" midiNote="36" midiChan="1" midiVel="100"
+          midiAccent="0" ch_lvl="1.0" ch_pan="0.5" ch_mute="0.0" ch_solo="0.0"
+          ch_sendEff="0.0" ch_sendDly="0.0" ch_sendRev="0.0" ch_scSrc="0.1111111119389534"
+          ch_scAmt="0.8500000238418579" ch_scAtk="0.004008016083389521"
+          ch_scRel="0.08542713522911072" ch_outBus="0.0">
+    <Modulators depthUnits="range" padDepthUnits="knobMax">
+      <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    </Modulators>
+  </Rhythm>
+  <Rhythm name="Rhythm 3" colour="2" sample="Hat 01.wav" stepsA="16" hitsA="11"
+          rotA="0" prePadA="0" postPadA="0" insStA="0" insLenA="0" insModeA="false"
+          prePadModeA="false" postPadModeA="false" stepsB="8" hitsB="0"
+          rotB="0" prePadB="0" postPadB="0" insStB="0" insLenB="0" insModeB="false"
+          prePadModeB="false" postPadModeB="false" stepsC="8" hitsC="0"
+          rotC="0" prePadC="0" postPadC="0" insStC="0" insLenC="0" insModeC="false"
+          prePadModeC="false" postPadModeC="false" logic="OR" patLeg="false"
+          vMono="false" rstSt="-1" pitchOct="0" pitchSemi="0" pitchFine="0"
+          pEnvAtk="0.004999999888241291" pEnvDec="0.1000000908970833" pEnvSus="0.0"
+          pEnvRel="0.1000000908970833" pEnvDep="0.0" fltType="LP12" fltCut="8000.0009765625"
+          fltRes="0.2000000029802322" fEnvAtk="0.009999999776482582" fEnvDec="0.3000000417232513"
+          fEnvSus="0.0" fEnvRel="0.3000000417232513" fEnvDep="0.0" fltLoCut="0.0"
+          fltDrv="0.0" ampLvl="0.0" aEnvAtk="0.004999999888241291" aEnvDec="0.3000000417232513"
+          aEnvSus="80.0" aEnvRel="0.4999999701976776" accentDb="0.0" drvChar="None"
+          insP1="0.0" insP2="0.0" insP3="0.0" insP4="0.0" outMode="0" midiNote="36"
+          midiChan="1" midiVel="100" midiAccent="0" ch_lvl="1.0" ch_pan="0.5"
+          ch_mute="0.0" ch_solo="0.0" ch_sendEff="0.300000011920929" ch_sendDly="0.4000000059604645"
+          ch_sendRev="0.5" ch_scSrc="0.0" ch_scAmt="0.0" ch_scAtk="0.008016032166779041"
+          ch_scRel="0.04522613063454628" ch_outBus="0.0">
+    <Modulators depthUnits="range" padDepthUnits="knobMax">
+      <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+      <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    </Modulators>
+  </Rhythm>
+  <GlobalState eff_algo="chorus" eff_en="true" eff_p0="0.5" eff_p1="0.5" eff_p2="0.5"
+               eff_p3="0.5" eff_p4="0.5" dly_en="true" dly_mode="true" dly_ms="250.0"
+               dly_syncDenom="2" dly_syncDot="true" dly_syncTrip="false" dly_count="1"
+               dly_fb="0.300000011920929" dly_spread="0.0" dly_dirt="0.0" rev_algo="hall"
+               rev_en="true" rev_lvl="1.0" rev_size="0.75" rev_pre="25.0" rev_diff="0.800000011920929"
+               rev_damp="0.300000011920929" rev_mod="0.1500000059604645" rev_dirt="0.0"
+               eff2dly="0.0" eff2rev="0.0" dly2rev="0.0" echo_en="true" echo_mode="0.0"
+               echo_ms="250.0" echo_syncDenom="2" echo_syncDot="false" echo_syncTrip="false"
+               echo_count="1" echo_fb="0.449999988079071" echo_spread="0.0"
+               echo_dirt="0.0" ret_eff_lvl="0.75" ret_eff_pan="0.0" ret_eff_mute="false"
+               ret_eff_solo="false" ret_eff_scSrc="0" ret_eff_scAmt="0.0" ret_eff_scAtk="5.0"
+               ret_eff_scRel="100.0" ret_dly_lvl="0.6000000238418579" ret_dly_pan="0.0"
+               ret_dly_mute="false" ret_dly_solo="false" ret_dly_scSrc="0" ret_dly_scAmt="0.0"
+               ret_dly_scAtk="5.0" ret_dly_scRel="100.0" ret_rev_lvl="0.800000011920929"
+               ret_rev_pan="0.0" ret_rev_mute="false" ret_rev_solo="false" ret_rev_scSrc="0"
+               ret_rev_scAmt="0.0" ret_rev_scAtk="5.0" ret_rev_scRel="100.0"
+               mstr_lvl="1.0" mstr_pan="0.0" mstrLoop="0" mstr_swap="0" mst_insChar="TapeSat"
+               mst_insP1="0.550000011920929" mst_insP2="0.4000000059604645"
+               mst_insP3="0.0" mst_insP4="0.0" mst_ins2Char="Compressor" mst_ins2P1="0.5"
+               mst_ins2P2="0.5" mst_ins2P3="0.0" mst_ins2P4="0.0"/>
+  <SessionParams>
+    <p id="r3_stepsA" x="8.0"/>
+    <p id="r3_hitsA" x="0.0"/>
+    <p id="r3_rotA" x="0.0"/>
+    <p id="r3_prePadA" x="0.0"/>
+    <p id="r3_postPadA" x="0.0"/>
+    <p id="r3_insStA" x="0.0"/>
+    <p id="r3_insLenA" x="0.0"/>
+    <p id="r3_insModeA" x="0.0"/>
+    <p id="r3_prePadModeA" x="0.0"/>
+    <p id="r3_postPadModeA" x="0.0"/>
+    <p id="r3_stepsB" x="8.0"/>
+    <p id="r3_hitsB" x="0.0"/>
+    <p id="r3_rotB" x="0.0"/>
+    <p id="r3_prePadB" x="0.0"/>
+    <p id="r3_postPadB" x="0.0"/>
+    <p id="r3_insStB" x="0.0"/>
+    <p id="r3_insLenB" x="0.0"/>
+    <p id="r3_insModeB" x="0.0"/>
+    <p id="r3_prePadModeB" x="0.0"/>
+    <p id="r3_postPadModeB" x="0.0"/>
+    <p id="r3_stepsC" x="8.0"/>
+    <p id="r3_hitsC" x="0.0"/>
+    <p id="r3_rotC" x="0.0"/>
+    <p id="r3_prePadC" x="0.0"/>
+    <p id="r3_postPadC" x="0.0"/>
+    <p id="r3_insStC" x="0.0"/>
+    <p id="r3_insLenC" x="0.0"/>
+    <p id="r3_insModeC" x="0.0"/>
+    <p id="r3_prePadModeC" x="0.0"/>
+    <p id="r3_postPadModeC" x="0.0"/>
+    <p id="r3_logic" x="0.0"/>
+    <p id="r3_patLeg" x="0.0"/>
+    <p id="r3_vMono" x="0.0"/>
+    <p id="r3_rstSt" x="-1.0"/>
+    <p id="r3_pitchOct" x="0.0"/>
+    <p id="r3_pitchSemi" x="0.0"/>
+    <p id="r3_pitchFine" x="0.0"/>
+    <p id="r3_pEnvAtk" x="0.0"/>
+    <p id="r3_pEnvDec" x="0.03000001236796379"/>
+    <p id="r3_pEnvSus" x="0.0"/>
+    <p id="r3_pEnvRel" x="0.03000001236796379"/>
+    <p id="r3_pEnvDep" x="0.0"/>
+    <p id="r3_fltType" x="0.0"/>
+    <p id="r3_fltCut" x="8000.0009765625"/>
+    <p id="r3_fltRes" x="0.2000000029802322"/>
+    <p id="r3_fEnvAtk" x="0.03000001236796379"/>
+    <p id="r3_fEnvDec" x="0.08999999612569809"/>
+    <p id="r3_fEnvSus" x="0.0"/>
+    <p id="r3_fEnvRel" x="0.08999999612569809"/>
+    <p id="r3_fEnvDep" x="0.0"/>
+    <p id="r3_fltLoCut" x="0.0"/>
+    <p id="r3_fltDrv" x="0.0"/>
+    <p id="r3_ampLvl" x="0.0"/>
+    <p id="r3_aEnvAtk" x="0.004999999888241291"/>
+    <p id="r3_aEnvDec" x="0.3000000417232513"/>
+    <p id="r3_aEnvSus" x="80.0"/>
+    <p id="r3_aEnvRel" x="0.4999999701976776"/>
+    <p id="r3_accentDb" x="0.0"/>
+    <p id="r3_drvChar" x="0.0"/>
+    <p id="r3_insP1" x="0.0"/>
+    <p id="r3_insP2" x="0.0"/>
+    <p id="r3_insP3" x="0.0"/>
+    <p id="r3_insP4" x="0.0"/>
+    <p id="r3_outMode" x="0.0"/>
+    <p id="r3_midiNote" x="36.0"/>
+    <p id="r3_midiChan" x="1.0"/>
+    <p id="r3_midiVel" x="100.0"/>
+    <p id="r3_midiAccent" x="0.0"/>
+    <p id="r4_stepsA" x="8.0"/>
+    <p id="r4_hitsA" x="0.0"/>
+    <p id="r4_rotA" x="0.0"/>
+    <p id="r4_prePadA" x="0.0"/>
+    <p id="r4_postPadA" x="0.0"/>
+    <p id="r4_insStA" x="0.0"/>
+    <p id="r4_insLenA" x="0.0"/>
+    <p id="r4_insModeA" x="0.0"/>
+    <p id="r4_prePadModeA" x="0.0"/>
+    <p id="r4_postPadModeA" x="0.0"/>
+    <p id="r4_stepsB" x="8.0"/>
+    <p id="r4_hitsB" x="0.0"/>
+    <p id="r4_rotB" x="0.0"/>
+    <p id="r4_prePadB" x="0.0"/>
+    <p id="r4_postPadB" x="0.0"/>
+    <p id="r4_insStB" x="0.0"/>
+    <p id="r4_insLenB" x="0.0"/>
+    <p id="r4_insModeB" x="0.0"/>
+    <p id="r4_prePadModeB" x="0.0"/>
+    <p id="r4_postPadModeB" x="0.0"/>
+    <p id="r4_stepsC" x="8.0"/>
+    <p id="r4_hitsC" x="0.0"/>
+    <p id="r4_rotC" x="0.0"/>
+    <p id="r4_prePadC" x="0.0"/>
+    <p id="r4_postPadC" x="0.0"/>
+    <p id="r4_insStC" x="0.0"/>
+    <p id="r4_insLenC" x="0.0"/>
+    <p id="r4_insModeC" x="0.0"/>
+    <p id="r4_prePadModeC" x="0.0"/>
+    <p id="r4_postPadModeC" x="0.0"/>
+    <p id="r4_logic" x="0.0"/>
+    <p id="r4_patLeg" x="0.0"/>
+    <p id="r4_vMono" x="0.0"/>
+    <p id="r4_rstSt" x="-1.0"/>
+    <p id="r4_pitchOct" x="0.0"/>
+    <p id="r4_pitchSemi" x="0.0"/>
+    <p id="r4_pitchFine" x="0.0"/>
+    <p id="r4_pEnvAtk" x="0.0"/>
+    <p id="r4_pEnvDec" x="0.03000001236796379"/>
+    <p id="r4_pEnvSus" x="0.0"/>
+    <p id="r4_pEnvRel" x="0.03000001236796379"/>
+    <p id="r4_pEnvDep" x="0.0"/>
+    <p id="r4_fltType" x="0.0"/>
+    <p id="r4_fltCut" x="8000.0009765625"/>
+    <p id="r4_fltRes" x="0.2000000029802322"/>
+    <p id="r4_fEnvAtk" x="0.03000001236796379"/>
+    <p id="r4_fEnvDec" x="0.08999999612569809"/>
+    <p id="r4_fEnvSus" x="0.0"/>
+    <p id="r4_fEnvRel" x="0.08999999612569809"/>
+    <p id="r4_fEnvDep" x="0.0"/>
+    <p id="r4_fltLoCut" x="0.0"/>
+    <p id="r4_fltDrv" x="0.0"/>
+    <p id="r4_ampLvl" x="0.0"/>
+    <p id="r4_aEnvAtk" x="0.004999999888241291"/>
+    <p id="r4_aEnvDec" x="0.3000000417232513"/>
+    <p id="r4_aEnvSus" x="80.0"/>
+    <p id="r4_aEnvRel" x="0.4999999701976776"/>
+    <p id="r4_accentDb" x="0.0"/>
+    <p id="r4_drvChar" x="0.0"/>
+    <p id="r4_insP1" x="0.0"/>
+    <p id="r4_insP2" x="0.0"/>
+    <p id="r4_insP3" x="0.0"/>
+    <p id="r4_insP4" x="0.0"/>
+    <p id="r4_outMode" x="0.0"/>
+    <p id="r4_midiNote" x="36.0"/>
+    <p id="r4_midiChan" x="1.0"/>
+    <p id="r4_midiVel" x="100.0"/>
+    <p id="r4_midiAccent" x="0.0"/>
+    <p id="r5_stepsA" x="8.0"/>
+    <p id="r5_hitsA" x="0.0"/>
+    <p id="r5_rotA" x="0.0"/>
+    <p id="r5_prePadA" x="0.0"/>
+    <p id="r5_postPadA" x="0.0"/>
+    <p id="r5_insStA" x="0.0"/>
+    <p id="r5_insLenA" x="0.0"/>
+    <p id="r5_insModeA" x="0.0"/>
+    <p id="r5_prePadModeA" x="0.0"/>
+    <p id="r5_postPadModeA" x="0.0"/>
+    <p id="r5_stepsB" x="8.0"/>
+    <p id="r5_hitsB" x="0.0"/>
+    <p id="r5_rotB" x="0.0"/>
+    <p id="r5_prePadB" x="0.0"/>
+    <p id="r5_postPadB" x="0.0"/>
+    <p id="r5_insStB" x="0.0"/>
+    <p id="r5_insLenB" x="0.0"/>
+    <p id="r5_insModeB" x="0.0"/>
+    <p id="r5_prePadModeB" x="0.0"/>
+    <p id="r5_postPadModeB" x="0.0"/>
+    <p id="r5_stepsC" x="8.0"/>
+    <p id="r5_hitsC" x="0.0"/>
+    <p id="r5_rotC" x="0.0"/>
+    <p id="r5_prePadC" x="0.0"/>
+    <p id="r5_postPadC" x="0.0"/>
+    <p id="r5_insStC" x="0.0"/>
+    <p id="r5_insLenC" x="0.0"/>
+    <p id="r5_insModeC" x="0.0"/>
+    <p id="r5_prePadModeC" x="0.0"/>
+    <p id="r5_postPadModeC" x="0.0"/>
+    <p id="r5_logic" x="0.0"/>
+    <p id="r5_patLeg" x="0.0"/>
+    <p id="r5_vMono" x="0.0"/>
+    <p id="r5_rstSt" x="-1.0"/>
+    <p id="r5_pitchOct" x="0.0"/>
+    <p id="r5_pitchSemi" x="0.0"/>
+    <p id="r5_pitchFine" x="0.0"/>
+    <p id="r5_pEnvAtk" x="0.0"/>
+    <p id="r5_pEnvDec" x="0.03000001236796379"/>
+    <p id="r5_pEnvSus" x="0.0"/>
+    <p id="r5_pEnvRel" x="0.03000001236796379"/>
+    <p id="r5_pEnvDep" x="0.0"/>
+    <p id="r5_fltType" x="0.0"/>
+    <p id="r5_fltCut" x="8000.0009765625"/>
+    <p id="r5_fltRes" x="0.2000000029802322"/>
+    <p id="r5_fEnvAtk" x="0.03000001236796379"/>
+    <p id="r5_fEnvDec" x="0.08999999612569809"/>
+    <p id="r5_fEnvSus" x="0.0"/>
+    <p id="r5_fEnvRel" x="0.08999999612569809"/>
+    <p id="r5_fEnvDep" x="0.0"/>
+    <p id="r5_fltLoCut" x="0.0"/>
+    <p id="r5_fltDrv" x="0.0"/>
+    <p id="r5_ampLvl" x="0.0"/>
+    <p id="r5_aEnvAtk" x="0.004999999888241291"/>
+    <p id="r5_aEnvDec" x="0.3000000417232513"/>
+    <p id="r5_aEnvSus" x="80.0"/>
+    <p id="r5_aEnvRel" x="0.4999999701976776"/>
+    <p id="r5_accentDb" x="0.0"/>
+    <p id="r5_drvChar" x="0.0"/>
+    <p id="r5_insP1" x="0.0"/>
+    <p id="r5_insP2" x="0.0"/>
+    <p id="r5_insP3" x="0.0"/>
+    <p id="r5_insP4" x="0.0"/>
+    <p id="r5_outMode" x="0.0"/>
+    <p id="r5_midiNote" x="36.0"/>
+    <p id="r5_midiChan" x="1.0"/>
+    <p id="r5_midiVel" x="100.0"/>
+    <p id="r5_midiAccent" x="0.0"/>
+    <p id="r6_stepsA" x="8.0"/>
+    <p id="r6_hitsA" x="0.0"/>
+    <p id="r6_rotA" x="0.0"/>
+    <p id="r6_prePadA" x="0.0"/>
+    <p id="r6_postPadA" x="0.0"/>
+    <p id="r6_insStA" x="0.0"/>
+    <p id="r6_insLenA" x="0.0"/>
+    <p id="r6_insModeA" x="0.0"/>
+    <p id="r6_prePadModeA" x="0.0"/>
+    <p id="r6_postPadModeA" x="0.0"/>
+    <p id="r6_stepsB" x="8.0"/>
+    <p id="r6_hitsB" x="0.0"/>
+    <p id="r6_rotB" x="0.0"/>
+    <p id="r6_prePadB" x="0.0"/>
+    <p id="r6_postPadB" x="0.0"/>
+    <p id="r6_insStB" x="0.0"/>
+    <p id="r6_insLenB" x="0.0"/>
+    <p id="r6_insModeB" x="0.0"/>
+    <p id="r6_prePadModeB" x="0.0"/>
+    <p id="r6_postPadModeB" x="0.0"/>
+    <p id="r6_stepsC" x="8.0"/>
+    <p id="r6_hitsC" x="0.0"/>
+    <p id="r6_rotC" x="0.0"/>
+    <p id="r6_prePadC" x="0.0"/>
+    <p id="r6_postPadC" x="0.0"/>
+    <p id="r6_insStC" x="0.0"/>
+    <p id="r6_insLenC" x="0.0"/>
+    <p id="r6_insModeC" x="0.0"/>
+    <p id="r6_prePadModeC" x="0.0"/>
+    <p id="r6_postPadModeC" x="0.0"/>
+    <p id="r6_logic" x="0.0"/>
+    <p id="r6_patLeg" x="0.0"/>
+    <p id="r6_vMono" x="0.0"/>
+    <p id="r6_rstSt" x="-1.0"/>
+    <p id="r6_pitchOct" x="0.0"/>
+    <p id="r6_pitchSemi" x="0.0"/>
+    <p id="r6_pitchFine" x="0.0"/>
+    <p id="r6_pEnvAtk" x="0.0"/>
+    <p id="r6_pEnvDec" x="0.03000001236796379"/>
+    <p id="r6_pEnvSus" x="0.0"/>
+    <p id="r6_pEnvRel" x="0.03000001236796379"/>
+    <p id="r6_pEnvDep" x="0.0"/>
+    <p id="r6_fltType" x="0.0"/>
+    <p id="r6_fltCut" x="8000.0009765625"/>
+    <p id="r6_fltRes" x="0.2000000029802322"/>
+    <p id="r6_fEnvAtk" x="0.03000001236796379"/>
+    <p id="r6_fEnvDec" x="0.08999999612569809"/>
+    <p id="r6_fEnvSus" x="0.0"/>
+    <p id="r6_fEnvRel" x="0.08999999612569809"/>
+    <p id="r6_fEnvDep" x="0.0"/>
+    <p id="r6_fltLoCut" x="0.0"/>
+    <p id="r6_fltDrv" x="0.0"/>
+    <p id="r6_ampLvl" x="0.0"/>
+    <p id="r6_aEnvAtk" x="0.004999999888241291"/>
+    <p id="r6_aEnvDec" x="0.3000000417232513"/>
+    <p id="r6_aEnvSus" x="80.0"/>
+    <p id="r6_aEnvRel" x="0.4999999701976776"/>
+    <p id="r6_accentDb" x="0.0"/>
+    <p id="r6_drvChar" x="0.0"/>
+    <p id="r6_insP1" x="0.0"/>
+    <p id="r6_insP2" x="0.0"/>
+    <p id="r6_insP3" x="0.0"/>
+    <p id="r6_insP4" x="0.0"/>
+    <p id="r6_outMode" x="0.0"/>
+    <p id="r6_midiNote" x="36.0"/>
+    <p id="r6_midiChan" x="1.0"/>
+    <p id="r6_midiVel" x="100.0"/>
+    <p id="r6_midiAccent" x="0.0"/>
+    <p id="r7_stepsA" x="8.0"/>
+    <p id="r7_hitsA" x="0.0"/>
+    <p id="r7_rotA" x="0.0"/>
+    <p id="r7_prePadA" x="0.0"/>
+    <p id="r7_postPadA" x="0.0"/>
+    <p id="r7_insStA" x="0.0"/>
+    <p id="r7_insLenA" x="0.0"/>
+    <p id="r7_insModeA" x="0.0"/>
+    <p id="r7_prePadModeA" x="0.0"/>
+    <p id="r7_postPadModeA" x="0.0"/>
+    <p id="r7_stepsB" x="8.0"/>
+    <p id="r7_hitsB" x="0.0"/>
+    <p id="r7_rotB" x="0.0"/>
+    <p id="r7_prePadB" x="0.0"/>
+    <p id="r7_postPadB" x="0.0"/>
+    <p id="r7_insStB" x="0.0"/>
+    <p id="r7_insLenB" x="0.0"/>
+    <p id="r7_insModeB" x="0.0"/>
+    <p id="r7_prePadModeB" x="0.0"/>
+    <p id="r7_postPadModeB" x="0.0"/>
+    <p id="r7_stepsC" x="8.0"/>
+    <p id="r7_hitsC" x="0.0"/>
+    <p id="r7_rotC" x="0.0"/>
+    <p id="r7_prePadC" x="0.0"/>
+    <p id="r7_postPadC" x="0.0"/>
+    <p id="r7_insStC" x="0.0"/>
+    <p id="r7_insLenC" x="0.0"/>
+    <p id="r7_insModeC" x="0.0"/>
+    <p id="r7_prePadModeC" x="0.0"/>
+    <p id="r7_postPadModeC" x="0.0"/>
+    <p id="r7_logic" x="0.0"/>
+    <p id="r7_patLeg" x="0.0"/>
+    <p id="r7_vMono" x="0.0"/>
+    <p id="r7_rstSt" x="-1.0"/>
+    <p id="r7_pitchOct" x="0.0"/>
+    <p id="r7_pitchSemi" x="0.0"/>
+    <p id="r7_pitchFine" x="0.0"/>
+    <p id="r7_pEnvAtk" x="0.0"/>
+    <p id="r7_pEnvDec" x="0.03000001236796379"/>
+    <p id="r7_pEnvSus" x="0.0"/>
+    <p id="r7_pEnvRel" x="0.03000001236796379"/>
+    <p id="r7_pEnvDep" x="0.0"/>
+    <p id="r7_fltType" x="0.0"/>
+    <p id="r7_fltCut" x="8000.0009765625"/>
+    <p id="r7_fltRes" x="0.2000000029802322"/>
+    <p id="r7_fEnvAtk" x="0.03000001236796379"/>
+    <p id="r7_fEnvDec" x="0.08999999612569809"/>
+    <p id="r7_fEnvSus" x="0.0"/>
+    <p id="r7_fEnvRel" x="0.08999999612569809"/>
+    <p id="r7_fEnvDep" x="0.0"/>
+    <p id="r7_fltLoCut" x="0.0"/>
+    <p id="r7_fltDrv" x="0.0"/>
+    <p id="r7_ampLvl" x="0.0"/>
+    <p id="r7_aEnvAtk" x="0.004999999888241291"/>
+    <p id="r7_aEnvDec" x="0.3000000417232513"/>
+    <p id="r7_aEnvSus" x="80.0"/>
+    <p id="r7_aEnvRel" x="0.4999999701976776"/>
+    <p id="r7_accentDb" x="0.0"/>
+    <p id="r7_drvChar" x="0.0"/>
+    <p id="r7_insP1" x="0.0"/>
+    <p id="r7_insP2" x="0.0"/>
+    <p id="r7_insP3" x="0.0"/>
+    <p id="r7_insP4" x="0.0"/>
+    <p id="r7_outMode" x="0.0"/>
+    <p id="r7_midiNote" x="36.0"/>
+    <p id="r7_midiChan" x="1.0"/>
+    <p id="r7_midiVel" x="100.0"/>
+    <p id="r7_midiAccent" x="0.0"/>
+    <p id="ch3_lvl" x="1.0"/>
+    <p id="ch3_pan" x="0.0"/>
+    <p id="ch3_mute" x="0.0"/>
+    <p id="ch3_solo" x="0.0"/>
+    <p id="ch3_sendEff" x="0.0"/>
+    <p id="ch3_sendDly" x="0.0"/>
+    <p id="ch3_sendRev" x="0.0"/>
+    <p id="ch3_scSrc" x="0.0"/>
+    <p id="ch3_scAmt" x="0.0"/>
+    <p id="ch3_scAtk" x="5.0"/>
+    <p id="ch3_scRel" x="100.0"/>
+    <p id="ch3_outBus" x="0.0"/>
+    <p id="ch4_lvl" x="1.0"/>
+    <p id="ch4_pan" x="0.0"/>
+    <p id="ch4_mute" x="0.0"/>
+    <p id="ch4_solo" x="0.0"/>
+    <p id="ch4_sendEff" x="0.0"/>
+    <p id="ch4_sendDly" x="0.0"/>
+    <p id="ch4_sendRev" x="0.0"/>
+    <p id="ch4_scSrc" x="0.0"/>
+    <p id="ch4_scAmt" x="0.0"/>
+    <p id="ch4_scAtk" x="5.0"/>
+    <p id="ch4_scRel" x="100.0"/>
+    <p id="ch4_outBus" x="0.0"/>
+    <p id="ch5_lvl" x="1.0"/>
+    <p id="ch5_pan" x="0.0"/>
+    <p id="ch5_mute" x="0.0"/>
+    <p id="ch5_solo" x="0.0"/>
+    <p id="ch5_sendEff" x="0.0"/>
+    <p id="ch5_sendDly" x="0.0"/>
+    <p id="ch5_sendRev" x="0.0"/>
+    <p id="ch5_scSrc" x="0.0"/>
+    <p id="ch5_scAmt" x="0.0"/>
+    <p id="ch5_scAtk" x="5.0"/>
+    <p id="ch5_scRel" x="100.0"/>
+    <p id="ch5_outBus" x="0.0"/>
+    <p id="ch6_lvl" x="1.0"/>
+    <p id="ch6_pan" x="0.0"/>
+    <p id="ch6_mute" x="0.0"/>
+    <p id="ch6_solo" x="0.0"/>
+    <p id="ch6_sendEff" x="0.0"/>
+    <p id="ch6_sendDly" x="0.0"/>
+    <p id="ch6_sendRev" x="0.0"/>
+    <p id="ch6_scSrc" x="0.0"/>
+    <p id="ch6_scAmt" x="0.0"/>
+    <p id="ch6_scAtk" x="5.0"/>
+    <p id="ch6_scRel" x="100.0"/>
+    <p id="ch6_outBus" x="0.0"/>
+    <p id="ch7_lvl" x="1.0"/>
+    <p id="ch7_pan" x="0.0"/>
+    <p id="ch7_mute" x="0.0"/>
+    <p id="ch7_solo" x="0.0"/>
+    <p id="ch7_sendEff" x="0.0"/>
+    <p id="ch7_sendDly" x="0.0"/>
+    <p id="ch7_sendRev" x="0.0"/>
+    <p id="ch7_scSrc" x="0.0"/>
+    <p id="ch7_scAmt" x="0.0"/>
+    <p id="ch7_scAtk" x="5.0"/>
+    <p id="ch7_scRel" x="100.0"/>
+    <p id="ch7_outBus" x="0.0"/>
+  </SessionParams>
+</MuClidPreset>
