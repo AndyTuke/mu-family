@@ -81,7 +81,7 @@ jobs:
 
       - name: Build plugins + Standalone + tests
         run: >
-          cmake --build build --config Debug --parallel --target
+          cmake --build build --config Debug --parallel 4 --target
           mu-clid_VST3 mu-clid_CLAP mu-clid_Standalone mu-clid-midi_VST3
           mu-tant_VST3 mu-tant_CLAP mu-tant_Standalone
           mu-on_VST3 mu-on_CLAP mu-on_Standalone
@@ -91,7 +91,7 @@ jobs:
 
       - name: Build mu-link (Windows only)
         if: runner.os == 'Windows'
-        run: cmake --build build --config Debug --parallel --target mu-link mu-link-server mu-link-tone mu-link-harness mu-link-tests
+        run: cmake --build build --config Debug --parallel 4 --target mu-link mu-link-server mu-link-tone mu-link-harness mu-link-tests
 
       # (macOS build + AU + universal lipo + auval + render evidence pack live in
       # mac-validate.yml — workflow_dispatch only, to avoid the 10x macOS runner cost.)

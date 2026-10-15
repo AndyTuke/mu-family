@@ -61,7 +61,7 @@ jobs:
 
       - name: Build Release plugins
         run: >
-          cmake --build build --config Release --parallel --target
+          cmake --build build --config Release --parallel 4 --target
           mu-clid_VST3 mu-clid_CLAP mu-clid_Standalone
           mu-clid-midi_VST3 mu-clid-midi_CLAP
           mu-tant_VST3 mu-tant_CLAP mu-tant_Standalone
@@ -71,7 +71,7 @@ jobs:
       # mu-link is a Windows desktop app (freeware); built and zipped on the Windows runner only.
       - name: Build mu-link (Windows)
         if: runner.os == 'Windows'
-        run: cmake --build build --config Release --parallel --target mu-link
+        run: cmake --build build --config Release --parallel 4 --target mu-link
 
       # AU is macOS-only (the _AU targets only exist in an APPLE configure — family rule).
       - name: Build AU (macOS only)
