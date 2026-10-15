@@ -19,6 +19,7 @@ target_sources(mu-core-tests PRIVATE
     ScopedStorageRootTests.cpp
     ChannelStateResetTests.cpp
     MixerStereoPeakTests.cpp
+    MixerBlockValueTests.cpp
     SupportPromptPolicyTests.cpp
     SettingsOverlayFitTests.cpp
     SettingsOverlayBackendTests.cpp
