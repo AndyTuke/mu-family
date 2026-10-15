@@ -805,6 +805,10 @@ whether it moves into the layer. Harder: nothing. The new hooks are generic (`la
 
 ### Stage 8: what the owner decides (#1319; 2026-10-12, Architecture Steward)
 
+**Answered 2026-10-15:** the combined instance is scheduled as the fifth product mu-Tronic, so option C is taken, staged product by product; see
+[mu-Tronic: the combined instance is scheduled](#mu-tronic-the-combined-instance-is-scheduled-ruled-2026-10-15) and [mu-tronic/design.md](mu-tronic/design.md).
+The text below is kept for the reasoning.
+
 The row waited for the saved-data renames (#1263); those are done (closed at build 1322), so that dependency is gone. What remains is not a technical question. The
 registry (`LayerTypeInfo`: id, name, prefix, preset extension, mod-target table, `create`) and `Layer::render` (the layer draws itself into the mixer, so a session can mix
 layer types) have exactly one customer: the combined instance of [design-future.md](design-future.md) ("One framework, one instance"), which is still unscheduled and
@@ -824,6 +828,27 @@ Question for Andy (one paragraph, for the morning): do you want the combined ins
 layers of the Pay What You Want products (mu-Toni, mu-On) and the freeware mu-Clid MIDI rhythm sit inside one licensed instance, and whose key covers it? Until you answer, #1319 should stay parked (option A); the answer decides where the registry
 lives (which product's processor hosts it), whether the plugin ID and licence of the combined instance are new, and so whether option B or C is next. No work on it is useful
 before that, and nothing that is done on stages 6 and 7 makes the answer harder.
+
+### mu-Tronic: the combined instance is scheduled (ruled 2026-10-15)
+
+**Supersedes the "park" recommendation of Stage 8 above.** Andy asked for mu-Tronic: a fifth product with 16 empty layer slots (paged 1-8 / 9-16), each
+able to hold a layer of any of the four existing types, on the shared mixer, FX and modulation, with buses in the mixer. The full ruling, staged plan
+(T0 to T9) and the questions for Andy are in [mu-tronic/design.md](mu-tronic/design.md). The structural rulings that bind other work:
+
+- **Layer = voice.** The code and docs keep *layer*; *voice* stays the polyphonic voice inside an engine. A layer is engine + sequencer + modulation + insert + parameters +
+  presets / clips + UI content; the mixer strip and the transport are not part of it.
+- **`Layer::render` with a per-block `RenderContext`** is the contract (Stage 8 option C), plus a registry (`LayerTypeInfo`) that only creates and describes. The engine
+  lives in the layer object; a replaced layer fades in a shared `RetireBin`. This amends Stage 7 ruling 1 for hosts that render through `Layer::render`.
+- **Per-product layer libraries, nothing moves into `mu-core`:** `mu-clid-layer`, `mu-tant-layer`, `mu-toni-layer`, `mu-on-layer` (INTERFACE) are each product's
+  `Audio/ Sequencer/ Modulation/ Persistence/ UI/` minus `UI/SettingsOverlay.*`. A library file includes nothing under `Plugin/` or `License/`, takes no
+  `PluginProcessor&` (the UI uses a `<Type>Host` interface), and every relative path is unique across `mu-core` and the libraries
+  (`tests/scripts/check-layer-boundary.ps1`, to be written in Stage T0). Each product's parameter table is `addLayerParams(layout, slot)` in its `Persistence/`.
+- **Each standalone product moves onto the shared render path** in the same stage in which its layer is extracted, so per-block glue exists once.
+- **Capacity:** `mu_limits::kMaxLayers` is a per-target compile-time constant (`MU_MAX_LAYERS`, default 8; mu-Tronic 16). One constant, one value per binary.
+- **Buses:** `MixerEngine::BusState` (a `ChannelState` plus the layer insert), opt-in count `MU_MAX_BUSES` (default 0, mu-Tronic 4), `ChannelState::busAssign`,
+  graph channels -> buses -> returns -> master, no bus-to-bus, a channel's sidechain source is never a bus. The existing `outputBus` is the DAW direct out and is relabelled
+  "Out" in the UI. All of it is `mu-core`.
+- **mu-link:** coexists; mu-Tronic is a mu-link client; no clock / MIDI-out code is duplicated; retirement is decided after T8.
 
 ### Shared layer sidebar and layer panel (ruled 2026-10-12, #1505 / #1506)
 
@@ -2048,4 +2073,5 @@ Time stretching sits behind `TimeStretcherBase` (currently a stub; SoundTouch in
 - [design-fx.md](design-fx.md) — FX chain, slot interface, intra-FX routing (family-shared)
 - [mu-clid/design-hotswap.md](mu-clid/design-hotswap.md) — **seamless preset/rhythm hot-swap** deep-dive (stager, boundary detection, retire-then-swap voice tail, threading). The family-level pattern + the product-side decision + the mu-tant variant are summarised in [Hot-swap](#hot-swap-staged-preset--layer-swaps-family-pattern) above.
 - [mu-clid/design-presets.md](mu-clid/design-presets.md) — μ-Clid preset storage. Each product defines its own preset format under its own `design-presets.md`; the family-level conventions are: per-layer preset in camelCase noun (`.muRhythm` / `.muPattern` / `.muArp` / `.muTrack`), full preset in plugin-name camelCase (`.muClid` / `.muTant` / `.muToni` / `.muOn`). A mu-On `.muTrack` belongs to the instrument it was saved from (it records `lane`), so each lane lists only its own.
+- [mu-tronic/design.md](mu-tronic/design.md) — the combined instance: 16 layer slots holding any product's layer, buses in the shared mixer, the layer libraries, staged plan
 - [design-future.md](design-future.md) — inter-plugin sync (μ family), MIDI CC control

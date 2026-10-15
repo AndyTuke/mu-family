@@ -194,6 +194,7 @@ One behaviour in every instrument product (Clid, Tant, Toni, On); the structural
 - **After a preset load or New,** the sidebar refreshes, selects layer 0 and the panel rebinds, in that order.
 - **Fresh instance = 1 layer** in every product that has variable layers. A saved state without a layer count loads with the product's legacy count (mu-Toni 4, mu-On 5).
 - **Do not:** hide Add at the limit; confirm on Add; fade on delete; let a product re-wire these callbacks itself; give the delete a different glyph or wording per product.
+- **mu-tronic is the one declared exception** (16 fixed slots that may be empty, ruled 2026-10-15): no Add button (the empty slot is the add affordance), Delete empties the slot and shifts nothing, never disabled, an instance starts empty, and the sidebar's bottom slot holds the 1-8 / 9-16 page switch. The rest of this section stands. Layout, chooser and mixer buses: [mu-tronic/design-ui.md](mu-tronic/design-ui.md).
 
 ### Padding
 
@@ -505,6 +506,7 @@ setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appYellow));   // mu-On
 - **Panel structure (every app)** — panels sit edge to edge, each drawn `reduced(2)` so a thin gap shows between them: a thin **preset strip** (the shared header bar, a screw at each end), then the app's **main panels**, each holding raised **sections**, then the **modulator panel** at the bottom. Section boxes sit `kScrewedPanelInset` in from a panel's sides and `kChannelInset` from its top / bottom; panel screws are drawn in the panel owner's `paintOverChildren`. Spare height goes to the modulator panel, where the display takes it (the one-row assignment box stops growing at `ModulatorEditor::kMetalAssignMaxH`).
 - **Selectors in a knob grid take two cells** (`ParamKnobGrid`) so their LCD lettering fits.
 - **A mixer is the main page of mu-link** (no layers, no sidebar): the standard chrome around a mixer panel and a scenes panel, laid out in [mu-link/design-ui.md](mu-link/design-ui.md). Its knobs keep the category colours (the mixer rule above), and its strips are the shared `MixerChannel` anatomy.
+- **Paging, buses and a mixed-type instance (mu-tronic; ruled 2026-10-15, [mu-tronic/design-ui.md](mu-tronic/design-ui.md)).** More than eight layers show eight at a time: one shell `shownPage` drives the sidebar (page switch in the Add slot), the Launchpad rows and the mixer's channel pages; the selected slot always belongs to the shown page. The mixer gains a **Buses** page of `MixerChannel::Type::Bus` strips (name, feeds line, the channel strip's sidechain section, one insert box shared with `MasterInsertPanel`, pan, fader, Output selector) and the Output selector lists Main, Bus 1 to 4, then Out 1 to 8 (plugin builds). "Bus" is the mixer group; the DAW multi-out stays "Out n". In a product that holds layers of several types the main area is painted in the selected layer's type colour.
 - Positioning stays app-specific; only the look is shared (the per-layer panel stack in section 5 is the one layout the instruments share).
 
 ---
@@ -618,6 +620,7 @@ Sections 12.1 to 12.5 settle the toggle (slot, size, accent lit), the indication
 | **Clip strip** pads | Locked, follows the surface | 13.4; launching is the surface's job. |
 | **Layer** selection (sidebar), Add, Delete, Reset, reorder | Locked | Layer selection follows the surface (12.3); nothing structural on stage. |
 | **Mute** buttons (header bar, mixer) | Locked | Quantised mute is the surface's action (design-launchpad 3.3). |
+| **Page switch** (mu-tronic sidebar, 1-8 / 9-16), Page Up / Page Down | Locked, follows the surface | The page follows the surface's selected layer; no performance keys (12.4); mu-tronic only, [mu-tronic/design-ui.md](mu-tronic/design-ui.md) 3.4. |
 | **Mixer** button and overlay | Locked | Opening an overlay under the shield would need every overlay control exempt; a frozen overlay is the failure 12.6 already guards against. |
 | **Settings** (gear), About | Locked | Device and sync setup is done with the mode off (14). |
 | **Master volume** | Locked | Owner decision 1 below. |
@@ -740,6 +743,7 @@ The strip is the same shared component with the product's layer noun in tooltips
 | mu-Tant | Voice | Yes, every voice (8) | Rows = voices | Master loop, voice loop, bar |
 | mu-Toni | Layer | Yes, every existing layer (1 to 8); rows with no layer stay off | Rows = existing layers | None shown: every timing is the bar |
 | mu-On | Track | Yes, every track (1 to 8); a clip may change the track's engine, as loading a `.muTrack` does | Rows = tracks | None shown: every timing is the bar |
+| mu-tronic | Layer (Rhythm, Voice, Arp or Track by type) | Yes, every filled slot of the shown page (the page is 8 of 16); an empty slot has no strip | Rows = the 8 slots of the shown page; empty slots off | Master loop, layer loop, bar |
 | mu-Clid MIDI | Rhythm | **No** (no hot-swap, no `mstr_swap`; a strip would be a dead control, as with the Trig / Leg switches). Shown later if it gains a stager | None | None |
 
 The Launchpad and Performance mode are standalone only for now (12, availability), so in a plugin build the strip is on screen only: click to launch, mute, store, clear, with the same quantise rules; no surface lights.
@@ -775,6 +779,7 @@ The screen half of the Launchpad surface mapping ([design-launchpad.md section 3
 
 ## Design rulings
 
+- 2026-10-15 - mu-tronic framework (16 layer slots, mixed types, mixer buses). Ruled: pages of 8 driven by one shell `shownPage` (page switch in the sidebar's Add slot, Page Up / Page Down, Launchpad rows follow the page), empty-slot chooser of four type cards, type shown by mini-visual + header type tag + main-area paint, mixer pages 1-8 / 9-16 / Buses with four bus strips (148 px, shared insert box, channel sidechain section, Output selector extended), no new window size or layer colours. Eight questions for Andy open. Changed: §5 (mu-tronic exception), §11 Conventions, §12.7, §13.7; new [mu-tronic/design-ui.md](mu-tronic/design-ui.md).
 - 2026-10-15 - mu-On `ParamKnobGrid` knobs became `KnobWithLabel` (empty label) to carry the modulation arcs (ae91ca7). Ruled: Pass; every table-driven knob shows the live arc, no bare sliders in grids. Changed: §6 KnobWithLabel (Live modulation arc), mu-On design-ui ENGINE box.
 
 - 2026-10-14 - mu-Toni step pattern: the accent cells become Step Off / On / Accented (Andy). Ruled: the shared `StepEditor` gains a generic level-cell mode `setLevelCells(n)` (metal look: each cell a whole lamp lens whose strength is the level, Off `lampOff`, On `lampOn`, Accented new `Lighting::lampAccent` 1.0; playhead = thin ring at new `Lighting::lampPlayheadRing` 0.6 alpha, not extra brightness; gesture: click cycles, Shift+click back, drag paints the first cell's new state), not `setQuantization(3)` (that only snaps bar height). Label "Acc Steps" becomes "Steps". Rests, storage (`stepMask`, default all On) and engine rules in mu-toni/design-sequencer.md. Changed mu-toni/design-ui.md (new), mu-toni/design-sequencer.md, §11 Lamp display row.

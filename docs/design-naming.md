@@ -29,6 +29,11 @@ Related: the family consistency rule in [CLAUDE.md](../CLAUDE.md), and the platf
 | **Performance** (built 2026-10-13) | A list of up to 8 pointers to presets for a gig; the new top level (backlog #1279). ✔ owner. File `.muPerformance`, folder `Performances/`, type `mu_pp::PerformanceFile` (ruled 2026-10-12, [design-launchpad.md §3.2c](design-launchpad.md)). | a preset |
 | **Clip** ✔ owner | One of 8 stored states of a layer that a controller pad launches, as in Ableton Live and Bitwig; plays until another is chosen; pads never write presets (backlog #1277). Stored in `mu_core::ClipBank` (`Layer::clips`), saved as `<Clips>` / `<Clip>`; a clip has no per-product type, it is the product's layer preset. "Slot" stays for FX / insert slots only. | an audio clip, an FX slot |
 
+Added 2026-10-15 for mu-Tronic ([mu-tronic/design.md §1](mu-tronic/design.md)): Andy's word "voice" for a mu-Tronic slot is a **layer** in code and docs. New terms: **Empty layer**
+(a slot with no type; `LayerTypeId::Empty`), **Page** (eight layers, `kLayersPerPage`, UI and controller only), **Bus** (an internal group strip,
+`BusState`, `busAssign`, parameters `bus{B}_`) and **Direct out** (the DAW output routing `ChannelState::outputBus`, parameter `outBus`, relabelled "Out" in the UI so "bus" has one
+meaning). Library targets are `mu-<product>-layer`; a host interface for a layer's UI is `<Type>Host`; mu-Clid's engine-carrying layer is `mu_clid::SampleRhythm`.
+
 ### Derived layer types ✔ owner (2026-10-09)
 
 Each product's layer is a subclass of `Layer`, named for what that product's layer *is*:
@@ -146,6 +151,11 @@ names. They are modal pop-ups, not `OverlayHost` screens, so the `Overlay` role 
   **`Audio`, `License`, `Modulation`, `Persistence`, `Plugin`, `Sequencer`, `Tests`, `UI`**. An empty
   folder carries a `.gitkeep` so git keeps it. A new product starts with all eight. (mu-link is
   infrastructure, not an instrument, and keeps its own layout.)
+- **Layer-library files (ruled 2026-10-15):** the files of a product's `Audio/ Sequencer/ Modulation/ Persistence/ UI/` (not `UI/SettingsOverlay.*`) form its
+  `mu-<product>-layer` library, which mu-Tronic links. Their **relative path must be unique across `mu-core` and all products' libraries** (`Audio/Scales.h` existed in both
+  mu-Tant and mu-Toni: renamed `TantScales.h` / `ToniScales.h`), none may include a `Plugin/` or `License/` header, and a product's parameter table lives in
+  `Persistence/` (`TrackParams.h` and `LayerParamIds.h` move there from `Plugin/`). Checked by `check-layer-boundary.ps1`.
+- **Capacity constants:** `mu_limits::kMaxLayers` is a per-target compile-time value (`MU_MAX_LAYERS`, default 8, mu-Tronic 16); a product still does not redeclare it.
 - What goes where: `Audio/` the engine (voices, samplers, DSP specific to the product); `Sequencer/` the
   sequencer data and generators; `Modulation/` the product's modulation-target table and snapshot;
   `Persistence/` preset and state (de)serialisation and migrations; `License/` licensing glue; `UI/` the
@@ -241,6 +251,9 @@ the two named legacy ones.
 code, manufacturer code, bundle id, CLAP id and state identifier may not (existing DAW projects find the
 plugin by them). The MIDI-effect product keeps `MCLt`, `com.transwarp.mu-clid-lite` and `MuClidState`
 under its name, **mu-Clid MIDI** (owner, 2026-10-11).
+
+**mu-Tronic (proposed 2026-10-15, name and plugin code `MTrn` await Andy):** slug `mu-tronic`, namespace `mu_tronic`, state `MuTronicState`, tag `MuTronicPreset`, extension
+`.muTronic`, docs `docs/mu-tronic/`. It has no layer type of its own; its slots hold `Rhythm`, `Pattern`, `Arp` or `Track` (or nothing), so no new layer extension.
 
 **Product naming pattern.** `mu-<Name>` in prose and artefacts (`mu-Clid`, `mu-Tant`), slug `mu-<name>` in
 folders and targets, namespace `mu_<name>`. A descriptive suffix (`mu-Clid MIDI`) is allowed only for a
