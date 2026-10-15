@@ -100,6 +100,30 @@ public:
             expectEquals(peakOf(out, N), 0.0f);
         }
 
+        beginTest("Noise is repeatable per slot: same slot identical, different slots differ");
+        {
+            // Noise-only render of a fresh engine seeded for `slot`.
+            auto renderNoise = [&](int slot)
+            {
+                VoiceEngine v; v.setBank(&bank); v.setSlotIndex(slot); v.prepare(sr, N);
+                VoiceConfig c; c.osc1LevelDb = -60.0f; c.osc2LevelDb = -60.0f; c.noiseLevelDb = 0.0f; c.levelDb = 0.0f;
+                v.setConfig(c);
+                juce::AudioBuffer<float> buf(2, N); buf.clear();
+                v.process(buf, N);
+                return buf;
+            };
+            const auto a = renderNoise(2), b = renderNoise(2), other = renderNoise(3);
+            bool same = true, differs = false;
+            for (int i = 0; i < N; ++i)
+            {
+                same    = same && a.getSample(0, i) == b.getSample(0, i);
+                differs = differs || a.getSample(0, i) != other.getSample(0, i);
+            }
+            expect(peakOf(a, N) > 0.0f, "noise is audible");
+            expect(same, "same slot gives bit-identical noise");
+            expect(differs, "different slots give different noise");
+        }
+
         beginTest("voice renders finite, non-silent output");
         {
             VoiceEngine v; v.setBank(&bank); v.prepare(sr, N);

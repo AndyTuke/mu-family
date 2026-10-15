@@ -62,6 +62,9 @@ class ToniVoice
 public:
     void setBank(const mu_wavetable::WavetableBank* b) noexcept { oscs.setBank(b); }
 
+    // Restarts the noise from the slot's fixed seed: repeatable renders, and layers do not share one sequence.
+    void setSlotIndex(int slot) noexcept { rng.setSeed(kNoiseSeed ^ (juce::int64) slot); }
+
     void prepare(double sampleRate, int blockSize)
     {
         sr = sampleRate > 0 ? sampleRate : 44100.0;
@@ -229,7 +232,8 @@ private:
     ToniVoiceParams params;
 
     mu_wavetable::XModOscPair oscs;   // Osc 1 (carrier) + Osc 2 (modulator)
-    juce::Random rng;
+    static constexpr juce::int64 kNoiseSeed = 0x6D75546F;   // "muTo"
+    juce::Random rng { kNoiseSeed };
     MultiModeFilter filter;
     juce::ADSR ampEnv, filterEnv, pitchEnv;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> pitchGlide;

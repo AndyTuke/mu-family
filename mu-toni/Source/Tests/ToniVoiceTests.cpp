@@ -95,6 +95,36 @@ public:
             renderPeak(v, 20, finite);   // release tail (10 ms) has long finished
             expect(! v.isActive(), "voice still active after its release");
         }
+
+        beginTest("Noise is repeatable per slot: same slot identical, different slots differ");
+        {
+            // Noise-only note on a fresh voice seeded for `slot`.
+            auto renderNoise = [&](int slot)
+            {
+                ToniVoice v;
+                v.setBank(&bank);
+                v.setSlotIndex(slot);
+                v.prepare(kSr, kBlock);
+                ToniVoiceParams p;
+                p.osc1LevelDb = -60.0f;  p.osc2LevelDb = -60.0f;  p.noiseLevelDb = 0.0f;
+                v.setParams(p);
+                v.noteOn(60);
+                juce::AudioBuffer<float> buf(2, kBlock);
+                buf.clear();
+                v.process(buf, kBlock);
+                return buf;
+            };
+            const auto a = renderNoise(1), b = renderNoise(1), other = renderNoise(2);
+            bool same = true, differs = false;
+            for (int i = 0; i < kBlock; ++i)
+            {
+                same    = same && a.getSample(0, i) == b.getSample(0, i);
+                differs = differs || a.getSample(0, i) != other.getSample(0, i);
+            }
+            expect(a.getMagnitude(0, 0, kBlock) > 0.0f, "noise is audible");
+            expect(same, "same slot gives bit-identical noise");
+            expect(differs, "different slots give different noise");
+        }
     }
 };
 

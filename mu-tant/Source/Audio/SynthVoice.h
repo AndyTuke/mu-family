@@ -91,7 +91,7 @@ struct VoiceConfig
 class NoiseGen
 {
 public:
-    NoiseGen() = default;
+    NoiseGen() : rng(seedFor(0)) {}
     explicit NoiseGen(juce::int64 seed) : rng(seed) {}   // fixed stream, for tests
     enum Type { White = 0, Pink = 1 };
 
@@ -111,7 +111,12 @@ public:
     // Clears the pink filter's memory (the random stream runs on).
     void reset() noexcept { b0 = b1 = b2 = 0.0f; }
 
+    // Restarts the stream from the slot's fixed seed, so a slot's noise is repeatable and layers do not share one sequence.
+    void setSlotIndex(int slot) noexcept { rng.setSeed(seedFor(slot)); }
+
 private:
+    static constexpr juce::int64 kSeed = 0x6D754E6F;   // "muNo"
+    static juce::int64 seedFor(int slot) noexcept { return kSeed ^ (juce::int64) slot; }
     juce::Random rng;
     float b0 = 0.0f, b1 = 0.0f, b2 = 0.0f;
 };
@@ -122,6 +127,7 @@ public:
 
     void prepare(double sampleRate, int blockSize);
     void setBank(const WavetableBank* b) noexcept;
+    void setSlotIndex(int slot) noexcept { noise.setSlotIndex(slot); }   // per-slot fixed noise seed
     void reset();   // clears filter, smoother, noise and cross-modulation memory without allocating (oscillator phase runs on)
     void setConfig(const VoiceConfig& c);   // recomputes osc frequencies + filter
 
