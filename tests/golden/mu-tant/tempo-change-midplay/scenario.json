@@ -1,0 +1,15 @@
+{
+  "name": "tempo-change-midplay",
+  "notes": "Gated voice with a synced delay send; tempo 120 -> 90 (1 s) -> 160 (2 s).",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 144000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 1,
+  "drainDeferredWorkEveryBlock": false,
+  "isolateStemsByMute": false,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "timedActions": [{ "frame": 48000, "label": "tempo 90" }, { "frame": 96000, "label": "tempo 160" }],
+  "midiByBlock": []
+}

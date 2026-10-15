@@ -1,0 +1,15 @@
+{
+  "name": "two-layers-structural-edit",
+  "notes": "Two voices with gates, pan and octave apart; a third drone is added (0.75 s), voices 0 and 2 swap (1.5 s), voice 1 is removed (2.25 s). Stems follow the slot, not the voice.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 144000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 2,
+  "drainDeferredWorkEveryBlock": false,
+  "isolateStemsByMute": false,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "timedActions": [{ "frame": 36000, "label": "addLayer, open its gate" }, { "frame": 72000, "label": "swapLayers(0, 2)" }, { "frame": 108000, "label": "removeLayer(1)" }],
+  "midiByBlock": []
+}

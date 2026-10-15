@@ -1,0 +1,15 @@
+{
+  "name": "transport-stop-start-wrap64",
+  "notes": "Starts at beat 62 so the 64-beat wrap falls at 1 s; stop at 2.5 s, start at 3 s, locate to beat 127.75 (crosses 128) at 3.5 s, to beat 300.25 at 4.5 s, to beat 1000000.25 at 5.25 s.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 288000,
+  "tempoBpm": 120,
+  "startBeat": 62,
+  "numStems": 1,
+  "drainDeferredWorkEveryBlock": false,
+  "isolateStemsByMute": false,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "timedActions": [{ "frame": 120000, "label": "host stops" }, { "frame": 144000, "label": "host starts" }, { "frame": 168000, "label": "locate to beat 127.75" }, { "frame": 216000, "label": "locate to beat 300.25" }, { "frame": 252000, "label": "locate to beat 1000000.25" }],
+  "midiByBlock": []
+}

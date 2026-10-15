@@ -1,0 +1,15 @@
+{
+  "name": "modulation-assignments",
+  "notes": "cs0 stepped on osc1 semitone (melody), cs1 smooth on cutoff, cs2 stepped unipolar on X-Mod index and level; all depth-as-percent-of-range targets.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 144000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 1,
+  "drainDeferredWorkEveryBlock": false,
+  "isolateStemsByMute": false,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "timedActions": [],
+  "midiByBlock": []
+}
