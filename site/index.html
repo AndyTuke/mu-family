@@ -276,7 +276,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     .pc-shot img { width: 100%; height: 100%; object-fit: cover; object-position: top left; display: block; transition: transform .4s; }
     .pcard:hover .pc-shot img { transform: scale(1.03); }
     .pc-shot.ring { display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at center, rgba(107,95,228,0.18), var(--bg) 70%); }
-    .pc-shot.ring img { width: auto; height: 100%; object-fit: contain; }
+    .pc-shot.ring img { width: 100%; height: auto; max-height: 100%; object-fit: contain; }
     .pc-body { padding: 22px 24px 24px; display: flex; flex-direction: column; flex: 1; }
     .pc-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
     .pc-label { font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--cb); padding-top: 4px; }
@@ -289,6 +289,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     .pc-ctas { display: flex; gap: 10px; flex-wrap: wrap; }
     .btn-pc { display: inline-block; font-family: var(--ff-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 11px 20px; border-radius: 4px; cursor: pointer; border: none; transition: all .2s; background: var(--c); color: var(--ct); }
     .btn-pc:hover { background: var(--cb); }
+    .btn-buy { flex: 1 1 100%; text-align: center; }
     .btn-pc-outline { display: inline-block; font-family: var(--ff-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 10px 18px; border-radius: 4px; cursor: pointer; transition: all .2s; color: var(--cb); border: 1px solid color-mix(in srgb, var(--c) 50%, transparent); }
     .btn-pc-outline:hover { background: color-mix(in srgb, var(--c) 12%, transparent); }
     .pcard a:focus-visible { outline: 2px solid var(--cb); outline-offset: 3px; }
@@ -372,7 +373,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
             <span class="pill purple">Made for live performance</span>
             <span class="pill teal">Pay what you want · from £0</span>
             <span class="pill">VST3 &amp; CLAP &amp; Standalone</span>
-            <span class="pill">Windows · Linux coming soon</span>
+            <span class="pill">Windows · Linux (beta)</span>
           </div>
           <div class="hero-ctas fade-5">
             <a href="#products" class="btn-primary">See the six products ↓</a>
@@ -447,7 +448,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
             <h3 class="pc-name"><span class="mu-d">μ</span>-clid</h3>
             <p class="pc-desc">Drive samples with mathematical precision. Three independent Euclidean layers per track combine through boolean logic to make hits no human would programme.</p>
             <div class="pc-meta">8 tracks · VST3 · CLAP · Standalone</div>
-            <div class="pc-ctas"><a href="mu-clid.html" class="btn-pc">Learn more</a><a href="download.html#mu-clid" class="btn-pc-outline">Download</a></div>
+            <div class="pc-ctas"><a href="https://transwarp.lemonsqueezy.com/checkout/buy/12d18415-e76d-42f3-a034-0dd187b197ff" class="btn-pc btn-buy" target="_blank" rel="noopener">Pay what you want</a><a href="mu-clid.html" class="btn-pc-outline">Learn more</a><a href="download.html#mu-clid" class="btn-pc-outline">Download</a></div>
           </div>
         </article>
         <article class="pcard tant">
@@ -458,7 +459,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
             <h3 class="pc-name"><span class="mu-d">μ</span>-tant</h3>
             <p class="pc-desc">A dual-oscillator wavetable drone with FM and ring modulation, shaped by a gate sequencer. Per-step gate, filter and pitch across up to 16 bars.</p>
             <div class="pc-meta">8 voices · VST3 · CLAP · Standalone</div>
-            <div class="pc-ctas"><a href="mu-tant.html" class="btn-pc">Learn more</a><a href="download.html" class="btn-pc-outline">Download</a></div>
+            <div class="pc-ctas"><a href="https://transwarp.lemonsqueezy.com/checkout/buy/a0354b49-199b-411d-b505-0aee737afe3e" class="btn-pc btn-buy" target="_blank" rel="noopener">Pay what you want</a><a href="mu-tant.html" class="btn-pc-outline">Learn more</a><a href="download.html#mu-tant" class="btn-pc-outline">Download</a></div>
           </div>
         </article>
         <article class="pcard toni">
@@ -469,7 +470,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
             <h3 class="pc-name"><span class="mu-d">μ</span>-toni</h3>
             <p class="pc-desc">Pick a scale and a chord and it plays the notes through a two-oscillator wavetable synth. Every control can be modulated, so the arpeggio never has to stand still.</p>
             <div class="pc-meta">Mono synth · VST3 · CLAP · Standalone</div>
-            <div class="pc-ctas"><a href="mu-toni.html" class="btn-pc">Learn more</a><a href="download.html#mu-toni" class="btn-pc-outline">Download</a></div>
+            <div class="pc-ctas"><a href="https://transwarp.lemonsqueezy.com/checkout/buy/dbecc900-4745-4b37-a349-4afef07adcc3" class="btn-pc btn-buy" target="_blank" rel="noopener">Pay what you want</a><a href="mu-toni.html" class="btn-pc-outline">Learn more</a><a href="download.html#mu-toni" class="btn-pc-outline">Download</a></div>
           </div>
         </article>
         <article class="pcard on">
@@ -480,12 +481,12 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
             <h3 class="pc-name"><span class="mu-d">μ</span>-on</h3>
             <p class="pc-desc">A hands-on groove box. Build a beat on a 16-step grid, add a techno rumble, and let the bass duck from the kick for a pumping groove.</p>
             <div class="pc-meta">Kick · Bass · Hat · Snare · VST3 · CLAP · Standalone</div>
-            <div class="pc-ctas"><a href="mu-on.html" class="btn-pc">Learn more</a><a href="download.html#mu-on" class="btn-pc-outline">Download</a></div>
+            <div class="pc-ctas"><a href="https://transwarp.lemonsqueezy.com/checkout/buy/3dd813d9-56a5-4e5b-99b4-09a14f48cf9b" class="btn-pc btn-buy" target="_blank" rel="noopener">Pay what you want</a><a href="mu-on.html" class="btn-pc-outline">Learn more</a><a href="download.html#mu-on" class="btn-pc-outline">Download</a></div>
           </div>
         </article>
         <article class="pcard midi">
           <div class="pc-accent-bar"></div>
-          <a class="pc-shot ring" href="mu-clid-midi.html" tabindex="-1" aria-hidden="true"><img src="Circles.png?v=1410" alt="A Euclidean rhythm ring from μ-clid MIDI" width="282" height="282" loading="lazy"></a>
+          <a class="pc-shot ring" href="mu-clid-midi.html" tabindex="-1" aria-hidden="true"><img src="mu-clid-midi_window.png?v=1411" alt="The μ-clid MIDI editor: Euclidean rhythm rings with step, hit and rotation controls" width="1110" height="420" loading="lazy"></a>
           <div class="pc-body">
             <div class="pc-top"><div class="pc-label">Euclidean MIDI effect</div><span class="pc-badge free">Freeware</span></div>
             <h3 class="pc-name"><span class="mu-d">μ</span>-clid MIDI</h3>
@@ -496,7 +497,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
         </article>
         <article class="pcard link">
           <div class="pc-accent-bar"></div>
-          <a class="pc-shot" href="mu-link.html" tabindex="-1" aria-hidden="true"><img src="mu-link_window.png" alt="The μ-link mixer with two connected apps and eight scenes" width="1172" height="902" loading="lazy"></a>
+          <a class="pc-shot" href="mu-link.html" tabindex="-1" aria-hidden="true"><img src="mu-link_window.png?v=1411" alt="The μ-link mixer with two connected apps and eight scenes" width="1172" height="880" loading="lazy"></a>
           <div class="pc-body">
             <div class="pc-top"><div class="pc-label">Sync hub and performance mixer</div><span class="pc-badge free">Freeware</span></div>
             <h3 class="pc-name"><span class="mu-d">μ</span>-link</h3>
@@ -526,13 +527,13 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
         </ul>
       </div>
       <div class="pay-ctas">
-        <a href="mu-clid.html#pricing" class="btn-primary">Support μ-clid</a>
-        <a href="mu-tant.html#pricing" class="btn-primary btn-amber">Support μ-tant</a>
-        <a href="mu-toni.html#download" class="btn-primary" style="background:var(--teal);color:#06120E">Get μ-toni</a>
-        <a href="mu-on.html#download" class="btn-primary" style="background:#C9A94A;color:#14100A">Get μ-on</a>
-        <a href="download.html" class="btn-secondary">Download ↓</a>
+        <a href="mu-clid.html#pricing" class="btn-primary">Get <span class="mu-d">μ</span>-clid</a>
+        <a href="mu-tant.html#pricing" class="btn-primary btn-amber">Get <span class="mu-d">μ</span>-tant</a>
+        <a href="mu-toni.html#download" class="btn-primary" style="background:var(--teal);color:#06120E">Get <span class="mu-d">μ</span>-toni</a>
+        <a href="mu-on.html#download" class="btn-primary" style="background:#C9A94A;color:#14100A">Get <span class="mu-d">μ</span>-on</a>
+        <a href="download.html" class="btn-secondary">All downloads ↓</a>
       </div>
-      <p class="pay-fine">All prices in GBP. Windows is current, Linux is coming soon, and macOS is on hold.</p>
+      <p class="pay-fine">All prices in GBP. Windows is current, Linux is in beta, and macOS is on hold.</p>
     </div>
   </section>
 
