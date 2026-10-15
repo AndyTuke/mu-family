@@ -166,7 +166,7 @@ P "While slaved, the tempo field shows the detected BPM to a tenth and is read-o
 H2 "Why It Stays Rock Solid"
 P "Raw MIDI clock is slightly jittery, so mu-link never uses it directly as its timebase. Instead it measures the incoming clock and smooths it into a stable tempo estimate, then drives its own sample-accurate audio clock at that tempo. The connected apps see the same clean, drift-free transport they always do — they never inherit MIDI jitter. The result is tight external sync without sacrificing timing stability."
 
-Pic "Transport bar with the clock-source switch set to MIDI In, the Clock lamp green, and a detected BPM shown."
+Pic "Transport bar with the clock-source switch set to MIDI In and no clock arriving yet: the Clock lamp sits dim amber (waiting) next to the tempo." "clock-lamp.png"
 
 # ── 10. MIDI Clock Out ────────────────────────────────────────────────────────
 H1 "10. MIDI Clock Out"
