@@ -1,0 +1,13 @@
+# frozen load result for fixture: Abyssal Pad.muPattern
+layers=1
+load_errors=0
+capture_bytes=3882
+capture_sha256=d5b0a0a7108d33462ec01025029bbbe44d1ff92c59f3d8675d2f0682cd377ea5
+--- parameters differing from default (id=plain value)
+v0_flt_cut=600
+v0_flt_res=0.25
+v0_level=-9
+v0_o1_oct=-2
+v0_o1_wt=4
+v0_o2_oct=-1
+v0_o2_wt=2

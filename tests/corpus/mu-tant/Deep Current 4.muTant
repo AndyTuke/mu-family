@@ -1,0 +1,583 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MuTantPreset name="Deep Current 4" description="Soundscapes — Monolith, Acid Root, Singing Wire" category="Soundscapes">
+  <MuTantState numVoices="3" voiceColours="0,1,2,3,4,5,6,7">
+    <PARAM id="root" value="8.0"/>
+    <PARAM id="scale" value="0.0"/>
+    <PARAM id="mstrLoop" value="0.0"/>
+    <PARAM id="v0_o1_oct" value="-1.0"/>
+    <PARAM id="v0_o1_semi" value="0.0"/>
+    <PARAM id="v0_o1_fine" value="0.0"/>
+    <PARAM id="v0_o1_pos" value="0.0"/>
+    <PARAM id="v0_o2_oct" value="-2.0"/>
+    <PARAM id="v0_o2_semi" value="2.0"/>
+    <PARAM id="v0_o2_fine" value="-7.0"/>
+    <PARAM id="v0_o2_pos" value="0.0"/>
+    <PARAM id="v0_o1_wt" value="4.0"/>
+    <PARAM id="v0_o2_wt" value="3.0"/>
+    <PARAM id="v0_xmod_phaseMode" value="1.0"/>
+    <PARAM id="v0_xmod_index" value="0.0"/>
+    <PARAM id="v0_sync" value="0.0"/>
+    <PARAM id="v0_xmod_fdbk" value="0.0"/>
+    <PARAM id="v0_xmod_ampMode" value="0.0"/>
+    <PARAM id="v0_xmod_depth" value="0.0"/>
+    <PARAM id="v0_xmod_ssb" value="0.0"/>
+    <PARAM id="v0_o1_lvl" value="0.0"/>
+    <PARAM id="v0_o2_lvl" value="-6.0"/>
+    <PARAM id="v0_noise_lvl" value="-60.0"/>
+    <PARAM id="v0_noise_type" value="0.0"/>
+    <PARAM id="v0_flt_type" value="4.0"/>
+    <PARAM id="v0_flt_cut" value="640.0"/>
+    <PARAM id="v0_flt_res" value="0.3"/>
+    <PARAM id="v0_flt_drv" value="0.0"/>
+    <PARAM id="v0_flt_lo_cut" value="0.0"/>
+    <PARAM id="v0_flt_env_depth" value="1.0"/>
+    <PARAM id="v0_flt2_type" value="0.0"/>
+    <PARAM id="v0_flt2_cut" value="8000.0"/>
+    <PARAM id="v0_flt2_res" value="0.0"/>
+    <PARAM id="v0_flt2_drv" value="0.0"/>
+    <PARAM id="v0_flt2_lo_cut" value="0.0"/>
+    <PARAM id="v0_flt2_env_depth" value="0.0"/>
+    <PARAM id="v0_flt_series" value="1.0"/>
+    <PARAM id="v0_o1_penv_depth" value="0.0"/>
+    <PARAM id="v0_o2_penv_depth" value="0.0"/>
+    <PARAM id="v0_level" value="-10.0"/>
+    <PARAM id="v0_gate_gap" value="0.0"/>
+    <PARAM id="v0_gate_bypass" value="0.0"/>
+    <PARAM id="v0_drvChar" value="0.0"/>
+    <PARAM id="v0_insP1" value="0.0"/>
+    <PARAM id="v0_insP2" value="0.0"/>
+    <PARAM id="v0_insP3" value="0.0"/>
+    <PARAM id="v0_insP4" value="0.0"/>
+    <PARAM id="v1_o1_oct" value="-1.0"/>
+    <PARAM id="v1_o1_semi" value="0.0"/>
+    <PARAM id="v1_o1_fine" value="0.0"/>
+    <PARAM id="v1_o1_pos" value="0.0"/>
+    <PARAM id="v1_o2_oct" value="-2.0"/>
+    <PARAM id="v1_o2_semi" value="2.0"/>
+    <PARAM id="v1_o2_fine" value="0.0"/>
+    <PARAM id="v1_o2_pos" value="0.0"/>
+    <PARAM id="v1_o1_wt" value="23.0"/>
+    <PARAM id="v1_o2_wt" value="4.0"/>
+    <PARAM id="v1_xmod_phaseMode" value="1.0"/>
+    <PARAM id="v1_xmod_index" value="0.0"/>
+    <PARAM id="v1_sync" value="0.0"/>
+    <PARAM id="v1_xmod_fdbk" value="0.0"/>
+    <PARAM id="v1_xmod_ampMode" value="0.0"/>
+    <PARAM id="v1_xmod_depth" value="0.0"/>
+    <PARAM id="v1_xmod_ssb" value="0.0"/>
+    <PARAM id="v1_o1_lvl" value="0.0"/>
+    <PARAM id="v1_o2_lvl" value="-4.0"/>
+    <PARAM id="v1_noise_lvl" value="-60.0"/>
+    <PARAM id="v1_noise_type" value="0.0"/>
+    <PARAM id="v1_flt_type" value="4.0"/>
+    <PARAM id="v1_flt_cut" value="600.0"/>
+    <PARAM id="v1_flt_res" value="0.6"/>
+    <PARAM id="v1_flt_drv" value="0.0"/>
+    <PARAM id="v1_flt_lo_cut" value="0.0"/>
+    <PARAM id="v1_flt_env_depth" value="1.0"/>
+    <PARAM id="v1_flt2_type" value="0.0"/>
+    <PARAM id="v1_flt2_cut" value="8000.0"/>
+    <PARAM id="v1_flt2_res" value="0.0"/>
+    <PARAM id="v1_flt2_drv" value="0.0"/>
+    <PARAM id="v1_flt2_lo_cut" value="0.0"/>
+    <PARAM id="v1_flt2_env_depth" value="0.0"/>
+    <PARAM id="v1_flt_series" value="1.0"/>
+    <PARAM id="v1_o1_penv_depth" value="0.0"/>
+    <PARAM id="v1_o2_penv_depth" value="0.0"/>
+    <PARAM id="v1_level" value="-6.0"/>
+    <PARAM id="v1_gate_gap" value="0.0"/>
+    <PARAM id="v1_gate_bypass" value="0.0"/>
+    <PARAM id="v1_drvChar" value="1.0"/>
+    <PARAM id="v1_insP1" value="0.5"/>
+    <PARAM id="v1_insP2" value="0.0"/>
+    <PARAM id="v1_insP3" value="0.0"/>
+    <PARAM id="v1_insP4" value="0.0"/>
+    <PARAM id="v2_o1_oct" value="0.0"/>
+    <PARAM id="v2_o1_semi" value="0.0"/>
+    <PARAM id="v2_o1_fine" value="0.0"/>
+    <PARAM id="v2_o1_pos" value="0.0"/>
+    <PARAM id="v2_o2_oct" value="-1.0"/>
+    <PARAM id="v2_o2_semi" value="2.0"/>
+    <PARAM id="v2_o2_fine" value="0.0"/>
+    <PARAM id="v2_o2_pos" value="0.0"/>
+    <PARAM id="v2_o1_wt" value="13.0"/>
+    <PARAM id="v2_o2_wt" value="15.0"/>
+    <PARAM id="v2_xmod_phaseMode" value="1.0"/>
+    <PARAM id="v2_xmod_index" value="0.0"/>
+    <PARAM id="v2_sync" value="0.0"/>
+    <PARAM id="v2_xmod_fdbk" value="0.0"/>
+    <PARAM id="v2_xmod_ampMode" value="0.0"/>
+    <PARAM id="v2_xmod_depth" value="0.0"/>
+    <PARAM id="v2_xmod_ssb" value="0.0"/>
+    <PARAM id="v2_o1_lvl" value="0.0"/>
+    <PARAM id="v2_o2_lvl" value="-6.0"/>
+    <PARAM id="v2_noise_lvl" value="-60.0"/>
+    <PARAM id="v2_noise_type" value="0.0"/>
+    <PARAM id="v2_flt_type" value="2.0"/>
+    <PARAM id="v2_flt_cut" value="1300.0"/>
+    <PARAM id="v2_flt_res" value="0.45"/>
+    <PARAM id="v2_flt_drv" value="0.0"/>
+    <PARAM id="v2_flt_lo_cut" value="0.0"/>
+    <PARAM id="v2_flt_env_depth" value="1.0"/>
+    <PARAM id="v2_flt2_type" value="0.0"/>
+    <PARAM id="v2_flt2_cut" value="8000.0"/>
+    <PARAM id="v2_flt2_res" value="0.0"/>
+    <PARAM id="v2_flt2_drv" value="0.0"/>
+    <PARAM id="v2_flt2_lo_cut" value="0.0"/>
+    <PARAM id="v2_flt2_env_depth" value="0.0"/>
+    <PARAM id="v2_flt_series" value="1.0"/>
+    <PARAM id="v2_o1_penv_depth" value="0.0"/>
+    <PARAM id="v2_o2_penv_depth" value="0.0"/>
+    <PARAM id="v2_level" value="-11.0"/>
+    <PARAM id="v2_gate_gap" value="0.0"/>
+    <PARAM id="v2_gate_bypass" value="0.0"/>
+    <PARAM id="v2_drvChar" value="0.0"/>
+    <PARAM id="v2_insP1" value="0.0"/>
+    <PARAM id="v2_insP2" value="0.0"/>
+    <PARAM id="v2_insP3" value="0.0"/>
+    <PARAM id="v2_insP4" value="0.0"/>
+    <PARAM id="v3_o1_oct" value="0.0"/>
+    <PARAM id="v3_o1_semi" value="0.0"/>
+    <PARAM id="v3_o1_fine" value="0.0"/>
+    <PARAM id="v3_o1_pos" value="0.0"/>
+    <PARAM id="v3_o2_oct" value="0.0"/>
+    <PARAM id="v3_o2_semi" value="2.0"/>
+    <PARAM id="v3_o2_fine" value="0.0"/>
+    <PARAM id="v3_o2_pos" value="0.0"/>
+    <PARAM id="v3_o1_wt" value="0.0"/>
+    <PARAM id="v3_o2_wt" value="0.0"/>
+    <PARAM id="v3_xmod_phaseMode" value="1.0"/>
+    <PARAM id="v3_xmod_index" value="0.0"/>
+    <PARAM id="v3_sync" value="0.0"/>
+    <PARAM id="v3_xmod_fdbk" value="0.0"/>
+    <PARAM id="v3_xmod_ampMode" value="0.0"/>
+    <PARAM id="v3_xmod_depth" value="0.0"/>
+    <PARAM id="v3_xmod_ssb" value="0.0"/>
+    <PARAM id="v3_o1_lvl" value="0.0"/>
+    <PARAM id="v3_o2_lvl" value="-6.0"/>
+    <PARAM id="v3_noise_lvl" value="-60.0"/>
+    <PARAM id="v3_noise_type" value="0.0"/>
+    <PARAM id="v3_flt_type" value="0.0"/>
+    <PARAM id="v3_flt_cut" value="8000.0"/>
+    <PARAM id="v3_flt_res" value="0.2"/>
+    <PARAM id="v3_flt_drv" value="0.0"/>
+    <PARAM id="v3_flt_lo_cut" value="0.0"/>
+    <PARAM id="v3_flt_env_depth" value="1.0"/>
+    <PARAM id="v3_flt2_type" value="0.0"/>
+    <PARAM id="v3_flt2_cut" value="8000.0"/>
+    <PARAM id="v3_flt2_res" value="0.0"/>
+    <PARAM id="v3_flt2_drv" value="0.0"/>
+    <PARAM id="v3_flt2_lo_cut" value="0.0"/>
+    <PARAM id="v3_flt2_env_depth" value="0.0"/>
+    <PARAM id="v3_flt_series" value="1.0"/>
+    <PARAM id="v3_o1_penv_depth" value="0.0"/>
+    <PARAM id="v3_o2_penv_depth" value="0.0"/>
+    <PARAM id="v3_level" value="-6.0"/>
+    <PARAM id="v3_gate_gap" value="0.0"/>
+    <PARAM id="v3_gate_bypass" value="0.0"/>
+    <PARAM id="v3_drvChar" value="0.0"/>
+    <PARAM id="v3_insP1" value="0.0"/>
+    <PARAM id="v3_insP2" value="0.0"/>
+    <PARAM id="v3_insP3" value="0.0"/>
+    <PARAM id="v3_insP4" value="0.0"/>
+    <PARAM id="v4_o1_oct" value="0.0"/>
+    <PARAM id="v4_o1_semi" value="0.0"/>
+    <PARAM id="v4_o1_fine" value="0.0"/>
+    <PARAM id="v4_o1_pos" value="0.0"/>
+    <PARAM id="v4_o2_oct" value="0.0"/>
+    <PARAM id="v4_o2_semi" value="2.0"/>
+    <PARAM id="v4_o2_fine" value="0.0"/>
+    <PARAM id="v4_o2_pos" value="0.0"/>
+    <PARAM id="v4_o1_wt" value="0.0"/>
+    <PARAM id="v4_o2_wt" value="0.0"/>
+    <PARAM id="v4_xmod_phaseMode" value="1.0"/>
+    <PARAM id="v4_xmod_index" value="0.0"/>
+    <PARAM id="v4_sync" value="0.0"/>
+    <PARAM id="v4_xmod_fdbk" value="0.0"/>
+    <PARAM id="v4_xmod_ampMode" value="0.0"/>
+    <PARAM id="v4_xmod_depth" value="0.0"/>
+    <PARAM id="v4_xmod_ssb" value="0.0"/>
+    <PARAM id="v4_o1_lvl" value="0.0"/>
+    <PARAM id="v4_o2_lvl" value="-6.0"/>
+    <PARAM id="v4_noise_lvl" value="-60.0"/>
+    <PARAM id="v4_noise_type" value="0.0"/>
+    <PARAM id="v4_flt_type" value="0.0"/>
+    <PARAM id="v4_flt_cut" value="8000.0"/>
+    <PARAM id="v4_flt_res" value="0.2"/>
+    <PARAM id="v4_flt_drv" value="0.0"/>
+    <PARAM id="v4_flt_lo_cut" value="0.0"/>
+    <PARAM id="v4_flt_env_depth" value="1.0"/>
+    <PARAM id="v4_flt2_type" value="0.0"/>
+    <PARAM id="v4_flt2_cut" value="8000.0"/>
+    <PARAM id="v4_flt2_res" value="0.0"/>
+    <PARAM id="v4_flt2_drv" value="0.0"/>
+    <PARAM id="v4_flt2_lo_cut" value="0.0"/>
+    <PARAM id="v4_flt2_env_depth" value="0.0"/>
+    <PARAM id="v4_flt_series" value="1.0"/>
+    <PARAM id="v4_o1_penv_depth" value="0.0"/>
+    <PARAM id="v4_o2_penv_depth" value="0.0"/>
+    <PARAM id="v4_level" value="-6.0"/>
+    <PARAM id="v4_gate_gap" value="0.0"/>
+    <PARAM id="v4_gate_bypass" value="0.0"/>
+    <PARAM id="v4_drvChar" value="0.0"/>
+    <PARAM id="v4_insP1" value="0.0"/>
+    <PARAM id="v4_insP2" value="0.0"/>
+    <PARAM id="v4_insP3" value="0.0"/>
+    <PARAM id="v4_insP4" value="0.0"/>
+    <PARAM id="v5_o1_oct" value="0.0"/>
+    <PARAM id="v5_o1_semi" value="0.0"/>
+    <PARAM id="v5_o1_fine" value="0.0"/>
+    <PARAM id="v5_o1_pos" value="0.0"/>
+    <PARAM id="v5_o2_oct" value="0.0"/>
+    <PARAM id="v5_o2_semi" value="2.0"/>
+    <PARAM id="v5_o2_fine" value="0.0"/>
+    <PARAM id="v5_o2_pos" value="0.0"/>
+    <PARAM id="v5_o1_wt" value="0.0"/>
+    <PARAM id="v5_o2_wt" value="0.0"/>
+    <PARAM id="v5_xmod_phaseMode" value="1.0"/>
+    <PARAM id="v5_xmod_index" value="0.0"/>
+    <PARAM id="v5_sync" value="0.0"/>
+    <PARAM id="v5_xmod_fdbk" value="0.0"/>
+    <PARAM id="v5_xmod_ampMode" value="0.0"/>
+    <PARAM id="v5_xmod_depth" value="0.0"/>
+    <PARAM id="v5_xmod_ssb" value="0.0"/>
+    <PARAM id="v5_o1_lvl" value="0.0"/>
+    <PARAM id="v5_o2_lvl" value="-6.0"/>
+    <PARAM id="v5_noise_lvl" value="-60.0"/>
+    <PARAM id="v5_noise_type" value="0.0"/>
+    <PARAM id="v5_flt_type" value="0.0"/>
+    <PARAM id="v5_flt_cut" value="8000.0"/>
+    <PARAM id="v5_flt_res" value="0.2"/>
+    <PARAM id="v5_flt_drv" value="0.0"/>
+    <PARAM id="v5_flt_lo_cut" value="0.0"/>
+    <PARAM id="v5_flt_env_depth" value="1.0"/>
+    <PARAM id="v5_flt2_type" value="0.0"/>
+    <PARAM id="v5_flt2_cut" value="8000.0"/>
+    <PARAM id="v5_flt2_res" value="0.0"/>
+    <PARAM id="v5_flt2_drv" value="0.0"/>
+    <PARAM id="v5_flt2_lo_cut" value="0.0"/>
+    <PARAM id="v5_flt2_env_depth" value="0.0"/>
+    <PARAM id="v5_flt_series" value="1.0"/>
+    <PARAM id="v5_o1_penv_depth" value="0.0"/>
+    <PARAM id="v5_o2_penv_depth" value="0.0"/>
+    <PARAM id="v5_level" value="-6.0"/>
+    <PARAM id="v5_gate_gap" value="0.0"/>
+    <PARAM id="v5_gate_bypass" value="0.0"/>
+    <PARAM id="v5_drvChar" value="0.0"/>
+    <PARAM id="v5_insP1" value="0.0"/>
+    <PARAM id="v5_insP2" value="0.0"/>
+    <PARAM id="v5_insP3" value="0.0"/>
+    <PARAM id="v5_insP4" value="0.0"/>
+    <PARAM id="v6_o1_oct" value="0.0"/>
+    <PARAM id="v6_o1_semi" value="0.0"/>
+    <PARAM id="v6_o1_fine" value="0.0"/>
+    <PARAM id="v6_o1_pos" value="0.0"/>
+    <PARAM id="v6_o2_oct" value="0.0"/>
+    <PARAM id="v6_o2_semi" value="2.0"/>
+    <PARAM id="v6_o2_fine" value="0.0"/>
+    <PARAM id="v6_o2_pos" value="0.0"/>
+    <PARAM id="v6_o1_wt" value="0.0"/>
+    <PARAM id="v6_o2_wt" value="0.0"/>
+    <PARAM id="v6_xmod_phaseMode" value="1.0"/>
+    <PARAM id="v6_xmod_index" value="0.0"/>
+    <PARAM id="v6_sync" value="0.0"/>
+    <PARAM id="v6_xmod_fdbk" value="0.0"/>
+    <PARAM id="v6_xmod_ampMode" value="0.0"/>
+    <PARAM id="v6_xmod_depth" value="0.0"/>
+    <PARAM id="v6_xmod_ssb" value="0.0"/>
+    <PARAM id="v6_o1_lvl" value="0.0"/>
+    <PARAM id="v6_o2_lvl" value="-6.0"/>
+    <PARAM id="v6_noise_lvl" value="-60.0"/>
+    <PARAM id="v6_noise_type" value="0.0"/>
+    <PARAM id="v6_flt_type" value="0.0"/>
+    <PARAM id="v6_flt_cut" value="8000.0"/>
+    <PARAM id="v6_flt_res" value="0.2"/>
+    <PARAM id="v6_flt_drv" value="0.0"/>
+    <PARAM id="v6_flt_lo_cut" value="0.0"/>
+    <PARAM id="v6_flt_env_depth" value="1.0"/>
+    <PARAM id="v6_flt2_type" value="0.0"/>
+    <PARAM id="v6_flt2_cut" value="8000.0"/>
+    <PARAM id="v6_flt2_res" value="0.0"/>
+    <PARAM id="v6_flt2_drv" value="0.0"/>
+    <PARAM id="v6_flt2_lo_cut" value="0.0"/>
+    <PARAM id="v6_flt2_env_depth" value="0.0"/>
+    <PARAM id="v6_flt_series" value="1.0"/>
+    <PARAM id="v6_o1_penv_depth" value="0.0"/>
+    <PARAM id="v6_o2_penv_depth" value="0.0"/>
+    <PARAM id="v6_level" value="-6.0"/>
+    <PARAM id="v6_gate_gap" value="0.0"/>
+    <PARAM id="v6_gate_bypass" value="0.0"/>
+    <PARAM id="v6_drvChar" value="0.0"/>
+    <PARAM id="v6_insP1" value="0.0"/>
+    <PARAM id="v6_insP2" value="0.0"/>
+    <PARAM id="v6_insP3" value="0.0"/>
+    <PARAM id="v6_insP4" value="0.0"/>
+    <PARAM id="v7_o1_oct" value="0.0"/>
+    <PARAM id="v7_o1_semi" value="0.0"/>
+    <PARAM id="v7_o1_fine" value="0.0"/>
+    <PARAM id="v7_o1_pos" value="0.0"/>
+    <PARAM id="v7_o2_oct" value="0.0"/>
+    <PARAM id="v7_o2_semi" value="2.0"/>
+    <PARAM id="v7_o2_fine" value="0.0"/>
+    <PARAM id="v7_o2_pos" value="0.0"/>
+    <PARAM id="v7_o1_wt" value="0.0"/>
+    <PARAM id="v7_o2_wt" value="0.0"/>
+    <PARAM id="v7_xmod_phaseMode" value="1.0"/>
+    <PARAM id="v7_xmod_index" value="0.0"/>
+    <PARAM id="v7_sync" value="0.0"/>
+    <PARAM id="v7_xmod_fdbk" value="0.0"/>
+    <PARAM id="v7_xmod_ampMode" value="0.0"/>
+    <PARAM id="v7_xmod_depth" value="0.0"/>
+    <PARAM id="v7_xmod_ssb" value="0.0"/>
+    <PARAM id="v7_o1_lvl" value="0.0"/>
+    <PARAM id="v7_o2_lvl" value="-6.0"/>
+    <PARAM id="v7_noise_lvl" value="-60.0"/>
+    <PARAM id="v7_noise_type" value="0.0"/>
+    <PARAM id="v7_flt_type" value="0.0"/>
+    <PARAM id="v7_flt_cut" value="8000.0"/>
+    <PARAM id="v7_flt_res" value="0.2"/>
+    <PARAM id="v7_flt_drv" value="0.0"/>
+    <PARAM id="v7_flt_lo_cut" value="0.0"/>
+    <PARAM id="v7_flt_env_depth" value="1.0"/>
+    <PARAM id="v7_flt2_type" value="0.0"/>
+    <PARAM id="v7_flt2_cut" value="8000.0"/>
+    <PARAM id="v7_flt2_res" value="0.0"/>
+    <PARAM id="v7_flt2_drv" value="0.0"/>
+    <PARAM id="v7_flt2_lo_cut" value="0.0"/>
+    <PARAM id="v7_flt2_env_depth" value="0.0"/>
+    <PARAM id="v7_flt_series" value="1.0"/>
+    <PARAM id="v7_o1_penv_depth" value="0.0"/>
+    <PARAM id="v7_o2_penv_depth" value="0.0"/>
+    <PARAM id="v7_level" value="-6.0"/>
+    <PARAM id="v7_gate_gap" value="0.0"/>
+    <PARAM id="v7_gate_bypass" value="0.0"/>
+    <PARAM id="v7_drvChar" value="0.0"/>
+    <PARAM id="v7_insP1" value="0.0"/>
+    <PARAM id="v7_insP2" value="0.0"/>
+    <PARAM id="v7_insP3" value="0.0"/>
+    <PARAM id="v7_insP4" value="0.0"/>
+    <PARAM id="ch0_lvl" value="0.736"/>
+    <PARAM id="ch0_pan" value="-0.6"/>
+    <PARAM id="ch0_mute" value="0.0"/>
+    <PARAM id="ch0_solo" value="0.0"/>
+    <PARAM id="ch0_sendEff" value="0.0"/>
+    <PARAM id="ch0_sendDly" value="0.158"/>
+    <PARAM id="ch0_sendRev" value="0.169"/>
+    <PARAM id="ch0_scSrc" value="0.0"/>
+    <PARAM id="ch0_scAmt" value="0.0"/>
+    <PARAM id="ch0_scAtk" value="5.0"/>
+    <PARAM id="ch0_scRel" value="100.0"/>
+    <PARAM id="ch0_outBus" value="0.0"/>
+    <PARAM id="ch1_lvl" value="0.741"/>
+    <PARAM id="ch1_pan" value="0.0"/>
+    <PARAM id="ch1_mute" value="0.0"/>
+    <PARAM id="ch1_solo" value="0.0"/>
+    <PARAM id="ch1_sendEff" value="0.0"/>
+    <PARAM id="ch1_sendDly" value="0.215"/>
+    <PARAM id="ch1_sendRev" value="0.141"/>
+    <PARAM id="ch1_scSrc" value="0.0"/>
+    <PARAM id="ch1_scAmt" value="0.0"/>
+    <PARAM id="ch1_scAtk" value="5.0"/>
+    <PARAM id="ch1_scRel" value="100.0"/>
+    <PARAM id="ch1_outBus" value="0.0"/>
+    <PARAM id="ch2_lvl" value="0.812"/>
+    <PARAM id="ch2_pan" value="0.6"/>
+    <PARAM id="ch2_mute" value="0.0"/>
+    <PARAM id="ch2_solo" value="0.0"/>
+    <PARAM id="ch2_sendEff" value="0.0"/>
+    <PARAM id="ch2_sendDly" value="0.205"/>
+    <PARAM id="ch2_sendRev" value="0.18"/>
+    <PARAM id="ch2_scSrc" value="0.0"/>
+    <PARAM id="ch2_scAmt" value="0.0"/>
+    <PARAM id="ch2_scAtk" value="5.0"/>
+    <PARAM id="ch2_scRel" value="100.0"/>
+    <PARAM id="ch2_outBus" value="0.0"/>
+    <PARAM id="ch3_lvl" value="1.0"/>
+    <PARAM id="ch3_pan" value="0.0"/>
+    <PARAM id="ch3_mute" value="0.0"/>
+    <PARAM id="ch3_solo" value="0.0"/>
+    <PARAM id="ch3_sendEff" value="0.0"/>
+    <PARAM id="ch3_sendDly" value="0.0"/>
+    <PARAM id="ch3_sendRev" value="0.0"/>
+    <PARAM id="ch3_scSrc" value="0.0"/>
+    <PARAM id="ch3_scAmt" value="0.0"/>
+    <PARAM id="ch3_scAtk" value="5.0"/>
+    <PARAM id="ch3_scRel" value="100.0"/>
+    <PARAM id="ch3_outBus" value="0.0"/>
+    <PARAM id="ch4_lvl" value="1.0"/>
+    <PARAM id="ch4_pan" value="0.0"/>
+    <PARAM id="ch4_mute" value="0.0"/>
+    <PARAM id="ch4_solo" value="0.0"/>
+    <PARAM id="ch4_sendEff" value="0.0"/>
+    <PARAM id="ch4_sendDly" value="0.0"/>
+    <PARAM id="ch4_sendRev" value="0.0"/>
+    <PARAM id="ch4_scSrc" value="0.0"/>
+    <PARAM id="ch4_scAmt" value="0.0"/>
+    <PARAM id="ch4_scAtk" value="5.0"/>
+    <PARAM id="ch4_scRel" value="100.0"/>
+    <PARAM id="ch4_outBus" value="0.0"/>
+    <PARAM id="ch5_lvl" value="1.0"/>
+    <PARAM id="ch5_pan" value="0.0"/>
+    <PARAM id="ch5_mute" value="0.0"/>
+    <PARAM id="ch5_solo" value="0.0"/>
+    <PARAM id="ch5_sendEff" value="0.0"/>
+    <PARAM id="ch5_sendDly" value="0.0"/>
+    <PARAM id="ch5_sendRev" value="0.0"/>
+    <PARAM id="ch5_scSrc" value="0.0"/>
+    <PARAM id="ch5_scAmt" value="0.0"/>
+    <PARAM id="ch5_scAtk" value="5.0"/>
+    <PARAM id="ch5_scRel" value="100.0"/>
+    <PARAM id="ch5_outBus" value="0.0"/>
+    <PARAM id="ch6_lvl" value="1.0"/>
+    <PARAM id="ch6_pan" value="0.0"/>
+    <PARAM id="ch6_mute" value="0.0"/>
+    <PARAM id="ch6_solo" value="0.0"/>
+    <PARAM id="ch6_sendEff" value="0.0"/>
+    <PARAM id="ch6_sendDly" value="0.0"/>
+    <PARAM id="ch6_sendRev" value="0.0"/>
+    <PARAM id="ch6_scSrc" value="0.0"/>
+    <PARAM id="ch6_scAmt" value="0.0"/>
+    <PARAM id="ch6_scAtk" value="5.0"/>
+    <PARAM id="ch6_scRel" value="100.0"/>
+    <PARAM id="ch6_outBus" value="0.0"/>
+    <PARAM id="ch7_lvl" value="1.0"/>
+    <PARAM id="ch7_pan" value="0.0"/>
+    <PARAM id="ch7_mute" value="0.0"/>
+    <PARAM id="ch7_solo" value="0.0"/>
+    <PARAM id="ch7_sendEff" value="0.0"/>
+    <PARAM id="ch7_sendDly" value="0.0"/>
+    <PARAM id="ch7_sendRev" value="0.0"/>
+    <PARAM id="ch7_scSrc" value="0.0"/>
+    <PARAM id="ch7_scAmt" value="0.0"/>
+    <PARAM id="ch7_scAtk" value="5.0"/>
+    <PARAM id="ch7_scRel" value="100.0"/>
+    <PARAM id="ch7_outBus" value="0.0"/>
+    <PARAM id="eff_algo" value="0.0"/>
+    <PARAM id="eff_en" value="1.0"/>
+    <PARAM id="eff_p0" value="0.4"/>
+    <PARAM id="eff_p1" value="0.5"/>
+    <PARAM id="eff_p2" value="0.5"/>
+    <PARAM id="eff_p3" value="0.5"/>
+    <PARAM id="eff_p4" value="0.5"/>
+    <PARAM id="dly_en" value="1.0"/>
+    <PARAM id="dly_mode" value="1.0"/>
+    <PARAM id="dly_ms" value="250.0"/>
+    <PARAM id="dly_syncDenom" value="2.0"/>
+    <PARAM id="dly_syncDot" value="1.0"/>
+    <PARAM id="dly_syncTrip" value="0.0"/>
+    <PARAM id="dly_count" value="1.0"/>
+    <PARAM id="dly_fb" value="0.35"/>
+    <PARAM id="dly_spread" value="0.0"/>
+    <PARAM id="dly_dirt" value="0.0"/>
+    <PARAM id="rev_algo" value="1.0"/>
+    <PARAM id="rev_en" value="1.0"/>
+    <PARAM id="rev_lvl" value="1.0"/>
+    <PARAM id="rev_size" value="0.85"/>
+    <PARAM id="rev_pre" value="25.0"/>
+    <PARAM id="rev_diff" value="0.8"/>
+    <PARAM id="rev_damp" value="0.35"/>
+    <PARAM id="rev_mod" value="0.15"/>
+    <PARAM id="rev_dirt" value="0.0"/>
+    <PARAM id="eff2dly" value="0.0"/>
+    <PARAM id="eff2rev" value="0.0"/>
+    <PARAM id="dly2rev" value="0.0"/>
+    <PARAM id="echo_en" value="1.0"/>
+    <PARAM id="echo_mode" value="0.0"/>
+    <PARAM id="echo_ms" value="250.0"/>
+    <PARAM id="echo_syncDenom" value="2.0"/>
+    <PARAM id="echo_syncDot" value="0.0"/>
+    <PARAM id="echo_syncTrip" value="0.0"/>
+    <PARAM id="echo_count" value="1.0"/>
+    <PARAM id="echo_fb" value="0.45"/>
+    <PARAM id="echo_spread" value="0.0"/>
+    <PARAM id="echo_dirt" value="0.0"/>
+    <PARAM id="mstr_lvl" value="1.0"/>
+    <PARAM id="mstr_pan" value="0.0"/>
+    <PARAM id="mst_insChar" value="0.0"/>
+    <PARAM id="mst_insP1" value="0.0"/>
+    <PARAM id="mst_insP2" value="0.0"/>
+    <PARAM id="mst_insP3" value="0.0"/>
+    <PARAM id="mst_insP4" value="0.0"/>
+    <PARAM id="mst_ins2Char" value="0.0"/>
+    <PARAM id="mst_ins2P1" value="0.0"/>
+    <PARAM id="mst_ins2P2" value="0.0"/>
+    <PARAM id="mst_ins2P3" value="0.0"/>
+    <PARAM id="mst_ins2P4" value="0.0"/>
+    <VoiceData>
+      <Voice idx="0">
+        <Modulators>
+          <Seq id="cs0" mode="Smooth" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+            <Point x="0.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+            <Point x="0.25" y="1.0" bez="0" hx="0.0" hy="0.0"/>
+            <Point x="0.5" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+            <Point x="0.75" y="-1.0" bez="0" hx="0.0" hy="0.0"/>
+            <Point x="1.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+          </Seq>
+          <Seq id="cs1" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs2" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs3" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs4" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs5" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs6" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs7" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Asgn id="asg0" src="cs0" dest="filter.cutoff" depth="0.24" curve="0.0"/>
+        </Modulators>
+        <Gate subdiv="16" bars="2">
+          <Env start="0" len="14" split="0.6" atk="0.6" dec="0.3" rev="0"/>
+          <Env start="20" len="8" split="0.6" atk="0.5" dec="0.5" rev="0"/>
+        </Gate>
+        <FilterGate subdiv="16" bars="2"/>
+        <PitchGate subdiv="16" bars="2"/>
+      </Voice>
+      <Voice idx="1">
+        <Modulators>
+          <Seq id="cs0" mode="Smooth" polarity="Bipolar" loopNV="Half" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+            <Point x="0.0" y="-1.0" bez="0" hx="0.0" hy="0.0"/>
+            <Point x="0.5" y="1.0" bez="0" hx="0.0" hy="0.0"/>
+            <Point x="1.0" y="-1.0" bez="0" hx="0.0" hy="0.0"/>
+          </Seq>
+          <Seq id="cs1" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs2" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs3" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs4" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs5" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs6" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs7" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Asgn id="asg0" src="cs0" dest="filter.cutoff" depth="0.23" curve="0.0"/>
+        </Modulators>
+        <Gate subdiv="16" bars="2">
+          <Env start="14" len="2" split="0.0" atk="0.0" dec="0.7" rev="0"/>
+          <Env start="22" len="2" split="0.0" atk="0.0" dec="0.7" rev="0"/>
+          <Env start="30" len="2" split="0.0" atk="0.0" dec="0.7" rev="0"/>
+          <Env start="6" len="2" split="0.0" atk="0.0" dec="0.7" rev="0"/>
+        </Gate>
+        <FilterGate subdiv="16" bars="2"/>
+        <PitchGate subdiv="16" bars="2"/>
+      </Voice>
+      <Voice idx="2">
+        <Modulators>
+          <Seq id="cs0" mode="Smooth" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+            <Point x="0.0" y="-1.0" bez="0" hx="0.0" hy="0.0"/>
+            <Point x="0.5" y="1.0" bez="0" hx="0.0" hy="0.0"/>
+            <Point x="1.0" y="-1.0" bez="0" hx="0.0" hy="0.0"/>
+          </Seq>
+          <Seq id="cs1" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs2" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs3" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs4" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs5" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs6" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Seq id="cs7" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+          <Asgn id="asg0" src="cs0" dest="filter.cutoff" depth="0.21" curve="0.0"/>
+        </Modulators>
+        <Gate subdiv="16" bars="2">
+          <Env start="21" len="6" split="0.6" atk="0.5" dec="0.3" rev="0"/>
+          <Env start="31" len="8" split="0.6" atk="0.5" dec="0.3" rev="0"/>
+          <Env start="11" len="8" split="0.6" atk="0.6" dec="0.4" rev="0"/>
+        </Gate>
+        <FilterGate subdiv="16" bars="2"/>
+        <PitchGate subdiv="16" bars="2"/>
+      </Voice>
+    </VoiceData>
+  </MuTantState>
+</MuTantPreset>

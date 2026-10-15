@@ -1,0 +1,11 @@
+# frozen load result for fixture: Aurora Pad.muPattern
+layers=1
+load_errors=0
+capture_bytes=3519
+capture_sha256=13f70dd0962a34657cdafedaffde8d6d3fdf2752014309700692b80f40386c37
+--- parameters differing from default (id=plain value)
+v0_flt_cut=4000
+v0_level=-8
+v0_o1_wt=4
+v0_o2_semi=5
+v0_o2_wt=4

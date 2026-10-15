@@ -1,0 +1,12 @@
+# frozen load result for fixture: Tidal Drift.muPattern
+layers=1
+load_errors=0
+capture_bytes=3553
+capture_sha256=91c5717da22fe9a5cf7d69758a4a51eba2737194556132661a2647c150887013
+--- parameters differing from default (id=plain value)
+v0_flt_cut=1800
+v0_level=-10
+v0_o1_oct=-1
+v0_o1_wt=4
+v0_o2_semi=-5
+v0_o2_wt=4
