@@ -121,6 +121,7 @@
       <p id="rev_en" x="1.0"/>
       <p id="rev_lvl" x="1.0"/>
       <p id="rev_size" x="0.75"/>
+      <p id="rev_decay" x="2.5"/>
       <p id="rev_pre" x="25.0"/>
       <p id="rev_diff" x="0.800000011920929"/>
       <p id="rev_damp" x="0.300000011920929"/>
