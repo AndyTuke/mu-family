@@ -73,6 +73,16 @@ struct BiquadFilter
                   1.0f + alpha / A,  -2.0f * cw, 1.0f - alpha / A);
     }
 
+    // Set band-pass coefficients: RBJ "constant 0 dB peak gain" form (gain 1 at the centre, Q sets the width).
+    void setBandPass(float cutoffHz, float q, float sampleRate) noexcept
+    {
+        const float w0    = juce::MathConstants<float>::twoPi * cutoffHz / sampleRate;
+        const float cw    = std::cos(w0);
+        const float alpha = std::sin(w0) / (2.0f * q);
+        setCoeffs(alpha, 0.0f, -alpha,
+                  1.0f + alpha, -2.0f * cw, 1.0f - alpha);
+    }
+
     // Set low-shelf coefficients. gainDb is fixed boost; Q controls shelf slope.
     void setLowShelf(float cutoffHz, float q, float gainDb, float sampleRate) noexcept
     {

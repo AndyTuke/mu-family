@@ -123,10 +123,11 @@ public:
             const float sr = (float) currentSampleRate;
             for (int b = 0; b < kNumBands; ++b)
             {
-                analysisBp [b].setPeak(bandCentres[b], kBandQ, 0.0f, sr);
-                analysisBpL[b].setPeak(bandCentres[b], kBandQ, 0.0f, sr);
-                analysisBpR[b].setPeak(bandCentres[b], kBandQ, 0.0f, sr);
-                synthBp    [b].setPeak(bandCentres[b], kBandQ, 0.0f, sr);
+                // Real band-passes: a 0 dB peak EQ is the identity filter and split nothing.
+                analysisBp [b].setBandPass(bandCentres[b], kBandQ, sr);
+                analysisBpL[b].setBandPass(bandCentres[b], kBandQ, sr);
+                analysisBpR[b].setBandPass(bandCentres[b], kBandQ, sr);
+                synthBp    [b].setBandPass(bandCentres[b], kBandQ, sr);
             }
             lastNoteIndex = noteIndex;
             lastOctave  = octave;
@@ -244,8 +245,8 @@ public:
                     vocoL += synthOut * envelopeL[b];
                     vocoR += synthOut * envelopeR[b];
                 }
-                if (nChClamped > 0) buf.getWritePointer(0)[i] = vocoL / (float)kNumBands;
-                if (nChClamped > 1) buf.getWritePointer(1)[i] = vocoR / (float)kNumBands;
+                if (nChClamped > 0) buf.getWritePointer(0)[i] = vocoL * kOutputGain;
+                if (nChClamped > 1) buf.getWritePointer(1)[i] = vocoR * kOutputGain;
             }
             else
             {
@@ -267,7 +268,7 @@ public:
                     vocoded += synthOut * envelope[b];
                 }
                 for (int ch = 0; ch < nChClamped; ++ch)
-                    buf.getWritePointer(ch)[i] = vocoded / (float)kNumBands;
+                    buf.getWritePointer(ch)[i] = vocoded * kOutputGain;
             }
         }
     }
@@ -277,6 +278,10 @@ private:
     static constexpr float kLowBandHz        = 80.0f;
     static constexpr float kHighBandHz       = 10000.0f;
     static constexpr float kBandQ            = 5.0f;
+    // Makeup for the band split: each band keeps only ~1/20 of the carrier and of the input envelope, so the summed
+    // output is ~100x (+40 dB) below the carrier x input level. A simulation (white-noise carrier, white-noise and two-sine
+    // inputs) put the ratio at 93..99, so 100/20 (the old 1/kNumBands average folded in) restores that level.
+    static constexpr float kOutputGain       = 100.0f / (float) kNumBands;
     static constexpr float kEnvAttackMs      = 5.0f;
     static constexpr float kEnvReleaseMs     = 30.0f;
     static constexpr float kLowestFreq       = 32.7f;     // SPN C1
