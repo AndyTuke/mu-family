@@ -27,8 +27,10 @@ public:
         // Skip the coefficient recompute when cutoff/resonance are unchanged.
         if (cutoffHz != lastCutoffHz || resonance != lastResonance)
         {
+            const float q = mu_filter::svfResonanceToQ(resonance);
             svf.setCutoffFrequency(cutoffHz);
-            svf.setResonance(mu_filter::svfResonanceToQ(resonance));
+            svf.setResonance(q);
+            bandpassGain = 1.0f / q;
             lastCutoffHz = cutoffHz; lastResonance = resonance;
         }
         juce::dsp::AudioBlock<float> block(buf.getArrayOfWritePointers(),
@@ -36,10 +38,16 @@ public:
                                            static_cast<size_t>(numSamples));
         juce::dsp::ProcessContextReplacing<float> ctx(block);
         svf.process(ctx);
+
+        // JUCE's SVF bandpass is not the RBJ 0 dB one: its centre gain is Q (see juce_StateVariableTPTFilter.h),
+        // so a resonant setting would boost the band. Scale by 1/Q for a constant 0 dB band-pass.
+        if constexpr (Type == juce::dsp::StateVariableTPTFilterType::bandpass)
+            block.multiplyBy(bandpassGain);
     }
 
 private:
     juce::dsp::StateVariableTPTFilter<float> svf;
+    float bandpassGain = 1.0f;   // 1/Q, used by the bandpass type only
     float lastCutoffHz = -1.0f, lastResonance = -1.0f;
 };
 
