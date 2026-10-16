@@ -239,3 +239,11 @@ struct MuToniProcessorSeamTests : juce::UnitTest
 };
 
 static MuToniProcessorSeamTests muToniProcessorSeamTests;
+
+// The layout word the shared layer driver reads follows every count store of the real processor (E1).
+struct MuToniLayoutWordTests : juce::UnitTest
+{
+    MuToniLayoutWordTests() : juce::UnitTest("mu-Toni layout word follows the live count", "mu-toni-processor") {}
+    void runTest() override { mu_seam_test::checkLayoutWordFollowsCount<mu_toni::PluginProcessor>(*this); }
+};
+static MuToniLayoutWordTests sMuToniLayoutWordTests;

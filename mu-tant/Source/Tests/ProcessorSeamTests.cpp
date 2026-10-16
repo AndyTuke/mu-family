@@ -505,3 +505,11 @@ struct MuTantProcessorSeamTests : juce::UnitTest
 };
 
 static MuTantProcessorSeamTests muTantProcessorSeamTests;
+
+// The layout word the shared layer driver reads follows every count store of the real processor (E1).
+struct MuTantLayoutWordTests : juce::UnitTest
+{
+    MuTantLayoutWordTests() : juce::UnitTest("mu-Tant layout word follows the live count", "mu-tant-processor") {}
+    void runTest() override { mu_seam_test::checkLayoutWordFollowsCount<mu_tant::PluginProcessor>(*this); }
+};
+static MuTantLayoutWordTests sMuTantLayoutWordTests;

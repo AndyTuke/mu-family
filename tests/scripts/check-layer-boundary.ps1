@@ -26,6 +26,12 @@
 #           `layerAs<` is reported unless the line carries a `layer-ok` marker (with a reason) that a reviewer
 #           wrote after auditing it (message-thread code, or a value cached by renderLayers). Coarse by design:
 #           it fires on the file, the reviewer clears audited lines. Live from the first Published host (T1).
+#   Rule 7  Every live-count store goes through ProcessorCore::storeLayerCount, which keeps the packed
+#           count | serial layout word in step: `numLayers.store` may appear only in mu-core/Plugin/ProcessorCore.h.
+#           Scans every mu-* source tree (mu-core and the products); Tests/ folders are exempt (test fixtures
+#           build states by hand).
+#   Rule 8  mu-core's Audio/, Modulation/, Persistence/ and Sequencer/ never include Plugin/ (the layer side of
+#           mu-core stays below the processor side; RetireBin and LayerBlock live in Plugin/ for that reason).
 #
 # The scan is driven by -Root, a directory laid out like the repo root: mu-core/, any mu-*-layer/ libraries and
 # the product trees mu-*/Source/. A layer library that does not exist yet is simply absent, so today the script
@@ -237,6 +243,34 @@ foreach ($lib in ($libraries | Where-Object { $_.IsLayer })) { $registeredProduc
 foreach ($r in $Registered) { foreach ($p in ($r -split ',')) { if ($p.Trim()) { $registeredProducts += ('mu-' + ($p.Trim() -replace '^mu-', '')) } } }
 foreach ($finding in (Test-Glue $productFiles $registeredProducts)) { Report $finding }
 foreach ($finding in (Test-LayerReadsOutsideLayerBlock $productFiles)) { Report $finding }
+
+# Rule 7: a count store outside storeLayerCount leaves the layout word stale.
+$countStore = [regex]'\bnumLayers\s*\.\s*store\s*\('
+foreach ($d in (Get-ChildItem -LiteralPath $Root -Directory -Filter 'mu-*' | Sort-Object Name)) {
+    $base = $d.FullName
+    foreach ($f in (Get-ChildItem -LiteralPath $base -Recurse -File -Include '*.h', '*.hpp', '*.cpp' | Sort-Object FullName)) {
+        $rel = $f.FullName.Substring($base.Length).TrimStart([char]92, '/').Replace([string][char]92, '/')
+        if ($skipDir.IsMatch($rel) -or $rel -match '(^|/)Tests/') { continue }
+        if ($d.Name -eq 'mu-core' -and $rel -eq 'Plugin/ProcessorCore.h') { continue }
+        $cleaned = Get-CleanedText ([System.IO.File]::ReadAllText($f.FullName))
+        foreach ($m in $countStore.Matches($cleaned)) {
+            $line = Get-LineNumber $cleaned $m.Index
+            Report "$($d.Name)/$($rel):$line — a live-count store outside storeLayerCount leaves the layout word stale (rule 7)"
+        }
+    }
+}
+
+# Rule 8: mu-core's layer-side folders never reach up into Plugin/.
+if (Test-Path -LiteralPath $core -PathType Container) {
+    foreach ($file in ($all | Where-Object { $_.Lib -eq 'mu-core' -and $_.Rel -match '^(Audio|Modulation|Persistence|Sequencer)/' })) {
+        # Comments blanked only: the include path is a string literal, which Get-CleanedText would empty.
+        $cleaned = $blockComment.Replace([System.IO.File]::ReadAllText($file.Full), $blankBlock) -replace '//[^\r\n]*', ''
+        foreach ($m in ([regex]'#\s*include\s*[<"]([^">]*/)?Plugin/[^">]*[">]').Matches($cleaned)) {
+            $line = Get-LineNumber $cleaned $m.Index
+            Report "mu-core/$($file.Rel):$line — mu-core's $($file.Rel.Split('/')[0])/ includes a Plugin/ header (rule 8)"
+        }
+    }
+}
 
 $layerCount = @($libraries | Where-Object { $_.IsLayer }).Count
 $status = if ($fails -eq 0) { 'PASS' } else { 'FAIL' }

@@ -654,3 +654,11 @@ struct MuClidProcessorSeamTests : juce::UnitTest
 };
 
 static MuClidProcessorSeamTests muClidProcessorSeamTests;
+
+// The layout word the shared layer driver reads follows every count store of the real processor (E1).
+struct MuClidLayoutWordTests : juce::UnitTest
+{
+    MuClidLayoutWordTests() : juce::UnitTest("mu-Clid layout word follows the live count", "mu-clid-processor") {}
+    void runTest() override { mu_seam_test::checkLayoutWordFollowsCount<mu_clid::PluginProcessor>(*this); }
+};
+static MuClidLayoutWordTests sMuClidLayoutWordTests;
