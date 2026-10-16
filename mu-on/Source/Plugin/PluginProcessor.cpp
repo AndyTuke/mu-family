@@ -84,10 +84,11 @@ PluginProcessor::~PluginProcessor()
         apvts.removeParameterListener(layerParamId(i, "eng"), engineListeners[(size_t) i].get());
 }
 
-// A track's engine parameter changed. On the message thread the track builds and swaps in the named engine
-// now; from any other thread (host automation on the audio thread, a state restored on a host thread) nothing
-// may allocate there, so the slot is flagged and the deferred work (message thread) builds it. Until then the
-// track renders silence: it holds another engine than its parameter names.
+// A track's engine parameter changed. A mu-On track holds all five engines (it is never engineLocked), so it
+// switches in the same block whatever thread the change came from, and syncEngine finds nothing to build. The
+// path stays for a locked track (one engine, a mu-Tronic layer): on the message thread it builds the named engine
+// now; from any other thread nothing may allocate, so the slot is flagged and the deferred work (message thread)
+// builds it, the track rendering silence until then.
 void PluginProcessor::engineParamChanged(int slot)
 {
     if (juce::MessageManager::existsAndIsCurrentThread())
