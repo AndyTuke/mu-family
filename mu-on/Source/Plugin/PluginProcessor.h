@@ -69,7 +69,7 @@ public:
     // A track is named after the engine it runs; the name is not saved, it follows the engine.
     juce::String getLayerName(int idx)       const override
     {
-        return (idx >= 0 && idx < mu_limits::kMaxLayers) ? juce::String(engineName(engineOf(idx))) : juce::String();
+        return (idx >= 0 && idx < mu_limits::kMaxLayers) ? juce::String(engineName(getTrackEngine(idx))) : juce::String();
     }
     // The palette colour is allocated per track and follows it through delete / reorder.
     int          getLayerColourIndex(int idx) const override
@@ -94,7 +94,7 @@ public:
     const Track& getTrack(int i) const noexcept { return layerAs<Track>(juce::jlimit(0, mu_limits::kMaxLayers - 1, i)); }
 
     // The engine track `i` runs (its `t{N}_eng` parameter).
-    EngineType engineOf(int i) const noexcept override
+    EngineType getTrackEngine(int i) const noexcept override
     {
         const auto* p = (i >= 0 && i < mu_limits::kMaxLayers) ? engineParam[(size_t) i] : nullptr;
         return engineFromIndex(p != nullptr ? juce::roundToInt(p->load(std::memory_order_relaxed)) : 0);
@@ -108,7 +108,7 @@ public:
     // Switch track `i` to `engine`: every engine keeps its settings on the track, the step row and
     // envelope stay, and the track's modulation assignments that target another engine's parameters
     // are dropped. Message thread.
-    void selectEngine(int i, EngineType engine) override;
+    void selectTrackEngine(int i, EngineType engine) override;
 
     // ── TrackHost: what TrackContent and StepRows read (message thread) ──────────
     juce::AudioProcessorValueTreeState& getTrackParameters() noexcept override { return apvts; }

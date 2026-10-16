@@ -56,7 +56,7 @@ juce::uint64 StepRows::signature() const
     // Count, then each live row's colour and engine, folded into one number.
     juce::uint64 h = (juce::uint64) host.getTrackCount();
     for (int i = 0; i < host.getTrackCount(); ++i)
-        h = h * 131u + (juce::uint64) (host.getTrackColourIndex(i) * 8 + toIndex(host.engineOf(i)));
+        h = h * 131u + (juce::uint64) (host.getTrackColourIndex(i) * 8 + toIndex(host.getTrackEngine(i)));
     return h;
 }
 
@@ -73,7 +73,7 @@ void StepRows::paintRow(juce::Graphics& g, int row)
 {
     const auto& L = MuLookAndFeel::lighting();
     const auto col = layerColour(row);
-    const bool isRumble = host.engineOf(row) == EngineType::Rumble;
+    const bool isRumble = host.getTrackEngine(row) == EngineType::Rumble;
     const auto area = rowArea(row);
 
     const juce::Graphics::ScopedSaveState state(g);
@@ -143,7 +143,7 @@ void StepRows::mouseDown(const juce::MouseEvent& e)
 
     // A Rumble row is not editable; a click on a cell of any other row edits it.
     int r = 0, s = 0;
-    if (! cellAt(e.getPosition(), r, s) || host.engineOf(r) == EngineType::Rumble) return;
+    if (! cellAt(e.getPosition(), r, s) || host.getTrackEngine(r) == EngineType::Rumble) return;
 
     // Right-click toggles accent, but only on an ON step (accent is invisible/inert
     // otherwise); on an OFF step it turns the step on so the gesture is never a no-op.

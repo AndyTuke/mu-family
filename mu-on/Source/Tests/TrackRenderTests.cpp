@@ -246,7 +246,7 @@ public:
         {
             TempStorage storage;
             PluginProcessor p;
-            p.selectEngine(0, EngineType::Bass);
+            p.selectTrackEngine(0, EngineType::Bass);
             auto& t = p.getTrack(0);
             t.prepare(sr, prepared);
             auto& cs = t.controlSequences[0];
@@ -278,7 +278,7 @@ public:
         {
             TempStorage storage;
             PluginProcessor p;
-            p.selectEngine(0, EngineType::Bass);
+            p.selectTrackEngine(0, EngineType::Bass);
             for (int s = 1; s < 16; ++s) p.getTrack(0).row.setOn(s, false);
             p.getTrack(0).row.setOn(0, true);
             setParam(p.apvts, engineParamId(0, EngineType::Bass, "sus"), 1.0f);

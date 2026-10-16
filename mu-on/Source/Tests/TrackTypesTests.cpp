@@ -45,7 +45,7 @@ public:
                 expectEquals(p.getTrack(i).typeId(), (int) layerTypeOf(engineFromIndex(i)));
                 expect(typeFromPreset(p.captureLayerPresetTree(i)) == layerTypeOf(engineFromIndex(i)), "preset of track " + juce::String(i));
             }
-            p.selectEngine(0, EngineType::Snare);
+            p.selectTrackEngine(0, EngineType::Snare);
             expectEquals(p.getTrack(0).typeId(), (int) mu_core::LayerTypeId::Snare, "the type changes with the engine");
 
             juce::ValueTree legacy("MuOnTrack");

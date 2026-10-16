@@ -188,9 +188,9 @@ int PluginProcessor::firstKickTrack() const noexcept
 {
     const int n = numLayers.load(std::memory_order_relaxed);
     for (int i = 0; i < n; ++i)
-        if (engineOf(i) == EngineType::Kick) return i;
+        if (getTrackEngine(i) == EngineType::Kick) return i;
     for (int i = 0; i < n; ++i)
-        if (engineOf(i) != EngineType::Rumble) return i;   // no Kick: any track a Rumble can process
+        if (getTrackEngine(i) != EngineType::Rumble) return i;   // no Kick: any track a Rumble can process
     return 0;
 }
 
@@ -199,7 +199,7 @@ int PluginProcessor::firstKickTrack() const noexcept
 void PluginProcessor::layerAdded(int index)
 {
     std::array<bool, kNumEngineTypes> used {};
-    for (int i = 0; i < index; ++i) used[(size_t) toIndex(engineOf(i))] = true;
+    for (int i = 0; i < index; ++i) used[(size_t) toIndex(getTrackEngine(i))] = true;
     int pick = 0;
     for (int e = 0; e < kNumEngineTypes; ++e)
         if (! used[(size_t) e]) { pick = e; break; }
@@ -215,18 +215,18 @@ void PluginProcessor::layerAdded(int index)
 
 void PluginProcessor::ensureRumbleSource(int track)
 {
-    if (track < 0 || track >= mu_limits::kMaxLayers || engineOf(track) != EngineType::Rumble) return;
+    if (track < 0 || track >= mu_limits::kMaxLayers || getTrackEngine(track) != EngineType::Rumble) return;
     if (auto* p = apvts.getParameter(layerParamId(track, "src")))
     {
         const int src = juce::roundToInt(p->convertFrom0to1(p->getValue()));
-        if (src == track || src >= numLayers.load(std::memory_order_relaxed) || engineOf(src) == EngineType::Rumble)
+        if (src == track || src >= numLayers.load(std::memory_order_relaxed) || getTrackEngine(src) == EngineType::Rumble)
             p->setValueNotifyingHost(p->convertTo0to1((float) firstKickTrack()));
     }
 }
 
-void PluginProcessor::selectEngine(int i, EngineType engine)
+void PluginProcessor::selectTrackEngine(int i, EngineType engine)
 {
-    if (i < 0 || i >= mu_limits::kMaxLayers || engineOf(i) == engine) return;
+    if (i < 0 || i >= mu_limits::kMaxLayers || getTrackEngine(i) == engine) return;
 
     if (auto* p = apvts.getParameter(layerParamId(i, "eng")))
     {
@@ -251,7 +251,7 @@ void PluginProcessor::remapLayerReferences(const std::function<int(int)>& oldToN
     const int live = numLayers.load(std::memory_order_relaxed);
     int fallback = live;
     for (int j = 0; j < mu_limits::kMaxLayers; ++j)
-        if (engineOf(j) == EngineType::Kick)
+        if (getTrackEngine(j) == EngineType::Kick)
         {
             const int nj = oldToNew(j);
             if (nj >= 0 && nj < live) fallback = juce::jmin(fallback, nj);
@@ -260,7 +260,7 @@ void PluginProcessor::remapLayerReferences(const std::function<int(int)>& oldToN
 
     for (int j = 0; j < mu_limits::kMaxLayers; ++j)
     {
-        if (engineOf(j) != EngineType::Rumble) continue;
+        if (getTrackEngine(j) != EngineType::Rumble) continue;
         auto* p = apvts.getParameter(layerParamId(j, "src"));
         if (p == nullptr) continue;
         const int oldSrc = juce::roundToInt(p->convertFrom0to1(p->getValue()));

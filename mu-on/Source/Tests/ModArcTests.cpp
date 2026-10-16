@@ -40,7 +40,7 @@ struct MuOnModArcTests : juce::UnitTest
 
             beginTest(juce::String(engineName(engine)) + ": every target's live value follows its modulation assignment");
             {
-                proc.selectEngine(0, engine);
+                proc.selectTrackEngine(0, engine);
 
                 // A constant full-scale unipolar sequence feeds the matrix.
                 auto& track = proc.getTrack(0);
@@ -82,7 +82,7 @@ struct MuOnModArcTests : juce::UnitTest
 
         beginTest("a block that misses the track's matrix lock holds the last resolved values (C12)");
         {
-            proc.selectEngine(0, EngineType::Bass);
+            proc.selectTrackEngine(0, EngineType::Bass);
             auto& track = proc.getTrack(0);
             auto& cs = track.controlSequences[0];
             cs.mode       = ControlSequence::Mode::Stepped;
