@@ -36,7 +36,9 @@ namespace mu_core
         int32_t  firstFrame;         // this call covers host frames [firstFrame, firstFrame + blockSize)
         uint16_t channelMask;        // bit c = channel c+1 is this layer's (0xFFFF = omni)
         uint16_t dropped;            // events the decoder had no room for; 0 expected
-        uint32_t reserved;
+        uint16_t carried;            // the first `carried` events are from earlier host blocks that rendered nothing
+                                     // (frame 0; only when the processor carries them, else 0)
+        uint16_t reserved;
     };
 
     // Where a layer writes MIDI (MIDI output mode; a tail's owed note-offs). events == nullptr: none.

@@ -98,10 +98,28 @@ void ProcessorBase::noteHostBlock(const mu_core::BlockTransport& t, int numSampl
 // A host block that rendered nothing: a stop hidden in it must still reach the layers, as a jump if play
 // resumes before the next rendered block (design 2.1.5, the stop rule).
 // The buffer arrived as the host gave it, so a skipped block clears it: silence, as a missed try-lock always was.
-void ProcessorBase::noteSkippedBlock(const mu_core::BlockTransport& t, juce::AudioBuffer<float>& buffer) noexcept
+// With the carry on, its channel messages wait for the next rendered block (at frame 0, in arrival order).
+void ProcessorBase::noteSkippedBlock(const mu_core::BlockTransport& t, juce::AudioBuffer<float>& buffer,
+                                     const juce::MidiBuffer& midi) noexcept
 {
     if (! t.playing && renderState.lastPlaying) renderState.jumpPending = true;
     buffer.clear();
+    if (renderState.carryMidi && renderState.midi.get() != nullptr)
+        for (const auto meta : midi)
+        {
+            if (meta.numBytes < 1 || meta.numBytes > 3) continue;
+            const auto type = (uint8_t) (meta.data[0] & 0xf0);
+            if (type < 0x80 || type == 0xf0) continue;   // a system message (clock, transport) holds no state to carry
+            if (renderState.carried >= mu_limits::kMaxCarriedMidiEvents)
+            {
+                if (renderState.carryDropped < 0xFFFF) ++renderState.carryDropped;
+                continue;
+            }
+            auto& e = renderState.midi[(size_t) renderState.carried++];
+            e.frame = 0;
+            e.size  = (uint8_t) meta.numBytes;
+            for (int b = 0; b < 3; ++b) e.bytes[b] = b < meta.numBytes ? meta.data[b] : (uint8_t) 0;
+        }
     // This block produced no MIDI: a later mergeLayerMidiOut must not re-send the last rendered block's events.
     renderState.liveOut = renderState.tailOut = 0;
     renderState.lastBlockFrames = 0;
@@ -129,12 +147,16 @@ void ProcessorBase::captureSidechainRegion(juce::AudioBuffer<float>& buffer, int
 }
 
 // One decode per block: the router has already taken its claims out of `midi`. Short messages only (sysex
-// and longer messages are not carried); the input fills the storage up to the note-off reserve.
+// and longer messages are not carried); the input fills the storage up to the note-off reserve. Events carried
+// from unrendered blocks are already at the front and stay there.
 void ProcessorBase::decodeBlockMidi(const juce::MidiBuffer& midi, int numSamples) noexcept
 {
     const int cap = mu_limits::kMaxBlockMidiEvents - mu_limits::kMidiNoteOffReserve;
-    int32_t count = 0;
-    uint16_t dropped = 0;
+    int32_t count = renderState.carried;
+    renderState.midiCarried = (uint16_t) renderState.carried;
+    renderState.carried = 0;
+    uint16_t dropped = renderState.carryDropped;   // what the carry could not keep is reported with this block
+    renderState.carryDropped = 0;
     for (const auto meta : midi)
     {
         if (meta.numBytes < 1 || meta.numBytes > 3) continue;
@@ -158,13 +180,13 @@ void ProcessorBase::renderAndMix(juce::AudioBuffer<float>& buffer, juce::MidiBuf
 
     // Step 1: continuity, every host block.
     noteHostBlock(t, n);
-    if (n <= 0 || renderState.prepared <= 0) { noteSkippedBlock(t, buffer); return; }
+    if (n <= 0 || renderState.prepared <= 0) { noteSkippedBlock(t, buffer, midi); return; }
     // The driver's chunk is never longer than what the mixer (and the FX it runs) was prepared for.
     jassert(renderState.prepared <= mixerEngine.getPreparedBlockSize());
 
     // Step 2: the block's one access to the layers (and its ScopedNoDenormals, C11).
     const mu_core::LayerBlock block(layerAccess, layersLock, layerEditInFlight, layers);
-    if (! block) { noteSkippedBlock(t, buffer); return; }
+    if (! block) { noteSkippedBlock(t, buffer, midi); return; }
 
     // Step 3: one MIDI decode for every layer.
     decodeBlockMidi(midi, n);
@@ -233,7 +255,8 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
     base.callBeats         = t.playing ? (double) numSamples * t.beatsPerSample : 0.0;
     base.beatWrap          = t.beatWrap;
     base.playing           = t.playing ? 1 : 0;
-    base.midi              = { renderState.midi.get(), renderState.midiIn, offset, 0xFFFF, renderState.dropped, 0 };
+    base.midi              = { renderState.midi.get(), renderState.midiIn, offset, 0xFFFF, renderState.dropped,
+                               renderState.midiCarried, 0 };
     base.midiOut           = { renderState.midi.get() + renderState.midiIn, reserveStart - renderState.midiIn, 0, &renderState.liveOut };
 
     // Phase 0 (first chunk): edges against the last RENDERED block, the transport hooks, and mixCount by the
@@ -300,6 +323,13 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
         if (! renderState.live[(size_t) s])
         {
             if (s < renderState.mixCount) openView(s);
+            // A layer parked above the live count (a kept spare) follows the call's input, nothing more.
+            if (s >= v.numLive && v.layer[(size_t) s] != nullptr && v.layer[(size_t) s]->typeId() != 0)
+            {
+                auto ctx = base;
+                ctx.slot = s;
+                v.layer[(size_t) s]->onParkedBlock(ctx);
+            }
             continue;
         }
         if (v.layer[(size_t) s]->renderPriority() != 0) continue;

@@ -691,6 +691,12 @@ protected:
     mu_core::RetireBin& retireBin = *retireBinStorage;
     // The count policy (RetireBin::CountPolicy) for tails past the live count. Constructor only.
     void setRetireCountPolicy(mu_core::RetireBin::CountPolicy p) noexcept { retireBin.setCountPolicy(p); }
+    // Constructor only. On: the channel messages of a host block that renders nothing (a missed try-lock, an
+    // edit in flight, 0 frames) are kept, up to kMaxCarriedMidiEvents, and handed to the next rendered block at
+    // frame 0 ahead of its own events, with MidiView::carried counting them. For a product whose layers keep
+    // input state (held keys): a key released during an edit would otherwise stay held. Off (the default): a
+    // skipped block's MIDI is dropped, as a missed try-lock always dropped it.
+    void setCarrySkippedMidi(bool on) noexcept { renderState.carryMidi = on; }
 
     // prepareToPlay (message or host thread, not processing; call it OUTSIDE layersLock): sizes the per-slot
     // scratch (kMaxLayers x 2 x blockSize) and the block's MIDI storage, prepares every slot's layer (spares
@@ -1047,6 +1053,12 @@ private:
         juce::HeapBlock<mu_core::MidiEvent> midi;
         int32_t  midiIn = 0, liveOut = 0, tailOut = 0;
         uint16_t dropped = 0;
+        // The carry (setCarrySkippedMidi): `carried` events of unrendered blocks wait at the front of `midi` for
+        // the next rendered block; `midiCarried` is how many of this block's input events they are.
+        bool     carryMidi = false;
+        int32_t  carried = 0;
+        uint16_t midiCarried = 0;
+        uint16_t carryDropped = 0;      // channel messages the carry had no room for, reported with the next decode
 
         MixerEngine::RenderChannelFn copyToMixer;   // the mixer's channel r = scratch[r], an exact copy
 
@@ -1058,7 +1070,7 @@ private:
     std::atomic<bool> useLayerRender { false };   // the test-controlled switch (see setUseLayerRenderForTest)
 
     void noteHostBlock(const mu_core::BlockTransport& t, int numSamples) noexcept;
-    void noteSkippedBlock(const mu_core::BlockTransport& t, juce::AudioBuffer<float>& buffer) noexcept;
+    void noteSkippedBlock(const mu_core::BlockTransport& t, juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi) noexcept;
     void decodeBlockMidi(const juce::MidiBuffer& midi, int numSamples) noexcept;
     void captureSidechainRegion(juce::AudioBuffer<float>& buffer, int offset, int numSamples) noexcept;
     void renderLayers(const mu_core::LayerBlock& block, const mu_core::BlockTransport& t,

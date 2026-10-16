@@ -117,7 +117,8 @@ struct RenderContextLayoutTests : juce::UnitTest
         const size_t members = 4 + 4 + 8 + 4 * 4 + 8 * 5 + 6 + 2 + sizeof (mu_core::MidiView)
                              + sizeof (mu_core::MidiSink) + sizeof (void*) + 4 + 4;
         expectEquals((int) members, (int) sizeof (RenderContext));
-        expectEquals((int) offsetof(mu_core::MidiView, reserved) + 4, (int) sizeof (mu_core::MidiView));
+        expectEquals((int) offsetof(mu_core::MidiView, carried), 20);
+        expectEquals((int) offsetof(mu_core::MidiView, reserved) + 2, (int) sizeof (mu_core::MidiView));
         expectEquals((int) offsetof(mu_core::MidiSink, count), 16);
         expectEquals((int) offsetof(mu_core::PeerTap, valid), 16);
        #endif
@@ -871,6 +872,69 @@ struct LayerRenderDriverTests : juce::UnitTest
             }
             juce::MidiBuffer none;
             expectEquals(p.mergeLayerMidiOut(none, 0), 0, "no budget, nothing added");
+        }
+
+        beginTest("Skipped-block MIDI: dropped by default; carried to the next rendered block when the product opts in");
+        {
+            for (const bool carry : { false, true })
+            {
+                auto pBox = std::make_unique<FakeLayerHost>(1); auto& p = *pBox;
+                p.setCarrySkippedMidi(carry);
+                p.setUseLayerRenderForTest(true);
+                Driver d(p);
+                d.block(256);
+                p.layerEditInFlight.store(true);   // an edit silences the next two host blocks
+                d.pendingMidi.push_back(juce::MidiMessage::noteOn(1, 64, (juce::uint8) 100));
+                d.pendingMidi.push_back(juce::MidiMessage::midiClock());   // a system message is never carried
+                d.midiOffset = 100;
+                d.block(256);
+                d.pendingMidi.push_back(juce::MidiMessage::noteOff(1, 64));
+                d.block(256);
+                d.block(0);                                  // a 0-frame block renders nothing either
+                p.layerEditInFlight.store(false);
+                const int seenBefore = p.fake(0).midiSeen;
+                d.pendingMidi.push_back(juce::MidiMessage::noteOn(1, 67, (juce::uint8) 100));
+                d.midiOffset = 10;
+                d.block(256);
+                const auto& f = p.fake(0);
+                if (carry)
+                {
+                    expectEquals(f.midiSeen - seenBefore, 3, "the two carried channel messages, then the block's own");
+                    expectEquals(f.lastCarried, 2, "the view counts the carried ones");
+                    expectEquals(f.firstEventNote, 64, "carried first, in arrival order, at frame 0");
+                }
+                else
+                {
+                    expectEquals(f.midiSeen - seenBefore, 1, "only the block's own message (today's behaviour)");
+                    expectEquals(f.lastCarried, 0);
+                }
+                d.block(256);
+                expectEquals(p.fake(0).lastCarried, 0, "a carried message is handed over once");
+                expectEquals(p.getLayerRenderProbe().midiDropped, 0);
+            }
+        }
+
+        beginTest("A parked spare above the live count follows the block's MIDI and renders nothing; live layers are never parked");
+        {
+            auto pBox = std::make_unique<FakeLayerHost>(2); auto& p = *pBox;
+            p.setUseLayerRenderForTest(true);
+            Driver d(p);
+            d.pendingMidi.push_back(juce::MidiMessage::noteOn(1, 60, (juce::uint8) 100));
+            d.block(1024);   // two chunks: one parked call per chunk, the event in the first
+            expectEquals(p.fake(0).parkedCalls, 0);
+            expectEquals(p.fake(1).parkedCalls, 0);
+            for (int s = 2; s < mu_limits::kMaxLayers; ++s)
+            {
+                expectEquals(p.fake(s).parkedCalls, 2);
+                expectEquals(p.fake(s).parkedSlot, s);
+                expectEquals(p.fake(s).parkedMidiSeen, 1);
+                expectEquals(p.fake(s).renders, 0, "a parked layer is never rendered");
+            }
+            expectEquals(p.getLayerRenderProbe().mixCount, 2, "and never mixed");
+            p.layerEditInFlight.store(true);
+            d.block(256);
+            p.layerEditInFlight.store(false);
+            expectEquals(p.fake(2).parkedCalls, 2, "a skipped block calls no parked layer");
         }
 
         beginTest("C11: denormals are flushed inside every layer render even without the product's own guard");
