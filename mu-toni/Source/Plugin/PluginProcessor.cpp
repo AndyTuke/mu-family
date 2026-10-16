@@ -210,9 +210,11 @@ int PluginProcessor::decodeNoteInput(const juce::MidiBuffer& midi, int numSample
 void PluginProcessor::carryNoteInput(int count) noexcept
 {
     // Channel messages only (a system message holds no key), moved down onto the carried prefix at frame 0.
+    // The block's events start where the prefix ended; the prefix grows into them as they are kept.
+    const int first = noteInputCarried;
     for (int i = 0; i < count && noteInputCarried < kNoteInputCarry; ++i)
     {
-        const auto e = noteInput[(size_t) (noteInputCarried + i)];
+        const auto e = noteInput[(size_t) (first + i)];
         const auto type = (uint8_t) (e.bytes[0] & 0xf0);
         if (type < 0x80 || type == 0xf0) continue;
         auto& kept = noteInput[(size_t) noteInputCarried++];

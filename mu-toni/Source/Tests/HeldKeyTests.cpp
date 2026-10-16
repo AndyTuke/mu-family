@@ -143,6 +143,23 @@ struct MuToniHeldKeyTests : juce::UnitTest
             expect(pressed.p.getArp(0).runner.stepsFired() > firedP, "the key pressed during the edit still holds the arp on");
             expectEquals(quiet.p.getArp(0).runner.stepsFired(), firedQ, "with no key left the arp stops");
         }
+
+        beginTest("Several keys released in one block an edit silenced are all released");
+        {
+            KeyRig rig;
+            rig.voice(0, 6);
+            rig.set("a0_trig", 1.0f);
+            rig.block({ keyOn(60), keyOn(64), keyOn(67) });
+            for (int b = 0; b < 9; ++b) rig.block();
+            rig.p.layerEditInFlight.store(true);
+            rig.block({ keyOff(64), keyOff(60), keyOff(67) });
+            rig.p.layerEditInFlight.store(false);
+            rig.block();
+            const int fired = rig.p.getArp(0).runner.stepsFired();
+            for (int b = 0; b < 14; ++b) rig.block();
+            expectEquals(rig.p.getArp(0).runner.stepsFired(), fired, "no key is left held: the arp stops");
+            expect(! rig.p.getArp(0).heldNotes.anyHeld());
+        }
     }
 };
 
