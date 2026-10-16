@@ -300,8 +300,15 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
 
     // Delay always processes every block — its feedback loop must run continuously
     // even between hits, otherwise echoes never propagate out of the circular buffer.
-    fxChain.processSends(effectSendBuf, delaySendBuf, reverbSendBuf,
-                         doEffect, true, doReverb);
+    // The send buffers are allocated at the prepared block size and an FX slot processes the whole buffer it
+    // is given, so hand it views of this block's real length: a host block shorter than the prepared size
+    // would otherwise advance every delay line, LFO and reverb tail by the full prepared size per call.
+    // (A view over the buffer's own storage: no allocation.)
+    const int fxSamples = juce::jmin(numSamples, effectSendBuf.getNumSamples());
+    juce::AudioBuffer<float> effectBus (effectSendBuf.getArrayOfWritePointers(), effectSendBuf.getNumChannels(), 0, fxSamples);
+    juce::AudioBuffer<float> delayBus  (delaySendBuf .getArrayOfWritePointers(), delaySendBuf .getNumChannels(), 0, fxSamples);
+    juce::AudioBuffer<float> reverbBus (reverbSendBuf.getArrayOfWritePointers(), reverbSendBuf.getNumChannels(), 0, fxSamples);
+    fxChain.processSends(effectBus, delayBus, reverbBus, doEffect, true, doReverb);
 
     // Mix FX returns into main output; capture return peaks post-fader so VU reflects the fader.
     // If fxReturnsOut is provided (bus 9), each post-fader FX return is also added there.
