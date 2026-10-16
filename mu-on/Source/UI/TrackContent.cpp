@@ -145,6 +145,11 @@ void TrackContent::rebuild()
     bindModulationArcs(specs);
     grid.setSpecs(specs);
 
+    // A host that fixes the track's engine (engineLocked) hides the Engine selector; mu-On never does.
+    const bool engineLocked = host.getTrack(currentLayer).engineLocked;
+    engineCaption.setVisible(! engineLocked);
+    engineSelect.setVisible(! engineLocked);
+
     const bool rumble = shownEngine == EngineType::Rumble;
     sourceCaption.setVisible(rumble);
     sourceSelect.setVisible(rumble);

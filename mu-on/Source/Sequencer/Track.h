@@ -35,6 +35,8 @@ class PluginProcessor;
 // prepare runs while the host is not processing; bindParams and resetEngineToPrepared run while no block
 // can render the track (before publication, during an edit, under layersLock). The UI reads only the
 // atomics (modLive, triggers, the row cells).
+// The live modulation values sit on their own cache line (alignas), which pads the struct on purpose.
+JUCE_BEGIN_IGNORE_WARNINGS_MSVC(4324)
 struct Track : Layer
 {
     std::atomic<int> triggers { 0 };
@@ -49,6 +51,11 @@ struct Track : Layer
 
     // The slot this track sits in (kept current by the structural edits through onMoved).
     int slot = 0;
+
+    // True when the host fixes this track's engine (a mu-Tronic layer is created as one of the five types and
+    // keeps it): the content hides the Engine selector. Message thread; false in mu-On, so the standalone is
+    // unchanged. Not saved: the host that locks it sets it when it creates the layer.
+    bool engineLocked = false;
     OwnerLink<PluginProcessor> owner;
 
     Track();
@@ -138,5 +145,6 @@ private:
     float lastRumbleEnv = 1.0f;  // reused while the envelope's lock is contended
     bool  parked = true;         // not rendered live in the last rendered block (or prepared since)
 };
+JUCE_END_IGNORE_WARNINGS_MSVC
 
 } // namespace mu_on
