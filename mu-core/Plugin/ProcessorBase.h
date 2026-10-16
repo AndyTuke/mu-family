@@ -687,7 +687,7 @@ protected:
     // poll is gone first on destruction; prepareForDestruction empties it before any product member goes.
     // Held on the heap (built with the processor, on the constructing thread) so ProcessorBase stays small
     // for hosts and tests that construct it on a stack.
-    std::unique_ptr<mu_core::RetireBin> retireBinStorage = std::make_unique<mu_core::RetireBin>(layerAccess.epoch);
+    std::unique_ptr<mu_core::RetireBin> retireBinStorage = std::make_unique<mu_core::RetireBin>(layerAccess.epoch, layerAccess.layout);
     mu_core::RetireBin& retireBin = *retireBinStorage;
     // The count policy (RetireBin::CountPolicy) for tails past the live count. Constructor only.
     void setRetireCountPolicy(mu_core::RetireBin::CountPolicy p) noexcept { retireBin.setCountPolicy(p); }
@@ -774,7 +774,7 @@ protected:
     {
         swapPoll.stop();
         retireBin.cutAll();
-        retireBin.service();
+        retireBin.service(true);   // nothing processes again: even a tail still waiting for its store is freed
     }
 
     // Audio thread, once per block after the transport resolved: flag the staged swaps whose

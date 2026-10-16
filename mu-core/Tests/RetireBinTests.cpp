@@ -82,7 +82,7 @@ namespace
 
     struct BinRig
     {
-        explicit BinRig(double sr = 48000.0, int bs = 512) : bin(epoch) { bin.setPrepared(sr, bs); out.setSize(2, bs); }
+        explicit BinRig(double sr = 48000.0, int bs = 512) : bin(epoch, layout) { bin.setPrepared(sr, bs); out.setSize(2, bs); }
         // One audio block: enter, render the slot's tails into a cleared buffer, leave.
         bool block(int slot, int n, uint32_t serial, bool slotHasLive = false)
         {
@@ -97,6 +97,7 @@ namespace
             return bin.render(slot, ctx, view, n, serial, slotHasLive);
         }
         mu_core::AudioEpoch epoch;
+        std::atomic<uint64_t> layout { 0 };   // the owner's packed layout word (serial in the high 32 bits)
         Bin bin;
         juce::AudioBuffer<float> out;
     };
@@ -268,10 +269,10 @@ struct RetireBinDepthTests : juce::UnitTest
                                 ~Inside() { out.signal(); t.join(); } } inside(rig.epoch);
                 const int before = ProbeTail::destroyed();
                 expect(rig.bin.park(0, std::unique_ptr<mu_core::RetireTail>(new ProbeTail()), 0, false) == Bin::ParkResult::Dropped);
-                expectEquals(ProbeTail::destroyed() - before, 1, "the incoming tail never sounded: freed at once, after binMutex");
+                expectEquals(ProbeTail::destroyed() - before, 0, "the incoming tail may still be live: never freed inside park (N1)");
                 expect(rig.bin.stateOf(0, 0) == Bin::Done, "the evicted entry stays Done for service");
             }
-            expect(rig.bin.service() >= 1, "the evicted entry is freed once the block ended");
+            expect(rig.bin.service() >= 2, "the evicted entry and the dropped tail are freed once the block ended");
             expect(rig.bin.park(0, std::unique_ptr<mu_core::RetireTail>(new ProbeTail()), 0, false) == Bin::ParkResult::Parked);
         }
 
@@ -506,7 +507,8 @@ struct RetireBinRulesTests : juce::UnitTest
         {
             constexpr int kRounds = 1500;
             mu_core::AudioEpoch epoch;
-            Bin bin(epoch);
+            std::atomic<uint64_t> layout { 0 };
+            Bin bin(epoch, layout);
             bin.setPrepared(48000.0, 256);
             const int before = ProbeTail::destroyed(), outside = ProbeTail::freedOutsideBin();
             std::thread hostThread([&]
@@ -652,6 +654,64 @@ struct RetireBinReviewTests : juce::UnitTest
 
     void runTest() override
     {
+        beginTest("N1: a dropped OUTGOING tail (still in the layout until the caller's store) is never freed inside park");
+        {
+            BinRig rig;
+            rig.bin.setEvictTimeoutMs(0);
+            for (int i = 0; i < 4; ++i)
+                rig.bin.park(1, std::unique_ptr<mu_core::RetireTail>(new ProbeTail()), 0, false);   // row 1 full
+            auto* outgoing = new ProbeTail();          // the live layer: the audio thread still reaches it by the layout
+            const int before = ProbeTail::destroyed();
+            const uint32_t activation = 1;             // nextLayoutSerial(): the store that will unpublish it
+            {
+                struct Inside { mu_core::AudioEpoch& e; juce::WaitableEvent in, out; std::thread t;
+                                explicit Inside(mu_core::AudioEpoch& ep) : e(ep), t([this] { e.enter(); in.signal(); out.wait(); e.leave(); }) { in.wait(); }
+                                ~Inside() { out.signal(); t.join(); } } inside(rig.epoch);
+                expect(rig.bin.park(1, std::unique_ptr<mu_core::RetireTail>(outgoing), activation, false) == Bin::ParkResult::Dropped,
+                       "a 0 ms eviction wait under an open block drops the incoming tail");
+            }
+            expectEquals(ProbeTail::destroyed() - before, 0, "not freed by park");
+            // The next block, before the store: it still renders the outgoing layer live.
+            {
+                mu_core::ScopedAudioEpoch blk(rig.epoch);
+                expect(outgoing->magic == kAliveMagic, "the live layer is intact in the block before the store");
+            }
+            rig.bin.service();
+            rig.bin.service();
+            expect(outgoing->magic == kAliveMagic, "service does not free it before the store lands");
+            rig.layout.store(mu_core::LayoutWord::pack(1, activation));   // the caller's count store
+            rig.bin.service();    // stamps after the store (no block running: the grace has passed)
+            rig.bin.service();
+            expect(outgoing->magic == kDeadMagic, "freed once the store landed and a grace passed");
+            rig.bin.cutAll();
+            rig.bin.service();
+        }
+
+        beginTest("N2: a NotParked tail serviced on another thread before the caller's store stays alive until after it");
+        {
+            BinRig rig;
+            auto* outgoing = new ProbeTail({});        // policy None: mu-Toni / mu-On layers
+            std::thread a([&] { rig.bin.park(0, std::unique_ptr<mu_core::RetireTail>(outgoing), 1, false); });
+            a.join();
+            std::thread b([&] { rig.bin.service(); rig.bin.service(); });   // the 100 Hz poll on another thread
+            b.join();
+            {
+                mu_core::ScopedAudioEpoch blk(rig.epoch);   // a block that still renders it live
+                expect(outgoing->magic == kAliveMagic);
+            }
+            rig.bin.service();
+            expect(outgoing->magic == kAliveMagic, "no stamp before the unpublishing store");
+            rig.layout.store(mu_core::LayoutWord::pack(1, 1));
+            {
+                rig.epoch.enter();                     // a block running at the first sight after the store
+                rig.bin.service();
+                expect(outgoing->magic == kAliveMagic, "stamped after the store, waits out that block");
+                rig.epoch.leave();
+            }
+            rig.bin.service();
+            expect(outgoing->magic == kDeadMagic, "freed after the store plus a grace");
+        }
+
         beginTest("M4: applyComposedState shrink 4 to 2, regrow to 4 inside the fade, shrink again: the second park fades afresh");
         {
             auto pBox = std::make_unique<FakeLayerHost>(4); auto& p = *pBox;
