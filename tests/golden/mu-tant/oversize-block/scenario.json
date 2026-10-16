@@ -1,0 +1,15 @@
+{
+  "name": "oversize-block",
+  "notes": "Two gated drones (one through Karplus) with a delay send, prepared at 512 and fed host blocks of 1024, 4096 and 2048: the driver chunks each into calls of at most 512 (C8).",
+  "sampleRate": 48000,
+  "preparedBlockSize": 512,
+  "lengthFrames": 96000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 2,
+  "drainDeferredWorkEveryBlock": false,
+  "isolateStemsByMute": false,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }, { "name": "oversize", "blocks": [4096, 1, 2048] }],
+  "timedActions": [],
+  "midiByBlock": []
+}

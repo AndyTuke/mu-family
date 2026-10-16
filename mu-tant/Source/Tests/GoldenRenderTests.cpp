@@ -437,6 +437,26 @@ namespace
             defs.push_back(d);
         }
 
+        // Contract pin P7: host blocks above the prepared size. Since E4.5 the shared driver chunks them into calls
+        // of at most the prepared size (C8); before it, the old chain overran the mixer's prepared buffers on such a
+        // block, so no golden could hold one (ExtractionPinTests pins the engine's own truncation).
+        {
+            Def d; d.name = "oversize-block"; d.numStems = 2; d.lengthFrames = 96000; d.preparedBlockSize = 512;
+            d.schedules = { mu_golden::Schedule::fixed512(), mu_golden::Schedule::ragged(), { "oversize", { 4096, 1, 2048 } } };
+            d.notes = "Two gated drones (one through Karplus) with a delay send, prepared at 512 and fed host blocks of 1024, 4096 and 2048: the driver chunks each into calls of at most 512 (C8).";
+            d.author = [](PluginProcessor& p)
+            {
+                mu_golden_rig::growTo(p, 2);
+                gate(p, 0, 1, { { 0, 3, 0.0f, 0.0f, 0.0f, false }, { 8, 4, 0.2f, 0.0f, 0.0f, false } });
+                gate(p, 1, 1, { { 4, 4, 0.3f, 0.0f, 0.0f, false }, { 12, 3, 0.0f, 0.0f, 0.0f, false } });
+                setVoice(p.apvts, 1, "o1_oct", -1); setVoice(p.apvts, 1, "o1_wt", 2);
+                setVoice(p.apvts, 1, "drvChar", 11); setVoice(p.apvts, 1, "insP1", 0.6f); setVoice(p.apvts, 1, "insP2", 0.7f);
+                setParam(p.apvts, "ch0_sendDly", 0.4f); setParam(p.apvts, "ret_dly_lvl", 0.8f);
+                setParam(p.apvts, "ch0_pan", -0.4f); setParam(p.apvts, "ch1_pan", 0.5f);
+            };
+            defs.push_back(d);
+        }
+
         return defs;
     }
 
