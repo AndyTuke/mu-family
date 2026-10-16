@@ -57,7 +57,7 @@ public:
         float peakGainDb = 0.0f;  // 0 or negative — fed back to UI meter via grOut
         // Sample-major: the four smoothed values advance once per sample and every channel uses them, so the
         // channels' thresholds and gains ramp together (channel-major looping left the right channel stepping).
-        auto** chans = buf.getArrayOfWritePointers();
+        auto chans = buf.getArrayOfWritePointers();
         for (int i = 0; i < ns; ++i)
         {
             const float attCoeff = smoothedAtt   .getNextValue();

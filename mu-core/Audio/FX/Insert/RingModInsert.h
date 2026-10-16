@@ -51,7 +51,7 @@ public:
         // Sample-major: the phase increment and mix advance once per sample and every channel uses them, so the
         // two channels' carriers stay in step (channel-major looping let the left ramp its increment up from 0
         // while the right ran at full rate, leaving the phases offset for good).
-        auto** chans = buf.getArrayOfWritePointers();
+        auto chans = buf.getArrayOfWritePointers();
         for (int i = 0; i < ns; ++i)
         {
             const float pInc = smoothedPhInc.getNextValue();

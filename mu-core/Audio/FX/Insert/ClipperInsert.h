@@ -32,7 +32,7 @@ public:
         smoothedOutGain.setTargetValue(outGain);
         // Sample-major: each smoothed value advances once per sample and every channel uses it, so the
         // right channel ramps with the left (channel-major looping left the right one stepping per block).
-        auto** chans = buf.getArrayOfWritePointers();
+        auto chans = buf.getArrayOfWritePointers();
         for (int i = 0; i < ns; ++i)
         {
             const float t  = smoothedThresh .getNextValue();

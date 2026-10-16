@@ -121,7 +121,7 @@ public:
         // Sample-major: the smoothed pitch and gain advance once per sample and both channels use them, so the
         // right channel's delay length and loop gain ramp with the left (channel-major looping left the right
         // one stepping per block).
-        auto** chans = buf.getArrayOfWritePointers();
+        auto chans = buf.getArrayOfWritePointers();
         for (int i = 0; i < ns; ++i)
         {
             // Per-sample smoothed target freq → per-sample delay length.

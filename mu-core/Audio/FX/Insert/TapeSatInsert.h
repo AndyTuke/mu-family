@@ -48,7 +48,7 @@ public:
         for (int ch = 0; ch < nCh; ++ch)
             toneFilter[ch].prepare(toneHz, (float)currentSampleRate);
         // Sample-major: each smoothed gain advances once per sample and every channel uses it.
-        auto** chans = buf.getArrayOfWritePointers();
+        auto chans = buf.getArrayOfWritePointers();
         for (int i = 0; i < ns; ++i)
         {
             const float pg = smoothedPreGain.getNextValue();

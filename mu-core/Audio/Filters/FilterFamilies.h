@@ -188,6 +188,7 @@ public:
         // Pre-compute the per-sample delay and resonance ramps once so every channel reads the
         // identical glide (otherwise only ch0 advances it and ch1 would click or step).
         jassert(numSamples <= static_cast<int>(delayRamp.size()));
+        numSamples = juce::jmin(numSamples, static_cast<int>(delayRamp.size()));   // never index past the prepared ramps
         for (int i = 0; i < numSamples; ++i)
         {
             delayRamp[static_cast<size_t>(i)] = smoothedDelay.getNextValue();
