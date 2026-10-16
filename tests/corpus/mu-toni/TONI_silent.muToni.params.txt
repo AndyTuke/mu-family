@@ -2,6 +2,7 @@
 layers=4
 load_errors=0
 resave_bytes=36151
-resave_sha256=05b4fe37bca0ce4fb402be3699cfa0d8ae7086d562e4158ac7197f10cecd9779
+resave_sha256=02e346fc972f45f7105e34d1d7544aababbe2a56ec11e4be1da2dee9c3b950a6
 --- parameters differing from default (id=plain value)
 mstr_lvl=0
+rev_decay=7.5
