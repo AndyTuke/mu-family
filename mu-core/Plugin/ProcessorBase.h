@@ -25,6 +25,7 @@
 #include "Control/LiveState.h"          // Performance mode: the live state this instance owns
 #include "Control/ParamGestureHold.h"
 #include "Persistence/LayerState.h"   // composed slot / full / host state (format 2)
+#include "Persistence/LegacyReverbDecay.h"   // a pre-Decay-knob state's reverb Decay
 #include "MuLimits.h"
 #include "Plugin/HotSwap.h"   // the shared loop-boundary swapper every layer preset hot-swap uses
 #include "Sequencer/Layer.h"
@@ -601,11 +602,13 @@ protected:
     juce::ValueTree captureLayerNode(int slot, const juce::Identifier& type) { return mu_pp::captureLayer(layerLayout, layerExtras, slot, type); }
     void            applyLayerNode(int slot, const juce::ValueTree& node)    { mu_pp::applyLayer(layerLayout, layerExtras, slot, node); }
     // A state in the composed shape: an older APVTS-dump state is rebuilt (`otherChild` receives
-    // the product's older root children); a composed one is returned as is.
+    // the product's older root children); a composed one is returned as is. A state saved before
+    // the reverb Decay knob gains the Decay its algorithm had then.
     juce::ValueTree toComposedState(const juce::ValueTree& state,
                                     const std::function<void(const juce::ValueTree&, juce::ValueTree&)>& otherChild = {}) const
     {
-        return mu_pp::composeLegacyState(state, layerLayout, otherChild);
+        return mu_pp::withLegacyReverbDecay(mu_pp::composeLegacyState(state, layerLayout, otherChild),
+                                            apvts.getParameter(mu_pp::kReverbAlgoId));
     }
     mu_pp::LayerLayout layerLayout;
     mu_pp::LayerExtras layerExtras;

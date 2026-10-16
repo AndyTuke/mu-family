@@ -155,6 +155,7 @@ target_sources(mu-toni-tests PRIVATE
     Source/Tests/ArpRunnerTests.cpp     # T3 — arp step timing (beat grid / MIDI trigger)
     Source/Tests/ProcessorSeamTests.cpp  # the real PluginProcessor, headless (layer ownership)
     Source/Tests/FrozenBaselineTests.cpp   # frozen parameter manifest + compat corpus on the real processor
+    Source/Tests/LegacyReverbDecayTests.cpp   # files saved before the reverb Decay knob keep their old Decay
     Source/Tests/LayerCountPersistTests.cpp   # layer count default / persistence / add-remove-swap carry
     Source/Tests/PrefixMigrationTests.cpp   # data saved before the v -> a id-prefix rename still loads
     Source/Tests/ClipLaunchTests.cpp   # clip store / launch on the real processor
