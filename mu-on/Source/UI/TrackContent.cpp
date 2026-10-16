@@ -43,9 +43,10 @@ namespace
     }
 }
 
-TrackContent::TrackContent(PluginProcessor& processor)
-    : proc(processor), grid(processor.apvts), rows(processor)
+TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
+    : host(trackHost), grid(trackHost.getTrackParameters()), rows(trackHost)
 {
+    juce::ignoreUnused(base);
     for (int e = 0; e < kNumEngineTypes; ++e) engineSelect.addItem(engineName(engineFromIndex(e)), e + 1);
     engineSelect.onChange = [this](int id) { engineChosen(id); };
     sourceSelect.onChange = [this](int id) { sourceChosen(id); };
@@ -67,14 +68,14 @@ TrackContent::TrackContent(PluginProcessor& processor)
     // Global Swing / Accent, shown in the Groove box (a Rumble track shows its envelope there instead).
     addAndMakeVisible(swingKnob);
     addAndMakeVisible(accentKnob);
-    swingAtt  = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(proc.apvts, "seq_swing",  swingKnob.getSlider());
-    accentAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(proc.apvts, "seq_accent", accentKnob.getSlider());
+    swingAtt  = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(host.getTrackParameters(), "seq_swing",  swingKnob.getSlider());
+    accentAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(host.getTrackParameters(), "seq_accent", accentKnob.getSlider());
 
     // The Rumble track's drawable bar-volume envelope, edited under the track's own lock.
     rumbleEnvEditor.setUnipolar(true);
     rumbleEnvEditor.onChange = [this](const std::vector<ControlSequence::CurvePoint>& pts)
     {
-        auto& t = proc.getTrack(currentLayer);
+        auto& t = host.getTrack(currentLayer);
         mu_core::spinLock(t.rumbleEnvLock);
         t.rumbleEnv.curvePoints = pts;
         mu_core::spinUnlock(t.rumbleEnvLock);
@@ -84,7 +85,7 @@ TrackContent::TrackContent(PluginProcessor& processor)
     // Its length: the same control as a modulator's Loop.
     rumbleLength.onChange = [this](NoteValue nv, NoteMod mod, int mult)
     {
-        auto& t = proc.getTrack(currentLayer);
+        auto& t = host.getTrack(currentLayer);
         mu_core::spinLock(t.rumbleEnvLock);
         t.rumbleEnv.loopNoteValue  = nv;
         t.rumbleEnv.loopNoteMod    = mod;
@@ -100,7 +101,7 @@ TrackContent::TrackContent(PluginProcessor& processor)
 juce::Colour TrackContent::layerColour() const
 {
     return MuLookAndFeel::layerPalette[
-        (size_t) (proc.getLayerColourIndex(currentLayer) % MuLookAndFeel::kLayerPaletteSize)];
+        (size_t) (host.getTrackColourIndex(currentLayer) % MuLookAndFeel::kLayerPaletteSize)];
 }
 
 // Give every knob that has a row in the shown engine's modulation target table its live arc, driven by
@@ -111,7 +112,7 @@ void TrackContent::bindModulationArcs(std::vector<mu_ui::ParamKnobGrid::Spec>& s
     static const float kNaN = std::numeric_limits<float>::quiet_NaN();
     int count = 0;
     const ModDestEntry* table = destsForEngine(shownEngine, count);
-    const auto* matrix = &proc.getTrack(currentLayer).modulationMatrix;
+    const auto* matrix = &host.getTrack(currentLayer).modulationMatrix;
     const juce::String prefix = layerParamPrefix(currentLayer);
     const int layer = currentLayer;
     const EngineType engine = shownEngine;
@@ -124,7 +125,7 @@ void TrackContent::bindModulationArcs(std::vector<mu_ui::ParamKnobGrid::Spec>& s
         spec.modDestId = table[dest].id;
         spec.modMatrix = matrix;
         spec.modLive   = [this, layer, engine, dest]() -> float
-                         { return proc.isInternalPlaying() ? proc.getModLive(layer, engine, dest) : kNaN; };
+                         { return host.isTrackTransportPlaying() ? host.getModLive(layer, engine, dest) : kNaN; };
     }
 }
 
@@ -138,7 +139,7 @@ void TrackContent::setLayer(int idx)
 // specs (re-attaching to this track's parameters), and the Rumble-only controls follow the engine.
 void TrackContent::rebuild()
 {
-    shownEngine = proc.engineOf(currentLayer);
+    shownEngine = host.engineOf(currentLayer);
     engineSelect.setSelectedId(toIndex(shownEngine) + 1, false);
     auto specs = specsFor(currentLayer, shownEngine);
     bindModulationArcs(specs);
@@ -156,7 +157,7 @@ void TrackContent::rebuild()
     {
         refreshSourceList();
 
-        auto& t = proc.getTrack(currentLayer);
+        auto& t = host.getTrack(currentLayer);
         mu_core::spinLock(t.rumbleEnvLock);
         const auto points = t.rumbleEnv.curvePoints;
         const auto nv = t.rumbleEnv.loopNoteValue;
@@ -176,12 +177,12 @@ void TrackContent::rebuild()
 void TrackContent::refreshSourceList()
 {
     sourceSelect.clear();
-    juce::uint64 sig = (juce::uint64) proc.getNumLayers();
-    for (int i = 0; i < proc.getNumLayers(); ++i)
+    juce::uint64 sig = (juce::uint64) host.getTrackCount();
+    for (int i = 0; i < host.getTrackCount(); ++i)
     {
-        sig = sig * 131u + (juce::uint64) toIndex(proc.engineOf(i));
+        sig = sig * 131u + (juce::uint64) toIndex(host.engineOf(i));
         if (i != currentLayer)
-            sourceSelect.addItem(juce::String(i + 1) + "  " + proc.getLayerName(i), i + 1);
+            sourceSelect.addItem(juce::String(i + 1) + "  " + host.getTrackName(i), i + 1);
     }
     shownLayerSignature = sig;
     refreshSourceSelection();
@@ -189,29 +190,29 @@ void TrackContent::refreshSourceList()
 
 void TrackContent::refreshSourceSelection()
 {
-    const int src = (int) std::lround(proc.apvts.getRawParameterValue(layerParamId(currentLayer, "src"))->load());
-    const bool usable = src >= 0 && src < proc.getNumLayers() && src != currentLayer;
+    const int src = (int) std::lround(host.getTrackParameters().getRawParameterValue(layerParamId(currentLayer, "src"))->load());
+    const bool usable = src >= 0 && src < host.getTrackCount() && src != currentLayer;
     sourceSelect.setSelectedId(usable ? src + 1 : 0, false);
 }
 
 void TrackContent::engineChosen(int id)
 {
-    proc.selectEngine(currentLayer, engineFromIndex(id - 1));
+    host.selectEngine(currentLayer, engineFromIndex(id - 1));
     rebuild();
     if (onEngineChanged) onEngineChanged();
 }
 
 void TrackContent::sourceChosen(int id)
 {
-    if (id > 0) setParamPlain(proc.apvts, layerParamId(currentLayer, "src"), (float) (id - 1));
+    if (id > 0) setParamPlain(host.getTrackParameters(), layerParamId(currentLayer, "src"), (float) (id - 1));
 }
 
 void TrackContent::timerCallback()
 {
-    if (currentLayer >= proc.getNumLayers()) return;   // between a delete and the editor reselecting
+    if (currentLayer >= host.getTrackCount()) return;   // between a delete and the editor reselecting
 
     // The engine changed underneath us (host automation, a preset): show the new one.
-    if (proc.engineOf(currentLayer) != shownEngine)
+    if (host.engineOf(currentLayer) != shownEngine)
     {
         rebuild();
         if (onEngineChanged) onEngineChanged();
@@ -220,13 +221,13 @@ void TrackContent::timerCallback()
     if (shownEngine != EngineType::Rumble) return;
 
     // Keep the Source list current (layers added, deleted, re-engined) and the envelope's playhead moving.
-    juce::uint64 sig = (juce::uint64) proc.getNumLayers();
-    for (int i = 0; i < proc.getNumLayers(); ++i) sig = sig * 131u + (juce::uint64) toIndex(proc.engineOf(i));
+    juce::uint64 sig = (juce::uint64) host.getTrackCount();
+    for (int i = 0; i < host.getTrackCount(); ++i) sig = sig * 131u + (juce::uint64) toIndex(host.engineOf(i));
     if (sig != shownLayerSignature) refreshSourceList();
     else                            refreshSourceSelection();
 
-    const double beat = proc.getInternalBeatPos();
-    const double len = juce::jmax(1.0e-6, proc.getTrack(currentLayer).rumbleEnv.getLoopLengthBeats());
+    const double beat = host.getTrackTransportBeat();
+    const double len = juce::jmax(1.0e-6, host.getTrack(currentLayer).rumbleEnv.getLoopLengthBeats());
     rumbleEnvEditor.setPlayheadPhase((float) (std::fmod(juce::jmax(0.0, beat), len) / len));
 }
 

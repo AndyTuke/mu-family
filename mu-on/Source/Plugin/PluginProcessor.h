@@ -8,6 +8,7 @@
 #include "Sequencer/GrooveSequencer.h"
 #include "Audio/GrooveVoices.h"
 #include "Sequencer/Track.h"
+#include "UI/TrackHost.h"   // what the Track layer's UI reads from its host
 
 #include <array>
 #include <atomic>
@@ -30,7 +31,7 @@
 namespace mu_on
 {
 
-class PluginProcessor : public ProcessorBase
+class PluginProcessor : public ProcessorBase, public TrackHost
 {
 public:
 
@@ -90,11 +91,11 @@ public:
     // ── The tracks ───────────────────────────────────────────────────────────
     // Layer `i` as its mu-On Track (colour, modulation, step row, Rumble envelope). The layers live in
     // ProcessorCore; the editor's ModulatorPanel binds to the shown one through this.
-    Track&       getTrack(int i) noexcept       { return layerAs<Track>(juce::jlimit(0, mu_limits::kMaxLayers - 1, i)); }
+    Track&       getTrack(int i) noexcept override { return layerAs<Track>(juce::jlimit(0, mu_limits::kMaxLayers - 1, i)); }
     const Track& getTrack(int i) const noexcept { return layerAs<Track>(juce::jlimit(0, mu_limits::kMaxLayers - 1, i)); }
 
     // The engine track `i` runs (its `t{N}_eng` parameter).
-    EngineType engineOf(int i) const noexcept
+    EngineType engineOf(int i) const noexcept override
     {
         const auto* p = (i >= 0 && i < mu_limits::kMaxLayers) ? engineParam[(size_t) i] : nullptr;
         return engineFromIndex(p != nullptr ? juce::roundToInt(p->load(std::memory_order_relaxed)) : 0);
@@ -103,12 +104,20 @@ public:
     // Post-matrix value of modulation target `dest` (a row of `engine`'s table) on track `i`, in the
     // target knob's parameter units; NaN while the track runs another engine. Written each block by
     // GrooveVoices; read by the knobs' live arcs.
-    float getModLive(int i, EngineType engine, int dest) const noexcept { return grooveVoices.getModLive(i, engine, dest); }
+    float getModLive(int i, EngineType engine, int dest) const noexcept override { return grooveVoices.getModLive(i, engine, dest); }
 
     // Switch track `i` to `engine`: every engine keeps its settings on the track, the step row and
     // envelope stay, and the track's modulation assignments that target another engine's parameters
     // are dropped. Message thread.
-    void selectEngine(int i, EngineType engine);
+    void selectEngine(int i, EngineType engine) override;
+
+    // ── TrackHost: what TrackContent and StepRows read (message thread) ──────────
+    juce::AudioProcessorValueTreeState& getTrackParameters() noexcept override { return apvts; }
+    int          getTrackCount() const override                 { return getNumLayers(); }
+    juce::String getTrackName(int layer) const override         { return getLayerName(layer); }
+    int          getTrackColourIndex(int layer) const override  { return getLayerColourIndex(layer); }
+    bool         isTrackTransportPlaying() const noexcept override { return isInternalPlaying(); }
+    double       getTrackTransportBeat() const noexcept override   { return getInternalBeatPos(); }
 
     // The first live track running Kick, or 0 when there is none (a Rumble's default source).
     int firstKickTrack() const noexcept;

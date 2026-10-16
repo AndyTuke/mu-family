@@ -8,7 +8,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     : EditorShellBase(p),
       proc(p),
       sidebar(p, "Track"),
-      trackContent(p),
+      trackContent(p, p),
       layerPanel(p, "Track"),
       // The content binds only APVTS parameters and reads tracks by index, never holding a pointer into
       // a layer's data, so there is nothing to release before a removal.
