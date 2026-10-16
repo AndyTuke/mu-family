@@ -68,6 +68,44 @@ struct FxAlgoSwitchTests : juce::UnitTest
             expectWithinAbsoluteError(rev.getSize(), 0.31f, 1.0e-3f, "size still follows the knob");
         }
 
+        beginTest("rev_decay: declared range and default, reaches the slot, and survives a rev_algo change");
+        {
+            FxParamProcessor p;
+            // Layout: 0.1..10 s, default 2.5 s (the Hall preset).
+            auto* param = dynamic_cast<juce::RangedAudioParameter*>(p.apvts.getParameter("rev_decay"));
+            expect(param != nullptr, "rev_decay exists");
+            if (param != nullptr)
+            {
+                const auto range = param->getNormalisableRange();
+                expectWithinAbsoluteError(range.start, 0.1f,  1.0e-6f, "rev_decay minimum");
+                expectWithinAbsoluteError(range.end,   10.0f, 1.0e-6f, "rev_decay maximum");
+                expectWithinAbsoluteError(param->convertFrom0to1(param->getDefaultValue()), 2.5f, 1.0e-4f, "rev_decay default");
+            }
+
+            const auto& rev = p.fxChain.reverbSlot();
+            setPlain(p, "rev_decay", 5.0f);
+            expectWithinAbsoluteError(rev.getDecay(), 5.0f, 1.0e-4f, "the decay knob reached the slot");
+
+            // A rev_algo change by parameter (the automation path) pushes the knob values back: Decay stays 5 s
+            // and does not fall to the new algorithm's preset (Spring 0.35 s, Room 0.6 s).
+            setPlain(p, "rev_size", 0.31f);
+            setPlain(p, "rev_pre",  42.0f);
+            setPlain(p, "rev_diff", 0.11f);
+            setPlain(p, "rev_damp", 0.93f);
+            setPlain(p, "rev_mod",  0.47f);
+            setPlain(p, "rev_algo", 3.0f);
+            expectEquals(rev.getAlgorithmIndex(), 3, "the algorithm changed");
+            expectWithinAbsoluteError(rev.getDecay(),     5.0f,  1.0e-4f, "decay follows the knob after the switch");
+            expectWithinAbsoluteError(rev.getSize(),      0.31f, 1.0e-3f, "size follows the knob");
+            expectWithinAbsoluteError(rev.getPreDelay(),  42.0f, 1.0e-2f, "pre-delay follows the knob");
+            expectWithinAbsoluteError(rev.getDiffusion(), 0.11f, 1.0e-3f, "diffusion follows the knob");
+            expectWithinAbsoluteError(rev.getDamp(),      0.93f, 1.0e-3f, "damp follows the knob");
+            expectWithinAbsoluteError(rev.getMod(),       0.47f, 1.0e-3f, "mod follows the knob");
+
+            setPlain(p, "rev_algo", 0.0f);
+            expectWithinAbsoluteError(rev.getDecay(), 5.0f, 1.0e-4f, "decay still follows the knob after switching to Room");
+        }
+
         beginTest("eff_algo: the new effect plays with the knob values, as if they had been set on it directly");
         {
             constexpr double kSr = 48000.0;

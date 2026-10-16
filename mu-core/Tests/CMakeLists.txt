@@ -42,6 +42,7 @@ set(MU_CORE_TEST_SOURCES
     StereoParityTests.cpp           # identical L / R in gives identical L / R out while a parameter ramps
     EnvelopeReleaseTests.cpp        # mu_env::applyParameters and the VoiceEngine release tail
     FxAlgoSwitchTests.cpp           # eff_algo / rev_algo by automation pushes the knob values
+    ReverbDecayTests.cpp            # reverb Decay presets, tail length, Size independence
     ParamRefreshQueueTests.cpp      # the allocation-free listener hand-off
     MidiRawTests.cpp                # raw-byte note tests and the allocation-free MIDI clock scan
     MidiClockSyncTests.cpp
