@@ -150,7 +150,6 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
 std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
 {
     auto t = std::make_unique<Track>();
-    t->owner.ptr = this;
     t->slot      = slot;
     seedRowGroove(t->row);
     t->bindParams(apvts, slot);

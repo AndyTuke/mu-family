@@ -6,6 +6,23 @@
 # mixer); the bass↔kick side-chain ducking is the shared MixerEngine's
 # channel-to-channel sidechain, so it's wiring + defaults, not new DSP.
 
+# ── mu-on-layer — the Track layer types as a library (docs/mu-tronic/design.md 2.5) ──
+# The product's own Source/ folders, no move: Audio/ Sequencer/ Modulation/ Persistence/ and UI/ (without the
+# app's SettingsOverlay). INTERFACE, like mu-core, so its sources compile in each consumer's target. The engine
+# side is the target's sources; the layer's UI content is MU_ON_LAYER_UI_SOURCES, which a GUI consumer adds
+# (a console test target has none of the mu-core UI it needs). A host of the five Track types (this app,
+# mu-Tronic) links it beside mu-core; tests/scripts/check-layer-boundary.ps1 keeps it free of Plugin/ and License/.
+add_library(mu-on-layer INTERFACE)
+target_sources(mu-on-layer INTERFACE
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Persistence/TrackParams.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/GrooveSequencer.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/Track.cpp"
+)
+target_include_directories(mu-on-layer INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
+set(MU_ON_LAYER_UI_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/StepRows.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/TrackContent.cpp")
+
 # ── mu-On — Standalone + VST3 + CLAP (+ AU on macOS) ────────────────────────
 juce_add_plugin(mu-on
     COMPANY_NAME "Transwarp Development Project"
@@ -31,11 +48,7 @@ target_sources(mu-on
         Source/Plugin/PluginProcessor.cpp
         Source/Plugin/PluginProcessor_Preset.cpp
         Source/Plugin/PluginEditor.cpp
-        Source/Persistence/TrackParams.cpp
-        Source/Sequencer/GrooveSequencer.cpp
-        Source/Sequencer/Track.cpp
-        Source/UI/StepRows.cpp
-        Source/UI/TrackContent.cpp
+        ${MU_ON_LAYER_UI_SOURCES}   # the layer's UI content (mu-on-layer)
         # Offline-license verifier + online activation live in mu-core (shared); compiled here + monocypher.c.
         "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
         "${CMAKE_SOURCE_DIR}/mu-core/License/LemonSqueezyClient.cpp"
@@ -69,6 +82,7 @@ target_compile_definitions(mu-on
 
 target_link_libraries(mu-on
     PRIVATE
+        mu-on-layer
         mu-core
         juce::juce_audio_utils
         juce::juce_dsp
@@ -143,9 +157,6 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/ModulationTests.cpp
     Source/Tests/PresetTests.cpp
     Source/Tests/SlotStateTests.cpp
-    Source/Sequencer/GrooveSequencer.cpp
-    Source/Sequencer/Track.cpp
-    Source/Persistence/TrackParams.cpp
     Source/Tests/ProcessorSeamTests.cpp  # the real PluginProcessor, headless (layer ownership)
     Source/Tests/FrozenBaselineTests.cpp   # frozen parameter manifest + compat corpus on the real processor
     Source/Tests/PrefixMigrationTests.cpp   # data saved before the k/b/h/s/r -> t{N} id-prefix rename still loads
@@ -156,6 +167,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/ModArcTests.cpp   # every mod target publishes its live value for the knob arcs
     Source/Tests/GoldenRenderTests.cpp   # golden renders of the real processor (tests/golden/mu-on)
     Source/Tests/ExtractionPinTests.cpp   # pins: per-engine sound, swing/accent, Rumble source, sidechain, stop edge, edits, oversize
+    Source/Tests/TrackLayerRecordTests.cpp   # the Track streams through the real processor (Tests/TrackLayerFixture.h)
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp
@@ -179,6 +191,7 @@ target_include_directories(mu-on-tests PRIVATE
 )
 
 target_link_libraries(mu-on-tests PRIVATE
+    mu-on-layer
     juce::juce_core
     juce::juce_audio_basics
     juce::juce_audio_processors
@@ -195,3 +208,48 @@ target_link_libraries(mu-on-tests PRIVATE
 target_compile_definitions(mu-on-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
 
 add_dependencies(mu-on mu-on-tests)
+
+# ── mu-on-layer-tests — the layer with no processor (extraction-plan 4.1) ──
+# Compiled from mu-on-layer, mu-core's layer-side sources and the test alone: no Plugin/ source, so a
+# layer that secretly needed the processor fails to link. It renders two Tracks (a Bass and a Rumble on it)
+# from hand-built RenderContexts and compares with the streams mu-on-tests records through the real
+# processor (Tests/TrackLayerFixture.h).
+juce_add_console_app(mu-on-layer-tests PRODUCT_NAME "mu-on-layer-tests")
+
+target_sources(mu-on-layer-tests PRIVATE
+    Source/Tests/TestMain.cpp
+    Source/Tests/LayerLibraryTests.cpp
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/MultiModeFilter.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/SamplePlayer.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/FX/Slots/ReverbSlot.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/ControlSequence.cpp"
+)
+
+target_compile_features(mu-on-layer-tests PRIVATE cxx_std_17)
+
+target_include_directories(mu-on-layer-tests PRIVATE
+    "${CMAKE_SOURCE_DIR}/mu-core"
+    SYSTEM
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"   # ReverbSlot
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+)
+
+target_link_libraries(mu-on-layer-tests PRIVATE
+    mu-on-layer
+    juce::juce_core
+    juce::juce_audio_basics
+    juce::juce_audio_processors
+    juce::juce_data_structures
+    juce::juce_events
+    juce::juce_graphics
+    juce::juce_gui_basics
+    juce::juce_dsp
+    juce::juce_audio_formats
+    juce::juce_recommended_config_flags
+    juce::juce_recommended_warning_flags
+)
+
+target_compile_definitions(mu-on-layer-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+
+add_dependencies(mu-on mu-on-layer-tests)

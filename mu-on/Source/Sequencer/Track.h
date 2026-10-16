@@ -17,8 +17,6 @@
 namespace mu_on
 {
 
-class PluginProcessor;
-
 // One mu-On layer, a track. The shared Layer (colour, modulation) plus what is the track's own and moves
 // with it through add / delete / reorder: its step row and the row's clock, its Rumble volume envelope, the
 // trigger counter the audio thread bumps and the editor polls to pulse the sidebar item, and the one sound
@@ -56,7 +54,6 @@ struct Track : Layer
     // keeps it): the content hides the Engine selector. Message thread; false in mu-On, so the standalone is
     // unchanged. Not saved: the host that locks it sets it when it creates the layer.
     bool engineLocked = false;
-    OwnerLink<PluginProcessor> owner;
 
     Track();
     ~Track() override;
