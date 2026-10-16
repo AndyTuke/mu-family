@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Plugin/ParamText.h"
+#include "Persistence/ParamText.h"
 #include "Plugin/HotSwap.h"   // mu_hotswap::kSwapTimingParamId
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Audio/AlgorithmNames.h"   // mu_audio::kInsertAlgorithmCount
