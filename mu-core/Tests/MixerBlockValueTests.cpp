@@ -145,6 +145,15 @@ namespace
 
     // Post-trim, pre-fader channel sample (the sidechain tap) and post-fader sample.
     float trimmed(float x) { return x * MixerEngine::kHeadroomTrim; }
+
+    // The post-trim source level at which the sidechain duck is full depth (kScFullDuckLevel in
+    // MixerEngine.cpp, which keeps it private). Below it the duck follows the level in proportion. A power
+    // of two, so dividing a dyadic source by it is exact. If the mixer retunes it, retune this and the
+    // sidechain expectations together.
+    constexpr float kFullDuck = 0.25f;
+
+    // The follower target for a post-trim source level: proportional up to kFullDuck, then clamped to 1.
+    float duckTarget(float postTrimSource) { return std::min(1.0f, std::abs(postTrimSource) / kFullDuck); }
 }
 
 struct MixerBlockValueTests : juce::UnitTest
@@ -180,6 +189,7 @@ struct MixerBlockValueTests : juce::UnitTest
         sidechainTap();
         sidechainOrder();
         sidechainEnvelope();
+        sidechainLevelFollow();
     }
 
     // Fader, pan law, headroom trim and pan modulation, for every block size.
@@ -670,7 +680,9 @@ struct MixerBlockValueTests : juce::UnitTest
 
         auto duckPair = [&](Rig& r)
         {
-            // Strip 0 ducks from strip 1 with instant attack and release, so the follower is a gate.
+            // Strip 0 ducks from strip 1 with an instant attack (a release of 0 is floored to 30 ms inside the
+            // mixer, which a constant source never exercises). Both strips play 0.5, post-trim 0.25 = kFullDuck:
+            // the follower target is exactly 1, so the first sample is a full duck and it then holds at 1.
             r.src[0] = { 0.5f, true };
             r.src[1] = { 0.5f, true };
             r.mixer.channels[0].sidechainSource.store(1);
@@ -679,7 +691,7 @@ struct MixerBlockValueTests : juce::UnitTest
             r.mixer.channels[0].sidechainReleaseMs.store(0.0f);
         };
 
-        beginTest("sidechain ducks the target by amount while the source is above the threshold, whatever the source fader");
+        beginTest("sidechain ducks the target by the full amount when the source is at the full-duck level, whatever the source fader");
         for (int n : kSizes)
         {
             Rig r;
@@ -691,14 +703,48 @@ struct MixerBlockValueTests : juce::UnitTest
             expectEquals(r.mixer.sidechainGR[1].load(), 0.0f, "source GR");
         }
 
-        beginTest("sidechain source below the threshold does not duck");
+        beginTest("sidechain source below the full-duck level ducks in proportion to its level, not fully");
+        for (int n : kSizes)
+        {
+            // Pre-trim source 0.125 / 0.25 / 0.5 / 1.0 is post-trim 1/16, 1/8, 1/4, 1/2: the follower target is
+            // the post-trim level over kFullDuck = 1/4, 1/2, 1, then clamped to 1. All dyadic, so exact.
+            for (float srcAmp : { 0.125f, 0.25f, 0.5f, 1.0f })
+            {
+                Rig r;
+                duckPair(r);
+                r.src[1] = { srcAmp, true };
+                r.run(2, n);
+                const float follow = duckTarget(trimmed(srcAmp));
+                const float gr     = duckDepth * follow;
+                const juce::String tag = "source " + juce::String(srcAmp) + " block " + juce::String(n);
+                expectChannel(r.out, 0, n, [&](int) { return trimmed(0.5f) * (1.0f - gr) + trimmed(srcAmp); }, tag + " L");
+                expectEquals(r.mixer.sidechainGR[0].load(), gr, tag + " GR meter");
+                expectEquals(r.mixer.getSidechainEnv(0), follow, tag + " follower");
+            }
+        }
+
+        beginTest("a source that is not dyadic (post-trim 0.05) ducks to a fifth of the amount, not fully");
+        {
+            // 0.05 / 0.25 = 0.2 is not exactly representable, and a follower held at a non-power-of-two level
+            // re-rounds each sample (a few ulp over 64 samples), so this one is compared to a tolerance.
+            Rig r;
+            duckPair(r);
+            r.src[1] = { 0.1f, true };
+            r.run(2, 64);
+            expectWithinAbsoluteError(r.mixer.getSidechainEnv(0), 0.2f, 1.0e-5f);
+            expectWithinAbsoluteError(r.mixer.sidechainGR[0].load(), duckDepth * 0.2f, 1.0e-5f);
+            expectWithinAbsoluteError(r.out.getSample(0, 63), trimmed(0.5f) * (1.0f - duckDepth * 0.2f) + trimmed(0.1f), 1.0e-5f);
+        }
+
+        beginTest("a silent source does not duck, and leaves the follower at rest");
         {
             Rig r;
             duckPair(r);
-            r.src[1] = { 0.001f, true };                // post-trim 0.0005 < 0.001
+            r.src[1] = { 0.0f, true };
             r.run(2, 64);
-            expectChannel(r.out, 0, 64, [&](int) { return trimmed(0.5f) + trimmed(0.001f); }, "L");
+            expectChannel(r.out, 0, 64, [&](int) { return trimmed(0.5f); }, "target undisturbed");
             expectEquals(r.mixer.sidechainGR[0].load(), 0.0f, "GR meter");
+            expectEquals(r.mixer.getSidechainEnv(0), 0.0f, "follower");
         }
 
         beginTest("a muted source does not duck (isAudible rule); the target still plays");
@@ -785,34 +831,43 @@ struct MixerBlockValueTests : juce::UnitTest
             }
         };
 
-        beginTest("mutual ducking, quiet strip first: strip 1 reads strip 0 AFTER it was ducked below threshold, so it is not ducked");
+        // All amplitudes below are powers of two, so every follower target and gain is exact and a follower held at
+        // its target stays bit-exact (rel x e + (1 - rel) x e = e when e is a power of two).
+        beginTest("mutual ducking, quiet strip first: strip 1 reads strip 0 AFTER it was ducked, so it ducks only slightly");
         {
             Rig r;
             mutual(r, kQuiet, 0.5f);
             r.run(2, 64);
-            // Strip 0 (post-trim 2^-9, above threshold) ducks from strip 1 (loud): 2^-10. Strip 1 then reads
-            // strip 0 at 2^-10 = 0.000977, under the 0.001 threshold: no duck. A pre-duck snapshot would duck it.
-            expectChannel(r.out, 0, 64, [&](int) { return trimmed(kQuiet) * (1.0f - depth) + trimmed(0.5f); }, "mix");
+            // Strip 0 (post-trim 2^-9) ducks from strip 1 (post-trim 1/4 = kFullDuck, full): 2^-10. Strip 1 then
+            // reads strip 0 at 2^-10, a follower target of 2^-10 / 2^-2 = 2^-8 and a GR of 2^-9. A pre-duck
+            // snapshot would read 2^-9 and duck strip 1 twice as deep (2^-8).
+            const float s0  = trimmed(kQuiet) * (1.0f - depth);
+            const float gr1 = depth * duckTarget(s0);
+            expectChannel(r.out, 0, 64, [&](int) { return s0 + trimmed(0.5f) * (1.0f - gr1); }, "mix");
             expectEquals(r.mixer.sidechainGR[0].load(), depth, "strip 0 GR");
-            expectEquals(r.mixer.sidechainGR[1].load(), 0.0f, "strip 1 GR (order dependent)");
+            expectEquals(r.mixer.sidechainGR[1].load(), gr1, "strip 1 GR (order dependent)");
+            expectEquals(gr1, 0.001953125f, "the arithmetic above: 2^-9");
         }
 
-        beginTest("mutual ducking, loud strip first: both are ducked (the source stays above threshold after its own duck)");
+        beginTest("mutual ducking, loud strip first: both are ducked (the source stays at full-duck level after its own duck)");
         {
             Rig r;
-            mutual(r, 0.5f, kQuiet);
+            mutual(r, 1.0f, kQuiet);
             r.run(2, 64);
-            // Strip 0 ducks from strip 1 (post-trim 2^-9 > threshold): 0.25 -> 0.125. Strip 1 reads strip 0 at
-            // 0.125 (above threshold): ducked 2^-9 -> 2^-10.
-            expectChannel(r.out, 0, 64, [&](int) { return trimmed(0.5f) * (1.0f - depth) + trimmed(kQuiet) * (1.0f - depth); }, "mix");
-            expectEquals(r.mixer.sidechainGR[0].load(), depth, "strip 0 GR");
+            // Strip 0 (post-trim 1/2) ducks from strip 1 (post-trim 2^-9): follower 2^-7, GR 2^-8, so strip 0 is
+            // 1/2 x (1 - 2^-8), still well above kFullDuck. Strip 1 reads that: follower 1, GR = depth.
+            const float gr0 = depth * duckTarget(trimmed(kQuiet));
+            const float s0  = trimmed(1.0f) * (1.0f - gr0);
+            expectChannel(r.out, 0, 64, [&](int) { return s0 + trimmed(kQuiet) * (1.0f - depth); }, "mix");
+            expectEquals(r.mixer.sidechainGR[0].load(), gr0, "strip 0 GR");
             expectEquals(r.mixer.sidechainGR[1].load(), depth, "strip 1 GR");
+            expectEquals(gr0, 0.00390625f, "the arithmetic above: 2^-8");
         }
 
         beginTest("a source with a higher index is read un-ducked; one with a lower index is read already ducked");
         {
             // Strip 0 ducks from 2 (higher: un-ducked) and strip 2 ducks from 0 (lower: already ducked). Both
-            // are quiet-then-loud so the lower strip's duck decides the higher strip's fate.
+            // are quiet-then-loud so the lower strip's duck decides how deep the higher strip's duck is.
             Rig r;
             r.src[0] = { kQuiet, true };
             r.src[1] = { 0.0f, true };
@@ -825,8 +880,10 @@ struct MixerBlockValueTests : juce::UnitTest
                 r.mixer.channels[(size_t) c].sidechainReleaseMs.store(0.0f);
             }
             r.run(3, 64);
+            // Strip 0 reads strip 2 at post-trim 1/4 (full): GR = depth, strip 0 becomes 2^-10. Strip 2 reads that:
+            // follower 2^-8, GR 2^-9 (a read of the un-ducked 2^-9 would give GR 2^-8).
             expectEquals(r.mixer.sidechainGR[0].load(), depth, "strip 0 (reads strip 2 un-ducked)");
-            expectEquals(r.mixer.sidechainGR[2].load(), 0.0f, "strip 2 (reads strip 0 already ducked below threshold)");
+            expectEquals(r.mixer.sidechainGR[2].load(), 0.001953125f, "strip 2 (reads strip 0 already ducked)");
         }
 
         beginTest("a muted or un-soloed source in a mutual pair leaves both unducked; a muted target is silent but its source still ducks nothing");
@@ -842,13 +899,15 @@ struct MixerBlockValueTests : juce::UnitTest
             expectEquals(r.mixer.sidechainGR[1].load(), depth, "strip 1 GR still metered while muted");
         }
 
-        beginTest("ducking is deterministic across block sizes when the envelope is a gate");
+        beginTest("ducking is deterministic across block sizes when the attack is instant and the levels are constant");
         for (int n : kSizes)
         {
             Rig r;
             mutual(r, kQuiet, 0.5f);
             r.run(2, n);
-            expectChannel(r.out, 0, n, [&](int) { return trimmed(kQuiet) * (1.0f - depth) + trimmed(0.5f); }, "mix");
+            const float s0  = trimmed(kQuiet) * (1.0f - depth);
+            const float gr1 = depth * duckTarget(s0);
+            expectChannel(r.out, 0, n, [&](int) { return s0 + trimmed(0.5f) * (1.0f - gr1); }, "mix");
         }
     }
 
@@ -871,6 +930,92 @@ struct MixerBlockValueTests : juce::UnitTest
             expectWithinAbsoluteError(r.mixer.sidechainGR[0].load(), env, 1.0e-6f);
             // The follower is plain state carried to the next block.
             expectWithinAbsoluteError(r.mixer.getSidechainEnv(0), env, 1.0e-6f);
+        }
+    }
+
+    // The duck follows the source level and recovers between hits; the release has a 30 ms floor.
+    void sidechainLevelFollow()
+    {
+        beginTest("a decaying kick (55 Hz, peak 0.8, 180 ms decay, every 0.5 s) lets the duck recover before the next hit");
+        {
+            // Strip 0 (a constant pad) ducks from strip 1 (the kick) at full amount, 5 ms attack, 100 ms release.
+            // A gate held the duck at full depth for as long as the kick tail stayed above -60 dBFS, so the
+            // follower never fell; the level follower must fall well below 0.3 before each next hit.
+            constexpr int period = 24000;                 // 0.5 s at 48 kHz: 120 BPM, one hit per beat
+            constexpr int beats  = 12;
+            constexpr int block  = 64;
+            Rig r;
+            long long pos = 0;                            // absolute sample index of the next block
+            r.render = [&](int ch, juce::AudioBuffer<float>& buf, int n)
+            {
+                for (int i = 0; i < n; ++i)
+                {
+                    float v = 0.5f;                       // the ducked pad
+                    if (ch == 1)
+                    {
+                        // Exponentially decaying sine, restarted at every beat: peak 0.8 pre-trim = 0.4 post-trim.
+                        const double t = (double) ((pos + i) % period) / kRate;
+                        v = (float) (0.8 * std::exp(-t / 0.18) * std::sin(2.0 * juce::MathConstants<double>::pi * 55.0 * t));
+                    }
+                    buf.setSample(0, i, v);
+                    buf.setSample(1, i, v);
+                }
+            };
+            r.mixer.channels[0].sidechainSource.store(1);
+            r.mixer.channels[0].sidechainAmount.store(1.0f);
+            r.mixer.channels[0].sidechainAttackMs.store(5.0f);
+            r.mixer.channels[0].sidechainReleaseMs.store(100.0f);
+
+            std::array<float, beats> cycleMin, cycleMax;
+            cycleMin.fill(1.0e9f);
+            cycleMax.fill(0.0f);
+            for (; pos < (long long) period * beats; )
+            {
+                r.run(2, block);
+                pos += block;
+                // Fold the follower at the end of each block into the cycle (beat) it belongs to.
+                const int   cycle = (int) ((pos - 1) / period);
+                const float env   = r.mixer.getSidechainEnv(0);
+                cycleMin[(size_t) cycle] = std::min(cycleMin[(size_t) cycle], env);
+                cycleMax[(size_t) cycle] = std::max(cycleMax[(size_t) cycle], env);
+            }
+            for (int cycle = 4; cycle < beats; ++cycle)   // beats 4 to 12: steady state, the follower's start-up long gone
+            {
+                const juce::String tag = "beat " + juce::String(cycle);
+                expect(cycleMin[(size_t) cycle] < 0.3f, tag + ": the duck recovers below 0.3 before the next hit (min "
+                                                           + juce::String(cycleMin[(size_t) cycle], 4) + ")");
+                expect(cycleMax[(size_t) cycle] > 0.5f, tag + ": the hit does duck (max "
+                                                           + juce::String(cycleMax[(size_t) cycle], 4) + ")");
+            }
+        }
+
+        beginTest("a release below 30 ms behaves as 30 ms; a longer one is honoured");
+        {
+            // Hold a full duck (follower exactly 1), silence the source, and read the follower after 1440 samples
+            // (30 ms): one time constant of a 30 ms release, e^-1. Float accumulation over 1440 steps is far
+            // inside the 1e-3 tolerance; the floored cases are also bit-identical to a plain 30 ms release.
+            auto envAfterSilence = [&](float releaseMs)
+            {
+                Rig r;
+                r.src[0] = { 0.5f, true };
+                r.src[1] = { 0.5f, true };                // post-trim 0.25 = kFullDuck: target 1
+                r.mixer.channels[0].sidechainSource.store(1);
+                r.mixer.channels[0].sidechainAmount.store(1.0f);
+                r.mixer.channels[0].sidechainAttackMs.store(0.0f);
+                r.mixer.channels[0].sidechainReleaseMs.store(releaseMs);
+                r.run(2, 64);
+                r.src[1] = { 0.0f, true };
+                for (int k = 0; k < 3; ++k)
+                    r.run(2, 480);
+                return r.mixer.getSidechainEnv(0);
+            };
+            const float at30 = envAfterSilence(30.0f);
+            expectWithinAbsoluteError(at30, std::exp(-1.0f), 1.0e-3f);
+            // Every release under 30 ms is raised to exactly 30 ms, so the same coefficient gives the same bits.
+            for (float rel : { 0.0f, 1.0f, 10.0f, 29.9f })
+                expectEquals(envAfterSilence(rel), at30, "release " + juce::String(rel) + " ms is exactly the 30 ms floor");
+            // A release above the floor is used as set: 1440 samples is half a 60 ms time constant, so e^-0.5.
+            expectWithinAbsoluteError(envAfterSilence(60.0f), std::exp(-0.5f), 1.0e-3f);
         }
     }
 };
