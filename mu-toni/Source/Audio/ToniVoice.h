@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_basics/juce_audio_basics.h>
+#include "Audio/EnvelopeParams.h"          // mu-core: ADSR parameter updates that do not cut a release
 #include "Audio/MultiModeFilter.h"          // mu-core (reused unchanged)
 #include "Audio/NoiseSeed.h"               // mu-core: per-slot, per-instance noise seeding
 #include "Audio/Wavetable/XModOscPair.h"   // mu-core: wavetable oscs + 2-lane X-Mod (shared with mu-Tant)
@@ -116,6 +117,7 @@ public:
         targetMidi = (float) midiNote;
         pitchGlide.setCurrentAndTargetValue(targetMidi);
         oscs.osc1.resetPhase(); oscs.osc2.resetPhase();
+        releasing = false;
         ampEnv.noteOn(); filterEnv.noteOn(); pitchEnv.noteOn();
     }
 
@@ -130,7 +132,7 @@ public:
         pitchGlide.setTargetValue(targetMidi);         // and slide to the new note
     }
 
-    void noteOff() { ampEnv.noteOff(); filterEnv.noteOff(); pitchEnv.noteOff(); }
+    void noteOff() { releasing = true; ampEnv.noteOff(); filterEnv.noteOff(); pitchEnv.noteOff(); }
 
     // The accent of the note about to start, 0..1 (303-style): up to kAccentDb louder and its
     // filter up to kAccentOctaves brighter. `glide` (a tied note) moves to it smoothly; otherwise
@@ -210,9 +212,10 @@ public:
 private:
     void applyEnvParams()
     {
-        ampEnv.setParameters   ({ params.ampA, params.ampD, params.ampS, params.ampR });
-        filterEnv.setParameters({ params.fA,   params.fD,   params.fS,   params.fR   });
-        pitchEnv.setParameters ({ params.pA,   params.pD,   params.pS,   params.pR   });
+        // Only when changed and not mid-release (see mu_env): ADSR::setParameters would otherwise cut a release.
+        mu_env::applyParameters(ampEnv,    { params.ampA, params.ampD, params.ampS, params.ampR }, releasing);
+        mu_env::applyParameters(filterEnv, { params.fA,   params.fD,   params.fS,   params.fR   }, releasing);
+        mu_env::applyParameters(pitchEnv,  { params.pA,   params.pD,   params.pS,   params.pR   }, releasing);
     }
 
     // White or pink noise (Paul Kellet economy pink filter — cheap, stable).
@@ -249,6 +252,7 @@ private:
     float osc1Gain = 1.0f, osc2Gain = 0.7f, noiseGain = 0.0f, levelGain = 1.0f;
     float panL = 0.7071f, panR = 0.7071f;
     double glideSeconds = 0.0;   // portamento time, taken when a tied note starts a slide
+    bool   releasing    = false; // set at noteOff, cleared at noteOn: envelope parameters wait while it is set
 };
 
 } // namespace mu_toni
