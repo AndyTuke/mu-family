@@ -31,12 +31,12 @@ struct MuOnClipLaunchTests : juce::UnitTest
             TempStorage storage;
             ExposedPluginProcessor p;
             p.addLayer();
-            p.selectEngine(1, mu_on::EngineType::Snare);
+            p.selectTrackEngine(1, mu_on::EngineType::Snare);
             setParam(p.apvts, "t1_snare_dec", 333.0f);
             expect(p.storeClip(1, 0));
             expectEquals(p.getLayer(1)->clips->get(0).getProperty("engine").toString(), p.getLayerName(1));
 
-            p.selectEngine(1, mu_on::EngineType::Hat);
+            p.selectTrackEngine(1, mu_on::EngineType::Hat);
             expectEquals((int) getParam(p.apvts, "t1_eng"), 2, "the Hat engine is selected");
             expect(p.launchClip(1, 0));
             expectEquals((int) getParam(p.apvts, "t1_eng"), 3, "the clip's Snare engine came back");

@@ -2,7 +2,7 @@
 
 #include "UI/ModulatorEditor.h"            // mu-core: ModDestProvider
 #include "UI/Components/DropdownSelect.h"   // mu-core
-#include "Plugin/TrackParams.h"            // EngineType
+#include "Persistence/TrackParams.h"            // EngineType
 #include "Modulation/ModTarget.h"         // mu-core: the standard target row
 #include "UI/ModTargetDropdown.h"        // mu-core: the shared destination-dropdown builder
 
@@ -21,7 +21,7 @@
 // the slider's 0..1 proportion, the matrix offsets it, and resolveLane converts back via the
 // param's NormalisableRange.
 //
-// The table ORDER is the single source of truth: it equals the order GrooveVoices feeds
+// The table ORDER is the single source of truth: it equals the order TrackEngine::setParams feeds
 // the modulated values back into each engine's setParams(), so reordering an engine's table
 // without matching the engine dispatch would scramble the mapping. New dests append.
 namespace mu_on

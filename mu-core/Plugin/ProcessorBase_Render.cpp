@@ -25,8 +25,8 @@ void ProcessorBase::prepareLayerRender(double sampleRate, int maxBlockSize)
     renderState.loopBeats.fill(kDefaultLoopBeats);
     renderState.live.fill(false);
     renderState.host = {};
-    renderState.lastPlaying = renderState.jumpPending = false;
-    renderState.edgeStarted = renderState.edgeStopped = renderState.edgeJumped = false;
+    renderState.lastPlaying = renderState.jumpPending = renderState.stopPending = false;
+    renderState.edgeStarted = renderState.edgeStopped = renderState.edgeJumped = renderState.edgeHiddenStop = false;
     renderState.mixCount = 0;
     renderState.midiIn = renderState.liveOut = renderState.tailOut = 0;
     renderState.dropped = 0;
@@ -51,7 +51,7 @@ void ProcessorBase::releaseLayerRender()
     retireBin.cutAll();
     retireBin.service();
     renderState.host = {};
-    renderState.lastPlaying = renderState.jumpPending = false;
+    renderState.lastPlaying = renderState.jumpPending = renderState.stopPending = false;
 }
 
 mu_core::BlockTransport ProcessorBase::resolveBlockTransport(juce::MidiBuffer& midi, int numSamples, double wrapBeats)
@@ -102,7 +102,7 @@ void ProcessorBase::noteHostBlock(const mu_core::BlockTransport& t, int numSampl
 void ProcessorBase::noteSkippedBlock(const mu_core::BlockTransport& t, juce::AudioBuffer<float>& buffer,
                                      const juce::MidiBuffer& midi) noexcept
 {
-    if (! t.playing && renderState.lastPlaying) renderState.jumpPending = true;
+    if (! t.playing && renderState.lastPlaying) renderState.jumpPending = renderState.stopPending = true;
     buffer.clear();
     if (renderState.carryMidi && renderState.midi.get() != nullptr)
         for (const auto meta : midi)
@@ -266,6 +266,7 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
         renderState.edgeStarted = t.playing && ! renderState.lastPlaying;
         renderState.edgeStopped = ! t.playing && renderState.lastPlaying;
         renderState.edgeJumped  = t.playing && renderState.lastPlaying && renderState.jumpPending;
+        renderState.edgeHiddenStop = renderState.edgeJumped && renderState.stopPending;
 
         int mc = juce::jlimit(0, K, (int) v.numLive);
         if (retireBin.countPolicy() == mu_core::RetireBin::CountPolicy::RenderPastCount)
@@ -275,6 +276,7 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
     base.justStarted     = firstChunk && renderState.edgeStarted ? 1 : 0;
     base.justStopped     = firstChunk && renderState.edgeStopped ? 1 : 0;
     base.transportJumped = firstChunk && renderState.edgeJumped  ? 1 : 0;
+    base.stoppedUnrendered = firstChunk && renderState.edgeHiddenStop ? 1 : 0;
 
     // Which slots have a live, non-Empty layer this block (Empty is never called).
     for (int s = 0; s < K; ++s)
@@ -316,8 +318,11 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
     };
 
     // Phase 1: priority-0 live layers in slot order; every other slot below mixCount gets cleared scratch (an
-    // entry cut between phase 0 and phase 4 then renders silence, never last block's samples).
+    // entry cut between phase 0 and phase 4 then renders silence, never last block's samples). Each live layer's
+    // priority is read once per call (`priority1`) and phase 3 uses that reading: a type whose priority follows a
+    // parameter (mu-On's engine) is rendered exactly once even when the parameter moves between the two passes.
     for (auto& p : renderState.peers) p = {};
+    std::array<bool, (size_t) K> priority1 {};
     for (int s = 0; s < K; ++s)
     {
         if (! renderState.live[(size_t) s])
@@ -332,7 +337,7 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
             }
             continue;
         }
-        if (v.layer[(size_t) s]->renderPriority() != 0) continue;
+        if (v.layer[(size_t) s]->renderPriority() != 0) { priority1[(size_t) s] = true; continue; }
         renderLive(s, nullptr);
 
         // Phase 2 (folded in): the peer table, post-insert and pre-strip (C10), before any tail is added.
@@ -344,7 +349,7 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
 
     // Phase 3: priority-1 live layers, which may read a priority-0 peer.
     for (int s = 0; s < K; ++s)
-        if (renderState.live[(size_t) s] && v.layer[(size_t) s]->renderPriority() != 0)
+        if (renderState.live[(size_t) s] && priority1[(size_t) s])
             renderLive(s, renderState.peers.data());
 
     // Phase 4: the bin, rows below mixCount only, slot order then entry order, added after the live layer.
@@ -367,7 +372,7 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
         for (int s = 0; s < K; ++s)
             renderState.loopBeats[(size_t) s] = renderState.live[(size_t) s] ? v.layer[(size_t) s]->loopBeats() : kDefaultLoopBeats;
         renderState.lastPlaying = t.playing;
-        renderState.jumpPending = false;
+        renderState.jumpPending = renderState.stopPending = false;
     }
 }
 

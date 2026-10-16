@@ -78,6 +78,7 @@ namespace mu_contract_test
             justStarted += ctx.justStarted;
             justStopped += ctx.justStopped;
             jumped      += ctx.transportJumped;
+            hiddenStops += ctx.stoppedUnrendered;
             lastStartBeat = ctx.startBeat;
             if (ctx.beatWrap > 0.0 && (ctx.startBeat < 0.0)) ++negativeInBoundedHost;
             mu_core::forEachMidi(ctx, [this](const mu_core::MidiEvent&, int) { ++midiSeen; });
@@ -90,7 +91,9 @@ namespace mu_contract_test
         }
 
         int priority = 0;
-        int renderPriority() const override { return priority; }
+        bool flipPriority = false;   // every read of the priority returns the other value (a type whose priority follows a parameter)
+        mutable int priorityReads = 0;
+        int renderPriority() const override { return flipPriority ? (priorityReads++ % 2) : priority; }
         double loopBeatsValue = 4.0;
         double loopBeats() const override { return loopBeatsValue; }
         void onTransportStopped(const mu_core::RenderContext& ctx) override { ++stopHooks; hookSlot = ctx.slot; }
@@ -108,7 +111,7 @@ namespace mu_contract_test
         double preparedRate = 0.0;
         int preparedBlock = 0, prepares = 0, binds = 0, boundSlot = -1, movedTo = -1, hookSlot = -1;
         int renders = 0, maxCall = 0, contractBreaks = 0, lastSlot = -1, useAfterFree = 0;
-        int justStarted = 0, justStopped = 0, jumped = 0, stopHooks = 0, jumpHooks = 0;
+        int justStarted = 0, justStopped = 0, jumped = 0, hiddenStops = 0, stopHooks = 0, jumpHooks = 0;
         int midiSeen = 0, midiEmitted = 0, negativeInBoundedHost = 0;
         int lastCarried = 0, firstEventNote = -1, parkedCalls = 0, parkedSlot = -1, parkedMidiSeen = 0;
         bool emitNoteOn = false;

@@ -8,7 +8,6 @@
 // Part 1, the bit-exact golden renders, is GoldenRenderTests.cpp.
 
 #include "GoldenTestRig.h"
-#include "Audio/GrooveVoices.h"
 #include "Tests/GoldenRender.h"
 
 namespace
@@ -659,7 +658,7 @@ struct MuOnExtractionPinTests : juce::UnitTest
             expect(rmsOf(playing, 1024, 2048) > 0.05f, "the bass sounds");
 
             rig.p.swapLayers(0, 1);
-            expect(rig.p.engineOf(0) == EngineType::Hat && rig.p.engineOf(1) == EngineType::Bass, "the engines moved with their tracks");
+            expect(rig.p.getTrackEngine(0) == EngineType::Hat && rig.p.getTrackEngine(1) == EngineType::Bass, "the engines moved with their tracks");
             expect(rig.p.pattern().isOn(0, 8) && rig.p.pattern().isOn(1, 0), "and so did the rows");
             const auto after = rig.render(4 * 512);
             logMessage("after swapLayers(0, 1): peak over 4 blocks " + juce::String(peakOf(after, 0, 2048), 6));
@@ -685,80 +684,38 @@ struct MuOnExtractionPinTests : juce::UnitTest
     // ── P7: a block larger than the prepared maximum ───────────────────────────────────────────
     void oversizeBlockPins()
     {
-        beginTest("GrooveVoices::renderAll renders at most the prepared block and drops the rest; the engines advance by what was rendered");
+        // Since the shared block driver (C8), a host block larger than the prepared size is rendered in calls of
+        // at most the prepared size, the layers and the mixer each; before it the old chain rendered only the
+        // prepared part and dropped the rest (and the mixer ran off its buffers). The oversize golden segment
+        // (tests/golden/mu-on/oversize-block) records the result.
+        beginTest("An oversize host block is rendered in prepared-size calls, bit-identical to prepared-size blocks");
         {
-            mu_seam_test::TempStorage storage;
-            mu_on::PluginProcessor p;
-            auto make = [&p]
+            Rig over, ref;
+            for (auto* r : { &over, &ref })
             {
-                auto v = std::make_unique<mu_on::GrooveVoices>();
-                v->prepare(kSr, 512);
-                v->cacheParams(p.apvts);
-                return v;
-            };
-            std::array<mu_on::Track*, mu_limits::kMaxLayers> tracks {};
-            tracks[0] = &p.getTrack(0);
-            auto fresh = [&](mu_on::GrooveVoices& v) { v.beginBlock(tracks.data(), 1); v.applyParams(0.0, 120.0); };
-
-            auto over = make(), ref = make();
-            Buf got(2, 1024), want(2, 512), second(2, 512);
-
-            fresh(*over); over->trigger(0, 1.0f); over->renderAll(1024);
-            over->copyOut(0, got, 1024);
-            fresh(*ref); ref->trigger(0, 1.0f); ref->renderAll(512);
-            ref->copyOut(0, want, 512);
-
+                useTrack(r->p, 1, EngineType::Bass);
+                useTrack(r->p, 2, EngineType::Rumble);
+                setParam(r->p.apvts, mu_on::layerParamId(2, "src"), 0.0f);
+            }
+            const auto big = over.render(8192, 4096);   // two 4096-frame blocks on a 512 preparation
+            const auto small = ref.render(8192, 512);
             bool same = true;
             for (int c = 0; c < 2; ++c)
-                for (int i = 0; i < 512; ++i) same = same && got.getSample(c, i) == want.getSample(c, i);
-            expect(same, "the first 512 frames are exactly a prepared-size render");
-            expect(peakOf(got, 0, 512) > 0.1f, "which sounds");
-            expectEquals(peakOf(got, 512, 1024), 0.0f, "frames 512 to 1023 are left at silence, with no error");
-
-            fresh(*over); over->renderAll(512); over->copyOut(0, second, 512);
-            fresh(*ref);  ref->renderAll(512);  ref->copyOut(0, want, 512);
-            same = true;
-            for (int c = 0; c < 2; ++c)
-                for (int i = 0; i < 512; ++i) same = same && second.getSample(c, i) == want.getSample(c, i);
-            expect(same, "the engine advanced by 512 frames, not 1024: the next block continues from frame 512");
+                for (int i = 0; i < 8192 && same; ++i) same = big.getSample(c, i) == small.getSample(c, i);
+            expect(same, "every frame of the oversize blocks equals the prepared-size render");
+            expect(peakOf(big, 4096, 8192) > 0.01f, "and the frames past the prepared size sound");
+            expect(over.p.getLayerRenderProbe().largestCall <= 512, "no call is longer than the prepared size");
         }
 
-        beginTest("A trigger whose offset lies beyond the rendered part of an oversize block is held and never sounds");
+        beginTest("A step whose offset lies past the prepared size of an oversize block sounds at its own frame");
         {
-            mu_seam_test::TempStorage storage;
-            mu_on::PluginProcessor p;
-            auto v = std::make_unique<mu_on::GrooveVoices>();
-            v->prepare(kSr, 512);
-            v->cacheParams(p.apvts);
-            std::array<mu_on::Track*, mu_limits::kMaxLayers> tracks {};
-            tracks[0] = &p.getTrack(0);
-            Buf got(2, 512);
-
-            v->beginBlock(tracks.data(), 1); v->applyParams(0.0, 120.0);
-            v->trigger(0, 1.0f, 700);          // the step landed at frame 700 of a 1024-frame block
-            v->renderAll(1024);                 // only 512 frames are rendered
-            float peak = 0.0f;
-            for (int b = 0; b < 8; ++b)
-            {
-                v->beginBlock(tracks.data(), 1); v->applyParams(0.0, 120.0);
-                v->renderAll(512);
-                v->copyOut(0, got, 512);
-                peak = juce::jmax(peak, peakOf(got, 0, 512));
-            }
-            logMessage("held trigger at offset 700, eight later blocks: peak " + juce::String(peak, 6));
-            expectEquals(peak, 0.0f, "the kick never starts: its onset offset is never reached in a 512-frame block");
-
-            v->trigger(0, 1.0f, 0);
-            v->renderAll(512);
-            v->copyOut(0, got, 512);
-            expect(peakOf(got, 0, 512) > 0.1f, "a fresh trigger replaces the held one and sounds");
+            Rig over, ref;
+            for (auto* r : { &over, &ref }) onlySteps(r->p, 0, { 1 });   // beat 0.25 = frame 6000 at 120 BPM
+            const auto big = over.render(8192, 8192);
+            const auto small = ref.render(8192, 512);
+            expectEquals(firstAbove(big), firstAbove(small), "the step lands at the same frame either way");
+            expect(firstAbove(big) >= 6000, "on its step, not at the start of a call");
         }
-
-        // Not exercised, only recorded: MixerEngine::processBlock applies pan, gain, sidechain and the
-        // peak readers to `numSamples` frames of channel buffers that prepare() sized at the prepared
-        // block, so an oversize block through PluginProcessor::processBlock runs off the end of them (it
-        // crashes a Debug heap). The contract has to say what an oversize block does (clamp or chunk)
-        // before a golden can include one; until then the golden schedules stay within the prepared size.
     }
 };
 

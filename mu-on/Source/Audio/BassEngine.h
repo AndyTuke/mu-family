@@ -54,6 +54,10 @@ public:
     // Silence the voice + clear the filter ring immediately (e.g. transport stop).
     void reset() noexcept { active = false; restart = false; filter.reset(); }
 
+    // The filter's drive smoothing back to where prepare() leaves it (0), so the next block ramps the drive in
+    // as a freshly prepared engine's does (a track arriving in another slot). Allocation-free.
+    void resetFilterSmoothing() noexcept { filter.resetSmoothers(); }
+
     void render(juce::AudioBuffer<float>& buf, int n)
     {
         const int chs = buf.getNumChannels();
