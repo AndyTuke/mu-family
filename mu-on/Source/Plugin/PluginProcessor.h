@@ -5,7 +5,7 @@
 #include "Plugin/MidiClockSync.h"         // mu-core: shared MIDI-clock slave
 #include "Persistence/TrackParams.h"
 #include "Sequencer/StepPattern.h"
-#include "Sequencer/GrooveSequencer.h"
+#include "Sequencer/GrooveSequencer.h"   // StepClock, the playhead step
 #include "Audio/GrooveVoices.h"
 #include "Sequencer/Track.h"
 #include "UI/TrackHost.h"   // what the Track layer's UI reads from its host
@@ -192,9 +192,9 @@ private:
     // GrooveVoices::renderAll before the mixer runs.
     MixerEngine::RenderChannelFn renderChannelCb;
 
-    // 909 sequencer — owns the grid pattern; clocked off the internal transport each block.
+    // The 909 grid as a view over the tracks' rows (the editor and the tests address rows by slot); each
+    // track clocks its own row.
     StepPattern     stepPattern;
-    GrooveSequencer sequencer { stepPattern };
     std::unique_ptr<GrooveVoices> grooveVoicesStore = std::make_unique<GrooveVoices>();   // every track slot's engines (large: kept off the stack)
     GrooveVoices&   grooveVoices = *grooveVoicesStore;
 

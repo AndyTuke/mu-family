@@ -10,34 +10,15 @@ void GrooveSequencer::process(double beatStart, int numSamples, double bpm, cons
     processSpan(beatStart, numSamples, (bpm / 60.0) / sampleRate, fire);
 }
 
+// Every row's clock runs (spare rows too, so a row that goes live is already in step); only the live rows fire.
 void GrooveSequencer::processSpan(double beatStart, int numSamples, double beatsPerSample, const TriggerFn& fire)
 {
-    if (numSamples <= 0 || beatsPerSample <= 0.0 || ! fire) return;
-
-    const double beatEnd = beatStart + beatsPerSample * (double) numSamples;
-
-    // Resync if the transport jumped (host scrub / a missed reset) so we never burst-fire
-    // a long backlog: snap nextGlobalStep to just before the current block.
-    const long long expected = (long long) std::floor(beatStart / kStepBeats);
-    if (nextGlobalStep < expected - 1 || nextGlobalStep > expected + 1)
-        nextGlobalStep = expected;
-
-    // Fire each step whose (swing-adjusted) beat lands within [beatStart, beatEnd).
-    for (int guard = 0; guard < StepPattern::kNumSteps * 2; ++guard)
+    if (! fire) return;
+    for (int tr = 0; tr < StepPattern::kNumTracks; ++tr)
     {
-        const double t = stepBeat(nextGlobalStep);
-        if (t >= beatEnd) break;
-        if (t >= beatStart)
-        {
-            const int local = (int) (((nextGlobalStep % StepPattern::kNumSteps)
-                                       + StepPattern::kNumSteps) % StepPattern::kNumSteps);
-            const int sampleOffset = juce::jlimit(0, numSamples - 1,
-                                                  (int) std::round((t - beatStart) / beatsPerSample));
-            for (int tr = 0; tr < activeTracks; ++tr)
-                if (pattern.isOn(tr, local))
-                    fire(tr, pattern.isAccent(tr, local) ? accentVel : normalVel, sampleOffset);
-        }
-        ++nextGlobalStep;
+        const bool live = tr < activeTracks;
+        clocks[(size_t) tr].processSpan(PatternRow { pattern, tr }, beatStart, numSamples, beatsPerSample, swing, accentVel,
+                                        [&](float velocity, int offset) { if (live) fire(tr, velocity, offset); });
     }
 }
 

@@ -89,7 +89,6 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     currentBlockSize  = samplesPerBlock;
     mixerEngine.prepare(sampleRate, samplesPerBlock);
     fxChain.prepare(sampleRate, samplesPerBlock);
-    sequencer.prepare(sampleRate);
 
     // Every slot's engines, spares included; under the layers lock because the audio thread reads them.
     const juce::ScopedLock sl(layersLock);
@@ -145,19 +144,23 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
             // Stop edge: silence the voices so a sustaining bass (no note-off yet) doesn't drone on.
             if (wasPlaying && ! isPlaying) grooveVoices.reset();
             wasPlaying = isPlaying;
+            // Every track clocks its own row with its own swing and accent, at the block's beat (the same
+            // arithmetic the grid clock had, so the rows fire as before). Spare tracks' clocks keep step too, so
+            // a track that goes live fires on time; only the live rows trigger.
             if (isPlaying)
-            {
-                sequencer.setSwing (seqSwingParam  ? seqSwingParam->load()  : 0.0f);
-                sequencer.setAccentVelocity(seqAccentParam ? seqAccentParam->load() : 1.0f);
-                sequencer.setActiveTracks(numActive);
-                sequencer.processSpan(beatStart, numSamples, transport.beatsPerSample,
-                                  [this, &tracks](int track, float vel, int off)
-                                  {
-                                      if (engineOf(track) == EngineType::Rumble) return;   // a Rumble track does not step
-                                      grooveVoices.trigger(track, vel, off);
-                                      tracks[(size_t) track]->triggers.fetch_add(1, std::memory_order_relaxed);
-                                  });
-            }
+                for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+                {
+                    auto& t = getTrack(i);
+                    const bool live = i < numActive;
+                    t.clock.processSpan(t.row, beatStart, numSamples, transport.beatsPerSample,
+                                        t.row.swingAmount(), t.row.accentVelocity(),
+                                        [this, &t, i, live](float vel, int off)
+                                        {
+                                            if (! live || engineOf(i) == EngineType::Rumble) return;   // a Rumble track does not step
+                                            grooveVoices.trigger(i, vel, off);
+                                            t.triggers.fetch_add(1, std::memory_order_relaxed);
+                                        });
+                }
 
             // Render the engines (Rumble last) → mixer through the shared path (engine→insert→mixer).
             grooveVoices.renderAll(numSamples);
