@@ -343,7 +343,10 @@ public:
                 }
                 logMessage("vocoder peak with a full-scale " + juce::String(freq, 0) + " Hz input: whole render "
                            + juce::String(peak, 3) + ", settled " + juce::String(settledPeak, 3));
-                expect(std::isfinite(peak) && settledPeak < 1.0f,
+                // The output soft limiter (VocoderInsert::softLimit) keeps every sample inside +/-1, onset included.
+                expect(std::isfinite(peak) && peak <= 1.0f,
+                       "peak " + juce::String(peak, 4) + " at " + juce::String(freq, 0) + " Hz");
+                expect(settledPeak < 1.0f,
                        "settled peak " + juce::String(settledPeak, 3) + " at " + juce::String(freq, 0) + " Hz");
             }
         }

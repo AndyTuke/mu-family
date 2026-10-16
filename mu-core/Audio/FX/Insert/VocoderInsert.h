@@ -245,8 +245,8 @@ public:
                     vocoL += synthOut * envelopeL[b];
                     vocoR += synthOut * envelopeR[b];
                 }
-                if (nChClamped > 0) buf.getWritePointer(0)[i] = vocoL * kOutputGain;
-                if (nChClamped > 1) buf.getWritePointer(1)[i] = vocoR * kOutputGain;
+                if (nChClamped > 0) buf.getWritePointer(0)[i] = softLimit(vocoL * kOutputGain);
+                if (nChClamped > 1) buf.getWritePointer(1)[i] = softLimit(vocoR * kOutputGain);
             }
             else
             {
@@ -268,7 +268,7 @@ public:
                     vocoded += synthOut * envelope[b];
                 }
                 for (int ch = 0; ch < nChClamped; ++ch)
-                    buf.getWritePointer(ch)[i] = vocoded * kOutputGain;
+                    buf.getWritePointer(ch)[i] = softLimit(vocoded * kOutputGain);
             }
         }
     }
@@ -282,6 +282,17 @@ private:
     // output is ~100x (+40 dB) below the carrier x input level. A simulation (white-noise carrier, white-noise and two-sine
     // inputs) put the ratio at 93..99, so 100/20 (the old 1/kNumBands average folded in) restores that level.
     static constexpr float kOutputGain       = 100.0f / (float) kNumBands;
+
+    // The makeup is matched to broadband input, so a loud low-frequency onset can overshoot full scale for
+    // ~16 ms (a float64 port measured up to 1.95). A soft limiter keeps the output inside +/-1: linear up to
+    // kKnee, then a tanh knee that approaches 1.0 and never reaches it, with unity slope at the knee.
+    static constexpr float kKnee             = 0.8f;
+    static float softLimit(float x) noexcept
+    {
+        const float a = std::abs(x);
+        if (a <= kKnee) return x;
+        return std::copysign(kKnee + (1.0f - kKnee) * std::tanh((a - kKnee) / (1.0f - kKnee)), x);
+    }
     static constexpr float kEnvAttackMs      = 5.0f;
     static constexpr float kEnvReleaseMs     = 30.0f;
     static constexpr float kLowestFreq       = 32.7f;     // SPN C1
