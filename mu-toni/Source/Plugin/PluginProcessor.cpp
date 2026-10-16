@@ -51,17 +51,15 @@ PluginProcessor::PluginProcessor()
     }
     storeLayerCount(1, std::memory_order_relaxed);   // a fresh instance starts with one layer
     unsavedLayerCount = 4;                           // a state saved before layers were editable held four
+    // A key pressed or released while an edit silences the audio still reaches the layers' held keys.
+    setCarrySkippedMidi(true);
 
-    // Per-channel render: each channel runs its own arpeggiator voice into the
-    // buffer; the shared mixer applies the strip + master mix downstream. Only called for the
-    // live layers, under the try-locked layersLock.
+    // The processor's own chain (until the shared driver is the only path): the mixer's render hook runs
+    // channel ch's Arp (engine -> insert -> mixer). Only called for the live layers, under the try-locked
+    // layersLock.
     renderChannelCb = [this](int ch, juce::AudioBuffer<float>& buf, int n)
     {
-        if (ch >= 0 && ch < mu_limits::kMaxLayers)
-        {
-            getArp(ch).runner.render(buf, n, getArp(ch).context);
-            getArp(ch).insert->process(buf, n, buf.getNumChannels(), getArp(ch).insertCfg);   // engine → insert → mixer
-        }
+        if (ch >= 0 && ch < mu_limits::kMaxLayers) getArp(ch).renderBlock(buf, n);
         else buf.clear();
     };
 
@@ -74,10 +72,9 @@ PluginProcessor::PluginProcessor()
 
     // The shared wavetable bank (procedural factory set), read by every voice's oscillators.
     bank.loadFactoryBank();
-    midiInChParam = apvts.getRawParameterValue(kMidiInChannelParamId);
     noteInput.allocate((size_t) (kNoteInputCarry + kNoteInputBlock), true);
 
-    cacheVoiceParamPointers();
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i) layers[(size_t) i]->bindParams(apvts, i);   // every slot's rows
     setupLayerState();       // the layer layout every preset / session save and load uses
     layerSwapper.setAppliers([this](juce::ValueTree& t) { applyStateTree(t); },
                         [this](int i, juce::ValueTree& t) { applyLayerTree(i, t); });
@@ -88,107 +85,6 @@ PluginProcessor::PluginProcessor()
 PluginProcessor::~PluginProcessor()
 {
     prepareForDestruction();   // first: no deferred-work tick may reach this half-destroyed object
-}
-
-namespace
-{
-    // The per-voice slot (vpi::*) a modulation target drives, found from its table param name.
-    int vpSlotFor(const char* param)
-    {
-        for (int k = 0; k < vpi::COUNT; ++k)
-            if (std::strcmp(vpi::suffix[k], param) == 0) return k;
-        jassertfalse;   // a table row names a parameter that does not exist
-        return 0;
-    }
-}
-
-void PluginProcessor::cacheVoiceParamPointers()
-{
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
-        for (int k = 0; k < kNumVoiceParams; ++k)
-        {
-            const juce::String id = layerParamId(i, vpi::suffix[k]);
-            vp[(size_t) i][(size_t) k] = apvts.getRawParameterValue(id);
-        }
-
-    // Modulation-resolve inputs: ids + ranges (voice-independent) + per-voice atoms.
-    for (int k = 0; k < kNumModDests; ++k)
-    {
-        modDestIds[(size_t) k]    = kModDestTable[k].id;
-        modDestRanges[(size_t) k] = apvts.getParameterRange(layerParamId(0, kModDestTable[k].param));
-        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
-            modDestAtoms[(size_t) i][(size_t) k] = vp[(size_t) i][(size_t) vpSlotFor(kModDestTable[k].param)];
-        modParamValues[kModDestTable[k].id] = 0.0f;   // pre-size the map (no audio-thread alloc)
-    }
-}
-
-void PluginProcessor::readVoice(int v, ArpParams& ap, ToniVoiceParams& tv,
-                                int& rateIdx, float& gate01, bool& midiTrig, ArpAccent& accent)
-{
-    const auto& p = vp[(size_t) v];
-    auto g = [&](int slot) { return p[(size_t) slot] != nullptr ? p[(size_t) slot]->load() : 0.0f; };
-
-    // Resolve this voice's modulation matrix over its control sequences → out[] (param units).
-    // Modulated destinations come from out[]; everything else reads the raw param.
-    float out[kNumModDests];
-    mu_mod::resolveLane(&getArp(v), modBeat, kNumModDests,
-                        modDestIds.data(), modDestAtoms[(size_t) v].data(),
-                        modDestRanges.data(), modParamValues, out);
-
-    // Publish the post-matrix values for the knobs' live modulation arcs.
-    for (int k = 0; k < kNumModDests; ++k)
-        modLive[(size_t) v][(size_t) k].store(out[k], std::memory_order_relaxed);
-
-    // Arp (integer dests round; direction/gate/porta continuous).
-    ap.scale        = (int) g(vpi::scale);                  // not modulated
-    ap.rootNote     = juce::roundToInt(out[D_root]);
-    ap.rootOctave   = juce::roundToInt(out[D_roct]);
-    ap.chord        = juce::roundToInt(out[D_chord]);
-    ap.inversion    = juce::roundToInt(out[D_inv]);
-    ap.octavesSpan  = juce::roundToInt(out[D_octs]);
-    ap.direction    = out[D_dir];
-    ap.diatonicSnap = g(vpi::snap) > 0.5f;                  // not modulated
-
-    tv.osc1Table = (int) g(vpi::o1wt); tv.osc1Oct = (int) g(vpi::o1o); tv.osc1Fine = g(vpi::o1f); tv.osc1Pos = out[D_o1pos]; tv.osc1LevelDb = out[D_o1lvl];
-    tv.osc2Table = (int) g(vpi::o2wt); tv.osc2Oct = (int) g(vpi::o2o); tv.osc2Semi = out[D_o2semi]; tv.osc2Fine = g(vpi::o2f);
-    tv.osc2Pos   = out[D_o2pos]; tv.osc2LevelDb = out[D_o2lvl];
-    tv.noiseLevelDb = out[D_noise]; tv.noiseType = (int) g(vpi::ntype);
-
-    // Cross-mod (index / depth are 0..100 / ±100 knobs → 0..1 / ±1).
-    tv.xmod.phaseMode = (int) g(vpi::xmPh);
-    tv.xmod.index     = out[D_xmIdx] * 0.01f;
-    tv.xmod.sync      = g(vpi::sync) > 0.5f;
-    tv.xmod.feedback  = g(vpi::xmFb) > 0.5f;
-    tv.xmod.ampMode   = (int) g(vpi::xmAm);
-    tv.xmod.depth     = out[D_xmDep] * 0.01f;
-    tv.xmod.ssbHz     = out[D_xmSsb];
-    tv.filterType = (int) g(vpi::ft); tv.cutoff = out[D_cut]; tv.resonance = out[D_res]; tv.drive = out[D_drv]; tv.lowCutHz = g(vpi::locut);
-
-    tv.ampA = g(vpi::aeA); tv.ampD = g(vpi::aeD); tv.ampS = g(vpi::aeS); tv.ampR = g(vpi::aeR); tv.ampLevelDb = out[D_amp];
-    tv.fA = g(vpi::feA); tv.fD = g(vpi::feD); tv.fS = g(vpi::feS); tv.fR = g(vpi::feR); tv.filterEnvDepth = out[D_fenv];
-    tv.pA = g(vpi::peA); tv.pD = g(vpi::peD); tv.pS = g(vpi::peS); tv.pR = g(vpi::peR); tv.pitchEnvDepth = out[D_penv];
-    tv.pitchEnvTarget = (int) g(vpi::ptgt);
-
-    tv.portamentoMs = out[D_porta];
-    tv.legato       = g(vpi::leg) > 0.5f;
-    tv.pan          = 0.0f;   // pan handled by the mixer strip
-
-    rateIdx  = juce::roundToInt(out[D_rate]);
-    gate01   = out[D_gate] * 0.01f;
-    midiTrig = g(vpi::trig) > 0.5f;
-
-    accent.amount  = out[D_acc] * 0.01f;
-    accent.length  = (int) g(vpi::accLen);
-    accent.pattern = (unsigned) juce::jmax(0, (int) g(vpi::accPat));
-    accent.stepMask = (unsigned) juce::jmax(0, (int) g(vpi::stepMask));
-
-    // Insert config (applied post-VCA in the render callback).
-    auto& ic = getArp(v).insertCfg;
-    ic.insertAlgo     = (int) g(vpi::drvChar);
-    ic.insertParam[0] = g(vpi::insP1);
-    ic.insertParam[1] = g(vpi::insP2);
-    ic.insertParam[2] = g(vpi::insP3);
-    ic.insertParam[3] = g(vpi::insP4);
 }
 
 int PluginProcessor::decodeNoteInput(const juce::MidiBuffer& midi, int numSamples) noexcept
@@ -231,20 +127,32 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     mixerEngine.prepare(sampleRate, samplesPerBlock);
     fxChain.prepare(sampleRate, samplesPerBlock);
 
-    // Every slot's runner and insert, spares included; under the layers lock because a structural
-    // edit moves the Arps.
-    const juce::ScopedLock sl(layersLock);
-    runnersLive = 0;   // every runner is reset as its slot goes live
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
-    {
-        getArp(i).runner.prepare(sampleRate, samplesPerBlock);
-        getArp(i).insert->prepare(sampleRate, samplesPerBlock);
-    }
+    // Every slot's Arp (runner and insert), spares included, and the shared driver's buffers.
+    prepareLayerRender(sampleRate, samplesPerBlock);
+    runnersLive = 0;   // the processor's own chain: every runner is reset as its slot goes live
+}
+
+void PluginProcessor::releaseResources()
+{
+    resetSwapPlayState();
+    releaseLayerRender();
 }
 
 void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
+
+    // The shared block driver over Arp::render (the layer contract), behind the test switch until the
+    // equivalence gate passes; the processor's own chain below is the default for this commit only.
+    if (usesLayerRender())
+    {
+        queueMidiProgramChanges(midiMessages);
+        const auto t = resolveBlockTransport(midiMessages, buffer.getNumSamples());
+        renderAndMix(buffer, midiMessages, t);
+        flagLayerSwapBoundaries(t);
+        return;
+    }
+
     const int numSamples = buffer.getNumSamples();
 
     // Preserve the DAW sidechain, then clear (shared — the SC input bus shares buffer
@@ -270,10 +178,6 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
 
     // Root-by-MIDI / trigger: this block's notes, decoded once for every layer's held keys.
     const int numNoteEvents = decodeNoteInput(midiMessages, numSamples);
-    const int inCh = midiInChParam != nullptr ? juce::roundToInt(midiInChParam->load()) : 0;
-
-    // Beat position for the modulation matrix (control-sequence playhead).
-    modBeat = transport.startBeat;
 
     // Push parameters into each live layer's runner and render it through the shared path (engine
     // -> insert -> mixer). Guarded by a try-lock against a structural edit moving the Arps (the message
@@ -284,6 +188,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
         if (layersTryLock.isLocked() && ! layerEditInFlight.load(std::memory_order_acquire))
         {
             const int numActive = numLayers.load(std::memory_order_relaxed);
+            const int inCh = getArp(0).midiInChannel();   // the one MIDI-in row every Arp binds
 
             // Every slot's Arp hears the block's keys, spares included, then takes the block's transport.
             for (int i = 0; i < mu_limits::kMaxLayers; ++i)
@@ -303,16 +208,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
             for (int i = runnersLive; i < numActive; ++i) getArp(i).runner.reset();
             runnersLive = numActive;
 
-            for (int i = 0; i < numActive; ++i)
-            {
-                ArpParams ap; ToniVoiceParams tv; int rateIdx = 6; float gate01 = 0.5f; bool midiTrig = false;
-                ArpAccent accent;
-                readVoice(i, ap, tv, rateIdx, gate01, midiTrig, accent);
-                getArp(i).runner.setAccent(accent);
-                getArp(i).runner.setArp(ap);
-                getArp(i).runner.setVoiceParams(tv);
-                getArp(i).runner.setStep(rateIdx, gate01, midiTrig);
-            }
+            // Each live layer resolves its modulation at the block's beat and takes its parameters.
+            for (int i = 0; i < numActive; ++i) getArp(i).readParams(transport.startBeat);
 
             // The render hook fills each channel; the mixer owns strip + master.
             processCoreBlock(buffer, nullptr, numActive, numSamples, bpm,
@@ -334,11 +231,8 @@ std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
     auto a = std::make_unique<Arp>();
     a->runner.setBank(&bank);
     a->runner.setSlotIndex(slot, noiseSeedSalt);
-    const double sr = currentSampleRate.load(std::memory_order_relaxed);
-    const int    bs = currentBlockSize.load(std::memory_order_relaxed);
-    a->runner.prepare(sr, bs);
     a->insert->setSlotIndex(slot);   // per-slot noise seed: layers do not share one sequence
-    a->insert->prepare(sr, bs);
+    a->prepare(currentSampleRate.load(std::memory_order_relaxed), currentBlockSize.load(std::memory_order_relaxed));
     return a;
 }
 

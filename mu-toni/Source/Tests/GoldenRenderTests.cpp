@@ -17,6 +17,7 @@
 #include "Plugin/PluginProcessor.h"
 #include "Tests/GoldenAllocationCheck.h"
 #include "Tests/GoldenRender.h"
+#include "Tests/LayerEquivalence.h"   // mu-core: the useLayerRender equivalence harness
 #include "Tests/ProcessorSeamHelpers.h"
 
 #include <cmath>
@@ -638,3 +639,109 @@ struct MuToniLayerPinTests : juce::UnitTest
 };
 
 static MuToniLayerPinTests muToniLayerPinTests;
+
+//==============================================================================
+// The useLayerRender equivalence gate (extraction-plan 2.7a, tests.md section 3): while both render paths
+// exist, the old processor-side chain and the shared driver over Arp::render must give the same master and the
+// same pre-mixer channel streams, bit for bit, for every golden scenario, three block schedules, and the
+// cases the review adds (locate and loop-back with held keys, tempo ramp, start mid-step, startBeat 1e6,
+// structural edits, keys during unrendered blocks, a count regrow by a state load).
+struct MuToniLayerEquivalenceTests : juce::UnitTest
+{
+    MuToniLayerEquivalenceTests() : juce::UnitTest("mu-Toni layer render equivalence", "mu-toni-equiv") {}
+
+    void runTest() override
+    {
+        mu_seam_test::TempStorage storage;
+        mu_seam_test::ScopedEnvVar deterministic("MU_DETERMINISTIC_NOISE", "1");
+        if (mu_golden::GoldenStore::fromEnvironment().updateMode) return;
+
+        const std::vector<mu_golden::Schedule> schedules {
+            mu_golden::Schedule::fixed512(), mu_golden::Schedule::ragged(), { "fixed64", { 64 } } };
+
+        auto check = [&](const mu_golden::Scenario& sc)
+        {
+            for (const auto& sched : schedules)
+            {
+                const auto r = mu_layer_equiv::compare(productFactory(), sc, sched, mu_limits::kMaxLayers);
+                expect(r.ok, sc.name + " / " + sched.name + ": " + r.message);
+            }
+        };
+
+        // Every golden scenario as recorded (prepared 1024, so no block is above the prepared size: the old
+        // chain cannot render one).
+        for (const auto& def : scenarioDefs())
+        {
+            beginTest("equivalence: " + juce::String(def.name));
+            check(buildScenario(def));
+        }
+
+        const auto byName = [](const char* scenarioName) -> const ScenarioDef&
+        {
+            for (const auto& d : scenarioDefs()) if (juce::String(d.name) == scenarioName) return d;
+            jassertfalse;
+            return scenarioDefs().front();
+        };
+
+        beginTest("equivalence: startBeat 1e6 and a start mid-step");
+        {
+            auto far = buildScenario(byName("loop-accent-steps"));
+            far.startBeat = 1.0e6;
+            far.lengthFrames = 48000;
+            check(far);
+            auto mid = buildScenario(byName("loop-legato-rests"));
+            mid.startBeat = 0.37;
+            mid.lengthFrames = 48000;
+            check(mid);
+        }
+
+        beginTest("equivalence: keys held across a locate, a loop-back and a tempo ramp");
+        {
+            auto sc = buildScenario(byName("root-by-midi"));
+            sc.lengthFrames = 72000;
+            sc.midi = { { 2, 0, on(1, 62) }, { 20, 100, on(1, 67) }, { 60, 0, off(1, 62) }, { 110, 0, off(1, 67) } };
+            sc.events.clear();
+            sc.events.push_back({ 30, "locate 9.5", [](ScriptContext& c) { c.host.ppq = 9.5; } });
+            sc.events.push_back({ 50, "loop back to 2", [](ScriptContext& c) { c.host.ppq = 2.0; } });
+            for (int b = 70; b < 100; b += 3)
+                sc.events.push_back({ b, "tempo ramp", [b](ScriptContext& c) { c.host.bpm = 100.0 + (double) (b - 70) * 2.0; } });
+            check(sc);
+        }
+
+        beginTest("equivalence: keys pressed and released while edits silence the audio");
+        {
+            auto sc = buildScenario(byName("midi-trigger"));
+            sc.lengthFrames = 72000;
+            sc.events.push_back({ 12, "edit in flight", [](ScriptContext& c) { c.proc.layerEditInFlight.store(true); } });
+            sc.events.push_back({ 16, "edit done",      [](ScriptContext& c) { c.proc.layerEditInFlight.store(false); } });
+            sc.events.push_back({ 44, "edit in flight", [](ScriptContext& c) { c.proc.layerEditInFlight.store(true); } });
+            sc.events.push_back({ 47, "edit done",      [](ScriptContext& c) { c.proc.layerEditInFlight.store(false); } });
+            sc.midi.push_back({ 13, 0, on(1, 72) });     // a press while silenced
+            sc.midi.push_back({ 45, 0, off(1, 72) });    // its release while silenced again
+            check(sc);
+        }
+
+        beginTest("equivalence: add, swap, remove mid-play with a key held, and a count regrow by a state load");
+        {
+            auto sc = buildScenario(byName("two-layers"));
+            const auto stateText = repoRoot().getChildFile("tests/golden/mu-toni/two-layers/state.xml").loadFileAsString();
+            sc.midi = { { 5, 0, on(1, 64) }, { 150, 0, off(1, 64) } };
+            sc.events.clear();
+            sc.events.push_back({ 20, "add layer",    [](ScriptContext& c) { c.proc.addLayer(); } });
+            sc.events.push_back({ 40, "swap 0 and 2", [](ScriptContext& c) { c.proc.swapLayers(0, 2); } });
+            sc.events.push_back({ 60, "remove 1",     [](ScriptContext& c) { c.proc.removeLayer(1); } });
+            sc.events.push_back({ 70, "remove 1",     [](ScriptContext& c) { c.proc.removeLayer(1); } });
+            sc.events.push_back({ 90, "regrow by state load", [stateText](ScriptContext& c)
+            {
+                const auto xml = juce::XmlDocument::parse(stateText);
+                juce::MemoryBlock mb;
+                juce::AudioProcessor::copyXmlToBinary(*xml, mb);
+                c.proc.setStateInformation(mb.getData(), (int) mb.getSize());
+            } });
+            sc.events.push_back({ 120, "reset layer 1", [](ScriptContext& c) { c.proc.resetLayer(1); } });
+            check(sc);
+        }
+    }
+};
+
+static MuToniLayerEquivalenceTests muToniLayerEquivalenceTests;

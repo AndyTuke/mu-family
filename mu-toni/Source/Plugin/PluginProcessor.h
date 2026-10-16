@@ -40,7 +40,7 @@ public:
 
     // ── AudioProcessor ───────────────────────────────────────────────────────
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
-    void releaseResources() override { resetSwapPlayState(); }
+    void releaseResources() override;
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
     juce::AudioProcessorEditor* createEditor() override;
@@ -134,12 +134,6 @@ private:
     // Register mixer/FX param listeners + run an initial engine sync (JUCE doesn't
     // fire parameterChanged on construction or for unchanged values).
 
-    // Cache the per-voice arp/voice/env raw parameter pointers (message thread).
-    void cacheVoiceParamPointers();
-    // Resolve a voice's modulation (matrix over its control sequences) then build its
-    // ArpParams + ToniVoiceParams + step config. Non-const: runs the matrix under try-lock.
-    void readVoice(int v, ArpParams& ap, ToniVoiceParams& vp, int& rateIdx, float& gate01, bool& midiTrig,
-                   ArpAccent& accent);
     // This block's short MIDI messages into noteInput, after the events carried from unrendered blocks;
     // returns how many were decoded (audio thread, allocation-free).
     int decodeNoteInput(const juce::MidiBuffer& midi, int numSamples) noexcept;
@@ -148,8 +142,6 @@ private:
     void carryNoteInput(int count) noexcept;
 
     mu_wavetable::WavetableBank bank;                        // the oscillators' wavetables (factory set)
-    std::atomic<float>*         midiInChParam = nullptr;     // MIDI In channel (0 = Omni)
-    std::array<std::array<std::atomic<float>*, kNumVoiceParams>, mu_limits::kMaxLayers>    vp {};
 
 public:
     // Layer `i` as its mu-Toni Arp (name, colour, modulation, arp voice, insert effect). The layers
@@ -157,11 +149,10 @@ public:
     Arp&       getArp(int i) noexcept override { return layerAs<Arp>(i); }
     const Arp& getArp(int i) const noexcept    { return layerAs<Arp>(i); }
     // Post-matrix value of modulation target `dest` (a ModDestIndex) on layer `layer`, in the
-    // target knob's parameter units. Written each block by readVoice; read by the knobs' live arcs.
+    // target knob's parameter units. Written each block by the layer; read by the knobs' live arcs.
     float getModLive(int layer, int dest) const noexcept override
     {
-        return modLive[(size_t) juce::jlimit(0, mu_limits::kMaxLayers - 1, layer)]
-                      [(size_t) juce::jlimit(0, kNumModDests - 1, dest)].load(std::memory_order_relaxed);
+        return getArp(juce::jlimit(0, mu_limits::kMaxLayers - 1, layer)).getModLive(dest);
     }
     // ── ArpHost: what ArpContent reads (message thread) ───────────────────────
     juce::AudioProcessorValueTreeState& getArpParameters() noexcept override { return apvts; }
@@ -172,14 +163,6 @@ public:
     juce::StringArray getWavetableNames() const override                     { return mu_wavetable::WavetableBank::factoryTableNames(); }
 
 private:
-    std::array<std::array<std::atomic<float>, kNumModDests>, mu_limits::kMaxLayers> modLive {};
-
-    // Modulation-resolve inputs: parallel arrays for mu_mod::resolveLane.
-    std::array<const char*, kNumModDests>                                         modDestIds {};
-    std::array<juce::NormalisableRange<float>, kNumModDests>                       modDestRanges {};
-    std::array<std::array<std::atomic<float>*, kNumModDests>, mu_limits::kMaxLayers>        modDestAtoms {};
-    std::unordered_map<std::string_view, float>                                   modParamValues;
-    double                                                                        modBeat = 0.0;
 
     // The block's MIDI as the layers hear it: events carried from unrendered blocks first (frame 0), then this
     // block's. Sized at construction; audio thread only.

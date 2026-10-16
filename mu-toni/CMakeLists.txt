@@ -29,6 +29,7 @@ target_sources(mu-toni
         Source/Plugin/PluginProcessor.cpp
         Source/Plugin/PluginProcessor_Preset.cpp
         Source/Persistence/ArpParams.cpp
+        Source/Sequencer/Arp.cpp
         Source/Plugin/PluginEditor.cpp
         Source/UI/SettingsOverlay.cpp
         Source/UI/ArpContent.cpp
@@ -153,6 +154,7 @@ target_sources(mu-toni-tests PRIVATE
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp
     Source/Persistence/ArpParams.cpp
+    Source/Sequencer/Arp.cpp
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/Wavetable/WavetableBank.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/License/LemonSqueezyClient.cpp"
