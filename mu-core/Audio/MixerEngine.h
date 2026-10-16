@@ -42,6 +42,17 @@ public:
     // master path. Null → render from `voices` as before (mu-clid).
     using RenderChannelFn = std::function<void(int, juce::AudioBuffer<float>&, int)>;
 
+    // TEST-ONLY tap (approved for the layer-extraction equivalence test, E0.9): when set, Phase 1 hands it
+    // each channel's buffer exactly as the channel gives it to the mixer (the render hook or engine output
+    // plus any retired tail, before the headroom trim). It must not allocate or block: it runs on the audio
+    // thread. Null in every product; set only by tests, while the processor is not processing.
+    struct ChannelTap
+    {
+        virtual ~ChannelTap() = default;
+        virtual void capture(int channel, const juce::AudioBuffer<float>& buf, int numSamples) noexcept = 0;
+    };
+    ChannelTap* channelTap = nullptr;
+
     // Stage 20: fixed −6 dB pre-fader trim on every channel input. Absorbs the
     // worst-case +18 dB of summing across 8 simultaneous correlated voices and
     // leaves the master with healthy headroom even on hot, normalised samples.
