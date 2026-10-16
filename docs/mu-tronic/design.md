@@ -96,7 +96,7 @@ reach shared state only through `ProcessorBase`/`Layer` interfaces and the per-b
 |---|---|---|---|
 | **mu-Tant** (`Pattern`) | `Pattern : Layer` (3 gates, user wavetables, insert, ring tap); `mu_tant::VoiceEngine` (`Audio/SynthVoice`); `GatePattern`; `PatternContent`, `GatingDesigner`, `PatternMiniVisual` | The whole render chain: `renderVoice`, `applyModulation`, `applyFilterEnvelope`, `applyPitchEnvelope`, `readConfig`, `renderRetiringVoice` (about 300 lines in `PluginProcessor.cpp`); the cached `v{N}_` atomic pointers (`voicePtrs`, `modDestAtoms`); the snapshot table `voiceSnap`; the engine array `voices`; `retiring[]`; the wavetable bank and `bankLock`; the **global Note mode** (`midiNoteMode`, `heldNotes`, `noteGateGain`, and `applyNoteModeGate` on the final mix); `createParameterLayout` (`PluginProcessor_APVTS.cpp`); `swapLoopBeats`/`SwapBoundary.h` (in `Plugin/`) | Render chain into `Pattern::render`; engine, retire fade and cached pointers into `Pattern`; Note mode becomes per layer state (held-note stack and gate ramp in `Pattern`, MIDI channel per layer); the param table into `Persistence/PatternParams.{h,cpp}`; `SwapBoundary.h` into `Sequencer/`; the bank into a shared service (section 2.4); `PatternContent` takes a `PatternHost&` interface instead of `mu_tant::PluginProcessor&` |
 | **mu-Toni** (`Arp`) | `Arp : Layer` already holds `ArpVoiceRunner` (arp clock + `ToniVoice`) and the insert. Cleanest of the four. | `readVoice` (modulation resolve into `ArpParams`/`ToniVoiceParams`), the `vp` pointer table, `modDestAtoms`, `modLive`, `renderChannelCb`; the **global** held-note stack and `ArpContext` (root-by-MIDI, MIDI-trigger mode), `midiInChParam`; `createParameterLayout`; `Plugin/LayerParamIds.h`; `ArpContent` includes the processor | `readVoice` + pointers + `modLive` into `Arp`; held notes and MIDI channel per layer; the param table and `LayerParamIds.h` into `Persistence/`; `ArpContent` onto an `ArpHost&` |
-| **mu-On** (`Track`) | `Track : Layer` (step row, Rumble envelope, trigger counter); engines `KickEngine`, `BassEngine`, `SampleChannel`, `RumbleEngine` in `Audio/` | `GrooveVoices` holds **every engine of every slot** (5 per slot, large) and does the modulation resolve; `StepPattern` + `GrooveSequencer` are **one global grid and clock for all tracks**, with global swing/accent params; the Rumble **reads another layer's audio** (render order, `remapLayerReferences`); `Plugin/TrackParams.h` (`EngineType`, param ids) is included by the engines, `MuOnModDest.h`, `StepPattern.h`, `GrooveVoices.h`; `TrackContent`/`StepRows` include the processor | Per-layer engine instance (only the selected engine allocated; changing engine is a layer-internal swap on the message thread), per-layer step grid and swing/accent (`StepPattern` becomes a per-layer `StepRow` driver, `GrooveSequencer` clocks one row), `TrackParams.h` into `Persistence/`, the Rumble source resolved through the render context (section 2.1), `TrackContent` onto a `TrackHost&`. No per-layer insert today (hook returns `nullptr`); buses give On groups an insert. **Each engine is also its own mu-Tronic layer type: section 1.4.** |
+| **mu-On** (`Track`) | `Track : Layer` (step row, Rumble envelope, trigger counter); engines `KickEngine`, `BassEngine`, `SampleChannel`, `RumbleEngine` in `Audio/` | (as it was before E3; built at E3, 2.1.9) `GrooveVoices` held **every engine of every slot** (5 per slot, large) and does the modulation resolve; `StepPattern` + `GrooveSequencer` are **one global grid and clock for all tracks**, with global swing/accent params; the Rumble **reads another layer's audio** (render order, `remapLayerReferences`); `Plugin/TrackParams.h` (`EngineType`, param ids) is included by the engines, `MuOnModDest.h`, `StepPattern.h`, `GrooveVoices.h`; `TrackContent`/`StepRows` include the processor | Per-layer engine instance (only the selected engine allocated; changing engine is a layer-internal swap on the message thread), per-layer step grid and swing/accent (`StepPattern` becomes a per-layer `StepRow` driver, `GrooveSequencer` clocks one row), `TrackParams.h` into `Persistence/`, the Rumble source resolved through the render context (section 2.1), `TrackContent` onto a `TrackHost&`. No per-layer insert today (hook returns `nullptr`); buses give On groups an insert. **Each engine is also its own mu-Tronic layer type: section 1.4.** |
 | **mu-Clid** (`Rhythm`) | Engine, sequencer, MIDI engine and play state are **already in `mu-core`** (`mu_core::Rhythm`, `RhythmSequencer`, `::VoiceEngine`, `MidiOutputEngine`, `RhythmPlayState`, shared with the MIDI product); `RhythmContent`, `VoiceSection`, `MidiOutSection`, `SampleBrowser`, `EuclideanPanel` | The per-block glue: `PluginProcessor_Modulation.cpp` (444 lines: mod seed and write-back, Euclid overrides), trigger firing, `voiceEngines[]`, `midiEngines[]`, retired tails and drain flags, `rhythmPlayState[]`, `modSnapshot`, `rawParams`/`pendingDirty` drain, `SampleLibrary`/sample paths, `orphanOffs`, `HotSwapStager` (prepares a `Rhythm` + `VoiceEngine` at stage time, sample I/O included), `PresetIO` (includes the processor), the master loop in `RhythmSequencer` | New `mu_clid::SampleRhythm : mu_core::Rhythm` that carries the engine, MIDI engine, play state, snapshot, sample path and retire tail, with `render`; the glue becomes its methods; `PresetIO` shapes onto `Layer::writeExtras/applyExtras` + `captureLayerPresetTree`; sample I/O at stage time via `preloadStaged`; `SampleLibrary` becomes a shared service |
 
 Everything above is "voice code in the processor" that the docs already say belongs elsewhere (design-naming §3: `Plugin/` holds only the processor,
@@ -115,7 +115,7 @@ Andy: every mu-On voice engine can be added as a mu-Tronic layer. So the registr
 | Mod targets, content, mini-visual | Per entry: the mod-target table is the engine's own subset (mu-On already filters by engine), `TrackContent` shows only the locked engine's panel, the mini-visual is the step row. |
 | Self-containment (section 1.3) | The per-layer engine allocation and per-layer step grid are now **required**, not optional: a 16-slot instance cannot afford five engines per slot. This settles the T6 decision: mu-On goes per-layer in the standalone too (one code path). `GrooveVoices` as a five-engine pool disappears. |
 | Global grid and clock | Gone from the layer: each `Track` owns its step row, length, swing and accent and reports `loopBeats()` (a 16-step row is one bar). The standalone's grid view is a view over its tracks; the shared clock is `RenderContext::startBeat`, as for every type. |
-| Rumble reading another layer | Stays the only cross-layer audio read. Priority 1; the source is a slot index resolved through `RenderContext::peer(slot)`. Because the types are now independent, the source may be **any priority-0 layer of any type** in the instance (a Kick, an Arp, a Pattern), which costs nothing extra and is the useful case; a priority-1 source (another Rumble) or an Empty slot processes silence. The source slot index is a layer parameter and is remapped on swap/remove by the existing `layersReordered` hook (`remapLayerReferences` becomes generic, not On-specific). |
+| Rumble reading another layer | Stays the only cross-layer audio read. Priority 1; the source is a slot index resolved through `RenderContext::peer(slot)`. Because the types are now independent, the source may be **any priority-0 layer of any type** in the instance (a Kick, an Arp, a Pattern), which costs nothing extra and is the useful case; a priority-1 source (another Rumble) or an Empty slot processes silence. The source slot index is a layer parameter and is remapped on swap/remove by the base's `remapLayerReferences` hook (generic since Stage 6, called in phase 3 where parameters may be written); `layersReordered` is **not** the hook for it (ruled at E3, 2.1.9 point 4). The Track-side rewrite is one library function, so mu-Tronic's processor calls it rather than copying it. |
 | Chooser | Types are grouped by product in the picker: `LayerTypeInfo::group` ("mu-Clid", "mu-Tant", "mu-Toni", "mu-On") and `displayName` ("Rhythm", "Pattern", "Arp", "Kick" ...). Nine types plus Empty; the layout of the chooser (nine cards or a grouped list) is the `ux-controller`'s. A type is offered only if registered in the build, so a mu-Tronic that has not yet got Pattern and Rhythm simply does not list them. |
 | Default names | `<displayName> <slot>` ("Kick 3"), editable and saved (section 4). |
 
@@ -145,7 +145,7 @@ New hooks (defaults do nothing; all called once per layer per block or per edit,
 | `void prepare(double sr, int blockSize)` | message; the layer is not reachable by the audio thread (not yet published, or the host is not processing) | Allocate everything (engine, buffers, insert). |
 | `void bindParams(juce::AudioProcessorValueTreeState&, int slot)` | message, before publication and again on `onMoved` (C9) | Cache the slot's parameter atomics (the products' `voicePtrs` / `vp` / `modDestAtoms` tables move here). `render` never calls `getRawParameterValue`. |
 | `void render(const RenderContext&, juce::AudioBuffer<float>& out, int n)` | audio | **Overwrite** frames `[0, n)` of `out` (two channels) with the layer's block, insert included (the former `renderVoice` / `renderChannelCb` / `GrooveVoices::renderAll`). No allocation, no lock beyond the existing in-layer spin locks, no APVTS by string, no host call (2.1.5). |
-| `int renderPriority() const` | any | 0 normal, 1 after every priority-0 layer (mu-On Rumble reads a peer). |
+| `int renderPriority() const` | any | 0 normal, 1 after every priority-0 layer (mu-On Rumble reads a peer). It may follow a parameter (mu-On's engine); the base reads it **once per call per live layer** and uses that reading for both passes (2.1.9 point 5). |
 | `double loopBeats() const` | audio | Loop length in beats for the hot-swap boundary (replaces `swapLoopBeats`, `blkPatternBeats`); cached per slot by the base each rendered block. |
 | `void preloadStaged(const juce::ValueTree&)` | message | File I/O for a staged tree (sample, user wavetable) so the boundary commit does none. |
 | `void onTransportStopped(const RenderContext&)` | audio | The play-to-stop edge (2.1.5): silence held notes and tails (Tant gates, On voices, Toni note-off). |
@@ -744,7 +744,8 @@ struct RenderContext
     uint8_t  transportJumped;    // playing in both, and a host-block discontinuity since the last rendered block (sticky jumpPending)
     uint8_t  retiring;           // 1 in renderRetiring (midi empty, midiOut valid from the note-off reserve, no peers)
     uint8_t  frozen;             // 1: render from the last resolved values, read no APVTS or matrix (C7 provision, C12 rule)
-    uint8_t  reserved[2];
+    uint8_t  stoppedUnrendered;  // 1 with transportJumped: the transport stopped in a host block that rendered nothing between the last rendered block and this one (below)
+    uint8_t  reserved;
     MidiView midi;
     MidiSink midiOut;
     const PeerTap* peers;        // kMaxLayers entries in the priority-1 pass, else nullptr
@@ -785,9 +786,18 @@ double below `wrap` where today's lambda returns `wrap` itself (an out-of-range 
 - **Play/stop latch, rendered blocks only** (phase 5, as now): `last = { bool playing; }`. `justStarted = playing && !last.playing`;
   `justStopped = !playing && last.playing`; `transportJumped = playing && last.playing && jumpPending`, and phase 5 clears `jumpPending`.
 
-What the three stop sequences give: a stop in an unrendered block, then a restart on the next rendered block: `transportJumped` once; a stop in an unrendered
-block, then the next rendered block stopped: `justStopped` fires and phase 5 clears the flag (no jump later); a pause and resume at the same position inside
-unrendered blocks: `transportJumped` once (the layers saw no stop, so the gap reaches them as a jump).
+**`stoppedUnrendered` (added at E3, ruled 2026-10-16).** A layer whose stop edge does real work (mu-On's `Track` silences a sustaining Bass, which has no note-off)
+cannot see a stop that happened only in unrendered blocks: `justStopped` needs a rendered stopped block, and a jump says only that the position moved. The base
+keeps a third sticky bit, `stopPending`, set exactly where the stop rule above sets `jumpPending` (a non-rendered host block, 0 frames included, with `!playing`
+while the rendered latch is playing) and cleared with it in phase 5. In the first chunk of a block that carries `transportJumped`, `stoppedUnrendered` is 1 when
+`stopPending` is set. It is a **qualifier of `transportJumped`**: never set without it, 0 when `justStopped` fires (the next rendered block saw the stop itself) and
+0 for a locate that hid no stop. A layer that stops its sound on a stop reacts to `justStopped || stoppedUnrendered`; a layer that only re-aligns on a
+discontinuity ignores the field. It uses a former `reserved` byte, so the struct keeps its size and `kRenderContextVersion` stays 1 (the `MidiView::carried`
+precedent, 2.1.8); the `offsetof` freeze test pins it at byte 78.
+
+What the three stop sequences give: a stop in an unrendered block, then a restart on the next rendered block: `transportJumped` once (and `stoppedUnrendered`); a stop in an unrendered
+block, then the next rendered block stopped: `justStopped` fires and phase 5 clears the flag (no jump later, no `stoppedUnrendered`); a pause and resume at the same position inside
+unrendered blocks: `transportJumped` once (the layers saw no stop, so the gap reaches them as a jump; `stoppedUnrendered` is 1, since the pause was a stop).
 
 **Why (the defect R5 fixes):** with the end beat latched only on rendered blocks, the block after an unrendered one (every structural edit in mu-Tant, mu-On and
 mu-Clid raises `layerEditInFlight`, and any try-lock miss) saw a delta of one block of beats and fired `transportJumped` during continuous play. Comparing
@@ -982,6 +992,77 @@ Branch `e2-toni` (E2.1 to E2.6, a C12 fix and the P7 goldens). Rulings of the `a
 3. *Skipped-block MIDI was dropped by the base.* Resolved by `setCarrySkippedMidi`; the default stays off so mu-Clid, mu-Tant and mu-On keep their pinned behaviour.
 
 **For the next products:** E3 (mu-On) needs none of 1 and 2; E4 (mu-Tant) and E5 (mu-Clid) keep `setCarrySkippedMidi` off unless a layer keeps input state.
+
+#### 2.1.9 E3 as built: mu-On on the shared layer contract (2026-10-16)
+
+Branch `e3-on` (E3.1 to E3.8, the contract commit, a C12 fix and the P7 goldens). mu-On is now a `Track : Layer` that clocks its own step row, owns its one engine
+and renders only through `renderAndMix`; `GrooveVoices` is deleted. `check-layer-boundary.ps1` passes with two layer libraries (Toni, On). Rulings of the
+`architecture-steward`, applying the E2 standards (2.1.8):
+
+| # | As built | Ruling |
+|---|---|---|
+| 1 | `UI/TrackHost.h` (`mu_on::TrackHost`); `TrackContent(ProcessorBase&, TrackHost&)` with `ProcessorBase` forward-declared and unused; `StepRows(TrackHost&)` | **Accept.** The unused `ProcessorBase&` stays: the content factory signature is `(ProcessorBase&, <Type>Host&)` for every type (2.2), and the shared sections that take a processor arrive with mu-Tronic's chrome. **Change the code:** `engineOf` / `selectEngine` become `getTrackEngine` / `selectTrackEngine`, because host methods carry the type name (2.1.8 row 1) so one adapter can implement several hosts. `getModLive` stays as ArpHost's does (the overloads differ by arity). `StepRows` takes only the host because it reads no `ProcessorBase` service; it is the standalone's all-tracks grid and mu-Tronic does not show it as is (point 8) |
+| 2 | `mu-on-layer` INTERFACE target in `mu-on/CMakeLists.txt` (`Persistence/TrackParams.cpp`, `Sequencer/GrooveSequencer.cpp`, `Sequencer/Track.cpp`); `MU_ON_LAYER_UI_SOURCES` (`StepRows.cpp`, `TrackContent.cpp`); `mu-on-layer-tests` (console target: library + mu-core layer-side sources + one test, no `Plugin/` source), with the stream hashed through the real processor and through hand-built contexts equal; the checker finds the library by its `add_library` | **Accept** as the 2.5 / 2.1.8 family shape; the target name `mu-<product>-layer-tests` matches Toni. `GrooveSequencer` leaving the library: point 3b |
+| 3 | `Audio/TrackEngine.h`: `TrackEngine` holds a `std::variant` of the five engines behind one interface (`prepare`, `reset`, `resetToPrepared`, `setParams`, `trigger`, `render`); built and prepared on the message thread, swapped under the track's `engineLock`, freed on the message thread | **Accept the placement and the name.** It is the engine side of the layer (`Audio/`, role `Engine` in design-naming); the `Track` prefix says whose engine it is, like `ToniVoice` in a `Toni` library. `std::variant` and `std::visit` do not allocate, and nothing is constructed on the audio thread. The mu-Tronic memory budget is the point (8 engines of one size, not 40): the variant is as large as the largest engine, so a Kick track pays for a Rumble's buffers only if `sizeof` says so; the `dsp-controller` owns that measurement |
+| 3a | `Persistence/TrackParams.{h,cpp}`: `EngineType` and its helpers, the `t{N}_` id helpers, the legacy lane prefixes, `addLayerParams` (one table per prefix: every engine's rows on every track), `addTrackGlobalParams` (`seq_swing`, `seq_accent`) | **Accept** (2.3, the `ArpParams` precedent). `addTrackGlobalParams` is the standalone's global rows and mu-Tronic does not call it: see point 8 |
+| 3b | `Sequencer/GrooveSequencer.h` holds two classes (`StepClock`, `GrooveSequencer`); `Sequencer/StepPattern.h` holds `StepRow` and `StepPattern`; `GrooveSequencer` is now used only by tests and by one `currentStep` helper | **Change the code (small):** one main class per file (design-naming §3): `Sequencer/StepRow.h` and `Sequencer/StepClock.h` (the two things `Track` needs); `Track.h` includes those and nothing else of the grid. `StepPattern` and `GrooveSequencer` are the standalone's whole-grid view: if no shipping code reads them beyond the tests they move to `Tests/` and leave the library sources; if the processor still needs `StepPattern`, it stays in `Sequencer/` but out of the library. `StepClock::currentStep` becomes the playhead helper `StepRows` calls |
+| 3c | `Sequencer/TrackTypes.h`: `layerTypeOf(EngineType)`, `isTrackType`, `engineOfType`, `typeFromPreset(tree)`, `createTrack(slot)`, `makeTrackTypeInfo(engine)` and the five `LayerTypeInfo` constants (`kKickType` ... `kRumbleType`) | **Accept the file and the five constants** (the constants are the registered types, 1.4; a header of free functions and constants is not a class, so the file-equals-class rule does not apply, and Toni's single constant sits in `Arp.h` only because it has one). `typeFromPreset` is a free function, not a `LayerTypeInfo` field, until the registry exists (T1 adds the field and points the five constants at it). **Change the code:** `layerTypeOf` and `Track::typeId` rely on `LayerTypeId::Kick..Rumble` being in `EngineType` order while `LayerTypeId` says "saved by name, the order may change": add `static_assert`s of the order next to the one mapping, and make `Track::typeId` use it (move the three mapping functions beside `EngineType` in `Persistence/TrackParams.h` so `Track.h` can) |
+| 3d | `Track::engineLocked`, a plain `bool`, default false, not saved; `TrackContent` hides the Engine selector when set | **Accept; not saving it is correct (point 6).** The Engine selector hides, nothing else changes |
+| 4 | `remapLayerReferences` kept for the Rumble source, in `PluginProcessor.cpp` | **Accept the hook, amend the plan, change the code (small).** See below |
+| 5 | `RenderContext::stoppedUnrendered`; `renderPriority()` read once per call | **Accept**, contract text in 2.1.5 and the 2.1 table; see below |
+| 6 | `engineLocked` not saved | **Accept** (architecture-steward's decision, below) |
+| 7 | Engines travel with the track, so a type returning to a slot does not reproduce the slot's engine history | **Accept** (below) |
+
+**Point 4: the Rumble source remap.** `layersReordered` runs under `layersLock` with processing suspended and is documented as "only move and reset, never allocate or
+wait"; a parameter write there (`setValueNotifyingHost`) notifies the host from inside the lock, and the parameter values themselves only shift later, in phase 3
+(`copyLayerParams`), so a rewrite has to happen **before that shift, at the old slot**, which is exactly where `remapLayerReferences` is called. That hook is already
+the generic one: its contract (design-plugin-family, "Layer references") is "a parameter whose value names another layer follows its layer", it is not mu-On-named, and
+mu-Tronic needs the same thing for the same parameter. So the extraction plan's "becomes the generic `layersReordered` use" was a wrong guess about which hook was
+generic, and is corrected there. What is left to fix is the placement of the body: it is in `PluginProcessor.cpp` (`Plugin/`), and mu-Tronic's processor would be a second
+copy, which the move rule forbids. **Change the code:** the body becomes `mu_on::remapRumbleSources(apvts, slotCount, engineOfSlot, oldToNew)` in
+`Persistence/TrackParams.{h,cpp}` (it reads and writes only `t{N}_eng` and `t{N}_src`, and the "gone source becomes the first Kick" fallback is the same rule over
+the type), and mu-On's `remapLayerReferences` override is one call. **mu-Tronic needs:** its processor overrides `remapLayerReferences` with the same one call, passing
+how it finds a slot's engine (the layer's type, for a Track). Nothing in `mu-core` changes. The rewrite applies to slots whose layer is a Rumble Track; other types'
+parameters are never touched.
+
+**Point 5: the two `mu-core` additions.**
+
+- `RenderContext::stoppedUnrendered` (2.1.5): a qualifier of `transportJumped`; name and placement accepted (a former `reserved` byte, size and version unchanged, the
+  `offsetof` freeze updated; the internal names `stopPending` and `edgeHiddenStop` are private to `ProcessorBase`). It closes a gap the E1 stop rule left open: P5
+  (the stop edge with a 0-frame stop block) now reaches a layer that silences on stop. Tests in `LayerRenderTests.cpp` cover a stop in an unrendered block, a 0-frame
+  stop block, a pause and resume, and the cases where it must stay 0.
+- `renderPriority()` read once per call (2.1 table): the base reads it for each live layer in pass 1 and keeps the result for pass 3, so a priority that follows a
+  parameter (mu-On's engine) cannot make a layer render twice or not at all when the parameter moves between the passes. **Contract text for `Layer::renderPriority`'s
+  comment (code change, comment only):** "may depend on state that changes on any thread; the base reads it once per live layer per call." Residual, accepted: a track whose
+  engine becomes a Rumble between the base's reading and its own `render` renders one call as a Rumble in pass 1 with no peers (it processes silence) and publishes that
+  output as a peer for the call; the next call is consistent. One block, never a hang or a double render.
+
+**Point 6: `engineLocked` is not saved.** The layer's type is the saved thing: mu-Tronic saves a Track layer by its type name (`"Kick"`), so what the host needs to restore is
+derived, not stored. A flag in the layer's saved node would be a second copy of the type that could disagree with it (and with `t{N}_eng`, which is saved too). Rule: **the
+host that creates the layer sets it, from the type, in the same function that sets `t{N}_eng`, on create and on restore.** Today's `createTrack(slot)` produces an
+unlocked track with the engine its parameter names, which is right for mu-On. **Gap, owed at T1:** `LayerTypeInfo::create` is `(slot) -> Layer` and cannot say which of
+the five types it is making, so all five constants point at the same `createTrack`. The registry gets a message-thread `initParams(apvts, slot)` hook on `LayerTypeInfo`
+(called after `create`, before `bindParams`), and mu-On's five write `t{N}_eng` and set `engineLocked`; this is also where a restored session's type name and `t{N}_eng`
+are reconciled (the type wins and the parameter is rewritten). Not an E3 blocker: mu-On has one host and sets what it needs.
+
+**Point 7: engines now travel with the track.** Consistent with the layer-state ownership design (1.3, 3.5): state that belongs to a layer lives in the layer and moves with it;
+the old arrangement, an engine per slot and per engine type, tied sound history to a slot number and made a track that moved to another slot start on whatever that slot's
+engine had last done. Now a moved track keeps its own engine (reset, with the Bass filter's drive smoothing restarted as a fresh engine's is: `resetToPrepared`). What changed
+is only the history, which was an accident of the slot: an engine that was left (Kick, then Bass, then Kick again) comes back freshly built, not as the slot's old Kick, and a
+Rumble that returns to a slot has a new reverb whose parameter glide starts from its defaults where the slot's old reverb had settled (a Rumble that merely moves slot keeps its
+reverb's settled parameters; only the Bass filter's drive smoothing is restarted, to match a fresh slot). An engine change already stopped the old engine dead, so the only new audible
+difference is that reverb glide; the `dsp-controller` confirms that is acceptable at E3.5 and the golden set is the check
+(a golden that depends on it is re-recorded in a signed goldens-only commit, never in the code-moving one). The
+engine swap (message thread builds and prepares outside every lock, pointer swap under `engineLock`, old engine freed on the message thread, a try-lock miss renders that
+track silent for one call) is the R1 rule applied to a layer-internal engine; the `dsp-controller` reviews it as E3.5.
+
+**Point 8: what mu-Tronic still needs from this library (owed, not E3 blockers).** (a) `TrackContent` and `Track::bindParams` bind to the global rows `seq_swing` and `seq_accent`;
+mu-Tronic has no global groove, so before it links the library the groove parameters become per-layer rows (appended to the `t{N}_` table, pre-release) or the host names the
+ids; the plan's E3.3 seeding (global values seed each row on load) stays for the standalone. (b) `StepRows` draws every live layer; mu-Tronic's Track content shows only its own
+row, so a one-row component is split out of it (T1, `ux-controller` for the look). (c) `initParams` (point 6). (d) `Track::prepare` builds no engine: the host calls `syncEngine()`
+after the engine parameter is set and prepared, and listens for `t{N}_eng` itself (mu-On's `engineParamChanged`). A generic message-thread service hook on `Layer` is the shape
+if mu-Tronic would otherwise copy that listener; decided at T1.
+
 ### 2.2 The product UI stops depending on the product processor
 
 Each `<Type>Content` takes `ProcessorBase&` plus one narrow host interface declared in the product's own `UI/` folder next to the content

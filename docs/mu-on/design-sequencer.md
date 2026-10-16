@@ -5,14 +5,15 @@ running the **Rumble** engine is not sequenced — it processes another track's 
 [design-engine.md](design-engine.md)) — and ignores its row, which is kept for when the track's engine
 changes.
 
-## Model — `StepPattern`
-[mu-on/Source/Sequencer/StepPattern.h](../../mu-on/Source/Sequencer/StepPattern.h) — a grid of
-**8 rows × 16 steps** (`mu_limits::kMaxLayers` rows). Each cell carries an **on/off** and an **accent**
-flag. Cells are `std::atomic<bool>` so the message thread (grid editing) and the audio thread
-(sequencer read) share them without a lock or a dropped block. A row is a `StepRow` owned by its
-`Track`, so it travels with the track through add / delete / reorder; the pattern points each slot at
-its track's row (`bind`, redone after every structural edit under the layer lock), and the sequencer
-reads it inside the processor's layer try-lock. Each engine has a starting groove
+## Model — `StepRow`, and `StepPattern` as the grid view
+A row is 16 steps; each cell carries an **on/off** and an **accent** flag, as `std::atomic<bool>` so the
+message thread (grid editing) and the audio thread (clock read) share them without a lock or a dropped
+block. A `StepRow` is owned by its `Track` ([Sequencer/Track.h](../../mu-on/Source/Sequencer/Track.h)),
+so it travels with the track through add / delete / reorder, and the track's clock reads it inside the
+layer's render call. `StepPattern`
+([StepPattern.h](../../mu-on/Source/Sequencer/StepPattern.h)) is only the standalone's view: a grid of
+**8 rows × 16 steps** (`mu_limits::kMaxLayers` rows) whose slots point at the tracks' rows (`bind`,
+redone after every structural edit under the layer lock). Each engine has a starting groove
 (`StepRow::loadDefaultGroove`): four-on-the-floor kick, off-beat bass, straight-8th hats, backbeat
 snare, nothing for Rumble; a fresh instance is one Kick track with the kick groove, and a new track
 takes the groove of its engine.
@@ -22,20 +23,30 @@ whatever its engine), so a row rides along in `get/setStateInformation`, `.muOn`
 presets — *not* 128 automatable APVTS params. States from the five-lane build keep their root
 `<Pattern>` and it is moved into the layer nodes on load.
 
-## Clocking — `GrooveSequencer`
-[mu-on/Source/Sequencer/GrooveSequencer.{h,cpp}](../../mu-on/Source/Sequencer/GrooveSequencer.h) —
-16 steps = one bar (each step = a 16th = 0.25 beat). Each block, `process(beatStart, numSamples,
-bpm, fire)` walks the step boundaries that fall in `[beatStart, beatEnd)` and, for each active
-cell, calls `fire(track, velocity, sampleOffset)`. It is driven off the product's free-running
-internal transport beat (`getInternalBeatPos`); the processor runs it **before** the channel
-render so a step's engine is armed for the same block. A jump guard re-syncs `nextGlobalStep` if
-the transport scrubs or restarts, so it never burst-fires a backlog.
+## Clocking — one `StepClock` per track
+16 steps = one bar (each step = a 16th = 0.25 beat; the layer's `loopBeats()` is 4). **Every track clocks
+its own row** with a `StepClock` (declared in
+[GrooveSequencer.h](../../mu-on/Source/Sequencer/GrooveSequencer.h)). In `Track::render` the
+clock's `processSpan(row, startBeat, n, beatsPerSample, swing, accent, fire)` walks the step boundaries
+that fall in this call's beats, taken from the shared `RenderContext` (`startBeat`, `beatsPerSample`),
+and for each active cell fires the track's engine at the step's sample offset, before the engine renders
+so a step sounds in its own block. There is no separate sequencer pass and no shared clock object: the
+only shared clock is the transport in the context. A jump guard re-syncs the clock's cursor if the
+transport scrubs or restarts, so it never burst-fires a backlog. A track parked in a spare slot keeps its
+clock in step (`onParkedBlock`), so it fires on time once live. `GrooveSequencer` (the whole-grid
+clock over a `StepPattern`) now exists for the tests; the arithmetic is the same.
 
 - **Swing** (`seq_swing`) delays the **odd** 16ths by up to half a step — the groove "shuffle".
 - **Accent** (`seq_accent`) sets the velocity of accented cells; plain cells use a lower fixed
   velocity. Velocity is passed to the engine trigger (louder hit / harder transient).
 
-`currentStep(beat)` gives the playhead's local step for the UI grid.
+Swing and accent are still the two global parameters: each track copies them into its row's own
+swing and accent at the top of every call, so the saved state is unchanged. The row holds the values so a
+host with per-layer groove (mu-Tronic) can set them per row; making them per-layer parameters is owed
+before mu-Tronic links the library ([design 2.1.9](../mu-tronic/design.md), point 8).
+
+`StepClock::currentStep(beat)` (today `GrooveSequencer::currentStep`) gives the playhead's local step
+for the UI grid.
 
 ## UI — `StepRows` / `TrackContent`
 [mu-on/Source/UI/StepRows.{h,cpp}](../../mu-on/Source/UI/StepRows.h) draws one 16-cell row per live
@@ -43,6 +54,7 @@ track in the track colours, every row the same height (steps-box height / `kMaxL
 **left-click toggles** a step on/off, **right-click toggles accent** (a hotter centre), beat groups
 are tinted, and a **30 Hz playhead** column tracks the transport; the selected track's row is
 outlined, a click in a row selects its track, and a Rumble row is dimmed and not editable.
+Both read the processor only through `TrackHost` ([UI/TrackHost.h](../../mu-on/Source/UI/TrackHost.h)), which `PluginProcessor` implements; they are the `mu-on-layer` library's UI sources (`MU_ON_LAYER_UI_SOURCES`).
 `TrackContent` ([TrackContent.h](../../mu-on/Source/UI/TrackContent.h)) is the content band of the
 shared `LayerPanel`: the ENGINE box (Engine dropdown, the Rumble's Source, the engine's knobs) over
 the Groove box (the global **Swing** and **Accent**, bound to `seq_swing`/`seq_accent`, or the Rumble

@@ -3,16 +3,24 @@
 μ-On is a 909-style groove sequencer with one to eight **tracks** (layers), each running one of five
 **engines**: Kick (synthesis), Bass (deep synth — the focus), Hat (sample), Snare (sample), and Rumble
 (processes another track's audio rather than stepping). Every track has a step row; a Rumble track
-ignores its row. Each track renders into its mixer channel via the shared
-`MixerEngine::RenderChannelFn` hook; the shared mixer then applies the per-channel strip, the
-sidechain (set up in the mixer, e.g. bass ducking the kick), sends, and master. `GrooveVoices`
-([mu-on/Source/Audio/GrooveVoices.h](../../mu-on/Source/Audio/GrooveVoices.h)) owns one engine of
-each type for every track slot, routes the sequencer's triggers to the engine the track has selected,
-and pulls engine params from cached APVTS atomic pointers each block (no per-block string lookups, no
-audio-thread allocation). Render order: every non-Rumble track first, then the Rumble tracks, so a
-Rumble's source has been rendered this block whatever the track order; a Rumble whose source is out
-of range, not live or itself a Rumble processes silence. The `Track` pointers are re-read under the
-layer lock every block and never kept across blocks.
+ignores its row. Each track is a shared-contract layer (`Track : Layer`,
+[Sequencer/Track.h](../../mu-on/Source/Sequencer/Track.h)) rendered by the shared block driver
+(`ProcessorBase::renderAndMix`, [design.md 2.1](../mu-tronic/design.md)); the shared mixer then applies the
+per-channel strip, the sidechain (set up in the mixer, e.g. bass ducking the kick), sends, and master.
+**A track owns exactly one engine**, the one its `t{N}_eng` parameter names, held as a `TrackEngine`
+([Audio/TrackEngine.h](../../mu-on/Source/Audio/TrackEngine.h): one interface over Kick, Bass, Hat/Snare
+`SampleChannel` or Rumble, so eight tracks hold eight engines, not forty). `Track::bindParams` caches the
+slot's APVTS atomics once (no per-block string lookups); `Track::render` resolves the selected engine's
+params **through the track's own `ModulationMatrix`** (proportion-space seed, matrix, write-back; try-lock,
+zero-cost when unused; the last values are held on a lock miss), clocks the track's step row and triggers
+the engine at the step's sample offset, then renders it, with no audio-thread allocation. An engine change
+builds and prepares the new engine on the message thread, outside every lock, swaps it in under the
+track's engine lock and frees the old one there; until it lands (a change made on another thread waits
+for the message thread) the track renders silent. The engine travels with the track through add / delete
+/ reorder (a moved track's engine is reset to its prepared state). Render order: a Rumble is a priority-1
+layer, so every other track renders first and a Rumble reads its source's block through
+`RenderContext::peer(slot)` (post-insert, pre-strip); a Rumble whose source is out of range, not live or
+itself a Rumble processes silence, so its tail still dies away.
 
 Parameters: every engine's parameters exist on every track, engine-qualified (`t{N}_kick_*`,
 `t{N}_bass_*`, `t{N}_hat_*`, `t{N}_snare_*`, `t{N}_rumble_*`), plus `t{N}_eng` (the engine) and
