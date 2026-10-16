@@ -1036,7 +1036,9 @@ private:
         HostBlock host;
         bool   lastPlaying = false;     // the play state of the last RENDERED block (the edge latch)
         bool   jumpPending = false;     // sticky: a discontinuity since the last rendered block
+        bool   stopPending = false;     // sticky: of those, a stop in a block that rendered nothing
         bool   edgeStarted = false, edgeStopped = false, edgeJumped = false;   // this block's edges (first chunk)
+        bool   edgeHiddenStop = false;  // this block's jump carries a stop no rendered block saw (first chunk)
 
         double rate = 0.0;              // prepared sample rate
         int    prepared = 0;            // prepared block size: the longest call any layer or the mixer gets
