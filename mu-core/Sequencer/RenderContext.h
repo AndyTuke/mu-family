@@ -78,7 +78,10 @@ namespace mu_core
         uint8_t  transportJumped;    // playing in both, and a host-block discontinuity since the last rendered block
         uint8_t  retiring;           // 1 in a tail call (empty MIDI in, a valid note-off sink, no peers)
         uint8_t  frozen;             // 1: render from the last resolved values, read no parameter or matrix
-        uint8_t  reserved[2];
+        uint8_t  stoppedUnrendered;  // playing in this and the last rendered block, but the transport stopped in a host
+                                     // block between them that rendered nothing (0 frames, a missed lock, an edit): the
+                                     // stop edge those blocks could not carry (transportJumped is 1 too)
+        uint8_t  reserved;
         MidiView midi;
         MidiSink midiOut;
         const PeerTap* peers;        // kMaxLayers entries in the priority-1 pass, else nullptr

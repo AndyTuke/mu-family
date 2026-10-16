@@ -11,10 +11,10 @@
 //   2. delay taps    — 1/16, 2/16, 3/16 of the beat-grid (tempo-synced), each with a level
 //   3. dark reverb   — Signalsmith reverb (size param) into a low-pass (darkness)
 //   4. bar envelope  — a per-bar volume shape from a drawable smooth curve (the shared
-//                      LFOEditor), evaluated per block by GrooveVoices and pushed via
+//                      LFOEditor), evaluated per block by its Track and pushed via
 //                      setBarEnvLevel(); loops once per bar
 //   5. filter        — a final multimode filter (cutoff + resonance)
-// Stereo in/out; the kick feed is supplied by GrooveVoices (it stashes the kick render).
+// Stereo in/out; the feed is its source track's block, which its Track reads as a render peer.
 //
 // The whole signal chain + params are wired and audible; the bar-volume envelope is live
 // (drawable curve, persisted in state, evaluated under a try-lock). The reverb tone + the
@@ -70,7 +70,7 @@ public:
     }
 
     // Per-block bar-volume level (0..1), evaluated from the drawable bar envelope by the
-    // caller (GrooveVoices) at the current bar phase.
+    // caller (its Track) at the current bar phase.
     void setBarEnvLevel(float v) noexcept { envLevel = juce::jlimit(0.0f, 1.0f, v); }
 
     // Silence the engine: delay line, filters and reverb tail (transport stop, a slot changing hands).

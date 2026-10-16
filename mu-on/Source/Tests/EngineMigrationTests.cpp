@@ -283,13 +283,13 @@ struct MuOnEngineMigrationTests : juce::UnitTest
             TempStorage storage;
             PluginProcessor p;
             p.addLayer();
-            p.selectEngine(1, EngineType::Snare);
+            p.selectTrackEngine(1, EngineType::Snare);
             setParam(p.apvts, "t1_snare_dec", 333.0f);
             p.saveLayerPreset(1, "Round Trip");
             const auto files = p.slotPresetFiles(0);
             expectEquals(files.size(), 1);
 
-            p.selectEngine(0, EngineType::Hat);
+            p.selectTrackEngine(0, EngineType::Hat);
             p.loadLayerPreset(0, files.getFirst());
             expectEquals((int) getParam(p.apvts, "t0_eng"), 3, "the Snare engine came back");
             expectWithinAbsoluteError(getParam(p.apvts, "t0_snare_dec"), 333.0f, 0.5f);

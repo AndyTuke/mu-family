@@ -171,6 +171,8 @@ struct Layer : public mu_core::RetireTail
     // nothing it already fired; the one discontinuity arrives as onTransportJump when the position moves again.
     virtual void render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n) { juce::ignoreUnused(ctx, out, n); }
     // 0 renders in the first pass, 1 after every priority-0 layer (a layer that reads a peer through ctx.peer).
+    // It may depend on state that changes on any thread (mu-On: the engine parameter makes a Rumble priority 1):
+    // the base reads it once per live layer per call and renders that layer in the pass that reading named.
     virtual int renderPriority() const { return 0; }
     // Audio thread: the loop length in beats the hot-swap boundary uses; cached per slot by the base each
     // rendered block. Negative: the slot has no loop to wait for. Default: the 4/4 bar (the swapper's common rule).

@@ -107,7 +107,8 @@ struct RenderContextLayoutTests : juce::UnitTest
         expectEquals((int) offsetof(RenderContext, transportJumped), 75);
         expectEquals((int) offsetof(RenderContext, retiring), 76);
         expectEquals((int) offsetof(RenderContext, frozen), 77);
-        expectEquals((int) offsetof(RenderContext, reserved), 78);
+        expectEquals((int) offsetof(RenderContext, stoppedUnrendered), 78);
+        expectEquals((int) offsetof(RenderContext, reserved), 79);
         expectEquals((int) offsetof(RenderContext, midi), 80);
         expectEquals((int) offsetof(RenderContext, midiOut), 104);
         expectEquals((int) offsetof(RenderContext, peers), 128);
@@ -689,6 +690,7 @@ struct LayerRenderDriverTests : juce::UnitTest
             p.layerEditInFlight.store(true);  d.block(256);  p.layerEditInFlight.store(false);
             for (int i = 0; i < 3; ++i) d.block(256);
             expectEquals(p.fake(0).jumped, 1, "the hidden locate reaches the layer once");
+            expectEquals(p.fake(0).hiddenStops, 0, "a locate is not a stop");
 
             // (a) stop in an unrendered block, restart on the next rendered one: one jump, no stop edge.
             const int j0 = p.fake(0).jumped, s0 = p.fake(0).justStopped;
@@ -698,6 +700,7 @@ struct LayerRenderDriverTests : juce::UnitTest
             d.block(256); d.block(256);
             expectEquals(p.fake(0).jumped - j0, 1);
             expectEquals(p.fake(0).justStopped - s0, 0);
+            expectEquals(p.fake(0).hiddenStops, 1, "the jump says a stop was hidden in it (stoppedUnrendered)");
 
             // (b) stop in an unrendered block, the next rendered block stopped: justStopped, and no jump later.
             const int j1 = p.fake(0).jumped, s1 = p.fake(0).justStopped;
@@ -708,6 +711,7 @@ struct LayerRenderDriverTests : juce::UnitTest
             d.block(256); d.block(256);
             expectEquals(p.fake(0).justStopped - s1, 1);
             expectEquals(p.fake(0).jumped - j1, 0);
+            expectEquals(p.fake(0).hiddenStops, 1, "a stop the next rendered block sees is justStopped only");
 
             // (c) pause and resume at the same position inside unrendered blocks: one jump.
             const int j2 = p.fake(0).jumped;
@@ -733,6 +737,27 @@ struct LayerRenderDriverTests : juce::UnitTest
             d.block(256);
             expectEquals(p.fake(0).stopHooks, 1);
             expectEquals(p.fake(0).justStopped, 1);
+            expectEquals(p.fake(0).hiddenStops, 0);
+
+            // A 0-frame block that sees the stop, then play again: one jump that carries the stop.
+            d.host.playing = true;
+            d.block(256);
+            d.host.playing = false;
+            d.block(0);
+            d.host.playing = true;
+            d.block(256); d.block(256);
+            expectEquals(p.fake(0).hiddenStops, 1, "the 0-frame stop reaches the next rendered block as stoppedUnrendered, once");
+        }
+
+        beginTest("renderPriority is read once per call: a layer whose priority flips between the passes renders exactly once");
+        {
+            auto pBox = std::make_unique<FakeLayerHost>(2); auto& p = *pBox;
+            p.fake(1).flipPriority = true;
+            p.setUseLayerRenderForTest(true);
+            Driver d(p);
+            for (int i = 0; i < 8; ++i) d.block(256);
+            expectEquals(p.fake(1).renders, 8, "one render per block, never zero or two");
+            expectEquals(p.fake(0).renders, 8);
         }
 
         beginTest("beatWrap 64: the host's wrap and deltas of +-1e-4 (and +-64) are not jumps; a real locate is");

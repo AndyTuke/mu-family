@@ -1,4 +1,3 @@
-#include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "Plugin/PluginProcessor.h"
 #include "Modulation/MuOnModDest.h"           // isValidEngineDest
 #include "Modulation/ModulatorSerialise.h"    // mu-core: modulator (de)serialise
@@ -18,35 +17,6 @@ namespace
     // The legacy five-lane colours: Kick red / Bass orange / Hat cyan / Snare magenta / Rumble lime, the
     // palette entries the lanes had, then the three unused slots.
     constexpr const char* kLegacyLaneColours = "0,2,1,3,4,5,6,7";
-
-    // A flat full-level envelope, one bar long: what a track that has not drawn one carries.
-    void setDefaultEnvelope(ControlSequence& env)
-    {
-        env.mode           = ControlSequence::Mode::Smooth;
-        env.polarity       = ControlSequence::Polarity::Unipolar;
-        env.loopNoteValue  = NoteValue::Quarter;
-        env.loopNoteMod    = NoteMod::None;
-        env.loopMultiplier = 4;   // 1 bar (4 beats) so it cycles once per bar
-        env.curvePoints    = { { 0.0f, 1.0f }, { 1.0f, 1.0f } };
-    }
-
-    // The Rumble volume envelope — its length (note value × multiplier, as a modulator's Loop) and
-    // curve points — as a <RumbleEnv> node.
-    juce::ValueTree envelopeNode(const ControlSequence& env)
-    {
-        juce::ValueTree node("RumbleEnv");
-        node.setProperty("loopNV",   mu_pp::enumName(mu_audio::kNoteValueNames, (int) env.loopNoteValue), nullptr);
-        node.setProperty("loopMod",  mu_pp::enumName(mu_audio::kNoteModNames,   (int) env.loopNoteMod),   nullptr);
-        node.setProperty("loopMult", env.loopMultiplier, nullptr);
-        for (const auto& p : env.curvePoints)
-        {
-            juce::ValueTree pt("P");
-            pt.setProperty("x", p.x, nullptr);
-            pt.setProperty("y", p.y, nullptr);
-            node.addChild(pt, -1, nullptr);
-        }
-        return node;
-    }
 
     // Put an older track node into the engine-qualified shape: every parameter row `x` becomes
     // `<engine>_x`, and the engine (and for Rumble its source, the first Kick) is written as rows.
@@ -78,77 +48,6 @@ namespace
                 return true;
         return false;
     }
-}
-
-Track::Track()
-{
-    setDefaultEnvelope(rumbleEnv);
-}
-
-void Track::resetRumbleEnv()
-{
-    mu_core::spinLock(rumbleEnvLock);
-    setDefaultEnvelope(rumbleEnv);
-    mu_core::spinUnlock(rumbleEnvLock);
-}
-
-bool Track::rumbleEnvIsDefault() const
-{
-    ControlSequence ref;
-    setDefaultEnvelope(ref);
-    mu_core::spinLock(rumbleEnvLock);
-    bool same = rumbleEnv.loopNoteValue == ref.loopNoteValue && rumbleEnv.loopNoteMod == ref.loopNoteMod
-             && rumbleEnv.loopMultiplier == ref.loopMultiplier && rumbleEnv.curvePoints.size() == ref.curvePoints.size();
-    for (size_t i = 0; same && i < ref.curvePoints.size(); ++i)
-        same = rumbleEnv.curvePoints[i].x == ref.curvePoints[i].x && rumbleEnv.curvePoints[i].y == ref.curvePoints[i].y;
-    mu_core::spinUnlock(rumbleEnvLock);
-    return same;
-}
-
-// A track saves its step row always (the row is kept when the engine changes) and its Rumble envelope
-// only when it differs from the default.
-void Track::writeExtras(juce::ValueTree& node) const
-{
-    node.appendChild(row.serialise(slot), nullptr);
-    if (! rumbleEnvIsDefault())
-    {
-        mu_core::spinLock(rumbleEnvLock);
-        node.appendChild(envelopeNode(rumbleEnv), nullptr);
-        mu_core::spinUnlock(rumbleEnvLock);
-    }
-    Layer::writeExtras(node);
-}
-
-bool Track::isValidDest(const std::string& id) const { return isValidEngineDest(owner.ptr->engineOf(slot), id); }
-
-// An absent <Track> clears the row and an absent envelope puts the default back, so a sparse or older
-// node never leaves the previous tenant's data behind.
-void Track::applyExtras(const juce::ValueTree& node)
-{
-    row.deserialise(node.getChildWithName("Track"));
-
-    const auto env = node.getChildWithName("RumbleEnv");
-    std::vector<ControlSequence::CurvePoint> pts;
-    for (int i = 0; i < env.getNumChildren(); ++i)
-    {
-        const auto p = env.getChild(i);
-        ControlSequence::CurvePoint cp;
-        cp.x = (float) p.getProperty("x", 0.0f);
-        cp.y = (float) p.getProperty("y", 0.0f);
-        pts.push_back(cp);
-    }
-    if (pts.size() < 2)
-        resetRumbleEnv();
-    else
-    {
-        mu_core::spinLock(rumbleEnvLock);
-        rumbleEnv.curvePoints    = std::move(pts);
-        rumbleEnv.loopNoteValue  = (NoteValue) mu_pp::readEnumIndex(env, "loopNV",  mu_audio::kNoteValueNames, (int) NoteValue::Quarter);
-        rumbleEnv.loopNoteMod    = (NoteMod)   mu_pp::readEnumIndex(env, "loopMod", mu_audio::kNoteModNames,   (int) NoteMod::None);
-        rumbleEnv.loopMultiplier = juce::jmax(1, (int) env.getProperty("loopMult", 4));
-        mu_core::spinUnlock(rumbleEnvLock);
-    }
-    Layer::applyExtras(node);
 }
 
 // Describe the tracks once (ctor): each track's param prefix; its step row, Rumble envelope and
@@ -224,6 +123,7 @@ juce::ValueTree PluginProcessor::toLayerState(const juce::ValueTree& tree) const
 void PluginProcessor::applyStateTree(const juce::ValueTree& state)
 {
     applyComposedState(state);
+    seedRowGrooves();    // the saved global Swing / Accent are every row's groove
     syncAllFxParams();   // re-seed mixer/FX (unchanged values skip listeners)
 }
 

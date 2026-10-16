@@ -8,7 +8,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     : EditorShellBase(p),
       proc(p),
       sidebar(p, "Track"),
-      trackContent(p),
+      trackContent(p, p),
       layerPanel(p, "Track"),
       // The content binds only APVTS parameters and reads tracks by index, never holding a pointer into
       // a layer's data, so there is nothing to release before a removal.
@@ -111,7 +111,7 @@ void PluginEditor::engineChanged()
 
 void PluginEditor::useDestinationsOf(int idx)
 {
-    layerPanel.setDestProvider(&modProviders[(size_t) toIndex(proc.engineOf(idx))]);
+    layerPanel.setDestProvider(&modProviders[(size_t) toIndex(proc.getTrackEngine(idx))]);
 }
 
 void PluginEditor::onPresetLoaded(const juce::File&)

@@ -1,0 +1,12 @@
+{
+  "name": "oversize-block",
+  "notes": "P7: the five-engine groove on a 512 preparation; ragged's 1024 and the oversize schedule's 4096 and 2048 are chunked (C8).",
+  "sampleRate": 48000,
+  "preparedBlockSize": 512,
+  "lengthFrames": 96000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 5,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }, { "name": "oversize", "blocks": [4096, 1, 2048] }],
+  "events": []
+}

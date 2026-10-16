@@ -16,6 +16,8 @@
 #include "Tests/GoldenAllocationCheck.h"
 #include "Tests/GoldenRender.h"
 
+#include <thread>
+
 namespace
 {
     // Blocks that allocate or free inside processBlock today, recorded with their exact counts (see
@@ -285,9 +287,57 @@ namespace
             defs.push_back(d);
         }
 
-        // There is deliberately no oversize-block scenario: a host block larger than the prepared size
-        // runs off the end of the mixer's channel buffers (see the P7 pin in ExtractionPinTests.cpp), so
-        // it cannot be rendered, let alone recorded, until the contract decides what an oversize block does.
+        // Host automation of the engine choice mid-play, from another thread than the message thread (as a host's
+        // audio thread delivers it): each change switches the track's engine in the block that sees it.
+        {
+            Def d; d.name = "engine-automation-midplay"; d.numStems = 3; d.lengthFrames = 120000;
+            d.notes = "Kick, Snare, Rumble(source Kick); t0_eng, t1_eng and t2_eng automated from a non-message thread at blocks 30, 55, 80 and 100.";
+            d.author = [](PluginProcessor& p)
+            {
+                useTrack(p, 1, EngineType::Snare);
+                useTrack(p, 2, EngineType::Rumble);
+                setParam(p.apvts, mu_on::layerParamId(2, "src"), 0.0f);
+                setRow(p, 1, "1010101010101010", "1000100010001000");
+                setRow(p, 2, "1000100010001000", "0000000000000000");
+            };
+            auto automate = [](int block, int track, EngineType e)
+            {
+                return mu_golden::ScriptedEvent { block, "automate t" + juce::String(track) + "_eng = " + juce::String(mu_on::engineName(e)),
+                    [track, e](mu_golden::ScriptContext& c)
+                    {
+                        std::thread host([&c, track, e] { setParam(c.proc.apvts, mu_on::layerParamId(track, "eng"), (float) mu_on::toIndex(e)); });
+                        host.join();
+                    } };
+            };
+            d.events = { automate(30, 0, EngineType::Bass), automate(55, 1, EngineType::Hat),
+                         automate(80, 0, EngineType::Kick), automate(100, 2, EngineType::Snare) };
+            defs.push_back(d);
+        }
+
+        // Contract pin P7: host blocks above the prepared size (512 here, so ragged's 1024 is one too), which
+        // the shared driver chunks into calls of at most the prepared size (C8). Before the driver an oversize
+        // block ran off the end of the mixer's channel buffers, so this segment could not be recorded. The
+        // state is groove-five-swing-accent's (all five engines, the Rumble on the Kick, swing and accent).
+        {
+            Def d; d.name = "oversize-block"; d.numStems = 5; d.preparedBlockSize = 512;
+            d.notes = "P7: the five-engine groove on a 512 preparation; ragged's 1024 and the oversize schedule's 4096 and 2048 are chunked (C8).";
+            d.schedules.push_back({ "oversize", { 4096, 1, 2048 } });
+            d.author = [](PluginProcessor& p)
+            {
+                useTrack(p, 1, EngineType::Bass);
+                useTrack(p, 2, EngineType::Hat);
+                useTrack(p, 3, EngineType::Snare);
+                useTrack(p, 4, EngineType::Rumble);
+                setParam(p.apvts, mu_on::layerParamId(4, "src"), 0.0f);
+                setRow(p, 0, "1000100010001001", "1000000010000000");
+                setRow(p, 1, "0010001000100010", "0010000000100000");
+                setRow(p, 2, "0101010101010101", "0001000100010001");
+                setRow(p, 3, "0000100000001000", "0000100000000000");
+                setParam(p.apvts, "seq_swing", 0.35f);
+                setParam(p.apvts, "seq_accent", 0.55f);
+            };
+            defs.push_back(d);
+        }
 
         return defs;
     }
@@ -429,3 +479,4 @@ struct MuOnGoldenRenderTests : juce::UnitTest
 };
 
 static MuOnGoldenRenderTests muOnGoldenRenderTests;
+
