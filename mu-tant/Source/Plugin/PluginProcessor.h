@@ -5,29 +5,27 @@
 #include "Sequencer/Pattern.h"           // mu-Tant layer type (derives mu-core Layer)
 #include "Persistence/PatternParams.h"   // the Pattern type's parameter ids and rows
 #include "UI/PatternHost.h"               // what the Pattern layer and its UI read from their host
-#include "Modulation/LaneModulation.h"       // mu-core: shared range-based per-lane resolve
 #include "Sequencer/GatePattern.h"           // mu-tant: per-voice gate pattern
+#include "Sequencer/HeldNoteStack.h"         // mu-tant: the final-mix gate's held keys
 #include "Audio/SynthVoice.h"                // mu-tant voice
 #include "Audio/Wavetable/WavetableBank.h"   // mu-core
 #include "Audio/InsertProcessor.h"           // mu-core: shared per-voice insert FX
 
-#include "Modulation/MuTantModSnap.h"
 #include "Plugin/MidiClockSync.h"            // mu-core: shared MIDI-clock slave
 #include "License/LicenseKey.h"              // product: mu-Tant id + filename + public key
 
 #include <array>
 #include <atomic>
 #include <memory>
-#include <string_view>
-#include <unordered_map>
 
 // mu-tant — wavetable drone synth.
 //
 // 1–8 free-running voices, each with two wavetable oscillators (cross-mod /
 // FM / Sync), scale-quantised pitch, mu-core filter + drive + lo-cut, a
 // per-voice drawable gater + filter envelope + pitch envelope, and a shared
-// insert effect. processBlock routes through the shared MixerEngine
-// (FX sends + sidechain + returns + master) via the renderVoiceCb hook.
+// insert effect. Each voice is a Pattern layer that renders itself through the
+// shared layer driver (renderAndMix) into the shared MixerEngine (FX sends +
+// sidechain + returns + master); the Note-mode gate multiplies the final mix.
 namespace mu_tant
 {
 
@@ -179,8 +177,7 @@ public:
     float getTantSnap(int voice, int snapIndex) const noexcept
     {
         if (voice < 0 || voice >= mu_limits::kMaxLayers) return 0.0f;
-        if (usesLayerRender()) return getPattern(voice).getModLive(snapIndex);
-        return voiceSnap[(size_t) voice][(size_t) snapIndex].load();
+        return getPattern(voice).getModLive(snapIndex);
     }
 
 protected:
@@ -194,75 +191,18 @@ protected:
     std::unique_ptr<Layer> createLayer(int slot) override;
 
 private:
-    VoiceConfig readConfig(int voiceIndex) const;
-
-    // Cached APVTS atomic pointers. The pointers returned by getRawParameterValue
-    // are stable for the processor's lifetime (replaceState changes values, not
-    // the parameter objects), so we resolve them once in the constructor and read
-    // them in processBlock — never rebuilding juce::String IDs on the audio thread.
-    struct VoicePtrs
-    {
-        std::atomic<float> *o1Oct, *o1Semi, *o1Fine, *o1Pos, *o1Wt;
-        std::atomic<float> *o2Oct, *o2Semi, *o2Fine, *o2Pos, *o2Wt;
-        std::atomic<float> *xmodPhaseMode, *xmodIndex, *sync, *xmodFdbk, *xmodAmpMode, *xmodDepth, *xmodSsb;
-        std::atomic<float> *o1Lvl, *o2Lvl, *noiseLvl, *noiseType;
-        std::atomic<float> *fltType,  *fltCut,  *fltRes,  *fltEnvDepth,  *fltDrv,  *fltLoCut;
-        std::atomic<float> *flt2Type, *flt2Cut, *flt2Res, *flt2EnvDepth, *flt2Drv, *flt2LoCut;
-        std::atomic<float> *fltSeries;
-        std::atomic<float> *o1PenvDepth, *o2PenvDepth;
-        std::atomic<float> *level, *gateGap, *gateBypass;
-        std::atomic<float> *drvChar, *insP1, *insP2, *insP3, *insP4;
-    };
-    std::array<VoicePtrs, mu_limits::kMaxLayers> voicePtrs {};
-    struct GlobalPtrs { std::atomic<float> *root, *scale; } globalPtrs {};
+    // The boundary rule's parameter atomics (master loop, swap timing), resolved once in the constructor.
     void cacheParamPointers();
-
-    // Per-channel render hook handed to the shared MixerEngine: runs one voice's
-    // modulation → engine → gate → insert into the channel buffer (engine→insert→
-    // mixer). Captures only `this`; the per-block transport snapshot it reads lives
-    // in the blk* members below, set at the top of processBlock (same thread).
-    MixerEngine::RenderChannelFn renderVoiceCb;
-    void   renderVoice(int voiceIndex, juce::AudioBuffer<float>& buf, int numSamples);
-    // Render a voice being retired by a count-reducing full-preset swap: its OLD
-    // (pre-swap) config through its still-intact engine+insert, under a falling gain.
-    void   renderRetiringVoice(int v, juce::AudioBuffer<float>& buf, int numSamples);
-    // renderVoice phases — called in order; each handles one concern.
-    void   applyModulation    (int v, VoiceConfig& cfg);
-    void   applyFilterEnvelope(int v, VoiceConfig& cfg, int numSamples);
-    void   applyPitchEnvelope (int v, VoiceConfig& cfg);
-    bool   blkPlaying        = false;
-    double blkBeatStart      = 0.0;
-    double blkBeatsPerSample = 0.0;
-    // Each voice's gate-pattern length in beats (the hot-swap boundary reference). Read from the
-    // patterns inside the layers try-lock, then kept for a block that misses the lock so the
-    // boundary detection still advances. Audio thread only.
-    std::array<double, mu_limits::kMaxLayers> blkPatternBeats { 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0 };
 
     WavetableBank                                          bank;
     // Per-instance noise seed salt, taken before the constructor body builds the voices; 0 when MU_DETERMINISTIC_NOISE is set (golden renders).
     const juce::int64 noiseSeedSalt = mu_core::makeNoiseSalt();
+    // The slot engines, one per slot (not per voice): the Pattern in a slot renders through that slot's engine,
+    // bound in Pattern::bindParams, so a voice that moves takes up the slot's oscillator phase (VoiceEngine::reset
+    // keeps it), as it always did. The per-voice insert (shared mu-core InsertProcessor) is Pattern::insert — it
+    // runs after the gate, before the pan/sum into the mixer (engine → insert → mixer, the family signal flow).
+    // A count-reducing preset's retire fade is the Pattern's own, in the shared retire bin (applyFullPresetTree).
     std::array<std::unique_ptr<VoiceEngine>, mu_limits::kMaxLayers>   voices;
-    // The per-voice insert effect (shared mu-core InsertProcessor) is Pattern::insert — it runs after
-    // the gate, before the pan/sum into the mixer (engine → insert → mixer, the family-wide signal flow).
-
-    // ── Retire-tail for count-reducing full-preset swaps ──────────────────────
-    // A committed full preset with fewer voices would hard-cut the dropped voices
-    // (the render loop just sums fewer channels), snapping their comb-filter / insert
-    // tail. Instead we snapshot each dropped voice's OLD config before replaceState
-    // and keep rendering it through its (intact) engine+insert under a falling gain
-    // for ~25 ms, then stop — so the tail fades. `samplesLeft` is the audio-thread
-    // countdown; `config` is written (message thread) before `samplesLeft` is armed
-    // (release) and read only when samplesLeft>0 (acquire), so no lock is needed.
-    struct RetiringVoice
-    {
-        std::atomic<int>    samplesLeft { 0 };
-        float               gainStep = 0.0f;   // per-sample gain decrement (= 1/rampLen)
-        VoiceConfig         config;            // OLD engine config (osc + filter)
-        int                 insAlgo = 0;       // OLD insert algo + params, so the insert
-        std::array<float,4> insP {};           // tail (e.g. a reverb the new preset drops) fades too
-    };
-    std::array<RetiringVoice, mu_limits::kMaxLayers> retiring {};
-    int retireRampSamples() const { return juce::jmax(1, (int) (currentSampleRate * 0.025)); }
 
 public:
     // ── PatternHost: what the Pattern layer and PatternContent read (message thread) ──────────
@@ -291,31 +231,6 @@ public:
     const Pattern& getPattern(int i) const noexcept { return layerAs<Pattern>(i); }
 
 private:
-    // Per-voice modulated-value snapshots — written by the audio thread in
-    // renderVoice() after the matrix runs; read by PatternContent at ~30 Hz via
-    // getTantSnap() to drive live-arc indicators on bound knobs.
-    std::array<std::atomic<float>, mu_tant::kTantSnapCount> voiceSnap[mu_limits::kMaxLayers];
-
-    // Pre-allocated modulation paramValues map — reused every block to avoid
-    // audio-thread allocation. Keys match the strings in MuTantModDest::kModDestTable.
-    // Values are seeded each block from the current VoiceConfig and read back
-    // after the matrix runs.
-    // THREADING: MixerEngine calls renderVoice sequentially (one voice at a time)
-    // so this map is never accessed concurrently — safe to share across voices.
-    // If MixerEngine ever renders channels in parallel, move this into a per-voice
-    // structure to avoid a data race.
-    std::unordered_map<std::string_view, float> modParamValues;
-
-    // Cached modulation-destination routing for mu_mod::resolveLane (built once in
-    // cacheParamPointers). `modDestIds` are the kModDestTable ids (proportion-space keys);
-    // `modDestRanges` each param's NormalisableRange (voice-independent); `modDestAtoms` the
-    // per-voice backing APVTS atomics. resolveLane seeds proportions from the atoms, runs the
-    // voice's matrix under a try-lock, and writes the modulated values back in param units.
-    static constexpr int kNumModDests = 31;   // == mu_tant::kModDestCount (asserted in the .cpp)
-    std::array<const char*, kNumModDests>                    modDestIds   {};
-    std::array<juce::NormalisableRange<float>, kNumModDests> modDestRanges{};
-    std::array<std::array<const std::atomic<float>*, kNumModDests>, mu_limits::kMaxLayers> modDestAtoms{};
-
     // Master-loop length param pointer, cached for RT-safe reads (no per-block
     // string lookup) in processBlock. Set in cacheParamPointers().
     const std::atomic<float>* mstrLoopPtr { nullptr };
@@ -324,19 +239,16 @@ private:
     // defined, else voice 0's gate boundary. Resolved once in cacheParamPointers().
     const std::atomic<float>* swapTimingPtr { nullptr };
 
-    // ── MIDI Note mode (gate + pitch-track) ──────────────────────────────────
-    // 0 = Free, 1 = Note. Set from the Settings overlay (message thread), read on
-    // the audio thread. The rest of the note-mode state below is touched ONLY on
-    // the audio thread (scanned + applied within processBlock/renderVoice on one
-    // thread) so it needs no synchronisation.
-    std::atomic<int>    midiNoteMode { 0 };
-    std::array<int, 16> heldNotes {};         // held-note stack (last-note priority)
-    int                 numHeldNotes   = 0;
-    int                 noteCurrentMidi = -1; // top of stack (-1 = none) → pitch-track
-    float               noteGateGain   = 1.0f;// ramped amplitude gate (anti-click)
-    int                 lastNoteMode   = 0;   // detects a Free↔Note switch → reset state
-    // Scans note on/off into the held-note stack → updates noteCurrentMidi (drives
-    // pitch-track in renderVoice). Run before the render. No-op in Free mode.
+    // ── MIDI Note mode: the final-mix gate (decision A3; each Pattern pitch-tracks its own held keys) ──
+    // 0 = Free, 1 = Note. Set from the Settings overlay (message thread, which also tells every Pattern), read
+    // on the audio thread. The rest of the state below is touched ONLY on the audio thread (scanned + applied
+    // within processBlock on one thread) so it needs no synchronisation.
+    std::atomic<int> midiNoteMode { 0 };
+    HeldNoteStack    gateNotes;              // the keys held, every host block (last-note priority)
+    float            noteGateGain   = 1.0f;  // ramped amplitude gate (anti-click)
+    int              lastNoteMode   = 0;     // detects a Free↔Note switch → reset state
+    // Scans note on/off of the whole host block into the gate's held-note stack. Run before the render (also
+    // for a block the driver does not render). No-op in Free mode.
     void scanNoteMode(const juce::MidiBuffer& midi);
     // Advances the anti-click amplitude ramp toward the held/silent target and applies
     // it to the final mix. Run after the render. No-op in Free mode (gate stays open).
@@ -348,18 +260,17 @@ private:
     // Under layersLock: a layer built after the constructor takes the held keys every other layer has heard.
     void seedInputState(int slot) noexcept;
 
-    // Shared MIDI-clock slave (standalone). process() scans the MIDI buffer each block;
-    // when enabled + playing, processBlock slaves the beat/tempo to it.
-    // Written in prepareToPlay (host suspends the audio thread first) — no atomic needed.
-    double currentSampleRate = 44100.0;
-    int    currentBlockSize  = 512;    // with the rate, how a new Pattern's insert is prepared
+    // The prepared rate and block size: written by prepareToPlay (a host thread), read by createLayer (message
+    // thread) and the final-mix gate (audio thread), so atomic.
+    std::atomic<double> currentSampleRate { 44100.0 };
+    std::atomic<int>    currentBlockSize  { 512 };    // with the rate, how a new Pattern is prepared
 
-    // The voice count (ProcessorCore::numLayers) and the per-voice data shift during add/remove
-    // are guarded against the audio thread by ProcessorCore::layersLock; processBlock takes a
-    // ScopedTryLock and silences the block on contention (a sub-millisecond gap while a voice is
-    // added/removed).
-    // Guards the wavetable bank append against the audio render (which reads the bank), kept apart
-    // from layersLock so an import never blocks a layer edit and the reverse.
+    // The voice count (ProcessorCore::numLayers) and the per-voice data shift during add/remove are guarded
+    // against the audio thread by ProcessorCore::layersLock, which the shared driver try-locks once per block
+    // (a miss silences the block: a sub-millisecond gap while a voice is added or removed).
+    // Guards the wavetable bank append against the audio render (which reads the bank), kept apart from
+    // layersLock so an import never blocks a layer edit and the reverse. Each Pattern try-locks it per call
+    // (after the driver's layersLock: the old acquire order); a miss silences that voice for the call.
     juce::CriticalSection bankLock;
 
     // Composed state (mu-core LayerState): the voice layout every save / load uses (a voice's

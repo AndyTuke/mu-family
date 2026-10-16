@@ -236,25 +236,20 @@ void PluginProcessor::applyFullPresetTree(const juce::ValueTree& state)
     // for the whole commit (the hot-swap glitch). Without it, a concurrent block sees
     // old-or-new per structure (≤1 block, inaudible) instead.
 
-    // Message thread only, which serialises it against every structural edit (add / remove / swap /
-    // reset): hosts restore state on their main thread (VST3 IComponent::setState, the CLAP state
-    // extension's load, the standalone's own message loop), and the staged commit runs there too.
-    // That is also why the retire-tail setup below may arm retiring[] without layersLock.
+    // Structural edits run on the message thread; a host may restore state from its own thread.
     const int oldN = numLayers.load(std::memory_order_relaxed);
     const int nv = savedLayerCount(state);
 
-    // Retire-tail: when this preset drops voices while playing, snapshot each dropped
-    // voice's OLD engine + insert config NOW (before the new params land)
-    // and arm a short fade so its comb-filter / insert tail rings out.
-    if (usesLayerRender() && layerSwapper.isRunning() && nv < oldN)
+    // Retire tail: when this preset drops voices while playing, each dropped voice's spare Pattern stays in its
+    // slot and is parked IN PLACE in the shared retire bin with the serial the count store in applyComposedState
+    // will carry, so the block that still sees the old count renders it live and the first that sees the new one
+    // renders its 25 ms fade (no block with both, none with neither). Its OLD engine + insert config is frozen now,
+    // before the new params land, and after the park: no block renders the entry until the store lands. A slot
+    // whose fade is still armed (AlreadyActive) keeps it and its snapshot, as the old countdown did (pin P1). The
+    // parks and the store share one hold of the layout writer lock (re-entrant; message / host threads only, never
+    // the audio thread), so no other count store can take that serial.
+    if (layerSwapper.isRunning() && nv < oldN)
     {
-        // The shared retire bin: each dropped voice's spare Pattern stays in its slot and is parked IN PLACE with
-        // the serial the count store below will carry, so the block that still sees the old count renders it live
-        // and the first that sees the new one renders its fade (no block with both, none with neither). The park,
-        // the snapshot and the store share one hold of the layout writer lock (re-entrant; message or host thread,
-        // never the audio thread), so no other count store can take that serial. A slot whose fade is still armed
-        // (AlreadyActive) keeps it and its snapshot, as the old countdown did (pin P1). The snapshot is written
-        // after the park and before the store: no block renders the entry until the store lands.
         const juce::ScopedLock lw(layoutWriteLock);
         const uint32_t activation = nextLayoutSerial();
         for (int v = nv; v < oldN; ++v)
@@ -263,33 +258,12 @@ void PluginProcessor::applyFullPresetTree(const juce::ValueTree& state)
             if (retireBin.parkInPlace(v, p, activation, false) == mu_core::RetireBin::ParkResult::Parked)
                 p.beginRetire();
         }
-        applyComposedState(state);   // also stores the count (with `activation`) and restores the colours
-        syncAllFxParams();
-        return;
+        applyComposedState(state);   // also stores the count (carrying `activation`) and restores the colours
     }
-
-    if (! usesLayerRender() && layerSwapper.isRunning() && nv < oldN)
+    else
     {
-        const int ramp = retireRampSamples();
-        for (int v = nv; v < oldN; ++v)
-        {
-            auto& r = retiring[(size_t) v];
-            // A tail still ringing is being read by the audio thread, so its config must not be
-            // rewritten; back-to-back swaps that drop the same voice miss the second tail by design.
-            if (r.samplesLeft.load(std::memory_order_acquire) > 0) continue;
-            r.config   = readConfig(v);                          // OLD osc + filter
-            const auto& vp = voicePtrs[(size_t) v];
-            r.insAlgo  = (int) vp.drvChar->load();
-            r.insP     = { juce::jlimit(0.0f, 1.0f, vp.insP1->load()),
-                           juce::jlimit(0.0f, 1.0f, vp.insP2->load()),
-                           juce::jlimit(0.0f, 1.0f, vp.insP3->load()),
-                           juce::jlimit(0.0f, 1.0f, vp.insP4->load()) };
-            r.gainStep = 1.0f / (float) ramp;
-            r.samplesLeft.store(ramp, std::memory_order_release);
-        }
+        applyComposedState(state);   // also stores the count and restores the colours
     }
-
-    applyComposedState(state);   // also stores the count and restores the colours
     syncAllFxParams();   // re-seed mixer/FX engine state (unchanged values skip listeners)
 }
 

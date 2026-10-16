@@ -1,58 +1,10 @@
-#include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "Plugin/PluginProcessor.h"
 #include "Sequencer/SwapBoundary.h"   // mu-tant: the hot-swap boundary rule
-#include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
-#include "Audio/Scales.h"
-#include "Modulation/MuTantModDest.h"
-#include "Modulation/ModulatorSerialise.h"   // mu-core: shared modulator (de)serialise
-#include "Sequencer/GatePatternSerialise.h"  // mu-tant: gate (de)serialise (also used by tests)
 #include "Plugin/HostTransport.h"            // mu-core: shared host-playhead reader
-
-#include <thread>
 
 namespace mu_tant
 {
-
-namespace
-{
-    // Filter-cutoff proportion-space helpers — same skew as mu-clid (cutoff range
-    // 20..20000 Hz, skewForCentre 640 Hz → skewFactor ≈ 0.2). Modulation runs in
-    // proportion space so a given depth always sweeps the same visual arc of the
-    // knob regardless of the base cutoff setting (matches depthScaleFor "filter.cutoff"
-    // scale = 1.0 in ModulationMatrix).
-    inline float tantPropFromCutoff(float hz)
-    {
-        return std::pow(juce::jlimit(0.0f, 1.0f, (hz - 20.0f) / 19980.0f), 0.2f);
-    }
-    inline float tantCutoffFromProp(float p)
-    {
-        return 20.0f + 19980.0f * std::pow(juce::jlimit(0.0f, 1.0f, p), 5.0f);
-    }
-
-    // (isValidModDest moved to PluginProcessor_Preset.cpp — used only by preset I/O.)
-
-    // Index of each resolved value in the resolveLane `out` array (kModDestTable order).
-    enum { D_o1Oct = 0, D_o1Semi, D_o1Fine, D_o1Pos, D_o1Penv,
-           D_o2Oct, D_o2Semi, D_o2Fine, D_o2Pos, D_o2Penv,
-           D_xmIndex, D_xmDepth, D_xmSsb, D_o1Lvl, D_o2Lvl, D_nzLvl,
-           D_fCut, D_fRes, D_fDrv, D_fLoCut, D_fEnv,
-           D_f2Cut, D_f2Res, D_f2Drv, D_f2LoCut, D_f2Env, D_level,
-           D_insP1, D_insP2, D_insP3, D_insP4 };
-
-    // Compile-time guard: pin the D_* indices to the table rows, so an insert / reorder that
-    // would read the wrong resolved value for a target fails to COMPILE.
-    constexpr bool cstrEq(const char* a, const char* b)
-    {
-        while (*a != '\0' && *a == *b) { ++a; ++b; }
-        return *a == *b;
-    }
-    static_assert(cstrEq(kModDestTable[D_o1Semi].id, "osc1.semi"),     "D_o1Semi desync");
-    static_assert(cstrEq(kModDestTable[D_fCut].id,   "filter.cutoff"), "D_fCut desync");
-    static_assert(cstrEq(kModDestTable[D_level].id,  "level"),         "D_level desync");
-    static_assert(cstrEq(kModDestTable[D_insP4].id,  "insert.p4"),     "D_insP4 desync");
-}
-
 
 PluginProcessor::PluginProcessor()
     : ProcessorBase(BusesProperties()
@@ -95,6 +47,7 @@ PluginProcessor::PluginProcessor()
         midiFullPresetMap.load();
     }
 
+    // The slot engines: one per slot, handed to the Pattern in that slot (PatternHost::getPatternEngine).
     bank.loadFactoryBank();      // multi-table, mip-mapped factory wavetable bank
     for (int v = 0; v < mu_limits::kMaxLayers; ++v)
     {
@@ -103,13 +56,13 @@ PluginProcessor::PluginProcessor()
         voices[(size_t) v]->setSlotIndex(v, noiseSeedSalt);
     }
 
-    cacheParamPointers();        // resolve all APVTS atomics once (audio thread reads these)
+    cacheParamPointers();        // resolve the boundary rule's APVTS atomics once
     initVoiceState();            // the voice layout every preset / session save and load uses
     refreshAllPitchQuantFlags(); // seed the stepped-pitch flags (default state has no modulators)
 
     // The shared layer driver: a voice a count-reducing preset drops fades in place past the live count
     // (RenderPastCount, the old renderCount rule); the channel messages of a block the driver does not render
-    // reach the layers on the next one (each Pattern keeps its own held keys, which today's shared stack heard
+    // reach the layers on the next one (each Pattern keeps its own held keys, which the old shared stack heard
     // in every block); a regrow keeps an armed fade armed (pin P1, until its signed golden update).
     setRetireCountPolicy(mu_core::RetireBin::CountPolicy::RenderPastCount);
     setCarrySkippedMidi(true);
@@ -123,21 +76,6 @@ PluginProcessor::PluginProcessor()
         p.initNoteMode(midiNoteMode.load(std::memory_order_relaxed));
         p.markInputSeeded();
     }
-
-    // Render hook for the shared MixerEngine — captures only `this`, so no
-    // per-block std::function construction (which would allocate). The per-block
-    // transport snapshot it reads lives in the blk* members, set in processBlock.
-    renderVoiceCb = [this](int v, juce::AudioBuffer<float>& buf, int n)
-    {
-        // Active voices render normally; a voice past the active count that is still
-        // retiring (count-reducing swap) fades its old tail; anything else is silent.
-        if (v < numLayers.load(std::memory_order_relaxed))
-            renderVoice(v, buf, n);
-        else if (retiring[(size_t) v].samplesLeft.load(std::memory_order_acquire) > 0)
-            renderRetiringVoice(v, buf, n);
-        else
-            buf.clear();
-    };
 
     layerSwapper.setAppliers([this](juce::ValueTree& t) { applyFullPresetTree(t); },
                              [this](int v, juce::ValueTree& t)
@@ -157,229 +95,49 @@ PluginProcessor::~PluginProcessor()
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     resetSwapPlayState();   // no processBlock is running yet: loads apply at once, not staged
-    currentSampleRate = sampleRate;
-    currentBlockSize  = samplesPerBlock;
+    currentSampleRate.store(sampleRate, std::memory_order_relaxed);
+    currentBlockSize.store(samplesPerBlock, std::memory_order_relaxed);
     for (auto& v : voices)
         if (v) v->prepare(sampleRate, samplesPerBlock);
-
-    if (! usesLayerRender())
-    {
-        // Every slot's insert, spares included; under the layers lock because a structural edit moves the Patterns.
-        const juce::ScopedLock sl(layersLock);
-        for (int v = 0; v < mu_limits::kMaxLayers; ++v)
-            getPattern(v).insert->prepare(sampleRate, samplesPerBlock);
-    }
 
     mixerEngine.prepare(sampleRate, samplesPerBlock);
     fxChain.prepare(sampleRate, samplesPerBlock);   // shared Effect/Delay/Reverb rack
 
-    // The shared driver's buffers and every slot's Pattern (its insert), spares included; the bin is flushed.
-    if (usesLayerRender()) prepareLayerRender(sampleRate, samplesPerBlock);
-
-    // Cancel any in-flight retire fade — its ramp length was derived from the old SR.
-    for (auto& r : retiring)
-        r.samplesLeft.store(0, std::memory_order_relaxed);
+    // The shared driver's buffers and every slot's Pattern (its insert), spares included; the retire bin is
+    // flushed (a fade's ramp length was derived from the old rate).
+    prepareLayerRender(sampleRate, samplesPerBlock);
 }
 
 void PluginProcessor::cacheParamPointers()
 {
-    auto P = [this](const juce::String& id) { return apvts.getRawParameterValue(id); };
-    globalPtrs.root    = P("root");
-    globalPtrs.scale   = P("scale");
-    mstrLoopPtr        = P("mstrLoop");   // master-loop length, read RT-safely in processBlock
-    swapTimingPtr      = P(mu_hotswap::kSwapTimingParamId);  // hot-swap timing (mu_hotswap::SwapTiming)
-
-    for (int v = 0; v < mu_limits::kMaxLayers; ++v)
-    {
-        auto vid = [v](const char* base) { return layerParamId(v, base); };
-        auto& p = voicePtrs[(size_t) v];
-        p.o1Oct  = P(vid("o1_oct"));  p.o1Semi = P(vid("o1_semi")); p.o1Fine = P(vid("o1_fine")); p.o1Pos = P(vid("o1_pos")); p.o1Wt = P(vid("o1_wt"));
-        p.o2Oct  = P(vid("o2_oct"));  p.o2Semi = P(vid("o2_semi")); p.o2Fine = P(vid("o2_fine")); p.o2Pos = P(vid("o2_pos")); p.o2Wt = P(vid("o2_wt"));
-        p.xmodPhaseMode = P(vid("xmod_phaseMode")); p.xmodIndex = P(vid("xmod_index")); p.sync = P(vid("sync"));
-        p.xmodFdbk = P(vid("xmod_fdbk")); p.xmodAmpMode = P(vid("xmod_ampMode")); p.xmodDepth = P(vid("xmod_depth")); p.xmodSsb = P(vid("xmod_ssb"));
-        p.o1Lvl  = P(vid("o1_lvl"));  p.o2Lvl  = P(vid("o2_lvl"));  p.noiseLvl = P(vid("noise_lvl")); p.noiseType = P(vid("noise_type"));
-        p.fltType= P(vid("flt_type")); p.fltCut = P(vid("flt_cut")); p.fltRes = P(vid("flt_res")); p.fltEnvDepth = P(vid("flt_env_depth")); p.fltDrv = P(vid("flt_drv")); p.fltLoCut = P(vid("flt_lo_cut"));
-        p.flt2Type=P(vid("flt2_type"));p.flt2Cut=P(vid("flt2_cut"));p.flt2Res=P(vid("flt2_res"));p.flt2EnvDepth=P(vid("flt2_env_depth"));p.flt2Drv=P(vid("flt2_drv"));p.flt2LoCut=P(vid("flt2_lo_cut"));
-        p.fltSeries = P(vid("flt_series"));
-        p.o1PenvDepth = P(vid("o1_penv_depth")); p.o2PenvDepth = P(vid("o2_penv_depth"));
-        p.level  = P(vid("level"));
-        p.gateGap= P(vid("gate_gap"));p.gateBypass = P(vid("gate_bypass"));
-        p.drvChar= P(vid("drvChar")); p.insP1  = P(vid("insP1")); p.insP2 = P(vid("insP2")); p.insP3 = P(vid("insP3")); p.insP4 = P(vid("insP4"));
-    }
-
-    // Build the cached modulation routing for resolveLane: dest ids + each param's range are
-    // voice-independent (cached once); the backing atomics differ per voice. Using the param's
-    // own NormalisableRange (via getParameterRange) means the filter-cutoff proportion seed
-    // exactly matches its skewed knob — no separate tantPropFromCutoff to drift.
-    modParamValues.reserve((size_t) kNumModDests + 4);   // pre-size → no audio-thread rehash
-    for (int i = 0; i < kNumModDests; ++i)
-    {
-        modDestIds[(size_t) i]    = kModDestTable[i].id;
-        modDestRanges[(size_t) i] = apvts.getParameterRange(layerParamId(0, kModDestTable[i].param));
-        modParamValues.emplace(std::string_view(kModDestTable[i].id), 0.0f);   // pre-insert key
-        for (int v = 0; v < mu_limits::kMaxLayers; ++v)
-        {
-            modDestAtoms[(size_t) v][(size_t) i] =
-                apvts.getRawParameterValue(layerParamId(v, kModDestTable[i].param));
-            jassert(modDestAtoms[(size_t) v][(size_t) i] != nullptr);   // catch an apvtsBase drift
-        }
-    }
+    mstrLoopPtr   = apvts.getRawParameterValue("mstrLoop");                   // master-loop length
+    swapTimingPtr = apvts.getRawParameterValue(mu_hotswap::kSwapTimingParamId);  // hot-swap timing (mu_hotswap::SwapTiming)
 }
 
-VoiceConfig PluginProcessor::readConfig(int voiceIndex) const
-{
-    const auto& p = voicePtrs[(size_t) voiceIndex];
-    VoiceConfig c;
-    // Tonal centre is global.
-    c.root         = (int) globalPtrs.root->load();
-    c.scaleIndex     = (int) globalPtrs.scale->load();
-    // Per-voice osc pitch (integer) + position.
-    c.osc1Octave   = (int) p.o1Oct->load();
-    c.osc1Semi     = (int) p.o1Semi->load();
-    c.osc1Fine     = (int) p.o1Fine->load();
-    c.osc1Pos      = p.o1Pos->load();
-    c.osc2Octave   = (int) p.o2Oct->load();
-    c.osc2Semi     = (int) p.o2Semi->load();
-    c.osc2Fine     = (int) p.o2Fine->load();
-    c.osc2Pos      = p.o2Pos->load();
-    // Wavetable: a loaded user table (resolved bank index) overrides the factory
-    // o{1,2}_wt selection; -1 → use the factory index.
-    {
-        const int u1 = getPattern(voiceIndex).osc1UserIndex.load();
-        const int u2 = getPattern(voiceIndex).osc2UserIndex.load();
-        c.osc1Wavetable = (u1 >= 0) ? u1 : (int) p.o1Wt->load();
-        c.osc2Wavetable = (u2 >= 0) ? u2 : (int) p.o2Wt->load();
-    }
-    // X-Mod — Lane A (phase/index) + Lane B (amplitude/multiply).
-    c.xmodPhaseMode = (int) p.xmodPhaseMode->load();   // 0 FM, 1 PM, 2 TZFM
-    c.xmodIndex     = p.xmodIndex->load() * 0.01f;     // 0..100 → 0..1
-    c.sync          = p.sync->load() > 0.5f;
-    c.xmodFeedback  = p.xmodFdbk->load() > 0.5f;
-    c.xmodAmpMode   = (int) p.xmodAmpMode->load();     // 0 AM, 1 RM, 2 SSB
-    c.xmodDepth     = p.xmodDepth->load() * 0.01f;     // -100..100 → -1..1
-    c.xmodSsbHz     = p.xmodSsb->load();               // Hz
-    // Per-source levels.
-    c.osc1LevelDb  = p.o1Lvl->load();
-    c.osc2LevelDb  = p.o2Lvl->load();
-    c.noiseLevelDb = p.noiseLvl->load();
-    c.noiseType    = (int) p.noiseType->load();
-    c.filterType      = (int) p.fltType->load();
-    c.filterCutoff    = p.fltCut->load();
-    c.filterRes       = p.fltRes->load();
-    c.filterEnvDepth  = p.fltEnvDepth->load();
-    c.filterDrive     = p.fltDrv->load();
-    c.filterLowCutHz  = p.fltLoCut->load();
-    c.filter2Type     = (int) p.flt2Type->load();
-    c.filter2Cutoff   = p.flt2Cut->load();
-    c.filter2Res      = p.flt2Res->load();
-    c.filter2EnvDepth = p.flt2EnvDepth->load();
-    c.filter2Drive    = p.flt2Drv->load();
-    c.filter2LowCutHz = p.flt2LoCut->load();
-    c.filterSeries    = p.fltSeries->load() > 0.5f;
-    c.osc1PitchEnvDepth = p.o1PenvDepth->load();
-    c.osc2PitchEnvDepth = p.o2PenvDepth->load();
-    c.levelDb         = p.level->load();
-    return c;
-}
-
+// The shared layer driver (docs/mu-tronic/design.md 2.1.1): program changes queued, the shell's Note-mode keys
+// scanned (the final-mix gate's input, every host block), the transport by the family rule wrapped into the
+// 64-beat pattern space, then one try-lock of the layers, the Patterns (and the in-place retire tails) and the
+// mixer; the Note-mode gate on the final mix (decision A3: a shell post-stage, so the FX returns are gated as
+// they always were); the boundary flagging from the per-slot loop lengths the driver cached. Real-time: nothing
+// here allocates or waits; a block the driver cannot render (an edit in flight, a missed lock) is silent while
+// the transport, the keys and the boundary detection still advance.
 void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
-    juce::ScopedNoDenormals noDenormals;
+    juce::ScopedNoDenormals noDenormals;   // the shell's own (N7): the final-mix gate runs outside the driver
     const int numSamples = buffer.getNumSamples();
 
-    if (usesLayerRender())
-    {
-        // The shared layer driver (docs/mu-tronic/design.md 2.1.1): program changes queued, the shell's Note-mode
-        // keys scanned (the final-mix gate's input, every host block), the transport by the family rule wrapped
-        // into the 64-beat pattern space, then one try-lock of the layers, the Patterns (and the in-place retire
-        // tails) and the mixer; the Note-mode gate on the final mix (decision A3: a shell post-stage, so the FX
-        // returns are gated as before); the boundary flagging from the per-slot loop lengths the driver cached.
-        queueMidiProgramChanges(midiMessages);
-        scanNoteMode(midiMessages);
-        const auto t = resolveBlockTransport(midiMessages, numSamples, Pattern::kBeatSpace);
-        renderAndMix(buffer, midiMessages, t);
-        applyNoteModeGate(buffer, numSamples);
-        std::array<double, mu_limits::kMaxLayers> beats {};
-        for (int s = 0; s < mu_limits::kMaxLayers; ++s) beats[(size_t) s] = layerLoopBeats(s);
-        flagPatternSwapBoundaries(t.playing, t.startBeat, t.blockBeats, beats.data());
-        return;
-    }
-
-    // Preserve the DAW sidechain, then clear (the SC input bus shares buffer channels
-    // with the output, so a bare clear would wipe it → no ducking / dead GR). Shared.
-    captureSidechainAndClear(buffer);
-
-    // MIDI program-change → preset load. Enqueue matching PCs (Ch 1-8 per-voice,
-    // Ch 9 full) into the lock-free FIFO; runDeferredWork drains them. Done
-    // before the voicesTryLock so PCs aren't dropped during a voice add/remove.
+    // MIDI program-change → preset load. Enqueue matching PCs (Ch 1-8 per-voice, Ch 9 full) into the
+    // lock-free FIFO; runDeferredWork drains them. Before the render, so PCs aren't dropped during an edit.
     queueMidiProgramChanges(midiMessages);
-
-    // Note mode (gate + pitch-track): scan note on/off into the held-note stack so
-    // renderVoice can pitch-track the held note. The amplitude gate is applied to the
-    // final mix after the render (applyNoteModeGate). No-op in Free mode.
     scanNoteMode(midiMessages);
 
-    // This block's transport — the family rule (mu-core TransportResolver): the host / mu-link
-    // position, else (standalone) external MIDI clock, else the own transport. Its beat is
-    // wrapped into mu-Tant's bounded beat space (the longest gate pattern, 64 beats) so the gates
-    // and the hot-swap boundary see positions exactly as they do free-running; only the SOURCE of
-    // the beat changes. Snapshotted into the per-block members the render hook reads. No voice
-    // data here, so this runs OUTSIDE the render lock: the transport keeps advancing even while a
-    // preset hot-swap commits on the message thread (no transport freeze).
-    constexpr double kMaxPatBeats = (double) GatePattern::kMaxPatternBars * 4.0;   // 64
-    const double midiClockBeat = midiClockSync.process(midiMessages, numSamples, currentSampleRate);
-    const auto   transport     = mu_core::resolveTransport(pollHostTransport(),
-                                                           wrapperType == wrapperType_Standalone,
-                                                           midiClockSync, midiClockBeat,
-                                                           { internalPlaying, internalBpm, internalBeatPos, &nudgePhaseBeats, &nudgeDirection, &appliedSyncOffsetBeats },
-                                                           numSamples, currentSampleRate, kMaxPatBeats, getSyncOffsetMs());
-    noteBlockTransport(transport);   // lets the next block's quantised control actions find the beat
-    const double bpm  = transport.bpm;
-    blkPlaying        = transport.playing;
-    blkBeatStart      = transport.startBeat;
-    blkBeatsPerSample = transport.beatsPerSample;
-
-    // Render → gate → insert → mixer through the shared path (engine→insert→mixer).
-    // Guarded by a try-lock ONLY against a voice add/remove data shift (the message
-    // thread holds layersLock for those). On contention, leave the buffer silent for
-    // this block — a sub-ms gap during a structural edit. A preset hot-swap does NOT
-    // take this lock (its data lands through the per-structure editLock / modLock +
-    // atomic params), so a swap commit never silences the render here.
-    {
-        // The bank lock is separate so a wavetable import never blocks a layer edit; the render
-        // reads the bank, so it must exclude an append too.
-        const juce::ScopedTryLock layersTryLock(layersLock);
-        const juce::ScopedTryLock bankTryLock(bankLock);
-        if (layersTryLock.isLocked() && bankTryLock.isLocked()
-            && ! layerEditInFlight.load(std::memory_order_acquire))   // a structural edit is still moving parameters
-        {
-            const int numActiveVoices = numLayers.load(std::memory_order_relaxed);
-
-            // Extend the rendered channel count to cover any voices still fading out
-            // from a count-reducing swap, so the mixer keeps mixing their tail.
-            int renderCount = numActiveVoices;
-            for (int v = numActiveVoices; v < mu_limits::kMaxLayers; ++v)
-                if (retiring[(size_t) v].samplesLeft.load(std::memory_order_acquire) > 0)
-                    renderCount = v + 1;
-
-            // (Sidechain already captured at the top of processBlock, before the clear.)
-            processCoreBlock(buffer, nullptr, renderCount, numSamples, bpm,
-                             nullptr, nullptr, nullptr, &renderVoiceCb);
-
-            // The hot-swap boundary reference: each voice's gate-pattern length. Read here, under the
-            // lock, because a structural edit moves the Pattern pointers; a block that misses the lock
-            // reuses these values, so the boundary detection below still advances.
-            for (int v = 0; v < mu_limits::kMaxLayers; ++v)
-                blkPatternBeats[(size_t) v] = (double) getPattern(v).gate.patternLengthBars.load(std::memory_order_relaxed) * 4.0;
-        }
-    }
-
-    // Note mode: gate the whole mix on the held→silent edge with a short anti-click
-    // fade (runs even if the render was skipped on lock contention — buffer is silent,
-    // the ramp still tracks). No-op in Free mode.
+    const auto t = resolveBlockTransport(midiMessages, numSamples, Pattern::kBeatSpace);
+    renderAndMix(buffer, midiMessages, t);
     applyNoteModeGate(buffer, numSamples);
 
-    flagPatternSwapBoundaries(blkPlaying, blkBeatStart, transport.blockBeats, blkPatternBeats.data());
+    std::array<double, mu_limits::kMaxLayers> beats {};
+    for (int s = 0; s < mu_limits::kMaxLayers; ++s) beats[(size_t) s] = layerLoopBeats(s);
+    flagPatternSwapBoundaries(t.playing, t.startBeat, t.blockBeats, beats.data());
 }
 
 // The hot-swap boundary check: a staged preset commits when its reference loop wraps (or on the
@@ -404,244 +162,6 @@ void PluginProcessor::flagPatternSwapBoundaries(bool playing, double startBeat, 
                        {
                            return swapLoopBeats(slot, numActive, swapTiming, masterLoopBeats, patternBeats);
                        });
-}
-
-void PluginProcessor::applyModulation(int v, VoiceConfig& cfg)
-{
-    // Resolve this voice's modulation through the shared mu-core range-based routing: seed each
-    // destination's proportion from its APVTS atom, run the voice's matrix under a try-lock
-    // (skipped on contention → the voice plays un-modulated this block), then write the
-    // modulated values back in param units. On lock-miss or with no assignments the values
-    // round-trip to the base config, so cfg + the live-arc snapshot stay correct either way.
-    // The dests are now proportion-clamped (scale 1.0) — a full-depth mod sweeps the whole
-    // range and clamps at the rails, instead of overflowing it as the old display-unit path did.
-    float out[kNumModDests];
-    mu_mod::resolveLane(&getPattern(v), blkBeatStart, kNumModDests,
-                        modDestIds.data(), modDestAtoms[(size_t) v].data(),
-                        modDestRanges.data(), modParamValues, out);
-
-    // Write the resolved values back into the voice config. Octave/fine pitch dests round to the
-    // nearest step (the proportion round-trip isn't bit-exact, so a plain truncation could drop
-    // a step); the rest map straight across, already range-clamped by resolveLane.
-    cfg.osc1Octave   = juce::roundToInt(out[D_o1Oct]);
-    cfg.osc1Fine     = juce::roundToInt(out[D_o1Fine]);
-    cfg.osc1Pos      = out[D_o1Pos];
-    cfg.osc2Octave   = juce::roundToInt(out[D_o2Oct]);
-    cfg.osc2Fine     = juce::roundToInt(out[D_o2Fine]);
-    cfg.osc2Pos      = out[D_o2Pos];
-
-    // Pitch (semitones): a Stepped CS snaps the whole result to a semitone (melodies); a
-    // smooth source glides via a fractional offset on top of the exact integer base.
-    {
-        const float o1Base = (float) voicePtrs[(size_t) v].o1Semi->load();
-        const float o2Base = (float) voicePtrs[(size_t) v].o2Semi->load();
-        const bool  o1Stepped = getPattern(v).osc1SemiStepped.load(std::memory_order_relaxed);
-        const bool  o2Stepped = getPattern(v).osc2SemiStepped.load(std::memory_order_relaxed);
-        if (o1Stepped) { cfg.osc1Semi = juce::roundToInt(out[D_o1Semi]); cfg.osc1SemiMod = 0.0f; }
-        else           { cfg.osc1Semi = juce::roundToInt(o1Base);        cfg.osc1SemiMod = out[D_o1Semi] - o1Base; }
-        if (o2Stepped) { cfg.osc2Semi = juce::roundToInt(out[D_o2Semi]); cfg.osc2SemiMod = 0.0f; }
-        else           { cfg.osc2Semi = juce::roundToInt(o2Base);        cfg.osc2SemiMod = out[D_o2Semi] - o2Base; }
-    }
-    cfg.xmodIndex    = out[D_xmIndex] * 0.01f;   // param 0..100 → engine 0..1
-    cfg.xmodDepth    = out[D_xmDepth] * 0.01f;   // param -100..100 → engine -1..1
-    cfg.xmodSsbHz    = out[D_xmSsb];             // Hz (direct)
-    cfg.osc1LevelDb  = out[D_o1Lvl];
-    cfg.osc2LevelDb  = out[D_o2Lvl];
-    cfg.noiseLevelDb = out[D_nzLvl];
-    cfg.osc1PitchEnvDepth = out[D_o1Penv];
-    cfg.osc2PitchEnvDepth = out[D_o2Penv];
-    cfg.filterCutoff   = out[D_fCut];
-    cfg.filterRes      = out[D_fRes];
-    cfg.filterDrive    = out[D_fDrv];
-    cfg.filterLowCutHz = out[D_fLoCut];
-    cfg.filterEnvDepth = out[D_fEnv];
-    cfg.filter2Cutoff  = out[D_f2Cut];
-    cfg.filter2Res     = out[D_f2Res];
-    cfg.filter2Drive   = out[D_f2Drv];
-    cfg.filter2LowCutHz= out[D_f2LoCut];
-    cfg.filter2EnvDepth= out[D_f2Env];
-    cfg.levelDb        = out[D_level];
-
-    // Publish post-matrix values for the UI live-arc indicators (same units as the bound knobs:
-    // filter cutoff in Hz, xmod 0..100, levels in dB). Filter 2 + insert P1-4 are read by the
-    // audio path from `out` / modParamValues; the two filter-2 dests have no live-arc.
-    auto& snap = voiceSnap[(size_t) v];
-    snap[mu_tant::kTantSnapOsc1Octave] .store(out[D_o1Oct]);
-    snap[mu_tant::kTantSnapOsc1Semi]   .store(out[D_o1Semi]);
-    snap[mu_tant::kTantSnapOsc1Fine]   .store(out[D_o1Fine]);
-    snap[mu_tant::kTantSnapOsc1Pos]    .store(out[D_o1Pos]);
-    snap[mu_tant::kTantSnapOsc2Octave] .store(out[D_o2Oct]);
-    snap[mu_tant::kTantSnapOsc2Semi]   .store(out[D_o2Semi]);
-    snap[mu_tant::kTantSnapOsc2Fine]   .store(out[D_o2Fine]);
-    snap[mu_tant::kTantSnapOsc2Pos]    .store(out[D_o2Pos]);
-    snap[mu_tant::kTantSnapXModIndex]  .store(out[D_xmIndex]);
-    snap[mu_tant::kTantSnapXModDepth]  .store(out[D_xmDepth]);
-    snap[mu_tant::kTantSnapXModSsb]    .store(out[D_xmSsb]);
-    snap[mu_tant::kTantSnapOsc1Level]  .store(out[D_o1Lvl]);
-    snap[mu_tant::kTantSnapOsc2Level]  .store(out[D_o2Lvl]);
-    snap[mu_tant::kTantSnapNoiseLevel] .store(out[D_nzLvl]);
-    snap[mu_tant::kTantSnapFilterCutoff].store(out[D_fCut]);   // actual Hz
-    snap[mu_tant::kTantSnapFilterRes]  .store(out[D_fRes]);
-    snap[mu_tant::kTantSnapLevel]      .store(out[D_level]);
-    snap[mu_tant::kTantSnapInsP1]      .store(out[D_insP1]);
-    snap[mu_tant::kTantSnapInsP2]      .store(out[D_insP2]);
-    snap[mu_tant::kTantSnapInsP3]      .store(out[D_insP3]);
-    snap[mu_tant::kTantSnapInsP4]      .store(out[D_insP4]);
-}
-
-void PluginProcessor::applyFilterEnvelope(int v, VoiceConfig& cfg, int numSamples)
-{
-    // Filter pattern envelopes add to cfg.filterCutoff in proportion space.
-    // envelope value 0 → no change from base; 1 at depth=1 → fully open.
-    // Apply the same kMinAttackMs rise-limiting as the gate to prevent clicks
-    // when gate and filter envelopes are out of sync.
-    auto& fPat = getPattern(v).filterGate;
-    if (blkPlaying && fPat.hasEnvelopes.load(std::memory_order_relaxed))
-    {
-        // The filter cutoff is a per-BLOCK value, so the de-click slew (a per-sample
-        // rate from kMinAttackMs) must be scaled by the block length — otherwise the
-        // rising edge is limited ~blockSize× too slowly and a per-bar decay envelope
-        // never re-opens the filter (it would take seconds to reach its peak).
-        const float maxRise = (currentSampleRate > 0.0 && GatePattern::kMinAttackMs > 0.0f)
-                            ? (float) ((double) juce::jmax(1, numSamples)
-                                       / ((double) GatePattern::kMinAttackMs * 0.001 * currentSampleRate))
-                            : 1.0f;
-        if (mu_core::trySpinLock(fPat.editLock))
-        {
-            fPat.resetGateCache();
-            const float target   = fPat.gateAt(blkBeatStart, 0.0f);
-            // Slew-limit the filter envelope rising edge (same as gate)
-            fPat.filterLevel = (target > fPat.filterLevel)
-                             ? std::min(target, fPat.filterLevel + maxRise)
-                             : target;
-            const float depth    = juce::jlimit(-1.0f, 1.0f, cfg.filterEnvDepth);
-            const float baseProp = tantPropFromCutoff(cfg.filterCutoff);
-            // baseProp + depth*filterLevel: envelope adds on top of base cutoff.
-            //   depth=1, filterLevel=0 → baseProp (no change)
-            //   depth=1, filterLevel=1 → clamped to 1.0 (fully open)
-            //   depth=-1,filterLevel=1 → baseProp-1 (clamped toward 20 Hz)
-            const float modProp  = juce::jlimit(0.0f, 1.0f, baseProp + depth * fPat.filterLevel);
-            cfg.filterCutoff = juce::jlimit(20.0f, 20000.0f, tantCutoffFromProp(modProp));
-
-            // Apply the same envelope to Filter 2 with its own depth.
-            const float depth2   = juce::jlimit(-1.0f, 1.0f, cfg.filter2EnvDepth);
-            const float baseProp2 = tantPropFromCutoff(cfg.filter2Cutoff);
-            const float modProp2  = juce::jlimit(0.0f, 1.0f, baseProp2 + depth2 * fPat.filterLevel);
-            cfg.filter2Cutoff = juce::jlimit(20.0f, 20000.0f, tantCutoffFromProp(modProp2));
-
-            mu_core::spinUnlock(fPat.editLock);
-        }
-        // On lock contention: use un-modulated cutoffs (edit-time blip)
-    }
-    else if (!blkPlaying)
-    {
-        fPat.filterLevel = 1.0f;  // reset when stopped
-    }
-}
-
-void PluginProcessor::applyPitchEnvelope(int v, VoiceConfig& cfg)
-{
-    // Pitch pattern envelope value (0..1) × depth (±24 semitones) shifts
-    // osc1/osc2 pitch before VoiceEngine processes it this block.
-    auto& pPat = getPattern(v).pitchGate;
-    if (blkPlaying && pPat.hasEnvelopes.load(std::memory_order_relaxed))
-    {
-        if (mu_core::trySpinLock(pPat.editLock))
-        {
-            pPat.resetGateCache();
-            const float envLevel = pPat.gateAt(blkBeatStart, 0.0f);
-            // Depth comes from cfg (so it tracks any pitch-env-depth modulation applied
-            // in applyModulation), not the raw param.
-            const float d1 = cfg.osc1PitchEnvDepth;
-            const float d2 = cfg.osc2PitchEnvDepth;
-            // Fractional semitone offset — the envelope sweeps smoothly (no semitone stepping).
-            cfg.osc1SemiMod += d1 * envLevel;
-            cfg.osc2SemiMod += d2 * envLevel;
-            mu_core::spinUnlock(pPat.editLock);
-        }
-    }
-}
-
-// One voice's full chain into the channel buffer: modulation → engine → gate →
-// insert. Invoked by MixerEngine::processBlock (Phase 1) per active channel; the
-// mixer then applies the channel strip + master. Renders even muted/un-soloed
-// voices (the mixer mutes at the mix), matching mu-clid's render-then-mute model.
-void PluginProcessor::renderVoice(int v, juce::AudioBuffer<float>& buf, int numSamples)
-{
-    VoiceConfig cfg = readConfig(v);
-    applyModulation(v, cfg);
-    applyFilterEnvelope(v, cfg, numSamples);
-    applyPitchEnvelope(v, cfg);
-
-    // Note mode pitch-track: transpose the voice so its tonal centre lands on the held
-    // MIDI note. Free-mode centre = root + 12*kBaseOctave (octave 0, root → C3), so the
-    // offset is held - that centre; scale intervals + per-osc oct/semi/fine still apply.
-    if (midiNoteMode.load(std::memory_order_relaxed) == 1 && noteCurrentMidi >= 0)
-        cfg.pitchOffsetSemis = (float) (noteCurrentMidi - (cfg.root + 12 * kBaseOctave));
-
-    buf.clear();
-    voices[(size_t) v]->setConfig(cfg);
-    voices[(size_t) v]->process(buf, numSamples);
-
-    // The per-voice gater shapes the (post-filter) voice output:
-    //   bypassed             → raw drone passes (audition / configure)
-    //   stopped              → silence (gate closed — nothing audible on load)
-    //   playing, no envelopes→ silence (nothing drawn → nothing passes)
-    //   playing, envelopes   → per-sample envelope gate
-    // See applyGateBlock — the audio path + the audio test harness share it.
-    const auto& vp = voicePtrs[(size_t) v];
-    const float gateGap    = vp.gateGap->load() * 0.01f;   // 0..100% → 0..1
-    const bool  gateBypass = vp.gateBypass->load() > 0.5f;
-    float* gl = buf.getWritePointer(0);
-    float* gr = buf.getNumChannels() > 1 ? buf.getWritePointer(1) : nullptr;
-    applyGateBlock(getPattern(v).gate, gl, gr, numSamples, gateGap, gateBypass,
-                   blkPlaying, blkBeatStart, blkBeatsPerSample, currentSampleRate);
-
-    // Use modulated insert param values (modulation may have adjusted them).
-    VoiceParams ip;
-    ip.insertAlgo     = (int) vp.drvChar->load();
-    ip.insertParam[0] = juce::jlimit(0.0f, 1.0f, modParamValues["insert.p1"]);
-    ip.insertParam[1] = juce::jlimit(0.0f, 1.0f, modParamValues["insert.p2"]);
-    ip.insertParam[2] = juce::jlimit(0.0f, 1.0f, modParamValues["insert.p3"]);
-    ip.insertParam[3] = juce::jlimit(0.0f, 1.0f, modParamValues["insert.p4"]);
-    getPattern(v).insert->process(buf, numSamples, buf.getNumChannels(), ip);
-
-    // Feed the sidebar spectrum glyph — capture post-insert audio on the audio thread.
-    getPattern(v).ring.write(buf, numSamples);
-}
-
-void PluginProcessor::renderRetiringVoice(int v, juce::AudioBuffer<float>& buf, int numSamples)
-{
-    auto& r = retiring[(size_t) v];
-    const int left = r.samplesLeft.load(std::memory_order_acquire);
-    if (left <= 0) { buf.clear(); return; }
-
-    // Render the OLD voice (snapshot config) through its still-intact engine — same
-    // oscillators + filter state as the instant before the swap, so the tail is faithful.
-    buf.clear();
-    voices[(size_t) v]->setConfig(r.config);
-    voices[(size_t) v]->process(buf, numSamples);
-
-    // Falling linear gain across the retire window: gain at sample i = (left - i) * gainStep,
-    // clamped ≥ 0 so the slot is silent once the countdown is spent.
-    for (int ch = 0; ch < buf.getNumChannels(); ++ch)
-    {
-        float* d = buf.getWritePointer(ch);
-        for (int i = 0; i < numSamples; ++i)
-            d[i] *= juce::jmax(0.0f, (float) (left - i) * r.gainStep);
-    }
-
-    // Run the OLD insert (snapshot algo + params) so an effect tail the new preset
-    // drops still fades out instead of vanishing at the swap instant.
-    VoiceParams ip;
-    ip.insertAlgo     = r.insAlgo;
-    ip.insertParam[0] = r.insP[0];
-    ip.insertParam[1] = r.insP[1];
-    ip.insertParam[2] = r.insP[2];
-    ip.insertParam[3] = r.insP[3];
-    getPattern(v).insert->process(buf, numSamples, buf.getNumChannels(), ip);
-
-    r.samplesLeft.store(juce::jmax(0, left - numSamples), std::memory_order_release);
 }
 
 void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
@@ -677,15 +197,16 @@ std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
     // The insert allocates its delay lines here, off the audio thread and outside any lock; the
     // per-slot noise seed makes layers not share one sequence.
     p->insert->setSlotIndex(slot);
-    p->prepare(currentSampleRate, currentBlockSize);
+    p->prepare(currentSampleRate.load(std::memory_order_relaxed), currentBlockSize.load(std::memory_order_relaxed));
     p->bindParams(apvts, slot);
     p->initNoteMode(midiNoteMode.load(std::memory_order_relaxed));   // its held keys come from seedInputState
     return p;
 }
 
-// Slots whose Pattern changed lose the previous tenant's filter, oscillator-modulation and insert
-// memory (the insert travels with its Pattern, so it is re-seeded for the new slot and cleared), any fade-out tail and the live-arc snapshot; the mixer strip and its ducking envelope are
-// reset by the edit itself. Allocation-free resets only.
+// Slots whose Pattern changed lose the previous tenant's filter, oscillator-modulation and insert memory (the
+// slot's engine stays and is reset and re-seeded; the insert travels with its Pattern, so it is re-seeded for the
+// new slot and cleared), any fade-out tail and the live-arc snapshot; the mixer strip and its ducking envelope are
+// reset by the edit itself. Under layersLock with processing suspended: allocation-free resets only.
 void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
 {
     for (int d = juce::jmax(0, firstIndex); d <= juce::jmin(lastIndex, mu_limits::kMaxLayers - 1); ++d)
@@ -694,11 +215,9 @@ void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
         auto& ins = *getPattern(d).insert;   // the Pattern now in slot d brings its own insert along
         ins.setSlotIndex(d);
         ins.reset();
-        retiring[(size_t) d].samplesLeft.store(0, std::memory_order_relaxed);
-        for (auto& v : voiceSnap[d]) v.store(0.0f, std::memory_order_relaxed);
-        // The shared driver's equivalents: the slot's in-place fade is cut (the old zeroed countdown above; the
-        // bin's lock nests inside layersLock), the live-arc values belong to the slot left, and a Pattern built
-        // after the constructor takes the held keys the others heard.
+        // The slot's in-place fade is cut (the bin's lock nests inside layersLock: order layersLock, binMutex), the
+        // live-arc values belong to the slot left, and a Pattern built after the constructor takes the held keys
+        // the others heard.
         retireBin.cutSlot(d);
         auto& pat = getPattern(d);
         pat.resetSlotState();
@@ -777,7 +296,7 @@ void PluginProcessor::setMidiNoteMode(int mode)
     if (appSettings != nullptr) { appSettings->setValue("midiNoteMode", mode); appSettings->saveIfNeeded(); }
 }
 
-// ── Note mode (gate + pitch-track) ───────────────────────────────────────────
+// ── Note mode: the final-mix gate (decision A3; the pitch track is each Pattern's) ──
 // Audio-thread-only: scanNoteMode + applyNoteModeGate both run within processBlock
 // on one thread, so the held-note stack + ramp state need no synchronisation.
 
@@ -789,46 +308,22 @@ void PluginProcessor::scanNoteMode(const juce::MidiBuffer& midi)
     // state (e.g. Free wouldn't get stuck silent, Note wouldn't open from a phantom note).
     if (mode != lastNoteMode)
     {
-        numHeldNotes    = 0;
-        noteCurrentMidi = -1;
-        noteGateGain    = (mode == 1) ? 0.0f : 1.0f;
-        lastNoteMode    = mode;
+        gateNotes.clear();
+        noteGateGain = (mode == 1) ? 0.0f : 1.0f;
+        lastNoteMode = mode;
     }
 
     if (mode != 1)
         return;
 
-    // Maintain a last-note-priority held-note stack: a Note On pushes (de-duped), a
-    // Note Off removes; the stack top is the sounding pitch. Stack capped at 16 held
-    // notes — beyond that the oldest is dropped (silently) to keep the array bounded.
+    // The keys of the whole host block, rendered or not (a block an edit silences still opens or closes the
+    // gate): a Note On pushes, a Note Off removes (HeldNoteStack, the same rule each Pattern applies).
     for (const auto meta : midi)
     {
         const auto msg = meta.getMessage();
-        if (msg.isNoteOn())
-        {
-            const int note = msg.getNoteNumber();
-            for (int i = 0; i < numHeldNotes; ++i)        // de-dupe a re-pressed note
-                if (heldNotes[(size_t) i] == note) { --numHeldNotes;
-                    for (int j = i; j < numHeldNotes; ++j) heldNotes[(size_t) j] = heldNotes[(size_t) j + 1];
-                    break; }
-            if (numHeldNotes == (int) heldNotes.size())   // full → drop the oldest
-            {
-                for (int j = 0; j + 1 < numHeldNotes; ++j) heldNotes[(size_t) j] = heldNotes[(size_t) j + 1];
-                --numHeldNotes;
-            }
-            heldNotes[(size_t) numHeldNotes++] = note;
-        }
-        else if (msg.isNoteOff())
-        {
-            const int note = msg.getNoteNumber();
-            for (int i = 0; i < numHeldNotes; ++i)
-                if (heldNotes[(size_t) i] == note) { --numHeldNotes;
-                    for (int j = i; j < numHeldNotes; ++j) heldNotes[(size_t) j] = heldNotes[(size_t) j + 1];
-                    break; }
-        }
+        if (msg.isNoteOn())       gateNotes.noteOn(msg.getNoteNumber());
+        else if (msg.isNoteOff()) gateNotes.noteOff(msg.getNoteNumber());
     }
-
-    noteCurrentMidi = numHeldNotes > 0 ? heldNotes[(size_t) (numHeldNotes - 1)] : -1;
 }
 
 void PluginProcessor::applyNoteModeGate(juce::AudioBuffer<float>& buffer, int numSamples)
@@ -838,9 +333,9 @@ void PluginProcessor::applyNoteModeGate(juce::AudioBuffer<float>& buffer, int nu
 
     // Linear amplitude ramp toward 1 (a note held) or 0 (all released), reaching the
     // target over ~8 ms so the held→silent edge fades instead of clicking.
-    const float target   = numHeldNotes > 0 ? 1.0f : 0.0f;
+    const float target   = gateNotes.numHeld() > 0 ? 1.0f : 0.0f;
     const float fadeSecs  = 0.008f;
-    const float gainStep = 1.0f / (float) juce::jmax(1.0, fadeSecs * currentSampleRate);
+    const float gainStep = 1.0f / (float) juce::jmax(1.0, fadeSecs * currentSampleRate.load(std::memory_order_relaxed));
 
     float* l = buffer.getWritePointer(0);
     float* r = buffer.getNumChannels() > 1 ? buffer.getWritePointer(1) : nullptr;
