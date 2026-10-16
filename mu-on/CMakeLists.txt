@@ -149,7 +149,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/ProcessorSeamTests.cpp  # the real PluginProcessor, headless (layer ownership)
     Source/Tests/FrozenBaselineTests.cpp   # frozen parameter manifest + compat corpus on the real processor
     Source/Tests/PrefixMigrationTests.cpp   # data saved before the k/b/h/s/r -> t{N} id-prefix rename still loads
-    Source/Tests/GrooveVoicesTests.cpp   # renderAll block sizes, the Rumble's tail handling
+    Source/Tests/TrackRenderTests.cpp   # Track::render: every engine, the Rumble's peer source, the engine swap, the Rumble's tail
     Source/Tests/EngineMigrationTests.cpp   # five-lane states and track presets load as engine-qualified layers
     Source/Tests/ClipLaunchTests.cpp   # clip store / launch on the real processor
     Source/Tests/ModArcTests.cpp   # every mod target publishes its live value for the knob arcs

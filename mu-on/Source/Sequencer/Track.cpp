@@ -8,7 +8,7 @@
 #include <limits>
 
 // The Track layer's half of the render contract: the parameter binding and the per-block render that used to
-// be mu-On's processor glue (GrooveVoices: engine ownership, modulation resolve, trigger, render).
+// be mu-On's processor glue (the former GrooveVoices: engine ownership, modulation resolve, trigger, render).
 // docs/mu-tronic/design.md 2.1.
 namespace mu_on
 {

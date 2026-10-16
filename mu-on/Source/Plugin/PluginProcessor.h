@@ -6,7 +6,6 @@
 #include "Persistence/TrackParams.h"
 #include "Sequencer/StepPattern.h"
 #include "Sequencer/GrooveSequencer.h"   // StepClock, the playhead step
-#include "Audio/GrooveVoices.h"
 #include "Sequencer/Track.h"
 #include "UI/TrackHost.h"   // what the Track layer's UI reads from its host
 
@@ -103,11 +102,8 @@ public:
 
     // Post-matrix value of modulation target `dest` (a row of `engine`'s table) on track `i`, in the
     // target knob's parameter units; NaN while the track runs another engine. Written each block by
-    // GrooveVoices; read by the knobs' live arcs.
-    float getModLive(int i, EngineType engine, int dest) const noexcept override
-    {
-        return usesLayerRender() ? getTrack(i).getModLive(engine, dest) : grooveVoices.getModLive(i, engine, dest);
-    }
+    // the track; read by the knobs' live arcs.
+    float getModLive(int i, EngineType engine, int dest) const noexcept override { return getTrack(i).getModLive(engine, dest); }
 
     // Switch track `i` to `engine`: every engine keeps its settings on the track, the step row and
     // envelope stay, and the track's modulation assignments that target another engine's parameters
@@ -191,15 +187,9 @@ private:
     juce::ValueTree     toLayerState(const juce::ValueTree& tree) const;
     void                applyStateTree(const juce::ValueTree& state);
 
-    // Per-channel render hook handed to the shared MixerEngine — copies each track's block, rendered by
-    // GrooveVoices::renderAll before the mixer runs.
-    MixerEngine::RenderChannelFn renderChannelCb;
-
     // The 909 grid as a view over the tracks' rows (the editor and the tests address rows by slot); each
     // track clocks its own row.
     StepPattern     stepPattern;
-    std::unique_ptr<GrooveVoices> grooveVoicesStore = std::make_unique<GrooveVoices>();   // every track slot's engines (large: kept off the stack)
-    GrooveVoices&   grooveVoices = *grooveVoicesStore;
 
     // Cached APVTS pointers for the product sequencer params and each track's engine choice.
     std::atomic<float>* seqSwingParam  = nullptr;
@@ -208,7 +198,6 @@ private:
 
     double currentSampleRate = 44100.0;
     int    currentBlockSize  = 512;
-    bool   wasPlaying = false;   // audio-thread only — detects the play→stop edge to silence voices
 
     // Hot-swap: parsed preset trees per track + one full preset, committed at the pattern wrap.
     void applyTrackTree(int track, const juce::ValueTree& tree);

@@ -1,8 +1,6 @@
 #include "Plugin/PluginProcessor.h"
-#include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 #include "License/LicenseKey.h"
-#include "Plugin/HostTransport.h"          // mu-core: DAW / mu-link transport read
 #include "Modulation/MuOnModDest.h"
 #include "Modulation/ModulatorSerialise.h"   // mu-core: shared modulator (de)serialise
 
@@ -53,15 +51,9 @@ PluginProcessor::PluginProcessor()
     getTrack(0).row.loadDefaultGroove(EngineType::Kick);   // ...with the four-on-the-floor row
     unsavedLayerCount = kNumLegacyLanes;                   // a state saved before layers were variable held five lanes
 
-    // Each track renders its engine into its own buffer first (GrooveVoices::renderAll, so a Rumble
-    // finds its source already rendered); the hook hands the block to the shared mixer, which applies
-    // the strip and the master mix.
-    renderChannelCb = [this](int ch, juce::AudioBuffer<float>& buf, int n) { grooveVoices.copyOut(ch, buf, n); };
-
     seqSwingParam  = apvts.getRawParameterValue("seq_swing");
     seqAccentParam = apvts.getRawParameterValue("seq_accent");
     for (int i = 0; i < mu_limits::kMaxLayers; ++i) engineParam[(size_t) i] = apvts.getRawParameterValue(layerParamId(i, "eng"));
-    grooveVoices.cacheParams(apvts);
 
     // Each track holds exactly one engine, the one its `t{N}_eng` parameter names: a change of that parameter
     // builds the new engine (message thread) and swaps it into the track.
@@ -130,103 +122,26 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
     // Every slot's Track (its engine and buffers), spares included, and the shared driver's buffers.
     prepareLayerRender(sampleRate, samplesPerBlock);
-
-    // The processor's own chain: every slot's engines, spares included; under the layers lock because the
-    // audio thread reads them.
-    const juce::ScopedLock sl(layersLock);
-    grooveVoices.prepare(sampleRate, samplesPerBlock);
 }
 
 void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
 
-    // The shared block driver over Track::render (the layer contract), behind the test switch until the
-    // equivalence gate passes; the processor's own chain below is the default for this commit only.
-    if (usesLayerRender())
-    {
-        queueMidiProgramChanges(midiMessages);
-        const auto t = resolveBlockTransport(midiMessages, buffer.getNumSamples());
-        renderAndMix(buffer, midiMessages, t);
-        flagLayerSwapBoundaries(t);
-        return;
-    }
-
-    const int numSamples = buffer.getNumSamples();
-
-    // Preserve the DAW sidechain, then clear (shared — the SC input bus shares buffer
-    // channels with the output, so a bare clear would wipe it).
-    captureSidechainAndClear(buffer);
-
-    // MIDI program change → preset load: queue matching PCs (Ch 1-8 track, Ch 9 full) for
-    // runDeferredWork to load on the message thread.
+    // MIDI program change → preset load: queue matching PCs (Ch 1-8 track, Ch 9 full) for runDeferredWork
+    // to load on the message thread.
     queueMidiProgramChanges(midiMessages);
 
-    // This block's transport — the family rule (mu-core TransportResolver): the host / mu-link
-    // position, else (standalone) external MIDI clock, else the own transport.
-    const double midiClockBeat = midiClockSync.process(midiMessages, numSamples, currentSampleRate);
-    const auto   transport     = mu_core::resolveTransport(pollHostTransport(),
-                                                           wrapperType == wrapperType_Standalone,
-                                                           midiClockSync, midiClockBeat,
-                                                           { internalPlaying, internalBpm, internalBeatPos, &nudgePhaseBeats, &nudgeDirection, &appliedSyncOffsetBeats },
-                                                           numSamples, currentSampleRate, 0.0, getSyncOffsetMs());
-    noteBlockTransport(transport);   // lets the next block's quantised control actions find the beat
-    const double bpm       = transport.bpm;
-    const double beatStart = transport.startBeat;
-    const bool   isPlaying = transport.playing;
+    // This block's transport by the family rule (the host / mu-link position, else external MIDI clock, else
+    // the own transport), then the shared block driver: one try-lock of the layers, the tracks in priority order
+    // (every non-Rumble track, then the Rumbles, which read their source's block), the mixer (strip, sidechain,
+    // FX, master). A block the driver cannot render (an edit in flight, a missed lock) is silent.
+    const auto t = resolveBlockTransport(midiMessages, buffer.getNumSamples());
+    renderAndMix(buffer, midiMessages, t);
 
-    // Everything that touches the tracks or their engines runs under a try-lock against a structural
-    // edit moving the Track pointers (the message thread holds layersLock for those); on contention, or
-    // while an edit is still moving parameter values, the block is left silent: a sub-ms gap during an edit.
-    {
-        const juce::ScopedTryLock layersTryLock(layersLock);
-        if (layersTryLock.isLocked() && ! layerEditInFlight.load(std::memory_order_acquire))
-        {
-            // This block's live tracks: the pointers are taken here and never kept past the block.
-            const int numActive = numLayers.load(std::memory_order_relaxed);
-            std::array<Track*, mu_limits::kMaxLayers> tracks {};
-            for (int i = 0; i < numActive; ++i) tracks[(size_t) i] = &getTrack(i);
-            grooveVoices.beginBlock(tracks.data(), numActive);
-
-            // The global Swing / Accent seed every row's groove (the grid is still global).
-            seedRowGrooves();
-
-            // Refresh engine params from the APVTS, then clock the 909 sequencer for this block
-            // (before the render so a step's engine is armed for this same block). Each fired track
-            // triggers its engine and bumps a counter the editor polls to pulse the sidebar.
-            grooveVoices.applyParams(beatStart, bpm);
-            // Stop edge: silence the voices so a sustaining bass (no note-off yet) doesn't drone on.
-            if (wasPlaying && ! isPlaying) grooveVoices.reset();
-            wasPlaying = isPlaying;
-            // Every track clocks its own row with its own swing and accent, at the block's beat (the same
-            // arithmetic the grid clock had, so the rows fire as before). Spare tracks' clocks keep step too, so
-            // a track that goes live fires on time; only the live rows trigger.
-            if (isPlaying)
-                for (int i = 0; i < mu_limits::kMaxLayers; ++i)
-                {
-                    auto& t = getTrack(i);
-                    const bool live = i < numActive;
-                    t.clock.processSpan(t.row, beatStart, numSamples, transport.beatsPerSample,
-                                        t.row.swingAmount(), t.row.accentVelocity(),
-                                        [this, &t, i, live](float vel, int off)
-                                        {
-                                            if (! live || engineOf(i) == EngineType::Rumble) return;   // a Rumble track does not step
-                                            grooveVoices.trigger(i, vel, off);
-                                            t.triggers.fetch_add(1, std::memory_order_relaxed);
-                                        });
-                }
-
-            // Render the engines (Rumble last) → mixer through the shared path (engine→insert→mixer).
-            grooveVoices.renderAll(numSamples);
-            processCoreBlock(buffer, nullptr, numActive, numSamples, bpm,
-                             nullptr, nullptr, nullptr, &renderChannelCb);
-        }
-    }
-
-    // Hot-swap: flag staged presets whose pattern wrap (one bar) passed in this block, or the
-    // transport stopped. When the beat comes from outside, the next block's start stands in for
-    // this block's end, so the block's own span is estimated from the tempo.
-    flagSwapBoundaries(isPlaying, beatStart, transport.beatsPerSample * (double) numSamples);
+    // Hot-swap: flag the staged presets whose bar line (each track's loopBeats, 4) passed in this block, or the
+    // transport stopped.
+    flagLayerSwapBoundaries(t);
 }
 
 // ── Dynamic track management ─────────────────────────────────────────────────
@@ -256,15 +171,15 @@ void PluginProcessor::seedRowGrooves() noexcept
     for (int i = 0; i < mu_limits::kMaxLayers; ++i) seedRowGroove(getTrack(i).row);
 }
 
-// Slots whose Track changed lose the previous tenant's voices and tails (the engines belong to the
-// slot, not the Track), and the pattern is re-pointed at each slot's current Track row. The mixer strip
-// and its ducking envelope are reset by the edit itself. Allocation-free resets only.
+// A track that moved to another slot starts there from silence, its engine as freshly prepared (as each
+// slot's first tenant did when the engines belonged to the slot), and the pattern view is re-pointed at each
+// slot's current Track row. The mixer strip and its ducking envelope are reset by the edit itself.
+// Under layersLock: allocation-free resets only.
 void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
 {
     for (int d = juce::jmax(0, firstIndex); d <= juce::jmin(lastIndex, mu_limits::kMaxLayers - 1); ++d)
     {
-        grooveVoices.resetSlot(d);
-        getTrack(d).resetEngineToPrepared();   // the track's own engine starts in its new slot as a fresh one
+        getTrack(d).resetEngineToPrepared();
         stepPattern.bind(d, &getTrack(d).row);
     }
 }
