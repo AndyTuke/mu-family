@@ -124,6 +124,8 @@ edits](design-plugin-family.md#layer-ownership-and-structural-edits--family-stan
 - `mu-core` uses `mu_core`, `mu_ui`, `mu_audio`, `mu_mod`, `mu_pp`, `mu_link`, … by area. The ~130
   `mu-core` types that are still global (filters, UI components) are left alone for now.
 - `createPluginFilter()` stays global (JUCE requires it).
+- Shared test helpers in `mu-core/Tests/` (headers products' tests include) use a topic namespace `mu_<topic>`: `mu_golden`, `mu_alloc`,
+  `mu_contract_test`, `mu_layer_equiv` (ruled 2026-10-16, as they already are), never `mu_core`, so test code cannot be mistaken for the shipped core.
 - `using namespace juce;` only at function scope in a `.cpp`, never in a header.
 
 ### Class-name roles
@@ -165,6 +167,11 @@ names. They are modal pop-ups, not `OverlayHost` screens, so the `Overlay` role 
   its names follow the standard (file = class, `mu_core` namespace, neutral terms, no product names).
   Remark: the struct `mu_core::Mapping` in `MidiControlMap.h` is too generic for a namespace shared by
   the whole core; rename it `MidiMapping` the next time that file is touched.
+- **Layer side and processor side inside `mu-core` (ruled 2026-10-16):** `mu-core`'s `Audio/ Modulation/ Persistence/ Sequencer/` never include a
+  `Plugin/` header. They are what a layer type may include, and the layer-library rule above ("no `Plugin/` include") must hold through them too. What only the
+  processor owns and runs goes in `Plugin/`: `LayerBlock.h`, `AudioEpoch.h`, `RetireBin.h`, `ProcessorBase_Render.cpp`. What a layer implements goes in
+  `Sequencer/`: `Layer.h`, `RetireTail.h`, `RenderContext.h`, `BeatWrap.h`, `LayerTypeInfo.h`. E1 built `RetireBin.h` under `Sequencer/`; it moves to
+  `Plugin/` before E2 (the one current exception).
 - `mu-control/` (ruled 2026-10-13; namespace `mu_control`, device helpers nest as `mu_control::launchpadx`) has folders by role, none of which may repeat a
   `mu-core` path: `Surface, Driver, Devices/<Device>, Manager, Tests`. Full list and file names in
   [design-plugin-family.md, Controller library](design-plugin-family.md#controller-library-mu-control--family-standard-ruled-2026-10-13-backlog-1276).
@@ -176,7 +183,8 @@ names. They are modal pop-ups, not `OverlayHost` screens, so the `Overlay` role 
   with; `UI/` holds only what the editor composes (panels, overlays, sidebars, `LiteEditor`-style
   secondary editors). A product with no panels of its own keeps `UI/` empty with a `.gitkeep`.
 - The processor splits as `PluginProcessor_<Aspect>.cpp` with a fixed aspect set:
-  `APVTS`, `Preset`, `Modulation`, `Content`.
+  `APVTS`, `Preset`, `Modulation`, `Content`. `mu-core`'s `ProcessorBase` splits the same way, as `ProcessorBase_<Aspect>.cpp`; its one aspect so far is
+  `Render` (the layer render contract's block driver, 2026-10-16).
 
 ### Identifiers
 - Members: **no suffix** (`proc`, `sampleRate`). No `m_`, no trailing `_`.
