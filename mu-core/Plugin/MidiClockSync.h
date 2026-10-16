@@ -70,6 +70,10 @@ public:
         if (!enabled.load(std::memory_order_relaxed))
         {
             wasEnabled = lost = haveAnchor = false;
+            // setEnabled(false) clears these on the message thread, but a block already inside the pulse
+            // loop can store them again afterwards; clearing here too keeps a stale tempo or play flag out.
+            bpmEst.store(0.0);
+            playing.store(false);
             clockState.store((int) ClockState::Off, std::memory_order_relaxed);
             return 0.0;
         }
