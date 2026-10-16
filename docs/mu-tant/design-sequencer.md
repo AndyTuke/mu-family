@@ -117,8 +117,8 @@ envelope.
 
 ## Audio-thread contract
 
-The gate stage runs in `PluginProcessor::processBlock` between the per-voice
-render and the pan/sum, per sample:
+The gate stage runs inside `Pattern::render` (the layer's block: modulation, engine,
+gate, insert) before the shared mixer's pan/sum, per sample:
 
 1. Compute the pattern's position from the internal transport (musical beats,
    modulo 2 bars).

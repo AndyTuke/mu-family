@@ -890,7 +890,7 @@ None of the twelve blocks E1. The pins (P) and measurements (M) named here are l
 2. **Single reader:** E1 codes N4 (read-modify-write parity, sticky reclaim-off, 2.1.2). Before E4, M2: Debug pluginval for VST3, CLAP and Standalone with the
    assert, plus an offline bounce while playing in Reaper and Bitwig.
 3. **mu-Tant shrink then regrow:** today has a latent bug (the stale tail stays armed; on the next shrink the arm is skipped, so the old snapshot resumes). The
-   bin's cut (2.1.3, R1) is accepted as the fix, with a signed golden update at E4.6 after pin P1.
+   bin's cut (2.1.3, R1) is accepted as the fix, with a signed golden update at E4.6 after pin P1. **As built (2.1.10 point 6):** E4 kept the stale tail behind `setRegrowCutsInPlaceTails(false)`; the golden update and the removal of the opt-out are a later signed commit.
 4. **mu-Clid output after drain:** Karplus inserts can ring for minutes. "Stop at Done" is accepted, with a signed golden update at E5.4d if pin P2 shows
    non-zero samples after `isFullyDrained()`.
 5. **C11 placement:** accepted with N7 (each product keeps its own top-of-`processBlock` `ScopedNoDenormals`, 2.1.1).
@@ -972,7 +972,7 @@ Branch `e2-toni` (E2.1 to E2.6, a C12 fix and the P7 goldens). Rulings of the `a
 | 2 | `MU_TONI_LAYER_UI_SOURCES` CMake list instead of a second target | **Accept** as the family convention (2.5) |
 | 3 | `check-layer-boundary.ps1` and its fixtures find a library declared in a product's `CMakeLists.txt` | **Accept.** 2.5 always said the product's own `CMakeLists.txt` defines the target and that no folder moves; the checker's root-level `mu-*-layer/` scan was the stale part. Both forms stay supported (the fixtures cover each) |
 | 4a | `HeldNotes.h` in `mu-toni/Source/Sequencer/`, not `mu-core` | **Accept.** One consumer; the second-product rule says it moves to `mu-core` (`Sequencer/`) when mu-Tronic or another product needs it for a second type, and mu-Toni's design says the same. Namespace `mu_toni` |
-| 4b | `ParamText.h` moved `Plugin/` to `Persistence/` in `mu-core` | **Accept:** a type's parameter table uses it and a library file may not include `Plugin/`. **Forwarding header: keep, transitionally.** `mu-core/Plugin/ParamText.h` forwards for mu-Clid's and mu-Tant's `PluginProcessor_APVTS.cpp` (live products, not touched before their release) and is deleted in E4.1 / E5.1, when those files move to `Persistence/` and change their include. `MixerFxParams.h` (mu-core) includes `Persistence/ParamText.h` directly now (code change owed on this branch) |
+| 4b | `ParamText.h` moved `Plugin/` to `Persistence/` in `mu-core` | **Accept:** a type's parameter table uses it and a library file may not include `Plugin/`. **Forwarding header: keep, transitionally.** `mu-core/Plugin/ParamText.h` forwards for mu-Clid's and mu-Tant's `PluginProcessor_APVTS.cpp` (live products, not touched before their release) and is deleted in E4.1 / E5.1, when those files move to `Persistence/` and change their include (mu-Tant's did at E4.1; mu-Clid's remains, so the header goes at E5.1). `MixerFxParams.h` (mu-core) includes `Persistence/ParamText.h` directly now (code change owed on this branch) |
 | 4c | `Persistence/ArpParams.{h,cpp}`, `Persistence/LayerParamIds.h` | **Accept** (2.3). Minor: the struct `ArpParams` in `Sequencer/ArpSequencer.h` shares the name; rename it `ArpPoolParams` at the next Toni touch |
 | 4d | `Audio/Scales.h` to `Audio/ToniScales.h` | **Accept**, done (2.5 rule 1) |
 | 5 | Four `mu-core` additions, below | **Accept** with the contract text below |
@@ -991,7 +991,7 @@ Branch `e2-toni` (E2.1 to E2.6, a C12 fix and the P7 goldens). Rulings of the `a
 2. *The base always sends `channelMask` 0xFFFF.* The field is per-layer in the contract; the base must fill it per slot from one shared per-layer setting (`LayerSettings::midiChannel`, state saved with the layer) at T8a. Until then mu-Toni filters by its own `midiInCh` parameter, which becomes that shared setting's source at T8a; **from then on a layer must not filter a second time** (mask in the context only). The Omni default reproduces today.
 3. *Skipped-block MIDI was dropped by the base.* Resolved by `setCarrySkippedMidi`; the default stays off so mu-Clid, mu-Tant and mu-On keep their pinned behaviour.
 
-**For the next products:** E3 (mu-On) needs none of 1 and 2; E4 (mu-Tant) and E5 (mu-Clid) keep `setCarrySkippedMidi` off unless a layer keeps input state.
+**For the next products:** E3 (mu-On) needs none of 1 and 2; E4 (mu-Tant) and E5 (mu-Clid) keep `setCarrySkippedMidi` off unless a layer keeps input state (mu-Tant's Pattern keeps its held keys, so mu-Tant turned it on, 2.1.10 point 5).
 
 #### 2.1.9 E3 as built: mu-On on the shared layer contract (2026-10-16)
 
@@ -1062,6 +1062,78 @@ after `engineLocked` and the engine parameter are set, and (for a locked track t
 its `engineParamChanged` listener is now only a safety net for the all-five policy. A generic message-thread service hook on `Layer` is the shape
 if mu-Tronic would otherwise copy that listener; decided at T1.
 
+#### 2.1.10 E4 as built: mu-Tant on the shared layer contract (2026-10-16)
+
+Branch `e4-tant` (E4.1 to E4.7 as nine commits, a contract commit, a C12 fix, the C3 twin test and the P7 goldens). mu-Tant is now a `Pattern : Layer` that renders only
+through `renderAndMix`; the processor-side render chain, `retiring[]` and the per-slot config tables are gone. `check-layer-boundary.ps1` passes with three layer
+libraries (Toni, On, Tant). Rulings of the `architecture-steward`, applying the E2 and E3 standards (2.1.8, 2.1.9):
+
+| # | As built | Ruling |
+|---|---|---|
+| 1 | `UI/PatternHost.h` (`mu_tant::PatternHost`); `PatternContent(ProcessorBase&, PatternHost&)`, `ProcessorBase` forward-declared; methods `getPatternParameters`, `getPatternLayer`, `getPatternModLive`, `getPatternInsertGainReduction`, `isPatternTransportPlaying`, `getPatternTransportBeat`, the five wavetable calls, `resolvePatternWavetable`, `getPatternEngine`, `getPatternBankLock` | **Accept.** The type name is in every method (2.1.8 row 1). The interface carries two bind-time resources (engine, bank lock) beside the UI reads; that is right, because a host that implements `PatternHost` is the one place that supplies everything a Pattern needs from outside (2.2). `Pattern::host` is an `OwnerLink<PatternHost>`. Contract on the two bind-time calls: below (row 3) |
+| 2 | `mu-tant-layer` INTERFACE target in `mu-tant/CMakeLists.txt` (`Persistence/PatternParams.cpp`, `Sequencer/Pattern.cpp`, `Sequencer/GatePattern.cpp`, `Audio/SynthVoice.cpp`); `MU_TANT_LAYER_UI_SOURCES` (`PatternContent.cpp`, `GatingDesigner.cpp`); `mu-tant-layer-tests` (library, mu-core layer-side sources and one test, no `Plugin/` source; the stream hashed through the real processor and through hand-built contexts equal); `Audio/Scales.h` to `Audio/TantScales.h`; `Persistence/PatternParams.{h,cpp}` (`addLayerParams`, `addPatternGlobalParams`, the `v{N}_` helpers, `kRootParamId`, `kScaleParamId`); registered in the checker by declaring the library | **Accept** as the 2.5 family shape. The `v` letter and ids are unchanged (saved data, design-naming section 3). `PatternParams.h` holds the id helpers as mu-On's `TrackParams.h` does (Toni keeps them in `LayerParamIds.h`; both stand). `ParamText.h` moved to `Persistence/` for mu-Tant at E4.1 as 2.1.8 row 4b said; the forwarding header in `mu-core/Plugin/` now has one user left (mu-Clid's `PluginProcessor_APVTS.cpp`) and is deleted at E5.1 |
+| 2b | `check-layer-boundary.ps1` rule 5 skips a function named `renderPlaysByDefault` | **Accept.** It is the `StandaloneShell` virtual (`mu-core/Plugin/StandaloneShell.h`) that tells `--render` whether to start the transport: app policy in the shell, not per-layer render glue, and mu-Tant's `StandaloneApp.cpp` is the first product to override it. An exact-name list (`$shellRenderHooks`) is the right shape: a new shell hook is one added name, never a pattern. **Code change owed (test-steward and the coder):** the rule 5 paragraph in the script header names the list; `test-check-layer-boundary.ps1` gets one fixture where the hook passes and one where a real `renderVoice` definition still fails |
+| 3 | The engine stays per **slot** and processor-owned (`voices[slot]`); a Pattern reaches it through `PatternHost::getPatternEngine(slot)` at `bindParams` | **Accept, and it does not conflict with layer-owned state.** See "Point 3" below |
+| 4 | `swapLoopBeats` and `SwapBoundary.h` stay in `mu-tant/Source/Plugin/`; the Pattern's part is `Pattern::loopBeats()` (its gate length) | **Accept; amends the plan's E4.1 row ("`SwapBoundary.h` from `Plugin/` to `Sequencer/`") and E4.7.** See "Point 4" below |
+| 5 | Note mode: `midiNoteMode` stays an app setting, pushed to every Pattern by `setMidiNoteMode`; each Pattern keeps its own held keys for its pitch track (`HeldNoteStack`); the 8 ms final-mix gate stays in the shell (`scanNoteMode`, `applyNoteModeGate`, decision A3); nothing new is saved (D7) | **Accept; the plan's E4.3 text "the setting is saved per layer" is withdrawn for the standalone.** What mu-Tronic needs: "Point 5" below |
+| 6 | `ProcessorBase::setRegrowCutsInPlaceTails(bool)`; `renderLayers` phase 5 caches `loopBeats()` for every non-Empty slot; `ProcessorBase::layerLoopBeats(slot)` | **Accept** with the contract text and two small code changes: "Point 6" below |
+| 7 | E4.3 + E4.4 one commit (both chains behind `useLayerRender`), E4.5 + E4.6 one commit (engine array, bank lock and the retire bin) | **Accept** as a deviation. The plan split them so no commit holds two render paths and a failure points at one change. The merged E4.3/E4.4 commit still holds both chains behind the switch with the equivalence test, then E4.5/4.6 deletes the old one, so the property the split protected is kept; the engine move is a pointer hand-over and the bin replaces `retiring[]` arithmetic-for-arithmetic, so there was no state to bisect between them. E4.3 stayed a single commit with E4.4 |
+| 8 | No generic `checkRetireIsolation` helper; no `kPatternType` constant | **Accept both as deferrals, tracked** ("Point 8" below) |
+| 9 | `HeldNoteStack` (mu-Tant, 16 keys, drop-oldest) written beside mu-Toni's `HeldNotes` (32 keys, ignore-when-full, MIDI decode) | **Change the code, tracked, not an E4 blocker.** The second-product rule (2.5) says it moves to `mu-core/Sequencer/` before the second copy is written, and 2.1.8 row 4a named the trigger: this is it. Two different overflow rules are pinned behaviour, so one `mu_core` class takes the capacity and the overflow policy as template parameters, Toni's channel-filtering `apply(MidiEvent, ...)` stays Toni's thin wrapper, and both products keep their numbers. No behaviour change; goldens must be byte-identical. Owed before T1 (mu-Tronic puts both libraries on one include path) |
+
+**Point 3: the engine is slot-bound, like the parameter rows.** The `v{N}_` rows are slot-keyed and the base rebinds a layer on every move (`bindParams(apvts, newSlot)`
+in the structural-edit paths of `ProcessorBase.cpp`), so a Pattern's engine pointer is a *binding* of the same kind as its `ParamBinding`s: re-fetched for the slot it is in, never owned,
+never outliving the host. What survives in the slot is only what `VoiceEngine::reset` keeps, the oscillator phase (the filter and insert memory is reset in `layersMoved`), plus the
+slot's noise-sequence identity (`setSlotIndex(slot, salt)`). Moving the engine with the Pattern would change the sound after a structural edit and break the pinned goldens
+(`note-mode-structural-edit`), on a live product whose rule is "nothing audible changes". That is a bounded, documented exception to 1.3 and 3.5 (state that belongs to a layer
+moves with it), and it is the opposite choice to mu-On's (2.1.9 point 7, where the engine history is the track's) for a reason that is mu-Tant's pin, not a principle. The interface keeps both
+options open for mu-Tronic: the Pattern never constructs, owns or frees an engine, so a different adapter changes only what `getPatternEngine` returns.
+Contract on `getPatternEngine` and `getPatternBankLock`: message thread; the base calls `bindParams` under `layersLock` on a move (a swap or a remove), so the call
+**allocates nothing and takes no lock**; the engine already exists, prepared, before the layer is created, and outlives every layer bound to it. mu-Tronic's
+adapter does the same (**recommended: one engine per slot, built when the slot's first Pattern is created, so the standalone and mu-Tronic share one path**; per-layer engines whose phase travels are
+a later choice for Andy, to be made with the `dsp-controller`'s `sizeof` measurement of 16 engines, because it changes the sound after a move). Not an E4 or T5 blocker.
+
+**Point 4: `swapLoopBeats` is the host's policy.** It chooses *which* loop ends a pending swap from the swap timing, the master loop, the live count and the slot; the type contributes only
+the per-slot length (`Pattern::loopBeats()`), which the base now caches (point 6). It builds on `mu_hotswap` (`mu-core/Plugin/HotSwap.h`), which checker rule 1 forbids
+a library file to include, and which loop a full preset waits for is each host's rule (mu-Tant: the master loop, else voice 0's). So it stays in `Plugin/` with a comment saying so (done) and the
+plan's `Sequencer/` placement was wrong. **Move rule:** `HotSwap.h` already holds the predicates that are common (`layerBoundaryReached`, `fullPresetBoundaryReached`); if mu-Clid's
+equivalent at E5 turns out to be the same arithmetic, `swapLoopBeats` moves to `HotSwap.h` as a function before E5 writes its copy, and mu-Tant's header is deleted. The `flagLayerSwapBoundaries(t, fullPresetLoopBeats)` convenience
+covers hosts whose full-preset rule is one number; mu-Tant needs the callable form (`flagSwapBoundaries` with a lambda) because its per-slot rule depends on the swap timing.
+
+**Point 5: Note mode, for mu-Tronic.** Recorded so T5 does not re-decide it:
+
+- *The standalone.* Note mode is an app setting (`midiNoteMode`, stored in the app settings, not in the preset), pushed to every Pattern on change. The held-key stack of each Pattern drives its
+  pitch track; the shell keeps a second stack and applies the 8 ms ramp to the **final mix** (so the FX returns are gated, as they always were; decision A3, saved bytes D7).
+- *mu-Tronic.* `Pattern::gatesOwnOutput` (default false) makes the layer apply the ramp to its **own output**, before its strip: a different point in the chain, owner-visible only in mu-Tronic and
+  not a regression, because mu-Tronic has no pinned mix. The Note-mode choice becomes a per-layer saved setting there. **It must not change mu-Tant's saved bytes (D7):** it is written by the host
+  that sets `gatesOwnOutput` (in its layer node), and `Pattern::writeExtras` stays as it is. The setting then reaches the Pattern through `setNoteMode`/`initNoteMode`, as the standalone's does.
+- *Input state is transitional.* `takeInputStateFrom`, `hasInputState` and `markInputSeeded`, with the processor's `seedInputState`, are mu-Tant's workaround for pathfinder gap 1 (2.1.8: a layer added while keys are held does not
+  know them). When the base owns the held-key snapshot and hands it to a layer when it goes live, those four are deleted and `Pattern` takes the snapshot instead. Owed with the gap-1 fix, before T8a.
+- `setCarrySkippedMidi(true)` is on for mu-Tant, as 2.1.8 prescribed for a product whose layers keep input state (the Pattern's held keys); it replaces the old shared stack, which heard every block.
+
+**Point 6: the two `mu-core` additions.**
+
+- `ProcessorBase::setRegrowCutsInPlaceTails(bool)` (protected, constructor only, default on; same shape as `setRetireCountPolicy` and `setCarrySkippedMidi`). Name accepted: it names what it turns off, the cut
+  of the in-place tails of the slots a count increase regrows (R1.3, 2.1.3). On is the contract. Off is mu-Tant's pin P1 (a shrink, regrow, shrink resumes the stale tail), kept so the live
+  product's mix is unchanged by this stage. **It is temporary:** it exists to separate the refactor from the bug fix. Remove the call, the member, the branch in `applyComposedState` and the opt-out wording
+  when Andy signs the P1 goldens-only update (the shrink-regrow-shrink cases, 2.1.6 point 3); the plan's E4.6 row put that update before the stage, and the stage went ahead without it.
+  Recommended timing: a separate signed commit after the first release that contains E4 and Andy's soak, and before mu-Tronic's Pattern work (T5). A new product never calls it.
+- `renderLayers` phase 5 caches `loopBeats()` for every non-Empty slot, a parked spare included (it was live slots only); `ProcessorBase::layerLoopBeats(slot)` reads the cache (audio thread, or a test while not processing; -1 out of range).
+  Accepted: mu-Tant's rule reads every slot's length, and a spare's length is the value the slot will have when it goes live. Placement (protected, next to the other render accessors) and the name (`layer` prefix as `layerAs`, `layerSwapper`) are right.
+  **Contract text (add to `Layer::loopBeats`):** "audio thread; called for any non-Empty layer in any slot, including a parked spare; reads atomics only". **Two code changes:** (a) `ProcessorBase_Render.cpp` compares `typeId() != 0`; use `mu_core::LayerTypeId::Empty`.
+  (b) `flagLayerSwapBoundaries` repeats the same cache read inline; it calls `layerLoopBeats(slot)` so there is one definition. The change alters what a staged swap for a slot at or above the live count sees (its spare's length, not the bar); Toni and On pass their goldens, and for mu-Clid it is the more correct value.
+
+**Point 8: deferrals, where tracked.**
+
+- *Generic `checkRetireIsolation`.* 2.1.7 row 6 said it is owed at E4.6. The twin test now exists for the fake type (`RetireBinTests`) and for `Pattern` (`RetireIsolationTests.cpp`), two instances, which is when a helper is
+  worth writing. It is owed **before mu-Clid's tails (E5.4d)**, the third and largest instance, and written once in `mu-core/Tests/` from the two existing tests. Tracked on the E1/E4 item (#1609).
+- *`kPatternType`.* Not done, and not done for `Arp` either: design-naming's statement that `kArpType` sits in `Arp.h` is wrong (mu-Toni has no `LayerTypeInfo` constant; mu-On has five, in `TrackTypes.h`). Fixed in design-naming. A `Pattern` constant cannot be complete today,
+  because `LayerTypeInfo::create(slot)` returns a layer with no host: a Pattern needs `host.ptr` set (and mu-On's `initParams` gap, 2.1.9 point 6, is the same shape). So `kPatternType` and `kArpType` are written together
+  with the registry hook at **T1** (`initParams` / host wiring), not now; the fields that exist already (`id`, `name`, `group`, `v`, `.muPattern`, `addLayerParams`) are known and the ids are in `LayerTypeId`. Tracked on #1609 for T1.
+
+**Other as-built points.** `mu-core` carries the E4 contract commit with its tests (`LayerRenderTests`, `RetireBinTests`, `LayerContractFixtures.h` exposing the two new members). The hold-last-value fix (C12) is `Pattern`'s, built on the `resolveLane` boolean of 2.1.8.
+`Pattern` names no processor; its `host` link is set by the creator (`createLayer`).
+
 ### 2.2 The product UI stops depending on the product processor
 
 Each `<Type>Content` takes `ProcessorBase&` plus one narrow host interface declared in the product's own `UI/` folder next to the content
@@ -1103,8 +1175,7 @@ product names; the one exception already made (`Rhythm`) is justified because **
 - **Include collisions.** All trees use includes relative to their own `Source/` (`"Audio/..."`, `"Sequencer/..."`), and mu-Tronic puts four `Source/` roots on
   one include path. A survey (2026-10-15) found exactly one voice-side clash, `Audio/Scales.h` in mu-Tant and mu-Toni (different content); every other clash
   is in `Plugin/`, `License/` or `UI/SettingsOverlay.*`, which are not in the library. Rules: (1) rename them `Audio/ToniScales.h` (mu-Toni, in Stage T4, when
-  mu-Toni is still pre-release) and `Audio/TantScales.h` (mu-Tant, in Stage T5, after its next release; until then Tant's `Audio/Scales.h` is the only one of that path in
-  mu-Tronic's include path, because mu-Tant is not yet in mu-Tronic, so there is no clash and the live app is untouched); (2) a layer-library file **never includes anything under `Plugin/` or `License/`**, which section 1.3 and 2.2 already require;
+  mu-Toni is still pre-release) and `Audio/TantScales.h` (mu-Tant, done in E4.7, 2.1.10); (2) a layer-library file **never includes anything under `Plugin/` or `License/`**, which section 1.3 and 2.2 already require;
   (3) **every relative path in a layer library is unique across mu-core and all four libraries** (new rule in design-naming §3, files). Both rules are
   enforced by a new `tests/scripts/check-layer-boundary.ps1` (run by `/build` beside `check-core-boundary.ps1`): fails on a `Plugin/`/`License/` include from a
   library file, on a duplicate relative path, and on a library file that includes another product's header.
@@ -1270,7 +1341,7 @@ A voice that is self-contained cannot read a processor-wide setting. Moves (each
 
 | Today (global) | Product | Becomes |
 |---|---|---|
-| Note mode (`midiNoteMode`, held-note stack, final-mix gate ramp) | Tant | layer state; ramp applied to the layer's own output; setting saved per layer (a layer extra) |
+| Note mode (`midiNoteMode`, held-note stack, final-mix gate ramp) | Tant | **As built (2.1.10 point 5):** the held keys and pitch track are `Pattern` state; the setting stays an app setting pushed to every Pattern and the final-mix gate stays a mu-Tant shell post-stage (A3, D7). mu-Tronic sets `Pattern::gatesOwnOutput` (ramp on the layer's own output) and saves the choice per layer in its own layer node, never in `Pattern::writeExtras` |
 | Held-note stack, `ArpContext` root-by-MIDI, MIDI-trigger, `midiInChParam` | Toni | layer state |
 | One `StepPattern` + `GrooveSequencer`, global swing/accent, five-engine pool | On | one `StepRow` driver and one engine per `Track`; swing/accent per layer (`t{N}_swing`, `t{N}_accent`; the standalone's global value seeds all tracks on load; a unit test pins that); section 1.4 |
 | Master loop (`mstrLoop`), swap timing (`mstr_swap`) | Clid, all | stays a global (it is already a shared global parameter) |
@@ -1392,7 +1463,7 @@ ownership: M mechanical, S supervised (audio thread or lock), O needs Andy.
 | **T2** | S | **Buses** in the shared mixer (section 5), opt-in `MU_MAX_BUSES` / `MU_BUS_INSERTS`, then tests with a test-tone layer in the core tests; mu-Tronic turns them on (**3 buses, 2 inserts each**). Rename the `outputBus` UI label to Out. | `mu-core` mixer + overlay + params | `BusRoutingTests`, `BusSidechainTests`, `BusInsertTests`, `BusStateResetTests` (section 7); all four products byte-identical (buses 0); a scripted mu-Tronic render with test-tone layers through a two-insert bus chain |
 | **T3** | S | `Layer::render`, `RenderContext`, `renderLayers`, `RetireBin`, `setLayerType` with real types, `LayerServices`, `bindParams`, `preloadStaged`, `loopBeats` (section 2.1), defaults only; mu-core tests drive a fake layer type. No product changes yet. | `mu-core` | `LayerRenderTests` (order, priority, empty skipped, lock miss silent and still advancing, retire fade then free off thread, no allocation under the lock), `LayerTypeSwapTests`; products byte-identical |
 | **T4** | S | **mu-Toni layer** (cleanest; mu-Toni is pre-release, so this may go ahead now): `readVoice` + pointers + held notes into `Arp::render`; param table and `LayerParamIds.h` into `Persistence/`; `ArpHost`; rename `Audio/Scales.h` to `ToniScales.h`; `mu-toni-layer` target; **mu-Toni standalone moves onto `renderLayers`** (so the glue exists once); mu-Tronic registers `Arp`. | mu-toni, mu-tronic | `TONI_roundtrip` byte-identical; mu-Toni suites; a mu-Tronic render with two Arp layers equals two mu-Toni layers' renders (the equivalence test, section 7) |
-| **T5** | S | **mu-Tant layer. WAITS until after mu-Tant's next release (Andy).** Rename `Audio/Scales.h` to `TantScales.h`; render chain, engine, retire fade (replaced by the shared bin), per-layer Note mode, shared bank, param table, `PatternHost`; standalone adopts `renderLayers`. | mu-tant, mu-tronic | `TANT_roundtrip` byte-identical (Note-mode behaviour pinned by a new test first); mu-Tant suites; equivalence test |
+| **T5** | S | **mu-Tant layer: the extraction is done as E4 (2.1.10); what remains for the mu-Tronic side is the shared wavetable bank service, per-layer Note mode and the `PatternHost` adapter (2.1.10 points 3 and 5).** Rename, render chain, engine, retire fade, param table and `renderLayers` adoption were E4. | mu-tant, mu-tronic | `TANT_roundtrip` byte-identical (Note-mode behaviour pinned by a new test first); mu-Tant suites; equivalence test |
 | **T6** | S | **mu-On layers (mu-On is pre-release, so this may go ahead now).** One `Track` class, **five registered types Kick, Bass, Hat, Snare, Rumble** (section 1.4): per-layer step grid, swing/accent, per-layer engine allocation with the `engineLocked` flag, Rumble through `RenderContext::peer` (any priority-0 source), `TrackParams.h` to `Persistence/`, `TrackHost`, `typeFromPreset`; the standalone adopts and the five-engine pool goes (decided: per-layer in both). | mu-on, mu-tronic | `ON_roundtrip` byte-identical; the 5-lane preset still loads as 5 tracks; equivalence test per engine type |
 | **T7** | S, O | **mu-Clid layer. WAITS until after mu-Clid's next release (Andy).** `SampleRhythm` (engine, MIDI engine, play state, snapshot, retire tail, sample path), glue out of `PluginProcessor_Modulation.cpp`, `PresetIO` shapes onto the `Layer` hooks, `SampleLibrary` as a service, sample I/O in `preloadStaged`, `RhythmHost`. **The standalone mu-Clid adopts it** (the glue must not exist twice); its `HotSwapStager` is either kept for the standalone only (recommended until the swap timing tests prove equal timing) or replaced. Highest risk of the plan (Stage 7 of Layer ownership is the precedent and its proof list applies in full). | mu-clid, mu-tronic | `CLID_roundtrip`, `swap`, `slot swap`, retire-tail renders byte-identical; `SwapCommitTimingTests`; `mu-clid-midi-tests` (shared `Rhythm`); equivalence test |
 | **T8a** | S | Cross-type features that need only the types already extracted (**can go ahead after T4 and T6**): type-carrying clips, **scenes** (`launchScene`, `LaunchScene`, section 3.6), performance files for `MuTronicState`, per-layer MIDI in, **controller pages** (`PagePrev` / `PageNext`, Launchpad top-row 5 and 6) in `mu-control`, mu-link bridge for the standalone (the hook is one line), CPU meter on the transport bar. | mu-core, mu-control, mu-tronic | tests of section 7 |
@@ -1424,8 +1495,8 @@ references). The equivalence test in each of T4 to T7 is the proof that "complet
 
 - **mu-Toni** (done 2026-10-16, Stage E2; 2.1.8): `Arp::render`, held notes per layer, `Persistence/Toni*Params`, `ArpHost`, `ToniScales.h`, `mu-toni-layer`, adopt `renderLayers`.
 - **mu-On** (now): per-layer step grid and swing/accent, one engine allocation per Track (`engineLocked` in mu-Tronic), five registered engine types, Rumble via the context, `TrackParams.h` to `Persistence/`, `TrackHost`, `mu-on-layer`, adopt `renderLayers`.
-- **mu-Tant** (after its next release): `Pattern::render` + engine + cached pointers, Note mode per layer, shared wavetable bank service, `Persistence/PatternParams`, `SwapBoundary.h` to `Sequencer/`,
-  `PatternHost`, `TantScales.h`, `mu-tant-layer`, adopt `renderLayers`.
+- **mu-Tant** (E4, built, 2.1.10): `Pattern::render` + engine binding + cached pointers, `Persistence/PatternParams`, `PatternHost`, `TantScales.h`, `mu-tant-layer`, adopt `renderLayers`;
+  `SwapBoundary.h` stays in `Plugin/`, Note mode per layer is mu-Tronic's (point 5), the shared wavetable bank service stays owed (2.4).
 - **mu-Clid** (after its next release): `SampleRhythm`, glue out of the processor, `PresetIO` onto the hooks, `SampleLibrary` service, `RhythmHost`, `mu-clid-layer`, adopt `renderLayers`.
 - **mu-Clid MIDI**: nothing (core `Rhythm`).
 - **All**: no `Plugin/`/`License/` include from library files; unique relative paths; param table as `addLayerParams`; every live-count store through
