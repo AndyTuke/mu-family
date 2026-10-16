@@ -118,6 +118,7 @@ public:
         pitchGlide.setCurrentAndTargetValue(targetMidi);
         oscs.osc1.resetPhase(); oscs.osc2.resetPhase();
         releasing = false;
+        applyEnvParams();   // settings held back during a release apply now, before the new note's envelopes start
         ampEnv.noteOn(); filterEnv.noteOn(); pitchEnv.noteOn();
     }
 

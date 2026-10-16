@@ -122,17 +122,19 @@ void VoiceEngine::trigger(bool isAccented, bool tied)
     // the insert. Tied hits on an active amp envelope already returned above so env state
     // carries across contiguous pattern hits (pattern legato unchanged).
     (void) claimedIndex;  // slot index no longer needed for env routing
+    // The filter and pitch envelopes are engine-level too and retrigger on untied hits like the amp envelope.
     ampEnv.reset();
-    ampEnv.noteOn();
-    ampReleasing = false;
-
-    // Filter / pitch envelopes — also engine-level, also retrigger on untied hits.
     filterEnv.reset();
-    filterEnv.noteOn();
-    filterReleasing = false;
     pitchEnv.reset();
+    ampReleasing = filterReleasing = pitchReleasing = false;
+
+    // The envelopes are idle now, so parameters that were held back during a release apply here: the new
+    // note starts with the current settings (syncEnvelopes otherwise runs only when a parameter changes).
+    syncEnvelopes();
+
+    ampEnv.noteOn();
+    filterEnv.noteOn();
     pitchEnv.noteOn();
-    pitchReleasing = false;
 }
 
 void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
