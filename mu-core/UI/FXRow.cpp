@@ -219,6 +219,17 @@ void FXRow::rebuildKnobs(int algorithmIndex)
                 return s.retainCharacters("-0123456789.").getDoubleValue();
             };
         }
+        else if (param.units == "s")
+        {
+            // seconds (reverb Decay): two decimals below one second (Spring is 0.35), one above, so the short
+            // values are readable and typed numbers parse as they are written.
+            knob->getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String(v, v < 1.0 ? 2 : 1);
+            };
+            knob->getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
+                return s.retainCharacters("-0123456789.").getDoubleValue();
+            };
+        }
         else if (param.minVal == 0.0f && param.maxVal == 1.0f)
         {
             // unitless 0..1 params (reverb Size, Diffusion, Damp, Mod, Dirt)

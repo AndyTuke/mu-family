@@ -94,7 +94,7 @@ Reverb has **no mix knob** — it is always a pure send. Shimmer removed from v1
 
 **Presets and the algorithm change:** choosing an algorithm from the editor menu pushes that algorithm's preset values, including decay, back into the knobs (APVTS). A host automating the algorithm parameter instead pushes the current knob values into the slot, so the knobs stay the source of truth.
 
-**Parameter manifests:** adding `rev_decay` changed the frozen parameter manifests (`tests/manifests`); they are regenerated with `tests/scripts/regenerate-frozen-baselines.ps1 -Reason`. Projects saved before it load with the default decay for their reverb type.
+**Parameter manifests:** adding `rev_decay` changed the frozen parameter manifests (`tests/manifests`); they are regenerated with `tests/scripts/regenerate-frozen-baselines.ps1 -Reason`. Projects and presets saved before it do not carry a decay value, so they load with the knob's current value (the default 2.5 s on a fresh load), not the decay of their reverb type; a Spring, Room or Plate project from before plays with a different tail until the knob is set. A hook that sets the decay from the preset when the value is missing is a possible follow-up.
 
 ### Stage 15: Signalsmith Reverb (complete)
 
