@@ -1,2 +1,2 @@
 #pragma once
-struct Host { PluginProcessor* owner = nullptr; };
+namespace mu_on { struct Host { PluginProcessor* owner = nullptr; }; }
