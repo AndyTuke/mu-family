@@ -17,10 +17,12 @@ void FXChain::processSends(juce::AudioBuffer<float>& effectSend,
     // Sequential processing with intra-FX routing.
 
     // Echo needs continuous processing (feedback loop), like the dedicated delay slot.
-    if (doEffect || effect.needsContinuousProcessing()) effect.processReturn(effectSend);
+    const bool runEffect = doEffect || effect.needsContinuousProcessing();
+    if (runEffect) effect.processReturn(effectSend);
 
-    // Route effect output into the delay and reverb send buses.
-    if (doEffect)
+    // Route effect output into the delay and reverb send buses; an Echo tail keeps feeding them
+    // after the channel sends go silent.
+    if (runEffect)
     {
         const int nSamples = effectSend.getNumSamples();
         if (effToDelay > 0.001f)
