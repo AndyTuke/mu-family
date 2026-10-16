@@ -16,6 +16,8 @@
 #include "Tests/GoldenAllocationCheck.h"
 #include "Tests/GoldenRender.h"
 
+#include <thread>
+
 namespace
 {
     // Blocks that allocate or free inside processBlock today, recorded with their exact counts (see
@@ -282,6 +284,33 @@ namespace
                 { 40,  "addLayer",           [](mu_golden::ScriptContext& c) { c.proc.addLayer(); } },
                 { 70,  "swapLayers(0, 2)",   [](mu_golden::ScriptContext& c) { c.proc.swapLayers(0, 2); } },
                 { 110, "removeLayer(1)",     [](mu_golden::ScriptContext& c) { c.proc.removeLayer(1); } } };
+            defs.push_back(d);
+        }
+
+        // Host automation of the engine choice mid-play, from another thread than the message thread (as a host's
+        // audio thread delivers it): each change switches the track's engine in the block that sees it.
+        {
+            Def d; d.name = "engine-automation-midplay"; d.numStems = 3; d.lengthFrames = 120000;
+            d.notes = "Kick, Snare, Rumble(source Kick); t0_eng, t1_eng and t2_eng automated from a non-message thread at blocks 30, 55, 80 and 100.";
+            d.author = [](PluginProcessor& p)
+            {
+                useTrack(p, 1, EngineType::Snare);
+                useTrack(p, 2, EngineType::Rumble);
+                setParam(p.apvts, mu_on::layerParamId(2, "src"), 0.0f);
+                setRow(p, 1, "1010101010101010", "1000100010001000");
+                setRow(p, 2, "1000100010001000", "0000000000000000");
+            };
+            auto automate = [](int block, int track, EngineType e)
+            {
+                return mu_golden::ScriptedEvent { block, "automate t" + juce::String(track) + "_eng = " + juce::String(mu_on::engineName(e)),
+                    [track, e](mu_golden::ScriptContext& c)
+                    {
+                        std::thread host([&c, track, e] { setParam(c.proc.apvts, mu_on::layerParamId(track, "eng"), (float) mu_on::toIndex(e)); });
+                        host.join();
+                    } };
+            };
+            d.events = { automate(30, 0, EngineType::Bass), automate(55, 1, EngineType::Hat),
+                         automate(80, 0, EngineType::Kick), automate(100, 2, EngineType::Snare) };
             defs.push_back(d);
         }
 
