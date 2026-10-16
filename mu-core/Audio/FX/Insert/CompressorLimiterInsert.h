@@ -88,8 +88,12 @@ public:
                 if (isLimiter)
                 {
                     float& lim = limGain[ch < 2 ? ch : 0];
+                    // The lower of the smoothed and the target threshold: a threshold that drops takes effect at
+                    // once (the smoother would otherwise leave the ceiling high for its 15 ms ramp, and at the
+                    // start after prepare()); one that rises is still approached smoothly.
+                    const float ceiling = juce::jmin(thr, threshLin);
                     const float a    = std::abs(y);
-                    const float need = (a > thr && a > 1e-9f) ? thr / a : 1.0f;
+                    const float need = (a > ceiling && a > 1e-9f) ? ceiling / a : 1.0f;
                     lim = juce::jmin(need, lim + (1.0f - lim) * (1.0f - relCoeff));
                     y  *= lim;
                     if (lim < 1.0f) gainDb += 20.0f * std::log10(lim);
