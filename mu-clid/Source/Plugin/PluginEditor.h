@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include "PluginProcessor.h"
 #include "UI/EditorShellBase.h"
 #include "UI/MasterLoopSection.h"
@@ -18,7 +19,8 @@ namespace mu_clid {
 // components (sidebar, RhythmContent in the shared LayerPanel, MixerOverlay, SettingsOverlay) and the
 // rhythm-set refresh wiring that drives them after preset loads / hot-swaps.
 class PluginEditor : public EditorShellBase,
-                     private juce::AudioProcessorValueTreeState::Listener
+                     private juce::AudioProcessorValueTreeState::Listener,
+                     private juce::Timer
 {
 public:
     explicit PluginEditor(PluginProcessor&);
@@ -62,7 +64,12 @@ private:
     // APVTS listener — drives voice-section Amp "Effect" send label off the
     // global eff_algo parameter so host automation updates the label even
     // when the mixer overlay is hidden.
+    // Runs on whichever thread changed the parameter (the audio thread under host automation), so it only
+    // raises a flag; timerCallback does the UI work on the message thread.
     void parameterChanged(const juce::String& parameterID, float newValue) override;
+    void timerCallback() override;
+    std::atomic<bool> outModeDirty { false };   // some rhythm's output mode changed: reload the mixer strips
+    std::atomic<bool> effAlgoDirty { false };   // the effect algorithm changed: relabel the effect send
     void syncVoiceEffectSendLabel();
     void applyEffectSendLabel(const juce::String& name);   // voice band label + the effect-send mod target
     bool isRhythmMidiOutput(int r) const;
