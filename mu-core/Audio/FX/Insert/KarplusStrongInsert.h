@@ -106,6 +106,15 @@ public:
         const float lpAlpha  = 1.0f - std::exp(-2.0f * juce::MathConstants<float>::pi
                                                 * lpCutoff / (float) currentSampleRate);
 
+        // The loop's one-pole LP delays the signal, so the delay line is shortened by its phase delay at the
+        // target pitch or the string plays flat (up to a fifth with a dark LPF). H(z) = a / (1 - c z^-1), c = 1 - a:
+        // phase delay = atan2(c sin w, 1 - c cos w) / w samples at w = 2 pi f / sr. Taken once per block at the
+        // target pitch; the few ms of a pitch glide are not compensated.
+        const float lpC          = 1.0f - lpAlpha;
+        const float pitchOmega   = 2.0f * juce::MathConstants<float>::pi * juce::jmax(20.0f, targetFreq)
+                                   / (float) currentSampleRate;
+        const float lpPhaseDelay = std::atan2(lpC * std::sin(pitchOmega), 1.0f - lpC * std::cos(pitchOmega)) / pitchOmega;
+
         // Karplus has no dedicated Output slot — pass through unity.
         const float outGain  = 1.0f;
         const int nChClamped = juce::jmin(nCh, 2);
@@ -126,7 +135,7 @@ public:
                 const float curFreq  = (ch == 0) ? smoothedFreq.getNextValue()
                                                  : smoothedFreq.getCurrentValue();
                 const float delayLen = juce::jmax(2.0f,
-                    (float) currentSampleRate / juce::jmax(20.0f, curFreq));
+                    (float) currentSampleRate / juce::jmax(20.0f, curFreq) - lpPhaseDelay);
 
                 // Linear-interpolated read tap (D samples behind write pos).
                 const float readF = static_cast<float>(wPos) - delayLen;
