@@ -242,6 +242,74 @@ public:
             for (auto& r : runs) { r.p->setPlayHead(nullptr); r.p->releaseResources(); }
         }
 
+        beginTest("C12 hold ends when the track parks: unparked with its matrix lock held, it takes the new unmodulated values");
+        {
+            TempStorage storage;
+            PluginProcessor p;
+            p.selectEngine(0, EngineType::Bass);
+            auto& t = p.getTrack(0);
+            t.prepare(sr, prepared);
+            auto& cs = t.controlSequences[0];
+            cs.mode = ControlSequence::Mode::Stepped;
+            cs.polarity = ControlSequence::Polarity::Unipolar;
+            cs.stepValues = { 100.0f };
+            const auto id = engineParamId(0, EngineType::Bass, "cut");
+            const auto range = p.apvts.getParameterRange(id);
+            setParam(p.apvts, id, range.convertFrom0to1(0.5f));
+            ModulationAssignment a;
+            a.id = "m"; a.sourceId = "cs0_output"; a.destinationId = "b.cut.prop"; a.depth = 40.0f;
+            expect(t.modulationMatrix.addAssignment(a));
+            juce::AudioBuffer<float> out(2, prepared);
+            out.clear();
+            t.render(callAt(0, 0, prepared, sr, prepared), out, prepared);
+            expect(range.convertTo0to1(t.getModLive(EngineType::Bass, 2)) > 0.7f, "modulated while live");
+
+            t.onParkedBlock(callAt(0, prepared, prepared, sr, prepared));
+            setParam(p.apvts, id, range.convertFrom0to1(0.3f));                 // changed while parked
+            t.modLock.store(true, std::memory_order_release);                     // the matrix is being edited
+            out.clear();
+            t.render(callAt(0, 2 * prepared, prepared, sr, prepared), out, prepared);
+            t.modLock.store(false, std::memory_order_release);
+            expectWithinAbsoluteError(range.convertTo0to1(t.getModLive(EngineType::Bass, 2)), 0.3f, 0.01f,
+                                      "not the value held from before it parked");
+        }
+
+        beginTest("a stop and restart hidden in blocks an edit silenced resets a sustaining Bass (stoppedUnrendered)");
+        {
+            TempStorage storage;
+            PluginProcessor p;
+            p.selectEngine(0, EngineType::Bass);
+            for (int s = 1; s < 16; ++s) p.getTrack(0).row.setOn(s, false);
+            p.getTrack(0).row.setOn(0, true);
+            setParam(p.apvts, engineParamId(0, EngineType::Bass, "sus"), 1.0f);
+            mu_golden::MockHost host;
+            host.bpm = 120.0;
+            p.setPlayHead(&host);
+            p.setRateAndBufferSizeDetails(sr, prepared);
+            p.prepareToPlay(sr, prepared);
+            juce::AudioBuffer<float> buf(2, prepared);
+            auto block = [&]
+            {
+                buf.clear();
+                juce::MidiBuffer midi;
+                p.processBlock(buf, midi);
+                if (host.playing) host.ppq += (double) prepared * 120.0 / (60.0 * sr);
+                return buf.getMagnitude(0, prepared);
+            };
+            float playing = 0.0f;
+            for (int b = 0; b < 4; ++b) playing = block();
+            expect(playing > 0.1f, "the held bass sounds");
+            p.layerEditInFlight.store(true);
+            host.playing = false; block();
+            host.playing = true;  block();
+            p.layerEditInFlight.store(false);
+            float after = 0.0f;
+            for (int b = 0; b < 4; ++b) after = juce::jmax(after, block());
+            expectEquals(after, 0.0f, "the stop no rendered block saw still silenced the bass");
+            p.setPlayHead(nullptr);
+            p.releaseResources();
+        }
+
         beginTest("RumbleEngine: reset clears the reverb tail; a spent silent feed is skipped; a returning feed plays");
         {
             RumbleEngine r;

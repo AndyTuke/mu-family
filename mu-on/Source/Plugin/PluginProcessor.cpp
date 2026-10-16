@@ -116,8 +116,8 @@ void PluginProcessor::releaseResources()
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     resetSwapPlayState();   // no processBlock is running yet: loads apply at once, not staged
-    currentSampleRate = sampleRate;
-    currentBlockSize  = samplesPerBlock;
+    currentSampleRate.store(sampleRate, std::memory_order_relaxed);
+    currentBlockSize.store(samplesPerBlock, std::memory_order_relaxed);
     mixerEngine.prepare(sampleRate, samplesPerBlock);
     fxChain.prepare(sampleRate, samplesPerBlock);
 
@@ -154,7 +154,7 @@ std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
     t->slot      = slot;
     seedRowGroove(t->row);
     t->bindParams(apvts, slot);
-    t->prepare(currentSampleRate, currentBlockSize);
+    t->prepare(currentSampleRate.load(std::memory_order_relaxed), currentBlockSize.load(std::memory_order_relaxed));
     t->syncEngine();   // the engine the slot's parameter names, built and prepared now
     return t;
 }

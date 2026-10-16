@@ -128,9 +128,10 @@ void Track::prepare(double sampleRate, int blockSize)
     silence.clear();
     for (auto& e : engines)
         if (e != nullptr) e->prepare(preparedRate, preparedBlock);
-    // The next rendered block starts from silence and resolves its engine afresh.
+    // The next rendered block starts from silence and resolves its engine afresh (no held C12 values).
     parked  = true;
     current = -1;
+    haveResolved = false;
 }
 
 void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
@@ -141,6 +142,7 @@ void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
     swingRow    = mu_core::ParamBinding(apvts.getRawParameterValue("seq_swing"), this);
     accentRow   = mu_core::ParamBinding(apvts.getRawParameterValue("seq_accent"), this);
     jassert(engineRow.isBound() && sourceRow.isBound() && bassWaveRow.isBound());   // an id drift from the layout (debug)
+    haveResolved = false;   // values held for C12 belong to the slot bound before
 
     // Every engine's modulation inputs for this slot, in its target table's order (the order setParams takes).
     for (int e = 0; e < kNumEngineTypes; ++e)
@@ -222,6 +224,7 @@ void Track::resetEngineToPrepared() noexcept
     for (auto& e : engines)
         if (e != nullptr) e->resetToPrepared();
     current = -1;
+    haveResolved = false;
 }
 
 float Track::getModLive(EngineType e, int dest) const noexcept
@@ -305,7 +308,7 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
     // Phase 1: a slot that has just gone live (or was prepared since) starts from silence, so a tail left by
     // an earlier state (a sustaining bass has no note-off) never resumes; an engine change stops the old one dead.
     // Both silence every engine the track holds, as the per-slot engines' reset always did.
-    if (parked) { resetEngines(); current = -1; parked = false; }
+    if (parked) { resetEngines(); current = -1; haveResolved = false; parked = false; }
     if (current != e) { resetEngines(); current = e; }
 
     // Phase 2: this block's parameters through the modulation matrix, at the call's beat.

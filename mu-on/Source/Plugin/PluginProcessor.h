@@ -196,8 +196,9 @@ private:
     std::atomic<float>* seqAccentParam = nullptr;
     std::array<std::atomic<float>*, mu_limits::kMaxLayers> engineParam {};
 
-    double currentSampleRate = 44100.0;
-    int    currentBlockSize  = 512;
+    // Written by prepareToPlay (the host's thread), read by createLayer (the message thread).
+    std::atomic<double> currentSampleRate { 44100.0 };
+    std::atomic<int>    currentBlockSize  { 512 };
 
     // Hot-swap: parsed preset trees per track + one full preset, committed at the pattern wrap.
     void applyTrackTree(int track, const juce::ValueTree& tree);
