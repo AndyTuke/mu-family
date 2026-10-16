@@ -190,6 +190,7 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/NoDemoCapsTests.cpp      # unlicensed is fully functional: 8 voices, long gates, saves
     Source/Tests/ProcessorSeamTests.cpp    # the real PluginProcessor, headless (ScopedStorageRoot, worker-thread processBlock)
     Source/Tests/FrozenBaselineTests.cpp   # frozen parameter manifest + compat corpus on the real processor
+    Source/Tests/LegacyReverbDecayTests.cpp   # files saved before the reverb Decay knob keep their old Decay
     Source/Tests/NudgeInputTests.cpp       # shared mu-core NudgeInput: whole numbers and the BPM decimals mode
     Source/Tests/ClipLaunchTests.cpp   # clip store / launch on the real processor
     Source/Tests/GoldenRenderTests.cpp   # golden renders of the real processor (tests/golden/mu-tant)

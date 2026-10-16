@@ -16,6 +16,7 @@
 #include "Persistence/PresetMigrations.h"   // migrateLegacyHostState
 #include "UI/Components/MuLookAndFeel.h" // kLayerPaletteSize
 #include "Persistence/PresetHelpers.h"   // kGlobalParamDefs
+#include "Persistence/LegacyReverbDecay.h"   // addLegacyReverbDecayParam
 #include "Persistence/RhythmParamTable.h"   // kRhythmParamDefs
 #include <set>
 
@@ -110,6 +111,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     // new 0..10 s ADSR ranges don't clamp old 0..100 values to absurd attacks.
     juce::ValueTree migrated = state.createCopy();
     migrateLegacyHostState(migrated);
+    mu_pp::addLegacyReverbDecayParam(migrated, proc.apvts.getParameter(mu_pp::kReverbAlgoId));   // older than the Decay knob
 
     {
         mu_core::ScopedApvtsLoading guard(proc.apvtsLoading);

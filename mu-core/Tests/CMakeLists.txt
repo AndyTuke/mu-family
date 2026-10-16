@@ -43,6 +43,7 @@ set(MU_CORE_TEST_SOURCES
     EnvelopeReleaseTests.cpp        # mu_env::applyParameters and the VoiceEngine release tail
     FxAlgoSwitchTests.cpp           # eff_algo / rev_algo by automation pushes the knob values
     ReverbDecayTests.cpp            # reverb Decay presets, tail length, Size independence
+    LegacyReverbDecayTests.cpp      # a state saved before the Decay knob loads its algorithm's old Decay
     ParamRefreshQueueTests.cpp      # the allocation-free listener hand-off
     MidiRawTests.cpp                # raw-byte note tests and the allocation-free MIDI clock scan
     MidiClockSyncTests.cpp

@@ -258,6 +258,7 @@ target_sources(mu-clid-tests PRIVATE
     # collaborators and the licence glue, so tests construct the product class itself.
     Source/Tests/ProcessorSeamTests.cpp
     Source/Tests/FrozenBaselineTests.cpp   # frozen parameter manifest + compat corpus on the real processor
+    Source/Tests/LegacyReverbDecayTests.cpp   # files saved before the reverb Decay knob keep their old Decay
     Source/Tests/ClidScriptedEditRenderTests.cpp
     Source/Tests/ClidLayerStructureTests.cpp
     Source/Tests/ClidEditContinuityTests.cpp
