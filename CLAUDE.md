@@ -105,7 +105,7 @@ The backlog in `backlog.md` must always be grouped: **Open → On Hold → Close
 
 **Open rows are short and carry a few fixed fields** (priority P1/P2/P3, who logged it, details, dated updates, who still has to sign off); the exact format and rules are in [.claude/agents/backlog-administrator.md](.claude/agents/backlog-administrator.md). Review findings go on the item's row, not into new rows.
 
-The single resolved status is **`✅ Closed`** — never `Fixed` / `Audited` / `Verified` / `Done` or any other variant, whether the item was fixed, verified as already correct, or resolved by design. Structure is enforced by [tests/scripts/check-backlog.ps1](tests/scripts/check-backlog.ps1); run it after editing the backlog.
+The single resolved status is **`✅ Closed`** — never `Fixed` / `Audited` / `Verified` / `Done` or any other variant, whether the item was fixed, verified as already correct, or resolved by design. Structure is enforced by [tests/scripts/check-backlog.ps1](tests/scripts/check-backlog.ps1); run it with `pwsh` after editing the backlog, and use its `-FixTally` switch instead of hand-editing the tally line. **Two PCs edit the backlog** (owner, 2026-10-16): `git pull --rebase` before any backlog edit, take a new number only after that pull, commit and push straight after; the laptop logs, rates and ranks, the build PC closes rows with build evidence. The full procedure is in [.claude/agents/backlog-administrator.md](.claude/agents/backlog-administrator.md).
 
 ## Family-shared design documents
 
