@@ -26,25 +26,31 @@ public:
         const float drive    = insertSlot(p, 0);
         const float outputDb = insertSlot(p, 1);
         const float preGain  = std::pow(10.0f, drive / 100.0f * 2.0f);
-        const float outGain  = std::pow(10.0f, outputDb / 20.0f) / preGain;
+        // Folding keeps the signal inside +/-1 at any drive, so the output gain is the Output knob alone
+        // (dividing by preGain made loud drive settings nearly silent).
+        const float outGain  = std::pow(10.0f, outputDb / 20.0f);
         smoothedPreGain.setTargetValue(preGain);
         smoothedOutGain.setTargetValue(outGain);
-        for (int ch = 0; ch < nCh; ++ch)
+        // Sample-major: each smoothed gain advances once per sample and every channel uses it, so the right
+        // channel ramps with the left (channel-major looping left the right one stepping per block).
+        auto chans = buf.getArrayOfWritePointers();
+        for (int i = 0; i < ns; ++i)
         {
-            auto* data = buf.getWritePointer(ch);
-            for (int i = 0; i < ns; ++i)
+            const float pg = smoothedPreGain.getNextValue();
+            const float og = smoothedOutGain.getNextValue();
+            for (int ch = 0; ch < nCh; ++ch)
             {
-                const float pg = (ch == 0) ? smoothedPreGain.getNextValue()
-                                           : smoothedPreGain.getCurrentValue();
-                const float og = (ch == 0) ? smoothedOutGain.getNextValue()
-                                           : smoothedOutGain.getCurrentValue();
-                float fx = juce::jlimit(-4.0f, 4.0f, data[i] * pg);
-                while (fx > 1.0f || fx < -1.0f)
+                // Triangle fold with period 4, closed form (no clamp, so a hard-driven input keeps folding):
+                // t = (x + 1) mod 4 in [0, 4); rising 0..2 gives -1..+1, falling 2..4 gives +1..-1.
+                const float x = chans[ch][i] * pg;
+                float fx = 0.0f;
+                if (std::isfinite(x))
                 {
-                    if (fx >  1.0f) fx =  2.0f - fx;
-                    if (fx < -1.0f) fx = -2.0f - fx;
+                    float t = std::fmod(x + 1.0f, 4.0f);
+                    if (t < 0.0f) t += 4.0f;
+                    fx = (t < 2.0f) ? t - 1.0f : 3.0f - t;
                 }
-                data[i] = fx * og;
+                chans[ch][i] = fx * og;
             }
         }
     }

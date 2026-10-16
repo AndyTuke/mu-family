@@ -38,6 +38,13 @@ set(MU_CORE_TEST_SOURCES
     DeferredWorkTests.cpp
     FilterDSPSmokeTests.cpp
     InsertDSPSmokeTests.cpp
+    SpectralBehaviourTests.cpp      # Fold / SoftClip / HardClip level, Notch12 / Bp12 response, Vocoder, SSB image, Karplus pitch
+    StereoParityTests.cpp           # identical L / R in gives identical L / R out while a parameter ramps
+    EnvelopeReleaseTests.cpp        # mu_env::applyParameters and the VoiceEngine release tail
+    FxAlgoSwitchTests.cpp           # eff_algo / rev_algo by automation pushes the knob values
+    ReverbDecayTests.cpp            # reverb Decay presets, tail length, Size independence
+    ParamRefreshQueueTests.cpp      # the allocation-free listener hand-off
+    MidiRawTests.cpp                # raw-byte note tests and the allocation-free MIDI clock scan
     MidiClockSyncTests.cpp
     MidiControlTests.cpp
     ModulationMatrixTests.cpp

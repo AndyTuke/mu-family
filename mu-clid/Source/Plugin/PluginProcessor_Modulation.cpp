@@ -98,6 +98,14 @@ namespace md
     static_assert(send_reverb >= 0, "send.reverb is not in ModDest::kTable");
 }
 
+// The Insert Start knob's range for a generator's current layout ([lo, hi], as EuclideanPanel sets it).
+// Modulation depth for Insert Start is a proportion of this range, like the pad knobs.
+static std::pair<int, int> insertStartKnobRange(const HitGenerator& g) noexcept
+{
+    const auto lay = g.clampLayout({ g.hits, g.rotate, g.prePad, g.postPad, g.insertStart, g.insertLength });
+    return HitGenerator::insertStartBounds(g.steps, lay.prePad, lay.postPad, lay.insertLength, g.prePadMode);
+}
+
 // Phase 1 — seed every destination with its knob value as the matrix expects it: a proportion
 // of the knob's range for skewed / step-count-dependent knobs, the offset 0 for pitch.
 void PluginProcessor::seedModulation(int r, const Rhythm& rhythm, const VoiceParams& modParams)
@@ -160,19 +168,22 @@ void PluginProcessor::seedModulation(int r, const Rhythm& rhythm, const VoicePar
     mv(md::euclid_a_rotate)  = (float) rhythm.genA.rotate       / (float) juce::jmax(1, stepsA_seed - 1);
     mv(md::euclid_a_prePad)  = propOf(rhythm.genA.prePad,       padMaxA.prePad);
     mv(md::euclid_a_postPad) = propOf(rhythm.genA.postPad,      padMaxA.postPad);
-    mv(md::euclid_a_insSt)   = (float) rhythm.genA.insertStart  / (float) juce::jmax(1, stepsA_seed - 1);
+    const auto insRangeA = insertStartKnobRange(rhythm.genA);
+    const auto insRangeB = insertStartKnobRange(rhythm.genB);
+    const auto insRangeC = insertStartKnobRange(rhythm.genC);
+    mv(md::euclid_a_insSt)   = propOf(juce::jlimit(insRangeA.first, insRangeA.second, rhythm.genA.insertStart) - insRangeA.first, insRangeA.second - insRangeA.first);
     mv(md::euclid_a_insLen)  = propOf(rhythm.genA.insertLength, padMaxA.insertLength);
     mv(md::euclid_b_hits)    = (float) rhythm.genB.hits         / (float) stepsB_seed;
     mv(md::euclid_b_rotate)  = (float) rhythm.genB.rotate       / (float) juce::jmax(1, stepsB_seed - 1);
     mv(md::euclid_b_prePad)  = propOf(rhythm.genB.prePad,       padMaxB.prePad);
     mv(md::euclid_b_postPad) = propOf(rhythm.genB.postPad,      padMaxB.postPad);
-    mv(md::euclid_b_insSt)   = (float) rhythm.genB.insertStart  / (float) juce::jmax(1, stepsB_seed - 1);
+    mv(md::euclid_b_insSt)   = propOf(juce::jlimit(insRangeB.first, insRangeB.second, rhythm.genB.insertStart) - insRangeB.first, insRangeB.second - insRangeB.first);
     mv(md::euclid_b_insLen)  = propOf(rhythm.genB.insertLength, padMaxB.insertLength);
     mv(md::euclid_c_hits)    = (float) rhythm.genC.hits         / (float) stepsC_seed;
     mv(md::euclid_c_rotate)  = (float) rhythm.genC.rotate       / (float) juce::jmax(1, stepsC_seed - 1);
     mv(md::euclid_c_prePad)  = propOf(rhythm.genC.prePad,       padMaxC.prePad);
     mv(md::euclid_c_postPad) = propOf(rhythm.genC.postPad,      padMaxC.postPad);
-    mv(md::euclid_c_insSt)   = (float) rhythm.genC.insertStart  / (float) juce::jmax(1, stepsC_seed - 1);
+    mv(md::euclid_c_insSt)   = propOf(juce::jlimit(insRangeC.first, insRangeC.second, rhythm.genC.insertStart) - insRangeC.first, insRangeC.second - insRangeC.first);
     mv(md::euclid_c_insLen)  = propOf(rhythm.genC.insertLength, padMaxC.insertLength);
 
     // Mixer strip: pan + FX sends, seeded from the mixer channel as proportions of
@@ -354,19 +365,25 @@ void PluginProcessor::writeBackModulation(int r, const Rhythm& rhythm, VoicePara
     lastEuclidOverrides[r].a.rotate       = juce::jlimit(0, stepsA_wb - 1,    modPropToSteps(md::euclid_a_rotate, stepsA_wb - 1));
     lastEuclidOverrides[r].a.prePad       = modPropToSteps(md::euclid_a_prePad, padMaxA.prePad);
     lastEuclidOverrides[r].a.postPad      = modPropToSteps(md::euclid_a_postPad, padMaxA.postPad);
-    lastEuclidOverrides[r].a.insertStart  = juce::jlimit(0, stepsA_wb - 1,    modPropToSteps(md::euclid_a_insSt, stepsA_wb - 1));
+    const auto insRangeA = insertStartKnobRange(rhythm.genA);
+    const auto insRangeB = insertStartKnobRange(rhythm.genB);
+    const auto insRangeC = insertStartKnobRange(rhythm.genC);
+    lastEuclidOverrides[r].a.insertStart  = juce::jlimit(insRangeA.first, insRangeA.second,
+                                                insRangeA.first + modPropToSteps(md::euclid_a_insSt, insRangeA.second - insRangeA.first));
     lastEuclidOverrides[r].a.insertLength = modPropToSteps(md::euclid_a_insLen, padMaxA.insertLength);
     lastEuclidOverrides[r].b.hits         = juce::jlimit(0, stepsB_wb,        modPropToSteps(md::euclid_b_hits,  stepsB_wb));
     lastEuclidOverrides[r].b.rotate       = juce::jlimit(0, stepsB_wb - 1,    modPropToSteps(md::euclid_b_rotate, stepsB_wb - 1));
     lastEuclidOverrides[r].b.prePad       = modPropToSteps(md::euclid_b_prePad, padMaxB.prePad);
     lastEuclidOverrides[r].b.postPad      = modPropToSteps(md::euclid_b_postPad, padMaxB.postPad);
-    lastEuclidOverrides[r].b.insertStart  = juce::jlimit(0, stepsB_wb - 1,    modPropToSteps(md::euclid_b_insSt, stepsB_wb - 1));
+    lastEuclidOverrides[r].b.insertStart  = juce::jlimit(insRangeB.first, insRangeB.second,
+                                                insRangeB.first + modPropToSteps(md::euclid_b_insSt, insRangeB.second - insRangeB.first));
     lastEuclidOverrides[r].b.insertLength = modPropToSteps(md::euclid_b_insLen, padMaxB.insertLength);
     lastEuclidOverrides[r].c.hits         = juce::jlimit(0, stepsC_wb,        modPropToSteps(md::euclid_c_hits,  stepsC_wb));
     lastEuclidOverrides[r].c.rotate       = juce::jlimit(0, stepsC_wb - 1,    modPropToSteps(md::euclid_c_rotate, stepsC_wb - 1));
     lastEuclidOverrides[r].c.prePad       = modPropToSteps(md::euclid_c_prePad, padMaxC.prePad);
     lastEuclidOverrides[r].c.postPad      = modPropToSteps(md::euclid_c_postPad, padMaxC.postPad);
-    lastEuclidOverrides[r].c.insertStart  = juce::jlimit(0, stepsC_wb - 1,    modPropToSteps(md::euclid_c_insSt, stepsC_wb - 1));
+    lastEuclidOverrides[r].c.insertStart  = juce::jlimit(insRangeC.first, insRangeC.second,
+                                                insRangeC.first + modPropToSteps(md::euclid_c_insSt, insRangeC.second - insRangeC.first));
     lastEuclidOverrides[r].c.insertLength = modPropToSteps(md::euclid_c_insLen, padMaxC.insertLength);
 }
 

@@ -317,4 +317,51 @@ namespace mu_clip_test
 
         runLiveClipChecks<Proc>(t, x);
     }
+
+    // A host state restore replaces everything at once, so a layer swap or a full preset staged for the next bar line
+    // must not land on top of it. Staged here as a clip launch (a layer swap) and as a loaded full preset while the
+    // transport runs; both hold the parameter at `a`, the state handed back holds it at `b`. mu-Clid has its own
+    // version of this check (HotSwapCancelTests.cpp) on its own stager; this is the one for the products that stage
+    // through ProcessorBase::layerSwapper.
+    template <typename Proc>
+    void runRestoreCancelsStagedSwapChecks(juce::UnitTest& t, const Accessor<Proc>& x)
+    {
+        using mu_seam_test::TempStorage;
+
+        for (int full = 0; full < 2; ++full)
+        {
+            t.beginTest(juce::String("setStateInformation cancels a staged ") + (full ? "full preset" : "layer swap")
+                        + " and the restored state wins");
+            TempStorage storage;
+            Proc p;
+
+            // The state the host will hand back: the parameter at b.
+            x.set(p, x.b);
+            juce::MemoryBlock saved;
+            p.getStateInformation(saved);
+
+            // What gets staged holds a.
+            x.set(p, x.a);
+            // saveFullPresetTo writes <stem>.<the product's full-preset extension>, so name the file with it.
+            const auto file = storage.root.getChildFile("restore_cancel." + p.getFullPresetExtension());
+            if (full) t.expect(p.saveFullPresetTo(file), "a full preset was written");
+            else      t.expect(p.storeClip(0, 2), "a clip was stored");
+
+            p.layerSwapper.flagBoundaries(true, 0.0, 0.1);   // the transport is running, so a load stages
+            if (full) p.loadPreset(file);
+            else      t.expect(p.launchClip(0, 2), "the clip launch was accepted");
+            const bool staged = full ? p.hasPendingFullPreset() : p.hasPendingSwap(0);
+            t.expect(staged, "the swap is staged beforehand");
+            if (! staged) continue;
+
+            p.setStateInformation(saved.getData(), (int) saved.getSize());
+            t.expect(! p.hasPendingFullPreset() && ! p.hasPendingSwap(0), "nothing is staged after the restore");
+            t.expectWithinAbsoluteError(x.get(p), x.b, x.tolerance, "the restored value is in place");
+
+            // The bar line that would have committed the staged swap.
+            p.layerSwapper.flagBoundaries(true, 3.95, 0.2);
+            p.layerSwapper.commit();
+            t.expectWithinAbsoluteError(x.get(p), x.b, x.tolerance, "and the staged swap did not land on top of it");
+        }
+    }
 }

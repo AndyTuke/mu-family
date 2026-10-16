@@ -4,6 +4,7 @@
 #include "VoiceSection.h"
 #include "MidiOutSection.h"
 #include "UI/LayerHeaderBar.h"
+#include "UI/ParamRefreshQueue.h"
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/SegmentControl.h"
 #include "UI/Components/MuLookAndFeel.h"
@@ -132,6 +133,13 @@ private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     void registerRhythmListeners(int ri);
     void deregisterRhythmListeners(int ri);
+
+    // Refresh the one control a parameter id belongs to (message thread).
+    void refreshForParameter(const juce::String& parameterID);
+
+    // Parameter ids that arrive on a non-message thread (host automation on the audio thread) wait here
+    // for timerCallback, which refreshes their controls on the message thread.
+    mu_ui::ParamRefreshQueue refreshQueue;
 };
 
 } // namespace mu_clid

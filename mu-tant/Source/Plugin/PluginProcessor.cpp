@@ -2,6 +2,7 @@
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/SwapBoundary.h"   // mu-tant: the hot-swap boundary rule
 #include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
+#include "Plugin/MidiRaw.h"             // mu-core: note tests on raw MIDI bytes (no allocation)
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 #include "Audio/Scales.h"
 #include "Modulation/MuTantModDest.h"
@@ -391,17 +392,20 @@ void PluginProcessor::applyModulation(int v, VoiceConfig& cfg)
     cfg.osc2Fine     = juce::roundToInt(out[D_o2Fine]);
     cfg.osc2Pos      = out[D_o2Pos];
 
-    // Pitch (semitones): a Stepped CS snaps the whole result to a semitone (melodies); a
-    // smooth source glides via a fractional offset on top of the exact integer base.
+    // Pitch (scale degrees): a Stepped CS snaps the whole result to a degree (melodies); a smooth
+    // source glides through the scale via a fractional degree offset (ToneMod) on top of the exact
+    // integer base. The offset is in degrees, not semitones, so a smooth source reaches the same
+    // notes as a stepped one; the pitch envelope adds chromatic semitones separately (SemiMod).
     {
         const float o1Base = (float) voicePtrs[(size_t) v].o1Semi->load();
         const float o2Base = (float) voicePtrs[(size_t) v].o2Semi->load();
         const bool  o1Stepped = getPattern(v).osc1SemiStepped.load(std::memory_order_relaxed);
         const bool  o2Stepped = getPattern(v).osc2SemiStepped.load(std::memory_order_relaxed);
-        if (o1Stepped) { cfg.osc1Semi = juce::roundToInt(out[D_o1Semi]); cfg.osc1SemiMod = 0.0f; }
-        else           { cfg.osc1Semi = juce::roundToInt(o1Base);        cfg.osc1SemiMod = out[D_o1Semi] - o1Base; }
-        if (o2Stepped) { cfg.osc2Semi = juce::roundToInt(out[D_o2Semi]); cfg.osc2SemiMod = 0.0f; }
-        else           { cfg.osc2Semi = juce::roundToInt(o2Base);        cfg.osc2SemiMod = out[D_o2Semi] - o2Base; }
+        cfg.osc1SemiMod = cfg.osc2SemiMod = 0.0f;   // the pitch envelope adds to these below
+        if (o1Stepped) { cfg.osc1Semi = juce::roundToInt(out[D_o1Semi]); cfg.osc1ToneMod = 0.0f; }
+        else           { cfg.osc1Semi = juce::roundToInt(o1Base);        cfg.osc1ToneMod = out[D_o1Semi] - o1Base; }
+        if (o2Stepped) { cfg.osc2Semi = juce::roundToInt(out[D_o2Semi]); cfg.osc2ToneMod = 0.0f; }
+        else           { cfg.osc2Semi = juce::roundToInt(o2Base);        cfg.osc2ToneMod = out[D_o2Semi] - o2Base; }
     }
     cfg.xmodIndex    = out[D_xmIndex] * 0.01f;   // param 0..100 → engine 0..1
     cfg.xmodDepth    = out[D_xmDepth] * 0.01f;   // param -100..100 → engine -1..1
@@ -659,6 +663,7 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
         if (xml->hasTagName(apvts.state.getType()))
         {
             const auto tree = juce::ValueTree::fromXml(*xml);
+            cancelAllStagedSwaps();                    // nothing staged before the restore may land on top of it
             applyFullPresetTree(toVoiceState(tree));   // host state restore — always immediate
             restoreLiveState(tree);                    // after the preset: it names the item that is playing
         }
@@ -776,10 +781,9 @@ void PluginProcessor::scanNoteMode(const juce::MidiBuffer& midi)
     // notes — beyond that the oldest is dropped (silently) to keep the array bounded.
     for (const auto meta : midi)
     {
-        const auto msg = meta.getMessage();
-        if (msg.isNoteOn())
+        if (mu_midi::isNoteOn (meta))
         {
-            const int note = msg.getNoteNumber();
+            const int note = mu_midi::noteNumber (meta);
             for (int i = 0; i < numHeldNotes; ++i)        // de-dupe a re-pressed note
                 if (heldNotes[(size_t) i] == note) { --numHeldNotes;
                     for (int j = i; j < numHeldNotes; ++j) heldNotes[(size_t) j] = heldNotes[(size_t) j + 1];
@@ -791,9 +795,9 @@ void PluginProcessor::scanNoteMode(const juce::MidiBuffer& midi)
             }
             heldNotes[(size_t) numHeldNotes++] = note;
         }
-        else if (msg.isNoteOff())
+        else if (mu_midi::isNoteOff (meta))
         {
-            const int note = msg.getNoteNumber();
+            const int note = mu_midi::noteNumber (meta);
             for (int i = 0; i < numHeldNotes; ++i)
                 if (heldNotes[(size_t) i] == note) { --numHeldNotes;
                     for (int j = i; j < numHeldNotes; ++j) heldNotes[(size_t) j] = heldNotes[(size_t) j + 1];

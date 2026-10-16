@@ -279,6 +279,7 @@ void Track::clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, i
 {
     row.setGroove(swingRow.load(0.0f), accentRow.load(1.0f));
     if (! ctx.playing) return;
+    if (ctx.justStarted) clock.seek(ctx.startBeat);   // the step the transport starts in fires, even on a quick replay
     clock.processSpan(row, ctx.startBeat, n, ctx.beatsPerSample, row.swingAmount(), row.accentVelocity(),
                       [this, fireInto, e](float velocity, int offset)
                       {

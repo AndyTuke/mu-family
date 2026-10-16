@@ -48,6 +48,7 @@ public:
     // setAlgorithm to read the algorithm's new defaults out of the slot and
     // push them into APVTS so the visible knobs match the audible state.
     float getSize()      const noexcept { return size; }
+    float getDecay()     const noexcept { return decay; }
     float getPreDelay()  const noexcept { return preDelay.load(std::memory_order_relaxed); }
     float getDiffusion() const noexcept { return diffusion; }
     float getDamp()      const noexcept { return damp; }
@@ -76,7 +77,7 @@ private:
     float              damp      = 0.4f;
     float              mod       = 0.2f;
     std::atomic<float> dirt      { 0.0f };    // read by processReturn (audio thread)
-    float              rt20      = 1.0f;      // decay time to -20dB (set per algorithm)
+    float              decay     = 2.0f;      // RT60: seconds to decay by 60 dB (set per algorithm, then by the Decay knob)
 
     double sr = 44100.0;
 

@@ -1,4 +1,5 @@
 #include "VoiceEngine.h"
+#include "EnvelopeParams.h"
 #include <cmath>
 #include <limits>
 
@@ -121,13 +122,18 @@ void VoiceEngine::trigger(bool isAccented, bool tied)
     // the insert. Tied hits on an active amp envelope already returned above so env state
     // carries across contiguous pattern hits (pattern legato unchanged).
     (void) claimedIndex;  // slot index no longer needed for env routing
+    // The filter and pitch envelopes are engine-level too and retrigger on untied hits like the amp envelope.
     ampEnv.reset();
-    ampEnv.noteOn();
-
-    // Filter / pitch envelopes — also engine-level, also retrigger on untied hits.
     filterEnv.reset();
-    filterEnv.noteOn();
     pitchEnv.reset();
+    ampReleasing = filterReleasing = pitchReleasing = false;
+
+    // The envelopes are idle now, so parameters that were held back during a release apply here: the new
+    // note starts with the current settings (syncEnvelopes otherwise runs only when a parameter changes).
+    syncEnvelopes();
+
+    ampEnv.noteOn();
+    filterEnv.noteOn();
     pitchEnv.noteOn();
 }
 
@@ -258,7 +264,10 @@ void VoiceEngine::markRetired() noexcept
     //    left it); sample plays through to its natural end at that level.
     //    isFullyDrained() switches to a voices-only drain criterion in this mode.
     if (!activeParams.ampRelToEnd)
+    {
         ampEnv.noteOff();
+        ampReleasing = true;
+    }
 
     // Filter / pitch envelopes — also engine-level — get a finite release. noteOff
     // so they progress to idle. Filter / insert state is NOT reset on note-off:
@@ -267,6 +276,7 @@ void VoiceEngine::markRetired() noexcept
     // feedback, and reverb-style insert tails).
     filterEnv.noteOff();
     pitchEnv.noteOff();
+    filterReleasing = pitchReleasing = true;
 
     // ~2 s drain budget for feedback-based inserts (Karplus loopGain cap 0.9999
     // decays to noise floor in well under this). Sampled in blocks: 2 s × sampleRate
@@ -281,9 +291,13 @@ void VoiceEngine::releaseHeldNote() noexcept
 {
     // Same envelope release as markRetired; the engine stays live, so no retired flag or drain timer.
     if (! activeParams.ampRelToEnd)
+    {
         ampEnv.noteOff();
+        ampReleasing = true;
+    }
     filterEnv.noteOff();
     pitchEnv.noteOff();
+    filterReleasing = pitchReleasing = true;
 }
 
 bool VoiceEngine::isFullyDrained() const noexcept
@@ -371,15 +385,16 @@ void VoiceEngine::syncEnvelopes()
                                              juce::jmax(kMinDecayRelSec, activeParams.ampEnvDec),
                                              activeParams.ampEnvSus,
                                              juce::jmax(kMinDecayRelSec, activeParams.ampEnvRel) };
-    ampEnv.setParameters(ampParams);
-    filterEnv.setParameters({ activeParams.filterEnvAtk,
-                              juce::jmax(kMinDecayRelSec, activeParams.filterEnvDec),
-                              activeParams.filterEnvSus,
-                              juce::jmax(kMinDecayRelSec, activeParams.filterEnvRel) });
-    pitchEnv.setParameters ({ activeParams.pitchEnvAtk,
-                              juce::jmax(kMinDecayRelSec, activeParams.pitchEnvDec),
-                              activeParams.pitchEnvSus,
-                              juce::jmax(kMinDecayRelSec, activeParams.pitchEnvRel) });
+    // Only when changed and not mid-release (mu_env): ADSR::setParameters would otherwise cut a release.
+    mu_env::applyParameters(ampEnv, ampParams, ampReleasing);
+    mu_env::applyParameters(filterEnv, { activeParams.filterEnvAtk,
+                                         juce::jmax(kMinDecayRelSec, activeParams.filterEnvDec),
+                                         activeParams.filterEnvSus,
+                                         juce::jmax(kMinDecayRelSec, activeParams.filterEnvRel) }, filterReleasing);
+    mu_env::applyParameters(pitchEnv, { activeParams.pitchEnvAtk,
+                                        juce::jmax(kMinDecayRelSec, activeParams.pitchEnvDec),
+                                        activeParams.pitchEnvSus,
+                                        juce::jmax(kMinDecayRelSec, activeParams.pitchEnvRel) }, pitchReleasing);
 }
 
 void VoiceEngine::syncFilter()

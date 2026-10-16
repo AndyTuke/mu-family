@@ -29,6 +29,9 @@ public:
     // Realign to the top of the pattern (call when the transport (re)starts from 0).
     void reset() noexcept { for (auto& c : clocks) c.reset(); }
 
+    // Realign every row's clock to the step the playhead sits in (the transport started there).
+    void seek(double beat) noexcept { for (auto& c : clocks) c.seek(beat); }
+
     // Fire every step boundary that falls in the block beginning at `beatStart`. The
     // caller advances the transport itself; this only emits triggers.
     void process(double beatStart, int numSamples, double bpm, const TriggerFn& fire);

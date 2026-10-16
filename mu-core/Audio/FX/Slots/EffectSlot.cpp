@@ -54,14 +54,16 @@ void EffectSlot::setParam(const juce::String& id, float value)
 
 void EffectSlot::processReturn(juce::AudioBuffer<float>& buffer)
 {
-    if (!enabled.load(std::memory_order_relaxed)) return;
+    // A disabled slot returns silence: the buffer arrives holding the dry send, which is already in
+    // the main bus and must not be added back through the return.
+    if (!enabled.load(std::memory_order_relaxed)) { buffer.clear(); return; }
     if (algorithmIndex.load(std::memory_order_relaxed) == kEchoAlgoIndex)
     {
-        echoDelay.processReturn(buffer);
+        echoDelay.processReturn(buffer);   // clears the buffer itself when the echo delay is off
         return;
     }
     auto* algo = currentAlgorithm();
-    if (!algo) return;
+    if (!algo) { buffer.clear(); return; }
     oversampler->process(buffer, [algo](juce::dsp::AudioBlock<float>& block)
     {
         algo->processInner(block);

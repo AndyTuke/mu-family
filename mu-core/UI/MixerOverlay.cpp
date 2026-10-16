@@ -15,6 +15,7 @@ static constexpr int kSyncDenoms[] = { 32, 16, 8, 4 };
 // Reverb row knob id → its APVTS parameter (matching ranges, so values pass straight through).
 static const std::pair<const char*, const char*> kRevParamMap[] = {
     { "size",      "rev_size" },
+    { "decay",     "rev_decay" },
     { "predelay",  "rev_pre"  },
     { "diffusion", "rev_diff" },
     { "damp",      "rev_damp" },
@@ -328,6 +329,7 @@ void MixerOverlay::wireFXRows()
                 pp->setValueNotifyingHost(pp->convertTo0to1(v));
         };
         pushP("rev_size", rev.getSize());
+        pushP("rev_decay", rev.getDecay());
         pushP("rev_pre",  rev.getPreDelay());
         pushP("rev_diff", rev.getDiffusion());
         pushP("rev_damp", rev.getDamp());
