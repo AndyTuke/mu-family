@@ -47,22 +47,21 @@ public:
         // filter coefficient step, much smaller than the gain step.
         for (int ch = 0; ch < nCh; ++ch)
             toneFilter[ch].prepare(toneHz, (float)currentSampleRate);
-        for (int ch = 0; ch < nCh; ++ch)
+        // Sample-major: each smoothed gain advances once per sample and every channel uses it.
+        auto** chans = buf.getArrayOfWritePointers();
+        for (int i = 0; i < ns; ++i)
         {
-            auto*  data = buf.getWritePointer(ch);
-            float& di   = dcIn [ch < 2 ? ch : 0];
-            float& dout = dcOut[ch < 2 ? ch : 0];
-            for (int i = 0; i < ns; ++i)
+            const float pg = smoothedPreGain.getNextValue();
+            const float og = smoothedOutGain.getNextValue();
+            for (int ch = 0; ch < nCh; ++ch)
             {
-                const float pg = (ch == 0) ? smoothedPreGain.getNextValue()
-                                           : smoothedPreGain.getCurrentValue();
-                const float og = (ch == 0) ? smoothedOutGain.getNextValue()
-                                           : smoothedOutGain.getCurrentValue();
-                const float sat = std::tanh(data[i] * pg);
+                float& di   = dcIn [ch < 2 ? ch : 0];
+                float& dout = dcOut[ch < 2 ? ch : 0];
+                const float sat = std::tanh(chans[ch][i] * pg);
                 const float dc  = sat - di + dcCoeff * dout;
                 di   = sat;
                 dout = dc;
-                data[i] = toneFilter[ch].process(dc) * og;
+                chans[ch][i] = toneFilter[ch].process(dc) * og;
             }
         }
     }

@@ -39,23 +39,23 @@ public:
             if (x < -1.0f) return -x - 0.5f;
             return x * x * 0.5f;
         };
-        for (int ch = 0; ch < nCh; ++ch)
+        // Sample-major: each smoothed gain advances once per sample and every channel uses it, so the right
+        // channel ramps with the left (channel-major looping left the right one stepping per block).
+        auto** chans = buf.getArrayOfWritePointers();
+        for (int i = 0; i < ns; ++i)
         {
-            auto*  data = buf.getWritePointer(ch);
-            float& xp   = xPrev[ch < 2 ? ch : 0];
-            for (int i = 0; i < ns; ++i)
+            const float pg = smoothedPreGain.getNextValue();
+            const float og = smoothedOutGain.getNextValue();
+            for (int ch = 0; ch < nCh; ++ch)
             {
-                const float pg = (ch == 0) ? smoothedPreGain.getNextValue()
-                                           : smoothedPreGain.getCurrentValue();
-                const float og = (ch == 0) ? smoothedOutGain.getNextValue()
-                                           : smoothedOutGain.getCurrentValue();
-                const float x  = data[i] * pg;
+                float& xp = xPrev[ch < 2 ? ch : 0];
+                const float x  = chans[ch][i] * pg;
                 const float dx = x - xp;
                 float y = std::abs(dx) < 1e-4f
                             ? juce::jlimit(-1.0f, 1.0f, 0.5f * (x + xp))
                             : (ad1Clip(x) - ad1Clip(xp)) / dx;
-                data[i] = y * og;
-                xp      = x;
+                chans[ch][i] = y * og;
+                xp           = x;
             }
         }
     }

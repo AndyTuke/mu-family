@@ -42,23 +42,22 @@ public:
             return std::abs(x) > 12.0f ? std::abs(x) - 0.6931472f
                                        : std::log(std::cosh(x));
         };
-        for (int ch = 0; ch < nCh; ++ch)
+        // Sample-major: each smoothed gain advances once per sample and every channel uses it, so the right
+        // channel ramps with the left (channel-major looping left the right one stepping per block).
+        auto** chans = buf.getArrayOfWritePointers();
+        for (int i = 0; i < ns; ++i)
         {
-            auto*  data = buf.getWritePointer(ch);
-            float& xp   = xPrev[ch < 2 ? ch : 0];
-            for (int i = 0; i < ns; ++i)
+            const float pg = smoothedPreGain.getNextValue();
+            const float og = smoothedOutGain.getNextValue();
+            for (int ch = 0; ch < nCh; ++ch)
             {
-                // ch0 advances the ramps; ch1 reads the latest values.
-                const float pg = (ch == 0) ? smoothedPreGain.getNextValue()
-                                           : smoothedPreGain.getCurrentValue();
-                const float og = (ch == 0) ? smoothedOutGain.getNextValue()
-                                           : smoothedOutGain.getCurrentValue();
-                const float x  = data[i] * pg;
+                float& xp = xPrev[ch < 2 ? ch : 0];
+                const float x  = chans[ch][i] * pg;
                 const float dx = x - xp;
                 float y = std::abs(dx) < 1e-4f ? std::tanh(0.5f * (x + xp))
                                                : (ad1Tanh(x) - ad1Tanh(xp)) / dx;
-                data[i] = y * og;
-                xp      = x;
+                chans[ch][i] = y * og;
+                xp           = x;
             }
         }
     }

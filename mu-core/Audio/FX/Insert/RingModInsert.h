@@ -48,22 +48,22 @@ public:
        #endif
         smoothedPhInc.setTargetValue(phInc);
         smoothedMix  .setTargetValue(mix);
-        for (int ch = 0; ch < nCh; ++ch)
+        // Sample-major: the phase increment and mix advance once per sample and every channel uses them, so the
+        // two channels' carriers stay in step (channel-major looping let the left ramp its increment up from 0
+        // while the right ran at full rate, leaving the phases offset for good).
+        auto** chans = buf.getArrayOfWritePointers();
+        for (int i = 0; i < ns; ++i)
         {
-            auto*  data = buf.getWritePointer(ch);
-            float& ph   = phase[ch < 2 ? ch : 0];
-            for (int i = 0; i < ns; ++i)
+            const float pInc = smoothedPhInc.getNextValue();
+            const float m    = smoothedMix  .getNextValue();
+            for (int ch = 0; ch < nCh; ++ch)
             {
-                // ch0 advances the ramps; ch1 reads the latest values.
-                const float pInc = (ch == 0) ? smoothedPhInc.getNextValue()
-                                             : smoothedPhInc.getCurrentValue();
-                const float m    = (ch == 0) ? smoothedMix  .getNextValue()
-                                             : smoothedMix  .getCurrentValue();
+                float& ph = phase[ch < 2 ? ch : 0];
                 const float carrier = std::sin(ph);
                 ph += pInc;
                 if (ph >= juce::MathConstants<float>::twoPi)
                     ph -= juce::MathConstants<float>::twoPi;
-                data[i] = data[i] * (1.0f - m + carrier * m);
+                chans[ch][i] = chans[ch][i] * (1.0f - m + carrier * m);
             }
         }
        #if JUCE_DEBUG

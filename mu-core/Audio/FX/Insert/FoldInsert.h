@@ -31,18 +31,18 @@ public:
         const float outGain  = std::pow(10.0f, outputDb / 20.0f);
         smoothedPreGain.setTargetValue(preGain);
         smoothedOutGain.setTargetValue(outGain);
-        for (int ch = 0; ch < nCh; ++ch)
+        // Sample-major: each smoothed gain advances once per sample and every channel uses it, so the right
+        // channel ramps with the left (channel-major looping left the right one stepping per block).
+        auto** chans = buf.getArrayOfWritePointers();
+        for (int i = 0; i < ns; ++i)
         {
-            auto* data = buf.getWritePointer(ch);
-            for (int i = 0; i < ns; ++i)
+            const float pg = smoothedPreGain.getNextValue();
+            const float og = smoothedOutGain.getNextValue();
+            for (int ch = 0; ch < nCh; ++ch)
             {
-                const float pg = (ch == 0) ? smoothedPreGain.getNextValue()
-                                           : smoothedPreGain.getCurrentValue();
-                const float og = (ch == 0) ? smoothedOutGain.getNextValue()
-                                           : smoothedOutGain.getCurrentValue();
                 // Triangle fold with period 4, closed form (no clamp, so a hard-driven input keeps folding):
                 // t = (x + 1) mod 4 in [0, 4); rising 0..2 gives -1..+1, falling 2..4 gives +1..-1.
-                const float x = data[i] * pg;
+                const float x = chans[ch][i] * pg;
                 float fx = 0.0f;
                 if (std::isfinite(x))
                 {
@@ -50,7 +50,7 @@ public:
                     if (t < 0.0f) t += 4.0f;
                     fx = (t < 2.0f) ? t - 1.0f : 3.0f - t;
                 }
-                data[i] = fx * og;
+                chans[ch][i] = fx * og;
             }
         }
     }

@@ -55,23 +55,19 @@ public:
         smoothedOut   .setTargetValue(outGain);
 
         float peakGainDb = 0.0f;  // 0 or negative — fed back to UI meter via grOut
-        for (int ch = 0; ch < nCh; ++ch)
+        // Sample-major: the four smoothed values advance once per sample and every channel uses them, so the
+        // channels' thresholds and gains ramp together (channel-major looping left the right channel stepping).
+        auto** chans = buf.getArrayOfWritePointers();
+        for (int i = 0; i < ns; ++i)
         {
-            auto*  data = buf.getWritePointer(ch);
-            float& env  = envelope[ch < 2 ? ch : 0];
-            for (int i = 0; i < ns; ++i)
+            const float attCoeff = smoothedAtt   .getNextValue();
+            const float relCoeff = smoothedRel   .getNextValue();
+            const float thr      = smoothedThresh.getNextValue();
+            const float og       = smoothedOut   .getNextValue();
+            for (int ch = 0; ch < nCh; ++ch)
             {
-                // ch0 advances the ramps; ch1 reads the latest values.
-                const float attCoeff = (ch == 0) ? smoothedAtt   .getNextValue()
-                                                 : smoothedAtt   .getCurrentValue();
-                const float relCoeff = (ch == 0) ? smoothedRel   .getNextValue()
-                                                 : smoothedRel   .getCurrentValue();
-                const float thr      = (ch == 0) ? smoothedThresh.getNextValue()
-                                                 : smoothedThresh.getCurrentValue();
-                const float og       = (ch == 0) ? smoothedOut   .getNextValue()
-                                                 : smoothedOut   .getCurrentValue();
-
-                const float level = std::abs(data[i]);
+                float& env = envelope[ch < 2 ? ch : 0];
+                const float level = std::abs(chans[ch][i]);
                 env = level > env ? attCoeff * env + (1.0f - attCoeff) * level
                                   : relCoeff * env + (1.0f - relCoeff) * level;
 
@@ -82,7 +78,7 @@ public:
                     gainDb = -overDb * (1.0f - 1.0f / ratio);
                 }
                 if (gainDb < peakGainDb) peakGainDb = gainDb;
-                data[i] *= juce::Decibels::decibelsToGain(gainDb) * og;
+                chans[ch][i] *= juce::Decibels::decibelsToGain(gainDb) * og;
             }
         }
         // Normalise to 0..1 (1 ≡ 24 dB GR) for the UI meter.

@@ -168,6 +168,7 @@ public:
         smoothedDelay.reset(sampleRate, 0.010);
         smoothedDelay.setCurrentAndTargetValue(static_cast<float>(sampleRate / 1000.0));
         delayRamp.assign(static_cast<size_t>(juce::jmax(1, blockSize)), smoothedDelay.getCurrentValue());
+        resRamp  .assign(static_cast<size_t>(juce::jmax(1, blockSize)), 0.0f);
     }
     void reset() override
     {
@@ -184,11 +185,14 @@ public:
     {
         smoothedRes.setTargetValue(resonance);
         smoothedDelay.setTargetValue(static_cast<float>(currentSampleRate) / juce::jmax(20.0f, cutoffHz));
-        // Pre-compute the per-sample delay ramp once so every channel reads the
-        // identical glide (otherwise only ch0 advances it and ch1 would click).
+        // Pre-compute the per-sample delay and resonance ramps once so every channel reads the
+        // identical glide (otherwise only ch0 advances it and ch1 would click or step).
         jassert(numSamples <= static_cast<int>(delayRamp.size()));
         for (int i = 0; i < numSamples; ++i)
+        {
             delayRamp[static_cast<size_t>(i)] = smoothedDelay.getNextValue();
+            resRamp  [static_cast<size_t>(i)] = smoothedRes  .getNextValue();
+        }
 
         const int nCh = juce::jmin(numChannels, 2);
         for (int ch = 0; ch < nCh; ++ch)
@@ -199,9 +203,7 @@ public:
             auto*     data    = audio.getWritePointer(ch);
             for (int i = 0; i < numSamples; ++i)
             {
-                // ch0 advances the resonance ramp; ch1 reads the latest value.
-                const float g     = (float) Sign * ((ch == 0) ? smoothedRes.getNextValue()
-                                                          : smoothedRes.getCurrentValue());
+                const float g     = (float) Sign * resRamp[static_cast<size_t>(i)];
                 const float delayF = delayRamp[static_cast<size_t>(i)];
                 const float readF = static_cast<float>(w) - delayF;
                 const int   r0    = ((static_cast<int>(std::floor(readF)) % bufSize) + bufSize) % bufSize;
@@ -221,6 +223,7 @@ private:
     std::vector<float> buf[2];
     int                wPos[2] = { 0, 0 };
     std::vector<float> delayRamp;   // per-sample smoothed delay length, shared across channels
+    std::vector<float> resRamp;     // per-sample smoothed resonance (feedback gain), shared across channels
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedRes;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedDelay;
 };
