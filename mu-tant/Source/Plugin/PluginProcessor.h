@@ -4,6 +4,7 @@
 #include "Plugin/MixerFxParams.h"            // mu-core: shared global-FX/mixer APVTS layout
 #include "Sequencer/Pattern.h"           // mu-Tant layer type (derives mu-core Layer)
 #include "Persistence/PatternParams.h"   // the Pattern type's parameter ids and rows
+#include "UI/PatternHost.h"               // what the Pattern layer and its UI read from their host
 #include "Modulation/LaneModulation.h"       // mu-core: shared range-based per-lane resolve
 #include "Sequencer/GatePattern.h"           // mu-tant: per-voice gate pattern
 #include "Audio/SynthVoice.h"                // mu-tant voice
@@ -30,7 +31,8 @@
 namespace mu_tant
 {
 
-class PluginProcessor : public ProcessorBase
+class PluginProcessor : public ProcessorBase,
+                        public PatternHost
 {
 public:
 
@@ -122,11 +124,11 @@ public:
     // The engine state of a slot stays put while its Pattern moves, so the slot is cleared for the
     // new tenant (called under layersLock; the render only runs under it).
     void layersMoved(int firstIndex, int lastIndex) override;
-    // Recompute the cached stepped-pitch flags for one voice / all voices. Call on the
-    // message thread whenever a voice's modulators change (editor edit, preset load,
+    // Recompute the cached stepped-pitch flags for one voice / all voices (Pattern::refreshPitchQuantFlags).
+    // Call on the message thread whenever a voice's modulators change (editor edit, preset load,
     // voice add/remove/swap/reset); the audio thread reads the flags lock-free.
-    void refreshPitchQuantFlags(int v);
-    void refreshAllPitchQuantFlags();
+    void refreshPitchQuantFlags(int v) { if (v >= 0 && v < mu_limits::kMaxLayers) getPattern(v).refreshPitchQuantFlags(); }
+    void refreshAllPitchQuantFlags()   { for (int v = 0; v < mu_limits::kMaxLayers; ++v) refreshPitchQuantFlags(v); }
 
     // Per-voice ("layer") presets — the voice's `v{N}_*` subtree saved/loaded as
     // a `.muPattern` file (voice-agnostic base IDs, so a preset loads into any
@@ -227,9 +229,6 @@ private:
     void   applyModulation    (int v, VoiceConfig& cfg);
     void   applyFilterEnvelope(int v, VoiceConfig& cfg, int numSamples);
     void   applyPitchEnvelope (int v, VoiceConfig& cfg);
-    // True if a Stepped ControlSequence is assigned to `destId` — those snap pitch to
-    // semitones (melodies); smooth sources + the envelope glide.
-    bool   pitchDestHasSteppedSource(const Layer& slot, const char* destId) const;
     bool   blkPlaying        = false;
     double blkBeatStart      = 0.0;
     double blkBeatsPerSample = 0.0;
@@ -265,6 +264,20 @@ private:
     int retireRampSamples() const { return juce::jmax(1, (int) (currentSampleRate * 0.025)); }
 
 public:
+    // ── PatternHost: what the Pattern layer and PatternContent read (message thread) ──────────
+    juce::AudioProcessorValueTreeState& getPatternParameters() noexcept override { return apvts; }
+    Pattern&     getPatternLayer(int layer) noexcept override                     { return getPattern(layer); }
+    float        getPatternModLive(int layer, int snap) const noexcept override    { return getTantSnap(layer, snap); }
+    const std::atomic<float>* getPatternInsertGainReduction(int layer) const override { return getInsertGR(layer); }
+    bool         isPatternTransportPlaying() const noexcept override              { return isInternalPlaying(); }
+    double       getPatternTransportBeat() const noexcept override                { return getInternalBeatPos(); }
+    juce::File   getPatternWavetablesDir() const override                         { return getWavetablesDir(); }
+    juce::String getPatternWavetablePath(int layer, int oscIndex) const override  { return userWavetablePath(layer, oscIndex); }
+    bool         isPatternWavetableMissing(int layer, int oscIndex) const override { return userWavetableMissing(layer, oscIndex); }
+    void         loadPatternWavetable(int layer, int oscIndex, const juce::File& file) override { loadUserWavetable(layer, oscIndex, file); }
+    void         clearPatternWavetable(int layer, int oscIndex) override          { clearUserWavetable(layer, oscIndex); }
+    int          resolvePatternWavetable(const juce::String& path) override;
+
     // Voice `i`'s Pattern (modulators, gate / filter / pitch envelopes, user wavetables, level tap),
     // valid for every slot 0..kMaxLayers-1. Public so the UI (ModulatorPanel, PatternContent) can point
     // at the currently-edited voice.
@@ -337,20 +350,10 @@ private:
     // from layersLock so an import never blocks a layer edit and the reverse.
     juce::CriticalSection bankLock;
 
-    friend struct Pattern;   // its persistence hooks hand over to the voice-extras members below
-    // Composed state (mu-core LayerState): the voice layout every save / load uses, a voice's
-    // non-parameter data (modulators, gates, user wavetables — they live outside APVTS) from its
-    // node, and any saved state rebuilt in the composed shape with old X-Mod data migrated.
+    // Composed state (mu-core LayerState): the voice layout every save / load uses (a voice's
+    // non-parameter data is the Pattern's own writeExtras / applyExtras), and any saved state rebuilt
+    // in the composed shape with old X-Mod data migrated.
     void            initVoiceState();
-    void            writeVoiceExtras(int v, juce::ValueTree& node) const;
-    void            applyVoiceExtras(int v, const juce::ValueTree& node);
-    int             voiceOf(const Pattern& p) const noexcept
-    {
-        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
-            if (layers[(size_t) i].get() == &p) return i;
-        return -1;
-    }
-    void            resolveUserWavetable(const juce::String& path, juce::String& storedPath, std::atomic<int>& index);
     juce::ValueTree toVoiceState(const juce::ValueTree& tree) const;
 
     // ── Preset hot-swap (full / per-voice) ─────────────────────────

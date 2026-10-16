@@ -21,16 +21,6 @@ namespace mu_tant
 
 namespace
 {
-    // mu-tant modulation-destination validator (drops assignments to dests this
-    // product doesn't expose; source IDs are ControlSequence ids, left unchecked).
-    // Used only by the preset-load paths below.
-    bool isValidModDest(const std::string& id)
-    {
-        for (int i = 0; i < kModDestCount; ++i)
-            if (id == kModDestTable[i].id) return true;
-        return false;
-    }
-
     // ── X-Mod preset migration (best-effort) ─────────────────────────────────
     // Old presets / patches carry xmod_fm / _am / _ring (+ modulator assignments to
     // xmod.fm/.am/.ring); the 2-lane redesign replaces them. Old FM depth → Lane A index in
@@ -105,46 +95,12 @@ void PluginProcessor::initVoiceState()
     initLayerState(prefixes);
 }
 
-// A voice's non-parameter data onto its node.
-void PluginProcessor::writeVoiceExtras(int v, juce::ValueTree& node) const
+// A saved user wavetable path → its bank index (-1: none, or the file is gone). Lock-free resolve first:
+// a hot-swap stage pre-loaded the table, so the boundary commit never takes bankLock (taking it would bail
+// the audio render to silence for that block). Only a load that wasn't pre-loaded (stopped / host restore —
+// audio silent then) takes the locked disk path.
+int PluginProcessor::resolvePatternWavetable(const juce::String& path)
 {
-    if (getPattern(v).osc1UserPath.isNotEmpty()) node.setProperty("o1WtPath", getPattern(v).osc1UserPath, nullptr);
-    if (getPattern(v).osc2UserPath.isNotEmpty()) node.setProperty("o2WtPath", getPattern(v).osc2UserPath, nullptr);
-    node.appendChild(mu_pp::serialiseModulators(getPattern(v)),                 nullptr);
-    node.appendChild(serialiseGate(getPattern(v).gate),                 nullptr);
-    node.appendChild(serialiseGate(getPattern(v).filterGate, "FilterGate"), nullptr);
-    node.appendChild(serialiseGate(getPattern(v).pitchGate,  "PitchGate"),  nullptr);
-}
-
-void Pattern::writeExtras(juce::ValueTree& node) const { owner.ptr->writeVoiceExtras(owner.ptr->voiceOf(*this), node); }
-void Pattern::applyExtras(const juce::ValueTree& node) { owner.ptr->applyVoiceExtras(owner.ptr->voiceOf(*this), node); }
-
-// A voice's non-parameter data from its node. Absent children clear (an invalid tree empties a
-// gate / the modulators); per-pattern spinlocks and modLock guard the audio thread, so no
-// layersLock is needed.
-void PluginProcessor::applyVoiceExtras(int v, const juce::ValueTree& node)
-{
-    mu_pp::clearModulators(getPattern(v));
-    mu_pp::deserialiseModulators(node.getChildWithName("Modulators"), getPattern(v), {}, isValidModDest);
-    refreshPitchQuantFlags(v);   // assignments changed → refresh stepped-pitch flags
-
-    const int maxCells = std::numeric_limits<int>::max();
-    deserialiseGate(node.getChildWithName("Gate"),       getPattern(v).gate,   maxCells);
-    deserialiseGate(node.getChildWithName("FilterGate"), getPattern(v).filterGate, maxCells);
-    deserialiseGate(node.getChildWithName("PitchGate"),  getPattern(v).pitchGate,  maxCells);
-
-    resolveUserWavetable(node.getProperty("o1WtPath").toString(), getPattern(v).osc1UserPath, getPattern(v).osc1UserIndex);
-    resolveUserWavetable(node.getProperty("o2WtPath").toString(), getPattern(v).osc2UserPath, getPattern(v).osc2UserIndex);
-}
-
-// A user wavetable path → its bank index. A missing file keeps the path (the UI shows "missing")
-// but resolves to -1, so the oscillator falls back to its factory selection. Lock-free resolve
-// first: a hot-swap stage pre-loaded the table, so the boundary commit never takes bankLock
-// (taking it would bail the audio render to silence for that block). Only a load that wasn't
-// pre-loaded (stopped / host restore — audio silent then) takes the locked disk path.
-void PluginProcessor::resolveUserWavetable(const juce::String& path, juce::String& storedPath, std::atomic<int>& index)
-{
-    storedPath = path;
     int idx = -1;
     if (path.isNotEmpty())
     {
@@ -155,7 +111,7 @@ void PluginProcessor::resolveUserWavetable(const juce::String& path, juce::Strin
             if (f.existsAsFile()) idx = bankIndexFor(f);
         }
     }
-    index.store(idx);
+    return idx;
 }
 
 // Any saved state (host session or full preset, either format) in the composed shape, with each

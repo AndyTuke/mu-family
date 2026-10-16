@@ -7,7 +7,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     : EditorShellBase(p),
       proc(p),
       sidebar(p, "Voice"),
-      patternContent(p),
+      patternContent(p, p),
       layerPanel(p, "Voice"),
       layerEdit(p, sidebar, layerPanel,
                 { [this] { patternContent.clearAllModBindings(); patternContent.clearPatternBindings(); },

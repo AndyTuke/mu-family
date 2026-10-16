@@ -56,6 +56,7 @@ target_sources(mu-tant
         Source/UI/GatingDesigner.cpp
         Source/UI/SettingsOverlay.cpp
         Source/Sequencer/GatePattern.cpp
+        Source/Sequencer/Pattern.cpp
         Source/Audio/SynthVoice.cpp
         # Offline-license verifier lives in mu-core (shared); compiled here + monocypher.c.
         "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
@@ -197,6 +198,7 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/ExtractionPinTests.cpp   # pins: Note mode, retire fade and its stale tail, structural edit, oversize
     Source/UI/GatingDesigner.cpp
     Source/Sequencer/GatePattern.cpp
+    Source/Sequencer/Pattern.cpp
     Source/Audio/SynthVoice.cpp
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/Wavetable/WavetableBank.cpp"
     # Editor-free APVTS layout factory — lets the ApvtsLayout test exercise the

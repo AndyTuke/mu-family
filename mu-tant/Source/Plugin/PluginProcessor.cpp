@@ -523,43 +523,6 @@ void PluginProcessor::applyPitchEnvelope(int v, VoiceConfig& cfg)
     }
 }
 
-bool PluginProcessor::pitchDestHasSteppedSource(const Layer& slot, const char* destId) const
-{
-    // A pitch destination is "stepped" if any assigned source is a Stepped ControlSequence.
-    // Allocation-free: compares sourceId ("csN_output") against each CS id without building
-    // strings, so it's safe to call on the audio thread (under the mod lock).
-    for (const auto& a : slot.modulationMatrix.getAssignments())
-    {
-        if (a.destinationId != destId) continue;
-        for (const auto& cs : slot.controlSequences)
-        {
-            if (cs.mode != ControlSequence::Mode::Stepped) continue;
-            const auto& sid = cs.id;
-            if (a.sourceId.size() == sid.size() + 7
-                && a.sourceId.compare(0, sid.size(), sid) == 0
-                && a.sourceId.compare(sid.size(), 7, "_output") == 0)
-                return true;
-        }
-    }
-    return false;
-}
-
-void PluginProcessor::refreshPitchQuantFlags(int v)
-{
-    if (v < 0 || v >= mu_limits::kMaxLayers) return;
-    // Message-thread only (after any modulator mutation); the audio thread reads the
-    // resulting atomics lock-free. Reading the assignments here is safe: the message
-    // thread is the sole writer and the mutation has already completed.
-    const auto& slot = getPattern(v);
-    getPattern(v).osc1SemiStepped.store(pitchDestHasSteppedSource(slot, "osc1.semi"), std::memory_order_relaxed);
-    getPattern(v).osc2SemiStepped.store(pitchDestHasSteppedSource(slot, "osc2.semi"), std::memory_order_relaxed);
-}
-
-void PluginProcessor::refreshAllPitchQuantFlags()
-{
-    for (int v = 0; v < mu_limits::kMaxLayers; ++v) refreshPitchQuantFlags(v);
-}
-
 // One voice's full chain into the channel buffer: modulation → engine → gate →
 // insert. Invoked by MixerEngine::processBlock (Phase 1) per active channel; the
 // mixer then applies the channel strip + master. Renders even muted/un-soloed
@@ -671,7 +634,7 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
 std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
 {
     auto p = std::make_unique<Pattern>();
-    p->owner.ptr = this;
+    p->host.ptr = this;
     // The insert allocates its delay lines here, off the audio thread and outside any lock; the
     // per-slot noise seed makes layers not share one sequence.
     p->insert->setSlotIndex(slot);

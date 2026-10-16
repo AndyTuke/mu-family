@@ -10,7 +10,7 @@
 namespace mu_tant
 {
 
-class PluginProcessor;
+class PatternHost;
 
 // One mu-Tant layer (a drone voice): the shared Layer (name, colour, modulation) plus everything
 // that belongs to this voice alone — its three drawable envelopes, its user wavetables and the
@@ -51,9 +51,14 @@ struct Pattern : Layer
     SlotBound<InsertProcessor> insert;
     const std::atomic<float>* insertGainReduction() const override { return &insert->grReduction; }
 
-    OwnerLink<PluginProcessor> owner;
+    // The layer's host (the wavetable bank a saved path resolves into); a copy keeps its own link.
+    OwnerLink<PatternHost> host;
     void writeExtras(juce::ValueTree& node) const override;
     void applyExtras(const juce::ValueTree& node) override;
+
+    // Recompute the stepped-pitch flags from the layer's own modulators. Message thread, after any modulator
+    // change (editor edit, preset load, structural edit); the audio thread reads the flags lock-free.
+    void refreshPitchQuantFlags();
 
     // Takes a default voice's data (built before the structural edit locked), keeping name and
     // colour; in place, so the editor's pointers into this Pattern stay valid. Exchanges rather than
