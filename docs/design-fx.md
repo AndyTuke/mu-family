@@ -81,14 +81,20 @@ The Effect slot hosts modulation and time-based algorithms only:
 
 | Algorithm | Library | Character | Parameters |
 |---|---|---|---|
-| Room | Signalsmith FDN | Tight natural space | Size, pre-delay, diffusion, damp, mod, dirt |
-| Hall | Signalsmith FDN | Long lush decay | Size, pre-delay, diffusion, damp, mod, dirt |
-| Plate | Signalsmith FDN | Dense metallic | Size, pre-delay, diffusion, damp, mod, dirt |
-| Spring | Signalsmith FDN | Lo-fi mechanical | Size, pre-delay, diffusion, damp, mod, dirt |
+| Room | Signalsmith FDN | Tight natural space (decay 0.6 s) | Size, decay, pre-delay, diffusion, damp, mod, dirt |
+| Hall | Signalsmith FDN | Long lush decay (decay 2.5 s) | Size, decay, pre-delay, diffusion, damp, mod, dirt |
+| Plate | Signalsmith FDN | Dense metallic (decay 1.8 s) | Size, decay, pre-delay, diffusion, damp, mod, dirt |
+| Spring | Signalsmith FDN | Lo-fi mechanical (decay 0.35 s) | Size, decay, pre-delay, diffusion, damp, mod, dirt |
 
 Reverb has **no mix knob** — it is always a pure send. Shimmer removed from v1 (requires pitch shifting in feedback loop — v2 feature).
 
-**Current implementation (Stage 15+):** All four reverb algorithms use the Signalsmith FDN reverb (integrated Stage 15). Algorithm selection applies parameter presets that bias `roomMs`/`rt20`/`early`/damping for different characters.
+**Current implementation (Stage 15+):** All four reverb algorithms use the Signalsmith FDN reverb (integrated Stage 15). Algorithm selection applies parameter presets that bias `roomMs`/decay/`early`/damping for different characters.
+
+**Decay (`rev_decay`):** 0.1–10 s, default 2.5, placed right after Size on the Reverb row. It is the RT60 in seconds (time to −60 dB). `ReverbSlot::setParam("decay")` passes `decay / 3` to Signalsmith's `rt20`, because the library defines `rt20` as the time to −20 dB (its own comment, "decay to -60dB", is `rt20` × 3). The per-algorithm preset decays (Room 0.6, Hall 2.5, Plate 1.8, Spring 0.35 s) are RT60 values; they were once passed straight to `rt20`, which made the old Hall tail about 7.5 s. Size sets only the room length and is independent of decay (the Signalsmith feedback is normalised per loop).
+
+**Presets and the algorithm change:** choosing an algorithm from the editor menu pushes that algorithm's preset values, including decay, back into the knobs (APVTS). A host automating the algorithm parameter instead pushes the current knob values into the slot, so the knobs stay the source of truth.
+
+**Parameter manifests:** adding `rev_decay` changed the frozen parameter manifests (`tests/manifests`); they are regenerated with `tests/scripts/regenerate-frozen-baselines.ps1 -Reason`. Projects saved before it load with the default decay for their reverb type.
 
 ### Stage 15: Signalsmith Reverb (complete)
 
@@ -96,7 +102,7 @@ Integrated the Signalsmith FDN reverb (`signalsmith-audio/basics`) as a pimpl in
 
 **Vendored-library patches (record here; ThirdParty has no patch list, 2026-10-12):** `ThirdParty/signalsmith-basics/.../reverb.h` `ReverbSTFX::reset()` carries one local line, `delay4.reset();`, which upstream omits so a reset left its last output behind; `ReverbSlot::reset()` relies on it. Re-apply after any re-vendoring (grep for `mu patch`).
 
-**Implementation:** `signalsmith::basics::ReverbFloat` wrapped behind a pimpl to keep Signalsmith headers out of `ReverbSlot.h`. Pre-delay buffer and `dirt` (tanh saturation) remain before the reverb call. Algorithm presets bias `roomMs`/`rt20`/`early`/`detune`/`highCutHz`/`highDampRate` for each character. UI params (Size, Decay, Diffusion, Damp, Mod) map to those member fields.
+**Implementation:** `signalsmith::basics::ReverbFloat` wrapped behind a pimpl to keep Signalsmith headers out of `ReverbSlot.h`. Pre-delay buffer and `dirt` (tanh saturation) remain before the reverb call. Algorithm presets bias `roomMs`/`rt20` (from decay)/`early`/`detune`/`highCutHz`/`highDampRate` for each character. UI params (Size, Decay, Diffusion, Damp, Mod) map to those member fields.
 
 **Pre-delay buffer:** ~100ms pre-allocated (`MaxPreDelaySamples = 192000 / 10`), applied before the reverb. Wet scratch buffers also pre-allocated in `prepare()` — no audio-thread allocation.
 
