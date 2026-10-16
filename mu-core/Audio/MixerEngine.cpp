@@ -97,22 +97,27 @@ bool isAudible(const MixerEngine::ChannelState& ch, bool anySolo) noexcept
         && ! (anySolo && ! ch.solo.load(std::memory_order_relaxed));
 }
 
-// Threshold-triggered sidechain duck: the envelope attacks to 1 while the source is above the
-// noise floor and releases to 0 when it is silent; the target is scaled by 1 - amount x envelope.
-// (Raw amplitude following ducked typical samples by under 1 dB.) Returns the peak reduction.
+// Level-following sidechain duck: the envelope follows the source level relative to
+// kScFullDuckLevel (a full duck at or above it, proportional below) with the strip's attack and
+// release; the target is scaled by 1 - amount x envelope. A pure threshold gate held the duck at
+// full depth for as long as a decaying source stayed above -60 dBFS (a kick's tail lasts about a
+// second), so the target never recovered between hits. The release has a floor so the follower
+// rides over the source's own audio-rate ripple (a bass note's rectified waveform).
+// Returns the peak reduction.
 float applySidechainDuck(const float* srcL, const float* srcR, bool sourceActive,
                          float* tgtL, float* tgtR, int numSamples, float amount,
                          float attackMs, float releaseMs, double sampleRate, float& env) noexcept
 {
-    constexpr float kScThreshold = 0.001f;   // about -60 dBFS post-trim
+    constexpr float kScFullDuckLevel = 0.25f;   // post-trim source level that ducks fully (about -12 dBFS)
+    constexpr float kScMinReleaseMs  = 30.0f;
     const float sr  = (float) sampleRate;
     const float atk = attackMs  > 0.0f ? std::exp(-1.0f / (attackMs  * 0.001f * sr)) : 0.0f;
-    const float rel = releaseMs > 0.0f ? std::exp(-1.0f / (releaseMs * 0.001f * sr)) : 0.0f;
+    const float rel = std::exp(-1.0f / (juce::jmax(releaseMs, kScMinReleaseMs) * 0.001f * sr));
     float peakGR = 0.0f;
     for (int i = 0; i < numSamples; ++i)
     {
         const float srcLvl = sourceActive ? juce::jmax(std::abs(srcL[i]), std::abs(srcR[i])) : 0.0f;
-        const float target = srcLvl > kScThreshold ? 1.0f : 0.0f;
+        const float target = juce::jmin(1.0f, srcLvl / kScFullDuckLevel);
         env = target > env ? atk * env + (1.0f - atk) * target
                            : rel * env + (1.0f - rel) * target;
         const float gr = amount * env;
