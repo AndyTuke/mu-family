@@ -40,7 +40,6 @@ Facts about this repo for the scheduled advisor routines. Each fact names the fi
   - `release.yml`: builds Release plugins on ubuntu-latest and windows-latest in a matrix, packages fixed-name zips, then a publish job creates or updates the GitHub Release tagged `v<version>.0.<build>`. Windows-only mu-link build step. `--parallel` build; no cache yet.
   - `ci.yml`: cross-platform build and unit-test safety net, run on request.
   - `mac-validate.yml`: macOS universal build, pluginval and auval, run on request (on hold).
-  - `sync-backlog.yml`: syncs GitHub issues into the backlog.
 - Actions used: `actions/checkout@v4`, `actions/upload-artifact@v4`, `actions/download-artifact@v4` (`release.yml`).
 - Local plugin validation: Tracktion pluginval over each VST3 (`tests/scripts/run-pluginval.ps1`). CLAP and Standalone are not covered by pluginval.
 
