@@ -342,7 +342,8 @@ namespace mu_clip_test
 
             // What gets staged holds a.
             x.set(p, x.a);
-            const auto file = storage.root.getChildFile("restore_cancel.preset");
+            // saveFullPresetTo writes <stem>.<the product's full-preset extension>, so name the file with it.
+            const auto file = storage.root.getChildFile("restore_cancel." + p.getFullPresetExtension());
             if (full) t.expect(p.saveFullPresetTo(file), "a full preset was written");
             else      t.expect(p.storeClip(0, 2), "a clip was stored");
 
