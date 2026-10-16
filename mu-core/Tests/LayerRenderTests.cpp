@@ -865,6 +865,24 @@ struct LayerRenderDriverTests : juce::UnitTest
             expect(d.host.ppq > 1.0 && d.host.ppq < 1.1, "at beat 1, well before the bar line");
         }
 
+        beginTest("layerLoopBeats: a parked spare caches its own loop length, an empty slot the bar");
+        {
+            auto pBox = std::make_unique<FakeLayerHost>(1); auto& p = *pBox;
+            p.fake(0).loopBeatsValue = 8.0;
+            p.fake(3).loopBeatsValue = 12.0;   // a spare above the live count
+            {
+                const juce::ScopedLock sl(p.layersLock);
+                p.layers[5].reset();             // a slot with no layer at all
+            }
+            p.setUseLayerRenderForTest(true);
+            Driver d(p);
+            d.block(512);
+            expectEquals(p.layerLoopBeats(0), 8.0, "the live layer's length");
+            expectEquals(p.layerLoopBeats(3), 12.0, "the parked spare's own length");
+            expectEquals(p.layerLoopBeats(5), 4.0, "no layer: the bar");
+            expect(p.layerLoopBeats(-1) < 0.0 && p.layerLoopBeats(mu_limits::kMaxLayers) < 0.0, "out of range: no loop");
+        }
+
         beginTest("MIDI: decoded once, each call sees its own frames, overflow is counted, the sinks merge within a budget");
         {
             auto pBox = std::make_unique<FakeLayerHost>(2); auto& p = *pBox;

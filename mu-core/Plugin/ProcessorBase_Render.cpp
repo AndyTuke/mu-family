@@ -369,8 +369,13 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
     // Phase 5 (last chunk): the loop lengths for the boundary flagging and the rendered play state. Values only.
     if (lastChunk)
     {
+        // A parked spare caches its own length too, so a product whose boundary rule reads every slot's length
+        // (mu-Tant's) sees the same value whether the count grew in this block or not; Empty slots take the bar.
         for (int s = 0; s < K; ++s)
-            renderState.loopBeats[(size_t) s] = renderState.live[(size_t) s] ? v.layer[(size_t) s]->loopBeats() : kDefaultLoopBeats;
+        {
+            const Layer* l = v.layer[(size_t) s];
+            renderState.loopBeats[(size_t) s] = l != nullptr && l->typeId() != 0 ? l->loopBeats() : kDefaultLoopBeats;
+        }
         renderState.lastPlaying = t.playing;
         renderState.jumpPending = renderState.stopPending = false;
     }

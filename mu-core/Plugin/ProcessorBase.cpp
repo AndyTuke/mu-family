@@ -785,8 +785,9 @@ void ProcessorBase::applyComposedState(const juce::ValueTree& state)
         // (retire bin rule R1.3), so no block has neither the live layer nor the tail and a later shrink parks
         // afresh. Inside the same layout hold (order layoutWriteLock, binMutex), so no structural edit can move
         // another slot's tail into these rows between the store and the cut.
-        for (int s = oldCount; s < newCount; ++s)
-            retireBin.cutSlot(s);
+        if (regrowCutsInPlaceTails)
+            for (int s = oldCount; s < newCount; ++s)
+                retireBin.cutSlot(s);
     }
     if (retireBin.countPolicy() == mu_core::RetireBin::CountPolicy::CutAtCount)
         retireBin.cutAtOrAbove(newCount);
