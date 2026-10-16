@@ -69,7 +69,9 @@ public:
             for (int ch = 0; ch < nCh; ++ch)
             {
                 float& env = envelope[ch < 2 ? ch : 0];
-                const float level = std::abs(chans[ch][i]);
+                // A NaN or inf sample would stick in the envelope (and inf x a zero gain is NaN): treat it as silence.
+                const float xin   = std::isfinite(chans[ch][i]) ? chans[ch][i] : 0.0f;
+                const float level = std::abs(xin);
                 env = level > env ? attCoeff * env + (1.0f - attCoeff) * level
                                   : relCoeff * env + (1.0f - relCoeff) * level;
 
@@ -79,7 +81,7 @@ public:
                     const float overDb = 20.0f * std::log10(env / thr);
                     gainDb = -overDb * (1.0f - 1.0f / ratio);
                 }
-                float y = chans[ch][i] * juce::Decibels::decibelsToGain(gainDb);
+                float y = xin * juce::Decibels::decibelsToGain(gainDb);
 
                 // Limiter only: a brick-wall stage after the 100:1 envelope stage. The envelope follower cannot react
                 // inside its attack time, so a transient would pass the ceiling; this gain is set from the sample

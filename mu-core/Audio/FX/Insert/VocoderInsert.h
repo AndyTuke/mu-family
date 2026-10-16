@@ -285,7 +285,7 @@ private:
 
     // The makeup is matched to broadband input, so a loud low-frequency onset can overshoot full scale for
     // ~16 ms (a float64 port measured up to 1.95). A soft limiter keeps the output inside +/-1: linear up to
-    // kKnee, then a tanh knee that approaches 1.0 and never reaches it, with unity slope at the knee.
+    // kKnee, then a tanh knee that approaches 1.0 (and saturates there in float), with unity slope at the knee.
     static constexpr float kKnee             = 0.8f;
     static float softLimit(float x) noexcept
     {

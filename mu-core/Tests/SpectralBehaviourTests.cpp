@@ -321,8 +321,8 @@ public:
             // The vocoder's makeup gain (kOutputGain) was fitted by simulation on broadband input. A float64 port of
             // the product (the same bands, filters, followers and carrier) gave, for a full-scale sine, a settled peak
             // of 0.88 at 100 Hz and under 0.5 from 200 Hz up, but a 16 ms onset transient of up to 1.9 for a low
-            // frequency (1.95 at 200 Hz, 1.09 at 1 kHz): that overshoot is logged, not asserted, and is a gain-staging
-            // question for the owner (see the backlog row). The settled peak is asserted below 1.0.
+            // frequency (1.95 at 200 Hz, 1.09 at 1 kHz). The output soft limiter (VocoderInsert::softLimit) removes that
+            // overshoot: the whole-render peak is asserted <= 1.0, and the settled peak < 1.0.
             constexpr int kSettled = 6000;
             for (const double freq : { 200.0, 1000.0, 4000.0 })
             {
@@ -475,8 +475,9 @@ public:
     void runTest() override
     {
         constexpr double kSr = 48000.0;
-        // Silence in front of every signal: the threshold, release and output gains ramp over 15 ms from their prepare()
-        // values, so the ceiling is only at its target once those ramps have finished (42 ms here).
+        // Silence in front of every signal. The limiter's ceiling is the lower of the smoothed and the target threshold, so
+        // it holds from the first sample and the prefix is not required; it is kept so the output smoother has settled and
+        // the signals start from a quiet state, as a real insert's would.
         constexpr int kWarm = 2048;
 
         beginTest("Limiter: no output sample exceeds the ceiling (sine, impulses, step bursts; Ceiling default / 0 / 100; blocks 64 and 512)");
