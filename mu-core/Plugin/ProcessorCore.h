@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include "Plugin/HostTransport.h"
+#include "Plugin/LayerBlock.h"
 #include "Sequencer/Layer.h"
 
 #include <atomic>
@@ -122,13 +123,15 @@ protected:
     //   unpublishLayerLocked takes layer `idx` out, shifts the ones above it down, shrinks the
     //                        count and puts `spare` (which may be null) in the vacated top slot
     //   swapLayersLocked     exchanges two live layers
+    // Both also hold layoutWriteLock (taken by the caller BEFORE layersLock): their count store advances the
+    // layout serial.
     std::unique_ptr<Layer> publishLayerLocked(std::unique_ptr<Layer> fresh)
     {
         const int n = numLayers.load(std::memory_order_relaxed);
         jassert(n < mu_limits::kMaxLayers);
         auto replaced = std::move(layers[(size_t) n]);
         layers[(size_t) n] = std::move(fresh);
-        numLayers.store(n + 1, std::memory_order_release);
+        storeLayerCount(n + 1, std::memory_order_release);
         return replaced;
     }
     std::unique_ptr<Layer> unpublishLayerLocked(int idx, std::unique_ptr<Layer> spare)
@@ -139,9 +142,39 @@ protected:
         for (int d = idx; d < n - 1; ++d)
             layers[(size_t) d] = std::move(layers[(size_t) (d + 1)]);
         layers[(size_t) (n - 1)] = std::move(spare);
-        numLayers.store(n - 1, std::memory_order_release);
+        storeLayerCount(n - 1, std::memory_order_release);
         return removed;
     }
+
+    // ─── Layer access for the render contract (docs/mu-tronic/design.md 2.1.2, 2.1.3) ────────────
+    // The audio thread reaches layers through one mu_core::LayerBlock built from this state. The mode is
+    // chosen once, in the product's constructor (TryLock: today's try-lock of layersLock, for the four
+    // products; Published: the immutable published view, for a host that changes types without muting).
+    void setLayerAccess(mu_core::LayerAccess mode) noexcept { layerAccess.mode = mode; }
+    mu_core::LayerAccess getLayerAccess() const noexcept     { return layerAccess.mode; }
+
+    // The packed layout word (count | serial << 32). EVERY live-count store goes through storeLayerCount, which
+    // advances the serial by a compare-exchange loop (never a load then a store) and mirrors the count into
+    // numLayers for the existing readers. The serial a park outside layersLock attaches is nextLayoutSerial():
+    // the serial the following count store will carry, so nextLayoutSerial() and that store must run inside
+    // ONE hold of layoutWriteLock (a message / host-thread lock, never taken by the audio thread; lock order
+    // layoutWriteLock, layersLock, binMutex). Returns the serial it stored.
+    uint32_t storeLayerCount(int n, std::memory_order mirrorOrder = std::memory_order_seq_cst) noexcept
+    {
+        jassert(n >= 0 && n <= mu_limits::kMaxLayers);
+        uint64_t w = layerAccess.layout.load(std::memory_order_seq_cst);
+        uint64_t next;
+        do
+            next = mu_core::LayoutWord::pack((uint32_t) n, mu_core::LayoutWord::serial(w) + 1u);
+        while (! layerAccess.layout.compare_exchange_weak(w, next, std::memory_order_seq_cst));
+        numLayers.store(n, mirrorOrder);
+        return mu_core::LayoutWord::serial(next);
+    }
+    uint32_t layoutSerial() const noexcept     { return mu_core::LayoutWord::serial(layerAccess.layout.load(std::memory_order_seq_cst)); }
+    uint32_t nextLayoutSerial() const noexcept { return layoutSerial() + 1u; }
+
+    mu_core::LayerAccessState layerAccess;
+    juce::CriticalSection     layoutWriteLock;
     void swapLayersLocked(int a, int b) noexcept
     {
         jassert(a >= 0 && b >= 0 && a < numLayers.load() && b < numLayers.load());
