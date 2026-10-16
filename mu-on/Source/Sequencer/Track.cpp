@@ -166,7 +166,7 @@ void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
 
 int Track::typeId() const
 {
-    return (int) mu_core::LayerTypeId::Kick + toIndex(engineSetting());
+    return (int) layerTypeOf(engineSetting());
 }
 
 EngineType Track::engineSetting() const noexcept
