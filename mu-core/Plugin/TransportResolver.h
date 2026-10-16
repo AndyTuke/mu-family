@@ -37,6 +37,7 @@ struct BlockTransport
     double startBeat      = 0.0;   // the beat at this block's first sample
     double beatsPerSample = 0.0;
     double blockBeats     = 0.0;   // beats this block spans (0 while stopped)
+    double beatWrap       = 0.0;   // the beat bound the resolver wrapped with (0 = unbounded): the layers' RenderContext::beatWrap
 
     bool   beatFromOutside() const noexcept { return beatOutside; }
 };
@@ -68,6 +69,7 @@ inline BlockTransport resolveTransport(const HostTransport& host, bool isStandal
                                        double syncOffsetMs = 0.0)
 {
     BlockTransport t;
+    t.beatWrap = wrapBeats > 0.0 ? wrapBeats : 0.0;
     bool relocated = false;   // the clock moved the own beat this block (store it even while stopped)
     const int    nudgeDir = internal.nudgeDirection != nullptr ? internal.nudgeDirection->load(std::memory_order_relaxed) : 0;
     const double bend     = 1.0 + (double) nudgeDir * kNudgeBendPercent / 100.0;

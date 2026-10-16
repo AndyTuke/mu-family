@@ -78,11 +78,13 @@ namespace mu_core
 
         // True while the bin is inside onRetireStart or renderRetiring of this object (audio thread only).
         // ParamBinding asserts on it: a tail that reads a parameter is a jassert in the first test that hits it.
-        bool inRetirePath() const noexcept { return retirePath; }
+        bool inRetirePath() const noexcept { return retirePath.load(std::memory_order_relaxed); }
 
     private:
         friend class RetireBin;
-        bool retirePath = false;   // written by the bin around the two tail calls, on the audio thread
+        // Written by the bin around the two tail calls (audio thread); an atomic so a read from another thread
+        // (a stray ParamBinding::load) is a defined race, not undefined behaviour. Relaxed: it orders nothing.
+        std::atomic<bool> retirePath { false };
     };
 
     // A layer type with a tail holds one of these as a member: plain data, written only by beginRetire and

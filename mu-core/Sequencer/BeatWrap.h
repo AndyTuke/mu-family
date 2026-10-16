@@ -10,6 +10,9 @@ namespace mu_core
     // On non-negative input this is exactly the resolver's old fmod lambda (fmod is exact), so no
     // render changes; a negative position (a pre-roll or count-in) wraps upward, and a tiny negative
     // value whose sum with `wrap` rounds to `wrap` itself is kept below it, never on it.
+    // A NaN or infinite beat (a broken host position) has no place in the space: fmod gives NaN, and the
+    // result is the largest double below `wrap` (in range, so no index overruns; the old lambda passed NaN on).
+    // With wrap <= 0 a NaN or infinity is returned unchanged.
     inline double wrapBeat(double b, double wrap) noexcept
     {
         if (wrap <= 0.0) return b;

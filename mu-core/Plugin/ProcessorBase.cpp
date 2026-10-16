@@ -17,10 +17,10 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
 {
     // The block driver's mixer hook: channel r is slot r's scratch, copied exactly (raw pointers, so a
     // buffer's "cleared" flag can never turn the copy into a clear). Built once here: no allocation per block.
-    lr.copyToMixer = [this](int r, juce::AudioBuffer<float>& buf, int n)
+    renderState.copyToMixer = [this](int r, juce::AudioBuffer<float>& buf, int n)
     {
         if (r < 0 || r >= mu_limits::kMaxLayers) return;
-        const auto& src = lr.scratch[(size_t) r];
+        const auto& src = renderState.scratch[(size_t) r];
         const int nCh = juce::jmin(buf.getNumChannels(), src.getNumChannels());
         const int len = juce::jmin(n, src.getNumSamples());
         for (int c = 0; c < nCh; ++c)
@@ -772,11 +772,20 @@ void ProcessorBase::applyComposedState(const juce::ValueTree& state)
     // (setStateInformation) while the message thread edits layers, and a lost or misattached serial would break
     // the retire bin's same-block hand-over. A product that parks a tail before this call holds layoutWriteLock
     // across both (it is re-entrant), so the park's nextLayoutSerial() is the serial this store carries.
+    // TryLock mode only until Published-mode quiesce exists: this store and the parameter moves above assume
+    // the audio thread's try-lock protocol.
+    jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);
     const int newCount = savedLayerCount(state);
+    int oldCount = 0;
     {
         const juce::ScopedLock lw(layoutWriteLock);
+        oldCount = numLayers.load(std::memory_order_relaxed);
         storeLayerCount(newCount);
     }
+    // A regrow into slots whose spares were fading in place: count first (above), then cut, as addLayer does
+    // (retire bin rule R1.3), so no block has neither the live layer nor the tail and a later shrink parks afresh.
+    for (int s = oldCount; s < newCount; ++s)
+        retireBin.cutSlot(s);
     if (retireBin.countPolicy() == mu_core::RetireBin::CountPolicy::CutAtCount)
         retireBin.cutAtOrAbove(newCount);
     const auto toks = juce::StringArray::fromTokens(state.getProperty("voiceColours", "").toString(), ",", "");
@@ -809,6 +818,7 @@ int ProcessorBase::addLayer()
 {
     const int n = numLayers.load(std::memory_order_relaxed);
     if (! canEditLayers() || n >= mu_limits::kMaxLayers) return -1;
+    jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);   // the edits' Published-mode quiesce is not built yet
 
     // Phase 1: build and prepare the new layer before anything is locked.
     auto fresh = createLayer(n);
@@ -861,6 +871,7 @@ bool ProcessorBase::removeLayer(int idx)
 {
     const int n = numLayers.load(std::memory_order_relaxed);
     if (! canEditLayers() || n <= 1 || idx < 0 || idx >= n) return false;   // the last layer stays
+    jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);   // the edits' Published-mode quiesce is not built yet
 
     // Phase 1: the down-shift renumbers every layer from idx upward, so every staged per-layer swap
     // (keyed by index) would land on the wrong slot. A staged full preset replaces all slots and wins.
@@ -936,6 +947,7 @@ bool ProcessorBase::swapLayers(int a, int b)
 {
     const int n = numLayers.load(std::memory_order_relaxed);
     if (! canEditLayers() || a < 0 || b < 0 || a >= n || b >= n || a == b) return false;
+    jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);   // the edits' Published-mode quiesce is not built yet
 
     // Phase 1: staged swaps are keyed by index, so swapping the two slots would misdirect them.
     cancelPendingSwap(a);

@@ -196,6 +196,8 @@ public:
     MixerEngine();
 
     void prepare(double sampleRate, int blockSize);
+    // The block size prepare() sized the channel and send buffers for: the longest block processBlock may get.
+    int getPreparedBlockSize() const noexcept { return channelBufs[0].getNumSamples(); }
 
     // UI helper: assemble a VoiceParams snapshot from the master-insert atomics.
     // slot 0 = Insert 1, slot 1 = Insert 2. Called from the message thread.

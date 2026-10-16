@@ -47,8 +47,11 @@
 // 100 Hz poll while hasPendingWork(), on the headless flush, and at prepare / release / destruction.
 //
 // Locks: every message-side operation takes binMutex (never the audio thread, never layersLock). Lock order
-// layoutWriteLock, layersLock, binMutex; nobody takes layersLock while holding binMutex. A RetireTail
-// destructor runs under binMutex (service) and must take no lock.
+// layoutWriteLock, layersLock, binMutex; nobody takes layersLock while holding binMutex. binMutex is held only
+// for bookkeeping: nothing is destroyed and nothing waits while it is held. A function collects what it frees
+// in a stack FreeList that is destroyed after the mutex is released; a caller that holds layersLock
+// (audioExcluded) hands its frees to the reclaim list instead, for a later service pass outside that lock; an
+// eviction that must wait for a grace period releases the mutex for the wait and re-validates afterwards.
 namespace mu_core
 {
     class RetireBin
@@ -61,13 +64,16 @@ namespace mu_core
             Parked,          // the entry will render from its activation serial on
             NotParked,       // the tail's policy is None: it is freed after the grace period
             AlreadyActive,   // parkInPlace on a row that already has an active in-place entry: no-op
-            Dropped,         // the row was full and its eviction timed out: the incoming tail is freed after its grace
+            Dropped,         // the row was full and its eviction timed out: the incoming tail is freed (it never sounded)
             Invalid          // slot out of range or no tail
         };
 
         static constexpr int kRows = mu_limits::kMaxLayers;
         static constexpr int kDepth = mu_limits::kRetireDepth;
-        static constexpr int kReclaimCapacity = kRows * kDepth;
+        static constexpr int kEntries = kRows * kDepth;
+        // The reclaim list holds twice the bin's entries: everything evicted under layersLock in one pass plus
+        // every NotParked or dropped tail can wait there for a service pass.
+        static constexpr int kReclaimCapacity = 2 * kEntries;
 
         explicit RetireBin(const AudioEpoch& e) noexcept : epoch(e) {}
         ~RetireBin() = default;   // owners call cutAll + service from prepareForDestruction first
@@ -78,15 +84,16 @@ namespace mu_core
         void        setCountPolicy(CountPolicy p) noexcept { policy = p; }
         CountPolicy countPolicy() const noexcept           { return policy; }
         // Tails sounding at once in this instance; when reached, a park evicts the oldest active entry.
-        void setGlobalBudget(int maxLive) { std::lock_guard<std::mutex> g(binMutex); budget = juce::jlimit(1, kReclaimCapacity, maxLive); }
-        // How long an eviction outside layersLock waits for the grace period before dropping the incoming tail.
-        void setEvictTimeoutMs(int ms) { std::lock_guard<std::mutex> g(binMutex); evictTimeoutMs = juce::jmax(0, ms); }
+        void setGlobalBudget(int maxLive) { BinLock g(binMutex); budget = juce::jlimit(1, kEntries, maxLive); }
+        // How long an eviction outside layersLock waits (with binMutex released) for the grace period before
+        // dropping the incoming tail.
+        void setEvictTimeoutMs(int ms) { BinLock g(binMutex); evictTimeoutMs = juce::jmax(0, ms); }
 
         // prepareToPlay: the rate park converts seconds with, and the declick scratch (the host is not
         // processing). Allocates on the calling (message or host) thread.
         void setPrepared(double sampleRate, int blockSize)
         {
-            std::lock_guard<std::mutex> g(binMutex);
+            BinLock g(binMutex);
             preparedRate = sampleRate;
             declick.setSize(2, juce::jmax(1, blockSize), false, true, false);
             declickFrames = juce::jmax(1, (int) (sampleRate * (mu_limits::kRetireDeclickMs / 1000.0)));
@@ -94,20 +101,22 @@ namespace mu_core
 
         // ─── Message side (every one takes binMutex) ─────────────────────────────────────────────────
         // An owned tail (a whole layer, an engine). `audioExcluded`: the caller holds layersLock in TryLock
-        // mode, so the audio thread cannot be inside the bin; an eviction then frees at once, without a wait.
+        // mode, so the audio thread cannot be inside the bin; an eviction then empties the entry at once, without
+        // a wait, and every free goes to the reclaim list (never a free under the caller's layersLock).
         ParkResult park(int slot, std::unique_ptr<RetireTail> owned, uint32_t activation, bool audioExcluded)
         {
             if (slot < 0 || slot >= kRows || owned == nullptr) return ParkResult::Invalid;
-            std::unique_lock<std::mutex> g(binMutex);
+            FreeList frees;                   // destroyed after the lock below is released
+            BinLock g(binMutex);
             if (owned->retirePolicy().kind == RetirePolicy::Kind::None)
             {
-                addReclaimLocked(std::move(owned), ! audioExcluded);   // it may have been live: free after the grace
+                dispose(std::move(owned), ! audioExcluded, audioExcluded, frees);   // it may have been live: after the grace
                 return ParkResult::NotParked;
             }
-            Entry* e = placeLocked(slot, audioExcluded);
+            Entry* e = placeLocked(slot, audioExcluded, g, frees);
             if (e == nullptr)
             {
-                addReclaimLocked(std::move(owned), false);   // never visible to the audio thread
+                dispose(std::move(owned), false, audioExcluded, frees);   // never visible to the audio thread
                 return ParkResult::Dropped;
             }
             RetireTail& t = *owned;
@@ -121,13 +130,13 @@ namespace mu_core
         ParkResult parkInPlace(int slot, RetireTail& spare, uint32_t activation, bool audioExcluded)
         {
             if (slot < 0 || slot >= kRows) return ParkResult::Invalid;
-            std::unique_lock<std::mutex> g(binMutex);
-            for (auto& e : rows[(size_t) slot])
-                if (e.inPlace != 0 && isActive(e.state.load(std::memory_order_seq_cst)))
-                    return ParkResult::AlreadyActive;
+            FreeList frees;
+            BinLock g(binMutex);
+            if (hasActiveInPlaceLocked(slot)) return ParkResult::AlreadyActive;
             if (spare.retirePolicy().kind == RetirePolicy::Kind::None) return ParkResult::NotParked;
-            Entry* e = placeLocked(slot, audioExcluded);
+            Entry* e = placeLocked(slot, audioExcluded, g, frees);
             if (e == nullptr) return ParkResult::Dropped;
+            if (hasActiveInPlaceLocked(slot)) return ParkResult::AlreadyActive;   // another park won during an eviction wait
             fillLocked(*e, spare, activation, true);
             return ParkResult::Parked;
         }
@@ -137,14 +146,14 @@ namespace mu_core
         void cutSlot(int slot)
         {
             if (slot < 0 || slot >= kRows) return;
-            std::lock_guard<std::mutex> g(binMutex);
+            BinLock g(binMutex);
             for (auto& e : rows[(size_t) slot]) cutLocked(e);
         }
 
         // CutAtCount products: a count-reducing store cuts the rows it leaves (after the store).
         void cutAtOrAbove(int count)
         {
-            std::lock_guard<std::mutex> g(binMutex);
+            BinLock g(binMutex);
             for (int s = juce::jmax(0, count); s < kRows; ++s)
                 for (auto& e : rows[(size_t) s]) cutLocked(e);
         }
@@ -154,7 +163,7 @@ namespace mu_core
         void swapRows(int a, int b)
         {
             if (a == b || a < 0 || b < 0 || a >= kRows || b >= kRows) return;
-            std::lock_guard<std::mutex> g(binMutex);
+            BinLock g(binMutex);
             for (int s : { a, b })
                 for (auto& e : rows[(size_t) s])
                     if (e.inPlace != 0) cutLocked(e);
@@ -168,7 +177,7 @@ namespace mu_core
         void removeRow(int index, int liveCount)
         {
             if (index < 0 || index >= kRows) return;
-            std::lock_guard<std::mutex> g(binMutex);
+            BinLock g(binMutex);
             for (auto& e : rows[(size_t) index]) cutLocked(e);
             const int top = juce::jmin(kRows, liveCount) - 1;
             for (int s = index + 1; s <= top; ++s)
@@ -182,45 +191,46 @@ namespace mu_core
         // prepareToPlay, releaseResources, prepareForDestruction: everything to Done (then call service).
         void cutAll()
         {
-            std::lock_guard<std::mutex> g(binMutex);
+            BinLock g(binMutex);
             for (auto& row : rows)
                 for (auto& e : row) cutLocked(e);
         }
 
         // Frees every Done entry (and reclaim-list tail) whose grace has passed. Never waits; an entry whose
-        // grace has not passed waits for the next pass. Message thread, outside layersLock. Returns the count freed.
+        // grace has not passed waits for the next pass. Message thread, outside layersLock. The destructors run
+        // after binMutex is released. Returns the count freed.
         int service()
         {
-            std::lock_guard<std::mutex> g(binMutex);
+            FreeList frees;
+            BinLock g(binMutex);
             // Cleared before the scan: an entry the audio thread marks Done during it raises the flag again.
             pending.store(false, std::memory_order_seq_cst);
-            int freed = 0;
             const bool canFree = ! epoch.reclaimDisabled();
             bool left = false;
+            int released = 0;
             for (auto& row : rows)
                 for (auto& e : row)
                 {
                     if (e.state.load(std::memory_order_seq_cst) != Done) continue;
-                    if (! e.doneSeen) { e.doneSeen = true; e.doneStamp = epoch.stamp(); }
-                    if (canFree && epoch.passed(e.doneStamp)) { releaseLocked(e, false); ++freed; }
+                    stampDoneLocked(e);
+                    if (canFree && epoch.passed(e.doneStamp)) { frees.add(releaseLocked(e)); ++released; }
                     else left = true;
                 }
             for (int i = 0; i < reclaimCount; )
             {
                 auto& r = reclaim[(size_t) i];
                 if (r.needsGrace && ! r.stamped) { r.stamped = true; r.stamp = epoch.stamp(); }
-                const bool ok = ! r.needsGrace || (canFree && epoch.passed(r.stamp));
-                if (ok)
+                if (! r.needsGrace || (canFree && epoch.passed(r.stamp)))
                 {
-                    { FreeingScope f; r.owned.reset(); }
-                    reclaim[(size_t) i] = std::move(reclaim[(size_t) (reclaimCount - 1)]);
+                    frees.add(std::move(r.owned));
+                    if (i != reclaimCount - 1) reclaim[(size_t) i] = std::move(reclaim[(size_t) (reclaimCount - 1)]);
                     --reclaimCount;
-                    ++freed;
+                    ++released;
                 }
                 else { left = true; ++i; }
             }
             if (left) pending.store(true, std::memory_order_seq_cst);
-            return freed;
+            return released;
         }
 
         // Any thread: something is Done or waiting in the reclaim list, so a service pass has work.
@@ -262,9 +272,9 @@ namespace mu_core
                 {
                     uint8_t expect = Parked;
                     if (! e.state.compare_exchange_strong(expect, (uint8_t) Draining, std::memory_order_seq_cst)) continue;
-                    e.tail->retirePath = true;
+                    e.tail->retirePath.store(true, std::memory_order_relaxed);
                     e.tail->onRetireStart(ctx);
-                    e.tail->retirePath = false;
+                    e.tail->retirePath.store(false, std::memory_order_relaxed);
                     e.rs.started = 1;
                 }
 
@@ -298,9 +308,11 @@ namespace mu_core
                 for (const auto& e : row) c += e.state.load(std::memory_order_seq_cst) == s ? 1 : 0;
             return c;
         }
-        int  reclaimPending() const { std::lock_guard<std::mutex> g(binMutex); return reclaimCount; }
+        int  reclaimPending() const { BinLock g(binMutex); return reclaimCount; }
         // True on the thread that is freeing a tail inside the bin (a destructor probe asserts it).
         static bool isFreeingOnThisThread() noexcept { return freeingFlag(); }
+        // True while the calling thread holds binMutex (a destructor probe asserts it is false: no free under it).
+        static bool isMutexHeldOnThisThread() noexcept { return heldFlag() > 0; }
 
     private:
         struct Entry
@@ -325,18 +337,59 @@ namespace mu_core
             uint64_t stamp = 0;
         };
 
-        // Marks the calling thread as freeing a tail (the destructor probe of the tests reads it).
-        struct FreeingScope
-        {
-            FreeingScope() noexcept  { freeingFlag() = true; }
-            ~FreeingScope() noexcept { freeingFlag() = false; }
-        };
         static bool& freeingFlag() noexcept { static thread_local bool f = false; return f; }
+        static int&  heldFlag() noexcept    { static thread_local int n = 0; return n; }
+
+        // binMutex with the "held on this thread" mark the free path checks; unlock / lock for an eviction wait.
+        class BinLock
+        {
+        public:
+            explicit BinLock(std::mutex& m) : lock(m) { ++heldFlag(); }
+            ~BinLock() { if (lock.owns_lock()) --heldFlag(); }
+            void unlock() { lock.unlock(); --heldFlag(); }
+            void relock() { lock.lock(); ++heldFlag(); }
+        private:
+            std::unique_lock<std::mutex> lock;
+        };
+
+        // The tails one call frees, destroyed when the call returns: declared BEFORE the call's BinLock, so they
+        // are destroyed after it is released. Fixed size: every entry plus every reclaim slot, nothing allocated.
+        class FreeList
+        {
+        public:
+            FreeList() = default;
+            ~FreeList()
+            {
+                jassert(! isMutexHeldOnThisThread());   // a tail destructor never runs under binMutex
+                freeingFlag() = true;
+                for (int i = 0; i < count; ++i) items[(size_t) i].reset();
+                freeingFlag() = false;
+            }
+            FreeList(const FreeList&) = delete;
+            FreeList& operator=(const FreeList&) = delete;
+            void add(std::unique_ptr<RetireTail> t) noexcept
+            {
+                if (t == nullptr) return;
+                jassert(count < (int) items.size());
+                if (count < (int) items.size()) items[(size_t) count++] = std::move(t);
+                else t.release();   // unreachable by construction; leaking beats freeing under the mutex
+            }
+        private:
+            std::array<std::unique_ptr<RetireTail>, (size_t) (kEntries + kReclaimCapacity)> items;
+            int count = 0;
+        };
 
         static bool isActive(uint8_t s) noexcept { return s == Parked || s == Draining; }
         static bool reached(uint32_t viewSerial, uint32_t activation) noexcept
         {
             return (int32_t) (viewSerial - activation) >= 0;
+        }
+
+        bool hasActiveInPlaceLocked(int slot) const noexcept
+        {
+            for (const auto& e : rows[(size_t) slot])
+                if (e.inPlace != 0 && isActive(e.state.load(std::memory_order_seq_cst))) return true;
+            return false;
         }
 
         // The message thread's cut: Parked or Draining to Done (the audio thread may race it: one CAS wins).
@@ -353,9 +406,13 @@ namespace mu_core
             }
         }
 
-        // Done to Empty. `deferFree`: the owned tail goes to the reclaim list (freed by a later service, never
-        // under the caller's layersLock); otherwise it is destroyed here, under binMutex.
-        void releaseLocked(Entry& e, bool deferFree)
+        void stampDoneLocked(Entry& e) noexcept
+        {
+            if (! e.doneSeen) { e.doneSeen = true; e.doneStamp = epoch.stamp(); }
+        }
+
+        // Done to Empty; returns the owned tail (null for an in-place entry) for the caller to dispose of.
+        std::unique_ptr<RetireTail> releaseLocked(Entry& e) noexcept
         {
             auto owned = std::move(e.owned);
             e.tail = nullptr;
@@ -363,68 +420,89 @@ namespace mu_core
             e.doneSeen = false;
             e.doneStamp = 0;
             e.state.store(Empty, std::memory_order_seq_cst);
-            if (owned == nullptr) return;
-            if (deferFree) addReclaimLocked(std::move(owned), false);
-            else { FreeingScope f; owned.reset(); }
+            return owned;
         }
 
-        void addReclaimLocked(std::unique_ptr<RetireTail> owned, bool needsGrace)
+        // A tail this call no longer holds: freed after the call (FreeList), or, when the caller holds layersLock
+        // or the audio thread may still read it, left in the reclaim list for a later service pass.
+        void dispose(std::unique_ptr<RetireTail> t, bool needsGrace, bool audioExcluded, FreeList& frees)
         {
-            if (owned == nullptr) return;
-            if (reclaimCount >= kReclaimCapacity)
+            if (t == nullptr) return;
+            if (! needsGrace && ! audioExcluded) { frees.add(std::move(t)); return; }
+            if (reclaimCount < kReclaimCapacity)
             {
-                // The list is full (it holds at most one bin's worth): wait out a grace here, bounded, then free.
-                // A timeout, or reclamation turned off, leaks the tail rather than risk a use-after-free.
-                const bool safe = ! needsGrace
-                               || (! epoch.reclaimDisabled() && epoch.waitFor(epoch.stamp(), evictTimeoutMs));
-                if (safe) { FreeingScope f; owned.reset(); }
-                else      owned.release();
+                auto& r = reclaim[(size_t) reclaimCount++];
+                r.owned = std::move(t);
+                r.needsGrace = needsGrace;
+                r.stamped = false;
+                r.stamp = 0;
+                pending.store(true, std::memory_order_seq_cst);
                 return;
             }
-            auto& r = reclaim[(size_t) reclaimCount++];
-            r.owned = std::move(owned);
-            r.needsGrace = needsGrace;
-            r.stamped = false;
-            r.stamp = 0;
-            pending.store(true, std::memory_order_seq_cst);
+            // The list holds twice the bin's entries, so this is unreachable in practice. A tail the audio thread
+            // may still read is leaked rather than freed early; one it cannot reach is freed after the call.
+            jassertfalse;
+            if (needsGrace) t.release();
+            else            frees.add(std::move(t));
         }
 
-        // Frees (or detaches) an entry the caller has decided to evict. Under audioExcluded the audio thread
-        // cannot be in the bin: the entry is emptied at once and its tail freed later outside the lock. Otherwise
-        // the entry is cut and one grace period is waited, bounded; false = timed out (the entry stays Done).
-        bool evictLocked(Entry& e, bool audioExcluded)
+        // Evicts an entry the caller chose (cut, then empty it). Under audioExcluded the audio thread cannot be in
+        // the bin: the entry is emptied at once and its tail goes to the reclaim list. Otherwise the entry is cut and,
+        // if its grace has not passed, binMutex is RELEASED for a bounded wait and the state re-validated after the
+        // re-lock (the entry may have been freed or re-used meanwhile). True = the entry is free for reuse now.
+        bool evictLocked(Entry& e, bool audioExcluded, BinLock& g, FreeList& frees)
         {
             cutLocked(e);
             if (e.state.load(std::memory_order_seq_cst) == Empty) return true;
-            if (audioExcluded) { releaseLocked(e, true); return true; }
+            if (audioExcluded) { dispose(releaseLocked(e), false, true, frees); return true; }
             if (epoch.reclaimDisabled()) return false;
-            if (! e.doneSeen) { e.doneSeen = true; e.doneStamp = epoch.stamp(); }
-            if (! epoch.waitFor(e.doneStamp, evictTimeoutMs)) return false;
-            releaseLocked(e, false);
+            stampDoneLocked(e);
+            const uint64_t stamp = e.doneStamp;
+            const uint64_t seq = e.parkSeq;
+            if (! epoch.passed(stamp))
+            {
+                const int timeout = evictTimeoutMs;
+                g.unlock();
+                const bool ok = epoch.waitFor(stamp, timeout);
+                g.relock();
+                if (! ok) return false;
+                // Re-validate: still the entry we cut (same park), still Done? Else another pass freed or re-used it.
+                if (e.state.load(std::memory_order_seq_cst) == Empty) return true;
+                if (e.parkSeq != seq || e.state.load(std::memory_order_seq_cst) != Done) return false;
+            }
+            frees.add(releaseLocked(e));
             return true;
         }
 
         // The entry a park fills: the row's first Empty one, after freeing its Done entries whose grace passed.
         // A full row evicts entry 0 (mu-Clid's force-cut rule); the global budget evicts the instance's oldest.
-        Entry* placeLocked(int slot, bool audioExcluded)
+        // May release binMutex during an eviction wait (see evictLocked); the row is re-scanned afterwards.
+        Entry* placeLocked(int slot, bool audioExcluded, BinLock& g, FreeList& frees)
         {
             auto& row = rows[(size_t) slot];
             const bool canFree = ! epoch.reclaimDisabled();
             for (auto& e : row)
                 if (e.state.load(std::memory_order_seq_cst) == Done)
                 {
-                    if (! e.doneSeen) { e.doneSeen = true; e.doneStamp = epoch.stamp(); }
-                    if (audioExcluded) releaseLocked(e, true);
-                    else if (canFree && epoch.passed(e.doneStamp)) releaseLocked(e, false);
+                    stampDoneLocked(e);
+                    if (audioExcluded) dispose(releaseLocked(e), false, true, frees);
+                    else if (canFree && epoch.passed(e.doneStamp)) frees.add(releaseLocked(e));
                 }
 
             if (activeCountLocked() >= budget)
                 if (Entry* oldest = oldestActiveLocked())
-                    if (! evictLocked(*oldest, audioExcluded)) return nullptr;
+                    if (! evictLocked(*oldest, audioExcluded, g, frees)) return nullptr;
 
+            if (Entry* e = firstEmptyLocked(row)) return e;
+            if (! evictLocked(row[0], audioExcluded, g, frees)) return nullptr;
+            return firstEmptyLocked(row);   // entry 0, unless another park took it during a wait
+        }
+
+        static Entry* firstEmptyLocked(std::array<Entry, kDepth>& row) noexcept
+        {
             for (auto& e : row)
                 if (e.state.load(std::memory_order_seq_cst) == Empty) return &e;
-            return evictLocked(row[0], audioExcluded) ? &row[0] : nullptr;
+            return nullptr;
         }
 
         // Fills an Empty entry and publishes it (the Parked store is the release of the payload).
@@ -494,9 +572,9 @@ namespace mu_core
             if (! inDeclick)
             {
                 rs.exclusive = exclusive ? 1 : 0;
-                e.tail->retirePath = true;
+                e.tail->retirePath.store(true, std::memory_order_relaxed);
                 alive = e.tail->renderRetiring(ctx, out, n, rs);
-                e.tail->retirePath = false;
+                e.tail->retirePath.store(false, std::memory_order_relaxed);
             }
             else
             {
@@ -504,9 +582,9 @@ namespace mu_core
                 juce::AudioBuffer<float> priv(declick.getArrayOfWritePointers(), nCh, n);
                 priv.clear();
                 rs.exclusive = 1;
-                e.tail->retirePath = true;
+                e.tail->retirePath.store(true, std::memory_order_relaxed);
                 alive = e.tail->renderRetiring(ctx, priv, n, rs);
-                e.tail->retirePath = false;
+                e.tail->retirePath.store(false, std::memory_order_relaxed);
                 // Linear declick to zero at the end of the lifetime: gain = framesLeftOfLife / declickFrames.
                 for (int c = 0; c < nCh; ++c)
                 {
@@ -536,7 +614,7 @@ namespace mu_core
         int reclaimCount = 0;                // guarded by binMutex
         mutable std::mutex binMutex;         // message and host threads only
         double preparedRate = 0.0;           // guarded by binMutex
-        int    budget = kReclaimCapacity;    // guarded by binMutex
+        int    budget = kEntries;            // guarded by binMutex
         int    evictTimeoutMs = 50;          // guarded by binMutex
         uint64_t parkCounter = 0;            // guarded by binMutex
         juce::AudioBuffer<float> declick;    // audio thread's after prepare; sized at prepare only
