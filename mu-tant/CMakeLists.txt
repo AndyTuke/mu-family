@@ -211,6 +211,7 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/GoldenRenderTests.cpp   # golden renders of the real processor (tests/golden/mu-tant)
     Source/Tests/ExtractionPinTests.cpp   # pins: Note mode, retire fade and its stale tail, structural edit, oversize
     Source/Tests/PatternLayerRecordTests.cpp   # the Pattern stream through the real processor (Tests/PatternLayerFixture.h)
+    Source/Tests/ModHoldTests.cpp   # C12: a matrix-lock miss holds the last modulated values
     Source/UI/GatingDesigner.cpp
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/Wavetable/WavetableBank.cpp"
     # Editor-free APVTS layout factory — lets the ApvtsLayout test exercise the

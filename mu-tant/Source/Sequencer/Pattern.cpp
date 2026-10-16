@@ -9,6 +9,7 @@
 #include "Audio/SpinLock.h"                  // mu-core: the envelopes' spin locks
 #include "Audio/TantScales.h"                    // kBaseOctave
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 
@@ -152,6 +153,7 @@ void Pattern::prepare(double sampleRate, int blockSize)
 {
     insert->prepare(sampleRate, blockSize);
     tailScratch.setSize(2, juce::jmax(1, blockSize), false, true, false);
+    haveResolved = false;   // a prepare is a fresh start: no held modulated values (C12)
 }
 
 void Pattern::bindParams(juce::AudioProcessorValueTreeState& apvts, int slot)
@@ -191,6 +193,7 @@ void Pattern::bindParams(juce::AudioProcessorValueTreeState& apvts, int slot)
         engine   = host.ptr->getPatternEngine(slot);
         bankLock = host.ptr->getPatternBankLock();
     }
+    haveResolved = false;   // values held for C12 belong to the slot bound before
 }
 
 VoiceConfig Pattern::readConfig() const noexcept
@@ -280,7 +283,20 @@ void Pattern::applyModulation(double beat, VoiceConfig& cfg, std::array<float, 4
     // proportion from its APVTS atom, run the voice's matrix under a try-lock (skipped on contention → the
     // voice plays un-modulated this block), then write the modulated values back in param units.
     float out[kNumModDests];
-    mu_mod::resolveLane(this, beat, kNumModDests, modIds.data(), modAtoms.data(), modRanges.data(), modMap, out);
+    const bool resolved = mu_mod::resolveLane(this, beat, kNumModDests, modIds.data(), modAtoms.data(),
+                                              modRanges.data(), modMap, out);
+
+    // A block that misses the matrix lock (the message thread is editing this voice's modulators) holds the last
+    // resolved values, so no target snaps back to its unmodulated knob for a block (C12). Before the first resolve
+    // of this slot (a fresh bind, a prepare, a move, a voice that has just gone live) it takes the unmodulated
+    // values, as every block of a miss did before.
+    if (resolved || ! haveResolved)
+    {
+        std::copy(out, out + kNumModDests, lastResolved.begin());
+        haveResolved = haveResolved || resolved;
+    }
+    else
+        std::copy(lastResolved.begin(), lastResolved.end(), out);
 
     // Octave/fine pitch dests round to the nearest step (the proportion round-trip isn't bit-exact, so a plain
     // truncation could drop a step); the rest map straight across, already range-clamped by resolveLane.
@@ -437,6 +453,7 @@ void Pattern::applyOwnNoteGate(juce::AudioBuffer<float>& out, int n, int mode, d
 void Pattern::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n)
 {
     const int mode = hearNotes(ctx);
+    if (parked) { haveResolved = false; parked = false; }   // just gone live: hold nothing from before (C12)
     if (engine == nullptr) return;
 
     // The engine reads the wavetable bank, which a user-wavetable import appends to under bankLock (same acquire
@@ -490,6 +507,7 @@ void Pattern::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>
 void Pattern::onParkedBlock(const mu_core::RenderContext& ctx)
 {
     hearNotes(ctx);
+    parked = true;
 }
 
 mu_core::RetirePolicy Pattern::retirePolicy() const
@@ -552,6 +570,7 @@ bool Pattern::renderRetiring(const mu_core::RenderContext& ctx, juce::AudioBuffe
 void Pattern::resetSlotState() noexcept
 {
     for (auto& v : modLive) v.store(0.0f, std::memory_order_relaxed);
+    haveResolved = false;
 }
 
 } // namespace mu_tant

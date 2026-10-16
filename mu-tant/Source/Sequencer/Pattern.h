@@ -236,6 +236,13 @@ private:
     struct PatternRetire { VoiceConfig config; int insAlgo = 0; std::array<float, 4> insP {}; };
     mu_core::RetireSnapshot<PatternRetire> retireSnap;
     juce::AudioBuffer<float> tailScratch;   // a tail that must add rather than write renders here (sized at prepare)
+
+    // C12 (hold-last-value on a matrix-lock miss), audio thread: the last block's resolved values, whether this slot
+    // has resolved once with the lock held, and whether the last rendered block had the layer parked (or none yet).
+    // Cleared by prepare, bindParams, resetSlotState (a move or reset) and going live, so nothing held crosses a slot.
+    std::array<float, kNumModDests> lastResolved {};
+    bool haveResolved = false;
+    bool parked       = true;
 };
 JUCE_END_IGNORE_WARNINGS_MSVC
 
