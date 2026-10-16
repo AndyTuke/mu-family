@@ -25,8 +25,8 @@ presets — *not* 128 automatable APVTS params. States from the five-lane build 
 
 ## Clocking — one `StepClock` per track
 16 steps = one bar (each step = a 16th = 0.25 beat; the layer's `loopBeats()` is 4). **Every track clocks
-its own row** with a `StepClock` (declared in
-[GrooveSequencer.h](../../mu-on/Source/Sequencer/GrooveSequencer.h)). In `Track::render` the
+its own row** with a `StepClock` ([Sequencer/StepClock.h](../../mu-on/Source/Sequencer/StepClock.h); the row is
+[StepRow.h](../../mu-on/Source/Sequencer/StepRow.h)). In `Track::render` the
 clock's `processSpan(row, startBeat, n, beatsPerSample, swing, accent, fire)` walks the step boundaries
 that fall in this call's beats, taken from the shared `RenderContext` (`startBeat`, `beatsPerSample`),
 and for each active cell fires the track's engine at the step's sample offset, before the engine renders
@@ -34,7 +34,7 @@ so a step sounds in its own block. There is no separate sequencer pass and no sh
 only shared clock is the transport in the context. A jump guard re-syncs the clock's cursor if the
 transport scrubs or restarts, so it never burst-fires a backlog. A track parked in a spare slot keeps its
 clock in step (`onParkedBlock`), so it fires on time once live. `GrooveSequencer` (the whole-grid
-clock over a `StepPattern`) now exists for the tests; the arithmetic is the same.
+clock over a `StepPattern`) is test support in `Tests/`; the arithmetic is the same.
 
 - **Swing** (`seq_swing`) delays the **odd** 16ths by up to half a step — the groove "shuffle".
 - **Accent** (`seq_accent`) sets the velocity of accented cells; plain cells use a lower fixed
@@ -45,7 +45,7 @@ swing and accent at the top of every call, so the saved state is unchanged. The 
 host with per-layer groove (mu-Tronic) can set them per row; making them per-layer parameters is owed
 before mu-Tronic links the library ([design 2.1.9](../mu-tronic/design.md), point 8).
 
-`StepClock::currentStep(beat)` (today `GrooveSequencer::currentStep`) gives the playhead's local step
+`StepClock::currentStep(beat)` gives the playhead's local step
 for the UI grid.
 
 ## UI — `StepRows` / `TrackContent`

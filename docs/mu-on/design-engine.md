@@ -7,17 +7,19 @@ ignores its row. Each track is a shared-contract layer (`Track : Layer`,
 [Sequencer/Track.h](../../mu-on/Source/Sequencer/Track.h)) rendered by the shared block driver
 (`ProcessorBase::renderAndMix`, [design.md 2.1](../mu-tronic/design.md)); the shared mixer then applies the
 per-channel strip, the sidechain (set up in the mixer, e.g. bass ducking the kick), sends, and master.
-**A track owns exactly one engine**, the one its `t{N}_eng` parameter names, held as a `TrackEngine`
-([Audio/TrackEngine.h](../../mu-on/Source/Audio/TrackEngine.h): one interface over Kick, Bass, Hat/Snare
-`SampleChannel` or Rumble, so eight tracks hold eight engines, not forty). `Track::bindParams` caches the
+**A track owns its engines**: all five (Kick, Bass, Hat, Snare, Rumble), each a `TrackEngine`
+([Audio/TrackEngine.h](../../mu-on/Source/Audio/TrackEngine.h), one interface over the engine classes),
+prepared and held for the track's life; it plays the one its `t{N}_eng` parameter names, so a change of that
+parameter from any thread (host automation included) takes effect in the same block. A track whose host fixes
+its engine (`engineLocked`, a mu-Tronic layer) holds only that one, so a 16-slot instance does not carry five
+engines per slot. `Track::bindParams` caches the
 slot's APVTS atomics once (no per-block string lookups); `Track::render` resolves the selected engine's
 params **through the track's own `ModulationMatrix`** (proportion-space seed, matrix, write-back; try-lock,
 zero-cost when unused; the last values are held on a lock miss), clocks the track's step row and triggers
-the engine at the step's sample offset, then renders it, with no audio-thread allocation. An engine change
-builds and prepares the new engine on the message thread, outside every lock, swaps it in under the
-track's engine lock and frees the old one there; until it lands (a change made on another thread waits
-for the message thread) the track renders silent. The engine travels with the track through add / delete
-/ reorder (a moved track's engine is reset to its prepared state). Render order: a Rumble is a priority-1
+the engine at the step's sample offset, then renders it, with no audio-thread allocation. Engines are built,
+prepared and freed only on the message thread (`Track::syncEngine`) and installed under the track's engine
+lock; for a locked track a missing engine renders silence until built. The engines travel with the track
+through add / delete / reorder (a moved track's engines are all reset to their prepared state). Render order: a Rumble is a priority-1
 layer, so every other track renders first and a Rumble reads its source's block through
 `RenderContext::peer(slot)` (post-insert, pre-strip); a Rumble whose source is out of range, not live or
 itself a Rumble processes silence, so its tail still dies away.
