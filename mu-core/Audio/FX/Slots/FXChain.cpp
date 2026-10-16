@@ -7,6 +7,8 @@ void FXChain::prepare(double sampleRate, int blockSize)
     effect.prepare(sampleRate, blockSize);
     delay.prepare(sampleRate, blockSize);
     reverb.prepare(sampleRate, blockSize);
+    effectTailBudget = juce::jmax(1, (int) sampleRate);   // one second
+    effectTailLeft   = 0;
 }
 
 void FXChain::processSends(juce::AudioBuffer<float>& effectSend,
@@ -17,7 +19,10 @@ void FXChain::processSends(juce::AudioBuffer<float>& effectSend,
     // Sequential processing with intra-FX routing.
 
     // Echo needs continuous processing (feedback loop), like the dedicated delay slot.
-    const bool runEffect = doEffect || effect.needsContinuousProcessing();
+    // A send burst restarts the tail; silent blocks count it down while the effect keeps running.
+    if (doEffect) effectTailLeft = effectTailBudget;
+    else          effectTailLeft = juce::jmax(0, effectTailLeft - effectSend.getNumSamples());
+    const bool runEffect = doEffect || effectTailLeft > 0 || effect.needsContinuousProcessing();
     if (runEffect) effect.processReturn(effectSend);
 
     // Route effect output into the delay and reverb send buses; an Echo tail keeps feeding them
