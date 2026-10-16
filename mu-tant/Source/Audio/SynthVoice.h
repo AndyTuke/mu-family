@@ -33,7 +33,8 @@ struct VoiceConfig
     // Fractional semitone offset from the pitch envelope + smooth pitch modulation.
     // Kept separate from the integer osc{1,2}Semi base so smooth sources glide rather
     // than stepping; stepped modulators instead snap osc{1,2}Semi (melodies).
-    float osc1SemiMod = 0.0f, osc2SemiMod = 0.0f;
+    float osc1SemiMod = 0.0f, osc2SemiMod = 0.0f;   // chromatic semitone offset added after the scale (pitch envelope)
+    float osc1ToneMod = 0.0f, osc2ToneMod = 0.0f;   // fractional scale-degree offset added to Semi (smooth Semi modulation)
 
     // Pitch-envelope depth (±24 semitones) per osc — consumed by applyPitchEnvelope.
     // Held in the config so modulation of the depth (a mod destination) is honoured.
