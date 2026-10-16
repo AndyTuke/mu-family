@@ -15,7 +15,6 @@
 add_library(mu-on-layer INTERFACE)
 target_sources(mu-on-layer INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Persistence/TrackParams.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/GrooveSequencer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/Track.cpp"
 )
 target_include_directories(mu-on-layer INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
@@ -153,6 +152,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/TestMain.cpp
     Source/Tests/ApvtsLayoutTests.cpp
     Source/Tests/SequencerTests.cpp
+    Source/Tests/GrooveSequencer.cpp   # the whole-grid clock the sequencer tests drive (test support)
     Source/Tests/EngineTests.cpp
     Source/Tests/ModulationTests.cpp
     Source/Tests/PresetTests.cpp

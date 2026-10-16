@@ -65,4 +65,31 @@ void addTrackGlobalParams(juce::AudioProcessorValueTreeState::ParameterLayout& l
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"seq_accent", 1}, "Accent", NormalisableRange<float>(0.0f, 1.0f, 0.001f), 1.0f));
 }
 
+void remapRumbleSources(juce::AudioProcessorValueTreeState& apvts, int liveCount,
+                        const std::function<EngineType(int)>& engineOfSlot,
+                        const std::function<int(int)>& oldToNew)
+{
+    // The first Kick in the new order (a source that is gone falls back to it).
+    int fallback = liveCount;
+    for (int j = 0; j < mu_limits::kMaxLayers; ++j)
+        if (engineOfSlot(j) == EngineType::Kick)
+        {
+            const int nj = oldToNew(j);
+            if (nj >= 0 && nj < liveCount) fallback = juce::jmin(fallback, nj);
+        }
+    if (fallback >= liveCount) fallback = 0;
+
+    // Every Rumble slot's source, rewritten at its old slot.
+    for (int j = 0; j < mu_limits::kMaxLayers; ++j)
+    {
+        if (engineOfSlot(j) != EngineType::Rumble) continue;
+        auto* p = apvts.getParameter(layerParamId(j, "src"));
+        if (p == nullptr) continue;
+        const int oldSrc = juce::roundToInt(p->convertFrom0to1(p->getValue()));
+        int newSrc = oldToNew(oldSrc);
+        if (newSrc < 0) newSrc = fallback;
+        if (newSrc != oldSrc) p->setValueNotifyingHost(p->convertTo0to1((float) newSrc));
+    }
+}
+
 } // namespace mu_on

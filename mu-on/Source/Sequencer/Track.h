@@ -3,9 +3,9 @@
 #include "Sequencer/Layer.h"            // mu-core: per-layer ControlSequences + ModulationMatrix, the render contract
 #include "Sequencer/LayerTypeInfo.h"    // mu-core: mu_core::LayerTypeId
 #include "Sequencer/RetireTail.h"       // mu-core: mu_core::ParamBinding
-#include "Sequencer/StepPattern.h"
-#include "Sequencer/GrooveSequencer.h"  // StepClock
-#include "Audio/TrackEngine.h"          // the one engine the track runs
+#include "Sequencer/StepRow.h"         // the track's steps and groove
+#include "Sequencer/StepClock.h"       // the row's step cursor
+#include "Audio/TrackEngine.h"          // the engines the track runs
 #include "Modulation/MuOnModDest.h"     // the engines' modulation target tables
 
 #include <array>
@@ -19,16 +19,19 @@ namespace mu_on
 
 // One mu-On layer, a track. The shared Layer (colour, modulation) plus what is the track's own and moves
 // with it through add / delete / reorder: its step row and the row's clock, its Rumble volume envelope, the
-// trigger counter the audio thread bumps and the editor polls to pulse the sidebar item, and the one sound
-// engine it runs (Kick, Bass, Hat, Snare or Rumble, named by its `t{N}_eng` parameter).
+// trigger counter the audio thread bumps and the editor polls to pulse the sidebar item, and its sound engines
+// (Kick, Bass, Hat, Snare, Rumble; the one that plays is named by its `t{N}_eng` parameter). A track whose engine
+// can change (every mu-On track) holds all five, built and prepared, so a change of the parameter from any thread
+// (host automation on the audio thread included) switches the engine in the same block, as the per-slot engines
+// always did. A track whose host fixes its engine (engineLocked: a mu-Tronic layer) holds only that one.
 //
 // It renders through the shared layer contract (docs/mu-tronic/design.md 2.1): bindParams caches the slot's
 // parameter atomics; render resolves the engine's modulation, clocks the row, triggers and renders the
 // engine. A Rumble is a priority-1 layer: it renders after every other track and reads its source track's
 // block through RenderContext::peer (post-insert, pre-strip).
 //
-// Threads. The audio thread runs render / onParkedBlock inside the block's layer access. The engine is
-// built and freed only on the message thread (syncEngine), and swapped in under `engineLock`, a spin lock
+// Threads. The audio thread runs render / onParkedBlock inside the block's layer access. Engines are built
+// and freed only on the message thread (syncEngine), and installed or removed under `engineLock`, a spin lock
 // the audio thread try-locks around its use for one call (a miss renders this track silent for that call).
 // prepare runs while the host is not processing; bindParams and resetEngineToPrepared run while no block
 // can render the track (before publication, during an edit, under layersLock). The UI reads only the
@@ -51,8 +54,9 @@ struct Track : Layer
     int slot = 0;
 
     // True when the host fixes this track's engine (a mu-Tronic layer is created as one of the five types and
-    // keeps it): the content hides the Engine selector. Message thread; false in mu-On, so the standalone is
-    // unchanged. Not saved: the host that locks it sets it when it creates the layer.
+    // keeps it): the content hides the Engine selector, and syncEngine keeps only that engine (one per layer,
+    // design 1.4). Message thread, before syncEngine; false in mu-On, so the standalone is unchanged. Not saved:
+    // the host that locks it sets it when it creates the layer.
     bool engineLocked = false;
 
     Track();
@@ -88,13 +92,17 @@ struct Track : Layer
     // ── The engine ───────────────────────────────────────────────────────────
     // The engine the track's `t{N}_eng` parameter names (any thread; Kick before bindParams).
     EngineType engineSetting() const noexcept;
-    // Message thread: when the track holds no engine, or another than its parameter names, build and prepare
-    // the named one outside every lock, swap it in under the engine lock and free the old one here. True
-    // when it built one.
+    // Message thread: brings the engines the track holds to the set it needs (all five; with engineLocked only
+    // the one its parameter names). Missing engines are built and prepared outside every lock and installed
+    // under the engine lock; engines no longer needed are taken out under it and freed here. True when it
+    // changed the set. For an unlocked track this runs once (at creation); later parameter changes need none.
     bool syncEngine();
-    // The engine the track holds (any thread), or -1 before the first syncEngine.
-    int heldEngineIndex() const noexcept { return heldEngine.load(std::memory_order_acquire); }
-    // Under layersLock (a structural edit moved this track to another slot): the engine back to its prepared
+    // Whether the track holds `engine`, built and prepared (any thread).
+    bool holdsEngine(EngineType engine) const noexcept
+    {
+        return ((heldMask.load(std::memory_order_acquire) >> (unsigned) toIndex(engine)) & 1u) != 0;
+    }
+    // Under layersLock (a structural edit moved this track to another slot): every engine back to its prepared
     // state, as a fresh tenant of that slot. Allocation-free; no block renders the track meanwhile.
     void resetEngineToPrepared() noexcept;
 
@@ -120,6 +128,7 @@ private:
     void  resolve(int engine, double beat, float* outValues) noexcept;   // modulation, then the modLive publish
     float evaluateRumbleEnv(double beat) noexcept;                       // the bar envelope, under its try-lock
     void  clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, int engine, int n) noexcept;
+    void  resetEngines() noexcept;   // every held engine's voice silenced (the per-slot engines' reset rule)
 
     mu_core::ParamBinding engineRow, sourceRow, bassWaveRow, swingRow, accentRow;
     std::array<EngineMod, kNumEngineTypes> mods;
@@ -128,10 +137,11 @@ private:
     alignas(64) std::array<std::atomic<float>, kMaxDests> modLive {};
     std::atomic<int> modLiveEngine { -1 };   // the engine those values belong to (-1: none yet)
 
-    std::unique_ptr<TrackEngine> engine;      // swapped only under engineLock, freed only on the message thread
+    // Indexed by EngineType; installed and removed only under engineLock, built and freed only on the message thread.
+    std::array<std::unique_ptr<TrackEngine>, kNumEngineTypes> engines;
     mutable CopyableSpinLock     engineLock;
-    std::atomic<int>             heldEngine { -1 };
-    juce::CriticalSection        engineBuild; // message side: prepare and syncEngine never overlap
+    std::atomic<unsigned>        heldMask { 0 };   // bit e: engines[e] is installed
+    juce::CriticalSection        engineBuild; // message side: prepare, syncEngine and resetEngineToPrepared never overlap
     double preparedRate  = 44100.0;
     int    preparedBlock = 512;
 

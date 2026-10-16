@@ -653,7 +653,7 @@ struct MuOnExtractionPinTests : juce::UnitTest
             expect(rmsOf(playing, 1024, 2048) > 0.05f, "the bass sounds");
 
             rig.p.swapLayers(0, 1);
-            expect(rig.p.engineOf(0) == EngineType::Hat && rig.p.engineOf(1) == EngineType::Bass, "the engines moved with their tracks");
+            expect(rig.p.getTrackEngine(0) == EngineType::Hat && rig.p.getTrackEngine(1) == EngineType::Bass, "the engines moved with their tracks");
             expect(rig.p.pattern().isOn(0, 8) && rig.p.pattern().isOn(1, 0), "and so did the rows");
             const auto after = rig.render(4 * 512);
             logMessage("after swapLayers(0, 1): peak over 4 blocks " + juce::String(peakOf(after, 0, 2048), 6));

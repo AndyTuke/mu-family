@@ -126,10 +126,12 @@ void Track::prepare(double sampleRate, int blockSize)
     preparedBlock = juce::jmax(1, blockSize);
     silence.setSize(2, preparedBlock);
     silence.clear();
-    if (engine != nullptr) engine->prepare(preparedRate, preparedBlock);
-    // The next rendered block starts from silence and resolves its engine afresh.
+    for (auto& e : engines)
+        if (e != nullptr) e->prepare(preparedRate, preparedBlock);
+    // The next rendered block starts from silence and resolves its engine afresh (no held C12 values).
     parked  = true;
     current = -1;
+    haveResolved = false;
 }
 
 void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
@@ -140,6 +142,7 @@ void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
     swingRow    = mu_core::ParamBinding(apvts.getRawParameterValue("seq_swing"), this);
     accentRow   = mu_core::ParamBinding(apvts.getRawParameterValue("seq_accent"), this);
     jassert(engineRow.isBound() && sourceRow.isBound() && bassWaveRow.isBound());   // an id drift from the layout (debug)
+    haveResolved = false;   // values held for C12 belong to the slot bound before
 
     // Every engine's modulation inputs for this slot, in its target table's order (the order setParams takes).
     for (int e = 0; e < kNumEngineTypes; ++e)
@@ -163,7 +166,7 @@ void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
 
 int Track::typeId() const
 {
-    return (int) mu_core::LayerTypeId::Kick + toIndex(engineSetting());
+    return (int) layerTypeOf(engineSetting());
 }
 
 EngineType Track::engineSetting() const noexcept
@@ -175,24 +178,53 @@ bool Track::syncEngine()
 {
     // Message thread. prepare (the host's thread, not processing) and this never overlap.
     const juce::ScopedLock sl(engineBuild);
-    const auto want = engineSetting();
-    if (engine != nullptr && engine->type() == want) return false;
+    const int want = toIndex(engineSetting());
+    auto needed = [this, want](int e) { return ! engineLocked || e == want; };
 
-    // Built and prepared outside the audio thread's lock; only the pointer swap happens under it, and the
-    // audio thread holds that lock for at most one call of this track's render.
-    auto fresh = std::make_unique<TrackEngine>(want);
-    fresh->prepare(preparedRate, preparedBlock);
+    // Phase 1: the missing engines, built and prepared outside the audio thread's lock.
+    std::array<std::unique_ptr<TrackEngine>, kNumEngineTypes> built;
+    bool change = false;
+    for (int e = 0; e < kNumEngineTypes; ++e)
+    {
+        if (needed(e) && engines[(size_t) e] == nullptr)
+        {
+            built[(size_t) e] = std::make_unique<TrackEngine>(engineFromIndex(e));
+            built[(size_t) e]->prepare(preparedRate, preparedBlock);
+            change = true;
+        }
+        change = change || (! needed(e) && engines[(size_t) e] != nullptr);
+    }
+    if (! change) return false;
+
+    // Phase 2: pointer moves only, under the lock the audio thread holds for at most one call of this track's
+    // render. The engines taken out land in `built` and are freed below, here on the message thread.
+    unsigned mask = 0;
     mu_core::spinLock(engineLock);
-    std::swap(engine, fresh);
-    heldEngine.store(toIndex(want), std::memory_order_release);
+    for (int e = 0; e < kNumEngineTypes; ++e)
+    {
+        if (needed(e) && engines[(size_t) e] == nullptr) std::swap(engines[(size_t) e], built[(size_t) e]);
+        else if (! needed(e))                            std::swap(engines[(size_t) e], built[(size_t) e]);
+        if (engines[(size_t) e] != nullptr) mask |= 1u << (unsigned) e;
+    }
+    heldMask.store(mask, std::memory_order_release);
     mu_core::spinUnlock(engineLock);
-    return true;   // `fresh` now holds the old engine, freed here on the message thread
+    return true;
+}
+
+void Track::resetEngines() noexcept
+{
+    for (auto& e : engines)
+        if (e != nullptr) e->reset();
 }
 
 void Track::resetEngineToPrepared() noexcept
 {
-    if (engine != nullptr) engine->resetToPrepared();
+    // Under layersLock (the edit's order: layersLock, then engineBuild); no block renders the track meanwhile.
+    const juce::ScopedLock sl(engineBuild);
+    for (auto& e : engines)
+        if (e != nullptr) e->resetToPrepared();
     current = -1;
+    haveResolved = false;
 }
 
 float Track::getModLive(EngineType e, int dest) const noexcept
@@ -260,12 +292,13 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
 {
     const int e = toIndex(engineSetting());
 
-    // The engine is swapped by the message thread under this lock; a miss (that swap is running) or an engine
-    // that is not yet the one the parameter names (a change from another thread waits for the message thread
-    // to build it) renders the track silent for this call. The row keeps step either way.
+    // Engines are installed by the message thread under this lock; a miss (an install is running) renders the
+    // track silent for this call. An unlocked track holds all five, so the engine the parameter names is always
+    // there, in the same block it is named; only a locked track whose single engine is not yet the named one
+    // (a change from another thread waits for the message thread to build it) is silent. The row keeps step.
     if (! mu_core::trySpinLock(engineLock)) { clockRow(ctx, nullptr, e, n); return; }
-    TrackEngine* eng = engine.get();
-    if (eng == nullptr || toIndex(eng->type()) != e)
+    TrackEngine* eng = engines[(size_t) e].get();
+    if (eng == nullptr)
     {
         clockRow(ctx, nullptr, e, n);
         mu_core::spinUnlock(engineLock);
@@ -274,8 +307,9 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
 
     // Phase 1: a slot that has just gone live (or was prepared since) starts from silence, so a tail left by
     // an earlier state (a sustaining bass has no note-off) never resumes; an engine change stops the old one dead.
-    if (parked) { eng->reset(); current = -1; parked = false; }
-    if (current != e) { eng->reset(); current = e; }
+    // Both silence every engine the track holds, as the per-slot engines' reset always did.
+    if (parked) { resetEngines(); current = -1; haveResolved = false; parked = false; }
+    if (current != e) { resetEngines(); current = e; }
 
     // Phase 2: this block's parameters through the modulation matrix, at the call's beat.
     float p[kMaxDests] {};
@@ -286,7 +320,7 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
     // Phase 3: the stop edge silences the voice after the block's parameters are in (a sustaining bass has no
     // note-off), so values set in the stop block survive the reset. A stop hidden in blocks that rendered
     // nothing arrives as stoppedUnrendered (the transport has restarted since).
-    if (ctx.justStopped || ctx.stoppedUnrendered) eng->reset();
+    if (ctx.justStopped || ctx.stoppedUnrendered) resetEngines();
 
     // Phase 4: the row's steps in this call trigger the engine (before the render, so a step sounds in its own block).
     clockRow(ctx, eng, e, n);

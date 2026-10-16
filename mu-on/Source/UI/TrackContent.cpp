@@ -139,7 +139,7 @@ void TrackContent::setLayer(int idx)
 // specs (re-attaching to this track's parameters), and the Rumble-only controls follow the engine.
 void TrackContent::rebuild()
 {
-    shownEngine = host.engineOf(currentLayer);
+    shownEngine = host.getTrackEngine(currentLayer);
     engineSelect.setSelectedId(toIndex(shownEngine) + 1, false);
     auto specs = specsFor(currentLayer, shownEngine);
     bindModulationArcs(specs);
@@ -185,7 +185,7 @@ void TrackContent::refreshSourceList()
     juce::uint64 sig = (juce::uint64) host.getTrackCount();
     for (int i = 0; i < host.getTrackCount(); ++i)
     {
-        sig = sig * 131u + (juce::uint64) toIndex(host.engineOf(i));
+        sig = sig * 131u + (juce::uint64) toIndex(host.getTrackEngine(i));
         if (i != currentLayer)
             sourceSelect.addItem(juce::String(i + 1) + "  " + host.getTrackName(i), i + 1);
     }
@@ -202,7 +202,7 @@ void TrackContent::refreshSourceSelection()
 
 void TrackContent::engineChosen(int id)
 {
-    host.selectEngine(currentLayer, engineFromIndex(id - 1));
+    host.selectTrackEngine(currentLayer, engineFromIndex(id - 1));
     rebuild();
     if (onEngineChanged) onEngineChanged();
 }
@@ -217,7 +217,7 @@ void TrackContent::timerCallback()
     if (currentLayer >= host.getTrackCount()) return;   // between a delete and the editor reselecting
 
     // The engine changed underneath us (host automation, a preset): show the new one.
-    if (host.engineOf(currentLayer) != shownEngine)
+    if (host.getTrackEngine(currentLayer) != shownEngine)
     {
         rebuild();
         if (onEngineChanged) onEngineChanged();
@@ -227,7 +227,7 @@ void TrackContent::timerCallback()
 
     // Keep the Source list current (layers added, deleted, re-engined) and the envelope's playhead moving.
     juce::uint64 sig = (juce::uint64) host.getTrackCount();
-    for (int i = 0; i < host.getTrackCount(); ++i) sig = sig * 131u + (juce::uint64) toIndex(host.engineOf(i));
+    for (int i = 0; i < host.getTrackCount(); ++i) sig = sig * 131u + (juce::uint64) toIndex(host.getTrackEngine(i));
     if (sig != shownLayerSignature) refreshSourceList();
     else                            refreshSourceSelection();
 

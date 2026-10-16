@@ -4,7 +4,7 @@
 #include <juce_data_structures/juce_data_structures.h>
 #include <vector>
 #include "Sequencer/StepPattern.h"
-#include "Sequencer/GrooveSequencer.h"
+#include "Tests/GrooveSequencer.h"
 
 using namespace mu_on;
 

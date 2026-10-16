@@ -38,6 +38,6 @@ namespace mu_golden_rig
     inline void useTrack(mu_on::PluginProcessor& p, int t, mu_on::EngineType engine)
     {
         while (p.getNumLayers() <= t) p.addLayer();
-        p.selectEngine(t, engine);
+        p.selectTrackEngine(t, engine);
     }
 }

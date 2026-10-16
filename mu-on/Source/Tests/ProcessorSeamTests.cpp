@@ -70,7 +70,7 @@ struct MuOnProcessorSeamTests : juce::UnitTest
         }
         expect(p.getLayer(0) == &p.getTrack(0), "getLayer(0) is getTrack(0)");
         expectEquals((int) seen.size(), mu_limits::kMaxLayers, "distinct tracks");
-        expect(p.engineOf(0) == EngineType::Kick, "the fresh track is a Kick");
+        expect(p.getTrackEngine(0) == EngineType::Kick, "the fresh track is a Kick");
         expectEquals(p.getLayerName(0), juce::String("Kick"), "a track is named after its engine");
         for (int s = 0; s < 16; ++s)
             expect(p.pattern().isOn(0, s) == (s % 4 == 0), "four on the floor, step " + juce::String(s));
@@ -182,15 +182,15 @@ struct MuOnProcessorSeamTests : juce::UnitTest
             a.id = "a1"; a.sourceId = "cs0_output"; a.destinationId = "k.tune.prop"; a.depth = 40.0f;
             expect(p.getTrack(0).modulationMatrix.addAssignment(a));
 
-            p.selectEngine(0, EngineType::Bass);
-            expect(p.engineOf(0) == EngineType::Bass);
+            p.selectTrackEngine(0, EngineType::Bass);
+            expect(p.getTrackEngine(0) == EngineType::Bass);
             expectEquals(p.getLayerName(0), juce::String("Bass"));
             expectWithinAbsoluteError(getParam(p.apvts, "t0_kick_tune"), 77.0f, 0.05f);
             expectWithinAbsoluteError(getParam(p.apvts, "t0_bass_cut"), 1500.0f, 0.5f);
             expect(p.pattern().isOn(0, 4), "the row stays when the engine changes");
             expectEquals((int) p.getTrack(0).modulationMatrix.getAssignments().size(), 1, "a Kick assignment waits for the Kick to return");
 
-            p.selectEngine(0, EngineType::Rumble);
+            p.selectTrackEngine(0, EngineType::Rumble);
             expectEquals(rumbleSource(p, 0), 0, "a Rumble never keeps itself as its source");   // no other Kick exists, falls back to 0
         }
 
@@ -200,11 +200,11 @@ struct MuOnProcessorSeamTests : juce::UnitTest
             ExposedPluginProcessor p;
             for (int i = 1; i < 5; ++i) p.addLayer();                       // Kick, Bass, Hat, Snare, Rumble (on the Kick)
             expectEquals(rumbleSource(p, 4), 0);
-            p.selectEngine(0, EngineType::Rumble);                          // the Kick turns into a Rumble
+            p.selectTrackEngine(0, EngineType::Rumble);                          // the Kick turns into a Rumble
             expectEquals(rumbleSource(p, 4), 1, "the dependent moves to the first non-Rumble track");
             expectEquals(rumbleSource(p, 0), 1, "and the new Rumble does not process itself");
-            p.selectEngine(0, EngineType::Kick);
-            p.selectEngine(1, EngineType::Rumble);
+            p.selectTrackEngine(0, EngineType::Kick);
+            p.selectTrackEngine(1, EngineType::Rumble);
             expectEquals(rumbleSource(p, 4), 0, "with a Kick available the dependent takes the first Kick");
         }
 
@@ -252,8 +252,8 @@ struct MuOnProcessorSeamTests : juce::UnitTest
             // has nothing to process (and no steps), so it is made a Kick with the Kick groove.
             [&](int layer)
             {
-                if (stress.engineOf(layer) != EngineType::Rumble) return;
-                stress.selectEngine(layer, EngineType::Kick);
+                if (stress.getTrackEngine(layer) != EngineType::Rumble) return;
+                stress.selectTrackEngine(layer, EngineType::Kick);
                 stress.pattern().loadDefaultGroove(layer, EngineType::Kick);
             },
             [&](const juce::String& where)

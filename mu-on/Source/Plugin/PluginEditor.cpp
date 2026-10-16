@@ -111,7 +111,7 @@ void PluginEditor::engineChanged()
 
 void PluginEditor::useDestinationsOf(int idx)
 {
-    layerPanel.setDestProvider(&modProviders[(size_t) toIndex(proc.engineOf(idx))]);
+    layerPanel.setDestProvider(&modProviders[(size_t) toIndex(proc.getTrackEngine(idx))]);
 }
 
 void PluginEditor::onPresetLoaded(const juce::File&)

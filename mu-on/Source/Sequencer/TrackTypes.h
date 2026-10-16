@@ -14,20 +14,6 @@
 namespace mu_on
 {
 
-// The layer type a track running `engine` is, and the engine a type runs (Kick for a type that is not mu-On's).
-inline constexpr mu_core::LayerTypeId layerTypeOf(EngineType engine) noexcept
-{
-    return (mu_core::LayerTypeId) ((int) mu_core::LayerTypeId::Kick + toIndex(engine));
-}
-inline constexpr bool isTrackType(mu_core::LayerTypeId id) noexcept
-{
-    return (int) id >= (int) mu_core::LayerTypeId::Kick && (int) id <= (int) mu_core::LayerTypeId::Rumble;
-}
-inline constexpr EngineType engineOfType(mu_core::LayerTypeId id) noexcept
-{
-    return isTrackType(id) ? engineFromIndex((int) id - (int) mu_core::LayerTypeId::Kick) : EngineType::Kick;
-}
-
 // The type a track preset (.muTrack) carries: its engine row ("eng"), or, in a preset saved when the lanes
 // were fixed, the instrument named by its "lane" property. Empty when the tree names neither.
 inline mu_core::LayerTypeId typeFromPreset(const juce::ValueTree& preset)

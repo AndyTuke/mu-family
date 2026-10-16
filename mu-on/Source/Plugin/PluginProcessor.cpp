@@ -84,10 +84,11 @@ PluginProcessor::~PluginProcessor()
         apvts.removeParameterListener(layerParamId(i, "eng"), engineListeners[(size_t) i].get());
 }
 
-// A track's engine parameter changed. On the message thread the track builds and swaps in the named engine
-// now; from any other thread (host automation on the audio thread, a state restored on a host thread) nothing
-// may allocate there, so the slot is flagged and the deferred work (message thread) builds it. Until then the
-// track renders silence: it holds another engine than its parameter names.
+// A track's engine parameter changed. A mu-On track holds all five engines (it is never engineLocked), so it
+// switches in the same block whatever thread the change came from, and syncEngine finds nothing to build. The
+// path stays for a locked track (one engine, a mu-Tronic layer): on the message thread it builds the named engine
+// now; from any other thread nothing may allocate, so the slot is flagged and the deferred work (message thread)
+// builds it, the track rendering silence until then.
 void PluginProcessor::engineParamChanged(int slot)
 {
     if (juce::MessageManager::existsAndIsCurrentThread())
@@ -115,8 +116,8 @@ void PluginProcessor::releaseResources()
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     resetSwapPlayState();   // no processBlock is running yet: loads apply at once, not staged
-    currentSampleRate = sampleRate;
-    currentBlockSize  = samplesPerBlock;
+    currentSampleRate.store(sampleRate, std::memory_order_relaxed);
+    currentBlockSize.store(samplesPerBlock, std::memory_order_relaxed);
     mixerEngine.prepare(sampleRate, samplesPerBlock);
     fxChain.prepare(sampleRate, samplesPerBlock);
 
@@ -153,7 +154,7 @@ std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
     t->slot      = slot;
     seedRowGroove(t->row);
     t->bindParams(apvts, slot);
-    t->prepare(currentSampleRate, currentBlockSize);
+    t->prepare(currentSampleRate.load(std::memory_order_relaxed), currentBlockSize.load(std::memory_order_relaxed));
     t->syncEngine();   // the engine the slot's parameter names, built and prepared now
     return t;
 }
@@ -187,9 +188,9 @@ int PluginProcessor::firstKickTrack() const noexcept
 {
     const int n = numLayers.load(std::memory_order_relaxed);
     for (int i = 0; i < n; ++i)
-        if (engineOf(i) == EngineType::Kick) return i;
+        if (getTrackEngine(i) == EngineType::Kick) return i;
     for (int i = 0; i < n; ++i)
-        if (engineOf(i) != EngineType::Rumble) return i;   // no Kick: any track a Rumble can process
+        if (getTrackEngine(i) != EngineType::Rumble) return i;   // no Kick: any track a Rumble can process
     return 0;
 }
 
@@ -198,7 +199,7 @@ int PluginProcessor::firstKickTrack() const noexcept
 void PluginProcessor::layerAdded(int index)
 {
     std::array<bool, kNumEngineTypes> used {};
-    for (int i = 0; i < index; ++i) used[(size_t) toIndex(engineOf(i))] = true;
+    for (int i = 0; i < index; ++i) used[(size_t) toIndex(getTrackEngine(i))] = true;
     int pick = 0;
     for (int e = 0; e < kNumEngineTypes; ++e)
         if (! used[(size_t) e]) { pick = e; break; }
@@ -214,18 +215,18 @@ void PluginProcessor::layerAdded(int index)
 
 void PluginProcessor::ensureRumbleSource(int track)
 {
-    if (track < 0 || track >= mu_limits::kMaxLayers || engineOf(track) != EngineType::Rumble) return;
+    if (track < 0 || track >= mu_limits::kMaxLayers || getTrackEngine(track) != EngineType::Rumble) return;
     if (auto* p = apvts.getParameter(layerParamId(track, "src")))
     {
         const int src = juce::roundToInt(p->convertFrom0to1(p->getValue()));
-        if (src == track || src >= numLayers.load(std::memory_order_relaxed) || engineOf(src) == EngineType::Rumble)
+        if (src == track || src >= numLayers.load(std::memory_order_relaxed) || getTrackEngine(src) == EngineType::Rumble)
             p->setValueNotifyingHost(p->convertTo0to1((float) firstKickTrack()));
     }
 }
 
-void PluginProcessor::selectEngine(int i, EngineType engine)
+void PluginProcessor::selectTrackEngine(int i, EngineType engine)
 {
-    if (i < 0 || i >= mu_limits::kMaxLayers || engineOf(i) == engine) return;
+    if (i < 0 || i >= mu_limits::kMaxLayers || getTrackEngine(i) == engine) return;
 
     if (auto* p = apvts.getParameter(layerParamId(i, "eng")))
     {
@@ -246,27 +247,7 @@ void PluginProcessor::selectEngine(int i, EngineType engine)
 // values shift, so each value is rewritten at its old slot and moves with it.
 void PluginProcessor::remapLayerReferences(const std::function<int(int)>& oldToNew)
 {
-    // The first Kick in the new order (a source that is gone falls back to it).
-    const int live = numLayers.load(std::memory_order_relaxed);
-    int fallback = live;
-    for (int j = 0; j < mu_limits::kMaxLayers; ++j)
-        if (engineOf(j) == EngineType::Kick)
-        {
-            const int nj = oldToNew(j);
-            if (nj >= 0 && nj < live) fallback = juce::jmin(fallback, nj);
-        }
-    if (fallback >= live) fallback = 0;
-
-    for (int j = 0; j < mu_limits::kMaxLayers; ++j)
-    {
-        if (engineOf(j) != EngineType::Rumble) continue;
-        auto* p = apvts.getParameter(layerParamId(j, "src"));
-        if (p == nullptr) continue;
-        const int oldSrc = juce::roundToInt(p->convertFrom0to1(p->getValue()));
-        int newSrc = oldToNew(oldSrc);
-        if (newSrc < 0) newSrc = fallback;
-        if (newSrc != oldSrc) p->setValueNotifyingHost(p->convertTo0to1((float) newSrc));
-    }
+    remapRumbleSources(apvts, numLayers.load(std::memory_order_relaxed), [this](int j) { return getTrackEngine(j); }, oldToNew);
 }
 
 void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
