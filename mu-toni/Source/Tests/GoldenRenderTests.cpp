@@ -17,10 +17,10 @@
 #include "Plugin/PluginProcessor.h"
 #include "Tests/GoldenAllocationCheck.h"
 #include "Tests/GoldenRender.h"
-#include "Tests/LayerEquivalence.h"   // mu-core: the useLayerRender equivalence harness
 #include "Tests/ProcessorSeamHelpers.h"
 
 #include <cmath>
+#include <cstring>
 #include <functional>
 #include <memory>
 
@@ -613,22 +613,35 @@ struct MuToniLayerPinTests : juce::UnitTest
 
     // ── A block larger than the prepared maximum ─────────────────────────────
 
-    // A host block above the size given to prepareToPlay is outside what the processor supports today:
-    // the voice and mixer scratch buffers are sized at prepare time and written without a bound, so an
-    // oversize block overwrites memory (observed: garbage output near 1e38, then a crash or a hang at
-    // teardown). It cannot be recorded as a render, only as the contract: the prepared size has to be
-    // the largest block the host sends. This pin holds the supported edge (a block exactly the prepared
-    // size, and the same audio in smaller blocks) so a stage that adds a bound or a split has the line
-    // to move.
+    // A host block above the size given to prepareToPlay. Before mu-Toni rendered through the shared driver,
+    // such a block overran the voice and mixer buffers sized at prepare (garbage near 1e38, then a crash), so
+    // this pin held only the supported edge. The driver now chunks it into calls of at most the prepared size
+    // (C8): a 4096-frame block on a 1024 preparation renders exactly what four 1024-frame blocks render, and no
+    // layer or mixer call is longer than the prepared size. (The line moved on purpose at the stage that
+    // adopted the driver.)
     void oversizeBlock()
     {
-        beginTest("Prepared size is the largest supported block: a full-size block renders cleanly (above it is unsupported today)");
-        Rig rig(1024);
-        rig.set("a0_rate", 6.0f);  rig.set("a0_gate", 70.0f);
+        beginTest("A block above the prepared size is chunked: 4096 frames on a 1024 preparation equal four 1024-frame blocks");
+        Rig big(1024), small(1024);
+        for (auto* r : { &big, &small }) { r->set("a0_rate", 6.0f); r->set("a0_gate", 70.0f); }
+        juce::AudioBuffer<float> a(2, 4096), b(2, 4096);
+        int differing = 0;
         float peak = 0.0f;
-        for (int b = 0; b < 12; ++b) peak = std::max(peak, rig.block(1024).peak);
-        expect(peak > 0.0f && peak < 4.0f, "blocks of exactly the prepared size sound and stay bounded");
-        expect(std::isfinite(peak));
+        for (int blk = 0; blk < 12; ++blk)
+        {
+            peak = std::max(peak, big.block(4096).peak);
+            for (int c = 0; c < 2; ++c) a.copyFrom(c, 0, big.work, c, 0, 4096);
+            for (int q = 0; q < 4; ++q)
+            {
+                small.block(1024);
+                for (int c = 0; c < 2; ++c) b.copyFrom(c, q * 1024, small.work, c, 0, 1024);
+            }
+            for (int c = 0; c < 2; ++c)
+                if (std::memcmp(a.getReadPointer(c), b.getReadPointer(c), 4096 * sizeof (float)) != 0) ++differing;
+        }
+        expectEquals(differing, 0, "the chunked block is bit-identical to the same frames in prepared-size blocks");
+        expect(peak > 0.0f && peak < 4.0f && std::isfinite(peak), "it sounds and stays bounded");
+        expect(big.p.getLayerRenderProbe().largestCall <= 1024, "no call is longer than the prepared size");
     }
 
     static juce::String layerId(int layer, const char* suffix) { return mu_toni::layerParamId(layer, suffix); }
@@ -640,108 +653,3 @@ struct MuToniLayerPinTests : juce::UnitTest
 
 static MuToniLayerPinTests muToniLayerPinTests;
 
-//==============================================================================
-// The useLayerRender equivalence gate (extraction-plan 2.7a, tests.md section 3): while both render paths
-// exist, the old processor-side chain and the shared driver over Arp::render must give the same master and the
-// same pre-mixer channel streams, bit for bit, for every golden scenario, three block schedules, and the
-// cases the review adds (locate and loop-back with held keys, tempo ramp, start mid-step, startBeat 1e6,
-// structural edits, keys during unrendered blocks, a count regrow by a state load).
-struct MuToniLayerEquivalenceTests : juce::UnitTest
-{
-    MuToniLayerEquivalenceTests() : juce::UnitTest("mu-Toni layer render equivalence", "mu-toni-equiv") {}
-
-    void runTest() override
-    {
-        mu_seam_test::TempStorage storage;
-        mu_seam_test::ScopedEnvVar deterministic("MU_DETERMINISTIC_NOISE", "1");
-        if (mu_golden::GoldenStore::fromEnvironment().updateMode) return;
-
-        const std::vector<mu_golden::Schedule> schedules {
-            mu_golden::Schedule::fixed512(), mu_golden::Schedule::ragged(), { "fixed64", { 64 } } };
-
-        auto check = [&](const mu_golden::Scenario& sc)
-        {
-            for (const auto& sched : schedules)
-            {
-                const auto r = mu_layer_equiv::compare(productFactory(), sc, sched, mu_limits::kMaxLayers);
-                expect(r.ok, sc.name + " / " + sched.name + ": " + r.message);
-            }
-        };
-
-        // Every golden scenario as recorded (prepared 1024, so no block is above the prepared size: the old
-        // chain cannot render one).
-        for (const auto& def : scenarioDefs())
-        {
-            beginTest("equivalence: " + juce::String(def.name));
-            check(buildScenario(def));
-        }
-
-        const auto byName = [](const char* scenarioName) -> const ScenarioDef&
-        {
-            for (const auto& d : scenarioDefs()) if (juce::String(d.name) == scenarioName) return d;
-            jassertfalse;
-            return scenarioDefs().front();
-        };
-
-        beginTest("equivalence: startBeat 1e6 and a start mid-step");
-        {
-            auto far = buildScenario(byName("loop-accent-steps"));
-            far.startBeat = 1.0e6;
-            far.lengthFrames = 48000;
-            check(far);
-            auto mid = buildScenario(byName("loop-legato-rests"));
-            mid.startBeat = 0.37;
-            mid.lengthFrames = 48000;
-            check(mid);
-        }
-
-        beginTest("equivalence: keys held across a locate, a loop-back and a tempo ramp");
-        {
-            auto sc = buildScenario(byName("root-by-midi"));
-            sc.lengthFrames = 72000;
-            sc.midi = { { 2, 0, on(1, 62) }, { 20, 100, on(1, 67) }, { 60, 0, off(1, 62) }, { 110, 0, off(1, 67) } };
-            sc.events.clear();
-            sc.events.push_back({ 30, "locate 9.5", [](ScriptContext& c) { c.host.ppq = 9.5; } });
-            sc.events.push_back({ 50, "loop back to 2", [](ScriptContext& c) { c.host.ppq = 2.0; } });
-            for (int b = 70; b < 100; b += 3)
-                sc.events.push_back({ b, "tempo ramp", [b](ScriptContext& c) { c.host.bpm = 100.0 + (double) (b - 70) * 2.0; } });
-            check(sc);
-        }
-
-        beginTest("equivalence: keys pressed and released while edits silence the audio");
-        {
-            auto sc = buildScenario(byName("midi-trigger"));
-            sc.lengthFrames = 72000;
-            sc.events.push_back({ 12, "edit in flight", [](ScriptContext& c) { c.proc.layerEditInFlight.store(true); } });
-            sc.events.push_back({ 16, "edit done",      [](ScriptContext& c) { c.proc.layerEditInFlight.store(false); } });
-            sc.events.push_back({ 44, "edit in flight", [](ScriptContext& c) { c.proc.layerEditInFlight.store(true); } });
-            sc.events.push_back({ 47, "edit done",      [](ScriptContext& c) { c.proc.layerEditInFlight.store(false); } });
-            sc.midi.push_back({ 13, 0, on(1, 72) });     // a press while silenced
-            sc.midi.push_back({ 45, 0, off(1, 72) });    // its release while silenced again
-            check(sc);
-        }
-
-        beginTest("equivalence: add, swap, remove mid-play with a key held, and a count regrow by a state load");
-        {
-            auto sc = buildScenario(byName("two-layers"));
-            const auto stateText = repoRoot().getChildFile("tests/golden/mu-toni/two-layers/state.xml").loadFileAsString();
-            sc.midi = { { 5, 0, on(1, 64) }, { 150, 0, off(1, 64) } };
-            sc.events.clear();
-            sc.events.push_back({ 20, "add layer",    [](ScriptContext& c) { c.proc.addLayer(); } });
-            sc.events.push_back({ 40, "swap 0 and 2", [](ScriptContext& c) { c.proc.swapLayers(0, 2); } });
-            sc.events.push_back({ 60, "remove 1",     [](ScriptContext& c) { c.proc.removeLayer(1); } });
-            sc.events.push_back({ 70, "remove 1",     [](ScriptContext& c) { c.proc.removeLayer(1); } });
-            sc.events.push_back({ 90, "regrow by state load", [stateText](ScriptContext& c)
-            {
-                const auto xml = juce::XmlDocument::parse(stateText);
-                juce::MemoryBlock mb;
-                juce::AudioProcessor::copyXmlToBinary(*xml, mb);
-                c.proc.setStateInformation(mb.getData(), (int) mb.getSize());
-            } });
-            sc.events.push_back({ 120, "reset layer 1", [](ScriptContext& c) { c.proc.resetLayer(1); } });
-            check(sc);
-        }
-    }
-};
-
-static MuToniLayerEquivalenceTests muToniLayerEquivalenceTests;

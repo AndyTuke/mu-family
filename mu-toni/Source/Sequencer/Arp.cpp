@@ -47,7 +47,7 @@ void Arp::bindParams(juce::AudioProcessorValueTreeState& apvts, int slot)
 
 void Arp::hearMidi(const mu_core::RenderContext& ctx) noexcept
 {
-    // The view's leading `carried` events are from unrendered blocks (see hearMidi above).
+    // MIDI-in: the processor-wide row, on top of the context's channel mask (Omni today; per-layer later).
     const int inCh = midiInChannel();
     const auto* first = ctx.midi.events;
     const int carried = ctx.midi.carried;

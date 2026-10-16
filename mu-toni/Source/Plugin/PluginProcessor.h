@@ -6,23 +6,20 @@
 #include "Plugin/MixerFxParams.h"         // mu-core: shared global-FX / mixer APVTS layout
 #include "Plugin/MidiClockSync.h"         // mu-core: shared MIDI-clock slave
 #include "Sequencer/Arp.h"                // mu-Toni layer: Layer + arp voice + insert
-#include "Modulation/LaneModulation.h"    // mu-core: mu_mod::resolveLane
 #include "Modulation/MuToniModDest.h"     // arp/voice modulation destinations
 #include "UI/ArpHost.h"                    // what the Arp layer's UI reads from its host
 
 #include <array>
 #include <atomic>
 #include <memory>
-#include <string_view>
-#include <unordered_map>
 
 // mu-Toni — generative arpeggiator mono-synth.
 //
 // The ProcessorBase subclass owning the arp + voice engine and the shared
 // platform: the APVTS mixer/FX layout, the MixerEngine + FXChain, and 1..8 "layer"
-// channels for the shared sidebar + MixerOverlay. Each layer runs an independent mono arp
-// (ArpVoiceRunner → ToniVoice), rendered through the shared mixer via the processCoreBlock hook
-// (engine→insert→mixer path). All eight layers' parameters and objects exist for the processor's
+// channels for the shared sidebar + MixerOverlay. Each layer is an Arp, an independent mono arp
+// (ArpVoiceRunner → ToniVoice → insert) rendered through the shared layer contract
+// (ProcessorBase::renderAndMix, then the mixer). All eight layers' parameters and objects exist for the processor's
 // lifetime; only the count (`numLayers`) is runtime, and add / delete / reorder go through the
 // shared ProcessorBase structural edits.
 namespace mu_toni
@@ -134,13 +131,6 @@ private:
     // Register mixer/FX param listeners + run an initial engine sync (JUCE doesn't
     // fire parameterChanged on construction or for unchanged values).
 
-    // This block's short MIDI messages into noteInput, after the events carried from unrendered blocks;
-    // returns how many were decoded (audio thread, allocation-free).
-    int decodeNoteInput(const juce::MidiBuffer& midi, int numSamples) noexcept;
-    // An unrendered block: keep its channel messages (decoded at [noteInputCarried, +count)) for the next
-    // rendered block, so a key pressed or released while a structural edit silences the audio still counts.
-    void carryNoteInput(int count) noexcept;
-
     mu_wavetable::WavetableBank bank;                        // the oscillators' wavetables (factory set)
 
 public:
@@ -164,17 +154,6 @@ public:
 
 private:
 
-    // The block's MIDI as the layers hear it: events carried from unrendered blocks first (frame 0), then this
-    // block's. Sized at construction; audio thread only.
-    static constexpr int kNoteInputCarry  = 512;    // messages kept across unrendered blocks (an edit is a few blocks)
-    static constexpr int kNoteInputBlock  = 1792;   // messages decoded per block (the rest of one block is dropped)
-    juce::HeapBlock<mu_core::MidiEvent> noteInput;
-    int                                 noteInputCarried = 0;
-
-    // Renders channel `ch` from its arp runner with the layer's own arp context.
-    MixerEngine::RenderChannelFn renderChannelCb;
-
-
     // Hot-swap: parsed preset trees per layer + one full preset, committed at the bar line.
     void applyLayerTree(int layer, const juce::ValueTree& tree);
     // Written by prepareToPlay, read by createLayer on the message thread and by processBlock.
@@ -182,7 +161,6 @@ private:
     std::atomic<int>    currentBlockSize  { 512 };
     // Per-instance noise seed salt, taken before the constructor body builds the layers; 0 when MU_DETERMINISTIC_NOISE is set (golden renders).
     const juce::int64   noiseSeedSalt = mu_core::makeNoiseSalt();
-    int                 runnersLive = 0;   // audio thread: layers whose runner has run since it was last reset
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };

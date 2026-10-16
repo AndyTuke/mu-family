@@ -56,18 +56,9 @@ struct Arp : Layer
     double loopBeats() const override { return 4.0; }
 
     // ── The block's work in parts ────────────────────────────────────────────
-    // Audio thread: this block's MIDI into the held keys, and the key fields of `context` from them. The first
-    // `carried` events are from earlier blocks that rendered nothing: their keys count, their presses do not.
-    // `inChannel` 0 hears every channel (Omni), 1..16 only that one.
-    void hearMidi(const mu_core::MidiEvent* events, int count, int carried, int inChannel) noexcept
-    {
-        context.noteOnEdge = false;
-        for (int i = 0; i < count; ++i)
-            heldNotes.apply(events[i], inChannel, i >= carried, context.noteOnEdge);
-        context.anyNoteHeld      = heldNotes.anyHeld();
-        context.rootOverrideMidi = heldNotes.newest();
-    }
-    // Audio thread: the same from a call's MIDI view (its own frames; the carried events lead the view).
+    // Audio thread: the call's MIDI (its own frames) into the held keys, and the key fields of `context` from
+    // them. The view's first ctx.midi.carried events are from earlier blocks that rendered nothing: their keys
+    // count, their presses do not (no fresh MIDI-trigger restart).
     void hearMidi(const mu_core::RenderContext& ctx) noexcept;
     // Audio thread: the MIDI-in channel row (0 = Omni).
     int midiInChannel() const noexcept { return juce::roundToInt(midiInParam.load(0.0f)); }
