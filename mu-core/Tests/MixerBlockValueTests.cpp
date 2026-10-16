@@ -8,6 +8,8 @@
 // significant bits), so each product and sum below is exact in float whatever the vector unit does (fused or
 // separate multiply-add, any summation order). Comparisons are therefore bit-exact. The one exception is the
 // sidechain envelope with a non-zero attack (it uses std::exp, a libm result): that case is compared to 1e-6.
+// FX returns are exact too, via 1 ms delay-line slots fed a constant (see Rig); the reverb return is checked
+// by scaling against its own unity-gain render.
 //
 // Block sizes: 1, 7, 64 and 512 are exercised against a mixer prepared for 512. MixerEngine sizes its channel
 // and send buffers once in prepare(); a block LARGER than the prepared size runs off those buffers (the product
@@ -36,6 +38,7 @@
 #include "Plugin/ProcessorBase.h"
 #include "Plugin/MixerFxParams.h"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
@@ -54,17 +57,32 @@ namespace
     // order or offset cannot hide behind a constant.
     float pat(int i) { return (float) ((i * 5) % 16 + 1) / 16.0f; }
 
-    // What a channel renders: a patterned stereo ramp (right = -left / 2) or a constant on both sides.
+    // What a channel renders: a patterned stereo ramp (right = -left / 2) or a constant. A constant is
+    // scale on the left and scale x rightMul on the right (1 = the same on both sides).
     struct Src
     {
         float scale    = 0.0f;
         bool  constant = false;
+        float rightMul = 1.0f;
         float left(int i)  const { return constant ? scale : scale * pat(i); }
-        float right(int i) const { return constant ? scale : -0.5f * scale * pat(i); }
+        float right(int i) const { return constant ? scale * rightMul : -0.5f * scale * pat(i); }
     };
 
-    // A mixer with the three FX slots disabled (they pass a send bus through untouched, so a return is the
-    // send times the return fader and pan) and a render hook that plays the configured sources.
+    // Samples a constant send must have been running before a 1 ms delay line returns it exactly: the
+    // 48-sample delay plus the four Hermite taps (about 52), rounded up.
+    constexpr int kSettle = 256;
+
+    // A mixer whose three FX slots are all DISABLED by default, and a render hook that plays the configured
+    // sources. A disabled slot returns silence (its send is already in the main bus), so with the defaults a
+    // send reaches the output only through the dry path and every return is silent.
+    //
+    // A test that needs a known FX return asks for one with effectReturn / delayReturn. That enables the
+    // Effect slot (Echo algorithm) or the Delay slot as a 1 ms (48-sample), zero-feedback, no-dirt delay.
+    // Fed a CONSTANT send that has run for longer than kSettle samples, such a delay returns the constant
+    // exactly: Hermite interpolation of four equal taps has c1, c2 and c3 exactly zero, so the result is c0
+    // (the constant) wherever the sub-sample glide position sits. A return is then the send times the return
+    // fader and pan, bit for bit. Use settle() before the block that is checked. The reverb has no such
+    // exact form; it is enabled directly where a test needs it.
     struct Rig
     {
         MixerEngine mixer;
@@ -73,12 +91,27 @@ namespace
         std::array<Src, MixerEngine::MaxChannels> src {};
         MixerEngine::RenderChannelFn render;
 
-        Rig()
+        explicit Rig(bool effectReturn = false, bool delayReturn = false)
         {
             mixer.prepare(kRate, kPrepared);
+
+            // Both delay-style slots: 1 ms, no feedback, no dirt, no spread. Set BEFORE prepare so the 50 ms
+            // time glide starts at the target instead of ramping towards it.
+            auto shape = [](DelaySlot& d)
+            {
+                d.setTimeMode(DelaySlot::TimeMode::Free);
+                d.setDelayMs(1.0f);
+                d.setFeedback(0.0f);
+                d.setSpread(0.0f);
+                d.setDirt(0.0f);
+            };
+            fx.effectSlot().setAlgorithm(EffectSlot::kEchoAlgoIndex);
+            shape(fx.effectSlot().getEchoDelay());
+            shape(fx.delaySlot());
             fx.prepare(kRate, kPrepared);
-            fx.effectSlot().setEnabled(false);
-            fx.delaySlot().setEnabled(false);
+
+            fx.effectSlot().setEnabled(effectReturn);
+            fx.delaySlot().setEnabled(delayReturn);
             fx.reverbSlot().setEnabled(false);
             render = [this](int r, juce::AudioBuffer<float>& buf, int n)
             {
@@ -95,6 +128,14 @@ namespace
                  juce::AudioBuffer<float>* fxReturns = nullptr)
         {
             mixer.processBlock(out, channels, nullptr, fx, n, directOuts, fxReturns, nullptr, &render);
+        }
+
+        // Plays blocks of n samples until kSettle samples have passed, so the 1 ms delay lines are full of the
+        // constant send and the next block is in steady state.
+        void settle(int channels, int n)
+        {
+            for (int done = 0; done < kSettle; done += n)
+                run(channels, n);
         }
     };
 
@@ -132,6 +173,9 @@ struct MixerBlockValueTests : juce::UnitTest
         levelPanTrim();
         masterAndDirect();
         sends();
+        disabledSlots();
+        echoRepeatsReachReverb();
+        reverbReturnStrip();
         muteSoloTruthTable();
         sidechainTap();
         sidechainOrder();
@@ -250,14 +294,16 @@ struct MixerBlockValueTests : juce::UnitTest
         }
     }
 
-    // Effect/delay/reverb sends and returns. The slots are disabled, so a return is send x return fader/pan.
+    // Effect/delay/reverb sends and returns. The Effect and Delay slots run as exact 1 ms delays (see Rig), so
+    // a steady return is the send times the return fader and pan. The reverb slot is disabled here: it
+    // returns silence, which the first test pins; its return strip is covered by reverbReturnStrip().
     void sends()
     {
-        beginTest("sends are post-fader, post-pan; a return is the send bus times the return fader and pan");
+        beginTest("sends are post-fader, post-pan; a return is the (delayed) send bus times the return fader and pan; a disabled reverb adds nothing");
         for (int n : kSizes)
         {
-            Rig r;
-            r.src[0] = { 0.5f, false };
+            Rig r(true, true);
+            r.src[0] = { 0.5f, true, -0.5f };
             r.mixer.channels[0].level.store(0.5f);
             r.mixer.channels[0].pan.store(0.5f);
             r.mixer.channels[0].sendEffect.store(0.5f);
@@ -267,27 +313,29 @@ struct MixerBlockValueTests : juce::UnitTest
             r.mixer.returns[1].level.store(0.5f);
             r.mixer.returns[2].level.store(0.25f);
             r.mixer.returns[2].pan.store(-0.5f);
+            r.settle(1, n);
             juce::AudioBuffer<float> fxOut(2, kPrepared);
             fxOut.clear();
             r.run(1, n, nullptr, &fxOut);
 
-            auto dryL = [&](int i) { return trimmed(r.src[0].left(i))  * gainL(0.5f, 0.5f); };
-            auto dryR = [&](int i) { return trimmed(r.src[0].right(i)) * gainR(0.5f, 0.5f); };
-            auto retL = [&](int i) { return (dryL(i) * 0.5f) * gainL(1.0f, 0.0f); };
-            auto retR = [&](int i) { return (dryR(i) * 0.5f) * gainR(1.0f, 0.0f); };
-            auto dlyL = [&](int i) { return (dryL(i) * 0.25f) * gainL(0.5f, 0.0f); };
-            auto dlyR = [&](int i) { return (dryR(i) * 0.25f) * gainR(0.5f, 0.0f); };
-            auto revL = [&](int i) { return (dryL(i) * 1.0f) * gainL(0.25f, -0.5f); };
-            auto revR = [&](int i) { return (dryR(i) * 1.0f) * gainR(0.25f, -0.5f); };
-            expectChannel(r.out, 0, n, [&](int i) { return ((dryL(i) + retL(i)) + dlyL(i)) + revL(i); }, "master L");
-            expectChannel(r.out, 1, n, [&](int i) { return ((dryR(i) + retR(i)) + dlyR(i)) + revR(i); }, "master R");
-            expectChannel(fxOut, 0, n, [&](int i) { return (retL(i) + dlyL(i)) + revL(i); }, "fx-returns bus L");
-            expectChannel(fxOut, 1, n, [&](int i) { return (retR(i) + dlyR(i)) + revR(i); }, "fx-returns bus R");
+            // The source is constant, so every term below is a constant of the block.
+            const float dryL = trimmed(r.src[0].left(0))  * gainL(0.5f, 0.5f);
+            const float dryR = trimmed(r.src[0].right(0)) * gainR(0.5f, 0.5f);
+            const float retL = (dryL * 0.5f) * gainL(1.0f, 0.0f);
+            const float retR = (dryR * 0.5f) * gainR(1.0f, 0.0f);
+            const float dlyL = (dryL * 0.25f) * gainL(0.5f, 0.0f);
+            const float dlyR = (dryR * 0.25f) * gainR(0.5f, 0.0f);
+            // The reverb send is 1.0 and its return fader/pan are set, but the slot is disabled: no wet at all.
+            expectChannel(r.out, 0, n, [&](int) { return (dryL + retL) + dlyL; }, "master L");
+            expectChannel(r.out, 1, n, [&](int) { return (dryR + retR) + dlyR; }, "master R");
+            expectChannel(fxOut, 0, n, [&](int) { return retL + dlyL; }, "fx-returns bus L");
+            expectChannel(fxOut, 1, n, [&](int) { return retR + dlyR; }, "fx-returns bus R");
+            expectEquals(r.mixer.returnPeaks[2].load(), 0.0f, "disabled reverb: return peak is zero");
         }
 
         beginTest("send modulation replaces the knob; several strips add into one send bus");
         {
-            Rig r;
+            Rig r(true, false);
             r.src[0] = { 0.5f, true };
             r.src[1] = { 0.25f, true };
             r.mixer.channels[0].sendEffect.store(0.0f);
@@ -295,24 +343,269 @@ struct MixerBlockValueTests : juce::UnitTest
             r.mixer.channels[1].sendEffect.store(1.0f);
             r.mixer.channels[1].sendEffectMod.store(0.0f);   // modulated off (0 is a value, not "unmodulated")
             r.mixer.returns[0].level.store(1.0f);
+            r.settle(2, 64);
             r.run(2, 64);
             expectChannel(r.out, 0, 64, [&](int) { return (trimmed(0.5f) + trimmed(0.25f)) + (trimmed(0.5f) * 0.5f); }, "L");
         }
 
-        beginTest("a muted return is not heard; a muted strip feeds no send");
+        beginTest("a muted return is not heard (the same return is heard when unmuted); a muted strip feeds no send");
         {
-            Rig r;
+            Rig r(false, true);                              // the delay return is the exact one
             r.src[0] = { 0.5f, true };
-            r.mixer.channels[0].sendReverb.store(1.0f);
-            r.mixer.returns[2].level.store(1.0f);
-            r.mixer.returns[2].mute.store(true);
+            r.mixer.channels[0].sendDelay.store(1.0f);
+            r.mixer.returns[1].level.store(1.0f);
+            r.settle(1, 64);
+            r.run(1, 64);
+            expectChannel(r.out, 0, 64, [&](int) { return trimmed(0.5f) + trimmed(0.5f); }, "return heard (control)");
+            r.mixer.returns[1].mute.store(true);
             r.run(1, 64);
             expectChannel(r.out, 0, 64, [&](int) { return trimmed(0.5f); }, "return muted");
-            expectEquals(r.mixer.returnPeaks[2].load(), 0.0f, "return peak cleared");
-            r.mixer.returns[2].mute.store(false);
+            expectEquals(r.mixer.returnPeaks[1].load(), 0.0f, "return peak cleared");
+        }
+
+        beginTest("a muted strip feeds no send: nothing reaches the output, and no wet appears after the delay time");
+        {
+            // A fresh rig whose strip is muted from the first sample: if the mute did not gate the send, the
+            // wet would appear once the 48-sample delay has elapsed, so the whole 512-sample block is checked.
+            Rig r(false, true);
+            r.src[0] = { 0.5f, true };
+            r.mixer.channels[0].sendDelay.store(1.0f);
+            r.mixer.returns[1].level.store(1.0f);
             r.mixer.channels[0].mute.store(true);
-            r.run(1, 64);
-            expectChannel(r.out, 0, 64, [](int) { return 0.0f; }, "strip muted: no dry and no wet");
+            r.run(1, 512);
+            expectChannel(r.out, 0, 512, [](int) { return 0.0f; }, "strip muted: no dry and no wet");
+        }
+    }
+
+    // Brings the rig's slots to the product default (all enabled, Chorus on the Effect slot, Echo delay on).
+    static void enableAllSlots(Rig& r)
+    {
+        r.fx.effectSlot().setAlgorithm(0);
+        r.fx.effectSlot().setEnabled(true);
+        r.fx.effectSlot().getEchoDelay().setEnabled(true);
+        r.fx.delaySlot().setEnabled(true);
+        r.fx.reverbSlot().setEnabled(true);
+    }
+
+    // A disabled FX slot returns silence. The send bus it is handed holds the strips' dry signal, which is
+    // already in the main bus; passing it on would add the dry signal a second time through the return.
+    // Each case disables one slot (others stay enabled but get no send) or all, sends the strips into the
+    // disabled slot's bus at full level, and compares the output bit for bit with a reference rig that has
+    // the same slot state and no sends at all, i.e. the dry-only render.
+    void disabledSlots()
+    {
+        enum Case { EffectOff, EffectOffEcho, EchoOff, DelayOff, ReverbOff, AllOff, kCases };
+        const char* names[kCases] = { "Effect slot (Chorus)", "Effect slot (Echo algorithm)", "Echo delay inside an enabled Effect slot",
+                                      "Delay slot", "Reverb slot", "all three slots together" };
+
+        for (int c = 0; c < kCases; ++c)
+        {
+            beginTest(juce::String("a disabled ") + names[c] + ": the output is the dry-only render, the returns are silent");
+            for (int n : kSizes)
+            {
+                Rig dry, wet;
+                for (Rig* r : { &dry, &wet })
+                {
+                    enableAllSlots(*r);
+                    r->src[0] = { 0.5f, false };
+                    r->src[1] = { 0.25f, false };
+                    r->mixer.channels[0].pan.store(0.5f);
+                    for (int ri = 0; ri < 3; ++ri) r->mixer.returns[(size_t) ri].level.store(1.0f);
+                }
+                for (Rig* r : { &dry, &wet })
+                {
+                    switch (c)
+                    {
+                        case EffectOff:     r->fx.effectSlot().setEnabled(false); break;
+                        case EffectOffEcho: r->fx.effectSlot().setAlgorithm(EffectSlot::kEchoAlgoIndex);
+                                            r->fx.effectSlot().setEnabled(false); break;
+                        case EchoOff:       r->fx.effectSlot().setAlgorithm(EffectSlot::kEchoAlgoIndex);
+                                            r->fx.effectSlot().getEchoDelay().setEnabled(false); break;
+                        case DelayOff:      r->fx.delaySlot().setEnabled(false); break;
+                        case ReverbOff:     r->fx.reverbSlot().setEnabled(false); break;
+                        default:            r->fx.effectSlot().setEnabled(false);
+                                            r->fx.delaySlot().setEnabled(false);
+                                            r->fx.reverbSlot().setEnabled(false); break;
+                    }
+                }
+                // Full-level send into the disabled slot's bus (all three for the combined case); the
+                // reference gets none.
+                for (int s = 0; s < 2; ++s)
+                {
+                    auto& ch = wet.mixer.channels[(size_t) s];
+                    if (c == EffectOff || c == EffectOffEcho || c == EchoOff || c == AllOff) ch.sendEffect.store(1.0f);
+                    if (c == DelayOff  || c == AllOff) ch.sendDelay.store(1.0f);
+                    if (c == ReverbOff || c == AllOff) ch.sendReverb.store(1.0f);
+                }
+
+                // Several blocks, so a leak that only shows once the slot's own state has filled is seen too.
+                for (int b = 0; b < 4; ++b)
+                {
+                    juce::AudioBuffer<float> dryBus(2, kPrepared), wetBus(2, kPrepared);
+                    dryBus.clear();
+                    wetBus.clear();
+                    dry.run(2, n, nullptr, &dryBus);
+                    wet.run(2, n, nullptr, &wetBus);
+                    const juce::String tag = juce::String(names[c]) + " block " + juce::String(b) + " size " + juce::String(n);
+                    for (int ch = 0; ch < 2; ++ch)
+                    {
+                        expectChannel(wet.out, ch, n, [&](int i) { return dry.out.getSample(ch, i); }, tag + " main output");
+                        expectChannel(wetBus, ch, n, [&](int i) { return dryBus.getSample(ch, i); }, tag + " fx-returns bus");
+                    }
+                }
+                // The disabled slot's own return meter reads zero (the other slots had no send).
+                if (c == EffectOff || c == EffectOffEcho || c == EchoOff || c == AllOff)
+                    expectEquals(wet.mixer.returnPeaks[0].load(), 0.0f, juce::String(names[c]) + ": effect return peak");
+                if (c == DelayOff || c == AllOff)
+                    expectEquals(wet.mixer.returnPeaks[1].load(), 0.0f, juce::String(names[c]) + ": delay return peak");
+                if (c == ReverbOff || c == AllOff)
+                    expectEquals(wet.mixer.returnPeaks[2].load(), 0.0f, juce::String(names[c]) + ": reverb return peak");
+            }
+        }
+
+        beginTest("a disabled Effect slot passes nothing on through Effect->Delay and Effect->Reverb routing");
+        for (int n : kSizes)
+        {
+            Rig dry, wet;
+            for (Rig* r : { &dry, &wet })
+            {
+                enableAllSlots(*r);                          // Delay and Reverb run, with no send of their own
+                r->fx.effectSlot().setEnabled(false);
+                r->fx.setEffectToDelaySend(1.0f);
+                r->fx.setEffectToReverbSend(1.0f);
+                r->fx.setDelayToReverbSend(1.0f);
+                r->src[0] = { 0.5f, false };
+                for (int ri = 0; ri < 3; ++ri) r->mixer.returns[(size_t) ri].level.store(1.0f);
+            }
+            wet.mixer.channels[0].sendEffect.store(1.0f);
+            for (int b = 0; b < 4; ++b)
+            {
+                dry.run(1, n);
+                wet.run(1, n);
+                for (int ch = 0; ch < 2; ++ch)
+                    expectChannel(wet.out, ch, n, [&](int i) { return dry.out.getSample(ch, i); },
+                                  "routing from a disabled Effect, block " + juce::String(b) + " size " + juce::String(n));
+            }
+            expectEquals(wet.mixer.returnPeaks[1].load(), 0.0f, "delay return stays silent");
+            expectEquals(wet.mixer.returnPeaks[2].load(), 0.0f, "reverb return stays silent");
+        }
+    }
+
+    // An Echo tail keeps feeding the reverb through Effect->Reverb after the channel send has gone silent:
+    // the routing must not be gated on the channel sends having signal this block.
+    void echoRepeatsReachReverb()
+    {
+        beginTest("Echo with Effect->Reverb routing: the repeats reach the reverb while the channel sends are silent");
+        {
+            constexpr int kBlock = 512, kBlocks = 24;
+            Rig r;
+            r.fx.effectSlot().setEnabled(true);              // the Rig leaves the algorithm on Echo
+            r.fx.reverbSlot().setEnabled(true);
+            r.fx.effectSlot().getEchoDelay().setDelayMs(20.0f);   // 960 samples: the first repeat is after block 0
+            r.fx.effectSlot().getEchoDelay().setFeedback(0.5f);
+            r.fx.setEffectToReverbSend(1.0f);
+            // Re-prepare so the 50 ms time glide starts at 20 ms rather than gliding from the rig's 1 ms
+            // (which would let the first repeat land inside block 0). Slot enable flags survive prepare().
+            r.fx.prepare(kRate, kPrepared);
+
+            // Source: a constant in block 0 only, then silence, so every later signal is an echo repeat.
+            int blockIndex = 0;
+            r.render = [&](int, juce::AudioBuffer<float>& buf, int n)
+            {
+                const float v = blockIndex == 0 ? 0.5f : 0.0f;
+                for (int i = 0; i < n; ++i) { buf.setSample(0, i, v); buf.setSample(1, i, v); }
+            };
+            r.mixer.channels[0].sendEffect.store(1.0f);      // no reverb send and no delay send anywhere
+            r.mixer.returns[0].level.store(1.0f);
+            r.mixer.returns[2].level.store(1.0f);
+
+            float echoBlock0 = -1.0f, reverbBlock0 = -1.0f, echoLater = 0.0f, reverbLater = 0.0f;
+            for (int b = 0; b < kBlocks; ++b)
+            {
+                blockIndex = b;
+                r.run(1, kBlock);
+                if (b == 0)
+                {
+                    echoBlock0   = r.mixer.returnPeaks[0].load();
+                    reverbBlock0 = r.mixer.returnPeaks[2].load();
+                }
+                else
+                {
+                    echoLater   = juce::jmax(echoLater,   r.mixer.returnPeaks[0].load());
+                    reverbLater = juce::jmax(reverbLater, r.mixer.returnPeaks[2].load());
+                }
+            }
+            // Block 0: the repeat is not due yet, so neither the echo return nor the reverb has signal.
+            expectEquals(echoBlock0, 0.0f, "no echo repeat in block 0");
+            expectEquals(reverbBlock0, 0.0f, "nothing reached the reverb in block 0");
+            // Later blocks: the repeats are audible, and the reverb (fed only by them) has a return.
+            expect(echoLater > 0.05f, "the echo repeats are audible (" + juce::String(echoLater, 5) + ")");
+            expect(reverbLater > 1.0e-4f, "the reverb sounds from the routed repeats (" + juce::String(reverbLater, 8) + ")");
+        }
+    }
+
+    // The reverb has no exact closed form, so its return fader and pan are checked against itself: a render
+    // at unity return gain is the reference, and a render with level 0.25 and pan -0.5 must be exactly that
+    // reference times the per-side gains (0.25 left, 0.125 right: powers of two, so the product is exact).
+    void reverbReturnStrip()
+    {
+        beginTest("reverb return strip: fader and pan scale the wet exactly, against a unity-gain reference render");
+        {
+            constexpr int kBlk = 256, kBlocks = 24;
+            std::vector<float> refL, refR, again_L, again_R, scL, scR;
+
+            // Plays a constant into the reverb send for kBlocks blocks and collects the fx-returns bus.
+            auto renderWet = [&](float level, float pan, std::vector<float>& L, std::vector<float>& R)
+            {
+                Rig r;
+                r.fx.reverbSlot().setEnabled(true);
+                r.src[0] = { 0.5f, true, -0.5f };
+                r.mixer.channels[0].sendReverb.store(1.0f);
+                r.mixer.returns[2].level.store(level);
+                r.mixer.returns[2].pan.store(pan);
+                for (int b = 0; b < kBlocks; ++b)
+                {
+                    juce::AudioBuffer<float> bus(2, kPrepared);
+                    bus.clear();
+                    r.run(1, kBlk, nullptr, &bus);
+                    for (int i = 0; i < kBlk; ++i) { L.push_back(bus.getSample(0, i)); R.push_back(bus.getSample(1, i)); }
+                }
+            };
+            renderWet(1.0f, 0.0f, refL, refR);
+            renderWet(1.0f, 0.0f, again_L, again_R);
+            renderWet(0.25f, -0.5f, scL, scR);
+
+            // Precondition: two reverbs built the same way render the same samples, else the comparison below
+            // would blame the return strip for reverb randomness.
+            expect(refL == again_L && refR == again_R, "the reverb render is reproducible across instances (precondition)");
+
+            int compared = 0;
+            float refPeak = 0.0f;
+            for (int b = 0; b < kBlocks; ++b)
+            {
+                // Skip blocks whose reference is near the mixer's 1e-9 'has signal' gate, where the scaled
+                // render may legitimately be dropped while the reference is not.
+                float blockPeak = 0.0f;
+                for (int i = 0; i < kBlk; ++i)
+                    blockPeak = juce::jmax(blockPeak, std::abs(refL[(size_t) (b * kBlk + i)]), std::abs(refR[(size_t) (b * kBlk + i)]));
+                refPeak = juce::jmax(refPeak, blockPeak);
+                if (blockPeak < 1.0e-6f) continue;
+                ++compared;
+                for (int i = 0; i < kBlk; ++i)
+                {
+                    const size_t k = (size_t) (b * kBlk + i);
+                    if (scL[k] != refL[k] * gainL(0.25f, -0.5f) || scR[k] != refR[k] * gainR(0.25f, -0.5f))
+                    {
+                        expect(false, "block " + juce::String(b) + " sample " + juce::String(i) + ": scaled L " + juce::String(scL[k], 9)
+                                          + " vs ref L x gain " + juce::String(refL[k] * gainL(0.25f, -0.5f), 9)
+                                          + ", scaled R " + juce::String(scR[k], 9) + " vs ref R x gain "
+                                          + juce::String(refR[k] * gainR(0.25f, -0.5f), 9));
+                        return;
+                    }
+                }
+            }
+            expect(refPeak > 1.0e-4f, "the reference reverb return is audible (peak " + juce::String(refPeak, 6) + ")");
+            expect(compared >= 8, "at least 8 blocks carried signal and were compared (" + juce::String(compared) + ")");
         }
     }
 
@@ -327,7 +620,7 @@ struct MixerBlockValueTests : juce::UnitTest
         {
             for (int ms = 0; ms < 64; ++ms)
             {
-                Rig r;
+                Rig r(true, true);   // Effect and Delay returns both live; only the Effect return is fed
                 bool mute[3], solo[3];
                 for (int c = 0; c < 3; ++c)
                 {
@@ -343,6 +636,7 @@ struct MixerBlockValueTests : juce::UnitTest
                 r.mixer.returns[0].solo.store(st == EffectSolo);
                 r.mixer.returns[1].solo.store(st == DelaySolo);
                 r.mixer.returns[0].mute.store(st == EffectMute);
+                r.settle(3, 64);     // fill the 1 ms delay line so the checked block is in steady state
                 r.run(3, 64);
 
                 const bool anySolo = solo[0] || solo[1] || solo[2];
@@ -452,7 +746,7 @@ struct MixerBlockValueTests : juce::UnitTest
 
         beginTest("a return ducks from a channel's post-trim signal and its source's mute/solo state");
         {
-            Rig r;
+            Rig r(true, false);
             r.src[0] = { 0.5f, true };
             r.mixer.channels[0].sendEffect.store(1.0f);
             r.mixer.returns[0].level.store(1.0f);
@@ -460,6 +754,7 @@ struct MixerBlockValueTests : juce::UnitTest
             r.mixer.returns[0].sidechainAmount.store(0.5f);
             r.mixer.returns[0].sidechainAttackMs.store(0.0f);
             r.mixer.returns[0].sidechainReleaseMs.store(0.0f);
+            r.settle(1, 64);
             r.run(1, 64);
             // dry 0.25; the send is the post-fader strip (0.25) ducked by half before the return fader: +0.125.
             expectChannel(r.out, 0, 64, [&](int) { return trimmed(0.5f) + trimmed(0.5f) * 0.5f; }, "ducked return");
