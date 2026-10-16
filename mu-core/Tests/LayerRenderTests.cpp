@@ -420,7 +420,8 @@ struct LayerRenderDriverTests : juce::UnitTest
                 AppendTap tap(total);
                 const auto out = renderThrough(p, sched, total, 0.0, &tap);
                 int diff = -1;
-                expect(bitEqual(out, reference, total, &diff),
+                const bool same = bitEqual(out, reference, total, &diff);   // before the message reads diff
+                expect(same,
                        "schedule starting " + juce::String(sched[0]) + " differs at frame " + juce::String(diff));
                 const auto probe = p.getLayerRenderProbe();
                 expect(probe.largestCall <= 512, "no call exceeds the prepared size");
@@ -431,6 +432,64 @@ struct LayerRenderDriverTests : juce::UnitTest
                            "a layer sees blockSize == n <= prepared and frameOffset == midi.firstFrame");
                 }
             }
+        }
+
+        beginTest("C8 with the DAW sidechain: every chunk ducks against its own sidechain frames (512 vs 1500, 4096, ragged)");
+        {
+            constexpr int total = 24000;
+            // An impulse every 700 frames on the sidechain input, which shares the output's buffer channels.
+            auto renderDucked = [total](const std::vector<int>& sched, bool withSidechain)
+            {
+                auto pBox = std::make_unique<FakeLayerHost>(2, mu_core::LayerAccess::TryLock, true);
+                auto& p = *pBox;
+                p.setUseLayerRenderForTest(true);
+                Driver d(p);
+                p.mixerEngine.channels[1].sidechainSource.store(MixerEngine::kExtSidechainSrc);
+                p.mixerEngine.channels[1].sidechainAmount.store(1.0f);
+                p.mixerEngine.channels[1].sidechainReleaseMs.store(20.0f);
+                if (withSidechain)
+                    d.fillInput = [](juce::AudioBuffer<float>& b, juce::int64 frame)
+                    {
+                        for (int i = 0; i < b.getNumSamples(); ++i)
+                            if ((frame + i) % 700 == 0)
+                                for (int c = 0; c < 2; ++c) b.setSample(c, i, 1.0f);
+                    };
+                juce::AudioBuffer<float> out(2, total);
+                int at = 0;
+                for (size_t k = 0; at < total; ++k)
+                {
+                    const int n = juce::jmin(sched[k % sched.size()], total - at);
+                    const auto& b = d.block(n);
+                    for (int c = 0; c < 2; ++c) out.copyFrom(c, at, b, c, 0, n);
+                    at += n;
+                }
+                return out;
+            };
+            const auto reference = renderDucked({ 512 }, true);
+            const auto unducked = renderDucked({ 512 }, false);
+            expect(! bitEqual(reference, unducked, total), "the sidechain ducks channel 1");
+            for (const auto& sched : std::vector<std::vector<int>> { { 1500 }, { 4096 }, { 1, 7, 63, 64, 129, 512, 1024, 3 } })
+            {
+                int diff = -1;
+                const bool same = bitEqual(renderDucked(sched, true), reference, total, &diff);
+                expect(same,
+                       "schedule starting " + juce::String(sched[0]) + " ducks differently from frame " + juce::String(diff));
+            }
+        }
+
+        beginTest("R1: a host that reports playing with a frozen position is one jump on resume, not one per block");
+        {
+            auto pBox = std::make_unique<FakeLayerHost>(1); auto& p = *pBox;
+            p.setUseLayerRenderForTest(true);
+            Driver d(p);
+            for (int i = 0; i < 4; ++i) d.block(256);
+            d.freezePosition = true;
+            for (int i = 0; i < 10; ++i) d.block(256);
+            expectEquals(p.fake(0).jumped, 0, "the frozen blocks are not jumps");
+            d.freezePosition = false;
+            for (int i = 0; i < 4; ++i) d.block(256);
+            expectEquals(p.fake(0).jumped, 1, "one jump when the position moves again");
+            expectEquals(p.fake(0).jumpHooks, 1);
         }
 
         beginTest("An oversize host block through MixerEngine: every chunk mixed, the tail of the block not lost");

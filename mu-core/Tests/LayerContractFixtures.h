@@ -128,8 +128,12 @@ namespace mu_contract_test
     // A ProcessorBase with eight fake slots, the real mixer-strip parameters and a gain parameter per slot.
     struct FakeLayerHost : ProcessorBase
     {
-        explicit FakeLayerHost(int live = 2, mu_core::LayerAccess access = mu_core::LayerAccess::TryLock)
-            : ProcessorBase(BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo()), makeLayout())
+        // `sidechainInput`: a stereo sidechain input bus sharing the output's buffer channels (an instrument's shape).
+        explicit FakeLayerHost(int live = 2, mu_core::LayerAccess access = mu_core::LayerAccess::TryLock, bool sidechainInput = false)
+            : ProcessorBase(sidechainInput ? BusesProperties().withInput("Sidechain", juce::AudioChannelSet::stereo(), true)
+                                                              .withOutput("Out", juce::AudioChannelSet::stereo())
+                                           : BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo()),
+                            makeLayout())
         {
             setLayerAccess(access);
             keepSpareLayers = true;
@@ -187,14 +191,14 @@ namespace mu_contract_test
         // The driver called directly (no product ScopedNoDenormals, no resolver), as a stress thread does.
         void renderAndMixForTest(juce::AudioBuffer<float>& buf, juce::MidiBuffer& m, const mu_core::BlockTransport& t) noexcept
         {
-            renderAndMix(buf, m, t, beatWrap);
+            renderAndMix(buf, m, t);
         }
 
         bool canEditLayers() const override { return editable; }
         std::unique_ptr<Layer> createLayer(int) override { return std::make_unique<FakeBeatLayer>(); }
         bool editable = true;
 
-        double beatWrap = 0.0;          // the host bound passed to renderAndMix
+        double beatWrap = 0.0;          // the host bound the resolver wraps with (BlockTransport::beatWrap)
         bool   lastFlagged = false;
         mu_core::BlockTransport lastTransport;
 
@@ -210,10 +214,10 @@ namespace mu_contract_test
         void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) override
         {
             juce::ScopedNoDenormals noDenormals;
-            captureSidechainAndClear(buffer);
             const int n = buffer.getNumSamples();
+            if (! usesLayerRender()) captureSidechainAndClear(buffer);   // the driver captures per chunk itself
             lastTransport = resolveBlockTransport(midi, n, beatWrap);
-            if (usesLayerRender()) renderAndMix(buffer, midi, lastTransport, beatWrap);
+            if (usesLayerRender()) renderAndMix(buffer, midi, lastTransport);
             else                   renderOldPath(buffer, lastTransport, n);
             flagLayerSwapBoundaries(lastTransport);
         }
@@ -286,6 +290,7 @@ namespace mu_contract_test
             if (n > work.getNumSamples()) work.setSize(2, n);
             view.setDataToReferTo(work.getArrayOfWritePointers(), 2, 0, n);
             view.clear();
+            if (fillInput) fillInput(view, frame);   // what the host's input bus carries (a sidechain)
             midi.clear();
             for (const auto& m : pendingMidi) midi.addEvent(m, juce::jmin(n - 1, midiOffset));
             pendingMidi.clear();
@@ -299,7 +304,8 @@ namespace mu_contract_test
             }
             else
                 proc.processBlock(view, midi);
-            if (host.playing) host.ppq += (double) n * host.bpm / (60.0 * rate);
+            if (host.playing && ! freezePosition) host.ppq += (double) n * host.bpm / (60.0 * rate);
+            frame += n;
             return view;
         }
 
@@ -310,6 +316,9 @@ namespace mu_contract_test
         juce::MidiBuffer midi;
         std::vector<juce::MidiMessage> pendingMidi;
         int  midiOffset = 0;
+        juce::int64 frame = 0;           // host frames rendered so far
+        bool freezePosition = false;     // the host reports playing but its position does not move
+        std::function<void(juce::AudioBuffer<float>&, juce::int64)> fillInput;
         bool countAllocations = false;   // count heap use inside processBlock (AllocationProbe)
         int  allocations = 0, frees = 0;
     };

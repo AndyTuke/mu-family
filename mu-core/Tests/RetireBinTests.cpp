@@ -34,6 +34,7 @@ namespace
             magic = kDeadMagic;
             ++destroyed();
             if (! mu_core::RetireBin::isFreeingOnThisThread()) ++freedOutsideBin();
+            if (mu_core::RetireBin::isMutexHeldOnThisThread()) ++freedUnderMutex();
             if (blockOpen != nullptr && *blockOpen && touchedThisBlock) ++freedUnderReader();
         }
 
@@ -65,6 +66,7 @@ namespace
         static int& useAfterFree()     { static int n = 0; return n; }
         static int& freedOutsideBin()  { static int n = 0; return n; }
         static int& freedUnderReader() { static int n = 0; return n; }
+        static int& freedUnderMutex()  { static int n = 0; return n; }
 
         uint32_t magic = kAliveMagic;
         mu_core::RetirePolicy pol;
@@ -264,10 +266,12 @@ struct RetireBinDepthTests : juce::UnitTest
                 struct Inside { mu_core::AudioEpoch& e; juce::WaitableEvent in, out; std::thread t;
                                 explicit Inside(mu_core::AudioEpoch& ep) : e(ep), t([this] { e.enter(); in.signal(); out.wait(); e.leave(); }) { in.wait(); }
                                 ~Inside() { out.signal(); t.join(); } } inside(rig.epoch);
+                const int before = ProbeTail::destroyed();
                 expect(rig.bin.park(0, std::unique_ptr<mu_core::RetireTail>(new ProbeTail()), 0, false) == Bin::ParkResult::Dropped);
+                expectEquals(ProbeTail::destroyed() - before, 1, "the incoming tail never sounded: freed at once, after binMutex");
                 expect(rig.bin.stateOf(0, 0) == Bin::Done, "the evicted entry stays Done for service");
             }
-            expect(rig.bin.service() >= 2, "the dropped incoming tail and the evicted entry are freed once the block ended");
+            expect(rig.bin.service() >= 1, "the evicted entry is freed once the block ended");
             expect(rig.bin.park(0, std::unique_ptr<mu_core::RetireTail>(new ProbeTail()), 0, false) == Bin::ParkResult::Parked);
         }
 
@@ -625,6 +629,130 @@ struct RetireBinRulesTests : juce::UnitTest
     }
 };
 static RetireBinRulesTests sRetireBinRulesTests;
+
+// ─── The review's M3 and M4: no free or wait under binMutex; a regrow by state cuts in-place tails ────
+namespace
+{
+    // A spare that fades in place (mu-Tant's shape), renders a constant into its tail.
+    struct FadingSpare : FakeBeatLayer
+    {
+        mu_core::RetirePolicy retirePolicy() const override { return { mu_core::RetirePolicy::Kind::Fade, 25.0f, 2.0f }; }
+        bool renderRetiring(const mu_core::RenderContext&, juce::AudioBuffer<float>& out, int n, mu_core::RetireState& rs) override
+        {
+            for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::add(out.getWritePointer(c), 0.25f, n);
+            mu_core::applyLinearFade(out, n, rs);
+            return true;
+        }
+    };
+}
+
+struct RetireBinReviewTests : juce::UnitTest
+{
+    RetireBinReviewTests() : juce::UnitTest("RetireBin review fixes (M3 lock hold, M4 regrow by state)", "mu-core") {}
+
+    void runTest() override
+    {
+        beginTest("M4: applyComposedState shrink 4 to 2, regrow to 4 inside the fade, shrink again: the second park fades afresh");
+        {
+            auto pBox = std::make_unique<FakeLayerHost>(4); auto& p = *pBox;
+            {
+                const juce::ScopedLock sl(p.layersLock);
+                for (int s = 2; s < 4; ++s) { p.layers[(size_t) s] = std::make_unique<FadingSpare>(); p.layers[(size_t) s]->bindParams(p.apvts, s); }
+            }
+            p.setUseLayerRenderForTest(true);
+            Driver d(p);
+            auto state4 = p.captureComposedState();
+            auto state2 = state4.createCopy();
+            state2.setProperty("numVoices", 2, nullptr);
+            auto shrink = [&]
+            {
+                // mu-Tant's E4.6 shape: park in place with the next serial, the count store in the same layout hold.
+                const juce::ScopedLock lw(p.layoutWriteLock);
+                const auto next = p.nextLayoutSerial();
+                const auto r2 = p.retireBin.parkInPlace(2, *p.layers[2], next, false);
+                const auto r3 = p.retireBin.parkInPlace(3, *p.layers[3], next, false);
+                p.applyComposedState(state2);
+                return std::make_pair(r2, r3);
+            };
+            const auto first = shrink();
+            expect(first.first == Bin::ParkResult::Parked && first.second == Bin::ParkResult::Parked);
+            d.block(256);
+            expect(p.retireBin.countIn(Bin::Draining) == 2, "both spares fade");
+            p.applyComposedState(state4);   // regrow inside the 25 ms fade
+            expectEquals(p.retireBin.countIn(Bin::Draining) + p.retireBin.countIn(Bin::Parked), 0,
+                         "the regrow cut the in-place entries (count first, then cut)");
+            d.block(256);
+            p.flushPendingAsyncUpdates();
+            p.retireBin.service();
+            const auto second = shrink();
+            expect(second.first == Bin::ParkResult::Parked && second.second == Bin::ParkResult::Parked,
+                   "the second shrink parks again (not AlreadyActive: no stale fade stays armed)");
+            int fresh = 0;
+            for (int e = 0; e < Bin::kDepth; ++e)
+                if (p.retireBin.stateOf(2, e) == Bin::Parked)
+                    fresh = p.retireBin.stateDataOf(2, e).samplesLeft;
+            expectEquals(fresh, juce::jmax(1, (int) (48000.0 * 0.025)), "the new fade starts from its full ramp");
+        }
+
+        beginTest("M3: forced evictions, structural edits and rendering on three threads; nothing is freed or waited on under binMutex");
+        {
+            constexpr int kParks = 1500, kEdits = 200, kBlocks = 5000;
+            auto pBox = std::make_unique<FakeLayerHost>(3); auto& p = *pBox;
+            p.setUseLayerRenderForTest(true);
+            p.retireBin.setEvictTimeoutMs(5);
+            Driver d(p);
+            const int underMutexBefore = ProbeTail::freedUnderMutex(), uafBefore = ProbeTail::useAfterFree();
+            std::atomic<bool> stop { false };
+            std::atomic<int> longestMissRun { 0 };
+            std::thread audio([&]
+            {
+                juce::AudioBuffer<float> buf(2, 256);
+                juce::MidiBuffer m;
+                mu_core::BlockTransport t;
+                t.playing = true; t.bpm = 120.0; t.beatsPerSample = 2.0 / 48000.0; t.blockBeats = t.beatsPerSample * 256;
+                int run = 0;
+                for (int i = 0; i < kBlocks; ++i)
+                {
+                    const int skippedBefore = p.getLayerRenderProbe().blocksSkipped;
+                    p.renderAndMixForTest(buf, m, t);
+                    run = p.getLayerRenderProbe().blocksSkipped != skippedBefore ? run + 1 : 0;
+                    if (run > longestMissRun.load()) longestMissRun.store(run);
+                    t.startBeat += t.blockBeats;
+                }
+                stop.store(true);
+            });
+            std::thread parker([&]
+            {
+                for (int i = 0; i < kParks; ++i)
+                {
+                    // Five into a row of four: every fifth park evicts entry 0, outside layersLock (a wait, unlocked).
+                    auto* tail = new ProbeTail({ mu_core::RetirePolicy::Kind::Natural, 25.0f, 0.05f });
+                    p.retireBin.park(i % 2, std::unique_ptr<mu_core::RetireTail>(tail), p.layoutSerial(), false);
+                    if (i % 7 == 0) p.retireBin.service();
+                }
+            });
+            for (int e = 0; e < kEdits; ++e)
+            {
+                switch (e % 3)
+                {
+                    case 0:  p.addLayer(); break;
+                    case 1:  if (p.getNumLayers() > 1) p.removeLayer(p.getNumLayers() - 1); break;
+                    default: if (p.getNumLayers() > 1) p.swapLayers(0, p.getNumLayers() - 1); break;
+                }
+                p.flushPendingAsyncUpdates();
+            }
+            parker.join();
+            audio.join();
+            p.retireBin.cutAll();
+            p.retireBin.service();
+            expectEquals(ProbeTail::freedUnderMutex() - underMutexBefore, 0, "no tail destructor ran while its thread held binMutex");
+            expectEquals(ProbeTail::useAfterFree() - uafBefore, 0, "no tail rendered after it was freed");
+            logMessage("lock-hold stress: longest run of skipped blocks " + juce::String(longestMissRun.load())
+                       + " (edits raise layerEditInFlight; information)");
+        }
+    }
+};
+static RetireBinReviewTests sRetireBinReviewTests;
 
 // ─── C3: frozen retire snapshots, the isolation twin test ────────────────────────────────────────────
 namespace
