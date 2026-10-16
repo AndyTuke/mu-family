@@ -2,7 +2,7 @@
 
 #include "UI/ModulatorEditor.h"            // mu-core: ModDestProvider
 #include "UI/Components/DropdownSelect.h"   // mu-core
-#include "Plugin/TrackParams.h"            // EngineType
+#include "Persistence/TrackParams.h"            // EngineType
 #include "Modulation/ModTarget.h"         // mu-core: the standard target row
 #include "UI/ModTargetDropdown.h"        // mu-core: the shared destination-dropdown builder
 

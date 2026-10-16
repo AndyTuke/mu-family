@@ -2,7 +2,7 @@
 
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include <juce_audio_processors/juce_audio_processors.h>
-#include "Plugin/TrackParams.h"   // EngineType, parameter ids
+#include "Persistence/TrackParams.h"   // EngineType, parameter ids
 #include "Audio/KickEngine.h"
 #include "Audio/BassEngine.h"
 #include "Audio/SampleChannel.h"

@@ -3,7 +3,7 @@
 #include "Plugin/ProcessorBase.h"        // mu-core base
 #include "Plugin/MixerFxParams.h"         // mu-core: shared global-FX / mixer APVTS layout
 #include "Plugin/MidiClockSync.h"         // mu-core: shared MIDI-clock slave
-#include "Plugin/TrackParams.h"
+#include "Persistence/TrackParams.h"
 #include "Sequencer/StepPattern.h"
 #include "Sequencer/GrooveSequencer.h"
 #include "Audio/GrooveVoices.h"

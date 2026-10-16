@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Plugin/TrackParams.h"
+#include "Persistence/TrackParams.h"
 #include <juce_data_structures/juce_data_structures.h>
 #include <array>
 #include <atomic>

@@ -8,6 +8,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Plugin/MixerFxParams.h"   // mu-core: mu_mixfx::addGlobalFxParams
+#include "Persistence/TrackParams.h"   // the Track type's per-slot table
 
 namespace
 {
@@ -65,3 +66,42 @@ public:
 };
 
 static MuOnApvtsLayoutTest muOnApvtsLayoutTest;
+
+// The Track type's table for one slot holds exactly the engine row, the Rumble source row and every engine's
+// parameters under the slot's prefix: a row added to one engine's name list and not the table (or the other
+// way round) would leave a knob with no parameter, or a parameter nothing shows.
+class MuOnTrackParamTableTest : public juce::UnitTest
+{
+public:
+    MuOnTrackParamTableTest() : juce::UnitTest ("Track layer parameter table", "Mixer") {}
+
+    void runTest() override
+    {
+        beginTest ("addLayerParams adds exactly eng, src and every engine's parameters of one slot, under its prefix");
+        StubProcessor proc;
+        juce::AudioProcessorValueTreeState::ParameterLayout layout;
+        mu_on::addLayerParams (layout, 3);
+        juce::AudioProcessorValueTreeState apvts (proc, nullptr, "PARAMS", std::move (layout));
+
+        int expected = 2;
+        expect (apvts.getParameter ("t3_eng") != nullptr && apvts.getParameter ("t3_src") != nullptr, "the engine and source rows");
+        for (int e = 0; e < mu_on::kNumEngineTypes; ++e)
+            for (const char* x : mu_on::engineParamNames (mu_on::engineFromIndex (e)))
+            {
+                ++expected;
+                const auto id = mu_on::engineParamId (3, mu_on::engineFromIndex (e), x);
+                expect (apvts.getParameter (id) != nullptr, "no row for " + id);
+            }
+        expectEquals (proc.getParameters().size(), expected);
+
+        beginTest ("addTrackGlobalParams adds the two groove rows");
+        StubProcessor globals;
+        juce::AudioProcessorValueTreeState::ParameterLayout g;
+        mu_on::addTrackGlobalParams (g);
+        juce::AudioProcessorValueTreeState gs (globals, nullptr, "PARAMS", std::move (g));
+        expectEquals (globals.getParameters().size(), 2);
+        expect (gs.getParameter ("seq_swing") != nullptr && gs.getParameter ("seq_accent") != nullptr);
+    }
+};
+
+static MuOnTrackParamTableTest muOnTrackParamTableTest;

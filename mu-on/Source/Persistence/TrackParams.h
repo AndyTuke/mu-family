@@ -1,16 +1,17 @@
 #pragma once
 
-#include <juce_core/juce_core.h>
+#include <juce_audio_processors/juce_audio_processors.h>
 #include <utility>
 #include <vector>
 
-// The mu-On parameter ids, spelled in one place. A mu-On layer is a "track"; each track has a sound
-// type, its engine (Kick, Bass, Hat, Snare, Rumble). Every engine's parameters exist on every track
+// The Track layer type's parameter table (docs/mu-tronic/design.md 2.3): the mu-On parameter ids, spelled
+// in one place, and the rows one track slot adds to the layout. A mu-On layer is a "track"; each track has
+// a sound type, its engine (Kick, Bass, Hat, Snare, Rumble). Every engine's parameters exist on every track
 // (switching the engine keeps the other engines' settings), so a track's ids are:
 //   t{N}_eng             the engine (choice)
 //   t{N}_src             the layer a Rumble track processes (a layer index)
 //   t{N}_<engine>_<x>    one engine's parameter, <engine> = kick / bass / hat / snare / rumble
-// Saved data keys on these ids, so they never change again.
+// Saved data keys on these ids and their order, so they never change again and rows are only appended.
 namespace mu_on
 {
 
@@ -113,5 +114,12 @@ inline std::vector<std::pair<juce::String, juce::String>> legacyLaneParamPrefixR
         renames.emplace_back(legacyLaneParamPrefix(l), layerParamPrefix(l) + engineTag(engineFromIndex(l)) + "_");
     return renames;
 }
+
+// The Track type's rows for one layer slot (t{slot}_*): the engine, the Rumble source, then every
+// engine's parameters.
+void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot);
+
+// mu-On's non-mixer global rows: the sequencer's groove controls (swing, accent).
+void addTrackGlobalParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout);
 
 } // namespace mu_on

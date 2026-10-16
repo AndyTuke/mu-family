@@ -31,6 +31,7 @@ target_sources(mu-on
         Source/Plugin/PluginProcessor.cpp
         Source/Plugin/PluginProcessor_Preset.cpp
         Source/Plugin/PluginEditor.cpp
+        Source/Persistence/TrackParams.cpp
         Source/Sequencer/GrooveSequencer.cpp
         Source/UI/StepRows.cpp
         Source/UI/TrackContent.cpp
@@ -142,6 +143,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/PresetTests.cpp
     Source/Tests/SlotStateTests.cpp
     Source/Sequencer/GrooveSequencer.cpp
+    Source/Persistence/TrackParams.cpp
     Source/Tests/ProcessorSeamTests.cpp  # the real PluginProcessor, headless (layer ownership)
     Source/Tests/FrozenBaselineTests.cpp   # frozen parameter manifest + compat corpus on the real processor
     Source/Tests/PrefixMigrationTests.cpp   # data saved before the k/b/h/s/r -> t{N} id-prefix rename still loads
