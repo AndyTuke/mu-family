@@ -410,6 +410,14 @@ public:
     // calls it for every layer it renumbers or clears, because a staged swap is keyed by index and
     // would otherwise land on the wrong layer. A staged full preset is left to win.
     virtual void cancelPendingSwap(int slot)                                { layerSwapper.cancel(slot); }
+    // Drops every staged swap, the full preset and each layer's. A host state restore replaces everything at once,
+    // so nothing staged before it may commit at its boundary and overwrite the restored state.
+    void cancelAllStagedSwaps()
+    {
+        cancelPendingFullPreset();
+        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            cancelPendingSwap(i);
+    }
     std::function<void(int slot)> onLayerPresetCommitted;
 
     // Set by the standalone (mu-link bridge) so the product can publish its current full-preset

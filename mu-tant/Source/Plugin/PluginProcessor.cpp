@@ -660,6 +660,7 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
         if (xml->hasTagName(apvts.state.getType()))
         {
             const auto tree = juce::ValueTree::fromXml(*xml);
+            cancelAllStagedSwaps();                    // nothing staged before the restore may land on top of it
             applyFullPresetTree(toVoiceState(tree));   // host state restore — always immediate
             restoreLiveState(tree);                    // after the preset: it names the item that is playing
         }
