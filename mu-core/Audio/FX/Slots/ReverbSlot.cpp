@@ -100,7 +100,9 @@ void ReverbSlot::process(juce::AudioBuffer<float>& buffer)
 
 void ReverbSlot::processReturn(juce::AudioBuffer<float>& buffer)
 {
-    if (!enabled.load(std::memory_order_relaxed)) return;
+    // A disabled slot returns silence: the buffer arrives holding the dry send, which is already in
+    // the main bus and must not be added back through the return.
+    if (!enabled.load(std::memory_order_relaxed)) { buffer.clear(); return; }
 
     // apply any pending Signalsmith reverb param changes BEFORE process().
     // Single point where the reverb's public fields get mutated — message thread
