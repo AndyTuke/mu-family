@@ -2,6 +2,7 @@
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/SwapBoundary.h"   // mu-tant: the hot-swap boundary rule
 #include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
+#include "Plugin/MidiRaw.h"             // mu-core: note tests on raw MIDI bytes (no allocation)
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 #include "Audio/Scales.h"
 #include "Modulation/MuTantModDest.h"
@@ -776,10 +777,9 @@ void PluginProcessor::scanNoteMode(const juce::MidiBuffer& midi)
     // notes — beyond that the oldest is dropped (silently) to keep the array bounded.
     for (const auto meta : midi)
     {
-        const auto msg = meta.getMessage();
-        if (msg.isNoteOn())
+        if (mu_midi::isNoteOn (meta))
         {
-            const int note = msg.getNoteNumber();
+            const int note = mu_midi::noteNumber (meta);
             for (int i = 0; i < numHeldNotes; ++i)        // de-dupe a re-pressed note
                 if (heldNotes[(size_t) i] == note) { --numHeldNotes;
                     for (int j = i; j < numHeldNotes; ++j) heldNotes[(size_t) j] = heldNotes[(size_t) j + 1];
@@ -791,9 +791,9 @@ void PluginProcessor::scanNoteMode(const juce::MidiBuffer& midi)
             }
             heldNotes[(size_t) numHeldNotes++] = note;
         }
-        else if (msg.isNoteOff())
+        else if (mu_midi::isNoteOff (meta))
         {
-            const int note = msg.getNoteNumber();
+            const int note = mu_midi::noteNumber (meta);
             for (int i = 0; i < numHeldNotes; ++i)
                 if (heldNotes[(size_t) i] == note) { --numHeldNotes;
                     for (int j = i; j < numHeldNotes; ++j) heldNotes[(size_t) j] = heldNotes[(size_t) j + 1];

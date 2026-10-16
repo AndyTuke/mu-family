@@ -1,6 +1,7 @@
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "PluginProcessor.h"
 #include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
+#include "Plugin/MidiRaw.h"             // mu-core: note tests on raw MIDI bytes (no allocation)
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 #include "PluginProcessor_Internal.h"
 #include "Audio/InsertSlotConfig.h"
@@ -293,8 +294,7 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
         // stops the sequencer; envelopes and FX tails play out naturally.
         for (const auto& meta : midiMessages)
         {
-            const auto msg = meta.getMessage();
-            if (msg.isNoteOn())
+            if (mu_midi::isNoteOn (meta))
             {
                 // First held note starts playback from beat 0.
                 if (midiHeldNotes.fetch_add(1, std::memory_order_relaxed) == 0)
@@ -303,7 +303,7 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
                     noteModePlaying.store(true, std::memory_order_relaxed);
                 }
             }
-            else if (msg.isNoteOff())
+            else if (mu_midi::isNoteOff (meta))
             {
                 const int prev = midiHeldNotes.fetch_sub(1, std::memory_order_relaxed);
                 if (prev <= 1)

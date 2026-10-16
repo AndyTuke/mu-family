@@ -113,15 +113,17 @@ public:
         // Walk the block's real-time messages: transport changes, then tempo + beat per tick.
         for (const auto& msgRef : midi)
         {
-            const auto& m = msgRef.getMessage();
+            // Raw bytes, not a juce::MidiMessage: constructing one allocates for messages over 8 bytes (SysEx).
+            const juce::uint8* d = msgRef.data;
+            const int          n = msgRef.numBytes;
 
             // Song Position Pointer (F2 lsb msb): the master located to a sixteenth (= 6 pulses).
             // Only valid while stopped (MIDI spec); the next Continue plays from there.
-            if (m.getRawDataSize() == 3 && m.getRawData()[0] == 0xF2)
+            if (n == 3 && d[0] == 0xF2)
             {
                 if (doTransport && ! playing.load())
                 {
-                    const int sixteenths = (m.getRawData()[1] & 0x7F) | ((m.getRawData()[2] & 0x7F) << 7);
+                    const int sixteenths = (d[1] & 0x7F) | ((d[2] & 0x7F) << 7);
                     nextPulse = (juce::int64) sixteenths * 6;
                     haveAnchor = false;
                     jumpBeat = beatOf(nextPulse);
@@ -129,8 +131,8 @@ public:
                 }
                 continue;
             }
-            if (m.getRawDataSize() != 1) continue;
-            const juce::uint8 b  = m.getRawData()[0];
+            if (n != 1) continue;
+            const juce::uint8 b  = d[0];
             const int         so = msgRef.samplePosition;
 
             if (doTransport)
