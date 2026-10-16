@@ -4,8 +4,8 @@
 #include <cmath>
 
 // insertAlgo = 7 (Compressor) and 8 (Limiter). Same envelope-follower
-// algorithm; the only difference is the ratio (4:1 vs 100:1) which is selected
-// from p.insertAlgo at process time. Sharing one class avoids duplicating
+// algorithm; the differences are the ratio (4:1 vs 100:1) and, for the Limiter, a
+// brick-wall peak stage after it, both selected from p.insertAlgo at process time. Sharing one class avoids duplicating
 // ~25 lines of identical code; storing one instance at both array indices 7
 // and 8 of InsertProcessor's dispatch table is fine because the instance reads
 // the ratio per-call from its parameters.
@@ -28,6 +28,7 @@ public:
     void reset() override
     {
         envelope[0] = envelope[1] = 0.0f;
+        limGain[0] = limGain[1] = 1.0f;
         // Snap the smoothers to their prepare() values so a reset slot ramps in exactly as a fresh one.
         smoothedAtt   .setCurrentAndTargetValue(1.0f);
         smoothedRel   .setCurrentAndTargetValue(1.0f);
@@ -48,7 +49,8 @@ public:
         const float threshLin  = juce::Decibels::decibelsToGain(-(threshKnob / 100.0f) * 40.0f);
         const float outGain    = juce::Decibels::decibelsToGain(outputDb);
         const float attackMs   = juce::jmax(0.1f, attackKnob);   // the knob is in ms, as labelled
-        const float ratio      = (p.insertAlgo == 8) ? 100.0f : 4.0f;
+        const bool  isLimiter  = (p.insertAlgo == 8);
+        const float ratio      = isLimiter ? 100.0f : 4.0f;
         smoothedAtt   .setTargetValue(std::exp(-2.2f / (attackMs * 0.001f * sr)));
         smoothedRel   .setTargetValue(std::exp(-2.2f / (relMs    * 0.001f * sr)));
         smoothedThresh.setTargetValue(threshLin);
@@ -77,8 +79,24 @@ public:
                     const float overDb = 20.0f * std::log10(env / thr);
                     gainDb = -overDb * (1.0f - 1.0f / ratio);
                 }
+                float y = chans[ch][i] * juce::Decibels::decibelsToGain(gainDb);
+
+                // Limiter only: a brick-wall stage after the 100:1 envelope stage. The envelope follower cannot react
+                // inside its attack time, so a transient would pass the ceiling; this gain is set from the sample
+                // itself (instant attack) so no output sample exceeds the ceiling, and it releases over the Release
+                // time so the gain does not pump at audio rate.
+                if (isLimiter)
+                {
+                    float& lim = limGain[ch < 2 ? ch : 0];
+                    const float a    = std::abs(y);
+                    const float need = (a > thr && a > 1e-9f) ? thr / a : 1.0f;
+                    lim = juce::jmin(need, lim + (1.0f - lim) * (1.0f - relCoeff));
+                    y  *= lim;
+                    if (lim < 1.0f) gainDb += 20.0f * std::log10(lim);
+                }
+
                 if (gainDb < peakGainDb) peakGainDb = gainDb;
-                chans[ch][i] *= juce::Decibels::decibelsToGain(gainDb) * og;
+                chans[ch][i] = y * og;
             }
         }
         // Normalise to 0..1 (1 ≡ 24 dB GR) for the UI meter.
@@ -88,6 +106,7 @@ public:
 private:
     double currentSampleRate = 44100.0;
     float  envelope[2] = {};
+    float  limGain[2]  = { 1.0f, 1.0f };   // the limiter's instant-attack peak stage, 0..1 per channel
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedAtt;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedRel;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedThresh;
