@@ -109,7 +109,9 @@ struct FxAlgoSwitchTests : juce::UnitTest
         beginTest("eff_algo: the new effect plays with the knob values, as if they had been set on it directly");
         {
             constexpr double kSr = 48000.0;
-            constexpr int kBlock = 256, kBlocks = 4;
+            // Chorus reads 30 ms (1440 samples at 48 kHz) plus up to 20 ms of depth behind the input and its send-mode
+            // return is wet only, so the render must outlast that delay to hear anything: 16 blocks = 85 ms.
+            constexpr int kBlock = 256, kBlocks = 16;
             FxParamProcessor p;
             auto& slot = p.fxChain.effectSlot();
             slot.prepare(kSr, kBlock);
