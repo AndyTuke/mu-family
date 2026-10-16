@@ -23,10 +23,11 @@ namespace mu_toni
 //
 // The keys it hears (root-by-MIDI, MIDI-trigger) are its own state: `heldNotes`, and `context`, the block's
 // arp context the runner renders with. Threads: everything below is written and read by the audio thread
-// only, inside the block's layer access (render, onParkedBlock), with two message-thread exceptions that run
-// while the audio thread cannot be inside a block (layersLock is held for every rendered block, TryLock
-// mode): prepare / bindParams, and the processor's layersMoved, which resets the runner and hands a new Arp
-// the keys already held. The UI reads only the modLive atomics.
+// only, inside the block's layer access (render, onParkedBlock), with three exceptions that run while no
+// block can render this layer: prepare (the host is not processing), bindParams (before the layer is
+// published, or while layerEditInFlight keeps every block silent during an edit) and the processor's
+// layersMoved (under layersLock, which every rendered block holds in TryLock mode), which resets the runner
+// and hands a new Arp the keys already held. The UI reads only the modLive atomics.
 struct Arp : Layer
 {
     ArpVoiceRunner  runner;

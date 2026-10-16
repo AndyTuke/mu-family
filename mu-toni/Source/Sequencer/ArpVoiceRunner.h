@@ -56,7 +56,7 @@ struct ArpAccent
     }
 };
 
-// Per-block context, set once by processBlock and shared by every runner.
+// Per-block context: each Arp fills its own from the call's RenderContext and the keys it holds.
 struct ArpContext
 {
     bool   playing         = false;

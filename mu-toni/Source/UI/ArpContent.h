@@ -13,7 +13,7 @@
 #include "Persistence/PresetFiles.h"      // mu-core: listPresetFiles
 #include "UI/Voice/InsertSubsection.h"
 #include "UI/Voice/VoiceBand.h"            // mu-core: shared voice band (mu-Clid layout)
-#include "Audio/Scales.h"
+#include "Audio/ToniScales.h"
 #include "Audio/Chords.h"
 #include <array>
 #include <memory>

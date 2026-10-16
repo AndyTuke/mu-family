@@ -4,7 +4,7 @@
 #include "Audio/ToniVoice.h"                  // kSawPosition
 #include "Audio/InsertProcessor.h"            // mu-core: InsertProcessor::kNumInsertAlgos
 #include "Audio/Wavetable/WavetableBank.h"    // mu-core: the factory table names
-#include "Plugin/ParamText.h"                 // mu-core: float parameter text in both directions
+#include "Persistence/ParamText.h"            // mu-core: float parameter text in both directions
 
 namespace mu_toni
 {
