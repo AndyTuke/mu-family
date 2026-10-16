@@ -224,6 +224,7 @@ juce::ValueTree PluginProcessor::toLayerState(const juce::ValueTree& tree) const
 void PluginProcessor::applyStateTree(const juce::ValueTree& state)
 {
     applyComposedState(state);
+    seedRowGrooves();    // the saved global Swing / Accent are every row's groove
     syncAllFxParams();   // re-seed mixer/FX (unchanged values skip listeners)
 }
 

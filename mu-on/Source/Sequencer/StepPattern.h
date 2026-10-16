@@ -10,8 +10,9 @@
 // read) share them without a lock or a dropped block. The row belongs to the track, not to its engine,
 // so it is kept when the engine changes (a Rumble track ignores its row).
 //
-// A row is owned by the Track that plays it (a StepRow member), so it travels with the track through
-// add / delete / reorder; the pattern only addresses the rows by slot. `bind` points a slot at a
+// A row is owned by the Track that plays it (a StepRow member, with its own steps, swing and accent), so
+// it travels with the track through add / delete / reorder; the pattern is only a view that addresses the
+// tracks' rows by slot. `bind` points a slot at a
 // track's row (the processor does it after every structural edit, under its layer lock); an unbound
 // slot uses a row of the pattern's own, which is what a standalone pattern (the tests) works on.
 // Rows serialise as <Track i on accent> nodes, carried inside each layer's saved node.
@@ -53,6 +54,18 @@ public:
         }
     }
 
+    // The row's groove: its swing (0..0.9, the share of half a 16th the odd steps are pushed later) and the
+    // velocity of its accented steps (0..1). mu-On's one Swing and Accent (seq_swing, seq_accent) stay the
+    // saved values: the processor seeds every row from them on a state load and every block, so all rows
+    // share them until a host gives each layer its own. Atomics: the message thread seeds, the audio thread reads.
+    void setGroove(float swing01, float accentVelocity01) noexcept
+    {
+        swing.store(juce::jlimit(0.0f, 0.9f, swing01), std::memory_order_relaxed);
+        accent.store(juce::jlimit(0.0f, 1.0f, accentVelocity01), std::memory_order_relaxed);
+    }
+    float swingAmount()    const noexcept { return swing.load(std::memory_order_relaxed); }
+    float accentVelocity() const noexcept { return accent.load(std::memory_order_relaxed); }
+
     // The row as a <Track i on accent> node (also what a layer preset carries).
     juce::ValueTree serialise(int slot) const
     {
@@ -83,6 +96,7 @@ private:
     static bool valid(int s) noexcept { return s >= 0 && s < kNumSteps; }
 
     std::array<Cell, kNumSteps> cells;
+    std::atomic<float> swing { 0.0f }, accent { 1.0f };   // the parameters' defaults
 };
 
 class StepPattern

@@ -291,3 +291,40 @@ struct MuOnLayoutWordTests : juce::UnitTest
     void runTest() override { mu_seam_test::checkLayoutWordFollowsCount<mu_on::PluginProcessor>(*this); }
 };
 static MuOnLayoutWordTests sMuOnLayoutWordTests;
+
+// Per-layer step rows behind the global grid (extraction-plan E3.3): every row carries its own swing and
+// accent, but the saved data stays the two global parameters, which seed every row when a state loads.
+struct MuOnRowGrooveTests : juce::UnitTest
+{
+    MuOnRowGrooveTests() : juce::UnitTest("mu-On rows take the global groove", "mu-on-processor") {}
+    void runTest() override
+    {
+        using namespace mu_seam_test;
+        beginTest("seq_swing and seq_accent stay the saved values and seed every track's row on load, spares included");
+        TempStorage storage;
+        juce::MemoryBlock saved;
+        {
+            mu_on::PluginProcessor a;
+            setParam(a.apvts, "seq_swing", 0.35f);
+            setParam(a.apvts, "seq_accent", 0.55f);
+            a.getStateInformation(saved);
+            const auto xml = juce::AudioProcessor::getXmlFromBinary(saved.getData(), (int) saved.getSize());
+            expect(xml != nullptr && ! xml->toString().contains("swing=\""), "a row saves no groove of its own");
+        }
+        mu_on::PluginProcessor b;
+        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+        {
+            expectEquals(b.getTrack(i).row.swingAmount(), 0.0f, "a fresh row has the default swing");
+            expectEquals(b.getTrack(i).row.accentVelocity(), 1.0f, "and the default accent");
+        }
+        b.setStateInformation(saved.getData(), (int) saved.getSize());
+        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+        {
+            expectEquals(b.getTrack(i).row.swingAmount(), b.apvts.getRawParameterValue("seq_swing")->load(), "track " + juce::String(i) + " swing");
+            expectEquals(b.getTrack(i).row.accentVelocity(), b.apvts.getRawParameterValue("seq_accent")->load(), "track " + juce::String(i) + " accent");
+        }
+        expectWithinAbsoluteError(b.getTrack(3).row.swingAmount(), 0.35f, 1.0e-6f);
+        expectWithinAbsoluteError(b.getTrack(3).row.accentVelocity(), 0.55f, 1.0e-6f);
+    }
+};
+static MuOnRowGrooveTests sMuOnRowGrooveTests;

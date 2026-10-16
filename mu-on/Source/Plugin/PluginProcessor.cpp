@@ -135,6 +135,9 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
             for (int i = 0; i < numActive; ++i) tracks[(size_t) i] = &getTrack(i);
             grooveVoices.beginBlock(tracks.data(), numActive);
 
+            // The global Swing / Accent seed every row's groove (the grid is still global).
+            seedRowGrooves();
+
             // Refresh engine params from the APVTS, then clock the 909 sequencer for this block
             // (before the render so a step's engine is armed for this same block). Each fired track
             // triggers its engine and bumps a counter the editor polls to pulse the sidebar.
@@ -177,7 +180,20 @@ std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
     auto t = std::make_unique<Track>();
     t->owner.ptr = this;
     t->slot      = slot;
+    seedRowGroove(t->row);
     return t;
+}
+
+// The global groove into one row, and into every slot's row (spares included). Any thread: atomics only.
+void PluginProcessor::seedRowGroove(StepRow& row) const noexcept
+{
+    row.setGroove(seqSwingParam  != nullptr ? seqSwingParam->load(std::memory_order_relaxed)  : 0.0f,
+                  seqAccentParam != nullptr ? seqAccentParam->load(std::memory_order_relaxed) : 1.0f);
+}
+
+void PluginProcessor::seedRowGrooves() noexcept
+{
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i) seedRowGroove(getTrack(i).row);
 }
 
 // Slots whose Track changed lose the previous tenant's voices and tails (the engines belong to the

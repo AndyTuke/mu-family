@@ -213,6 +213,11 @@ private:
     // A Rumble track whose source is itself, gone, or another Rumble starts on the first Kick.
     void ensureRumbleSource(int track);
 
+    // The global groove (seq_swing, seq_accent) into one row, or into every slot's row: the grid is still
+    // global, so every row takes it on a state load and every block. Atomics only (any thread).
+    void seedRowGroove(StepRow& row) const noexcept;
+    void seedRowGrooves() noexcept;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };
 
