@@ -107,6 +107,22 @@ PluginProcessor::PluginProcessor()
     initVoiceState();            // the voice layout every preset / session save and load uses
     refreshAllPitchQuantFlags(); // seed the stepped-pitch flags (default state has no modulators)
 
+    // The shared layer driver: a voice a count-reducing preset drops fades in place past the live count
+    // (RenderPastCount, the old renderCount rule); the channel messages of a block the driver does not render
+    // reach the layers on the next one (each Pattern keeps its own held keys, which today's shared stack heard
+    // in every block); a regrow keeps an armed fade armed (pin P1, until its signed golden update).
+    setRetireCountPolicy(mu_core::RetireBin::CountPolicy::RenderPastCount);
+    setCarrySkippedMidi(true);
+    setRegrowCutsInPlaceTails(false);
+    // Every slot's Pattern binds now that the slot engines exist, and starts in the restored Note mode with an
+    // input state of its own (it hears every block from the first).
+    for (int v = 0; v < mu_limits::kMaxLayers; ++v)
+    {
+        auto& p = getPattern(v);
+        p.bindParams(apvts, v);
+        p.initNoteMode(midiNoteMode.load(std::memory_order_relaxed));
+        p.markInputSeeded();
+    }
 
     // Render hook for the shared MixerEngine — captures only `this`, so no
     // per-block std::function construction (which would allocate). The per-block
@@ -146,6 +162,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     for (auto& v : voices)
         if (v) v->prepare(sampleRate, samplesPerBlock);
 
+    if (! usesLayerRender())
     {
         // Every slot's insert, spares included; under the layers lock because a structural edit moves the Patterns.
         const juce::ScopedLock sl(layersLock);
@@ -155,6 +172,9 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
     mixerEngine.prepare(sampleRate, samplesPerBlock);
     fxChain.prepare(sampleRate, samplesPerBlock);   // shared Effect/Delay/Reverb rack
+
+    // The shared driver's buffers and every slot's Pattern (its insert), spares included; the bin is flushed.
+    if (usesLayerRender()) prepareLayerRender(sampleRate, samplesPerBlock);
 
     // Cancel any in-flight retire fade — its ramp length was derived from the old SR.
     for (auto& r : retiring)
@@ -267,6 +287,24 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     juce::ScopedNoDenormals noDenormals;
     const int numSamples = buffer.getNumSamples();
 
+    if (usesLayerRender())
+    {
+        // The shared layer driver (docs/mu-tronic/design.md 2.1.1): program changes queued, the shell's Note-mode
+        // keys scanned (the final-mix gate's input, every host block), the transport by the family rule wrapped
+        // into the 64-beat pattern space, then one try-lock of the layers, the Patterns (and the in-place retire
+        // tails) and the mixer; the Note-mode gate on the final mix (decision A3: a shell post-stage, so the FX
+        // returns are gated as before); the boundary flagging from the per-slot loop lengths the driver cached.
+        queueMidiProgramChanges(midiMessages);
+        scanNoteMode(midiMessages);
+        const auto t = resolveBlockTransport(midiMessages, numSamples, Pattern::kBeatSpace);
+        renderAndMix(buffer, midiMessages, t);
+        applyNoteModeGate(buffer, numSamples);
+        std::array<double, mu_limits::kMaxLayers> beats {};
+        for (int s = 0; s < mu_limits::kMaxLayers; ++s) beats[(size_t) s] = layerLoopBeats(s);
+        flagPatternSwapBoundaries(t.playing, t.startBeat, t.blockBeats, beats.data());
+        return;
+    }
+
     // Preserve the DAW sidechain, then clear (the SC input bus shares buffer channels
     // with the output, so a bare clear would wipe it → no ducking / dead GR). Shared.
     captureSidechainAndClear(buffer);
@@ -341,29 +379,30 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // the ramp still tracks). No-op in Free mode.
     applyNoteModeGate(buffer, numSamples);
 
-    // The block's beat span for the boundary test starts at the block start and runs the RAW
-    // (pre-wrap) block length, so the loop-index test holds for pattern lengths that don't divide 64.
-    // (The resolver already advanced the counter.)
-    const double oldPos = blkBeatStart;
+    flagPatternSwapBoundaries(blkPlaying, blkBeatStart, transport.blockBeats, blkPatternBeats.data());
+}
 
-    // Hot-swap boundary check: a staged preset commits when its reference loop wraps
-    // (or on the playing→stopped edge). Uses the RAW pre-ceiling position so the
-    // loop-index test holds for lengths that don't divide 64. The reference loop
-    // depends on the swap timing (`mstr_swap`) + the master loop:
-    //   • master-loop length in beats = mstrLoop steps / 4 (4 steps/beat); 0 = off.
-    //   • per-voice swap: OnMasterLoop (+ a loop set) → master loop; else the voice's
-    //     own gate-pattern boundary (so a swap can't hang when no master loop exists).
-    //   • full preset: master loop when one is defined, else voice 0's gate boundary.
+// The hot-swap boundary check: a staged preset commits when its reference loop wraps (or on the
+// playing→stopped edge). The block's beat span starts at the block start and runs the RAW (pre-wrap) block
+// length, so the loop-index test holds for pattern lengths that don't divide 64. The reference loop depends
+// on the swap timing (`mstr_swap`) + the master loop:
+//   • master-loop length in beats = mstrLoop steps / 4 (4 steps/beat); 0 = off.
+//   • per-voice swap: OnMasterLoop (+ a loop set) → master loop; else the voice's own gate-pattern boundary
+//     (so a swap can't hang when no master loop exists).
+//   • full preset: master loop when one is defined, else voice 0's gate boundary.
+void PluginProcessor::flagPatternSwapBoundaries(bool playing, double startBeat, double blockBeats,
+                                                const double* patternBeats) noexcept
+{
     const int    mlSteps         = mstrLoopPtr ? juce::jmin((int) mstrLoopPtr->load() * 16, 256) : 0;
     const double masterLoopBeats = mlSteps > 0 ? (double) mlSteps / 4.0 : 0.0;
     const float  swapRaw         = swapTimingPtr != nullptr ? swapTimingPtr->load(std::memory_order_relaxed) : 0.0f;
     const auto   swapTiming      = mu_hotswap::swapTimingFromIndex(std::isfinite(swapRaw) ? (int) std::lround(swapRaw) : 0);
 
     const int numActive = numLayers.load(std::memory_order_relaxed);
-    flagSwapBoundaries(blkPlaying, oldPos, transport.blockBeats,
+    flagSwapBoundaries(playing, startBeat, blockBeats,
                        [&](int slot) noexcept
                        {
-                           return swapLoopBeats(slot, numActive, swapTiming, masterLoopBeats, blkPatternBeats.data());
+                           return swapLoopBeats(slot, numActive, swapTiming, masterLoopBeats, patternBeats);
                        });
 }
 
@@ -638,7 +677,9 @@ std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
     // The insert allocates its delay lines here, off the audio thread and outside any lock; the
     // per-slot noise seed makes layers not share one sequence.
     p->insert->setSlotIndex(slot);
-    p->insert->prepare(currentSampleRate, currentBlockSize);
+    p->prepare(currentSampleRate, currentBlockSize);
+    p->bindParams(apvts, slot);
+    p->initNoteMode(midiNoteMode.load(std::memory_order_relaxed));   // its held keys come from seedInputState
     return p;
 }
 
@@ -655,7 +696,28 @@ void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
         ins.reset();
         retiring[(size_t) d].samplesLeft.store(0, std::memory_order_relaxed);
         for (auto& v : voiceSnap[d]) v.store(0.0f, std::memory_order_relaxed);
+        // The shared driver's equivalents: the slot's in-place fade is cut (the old zeroed countdown above; the
+        // bin's lock nests inside layersLock), the live-arc values belong to the slot left, and a Pattern built
+        // after the constructor takes the held keys the others heard.
+        retireBin.cutSlot(d);
+        auto& pat = getPattern(d);
+        pat.resetSlotState();
+        if (! pat.hasInputState()) seedInputState(d);
     }
+}
+
+// Every Pattern that existed from the processor's first block has heard every block's keys, so any one of
+// them holds what today's single held-note stack holds; the new one copies it. Under layersLock: no block
+// reads or writes either Pattern meanwhile, and the lock orders the audio thread's last writes before this.
+void PluginProcessor::seedInputState(int slot) noexcept
+{
+    for (int s = 0; s < mu_limits::kMaxLayers; ++s)
+        if (s != slot && layers[(size_t) s] != nullptr && getPattern(s).hasInputState())
+        {
+            getPattern(slot).takeInputStateFrom(getPattern(s));
+            return;
+        }
+    jassertfalse;   // unreachable: the constructor's Patterns are seeded and every later one is seeded here
 }
 
 // The bank index for a wavetable file: found by path, else decoded OFF bankLock (file read, WAV decode
@@ -710,6 +772,8 @@ bool PluginProcessor::userWavetableMissing(int voice, int oscIndex) const
 void PluginProcessor::setMidiNoteMode(int mode)
 {
     midiNoteMode.store(mode, std::memory_order_relaxed);
+    for (int v = 0; v < mu_limits::kMaxLayers; ++v)
+        if (layers[(size_t) v] != nullptr) getPattern(v).setNoteMode(mode);   // each layer resets its keys on its next block
     if (appSettings != nullptr) { appSettings->setValue("midiNoteMode", mode); appSettings->saveIfNeeded(); }
 }
 

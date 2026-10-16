@@ -26,6 +26,7 @@ namespace mu_golden_rig
     struct OwnedProcessor : StorageHolder, mu_tant::PluginProcessor
     {
         using mu_tant::PluginProcessor::drainDeferredWork;
+        using mu_tant::PluginProcessor::stageLayerPreset;
         std::vector<bool> fired;
     };
 

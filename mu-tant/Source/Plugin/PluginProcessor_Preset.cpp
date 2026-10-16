@@ -246,7 +246,29 @@ void PluginProcessor::applyFullPresetTree(const juce::ValueTree& state)
     // Retire-tail: when this preset drops voices while playing, snapshot each dropped
     // voice's OLD engine + insert config NOW (before the new params land)
     // and arm a short fade so its comb-filter / insert tail rings out.
-    if (layerSwapper.isRunning() && nv < oldN)
+    if (usesLayerRender() && layerSwapper.isRunning() && nv < oldN)
+    {
+        // The shared retire bin: each dropped voice's spare Pattern stays in its slot and is parked IN PLACE with
+        // the serial the count store below will carry, so the block that still sees the old count renders it live
+        // and the first that sees the new one renders its fade (no block with both, none with neither). The park,
+        // the snapshot and the store share one hold of the layout writer lock (re-entrant; message or host thread,
+        // never the audio thread), so no other count store can take that serial. A slot whose fade is still armed
+        // (AlreadyActive) keeps it and its snapshot, as the old countdown did (pin P1). The snapshot is written
+        // after the park and before the store: no block renders the entry until the store lands.
+        const juce::ScopedLock lw(layoutWriteLock);
+        const uint32_t activation = nextLayoutSerial();
+        for (int v = nv; v < oldN; ++v)
+        {
+            auto& p = getPattern(v);
+            if (retireBin.parkInPlace(v, p, activation, false) == mu_core::RetireBin::ParkResult::Parked)
+                p.beginRetire();
+        }
+        applyComposedState(state);   // also stores the count (with `activation`) and restores the colours
+        syncAllFxParams();
+        return;
+    }
+
+    if (! usesLayerRender() && layerSwapper.isRunning() && nv < oldN)
     {
         const int ramp = retireRampSamples();
         for (int v = nv; v < oldN; ++v)

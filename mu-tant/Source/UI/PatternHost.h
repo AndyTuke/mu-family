@@ -14,6 +14,7 @@ namespace mu_tant
 {
 
 struct Pattern;
+class VoiceEngine;
 
 class PatternHost
 {
@@ -43,6 +44,13 @@ public:
     // A saved user wavetable path as an index into the shared bank (-1: none, or the file is unreadable). The
     // layer's state load calls it; a table a staged preset pre-loaded resolves without taking the bank lock.
     virtual int resolvePatternWavetable(const juce::String& path) = 0;
+
+    // Bound by the layer in bindParams (message thread), then used by its render (audio thread): the engine that
+    // belongs to slot `slot` (the host keeps one per slot, so a voice that moves takes up the slot's oscillator
+    // phase, as the per-slot engines always did) and the lock that guards the wavetable bank it reads (the
+    // audio thread only try-locks it; null when the bank is never appended to while rendering).
+    virtual VoiceEngine*                 getPatternEngine(int slot) noexcept = 0;
+    virtual const juce::CriticalSection* getPatternBankLock() const noexcept = 0;
 };
 
 } // namespace mu_tant

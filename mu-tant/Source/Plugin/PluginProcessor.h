@@ -46,7 +46,7 @@ public:
 
     // ── AudioProcessor ───────────────────────────────────────────────────────
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
-    void releaseResources() override { resetSwapPlayState(); }
+    void releaseResources() override { resetSwapPlayState(); releaseLayerRender(); }
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
     juce::AudioProcessorEditor* createEditor() override;
@@ -179,6 +179,7 @@ public:
     float getTantSnap(int voice, int snapIndex) const noexcept
     {
         if (voice < 0 || voice >= mu_limits::kMaxLayers) return 0.0f;
+        if (usesLayerRender()) return getPattern(voice).getModLive(snapIndex);
         return voiceSnap[(size_t) voice][(size_t) snapIndex].load();
     }
 
@@ -277,6 +278,11 @@ public:
     void         loadPatternWavetable(int layer, int oscIndex, const juce::File& file) override { loadUserWavetable(layer, oscIndex, file); }
     void         clearPatternWavetable(int layer, int oscIndex) override          { clearUserWavetable(layer, oscIndex); }
     int          resolvePatternWavetable(const juce::String& path) override;
+    VoiceEngine* getPatternEngine(int slot) noexcept override
+    {
+        return slot >= 0 && slot < mu_limits::kMaxLayers ? voices[(size_t) slot].get() : nullptr;
+    }
+    const juce::CriticalSection* getPatternBankLock() const noexcept override { return &bankLock; }
 
     // Voice `i`'s Pattern (modulators, gate / filter / pitch envelopes, user wavetables, level tap),
     // valid for every slot 0..kMaxLayers-1. Public so the UI (ModulatorPanel, PatternContent) can point
@@ -335,6 +341,12 @@ private:
     // Advances the anti-click amplitude ramp toward the held/silent target and applies
     // it to the final mix. Run after the render. No-op in Free mode (gate stays open).
     void applyNoteModeGate(juce::AudioBuffer<float>& buffer, int numSamples);
+
+    // The hot-swap boundary flagging of one block (audio thread): mu-Tant's rule (swapLoopBeats) over each
+    // slot's gate-pattern length in beats, the swap timing and the master loop.
+    void flagPatternSwapBoundaries(bool playing, double startBeat, double blockBeats, const double* patternBeats) noexcept;
+    // Under layersLock: a layer built after the constructor takes the held keys every other layer has heard.
+    void seedInputState(int slot) noexcept;
 
     // Shared MIDI-clock slave (standalone). process() scans the MIDI buffer each block;
     // when enabled + playing, processBlock slaves the beat/tempo to it.
