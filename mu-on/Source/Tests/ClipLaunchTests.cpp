@@ -19,10 +19,12 @@ struct MuOnClipLaunchTests : juce::UnitTest
     void runTest() override
     {
         using namespace mu_seam_test;
-        mu_clip_test::runClipLaunchChecks<ExposedPluginProcessor>(
-            *this, { [](ExposedPluginProcessor& p, float v) { setParam(p.apvts, "t0_kick_tune", v); },
-                     [](ExposedPluginProcessor& p) { return getParam(p.apvts, "t0_kick_tune"); },
-                     40.0f, 80.0f, 0.2f });
+        const mu_clip_test::Accessor<ExposedPluginProcessor> accessor {
+            [](ExposedPluginProcessor& p, float v) { setParam(p.apvts, "t0_kick_tune", v); },
+            [](ExposedPluginProcessor& p) { return getParam(p.apvts, "t0_kick_tune"); },
+            40.0f, 80.0f, 0.2f };
+        mu_clip_test::runClipLaunchChecks<ExposedPluginProcessor>(*this, accessor);
+        mu_clip_test::runRestoreCancelsStagedSwapChecks<ExposedPluginProcessor>(*this, accessor);   // a host restore drops staged swaps
 
         beginTest("a clip carries its engine: launching it onto a track running another engine switches it back");
         {

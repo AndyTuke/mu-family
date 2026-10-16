@@ -178,6 +178,60 @@ struct ClidEditContinuityTests : juce::UnitTest
         continuityDuringEdits();
         modulationMemoryAfterRemove();
         modulationMemoryAfterReset();
+        insertStartModulationRange();
+    }
+
+    // A 100 % depth modulation of Insert Start sweeps the knob's own range (HitGenerator::insertStartBounds), as the pad and
+    // length targets do. It used to sweep 0..steps-1, which overshoots the knob and is clamped whenever a pad is set.
+    void insertStartModulationRange()
+    {
+        using Probe = mu_clid::ModulationMemoryProbe;
+        for (int mode = 0; mode < 2; ++mode)
+        {
+            const bool mute = (mode == 0);
+            beginTest(juce::String("Insert Start modulation at 100 % depth sweeps the knob range (pre-pad in ")
+                      + (mute ? "Mute" : "Pad") + " mode)");
+            TempStorage storage;
+            EditProcessor p;
+            constexpr int kBlock = 256;
+            p.prepareToPlay(48000.0, kBlock);
+            RunningPlayHead host(48000.0, kBlock);
+            p.setPlayHead(&host);
+
+            // 16 steps, pre-pad 2, post-pad 1, insert length 3, Insert Start knob at 4. The bounds are
+            // lo = pre-pad (Mute) or 0 (Pad) and hi = steps - post - length - (Pad ? pre-pad : 0), by HitGenerator::insertStartBounds.
+            auto& rhythm = p.layerAs<mu_clid::Rhythm>(0);
+            auto& g = rhythm.genA;
+            g.steps = 16;  g.hits = 5;  g.prePad = 2;  g.postPad = 1;  g.insertLength = 3;  g.insertStart = 4;
+            g.prePadMode = mute ? mu_core::InsertMode::Mute : mu_core::InsertMode::Pad;
+            const int lo = mute ? 2 : 0, hi = mute ? 12 : 10;
+            const auto bounds = mu_core::HitGenerator::insertStartBounds(g.steps, g.prePad, g.postPad, g.insertLength, g.prePadMode);
+            expectEquals(bounds.first, lo, "the knob's lower bound");
+            expectEquals(bounds.second, hi, "the knob's upper bound");
+            expect(hi > lo, "the range is not degenerate");
+
+            ModulationAssignment a;
+            a.id = "insStartRange";
+            a.sourceId = "cs0_output";
+            a.destinationId = "euclid.a.insSt";
+            a.depth = 100.0f;
+            rhythm.modulationMatrix.addAssignment(a);
+
+            // A source held at the top, the bottom and the middle of its range: the modulated Insert Start is the knob's
+            // hi, its lo, and (with no net offset) the knob value itself.
+            // Bipolar, so a negative level reaches the bottom of the range (a unipolar source floors at 0).
+            rhythm.controlSequences[0].polarity = decltype(rhythm.controlSequences[0].polarity)::Bipolar;
+            auto insertStartAt = [&](float level)
+            {
+                rhythm.controlSequences[0].stepValues = { level, level, level, level };
+                runBlocks(p, 8, kBlock);
+                return Probe::last(p, 0).a.insertStart;
+            };
+            expectEquals(insertStartAt(100.0f),  hi, "source at +100 %: the top of the knob range");
+            expectEquals(insertStartAt(-100.0f), lo, "source at -100 %: the bottom of the knob range");
+            expectEquals(insertStartAt(0.0f),    4,  "source at 0: the knob value, unchanged");
+            p.setPlayHead(nullptr);
+        }
     }
 
     void continuityDuringEdits()
