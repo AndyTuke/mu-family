@@ -414,6 +414,29 @@ namespace
             defs.push_back(d);
         }
 
+        // Note mode across structural edits with pitched voices: every voice pitch-tracks the held note, so a
+        // voice added (or regrown) while a key is held must start on that note, not on the root.
+        {
+            Def d; d.name = "note-mode-structural-edit"; d.numStems = 3; d.lengthFrames = 144000;
+            d.isolateStemsByMute = true;   // slot 2 is dropped for a while, and the mixer ignores a solo on a dropped strip
+            d.notes = "Note mode on, two pitched drones; 60 then 67 held; a third voice added while 67 is held (0.5 s), voices 0 and 2 swap (1 s), voice 1 removed (1.5 s), a host restore regrows to three voices (2 s); 67 released (back to 60), then 60 released.";
+            d.author = [](PluginProcessor& p)
+            {
+                mu_golden_rig::growTo(p, 2);
+                for (int v = 0; v < 2; ++v) { openGate(p.apvts, v); setVoice(p.apvts, v, "o1_wt", 1); setVoice(p.apvts, v, "flt_cut", 4000); }
+                setVoice(p.apvts, 1, "o1_oct", -1);
+                setParam(p.apvts, "ch0_pan", -0.3f); setParam(p.apvts, "ch1_pan", 0.4f);
+            };
+            d.timed = { { 0, "Note mode on", [](OwnedProcessor& o, mu_golden::MockHost&) { o.setMidiNoteMode(1); } },
+                        { 24000, "addLayer, open its gate", [](OwnedProcessor& o, mu_golden::MockHost&)
+                          { o.addLayer(); openGate(o.apvts, 2); setVoice(o.apvts, 2, "o1_oct", 1); setVoice(o.apvts, 2, "o1_wt", 1); } },
+                        { 48000, "swapLayers(0, 2)", [](OwnedProcessor& o, mu_golden::MockHost&) { o.swapLayers(0, 2); } },
+                        { 72000, "removeLayer(1)",   [](OwnedProcessor& o, mu_golden::MockHost&) { o.removeLayer(1); } },
+                        restoreAt(96000, 3) };
+            d.midi = { noteOn(4, 0, 60), noteOn(30, 200, 67), noteOff(230, 0, 67), noteOff(260, 0, 60) };
+            defs.push_back(d);
+        }
+
         return defs;
     }
 
