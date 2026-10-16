@@ -144,6 +144,10 @@ and the two code changes owed before E2 (`RetireBin.h` from `Sequencer/` to `Plu
 `renderAndMix` argument) are in [design 2.1.7](design.md#217-e1-as-built-the-architecture-stewards-rulings-2026-10-16). The one `MixerEngine` change is the
 test-only channel tap approved at E0.9. The conversion items each product owes at adoption are listed there and in the stage rows below.
 
+**Conversion note: structural edits can silence the audio in an edit storm.** The layer-edit protocol (`layerEditInFlight`) that `TryLock` mode keeps from today
+makes structural edits (add, remove, swap, reset) silence the whole audio for up to hundreds of blocks in a back-to-back edit storm. This is today's protocol,
+accepted for E1 to E5; revisit it at T1 (non-muting publication, C1).
+
 **Why this is the right cut.** Design.md's T3 asked for the full contract before any product, so it would be proven on a fake type rather than guessed
 from one product. Keep that, but prove the *consumed* half on the fake type and let the pathfinder (Toni, E2) prove the rest by adopting it. Anything the
 pathfinder shows to be wrong is a core change in E2, at the cheapest moment.

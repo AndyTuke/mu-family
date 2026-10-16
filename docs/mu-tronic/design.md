@@ -170,7 +170,7 @@ A product's `processBlock`, after its E stage, is the transport, one base call a
 ```cpp
 void mu_xxx::PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
-    captureSidechainAndClear(buffer);                      // unchanged
+    // no captureSidechainAndClear here: renderAndMix does the sidechain copy and the clear per chunk (below)
     queueMidiProgramChanges(midi);                         // router claims leave `midi` here
     const auto t = resolveBlockTransport(midi, buffer.getNumSamples(), kBeatWrap);   // base wrapper of resolveTransport (2.1.5); t carries kBeatWrap; mu-Clid keeps its Note-mode source
     renderAndMix(buffer, midi, t, directOuts, fxReturns);  // base: LayerBlock, MIDI decode, chunk loop { renderLayers, processCoreBlock }; both outs optional (mu-Clid's direct outs)
@@ -181,8 +181,13 @@ void mu_xxx::PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juc
 ```
 
 **The beat bound is given once.** `kBeatWrap` goes to `resolveBlockTransport` only and travels in the `BlockTransport` it returns; `renderAndMix` reads it from
-there for the continuity reduction and `RenderContext::beatWrap`. (As built in E1, `renderAndMix` takes it as a second argument; that is changed before the first
-product adopts the driver, 2.1.7, because two copies of one value can differ, and a mismatch makes every wrap of mu-Tant's 64-beat space a false jump.)
+there for the continuity reduction and `RenderContext::beatWrap`. `renderAndMix` has no `beatWrap` argument (as built, 2026-10-16): the resolver sets
+`BlockTransport::beatWrap`, because two copies of one value can differ, and a mismatch makes every wrap of mu-Tant's 64-beat space a false jump.
+
+**Sidechain capture and the clear are inside `renderAndMix`** (as built). It takes the host buffer as received and, per chunk, copies that chunk's DAW-sidechain
+frames, clears the chunk's output region, then renders and mixes; a skipped block (failed `LayerBlock`) clears the whole buffer. A product adopting the driver
+**must not** call `captureSidechainAndClear` before `renderAndMix`: doing so on an oversize host block captured the wrong sidechain frames for later chunks
+(wrong ducking).
 
 **MIDI out is merged by the product, not by `renderAndMix`** (as built, accepted 2026-10-16). The layers' and tails' MIDI stays in the block's event storage;
 the product calls `mergeLayerMidiOut(midi, byteBudget)` once per rendered block, after `renderAndMix` and before any shell stage that reads `midi`. The budget
@@ -913,10 +918,20 @@ boundary breach. Where the build differs from the text, the subsections above no
 | 10 | `mu-core-tests-16`: the same source list through one CMake function with `MU_MAX_LAYERS=16`; two fixtures stop assuming 8 slots | **Accept** (3.4): one list, so the two cannot drift |
 | 11 | `MixerEngine::ChannelTap` added although E1 "does not change `MixerEngine`" | **Accept**: it is the test-only channel tap approved at E0.9 |
 
-**Code changes owed on the E1 item (backlog #1609) before E2 starts** (cheap now, since nothing outside `mu-core` uses them): (a) `mu-core/Sequencer/RetireBin.h` to
-`mu-core/Plugin/RetireBin.h`, with its includers. It is processor-side machinery that only `ProcessorBase` owns. It is the one file in `mu-core`'s
-`Audio/ Modulation/ Persistence/ Sequencer/` that includes a `Plugin/` header, and a layer type must reach only `RetireTail.h` (design-naming §3).
-(b) `BlockTransport` carries the beat bound set by `resolveTransport`; `renderAndMix` drops its `beatWrap` argument and reads `t`.
+**Code changes owed on the E1 item (backlog #1609) before E2 starts**, both now done: (a) `RetireBin.h` lives in `mu-core/Plugin/` (not `Sequencer/`): it is
+processor-side machinery that only `ProcessorBase` owns, and layer-side folders (`Audio/ Modulation/ Persistence/ Sequencer/`) never include `Plugin/`; a layer
+type reaches only `RetireTail.h` (design-naming §3). (b) `BlockTransport::beatWrap` is set by the resolver; `renderAndMix` has no `beatWrap` argument.
+
+**Further as-built points from the E1 review (2026-10-16):**
+
+- **Nothing is freed or waited under `binMutex`.** Frees go to a stack list that is destroyed after the lock is released; a waiting eviction releases the lock,
+  waits, re-locks and revalidates the entry.
+- **`applyComposedState` cuts the in-place slots `[old, new)` on a count increase**, so a regrown slot never inherits a parked tail.
+- **A host reporting playing with a frozen ppq** (paused-but-playing) produces no transport jump during the freeze and exactly one on resume.
+- **`mergeLayerMidiOut` clamps frames** to the block, and the caller reserves room in the host buffer first (the `midiEventBytes` helper gives the size of one
+  event for the budget).
+- **`check-layer-boundary.ps1` rules 7 and 8:** (7) no `numLayers.store` outside `ProcessorCore.h` (`Tests/` exempt), so every count store goes through
+  `storeLayerCount`; (8) no `Plugin/` include from `mu-core` `Audio/`, `Modulation/`, `Persistence/` or `Sequencer/`.
 
 **What each product converts when it adopts the contract** (stage rows in [extraction-plan.md](extraction-plan.md) section 2):
 
@@ -924,7 +939,7 @@ boundary breach. Where the build differs from the text, the subsections above no
   `PluginProcessor.cpp`, mu-Tant `PluginProcessor.cpp`, mu-Toni `PluginProcessor.cpp`, mu-On `PluginProcessor.cpp`), and so do mu-Clid's
   `Persistence/PresetIO.cpp` (shrink and grow in the full-preset apply) and `Persistence/PresetIO_HostState.cpp` (both stores). Each is converted in the
   product's first code-moving commit (E2.1, E3.1, E4.1, E5.2), under `layoutWriteLock` where it can race an edit. After E5 no `numLayers.store` remains outside
-  `ProcessorCore::storeLayerCount`. A checker rule can enforce that from then on.
+  `ProcessorCore::storeLayerCount`; checker rule 7 enforces it.
 - **Each product sets its `RetireBin` count policy in its constructor** (`setRetireCountPolicy`): mu-Tant `RenderPastCount` (E4.6); mu-Clid decided at E5 after
   pin P3 (E5.4d); mu-Toni and mu-On park nothing, so they leave the default.
 - **mu-Clid's `VoiceEngine::bufferLock`** (`mu-core/Audio/VoiceEngine.cpp`, `tryEnterRead` in `process`) is a `juce::ReadWriteLock`, whose reader bookkeeping
