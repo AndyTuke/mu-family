@@ -11,7 +11,7 @@ default and noted in the docs.
 
 | # | Stage | Deliverable | State |
 |---|---|---|---|
-| **T1** | **Arp engine (pure, tested)** | `Audio/Scales.h`, `Audio/Chords.h`, `Sequencer/ArpSequencer.h` (header-only) — pool derivation (scale·chord·inversion·octaves) + skewed-triangle scan + step→MIDI. `Tests/ArpSequencerTests.cpp`. | **✅ done — mu-toni-tests 0 failures/8 results** |
+| **T1** | **Arp engine (pure, tested)** | `Audio/Scales.h` (now `ToniScales.h`), `Audio/Chords.h`, `Sequencer/ArpSequencer.h` (header-only) — pool derivation (scale·chord·inversion·octaves) + skewed-triangle scan + step→MIDI. `Tests/ArpSequencerTests.cpp`. | **✅ done — mu-toni-tests 0 failures/8 results** |
 | **T2** | **Voice engine** | `Audio/AnalogueOsc.h` (PolyBLEP) + `Audio/ToniVoice.h` — 2 oscs + noise + `MultiModeFilter` + **Amp/Filter/Pitch `juce::ADSR`** + portamento slew + Legato. note-on/off + gate. `Tests/AnalogueOscTests.cpp`. | **✅ done** |
 | **T3** | **Plugin integration** | `PluginProcessor` APVTS layout (43 params × voice), `Sequencer/ArpVoiceRunner.h` (arp clock → voice), render hook via `processCoreBlock`, transport-driven step clock, **MIDI note-in** (root + trigger), default patch. | **✅ done** |
 | **T4** | **UI** | `EnginePanel` rebuilt as a rebindable arp/osc/filter/env control panel (shared `KnobWithLabel`/`DropdownSelect`/toggles, APVTS attachments), rebinds per sidebar layer. | **✅ done** |
