@@ -154,6 +154,7 @@ void ReverbSlot::setParam(const char* id, float value)
     auto is = [id](const char* s) { return std::strcmp(id, s) == 0; };
     if      (is("size"))      size      = value;
     else if (is("predelay"))  preDelay.store(value, std::memory_order_relaxed);
+    else if (is("decay"))     decay     = juce::jlimit(0.05f, 20.0f, value);   // RT60 seconds
     else if (is("diffusion")) diffusion = value;
     else if (is("damp"))      damp      = value;
     else if (is("mod"))       mod       = value;
@@ -168,16 +169,16 @@ void ReverbSlot::applyAlgorithmPreset()
     switch (static_cast<Algorithm>(algorithmIndex))
     {
         case Algorithm::Room:
-            size = 0.25f; rt20 = 0.6f;  damp = 0.6f; diffusion = 0.6f; setPreDelay(5.0f);  mod = 0.10f;
+            size = 0.25f; decay = 0.6f;  damp = 0.6f; diffusion = 0.6f; setPreDelay(5.0f);  mod = 0.10f;
             break;
         case Algorithm::Hall:
-            size = 0.75f; rt20 = 2.5f;  damp = 0.3f; diffusion = 0.8f; setPreDelay(25.0f); mod = 0.15f;
+            size = 0.75f; decay = 2.5f;  damp = 0.3f; diffusion = 0.8f; setPreDelay(25.0f); mod = 0.15f;
             break;
         case Algorithm::Plate:
-            size = 0.45f; rt20 = 1.8f;  damp = 0.5f; diffusion = 0.9f; setPreDelay(10.0f); mod = 0.30f;
+            size = 0.45f; decay = 1.8f;  damp = 0.5f; diffusion = 0.9f; setPreDelay(10.0f); mod = 0.30f;
             break;
         case Algorithm::Spring:
-            size = 0.15f; rt20 = 0.35f; damp = 0.8f; diffusion = 0.3f; setPreDelay(2.0f);  mod = 0.60f;
+            size = 0.15f; decay = 0.35f; damp = 0.8f; diffusion = 0.3f; setPreDelay(2.0f);  mod = 0.60f;
             break;
     }
 }
@@ -191,7 +192,7 @@ void ReverbSlot::updateReverb()
     // reverb single-threaded-access assumptions.
     ReverbImpl::PendingParams p;
     p.roomMs       = 10.0 + (double)size * 190.0;     // size [0,1] → 10..200 ms
-    p.rt20         = (double)rt20;
+    p.rt20         = (double)decay / 3.0;              // decay is RT60 (to -60 dB); the library's rt20 is the time to -20 dB
     p.early        = (double)diffusion * 2.5;          // diffusion → early reflections
     p.highDampRate = 1.0 + (double)damp * 8.0;
     p.lowDampRate  = 1.0 + (double)damp * 1.5;

@@ -522,7 +522,7 @@ void ProcessorBase::syncFxSlotParam(const juce::String& id, float v)
         // As with the effect: a host automating the algorithm leaves the knobs where they were, so put the
         // knob values back into the slot. The editor's algorithm menu then rewrites the knobs from the preset.
         struct KnobToSlot { const char* apvtsId; const char* slotId; };
-        static constexpr KnobToSlot kRevKnobs[] = { { "rev_size", "size" }, { "rev_pre", "predelay" },
+        static constexpr KnobToSlot kRevKnobs[] = { { "rev_size", "size" }, { "rev_decay", "decay" }, { "rev_pre", "predelay" },
                                                     { "rev_diff", "diffusion" }, { "rev_damp", "damp" },
                                                     { "rev_mod", "mod" } };
         for (const auto& k : kRevKnobs)
@@ -532,6 +532,7 @@ void ProcessorBase::syncFxSlotParam(const juce::String& id, float v)
     else if (id == "rev_en")     rev.setEnabled(v > 0.5f);
     else if (id == "rev_lvl")    rev.setLevel(v);
     else if (id == "rev_size")   rev.setParam("size",      v);
+    else if (id == "rev_decay")  rev.setParam("decay",     v);
     else if (id == "rev_pre")    rev.setParam("predelay",  v);
     else if (id == "rev_diff")   rev.setParam("diffusion", v);
     else if (id == "rev_damp")   rev.setParam("damp",      v);
