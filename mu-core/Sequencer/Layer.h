@@ -166,6 +166,9 @@ struct Layer : public mu_core::RetireTail
     // Audio thread: frames [0, n) of `out` (two channels, handed over cleared) become the layer's block,
     // insert included. No allocation, no lock beyond the layer's own spin locks, no parameter lookup by id,
     // no call into the host: the only outputs are `out`, ctx.midiOut and the layer's own atomics.
+    // A playing block may REPEAT the previous block's startBeat: a host that stalls its position while reporting
+    // play (a freeze) is not a jump, so a transport-anchored layer keeps a last-evaluated-beat cursor and fires
+    // nothing it already fired; the one discontinuity arrives as onTransportJump when the position moves again.
     virtual void render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n) { juce::ignoreUnused(ctx, out, n); }
     // 0 renders in the first pass, 1 after every priority-0 layer (a layer that reads a peer through ctx.peer).
     virtual int renderPriority() const { return 0; }

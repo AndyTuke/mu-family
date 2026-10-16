@@ -492,6 +492,72 @@ struct LayerRenderDriverTests : juce::UnitTest
             expectEquals(p.fake(0).jumpHooks, 1);
         }
 
+        beginTest("N3: a skipped block clears the layers' MIDI out, so a merge never re-sends the last rendered block's events");
+        {
+            auto pBox = std::make_unique<FakeLayerHost>(1); auto& p = *pBox;
+            p.setUseLayerRenderForTest(true);
+            Driver d(p);
+            p.fake(0).emitNoteOn = true;
+            d.block(256);
+            juce::MidiBuffer first;
+            first.ensureSize(256);
+            expectEquals(p.mergeLayerMidiOut(first, 200), 1, "the rendered block's note-on");
+            {
+                struct H { juce::CriticalSection& l; juce::WaitableEvent in, out; std::thread th;
+                           explicit H(juce::CriticalSection& c) : l(c), th([this] { l.enter(); in.signal(); out.wait(); l.exit(); }) { in.wait(); }
+                           ~H() { out.signal(); th.join(); } } h(p.layersLock);
+                d.block(256);   // skipped: a missed try-lock
+            }
+            juce::MidiBuffer second;
+            second.ensureSize(256);
+            expectEquals(p.mergeLayerMidiOut(second, 200), 0, "nothing after a skipped block");
+            d.block(0);     // a 0-frame block
+            expectEquals(p.mergeLayerMidiOut(second, 200), 0, "nothing after a 0-frame block");
+        }
+
+        beginTest("A transport-anchored layer with a beat cursor fires no extra trigger over a 10-block freeze");
+        {
+            // Fires one trigger per quarter beat it crosses, from a last-evaluated-beat cursor (the allowed state),
+            // and re-anchors the cursor on a jump.
+            struct CursorLayer : FakeBeatLayer
+            {
+                void render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>&, int) override
+                {
+                    if (! ctx.playing) return;
+                    if (! anchored) { cursor = ctx.startBeat; anchored = true; }
+                    const double end = ctx.endBeat();
+                    while (std::floor(cursor * 4.0) < std::floor(end * 4.0)) { cursor = (std::floor(cursor * 4.0) + 1.0) / 4.0; ++triggers; }
+                    cursor = juce::jmax(cursor, end);
+                }
+                void onTransportJump(const mu_core::RenderContext& ctx) override { cursor = ctx.startBeat; }
+                double cursor = 0.0;
+                bool anchored = false;
+                int triggers = 0;
+            };
+            auto run = [](bool freeze)
+            {
+                auto pBox = std::make_unique<FakeLayerHost>(1); auto& p = *pBox;
+                {
+                    const juce::ScopedLock sl(p.layersLock);
+                    p.layers[0] = std::make_unique<CursorLayer>();
+                }
+                p.setUseLayerRenderForTest(true);
+                Driver d(p);
+                for (int i = 0; i < 30; ++i) d.block(512);
+                if (freeze)
+                {
+                    d.freezePosition = true;
+                    for (int i = 0; i < 10; ++i) d.block(512);
+                    d.freezePosition = false;
+                }
+                for (int i = 0; i < 30; ++i) d.block(512);
+                return static_cast<CursorLayer&>(*p.layers[0]).triggers;
+            };
+            const int moving = run(false), frozen = run(true);
+            expect(moving > 0);
+            expectEquals(frozen, moving, "the frozen blocks repeat startBeat and fire nothing new");
+        }
+
         beginTest("An oversize host block through MixerEngine: every chunk mixed, the tail of the block not lost");
         {
             auto pBox = std::make_unique<FakeLayerHost>(2); auto& p = *pBox;

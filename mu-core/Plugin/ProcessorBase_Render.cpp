@@ -102,6 +102,9 @@ void ProcessorBase::noteSkippedBlock(const mu_core::BlockTransport& t, juce::Aud
 {
     if (! t.playing && renderState.lastPlaying) renderState.jumpPending = true;
     buffer.clear();
+    // This block produced no MIDI: a later mergeLayerMidiOut must not re-send the last rendered block's events.
+    renderState.liveOut = renderState.tailOut = 0;
+    renderState.lastBlockFrames = 0;
     ++renderState.blocksSkipped;
 }
 
