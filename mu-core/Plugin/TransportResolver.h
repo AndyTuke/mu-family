@@ -2,6 +2,7 @@
 
 #include "Plugin/HostTransport.h"
 #include "Plugin/MidiClockSync.h"
+#include "Sequencer/BeatWrap.h"
 #include <atomic>
 #include <cmath>
 
@@ -122,13 +123,9 @@ inline BlockTransport resolveTransport(const HostTransport& host, bool isStandal
         t.startBeat = internal.beatPos.load(std::memory_order_relaxed);
     }
 
-    // Bound the beat space (a host position can be any size, or negative in a pre-roll).
-    auto wrap = [wrapBeats](double b)
-    {
-        if (wrapBeats <= 0.0) return b;
-        b = std::fmod(b, wrapBeats);
-        return b < 0.0 ? b + wrapBeats : b;
-    };
+    // Bound the beat space (a host position can be any size, or negative in a pre-roll): the one floor-wrap
+    // of the time model, exact on non-negative input and kept below the bound for a tiny negative one.
+    auto wrap = [wrapBeats](double b) { return wrapBeat(b, wrapBeats); };
     t.startBeat      = wrap(t.startBeat);
     t.beatsPerSample = sampleRate > 0.0 ? (t.bpm / 60.0) / sampleRate : 0.0;
     t.blockBeats     = t.playing ? t.beatsPerSample * (double) numSamples : 0.0;
