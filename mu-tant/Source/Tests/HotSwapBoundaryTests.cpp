@@ -6,7 +6,7 @@
 #include <juce_data_structures/juce_data_structures.h>
 #include <array>
 #include "Plugin/HotSwap.h"   // mu-core: the shared loop-wrap predicates
-#include "Sequencer/SwapBoundary.h"   // mu-tant: the boundary rule
+#include "Plugin/SwapBoundary.h"   // mu-tant: the boundary rule
 #include "MuLimits.h"
 #include <vector>
 

@@ -7,7 +7,7 @@
 #include "Persistence/PatternParams.h"       // the v{N}_ ids
 #include "Modulation/LaneModulation.h"       // mu-core: mu_mod::resolveLane
 #include "Audio/SpinLock.h"                  // mu-core: the envelopes' spin locks
-#include "Audio/Scales.h"                    // kBaseOctave
+#include "Audio/TantScales.h"                    // kBaseOctave
 
 #include <cmath>
 #include <limits>
@@ -471,8 +471,6 @@ void Pattern::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>
     float* gr = out.getNumChannels() > 1 ? out.getWritePointer(1) : nullptr;
     applyGateBlock(gate, gl, gr, n, gateGap, gateBypass, playing, beat, ctx.beatsPerSample, ctx.sampleRate);
 
-    if (gatesOwnOutput) applyOwnNoteGate(out, n, mode, ctx.sampleRate);
-
     // The insert with its modulated slot parameters.
     VoiceParams ip;
     ip.insertAlgo     = (int) rows.drvChar.load();
@@ -481,6 +479,9 @@ void Pattern::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>
     ip.insertParam[2] = insP[2];
     ip.insertParam[3] = insP[3];
     insert->process(out, n, out.getNumChannels(), ip);
+
+    // The layer's own Note-mode gate, on its final output (off in the standalone, which gates the final mix).
+    if (gatesOwnOutput) applyOwnNoteGate(out, n, mode, ctx.sampleRate);
 
     // Feed the sidebar spectrum glyph with the post-insert audio.
     ring.write(out, n);

@@ -1,7 +1,7 @@
 #include "Persistence/PatternParams.h"
 #include "ValueFormat.h"                     // mu-core: shared value text
 #include "Persistence/ParamText.h"           // mu-core: float parameter text in both directions
-#include "Audio/Scales.h"                    // kScales (scale names)
+#include "Audio/TantScales.h"                    // kScales (scale names)
 #include "Audio/InsertProcessor.h"           // mu-core: InsertProcessor::kNumInsertAlgos
 #include "Audio/Wavetable/WavetableBank.h"   // mu-core: the factory table names
 
@@ -43,7 +43,7 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     };
 
     // Per-oscillator pitch — all integer-stepped. Octave ±3 offset, Semi
-    // ±12 (scale-degree, see Scales.h), Fine ±100 cents. Wavetable position
+    // ±12 (scale-degree, see TantScales.h), Fine ±100 cents. Wavetable position
     // is a 0..255 frame index (256-frame Serum/Vital tables).
     layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o1_oct"),  1}, label("Osc1 Octave"),   -3, 3, 0));
     layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o1_semi"), 1}, label("Osc1 Semi"),     -12, 12, 0));

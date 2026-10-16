@@ -1,5 +1,5 @@
 #include "Plugin/PluginProcessor.h"
-#include "Sequencer/SwapBoundary.h"   // mu-tant: the hot-swap boundary rule
+#include "Plugin/SwapBoundary.h"   // mu-tant: the hot-swap boundary rule (the host's policy)
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 #include "Plugin/HostTransport.h"            // mu-core: shared host-playhead reader
 

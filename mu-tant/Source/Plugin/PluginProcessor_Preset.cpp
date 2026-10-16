@@ -1,5 +1,4 @@
 #include "Plugin/PluginProcessor.h"
-#include "Audio/Scales.h"
 #include "Modulation/MuTantModDest.h"
 #include "Modulation/ModulatorSerialise.h"   // mu-core: shared modulator (de)serialise
 #include "Sequencer/GatePatternSerialise.h"  // mu-tant: gate (de)serialise

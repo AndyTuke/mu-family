@@ -3,7 +3,7 @@
 #include "Sequencer/Pattern.h"          // the layer: its envelopes and modulation matrix
 #include "Persistence/PatternParams.h"  // layerParamId
 #include "Audio/SynthVoice.h"           // WavetableBank (the factory table names)
-#include "Audio/Scales.h"
+#include "Audio/TantScales.h"
 #include "Audio/AlgorithmNames.h"   // mu-core: kFilterTypeNames (shared canonical list)
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/ConfirmDialog.h"   // mu-core shared confirm dialogs

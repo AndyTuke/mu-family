@@ -163,11 +163,14 @@ function Get-ProductPluginFiles([string]$root) {
 # Rule 5: per-layer render glue left in a registered product's shell.
 $glueDefinition = [regex]'(?m)^[ \t]*(?:[\w:<>,]+[ \t\*&]+)+(?:\w+::)*(?<fn>render\w*|read\w*Config|applyModulation)\s*\((?<args>[^;{}]*)\)\s*(?:const\s*)?(?:noexcept\s*)?(?:override\s*)?(?:final\s*)?\{'
 $glueIdentifier = [regex]'\b(voiceEngines|retiring)\b'
+# The standalone shell's render-mode hooks (mu-core Plugin/StandaloneShell.h) are app policy, not layer glue.
+$shellRenderHooks = @('renderPlaysByDefault')
 function Test-Glue($files, [string[]]$registeredProducts) {
     $found = @()
     foreach ($f in ($files | Where-Object { $_.Candidate -and $registeredProducts -contains $_.Product })) {
         $cleaned = Get-CleanedText ([System.IO.File]::ReadAllText($f.Full))
         foreach ($m in $glueDefinition.Matches($cleaned)) {
+            if ($shellRenderHooks -contains $m.Groups['fn'].Value) { continue }
             $line = Get-LineNumber $cleaned $m.Index
             $found += "$($f.Product)/$($f.Rel):$line — a registered product's shell defines layer glue '$($m.Groups['fn'].Value)' (rule 5)"
         }

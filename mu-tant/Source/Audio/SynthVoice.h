@@ -24,7 +24,7 @@ struct VoiceConfig
 
     // Per-oscillator pitch — all integer-stepped.
     //   octave : -3..+3 offset from the base octave
-    //   semi   : -12..+12 scale-degree offset (scale-quantised — see Scales.h)
+    //   semi   : -12..+12 scale-degree offset (scale-quantised — see TantScales.h)
     //   fine   : -100..+100 cents off-grid detune
     int   osc1Octave  = 0,   osc2Octave = 0;
     int   osc1Semi    = 0,   osc2Semi   = 2;
