@@ -110,6 +110,13 @@ namespace
             { "insert-effect",    [](mu_golden::Scenario&) {} },
             { "noise-on",         [](mu_golden::Scenario&) {} },
             { "master-fx-return", [](mu_golden::Scenario&) {} },
+
+            // Contract pin P7: host blocks above the prepared size (512 here, so ragged's 1024 is one too),
+            // which the shared driver chunks into calls of at most the prepared size (C8).
+            { "oversize-block", [](mu_golden::Scenario& sc)
+              {
+                  sc.schedules.push_back({ "oversize", { 4096, 1, 2048 } });
+              } },
         };
         return defs;
     }
