@@ -103,13 +103,10 @@ public:
         filter.setDrive(p.drive);
         filter.setLowCut(p.lowCutHz);
 
-        if (p.portamentoMs != lastPortaMs)
-        {
-            lastPortaMs = p.portamentoMs;
-            const float cur = pitchGlide.getCurrentValue();
-            pitchGlide.reset(sr, (double) p.portamentoMs * 0.001);
-            pitchGlide.setCurrentAndTargetValue(cur);
-        }
+        // The glide time is read when a slide starts (noteOnLegato), never mid-slide: re-seeding the ramp
+        // here (SmoothedValue::reset jumps to the target) cancelled a slide in flight whenever Glide was
+        // modulated or automated.
+        glideSeconds = (double) p.portamentoMs * 0.001;
         applyEnvParams();
     }
 
@@ -126,7 +123,11 @@ public:
     void noteOnLegato(int midiNote)
     {
         targetMidi = (float) midiNote;
-        pitchGlide.setTargetValue(targetMidi);
+        // Start the slide from where the pitch is now, over the glide time as it stands now.
+        const float cur = pitchGlide.getCurrentValue();
+        pitchGlide.reset(sr, glideSeconds);            // sets the ramp length (and jumps current to target)
+        pitchGlide.setCurrentAndTargetValue(cur);      // keep the pitch where it is
+        pitchGlide.setTargetValue(targetMidi);         // and slide to the new note
     }
 
     void noteOff() { ampEnv.noteOff(); filterEnv.noteOff(); pitchEnv.noteOff(); }
@@ -247,7 +248,7 @@ private:
     float pb0 = 0.0f, pb1 = 0.0f, pb2 = 0.0f;   // pink-noise filter state
     float osc1Gain = 1.0f, osc2Gain = 0.7f, noiseGain = 0.0f, levelGain = 1.0f;
     float panL = 0.7071f, panR = 0.7071f;
-    float lastPortaMs = -1.0f;
+    double glideSeconds = 0.0;   // portamento time, taken when a tied note starts a slide
 };
 
 } // namespace mu_toni
