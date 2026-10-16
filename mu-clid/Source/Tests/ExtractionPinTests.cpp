@@ -325,7 +325,6 @@ struct MuClidExtractionPinTests : juce::UnitTest
                     for (int r = 0; r < 3; ++r) tails[(size_t) r] = p.retiredVoiceEngines[(size_t) r][0].get();
                     p.loadPreset(silentFull);   // playing: staged, lands at the next loop boundary
                 }
-                if (b == 59) for (int r = 0; r < 3; ++r) preShrink[r] = chPeak(p, r);
                 if (b == 150)
                 {
                     expectEquals(p.getNumRhythms(), 1, "the full preset has landed: one rhythm");
@@ -338,12 +337,17 @@ struct MuClidExtractionPinTests : juce::UnitTest
                 if (b == 400) { p.addLayer(); p.addLayer(); }
                 rig.block(512);
                 if (b == 401) for (int r = 0; r < 3; ++r) postRegrow[r] = chPeak(p, r);
+                // The tails ring on until the staged preset lands at a loop boundary, so the reference for "where they
+                // stopped" is the last block that still had three rhythms, not the block the preset was loaded in.
+                if (b >= 59 && b < 150 && p.getNumRhythms() == 3) for (int r = 0; r < 3; ++r) preShrink[r] = chPeak(p, r);
             }
             logMessage("P3 channel peaks before the shrink " + juce::String(preShrink[1], 4) + "/" + juce::String(preShrink[2], 4)
                        + ", just after the regrow " + juce::String(postRegrow[1], 4) + "/" + juce::String(postRegrow[2], 4));
             expect(slotHolds(p, 1, tails[1]) && slotHolds(p, 2, tails[2]), "after the regrow the same tail engines are in the same slots");
             expect(postRegrow[1] > 0.01f && postRegrow[2] > 0.01f, "the regrown slots, whose rhythms are silent, ring with the old tails (stale tails resume)");
-            expect(postRegrow[1] > 0.5f * preShrink[1] && postRegrow[2] > 0.5f * preShrink[2], "from where they stopped: they did not decay while the slots were dormant");
+            // Only the landing block and the regrow block of ringing separate the two readings (about 1 % of decay); a tail
+            // that kept decaying through the ~300 dormant blocks would have lost about 15 % (slot 0's own tail does).
+            expect(postRegrow[1] > 0.97f * preShrink[1] && postRegrow[2] > 0.97f * preShrink[2], "from where they stopped: they did not decay while the slots were dormant");
         }
 
         beginTest("P3: removeLayer shifts the tails down with their rhythms; the removed slot's tail is dropped and the top slot is empty");
