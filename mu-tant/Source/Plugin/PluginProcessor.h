@@ -3,6 +3,7 @@
 #include "Plugin/ProcessorBase.h"            // mu-core base
 #include "Plugin/MixerFxParams.h"            // mu-core: shared global-FX/mixer APVTS layout
 #include "Sequencer/Pattern.h"           // mu-Tant layer type (derives mu-core Layer)
+#include "Persistence/PatternParams.h"   // the Pattern type's parameter ids and rows
 #include "Modulation/LaneModulation.h"       // mu-core: shared range-based per-lane resolve
 #include "Sequencer/GatePattern.h"           // mu-tant: per-voice gate pattern
 #include "Audio/SynthVoice.h"                // mu-tant voice
@@ -165,14 +166,7 @@ public:
 
     // The "SWP" badges and the cancel read the shared ProcessorBase::layerSwapper.
 
-    // ── Per-voice param IDs (used by PatternContent for SliderAttachment binding) ──
-    // Family rule: per-voice params are subtree-scoped via `v{N}_` prefix so a
-    // ValueTree restore round-trips cleanly + presets can target a specific
-    // voice without name collisions across the 8 slots.
-    static juce::String voiceParamId(int voice, const juce::String& base)
-    {
-        return juce::String("v") + juce::String(voice) + "_" + base;
-    }
+    // Per-voice param IDs are the Pattern type's: layerParamId(voice, base) in Persistence/PatternParams.h.
 
     // The APVTS layout factory (defined in PluginProcessor_APVTS.cpp). Public so
     // the layout test can exercise the real param set without constructing the

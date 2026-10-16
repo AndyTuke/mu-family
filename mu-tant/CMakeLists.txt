@@ -50,6 +50,7 @@ target_sources(mu-tant
         Source/Plugin/PluginProcessor.cpp
         Source/Plugin/PluginProcessor_APVTS.cpp
         Source/Plugin/PluginProcessor_Preset.cpp
+        Source/Persistence/PatternParams.cpp
         Source/Plugin/PluginEditor.cpp
         Source/UI/PatternContent.cpp
         Source/UI/GatingDesigner.cpp
@@ -201,6 +202,7 @@ target_sources(mu-tant-tests PRIVATE
     # Editor-free APVTS layout factory — lets the ApvtsLayout test exercise the
     # real createParameterLayout() without pulling in PluginEditor/UI.
     Source/Plugin/PluginProcessor_APVTS.cpp
+    Source/Persistence/PatternParams.cpp
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked) and
     # its licence glue, so tests construct the product class itself (see ProcessorTestSources.cmake).
     Source/Plugin/PluginProcessor.cpp

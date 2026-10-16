@@ -165,11 +165,11 @@ void PatternContent::setupSourceControls()
     addAndMakeVisible(phaseModeCtrl);
     addAndMakeVisible(ampModeCtrl);
     phaseModeCtrl.onChange = [this](int idx) {
-        if (auto* p = proc.apvts.getParameter(PluginProcessor::voiceParamId(currentLayer, "xmod_phaseMode")))
+        if (auto* p = proc.apvts.getParameter(layerParamId(currentLayer, "xmod_phaseMode")))
             p->setValueNotifyingHost(p->convertTo0to1((float) idx));
     };
     ampModeCtrl.onChange = [this](int idx) {
-        if (auto* p = proc.apvts.getParameter(PluginProcessor::voiceParamId(currentLayer, "xmod_ampMode")))
+        if (auto* p = proc.apvts.getParameter(layerParamId(currentLayer, "xmod_ampMode")))
             p->setValueNotifyingHost(p->convertTo0to1((float) idx));
         bindAmpDepthKnob(idx == 2);   // SSB → bind Depth knob to the shift param
     };
@@ -181,7 +181,7 @@ void PatternContent::setupFilterControls()
     auto& apvts = proc.apvts;
 
     addLabel(noiseTypeLabel, "Noise");
-    mu_ui::addChoiceItems(noiseTypeDropdown, apvts, PluginProcessor::voiceParamId(0, "noise_type"));
+    mu_ui::addChoiceItems(noiseTypeDropdown, apvts, layerParamId(0, "noise_type"));
     addAndMakeVisible(noiseTypeDropdown);
 
     addLabel(fltTypeLabel,  "Type");
@@ -316,14 +316,14 @@ void PatternContent::setLayer(int voiceIndex)
 
 void PatternContent::rebindAttachments()
 {
-    fltTypeParam  = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentLayer, "flt_type"));
-    flt2TypeParam = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentLayer, "flt2_type"));
-    o1WtParam     = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentLayer, "o1_wt"));
-    o2WtParam     = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentLayer, "o2_wt"));
+    fltTypeParam  = proc.apvts.getRawParameterValue(layerParamId(currentLayer, "flt_type"));
+    flt2TypeParam = proc.apvts.getRawParameterValue(layerParamId(currentLayer, "flt2_type"));
+    o1WtParam     = proc.apvts.getRawParameterValue(layerParamId(currentLayer, "o1_wt"));
+    o2WtParam     = proc.apvts.getRawParameterValue(layerParamId(currentLayer, "o2_wt"));
 
     auto& apvts = proc.apvts;
     auto id = [this](const char* base) {
-        return PluginProcessor::voiceParamId(currentLayer, base);
+        return layerParamId(currentLayer, base);
     };
 
     // Destroy previous attachments first — the JUCE attachment dtor unhooks
@@ -435,7 +435,7 @@ void PatternContent::bindAmpDepthKnob(bool ssbMode)
     currentAmpMode = ssbMode ? 1 : 0;
     xmodDepthAttachment = nullptr;
     xmodDepthAttachment = std::make_unique<APVTS::SliderAttachment>(
-        proc.apvts, PluginProcessor::voiceParamId(currentLayer, ssbMode ? "xmod_ssb" : "xmod_depth"),
+        proc.apvts, layerParamId(currentLayer, ssbMode ? "xmod_ssb" : "xmod_depth"),
         xmodDepthKnob.getSlider());
 }
 
@@ -769,7 +769,7 @@ void PatternContent::refreshWavetableDropdowns()
         else
         {
             int idx = 0;
-            if (auto* raw = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentLayer, pid)))
+            if (auto* raw = proc.apvts.getRawParameterValue(layerParamId(currentLayer, pid)))
                 idx = juce::jlimit(0, names.size() - 1, (int) raw->load());
             dd.setSelectedId(idx + 1, false);
         }
@@ -809,7 +809,7 @@ void PatternContent::handleWtSelection(int oscIndex, int itemId)
 
     // Factory item (1..N): clear any user table for this osc, set the APVTS index.
     proc.clearUserWavetable(currentLayer, oscIndex);
-    if (auto* p = proc.apvts.getParameter(PluginProcessor::voiceParamId(currentLayer, oscIndex == 0 ? "o1_wt" : "o2_wt")))
+    if (auto* p = proc.apvts.getParameter(layerParamId(currentLayer, oscIndex == 0 ? "o1_wt" : "o2_wt")))
         p->setValueNotifyingHost(p->convertTo0to1((float) (itemId - 1)));
     refreshWavetableDropdowns();
 }

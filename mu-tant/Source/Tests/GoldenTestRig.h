@@ -29,7 +29,7 @@ namespace mu_golden_rig
         std::vector<bool> fired;
     };
 
-    inline juce::String vp(int voice, const char* base) { return mu_tant::PluginProcessor::voiceParamId(voice, base); }
+    inline juce::String vp(int voice, const char* base) { return mu_tant::layerParamId(voice, base); }
 
     inline void setParam(juce::AudioProcessorValueTreeState& apvts, const juce::String& id, float plain)
     {

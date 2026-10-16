@@ -1,6 +1,6 @@
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "Plugin/PluginProcessor.h"
-#include "Plugin/SwapBoundary.h"   // mu-tant: the hot-swap boundary rule
+#include "Sequencer/SwapBoundary.h"   // mu-tant: the hot-swap boundary rule
 #include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 #include "Audio/Scales.h"
@@ -171,7 +171,7 @@ void PluginProcessor::cacheParamPointers()
 
     for (int v = 0; v < mu_limits::kMaxLayers; ++v)
     {
-        auto vid = [v](const char* base) { return voiceParamId(v, base); };
+        auto vid = [v](const char* base) { return layerParamId(v, base); };
         auto& p = voicePtrs[(size_t) v];
         p.o1Oct  = P(vid("o1_oct"));  p.o1Semi = P(vid("o1_semi")); p.o1Fine = P(vid("o1_fine")); p.o1Pos = P(vid("o1_pos")); p.o1Wt = P(vid("o1_wt"));
         p.o2Oct  = P(vid("o2_oct"));  p.o2Semi = P(vid("o2_semi")); p.o2Fine = P(vid("o2_fine")); p.o2Pos = P(vid("o2_pos")); p.o2Wt = P(vid("o2_wt"));
@@ -195,12 +195,12 @@ void PluginProcessor::cacheParamPointers()
     for (int i = 0; i < kNumModDests; ++i)
     {
         modDestIds[(size_t) i]    = kModDestTable[i].id;
-        modDestRanges[(size_t) i] = apvts.getParameterRange(voiceParamId(0, kModDestTable[i].param));
+        modDestRanges[(size_t) i] = apvts.getParameterRange(layerParamId(0, kModDestTable[i].param));
         modParamValues.emplace(std::string_view(kModDestTable[i].id), 0.0f);   // pre-insert key
         for (int v = 0; v < mu_limits::kMaxLayers; ++v)
         {
             modDestAtoms[(size_t) v][(size_t) i] =
-                apvts.getRawParameterValue(voiceParamId(v, kModDestTable[i].param));
+                apvts.getRawParameterValue(layerParamId(v, kModDestTable[i].param));
             jassert(modDestAtoms[(size_t) v][(size_t) i] != nullptr);   // catch an apvtsBase drift
         }
     }

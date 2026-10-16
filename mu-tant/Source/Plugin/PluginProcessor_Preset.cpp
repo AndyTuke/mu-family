@@ -31,8 +31,6 @@ namespace
         return false;
     }
 
-    juce::String voicePrefix(int v) { return "v" + juce::String(v) + "_"; }
-
     // ── X-Mod preset migration (best-effort) ─────────────────────────────────
     // Old presets / patches carry xmod_fm / _am / _ring (+ modulator assignments to
     // xmod.fm/.am/.ring); the 2-lane redesign replaces them. Old FM depth → Lane A index in
@@ -103,7 +101,7 @@ namespace
 void PluginProcessor::initVoiceState()
 {
     juce::StringArray prefixes;
-    for (int v = 0; v < mu_limits::kMaxLayers; ++v) prefixes.add(voicePrefix(v));
+    for (int v = 0; v < mu_limits::kMaxLayers; ++v) prefixes.add(layerParamPrefix(v));
     initLayerState(prefixes);
 }
 
