@@ -2,8 +2,8 @@
 layers=1
 load_errors=1
 load_error=Sample 'Hat 01.wav' missing from content folder — rhythm loaded without audio.
-resave_bytes=5401
-resave_sha256=9ca1ac2115e245653f7eb9c126b93152fa0a06c43094265910aba8fe8a08c299
+resave_bytes=5433
+resave_sha256=bcf4fcf636f2c4f519f3b31811b060f6c0673d040624fb23c390e260fa9fba54
 --- parameters differing from default (id=plain value)
 ch0_lvl=0.85
 r0_aEnvAtk=0.001

@@ -1,8 +1,8 @@
 # frozen load result for fixture: Deep Current 4.muTant
 layers=3
 load_errors=0
-resave_bytes=34776
-resave_sha256=992822684a93d76fbf94b5da3900afa08d20c3b16b040ddd4c00b28a1d59d637
+resave_bytes=34811
+resave_sha256=d246f1e6d557c83ed007a48b6316d6901de5cc278eaa6d5824fabd7b4708d159
 --- parameters differing from default (id=plain value)
 ch0_lvl=0.736
 ch0_pan=-0.6
