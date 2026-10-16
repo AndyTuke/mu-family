@@ -1,8 +1,8 @@
 # frozen load result for fixture: Pulse Grid 4.muTant
 layers=4
 load_errors=0
-resave_bytes=35937
-resave_sha256=dc605cebbdc5baa4105352ae7f36416ecacdaea1d0d02d88d3fd848f9e446c1c
+resave_bytes=35972
+resave_sha256=59f4447986e80a7605670d5cfc374e0e41a0e8ea63249facf5fd522a986495dd
 --- parameters differing from default (id=plain value)
 ch0_lvl=0.808
 ch0_pan=-0.6
