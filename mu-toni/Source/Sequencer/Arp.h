@@ -98,6 +98,8 @@ private:
     std::array<juce::NormalisableRange<float>, kNumModDests>  modDestRanges {};
     std::unordered_map<std::string_view, float>               modParamValues;
     LiveValues                                                modLive;
+    std::array<float, kNumModDests>                           lastResolved {};   // the last block's out[] (C12)
+    bool                                                      haveResolved = false;
 
     bool parked = true;   // not rendered live in the last rendered block (or prepared since): start from silence
 };

@@ -2,6 +2,7 @@
 #include "Persistence/LayerParamIds.h"     // layerParamId
 #include "Modulation/LaneModulation.h"     // mu-core: mu_mod::resolveLane
 
+#include <algorithm>
 #include <cstring>
 
 // The Arp layer's half of the render contract: the parameter binding and the per-block render that used to
@@ -67,9 +68,19 @@ void Arp::readParams(double modBeat) noexcept
     // Resolve this layer's modulation matrix over its control sequences → out[] (param units).
     // Modulated destinations come from out[]; everything else reads the raw param.
     float out[kNumModDests];
-    mu_mod::resolveLane(this, modBeat, kNumModDests,
-                        modDestIds.data(), modDestAtoms.data(),
-                        modDestRanges.data(), modParamValues, out);
+    const bool resolved = mu_mod::resolveLane(this, modBeat, kNumModDests,
+                                              modDestIds.data(), modDestAtoms.data(),
+                                              modDestRanges.data(), modParamValues, out);
+
+    // A block that misses the matrix lock (the message thread is editing this layer's modulators) holds the
+    // last resolved values, so no target snaps back to its unmodulated knob for a block (C12).
+    if (resolved || ! haveResolved)
+    {
+        std::copy(out, out + kNumModDests, lastResolved.begin());
+        haveResolved = haveResolved || resolved;
+    }
+    else
+        std::copy(lastResolved.begin(), lastResolved.end(), out);
 
     // Publish the post-matrix values for the knobs' live modulation arcs.
     for (int k = 0; k < kNumModDests; ++k)
