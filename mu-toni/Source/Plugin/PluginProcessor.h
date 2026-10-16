@@ -140,8 +140,12 @@ private:
     // ArpParams + ToniVoiceParams + step config. Non-const: runs the matrix under try-lock.
     void readVoice(int v, ArpParams& ap, ToniVoiceParams& vp, int& rateIdx, float& gate01, bool& midiTrig,
                    ArpAccent& accent);
-    // Update the held-note stack from incoming MIDI; sets noteOnEdge if a new note landed.
-    void updateHeldNotes(const juce::MidiBuffer& midi, bool& noteOnEdge);
+    // This block's short MIDI messages into noteInput, after the events carried from unrendered blocks;
+    // returns how many were decoded (audio thread, allocation-free).
+    int decodeNoteInput(const juce::MidiBuffer& midi, int numSamples) noexcept;
+    // An unrendered block: keep its channel messages (decoded at [noteInputCarried, +count)) for the next
+    // rendered block, so a key pressed or released while a structural edit silences the audio still counts.
+    void carryNoteInput(int count) noexcept;
 
     mu_wavetable::WavetableBank bank;                        // the oscillators' wavetables (factory set)
     std::atomic<float>*         midiInChParam = nullptr;     // MIDI In channel (0 = Omni)
@@ -177,12 +181,14 @@ private:
     std::unordered_map<std::string_view, float>                                   modParamValues;
     double                                                                        modBeat = 0.0;
 
-    // Root-by-MIDI held-note stack (newest on top) + per-block arp context.
-    std::array<int, 32> heldStack {};
-    int                 heldCount = 0;
-    ArpContext          arpCtx;
+    // The block's MIDI as the layers hear it: events carried from unrendered blocks first (frame 0), then this
+    // block's. Sized at construction; audio thread only.
+    static constexpr int kNoteInputCarry  = 512;    // messages kept across unrendered blocks (an edit is a few blocks)
+    static constexpr int kNoteInputBlock  = 1792;   // messages decoded per block (the rest of one block is dropped)
+    juce::HeapBlock<mu_core::MidiEvent> noteInput;
+    int                                 noteInputCarried = 0;
 
-    // Renders channel `ch` from its arp runner. Captures `this` (reads arpCtx).
+    // Renders channel `ch` from its arp runner with the layer's own arp context.
     MixerEngine::RenderChannelFn renderChannelCb;
 
 

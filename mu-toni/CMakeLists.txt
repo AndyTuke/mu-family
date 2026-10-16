@@ -148,6 +148,7 @@ target_sources(mu-toni-tests PRIVATE
     Source/Tests/ModArcTests.cpp   # every mod target publishes its live value for the knob arcs
     Source/Tests/StepPatternTests.cpp   # step pattern: rests, Legato tie end, defaults
     Source/Tests/GoldenRenderTests.cpp   # golden renders (tests/golden/mu-toni) and the behaviour pins
+    Source/Tests/HeldKeyTests.cpp   # held keys across edits, unrendered blocks and count changes
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp

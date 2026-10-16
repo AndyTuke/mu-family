@@ -59,7 +59,7 @@ PluginProcessor::PluginProcessor()
     {
         if (ch >= 0 && ch < mu_limits::kMaxLayers)
         {
-            getArp(ch).runner.render(buf, n, arpCtx);
+            getArp(ch).runner.render(buf, n, getArp(ch).context);
             getArp(ch).insert->process(buf, n, buf.getNumChannels(), getArp(ch).insertCfg);   // engine → insert → mixer
         }
         else buf.clear();
@@ -75,6 +75,7 @@ PluginProcessor::PluginProcessor()
     // The shared wavetable bank (procedural factory set), read by every voice's oscillators.
     bank.loadFactoryBank();
     midiInChParam = apvts.getRawParameterValue(kMidiInChannelParamId);
+    noteInput.allocate((size_t) (kNoteInputCarry + kNoteInputBlock), true);
 
     cacheVoiceParamPointers();
     setupLayerState();       // the layer layout every preset / session save and load uses
@@ -190,34 +191,33 @@ void PluginProcessor::readVoice(int v, ArpParams& ap, ToniVoiceParams& tv,
     ic.insertParam[3] = g(vpi::insP4);
 }
 
-void PluginProcessor::updateHeldNotes(const juce::MidiBuffer& midi, bool& noteOnEdge)
+int PluginProcessor::decodeNoteInput(const juce::MidiBuffer& midi, int numSamples) noexcept
 {
-    noteOnEdge = false;
-    auto removeNote = [this](int note)
-    {
-        for (int i = 0; i < heldCount; ++i)
-            if (heldStack[(size_t) i] == note)
-            {
-                for (int j = i; j < heldCount - 1; ++j) heldStack[(size_t) j] = heldStack[(size_t) j + 1];
-                --heldCount;
-                return;
-            }
-    };
-
-    // MIDI In channel: Omni takes every channel's notes, else only that channel's.
-    const int inCh = midiInChParam != nullptr ? juce::roundToInt(midiInChParam->load()) : 0;
+    // Short messages only, in time order (what juce::MidiBuffer iterates); a held-key scan reads nothing longer.
+    int count = 0;
     for (const auto meta : midi)
     {
-        const auto m = meta.getMessage();
-        if (inCh > 0 && m.getChannel() != inCh) continue;
-        if (m.isNoteOn())
-        {
-            removeNote(m.getNoteNumber());
-            if (heldCount < (int) heldStack.size()) heldStack[(size_t) heldCount++] = m.getNoteNumber();
-            noteOnEdge = true;
-        }
-        else if (m.isNoteOff())          removeNote(m.getNoteNumber());
-        else if (m.isAllNotesOff() || m.isAllSoundOff()) heldCount = 0;
+        if (meta.numBytes < 1 || meta.numBytes > 3) continue;
+        if (count >= kNoteInputBlock) break;
+        auto& e = noteInput[(size_t) (noteInputCarried + count++)];
+        e.frame = juce::jlimit(0, juce::jmax(0, numSamples - 1), meta.samplePosition);
+        e.size  = (uint8_t) meta.numBytes;
+        for (int b = 0; b < 3; ++b) e.bytes[b] = b < meta.numBytes ? meta.data[b] : (uint8_t) 0;
+    }
+    return count;
+}
+
+void PluginProcessor::carryNoteInput(int count) noexcept
+{
+    // Channel messages only (a system message holds no key), moved down onto the carried prefix at frame 0.
+    for (int i = 0; i < count && noteInputCarried < kNoteInputCarry; ++i)
+    {
+        const auto e = noteInput[(size_t) (noteInputCarried + i)];
+        const auto type = (uint8_t) (e.bytes[0] & 0xf0);
+        if (type < 0x80 || type == 0xf0) continue;
+        auto& kept = noteInput[(size_t) noteInputCarried++];
+        kept = e;
+        kept.frame = 0;
     }
 }
 
@@ -266,19 +266,9 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     const double bpm       = transport.bpm;
     const bool   isPlaying = transport.playing;
 
-    // Root-by-MIDI / trigger: update the held-note stack from incoming notes.
-    bool noteOnEdge = false;
-    updateHeldNotes(midiMessages, noteOnEdge);
-
-    // Per-block arp context (read by the render callback for every voice).
-    arpCtx.playing          = isPlaying;
-    arpCtx.sampleRate       = currentSampleRate.load(std::memory_order_relaxed);
-    arpCtx.bpm              = bpm;
-    arpCtx.anyNoteHeld      = heldCount > 0;
-    arpCtx.rootOverrideMidi = heldCount > 0 ? heldStack[(size_t) (heldCount - 1)] : -1;
-    arpCtx.noteOnEdge       = noteOnEdge;
-    arpCtx.startBeat        = transport.startBeat;
-    arpCtx.beatsPerSample   = transport.beatsPerSample;
+    // Root-by-MIDI / trigger: this block's notes, decoded once for every layer's held keys.
+    const int numNoteEvents = decodeNoteInput(midiMessages, numSamples);
+    const int inCh = midiInChParam != nullptr ? juce::roundToInt(midiInChParam->load()) : 0;
 
     // Beat position for the modulation matrix (control-sequence playhead).
     modBeat = transport.startBeat;
@@ -292,6 +282,19 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
         if (layersTryLock.isLocked() && ! layerEditInFlight.load(std::memory_order_acquire))
         {
             const int numActive = numLayers.load(std::memory_order_relaxed);
+
+            // Every slot's Arp hears the block's keys, spares included, then takes the block's transport.
+            for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            {
+                auto& a = getArp(i);
+                a.hearMidi(noteInput.get(), noteInputCarried + numNoteEvents, noteInputCarried, inCh);
+                a.context.playing        = isPlaying;
+                a.context.sampleRate     = currentSampleRate.load(std::memory_order_relaxed);
+                a.context.bpm            = bpm;
+                a.context.startBeat      = transport.startBeat;
+                a.context.beatsPerSample = transport.beatsPerSample;
+            }
+            noteInputCarried = 0;
 
             // A slot that has just gone live starts from silence: a deleted layer's held note or
             // voice tail never resumes in the new one.
@@ -313,6 +316,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
             processCoreBlock(buffer, nullptr, numActive, numSamples, bpm,
                              nullptr, nullptr, nullptr, &renderChannelCb);
         }
+        else
+            carryNoteInput(numNoteEvents);
     }
 
     // Hot-swap: flag staged presets whose bar line passed in this block (or the transport stopped).
@@ -338,8 +343,15 @@ std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
 // Slots whose Arp changed lose the previous tenant's voice, step position and insert memory (the
 // insert travels with its Arp, so it is re-seeded for the new slot and cleared). The mixer strip and
 // its ducking envelope are reset by the edit itself. Allocation-free resets only.
+//
+// The held keys are not slot state: every Arp that has been in the processor hears every block, so all of
+// them hold the same keys. An Arp built for this edit (an added layer, the spare a removal leaves on top)
+// has heard nothing yet, so it takes slot 0's keys (slot 0 never holds such a new Arp). Safe here:
+// layersMoved runs under layersLock, which the audio thread holds for the whole of every block it renders
+// (TryLock mode).
 void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
 {
+    jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);
     for (int d = juce::jmax(0, firstIndex); d <= juce::jmin(lastIndex, mu_limits::kMaxLayers - 1); ++d)
     {
         auto& arp = getArp(d);
@@ -347,6 +359,7 @@ void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
         arp.runner.reset();
         arp.insert->setSlotIndex(d);
         arp.insert->reset();
+        if (d != 0) arp.heldNotes = getArp(0).heldNotes;
     }
 }
 
