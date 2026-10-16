@@ -1,4 +1,4 @@
-#include "GrooveSequencer.h"
+#include "Tests/GrooveSequencer.h"
 #include <cmath>
 
 namespace mu_on

@@ -3,8 +3,8 @@
 #include "Sequencer/Layer.h"            // mu-core: per-layer ControlSequences + ModulationMatrix, the render contract
 #include "Sequencer/LayerTypeInfo.h"    // mu-core: mu_core::LayerTypeId
 #include "Sequencer/RetireTail.h"       // mu-core: mu_core::ParamBinding
-#include "Sequencer/StepPattern.h"
-#include "Sequencer/GrooveSequencer.h"  // StepClock
+#include "Sequencer/StepRow.h"         // the track's steps and groove
+#include "Sequencer/StepClock.h"       // the row's step cursor
 #include "Audio/TrackEngine.h"          // the engines the track runs
 #include "Modulation/MuOnModDest.h"     // the engines' modulation target tables
 

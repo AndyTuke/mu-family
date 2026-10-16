@@ -1,5 +1,5 @@
 #include "StepRows.h"
-#include "Sequencer/GrooveSequencer.h"   // currentStep
+#include "Sequencer/StepClock.h"   // currentStep
 #include "Sequencer/Track.h"             // the rows the cells edit
 #include "UI/Components/MuLookAndFeel.h"
 
@@ -47,7 +47,7 @@ bool StepRows::cellAt(juce::Point<int> p, int& row, int& step) const
     if (row < 0 || row >= host.getTrackCount()) return false;
     const auto cells = cellsArea(row);
     if (! cells.contains(p)) return false;
-    step = juce::jlimit(0, StepPattern::kNumSteps - 1, (int) ((p.x - cells.getX()) / (cells.getWidth() / (float) StepPattern::kNumSteps)));
+    step = juce::jlimit(0, StepRow::kNumSteps - 1, (int) ((p.x - cells.getX()) / (cells.getWidth() / (float) StepRow::kNumSteps)));
     return true;
 }
 
@@ -86,8 +86,8 @@ void StepRows::paintRow(juce::Graphics& g, int row)
                                     juce::Justification::centredLeft, col, false);
 
     const auto cells = cellsArea(row);
-    const float cellW = cells.getWidth() / (float) StepPattern::kNumSteps;
-    for (int s = 0; s < StepPattern::kNumSteps; ++s)
+    const float cellW = cells.getWidth() / (float) StepRow::kNumSteps;
+    for (int s = 0; s < StepRow::kNumSteps; ++s)
     {
         const juce::Rectangle<float> cell((float) cells.getX() + s * cellW + 1.5f, (float) cells.getY() + 1.5f,
                                           cellW - 3.0f, (float) cells.getHeight() - 3.0f);
@@ -170,11 +170,11 @@ void StepRows::timerCallback()
     }
 
     const int step = host.isTrackTransportPlaying()
-                        ? GrooveSequencer::currentStep(host.getTrackTransportBeat()) : -1;
+                        ? StepClock::currentStep(host.getTrackTransportBeat()) : -1;
     if (step == playheadStep) return;
 
     // Repaint only the cells the playhead left and entered, not the whole grid.
-    const float cellW = (getWidth() - mu_ui::s(kLabelW)) / (float) StepPattern::kNumSteps;
+    const float cellW = (getWidth() - mu_ui::s(kLabelW)) / (float) StepRow::kNumSteps;
     for (int s : { playheadStep, step })
         if (s >= 0)
             repaint(juce::Rectangle<float>((float) mu_ui::s(kLabelW) + s * cellW, 0.0f, cellW, (float) getHeight())

@@ -5,7 +5,6 @@
 #include "Plugin/MidiClockSync.h"         // mu-core: shared MIDI-clock slave
 #include "Persistence/TrackParams.h"
 #include "Sequencer/StepPattern.h"
-#include "Sequencer/GrooveSequencer.h"   // StepClock, the playhead step
 #include "Sequencer/Track.h"
 #include "UI/TrackHost.h"   // what the Track layer's UI reads from its host
 
