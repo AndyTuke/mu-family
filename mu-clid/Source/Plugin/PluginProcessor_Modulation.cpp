@@ -171,19 +171,19 @@ void PluginProcessor::seedModulation(int r, const Rhythm& rhythm, const VoicePar
     const auto insRangeA = insertStartKnobRange(rhythm.genA);
     const auto insRangeB = insertStartKnobRange(rhythm.genB);
     const auto insRangeC = insertStartKnobRange(rhythm.genC);
-    mv(md::euclid_a_insSt)   = propOf(rhythm.genA.insertStart - insRangeA.first, insRangeA.second - insRangeA.first);
+    mv(md::euclid_a_insSt)   = propOf(juce::jlimit(insRangeA.first, insRangeA.second, rhythm.genA.insertStart) - insRangeA.first, insRangeA.second - insRangeA.first);
     mv(md::euclid_a_insLen)  = propOf(rhythm.genA.insertLength, padMaxA.insertLength);
     mv(md::euclid_b_hits)    = (float) rhythm.genB.hits         / (float) stepsB_seed;
     mv(md::euclid_b_rotate)  = (float) rhythm.genB.rotate       / (float) juce::jmax(1, stepsB_seed - 1);
     mv(md::euclid_b_prePad)  = propOf(rhythm.genB.prePad,       padMaxB.prePad);
     mv(md::euclid_b_postPad) = propOf(rhythm.genB.postPad,      padMaxB.postPad);
-    mv(md::euclid_b_insSt)   = propOf(rhythm.genB.insertStart - insRangeB.first, insRangeB.second - insRangeB.first);
+    mv(md::euclid_b_insSt)   = propOf(juce::jlimit(insRangeB.first, insRangeB.second, rhythm.genB.insertStart) - insRangeB.first, insRangeB.second - insRangeB.first);
     mv(md::euclid_b_insLen)  = propOf(rhythm.genB.insertLength, padMaxB.insertLength);
     mv(md::euclid_c_hits)    = (float) rhythm.genC.hits         / (float) stepsC_seed;
     mv(md::euclid_c_rotate)  = (float) rhythm.genC.rotate       / (float) juce::jmax(1, stepsC_seed - 1);
     mv(md::euclid_c_prePad)  = propOf(rhythm.genC.prePad,       padMaxC.prePad);
     mv(md::euclid_c_postPad) = propOf(rhythm.genC.postPad,      padMaxC.postPad);
-    mv(md::euclid_c_insSt)   = propOf(rhythm.genC.insertStart - insRangeC.first, insRangeC.second - insRangeC.first);
+    mv(md::euclid_c_insSt)   = propOf(juce::jlimit(insRangeC.first, insRangeC.second, rhythm.genC.insertStart) - insRangeC.first, insRangeC.second - insRangeC.first);
     mv(md::euclid_c_insLen)  = propOf(rhythm.genC.insertLength, padMaxC.insertLength);
 
     // Mixer strip: pan + FX sends, seeded from the mixer channel as proportions of

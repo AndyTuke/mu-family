@@ -1,6 +1,7 @@
 #pragma once
 
 #include "StepPattern.h"
+#include <cmath>
 #include <functional>
 
 // GrooveSequencer — clocks the StepPattern off the host/internal transport beat and
