@@ -285,9 +285,30 @@ namespace
             defs.push_back(d);
         }
 
-        // There is deliberately no oversize-block scenario: a host block larger than the prepared size
-        // runs off the end of the mixer's channel buffers (see the P7 pin in ExtractionPinTests.cpp), so
-        // it cannot be rendered, let alone recorded, until the contract decides what an oversize block does.
+        // Contract pin P7: host blocks above the prepared size (512 here, so ragged's 1024 is one too), which
+        // the shared driver chunks into calls of at most the prepared size (C8). Before the driver an oversize
+        // block ran off the end of the mixer's channel buffers, so this segment could not be recorded. The
+        // state is groove-five-swing-accent's (all five engines, the Rumble on the Kick, swing and accent).
+        {
+            Def d; d.name = "oversize-block"; d.numStems = 5; d.preparedBlockSize = 512;
+            d.notes = "P7: the five-engine groove on a 512 preparation; ragged's 1024 and the oversize schedule's 4096 and 2048 are chunked (C8).";
+            d.schedules.push_back({ "oversize", { 4096, 1, 2048 } });
+            d.author = [](PluginProcessor& p)
+            {
+                useTrack(p, 1, EngineType::Bass);
+                useTrack(p, 2, EngineType::Hat);
+                useTrack(p, 3, EngineType::Snare);
+                useTrack(p, 4, EngineType::Rumble);
+                setParam(p.apvts, mu_on::layerParamId(4, "src"), 0.0f);
+                setRow(p, 0, "1000100010001001", "1000000010000000");
+                setRow(p, 1, "0010001000100010", "0010000000100000");
+                setRow(p, 2, "0101010101010101", "0001000100010001");
+                setRow(p, 3, "0000100000001000", "0000100000000000");
+                setParam(p.apvts, "seq_swing", 0.35f);
+                setParam(p.apvts, "seq_accent", 0.55f);
+            };
+            defs.push_back(d);
+        }
 
         return defs;
     }
