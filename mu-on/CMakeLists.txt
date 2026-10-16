@@ -33,6 +33,7 @@ target_sources(mu-on
         Source/Plugin/PluginEditor.cpp
         Source/Persistence/TrackParams.cpp
         Source/Sequencer/GrooveSequencer.cpp
+        Source/Sequencer/Track.cpp
         Source/UI/StepRows.cpp
         Source/UI/TrackContent.cpp
         # Offline-license verifier + online activation live in mu-core (shared); compiled here + monocypher.c.
@@ -143,6 +144,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/PresetTests.cpp
     Source/Tests/SlotStateTests.cpp
     Source/Sequencer/GrooveSequencer.cpp
+    Source/Sequencer/Track.cpp
     Source/Persistence/TrackParams.cpp
     Source/Tests/ProcessorSeamTests.cpp  # the real PluginProcessor, headless (layer ownership)
     Source/Tests/FrozenBaselineTests.cpp   # frozen parameter manifest + compat corpus on the real processor

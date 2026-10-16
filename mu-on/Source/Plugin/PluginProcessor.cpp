@@ -63,6 +63,14 @@ PluginProcessor::PluginProcessor()
     for (int i = 0; i < mu_limits::kMaxLayers; ++i) engineParam[(size_t) i] = apvts.getRawParameterValue(layerParamId(i, "eng"));
     grooveVoices.cacheParams(apvts);
 
+    // Each track holds exactly one engine, the one its `t{N}_eng` parameter names: a change of that parameter
+    // builds the new engine (message thread) and swaps it into the track.
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    {
+        engineListeners[(size_t) i] = std::make_unique<EngineParamListener>(*this, i);
+        apvts.addParameterListener(layerParamId(i, "eng"), engineListeners[(size_t) i].get());
+    }
+
     // A saved MIDI map written under the old "k_ b_ h_ s_ r_" ids is renamed as it loads (set before initAppSettings loads it).
     getMidiControlMap().setIdPrefixRenames(legacyLaneParamPrefixRenames());
     initAppSettings("muOn");   // settings file + saved UI size / MIDI clock (ProcessorBase)
@@ -80,6 +88,36 @@ PluginProcessor::PluginProcessor()
 PluginProcessor::~PluginProcessor()
 {
     prepareForDestruction();   // first: no deferred-work tick may reach this half-destroyed object
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+        apvts.removeParameterListener(layerParamId(i, "eng"), engineListeners[(size_t) i].get());
+}
+
+// A track's engine parameter changed. On the message thread the track builds and swaps in the named engine
+// now; from any other thread (host automation on the audio thread, a state restored on a host thread) nothing
+// may allocate there, so the slot is flagged and the deferred work (message thread) builds it. Until then the
+// track renders silence: it holds another engine than its parameter names.
+void PluginProcessor::engineParamChanged(int slot)
+{
+    if (juce::MessageManager::existsAndIsCurrentThread())
+        getTrack(slot).syncEngine();
+    else
+    {
+        enginesPending.fetch_or(1u << (unsigned) slot, std::memory_order_acq_rel);
+        requestDeferredWork();
+    }
+}
+
+void PluginProcessor::commitDeferredWork()
+{
+    const unsigned pending = enginesPending.exchange(0u, std::memory_order_acq_rel);
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+        if ((pending >> (unsigned) i) & 1u) getTrack(i).syncEngine();
+}
+
+void PluginProcessor::releaseResources()
+{
+    resetSwapPlayState();
+    releaseLayerRender();
 }
 
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -90,7 +128,11 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     mixerEngine.prepare(sampleRate, samplesPerBlock);
     fxChain.prepare(sampleRate, samplesPerBlock);
 
-    // Every slot's engines, spares included; under the layers lock because the audio thread reads them.
+    // Every slot's Track (its engine and buffers), spares included, and the shared driver's buffers.
+    prepareLayerRender(sampleRate, samplesPerBlock);
+
+    // The processor's own chain: every slot's engines, spares included; under the layers lock because the
+    // audio thread reads them.
     const juce::ScopedLock sl(layersLock);
     grooveVoices.prepare(sampleRate, samplesPerBlock);
 }
@@ -98,6 +140,18 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
+
+    // The shared block driver over Track::render (the layer contract), behind the test switch until the
+    // equivalence gate passes; the processor's own chain below is the default for this commit only.
+    if (usesLayerRender())
+    {
+        queueMidiProgramChanges(midiMessages);
+        const auto t = resolveBlockTransport(midiMessages, buffer.getNumSamples());
+        renderAndMix(buffer, midiMessages, t);
+        flagLayerSwapBoundaries(t);
+        return;
+    }
+
     const int numSamples = buffer.getNumSamples();
 
     // Preserve the DAW sidechain, then clear (shared — the SC input bus shares buffer
@@ -184,6 +238,9 @@ std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
     t->owner.ptr = this;
     t->slot      = slot;
     seedRowGroove(t->row);
+    t->bindParams(apvts, slot);
+    t->prepare(currentSampleRate, currentBlockSize);
+    t->syncEngine();   // the engine the slot's parameter names, built and prepared now
     return t;
 }
 
@@ -207,6 +264,7 @@ void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
     for (int d = juce::jmax(0, firstIndex); d <= juce::jmin(lastIndex, mu_limits::kMaxLayers - 1); ++d)
     {
         grooveVoices.resetSlot(d);
+        getTrack(d).resetEngineToPrepared();   // the track's own engine starts in its new slot as a fresh one
         stepPattern.bind(d, &getTrack(d).row);
     }
 }

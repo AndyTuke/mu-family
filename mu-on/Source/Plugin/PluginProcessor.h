@@ -43,7 +43,7 @@ public:
 
     // ── AudioProcessor ───────────────────────────────────────────────────────
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
-    void releaseResources() override { resetSwapPlayState(); }
+    void releaseResources() override;
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
     juce::AudioProcessorEditor* createEditor() override;
@@ -104,7 +104,10 @@ public:
     // Post-matrix value of modulation target `dest` (a row of `engine`'s table) on track `i`, in the
     // target knob's parameter units; NaN while the track runs another engine. Written each block by
     // GrooveVoices; read by the knobs' live arcs.
-    float getModLive(int i, EngineType engine, int dest) const noexcept override { return grooveVoices.getModLive(i, engine, dest); }
+    float getModLive(int i, EngineType engine, int dest) const noexcept override
+    {
+        return usesLayerRender() ? getTrack(i).getModLive(engine, dest) : grooveVoices.getModLive(i, engine, dest);
+    }
 
     // Switch track `i` to `engine`: every engine keeps its settings on the track, the step row and
     // envelope stay, and the track's modulation assignments that target another engine's parameters
@@ -217,6 +220,20 @@ private:
     // global, so every row takes it on a state load and every block. Atomics only (any thread).
     void seedRowGroove(StepRow& row) const noexcept;
     void seedRowGrooves() noexcept;
+
+    // Track engines follow their `t{N}_eng` parameter (engineParamChanged); a change from another thread
+    // than the message thread is flagged here and built by commitDeferredWork.
+    struct EngineParamListener : juce::AudioProcessorValueTreeState::Listener
+    {
+        EngineParamListener(PluginProcessor& p, int s) : owner(p), slot(s) {}
+        void parameterChanged(const juce::String&, float) override { owner.engineParamChanged(slot); }
+        PluginProcessor& owner;
+        int slot;
+    };
+    void engineParamChanged(int slot);
+    void commitDeferredWork() override;
+    std::array<std::unique_ptr<EngineParamListener>, mu_limits::kMaxLayers> engineListeners;
+    std::atomic<unsigned> enginesPending { 0 };   // slots whose engine waits for the message thread
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };

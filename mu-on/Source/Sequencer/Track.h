@@ -1,20 +1,40 @@
 #pragma once
 
-#include "Sequencer/Layer.h"   // mu-core: per-layer ControlSequences + ModulationMatrix
+#include "Sequencer/Layer.h"            // mu-core: per-layer ControlSequences + ModulationMatrix, the render contract
+#include "Sequencer/LayerTypeInfo.h"    // mu-core: mu_core::LayerTypeId
+#include "Sequencer/RetireTail.h"       // mu-core: mu_core::ParamBinding
 #include "Sequencer/StepPattern.h"
-#include "Sequencer/GrooveSequencer.h"   // StepClock
+#include "Sequencer/GrooveSequencer.h"  // StepClock
+#include "Audio/TrackEngine.h"          // the one engine the track runs
+#include "Modulation/MuOnModDest.h"     // the engines' modulation target tables
 
+#include <array>
 #include <atomic>
+#include <memory>
+#include <string_view>
+#include <unordered_map>
 
 namespace mu_on
 {
 
 class PluginProcessor;
 
-// One mu-On layer, a track. The shared Layer (colour, modulation) plus what is the track's own and
-// must move with it through add / delete / reorder: its step row and that row's clock, its Rumble volume envelope, the
-// trigger counter the audio thread bumps and the editor polls to pulse the sidebar item. Which engine
-// the track runs is a parameter (`t{N}_eng`), not a property of this object.
+// One mu-On layer, a track. The shared Layer (colour, modulation) plus what is the track's own and moves
+// with it through add / delete / reorder: its step row and the row's clock, its Rumble volume envelope, the
+// trigger counter the audio thread bumps and the editor polls to pulse the sidebar item, and the one sound
+// engine it runs (Kick, Bass, Hat, Snare or Rumble, named by its `t{N}_eng` parameter).
+//
+// It renders through the shared layer contract (docs/mu-tronic/design.md 2.1): bindParams caches the slot's
+// parameter atomics; render resolves the engine's modulation, clocks the row, triggers and renders the
+// engine. A Rumble is a priority-1 layer: it renders after every other track and reads its source track's
+// block through RenderContext::peer (post-insert, pre-strip).
+//
+// Threads. The audio thread runs render / onParkedBlock inside the block's layer access. The engine is
+// built and freed only on the message thread (syncEngine), and swapped in under `engineLock`, a spin lock
+// the audio thread try-locks around its use for one call (a miss renders this track silent for that call).
+// prepare runs while the host is not processing; bindParams and resetEngineToPrepared run while no block
+// can render the track (before publication, during an edit, under layersLock). The UI reads only the
+// atomics (modLive, triggers, the row cells).
 struct Track : Layer
 {
     std::atomic<int> triggers { 0 };
@@ -23,7 +43,7 @@ struct Track : Layer
     // drawable bar-volume envelope the engine follows. The envelope is edited on the message thread and
     // read by the audio thread under `rumbleEnvLock`; both are kept when the engine changes.
     StepRow           row;
-    StepClock         clock;   // the row's own step cursor: it moves with the track (audio thread)
+    StepClock         clock;            // the row's step cursor (audio thread)
     ControlSequence   rumbleEnv;
     mutable CopyableSpinLock rumbleEnvLock;
 
@@ -32,6 +52,7 @@ struct Track : Layer
     OwnerLink<PluginProcessor> owner;
 
     Track();
+    ~Track() override;
 
     // Flat, full level, one bar long: the envelope of a track that has not drawn one.
     void resetRumbleEnv();
@@ -41,6 +62,81 @@ struct Track : Layer
     void applyExtras(const juce::ValueTree& node) override;
     bool isValidDest(const std::string& id) const override;
     void onMoved(int newIndex) override { slot = newIndex; }
+
+    // ── The render contract ──────────────────────────────────────────────────
+    // The type is the engine the track's parameter names (mu_core::LayerTypeId::Kick .. Rumble).
+    int  typeId() const override;
+    // A Rumble renders after every other track (it reads its source's block); everything else first.
+    int  renderPriority() const override { return engineSetting() == EngineType::Rumble ? 1 : 0; }
+    // Message thread, not processing: the engine's and the track's buffers for this rate and block size. The
+    // next rendered block starts the engine from silence (a prepare, like a slot going live, is a fresh start).
+    void prepare(double sampleRate, int blockSize) override;
+    // Message thread: the slot's t{slot}_ rows (engine, source, Bass wave), the groove rows and every engine's
+    // modulation inputs.
+    void bindParams(juce::AudioProcessorValueTreeState& apvts, int slot) override;
+    // Audio thread: the track's block into out[0, n) (handed over cleared).
+    void render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n) override;
+    // Audio thread: a parked spare's row clock keeps step with the transport, so it fires on time once live.
+    void onParkedBlock(const mu_core::RenderContext& ctx) override;
+    // A staged track preset lands on the 16-step row's wrap: the bar.
+    double loopBeats() const override { return 4.0; }
+
+    // ── The engine ───────────────────────────────────────────────────────────
+    // The engine the track's `t{N}_eng` parameter names (any thread; Kick before bindParams).
+    EngineType engineSetting() const noexcept;
+    // Message thread: when the track holds no engine, or another than its parameter names, build and prepare
+    // the named one outside every lock, swap it in under the engine lock and free the old one here. True
+    // when it built one.
+    bool syncEngine();
+    // The engine the track holds (any thread), or -1 before the first syncEngine.
+    int heldEngineIndex() const noexcept { return heldEngine.load(std::memory_order_acquire); }
+    // Under layersLock (a structural edit moved this track to another slot): the engine back to its prepared
+    // state, as a fresh tenant of that slot. Allocation-free; no block renders the track meanwhile.
+    void resetEngineToPrepared() noexcept;
+
+    // Post-matrix value of modulation target `dest` (a row of `engine`'s table), in the target's parameter
+    // units, as the last rendered block resolved it; NaN while the track runs another engine (any thread).
+    float getModLive(EngineType engine, int dest) const noexcept;
+
+    // The most targets any engine's table holds (Bass: 10).
+    static constexpr int kMaxDests = 16;
+
+private:
+    // Cached modulation inputs for one engine: the destination ids (proportion-space keys), their backing
+    // APVTS atomics and ranges, and the reusable seed/result map (pre-sized in bindParams).
+    struct EngineMod
+    {
+        int count = 0;
+        std::array<const char*, kMaxDests>                    ids   {};
+        std::array<const std::atomic<float>*, kMaxDests>      atoms {};
+        std::array<juce::NormalisableRange<float>, kMaxDests> ranges{};
+        std::unordered_map<std::string_view, float>           map;
+    };
+
+    void  resolve(int engine, double beat, float* outValues) noexcept;   // modulation, then the modLive publish
+    float evaluateRumbleEnv(double beat) noexcept;                       // the bar envelope, under its try-lock
+    void  clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, int engine, int n) noexcept;
+
+    mu_core::ParamBinding engineRow, sourceRow, bassWaveRow, swingRow, accentRow;
+    std::array<EngineMod, kNumEngineTypes> mods;
+
+    // The UI's live modulation values, on their own cache line (C16): written by the audio thread.
+    alignas(64) std::array<std::atomic<float>, kMaxDests> modLive {};
+    std::atomic<int> modLiveEngine { -1 };   // the engine those values belong to (-1: none yet)
+
+    std::unique_ptr<TrackEngine> engine;      // swapped only under engineLock, freed only on the message thread
+    mutable CopyableSpinLock     engineLock;
+    std::atomic<int>             heldEngine { -1 };
+    juce::CriticalSection        engineBuild; // message side: prepare and syncEngine never overlap
+    double preparedRate  = 44100.0;
+    int    preparedBlock = 512;
+
+    juce::AudioBuffer<float> silence;          // a Rumble with no source processes this (sized at prepare)
+    juce::AudioBuffer<float> sourceView;       // a Rumble's view of its source's block (no allocation)
+
+    int   current = -1;          // the engine the last rendered block resolved (-1: none, the next block resets)
+    float lastRumbleEnv = 1.0f;  // reused while the envelope's lock is contended
+    bool  parked = true;         // not rendered live in the last rendered block (or prepared since)
 };
 
 } // namespace mu_on
