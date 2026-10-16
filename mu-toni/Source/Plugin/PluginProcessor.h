@@ -8,6 +8,7 @@
 #include "Sequencer/Arp.h"                // mu-Toni layer: Layer + arp voice + insert
 #include "Modulation/LaneModulation.h"    // mu-core: mu_mod::resolveLane
 #include "Modulation/MuToniModDest.h"     // arp/voice modulation destinations
+#include "UI/ArpHost.h"                    // what the Arp layer's UI reads from its host
 
 #include <array>
 #include <atomic>
@@ -27,7 +28,8 @@
 namespace mu_toni
 {
 
-class PluginProcessor : public ProcessorBase
+class PluginProcessor : public ProcessorBase,
+                        public ArpHost
 {
 public:
     PluginProcessor();
@@ -148,15 +150,23 @@ private:
 public:
     // Layer `i` as its mu-Toni Arp (name, colour, modulation, arp voice, insert effect). The layers
     // live in ProcessorCore; the UI ModulatorPanel binds to the active one through this.
-    Arp&       getArp(int i) noexcept       { return layerAs<Arp>(i); }
-    const Arp& getArp(int i) const noexcept { return layerAs<Arp>(i); }
+    Arp&       getArp(int i) noexcept override { return layerAs<Arp>(i); }
+    const Arp& getArp(int i) const noexcept    { return layerAs<Arp>(i); }
     // Post-matrix value of modulation target `dest` (a ModDestIndex) on layer `layer`, in the
     // target knob's parameter units. Written each block by readVoice; read by the knobs' live arcs.
-    float getModLive(int layer, int dest) const noexcept
+    float getModLive(int layer, int dest) const noexcept override
     {
         return modLive[(size_t) juce::jlimit(0, mu_limits::kMaxLayers - 1, layer)]
                       [(size_t) juce::jlimit(0, kNumModDests - 1, dest)].load(std::memory_order_relaxed);
     }
+    // ── ArpHost: what ArpContent reads (message thread) ───────────────────────
+    juce::AudioProcessorValueTreeState& getArpParameters() noexcept override { return apvts; }
+    int    getArpColourIndex(int layer) const override                       { return getLayerColourIndex(layer); }
+    const std::atomic<float>* getArpInsertGainReduction(int layer) const override { return getInsertGR(layer); }
+    bool   isArpTransportPlaying() const noexcept override                   { return isInternalPlaying(); }
+    double getArpTransportBeat() const noexcept override                     { return getInternalBeatPos(); }
+    juce::StringArray getWavetableNames() const override                     { return mu_wavetable::WavetableBank::factoryTableNames(); }
+
 private:
     std::array<std::array<std::atomic<float>, kNumModDests>, mu_limits::kMaxLayers> modLive {};
 

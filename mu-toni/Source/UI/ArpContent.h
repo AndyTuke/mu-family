@@ -1,7 +1,10 @@
 #pragma once
 #include "UI/ParamChoices.h"   // mu-core: selector items from choice parameters
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "Plugin/PluginProcessor.h"
+#include "UI/ArpHost.h"                 // what the content needs from the layer's host
+#include "Sequencer/Arp.h"                // the layer: its modulation matrix
+#include "Persistence/LayerParamIds.h"   // layerParamPrefix / layerParamId
+#include "Modulation/MuToniModDest.h"    // the modulation target table
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/DropdownSelect.h"
@@ -12,10 +15,11 @@
 #include "UI/Voice/VoiceBand.h"            // mu-core: shared voice band (mu-Clid layout)
 #include "Audio/Scales.h"
 #include "Audio/Chords.h"
-#include "Audio/Wavetable/WavetableBank.h"   // mu-core: the wavetable names
 #include <array>
 #include <memory>
 #include <vector>
+
+class ProcessorBase;
 
 namespace mu_toni
 {
@@ -31,7 +35,9 @@ class ArpContent : public juce::Component,
 public:
     enum Group { G_OSC1, G_OSC2, G_XMOD, G_MIX, G_PITCH, G_FILTER, G_AMP, G_INSERT, G_ARP, G_COUNT };
 
-    explicit ArpContent(PluginProcessor& processor);
+    // `base` is handed to the shared mu-core sections that take the processor (the insert section);
+    // everything the content itself reads comes through `host`.
+    ArpContent(ProcessorBase& base, ArpHost& host);
 
     ~ArpContent() override { stopTimer(); }
 
@@ -116,7 +122,7 @@ private:
     { juce::StringArray a; for (int i = 0; i < kNumScales; ++i) a.add(kScales[(size_t) i].name); return a; }
     static juce::StringArray chordItems()
     { juce::StringArray a; for (int i = 0; i < kNumChords; ++i) a.add(kChords[(size_t) i].name); return a; }
-    static juce::StringArray waveItems() { return mu_wavetable::WavetableBank::factoryTableNames(); }
+    juce::StringArray waveItems() const { return host.getWavetableNames(); }
     static juce::StringArray rateItems()
     { return { "1/4","1/4.","1/4T","1/8","1/8.","1/8T","1/16","1/16.","1/16T","1/32","1/32.","1/32T" }; }
     static juce::StringArray filterItems()
@@ -129,7 +135,8 @@ public:
     std::function<void(const juce::String&, const juce::String&)> onStatusUpdate;
 
 private:
-    PluginProcessor& proc;
+    ArpHost& host;
+    juce::AudioProcessorValueTreeState& apvts;   // host.getArpParameters(), cached
     int currentLayer = 0;
     std::vector<KnobDef>   knobs;
     std::vector<ComboDef>  combos;
