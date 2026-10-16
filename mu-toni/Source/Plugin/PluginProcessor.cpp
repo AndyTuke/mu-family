@@ -4,164 +4,28 @@
 #include "License/LicenseKey.h"
 #include "Plugin/HostTransport.h"          // mu-core: DAW / mu-link transport read
 #include "Modulation/ModulatorSerialise.h" // mu-core: modulator state save/load
-#include "Plugin/ParamText.h"           // mu-core: float parameter text in both directions
 
 namespace mu_toni
 {
 
-// ── Per-voice arp/voice/env parameter slots ──────────────────────────────────
-// Order MUST match the vpSuffix[] table + the layout added in createParameterLayout.
-// Read via vp[voice][slot]->load() on the audio thread (pointers cached once).
-namespace vpi
-{
-    enum
-    {
-        scale, root, roct, chord, inv, octs, dir, rate, gate, leg, porta, snap, trig,     // arp (13)
-        o1wt, o1o, o1f, o1pos, o1l, o2wt, o2o, o2s, o2f, o2pos, o2l,                            // oscillators (11)
-        xmPh, xmIdx, sync, xmFb, xmAm, xmDep, xmSsb,                                              // cross-mod (7)
-        noise, ntype, ft, cut, res, drv, locut,                                                  // noise + filter (7)
-        aeA, aeD, aeS, aeR, aeL, feA, feD, feS, feR, feDep, peA, peD, peS, peR, peDep, ptgt,      // envs (16)
-        drvChar, insP1, insP2, insP3, insP4,                                                     // insert (5)
-        acc, accLen, accPat, stepMask,                                                           // accent + step pattern (4)
-        COUNT
-    };
-    static const char* const suffix[COUNT] = {
-        "scale","root","roct","chord","inv","octs","dir","rate","gate","leg","porta","snap","trig",
-        "o1_wt","o1o","o1f","o1_pos","o1l","o2_wt","o2o","o2s","o2f","o2_pos","o2l",
-        "xmod_phaseMode","xmod_index","sync","xmod_fdbk","xmod_ampMode","xmod_depth","xmod_ssb",
-        "noise","ntype","ft","cut","res","drv","locut",
-        "aeA","aeD","aeS","aeR","aeL","feA","feD","feS","feR","feDep","peA","peD","peS","peR","peDep","ptgt",
-        "drvChar","insP1","insP2","insP3","insP4",
-        "acc","accLen","accPat","stepMask",
-    };
-    static_assert(COUNT == 63, "vpi slot count must equal PluginProcessor::kNumVoiceParams");
-}
-
 juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParameterLayout()
 {
-    using namespace juce;
-    AudioProcessorValueTreeState::ParameterLayout layout;
-    auto f = [](float lo, float hi, float step) { return NormalisableRange<float>(lo, hi, step); };
+    juce::AudioProcessorValueTreeState::ParameterLayout layout;
 
     // ── Mixer channel strips (one per layer slot, all eight) — shared `ch{N}_`
     //    binding the MixerChannel / MixerOverlay use: level/pan/mute/solo + FX
     //    sends + sidechain + output bus. Synced via ProcessorBase::syncGlobalFxParam.
     for (int i = 0; i < mu_limits::kMaxLayers; ++i)
     {
-        const String c = "ch" + String(i) + "_";
-        const String n = "Layer " + String(i + 1) + " Ch ";
+        const juce::String c = "ch" + juce::String(i) + "_";
+        const juce::String n = "Layer " + juce::String(i + 1) + " Ch ";
         mu_mixfx::addChannelStripParams(layout, c, n);
     }
 
-    // ── Per-voice arpeggiator + analogue voice + envelopes (a{N}_*) ───────────
-    // A time range (seconds) skewed so short attacks/decays get resolution.
-    auto tf = []
-    {
-        NormalisableRange<float> r(0.001f, 4.0f, 0.001f);
-        r.setSkewForCentre(0.2f);
-        return r;
-    };
-    NormalisableRange<float> cutR(20.0f, 18000.0f, 1.0f);
-    cutR.setSkewForCentre(1200.0f);
-
+    // ── The Arp type's rows for every layer slot (a{N}_*), then the MIDI-in channel ──
     for (int i = 0; i < mu_limits::kMaxLayers; ++i)
-    {
-        const String v = layerParamPrefix(i);
-        auto pid = [&](const char* s) { return ParameterID{ v + s, 1 }; };
-        auto lbl = [&](const char* s) { return "V" + String(i + 1) + " " + s; };
-
-        // Arp
-        layout.add(std::make_unique<AudioParameterInt>  (pid("scale"), lbl("Scale"), 0, 11, 1));      // Minor
-        layout.add(std::make_unique<AudioParameterInt>  (pid("root"),  lbl("Root"),  0, 11, 0));      // C
-        layout.add(std::make_unique<AudioParameterInt>  (pid("roct"),  lbl("Root Octave"), 0, 8, 4));
-        layout.add(std::make_unique<AudioParameterInt>  (pid("chord"), lbl("Chord"), 0, 34, 3));      // Minor
-        layout.add(std::make_unique<AudioParameterInt>  (pid("inv"),   lbl("Inversion"), -4, 4, 0));
-        layout.add(std::make_unique<AudioParameterInt>  (pid("octs"),  lbl("Octaves"), 1, 4, 2));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("dir"),   lbl("Direction"), f(-100.0f, 100.0f, 1.0f), 100.0f));
-        layout.add(std::make_unique<AudioParameterInt>  (pid("rate"),  lbl("Rate"), 0, 11, 6));       // 1/16
-        layout.add(std::make_unique<AudioParameterFloat>(pid("gate"),  lbl("Gate Length"), f(1.0f, 100.0f, 1.0f), 50.0f));
-        layout.add(std::make_unique<AudioParameterBool> (pid("leg"),   lbl("Legato"), false));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("porta"), lbl("Portamento"), f(0.0f, 500.0f, 1.0f), 0.0f));
-        layout.add(std::make_unique<AudioParameterBool> (pid("snap"),  lbl("Diatonic Snap"), false));
-        layout.add(std::make_unique<AudioParameterInt>  (pid("trig"),  lbl("Trigger"), 0, 1, 0));     // 0=Loop
-        // Accent: a repeating on/off pattern over the arp's steps (bit i = step i+1 accented),
-        // its length, and how much an accented step lifts (louder + a brighter filter).
-        layout.add(std::make_unique<AudioParameterFloat>(pid("acc"),    lbl("Accent"), f(0.0f, 100.0f, 1.0f), 0.0f));
-        layout.add(std::make_unique<AudioParameterInt>  (pid("accLen"), lbl("Pattern Steps"), 1, ArpAccent::kMaxSteps, 4));
-        layout.add(std::make_unique<AudioParameterInt>  (pid("accPat"), lbl("Accent Pattern"), 0, (1 << ArpAccent::kMaxSteps) - 1, 1));
-        // Step pattern: bit i = step i+1 is On (clear = Off, a rest). Default all On, so layers saved
-        // before this existed play every step as before.
-        layout.add(std::make_unique<AudioParameterInt>  (pid("stepMask"), lbl("Step Mask"), 0, (1 << ArpAccent::kMaxSteps) - 1, (1 << ArpAccent::kMaxSteps) - 1));
-
-        // Oscillators — mu-Tant's wavetable oscs: a table from the shared bank + its scan
-        // position (frame 0..255), defaulting to Basic Shapes' saw.
-        const int maxWt = juce::jmax(0, mu_wavetable::WavetableBank::factoryTableNames().size() - 1);
-        layout.add(std::make_unique<AudioParameterInt>  (pid("o1_wt"),  lbl("Osc1 Wavetable"), 0, maxWt, 0));
-        layout.add(std::make_unique<AudioParameterInt>  (pid("o1o"),    lbl("Osc1 Octave"), -3, 3, 0));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("o1f"),    lbl("Osc1 Fine"), f(-100.0f, 100.0f, 1.0f), 0.0f));
-        layout.add(std::make_unique<AudioParameterInt>  (pid("o1_pos"), lbl("Osc1 Position"), 0, 255, kSawPosition));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("o1l"),    lbl("Osc1 Level"), f(-60.0f, 6.0f, 0.1f), 0.0f));
-        layout.add(std::make_unique<AudioParameterInt>  (pid("o2_wt"),  lbl("Osc2 Wavetable"), 0, maxWt, 0));
-        layout.add(std::make_unique<AudioParameterInt>  (pid("o2o"),    lbl("Osc2 Octave"), -3, 3, 0));
-        layout.add(std::make_unique<AudioParameterInt>  (pid("o2s"),    lbl("Osc2 Semi"), -12, 12, 0));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("o2f"),    lbl("Osc2 Fine"), f(-100.0f, 100.0f, 1.0f), 7.0f));
-        layout.add(std::make_unique<AudioParameterInt>  (pid("o2_pos"), lbl("Osc2 Position"), 0, 255, kSawPosition));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("o2l"),    lbl("Osc2 Level"), f(-60.0f, 6.0f, 0.1f), -3.0f));
-
-        // Cross-mod — mu-Tant's 2-lane model (same ids + ranges): Lane A index + mode + Sync +
-        // Feedback; Lane B bipolar depth + mode, with the SSB shift in Hz.
-        layout.add(std::make_unique<AudioParameterChoice>(pid("xmod_phaseMode"), lbl("X-Mod Phase Mode"), StringArray{ "FM", "PM", "TZFM" }, 1));
-        layout.add(std::make_unique<AudioParameterFloat> (pid("xmod_index"),     lbl("X-Mod Index"), f(0.0f, 100.0f, 1.0f), 0.0f));
-        layout.add(std::make_unique<AudioParameterBool>  (pid("sync"),           lbl("Osc Sync"), false));
-        layout.add(std::make_unique<AudioParameterBool>  (pid("xmod_fdbk"),      lbl("X-Mod Feedback"), false));
-        layout.add(std::make_unique<AudioParameterChoice>(pid("xmod_ampMode"),   lbl("X-Mod Amp Mode"), StringArray{ "AM", "RM", "SSB" }, 0));
-        layout.add(std::make_unique<AudioParameterFloat> (pid("xmod_depth"),     lbl("X-Mod Depth"), f(-100.0f, 100.0f, 1.0f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat> (pid("xmod_ssb"),       lbl("X-Mod SSB Shift"), f(-2000.0f, 2000.0f, 1.0f), 0.0f,
-                    mu_fmt::floatText(f(-2000.0f, 2000.0f, 1.0f),
-                        [](float v, int) -> juce::String { return juce::String((int) std::round(v)) + " Hz"; })));
-
-        // Noise / filter
-        layout.add(std::make_unique<AudioParameterFloat>(pid("noise"), lbl("Noise Level"), f(-60.0f, 0.0f, 0.1f), -60.0f));
-        layout.add(std::make_unique<AudioParameterInt>  (pid("ntype"), lbl("Noise Type"), 0, 1, 0));    // 0=White
-        layout.add(std::make_unique<AudioParameterInt>  (pid("ft"),  lbl("Filter Type"), 0, 15, 0));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("cut"), lbl("Cutoff"), cutR, 3000.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("res"), lbl("Resonance"), f(0.0f, 0.99f, 0.001f), 0.3f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("drv"), lbl("Drive"), f(0.0f, 1.0f, 0.001f), 0.0f));
-        { NormalisableRange<float> loR(0.0f, 1000.0f, 1.0f); loR.setSkewForCentre(200.0f);
-          layout.add(std::make_unique<AudioParameterFloat>(pid("locut"), lbl("Low Cut"), loR, 0.0f)); }
-
-        // Amp / Filter / Pitch ADSR
-        layout.add(std::make_unique<AudioParameterFloat>(pid("aeA"), lbl("Amp Attack"),  tf(), 0.004f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("aeD"), lbl("Amp Decay"),   tf(), 0.15f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("aeS"), lbl("Amp Sustain"), f(0.0f, 1.0f, 0.001f), 0.5f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("aeR"), lbl("Amp Release"), tf(), 0.15f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("aeL"), lbl("Amp Level"),   f(-60.0f, 6.0f, 0.1f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("feA"), lbl("Filter Attack"),  tf(), 0.004f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("feD"), lbl("Filter Decay"),   tf(), 0.20f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("feS"), lbl("Filter Sustain"), f(0.0f, 1.0f, 0.001f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("feR"), lbl("Filter Release"), tf(), 0.20f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("feDep"), lbl("Filter Env Depth"), f(-1.0f, 1.0f, 0.001f), 0.3f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("peA"), lbl("Pitch Attack"),  tf(), 0.004f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("peD"), lbl("Pitch Decay"),   tf(), 0.10f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("peS"), lbl("Pitch Sustain"), f(0.0f, 1.0f, 0.001f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("peR"), lbl("Pitch Release"), tf(), 0.10f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("peDep"), lbl("Pitch Env Depth"), f(-24.0f, 24.0f, 0.1f), 0.0f));
-        layout.add(std::make_unique<AudioParameterInt>  (pid("ptgt"),  lbl("Pitch Env Target"), 0, 1, 1));   // 1=Osc 2 only
-
-        // Insert effect (shared mu-core InsertProcessor) — same schema as mu-clid/mu-tant.
-        layout.add(std::make_unique<AudioParameterInt>  (pid("drvChar"), lbl("Insert Algo"), 0, InsertProcessor::kNumInsertAlgos - 1, 0));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("insP1"), lbl("Insert P1"), f(0.0f, 1.0f, 0.0f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("insP2"), lbl("Insert P2"), f(0.0f, 1.0f, 0.0f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("insP3"), lbl("Insert P3"), f(0.0f, 1.0f, 0.0f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("insP4"), lbl("Insert P4"), f(0.0f, 1.0f, 0.0f), 0.0f));
-    }
-
-    // ── MIDI in: which channel's notes drive the arps (Omni = any) ─────────────
-    {
-        StringArray chans { "Omni" };
-        for (int c = 1; c <= 16; ++c) chans.add(String(c));
-        layout.add(std::make_unique<AudioParameterChoice>(ParameterID{ "midiInCh", 1 }, "MIDI In Channel", chans, 0));
-    }
+        addLayerParams(layout, i);
+    addArpGlobalParams(layout);
 
     // ── Shared global FX rack + returns + master (mu-core) ────────────────────
     mu_mixfx::addGlobalFxParams(layout, 2);   // no loop of its own: swaps land on the bar
@@ -210,7 +74,7 @@ PluginProcessor::PluginProcessor()
 
     // The shared wavetable bank (procedural factory set), read by every voice's oscillators.
     bank.loadFactoryBank();
-    midiInChParam = apvts.getRawParameterValue("midiInCh");
+    midiInChParam = apvts.getRawParameterValue(kMidiInChannelParamId);
 
     cacheVoiceParamPointers();
     setupLayerState();       // the layer layout every preset / session save and load uses

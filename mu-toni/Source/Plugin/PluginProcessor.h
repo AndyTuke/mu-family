@@ -1,7 +1,8 @@
 #pragma once
 
 #include "Plugin/ProcessorBase.h"        // mu-core base
-#include "Plugin/LayerParamIds.h"        // layerParamPrefix / layerParamId
+#include "Persistence/LayerParamIds.h"   // layerParamPrefix / layerParamId
+#include "Persistence/ArpParams.h"       // the Arp type's parameter table (vpi, addLayerParams)
 #include "Plugin/MixerFxParams.h"         // mu-core: shared global-FX / mixer APVTS layout
 #include "Plugin/MidiClockSync.h"         // mu-core: shared MIDI-clock slave
 #include "Sequencer/Arp.h"                // mu-Toni layer: Layer + arp voice + insert
@@ -117,10 +118,6 @@ protected:
 
     // A default Arp for slot `slot`, built and prepared before a structural edit takes the lock.
     std::unique_ptr<Layer> createLayer(int slot) override;
-
-    // ── Arp/voice parameter cache (index into vp[voice][slot]) ────────────────
-    // Enum + suffix table live in the .cpp; count is needed here for the array.
-    static constexpr int kNumVoiceParams = 63;
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
