@@ -61,8 +61,10 @@ It's the "engine swap-point" pattern: same UX, same mixer, same modulation.
 **Net new code** lives under `mu-toni/Source/`: the arpeggiator engine
 (`Sequencer/ArpSequencer.h` + `ArpVoiceRunner.h`), the note-on/off + ADSR wiring
 into the voice (`Audio/ToniVoice.h`), its editor panel (`UI/EnginePanel.h`), the
-scale/chord tables (`Audio/Scales.h`, `Audio/Chords.h`), and the arp
-modulation-destination provider (`Modulation/MuToniModDest.h`).
+scale/chord tables (`Audio/ToniScales.h`, `Audio/Chords.h`), and the arp
+modulation-destination provider (`Modulation/MuToniModDest.h`). Since the shared layer contract (Stage E2, 2026-10-16) the arp is the layer type `Arp`
+(`Sequencer/Arp.{h,cpp}`) with its held keys (`Sequencer/HeldNotes.h`) and parameter table (`Persistence/ArpParams.{h,cpp}`, `Persistence/LayerParamIds.h`),
+and the product is the library `mu-toni-layer` plus the app ([mu-tronic/design.md 2.1.8](../mu-tronic/design.md#218-e2-as-built-mu-toni-on-the-shared-layer-contract-2026-10-16)).
 
 ---
 
@@ -211,7 +213,7 @@ and the [UI design system](../design-ui-family.md):
 mu-clid/-tant/-on are all PC-only; note-in is genuinely new mu-toni code
 (`processBlock` MIDI parse → root/trigger state). Small and self-contained, but
 worth noting it's the first family member to consume played notes — if a second
-sibling ever wants it, lift the note-priority/held-stack helper to mu-core then.
+sibling ever wants it, lift the note-priority/held-stack helper (`Sequencer/HeldNotes.h`, per layer since E2) to mu-core then.
 
 ---
 

@@ -150,6 +150,7 @@ New hooks (defaults do nothing; all called once per layer per block or per edit,
 | `void preloadStaged(const juce::ValueTree&)` | message | File I/O for a staged tree (sample, user wavetable) so the boundary commit does none. |
 | `void onTransportStopped(const RenderContext&)` | audio | The play-to-stop edge (2.1.5): silence held notes and tails (Tant gates, On voices, Toni note-off). |
 | `void onTransportJump(const RenderContext&)` | audio | A discontinuity while playing (locate, host loop, clock snap): release or re-anchor pending notes (2.1.5). |
+| `void onParkedBlock(const RenderContext&)` | audio | Once per call for a layer parked above the live count (a kept spare): no audio, no output, no parameter; it may follow the call's MIDI and flags so input state it keeps (held keys) is current when the slot goes live (2.1.8). |
 | `RetirePolicy retirePolicy() const` | any | How this layer leaves: `None` (dropped after the grace period, mu-Toni and mu-On today), `Fade`, `Natural` (2.1.3). Replaces the earlier `tailBlocks()`: block counts depend on the block size. |
 | `void beginRetire()` | message | Freeze what the tail needs (2.1.4). |
 | `void onRetireStart(const RenderContext&)` | audio, once | Audio-side freeze at the first tail block (2.1.4). |
@@ -704,7 +705,8 @@ struct MidiView                  // the block's MIDI after the control router's 
     int32_t  firstFrame;         // this call covers host frames [firstFrame, firstFrame + blockSize)
     uint16_t channelMask;        // bit c = channel c+1 is this layer's (0xFFFF = omni; per-layer MIDI-in arrives at T8a)
     uint16_t dropped;            // events the decoder had no room for; 0 expected, asserted by tests
-    uint32_t reserved;           // explicit: no implicit padding (24 bytes)
+    uint16_t carried;            // the first `carried` events are earlier host blocks' channel messages, at frame 0 (2.1.8); 0 unless the processor carries them
+    uint16_t reserved;           // explicit: no implicit padding (24 bytes)
 };
 
 struct MidiSink                  // the layer's MIDI output (mu-Clid MIDI mode, E5; tails: owed note-offs); events == nullptr: none
@@ -950,9 +952,40 @@ type reaches only `RetireTail.h` (design-naming §3). (b) `BlockTransport::beatW
 - **Sidechain duck order (C13) stays a later decision.** E1 keeps today's written index order unchanged (pinned by E0.8). It is decided before any change to
   the mixer's channel loop, at the latest with the buses (T2).
 
+#### 2.1.8 E2 as built: mu-Toni on the shared layer contract (2026-10-16)
+
+Branch `e2-toni` (E2.1 to E2.6, a C12 fix and the P7 goldens). Rulings of the `architecture-steward`:
+
+| # | As built | Ruling |
+|---|---|---|
+| 1 | `UI/ArpHost.h` (`mu_toni::ArpHost`: parameters, `Arp&`, `getModLive`, colour index, insert meter, transport, wavetable names); `ArpContent(ProcessorBase&, ArpHost&)`, `ProcessorBase` forward-declared | **Accept** (2.2). The method names carry the type (`getArpParameters`, `getArpColourIndex`) so one adapter class can implement several `<Type>Host`s without clashes |
+| 2 | `MU_TONI_LAYER_UI_SOURCES` CMake list instead of a second target | **Accept** as the family convention (2.5) |
+| 3 | `check-layer-boundary.ps1` and its fixtures find a library declared in a product's `CMakeLists.txt` | **Accept.** 2.5 always said the product's own `CMakeLists.txt` defines the target and that no folder moves; the checker's root-level `mu-*-layer/` scan was the stale part. Both forms stay supported (the fixtures cover each) |
+| 4a | `HeldNotes.h` in `mu-toni/Source/Sequencer/`, not `mu-core` | **Accept.** One consumer; the second-product rule says it moves to `mu-core` (`Sequencer/`) when mu-Tronic or another product needs it for a second type, and mu-Toni's design says the same. Namespace `mu_toni` |
+| 4b | `ParamText.h` moved `Plugin/` to `Persistence/` in `mu-core` | **Accept:** a type's parameter table uses it and a library file may not include `Plugin/`. **Forwarding header: keep, transitionally.** `mu-core/Plugin/ParamText.h` forwards for mu-Clid's and mu-Tant's `PluginProcessor_APVTS.cpp` (live products, not touched before their release) and is deleted in E4.1 / E5.1, when those files move to `Persistence/` and change their include. `MixerFxParams.h` (mu-core) includes `Persistence/ParamText.h` directly now (code change owed on this branch) |
+| 4c | `Persistence/ArpParams.{h,cpp}`, `Persistence/LayerParamIds.h` | **Accept** (2.3). Minor: the struct `ArpParams` in `Sequencer/ArpSequencer.h` shares the name; rename it `ArpPoolParams` at the next Toni touch |
+| 4d | `Audio/Scales.h` to `Audio/ToniScales.h` | **Accept**, done (2.5 rule 1) |
+| 5 | Four `mu-core` additions, below | **Accept** with the contract text below |
+| 6 | Gaps the author found, below | **Accept as owed work**, not E2 blockers |
+
+**The four additions (contract text).**
+
+- `ProcessorBase::setCarrySkippedMidi(bool)` (constructor only, default off; same shape as `setRetireCountPolicy`). On: the channel messages (not system messages) of a host block that renders nothing are kept, up to `kMaxCarriedMidiEvents` (512, in `MuLimits.h`), and delivered at frame 0 ahead of the next rendered block's events. Overflow is counted into `MidiView::dropped`. For a product whose layers keep input state: a key released during an edit must not stay held.
+- `MidiView::carried` (uses the former `reserved` bytes; the struct stays 24 bytes and the `offsetof` freeze is updated): the first `carried` events are carried. A layer applies their key state but does not count a carried note-on as this block's press (`HeldNotes::apply(..., countsAsPress, ...)`).
+- `Layer::onParkedBlock(const RenderContext&)`: audio thread, once per call for a layer parked in a slot at or above the live count. It renders nothing; it may follow MIDI and flags only. A layer that finds it was parked in the last rendered block knows it has just gone live. No allocation. Default does nothing, so only a layer that keeps input state overrides it.
+- `mu_mod::resolveLane` returns `bool` (false: the slot's `modLock` was missed, `out` holds the unmodulated values). This is how C12 (hold last value on a miss) is implemented generically: the caller keeps its last resolved values and ignores `out` on false.
+
+**Contract gaps the pathfinder found (the "what the contract got wrong" list).**
+
+1. *A layer added or swapped in while keys are held does not know about them.* Today's shared held stack let a new layer see them; per-layer state starts empty. The fix is generic and belongs to `mu-core`: `ProcessorBase` keeps the processor's current input state (a held-key bitmap per MIDI channel, updated in `decodeBlockMidi`, audio thread) and hands it to a layer once when it goes live, through `onParkedBlock`'s counterpart `Layer::onLive(const InputSnapshot&)` or an `InputSnapshot*` in `RenderContext` (decide by struct-freeze cost when built). Owed before T8a (per-layer MIDI-in), which makes it visible; for mu-Toni (pre-release) the gap is accepted until then and recorded here.
+2. *The base always sends `channelMask` 0xFFFF.* The field is per-layer in the contract; the base must fill it per slot from one shared per-layer setting (`LayerSettings::midiChannel`, state saved with the layer) at T8a. Until then mu-Toni filters by its own `midiInCh` parameter, which becomes that shared setting's source at T8a; **from then on a layer must not filter a second time** (mask in the context only). The Omni default reproduces today.
+3. *Skipped-block MIDI was dropped by the base.* Resolved by `setCarrySkippedMidi`; the default stays off so mu-Clid, mu-Tant and mu-On keep their pinned behaviour.
+
+**For the next products:** E3 (mu-On) needs none of 1 and 2; E4 (mu-Tant) and E5 (mu-Clid) keep `setCarrySkippedMidi` off unless a layer keeps input state.
 ### 2.2 The product UI stops depending on the product processor
 
 Each `<Type>Content` takes `ProcessorBase&` plus one narrow host interface declared in the product's own `UI/` folder next to the content
+(`ProcessorBase` is only forward-declared in the content's header: the layer-library rule forbids a `Plugin/` include, so the content's `.cpp` includes what it needs from `mu-core`)
 (`mu_tant::PatternHost`, `mu_toni::ArpHost`, `mu_on::TrackHost`, `mu_clid::RhythmHost`): the few things it calls today on the product
 processor (`getPattern(i)`, `loadUserWavetable`, `getTantSnap`, `getModLive`, `selectEngine`, `samples`...). The product's `PluginProcessor` implements its host
 interface for the standalone; in mu-Tronic one adapter per type implements it over the type's shared service (section 2.4). `SettingsOverlay` is *not* a
@@ -995,6 +1028,7 @@ product names; the one exception already made (`Rhythm`) is justified because **
   (3) **every relative path in a layer library is unique across mu-core and all four libraries** (new rule in design-naming §3, files). Both rules are
   enforced by a new `tests/scripts/check-layer-boundary.ps1` (run by `/build` beside `check-core-boundary.ps1`): fails on a `Plugin/`/`License/` include from a
   library file, on a duplicate relative path, and on a library file that includes another product's header.
+- **Library sources and the UI list (ruled 2026-10-16, built at E2.6).** `mu-<product>-layer` is an `INTERFACE` target whose sources are the engine files (`Persistence/<Type>Params.cpp`, `Sequencer/<Type>.cpp`). The layer's UI source is **not** on the target but in the CMake list `MU_<PRODUCT>_LAYER_UI_SOURCES`, which a GUI consumer adds to its own sources: an `INTERFACE` library that carried UI sources could not be linked by a console test target, since the UI needs `juce_gui_basics` and the mu-core UI sources. The list is the family convention (every product's library does the same); mu-Tronic adds the four lists to its target. If a second target (`mu-<product>-layer-ui`) proves cleaner at T1 it replaces the list in all four products at once. The library is declared in the product's own `CMakeLists.txt`, with no `mu-<product>-layer/` folder, and `check-layer-boundary.ps1` finds it from `add_library(mu-<product>-layer INTERFACE ...)` over `Audio/ Sequencer/ Modulation/ Persistence/ UI/` minus `UI/SettingsOverlay.*`.
 - Namespaces are already per product (`mu_clid` ... `mu_on`, design-naming §3), so four engines coexist in one binary. Global-namespace names in a library
   are not allowed (the checker greps for them): the only global voice-side class today is mu-core's `::VoiceEngine`, which mu-Tant's `mu_tant::VoiceEngine`
   already coexists with.
@@ -1308,7 +1342,7 @@ references). The equivalence test in each of T4 to T7 is the proof that "complet
 
 ### What each product must change (summary)
 
-- **mu-Toni** (now): `Arp::render`, held notes per layer, `Persistence/Toni*Params`, `ArpHost`, `ToniScales.h`, `mu-toni-layer`, adopt `renderLayers`.
+- **mu-Toni** (done 2026-10-16, Stage E2; 2.1.8): `Arp::render`, held notes per layer, `Persistence/Toni*Params`, `ArpHost`, `ToniScales.h`, `mu-toni-layer`, adopt `renderLayers`.
 - **mu-On** (now): per-layer step grid and swing/accent, one engine allocation per Track (`engineLocked` in mu-Tronic), five registered engine types, Rumble via the context, `TrackParams.h` to `Persistence/`, `TrackHost`, `mu-on-layer`, adopt `renderLayers`.
 - **mu-Tant** (after its next release): `Pattern::render` + engine + cached pointers, Note mode per layer, shared wavetable bank service, `Persistence/PatternParams`, `SwapBoundary.h` to `Sequencer/`,
   `PatternHost`, `TantScales.h`, `mu-tant-layer`, adopt `renderLayers`.
