@@ -30,7 +30,8 @@ public:
         const float drive    = insertSlot(p, 0);
         const float outputDb = insertSlot(p, 1);
         const float preGain  = std::pow(10.0f, drive / 100.0f * 2.0f);
-        const float outGain  = std::pow(10.0f, outputDb / 20.0f) / preGain;
+        // Square-root makeup, as the filter drive stage uses: full 1/preGain made loud drive settings ~40 dB quieter.
+        const float outGain  = std::pow(10.0f, outputDb / 20.0f) / std::sqrt(preGain);
         smoothedPreGain.setTargetValue(preGain);
         smoothedOutGain.setTargetValue(outGain);
         auto ad1Clip = [](float x) -> float {
