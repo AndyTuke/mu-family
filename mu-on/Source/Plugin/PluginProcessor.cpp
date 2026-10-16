@@ -191,6 +191,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
             grooveVoices.applyParams(beatStart, bpm);
             // Stop edge: silence the voices so a sustaining bass (no note-off yet) doesn't drone on.
             if (wasPlaying && ! isPlaying) grooveVoices.reset();
+            // Start edge: realign the sequencer to the step the transport starts in.
+            if (! wasPlaying && isPlaying) sequencer.seek(beatStart);
             wasPlaying = isPlaying;
             if (isPlaying)
             {

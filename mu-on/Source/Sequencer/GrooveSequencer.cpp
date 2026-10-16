@@ -22,12 +22,14 @@ void GrooveSequencer::processSpan(double beatStart, int numSamples, double beats
     if (nextGlobalStep < expected - 1 || nextGlobalStep > expected + 1)
         nextGlobalStep = expected;
 
-    // Fire each step whose (swing-adjusted) beat lands within [beatStart, beatEnd).
+    // Fire each step whose (swing-adjusted) beat lands within [beatStart, beatEnd). The start edge has a
+    // 1e-9 beat tolerance so a host reporting a block start an ulp past the previous block's end does not skip the step.
+    constexpr double kBeatEpsilon = 1e-9;
     for (int guard = 0; guard < StepPattern::kNumSteps * 2; ++guard)
     {
         const double t = stepBeat(nextGlobalStep);
         if (t >= beatEnd) break;
-        if (t >= beatStart)
+        if (t >= beatStart - kBeatEpsilon)
         {
             const int local = (int) (((nextGlobalStep % StepPattern::kNumSteps)
                                        + StepPattern::kNumSteps) % StepPattern::kNumSteps);
