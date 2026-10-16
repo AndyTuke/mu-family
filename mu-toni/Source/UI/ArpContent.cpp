@@ -5,8 +5,8 @@
 namespace mu_toni
 {
 
-ArpContent::ArpContent(PluginProcessor& processor)
-    : proc(processor), insertSub(processor, kLayerParamLetter)
+ArpContent::ArpContent(ProcessorBase& base, ArpHost& h)
+    : host(h), apvts(h.getArpParameters()), insertSub(base, kLayerParamLetter)
 {
     addSourceControls();
     addVoiceControls();
@@ -33,8 +33,8 @@ void ArpContent::addSourceControls()
     addKnob (G_OSC2, "o2f",    "Fine", LF::knobEuclidean);
     addKnob (G_OSC2, "o2_pos", "Pos",  LF::knobEuclidean);
     // Cross-mod (Osc 2 → Osc 1): Lane A mode + Index, Sync, Feedback; Lane B mode + Depth, SSB shift.
-    addCombo (G_XMOD, "xmod_phaseMode", mu_ui::choiceNames(proc.apvts, layerParamId(0, "xmod_phaseMode")));
-    addCombo (G_XMOD, "xmod_ampMode",   mu_ui::choiceNames(proc.apvts, layerParamId(0, "xmod_ampMode")));
+    addCombo (G_XMOD, "xmod_phaseMode", mu_ui::choiceNames(apvts, layerParamId(0, "xmod_phaseMode")));
+    addCombo (G_XMOD, "xmod_ampMode",   mu_ui::choiceNames(apvts, layerParamId(0, "xmod_ampMode")));
     addToggle(G_XMOD, "sync",           "Sync");
     addToggle(G_XMOD, "xmod_fdbk",      "Fdbk");
     addKnob  (G_XMOD, "xmod_index", "Index", LF::knobEuclidean);
@@ -124,7 +124,7 @@ void ArpContent::setStepLevel(int step, int level)
     if (step < 0 || step >= ArpAccent::kMaxSteps) return;
     auto writeBit = [&](const char* suffix, bool on)
     {
-        auto* p = proc.apvts.getParameter(layerParamId(currentLayer, suffix));
+        auto* p = apvts.getParameter(layerParamId(currentLayer, suffix));
         if (p == nullptr) return;
         const int was = (int) p->convertFrom0to1(p->getValue());
         const int now = on ? (was | (1 << step)) : (was & ~(1 << step));
@@ -144,10 +144,10 @@ void ArpContent::refreshAccentSteps()
     if (accentParamsLayer != currentLayer)
     {
         const juce::String pre = layerParamPrefix(currentLayer);
-        accLenParam  = proc.apvts.getRawParameterValue(pre + "accLen");
-        accPatParam  = proc.apvts.getRawParameterValue(pre + "accPat");
-        stepMaskParam = proc.apvts.getRawParameterValue(pre + "stepMask");
-        arpRateParam = proc.apvts.getRawParameterValue(pre + "rate");
+        accLenParam  = apvts.getRawParameterValue(pre + "accLen");
+        accPatParam  = apvts.getRawParameterValue(pre + "accPat");
+        stepMaskParam = apvts.getRawParameterValue(pre + "stepMask");
+        arpRateParam = apvts.getRawParameterValue(pre + "rate");
         accentParamsLayer = currentLayer;
     }
     auto value = [](const std::atomic<float>* a) { return a != nullptr ? a->load() : 0.0f; };
@@ -166,7 +166,7 @@ void ArpContent::refreshAccentSteps()
         accentSteps.setSteps(cells);
     }
     // Loop mode: the arp's step follows the beat, so its place in the pattern does too.
-    const long long step = (long long) std::floor(proc.getInternalBeatPos() / rateBeats((int) value(arpRateParam)));
+    const long long step = (long long) std::floor(host.getArpTransportBeat() / rateBeats((int) value(arpRateParam)));
     accentSteps.setPlayheadPhase((float) (((step % len) + len) % len) / (float) len);
     accentSteps.setBarColour(layerColour());
 }
@@ -195,7 +195,7 @@ void ArpContent::buildVoiceBand()
     voiceBand.setSections(pitchBox, filterBox, ampBox, insertSub,
                           { findKnob("sendEff"), findKnob("sendDly"), findKnob("sendRev") });
     addAndMakeVisible(voiceBand);
-    insertSub.getInsertGR = [this] { return proc.getInsertGR(currentLayer); };
+    insertSub.getInsertGR = [this] { return host.getArpInsertGainReduction(currentLayer); };
     insertSub.onStatusUpdate = [this](const juce::String& n, const juce::String& val)
     { if (onStatusUpdate) onStatusUpdate(n, val); };
 }
@@ -212,13 +212,13 @@ void ArpContent::setLayer(int idx)
 
     for (auto& k : knobs)
         k.att = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-            proc.apvts, layerParamId(k.prefix, currentLayer, k.suffix), k.comp->getSlider());
+            apvts, layerParamId(k.prefix, currentLayer, k.suffix), k.comp->getSlider());
     for (auto& c : combos)
         c.att = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
-            proc.apvts, layerParamId(currentLayer, c.suffix), c.comp->getComboBox());
+            apvts, layerParamId(currentLayer, c.suffix), c.comp->getComboBox());
     for (auto& t : toggles)
         t.att = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
-            proc.apvts, layerParamId(currentLayer, t.suffix), *t.comp);
+            apvts, layerParamId(currentLayer, t.suffix), *t.comp);
 
     bindModulationArcs();
     insertSub.setChannel(currentLayer);
@@ -232,7 +232,7 @@ void ArpContent::setLayer(int idx)
 void ArpContent::bindModulationArcs()
 {
     static const float kNaN = std::numeric_limits<float>::quiet_NaN();
-    const auto* matrix = &proc.getArp(currentLayer).modulationMatrix;
+    const auto* matrix = &host.getArp(currentLayer).modulationMatrix;
     const int layer = currentLayer;
 
     for (auto& k : knobs)
@@ -242,7 +242,7 @@ void ArpContent::bindModulationArcs()
         if (dest < 0) { k.comp->clearModBinding(); continue; }
 
         k.comp->bindModulation(kModDestTable[dest].id, matrix,
-            [this, layer, dest]() -> float { return proc.isInternalPlaying() ? proc.getModLive(layer, dest) : kNaN; });
+            [this, layer, dest]() -> float { return host.isArpTransportPlaying() ? host.getModLive(layer, dest) : kNaN; });
     }
 }
 
@@ -327,7 +327,7 @@ void ArpContent::layoutSourceRow(juce::Rectangle<int> row, int gap)
 
 juce::Colour ArpContent::layerColour() const
 {
-    return MuLookAndFeel::layerPalette[(size_t) (proc.getLayerColourIndex(currentLayer)
+    return MuLookAndFeel::layerPalette[(size_t) (host.getArpColourIndex(currentLayer)
                                                    % MuLookAndFeel::kLayerPaletteSize)];
 }
 

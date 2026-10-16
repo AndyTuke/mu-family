@@ -8,7 +8,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     : EditorShellBase(p),
       proc(p),
       sidebar(p, "Layer"),
-      arpContent(p),
+      arpContent(p, p),
       layerPanel(p, "Layer"),
       // The knobs' live modulation arcs hold a layer's matrix: release them before a removal frees it.
       layerEdit(p, sidebar, layerPanel, { [this] { arpContent.releaseModulationArcs(); },

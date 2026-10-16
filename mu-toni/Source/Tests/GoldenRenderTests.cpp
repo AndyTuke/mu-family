@@ -20,6 +20,7 @@
 #include "Tests/ProcessorSeamHelpers.h"
 
 #include <cmath>
+#include <cstring>
 #include <functional>
 #include <memory>
 
@@ -109,6 +110,13 @@ namespace
             { "insert-effect",    [](mu_golden::Scenario&) {} },
             { "noise-on",         [](mu_golden::Scenario&) {} },
             { "master-fx-return", [](mu_golden::Scenario&) {} },
+
+            // Contract pin P7: host blocks above the prepared size (512 here, so ragged's 1024 is one too),
+            // which the shared driver chunks into calls of at most the prepared size (C8).
+            { "oversize-block", [](mu_golden::Scenario& sc)
+              {
+                  sc.schedules.push_back({ "oversize", { 4096, 1, 2048 } });
+              } },
         };
         return defs;
     }
@@ -612,22 +620,35 @@ struct MuToniLayerPinTests : juce::UnitTest
 
     // ── A block larger than the prepared maximum ─────────────────────────────
 
-    // A host block above the size given to prepareToPlay is outside what the processor supports today:
-    // the voice and mixer scratch buffers are sized at prepare time and written without a bound, so an
-    // oversize block overwrites memory (observed: garbage output near 1e38, then a crash or a hang at
-    // teardown). It cannot be recorded as a render, only as the contract: the prepared size has to be
-    // the largest block the host sends. This pin holds the supported edge (a block exactly the prepared
-    // size, and the same audio in smaller blocks) so a stage that adds a bound or a split has the line
-    // to move.
+    // A host block above the size given to prepareToPlay. Before mu-Toni rendered through the shared driver,
+    // such a block overran the voice and mixer buffers sized at prepare (garbage near 1e38, then a crash), so
+    // this pin held only the supported edge. The driver now chunks it into calls of at most the prepared size
+    // (C8): a 4096-frame block on a 1024 preparation renders exactly what four 1024-frame blocks render, and no
+    // layer or mixer call is longer than the prepared size. (The line moved on purpose at the stage that
+    // adopted the driver.)
     void oversizeBlock()
     {
-        beginTest("Prepared size is the largest supported block: a full-size block renders cleanly (above it is unsupported today)");
-        Rig rig(1024);
-        rig.set("a0_rate", 6.0f);  rig.set("a0_gate", 70.0f);
+        beginTest("A block above the prepared size is chunked: 4096 frames on a 1024 preparation equal four 1024-frame blocks");
+        Rig big(1024), small(1024);
+        for (auto* r : { &big, &small }) { r->set("a0_rate", 6.0f); r->set("a0_gate", 70.0f); }
+        juce::AudioBuffer<float> a(2, 4096), b(2, 4096);
+        int differing = 0;
         float peak = 0.0f;
-        for (int b = 0; b < 12; ++b) peak = std::max(peak, rig.block(1024).peak);
-        expect(peak > 0.0f && peak < 4.0f, "blocks of exactly the prepared size sound and stay bounded");
-        expect(std::isfinite(peak));
+        for (int blk = 0; blk < 12; ++blk)
+        {
+            peak = std::max(peak, big.block(4096).peak);
+            for (int c = 0; c < 2; ++c) a.copyFrom(c, 0, big.work, c, 0, 4096);
+            for (int q = 0; q < 4; ++q)
+            {
+                small.block(1024);
+                for (int c = 0; c < 2; ++c) b.copyFrom(c, q * 1024, small.work, c, 0, 1024);
+            }
+            for (int c = 0; c < 2; ++c)
+                if (std::memcmp(a.getReadPointer(c), b.getReadPointer(c), 4096 * sizeof (float)) != 0) ++differing;
+        }
+        expectEquals(differing, 0, "the chunked block is bit-identical to the same frames in prepared-size blocks");
+        expect(peak > 0.0f && peak < 4.0f && std::isfinite(peak), "it sounds and stays bounded");
+        expect(big.p.getLayerRenderProbe().largestCall <= 1024, "no call is longer than the prepared size");
     }
 
     static juce::String layerId(int layer, const char* suffix) { return mu_toni::layerParamId(layer, suffix); }
@@ -638,3 +659,4 @@ struct MuToniLayerPinTests : juce::UnitTest
 };
 
 static MuToniLayerPinTests muToniLayerPinTests;
+

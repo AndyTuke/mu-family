@@ -4,7 +4,7 @@
 #include "Audio/MultiModeFilter.h"          // mu-core (reused unchanged)
 #include "Audio/NoiseSeed.h"               // mu-core: per-slot, per-instance noise seeding
 #include "Audio/Wavetable/XModOscPair.h"   // mu-core: wavetable oscs + 2-lane X-Mod (shared with mu-Tant)
-#include "Scales.h"                           // midiToFreq
+#include "Audio/ToniScales.h"                 // midiToFreq
 
 // μ-Toni voice — a note-triggered wavetable mono synth (mu-Tant's oscillators + X-Mod).
 //   Osc1 + Osc2 (cross-modulated) (+ noise) → MultiModeFilter → Amp VCA → (caller adds insert)

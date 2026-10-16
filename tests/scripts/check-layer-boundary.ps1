@@ -34,8 +34,11 @@
 #           mu-core stays below the processor side; RetireBin and LayerBlock live in Plugin/ for that reason).
 #
 # The scan is driven by -Root, a directory laid out like the repo root: mu-core/, any mu-*-layer/ libraries and
-# the product trees mu-*/Source/. A layer library that does not exist yet is simply absent, so today the script
-# scans mu-core, finds no library and no Published product, and passes. The fixture self-test
+# the product trees mu-*/Source/. A layer library is either its own mu-<p>-layer/ folder or, as the products
+# build them (docs/mu-tronic/design.md 2.5, "no folder moves"), declared in the product's own CMakeLists.txt as
+# add_library(mu-<p>-layer INTERFACE ...): its files are then the product's Source/Audio, Sequencer,
+# Modulation, Persistence and UI folders, without UI/SettingsOverlay.* (Plugin/, License/ and Tests/ are the
+# app). A layer library that does not exist yet is simply absent. The fixture self-test
 # (test-check-layer-boundary.ps1) points -Root at synthetic trees under fixtures/layer-boundary/.
 #
 #   pwsh tests/scripts/check-layer-boundary.ps1                 # check the repo
@@ -67,9 +70,21 @@ $Root = (Resolve-Path -LiteralPath $Root).Path.TrimEnd([char]92, '/')
 # Libraries present under the root: mu-core (when it exists) and every mu-*-layer folder.
 $libraries = @()
 $core = Join-Path $Root 'mu-core'
-if (Test-Path -LiteralPath $core -PathType Container) { $libraries += @{ Name = 'mu-core'; Dir = $core; IsLayer = $false } }
+if (Test-Path -LiteralPath $core -PathType Container) { $libraries += @{ Name = 'mu-core'; Dir = $core; IsLayer = $false; InTree = $false } }
 foreach ($d in (Get-ChildItem -LiteralPath $Root -Directory -Filter 'mu-*-layer' | Sort-Object Name)) {
-    $libraries += @{ Name = $d.Name; Dir = $d.FullName; IsLayer = $true }
+    $libraries += @{ Name = $d.Name; Dir = $d.FullName; IsLayer = $true; InTree = $false }
+}
+# Layer libraries a product declares over its own Source/ folders.
+$inTreeLibrary = [regex]'(?m)^[ \t]*add_library\s*\(\s*(?<name>mu-[a-z-]+-layer)\s+INTERFACE\b'
+foreach ($d in (Get-ChildItem -LiteralPath $Root -Directory -Filter 'mu-*' | Sort-Object Name)) {
+    if ($d.Name -eq 'mu-core' -or $d.Name -like 'mu-*-layer') { continue }
+    $cmake  = Join-Path $d.FullName 'CMakeLists.txt'
+    $source = Join-Path $d.FullName 'Source'
+    if (-not (Test-Path -LiteralPath $cmake -PathType Leaf) -or -not (Test-Path -LiteralPath $source -PathType Container)) { continue }
+    foreach ($m in $inTreeLibrary.Matches([System.IO.File]::ReadAllText($cmake))) {
+        if ($m.Groups['name'].Value -ne ($d.Name + '-layer')) { continue }
+        $libraries += @{ Name = $m.Groups['name'].Value; Dir = $source; IsLayer = $true; InTree = $true }
+    }
 }
 
 $blockComment = [regex]'(?s)/\*.*?\*/'
@@ -79,12 +94,16 @@ $includeProduct = [regex]'#\s*include\s*[<"]([^">]*/)?(mu-(clid-midi|clid|tant|t
 $includeLayerLib = [regex]'#\s*include\s*[<"]([^">]*/)?(mu-[a-z-]+-layer)/'
 $namesProcessor = [regex]'\bPluginProcessor\b'
 $skipDir = [regex]'(^|/)(build[^/]*|cmake-build[^/]*|ThirdParty|_deps|\.git|_out)(/|$)'
+# An in-tree library's files: the layer folders of the product's Source/, without the app's settings page.
+$inTreeFolders = [regex]'^(Audio|Sequencer|Modulation|Persistence|UI)/'
+$inTreeExcluded = [regex]'^UI/SettingsOverlay\.'
 
 function Get-LibraryFiles($lib) {
     $base = (Resolve-Path -LiteralPath $lib.Dir).Path.TrimEnd([char]92, '/')
     foreach ($f in (Get-ChildItem -LiteralPath $base -Recurse -File -Include '*.h', '*.hpp', '*.cpp' | Sort-Object FullName)) {
         $rel = $f.FullName.Substring($base.Length).TrimStart([char]92, '/').Replace([string][char]92, '/')
         if ($skipDir.IsMatch($rel)) { continue }
+        if ($lib.InTree -and (-not $inTreeFolders.IsMatch($rel) -or $inTreeExcluded.IsMatch($rel))) { continue }
         [pscustomobject]@{ Full = $f.FullName; Rel = $rel; Lib = $lib.Name; IsLayer = $lib.IsLayer }
     }
 }

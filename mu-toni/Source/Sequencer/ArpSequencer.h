@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Audio/Chords.h"
-#include "Audio/Scales.h"
+#include "Audio/ToniScales.h"
 #include <cmath>
 
 // mu-toni ArpSequencer — the deterministic note-generation core.
@@ -15,7 +15,7 @@ namespace mu_toni
 
 struct ArpParams
 {
-    int   scale        = 0;      // 0..11  (Scales.h)
+    int   scale        = 0;      // 0..11  (ToniScales.h)
     int   rootNote     = 0;      // 0..11  (C..B)
     int   rootOctave   = 4;      // 0..8   (C4 = MIDI 60)
     int   chord        = 2;      // Chords.h index — default Major

@@ -16,10 +16,12 @@
 //   3. write the modulated value back into out[i] in the destination's value units
 //      (range.convertFrom0to1, clamped 0..1).
 // Audio-thread-only; allocation-free given a pre-sized `map`. `ids` / `atoms` / `ranges` are
-// parallel arrays of length `count`; `out` must hold `count` floats.
+// parallel arrays of length `count`; `out` must hold `count` floats. Returns false when the slot's
+// matrix lock was missed (its modulators are being edited), so `out` holds the unmodulated values: a
+// caller that keeps its last resolved values holds them for the block instead (C12).
 namespace mu_mod {
 
-inline void resolveLane(Layer* slot, double beat, int count,
+inline bool resolveLane(Layer* slot, double beat, int count,
                         const char* const* ids,
                         const std::atomic<float>* const* atoms,
                         const juce::NormalisableRange<float>* ranges,
@@ -33,6 +35,7 @@ inline void resolveLane(Layer* slot, double beat, int count,
         map[ids[i]] = ranges[i].convertTo0to1(v);
     }
 
+    bool resolved = true;
     if (slot != nullptr)
     {
         if (mu_core::trySpinLock(slot->modLock))
@@ -40,10 +43,12 @@ inline void resolveLane(Layer* slot, double beat, int count,
             slot->modulationMatrix.process(slot->controlSequences, beat, map);
             mu_core::spinUnlock(slot->modLock);
         }
+        else resolved = false;
     }
 
     for (int i = 0; i < count; ++i)
         out[i] = ranges[i].convertFrom0to1(juce::jlimit(0.0f, 1.0f, map[ids[i]]));
+    return resolved;
 }
 
 } // namespace mu_mod

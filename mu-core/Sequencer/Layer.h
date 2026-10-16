@@ -183,6 +183,12 @@ struct Layer : public mu_core::RetireTail
     // pending notes). A type acts on these hooks or on the same flags inside render, not on both.
     virtual void onTransportStopped(const mu_core::RenderContext& ctx) { juce::ignoreUnused(ctx); }
     virtual void onTransportJump(const mu_core::RenderContext& ctx)    { juce::ignoreUnused(ctx); }
+    // Audio thread, once per call for a layer parked in a slot at or above the live count (a spare a product
+    // keeps): it renders nothing and is not mixed, but it may follow the call's MIDI and flags so input state
+    // it keeps (the keys held down) is current when the slot goes live again. Nothing else: no audio, no
+    // output, no parameter. A layer that finds it was parked in the last rendered block also knows it has just
+    // gone live (a slot that starts from silence).
+    virtual void onParkedBlock(const mu_core::RenderContext& ctx)      { juce::ignoreUnused(ctx); }
 
     // The insert effect's gain-reduction meter (0..1, written by the audio thread, read by the UI), or
     // null when the layer has no insert or the algorithm shows none. Message thread only: the pointer

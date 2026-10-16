@@ -17,6 +17,7 @@ namespace
     {
         using mu_toni::PluginProcessor::layers;
         using mu_toni::PluginProcessor::numLayers;
+        using mu_toni::PluginProcessor::storeLayerCount;
         using mu_toni::PluginProcessor::layersMoved;
         // Performance mode is standalone-only; the test stands in for the standalone wrapper.
         bool isStandaloneApp() const noexcept override { return true; }
@@ -210,7 +211,7 @@ struct MuToniProcessorSeamTests : juce::UnitTest
             auto& spare = q.getArp(1).runner;                 // a spare slot above the live count
             for (int b = 0; b < 40; ++b) { ctx.startBeat = b * 256 * ctx.beatsPerSample; spare.render(blk, 256, ctx); }
             expect(spare.isActive(), "the spare slot's voice is sounding");
-            q.numLayers.store(2);                              // the slot goes live
+            q.storeLayerCount(2);                              // the slot goes live (the count store the layer driver reads)
             juce::MidiBuffer noMidi;
             q.processBlock(blk, noMidi);
             expect(! q.getArp(1).runner.isActive(), "its voice was reset when it went live");

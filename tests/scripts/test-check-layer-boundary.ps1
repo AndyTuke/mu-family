@@ -1,9 +1,9 @@
 # test-check-layer-boundary.ps1 — self-test for check-layer-boundary.ps1.
 #
 # Each folder under fixtures/layer-boundary/ is a synthetic repo root holding mu-core/ and zero or more
-# mu-*-layer/ libraries (the real libraries do not exist yet). fail-* must exit 1 with exactly one
-# violation, pass-* must exit 0, so the checker is proven to reject a violating tree and accept a clean one,
-# and to cope with a tree that has no layer library at all.
+# mu-*-layer/ libraries, or a product folder whose CMakeLists.txt declares its in-tree mu-<p>-layer library.
+# fail-* must exit 1 with exactly one violation, pass-* must exit 0, so the checker is proven to reject a
+# violating tree and accept a clean one, and to cope with a tree that has no layer library at all.
 #
 #   pwsh tests/scripts/test-check-layer-boundary.ps1
 #
@@ -35,7 +35,7 @@ $missing = Join-Path ([IO.Path]::GetTempPath()) ("no-such-root-" + [guid]::NewGu
 $null = & pwsh -NoProfile -File $checker -Root $missing 2>&1
 if ($LASTEXITCODE -eq 2) { Write-Host "  [ok]   missing-root (exit 2)" } else { Write-Host "  [FAIL] missing-root — expected exit 2, got $LASTEXITCODE"; $bad++ }
 
-# The real repo has no layer library yet: the checker must pass on it.
+# The real repo (mu-toni-layer registered since E2.6) must pass.
 $null = & pwsh -NoProfile -File $checker -Quiet 2>&1
 if ($LASTEXITCODE -eq 0) { Write-Host "  [ok]   real-repo (exit 0)" } else { Write-Host "  [FAIL] real-repo — expected exit 0, got $LASTEXITCODE"; $bad++ }
 

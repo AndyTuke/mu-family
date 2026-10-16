@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MuToniState format="2" numVoices="2" voiceColours="0,1,2,3,4,5,6,7">
+    <Globals>
+      <p id="ch0_pan" x="-0.4"/>
+      <p id="ch1_lvl" x="0.7"/>
+      <p id="ch1_pan" x="0.5"/>
+    </Globals>
+    <Slots>
+      <Slot idx="0">
+        <p id="chord" x="3"/>
+        <p id="gate" x="50"/>
+        <p id="rate" x="6"/>
+        <p id="root" x="0"/>
+        <p id="scale" x="1"/>
+      </Slot>
+      <Slot idx="1">
+        <p id="chord" x="10"/>
+        <p id="cut" x="1800"/>
+        <p id="dir" x="-50"/>
+        <p id="ft" x="4"/>
+        <p id="gate" x="40"/>
+        <p id="leg" x="1"/>
+        <p id="o1_wt" x="1"/>
+        <p id="o2_wt" x="2"/>
+        <p id="octs" x="3"/>
+        <p id="rate" x="4"/>
+        <p id="res" x="0.5"/>
+        <p id="roct" x="3"/>
+        <p id="root" x="7"/>
+        <p id="scale" x="5"/>
+      </Slot>
+    </Slots>
+</MuToniState>

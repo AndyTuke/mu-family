@@ -81,6 +81,8 @@ namespace mu_contract_test
             lastStartBeat = ctx.startBeat;
             if (ctx.beatWrap > 0.0 && (ctx.startBeat < 0.0)) ++negativeInBoundedHost;
             mu_core::forEachMidi(ctx, [this](const mu_core::MidiEvent&, int) { ++midiSeen; });
+            lastCarried = ctx.midi.carried;
+            if (ctx.midi.count > 0) firstEventNote = ctx.midi.events[0].bytes[1];
             if (! ctx.playing) return;   // stopped: silence (the scratch arrives cleared)
             const float g = gainParam.isBound() ? 0.25f + gainParam.load() : 0.5f;
             renderFakeEngine(absoluteFrame(ctx), ctx.slot, out, n, g);
@@ -94,6 +96,12 @@ namespace mu_contract_test
         void onTransportStopped(const mu_core::RenderContext& ctx) override { ++stopHooks; hookSlot = ctx.slot; }
         void onTransportJump(const mu_core::RenderContext& ctx) override    { ++jumpHooks; hookSlot = ctx.slot; }
         void onMoved(int i) override { movedTo = i; }
+        void onParkedBlock(const mu_core::RenderContext& ctx) override
+        {
+            ++parkedCalls;
+            parkedSlot = ctx.slot;
+            mu_core::forEachMidi(ctx, [this](const mu_core::MidiEvent&, int) { ++parkedMidiSeen; });
+        }
 
         uint32_t magic = kAliveMagic;
         mu_core::ParamBinding gainParam;
@@ -102,6 +110,7 @@ namespace mu_contract_test
         int renders = 0, maxCall = 0, contractBreaks = 0, lastSlot = -1, useAfterFree = 0;
         int justStarted = 0, justStopped = 0, jumped = 0, stopHooks = 0, jumpHooks = 0;
         int midiSeen = 0, midiEmitted = 0, negativeInBoundedHost = 0;
+        int lastCarried = 0, firstEventNote = -1, parkedCalls = 0, parkedSlot = -1, parkedMidiSeen = 0;
         bool emitNoteOn = false;
         double lastStartBeat = 0.0;
     };
@@ -185,6 +194,7 @@ namespace mu_contract_test
         using ProcessorBase::captureComposedState;
         using ProcessorBase::mergeLayerMidiOut;
         using ProcessorBase::setRetireCountPolicy;
+        using ProcessorBase::setCarrySkippedMidi;
         using ProcessorBase::flushPendingAsyncUpdates;
         using ProcessorBase::layerSwapper;
 

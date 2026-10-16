@@ -79,6 +79,10 @@ namespace mu_limits
     inline constexpr int kMaxBlockMidiEvents = 2048;
     inline constexpr int kMidiNoteOffReserve = 256;
     static_assert(kMidiNoteOffReserve < kMaxBlockMidiEvents, "the note-off reserve is part of the block's storage");
+    // Channel messages kept from host blocks that rendered nothing, for a processor that carries them into its
+    // next rendered block (ProcessorBase::setCarrySkippedMidi). They sit at the front of the block's input.
+    inline constexpr int kMaxCarriedMidiEvents = 512;
+    static_assert(kMaxCarriedMidiEvents < kMaxBlockMidiEvents - kMidiNoteOffReserve, "the carried events are part of the input");
     // Published layer views (Published access mode): the live view, at most two in their grace period,
     // and one free for the next publication.
     inline constexpr int kLayerViewPool = 4;
