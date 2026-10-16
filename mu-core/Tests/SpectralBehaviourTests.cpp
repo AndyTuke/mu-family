@@ -23,6 +23,7 @@
 #include "Audio/FX/Insert/HardClipInsert.h"
 #include "Audio/FX/Insert/FoldInsert.h"
 #include "Audio/FX/Insert/KarplusStrongInsert.h"
+#include "Audio/FX/Insert/CompressorLimiterInsert.h"
 #include "Audio/FX/Insert/VocoderInsert.h"
 #include "Audio/Filters/Bp12Filter.h"
 #include "Audio/Filters/Notch12Filter.h"
@@ -350,10 +351,261 @@ public:
                        "settled peak " + juce::String(settledPeak, 3) + " at " + juce::String(freq, 0) + " Hz");
             }
         }
+
+        beginTest("a full-scale input never leaves +/-1, onset included, at 100 / 200 / 500 / 1000 Hz");
+        {
+            // A float64 port measured onset peaks of 1.85 / 1.95 / 1.78 / 1.09 at these frequencies before the output
+            // soft limiter; the limiter's tanh knee approaches 1.0, so the whole render (not just the settled part) is bounded.
+            for (const double freq : { 100.0, 200.0, 500.0, 1000.0 })
+            {
+                VocoderInsert v(false);
+                v.prepare(kSr, 512);
+                v.setSlotIndex(0);
+                VoiceParams p;
+                p.insertAlgo = 12;
+                setSlotActual(p, 0, 0.0f);   // Wave: Saw
+                setSlotActual(p, 1, 6.0f);   // Unison: 13 voices
+                setSlotActual(p, 2, 2.0f);   // Octave
+                setSlotActual(p, 3, 1.0f);   // Note: C
+                const auto y = renderSine(v, p, kSr, freq, 1.0f, 12000, 512);
+                float peak = 0.0f;
+                for (const float s : y) peak = juce::jmax(peak, std::abs(s));
+                logMessage("vocoder whole-render peak at " + juce::String(freq, 0) + " Hz: " + juce::String(peak, 4));
+                expect(std::isfinite(peak) && peak <= 1.0f,
+                       "peak " + juce::String(peak, 4) + " at " + juce::String(freq, 0) + " Hz");
+            }
+        }
+
+        beginTest("below the knee the output limiter changes nothing: doubling a quiet input exactly doubles the output");
+        {
+            // Without the limiter the vocoder is homogeneous in the input level: the carrier does not depend on the input,
+            // the band filters are linear and the envelope followers only compare levels. Scaling the input by 2 (an exact
+            // power of two, so every float operation scales exactly) must therefore scale the output by exactly 2. A limiter
+            // that bent the signal anywhere under its 0.8 knee would break that. The white-noise carrier is seeded per slot,
+            // so both renders see the same noise.
+            auto render = [&] (float amp)
+            {
+                VocoderInsert v(false);
+                v.prepare(kSr, 512);
+                v.setSlotIndex(0);
+                VoiceParams p;
+                p.insertAlgo = 12;
+                setSlotActual(p, 0, 2.0f);   // Wave: White noise
+                setSlotActual(p, 1, 0.0f);
+                setSlotActual(p, 2, 1.0f);
+                setSlotActual(p, 3, 1.0f);
+                return renderSine(v, p, kSr, 1000.0, amp, 9600, 512);
+            };
+            const float quiet = 0.05f;
+            const auto y1 = render(quiet);
+            const auto y2 = render(2.0f * quiet);
+            float peak2 = 0.0f, worst = 0.0f;
+            for (size_t i = 0; i < y1.size(); ++i)
+            {
+                peak2 = juce::jmax(peak2, std::abs(y2[i]));
+                worst = juce::jmax(worst, std::abs(y2[i] - 2.0f * y1[i]));
+            }
+            logMessage("vocoder quiet render: doubled-input peak " + juce::String(peak2, 4)
+                       + ", worst |y(2a) - 2 y(a)| " + juce::String(worst, 8));
+            // Precondition: the doubled render must itself sit under the knee, or the test says nothing about it.
+            expect(peak2 > 1.0e-3f && peak2 < 0.8f, "doubled-input peak " + juce::String(peak2, 4) + " is not a below-knee signal");
+            expect(worst <= 1.0e-6f, "output is not linear below the knee: worst difference " + juce::String(worst, 8));
+        }
     }
 };
 
 static VocoderSpectrumTest vocoderSpectrumTest;
+
+// ── Compressor / Limiter ceiling ────────────────────────────────────────────────────────────────────
+class LimiterCeilingTest : public juce::UnitTest
+{
+public:
+    LimiterCeilingTest() : juce::UnitTest("Limiter: brick-wall ceiling from the first sample, Compressor unchanged, gain recovers", "DSP") {}
+
+    // Renders `inL` / `inR` (equal length) through `algo` in blocks of `block`; the right channel comes back in outR.
+    static std::vector<float> renderStereo(InsertAlgorithmBase& algo, const VoiceParams& p,
+                                           const std::vector<float>& inL, const std::vector<float>& inR,
+                                           int block, std::vector<float>& outR)
+    {
+        const int total = (int) inL.size();
+        std::vector<float> outL((size_t) total);
+        outR.assign((size_t) total, 0.0f);
+        juce::AudioBuffer<float> buf(2, block);
+        float gr = 0.0f;
+        // Feed the signal block by block, as a host would.
+        for (int start = 0; start < total; start += block)
+        {
+            const int n = juce::jmin(block, total - start);
+            for (int i = 0; i < n; ++i)
+            {
+                buf.setSample(0, i, inL[(size_t) (start + i)]);
+                buf.setSample(1, i, inR[(size_t) (start + i)]);
+            }
+            algo.process(buf, n, 2, p, gr);
+            for (int i = 0; i < n; ++i)
+            {
+                outL[(size_t) (start + i)] = buf.getSample(0, i);
+                outR[(size_t) (start + i)] = buf.getSample(1, i);
+            }
+        }
+        return outL;
+    }
+
+    static VoiceParams makeParams(int algoId, float ceilingKnob, float releaseMs)
+    {
+        VoiceParams p;
+        p.insertAlgo = algoId;
+        setSlotActual(p, 0, ceilingKnob);
+        setSlotActual(p, 1, 0.0f);        // Output 0 dB
+        setSlotActual(p, 2, mu_ui::kInsertAlgoDefaults[algoId][2]);   // Attack at its default
+        setSlotActual(p, 3, releaseMs);
+        return p;
+    }
+
+    // Ceiling knob 0..100 maps to 0..-40 dB, applied before the Output gain.
+    static float ceilingLinear(float knob) { return (float) std::pow(10.0, -(double) knob / 100.0 * 40.0 / 20.0); }
+
+    static float peakOf(const std::vector<float>& x, int from, int to)
+    {
+        float m = 0.0f;
+        for (int i = from; i < to; ++i) m = juce::jmax(m, std::abs(x[(size_t) i]));
+        return m;
+    }
+
+    void runTest() override
+    {
+        constexpr double kSr = 48000.0;
+        // Silence in front of every signal: the threshold, release and output gains ramp over 15 ms from their prepare()
+        // values, so the ceiling is only at its target once those ramps have finished (42 ms here).
+        constexpr int kWarm = 2048;
+
+        beginTest("Limiter: no output sample exceeds the ceiling (sine, impulses, step bursts; Ceiling default / 0 / 100; blocks 64 and 512)");
+        {
+            const float knobs[] = { mu_ui::kInsertAlgoDefaults[8][0], 0.0f, 100.0f };
+            for (const int block : { 64, 512 })
+                for (const float knob : knobs)
+                {
+                    const float ceiling = ceilingLinear(knob);
+                    for (int kind = 0; kind < 3; ++kind)
+                    {
+                        // kind 0: 0 dBFS 1 kHz sine. 1: a single full-scale impulse of each sign. 2: full-scale step bursts.
+                        std::vector<float> x((size_t) (kWarm + 4800), 0.0f);
+                        if (kind == 0)
+                            for (int i = 0; i < 4800; ++i)
+                                x[(size_t) (kWarm + i)] = (float) std::sin(kTwoPi * 1000.0 * (double) i / kSr);
+                        else if (kind == 1)
+                        {
+                            x[(size_t) (kWarm + 10)] = 1.0f;
+                            x[(size_t) (kWarm + 2000)] = -1.0f;
+                        }
+                        else
+                        {
+                            for (int i = 0; i < 480; ++i) x[(size_t) (kWarm + i)] = 1.0f;
+                            for (int i = 0; i < 480; ++i) x[(size_t) (kWarm + 2400 + i)] = -1.0f;
+                        }
+
+                        CompressorLimiterInsert lim;
+                        lim.prepare(kSr, 512);
+                        std::vector<float> outR;
+                        const auto outL = renderStereo(lim, makeParams(8, knob, 200.0f), x, x, block, outR);
+                        const float pk = juce::jmax(peakOf(outL, 0, (int) outL.size()), peakOf(outR, 0, (int) outR.size()));
+                        expect(std::isfinite(pk) && pk <= ceiling + 1.0e-4f,
+                               "kind " + juce::String(kind) + ", Ceiling " + juce::String(knob, 0) + ", block " + juce::String(block)
+                               + ": peak " + juce::String(pk, 5) + " > ceiling " + juce::String(ceiling, 5));
+                    }
+                }
+        }
+
+        beginTest("Limiter: each channel is held to the ceiling on its own (L full scale, R at 0.3)");
+        {
+            for (const int block : { 64, 512 })
+            {
+                const float knob = mu_ui::kInsertAlgoDefaults[8][0];
+                const float ceiling = ceilingLinear(knob);
+                std::vector<float> l((size_t) (kWarm + 4800), 0.0f), r((size_t) (kWarm + 4800), 0.0f);
+                for (int i = 0; i < 4800; ++i)
+                {
+                    const float s = (float) std::sin(kTwoPi * 1000.0 * (double) i / kSr);
+                    l[(size_t) (kWarm + i)] = s;
+                    r[(size_t) (kWarm + i)] = 0.3f * s;
+                }
+                CompressorLimiterInsert lim;
+                lim.prepare(kSr, 512);
+                std::vector<float> outR;
+                const auto outL = renderStereo(lim, makeParams(8, knob, 200.0f), l, r, block, outR);
+                expect(peakOf(outL, 0, (int) outL.size()) <= ceiling + 1.0e-4f, "left peak above the ceiling, block " + juce::String(block));
+                expect(peakOf(outR, 0, (int) outR.size()) <= ceiling + 1.0e-4f, "right peak above the ceiling, block " + juce::String(block));
+
+                // At Ceiling 0 (0 dB) the 0.3 right channel is below the ceiling and must pass untouched.
+                CompressorLimiterInsert lim0;
+                lim0.prepare(kSr, 512);
+                const auto outL0 = renderStereo(lim0, makeParams(8, 0.0f, 200.0f), l, r, block, outR);
+                float worst = 0.0f;
+                for (size_t i = 0; i < r.size(); ++i) worst = juce::jmax(worst, std::abs(outR[i] - r[i]));
+                expect(worst <= 1.0e-5f, "a signal under the ceiling was changed by " + juce::String(worst, 7));
+                juce::ignoreUnused(outL0);
+            }
+        }
+
+        beginTest("Compressor (algo 7) is not hard-limited: its first 2 ms exceed the threshold, the Limiter's do not");
+        {
+            // The compressor's envelope follower needs its 5 ms attack before it reduces anything, so the first
+            // peaks pass nearly unchanged (a 1 kHz sine peaks at sample 12). Only the Limiter has the instant stage.
+            const float knob = mu_ui::kInsertAlgoDefaults[7][0];
+            const float thr = ceilingLinear(knob);
+            std::vector<float> x((size_t) (kWarm + 4800), 0.0f);
+            for (int i = 0; i < 4800; ++i)
+                x[(size_t) (kWarm + i)] = (float) std::sin(kTwoPi * 1000.0 * (double) i / kSr);
+
+            CompressorLimiterInsert comp, lim;
+            comp.prepare(kSr, 512);
+            lim.prepare(kSr, 512);
+            std::vector<float> outR;
+            const auto c = renderStereo(comp, makeParams(7, knob, 200.0f), x, x, 512, outR);
+            const auto l = renderStereo(lim,  makeParams(8, knob, 200.0f), x, x, 512, outR);
+            const int first2ms = (int) (0.002 * kSr);
+            const float cPeak = peakOf(c, kWarm, kWarm + first2ms);
+            const float lPeak = peakOf(l, kWarm, kWarm + first2ms);
+            logMessage("first 2 ms peak: compressor " + juce::String(cPeak, 3) + ", limiter " + juce::String(lPeak, 3)
+                       + ", threshold " + juce::String(thr, 3));
+            expect(cPeak > 2.0f * thr, "the compressor was limited in its first 2 ms (peak " + juce::String(cPeak, 3) + ")");
+            expect(lPeak <= thr + 1.0e-4f, "the limiter let " + juce::String(lPeak, 3) + " through in its first 2 ms");
+        }
+
+        beginTest("Limiter: after a loud burst the gain recovers (Release 50 ms): reduced just after, within 1 dB after 5 release times");
+        {
+            constexpr float kReleaseMs = 50.0f;
+            const int burstLen = 2400;                                   // 50 ms of full-scale sine
+            const int recoverLen = (int) (5.0 * (double) kReleaseMs * 0.001 * kSr);   // 5 release times = 12000 samples
+            const int windowLen = 2400;
+            const int toneStart = kWarm + burstLen;
+            std::vector<float> x((size_t) (toneStart + recoverLen + windowLen), 0.0f);
+            for (int i = 0; i < burstLen; ++i)
+                x[(size_t) (kWarm + i)] = (float) std::sin(kTwoPi * 1000.0 * (double) i / kSr);
+            // The quiet tone (0.05, well under the default ceiling) continues right after the burst.
+            for (int i = 0; i < recoverLen + windowLen; ++i)
+                x[(size_t) (toneStart + i)] = 0.05f * (float) std::sin(kTwoPi * 1000.0 * (double) i / kSr);
+
+            CompressorLimiterInsert lim;
+            lim.prepare(kSr, 512);
+            std::vector<float> outR;
+            const auto y = renderStereo(lim, makeParams(8, mu_ui::kInsertAlgoDefaults[8][0], kReleaseMs), x, x, 512, outR);
+
+            // Just after the burst (first 5 ms) the gain is still pulled down.
+            const int early = (int) (0.005 * kSr);
+            const double earlyDb = toDb(rmsOf(y, toneStart, toneStart + early) / rmsOf(x, toneStart, toneStart + early));
+            // After 5 release times the output equals the unlimited level.
+            const double lateDb = toDb(rmsOf(y, toneStart + recoverLen, toneStart + recoverLen + windowLen)
+                                       / rmsOf(x, toneStart + recoverLen, toneStart + recoverLen + windowLen));
+            logMessage("limiter recovery: " + juce::String(earlyDb, 2) + " dB just after the burst, "
+                       + juce::String(lateDb, 2) + " dB after 5 release times");
+            expect(earlyDb < -3.0, "the gain was not reduced after the burst (" + juce::String(earlyDb, 2) + " dB)");
+            expect(std::abs(lateDb) <= 1.0, "the gain has not recovered after 5 release times (" + juce::String(lateDb, 2) + " dB)");
+        }
+    }
+};
+
+static LimiterCeilingTest limiterCeilingTest;
 
 // ── X-Mod SSB (Hilbert transformer) ─────────────────────────────────────────────────────────────────
 class HilbertImageTest : public juce::UnitTest
