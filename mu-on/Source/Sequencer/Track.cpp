@@ -5,6 +5,7 @@
 #include "Modulation/ModulatorSerialise.h"  // mu-core: the modulators the base saves
 #include "Persistence/PresetFiles.h"      // mu-core: enum names in saved data
 
+#include <algorithm>
 #include <limits>
 
 // The Track layer's half of the render contract: the parameter binding and the per-block render that used to
@@ -208,7 +209,21 @@ float Track::getModLive(EngineType e, int dest) const noexcept
 void Track::resolve(int e, double beat, float* outValues) noexcept
 {
     auto& L = mods[(size_t) e];
-    mu_mod::resolveLane(this, beat, L.count, L.ids.data(), L.atoms.data(), L.ranges.data(), L.map, outValues);
+    const bool resolved = mu_mod::resolveLane(this, beat, L.count, L.ids.data(), L.atoms.data(), L.ranges.data(), L.map, outValues);
+
+    // A block that misses the matrix lock (the message thread is editing this track's modulators) holds the last
+    // values resolved for this engine, so no target snaps back to its unmodulated knob for a block (C12). Before
+    // the engine's first resolve it takes the unmodulated values, as a miss always did.
+    if (lastResolvedEngine != e) haveResolved = false;
+    if (resolved || ! haveResolved)
+    {
+        std::copy(outValues, outValues + L.count, lastResolved.begin());
+        haveResolved = haveResolved || resolved;
+        lastResolvedEngine = e;
+    }
+    else
+        std::copy(lastResolved.begin(), lastResolved.begin() + L.count, outValues);
+
     for (int k = 0; k < L.count; ++k)
         modLive[(size_t) k].store(outValues[k], std::memory_order_relaxed);
     modLiveEngine.store(e, std::memory_order_release);   // after the values: the tag publishes them

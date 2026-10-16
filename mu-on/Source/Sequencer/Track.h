@@ -141,6 +141,10 @@ private:
     int   current = -1;          // the engine the last rendered block resolved (-1: none, the next block resets)
     float lastRumbleEnv = 1.0f;  // reused while the envelope's lock is contended
     bool  parked = true;         // not rendered live in the last rendered block (or prepared since)
+
+    std::array<float, kMaxDests> lastResolved {};   // the last block's resolved values (C12: held on a matrix-lock miss)
+    int   lastResolvedEngine = -1;                  // the engine they belong to
+    bool  haveResolved = false;                     // a resolve of that engine has run with the lock held
 };
 JUCE_END_IGNORE_WARNINGS_MSVC
 
