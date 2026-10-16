@@ -185,7 +185,7 @@ PluginProcessor::PluginProcessor()
         layers[(size_t) i]->colourIndex = i;   // each layer starts on its own palette colour
         jassert(dynamic_cast<Arp*>(layers[(size_t) i].get()) != nullptr);   // the one type check; layerAs only casts
     }
-    numLayers.store(1, std::memory_order_relaxed);   // a fresh instance starts with one layer
+    storeLayerCount(1, std::memory_order_relaxed);   // a fresh instance starts with one layer
     unsavedLayerCount = 4;                           // a state saved before layers were editable held four
 
     // Per-channel render: each channel runs its own arpeggiator voice into the

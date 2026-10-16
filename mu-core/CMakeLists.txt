@@ -54,6 +54,7 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MixerOverlay.cpp"
     # Shared plugin scaffolding
     "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_Render.cpp"   # the layer render contract's block driver
     # The headless --render mode is header-only (Plugin/ProductRender.h), compiled
     # into each Standalone target through Plugin/StandaloneShell.h.
     # Persistence — MIDI PC preset maps (per-slot ch 1-8 + full-preset ch 9).

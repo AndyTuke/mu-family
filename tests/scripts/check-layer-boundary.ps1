@@ -12,29 +12,42 @@
 #           another layer library's headers (a library may include its own folder name).
 #   Rule 3  Every relative path (relative to its library root) must be unique across mu-core and all layer
 #           libraries, so an include "Audio/Foo.h" can never mean two files. Reported once per colliding pair.
+#   Rule 4  A layer-library file must not define a type (class / struct / union / enum) in the global
+#           namespace: four libraries share one include path and one link in a multi-layer host, so every
+#           library type lives in its product's namespace. Forward declarations of mu-core's own global types
+#           (`struct Layer;`, `class VoiceEngine;`) are not definitions and pass.
+#   Rule 5  "Glue" (D1): for a REGISTERED product (one whose mu-<product>-layer library exists, or named in
+#           -Registered), a file under mu-<product>/Source/Plugin/ that is a .cpp or named PluginProcessor*
+#           must not DEFINE a function named render*, read*Config or applyModulation, nor name the identifiers
+#           voiceEngines or retiring: that per-layer render glue belongs in the layer. Calls (renderAndMix(...);)
+#           are not definitions. Coarse by design; comments are blanked first.
+#   Rule 6  Layer reads outside LayerBlock (N5): in a product whose Plugin/ sources select
+#           LayerAccess::Published, any line of its Plugin/*.cpp or PluginProcessor* files reading `layers[` or
+#           `layerAs<` is reported unless the line carries a `layer-ok` marker (with a reason) that a reviewer
+#           wrote after auditing it (message-thread code, or a value cached by renderLayers). Coarse by design:
+#           it fires on the file, the reviewer clears audited lines. Live from the first Published host (T1).
+#   Rule 7  Every live-count store goes through ProcessorCore::storeLayerCount, which keeps the packed
+#           count | serial layout word in step: `numLayers.store` may appear only in mu-core/Plugin/ProcessorCore.h.
+#           Scans every mu-* source tree (mu-core and the products); Tests/ folders are exempt (test fixtures
+#           build states by hand).
+#   Rule 8  mu-core's Audio/, Modulation/, Persistence/ and Sequencer/ never include Plugin/ (the layer side of
+#           mu-core stays below the processor side; RetireBin and LayerBlock live in Plugin/ for that reason).
 #
-# Rules from the plan that are NOT implemented yet (they need the registered types and the Published
-# LayerAccess mode that only exist once E1 lands; each reports nothing today):
-#   Rule 4  A global-namespace type in a library file.
-#   Rule 5  "Glue": Plugin/*.cpp or PluginProcessor* defining render* / read*Config / applyModulation, or
-#           naming voiceEngines / retiring for a registered type.
-#   Rule 6  Layer reads outside LayerBlock (N5): in a product whose processor selects LayerAccess::Published,
-#           a `layers[` or `layerAs<` read in processBlock, a shell post-stage or flagLayerSwapBoundaries.
-#           TODO(E1): see Test-LayerReadsOutsideLayerBlock below, a documented stub that returns no finding.
-#
-# The scan is driven by -Root, a directory laid out like the repo root: mu-core/ and any mu-*-layer/
-# folders in it. A layer library that does not exist yet is simply absent, so today the script scans
-# mu-core, finds no library and passes. The fixture self-test (test-check-layer-boundary.ps1) points -Root at
-# synthetic trees under fixtures/layer-boundary/.
+# The scan is driven by -Root, a directory laid out like the repo root: mu-core/, any mu-*-layer/ libraries and
+# the product trees mu-*/Source/. A layer library that does not exist yet is simply absent, so today the script
+# scans mu-core, finds no library and no Published product, and passes. The fixture self-test
+# (test-check-layer-boundary.ps1) points -Root at synthetic trees under fixtures/layer-boundary/.
 #
 #   pwsh tests/scripts/check-layer-boundary.ps1                 # check the repo
 #   pwsh tests/scripts/check-layer-boundary.ps1 -Root <dir>     # check another tree
+#   pwsh tests/scripts/check-layer-boundary.ps1 -Registered toni,on   # treat these products as registered (rule 5)
 #   pwsh tests/scripts/check-layer-boundary.ps1 -Quiet          # summary line only
 #
 # Exit code 0 = clean, 1 = one or more violations, 2 = setup error (root missing).
 
 param(
     [string]$Root,
+    [string[]]$Registered = @(),
     [switch]$Quiet
 )
 
@@ -76,11 +89,104 @@ function Get-LibraryFiles($lib) {
     }
 }
 
-# TODO(E1): rule 6 (N5). Once a product's processor selects LayerAccess::Published, this must report any
-# `layers[` / `layerAs<` read in processBlock, a shell post-stage or flagLayerSwapBoundaries, with a
-# `layer-ok` marker for audited lines. It needs to know which products have switched mode, which only
-# exists after E1, so it deliberately finds nothing now.
-function Test-LayerReadsOutsideLayerBlock([string]$root) { return @() }
+# Comments, string and character literals blanked (newlines kept, so line numbers stay true).
+function Get-CleanedText([string]$text) {
+    $t = $blockComment.Replace($text, $blankBlock)
+    $t = [regex]::Replace($t, '"(?:\\.|[^"\\\r\n])*"', '""')
+    $t = [regex]::Replace($t, "'(?:\\.|[^'\\\r\n])+'", "''")
+    $t = $t -replace '//[^\r\n]*', ''
+    return $t
+}
+
+function Get-LineNumber([string]$text, [int]$index) {
+    return ([regex]::Matches($text.Substring(0, $index), "`n")).Count + 1
+}
+
+# Rule 4: type definitions at global scope. A brace stack tells namespace bodies (allowed to hold types)
+# from every other brace; a type definition found with an empty stack is global.
+$scopeToken = [regex]'(?<ns>\bnamespace\b(?:\s+[A-Za-z_][\w:]*)?\s*\{)|(?<type>\b(?<kw>class|struct|union|enum)\b(?:\s+(?:class|struct))?\s+(?:alignas\s*\([^)]*\)\s*)?(?<name>[A-Za-z_]\w*)(?:\s+final)?\s*(?::[^;{}()]*)?\{)|(?<open>\{)|(?<close>\})'
+function Test-GlobalTypes($file) {
+    $text = [System.IO.File]::ReadAllText($file.Full)
+    $cleaned = (Get-CleanedText $text) -replace '(?m)^[ \t]*#[^\r\n]*', ''
+    $stack = New-Object System.Collections.Generic.List[string]
+    $found = @()
+    foreach ($m in $scopeToken.Matches($cleaned)) {
+        if ($m.Groups['ns'].Success)      { $stack.Add('ns') }
+        elseif ($m.Groups['type'].Success) {
+            if ($stack.Count -eq 0) {
+                $line = Get-LineNumber $cleaned $m.Index
+                $found += "$($file.Lib)/$($file.Rel):$line — a layer library defines a global-namespace type '$($m.Groups['name'].Value)' (rule 4)"
+            }
+            $stack.Add('type')
+        }
+        elseif ($m.Groups['open'].Success) { $stack.Add('other') }
+        elseif ($stack.Count -gt 0)        { $stack.RemoveAt($stack.Count - 1) }
+    }
+    return $found
+}
+
+# The product trees under the root (mu-<name>/Source/Plugin), excluding mu-core and the layer libraries.
+function Get-ProductPluginFiles([string]$root) {
+    $out = @()
+    foreach ($d in (Get-ChildItem -LiteralPath $root -Directory -Filter 'mu-*' | Sort-Object Name)) {
+        if ($d.Name -eq 'mu-core' -or $d.Name -like 'mu-*-layer') { continue }
+        $plugin = Join-Path $d.FullName 'Source/Plugin'
+        if (-not (Test-Path -LiteralPath $plugin -PathType Container)) { continue }
+        foreach ($f in (Get-ChildItem -LiteralPath $plugin -File -Include '*.h', '*.hpp', '*.cpp' -Recurse | Sort-Object FullName)) {
+            $isGlueCandidate = $f.Extension -eq '.cpp' -or $f.Name -like 'PluginProcessor*'
+            $rel = $f.FullName.Substring($d.FullName.Length).TrimStart([char]92, '/').Replace([string][char]92, '/')
+            $out += [pscustomobject]@{ Product = $d.Name; Full = $f.FullName; Rel = $rel; Candidate = $isGlueCandidate }
+        }
+    }
+    return $out
+}
+
+# Rule 5: per-layer render glue left in a registered product's shell.
+$glueDefinition = [regex]'(?m)^[ \t]*(?:[\w:<>,]+[ \t\*&]+)+(?:\w+::)*(?<fn>render\w*|read\w*Config|applyModulation)\s*\((?<args>[^;{}]*)\)\s*(?:const\s*)?(?:noexcept\s*)?(?:override\s*)?(?:final\s*)?\{'
+$glueIdentifier = [regex]'\b(voiceEngines|retiring)\b'
+function Test-Glue($files, [string[]]$registeredProducts) {
+    $found = @()
+    foreach ($f in ($files | Where-Object { $_.Candidate -and $registeredProducts -contains $_.Product })) {
+        $cleaned = Get-CleanedText ([System.IO.File]::ReadAllText($f.Full))
+        foreach ($m in $glueDefinition.Matches($cleaned)) {
+            $line = Get-LineNumber $cleaned $m.Index
+            $found += "$($f.Product)/$($f.Rel):$line — a registered product's shell defines layer glue '$($m.Groups['fn'].Value)' (rule 5)"
+        }
+        foreach ($m in $glueIdentifier.Matches($cleaned)) {
+            $line = Get-LineNumber $cleaned $m.Index
+            $found += "$($f.Product)/$($f.Rel):$line — a registered product's shell names '$($m.Value)' (rule 5)"
+        }
+    }
+    return $found
+}
+
+# Rule 6 (N5): a product whose processor selects LayerAccess::Published reads layers only through LayerBlock.
+$publishedMode = [regex]'LayerAccess::Published'
+$layerRead = [regex]'\blayers\s*\[|\blayerAs\s*<'
+function Test-LayerReadsOutsideLayerBlock($files) {
+    $found = @()
+    $byProduct = $files | Group-Object Product
+    foreach ($g in $byProduct) {
+        $published = $false
+        foreach ($f in $g.Group) {
+            if ($publishedMode.IsMatch((Get-CleanedText ([System.IO.File]::ReadAllText($f.Full))))) { $published = $true; break }
+        }
+        if (-not $published) { continue }
+        foreach ($f in ($g.Group | Where-Object { $_.Candidate })) {
+            $text = [System.IO.File]::ReadAllText($f.Full)
+            $origLines = $text -split "\r?\n"
+            $cleanLines = (Get-CleanedText $text) -split "\r?\n"
+            for ($i = 0; $i -lt $cleanLines.Count; $i++) {
+                if (-not $layerRead.IsMatch($cleanLines[$i])) { continue }
+                if ($i -lt $origLines.Count -and $origLines[$i] -match '\blayer-ok\b') { continue }
+                $snippet = $origLines[$i].Trim()
+                if ($snippet.Length -gt 90) { $snippet = $snippet.Substring(0, 90) }
+                $found += "$($f.Product)/$($f.Rel):$($i + 1) — a Published-mode product reads a layer outside LayerBlock (rule 6; audited lines carry layer-ok): $snippet"
+            }
+        }
+    }
+    return $found
+}
 
 $all = @()
 foreach ($lib in $libraries) { $all += @(Get-LibraryFiles $lib) }
@@ -125,8 +231,46 @@ foreach ($g in $byRel) {
     Report "$($g.Group[0].Rel) — the same relative path exists in more than one library (rule 3): $owners"
 }
 
-# Rule 6 stub: reports nothing until E1.
-foreach ($finding in (Test-LayerReadsOutsideLayerBlock $Root)) { Report $finding }
+# Rule 4: global-namespace types in layer-library files.
+foreach ($file in ($all | Where-Object { $_.IsLayer })) {
+    foreach ($finding in (Test-GlobalTypes $file)) { Report $finding }
+}
+
+# Rules 5 and 6 read the product shells. A product is registered when its layer library exists (or -Registered names it).
+$productFiles = @(Get-ProductPluginFiles $Root)
+$registeredProducts = @()
+foreach ($lib in ($libraries | Where-Object { $_.IsLayer })) { $registeredProducts += ($lib.Name -replace '-layer$', '') }
+foreach ($r in $Registered) { foreach ($p in ($r -split ',')) { if ($p.Trim()) { $registeredProducts += ('mu-' + ($p.Trim() -replace '^mu-', '')) } } }
+foreach ($finding in (Test-Glue $productFiles $registeredProducts)) { Report $finding }
+foreach ($finding in (Test-LayerReadsOutsideLayerBlock $productFiles)) { Report $finding }
+
+# Rule 7: a count store outside storeLayerCount leaves the layout word stale.
+$countStore = [regex]'\bnumLayers\s*\.\s*store\s*\('
+foreach ($d in (Get-ChildItem -LiteralPath $Root -Directory -Filter 'mu-*' | Sort-Object Name)) {
+    $base = $d.FullName
+    foreach ($f in (Get-ChildItem -LiteralPath $base -Recurse -File -Include '*.h', '*.hpp', '*.cpp' | Sort-Object FullName)) {
+        $rel = $f.FullName.Substring($base.Length).TrimStart([char]92, '/').Replace([string][char]92, '/')
+        if ($skipDir.IsMatch($rel) -or $rel -match '(^|/)Tests/') { continue }
+        if ($d.Name -eq 'mu-core' -and $rel -eq 'Plugin/ProcessorCore.h') { continue }
+        $cleaned = Get-CleanedText ([System.IO.File]::ReadAllText($f.FullName))
+        foreach ($m in $countStore.Matches($cleaned)) {
+            $line = Get-LineNumber $cleaned $m.Index
+            Report "$($d.Name)/$($rel):$line — a live-count store outside storeLayerCount leaves the layout word stale (rule 7)"
+        }
+    }
+}
+
+# Rule 8: mu-core's layer-side folders never reach up into Plugin/.
+if (Test-Path -LiteralPath $core -PathType Container) {
+    foreach ($file in ($all | Where-Object { $_.Lib -eq 'mu-core' -and $_.Rel -match '^(Audio|Modulation|Persistence|Sequencer)/' })) {
+        # Comments blanked only: the include path is a string literal, which Get-CleanedText would empty.
+        $cleaned = $blockComment.Replace([System.IO.File]::ReadAllText($file.Full), $blankBlock) -replace '//[^\r\n]*', ''
+        foreach ($m in ([regex]'#\s*include\s*[<"]([^">]*/)?Plugin/[^">]*[">]').Matches($cleaned)) {
+            $line = Get-LineNumber $cleaned $m.Index
+            Report "mu-core/$($file.Rel):$line — mu-core's $($file.Rel.Split('/')[0])/ includes a Plugin/ header (rule 8)"
+        }
+    }
+}
 
 $layerCount = @($libraries | Where-Object { $_.IsLayer }).Count
 $status = if ($fails -eq 0) { 'PASS' } else { 'FAIL' }

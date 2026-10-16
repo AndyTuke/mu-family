@@ -133,7 +133,7 @@ PluginProcessor::PluginProcessor()
     for (auto& slotArr : retiredReadyForCleanup)
         for (auto& flag : slotArr)
             flag.store(false, std::memory_order_relaxed);
-    numLayers.store(1, std::memory_order_release);
+    storeLayerCount(1, std::memory_order_release);   // through the packed layout word, as every count store
 
     {
         mu_core::ScopedApvtsLoading guard(apvtsLoading);

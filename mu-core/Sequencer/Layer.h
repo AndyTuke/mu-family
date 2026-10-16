@@ -4,9 +4,14 @@
 #include "Modulation/ModulationMatrix.h"
 #include "Audio/VoiceParams.h"
 #include "Sequencer/ClipBank.h"
+#include "Sequencer/RenderContext.h"
+#include "Sequencer/RetireTail.h"
 #include "MuLimits.h"
 
 #include <juce_data_structures/juce_data_structures.h>
+#include <juce_audio_basics/juce_audio_basics.h>
+
+namespace juce { class AudioProcessorValueTreeState; }
 
 #include <atomic>
 #include <string>
@@ -67,7 +72,11 @@ struct SlotBound
 // Base struct shared by all mu-family voice slots.
 // Rhythm (mu-clid) extends this with Euclidean hit generators.
 // Future mu-tant voice types extend it with their own trigger data.
-struct Layer
+//
+// A Layer is also a mu_core::RetireTail (retirePolicy, beginRetire, onRetireStart, renderRetiring), so the
+// shared RetireBin can hold a whole layer that keeps sounding after it left its slot. It stays a copyable
+// value: heavy members (engines, inserts) are SlotBound / unique_ptr members a copy leaves alone.
+struct Layer : public mu_core::RetireTail
 {
     static constexpr int MaxControlSequences = mu_limits::kMaxControlSequences;
 
@@ -139,6 +148,41 @@ struct Layer
         std::swap(modulationMatrix, fresh.modulationMatrix);
     }
     virtual void onMoved(int newIndex) { juce::ignoreUnused(newIndex); }
+
+    // ─── The render contract (docs/mu-tronic/design.md 2.1) ─────────────────────────────────────
+    // A host that renders through ProcessorBase::renderAndMix calls these; every default does nothing, so a
+    // product that has not adopted the contract is unchanged. All are called once per layer per block or per
+    // edit, never per sample.
+    //
+    // The type's id, a mu_core::LayerTypeId value (Sequencer/LayerTypeInfo.h). Any thread. The base Layer is
+    // Empty, which renderLayers skips (its slot's scratch is cleared instead).
+    virtual int typeId() const { return 0; }
+    // Message thread, while the audio thread cannot reach the layer (not yet published, or not processing):
+    // allocate everything render needs (engine, buffers, insert) for this rate and block size.
+    virtual void prepare(double sampleRate, int blockSize) { juce::ignoreUnused(sampleRate, blockSize); }
+    // Message thread, before publication and again after every move to another slot (C9): cache the slot's
+    // parameter atomics (mu_core::ParamBinding). render never looks a parameter up by id.
+    virtual void bindParams(juce::AudioProcessorValueTreeState& apvts, int slot) { juce::ignoreUnused(apvts, slot); }
+    // Audio thread: frames [0, n) of `out` (two channels, handed over cleared) become the layer's block,
+    // insert included. No allocation, no lock beyond the layer's own spin locks, no parameter lookup by id,
+    // no call into the host: the only outputs are `out`, ctx.midiOut and the layer's own atomics.
+    // A playing block may REPEAT the previous block's startBeat: a host that stalls its position while reporting
+    // play (a freeze) is not a jump, so a transport-anchored layer keeps a last-evaluated-beat cursor and fires
+    // nothing it already fired; the one discontinuity arrives as onTransportJump when the position moves again.
+    virtual void render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n) { juce::ignoreUnused(ctx, out, n); }
+    // 0 renders in the first pass, 1 after every priority-0 layer (a layer that reads a peer through ctx.peer).
+    virtual int renderPriority() const { return 0; }
+    // Audio thread: the loop length in beats the hot-swap boundary uses; cached per slot by the base each
+    // rendered block. Negative: the slot has no loop to wait for. Default: the 4/4 bar (the swapper's common rule).
+    virtual double loopBeats() const { return 4.0; }
+    // Message thread: file work for a staged layer-preset tree (a sample, a user wavetable), so the commit at
+    // the boundary does none.
+    virtual void preloadStaged(const juce::ValueTree& staged) { juce::ignoreUnused(staged); }
+    // Audio thread, before any render of the block that carries the edge: the play-to-stop edge (silence held
+    // notes and gates) and a discontinuity while playing (locate, host loop, clock snap: release or re-anchor
+    // pending notes). A type acts on these hooks or on the same flags inside render, not on both.
+    virtual void onTransportStopped(const mu_core::RenderContext& ctx) { juce::ignoreUnused(ctx); }
+    virtual void onTransportJump(const mu_core::RenderContext& ctx)    { juce::ignoreUnused(ctx); }
 
     // The insert effect's gain-reduction meter (0..1, written by the audio thread, read by the UI), or
     // null when the layer has no insert or the algorithm shows none. Message thread only: the pointer

@@ -70,7 +70,7 @@ PluginProcessor::PluginProcessor()
         layers[(size_t) i]->colourIndex = i;   // each voice starts on its own palette colour
         jassert(dynamic_cast<Pattern*>(layers[(size_t) i].get()) != nullptr);   // the one type check; layerAs only casts
     }
-    numLayers.store(1, std::memory_order_relaxed);
+    storeLayerCount(1, std::memory_order_relaxed);   // through the packed layout word, as every count store
 
     initAppSettings("muTant");   // settings file + saved UI size / MIDI clock (ProcessorBase)
 

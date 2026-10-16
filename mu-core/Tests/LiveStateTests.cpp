@@ -31,11 +31,14 @@ struct Fake
     // a new per-layer serial, as the hot-swap stager does; a commit consumes without touching the serial.
     bool refuseLaunch = false;
     std::vector<std::pair<int, int>> launched;
-    std::array<bool, 8>     slotPend {};
-    std::array<uint32_t, 8> slotSer {};
-    std::array<bool, 8>     muted {};
-    std::array<int, 8>      recorded { -1, -1, -1, -1, -1, -1, -1, -1 };
-    std::array<int, 8>      saved    { -1, -1, -1, -1, -1, -1, -1, -1 };   // each layer's saved playing clip
+    // One entry per layer slot (the live state walks every slot up to kMaxLayers, 8 or 16 by build).
+    static constexpr size_t kSlots = (size_t) mu_limits::kMaxLayers;
+    static std::array<int, kSlots> noClips() { std::array<int, kSlots> a {}; a.fill(-1); return a; }
+    std::array<bool, kSlots>     slotPend {};
+    std::array<uint32_t, kSlots> slotSer {};
+    std::array<bool, kSlots>     muted {};
+    std::array<int, kSlots>      recorded = noClips();
+    std::array<int, kSlots>      saved    = noClips();   // each layer's saved playing clip
     int mutes = 0;
     int slotCancels = 0;
 
@@ -647,9 +650,9 @@ public:
             expectEquals(count.n, 1);
             s.setClipName(0, 3, "Intro");
             expectEquals(count.n, 1, "the same name is not a change");
-            s.setClipName(9, 0, "x"); s.setClipName(0, 8, "x"); s.setClipName(0, -1, "x");
+            s.setClipName(mu_limits::kMaxLayers + 1, 0, "x"); s.setClipName(0, 8, "x"); s.setClipName(0, -1, "x");   // a layer past the build's capacity
             expectEquals(count.n, 1, "out of range is ignored");
-            expectEquals(s.getClipName(9, 0), juce::String());
+            expectEquals(s.getClipName(mu_limits::kMaxLayers + 1, 0), juce::String());
             expectEquals(s.getClipName(0, 8), juce::String());
 
             s.remapLayers([](int i) { return i == 0 ? 2 : (i == 2 ? 0 : i); });

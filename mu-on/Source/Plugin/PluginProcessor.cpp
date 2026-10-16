@@ -99,7 +99,7 @@ PluginProcessor::PluginProcessor()
         jassert(dynamic_cast<Track*>(layers[(size_t) i].get()) != nullptr);   // the one type check; layerAs only casts
         stepPattern.bind(i, &getTrack(i).row);
     }
-    numLayers.store(1, std::memory_order_relaxed);         // a fresh instance is one Kick track...
+    storeLayerCount(1, std::memory_order_relaxed);         // a fresh instance is one Kick track...
     getTrack(0).row.loadDefaultGroove(EngineType::Kick);   // ...with the four-on-the-floor row
     unsavedLayerCount = kNumLegacyLanes;                   // a state saved before layers were variable held five lanes
 

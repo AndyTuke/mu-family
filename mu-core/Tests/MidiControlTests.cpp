@@ -12,23 +12,11 @@
 #include <new>
 #include <thread>
 
-// Counts heap allocations made by a thread that has switched counting on, so a test can prove
-// that a call allocates nothing. Replacing the global operator new affects the whole test binary,
-// but only the counting thread's allocations are recorded.
-namespace mu_test_alloc
-{
-    thread_local bool         counting = false;
-    thread_local std::size_t  count    = 0;
-}
-
-void* operator new(std::size_t n)
-{
-    if (mu_test_alloc::counting) ++mu_test_alloc::count;
-    if (void* p = std::malloc(n == 0 ? 1 : n)) return p;
-    throw std::bad_alloc();
-}
-void operator delete(void* p) noexcept { std::free(p); }
-void operator delete(void* p, std::size_t) noexcept { std::free(p); }
+// The heap counter for the whole mu-core-tests binary: this TU carries AllocationProbe.h's replaced
+// global operators (one TU per executable). A test proves a call allocates nothing by arming the
+// probe on its own thread (mu_alloc::ArmedNewOnly here, mu_alloc::Armed where plain malloc counts too).
+#define MU_ALLOCATION_PROBE_DEFINE_OPERATORS
+#include "AllocationProbe.h"
 
 using namespace mu_core;
 
@@ -456,10 +444,10 @@ public:
             {
                 auto block = makeBlock();
                 router.noteBlock(playingBlock(rep * 0.1, 0.1), 4.0);
-                mu_test_alloc::count = 0; mu_test_alloc::counting = true;
+                mu_alloc::ArmedNewOnly counted;
                 router.process(block);
-                mu_test_alloc::counting = false;
-                total += mu_test_alloc::count;
+                counted.stop();
+                total += (std::size_t) counted.allocs();
                 // The unclaimed notes (60) and odd CCs stay; the claimed ones are gone.
                 bool leftover = false;
                 for (const auto meta : block)
@@ -493,10 +481,10 @@ public:
             };
             auto block = makeBlock();
 
-            mu_test_alloc::count = 0; mu_test_alloc::counting = true;
+            mu_alloc::ArmedNewOnly counted;
             router.process(block);
-            mu_test_alloc::counting = false;
-            expectEquals((int) mu_test_alloc::count, 0);
+            counted.stop();
+            expectEquals(counted.allocs(), 0);
 
             int sysex = 0, ccs = 0;
             for (const auto meta : block)

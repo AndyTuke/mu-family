@@ -100,6 +100,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     // does (the audio thread's ScopedTryLock bails while we hold it). The lock is held
     // for the rest of the function (RAII) and released on return.
     proc.suspendProcessing(true);
+    const juce::ScopedLock lw(proc.layoutWriteLock);   // first: the count stores below advance the layout serial
     const juce::ScopedLock sl(proc.layersLock);
 
     // Expand to MaxRhythms so parameterChanged can write to all 8 rhythm slots.
@@ -145,7 +146,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     const int oldN = proc.numLayers.load(std::memory_order_acquire);
     if (n < oldN)
     {
-        proc.numLayers.store(n, std::memory_order_release);  // decrement first
+        proc.storeLayerCount(n, std::memory_order_release);  // decrement first
         for (int i = n; i < oldN; ++i)
         {
             proc.voiceEngines[i].reset();
@@ -165,7 +166,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
                 proc.midiEngines[i].prepare(proc.currentSampleRate, proc.currentBlockSize);
             }
         }
-        proc.numLayers.store(n, std::memory_order_release);  // increment after slots ready
+        proc.storeLayerCount(n, std::memory_order_release);  // increment after slots ready
     }
 
     // Restore non-APVTS properties and refresh engines.

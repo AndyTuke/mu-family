@@ -1,13 +1,20 @@
 # mu-core-tests — console UnitTests for shared mu-core behaviour that needs no product
 # (ProcessorCore host transport + layer access). Built as part of ALL_BUILD like the
 # per-product test targets. Tests of shared mu-core code live here, not in a product.
+#
+# mu-core-tests-16 is the same executable built with MU_MAX_LAYERS=16 (the 16-layer host's capacity): one
+# source list, one function, so the two can never drift apart (docs/mu-tronic/design.md 3.4).
 include("${CMAKE_CURRENT_SOURCE_DIR}/../cmake/ProcessorTestSources.cmake")
-juce_add_console_app(mu-core-tests PRODUCT_NAME "mu-core-tests")
 
-target_sources(mu-core-tests PRIVATE
+set(MU_CORE_TEST_SOURCES
     TestMain.cpp
     HostTransportPublishTests.cpp
     GoldenRenderHarnessTests.cpp
+    LayerRenderTests.cpp            # the layer render contract: driver, epoch, LayerBlock, time model
+    RetireBinTests.cpp              # the shared retire bin and the retire isolation twin test
+    LayerEquivalenceTests.cpp       # the useLayerRender equivalence harness on the fake host
+    LayerContractFixtures.h
+    LayerEquivalence.h
     LayerAccessTests.cpp
     ClipBankTests.cpp
     ClipLaunchTests.cpp
@@ -85,31 +92,38 @@ foreach(_f ${MU_CORE_CHROME_SOURCES})
         list(APPEND _chrome_extra "${_n}")
     endif()
 endforeach()
-target_sources(mu-core-tests PRIVATE ${_chrome_extra})
 
-target_compile_features(mu-core-tests PRIVATE cxx_std_17)
+# One mu-core test executable; `max_layers` is the MU_MAX_LAYERS it is built with (empty = the default).
+function(mu_core_add_test_target name max_layers)
+    juce_add_console_app(${name} PRODUCT_NAME "${name}")
+    target_sources(${name} PRIVATE ${MU_CORE_TEST_SOURCES} ${_chrome_extra})
+    target_compile_features(${name} PRIVATE cxx_std_17)
+    target_include_directories(${name} PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/.."
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"   # ReverbSlot
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+    )
+    target_link_libraries(${name} PRIVATE
+        juce::juce_core
+        juce::juce_audio_basics
+        juce::juce_audio_processors
+        juce::juce_audio_formats
+        juce::juce_data_structures
+        juce::juce_events
+        juce::juce_graphics
+        juce::juce_gui_basics
+        juce::juce_dsp
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags
+    )
+    target_compile_definitions(${name} PRIVATE JUCE_USE_MP3AUDIOFORMAT=1 JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0
+        JUCE_MODAL_LOOPS_PERMITTED=1   # the teardown tests pump the message loop to let timers run
+        MU_VOICE_ENGINE_TEST_SEAM=1)   # exposes VoiceEngine::setParamsHoldHook to VoiceEngineParamsTests only
+    if(NOT "${max_layers}" STREQUAL "")
+        target_compile_definitions(${name} PRIVATE MU_MAX_LAYERS=${max_layers})
+    endif()
+endfunction()
 
-target_include_directories(mu-core-tests PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}"
-    "${CMAKE_CURRENT_SOURCE_DIR}/.."
-    "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"   # ReverbSlot
-    "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
-)
-
-target_link_libraries(mu-core-tests PRIVATE
-    juce::juce_core
-    juce::juce_audio_basics
-    juce::juce_audio_processors
-    juce::juce_audio_formats
-    juce::juce_data_structures
-    juce::juce_events
-    juce::juce_graphics
-    juce::juce_gui_basics
-    juce::juce_dsp
-    juce::juce_recommended_config_flags
-    juce::juce_recommended_warning_flags
-)
-
-target_compile_definitions(mu-core-tests PRIVATE JUCE_USE_MP3AUDIOFORMAT=1 JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0
-    JUCE_MODAL_LOOPS_PERMITTED=1   # the teardown tests pump the message loop to let timers run
-    MU_VOICE_ENGINE_TEST_SEAM=1)   # exposes VoiceEngine::setParamsHoldHook to VoiceEngineParamsTests only
+mu_core_add_test_target(mu-core-tests "")
+mu_core_add_test_target(mu-core-tests-16 16)   # the 16-layer build of the same sources

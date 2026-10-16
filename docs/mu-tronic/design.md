@@ -132,7 +132,9 @@ stay in that table and bind this section too. **Status: specified 2026-10-15; `d
 C4 Not yet (R1 to R7), structure kept; this revision folds in R1 to R7, the binding notes N1 to N7, the accepted amendments and the open-point rulings (2.1.6).
 Round 2 (2026-10-15): C1 and C2 Pass with notes, C3 Pass, C4 Not yet (F1, folded in with the R5 rule line and the round-2 binding notes on the packed word,
 lock order, eviction under `layersLock` and phase 4). `dsp-controller` sign-off: C1-C3 signed (round 2, with binding notes); C4 accepted once F1 and the R5
-rule line are in the doc (dsp-controller: no further round).** E1 may start on C1 to C3.
+rule line are in the doc (dsp-controller: no further round).** E1 may start on C1 to C3. **E1 built 2026-10-16** (branch `extraction`); the
+`architecture-steward`'s rulings on where the build differs from this text, and what each product must convert when it adopts the contract, are in 2.1.7. The
+subsections below already show the accepted as-built shape.
 
 New hooks (defaults do nothing; all called once per layer per block or per edit, never per sample). `Layer` gains a second base, the interface
 `mu_core::RetireTail` (2.1.3), so the bin can hold either a whole layer or a product's engine tail:
@@ -168,14 +170,30 @@ A product's `processBlock`, after its E stage, is the transport, one base call a
 ```cpp
 void mu_xxx::PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
-    captureSidechainAndClear(buffer);                      // unchanged
+    // no captureSidechainAndClear here: renderAndMix does the sidechain copy and the clear per chunk (below)
     queueMidiProgramChanges(midi);                         // router claims leave `midi` here
-    const auto t = resolveBlockTransport(midi, buffer.getNumSamples(), kBeatWrap);   // base wrapper of resolveTransport (2.1.5); mu-Clid keeps its Note-mode source
-    renderAndMix(buffer, midi, t, outs);                   // base: LayerBlock, MIDI decode, chunk loop { renderLayers, processCoreBlock }; outs = mu-Clid's direct outs, else {}
+    const auto t = resolveBlockTransport(midi, buffer.getNumSamples(), kBeatWrap);   // base wrapper of resolveTransport (2.1.5); t carries kBeatWrap; mu-Clid keeps its Note-mode source
+    renderAndMix(buffer, midi, t, directOuts, fxReturns);  // base: LayerBlock, MIDI decode, chunk loop { renderLayers, processCoreBlock }; both outs optional (mu-Clid's direct outs)
+    mergeLayerMidiOut(midi, byteBudget);                   // only a product whose layer types write ctx.midiOut (mu-Clid MIDI mode, mu-Tronic)
     // product shell post-stage, if any: mu-Tant's Note-mode final-mix gate (decision A3), mu-Clid's sample preview
-    flagLayerSwapBoundaries(t);                            // per-slot loopBeats cached by renderLayers; runs on a miss too
+    flagLayerSwapBoundaries(t, fullPresetLoopBeats);       // per-slot loopBeats cached by renderLayers; the full preset's length is the product's rule (default 4); runs on a miss too
 }
 ```
+
+**The beat bound is given once.** `kBeatWrap` goes to `resolveBlockTransport` only and travels in the `BlockTransport` it returns; `renderAndMix` reads it from
+there for the continuity reduction and `RenderContext::beatWrap`. `renderAndMix` has no `beatWrap` argument (as built, 2026-10-16): the resolver sets
+`BlockTransport::beatWrap`, because two copies of one value can differ, and a mismatch makes every wrap of mu-Tant's 64-beat space a false jump.
+
+**Sidechain capture and the clear are inside `renderAndMix`** (as built). It takes the host buffer as received and, per chunk, copies that chunk's DAW-sidechain
+frames, clears the chunk's output region, then renders and mixes; a skipped block (failed `LayerBlock`) clears the whole buffer. A product adopting the driver
+**must not** call `captureSidechainAndClear` before `renderAndMix`: doing so on an oversize host block captured the wrong sidechain frames for later chunks
+(wrong ducking).
+
+**MIDI out is merged by the product, not by `renderAndMix`** (as built, accepted 2026-10-16). The layers' and tails' MIDI stays in the block's event storage;
+the product calls `mergeLayerMidiOut(midi, byteBudget)` once per rendered block, after `renderAndMix` and before any shell stage that reads `midi`. The budget
+is the room the product knows the host buffer already has, so the merge never grows it on the audio thread (2.1.5, R7); tails' owed note-offs go first. Only the
+product knows that room (mu-Clid's `ProcessorSeamTests` rule), which is why the base does not merge by itself; the budget mechanism is settled at E5.4c. A
+product none of whose types writes `midiOut` (mu-Tant, mu-Toni, mu-On) does not call it.
 
 Each product keeps its own `juce::ScopedNoDenormals` at the top of `processBlock` (N7): mu-Tant's Note-mode gate and any other shell post-stage run outside
 `LayerBlock`. **Shell code reads no layer (N5):** in `Published` mode nothing on the audio thread outside `LayerBlock` may read `layers[]` or `layerAs<T>`;
@@ -203,6 +221,10 @@ delivered on the next rendered block.
 
 `processCoreBlock` gets a `RenderChannelFn` that copies `scratch[r]` into the mixer's channel buffer (an exact copy, so R11 holds) for `r < mixCount`. Scratch
 buffers (`kMaxLayers` x 2 channels x prepared size) and the decoded MIDI array are allocated in `prepareToPlay` / at construction, never grown.
+The driver's own state (scratch, peers, latches, MIDI storage) and the `RetireBin` are `ProcessorBase` members held by a `unique_ptr` created in the member
+initialiser (as built, accepted): allocated once on the constructing thread, never reset or reseated while the processor lives, and reached through a
+reference member, so the audio thread sees a fixed address and `ProcessorBase` stays small for stack-built test hosts. The driver is in
+`mu-core/Plugin/ProcessorBase_Render.cpp` (design-naming §3, `ProcessorBase_<Aspect>.cpp`).
 
 #### 2.1.2 C1: layer access and non-muting publication
 
@@ -366,7 +388,8 @@ kRetireDepth` (never binding in the four products); mu-Tronic sets it from the C
 evicted.
 
 ```cpp
-// mu-core/Sequencer/RetireBin.h  (namespace mu_core)
+// mu-core/Sequencer/RetireTail.h  (namespace mu_core): what a layer type implements and includes (Layer.h includes it).
+// Also holds RetireSnapshot, ParamBinding and applyLinearFade (2.1.4). No Plugin/ include.
 struct RetirePolicy
 {
     enum class Kind : uint8_t { None, Fade, Natural };
@@ -395,31 +418,44 @@ public:
     virtual bool renderRetiring(const RenderContext&, juce::AudioBuffer<float>&, int, RetireState&) { return false; }
 };
 
+// mu-core/Plugin/RetireBin.h  (namespace mu_core): processor-side machinery, owned by ProcessorBase beside LayerBlock.h and
+// AudioEpoch.h; no layer type includes it (ruled 2026-10-16, 2.1.7; E1 built it as Sequencer/RetireBin.h, to be moved).
 class RetireBin
 {
 public:
     enum State : uint8_t { Empty = 0, Parked, Draining, Done };
     enum class CountPolicy : uint8_t { RenderPastCount, CutAtCount };   // R3: per product, set once at construction
+    enum class ParkResult : uint8_t { Parked, NotParked, AlreadyActive, Dropped, Invalid };
+
+    explicit RetireBin(const AudioEpoch&);   // the processor's epoch; service() needs no argument
+
+    // Configuration, constructor or before processing.
+    void setCountPolicy(CountPolicy);  void setGlobalBudget(int maxLive);  void setEvictTimeoutMs(int ms);   // default 50 ms
 
     // Message or host thread; every one takes binMutex (both modes, R2). binMutex is never taken by the audio thread and is
     // not layersLock. Lock order: layoutWriteLock, layersLock, binMutex (mu-Tant's layersMoved calls cutSlot under layersLock);
     // never the reverse. A RetireTail destructor (run under binMutex by service) takes no lock.
-    void setPrepared(double sampleRate);     // prepareToPlay: stores the rate park converts with
-    void park       (int slot, std::unique_ptr<RetireTail> owned, uint32_t activationSerial);  // owned; reads the rate under binMutex
-    void parkInPlace(int slot, RetireTail& spare,                 uint32_t activationSerial);  // borrowed spare (mu-Tant); no-op if the row
-                                                                                               // already holds an active in-place entry (R1)
+    void setPrepared(double sampleRate, int blockSize);   // prepareToPlay: the rate park converts with, and the declick scratch
+    // audioExcluded: the caller holds layersLock in TryLock mode, so the audio thread cannot be in the bin (eviction without a wait).
+    ParkResult park       (int slot, std::unique_ptr<RetireTail> owned, uint32_t activationSerial, bool audioExcluded);
+    ParkResult parkInPlace(int slot, RetireTail& spare,                 uint32_t activationSerial, bool audioExcluded);
+                                             // borrowed spare (mu-Tant); AlreadyActive if the row holds an active in-place entry (R1)
     void cutSlot (int slot);                 // every entry of the slot to Done: a remove, a regrow into an in-place slot, before a spare dies
     void cutAtOrAbove(int count);            // CutAtCount products: a count-reducing store cuts the rows it leaves
-    void swapRows(int a, int b);  void removeRow(int index);   // structural edits, quiesced: owned tails follow their slot;
-                                                               // in-place entries are CUT, never moved (R1); the removed row is cut
+    void swapRows(int a, int b);             // structural edits, quiesced: owned tails follow their slot; in-place entries are CUT (R1)
+    void removeRow(int index, int liveCount);   // mirrors unpublishLayerLocked: the removed row is cut, rows index+1 .. liveCount-1
+                                                // move down one with their layers, the cut row lands at liveCount-1; spares above stay
     void cutAll  ();                         // prepareToPlay, releaseResources, prepareForDestruction
-    int  service (const AudioEpoch&);        // free every Done entry whose grace passed; never waits
+    int  service ();                         // free every Done entry and reclaim-list tail whose grace passed; never waits
+    bool hasPendingWork() const noexcept;    // any thread: something waits for a service pass (the 100 Hz poll checks it)
+    static bool isFreeingOnThisThread() noexcept;   // true while this thread runs a tail destructor inside the bin
 
     // Audio thread, inside a LayerBlock that succeeded (a failed one calls nothing here, R4).
     int  highestActiveSlot(uint32_t viewSerial) const noexcept;
-    void render(int slot, RenderContext ctx, juce::AudioBuffer<float>& slotOut, int n,
+    bool render(int slot, RenderContext ctx, juce::AudioBuffer<float>& slotOut, int n,
                 uint32_t viewSerial, bool slotHasLive) noexcept;   // ctx.retiring = 1, empty midi, valid midiOut (R7), no peers;
-                                                                   // skips in-place entries when slotHasLive (R1)
+                                                                   // skips in-place entries when slotHasLive (R1);
+                                                                   // true: an entry went Done (the caller requests deferred work)
 
 private:
     struct Entry
@@ -518,7 +554,9 @@ entry above the count must not render in the window between the count store and 
 under `binMutex`, in one of two ways:
 
 - **`TryLock` mode, park under `layersLock`** (mu-Clid's install): the audio thread cannot be inside the bin while the caller holds `layersLock`, so the
-  entry is cut and freed **at once, without a wait** (today's force-cut: bit-identical, and nothing is added to the lock hold).
+  entry is cut and emptied **at once, without a wait** (today's force-cut: bit-identical, and nothing is added to the lock hold). Its tail is **not deleted
+  there**: it goes to the bin's reclaim list and the next `service()` deletes it, outside `layersLock` (as built in E1, accepted 2026-10-16: "only `service`
+  frees" and "no free under `layersLock`" then hold without exception, and the entry is reusable at once, so the render is unchanged).
 - **Otherwise** (a park outside `layersLock`, or under the writers' mutex in `Published` mode): the message thread cuts it, then `waitFor(stamp, timeout)` its
   grace (one block at most; `binMutex`, and in `Published` mode the writers' mutex, are held across this one bounded wait, the exception named in 2.1.2;
   `layersLock` in `TryLock` mode never is). On success it frees the entry and reuses it, on a timeout it **drops the incoming tail** (an owned tail goes to the reclaim list and is
@@ -537,7 +575,9 @@ today, now fades out at 30 s. **Seconds, with one kept exception (amendment b):*
 
 **Who frees, on which thread.** Only `service()` frees, on the message thread (the 100 Hz poll, `runDeferredWork`, `flushPendingAsyncUpdates` for headless
 renders), under `binMutex` and outside `layersLock`; it never waits (an entry whose grace has not passed waits for the next pass). Because frees run under
-`binMutex`, **a `RetireTail` destructor takes no lock** (and so cannot invert the order). The audio thread's Done requests deferred work so the free is
+`binMutex`, **a `RetireTail` destructor takes no lock** (and so cannot invert the order). C++ cannot detect "took a lock" generically, so the rule is
+enforced per tail type: review, plus a destructor probe in the type's tests that asserts on `RetireBin::isFreeingOnThisThread()` around any lock the type's
+members own (mu-Clid's `EngineTail` at E5.4d is the first; the E1 fake tail proves the probe). The audio thread's Done requests deferred work so the free is
 prompt. **Flush:** `prepareToPlay` and `releaseResources` call `setPrepared` (prepare only), `cutAll()` then `service()` under `binMutex`, nested inside the
 writers' mutex they already hold (or after releasing it; 2.1.2 lock order), so they serialise with a concurrent 100 Hz service on another thread (the host is not processing, the stamp is even, everything is freed at
 once); `prepareForDestruction()` does the same before any product member is destroyed. mu-Clid's flush at prepare (today it re-prepares retired engines and
@@ -570,7 +610,7 @@ overlap (`binMutex`, two-thread stress); `service` runs before the install in a 
 `CutAtCount` cuts at the store); a failed `LayerBlock` changes no entry; an entry cut after phase 0 renders silence in its slot; every count store goes through the
 packed word and no serial is lost or misattached (the `applyComposedState` race test, run from a second thread against message-thread edits); under
 `CutAtCount` a Draining entry above a just-stored count does not render before `cutAtOrAbove`; a full-row eviction under `layersLock` in `TryLock` mode frees
-without a wait; a `RetireTail` destructor taking a lock is a Debug assert.
+without a wait (the tail is deleted by the next `service`); a tail destructor runs only with `isFreeingOnThisThread()` true (the destructor probe).
 
 **Failure modes considered.** Free while the audio thread is inside `renderRetiring` (the grace period); a tail started after it was cut (the audio
 compare-exchange); a tail rendered both live and as a tail (activation serial; for in-place entries also the `slotHasLive` skip); a block with neither (count
@@ -603,7 +643,7 @@ ones, and emits owed MIDI note-offs into `ctx.midiOut` so a tail never holds a M
 **How a layer declares its snapshot so the test can prove it.**
 
 ```cpp
-// mu-core/Sequencer/RetireBin.h
+// mu-core/Sequencer/RetireTail.h
 template <class Snapshot>
 struct RetireSnapshot                    // a layer type with a tail holds one of these as a member
 {
@@ -615,14 +655,19 @@ struct RetireSnapshot                    // a layer type with a tail holds one o
 //                RetireSnapshot<PatternRetire> retireSnap;   // written only by beginRetire, read only by renderRetiring
 ```
 
-The proof is behavioural and generic, so it needs nothing from the type but its registration: **`mu_core::testing::checkRetireIsolation(info)`** builds two
+The proof is behavioural and generic, so it needs nothing from the type but its registration: **`mu_contract_test::checkRetireIsolation(info)`**
+(`mu-core/Tests/RetireIsolation.h`, the test-helper namespace rule of design-naming §3; E1 proved the twin test on its fake type inside `RetireBinTests.cpp`
+with a negative control, and the generic helper is written, from that test, with the first product type that has a tail, mu-Tant's `Pattern` at E4.6, then
+run for every registered type at T1) builds two
 identical instances of the type in slot 0 of a test processor, renders the same blocks, calls `beginRetire` on both and parks both, then on **one** of them
 scrambles **every APVTS parameter of the processor** (legal random values; not only the slot's prefix, because a snapshot may hold globals: mu-Tant's includes
 the global root and scale through `globalPtrs`), replaces its modulation matrix and control sequences, and feeds garbage peers; the two tails must be
 bit-identical for their whole life, compared on the **tail's own output before the strip** (N6), so mixer and FX parameters scrambled on one side cannot mask
 or fake a difference. A second case puts a same-prefix type in the slot while the first rings (the E1 fake pair; mu-On Kick to Bass
-in E3). In Debug and test builds the `bindParams` cache is a `mu_core::ParamBinding` whose `load()` asserts that `onRetireStart` has not run, so an accidental
-read is a jassert in the first test that hits it, not a silent mix of two layers.
+in E3). In Debug and test builds the `bindParams` cache is a `mu_core::ParamBinding` whose `load()` asserts that the read is **not made from inside a tail call**
+(`onRetireStart` or `renderRetiring` of its own layer; the bin sets the flag around both), so an accidental read is a jassert in the first test that hits it,
+not a silent mix of two layers. (As built, accepted 2026-10-16: "has `onRetireStart` run" would stay true for a mu-Tant in-place spare that becomes the live
+layer again on regrow, and would then fire on legal live reads.)
 
 **Invariants.** The isolation twin test per registered type; the same-prefix case; a tail emits every owed note-off in its first block and none later; no
 allocation in `onRetireStart` or `renderRetiring`.
@@ -774,8 +819,8 @@ type may reuse it for triggers inside a block; a new type counts from the event'
 **MIDI from a tail (R7).** The tail context has an **empty** `midi` view and a **valid** `midiOut` sink drawn from the note-off reserve (the last 256 entries of
 the block's event storage), so `onRetireStart` can emit its owed note-offs into `ctx.midiOut` even when live layers filled the rest. **Merging sinks into the
 host `MidiBuffer` never grows it on the audio thread:** the merge stays within the room the host buffer already has (today's rule, pinned by mu-Clid's
-`ProcessorSeamTests`, "the host owns this buffer's room; the processor must not need more"), note-offs first; the AllocationProbe covers it, and the exact
-mechanism is reviewed with E5.4c.
+`ProcessorSeamTests`, "the host owns this buffer's room; the processor must not need more"), note-offs first; the AllocationProbe covers it. The merge is the
+product's call, `mergeLayerMidiOut(midi, byteBudget)` (2.1.1); how mu-Clid derives the budget is reviewed with E5.4c.
 
 **Tempo changes between blocks stay phase-continuous** by construction: the resolver makes each block start where the last one ended (internal and MIDI
 clock; a host supplies its own position), positions are functions of the beat, so a new tempo changes only the next block's `beatsPerSample`; event-anchored
@@ -850,6 +895,60 @@ None of the twelve blocks E1. The pins (P) and measurements (M) named here are l
 
 **Amendments accepted with caveats:** (a) frame countdowns for note-offs, but no mu-Tronic type reuses `MidiOutputEngine` for in-block triggers (2.1.5); (b)
 `retirePolicy()` in seconds, with mu-Clid's drain kept block-counted inside its tail (2.1.3); (c) no mu-Toni clock rework; (d) no trigger field, E5.5 re-opened.
+
+#### 2.1.7 E1 as built: the architecture-steward's rulings (2026-10-16)
+
+E1 (branch `extraction`, six commits) is all `mu-core`, additive, and touches no product source; `check-core-boundary.ps1` and
+`check-layer-boundary.ps1` pass on it. Files and names follow 2.1 and design-naming §3 (`Plugin/AudioEpoch.h`, `Plugin/LayerBlock.h`,
+`Plugin/ProcessorBase_Render.cpp`, `Sequencer/RenderContext.h`, `Sequencer/BeatWrap.h`, `Sequencer/LayerTypeInfo.h`, `Sequencer/RetireTail.h`; the tests and
+`LayerEquivalence.h` in `mu-core/Tests/`, as tests.md section 3 places it). `LayerTypeId` naming the family's type names in `mu-core` is the 2.5 ruling, not a
+boundary breach. Where the build differs from the text, the subsections above now show the accepted shape; the verdicts:
+
+| # | As built | Verdict |
+|---|---|---|
+| 1 | MIDI out not merged by `renderAndMix`; the product calls `mergeLayerMidiOut(midi, byteBudget)` | **Accept** (2.1.1): only the product knows the host buffer's room |
+| 2 | Eviction under `layersLock` empties the entry at once and defers the delete to `service()` | **Accept** (2.1.3): no free under `layersLock` without exception, render unchanged |
+| 3 | `removeRow(index, liveCount)` | **Accept** (2.1.3): it must mirror `unpublishLayerLocked`, which moves only the live rows |
+| 4 | `ParamBinding` asserts "not inside a tail call" | **Accept** (2.1.4): survives an in-place spare going live again |
+| 5 | No generic lock assert in tail destructors; `RetireBin::isFreeingOnThisThread()` for per-type probes | **Accept** (2.1.3): not detectable generically; per-type destructor probe |
+| 6 | No `checkRetireIsolation` helper; the twin test runs on the fake type | **Accept as a deferral** (2.1.4): the generic helper is owed at E4.6, not dropped |
+| 7 | `RetireTail` in its own `Sequencer/RetireTail.h` | **Accept, and change the code:** `RetireBin.h` moves to `mu-core/Plugin/` (below) |
+| 8 | Extra parameters: `setPrepared(rate, blockSize)`, `flagLayerSwapBoundaries(t, fullPresetLoopBeats)`, `resolveBlockTransport`, `park(..., audioExcluded)` returning `ParkResult`, `setGlobalBudget`, `setEvictTimeoutMs`, `hasPendingWork`, `render` returning bool | **Accept** (2.1.1, 2.1.3); `resolveBlockTransport` was already in the 2.1.1 sketch. **Change the code** for one: `renderAndMix`'s separate `beatWrap` argument goes; it travels in `BlockTransport` (2.1.1) |
+| 9 | `RetireBin` and the driver state heap-held in `ProcessorBase` (`unique_ptr` + reference member) | **Accept** (2.1.1): allocated once at construction, never reseated |
+| 10 | `mu-core-tests-16`: the same source list through one CMake function with `MU_MAX_LAYERS=16`; two fixtures stop assuming 8 slots | **Accept** (3.4): one list, so the two cannot drift |
+| 11 | `MixerEngine::ChannelTap` added although E1 "does not change `MixerEngine`" | **Accept**: it is the test-only channel tap approved at E0.9 |
+
+**Code changes owed on the E1 item (backlog #1609) before E2 starts**, both now done: (a) `RetireBin.h` lives in `mu-core/Plugin/` (not `Sequencer/`): it is
+processor-side machinery that only `ProcessorBase` owns, and layer-side folders (`Audio/ Modulation/ Persistence/ Sequencer/`) never include `Plugin/`; a layer
+type reaches only `RetireTail.h` (design-naming §3). (b) `BlockTransport::beatWrap` is set by the resolver; `renderAndMix` has no `beatWrap` argument.
+
+**Further as-built points from the E1 review (2026-10-16):**
+
+- **Nothing is freed or waited under `binMutex`.** Frees go to a stack list that is destroyed after the lock is released; a waiting eviction releases the lock,
+  waits, re-locks and revalidates the entry.
+- **`applyComposedState` cuts the in-place slots `[old, new)` on a count increase**, so a regrown slot never inherits a parked tail.
+- **A host reporting playing with a frozen ppq** (paused-but-playing) produces no transport jump during the freeze and exactly one on resume.
+- **`mergeLayerMidiOut` clamps frames** to the block, and the caller reserves room in the host buffer first (the `midiEventBytes` helper gives the size of one
+  event for the budget).
+- **`check-layer-boundary.ps1` rules 7 and 8:** (7) no `numLayers.store` outside `ProcessorCore.h` (`Tests/` exempt), so every count store goes through
+  `storeLayerCount`; (8) no `Plugin/` include from `mu-core` `Audio/`, `Modulation/`, `Persistence/` or `Sequencer/`.
+
+**What each product converts when it adopts the contract** (stage rows in [extraction-plan.md](extraction-plan.md) section 2):
+
+- **Every live-count store goes through `storeLayerCount`.** The four product constructors store `numLayers` directly today (mu-Clid
+  `PluginProcessor.cpp`, mu-Tant `PluginProcessor.cpp`, mu-Toni `PluginProcessor.cpp`, mu-On `PluginProcessor.cpp`), and so do mu-Clid's
+  `Persistence/PresetIO.cpp` (shrink and grow in the full-preset apply) and `Persistence/PresetIO_HostState.cpp` (both stores). Each is converted in the
+  product's first code-moving commit (E2.1, E3.1, E4.1, E5.2), under `layoutWriteLock` where it can race an edit. After E5 no `numLayers.store` remains outside
+  `ProcessorCore::storeLayerCount`; checker rule 7 enforces it.
+- **Each product sets its `RetireBin` count policy in its constructor** (`setRetireCountPolicy`): mu-Tant `RenderPastCount` (E4.6); mu-Clid decided at E5 after
+  pin P3 (E5.4d); mu-Toni and mu-On park nothing, so they leave the default.
+- **mu-Clid's `VoiceEngine::bufferLock`** (`mu-core/Audio/VoiceEngine.cpp`, `tryEnterRead` in `process`) is a `juce::ReadWriteLock`, whose reader bookkeeping
+  can allocate on the audio thread. It is replaced, in `mu-core` (it is the shared engine) and by a mechanism the `dsp-controller` signs, **before mu-Clid renders
+  through the contract**: a gate item of E5.0, so that `SampleRhythm::render` and the tails pass the AllocationProbe.
+- **Oversize-block goldens (pin P7)** are re-recorded when each product adopts `renderAndMix` (E2.5, E3.6, E4.7, E5.7), in a signed goldens-only commit
+  (2.1.6 point 10), never in the code-moving commit.
+- **Sidechain duck order (C13) stays a later decision.** E1 keeps today's written index order unchanged (pinned by E0.8). It is decided before any change to
+  the mixer's channel loop, at the latest with the buses (T2).
 
 ### 2.2 The product UI stops depending on the product processor
 
@@ -1215,7 +1314,8 @@ references). The equivalence test in each of T4 to T7 is the proof that "complet
   `PatternHost`, `TantScales.h`, `mu-tant-layer`, adopt `renderLayers`.
 - **mu-Clid** (after its next release): `SampleRhythm`, glue out of the processor, `PresetIO` onto the hooks, `SampleLibrary` service, `RhythmHost`, `mu-clid-layer`, adopt `renderLayers`.
 - **mu-Clid MIDI**: nothing (core `Rhythm`).
-- **All**: no `Plugin/`/`License/` include from library files; unique relative paths; param table as `addLayerParams`.
+- **All**: no `Plugin/`/`License/` include from library files; unique relative paths; param table as `addLayerParams`; every live-count store through
+  `storeLayerCount`, the count policy set in the constructor, the P7 oversize golden re-recorded at adoption (2.1.7).
 
 ---
 

@@ -29,6 +29,10 @@
 #include "Plugin/HotSwap.h"   // the shared loop-boundary swapper every layer preset hot-swap uses
 #include "Sequencer/Layer.h"
 #include "Plugin/ProcessorCore.h"   // layer accessors + published host transport
+#include "Plugin/LayerBlock.h"      // the audio thread's one way to the layers (render contract)
+#include "Plugin/TransportResolver.h"
+#include "Sequencer/RenderContext.h"
+#include "Plugin/RetireBin.h"
 #include "Plugin/MidiClockSync.h"
 #include "Plugin/ShellBackend.h"   // the interface the shared shell chrome consumes
 #include "License/MachineFingerprint.h"
@@ -271,7 +275,49 @@ public:
     // Headless render: the render loop never returns to the message loop, so neither the swap poll
     // swap poll timer is serviced. Call after each processBlock so deferred work (hot-swap commits, MIDI
     // program changes, control actions) runs on the calling thread. No-op when nothing is pending.
-    void flushPendingAsyncUpdates() { drainDeferredWork(); consumeMuteChange(); }
+    void flushPendingAsyncUpdates()
+    {
+        drainDeferredWork();
+        consumeMuteChange();
+        if (retireBin.hasPendingWork()) retireBin.service();   // a tail that went Done is freed off the render loop too
+    }
+
+    // ─── Test accessors for the layer extraction (approved, E0.9) ─────────────────────────────────
+    // The `useLayerRender` switch: while a stage moves a product's render chain, the old chain and
+    // Layer::render coexist behind it (extraction-plan 2.7a); a product reads usesLayerRender() in
+    // processBlock and the equivalence test (mu-core/Tests/LayerEquivalence.h) flips it on one of two
+    // processors. Default off; never set by production code. A switch that outlives its stage is a defect.
+    void setUseLayerRenderForTest(bool on) noexcept { useLayerRender.store(on, std::memory_order_relaxed); }
+    bool usesLayerRender() const noexcept           { return useLayerRender.load(std::memory_order_relaxed); }
+    // The per-channel tap: what each channel hands the mixer (MixerEngine::ChannelTap). Set while not processing.
+    void setChannelTapForTest(MixerEngine::ChannelTap* tap) noexcept { mixerEngine.channelTap = tap; }
+
+    // What the shared block driver did, for tests (audio-thread values, read while not processing).
+    struct LayerRenderProbe
+    {
+        int  mixCount = 0;          // channels handed to the mixer by the last rendered block
+        int  blocksRendered = 0;    // host blocks renderAndMix rendered
+        int  blocksSkipped = 0;     // host blocks it did not (a missed lock, an edit in flight, 0 frames)
+        int  largestCall = 0;       // the longest call any layer or the mixer was given (chunking bound)
+        int  midiDropped = 0;       // input events the last block's decoder had no room for
+        bool jumpPending = false;
+        bool lastPlaying = false;
+    };
+    // The live count as the packed layout word holds it, and as the numLayers mirror holds it: equal after every
+    // count store (ProcessorCore::storeLayerCount). Tests only.
+    int layoutWordCountForTest() const noexcept { return (int) mu_core::LayoutWord::count(layerAccess.layout.load()); }
+    int layerCountMirrorForTest() const noexcept { return numLayers.load(); }
+    // Tests only, message thread, not processing, after the product's prepareToPlay: renders one playing block of
+    // n frames through renderAndMix on a scratch buffer and returns what the driver did (prepares and releases the
+    // driver around it). A product whose layers have not adopted Layer::render renders silence, so the check is
+    // that the driver saw every live layer (mixCount), not the sound.
+    LayerRenderProbe renderOneLayerBlockForTest(double sampleRate, int n);
+
+    LayerRenderProbe getLayerRenderProbe() const noexcept
+    {
+        return { renderState.mixCount, renderState.blocksRendered, renderState.blocksSkipped, renderState.largestCall, (int) renderState.dropped,
+                 renderState.jumpPending, renderState.lastPlaying };
+    }
 
     // Default preset: <presets>/_default.<ext>, written by the shell's "Save as Default". Each
     // product calls loadStartupDefault() at the end of its constructor so a saved default is
@@ -594,6 +640,7 @@ protected:
     // control actions.
     void runDeferredWork()
     {
+        retireBin.service();   // frees first, so an install that follows never finds a row of reusable Done entries full
         if (layerSwapper.commit())
         {
             liveState.fullPresetCommitted();   // before the editor refresh, so it reads the settled state
@@ -632,6 +679,68 @@ protected:
     std::array<juce::RangedAudioParameter*, mu_limits::kMaxLayers> muteParams {};   // ch{N}_mute, cached (null = none)
     std::atomic<bool> fullPresetLoadFailed { false };   // set by a load that could not read its file
 
+    // ─── The layer render contract (docs/mu-tronic/design.md 2.1; extraction stage E1) ────────────
+    // Unused by a product until it adopts the contract: nothing below runs unless the product calls it,
+    // except the bin's service passes (an empty bin frees nothing).
+    //
+    // The shared retire bin (Plugin/RetireBin.h). Declared before the swap poll, which services it, so the
+    // poll is gone first on destruction; prepareForDestruction empties it before any product member goes.
+    // Held on the heap (built with the processor, on the constructing thread) so ProcessorBase stays small
+    // for hosts and tests that construct it on a stack.
+    std::unique_ptr<mu_core::RetireBin> retireBinStorage = std::make_unique<mu_core::RetireBin>(layerAccess.epoch, layerAccess.layout);
+    mu_core::RetireBin& retireBin = *retireBinStorage;
+    // The count policy (RetireBin::CountPolicy) for tails past the live count. Constructor only.
+    void setRetireCountPolicy(mu_core::RetireBin::CountPolicy p) noexcept { retireBin.setCountPolicy(p); }
+
+    // prepareToPlay (message or host thread, not processing; call it OUTSIDE layersLock): sizes the per-slot
+    // scratch (kMaxLayers x 2 x blockSize) and the block's MIDI storage, prepares every slot's layer (spares
+    // included), flushes the bin (cutAll then service) and resets the transport latches. Nothing it sizes is
+    // ever grown on the audio thread: a longer host block is chunked.
+    void prepareLayerRender(double sampleRate, int maxBlockSize);
+    // releaseResources: flushes the bin and resets the latches.
+    void releaseLayerRender();
+
+    // Audio thread: the block's transport by the family rule (MIDI clock, host or own transport; see
+    // TransportResolver.h), published for the next block's quantised control actions. `wrapBeats` bounds the
+    // beat space (mu-Tant's 64-beat pattern space); 0 = unbounded. The bound travels in the result
+    // (BlockTransport::beatWrap), which is what renderAndMix and the layers use.
+    mu_core::BlockTransport resolveBlockTransport(juce::MidiBuffer& midi, int numSamples, double wrapBeats = 0.0);
+
+    // Audio thread, noexcept: the base block driver (design 2.1.1). `buffer` is the host buffer AS RECEIVED: do
+    // not call captureSidechainAndClear first. In order: (1) the host-block continuity check (every host block,
+    // rendered or not); (2) one LayerBlock (try-lock or published view; a failed one clears `buffer` and renders
+    // nothing); (3) one decode of `midi` into the block's MidiEvent storage; (4) chunks of at most the prepared
+    // size: per chunk the DAW sidechain of that chunk's frames is captured, the chunk's output region cleared,
+    // then renderLayers and the mixer (processCoreBlock) run on a sub-buffer, so an oversize host block never
+    // overruns a prepared buffer and every chunk ducks against its own sidechain frames (C8). The layers' MIDI
+    // out stays in the block's storage for mergeLayerMidiOut. A 0-frame block renders nothing and calls no hook;
+    // its edges reach the next rendered block. The host's beat bound is t.beatWrap.
+    void renderAndMix(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi, const mu_core::BlockTransport& t,
+                      std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels>* directOuts = nullptr,
+                      juce::AudioBuffer<float>* fxReturnsOut = nullptr) noexcept;
+
+    // Audio thread, after renderAndMix: appends the block's layer MIDI out (the tails' owed note-offs first)
+    // to `midi`, adding at most `byteBudget` bytes of MidiBuffer storage (midiEventBytes per event): the room the
+    // caller knows the buffer already has, so it never grows on the audio thread. Frames are clamped to the last
+    // rendered block. Returns the count added. (juce::MidiBuffer does not expose its allocated size, so the room
+    // cannot be read from the buffer itself: the caller sizes it, e.g. with ensureSize on the message thread.)
+    int mergeLayerMidiOut(juce::MidiBuffer& midi, int byteBudget) noexcept;
+    // The MidiBuffer storage one short message of `size` bytes takes (int32 time + uint16 size + the bytes),
+    // for a caller that reserves room for n events: n * midiEventBytes(3).
+    static constexpr int midiEventBytes(int size) noexcept { return 6 + size; }
+
+    // Audio thread, once per block after renderAndMix (also on a skipped block): flags the staged swaps whose
+    // boundary passed, each slot by the loopBeats() renderLayers cached for it on the last rendered block, and a
+    // staged full preset by `fullPresetLoopBeats` (the product's rule; default the 4/4 bar).
+    void flagLayerSwapBoundaries(const mu_core::BlockTransport& t, double fullPresetLoopBeats = 4.0) noexcept
+    {
+        flagSwapBoundaries(t.playing, t.startBeat, t.blockBeats, [this, fullPresetLoopBeats](int slot) noexcept
+        {
+            if (slot == mu_hotswap::kFullPreset) return fullPresetLoopBeats;
+            return slot >= 0 && slot < mu_limits::kMaxLayers ? renderState.loopBeats[(size_t) slot] : -1.0;
+        });
+    }
+
     // The audio thread's deferred-work request and the message-thread timer (100 Hz, one relaxed exchange per tick) that drains it.
     // The timer does nothing but check the flag. Nothing here uses AsyncUpdater: its trigger
     // allocates and takes a lock, so it must never run on the audio thread. Every destructor stops
@@ -647,6 +756,8 @@ protected:
             owner.drainDeferredWork();
             owner.consumeMuteChange();
             owner.consumeTransportChange();
+            if (owner.retireBin.hasPendingWork())
+                owner.retireBin.service();   // a Done tail whose grace had not passed at the last pass
             if (owner.liveState.needsSettling())
                 owner.settleLiveState();   // also catches a stopped-transport load, which never raises the mailbox
         }
@@ -657,7 +768,14 @@ protected:
     // a half-destroyed processor through a virtual (commitDeferredWork, getFullPresetExtension, ...).
     // Every product destructor calls it first, before any of its own members go; the base destructor
     // calls it again as a backstop. Safe to call more than once.
-    void prepareForDestruction() noexcept { swapPoll.stop(); }
+    // It also empties the retire bin (nothing is processing any more, so every tail is freed at once) while
+    // the services a tail may read are still alive.
+    void prepareForDestruction() noexcept
+    {
+        swapPoll.stop();
+        retireBin.cutAll();
+        retireBin.service(true);   // nothing processes again: even a tail still waiting for its store is freed
+    }
 
     // Audio thread, once per block after the transport resolved: flag the staged swaps whose
     // boundary passed (`loopBeatsFor(slot)`, see LayerSwapper::flagBoundaries) and schedule the commit.
@@ -897,6 +1015,54 @@ private:
     // The listener's one entry (any thread, audio thread included): the engine sync, plus a flag for the
     // message thread when a strip mute moved. No allocation.
     void onFxParamChanged(const juce::String& id, float v);
+
+    // ─── The block driver's state (ProcessorBase_Render.cpp) ─────────────────────────────────────
+    // Audio-thread state survives blocks as values only, never as addresses of layers, views or tails.
+    // Sized by prepareLayerRender; nothing here is allocated or grown on the audio thread.
+    struct LayerRenderState
+    {
+        // The previous HOST block (rendered or not): the continuity check compares against it, so a block
+        // after a missed lock or an edit is not a false jump (design 2.1.5, R5).
+        // `frozen`: the host reported playing with a position that did not move (a stalled or pre-rolling host);
+        // the blocks of a freeze are not jumps, and the one discontinuity is delivered when the position moves again.
+        struct HostBlock { bool valid = false; bool playing = false; double startBeat = 0.0; double endBeat = 0.0;
+                           double beatsPerSecond = 0.0; double blockSeconds = 0.0; bool frozen = false; };
+        HostBlock host;
+        bool   lastPlaying = false;     // the play state of the last RENDERED block (the edge latch)
+        bool   jumpPending = false;     // sticky: a discontinuity since the last rendered block
+        bool   edgeStarted = false, edgeStopped = false, edgeJumped = false;   // this block's edges (first chunk)
+
+        double rate = 0.0;              // prepared sample rate
+        int    prepared = 0;            // prepared block size: the longest call any layer or the mixer gets
+        int    mixCount = 0;            // channels handed to the mixer this block (the count policy)
+
+        std::array<juce::AudioBuffer<float>, mu_limits::kMaxLayers> scratch;   // per slot, 2 x prepared
+        std::array<juce::AudioBuffer<float>, mu_limits::kMaxLayers> view;      // per-call views of scratch (no storage)
+        std::array<mu_core::PeerTap, mu_limits::kMaxLayers> peers {};
+        std::array<bool, mu_limits::kMaxLayers> live {};
+        std::array<double, mu_limits::kMaxLayers> loopBeats {};                // cached per slot, last rendered block
+
+        // The block's MIDI: input decoded at the front, the live layers' output after it, the note-off
+        // reserve (tails' owed note-offs) in the last kMidiNoteOffReserve entries.
+        juce::HeapBlock<mu_core::MidiEvent> midi;
+        int32_t  midiIn = 0, liveOut = 0, tailOut = 0;
+        uint16_t dropped = 0;
+
+        MixerEngine::RenderChannelFn copyToMixer;   // the mixer's channel r = scratch[r], an exact copy
+
+        int lastBlockFrames = 0;        // frames of the last rendered host block (mergeLayerMidiOut clamps to it)
+        int blocksRendered = 0, blocksSkipped = 0, largestCall = 0;   // test probe
+    };
+    std::unique_ptr<LayerRenderState> renderStateStorage = std::make_unique<LayerRenderState>();   // heap: see retireBinStorage
+    LayerRenderState& renderState = *renderStateStorage;
+    std::atomic<bool> useLayerRender { false };   // the test-controlled switch (see setUseLayerRenderForTest)
+
+    void noteHostBlock(const mu_core::BlockTransport& t, int numSamples) noexcept;
+    void noteSkippedBlock(const mu_core::BlockTransport& t, juce::AudioBuffer<float>& buffer) noexcept;
+    void decodeBlockMidi(const juce::MidiBuffer& midi, int numSamples) noexcept;
+    void captureSidechainRegion(juce::AudioBuffer<float>& buffer, int offset, int numSamples) noexcept;
+    void renderLayers(const mu_core::LayerBlock& block, const mu_core::BlockTransport& t,
+                      int offset, int numSamples, bool firstChunk, bool lastChunk) noexcept;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ProcessorBase)
 };

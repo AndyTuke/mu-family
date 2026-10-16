@@ -193,6 +193,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
             }
         }
 
+        if (channelTap != nullptr) channelTap->capture(r, buf, numSamples);   // tests only (null otherwise)
         buf.applyGain(kHeadroomTrim);
     }
 

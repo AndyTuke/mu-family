@@ -88,6 +88,19 @@ namespace mu_alloc
         juce::String firstFreeStack() const { return tls.firstFreeStack; }
     };
 
+    // Counts only operator new / delete on the calling thread (no malloc hook): for a test that asserts "no
+    // new" exactly as the older per-executable counters did.
+    class ArmedNewOnly
+    {
+    public:
+        ArmedNewOnly() noexcept { tls.allocs = 0; tls.frees = 0; tls.countMalloc = false; tls.armed = true; }
+        ~ArmedNewOnly() { stop(); }
+        ArmedNewOnly(const ArmedNewOnly&) = delete;
+        ArmedNewOnly& operator=(const ArmedNewOnly&) = delete;
+        void stop() noexcept { tls.armed = false; }
+        int allocs() const noexcept { return tls.allocs; }
+    };
+
     // Suspends counting for a scope, then restores the previous state.
     class Paused
     {

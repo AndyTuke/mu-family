@@ -972,12 +972,13 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     std::array<std::unique_ptr<VoiceEngine>, RhythmSequencer::MaxRhythms> cutVictims, shrunkEngines;
     proc.suspendProcessing(true);
     {
+        const juce::ScopedLock lw(proc.layoutWriteLock);   // first: the count stores below advance the layout serial
         const juce::ScopedLock sl(proc.layersLock);
 
     proc.setRhythmCount(n);
 
     if (n < oldN)
-        proc.numLayers.store(n, std::memory_order_release);  // shrink: drop count first
+        proc.storeLayerCount(n, std::memory_order_release);  // shrink: drop count first
 
     for (int i = 0; i < n; ++i)
     {
@@ -1004,7 +1005,7 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     }
 
     if (n > oldN)
-        proc.numLayers.store(n, std::memory_order_release);  // grow: publish after slots ready
+        proc.storeLayerCount(n, std::memory_order_release);  // grow: publish after slots ready
     }   // release layersLock before resuming
     proc.suspendProcessing(false);
 
