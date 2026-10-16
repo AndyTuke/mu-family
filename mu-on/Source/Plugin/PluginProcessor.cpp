@@ -247,27 +247,7 @@ void PluginProcessor::selectTrackEngine(int i, EngineType engine)
 // values shift, so each value is rewritten at its old slot and moves with it.
 void PluginProcessor::remapLayerReferences(const std::function<int(int)>& oldToNew)
 {
-    // The first Kick in the new order (a source that is gone falls back to it).
-    const int live = numLayers.load(std::memory_order_relaxed);
-    int fallback = live;
-    for (int j = 0; j < mu_limits::kMaxLayers; ++j)
-        if (getTrackEngine(j) == EngineType::Kick)
-        {
-            const int nj = oldToNew(j);
-            if (nj >= 0 && nj < live) fallback = juce::jmin(fallback, nj);
-        }
-    if (fallback >= live) fallback = 0;
-
-    for (int j = 0; j < mu_limits::kMaxLayers; ++j)
-    {
-        if (getTrackEngine(j) != EngineType::Rumble) continue;
-        auto* p = apvts.getParameter(layerParamId(j, "src"));
-        if (p == nullptr) continue;
-        const int oldSrc = juce::roundToInt(p->convertFrom0to1(p->getValue()));
-        int newSrc = oldToNew(oldSrc);
-        if (newSrc < 0) newSrc = fallback;
-        if (newSrc != oldSrc) p->setValueNotifyingHost(p->convertTo0to1((float) newSrc));
-    }
+    remapRumbleSources(apvts, numLayers.load(std::memory_order_relaxed), [this](int j) { return getTrackEngine(j); }, oldToNew);
 }
 
 void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
