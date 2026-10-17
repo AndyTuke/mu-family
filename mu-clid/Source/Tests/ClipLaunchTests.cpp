@@ -108,6 +108,35 @@ struct MuClidClipLaunchTests : juce::UnitTest
         stagedFullPresetCarriesBanks();
         oldFilesLoadEmpty();
         clipNamesFollowPresets();
+        foreignRootRejected();
+    }
+
+    // Another product's file, offered as a full preset or as host state, is refused and leaves the
+    // parameters, the rhythm count and the clip banks as they were.
+    void foreignRootRejected()
+    {
+        beginTest("a foreign-root file is rejected: parameters, rhythm count and clips unchanged");
+        TempStorage storage;
+        mu_clid::PluginProcessor p;
+        p.storeClip(0, 1);
+        const int rhythms = p.getNumRhythms();
+        const auto mask = p.clipMask(0);
+        const auto before = xmlOf(p, storage.root.getChildFile("snap.muClid"));
+
+        const auto foreign = storage.root.getChildFile("foreign.muTant");
+        foreign.replaceWithText("<MuTantState><PARAM id=\"r0_hitsA\" value=\"3\"/></MuTantState>");
+        int errors = 0;
+        p.onLoadError = [&errors](const juce::String&) { ++errors; };
+        p.loadPreset(foreign);
+        expectEquals(errors, 1, "loadPreset refuses a foreign root with one error");
+
+        const auto text = foreign.loadFileAsString();
+        p.setStateInformation(text.toRawUTF8(), (int) text.getNumBytesAsUTF8());
+        expectEquals(errors, 2);
+
+        expectEquals(p.getNumRhythms(), rhythms);
+        expectEquals((int) p.clipMask(0), (int) mask);
+        expectEquals(xmlOf(p, storage.root.getChildFile("snap.muClid")), before);
     }
 
     // A clip is named after the preset it was stored from; the live view carries the names with the queue.
@@ -850,7 +879,7 @@ struct MuClidClipLaunchTests : juce::UnitTest
         }
 
         p.storeClip(0, 2);
-        juce::ValueTree legacy("LegacyHostState");
+        juce::ValueTree legacy(p.apvts.state.getType());
         legacy.setProperty("numRhythms", 1, nullptr);
         const auto text = legacy.createXml()->toString();
         p.setStateInformation(text.toRawUTF8(), (int) text.getNumBytesAsUTF8());

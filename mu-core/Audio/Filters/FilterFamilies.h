@@ -185,36 +185,42 @@ public:
     {
         smoothedRes.setTargetValue(resonance);
         smoothedDelay.setTargetValue(static_cast<float>(currentSampleRate) / juce::jmax(20.0f, cutoffHz));
-        // Pre-compute the per-sample delay and resonance ramps once so every channel reads the
-        // identical glide (otherwise only ch0 advances it and ch1 would click or step).
-        jassert(numSamples <= static_cast<int>(delayRamp.size()));
-        numSamples = juce::jmin(numSamples, static_cast<int>(delayRamp.size()));   // never index past the prepared ramps
-        for (int i = 0; i < numSamples; ++i)
+        // A block larger than the prepared ramps is processed in ramp-sized chunks, so none of it is left unfiltered.
+        const int nCh      = juce::jmin(numChannels, 2);
+        const int rampSize = static_cast<int>(delayRamp.size());
+        if (rampSize <= 0) return;   // not prepared
+        for (int start = 0; start < numSamples; start += rampSize)
         {
-            delayRamp[static_cast<size_t>(i)] = smoothedDelay.getNextValue();
-            resRamp  [static_cast<size_t>(i)] = smoothedRes  .getNextValue();
-        }
+            const int n = juce::jmin(rampSize, numSamples - start);
 
-        const int nCh = juce::jmin(numChannels, 2);
-        for (int ch = 0; ch < nCh; ++ch)
-        {
-            auto&     b       = buf[ch];
-            int&      w       = wPos[ch];
-            const int bufSize = static_cast<int>(b.size());
-            auto*     data    = audio.getWritePointer(ch);
-            for (int i = 0; i < numSamples; ++i)
+            // Pre-compute the per-sample delay and resonance ramps once so every channel reads the
+            // identical glide (otherwise only ch0 advances it and ch1 would click or step).
+            for (int i = 0; i < n; ++i)
             {
-                const float g     = (float) Sign * resRamp[static_cast<size_t>(i)];
-                const float delayF = delayRamp[static_cast<size_t>(i)];
-                const float readF = static_cast<float>(w) - delayF;
-                const int   r0    = ((static_cast<int>(std::floor(readF)) % bufSize) + bufSize) % bufSize;
-                const int   r1    = (r0 + 1) % bufSize;
-                const float frac  = readF - std::floor(readF);
-                const float delayed = b[r0] + frac * (b[r1] - b[r0]);
-                const float out   = data[i] + g * delayed;
-                b[w] = out;
-                data[i] = out;
-                w = (w + 1) % bufSize;
+                delayRamp[static_cast<size_t>(i)] = smoothedDelay.getNextValue();
+                resRamp  [static_cast<size_t>(i)] = smoothedRes  .getNextValue();
+            }
+
+            for (int ch = 0; ch < nCh; ++ch)
+            {
+                auto&     b       = buf[ch];
+                int&      w       = wPos[ch];
+                const int bufSize = static_cast<int>(b.size());
+                auto*     data    = audio.getWritePointer(ch) + start;
+                for (int i = 0; i < n; ++i)
+                {
+                    const float g     = (float) Sign * resRamp[static_cast<size_t>(i)];
+                    const float delayF = delayRamp[static_cast<size_t>(i)];
+                    const float readF = static_cast<float>(w) - delayF;
+                    const int   r0    = ((static_cast<int>(std::floor(readF)) % bufSize) + bufSize) % bufSize;
+                    const int   r1    = (r0 + 1) % bufSize;
+                    const float frac  = readF - std::floor(readF);
+                    const float delayed = b[r0] + frac * (b[r1] - b[r0]);
+                    const float out   = data[i] + g * delayed;
+                    b[w] = out;
+                    data[i] = out;
+                    w = (w + 1) % bufSize;
+                }
             }
         }
     }

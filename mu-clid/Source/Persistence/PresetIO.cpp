@@ -927,8 +927,15 @@ bool PresetIO::loadPreset(const juce::File& file)
     // format), not a .muclid preset — restore it directly.
     if (root.getType() != juce::Identifier("MuClidPreset"))
     {
-        restoreStateFromTree(root);
-        return true;
+        // Only this product's own state root is legacy host state; another product's file is rejected.
+        if (root.hasType(proc.apvts.state.getType()))
+        {
+            restoreStateFromTree(root);
+            return true;
+        }
+        proc.noteFullPresetLoadFailed();
+        if (proc.onLoadError) proc.onLoadError("Not a mu-Clid preset: " + file.getFileName());
+        return false;
     }
 
     // Full .muclid preset — ONE unified path. Pre-build every Rhythm + VoiceEngine +

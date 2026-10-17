@@ -39,6 +39,7 @@ public:
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh,
                  const VoiceParams& p, float& grOut) override
     {
+        const int   nChState  = juce::jmin(nCh, 2);   // state is kept for two channels; extra channels pass through
         const float sr        = (float)currentSampleRate;
         // Slot 0 = Threshold 0..100 (mapped to 0..-40 dB), Slot 1 = Output -24..24 dB,
         // Slot 2 = Attack 0..100 ms, Slot 3 = Release 20..2000 ms (log).
@@ -66,9 +67,9 @@ public:
             const float relCoeff = smoothedRel   .getNextValue();
             const float thr      = smoothedThresh.getNextValue();
             const float og       = smoothedOut   .getNextValue();
-            for (int ch = 0; ch < nCh; ++ch)
+            for (int ch = 0; ch < nChState; ++ch)
             {
-                float& env = envelope[ch < 2 ? ch : 0];
+                float& env = envelope[ch];
                 // A NaN or inf sample would stick in the envelope (and inf x a zero gain is NaN): treat it as silence.
                 const float xin   = std::isfinite(chans[ch][i]) ? chans[ch][i] : 0.0f;
                 const float level = std::abs(xin);
@@ -89,7 +90,7 @@ public:
                 // time so the gain does not pump at audio rate.
                 if (isLimiter)
                 {
-                    float& lim = limGain[ch < 2 ? ch : 0];
+                    float& lim = limGain[ch];
                     // The lower of the smoothed and the target threshold: a threshold that drops takes effect at
                     // once (the smoother would otherwise leave the ceiling high for its 15 ms ramp, and at the
                     // start after prepare()); one that rises is still approached smoothly.

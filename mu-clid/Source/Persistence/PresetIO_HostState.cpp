@@ -232,8 +232,14 @@ void PresetIO::setStateInformation(const void* data, int sizeInBytes)
 
         if (state.hasType("MuClidPreset"))
             restoreSession(state);
-        else if (state.isValid())
+        else if (state.hasType(proc.apvts.state.getType()))
             restoreStateFromTree(state);
+        else if (state.isValid())
+        {
+            proc.noteFullPresetLoadFailed();
+            if (proc.onLoadError)
+                proc.onLoadError("Host state restore failed: not a mu-Clid state");
+        }
         else if (proc.onLoadError)
             proc.onLoadError("Host state restore failed: invalid tree");
         if (state.isValid())

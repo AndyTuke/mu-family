@@ -11,7 +11,7 @@ struct StepEditorLevelCellTests : juce::UnitTest
     // A left-button mouse event at (x, y) in the editor, with optional Shift held.
     static juce::MouseEvent mouse(StepEditor& ed, int x, int y, bool shift = false)
     {
-        auto& src = juce::Desktop::getInstance().getMainMouseSource();
+        auto src = juce::Desktop::getInstance().getMainMouseSource();
         const auto mods = juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier
                                              | (shift ? juce::ModifierKeys::shiftModifier : 0));
         const auto pos = juce::Point<float>((float) x, (float) y);

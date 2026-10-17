@@ -197,3 +197,53 @@ public:
 };
 
 static FilterDSPSmokeTest filterDSPSmokeTest;
+
+// A block longer than the size the comb was prepared for is filtered all the way to its end: the result
+// matches the same signal fed as prepared-size blocks.
+class CombOversizeBlockTest : public juce::UnitTest
+{
+public:
+    CombOversizeBlockTest() : juce::UnitTest ("Comb filter oversize block", "DSP") {}
+
+    template <typename Comb>
+    void check (const char* name)
+    {
+        constexpr double kSr = 48000.0;
+        constexpr int kPrepared = 128, kTotal = 128 * 5 + 37;   // not a multiple of the prepared size
+        juce::AudioBuffer<float> big (2, kTotal), split (2, kTotal);
+        for (int ch = 0; ch < 2; ++ch)
+            for (int i = 0; i < kTotal; ++i)
+            {
+                const float x = 0.5f * std::sin (0.03f * (float) i * (float) (ch + 1)) + (i == 3 ? 0.4f : 0.0f);
+                big.setSample (ch, i, x);
+                split.setSample (ch, i, x);
+            }
+
+        Comb a, b;
+        a.prepare (kSr, kPrepared, 2);
+        b.prepare (kSr, kPrepared, 2);
+        a.process (big, kTotal, 2, 800.0f, 0.7f);
+        for (int start = 0; start < kTotal; start += kPrepared)
+        {
+            const int n = juce::jmin (kPrepared, kTotal - start);
+            juce::AudioBuffer<float> chunk (split.getArrayOfWritePointers(), 2, start, n);
+            b.process (chunk, n, 2, 800.0f, 0.7f);
+        }
+
+        float maxDiff = 0.0f;
+        for (int ch = 0; ch < 2; ++ch)
+            for (int i = 0; i < kTotal; ++i)
+                maxDiff = juce::jmax (maxDiff, std::abs (big.getSample (ch, i) - split.getSample (ch, i)));
+        expectLessThan (maxDiff, 1.0e-6f, juce::String (name) + ": the oversize block differs from prepared-size blocks");
+    }
+
+    void runTest() override
+    {
+        beginTest ("CombPlusFilter: oversize block equals prepared-size blocks");
+        check<CombPlusFilter> ("CombPlusFilter");
+        beginTest ("CombMinusFilter: oversize block equals prepared-size blocks");
+        check<CombMinusFilter> ("CombMinusFilter");
+    }
+};
+
+static CombOversizeBlockTest combOversizeBlockTest;
