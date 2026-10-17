@@ -331,6 +331,36 @@ public:
             expect(activeAt400 && at400 > 0.02f, "the new 0.8 s Release was not in use (peak " + juce::String(at400, 4) + " at 0.4 s)");
             expect(! v.isActive(), "the second release ran past its 0.8 s");
         }
+
+        beginTest("Envelope retrigger: with Sustain 0 a changed Decay during the tail still attacks from the tail level");
+        {
+            constexpr int kBlk = 256;
+            // Peak of the first 48 samples (the 1 ms attack) of a note retriggered during the tail.
+            auto firstPeak = [&](bool changeDecay)
+            {
+                ToniVoice v;
+                v.setBank(&bank);
+                v.prepare(kSr, kBlk);
+                ToniVoiceParams p;
+                p.ampA = 0.001f;  p.ampD = 0.5f;  p.ampS = 0.0f;  p.ampR = 1.0f;
+                v.setParams(p);
+                v.noteOn(60);
+                juce::AudioBuffer<float> blk(2, kBlk);
+                for (int i = 0; i < 20; ++i) { blk.clear(); v.process(blk, kBlk); }   // about 0.1 s into the decay
+                v.noteOff();
+                for (int i = 0; i < 20; ++i) { blk.clear(); v.process(blk, kBlk); }   // 0.1 s into the release
+                if (changeDecay) { p.ampD = 0.3f; v.setParams(p); }
+                v.noteOn(60);
+                blk.clear();
+                v.process(blk, kBlk);
+                return blk.getMagnitude(0, 0, 48);
+            };
+            const float unchanged = firstPeak(false);
+            const float changed   = firstPeak(true);
+            expect(unchanged > 0.01f, "the reference retrigger is audible");
+            expect(changed >= 0.9f * unchanged, "the retrigger restarted from silence (peak " + juce::String(changed, 4)
+                                                 + " against " + juce::String(unchanged, 4) + ")");
+        }
     }
 };
 

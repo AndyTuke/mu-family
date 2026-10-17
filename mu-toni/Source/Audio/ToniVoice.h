@@ -118,6 +118,10 @@ public:
         pitchGlide.setCurrentAndTargetValue(targetMidi);
         oscs.osc1.resetPhase(); oscs.osc2.resetPhase();
         releasing = false;
+        // An envelope still in its release is first moved on to attack: ADSR::setParameters resets a release
+        // to zero (Sustain 0), which would restart the new note from silence instead of the tail level.
+        for (auto* env : { &ampEnv, &filterEnv, &pitchEnv })
+            if (env->isActive()) env->noteOn();
         applyEnvParams();   // settings held back during a release apply now, before the new note's envelopes start
         ampEnv.noteOn(); filterEnv.noteOn(); pitchEnv.noteOn();
     }
