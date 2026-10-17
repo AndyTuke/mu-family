@@ -213,7 +213,7 @@ P "The faders use a rectangular cap like a small knob, with a pointer line acros
 H2 "Effects"
 Bullet "Effect — Chorus (Rate, Depth, Voices, Spread), Flanger (Rate, Depth, Feedback), Phaser (Rate, Depth, Stages, Feedback) or Echo (Time, Feedback, Spread). The Effect is a pure send, like the Reverb, so it has no Mix knob; use each track's Effect send."
 Bullet "Delay — a Time dropdown (Free, 1/32, 1/16, 1/8 or 1/4). With a note value, a Straight | Dotted | Triplet switch and a Multiple knob (1 to 8) set the time; in Free mode a Time knob sets it in milliseconds. Feedback, Spread and Dirt complete it."
-Bullet "Reverb — Room, Hall, Plate or Spring, with Size, Pre-delay, Diffusion, Damp, Mod and Dirt. Reverb is a pure send."
+Bullet "Reverb — Room, Hall, Plate or Spring, with Size, Decay (how long the tail rings, 0.1 to 10 seconds, default 2.5), Pre-delay, Diffusion, Damp, Mod and Dirt. Reverb is a pure send."
 
 Pic "Mixer overlay with track channels, FX returns, and master." "mixer.png"
 

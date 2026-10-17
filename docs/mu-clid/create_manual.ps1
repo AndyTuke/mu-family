@@ -376,7 +376,7 @@ Bullet "Room — short, intimate"
 Bullet "Hall — long, diffuse"
 Bullet "Plate — bright, dense"
 Bullet "Spring — bouncy, modulated"
-P "Controls: Size, Pre-delay, Diffusion, Damp, Mod, Dirt. Reverb is always a pure send — there is no Mix knob."
+P "Controls: Size, Decay (how long the tail rings, 0.1 to 10 seconds, default 2.5), Pre-delay, Diffusion, Damp, Mod, Dirt. Reverb is always a pure send — there is no Mix knob."
 
 Pic "Effect, Delay, and Reverb FX rows side by side in the Mixer view." "fx-rows.png"
 
