@@ -2,7 +2,7 @@
 layers=3
 load_errors=0
 resave_bytes=35207
-resave_sha256=a3b09f3c9c728efa66924110ca13763b3574edbb4227b656c90c5273627b90c8
+resave_sha256=dce96df9e1249c9b261068cca4855e48e15a9080e5f2688fc3c50cc382d60ff3
 --- parameters differing from default (id=plain value)
 ch0_lvl=0.893
 ch0_pan=-0.6
@@ -19,6 +19,7 @@ dly_count=2
 dly_fb=0.5
 dly_syncDenom=1
 eff_algo=2
+rev_decay=7.5
 rev_diff=0.9
 rev_pre=40
 rev_size=0.95

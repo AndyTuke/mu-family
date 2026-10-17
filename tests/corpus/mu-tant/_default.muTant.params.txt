@@ -2,7 +2,7 @@
 layers=1
 load_errors=0
 resave_bytes=36237
-resave_sha256=7fed848f3d96da8ba63e76f853b15be78510d34e6897891c7edba21e2581acf8
+resave_sha256=0a85c4afee27052a39b57c23ee66a48f3a36003c0f0c927d18742793f45965c3
 --- parameters differing from default (id=plain value)
 ch0_scAtk=1
 ch0_scRel=10
@@ -22,6 +22,7 @@ ret_eff_scAtk=1
 ret_eff_scRel=10
 ret_rev_scAtk=1
 ret_rev_scRel=10
+rev_decay=7.5
 root=9
 v0_flt2_cut=20000
 v0_flt_cut=20000

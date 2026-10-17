@@ -2,7 +2,7 @@
 layers=4
 load_errors=0
 resave_bytes=37074
-resave_sha256=51cb58481952beceb5a2d2fbeb5b35b74db099253d877e88e23f8724a0978cfe
+resave_sha256=1eecf2b04fec0c010545b4b77d9c984b1ddbd7b4af672e32f565648044da502a
 --- parameters differing from default (id=plain value)
 ch0_lvl=0.734
 ch0_pan=-0.6
@@ -24,6 +24,7 @@ dly_count=2
 dly_fb=0.5
 dly_syncDenom=1
 eff_algo=2
+rev_decay=7.5
 rev_diff=0.9
 rev_pre=40
 rev_size=0.95
