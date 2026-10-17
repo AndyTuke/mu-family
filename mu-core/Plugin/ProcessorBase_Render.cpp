@@ -8,6 +8,7 @@
 
 #include "Plugin/ProcessorBase.h"
 #include "Sequencer/BeatWrap.h"
+#include "Sequencer/LayerTypeInfo.h"   // mu_core::LayerTypeId
 
 namespace
 {
@@ -374,7 +375,7 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
         for (int s = 0; s < K; ++s)
         {
             const Layer* l = v.layer[(size_t) s];
-            renderState.loopBeats[(size_t) s] = l != nullptr && l->typeId() != 0 ? l->loopBeats() : kDefaultLoopBeats;
+            renderState.loopBeats[(size_t) s] = l != nullptr && l->typeId() != (int) mu_core::LayerTypeId::Empty ? l->loopBeats() : kDefaultLoopBeats;
         }
         renderState.lastPlaying = t.playing;
         renderState.jumpPending = renderState.stopPending = false;

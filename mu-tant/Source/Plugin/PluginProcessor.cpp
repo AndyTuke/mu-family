@@ -1,5 +1,6 @@
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/SwapBoundary.h"   // mu-tant: the hot-swap boundary rule (the host's policy)
+#include "Plugin/MidiRaw.h"        // mu-core: note tests on raw MIDI bytes (no allocation)
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 #include "Plugin/HostTransport.h"            // mu-core: shared host-playhead reader
 
@@ -181,6 +182,7 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
         if (xml->hasTagName(apvts.state.getType()))
         {
             const auto tree = juce::ValueTree::fromXml(*xml);
+            cancelAllStagedSwaps();                    // nothing staged before the restore may land on top of it
             applyFullPresetTree(toVoiceState(tree));   // host state restore — always immediate
             restoreLiveState(tree);                    // after the preset: it names the item that is playing
         }
@@ -320,9 +322,8 @@ void PluginProcessor::scanNoteMode(const juce::MidiBuffer& midi)
     // gate): a Note On pushes, a Note Off removes (HeldNoteStack, the same rule each Pattern applies).
     for (const auto meta : midi)
     {
-        const auto msg = meta.getMessage();
-        if (msg.isNoteOn())       gateNotes.noteOn(msg.getNoteNumber());
-        else if (msg.isNoteOff()) gateNotes.noteOff(msg.getNoteNumber());
+        if (mu_midi::isNoteOn (meta))       gateNotes.noteOn(mu_midi::noteNumber (meta));
+        else if (mu_midi::isNoteOff (meta)) gateNotes.noteOff(mu_midi::noteNumber (meta));
     }
 }
 

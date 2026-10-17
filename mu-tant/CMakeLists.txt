@@ -206,6 +206,7 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/NoDemoCapsTests.cpp      # unlicensed is fully functional: 8 voices, long gates, saves
     Source/Tests/ProcessorSeamTests.cpp    # the real PluginProcessor, headless (ScopedStorageRoot, worker-thread processBlock)
     Source/Tests/FrozenBaselineTests.cpp   # frozen parameter manifest + compat corpus on the real processor
+    Source/Tests/LegacyReverbDecayTests.cpp   # files saved before the reverb Decay knob keep their old Decay
     Source/Tests/NudgeInputTests.cpp       # shared mu-core NudgeInput: whole numbers and the BPM decimals mode
     Source/Tests/ClipLaunchTests.cpp   # clip store / launch on the real processor
     Source/Tests/GoldenRenderTests.cpp   # golden renders of the real processor (tests/golden/mu-tant)
@@ -213,6 +214,7 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/PatternLayerRecordTests.cpp   # the Pattern stream through the real processor (Tests/PatternLayerFixture.h)
     Source/Tests/ModHoldTests.cpp   # C12: a matrix-lock miss holds the last modulated values
     Source/Tests/RetireIsolationTests.cpp   # C3: a retiring Pattern reads only its snapshot (the twin test)
+    Source/Tests/PatternToneModTests.cpp   # a smooth Semi modulator moves in scale degrees (the Pattern path)
     Source/UI/GatingDesigner.cpp
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/Wavetable/WavetableBank.cpp"
     # Editor-free APVTS layout factory — lets the ApvtsLayout test exercise the

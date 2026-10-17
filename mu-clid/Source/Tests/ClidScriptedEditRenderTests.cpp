@@ -7,6 +7,8 @@
 #include "Plugin/PluginProcessor.h"
 #include "Tests/ProcessorSeamHelpers.h"
 
+#include <algorithm>
+#include <cmath>
 #include <vector>
 
 namespace
@@ -130,9 +132,19 @@ struct ClidScriptedEditRenderTests : juce::UnitTest
         return out;
     }
 
-    // Two strips duck from layer 0; the middle layer is deleted mid-play, so the second ducked strip lands in the
-    // slot of the first (whose follower state is its own, not the strip's). Returns the samples either side of the edit.
-    static std::vector<float> renderDuckedMove(const juce::File& presets, float* maxGrStep = nullptr)
+    // Per-block record of the strip that the delete moves (slot 2 before the edit, slot 1 after it).
+    struct DuckTrace
+    {
+        std::vector<float> gr;          // the strip's peak gain reduction in each block
+        std::vector<float> env;         // its sidechain follower at the end of each block
+        float envBeforeEdit = -1.0f;    // the follower in slot 2 just before the delete
+        float envAfterEdit  = -1.0f;    // the follower in slot 1 just after it
+    };
+
+    // Two strips duck from layer 0; the middle layer is deleted mid-play (unless `remove` is false, the reference),
+    // so the second ducked strip lands in the slot of the first (whose follower state is its own, not the strip's).
+    // Returns the samples either side of the edit.
+    static std::vector<float> renderDuckedMove(const juce::File& presets, DuckTrace* trace = nullptr, bool remove = true)
     {
         TempStorage storage;
         ScriptedProcessor p;
@@ -155,22 +167,33 @@ struct ClidScriptedEditRenderTests : juce::UnitTest
             setParam(p.apvts, juce::String(ch) + "_scSrc", 1.0f);   // ducks from layer 0
             setParam(p.apvts, juce::String(ch) + "_scAmt", 1.0f);
         }
+        // Strip 1's follower is slow, so the two followers differ and one left behind in slot 1 by the delete shows.
+        setParam(p.apvts, "ch1_scAtk", 200.0f);
+        setParam(p.apvts, "ch1_scRel", 1500.0f);
 
         std::vector<float> out;
         juce::AudioBuffer<float> buf(2, kBlock);
         juce::MidiBuffer midi;
-        float prevGr = 0.0f;
+        constexpr int kEditBlock = 70;
         for (int b = 0; b < kBlocks; ++b)
         {
-            if (b == 70) editRemove(p, 1);
+            if (remove && b == kEditBlock)
+            {
+                if (trace != nullptr) trace->envBeforeEdit = p.mixerEngine.getSidechainEnv(2);
+                editRemove(p, 1);
+                if (trace != nullptr) trace->envAfterEdit = p.mixerEngine.getSidechainEnv(1);
+            }
             buf.clear();
             midi.clear();
             p.processBlock(buf, midi);
             p.drainDeferredWork();
-            // The moved strip (now slot 1) reports its gain reduction per block; a lost follower shows as a jump.
-            const float gr = p.mixerEngine.sidechainGR[1].load();
-            if (maxGrStep != nullptr && b >= 68 && b <= 74) *maxGrStep = std::max(*maxGrStep, std::abs(gr - prevGr));
-            prevGr = gr;
+            // The moved strip's gain reduction and follower, read from the slot it occupies in this block.
+            if (trace != nullptr)
+            {
+                const int slot = (remove && b >= kEditBlock) ? 1 : 2;
+                trace->gr .push_back(p.mixerEngine.sidechainGR[slot].load());
+                trace->env.push_back(p.mixerEngine.getSidechainEnv(slot));
+            }
             for (int i = 0; i < kBlock; ++i) { out.push_back(buf.getSample(0, i)); out.push_back(buf.getSample(1, i)); }
         }
         p.setPlayHead(nullptr);
@@ -197,10 +220,29 @@ struct ClidScriptedEditRenderTests : juce::UnitTest
             expect(presets2.isDirectory(), "tests/presets found");
             if (presets2.isDirectory())
             {
-                float maxGrStep = 0.0f;
-                renderDuckedMove(presets2, &maxGrStep);
-                logMessage("ducked-move max block-to-block gain-reduction step around the delete: " + juce::String(maxGrStep, 5));
-                expect(maxGrStep < 0.1f, "the moved strip does not jump when its slot changes");
+                // The duck follows the source level, so the gain reduction pumps with layer 0's hits and a
+                // block-to-block step alone cannot tell a lost follower from the music. Compare instead with the same
+                // render without the delete: the moved strip must carry its follower across the edit and then duck
+                // exactly as it would have in its old slot (the source and the strip's own settings are unchanged).
+                DuckTrace edited, reference;
+                renderDuckedMove(presets2, &edited, true);
+                renderDuckedMove(presets2, &reference, false);
+                float maxGrDiff = 0.0f, maxEnvDiff = 0.0f, maxNaturalStep = 0.0f;
+                const size_t n = std::min(edited.gr.size(), reference.gr.size());
+                for (size_t b = 0; b < n; ++b)
+                {
+                    maxGrDiff  = std::max(maxGrDiff,  std::abs(edited.gr [b] - reference.gr [b]));
+                    maxEnvDiff = std::max(maxEnvDiff, std::abs(edited.env[b] - reference.env[b]));
+                    if (b > 0 && b >= 68 && b <= 74) maxNaturalStep = std::max(maxNaturalStep, std::abs(reference.gr[b] - reference.gr[b - 1]));
+                }
+                logMessage("ducked-move follower " + juce::String(edited.envBeforeEdit, 5) + " -> " + juce::String(edited.envAfterEdit, 5)
+                           + "; max difference to the unedited render: gain reduction " + juce::String(maxGrDiff, 6)
+                           + ", follower " + juce::String(maxEnvDiff, 6)
+                           + "; the unedited strip's own largest block step near the edit " + juce::String(maxNaturalStep, 5));
+                expect(n == 140 && reference.gr.size() == edited.gr.size(), "both renders traced every block");
+                expect(edited.envBeforeEdit > 0.01f, "the strip was ducking when the delete came");
+                expectWithinAbsoluteError(edited.envAfterEdit, edited.envBeforeEdit, 1.0e-7f, "the follower moved with its strip");
+                expect(maxGrDiff < 1.0e-4f && maxEnvDiff < 1.0e-4f, "the moved strip does not jump when its slot changes");
             }
         }
 

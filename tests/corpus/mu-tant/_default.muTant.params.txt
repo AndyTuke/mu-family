@@ -1,8 +1,8 @@
 # frozen load result for fixture: _default.muTant
 layers=1
 load_errors=0
-resave_bytes=36202
-resave_sha256=3aacd9900e27dd279cb8fef0b8b67724cd6ef1c16a67f35a58a105c130a00392
+resave_bytes=36237
+resave_sha256=0a85c4afee27052a39b57c23ee66a48f3a36003c0f0c927d18742793f45965c3
 --- parameters differing from default (id=plain value)
 ch0_scAtk=1
 ch0_scRel=10
@@ -22,6 +22,7 @@ ret_eff_scAtk=1
 ret_eff_scRel=10
 ret_rev_scAtk=1
 ret_rev_scRel=10
+rev_decay=7.5
 root=9
 v0_flt2_cut=20000
 v0_flt_cut=20000

@@ -307,17 +307,20 @@ void Pattern::applyModulation(double beat, VoiceConfig& cfg, std::array<float, 4
     cfg.osc2Fine     = juce::roundToInt(out[D_o2Fine]);
     cfg.osc2Pos      = out[D_o2Pos];
 
-    // Pitch (semitones): a Stepped CS snaps the whole result to a semitone (melodies); a smooth source glides
-    // via a fractional offset on top of the exact integer base.
+    // Pitch (scale degrees): a Stepped CS snaps the whole result to a degree (melodies); a smooth
+    // source glides through the scale via a fractional degree offset (ToneMod) on top of the exact
+    // integer base. The offset is in degrees, not semitones, so a smooth source reaches the same
+    // notes as a stepped one; the pitch envelope adds chromatic semitones separately (SemiMod).
     {
         const float o1Base = (float) rows.o1Semi.load();
         const float o2Base = (float) rows.o2Semi.load();
         const bool  o1Stepped = osc1SemiStepped.load(std::memory_order_relaxed);
         const bool  o2Stepped = osc2SemiStepped.load(std::memory_order_relaxed);
-        if (o1Stepped) { cfg.osc1Semi = juce::roundToInt(out[D_o1Semi]); cfg.osc1SemiMod = 0.0f; }
-        else           { cfg.osc1Semi = juce::roundToInt(o1Base);        cfg.osc1SemiMod = out[D_o1Semi] - o1Base; }
-        if (o2Stepped) { cfg.osc2Semi = juce::roundToInt(out[D_o2Semi]); cfg.osc2SemiMod = 0.0f; }
-        else           { cfg.osc2Semi = juce::roundToInt(o2Base);        cfg.osc2SemiMod = out[D_o2Semi] - o2Base; }
+        cfg.osc1SemiMod = cfg.osc2SemiMod = 0.0f;   // the pitch envelope adds to these below
+        if (o1Stepped) { cfg.osc1Semi = juce::roundToInt(out[D_o1Semi]); cfg.osc1ToneMod = 0.0f; }
+        else           { cfg.osc1Semi = juce::roundToInt(o1Base);        cfg.osc1ToneMod = out[D_o1Semi] - o1Base; }
+        if (o2Stepped) { cfg.osc2Semi = juce::roundToInt(out[D_o2Semi]); cfg.osc2ToneMod = 0.0f; }
+        else           { cfg.osc2Semi = juce::roundToInt(o2Base);        cfg.osc2ToneMod = out[D_o2Semi] - o2Base; }
     }
     cfg.xmodIndex    = out[D_xmIndex] * 0.01f;   // param 0..100 → engine 0..1
     cfg.xmodDepth    = out[D_xmDepth] * 0.01f;   // param -100..100 → engine -1..1
@@ -540,6 +543,9 @@ bool Pattern::renderRetiring(const mu_core::RenderContext& ctx, juce::AudioBuffe
 
     // The slot is empty of a live layer (an in-place tail renders only then), so the tail writes `out`; a tail
     // that shares the slot with something else renders aside and adds.
+    // Pattern tails are in-place only (a spare in its own slot, rendered only while the slot has no live layer and
+    // one in-place entry per row), so the bin always hands them the slot exclusively; the add path is a guard.
+    jassert(rs.exclusive != 0);
     juce::AudioBuffer<float> aside;
     if (rs.exclusive == 0)
     {

@@ -654,3 +654,44 @@ struct MuTantGoldenRenderTests : juce::UnitTest
 
 static MuTantGoldenRenderTests muTantGoldenRenderTests;
 
+// The audio thread's note scans read raw MIDI bytes (audit fix 8554f03, kept in the shell's final-mix gate scan
+// and in each Pattern's scan of the decoded MIDI view): a block holding a SysEx message longer than juce::MidiMessage's
+// inline storage, in Note mode, makes no heap allocation inside processBlock.
+struct MuTantSysExScanTests : juce::UnitTest
+{
+    MuTantSysExScanTests() : juce::UnitTest("mu-Tant Note-mode scan with SysEx: no allocation", "mu-tant-processor") {}
+
+    void runTest() override
+    {
+        beginTest("processBlock in Note mode with a 16-byte SysEx and a note in the buffer allocates nothing");
+        OwnedProcessor p;
+        mu_golden::MockHost host;
+        p.setPlayHead(&host);
+        p.setRateAndBufferSizeDetails(48000.0, 512);
+        p.prepareToPlay(48000.0, 512);
+        openGate(p.apvts, 0);
+        p.setMidiNoteMode(1);
+        juce::AudioBuffer<float> buf(2, 512);
+        for (int b = 0; b < 4; ++b) { buf.clear(); juce::MidiBuffer none; p.processBlock(buf, none); }
+
+        const juce::uint8 sysex[16] = { 0xf0, 0x7d, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 0xf7 };
+        juce::MidiBuffer midi;
+        midi.addEvent(sysex, 16, 0);
+        midi.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8) 100), 10);
+        midi.ensureSize(4096);
+        buf.clear();
+        int allocs = -1;
+        {
+            mu_alloc::ArmedNewOnly armed;
+            p.processBlock(buf, midi);
+            allocs = armed.allocs();
+        }
+        expectEquals(allocs, 0, "no operator new inside processBlock");
+        p.setMidiNoteMode(0);
+        p.setPlayHead(nullptr);
+        p.releaseResources();
+    }
+};
+
+static MuTantSysExScanTests muTantSysExScanTests;
+

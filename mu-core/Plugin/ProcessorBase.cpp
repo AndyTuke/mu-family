@@ -474,7 +474,26 @@ void ProcessorBase::syncFxSlotParam(const juce::String& id, float v)
         auto* a = apvts.getRawParameterValue(p); return a && a->load() > 0.5f;
     };
 
-    if      (id == "eff_algo") eff.setAlgorithm((int) v);
+    if      (id == "eff_algo")
+    {
+        eff.setAlgorithm((int) v);
+
+        // The new algorithm starts from its own member defaults while eff_p0..4 still hold the old algorithm's
+        // knob values (a host automating the algorithm leaves them alone), so the knobs and the sound disagree.
+        // Push the knob values into the new algorithm. The editor's algorithm menu rewrites the knobs itself
+        // right after this, which then overrides what is pushed here.
+        static constexpr const char* kEffKnobIds[5] = { "eff_p0", "eff_p1", "eff_p2", "eff_p3", "eff_p4" };
+        const auto& algos = FXAlgorithmRegistry::effectAlgorithms();
+        const int ai = eff.getAlgorithmIndex();
+        if (ai >= 0 && ai < (int) algos.size())
+        {
+            const auto& params = algos[(size_t) ai].params;
+            for (int i = 0; i < (int) params.size() && i < 5; ++i)
+                if (auto* knob = apvts.getRawParameterValue(kEffKnobIds[i]))
+                    eff.setParam(params[(size_t) i].id,
+                                 params[(size_t) i].minVal + knob->load() * (params[(size_t) i].maxVal - params[(size_t) i].minVal));
+        }
+    }
     else if (id == "eff_en")   eff.setEnabled(v > 0.5f);
     else if (id.startsWith("eff_p"))
     {
@@ -496,10 +515,24 @@ void ProcessorBase::syncFxSlotParam(const juce::String& id, float v)
     else if (id == "dly_fb")     dly.setFeedback(v);
     else if (id == "dly_spread") dly.setSpread(v);
     else if (id == "dly_dirt")   dly.setDirt(v);
-    else if (id == "rev_algo")   rev.setAlgorithm((int) v);
+    else if (id == "rev_algo")
+    {
+        rev.setAlgorithm((int) v);   // applies the algorithm's preset (size, damp, diffusion, mod, pre-delay)
+
+        // As with the effect: a host automating the algorithm leaves the knobs where they were, so put the
+        // knob values back into the slot. The editor's algorithm menu then rewrites the knobs from the preset.
+        struct KnobToSlot { const char* apvtsId; const char* slotId; };
+        static constexpr KnobToSlot kRevKnobs[] = { { "rev_size", "size" }, { "rev_decay", "decay" }, { "rev_pre", "predelay" },
+                                                    { "rev_diff", "diffusion" }, { "rev_damp", "damp" },
+                                                    { "rev_mod", "mod" } };
+        for (const auto& k : kRevKnobs)
+            if (auto* knob = apvts.getRawParameterValue(k.apvtsId))
+                rev.setParam(k.slotId, knob->load());
+    }
     else if (id == "rev_en")     rev.setEnabled(v > 0.5f);
     else if (id == "rev_lvl")    rev.setLevel(v);
     else if (id == "rev_size")   rev.setParam("size",      v);
+    else if (id == "rev_decay")  rev.setParam("decay",     v);
     else if (id == "rev_pre")    rev.setParam("predelay",  v);
     else if (id == "rev_diff")   rev.setParam("diffusion", v);
     else if (id == "rev_damp")   rev.setParam("damp",      v);

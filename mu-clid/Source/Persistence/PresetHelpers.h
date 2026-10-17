@@ -36,7 +36,7 @@ inline const GlobalParamDef kGlobalParamDefs[] = {
     // ── Reverb slot ──────────────────────────────────────────────────────
     { "rev_algo",      ParamKind::AlgorithmIndex, mu_audio::kReverbAlgorithmNames },
     { "rev_en",        ParamKind::Bool   },
-    { "rev_lvl" }, { "rev_size" }, { "rev_pre" }, { "rev_diff" },
+    { "rev_lvl" }, { "rev_size" }, { "rev_decay" }, { "rev_pre" }, { "rev_diff" },
     { "rev_damp" }, { "rev_mod" }, { "rev_dirt" },
     // ── Intra-FX routing ────────────────────────────────────────────────
     { "eff2dly" }, { "eff2rev" }, { "dly2rev" },

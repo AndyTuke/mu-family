@@ -25,6 +25,7 @@
 #include "Control/LiveState.h"          // Performance mode: the live state this instance owns
 #include "Control/ParamGestureHold.h"
 #include "Persistence/LayerState.h"   // composed slot / full / host state (format 2)
+#include "Persistence/LegacyReverbDecay.h"   // a pre-Decay-knob state's reverb Decay
 #include "MuLimits.h"
 #include "Plugin/HotSwap.h"   // the shared loop-boundary swapper every layer preset hot-swap uses
 #include "Sequencer/Layer.h"
@@ -410,6 +411,14 @@ public:
     // calls it for every layer it renumbers or clears, because a staged swap is keyed by index and
     // would otherwise land on the wrong layer. A staged full preset is left to win.
     virtual void cancelPendingSwap(int slot)                                { layerSwapper.cancel(slot); }
+    // Drops every staged swap, the full preset and each layer's. A host state restore replaces everything at once,
+    // so nothing staged before it may commit at its boundary and overwrite the restored state.
+    void cancelAllStagedSwaps()
+    {
+        cancelPendingFullPreset();
+        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            cancelPendingSwap(i);
+    }
     std::function<void(int slot)> onLayerPresetCommitted;
 
     // Set by the standalone (mu-link bridge) so the product can publish its current full-preset
@@ -593,11 +602,13 @@ protected:
     juce::ValueTree captureLayerNode(int slot, const juce::Identifier& type) { return mu_pp::captureLayer(layerLayout, layerExtras, slot, type); }
     void            applyLayerNode(int slot, const juce::ValueTree& node)    { mu_pp::applyLayer(layerLayout, layerExtras, slot, node); }
     // A state in the composed shape: an older APVTS-dump state is rebuilt (`otherChild` receives
-    // the product's older root children); a composed one is returned as is.
+    // the product's older root children); a composed one is returned as is. A state saved before
+    // the reverb Decay knob gains the Decay its algorithm had then.
     juce::ValueTree toComposedState(const juce::ValueTree& state,
                                     const std::function<void(const juce::ValueTree&, juce::ValueTree&)>& otherChild = {}) const
     {
-        return mu_pp::composeLegacyState(state, layerLayout, otherChild);
+        return mu_pp::withLegacyReverbDecay(mu_pp::composeLegacyState(state, layerLayout, otherChild),
+                                            apvts.getParameter(mu_pp::kReverbAlgoId));
     }
     mu_pp::LayerLayout layerLayout;
     mu_pp::LayerExtras layerExtras;
@@ -756,7 +767,7 @@ protected:
         flagSwapBoundaries(t.playing, t.startBeat, t.blockBeats, [this, fullPresetLoopBeats](int slot) noexcept
         {
             if (slot == mu_hotswap::kFullPreset) return fullPresetLoopBeats;
-            return slot >= 0 && slot < mu_limits::kMaxLayers ? renderState.loopBeats[(size_t) slot] : -1.0;
+            return layerLoopBeats(slot);
         });
     }
 

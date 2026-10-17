@@ -19,10 +19,12 @@ struct MuToniClipLaunchTests : juce::UnitTest
     void runTest() override
     {
         using namespace mu_seam_test;
-        mu_clip_test::runClipLaunchChecks<ExposedPluginProcessor>(
-            *this, { [](ExposedPluginProcessor& p, float v) { setParam(p.apvts, "a0_cut", v); },
-                     [](ExposedPluginProcessor& p) { return getParam(p.apvts, "a0_cut"); },
-                     1000.0f, 3000.0f, 1.0f });
+        const mu_clip_test::Accessor<ExposedPluginProcessor> accessor {
+            [](ExposedPluginProcessor& p, float v) { setParam(p.apvts, "a0_cut", v); },
+            [](ExposedPluginProcessor& p) { return getParam(p.apvts, "a0_cut"); },
+            1000.0f, 3000.0f, 1.0f };
+        mu_clip_test::runClipLaunchChecks<ExposedPluginProcessor>(*this, accessor);
+        mu_clip_test::runRestoreCancelsStagedSwapChecks<ExposedPluginProcessor>(*this, accessor);   // a host restore drops staged swaps
     }
 };
 

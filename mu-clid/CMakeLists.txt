@@ -258,12 +258,14 @@ target_sources(mu-clid-tests PRIVATE
     # collaborators and the licence glue, so tests construct the product class itself.
     Source/Tests/ProcessorSeamTests.cpp
     Source/Tests/FrozenBaselineTests.cpp   # frozen parameter manifest + compat corpus on the real processor
+    Source/Tests/LegacyReverbDecayTests.cpp   # files saved before the reverb Decay knob keep their old Decay
     Source/Tests/ClidScriptedEditRenderTests.cpp
     Source/Tests/ClidLayerStructureTests.cpp
     Source/Tests/ClidEditContinuityTests.cpp
     Source/Tests/HotSwapCancelTests.cpp        # staged swaps vs take-back, failed load, host restore, stopped load
     Source/Tests/ClipLaunchTests.cpp           # clip bank: store / launch / persistence on the real processor
     Source/Tests/FxTailTests.cpp               # a full-preset commit keeps the FX tail
+    Source/Tests/SamplePreviewTests.cpp        # an oversize host block is chunked to the prepared size
     Source/Tests/GoldenRenderTests.cpp         # golden renders of the real processor (tests/golden/mu-clid)
     Source/Tests/ExtractionPinTests.cpp        # pins: drained tails, count policy, longest tail, edit mid-play, oversize, trigger source
     Source/Plugin/PluginProcessor.cpp

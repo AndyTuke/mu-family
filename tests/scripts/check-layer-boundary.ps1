@@ -20,7 +20,9 @@
 #           -Registered), a file under mu-<product>/Source/Plugin/ that is a .cpp or named PluginProcessor*
 #           must not DEFINE a function named render*, read*Config or applyModulation, nor name the identifiers
 #           voiceEngines or retiring: that per-layer render glue belongs in the layer. Calls (renderAndMix(...);)
-#           are not definitions. Coarse by design; comments are blanked first.
+#           are not definitions. Coarse by design; comments are blanked first. The standalone shell's
+#           render-mode hooks listed in $shellRenderHooks (renderPlaysByDefault, a mu-core StandaloneShell
+#           override) are app policy, not layer glue, and are skipped.
 #   Rule 6  Layer reads outside LayerBlock (N5): in a product whose Plugin/ sources select
 #           LayerAccess::Published, any line of its Plugin/*.cpp or PluginProcessor* files reading `layers[` or
 #           `layerAs<` is reported unless the line carries a `layer-ok` marker (with a reason) that a reviewer

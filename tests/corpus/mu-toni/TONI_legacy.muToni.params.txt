@@ -1,8 +1,8 @@
 # frozen load result for fixture: TONI_legacy.muToni
 layers=4
 load_errors=0
-resave_bytes=36370
-resave_sha256=91d418855be90531285a77a14bb4c4ca13b2dea57067f2bf6580fb5a34108f4f
+resave_bytes=36405
+resave_sha256=7e03e7995a4c12e8acb6d22689a67f02b1f8d2249d170c803dcf61b174063b58
 --- parameters differing from default (id=plain value)
 a0_aeD=0.4
 a0_chord=5
@@ -18,3 +18,4 @@ a3_o2l=-60
 ch1_mute=1
 ch2_mute=1
 ch3_mute=1
+rev_decay=7.5

@@ -41,12 +41,21 @@ void SamplePreview::stop()
 void SamplePreview::mixInto(juce::AudioBuffer<float>& masterBus, int numSamples)
 {
     if (!transport.isPlaying()) return;
-    scratchBuffer.clear(0, 0, numSamples);
-    scratchBuffer.clear(1, 0, numSamples);
-    transport.getNextAudioBlock({ &scratchBuffer, 0, numSamples });
-    for (int ch = 0; ch < masterBus.getNumChannels(); ++ch)
-        masterBus.addFrom(ch, 0, scratchBuffer,
-                          ch % scratchBuffer.getNumChannels(), 0, numSamples, 0.7f);
+
+    // Chunk to the prepared size: a host block larger than prepare() would otherwise run past the scratch buffer.
+    const int chunkMax = scratchBuffer.getNumSamples();
+    if (chunkMax <= 0) return;
+    for (int done = 0; done < numSamples; )
+    {
+        const int n = juce::jmin(chunkMax, numSamples - done);
+        scratchBuffer.clear(0, 0, n);
+        scratchBuffer.clear(1, 0, n);
+        transport.getNextAudioBlock({ &scratchBuffer, 0, n });
+        for (int ch = 0; ch < masterBus.getNumChannels(); ++ch)
+            masterBus.addFrom(ch, done, scratchBuffer,
+                              ch % scratchBuffer.getNumChannels(), 0, n, 0.7f);
+        done += n;
+    }
 }
 
 } // namespace mu_clid

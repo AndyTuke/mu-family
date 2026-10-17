@@ -1,8 +1,8 @@
 # frozen load result for fixture: Cavern 3.muTant
 layers=3
 load_errors=0
-resave_bytes=35172
-resave_sha256=721741a6c3aec5b3ab99b68cf93e150e01e6c981eb89add9e566d168ad977863
+resave_bytes=35207
+resave_sha256=dce96df9e1249c9b261068cca4855e48e15a9080e5f2688fc3c50cc382d60ff3
 --- parameters differing from default (id=plain value)
 ch0_lvl=0.893
 ch0_pan=-0.6
@@ -19,6 +19,7 @@ dly_count=2
 dly_fb=0.5
 dly_syncDenom=1
 eff_algo=2
+rev_decay=7.5
 rev_diff=0.9
 rev_pre=40
 rev_size=0.95

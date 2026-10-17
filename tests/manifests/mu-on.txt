@@ -3,7 +3,7 @@
 product=mu-on
 layers_at_start=1
 max_layers=8
-param_count=422
+param_count=423
 ---
 ch0_lvl | float | 0 | 1 | 0.001 | 1 | 1 | 1
 ch0_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
@@ -170,6 +170,7 @@ ret_rev_scSrc | int | 0 | 9 | 1 | 1 | 0 | 0
 ret_rev_solo | bool | 0 | 1 | 1 | 1 | 0 | 0
 rev_algo | int | 0 | 3 | 1 | 1 | 1 | 0.333333
 rev_damp | float | 0 | 1 | 0 | 1 | 0.3 | 0.3
+rev_decay | float | 0.1 | 10 | 0 | 1 | 2.5 | 0.242424
 rev_diff | float | 0 | 1 | 0 | 1 | 0.8 | 0.8
 rev_dirt | float | 0 | 1 | 0 | 1 | 0 | 0
 rev_en | bool | 0 | 1 | 1 | 1 | 1 | 1
@@ -443,7 +444,7 @@ eff=7
 mst=10
 mstr=3
 ret=24
-rev=9
+rev=10
 seq=2
 t0=31
 t1=31

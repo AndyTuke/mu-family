@@ -72,5 +72,5 @@ namespace mu_tant_fixture
     };
 
     // The stream's hash as recorded (both targets must reproduce it).
-    constexpr std::uint64_t kRecordedHash = 0x4f2fd5d76786a83full;
+    constexpr std::uint64_t kRecordedHash = 0x217b53f613564ba1ull;
 }

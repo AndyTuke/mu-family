@@ -159,6 +159,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/SlotStateTests.cpp
     Source/Tests/ProcessorSeamTests.cpp  # the real PluginProcessor, headless (layer ownership)
     Source/Tests/FrozenBaselineTests.cpp   # frozen parameter manifest + compat corpus on the real processor
+    Source/Tests/LegacyReverbDecayTests.cpp   # files saved before the reverb Decay knob keep their old Decay
     Source/Tests/PrefixMigrationTests.cpp   # data saved before the k/b/h/s/r -> t{N} id-prefix rename still loads
     Source/Tests/TrackTypesTests.cpp   # the five layer types over the one Track class
     Source/Tests/TrackRenderTests.cpp   # Track::render: every engine, the Rumble's peer source, the engine swap, the Rumble's tail

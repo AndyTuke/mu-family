@@ -30,17 +30,15 @@ public:
         const float outGain  = std::pow(10.0f, outputDb / 20.0f);
         smoothedThresh .setTargetValue(thresh);
         smoothedOutGain.setTargetValue(outGain);
-        for (int ch = 0; ch < nCh; ++ch)
+        // Sample-major: each smoothed value advances once per sample and every channel uses it, so the
+        // right channel ramps with the left (channel-major looping left the right one stepping per block).
+        auto chans = buf.getArrayOfWritePointers();
+        for (int i = 0; i < ns; ++i)
         {
-            auto* data = buf.getWritePointer(ch);
-            for (int i = 0; i < ns; ++i)
-            {
-                const float t  = (ch == 0) ? smoothedThresh .getNextValue()
-                                           : smoothedThresh .getCurrentValue();
-                const float og = (ch == 0) ? smoothedOutGain.getNextValue()
-                                           : smoothedOutGain.getCurrentValue();
-                data[i] = juce::jlimit(-t, t, data[i]) * og;
-            }
+            const float t  = smoothedThresh .getNextValue();
+            const float og = smoothedOutGain.getNextValue();
+            for (int ch = 0; ch < nCh; ++ch)
+                chans[ch][i] = juce::jlimit(-t, t, chans[ch][i]) * og;
         }
     }
 

@@ -19,6 +19,10 @@ public:
     // Realign to the top of the pattern.
     void reset() noexcept { nextGlobalStep = 0; }
 
+    // Realign to the step the playhead sits in (call when the transport starts playing, wherever it starts):
+    // a stop and replay inside one 16th otherwise lands inside the resync window and drops that step.
+    void seek(double beat) noexcept { nextGlobalStep = (long long) std::floor(beat / kStepBeats); }
+
     // Fire every on-step of `row` (a StepRow, or anything with its isOn / isAccent) whose (swing-adjusted) beat lands in the block [beatStart, beatStart +
     // numSamples x beatsPerSample): fire(velocity, sampleOffsetWithinBlock). `swing` 0..0.9, `accentVelocity`
     // 0..1 (StepRow::setGroove's ranges). The caller advances the transport itself; this only emits triggers.
@@ -39,12 +43,14 @@ public:
         if (nextGlobalStep < expected - 1 || nextGlobalStep > expected + 1)
             nextGlobalStep = expected;
 
-        // Fire each step whose (swing-adjusted) beat lands within [beatStart, beatEnd).
+        // Fire each step whose (swing-adjusted) beat lands within [beatStart, beatEnd). The start edge has a 1e-9
+        // beat tolerance so a host reporting a block start an ulp past the previous block's end does not skip the step.
+        constexpr double kBeatEpsilon = 1e-9;
         for (int guard = 0; guard < StepRow::kNumSteps * 2; ++guard)
         {
             const double t = stepBeat(nextGlobalStep, swing);
             if (t >= beatEnd) break;
-            if (t >= beatStart)
+            if (t >= beatStart - kBeatEpsilon)
             {
                 const int local = localStep(nextGlobalStep);
                 const int sampleOffset = juce::jlimit(0, numSamples - 1,

@@ -39,7 +39,8 @@ public:
     TimeMode getTimeMode() const { return timeMode.load(std::memory_order_relaxed); }
 
     void setFeedback(float fb)  { feedback.store(juce::jlimit(0.0f, 0.98f, fb), std::memory_order_relaxed); }
-    void setSpread(float s)     { spread.store(juce::jlimit(0.0f, 1.0f, s), std::memory_order_relaxed); }
+    // Spread sets the right-channel delay target, so it re-derives both targets (as a time change does).
+    void setSpread(float s)     { spread.store(juce::jlimit(0.0f, 1.0f, s), std::memory_order_relaxed); updateDelayFromMode(); }
     void setDirt(float d)       { dirt.store(juce::jlimit(0.0f, 1.0f, d), std::memory_order_relaxed); }
     void setHostBpm(double bpm) { hostBpm  = bpm; if (timeMode.load(std::memory_order_relaxed) == TimeMode::Sync) updateDelayFromMode(); }
 

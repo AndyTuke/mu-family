@@ -39,4 +39,10 @@ private:
     float effToDelay  = 0.0f;
     float effToReverb = 0.0f;
     float delToReverb = 0.0f;
+
+    // The Effect slot keeps running for a tail after its send goes silent, so a chorus, flanger or phaser
+    // plays its delay lines and feedback out instead of freezing them (stale audio replayed on the next
+    // send, feedback cut mid-ring). Counted in samples; one second.
+    int effectTailBudget = 44100;
+    int effectTailLeft   = 0;
 };

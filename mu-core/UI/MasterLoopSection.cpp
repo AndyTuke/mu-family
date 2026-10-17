@@ -123,21 +123,14 @@ void MasterLoopSection::parameterChanged(const juce::String& parameterID, float 
     const bool swap = parameterID == mu_hotswap::kSwapTimingParamId;
     if (! loop && ! swap) return;
 
-    // host automation can fire on the audio thread; juce::Slider / DropdownSelect
-    // state isn't safe to mutate off the message thread.
-    juce::Component::SafePointer<MasterLoopSection> safe(this);
-    auto refresh = [safe, loop]
-    {
-        if (auto* self = safe.getComponent())
-        {
-            if (loop) self->syncLoopDropdownFromApvts();
-            else      self->syncSwapDropdownFromApvts();
-        }
-    };
-    if (juce::MessageManager::getInstance()->isThisTheMessageThread())
-        refresh();
-    else
-        juce::MessageManager::callAsync(std::move(refresh));
+    // Host automation can fire on the audio thread, where juce::Slider / DropdownSelect state must not be
+    // touched and a message-queue post would allocate. Off the message thread do nothing: timerCallback
+    // reconciles both dropdowns with their parameters on every tick.
+    if (! juce::MessageManager::getInstance()->isThisTheMessageThread())
+        return;
+
+    if (loop) syncLoopDropdownFromApvts();
+    else      syncSwapDropdownFromApvts();
 }
 
 void MasterLoopSection::timerCallback()

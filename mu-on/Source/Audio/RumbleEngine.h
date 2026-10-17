@@ -47,6 +47,9 @@ public:
         reverb.setEnabled(true);
         reverb.setLevel(1.0f);
         reverb.setParam("damp", 0.7f);   // dark by default
+        // The Rumble owns its own ReverbSlot (no Decay knob reaches it): keep its tail at the RT60 it had before
+        // the slot read decay as RT60 (1.8 s; 0.6f * 3.0f is exact, so the old rt20 of 0.6 s is reproduced bit for bit).
+        reverb.setParam("decay", 0.6f * 3.0f);
 
         scratch.setSize(2, maxBlockSize);
         revWet.setSize(2, maxBlockSize);

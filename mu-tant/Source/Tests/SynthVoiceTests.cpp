@@ -281,6 +281,56 @@ public:
             expect(maxDiff > 1.0e-4f, "quarter-tone offset changes the waveform (fractional pitch)");
         }
 
+        beginTest("smooth Semi modulation (osc1ToneMod) moves in scale degrees, SemiMod stays chromatic");
+        {
+            // Renders osc1 alone for one block. Two voices at the same frequency start from the same phase and render the
+            // same waveform, so comparing blocks compares pitch without estimating it; a different pitch drifts apart
+            // by many tenths of a cycle within 512 samples.
+            auto render = [&](int scale, int semi, float toneMod, float semiMod)
+            {
+                VoiceEngine v; v.setBank(&bank); v.prepare(sr, N);
+                VoiceConfig c;
+                c.osc2LevelDb = -60.0f; c.noiseLevelDb = -60.0f;
+                c.osc1LevelDb = 0.0f;   c.levelDb = 0.0f;
+                c.root = 0;  c.scaleIndex = scale;
+                c.osc1Semi = semi;  c.osc1ToneMod = toneMod;  c.osc1SemiMod = semiMod;
+                v.setConfig(c);
+                juce::AudioBuffer<float> out(2, N); out.clear();
+                v.process(out, N);
+                expect(allFinite(out, N), "finite");
+                return out;
+            };
+            auto maxDiff = [&](const juce::AudioBuffer<float>& a, const juce::AudioBuffer<float>& b)
+            {
+                float d = 0.0f;
+                for (int i = 0; i < N; ++i) d = std::max(d, std::abs(a.getSample(0, i) - b.getSample(0, i)));
+                return d;
+            };
+            // Same frequency differs only by float rounding of the pitch sum (about 1e-7 in the phase increment); a wrong
+            // pitch differs by a large fraction of the waveform. 1e-3 sits far from both.
+            const float same = 1.0e-3f, different = 0.05f;
+
+            const int major = 0, chromatic = 11;   // kScales[0] = Major (0 2 4 5 7 9 11), kScales[11] = Chromatic
+            // Major, root C: +1 degree is D (2 semitones), +3 is F (5), +7 is the C an octave up (12).
+            expect(maxDiff(render(major, 0, 1.0f, 0.0f), render(major, 0, 0.0f, 2.0f)) < same,  "+1 degree is D, two semitones up");
+            expect(maxDiff(render(major, 0, 3.0f, 0.0f), render(major, 0, 0.0f, 5.0f)) < same,  "+3 degrees is F, five semitones up");
+            expect(maxDiff(render(major, 0, 7.0f, 0.0f), render(major, 0, 0.0f, 12.0f)) < same, "+7 degrees is the octave");
+            // A smooth source on an integer degree agrees with a stepped one (a stepped source sets Semi itself).
+            expect(maxDiff(render(major, 0, 1.0f, 0.0f), render(major, 1, 0.0f, 0.0f)) < same,  "smooth +1 degree equals stepped Semi 1");
+            // ToneMod adds to the base Semi: base 2 (E) plus one degree is F.
+            expect(maxDiff(render(major, 2, 1.0f, 0.0f), render(major, 0, 0.0f, 5.0f)) < same,  "base Semi 2 plus 1 degree is F");
+            // No modulation reproduces the unmodulated pitch exactly.
+            expect(maxDiff(render(major, 0, 0.0f, 0.0f), render(major, 0, 0.0f, 0.0f)) == 0.0f, "ToneMod 0 is the old pitch");
+            // The old behaviour (one semitone per unit) is a different pitch.
+            expect(maxDiff(render(major, 0, 1.0f, 0.0f), render(major, 0, 0.0f, 1.0f)) > different, "ToneMod 1 is no longer one semitone");
+            // SemiMod still adds chromatic semitones, in any scale.
+            expect(maxDiff(render(major, 0, 0.0f, 3.0f), render(chromatic, 3, 0.0f, 0.0f)) < same, "SemiMod 3 is three chromatic semitones");
+            // In the Chromatic scale degrees are semitones, so ToneMod and SemiMod give the same frequency, fractions included.
+            for (const float amount : { 1.0f, 4.0f, 2.5f, -3.0f })
+                expect(maxDiff(render(chromatic, 0, amount, 0.0f), render(chromatic, 0, 0.0f, amount)) < same,
+                       "Chromatic: ToneMod and SemiMod agree at " + juce::String(amount));
+        }
+
         beginTest("noise-only voice (oscs muted) is audible");
         {
             VoiceEngine v; v.setBank(&bank); v.prepare(sr, N);
