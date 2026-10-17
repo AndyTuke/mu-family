@@ -39,6 +39,7 @@ private:
         static constexpr float rawDb[21] = {
             -9.34f, -8.49f, -7.45f, -6.43f, -5.42f, -4.42f, -3.41f, -2.41f, -1.40f, -0.40f, 0.60f,
              1.59f,  2.55f,  3.49f,  4.39f,  5.23f,  6.04f,  6.78f,  7.47f,  8.11f,  8.71f };
+        if (! (resonance == resonance)) resonance = 0.0f;   // NaN guard: the table index must stay in range
         const float pos = juce::jlimit(0.01f, 1.0f, resonance) * 20.0f;   // same floor the ladder is given
         const int   i   = juce::jmin(19, static_cast<int>(pos));
         const float db  = rawDb[i] + (rawDb[i + 1] - rawDb[i]) * (pos - static_cast<float>(i));
