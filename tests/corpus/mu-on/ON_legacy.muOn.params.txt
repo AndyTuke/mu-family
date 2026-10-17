@@ -2,12 +2,13 @@
 layers=5
 load_errors=0
 resave_bytes=29249
-resave_sha256=eab64aab9d5ead87789a7d8737e5066a2de3bf39cc933c3fe4987a754498c0e0
+resave_sha256=c5c32d8b48a1481c789b836e69c8244d90ea5dcfbbaeb47829ce1961d65457f6
 --- parameters differing from default (id=plain value)
 ch1_scAmt=0.4
 ch1_scRel=120
 ch1_scSrc=1
 ch4_scSrc=1
+rev_decay=7.5
 t1_eng=1
 t2_eng=2
 t2_hat_dec=10
