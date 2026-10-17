@@ -208,7 +208,11 @@ struct AudioEpochTests : juce::UnitTest
         e.enter();
         const auto s1 = e.stamp();
         expect((s1 & 1u) == 1 && ! e.passed(s1), "a block that started before the stamp may still hold the old pointer");
-        expect(e.callerIsInsideBlock() == (bool) JUCE_DEBUG);
+       #if JUCE_DEBUG
+        expect(e.callerIsInsideBlock());
+       #else
+        expect(! e.callerIsInsideBlock());
+       #endif
         e.leave();
         expect(e.passed(s1) && ! e.callerIsInsideBlock());
         expect(! e.reclaimDisabled());
