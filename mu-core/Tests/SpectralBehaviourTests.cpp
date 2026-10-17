@@ -27,6 +27,8 @@
 #include "Audio/FX/Insert/VocoderInsert.h"
 #include "Audio/Filters/Bp12Filter.h"
 #include "Audio/Filters/Notch12Filter.h"
+#include "Audio/Filters/Bp24Filter.h"
+#include "Audio/Filters/Notch24Filter.h"
 #include "Audio/Wavetable/HilbertTransform.h"
 #include "Audio/VoiceParams.h"
 #include "Audio/InsertSlotConfig.h"
@@ -282,6 +284,36 @@ public:
 };
 
 static SvfResponseTest svfResponseTest;
+
+// ── Centre-gain survey, 12 and 24 dB band-pass / notch (informational, asserts nothing) ──────────────
+class BandFilterSurveyTest : public juce::UnitTest
+{
+public:
+    BandFilterSurveyTest() : juce::UnitTest("Band-pass / notch survey: centre gain vs resonance (log only)", "DSP") {}
+
+    void runTest() override
+    {
+        beginTest("Centre gain (dB) at 48 kHz, tone at the cutoff, and notch gain 2 octaves either side");
+        const double inRms = 0.5 / std::sqrt(2.0);
+        auto gainDb = [&](FilterAlgorithmBase& f, float c, float r, double hz)
+        { return toDb(SvfResponseTest::steadyRms(f, 48000.0, c, r, hz) / inRms); };
+        for (const float c : { 200.0f, 1000.0f, 4000.0f })
+            for (const float r : { 0.0f, 0.2f, 0.4f, 0.6f, 0.8f, 1.0f })
+            {
+                Bp12Filter b12; Notch12Filter n12; Bp24Filter b24; Notch24Filter n24;
+                const double lo = c / 4.0, hi = c * 4.0;
+                logMessage("fc " + juce::String(c, 0) + " res " + juce::String(r, 1)
+                    + " | Bp12 " + juce::String(gainDb(b12, c, r, c), 2)
+                    + " | Notch12 " + juce::String(gainDb(n12, c, r, c), 2)
+                      + " (" + juce::String(gainDb(n12, c, r, lo), 2) + "/" + juce::String(gainDb(n12, c, r, hi), 2) + ")"
+                    + " | Bp24 " + juce::String(gainDb(b24, c, r, c), 2)
+                    + " | Notch24 " + juce::String(gainDb(n24, c, r, c), 2)
+                      + " (" + juce::String(gainDb(n24, c, r, lo), 2) + "/" + juce::String(gainDb(n24, c, r, hi), 2) + ")");
+            }
+    }
+};
+
+static BandFilterSurveyTest bandFilterSurveyTest;
 
 // ── Vocoder ─────────────────────────────────────────────────────────────────────────────────────────
 class VocoderSpectrumTest : public juce::UnitTest
