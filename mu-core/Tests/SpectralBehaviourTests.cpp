@@ -285,11 +285,11 @@ public:
 
 static SvfResponseTest svfResponseTest;
 
-// ── Centre-gain survey, 12 and 24 dB band-pass / notch (informational, asserts nothing) ──────────────
+// ── Centre-gain survey, 12 and 24 dB band-pass / notch (the 12 dB rows are informational, the 24 dB filters are asserted) ──────────────
 class BandFilterSurveyTest : public juce::UnitTest
 {
 public:
-    BandFilterSurveyTest() : juce::UnitTest("Band-pass / notch survey: centre gain vs resonance (log only)", "DSP") {}
+    BandFilterSurveyTest() : juce::UnitTest("Band-pass / notch survey: centre gain vs resonance (24 dB asserted)", "DSP") {}
 
     void runTest() override
     {
@@ -302,13 +302,23 @@ public:
             {
                 Bp12Filter b12; Notch12Filter n12; Bp24Filter b24; Notch24Filter n24;
                 const double lo = c / 4.0, hi = c * 4.0;
+                const double b24c = gainDb(b24, c, r, c);
+                const double n24c = gainDb(n24, c, r, c), n24lo = gainDb(n24, c, r, lo), n24hi = gainDb(n24, c, r, hi);
                 logMessage("fc " + juce::String(c, 0) + " res " + juce::String(r, 1)
                     + " | Bp12 " + juce::String(gainDb(b12, c, r, c), 2)
                     + " | Notch12 " + juce::String(gainDb(n12, c, r, c), 2)
                       + " (" + juce::String(gainDb(n12, c, r, lo), 2) + "/" + juce::String(gainDb(n12, c, r, hi), 2) + ")"
-                    + " | Bp24 " + juce::String(gainDb(b24, c, r, c), 2)
-                    + " | Notch24 " + juce::String(gainDb(n24, c, r, c), 2)
-                      + " (" + juce::String(gainDb(n24, c, r, lo), 2) + "/" + juce::String(gainDb(n24, c, r, hi), 2) + ")");
+                    + " | Bp24 " + juce::String(b24c, 2)
+                    + " | Notch24 " + juce::String(n24c, 2)
+                      + " (" + juce::String(n24lo, 2) + "/" + juce::String(n24hi, 2) + ")");
+
+                // The 24 dB filters are asserted: Bp24 holds about 0 dB at the centre, Notch24 nulls it
+                // and leaves two octaves either side untouched.
+                const juce::String tag = " (fc " + juce::String(c, 0) + ", res " + juce::String(r, 1) + ")";
+                expect(std::abs(b24c) <= 3.0, "Bp24 centre gain " + juce::String(b24c, 2) + " dB is outside +-3 dB" + tag);
+                expect(n24c < -30.0, "Notch24 null " + juce::String(n24c, 2) + " dB is not deeper than -30 dB" + tag);
+                expect(std::abs(n24lo) <= 1.5, "Notch24 gain two octaves below " + juce::String(n24lo, 2) + " dB" + tag);
+                expect(std::abs(n24hi) <= 1.5, "Notch24 gain two octaves above " + juce::String(n24hi, 2) + " dB" + tag);
             }
     }
 };

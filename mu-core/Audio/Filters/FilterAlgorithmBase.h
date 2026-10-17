@@ -33,7 +33,7 @@ inline float svfResonanceToQ(float resonance) noexcept
 //   7  Lp6Filter          (1-pole 6 dB/oct LP)
 //   8  CombPlusFilter     (feedback comb, positive feedback)
 //   9  Ap12Filter         (biquad all-pass)
-//  10  Notch24Filter      (Ladder BP24, dry − BP)
+//  10  Notch24Filter      (two cascaded Notch12 stages)
 //  11  Hp6Filter          (1-pole 6 dB/oct HP)
 //  12  PeakFilter         (biquad peak / bell, +12 dB)
 //  13  LowShelfFilter     (biquad low shelf, +12 dB)
