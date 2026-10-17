@@ -363,3 +363,69 @@ private:
 };
 
 static InsertAllAlgosSmokeTest insertAllAlgosSmokeTest;
+
+// Inserts keep per-channel state for two channels. A buffer of more than two channels must leave channels 0
+// and 1 exactly as a stereo buffer would, rather than the extra channels sharing (and corrupting) their state.
+class InsertMultiChannelStateTest : public juce::UnitTest
+{
+public:
+    InsertMultiChannelStateTest() : juce::UnitTest ("Insert state with more than two channels", "DSP") {}
+
+    void runTest() override
+    {
+        constexpr double kSR = 48000.0;
+        constexpr int    kNs = 512;
+
+        for (const int algo : { 7, 8, 10 })   // Compressor, Limiter, TapeSat
+        {
+            beginTest ("algo " + juce::String(algo) + ": channels 2 and 3 do not disturb channels 0 and 1");
+
+            VoiceParams p;
+            p.insertAlgo = algo;
+            if (algo == 10)
+            {
+                p.insertParam[0] = mu_ui::actualToNorm(60.0f,   algo, 0);   // Drive
+                p.insertParam[3] = mu_ui::actualToNorm(4000.0f, algo, 3);   // Tone
+            }
+            else
+            {
+                p.insertParam[0] = mu_ui::actualToNorm(80.0f,   algo, 0);   // Threshold
+                p.insertParam[2] = mu_ui::actualToNorm(5.0f,    algo, 2);   // Attack
+                p.insertParam[3] = mu_ui::actualToNorm(100.0f,  algo, 3);   // Release
+            }
+
+            // Quiet sines on channels 0 and 1; a hard loud signal on the extra channels.
+            auto fill = [&](juce::AudioBuffer<float>& b)
+            {
+                for (int ch = 0; ch < b.getNumChannels(); ++ch)
+                    for (int i = 0; i < kNs; ++i)
+                        b.setSample(ch, i, ch < 2 ? 0.2f * std::sin(0.05f * (float) i * (float) (ch + 1))
+                                                  : (((i / 8) & 1) ? 0.95f : -0.95f));
+            };
+            auto run = [&](juce::AudioBuffer<float>& b)
+            {
+                std::unique_ptr<InsertAlgorithmBase> ins;
+                if (algo == 10) ins = std::make_unique<TapeSatInsert>();
+                else            ins = std::make_unique<CompressorLimiterInsert>();
+                ins->prepare(kSR, kNs);
+                float gr = 0.0f;
+                for (int block = 0; block < 4; ++block)   // several blocks so the carried state matters
+                {
+                    fill(b);
+                    ins->process(b, kNs, b.getNumChannels(), p, gr);
+                }
+            };
+
+            juce::AudioBuffer<float> stereo(2, kNs), quad(4, kNs);
+            run(stereo);
+            run(quad);
+            bool same = true;
+            for (int ch = 0; ch < 2; ++ch)
+                for (int i = 0; i < kNs; ++i)
+                    same = same && quad.getSample(ch, i) == stereo.getSample(ch, i);
+            expect(same, "channels 0 and 1 differ from the stereo result");
+        }
+    }
+};
+
+static InsertMultiChannelStateTest insertMultiChannelStateTest;
