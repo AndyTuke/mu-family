@@ -20,20 +20,19 @@ namespace
 
     // A 1 s stereo 440 Hz tone (0.5 and 0.4 on the two channels, so the channels are told apart) as a 16-bit WAV,
     // written by hand (a 44-byte RIFF header plus interleaved samples) so the test does not depend on a WAV writer.
-    juce::File writeTone(const juce::File& dir)
+    juce::File writeTone(const juce::File& dir, double rate = kSr, int frames = (int) kSr, const char* name = "preview_tone.wav")
     {
-        auto file = dir.getChildFile("preview_tone.wav");
+        auto file = dir.getChildFile(name);
         file.deleteFile();
-        const int frames = (int) kSr;
         const int dataBytes = frames * 2 * 2;
         juce::MemoryOutputStream m;
         m.write("RIFF", 4);  m.writeInt(36 + dataBytes);  m.write("WAVEfmt ", 8);
         m.writeInt(16);  m.writeShort(1);  m.writeShort(2);
-        m.writeInt((int) kSr);  m.writeInt((int) kSr * 4);  m.writeShort(4);  m.writeShort(16);
+        m.writeInt((int) rate);  m.writeInt((int) rate * 4);  m.writeShort(4);  m.writeShort(16);
         m.write("data", 4);  m.writeInt(dataBytes);
         for (int i = 0; i < frames; ++i)
         {
-            const float s = (float) std::sin(6.283185307179586 * 440.0 * (double) i / kSr);
+            const float s = (float) std::sin(6.283185307179586 * 440.0 * (double) i / rate);
             m.writeShort((short) juce::roundToInt(0.5f * s * 32767.0f));
             m.writeShort((short) juce::roundToInt(0.4f * s * 32767.0f));
         }
@@ -166,11 +165,38 @@ struct SamplePreviewDecodeTests : juce::UnitTest
         expect(diff == 0.0f, "the restart begins at the start of the file");
         p.stop();
 
+        beginTest("downsampling very short files from 192 kHz completes and stays finite");
+        for (const int frames : { 1, 100 })
+        {
+            const auto f192 = writeTone(dir, 192000.0, frames, "short192.wav");
+            mu_clid::SamplePreview q;
+            q.prepare(kPrepared, 44100.0);
+            q.start(f192);
+            juce::AudioBuffer<float> o(2, 64);
+            o.clear();
+            q.mixInto(o, 64);
+            bool finite = true;
+            for (int i = 0; i < 64; ++i) finite = finite && std::isfinite(o.getSample(0, i));
+            expect(finite, "finite output for " + juce::String(frames) + " frames");
+            q.stop();
+        }
+
+        beginTest("start() before prepare() is ignored");
+        {
+            mu_clid::SamplePreview q;
+            q.start(tone2);
+            juce::AudioBuffer<float> o(2, 64);
+            o.clear();
+            q.mixInto(o, 64);
+            expect(o.getMagnitude(0, 64) == 0.0f, "silent");
+        }
+
         dir.deleteRecursively();
     }
 };
 
 static SamplePreviewDecodeTests samplePreviewDecodeTests;
+
 
 
 

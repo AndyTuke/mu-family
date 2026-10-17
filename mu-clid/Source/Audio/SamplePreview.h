@@ -39,6 +39,7 @@ private:
     // Message thread: free retired buffers the audio thread is no longer reading.
     void collectRetired();
 
+    juce::CriticalSection    messageLock;   // serialises start/stop/prepare/retire; the audio thread never takes it
     juce::AudioFormatManager formatManager;
     double                   sampleRate = 0.0;
     int                      chunkMax = 0;
@@ -54,3 +55,4 @@ private:
 };
 
 } // namespace mu_clid
+
