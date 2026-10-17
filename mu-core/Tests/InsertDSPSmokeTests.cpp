@@ -88,6 +88,30 @@ public:
             expect (!hasNaN(buf, 2, kNs), "Karplus produced NaN/Inf");
         }
 
+        beginTest ("Karplus: a sustained tone at full feedback stays inside full scale");
+        {
+            KarplusStrongInsert k;
+            k.prepare(kSR, kNs);
+            VoiceParams p;
+            p.insertAlgo = 11;
+            setSlot(p, 0, 9.0f);      // Note A
+            setSlot(p, 1, 2.0f);      // Octave 2 (A at 220 Hz)
+            setSlot(p, 2, 100.0f);    // Feedback 100%
+            setSlot(p, 3, 20000.0f);  // LPF open
+
+            float peak = 0.0f, gr = 0.0f;
+            double phase = 0.0;
+            for (int block = 0; block < 400; ++block)   // about 4 s of a half-scale sine on the loop's pitch
+            {
+                juce::AudioBuffer<float> buf(1, kNs);
+                for (int i = 0; i < kNs; ++i, phase += 6.283185307179586 * 220.0 / kSR)
+                    buf.setSample(0, i, 0.5f * (float) std::sin(phase));
+                k.process(buf, kNs, 1, p, gr);
+                peak = juce::jmax(peak, buf.getMagnitude(0, 0, kNs));
+            }
+            expect(peak <= 1.0f, "loop ran past full scale: peak " + juce::String(peak));
+        }
+
         beginTest ("Karplus: high feedback produces non-zero output on impulse");
         {
             KarplusStrongInsert k;
