@@ -27,7 +27,7 @@ namespace
         using mu_tant::PluginProcessor::layersLock;
     };
 
-    juce::String vp(int voice, const char* base) { return mu_tant::PluginProcessor::voiceParamId(voice, base); }
+    juce::String vp(int voice, const char* base) { return mu_tant::layerParamId(voice, base); }
 
     // Opens the gater on a voice so its drone reaches the output while the transport is stopped.
     void bypassGate(juce::AudioProcessorValueTreeState& apvts, int voice)

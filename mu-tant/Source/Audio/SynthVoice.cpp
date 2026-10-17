@@ -1,5 +1,5 @@
 #include "SynthVoice.h"
-#include "Scales.h"
+#include "TantScales.h"
 
 namespace mu_tant
 {

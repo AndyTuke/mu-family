@@ -174,8 +174,9 @@ struct Layer : public mu_core::RetireTail
     // It may depend on state that changes on any thread (mu-On: the engine parameter makes a Rumble priority 1):
     // the base reads it once per live layer per call and renders that layer in the pass that reading named.
     virtual int renderPriority() const { return 0; }
-    // Audio thread: the loop length in beats the hot-swap boundary uses; cached per slot by the base each
-    // rendered block. Negative: the slot has no loop to wait for. Default: the 4/4 bar (the swapper's common rule).
+    // Audio thread; called for any non-Empty layer in any slot, including a parked spare; reads atomics only: the
+    // loop length in beats the hot-swap boundary uses, cached per slot by the base each rendered block. Negative:
+    // the slot has no loop to wait for. Default: the 4/4 bar (the swapper's common rule).
     virtual double loopBeats() const { return 4.0; }
     // Message thread: file work for a staged layer-preset tree (a sample, a user wavetable), so the commit at
     // the boundary does none.

@@ -1,8 +1,8 @@
-// mu-tant scale-quantisation tests - Scales.h is pure + header-only, so this
+// mu-tant scale-quantisation tests - TantScales.h is pure + header-only, so this
 // pins the tone->MIDI->frequency maths that the synth pitch path depends on.
 
 #include <juce_core/juce_core.h>
-#include "Audio/Scales.h"
+#include "Audio/TantScales.h"
 
 class ScalesTest : public juce::UnitTest
 {

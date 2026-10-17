@@ -6,7 +6,7 @@
 #include <juce_core/juce_core.h>
 #include <vector>
 #include <cmath>
-#include "Audio/Scales.h"
+#include "Audio/TantScales.h"
 #include "Audio/Wavetable/WavetableBank.h"        // mu-core
 #include "Audio/Wavetable/WavetableOscillator.h"
 

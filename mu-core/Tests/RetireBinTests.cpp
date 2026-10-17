@@ -754,6 +754,48 @@ struct RetireBinReviewTests : juce::UnitTest
             expectEquals(fresh, juce::jmax(1, (int) (48000.0 * 0.025)), "the new fade starts from its full ramp");
         }
 
+        beginTest("Regrow cut off (mu-Tant's pinned P1): shrink, regrow inside the fade, shrink again resumes the first fade");
+        {
+            auto pBox = std::make_unique<FakeLayerHost>(4); auto& p = *pBox;
+            p.setRegrowCutsInPlaceTails(false);
+            {
+                const juce::ScopedLock sl(p.layersLock);
+                for (int s = 2; s < 4; ++s) { p.layers[(size_t) s] = std::make_unique<FadingSpare>(); p.layers[(size_t) s]->bindParams(p.apvts, s); }
+            }
+            p.setUseLayerRenderForTest(true);
+            Driver d(p);
+            auto state4 = p.captureComposedState();
+            auto state2 = state4.createCopy();
+            state2.setProperty("numVoices", 2, nullptr);
+            auto shrink = [&]
+            {
+                const juce::ScopedLock lw(p.layoutWriteLock);
+                const auto next = p.nextLayoutSerial();
+                const auto r2 = p.retireBin.parkInPlace(2, *p.layers[2], next, false);
+                p.applyComposedState(state2);
+                return r2;
+            };
+            auto slot2Left = [&]
+            {
+                for (int e = 0; e < Bin::kDepth; ++e)
+                    if (p.retireBin.stateOf(2, e) == Bin::Draining || p.retireBin.stateOf(2, e) == Bin::Parked)
+                        return p.retireBin.stateDataOf(2, e).samplesLeft;
+                return -1;
+            };
+            expect(shrink() == Bin::ParkResult::Parked);
+            d.block(256);
+            const int afterFirst = slot2Left();
+            expectEquals(afterFirst, juce::jmax(1, (int) (48000.0 * 0.025)) - 256, "the first fade ran one block");
+            p.applyComposedState(state4);   // regrow inside the fade: nothing is cut
+            d.block(256);
+            expectEquals(slot2Left(), afterFirst, "the entry stays armed and is skipped while the slot is live");
+            expect(shrink() == Bin::ParkResult::AlreadyActive, "the second shrink finds the first fade still armed");
+            d.block(256);
+            expectEquals(slot2Left(), afterFirst - 256, "and the first fade resumes where it stopped");
+            p.retireBin.cutAll();
+            p.retireBin.service();
+        }
+
         beginTest("M3: forced evictions, structural edits and rendering on three threads; nothing is freed or waited on under binMutex");
         {
             constexpr int kParks = 1500, kEdits = 200, kBlocks = 5000;

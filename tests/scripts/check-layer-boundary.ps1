@@ -20,7 +20,9 @@
 #           -Registered), a file under mu-<product>/Source/Plugin/ that is a .cpp or named PluginProcessor*
 #           must not DEFINE a function named render*, read*Config or applyModulation, nor name the identifiers
 #           voiceEngines or retiring: that per-layer render glue belongs in the layer. Calls (renderAndMix(...);)
-#           are not definitions. Coarse by design; comments are blanked first.
+#           are not definitions. Coarse by design; comments are blanked first. The standalone shell's
+#           render-mode hooks listed in $shellRenderHooks (renderPlaysByDefault, a mu-core StandaloneShell
+#           override) are app policy, not layer glue, and are skipped.
 #   Rule 6  Layer reads outside LayerBlock (N5): in a product whose Plugin/ sources select
 #           LayerAccess::Published, any line of its Plugin/*.cpp or PluginProcessor* files reading `layers[` or
 #           `layerAs<` is reported unless the line carries a `layer-ok` marker (with a reason) that a reviewer
@@ -163,11 +165,14 @@ function Get-ProductPluginFiles([string]$root) {
 # Rule 5: per-layer render glue left in a registered product's shell.
 $glueDefinition = [regex]'(?m)^[ \t]*(?:[\w:<>,]+[ \t\*&]+)+(?:\w+::)*(?<fn>render\w*|read\w*Config|applyModulation)\s*\((?<args>[^;{}]*)\)\s*(?:const\s*)?(?:noexcept\s*)?(?:override\s*)?(?:final\s*)?\{'
 $glueIdentifier = [regex]'\b(voiceEngines|retiring)\b'
+# The standalone shell's render-mode hooks (mu-core Plugin/StandaloneShell.h) are app policy, not layer glue.
+$shellRenderHooks = @('renderPlaysByDefault')
 function Test-Glue($files, [string[]]$registeredProducts) {
     $found = @()
     foreach ($f in ($files | Where-Object { $_.Candidate -and $registeredProducts -contains $_.Product })) {
         $cleaned = Get-CleanedText ([System.IO.File]::ReadAllText($f.Full))
         foreach ($m in $glueDefinition.Matches($cleaned)) {
+            if ($shellRenderHooks -contains $m.Groups['fn'].Value) { continue }
             $line = Get-LineNumber $cleaned $m.Index
             $found += "$($f.Product)/$($f.Rel):$line — a registered product's shell defines layer glue '$($m.Groups['fn'].Value)' (rule 5)"
         }

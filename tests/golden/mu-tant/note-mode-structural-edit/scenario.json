@@ -1,0 +1,15 @@
+{
+  "name": "note-mode-structural-edit",
+  "notes": "Note mode on, two pitched drones; 60 then 67 held; a third voice added while 67 is held (0.5 s), voices 0 and 2 swap (1 s), voice 1 removed (1.5 s), a host restore regrows to three voices (2 s); 67 released (back to 60), then 60 released.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 144000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 3,
+  "drainDeferredWorkEveryBlock": false,
+  "isolateStemsByMute": true,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "timedActions": [{ "frame": 0, "label": "Note mode on" }, { "frame": 24000, "label": "addLayer, open its gate" }, { "frame": 48000, "label": "swapLayers(0, 2)" }, { "frame": 72000, "label": "removeLayer(1)" }, { "frame": 96000, "label": "host restores a state with 3 voices" }],
+  "midiByBlock": [{ "block": 4, "offset": 0, "message": "noteOn 60" }, { "block": 30, "offset": 200, "message": "noteOn 67" }, { "block": 230, "offset": 0, "message": "noteOff 67" }, { "block": 260, "offset": 0, "message": "noteOff 60" }]
+}

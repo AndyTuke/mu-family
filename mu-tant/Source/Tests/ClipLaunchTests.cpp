@@ -19,7 +19,7 @@ struct MuTantClipLaunchTests : juce::UnitTest
     void runTest() override
     {
         using namespace mu_seam_test;
-        const auto id = [](int v) { return mu_tant::PluginProcessor::voiceParamId(v, "flt_res"); };
+        const auto id = [](int v) { return mu_tant::layerParamId(v, "flt_res"); };
         const mu_clip_test::Accessor<ExposedPluginProcessor> accessor {
             [id](ExposedPluginProcessor& p, float v) { setParam(p.apvts, id(0), v); },
             [id](ExposedPluginProcessor& p) { return getParam(p.apvts, id(0)); },

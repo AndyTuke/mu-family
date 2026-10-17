@@ -71,7 +71,7 @@ public:
             for (int v = 0; v < mu_limits::kMaxLayers; ++v)
                 for (const char* b : base)
                 {
-                    const juce::String id = PluginProcessor::voiceParamId(v, b);
+                    const juce::String id = mu_tant::layerParamId(v, b);
                     expect (has(id), "missing per-voice param '" + id + "'");
                 }
         }
@@ -152,3 +152,34 @@ public:
 };
 
 static MuTantApvtsLayoutTest muTantApvtsLayoutTest;
+
+// The Pattern type's table for one slot is exactly the slot's rows of the product layout, in the same order:
+// a layer that binds from the table and a DAW that automates the product see the same parameters.
+class MuTantPatternParamTableTest : public juce::UnitTest
+{
+public:
+    MuTantPatternParamTableTest() : juce::UnitTest ("Pattern layer parameter table", "Mixer") {}
+
+    void runTest() override
+    {
+        beginTest ("addLayerParams adds exactly the product layout's v3_ rows, in order");
+        StubProcessor table, product;
+        juce::AudioProcessorValueTreeState::ParameterLayout layout;
+        mu_tant::addLayerParams (layout, 3);
+        juce::AudioProcessorValueTreeState slotOnly (table, nullptr, "PARAMS", std::move (layout));
+        juce::AudioProcessorValueTreeState whole (product, nullptr, "PARAMS", mu_tant::PluginProcessor::createParameterLayout());
+
+        juce::StringArray fromTable, fromProduct;
+        for (auto* p : table.getParameters())
+            if (auto* rp = dynamic_cast<juce::RangedAudioParameter*> (p)) fromTable.add (rp->getParameterID());
+        for (auto* p : product.getParameters())
+            if (auto* rp = dynamic_cast<juce::RangedAudioParameter*> (p))
+                if (rp->getParameterID().startsWith (mu_tant::layerParamPrefix (3))) fromProduct.add (rp->getParameterID());
+        expect (fromTable.size() > 0, "the table adds rows");
+        expect (fromTable == fromProduct, "the slot's rows and their order match the product layout");
+        for (const auto& id : fromTable)
+            expect (id.startsWith ("v3_"), "every row is under the slot's prefix: " + id);
+    }
+};
+
+static MuTantPatternParamTableTest muTantPatternParamTableTest;

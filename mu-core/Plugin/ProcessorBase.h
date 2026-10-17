@@ -708,6 +708,19 @@ protected:
     // input state (held keys): a key released during an edit would otherwise stay held. Off (the default): a
     // skipped block's MIDI is dropped, as a missed try-lock always dropped it.
     void setCarrySkippedMidi(bool on) noexcept { renderState.carryMidi = on; }
+    // Constructor only. On (the default): a count increase by applyComposedState cuts the in-place tails of the
+    // slots it regrows (retire bin rule R1.3), so a later shrink fades afresh. Off: a regrown slot's in-place
+    // entry stays armed, skipped while the slot is live (rule R1.2), and a later shrink resumes it (its second
+    // park is AlreadyActive): mu-Tant's pinned behaviour (pin P1, the stale tail of a shrink-regrow-shrink),
+    // kept until its signed golden update. Structural edits cut either way.
+    void setRegrowCutsInPlaceTails(bool on) noexcept { regrowCutsInPlaceTails = on; }
+    // Audio thread (or a test while not processing): the loop length renderLayers cached for `slot` on the last
+    // rendered block, for a product that applies its own boundary rule over the per-slot lengths. A slot with a
+    // layer (live or a parked spare) caches its layer's loopBeats(); an empty slot the default bar.
+    double layerLoopBeats(int slot) const noexcept
+    {
+        return slot >= 0 && slot < mu_limits::kMaxLayers ? renderState.loopBeats[(size_t) slot] : -1.0;
+    }
 
     // prepareToPlay (message or host thread, not processing; call it OUTSIDE layersLock): sizes the per-slot
     // scratch (kMaxLayers x 2 x blockSize) and the block's MIDI storage, prepares every slot's layer (spares
@@ -754,7 +767,7 @@ protected:
         flagSwapBoundaries(t.playing, t.startBeat, t.blockBeats, [this, fullPresetLoopBeats](int slot) noexcept
         {
             if (slot == mu_hotswap::kFullPreset) return fullPresetLoopBeats;
-            return slot >= 0 && slot < mu_limits::kMaxLayers ? renderState.loopBeats[(size_t) slot] : -1.0;
+            return layerLoopBeats(slot);
         });
     }
 
@@ -1081,6 +1094,7 @@ private:
     std::unique_ptr<LayerRenderState> renderStateStorage = std::make_unique<LayerRenderState>();   // heap: see retireBinStorage
     LayerRenderState& renderState = *renderStateStorage;
     std::atomic<bool> useLayerRender { false };   // the test-controlled switch (see setUseLayerRenderForTest)
+    bool regrowCutsInPlaceTails = true;           // setRegrowCutsInPlaceTails (constructor only)
 
     void noteHostBlock(const mu_core::BlockTransport& t, int numSamples) noexcept;
     void noteSkippedBlock(const mu_core::BlockTransport& t, juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi) noexcept;

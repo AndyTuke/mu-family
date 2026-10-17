@@ -414,6 +414,49 @@ namespace
             defs.push_back(d);
         }
 
+        // Note mode across structural edits with pitched voices: every voice pitch-tracks the held note, so a
+        // voice added (or regrown) while a key is held must start on that note, not on the root.
+        {
+            Def d; d.name = "note-mode-structural-edit"; d.numStems = 3; d.lengthFrames = 144000;
+            d.isolateStemsByMute = true;   // slot 2 is dropped for a while, and the mixer ignores a solo on a dropped strip
+            d.notes = "Note mode on, two pitched drones; 60 then 67 held; a third voice added while 67 is held (0.5 s), voices 0 and 2 swap (1 s), voice 1 removed (1.5 s), a host restore regrows to three voices (2 s); 67 released (back to 60), then 60 released.";
+            d.author = [](PluginProcessor& p)
+            {
+                mu_golden_rig::growTo(p, 2);
+                for (int v = 0; v < 2; ++v) { openGate(p.apvts, v); setVoice(p.apvts, v, "o1_wt", 1); setVoice(p.apvts, v, "flt_cut", 4000); }
+                setVoice(p.apvts, 1, "o1_oct", -1);
+                setParam(p.apvts, "ch0_pan", -0.3f); setParam(p.apvts, "ch1_pan", 0.4f);
+            };
+            d.timed = { { 0, "Note mode on", [](OwnedProcessor& o, mu_golden::MockHost&) { o.setMidiNoteMode(1); } },
+                        { 24000, "addLayer, open its gate", [](OwnedProcessor& o, mu_golden::MockHost&)
+                          { o.addLayer(); openGate(o.apvts, 2); setVoice(o.apvts, 2, "o1_oct", 1); setVoice(o.apvts, 2, "o1_wt", 1); } },
+                        { 48000, "swapLayers(0, 2)", [](OwnedProcessor& o, mu_golden::MockHost&) { o.swapLayers(0, 2); } },
+                        { 72000, "removeLayer(1)",   [](OwnedProcessor& o, mu_golden::MockHost&) { o.removeLayer(1); } },
+                        restoreAt(96000, 3) };
+            d.midi = { noteOn(4, 0, 60), noteOn(30, 200, 67), noteOff(230, 0, 67), noteOff(260, 0, 60) };
+            defs.push_back(d);
+        }
+
+        // Contract pin P7: host blocks above the prepared size. Since E4.5 the shared driver chunks them into calls
+        // of at most the prepared size (C8); before it, the old chain overran the mixer's prepared buffers on such a
+        // block, so no golden could hold one (ExtractionPinTests pins the engine's own truncation).
+        {
+            Def d; d.name = "oversize-block"; d.numStems = 2; d.lengthFrames = 96000; d.preparedBlockSize = 512;
+            d.schedules = { mu_golden::Schedule::fixed512(), mu_golden::Schedule::ragged(), { "oversize", { 4096, 1, 2048 } } };
+            d.notes = "Two gated drones (one through Karplus) with a delay send, prepared at 512 and fed host blocks of 1024, 4096 and 2048: the driver chunks each into calls of at most 512 (C8).";
+            d.author = [](PluginProcessor& p)
+            {
+                mu_golden_rig::growTo(p, 2);
+                gate(p, 0, 1, { { 0, 3, 0.0f, 0.0f, 0.0f, false }, { 8, 4, 0.2f, 0.0f, 0.0f, false } });
+                gate(p, 1, 1, { { 4, 4, 0.3f, 0.0f, 0.0f, false }, { 12, 3, 0.0f, 0.0f, 0.0f, false } });
+                setVoice(p.apvts, 1, "o1_oct", -1); setVoice(p.apvts, 1, "o1_wt", 2);
+                setVoice(p.apvts, 1, "drvChar", 11); setVoice(p.apvts, 1, "insP1", 0.6f); setVoice(p.apvts, 1, "insP2", 0.7f);
+                setParam(p.apvts, "ch0_sendDly", 0.4f); setParam(p.apvts, "ret_dly_lvl", 0.8f);
+                setParam(p.apvts, "ch0_pan", -0.4f); setParam(p.apvts, "ch1_pan", 0.5f);
+            };
+            defs.push_back(d);
+        }
+
         return defs;
     }
 
@@ -610,3 +653,45 @@ struct MuTantGoldenRenderTests : juce::UnitTest
 };
 
 static MuTantGoldenRenderTests muTantGoldenRenderTests;
+
+// The audio thread's note scans read raw MIDI bytes (audit fix 8554f03, kept in the shell's final-mix gate scan
+// and in each Pattern's scan of the decoded MIDI view): a block holding a SysEx message longer than juce::MidiMessage's
+// inline storage, in Note mode, makes no heap allocation inside processBlock.
+struct MuTantSysExScanTests : juce::UnitTest
+{
+    MuTantSysExScanTests() : juce::UnitTest("mu-Tant Note-mode scan with SysEx: no allocation", "mu-tant-processor") {}
+
+    void runTest() override
+    {
+        beginTest("processBlock in Note mode with a 16-byte SysEx and a note in the buffer allocates nothing");
+        OwnedProcessor p;
+        mu_golden::MockHost host;
+        p.setPlayHead(&host);
+        p.setRateAndBufferSizeDetails(48000.0, 512);
+        p.prepareToPlay(48000.0, 512);
+        openGate(p.apvts, 0);
+        p.setMidiNoteMode(1);
+        juce::AudioBuffer<float> buf(2, 512);
+        for (int b = 0; b < 4; ++b) { buf.clear(); juce::MidiBuffer none; p.processBlock(buf, none); }
+
+        const juce::uint8 sysex[16] = { 0xf0, 0x7d, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 0xf7 };
+        juce::MidiBuffer midi;
+        midi.addEvent(sysex, 16, 0);
+        midi.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8) 100), 10);
+        midi.ensureSize(4096);
+        buf.clear();
+        int allocs = -1;
+        {
+            mu_alloc::ArmedNewOnly armed;
+            p.processBlock(buf, midi);
+            allocs = armed.allocs();
+        }
+        expectEquals(allocs, 0, "no operator new inside processBlock");
+        p.setMidiNoteMode(0);
+        p.setPlayHead(nullptr);
+        p.releaseResources();
+    }
+};
+
+static MuTantSysExScanTests muTantSysExScanTests;
+
