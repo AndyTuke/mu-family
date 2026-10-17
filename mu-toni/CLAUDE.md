@@ -14,8 +14,8 @@ The editor inherits `mu-core/UI/EditorShellBase.h`, so TransportBar, StatusBar, 
 
 ### What's wired
 
-- **`mu_toni::PluginProcessor : ProcessorBase`** ([Source/Plugin/PluginProcessor.{h,cpp}](Source/Plugin/PluginProcessor.cpp)) — 43-param/voice APVTS plus `mu_mixfx::addGlobalFxParams` + per-layer `ch{N}_` strips; renders through the shared `MixerEngine` (engine → insert → mixer) via the `processCoreBlock` hook; free-running internal transport driving the TransportBar.
-- **Arp engine** — [Sequencer/ArpSequencer.h](Source/Sequencer/ArpSequencer.h) (pool derivation + skewed-triangle scan, pure and unit-tested) and [Sequencer/ArpVoiceRunner.h](Source/Sequencer/ArpVoiceRunner.h) (arp clock → voice note-on/off). Tables in [Audio/Scales.h](Source/Audio/Scales.h) and [Audio/Chords.h](Source/Audio/Chords.h) (~35 chords, absolute intervals, tier-grouped).
+- **`mu_toni::PluginProcessor : ProcessorBase`** ([Source/Plugin/PluginProcessor.{h,cpp}](Source/Plugin/PluginProcessor.cpp)) — 43-param/voice APVTS plus `mu_mixfx::addGlobalFxParams` + per-layer `ch{N}_` strips; renders through the shared `renderAndMix` driver (`Arp` layer → insert → `MixerEngine`); free-running internal transport driving the TransportBar.
+- **Arp engine** — [Sequencer/ArpSequencer.h](Source/Sequencer/ArpSequencer.h) (pool derivation + skewed-triangle scan, pure and unit-tested) and [Sequencer/ArpVoiceRunner.h](Source/Sequencer/ArpVoiceRunner.h) (arp clock → voice note-on/off). Tables in [Audio/ToniScales.h](Source/Audio/ToniScales.h) and [Audio/Chords.h](Source/Audio/Chords.h) (~35 chords, absolute intervals, tier-grouped).
 - **Voice** — [Audio/ToniVoice.h](Source/Audio/ToniVoice.h): mu-Tant's wavetable oscillators + 2-lane X-Mod + sync, shared from mu-core ([Audio/Wavetable/](../mu-core/Audio/Wavetable/) — `WavetableBank`, `XModOscPair`).
 - **Per-voice modulation** — `Layer` (8 control sequences + `ModulationMatrix`) with the shared mu-core `ModulatorPanel` as the engine panel's bottom band; [Modulation/MuToniModDest.h](Source/Modulation/MuToniModDest.h) registers 20 arp/voice/env destinations, resolved per block through `mu_mod::resolveLane`. Persists in the APVTS state as the `MuToniMods` child.
 - **`mu_toni::PluginEditor : EditorShellBase`** — shared shell + `LayerSidebar` + the shared `LayerPanel` around a populated [UI/ArpContent.h](Source/UI/ArpContent.h) (arp / osc / filter / env / insert, APVTS-attached shared widgets) + `MixerOverlay`. No bespoke shell or mixer code.
@@ -40,7 +40,7 @@ The editor inherits `mu-core/UI/EditorShellBase.h`, so TransportBar, StatusBar, 
 ### Conventions in force
 
 - All product symbols under the `mu_toni::` namespace (boundary check `tests/scripts/check-core-boundary.ps1` catches mu-core regressions).
-- `Source/` follows the family `{Plugin, Sequencer, UI, Persistence, License, Tests}` layout, **plus** `Audio/` and `Modulation/` for the engine and its mod-destination provider. `Persistence/` and `License/` are currently placeholders (`.gitkeep` only).
+- `Source/` follows the family `{Plugin, Sequencer, UI, Persistence, License, Tests}` layout, **plus** `Audio/` and `Modulation/` for the engine and its mod-destination provider. `Persistence/` holds `ArpParams.{h,cpp}` and `LayerParamIds.h`; `License/` holds `LicenseKey.h`.
 - Builds tick the shared family build counter (`add_dependencies(mu-toni increment_build_number)`).
 
 ## Design documents
@@ -50,3 +50,11 @@ The editor inherits `mu-core/UI/EditorShellBase.h`, so TransportBar, StatusBar, 
 | [docs/mu-toni/design.md](../docs/mu-toni/design.md) | Product overview, shared-engine inheritance map, file formats, freeware/distribution |
 | [docs/mu-toni/design-sequencer.md](../docs/mu-toni/design-sequencer.md) | The arp model — scale/chord pool, skewed-triangle scan, gate/legato/portamento, MIDI control |
 | [docs/mu-toni/design-buildplan.md](../docs/mu-toni/design-buildplan.md) | The staged T1–T5 MVP build plan |
+
+<!-- layer-extraction as-built 2026-10-17 -->
+## Layer library (as built, E2)
+
+- Rendering goes through the shared `renderAndMix` driver. The layer type is `Arp` (`Sequencer/Arp.{h,cpp}`); held keys live in `Sequencer/HeldNotes.h`. The processor holds no per-voice glue.
+- `ArpContent` takes `ProcessorBase&` and an `ArpHost&` (`UI/ArpHost.h`). Host methods carry the type name (`getArp...`).
+- `Persistence/` holds `ArpParams.{h,cpp}` and `LayerParamIds.h` (moved from `Plugin/`). `Audio/ToniScales.h` was `Scales.h`.
+- Library: `mu-toni-layer` (INTERFACE; UI sources in `MU_TONI_LAYER_UI_SOURCES`). Tests: `mu-toni-tests` and `mu-toni-layer-tests`. A library file never includes `Plugin/` or `License/` (`check-layer-boundary.ps1`).
