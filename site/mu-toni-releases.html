@@ -140,12 +140,34 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <p class="rel-note">Nothing in testing right now. Changes that are coming in the next version will appear here.</p>
       </section>
 
+      <!-- ── v1.1.0.1415 ── -->
+      <section class="release">
+        <div class="rel-head">
+          <span class="rel-ver">v1.1.0.1415</span>
+          <span class="rel-date">released 17 October 2026</span>
+          <span class="rel-pill current">Current</span>
+        </div>
+        <div class="rn-group improved">
+          <h3>Improved</h3>
+          <ul>
+            <li>The reverb now has a Decay control. The default Hall tail is shorter than before, and older projects are converted to sound the same.</li>
+            <li>The 24 dB band-pass and notch filters now sit at the same level as their 12 dB versions, instead of being louder or quieter.</li>
+          </ul>
+        </div>
+        <div class="rn-group fixed">
+          <h3>Fixed</h3>
+          <ul>
+            <li>Fixed the loudness of the Fold, Soft Clip and Hard Clip effects, and fixed the sidechain ducking, the Compressor and the 12 dB band-pass filter.</li>
+            <li>Retriggering a note during its release no longer drops the envelope to zero first. It now attacks from where the tail had got to, so there is no click.</li>
+          </ul>
+        </div>
+      </section>
+
       <!-- ── v1.1.0.1412 ── -->
       <section class="release">
         <div class="rel-head">
           <span class="rel-ver">v1.1.0.1412</span>
           <span class="rel-date">released 15 October 2026</span>
-          <span class="rel-pill current">Current</span>
         </div>
         <div class="rn-group new">
           <h3>New</h3>

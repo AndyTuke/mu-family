@@ -142,7 +142,32 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <div class="rn-group fixed">
           <h3>Fixed</h3>
           <ul>
+            <li>Renaming a rhythm now updates its name in the sidebar and in the sidechain source list.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ── v1.1.0.1415 ── -->
+      <section class="release">
+        <div class="rel-head">
+          <span class="rel-ver">v1.1.0.1415</span>
+          <span class="rel-date">released 17 October 2026</span>
+          <span class="rel-pill current">Current</span>
+        </div>
+        <div class="rn-group improved">
+          <h3>Improved</h3>
+          <ul>
+            <li>The reverb now has a Decay control. The default Hall tail is shorter than before, and older projects are converted to sound the same.</li>
+            <li>The 24 dB band-pass and notch filters now sit at the same level as their 12 dB versions, instead of being louder or quieter.</li>
+          </ul>
+        </div>
+        <div class="rn-group fixed">
+          <h3>Fixed</h3>
+          <ul>
+            <li>Fixed the loudness of the Fold, Soft Clip and Hard Clip effects, and fixed the sidechain ducking, the Compressor and the 12 dB band-pass filter.</li>
             <li>The rhythm ring no longer hops occasionally when a hit sounds. The ring now reads the step and its position within the step as one consistent reading.</li>
+            <li>Sample preview no longer reads the disk on the audio thread, so previewing a sample can't cause a click or dropout.</li>
+            <li>Loading a preset or host state from a different μ-series product is now refused with a clear message, instead of replacing your sound with the wrong data.</li>
           </ul>
         </div>
       </section>
@@ -152,7 +177,6 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <div class="rel-head">
           <span class="rel-ver">v1.1.0.1412</span>
           <span class="rel-date">released 15 October 2026</span>
-          <span class="rel-pill current">Current</span>
         </div>
         <div class="rn-group new">
           <h3>New</h3>
