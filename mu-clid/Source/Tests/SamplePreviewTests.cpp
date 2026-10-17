@@ -18,32 +18,28 @@ namespace
     constexpr double kSr = 48000.0;
     constexpr int kPrepared = 256;
 
-    // A 1 s stereo 440 Hz tone (0.5 and 0.4 on the two channels, so the channels are told apart) as a 16-bit WAV.
+    // A 1 s stereo 440 Hz tone (0.5 and 0.4 on the two channels, so the channels are told apart) as a 16-bit WAV,
+    // written by hand (a 44-byte RIFF header plus interleaved samples) so the test does not depend on a WAV writer.
     juce::File writeTone(const juce::File& dir)
     {
         auto file = dir.getChildFile("preview_tone.wav");
         file.deleteFile();
+        const int frames = (int) kSr;
+        const int dataBytes = frames * 2 * 2;
+        juce::MemoryOutputStream m;
+        m.write("RIFF", 4);  m.writeInt(36 + dataBytes);  m.write("WAVEfmt ", 8);
+        m.writeInt(16);  m.writeShort(1);  m.writeShort(2);
+        m.writeInt((int) kSr);  m.writeInt((int) kSr * 4);  m.writeShort(4);  m.writeShort(16);
+        m.write("data", 4);  m.writeInt(dataBytes);
+        for (int i = 0; i < frames; ++i)
         {
-            juce::WavAudioFormat wav;
-            std::unique_ptr<juce::OutputStream> out = file.createOutputStream();
-            if (out == nullptr) return {};
-            auto writer = wav.createWriterFor(out, juce::AudioFormatWriterOptions{}.withSampleRate(kSr)
-                                                                                   .withNumChannels(2)
-                                                                                   .withBitsPerSample(16));
-            if (writer == nullptr) return {};
-            juce::AudioBuffer<float> b(2, (int) kSr);
-            for (int i = 0; i < b.getNumSamples(); ++i)
-            {
-                const float s = (float) std::sin(6.283185307179586 * 440.0 * (double) i / kSr);
-                b.setSample(0, i, 0.5f * s);
-                b.setSample(1, i, 0.4f * s);
-            }
-            writer->writeFromAudioSampleBuffer(b, 0, b.getNumSamples());
-        }   // the writer is destroyed here, which flushes the file
-        return file;
+            const float s = (float) std::sin(6.283185307179586 * 440.0 * (double) i / kSr);
+            m.writeShort((short) juce::roundToInt(0.5f * s * 32767.0f));
+            m.writeShort((short) juce::roundToInt(0.4f * s * 32767.0f));
+        }
+        const bool ok = file.replaceWithData(m.getData(), m.getDataSize()); return ok ? file : juce::File();
     }
 }
-
 struct SamplePreviewTests : juce::UnitTest
 {
     SamplePreviewTests() : juce::UnitTest("mu-Clid SamplePreview chunks an oversize host block", "mu-clid") {}
@@ -53,8 +49,8 @@ struct SamplePreviewTests : juce::UnitTest
         const auto dir = juce::File::getSpecialLocation(juce::File::tempDirectory)
                              .getChildFile("mu-preview-test-" + juce::String::toHexString(juce::Random().nextInt64()));
         dir.createDirectory();
-        const auto tone = writeTone(dir);
-        expect(tone.existsAsFile(), "the test tone was written");
+        beginTest("setup");   // expect() needs a current test
+        const auto tone = writeTone(dir); expect(tone.existsAsFile(), "the test tone was written");
         if (! tone.existsAsFile()) { dir.deleteRecursively(); return; }
 
         // A block 2x, 5x and 5x plus a ragged tail the prepared size: the last chunk is shorter than the others.
@@ -64,10 +60,8 @@ struct SamplePreviewTests : juce::UnitTest
                       + ") equals the same audio in prepared-size blocks");
 
             // Reference: the audio the preview produces when the host honours the prepared size.
-            mu_clid::SamplePreview reference;
-            reference.prepare(kPrepared, kSr);
-            reference.start(tone);
-            juce::AudioBuffer<float> expected(2, total);
+            mu_clid::SamplePreview reference; reference.prepare(kPrepared, kSr);
+            reference.start(tone); juce::AudioBuffer<float> expected(2, total);
             expected.clear();
             for (int done = 0; done < total; done += kPrepared)
             {
@@ -110,3 +104,83 @@ struct SamplePreviewTests : juce::UnitTest
 };
 
 static SamplePreviewTests samplePreviewTests;
+
+struct SamplePreviewDecodeTests : juce::UnitTest
+{
+    SamplePreviewDecodeTests() : juce::UnitTest("mu-Clid SamplePreview plays from memory", "mu-clid") {}
+
+    void runTest() override
+    {
+        const auto dir = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                             .getChildFile("mu-preview-test-" + juce::String::toHexString(juce::Random().nextInt64()));
+        dir.createDirectory();
+        beginTest("setup");   // expect() needs a current test
+        const auto tone = writeTone(dir); if (! tone.existsAsFile()) { expect(false, "the test tone was written"); dir.deleteRecursively(); return; }
+
+        // Reference: the file decoded directly, scaled by the preview's 0.7 mix gain.
+        juce::AudioFormatManager fm;
+        fm.registerBasicFormats();
+        std::unique_ptr<juce::AudioFormatReader> reader(fm.createReaderFor(tone));
+        const int len = (int) reader->lengthInSamples;
+        juce::AudioBuffer<float> ref(2, len);
+        reader->read(&ref, 0, len, 0, true, true);
+        reader.reset();
+
+        mu_clid::SamplePreview p;
+        p.prepare(kPrepared, kSr);
+        p.start(tone);
+        tone.deleteFile();   // any file read in mixInto would now fail: playback must come from memory
+
+        beginTest("preview matches the decoded file at 0.7x with the file deleted after start()");
+        const int total = len + 3 * kPrepared;
+        juce::AudioBuffer<float> out(2, total);
+        out.clear();
+        p.mixInto(out, total);   // oversize block, also runs past the end of the file
+        float maxDiff = 0.0f, tailLevel = 0.0f;
+        for (int ch = 0; ch < 2; ++ch)
+            for (int i = 0; i < total; ++i)
+            {
+                const float e = i < len ? 0.7f * ref.getSample(ch, i) : 0.0f;
+                maxDiff = juce::jmax(maxDiff, std::abs(out.getSample(ch, i) - e));
+                if (i >= len) tailLevel = juce::jmax(tailLevel, std::abs(out.getSample(ch, i)));
+            }
+        expect(maxDiff < 1.0e-6f, "largest difference from the reference " + juce::String(maxDiff, 8));
+        expect(tailLevel == 0.0f, "silent after the end of the file");
+
+        beginTest("stop() silences and start() restarts from the beginning");
+        const auto tone2 = writeTone(dir);
+        p.start(tone2);
+        juce::AudioBuffer<float> a(2, kPrepared), b(2, kPrepared), c(2, kPrepared);
+        a.clear(); b.clear(); c.clear();
+        p.mixInto(a, kPrepared);
+        p.stop();
+        p.mixInto(b, kPrepared);
+        expect(b.getMagnitude(0, kPrepared) == 0.0f, "silent after stop()");
+        p.start(tone2);
+        p.start(tone2);   // restart while a preview is already published
+        p.mixInto(c, kPrepared);
+        float diff = 0.0f;
+        for (int i = 0; i < kPrepared; ++i)
+            diff = juce::jmax(diff, std::abs(a.getSample(0, i) - c.getSample(0, i)));
+        expect(a.getMagnitude(0, kPrepared) > 0.05f, "played before stop()");
+        expect(diff == 0.0f, "the restart begins at the start of the file");
+        p.stop();
+
+        dir.deleteRecursively();
+    }
+};
+
+static SamplePreviewDecodeTests samplePreviewDecodeTests;
+
+
+
+
+
+
+
+
+
+
+
+
+
