@@ -152,9 +152,7 @@ public:
 
                 // Input excitation + filtered feedback. Output IS the loop
                 // signal so the user hears the resonant body.
-                // A loop gain near 1 lets each new hit pile onto the ring; the soft limit keeps the loop bounded so
-                // a hot string cannot run away or clip downstream into alias-like bursts.
-                const float out = softLimit(chans[ch][i] + curGain * lp);
+                const float out = chans[ch][i] + curGain * lp;
                 buffer[wPos]    = out;
                 chans[ch][i]    = out * outGain;
                 wPos = (wPos + 1) % bufSize;
@@ -163,16 +161,6 @@ public:
     }
 
 private:
-    // Transparent below 0.9; above it a tanh knee approaches 1.0, so the loop and the output never exceed full scale.
-    static float softLimit(float x) noexcept
-    {
-        constexpr float knee = 0.9f, room = 1.0f - knee;
-        const float a = std::abs(x);
-        if (a <= knee) return x;
-        const float y = knee + room * std::tanh((a - knee) / room);
-        return x < 0.0f ? -y : y;
-    }
-
     // Lowest target frequency: SPN C1 = 32.7 Hz (Octave 0 + Note C).
     static constexpr float kLowestFreq = 32.7f;
 
