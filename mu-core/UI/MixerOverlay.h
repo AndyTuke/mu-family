@@ -22,6 +22,7 @@ class MixerOverlay : public juce::Component,
                      private juce::Timer
 {
 public:
+    void refreshSidechainSources();   // source dropdowns follow the layer names (works while hidden)
     explicit MixerOverlay(ProcessorBase& proc, MixerEngine& mixer);
     ~MixerOverlay() override;
 
@@ -102,7 +103,6 @@ private:
     void loadDelayRow(DelayRow& row, const juce::String& prefix);
     void loadEffectParams();   // effect row knobs from eff_p0..4, in the active algorithm's range
     void loadReverbParams();   // reverb row knobs from rev_*
-    void refreshSidechainSources();
 
     // juce::AudioProcessorValueTreeState::Listener — sets dirty flag for deferred reload.
     void parameterChanged(const juce::String& parameterID, float newValue) override;

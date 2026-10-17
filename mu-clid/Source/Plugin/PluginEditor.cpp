@@ -105,6 +105,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     rhythmContent.onRhythmRenamed = [this]
     {
         sidebar.repaintItems();
+        mixerOverlay.refreshSidechainSources();
         if (isMixerVisible()) mixerOverlay.refresh();
     };
 
@@ -113,6 +114,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         if (r == layerPanel.getLayer())
             layerPanel.setLayer(r);
         sidebar.repaintItems();
+        mixerOverlay.refreshSidechainSources();
         if (isMixerVisible()) mixerOverlay.refresh();
     };
 
