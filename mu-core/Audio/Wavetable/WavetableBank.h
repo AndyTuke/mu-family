@@ -92,6 +92,7 @@ public:
 private:
     static constexpr int kMinMipSize     = 8;    // smallest band-limited table
     static constexpr int kFactoryFrames  = 64;   // morph frames per factory table
+    static constexpr int kMaxTables      = 256;  // reserved up front: factory set plus user imports, never reallocated
 
     std::vector<Wavetable>   tables;
     juce::AudioFormatManager formatManager;

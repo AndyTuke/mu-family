@@ -460,7 +460,12 @@ void ModulatorEditor::rebuildRows()
 
     const juce::String sourceKey = cs->id + "_output";
     const bool steppedMode = (cs->mode == ControlSequence::Mode::Stepped);
-    for (const auto& a : matrix->getAssignments())
+    // Snapshot under the modulation lock: a state restore may rebuild the assignment list off this thread.
+    lockMod();
+    const auto snapshot = matrix->getAssignments();
+    unlockMod();
+
+    for (const auto& a : snapshot)
     {
         if (a.sourceId != sourceKey.toStdString()) continue;
 

@@ -232,7 +232,12 @@ void TrackContent::timerCallback()
     else                            refreshSourceSelection();
 
     const double beat = host.getTrackTransportBeat();
-    const double len = juce::jmax(1.0e-6, host.getTrack(currentLayer).rumbleEnv.getLoopLengthBeats());
+    // The loop length is read under the envelope lock (a state restore rewrites it); a busy lock skips this tick.
+    auto& t = host.getTrack(currentLayer);
+    if (! mu_core::spinLockFor(t.rumbleEnvLock, 1000)) return;
+    const double loopBeats = t.rumbleEnv.getLoopLengthBeats();
+    mu_core::spinUnlock(t.rumbleEnvLock);
+    const double len = juce::jmax(1.0e-6, loopBeats);
     rumbleEnvEditor.setPlayheadPhase((float) (std::fmod(juce::jmax(0.0, beat), len) / len));
 }
 

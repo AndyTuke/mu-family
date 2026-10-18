@@ -44,6 +44,7 @@ static int parseSerumFrameSize(const void* data, size_t numBytes) noexcept
 WavetableBank::WavetableBank()
 {
     formatManager.registerBasicFormats();
+    tables.reserve((size_t) kMaxTables);   // never reallocates after this, so a lock-free findByPath never reads moved storage
 }
 
 const juce::StringArray& WavetableBank::factoryTableNames()
@@ -274,7 +275,7 @@ Wavetable WavetableBank::decodeWavData(const void* wavData, size_t numBytes, con
 int WavetableBank::addFromWav(const void* wavData, size_t numBytes, const juce::String& name)
 {
     auto wt = decodeWavData(wavData, numBytes, name);
-    if (wt.frames <= 0) return -1;
+    if (wt.frames <= 0 || tables.size() >= tables.capacity()) return -1;   // never reallocate (see appendTable)
     tables.push_back(std::move(wt));
     return numTables() - 1;
 }
@@ -290,10 +291,11 @@ Wavetable WavetableBank::decodeFile(const juce::File& file)
 }
 
 // Install a pre-decoded table. Caller holds the bank lock (the product's bankLock) for the brief
-// push; returns the new index, or -1 for an empty/failed decode.
+// push; returns the new index, or -1 for an empty/failed decode or a full bank (kMaxTables: appending past the
+// reserved capacity would move every table under a concurrent lock-free findByPath).
 int WavetableBank::appendTable(Wavetable&& wt)
 {
-    if (wt.frames <= 0) return -1;
+    if (wt.frames <= 0 || tables.size() >= tables.capacity()) return -1;
     tables.push_back(std::move(wt));
     return numTables() - 1;
 }

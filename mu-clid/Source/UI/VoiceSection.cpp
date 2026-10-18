@@ -31,8 +31,10 @@ VoiceSection::VoiceSection(PluginProcessor& p)
     {
         if (currentRhythm < 0 || currentRhythm >= proc.getNumRhythms()) return false;
         const char* const dest[4] = { "insert.p1", "insert.p2", "insert.p3", "insert.p4" };
-        for (const auto& a : proc.getRhythm(currentRhythm).modulationMatrix.getAssignments())
-            if (a.destinationId == dest[slot]) return true;
+        const auto snap = proc.getRhythm(currentRhythm).modulationMatrix.assignedSnapshot();   // lock-free published copy
+        if (snap == nullptr) return false;
+        for (const auto& d : snap->destinations)
+            if (d == dest[slot]) return true;
         return false;
     };
     insertSub.slotModValue = [this](int slot) -> float

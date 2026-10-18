@@ -4,6 +4,7 @@
 #include "Sequencer/ControlSequence.h"
 #include "MuLimits.h"
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -50,6 +51,12 @@ public:
     // compare against a cached value and skip re-scanning the list when unchanged.
     int assignmentsRevision() const noexcept { return revision; }
 
+    // The assigned destinations as of the last structural change, published whole (shared_ptr, atomic load /
+    // store) so the editor can poll "is this destination modulated?" from the message thread without the
+    // modulation lock while a state restore rebuilds the list on another thread. Null before the first change.
+    struct AssignedSnapshot { int revision = 0; std::vector<std::string> destinations; };
+    std::shared_ptr<const AssignedSnapshot> assignedSnapshot() const noexcept { return std::atomic_load(&published); }
+
 
 
     // Evaluates all ControlSequences at songBeatPos, then applies every assignment
@@ -63,6 +70,7 @@ public:
 private:
     std::vector<ModulationAssignment> assignments;
     int revision = 0;   // bumped by rebuildCache() on every add/remove (see assignmentsRevision)
+    std::shared_ptr<const AssignedSnapshot> published;   // swapped by rebuildCache() with std::atomic_store
 
     // Pre-allocated work map reused each process() call to avoid heap allocation
     // on the audio thread.  process() is audio-thread-only, so this is safe.

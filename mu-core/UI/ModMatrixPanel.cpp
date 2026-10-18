@@ -208,7 +208,16 @@ void ModMatrixPanel::rebuildRows()
     matPage = 0;
     if (!layer) return;
 
-    for (const auto& a : layer->modulationMatrix.getAssignments())
+    // Snapshot under the layer's modulation lock: a state restore may rebuild the assignment list off this thread.
+    // A busy lock (jassert in lockMods) leaves the rows empty until the next rebuild rather than iterating live data.
+    std::vector<ModulationAssignment> snapshot;
+    if (lockMods(*layer))
+    {
+        snapshot = layer->modulationMatrix.getAssignments();
+        unlockMods(*layer);
+    }
+
+    for (const auto& a : snapshot)
     {
         const int csIndex = csIndexFromSourceId(a.sourceId);
         // A row's source modulator may be Stepped or Smooth; Smooth omits stepped-only dests.
