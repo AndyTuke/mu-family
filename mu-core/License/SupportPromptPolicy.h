@@ -14,6 +14,10 @@ namespace mu_core::support_prompt
 // settings file (not APVTS) so it survives across sessions and never travels in a preset.
 inline constexpr const char* kHiddenKey = "supportPromptHidden";
 
+// The tip page a supporter's About card links to ("Want to give more?"): one shared pay-what-you-want
+// product with no licence key, so a tip never uses up a key or an activation.
+inline constexpr const char* kTipUrl = "https://transwarp.lemonsqueezy.com/checkout/buy/a6bc15b0-9e2d-4aad-a4d2-7327a8e56e7b";
+
 // A supporter holds a valid licence key: the offline signed .lic or an online activation.
 // A product with no licensing model (never called initLicensing) has no supporters.
 inline bool isSupporter(bool licensingEnabled, bool offlineLicensed, bool onlineActivated) noexcept
