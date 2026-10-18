@@ -328,6 +328,10 @@ public:
                               const juce::Colour& bg, bool over, bool down) override;
     void drawButtonText(juce::Graphics&, juce::TextButton&, bool over, bool down) override;
 
+    // Check boxes: in metal style a small raised metal case with a lamp lens (lit in the app accent when on)
+    // and the engraved label beside it; otherwise the stock tick box.
+    void drawToggleButton(juce::Graphics&, juce::ToggleButton&, bool over, bool down) override;
+
     // ComboBox
     void drawComboBox(juce::Graphics&, int w, int h, bool down,
                       int bx, int by, int bw, int bh, juce::ComboBox&) override;
