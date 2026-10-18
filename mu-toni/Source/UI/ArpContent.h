@@ -89,7 +89,9 @@ private:
 
     struct KnobDef   { std::unique_ptr<KnobWithLabel>  comp; juce::String suffix, prefix; int group;
                        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   att; };
+    // caption: engraved text left of the dropdown, only where its values don't name the field; captionR is set by layoutBox.
     struct ComboDef  { std::unique_ptr<DropdownSelect> comp; juce::String suffix; int group;
+                       juce::String caption; juce::Rectangle<int> captionR;
                        std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> att; };
     struct ToggleDef { std::unique_ptr<juce::ToggleButton> comp; juce::String suffix; int group;
                        std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>   att; };
@@ -114,7 +116,7 @@ private:
         knobs.push_back(std::move(d));
     }
 
-    void addCombo(int group, const char* suffix, const juce::StringArray& items);
+    void addCombo(int group, const char* suffix, const juce::StringArray& items, const char* caption = "");
 
     void addToggle(int group, const char* suffix, const juce::String& label);
 

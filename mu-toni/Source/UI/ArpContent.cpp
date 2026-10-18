@@ -88,10 +88,10 @@ void ArpContent::addArpControls()
     using LF = MuLookAndFeel;
 
     // ── Appergater (arpeggiator, boxed) ──────────────────────────────────
-    addCombo (G_ARP, "scale", scaleItems());
-    addCombo (G_ARP, "chord", chordItems());
-    addCombo (G_ARP, "rate",  rateItems());
-    addCombo (G_ARP, "trig",  { "Loop", "MIDI" });
+    addCombo (G_ARP, "scale", scaleItems(),       "Scale");
+    addCombo (G_ARP, "chord", chordItems(),       "Chord");
+    addCombo (G_ARP, "rate",  rateItems(),        "Rate");
+    addCombo (G_ARP, "trig",  { "Loop", "MIDI" }, "Trigger");
     addToggle(G_ARP, "leg",   "Legato");
     addToggle(G_ARP, "snap",  "Snap");
     addKnob  (G_ARP, "root",  "Root",      LF::knobEuclidean);
@@ -263,6 +263,21 @@ void ArpContent::paint(juce::Graphics& g)
     MuLookAndFeel::drawSections(g, *this, { { oscR[0], "OSCILLATOR 1" }, { oscR[1], "OSCILLATOR 2" },
                                             { oscR[2], "X-MOD" }, { oscR[3], "MIX" },
                                             { arpR, "APPERGATER" } }, accent);
+
+    // Dropdown captions: engraved into the metal, or plain text in the flat look.
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(11.0f))));
+    for (auto& c : combos)
+        if (c.caption.isNotEmpty())
+        {
+            if (MuLookAndFeel::isMetal(*this))
+                MuLookAndFeel::drawEngravedText(g, c.caption, c.captionR, juce::Justification::centredLeft,
+                                                MuLookAndFeel::colour(MuLookAndFeel::labelText));
+            else
+            {
+                g.setColour(MuLookAndFeel::colour(MuLookAndFeel::labelText));
+                g.drawText(c.caption, c.captionR, juce::Justification::centredLeft);
+            }
+        }
 }
 
 // Source (Osc 1 / Osc 2 / X-Mod / Mix) and voice band at their natural heights; the Appergater
@@ -303,7 +318,7 @@ void ArpContent::resized()
 int ArpContent::sourceContentW(int group) const
 {
     int top = 0, row = 0;
-    for (auto& c : combos)  if (c.group == group) top += kBoxComboW  + kBoxGap;
+    for (auto& c : combos)  if (c.group == group) top += (c.caption.isNotEmpty() ? MuLookAndFeel::kDropdownCaptionW : 0) + kBoxComboW + kBoxGap;
     for (auto& t : toggles) if (t.group == group) top += kBoxToggleW + kBoxGap;
     for (auto& k : knobs)   if (k.group == group) row += MuLookAndFeel::kKnobSize2W + MuLookAndFeel::kVoiceGap;
     return juce::jmax(top, row);
@@ -352,7 +367,12 @@ void ArpContent::layoutBox(int group, juce::Rectangle<int> rect)
                          : kBoxComboW;
         auto top = inner.removeFromTop(s(LF::kDropdownH));
         for (auto& c : combos)
-            if (c.group == group) { c.comp->setBounds(top.removeFromLeft(s(comboW)).reduced(1)); top.removeFromLeft(s(kBoxGap)); }
+            if (c.group == group)
+            {
+                if (c.caption.isNotEmpty()) c.captionR = top.removeFromLeft(s(LF::kDropdownCaptionW));
+                c.comp->setBounds(top.removeFromLeft(s(comboW)).reduced(1));
+                top.removeFromLeft(s(kBoxGap));
+            }
         for (auto& t : toggles)
             if (t.group == group) { t.comp->setBounds(top.removeFromLeft(s(kBoxToggleW)).reduced(1)); top.removeFromLeft(s(kBoxGap)); }
         inner.removeFromTop(s(4));
@@ -374,11 +394,11 @@ void ArpContent::layoutBox(int group, juce::Rectangle<int> rect)
                               juce::jmax(kH - s(kLabelGap), inner.getBottom() - y));   // uses the flex height
 }
 
-void ArpContent::addCombo(int group, const char* suffix, const juce::StringArray& items)
+void ArpContent::addCombo(int group, const char* suffix, const juce::StringArray& items, const char* caption)
 {
     ComboDef d;
     d.comp = std::make_unique<DropdownSelect>();
-    d.suffix = suffix; d.group = group;
+    d.suffix = suffix; d.group = group; d.caption = caption;
     for (int i = 0; i < items.size(); ++i) d.comp->addItem(items[i], i + 1);
     addAndMakeVisible(*d.comp);
     combos.push_back(std::move(d));

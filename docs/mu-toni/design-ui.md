@@ -2,6 +2,22 @@
 
 The family rules are in [design-ui-family.md](../design-ui-family.md); the band fit is in [design.md](design.md#layer-content-band-fit-464). This page holds only what is specific to μ-Toni's panels.
 
+## Appergater dropdown captions
+
+Ruled 2026-10-18 (backlog #1611: Scale and Chord both read "Minor" and nothing says which is which).
+
+**Decision.** Each of the four Appergater dropdowns (Scale, Chord, Rate, Trigger) gets a short **engraved caption to its left**, in the same top row. No extra height: the band is fixed at 464 and the row stays `kDropdownH`.
+
+**Spec.**
+- Text: `Scale`, `Chord`, `Rate`, `Trigger`. Title case, full words, no colon, no units (as the knob labels).
+- Drawn with `MuLookAndFeel::drawEngravedText` (left-justified, vertically centred, `labelText` ink, the 11 pt row-label font used by the Clip caption in [design-ui-family.md §13](../design-ui-family.md#13-clip-bank-the-per-layer-clip-strip-ruled-2026-10-13-backlog-1277)), in `ArpContent::paint`. Not a juce::Label, not a new component.
+- Layout in `layoutBox` for `G_ARP` only: per combo, a caption slot of `kDropdownCaptionW` then the dropdown at `kBoxComboW`, then `kBoxGap`. `sourceContentW` is unaffected (it is not used for the Arp group).
+- New token `MuLookAndFeel::kDropdownCaptionW = 44` (fits "Trigger" at 11 pt; family-wide, so mu-Clid's `MidiOutSection` captioned dropdowns can adopt it later). Scaled with `mu_ui::s()`.
+- Dropdown contents unchanged (the LCD text shows the value; the caption names the field). Status bar already reports the parameter name on hover.
+- The Osc, Pitch, Filter and Mix dropdowns stay uncaptioned: their items name themselves (wavetable names, filter types) and the box plate gives the context. Rule of thumb: caption a dropdown when its values can be confused with another dropdown's, or do not name the field.
+
+**Do not.** Put a caption above the dropdown (costs height the band does not have; mu-Clid's above-dropdown caption has its own taller cell), prefix the item text ("Scale: Minor") which breaks the value formatters, or add per-product constants for the caption.
+
 ## Appergater step pattern
 
 Ruled 2026-10-14 (Andy: the accent squares should be Step Off / On / Accented, three shades). Engine meaning: [design-sequencer.md](design-sequencer.md#step-pattern--off--on--accented-ruled-2026-10-14).
