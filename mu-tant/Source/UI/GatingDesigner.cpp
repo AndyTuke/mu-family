@@ -126,10 +126,6 @@ GatingDesigner::GatingDesigner()
     addAndMakeVisible(gapSlider);
 
     // ── Subdivision ──────────────────────────────────────────────────────────
-    subdivLabel.setText("Grid", juce::dontSendNotification);
-    subdivLabel.setJustificationType(juce::Justification::centredRight);
-    subdivLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-    addAndMakeVisible(subdivLabel);
     for (int i = 0; i < kSubdivCount; ++i)
         subdivDropdown.addItem(kSubdivOptions[i].label, i + 1);
     subdivDropdown.setSelectedId(idForDenom(subdivisionDenom), false);
@@ -679,7 +675,7 @@ void GatingDesigner::paint(juce::Graphics& g)
         if (MuLookAndFeel::hasScrews(*this))
             MuLookAndFeel::drawSubPanelScrews(g, box);
         for (const auto& [text, area] : { std::pair<const char*, juce::Rectangle<int>> { "Gap", gapLabelR },
-                                          { "Bars", barsLabelR } })
+                                          { "Bars", barsLabelR }, { "Grid", gridLabelR } })
             MuLookAndFeel::drawEngravedText(g, text, area, juce::Justification::centredLeft,
                                             MuLookAndFeel::colour(Id::labelText), false);
     }
@@ -690,6 +686,7 @@ void GatingDesigner::paint(juce::Graphics& g)
         g.setColour(MuLookAndFeel::colour(Id::labelText));
         g.drawText("Gap",  gapLabelR,  juce::Justification::centredLeft, false);
         g.drawText("Bars", barsLabelR, juce::Justification::centredLeft, false);
+        g.drawText("Grid", gridLabelR, juce::Justification::centredLeft, false);
     }
 
     // Gate grid: a dark lamp base (metal) or the flat inactive fill.
@@ -887,12 +884,12 @@ void GatingDesigner::resized()
     scrollBar.setBounds(0, scrollY, w, s(kScrollH));
 
     // ── Right-anchored controls ────────────────────────────────────────────────
-    // "Grid" label + subdivision dropdown at far right.
-    subdivDropdown.setBounds(w - ddW - inset,         ddY, ddW,   ddH);
-    subdivLabel   .setBounds(w - ddW - inset - s(40), ddY, s(36), ddH);
+    // "Grid" label (painted, like "Gap" and "Bars") + subdivision dropdown at far right.
+    subdivDropdown.setBounds(w - ddW - inset, ddY, ddW, ddH);
+    gridLabelR = { w - ddW - inset - s(kLabelW), ddY, s(kLabelW), ddH };
 
-    // "Bars" dropdown immediately left of the Grid controls, its label painted before it.
-    const int barsGroupRight = w - ddW - inset - s(40) - s(6);
+    // "Bars" dropdown left of the Grid group, a group gap apart, its label painted before it.
+    const int barsGroupRight = gridLabelR.getX() - s(10);
     const int barsDropX = barsGroupRight - s(kBarsW);
     barsDropdown.setBounds(barsDropX, ddY, s(kBarsW), ddH);
     barsLabelR = { barsDropX - s(kLabelW), ddY, s(kLabelW), ddH };

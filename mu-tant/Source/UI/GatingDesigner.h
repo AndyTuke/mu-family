@@ -74,7 +74,6 @@ private:
     GateLayer currentLayer = GateLayer::Gater;
 
     // ── Subdivision ─────────────────────────────────────────────────────────
-    juce::Label    subdivLabel;
     DropdownSelect subdivDropdown;
 
     // ── Pattern length (1-16 bars) ───────────────────────────────────────────
@@ -113,7 +112,7 @@ private:
     static constexpr int kLabelW   = 26;   // painted "Gap" / "Bars" label width
 
     // Painted label areas, set by resized() so paint() draws them where the controls sit.
-    juce::Rectangle<int> gapLabelR, barsLabelR;
+    juce::Rectangle<int> gapLabelR, barsLabelR, gridLabelR;
     // Metal style: the header row is a raised box (with its controls inside) above the grid.
     juce::Rectangle<float> headerBox() const noexcept;
 
