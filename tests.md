@@ -245,6 +245,20 @@ Boundary self-test: `pwsh tests/scripts/test-check-core-boundary.ps1` also cover
 
 ---
 
+## C++ unit tests — μ-Toni (step pattern, live modulation arcs)
+
+Build: `cmake --build build --target mu-toni-tests --config Debug`, then run `build/mu-toni/mu-toni-tests_artefacts/Debug/mu-toni-tests.exe`. Status here is the recorded result from the backlog sign-off (suite counts mu-Toni 58, mu-On 71, mu-core 472 at the 1411 release, dsp-controller Pass); these features were not re-run when the rows were added (an attempted category run of the mu-Toni exe did not finish in 2 minutes and was killed).
+
+| Coverage | File | Status | Verified Build |
+|---|---|---|---|
+| Appergater Off / On / Accented step pattern: Off is a rest, an accent bit on an Off step is ignored, bits at or above Steps are kept but ignored, the all-On default plays bit-identically to the old accent-only pattern, a rest fires no note but the counter advances and stays bar-locked, a Legato rest ends the tie, a rest cuts a held note across a tempo change, stop/start with Legato, MIDI-mode rest at step 0, block-size independence, `stepMask` loads all-On when absent and survives a state round trip | `mu-toni/Source/Tests/StepPatternTests.cpp` (`StepPatternTests`, 14 cases) | ✅ Pass | 1411 |
+| Shared `StepEditor` three-state level cells (`setLevelCells(3)`): levels map to 0 / 50 / 100, click cycles Off, On, Accented, Off, Shift+click goes back, a drag paints the first click's state, off by default | `mu-core/Tests/StepEditorTests.cpp` (`StepEditorLevelCellTests`) | ✅ Pass | 1411 |
+| mu-Toni live modulation arcs: every target names an existing layer parameter, every target's published live value follows its modulation assignment, a block that misses the matrix lock holds the last values | `mu-toni/Source/Tests/ModArcTests.cpp` (`MuToniModArcTests`) | ✅ Pass | 1411 |
+| mu-On live modulation arcs, per engine: every target names an existing track parameter, live value follows the assignment, a matrix-lock miss holds the last values | `mu-on/Source/Tests/ModArcTests.cpp` (`MuOnModArcTests`) | ✅ Pass | 1411 |
+| Not covered by a test: the arc drawing on the knob, the mu-On `ParamKnobGrid` to `KnobWithLabel` swap and the Off/On/Accented cell look (all checked by eye by Andy, 2026-10-15); `clearModBindings` / `releaseModulationArcs` on layer delete (dsp-controller diff read only) | n/a | Manual | 1411 |
+
+---
+
 ## C++ unit tests — μ-On
 
 Built as part of **ALL_BUILD** every build (mirrors mu-tant-tests — local-only product, small suite). Build command:
