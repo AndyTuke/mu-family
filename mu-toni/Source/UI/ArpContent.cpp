@@ -318,7 +318,7 @@ void ArpContent::resized()
 int ArpContent::sourceContentW(int group) const
 {
     int top = 0, row = 0;
-    for (auto& c : combos)  if (c.group == group) top += (c.caption.isNotEmpty() ? MuLookAndFeel::kDropdownCaptionW : 0) + kBoxComboW + kBoxGap;
+    for (auto& c : combos)  if (c.group == group) top += (c.caption.isNotEmpty() ? MuLookAndFeel::kDropdownCaptionW + MuLookAndFeel::kSpaceL : 0) + kBoxComboW + kBoxGap;
     for (auto& t : toggles) if (t.group == group) top += kBoxToggleW + kBoxGap;
     for (auto& k : knobs)   if (k.group == group) row += MuLookAndFeel::kKnobSize2W + MuLookAndFeel::kVoiceGap;
     return juce::jmax(top, row);
@@ -371,7 +371,7 @@ void ArpContent::layoutBox(int group, juce::Rectangle<int> rect)
             {
                 if (c.caption.isNotEmpty()) c.captionR = top.removeFromLeft(s(LF::kDropdownCaptionW));
                 c.comp->setBounds(top.removeFromLeft(s(comboW)).reduced(1));
-                top.removeFromLeft(s(kBoxGap));
+                top.removeFromLeft(s(kBoxGap + (c.caption.isNotEmpty() ? LF::kSpaceL : 0)));   // wider gap after a captioned pair so each caption reads with its own dropdown
             }
         for (auto& t : toggles)
             if (t.group == group) { t.comp->setBounds(top.removeFromLeft(s(kBoxToggleW)).reduced(1)); top.removeFromLeft(s(kBoxGap)); }
