@@ -801,9 +801,10 @@ void ProcessorBase::applyComposedState(const juce::ValueTree& state)
     if (! canEditLayers()) return;
 
     // Count last, so the audio thread never sees a count ahead of the data; then the colours (a state without colours keeps the current ones).
-    // The store goes through the packed layout word under layoutWriteLock: this may run on a host thread
-    // (setStateInformation) while the message thread edits layers, and a lost or misattached serial would break
-    // the retire bin's same-block hand-over. A product that parks a tail before this call holds layoutWriteLock
+    // Thread contract: hosts normally call setStateInformation on the message thread, and the editor's modulation
+    // reads, the Stager and the products' lock-free paths all assume that. The layout store below is the one part
+    // that is also safe from a host thread, so it goes through the packed layout word under layoutWriteLock: a lost
+    // or misattached serial would break the retire bin's same-block hand-over. A product that parks a tail before this call holds layoutWriteLock
     // across both (it is re-entrant), so the park's nextLayoutSerial() is the serial this store carries.
     // TryLock mode only until Published-mode quiesce exists: this store and the parameter moves above assume
     // the audio thread's try-lock protocol.
