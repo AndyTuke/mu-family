@@ -122,6 +122,34 @@ public:
             m.setCurve("a1", -30.0f);
             expectWithinAbsoluteError (m.getAssignments()[0].curve, -30.0f, 1e-4f);
         }
+
+        // ── Published snapshot (the editor's lock-free "is this destination modulated?" read) ──
+        beginTest ("assignedSnapshot tracks add and remove");
+        {
+            ModulationMatrix m;
+            expect (m.assignedSnapshot() == nullptr);
+            m.addAssignment(makeAssign("a1", "cs0_output", "filter.cutoff"));
+            auto snap = m.assignedSnapshot();
+            expect (snap != nullptr);
+            expectEquals ((int) snap->destinations.size(), 1);
+            expect (snap->destinations[0] == "filter.cutoff");
+            expectEquals (snap->revision, m.assignmentsRevision());
+            m.removeAssignment("a1");
+            expectEquals ((int) m.assignedSnapshot()->destinations.size(), 0);
+            expectEquals ((int) snap->destinations.size(), 1);   // an earlier snapshot is immutable
+        }
+
+        beginTest ("Revisions are unique across matrices, so a matrix swap never reuses one");
+        {
+            ModulationMatrix a, b;
+            a.addAssignment(makeAssign("a1", "cs0_output", "filter.cutoff"));
+            b.addAssignment(makeAssign("b1", "cs0_output", "amp.level"));
+            expect (a.assignmentsRevision() != b.assignmentsRevision());
+            const int before = a.assignmentsRevision();
+            std::swap(a, b);
+            expect (a.assignmentsRevision() != before);
+            expect (a.assignedSnapshot()->destinations[0] == "amp.level");
+        }
     }
 };
 
