@@ -98,3 +98,4 @@ The advisor routines append a dated entry here for every suggestion they make, s
 2026-10-15: ci.yml coverage gap (.github/workflows/ci.yml): build mu-Toni and run every `*-tests` target (mu-toni, mu-core, mu-control, mu-clid-midi) plus all static checks; reported in issue #4.
 2026-10-15: pre-commit static checks hook (.claude/hooks/pre_commit_checks.ps1, .claude/settings.json): PreToolUse hook on `git commit` running the check-*.ps1 scripts; reported in issue #4.
 2026-10-15: permission guard rails (.claude/settings.json): deny force-push, reset --hard, --no-verify; ask before `gh workflow run`; reported in issue #4.
+2026-10-19: sync-backlog.yml issue trigger (.github/workflows/sync-backlog.yml): drop `issues: opened` so it is dispatch-only (rule conflict, paid API key, bypasses backlog-administrator); reported in issue #5.
