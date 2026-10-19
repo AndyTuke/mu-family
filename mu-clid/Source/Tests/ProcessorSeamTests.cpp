@@ -537,7 +537,7 @@ struct MuClidProcessorSeamTests : juce::UnitTest
 
             const int stepsBefore = p.getRhythm(0).genA.steps;
             const int hitsBefore  = p.getRhythm(0).genA.hits;
-            const int lengthBefore = p.sequencer.getPatternLength(0);
+            const int lengthBefore = p.sampleRhythm(0).cursor.patternLength();
             expectEquals(stepsBefore, 16);
 
             // The set calls differ from the current values so each one fires the listener. Warm-up
@@ -567,7 +567,7 @@ struct MuClidProcessorSeamTests : juce::UnitTest
             expectEquals(p.sequencer.getMasterLoopSteps(), 32);
             expectEquals(p.getRhythm(0).genA.steps, stepsBefore);
             expectEquals(p.getRhythm(0).genA.hits, hitsBefore);
-            expectEquals(p.sequencer.getPatternLength(0), lengthBefore);
+            expectEquals(p.sampleRhythm(0).cursor.patternLength(), lengthBefore);
 
             expect(p.drainDeferredWork(), "the listener asked for the deferred-work pass");
             expectEquals(p.getRhythm(0).genA.steps, 9);
@@ -579,7 +579,7 @@ struct MuClidProcessorSeamTests : juce::UnitTest
             juce::MidiBuffer midi;
             for (int i = 0; i < 4; ++i) p.processBlock(block, midi);
             p.setPlayHead(nullptr);
-            expect(p.sequencer.getPatternLength(0) != lengthBefore, "the pattern was rebuilt on the message thread");
+            expect(p.sampleRhythm(0).cursor.patternLength() != lengthBefore, "the pattern was rebuilt on the message thread");
 
             // The host's own notification work is the same with or without our listener; ours adds none.
             expect(coreAllocs == bareAllocs, "our listener allocated: " + juce::String(coreAllocs) + " vs " + juce::String(bareAllocs));

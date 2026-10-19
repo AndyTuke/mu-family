@@ -119,7 +119,7 @@ public:
     uint32_t fullStageSerial() const override             { return hotSwapStager.fullStageSerial(); }
     uint32_t slotStageSerial(int ri) const override       { return hotSwapStager.slotStageSerial(ri); }
     int  getMasterLoopSteps() const override              { return sequencer.getMasterLoopSteps(); }
-    int  getMasterLoopCurrentStep() const override        { return usesLayerRender() ? stepClock.getMasterLoopCurrentStep() : sequencer.getMasterLoopCurrentStep(); }
+    int  getMasterLoopCurrentStep() const override        { return stepClock.getMasterLoopCurrentStep(); }
 
     // A rhythm hot-swap commit fires ProcessorBase::onLayerPresetCommitted: the editor refreshes
     // the non-APVTS UI state (name label, sample bar, colour-tinted bits) pushRhythmToApvts can't.
@@ -166,10 +166,11 @@ public:
     void loadDefaultPreset() override            { presetIO.loadDefaultPreset(); }
 
 
+    // The rhythm bindings, the master-loop length and the pattern bookkeeping (the hits are the cursors'
+    // since E5.5d; the sequencer's own state is still kept in step until E5.7 deletes it).
     RhythmSequencer sequencer;
-    // The rhythms' own step clocks (E5.5b): the host half here, a RhythmCursor in each SampleRhythm. They are
-    // handed every pattern, swap start, loop length and restart the sequencer is; while useLayerRender is on
-    // (tests only, until E5.5d) they, not the sequencer, decide the hits.
+    // The rhythms' own step clocks: the host half here, a RhythmCursor in each SampleRhythm. They are handed every
+    // pattern, swap start, loop length and restart, and decide each block's hits.
     RhythmStepClock stepClock;
     static constexpr int kStepCap = HitGenerator::kMaxSteps;   // the sequencer's step cap (setStepCap)
 
@@ -180,12 +181,10 @@ public:
         if (index >= 0 && index < RhythmSequencer::MaxRhythms)
             sampleRhythm(index).cursor.updatePattern(sampleRhythm(index), kStepCap);
     }
-    // useLayerRender as processBlock read it once for the block (audio thread), so one block never mixes clocks.
-    bool cursorsDriveThisBlock = false;
-    // Where slot r's pattern last started a pass, and the step counter's run id, from whichever clock
-    // decides this block's hits (audio thread: the swap stager records both at a boundary).
-    int      swapBoundaryEff(int r) const noexcept { return cursorsDriveThisBlock ? sampleRhythm(r).cursor.boundaryEffective() : sequencer.getBoundaryEff(r); }
-    uint32_t swapFrameEpoch() const noexcept       { return cursorsDriveThisBlock ? stepClock.currentEpoch() : sequencer.getFrameEpoch(); }
+    // Where slot r's pattern last started a pass, and the step counter's run id (audio thread: the swap stager
+    // records both at a boundary).
+    int      swapBoundaryEff(int r) const noexcept { return sampleRhythm(r).cursor.boundaryEffective(); }
+    uint32_t swapFrameEpoch() const noexcept       { return stepClock.currentEpoch(); }
     // Slot `slot`'s voice engine: SampleRhythm::voice (E5.5d), so it moves with its layer. Null in a slot that
     // is not live. Each rhythm's MidiOutputEngine is SampleRhythm::midi (E5.5c), its retired engines
     // SampleRhythm::retiredEngines.
@@ -338,29 +337,17 @@ private:
 
     // ── processBlock phases ──────────────────────────────────────────────
     // processBlock is decomposed into private helpers invoked in order on the
-    // audio thread. None allocate or take locks beyond processBlock's own
-    // layersLock ScopedTryLock.
+    // audio thread. None allocate or take locks beyond the driver's layersLock try-lock.
     struct BlockTransport { bool playing; double beatPos; double bpm = 120.0; };   // bpm = the block's tempo (host > MIDI clock ticks > BPM field)
     // Scan MIDI clock + program changes, read the playhead / clock / internal
     // transport, reset the wrap detector on a stop->start edge, and publish
     // sequencerPlaying + lastBeatPos.
     BlockTransport deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages);
-    // Step the sequencer, fire voice triggers (or MIDI notes for rhythms in MIDI output mode, into
-    // midiMessages), check hot-swap boundaries, and
-    // publish per-rhythm UI play-state. Called only while playing.
-    void advanceSequencer(int numRhythms, double beatPos, juce::MidiBuffer& midiMessages);
-    // The cursors' version of sequencer.processBlock (useLayerRender on): the host clock's frame, each live
-    // rhythm's cursor walk, the same BlockResult; `steps` gets each rhythm's step, accent step and length.
+    // The block's hits: the host clock's frame, each live rhythm's cursor walk, gathered as a BlockResult;
+    // `steps` gets each rhythm's step, accent step and length.
     struct CursorSteps { int step = -1, accentStep = 0, length = 0; };
     BlockResult advanceCursors(int numRhythms, double beatPos, std::array<CursorSteps, RhythmSequencer::MaxRhythms>& steps);
-    // Gather output buses, run the core mixer/voice render, mix the sample
-    // preview, and emit per-rhythm MIDI.
-    void renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages,
-                          int numRhythms, double effectiveBpm);
-    // The mixer's channel r on the processor chain: rhythm r's voice and retired engines (built once).
-    MixerEngine::RenderChannelFn renderRhythmChannel;
-
-    // ── The layer chain (useLayerRender on, tests only until the flip) ──────────────────────────────
+    // ── The render: the shared layer driver ──────────────────────────────────────────────────────────
     // The host's buses, the block's transport, then the shared driver (ProcessorBase::renderAndMix): the
     // rhythms render themselves (SampleRhythm::render) and the mixer runs, in chunks of the prepared size.
     void renderThroughLayers(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages, const BlockTransport& transport);

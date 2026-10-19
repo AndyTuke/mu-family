@@ -1,5 +1,5 @@
 // SampleRhythm — the per-block hit, play state and render (audio thread). The hit and play state moved from the
-// processor's advanceSequencer (E5.4b); the render (voice, retired engines) from the mixer's channel loop (E5.5d).
+// processor's sequencer pass (E5.4b); the render (voice, retired engines) from the mixer's channel loop (E5.5d).
 
 #include "Sequencer/SampleRhythm.h"
 #include "Audio/MidiOutputMapping.h"   // mu-core: velocity for the MIDI output mode
@@ -17,29 +17,14 @@ void SampleRhythm::prepare(double sampleRate, int blockSize)
             engine->prepareToPlay(sampleRate, blockSize);
 }
 
-void SampleRhythm::fireHit(bool accented, bool tied, juce::MidiBuffer& midiOut, VoiceEngine* engine)
+void SampleRhythm::takeHit(bool accented, bool tied, juce::MidiBuffer& midiOut)
 {
-    // A hit in MIDI output mode becomes one MIDI note-on and never reaches the voice. The settings are
-    // relaxed atomics on the Rhythm.
+    // A hit in MIDI output mode becomes one MIDI note-on now and never reaches the voice; a sample hit waits for
+    // render. The output mode is read once, here; the settings are relaxed atomics on the Rhythm.
     if (outputMode.load() == (int) mu_core::OutputMode::Midi)
     {
         midi.trigger(midiOut, 0, midiNote.load(), midiChannel.load(),
                      mu_core::midiOutVelocity(midiVelocity.load(), (float) midiAccent.load(), accented));
-    }
-    else if (engine != nullptr)
-    {
-        // Pattern-legato gating: the sequencer always marks tied hits; the rhythm's patternLegato flag
-        // decides whether to act on it. Untied / legato-off hits go through the standard retrigger.
-        engine->trigger(accented, patternLegato && tied);
-    }
-}
-
-void SampleRhythm::takeHit(bool accented, bool tied, juce::MidiBuffer& midiOut)
-{
-    // The output mode is read once, here, as fireHit reads it: a MIDI hit goes out now, a sample hit waits for render.
-    if (outputMode.load() == (int) mu_core::OutputMode::Midi)
-    {
-        fireHit(accented, tied, midiOut, nullptr);
         return;
     }
     block.voiceHit = true;
@@ -69,11 +54,13 @@ void SampleRhythm::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<f
     // voice and strip values (both at the block start, as the processor chain did).
     if (ctx.frameOffset == 0)
     {
+        // Pattern-legato gating: the cursor always marks tied hits; the rhythm's patternLegato flag decides whether
+        // to act on it. Untied / legato-off hits go through the standard retrigger.
         if (block.voiceHit && voice != nullptr)
             voice->trigger(block.accented, patternLegato && block.tied);
         block.voiceHit = false;
         if (block.strip != nullptr)
-            applyModulation(ctx.startBeat, *block.strip, block.lastEffectiveStep, nullptr, -1, voice.get());
+            applyModulation(ctx.startBeat, *block.strip, block.lastEffectiveStep, voice.get());
         block.strip = nullptr;
     }
 

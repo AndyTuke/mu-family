@@ -60,26 +60,17 @@ struct SampleRhythm : Rhythm
     };
     BlockInputs block;
 
-    // Audio thread, once per block for a live rhythm, under the host's layer lock: the modulation pass. `strip`
-    // is the rhythm's mixer channel (its pan and sends seed the matrix; the modulated values go back to it),
-    // the modulated Euclid values recompute the pattern the hits come from (`sequencer`'s slot `slot` when one
-    // is given, else the rhythm's own cursor, with the host clock's `lastEffectiveStep`), and `engine` (null:
-    // none) takes the block's modulated voice parameters.
-    void applyModulation(double beatPos, MixerEngine::ChannelState& strip, int lastEffectiveStep,
-                         RhythmSequencer* sequencer, int slot, VoiceEngine* engine);
-
-    // Audio thread: the hit fired for this rhythm this block. In MIDI output mode it becomes one note-on in
-    // `midiOut` through the rhythm's own `midi` engine (never the voice); otherwise `engine` (null: none)
-    // retriggers, tied when the hit is tied and the rhythm has pattern legato on. Allocates nothing itself.
-    void fireHit(bool accented, bool tied, juce::MidiBuffer& midiOut, VoiceEngine* engine);
+    // Audio thread, once per block for a live rhythm, under the host's layer lock (render's first call): the
+    // modulation pass. `strip` is the rhythm's mixer channel (its pan and sends seed the matrix; the modulated
+    // values go back to it), the modulated Euclid values recompute the cursor's pattern (with the host clock's
+    // `lastEffectiveStep`), and `engine` (null: none) takes the block's modulated voice parameters.
+    void applyModulation(double beatPos, MixerEngine::ChannelState& strip, int lastEffectiveStep, VoiceEngine* engine);
 
     // Audio thread, from the host's block start: the hit the rhythm's cursor found this block. In MIDI output
-    // mode it becomes one note-on in `midiOut` now; otherwise it waits in `block` for render, which retriggers
-    // the voice before the modulation pass, as fireHit did.
+    // mode it becomes one note-on in `midiOut` through the rhythm's own `midi` engine (never the voice), now;
+    // otherwise it waits in `block` for render, which retriggers the voice (tied when the hit is tied and the
+    // rhythm has pattern legato on) before the modulation pass. Allocates nothing itself.
     void takeHit(bool accented, bool tied, juce::MidiBuffer& midiOut);
-
-    // Audio thread: the voice, then each retired engine (raising its drained flag), added into `out`.
-    void renderVoices(juce::AudioBuffer<float>& out, int n);
 
     // Audio thread, once per playing block: the play state the UI draws (step and fraction as one snapshot, the
     // pattern and ring lengths, and the monotonic hit counter when `fired`).
@@ -129,9 +120,11 @@ private:
     std::array<float*, ModDest::kTableSize>     modSlot {};
     float& mv(int destIndex) noexcept { jassert(modSlot[(size_t) destIndex] != nullptr); return *modSlot[(size_t) destIndex]; }
 
+    // Audio thread: the voice, then each retired engine (raising its drained flag), added into `out`.
+    void renderVoices(juce::AudioBuffer<float>& out, int n);
+
 public:
-    // The rhythm's own step cursor: built and handed patterns alongside the processor's RhythmSequencer;
-    // its hits drive the voice only while the processor's useLayerRender switch is on (E5.5b).
+    // The rhythm's own step cursor: it decides the rhythm's hits from the host's step clock.
     RhythmCursor cursor;
 
     // Engines a preset swap retired, still rendering their tails after the voice until drained; the audio thread

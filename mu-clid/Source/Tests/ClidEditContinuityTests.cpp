@@ -399,7 +399,7 @@ struct ClidEditContinuityTests : juce::UnitTest
                "the change-detection memory is clean");
         runBlocks(p, 6, kBlock);
         expect(! Probe::prevHad(p, 1) && Probe::prev(p, 1) == Probe::last(p, 1), "and stays idle: no stale retry rewrites the pattern");
-        expectEquals(p.sequencer.getPatternLength(1), p.layerAs<mu_clid::Rhythm>(1).genA.steps, "the pattern is the base one");
+        expectEquals(p.sampleRhythm(1).cursor.patternLength(), p.layerAs<mu_clid::Rhythm>(1).genA.steps, "the pattern is the base one");
         p.setPlayHead(nullptr);
     }
 };
