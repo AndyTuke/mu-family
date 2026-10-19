@@ -92,7 +92,10 @@ public:
 private:
     juce::AudioFormatManager formatManager;
 
-    juce::ReadWriteLock      bufferLock;
+    // Guards buffer / originalSampleRate / playbackRatio (and sampleLoaded's writes) between the message thread's swaps
+    // (prepareToPlay, loadFile, clearSample: brief, no I/O inside) and process(), which only try-locks it.
+    // A spin lock, not juce::ReadWriteLock, whose reader bookkeeping can allocate on the audio thread.
+    juce::SpinLock           bufferLock;
     juce::AudioBuffer<float> buffer;
     double originalSampleRate = 44100.0;
     double playbackRatio      = 1.0;
@@ -100,7 +103,8 @@ private:
     std::array<SamplePlayer, MaxVoices> voices;
     int    nextVoice         = 0;
     double currentSampleRate = 44100.0;
-    bool   sampleLoaded      = false;
+    // Written under bufferLock; atomic because hasSample() reads it without the lock.
+    std::atomic<bool> sampleLoaded { false };
 
     VoiceParams params;        // base params — updated from message thread via setParams()
     VoiceParams activeParams;  // audio thread only — what process() actually uses

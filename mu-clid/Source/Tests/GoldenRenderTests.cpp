@@ -21,31 +21,9 @@ namespace
     // GoldenAllocationCheck.h). Informational: reported on every run, never an approval to allocate.
     const std::vector<mu_golden::KnownAllocation> kKnownAllocations = {
         // Findings, to be fixed by moving the work off the audio thread (stream "*" = any stream of the scenario):
-        // VoiceEngine::process holds a juce::ReadWriteLock read lock; JUCE keeps a per-thread recursion
-        // count array that is grown on enter and shrunk on exit, so the lock itself touches the heap.
         // MidiOutputEngine fills the host MIDI buffer, whose storage the harness reuses and grows on demand.
-        { "euclid-rings-logic", "*", 0, 2, 2, "juce::ReadWriteLock read lock in VoiceEngine::process grows/shrinks the per-thread recursion array (HeapBlock realloc)" },
-        { "eight-rhythms-polyrhythm", "*", 0, 9, 9, "juce::ReadWriteLock read lock in VoiceEngine::process grows/shrinks the per-thread recursion array (HeapBlock realloc)" },
-        { "voice-envelopes-legato", "*", 0, 2, 2, "juce::ReadWriteLock read lock in VoiceEngine::process grows/shrinks the per-thread recursion array (HeapBlock realloc)" },
-        { "modulation-geometry-voice", "*", 0, 4, 4, "juce::ReadWriteLock read lock in VoiceEngine::process grows/shrinks the per-thread recursion array (HeapBlock realloc)" },
-        { "inserts-karplus-ring", "*", 0, 4, 4, "juce::ReadWriteLock read lock in VoiceEngine::process grows/shrinks the per-thread recursion array (HeapBlock realloc)" },
-        { "master-fx-sidechain", "*", 0, 4, 4, "juce::ReadWriteLock read lock in VoiceEngine::process grows/shrinks the per-thread recursion array (HeapBlock realloc)" },
-        { "tempo-transport", "*", 0, 4, 4, "juce::ReadWriteLock read lock in VoiceEngine::process grows/shrinks the per-thread recursion array (HeapBlock realloc)" },
-        { "midi-out-events", "*", 0, 6, 5, "MidiBuffer::addEvent grows the harness-owned MIDI buffer in MidiOutputEngine::trigger" },
+        { "midi-out-events", "*", 0, 2, 1, "MidiBuffer::addEvent grows the harness-owned MIDI buffer in MidiOutputEngine::trigger" },
         { "midi-out-events", "*", 94, 1, 1, "MidiBuffer::addEvent grows the harness-owned MIDI buffer in MidiOutputEngine::processBlock" },
-        { "hotswap-clip", "*", 0, 3, 3, "juce::ReadWriteLock read lock in VoiceEngine::process grows/shrinks the per-thread recursion array (HeapBlock realloc)" },
-        { "hotswap-clip", "*", 189, 1, 1, "juce::ReadWriteLock read lock in VoiceEngine::process grows/shrinks the per-thread recursion array (HeapBlock realloc)" },
-        { "hotswap-clip", "*", 283, 2, 2, "juce::ReadWriteLock read lock in VoiceEngine::process grows/shrinks the per-thread recursion array (HeapBlock realloc)" },
-        { "hotswap-clip", "*", 431, 1, 1, "juce::ReadWriteLock read lock in VoiceEngine::process grows/shrinks the per-thread recursion array (HeapBlock realloc)" },
-        { "hotswap-clip", "*", 640, 1, 1, "juce::ReadWriteLock read lock in VoiceEngine::process grows/shrinks the per-thread recursion array (HeapBlock realloc)" },
-        { "retire-long-amprel", "*", 0, 3, 3, "juce::ReadWriteLock read lock in VoiceEngine::process grows/shrinks the per-thread recursion array (HeapBlock realloc)" },
-        { "retire-long-amprel", "*", 189, 1, 1, "juce::ReadWriteLock read lock in VoiceEngine::process grows/shrinks the per-thread recursion array (HeapBlock realloc)" },
-        { "retire-long-amprel", "*", 431, 1, 1, "juce::ReadWriteLock read lock in VoiceEngine::process grows/shrinks the per-thread recursion array (HeapBlock realloc)" },
-        { "structural-edit-midplay", "*", 0, 4, 4, "juce::ReadWriteLock read lock in VoiceEngine::process grows/shrinks the per-thread recursion array (HeapBlock realloc)" },
-        { "structural-edit-midplay", "*", 40, 1, 1, "juce::ReadWriteLock read lock in VoiceEngine::process grows/shrinks the per-thread recursion array (HeapBlock realloc)" },
-        { "preset-a3-filter-t11", "*", 0, 3, 3, "juce::ReadWriteLock read lock in VoiceEngine::process grows/shrinks the per-thread recursion array (HeapBlock realloc)" },
-        { "preset-ts1", "*", 0, 2, 2, "juce::ReadWriteLock read lock in VoiceEngine::process grows/shrinks the per-thread recursion array (HeapBlock realloc)" },
-        { "preset-a9-base-hat", "*", 0, 3, 3, "juce::ReadWriteLock read lock in VoiceEngine::process grows/shrinks the per-thread recursion array (HeapBlock realloc)" },
     };
 
     using mu_clid::PluginProcessor;

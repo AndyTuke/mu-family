@@ -15,7 +15,7 @@ void VoiceEngine::prepareToPlay(double sampleRate, int blockSize)
     currentSampleRate = sampleRate;
 
     {
-        juce::ScopedWriteLock sl(bufferLock);
+        const juce::SpinLock::ScopedLockType sl(bufferLock);
         playbackRatio = buffer.getNumSamples() > 0
                       ? originalSampleRate / currentSampleRate
                       : 1.0;
@@ -60,11 +60,11 @@ void VoiceEngine::loadFile(const juce::File& file)
     const double srcRate = reader->sampleRate;
 
     {
-        juce::ScopedWriteLock sl(bufferLock);
+        const juce::SpinLock::ScopedLockType sl(bufferLock);
         buffer             = std::move(temp);
         originalSampleRate = srcRate;
         playbackRatio      = srcRate / currentSampleRate;
-        sampleLoaded       = true;
+        sampleLoaded.store(true, std::memory_order_relaxed);
     }
 }
 
@@ -141,14 +141,13 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
 {
     applyPendingParams();
 
-    // tryEnterRead avoids blocking the audio thread if loadFile() holds the
-    // write lock (file I/O + buffer allocation can be hundreds of ms). On
-    // contention: output a silent block rather than stalling the audio thread.
-    if (!bufferLock.tryEnterRead())
+    // A try-lock: the audio thread never waits for a buffer swap on the message thread (loadFile reads the
+    // file outside the lock and holds it only to move the new buffer in). On contention: a silent block.
+    const juce::SpinLock::ScopedTryLockType bufferGuard(bufferLock);
+    if (! bufferGuard.isLocked())
         return;
-    struct ReadGuard { juce::ReadWriteLock& l; ~ReadGuard() { l.exitRead(); } } readGuard { bufferLock };
 
-    if (!sampleLoaded || buffer.getNumSamples() == 0 || buffer.getNumChannels() == 0)
+    if (! sampleLoaded.load(std::memory_order_relaxed) || buffer.getNumSamples() == 0 || buffer.getNumChannels() == 0)
         return;
 
     // Guard against hosts that call process() with more samples than prepareToPlay() promised.
@@ -246,7 +245,7 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
 
 bool VoiceEngine::hasSample() const
 {
-    return sampleLoaded;
+    return sampleLoaded.load(std::memory_order_relaxed);
 }
 
 void VoiceEngine::markRetired() noexcept
@@ -327,9 +326,9 @@ bool VoiceEngine::isFullyDrained() const noexcept
 
 void VoiceEngine::clearSample()
 {
-    juce::ScopedWriteLock sl(bufferLock);
+    const juce::SpinLock::ScopedLockType sl(bufferLock);
     buffer.setSize(0, 0);
-    sampleLoaded = false;
+    sampleLoaded.store(false, std::memory_order_relaxed);
 }
 
 void VoiceEngine::setParams(const VoiceParams& p)
