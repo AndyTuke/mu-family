@@ -33,7 +33,7 @@ bool LaunchpadXDriver::open(DevicePorts& devicePorts)
     sent.clear();
     desired.clear();
 
-    // Input arrives on the MIDI thread and goes straight out as SurfaceEvents.
+    // Input is delivered on the message thread (ManagedPorts moves it off the MIDI thread) and goes straight out as SurfaceEvents.
     ports->onBytes = [this](const uint8_t* data, size_t size)
     {
         for (const auto& e : launchpadx::decodeInput(data, size))
