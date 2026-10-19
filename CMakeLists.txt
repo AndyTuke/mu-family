@@ -170,6 +170,7 @@ add_subdirectory(mu-clid-midi) # mu-Clid MIDI: Euclidean MIDI effect (VST3 + CLA
 add_subdirectory(mu-tant)     # wavetable drone synth (Standalone + VST3 + CLAP)
 add_subdirectory(mu-toni)     # generative arpeggiator mono-synth, freeware (Standalone + VST3 + CLAP)
 add_subdirectory(mu-on)       # 909-style groove sequencer: Kick/Bass/Hat/Snare (Standalone + VST3 + CLAP)
+add_subdirectory(tests/layer-link)    # mu-layer-link-test: the four layer libraries in one link (after the products define them)
 add_subdirectory(mu-link)     # local audio receiver + master clock (foundation: IPC tests only)
 add_subdirectory(ControlDesign)       # knob-style design sandbox (dev tool, not shipped)
 add_subdirectory(tools/license-tool)  # owner-side license keygen + signer (dev tool, not shipped)

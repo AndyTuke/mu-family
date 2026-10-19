@@ -284,6 +284,8 @@ unique", legitimate because the type is one `mu-core` class (§1).
 
 ## 4. Audit — where the code differs from §3 (2026-10-09)
 
+**Status: done (layer extraction closed at E6, 2026-10-19).** The layer-noun, parent-class, `Slot`-in-layer-API, folder, namespace, panel and main-panel rows are delivered: every product's layer is a `mu_core::Layer` subclass (`SampleRhythm`, `Pattern`, `Arp`, `Track`) with its own `mu-<product>-layer` library, and the four `Source/` roots have unique relative paths (`ToniScales.h`, `TantScales.h`; `mu-layer-link-test` builds all four together). What stays open is listed in the rows that are not marked Done (Acronyms, Members, Enums, the `ArpParams` double name) and the shared `HeldNoteStack`, still owed before mu-Tronic T1.
+
 | Area | Finding |
 |---|---|
 | Layer noun | Rhythm (mu-Clid, ~1580 uses), Voice (mu-Tant, ~820), Layer (mu-Toni), Lane / Channel / Track (mu-On). |
@@ -306,6 +308,8 @@ unique", legitimate because the type is one `mu-core` class (§1).
 ---
 
 ## 5. Migration order (safest first)
+
+**Status: done (2026-10-19, E6).** Steps 2 to 5 are complete, including 5.7 (mu-Clid's `Rhythm` takes its engine, MIDI engine, play state and samples as `mu_clid::SampleRhythm`, the extraction-plan E5) and 5.8 (the layer-type contract `Layer::render` / `renderLayers`, extraction-plan E1). Step 1 (cosmetic) was never a gate and remains optional. The text below is kept as the record of the order.
 
 C++ identifier changes never touch saved files; the data renames at the end do.
 
