@@ -38,6 +38,15 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         });
     aboutOverlay.onDismiss = [this] { aboutOverlay.setVisible(false); };
     addChildComponent(aboutOverlay);
+
+    // Update check: no Settings page here, so the opt-out is a tick box on the About card.
+    aboutOverlay.setUpdateCheck(true, mu_core::update_check::isEnabled(proc.getAppSettingsFile()));
+    aboutOverlay.onUpdateCheckChanged = [this](bool on)
+    {
+        mu_core::update_check::setEnabled(proc.getAppSettingsFile(), on);
+        if (proc.onUpdateCheckToggled) proc.onUpdateCheckToggled();
+    };
+    updateNotice.start();
     transportBar.onLogoClicked = [this]
     {
         aboutOverlay.setVisible(true);

@@ -23,6 +23,11 @@ public:
     std::function<void()> onSupport;
     std::function<void()> onEnterKey;
 
+    // The update-check opt-out, for a product with no Settings page (mu-Clid MIDI): a "Check for updates"
+    // tick box where a supporter's tip link would sit. Products with a Settings page offer it there instead.
+    void setUpdateCheck(bool offered, bool enabled);
+    std::function<void(bool enabled)> onUpdateCheckChanged;
+
     void paint(juce::Graphics& g) override;
     void resized() override;
     void mouseDown(const juce::MouseEvent& e) override;
@@ -31,6 +36,7 @@ private:
     juce::TextButton closeBtn   { "Close" };
     juce::TextButton supportBtn { "Support" };
     juce::TextButton keyBtn     { "Enter a key" };
+    juce::ToggleButton updateToggle { "Check for updates" };
     juce::HyperlinkButton tipLink;   // supporters only: opens the shared tip page
     SupportState     supportState = SupportState::None;
 

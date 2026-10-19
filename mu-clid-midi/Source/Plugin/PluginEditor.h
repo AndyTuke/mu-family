@@ -11,6 +11,7 @@
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/AboutOverlay.h"
+#include "UI/UpdateNotice.h"
 
 namespace mu_clid_midi {
 
@@ -46,6 +47,7 @@ private:
     mu_ui::RhythmCircle    rhythmCircle;
     mu_ui::EuclideanPanel  euclidPanel;
     StatusBar      statusBar;
+    mu_ui::UpdateNotice updateNotice { proc, statusBar };   // the status-bar "Update available" link
     AboutOverlay     aboutOverlay;
     DropdownSelect noteSelector;
     DropdownSelect sizeDropdown;

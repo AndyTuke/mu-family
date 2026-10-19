@@ -21,6 +21,9 @@ AboutOverlay::AboutOverlay()
     tipLink.setColour(juce::HyperlinkButton::textColourId,
                       MuLookAndFeel::colour(MuLookAndFeel::ColourIds::globalAccent));
     addChildComponent(tipLink);
+
+    updateToggle.onClick = [this] { if (onUpdateCheckChanged) onUpdateCheckChanged(updateToggle.getToggleState()); };
+    addChildComponent(updateToggle);
 }
 
 void AboutOverlay::setSupportState(SupportState state)
@@ -55,6 +58,12 @@ void AboutOverlay::mouseDown(const juce::MouseEvent& e)
         if (onDismiss) onDismiss();
 }
 
+void AboutOverlay::setUpdateCheck(bool offered, bool enabled)
+{
+    updateToggle.setToggleState(enabled, juce::dontSendNotification);
+    updateToggle.setVisible(offered);
+}
+
 void AboutOverlay::resized()
 {
     using mu_ui::s;
@@ -74,6 +83,7 @@ void AboutOverlay::resized()
 
     // A supporter's thank-you (painted) and the tip link sit left-aligned above the Close row.
     tipLink.setBounds(cardX + s(24), rowY - s(22), s(160), s(18));
+    updateToggle.setBounds(cardX + s(24), rowY - s(26), s(180), s(22));
 }
 
 void AboutOverlay::paint(juce::Graphics& g)

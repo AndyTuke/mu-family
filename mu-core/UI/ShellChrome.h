@@ -5,7 +5,7 @@
 #include <vector>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Plugin/ShellBackend.h"
-#include "Plugin/UpdateChecker.h"
+#include "UI/UpdateNotice.h"
 #include "Control/LiveView.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/StatusBar.h"
@@ -240,12 +240,7 @@ private:
     void leaveLock();
     void raiseShield();   // back on top after a child was added above it
 
-    mu_core::update_check::Entry updateEntry;   // this product's latest build (stored or just fetched)
-    bool updateWanted  = false;
-    bool fetchInFlight = false;
-    juce::SharedResourcePointer<mu_core::update_check::UpdateChecker> updateChecker;   // held for the editor's life so the fetch is not cancelled
-    void refreshUpdateLink();
-    void dismissUpdateNotice();
+    UpdateNotice updateNotice { backend, statusBar };   // the status-bar update link
 
     // Opens the Preset Browser in pick mode for the chooser; closing it (picked or not) returns to the chooser.
     void pickPresetForChooser(std::function<void(const juce::File&)> picked);

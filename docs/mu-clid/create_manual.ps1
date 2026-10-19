@@ -494,7 +494,7 @@ P "mu-Clid can tell you when a newer version is available. Once a day it asks th
 Bullet "Click the link to open the download page in your web browser. mu-Clid never downloads or installs anything itself. The link then stays hidden for that version and comes back only when a still newer one is released."
 Bullet "Right-click the link and choose Hide this notice to hide it for that version without opening the page."
 Bullet "The link never appears in Performance mode."
-P "Privacy: the check is a plain request for a public file. It sends nothing about you: no name, no identifier, no version number and no details of your computer. The app compares the answer with its own version on your machine. To switch the check off, open Settings and, under General, untick the Check for updates box. With the box unticked, mu-Clid sends no request at all and shows no link. The box is ticked by default."
+P "Privacy: the check is a plain request for a public file. It sends nothing about you: no name, no identifier, no version number and no details of your computer. As with any request to a website, the site can see your internet (IP) address, as it would if you opened the page in a browser. The app compares the answer with its own version on your machine. To switch the check off, open Settings and, under General, untick the Check for updates box. With the box unticked, mu-Clid sends no request at all and shows no link. The box is ticked by default."
 
 # ── 17. Tips and Workflow ─────────────────────────────────────────────────────
 H1 "17. Tips and Workflow"
