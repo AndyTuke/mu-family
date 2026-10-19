@@ -46,6 +46,12 @@ public:
     // Products whose layer set is fixed show neither delete nor rename on the header.
     void setFixedLayers(bool fixed);
 
+    // An empty slot (a host of typed slots): the header keeps the name and the preset box only (no Save, Reset,
+    // Delete or clips) and the content and modulator bands become one panel for the product's content, with no
+    // modulator panel. The product swaps the content to its chooser; false restores the normal stack.
+    void setLayerEmpty(bool empty);
+    bool isLayerEmpty() const noexcept { return layerEmpty; }
+
     // Show layer `idx`: commit any rename in progress, refresh the header and the modulator
     // binding, then tell the product (onLayerChanged) so it rebinds its content.
     void setLayer(int idx);
@@ -78,6 +84,7 @@ private:
     LayerHeaderBar header;
     ModulatorPanel   modulatorPanel;
     juce::Component* content = nullptr;
+    bool layerEmpty = false;
     std::function<double()> beatSource;
     std::function<juce::String(int)> presetNameFn;
     bool ownsPresetList = true;

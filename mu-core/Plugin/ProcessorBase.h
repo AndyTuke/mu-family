@@ -33,6 +33,7 @@
 #include "Plugin/LayerBlock.h"      // the audio thread's one way to the layers (render contract)
 #include "Plugin/TransportResolver.h"
 #include "Sequencer/RenderContext.h"
+#include "Sequencer/LayerTypeRegistry.h"
 #include "Plugin/RetireBin.h"
 #include "Plugin/MidiClockSync.h"
 #include "Plugin/ShellBackend.h"   // the interface the shared shell chrome consumes
@@ -132,6 +133,28 @@ public:
     virtual bool canReorderLayers() const { return canEditLayers(); }
     int          addLayer();
     bool         removeLayer(int idx);
+
+    // ─── Typed slots (a host whose slots each hold one of several layer types: mu-Tronic) ──────────
+    // True when the layers are fixed positions rather than a list: the live count never changes (it is the
+    // capacity), a deleted layer leaves its slot Empty and nothing above it shifts, and a state restore keeps
+    // the count. Such a host runs in LayerAccess::Published and changes a slot with setLayerType; the shared
+    // delete (deleteLayer) then empties the slot. Set by the product; the four list products leave it false.
+    virtual bool layersAreSlots() const { return false; }
+    // The layer types the host offers a slot (Empty is always available and is not listed).
+    const mu_core::LayerTypeRegistry& getLayerTypes() const noexcept { return layerTypes; }
+    // Message thread. Gives `slot` a fresh layer of `type` (Empty empties it) without muting anything: the
+    // new layer is built and prepared first, the old one is published away and sounds out in the retire bin,
+    // the slot's type parameters go back to defaults (or take `initial`, a layer node) while nothing live reads
+    // them, and the new layer is published; the mixer strip, the colour and the name stay. Two view
+    // publications with a grace wait between them (design 2.1.2). Published mode only; false for a slot out of
+    // range, a type the host does not offer, or a host in TryLock mode. Setting the type the slot has is a no-op.
+    bool         setLayerType(int slot, mu_core::LayerTypeId type, const juce::ValueTree* initial = nullptr);
+    // Message thread, outside every lock, called by setLayerType (design step 3) before the old layer is retired: the
+    // editor releases every pointer into slot `slot`'s layer (the modulator panel, the content's bindings). The
+    // editor must clear it in its destructor, as the other shell callbacks.
+    std::function<void(int slot)> onLayerTypeChanging;
+    // The shell's delete: a list product removes the layer (the ones above shift down); a slot host empties it.
+    bool         deleteLayer(int idx) { return layersAreSlots() ? setLayerType(idx, mu_core::LayerTypeId::Empty) : removeLayer(idx); }
     virtual bool swapLayers(int a, int b);
     virtual void resetLayer(int layer);
 
@@ -708,6 +731,11 @@ protected:
     // for hosts and tests that construct it on a stack.
     std::unique_ptr<mu_core::RetireBin> retireBinStorage = std::make_unique<mu_core::RetireBin>(layerAccess.epoch, layerAccess.layout);
     mu_core::RetireBin& retireBin = *retireBinStorage;
+    // The layer types this host offers a slot (see getLayerTypes). Filled in the product's constructor.
+    mu_core::LayerTypeRegistry layerTypes;
+    // A Published-mode host's constructor, once layers[0..liveCount) are filled: stores the count and publishes the
+    // first view of them. Nothing renders before this, and a TryLock host never calls it.
+    void publishLayers(int liveCount);
     // The count policy (RetireBin::CountPolicy) for tails past the live count. Constructor only.
     void setRetireCountPolicy(mu_core::RetireBin::CountPolicy p) noexcept { retireBin.setCountPolicy(p); }
     // Constructor only. On: the channel messages of a host block that renders nothing (a missed try-lock, an
@@ -1113,6 +1141,17 @@ private:
     std::unique_ptr<LayerRenderState> renderStateStorage = std::make_unique<LayerRenderState>();   // heap: see retireBinStorage
     LayerRenderState& renderState = *renderStateStorage;
     std::atomic<bool> useLayerRender { false };   // the test-controlled switch (see setUseLayerRenderForTest)
+
+    // What the last prepareLayerRender used, and a count of its calls, all guarded by layersLock: setLayerType
+    // prepares its new layer outside the lock and compares the count again before publishing, so a prepare that
+    // landed in between (a host thread) is not missed (design 2.1.2, N1).
+    uint32_t prepareGeneration = 0;
+    double   layersPreparedRate = 0.0;
+    int      layersPreparedBlock = 0;
+    // The slots' pointers as a view (layersLock held); the caller sets the serial.
+    mu_core::LayerView makeLayerView() const;
+    // A slot's own parameters (its layer-layout prefix) back to defaults; the mixer strip is left alone.
+    void resetOwnLayerParams(int slot);
     bool regrowCutsInPlaceTails = true;           // setRegrowCutsInPlaceTails (constructor only)
 
     void noteHostBlock(const mu_core::BlockTransport& t, int numSamples) noexcept;

@@ -43,6 +43,17 @@ public:
     // Rebuild channel strips to match the current rhythm count.
     void refresh();
 
+    // ── Pages (a host with more layers than mu_limits::kLayersPerPage) ───────────────────────────────
+    // The strips of one page are shown at a time, the returns and the master always. The page selector sits in
+    // the header strip beside the meter mode; one page (every product but mu-Tronic) shows none. The mixer's page
+    // is independent of the sidebar's once open; `pageOnOpen` (optional) names the page to show each time the mixer
+    // opens (the sidebar's).
+    int  getNumPages() const noexcept;
+    int  getShownPage() const noexcept { return shownPage; }
+    void showPage(int page);
+    bool showAdjacentPage(int delta);   // PageUp / PageDown: no wrap; false when there is nowhere to go
+    std::function<int()> pageOnOpen;
+
     // Reload all FX-row and mixer-channel UI from current APVTS values.
     void loadFromApvts();
 
@@ -91,6 +102,12 @@ private:
     void paintMetal(juce::Graphics&);
 
     SegmentControl meterModeCtrl { {"Peak", "VU", "K-12", "K-14"} };
+
+    int shownPage = 0;
+    SegmentControl pageCtrl { {}, SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Bar };
+    void syncPageCtrl();
+    // True for a slot host's slot that holds no layer: its strip is drawn inactive and is no sidechain source.
+    bool channelIsEmpty(int r) const;
 
     void propagateMeterMode(VUMeter::MeterMode m);
 

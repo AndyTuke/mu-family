@@ -441,7 +441,7 @@ void ProcessorBase::syncReturnStripParam(int retIndex, const char* rest, float v
     else if (is("pan"))   ret.pan.store(v, std::memory_order_relaxed);
     else if (is("mute"))  ret.mute.store(v > 0.5f, std::memory_order_relaxed);
     else if (is("solo"))  ret.solo.store(v > 0.5f, std::memory_order_relaxed);
-    else if (is("scSrc")) ret.sidechainSource.store(juce::jlimit(0, 9, (int) v) - 1, std::memory_order_relaxed);
+    else if (is("scSrc")) ret.sidechainSource.store(juce::jlimit(0, mu_limits::kMaxLayers + 1, (int) v) - 1, std::memory_order_relaxed);
     else if (is("scAmt")) ret.sidechainAmount.store(juce::jlimit(0.0f, 1.0f, v), std::memory_order_relaxed);
     else if (is("scAtk")) ret.sidechainAttackMs.store(v, std::memory_order_relaxed);
     else if (is("scRel")) ret.sidechainReleaseMs.store(v, std::memory_order_relaxed);
@@ -748,7 +748,7 @@ void ProcessorBase::remapSidechainSources(const std::function<int(int)>& remap)
         if (auto* p = apvts.getParameter(id))
         {
             const int v  = juce::roundToInt(p->convertFrom0to1(p->getValue()));
-            const int nv = juce::jlimit(0, 9, remap(v));
+            const int nv = juce::jlimit(0, mu_limits::kMaxLayers + 1, remap(v));   // 0 off, 1..kMaxLayers a channel, then external
             if (nv != v) p->setValueNotifyingHost(p->convertTo0to1((float) nv));
         }
     };
@@ -810,6 +810,16 @@ void ProcessorBase::applyComposedState(const juce::ValueTree& state)
     // that is also safe from a host thread, so it goes through the packed layout word under layoutWriteLock: a lost
     // or misattached serial would break the retire bin's same-block hand-over. A product that parks a tail before this call holds layoutWriteLock
     // across both (it is re-entrant), so the park's nextLayoutSerial() is the serial this store carries.
+    // A slot host keeps its count (the capacity): only the colours are restored.
+    if (layersAreSlots())
+    {
+        const auto slotToks = juce::StringArray::fromTokens(state.getProperty("voiceColours", "").toString(), ",", "");
+        for (int i = 0; i < mu_limits::kMaxLayers && i < slotToks.size(); ++i)
+            if (layers[(size_t) i] != nullptr)
+                layers[(size_t) i]->colourIndex = juce::jlimit(0, mu_limits::kMaxLayers - 1, slotToks[i].getIntValue());
+        return;
+    }
+
     // TryLock mode only until Published-mode quiesce exists: this store and the parameter moves above assume
     // the audio thread's try-lock protocol.
     jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);
@@ -859,7 +869,7 @@ int ProcessorBase::addLayer()
 {
     const int n = numLayers.load(std::memory_order_relaxed);
     if (! canEditLayers() || n >= mu_limits::kMaxLayers) return -1;
-    jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);   // the edits' Published-mode quiesce is not built yet
+    if (getLayerAccess() != mu_core::LayerAccess::TryLock) return -1;   // refused, never half done: a Published host uses setLayerType
 
     // Phase 1: build and prepare the new layer before anything is locked.
     auto fresh = createLayer(n);
@@ -912,7 +922,7 @@ bool ProcessorBase::removeLayer(int idx)
 {
     const int n = numLayers.load(std::memory_order_relaxed);
     if (! canEditLayers() || n <= 1 || idx < 0 || idx >= n) return false;   // the last layer stays
-    jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);   // the edits' Published-mode quiesce is not built yet
+    if (getLayerAccess() != mu_core::LayerAccess::TryLock) return false;   // the Published-mode quiesce is not built yet
 
     // Phase 1: the down-shift renumbers every layer from idx upward, so every staged per-layer swap
     // (keyed by index) would land on the wrong slot. A staged full preset replaces all slots and wins.
@@ -990,7 +1000,7 @@ bool ProcessorBase::swapLayers(int a, int b)
 {
     const int n = numLayers.load(std::memory_order_relaxed);
     if (! canEditLayers() || a < 0 || b < 0 || a >= n || b >= n || a == b) return false;
-    jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);   // the edits' Published-mode quiesce is not built yet
+    if (getLayerAccess() != mu_core::LayerAccess::TryLock) return false;   // the Published-mode quiesce is not built yet
 
     // Phase 1: staged swaps are keyed by index, so swapping the two slots would misdirect them.
     cancelPendingSwap(a);
@@ -1043,6 +1053,21 @@ bool ProcessorBase::swapLayers(int a, int b)
 void ProcessorBase::resetLayer(int idx)
 {
     if (idx < 0 || idx >= numLayers.load(std::memory_order_relaxed) || layers[(size_t) idx] == nullptr) return;
+
+    // A Published host never suspends: it gives the slot a fresh layer of the same type through two publications
+    // (setLayerType, via Empty), then returns the strip and the name to defaults, as a reset always does.
+    if (getLayerAccess() == mu_core::LayerAccess::Published)
+    {
+        const auto type = (mu_core::LayerTypeId) layers[(size_t) idx]->typeId();
+        if (type != mu_core::LayerTypeId::Empty)
+        {
+            setLayerType(idx, mu_core::LayerTypeId::Empty);
+            setLayerType(idx, type);
+        }
+        resetLayerParams(idx);
+        layers[(size_t) idx]->name.clear();
+        return;
+    }
     cancelPendingSwap(idx);                     // a staged swap would re-fill what we are clearing
 
     // Phase 1: build the default data before anything is locked (constructing allocates).
@@ -1072,6 +1097,130 @@ void ProcessorBase::resetLayer(int idx)
     {
         resetLayerParams(idx);
     }
+}
+
+// ─── Typed slots ─────────────────────────────────────────────────────────────────────────────
+// docs/mu-tronic/design.md 2.1.2: a slot's type changes in two view publications with a grace wait between
+// them, nothing suspended and nothing muted. The audio thread reaches layers only through the published view
+// (LayerAccess::Published), so every pointer move here is invisible to it until a view is published.
+
+mu_core::LayerView ProcessorBase::makeLayerView() const
+{
+    mu_core::LayerView v;
+    v.numLive = numLayers.load(std::memory_order_relaxed);
+    for (int s = 0; s < mu_limits::kMaxLayers; ++s) v.layer[(size_t) s] = layers[(size_t) s].get();
+    return v;
+}
+
+void ProcessorBase::resetOwnLayerParams(int slot)
+{
+    if (const auto own = layerLayout.prefix(slot); own.isNotEmpty())
+        forEachPrefixed(*this, own, [](juce::RangedAudioParameter& rp, const juce::String&)
+        {
+            rp.setValueNotifyingHost(rp.getDefaultValue());
+        });
+}
+
+void ProcessorBase::publishLayers(int liveCount)
+{
+    jassert(getLayerAccess() == mu_core::LayerAccess::Published);
+    const juce::ScopedLock lw(layoutWriteLock);
+    const juce::ScopedLock sl(layersLock);
+    auto v = makeLayerView();
+    v.numLive = liveCount;
+    v.serial = nextLayoutSerial();
+    layerAccess.views.publish(v, layerAccess.epoch);   // the view first, then the word: the serial order of setLayerType
+    storeLayerCount(liveCount);
+}
+
+bool ProcessorBase::setLayerType(int slot, mu_core::LayerTypeId type, const juce::ValueTree* initial)
+{
+    using mu_core::LayerTypeId;
+    if (getLayerAccess() != mu_core::LayerAccess::Published) return false;   // a TryLock host edits through add / remove
+    if (slot < 0 || slot >= numLayers.load(std::memory_order_relaxed) || layers[(size_t) slot] == nullptr) return false;
+    const mu_core::LayerTypeInfo* info = type == LayerTypeId::Empty ? nullptr : layerTypes.find(type);
+    if (type != LayerTypeId::Empty && info == nullptr) return false;
+    if ((LayerTypeId) layers[(size_t) slot]->typeId() == type) return true;
+    mu_hotswap::assertMessageThread();   // one caller at a time: the editor, a state restore and a swap commit are all message-thread work
+
+    // Step 3: the UI lets go of the old layer (modulator panel, content) before it can leave the view.
+    if (onLayerTypeChanging) onLayerTypeChanging(slot);
+
+    // Step 1: a staged swap of the old type must not land on the new one.
+    cancelPendingSwap(slot);
+
+    // Step 2: build and prepare the new layer before anything is visible. A prepareToPlay on a host thread may
+    // land before step 8; the generation read here is compared again there.
+    uint32_t generation = 0;
+    double rate = 0.0;
+    int block = 0;
+    {
+        const juce::ScopedLock sl(layersLock);
+        generation = prepareGeneration;
+        rate  = layersPreparedRate;
+        block = layersPreparedBlock;
+    }
+    std::unique_ptr<Layer> fresh = info != nullptr ? info->create(slot) : createLayer(slot);
+    if (fresh == nullptr) return false;
+    if (rate > 0.0) fresh->prepare(rate, block);
+    // The slot's identity stays with the slot: its colour and its name.
+    fresh->colourIndex = layers[(size_t) slot]->colourIndex;
+    fresh->name        = layers[(size_t) slot]->name;
+
+    // Step 4: the last moment the old layer may read its parameters, none has changed yet.
+    if (layers[(size_t) slot]->retirePolicy().kind != mu_core::RetirePolicy::Kind::None)
+        layers[(size_t) slot]->beginRetire();
+
+    // Step 5: publish view V1 with the slot empty and park the old layer in the bin. The bin entry is written
+    // before V1 is published, with V1's serial as its activation, so the first block that loads V1 renders the
+    // old layer as a tail and no block has neither. Lock order: layoutWriteLock, layersLock, binMutex.
+    uint64_t afterV1 = 0;
+    {
+        const juce::ScopedLock lw(layoutWriteLock);
+        const juce::ScopedLock sl(layersLock);
+        std::unique_ptr<Layer> old = std::move(layers[(size_t) slot]);
+        auto v1 = makeLayerView();
+        v1.serial = nextLayoutSerial();
+        retireBin.park(slot, std::move(old), v1.serial, false);
+        layerAccess.views.publish(v1, layerAccess.epoch);
+        storeLayerCount(numLayers.load(std::memory_order_relaxed));   // the layout word follows the view: the same serial
+        afterV1 = layerAccess.epoch.stamp();
+    }
+
+    // Step 6: no block that still renders the old layer live can overlap step 7. A timeout costs at most one
+    // block of a parameter mix; nothing is freed by step 7.
+    layerAccess.epoch.waitFor(afterV1, 50);
+
+    // Step 7: the new type's parameters to defaults (or the initial node) while nothing live reads them, then the
+    // layer binds them. The mixer strip (ch{N}_) is not touched. The new layer sits in layers[] but is not in any
+    // view, so the audio thread cannot reach it.
+    {
+        const juce::ScopedLock sl(layersLock);
+        layers[(size_t) slot] = std::move(fresh);
+    }
+    resetOwnLayerParams(slot);
+    if (initial != nullptr && initial->isValid()) applyLayerNode(slot, *initial);
+    layers[(size_t) slot]->bindParams(apvts, slot);
+    clearLayerClips(slot);   // a type change empties the clip bank (a clip carries its type)
+
+    // Step 8: V2 with the new layer. A prepare that ran since step 2 (a new rate or block size) is repeated for the
+    // new layer first, so its first block is prepared for that block's rate and size.
+    {
+        const juce::ScopedLock lw(layoutWriteLock);
+        const juce::ScopedLock sl(layersLock);
+        if (prepareGeneration != generation && layersPreparedRate > 0.0)
+            layers[(size_t) slot]->prepare(layersPreparedRate, layersPreparedBlock);
+        auto v2 = makeLayerView();
+        v2.serial = nextLayoutSerial();
+        layerAccess.views.publish(v2, layerAccess.epoch);
+        storeLayerCount(numLayers.load(std::memory_order_relaxed));
+    }
+
+    // Step 9: the old view and the old layer are freed after their grace by the views' reclaim and the bin's
+    // service, on this side; ask for a pass.
+    if (retireBin.hasPendingWork()) requestDeferredWork();
+    publishClipMasks();
+    return true;
 }
 
 void ProcessorBase::clearLayerClips(int slot)

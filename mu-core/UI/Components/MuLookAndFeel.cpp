@@ -118,6 +118,7 @@ juce::Colour MuLookAndFeel::colour(ColourIds id) noexcept
         case appGreen:                return t.apps.green;
         case appBlue:                 return t.apps.blue;
         case appYellow:               return t.apps.yellow;
+        case appIce:                  return t.apps.ice;
         case indicatorFault:          return t.indicators.fault;
         case buttonDangerBg:          return t.indicators.buttonDangerBg;
         case queuedText:              return t.text.queued;

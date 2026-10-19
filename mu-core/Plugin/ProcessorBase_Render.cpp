@@ -19,6 +19,13 @@ namespace
 void ProcessorBase::prepareLayerRender(double sampleRate, int maxBlockSize)
 {
     // Message or host thread; the host is not processing. Every allocation of the driver happens here.
+    {
+        // What setLayerType compares against: this prepare's rate and size, and a new generation.
+        const juce::ScopedLock sl(layersLock);
+        ++prepareGeneration;
+        layersPreparedRate  = sampleRate;
+        layersPreparedBlock = juce::jmax(1, maxBlockSize);
+    }
     renderState.rate     = sampleRate;
     renderState.prepared = juce::jmax(1, maxBlockSize);
     for (auto& s : renderState.scratch) s.setSize(2, renderState.prepared, false, true, false);

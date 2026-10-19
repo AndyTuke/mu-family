@@ -4,6 +4,7 @@
 #include "Plugin/HotSwap.h"   // mu_hotswap::kSwapTimingParamId
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Audio/AlgorithmNames.h"   // mu_audio::kInsertAlgorithmCount
+#include "MuLimits.h"             // mu_limits::kMaxLayers: the sidechain source range
 
 // Shared global FX + return + master APVTS parameter layout for the family
 // mixer. The shared MixerOverlay / FXRow / DelayRow bind to these exact IDs, so
@@ -92,7 +93,7 @@ inline void addGlobalFxParams(juce::AudioProcessorValueTreeState::ParameterLayou
         addF3(q+"pan",  nm+"Pan",     -1.0f,    1.0f,    0.0f);
         addB(q+"mute",  nm+"Mute",    false);
         addB(q+"solo",  nm+"Solo",    false);
-        addI(q+"scSrc", nm+"SC Src",  0,        9,       0);  // 0=off, 1-8=ch0-ch7, 9=ext DAW bus
+        addI(q+"scSrc", nm+"SC Src",  0,        mu_limits::kMaxLayers + 1, 0);  // 0=off, 1..kMaxLayers=channels, kMaxLayers+1=external bus
         addF(q+"scAmt", nm+"SC Amt",  0.0f,     1.0f,    0.0f);
         addF(q+"scAtk", nm+"SC Atk",  1.0f,   500.0f,    5.0f);
         addF(q+"scRel", nm+"SC Rel",  10.0f, 2000.0f,  100.0f);
@@ -133,7 +134,7 @@ struct ChannelStripOptions
 {
     int   versionHint = 1;        // parameter version hint (mu-Clid's strips predate hints: 0)
     bool  continuous  = false;    // ranges without a snapping interval (mu-Clid's reference layout)
-    int   scSrc       = 0;        // sidechain source default: 0 = off, 1..8 = ch0..7, 9 = external
+    int   scSrc       = 0;        // sidechain source default: 0 = off, 1..kMaxLayers = channels, kMaxLayers + 1 = external
     float scAmt       = 0.0f;     // sidechain amount default
     float scRel       = 100.0f;   // sidechain release default (ms)
 };
@@ -169,7 +170,7 @@ inline void addChannelStripParams(juce::AudioProcessorValueTreeState::ParameterL
     addF("sendEff", "Send Eff",   0.0f,    1.0f, 0.001f, 0.0f);
     addF("sendDly", "Send Dly",   0.0f,    1.0f, 0.001f, 0.0f);
     addF("sendRev", "Send Rev",   0.0f,    1.0f, 0.001f, 0.0f);
-    addI("scSrc",   "SC Src",     0, 9, o.scSrc);
+    addI("scSrc",   "SC Src",     0, mu_limits::kMaxLayers + 1, o.scSrc);   // 0 off, 1..kMaxLayers channels, then the external bus
     addF("scAmt",   "SC Amount",  0.0f,    1.0f, 0.001f, o.scAmt);
     addF("scAtk",   "SC Attack",  1.0f,  500.0f, 0.1f,   5.0f);
     addF("scRel",   "SC Release", 10.0f, 2000.0f, 1.0f,  o.scRel);

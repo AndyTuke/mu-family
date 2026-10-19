@@ -75,6 +75,10 @@ MixerOverlay::MixerOverlay(ProcessorBase& p, MixerEngine& m)
         propagateMeterMode(static_cast<VUMeter::MeterMode>(idx));
     };
 
+    addChildComponent(pageCtrl);
+    pageCtrl.onChange = [this](int page) { showPage(page); };
+    syncPageCtrl();
+
     // subscribe only to mixer-relevant IDs (see isMixerRelevantParam above).
     // Rhythm/euclid/voice/mod params no longer trigger spurious mixer reloads.
     for (auto* param : proc.getParameters())
@@ -99,8 +103,60 @@ void MixerOverlay::parameterChanged(const juce::String& /*parameterID*/, float /
     apvtsDirty.store(true, std::memory_order_release);
 }
 
+int MixerOverlay::getNumPages() const noexcept
+{
+    return juce::jmax(1, (proc.getNumLayers() + mu_limits::kLayersPerPage - 1) / mu_limits::kLayersPerPage);
+}
+
+// "1-8" and "9-16" at two pages (four at most read as ranges, beyond that plain numbers).
+void MixerOverlay::syncPageCtrl()
+{
+    const int pages = getNumPages();
+    if (pages <= 1) { pageCtrl.setVisible(false); return; }
+    std::vector<juce::String> labels;
+    const int n = proc.getNumLayers();
+    for (int p = 0; p < pages; ++p)
+    {
+        const int first = p * mu_limits::kLayersPerPage + 1;
+        const int last  = juce::jmin(n, (p + 1) * mu_limits::kLayersPerPage);
+        labels.push_back(pages <= 4 ? juce::String(first) + "-" + juce::String(last) : juce::String(p + 1));
+    }
+    pageCtrl.setLabels(labels);
+    shownPage = juce::jlimit(0, pages - 1, shownPage);
+    pageCtrl.setSelectedIndex(shownPage);
+    pageCtrl.setVisible(true);
+}
+
+void MixerOverlay::showPage(int page)
+{
+    page = juce::jlimit(0, getNumPages() - 1, page);
+    if (page == shownPage) { syncPageCtrl(); return; }
+    shownPage = page;
+    syncPageCtrl();
+    resized();
+    repaint();
+}
+
+bool MixerOverlay::showAdjacentPage(int delta)
+{
+    const int page = shownPage + (delta < 0 ? -1 : 1);
+    if (page < 0 || page >= getNumPages()) return false;
+    showPage(page);
+    return true;
+}
+
+bool MixerOverlay::channelIsEmpty(int r) const
+{
+    if (! proc.layersAreSlots()) return false;
+    const auto* layer = proc.getLayer(r);
+    return layer != nullptr && layer->typeId() == 0;
+}
+
 void MixerOverlay::visibilityChanged()
 {
+    if (isVisible() && pageOnOpen && getNumPages() > 1)
+        showPage(pageOnOpen());
+
     // exchange so a parameterChanged firing between the read and the clear
     // is preserved for the next tick instead of being silently dropped.
     if (isVisible() && apvtsDirty.exchange(false, std::memory_order_acq_rel))
@@ -132,7 +188,7 @@ void MixerOverlay::buildChannels()
         ch->bindChannel(mixer.channels[r], mixer.channelPeaks[r], &proc, prefix,
                        &mixer.sidechainGR[r]);
         ch->bindClientMeter(mixer.channelPeaksL[r], mixer.channelPeaksR[r]);   // stereo bars
-        if (!hasRhythm || (isChannelSilent && isChannelSilent(r))) ch->setActive(false);
+        if (!hasRhythm || channelIsEmpty(r) || (isChannelSilent && isChannelSilent(r))) ch->setActive(false);
         // forward status updates to the global StatusBar via PluginEditor.
         ch->onStatusUpdate = [this](const juce::String& n, const juce::String& v, juce::Colour c) {
             if (onStatusUpdate) onStatusUpdate(n, v, c);
@@ -148,7 +204,7 @@ void MixerOverlay::refreshSidechainSources()
     juce::StringArray names;
     const int numActive = proc.getNumLayers();
     for (int r = 0; r < MixerEngine::MaxChannels; ++r)
-        names.add((r < numActive) ? juce::String(proc.getLayerName(r)) : juce::String());
+        names.add((r < numActive && ! channelIsEmpty(r)) ? juce::String(proc.getLayerName(r)) : juce::String());
     for (int r = 0; r < (int)rhythmChannels.size(); ++r)
         rhythmChannels[r]->setSidechainSources(r, names);
     // Return channels can sidechain from any rhythm channel (no self-exclusion, pass -1).
@@ -455,7 +511,7 @@ void MixerOverlay::loadFromApvts()
     for (int r = 0; r < (int)rhythmChannels.size(); ++r)
     {
         const bool hasRhythm = r < numActive;
-        rhythmChannels[r]->setActive(hasRhythm && ! (isChannelSilent && isChannelSilent(r)));
+        rhythmChannels[r]->setActive(hasRhythm && ! channelIsEmpty(r) && ! (isChannelSilent && isChannelSilent(r)));
         rhythmChannels[r]->setChannelName(hasRhythm ? juce::String(proc.getLayerName(r)) : "-");
         rhythmChannels[r]->setChannelColour(
             hasRhythm ? palette[proc.getLayerColourIndex(r) % MuLookAndFeel::kLayerPaletteSize]
@@ -590,12 +646,30 @@ void MixerOverlay::resized()
     const int modeW = s(176);
     const int modeBtnH = s(18);
     meterModeCtrl.setBounds(w - modeW - s(4), (hdrH - modeBtnH) / 2, modeW, modeBtnH);
+    if (pageCtrl.isVisible())
+    {
+        // The page selector to the left of the meter mode, one cell per page.
+        const int pageW = s(46) * getNumPages();
+        pageCtrl.setBounds(w - modeW - s(4) - s(8) - pageW, (hdrH - modeBtnH) / 2, pageW, modeBtnH);
+    }
 
-    int x = labelPanelW;
+    // The strips of the shown page, left to right; the others are hidden. One page shows every strip, as before.
+    const int perPage = mu_limits::kLayersPerPage;
+    int shownCount = 0;
     for (int i = 0; i < (int)rhythmChannels.size(); ++i)
     {
+        const bool onShown = (i / perPage) == shownPage;
+        rhythmChannels[i]->setVisible(onShown);
+        shownCount += onShown ? 1 : 0;
+    }
+    int x = labelPanelW;
+    int placed = 0;
+    for (int i = 0; i < (int)rhythmChannels.size(); ++i)
+    {
+        if ((i / perPage) != shownPage) continue;
         rhythmChannels[i]->setBounds(x, hdrH, chanW, stripH);
-        x += chanW + (i + 1 < (int)rhythmChannels.size() ? chanGap : 0);
+        ++placed;
+        x += chanW + (placed < shownCount ? chanGap : 0);
     }
 
     lastDivX1 = x;
