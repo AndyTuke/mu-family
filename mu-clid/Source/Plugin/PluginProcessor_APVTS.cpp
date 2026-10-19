@@ -32,7 +32,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     };
 
     // ── Per-rhythm parameters (one set per rhythm slot): the Rhythm type's table ─────────
-    for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
         addLayerParams(layout, i);
 
     // ── Shared global FX + return + master layout (mu-core) ───────────────────
@@ -43,7 +43,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     mu_mixfx::addGlobalFxParams(layout);
 
     // ── Rhythm channel strips (11 × 8 = 88) ──────────────────────────────────
-    for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
     {
         const juce::String c = "ch" + juce::String(i) + "_";
         const juce::String n = (i < kAutomatedRhythms)
@@ -72,17 +72,16 @@ void PluginProcessor::parameterChanged(const juce::String& id, float v)
     const char* raw = id.toRawUTF8();
 
     // Rhythm params: r{0-7}_{suffix}
-    if (raw[0] == 'r' && raw[1] >= '0' && raw[1] < '0' + RhythmSequencer::MaxRhythms && raw[2] == '_' && raw[3] != '\0')
+    if (raw[0] == 'r' && raw[1] >= '0' && raw[1] < '0' + mu_limits::kMaxLayers && raw[2] == '_' && raw[3] != '\0')
     {
         markRhythmParamDirty(raw[1] - '0', raw + 3);
         return;
     }
     // (Mixer / global-FX ids never reach here: ProcessorBase's own listener syncs them.)
-    // Master loop length (a relaxed atomic in the sequencer, so safe from any thread)
+    // Master loop length (a relaxed atomic in the step clock, so safe from any thread)
     if (std::strcmp(raw, "mstrLoop") == 0)
     {
-        sequencer.setMasterLoopSteps(juce::jmin((int)v * 16, 256));   // 0 = free
-        stepClock.setMasterLoopSteps(juce::jmin((int)v * 16, 256));
+        stepClock.setMasterLoopSteps(juce::jmin((int)v * 16, 256));   // 0 = free
         return;
     }
 }
@@ -111,7 +110,7 @@ int PluginProcessor::findRhythmParamIndex(const char* suffix) const noexcept
 // once; elsewhere ask for the message-thread deferred-work pass (one atomic store, no allocation).
 void PluginProcessor::markRhythmParamDirty(int ri, const char* suffix) noexcept
 {
-    if (ri < 0 || ri >= RhythmSequencer::MaxRhythms) return;
+    if (ri < 0 || ri >= mu_limits::kMaxLayers) return;
     const int index = findRhythmParamIndex(suffix);
     if (index < 0) return;
 
@@ -138,7 +137,7 @@ bool PluginProcessor::servicePendingRhythmParams(bool waitForOtherApply)
             return false;
         std::this_thread::yield();
     }
-    for (int ri = 0; ri < RhythmSequencer::MaxRhythms; ++ri)
+    for (int ri = 0; ri < mu_limits::kMaxLayers; ++ri)
         if (rhythmHasPending[(size_t) ri].exchange(false, std::memory_order_acq_rel))
             applyPendingRhythmParams(ri);
     applyingRhythmParams.clear(std::memory_order_release);
@@ -158,13 +157,13 @@ void PluginProcessor::dropPendingRhythmParams(int ri) noexcept
 // its orchestrator does the full resync afterwards).
 void PluginProcessor::applyPendingRhythmParams(int ri)
 {
-    if (ri >= sequencer.getNumRhythms())
+    if (ri >= getNumRhythms())
     {
         dropPendingRhythmParams(ri);   // no rhythm to apply to
         return;
     }
 
-    Rhythm& r = sequencer.getRhythm(ri);
+    Rhythm& r = getRhythm(ri);
     bool patternDirty = false;
     bool voiceDirty   = false;
 
@@ -198,10 +197,10 @@ void PluginProcessor::applyPendingRhythmParams(int ri)
 // default voice params.
 void PluginProcessor::forceSyncRhythmFromApvts(int ri)
 {
-    if (ri < 0 || ri >= RhythmSequencer::MaxRhythms) return;
-    if (ri >= sequencer.getNumRhythms()) return;
+    if (ri < 0 || ri >= mu_limits::kMaxLayers) return;
+    if (ri >= getNumRhythms()) return;
 
-    Rhythm& r = sequencer.getRhythm(ri);
+    Rhythm& r = getRhythm(ri);
     const juce::String prefix = "r" + juce::String(ri) + "_";
 
     bool patternDirty = false;
@@ -234,8 +233,8 @@ void PluginProcessor::forceSyncRhythmFromApvts(int ri)
 //==============================================================================
 void PluginProcessor::pushRhythmToApvts(int ri)
 {
-    if (ri < 0 || ri >= sequencer.getNumRhythms()) return;
-    const Rhythm& r = sequencer.getRhythm(ri);
+    if (ri < 0 || ri >= getNumRhythms()) return;
+    const Rhythm& r = getRhythm(ri);
     const juce::String px = "r" + juce::String(ri) + "_";
 
     auto set = [this](const juce::String& id, float v)
@@ -258,7 +257,7 @@ void PluginProcessor::pushRhythmToApvts(int ri)
 
 void PluginProcessor::pushMixerChannelToApvts(int idx)
 {
-    if (idx < 0 || idx >= RhythmSequencer::MaxRhythms) return;
+    if (idx < 0 || idx >= mu_limits::kMaxLayers) return;
     const auto& ch = mixerEngine.channels[idx];
     const juce::String px = "ch" + juce::String(idx) + "_";
 

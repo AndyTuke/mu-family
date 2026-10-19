@@ -62,11 +62,10 @@ PluginProcessor::PluginProcessor()
     // Offline licence + online activation (shared; after initAppSettings for getContentDir).
     initLicensing({ mu_clid::kLicenseProductId, mu_clid::kLicenseFilename,
                     mu_clid::kLicensePublicKey, "muclid.activation", mu_clid::kCheckoutUrl });
-    sequencer.setStepCap(HitGenerator::kMaxSteps);
 
     // Resolve each rhythm parameter once (its raw value pointer for the drain) and build the sorted
     // suffix table the listener searches, before any listener can fire.
-    for (int ri = 0; ri < RhythmSequencer::MaxRhythms; ++ri)
+    for (int ri = 0; ri < mu_limits::kMaxLayers; ++ri)
     {
         const juce::String prefix = "r" + juce::String(ri) + "_";
         for (int i = 0; i < kRhythmParamCount; ++i)
@@ -89,12 +88,11 @@ PluginProcessor::PluginProcessor()
 
     // Add default rhythm (16 steps, 4 hits) and sync its state to APVTS.
     // All eight rhythms exist for the processor's lifetime (a restored state writes into slots above
-    // the live count before it sets the count); the sequencer binds to them.
+    // the live count before it sets the count).
     keepSpareLayers = true;
-    for (int ri = 0; ri < RhythmSequencer::MaxRhythms; ++ri)
+    for (int ri = 0; ri < mu_limits::kMaxLayers; ++ri)
     {
         layers[(size_t) ri] = makeRhythm(ri);
-        sequencer.bindRhythm(ri, &layerAs<Rhythm>(ri));
     }
     Rhythm& defaultRhythm = layerAs<Rhythm>(0);
     defaultRhythm.name       = "<unnamed>";
@@ -246,7 +244,7 @@ void PluginProcessor::layersBlockStarting(const mu_core::LayerView& view, const 
     if (isNonRealtime())
         servicePendingRhythmParams(true);
 
-    const int numRhythms = juce::jlimit(0, (int) RhythmSequencer::MaxRhythms, (int) view.numLive);
+    const int numRhythms = juce::jlimit(0, (int) mu_limits::kMaxLayers, (int) view.numLive);
     sendOrphanOffs(midiMessages);
 
     // Each live rhythm starts the block with no hit; the cursors then find this block's.
@@ -255,7 +253,7 @@ void PluginProcessor::layersBlockStarting(const mu_core::LayerView& view, const 
 
     if (t.playing)
     {
-        std::array<CursorSteps, RhythmSequencer::MaxRhythms> cursorSteps;
+        std::array<CursorSteps, mu_limits::kMaxLayers> cursorSteps;
         const auto blockResult = advanceCursors(numRhythms, t.startBeat, cursorSteps);
 
         // Phase 1: each rhythm that has a hit takes it (a MIDI note-on now, a sample hit at its render).
@@ -302,7 +300,7 @@ void PluginProcessor::layersBlockRendered(const mu_core::LayerView& view, juce::
         samples.mixPreviewInto(masterView, len);
     }
 
-    const int numRhythms = juce::jlimit(0, (int) RhythmSequencer::MaxRhythms, (int) view.numLive);
+    const int numRhythms = juce::jlimit(0, (int) mu_limits::kMaxLayers, (int) view.numLive);
     for (int r = 0; r < numRhythms; ++r)
         sampleRhythm(r).midi.processBlock(midiMessages, total);
 }
@@ -393,7 +391,7 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
         noteBlockTransport(t);   // lets the next block's quantised control actions find the beat
     }
 
-    // detect transport stop→start edge and reset the sequencer's wrap detector
+    // detect transport stop→start edge and reset the step clock's wrap detector
     // so the first block after restart can't emit a false masterLoopWrapped from
     // a stale lastEffectiveStep.
     {
@@ -401,13 +399,10 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
         // backward jump resets the detector so it cannot read as a master-loop wrap and commit a staged
         // hot-swap early (see RhythmSequencer::resolveBlockBeat).
         const auto resolved = RhythmSequencer::resolveBlockBeat(lastBeatPos.load(), beatPos, playing,
-                                                                sequencerPlaying.load(), sequencer.getMasterLoopSteps());
+                                                                sequencerPlaying.load(), stepClock.getMasterLoopSteps());
         beatPos = resolved.beat;
         if (resolved.resetWrap)
-        {
-            sequencer.resetWrapDetector();
             stepClock.resetWrapDetector();
-        }
     }
     sequencerPlaying.store(playing);
     lastBeatPos.store(beatPos);
@@ -419,7 +414,7 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
 // BlockResult shape. Like RhythmSequencer::processBlock, nothing runs (no history consumed) with no live rhythm, and
 // the frame's step becomes the previous one only after every cursor walked.
 BlockResult PluginProcessor::advanceCursors(int numRhythms, double beatPos,
-                                            std::array<CursorSteps, RhythmSequencer::MaxRhythms>& steps)
+                                            std::array<CursorSteps, mu_limits::kMaxLayers>& steps)
 {
     BlockResult result;
     if (numRhythms <= 0)

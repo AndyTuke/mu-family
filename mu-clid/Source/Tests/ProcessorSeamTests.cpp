@@ -589,7 +589,7 @@ struct MuClidProcessorSeamTests : juce::UnitTest
             audio.join();
 
             // The listener only queued the rhythm values; the loop length is a lone atomic and is live.
-            expectEquals(p.sequencer.getMasterLoopSteps(), 32);
+            expectEquals(p.getMasterLoopSteps(), 32);
             expectEquals(p.getRhythm(0).genA.steps, stepsBefore);
             expectEquals(p.getRhythm(0).genA.hits, hitsBefore);
             expectEquals(p.sampleRhythm(0).cursor.patternLength(), lengthBefore);

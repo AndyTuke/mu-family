@@ -90,9 +90,9 @@ public:
     // its own: it takes the layer lock, because the audio path may read the name.
     void renameRhythm(int index, const juce::String& newName);
 
-    Rhythm& getRhythm    (int index)       { return sequencer.getRhythm(index); }
-    const Rhythm& getRhythm(int index) const { return sequencer.getRhythm(index); }
-    int     getNumRhythms() const          { return sequencer.getNumRhythms(); }
+    Rhythm& getRhythm    (int index)       { return layerAs<Rhythm>(index); }
+    const Rhythm& getRhythm(int index) const { return layerAs<Rhythm>(index); }
+    int     getNumRhythms() const          { return liveRhythms.load(std::memory_order_relaxed); }
 
     // ProcessorBase channel-metadata interface — mu-clid maps "channel" → "rhythm"; the count and
     // getLayer come from the layer container.
@@ -118,7 +118,7 @@ public:
     void cancelPendingFullPreset() override               { hotSwapStager.cancelStagedFullPreset(); }
     uint32_t fullStageSerial() const override             { return hotSwapStager.fullStageSerial(); }
     uint32_t slotStageSerial(int ri) const override       { return hotSwapStager.slotStageSerial(ri); }
-    int  getMasterLoopSteps() const override              { return sequencer.getMasterLoopSteps(); }
+    int  getMasterLoopSteps() const override              { return stepClock.getMasterLoopSteps(); }
     int  getMasterLoopCurrentStep() const override        { return stepClock.getMasterLoopCurrentStep(); }
 
     // A rhythm hot-swap commit fires ProcessorBase::onLayerPresetCommitted: the editor refreshes
@@ -166,19 +166,15 @@ public:
     void loadDefaultPreset() override            { presetIO.loadDefaultPreset(); }
 
 
-    // The rhythm bindings, the master-loop length and the pattern bookkeeping (the hits are the cursors'
-    // since E5.5d; the sequencer's own state is still kept in step until E5.7 deletes it).
-    RhythmSequencer sequencer;
-    // The rhythms' own step clocks: the host half here, a RhythmCursor in each SampleRhythm. They are handed every
-    // pattern, swap start, loop length and restart, and decide each block's hits.
+    // The rhythms' own step clocks: the host half here (it holds the master-loop length), a RhythmCursor in each
+    // SampleRhythm. They are handed every pattern, swap start, loop length and restart, and decide each block's hits.
     RhythmStepClock stepClock;
-    static constexpr int kStepCap = HitGenerator::kMaxSteps;   // the sequencer's step cap (setStepCap)
+    static constexpr int kStepCap = HitGenerator::kMaxSteps;   // the Euclid step cap every pattern is built with
 
-    // Rebuilds slot `index`'s pattern for the sequencer and the rhythm's cursor (message thread).
+    // Rebuilds slot `index`'s pattern in the rhythm's cursor (message thread).
     void updateRhythmPattern(int index)
     {
-        sequencer.updatePattern(index);
-        if (index >= 0 && index < RhythmSequencer::MaxRhythms)
+        if (index >= 0 && index < mu_limits::kMaxLayers)
             sampleRhythm(index).cursor.updatePattern(sampleRhythm(index), kStepCap);
     }
     // Where slot r's pattern last started a pass, and the step counter's run id (audio thread: the swap stager
@@ -249,8 +245,8 @@ public:
     // A struct copy (see SampleRhythm::modulatedEuclidOverrides); empty for a slot that is not live.
     EuclidOverrides getModulatedEuclidOverrides(int rhythmIndex) const noexcept
     {
-        if (rhythmIndex < 0 || rhythmIndex >= RhythmSequencer::MaxRhythms
-                          || rhythmIndex >= sequencer.getNumRhythms())
+        if (rhythmIndex < 0 || rhythmIndex >= mu_limits::kMaxLayers
+                          || rhythmIndex >= getNumRhythms())
             return {};
         return sampleRhythm(rhythmIndex).modulatedEuclidOverrides();
     }
@@ -360,7 +356,7 @@ private:
     // The block's hits: the host clock's frame, each live rhythm's cursor walk, gathered as a BlockResult;
     // `steps` gets each rhythm's step, accent step and length.
     struct CursorSteps { int step = -1, accentStep = 0, length = 0; };
-    BlockResult advanceCursors(int numRhythms, double beatPos, std::array<CursorSteps, RhythmSequencer::MaxRhythms>& steps);
+    BlockResult advanceCursors(int numRhythms, double beatPos, std::array<CursorSteps, mu_limits::kMaxLayers>& steps);
     // ── The render: the shared layer driver ──────────────────────────────────────────────────────────
     // The host's buses, the block's transport, then the shared driver (ProcessorBase::renderAndMix): the
     // rhythms render themselves (SampleRhythm::render) and the mixer runs, in chunks of the prepared size.
@@ -405,12 +401,12 @@ private:
     void applyPendingRhythmParams(int ri);        // message thread: one rhythm
     void dropPendingRhythmParams(int ri) noexcept;
 
-    std::array<std::array<std::atomic<bool>, kRhythmParamCount>, RhythmSequencer::MaxRhythms> pendingDirty {};
-    std::array<std::atomic<bool>, RhythmSequencer::MaxRhythms> rhythmHasPending {};
+    std::array<std::array<std::atomic<bool>, kRhythmParamCount>, mu_limits::kMaxLayers> pendingDirty {};
+    std::array<std::atomic<bool>, mu_limits::kMaxLayers> rhythmHasPending {};
 
     // Per (rhythm, kRhythmParamDefs entry), the parameter's raw value (null if it has none); resolved
     // once in the constructor so the drain does no lookup by id.
-    std::array<std::array<std::atomic<float>*, kRhythmParamCount>, RhythmSequencer::MaxRhythms> rawParams {};
+    std::array<std::array<std::atomic<float>*, kRhythmParamCount>, mu_limits::kMaxLayers> rawParams {};
 
     // Suffix to index in kRhythmParamDefs, sorted by suffix, for the listener's lookup by binary
     // search (no String, no allocation). Built in the constructor and never changed.
@@ -428,10 +424,10 @@ private:
     // orchestrators (insert-algo dropdown) can call it after their own
     // apvtsLoading-guarded multi-writes.
     void pushMixerChannelToApvts(int idx);
-    // Sets the sequencer's live rhythm count; a dropped rhythm is reset so a later grow starts from a default one.
+    // Sets the live rhythm count; a dropped rhythm is reset so a later grow starts from a default one.
     void setRhythmCount(int n);
-    // The sequencer's live count; a cursor whose slot becomes live or stops being live is cleared, as the
-    // sequencer clears its slot state (message thread, layer lock held or not yet processing).
+    // The live rhythm count; a cursor whose slot becomes live or stops being live is cleared (message thread,
+    // layer lock held or not yet processing).
     void setLiveRhythms(int n);
 
     // ── Layer container (ProcessorBase) ──────────────────────────────────────
@@ -443,7 +439,7 @@ private:
     // A default rhythm for `slot`. For a slot at or above the live count it also readies that slot's
     // voice and MIDI engines (built here, outside every lock), so the publish only moves pointers.
     std::unique_ptr<Layer> createLayer(int slot) override;
-    // Under layersLock: the sequencer's count and rhythm bindings follow the layer set.
+    // Under layersLock: the live rhythm count follows the layer set.
     void layersMoved(int firstIndex, int lastIndex) override;
     // Under layersLock, before layersMoved: moves the per-slot audio state with the rhythms.
     void layersReordered(LayerEdit kind, int a, int b) override;
@@ -466,6 +462,10 @@ private:
     // (add / reset) and so needs its pattern and engine parameters rebuilt, and, during a remove or
     // swap, the last slot syncSlotParams will be given.
     int rebuildSlot     = -1;
+    // The rhythms the parameter code treats as live: the layer count, except inside an edit (layersReordered sees
+    // the count before a remove) and the legacy host restore, which opens all eight slots while it replaces the
+    // parameter state so the listener applies every slot. Written on the message thread; read by the UI.
+    std::atomic<int> liveRhythms { 0 };
     int reorderLastSlot = -1;
     void restoreStateFromTree(const juce::ValueTree& s) { presetIO.restoreStateFromTree(s); }
 

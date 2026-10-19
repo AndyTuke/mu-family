@@ -2,8 +2,8 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "Sequencer/GeneratorAliases.h"
+#include "Sequencer/RhythmCursor.h"   // RhythmCursor::kAnyFrameEpoch
 #include "Audio/VoiceEngine.h"
-#include "Sequencer/GeneratorAliases.h"
 #include "Plugin/HotSwap.h"   // mu-core: the shared staging state
 #include <array>
 #include <atomic>
@@ -82,11 +82,11 @@ public:
     // the pattern rebuilds. The one swap behind the loop-boundary commit, the stopped load and the
     // full-preset commit. Caller holds suspendProcessing (and layersLock where needed); the
     // APVTS push follows outside the suspend.
-    // originEff / frameEpoch say where the new pattern's step 0 falls (see RhythmSequencer::requestSwapStart);
+    // originEff / frameEpoch say where the new pattern's step 0 falls (see RhythmCursor::requestSwapStart);
     // the defaults start it on the step counter's own phase, for a load that has no boundary.
     // `rhythm` comes back holding the outgoing rhythm, so the caller can let it destruct after it drops its locks.
     void installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceEngine>&& voice, const juce::String& samplePath,
-                       int originEff = 0, uint32_t frameEpoch = RhythmSequencer::kAnyFrameEpoch);
+                       int originEff = 0, uint32_t frameEpoch = RhythmCursor::kAnyFrameEpoch);
 
     // Message-thread: commit all flagged swaps.
     // Called from PluginProcessor::runDeferredWork.

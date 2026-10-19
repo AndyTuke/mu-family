@@ -54,7 +54,7 @@ static juce::ValueTree uncoveredParamRows(juce::AudioProcessor& proc, int numRhy
 void PresetIO::getStateInformation(juce::MemoryBlock& destData)
 {
     auto root = buildFullPresetTree({}, {}, {}, false, true);
-    root.appendChild(uncoveredParamRows(proc, proc.sequencer.getNumRhythms()), nullptr);
+    root.appendChild(uncoveredParamRows(proc, proc.getNumRhythms()), nullptr);
     proc.saveLiveState(root);   // the session also keeps the Performance (path, current item, mode)
     juce::MemoryOutputStream(destData, true).writeString(root.toXmlString());
 }
@@ -86,10 +86,10 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
 
     // A session in this format predates clips, so every bank empties. Done before the lock below:
     // freeing trees is not a microsecond job.
-    for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
         proc.clearLayerClips(i);
 
-    int n = juce::jlimit(1, RhythmSequencer::MaxRhythms,
+    int n = juce::jlimit(1, mu_limits::kMaxLayers,
                          (int)state.getProperty("numRhythms", 1));
 
     // Guard the live-state mutation below (sequencer resize, voiceEngine
@@ -105,7 +105,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     const juce::ScopedLock sl(proc.layersLock);
 
     // Expand to MaxRhythms so parameterChanged can write to all 8 rhythm slots.
-    proc.setRhythmCount(RhythmSequencer::MaxRhythms);
+    proc.setRhythmCount(mu_limits::kMaxLayers);
 
     // migrate legacy state in-place before pushing it into APVTS so the
     // new 0..10 s ADSR ranges don't clamp old 0..100 values to absurd attacks.
@@ -131,7 +131,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
         if (child.getType() != juce::Identifier("Modulators")) continue;
         const int ri = (int)child.getProperty("rhythmIdx", -1);
         if (ri < 0 || ri >= n) continue;
-        Rhythm& target = proc.sequencer.getRhythm(ri);
+        Rhythm& target = proc.getRhythm(ri);
         clearModulators(target);
         auto dropped = deserialiseModulators(child, target);
         if (! dropped.isEmpty() && proc.onLoadError)
@@ -175,7 +175,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     // Restore non-APVTS properties and refresh engines.
     for (int i = 0; i < n; ++i)
     {
-        Rhythm& r = proc.sequencer.getRhythm(i);
+        Rhythm& r = proc.getRhythm(i);
         const juce::String slotPrefix = "r" + juce::String(i) + "_";
 
         r.name        = state.getProperty(slotPrefix + "name",

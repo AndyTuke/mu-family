@@ -84,7 +84,7 @@ int PluginProcessor::retiredCountForTest(int slot) const noexcept
 
 void PluginProcessor::resetPlayState(int idx)
 {
-    if (idx < 0 || idx >= RhythmSequencer::MaxRhythms) return;
+    if (idx < 0 || idx >= mu_limits::kMaxLayers) return;
     auto& s = sampleRhythm(idx).playState;
     s.patternLength.store(1);
     s.stepsA       .store(1);
@@ -93,23 +93,23 @@ void PluginProcessor::resetPlayState(int idx)
     s.hitCount     .store(0);
 }
 
-// Sets the sequencer's live rhythm count. A rhythm that stops being live is returned to a default one, so
+// Sets the live rhythm count. A rhythm that stops being live is returned to a default one, so
 // a later grow starts from defaults (a restore then fills in what the state carries).
 void PluginProcessor::setRhythmCount(int n)
 {
-    n = juce::jlimit(0, RhythmSequencer::MaxRhythms, n);
-    for (int i = n; i < sequencer.getNumRhythms(); ++i)
+    n = juce::jlimit(0, mu_limits::kMaxLayers, n);
+    for (int i = n; i < getNumRhythms(); ++i)
         layerAs<Rhythm>(i) = Rhythm{};
     setLiveRhythms(n);
 }
 
 void PluginProcessor::setLiveRhythms(int n)
 {
-    n = juce::jlimit(0, RhythmSequencer::MaxRhythms, n);
-    const int current = sequencer.getNumRhythms();
+    n = juce::jlimit(0, mu_limits::kMaxLayers, n);
+    const int current = getNumRhythms();
     for (int i = std::min(n, current); i < std::max(n, current); ++i)
         sampleRhythm(i).cursor.clear();
-    sequencer.setNumRhythms(n);
+    liveRhythms.store(n, std::memory_order_relaxed);
 }
 
 void PluginProcessor::renameRhythm(int index, const juce::String& newName)
@@ -124,8 +124,7 @@ void PluginProcessor::renameRhythm(int index, const juce::String& newName)
 }
 
 //==============================================================================
-// Called under layersLock after every pointer move: the sequencer's count and Rhythm bindings follow
-// the layer set. Nothing is built or freed here.
+// Called under layersLock after every pointer move: the live rhythm count follows the layer set. Nothing is built or freed here.
 void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
 {
     // An edit that did not reorder (add, reset) rebuilds the new rhythm's pattern after the unlock.
@@ -141,12 +140,10 @@ void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
     }
 
     setLiveRhythms(numLayers.load(std::memory_order_relaxed));
-    for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
-        sequencer.bindRhythm(i, static_cast<Rhythm*>(layers[(size_t) i].get()));
 
     // A slot's tenant changed, so the modulation change-detection starts clean: the next block re-runs a
     // modulated tenant's pass and pattern recompute instead of trusting the previous tenant's memory.
-    for (int i = firstIndex; i <= lastIndex && i < RhythmSequencer::MaxRhythms; ++i)
+    for (int i = firstIndex; i <= lastIndex && i < mu_limits::kMaxLayers; ++i)
         sampleRhythm(i).resetModulationMemory();
 }
 
@@ -159,7 +156,6 @@ void PluginProcessor::layersReordered(LayerEdit kind, int a, int b)
     if (kind == LayerEdit::Swap)
     {
         reorderLastSlot = b;
-        sequencer.swapSlotState(a, b);
         sampleRhythm(a).cursor.requestAbsorb();   // each cursor moved with its rhythm: absorb the current step
         sampleRhythm(b).cursor.requestAbsorb();
         resetPlayState(a);
@@ -177,11 +173,10 @@ void PluginProcessor::layersReordered(LayerEdit kind, int a, int b)
     // the retire-bin rows above it down with them (a retired tail renders into the channel of the slot that
     // holds it, so it follows the rhythm whose swap left it); the removed rhythm's engine goes with it, destroyed
     // by the base after the unlock, its tails are cut, and the vacated top slot's spare holds none.
-    const int n    = sequencer.getNumRhythms();   // the count before the removal
+    const int n    = getNumRhythms();   // the count before the removal
     const int newN = n - 1;
     reorderLastSlot = newN;
 
-    sequencer.removeSlotState(a);
     for (int i = a; i < newN; ++i)
         sampleRhythm(i).cursor.requestAbsorb();   // the rhythms that moved down absorb the current step
     samples.shiftPathsDown(a, n);
@@ -214,7 +209,7 @@ void PluginProcessor::layerRemoved(Layer& removed, int index)
 // these parameter values, and apvtsLoading mutes the listeners meanwhile.
 void PluginProcessor::syncSlotParams(int slot)
 {
-    const bool live = slot < sequencer.getNumRhythms();
+    const bool live = slot < getNumRhythms();
     {
         mu_core::ScopedApvtsLoading guard(apvtsLoading);
         if (live) pushRhythmToApvts(slot);
@@ -225,7 +220,7 @@ void PluginProcessor::syncSlotParams(int slot)
         samples.clearPath(slot);   // the vacated top slot: the removed rhythm's path was moved up here
 
     // A new or reset rhythm: its pattern is built now, and the engine takes its voice parameters. A
-    // moved rhythm keeps both, and rebuilding its pattern would make the sequencer re-absorb the step.
+    // moved rhythm keeps both, and rebuilding its pattern would make the cursor re-absorb the step.
     if (slot == rebuildSlot)
     {
         rebuildSlot = -1;

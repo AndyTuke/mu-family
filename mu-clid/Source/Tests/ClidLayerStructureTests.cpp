@@ -152,7 +152,7 @@ struct ClidLayerStructureTests : juce::UnitTest
         expect(p.removeLayer(gone));
         const auto after = take(p);
         expectEquals(p.getNumRhythms(), kMax - 1);
-        expectEquals(p.sequencer.getNumRhythms(), kMax - 1);
+        expectEquals(p.getNumRhythms(), kMax - 1);
 
         for (int i = 0; i < kMax - 1; ++i)
         {
@@ -172,14 +172,14 @@ struct ClidLayerStructureTests : juce::UnitTest
         expect(p.voiceEngine(kMax - 1) == nullptr, "the vacated top slot holds no engine");
         expectEquals(p.retiredCountForTest(kMax - 1), 0, "and no sounding tail (the removed slot's were cut)");
         expect(p.samples.path(kMax - 1).isEmpty(), "and no sample path");
-        expect(p.getLayer(kMax - 1) == nullptr && p.sequencer.getNumRhythms() == kMax - 1, "and is not live");
+        expect(p.getLayer(kMax - 1) == nullptr && p.getNumRhythms() == kMax - 1, "and is not live");
         expect(p.layerAs<mu_clid::Rhythm>(kMax - 1).name != "", "though a spare rhythm stays in it");
 
         // Strip 6 ducked from layer 3, the one removed: it now ducks from nothing. Strip 6 itself is slot 5 now.
         expectEquals(after.scSrc[5], -1, "a sidechain from the removed rhythm is gone");
         expectEquals((int) plain(p.apvts, "ch5_scSrc"), 0, "in the parameter too");
         for (int i = 0; i < kMax - 1; ++i)
-            expect(&p.sequencer.getRhythm(i) == p.getLayer(i), "the sequencer is bound to the layer in each live slot");
+            expect(&p.getRhythm(i) == p.getLayer(i), "the sequencer is bound to the layer in each live slot");
     }
 
     void swapEnds()
@@ -491,8 +491,8 @@ struct ClidLayerStructureTests : juce::UnitTest
         expect(std::abs(plain(p.apvts, "ch1_lvl") - 1.0f) < 2.0e-3f, "a default strip");
         expect(std::abs(p.mixerEngine.channels[1].level.load() - 1.0f) < 1.0e-4f);
         expect(p.getLayer(1)->colourIndex != firstColour, "a colour the first rhythm does not use");
-        expectEquals(p.sequencer.getNumRhythms(), 2);
-        expect(&p.sequencer.getRhythm(1) == p.getLayer(1), "the sequencer is bound to the new layer");
+        expectEquals(p.getNumRhythms(), 2);
+        expect(&p.getRhythm(1) == p.getLayer(1), "the sequencer is bound to the new layer");
         expect(juce::String(p.getRhythm(1).name) == "Rhythm 2");
 
         // The audio thread renders the new slot.

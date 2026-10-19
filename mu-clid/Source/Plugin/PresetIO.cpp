@@ -50,7 +50,7 @@ juce::ValueTree PresetIO::readRhythmPresetFile(const juce::File& file) const
 // stage entry (which leaves no clip active) into stageRhythmPresetTree below.
 void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file, bool keepIdentity)
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.sequencer.getNumRhythms()) return;
+    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
 
     const auto state = readRhythmPresetFile(file);
     if (! state.isValid()) return;
@@ -68,7 +68,7 @@ void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file, bool k
 // Playing: the same prepared rhythm waits for its loop boundary.
 void PresetIO::stageRhythmPresetTree(int rhythmIndex, const juce::ValueTree& state, bool keepIdentity)
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.sequencer.getNumRhythms() || ! state.isValid()) return;
+    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms() || ! state.isValid()) return;
 
     const juce::String source = loadSource.isNotEmpty() ? loadSource : juce::String("layer preset");
     if (! proc.sequencerPlaying.load())
@@ -101,7 +101,7 @@ PreparedRhythm PresetIO::prepareRhythmPresetTree(const juce::ValueTree& state, i
     auto prepared = SampleRhythm::prepareStaged(state, "r0_", presetContext(), source);
     if (keepIdentity)
     {
-        const Rhythm& current = proc.sequencer.getRhythm(rhythmIndex);
+        const Rhythm& current = proc.getRhythm(rhythmIndex);
         prepared.rhythm.name        = current.name;
         prepared.rhythm.colourIndex = current.colourIndex;
     }
@@ -159,7 +159,7 @@ juce::ValueTree PresetIO::buildRhythmPresetTree(int rhythmIndex, bool embedSampl
                                                 const juce::String& presetName, const juce::String& category,
                                                 const juce::String& description)
 {
-    return rhythm_preset::buildLayerTree(proc.sequencer.getRhythm(rhythmIndex), proc.apvts, rhythmIndex,
+    return rhythm_preset::buildLayerTree(proc.getRhythm(rhythmIndex), proc.apvts, rhythmIndex,
                                          proc.samples.path(rhythmIndex), proc.getSamplesDir(),
                                          embedSample, forFile, presetName, category, description);
 }
@@ -168,7 +168,7 @@ juce::ValueTree PresetIO::buildRhythmPresetTree(int rhythmIndex, bool embedSampl
 // identity. An invalid tree when the slot is out of range.
 juce::ValueTree PresetIO::captureRhythmPresetTree(int rhythmIndex)
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.sequencer.getNumRhythms()) return {};
+    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return {};
     return buildRhythmPresetTree(rhythmIndex, false, false, {}, {}, {});
 }
 
@@ -176,7 +176,7 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFil
                                              bool embedSample, const juce::String& category,
                                              const juce::String& description)
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.sequencer.getNumRhythms()) return;
+    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
 
     // if the current sample comes from an embedded-sample decode (path
     // points into %TEMP%/muClid_samples/), force-embed so we never write the
@@ -202,13 +202,13 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFil
 // loads: a layer preset (.muRhythm) does not carry the mixer strip, so the slot's strip is left as it is.
 bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIndex, bool keepIdentity)
 {
-    if (targetIndex < 0 || targetIndex >= proc.sequencer.getNumRhythms()) return false;
+    if (targetIndex < 0 || targetIndex >= proc.getNumRhythms()) return false;
     const auto state = readRhythmPresetFile(file);
     if (! state.isValid()) return false;
     if (! applyRhythmPresetTree(state, targetIndex, keepIdentity, file.getFileName())) return false;
 
     // A direct load is not a clip launch: the install keeps the slot's activeClip, so clear it here.
-    proc.sequencer.getRhythm(targetIndex).activeClip = -1;
+    proc.getRhythm(targetIndex).activeClip = -1;
     proc.getLiveState().clearLayerClips(targetIndex);
     proc.noteLayerPresetLabel(targetIndex, keepIdentity ? juce::String() : file.getFileNameWithoutExtension());
     return true;
@@ -219,7 +219,7 @@ bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIndex, bool k
 bool PresetIO::applyRhythmPresetTree(const juce::ValueTree& state, int targetIndex, bool keepIdentity,
                                      const juce::String& source)
 {
-    if (targetIndex < 0 || targetIndex >= proc.sequencer.getNumRhythms()) return false;
+    if (targetIndex < 0 || targetIndex >= proc.getNumRhythms()) return false;
     auto prepared = prepareRhythmPresetTree(state, targetIndex, keepIdentity, source);
     if (! prepared.voice) return false;
 
@@ -228,7 +228,7 @@ bool PresetIO::applyRhythmPresetTree(const juce::ValueTree& state, int targetInd
     {
         const juce::ScopedLock sl(proc.layersLock);
         proc.hotSwapStager.installRhythm(targetIndex, std::move(prepared.rhythm), std::move(prepared.voice),
-                                          prepared.samplePath, 0, RhythmSequencer::kAnyFrameEpoch);
+                                          prepared.samplePath, 0, RhythmCursor::kAnyFrameEpoch);
     }
     proc.suspendProcessing(false);
 
@@ -300,7 +300,7 @@ bool PresetIO::writeFullPresetFile(const juce::File& file, const juce::String& n
 {
     if (! embedSamples)
     {
-        for (int i = 0; i < proc.sequencer.getNumRhythms(); ++i)
+        for (int i = 0; i < proc.getNumRhythms(); ++i)
         {
             if (isEmbeddedSampleTempPath(proc.samples.path(i)))
             {
@@ -322,7 +322,7 @@ bool PresetIO::writeFullPresetFile(const juce::File& file, const juce::String& n
 juce::ValueTree PresetIO::buildFullPresetTree(const juce::String& name, const juce::String& description,
                                               const juce::String& category, bool embedSamples, bool forSession)
 {
-    const int n = proc.sequencer.getNumRhythms();
+    const int n = proc.getNumRhythms();
     juce::ValueTree root("MuClidPreset");
     root.setProperty("presetName",         name,                 nullptr);
     root.setProperty("presetDescription",  description,          nullptr);
@@ -331,7 +331,7 @@ juce::ValueTree PresetIO::buildFullPresetTree(const juce::String& name, const ju
     // presetVersion property dropped: not distributing yet, current-build-only.
 
     for (int i = 0; i < n; ++i)
-        root.addChild(rhythm_preset::buildFullPresetNode(proc.sequencer.getRhythm(i), proc.apvts, i,
+        root.addChild(rhythm_preset::buildFullPresetNode(proc.getRhythm(i), proc.apvts, i,
                                                          proc.samples.path(i), proc.getSamplesDir(),
                                                          embedSamples, forSession),
                       -1, nullptr);
@@ -379,7 +379,7 @@ buildPreparedFullPreset(const juce::ValueTree& root, const RhythmPresetContext& 
     int n = 0;
     for (int ci = 0; ci < root.getNumChildren(); ++ci)
         if (root.getChild(ci).getType() == juce::Identifier("Rhythm")) ++n;
-    n = juce::jlimit(1, juce::jmin(maxRhythms, (int) RhythmSequencer::MaxRhythms), n);
+    n = juce::jlimit(1, juce::jmin(maxRhythms, (int) mu_limits::kMaxLayers), n);
     out.numRhythms = n;
 
     // Prepare each <Rhythm> child into its slot.
@@ -409,7 +409,7 @@ buildPreparedFullPreset(const juce::ValueTree& root, const RhythmPresetContext& 
 
 HotSwapStager::PreparedFullPreset PresetIO::prepareFullPreset(const juce::ValueTree& root) const
 {
-    return buildPreparedFullPreset(root, presetContext(), (int) RhythmSequencer::MaxRhythms);
+    return buildPreparedFullPreset(root, presetContext(), (int) mu_limits::kMaxLayers);
 }
 
 bool PresetIO::loadPreset(const juce::File& file)
@@ -490,7 +490,7 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     // microseconds and the swap stays glitch-free. The lock is released before the
     // APVTS finalize below so that (post-resume) work doesn't bail the audio thread.
     // Engines that must not destruct under the lock (the shrunk slots') land here and free after it is released.
-    std::array<std::unique_ptr<VoiceEngine>, RhythmSequencer::MaxRhythms> shrunkEngines;
+    std::array<std::unique_ptr<VoiceEngine>, mu_limits::kMaxLayers> shrunkEngines;
     proc.suspendProcessing(true);
     {
         const juce::ScopedLock lw(proc.layoutWriteLock);   // first: the count stores below advance the layout serial
@@ -541,7 +541,7 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     // After the lock: freeing trees is not a microsecond job.
     for (int i = 0; i < n; ++i)
     {
-        Rhythm& r = proc.sequencer.getRhythm(i);
+        Rhythm& r = proc.getRhythm(i);
         *r.clips      = std::move(prepared.clipBanks[(size_t) i]);
         r.activeClip  = prepared.activeClips[(size_t) i];
     }

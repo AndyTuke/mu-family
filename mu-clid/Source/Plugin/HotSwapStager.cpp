@@ -21,13 +21,13 @@ void HotSwapStager::stage(int rhythmIndex, Rhythm&& rhythm,
 
 void HotSwapStager::cancelStagedSwap(int rhythmIndex)
 {
-    if (rhythmIndex < 0 || rhythmIndex >= RhythmSequencer::MaxRhythms) return;
+    if (rhythmIndex < 0 || rhythmIndex >= mu_limits::kMaxLayers) return;
     cancelPendingIfAny(rhythmIndex);
 }
 
 bool HotSwapStager::hasPendingSwap(int rhythmIndex) const
 {
-    if (rhythmIndex < 0 || rhythmIndex >= RhythmSequencer::MaxRhythms) return false;
+    if (rhythmIndex < 0 || rhythmIndex >= mu_limits::kMaxLayers) return false;
     return stager.hasPending(rhythmIndex);
 }
 
@@ -56,7 +56,7 @@ bool HotSwapStager::takeStagedFullPreset(PreparedFullPreset& out)
 void HotSwapStager::cancelAllStaged()
 {
     // Drop every per-rhythm swap, then the full preset: a full preset applied at once overwrites every slot.
-    for (int r = 0; r < RhythmSequencer::MaxRhythms; ++r) stager.cancel(r);
+    for (int r = 0; r < mu_limits::kMaxLayers; ++r) stager.cancel(r);
     stager.cancelFull();
 }
 
@@ -67,7 +67,7 @@ bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
     // Per-rhythm swaps: the master loop point, or each rhythm's own loop (the `mstr_swap` timing). With no
     // master loop set there is no master wrap, so the own loop is used whatever the timing says.
     const auto timing = proc.swapTiming();
-    const bool hasMasterLoop = proc.sequencer.getMasterLoopSteps() > 0;
+    const bool hasMasterLoop = proc.stepClock.getMasterLoopSteps() > 0;
     const bool onMasterLoop  = mu_hotswap::usesMasterLoop(timing, hasMasterLoop);
     const uint32_t epoch = proc.swapFrameEpoch();
     bool needAsync = false;
@@ -124,12 +124,11 @@ void HotSwapStager::installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceE
     // Swap rather than assign: the outgoing rhythm ends up in the caller's object, which the caller
     // destroys after releasing its locks. The clip bank stays with the slot (SlotBound); the playing
     // clip is the slot's too, so a clip launch keeps it and a non-clip load clears it before it gets here.
-    const int activeClip = proc.sequencer.getRhythm(r).activeClip;
-    std::swap(proc.sequencer.getRhythm(r), rhythm);
-    proc.sequencer.getRhythm(r).activeClip = activeClip;
+    const int activeClip = proc.getRhythm(r).activeClip;
+    std::swap(proc.getRhythm(r), rhythm);
+    proc.getRhythm(r).activeClip = activeClip;
     proc.samples.setPath(r, samplePath);
     // Rebuilds the pattern and hands the audio thread its start position in one step.
-    proc.sequencer.requestSwapStart(r, originEff, frameEpoch);
     proc.sampleRhythm(r).cursor.requestSwapStart(proc.sampleRhythm(r), PluginProcessor::kStepCap, originEff, frameEpoch);
 }
 
@@ -140,7 +139,7 @@ void HotSwapStager::processSwaps()
     // Two-pass to suspend audio ONCE per call: collect all ready slots, then swap
     // them under one suspend, then do post-commit APVTS push + UI callback outside it.
     const int n = proc.numLayers.load(std::memory_order_acquire);
-    std::array<int, RhythmSequencer::MaxRhythms> readyRhythms {};
+    std::array<int, mu_limits::kMaxLayers> readyRhythms {};
     int readyCount = 0;
     for (int r = 0; r < n; ++r)
         if (stager.isFlagged(r))   // (a swap cancelled after it was flagged is skipped)
@@ -149,10 +148,10 @@ void HotSwapStager::processSwaps()
     if (readyCount > 0)
     {
         // Which slots consume actually applied: a swap cancelled between the scan and here is skipped.
-        std::array<bool, RhythmSequencer::MaxRhythms> applied {};
+        std::array<bool, mu_limits::kMaxLayers> applied {};
         // Everything the commit empties lives out here, so its destructors run after the lock and the suspend
         // are released, not inside them (a retired engine goes to the RetireBin, which frees it later).
-        std::array<PendingRhythm, RhythmSequencer::MaxRhythms>            spent;
+        std::array<PendingRhythm, mu_limits::kMaxLayers>            spent;
         proc.suspendProcessing(true);
         {
             // suspendProcessing alone does not stop an in-flight callback in hosts that ignore it
