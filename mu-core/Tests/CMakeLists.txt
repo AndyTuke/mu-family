@@ -17,6 +17,7 @@ set(MU_CORE_TEST_SOURCES
     LayerEquivalence.h
     LayerAccessTests.cpp
     ClipBankTests.cpp
+    HeldNoteStackTests.cpp          # the shared held-key stack and its two overflow policies
     ClipLaunchTests.cpp
     LayerOwnershipTests.cpp
     RhythmAdoptDefaultsTests.cpp
