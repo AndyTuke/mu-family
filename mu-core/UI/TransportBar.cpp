@@ -447,7 +447,15 @@ void TransportBar::timerCallback()
     {
         const bool midiClockBpm = proc.getMidiSyncEnabled() && proc.getMidiSyncMessages() != 1;
         if (midiClockBpm && proc.getMidiClockBpm() > 0.0)   // 0 = no clock heard yet: keep the field's value
-            bpmInput.setValueD(proc.getMidiClockBpm());
+        {
+            // Display only (the sync itself uses the raw estimate): a real change snaps, small wander
+            // inside the dead band is ignored, and larger drift is eased in, so the number holds still.
+            const double est = proc.getMidiClockBpm();
+            if (shownClockBpm <= 0.0 || std::abs(est - shownClockBpm) > 3.0) shownClockBpm = est;
+            else if (std::abs(est - shownClockBpm) > 0.25)                  shownClockBpm += 0.15 * (est - shownClockBpm);
+            bpmInput.setValueD(shownClockBpm);
+        }
+        else shownClockBpm = 0.0;
         bpmInput.setEnabled(!midiClockBpm);
 
         const bool midiTransport = proc.getMidiSyncEnabled() && proc.getMidiSyncMessages() != 0;

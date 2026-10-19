@@ -192,6 +192,7 @@ private:
     void timerCallback() override;
     void refreshPlayBtn();
     void updateNudge();        // tell the audio thread which nudge buttons are held
+    double shownClockBpm = 0.0;   // the eased MIDI-clock tempo shown in the BPM field (0 = none yet)
     void refreshClockLamp();   // the MIDI clock lamp's colour + status from the watchdog state
     void updatePositionLabel();
     void populatePresetDropdown();
