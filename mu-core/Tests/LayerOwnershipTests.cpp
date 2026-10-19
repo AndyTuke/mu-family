@@ -948,6 +948,52 @@ struct LayerOwnershipTests : juce::UnitTest
             expect(many.layers[2]->clips->isEmpty(), "a slot the state lacks is emptied");
             expectEquals(payloadTag(many.layers[0]->clips->get(1)), 1);
         }
+
+        beginTest("a restore that lowers the count publishes the count before the parameters move");
+        {
+            EditableProcessor src(true);                       // one layer: its state names one voice
+            const auto state = src.captureComposedState();
+
+            EditableProcessor dst(true);
+            dst.addLayer(); dst.addLayer();
+            dst.setParam("v2_a", 0.9f);                        // off its default, so the restore moves it
+
+            struct CountAtChange : juce::AudioProcessorValueTreeState::Listener
+            {
+                explicit CountAtChange(EditableProcessor& o) : owner(o) {}
+                void parameterChanged(const juce::String&, float) override { countSeen = owner.getNumLayers(); }
+                EditableProcessor& owner;
+                int countSeen = -1;
+            } listener(dst);
+            dst.apvts.addParameterListener("v2_a", &listener);
+
+            dst.applyComposedState(state);
+            dst.apvts.removeParameterListener("v2_a", &listener);
+            expectEquals(listener.countSeen, 1, "slot 2 was already out of the count when its parameter was reset");
+            expectEquals(dst.getNumLayers(), 1);
+        }
+
+        beginTest("a restore that raises the count keeps the count last");
+        {
+            EditableProcessor src(true);
+            src.addLayer(); src.addLayer();
+            src.setParam("v2_a", 0.7f);
+            const auto state = src.captureComposedState();
+
+            EditableProcessor dst(true);                       // one layer
+            struct CountAtChange : juce::AudioProcessorValueTreeState::Listener
+            {
+                explicit CountAtChange(EditableProcessor& o) : owner(o) {}
+                void parameterChanged(const juce::String&, float) override { countSeen = owner.getNumLayers(); }
+                EditableProcessor& owner;
+                int countSeen = -1;
+            } listener(dst);
+            dst.apvts.addParameterListener("v2_a", &listener);
+            dst.applyComposedState(state);
+            dst.apvts.removeParameterListener("v2_a", &listener);
+            expectEquals(listener.countSeen, 1, "slot 2 got its data while still outside the count");
+            expectEquals(dst.getNumLayers(), 3);
+        }
     }
 };
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Audio/SpinLock.h"
 #include "Sequencer/ControlSequence.h"
 #include "Modulation/ModulationMatrix.h"
 #include "Audio/VoiceParams.h"
@@ -15,6 +16,7 @@ namespace juce { class AudioProcessorValueTreeState; }
 
 #include <atomic>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -138,14 +140,38 @@ struct Layer : public mu_core::RetireTail
     // address); whatever `fresh` is left holding is destroyed by the caller after the lock is dropped.
     // A product extends it to take its own data. onMoved tells a layer its slot index changed, so
     // state tied to the slot (not the data) can be reset.
+    //
+    // The base takes voiceParamsLock around the parameter copy and modLock around the modulator exchange,
+    // so a reader that holds either lock (an editor, a host that renders while processing is not
+    // suspended) sees the old data or the new, never a mix. The caller already holds layersLock, which
+    // keeps the audio thread out of the layer in every product, so the wait is only for the message
+    // thread's own brief edits. The wait is bounded (kResetLockWaitMs): a holder that never lets go can
+    // never hang the message thread, the reset then proceeds as it did before the locks were taken.
     virtual void adoptDefaults(Layer& fresh)
     {
+        static constexpr juce::uint32 kResetLockWaitMs = 500;
+        auto acquire = [](CopyableSpinLock& lock)
+        {
+            const auto start = juce::Time::getMillisecondCounter();
+            while (! mu_core::trySpinLock(lock))
+            {
+                if (juce::Time::getMillisecondCounter() - start > kResetLockWaitMs) return false;
+                std::this_thread::yield();
+            }
+            return true;
+        };
+
+        const bool gotParams = acquire(voiceParamsLock);
         voiceParams = fresh.voiceParams;
+        if (gotParams) mu_core::spinUnlock(voiceParamsLock);
+
+        const bool gotMods = acquire(modLock);
         // Exchange the sequences one by one, not the vector: an editor holds pointers to these
         // elements, and a vector swap would leave them pointing into `fresh`, which dies after unlock.
         for (size_t i = 0; i < controlSequences.size() && i < fresh.controlSequences.size(); ++i)
             std::swap(controlSequences[i], fresh.controlSequences[i]);
         std::swap(modulationMatrix, fresh.modulationMatrix);
+        if (gotMods) mu_core::spinUnlock(modLock);
     }
     virtual void onMoved(int newIndex) { juce::ignoreUnused(newIndex); }
 

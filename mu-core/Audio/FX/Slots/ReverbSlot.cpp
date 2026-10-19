@@ -11,26 +11,24 @@ struct ReverbSlot::ReverbImpl
 {
     signalsmith::basics::ReverbFloat reverb;
 
-    // snapshot of computed reverb parameters. Message thread (updateReverb)
-    // writes the snapshot under pendingLock; audio thread (applyPendingReverbParams)
-    // try-locks at block boundary and copies into reverb.* before reverb.process().
-    // Without this, setParam/updateReverb wrote reverb.roomMs/rt20/etc. directly
-    // while reverb.process() was running — undefined behaviour per typical embedded
-    // reverb assumptions of single-threaded access to public state.
+    // Snapshot of the computed reverb parameters: any writer thread (updateReverb) stores each field
+    // relaxed, then raises the dirty flag; the audio thread (applyPendingReverbParams) clears the flag
+    // first, then copies into reverb.* before reverb.process(). No lock on either side, so a writer on
+    // the audio thread (host automation) can never block behind another. A write that lands mid-copy
+    // re-raises the flag, so the next block picks the newer values up; each field is valid on its own.
     struct PendingParams
     {
-        double roomMs       = 0.0;
-        double rt20         = 0.0;
-        double early        = 0.0;
-        double highDampRate = 0.0;
-        double lowDampRate  = 0.0;
-        double detune       = 0.0;
-        double lowCutHz     = 0.0;
-        double highCutHz    = 0.0;
+        std::atomic<double> roomMs       { 0.0 };
+        std::atomic<double> rt20         { 0.0 };
+        std::atomic<double> early        { 0.0 };
+        std::atomic<double> highDampRate { 0.0 };
+        std::atomic<double> lowDampRate  { 0.0 };
+        std::atomic<double> detune       { 0.0 };
+        std::atomic<double> lowCutHz     { 0.0 };
+        std::atomic<double> highCutHz    { 0.0 };
     };
     PendingParams pending;
     std::atomic<bool> pendingDirty { false };
-    juce::SpinLock    pendingLock;
 };
 
 ReverbSlot::ReverbSlot()
@@ -166,7 +164,7 @@ void ReverbSlot::applyAlgorithmPreset()
 {
     // preDelay is atomic (read on the audio thread); use store for the assignment.
     auto setPreDelay = [this](float v) { preDelay.store(v, std::memory_order_relaxed); };
-    switch (static_cast<Algorithm>(algorithmIndex))
+    switch (static_cast<Algorithm>(algorithmIndex.load(std::memory_order_relaxed)))
     {
         case Algorithm::Room:
             size = 0.25f; decay = 0.6f;  damp = 0.6f; diffusion = 0.6f; setPreDelay(5.0f);  mod = 0.10f;
@@ -185,53 +183,44 @@ void ReverbSlot::applyAlgorithmPreset()
 
 void ReverbSlot::updateReverb()
 {
-    // compute the snapshot here (message thread) — the audio thread copies it
-    // into impl->reverb at the next processReturn via applyPendingReverbParams().
-    // Was: direct writes to impl->reverb.<field> from the message thread while the
-    // audio thread was inside reverb.process() — undefined per typical embedded
-    // reverb single-threaded-access assumptions.
-    ReverbImpl::PendingParams p;
-    p.roomMs       = 10.0 + (double)size * 190.0;     // size [0,1] → 10..200 ms
-    p.rt20         = (double)decay / 3.0;              // decay is RT60 (to -60 dB); the library's rt20 is the time to -20 dB
-    p.early        = (double)diffusion * 2.5;          // diffusion → early reflections
-    p.highDampRate = 1.0 + (double)damp * 8.0;
-    p.lowDampRate  = 1.0 + (double)damp * 1.5;
-    p.detune       = (double)mod * 30.0;
-    switch (static_cast<Algorithm>(algorithmIndex))
+    // Compute the snapshot here (any writer thread); the audio thread copies it into impl->reverb at
+    // the next processReturn via applyPendingReverbParams(), so the library's public fields are only
+    // ever touched by the thread that runs reverb.process().
+    constexpr auto rx = std::memory_order_relaxed;
+    auto& p = impl->pending;
+    p.roomMs.store(10.0 + (double) size.load(rx) * 190.0, rx);   // size [0,1] -> 10..200 ms
+    p.rt20.store((double) decay.load(rx) / 3.0, rx);              // decay is RT60 (to -60 dB); the library's rt20 is the time to -20 dB
+    p.early.store((double) diffusion.load(rx) * 2.5, rx);         // diffusion -> early reflections
+    p.highDampRate.store(1.0 + (double) damp.load(rx) * 8.0, rx);
+    p.lowDampRate.store(1.0 + (double) damp.load(rx) * 1.5, rx);
+    p.detune.store((double) mod.load(rx) * 30.0, rx);
+    switch (static_cast<Algorithm>(algorithmIndex.load(rx)))
     {
-        case Algorithm::Room:   p.lowCutHz = 100.0; p.highCutHz = 8000.0;  break;
-        case Algorithm::Hall:   p.lowCutHz =  60.0; p.highCutHz = 12000.0; break;
-        case Algorithm::Plate:  p.lowCutHz = 150.0; p.highCutHz = 10000.0; break;
-        case Algorithm::Spring: p.lowCutHz = 200.0; p.highCutHz = 5500.0;  break;
-    }
-
-    {
-        juce::SpinLock::ScopedLockType lock(impl->pendingLock);
-        impl->pending = p;
+        case Algorithm::Room:   p.lowCutHz.store(100.0, rx); p.highCutHz.store(8000.0, rx);  break;
+        case Algorithm::Hall:   p.lowCutHz.store( 60.0, rx); p.highCutHz.store(12000.0, rx); break;
+        case Algorithm::Plate:  p.lowCutHz.store(150.0, rx); p.highCutHz.store(10000.0, rx); break;
+        case Algorithm::Spring: p.lowCutHz.store(200.0, rx); p.highCutHz.store(5500.0, rx);  break;
     }
     impl->pendingDirty.store(true, std::memory_order_release);
 }
 
 void ReverbSlot::applyPendingReverbParams()
 {
-    if (! impl->pendingDirty.load(std::memory_order_acquire))
+    // Clear the flag before reading: a writer that lands during the copy raises it again.
+    if (! impl->pendingDirty.exchange(false, std::memory_order_acquire))
         return;
 
-    const juce::SpinLock::ScopedTryLockType lock(impl->pendingLock);
-    if (! lock.isLocked())
-        return;  // Message thread mid-write — leave dirty set; retry next block.
-
+    constexpr auto rx = std::memory_order_relaxed;
     auto& r = impl->reverb;
+    const auto& p = impl->pending;
     r.dry          = 0.0;
     r.wet          = 1.0;
-    r.roomMs       = impl->pending.roomMs;
-    r.rt20         = impl->pending.rt20;
-    r.early        = impl->pending.early;
-    r.highDampRate = impl->pending.highDampRate;
-    r.lowDampRate  = impl->pending.lowDampRate;
-    r.detune       = impl->pending.detune;
-    r.lowCutHz     = impl->pending.lowCutHz;
-    r.highCutHz    = impl->pending.highCutHz;
-
-    impl->pendingDirty.store(false, std::memory_order_release);
+    r.roomMs       = p.roomMs.load(rx);
+    r.rt20         = p.rt20.load(rx);
+    r.early        = p.early.load(rx);
+    r.highDampRate = p.highDampRate.load(rx);
+    r.lowDampRate  = p.lowDampRate.load(rx);
+    r.detune       = p.detune.load(rx);
+    r.lowCutHz     = p.lowCutHz.load(rx);
+    r.highCutHz    = p.highCutHz.load(rx);
 }

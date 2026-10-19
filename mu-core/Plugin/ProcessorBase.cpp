@@ -4,6 +4,9 @@
 #include "Audio/FX/Slots/FXAlgorithmDef.h"   // FXAlgorithmRegistry
 #include "Audio/AlgorithmNames.h"             // mu_audio::kInsertAlgorithmCount
 #include <cstring>                            // std::strcmp — alloc-free suffix compare
+#include <map>
+#include <memory>
+#include <mutex>
 
 #if MU_CORE_HAS_CLAP
  #pragma message("mu-core: ProcessorBase built WITH CLAP sidechain capability (isInputMain=false)")
@@ -255,6 +258,25 @@ ProcessorBase::ScopedStorageRoot::~ScopedStorageRoot()
     storageRootOverride() = previous;
 }
 
+namespace
+{
+// One PropertiesFile per settings file per module: every instance in the host process shares it, so a
+// second instance's write can no longer revert a setting the first one saved (each used to hold its own
+// copy, loaded at construction and rewritten whole). PropertiesFile serialises its own accessors.
+std::shared_ptr<juce::PropertiesFile> sharedSettingsFile(const juce::File& file, const juce::PropertiesFile::Options& opts)
+{
+    static std::mutex registryLock;
+    static std::map<juce::String, std::weak_ptr<juce::PropertiesFile>> registry;
+
+    const std::lock_guard<std::mutex> guard(registryLock);
+    auto& slot = registry[file.getFullPathName()];
+    if (auto existing = slot.lock()) return existing;
+    auto created = std::make_shared<juce::PropertiesFile>(file, opts);
+    slot = created;
+    return created;
+}
+}
+
 void ProcessorBase::initAppSettings(const juce::String& name)
 {
     appName = name;
@@ -268,7 +290,7 @@ void ProcessorBase::initAppSettings(const juce::String& name)
                           ? testRoot.getChildFile("settings").getChildFile(name + ".xml")
                           : opts.getDefaultFile();
     settingsFile.getParentDirectory().createDirectory();
-    appSettings = std::make_unique<juce::PropertiesFile>(settingsFile, opts);
+    appSettings = sharedSettingsFile(settingsFile, opts);
 
     // The MIDI control map is per user and per product, beside the settings file.
     midiControlMap.setStorageFile(settingsFile.getParentDirectory().getChildFile(name + "_midiControl.json"));
@@ -348,6 +370,61 @@ void ProcessorBase::onFxParamChanged(const juce::String& id, float v)
     // ch{0-7}_mute: a flag for the message-thread poll (the lamps follow a mute made anywhere); alloc-free.
     if (id.length() == 8 && id[0] == 'c' && id[1] == 'h' && id[3] == '_' && std::strcmp(id.toRawUTF8() + 4, "mute") == 0)
         muteChanged.store(true, std::memory_order_relaxed);
+}
+
+namespace
+{
+// One online-activation call off the message thread. Owned and joined by the processor, so `fn` may capture it.
+struct ActivationWorker : juce::Thread
+{
+    using Done = std::function<void(const mu_core::OnlineActivationOutcome&)>;
+
+    ActivationWorker(std::function<mu_core::OnlineActivationOutcome(const juce::String&)> f, juce::String k, Done d,
+                     std::shared_ptr<std::atomic<bool>> aliveFlag)
+        : juce::Thread("mu activation"), fn(std::move(f)), key(std::move(k)), done(std::move(d)), alive(std::move(aliveFlag)) {}
+
+    void run() override
+    {
+        const auto outcome = fn(key);   // blocks on the network here
+        if (threadShouldExit()) return;
+        // The flag is only lowered on the message thread (prepareForDestruction), where this runs too.
+        juce::MessageManager::callAsync([alive = alive, done = done, outcome]
+        {
+            if (alive->load(std::memory_order_acquire) && done) done(outcome);
+        });
+    }
+
+    std::function<mu_core::OnlineActivationOutcome(const juce::String&)> fn;
+    juce::String key;
+    Done done;
+    std::shared_ptr<std::atomic<bool>> alive;
+};
+
+constexpr int kActivationJoinMs = 12000;   // longer than the activation request's own 8 s connection timeout
+}
+
+bool ProcessorBase::activateOnlineAsync(const juce::String& key,
+                                        std::function<void(const mu_core::OnlineActivationOutcome&)> done)
+{
+    if (! activateOnlineFn) return false;
+    if (activationWorker != nullptr)
+    {
+        if (activationWorker->isThreadRunning()) return false;
+        activationWorker.reset();   // a finished one: nothing to wait for
+    }
+    activationWorker = std::make_unique<ActivationWorker>(activateOnlineFn, key, std::move(done), activationAlive);
+    activationWorker->startThread();
+    return true;
+}
+
+void ProcessorBase::stopActivationWorker() noexcept
+{
+    activationAlive->store(false, std::memory_order_release);   // a reply already queued is dropped
+    if (activationWorker != nullptr)
+    {
+        activationWorker->stopThread(kActivationJoinMs);
+        activationWorker.reset();
+    }
 }
 
 ProcessorBase::~ProcessorBase()
@@ -787,6 +864,26 @@ juce::ValueTree ProcessorBase::captureComposedState()
 
 void ProcessorBase::applyComposedState(const juce::ValueTree& state)
 {
+    // A restore that lowers the count publishes the new count BEFORE the parameters move: applyState
+    // writes defaults into the slots the state lacks, and those slots must already be out of the count
+    // by then or they would render with default parameters until the store below. A restore that grows
+    // the count keeps the count last, so no block sees a slot counted before its data is in.
+    const bool editsLayers = canEditLayers();
+    const int  newCount    = editsLayers ? savedLayerCount(state) : 0;
+    bool       shrinkStored = false;
+    if (editsLayers)
+    {
+        jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);
+        const juce::ScopedLock lw(layoutWriteLock);
+        if (newCount < numLayers.load(std::memory_order_relaxed))
+        {
+            storeLayerCount(newCount);
+            shrinkStored = true;
+        }
+    }
+    if (shrinkStored && retireBin.countPolicy() == mu_core::RetireBin::CountPolicy::CutAtCount)
+        retireBin.cutAtOrAbove(newCount);
+
     mu_pp::applyState(state, layerLayout, layerExtras);
 
     // Every slot takes its node's clips: a node without a <Clips> child (an older file, or a slot the
@@ -802,9 +899,9 @@ void ProcessorBase::applyComposedState(const juce::ValueTree& state)
         }
     publishClipMasks();
 
-    if (! canEditLayers()) return;
+    if (! editsLayers) return;
 
-    // Count last, so the audio thread never sees a count ahead of the data; then the colours (a state without colours keeps the current ones).
+    // Count last on a grow, so the audio thread never sees a count ahead of the data; then the colours (a state without colours keeps the current ones).
     // Thread contract: hosts normally call setStateInformation on the message thread, and the editor's modulation
     // reads, the Stager and the products' lock-free paths all assume that. The layout store below is the one part
     // that is also safe from a host thread, so it goes through the packed layout word under layoutWriteLock: a lost
@@ -812,9 +909,8 @@ void ProcessorBase::applyComposedState(const juce::ValueTree& state)
     // across both (it is re-entrant), so the park's nextLayoutSerial() is the serial this store carries.
     // TryLock mode only until Published-mode quiesce exists: this store and the parameter moves above assume
     // the audio thread's try-lock protocol.
-    jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);
-    const int newCount = savedLayerCount(state);
     int oldCount = 0;
+    if (! shrinkStored)
     {
         const juce::ScopedLock lw(layoutWriteLock);
         oldCount = numLayers.load(std::memory_order_relaxed);
@@ -827,7 +923,7 @@ void ProcessorBase::applyComposedState(const juce::ValueTree& state)
             for (int s = oldCount; s < newCount; ++s)
                 retireBin.cutSlot(s);
     }
-    if (retireBin.countPolicy() == mu_core::RetireBin::CountPolicy::CutAtCount)
+    if (! shrinkStored && retireBin.countPolicy() == mu_core::RetireBin::CountPolicy::CutAtCount)
         retireBin.cutAtOrAbove(newCount);
     const auto toks = juce::StringArray::fromTokens(state.getProperty("voiceColours", "").toString(), ",", "");
     for (int i = 0; i < mu_limits::kMaxLayers && i < toks.size(); ++i)

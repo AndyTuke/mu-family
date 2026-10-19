@@ -69,15 +69,16 @@ private:
     // setEnabled / setLevel / setParam writes from the message thread.
     std::atomic<bool>  enabled  { true };
     std::atomic<float> level    { 1.0f };
-    int                algorithmIndex = 0;
+    // Written by the UI or by host automation, read by whichever thread runs updateReverb: all atomic.
+    std::atomic<int>   algorithmIndex { 0 };
 
-    float              size      = 0.5f;
+    std::atomic<float> size      { 0.5f };
     std::atomic<float> preDelay  { 10.0f };   // read by runPreDelay (audio thread)
-    float              diffusion = 0.7f;
-    float              damp      = 0.4f;
-    float              mod       = 0.2f;
+    std::atomic<float> diffusion { 0.7f };
+    std::atomic<float> damp      { 0.4f };
+    std::atomic<float> mod       { 0.2f };
     std::atomic<float> dirt      { 0.0f };    // read by processReturn (audio thread)
-    float              decay     = 2.0f;      // RT60: seconds to decay by 60 dB (set per algorithm, then by the Decay knob)
+    std::atomic<float> decay     { 2.0f };    // RT60: seconds to decay by 60 dB (set per algorithm, then by the Decay knob)
 
     double sr = 44100.0;
 

@@ -175,10 +175,11 @@ modulator section. The Gap knob sits in the gating band beside the grid.
 ## Filter envelope layer
 
 A second pattern layer (toggled [GATE|FILT] in the editor header) shapes the
-**filter cutoff** instead of amplitude. Envelope value 0 → 20 Hz (filter
-closed); 1 → base cutoff (fully open). Uncovered cells close the filter (0).
-Only active while transport is playing; when the pattern is empty the filter
-cutoff is unchanged.
+**filter cutoff** instead of amplitude. The envelope adds to the cutoff in the knob's
+proportion space, scaled by the Filter Env Depth knob: envelope value 0 → the base
+cutoff unchanged; 1 at depth +1 → fully open (negative depth sweeps down). Uncovered
+cells read 0, so they leave the cutoff at its base. Only active while transport is
+playing; when the pattern is empty the filter cutoff is unchanged.
 
 Ghost rendering: the inactive layer is drawn at 20% alpha in its own colour
 (gate = coral `knobFxSend`, filter = teal `knobPostPad`) so both layers can be

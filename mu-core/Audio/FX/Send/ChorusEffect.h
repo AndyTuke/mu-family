@@ -1,6 +1,8 @@
 #pragma once
 
 #include "EffectAlgorithmBase.h"
+#include <algorithm>
+#include <atomic>
 #include <cmath>
 
 // Stereo chorus: multiple delay lines modulated by LFOs at slightly different rates.
@@ -42,7 +44,8 @@ public:
 
     void processInner(juce::dsp::AudioBlock<float>& block) override
     {
-        const int    numVoices = juce::jlimit(2, MaxVoices, static_cast<int>(voices));
+        // Round, not truncate: a host-automated Voices value of 3.9 means 4 voices.
+        const int    numVoices = juce::jlimit(2, MaxVoices, juce::roundToInt(voices.load(std::memory_order_relaxed)));
         const float  baseSamp  = static_cast<float>(0.03 * sr);  // 30ms base delay
         smoothedDepth .setTargetValue(depth);
         smoothedRate  .setTargetValue(rate);
@@ -69,10 +72,18 @@ public:
             const float inL = (dataL != nullptr) ? dataL[i] : 0.0f;
             const float inR = (dataR != nullptr) ? dataR[i] : 0.0f;
 
-            for (int v = 0; v < numVoices; ++v)
+            // Every line records the input, active or not, so a voice that becomes active later reads
+            // recent audio rather than whatever the line held when it was last in use.
+            for (int v = 0; v < MaxVoices; ++v)
             {
                 delayL[v][writePos[v]] = inL;
                 delayR[v][writePos[v]] = inR;
+
+                if (v >= numVoices)
+                {
+                    writePos[v] = (writePos[v] + 1) % delaySize;
+                    continue;
+                }
 
                 const float lfoVal  = std::sin(phase[v] * juce::MathConstants<float>::twoPi);
                 const float spreadV = (v % 2 == 0) ? 1.0f : (1.0f + spreadNow * 0.5f);
@@ -95,6 +106,15 @@ public:
             const float scale = 1.0f / numVoices;
             if (dataL != nullptr) dataL[i] = dry * inL + wet * wetL * scale;
             if (dataR != nullptr) dataR[i] = dry * inR + wet * wetR * scale;
+        }
+    }
+
+    void reset() override
+    {
+        for (int v = 0; v < MaxVoices; ++v)
+        {
+            std::fill(delayL[v].begin(), delayL[v].end(), 0.0f);
+            std::fill(delayR[v].begin(), delayR[v].end(), 0.0f);
         }
     }
 
@@ -133,11 +153,12 @@ private:
 
     FXAlgorithmDef def;
 
-    float rate   = 1.0f;
-    float depth  = 0.5f;
-    float voices = 2.0f;
-    float spread = 0.5f;
-    float mix    = 0.5f;
+    // Written by the UI or host automation, read by the audio thread: relaxed atomics.
+    std::atomic<float> rate   { 1.0f };
+    std::atomic<float> depth  { 0.5f };
+    std::atomic<float> voices { 2.0f };
+    std::atomic<float> spread { 0.5f };
+    std::atomic<float> mix    { 0.5f };
     double sr    = 44100.0;
 
     std::vector<float> delayL[MaxVoices];

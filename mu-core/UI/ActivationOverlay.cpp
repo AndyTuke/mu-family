@@ -53,21 +53,22 @@ void ActivationOverlay::activatePressed()
     activateBtn.setEnabled (false);
     setStatus ("Contacting the activation server\xe2\x80\xa6", false);
 
-    auto fn = processorRef.activateOnlineFn;            // copy (safe to use off-thread)
     juce::Component::SafePointer<ActivationOverlay> safe (this);
 
-    juce::Thread::launch ([safe, fn, key]
+    // The processor owns the worker (joined when it goes), and the reply lands on the message thread.
+    const bool started = processorRef.activateOnlineAsync (key, [safe] (const mu_core::OnlineActivationOutcome& outcome)
     {
-        const auto outcome = fn (key);                  // blocks on the network here
-        juce::MessageManager::callAsync ([safe, outcome]
-        {
-            if (safe == nullptr) return;                // editor closed mid-activation
-            safe->activateBtn.setEnabled (true);
-            safe->setStatus (outcome.message, ! outcome.ok);
-            if (outcome.ok && safe->onActivated)
-                safe->onActivated();                    // shell refreshes the Support link
-        });
+        if (safe == nullptr) return;                    // editor closed mid-activation
+        safe->activateBtn.setEnabled (true);
+        safe->setStatus (outcome.message, ! outcome.ok);
+        if (outcome.ok && safe->onActivated)
+            safe->onActivated();                        // shell refreshes the Support link
     });
+    if (! started)
+    {
+        activateBtn.setEnabled (true);
+        setStatus ("An activation is already in progress.", true);
+    }
 }
 
 void ActivationOverlay::mouseDown (const juce::MouseEvent& e)

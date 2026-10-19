@@ -94,9 +94,8 @@ public:
 protected:
     // Layer storage: fixed capacity, runtime count. A product whose count or layer order changes at
     // runtime must have its audio thread take a ScopedTryLock on `layersLock` once per block and read
-    // layers only inside it (mu-Tant does); the message thread holds it only to change the count or
-    // move layers, and constructs and destroys layers outside it. A fixed-count product (mu-Toni,
-    // mu-On) never edits layers after construction and so reads them lock-free by design.
+    // layers only inside it (mu-Clid, mu-Tant, mu-Toni and mu-On all do, through LayerBlock); the message thread holds it
+    // only to change the count or move layers, and constructs and destroys layers outside it.
     std::array<std::unique_ptr<Layer>, mu_limits::kMaxLayers> layers;
     std::atomic<int>      numLayers { 0 };
 public:

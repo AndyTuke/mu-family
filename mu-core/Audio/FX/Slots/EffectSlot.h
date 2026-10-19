@@ -8,7 +8,6 @@
 #include "Audio/FX/Send/ChorusEffect.h"
 #include "Audio/FX/Send/FlangerEffect.h"
 #include "Audio/FX/Send/PhaserEffect.h"
-#include "Audio/FX/Send/EchoEffect.h"
 
 #include <array>
 #include <atomic>
@@ -40,6 +39,9 @@ public:
     void getStateInformation(juce::MemoryBlock&) override {}
     void setStateInformation(const void*, int) override {}
 
+    // Silence every algorithm's state and the embedded echo delay. Audio thread; no allocation.
+    void reset();
+
     void setAlgorithm(int index);   // 0–3 — allocation-free; just flips active index
     int  getAlgorithmIndex() const { return algorithmIndex.load(std::memory_order_relaxed); }
 
@@ -66,11 +68,13 @@ public:
 
 private:
     // Pre-allocated in ctor — setAlgorithm() flips `algorithmIndex` into this array.
-    std::array<std::unique_ptr<EffectAlgorithmBase>, kNumEffectAlgos> algorithms;
+    // Chorus, Flanger and Phaser; the Echo index has no object here (the embedded DelaySlot runs it).
+    std::array<std::unique_ptr<EffectAlgorithmBase>, kEchoAlgoIndex> algorithms;
 
     EffectAlgorithmBase* currentAlgorithm() const
     {
-        return algorithms[(size_t) algorithmIndex.load(std::memory_order_relaxed)].get();
+        const int i = algorithmIndex.load(std::memory_order_relaxed);
+        return i >= 0 && i < kEchoAlgoIndex ? algorithms[(size_t) i].get() : nullptr;
     }
 
     std::unique_ptr<OversampledProcessor> oversampler;

@@ -45,7 +45,8 @@ public:
         const float aaCut   = juce::jmin(rateHz * 0.45f,
                                          (float)currentSampleRate * 0.49f);
 
-        for (int ch = 0; ch < nCh; ++ch)
+        // State is kept for two channels; any further channel shares channel 0's (as cnt / held do).
+        for (int ch = 0; ch < juce::jmin(nCh, 2); ++ch)
             bitAaFilter[ch].prepare(aaCut, (float)currentSampleRate);
 
         for (int ch = 0; ch < nCh; ++ch)
@@ -56,7 +57,7 @@ public:
 
             for (int i = 0; i < ns; ++i)
             {
-                const float filtered = ratioF > 1.0f ? bitAaFilter[ch].process(data[i])
+                const float filtered = ratioF > 1.0f ? bitAaFilter[ch < 2 ? ch : 0].process(data[i])
                                                      : data[i];
                 c += 1.0f;
                 if (c >= ratioF)

@@ -21,7 +21,13 @@ class ManagedPorts : public DevicePorts, private juce::AsyncUpdater
 {
 public:
     explicit ManagedPorts(DevicePorts& innerPorts) : inner(innerPorts) {}
-    ~ManagedPorts() override { cancelPendingUpdate(); }
+    ~ManagedPorts() override
+    {
+        // Stop the input thread before this object goes: it calls pushBytes / pushConnection on `this`.
+        if (inner.isOpen()) inner.close();
+        detach();
+        cancelPendingUpdate();
+    }
 
     juce::StringArray outputNames() const override { return inner.outputNames(); }
     juce::StringArray inputNames() const override  { return inner.inputNames(); }

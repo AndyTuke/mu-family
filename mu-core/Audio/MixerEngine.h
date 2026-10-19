@@ -192,6 +192,9 @@ public:
     std::atomic<float> sidechainGR[MaxChannels];
     // Per-return peak gain-reduction for sidechain ducking.
     std::atomic<float> returnSidechainGR[3];
+    // How many blocks were silenced because the master output held a NaN or infinity (the FX tails and master
+    // inserts were reset with them). Written by the audio thread; read by tests and diagnostics.
+    std::atomic<int> nonFiniteBlocks { 0 };
 
     MixerEngine();
 
@@ -355,6 +358,9 @@ private:
 
     juce::AudioBuffer<float> channelBufs[MaxChannels];
     juce::AudioBuffer<float> effectSendBuf, delaySendBuf, reverbSendBuf;
+    // The channel each return's sidechain listens to, copied before the strip's fader and pan are applied (as
+    // the channel-to-channel ducking reads it), so the fader does not change how hard a return ducks.
+    juce::AudioBuffer<float> returnScSource[3];
 
     bool         hasSolo(int numActive) const;
     static float peakOf(const juce::AudioBuffer<float>& buf, int numSamples);

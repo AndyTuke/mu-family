@@ -20,6 +20,7 @@ MixerEngine::MixerEngine()
 
 void MixerEngine::prepare(double sr, int blockSize)
 {
+    blockSize = juce::jmax(1, blockSize);   // the block driver sizes its scratch the same way, so the two always agree
     sampleRate = sr;
     for (auto& e : scEnv)    e = 0.0f;
     for (auto& e : scRetEnv) e = 0.0f;
@@ -28,6 +29,8 @@ void MixerEngine::prepare(double sr, int blockSize)
     effectSendBuf.setSize(2, blockSize, false, true, true);
     delaySendBuf .setSize(2, blockSize, false, true, true);
     reverbSendBuf.setSize(2, blockSize, false, true, true);
+    for (auto& b : returnScSource)
+        b.setSize(2, blockSize, false, true, true);
     extScCapture .setSize(2, blockSize, false, true, true);
     masterInsert.prepare(sr, blockSize);
     masterInsert2.prepare(sr, blockSize);
@@ -233,6 +236,17 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
                                                 sampleRate, scEnv[r]));
     }
 
+    // Phase 2b: a return that ducks from a channel listens to that channel before its fader and pan, so keep a
+    // copy now (Phase 3 applies them in place). Only the sources a return actually uses are copied.
+    for (int ri = 0; ri < 3; ++ri)
+    {
+        const int src = returns[ri].sidechainSource.load(std::memory_order_relaxed);
+        if (returns[ri].sidechainAmount.load(std::memory_order_relaxed) <= 0.0f) continue;
+        if (src < 0 || src >= numActiveChannels) continue;   // external or invalid: handled in the duck pass
+        for (int c = 0; c < returnScSource[ri].getNumChannels(); ++c)
+            returnScSource[ri].copyFrom(c, 0, channelBufs[src], juce::jmin(c, channelBufs[src].getNumChannels() - 1), 0, numSamples);
+    }
+
     // Phase 3: pan/gain, route to output bus, FX sends, peak capture.
     for (int r = 0; r < numActiveChannels; ++r)
     {
@@ -349,10 +363,11 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
                      : (ri == 1) ? delaySendBuf
                                  : reverbSendBuf;
 
-        const float* srcL = isExt ? extScL : channelBufs[src].getReadPointer(0);
+        // Internal sources come from the pre-fader copy taken in Phase 2b.
+        const auto& scBuf = returnScSource[ri];
+        const float* srcL = isExt ? extScL : scBuf.getReadPointer(0);
         const float* srcR = isExt ? extScR
-                          : (channelBufs[src].getNumChannels() > 1
-                             ? channelBufs[src].getReadPointer(1) : srcL);
+                          : (scBuf.getNumChannels() > 1 ? scBuf.getReadPointer(1) : srcL);
         float* tgtL = retBuf.getWritePointer(0);
         float* tgtR = retBuf.getNumChannels() > 1 ? retBuf.getWritePointer(1) : nullptr;
         const bool sourceActive = isExt || isAudible(channels[src], anySolo);
@@ -433,5 +448,27 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     // post-insert, post-fader output that actually leaves the mixer.
     applyPanGain(output, masterLevel.load(std::memory_order_relaxed),
                          masterPan.load(std::memory_order_relaxed), numSamples);
+
+    // NaN / infinity containment: one non-finite sample in any feedback state (a delay line, a reverb tail, a
+    // master insert) would otherwise repeat forever. Adding x * 0 over the block gives NaN if any sample is
+    // NaN or infinite and exactly zero otherwise (one cheap pass, no branch per sample). On a hit the block is
+    // silenced and the master-bus state that can hold the poison is cleared; a strip's own engine state is
+    // not reachable from here.
+    float probe = 0.0f;
+    for (int c = 0; c < output.getNumChannels(); ++c)
+    {
+        const float* p = output.getReadPointer(c);
+        for (int i = 0; i < numSamples; ++i)
+            probe += p[i] * 0.0f;
+    }
+    if (! std::isfinite(probe))
+    {
+        output.clear(0, numSamples);
+        fxChain.resetState();
+        masterInsert.reset();
+        masterInsert2.reset();
+        nonFiniteBlocks.fetch_add(1, std::memory_order_relaxed);
+    }
+
     storePeak(output, numSamples, masterPeak, masterPeakL, masterPeakR);
 }

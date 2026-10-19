@@ -487,6 +487,13 @@ public:
     // products leave it null, so the overlay simply reports "unavailable". isLicensed() in a
     // licensed product returns true when the offline `.lic` OR the online activation is valid.
     std::function<mu_core::OnlineActivationOutcome(const juce::String& licenseKey)> activateOnlineFn;
+
+    // Runs activateOnlineFn on a worker this processor owns and joins in prepareForDestruction, so the call
+    // (which captures the processor and blocks on the network) can never outlive the processor or the plugin
+    // module. `done` runs on the message thread with the outcome, and not at all once the processor is being
+    // torn down. Message thread. One request at a time: false when none is set or one is already running.
+    bool activateOnlineAsync(const juce::String& licenseKey,
+                             std::function<void(const mu_core::OnlineActivationOutcome&)> done);
     std::atomic<bool> onlineActivated { false };
     bool isOnlineActivated() const noexcept { return onlineActivated.load(std::memory_order_relaxed); }
 
@@ -821,6 +828,7 @@ protected:
     // the services a tail may read are still alive.
     void prepareForDestruction() noexcept
     {
+        stopActivationWorker();
         swapPoll.stop();
         retireBin.cutAll();
         retireBin.service(true);   // nothing processes again: even a tail still waiting for its store is freed
@@ -962,7 +970,7 @@ protected:
     // constructor (before anything calls getContentDir); products read / write their own extra
     // keys through appSettings.
     void initAppSettings(const juce::String& appName);
-    std::unique_ptr<juce::PropertiesFile> appSettings;
+    std::shared_ptr<juce::PropertiesFile> appSettings;   // shared by every instance in the module (see initAppSettings)
     juce::String  appName;
     MidiClockSync midiClockSync;
 
@@ -977,6 +985,11 @@ protected:
         const char*    activationFile;
         const char*    checkoutUrl = nullptr;   // pay-what-you-want page the support prompt opens
     };
+    // Joins the online-activation worker (bounded by the network timeout) and drops its pending reply.
+    void stopActivationWorker() noexcept;
+    std::unique_ptr<juce::Thread>         activationWorker;
+    std::shared_ptr<std::atomic<bool>>    activationAlive = std::make_shared<std::atomic<bool>>(true);
+
     // Check the offline licence + stored activation and wire activateOnlineFn. Call after
     // initAppSettings (it needs getContentDir). Defined in License/ProductLicensing.h — include
     // that only in a licensed product, which is the only kind that compiles the verifier.
