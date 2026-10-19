@@ -51,6 +51,7 @@ public:
     bool hasEditor() const override { return true; }
 
     const juce::String getName() const override { return juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Tant")); }
+    juce::String getProductSlug() const override { return "mu-tant"; }   // key in latest.json
     bool acceptsMidi()  const override { return true; }
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }

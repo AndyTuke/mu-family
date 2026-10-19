@@ -471,6 +471,7 @@ public:
     // "Don't show this again": kept in the app settings file, not APVTS, so it is never in a preset.
     bool isSupportPromptHidden() const { return mu_core::support_prompt::isHidden(appSettings.get()); }
     void setSupportPromptHidden(bool hidden) { mu_core::support_prompt::setHidden(appSettings.get(), hidden); }
+    juce::PropertiesFile* getAppSettingsFile() noexcept override { return appSettings.get(); }
 
     // ─── Online activation (Lemon Squeezy, Phase 1) ──────────────────────────
     // Licensed products set activateOnlineFn (a lambda calling mu_core::OnlineActivation,

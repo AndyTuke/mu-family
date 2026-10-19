@@ -4,6 +4,7 @@
 #include "UI/SettingsOverlayBase.h"
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/SegmentControl.h"
+#include "Plugin/UpdateCheckPolicy.h"
 #include "UI/Components/NudgeInput.h"
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/StatusLamp.h"
@@ -96,6 +97,8 @@ private:
     KnobWithLabel  masterVolKnob { "Master Vol", MuLookAndFeel::knobLevel };
     juce::Label    uiSizeLabel;
     SegmentControl uiSizeCtrl { { "Medium", "Large" } };
+    juce::Label    updateCheckLabel;
+    SegmentControl updateCheckCtrl { { "On", "Off" }, SegmentControl::ActiveStyle::Positive };
     juce::Label    bpmLabel;
     NudgeInput     bpmInput { "BPM", 20, 300, 120 };
     juce::Label    clockSourceLabel, midiMessagesLabel, syncOffsetLabel, timeSigLabel;

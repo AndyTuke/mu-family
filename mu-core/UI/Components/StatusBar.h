@@ -4,7 +4,8 @@
 
 // Single-line parameter feedback bar. Shows last-touched param name + value.
 // Rhythm colour tag shown when the param belongs to a rhythm.
-class StatusBar : public juce::Component
+class StatusBar : public juce::Component,
+                  public juce::TooltipClient
 {
 public:
     StatusBar();
@@ -19,6 +20,16 @@ public:
     void setSupportLinkVisible(bool visible);
     std::function<void()> onSupportClicked;
 
+    // An "Update available" text link, left of the Support link (or at the right edge where there is
+    // none). Left click calls onUpdateClicked; right click calls onUpdateHideRequested (the shell
+    // offers "Hide this notice"). `tooltip` is the one-line hint shown on hover.
+    void setUpdateLinkVisible(bool visible, const juce::String& tooltip = {});
+    bool isUpdateLinkVisible() const noexcept { return updateLinkVisible; }
+    std::function<void()> onUpdateClicked;
+    std::function<void()> onUpdateHideRequested;
+
+    juce::String getTooltip() override { return updateLinkHover ? updateTooltip : juce::String(); }
+
     void paint(juce::Graphics& g) override;
     void mouseMove(const juce::MouseEvent& e) override;
     void mouseExit(const juce::MouseEvent& e) override;
@@ -26,9 +37,14 @@ public:
 
 private:
     juce::Rectangle<int> supportLinkBounds() const;
+    juce::Rectangle<int> updateLinkBounds() const;
+    static juce::Rectangle<int> linkBoundsFor(const juce::String& text, int rightEdge, int height);
 
     bool supportLinkVisible = false;
     bool supportLinkHover   = false;
+    bool updateLinkVisible  = false;
+    bool updateLinkHover    = false;
+    juce::String updateTooltip;
 
     juce::String currentName;
     juce::String currentValue;

@@ -23,40 +23,72 @@ void StatusBar::setSupportLinkVisible(bool visible)
     repaint();
 }
 
-// The link sits at the bar's right edge, vertically centred; sized from the label text.
-juce::Rectangle<int> StatusBar::supportLinkBounds() const
+// A link is vertically centred and sized from its text; its right edge is `rightEdge`.
+juce::Rectangle<int> StatusBar::linkBoundsFor(const juce::String& text, int rightEdge, int height)
 {
     using mu_ui::s;
     using mu_ui::sf;
     const juce::Font font(juce::FontOptions{}.withHeight(sf(11.0f)));
     juce::GlyphArrangement ga;
-    ga.addLineOfText(font, "Support", 0.0f, 0.0f);
+    ga.addLineOfText(font, text, 0.0f, 0.0f);
     const int textW = (int) std::ceil(ga.getBoundingBox(0, ga.getNumGlyphs(), true).getWidth());
     const int w = textW + s(16);   // padding either side keeps the click target forgiving
-    return { getWidth() - w - s(4), 0, w, getHeight() };
+    return { rightEdge - w, 0, w, height };
+}
+
+// The Support link sits at the bar's right edge.
+juce::Rectangle<int> StatusBar::supportLinkBounds() const
+{
+    return linkBoundsFor("Support", getWidth() - mu_ui::s(4), getHeight());
+}
+
+// The update link sits just left of the Support link, or at the right edge without one.
+juce::Rectangle<int> StatusBar::updateLinkBounds() const
+{
+    const int right = supportLinkVisible ? supportLinkBounds().getX() : getWidth() - mu_ui::s(4);
+    return linkBoundsFor("Update available", right, getHeight());
+}
+
+void StatusBar::setUpdateLinkVisible(bool visible, const juce::String& tooltip)
+{
+    updateTooltip = tooltip;
+    if (updateLinkVisible == visible) return;
+    updateLinkVisible = visible;
+    updateLinkHover   = false;
+    setMouseCursor(juce::MouseCursor::NormalCursor);
+    repaint();
 }
 
 void StatusBar::mouseMove(const juce::MouseEvent& e)
 {
-    const bool over = supportLinkVisible && supportLinkBounds().contains(e.getPosition());
-    if (over != supportLinkHover)
+    const bool over   = supportLinkVisible && supportLinkBounds().contains(e.getPosition());
+    const bool overUp = updateLinkVisible  && updateLinkBounds().contains(e.getPosition());
+    if (over != supportLinkHover || overUp != updateLinkHover)
     {
         supportLinkHover = over;
-        setMouseCursor(over ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+        updateLinkHover  = overUp;
+        setMouseCursor(over || overUp ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
         repaint();
     }
 }
 
 void StatusBar::mouseExit(const juce::MouseEvent&)
 {
-    if (! supportLinkHover) return;
+    if (! supportLinkHover && ! updateLinkHover) return;
     supportLinkHover = false;
+    updateLinkHover  = false;
     setMouseCursor(juce::MouseCursor::NormalCursor);
     repaint();
 }
 
 void StatusBar::mouseDown(const juce::MouseEvent& e)
 {
+    if (updateLinkVisible && updateLinkBounds().contains(e.getPosition()))
+    {
+        auto& cb = e.mods.isPopupMenu() ? onUpdateHideRequested : onUpdateClicked;
+        if (cb) cb();
+        return;
+    }
     if (supportLinkVisible && supportLinkBounds().contains(e.getPosition()) && onSupportClicked)
         onSupportClicked();
 }
@@ -77,6 +109,14 @@ void StatusBar::paint(juce::Graphics& g)
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
         g.setColour(MuLookAndFeel::colour(supportLinkHover ? Id::statusBarValue : Id::statusBarText));
         g.drawText("Support", supportLinkBounds(), juce::Justification::centred, false);
+    }
+
+    // Update link: underlined.
+    if (updateLinkVisible)
+    {
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))).withStyle(juce::Font::underlined));
+        g.setColour(MuLookAndFeel::colour(Id::statusBarValue));
+        g.drawText("Update available", updateLinkBounds(), juce::Justification::centred, false);
     }
 
     const int h = getHeight();

@@ -28,6 +28,7 @@ set(MU_CORE_TEST_SOURCES
     MixerStereoPeakTests.cpp
     MixerBlockValueTests.cpp
     SupportPromptPolicyTests.cpp
+    UpdateCheckPolicyTests.cpp
     SettingsOverlayFitTests.cpp
     SettingsOverlayBackendTests.cpp
     AlgorithmNameTableTests.cpp

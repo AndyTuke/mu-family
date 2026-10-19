@@ -5,6 +5,7 @@
 #include <vector>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Plugin/ShellBackend.h"
+#include "Plugin/UpdateChecker.h"
 #include "Control/LiveView.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/StatusBar.h"
@@ -20,7 +21,7 @@ namespace mu_ui
 // ShellChrome — the processor-free half of the family's editor shell, as a helper object
 // (not a base class). It is built over a host Component and a mu_core::ShellBackend, owns the
 // look and feel, transport bar, status bar, About / Save / Preset Browser overlays, the mixer
-// and settings overlay slots and the upgrade banner, and parents all of them directly to the
+// and settings overlay slots, and parents all of them directly to the
 // host so the host's component tree is exactly the shell's tree. It holds the overlay state
 // machine, the main-area layout, the metal style, the knob-status plumbing and the online
 // version check. EditorShellBase (a plugin editor) and an app window both use it; it never
@@ -185,11 +186,11 @@ public:
     // Lays out the transport bar, sidebar, main area, overlays, banner and status bar.
     void resized();
 
-    // ─── Upgrade banner ──────────────────────────────────────────────────────
-    // Kicks off the async GitHub "latest release" check (fail-silent, off-thread, cached for the
-    // process); raises the banner when a newer build exists.
+    // ─── Update check ────────────────────────────────────────────────────────
+    // Decides whether the status bar's "Update available" link shows (at most one fetch of the
+    // site's latest.json a day, off-thread, silent on failure; off when the Settings row says so).
+    // Called when the editor opens and when the Settings row changes.
     void startVersionCheck();
-    static constexpr int kUpgradeBannerH = 20;
 
 private:
     JUCE_DECLARE_WEAK_REFERENCEABLE(ShellChrome)
@@ -209,7 +210,6 @@ private:
     PresetBrowser       presetBrowser;
     PerformanceChooser  performanceChooser;
     StatusBar           statusBar;
-    juce::Label         upgradeBanner;   // shown when a newer release is available online
 
     juce::Component* sidebar         = nullptr;
     juce::Component* mainPanel       = nullptr;
@@ -240,10 +240,11 @@ private:
     void leaveLock();
     void raiseShield();   // back on top after a child was added above it
 
-    std::atomic<bool> upgradeAvailable { false };
-    void showUpgradeAvailable(const juce::String& latestTag);
-    void mouseDown(const juce::MouseEvent& e) override;
-    static constexpr const char* kDownloadUrl = "https://transwarp.me/download";
+    mu_core::update_check::Entry updateEntry;   // this product's latest build (stored or just fetched)
+    bool updateWanted  = false;
+    bool fetchInFlight = false;
+    void refreshUpdateLink();
+    void dismissUpdateNotice();
 
     // Opens the Preset Browser in pick mode for the chooser; closing it (picked or not) returns to the chooser.
     void pickPresetForChooser(std::function<void(const juce::File&)> picked);

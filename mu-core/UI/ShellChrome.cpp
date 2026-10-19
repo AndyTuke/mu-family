@@ -5,7 +5,7 @@
 #include "UI/ModalDialog.h"
 #include "Persistence/PresetFiles.h"    // mu_pp::safePresetFileName, readPresetMeta
 #include "UI/PerformanceChooserModel.h" // perf::performancesDir
-#include "BuildNumber.h"        // BUILD_NUMBER, MU_VERSION_STRING: local version for the upgrade check
+#include "BuildNumber.h"        // BUILD_NUMBER, MU_VERSION_STRING: local version for the update check
 
 namespace mu_ui
 {
@@ -51,6 +51,7 @@ ShellChrome::~ShellChrome()
     // callback into this object may survive it.
     backend.onLoadError           = nullptr;
     backend.onUiScaleChanged      = nullptr;
+    backend.onUpdateCheckToggled  = nullptr;
     backend.onSaveAndQuit         = nullptr;
     backend.onPresetSwapCommitted = nullptr;
     host.removeKeyListener(this);
@@ -94,20 +95,24 @@ void ShellChrome::wireBuiltIns()
         statusBar.showParam("Load failed", msg, MuLookAndFeel::colour(MuLookAndFeel::knobLevel));
     };
 
-    // Upgrade banner: hidden until the async version check finds a newer release online.
+    // Update link: hidden until the update check finds a newer build. A click opens the download
+    // page and counts as seen; a right click offers to hide the notice for that build.
+    statusBar.onUpdateClicked = [this]
     {
-        using Id = MuLookAndFeel::ColourIds;
-        upgradeBanner.setJustificationType(juce::Justification::centred);
-        upgradeBanner.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-        upgradeBanner.setColour(juce::Label::backgroundColourId, MuLookAndFeel::colour(Id::segmentActiveBg));
-        upgradeBanner.setColour(juce::Label::textColourId, MuLookAndFeel::colour(Id::headingText));
-        host.addChildComponent(upgradeBanner);
-        upgradeBanner.setVisible(false);
-        // Whole banner is a click target: it opens the download page.
-        upgradeBanner.setInterceptsMouseClicks(true, false);
-        upgradeBanner.addMouseListener(this, false);
-        upgradeBanner.setMouseCursor(juce::MouseCursor::PointingHandCursor);
-    }
+        juce::URL(mu_core::update_check::safeUrl(updateEntry.download)).launchInDefaultBrowser();
+        dismissUpdateNotice();
+    };
+    statusBar.onUpdateHideRequested = [this]
+    {
+        juce::PopupMenu menu;
+        menu.addItem(1, "Hide this notice");
+        juce::WeakReference<ShellChrome> safe(this);
+        menu.showMenuAsync(juce::PopupMenu::Options(), [safe](int r)
+        {
+            if (r == 1 && safe != nullptr) safe->dismissUpdateNotice();
+        });
+    };
+    backend.onUpdateCheckToggled = [this] { startVersionCheck(); };
 }
 
 // The Performance chooser joins the state machine as a page over the main area, and its entry points
@@ -183,79 +188,60 @@ void ShellChrome::applyWindowSize()
     };
 }
 
-void ShellChrome::showUpgradeAvailable(const juce::String& latestTag)
-{
-    const juce::String current   = "v" + juce::String(MU_VERSION_STRING);
-    const juce::String available = latestTag;   // the release's own tag, e.g. v1.1.0.972
-    upgradeBanner.setText(
-        juce::String::fromUTF8("Update available  \xe2\x80\x94  you have ") + current
-            + juce::String::fromUTF8("  \xe2\x80\x94  ") + available
-            + juce::String::fromUTF8(" is out  \xe2\x80\x94  click here to download"),
-        juce::dontSendNotification);
-    upgradeAvailable.store(true);
-    upgradeBanner.setVisible(true);
-    host.resized();
-    host.repaint();
-}
-
 void ShellChrome::startVersionCheck()
 {
-    // Ask GitHub for the "latest release" (the same endpoint the website's download page uses),
-    // parse the build number out of its tag (vX.Y.0.NNN), and raise the upgrade banner if it beats
-    // our local BUILD_NUMBER. Only the build number is compared: it never resets across major /
-    // minor bumps, so it alone orders releases.
-    //
-    // The result is cached PROCESS-WIDE so we fetch at most once per process: reopening the
-    // editor, or running many plugin instances in one DAW session, all share the single result
-    // instead of each hammering GitHub's unauthenticated API (60 req/hr/IP, after which the call
-    // would just fail). The fetch runs on a throwaway thread (it blocks on the network) and fails
-    // silently offline.
-    //   -1 = not yet checked   0 = checked, nothing newer   >BUILD_NUMBER = newer build
-    static std::atomic<int>  s_latestBuild  { -1 };
-    static std::atomic<bool> s_fetchStarted { false };
-    static juce::String      s_latestTag;   // written before s_latestBuild's release-store
+    // Update check (docs/design-plugin-family.md, "Update check"). The link shows when this product's
+    // entry in the site's latest.json is a newer build than ours. The data is fetched at most once a
+    // day (the result is stored in the app settings) by the shared UpdateChecker thread; between
+    // fetches the stored answer decides, so the link also goes away as soon as the user updates.
+    namespace uc = mu_core::update_check;
+    auto* settings = backend.getAppSettingsFile();
+    const juce::String slug = backend.getProductSlug();
+    updateWanted = false;
+    if (settings == nullptr || slug.isEmpty() || ! uc::isEnabled(settings)) { refreshUpdateLink(); return; }
 
-    const int cached = s_latestBuild.load(std::memory_order_acquire);
-    if (cached > BUILD_NUMBER) { showUpgradeAvailable(s_latestTag); return; }  // already known
-    if (cached >= 0)           return;                                         // already checked, none newer
-    if (s_fetchStarted.exchange(true)) return;                                 // a fetch is already in flight
+    updateEntry = uc::storedLatest(settings);
+    const auto now = juce::Time::currentTimeMillis();
+    if (! uc::isDue(now, uc::lastCheck(settings))) { refreshUpdateLink(); return; }
 
-    juce::WeakReference<ShellChrome> safe(this);
-    juce::Thread::launch([safe]
+    refreshUpdateLink();   // show the stored answer while the fetch runs
+    if (fetchInFlight) return;
+    fetchInFlight = true;
+    juce::SharedResourcePointer<uc::UpdateChecker> checker;
+    juce::WeakReference<ShellChrome> safeSelf(this);
+    checker->request([safe = safeSelf, slug](const juce::String& body)
     {
-        const juce::URL url("https://api.github.com/repos/AndyTuke/mu-family/releases/latest");
-        const auto opts = juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inAddress)
-                              .withConnectionTimeoutMs(5000);
-        std::unique_ptr<juce::InputStream> stream(url.createInputStream(opts));
-
-        int latestBuild = 0;   // 0 = nothing newer / fetch failed
-        juce::String tag;
-        if (stream != nullptr)
-        {
-            const juce::var json = juce::JSON::parse(stream->readEntireStreamAsString());
-            tag = json.getProperty("tag_name", {}).toString();   // e.g. "v1.1.0.972"
-            if (tag.isNotEmpty())   // build number = final dot-separated segment
-                latestBuild = tag.fromLastOccurrenceOf(".", false, false).getIntValue();
-        }
-
-        // Cache the verdict for this process (clamp to 0 when nothing newer / failed).
-        if (latestBuild > BUILD_NUMBER) s_latestTag = tag;
-        s_latestBuild.store(latestBuild > BUILD_NUMBER ? latestBuild : 0, std::memory_order_release);
-        if (latestBuild <= BUILD_NUMBER) return;
-
-        juce::MessageManager::callAsync([safe, tag]
-        {
-            if (safe == nullptr) return;   // host closed mid-check
-            safe->showUpgradeAvailable(tag);
-        });
+        if (safe == nullptr) return;   // the host closed mid-check
+        safe->fetchInFlight = false;
+        uc::Entry entry;
+        auto* s = safe->backend.getAppSettingsFile();
+        if (s == nullptr || ! uc::parse(body, slug, entry)) return;   // unreadable data: stay silent
+        uc::storeLatest(s, entry, juce::Time::currentTimeMillis());
+        safe->updateEntry = entry;
+        safe->refreshUpdateLink();
     });
 }
 
-void ShellChrome::mouseDown(const juce::MouseEvent& e)
+// Decides from the stored entry whether the link shows. It is never shown in Performance mode (it returns afterwards).
+void ShellChrome::refreshUpdateLink()
 {
-    // Clicking the upgrade banner opens the download page.
-    if (e.eventComponent == &upgradeBanner)
-        juce::URL(kDownloadUrl).launchInDefaultBrowser();
+    namespace uc = mu_core::update_check;
+    auto* settings = backend.getAppSettingsFile();
+    updateWanted = settings != nullptr
+                   && uc::shouldShow(uc::isEnabled(settings), updateEntry.build,
+                                     uc::dismissedBuild(settings), BUILD_NUMBER);
+    const juce::String tip = juce::String(updateEntry.version.isNotEmpty() ? updateEntry.version
+                                                                          : "v1.1." + juce::String(updateEntry.build))
+                             + " is out (you have v" + juce::String(MU_VERSION_STRING)
+                             + "). Click to open the download page.";
+    statusBar.setUpdateLinkVisible(updateWanted && ! shieldUp, tip);
+}
+
+// A click or "Hide this notice": remember the build, so the link only returns for a newer one.
+void ShellChrome::dismissUpdateNotice()
+{
+    mu_core::update_check::setDismissedBuild(backend.getAppSettingsFile(), updateEntry.build);
+    refreshUpdateLink();
 }
 
 void ShellChrome::setMainArea(juce::Component* newSidebar, juce::Component* newMainPanel)
@@ -751,6 +737,7 @@ void ShellChrome::syncPerformanceMode()
     if (on == shieldUp) return;
 
     shieldUp = on;
+    refreshUpdateLink();
     if (on) enterLock(); else leaveLock();
 }
 
@@ -828,8 +815,6 @@ void ShellChrome::setMetalStyle(bool metal, juce::Colour appAccent)
     if (! appAccent.isTransparent())
     {
         lookAndFeel.setAppAccent(appAccent);
-        upgradeBanner.setColour(juce::Label::backgroundColourId,   // set before the app colour existed
-                                MuLookAndFeel::colour(MuLookAndFeel::segmentActiveBg));
     }
     host.sendLookAndFeelChange();   // shared components re-read the style in lookAndFeelChanged()
     host.repaint();
@@ -874,9 +859,7 @@ void ShellChrome::resized()
     const int statusH    = s(MuLookAndFeel::kStatusBarH);
     const int transportH = s(MuLookAndFeel::kTransportBarH);
     const int sidebarW   = (sidebar != nullptr) ? s(MuLookAndFeel::kSidebarW) : 0;
-    const int upgradeH   = upgradeAvailable.load()        ? s(kUpgradeBannerH) : 0;
-    const int bannerH    = upgradeH;
-    const int contentH   = h - transportH - statusH - bannerH;
+    const int contentH   = h - transportH - statusH;
 
     const juce::Rectangle<int> mainArea { sidebarW, transportH,
                                           w - sidebarW, contentH };
@@ -895,10 +878,6 @@ void ShellChrome::resized()
     for (auto& e : extras)
         if (e.kind == ExtraKind::Modal) e.screen->setBounds(host.getLocalBounds());
     saveDialog.setBounds(host.getLocalBounds());
-
-    // The upgrade banner sits just above the status bar.
-    const int by = h - statusH - bannerH;
-    if (upgradeH > 0) upgradeBanner.setBounds(0, by, w, upgradeH);
 
     statusBar.setBounds(0, h - statusH, w, statusH);
     shield.setBounds(host.getLocalBounds());

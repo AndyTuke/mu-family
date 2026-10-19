@@ -3,3 +3,9 @@
 # Publish directory and other settings stay as configured in the Netlify dashboard.
 [build]
   ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- site/ netlify.toml"
+
+# The update-check data file: short cache so a release is noticed within minutes.
+[[headers]]
+  for = "/latest.json"
+  [headers.values]
+    Cache-Control = "public, max-age=300"

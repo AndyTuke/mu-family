@@ -2,6 +2,8 @@
 
 #include <juce_core/juce_core.h>
 
+namespace juce { class PropertiesFile; }
+
 #include "Plugin/MidiClockSync.h"   // MidiClockSync::ClockState
 #include "Persistence/PerformanceFile.h"
 
@@ -123,6 +125,12 @@ public:
         return false;
     }
 
+    // ─── Update check ────────────────────────────────────────────────────────
+    // The machine-wide app settings file and the product's slug in latest.json (mu-clid, mu-tant,
+    // ...). An app with no settings file or no slug (mu-link) has no update check and no Settings row.
+    virtual juce::PropertiesFile* getAppSettingsFile() noexcept { return nullptr; }
+    virtual juce::String          getProductSlug() const { return {}; }
+
     // ─── Shell callbacks (message thread, set by the shell) ──────────────────
     // The shell MUST clear these in its destructor: the backend can outlive it, and a deferred
     // call into a destroyed shell is a use-after-free.
@@ -130,6 +138,7 @@ public:
     std::function<void(const juce::String& message)> onLoadError;
     std::function<void()>                            onPresetSwapCommitted;
     std::function<void(float)>                       onUiScaleChanged;
+    std::function<void()>                            onUpdateCheckToggled;   // the Settings On / Off row changed
 };
 
 } // namespace mu_core

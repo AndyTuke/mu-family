@@ -47,6 +47,7 @@ public:
     bool hasEditor() const override;
 
     const juce::String getName() const override;
+    juce::String getProductSlug() const override { return "mu-clid"; }   // key in latest.json
     // True for both DAW and standalone:
     //   - Standalone: MIDI clock sync.
     //   - DAW (VST3/CLAP): program-change → preset hot-swap.
