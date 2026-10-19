@@ -15,7 +15,7 @@
 #include "Audio/SampleLibrary.h"
 #include "Sequencer/RhythmPlayState.h"
 #include "Plugin/MidiClockSync.h"   // shared mu-core MIDI-clock slave
-#include "Plugin/PresetIO.h"
+#include "Persistence/RhythmPresetTree.h"   // the Rhythm type's saved form (PreparedRhythm, RhythmPresetContext)
 #include "UI/RhythmHost.h"   // what the Rhythm layer's UI reads from its host
 #include "Sequencer/SampleRhythm.h"   // mu-Clid's layer type
 #include "HotSwapStager.h"
@@ -65,8 +65,9 @@ public:
     const juce::String getProgramName(int index) override;
     void changeProgramName(int index, const juce::String& newName) override;
 
-    void getStateInformation(juce::MemoryBlock& d) override { presetIO.getStateInformation(d); }
-    void setStateInformation(const void* d, int s) override { presetIO.setStateInformation(d, s); notifyHostStateRestored(); }
+    // The host session (PluginProcessor_HostState.cpp): the .muClid tree plus the parameters it doesn't carry.
+    void getStateInformation(juce::MemoryBlock& d) override;
+    void setStateInformation(const void* d, int s) override { restoreHostState(d, s); notifyHostStateRestored(); }
 
 
     // Multi-bus output (DAW only). Toggle is read at host scan-time; toggling at runtime
@@ -111,7 +112,8 @@ public:
 
     // Hot-swap staging: stages a rhythm preset for atomic commit at the next loop boundary.
     // If the sequencer is not playing, applies the preset immediately instead.
-    void stageRhythmPreset(int ri, const juce::File& f, bool keepIdentity = false)  { presetIO.stageRhythmPreset(ri, f, keepIdentity); }
+    // keepIdentity: the slot keeps its name and colour (a settings reset such as the default rhythm).
+    void stageRhythmPreset(int ri, const juce::File& f, bool keepIdentity = false);
     void cancelPendingSwap(int ri) override               { hotSwapStager.cancelStagedSwap(ri); }
     bool hasPendingSwap  (int ri) const override         { return hotSwapStager.hasPendingSwap(ri); }
     bool hasPendingFullPreset() const override            { return hotSwapStager.hasPendingFullPreset(); }
@@ -129,10 +131,11 @@ public:
     void loadLayerPreset(int ri, const juce::File& f) override { stageRhythmPreset(ri, f); }
     // The clip hooks: the tree a .muRhythm holds (without file metadata, name, colour) and the tail of a
     // .muRhythm load. Clips reach the sample by path only.
-    juce::ValueTree captureLayerPresetTree(int ri) override { return presetIO.captureRhythmPresetTree(ri); }
+    juce::ValueTree captureLayerPresetTree(int ri) override;
 protected:
-    void stageLayerPresetTree(int ri, juce::ValueTree tree, bool keepIdentity) override
-        { presetIO.stageRhythmPresetTree(ri, tree, keepIdentity); }
+    // Everything a .muRhythm load does after the parse (file or clip): installs at once when stopped, else commits
+    // at the rhythm's boundary. Callers go through ProcessorBase::stageLayerPreset.
+    void stageLayerPresetTree(int ri, juce::ValueTree tree, bool keepIdentity) override;
 public:
     // Where a staged swap lands: the shared `mstr_swap` parameter, read here on the audio thread from a
     // pointer resolved once. mu-Clid has no bar-line rule, so OnBar behaves as OnLayerLoop.
@@ -148,22 +151,27 @@ public:
     void setContentDir(const juce::File& dir);
     void ensureContentFoldersExist();
 
+    // Preset orchestration (PluginProcessor_Preset.cpp).
     void savePreset(const juce::String& n, const juce::String& d,
-                    const juce::String& c, bool e = false) override { presetIO.savePreset(n, d, c, e); }
-    void loadPreset(const juce::File& f) override { if (presetIO.loadPreset(f)) publishPresetName(f.getFileNameWithoutExtension()); }
-    bool saveFullPresetTo(const juce::File& f) override { return presetIO.saveFullPresetTo(f); }
+                    const juce::String& c, bool e = false) override;
+    void loadPreset(const juce::File& f) override { if (loadPresetFile(f)) publishPresetName(f.getFileNameWithoutExtension()); }
+    // A full preset or host-state file: a .muClid is prepared off the audio thread and committed at the next loop
+    // point when playing, at once when stopped; another state root of this product restores as legacy host state.
+    // False when nothing could be read (nothing was loaded or staged).
+    bool loadPresetFile(const juce::File& f);
+    bool saveFullPresetTo(const juce::File& f) override;   // headless render --save-preset
     void saveRhythmPresetToFile(int ri, const juce::File& dest,
                                 bool emb = false, const juce::String& cat = {},
-                                const juce::String& desc = {})
-                                { presetIO.saveRhythmPresetToFile(ri, dest, emb, cat, desc); }
+                                const juce::String& desc = {});
 
     // Shared preset category list.
-    juce::StringArray loadCategoryList() const override  { return presetIO.loadCategoryList(); }
-    void ensureCategoryInList(const juce::String& c) override { presetIO.ensureCategoryInList(c); }
-    bool applyRhythmPreset(const juce::File& f, int ri) { return presetIO.applyRhythmPreset(f, ri); }
-    bool applyDefaultRhythm(int ri)              { return presetIO.applyDefaultRhythm(ri); }
-    // _default.muClid, falling back to a single-rhythm _default.muRhythm (PresetIO).
-    void loadDefaultPreset() override            { presetIO.loadDefaultPreset(); }
+    juce::StringArray loadCategoryList() const override;
+    void ensureCategoryInList(const juce::String& c) override;
+    // A .muRhythm into slot `ri` at once, whatever the transport is doing.
+    bool applyRhythmPreset(const juce::File& f, int ri, bool keepIdentity = false);
+    bool applyDefaultRhythm(int ri);
+    // _default.muClid, falling back to a single-rhythm _default.muRhythm.
+    void loadDefaultPreset() override;
 
 
     // The rhythms' own step clocks: the host half here (it holds the master-loop length), a RhythmCursor in each
@@ -226,7 +234,6 @@ public:
 
     // Play-state atomics: written by audio thread, read by UI at 30 Hz. Each rhythm's own play state is its layer's
     // (SampleRhythm::playState), looked up through getRhythmPlayState on every read.
-    std::atomic<float>  beatFraction     { 0.0f }; // fractional position within the current 1/16 step
     std::atomic<bool>   sequencerPlaying { false };
     std::atomic<double> lastBeatPos      { 0.0 };  // most recent beat position (for UI playhead)
 
@@ -467,14 +474,43 @@ private:
     // parameter state so the listener applies every slot. Written on the message thread; read by the UI.
     std::atomic<int> liveRhythms { 0 };
     int reorderLastSlot = -1;
-    void restoreStateFromTree(const juce::ValueTree& s) { presetIO.restoreStateFromTree(s); }
+    // ── Preset orchestration internals (PluginProcessor_Preset.cpp / _HostState.cpp, message thread) ───────
+    // Commit a pre-built full preset under suspend + layersLock, then finalise APVTS / mixer / globals: the
+    // stopped load, the host restore and the stager's boundary commit. `prepared` is consumed.
+    void commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepared, int originEff = 0,
+                                uint32_t frameEpoch = RhythmCursor::kAnyFrameEpoch);
+    // The legacy host-state format (the APVTS dump + r{i}_ properties), restored at once.
+    void restoreStateFromTree(const juce::ValueTree& state);
+    void restoreHostState(const void* data, int sizeInBytes);
+    void restoreSession(const juce::ValueTree& root);   // a .muClid session tree + its extra parameter rows
+    juce::ValueTree readRhythmPresetFile(const juce::File& file) const;
+    PreparedRhythm  prepareRhythmPresetTree(const juce::ValueTree& state, int rhythmIndex, bool keepIdentity,
+                                            const juce::String& source);
+    bool            applyRhythmPresetTree(const juce::ValueTree& state, int targetIndex, bool keepIdentity,
+                                          const juce::String& source);
+    // The .muRhythm tree: a file (forFile) adds its metadata, name and colour; a clip does not.
+    juce::ValueTree buildRhythmPresetTree(int rhythmIndex, bool embedSample, bool forFile,
+                                          const juce::String& presetName, const juce::String& category,
+                                          const juce::String& description);
+    HotSwapStager::PreparedFullPreset prepareFullPreset(const juce::ValueTree& root) const;
+    // The .muClid tree (shared by preset files and the host session) and its atomic write.
+    juce::ValueTree buildFullPresetTree(const juce::String& name, const juce::String& description,
+                                        const juce::String& category, bool embedSamples, bool forSession);
+    bool            writeFullPresetFile(const juce::File& file, const juce::String& name,
+                                        const juce::String& description, const juce::String& category,
+                                        bool embedSamples);
+    // The context a rhythm tree is read in: the Samples folder, the prepared rate and block size, onLoadError.
+    RhythmPresetContext presetContext() const;
+    // The legacy host-state sample restore for slot `slot` (the three property names to read).
+    void restoreRhythmSample(int slot, const juce::ValueTree& tree, const juce::String& samplePathProp,
+                             const juce::String& sampleDataProp, const juce::String& sampleNameProp);
+    // The file name of the .muRhythm being staged, so load messages can name it; empty for a clip.
+    juce::String loadSource;
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
-    PresetIO       presetIO      { *this };
     HotSwapStager  hotSwapStager { *this };
 
-    friend class PresetIO;
     friend class HotSwapStager;
     friend struct ClipCommitProbe;         // tests drive the boundary scan and commit of a staged launch
 

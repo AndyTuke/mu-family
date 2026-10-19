@@ -5,7 +5,6 @@
 
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/HotSwapStager.h"
-#include "Plugin/PresetIO.h"
 #include "Tests/ProcessorSeamHelpers.h"
 
 namespace
@@ -115,7 +114,7 @@ struct MuClidHotSwapCancelTests : juce::UnitTest
         }
     }
 
-    // A file that does not parse loads nothing: PresetIO says so, and the processor does not announce
+    // A file that does not parse loads nothing: loadPresetFile says so, and the processor does not announce
     // the file's name as the current preset (a good file does).
     void failedLoadPublishesNoName()
     {
@@ -131,8 +130,7 @@ struct MuClidHotSwapCancelTests : juce::UnitTest
         p.onLoadError = [&](const juce::String& e) { errors.add(e); };
 
         const int hitsBefore = p.getRhythm(0).genA.hits;
-        mu_clid::PresetIO io(p);
-        expect(! io.loadPreset(garbage), "PresetIO::loadPreset returns false");
+        expect(! p.loadPresetFile(garbage), "loadPresetFile returns false");
         expectEquals(errors.size(), 1, "the load error callback ran once");
 
         p.loadPreset(garbage);
@@ -142,7 +140,7 @@ struct MuClidHotSwapCancelTests : juce::UnitTest
         // Control: a readable full preset does publish its name.
         const auto good = storage.root.getChildFile("goodOne.muClid");
         expect(p.saveFullPresetTo(good), "a full preset was written");
-        expect(io.loadPreset(good), "PresetIO::loadPreset returns true for a readable file");
+        expect(p.loadPresetFile(good), "loadPresetFile returns true for a readable file");
         p.loadPreset(good);
         expectEquals(names.size(), 1, "the name is published on success");
         expectEquals(names.isEmpty() ? juce::String() : names[0], juce::String("goodOne"));

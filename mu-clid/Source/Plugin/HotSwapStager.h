@@ -47,11 +47,11 @@ public:
     explicit HotSwapStager(PluginProcessor& proc) : proc(proc) {}
 
     // Message-thread: cancel any existing staged swap for a slot without bounds check.
-    // Called from PresetIO::stageRhythmPreset before overwriting a pending swap.
+    // Called from PluginProcessor::stageLayerPresetTree before overwriting a pending swap.
     void cancelPendingIfAny(int rhythmIndex);
 
     // Message-thread: atomically commit all staged data for a slot.
-    // Called from PresetIO::stageRhythmPreset after preparing rhythm + voice.
+    // Called from PluginProcessor::stageLayerPresetTree after preparing rhythm + voice.
     void stage(int rhythmIndex, Rhythm&& rhythm, std::unique_ptr<VoiceEngine>&& voice,
                const juce::String& samplePath);
 
@@ -61,7 +61,7 @@ public:
 
     // Message-thread: stage a pre-built full preset for commit at the next MASTER
     // loop boundary. Supersedes any pending per-rhythm swaps (a full preset
-    // replaces every slot). Committed via PresetIO::commitStagedFullPreset from
+    // replaces every slot). Committed via PluginProcessor::commitStagedFullPreset from
     // processSwaps() once the boundary is reached.
     void stageFullPreset(PreparedFullPreset&& prepared);
 

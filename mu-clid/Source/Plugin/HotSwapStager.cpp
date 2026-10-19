@@ -194,7 +194,7 @@ void HotSwapStager::processSwaps()
     // (consumeFull releases the pre-built voices + tree afterwards.)
     const bool committed = stager.consumeFull([this](PreparedFullPreset& p)
     {
-        proc.presetIO.commitStagedFullPreset(p, fullFlaggedOrigin.load(std::memory_order_relaxed),
+        proc.commitStagedFullPreset(p, fullFlaggedOrigin.load(std::memory_order_relaxed),
                                              fullFlaggedEpoch.load(std::memory_order_relaxed));
     });
     if (committed)

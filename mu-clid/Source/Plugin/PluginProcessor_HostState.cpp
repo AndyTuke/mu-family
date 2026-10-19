@@ -1,15 +1,7 @@
-// PresetIO host-state I/O — DAW project / plugin-state serialise + restore. A session is the
-// .muClid full-preset tree (+ rows for the parameters it doesn't carry); sessions saved before
-// that (the APVTS dump + r{i}_ properties) still restore through restoreStateFromTree.
-//
-// Partial class: these are PresetIO members declared in PresetIO.h, split out
-// of PresetIO.cpp so the preset save / .muClid load path and the
-// host-state path each read as their own file. This TU owns the host-state
-// format version, the message-thread state tree builder, the legacy-state
-// migration, and the three AudioProcessor state overrides. The per-rhythm load
-// helpers (restoreRhythmSample etc.) and loadPreset stay in PresetIO.cpp and
-// are reached here as ordinary cross-TU method calls.
-#include "PresetIO.h"
+// PluginProcessor — host-state I/O: the DAW project / plugin state serialise and restore. A session is the
+// .muClid full-preset tree (+ rows for the parameters it doesn't carry); sessions saved before that (the APVTS
+// dump + r{i}_ properties) still restore through restoreStateFromTree. Partial-class TU split from
+// PluginProcessor_Preset.cpp, which keeps the per-rhythm load helpers and loadPresetFile.
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/PluginProcessor_Internal.h"
 #include "Persistence/ModulatorSerialise.h" // serialiseModulators, deserialiseModulators, clearModulators
@@ -27,7 +19,7 @@ using mu_clid::migrate::migrateLegacyHostState;
 // slots' params and anything outside the preset tables — so a project restores every parameter.
 static const juce::Identifier kSessionParamsTag { "SessionParams" };
 
-static juce::ValueTree uncoveredParamRows(juce::AudioProcessor& proc, int numRhythms)
+static juce::ValueTree uncoveredParamRows(juce::AudioProcessor& processor, int numRhythms)
 {
     // The ids the .muClid tree already writes: each active rhythm's table params + mixer strip,
     // and the global defs.
@@ -41,7 +33,7 @@ static juce::ValueTree uncoveredParamRows(juce::AudioProcessor& proc, int numRhy
     for (int i = 0; i < mu_clid::kGlobalParamDefCount; ++i) covered.insert(mu_clid::kGlobalParamDefs[i].id);
 
     juce::ValueTree rows(kSessionParamsTag);
-    for (auto* p : proc.getParameters())
+    for (auto* p : processor.getParameters())
         if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
             if (covered.count(rp->getParameterID()) == 0)
                 mu_pp::appendParamRow(rows, *rp, rp->getParameterID());
@@ -51,15 +43,15 @@ static juce::ValueTree uncoveredParamRows(juce::AudioProcessor& proc, int numRhy
 // The host session: the same .muClid tree a full preset saves (temp-dir sample paths kept, no
 // embedded data) plus the rows for every other parameter. Restored by the same prepare + commit
 // as a full preset (restoreSession).
-void PresetIO::getStateInformation(juce::MemoryBlock& destData)
+void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
     auto root = buildFullPresetTree({}, {}, {}, false, true);
-    root.appendChild(uncoveredParamRows(proc, proc.getNumRhythms()), nullptr);
-    proc.saveLiveState(root);   // the session also keeps the Performance (path, current item, mode)
+    root.appendChild(uncoveredParamRows(*this, getNumRhythms()), nullptr);
+    saveLiveState(root);   // the session also keeps the Performance (path, current item, mode)
     juce::MemoryOutputStream(destData, true).writeString(root.toXmlString());
 }
 
-void PresetIO::restoreSession(const juce::ValueTree& root)
+void PluginProcessor::restoreSession(const juce::ValueTree& root)
 {
     // A host restore applies at once (the project is loading, not a live swap), through the
     // full-preset prepare + commit; then the rows for the parameters the tree doesn't carry.
@@ -70,7 +62,7 @@ void PresetIO::restoreSession(const juce::ValueTree& root)
     for (int i = 0; i < rows.getNumChildren(); ++i)
     {
         const auto row = rows.getChild(i);
-        if (auto* p = proc.apvts.getParameter(row.getProperty("id").toString()))
+        if (auto* p = apvts.getParameter(row.getProperty("id").toString()))
         {
             float v = 0.0f;
             if (mu_pp::readRowValue(row, *p, v) && p->getValue() != v)
@@ -79,15 +71,15 @@ void PresetIO::restoreSession(const juce::ValueTree& root)
     }
 }
 
-void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
+void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
 {
     // Applied at once: anything staged while the transport played must not land on top of the restored state.
-    proc.hotSwapStager.cancelAllStaged();
+    hotSwapStager.cancelAllStaged();
 
     // A session in this format predates clips, so every bank empties. Done before the lock below:
     // freeing trees is not a microsecond job.
     for (int i = 0; i < mu_limits::kMaxLayers; ++i)
-        proc.clearLayerClips(i);
+        clearLayerClips(i);
 
     int n = juce::jlimit(1, mu_limits::kMaxLayers,
                          (int)state.getProperty("numRhythms", 1));
@@ -100,26 +92,26 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     // alone is not enough — it doesn't block an in-flight processBlock; layersLock
     // does (the audio thread's ScopedTryLock bails while we hold it). The lock is held
     // for the rest of the function (RAII) and released on return.
-    proc.suspendProcessing(true);
-    const juce::ScopedLock lw(proc.layoutWriteLock);   // first: the count stores below advance the layout serial
-    const juce::ScopedLock sl(proc.layersLock);
+    suspendProcessing(true);
+    const juce::ScopedLock lw(layoutWriteLock);   // first: the count stores below advance the layout serial
+    const juce::ScopedLock sl(layersLock);
 
     // Expand to MaxRhythms so parameterChanged can write to all 8 rhythm slots.
-    proc.setRhythmCount(mu_limits::kMaxLayers);
+    setRhythmCount(mu_limits::kMaxLayers);
 
     // migrate legacy state in-place before pushing it into APVTS so the
     // new 0..10 s ADSR ranges don't clamp old 0..100 values to absurd attacks.
     juce::ValueTree migrated = state.createCopy();
     migrateLegacyHostState(migrated);
-    mu_pp::addLegacyReverbDecayParam(migrated, proc.apvts.getParameter(mu_pp::kReverbAlgoId));   // older than the Decay knob
+    mu_pp::addLegacyReverbDecayParam(migrated, apvts.getParameter(mu_pp::kReverbAlgoId));   // older than the Decay knob
 
     {
-        mu_core::ScopedApvtsLoading guard(proc.apvtsLoading);
-        proc.apvts.replaceState(migrated);
+        mu_core::ScopedApvtsLoading guard(apvtsLoading);
+        apvts.replaceState(migrated);
     }
 
     // Trim to actual active count.
-    proc.setRhythmCount(n);
+    setRhythmCount(n);
 
     // restore per-rhythm modulator state from the Modulators children.
     // Each child carries a rhythmIndex property so we apply to the right slot
@@ -131,11 +123,11 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
         if (child.getType() != juce::Identifier("Modulators")) continue;
         const int ri = (int)child.getProperty("rhythmIdx", -1);
         if (ri < 0 || ri >= n) continue;
-        Rhythm& target = proc.getRhythm(ri);
+        Rhythm& target = getRhythm(ri);
         clearModulators(target);
         auto dropped = deserialiseModulators(child, target);
-        if (! dropped.isEmpty() && proc.onLoadError)
-            proc.onLoadError("Dropped " + juce::String(dropped.size())
+        if (! dropped.isEmpty() && onLoadError)
+            onLoadError("Dropped " + juce::String(dropped.size())
                         + " modulator assignment(s) on rhythm " + juce::String(ri + 1)
                         + ": " + dropped.joinIntoString("; "));
     }
@@ -145,37 +137,37 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     // excess slots so the audio thread can't access a slot being reset.  When expanding,
     // create and prepare slots BEFORE incrementing the count so the audio thread never
     // sees an uninitialised slot.
-    const int oldN = proc.numLayers.load(std::memory_order_acquire);
+    const int oldN = numLayers.load(std::memory_order_acquire);
     if (n < oldN)
     {
-        proc.storeLayerCount(n, std::memory_order_release);  // decrement first
-        proc.retireBin.cutAtOrAbove(n);                       // the dropped slots' tails stop (count policy CutAtCount)
+        storeLayerCount(n, std::memory_order_release);  // decrement first
+        retireBin.cutAtOrAbove(n);                       // the dropped slots' tails stop (count policy CutAtCount)
         for (int i = n; i < oldN; ++i)
         {
-            proc.voiceEngine(i).reset();
-            proc.parkPendingMidiOff(proc.sampleRhythm(i).midi);   // keep the owed note-off (under layersLock, held above)
-            proc.sampleRhythm(i).midi = MidiOutputEngine{};
+            voiceEngine(i).reset();
+            parkPendingMidiOff(sampleRhythm(i).midi);   // keep the owed note-off (under layersLock, held above)
+            sampleRhythm(i).midi = MidiOutputEngine{};
         }
     }
     else
     {
         for (int i = oldN; i < n; ++i)
         {
-            proc.voiceEngine(i) = std::make_unique<VoiceEngine>();
-            proc.voiceEngine(i)->insertProc.setSlotIndex(i);   // per-slot noise seed
-            if (proc.currentSampleRate > 0 && proc.currentBlockSize > 0)
+            voiceEngine(i) = std::make_unique<VoiceEngine>();
+            voiceEngine(i)->insertProc.setSlotIndex(i);   // per-slot noise seed
+            if (currentSampleRate > 0 && currentBlockSize > 0)
             {
-                proc.voiceEngine(i)->prepareToPlay(proc.currentSampleRate, proc.currentBlockSize);
-                proc.sampleRhythm(i).midi.prepare(proc.currentSampleRate, proc.currentBlockSize);
+                voiceEngine(i)->prepareToPlay(currentSampleRate, currentBlockSize);
+                sampleRhythm(i).midi.prepare(currentSampleRate, currentBlockSize);
             }
         }
-        proc.storeLayerCount(n, std::memory_order_release);  // increment after slots ready
+        storeLayerCount(n, std::memory_order_release);  // increment after slots ready
     }
 
     // Restore non-APVTS properties and refresh engines.
     for (int i = 0; i < n; ++i)
     {
-        Rhythm& r = proc.getRhythm(i);
+        Rhythm& r = getRhythm(i);
         const juce::String slotPrefix = "r" + juce::String(i) + "_";
 
         r.name        = state.getProperty(slotPrefix + "name",
@@ -185,21 +177,21 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
         // force-sync APVTS → Rhythm so shrink/grow cycles (preset A → B → A)
         // repopulate freshly-defaulted Rhythm fields even when JUCE skips listener
         // callbacks because the APVTS values didn't change. Internally calls
-        // updatePattern + proc.voiceEngine(i)->setParams.
-        proc.forceSyncRhythmFromApvts(i);
+        // updatePattern + voiceEngine(i)->setParams.
+        forceSyncRhythmFromApvts(i);
 
         // Host-state format prefixes every sample-related property with "r{i}_".
-        proc.samples.setPath(i, state.getProperty(slotPrefix + "sample").toString());
+        samples.setPath(i, state.getProperty(slotPrefix + "sample").toString());
         restoreRhythmSample(i, state,
                              slotPrefix + "sample",
                              slotPrefix + "sampleData",
                              slotPrefix + "sampleName");
     }
 
-    proc.suspendProcessing(false);   // layersLock (sl) releases on return
+    suspendProcessing(false);   // layersLock (sl) releases on return
 }
 
-void PresetIO::setStateInformation(const void* data, int sizeInBytes)
+void PluginProcessor::restoreHostState(const void* data, int sizeInBytes)
 {
     // Parsed first: a session that left Performance mode on must win over `_default`, because the live
     // state names the performance item that was playing, and that is the session's, not the default's.
@@ -210,12 +202,12 @@ void PresetIO::setStateInformation(const void* data, int sizeInBytes)
     // on every launch — JUCE's auto-saved "filterState" should NOT override it.
     // The host (DAW) path still needs setStateInformation to restore project
     // state, so this override only fires when running standalone.
-    if (proc.wrapperType == juce::AudioProcessor::wrapperType_Standalone && ! ProcessorBase::skipAutoLoadDefault && ! performing)
+    if (wrapperType == juce::AudioProcessor::wrapperType_Standalone && ! ProcessorBase::skipAutoLoadDefault && ! performing)
     {
-        const juce::File defaultPreset = proc.getPresetsDir().getChildFile("_default.muClid");
+        const juce::File defaultPreset = getPresetsDir().getChildFile("_default.muClid");
         if (defaultPreset.existsAsFile())
         {
-            loadPreset(defaultPreset);
+            loadPresetFile(defaultPreset);
             return;
         }
         // No default preset saved — fall through to JUCE's auto-restore.
@@ -229,26 +221,26 @@ void PresetIO::setStateInformation(const void* data, int sizeInBytes)
         // A host restore applies at once, for either format: anything staged while the transport played
         // must not land on top of it. Runs on the message thread, like the rest of the restore.
         if (state.isValid())
-            proc.hotSwapStager.cancelAllStaged();
+            hotSwapStager.cancelAllStaged();
 
         if (state.hasType("MuClidPreset"))
             restoreSession(state);
-        else if (state.hasType(proc.apvts.state.getType()))
+        else if (state.hasType(apvts.state.getType()))
             restoreStateFromTree(state);
         else if (state.isValid())
         {
-            proc.noteFullPresetLoadFailed();
-            if (proc.onLoadError)
-                proc.onLoadError("Host state restore failed: not a mu-Clid state");
+            noteFullPresetLoadFailed();
+            if (onLoadError)
+                onLoadError("Host state restore failed: not a mu-Clid state");
         }
-        else if (proc.onLoadError)
-            proc.onLoadError("Host state restore failed: invalid tree");
+        else if (onLoadError)
+            onLoadError("Host state restore failed: invalid tree");
         if (state.isValid())
-            proc.restoreLiveState(state);   // after the preset: it names the item that is playing
+            restoreLiveState(state);   // after the preset: it names the item that is playing
     }
-    else if (proc.onLoadError)
+    else if (onLoadError)
     {
-        proc.onLoadError("Host state restore failed: could not parse XML");
+        onLoadError("Host state restore failed: could not parse XML");
     }
 }
 
