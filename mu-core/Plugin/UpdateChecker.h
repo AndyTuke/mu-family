@@ -34,7 +34,8 @@ public:
                 return;
             }
             waiting.push_back(std::move(onBody));
-            if (isThreadRunning()) return;
+            if (running) return;   // the fetch in flight serves this waiter too
+            running = true;
         }
         startThread();
     }
@@ -57,6 +58,7 @@ private:
             const juce::ScopedLock sl(lock);
             cachedBody = body;
             fetched    = true;
+            running    = false;
             toCall.swap(waiting);
         }
         for (auto& cb : toCall)
@@ -69,6 +71,7 @@ private:
         std::vector<std::function<void(const juce::String&)>> toCall;
         {
             const juce::ScopedLock sl(lock);
+            running = false;
             toCall.swap(waiting);
         }
         for (auto& cb : toCall)
@@ -77,6 +80,7 @@ private:
 
     juce::CriticalSection lock;
     bool fetched = false;
+    bool running = false;   // a fetch has been started and has not yet delivered; guarded by `lock`
     juce::String cachedBody;
     std::vector<std::function<void(const juce::String&)>> waiting;
 };
