@@ -9,12 +9,12 @@
 
 namespace juce { class RangedAudioParameter; }
 namespace mu_clid {
-class PluginProcessor;
+class RhythmHost;
 
 class AmpSubsection : public juce::Component
 {
 public:
-    explicit AmpSubsection(PluginProcessor& p);
+    explicit AmpSubsection(RhythmHost& host);
 
     void setRhythm(int ri);
     void loadFromRhythm();
@@ -37,7 +37,7 @@ public:
 private:
     using Id = MuLookAndFeel::ColourIds;
 
-    PluginProcessor& proc;
+    RhythmHost& host;
     int rhythmIndex = -1;
 
     KnobWithLabel ampLevel   { "Level",   Id::knobLevel  };

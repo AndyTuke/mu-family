@@ -8,12 +8,12 @@
 
 namespace juce { class RangedAudioParameter; }
 namespace mu_clid {
-class PluginProcessor;
+class RhythmHost;
 
 class PitchSubsection : public juce::Component
 {
 public:
-    explicit PitchSubsection(PluginProcessor& p);
+    explicit PitchSubsection(RhythmHost& host);
 
     void setRhythm(int ri);
     void loadFromRhythm();
@@ -27,7 +27,7 @@ public:
 private:
     using Id = MuLookAndFeel::ColourIds;
 
-    PluginProcessor& proc;
+    RhythmHost& host;
     int rhythmIndex = -1;
 
     KnobWithLabel pitchOctave { "Octave",      Id::knobEuclidean };

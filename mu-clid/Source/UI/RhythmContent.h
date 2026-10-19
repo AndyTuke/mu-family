@@ -9,7 +9,9 @@
 #include "UI/Components/SegmentControl.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/SaveDialog.h"
-#include "Plugin/PluginProcessor.h"
+#include "UI/RhythmHost.h"   // what the content reads from the layer's host
+
+class ProcessorBase;
 
 namespace mu_clid {
 
@@ -24,7 +26,9 @@ class RhythmContent : public juce::Component,
                     private juce::Timer
 {
 public:
-    explicit RhythmContent(PluginProcessor& p);
+    // `base` is handed only to the shared Euclid panel and insert section (mu-core components);
+    // everything the content itself reads comes through `host`.
+    RhythmContent(ProcessorBase& base, RhythmHost& host);
     ~RhythmContent() override;
 
     // Bind the band to rhythm `index` (the LayerPanel calls this on a layer change).
@@ -77,7 +81,7 @@ public:
     void setVoiceEffectSendLabel(const juce::String& name);
 
 private:
-    PluginProcessor& proc;
+    RhythmHost& host;
     int currentRhythmIndex = -1;
 
     // Tracks the most recent euclid overrides applied to the RhythmCircle so the

@@ -9,7 +9,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
       proc(p),
       masterLoop(p),
       sidebar(p, "Rhythm"),
-      rhythmContent(p),
+      rhythmContent(p, p),
       layerPanel(p, "Rhythm"),
       layerEdit(p, sidebar, layerPanel,
                 { [this] { rhythmContent.setLayer(-1); },   // nothing stays bound into a layer that is about to move

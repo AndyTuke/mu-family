@@ -1,10 +1,10 @@
 #include "MidiOutSection.h"
-#include "Plugin/PluginProcessor.h"
+#include "UI/RhythmHost.h"
 #include "Audio/MidiOutputMapping.h"   // mu-core: note names
 
 namespace mu_clid {
 
-MidiOutSection::MidiOutSection(PluginProcessor& p) : proc(p)
+MidiOutSection::MidiOutSection(RhythmHost& h) : host(h)
 {
     // Note: all 128 MIDI notes, item id = note + 1 (as mu-Clid MIDI's selector).
     for (int n = 0; n < 128; ++n)
@@ -43,14 +43,14 @@ MidiOutSection::MidiOutSection(PluginProcessor& p) : proc(p)
 void MidiOutSection::apvtsSet(const char* suffix, float v)
 {
     if (rhythmIndex < 0) return;
-    if (auto* p = proc.apvts.getParameter("r" + juce::String(rhythmIndex) + "_" + suffix))
+    if (auto* p = host.getRhythmParameters().getParameter("r" + juce::String(rhythmIndex) + "_" + suffix))
         p->setValueNotifyingHost(p->convertTo0to1(v));
 }
 
 float MidiOutSection::apvtsGet(const char* suffix, float fallback) const
 {
     if (rhythmIndex < 0) return fallback;
-    if (auto* raw = proc.apvts.getRawParameterValue("r" + juce::String(rhythmIndex) + "_" + suffix))
+    if (auto* raw = host.getRhythmParameters().getRawParameterValue("r" + juce::String(rhythmIndex) + "_" + suffix))
         return raw->load();
     return fallback;
 }

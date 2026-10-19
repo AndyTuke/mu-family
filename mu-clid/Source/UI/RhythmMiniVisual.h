@@ -3,7 +3,7 @@
 #include "EuclidPanelAliases.h"
 #include "Sequencer/Rhythm.h"
 #include "Sequencer/GeneratorAliases.h"
-#include "Plugin/PluginProcessor.h"
+#include "UI/RhythmHost.h"
 
 namespace mu_clid {
 
@@ -16,7 +16,7 @@ namespace mu_clid {
 class RhythmMiniVisual : public juce::Component, private juce::Timer
 {
 public:
-    RhythmMiniVisual(PluginProcessor& proc, int rhythmIndex);
+    RhythmMiniVisual(RhythmHost& host, int rhythmIndex);
     ~RhythmMiniVisual() override { stopTimer(); }
 
     std::function<void()> onHit;   // step hit → parent SidebarItem pulses
@@ -24,7 +24,7 @@ public:
     void resized() override;
 
 private:
-    PluginProcessor& proc;
+    RhythmHost&      host;
     int              rhythmIndex;
     RhythmCircle     miniCircle;
 

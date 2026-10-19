@@ -5,17 +5,19 @@
 #include "Voice/AmpSubsection.h"
 #include "UI/Voice/InsertSubsection.h"   // shared mu-core insert panel
 #include "UI/Voice/VoiceBand.h"          // shared mu-core voice band layout + drawing
+#include "UI/RhythmHost.h"
+
+class ProcessorBase;
 
 namespace mu_clid {
-
-class PluginProcessor;
 
 // mu-Clid's voice chain: the shared VoiceBand (Pitch | Filter | Amp | Effects layout + drawing)
 // filled with mu-Clid's subsections, which bind to the selected rhythm.
 class VoiceSection : public VoiceBand
 {
 public:
-    explicit VoiceSection(PluginProcessor& p);
+    // `base` is handed only to the shared insert section; the subsections read through `host`.
+    VoiceSection(ProcessorBase& base, RhythmHost& host);
 
     void setRhythm(int rhythmIndex);
     void loadFromRhythm();
@@ -28,7 +30,7 @@ public:
     std::function<void(int insertAlgo)> onInsertAlgorithmChanged;
 
 private:
-    PluginProcessor& proc;
+    RhythmHost&      host;
     int              currentRhythm = -1;
 
     PitchSubsection  pitchSub;

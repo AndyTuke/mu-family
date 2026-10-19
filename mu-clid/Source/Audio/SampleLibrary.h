@@ -3,20 +3,34 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "SamplePreview.h"
 
+class VoiceEngine;
+
 namespace mu_clid {
 
-class PluginProcessor;
+// What the sample library loads into and keeps its one setting in: the voice engine of each slot, the live
+// slot count, and the host's app settings file (the storage root; null until the host has created it).
+// mu-Clid's PluginProcessor implements it. Message thread only.
+class SampleSlotHost
+{
+public:
+    virtual ~SampleSlotHost() = default;
+    virtual int                   getSampleSlotCount() const noexcept = 0;
+    // Slot `slot`'s voice engine (any slot below the maximum, live or not), or null when it has none.
+    virtual VoiceEngine*          getSampleSlotEngine(int slot) noexcept = 0;
+    virtual const VoiceEngine*    getSampleSlotEngine(int slot) const noexcept = 0;
+    virtual juce::PropertiesFile* getSampleSettingsFile() const noexcept = 0;
+};
 
 // mu-Clid's per-rhythm sample bookkeeping: the sample path each rhythm slot plays, the
 // load / name / missing queries the UI reads, the file-browser preview player and the
 // user's primary sample-library folder. Owned by PluginProcessor as `samples`.
 //
 // Threading: everything here is message-thread except mixPreviewInto (audio thread).
-// Path slots are indexed by rhythm and stay sized to RhythmSequencer::MaxRhythms.
+// Path slots are indexed by rhythm and stay sized to mu_limits::kMaxLayers.
 class SampleLibrary
 {
 public:
-    explicit SampleLibrary(PluginProcessor& p);
+    explicit SampleLibrary(SampleSlotHost& host);
 
     // Loads a file into the rhythm's voice engine and records its path.
     void load(int rhythmIndex, const juce::File& file);
@@ -52,7 +66,7 @@ public:
     void       setPrimarySampleDir(const juce::File& dir);
 
 private:
-    PluginProcessor&  proc;
+    SampleSlotHost&   host;
     juce::StringArray samplePaths;
     SamplePreview     preview;
 };

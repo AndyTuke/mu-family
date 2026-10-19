@@ -1,11 +1,12 @@
 #include "SampleBrowser.h"
+#include "Audio/SampleLibrary.h"
 
 namespace mu_clid {
 
-SampleBrowserContent::SampleBrowserContent(PluginProcessor& proc,
+SampleBrowserContent::SampleBrowserContent(RhythmHost& host,
                                             const juce::File& startDir,
                                             std::function<void(const juce::File&)> onChosen)
-    : proc(proc), onChosen(std::move(onChosen)),
+    : host(host), onChosen(std::move(onChosen)),
       fileFilter("*.wav;*.aiff;*.aif;*.mp3;*.flac", {}, "Audio files"),
       browser(juce::FileBrowserComponent::openMode |
               juce::FileBrowserComponent::canSelectFiles,
@@ -22,12 +23,12 @@ SampleBrowserContent::SampleBrowserContent(PluginProcessor& proc,
     // index reflects the current root so the toggle stays honest when the user
     // navigates away via the browser, then jumps back via the toggle.
     sourceToggle.setSelectedIndex(
-        startDir == this->proc.getSamplesDir() ? 1 : 0,
+        startDir == this->host.getRhythmSamplesDir() ? 1 : 0,
         juce::dontSendNotification);
     sourceToggle.onChange = [this](int idx)
     {
-        const juce::File target = (idx == 1) ? this->proc.getSamplesDir()
-                                             : this->proc.samples.getPrimarySampleDir();
+        const juce::File target = (idx == 1) ? this->host.getRhythmSamplesDir()
+                                             : this->host.getRhythmSamples().getPrimarySampleDir();
         if (target.isDirectory())
             browser.setRoot(target);
     };
@@ -39,14 +40,14 @@ SampleBrowserContent::SampleBrowserContent(PluginProcessor& proc,
     };
     cancelBtn.onClick = [this]
     {
-        this->proc.samples.stopPreview();
+        this->host.getRhythmSamples().stopPreview();
         if (onDismiss) onDismiss();
     };
 
     setSize(mu_ui::s(560), mu_ui::s(470));
 }
 
-SampleBrowserContent::~SampleBrowserContent() { proc.samples.stopPreview(); }
+SampleBrowserContent::~SampleBrowserContent() { host.getRhythmSamples().stopPreview(); }
 
 void SampleBrowserContent::resized()
 {
@@ -67,14 +68,14 @@ void SampleBrowserContent::selectionChanged()
 {
     const auto f = browser.getSelectedFile(0);
     if (f.existsAsFile())
-        proc.samples.startPreview(f);
+        host.getRhythmSamples().startPreview(f);
 }
 
 void SampleBrowserContent::fileDoubleClicked(const juce::File& f) { commit(f); }
 
 void SampleBrowserContent::commit(const juce::File& f)
 {
-    proc.samples.stopPreview();
+    host.getRhythmSamples().stopPreview();
     onChosen(f);
     if (onDismiss) onDismiss();
 }

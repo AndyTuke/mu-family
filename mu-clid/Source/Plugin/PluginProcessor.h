@@ -17,6 +17,7 @@
 #include "Sequencer/RhythmPlayState.h"
 #include "Plugin/MidiClockSync.h"   // shared mu-core MIDI-clock slave
 #include "Persistence/PresetIO.h"
+#include "UI/RhythmHost.h"   // what the Rhythm layer's UI reads from its host
 #include "HotSwapStager.h"
 
 #include <memory>
@@ -27,6 +28,8 @@
 namespace mu_clid {
 
 class PluginProcessor : public ProcessorBase,
+                        public RhythmHost,
+                        public SampleSlotHost,
                         private juce::AudioProcessorValueTreeState::Listener
 {
 public:
@@ -255,6 +258,39 @@ public:
         return &voiceEngines[(size_t)ri]->insertProc.grReduction;
     }
 
+    // ── RhythmHost: what RhythmContent and the sidebar's mini circle read (message thread) ─────────
+    juce::AudioProcessorValueTreeState& getRhythmParameters() noexcept override { return apvts; }
+    int           getRhythmCount() const noexcept override                    { return getNumRhythms(); }
+    Rhythm&       getRhythmLayer(int layer) noexcept override                 { return getRhythm(layer); }
+    const Rhythm& getRhythmLayer(int layer) const noexcept override           { return getRhythm(layer); }
+    bool                     isRhythmTransportPlaying() const noexcept override { return sequencerPlaying.load(); }
+    const std::atomic<bool>& getRhythmTransportFlag() const noexcept override   { return sequencerPlaying; }
+    RhythmPlayState&         getRhythmPlayState(int layer) noexcept override    { return rhythmPlayState[(size_t) layer]; }
+    float getRhythmModLive(int layer, int snap) const noexcept override         { return getModSnapshot(layer, snap); }
+    EuclidOverrides getRhythmEuclidOverrides(int layer) const noexcept override { return getModulatedEuclidOverrides(layer); }
+    const std::atomic<float>* getRhythmInsertGainReduction(int layer) override  { return getInsertGRReductionPtr(layer); }
+    bool               isRhythmParamsLoading() const noexcept override          { return isApvtsLoading(); }
+    std::atomic<bool>& getRhythmParamsLoadingFlag() noexcept override           { return getApvtsLoadingFlag(); }
+    void               syncRhythmFromParameters(int layer) override             { forceSyncRhythmFromApvts(layer); }
+    void renameRhythmLayer(int layer, const juce::String& newName) override     { renameRhythm(layer, newName); }
+    void resetRhythmLayer(int layer) override                                   { resetLayer(layer); }
+    int  getRhythmClipCount(int layer) const override                           { return clipCount(layer); }
+    juce::File getRhythmPresetsDir() const override                             { return getRhythmsDir(); }
+    void saveRhythmPresetFile(int layer, const juce::File& dest, bool embedSample,
+                              const juce::String& category, const juce::String& description) override
+        { saveRhythmPresetToFile(layer, dest, embedSample, category, description); }
+    void stageRhythmPresetFile(int layer, const juce::File& file) override      { stageRhythmPreset(layer, file); }
+    juce::StringArray getRhythmPresetCategories() const override                { return loadCategoryList(); }
+    void addRhythmPresetCategory(const juce::String& category) override        { ensureCategoryInList(category); }
+    SampleLibrary& getRhythmSamples() noexcept override                         { return samples; }
+    juce::File     getRhythmSamplesDir() const override                         { return getSamplesDir(); }
+
+    // ── SampleSlotHost: the engines and the settings file the sample library uses (message thread) ──
+    int getSampleSlotCount() const noexcept override                         { return numLayers.load(std::memory_order_acquire); }
+    VoiceEngine*       getSampleSlotEngine(int slot) noexcept override       { return voiceEngines[(size_t) slot].get(); }
+    const VoiceEngine* getSampleSlotEngine(int slot) const noexcept override { return voiceEngines[(size_t) slot].get(); }
+    juce::PropertiesFile* getSampleSettingsFile() const noexcept override    { return appSettings.get(); }
+
 private:
     std::array<std::atomic<float>, kSnapCount> modSnapshot[RhythmSequencer::MaxRhythms];
 
@@ -462,7 +498,6 @@ private:
 
     friend class PresetIO;
     friend class HotSwapStager;
-    friend class SampleLibrary;
     friend struct ClipCommitProbe;         // tests drive the boundary scan and commit of a staged launch
     friend struct ModulationMemoryProbe;   // tests read the per-slot modulation change-detection state
 

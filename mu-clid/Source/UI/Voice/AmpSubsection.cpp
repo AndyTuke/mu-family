@@ -1,12 +1,12 @@
 #include "AmpSubsection.h"
-#include "Plugin/PluginProcessor.h"
+#include "UI/RhythmHost.h"
 #include "ValueFormat.h"   // mu-core: shared value text
 #include "Modulation/ModulationSnapshot.h"
 #include "Sequencer/Rhythm.h"
 
 namespace mu_clid {
 
-AmpSubsection::AmpSubsection(PluginProcessor& p) : proc(p)
+AmpSubsection::AmpSubsection(RhythmHost& h) : host(h)
 {
     for (auto* k : { &ampLevel, &ampSendEff, &ampSendDly, &ampSendRev, &ampAccent, &ampPan,
                      &ampAtk, &ampDec, &ampSus, &ampRel })
@@ -38,7 +38,7 @@ void AmpSubsection::apvtsSet(const char* suffix, float v)
     if (it == paramPtrCache.end())
     {
         const auto id = "r" + juce::String(rhythmIndex) + "_" + suffix;
-        it = paramPtrCache.emplace(suffix, proc.apvts.getParameter(id)).first;
+        it = paramPtrCache.emplace(suffix, host.getRhythmParameters().getParameter(id)).first;
     }
     if (auto* p = it->second)
         p->setValueNotifyingHost(p->convertTo0to1(v));
@@ -159,7 +159,7 @@ void AmpSubsection::wireCallbacks()
 
     auto writeChannelSend = [this](const char* suffix, double v) {
         if (rhythmIndex < 0) return;
-        if (auto* p = proc.apvts.getParameter("ch" + juce::String(rhythmIndex) + "_" + suffix))
+        if (auto* p = host.getRhythmParameters().getParameter("ch" + juce::String(rhythmIndex) + "_" + suffix))
             p->setValueNotifyingHost(p->convertTo0to1((float)v));
     };
     ampSendEff.onValueChanged = [writeChannelSend](double v) { writeChannelSend("sendEff", v); };
@@ -179,8 +179,8 @@ void AmpSubsection::setRhythm(int ri)
 
 void AmpSubsection::loadFromRhythm()
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
-    const auto& p = proc.getRhythm(rhythmIndex).voiceParams;
+    if (rhythmIndex < 0 || rhythmIndex >= host.getRhythmCount()) return;
+    const auto& p = host.getRhythmLayer(rhythmIndex).voiceParams;
     constexpr auto dn = juce::dontSendNotification;
 
     ampLevel.setValue(p.ampLevel,  dn);          // dB already (Step 0)
@@ -191,7 +191,7 @@ void AmpSubsection::loadFromRhythm()
 
     const auto chPfx = "ch" + juce::String(rhythmIndex) + "_";
     auto load = [&](KnobWithLabel& k, const char* param) {
-        if (auto* raw = proc.apvts.getRawParameterValue(chPfx + param))
+        if (auto* raw = host.getRhythmParameters().getRawParameterValue(chPfx + param))
             k.setValue(*raw, dn);
     };
     load(ampSendEff, "sendEff");
@@ -202,8 +202,8 @@ void AmpSubsection::loadFromRhythm()
 
 void AmpSubsection::refreshSuffix(const juce::String& suffix)
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
-    const auto& p = proc.getRhythm(rhythmIndex).voiceParams;
+    if (rhythmIndex < 0 || rhythmIndex >= host.getRhythmCount()) return;
+    const auto& p = host.getRhythmLayer(rhythmIndex).voiceParams;
     constexpr auto dn = juce::dontSendNotification;
 
     if      (suffix == "ampLvl")   ampLevel .setValue(p.ampLevel,  dn);
@@ -215,7 +215,7 @@ void AmpSubsection::refreshSuffix(const juce::String& suffix)
     else if (suffix == "sendEff" || suffix == "sendDly" || suffix == "sendRev" || suffix == "pan")
     {
         const auto chPfx = "ch" + juce::String(rhythmIndex) + "_";
-        if (auto* raw = proc.apvts.getRawParameterValue(chPfx + suffix))
+        if (auto* raw = host.getRhythmParameters().getRawParameterValue(chPfx + suffix))
         {
             if      (suffix == "sendEff") ampSendEff.setValue(*raw, dn);
             else if (suffix == "sendDly") ampSendDly.setValue(*raw, dn);
@@ -227,36 +227,36 @@ void AmpSubsection::refreshSuffix(const juce::String& suffix)
 
 void AmpSubsection::bindModulationIndicators()
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms())
+    if (rhythmIndex < 0 || rhythmIndex >= host.getRhythmCount())
     {
         for (auto* k : { &ampAtk, &ampDec, &ampSus, &ampLevel, &ampAccent,
                          &ampPan, &ampSendEff, &ampSendDly, &ampSendRev })
             k->clearModBinding();
         return;
     }
-    const auto* mx = &proc.getRhythm(rhythmIndex).modulationMatrix;
+    const auto* mx = &host.getRhythmLayer(rhythmIndex).modulationMatrix;
     static const float kNaN = std::numeric_limits<float>::quiet_NaN();
 
     // ADSR attack/decay: snap stores ACTUAL seconds (skewFactor 0.3 slider) → setModulatedActual.
     ampAtk.bindModulation("amp.attack", mx,
-        [&proc = proc, ri = rhythmIndex]() -> float {
-            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapAmpAtk) : kNaN; });
+        [&host = host, ri = rhythmIndex]() -> float {
+            return host.isRhythmTransportPlaying() ? host.getRhythmModLive(ri, kSnapAmpAtk) : kNaN; });
     ampDec.bindModulation("amp.decay", mx,
-        [&proc = proc, ri = rhythmIndex]() -> float {
-            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapAmpDec) : kNaN; });
+        [&host = host, ri = rhythmIndex]() -> float {
+            return host.isRhythmTransportPlaying() ? host.getRhythmModLive(ri, kSnapAmpDec) : kNaN; });
     // Sustain: snap normalised 0..1, slider linear 0..100 → normMode.
     ampSus.bindModulation("amp.sustain", mx,
-        [&proc = proc, ri = rhythmIndex]() -> float {
-            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapAmpSus) : kNaN; },
+        [&host = host, ri = rhythmIndex]() -> float {
+            return host.isRhythmTransportPlaying() ? host.getRhythmModLive(ri, kSnapAmpSus) : kNaN; },
         true);
     // amp.level: snap stores actual dB (-60..+6).
     ampLevel.bindModulation("amp.level", mx,
-        [&proc = proc, ri = rhythmIndex]() -> float {
-            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapAmpLvl) : kNaN; });
+        [&host = host, ri = rhythmIndex]() -> float {
+            return host.isRhythmTransportPlaying() ? host.getRhythmModLive(ri, kSnapAmpLvl) : kNaN; });
     // accentDb: snap stores display 0..100 dB.
     ampAccent.bindModulation("accentDb", mx,
-        [&proc = proc, ri = rhythmIndex]() -> float {
-            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapAccent) : kNaN; });
+        [&host = host, ri = rhythmIndex]() -> float {
+            return host.isRhythmTransportPlaying() ? host.getRhythmModLive(ri, kSnapAccent) : kNaN; });
     // Mixer strip: pan + FX sends — snap stores the actual value (pan -1..+1, sends 0..1).
     struct { KnobWithLabel* k; const char* dest; ModSnapIdx snap; } strip[] = {
         { &ampPan,     "amp.pan",     kSnapPan     }, { &ampSendEff, "send.effect", kSnapSendEff },
@@ -264,8 +264,8 @@ void AmpSubsection::bindModulationIndicators()
     };
     for (auto& e : strip)
         e.k->bindModulation(e.dest, mx,
-            [&proc = proc, ri = rhythmIndex, snap = e.snap]() -> float {
-                return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, snap) : kNaN; });
+            [&host = host, ri = rhythmIndex, snap = e.snap]() -> float {
+                return host.isRhythmTransportPlaying() ? host.getRhythmModLive(ri, snap) : kNaN; });
     // ampRel: Release is not a modulation target — leave unbound.
 }
 
