@@ -202,7 +202,7 @@ namespace
         ve.prepareToPlay(48000.0, kBlock);
         ve.loadFile(click);
         VoiceParams p;
-        p.ampEnvRel = 0.5f;   // a release long enough that contended blocks must move it on too
+        p.ampEnvRel = 4.0f;   // longer than the 2 s drain budget, so the drain waits on the release: contended blocks must move it on too
         ve.setParams(p);
         juce::AudioBuffer<float> block(2, kBlock);
         ve.trigger(false, false);

@@ -364,11 +364,16 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
         ctx.slot = s;
         ctx.midiOut = { renderState.midi.get() + reserveStart, mu_limits::kMidiNoteOffReserve, 0, &renderState.tailOut };
         auto& view = renderState.view[(size_t) s];
-        // Re-pointing drops the view's cleared flag; a slot nothing has written yet keeps it (the clear only
-        // re-zeroes zeros), so the mixer hook can tell a silent slot from one that rendered.
-        const bool untouched = view.hasBeenCleared();
-        view.setDataToReferTo(renderState.scratch[(size_t) s].getArrayOfWritePointers(), 2, 0, numSamples);
-        if (untouched) view.clear();
+        // Every slot below mixCount was opened this call, so the view normally refers to its scratch already and is
+        // left alone (its cleared flag tells the mixer hook a silent slot from one that rendered). Re-pointing would
+        // drop that flag, so a re-point keeps it (the clear only re-zeroes zeros).
+        auto& scratch = renderState.scratch[(size_t) s];
+        if (view.getNumSamples() != numSamples || view.getNumChannels() != 2 || view.getReadPointer(0) != scratch.getReadPointer(0))
+        {
+            const bool untouched = view.hasBeenCleared();
+            view.setDataToReferTo(scratch.getArrayOfWritePointers(), 2, 0, numSamples);
+            if (untouched) view.clear();
+        }
         wentDone |= retireBin.render(s, ctx, view, numSamples, v.serial, renderState.live[(size_t) s]);
     }
     if (wentDone) requestDeferredWork();   // the free runs on the message thread after the grace period
