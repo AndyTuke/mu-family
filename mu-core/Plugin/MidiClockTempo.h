@@ -5,11 +5,11 @@
 // (timestamps from the MIDI thread), so every μ app follows an external clock the same way.
 //
 // Each 0xF8 pulse (24 per quarter-note) is timestamped, and the tempo is the average rate over the
-// last two beats of pulses: the span from the oldest pulse in the window to the newest, divided into the
+// last four beats of pulses: the span from the oldest pulse in the window to the newest, divided into the
 // pulse count. A timestamp is only as exact as its audio block (pulses in one block bunch together),
-// and that error does not grow with the window, so averaging two beats settles the reading to a
+// and that error does not grow with the window, so averaging four beats settles the reading to a
 // fraction of a BPM where a pulse-to-pulse filter jitters. A gap too long to be a pulse (a dropout)
-// restarts the window. The cost is that a real tempo change is followed over about two beats.
+// restarts the window. The cost is that a real tempo change is followed over about four beats.
 //
 // Pure logic, no JUCE and no atomics: the owner decides which thread calls it.
 namespace mu_core
@@ -55,7 +55,7 @@ public:
     double bpm() const noexcept { return estBpm; }
 
 private:
-    static constexpr int kWindow = 48;   // two beats of pulses
+    static constexpr int kWindow = 96;   // four beats of pulses
 
     double stamp[kWindow + 1] {};
     int    head   = 0;
