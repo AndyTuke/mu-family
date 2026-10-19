@@ -399,31 +399,37 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
   </footer>
 
   <script>
-  // Show the version that will actually be downloaded by querying GitHub's
-  // "latest release" — the same release the download buttons resolve to.
+  // Show the current version and release date from our own latest.json (the same
+  // file the apps read for their update check). Fails silently to the baked-in values.
   (function () {
-    var REPO = 'AndyTuke/mu-family';
-    var setAll = function (sel, val) {
-      document.querySelectorAll(sel).forEach(function (el) { el.textContent = val; });
-    };
-    fetch('https://api.github.com/repos/' + REPO + '/releases/latest', { headers: { 'Accept': 'application/vnd.github+json' } })
+    var SLUGS = { 'mu-Clid-Windows.zip': 'mu-clid', 'mu-Clid-MIDI-Windows.zip': 'mu-clid-midi',
+                  'mu-Link-Windows.zip': 'mu-link', 'mu-Tant-Windows.zip': 'mu-tant',
+                  'mu-Toni-Windows.zip': 'mu-toni', 'mu-On-Windows.zip': 'mu-on' };
+    var vtext = function (v) { v = String(v); return v.charAt(0) === 'v' ? v : 'v' + v; };
+    fetch('https://transwarp.me/latest.json')
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function (rel) {
-        setAll('[data-version]', rel.tag_name || 'latest');
-        if (rel.published_at) {
-          var d = new Date(rel.published_at);
-          setAll('[data-reldate]', '· released ' + d.toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' }));
-        }
-        (rel.assets || []).forEach(function (a) {
-          var el = document.querySelector('[data-asset="' + a.name + '"]');
-          if (el && a.size) el.textContent = (a.size / 1048576).toFixed(1) + ' MB';
+      .then(function (data) {
+        if (!data || data.schema !== 1 || !data.products) return;
+        // Per-product version in each download card.
+        document.querySelectorAll('[data-asset]').forEach(function (assetEl) {
+          var p = data.products[SLUGS[assetEl.getAttribute('data-asset')]];
+          var card = assetEl.parentNode;
+          var el = card && card.querySelector('[data-version]');
+          if (p && p.version && el) el.textContent = vtext(p.version);
         });
+        // Banner: the main product's version and the family release date.
+        var main = data.products['mu-clid'];
+        var banner = document.querySelector('.ver-banner [data-version]');
+        if (main && main.version && banner) banner.textContent = vtext(main.version);
+        if (data.released) {
+          var d = new Date(data.released);
+          if (!isNaN(d)) {
+            var txt = '· released ' + d.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+            document.querySelectorAll('[data-reldate]').forEach(function (el) { el.textContent = txt; });
+          }
+        }
       })
-      .catch(function () {
-        // API unavailable (offline, rate-limited, or local file:// preview where
-        // cross-origin fetch is blocked): keep the hardcoded defaults baked into the
-        // HTML so a real version + sizes are always shown. Nothing to do here.
-      });
+      .catch(function () { /* offline or file:// preview: keep the baked-in values */ });
   })();
   </script>
 
