@@ -183,7 +183,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     for (int c = masterChannels; c < buffer.getNumChannels(); ++c)
         buffer.clear(c, 0, buffer.getNumSamples());
 
-    renderThroughLayers(buffer, midiMessages, deriveTransport(buffer, midiMessages));
+    driveLayers(buffer, midiMessages, deriveTransport(buffer, midiMessages));
 }
 
 void PluginProcessor::sendOrphanOffs(juce::MidiBuffer& midiMessages)
@@ -195,8 +195,8 @@ void PluginProcessor::sendOrphanOffs(juce::MidiBuffer& midiMessages)
 
 // The layer chain: the block's transport as the driver reads it (the beat after mu-Clid's own resolve, so a
 // sub-step dip is held as before), the host's buses, then renderAndMix. The per-block glue runs in its hooks.
-void PluginProcessor::renderThroughLayers(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages,
-                                          const BlockTransport& transport)
+void PluginProcessor::driveLayers(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages,
+                                  const BlockTransport& transport)
 {
     const int n = buffer.getNumSamples();
     mu_core::BlockTransport t;

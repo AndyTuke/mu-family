@@ -8,6 +8,35 @@ juce_add_binary_data(mu-clid-resources
     SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/mu-clid.png"
 )
 
+# ── mu-clid-layer — the Rhythm layer type as a library (docs/mu-tronic/design.md 2.5) ──
+# The product's own Source/ folders, no move: Audio/ Sequencer/ Modulation/ Persistence/ and UI/ (without the
+# app's SettingsOverlay). INTERFACE, like mu-core, so its sources compile in each consumer's target. The engine
+# side is the library's sources; the layer's UI content is MU_CLID_LAYER_UI_SOURCES, which a GUI consumer adds
+# (a console test target has none of the mu-core UI it needs). A host of the Rhythm type (this app, mu-Tronic)
+# links it beside mu-core; tests/scripts/check-layer-boundary.ps1 keeps it free of Plugin/ and License/.
+# Not in it: the processor, the hot-swap stager and the licence glue (the app).
+add_library(mu-clid-layer INTERFACE)
+target_sources(mu-clid-layer INTERFACE
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/SampleRhythm.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/SampleRhythm_Modulation.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/RhythmCursor.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Persistence/RhythmParams.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Persistence/RhythmPresetTree.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Persistence/PresetMigrations.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Audio/SamplePreview.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Audio/SampleLibrary.cpp"
+)
+target_include_directories(mu-clid-layer INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
+set(MU_CLID_LAYER_UI_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/RhythmMiniVisual.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/VoiceSection.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Voice/PitchSubsection.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Voice/FilterSubsection.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Voice/AmpSubsection.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/RhythmContent.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/MidiOutSection.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/SampleBrowser.cpp")
+
 # ── mu-Clid — full plugin (VST3 + CLAP + Standalone) ────────────────────────
 juce_add_plugin(mu-clid
     COMPANY_NAME "Transwarp Development Project"
@@ -45,29 +74,14 @@ target_sources(mu-clid
     PRIVATE
         Source/Plugin/PluginProcessor.cpp
         Source/Plugin/PluginProcessor_APVTS.cpp
-        Source/Sequencer/SampleRhythm.cpp
-        Source/Sequencer/RhythmCursor.cpp
-        Source/Sequencer/SampleRhythm_Modulation.cpp
         Source/Plugin/PluginProcessor_Layers.cpp
         Source/Plugin/PluginProcessor_Content.cpp
-        Source/Persistence/RhythmParams.cpp
-        Source/Persistence/RhythmPresetTree.cpp
         Source/Plugin/PluginProcessor_Preset.cpp
         Source/Plugin/PluginProcessor_HostState.cpp
-        Source/Persistence/PresetMigrations.cpp
         Source/Plugin/HotSwapStager.cpp
-        Source/Audio/SamplePreview.cpp
-        Source/Audio/SampleLibrary.cpp
         Source/Plugin/PluginEditor.cpp
-        Source/UI/RhythmMiniVisual.cpp
-        Source/UI/VoiceSection.cpp
-        Source/UI/Voice/PitchSubsection.cpp
-        Source/UI/Voice/FilterSubsection.cpp
-        Source/UI/Voice/AmpSubsection.cpp
-        Source/UI/RhythmContent.cpp
-        Source/UI/MidiOutSection.cpp
-        Source/UI/SampleBrowser.cpp
         Source/UI/SettingsOverlay.cpp
+        ${MU_CLID_LAYER_UI_SOURCES}   # the layer's UI content (mu-clid-layer)
         # Offline-license verifier lives in mu-core (shared); compiled here + monocypher.c.
         "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
         "${CMAKE_SOURCE_DIR}/mu-core/License/LemonSqueezyClient.cpp"
@@ -106,6 +120,7 @@ target_compile_definitions(mu-clid
 
 target_link_libraries(mu-clid
     PRIVATE
+        mu-clid-layer
         mu-core
         mu-clid-resources
         juce::juce_audio_utils
@@ -253,7 +268,6 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/RhythmCursorEqualityTests.cpp # the per-layer step cursor equals RhythmSequencer bit for bit
     Source/Tests/MidiOutputModeTests.cpp       # per-rhythm Sample / MIDI output: table, presets, render through the real processor
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/RhythmSequencer.cpp"        # under test by the wrap tests
-    Source/Persistence/PresetMigrations.cpp    # under test by C1/C2
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/Rhythm.cpp"                 # RhythmSequencer builds patterns through it
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/HitGenerator.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/EuclideanGenerator.cpp"
@@ -276,18 +290,11 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/ExtractionPinTests.cpp        # pins: drained tails, count policy, longest tail, edit mid-play, oversize, trigger source
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_APVTS.cpp
-    Source/Sequencer/SampleRhythm.cpp
-    Source/Sequencer/RhythmCursor.cpp
-    Source/Sequencer/SampleRhythm_Modulation.cpp
     Source/Plugin/PluginProcessor_Content.cpp
     Source/Plugin/PluginProcessor_Layers.cpp
-    Source/Persistence/RhythmParams.cpp
-    Source/Persistence/RhythmPresetTree.cpp
     Source/Plugin/PluginProcessor_Preset.cpp
     Source/Plugin/PluginProcessor_HostState.cpp
     Source/Plugin/HotSwapStager.cpp
-    Source/Audio/SamplePreview.cpp
-    Source/Audio/SampleLibrary.cpp
     "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/License/LemonSqueezyClient.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/License/OnlineActivation.cpp"
@@ -307,6 +314,7 @@ target_include_directories(mu-clid-tests PRIVATE
 )
 
 target_link_libraries(mu-clid-tests PRIVATE
+    mu-clid-layer
     juce::juce_core
     juce::juce_graphics
     juce::juce_gui_basics
@@ -329,3 +337,59 @@ target_compile_definitions(mu-clid-tests PRIVATE
 )
 
 set_target_properties(mu-clid-tests PROPERTIES EXCLUDE_FROM_ALL TRUE)
+# ── mu-clid-layer-tests — the layer with no processor (extraction-plan 4.1) ──
+# Compiled from mu-clid-layer, mu-core's layer-side sources and the test alone: no Plugin/ source, so a
+# layer that secretly needed the processor fails to link. Built on demand, like mu-clid-tests.
+juce_add_console_app(mu-clid-layer-tests PRODUCT_NAME "mu-clid-layer-tests")
+
+target_sources(mu-clid-layer-tests PRIVATE
+    Source/Tests/TestMain.cpp
+    Source/Tests/LayerLibraryTests.cpp
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/VoiceEngine.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/InsertProcessor.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/MultiModeFilter.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/SamplePlayer.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/MixerEngine.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/MidiOutputEngine.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/FX/Slots/EffectSlot.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/FX/Slots/DelaySlot.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/FX/Slots/ReverbSlot.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/FX/Slots/FXChain.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/ControlSequence.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/Rhythm.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/HitGenerator.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/EuclideanGenerator.cpp"
+)
+
+target_compile_features(mu-clid-layer-tests PRIVATE cxx_std_17)
+
+target_include_directories(mu-clid-layer-tests PRIVATE
+    "${CMAKE_SOURCE_DIR}/mu-core"
+    SYSTEM
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+)
+
+target_link_libraries(mu-clid-layer-tests PRIVATE
+    mu-clid-layer
+    juce::juce_core
+    juce::juce_audio_basics
+    juce::juce_audio_processors
+    juce::juce_audio_utils
+    juce::juce_data_structures
+    juce::juce_events
+    juce::juce_graphics
+    juce::juce_gui_basics
+    juce::juce_dsp
+    juce::juce_audio_formats
+    juce::juce_recommended_config_flags
+    juce::juce_recommended_warning_flags
+)
+
+target_compile_definitions(mu-clid-layer-tests PRIVATE JUCE_USE_MP3AUDIOFORMAT=1 JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+
+set_target_properties(mu-clid-layer-tests PROPERTIES EXCLUDE_FROM_ALL TRUE)
+
+# A link regression in the layer shows up in a normal build (as mu-tant does).
+add_dependencies(mu-clid mu-clid-layer-tests)

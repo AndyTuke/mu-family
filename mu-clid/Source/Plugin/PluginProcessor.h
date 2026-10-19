@@ -367,7 +367,7 @@ private:
     // ── The render: the shared layer driver ──────────────────────────────────────────────────────────
     // The host's buses, the block's transport, then the shared driver (ProcessorBase::renderAndMix): the
     // rhythms render themselves (SampleRhythm::render) and the mixer runs, in chunks of the prepared size.
-    void renderThroughLayers(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages, const BlockTransport& transport);
+    void driveLayers(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages, const BlockTransport& transport);
     // The driver's per-block hooks (rendered blocks only, under the layer lock): the start sends the owed
     // note-offs, finds each rhythm's hit with the host step clock and the rhythm cursors (MIDI hits go out
     // now, sample hits wait for the rhythm's render), checks the swap boundaries, publishes the play state and
