@@ -1,7 +1,8 @@
 # mu-layer-link-test — mu-clid-layer, mu-tant-layer, mu-on-layer and mu-toni-layer linked into one console target,
 # headers of each included, nothing run (extraction-plan 2.6). Exercises the include-path and symbol collisions
 # of design 2.5 that no single-product build can see. Built on demand, not part of ALL_BUILD.
-# The mu-core list is the union of the four *-layer-tests targets' lists.
+# The mu-core list is the union of the four *-layer-tests targets' lists: when a source is added to one
+# of those lists, add it here too.
 juce_add_console_app(mu-layer-link-test PRODUCT_NAME "mu-layer-link-test")
 
 target_sources(mu-layer-link-test PRIVATE
