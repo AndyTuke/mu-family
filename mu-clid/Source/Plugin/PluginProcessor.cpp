@@ -463,11 +463,34 @@ void PluginProcessor::renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::M
         kMaxRetiredEngines
     };
 
-    processCoreBlock(masterBus, voiceEngines.data(), numRhythms,
-                     buffer.getNumSamples(), effectiveBpm, &directPtrs, fxRetPtr,
-                     &retiredDesc);
+    // A host may send a block longer than the size prepared for; the mixer and the voices size their
+    // scratch buffers for the prepared size only. So the audio render runs in chunks of at most that
+    // size, each on views of the host's buses (no allocation: the view keeps its channel pointers inline).
+    const int total = buffer.getNumSamples();
+    const int chunkMax = juce::jmax(1, currentBlockSize);
+    for (int start = 0; start < total; start += chunkMax)
+    {
+        const int len = juce::jmin(chunkMax, total - start);
+        auto view = [start, len](juce::AudioBuffer<float>& b) {
+            return juce::AudioBuffer<float>(b.getArrayOfWritePointers(), b.getNumChannels(), start, len); };
 
-    samples.mixPreviewInto(masterBus, buffer.getNumSamples());
+        auto masterView = view(masterBus);
+        std::array<juce::AudioBuffer<float>, 8> directViews;
+        std::array<juce::AudioBuffer<float>*, 8> directViewPtrs {};
+        for (size_t i = 0; i < 8; ++i)
+            if (directPtrs[i] != nullptr)
+            {
+                directViews[i]    = view(*directPtrs[i]);
+                directViewPtrs[i] = &directViews[i];
+            }
+        juce::AudioBuffer<float> fxRetView;
+        if (fxRetPtr != nullptr) fxRetView = view(*fxRetPtr);
+
+        processCoreBlock(masterView, voiceEngines.data(), numRhythms,
+                         len, effectiveBpm, &directViewPtrs, fxRetPtr != nullptr ? &fxRetView : nullptr,
+                         &retiredDesc);
+        samples.mixPreviewInto(masterView, len);
+    }
 
     for (int r = 0; r < numRhythms; ++r)
         midiEngines[r].processBlock(midiMessages, buffer.getNumSamples());

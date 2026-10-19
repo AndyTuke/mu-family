@@ -592,11 +592,28 @@ struct MuClidExtractionPinTests : juce::UnitTest
             for (const auto meta : m) expectEquals(meta.samplePosition, 1024 - 64, "at frame 960 of the block");
         }
 
-        // Not exercised, only recorded: MixerEngine::processBlock applies pan, gain, sidechain and the peak readers
-        // to `numSamples` frames of channel buffers that prepare() sized at the prepared block, so an oversize block
-        // through PluginProcessor::processBlock runs off the end of them (it crashes a Debug heap). The contract has
-        // to say what an oversize block does (clamp or chunk) before a golden can include one; until then the golden
-        // schedules stay within the prepared size.
+        beginTest("An oversize host block (1024 frames on a 256 prepared size) is rendered in chunks: no overrun, finite sound across the whole block");
+        {
+            mu_seam_test::TempStorage storage;
+            Rig rig(256);
+            rig.host.playing = true;
+            useSample(rig.p, 0, "Kick 01.wav");
+            ringA(rig.p, 0, 16, 16);
+            const auto out = rig.block(1024);
+            float peak = 0.0f, tailPeak = 0.0f;
+            bool finite = true;
+            for (int c = 0; c < 2; ++c)
+                for (int i = 0; i < 1024; ++i)
+                {
+                    const float v = out.getSample(c, i);
+                    finite = finite && std::isfinite(v);
+                    peak = juce::jmax(peak, std::abs(v));
+                    if (i >= 768) tailPeak = juce::jmax(tailPeak, std::abs(v));
+                }
+            expect(finite);
+            expect(peak > 0.0f);
+            expect(tailPeak > 0.0f, "the last chunk is rendered too, not dropped");
+        }
     }
 
     // ── The trigger source and the step cursor ──────────────────────────────────────────────────────
