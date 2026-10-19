@@ -116,7 +116,7 @@ P "The mu-Clid window is divided into four regions:"
 Bullet "Transport Bar (top) — playback, BPM, presets, and global controls"
 Bullet "Rhythm Sidebar (left) — one item per active rhythm, plus an Add button"
 Bullet "Main Panel (centre) — the selected rhythm, or the Mixer when toggled"
-Bullet "Status Bar (bottom) — live readout of the last touched control, with a small Support link at the right-hand end"
+Bullet "Status Bar (bottom) — live readout of the last touched control, with a small Support link at the right-hand end. When a newer version is available, an Update available link appears beside Support (see Update Check in the Settings chapter)"
 P "The window has two sizes, Medium and Large, chosen in Settings (Display, Size). Everything scales with it. In the standalone application an Options button at the top left of the window opens the audio and MIDI device settings."
 
 Pic "The four main regions of the window." "main-window.png"
@@ -476,6 +476,7 @@ Bullet "Audio, Master Vol — the overall output level."
 Bullet "Display, Size — Medium or Large window. Reopen the app for the label fonts to rescale fully."
 Bullet "Transport, Time signature (standalone) — 2/4, 3/4, 4/4, 5/4, 6/4, 7/4, 5/8, 6/8, 7/8, 9/8 or 12/8; default 4/4. It changes how the bar.beat.sixteenth Position readout counts (a beat is a quarter note in x/4 and an eighth note in x/8). Patterns still run in four-beat bars. The tempo is set in the Transport Bar, so it is not repeated here."
 Bullet "Output, Multi-bus output (DAW) — enable or disable the extra output buses; the hint beside it reads '(rescan host to apply)', so rescan plugins in your host after toggling."
+Bullet "Updates, Update check — On or Off; default On. Whether the app checks once a day for a newer version (see Update Check below)."
 P "MIDI (right column):"
 Bullet "MIDI Clock, Source (standalone) — Internal, or MIDI In to follow an external clock. With MIDI In, the Messages choice and the Sync offset field appear (see MIDI Clock Sync)."
 Bullet "MIDI Mode (DAW) — Free or Note (see MIDI Mode)."
@@ -486,6 +487,13 @@ Bullet "Content Folder — where mu-Clid keeps presets, rhythm presets and sampl
 P "A Contact Support link at the bottom of the page is there when you need help."
 
 Pic "Settings overlay open over the main window." "settings.png"
+
+H2 "Update Check"
+P "mu-Clid can tell you when a newer version is available. Once a day it asks the transwarp.me website for the latest version number. When a newer version exists, a small Update available link appears at the right of the Status Bar, beside the Support link. Hover over it to see which version is out and which one you have."
+Bullet "Click the link to open the download page in your web browser. mu-Clid never downloads or installs anything itself. The link then stays hidden for that version and comes back only when a still newer one is released."
+Bullet "Right-click the link and choose Hide this notice to hide it for that version without opening the page."
+Bullet "The link never appears in Performance mode."
+P "Privacy: the check is a plain request for a public file. It sends nothing about you: no name, no identifier, no version number and no details of your computer. The app compares the answer with its own version on your machine. To switch the check off, open Settings and, under General, set Update check to Off. With the check off, mu-Clid sends no request at all and shows no link. The default is On."
 
 # ── 17. Tips and Workflow ─────────────────────────────────────────────────────
 H1 "17. Tips and Workflow"
