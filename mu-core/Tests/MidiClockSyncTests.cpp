@@ -85,6 +85,23 @@ public:
             expectWithinAbsoluteError (sync.getBpm(), 128.0, 1.5, "jittered 128");
         }
 
+        beginTest ("Jittery clock: the displayed tempo holds steady pulse to pulse");
+        {
+            MidiClockSync sync;
+            sync.setEnabled(true);
+            Feeder f { sync };
+            f.run(128.0, 96, true, 100);   // heavy timing error, as from a bunched MIDI input
+            double lo = 1.0e9, hi = 0.0;
+            for (int i = 0; i < 48; ++i)
+            {
+                f.run(128.0, 1, false, 100);
+                lo = juce::jmin(lo, sync.getBpm());
+                hi = juce::jmax(hi, sync.getBpm());
+            }
+            expectLessThan(hi - lo, 1.0, "reading wanders by under 1 BPM");
+            expectWithinAbsoluteError (sync.getBpm(), 128.0, 0.5, "and sits on the true tempo");
+        }
+
         beginTest ("Beat position advances one beat per 24 pulses");
         {
             // The first clock after Start is tick 0, so 48 clocks reach 47/24 beats; the UI beat
