@@ -98,6 +98,39 @@ public:
             expectWithinAbsoluteError(peak(L2, R2), 0.0f, 1.0e-6f, "empty cell -> silent while playing");
         }
 
+        beginTest("A block that cannot take the edit lock holds the previous gate level");
+        {
+            GatePattern p;
+            p.subdivision = GatePattern::Subdivision::Sixteenth;
+            GateEnvelope e; e.startCell = 0; e.lengthCells = 4; e.split = 0.0f;
+            p.addEnvelope(e);
+
+            // Closed: a stopped block leaves the gate shut, then an edit holds the lock for the next block.
+            std::vector<float> L(N, 1.0f), R(N, 1.0f);
+            applyGateBlock(p, L.data(), R.data(), N, 0.0f, false, /*playing*/false, 0.0, bps, SR);
+            p.editLock.store(true);
+            std::fill(L.begin(), L.end(), 1.0f);
+            std::fill(R.begin(), R.end(), 1.0f);
+            applyGateBlock(p, L.data(), R.data(), N, 0.0f, false, /*playing*/true, 0.0, bps, SR);
+            expectWithinAbsoluteError(peak(L, R), 0.0f, 1.0e-7f, "a closed gate stays closed through a lock miss");
+            expect(p.editLock.load(), "the audio thread must not release a lock it did not take");
+            p.editLock.store(false);
+
+            // Open: render until the ramp is fully up, then miss the lock again.
+            const int M = 1024;
+            std::vector<float> L2(M, 1.0f), R2(M, 1.0f);
+            applyGateBlock(p, L2.data(), R2.data(), M, 0.0f, false, /*playing*/true, 0.0, bps, SR);
+            const float open = p.gateLevel;
+            expect(open > 0.9f, "the envelope is open after the ramp");
+            p.editLock.store(true);
+            std::fill(L.begin(), L.end(), 1.0f);
+            std::fill(R.begin(), R.end(), 1.0f);
+            applyGateBlock(p, L.data(), R.data(), N, 0.0f, false, /*playing*/true, 0.0, bps, SR);
+            expectWithinAbsoluteError(L[0], open, 1.0e-6f, "an open gate keeps its level through a lock miss");
+            expectWithinAbsoluteError(L[N - 1], open, 1.0e-6f, "and holds it for the whole block");
+            p.editLock.store(false);
+        }
+
         beginTest("0-attack envelope ramps over ~kMinAttackMs instead of clicking");
         {
             GatePattern p;
