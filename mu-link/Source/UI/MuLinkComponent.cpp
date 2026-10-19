@@ -58,6 +58,7 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow, juce::File 
     // Unpainted brushed steel, LCD lettering in the global accent, until an app colour is chosen.
     chrome.setMetalStyle(true);
     chrome.setScrews(true);
+    chrome.startVersionCheck();   // the status-bar "Update available" link (once a day, opt-out in Settings)
 
     // Status bar: hover text from the panels and the clock switch, and the strips' value changes.
     page.mixer.onStatus = [this](const juce::String& n, const juce::String& v, juce::Colour tag)
