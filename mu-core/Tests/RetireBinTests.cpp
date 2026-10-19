@@ -4,6 +4,7 @@
 // MIDI sink R7, and the isolation twin test. docs/mu-tronic/design.md 2.1.3, 2.1.4; tests.md section 6.6.
 
 #include "LayerContractFixtures.h"
+#include "RetireIsolation.h"
 
 #include <array>
 #include <thread>
@@ -205,6 +206,32 @@ struct RetireBinStateMachineTests : juce::UnitTest
             }
             expectEquals(rig.bin.service(), 1);
             expect(rig.bin.stateOf(0, 0) == Bin::Empty && ! rig.bin.hasPendingWork());
+        }
+
+        beginTest("Natural with closeWithDeclick: a silent report starts the 10 ms declick, Done after it, the output ramps to zero");
+        {
+            BinRig rig(48000.0, 512);
+            auto* t = new ProbeTail({ mu_core::RetirePolicy::Kind::Natural, 25.0f, 2.0f, true });
+            t->silentAfter = 2;   // the second call reports silent
+            rig.bin.park(0, std::unique_ptr<mu_core::RetireTail>(t), 0, false);
+            rig.block(0, 64, 0);
+            const bool doneAtReport = rig.block(0, 64, 0);
+            expect(! doneAtReport && rig.bin.stateOf(0, 0) == Bin::Draining, "still sounding after the silent report");
+            float last = 1.0f;
+            bool falls = true;
+            int calls = 0;
+            while (rig.bin.stateOf(0, 0) == Bin::Draining && calls < 100)
+            {
+                rig.block(0, 64, 0);
+                ++calls;
+                const float v = rig.out.getSample(0, 63);
+                falls = falls && v <= last;
+                last = v;
+            }
+            logMessage("closing declick: Done after " + juce::String(calls) + " more 64-frame calls, last sample " + juce::String(last, 6));
+            expect(rig.bin.stateOf(0, 0) == Bin::Done, "then Done");
+            expect(calls >= 7 && calls <= 8, "after the 480-frame declick");
+            expect(falls && last < 0.05f, "the output falls to near zero along the ramp");
         }
 
         beginTest("Kind None is not parked: it waits out the grace in the reclaim list");
@@ -974,3 +1001,65 @@ struct RetireIsolationTests : juce::UnitTest
     }
 };
 static RetireIsolationTests sRetireIsolationTests;
+
+// The generic twin test (RetireIsolation.h) on the fake type: the tail's channel stream, compared through the
+// mixer's channel tap, is bit-identical with every parameter scrambled; and the negative control (a tail that
+// reads its live parameter) fails it. Every product's tail type runs the same helper.
+namespace
+{
+    mu_contract_test::RetireIsolationCase fakeCase(bool liveRead)
+    {
+        mu_contract_test::RetireIsolationCase c;
+        c.make = [liveRead]
+        {
+            auto p = std::make_unique<FakeLayerHost>(2);
+            {
+                const juce::ScopedLock sl(p->layersLock);
+                auto l = std::make_unique<SnapLayer>();
+                l->bindParams(p->apvts, 1);
+                l->liveRead = liveRead;
+                l->rawGain = p->apvts.getRawParameterValue("v1_a");
+                p->layers[1] = std::move(l);
+            }
+            p->apvts.getParameter("v1_a")->setValueNotifyingHost(0.6f);
+            p->setUseLayerRenderForTest(true);
+            return std::unique_ptr<ProcessorBase>(std::move(p));
+        };
+        c.retire = [](ProcessorBase& pb)
+        {
+            // mu-Tant's shape: snapshot, park in place with the next serial, then the count store, in one layout hold.
+            auto& p = static_cast<FakeLayerHost&>(pb);
+            const juce::ScopedLock lw(p.layoutWriteLock);
+            auto* old = static_cast<SnapLayer*>(p.layers[1].get());
+            old->beginRetire();
+            p.retireBin.parkInPlace(1, *old, p.nextLayoutSerial(), false);
+            p.storeLayerCount(1);
+        };
+        c.slot = 1;
+        c.blocksBefore = 12;   // the retire lands at frame 3072, inside a gate-on stretch of the fake engine (3000 to 4500)
+        c.blocksAfter = 3;     // inside the 25 ms fade (1200 frames)
+        return c;
+    }
+}
+
+struct RetireIsolationHelperTests : juce::UnitTest
+{
+    RetireIsolationHelperTests() : juce::UnitTest("Retire isolation helper (C3 twin, generic)", "mu-core") {}
+
+    void runTest() override
+    {
+        beginTest("checkRetireIsolation passes a tail that reads only its snapshot");
+        {
+            const auto r = mu_contract_test::checkRetireIsolation(fakeCase(false));
+            expect(r.tailFrames > 0 && r.sounded, "the tail rendered into its channel");
+            expect(r.ok, r.message);
+        }
+        beginTest("Negative control: checkRetireIsolation fails a tail that reads its live parameter");
+        {
+            const auto r = mu_contract_test::checkRetireIsolation(fakeCase(true));
+            expect(r.sounded, "the tail rendered into its channel");
+            expect(! r.ok, "the scrambled twin's tail differs");
+        }
+    }
+};
+static RetireIsolationHelperTests sRetireIsolationHelperTests;

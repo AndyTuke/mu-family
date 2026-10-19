@@ -1,5 +1,5 @@
 // SampleRhythm — the per-block hit, play state and render (audio thread). The hit and play state moved from the
-// processor's sequencer pass (E5.4b); the render (voice, retired engines) from the mixer's channel loop (E5.5d).
+// processor's sequencer pass (E5.4b); the render of the voice from the mixer's channel loop (E5.5d).
 
 #include "Sequencer/SampleRhythm.h"
 #include "Audio/MidiOutputMapping.h"   // mu-core: velocity for the MIDI output mode
@@ -12,9 +12,6 @@ void SampleRhythm::prepare(double sampleRate, int blockSize)
     if (voice != nullptr)
         voice->prepareToPlay(sampleRate, blockSize);
     midi.prepare(sampleRate, blockSize);
-    for (auto& engine : retiredEngines)
-        if (engine != nullptr)
-            engine->prepareToPlay(sampleRate, blockSize);
 }
 
 void SampleRhythm::takeHit(bool accented, bool tied, juce::MidiBuffer& midiOut)
@@ -30,22 +27,6 @@ void SampleRhythm::takeHit(bool accented, bool tied, juce::MidiBuffer& midiOut)
     block.voiceHit = true;
     block.accented = accented;
     block.tied     = tied;
-}
-
-void SampleRhythm::renderVoices(juce::AudioBuffer<float>& out, int n)
-{
-    if (voice != nullptr)
-        voice->process(out, n);
-
-    // The retired engines ride the same channel after the voice; one that has drained is flagged for the
-    // message thread, which frees it (it keeps rendering until then).
-    for (int i = 0; i < kMaxRetiredEngines; ++i)
-        if (auto& engine = retiredEngines[(size_t) i])
-        {
-            engine->process(out, n);
-            if (engine->isFullyDrained())
-                retiredReadyForCleanup[(size_t) i].store(true, std::memory_order_release);
-        }
 }
 
 void SampleRhythm::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n)
@@ -64,8 +45,9 @@ void SampleRhythm::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<f
         block.strip = nullptr;
     }
 
-    // Phase 2, every call: the voice and the retired engines into this call's frames.
-    renderVoices(out, n);
+    // Phase 2, every call: the voice into this call's frames.
+    if (voice != nullptr)
+        voice->process(out, n);
 }
 
 void SampleRhythm::publishPlayState(RhythmPlayState& state, int step, int accentStep, int patternLength,

@@ -5,65 +5,39 @@
 // strip (the approved channel tap, N6), must be bit-identical in both for its whole life.
 
 #include "GoldenTestRig.h"
-#include "Tests/GoldenRender.h"        // mu-core: MockHost
-#include "Tests/LayerEquivalence.h"    // mu-core: ChannelStreamTap
+#include "Tests/RetireIsolation.h"     // mu-core: the generic twin test
 #include "Audio/SpinLock.h"            // mu-core: the modLock helpers
-
-#include <cstring>
-
-#include <random>
 
 namespace
 {
-    struct Twin
+    // Three voices on a wavetable, voice 2 an octave up through a ringing insert, so the tail shows its snapshot.
+    void setupVoices(ProcessorBase& pb)
     {
-        Twin()
-        {
-            host.bpm = 120.0;
-            p.setPlayHead(&host);
-            p.setRateAndBufferSizeDetails(48000.0, 256);
-            p.prepareToPlay(48000.0, 256);
-            mu_golden_rig::growTo(p, 3);
-            for (int v = 0; v < 3; ++v) { mu_golden_rig::openGate(p.apvts, v); mu_golden_rig::setVoice(p.apvts, v, "o1_wt", 1); }
-            mu_golden_rig::setVoice(p.apvts, 2, "o1_oct", 1);
-            mu_golden_rig::setVoice(p.apvts, 2, "drvChar", 11);   // a ringing insert, so the tail shows its snapshot
-            mu_golden_rig::setVoice(p.apvts, 2, "insP1", 0.6f);
-            mu_golden_rig::setVoice(p.apvts, 2, "insP2", 0.8f);
-            p.setChannelTapForTest(&tap);
-        }
-        ~Twin() { p.setChannelTapForTest(nullptr); p.setPlayHead(nullptr); p.releaseResources(); }
+        auto& p = static_cast<mu_tant::PluginProcessor&>(pb);
+        mu_golden_rig::growTo(p, 3);
+        for (int v = 0; v < 3; ++v) { mu_golden_rig::openGate(p.apvts, v); mu_golden_rig::setVoice(p.apvts, v, "o1_wt", 1); }
+        mu_golden_rig::setVoice(p.apvts, 2, "o1_oct", 1);
+        mu_golden_rig::setVoice(p.apvts, 2, "drvChar", 11);
+        mu_golden_rig::setVoice(p.apvts, 2, "insP1", 0.6f);
+        mu_golden_rig::setVoice(p.apvts, 2, "insP2", 0.8f);
+    }
 
-        void block()
-        {
-            juce::AudioBuffer<float> buf(2, 256);
-            juce::MidiBuffer midi;
-            buf.clear();
-            p.processBlock(buf, midi);
-            host.ppq += 256.0 * host.bpm / (60.0 * 48000.0);
-        }
-
-        void restoreWith(int voices)
-        {
-            auto tree = p.captureFullPreset();
-            tree.setProperty("numVoices", voices, nullptr);
-            juce::MemoryBlock mb;
-            if (auto xml = tree.createXml()) juce::AudioProcessor::copyXmlToBinary(*xml, mb);
-            p.setStateInformation(mb.getData(), (int) mb.getSize());
-        }
-
-        mu_golden_rig::OwnedProcessor p;
-        mu_golden::MockHost host;
-        mu_layer_equiv::ChannelStreamTap tap { 256 * 64 };
-    };
-
-    // Every parameter of the processor to a legal random value, and every voice's modulators and envelopes
-    // replaced: whatever a tail might wrongly read is now different on this twin.
-    void scramble(mu_tant::PluginProcessor& p)
+    // The retire: a count-reducing restore to two voices while playing, so voice 2 fades in place.
+    void restoreWithTwo(ProcessorBase& pb)
     {
-        std::mt19937 rng(1234);
-        std::uniform_real_distribution<float> u(0.0f, 1.0f);
-        for (auto* param : p.getParameters())
-            param->setValueNotifyingHost(u(rng));
+        auto& p = static_cast<mu_tant::PluginProcessor&>(pb);
+        auto tree = p.captureFullPreset();
+        tree.setProperty("numVoices", 2, nullptr);
+        juce::MemoryBlock mb;
+        if (auto xml = tree.createXml()) juce::AudioProcessor::copyXmlToBinary(*xml, mb);
+        p.setStateInformation(mb.getData(), (int) mb.getSize());
+    }
+
+    // Beyond the parameters (the helper scrambles every one): every voice's modulators and envelopes replaced, so
+    // whatever a tail might wrongly read is now different on this twin.
+    void scramble(ProcessorBase& pb)
+    {
+        auto& p = static_cast<mu_tant::PluginProcessor&>(pb);
         for (int v = 0; v < mu_limits::kMaxLayers; ++v)
         {
             auto& pat = p.getPattern(v);
@@ -89,28 +63,18 @@ struct MuTantRetireIsolationTests : juce::UnitTest
     {
         beginTest("A dropped voice's fade is the same whatever every parameter, modulator and envelope does meanwhile");
         mu_seam_test::ScopedEnvVar deterministic("MU_DETERMINISTIC_NOISE", "1");
-        auto a = std::make_unique<Twin>(), b = std::make_unique<Twin>();
-        for (int i = 0; i < 12; ++i) { a->block(); b->block(); }
-        const int before = a->tap.written[2];
-        expectEquals(b->tap.written[2], before, "both twins rendered voice 2 alike so far");
-
-        a->restoreWith(2);
-        b->restoreWith(2);
-        scramble(b->p);   // after the park and the count store, before the first tail block
-        for (int i = 0; i < 8; ++i) { a->block(); b->block(); }   // 2048 frames: past the 1200-frame fade
-
-        expect(a->tap.written[2] > before + 1000, "the dropped voice kept rendering into its channel (its fade)");
-        expectEquals(b->tap.written[2], a->tap.written[2], "both twins rendered the same tail length");
-        bool same = true, sounded = false;
-        for (int c = 0; c < 2; ++c)
-            for (int i = before; i < a->tap.written[2]; ++i)
-            {
-                const float x = a->tap.bufs[2].getSample(c, i), y = b->tap.bufs[2].getSample(c, i);
-                same = same && std::memcmp(&x, &y, sizeof (float)) == 0;
-                sounded = sounded || x != 0.0f;
-            }
-        expect(sounded, "the tail is audible");
-        expect(same, "the scrambled twin's tail is bit-identical (the tail reads only its snapshot)");
+        mu_contract_test::RetireIsolationCase c;
+        c.make = [] { return std::unique_ptr<ProcessorBase>(new mu_golden_rig::OwnedProcessor()); };
+        c.setup = setupVoices;
+        c.retire = restoreWithTwo;     // the park and the count store; the scramble follows, before the first tail block
+        c.scramble = scramble;
+        c.slot = 2;
+        c.blocksBefore = 12;
+        c.blocksAfter = 8;             // 2048 frames: past the 1200-frame fade
+        const auto r = mu_contract_test::checkRetireIsolation(c);
+        expect(r.tailFrames > 1000, "the dropped voice kept rendering into its channel (its fade)");
+        expect(r.sounded, "the tail is audible");
+        expect(r.ok, "the scrambled twin's tail is bit-identical (the tail reads only its snapshot): " + r.message);
     }
 };
 

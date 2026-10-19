@@ -108,36 +108,18 @@ bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
 
 //==============================================================================
 void HotSwapStager::installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceEngine>&& voice,
-                                  const juce::String& samplePath, int originEff, uint32_t frameEpoch,
-                                  std::unique_ptr<VoiceEngine>* cutVictim)
+                                  const juce::String& samplePath, int originEff, uint32_t frameEpoch)
 {
     // The incoming engine is not yet visible to the audio thread, so its noise seed can be set here.
     if (voice) voice->insertProc.setSlotIndex(r);
 
-    // Retire-then-swap: the old engine continues rendering its in-flight tail from a retired slot.
+    // Retire-then-swap: the old engine continues rendering its in-flight tail from the shared RetireBin (its
+    // envelopes are released at its first tail block). A full row (spam-swap back-pressure) cuts its entry 0,
+    // whose engine is freed later, outside the lock.
     auto& layer = proc.sampleRhythm(r);
     auto oldEngine = std::move(layer.voice);
     layer.voice = std::move(voice);
-
-    if (oldEngine)
-    {
-        // Must happen BEFORE placement so the engine is already in its
-        // released / filter-reset state when the next audio block picks it up.
-        oldEngine->markRetired();
-
-        bool placed = false;
-        for (auto& slot : layer.retiredEngines)
-            if (! slot) { slot = std::move(oldEngine); placed = true; break; }
-        if (! placed)
-        {
-            // All retired slots full — spam-swap back-pressure: force-cut slot 0. The engine it held
-            // goes to the caller's slot when given, so its teardown runs after the caller's unlock.
-            auto victim = std::move(layer.retiredEngines[0]);
-            layer.retiredEngines[0] = std::move(oldEngine);
-            if (cutVictim != nullptr) *cutVictim = std::move(victim);
-            layer.retiredReadyForCleanup[0].store(false, std::memory_order_release);
-        }
-    }
+    proc.retireEngine(r, std::move(oldEngine));
 
     // Swap rather than assign: the outgoing rhythm ends up in the caller's object, which the caller
     // destroys after releasing its locks. The clip bank stays with the slot (SlotBound); the playing
@@ -153,42 +135,7 @@ void HotSwapStager::installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceE
 
 void HotSwapStager::processSwaps()
 {
-    // Drain retired-engine cleanup flags. Audio thread store-releases the per-slot
-    // flag once VoiceEngine::isFullyDrained() returns true; the move-out below
-    // transfers ownership to a local that destructs off the RT thread.
-    // suspendProcessing fences the audio thread so it cannot be mid-process() on
-    // the engine when the unique_ptr is yanked.
-    // Empty-fast-path: skip the suspend cost when no engines need cleanup.
-    // (The flags are read without the layer lock: every slot always holds a layer, and a flag is an atomic.)
-    bool anyCleanupNeeded = false;
-    for (int r = 0; r < RhythmSequencer::MaxRhythms && ! anyCleanupNeeded; ++r)
-        for (auto& flag : proc.sampleRhythm(r).retiredReadyForCleanup)
-            if (flag.load(std::memory_order_acquire)) { anyCleanupNeeded = true; break; }
-    if (anyCleanupNeeded)
-    {
-        std::array<std::unique_ptr<VoiceEngine>,
-                   RhythmSequencer::MaxRhythms * mu_limits::kMaxRetiredVoiceEngines> orphans;
-        int orphanCount = 0;
-        proc.suspendProcessing(true);
-        {
-            // layersLock as for an install: suspend is no barrier in every host, and a structural edit
-            // moves these tail slots under the same lock.
-            const juce::ScopedLock sl(proc.layersLock);
-            for (int r = 0; r < RhythmSequencer::MaxRhythms; ++r)
-            {
-                auto& layer = proc.sampleRhythm(r);
-                for (int i = 0; i < mu_limits::kMaxRetiredVoiceEngines; ++i)
-                {
-                    if (! layer.retiredReadyForCleanup[(size_t) i].load(std::memory_order_acquire))
-                        continue;
-                    orphans[(size_t) orphanCount++] = std::move(layer.retiredEngines[(size_t) i]);
-                    layer.retiredReadyForCleanup[(size_t) i].store(false, std::memory_order_release);
-                }
-            }
-        }
-        proc.suspendProcessing(false);
-        // `orphans` destructs at scope exit — fully off the audio thread.
-    }
+    // (The drained tails are freed by the RetireBin's service pass, which runDeferredWork runs before this one.)
 
     // Two-pass to suspend audio ONCE per call: collect all ready slots, then swap
     // them under one suspend, then do post-commit APVTS push + UI callback outside it.
@@ -203,10 +150,9 @@ void HotSwapStager::processSwaps()
     {
         // Which slots consume actually applied: a swap cancelled between the scan and here is skipped.
         std::array<bool, RhythmSequencer::MaxRhythms> applied {};
-        // Everything the commit retires or empties lives out here, so its destructors run after the
-        // lock and the suspend are released, not inside them.
+        // Everything the commit empties lives out here, so its destructors run after the lock and the suspend
+        // are released, not inside them (a retired engine goes to the RetireBin, which frees it later).
         std::array<PendingRhythm, RhythmSequencer::MaxRhythms>            spent;
-        std::array<std::unique_ptr<VoiceEngine>, RhythmSequencer::MaxRhythms> cutVictims;
         proc.suspendProcessing(true);
         {
             // suspendProcessing alone does not stop an in-flight callback in hosts that ignore it
@@ -222,8 +168,7 @@ void HotSwapStager::processSwaps()
                     auto& in = spent[(size_t) r];
                     installRhythm(r, std::move(in.rhythm), std::move(in.voice), in.samplePath,
                                   flaggedOrigin[(size_t) r].load(std::memory_order_relaxed),
-                                  flaggedEpoch [(size_t) r].load(std::memory_order_relaxed),
-                                  &cutVictims[(size_t) r]);
+                                  flaggedEpoch [(size_t) r].load(std::memory_order_relaxed));
                 });
             }
         }

@@ -149,6 +149,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     if (n < oldN)
     {
         proc.storeLayerCount(n, std::memory_order_release);  // decrement first
+        proc.retireBin.cutAtOrAbove(n);                       // the dropped slots' tails stop (count policy CutAtCount)
         for (int i = n; i < oldN; ++i)
         {
             proc.voiceEngine(i).reset();

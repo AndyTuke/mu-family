@@ -38,6 +38,10 @@ PluginProcessor::PluginProcessor()
 
     initAppSettings("muClid");   // settings file + saved UI size / MIDI clock (ProcessorBase)
 
+    // A hot-swap's retired engines sound out in the shared RetireBin only in live slots: a count-reducing store
+    // cuts the tails of the slots it drops (they were silent there before too, and a regrow starts clean).
+    setRetireCountPolicy(mu_core::RetireBin::CountPolicy::CutAtCount);
+
     midiNoteMode.store(appSettings->getIntValue("midiNoteMode", 0), std::memory_order_relaxed);
 
     // Load MIDI program-change preset maps (each lives in its own JSON file
@@ -154,8 +158,8 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     mixerEngine.prepare(sampleRate, samplesPerBlock);
     samples.prepare(samplesPerBlock, sampleRate);
 
-    // The shared driver's buffers and every slot's rhythm (SampleRhythm::prepare: its voice, MIDI and retired
-    // engines, so a mid-stream rate or block-size change leaves no tail on stale sizing).
+    // The shared driver's buffers and every slot's rhythm (SampleRhythm::prepare: its voice and MIDI engines); the
+    // retire bin is flushed, so a mid-stream rate or block-size change leaves no tail on stale sizing.
     prepareLayerRender(sampleRate, samplesPerBlock);
 }
 
@@ -163,6 +167,7 @@ void PluginProcessor::releaseResources()
 {
     sequencerPlaying.store(false);   // the host stopped calling processBlock: nothing will flag a staged swap
     samples.releaseResources();
+    releaseLayerRender();            // the retire bin is flushed: no tail outlives the stream it played in
 }
 
 // One block: the transport (mu-Clid's own resolve, every host block), then the shared driver (renderAndMix): one
@@ -500,7 +505,7 @@ void PluginProcessor::commitDeferredWork()
     // Apply the rhythm parameter changes that arrived off the message thread (VST3 automation).
     servicePendingRhythmParams();
 
-    // Drain retired engines + commit pending swaps (both sides of the hot-swap lifecycle).
+    // Commit the pending swaps (the retire bin has already freed what drained, at the top of this pass).
     // ProcessorBase then drains the MIDI program-change queue.
     hotSwapStager.processSwaps();
 }

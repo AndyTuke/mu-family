@@ -1,13 +1,14 @@
 // PluginProcessor — the layer container hooks. ProcessorBase owns the rhythms as layers and runs the
-// structural edits (add, delete, reorder, reset); what mu-Clid keeps per slot on the processor side
-// (voice and MIDI engines, retired tails, play state, sample paths) is moved here, in the order the
-// edit's locked section always had. Partial-class TU split from PluginProcessor.cpp.
+// structural edits (add, delete, reorder, reset); the rhythms carry their voice and MIDI engines, the shared
+// RetireBin the retired tails, and what mu-Clid keeps per slot on the processor side (play state, sample paths)
+// is moved here, in the order the edit's locked section always had. Partial-class TU split from PluginProcessor.cpp.
 
 #include "Audio/SpinLock.h"
 #include "Persistence/ScopedApvtsLoading.h"
 #include "PluginProcessor.h"
 #include "Sequencer/GeneratorAliases.h"
 #include "Sequencer/SampleRhythm.h"
+#include "Sequencer/EngineTail.h"
 
 #include <algorithm>
 
@@ -50,20 +51,35 @@ std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
         auto& fresh = static_cast<SampleRhythm&>(*layer);
         fresh.voice = std::move(engine);
         fresh.midi.prepare(currentSampleRate, currentBlockSize);   // the new rhythm's MIDI engine
-
-        // The tails a count-reducing load left in the slot stay with the slot, as they did when the processor
-        // held them: the new rhythm takes them over from the spare it replaces (which is not live, so no block
-        // renders it meanwhile).
-        auto& spare = sampleRhythm(slot);
-        for (int k = 0; k < kMaxRetiredEngines; ++k)
-        {
-            fresh.retiredEngines[(size_t) k] = std::move(spare.retiredEngines[(size_t) k]);
-            fresh.retiredReadyForCleanup[(size_t) k].store(spare.retiredReadyForCleanup[(size_t) k].load(std::memory_order_acquire),
-                                                           std::memory_order_release);
-            spare.retiredReadyForCleanup[(size_t) k].store(false, std::memory_order_release);
-        }
     }
     return layer;
+}
+
+// Under layersLock: the outgoing engine of a hot-swap joins the slot's retire-bin row from the current layout
+// serial, so the next rendered block plays it after the slot's live voice. The tail is built here (a small
+// allocation on the message thread); nothing is freed under the lock (an evicted entry 0 waits for a service pass).
+void PluginProcessor::retireEngine(int slot, std::unique_ptr<VoiceEngine> engine)
+{
+    if (engine == nullptr) return;
+    [[maybe_unused]] const auto parked = retireBin.park(slot, std::make_unique<EngineTail>(std::move(engine)), layoutSerial(),
+                                                        /*audioExcluded*/ true);
+    jassert(parked == mu_core::RetireBin::ParkResult::Parked);   // with the audio thread excluded nothing else is reachable
+}
+
+const VoiceEngine* PluginProcessor::retiredEngineForTest(int slot, int entry) const noexcept
+{
+    const auto state = retireBin.stateOf(slot, entry);
+    if (state != mu_core::RetireBin::Parked && state != mu_core::RetireBin::Draining) return nullptr;
+    const auto* tail = dynamic_cast<const EngineTail*>(retireBin.tailOf(slot, entry));
+    return tail != nullptr ? &tail->voice() : nullptr;
+}
+
+int PluginProcessor::retiredCountForTest(int slot) const noexcept
+{
+    int n = 0;
+    for (int e = 0; e < mu_core::RetireBin::kDepth; ++e)
+        n += retiredEngineForTest(slot, e) != nullptr ? 1 : 0;
+    return n;
 }
 
 void PluginProcessor::resetPlayState(int idx)
@@ -150,25 +166,17 @@ void PluginProcessor::layersReordered(LayerEdit kind, int a, int b)
         resetPlayState(b);
         samples.swapPaths(a, b);
 
-        // The voice engines moved with their rhythms. The retired tails stay in their slot's channel on a swap,
-        // so the two layers hand theirs back (nothing is allocated or freed).
-        auto& ra = sampleRhythm(a);
-        auto& rb = sampleRhythm(b);
-        for (int k = 0; k < kMaxRetiredEngines; ++k)
-        {
-            std::swap(ra.retiredEngines[(size_t) k], rb.retiredEngines[(size_t) k]);
-            const bool flagA = ra.retiredReadyForCleanup[(size_t) k].load(std::memory_order_acquire);
-            ra.retiredReadyForCleanup[(size_t) k].store(rb.retiredReadyForCleanup[(size_t) k].load(std::memory_order_acquire),
-                                                        std::memory_order_release);
-            rb.retiredReadyForCleanup[(size_t) k].store(flagA, std::memory_order_release);
-        }
+        // The voice engines moved with their rhythms, and the base moved the two slots' retire-bin rows with
+        // them. mu-Clid keeps a slot's retired tails in that slot's channel on a swap (as it always did), so the
+        // rows go back (mu-Clid parks no in-place tail, so the exchange cuts nothing; nothing allocated or freed).
+        retireBin.swapRows(a, b);
         return;
     }
 
-    // Remove slot `a`: everything above it moved down one, each rhythm with its voice and retired engines (a
-    // retired tail renders into the channel of the slot that holds it, so it follows the rhythm whose swap left
-    // it); the removed rhythm's go with it, destroyed by the base after the unlock, and the vacated top slot's
-    // spare holds none.
+    // Remove slot `a`: everything above it moved down one, each rhythm with its voice engine, and the base moved
+    // the retire-bin rows above it down with them (a retired tail renders into the channel of the slot that
+    // holds it, so it follows the rhythm whose swap left it); the removed rhythm's engine goes with it, destroyed
+    // by the base after the unlock, its tails are cut, and the vacated top slot's spare holds none.
     const int n    = sequencer.getNumRhythms();   // the count before the removal
     const int newN = n - 1;
     reorderLastSlot = newN;
@@ -178,13 +186,15 @@ void PluginProcessor::layersReordered(LayerEdit kind, int a, int b)
         sampleRhythm(i).cursor.requestAbsorb();   // the rhythms that moved down absorb the current step
     samples.shiftPathsDown(a, n);
 
-    // A moved engine takes its new slot's noise seed.
+    // A moved engine takes its new slot's noise seed, its sounding retired tails too (the bin holds its lock
+    // meanwhile, so no service pass frees one; the audio thread is excluded by layersLock).
     for (int i = a; i < newN; ++i)
     {
-        auto& r = sampleRhythm(i);
-        if (r.voice) r.voice->insertProc.setSlotIndex(i);
-        for (auto& tail : r.retiredEngines)
-            if (tail) tail->insertProc.setSlotIndex(i);
+        if (auto& voice = sampleRhythm(i).voice) voice->insertProc.setSlotIndex(i);
+        retireBin.forEachActive(i, [i](mu_core::RetireTail& t)
+        {
+            if (auto* tail = dynamic_cast<EngineTail*>(&t)) tail->takeSlot(i);
+        });
     }
 }
 

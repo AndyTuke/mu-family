@@ -32,7 +32,7 @@ namespace
         std::array<float, kMax>        level {};
         std::array<juce::String, kMax> samplePath;
         std::array<VoiceEngine*, kMax> engine {};
-        std::array<VoiceEngine*, kMax> tail {};
+        std::array<const VoiceEngine*, kMax> tail {};   // the slot's first retire-bin entry, while it sounds
         std::array<Layer*, kMax>       layer {};
         std::array<int, kMax>          scSrc {};   // the engine strip's sidechain source (-1 off, else a layer)
     };
@@ -55,8 +55,7 @@ struct ClidLayerStructureTests : juce::UnitTest
             setParam(p.apvts, "ch" + juce::String(i) + "_lvl", 0.1f * (float) (i + 1));
             p.samples.setPath(i, "slot" + juce::String(i) + ".wav");
             p.getLayer(i)->colourIndex = (i * 3) % kMax;
-            auto& tail = p.sampleRhythm(i).retiredEngines[0];
-            tail = std::make_unique<VoiceEngine>();
+            p.retireEngineForTest(i, std::make_unique<VoiceEngine>());
         }
         setParam(p.apvts, "ch6_scSrc", 4.0f);   // APVTS: 0 off, n = layer n - 1, so layer 3
         p.mixerEngine.channels[6].sidechainSource.store(3);
@@ -72,7 +71,7 @@ struct ClidLayerStructureTests : juce::UnitTest
             s.level[(size_t) i]      = p.mixerEngine.channels[i].level.load();
             s.samplePath[(size_t) i] = p.samples.path(i);
             s.engine[(size_t) i]     = p.voiceEngine(i).get();
-            s.tail[(size_t) i]       = p.sampleRhythm(i).retiredEngines[0].get();
+            s.tail[(size_t) i]       = p.retiredEngineForTest(i, 0);
             s.layer[(size_t) i]      = &p.layerAs<mu_clid::Rhythm>(i);
             s.scSrc[(size_t) i]      = p.mixerEngine.channels[i].sidechainSource.load();
         }
@@ -124,7 +123,7 @@ struct ClidLayerStructureTests : juce::UnitTest
         }
 
         expect(p.voiceEngine(kMax - 1) == nullptr, "the vacated top slot holds no engine");
-        expect(p.sampleRhythm(kMax - 1).retiredEngines[0] == nullptr, "and no tail");
+        expectEquals(p.retiredCountForTest(kMax - 1), 0, "and no sounding tail (the removed slot's were cut)");
         expect(p.samples.path(kMax - 1).isEmpty(), "and no sample path");
         expect(p.getLayer(kMax - 1) == nullptr && p.sequencer.getNumRhythms() == kMax - 1, "and is not live");
         expect(p.layerAs<mu_clid::Rhythm>(kMax - 1).name != "", "though a spare rhythm stays in it");

@@ -27,6 +27,9 @@ namespace mu_core
         Kind  kind       = Kind::None;
         float fadeMs     = 25.0f;
         float maxSeconds = 2.0f;
+        // Natural only: renderRetiring's "silent" is a drain criterion, not a level (a feedback insert may still ring),
+        // so the bin closes the tail with its 10 ms declick instead of cutting it there (mu-Clid's EngineTail).
+        bool  closeWithDeclick = false;
     };
 
     // Per bin entry: filled by the message thread before the entry is Parked, owned by the audio thread after.
@@ -38,7 +41,7 @@ namespace mu_core
         int64_t maxSamples;          // hard lifetime in frames
         uint8_t exclusive;           // 1: `out` holds nothing yet this block (no live layer, no earlier tail): the tail may write
         uint8_t started;             // onRetireStart has run
-        uint8_t reserved[6];
+        uint8_t reserved[6];         // [0]: the bin armed a Natural tail's closing declick (the bin's own; a tail leaves it alone)
     };
     static_assert(std::is_trivially_copyable_v<RetireState>);
 

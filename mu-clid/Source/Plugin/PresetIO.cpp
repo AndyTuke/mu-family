@@ -224,13 +224,11 @@ bool PresetIO::applyRhythmPresetTree(const juce::ValueTree& state, int targetInd
     if (! prepared.voice) return false;
 
     proc.hotSwapStager.cancelPendingIfAny(targetIndex);
-    // Declared before the lock so a force-cut engine destructs after suspend and the lock are released.
-    std::unique_ptr<VoiceEngine> cutVictim;
     proc.suspendProcessing(true);
     {
         const juce::ScopedLock sl(proc.layersLock);
         proc.hotSwapStager.installRhythm(targetIndex, std::move(prepared.rhythm), std::move(prepared.voice),
-                                          prepared.samplePath, 0, RhythmSequencer::kAnyFrameEpoch, &cutVictim);
+                                          prepared.samplePath, 0, RhythmSequencer::kAnyFrameEpoch);
     }
     proc.suspendProcessing(false);
 
@@ -491,9 +489,8 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     // in-memory (no parse, no disk I/O — done at stage time), so the lock is held for
     // microseconds and the swap stays glitch-free. The lock is released before the
     // APVTS finalize below so that (post-resume) work doesn't bail the audio thread.
-    // Engines that must not destruct under the lock (force-cut victims, shrunk slots) land here and
-    // free after it is released.
-    std::array<std::unique_ptr<VoiceEngine>, RhythmSequencer::MaxRhythms> cutVictims, shrunkEngines;
+    // Engines that must not destruct under the lock (the shrunk slots') land here and free after it is released.
+    std::array<std::unique_ptr<VoiceEngine>, RhythmSequencer::MaxRhythms> shrunkEngines;
     proc.suspendProcessing(true);
     {
         const juce::ScopedLock lw(proc.layoutWriteLock);   // first: the count stores below advance the layout serial
@@ -502,7 +499,10 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     proc.setRhythmCount(n);
 
     if (n < oldN)
+    {
         proc.storeLayerCount(n, std::memory_order_release);  // shrink: drop count first
+        proc.retireBin.cutAtOrAbove(n);                       // the dropped slots' tails stop (count policy CutAtCount)
+    }
 
     for (int i = 0; i < n; ++i)
     {
@@ -510,7 +510,7 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
         // new preset plays, instead of being hard-cut. Grown slots have no old engine.
         proc.hotSwapStager.installRhythm(i, std::move(prepared.rhythms[(size_t) i]),
                                           std::move(prepared.voices[(size_t) i]), prepared.samplePaths[(size_t) i],
-                                          originEff, frameEpoch, &cutVictims[(size_t) i]);
+                                          originEff, frameEpoch);
         // Prepare MIDI engines for freshly-grown slots; existing slots keep theirs.
         if (i >= oldN && proc.currentSampleRate > 0 && proc.currentBlockSize > 0)
             proc.sampleRhythm(i).midi.prepare(proc.currentSampleRate, proc.currentBlockSize);

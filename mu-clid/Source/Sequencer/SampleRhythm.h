@@ -19,12 +19,13 @@
 
 // mu-Clid's layer type (docs/mu-tronic/extraction-plan.md 2.5, E5.3): the shared Euclid Rhythm plus what
 // a sample-playing rhythm keeps per layer: its voice engine, its MIDI output engine, the play state the
-// UI draws, the live modulation snapshot, its sample path, the modulation pass's previous-block memory and
-// the retired engines still sounding their tails. mu_core::Rhythm itself, and mu-Clid MIDI, are untouched.
+// UI draws, the live modulation snapshot, its sample path and the modulation pass's previous-block memory. The
+// engines a hot-swap retires sound out in the shared RetireBin as EngineTails (E5.5e). mu_core::Rhythm itself, and
+// mu-Clid MIDI, are untouched.
 //
-// Being built up stage by stage: the processor creates every layer as a SampleRhythm; the layer owns its voice,
-// MIDI and retired engines (E5.5c, E5.5d) and renders through the render contract, while the processor still
-// decides each block's hit and keeps the play state the UI reads (to E5.7). Not copyable (atomics, owned engines). An assignment
+// Being built up stage by stage: the processor creates every layer as a SampleRhythm; the layer owns its voice and
+// MIDI engines (E5.5c, E5.5d) and renders through the render contract, while the processor still decides each
+// block's hit and keeps the play state the UI reads (to E5.7). Not copyable (atomics, owned engines). An assignment
 // through Rhythm& (a preset install, a reset to defaults) changes only the Rhythm part, so what is below
 // stays with the slot; a reorder moves the whole layer, members included (the host then resets the moved
 // slots' modulation memory, resetModulationMemory).
@@ -33,19 +34,17 @@ namespace mu_clid
 
 struct SampleRhythm : Rhythm
 {
-    static constexpr int kMaxRetiredEngines = mu_limits::kMaxRetiredVoiceEngines;
-
     SampleRhythm();
     SampleRhythm(const SampleRhythm&)            = delete;
     SampleRhythm& operator=(const SampleRhythm&) = delete;
 
-    // mu_core::Layer (E5.5d): a Rhythm layer. prepare readies the engines the layer holds (its voice, its MIDI
-    // engine and the engines its swaps retired); render plays the block on the voice.
+    // mu_core::Layer (E5.5d): a Rhythm layer. prepare readies the engines the layer holds (its voice and its MIDI
+    // engine); render plays the block on the voice.
     int  typeId() const override { return (int) mu_core::LayerTypeId::Rhythm; }
     void prepare(double sampleRate, int blockSize) override;
     // Audio thread, under the host's layer lock. The block's first call (frameOffset 0) retriggers the voice
-    // when `block` holds a hit, then runs the modulation pass; every call then renders the voice and the
-    // retired engines into `out`.
+    // when `block` holds a hit, then runs the modulation pass; every call then renders the voice into `out` (the
+    // slot's retired engines follow it from the RetireBin).
     void render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n) override;
 
     // What the host hands the rhythm for one rendered block, before any layer renders (audio thread, the
@@ -120,18 +119,9 @@ private:
     std::array<float*, ModDest::kTableSize>     modSlot {};
     float& mv(int destIndex) noexcept { jassert(modSlot[(size_t) destIndex] != nullptr); return *modSlot[(size_t) destIndex]; }
 
-    // Audio thread: the voice, then each retired engine (raising its drained flag), added into `out`.
-    void renderVoices(juce::AudioBuffer<float>& out, int n);
-
 public:
     // The rhythm's own step cursor: it decides the rhythm's hits from the host's step clock.
     RhythmCursor cursor;
-
-    // Engines a preset swap retired, still rendering their tails after the voice until drained; the audio thread
-    // raises the flag once one reports drained, and the host's deferred-work pass frees it (E5.5e moves these
-    // into the shared RetireBin).
-    std::array<std::unique_ptr<VoiceEngine>, kMaxRetiredEngines> retiredEngines;
-    std::array<std::atomic<bool>, kMaxRetiredEngines>            retiredReadyForCleanup {};
 };
 
 } // namespace mu_clid

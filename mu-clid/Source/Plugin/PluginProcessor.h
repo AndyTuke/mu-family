@@ -186,8 +186,8 @@ public:
     int      swapBoundaryEff(int r) const noexcept { return sampleRhythm(r).cursor.boundaryEffective(); }
     uint32_t swapFrameEpoch() const noexcept       { return stepClock.currentEpoch(); }
     // Slot `slot`'s voice engine: SampleRhythm::voice (E5.5d), so it moves with its layer. Null in a slot that
-    // is not live. Each rhythm's MidiOutputEngine is SampleRhythm::midi (E5.5c), its retired engines
-    // SampleRhythm::retiredEngines.
+    // is not live. Each rhythm's MidiOutputEngine is SampleRhythm::midi (E5.5c); the engines its swaps retired
+    // sound out in the shared RetireBin (retireEngine).
     std::unique_ptr<VoiceEngine>&       voiceEngine(int slot) noexcept       { return sampleRhythm(slot).voice; }
     const std::unique_ptr<VoiceEngine>& voiceEngine(int slot) const noexcept { return sampleRhythm(slot).voice; }
 
@@ -210,11 +210,23 @@ public:
     }
     // fxChain and mixerEngine are inherited from ProcessorBase.
 
-    // Retired voice engines keep rendering their in-flight sample / envelope tail after a hot-swap. They are the
-    // layer's (SampleRhythm::retiredEngines): when one reports isFullyDrained(), the audio thread store-releases
-    // its flag; the message thread (runDeferredWork) takes it under suspendProcessing and the layer lock and
-    // destroys it off the audio thread.
-    static constexpr int kMaxRetiredEngines = mu_limits::kMaxRetiredVoiceEngines;
+    // A hot-swap's outgoing voice engine keeps rendering its in-flight sample / envelope tail in slot `slot`'s
+    // channel from the shared RetireBin (an EngineTail, E5.5e) until it reports drained, at most 30 s; the bin frees
+    // it on the message thread. Call under layersLock (the audio thread is then outside the bin): it starts with the
+    // next rendered block; a full row evicts its entry 0, whose engine is freed later by a service pass.
+    void retireEngine(int slot, std::unique_ptr<VoiceEngine> engine);
+
+    // Tests only (message thread, not processing): slot `slot`'s retire-bin entry `entry`: its engine while the
+    // entry still sounds (Parked or Draining; null otherwise) and its state.
+    const VoiceEngine*        retiredEngineForTest(int slot, int entry) const noexcept;
+    mu_core::RetireBin::State retiredStateForTest(int slot, int entry) const noexcept { return retireBin.stateOf(slot, entry); }
+    int                       retiredCountForTest(int slot) const noexcept;
+    // Tests only: retires `engine` into slot `slot`'s row now, as a swap's install does (takes the layer lock).
+    void retireEngineForTest(int slot, std::unique_ptr<VoiceEngine> engine)
+    {
+        const juce::ScopedLock sl(layersLock);
+        retireEngine(slot, std::move(engine));
+    }
 
     // Play-state atomics: written by audio thread, read by UI at 30 Hz.
     using RhythmPlayState = mu_clid::RhythmPlayState;
@@ -446,8 +458,8 @@ private:
     std::unique_ptr<VoiceEngine> makeSlotEngine(int slot) const;
     void resetPlayState(int slot);
 
-    // A removed rhythm takes its voice and retired engines with it: the base destroys the removed layer after
-    // the unlock, so nothing is freed under layersLock.
+    // A removed rhythm takes its voice engine with it: the base destroys the removed layer after the unlock, and
+    // the bin cuts the removed slot's tails and frees them later, so nothing is freed under layersLock.
     // Edit bookkeeping between the locked hooks and syncSlotParams: the slot whose rhythm is new
     // (add / reset) and so needs its pattern and engine parameters rebuilt, and, during a remove or
     // swap, the last slot syncSlotParams will be given.
