@@ -5,7 +5,7 @@
 
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/HotSwapStager.h"
-#include "Persistence/PresetIO.h"
+#include "Plugin/PresetIO.h"
 #include "Tests/ProcessorSeamHelpers.h"
 
 namespace

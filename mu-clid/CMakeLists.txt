@@ -49,8 +49,9 @@ target_sources(mu-clid
         Source/Plugin/PluginProcessor_Layers.cpp
         Source/Plugin/PluginProcessor_Content.cpp
         Source/Persistence/RhythmParams.cpp
-        Source/Persistence/PresetIO.cpp
-        Source/Persistence/PresetIO_HostState.cpp
+        Source/Persistence/RhythmPresetTree.cpp
+    Source/Plugin/PresetIO.cpp
+        Source/Plugin/PresetIO_HostState.cpp
         Source/Persistence/PresetMigrations.cpp
         Source/Plugin/HotSwapStager.cpp
         Source/Audio/SamplePreview.cpp
@@ -276,8 +277,9 @@ target_sources(mu-clid-tests PRIVATE
     Source/Plugin/PluginProcessor_Content.cpp
     Source/Plugin/PluginProcessor_Layers.cpp
     Source/Persistence/RhythmParams.cpp
-    Source/Persistence/PresetIO.cpp
-    Source/Persistence/PresetIO_HostState.cpp
+    Source/Persistence/RhythmPresetTree.cpp
+    Source/Plugin/PresetIO.cpp
+    Source/Plugin/PresetIO_HostState.cpp
     Source/Plugin/HotSwapStager.cpp
     Source/Audio/SamplePreview.cpp
     Source/Audio/SampleLibrary.cpp

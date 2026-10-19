@@ -2,34 +2,21 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "Plugin/HotSwapStager.h"   // HotSwapStager::PreparedFullPreset (commit payload)
+#include "Persistence/RhythmPresetTree.h"   // the Rhythm type's saved form (PreparedRhythm, RhythmPresetContext)
 
 namespace mu_clid {
 
 class PluginProcessor;
 
-// Encapsulates all preset save/load logic extracted from PluginProcessor.
-// Declared as friend of PluginProcessor so it can access private members
-// (apvts, sequencer, voiceEngines, pendingSwaps, etc.) via proc.
-// PluginProcessor keeps thin public delegates to the methods below.
+// mu-Clid's preset orchestration: when a rhythm preset, a full preset or a host session is read or
+// written, and how the result is installed into the processor (the stager, the slot engines, the
+// locks). The rhythm's own saved form is Persistence/RhythmPresetTree. Declared as friend of
+// PluginProcessor so it can reach its private members via proc; PluginProcessor keeps thin public
+// delegates to the methods below.
 class PresetIO
 {
 public:
     explicit PresetIO(PluginProcessor& proc) : proc(proc) {}
-
-    // One rhythm prepared off the audio thread, ready to install into a slot.
-    struct PreparedRhythm
-    {
-        Rhythm                       rhythm;
-        std::unique_ptr<VoiceEngine> voice;   // null when the preset couldn't be read
-        juce::String                 samplePath;
-    };
-
-    // Build a rhythm from a preset node: a .muRhythm root (prefix "r0_") or a .muClid <Rhythm>
-    // child (no prefix). Defaults for what the node lacks; `source` names it in load messages.
-    static PreparedRhythm prepareRhythm(const juce::ValueTree& node, const juce::String& prefix,
-                                        double sampleRate, int blockSize, const juce::File& samplesDir,
-                                        const std::function<void(const juce::String&)>& onLoadError,
-                                        const juce::String& source);
 
     // Hot-swap staging: loads a preset file and stages it via HotSwapStager.
     // keepIdentity: the slot keeps its name + colour (a settings reset such as the default
@@ -102,24 +89,13 @@ private:
                                         bool embedSamples);
     // A session (a .muClid tree + every parameter it doesn't carry) restored at once.
     void            restoreSession(const juce::ValueTree& root);
-    static void     applyPresetIdentity(const juce::ValueTree& state, Rhythm& r);
+    // The context a rhythm tree is read in: the Samples folder, the prepared rate and block size, onLoadError.
+    RhythmPresetContext presetContext() const;
 
     PluginProcessor& proc;
 
     // The file name of the .muRhythm being staged, so load messages can name it; empty for a clip.
     juce::String loadSource;
-
-    // Helpers extracted from loadPreset / applyRhythmPreset / restoreStateFromTree
-    // so each top-level function reads as a sequence of named steps. All run on
-    // the message thread under a single mu_core::ScopedApvtsLoading guard managed
-    // by the caller.
-
-
-
-    // Restore the channel-strip params for slot `apvtsSlot`. Only relevant for
-    // the .muClid format — legacy .muRhythm `ch_*` properties are intentionally
-    // ignored by applyRhythmPreset (see Mixer-state-stays-with-slot policy).
-    void restoreRhythmChannelParams(int apvtsSlot, const juce::ValueTree& rTree);
 
     // Restore embedded-sample bytes (preferred) or stored sample path for slot.
     // The three property-name args spell out exactly which keys to read so the
@@ -130,10 +106,6 @@ private:
                               const juce::String& samplePathProp,
                               const juce::String& sampleDataProp,
                               const juce::String& sampleNameProp);
-
-
-    // Restore the <GlobalState> child if present (mixer + FX algorithm params).
-    void restoreGlobalState(const juce::ValueTree& root);
 };
 
 } // namespace mu_clid

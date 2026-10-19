@@ -16,7 +16,7 @@
 #include "Audio/SampleLibrary.h"
 #include "Sequencer/RhythmPlayState.h"
 #include "Plugin/MidiClockSync.h"   // shared mu-core MIDI-clock slave
-#include "Persistence/PresetIO.h"
+#include "Plugin/PresetIO.h"
 #include "UI/RhythmHost.h"   // what the Rhythm layer's UI reads from its host
 #include "HotSwapStager.h"
 
