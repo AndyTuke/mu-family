@@ -4,7 +4,7 @@
 #include "Sequencer/LayerTypeInfo.h"  // mu-core: mu_core::LayerTypeId
 #include "Sequencer/RetireTail.h"     // mu-core: ParamBinding, RetireSnapshot
 #include "Sequencer/GatePattern.h"    // the drawable gate / filter / pitch envelopes
-#include "Sequencer/HeldNoteStack.h"  // Note mode's held keys
+#include "Sequencer/HeldNoteStack.h"  // mu-core: the held-key stack Note mode uses
 #include "Audio/SynthVoice.h"         // VoiceEngine, VoiceConfig
 #include "Audio/VoiceRingBuffer.h"    // audio -> UI level tap for the sidebar glyph
 #include "Audio/InsertProcessor.h"    // mu-core: shared per-voice insert FX
@@ -18,6 +18,9 @@
 
 namespace mu_tant
 {
+
+// Note mode's held keys: last-note priority, 16 notes, a 17th drops the oldest.
+using HeldNoteStack = mu_core::HeldNoteStack<16, mu_core::HeldNoteOverflow::DropOldest>;
 
 class PatternHost;
 

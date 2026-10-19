@@ -271,8 +271,8 @@ int Pattern::hearNotes(const mu_core::RenderContext& ctx) noexcept
     {
         if (e.size < 1) return;
         const int type = e.bytes[0] & 0xf0;
-        if (type == 0x90 && e.bytes[2] != 0)       notes.held.noteOn(e.bytes[1]);
-        else if (type == 0x80 || type == 0x90)     notes.held.noteOff(e.bytes[1]);
+        if (type == 0x90 && e.bytes[2] != 0)       notes.held.push(e.bytes[1]);
+        else if (type == 0x80 || type == 0x90)     notes.held.remove(e.bytes[1]);
     });
     return mode;
 }

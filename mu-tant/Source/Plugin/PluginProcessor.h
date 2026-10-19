@@ -6,7 +6,6 @@
 #include "Persistence/PatternParams.h"   // the Pattern type's parameter ids and rows
 #include "UI/PatternHost.h"               // what the Pattern layer and its UI read from their host
 #include "Sequencer/GatePattern.h"           // mu-tant: per-voice gate pattern
-#include "Sequencer/HeldNoteStack.h"         // mu-tant: the final-mix gate's held keys
 #include "Audio/SynthVoice.h"                // mu-tant voice
 #include "Audio/Wavetable/WavetableBank.h"   // mu-core
 #include "Audio/InsertProcessor.h"           // mu-core: shared per-voice insert FX
