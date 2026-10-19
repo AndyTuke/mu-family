@@ -82,6 +82,7 @@ void PluginProcessor::parameterChanged(const juce::String& id, float v)
     if (std::strcmp(raw, "mstrLoop") == 0)
     {
         sequencer.setMasterLoopSteps(juce::jmin((int)v * 16, 256));   // 0 = free
+        stepClock.setMasterLoopSteps(juce::jmin((int)v * 16, 256));
         return;
     }
 }
@@ -183,7 +184,7 @@ void PluginProcessor::applyPendingRhythmParams(int ri)
 
     if (!apvtsLoading.load(std::memory_order_acquire))
     {
-        if (patternDirty) sequencer.updatePattern(ri);
+        if (patternDirty) updateRhythmPattern(ri);
         if (voiceDirty && voiceEngines[ri]) voiceEngines[ri]->setParams(r.voiceParams);
     }
 }
@@ -222,7 +223,7 @@ void PluginProcessor::forceSyncRhythmFromApvts(int ri)
         }
     }
 
-    if (patternDirty) sequencer.updatePattern(ri);
+    if (patternDirty) updateRhythmPattern(ri);
     if (voiceEngines[ri]) voiceEngines[ri]->setParams(r.voiceParams);
 }
 

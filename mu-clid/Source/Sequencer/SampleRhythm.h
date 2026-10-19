@@ -6,6 +6,7 @@
 #include "Audio/MixerEngine.h"               // mu-core: the mixer channel the modulation pass seeds and drives
 #include "Modulation/ModulationDestinations.h"   // ModDest::kTableSize
 #include "Modulation/ModulationSnapshot.h"   // kSnapCount
+#include "Sequencer/RhythmCursor.h"          // the rhythm's own step cursor
 #include "MuLimits.h"
 
 #include <array>
@@ -38,10 +39,12 @@ struct SampleRhythm : Rhythm
 
     // Audio thread, once per block for a live rhythm, under the host's layer lock: the modulation pass. `strip`
     // is the rhythm's mixer channel (its pan and sends seed the matrix; the modulated values go back to it),
-    // `sequencer` / `slot` take the modulated Euclid values for the pattern recompute, and `engine` (null: none)
+    // the modulated Euclid values recompute the pattern the hits come from (the rhythm's own cursor when
+    // `cursorDrives`, with `clock`'s last step; else `sequencer`'s slot `slot`), and `engine` (null: none)
     // takes the block's modulated voice parameters.
     void applyModulation(double beatPos, MixerEngine::ChannelState& strip,
-                         RhythmSequencer& sequencer, int slot, VoiceEngine* engine);
+                         RhythmSequencer& sequencer, int slot, const RhythmStepClock& clock, bool cursorDrives,
+                         VoiceEngine* engine);
 
     // Audio thread: the hit the sequencer fired for this rhythm this block. In MIDI output mode it becomes one
     // note-on in `midiOut` through `midiEngine` (never the voice); otherwise `engine` (null: none) retriggers, tied when
@@ -93,6 +96,10 @@ private:
     float& mv(int destIndex) noexcept { jassert(modSlot[(size_t) destIndex] != nullptr); return *modSlot[(size_t) destIndex]; }
 
 public:
+    // The rhythm's own step cursor: built and handed patterns alongside the processor's RhythmSequencer;
+    // its hits drive the voice only while the processor's useLayerRender switch is on (E5.5b).
+    RhythmCursor cursor;
+
     // Engines a preset swap retired, still rendering their tails until drained (E5.4d moves these into
     // the shared RetireBin).
     std::array<std::unique_ptr<VoiceEngine>, kMaxRetiredEngines> retiredEngines;

@@ -96,8 +96,8 @@ PluginProcessor::PluginProcessor()
     defaultRhythm.name       = "<unnamed>";
     defaultRhythm.genA.steps = 16;
     defaultRhythm.genA.hits  = 4;
-    sequencer.setNumRhythms(1);
-    sequencer.updatePattern(0);
+    setLiveRhythms(1);
+    updateRhythmPattern(0);
     voiceEngines[0] = std::make_unique<VoiceEngine>();
     voiceEngines[0]->insertProc.setSlotIndex(0);   // per-slot noise seed: layers do not share one sequence
     // Stage 34 Step 2: C++17 std::atomic<bool> default ctor leaves the value
@@ -215,6 +215,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     // Must read the layer count AFTER acquiring layersLock — otherwise the snapshot
     // can be stale relative to the layer set and `sequencer.getRhythm(r)` indexes out of range.
     const int numRhythms = numLayers.load(std::memory_order_acquire);
+    cursorsDriveThisBlock = usesLayerRender();   // read once: every step of this block uses the same clock
 
     // Send the note-offs owed by slots torn down since the last block, ahead of any new hit.
     for (int i = 0; i < numOrphanOffs; ++i)
@@ -228,7 +229,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     // from its matrix. Try-locks only, so the audio thread never blocks on the message thread.
     for (int r = 0; r < numRhythms; ++r)
         sampleRhythm(r).applyModulation(beatPos, mixerEngine.channels[(size_t) r], sequencer, r,
-                                        voiceEngines[(size_t) r].get());
+                                        stepClock, cursorsDriveThisBlock, voiceEngines[(size_t) r].get());
 
     renderAudioBuses(buffer, midiMessages, numRhythms, transport.bpm);
 }
@@ -331,7 +332,10 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
                                                                 sequencerPlaying.load(), sequencer.getMasterLoopSteps());
         beatPos = resolved.beat;
         if (resolved.resetWrap)
+        {
             sequencer.resetWrapDetector();
+            stepClock.resetWrapDetector();
+        }
     }
     sequencerPlaying.store(playing);
     lastBeatPos.store(beatPos);
@@ -341,7 +345,11 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
 
 void PluginProcessor::advanceSequencer(int numRhythms, double beatPos, juce::MidiBuffer& midiMessages)
 {
-    const auto blockResult = sequencer.processBlock(beatPos);
+    // The hits: the sequencer's, or (useLayerRender on) each rhythm's own cursor's, which equal them.
+    std::array<CursorSteps, RhythmSequencer::MaxRhythms> cursorSteps;
+    const bool cursorsDrive = cursorsDriveThisBlock;
+    const auto blockResult = cursorsDrive ? advanceCursors(numRhythms, beatPos, cursorSteps)
+                                          : sequencer.processBlock(beatPos);
     // Phase 1: each rhythm the sequencer fired plays its hit (its sample, or in MIDI output mode one note-on).
     for (int r = 0; r < numRhythms; ++r)
         if (blockResult.firedMask & (1 << r))
@@ -358,11 +366,42 @@ void PluginProcessor::advanceSequencer(int numRhythms, double beatPos, juce::Mid
         std::fmod(beatPos / RhythmSequencer::StepLengthBeats, 1.0));
     beatFraction.store(frac);
     for (int r = 0; r < numRhythms; ++r)
-        sampleRhythm(r).publishPlayState(rhythmPlayState[(size_t) r], sequencer.getLastStepIndex(r),
-                                         sequencer.getLastAccentStepIndex(r), sequencer.getPatternLength(r), frac,
+    {
+        const auto& cs = cursorSteps[(size_t) r];
+        sampleRhythm(r).publishPlayState(rhythmPlayState[(size_t) r],
+                                         cursorsDrive ? cs.step       : sequencer.getLastStepIndex(r),
+                                         cursorsDrive ? cs.accentStep : sequencer.getLastAccentStepIndex(r),
+                                         cursorsDrive ? cs.length     : sequencer.getPatternLength(r), frac,
                                          (blockResult.firedMask & (1 << r)) != 0);
+    }
 }
 
+
+// The host clock's frame for the block, then each live rhythm's cursor walk, gathered into the sequencer's
+// BlockResult shape. Like sequencer.processBlock, nothing runs (no history consumed) with no live rhythm, and
+// the frame's step becomes the previous one only after every cursor walked.
+BlockResult PluginProcessor::advanceCursors(int numRhythms, double beatPos,
+                                            std::array<CursorSteps, RhythmSequencer::MaxRhythms>& steps)
+{
+    BlockResult result;
+    if (numRhythms <= 0)
+        return result;
+
+    const StepFrame frame = stepClock.advance(beatPos);
+    result.masterLoopWrapped = frame.masterLoopWrapped;
+    for (int r = 0; r < numRhythms; ++r)
+    {
+        auto& cursor = sampleRhythm(r).cursor;
+        const auto hit = cursor.advance(frame);
+        if (hit.fired)       result.firedMask          |= 1 << r;
+        if (hit.accented)    result.accentMask         |= 1 << r;
+        if (hit.tied)        result.tiedMask           |= 1 << r;
+        if (hit.loopWrapped) result.rhythmLoopWrapMask |= 1 << r;
+        steps[(size_t) r] = { cursor.lastStep(), cursor.lastAccentStep(), cursor.patternLength() };
+    }
+    stepClock.endBlock(frame);
+    return result;
+}
 
 void PluginProcessor::renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages,
                                        int numRhythms, double effectiveBpm)

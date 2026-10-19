@@ -4,8 +4,8 @@
 // render chain, the old processor-side chain and Layer::render coexist behind ProcessorBase's useLayerRender
 // switch. This builds two identical processors from one factory and scenario, turns the switch on in the
 // second, drives both with the same block schedule, scripted events and MIDI, and requires the master output
-// of every block and every channel's pre-mixer stream (the approved test-only channel tap) to be equal bit for
-// bit. Both paths run the same compiled maths, so tolerance is 0 with no exceptions, a sign of zero included.
+// and the MIDI out of every block and every channel's pre-mixer stream (the approved test-only channel tap) to
+// be equal bit for bit. Both paths run the same compiled maths, so tolerance is 0 with no exceptions, a sign of zero included.
 //
 // After a stage the same harness is the mu-Tronic test of design section 7 (a slot of type X equals the
 // product's own layer). Header-only and product-free; the scenario description is GoldenRender.h's.
@@ -119,6 +119,27 @@ namespace mu_layer_equiv
             vb.clear();
             a->processBlock(va, midiA);
             b->processBlock(vb, midiB);
+
+            // The block's MIDI out (a product that sends notes): the same events, in order, at the same frames.
+            {
+                auto ia = midiA.begin(), ib = midiB.begin();
+                for (; res.ok && ia != midiA.end() && ib != midiB.end(); ++ia, ++ib)
+                {
+                    const auto ma = *ia, mb = *ib;
+                    if (ma.samplePosition != mb.samplePosition || ma.numBytes != mb.numBytes
+                        || std::memcmp(ma.data, mb.data, (size_t) ma.numBytes) != 0)
+                    {
+                        res.ok = false;
+                        res.message = "MIDI out differs in block " + juce::String(block) + " at frame " + juce::String(ma.samplePosition)
+                                    + " (old path) / " + juce::String(mb.samplePosition) + " (layer path)";
+                    }
+                }
+                if (res.ok && ((ia == midiA.end()) != (ib == midiB.end())))
+                {
+                    res.ok = false;
+                    res.message = "MIDI out differs in block " + juce::String(block) + ": one path sent more events";
+                }
+            }
             for (int c = 0; c < 2 && res.ok; ++c)
             {
                 bool zeroSign = false;

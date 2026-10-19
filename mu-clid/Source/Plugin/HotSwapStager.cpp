@@ -69,7 +69,7 @@ bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
     const auto timing = proc.swapTiming();
     const bool hasMasterLoop = proc.sequencer.getMasterLoopSteps() > 0;
     const bool onMasterLoop  = mu_hotswap::usesMasterLoop(timing, hasMasterLoop);
-    const uint32_t epoch = proc.sequencer.getFrameEpoch();
+    const uint32_t epoch = proc.swapFrameEpoch();
     bool needAsync = false;
     for (int r = 0; r < numRhythms; ++r)
     {
@@ -83,7 +83,7 @@ bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
         // is wherever that rhythm last wrapped).
         if (token != 0 && atBoundary)
         {
-            flaggedOrigin[(size_t) r].store(onMasterLoop ? 0 : proc.sequencer.getBoundaryEff(r), std::memory_order_relaxed);
+            flaggedOrigin[(size_t) r].store(onMasterLoop ? 0 : proc.swapBoundaryEff(r), std::memory_order_relaxed);
             flaggedEpoch [(size_t) r].store(epoch, std::memory_order_relaxed);
         }
         needAsync |= stager.flagIfReady(r, token, atBoundary);
@@ -99,7 +99,7 @@ bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
                                                                       rhythmLoopWrapMask, /*barWrapped*/ false);
     if (fullToken != 0 && fullAtBoundary)
     {
-        fullFlaggedOrigin.store(hasMasterLoop ? 0 : proc.sequencer.getBoundaryEff(0), std::memory_order_relaxed);
+        fullFlaggedOrigin.store(hasMasterLoop ? 0 : proc.swapBoundaryEff(0), std::memory_order_relaxed);
         fullFlaggedEpoch .store(epoch, std::memory_order_relaxed);
     }
     needAsync |= stager.flagFullIfReady(fullToken, fullAtBoundary);
@@ -147,6 +147,7 @@ void HotSwapStager::installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceE
     proc.samples.setPath(r, samplePath);
     // Rebuilds the pattern and hands the audio thread its start position in one step.
     proc.sequencer.requestSwapStart(r, originEff, frameEpoch);
+    proc.sampleRhythm(r).cursor.requestSwapStart(proc.sampleRhythm(r), PluginProcessor::kStepCap, originEff, frameEpoch);
 }
 
 void HotSwapStager::processSwaps()

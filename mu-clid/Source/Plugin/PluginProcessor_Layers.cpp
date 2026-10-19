@@ -64,6 +64,15 @@ void PluginProcessor::setRhythmCount(int n)
     n = juce::jlimit(0, RhythmSequencer::MaxRhythms, n);
     for (int i = n; i < sequencer.getNumRhythms(); ++i)
         layerAs<Rhythm>(i) = Rhythm{};
+    setLiveRhythms(n);
+}
+
+void PluginProcessor::setLiveRhythms(int n)
+{
+    n = juce::jlimit(0, RhythmSequencer::MaxRhythms, n);
+    const int current = sequencer.getNumRhythms();
+    for (int i = std::min(n, current); i < std::max(n, current); ++i)
+        sampleRhythm(i).cursor.clear();
     sequencer.setNumRhythms(n);
 }
 
@@ -95,7 +104,7 @@ void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
             engine->releaseHeldNote();
     }
 
-    sequencer.setNumRhythms(numLayers.load(std::memory_order_relaxed));
+    setLiveRhythms(numLayers.load(std::memory_order_relaxed));
     for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
         sequencer.bindRhythm(i, static_cast<Rhythm*>(layers[(size_t) i].get()));
 
@@ -115,6 +124,8 @@ void PluginProcessor::layersReordered(LayerEdit kind, int a, int b)
     {
         reorderLastSlot = b;
         sequencer.swapSlotState(a, b);
+        sampleRhythm(a).cursor.requestAbsorb();   // each cursor moved with its rhythm: absorb the current step
+        sampleRhythm(b).cursor.requestAbsorb();
         std::swap(voiceEngines[(size_t) a], voiceEngines[(size_t) b]);
         std::swap(midiEngines[(size_t) a],  midiEngines[(size_t) b]);
         resetPlayState(a);
@@ -130,6 +141,8 @@ void PluginProcessor::layersReordered(LayerEdit kind, int a, int b)
     jassert(std::all_of(parkedEngines.begin(), parkedEngines.end(), [](const auto& p) { return p == nullptr; }));
 
     sequencer.removeSlotState(a);
+    for (int i = a; i < newN; ++i)
+        sampleRhythm(i).cursor.requestAbsorb();   // the rhythms that moved down absorb the current step
     parkPendingMidiOff(a);   // the removed slot's engine is overwritten below; keep its owed note-off
     samples.shiftPathsDown(a, n);
 
@@ -192,7 +205,7 @@ void PluginProcessor::syncSlotParams(int slot)
     if (slot == rebuildSlot)
     {
         rebuildSlot = -1;
-        sequencer.updatePattern(slot);
+        updateRhythmPattern(slot);
         if (voiceEngines[(size_t) slot])
         {
             voiceEngines[(size_t) slot]->setParams(getRhythm(slot).voiceParams);

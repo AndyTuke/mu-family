@@ -104,7 +104,7 @@ public:
     {
         return (idx >= 0 && idx < getNumRhythms()) ? getRhythm(idx).colourIndex : 0;
     }
-    void    updatePattern (int index)      { sequencer.updatePattern(index); }
+    void    updatePattern (int index)      { updateRhythmPattern(index); }
 
     // Per-rhythm sample paths, load / missing queries, preview player and primary sample folder.
     SampleLibrary samples { *this };
@@ -119,7 +119,7 @@ public:
     uint32_t fullStageSerial() const override             { return hotSwapStager.fullStageSerial(); }
     uint32_t slotStageSerial(int ri) const override       { return hotSwapStager.slotStageSerial(ri); }
     int  getMasterLoopSteps() const override              { return sequencer.getMasterLoopSteps(); }
-    int  getMasterLoopCurrentStep() const override        { return sequencer.getMasterLoopCurrentStep(); }
+    int  getMasterLoopCurrentStep() const override        { return usesLayerRender() ? stepClock.getMasterLoopCurrentStep() : sequencer.getMasterLoopCurrentStep(); }
 
     // A rhythm hot-swap commit fires ProcessorBase::onLayerPresetCommitted: the editor refreshes
     // the non-APVTS UI state (name label, sample bar, colour-tinted bits) pushRhythmToApvts can't.
@@ -167,6 +167,25 @@ public:
 
 
     RhythmSequencer sequencer;
+    // The rhythms' own step clocks (E5.5b): the host half here, a RhythmCursor in each SampleRhythm. They are
+    // handed every pattern, swap start, loop length and restart the sequencer is; while useLayerRender is on
+    // (tests only, until E5.5d) they, not the sequencer, decide the hits.
+    RhythmStepClock stepClock;
+    static constexpr int kStepCap = HitGenerator::kMaxSteps;   // the sequencer's step cap (setStepCap)
+
+    // Rebuilds slot `index`'s pattern for the sequencer and the rhythm's cursor (message thread).
+    void updateRhythmPattern(int index)
+    {
+        sequencer.updatePattern(index);
+        if (index >= 0 && index < RhythmSequencer::MaxRhythms)
+            sampleRhythm(index).cursor.updatePattern(sampleRhythm(index), kStepCap);
+    }
+    // useLayerRender as processBlock read it once for the block (audio thread), so one block never mixes clocks.
+    bool cursorsDriveThisBlock = false;
+    // Where slot r's pattern last started a pass, and the step counter's run id, from whichever clock
+    // decides this block's hits (audio thread: the swap stager records both at a boundary).
+    int      swapBoundaryEff(int r) const noexcept { return cursorsDriveThisBlock ? sampleRhythm(r).cursor.boundaryEffective() : sequencer.getBoundaryEff(r); }
+    uint32_t swapFrameEpoch() const noexcept       { return cursorsDriveThisBlock ? stepClock.currentEpoch() : sequencer.getFrameEpoch(); }
     // Fixed-size arrays so the audio thread never races with a vector reallocation caused by a
     // structural edit on the message thread. The layer count (ProcessorCore::numLayers) is the
     // authoritative count; processBlock reads it atomically once per block, under layersLock.
@@ -335,6 +354,10 @@ private:
     // midiMessages), check hot-swap boundaries, and
     // publish per-rhythm UI play-state. Called only while playing.
     void advanceSequencer(int numRhythms, double beatPos, juce::MidiBuffer& midiMessages);
+    // The cursors' version of sequencer.processBlock (useLayerRender on): the host clock's frame, each live
+    // rhythm's cursor walk, the same BlockResult; `steps` gets each rhythm's step, accent step and length.
+    struct CursorSteps { int step = -1, accentStep = 0, length = 0; };
+    BlockResult advanceCursors(int numRhythms, double beatPos, std::array<CursorSteps, RhythmSequencer::MaxRhythms>& steps);
     // Gather output buses, run the core mixer/voice render, mix the sample
     // preview, and emit per-rhythm MIDI.
     void renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages,
@@ -397,6 +420,9 @@ private:
     void pushMixerChannelToApvts(int idx);
     // Sets the sequencer's live rhythm count; a dropped rhythm is reset so a later grow starts from a default one.
     void setRhythmCount(int n);
+    // The sequencer's live count; a cursor whose slot becomes live or stops being live is cleared, as the
+    // sequencer clears its slot state (message thread, layer lock held or not yet processing).
+    void setLiveRhythms(int n);
 
     // ── Layer container (ProcessorBase) ──────────────────────────────────────
     // The engines, tails, play state and sample paths stay here, keyed by slot; the hooks below move
