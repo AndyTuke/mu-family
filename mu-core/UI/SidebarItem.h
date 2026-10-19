@@ -22,6 +22,12 @@ public:
     void setSelected(bool s);
     void setPendingSwap(bool p);
 
+    // A host of fixed slots (mu-Tronic): the slot's number engraved at the top left of the box (0 = none), and
+    // the empty look: no mini-graphic, a ghost "+" in its place.
+    void setSlotNumber(int n);
+    void setEmpty(bool e);
+    bool isEmpty() const noexcept { return empty; }
+
     // Metal style: no fill of its own; the item's box (metalBox) is drawn raised by the
     // LayerSidebar behind it, and selection is the box outlined in the layer colour.
     void setMetalStyle(bool m) { metal = m; resized(); repaint(); }
@@ -54,6 +60,8 @@ private:
     bool         selected    = false;
     bool         pendingSwap = false;
     bool         metal       = false;
+    bool         empty       = false;
+    int          slotNumber  = 0;
     float        pulseAlpha  = 0.0f;
 
     juce::Point<int> mouseDownPos;

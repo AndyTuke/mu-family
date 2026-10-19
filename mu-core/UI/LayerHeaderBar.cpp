@@ -56,8 +56,9 @@ void LayerHeaderBar::lookAndFeelChanged()
 {
     // Metal: the name is an LCD lit in the layer colour; flat: plain heading text.
     const bool metal = MuLookAndFeel::isMetal(*this);
-    nameLabel.setColour(juce::Label::textColourId,
-                        metal ? colour.brighter(MuLookAndFeel::lighting().lcdOwnLift) : MuLookAndFeel::colour(MuLookAndFeel::headingText));
+    auto lit = metal ? colour.brighter(MuLookAndFeel::lighting().lcdOwnLift) : MuLookAndFeel::colour(MuLookAndFeel::headingText);
+    if (ghostName) lit = lit.withAlpha(MuLookAndFeel::lighting().lcdGhost * 2.5f);   // unlit, but legible
+    nameLabel.setColour(juce::Label::textColourId, lit);
     nameLabel.setFont(metal ? MuLookAndFeel::lcdFont(mu_ui::sf((float) MuLookAndFeel::kLcdNameTextH))
                             : juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(15.0f))));
     repaint();
@@ -94,6 +95,19 @@ void LayerHeaderBar::setShowReset(bool show)
     showReset = show;
     resetBtn.setVisible(show);
     resized();
+}
+
+void LayerHeaderBar::setShowSave(bool show)
+{
+    showSave = show;
+    saveBtn.setVisible(show);
+    resized();
+}
+
+void LayerHeaderBar::setGhostName(bool ghost)
+{
+    ghostName = ghost;
+    lookAndFeelChanged();
 }
 
 void LayerHeaderBar::setShowClips(bool show)
@@ -136,7 +150,7 @@ void LayerHeaderBar::resized()
     int x = rightEdge;
     if (showDelete) { deleteBtn.setBounds(x - iconW, btnY, iconW, btnH);  x -= iconW + s(4); }
     if (showReset) { resetBtn.setBounds(x - iconW, btnY, iconW, btnH);  x -= iconW + s(4); }
-    saveBtn.setBounds(x - presetW, btnY, presetW, btnH);  x -= presetW + s(4);
+    if (showSave) { saveBtn.setBounds(x - presetW, btnY, presetW, btnH);  x -= presetW + s(4); }
 
     // The clip strip sits right of the preset dropdown it relates to, left of Save; the dropdown yields the width.
     int ddRight = x - s(4);

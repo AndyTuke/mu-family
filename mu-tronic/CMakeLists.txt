@@ -1,0 +1,138 @@
+# mu-tronic — μ-family performance unit: 16 layer slots, each holding a layer taken from the other products
+# (Standalone only, freeware). docs/mu-tronic/design.md.
+#
+# The target combines the product's shell (the 16-slot processor, the empty-slot chooser) with the shared
+# platform (ProcessorBase + MixerEngine + FXChain + the shared editor shell / sidebar / mixer). Shared
+# audio/UI/ProcessorBase come from mu-core via the link; the layer types come from the layer libraries
+# (mu-<product>-layer) as each is registered in Source/Persistence/LayerTypes.cpp. None is yet.
+
+# ── mu-Tronic — Standalone only (no VST3, no CLAP, no AU) ────────────────────
+juce_add_plugin(mu-tronic
+    COMPANY_NAME "Transwarp Development Project"
+    BUNDLE_ID "com.transwarp.mu-tronic"
+    PLUGIN_MANUFACTURER_CODE TDP1
+    PLUGIN_CODE MTrn
+    FORMATS Standalone
+    PRODUCT_NAME "mu-Tronic"
+    PLUGIN_NAME  "μ-Tronic"
+    IS_SYNTH TRUE
+    NEEDS_MIDI_INPUT TRUE
+    NEEDS_MIDI_OUTPUT FALSE
+    IS_MIDI_EFFECT FALSE
+    EDITOR_WANTS_KEYBOARD_FOCUS FALSE
+    VERSION         "${MUFAMILY_PRE_PLUGIN_VERSION}"   # pre-release 0.1 line until it launches
+    COMPANY_COPYRIGHT "${MUFAMILY_COPYRIGHT}"
+)
+
+target_sources(mu-tronic
+    PRIVATE
+        Source/Plugin/PluginProcessor.cpp
+        Source/Plugin/PluginProcessor_Preset.cpp
+        Source/Plugin/PluginEditor.cpp
+        Source/Persistence/LayerTypes.cpp
+        Source/UI/EmptySlotChooser.cpp
+        Source/UI/TronicSettingsOverlay.cpp
+)
+
+target_include_directories(mu-tronic
+    PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/Source"
+    SYSTEM PRIVATE
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+)
+
+# 16 layer slots: MU_MAX_LAYERS is a per-target capacity (mu-core is an INTERFACE library, so each binary
+# compiles its own copy); the four other products keep 8. Freeware: no licence code, no monocypher.
+target_compile_definitions(mu-tronic
+    PUBLIC
+        MU_MAX_LAYERS=16
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_VST3_CAN_REPLACE_VST2=0
+        "MU_VERSION_BASE=\"${MUFAMILY_PRE_VERSION_BASE}\""   # pre-release 0.1 line shown in About
+)
+
+target_link_libraries(mu-tronic
+    PRIVATE
+        mu-core
+        juce::juce_audio_utils
+        juce::juce_dsp
+        juce::juce_gui_basics
+        juce::juce_gui_extra
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+# Custom standalone app: the shared "Close μ-Tronic?" confirmation on quit (mirrors the other products).
+target_compile_definitions(mu-tronic_Standalone PRIVATE JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1)
+target_sources(mu-tronic_Standalone PRIVATE
+    Source/Plugin/StandaloneApp.cpp)
+
+# Hardware controller support (mu-control) in this Standalone only; a no-op unless MUFAMILY_WITH_CONTROL is ON.
+mu_control_attach(mu-tronic_Standalone)
+mu_asio_attach(mu-tronic_Standalone)   # ASIO devices when -DMUFAMILY_WITH_ASIO=ON
+
+# Family build-counter (shared increment target defined in mu-clid/CMakeLists.txt).
+add_dependencies(mu-tronic increment_build_number)
+
+# Custom Windows VERSIONINFO with the full four-part family version (JUCE's generated .rc can't take x.y.0.N).
+if(WIN32)
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/versioninfo.rc.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc"
+        @ONLY
+        NEWLINE_STYLE CRLF   # RC compiler expects CRLF on Windows
+    )
+    target_compile_definitions(mu-tronic        PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc\"")
+    target_compile_definitions(mu-tronic_rc_lib PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc\"")
+    add_dependencies(mu-tronic_rc_lib increment_build_number)
+endif()
+
+# ── mu-tronic-tests — console UnitTests ─────────────────────────────────────
+# Built as part of ALL_BUILD (small and local, like mu-toni-tests).
+include("${CMAKE_SOURCE_DIR}/mu-core/cmake/ProcessorTestSources.cmake")
+juce_add_console_app(mu-tronic-tests PRODUCT_NAME "mu-tronic-tests")
+
+target_sources(mu-tronic-tests PRIVATE
+    Source/Tests/TestMain.cpp
+    Source/Tests/TronicProcessorTests.cpp   # the real PluginProcessor, headless: 16 empty slots, types, state round trip
+    Source/Tests/TronicLayoutTests.cpp      # the 16-slot parameter layout: size, build time, unique ids
+    # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
+    Source/Plugin/PluginProcessor.cpp
+    Source/Plugin/PluginProcessor_Preset.cpp
+    Source/Persistence/LayerTypes.cpp
+    # The mu-core .cpps behind ProcessorBase (the console target can't link mu-core directly).
+    ${MU_CORE_PROCESSOR_TEST_SOURCES}
+)
+
+target_compile_features(mu-tronic-tests PRIVATE cxx_std_17)
+
+target_include_directories(mu-tronic-tests PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source"
+    "${CMAKE_SOURCE_DIR}/mu-core"
+    SYSTEM
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"   # ReverbSlot
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+)
+
+target_link_libraries(mu-tronic-tests PRIVATE
+    juce::juce_core
+    juce::juce_audio_basics
+    juce::juce_audio_processors
+    juce::juce_data_structures
+    juce::juce_events
+    juce::juce_graphics
+    juce::juce_gui_basics
+    juce::juce_dsp
+    juce::juce_audio_formats
+    juce::juce_recommended_config_flags
+    juce::juce_recommended_warning_flags
+)
+
+target_compile_definitions(mu-tronic-tests PRIVATE MU_MAX_LAYERS=16 JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+
+add_dependencies(mu-tronic mu-tronic-tests)

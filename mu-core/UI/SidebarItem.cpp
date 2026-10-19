@@ -18,6 +18,16 @@ void SidebarItem::setPendingSwap(bool p)
     if (pendingSwap != p) { pendingSwap = p; repaint(); }
 }
 
+void SidebarItem::setSlotNumber(int n)
+{
+    if (slotNumber != n) { slotNumber = n; repaint(); }
+}
+
+void SidebarItem::setEmpty(bool e)
+{
+    if (empty != e) { empty = e; repaint(); }
+}
+
 void SidebarItem::pulse()
 {
     pulseAlpha = 0.4f;
@@ -151,6 +161,26 @@ void SidebarItem::paint(juce::Graphics& g)
             g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
             g.drawText(name, s(14), nameY, w - s(18), nameRowH, juce::Justification::centredLeft, true);
         }
+    }
+
+    // An empty slot: a ghost "+" where the mini-graphic would be (the add affordance, faintly lit like unlit LCD lettering).
+    if (empty && miniVisual == nullptr)
+    {
+        const int plusSize = metal ? juce::jmin(w - s(20), h - s(26)) : juce::jmin(w - s(8), h - s(20));
+        g.setColour(MuLookAndFeel::colour(Id::labelText).withAlpha(MuLookAndFeel::lighting().emptyPlus));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(30.0f))));
+        g.drawText("+", juce::Rectangle<int>((w - plusSize) / 2, metal ? s(7) : s(4), plusSize, plusSize),
+                   juce::Justification::centred, false);
+    }
+
+    // The slot's number, small, at the top left of the box (clear of its corner screw when the box has them).
+    if (slotNumber > 0)
+    {
+        const int clear = MuLookAndFeel::hasScrews(*this) ? s(MuLookAndFeel::kSubPanelScrewClear) : s(4);
+        g.setColour(MuLookAndFeel::colour(Id::labelText));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
+        g.drawText(juce::String(slotNumber), juce::Rectangle<int>((int) box.getX() + clear, (int) box.getY() + s(3), s(18), s(11)),
+                   juce::Justification::topLeft, false);
     }
 
     // Pending hot-swap badge — orange pill, top-right, "SWP". Click cancels.

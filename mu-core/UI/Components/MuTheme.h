@@ -193,6 +193,7 @@ struct MuTheme
         juce::Colour green             { 0xff4ADC8E };
         juce::Colour blue              { 0xff3D8BEB };
         juce::Colour yellow            { 0xffF2C53D };
+        juce::Colour ice               { 0xffDCEBF7 };   // mu-Tronic: cool near-white lamps on bare steel
     } apps;
 
     // ── Control-surface colours ───────────────────────────────────────────
@@ -278,6 +279,7 @@ struct MuTheme
         float lcdBacklight       = 0.28f;   // active tab: glass tinted by the lit colour
         float lcdGlow            = 0.35f;   // glow round the lit lettering
         float lcdGhost           = 0.22f;   // unlit lettering, faintly visible through the glass
+        float emptyPlus          = 0.55f;   // the "+" of an empty slot in the sidebar (stronger than ghost lettering: it is an affordance)
         float lcdGlare           = 0.07f;   // glass glare from the top right
         float lcdOwnLift         = 0.30f;   // lettering on a display lit in its own (voice) colour: that colour brightened by this
         float lcdAccentLift      = 0.60f;   // lettering on an app-lit display: the app colour brightened by this

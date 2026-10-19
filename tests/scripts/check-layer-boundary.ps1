@@ -38,6 +38,10 @@
 #           target_sources(mu-<p>-layer INTERFACE ...) block nor its MU_<P>_LAYER_UI_SOURCES list may name a file
 #           under Plugin/, License/ or Tests/, the app's SettingsOverlay or PluginEditor. A layer library file also
 #           must not include PluginEditor.h or SettingsOverlay.h (the app's own window and settings page; rule 2).
+#   Rule 10 mu-Tronic hosts layer types through the registry and names none: a file under mu-tronic/Source/ outside
+#           Persistence/ (where the registry list is) and Tests/ must not #include a header that belongs to a layer
+#           library (an engine, a sequencer, a layer's parameter table or content). A layer library also must not
+#           include the mu-tronic tree (rule 2's product list names it).
 #
 # The scan is driven by -Root, a directory laid out like the repo root: mu-core/, any mu-*-layer/ libraries and
 # the product trees mu-*/Source/. A layer library is either its own mu-<p>-layer/ folder or, as the products
@@ -96,7 +100,7 @@ foreach ($d in (Get-ChildItem -LiteralPath $Root -Directory -Filter 'mu-*' | Sor
 $blockComment = [regex]'(?s)/\*.*?\*/'
 $blankBlock = [System.Text.RegularExpressions.MatchEvaluator] { param($m) $m.Value -replace '[^\r\n]+', '' }
 $includePluginOrLicense = [regex]'#\s*include\s*[<"]([^">]*/)?(Plugin|License)/'
-$includeProduct = [regex]'#\s*include\s*[<"]([^">]*/)?(mu-(clid-midi|clid|tant|toni|on))/'
+$includeProduct = [regex]'#\s*include\s*[<"]([^">]*/)?(mu-(clid-midi|clid|tant|toni|on|tronic))/'
 $includeLayerLib = [regex]'#\s*include\s*[<"]([^">]*/)?(mu-[a-z-]+-layer)/'
 $namesProcessor = [regex]'\bPluginProcessor\b'
 $includeAppUi = [regex]'#\s*include\s*[<"]([^">]*/)?(PluginEditor|SettingsOverlay)\.h[">]'
@@ -321,6 +325,28 @@ foreach ($lib in ($libraries | Where-Object { $_.IsLayer -and $_.InTree })) {
             if ($appSourcePath.IsMatch($tok.Value)) {
                 $line = Get-LineNumber $cmakeText ($b.Index + $b.Body.IndexOf($tok.Value))
                 Report "$product/CMakeLists.txt:$line — $($b.Where) lists an app source '$($tok.Value)' (rule 9)"
+            }
+        }
+    }
+}
+
+# Rule 10: mu-Tronic names no layer type's header outside Persistence/ (the registry list) and Tests/.
+$tronicSource = Join-Path $Root 'mu-tronic/Source'
+if (Test-Path -LiteralPath $tronicSource -PathType Container) {
+    $layerHeaders = @{}
+    foreach ($f in ($all | Where-Object { $_.IsLayer -and $_.Rel -match '\.(h|hpp)$' })) { $layerHeaders[$f.Rel.ToLowerInvariant()] = $f.Lib }
+    $tronicBase = (Resolve-Path -LiteralPath $tronicSource).Path.TrimEnd([char]92, '/')
+    $includeAny = [regex]'#\s*include\s*[<"]([^">]+)[">]'
+    foreach ($f in (Get-ChildItem -LiteralPath $tronicBase -Recurse -File -Include '*.h', '*.hpp', '*.cpp' | Sort-Object FullName)) {
+        $rel = $f.FullName.Substring($tronicBase.Length).TrimStart([char]92, '/').Replace([string][char]92, '/')
+        if ($skipDir.IsMatch($rel) -or $rel -match '^(Persistence|Tests)/') { continue }
+        # Comments blanked only: the include path is a string literal, which Get-CleanedText would empty.
+        $cleaned = $blockComment.Replace([System.IO.File]::ReadAllText($f.FullName), $blankBlock) -replace '//[^\r\n]*', ''
+        foreach ($m in $includeAny.Matches($cleaned)) {
+            $inc = $m.Groups[1].Value.Replace('\', '/').ToLowerInvariant()
+            if ($layerHeaders.ContainsKey($inc)) {
+                $line = Get-LineNumber $cleaned $m.Index
+                Report "mu-tronic/Source/${rel}:$line — mu-Tronic names a layer type's header '$($m.Groups[1].Value)' of $($layerHeaders[$inc]) (rule 10; the registry list in Persistence/ is the one place)"
             }
         }
     }

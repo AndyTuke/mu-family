@@ -41,6 +41,8 @@ public:
     void setStagingBadge(bool show);                  // optional hot-swap "SWP" pill
     void setShowReset(bool show);                     // some products may hide reset
     void setShowDelete(bool show);                    // products with fixed layers hide delete
+    void setShowSave(bool show);                      // a slot host hides Save on an empty slot
+    void setGhostName(bool ghost);                    // the name LCD unlit (an empty slot reads "Slot 5" in ghost lettering)
     void setDeleteEnabled(bool enabled);              // greyed when only one layer remains
     void setNoun(const juce::String& n);              // the product's word for a layer (tooltips); lower-cased
     void setNameEditable(bool editable);              // fixed-name layers can't be renamed
@@ -84,6 +86,8 @@ private:
     bool         staging   = false;
     bool         showReset = true;
     bool         showDelete = true;
+    bool         showSave   = true;
+    bool         ghostName  = false;
     bool         showClips  = false;
     juce::String noun { "layer" };
 

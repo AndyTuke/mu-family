@@ -146,8 +146,19 @@ void EditorShellBase::setMixerOverlay(juce::Component* overlay)
     chrome.setMixerOverlay(overlay);
     // A mu-core MixerOverlay also reports its status messages to the status bar.
     if (auto* mixer = dynamic_cast<MixerOverlay*>(overlay))
+    {
+        sharedMixer = mixer;
         mixer->onStatusUpdate = [this](const juce::String& name, const juce::String& val, juce::Colour col)
         { statusBar.showParam(name, val, col); };
+        // The mixer opens on the sidebar's page (a paged host); after that the two are independent.
+        mixer->pageOnOpen = [this] { return layerSidebar != nullptr ? layerSidebar->getShownPage() : 0; };
+    }
+    // PageUp / PageDown page the mixer's strips while it is open, else the sidebar (a one-page host does nothing).
+    chrome.onPageKey = [this](int delta)
+    {
+        if (chrome.isMixerVisible()) return sharedMixer != nullptr && sharedMixer->showAdjacentPage(delta);
+        return layerSidebar != nullptr && layerSidebar->showAdjacentPage(delta);
+    };
 }
 
 void EditorShellBase::setMetalStyle(bool metal, juce::Colour appAccent)

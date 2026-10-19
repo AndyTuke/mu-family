@@ -591,6 +591,11 @@ bool ShellChrome::keyPressed(const juce::KeyPress& key, juce::Component*)
         return true;
     }
 
+    // PageUp / PageDown page the sidebar, or the mixer's strips while the mixer is the open overlay.
+    if (onPageKey && (key == juce::KeyPress::pageUpKey || key == juce::KeyPress::pageDownKey)
+        && (! anyOverlayVisible() || (mixerVisible && ! aboutVisible && ! saveVisible && ! browserVisible && ! settingsVisible)))
+        return onPageKey(key == juce::KeyPress::pageUpKey ? -1 : 1);
+
     if (backend.isStandaloneApp() && key == keybindPlayStop)
     {
         backend.toggleInternalPlay();

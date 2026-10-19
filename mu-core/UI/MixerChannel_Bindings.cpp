@@ -23,7 +23,7 @@ void MixerChannel::bindStripToApvts(ProcessorBase* proc, const juce::String& pre
     soloBtn.onClick = [write, this] { write("solo", soloBtn.getToggleState() ? 1.0f : 0.0f); };
     if (! hasSidechainControls()) return;
     scSourceBox.onChange = [write, this] {
-        const int id = scSourceBox.getSelectedId();   // 1 = none, 2..9 = ch0..ch7 → param 0 / 1..8
+        const int id = scSourceBox.getSelectedId();   // 1 = none, 2.. = ch0.. → param 0 / 1..; the external bus is last
         write("scSrc", (float) (id <= 1 ? 0 : id - 1));
         if (onStatusUpdate) onStatusUpdate(channelName + " Sidechain", scSourceBox.getText(), channelColour);
     };
@@ -235,7 +235,7 @@ void MixerChannel::setSidechainSources(int ownIndex, const juce::StringArray& na
                                                       : names[i];
         scSourceBox.addItem(label, i + 2);  // ID = channel index + 2
     }
-    // External DAW sidechain bus — ID = MaxChannels + 2 (maps to apvts=9, engine=kExtSidechainSrc).
+    // External DAW sidechain bus — ID = MaxChannels + 2 (maps to apvts = kMaxLayers + 1, engine = kExtSidechainSrc).
     scSourceBox.addItem("Ext In", MixerEngine::MaxChannels + 2);
     // Restore previous selection if still valid, else default to none
     if (prevId > 1 && scSourceBox.indexOfItemId(prevId) >= 0)

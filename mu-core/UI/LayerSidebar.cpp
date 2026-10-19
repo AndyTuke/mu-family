@@ -9,8 +9,10 @@ LayerSidebar::LayerSidebar(ProcessorBase& processor, const juce::String& addButt
     addAndMakeVisible(viewport);
     addAndMakeVisible(addButton);
     addChildComponent(layerIndicator);
+    addChildComponent(pageSwitch);
 
     addButton.onClick = [this] { if (onAddLayer) onAddLayer(); };
+    pageSwitch.onChange = [this](int page) { showPage(page); };
 
     // Metal style: every visible item's raised box, all shadows first, then the faces.
     itemContainer.onPaint = [this](juce::Graphics& g)
@@ -46,6 +48,7 @@ void LayerSidebar::refreshItems()
     items.clear();
 
     const int n = proc.getNumLayers();
+    const bool slots = proc.layersAreSlots();
     for (int i = 0; i < n; ++i)
     {
         auto item = std::make_unique<SidebarItem>(i);
@@ -53,7 +56,10 @@ void LayerSidebar::refreshItems()
         item->setColour(colourFor(i));
         item->setSelected(i == selectedIndex);
         item->setMetalStyle(metal);
-        if (createMiniVisual) item->setMiniVisual(createMiniVisual(i, [this, i] { pulseItem(i); }));
+        // A host of fixed slots numbers them and shows an empty one as a "+": no mini-graphic is built for it.
+        const bool emptySlot = slots && proc.getLayer(i) != nullptr && proc.getLayer(i)->typeId() == 0;
+        if (slots) { item->setSlotNumber(i + 1); item->setEmpty(emptySlot); }
+        if (createMiniVisual && ! emptySlot) item->setMiniVisual(createMiniVisual(i, [this, i] { pulseItem(i); }));
 
         item->onSelected = [this](int idx)
         {
@@ -70,13 +76,76 @@ void LayerSidebar::refreshItems()
     }
 
     updateAddEnabled();
-
-    itemContainer.setSize(kWidth, (int) items.size() * kItemH);
+    shownPage = juce::jlimit(0, juce::jmax(0, getNumPages() - 1), shownPage);
+    syncPageSwitch();
+    applyPage();
+    itemContainer.setSize(kWidth, visibleCount() * kItemH);
     resized();
 
     // Animate a freshly-added item sliding in (skip on initial construction).
-    if (n > prevCount && prevCount > 0)
+    if (n > prevCount && prevCount > 0 && getNumPages() == 1)
         layoutItems(true, n - 1);
+}
+
+// ── Pages ────────────────────────────────────────────────────────────────────
+
+int LayerSidebar::getNumPages() const noexcept
+{
+    const int n = proc.getNumLayers();
+    return juce::jmax(1, (n + mu_limits::kLayersPerPage - 1) / mu_limits::kLayersPerPage);
+}
+
+// The items of the shown page: a full page except the last, which holds what is left.
+int LayerSidebar::visibleCount() const noexcept
+{
+    return juce::jlimit(0, mu_limits::kLayersPerPage, (int) items.size() - firstOnPage());
+}
+
+// The page numbers, "1" and "2": a range does not fit the 30 px segment, so the slot's caption says "Page".
+void LayerSidebar::syncPageSwitch()
+{
+    const int pages = getNumPages();
+    if (pages <= 1) { pageSwitch.setVisible(false); return; }
+    std::vector<juce::String> labels;
+    for (int p = 0; p < pages; ++p) labels.push_back(juce::String(p + 1));
+    pageSwitch.setLabels(labels);
+    pageSwitch.setSelectedIndex(shownPage);
+    pageSwitch.setVisible(showsPageSwitch());
+}
+
+void LayerSidebar::applyPage()
+{
+    for (int i = 0; i < (int) items.size(); ++i)
+    {
+        const bool onShown = pageOf(i) == shownPage;
+        items[(size_t) i]->setVisible(onShown);
+        if (onShown) items[(size_t) i]->setBounds(itemBounds(i));
+    }
+    itemContainer.repaint();
+}
+
+void LayerSidebar::showPage(int page)
+{
+    page = juce::jlimit(0, getNumPages() - 1, page);
+    if (page == shownPage) { syncPageSwitch(); return; }
+
+    // The layer at the same position on the new page becomes the selection, so the main panel always shows a layer.
+    const int perPage = mu_limits::kLayersPerPage;
+    const int target = juce::jlimit(0, juce::jmax(0, (int) items.size() - 1), page * perPage + selectedIndex % perPage);
+    shownPage = page;
+    syncPageSwitch();
+    applyPage();
+    resized();
+    setSelectedIndex(target);
+    if (onLayerSelected) onLayerSelected(target);
+}
+
+bool LayerSidebar::showAdjacentPage(int delta)
+{
+    const int page = shownPage + (delta < 0 ? -1 : 1);
+    if (page < 0 || page >= getNumPages()) return false;
+    showPage(page);
+    return true;
 }
 
 void LayerSidebar::setLiveView(const mu_core::LiveView* view)
@@ -155,6 +224,14 @@ void LayerSidebar::setSelectedIndex(int i)
     selectedIndex = i;
     for (int j = 0; j < (int) items.size(); ++j)
         items[(size_t) j]->setSelected(j == i);
+    // The page follows the selection (a layer picked by the surface or the mixer may be on the other page).
+    if (i >= 0 && i < (int) items.size() && pageOf(i) != shownPage)
+    {
+        shownPage = pageOf(i);
+        syncPageSwitch();
+        applyPage();
+        resized();
+    }
 }
 
 void LayerSidebar::pulseItem(int idx)
@@ -189,6 +266,10 @@ void LayerSidebar::paint(juce::Graphics& g)
 
 void LayerSidebar::paintOverChildren(juce::Graphics& g)
 {
+    if (pageSwitch.isVisible() && ! pageCaptionR.isEmpty())
+        MuLookAndFeel::drawEngravedText(g, "Page", pageCaptionR, juce::Justification::centred,
+                                        MuLookAndFeel::colour(MuLookAndFeel::ColourIds::labelText));
+
     // Panel screws over the items, set into the painted border.
     if (metal && MuLookAndFeel::hasScrews(*this))
         MuLookAndFeel::drawPanelScrews(g, getLocalBounds().reduced(2).toFloat());
@@ -263,7 +344,8 @@ int LayerSidebar::computeTargetIndex(int containerLocalY) const
 {
     if (items.empty()) return 0;
     const int pitch = itemBounds(1).getY() - itemBounds(0).getY();
-    return juce::jlimit(0, (int) items.size() - 1, (containerLocalY - itemGap / 2) / juce::jmax(1, pitch));
+    // A drag stays within the shown page.
+    return firstOnPage() + juce::jlimit(0, juce::jmax(0, visibleCount() - 1), (containerLocalY - itemGap / 2) / juce::jmax(1, pitch));
 }
 
 void LayerSidebar::commitDrag()
@@ -324,9 +406,11 @@ void LayerSidebar::resized()
     // does nothing (e.g. mu-toni with no engine yet defined).
     // In Performance mode the slot holds the read-only layer indicator instead, even with no Add.
     const bool following = shownFollowing;
-    const bool showAdd   = static_cast<bool>(onAddLayer) || following;
-    addButton.setVisible(static_cast<bool>(onAddLayer) && ! following);
-    layerIndicator.setVisible(following);
+    const bool paged     = showsPageSwitch();   // the page switch takes the Add slot (a paged host has no Add button)
+    const bool showAdd   = static_cast<bool>(onAddLayer) || following || paged;
+    addButton.setVisible(static_cast<bool>(onAddLayer) && ! following && ! paged);
+    layerIndicator.setVisible(following && ! paged);   // a paged host shows its page switch, which already follows the surface
+    pageSwitch.setVisible(paged);
 
     // Metal style keeps the items and the Add button clear of the painted border, and
     // with screws, clear of the corner screws above the first item / below the Add button.
@@ -341,6 +425,10 @@ void LayerSidebar::resized()
         const int addBtnY = h - ah - edgeY;
         addButton.setBounds(edgeX, addBtnY, w - 2 * edgeX, ah);
         layerIndicator.setBounds(addButton.getBounds());
+        // The page switch: an engraved "Page" caption over the segments, in the same slot.
+        const int capH = s(LF::kClientNameH);
+        pageCaptionR = addButton.getBounds().withHeight(capH);
+        pageSwitch.setBounds(addButton.getBounds().withTrimmedTop(capH));
         viewport.setBounds(0, top, w, addBtnY - s(2) - top);
     }
     else
@@ -350,21 +438,23 @@ void LayerSidebar::resized()
 
     // Spread the items evenly: equal gaps above, between and below them, capped so a few
     // items stay grouped near the top. If they don't fit, no gap — the viewport scrolls.
-    const int n     = (int) items.size();
+    const int n     = visibleCount();
     const int spare = viewport.getHeight() - n * ih;
     itemGap    = spare > 0 ? juce::jmin(spare / (n + 1), s(kItemH / 4)) : 0;
     itemInsetX = itemX;
     itemContainer.setSize(w, juce::jmax(1, n * (ih + itemGap) + itemGap));
 
-    for (int i = 0; i < n; ++i)
-        items[(size_t) i]->setBounds(itemBounds(i));
+    for (int i = 0; i < (int) items.size(); ++i)
+        if (pageOf(i) == shownPage) items[(size_t) i]->setBounds(itemBounds(i));
 }
 
+// An item's place is its position within its page.
 juce::Rectangle<int> LayerSidebar::itemBounds(int i) const
 {
     using mu_ui::s;
     const int ih = s(kItemH);
-    return { itemInsetX, itemGap + i * (ih + itemGap), itemContainer.getWidth() - 2 * itemInsetX, ih };
+    const int local = i % mu_limits::kLayersPerPage;
+    return { itemInsetX, itemGap + local * (ih + itemGap), itemContainer.getWidth() - 2 * itemInsetX, ih };
 }
 
 void LayerSidebar::timerCallback()
@@ -373,13 +463,23 @@ void LayerSidebar::timerCallback()
     // setStateInformation after the editor opened).
     if (proc.getNumLayers() != (int) items.size())
         refreshItems();
+    else if (proc.layersAreSlots())
+    {
+        // A slot host: a layer type changed outside the editor (a state restore, a program change).
+        for (int i = 0; i < (int) items.size(); ++i)
+            if (const auto* l = proc.getLayer(i); l != nullptr && (l->typeId() == 0) != items[(size_t) i]->isEmpty())
+            {
+                refreshItems();
+                break;
+            }
+    }
 
     updateAddEnabled();   // the count can change outside the editor (host state restore)
 
     // Sync Add button visibility in case onAddLayer was wired (or cleared)
     // after the last resized() call.
     followLiveState();
-    if (addButton.isVisible() != (static_cast<bool>(onAddLayer) && ! shownFollowing))
+    if (addButton.isVisible() != (static_cast<bool>(onAddLayer) && ! shownFollowing && ! showsPageSwitch()))
         resized();
 
     // Show the staging badge on every layer whose preset swap is waiting for its boundary.

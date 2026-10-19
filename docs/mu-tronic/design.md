@@ -1251,7 +1251,7 @@ class PluginProcessor : public ProcessorBase
 public:
     // Always 16 live layers (numLayers == kMaxLayers == 16); an unused slot holds an EmptyLayer.
     bool canEditLayers() const override    { return true; }
-    bool canReorderLayers() const override { return true; }   // swap two slots, empty or not
+    bool canReorderLayers() const override { return true; }   // swap two slots, empty or not (T1a: false; the Published-mode swap is T1c)
     int  getNumActiveLayers() const override;                 // non-empty layers (CPU meter, controller)
 
     // Base API added by this work (message thread, same protocol as resetLayer):
@@ -1301,6 +1301,16 @@ earlier draft (hidden inactive prefixes, the 64-slot parameter pool) are dropped
 layout once and record APVTS construction time and memory against a budget (target: editor opens in under a second on the development machine; the number is
 recorded in this section). If it fails, the answer is lazy per-type declaration inside the product (a design change then, not now). The parameter-name scheme
 stays unchanged, so nothing that is built now closes that door.
+
+**Cost check, measured 2026-10-19 (T1a, `mu-tronic/Source/Tests/TronicLayoutTests.cpp`).** A synthetic 16-slot layout of 6,000 float parameters (the top of the estimate)
+builds into an `AudioProcessorValueTreeState` in about 535 to 541 ms in a Debug build on the development PC, about 12 MB of private memory; the real T1a layout is 269
+parameters (16 strips x 12, plus the globals). The test holds the Debug figure to 1,000 ms; the under-a-second budget is for the whole editor opening in Release, so
+**lazy per-type declaration is not needed yet**. Re-run the test when the first layer type is registered (T1b) and again when the fourth is.
+
+**Interim at T1a (ruled 2026-10-19).** No type is registered, so no `r{N}_ a{N}_ v{N}_ t{N}_` parameter exists; `TronicState.h` reserves the placeholder prefix `mtrn{N}_`
+for the composed state (one prefix per slot, which is all `LayerLayout` holds). It never names a parameter. T1b replaces it: `LayerLayout` (mu-core, generic) takes a
+list of prefixes per slot, a slot's rows are saved with the prefix of its **live** type only (the type attribute selects it on load; the dormant prefixes keep defaults and are
+never written), and `setLayerType` resets the new type's prefix, not all of the slot's. The four list products keep one prefix and stay byte-identical.
 
 **What is saved.** Slot state is the family standard ([Slot state](../design-plugin-family.md#slot-state-presets--sessions--family-standard)),
 with one addition, the `type` attribute, which is Stage 8 option B:
@@ -1375,7 +1385,9 @@ A scene is **an action across layers**, designed into the base now so no product
   slot's type (the 2026-10-12 ruling anticipated this). The page shown is editor state, not saved; the page of the selected layer is shown on selection.
   `kLayersPerPage` may not exceed 8 while a Launchpad (8 by 8 grid) is a target; a larger page would need the surface to page inside it.
 - **Layer names are editable and saved** (Andy). They use the existing `LayerHeaderBar` name field and the slot's saved name exactly as the four products do (mirror
-  them; no new storage). The default is `<displayName> <slot>`; a changed type resets a name that was still the default and keeps one the user typed.
+  them; no new storage). The default is `<displayName> <slot>` ("Slot 5" while Empty), **derived, not stored (as built at T1a, 2026-10-19)**: an empty `Layer::name`
+  means "derive", the user's typed name is saved as the slot node's `name` attribute, and a changed type keeps a typed name and re-derives the rest, with no rename hook.
+  T1b shows the type's `LayerTypeInfo::name` as `<displayName>`, not the saved id.
 - **Layer-type chooser.** Choosing a type for an empty slot (or changing it) is a shell dialog listing the registry grouped by product (section 1.4); the type's
   preset dropdown appears in the `LayerHeaderBar` as today, filled from the slot's type. The main area is painted by the **type's colour** (Andy, UI decision;
   token named by the `ux-controller`): `LayerTypeInfo` carries the token, so a type added later brings its own colour with it.
@@ -1459,7 +1471,7 @@ ownership: M mechanical, S supervised (audio thread or lock), O needs Andy.
 | Stage | Kind | What | Touches | Proof |
 |---|---|---|---|---|
 | **T0** | M | Groundwork with no behaviour change: `MU_MAX_LAYERS` / `MU_MAX_BUSES` / `MU_BUS_INSERTS` / `kLayersPerPage` in `MuLimits.h` (defaults 8 / 0 / 2 / 8); add `LayerTypeId`, `LayerTypeInfo`, `Layer::typeId`; `check-layer-boundary.ps1`; build a throw-away 16-slot APVTS layout from the param tables to **record construction time and memory** (the section 3.4 cost check). **No product source is touched** (the `Scales.h` renames moved to T4 and T5). | `mu-core`, `tests/scripts` | full Debug build of all five; every suite and `*_roundtrip` byte-identical; `mu-core-tests-16` builds and passes; measurement recorded in this doc |
-| **T1** | M | **The empty unit.** `mu-tronic/` (Standalone only, freeware) with the eight folders, 16 `EmptyLayer`s, `setLayerType` (only `Empty` registered), the shared mixer/FX/master/modulator panel/preset flow/transport, sidebar and mixer **paging**, a `.muTronic` round trip. No audio sources, no licence code. This is the brief's "empty unit". | new product; `LayerSidebar`/`MixerOverlay` page (core, ux-controller) | builds; opens; the standalone smoke (no pluginval: no plugin formats); 16 strips page; state round trip; the other four unchanged (byte-identical) |
+| **T1** | M | **Split 2026-10-19: T1a (built, uncommitted at this date) is the empty unit below; T1b registers the real types (see "What is left").** **The empty unit.** `mu-tronic/` (Standalone only, freeware) with the eight folders, 16 `EmptyLayer`s, `setLayerType` (only `Empty` registered), the shared mixer/FX/master/modulator panel/preset flow/transport, sidebar and mixer **paging**, a `.muTronic` round trip. No audio sources, no licence code. This is the brief's "empty unit". | new product; `LayerSidebar`/`MixerOverlay` page (core, ux-controller) | builds; opens; the standalone smoke (no pluginval: no plugin formats); 16 strips page; state round trip; the other four unchanged (byte-identical) |
 | **T2** | S | **Buses** in the shared mixer (section 5), opt-in `MU_MAX_BUSES` / `MU_BUS_INSERTS`, then tests with a test-tone layer in the core tests; mu-Tronic turns them on (**3 buses, 2 inserts each**). Rename the `outputBus` UI label to Out. | `mu-core` mixer + overlay + params | `BusRoutingTests`, `BusSidechainTests`, `BusInsertTests`, `BusStateResetTests` (section 7); all four products byte-identical (buses 0); a scripted mu-Tronic render with test-tone layers through a two-insert bus chain |
 | **T3** | S | `Layer::render`, `RenderContext`, `renderLayers`, `RetireBin`, `setLayerType` with real types, `LayerServices`, `bindParams`, `preloadStaged`, `loopBeats` (section 2.1), defaults only; mu-core tests drive a fake layer type. No product changes yet. | `mu-core` | `LayerRenderTests` (order, priority, empty skipped, lock miss silent and still advancing, retire fade then free off thread, no allocation under the lock), `LayerTypeSwapTests`; products byte-identical |
 | **T4** | S | **Done as E2 (2026-10-16).** **mu-Toni layer** (cleanest; mu-Toni is pre-release, so this may go ahead now): `readVoice` + pointers + held notes into `Arp::render`; param table and `LayerParamIds.h` into `Persistence/`; `ArpHost`; rename `Audio/Scales.h` to `ToniScales.h`; `mu-toni-layer` target; **mu-Toni standalone moves onto `renderLayers`** (so the glue exists once); mu-Tronic registers `Arp`. | mu-toni, mu-tronic | `TONI_roundtrip` byte-identical; mu-Toni suites; a mu-Tronic render with two Arp layers equals two mu-Toni layers' renders (the equivalence test, section 7) |
@@ -1486,11 +1498,23 @@ design's units. What was run is [extraction-plan.md](extraction-plan.md)'s order
 Both live products were extracted before any mu-Tronic product work, on Andy's ruling of 2026-10-15 (later); the earlier plan to wait for their next releases was dropped.
 Each extraction kept the standalone's behaviour identical: `*_roundtrip` byte-identical or a signed golden update.
 
-**What is left, in order.** (1) The small owed items before T1: one shared `mu_core::HeldNoteStack` (mu-Toni and mu-Tant still carry their own), the mu-Tant wavetable bank service
-and the `PatternHost` adapter. (2) **T1** the empty unit, which now registers real types at once. (3) **T2** buses (`mu-core` mixer; it edits audio code every product renders
-through, so it follows E5, which has now closed). (4) **T8a** scenes, controller pages, per-layer MIDI in, type-carrying clips; **T8b** importers for `.muTant` and `.muClid`
-(`.muToni` and `.muOn` with T8a). (5) **T9** release: only with all four engines ready, freeware, no licence work. T1's first checks are the cost measurement of section 3.4
-(16-slot APVTS construction time and memory) and the sidebar/mixer paging.
+**T0 and T1a as built (2026-10-19).** T0: the limits, `LayerTypeId`/`LayerTypeInfo`, `check-layer-boundary.ps1` (E1), the 16-slot cost check (3.4). T1a, the empty unit: `mu-tronic/`
+(Standalone only, freeware, `MU_MAX_LAYERS=16` for its targets, eight Source folders, empty ones kept with `.gitkeep`) with sixteen `EmptyLayer`s and `mu_core::LayerTypeRegistry`
+(`mu-core/Sequencer/`, empty in this build, filled by `Persistence/LayerTypes.cpp`); in `mu-core`, generic: `ProcessorBase::layersAreSlots`, `getLayerTypes`, `setLayerType` (the
+non-muting protocol of 2.1.2, Published mode only), `deleteLayer`, `publishLayers`, a state restore that keeps a slot host's count, sidebar and mixer **paging**, the empty-slot look,
+`MuTheme::apps.ice`, and the strip sidechain-source range sized by `kMaxLayers` (a latent 16-layer defect, identical at 8). `.muTronic` round-trips the type by name; an absent
+`<Slot>` is Empty. Rule 10 of `check-layer-boundary.ps1`: mu-Tronic names a layer type's header only under `Persistence/` and `Tests/`. **Deliberately not in T1a, and where each lands:**
+`swapLayers`/reorder (`canReorderLayers` is false until the Published-mode quiesce exists: T1c, before release); the mixer-follower reset after a type change (C17: T1b, before the
+first type is registered); per-type prefixes and the multi-prefix layout (T1b); mu-link bridge, controller pages, scenes, CPU meter (T8a); icon, installer, manual, site (T9).
+
+**What is left, in order.** (1) The small owed items before T1b: one shared `mu_core::HeldNoteStack` (done: mu-Toni and mu-Tant share it), the mu-Tant wavetable bank service
+and the `PatternHost` adapter (both only before the Pattern type is registered). (2) **T1b** register real types, one at a time (Arp first, the cleanest, then the five Track types, then Pattern, then Rhythm): link the layer library and
+its `MU_<P>_LAYER_UI_SOURCES`, one line in `registerLayerTypes`, multi-prefix `LayerLayout` and the live-type-only save (3.4), C17 follower reset, the type's `addLayerParams` in the layout,
+`getLayerPresetDir`/`slotPresetFiles` from the slot's type (not a mu-Tronic `Layers` folder), a `TronicProcessorTests` case and an equivalence test per type, the cost test re-run;
+the `dsp-controller` reviews the C17 and multi-prefix changes. (3) **T1c** `swapLayers` on a Published host. (4) **T2** buses (`mu-core` mixer; it edits audio code every product renders
+through, so it follows E5, which has now closed). (5) **T8a** scenes, controller pages, per-layer MIDI in, type-carrying clips; **T8b** importers for `.muTant` and `.muClid`
+(`.muToni` and `.muOn` with T8a). (6) **T9** release: only with all four engines ready, freeware, no licence work. The cost measurement and the sidebar/mixer paging, T1's first
+checks, are done at T1a.
 
 Order rationale, kept: T1 is small and safe; buses are pure `mu-core` and testable with synthetic sources; the contract (T3) was proven on a fake type before any product was
 guessed from one; then products by ascending risk (Toni, On, then the live pair Tant and Clid last, the reversal of the Stage 7 engine ruling). The equivalence test in

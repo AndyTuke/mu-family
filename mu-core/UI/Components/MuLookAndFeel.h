@@ -177,6 +177,7 @@ public:
         appGreen                = 0x100000d4,
         appBlue                 = 0x100000d5,
         appYellow               = 0x100000d6,
+        appIce                  = 0x100000da,   // mu-Tronic's near-white (the host of the other four)
 
         // Status lamps: a fault (e.g. MIDI clock lost) — its own red, not the VU clip red.
         indicatorFault          = 0x100000d7,

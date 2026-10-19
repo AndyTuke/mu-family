@@ -166,6 +166,10 @@ public:
     bool keyStateChanged(bool isKeyDown, juce::Component* originator) override;
     void parentHierarchyChanged();
 
+    // PageUp (-1) / PageDown (+1): a host with paged panels (mu-Tronic) switches page. Called when no text field
+    // has focus and no overlay but the mixer is up; true = handled. Unset (the default): the keys are left alone.
+    std::function<bool(int delta)> onPageKey;
+
     // ─── Look ────────────────────────────────────────────────────────────────
     // The family's metal look; `appAccent` is the product's colour (transparent keeps globalAccent).
     void setMetalStyle(bool metal, juce::Colour appAccent = juce::Colours::transparentBlack);

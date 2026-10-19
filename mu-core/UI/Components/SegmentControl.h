@@ -19,6 +19,10 @@ public:
                    DrawStyle   drawStyle = DrawStyle::Bar);
 
     void setSelectedIndex(int index, bool notify = false);
+    // Replaces the labels (a count known only at run time, such as the page switch). The selection is kept when
+    // it still exists, else the first segment.
+    void setLabels(const std::vector<juce::String>& labels);
+    int  getNumSegments() const noexcept { return (int) options.size(); }
     int  getSelectedIndex() const noexcept { return selectedIndex; }
     void setDrawStyle(DrawStyle d) { drawStyle = d; repaint(); }
     // Opt in to onChange firing when the already-selected segment is chosen again (e.g. a scene

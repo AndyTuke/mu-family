@@ -12,6 +12,13 @@ set(MU_CORE_TEST_SOURCES
     GoldenRenderHarnessTests.cpp
     LayerRenderTests.cpp            # the layer render contract: driver, epoch, LayerBlock, time model
     RetireBinTests.cpp              # the shared retire bin and the retire isolation twin test
+    LayerTypeSwapTests.cpp          # the layer type registry and setLayerType on a Published host
+    LayerPagingTests.cpp            # the sidebar and the mixer page a host of more than one page of layers
+    ../UI/LayerSidebar.cpp
+    ../UI/SidebarItem.cpp
+    ../UI/MixerOverlay.cpp
+    ../UI/FXRow.cpp
+    ../UI/DelayRow.cpp
     LayerEquivalenceTests.cpp       # the useLayerRender equivalence harness on the fake host
     LayerContractFixtures.h
     LayerEquivalence.h
