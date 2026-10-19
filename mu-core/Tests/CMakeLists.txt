@@ -27,6 +27,7 @@ set(MU_CORE_TEST_SOURCES
     ScopedStorageRootTests.cpp
     ChannelStateResetTests.cpp
     MixerStereoPeakTests.cpp
+    AuditMinorsTests.cpp            # Layer reset locks, FX hand-off and sizing, NaN containment, activation worker
     MixerBlockValueTests.cpp
     SupportPromptPolicyTests.cpp
     UpdateCheckPolicyTests.cpp
