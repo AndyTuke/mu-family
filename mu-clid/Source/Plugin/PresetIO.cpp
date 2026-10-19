@@ -98,7 +98,7 @@ PreparedRhythm PresetIO::prepareRhythmPresetTree(const juce::ValueTree& state, i
                                                            bool keepIdentity, const juce::String& source)
 {
     if (! state.isValid()) return {};
-    auto prepared = rhythm_preset::prepare(state, "r0_", presetContext(), source);
+    auto prepared = SampleRhythm::prepareStaged(state, "r0_", presetContext(), source);
     if (keepIdentity)
     {
         const Rhythm& current = proc.sequencer.getRhythm(rhythmIndex);
@@ -389,7 +389,7 @@ buildPreparedFullPreset(const juce::ValueTree& root, const RhythmPresetContext& 
         auto rTree = root.getChild(ci);
         if (rTree.getType() != juce::Identifier("Rhythm")) continue;
         const int i = idx++;
-        auto prepared = rhythm_preset::prepare(rTree, {}, ctx, "rhythm " + juce::String(i + 1));
+        auto prepared = SampleRhythm::prepareStaged(rTree, {}, ctx, "rhythm " + juce::String(i + 1));
         out.rhythms[(size_t) i]     = std::move(prepared.rhythm);
         out.voices[(size_t) i]      = std::move(prepared.voice);
         out.samplePaths[(size_t) i] = prepared.samplePath;

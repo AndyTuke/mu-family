@@ -3,8 +3,26 @@
 
 #include "Sequencer/SampleRhythm.h"
 #include "Audio/MidiOutputMapping.h"   // mu-core: velocity for the MIDI output mode
+#include "Persistence/RhythmPresetTree.h"   // the Rhythm type's saved form: readRhythm, loadPresetSample
 
 namespace mu_clid {
+
+PreparedRhythm SampleRhythm::prepareStaged(const juce::ValueTree& node, const juce::String& prefix,
+                                           const RhythmPresetContext& ctx, const juce::String& source)
+{
+    PreparedRhythm out;
+    out.rhythm = rhythm_preset::readRhythm(node, prefix, ctx, source);
+
+    // The voice engine, built and primed with the rhythm's VoiceParams before anything can reach it.
+    out.voice = std::make_unique<VoiceEngine>();
+    out.voice->prepareToPlay(ctx.sampleRate, ctx.blockSize);
+    out.voice->setParams(out.rhythm.voiceParams);
+
+    // The sample: the one sample-I/O function (a missing sample is reported; unreadable embedded data loads none).
+    out.samplePath = rhythm_preset::loadPresetSample(*out.voice, node, prefix + "sample", "sampleData", "sampleName",
+                                                     ctx, /*reportMissing*/ true, {}, "embedded").value_or(juce::String());
+    return out;
+}
 
 void SampleRhythm::prepare(double sampleRate, int blockSize)
 {

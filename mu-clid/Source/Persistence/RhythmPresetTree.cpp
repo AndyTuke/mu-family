@@ -366,18 +366,29 @@ void restoreChannelStrip(juce::AudioProcessorValueTreeState& apvts, int slot, co
     }
 }
 
-std::optional<juce::String> restoreSample(VoiceEngine& voice, const juce::ValueTree& tree, int slot,
-                                          const juce::String& samplePathProp, const juce::String& sampleDataProp,
-                                          const juce::String& sampleNameProp, const RhythmPresetContext& ctx)
+std::optional<juce::String> loadPresetSample(VoiceEngine& voice, const juce::ValueTree& tree,
+                                             const juce::String& samplePathProp, const juce::String& sampleDataProp,
+                                             const juce::String& sampleNameProp, const RhythmPresetContext& ctx,
+                                             bool reportMissing, const juce::String& context,
+                                             const juce::String& defaultSampleName)
 {
+    // Embedded bytes first (decoded to a temp file), else the stored path; then the file is loaded into `voice`.
     const auto smp = resolvePresetSample(tree.getProperty(juce::Identifier(sampleDataProp)).toString(),
-                                         tree.getProperty(juce::Identifier(sampleNameProp)).toString(),
+                                         tree.getProperty(juce::Identifier(sampleNameProp), defaultSampleName).toString(),
                                          tree.getProperty(juce::Identifier(samplePathProp)).toString(),
                                          ctx.samplesDir,
                                          tree.getProperty(juce::Identifier(sampleDataProp + "Codec")).toString(),
                                          (int) tree.getProperty(juce::Identifier(sampleDataProp + "Bits"), 0));
-    if (smp.kind == PresetSample::Kind::BadEmbed) return std::nullopt;   // unreadable embedded data: leave the slot as it is
-    return applyPresetSample(smp, voice, ctx.onLoadError, false, " (rhythm " + juce::String(slot + 1) + ")");
+    if (smp.kind == PresetSample::Kind::BadEmbed) return std::nullopt;   // unreadable embedded data: leave the voice as it is
+    return applyPresetSample(smp, voice, ctx.onLoadError, reportMissing, context);
+}
+
+std::optional<juce::String> restoreSample(VoiceEngine& voice, const juce::ValueTree& tree, int slot,
+                                          const juce::String& samplePathProp, const juce::String& sampleDataProp,
+                                          const juce::String& sampleNameProp, const RhythmPresetContext& ctx)
+{
+    return loadPresetSample(voice, tree, samplePathProp, sampleDataProp, sampleNameProp, ctx, false,
+                            " (rhythm " + juce::String(slot + 1) + ")");
 }
 
 void restoreGlobalState(juce::AudioProcessorValueTreeState& apvts, const juce::ValueTree& root)
@@ -420,18 +431,13 @@ void restoreGlobalState(juce::AudioProcessorValueTreeState& apvts, const juce::V
     }
 }
 
-// One rhythm built off the audio thread from a preset node — a .muRhythm root (properties
-// prefixed "r0_") or a .muClid <Rhythm> child (unprefixed). It starts from a default Rhythm, so
-// whatever the node doesn't carry is the default (as in every product); then its modulators and
-// a primed VoiceEngine with the node's sample loaded. The expensive bits — sample decode / disk
-// load and VoiceEngine::prepareToPlay — happen here, so every install (stopped load, loop-boundary
-// swap, full preset, session) is just in-memory moves.
-PreparedRhythm prepare(const juce::ValueTree& nodeIn, const juce::String& prefix,
-                       const RhythmPresetContext& ctx, const juce::String& source)
+// One rhythm's data from a preset node: a .muRhythm root (properties prefixed "r0_") or a .muClid <Rhythm>
+// child (unprefixed). It starts from a default Rhythm, so whatever the node doesn't carry is the default (as in
+// every product), then takes the node's identity and modulators. No file work: the sample is loadPresetSample's.
+Rhythm readRhythm(const juce::ValueTree& nodeIn, const juce::String& prefix,
+                  const RhythmPresetContext& ctx, const juce::String& source)
 {
-    PreparedRhythm out;
-    Rhythm& r = out.rhythm;
-
+    Rhythm r;
     // v3 insert-slot migration (algo-aware) on a copy, before the params are read.
     juce::ValueTree node = nodeIn.createCopy();
     migrateInsertSlotsV3(node, prefix);
@@ -476,19 +482,7 @@ PreparedRhythm prepare(const juce::ValueTree& nodeIn, const juce::String& prefix
                             + source + ": " + dropped.joinIntoString("; "));
     }
 
-    // The voice engine, built and primed with the rhythm's VoiceParams off the audio thread.
-    out.voice = std::make_unique<VoiceEngine>();
-    out.voice->prepareToPlay(ctx.sampleRate, ctx.blockSize);
-    out.voice->setParams(r.voiceParams);
-
-    // Sample: embedded blob first, else the stored path.
-    const auto smp = resolvePresetSample(node.getProperty("sampleData").toString(),
-                                         node.getProperty("sampleName", "embedded").toString(),
-                                         node.getProperty(prefix + "sample").toString(), ctx.samplesDir,
-                                         node.getProperty("sampleDataCodec").toString(),
-                                         (int) node.getProperty("sampleDataBits", 0));
-    out.samplePath = applyPresetSample(smp, *out.voice, ctx.onLoadError, true);
-    return out;
+    return r;
 }
 
 } // namespace mu_clid::rhythm_preset

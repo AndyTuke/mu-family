@@ -32,11 +32,22 @@
 namespace mu_clid
 {
 
+struct PreparedRhythm;        // Persistence/RhythmPresetTree.h
+struct RhythmPresetContext;   // Persistence/RhythmPresetTree.h
+
 struct SampleRhythm : Rhythm
 {
     SampleRhythm();
     SampleRhythm(const SampleRhythm&)            = delete;
     SampleRhythm& operator=(const SampleRhythm&) = delete;
+
+    // Message thread, outside every lock: a staged preset node prepared for install (E5.6), all its file work done
+    // here so the commit at the boundary does none: the rhythm read from the node, a voice engine primed at the
+    // context's rate and block size with the rhythm's voice parameters, and the node's sample loaded into it. A
+    // .muRhythm root takes prefix "r0_", a .muClid <Rhythm> child none; `source` names the node in load messages.
+    // The hot-swap stager's payload (a per-rhythm swap, a stopped load, every slot of a full preset or session).
+    static PreparedRhythm prepareStaged(const juce::ValueTree& node, const juce::String& prefix,
+                                        const RhythmPresetContext& ctx, const juce::String& source);
 
     // mu_core::Layer (E5.5d): a Rhythm layer. prepare readies the engines the layer holds (its voice and its MIDI
     // engine); render plays the block on the voice.
