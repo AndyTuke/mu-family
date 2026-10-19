@@ -16,7 +16,7 @@
 #include "Audio/FX/Slots/FXAlgorithmDef.h"
 #include "Plugin/MixerFxParams.h"
 #include "ValueFormat.h"   // mu-core: shared value text
-#include "Plugin/ParamText.h"   // mu-core: float parameter text in both directions
+#include "Persistence/ParamText.h"   // mu-core: float parameter text in both directions
 #include "Sequencer/EuclidParamLayout.h"   // mu-core: the Euclid parameter set
 
 #include <algorithm>
