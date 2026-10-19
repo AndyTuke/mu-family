@@ -24,7 +24,7 @@ std::unique_ptr<Layer> PluginProcessor::makeRhythm(int slot) const
     return r;
 }
 
-// Message thread, outside every lock: the voice engine a slot needs once it is live.
+// Message thread, outside every lock (except the legacy restore fallback): the voice engine a slot needs once it is live.
 std::unique_ptr<VoiceEngine> PluginProcessor::makeSlotEngine(int slot) const
 {
     auto engine = std::make_unique<VoiceEngine>();
