@@ -11,6 +11,14 @@ void FXChain::prepare(double sampleRate, int blockSize)
     effectTailLeft   = 0;
 }
 
+void FXChain::resetState()
+{
+    effect.reset();
+    delay.reset();
+    reverb.reset();
+    effectTailLeft = 0;
+}
+
 void FXChain::processSends(juce::AudioBuffer<float>& effectSend,
                            juce::AudioBuffer<float>& delaySend,
                            juce::AudioBuffer<float>& reverbSend,

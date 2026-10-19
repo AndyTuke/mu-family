@@ -1,10 +1,11 @@
 #include "DelaySlot.h"
+#include <algorithm>
 #include <cmath>
 
 DelaySlot::DelaySlot()
 {
-    bufL.assign(MaxDelaySamples, 0.0f);
-    bufR.assign(MaxDelaySamples, 0.0f);
+    bufL.assign((size_t) maxDelaySamples, 0.0f);
+    bufR.assign((size_t) maxDelaySamples, 0.0f);
 }
 
 // Hermite cubic interpolation for fractional delay reads.
@@ -36,8 +37,9 @@ static float hermiteDelay(const std::vector<float>& buf, int writePos, float del
 void DelaySlot::prepare(double sampleRate, int /*blockSize*/)
 {
     sr = sampleRate;
-    bufL.assign(MaxDelaySamples, 0.0f);
-    bufR.assign(MaxDelaySamples, 0.0f);
+    maxDelaySamples = juce::jmax(kBaseDelaySamples, (int) std::ceil(kMinDelaySeconds * sampleRate));
+    bufL.assign((size_t) maxDelaySamples, 0.0f);
+    bufR.assign((size_t) maxDelaySamples, 0.0f);
     writePosL = writePosR = 0;
     feedL = feedR = 0.0f;
 
@@ -45,8 +47,15 @@ void DelaySlot::prepare(double sampleRate, int /*blockSize*/)
     smoothCoeff = (float)std::exp(-1.0 / (0.050 * sampleRate));
 
     updateDelayFromMode();
-    smoothedDelayL = targetDelayL;
-    smoothedDelayR = targetDelayR;
+    smoothedDelayL = targetDelayL.load(std::memory_order_relaxed);
+    smoothedDelayR = targetDelayR.load(std::memory_order_relaxed);
+}
+
+void DelaySlot::reset()
+{
+    std::fill(bufL.begin(), bufL.end(), 0.0f);
+    std::fill(bufR.begin(), bufR.end(), 0.0f);
+    feedL = feedR = 0.0f;
 }
 
 void DelaySlot::process(juce::AudioBuffer<float>& buffer)
@@ -68,13 +77,17 @@ void DelaySlot::processReturn(juce::AudioBuffer<float>& buffer)
     auto* outL = (numCh > 0) ? buffer.getWritePointer(0) : nullptr;
     auto* outR = (numCh > 1) ? buffer.getWritePointer(1) : outL;
 
+    // One snapshot of the targets per block; they glide through the smoothers below.
+    const float tgtL = targetDelayL.load(std::memory_order_relaxed);
+    const float tgtR = targetDelayR.load(std::memory_order_relaxed);
+
     for (int i = 0; i < numSamples; ++i)
     {
         const float inL = (outL != nullptr) ? outL[i] : 0.0f;
         const float inR = (outR != nullptr) ? outR[i] : 0.0f;
 
-        smoothedDelayL = smoothCoeff * smoothedDelayL + (1.0f - smoothCoeff) * targetDelayL;
-        smoothedDelayR = smoothCoeff * smoothedDelayR + (1.0f - smoothCoeff) * targetDelayR;
+        smoothedDelayL = smoothCoeff * smoothedDelayL + (1.0f - smoothCoeff) * tgtL;
+        smoothedDelayR = smoothCoeff * smoothedDelayR + (1.0f - smoothCoeff) * tgtR;
 
         const float delayedL = hermiteDelay(bufL, writePosL, smoothedDelayL);
         const float delayedR = hermiteDelay(bufR, writePosR, smoothedDelayR);
@@ -86,8 +99,8 @@ void DelaySlot::processReturn(juce::AudioBuffer<float>& buffer)
         bufL[writePosL] = inL + feedL;
         bufR[writePosR] = inR + feedR;
 
-        writePosL = (writePosL + 1) % MaxDelaySamples;
-        writePosR = (writePosR + 1) % MaxDelaySamples;
+        writePosL = (writePosL + 1) % maxDelaySamples;
+        writePosR = (writePosR + 1) % maxDelaySamples;
 
         if (outL != nullptr) outL[i] = delayedL;
         if (outR != nullptr) outR[i] = delayedR;
@@ -96,23 +109,23 @@ void DelaySlot::processReturn(juce::AudioBuffer<float>& buffer)
 
 void DelaySlot::setTimeCount(int count)
 {
-    syncCount = juce::jmax(1, count);
+    syncCount.store(juce::jmax(1, count), std::memory_order_relaxed);
     if (timeMode.load(std::memory_order_relaxed) == TimeMode::Sync)
         updateDelayFromMode();
 }
 
 void DelaySlot::setDelayMs(float ms)
 {
-    delayMs = juce::jlimit(1.0f, 4000.0f, ms);
+    delayMs.store(juce::jlimit(1.0f, 4000.0f, ms), std::memory_order_relaxed);
     if (timeMode.load(std::memory_order_relaxed) == TimeMode::Free)
         updateDelayFromMode();
 }
 
 void DelaySlot::setTimeDivision(int denominator, bool dotted, bool triplet)
 {
-    syncDenominator = denominator;
-    syncDotted      = dotted;
-    syncTriplet     = triplet;
+    syncDenominator.store(denominator, std::memory_order_relaxed);
+    syncDotted.store(dotted, std::memory_order_relaxed);
+    syncTriplet.store(triplet, std::memory_order_relaxed);
     if (timeMode.load(std::memory_order_relaxed) == TimeMode::Sync)
         updateDelayFromMode();
 }
@@ -122,15 +135,15 @@ void DelaySlot::updateDelayFromMode()
     float ms;
     if (timeMode.load(std::memory_order_relaxed) == TimeMode::Free)
     {
-        ms = delayMs;
+        ms = delayMs.load(std::memory_order_relaxed);
     }
     else
     {
-        const double beatMs = 60000.0 / hostBpm;
-        double noteMs = beatMs * 4.0 / syncDenominator;
-        if (syncDotted)   noteMs *= 1.5;
-        if (syncTriplet)  noteMs *= 2.0 / 3.0;
-        noteMs *= syncCount;
+        const double beatMs = 60000.0 / hostBpm.load(std::memory_order_relaxed);
+        double noteMs = beatMs * 4.0 / syncDenominator.load(std::memory_order_relaxed);
+        if (syncDotted.load(std::memory_order_relaxed))   noteMs *= 1.5;
+        if (syncTriplet.load(std::memory_order_relaxed))  noteMs *= 2.0 / 3.0;
+        noteMs *= syncCount.load(std::memory_order_relaxed);
         ms = static_cast<float>(noteMs);
     }
 
@@ -141,8 +154,9 @@ void DelaySlot::updateDelayFromMode()
 
 void DelaySlot::setDelaySamplesLR(float sampL, float sampR)
 {
-    targetDelayL = juce::jlimit(1.0f, static_cast<float>(MaxDelaySamples - 1), sampL);
-    targetDelayR = juce::jlimit(1.0f, static_cast<float>(MaxDelaySamples - 1), sampR);
+    const float top = static_cast<float>(maxDelaySamples - 1);
+    targetDelayL.store(juce::jlimit(1.0f, top, sampL), std::memory_order_relaxed);
+    targetDelayR.store(juce::jlimit(1.0f, top, sampR), std::memory_order_relaxed);
 }
 
 float DelaySlot::processDirt(float x) const

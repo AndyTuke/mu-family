@@ -1,6 +1,8 @@
 #pragma once
 
 #include "EffectAlgorithmBase.h"
+#include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <vector>
 
@@ -9,7 +11,9 @@
 class FlangerEffect : public EffectAlgorithmBase
 {
 public:
-    static constexpr int MaxDelaySamples = 2048;   // ~46ms at 44.1kHz, plenty for 10ms
+    // The wet read reaches twice the 5.25 ms centre (10.5 ms) behind the write head; the line is sized from
+    // the sample rate in prepareInner (this floor is enough up to 192 kHz).
+    static constexpr int MinDelaySamples = 2048;
 
     FlangerEffect()
     {
@@ -21,8 +25,9 @@ public:
     void prepareInner(double sampleRate, int /*blockSize*/) override
     {
         sr = sampleRate;
-        bufL.assign(MaxDelaySamples, 0.0f);
-        bufR.assign(MaxDelaySamples, 0.0f);
+        delaySize = juce::jmax(MinDelaySamples, (int) std::ceil(0.0105 * sr) + 8);   // 10.5 ms plus interpolation headroom
+        bufL.assign((size_t) delaySize, 0.0f);
+        bufR.assign((size_t) delaySize, 0.0f);
         writePos = 0;
         lfoPhase = 0.0f;
         feedL = feedR = 0.0f;
@@ -81,10 +86,17 @@ public:
             if (dataL) dataL[i] = dry * dryL + wet * wetL;
             if (dataR) dataR[i] = dry * dryR + wet * wetR;
 
-            writePos = (writePos + 1) % MaxDelaySamples;
+            writePos = (writePos + 1) % delaySize;
             lfoPhase += lfoInc;
             if (lfoPhase >= 1.0f) lfoPhase -= 1.0f;
         }
+    }
+
+    void reset() override
+    {
+        std::fill(bufL.begin(), bufL.end(), 0.0f);
+        std::fill(bufR.begin(), bufR.end(), 0.0f);
+        feedL = feedR = 0.0f;
     }
 
     void setParam(const juce::String& id, float value) override
@@ -108,10 +120,12 @@ private:
 
     FXAlgorithmDef def;
     double sr       = 44100.0;
-    float rate      = 0.5f;
-    float depth     = 0.5f;
-    float feedback  = 0.0f;
-    float mix       = 0.5f;
+    // Written by the UI or host automation, read by the audio thread: relaxed atomics.
+    std::atomic<float> rate     { 0.5f };
+    std::atomic<float> depth    { 0.5f };
+    std::atomic<float> feedback { 0.0f };
+    std::atomic<float> mix      { 0.5f };
+    int   delaySize = MinDelaySamples;
 
     std::vector<float> bufL, bufR;
     int   writePos  = 0;

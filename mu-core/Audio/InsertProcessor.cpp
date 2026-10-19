@@ -94,10 +94,12 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh,
         const float lpfHz = mu_ui::normToActual(p.insertParam[3], p.insertAlgo, 3);
         if (lpfHz < 19000.0f)
         {
-            for (int ch = 0; ch < nCh; ++ch)
+            // State is kept for two channels; any further channel passes through unfiltered.
+            const int nToneCh = juce::jmin(nCh, 2);
+            for (int ch = 0; ch < nToneCh; ++ch)
                 postDriveTone[ch].prepare(lpfHz, (float) currentSampleRate);
 
-            for (int ch = 0; ch < nCh; ++ch)
+            for (int ch = 0; ch < nToneCh; ++ch)
             {
                 auto* data = buf.getWritePointer(ch);
                 for (int i = 0; i < ns; ++i)

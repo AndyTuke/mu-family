@@ -124,4 +124,4 @@ algorithms live in `InsertProcessor` for the voice insert slot instead.
 `Source/FX/Effects/FlangerEffect.h` — registered and active in the Effect slot.
 `Source/FX/Effects/PhaserEffect.h` — registered and active in the Effect slot.
 `Source/FX/Effects/ChorusEffect.h` — registered and active in the Effect slot.
-`Source/FX/Effects/EchoEffect.h` — registered and active (Echo = Delay algorithm in Effect slot).
+Echo has no algorithm class: the Effect slot's Echo index runs its embedded `DelaySlot` (the old `EchoEffect.h` was removed as dead code).

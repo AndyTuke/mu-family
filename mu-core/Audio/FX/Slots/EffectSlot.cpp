@@ -9,9 +9,8 @@ EffectSlot::EffectSlot()
     algorithms[0] = std::make_unique<ChorusEffect>();
     algorithms[1] = std::make_unique<FlangerEffect>();
     algorithms[2] = std::make_unique<PhaserEffect>();
-    algorithms[3] = std::make_unique<EchoEffect>();
     for (auto& a : algorithms)
-        a->setSendMode(true);
+        a->setSendMode(true);   // slot 3 (Echo) has no algorithm object: kEchoAlgoIndex runs the embedded DelaySlot
 }
 
 void EffectSlot::prepare(double sampleRate, int blockSize)
@@ -30,6 +29,13 @@ void EffectSlot::prepare(double sampleRate, int blockSize)
         if (a) a->prepareInner(sampleRate, blockSize);
 
     echoDelay.prepare(sampleRate, blockSize);
+}
+
+void EffectSlot::reset()
+{
+    for (auto& a : algorithms)
+        if (a) a->reset();
+    echoDelay.reset();
 }
 
 void EffectSlot::process(juce::AudioBuffer<float>& buffer)
@@ -63,7 +69,8 @@ void EffectSlot::processReturn(juce::AudioBuffer<float>& buffer)
         return;
     }
     auto* algo = currentAlgorithm();
-    if (!algo) { buffer.clear(); return; }
+    // Before prepare() there is no oversampler yet: return silence rather than dereference null.
+    if (!algo || oversampler == nullptr) { buffer.clear(); return; }
     oversampler->process(buffer, [algo](juce::dsp::AudioBlock<float>& block)
     {
         algo->processInner(block);

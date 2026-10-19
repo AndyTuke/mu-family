@@ -20,6 +20,9 @@ public:
 
     virtual void setParam(const juce::String& id, float value) = 0;
 
+    // Silence the algorithm's audio state (delay lines, feedback, all-pass memory). Audio thread; no allocation.
+    virtual void reset() {}
+
     float getParam(const juce::String& id) const
     {
         for (auto& p : getDef().params)
