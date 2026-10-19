@@ -167,3 +167,78 @@ struct VoiceEngineParamsTests : juce::UnitTest
 };
 
 static VoiceEngineParamsTests voiceEngineParamsTests;
+
+//==============================================================================
+// A block whose sample-buffer try-lock misses (a sample load on the message thread holds it) is silent, but it
+// keeps time: the three envelopes and a retired engine's drain countdown advance by the block, as a rendered
+// block's do. So a retired engine drains after the same number of process() calls, contended or not.
+namespace
+{
+    // A 64-frame click written to a temporary WAV, so the engine has a sample that ends inside the first block.
+    juce::File writeClick(const juce::File& dir)
+    {
+        auto f = dir.getChildFile("click.wav");
+        f.deleteFile();
+        juce::AudioBuffer<float> click(1, 64);
+        for (int i = 0; i < 64; ++i) click.setSample(0, i, 0.5f);
+        {
+            juce::WavAudioFormat wav;
+            std::unique_ptr<juce::OutputStream> out = f.createOutputStream();
+            if (out == nullptr) return {};
+            auto writer = wav.createWriterFor(out, juce::AudioFormatWriterOptions{}.withSampleRate(48000.0)
+                                                                                   .withNumChannels(1)
+                                                                                   .withBitsPerSample(16));
+            if (writer == nullptr) return {};
+            writer->writeFromAudioSampleBuffer(click, 0, 64);
+        }   // the writer is destroyed here, which flushes the file
+        return f;
+    }
+
+    // process() calls from the retire until the engine reports drained; every other call contended when asked.
+    int callsToDrain(const juce::File& click, bool contendEveryOther)
+    {
+        constexpr int kBlock = 256;
+        VoiceEngine ve;
+        ve.prepareToPlay(48000.0, kBlock);
+        ve.loadFile(click);
+        VoiceParams p;
+        p.ampEnvRel = 4.0f;   // longer than the 2 s drain budget, so the drain waits on the release: contended blocks must move it on too
+        ve.setParams(p);
+        juce::AudioBuffer<float> block(2, kBlock);
+        ve.trigger(false, false);
+        block.clear();
+        ve.process(block, kBlock);   // the click plays out in this block
+        ve.markRetired();
+        int calls = 0;
+        while (! ve.isFullyDrained() && calls < 100000)
+        {
+            VoiceEngine::forceBufferContention.store(contendEveryOther && (calls % 2) == 0);
+            block.clear();
+            ve.process(block, kBlock);
+            VoiceEngine::forceBufferContention.store(false);
+            ++calls;
+        }
+        return calls;
+    }
+}
+
+struct VoiceEngineContendedBlockTests : juce::UnitTest
+{
+    VoiceEngineContendedBlockTests() : juce::UnitTest("VoiceEngine contended block keeps time", "mu-core") {}
+
+    void runTest() override
+    {
+        beginTest("a retired engine drains after the same number of process() calls when half of them are contended");
+        const juce::File dir = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("mu-core-voice-contention");
+        dir.createDirectory();
+        const auto click = writeClick(dir);
+        const int plain = callsToDrain(click, false);
+        const int contended = callsToDrain(click, true);
+        logMessage("drained after " + juce::String(plain) + " calls, and " + juce::String(contended) + " with every other call contended");
+        expect(plain > 2 && plain < 100000, "the engine drains");
+        expectEquals(contended, plain);
+        dir.deleteRecursively();
+    }
+};
+
+static VoiceEngineContendedBlockTests voiceEngineContendedBlockTests;

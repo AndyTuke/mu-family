@@ -32,7 +32,7 @@ namespace
         std::array<float, kMax>        level {};
         std::array<juce::String, kMax> samplePath;
         std::array<VoiceEngine*, kMax> engine {};
-        std::array<VoiceEngine*, kMax> tail {};
+        std::array<const VoiceEngine*, kMax> tail {};   // the slot's first retire-bin entry, while it sounds
         std::array<Layer*, kMax>       layer {};
         std::array<int, kMax>          scSrc {};   // the engine strip's sidechain source (-1 off, else a layer)
     };
@@ -55,8 +55,7 @@ struct ClidLayerStructureTests : juce::UnitTest
             setParam(p.apvts, "ch" + juce::String(i) + "_lvl", 0.1f * (float) (i + 1));
             p.samples.setPath(i, "slot" + juce::String(i) + ".wav");
             p.getLayer(i)->colourIndex = (i * 3) % kMax;
-            auto& tail = p.retiredVoiceEngines[(size_t) i][0];
-            tail = std::make_unique<VoiceEngine>();
+            p.retireEngineForTest(i, std::make_unique<VoiceEngine>());
         }
         setParam(p.apvts, "ch6_scSrc", 4.0f);   // APVTS: 0 off, n = layer n - 1, so layer 3
         p.mixerEngine.channels[6].sidechainSource.store(3);
@@ -71,8 +70,8 @@ struct ClidLayerStructureTests : juce::UnitTest
             s.colour[(size_t) i]     = p.layerAs<mu_clid::Rhythm>(i).colourIndex;
             s.level[(size_t) i]      = p.mixerEngine.channels[i].level.load();
             s.samplePath[(size_t) i] = p.samples.path(i);
-            s.engine[(size_t) i]     = p.voiceEngines[(size_t) i].get();
-            s.tail[(size_t) i]       = p.retiredVoiceEngines[(size_t) i][0].get();
+            s.engine[(size_t) i]     = p.voiceEngine(i).get();
+            s.tail[(size_t) i]       = p.retiredEngineForTest(i, 0);
             s.layer[(size_t) i]      = &p.layerAs<mu_clid::Rhythm>(i);
             s.scSrc[(size_t) i]      = p.mixerEngine.channels[i].sidechainSource.load();
         }
@@ -123,8 +122,8 @@ struct ClidLayerStructureTests : juce::UnitTest
             expect(after.layer[(size_t) i] == before.layer[(size_t) from], at + ": the layer object moved by pointer");
         }
 
-        expect(p.voiceEngines[kMax - 1] == nullptr, "the vacated top slot holds no engine");
-        expect(p.retiredVoiceEngines[kMax - 1][0] == nullptr, "and no tail");
+        expect(p.voiceEngine(kMax - 1) == nullptr, "the vacated top slot holds no engine");
+        expectEquals(p.retiredCountForTest(kMax - 1), 0, "and no sounding tail (the removed slot's were cut)");
         expect(p.samples.path(kMax - 1).isEmpty(), "and no sample path");
         expect(p.getLayer(kMax - 1) == nullptr && p.sequencer.getNumRhythms() == kMax - 1, "and is not live");
         expect(p.layerAs<mu_clid::Rhythm>(kMax - 1).name != "", "though a spare rhythm stays in it");
@@ -244,9 +243,9 @@ struct ClidLayerStructureTests : juce::UnitTest
             if (w != nullptr) w->writeFromAudioSampleBuffer(b, 0, b.getNumSamples());
         }
         p.getRhythm(1).voiceParams.ampRelToEnd = c.relToEnd;
-        p.voiceEngines[1]->setParams(p.getRhythm(1).voiceParams);   // the engine takes the flag at its next trigger
-        p.voiceEngines[1]->loadFile(f);
-        p.voiceEngines[1]->trigger(false, false);
+        p.voiceEngine(1)->setParams(p.getRhythm(1).voiceParams);   // the engine takes the flag at its next trigger
+        p.voiceEngine(1)->loadFile(f);
+        p.voiceEngine(1)->trigger(false, false);
 
         juce::AudioBuffer<float> block(2, kBlock);
         juce::MidiBuffer midi;
@@ -277,7 +276,7 @@ struct ClidLayerStructureTests : juce::UnitTest
             // Mid-release: a tied hit must neither retrigger the envelope nor lift the level.
             run(20);
             res.beforeTie = p.mixerEngine.channelPeaks[1].load();
-            p.voiceEngines[1]->trigger(false, true);
+            p.voiceEngine(1)->trigger(false, true);
             run(1);
             res.afterTie = p.mixerEngine.channelPeaks[1].load();
             run(blocks - 21);
@@ -290,7 +289,7 @@ struct ClidLayerStructureTests : juce::UnitTest
 
         if (c.tiedAfter)
         {
-            p.voiceEngines[1]->trigger(false, true);
+            p.voiceEngine(1)->trigger(false, true);
             res.maxPeak = 0.0f;
             run(20);
         }
@@ -360,7 +359,7 @@ struct ClidLayerStructureTests : juce::UnitTest
         expect(! p.swapLayers(0, 0));
         expect(! p.swapLayers(0, 1));
         expectEquals(p.getNumRhythms(), 1);
-        expect(p.voiceEngines[0] != nullptr);
+        expect(p.voiceEngine(0) != nullptr);
     }
 
     // A MIDI-mode slot removed inside its 20 ms note hold still owes a note-off; the next block sends it.
@@ -440,7 +439,7 @@ struct ClidLayerStructureTests : juce::UnitTest
         const auto firstColour = p.getLayer(0)->colourIndex;
 
         expectEquals(p.addLayer(), 1);
-        expect(p.voiceEngines[1] != nullptr && p.voiceEngines[1] != p.voiceEngines[0], "a new engine");
+        expect(p.voiceEngine(1) != nullptr && p.voiceEngine(1) != p.voiceEngine(0), "a new engine");
         expect(p.samples.path(1).isEmpty(), "no sample path");
         expect(std::abs(plain(p.apvts, "ch1_lvl") - 1.0f) < 2.0e-3f, "a default strip");
         expect(std::abs(p.mixerEngine.channels[1].level.load() - 1.0f) < 1.0e-4f);

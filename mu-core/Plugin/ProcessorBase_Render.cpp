@@ -191,6 +191,7 @@ void ProcessorBase::renderAndMix(juce::AudioBuffer<float>& buffer, juce::MidiBuf
 
     // Step 3: one MIDI decode for every layer.
     decodeBlockMidi(midi, n);
+    layersBlockStarting(block.view(), t, midi);
 
     // Step 4: chunks of at most the prepared size (C8), each the layers then the mixer on a sub-buffer, so an
     // oversize host block never overruns the scratch, the mixer's channel buffers or the FX.
@@ -232,6 +233,7 @@ void ProcessorBase::renderAndMix(juce::AudioBuffer<float>& buffer, juce::MidiBuf
     // The layers' MIDI out stays in the block's storage: the product merges it into the host buffer with
     // mergeLayerMidiOut and the room it knows that buffer has (design 2.1.5, R7; the mechanism is the
     // MIDI-output product's to settle when it adopts the driver).
+    layersBlockRendered(block.view(), buffer, midi);
     renderState.lastBlockFrames = n;
     ++renderState.blocksRendered;
 }
@@ -362,7 +364,16 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
         ctx.slot = s;
         ctx.midiOut = { renderState.midi.get() + reserveStart, mu_limits::kMidiNoteOffReserve, 0, &renderState.tailOut };
         auto& view = renderState.view[(size_t) s];
-        view.setDataToReferTo(renderState.scratch[(size_t) s].getArrayOfWritePointers(), 2, 0, numSamples);
+        // Every slot below mixCount was opened this call, so the view normally refers to its scratch already and is
+        // left alone (its cleared flag tells the mixer hook a silent slot from one that rendered). Re-pointing would
+        // drop that flag, so a re-point keeps it (the clear only re-zeroes zeros).
+        auto& scratch = renderState.scratch[(size_t) s];
+        if (view.getNumSamples() != numSamples || view.getNumChannels() != 2 || view.getReadPointer(0) != scratch.getReadPointer(0))
+        {
+            const bool untouched = view.hasBeenCleared();
+            view.setDataToReferTo(scratch.getArrayOfWritePointers(), 2, 0, numSamples);
+            if (untouched) view.clear();
+        }
         wentDone |= retireBin.render(s, ctx, view, numSamples, v.serial, renderState.live[(size_t) s]);
     }
     if (wentDone) requestDeferredWork();   // the free runs on the message thread after the grace period

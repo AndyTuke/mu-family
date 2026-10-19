@@ -14,7 +14,6 @@
 #include "GoldenTestRig.h"
 #include "Tests/GoldenAllocationCheck.h"
 #include "Tests/GoldenRender.h"
-#include "Tests/LayerEquivalence.h"   // mu-core: the useLayerRender equivalence harness
 
 namespace
 {
@@ -595,90 +594,3 @@ struct MuClidGoldenRenderTests : juce::UnitTest
 };
 
 static MuClidGoldenRenderTests muClidGoldenRenderTests;
-
-//==============================================================================
-// The useLayerRender equivalence gate for E5.5b (extraction-plan 2.7a, rows E5.5b to E5.5d): with the switch
-// on, the hits come from each rhythm's own RhythmCursor and the processor's RhythmStepClock instead of the
-// RhythmSequencer. Master, MIDI out and every pre-mixer channel stream must be bit-identical to the default
-// chain for every golden scenario at three block schedules, and for the cases the plan names: a start far
-// into the song and one mid-step, a locate, a loop-back and a tempo ramp, stops and restarts, master-loop
-// length changes, Euclid modulation, swap starts and structural edits mid-play (the golden set covers
-// modulation, hot swaps, clip launches and the structural-edit script).
-struct MuClidLayerEquivalenceTests : juce::UnitTest
-{
-    MuClidLayerEquivalenceTests() : juce::UnitTest("mu-Clid layer render equivalence", "mu-clid-equiv") {}
-
-    static mu_golden::ScriptedEvent hostAt(int block, const char* label, std::function<void(mu_golden::MockHost&)> fn)
-    {
-        return { block, label, [fn](mu_golden::ScriptContext& c) { fn(c.host); } };
-    }
-
-    void runTest() override
-    {
-        if (mu_golden::GoldenStore::fromEnvironment().updateMode || authoringRequested()) return;
-
-        const mu_golden::ProcessorFactory factory = [] { return std::unique_ptr<ProcessorBase>(new OwnedProcessor()); };
-        const std::vector<mu_golden::Schedule> schedules {
-            mu_golden::Schedule::fixed512(), mu_golden::Schedule::ragged(), { "fixed64", { 64 } } };
-
-        auto check = [&](const mu_golden::Scenario& sc)
-        {
-            for (const auto& sched : schedules)
-            {
-                const auto r = mu_layer_equiv::compare(factory, sc, sched, mu_limits::kMaxLayers);
-                expect(r.ok, sc.name + " / " + sched.name + ": " + r.message);
-            }
-        };
-
-        const auto defs = makeDefs();
-        const auto byName = [&defs](const char* wanted) -> const Def&
-        {
-            for (const auto& d : defs) if (d.name == wanted) return d;
-            jassertfalse;
-            return defs.front();
-        };
-
-        for (const auto& d : defs)
-        {
-            if (! scenarioDir(d.name).getChildFile("state.xml").existsAsFile()) continue;
-            beginTest("equivalence: " + d.name);
-            check(makeScenario(d));
-        }
-
-        beginTest("equivalence: startBeat 1e6, and a start mid-step");
-        {
-            auto far = makeScenario(byName("eight-rhythms-polyrhythm"));
-            far.startBeat = 1.0e6;
-            far.lengthFrames = 72000;
-            check(far);
-            auto mid = makeScenario(byName("euclid-rings-logic"));
-            mid.startBeat = 0.37;
-            mid.lengthFrames = 72000;
-            check(mid);
-        }
-
-        beginTest("equivalence: a locate, a loop-back, a tempo ramp, stops and restarts");
-        {
-            auto sc = makeScenario(byName("eight-rhythms-polyrhythm"));
-            sc.events.push_back(hostAt(40, "locate 9.5", [](mu_golden::MockHost& h) { h.ppq = 9.5; }));
-            sc.events.push_back(hostAt(80, "loop back to 2", [](mu_golden::MockHost& h) { h.ppq = 2.0; }));
-            for (int b = 100; b < 160; b += 4)
-                sc.events.push_back(hostAt(b, "tempo ramp", [b](mu_golden::MockHost& h) { h.bpm = 100.0 + (double) (b - 100) * 3.0; }));
-            sc.events.push_back(hostAt(170, "stop", [](mu_golden::MockHost& h) { h.playing = false; }));
-            sc.events.push_back(hostAt(176, "play from 0.6", [](mu_golden::MockHost& h) { h.playing = true; h.ppq = 0.6; }));
-            sc.events.push_back(hostAt(260, "a sub-step dip", [](mu_golden::MockHost& h) { h.ppq -= 0.1; }));
-            check(sc);
-        }
-
-        beginTest("equivalence: master-loop length changes mid-play");
-        {
-            auto sc = makeScenario(byName("eight-rhythms-polyrhythm"));
-            sc.events.push_back(setParamAt(30, "mstrLoop", 1.0f));
-            sc.events.push_back(setParamAt(120, "mstrLoop", 3.0f));
-            sc.events.push_back(setParamAt(220, "mstrLoop", 0.0f));
-            check(sc);
-        }
-    }
-};
-
-static MuClidLayerEquivalenceTests muClidLayerEquivalenceTests;

@@ -757,6 +757,17 @@ protected:
                       std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels>* directOuts = nullptr,
                       juce::AudioBuffer<float>* fxReturnsOut = nullptr) noexcept;
 
+    // Audio thread, called by renderAndMix only in a host block that renders (its LayerBlock succeeded), with
+    // `view` that block's layout: layersBlockStarting after the MIDI decode and before any layer or tail renders,
+    // layersBlockRendered after the last chunk's mixer. For a product whose layers share per-block state that
+    // must move only in a block that renders (mu-Clid's step clock, its swap boundaries and its MIDI out).
+    // `midi` is the host buffer renderAndMix was given, `buffer` the host buffer it rendered. Same rules as
+    // Layer::render: no allocation, no wait (an offline render may do bounded work). Default: nothing.
+    virtual void layersBlockStarting(const mu_core::LayerView& view, const mu_core::BlockTransport& t, juce::MidiBuffer& midi)
+    { juce::ignoreUnused(view, t, midi); }
+    virtual void layersBlockRendered(const mu_core::LayerView& view, juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
+    { juce::ignoreUnused(view, buffer, midi); }
+
     // Audio thread, after renderAndMix: appends the block's layer MIDI out (the tails' owed note-offs first)
     // to `midi`, adding at most `byteBudget` bytes of MidiBuffer storage (midiEventBytes per event): the room the
     // caller knows the buffer already has, so it never grows on the audio thread. Frames are clamped to the last

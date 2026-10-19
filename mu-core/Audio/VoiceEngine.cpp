@@ -142,10 +142,28 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
     applyPendingParams();
 
     // A try-lock: the audio thread never waits for a buffer swap on the message thread (loadFile reads the
-    // file outside the lock and holds it only to move the new buffer in). On contention: a silent block.
+    // file outside the lock and holds it only to move the new buffer in). On contention: a silent block that
+    // still keeps time, so the envelopes and a retired engine's drain countdown advance as a rendered block's do.
     const juce::SpinLock::ScopedTryLockType bufferGuard(bufferLock);
-    if (! bufferGuard.isLocked())
+    bool contended = ! bufferGuard.isLocked();
+#if defined(MU_VOICE_ENGINE_TEST_SEAM) && MU_VOICE_ENGINE_TEST_SEAM
+    contended = contended || forceBufferContention.load(std::memory_order_relaxed);   // test seam, mu-core-tests only
+#endif
+    if (contended)
+    {
+        if (! sampleLoaded.load(std::memory_order_relaxed))
+            return;   // a block with no sample advances nothing either
+        const int skipped = juce::jmin(numSamples, tempBuffer.getNumSamples());
+        for (int s = 0; s < skipped; ++s)
+        {
+            pitchEnv.getNextSample();
+            filterEnv.getNextSample();
+            ampEnv.getNextSample();
+        }
+        if (retired && retireDrainBlocks > 0)
+            --retireDrainBlocks;
         return;
+    }
 
     if (! sampleLoaded.load(std::memory_order_relaxed) || buffer.getNumSamples() == 0 || buffer.getNumChannels() == 0)
         return;
@@ -250,9 +268,7 @@ bool VoiceEngine::hasSample() const
 
 void VoiceEngine::markRetired() noexcept
 {
-    // Caller (runDeferredWork retire path) holds suspendProcessing — the
-    // audio thread cannot be mid-process() on this engine, so direct state
-    // mutation is safe.
+    // The caller owns the engine alone (the retire bin's tail, on the audio thread), so direct state mutation is safe.
 
     // Amp env noteOff is gated on ampRelToEnd:
     //  - ampRelToEnd == false: noteOff so the env enters release. ampEnv multiplies
@@ -277,8 +293,8 @@ void VoiceEngine::markRetired() noexcept
     pitchEnv.noteOff();
     filterReleasing = pitchReleasing = true;
 
-    // ~2 s drain budget for feedback-based inserts (Karplus loopGain cap 0.9999
-    // decays to noise floor in well under this). Sampled in blocks: 2 s × sampleRate
+    // ~2 s drain budget for feedback-based inserts (a typical Karplus tail decays within it; a full-feedback one
+    // rings longer and is closed by the retire bin's declick). Sampled in blocks: 2 s × sampleRate
     // / blockSize. tempBuffer.getNumSamples() == blockSize after prepareToPlay.
     const int blockSize = juce::jmax(1, tempBuffer.getNumSamples());
     retireDrainBlocks = (int) (2.0 * currentSampleRate / (double) blockSize);

@@ -149,9 +149,10 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     if (n < oldN)
     {
         proc.storeLayerCount(n, std::memory_order_release);  // decrement first
+        proc.retireBin.cutAtOrAbove(n);                       // the dropped slots' tails stop (count policy CutAtCount)
         for (int i = n; i < oldN; ++i)
         {
-            proc.voiceEngines[i].reset();
+            proc.voiceEngine(i).reset();
             proc.parkPendingMidiOff(proc.sampleRhythm(i).midi);   // keep the owed note-off (under layersLock, held above)
             proc.sampleRhythm(i).midi = MidiOutputEngine{};
         }
@@ -160,11 +161,11 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     {
         for (int i = oldN; i < n; ++i)
         {
-            proc.voiceEngines[i] = std::make_unique<VoiceEngine>();
-            proc.voiceEngines[i]->insertProc.setSlotIndex(i);   // per-slot noise seed
+            proc.voiceEngine(i) = std::make_unique<VoiceEngine>();
+            proc.voiceEngine(i)->insertProc.setSlotIndex(i);   // per-slot noise seed
             if (proc.currentSampleRate > 0 && proc.currentBlockSize > 0)
             {
-                proc.voiceEngines[i]->prepareToPlay(proc.currentSampleRate, proc.currentBlockSize);
+                proc.voiceEngine(i)->prepareToPlay(proc.currentSampleRate, proc.currentBlockSize);
                 proc.sampleRhythm(i).midi.prepare(proc.currentSampleRate, proc.currentBlockSize);
             }
         }
@@ -184,7 +185,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
         // force-sync APVTS → Rhythm so shrink/grow cycles (preset A → B → A)
         // repopulate freshly-defaulted Rhythm fields even when JUCE skips listener
         // callbacks because the APVTS values didn't change. Internally calls
-        // updatePattern + proc.voiceEngines[i]->setParams.
+        // updatePattern + proc.voiceEngine(i)->setParams.
         proc.forceSyncRhythmFromApvts(i);
 
         // Host-state format prefixes every sample-related property with "r{i}_".

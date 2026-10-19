@@ -119,7 +119,7 @@ public:
     uint32_t fullStageSerial() const override             { return hotSwapStager.fullStageSerial(); }
     uint32_t slotStageSerial(int ri) const override       { return hotSwapStager.slotStageSerial(ri); }
     int  getMasterLoopSteps() const override              { return sequencer.getMasterLoopSteps(); }
-    int  getMasterLoopCurrentStep() const override        { return usesLayerRender() ? stepClock.getMasterLoopCurrentStep() : sequencer.getMasterLoopCurrentStep(); }
+    int  getMasterLoopCurrentStep() const override        { return stepClock.getMasterLoopCurrentStep(); }
 
     // A rhythm hot-swap commit fires ProcessorBase::onLayerPresetCommitted: the editor refreshes
     // the non-APVTS UI state (name label, sample bar, colour-tinted bits) pushRhythmToApvts can't.
@@ -166,10 +166,11 @@ public:
     void loadDefaultPreset() override            { presetIO.loadDefaultPreset(); }
 
 
+    // The rhythm bindings, the master-loop length and the pattern bookkeeping (the hits are the cursors'
+    // since E5.5d; the sequencer's own state is still kept in step until E5.7 deletes it).
     RhythmSequencer sequencer;
-    // The rhythms' own step clocks (E5.5b): the host half here, a RhythmCursor in each SampleRhythm. They are
-    // handed every pattern, swap start, loop length and restart the sequencer is; while useLayerRender is on
-    // (tests only, until E5.5d) they, not the sequencer, decide the hits.
+    // The rhythms' own step clocks: the host half here, a RhythmCursor in each SampleRhythm. They are handed every
+    // pattern, swap start, loop length and restart, and decide each block's hits.
     RhythmStepClock stepClock;
     static constexpr int kStepCap = HitGenerator::kMaxSteps;   // the sequencer's step cap (setStepCap)
 
@@ -180,17 +181,15 @@ public:
         if (index >= 0 && index < RhythmSequencer::MaxRhythms)
             sampleRhythm(index).cursor.updatePattern(sampleRhythm(index), kStepCap);
     }
-    // useLayerRender as processBlock read it once for the block (audio thread), so one block never mixes clocks.
-    bool cursorsDriveThisBlock = false;
-    // Where slot r's pattern last started a pass, and the step counter's run id, from whichever clock
-    // decides this block's hits (audio thread: the swap stager records both at a boundary).
-    int      swapBoundaryEff(int r) const noexcept { return cursorsDriveThisBlock ? sampleRhythm(r).cursor.boundaryEffective() : sequencer.getBoundaryEff(r); }
-    uint32_t swapFrameEpoch() const noexcept       { return cursorsDriveThisBlock ? stepClock.currentEpoch() : sequencer.getFrameEpoch(); }
-    // Fixed-size arrays so the audio thread never races with a vector reallocation caused by a
-    // structural edit on the message thread. The layer count (ProcessorCore::numLayers) is the
-    // authoritative count; processBlock reads it atomically once per block, under layersLock.
-    std::array<std::unique_ptr<VoiceEngine>, RhythmSequencer::MaxRhythms> voiceEngines;
-    // Each rhythm's MidiOutputEngine is SampleRhythm::midi (E5.5c): it moves with its layer.
+    // Where slot r's pattern last started a pass, and the step counter's run id (audio thread: the swap stager
+    // records both at a boundary).
+    int      swapBoundaryEff(int r) const noexcept { return sampleRhythm(r).cursor.boundaryEffective(); }
+    uint32_t swapFrameEpoch() const noexcept       { return stepClock.currentEpoch(); }
+    // Slot `slot`'s voice engine: SampleRhythm::voice (E5.5d), so it moves with its layer. Null in a slot that
+    // is not live. Each rhythm's MidiOutputEngine is SampleRhythm::midi (E5.5c); the engines its swaps retired
+    // sound out in the shared RetireBin (retireEngine).
+    std::unique_ptr<VoiceEngine>&       voiceEngine(int slot) noexcept       { return sampleRhythm(slot).voice; }
+    const std::unique_ptr<VoiceEngine>& voiceEngine(int slot) const noexcept { return sampleRhythm(slot).voice; }
 
     // Note-offs owed by MIDI-mode rhythms that were removed or dropped inside their 20 ms hold: a removed
     // layer hands its owed note-off over in layerRemoved. Written only under layersLock (message thread,
@@ -211,19 +210,23 @@ public:
     }
     // fxChain and mixerEngine are inherited from ProcessorBase.
 
-    // Stage 34: per-rhythm retired voice engines that continue rendering their
-    // in-flight sample / envelope tail after a hot-swap. Step 2 (this commit)
-    // wires the storage + render loop + cleanup-flag drain with nothing
-    // populating the slots, so behaviour is unchanged. Step 3 wires retire-on-
-    // swap, which is what actually populates these. When an engine reports
-    // isFullyDrained(), the audio thread store-releases retiredReadyForCleanup;
-    // the message thread (runDeferredWork) polls + clears the flag under
-    // suspendProcessing and destroys the engine off the RT thread.
-    static constexpr int kMaxRetiredEngines = mu_limits::kMaxRetiredVoiceEngines;
-    std::array<std::array<std::unique_ptr<VoiceEngine>, kMaxRetiredEngines>,
-               RhythmSequencer::MaxRhythms> retiredVoiceEngines;
-    std::array<std::array<std::atomic<bool>, kMaxRetiredEngines>,
-               RhythmSequencer::MaxRhythms> retiredReadyForCleanup;
+    // A hot-swap's outgoing voice engine keeps rendering its in-flight sample / envelope tail in slot `slot`'s
+    // channel from the shared RetireBin (an EngineTail, E5.5e) until it reports drained, at most 30 s; the bin frees
+    // it on the message thread. Call under layersLock (the audio thread is then outside the bin): it starts with the
+    // next rendered block; a full row evicts its entry 0, whose engine is freed later by a service pass.
+    void retireEngine(int slot, std::unique_ptr<VoiceEngine> engine);
+
+    // Tests only (message thread, not processing): slot `slot`'s retire-bin entry `entry`: its engine while the
+    // entry still sounds (Parked or Draining; null otherwise) and its state.
+    const VoiceEngine*        retiredEngineForTest(int slot, int entry) const noexcept;
+    mu_core::RetireBin::State retiredStateForTest(int slot, int entry) const noexcept { return retireBin.stateOf(slot, entry); }
+    int                       retiredCountForTest(int slot) const noexcept;
+    // Tests only: retires `engine` into slot `slot`'s row now, as a swap's install does (takes the layer lock).
+    void retireEngineForTest(int slot, std::unique_ptr<VoiceEngine> engine)
+    {
+        const juce::ScopedLock sl(layersLock);
+        retireEngine(slot, std::move(engine));
+    }
 
     // Play-state atomics: written by audio thread, read by UI at 30 Hz.
     using RhythmPlayState = mu_clid::RhythmPlayState;
@@ -257,8 +260,8 @@ public:
     // Returns nullptr when the rhythm index is out of range or the engine is null.
     std::atomic<float>* getInsertGRReductionPtr(int ri)
     {
-        if (ri < 0 || ri >= getNumRhythms() || !voiceEngines[(size_t)ri]) return nullptr;
-        return &voiceEngines[(size_t)ri]->insertProc.grReduction;
+        if (ri < 0 || ri >= getNumRhythms() || ! voiceEngine(ri)) return nullptr;
+        return &voiceEngine(ri)->insertProc.grReduction;
     }
 
     // ── RhythmHost: what RhythmContent and the sidebar's mini circle read (message thread) ─────────
@@ -290,8 +293,8 @@ public:
 
     // ── SampleSlotHost: the engines and the settings file the sample library uses (message thread) ──
     int getSampleSlotCount() const noexcept override                         { return numLayers.load(std::memory_order_acquire); }
-    VoiceEngine*       getSampleSlotEngine(int slot) noexcept override       { return voiceEngines[(size_t) slot].get(); }
-    const VoiceEngine* getSampleSlotEngine(int slot) const noexcept override { return voiceEngines[(size_t) slot].get(); }
+    VoiceEngine*       getSampleSlotEngine(int slot) noexcept override       { return voiceEngine(slot).get(); }
+    const VoiceEngine* getSampleSlotEngine(int slot) const noexcept override { return voiceEngine(slot).get(); }
     juce::PropertiesFile* getSampleSettingsFile() const noexcept override    { return appSettings.get(); }
 
 private:
@@ -346,25 +349,27 @@ private:
 
     // ── processBlock phases ──────────────────────────────────────────────
     // processBlock is decomposed into private helpers invoked in order on the
-    // audio thread. None allocate or take locks beyond processBlock's own
-    // layersLock ScopedTryLock.
+    // audio thread. None allocate or take locks beyond the driver's layersLock try-lock.
     struct BlockTransport { bool playing; double beatPos; double bpm = 120.0; };   // bpm = the block's tempo (host > MIDI clock ticks > BPM field)
     // Scan MIDI clock + program changes, read the playhead / clock / internal
     // transport, reset the wrap detector on a stop->start edge, and publish
     // sequencerPlaying + lastBeatPos.
     BlockTransport deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages);
-    // Step the sequencer, fire voice triggers (or MIDI notes for rhythms in MIDI output mode, into
-    // midiMessages), check hot-swap boundaries, and
-    // publish per-rhythm UI play-state. Called only while playing.
-    void advanceSequencer(int numRhythms, double beatPos, juce::MidiBuffer& midiMessages);
-    // The cursors' version of sequencer.processBlock (useLayerRender on): the host clock's frame, each live
-    // rhythm's cursor walk, the same BlockResult; `steps` gets each rhythm's step, accent step and length.
+    // The block's hits: the host clock's frame, each live rhythm's cursor walk, gathered as a BlockResult;
+    // `steps` gets each rhythm's step, accent step and length.
     struct CursorSteps { int step = -1, accentStep = 0, length = 0; };
     BlockResult advanceCursors(int numRhythms, double beatPos, std::array<CursorSteps, RhythmSequencer::MaxRhythms>& steps);
-    // Gather output buses, run the core mixer/voice render, mix the sample
-    // preview, and emit per-rhythm MIDI.
-    void renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages,
-                          int numRhythms, double effectiveBpm);
+    // ── The render: the shared layer driver ──────────────────────────────────────────────────────────
+    // The host's buses, the block's transport, then the shared driver (ProcessorBase::renderAndMix): the
+    // rhythms render themselves (SampleRhythm::render) and the mixer runs, in chunks of the prepared size.
+    void renderThroughLayers(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages, const BlockTransport& transport);
+    // The driver's per-block hooks (rendered blocks only, under the layer lock): the start sends the owed
+    // note-offs, finds each rhythm's hit with the host step clock and the rhythm cursors (MIDI hits go out
+    // now, sample hits wait for the rhythm's render), checks the swap boundaries, publishes the play state and
+    // hands each rhythm its block inputs; the end mixes the sample preview and counts down the MIDI note-offs.
+    void layersBlockStarting(const mu_core::LayerView& view, const mu_core::BlockTransport& t, juce::MidiBuffer& midi) override;
+    void layersBlockRendered(const mu_core::LayerView& view, juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) override;
+    void sendOrphanOffs(juce::MidiBuffer& midiMessages);
 
     // Multi-bus output (DAW). Read by isBusesLayoutSupported at host scan-time;
     // persisted to appSettings so it survives across plugin instances.
@@ -428,8 +433,9 @@ private:
     void setLiveRhythms(int n);
 
     // ── Layer container (ProcessorBase) ──────────────────────────────────────
-    // The engines, tails, play state and sample paths stay here, keyed by slot; the hooks below move
-    // them with the rhythms. All of them run on the message thread, processing suspended.
+    // The engines and tails are the layers' and move with them; the play state and sample paths stay here,
+    // keyed by slot, and the hooks below move them with the rhythms. All of them run on the message thread,
+    // processing suspended.
     bool canEditLayers() const override { return true; }
     bool layerHoldsParamTruth() const override { return true; }
     // A default rhythm for `slot`. For a slot at or above the live count it also readies that slot's
@@ -448,14 +454,12 @@ private:
     void layerAdded(int index) override { applyDefaultRhythm(index); }
 
     std::unique_ptr<Layer> makeRhythm(int slot) const;
-    void prepareSlotEngines(int slot);
+    // A prepared voice engine for live slot `slot` (message thread, outside every lock).
+    std::unique_ptr<VoiceEngine> makeSlotEngine(int slot) const;
     void resetPlayState(int slot);
-    void releaseParkedEngines();
 
-    // What the audio state moved out of a removed slot waits in until the unlock: its voice engine
-    // and the slot's retired tails. Never constructed or freed under layersLock.
-    static constexpr int kParkedEngines = 1 + kMaxRetiredEngines;
-    std::array<std::unique_ptr<VoiceEngine>, kParkedEngines> parkedEngines;
+    // A removed rhythm takes its voice engine with it: the base destroys the removed layer after the unlock, and
+    // the bin cuts the removed slot's tails and frees them later, so nothing is freed under layersLock.
     // Edit bookkeeping between the locked hooks and syncSlotParams: the slot whose rhythm is new
     // (add / reset) and so needs its pattern and engine parameters rebuilt, and, during a remove or
     // swap, the last slot syncSlotParams will be given.

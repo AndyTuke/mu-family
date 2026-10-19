@@ -44,6 +44,8 @@ public:
     // called by setParams while it holds the pending-params lock, so a test can hold the lock open and
     // check the audio thread neither blocks nor loses the update. Absent from every shipping target.
     static inline std::atomic<void (*)()> setParamsHoldHook { nullptr };
+    // Test seam: while true, process() takes its contended-block path, as when the sample-buffer try-lock misses.
+    static inline std::atomic<bool> forceBufferContention { false };
 #endif
 
     // Called from audio thread only (PluginProcessor::processBlock).
@@ -51,35 +53,18 @@ public:
     // message-thread pending mechanism.  Must be called before process().
     void setActiveParams(const VoiceParams& p);
 
-    // Stage 34 Step 1: True when no sample voice is mid-playback (or pending trigger)
-    // AND the amp envelope is in JUCE's idle state. A retired VoiceEngine that
-    // returns true has nothing left to render and is safe to destroy off the audio
-    // thread. Pure inspection — no state mutation, no side effects. Audio thread
-    // calls this each block on retired engines; message thread polls a cleanup flag
-    // set by the audio thread once this returns true.
+    // True when no sample voice is mid-playback (or pending trigger) AND the amp envelope is idle (a retired
+    // engine: and its post-idle drain budget is spent; a retired ampRelToEnd engine: once its voices end). A drain
+    // criterion, not a level: a feedback insert may still ring, so the retire bin closes a drained tail with a
+    // short declick. Pure inspection, no side effects; the audio thread asks it after each retired block.
     bool isFullyDrained() const noexcept;
 
-    // Stage 34 Step 3 fix: prepare the engine for tail-out as a retired (frozen)
-    // engine. Must be called by the message thread under suspendProcessing — no
-    // audio-thread reads of the affected state can race with these mutations.
-    //
-    // Three things happen:
-    //   1. noteOff() on all three envelopes so the amp env actually progresses
-    //      to idle. Without this, the engine sits in the sustain state forever
-    //      (no triggers / no noteOffs anywhere else in the codebase) and
-    //      isFullyDrained() never returns true — the retired slot leaks and
-    //      the engine renders until plugin destruction.
-    //   2. voiceFilter.reset() + insertProc.reset() to clear comb-buffer /
-    //      compressor-envelope / DC-block / bitrate-hold state. Otherwise a
-    //      high-feedback comb or sustained insert state keeps ringing into the
-    //      channel buf for many seconds after retirement, audible as an
-    //      "effect overlay" on the new active rhythm — the symptom from the
-    //      first listening test on Step 3. The sample (SamplePlayer voices)
-    //      and the amp envelope release are preserved — those are the
-    //      legitimate "natural tail" Stage 34 is supposed to give.
-    //   3. retired flag — switches isFullyDrained() to a voices-only drain
-    //      criterion for ampRelToEnd engines (which don't get noteOff'd so
-    //      amp env never reaches idle).
+    // Prepares the engine for its tail as a retired engine: the envelopes enter their release (the amp envelope
+    // only when ampRelToEnd is off, so a release-to-end sample plays through at its level), the post-idle drain
+    // budget (2 s of prepared-size blocks) starts, and the retired flag switches isFullyDrained to its retired
+    // criteria. Filter and insert state are kept (their tails ring down under the amp envelope). Called once by
+    // whoever then owns the engine alone: mu-Clid's EngineTail at its first tail block, on the audio thread.
+    // Allocates nothing.
     void markRetired() noexcept;
 
     // Lets the held note of a LIVE engine go: the envelopes enter release (the amp env otherwise sits at
