@@ -227,7 +227,7 @@ struct MuClidExtractionPinTests : juce::UnitTest
             expect(freedBlock >= doneBlock && freedBlock <= doneBlock + 1, "the deferred-work pass the Done asks for frees it at once");
         }
 
-        beginTest("P2: the drain budget is counted in process() calls of the prepared block size, whatever size the host calls with");
+        beginTest("P2: a tail with nothing ringing drains on its measured silence, in the same time whatever size the host calls with");
         {
             auto drainBlocks = [this](int hostBlock)
             {
@@ -248,11 +248,13 @@ struct MuClidExtractionPinTests : juce::UnitTest
                 logMessage("P2 host block " + juce::String(hostBlock) + ": drained " + juce::String(done - placed) + " calls after the retire");
                 return done - placed;
             };
-            const int atPrepared = drainBlocks(512);
-            const int atQuarter  = drainBlocks(128);
-            expect(std::abs(atPrepared - 187) <= 3, "512-frame calls, prepared at 512: about 187 calls");
-            // The closing 10 ms declick adds about 1 call at 512 frames and 4 at 128.
-            expect(std::abs(atQuarter - atPrepared) <= 6, "128-frame calls drain after the same number of calls (plus the declick), so in a quarter of the time");
+            // The Kick has nothing that rings past its envelope, so its tail ends on measured silence (50 ms below
+            // -100 dBFS after the 0.5 s release), not on the 2 s budget: the same time whatever the host block size.
+            const double atPrepared = drainBlocks(512) * 512.0 / kSr;
+            const double atQuarter  = drainBlocks(128) * 128.0 / kSr;
+            expect(atPrepared > 0.45 && atPrepared < 0.7, "512-frame calls: drained on silence, about 0.55 s after the retire");
+            expect(atQuarter > 0.45 && atQuarter < 0.7, "128-frame calls: drained on silence, about 0.5 s after the retire");
+            expect(std::abs(atPrepared - atQuarter) < 0.06, "the drain time does not follow the host block size");
         }
 
         beginTest("P2/P4: a retired engine that holds no sample renders nothing and ends at once (it no longer holds its entry)");
@@ -445,7 +447,7 @@ struct MuClidExtractionPinTests : juce::UnitTest
                        + juce::String(clipS.undrainedWithSample) + ", without " + juce::String(clipS.undrainedWithoutSample));
             expectEquals(longS.undrainedWithSample + clipS.undrainedWithSample, 0, "every retired engine that holds a sample drains before its scenario ends");
             expect(longS.longestDrained > 11.8 && longS.longestDrained < 12.2, "the amp-release-at-maximum engine plays its whole 12 s sample from the retrigger at the swap boundary, on past the retire");
-            expect(clipS.longestDrained > 0.9 && clipS.longestDrained < 1.1, "the Kick engines of the hot-swap scenario drain after 93 calls (the 2 s budget counted in prepared-size blocks of 1024) of 512 frames: about 1 s");
+            expect(clipS.longestDrained > 0.4 && clipS.longestDrained < 0.8, "the Kick engines of the hot-swap scenario drain on their measured silence after the release: about 0.55 s, well inside the 2 s budget");
             expect(juce::jmax(longS.longestDrained, clipS.longestDrained) < 30.0, "so the 30 s cap cuts nothing the golden set plays");
             expectEquals(longS.undrainedWithoutSample + clipS.undrainedWithoutSample, 0, "the engines that never held a sample (the slot's default engine, retired when the state loads) end at once");
         }

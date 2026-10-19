@@ -54,9 +54,10 @@ public:
     void setActiveParams(const VoiceParams& p);
 
     // True when no sample voice is mid-playback (or pending trigger) AND the amp envelope is idle (a retired
-    // engine: and its post-idle drain budget is spent; a retired ampRelToEnd engine: once its voices end). A drain
-    // criterion, not a level: a feedback insert may still ring, so the retire bin closes a drained tail with a
-    // short declick. Pure inspection, no side effects; the audio thread asks it after each retired block.
+    // engine: and either its output has stayed below -100 dBFS for 50 ms, or its 2 s post-idle drain budget is
+    // spent; a retired ampRelToEnd engine: once its voices end). The budget bounds a feedback insert that still
+    // rings, which the retire bin closes with a short declick. Pure inspection, no side effects; the audio thread
+    // asks it after each retired block.
     bool isFullyDrained() const noexcept;
 
     // Prepares the engine for its tail as a retired engine: the envelopes enter their release (the amp envelope
@@ -143,6 +144,11 @@ private:
     // beyond env-idle so the insert's internal feedback decays audibly instead
     // of being cut by engine destruction during hot-swap.
     int retireDrainBlocks = 0;
+    // A retired engine's run of rendered output below kRetireSilentLevel, in samples (audio thread; reset by any
+    // louder block, left alone by a contended one), and the run that counts as drained (50 ms, set by markRetired).
+    static constexpr float kRetireSilentLevel = 1.0e-5f;   // -100 dBFS
+    int retireSilentSamples = 0;
+    int retireSilentHold    = 0;
 
     void applyPendingParams();   // audio thread only — syncs activeParams from pendingParams
     void syncEnvelopes();        // audio thread only — pushes activeParams into ADSR objects

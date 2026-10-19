@@ -8,7 +8,8 @@
 
 // mu-Clid's retire tail (docs/mu-tronic/design.md 2.1.3, E5.5e): the voice engine a hot-swap replaced, still sounding
 // its in-flight sample and envelope release in its slot's channel from the shared RetireBin. Natural policy: it ends
-// when the engine reports drained (its block-counted drain budget is counted inside the engine, as it always was),
+// when the engine reports drained (measured inside the engine: 50 ms of silence after its envelope is idle, or its
+// 2 s block-counted budget for an insert that keeps ringing),
 // with the bin's closing 10 ms declick, bounded by the bin's 30 s hard lifetime; an engine with no sample renders
 // nothing, so it ends at once. The tail reads nothing but its own engine.
 namespace mu_clid

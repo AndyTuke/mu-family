@@ -238,6 +238,65 @@ struct VoiceEngineContendedBlockTests : juce::UnitTest
         expect(plain > 2 && plain < 100000, "the engine drains");
         expectEquals(contended, plain);
         dir.deleteRecursively();
+
+        beginTest("a sample voice moves on through contended blocks: the block after them plays where it would have");
+        dir.createDirectory();
+        const auto ramp = writeRamp(dir);
+        constexpr int kBlocks = 10;
+        const auto plainLast     = lastBlockOf(ramp, kBlocks, false);
+        const auto contendedLast = lastBlockOf(ramp, kBlocks, true);
+        // The second half of the block: the filter, which skipped the contended blocks, has settled by then.
+        float maxDiff = 0.0f, peak = 0.0f;
+        for (int i = plainLast.getNumSamples() / 2; i < plainLast.getNumSamples(); ++i)
+        {
+            maxDiff = juce::jmax(maxDiff, std::abs(plainLast.getSample(0, i) - contendedLast.getSample(0, i)));
+            peak    = juce::jmax(peak, std::abs(plainLast.getSample(0, i)));
+        }
+        logMessage("last block peak " + juce::String(peak) + ", largest difference " + juce::String(maxDiff));
+        expect(peak > 0.02f, "the ramp is still sounding in the last block");
+        // A voice held at its old position would be (kBlocks - 2) blocks of ramp behind: about 0.017 here.
+        expect(maxDiff < 0.002f, "the voice played on from where an uncontended run would be");
+        dir.deleteRecursively();
+    }
+
+    // A one-second rising ramp (0 to 0.5), so a voice's position shows in its level.
+    static juce::File writeRamp(const juce::File& dir)
+    {
+        auto f = dir.getChildFile("ramp.wav");
+        f.deleteFile();
+        constexpr int kLen = 48000;
+        juce::AudioBuffer<float> ramp(1, kLen);
+        for (int i = 0; i < kLen; ++i) ramp.setSample(0, i, 0.5f * (float) i / (float) kLen);
+        juce::WavAudioFormat wav;
+        std::unique_ptr<juce::OutputStream> out = f.createOutputStream();
+        if (out == nullptr) return {};
+        auto writer = wav.createWriterFor(out, juce::AudioFormatWriterOptions{}.withSampleRate(48000.0)
+                                                                               .withNumChannels(1)
+                                                                               .withBitsPerSample(24));
+        if (writer == nullptr) return {};
+        writer->writeFromAudioSampleBuffer(ramp, 0, kLen);
+        return f;
+    }
+
+    // The last of `blocks` process() calls after one trigger; with `contendMiddle` every call but the first and
+    // the last misses the buffer lock.
+    static juce::AudioBuffer<float> lastBlockOf(const juce::File& sample, int blocks, bool contendMiddle)
+    {
+        constexpr int kBlock = 256;
+        VoiceEngine ve;
+        ve.prepareToPlay(48000.0, kBlock);
+        ve.loadFile(sample);
+        ve.setParams(VoiceParams{});
+        juce::AudioBuffer<float> block(2, kBlock);
+        ve.trigger(false, false);
+        for (int b = 0; b < blocks; ++b)
+        {
+            VoiceEngine::forceBufferContention.store(contendMiddle && b > 0 && b < blocks - 1);
+            block.clear();
+            ve.process(block, kBlock);
+            VoiceEngine::forceBufferContention.store(false);
+        }
+        return block;
     }
 };
 

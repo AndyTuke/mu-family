@@ -11,6 +11,24 @@ void SamplePlayer::trigger(int fadeInSamples)
     triggered.store(true, std::memory_order_release);
 }
 
+void SamplePlayer::skip(const double* ratios, int numSamples) noexcept
+{
+    if (triggered.exchange(false, std::memory_order_acquire))
+    {
+        playPos = 0.0;
+        fadeInTotal     = pendingFadeInSamples.load(std::memory_order_relaxed);
+        fadeInRemaining = fadeInTotal;
+    }
+
+    if (playPos < 0.0 || ratios == nullptr)
+        return;
+
+    // The same per-sample advance as process(), with nothing read or written.
+    for (int s = 0; s < numSamples; ++s)
+        playPos += ratios[s];
+    fadeInRemaining = std::max(0, fadeInRemaining - numSamples);
+}
+
 bool SamplePlayer::isActive() const
 {
     return playPos >= 0.0 || triggered.load();

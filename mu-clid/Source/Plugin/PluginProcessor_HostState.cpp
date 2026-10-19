@@ -92,6 +92,14 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
     // alone is not enough — it doesn't block an in-flight processBlock; layersLock
     // does (the audio thread's ScopedTryLock bails while we hold it). The lock is held
     // for the rest of the function (RAII) and released on return.
+    // The engines the restore drops and the ones it adds are freed and built out here, outside the locks: the
+    // shrunk slots' engines land in `shrunkEngines` (declared before the locks, so they destruct after them) and
+    // the grown slots' engines are built and prepared now.
+    std::array<std::unique_ptr<VoiceEngine>, mu_limits::kMaxLayers> shrunkEngines;
+    std::array<std::unique_ptr<VoiceEngine>, mu_limits::kMaxLayers> grownEngines;
+    for (int i = numLayers.load(std::memory_order_acquire); i < n; ++i)
+        grownEngines[(size_t) i] = makeSlotEngine(i);
+
     suspendProcessing(true);
     const juce::ScopedLock lw(layoutWriteLock);   // first: the count stores below advance the layout serial
     const juce::ScopedLock sl(layersLock);
@@ -144,7 +152,7 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
         retireBin.cutAtOrAbove(n);                       // the dropped slots' tails stop (count policy CutAtCount)
         for (int i = n; i < oldN; ++i)
         {
-            voiceEngine(i).reset();
+            shrunkEngines[(size_t) i] = std::move(voiceEngine(i));
             parkPendingMidiOff(sampleRhythm(i).midi);   // keep the owed note-off (under layersLock, held above)
             sampleRhythm(i).midi = MidiOutputEngine{};
         }
@@ -153,13 +161,9 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
     {
         for (int i = oldN; i < n; ++i)
         {
-            voiceEngine(i) = std::make_unique<VoiceEngine>();
-            voiceEngine(i)->insertProc.setSlotIndex(i);   // per-slot noise seed
+            voiceEngine(i) = std::move(grownEngines[(size_t) i]);   // built above with its slot's noise seed
             if (currentSampleRate > 0 && currentBlockSize > 0)
-            {
-                voiceEngine(i)->prepareToPlay(currentSampleRate, currentBlockSize);
                 sampleRhythm(i).midi.prepare(currentSampleRate, currentBlockSize);
-            }
         }
         storeLayerCount(n, std::memory_order_release);  // increment after slots ready
     }

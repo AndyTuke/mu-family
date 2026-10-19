@@ -143,7 +143,8 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
 
     // A try-lock: the audio thread never waits for a buffer swap on the message thread (loadFile reads the
     // file outside the lock and holds it only to move the new buffer in). On contention: a silent block that
-    // still keeps time, so the envelopes and a retired engine's drain countdown advance as a rendered block's do.
+    // still keeps time, so the envelopes, the sample voices' positions and a retired engine's drain countdown
+    // advance as a rendered block's do.
     const juce::SpinLock::ScopedTryLockType bufferGuard(bufferLock);
     bool contended = ! bufferGuard.isLocked();
 #if defined(MU_VOICE_ENGINE_TEST_SEAM) && MU_VOICE_ENGINE_TEST_SEAM
@@ -160,6 +161,10 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
             filterEnv.getNextSample();
             ampEnv.getNextSample();
         }
+        // The voices move on at the last rendered block's pitch ratios (the current ratio needs the buffer's rate,
+        // which the lock holder may be changing); pitchRatioBuffer is sized to the prepared block, as tempBuffer.
+        for (auto& v : voices)
+            v.skip(pitchRatioBuffer.data(), juce::jmin(skipped, (int) pitchRatioBuffer.size()));
         if (retired && retireDrainBlocks > 0)
             --retireDrainBlocks;
         return;
@@ -257,6 +262,13 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
 
     // ampLevel is dB-domain (-60..+6); convert to linear gain once per block.
     const float levelGain = juce::Decibels::decibelsToGain(activeParams.ampLevel, -60.0f);
+
+    // A retired engine measures what it adds: a run of silent blocks after the envelope is idle ends it early.
+    if (retired)
+    {
+        const float level = tempBuffer.getMagnitude(0, ns) * levelGain * accentGain;
+        retireSilentSamples = level < kRetireSilentLevel ? retireSilentSamples + ns : 0;
+    }
     for (int ch = 0; ch < nCh; ++ch)
         output.addFrom(ch, 0, tempBuffer, ch, 0, ns, levelGain * accentGain);
 }
@@ -298,6 +310,8 @@ void VoiceEngine::markRetired() noexcept
     // / blockSize. tempBuffer.getNumSamples() == blockSize after prepareToPlay.
     const int blockSize = juce::jmax(1, tempBuffer.getNumSamples());
     retireDrainBlocks = (int) (2.0 * currentSampleRate / (double) blockSize);
+    retireSilentSamples = 0;
+    retireSilentHold    = juce::jmax(1, (int) (0.05 * currentSampleRate));
 
     retired = true;
 }
@@ -336,7 +350,7 @@ bool VoiceEngine::isFullyDrained() const noexcept
     // ringing past env idle from their own internal state. Wait the drain budget
     // so the audible tail completes before the engine is destroyed in hot-swap.
     if (ampEnv.isActive()) return false;
-    if (retired && retireDrainBlocks > 0) return false;
+    if (retired && retireDrainBlocks > 0 && retireSilentSamples < retireSilentHold) return false;
     return true;
 }
 
