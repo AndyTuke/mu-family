@@ -31,6 +31,7 @@ project(mu-family VERSION ${MUFAMILY_VERSION_BASE}.0)
 #   mu-tant/             wavetable drone synth
 #   mu-toni/             generative arpeggiator mono-synth
 #   mu-on/               909-style groove sequencer
+#   mu-tronic/           performance unit of 16 layer slots (Standalone only, freeware)
 #   tools/               shared dev tools (license keygen etc.)
 #   tests/               cross-plugin listening-test pipeline (analyse.py, runners)
 #   cmake/               shared cmake helpers (build-number increment, installer)
@@ -170,6 +171,7 @@ add_subdirectory(mu-clid-midi) # mu-Clid MIDI: Euclidean MIDI effect (VST3 + CLA
 add_subdirectory(mu-tant)     # wavetable drone synth (Standalone + VST3 + CLAP)
 add_subdirectory(mu-toni)     # generative arpeggiator mono-synth, freeware (Standalone + VST3 + CLAP)
 add_subdirectory(mu-on)       # 909-style groove sequencer: Kick/Bass/Hat/Snare (Standalone + VST3 + CLAP)
+add_subdirectory(mu-tronic)   # performance unit: 16 layer slots (Standalone only, freeware); after the products whose layers it will host
 add_subdirectory(tests/layer-link)    # mu-layer-link-test: the four layer libraries in one link (after the products define them)
 add_subdirectory(mu-link)     # local audio receiver + master clock (foundation: IPC tests only)
 add_subdirectory(ControlDesign)       # knob-style design sandbox (dev tool, not shipped)
