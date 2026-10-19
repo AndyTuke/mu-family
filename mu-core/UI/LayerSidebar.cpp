@@ -143,6 +143,8 @@ void LayerSidebar::layoutItems(bool animate, int newItemIndex)
 
 void LayerSidebar::repaintItems()
 {
+    // Names are cached on the tiles, so a rename must be pulled in here.
+    for (size_t i = 0; i < items.size(); ++i) items[i]->setName(proc.getLayerName((int) i));
     for (auto& item : items) item->repaint();
     itemContainer.repaint();
     repaint();

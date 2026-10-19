@@ -268,12 +268,15 @@ void KnobWithLabel::timerCallback()
         // assignment list does — re-scan it only when the revision moved, not every tick.
         if (modMatrix)
         {
-            const int rev = modMatrix->assignmentsRevision();
+            // Read the published snapshot, not the live list: a state restore may rebuild it off this thread.
+            const auto snap = modMatrix->assignedSnapshot();
+            const int rev = snap != nullptr ? snap->revision : 0;
             if (rev != lastModRevision)
             {
                 bool assigned = false;
-                for (const auto& a : modMatrix->getAssignments())
-                    if (a.destinationId == modDestId) { assigned = true; break; }
+                if (snap != nullptr)
+                    for (const auto& d : snap->destinations)
+                        if (d == modDestId) { assigned = true; break; }
                 modAssignedCached = assigned;
                 lastModRevision   = rev;
             }

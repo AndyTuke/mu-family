@@ -1,0 +1,461 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<MuClidPreset presetName="Lost control" presetDescription="" presetEmbedSamples="0"
+              presetCategory="Techno">
+  <Rhythm name="Kick Accents" colour="1" sample="Kick 04.wav" stepsA="4"
+          hitsA="1" rotA="0" prePadA="0" postPadA="0" insStA="0" insLenA="0"
+          insModeA="false" prePadModeA="false" postPadModeA="false" stepsB="12"
+          hitsB="3" rotB="0" prePadB="0" postPadB="0" insStB="0" insLenB="0"
+          insModeB="false" prePadModeB="false" postPadModeB="false" stepsC="8"
+          hitsC="1" rotC="0" prePadC="0" postPadC="0" insStC="0" insLenC="0"
+          insModeC="false" prePadModeC="false" postPadModeC="false" logic="OR"
+          patLeg="false" vMono="false" rstSt="-1" pitchOct="0" pitchSemi="0"
+          pitchFine="0" pEnvAtk="0.0" pEnvDec="0.0" pEnvSus="0.0" pEnvRel="0.0"
+          pEnvDep="0.0" fltType="LP12" fltCut="20000.0" fltRes="0.0" fEnvAtk="0.0"
+          fEnvDec="0.0" fEnvSus="0.0" fEnvRel="0.0" fEnvDep="0.0" fltLoCut="0.0"
+          fltDrv="0.0" ampLvl="1.0" aEnvAtk="0.0" aEnvDec="1.25088095664978"
+          aEnvSus="100.0" aEnvRel="10.0" accentDb="4.400000095367432" drvChar="None"
+          insP1="0.0" insP2="0.0" insP3="0.0" insP4="0.0" ch_lvl="1.0"
+          ch_pan="0.5" ch_mute="0.0" ch_solo="0.0" ch_sendEff="0.0" ch_sendDly="0.0"
+          ch_sendRev="0.0" ch_scSrc="0.0" ch_scAmt="0.0" ch_scAtk="0.008016032166779041"
+          ch_scRel="0.04522613063454628" ch_outBus="0.0">
+    <Modulators>
+      <Seq id="cs0" mode="Stepped" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+           loopMult="1" stepNV="Quarter" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+      </Seq>
+      <Seq id="cs1" mode="Stepped" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+           loopMult="4" stepNV="Quarter" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+      </Seq>
+      <Seq id="cs2" mode="Stepped" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+           loopMult="4" stepNV="Quarter" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+      </Seq>
+      <Seq id="cs3" mode="Stepped" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+           loopMult="4" stepNV="Quarter" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+      </Seq>
+      <Seq id="cs4" mode="Stepped" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+           loopMult="4" stepNV="Quarter" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+      </Seq>
+      <Seq id="cs5" mode="Stepped" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+           loopMult="4" stepNV="Quarter" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+      </Seq>
+      <Seq id="cs6" mode="Stepped" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+           loopMult="4" stepNV="Quarter" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+      </Seq>
+      <Seq id="cs7" mode="Stepped" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+           loopMult="4" stepNV="Quarter" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+      </Seq>
+    </Modulators>
+  </Rhythm>
+  <Rhythm name="_default" colour="2" sample="Clap 09.wav" stepsA="16" hitsA="5"
+          rotA="0" prePadA="0" postPadA="0" insStA="0" insLenA="0" insModeA="false"
+          prePadModeA="false" postPadModeA="false" stepsB="8" hitsB="0"
+          rotB="0" prePadB="0" postPadB="0" insStB="0" insLenB="0" insModeB="false"
+          prePadModeB="false" postPadModeB="false" stepsC="8" hitsC="0"
+          rotC="0" prePadC="0" postPadC="0" insStC="0" insLenC="0" insModeC="false"
+          prePadModeC="false" postPadModeC="false" logic="OR" patLeg="false"
+          vMono="false" rstSt="-1" pitchOct="0" pitchSemi="0" pitchFine="0"
+          pEnvAtk="5.489031451588744e-9" pEnvDec="0.0001191962728626095"
+          pEnvSus="0.0" pEnvRel="0.0001191962728626095" pEnvDep="0.0" fltType="CombMinus"
+          fltCut="33.00000762939453" fltRes="0.7960000038146973" fEnvAtk="5.532602287416921e-8"
+          fEnvDec="0.00464158970862627" fEnvSus="0.0" fEnvRel="0.00464158970862627"
+          fEnvDep="0.0" fltLoCut="0.0" fltDrv="0.0" ampLvl="1.0" aEnvAtk="5.489031451588744e-9"
+          aEnvDec="0.00464158970862627" aEnvSus="100.0" aEnvRel="0.02547782845795155"
+          accentDb="0.0" drvChar="RingMod" insP1="0.5" insP2="0.0" insP3="0.0"
+          insP4="0.4875824153423309" ch_lvl="0.7519999742507935" ch_pan="0.5"
+          ch_mute="0.0" ch_solo="0.0" ch_sendEff="0.0" ch_sendDly="0.2700000107288361"
+          ch_sendRev="0.1500000059604645" ch_scSrc="0.1111111119389534"
+          ch_scAmt="0.2599999904632568" ch_scAtk="0.0" ch_scRel="0.002010050229728222"
+          ch_outBus="0.0">
+    <Modulators>
+      <Seq id="cs0" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+        <Step v="94.98106384277344"/>
+        <Step v="-17.79278564453125"/>
+        <Step v="34.00552368164062"/>
+        <Step v="-96.82949829101562"/>
+        <Step v="-98.59701538085938"/>
+        <Step v="-90.06500244140625"/>
+        <Step v="-60.89826965332031"/>
+        <Step v="90.08456420898438"/>
+        <Step v="63.9564208984375"/>
+        <Step v="-32.29835510253906"/>
+        <Step v="83.84281921386719"/>
+        <Step v="46.87481689453125"/>
+        <Step v="-17.88147735595703"/>
+        <Step v="5.642959594726562"/>
+        <Step v="-28.17214965820312"/>
+        <Step v="-24.46073913574219"/>
+      </Seq>
+      <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+        <Step v="22.88607788085938"/>
+        <Step v="59.82918548583984"/>
+        <Step v="9.834941864013672"/>
+        <Step v="97.32154083251953"/>
+        <Step v="84.90057373046875"/>
+        <Step v="64.97096252441406"/>
+        <Step v="7.484207153320312"/>
+        <Step v="24.96714210510254"/>
+        <Step v="50.9183349609375"/>
+        <Step v="77.56864929199219"/>
+        <Step v="35.71652984619141"/>
+        <Step v="66.74565124511719"/>
+        <Step v="49.31694412231445"/>
+        <Step v="96.12502288818359"/>
+        <Step v="99.15757751464844"/>
+        <Step v="65.13795471191406"/>
+      </Seq>
+      <Seq id="cs2" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+      </Seq>
+      <Seq id="cs3" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+      </Seq>
+      <Seq id="cs4" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+      </Seq>
+      <Seq id="cs5" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+      </Seq>
+      <Seq id="cs6" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+      </Seq>
+      <Seq id="cs7" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+      </Seq>
+      <Asgn id="cs1_assign_fcefbf6e83494e55bf71e420c70c19d0" src="cs1_output"
+            dest="filter.cutoff" depth="25.79999923706055" curve="0.0"/>
+      <Asgn id="cs0_assign_e8f2462a52fb402985d24169749e653b" src="cs0_output"
+            dest="insert.p4" depth="25.79999923706055" curve="0.0"/>
+    </Modulators>
+  </Rhythm>
+  <Rhythm name="_default" colour="3" sample="Clap 03.wav" stepsA="24" hitsA="7"
+          rotA="0" prePadA="0" postPadA="0" insStA="0" insLenA="0" insModeA="false"
+          prePadModeA="false" postPadModeA="false" stepsB="8" hitsB="0"
+          rotB="0" prePadB="0" postPadB="0" insStB="0" insLenB="0" insModeB="false"
+          prePadModeB="false" postPadModeB="false" stepsC="8" hitsC="0"
+          rotC="0" prePadC="0" postPadC="0" insStC="0" insLenC="0" insModeC="false"
+          prePadModeC="false" postPadModeC="false" logic="OR" patLeg="false"
+          vMono="false" rstSt="-1" pitchOct="0" pitchSemi="0" pitchFine="0"
+          pEnvAtk="5.489031451588744e-9" pEnvDec="0.0001191962728626095"
+          pEnvSus="0.0" pEnvRel="0.0001191962728626095" pEnvDep="0.0" fltType="LP12"
+          fltCut="20000.0" fltRes="0.0" fEnvAtk="5.532602287416921e-8"
+          fEnvDec="0.00464158970862627" fEnvSus="0.0" fEnvRel="0.00464158970862627"
+          fEnvDep="0.0" fltLoCut="0.0" fltDrv="0.0" ampLvl="3.599998474121094"
+          aEnvAtk="5.489031451588744e-9" aEnvDec="0.00464158970862627"
+          aEnvSus="100.0" aEnvRel="0.02547782845795155" accentDb="0.0"
+          drvChar="None" insP1="0.0" insP2="0.0" insP3="0.0" insP4="0.0"
+          ch_lvl="1.0" ch_pan="0.5" ch_mute="0.0" ch_solo="0.0" ch_sendEff="0.0"
+          ch_sendDly="0.0" ch_sendRev="0.0" ch_scSrc="0.0" ch_scAmt="0.0"
+          ch_scAtk="0.008016032166779041" ch_scRel="0.04522613063454628"
+          ch_outBus="0.0">
+    <Modulators>
+      <Seq id="cs0" mode="Smooth" polarity="Unipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Point x="0.0" y="0.7933333516120911" bez="0" hx="0.0" hy="0.0"/>
+        <Point x="0.1461824923753738" y="0.7533333301544189" bez="0" hx="0.0"
+               hy="0.0"/>
+        <Point x="0.3305400311946869" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+        <Point x="0.8333333134651184" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+        <Point x="0.8454376459121704" y="0.9266666769981384" bez="0" hx="0.0"
+               hy="0.0"/>
+        <Point x="1.0" y="0.9399999976158142" bez="0" hx="0.0" hy="0.0"/>
+      </Seq>
+      <Seq id="cs1" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+      </Seq>
+      <Seq id="cs2" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+      </Seq>
+      <Seq id="cs3" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+      </Seq>
+      <Seq id="cs4" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+      </Seq>
+      <Seq id="cs5" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+      </Seq>
+      <Seq id="cs6" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+      </Seq>
+      <Seq id="cs7" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None"
+           loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+        <Step v="0.0"/>
+      </Seq>
+      <Asgn id="cs0_assign_2e5f3b7b38b24cb1adf3c94452525208" src="cs0_output"
+            dest="euclid.b.hits" depth="61.29999923706055" curve="0.0"/>
+    </Modulators>
+  </Rhythm>
+  <GlobalState eff_algo="phaser" eff_en="true" eff_p0="0.0" eff_p1="0.0" eff_p2="0.0"
+               eff_p3="0.0" eff_p4="0.5" dly_en="true" dly_mode="true" dly_ms="250.0"
+               dly_syncDenom="2" dly_syncDot="true" dly_syncTrip="false" dly_count="1"
+               dly_fb="0.6100000143051147" dly_spread="0.0" dly_dirt="0.0" rev_algo="plate"
+               rev_en="true" rev_lvl="1.0" rev_size="0.449999988079071" rev_pre="10.0"
+               rev_diff="0.8999999761581421" rev_damp="0.5" rev_mod="0.300000011920929"
+               rev_dirt="0.0" eff2dly="0.0" eff2rev="0.0" dly2rev="0.0" echo_en="true"
+               echo_mode="1.0" echo_ms="250.0" echo_syncDenom="1" echo_syncDot="false"
+               echo_syncTrip="false" echo_count="1" echo_fb="0.449999988079071"
+               echo_spread="0.0" echo_dirt="0.0" ret_eff_lvl="0.75" ret_eff_pan="0.0"
+               ret_eff_mute="false" ret_eff_solo="false" ret_eff_scSrc="0" ret_eff_scAmt="0.0"
+               ret_eff_scAtk="5.0" ret_eff_scRel="100.0" ret_dly_lvl="0.75"
+               ret_dly_pan="0.0" ret_dly_mute="false" ret_dly_solo="false" ret_dly_scSrc="0"
+               ret_dly_scAmt="0.0" ret_dly_scAtk="5.0" ret_dly_scRel="100.0"
+               ret_rev_lvl="0.75" ret_rev_pan="0.0" ret_rev_mute="false" ret_rev_solo="false"
+               ret_rev_scSrc="0" ret_rev_scAmt="0.0" ret_rev_scAtk="5.0" ret_rev_scRel="100.0"
+               mstr_lvl="1.0" mstr_pan="0.0" mstrLoop="4" mst_insChar="EQ" mst_insP1="0.5"
+               mst_insP2="0.5" mst_insP3="1.0" mst_insP4="0.5" mst_ins2Char="None"
+               mst_ins2P1="0.0" mst_ins2P2="0.0" mst_ins2P3="0.0" mst_ins2P4="0.0"/>
+</MuClidPreset>

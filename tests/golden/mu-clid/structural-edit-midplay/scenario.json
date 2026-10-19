@@ -1,0 +1,12 @@
+{
+  "name": "structural-edit-midplay",
+  "notes": "Kick, Hat and Synth C; a rhythm is added (block 40), rhythms 0 and 2 swap (block 90), rhythm 1 is reset (block 140), rhythm 0 is removed (block 190), rhythm 2 is removed (block 240), which leaves the reset rhythm and the Kick.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 288000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 0,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "events": [{ "block": 40, "label": "addLayer" }, { "block": 90, "label": "swapLayers(0, 2)" }, { "block": 140, "label": "resetLayer(1)" }, { "block": 190, "label": "removeLayer(0)" }, { "block": 240, "label": "removeLayer(2)" }]
+}

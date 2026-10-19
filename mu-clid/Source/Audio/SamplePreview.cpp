@@ -7,46 +7,124 @@ SamplePreview::SamplePreview()
     formatManager.registerBasicFormats();
 }
 
-void SamplePreview::prepare(int blockSize, double sampleRate)
+SamplePreview::~SamplePreview()
 {
-    transport.prepareToPlay(blockSize, sampleRate);
-    scratchBuffer.setSize(2, blockSize, false, true, true);
+    const juce::ScopedLock sl(messageLock);
+    owned.clear();
+}
+
+void SamplePreview::prepare(int blockSize, double sr)
+{
+    const juce::ScopedLock sl(messageLock);
+    sampleRate = sr;
+    chunkMax = blockSize;
 }
 
 void SamplePreview::releaseResources()
 {
-    transport.releaseResources();
+    stop();
+}
+
+void SamplePreview::collectRetired()
+{
+    const juce::ScopedLock sl(messageLock);
+    // Keep the published buffer and whichever one the audio thread is reading; free the rest.
+    const Decoded* live = current.load();
+    const Decoded* busy = audioHolding.load();
+    for (size_t i = owned.size(); i-- > 0; )
+        if (owned[i].get() != live && owned[i].get() != busy)
+            owned.erase(owned.begin() + (std::ptrdiff_t) i);
 }
 
 void SamplePreview::start(const juce::File& file)
 {
+    const juce::ScopedLock sl(messageLock);
+    if (sampleRate <= 0.0) return;   // not prepared yet: nothing to convert to, so ignore the request
     if (!file.existsAsFile()) return;
-    auto* reader = formatManager.createReaderFor(file);
-    if (!reader) return;
-    transport.stop();
-    transport.setSource(nullptr);
-    source = std::make_unique<juce::AudioFormatReaderSource>(reader, true);
-    transport.setSource(source.get(), 0, nullptr, reader->sampleRate, reader->numChannels);
-    transport.setPosition(0.0);
-    transport.start();
+    std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(file));
+    if (!reader || reader->lengthInSamples <= 0) return;
+    // Phase 1: decode up to kMaxSeconds at the file's own rate (mono is duplicated to both channels, >2 channels use the first two).
+    const double srcRate = reader->sampleRate > 0.0 ? reader->sampleRate : 44100.0;
+    const int srcLen = (int) juce::jmin<juce::int64>(reader->lengthInSamples, (juce::int64) (kMaxSeconds * srcRate));
+    // The interpolator can read a few samples past the end when downsampling, so the buffer carries zero padding.
+    const double ratio = srcRate / sampleRate;
+    const int pad = (int) std::ceil(juce::jmax(1.0, ratio)) + 8;
+    juce::AudioBuffer<float> src(2, srcLen + pad);
+    src.clear();
+    reader->read(&src, 0, srcLen, 0, true, true);
+    if (reader->numChannels == 1)
+        src.copyFrom(1, 0, src, 0, 0, srcLen);
+
+    // Replace NaN/Inf from a corrupt file with silence.
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        float* p = src.getWritePointer(ch);
+        for (int i = 0; i < srcLen; ++i)
+            if (! std::isfinite(p[i])) p[i] = 0.0f;
+    }
+    // Phase 2: convert to the device rate with Lagrange interpolation, as the transport's resampler did.
+    auto dec = std::make_unique<Decoded>();
+    if (std::abs(srcRate - sampleRate) > 1.0e-6)
+    {
+        const int outLen = (int) std::ceil((double) srcLen / ratio);
+        dec->audio.setSize(2, outLen);
+        dec->audio.clear();
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            juce::LagrangeInterpolator interp;
+            interp.process(ratio, src.getReadPointer(ch), dec->audio.getWritePointer(ch), outLen);
+        }
+    }
+    else
+    {
+        dec->audio.setSize(2, srcLen);
+        for (int ch = 0; ch < 2; ++ch)
+            dec->audio.copyFrom(ch, 0, src, ch, 0, srcLen);
+    }
+    dec->id = nextId++;
+    // Phase 3: publish; the audio thread restarts from zero when it sees the new id.
+    Decoded* raw = dec.get();
+    owned.push_back(std::move(dec));
+    current.store(raw);
+    collectRetired();
 }
 
 void SamplePreview::stop()
 {
-    transport.stop();
-    transport.setSource(nullptr);
-    source.reset();
+    const juce::ScopedLock sl(messageLock);
+    current.store(nullptr);
+    collectRetired();
 }
 
 void SamplePreview::mixInto(juce::AudioBuffer<float>& masterBus, int numSamples)
 {
-    if (!transport.isPlaying()) return;
-    scratchBuffer.clear(0, 0, numSamples);
-    scratchBuffer.clear(1, 0, numSamples);
-    transport.getNextAudioBlock({ &scratchBuffer, 0, numSamples });
-    for (int ch = 0; ch < masterBus.getNumChannels(); ++ch)
-        masterBus.addFrom(ch, 0, scratchBuffer,
-                          ch % scratchBuffer.getNumChannels(), 0, numSamples, 0.7f);
+    // Take a hazard pointer so the message thread does not free the buffer mid-read.
+    Decoded* d = nullptr;
+    for (;;)
+    {
+        d = current.load();
+        audioHolding.store(d);
+        if (current.load() == d) break;
+    }
+    if (d == nullptr || chunkMax <= 0) { audioHolding.store(nullptr); return; }
+
+    if (d->id != playingId) { playingId = d->id; readPos = 0; }
+
+    // Chunk to the prepared size, copying from the in-memory buffer.
+    const int len = d->audio.getNumSamples();
+    for (int done = 0; done < numSamples && readPos < len; )
+    {
+        const int n = juce::jmin(chunkMax, numSamples - done, len - readPos);
+        for (int ch = 0; ch < masterBus.getNumChannels(); ++ch)
+            masterBus.addFrom(ch, done, d->audio, ch % 2, readPos, n, 0.7f);
+        readPos += n;
+        done += n;
+    }
+    audioHolding.store(nullptr);
 }
 
 } // namespace mu_clid
+
+
+
+

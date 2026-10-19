@@ -1,0 +1,14 @@
+{
+  "scenario": "loop-legato-rests",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 96000,
+  "tempoBpm": 120.0,
+  "startBeat": 1000000.0,
+  "numStems": 1,
+  "script": [
+    "Loop mode, 1/8, Legato on with a 100 percent gate (tie) and 60 ms portamento.",
+    "Six-step pattern with rests at steps 3 and 6 so ties end at the rest; step 3 carries an accent bit that is ignored (Off).",
+    "Host starts at beat 1000000 to exercise the beat-grid arithmetic far from zero."
+  ]
+}

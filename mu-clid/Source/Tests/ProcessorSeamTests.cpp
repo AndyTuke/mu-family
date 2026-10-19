@@ -16,20 +16,11 @@
 #include <vector>
 #include <vector>
 
-// Allocation counter: counts operator new calls made while the calling thread has counting switched on.
-namespace alloc_count {
-inline thread_local bool counting = false;
-inline thread_local int  count    = 0;
-}
-
-void* operator new(std::size_t size)
-{
-    if (alloc_count::counting) ++alloc_count::count;
-    if (void* p = std::malloc(size > 0 ? size : 1)) return p;
-    throw std::bad_alloc();
-}
-void operator delete(void* p) noexcept { std::free(p); }
-void operator delete(void* p, std::size_t) noexcept { std::free(p); }
+// Allocation counter: the shared probe replaces this executable's operator new / delete (this is the one
+// translation unit that carries them). A test counts a region by setting mu_alloc::tls.armed and reading
+// mu_alloc::tls.allocs, or with mu_alloc::Armed.
+#define MU_ALLOCATION_PROBE_DEFINE_OPERATORS
+#include "Tests/AllocationProbe.h"
 
 // The product class names its editor in a virtual, defined in PluginEditor.cpp, which this headless
 // target does not link (see "Headless product processors" in design-plugin-family.md).
@@ -339,7 +330,7 @@ struct MuClidProcessorSeamTests : juce::UnitTest
             juce::MidiBuffer midi;
             midi.ensureSize(4096);
             for (int i = 0; i < 8; ++i) { buf.clear(); midi.clear(); p.processBlock(buf, midi); }   // warm-up, uncounted
-            alloc_count::count = 0; alloc_count::counting = true;
+            mu_alloc::tls.allocs = 0; mu_alloc::tls.armed = true;
             ready.store(true);
             while (! stop.load())
             {
@@ -347,8 +338,8 @@ struct MuClidProcessorSeamTests : juce::UnitTest
                 p.processBlock(buf, midi);
                 blocks.fetch_add(1);
             }
-            alloc_count::counting = false;
-            allocs.store(alloc_count::count);
+            mu_alloc::tls.armed = false;
+            allocs.store(mu_alloc::tls.allocs);
         });
         while (! ready.load()) std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
@@ -520,17 +511,17 @@ struct MuClidProcessorSeamTests : juce::UnitTest
         for (int i = 0; i < 8; ++i) { block.clear(); midi.clear(); p.processBlock(block, midi); }   // warm-up, uncounted
 
         int notes = 0;
-        alloc_count::count = 0; alloc_count::counting = true;
+        mu_alloc::tls.allocs = 0; mu_alloc::tls.armed = true;
         for (int i = 0; i < 400; ++i)
         {
             block.clear(); midi.clear();
             p.processBlock(block, midi);
             notes += midi.getNumEvents();
         }
-        alloc_count::counting = false;
+        mu_alloc::tls.armed = false;
         p.setPlayHead(nullptr);
         expect(notes > 0, "the rhythm sent notes during the counted blocks");
-        expectEquals(alloc_count::count, 0);
+        expectEquals(mu_alloc::tls.allocs, 0);
     }
 
     // Automation can call parameterChanged on the audio thread. It must then allocate nothing, leave
@@ -562,13 +553,13 @@ struct MuClidProcessorSeamTests : juce::UnitTest
                 setParam(bare.apvts, "p5", 1.0f);
                 setParam(p.apvts, ids[5], 1.0f);   // the same one-off warm-up for the real processor
                 setParam(p.apvts, ids[0], 11.0f);
-                alloc_count::count = 0; alloc_count::counting = true;
+                mu_alloc::tls.allocs = 0; mu_alloc::tls.armed = true;
                 for (int i = 0; i < 6; ++i) setParam(bare.apvts, bareIds[i], 10.0f + (float) i);
-                alloc_count::counting = false; bareAllocs = alloc_count::count;
+                mu_alloc::tls.armed = false; bareAllocs = mu_alloc::tls.allocs;
 
-                alloc_count::count = 0; alloc_count::counting = true;
+                mu_alloc::tls.allocs = 0; mu_alloc::tls.armed = true;
                 for (int i = 0; i < 6; ++i) setParam(p.apvts, ids[i], first[i]);
-                alloc_count::counting = false; coreAllocs = alloc_count::count;
+                mu_alloc::tls.armed = false; coreAllocs = mu_alloc::tls.allocs;
             });
             audio.join();
 
@@ -663,3 +654,11 @@ struct MuClidProcessorSeamTests : juce::UnitTest
 };
 
 static MuClidProcessorSeamTests muClidProcessorSeamTests;
+
+// The layout word the shared layer driver reads follows every count store of the real processor (E1).
+struct MuClidLayoutWordTests : juce::UnitTest
+{
+    MuClidLayoutWordTests() : juce::UnitTest("mu-Clid layout word follows the live count", "mu-clid-processor") {}
+    void runTest() override { mu_seam_test::checkLayoutWordFollowsCount<mu_clid::PluginProcessor>(*this); }
+};
+static MuClidLayoutWordTests sMuClidLayoutWordTests;

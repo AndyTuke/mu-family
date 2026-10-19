@@ -39,14 +39,16 @@ void RhythmCircle::setPatterns(const std::vector<mu_core::StepType>& patA,
 }
 
 void RhythmCircle::setPlayState(mu_core::RhythmPlayState*  state,
-                                 const std::atomic<float>*          beatFrac,
                                  const std::atomic<bool>*            playing,
                                  juce::Colour                         colour)
 {
     playState     = state;
-    beatFracAtom  = beatFrac;
     isPlayingAtom = playing;
     rhythmColour  = colour;
+
+    // Show the new rhythm's own step at once; while stopped the timer does not refresh it, so it
+    // would otherwise keep the previous rhythm's highlight.
+    paintStep = state ? state->readPosition().step : 0;
 }
 
 //==============================================================================
@@ -72,15 +74,19 @@ void RhythmCircle::timerCallback()
     bool dirty = false;
 
     // ── Read play state ──────────────────────────────────────────────────────
-    if (playState && beatFracAtom && isPlayingAtom)
+    if (playState && isPlayingAtom)
     {
         const bool playing = isPlayingAtom->load();
 
         if (playing)
         {
-            const int   step  = playState->currentStep.load();
-            const int   stepC = playState->currentStepC.load();
-            const float frac  = beatFracAtom->load();
+            // One consistent snapshot: a fraction from the next step paired with the old step would
+            // make the ring jump back a step at the moment a hit sounds.
+            const auto  pos   = playState->readPosition();
+            const int   step  = pos.step;
+            const int   stepC = pos.stepC;
+            const float frac  = pos.frac;
+            paintStep         = step;
             const int   sA    = juce::jmax(1, playState->stepsA.load());
             const int   sB    = juce::jmax(1, playState->stepsB.load());
             const int   sC    = juce::jmax(1, playState->stepsC.load());
@@ -311,7 +317,7 @@ void RhythmCircle::paint(juce::Graphics& g)
 
     // Per-ring current step is derived from pattern size below to avoid a race
     // between the pattern update and the stepsA/stepsB atomics.
-    const int combinedStep = playState ? playState->currentStep.load() : 0;
+    const int combinedStep = paintStep;
 
     // ── Ring A — purple ──────────────────────────────────────────────────────
     const float aOuter = maxR;

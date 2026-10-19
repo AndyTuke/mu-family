@@ -43,12 +43,12 @@ public:
         {
             Pattern src, dst;
             int owner = 0;
-            dst.owner.ptr = reinterpret_cast<PluginProcessor*>(&owner);   // only compared, never used
+            dst.host.ptr = reinterpret_cast<PatternHost*>(&owner);   // only compared, never used
             dst.osc1SemiStepped.store(true);
             dst.ring.writeHead.store(123);
 
             dst = src;
-            expect(dst.owner.ptr == reinterpret_cast<PluginProcessor*>(&owner), "the processor link must survive an assignment");
+            expect(dst.host.ptr == reinterpret_cast<PatternHost*>(&owner), "the host link must survive an assignment");
             expect(dst.osc1SemiStepped.load(), "the stepped-pitch flag is derived state, not copied");
             expectEquals(dst.ring.writeHead.load(), 123);   // the level tap keeps running
         }

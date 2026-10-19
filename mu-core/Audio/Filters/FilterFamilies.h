@@ -27,8 +27,10 @@ public:
         // Skip the coefficient recompute when cutoff/resonance are unchanged.
         if (cutoffHz != lastCutoffHz || resonance != lastResonance)
         {
+            const float q = mu_filter::svfResonanceToQ(resonance);
             svf.setCutoffFrequency(cutoffHz);
-            svf.setResonance(mu_filter::svfResonanceToQ(resonance));
+            svf.setResonance(q);
+            bandpassGain = 1.0f / q;
             lastCutoffHz = cutoffHz; lastResonance = resonance;
         }
         juce::dsp::AudioBlock<float> block(buf.getArrayOfWritePointers(),
@@ -36,10 +38,16 @@ public:
                                            static_cast<size_t>(numSamples));
         juce::dsp::ProcessContextReplacing<float> ctx(block);
         svf.process(ctx);
+
+        // JUCE's SVF bandpass is not the RBJ 0 dB one: its centre gain is Q (see juce_StateVariableTPTFilter.h),
+        // so a resonant setting would boost the band. Scale by 1/Q for a constant 0 dB band-pass.
+        if constexpr (Type == juce::dsp::StateVariableTPTFilterType::bandpass)
+            block.multiplyBy(bandpassGain);
     }
 
 private:
     juce::dsp::StateVariableTPTFilter<float> svf;
+    float bandpassGain = 1.0f;   // 1/Q, used by the bandpass type only
     float lastCutoffHz = -1.0f, lastResonance = -1.0f;
 };
 
@@ -160,6 +168,7 @@ public:
         smoothedDelay.reset(sampleRate, 0.010);
         smoothedDelay.setCurrentAndTargetValue(static_cast<float>(sampleRate / 1000.0));
         delayRamp.assign(static_cast<size_t>(juce::jmax(1, blockSize)), smoothedDelay.getCurrentValue());
+        resRamp  .assign(static_cast<size_t>(juce::jmax(1, blockSize)), 0.0f);
     }
     void reset() override
     {
@@ -176,34 +185,42 @@ public:
     {
         smoothedRes.setTargetValue(resonance);
         smoothedDelay.setTargetValue(static_cast<float>(currentSampleRate) / juce::jmax(20.0f, cutoffHz));
-        // Pre-compute the per-sample delay ramp once so every channel reads the
-        // identical glide (otherwise only ch0 advances it and ch1 would click).
-        jassert(numSamples <= static_cast<int>(delayRamp.size()));
-        for (int i = 0; i < numSamples; ++i)
-            delayRamp[static_cast<size_t>(i)] = smoothedDelay.getNextValue();
-
-        const int nCh = juce::jmin(numChannels, 2);
-        for (int ch = 0; ch < nCh; ++ch)
+        // A block larger than the prepared ramps is processed in ramp-sized chunks, so none of it is left unfiltered.
+        const int nCh      = juce::jmin(numChannels, 2);
+        const int rampSize = static_cast<int>(delayRamp.size());
+        if (rampSize <= 0) return;   // not prepared
+        for (int start = 0; start < numSamples; start += rampSize)
         {
-            auto&     b       = buf[ch];
-            int&      w       = wPos[ch];
-            const int bufSize = static_cast<int>(b.size());
-            auto*     data    = audio.getWritePointer(ch);
-            for (int i = 0; i < numSamples; ++i)
+            const int n = juce::jmin(rampSize, numSamples - start);
+
+            // Pre-compute the per-sample delay and resonance ramps once so every channel reads the
+            // identical glide (otherwise only ch0 advances it and ch1 would click or step).
+            for (int i = 0; i < n; ++i)
             {
-                // ch0 advances the resonance ramp; ch1 reads the latest value.
-                const float g     = (float) Sign * ((ch == 0) ? smoothedRes.getNextValue()
-                                                          : smoothedRes.getCurrentValue());
-                const float delayF = delayRamp[static_cast<size_t>(i)];
-                const float readF = static_cast<float>(w) - delayF;
-                const int   r0    = ((static_cast<int>(std::floor(readF)) % bufSize) + bufSize) % bufSize;
-                const int   r1    = (r0 + 1) % bufSize;
-                const float frac  = readF - std::floor(readF);
-                const float delayed = b[r0] + frac * (b[r1] - b[r0]);
-                const float out   = data[i] + g * delayed;
-                b[w] = out;
-                data[i] = out;
-                w = (w + 1) % bufSize;
+                delayRamp[static_cast<size_t>(i)] = smoothedDelay.getNextValue();
+                resRamp  [static_cast<size_t>(i)] = smoothedRes  .getNextValue();
+            }
+
+            for (int ch = 0; ch < nCh; ++ch)
+            {
+                auto&     b       = buf[ch];
+                int&      w       = wPos[ch];
+                const int bufSize = static_cast<int>(b.size());
+                auto*     data    = audio.getWritePointer(ch) + start;
+                for (int i = 0; i < n; ++i)
+                {
+                    const float g     = (float) Sign * resRamp[static_cast<size_t>(i)];
+                    const float delayF = delayRamp[static_cast<size_t>(i)];
+                    const float readF = static_cast<float>(w) - delayF;
+                    const int   r0    = ((static_cast<int>(std::floor(readF)) % bufSize) + bufSize) % bufSize;
+                    const int   r1    = (r0 + 1) % bufSize;
+                    const float frac  = readF - std::floor(readF);
+                    const float delayed = b[r0] + frac * (b[r1] - b[r0]);
+                    const float out   = data[i] + g * delayed;
+                    b[w] = out;
+                    data[i] = out;
+                    w = (w + 1) % bufSize;
+                }
             }
         }
     }
@@ -213,6 +230,7 @@ private:
     std::vector<float> buf[2];
     int                wPos[2] = { 0, 0 };
     std::vector<float> delayRamp;   // per-sample smoothed delay length, shared across channels
+    std::vector<float> resRamp;     // per-sample smoothed resonance (feedback gain), shared across channels
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedRes;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedDelay;
 };

@@ -1,0 +1,12 @@
+{
+  "name": "euclid-rings-logic",
+  "notes": "One Kick rhythm: ring A 8/3 rot 1 with a muted insert, ring B 6/4 with a pre-pad, accent ring C 4/1; logic OR, then AND (block 40), XOR (75), A only (110), B only (145).",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 192000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 1,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "events": [{ "block": 40, "label": "set r0_logic = 1" }, { "block": 75, "label": "set r0_logic = 2" }, { "block": 110, "label": "set r0_logic = 3" }, { "block": 145, "label": "set r0_logic = 4" }]
+}

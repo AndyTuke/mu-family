@@ -1,0 +1,24 @@
+# frozen load result for fixture: Comb Hum.muRhythm
+layers=1
+load_errors=1
+load_error=Sample 'Synth C 03.wav' missing from content folder — rhythm loaded without audio.
+capture_bytes=3678
+capture_sha256=948e21585fc0ca6086d4aed66baf93cdf27a71e675526ed3234e8d24e5828273
+--- parameters differing from default (id=plain value)
+r0_aEnvAtk=0.05
+r0_aEnvDec=0.8
+r0_aEnvRel=3
+r0_aEnvSus=70
+r0_ampLvl=0.700001
+r0_fEnvAtk=0.01
+r0_fEnvDec=0.3
+r0_fEnvRel=0.3
+r0_fltCut=140
+r0_fltRes=0.92
+r0_fltType=8
+r0_hitsA=2
+r0_pEnvAtk=0.005
+r0_pEnvDec=0.1
+r0_pEnvRel=0.1
+r0_stepsB=16
+r0_stepsC=16

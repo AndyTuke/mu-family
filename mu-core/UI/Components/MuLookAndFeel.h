@@ -328,6 +328,10 @@ public:
                               const juce::Colour& bg, bool over, bool down) override;
     void drawButtonText(juce::Graphics&, juce::TextButton&, bool over, bool down) override;
 
+    // Check boxes: in metal style a small raised metal case with a lamp lens (lit in the app accent when on)
+    // and the engraved label beside it; otherwise the stock tick box.
+    void drawToggleButton(juce::Graphics&, juce::ToggleButton&, bool over, bool down) override;
+
     // ComboBox
     void drawComboBox(juce::Graphics&, int w, int h, bool down,
                       int bx, int by, int bw, int bh, juce::ComboBox&) override;
@@ -410,6 +414,7 @@ public:
     static constexpr int kPanelPad        = kSpaceS;
     static constexpr int kDropdownEdgeGap = kSpaceS;   // space between a dropdown and the edge of its box / panel
     static constexpr int kDropdownW       = 120;       // family-standard dropdown (selector) width
+    static constexpr int kDropdownCaptionW = 44;       // engraved caption to the left of a dropdown (fits "Trigger" at 11 pt)
     static constexpr int kDropdownH       = 24;        // family-standard dropdown height
     static constexpr int kGrooveBoxW      = 300;       // fixed width of a two-knob / envelope-editor box, so its layout never jumps
     // The Root / Scale row (mu-Tant's tonal centre): label, root and scale selector widths and the gap between pairs.

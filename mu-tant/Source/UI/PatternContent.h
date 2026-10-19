@@ -8,8 +8,11 @@
 #include "UI/Components/SegmentControl.h"
 #include "UI/Voice/InsertSubsection.h"   // shared mu-core insert panel
 #include "UI/GatingDesigner.h"
+#include "UI/PatternHost.h"               // what the content reads from the layer's host
 
 #include <vector>
+
+class ProcessorBase;
 
 namespace mu_tant
 {
@@ -38,7 +41,7 @@ private:
     void timerCallback() override;
 };
 
-class PluginProcessor;
+
 
 // μ-Tant's content band inside the shared LayerPanel (kLayerContentH tall): Root / Scale, the
 // oscillator / noise row, the X-Mod / Filter / Effects row and the gate editor, which is the flex
@@ -50,7 +53,9 @@ class PatternContent : public juce::Component,
                    private juce::Timer
 {
 public:
-    explicit PatternContent(PluginProcessor& proc);
+    // `base` is handed to the shared mu-core sections that take the processor (the insert section);
+    // everything the content itself reads comes through `host`.
+    PatternContent(ProcessorBase& base, PatternHost& host);
     ~PatternContent() override;
 
     // Rebind every per-voice attachment to the v{idx}_* family. Shared params
@@ -80,7 +85,7 @@ public:
     void lookAndFeelChanged() override { resized(); repaint(); }   // metal style / screws change the layout
 
 private:
-    PluginProcessor& proc;
+    PatternHost& host;
     int currentLayer = 0;
 
     using APVTS = juce::AudioProcessorValueTreeState;
@@ -191,8 +196,7 @@ private:
     // ── Insert effect (shared mu-core InsertSubsection, "v" prefix) ──────────
     // Identical UI to mu-clid; rebound to the active voice in setLayer(). Sits in
     // the voice section: synth engine → insert → mixer (family signal flow).
-    // Constructed in the .cpp init list — needs PluginProcessor's complete type
-    // for the derived→ProcessorBase& conversion (only forward-declared here).
+    // Constructed in the .cpp init list from the ProcessorBase the content is handed.
     InsertSubsection insertSub;
 
     // ── Gating designer (full-width; Gap slider + Bypass button live inside it) ──

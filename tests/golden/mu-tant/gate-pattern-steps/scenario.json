@@ -1,0 +1,15 @@
+{
+  "name": "gate-pattern-steps",
+  "notes": "One bar of 16 cells, five regions (instant decay, mid split, bent, near-pure attack, reversed) with 25% gap; two loops at 120 bpm.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 192000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 1,
+  "drainDeferredWorkEveryBlock": false,
+  "isolateStemsByMute": false,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "timedActions": [],
+  "midiByBlock": []
+}

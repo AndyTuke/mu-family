@@ -1,32 +1,32 @@
 #pragma once
 
 #include "Plugin/ProcessorBase.h"        // mu-core base
-#include "Plugin/LayerParamIds.h"        // layerParamPrefix / layerParamId
+#include "Persistence/LayerParamIds.h"   // layerParamPrefix / layerParamId
+#include "Persistence/ArpParams.h"       // the Arp type's parameter table (vpi, addLayerParams)
 #include "Plugin/MixerFxParams.h"         // mu-core: shared global-FX / mixer APVTS layout
 #include "Plugin/MidiClockSync.h"         // mu-core: shared MIDI-clock slave
 #include "Sequencer/Arp.h"                // mu-Toni layer: Layer + arp voice + insert
-#include "Modulation/LaneModulation.h"    // mu-core: mu_mod::resolveLane
 #include "Modulation/MuToniModDest.h"     // arp/voice modulation destinations
+#include "UI/ArpHost.h"                    // what the Arp layer's UI reads from its host
 
 #include <array>
 #include <atomic>
 #include <memory>
-#include <string_view>
-#include <unordered_map>
 
 // mu-Toni — generative arpeggiator mono-synth.
 //
 // The ProcessorBase subclass owning the arp + voice engine and the shared
 // platform: the APVTS mixer/FX layout, the MixerEngine + FXChain, and 1..8 "layer"
-// channels for the shared sidebar + MixerOverlay. Each layer runs an independent mono arp
-// (ArpVoiceRunner → ToniVoice), rendered through the shared mixer via the processCoreBlock hook
-// (engine→insert→mixer path). All eight layers' parameters and objects exist for the processor's
+// channels for the shared sidebar + MixerOverlay. Each layer is an Arp, an independent mono arp
+// (ArpVoiceRunner → ToniVoice → insert) rendered through the shared layer contract
+// (ProcessorBase::renderAndMix, then the mixer). All eight layers' parameters and objects exist for the processor's
 // lifetime; only the count (`numLayers`) is runtime, and add / delete / reorder go through the
 // shared ProcessorBase structural edits.
 namespace mu_toni
 {
 
-class PluginProcessor : public ProcessorBase
+class PluginProcessor : public ProcessorBase,
+                        public ArpHost
 {
 public:
     PluginProcessor();
@@ -37,13 +37,14 @@ public:
 
     // ── AudioProcessor ───────────────────────────────────────────────────────
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
-    void releaseResources() override { resetSwapPlayState(); }
+    void releaseResources() override;
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
 
     const juce::String getName() const override { return juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Toni")); }
+    juce::String getProductSlug() const override { return "mu-toni"; }   // key in latest.json
     bool acceptsMidi()  const override { return true; }
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }
@@ -118,10 +119,6 @@ protected:
     // A default Arp for slot `slot`, built and prepared before a structural edit takes the lock.
     std::unique_ptr<Layer> createLayer(int slot) override;
 
-    // ── Arp/voice parameter cache (index into vp[voice][slot]) ────────────────
-    // Enum + suffix table live in the .cpp; count is needed here for the array.
-    static constexpr int kNumVoiceParams = 63;
-
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
@@ -135,56 +132,36 @@ private:
     // Register mixer/FX param listeners + run an initial engine sync (JUCE doesn't
     // fire parameterChanged on construction or for unchanged values).
 
-    // Cache the per-voice arp/voice/env raw parameter pointers (message thread).
-    void cacheVoiceParamPointers();
-    // Resolve a voice's modulation (matrix over its control sequences) then build its
-    // ArpParams + ToniVoiceParams + step config. Non-const: runs the matrix under try-lock.
-    void readVoice(int v, ArpParams& ap, ToniVoiceParams& vp, int& rateIdx, float& gate01, bool& midiTrig,
-                   ArpAccent& accent);
-    // Update the held-note stack from incoming MIDI; sets noteOnEdge if a new note landed.
-    void updateHeldNotes(const juce::MidiBuffer& midi, bool& noteOnEdge);
-
     mu_wavetable::WavetableBank bank;                        // the oscillators' wavetables (factory set)
-    std::atomic<float>*         midiInChParam = nullptr;     // MIDI In channel (0 = Omni)
-    std::array<std::array<std::atomic<float>*, kNumVoiceParams>, mu_limits::kMaxLayers>    vp {};
 
 public:
     // Layer `i` as its mu-Toni Arp (name, colour, modulation, arp voice, insert effect). The layers
     // live in ProcessorCore; the UI ModulatorPanel binds to the active one through this.
-    Arp&       getArp(int i) noexcept       { return layerAs<Arp>(i); }
-    const Arp& getArp(int i) const noexcept { return layerAs<Arp>(i); }
+    Arp&       getArp(int i) noexcept override { return layerAs<Arp>(i); }
+    const Arp& getArp(int i) const noexcept    { return layerAs<Arp>(i); }
     // Post-matrix value of modulation target `dest` (a ModDestIndex) on layer `layer`, in the
-    // target knob's parameter units. Written each block by readVoice; read by the knobs' live arcs.
-    float getModLive(int layer, int dest) const noexcept
+    // target knob's parameter units. Written each block by the layer; read by the knobs' live arcs.
+    float getModLive(int layer, int dest) const noexcept override
     {
-        return modLive[(size_t) juce::jlimit(0, mu_limits::kMaxLayers - 1, layer)]
-                      [(size_t) juce::jlimit(0, kNumModDests - 1, dest)].load(std::memory_order_relaxed);
+        return getArp(juce::jlimit(0, mu_limits::kMaxLayers - 1, layer)).getModLive(dest);
     }
+    // ── ArpHost: what ArpContent reads (message thread) ───────────────────────
+    juce::AudioProcessorValueTreeState& getArpParameters() noexcept override { return apvts; }
+    int    getArpColourIndex(int layer) const override                       { return getLayerColourIndex(layer); }
+    const std::atomic<float>* getArpInsertGainReduction(int layer) const override { return getInsertGR(layer); }
+    bool   isArpTransportPlaying() const noexcept override                   { return isInternalPlaying(); }
+    double getArpTransportBeat() const noexcept override                     { return getInternalBeatPos(); }
+    juce::StringArray getWavetableNames() const override                     { return mu_wavetable::WavetableBank::factoryTableNames(); }
+
 private:
-    std::array<std::array<std::atomic<float>, kNumModDests>, mu_limits::kMaxLayers> modLive {};
-
-    // Modulation-resolve inputs: parallel arrays for mu_mod::resolveLane.
-    std::array<const char*, kNumModDests>                                         modDestIds {};
-    std::array<juce::NormalisableRange<float>, kNumModDests>                       modDestRanges {};
-    std::array<std::array<std::atomic<float>*, kNumModDests>, mu_limits::kMaxLayers>        modDestAtoms {};
-    std::unordered_map<std::string_view, float>                                   modParamValues;
-    double                                                                        modBeat = 0.0;
-
-    // Root-by-MIDI held-note stack (newest on top) + per-block arp context.
-    std::array<int, 32> heldStack {};
-    int                 heldCount = 0;
-    ArpContext          arpCtx;
-
-    // Renders channel `ch` from its arp runner. Captures `this` (reads arpCtx).
-    MixerEngine::RenderChannelFn renderChannelCb;
-
 
     // Hot-swap: parsed preset trees per layer + one full preset, committed at the bar line.
     void applyLayerTree(int layer, const juce::ValueTree& tree);
     // Written by prepareToPlay, read by createLayer on the message thread and by processBlock.
     std::atomic<double> currentSampleRate { 44100.0 };
     std::atomic<int>    currentBlockSize  { 512 };
-    int                 runnersLive = 0;   // audio thread: layers whose runner has run since it was last reset
+    // Per-instance noise seed salt, taken before the constructor body builds the layers; 0 when MU_DETERMINISTIC_NOISE is set (golden renders).
+    const juce::int64   noiseSeedSalt = mu_core::makeNoiseSalt();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };

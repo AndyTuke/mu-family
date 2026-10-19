@@ -240,6 +240,19 @@ Same `KnobWithLabel` / `SegmentControl` / `DropdownSelect` widgets from `mu-core
 
 ---
 
+## The Pattern layer library (stage E4, 2026-10-16)
+
+The voice is a detachable layer type: `mu-tant-layer` (CMake `INTERFACE`, declared in `mu-tant/CMakeLists.txt`) is `Audio/`, `Sequencer/`, `Modulation/`, `Persistence/` and `UI/` minus the app's `SettingsOverlay`; `Plugin/`, `License/` and `Tests/` are the app. Rules, with the reasons, are in [../mu-tronic/design.md](../mu-tronic/design.md) 2.1.10; what matters when editing:
+
+- **Parameters:** the `v{N}_` table is `Persistence/PatternParams.{h,cpp}` (`addLayerParams`, `addPatternGlobalParams`, `layerParamId`). Ids and order are saved data: append only.
+- **The host:** the UI and the layer reach the processor only through `UI/PatternHost.h`; a library file never includes `Plugin/` (checked by `tests/scripts/check-layer-boundary.ps1`).
+- **Engine per slot:** `Pattern` binds the engine and the wavetable-bank lock the host gives for its slot (`getPatternEngine`, `getPatternBankLock`), re-bound on every move. `VoiceEngine::reset` keeps the oscillator phase, so a voice that moves keeps its slot's phase.
+- **Note mode:** each Pattern tracks its own held keys for its pitch; the 8 ms gate on the final mix is the shell's (`scanNoteMode`, `applyNoteModeGate`), so the FX returns are gated as before. The mode is an app setting, not saved in a preset.
+- **Retire:** a count-reducing preset fades the dropped voices in place (25 ms, the shared `RetireBin`). The regrow cut is switched off for mu-Tant (`setRegrowCutsInPlaceTails(false)`), keeping the old stale-tail behaviour until the signed golden update.
+- **Tests:** `mu-tant-layer-tests` builds the library with no `Plugin/` source and renders a Pattern from hand-built contexts; its stream must equal the one `mu-tant-tests` records through the real processor.
+
+---
+
 ## mu-core reuse map
 
 What mu-tant **owns** (lives in `mu-tant/Source/`):
@@ -247,9 +260,10 @@ What mu-tant **owns** (lives in `mu-tant/Source/`):
 - `WavetableOscillator` — single-osc DSP
 - `VoiceEngine` (mu-tant's flavour) — two `WavetableOscillator`s + cross-mod + the call into the shared filter/insert + the gate stage
 - `GateSequencer` — pattern storage + per-step decay-envelope driver
-- `PluginProcessor` (extends `mu-core::ProcessorBase`)
+- `Pattern : Layer` (`Sequencer/Pattern.{h,cpp}`) — the voice as a layer: parameter binding, modulation, the engine call, gate, insert and the 25 ms retire fade, rendered by the shared driver
+- `PluginProcessor` (extends `mu-core::ProcessorBase` and implements `PatternHost`; owns the per-slot engines and the wavetable bank)
 - UI panels (the oscillator/filter/insert area + the gate-pattern grid)
-- `Pitch.h` / `Scales.h` — scale table + degree-to-MIDI helper (reused inside the voice; not in mu-core because mu-clid has no use for it)
+- `Pitch.h` / `TantScales.h` — scale table + degree-to-MIDI helper (reused inside the voice; not in mu-core because mu-clid has no use for it)
 
 What mu-tant **reuses from mu-core** (no duplication):
 - `VoiceFilter` (same DSP)

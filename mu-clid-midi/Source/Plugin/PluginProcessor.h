@@ -32,6 +32,7 @@ public:
     bool hasEditor() const override { return true; }
 
     const juce::String getName() const override;
+    juce::String getProductSlug() const override { return "mu-clid-midi"; }   // key in latest.json
     bool acceptsMidi() const override { return true; }
     bool producesMidi() const override { return true; }
     bool isMidiEffect() const override { return true; }

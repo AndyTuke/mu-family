@@ -1,0 +1,9 @@
+# frozen load result for fixture: Demo  Perf.muPerformance
+name=Demo  Perf
+items=4
+ignored=0
+item0=Dubster.muClid | MuClidState | status 1
+item1=Simple Beat.muClid | MuClidState | status 1
+item2=Loving It.muClid | MuClidState | status 1
+item3=Well this is nice.muClid | MuClidState | status 1
+resave_sha256=f1d616a3c2d5c588892097841126a3b7b343bf5d6f78791f3613fa73bb27bb33

@@ -603,7 +603,7 @@ words** ("Attack", not "ATK").
 ### File placement
 
 `Source/Sequencer/` — `Arpeggiator.{h,cpp}` (pool/walk/step→note) + note-gate
-logic. `Source/Audio/` — `Chords.h` (library) + `Scales.h`. `Source/UI/` — the
+logic. `Source/Audio/` — `Chords.h` (library) + `ToniScales.h` (was `Scales.h`; renamed in Stage E2 so the relative path is unique across the layer libraries). `Source/UI/` — the
 arp/envelope panel (replaces the blank `EnginePanel`) + a `LayerSidebar`
 subclass. `Source/Modulation/` — `MuToniModDest.h` (mirrors `MuTantModDest.h`).
 `Source/Plugin/` — note-on/off + ADSR wiring in the render hook. Mixer, shell,

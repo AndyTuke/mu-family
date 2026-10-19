@@ -58,7 +58,9 @@ void DelaySlot::process(juce::AudioBuffer<float>& buffer)
 
 void DelaySlot::processReturn(juce::AudioBuffer<float>& buffer)
 {
-    if (!enabled.load(std::memory_order_relaxed)) return;
+    // A disabled slot returns silence: the buffer arrives holding the dry send, which is already in
+    // the main bus and must not be added back through the return.
+    if (!enabled.load(std::memory_order_relaxed)) { buffer.clear(); return; }
 
     const int numCh      = buffer.getNumChannels();
     const int numSamples = buffer.getNumSamples();

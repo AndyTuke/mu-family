@@ -2,6 +2,7 @@
 
 #include "Plugin/HostTransport.h"
 #include "Plugin/MidiClockSync.h"
+#include "Sequencer/BeatWrap.h"
 #include <atomic>
 #include <cmath>
 
@@ -36,6 +37,7 @@ struct BlockTransport
     double startBeat      = 0.0;   // the beat at this block's first sample
     double beatsPerSample = 0.0;
     double blockBeats     = 0.0;   // beats this block spans (0 while stopped)
+    double beatWrap       = 0.0;   // the beat bound the resolver wrapped with (0 = unbounded): the layers' RenderContext::beatWrap
 
     bool   beatFromOutside() const noexcept { return beatOutside; }
 };
@@ -67,6 +69,7 @@ inline BlockTransport resolveTransport(const HostTransport& host, bool isStandal
                                        double syncOffsetMs = 0.0)
 {
     BlockTransport t;
+    t.beatWrap = wrapBeats > 0.0 ? wrapBeats : 0.0;
     bool relocated = false;   // the clock moved the own beat this block (store it even while stopped)
     const int    nudgeDir = internal.nudgeDirection != nullptr ? internal.nudgeDirection->load(std::memory_order_relaxed) : 0;
     const double bend     = 1.0 + (double) nudgeDir * kNudgeBendPercent / 100.0;
@@ -122,13 +125,9 @@ inline BlockTransport resolveTransport(const HostTransport& host, bool isStandal
         t.startBeat = internal.beatPos.load(std::memory_order_relaxed);
     }
 
-    // Bound the beat space (a host position can be any size, or negative in a pre-roll).
-    auto wrap = [wrapBeats](double b)
-    {
-        if (wrapBeats <= 0.0) return b;
-        b = std::fmod(b, wrapBeats);
-        return b < 0.0 ? b + wrapBeats : b;
-    };
+    // Bound the beat space (a host position can be any size, or negative in a pre-roll): the one floor-wrap
+    // of the time model, exact on non-negative input and kept below the bound for a tiny negative one.
+    auto wrap = [wrapBeats](double b) { return wrapBeat(b, wrapBeats); };
     t.startBeat      = wrap(t.startBeat);
     t.beatsPerSample = sampleRate > 0.0 ? (t.bpm / 60.0) / sampleRate : 0.0;
     t.blockBeats     = t.playing ? t.beatsPerSample * (double) numSamples : 0.0;

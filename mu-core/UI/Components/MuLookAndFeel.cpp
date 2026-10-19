@@ -1105,6 +1105,36 @@ void MuLookAndFeel::drawRaisedSubPanel(juce::Graphics& g, juce::Rectangle<float>
     g.strokePath(shape, juce::PathStrokeType(1.0f));
 }
 
+void MuLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButton& b, bool over, bool down)
+{
+    if (! metalStyle)
+    {
+        juce::LookAndFeel_V4::drawToggleButton(g, b, over, down);
+        return;
+    }
+
+    // Phase 1: the metal case.
+    const auto& L = lighting();
+    const auto box = b.getLocalBounds().toFloat().reduced(2.0f);
+    drawRaisedSubPanelShadow(g, box, 3.0f);
+    drawRaisedSubPanel(g, box, appAccent(b), 3.0f);
+
+    // Phase 2: the lamp, a lens over the lamp base (lit in the app accent when on, brighter under the mouse).
+    const float d = juce::jmin(box.getHeight() - 8.0f, 12.0f);
+    const juce::Rectangle<float> disc(box.getX() + 6.0f, box.getCentreY() - d * 0.5f, d, d);
+    g.setColour(lampBase());
+    g.fillEllipse(disc);
+    juce::Path lens;
+    lens.addEllipse(disc.reduced(1.0f));
+    const float lit = b.getToggleState() ? L.lampOn : (over || down ? L.lampDim * 0.5f : L.lampOff);
+    drawLamp(g, lens, {}, lampColour(appAccent(b), lit), disc.getCentre(), d * L.lampHotSpotReach);
+
+    // Phase 3: the label, engraved to the right of the lamp.
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(11.0f))));
+    drawEngravedText(g, b.getButtonText(), box.withTrimmedLeft(disc.getRight() - box.getX() + 4.0f).toNearestInt(),
+                     juce::Justification::centredLeft, colour(labelText));
+}
+
 void MuLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& button,
                                           const juce::Colour& bg,
                                           bool isOver, bool isDown)

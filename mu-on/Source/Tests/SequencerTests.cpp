@@ -4,7 +4,7 @@
 #include <juce_data_structures/juce_data_structures.h>
 #include <vector>
 #include "Sequencer/StepPattern.h"
-#include "Sequencer/GrooveSequencer.h"
+#include "Tests/GrooveSequencer.h"
 
 using namespace mu_on;
 
@@ -124,6 +124,65 @@ public:
             const double swung    = fireBeatOfStep1(1.0f);
             expectWithinAbsoluteError(straight, 0.25, 1.0e-3);
             expect(swung > straight + 0.02, "swing should push the odd step later in the bar");
+        }
+
+        beginTest("seek: a restart inside the first sixteenth fires step 0 again");
+        {
+            StepPattern p;
+            p.setOn(0, 0, true);                                  // a kick on step 0 only
+            GrooveSequencer seq(p);
+            seq.prepare(48000.0);
+
+            // 2400 samples at 120 BPM = 0.1 beat: step 0 fires and the sequencer waits for step 1.
+            expectEquals((int) run(seq, 0.0, 2400, 120.0).size(), 1, "the first play fires step 0");
+            // Stop and play again within the same sixteenth. Without a seek the sequencer still waits for step 1
+            // (inside the resync window) and the new play loses its first step.
+            expectEquals((int) run(seq, 0.0, 2400, 120.0).size(), 0, "premise: without a seek the replay drops step 0");
+            seq.seek(0.0);
+            const auto replay = run(seq, 0.0, 2400, 120.0);
+            expectEquals((int) replay.size(), 1, "after seek(0) the replay fires step 0");
+            if (! replay.empty()) expectEquals(replay[0].offset, 0, "on the first sample");
+        }
+
+        beginTest("seek: a start part-way through a swung sixteenth fires the step that lies ahead, once");
+        {
+            StepPattern p;
+            p.setOn(0, 1, true);                                  // only step 1, an odd sixteenth
+            GrooveSequencer seq(p);
+            seq.prepare(48000.0);
+            seq.setSwing(0.5f);                                   // step 1 fires at 0.25 + 0.5 * 0.5 * 0.25 = 0.3125 beat
+
+            // Play the first half beat (fires step 1 at 0.3125); the sequencer now waits for step 2.
+            expectEquals((int) run(seq, 0.0, 12000, 120.0).size(), 1, "the first play fires step 1");
+
+            // Transport restarts at beat 0.3, inside step 1, 0.0125 beat before its swung start.
+            seq.seek(0.3);
+            const auto hits = run(seq, 0.3, 2400, 120.0);         // covers [0.3, 0.4)
+            expectEquals((int) hits.size(), 1, "step 1 fires once after the restart");
+            if (! hits.empty())
+            {
+                // 0.0125 beat at 120 BPM and 48 kHz is 300 samples.
+                expect(std::abs(hits[0].offset - 300) <= 2, "at its swung position (offset " + juce::String(hits[0].offset) + ")");
+            }
+        }
+
+        beginTest("a block start an ulp past the previous block's end does not skip the step on the boundary");
+        {
+            StepPattern p;
+            p.setOn(0, 4, true);                                  // beat 1.0
+            GrooveSequencer seq(p);
+            seq.prepare(48000.0);
+
+            // 1 / 4096 is exact in binary, so the first block ends on beat 1.0 exactly and step 4 (t = 1.0) is not yet inside it.
+            constexpr double bps = 1.0 / 4096.0;
+            int fired = 0;
+            auto count = [&fired](int, float, int) { ++fired; };
+            seq.processSpan(0.0, 4096, bps, count);
+            expectEquals(fired, 0, "step 4 is not in the first block, which ends at beat 1.0");
+
+            // The host reports the next block starting 1e-13 beat after where the last one ended (rounding in ppq).
+            seq.processSpan(1.0 + 1.0e-13, 4096, bps, count);
+            expectEquals(fired, 1, "step 4 fires once, in the second block");
         }
 
         beginTest("pattern serialise -> deserialise round-trips on/accent");

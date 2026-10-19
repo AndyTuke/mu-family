@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<MuClidRhythm presetName="Vocoder Drift" presetCategory="Pads" presetDescription=""
+              presetEmbedSamples="0" r0_name="Vocoder Drift" r0_colour="5"
+              r0_sample="Synth C# 01.wav" r0_stepsA="16" r0_hitsA="3" r0_rotA="0"
+              r0_prePadA="0" r0_postPadA="0" r0_insStA="0" r0_insLenA="0" r0_insModeA="false"
+              r0_prePadModeA="false" r0_postPadModeA="false" r0_stepsB="16"
+              r0_hitsB="0" r0_rotB="0" r0_prePadB="0" r0_postPadB="0" r0_insStB="0"
+              r0_insLenB="0" r0_insModeB="false" r0_prePadModeB="false" r0_postPadModeB="false"
+              r0_stepsC="16" r0_hitsC="0" r0_rotC="0" r0_prePadC="0" r0_postPadC="0"
+              r0_insStC="0" r0_insLenC="0" r0_insModeC="false" r0_prePadModeC="false"
+              r0_postPadModeC="false" r0_logic="OR" r0_patLeg="true" r0_vMono="false"
+              r0_rstSt="-1" r0_pitchOct="-2" r0_pitchSemi="0" r0_pitchFine="0"
+              r0_pEnvAtk="0.009999999776482582" r0_pEnvDec="0.2000000327825546"
+              r0_pEnvSus="0.0" r0_pEnvRel="0.2000000327825546" r0_pEnvDep="0.0"
+              r0_fltType="LP24" r0_fltCut="1200.000366210938" r0_fltRes="0.449999988079071"
+              r0_fEnvAtk="0.3000000417232513" r0_fEnvDec="0.7999999523162842"
+              r0_fEnvSus="50.0" r0_fEnvRel="1.500000357627869" r0_fEnvDep="18.0"
+              r0_fltLoCut="0.0" r0_ampLvl="1.995262384414673" r0_aEnvAtk="0.3000000417232513"
+              r0_aEnvDec="1.199999928474426" r0_aEnvSus="92.19999694824219"
+              r0_aEnvRel="3.500000476837158" r0_accentDb="0.0" r0_drvChar="VocoderSt"
+              r0_insP1="0.0" r0_insP2="0.1666666716337204" r0_insP3="0.0" r0_insP4="1.0">
+  <Modulators>
+    <Seq id="cs0" mode="Smooth" polarity="Bipolar" loopNV="Whole" loopMod="None"
+         loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Point x="0.0" y="-1.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="0.25" y="0.5" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="0.5" y="-0.300000011920929" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="0.75" y="1.0" bez="0" hx="0.0" hy="0.0"/>
+    </Seq>
+    <Seq id="cs1" mode="Smooth" polarity="Bipolar" loopNV="Whole" loopMod="None"
+         loopMult="8" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Point x="0.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="0.5" y="1.0" bez="0" hx="0.0" hy="0.0"/>
+    </Seq>
+    <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Quarter"
+         loopMod="None" loopMult="4" stepNV="Half" stepMod="None" stepMult="1">
+      <Step v="0.0"/>
+      <Step v="33.29999923706055"/>
+    </Seq>
+    <Seq id="cs3" mode="Smooth" polarity="Bipolar" loopNV="Whole" loopMod="None"
+         loopMult="2" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Point x="0.0" y="-1.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="0.5" y="1.0" bez="0" hx="0.0" hy="0.0"/>
+    </Seq>
+    <Seq id="cs4" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+         loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Point x="0.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="1.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+    </Seq>
+    <Seq id="cs5" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+         loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Point x="0.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="1.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+    </Seq>
+    <Seq id="cs6" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+         loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Point x="0.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="1.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+    </Seq>
+    <Seq id="cs7" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None"
+         loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Point x="0.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+      <Point x="1.0" y="0.0" bez="0" hx="0.0" hy="0.0"/>
+    </Seq>
+    <Asgn id="asgn0" src="cs0_output" dest="insert.p4" depth="7.0" curve="0.0"/>
+    <Asgn id="asgn1" src="cs1_output" dest="insert.p3" depth="2.0" curve="0.0"/>
+    <Asgn id="asgn2" src="cs2_output" dest="insert.p2" depth="0.6000000238418579"
+          curve="0.0"/>
+    <Asgn id="asgn3" src="cs3_output" dest="filter.cutoff" depth="1200.0"
+          curve="0.0"/>
+    <Asgn id="asgn4" src="cs1_output" dest="insert.p1" depth="20.0" curve="0.0"/>
+  </Modulators>
+</MuClidRhythm>

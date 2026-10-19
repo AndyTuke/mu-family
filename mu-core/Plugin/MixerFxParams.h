@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Plugin/ParamText.h"
+#include "Persistence/ParamText.h"
 #include "Plugin/HotSwap.h"   // mu_hotswap::kSwapTimingParamId
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Audio/AlgorithmNames.h"   // mu_audio::kInsertAlgorithmCount
@@ -59,6 +59,7 @@ inline void addGlobalFxParams(juce::AudioProcessorValueTreeState::ParameterLayou
     addB("rev_en",   "Reverb Enable",     true);
     addF("rev_lvl",  "Reverb Level",  0.0f,   1.0f,  1.0f);
     addF("rev_size", "Reverb Size",   0.0f,   1.0f,  0.75f);
+    addF("rev_decay", "Reverb Decay", 0.1f,  10.0f,  2.5f);    // RT60 in seconds; 2.5 is the Hall preset
     addF("rev_pre",  "Reverb Pre-Delay", 0.0f, 100.0f, 25.0f);
     addF("rev_diff", "Reverb Diffusion", 0.0f,   1.0f,  0.80f);
     addF("rev_damp", "Reverb Damp",   0.0f,   1.0f,  0.30f);

@@ -49,7 +49,6 @@ void PluginProcessor::resetPlayState(int idx)
 {
     if (idx < 0 || idx >= RhythmSequencer::MaxRhythms) return;
     auto& s = rhythmPlayState[(size_t) idx];
-    s.currentStep  .store(0);
     s.patternLength.store(1);
     s.stepsA       .store(1);
     s.stepsB       .store(1);

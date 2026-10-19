@@ -1,0 +1,12 @@
+{
+  "name": "retire-long-amprel",
+  "notes": "Rhythm 0 plays the 12 s Pad Long sample with the amp release at maximum (the sample plays to its end); A9_hat is staged on it at block 25, so the old engine is retired mid-sample and rings on for about ten seconds. Rhythm 1 is a steady Kick.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 720000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 2,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "events": [{ "block": 25, "label": "stage A9_hat on rhythm 0" }]
+}

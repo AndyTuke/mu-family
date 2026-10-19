@@ -6,7 +6,7 @@
 #include <juce_core/juce_core.h>
 #include <vector>
 #include <cmath>
-#include "Audio/Scales.h"
+#include "Audio/TantScales.h"
 #include "Audio/Wavetable/WavetableBank.h"        // mu-core
 #include "Audio/Wavetable/WavetableOscillator.h"
 
@@ -198,3 +198,41 @@ public:
 };
 
 static SynthDSPTest synthDSPTest;
+
+// The wavetable bank reserves its table list once so a lock-free findByPath never reads moved storage.
+class WavetableBankCapacityTest : public juce::UnitTest
+{
+public:
+    WavetableBankCapacityTest() : juce::UnitTest ("WavetableBank capacity (mu-core bank)", "mu-tant") {}
+
+    void runTest() override
+    {
+        using namespace mu_wavetable;
+        beginTest ("appendTable refuses past the reserved capacity and never moves the tables");
+        WavetableBank bank;
+        const int base = bank.numTables();
+        int firstIdx = -1, lastOk = -1;
+        for (int i = base; i < 4096; ++i)
+        {
+            Wavetable wt;
+            wt.name = "t" + juce::String(i);
+            wt.sourcePath = "/x/" + juce::String(i);
+            wt.frames = 1;
+            wt.mipSize = { 8 };
+            wt.mip = { std::vector<float>(8, 0.0f) };
+            const int idx = bank.appendTable(std::move(wt));
+            if (idx < 0) break;
+            if (firstIdx < 0) firstIdx = idx;
+            lastOk = idx;
+        }
+        expect (firstIdx == base);
+        expect (lastOk >= base);
+        expect (bank.numTables() == lastOk + 1);
+        expect (bank.numTables() < 4096);                          // it stopped: the bank is capped
+        expectEquals (bank.findByPath("/x/" + juce::String(base)), base);   // still found after hitting the cap
+        Wavetable more; more.frames = 1; more.mipSize = { 8 }; more.mip = { std::vector<float>(8, 0.0f) };
+        expectEquals (bank.appendTable(std::move(more)), -1);
+    }
+};
+
+static WavetableBankCapacityTest wavetableBankCapacityTest;

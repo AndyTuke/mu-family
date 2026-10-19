@@ -329,6 +329,7 @@ The shared visual identity (`MuLookAndFeel`) ensures a consistent look across al
 - **Everything in APVTS** — each plugin defines its own APVTS layout; `ProcessorBase` provides helpers for the common subset (voice params, mixer params, FX params).
 - **VoiceSlots are fully self-contained** — no cross-slot modulation. Same rule as current per-rhythm constraint.
 - **GPU-backed image caches are heap-allocated and never destroyed** (ruled 2026-10-12) — a function-static or global cache of `juce::Image` under the Direct2D renderer is held by a leaked `new` pointer, not a static object. A static destructor runs at plugin-DLL unload under the loader lock, where releasing the Direct3D device hangs the graphics driver (found with Debug pluginval on mu-Clid; fixed in the `MuLookAndFeel` brushed-grain cache). Clearing such a cache at a size cap is safe only on the message thread, and only if every caller uses the returned reference immediately and never keeps it.
+- **State-restore thread contract** (ruled 2026-10-18) — hosts normally call `setStateInformation` on the message thread, and the editor, the Stager and the products' lock-free paths assume that. Only the layout store in `applyComposedState` (the packed layout word under `layoutWriteLock`) is also safe from a host thread. Consequences: (a) the editor polls "is this destination modulated?" through `ModulationMatrix::assignedSnapshot()` (a published, immutable copy, revisions from one process-wide counter so a `Layer::adoptDefaults` swap of matrices never looks current), never the live assignment list; a UI that needs the full list copies `getAssignments()` under the modulation lock; (b) `WavetableBank` reserves `kMaxTables` up front and never reallocates, so a lock-free `findByPath` stays valid, and an import past the cap is refused; (c) any new lock-free reader of state that a restore rewrites must follow one of these two patterns (publish a snapshot, or never move the storage), not read live data.
 
 ---
 
@@ -805,6 +806,10 @@ whether it moves into the layer. Harder: nothing. The new hooks are generic (`la
 
 ### Stage 8: what the owner decides (#1319; 2026-10-12, Architecture Steward)
 
+**Answered 2026-10-15:** the combined instance is scheduled as the fifth product mu-Tronic, so option C is taken, staged product by product; see
+[mu-Tronic: the combined instance is scheduled](#mu-tronic-the-combined-instance-is-scheduled-ruled-2026-10-15) and [mu-tronic/design.md](mu-tronic/design.md).
+The text below is kept for the reasoning.
+
 The row waited for the saved-data renames (#1263); those are done (closed at build 1322), so that dependency is gone. What remains is not a technical question. The
 registry (`LayerTypeInfo`: id, name, prefix, preset extension, mod-target table, `create`) and `Layer::render` (the layer draws itself into the mixer, so a session can mix
 layer types) have exactly one customer: the combined instance of [design-future.md](design-future.md) ("One framework, one instance"), which is still unscheduled and
@@ -824,6 +829,43 @@ Question for Andy (one paragraph, for the morning): do you want the combined ins
 layers of the Pay What You Want products (mu-Toni, mu-On) and the freeware mu-Clid MIDI rhythm sit inside one licensed instance, and whose key covers it? Until you answer, #1319 should stay parked (option A); the answer decides where the registry
 lives (which product's processor hosts it), whether the plugin ID and licence of the combined instance are new, and so whether option B or C is next. No work on it is useful
 before that, and nothing that is done on stages 6 and 7 makes the answer harder.
+
+### mu-Tronic: the combined instance is scheduled (ruled 2026-10-15)
+
+**Supersedes the "park" recommendation of Stage 8 above.** Andy asked for mu-Tronic: a fifth product with 16 empty layer slots (paged 1-8 / 9-16), each
+able to hold a layer of any of the four existing types, on the shared mixer, FX and modulation, with buses in the mixer. The full ruling, staged plan
+(T0 to T9) and the short list still open are in [mu-tronic/design.md](mu-tronic/design.md). **Andy's answers, 2026-10-15:** a fifth product; **Standalone only** (no
+VST3 or CLAP, so no host parameter-list constraint); **freeware** (no licence key, no Support prompt); name mu-Tronic, code `MTrn`; **3 buses with 2 inserts
+each**; every mu-On engine (Kick, Bass, Hat, Snare, Rumble) is its own layer type; scenes; mu-link left as it is; all four extractions (mu-Toni, mu-On, mu-Tant, mu-Clid) come before any mu-Tronic product work
+(re-prioritised by Andy later the same day; plan: [mu-tronic/extraction-plan.md](mu-tronic/extraction-plan.md)). The structural rulings that bind other work:
+
+- **Layer = voice.** The code and docs keep *layer*; *voice* stays the polyphonic voice inside an engine. A layer is engine + sequencer + modulation + insert + parameters +
+  presets / clips + UI content; the mixer strip and the transport are not part of it.
+- **`Layer::render` with a per-block `RenderContext`** is the contract (Stage 8 option C), plus a registry (`LayerTypeInfo`) that only creates and describes. The engine
+  lives in the layer object; a replaced layer fades in a shared `RetireBin`. This amends Stage 7 ruling 1 for hosts that render through `Layer::render`.
+- **Per-product layer libraries, nothing moves into `mu-core`:** `mu-clid-layer`, `mu-tant-layer`, `mu-toni-layer`, `mu-on-layer` (INTERFACE) are each product's
+  `Audio/ Sequencer/ Modulation/ Persistence/ UI/` minus `UI/SettingsOverlay.*`. A library file includes nothing under `Plugin/` or `License/`, takes no
+  `PluginProcessor&` (the UI uses a `<Type>Host` interface), and every relative path is unique across `mu-core` and the libraries
+  (`tests/scripts/check-layer-boundary.ps1`, to be written in Stage T0). Each product's parameter table is `addLayerParams(layout, slot)` in its `Persistence/`.
+- **Each standalone product moves onto the shared render path** in the same stage in which its layer is extracted, so per-block glue exists once.
+- **Capacity:** `mu_limits::kMaxLayers` is a per-target compile-time constant (`MU_MAX_LAYERS`, default 8; mu-Tronic 16). One constant, one value per binary.
+- **Buses:** `MixerEngine::BusState` (a `ChannelState` plus a chain of `kBusInserts` layer inserts), opt-in compile-time counts `MU_MAX_BUSES` (default 0, mu-Tronic 3) and
+  `MU_BUS_INSERTS` (default 2), `ChannelState::busAssign`,
+  graph channels -> buses -> returns -> master, no bus-to-bus, a channel's sidechain source is never a bus. The existing `outputBus` is the DAW direct out and is relabelled
+  "Out" in the UI (not offered in mu-Tronic). All of it is `mu-core`.
+- **Layer types are finer than products:** the registry lists each mu-On engine (Kick, Bass, Hat, Snare, Rumble) as its own `LayerTypeId` over the one `Track` class
+  (engine locked in mu-Tronic); `LayerTypeInfo::group` names the product for the chooser and `typeFromPreset` picks the type from a preset file. Hence mu-On goes
+  per-layer (engine, step grid, swing/accent) in its own standalone too.
+- **Scenes:** `ProcessorBase::launchScene(n)` and `ControlAction::LaunchScene(n)` launch clip n on every layer in one staged batch; with `PagePrev` / `PageNext` they
+  are generic actions in `mu-core/Control/`.
+- **Product shape:** Standalone-only, freeware product: `FORMATS Standalone`, an empty `License/` (`.gitkeep`), no `LicenseKey.h`. Plugin code `MTrn` (JUCE needs an
+  upper-case letter).
+- **Static libraries, licence follows the install (Andy, 2026-10-15):** the layer libraries are compiled into mu-Tronic; engines are **not** loaded at runtime from the installed
+  apps and need not update independently (releases are suite-wide; mu-Tronic is rebuilt and released whenever an app's engine changes). Each app writes a small manifest
+  (supporter flag, checkout URL, content dir) at install and at every launch; mu-Tronic carries no key code. Three E1 constraints keep a module ABI possible at no cost:
+  `RenderContext` mirrors a C struct, layer state is text, `render` makes no host callback. Analysis: [mu-tronic/extraction-plan.md](mu-tronic/extraction-plan.md) sections 8 and 9.
+- **mu-link:** coexists, no freeze, revisit later (Andy: "leave it as is for now"); mu-Tronic is a mu-link client; no clock / MIDI-out code is duplicated.
+- **Timing:** all four extractions are scheduled before mu-Tronic product work, in the order Toni, On, Tant, Clid, behind a golden-render / compat / equivalence safety net ([mu-tronic/extraction-plan.md](mu-tronic/extraction-plan.md)).
 
 ### Shared layer sidebar and layer panel (ruled 2026-10-12, #1505 / #1506)
 
@@ -934,7 +976,7 @@ preset flow) took `ProcessorBase&`, so mu-link, which is an app with no `AudioPr
 | Piece | Where | What it is |
 |---|---|---|
 | `mu_core::ShellBackend` | `mu-core/Plugin/ShellBackend.h` (header-only; namespace `mu_core`) | An abstract class: **everything the chrome reads from or tells the app**, taken verbatim from the "Shell-facing API" block of `ProcessorBase`. Groups: **transport** (`isStandaloneApp`, `isInternalPlaying`, `toggleInternalPlay`, `getInternalBpm` / `setInternalBpm`, `getInternalBeatPos`, `getTimeSignature` / `setTimeSignature`, `setNudgeDirection`); **clock sync** (`getMidiSyncEnabled` / `setMidiSyncEnabled`, `getMidiSyncMessages` / `setMidiSyncMessages`, `getMidiClockBpm`, `isMidiClockPlaying`, `getMidiClockState`, `getSyncOffsetMs` / `setSyncOffsetMs`, `kSyncOffsetMinMs` / `MaxMs`); **host reads** (`isHostPlaying`, `getHostPpqPosition`, `getHostTimeSignature`, `getHostBarStartPpq`), defaulted to "no host"; **display** (`getUiScale` / `setUiScale`, `kUiScaleMedium` / `Large`); **presets** (`getPresetsDir`, `getFullPresetExtension`, `hasPendingFullPreset` defaulted false, `loadPreset`, `savePreset`, `loadCategoryList`, `ensureCategoryInList`, `getDefaultPresetFile`); **master level** (`hasMasterLevel` defaulted false, `getMasterLevel` / `setMasterLevel`); `getContentDir`; and the four callbacks the shell sets (`onLoadError`, `onUiScaleChanged`, `onSaveAndQuit`, `onPresetSwapCommitted`) as public `std::function` members. |
-| `mu_ui::ShellChrome` | `mu-core/UI/ShellChrome.{h,cpp}` | The processor-free half of `EditorShellBase`, as a **helper object, not a base class**: constructed with the host `juce::Component&` and a `ShellBackend&`, it owns and parents to the host the `MuLookAndFeel`, `TransportBar`, `StatusBar`, `AboutOverlay`, `SaveDialog`, `PresetBrowser`, the mixer / settings overlay slots and the upgrade banner; it holds the overlay state machine (`hideAllOverlays`, `fadeSwitch`, `show*`), the layout (transport / optional sidebar / main / status), `setMetalStyle`, `setScrews`, `forwardKnobStatus`, the version check, the play / stop key, and the preset flow (load, save with overwrite confirm, new with discard confirm, dirty flag). |
+| `mu_ui::ShellChrome` | `mu-core/UI/ShellChrome.{h,cpp}` | The processor-free half of `EditorShellBase`, as a **helper object, not a base class**: constructed with the host `juce::Component&` and a `ShellBackend&`, it owns and parents to the host the `MuLookAndFeel`, `TransportBar`, `StatusBar`, `AboutOverlay`, `SaveDialog`, `PresetBrowser`, the mixer / settings overlay slots and the upgrade banner; it holds the overlay state machine (`hideAllOverlays`, `fadeSwitch`, `show*`), the layout (transport / optional sidebar / main / status), `setMetalStyle`, `setScrews`, `forwardKnobStatus`, the update check, the play / stop key, and the preset flow (load, save with overwrite confirm, new with discard confirm, dirty flag). |
 | `EditorShellBase` | unchanged name and public / protected API | `juce::AudioProcessorEditor` + a `ShellChrome` (passing itself and the `ProcessorBase`) + what genuinely needs a processor: the APVTS dirty listener (calls the chrome's `markDirty`), `ActivationOverlay`, the MIDI program-change overlays, the support prompt, licensing affordances and the `processorRef` cleanup in the destructor. |
 
 **Why a helper and not a sibling shell class.** `AudioProcessorEditor` is itself a `Component`, so a processor-free
@@ -986,7 +1028,7 @@ identically after every stage):**
 |---|---|---|
 | S1 | `Plugin/ShellBackend.h` (transport, clock sync, host reads, display, `Drifting`); `ProcessorBase` implements it; `TransportBar` takes `ShellBackend&`; `UIChromeSources.cmake` created with the files already free of `ProcessorBase` | same values flow through the same methods |
 | S2 | `ShellBackend` gains master level; `StandardSettingsOverlay` takes `ShellBackend&`; its `Options` gain row switches (below) with today's values as defaults | defaults reproduce today's page |
-| S3 | `ShellChrome` part A: look and feel, bar, status bar, About, Save, browser, slots, overlay state machine, layout, banner, version check; `EditorShellBase` delegates | same children, same parent, same order |
+| S3 | `ShellChrome` part A: look and feel, bar, status bar, About, Save, browser, slots, overlay state machine, layout, banner, update check; `EditorShellBase` delegates | same children, same parent, same order |
 | S4 | `ShellChrome` part B: preset flow (load / save / new, dirty) over `ShellBackend`, the play key; `ShellBackend` gains the preset operations | `EditorShellBase` keeps its `onPreset*` hooks and calls them at the same moments |
 | S5 | `MixerChannel.cpp` free of `ProcessorBase` (client and master strips callback-driven; binding stays in the two `.cpp` files); chrome list completed; boundary check extended | binding code moves nowhere |
 | S6 | mu-link: `LinkShellBackend`, its CMake switched to `MU_CORE_CHROME_SOURCES`, tests for the adapter | mu-link window unchanged (no UI change yet) |
@@ -1814,7 +1856,7 @@ product only has to override/​wire those.
 | Delete | Keep |
 |---|---|
 | `ProcessorBase::demoMaxChannels`, `demoMaxSteps`, `canAddChannel`, `canSaveLayerPreset`, `maxSteps` (and their callers: `ChannelSidebar`, `MasterLoopSection`, `LayerPresetHeader`, both `PluginEditor` add-channel checks, `EuclideanPanel`, `RhythmPanel`, `VoicePanel`, `GatingDesigner::setMaxCells` use, the tant `limitToCells` demo calls, the preset-load clamps in `PresetIO*` and `PluginProcessor_Preset`, the sequencer `setStepCap`) | `LicenseManager`, `OnlineActivation`, `LemonSqueezyClient`, `ActivationStore`, `MachineFingerprint`, `initLicensing`, `ActivationOverlay`, `activateOnlineFn`, the `.lic` offline path, the license tool |
-| `EditorShellBase::demoBanner`, `kDemoBannerH`, the banner click route, the banner layout rows | `upgradeBanner` and the version check |
+| `EditorShellBase::demoBanner`, `kDemoBannerH`, the banner click route, the banner layout rows | the update check (`StatusBar` update link, `UpdateChecker`) |
 | The save gate in `transportBar.onSavePreset`, `setSaveEnabled(licensed)` calls | The `StatusBar` is no longer given "Demo limited ..." messages (delete those two) |
 | `MUFAMILY_REQUIRE_LICENSE` as a feature gate (see below) | |
 | The mu-Clid *demo-limit* paths. mu-Clid Lite is **not** deleted: as of 2026-10-11 it is a product in its own right and leaves mu-Clid by the staged plan in "The MIDI-effect product" below, not by deletion. | |
@@ -2027,6 +2069,35 @@ and bump the hardcoded version default in `site/download.html`.
 Artefacts land at `build/<product>/<target>_artefacts/<Config>/<Format>/`. mu-clid and
 mu-clid-lite both use `build/mu-clid/...` because they share a CMakeLists.
 
+### Update check — family standard (ruled 2026-10-19; backlog #1612; not yet built)
+
+**Today.** `ShellChrome::startVersionCheck()` (called from the `EditorShellBase` constructor) asks the GitHub "latest release" API, reads the build number from the tag, and raises `upgradeBanner`. It is cached once per process, but it has no opt-out, no daily limit, no dismissal, a detached thread that can outlive the plugin DLL, and a dependence on GitHub's anonymous rate limit. This section replaces it. `upgradeBanner` and `kUpgradeBannerH` are retired (ruled with the `ux-controller`, 2026-10-19; look in design-ui-family §6 "Update notice"): the notice is a link in the status bar, `StatusBar::setUpdateLinkVisible(bool)` plus the `onUpdateClicked` callback, in mu-core and shared by every product.
+
+**Scope.** Every product, because every product hosts `ShellChrome`: mu-Clid, mu-Tant, mu-Toni, mu-On, mu-Clid MIDI and mu-Link (mu-Link through `LinkShellBackend`), in VST3, CLAP and Standalone, Windows and Linux. The `APPLE` paths keep compiling in principle (the platform key below simply has no macOS entry). No product writes any update code.
+
+1. **Version data: `site/latest.json`, served at `https://transwarp.me/latest.json`.** A static file written by `/release`, schema 1:
+   ```json
+   { "schema": 1, "build": 1416, "released": "2026-10-19",
+     "products": {
+       "mu-clid": { "version": "1.1.0.1416", "build": 1416,
+                    "notes": "https://transwarp.me/mu-clid-releases",
+                    "download": "https://transwarp.me/download",
+                    "windows": "https://github.com/AndyTuke/mu-family/releases/download/v1.1.0.1416/mu-clid-windows.zip",
+                    "linux":   "https://github.com/AndyTuke/mu-family/releases/download/v1.1.0.1416/mu-clid-linux.zip" } } }
+   ```
+   Keys under `products` are the product slugs (`mu-clid`, `mu-clid-midi`, `mu-tant`, `mu-toni`, `mu-on`, `mu-link`). The top-level `build` is the family build of the release; each product carries its own `build` because a product that did not ship in a release keeps its older entry, and a product with no entry (a pre-release product not yet published) never sees a notice. `windows` and `linux` are optional per product (no `macos` key while the hold lasts). Unknown fields are ignored; `schema` changes only for a breaking change and a client that does not know the number stays silent. `download.html` should read the same file instead of the GitHub API (separate site task). Netlify sends `Cache-Control: max-age=300` for it (`netlify.toml`).
+2. **Comparison.** Integer compare of the product's entry `build` with the compiled `BUILD_NUMBER`: newer means an update. Only the build number is compared, because it never resets across major and minor bumps (Version numbering above). The live (`version.txt`) versus pre-release (`version-pre.txt`) split needs no logic: `version` in the entry is display text only (`v1.1.0.1416` or `v0.1.0.1416`), and each product is compared with its own entry. A running build equal to or above the entry (a Debug build) is silent.
+3. **Where the code lives.** Two files in `mu-core/Plugin/`, namespace `mu_core::update_check`, on the processor side because they use settings and threads:
+   - `UpdateCheckPolicy.h`: header-only, `juce_core` only, the testable part, in the style of `SupportPromptPolicy.h`. Parse `latest.json` for a slug into `struct Latest { int build; juce::String version, notes; }` (rejects bad schema, non-integer build, an oversized body), `isNewer(running, latest)`, `isDue(nowMs, lastCheckMs)` (true when the stamp is missing, 24 h old, or in the future), `shouldShow(enabled, latestBuild, dismissedBuild, running)`, and the settings-key constants.
+   - `UpdateChecker.{h,cpp}`: a `juce::Thread` held through `juce::SharedResourcePointer<UpdateChecker>` by `ShellChrome` (one fetch per process however many instances, the thread joined when the last user goes, never detached). The `.cpp` is listed in each product's plugin and tests targets like the other `mu-core/**/*.cpp` files.
+   - Persistence through three `ProcessorBase` accessors in the style of `setSupportPromptHidden` and surfaced to the shell through `ShellBackend` (so mu-Link's backend supplies them too): `get/setUpdateCheckEnabled`, `get/setUpdateLastCheck` and latest-known build, `get/setUpdateDismissedBuild`. The slug comes from `ShellBackend::getProductSlug()`, returning the product's `kProductSlug` constant (a new line in each product's `Plugin/`). `ShellChrome` starts the check with a short call into these (the old `startVersionCheck` name goes). The status-bar link opens the product's `download` URL from `latest.json` if it starts with `https://transwarp.me/`, else the fixed `kDownloadUrl`; no URL from the file is opened unchecked.
+4. **Threading.** The fetch runs on the checker's own thread, never on the message thread and never touching the audio thread or `processBlock` (the check starts from the editor, so a headless instance never fetches). Connection timeout 3000 ms, read cap 64 KB, one attempt, no retry. Any failure (offline, timeout, bad JSON, wrong schema, unknown slug) leaves the stored state unchanged and shows nothing. The result reaches the UI by `MessageManager::callAsync` with a `WeakReference` to the `ShellChrome`, checked before use. The thread honours `threadShouldExit` and the destructor waits at most the connection timeout.
+5. **Privacy and opt-out.** A plain HTTPS GET of one static URL: no query string, no product, version, build, platform or machine identifier, no cookie, no body (the comparison happens on the user's machine). The web host sees an ordinary request (IP address, as for any web page); the manuals say so. The opt-out is a `SegmentControl` "Update check" On/Off in Settings General, default on, key `updateCheckEnabled`, stored machine-wide in the same app-settings store as Display size (not per product, not APVTS, so it never travels in a preset or project). Off means no request at all and no link.
+6. **Rate limit and dismissal.** At most one request per 24 hours per product per user: `updateLastCheck` (epoch ms) and `updateLatestBuild` are stored; on editor open, a fetch happens only when `isDue`, otherwise the link is decided from the stored latest build, so it also disappears at once after the user updates. Clicking the link counts as seen and stores `updateDismissedBuild`; the right-click menu "Hide this notice" stores it too. The link stays hidden until a build above it appears, and is never shown in Performance mode.
+7. **`/release` publishes it.** A new step after the CI run has finished and the GitHub release assets exist (not at dispatch time, or users would be told of a download that is not there yet): `scripts/write-latest-json.ps1` builds the file from `build_number.txt`, `version.txt` / `version-pre.txt` and the products actually released, then the file is committed with the batched site push of step (c) (no extra Netlify deploy). `tests/scripts/check-latest-json.ps1` checks schema, that each entry's `build` is at most `build_number.txt`, the URLs, and that every slug is a real product; `/release` runs it before the push.
+
+Do not: add a second fetch path in a product, call the GitHub API from the plugin again, put the opt-out in APVTS, or detach the thread.
+
 ### Third-party libraries
 
 | Library | Purpose | Notes |
@@ -2048,4 +2119,5 @@ Time stretching sits behind `TimeStretcherBase` (currently a stub; SoundTouch in
 - [design-fx.md](design-fx.md) — FX chain, slot interface, intra-FX routing (family-shared)
 - [mu-clid/design-hotswap.md](mu-clid/design-hotswap.md) — **seamless preset/rhythm hot-swap** deep-dive (stager, boundary detection, retire-then-swap voice tail, threading). The family-level pattern + the product-side decision + the mu-tant variant are summarised in [Hot-swap](#hot-swap-staged-preset--layer-swaps-family-pattern) above.
 - [mu-clid/design-presets.md](mu-clid/design-presets.md) — μ-Clid preset storage. Each product defines its own preset format under its own `design-presets.md`; the family-level conventions are: per-layer preset in camelCase noun (`.muRhythm` / `.muPattern` / `.muArp` / `.muTrack`), full preset in plugin-name camelCase (`.muClid` / `.muTant` / `.muToni` / `.muOn`). A mu-On `.muTrack` belongs to the instrument it was saved from (it records `lane`), so each lane lists only its own.
+- [mu-tronic/design.md](mu-tronic/design.md) — the combined instance: 16 layer slots holding any product's layer, buses in the shared mixer, the layer libraries, staged plan
 - [design-future.md](design-future.md) — inter-plugin sync (μ family), MIDI CC control

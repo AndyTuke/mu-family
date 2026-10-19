@@ -1,7 +1,7 @@
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "Plugin/PluginProcessor.h"
+#include "UI/TrackHost.h"   // what the rows read from the layer's host
 #include "UI/Components/MuLookAndFeel.h"
 
 #include <array>
@@ -19,7 +19,7 @@ namespace mu_on
 class StepRows : public juce::Component, private juce::Timer
 {
 public:
-    explicit StepRows(PluginProcessor& processor);
+    explicit StepRows(TrackHost& host);
     ~StepRows() override { stopTimer(); }
 
     // Outline the row of layer `idx` (the layer shown by the rest of the panel).
@@ -44,7 +44,7 @@ private:
     void paintRow(juce::Graphics&, int row);
     juce::uint64 signature() const;                   // changes when a row's colour, engine or the count does
 
-    PluginProcessor& proc;
+    TrackHost& host;
     int selected      = 0;
     int playheadStep  = -1;
     juce::uint64 shownSignature = 0;

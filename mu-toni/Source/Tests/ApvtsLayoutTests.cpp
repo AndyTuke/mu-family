@@ -9,6 +9,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Plugin/MixerFxParams.h"   // mu-core: mu_mixfx::addGlobalFxParams
+#include "Persistence/ArpParams.h"  // the Arp type's per-slot table
 
 namespace
 {
@@ -72,3 +73,27 @@ public:
 };
 
 static MuToniApvtsLayoutTest muToniApvtsLayoutTest;
+
+// The Arp type's table for one slot holds exactly the rows of the suffix table a layer binds from: a row
+// added to one and not the other would leave a layer reading nothing, or a parameter it does not show.
+class MuToniArpParamTableTest : public juce::UnitTest
+{
+public:
+    MuToniArpParamTableTest() : juce::UnitTest ("Arp layer parameter table", "Mixer") {}
+
+    void runTest() override
+    {
+        beginTest ("addLayerParams adds exactly the vpi suffix rows of one slot, under its prefix");
+        StubProcessor proc;
+        juce::AudioProcessorValueTreeState::ParameterLayout layout;
+        mu_toni::addLayerParams (layout, 3);
+        juce::AudioProcessorValueTreeState apvts (proc, nullptr, "PARAMS", std::move (layout));
+
+        expectEquals (proc.getParameters().size(), mu_toni::kNumVoiceParams);
+        for (int k = 0; k < mu_toni::kNumVoiceParams; ++k)
+            expect (apvts.getParameter (juce::String ("a3_") + mu_toni::vpi::suffix[k]) != nullptr,
+                    juce::String ("no row for suffix ") + mu_toni::vpi::suffix[k]);
+    }
+};
+
+static MuToniArpParamTableTest muToniArpParamTableTest;

@@ -1,0 +1,13 @@
+# frozen load result for fixture: Cavern Bass.muPattern
+layers=1
+load_errors=0
+capture_bytes=3262
+capture_sha256=46c8f2a5d2c5b452ac5405b6a74921c168246b4a094b63d893f778b34a4046e4
+--- parameters differing from default (id=plain value)
+v0_drvChar=10
+v0_flt_cut=400
+v0_insP1=0.44
+v0_o1_oct=-2
+v0_o1_wt=4
+v0_o2_lvl=-4
+v0_o2_oct=-2

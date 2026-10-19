@@ -106,27 +106,38 @@ public:
         const float lpAlpha  = 1.0f - std::exp(-2.0f * juce::MathConstants<float>::pi
                                                 * lpCutoff / (float) currentSampleRate);
 
+        // The loop's one-pole LP delays the signal, so the delay line is shortened by its phase delay at the
+        // target pitch or the string plays flat (up to a fifth with a dark LPF). H(z) = a / (1 - c z^-1), c = 1 - a:
+        // phase delay = atan2(c sin w, 1 - c cos w) / w samples at w = 2 pi f / sr. Taken once per block at the
+        // target pitch; the few ms of a pitch glide are not compensated.
+        const float lpC          = 1.0f - lpAlpha;
+        const float pitchOmega   = 2.0f * juce::MathConstants<float>::pi * juce::jmax(20.0f, targetFreq)
+                                   / (float) currentSampleRate;
+        const float lpPhaseDelay = std::atan2(lpC * std::sin(pitchOmega), 1.0f - lpC * std::cos(pitchOmega)) / pitchOmega;
+
         // Karplus has no dedicated Output slot — pass through unity.
         const float outGain  = 1.0f;
         const int nChClamped = juce::jmin(nCh, 2);
-        for (int ch = 0; ch < nChClamped; ++ch)
+        // Sample-major: the smoothed pitch and gain advance once per sample and both channels use them, so the
+        // right channel's delay length and loop gain ramp with the left (channel-major looping left the right
+        // one stepping per block).
+        auto chans = buf.getArrayOfWritePointers();
+        for (int i = 0; i < ns; ++i)
         {
-            auto*     data    = buf.getWritePointer(ch);
-            auto&     buffer  = delayBuf[ch];
-            int&      wPos    = writePos[ch];
-            float&    lp      = lpState[ch];
-            const int bufSize = static_cast<int>(buffer.size());
+            // Per-sample smoothed target freq → per-sample delay length.
+            const float curFreq  = smoothedFreq.getNextValue();
+            const float delayLen = juce::jmax(2.0f,
+                (float) currentSampleRate / juce::jmax(20.0f, curFreq) - lpPhaseDelay);
 
-            for (int i = 0; i < ns; ++i)
+            // Per-sample smoothed gain. Eliminates crackle when the feedback knob moves.
+            const float curGain = smoothedGain.getNextValue();
+
+            for (int ch = 0; ch < nChClamped; ++ch)
             {
-                // Per-sample smoothed target freq → per-sample delay length.
-                // Each voice reads its own next smoothed value to keep the
-                // ramp sample-accurate; smoothedFreq is shared across
-                // channels so we tick once and reuse for both.
-                const float curFreq  = (ch == 0) ? smoothedFreq.getNextValue()
-                                                 : smoothedFreq.getCurrentValue();
-                const float delayLen = juce::jmax(2.0f,
-                    (float) currentSampleRate / juce::jmax(20.0f, curFreq));
+                auto&     buffer  = delayBuf[ch];
+                int&      wPos    = writePos[ch];
+                float&    lp      = lpState[ch];
+                const int bufSize = static_cast<int>(buffer.size());
 
                 // Linear-interpolated read tap (D samples behind write pos).
                 const float readF = static_cast<float>(wPos) - delayLen;
@@ -139,16 +150,11 @@ public:
                 // that gives K-S its decaying-pluck timbre).
                 lp += lpAlpha * (delayed - lp);
 
-                // Per-sample smoothed gain — ch0 advances the ramp, ch1 reads the
-                // latest value. Eliminates crackle when the feedback knob moves.
-                const float curGain = (ch == 0) ? smoothedGain.getNextValue()
-                                                 : smoothedGain.getCurrentValue();
-
                 // Input excitation + filtered feedback. Output IS the loop
                 // signal so the user hears the resonant body.
-                const float out = data[i] + curGain * lp;
-                buffer[wPos] = out;
-                data[i]      = out * outGain;
+                const float out = chans[ch][i] + curGain * lp;
+                buffer[wPos]    = out;
+                chans[ch][i]    = out * outGain;
                 wPos = (wPos + 1) % bufSize;
             }
         }

@@ -270,8 +270,9 @@ void RhythmContent::deregisterRhythmListeners(int ri)
 void RhythmContent::parameterChanged(const juce::String& parameterID, float /*newValue*/)
 {
     // JUCE invokes parameterChanged on whatever thread called setValueNotifyingHost.
-    // Some DAWs run host automation on the audio thread — and the refresh below mutates
-    // juce::Slider state (not audio-thread-safe). Marshal to the message thread.
+    // Some DAWs run host automation on the audio thread — and the refresh mutates
+    // juce::Slider state (not audio-thread-safe). Off the message thread the id is queued
+    // (allocation-free; this can be the audio thread) and timerCallback refreshes the control.
     // refresh only the single control matching `suffix`, not the whole panel
     // (was 21 euclid knobs + 9 segments OR 28+ voice knobs per parameter change).
     // skip during bulk APVTS loads (state restore, swap commit, swap-rhythms).
@@ -281,37 +282,33 @@ void RhythmContent::parameterChanged(const juce::String& parameterID, float /*ne
     // sliders. Net cost was ~30 redundant refreshSuffix calls per swap commit.
     if (proc.isApvtsLoading()) return;
 
-    juce::Component::SafePointer<RhythmContent> safeThis(this);
+    if (juce::MessageManager::getInstance()->isThisTheMessageThread())
+        refreshForParameter(parameterID);
+    else
+        refreshQueue.post(parameterID);
+}
+
+void RhythmContent::refreshForParameter(const juce::String& parameterID)
+{
     const juce::String suffix = parameterID.fromFirstOccurrenceOf("_", false, false);
 
-    auto refresh = [safeThis, suffix]
+    if (isEuclidSuffix(suffix))
     {
-        if (auto* self = safeThis.getComponent())
-        {
-            if (isEuclidSuffix(suffix))
-            {
-                self->euclidPanel.refreshSuffix(suffix);
-                self->refreshCircle();
-            }
-            else if (suffix == "outMode")
-            {
-                self->updateOutputModeUi();
-            }
-            else if (suffix.startsWith("midi"))
-            {
-                self->midiOutSection.refreshSuffix(suffix);
-            }
-            else
-            {
-                self->voiceSection.refreshSuffix(suffix);
-            }
-        }
-    };
-
-    if (juce::MessageManager::getInstance()->isThisTheMessageThread())
-        refresh();
+        euclidPanel.refreshSuffix(suffix);
+        refreshCircle();
+    }
+    else if (suffix == "outMode")
+    {
+        updateOutputModeUi();
+    }
+    else if (suffix.startsWith("midi"))
+    {
+        midiOutSection.refreshSuffix(suffix);
+    }
     else
-        juce::MessageManager::callAsync(std::move(refresh));
+    {
+        voiceSection.refreshSuffix(suffix);
+    }
 }
 
 void RhythmContent::setLayer(int index)
@@ -347,7 +344,6 @@ void RhythmContent::refreshCircle()
     circle.setPatterns(r.genA.getStepTypes(ov.a), r.genB.getStepTypes(ov.b), r.genC.getStepTypes(ov.c));
     lastCircleOverrides = ov;
     circle.setPlayState(&proc.rhythmPlayState[currentRhythmIndex],
-                        &proc.beatFraction,
                         &proc.sequencerPlaying,
                         currentColour());
 }
@@ -642,6 +638,9 @@ void RhythmContent::confirmReset()
 
 void RhythmContent::timerCallback()
 {
+    // Controls whose parameters changed on a non-message thread (host automation on the audio thread).
+    refreshQueue.drain([this](const juce::String& id) { if (! proc.isApvtsLoading()) refreshForParameter(id); });
+
     const bool playing = proc.sequencerPlaying.load();
 
     // Re-render the RhythmCircle when euclid modulation changes the pattern

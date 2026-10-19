@@ -94,6 +94,26 @@ StandardSettingsOverlay::StandardSettingsOverlay(mu_core::ShellBackend& backend,
             } } });
     }
 
+    // ── Update check — whether the app asks the website, once a day, for a newer version. A plain
+    //    request carrying nothing about the user; Off sends nothing and hides the status-bar link.
+    //    Shown only where the backend has a settings file and a product slug.
+    if (proc.getAppSettingsFile() != nullptr && proc.getProductSlug().isNotEmpty())
+    {
+        updateCheckToggle.setToggleState(mu_core::update_check::isEnabled(proc.getAppSettingsFile()), juce::dontSendNotification);
+        updateCheckToggle.onClick = [this]
+        {
+            mu_core::update_check::setEnabled(proc.getAppSettingsFile(), updateCheckToggle.getToggleState());
+            if (proc.onUpdateCheckToggled) proc.onUpdateCheckToggled();
+        };
+        addAndMakeVisible(updateCheckToggle);
+        general.push_back({ "Updates", 2 * kRowH + kRowGap, [this](const Rows& r) {
+            updateCheckToggle.setBounds(r.labelX, r.area.getY(), s(200), r.rowH); },
+            [this](juce::Graphics& g, const Rows& r) {
+            drawHint(g, r.area.getY() + r.rowH + s(kRowGap) / 2 + r.rowH / 2,
+                     "Checks once a day for a newer version. Nothing about you is sent.",
+                     r.labelX, r.area.getRight() - r.labelX); } });
+    }
+
     // ── MIDI Clock (standalone only) — slave the beat / tempo to external MIDI clock. Without the
     //    Source and Messages rows (showClockSource off) only the Sync offset row remains.
     if (isStandalone && (opts.showClockSource || opts.syncOffsetAlways))

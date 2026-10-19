@@ -1,0 +1,12 @@
+{
+  "name": "voice-envelopes-legato",
+  "notes": "One Synth C rhythm in legato and mono with pitch and filter envelopes, LP24 with drive and a low cut, a shaped amp envelope, accent +6 dB from a ring-C accent pattern.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 144000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 1,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "events": []
+}

@@ -29,6 +29,11 @@ Related: the family consistency rule in [CLAUDE.md](../CLAUDE.md), and the platf
 | **Performance** (built 2026-10-13) | A list of up to 8 pointers to presets for a gig; the new top level (backlog #1279). ✔ owner. File `.muPerformance`, folder `Performances/`, type `mu_pp::PerformanceFile` (ruled 2026-10-12, [design-launchpad.md §3.2c](design-launchpad.md)). | a preset |
 | **Clip** ✔ owner | One of 8 stored states of a layer that a controller pad launches, as in Ableton Live and Bitwig; plays until another is chosen; pads never write presets (backlog #1277). Stored in `mu_core::ClipBank` (`Layer::clips`), saved as `<Clips>` / `<Clip>`; a clip has no per-product type, it is the product's layer preset. "Slot" stays for FX / insert slots only. | an audio clip, an FX slot |
 
+Added 2026-10-15 for mu-Tronic ([mu-tronic/design.md §1](mu-tronic/design.md)): Andy's word "voice" for a mu-Tronic slot is a **layer** in code and docs. New terms: **Empty layer**
+(a slot with no type; `LayerTypeId::Empty`), **Page** (eight layers, `kLayersPerPage`, UI and controller only), **Bus** (an internal group strip,
+`BusState`, `busAssign`, parameters `bus{B}_`), **Scene** (clip n launched on every layer, `launchScene`) and **Direct out** (the DAW output routing `ChannelState::outputBus`, parameter `outBus`, relabelled "Out" in the UI so "bus" has one
+meaning). Library targets are `mu-<product>-layer`; a host interface for a layer's UI is `<Type>Host`; mu-Clid's engine-carrying layer is `mu_clid::SampleRhythm`.
+
 ### Derived layer types ✔ owner (2026-10-09)
 
 Each product's layer is a subclass of `Layer`, named for what that product's layer *is*:
@@ -119,6 +124,8 @@ edits](design-plugin-family.md#layer-ownership-and-structural-edits--family-stan
 - `mu-core` uses `mu_core`, `mu_ui`, `mu_audio`, `mu_mod`, `mu_pp`, `mu_link`, … by area. The ~130
   `mu-core` types that are still global (filters, UI components) are left alone for now.
 - `createPluginFilter()` stays global (JUCE requires it).
+- Shared test helpers in `mu-core/Tests/` (headers products' tests include) use a topic namespace `mu_<topic>`: `mu_golden`, `mu_alloc`,
+  `mu_contract_test`, `mu_layer_equiv` (ruled 2026-10-16, as they already are), never `mu_core`, so test code cannot be mistaken for the shipped core.
 - `using namespace juce;` only at function scope in a `.cpp`, never in a header.
 
 ### Class-name roles
@@ -128,7 +135,8 @@ edits](design-plugin-family.md#layer-ownership-and-structural-edits--family-stan
 | `Panel` | an inline region of the editor |
 | `Overlay` | a full-editor screen shown through `OverlayHost` (`SettingsOverlay`, `MixerOverlay`) |
 | `Sidebar` / `Section` / `Subsection` / `Row` / `Bar` | as their names say |
-| `Engine` / `Sequencer` | the two halves of a layer |
+| `Engine` / `Sequencer` | the two halves of a layer (when several layer types are one class, `<Class>Engine` holds the choice of sound engine behind one interface: mu-On's `TrackEngine`) |
+| `Host` | the narrow interface a layer's UI content reads from whoever hosts the layer: `<Type>Host` in `UI/` (`TrackHost`, `ArpHost`). Every method carries the type (`getTrackParameters`, `getTrackEngine`, `selectTrackEngine`, `getArpColourIndex`) so one adapter can implement several hosts; only a method whose signature differs from every other host's may stay bare (`getModLive`). Ruled 2026-10-16 |
 | `Backend` | the interface an app implements for the shared chrome (`mu_core::ShellBackend`; `ProcessorBase` and mu-link's `LinkShellBackend` implement it). Not `Surface`: that word is the controller surface of `mu-control` |
 | `Driver` / `Manager` | `mu-control` only: a `<Device>Driver` speaks one device family's wire protocol and nothing else (`LaunchpadXDriver`, behind the `SurfaceDriver` interface); a `Manager` owns the lifetime of a set of drivers and their model (`ControllerManager`). The four parts are `SurfaceDriver`, `SurfaceDescription`, `SurfaceMapping`, `SurfaceModel` |
 | `Chrome` | a processor-free helper that owns the shared window furniture for a host component (`mu_ui::ShellChrome`) |
@@ -146,6 +154,14 @@ names. They are modal pop-ups, not `OverlayHost` screens, so the `Overlay` role 
   **`Audio`, `License`, `Modulation`, `Persistence`, `Plugin`, `Sequencer`, `Tests`, `UI`**. An empty
   folder carries a `.gitkeep` so git keeps it. A new product starts with all eight. (mu-link is
   infrastructure, not an instrument, and keeps its own layout.)
+- **Layer-library files (ruled 2026-10-15):** the files of a product's `Audio/ Sequencer/ Modulation/ Persistence/ UI/` (not `UI/SettingsOverlay.*`) form its
+  `mu-<product>-layer` library, which mu-Tronic links. Their **relative path must be unique across `mu-core` and all products' libraries** (`Audio/Scales.h` existed in both
+  mu-Tant and mu-Toni: mu-Toni's is `ToniScales.h` since Stage E2, done 2026-10-16; mu-Tant's is `TantScales.h` since Stage E4, done 2026-10-16), none may include a `Plugin/` or `License/` header, and a product's parameter table lives in
+  `Persistence/` (`<Type>Params.{h,cpp}` and `LayerParamIds.h`; done 2026-10-16 for mu-Toni, `ArpParams` and `LayerParamIds.h`, for mu-On, `TrackParams.{h,cpp}`, and for mu-Tant, `PatternParams.{h,cpp}`, which holds the `v{N}_` id helpers as `TrackParams.h` does). The library is declared in the product's own
+  `CMakeLists.txt` as `add_library(mu-<product>-layer INTERFACE)` over those folders (no `mu-<product>-layer/` directory exists), and its UI source is exported as the CMake list
+  `MU_<PRODUCT>_LAYER_UI_SOURCES` (family convention, design 2.5; built for mu-Toni, mu-On and mu-Tant). A layer-side host interface is `UI/<Type>Host.h` with methods that carry the type name (`getPatternLayer`, `getTrackEngine`), so one adapter can implement several. The `LayerTypeInfo` constants sit with the layer class (`kPatternType` in `Pattern.h`, `kArpType` in `Arp.h`; **only mu-On has its constants so far, and `kPatternType` / `kArpType` are written with the registry hook at T1**: a type that needs a host link cannot be created from `create(slot)` alone); where several types share one class they get `Sequencer/<Class>Types.h` (`TrackTypes.h`: `kKickType` ... `kRumbleType`, `layerTypeOf`, `typeFromPreset`), a file of constants and free functions, which "file = class" does not cover; a header never holds two classes. Code a layer needs from `Plugin/` that is not processor state moves to a layer-side folder of `mu-core`
+  (`ParamText.h` moved to `Persistence/`). Checked by `check-layer-boundary.ps1`, which finds in-tree libraries from that `add_library`.
+- **Capacity constants:** `mu_limits::kMaxLayers` is a per-target compile-time value (`MU_MAX_LAYERS`, default 8, mu-Tronic 16); a product still does not redeclare it.
 - What goes where: `Audio/` the engine (voices, samplers, DSP specific to the product); `Sequencer/` the
   sequencer data and generators; `Modulation/` the product's modulation-target table and snapshot;
   `Persistence/` preset and state (de)serialisation and migrations; `License/` licensing glue; `UI/` the
@@ -155,6 +171,11 @@ names. They are modal pop-ups, not `OverlayHost` screens, so the `Overlay` role 
   its names follow the standard (file = class, `mu_core` namespace, neutral terms, no product names).
   Remark: the struct `mu_core::Mapping` in `MidiControlMap.h` is too generic for a namespace shared by
   the whole core; rename it `MidiMapping` the next time that file is touched.
+- **Layer side and processor side inside `mu-core` (ruled 2026-10-16):** `mu-core`'s `Audio/ Modulation/ Persistence/ Sequencer/` never include a
+  `Plugin/` header. They are what a layer type may include, and the layer-library rule above ("no `Plugin/` include") must hold through them too. What only the
+  processor owns and runs goes in `Plugin/`: `LayerBlock.h`, `AudioEpoch.h`, `RetireBin.h`, `ProcessorBase_Render.cpp`. What a layer implements goes in
+  `Sequencer/`: `Layer.h`, `RetireTail.h`, `RenderContext.h`, `BeatWrap.h`, `LayerTypeInfo.h`. E1 built `RetireBin.h` under `Sequencer/`; it moves to
+  `Plugin/` before E2 (the one current exception).
 - `mu-control/` (ruled 2026-10-13; namespace `mu_control`, device helpers nest as `mu_control::launchpadx`) has folders by role, none of which may repeat a
   `mu-core` path: `Surface, Driver, Devices/<Device>, Manager, Tests`. Full list and file names in
   [design-plugin-family.md, Controller library](design-plugin-family.md#controller-library-mu-control--family-standard-ruled-2026-10-13-backlog-1276).
@@ -166,7 +187,8 @@ names. They are modal pop-ups, not `OverlayHost` screens, so the `Overlay` role 
   with; `UI/` holds only what the editor composes (panels, overlays, sidebars, `LiteEditor`-style
   secondary editors). A product with no panels of its own keeps `UI/` empty with a `.gitkeep`.
 - The processor splits as `PluginProcessor_<Aspect>.cpp` with a fixed aspect set:
-  `APVTS`, `Preset`, `Modulation`, `Content`.
+  `APVTS`, `Preset`, `Modulation`, `Content`. `mu-core`'s `ProcessorBase` splits the same way, as `ProcessorBase_<Aspect>.cpp`; its one aspect so far is
+  `Render` (the layer render contract's block driver, 2026-10-16).
 
 ### Identifiers
 - Members: **no suffix** (`proc`, `sampleRate`). No `m_`, no trailing `_`.
@@ -242,6 +264,14 @@ code, manufacturer code, bundle id, CLAP id and state identifier may not (existi
 plugin by them). The MIDI-effect product keeps `MCLt`, `com.transwarp.mu-clid-lite` and `MuClidState`
 under its name, **mu-Clid MIDI** (owner, 2026-10-11).
 
+**mu-Tronic (ruled 2026-10-15 with Andy's answers):** display name **mu-Tronic** (the pattern `mu-<Name>` capitalises the name; Andy typed `mu-tronic`, which is the slug),
+slug `mu-tronic`, namespace `mu_tronic`, JUCE `PLUGIN_CODE` **`MTrn`** (JUCE requires four characters with at least one upper-case letter, so `mtrn` is invalid; the family
+codes are `MCld MTnt MTni MuOn MCLt`), manufacturer `TDP1`, bundle id `com.transwarp.mu-tronic`, state `MuTronicState`, tag `MuTronicPreset`, extension `.muTronic`, docs
+`docs/mu-tronic/`. **Standalone only** (`FORMATS Standalone`) and **freeware** (empty `License/`). The codes are now data: they may not change. It has no layer type of
+its own and no new layer extension; its slots hold `Rhythm`, `Pattern`, `Arp`, or one of mu-On's five engines `Kick`, `Bass`, `Hat`, `Snare`, `Rumble` (or nothing). The
+engine ids share `Track`'s prefix `t` and extension `.muTrack`; the `LayerTypeId` identifies the type, the saved engine selects it from a `.muTrack` file
+([mu-tronic/design.md §1.4](mu-tronic/design.md)). Bus parameters are `bus{B}_` with insert parameters `bus{B}_i{I}_`; capacity constants `MU_MAX_LAYERS`, `MU_MAX_BUSES`, `MU_BUS_INSERTS`.
+
 **Product naming pattern.** `mu-<Name>` in prose and artefacts (`mu-Clid`, `mu-Tant`), slug `mu-<name>` in
 folders and targets, namespace `mu_<name>`. A descriptive suffix (`mu-Clid MIDI`) is allowed only for a
 product that is a deliberate sibling of another; a standalone product takes a one-word pun like the rest.
@@ -268,7 +298,8 @@ unique", legitimate because the type is one `mu-core` class (§1).
 | Acronyms | `…APVTS` function names in mu-Clid vs `…Apvts` elsewhere. |
 | Members | Trailing `_` in seven classes (mu-Clid helpers, `MidiClockSync`, `VocoderInsert`). |
 | Enums | plain `enum` in mu-Toni (3), mu-On (3), mu-Tant (2). |
-| Folders | Done at build 1187: mu-Clid now has all eight (`RhythmManager` was deleted by the stage 7 container move; `SamplePreview` + `SampleLibrary` in `Audio/`, `PresetIO` + `PresetIO_HostState` in `Persistence/`, `ModulationSkew` in `Modulation/`, `LiteEditor` in `UI/`; `HotSwapStager` stays in `Plugin/` like mu-Tant's stager (`HotSwapBoundary.h` was deleted 2026-10-13 for the shared predicates)). Still open: mu-On has no `License` or `Persistence`; mu-Tant and mu-Toni `Persistence/` hold only `.gitkeep`. |
+| Folders | Done at build 1187: mu-Clid now has all eight (`RhythmManager` was deleted by the stage 7 container move; `SamplePreview` + `SampleLibrary` in `Audio/`, `PresetIO` + `PresetIO_HostState` in `Persistence/`, `ModulationSkew` in `Modulation/`, `LiteEditor` in `UI/`; `HotSwapStager` stays in `Plugin/` like mu-Tant's stager (`HotSwapBoundary.h` was deleted 2026-10-13 for the shared predicates)). mu-On has all eight (`Persistence/` holds `TrackParams.{h,cpp}` since 2026-10-16). Done 2026-10-16: mu-Tant's `Persistence/` holds `PatternParams.{h,cpp}` (mu-Toni's holds `ArpParams.{h,cpp}` and `LayerParamIds.h` since 2026-10-16). Minor: mu-Toni now has two things called `ArpParams` (the pool/scan inputs struct in `Sequencer/ArpSequencer.h` and the parameter-table file/namespace content `Persistence/ArpParams.h`); rename the struct to `ArpPoolParams` at the next Toni touch. |
+| Held-key helper | Two copies since E4: `mu_toni::HeldNotes` (32 keys, ignore when full) and `mu_tant::HeldNoteStack` (16 keys, drop the oldest). Ruled 2026-10-16: one `mu_core::HeldNoteStack` in `mu-core/Sequencer/` with capacity and overflow policy as template parameters; each product keeps its numbers and its own MIDI decode wrapper. Before T1. |
 | Products | mu-Clid Lite is still a second target in `mu-clid/` (`MUCLID_LITE_BUILD`, about 60 `#if` sites, `LiteEditor` in mu-Clid's `UI/`, namespace `mu_clid`). Owner made it a separate product on 2026-10-11: it is named mu-Clid MIDI (2026-10-11) and gets `mu-clid-midi/` and `mu_clid_midi` by the staged plan in the family doc (stage 1 identity first; stage 2 moved the pure generators to `mu-core/Sequencer/`). The product exists and compiles nothing from `mu-clid/`: `Rhythm`, `RhythmSequencer`, `EuclideanPanel` and `RhythmCircle` moved to `mu-core` (Stage 2b of the family doc, done; the known exception is closed, backlog #1411). |
 | Saved data | Parameter-id prefixes done 2026-10-12: one index scheme per layer type (`r0_` Rhythm, `v0_` Pattern, `a0_` Arp, `t0_` Track), each product via `layerParamPrefix` / `layerParamId`. Open (optional, on hold): mu-Tant's folder `Voices/` disagrees with its `.muPattern`. See §3 "Saved-data names". |
 

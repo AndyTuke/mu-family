@@ -1,0 +1,22 @@
+# frozen load result for fixture: _default.muRhythm
+layers=1
+load_errors=1
+load_error=Sample '01 Kick.wav' missing from content folder — rhythm loaded without audio.
+capture_bytes=2979
+capture_sha256=21a7a6cb42e1c7411673088c5ebe76626ec2d28759c1c29ef466ca8785ea5332
+--- parameters differing from default (id=plain value)
+r0_aEnvAtk=5.48903e-09
+r0_aEnvDec=0.00464159
+r0_aEnvRel=0.0254778
+r0_aEnvSus=100
+r0_ampLvl=1
+r0_fEnvAtk=5.5326e-08
+r0_fEnvDec=0.00464159
+r0_fEnvRel=0.00464159
+r0_fltCut=20000
+r0_fltRes=0
+r0_hitsA=2
+r0_pEnvAtk=5.48903e-09
+r0_pEnvDec=0.000119196
+r0_pEnvRel=0.000119196
+r0_stepsA=16

@@ -4,6 +4,20 @@
 # (ProcessorBase + MixerEngine + FXChain + the shared editor shell / sidebar /
 # mixer). Shared audio/UI/ProcessorBase come from mu-core via the link.
 
+# ── mu-toni-layer — the Arp layer type as a library (docs/mu-tronic/design.md 2.5) ──
+# The product's own Source/ folders, no move: Audio/ Sequencer/ Modulation/ Persistence/ and UI/ (without the
+# app's SettingsOverlay). INTERFACE, like mu-core, so its sources compile in each consumer's target. The engine
+# side is the target's sources; the layer's UI content is MU_TONI_LAYER_UI_SOURCES, which a GUI consumer adds
+# (a console test target has none of the mu-core UI it needs). A host of the Arp type (this app, mu-Tronic)
+# links it beside mu-core; tests/scripts/check-layer-boundary.ps1 keeps it free of Plugin/ and License/.
+add_library(mu-toni-layer INTERFACE)
+target_sources(mu-toni-layer INTERFACE
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Persistence/ArpParams.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/Arp.cpp"
+)
+target_include_directories(mu-toni-layer INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
+set(MU_TONI_LAYER_UI_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/ArpContent.cpp")
+
 # ── mu-Toni — Standalone + VST3 + CLAP ──────────────────────────────────────
 juce_add_plugin(mu-toni
     COMPANY_NAME "Transwarp Development Project"
@@ -30,7 +44,7 @@ target_sources(mu-toni
         Source/Plugin/PluginProcessor_Preset.cpp
         Source/Plugin/PluginEditor.cpp
         Source/UI/SettingsOverlay.cpp
-        Source/UI/ArpContent.cpp
+        ${MU_TONI_LAYER_UI_SOURCES}   # the layer's UI content (mu-toni-layer)
         # Offline-license verifier + online activation live in mu-core (shared); compiled here + monocypher.c.
         "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
         "${CMAKE_SOURCE_DIR}/mu-core/License/LemonSqueezyClient.cpp"
@@ -64,6 +78,7 @@ target_compile_definitions(mu-toni
 
 target_link_libraries(mu-toni
     PRIVATE
+        mu-toni-layer
         mu-core
         juce::juce_audio_utils
         juce::juce_dsp
@@ -84,6 +99,7 @@ target_sources(mu-toni_Standalone PRIVATE
 
 # Hardware controller support (mu-control) in this Standalone only; a no-op unless MUFAMILY_WITH_CONTROL is ON.
 mu_control_attach(mu-toni_Standalone)
+mu_asio_attach(mu-toni_Standalone)   # ASIO devices when -DMUFAMILY_WITH_ASIO=ON
 
 # CLAP format via clap-juce-extensions (mirrors mu-clid / mu-tant). Creates mu-toni_CLAP.
 clap_juce_extensions_plugin(TARGET mu-toni
@@ -139,12 +155,17 @@ target_sources(mu-toni-tests PRIVATE
     Source/Tests/ToniVoiceTests.cpp     # T2 — wavetable voice + X-Mod render
     Source/Tests/ArpRunnerTests.cpp     # T3 — arp step timing (beat grid / MIDI trigger)
     Source/Tests/ProcessorSeamTests.cpp  # the real PluginProcessor, headless (layer ownership)
+    Source/Tests/FrozenBaselineTests.cpp   # frozen parameter manifest + compat corpus on the real processor
+    Source/Tests/LegacyReverbDecayTests.cpp   # files saved before the reverb Decay knob keep their old Decay
     Source/Tests/LayerCountPersistTests.cpp   # layer count default / persistence / add-remove-swap carry
     Source/Tests/PrefixMigrationTests.cpp   # data saved before the v -> a id-prefix rename still loads
     Source/Tests/ClipLaunchTests.cpp   # clip store / launch on the real processor
     Source/Tests/FxTailTests.cpp   # a full-preset commit keeps the FX tail
     Source/Tests/ModArcTests.cpp   # every mod target publishes its live value for the knob arcs
     Source/Tests/StepPatternTests.cpp   # step pattern: rests, Legato tie end, defaults
+    Source/Tests/GoldenRenderTests.cpp   # golden renders (tests/golden/mu-toni) and the behaviour pins
+    Source/Tests/HeldKeyTests.cpp   # held keys across edits, unrendered blocks and count changes
+    Source/Tests/ArpLayerRecordTests.cpp   # the Arp stream through the real processor (Tests/ArpLayerFixture.h)
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp
@@ -169,6 +190,7 @@ target_include_directories(mu-toni-tests PRIVATE
 )
 
 target_link_libraries(mu-toni-tests PRIVATE
+    mu-toni-layer
     juce::juce_core
     juce::juce_audio_basics
     juce::juce_audio_processors
@@ -185,3 +207,47 @@ target_link_libraries(mu-toni-tests PRIVATE
 target_compile_definitions(mu-toni-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
 
 add_dependencies(mu-toni mu-toni-tests)
+
+# ── mu-toni-layer-tests — the layer with no processor (extraction-plan 4.1) ──
+# Compiled from mu-toni-layer, mu-core's layer-side sources and the test alone: no Plugin/ source, so a
+# layer that secretly needed the processor fails to link. It renders an Arp from hand-built RenderContexts
+# and compares with the stream mu-toni-tests records through the real processor (Tests/ArpLayerFixture.h).
+juce_add_console_app(mu-toni-layer-tests PRODUCT_NAME "mu-toni-layer-tests")
+
+target_sources(mu-toni-layer-tests PRIVATE
+    Source/Tests/TestMain.cpp
+    Source/Tests/LayerLibraryTests.cpp
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/Wavetable/WavetableBank.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/InsertProcessor.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/MultiModeFilter.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/ControlSequence.cpp"
+)
+
+target_compile_features(mu-toni-layer-tests PRIVATE cxx_std_17)
+
+target_include_directories(mu-toni-layer-tests PRIVATE
+    "${CMAKE_SOURCE_DIR}/mu-core"
+    SYSTEM
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+)
+
+target_link_libraries(mu-toni-layer-tests PRIVATE
+    mu-toni-layer
+    juce::juce_core
+    juce::juce_audio_basics
+    juce::juce_audio_processors
+    juce::juce_data_structures
+    juce::juce_events
+    juce::juce_graphics
+    juce::juce_gui_basics
+    juce::juce_dsp
+    juce::juce_audio_formats   # WavetableBank WAV loader
+    juce::juce_recommended_config_flags
+    juce::juce_recommended_warning_flags
+)
+
+target_compile_definitions(mu-toni-layer-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+
+add_dependencies(mu-toni mu-toni-layer-tests)

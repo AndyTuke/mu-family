@@ -12,14 +12,14 @@ The editor inherits `mu-core/UI/EditorShellBase.h` — same TransportBar, About,
 
 **What's implemented**
 - **Dynamic 1–8 voices** (default 1) — `PluginProcessor` supplies `createLayer` and the central `ProcessorBase::addLayer`/`removeLayer`/`swapLayers`/`resetLayer` do the edits (message-thread, guarded by the layers lock; `processBlock` tryLocks). Each voice has 2 wavetable oscillators (`Source/Audio/SynthVoice.{h,cpp}`, `WavetableOscillator.h`, `WavetableBank.{h,cpp}`)
-- 12-scale + 12-root tonal centre (`Source/Audio/Scales.h`), shared across voices
+- 12-scale + 12-root tonal centre (`Source/Audio/TantScales.h`), shared across voices
 - mu-core multimode filter per voice
 - Per-voice APVTS subtrees (`v{N}_*` for N=0..7) — osc1/osc2/xmod/levels/filter/level/gate/insert; per-voice palette colour allocated on add and following the voice through delete/reorder
 - Per-channel mixer params (`ch{N}_lvl/pan/mute/solo`) + `mstr_lvl/pan`, read via cached APVTS atomic pointers (no per-block string building)
 - **Shared left sidebar** — mu-core's `LayerSidebar` with the per-voice `PatternMiniVisual` glyph (`Source/UI/PatternMiniVisual.h`): select / **add** / **delete** / drag-**reorder**
 - `PatternContent` (the content band of mu-core's shared `LayerPanel`, which owns the header strip, presets and modulators) with per-voice rebind via `setLayer(int)` (which repaints so borders/titles track the active voice's palette colour). Layout: per-oscillator sub-panels (wavetable selector + Oct/Semi/Fine/Pos), an X-Mod/Noise row, a Filter row (Type + Cutoff + Resonance + per-voice Level), the shared **`LayerHeaderBar`** (in the `LayerPanel`), the shared **`InsertSubsection`** (INSERT sub-panel, `"v"` prefix), the gate editor, and a right-hand **Mixer sub-panel** (Osc 1 / Osc 2 / Noise levels). Knob colours follow mu-clid's category logic; osc/mixer titles take the per-voice palette colour.
 - **Shared per-voice insert effect** — each voice runs mu-core's `InsertProcessor` post-gate (engine → insert → mixer); selectable via the shared `InsertSubsection` UI (`v{N}_drvChar` + `v{N}_insP1..4`)
-- **Routes through the shared `MixerEngine`** — `processBlock` calls `ProcessorBase::processCoreBlock(..., &renderVoiceCb)`; the render hook fills each channel (modulation → engine → gate → insert) and the shared mixer owns the strip/master mix, so the MixerOverlay VU meters are live
+- **Routes through the shared `MixerEngine`** — `processBlock` calls the shared `ProcessorBase::renderAndMix` driver; each `Pattern` layer fills its channel (modulation → engine → gate → insert, see "Layer library" below) and the shared mixer owns the strip/master mix, so the MixerOverlay VU meters are live
 - **Full mixer FX rack** — channel sends + sidechain + the shared Effect/Delay/Reverb slots + FX returns + master inserts are declared via `mu_mixfx::addGlobalFxParams` (mu-core) and synced to `fxChain`/`mixerEngine` through `ProcessorBase::syncGlobalFxParam`, driven by a `parameterChanged` listener (channel/return/master state kept in sync; an initial + post-preset full sync seeds it). `fxChain.prepare` runs in `prepareToPlay`
 - **Confirmation dialogs** — shared `mu-core/UI/ConfirmDialog.h`: reset/delete a voice prompts first (`mu_ui::confirmAsync`); closing the standalone shows the "Close μ-Tant?" prompt (`mu_ui::confirmQuitAsync` via `Source/Plugin/StandaloneApp.cpp`)
 - **Per-voice modulator chain** — `std::array<Layer, kMaxVoices> voiceSlots` (each with 8 `ControlSequence` + `ModulationMatrix` + `modLock`); the shared mu-core `ModulatorPanel` is the `LayerPanel`'s bottom band and rebinds to the active voice's slot. mu-tant destinations declared in [`Source/Modulation/MuTantModDest.h`](Source/Modulation/MuTantModDest.h)
@@ -77,3 +77,15 @@ Add new product docs at `docs/mu-tant/` mirroring `docs/mu-clid/` as topics get 
 ## File extensions (forward-looking)
 
 Per the family consistency rule: per-layer preset = `.muPattern` (camelCase noun, in `Voices/`); full preset = `.muTant` (plugin-name camelCase, in `Presets/`). Both are wired: `saveLayerPreset`/`loadLayerPreset` (per-voice, the ProcessorBase slot API) and `savePreset`/`loadPreset` (full), declared via `getLayerPresetExtension()` + `getFullPresetExtension()`.
+
+<!-- layer-extraction as-built 2026-10-17 -->
+## Layer library (as built, E4)
+
+- The voice is `Pattern : Layer` in the `mu-tant-layer` INTERFACE library (UI in `MU_TANT_LAYER_UI_SOURCES`). A library file never includes `Plugin/` or `License/` (`check-layer-boundary.ps1`). Tests: `mu-tant-layer-tests` and `mu-tant-tests`.
+- `processBlock` is the shared driver: `resolveBlockTransport`, `renderAndMix`, then `flagPatternSwapBoundaries` over `layerLoopBeats(slot)`. There is no processor-side render chain, `retiring[]` or `voiceEngines`.
+- Slot engines (`voices[slot]`) and the wavetable bank plus `bankLock` stay processor-owned and are bound by the Pattern through `PatternHost` (`UI/PatternHost.h`). Do not move the engine into the Pattern: the oscillator phase is slot-owned and pinned by a golden.
+- Note mode is an app setting pushed to every Pattern; the final-mix gate is the shell's (decision A3). Do not save it in a preset.
+- `Persistence/PatternParams.{h,cpp}` holds the parameter table; `Audio/TantScales.h` was `Scales.h`; `Sequencer/Pattern.{h,cpp}` and `HeldNoteStack.h` are the layer.
+- `setRegrowCutsInPlaceTails(false)` is a temporary opt-out that keeps the old stale-tail behaviour until the retire-regrow golden update; delete it afterwards.
+- `swapLoopBeats` and `SwapBoundary.h` stay in `Plugin/` (host policy).
+- `v{N}_` parameter ids and order, and the preset bytes, are saved data: append only.

@@ -54,14 +54,31 @@ jobs:
             libasound2-dev libjack-jackd2-dev \
             libx11-dev libxext-dev libxinerama-dev libxrandr-dev libxcursor-dev \
             libxcomposite-dev libxrender-dev libxi-dev \
-            libfreetype6-dev libfontconfig1-dev libgl1-mesa-dev
+            libfreetype6-dev libfontconfig1-dev libgl1-mesa-dev ccache
 
-      - name: Configure
+      # Reuse compiled objects between runs: JUCE and mu-core are identical from one release to the next.
+      - name: Cache compiler output (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-${{ runner.os }}-${{ hashFiles('juce-version.txt') }}-${{ github.sha }}
+          restore-keys: ccache-${{ runner.os }}-${{ hashFiles('juce-version.txt') }}-
+
+      - name: Configure (Linux)
+        if: runner.os == 'Linux'
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DMUFAMILY_DEPLOY_TESTERS=OFF -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache
+
+      # MSVC compiles one file at a time unless told otherwise: /MP spreads each project over the cores.
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        env:
+          CXXFLAGS: /MP   # added to CMake's default MSVC flags (setting CMAKE_CXX_FLAGS would replace them)
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DMUFAMILY_DEPLOY_TESTERS=OFF
 
       - name: Build Release plugins
         run: >
-          cmake --build build --config Release --parallel --target
+          cmake --build build --config Release --parallel 4 --target
           mu-clid_VST3 mu-clid_CLAP mu-clid_Standalone
           mu-clid-midi_VST3 mu-clid-midi_CLAP
           mu-tant_VST3 mu-tant_CLAP mu-tant_Standalone
@@ -71,7 +88,7 @@ jobs:
       # mu-link is a Windows desktop app (freeware); built and zipped on the Windows runner only.
       - name: Build mu-link (Windows)
         if: runner.os == 'Windows'
-        run: cmake --build build --config Release --parallel --target mu-link
+        run: cmake --build build --config Release --parallel 4 --target mu-link
 
       # AU is macOS-only (the _AU targets only exist in an APPLE configure — family rule).
       - name: Build AU (macOS only)

@@ -1,0 +1,12 @@
+{
+  "scenario": "insert-effect",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 96000,
+  "tempoBpm": 120.0,
+  "startBeat": 0.0,
+  "numStems": 2,
+  "script": [
+    "Layer 1 insert is the compressor (gain-reduction meter in the fingerprint); layer 2 insert is tape saturation."
+  ]
+}

@@ -24,8 +24,10 @@ public:
         // Skip the coefficient recompute when cutoff/resonance are unchanged.
         if (cutoffHz != lastCutoffHz || resonance != lastResonance)
         {
+            const float q = mu_filter::svfResonanceToQ(resonance);
             svf.setCutoffFrequency(cutoffHz);
-            svf.setResonance(mu_filter::svfResonanceToQ(resonance));
+            svf.setResonance(q);
+            bandpassGain = 1.0f / q;
             lastCutoffHz = cutoffHz; lastResonance = resonance;
         }
 
@@ -43,13 +45,16 @@ public:
         {
             auto*       data = buf.getWritePointer(ch);
             const auto* dry  = dryScratch.getReadPointer(ch);
+            // The SVF bandpass has centre gain Q, so subtract the 0 dB version (x 1/Q): the notch then nulls
+            // the centre at every resonance instead of only where Q happens to be 1.
             for (int i = 0; i < numSamples; ++i)
-                data[i] = dry[i] - data[i];
+                data[i] = dry[i] - data[i] * bandpassGain;
         }
     }
 
 private:
     juce::dsp::StateVariableTPTFilter<float> svf;
+    float bandpassGain = 1.0f;   // 1/Q
     juce::AudioBuffer<float> dryScratch;
     float lastCutoffHz = -1.0f, lastResonance = -1.0f;
 };

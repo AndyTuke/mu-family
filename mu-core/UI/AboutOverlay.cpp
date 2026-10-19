@@ -1,4 +1,5 @@
 #include "AboutOverlay.h"
+#include "License/SupportPromptPolicy.h"
 #include "BuildNumber.h"
 #include "UI/ModalCard.h"   // shared dim + card chrome
 
@@ -10,6 +11,16 @@ AboutOverlay::AboutOverlay()
     addAndMakeVisible(closeBtn);
     addChildComponent(supportBtn);
     addChildComponent(keyBtn);
+
+    // The supporter's tip link, styled like the Settings "Contact Support" link.
+    tipLink.setButtonText("Want to give more?");
+    tipLink.setURL(juce::URL(mu_core::support_prompt::kTipUrl));
+    tipLink.setTooltip("Opens the tip page in your browser");
+    tipLink.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(12.0f))), false,
+                    juce::Justification::centredLeft);
+    tipLink.setColour(juce::HyperlinkButton::textColourId,
+                      MuLookAndFeel::colour(MuLookAndFeel::ColourIds::globalAccent));
+    addChildComponent(tipLink);
 }
 
 void AboutOverlay::setSupportState(SupportState state)
@@ -17,6 +28,7 @@ void AboutOverlay::setSupportState(SupportState state)
     supportState = state;
     supportBtn.setVisible(state == SupportState::Unlicensed);
     keyBtn.setVisible(state == SupportState::Unlicensed);
+    tipLink.setVisible(state == SupportState::Supporter);
     repaint();
 }
 
@@ -59,6 +71,9 @@ void AboutOverlay::resized()
     closeBtn.setBounds(cardX + cardW / 2 - s(36), rowY, s(72), s(28));
     supportBtn.setBounds(closeBtn.getRight() + s(8), rowY, s(80), s(28));
     keyBtn.setBounds(closeBtn.getX() - s(8) - s(100), rowY, s(100), s(28));
+
+    // A supporter's thank-you (painted) and the tip link sit left-aligned above the Close row.
+    tipLink.setBounds(cardX + s(24), rowY - s(22), s(160), s(18));
 }
 
 void AboutOverlay::paint(juce::Graphics& g)
@@ -108,12 +123,12 @@ void AboutOverlay::paint(juce::Graphics& g)
         ty += s(17);
     }
 
-    // A supporter gets a thank-you in the bottom row, left of Close.
+    // A supporter gets a thank-you above the Close row, with the tip link under it.
     if (supportState == SupportState::Supporter)
     {
-        g.setColour(MuLookAndFeel::colour(Id::headingText));
+        g.setColour(MuLookAndFeel::colour(Id::mutedText));
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
-        g.drawText("Thank you for your support", cardX + s(24), cardY + cardH - s(40),
-                   cardW / 2 - s(36) - s(32), s(28), juce::Justification::centredLeft, false);
+        g.drawText("Thank you for supporting " + productName + ".", cardX + s(24), cardY + cardH - s(62),
+                   cardW - s(48), s(18), juce::Justification::centredLeft, false);
     }
 }

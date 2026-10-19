@@ -111,7 +111,7 @@ Bullet "Transport Bar (top) — playback, BPM, presets, mixer, and settings"
 Bullet "Voice Sidebar (left) — one item per active voice, plus an Add button"
 Bullet "Voice Editor (centre) — oscillators, noise, cross-mod, filters, effects, gate editor, and modulators for the selected voice"
 Bullet "Mixer overlay — opened from the transport bar, replacing the editor"
-Bullet "Status Bar (bottom) — the name and value of the control you last touched, with a small Support link at the right-hand end"
+Bullet "Status Bar (bottom) — the name and value of the control you last touched, with a small Support link at the right-hand end. When a newer version is available, an Update available link appears beside Support (see Update Check in the Settings chapter)"
 P "The window has two sizes, Medium and Large, chosen in Settings (Display, Size). Everything scales with it. In the standalone application an Options button at the top left of the window opens the audio and MIDI device settings."
 
 Pic "The voice editor regions." "main-window.png"
@@ -282,7 +282,7 @@ P "Each voice strip has a fader with VU metering, pan, mute and solo, sidechain 
 
 P "The faders use a rectangular cap like a small knob, with a pointer line across its middle that marks the level, running in a groove that lights up from the bottom to the cap. Every fader in the mixer looks and works the same way."
 Pic "Mixer overlay with voice channels, FX returns, and master." "mixer.png"
-Pic "Mixer fader with the knob-style cap and lit groove." ""
+Pic "Mixer fader with the knob-style cap and lit groove." "mixer-fader.png"
 
 # ── 16. Presets ───────────────────────────────────────────────────────────────
 H1 "16. Presets"
@@ -309,7 +309,7 @@ Bullet "Right-click a pad (or Ctrl + click) to open a small menu with Store here
 P "Turning a knob changes only the voice that is playing, not the stored clip. To keep a tweak, store it again with Shift + click. Recalling a clip replaces any changes you have not stored, without asking."
 P "Resetting a voice with Reset also clears its clips; the confirmation then reads This also clears its clips. Deleting a voice removes its clips with it. Clips are saved with full presets (.muTant) and with your DAW session or standalone state. Clips are not saved in single-voice .muPattern files."
 P "In Performance mode the Clip strip cannot be clicked, but it keeps moving so you can see what the control surface is doing."
-Pic "Voice Panel header with the Clip strip: eight numbered pads showing playing, stored, empty and queued states." ""
+Pic "Clip strip at the right end of the Voice Panel header: pad 3 is the playing clip, pad 1 is queued and pulsing, pad 2 holds a stored clip, and pads 4 to 8 are empty." "clip-strip.png"
 
 H2 "Performance Mode (Standalone)"
 P "Performance mode turns the standalone app into a locked gig view. The screen shows the preset that is playing, exactly as normal, but you cannot change anything with the mouse or keyboard. Only a connected control surface (set up through MIDI mapping) switches presets and voices. Performance mode is not available in the VST3 or CLAP plug-in."
@@ -319,22 +319,22 @@ P "Open the chooser from the Performances entry at the bottom of the preset drop
 Bullet "On the left is the list of your saved performances. Click one to open it. The list scrolls."
 Bullet "On the right are the eight places in the performance. Each row shows its number, the preset name, which product the preset is for, and buttons. An empty row has a + Preset button. A filled row has Replace, Up, Down and Remove: Replace picks a different preset, Up and Down move the preset in the order, and Remove empties the place."
 Bullet "A preset whose file can no longer be found stays in its place with a red lamp and the word missing. Replace it or remove it."
-Bullet "New starts an empty performance. Save stores the performance under a name and an optional description. Rename changes its name. Delete removes the saved file after asking you to confirm. Saving under the name of another performance asks before it overwrites."
+Bullet "New starts an empty performance. Load opens a .muPerformance file that you choose from disk into the list; it never saves anything. Save stores the performance under a name and an optional description. Rename changes its name. Delete removes the saved file after asking you to confirm. Saving under the name of another performance asks before it overwrites."
 Bullet "Use makes this performance the one that Performance mode plays, then closes the chooser. It does not change the preset that is playing now. If the performance is new or has changes you have not saved, Use saves it first (a new one asks for a name). Use is unavailable while the performance has no presets."
 Bullet "While you have unsaved changes the title shows the name followed by (unsaved). Closing the chooser, clicking New, or opening another saved performance then asks Discard unsaved changes? Choose Discard to lose the changes, or cancel to keep working."
 P "To fill a place, click + Preset or Replace. The Preset Browser opens in pick mode: its Load button reads Pick, and the Performances button is hidden. Select a preset and click Pick (or double-click it) to put it in the place and return to the chooser with your other edits kept. Close returns to the chooser without picking. The browser lists presets for this product only."
-Pic "Performance chooser: saved performances on the left, the eight place rows on the right, and the New, Save, Rename, Delete and Use buttons." ""
+Pic "Performance chooser with a new performance holding four presets in places 1 to 4, and the New, Load, Save, Rename, Delete and Use buttons. The list of saved performances on the left stays empty until you save one." "performance-chooser.png"
 H3 "Entering"
 P "Click the Perf button (or press Ctrl+P). The preset that is playing carries on. Any open window, such as the Preset Browser, Mixer or Settings, closes without saving. If no performance has been chosen yet, the Performance chooser opens instead and the mode stays off."
 H3 "What You See"
-Bullet "The Perf button lights in the app colour, and a thin lit line runs along the bottom of the Transport Bar."
+Bullet "The Perf button lights in the app colour and its label changes to LIVE, and a thin lit line runs along the bottom of the Transport Bar."
 Bullet "The preset dropdown, New and Save are replaced by a step indicator: a display showing the position and name of the playing preset (for example 3/8 Bassline), followed by a dimmed next preset when there is room, and a row of eight lamps. A bright lamp is the playing preset, a dim lamp is an available preset, a pulsing lamp is the preset queued to start, and an unlit lamp is an empty place. A red lamp marks a preset whose file is missing."
 Bullet "When the control surface queues a switch, the playing preset stays on screen until the switch lands. The queued lamp pulses, an orange SWP badge appears, the display shows the queued preset in pulsing text, and the status bar reads Queued followed by the preset. All of this clears when the switch happens or is cancelled. The switch lands at the point set by the Swap dropdown."
 Bullet "In the sidebar, the Add button is replaced by a read-only indicator such as Layer 3/5. The screen follows the control surface: selecting a voice on the surface shows that voice on screen."
 Bullet "Nothing dims or changes colour; knobs, meters and the playhead keep moving, so you can see what the surface is doing."
 H3 "Leaving"
 P "Press and hold the Perf button for one second. The button fills from left to right while you hold, and the status bar reads Hold to leave Performance mode. Let go early to stay in the mode. A plain click does nothing, so you cannot leave by accident. When you leave, the normal controls come back."
-Pic "Transport Bar in Performance mode: lit Perf button, step indicator with eight lamps, and the lit line along the bottom edge." ""
+Pic "Transport Bar in Performance mode: the Perf button lit and reading LIVE, the step indicator with its row of eight lamps, and the lit line along the edge of the bar." "performance-transport.png"
 
 
 # ── 17. Settings ──────────────────────────────────────────────────────────────
@@ -345,6 +345,7 @@ Bullet "Audio, Master Vol — overall output level"
 Bullet "Display, Size — Medium or Large window. Reopen the app for the label fonts to rescale fully."
 Bullet "Transport, Tempo — internal clock, 20.0 to 300.0 BPM with one decimal, also editable from the transport BPM field"
 Bullet "Time Signature (standalone) — in Settings under General, Transport: 2/4, 3/4, 4/4, 5/4, 6/4, 7/4, 5/8, 6/8, 7/8, 9/8 or 12/8; default 4/4. It changes how the bar.beat.sixteenth Position readout counts (a beat is a quarter note in x/4 and an eighth note in x/8). Patterns still run in four-beat bars."
+Bullet "Updates, Check for updates — a tick box, ticked by default. Whether the app checks once a day for a newer version (see Update Check below)."
 P "MIDI (right column):"
 Bullet "MIDI Clock, Source (standalone) — Internal, or MIDI In to follow an external MIDI clock, with a Sync Offset to compensate for audio latency (see below)."
 Bullet "Note Mode, Mode — Free or Note (see Note Mode)."
@@ -352,6 +353,13 @@ Bullet "MIDI Program Change — the Voice Presets and Full Presets buttons open 
 P "A Contact Support link at the bottom of the page is there when you need help."
 
 Pic "Settings overlay open over the main window." "settings.png"
+
+H2 "Update Check"
+P "mu-Tant can tell you when a newer version is available. Once a day it asks the transwarp.me website for the latest version number. When a newer version exists, a small Update available link appears at the right of the Status Bar, beside the Support link. Hover over it to see which version is out and which one you have."
+Bullet "Click the link to open the download page in your web browser. mu-Tant never downloads or installs anything itself. The link then stays hidden for that version and comes back only when a still newer one is released."
+Bullet "Right-click the link and choose Hide this notice to hide it for that version without opening the page."
+Bullet "The link never appears in Performance mode."
+P "Privacy: the check is a plain request for a public file. It sends nothing about you: no name, no identifier, no version number and no details of your computer. The app compares the answer with its own version on your machine. To switch the check off, open Settings and, under General, untick the Check for updates box. With the box unticked, mu-Tant sends no request at all and shows no link. The box is ticked by default."
 
 H2 "MIDI Clock Sync (Standalone)"
 P "When running as a standalone application, mu-Tant can follow an external MIDI clock from a drum machine, groovebox, or DAW. First choose the MIDI input that carries the clock in the standalone's MIDI settings. Selecting the input does not turn sync on by itself. To follow the clock, open Settings and, in the MIDI Clock section, set Source to MIDI In; set it back to Internal to turn sync off and ignore any incoming clock. A Messages choice appears, which decides what mu-Tant takes from the clock:"
@@ -365,7 +373,7 @@ Bullet "Green  —  Locked. mu-Tant is following the clock. Hover over the lamp 
 Bullet "Red  —  Lost. The clock pulses stopped arriving for about a quarter of a second while the master was playing, for example because a cable came loose or the master device was switched off. mu-Tant stops the transport, and the status bar shows `"MIDI Clock: Lost, transport stopped`" once, without you having to hover. When the pulses come back, mu-Tant carries on by itself."
 P "The lamp is hidden with Transport only, because the clock's ticks are not used, and whenever Source is Internal. The BPM display works as before: it is locked and shows the clock's tempo while the clock sets the tempo."
 P "Sync Offset  —  with Source set to MIDI In, a Sync Offset field appears in the MIDI Clock section of Settings. It runs from −50 to +250 ms (the label reads simply Sync offset) and defaults to 0. The value is shown with a sign, for example +25. The arrows step 1 ms; Shift+click steps 10 ms. A positive value makes mu-Tant play earlier than the clock says. Enter your audio output latency here (about 20 to 40 ms on Windows WASAPI) so the sound lands on the beat of a hardware master. mu-Tant remembers the setting between sessions."
-Pic "Transport bar with the Clock lamp lit green (locked) between the BPM display and the Position readout."
+Pic "Transport bar with MIDI clock sync switched on and no clock arriving yet: the Clock lamp sits dim amber (waiting) between the BPM display and the Position readout." "clock-lamp.png"
 
 H2 "Note Mode"
 P "By default (Free) mu-Tant ignores MIDI notes: the drone plays all the time and the gate follows the transport. Setting Note Mode, Mode to Note turns mu-Tant into a keyboard instrument: the drone is silent until you hold a key, and fades out (in about 8 milliseconds) when you release the last one. While a key is held, every voice is transposed so its tonal centre (the Root) sits on the note you are holding, and the scale, oscillator and modulation settings still apply on top. With several keys held, the most recently pressed one sounds. The gate pattern keeps running on the transport as usual."

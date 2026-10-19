@@ -1,4 +1,5 @@
 #include "ModulationMatrix.h"
+#include <atomic>
 
 #include <algorithm>
 #include <cmath>
@@ -73,7 +74,17 @@ void ModulationMatrix::setCurve(const std::string& id, float curve)
 
 void ModulationMatrix::rebuildCache()
 {
-    ++revision;   // structural change — let UI know its cached "is assigned" flags are stale
+    // Structural change — let UI know its cached "is assigned" flags are stale. Revisions come from one
+    // process-wide counter so two matrices never share a value (a Layer::adoptDefaults swap of matrices must
+    // not make a knob think its cached flag is current).
+    static std::atomic<int> nextRevision { 0 };
+    revision = ++nextRevision;
+
+    // Publish the assigned destinations for lock-free UI polling (assignedSnapshot).
+    auto snap = std::make_shared<AssignedSnapshot>();
+    snap->revision = revision;
+    for (const auto& a : assignments) snap->destinations.push_back(a.destinationId);
+    std::atomic_store(&published, std::shared_ptr<const AssignedSnapshot>(std::move(snap)));
 
     cachedSortOrder = getSortedOrder();
 

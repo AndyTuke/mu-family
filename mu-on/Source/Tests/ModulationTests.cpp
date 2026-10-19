@@ -79,7 +79,7 @@ public:
         {
             // Each engine table's ROW ORDER is silently coupled to three things at once: the
             // 1-based dropdown id (addItem(alias, i+1)), the resolved out[] index, and the
-            // positional argument order of that engine's setParams() (the GrooveVoices
+            // positional argument order of that engine's setParams() (the TrackEngine
             // dispatch). An insert/reorder/delete in any one would re-route modulation to the
             // wrong engine param with no other failure - so pin the full ordered id list per
             // engine here. If a dest is added, update BOTH this list and the engine dispatch.

@@ -1,0 +1,13 @@
+{
+  "scenario": "oversize-block",
+  "sampleRate": 48000,
+  "preparedBlockSize": 512,
+  "lengthFrames": 96000,
+  "tempoBpm": 120.0,
+  "startBeat": 0.0,
+  "numStems": 2,
+  "script": [
+    "Contract pin P7: host blocks larger than the prepared size (512). The two-layers state (two layers with different pools, rates, wavetables and filters, panned apart), no scripted events.",
+    "Schedules: fixed512, ragged (its 1024 block is twice the prepared size) and oversize (4096, 1, 2048 repeated). The shared driver chunks every block above 512 frames into calls of at most 512 (C8)."
+  ]
+}

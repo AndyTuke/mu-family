@@ -6,8 +6,8 @@
 #include "TestProcessorBase.h"
 #include <type_traits>
 
-// The allocation counter lives with the global operator new in MidiControlTests.cpp.
-namespace mu_test_alloc { extern thread_local bool counting; extern thread_local std::size_t count; }
+// The allocation counter: AllocationProbe.h, whose global operators MidiControlTests.cpp carries.
+#include "AllocationProbe.h"
 
 // An AsyncUpdater base would bring back an audio-thread-callable triggerAsyncUpdate().
 static_assert(! std::is_base_of_v<juce::AsyncUpdater, ProcessorBase>,
@@ -130,11 +130,11 @@ struct DeferredWorkTests : juce::UnitTest
             midi.addEvent(juce::MidiMessage::createSysExMessage(payload.data(), (int) payload.size()), 0);
             midi.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8) 100), 1);
 
-            mu_test_alloc::count = 0; mu_test_alloc::counting = true;
+            mu_alloc::ArmedNewOnly counted;
             p.queueMidiProgramChanges(midi);
-            mu_test_alloc::counting = false;
+            counted.stop();
 
-            expectEquals((int) mu_test_alloc::count, 0);
+            expectEquals(counted.allocs(), 0);
             expect(! p.mailboxPending());
             expectEquals(midi.getNumEvents(), 2);
         }

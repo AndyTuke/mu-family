@@ -100,10 +100,12 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     rhythmContent.onOutputModeChanged = [this] { if (isMixerVisible()) mixerOverlay.loadFromApvts(); };
     for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
         proc.apvts.addParameterListener("r" + juce::String(i) + "_outMode", this);
+    startTimerHz(mu_ui::kUiRefreshHz);   // drains the flags the parameter listener raises
 
     rhythmContent.onRhythmRenamed = [this]
     {
         sidebar.repaintItems();
+        mixerOverlay.refreshSidechainSources();
         if (isMixerVisible()) mixerOverlay.refresh();
     };
 
@@ -112,6 +114,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         if (r == layerPanel.getLayer())
             layerPanel.setLayer(r);
         sidebar.repaintItems();
+        mixerOverlay.refreshSidechainSources();
         if (isMixerVisible()) mixerOverlay.refresh();
     };
 
@@ -137,6 +140,7 @@ PluginEditor::~PluginEditor()
 {
     // Clear product-owned processor callbacks before teardown — same UAF
     // contract as the shell base's destructor.
+    stopTimer();
     proc.apvts.removeParameterListener("eff_algo", this);
     for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
         proc.apvts.removeParameterListener("r" + juce::String(i) + "_outMode", this);
@@ -187,27 +191,24 @@ void PluginEditor::onCategoriesRefreshed(const juce::StringArray& merged)
     rhythmContent.setKnownCategories(merged);
 }
 
-// ── APVTS listener — host automation of eff_algo ────────────────────────────
-// fires from any thread. Marshal to the message thread before touching the UI.
+// ── APVTS listener — host automation of eff_algo and the rhythms' output modes ──
+// Fires from any thread, the audio thread under DAW automation: no allocation, no UI work. It raises a
+// flag and timerCallback refreshes the UI on the message thread.
 void PluginEditor::parameterChanged(const juce::String& parameterID, float)
 {
     // A rhythm's output mode (Sample / MIDI) decides whether its mixer strip is drawn active.
     if (parameterID.endsWith("_outMode"))
-    {
-        juce::Component::SafePointer<PluginEditor> safeThis(this);
-        juce::MessageManager::callAsync([safeThis]
-        {
-            if (safeThis && safeThis->isMixerVisible()) safeThis->mixerOverlay.loadFromApvts();
-        });
-        return;
-    }
-    if (parameterID != "eff_algo") return;
+        outModeDirty.store(true, std::memory_order_release);
+    else if (parameterID == "eff_algo")
+        effAlgoDirty.store(true, std::memory_order_release);
+}
 
-    juce::Component::SafePointer<PluginEditor> safeThis(this);
-    juce::MessageManager::callAsync([safeThis]
-    {
-        if (safeThis) safeThis->syncVoiceEffectSendLabel();
-    });
+void PluginEditor::timerCallback()
+{
+    if (outModeDirty.exchange(false, std::memory_order_acq_rel) && isMixerVisible())
+        mixerOverlay.loadFromApvts();
+    if (effAlgoDirty.exchange(false, std::memory_order_acq_rel))
+        syncVoiceEffectSendLabel();
 }
 
 // True when rhythm `r` is set to send MIDI notes instead of playing its sample.

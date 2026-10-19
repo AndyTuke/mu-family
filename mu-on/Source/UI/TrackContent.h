@@ -1,7 +1,9 @@
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "Plugin/PluginProcessor.h"
+#include "UI/TrackHost.h"                  // what the content reads from the layer's host
+#include "Sequencer/Track.h"                // the layer: its row, envelope and modulation matrix
+#include "Modulation/MuOnModDest.h"        // the engines' modulation target tables
 #include "UI/ParamKnobGrid.h"                // mu-core: spec-driven knob/combo grid
 #include "UI/StepRows.h"
 #include "UI/Components/DropdownSelect.h"
@@ -13,6 +15,8 @@
 #include <array>
 #include <functional>
 #include <memory>
+
+class ProcessorBase;
 
 namespace mu_on
 {
@@ -28,7 +32,9 @@ namespace mu_on
 class TrackContent : public juce::Component, private juce::Timer
 {
 public:
-    explicit TrackContent(PluginProcessor& processor);
+    // `base` is for the shared mu-core sections that take the processor (this content uses none yet);
+    // everything the content itself reads comes through `host`.
+    TrackContent(ProcessorBase& base, TrackHost& host);
     ~TrackContent() override { stopTimer(); }
 
     // Show track `idx`: its engine's controls, its Rumble source and envelope, its row selected.
@@ -59,7 +65,7 @@ private:
     void sourceChosen(int id);
     juce::Colour layerColour() const;
 
-    PluginProcessor& proc;
+    TrackHost& host;
     int        currentLayer = 0;
     EngineType shownEngine  = EngineType::Kick;
     juce::uint64 shownLayerSignature = 0;   // the live layers' engines, for the Source list

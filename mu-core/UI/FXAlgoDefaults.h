@@ -8,8 +8,8 @@
 // Derived from FXAlgorithmDef::effectAlgorithms()[i].params[j].defaultVal.
 // When adding a new send-FX algorithm, append a matching entry here.
 //
-// Note: reverb algorithms (room/hall/plate/spring) all share the same six APVTS
-// param IDs and ranges (rev_size/pre/diff/damp/mod/dirt) — no aliasing on switch,
+// Note: reverb algorithms (room/hall/plate/spring) all share the same seven APVTS
+// param IDs and ranges (rev_size/decay/pre/diff/damp/mod/dirt) — no aliasing on switch,
 // so per-algorithm reverb defaults are not needed.
 
 struct EffectAlgoDefaults {

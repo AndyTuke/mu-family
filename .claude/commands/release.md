@@ -29,6 +29,7 @@ For each affected product (`site/mu-clid-releases.html`, `site/mu-tant-releases.
 - Turn the "Next release · In testing" section into a dated `v1.1.0.NNN` "Current" release (`rel-pill testing` → `rel-pill current`, `Next release`/`in testing` → `v1.1.0.NNN`/`released <D Month YYYY>`).
 - Insert a fresh empty In-Testing section above it; demote the previous release (remove its `rel-pill current`).
 - `site/download.html`: bump the hardcoded `data-version`/`data-reldate` fallbacks (live values come from the GitHub latest-release tag via JS, so this is just the pre-JS default).
+- **Update-check data:** run `pwsh scripts/write-latest-json.ps1 -Products <slugs released this time>` (slugs: mu-clid, mu-clid-midi, mu-tant, mu-toni, mu-on, mu-link; a product left out keeps its old entry), then `pwsh tests/scripts/check-latest-json.ps1`. This writes `site/latest.json`, which every app reads to show its "Update available" link. Push it only once the CI run has finished and the GitHub release assets exist, so the link never points at a download that is not there yet.
 - Commit + push the site (Netlify auto-deploys; no CI).
 
 ## 5. Report

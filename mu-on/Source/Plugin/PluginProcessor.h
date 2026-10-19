@@ -3,11 +3,10 @@
 #include "Plugin/ProcessorBase.h"        // mu-core base
 #include "Plugin/MixerFxParams.h"         // mu-core: shared global-FX / mixer APVTS layout
 #include "Plugin/MidiClockSync.h"         // mu-core: shared MIDI-clock slave
-#include "Plugin/TrackParams.h"
+#include "Persistence/TrackParams.h"
 #include "Sequencer/StepPattern.h"
-#include "Sequencer/GrooveSequencer.h"
-#include "Audio/GrooveVoices.h"
 #include "Sequencer/Track.h"
+#include "UI/TrackHost.h"   // what the Track layer's UI reads from its host
 
 #include <array>
 #include <atomic>
@@ -30,7 +29,7 @@
 namespace mu_on
 {
 
-class PluginProcessor : public ProcessorBase
+class PluginProcessor : public ProcessorBase, public TrackHost
 {
 public:
 
@@ -42,13 +41,14 @@ public:
 
     // ── AudioProcessor ───────────────────────────────────────────────────────
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
-    void releaseResources() override { resetSwapPlayState(); }
+    void releaseResources() override;
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
 
     const juce::String getName() const override { return juce::String (juce::CharPointer_UTF8 ("\xce\xbc-On")); }
+    juce::String getProductSlug() const override { return "mu-on"; }   // key in latest.json
     bool acceptsMidi()  const override { return true; }
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }
@@ -69,7 +69,7 @@ public:
     // A track is named after the engine it runs; the name is not saved, it follows the engine.
     juce::String getLayerName(int idx)       const override
     {
-        return (idx >= 0 && idx < mu_limits::kMaxLayers) ? juce::String(engineName(engineOf(idx))) : juce::String();
+        return (idx >= 0 && idx < mu_limits::kMaxLayers) ? juce::String(engineName(getTrackEngine(idx))) : juce::String();
     }
     // The palette colour is allocated per track and follows it through delete / reorder.
     int          getLayerColourIndex(int idx) const override
@@ -90,11 +90,11 @@ public:
     // ── The tracks ───────────────────────────────────────────────────────────
     // Layer `i` as its mu-On Track (colour, modulation, step row, Rumble envelope). The layers live in
     // ProcessorCore; the editor's ModulatorPanel binds to the shown one through this.
-    Track&       getTrack(int i) noexcept       { return layerAs<Track>(juce::jlimit(0, mu_limits::kMaxLayers - 1, i)); }
+    Track&       getTrack(int i) noexcept override { return layerAs<Track>(juce::jlimit(0, mu_limits::kMaxLayers - 1, i)); }
     const Track& getTrack(int i) const noexcept { return layerAs<Track>(juce::jlimit(0, mu_limits::kMaxLayers - 1, i)); }
 
     // The engine track `i` runs (its `t{N}_eng` parameter).
-    EngineType engineOf(int i) const noexcept
+    EngineType getTrackEngine(int i) const noexcept override
     {
         const auto* p = (i >= 0 && i < mu_limits::kMaxLayers) ? engineParam[(size_t) i] : nullptr;
         return engineFromIndex(p != nullptr ? juce::roundToInt(p->load(std::memory_order_relaxed)) : 0);
@@ -102,13 +102,21 @@ public:
 
     // Post-matrix value of modulation target `dest` (a row of `engine`'s table) on track `i`, in the
     // target knob's parameter units; NaN while the track runs another engine. Written each block by
-    // GrooveVoices; read by the knobs' live arcs.
-    float getModLive(int i, EngineType engine, int dest) const noexcept { return grooveVoices.getModLive(i, engine, dest); }
+    // the track; read by the knobs' live arcs.
+    float getModLive(int i, EngineType engine, int dest) const noexcept override { return getTrack(i).getModLive(engine, dest); }
 
     // Switch track `i` to `engine`: every engine keeps its settings on the track, the step row and
     // envelope stay, and the track's modulation assignments that target another engine's parameters
     // are dropped. Message thread.
-    void selectEngine(int i, EngineType engine);
+    void selectTrackEngine(int i, EngineType engine) override;
+
+    // ── TrackHost: what TrackContent and StepRows read (message thread) ──────────
+    juce::AudioProcessorValueTreeState& getTrackParameters() noexcept override { return apvts; }
+    int          getTrackCount() const override                 { return getNumLayers(); }
+    juce::String getTrackName(int layer) const override         { return getLayerName(layer); }
+    int          getTrackColourIndex(int layer) const override  { return getLayerColourIndex(layer); }
+    bool         isTrackTransportPlaying() const noexcept override { return isInternalPlaying(); }
+    double       getTrackTransportBeat() const noexcept override   { return getInternalBeatPos(); }
 
     // The first live track running Kick, or 0 when there is none (a Rumble's default source).
     int firstKickTrack() const noexcept;
@@ -179,30 +187,43 @@ private:
     juce::ValueTree     toLayerState(const juce::ValueTree& tree) const;
     void                applyStateTree(const juce::ValueTree& state);
 
-    // Per-channel render hook handed to the shared MixerEngine — copies each track's block, rendered by
-    // GrooveVoices::renderAll before the mixer runs.
-    MixerEngine::RenderChannelFn renderChannelCb;
-
-    // 909 sequencer — owns the grid pattern; clocked off the internal transport each block.
+    // The 909 grid as a view over the tracks' rows (the editor and the tests address rows by slot); each
+    // track clocks its own row.
     StepPattern     stepPattern;
-    GrooveSequencer sequencer { stepPattern };
-    std::unique_ptr<GrooveVoices> grooveVoicesStore = std::make_unique<GrooveVoices>();   // every track slot's engines (large: kept off the stack)
-    GrooveVoices&   grooveVoices = *grooveVoicesStore;
 
     // Cached APVTS pointers for the product sequencer params and each track's engine choice.
     std::atomic<float>* seqSwingParam  = nullptr;
     std::atomic<float>* seqAccentParam = nullptr;
     std::array<std::atomic<float>*, mu_limits::kMaxLayers> engineParam {};
 
-    double currentSampleRate = 44100.0;
-    int    currentBlockSize  = 512;
-    bool   wasPlaying = false;   // audio-thread only — detects the play→stop edge to silence voices
+    // Written by prepareToPlay (the host's thread), read by createLayer (the message thread).
+    std::atomic<double> currentSampleRate { 44100.0 };
+    std::atomic<int>    currentBlockSize  { 512 };
 
     // Hot-swap: parsed preset trees per track + one full preset, committed at the pattern wrap.
     void applyTrackTree(int track, const juce::ValueTree& tree);
 
     // A Rumble track whose source is itself, gone, or another Rumble starts on the first Kick.
     void ensureRumbleSource(int track);
+
+    // The global groove (seq_swing, seq_accent) into one row, or into every slot's row: the grid is still
+    // global, so every row takes it on a state load and every block. Atomics only (any thread).
+    void seedRowGroove(StepRow& row) const noexcept;
+    void seedRowGrooves() noexcept;
+
+    // Track engines follow their `t{N}_eng` parameter (engineParamChanged); a change from another thread
+    // than the message thread is flagged here and built by commitDeferredWork.
+    struct EngineParamListener : juce::AudioProcessorValueTreeState::Listener
+    {
+        EngineParamListener(PluginProcessor& p, int s) : owner(p), slot(s) {}
+        void parameterChanged(const juce::String&, float) override { owner.engineParamChanged(slot); }
+        PluginProcessor& owner;
+        int slot;
+    };
+    void engineParamChanged(int slot);
+    void commitDeferredWork() override;
+    std::array<std::unique_ptr<EngineParamListener>, mu_limits::kMaxLayers> engineListeners;
+    std::atomic<unsigned> enginesPending { 0 };   // slots whose engine waits for the message thread
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };

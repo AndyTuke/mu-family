@@ -17,7 +17,8 @@ namespace mu_clid_midi {
 // The mu-Clid MIDI editor: TransportBar + RhythmCircle + EuclideanPanel, with the MIDI note and
 // accent controls. No sidebar, voice section or mixer.
 class PluginEditor : public juce::AudioProcessorEditor,
-                     public juce::AudioProcessorValueTreeState::Listener
+                     public juce::AudioProcessorValueTreeState::Listener,
+                     private juce::Timer
 {
 public:
     explicit PluginEditor(PluginProcessor&);
@@ -26,12 +27,16 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
-    // Host automation arrives on whatever thread setValueNotifyingHost runs on
-    // (audio thread under DAW automation); marshal to message thread before
-    // touching the dropdown / knob.
+    // Host automation arrives on whatever thread setValueNotifyingHost runs on (the audio thread under DAW
+    // automation), so this only raises a flag: no allocation, no UI work. timerCallback reads the parameter
+    // and updates the dropdown / knob on the message thread.
     void parameterChanged(const juce::String& parameterID, float newValue) override;
 
 private:
+    void timerCallback() override;
+    std::atomic<bool> noteDirty   { false };
+    std::atomic<bool> accentDirty { false };
+
     PluginProcessor& proc;
 
     MuLookAndFeel lookAndFeel;

@@ -47,7 +47,6 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     {
         const juce::Colour colour { 0xff7F77DD };
         rhythmCircle.setPlayState(&proc.rhythmPlayState,
-                                  &proc.beatFraction,
                                   &proc.sequencerPlaying,
                                   colour);
         euclidPanel.setRhythm(0);
@@ -108,6 +107,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // Catch host automation of the note and accent params so the dropdown + knob track DAW automation lanes.
     proc.apvts.addParameterListener(kMidiNoteId,  this);
     proc.apvts.addParameterListener(kAccentAmtId, this);
+    startTimerHz(mu_ui::kUiRefreshHz);   // drains the flags the parameter listener raises
 
     // Size dropdown — Normal / Large, right-aligned in the transport bar row.
     sizeDropdown.addItem("Normal", 1);
@@ -148,28 +148,29 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
 PluginEditor::~PluginEditor()
 {
+    stopTimer();
     proc.onUiScaleChanged = nullptr;
     proc.apvts.removeParameterListener(kAccentAmtId, this);
     proc.apvts.removeParameterListener(kMidiNoteId,  this);
     setLookAndFeel(nullptr);
 }
 
-void PluginEditor::parameterChanged(const juce::String& parameterID, float newValue)
+void PluginEditor::parameterChanged(const juce::String& parameterID, float /*newValue*/)
 {
-    juce::Component::SafePointer<PluginEditor> safe(this);
-    auto refresh = [safe, parameterID, newValue]
-    {
-        auto* self = safe.getComponent();
-        if (! self) return;
-        if (parameterID == kMidiNoteId)
-            self->noteSelector.setSelectedId((int) newValue + 1, false);
-        else if (parameterID == kAccentAmtId)
-            self->accentKnob.setValue((double) newValue, juce::dontSendNotification);
-    };
-    if (juce::MessageManager::getInstance()->isThisTheMessageThread())
-        refresh();
-    else
-        juce::MessageManager::callAsync(std::move(refresh));
+    if (parameterID == kMidiNoteId)
+        noteDirty.store(true, std::memory_order_release);
+    else if (parameterID == kAccentAmtId)
+        accentDirty.store(true, std::memory_order_release);
+}
+
+void PluginEditor::timerCallback()
+{
+    if (noteDirty.exchange(false, std::memory_order_acq_rel))
+        if (const auto* note = proc.apvts.getRawParameterValue(kMidiNoteId))
+            noteSelector.setSelectedId((int) note->load() + 1, false);
+    if (accentDirty.exchange(false, std::memory_order_acq_rel))
+        if (const auto* amt = proc.apvts.getRawParameterValue(kAccentAmtId))
+            accentKnob.setValue((double) amt->load(), juce::dontSendNotification);
 }
 
 void PluginEditor::paint(juce::Graphics& g)

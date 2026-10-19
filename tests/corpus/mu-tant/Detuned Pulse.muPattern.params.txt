@@ -1,0 +1,17 @@
+# frozen load result for fixture: Detuned Pulse.muPattern
+layers=1
+load_errors=0
+capture_bytes=3395
+capture_sha256=30b41b8ecf3d0d0b57f0911f3eb74d4e821216a7c7ffadb8572ff805fad9f949
+--- parameters differing from default (id=plain value)
+v0_drvChar=10
+v0_flt_cut=680
+v0_flt_res=0.35
+v0_flt_type=4
+v0_insP1=0.38
+v0_o1_oct=-1
+v0_o1_wt=1
+v0_o2_fine=8
+v0_o2_lvl=-4
+v0_o2_oct=-1
+v0_o2_wt=1

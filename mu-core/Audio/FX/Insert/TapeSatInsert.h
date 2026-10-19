@@ -32,6 +32,7 @@ public:
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh,
                  const VoiceParams& p, float& /*grOut*/) override
     {
+        const int nChState = juce::jmin(nCh, 2);   // state is kept for two channels; extra channels pass through
         // Slot 0 = Drive 0..100, Slot 1 = Output -24..0 dB, Slot 3 = Tone 200..20000 Hz (log).
         const float drive    = insertSlot(p, 0);
         const float outputDb = insertSlot(p, 1);
@@ -45,24 +46,23 @@ public:
         // toneHz also jumps per block but the OnePoleLP doesn't expose a smoothed
         // setter — leaving as-is; the audible artefact on tone-knob sweep is the
         // filter coefficient step, much smaller than the gain step.
-        for (int ch = 0; ch < nCh; ++ch)
+        for (int ch = 0; ch < nChState; ++ch)
             toneFilter[ch].prepare(toneHz, (float)currentSampleRate);
-        for (int ch = 0; ch < nCh; ++ch)
+        // Sample-major: each smoothed gain advances once per sample and every channel uses it.
+        auto chans = buf.getArrayOfWritePointers();
+        for (int i = 0; i < ns; ++i)
         {
-            auto*  data = buf.getWritePointer(ch);
-            float& di   = dcIn [ch < 2 ? ch : 0];
-            float& dout = dcOut[ch < 2 ? ch : 0];
-            for (int i = 0; i < ns; ++i)
+            const float pg = smoothedPreGain.getNextValue();
+            const float og = smoothedOutGain.getNextValue();
+            for (int ch = 0; ch < nChState; ++ch)
             {
-                const float pg = (ch == 0) ? smoothedPreGain.getNextValue()
-                                           : smoothedPreGain.getCurrentValue();
-                const float og = (ch == 0) ? smoothedOutGain.getNextValue()
-                                           : smoothedOutGain.getCurrentValue();
-                const float sat = std::tanh(data[i] * pg);
+                float& di   = dcIn [ch];
+                float& dout = dcOut[ch];
+                const float sat = std::tanh(chans[ch][i] * pg);
                 const float dc  = sat - di + dcCoeff * dout;
                 di   = sat;
                 dout = dc;
-                data[i] = toneFilter[ch].process(dc) * og;
+                chans[ch][i] = toneFilter[ch].process(dc) * og;
             }
         }
     }

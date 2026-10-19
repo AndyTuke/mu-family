@@ -15,6 +15,18 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
     : ProcessorCore(props),
       apvts(*this, nullptr, stateTreeType, std::move(layout))
 {
+    // The block driver's mixer hook: channel r is slot r's scratch, copied exactly (raw pointers, so a
+    // buffer's "cleared" flag can never turn the copy into a clear). Built once here: no allocation per block.
+    renderState.copyToMixer = [this](int r, juce::AudioBuffer<float>& buf, int n)
+    {
+        if (r < 0 || r >= mu_limits::kMaxLayers) return;
+        const auto& src = renderState.scratch[(size_t) r];
+        const int nCh = juce::jmin(buf.getNumChannels(), src.getNumChannels());
+        const int len = juce::jmin(n, src.getNumSamples());
+        for (int c = 0; c < nCh; ++c)
+            juce::FloatVectorOperations::copy(buf.getWritePointer(c), src.getReadPointer(c), len);
+    };
+
     // Performance mode's live state: how a performance item is staged and cancelled is this processor's
     // own full-preset path, so the state itself never names a product or the hot-swap machinery.
     mu_core::LiveState::Callbacks cb;
@@ -462,7 +474,26 @@ void ProcessorBase::syncFxSlotParam(const juce::String& id, float v)
         auto* a = apvts.getRawParameterValue(p); return a && a->load() > 0.5f;
     };
 
-    if      (id == "eff_algo") eff.setAlgorithm((int) v);
+    if      (id == "eff_algo")
+    {
+        eff.setAlgorithm((int) v);
+
+        // The new algorithm starts from its own member defaults while eff_p0..4 still hold the old algorithm's
+        // knob values (a host automating the algorithm leaves them alone), so the knobs and the sound disagree.
+        // Push the knob values into the new algorithm. The editor's algorithm menu rewrites the knobs itself
+        // right after this, which then overrides what is pushed here.
+        static constexpr const char* kEffKnobIds[5] = { "eff_p0", "eff_p1", "eff_p2", "eff_p3", "eff_p4" };
+        const auto& algos = FXAlgorithmRegistry::effectAlgorithms();
+        const int ai = eff.getAlgorithmIndex();
+        if (ai >= 0 && ai < (int) algos.size())
+        {
+            const auto& params = algos[(size_t) ai].params;
+            for (int i = 0; i < (int) params.size() && i < 5; ++i)
+                if (auto* knob = apvts.getRawParameterValue(kEffKnobIds[i]))
+                    eff.setParam(params[(size_t) i].id,
+                                 params[(size_t) i].minVal + knob->load() * (params[(size_t) i].maxVal - params[(size_t) i].minVal));
+        }
+    }
     else if (id == "eff_en")   eff.setEnabled(v > 0.5f);
     else if (id.startsWith("eff_p"))
     {
@@ -484,10 +515,24 @@ void ProcessorBase::syncFxSlotParam(const juce::String& id, float v)
     else if (id == "dly_fb")     dly.setFeedback(v);
     else if (id == "dly_spread") dly.setSpread(v);
     else if (id == "dly_dirt")   dly.setDirt(v);
-    else if (id == "rev_algo")   rev.setAlgorithm((int) v);
+    else if (id == "rev_algo")
+    {
+        rev.setAlgorithm((int) v);   // applies the algorithm's preset (size, damp, diffusion, mod, pre-delay)
+
+        // As with the effect: a host automating the algorithm leaves the knobs where they were, so put the
+        // knob values back into the slot. The editor's algorithm menu then rewrites the knobs from the preset.
+        struct KnobToSlot { const char* apvtsId; const char* slotId; };
+        static constexpr KnobToSlot kRevKnobs[] = { { "rev_size", "size" }, { "rev_decay", "decay" }, { "rev_pre", "predelay" },
+                                                    { "rev_diff", "diffusion" }, { "rev_damp", "damp" },
+                                                    { "rev_mod", "mod" } };
+        for (const auto& k : kRevKnobs)
+            if (auto* knob = apvts.getRawParameterValue(k.apvtsId))
+                rev.setParam(k.slotId, knob->load());
+    }
     else if (id == "rev_en")     rev.setEnabled(v > 0.5f);
     else if (id == "rev_lvl")    rev.setLevel(v);
     else if (id == "rev_size")   rev.setParam("size",      v);
+    else if (id == "rev_decay")  rev.setParam("decay",     v);
     else if (id == "rev_pre")    rev.setParam("predelay",  v);
     else if (id == "rev_diff")   rev.setParam("diffusion", v);
     else if (id == "rev_damp")   rev.setParam("damp",      v);
@@ -756,7 +801,30 @@ void ProcessorBase::applyComposedState(const juce::ValueTree& state)
     if (! canEditLayers()) return;
 
     // Count last, so the audio thread never sees a count ahead of the data; then the colours (a state without colours keeps the current ones).
-    numLayers.store(savedLayerCount(state));
+    // Thread contract: hosts normally call setStateInformation on the message thread, and the editor's modulation
+    // reads, the Stager and the products' lock-free paths all assume that. The layout store below is the one part
+    // that is also safe from a host thread, so it goes through the packed layout word under layoutWriteLock: a lost
+    // or misattached serial would break the retire bin's same-block hand-over. A product that parks a tail before this call holds layoutWriteLock
+    // across both (it is re-entrant), so the park's nextLayoutSerial() is the serial this store carries.
+    // TryLock mode only until Published-mode quiesce exists: this store and the parameter moves above assume
+    // the audio thread's try-lock protocol.
+    jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);
+    const int newCount = savedLayerCount(state);
+    int oldCount = 0;
+    {
+        const juce::ScopedLock lw(layoutWriteLock);
+        oldCount = numLayers.load(std::memory_order_relaxed);
+        storeLayerCount(newCount);
+        // A regrow into slots whose spares were fading in place: count first (above), then cut, as addLayer does
+        // (retire bin rule R1.3), so no block has neither the live layer nor the tail and a later shrink parks
+        // afresh. Inside the same layout hold (order layoutWriteLock, binMutex), so no structural edit can move
+        // another slot's tail into these rows between the store and the cut.
+        if (regrowCutsInPlaceTails)
+            for (int s = oldCount; s < newCount; ++s)
+                retireBin.cutSlot(s);
+    }
+    if (retireBin.countPolicy() == mu_core::RetireBin::CountPolicy::CutAtCount)
+        retireBin.cutAtOrAbove(newCount);
     const auto toks = juce::StringArray::fromTokens(state.getProperty("voiceColours", "").toString(), ",", "");
     for (int i = 0; i < mu_limits::kMaxLayers && i < toks.size(); ++i)
         if (layers[(size_t) i] != nullptr)
@@ -787,21 +855,29 @@ int ProcessorBase::addLayer()
 {
     const int n = numLayers.load(std::memory_order_relaxed);
     if (! canEditLayers() || n >= mu_limits::kMaxLayers) return -1;
+    jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);   // the edits' Published-mode quiesce is not built yet
 
     // Phase 1: build and prepare the new layer before anything is locked.
     auto fresh = createLayer(n);
     if (fresh == nullptr) return -1;
     cancelPendingSwap(n);                       // the new slot must carry no stale staged swap
     fresh->colourIndex = firstUnusedColourIndex();
+    fresh->bindParams(apvts, n);                // the render contract: bound before it is published (no-op by default)
 
     // Declared before the suspend guard so a replaced spare is released after processing resumes.
     std::unique_ptr<Layer> retired;
     ScopedSuspend suspend(*this);
 
-    // Phase 2: publish under layersLock (pointer move, count, a clean mixer strip), microseconds.
+    // Phase 2: publish under layersLock (pointer move, count, a clean mixer strip), microseconds. The layout
+    // writer lock comes first (lock order layoutWriteLock, layersLock, binMutex): the count store advances the serial.
     {
+        const juce::ScopedLock lw(layoutWriteLock);
         const juce::ScopedLock sl(layersLock);
         retired = publishLayerLocked(std::move(fresh));
+        // A regrow into a slot whose spare was fading in place: the count is published first, then the entry
+        // is cut, so no block has neither the live layer nor the tail; and the spare `retired` is released only
+        // after this cut (retire bin rules R1.3 and R1.4). Nothing is parked in any product today.
+        retireBin.cutSlot(n);
         mixerEngine.channels[(size_t) n].reset();
         mixerEngine.resetSidechainEnv(n);
         layersMoved(n, n);
@@ -832,6 +908,7 @@ bool ProcessorBase::removeLayer(int idx)
 {
     const int n = numLayers.load(std::memory_order_relaxed);
     if (! canEditLayers() || n <= 1 || idx < 0 || idx >= n) return false;   // the last layer stays
+    jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);   // the edits' Published-mode quiesce is not built yet
 
     // Phase 1: the down-shift renumbers every layer from idx upward, so every staged per-layer swap
     // (keyed by index) would land on the wrong slot. A staged full preset replaces all slots and wins.
@@ -849,8 +926,10 @@ bool ProcessorBase::removeLayer(int idx)
     std::unique_ptr<Layer> retired;             // released last, after processing resumes
     ScopedSuspend suspend(*this);
 
-    // Phase 2: pointer shift, strip state shift and sidechain re-pointing under layersLock.
+    // Phase 2: pointer shift, strip state shift and sidechain re-pointing under layersLock (after the layout
+    // writer lock: the count store advances the serial).
     {
+        const juce::ScopedLock lw(layoutWriteLock);
         const juce::ScopedLock sl(layersLock);
         mixerEngine.renumberSidechainsAfterRemove(idx);   // before the strips shift down
         retired = unpublishLayerLocked(idx, std::move(spare));
@@ -862,9 +941,19 @@ bool ProcessorBase::removeLayer(int idx)
         }
         mixerEngine.channels[(size_t) (n - 1)].reset();
         mixerEngine.resetSidechainEnv(n - 1);
+        // The removed slot's tails are cut; owned tails above it move down with their layers (empty bins in
+        // every product today).
+        retireBin.removeRow(idx, n);
+        if (retireBin.countPolicy() == mu_core::RetireBin::CountPolicy::CutAtCount)
+            retireBin.cutAtOrAbove(n - 1);
         layersReordered(LayerEdit::Remove, idx, -1);
         layersMoved(idx, n - 1);                // the shifted slots and the vacated top one
     }
+
+    // The moved layers re-bind their parameter pointers to their new slot (C9) while layerEditInFlight still
+    // keeps the audio thread from rendering them; outside layersLock because binding looks parameters up by id.
+    for (int d = idx; d < n; ++d)
+        if (layers[(size_t) d] != nullptr) layers[(size_t) d]->bindParams(apvts, d);
 
     // Phase 3: parameter values. Strips that ducked from the removed layer now duck from nothing and
     // the others follow their layer down (translated before the values shift).
@@ -895,6 +984,7 @@ bool ProcessorBase::swapLayers(int a, int b)
 {
     const int n = numLayers.load(std::memory_order_relaxed);
     if (! canEditLayers() || a < 0 || b < 0 || a >= n || b >= n || a == b) return false;
+    jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);   // the edits' Published-mode quiesce is not built yet
 
     // Phase 1: staged swaps are keyed by index, so swapping the two slots would misdirect them.
     cancelPendingSwap(a);
@@ -904,16 +994,23 @@ bool ProcessorBase::swapLayers(int a, int b)
 
     // Phase 2: pointers and strip state exchanged under layersLock; sidechain sources re-pointed first.
     {
+        const juce::ScopedLock lw(layoutWriteLock);
         const juce::ScopedLock sl(layersLock);
         mixerEngine.renumberSidechainsAfterSwap(a, b);
         swapLayersLocked(a, b);
+        storeLayerCount(numLayers.load(std::memory_order_relaxed), std::memory_order_relaxed);   // same count, next serial
         mixerEngine.swapChannelState(a, b);
+        retireBin.swapRows(a, b);              // owned tails follow their slot, in-place ones are cut
         layers[(size_t) a]->onMoved(a);
         layers[(size_t) b]->onMoved(b);
         layersReordered(LayerEdit::Swap, a, b);
         layersMoved(a, a);                      // only the two exchanged slots, not those between
         layersMoved(b, b);
     }
+
+    // Re-bind the two moved layers to their new slots (C9), still before any block can render them.
+    layers[(size_t) a]->bindParams(apvts, a);
+    layers[(size_t) b]->bindParams(apvts, b);
 
     // Phase 3: parameter values. A strip that ducked from one swapped layer now ducks from the other
     // (translated before the values swap, so each strip's own source moves with it).

@@ -1,0 +1,12 @@
+{
+  "name": "engine-automation-midplay",
+  "notes": "Kick, Snare, Rumble(source Kick); t0_eng, t1_eng and t2_eng automated from a non-message thread at blocks 30, 55, 80 and 100.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 120000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 3,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "events": [{ "block": 30, "label": "automate t0_eng = Bass" }, { "block": 55, "label": "automate t1_eng = Hat" }, { "block": 80, "label": "automate t0_eng = Kick" }, { "block": 100, "label": "automate t2_eng = Snare" }]
+}

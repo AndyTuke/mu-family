@@ -34,6 +34,33 @@ namespace mu_seam_test
         ProcessorBase::ScopedStorageRoot scope;
     };
 
+    // Sets an environment variable for its lifetime (empty value = unset) and restores the previous value.
+    // A processor reads MU_DETERMINISTIC_NOISE in its constructor, so scope this around the construction.
+    struct ScopedEnvVar
+    {
+        ScopedEnvVar(const char* varName, const char* value) : name(varName)
+        {
+            const auto old = juce::SystemStats::getEnvironmentVariable(name, {});
+            hadOld = old.isNotEmpty();
+            oldValue = old;
+            set(value);
+        }
+        ~ScopedEnvVar() { set(hadOld ? oldValue.toRawUTF8() : ""); }
+
+    private:
+        void set(const char* value)
+        {
+           #if JUCE_WINDOWS
+            _putenv_s(name, value);
+           #else
+            if (value[0] == 0) unsetenv(name); else setenv(name, value, 1);
+           #endif
+        }
+        const char* name;
+        bool hadOld = false;
+        juce::String oldValue;
+    };
+
     // True when a process with this executable name is running (Windows only; elsewhere false). Used to
     // tell a write by a real instance of the product from one the test made.
     inline bool processIsRunning(const juce::String& exeName)
@@ -288,6 +315,56 @@ namespace mu_seam_test
             renderer.stop();
             t.expect(! renderer.sawInsaneOutput(), "block size " + juce::String(n) + ": output stayed finite and bounded");
             t.expect(! p.layerEditInFlight.load(), "no edit left the in-flight flag set");
+        }
+    }
+
+    // The packed layout word follows every count store of a real product (construction, layers added, a host-state
+    // restore, a full-preset load): LayoutWord::count(layout) == numLayers, and one block through the shared
+    // driver (renderAndMix) sees every live layer. A stale word would make an adopting product render too few
+    // layers, or none.
+    template <class Proc>
+    inline void checkLayoutWordFollowsCount(juce::UnitTest& t)
+    {
+        t.beginTest("the packed layout word follows the live count: construction, added layers, host restore, preset load");
+        TempStorage storage;
+        auto check = [&t](ProcessorBase& p, const juce::String& when)
+        {
+            t.expectEquals(p.layoutWordCountForTest(), p.layerCountMirrorForTest(), "layout word vs numLayers " + when);
+            p.setRateAndBufferSizeDetails(48000.0, 512);
+            p.prepareToPlay(48000.0, 512);
+            const int renderedBefore = p.getLayerRenderProbe().blocksRendered;   // the counter is cumulative
+            const auto probe = p.renderOneLayerBlockForTest(48000.0, 512);
+            t.expectEquals(probe.blocksRendered - renderedBefore, 1, "the driver rendered the block " + when);
+            t.expectEquals(probe.mixCount, p.layerCountMirrorForTest(), "the driver saw every live layer " + when);
+            t.expect(probe.mixCount > 0, "at least one live layer " + when);
+            p.releaseResources();
+        };
+
+        auto a = std::make_unique<Proc>();
+        check(*a, "after construction");
+        a->addLayer();   // a product with a fixed count refuses: the count stays, the check still holds
+        a->addLayer();
+        check(*a, "after adding layers");
+
+        juce::MemoryBlock session;
+        a->getStateInformation(session);
+        const auto presetDir = storage.root.getChildFile("layout-word-presets");
+        presetDir.createDirectory();
+        const bool saved = a->saveFullPresetTo(presetDir.getChildFile("count"));
+        t.expect(saved, "the full preset was written");
+
+        auto b = std::make_unique<Proc>();
+        b->setStateInformation(session.getData(), (int) session.getSize());
+        t.expectEquals(b->layerCountMirrorForTest(), a->layerCountMirrorForTest(), "the restore brought the count back");
+        check(*b, "after a host-state restore");
+
+        const auto files = presetDir.findChildFiles(juce::File::findFiles, false);
+        if (! files.isEmpty())
+        {
+            auto c = std::make_unique<Proc>();
+            c->loadPreset(files[0]);
+            t.expectEquals(c->layerCountMirrorForTest(), a->layerCountMirrorForTest(), "the preset load brought the count back");
+            check(*c, "after a full-preset load");
         }
     }
 }

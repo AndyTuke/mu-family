@@ -40,7 +40,7 @@ struct MuOnModArcTests : juce::UnitTest
 
             beginTest(juce::String(engineName(engine)) + ": every target's live value follows its modulation assignment");
             {
-                proc.selectEngine(0, engine);
+                proc.selectTrackEngine(0, engine);
 
                 // A constant full-scale unipolar sequence feeds the matrix.
                 auto& track = proc.getTrack(0);
@@ -78,6 +78,38 @@ struct MuOnModArcTests : juce::UnitTest
                 const auto other = engineFromIndex((e + 1) % kNumEngineTypes);
                 expect(std::isnan(proc.getModLive(0, other, 0)), "a different engine's live value is NaN");
             }
+        }
+
+        beginTest("a block that misses the track's matrix lock holds the last resolved values (C12)");
+        {
+            proc.selectTrackEngine(0, EngineType::Bass);
+            auto& track = proc.getTrack(0);
+            auto& cs = track.controlSequences[0];
+            cs.mode       = ControlSequence::Mode::Stepped;
+            cs.polarity   = ControlSequence::Polarity::Unipolar;
+            cs.stepValues = { 100.0f };
+            int count = 0;
+            const ModDestEntry* table = destsForEngine(EngineType::Bass, count);
+            const int cut = 2;   // b.cut.prop
+            const auto id = layerParamPrefix(0) + table[cut].param;
+            const auto range = proc.apvts.getParameterRange(id);
+            setParam(proc.apvts, id, range.convertFrom0to1(0.5f));
+
+            ModulationAssignment a;
+            a.id = "hold"; a.sourceId = "cs0_output"; a.destinationId = table[cut].id; a.depth = 40.0f;
+            expect(track.modulationMatrix.addAssignment(a));
+            block();
+            const float modulated = proc.getModLive(0, EngineType::Bass, cut);
+            expect(range.convertTo0to1(modulated) > 0.7f, "the assignment moves the cutoff up");
+
+            track.modLock.store(true, std::memory_order_release);   // stands in for the message thread editing the modulators
+            block();
+            expectEquals(proc.getModLive(0, EngineType::Bass, cut), modulated, "held: the cutoff does not drop to its knob for the missed block");
+            track.modLock.store(false, std::memory_order_release);
+
+            track.modulationMatrix.removeAssignment("hold");
+            block();
+            expect(std::abs(range.convertTo0to1(proc.getModLive(0, EngineType::Bass, cut)) - 0.5f) < 0.02f, "and it follows the matrix again");
         }
 
         proc.releaseResources();

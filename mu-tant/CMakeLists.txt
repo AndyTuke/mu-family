@@ -10,6 +10,24 @@ juce_add_binary_data(mu-tant-resources
     SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/mu-tant.png"
 )
 
+# ── mu-tant-layer — the Pattern layer type as a library (docs/mu-tronic/design.md 2.5) ──
+# The product's own Source/ folders, no move: Audio/ Sequencer/ Modulation/ Persistence/ and UI/ (without the
+# app's SettingsOverlay). INTERFACE, like mu-core, so its sources compile in each consumer's target. The engine
+# side is the target's sources; the layer's UI content is MU_TANT_LAYER_UI_SOURCES, which a GUI consumer adds
+# (a console test target has none of the mu-core UI it needs). A host of the Pattern type (this app, mu-Tronic)
+# links it beside mu-core; tests/scripts/check-layer-boundary.ps1 keeps it free of Plugin/ and License/.
+add_library(mu-tant-layer INTERFACE)
+target_sources(mu-tant-layer INTERFACE
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Persistence/PatternParams.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/Pattern.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/GatePattern.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Audio/SynthVoice.cpp"
+)
+target_include_directories(mu-tant-layer INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
+set(MU_TANT_LAYER_UI_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/PatternContent.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/GatingDesigner.cpp")
+
 # ── mu-Tant — Standalone + VST3 + CLAP ──────────────────────────────────────
 juce_add_plugin(mu-tant
     COMPANY_NAME "Transwarp Development Project"
@@ -51,11 +69,8 @@ target_sources(mu-tant
         Source/Plugin/PluginProcessor_APVTS.cpp
         Source/Plugin/PluginProcessor_Preset.cpp
         Source/Plugin/PluginEditor.cpp
-        Source/UI/PatternContent.cpp
-        Source/UI/GatingDesigner.cpp
         Source/UI/SettingsOverlay.cpp
-        Source/Sequencer/GatePattern.cpp
-        Source/Audio/SynthVoice.cpp
+        ${MU_TANT_LAYER_UI_SOURCES}   # the layer's UI content (mu-tant-layer)
         # Offline-license verifier lives in mu-core (shared); compiled here + monocypher.c.
         "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
         "${CMAKE_SOURCE_DIR}/mu-core/License/LemonSqueezyClient.cpp"
@@ -89,6 +104,7 @@ target_compile_definitions(mu-tant
 
 target_link_libraries(mu-tant
     PRIVATE
+        mu-tant-layer
         mu-core
         mu-tant-resources
         juce::juce_audio_utils
@@ -110,6 +126,7 @@ target_sources(mu-tant_Standalone PRIVATE
 
 # Hardware controller support (mu-control) in this Standalone only; a no-op unless MUFAMILY_WITH_CONTROL is ON.
 mu_control_attach(mu-tant_Standalone)
+mu_asio_attach(mu-tant_Standalone)   # ASIO devices when -DMUFAMILY_WITH_ASIO=ON
 
 # CLAP format via clap-juce-extensions (mirrors mu-clid). Creates mu-tant_CLAP.
 clap_juce_extensions_plugin(TARGET mu-tant
@@ -189,11 +206,17 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/HotSwapBoundaryTests.cpp  # hot-swap boundary predicates + stager handshake
     Source/Tests/NoDemoCapsTests.cpp      # unlicensed is fully functional: 8 voices, long gates, saves
     Source/Tests/ProcessorSeamTests.cpp    # the real PluginProcessor, headless (ScopedStorageRoot, worker-thread processBlock)
+    Source/Tests/FrozenBaselineTests.cpp   # frozen parameter manifest + compat corpus on the real processor
+    Source/Tests/LegacyReverbDecayTests.cpp   # files saved before the reverb Decay knob keep their old Decay
     Source/Tests/NudgeInputTests.cpp       # shared mu-core NudgeInput: whole numbers and the BPM decimals mode
     Source/Tests/ClipLaunchTests.cpp   # clip store / launch on the real processor
+    Source/Tests/GoldenRenderTests.cpp   # golden renders of the real processor (tests/golden/mu-tant)
+    Source/Tests/ExtractionPinTests.cpp   # pins: Note mode, retire fade and its stale tail, structural edit, oversize
+    Source/Tests/PatternLayerRecordTests.cpp   # the Pattern stream through the real processor (Tests/PatternLayerFixture.h)
+    Source/Tests/ModHoldTests.cpp   # C12: a matrix-lock miss holds the last modulated values
+    Source/Tests/RetireIsolationTests.cpp   # C3: a retiring Pattern reads only its snapshot (the twin test)
+    Source/Tests/PatternToneModTests.cpp   # a smooth Semi modulator moves in scale degrees (the Pattern path)
     Source/UI/GatingDesigner.cpp
-    Source/Sequencer/GatePattern.cpp
-    Source/Audio/SynthVoice.cpp
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/Wavetable/WavetableBank.cpp"
     # Editor-free APVTS layout factory — lets the ApvtsLayout test exercise the
     # real createParameterLayout() without pulling in PluginEditor/UI.
@@ -222,6 +245,7 @@ target_include_directories(mu-tant-tests PRIVATE
 )
 
 target_link_libraries(mu-tant-tests PRIVATE
+    mu-tant-layer
     juce::juce_core
     juce::juce_audio_basics
     juce::juce_audio_processors    # APVTS + AudioProcessor for the layout coverage test
@@ -240,6 +264,50 @@ target_compile_definitions(mu-tant-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSE
 # Built as part of ALL_BUILD from day 1 — mu-tant's DSP changes get caught
 # every build, matching mu-clid's full-coverage discipline.
 add_dependencies(mu-tant mu-tant-tests)
+
+# ── mu-tant-layer-tests — the layer with no processor (extraction-plan 4.1) ──
+# Compiled from mu-tant-layer, mu-core's layer-side sources and the test alone: no Plugin/ source, so a
+# layer that secretly needed the processor fails to link. It renders a Pattern from hand-built RenderContexts
+# and compares with the stream mu-tant-tests records through the real processor (Tests/PatternLayerFixture.h).
+juce_add_console_app(mu-tant-layer-tests PRODUCT_NAME "mu-tant-layer-tests")
+
+target_sources(mu-tant-layer-tests PRIVATE
+    Source/Tests/TestMain.cpp
+    Source/Tests/LayerLibraryTests.cpp
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/Wavetable/WavetableBank.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/InsertProcessor.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/MultiModeFilter.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/ControlSequence.cpp"
+)
+
+target_compile_features(mu-tant-layer-tests PRIVATE cxx_std_17)
+
+target_include_directories(mu-tant-layer-tests PRIVATE
+    "${CMAKE_SOURCE_DIR}/mu-core"
+    SYSTEM
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+)
+
+target_link_libraries(mu-tant-layer-tests PRIVATE
+    mu-tant-layer
+    juce::juce_core
+    juce::juce_audio_basics
+    juce::juce_audio_processors
+    juce::juce_data_structures
+    juce::juce_events
+    juce::juce_graphics
+    juce::juce_gui_basics
+    juce::juce_dsp
+    juce::juce_audio_formats   # WavetableBank WAV loader
+    juce::juce_recommended_config_flags
+    juce::juce_recommended_warning_flags
+)
+
+target_compile_definitions(mu-tant-layer-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+
+add_dependencies(mu-tant mu-tant-layer-tests)
 
 # ── mu-tant-wavetable-gen — offline tool that writes the factory wavetable .wav set ──
 # Self-contained (no mu-core/plugin deps). EXCLUDE_FROM_ALL — built + run on demand:

@@ -1,0 +1,15 @@
+{
+  "name": "note-mode-held-notes",
+  "notes": "Note mode on: 60 held, 67 on top (pitch follows the last note), 64 on top of that, 64 off (back to 67), 67 off, 60 off (gate closes), then 48 on and off. No sends, so stem and master are the same signal.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 96000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 1,
+  "drainDeferredWorkEveryBlock": false,
+  "isolateStemsByMute": false,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "timedActions": [{ "frame": 0, "label": "Note mode on" }],
+  "midiByBlock": [{ "block": 4, "offset": 100, "message": "noteOn 60" }, { "block": 40, "offset": 0, "message": "noteOn 67" }, { "block": 70, "offset": 300, "message": "noteOn 64" }, { "block": 100, "offset": 0, "message": "noteOff 64" }, { "block": 130, "offset": 0, "message": "noteOff 67" }, { "block": 150, "offset": 0, "message": "noteOff 60" }, { "block": 175, "offset": 0, "message": "noteOn 48" }, { "block": 180, "offset": 0, "message": "noteOff 48" }]
+}

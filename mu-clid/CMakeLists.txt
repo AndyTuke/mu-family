@@ -125,6 +125,7 @@ target_sources(mu-clid_Standalone PRIVATE
 )
 # Hardware controller support (mu-control) in this Standalone only; a no-op unless MUFAMILY_WITH_CONTROL is ON.
 mu_control_attach(mu-clid_Standalone)
+mu_asio_attach(mu-clid_Standalone)   # ASIO devices when -DMUFAMILY_WITH_ASIO=ON
 
 # ── Build-number increment (runs every build; Debug bumps, Release reuses) ────
 # Writes mu-core/BuildNumber.h (About panel) AND regenerates the Windows version
@@ -257,12 +258,17 @@ target_sources(mu-clid-tests PRIVATE
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked), its
     # collaborators and the licence glue, so tests construct the product class itself.
     Source/Tests/ProcessorSeamTests.cpp
+    Source/Tests/FrozenBaselineTests.cpp   # frozen parameter manifest + compat corpus on the real processor
+    Source/Tests/LegacyReverbDecayTests.cpp   # files saved before the reverb Decay knob keep their old Decay
     Source/Tests/ClidScriptedEditRenderTests.cpp
     Source/Tests/ClidLayerStructureTests.cpp
     Source/Tests/ClidEditContinuityTests.cpp
     Source/Tests/HotSwapCancelTests.cpp        # staged swaps vs take-back, failed load, host restore, stopped load
     Source/Tests/ClipLaunchTests.cpp           # clip bank: store / launch / persistence on the real processor
     Source/Tests/FxTailTests.cpp               # a full-preset commit keeps the FX tail
+    Source/Tests/SamplePreviewTests.cpp        # an oversize host block is chunked to the prepared size
+    Source/Tests/GoldenRenderTests.cpp         # golden renders of the real processor (tests/golden/mu-clid)
+    Source/Tests/ExtractionPinTests.cpp        # pins: drained tails, count policy, longest tail, edit mid-play, oversize, trigger source
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_APVTS.cpp
     Source/Plugin/PluginProcessor_Modulation.cpp

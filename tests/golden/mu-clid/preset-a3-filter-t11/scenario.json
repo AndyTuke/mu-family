@@ -1,0 +1,12 @@
+{
+  "name": "preset-a3-filter-t11",
+  "notes": "The A3_filter full preset with the T11 rhythm preset loaded into a second rhythm.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 192000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 2,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "events": []
+}

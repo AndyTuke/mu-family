@@ -1,0 +1,14 @@
+{
+  "scenario": "loop-accent-steps",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 96000,
+  "tempoBpm": 120.0,
+  "startBeat": 0.0,
+  "numStems": 1,
+  "script": [
+    "Loop mode, 1/16 at 120 bpm, A minor chord pool over 2 octaves.",
+    "Eight-step pattern: steps 2 and 5 are rests (Off), steps 1, 4 and 7 are Accented at 70 percent.",
+    "No scripted events."
+  ]
+}

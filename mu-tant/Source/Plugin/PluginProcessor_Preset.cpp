@@ -1,5 +1,4 @@
 #include "Plugin/PluginProcessor.h"
-#include "Audio/Scales.h"
 #include "Modulation/MuTantModDest.h"
 #include "Modulation/ModulatorSerialise.h"   // mu-core: shared modulator (de)serialise
 #include "Sequencer/GatePatternSerialise.h"  // mu-tant: gate (de)serialise
@@ -21,18 +20,6 @@ namespace mu_tant
 
 namespace
 {
-    // mu-tant modulation-destination validator (drops assignments to dests this
-    // product doesn't expose; source IDs are ControlSequence ids, left unchecked).
-    // Used only by the preset-load paths below.
-    bool isValidModDest(const std::string& id)
-    {
-        for (int i = 0; i < kModDestCount; ++i)
-            if (id == kModDestTable[i].id) return true;
-        return false;
-    }
-
-    juce::String voicePrefix(int v) { return "v" + juce::String(v) + "_"; }
-
     // ── X-Mod preset migration (best-effort) ─────────────────────────────────
     // Old presets / patches carry xmod_fm / _am / _ring (+ modulator assignments to
     // xmod.fm/.am/.ring); the 2-lane redesign replaces them. Old FM depth → Lane A index in
@@ -103,50 +90,16 @@ namespace
 void PluginProcessor::initVoiceState()
 {
     juce::StringArray prefixes;
-    for (int v = 0; v < mu_limits::kMaxLayers; ++v) prefixes.add(voicePrefix(v));
+    for (int v = 0; v < mu_limits::kMaxLayers; ++v) prefixes.add(layerParamPrefix(v));
     initLayerState(prefixes);
 }
 
-// A voice's non-parameter data onto its node.
-void PluginProcessor::writeVoiceExtras(int v, juce::ValueTree& node) const
+// A saved user wavetable path → its bank index (-1: none, or the file is gone). Lock-free resolve first:
+// a hot-swap stage pre-loaded the table, so the boundary commit never takes bankLock (taking it would bail
+// the audio render to silence for that block). Only a load that wasn't pre-loaded (stopped / host restore —
+// audio silent then) takes the locked disk path.
+int PluginProcessor::resolvePatternWavetable(const juce::String& path)
 {
-    if (getPattern(v).osc1UserPath.isNotEmpty()) node.setProperty("o1WtPath", getPattern(v).osc1UserPath, nullptr);
-    if (getPattern(v).osc2UserPath.isNotEmpty()) node.setProperty("o2WtPath", getPattern(v).osc2UserPath, nullptr);
-    node.appendChild(mu_pp::serialiseModulators(getPattern(v)),                 nullptr);
-    node.appendChild(serialiseGate(getPattern(v).gate),                 nullptr);
-    node.appendChild(serialiseGate(getPattern(v).filterGate, "FilterGate"), nullptr);
-    node.appendChild(serialiseGate(getPattern(v).pitchGate,  "PitchGate"),  nullptr);
-}
-
-void Pattern::writeExtras(juce::ValueTree& node) const { owner.ptr->writeVoiceExtras(owner.ptr->voiceOf(*this), node); }
-void Pattern::applyExtras(const juce::ValueTree& node) { owner.ptr->applyVoiceExtras(owner.ptr->voiceOf(*this), node); }
-
-// A voice's non-parameter data from its node. Absent children clear (an invalid tree empties a
-// gate / the modulators); per-pattern spinlocks and modLock guard the audio thread, so no
-// layersLock is needed.
-void PluginProcessor::applyVoiceExtras(int v, const juce::ValueTree& node)
-{
-    mu_pp::clearModulators(getPattern(v));
-    mu_pp::deserialiseModulators(node.getChildWithName("Modulators"), getPattern(v), {}, isValidModDest);
-    refreshPitchQuantFlags(v);   // assignments changed → refresh stepped-pitch flags
-
-    const int maxCells = std::numeric_limits<int>::max();
-    deserialiseGate(node.getChildWithName("Gate"),       getPattern(v).gate,   maxCells);
-    deserialiseGate(node.getChildWithName("FilterGate"), getPattern(v).filterGate, maxCells);
-    deserialiseGate(node.getChildWithName("PitchGate"),  getPattern(v).pitchGate,  maxCells);
-
-    resolveUserWavetable(node.getProperty("o1WtPath").toString(), getPattern(v).osc1UserPath, getPattern(v).osc1UserIndex);
-    resolveUserWavetable(node.getProperty("o2WtPath").toString(), getPattern(v).osc2UserPath, getPattern(v).osc2UserIndex);
-}
-
-// A user wavetable path → its bank index. A missing file keeps the path (the UI shows "missing")
-// but resolves to -1, so the oscillator falls back to its factory selection. Lock-free resolve
-// first: a hot-swap stage pre-loaded the table, so the boundary commit never takes bankLock
-// (taking it would bail the audio render to silence for that block). Only a load that wasn't
-// pre-loaded (stopped / host restore — audio silent then) takes the locked disk path.
-void PluginProcessor::resolveUserWavetable(const juce::String& path, juce::String& storedPath, std::atomic<int>& index)
-{
-    storedPath = path;
     int idx = -1;
     if (path.isNotEmpty())
     {
@@ -157,7 +110,7 @@ void PluginProcessor::resolveUserWavetable(const juce::String& path, juce::Strin
             if (f.existsAsFile()) idx = bankIndexFor(f);
         }
     }
-    index.store(idx);
+    return idx;
 }
 
 // Any saved state (host session or full preset, either format) in the composed shape, with each
@@ -282,38 +235,34 @@ void PluginProcessor::applyFullPresetTree(const juce::ValueTree& state)
     // for the whole commit (the hot-swap glitch). Without it, a concurrent block sees
     // old-or-new per structure (≤1 block, inaudible) instead.
 
-    // Message thread only, which serialises it against every structural edit (add / remove / swap /
-    // reset): hosts restore state on their main thread (VST3 IComponent::setState, the CLAP state
-    // extension's load, the standalone's own message loop), and the staged commit runs there too.
-    // That is also why the retire-tail setup below may arm retiring[] without layersLock.
+    // Structural edits run on the message thread; a host may restore state from its own thread.
     const int oldN = numLayers.load(std::memory_order_relaxed);
     const int nv = savedLayerCount(state);
 
-    // Retire-tail: when this preset drops voices while playing, snapshot each dropped
-    // voice's OLD engine + insert config NOW (before the new params land)
-    // and arm a short fade so its comb-filter / insert tail rings out.
+    // Retire tail: when this preset drops voices while playing, each dropped voice's spare Pattern stays in its
+    // slot and is parked IN PLACE in the shared retire bin with the serial the count store in applyComposedState
+    // will carry, so the block that still sees the old count renders it live and the first that sees the new one
+    // renders its 25 ms fade (no block with both, none with neither). Its OLD engine + insert config is frozen now,
+    // before the new params land, and after the park: no block renders the entry until the store lands. A slot
+    // whose fade is still armed (AlreadyActive) keeps it and its snapshot, as the old countdown did (pin P1). The
+    // parks and the store share one hold of the layout writer lock (re-entrant; message / host threads only, never
+    // the audio thread), so no other count store can take that serial.
     if (layerSwapper.isRunning() && nv < oldN)
     {
-        const int ramp = retireRampSamples();
+        const juce::ScopedLock lw(layoutWriteLock);
+        const uint32_t activation = nextLayoutSerial();
         for (int v = nv; v < oldN; ++v)
         {
-            auto& r = retiring[(size_t) v];
-            // A tail still ringing is being read by the audio thread, so its config must not be
-            // rewritten; back-to-back swaps that drop the same voice miss the second tail by design.
-            if (r.samplesLeft.load(std::memory_order_acquire) > 0) continue;
-            r.config   = readConfig(v);                          // OLD osc + filter
-            const auto& vp = voicePtrs[(size_t) v];
-            r.insAlgo  = (int) vp.drvChar->load();
-            r.insP     = { juce::jlimit(0.0f, 1.0f, vp.insP1->load()),
-                           juce::jlimit(0.0f, 1.0f, vp.insP2->load()),
-                           juce::jlimit(0.0f, 1.0f, vp.insP3->load()),
-                           juce::jlimit(0.0f, 1.0f, vp.insP4->load()) };
-            r.gainStep = 1.0f / (float) ramp;
-            r.samplesLeft.store(ramp, std::memory_order_release);
+            auto& p = getPattern(v);
+            if (retireBin.parkInPlace(v, p, activation, false) == mu_core::RetireBin::ParkResult::Parked)
+                p.beginRetire();
         }
+        applyComposedState(state);   // also stores the count (carrying `activation`) and restores the colours
     }
-
-    applyComposedState(state);   // also stores the count and restores the colours
+    else
+    {
+        applyComposedState(state);   // also stores the count and restores the colours
+    }
     syncAllFxParams();   // re-seed mixer/FX engine state (unchanged values skip listeners)
 }
 

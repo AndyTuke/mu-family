@@ -1,6 +1,7 @@
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "PluginProcessor.h"
 #include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
+#include "Plugin/MidiRaw.h"             // mu-core: note tests on raw MIDI bytes (no allocation)
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 #include "PluginProcessor_Internal.h"
 #include "Audio/InsertSlotConfig.h"
@@ -133,7 +134,7 @@ PluginProcessor::PluginProcessor()
     for (auto& slotArr : retiredReadyForCleanup)
         for (auto& flag : slotArr)
             flag.store(false, std::memory_order_relaxed);
-    numLayers.store(1, std::memory_order_release);
+    storeLayerCount(1, std::memory_order_release);   // through the packed layout word, as every count store
 
     {
         mu_core::ScopedApvtsLoading guard(apvtsLoading);
@@ -293,8 +294,7 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
         // stops the sequencer; envelopes and FX tails play out naturally.
         for (const auto& meta : midiMessages)
         {
-            const auto msg = meta.getMessage();
-            if (msg.isNoteOn())
+            if (mu_midi::isNoteOn (meta))
             {
                 // First held note starts playback from beat 0.
                 if (midiHeldNotes.fetch_add(1, std::memory_order_relaxed) == 0)
@@ -303,7 +303,7 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
                     noteModePlaying.store(true, std::memory_order_relaxed);
                 }
             }
-            else if (msg.isNoteOff())
+            else if (mu_midi::isNoteOff (meta))
             {
                 const int prev = midiHeldNotes.fetch_sub(1, std::memory_order_relaxed);
                 if (prev <= 1)
@@ -400,8 +400,9 @@ void PluginProcessor::advanceSequencer(int numRhythms, double beatPos, juce::Mid
     beatFraction.store(frac);
     for (int r = 0; r < numRhythms; ++r)
     {
-        rhythmPlayState[r].currentStep  .store(sequencer.getLastStepIndex(r));
-        rhythmPlayState[r].currentStepC .store(sequencer.getLastAccentStepIndex(r));
+        // Step and fraction go out as one snapshot so the ring never pairs a new fraction with an old step.
+        rhythmPlayState[r].publishPosition({ sequencer.getLastStepIndex(r),
+                                             sequencer.getLastAccentStepIndex(r), frac });
         rhythmPlayState[r].patternLength.store(sequencer.getPatternLength(r));
         const Rhythm& rhy = sequencer.getRhythm(r);
         rhythmPlayState[r].stepsA.store(juce::jmax(1, rhy.genA.steps));

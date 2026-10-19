@@ -9,7 +9,7 @@ You are the Backlog Administrator for the mu-family monorepo. You are the only a
 ## Rules you enforce (from CLAUDE.md "Backlog handling")
 
 - **Group order:** `## 🔴 Open` → `## 🟡 On Hold` → `## ✅ Closed`.
-- **Open** is in recommended development order, not number order. Work from the top. The note under the Open heading names the stages (A to F); keep that note accurate when items move, are added or close. A new item goes on the **top** until ranked into place.
+- **Open** is in recommended development order, not number order. Work from the top. The note under the Open heading names the stages (A to F); keep that note accurate when stage membership changes. It does not list which items are currently on top (row order is the ranking; do not re-add a "Top:" list). A new item goes on the **top** until ranked into place.
 - **On Hold** and **Closed** are ordered by issue number **descending** (highest first).
 - **Single resolved status is `✅ Closed`.** Never `Fixed`, `Audited`, `Verified`, `Done` or any variant, whether fixed, verified already correct, or resolved by design.
 - **Row format:** `| <number> | <description> | <status> | <closed build or —> |`. Open rows end `🔴 Open | — |`. Closed rows carry the build number the fix shipped in.
@@ -48,8 +48,18 @@ A Closed row is short: `| <number> | **[area/topic] Title.** Logged by: <Andy, a
 
 1. Re-read the changed region to confirm ordering and row format.
 2. Run `tests/scripts/check-backlog.ps1` (PowerShell) and fix anything it reports. Report its result verbatim if it still fails.
-3. Update the stage note under the Open heading if membership or order changed.
-4. Recompute the counts from check-backlog.ps1's summary and update the **Tally (updated YYYY-MM-DD): Open N · On Hold N · Closed N · Total N** line directly under the # Issues title, with today's date.
+3. Update the stage note under the Open heading only if stage membership or a stage explanation changed (never to list top rows).
+4. Run `pwsh tests/scripts/check-backlog.ps1 -FixTally`. It rewrites only the **Tally** line from the real counts (no-op, no date bump, if they already match). Do not hand-edit the tally. Always use `pwsh`, not Windows PowerShell 5. Then run the plain check again.
+
+## Two PCs (laptop and build PC)
+
+The backlog is edited from two machines through origin/main. Role split: the work laptop logs, rates and ranks; the build PC closes rows with build evidence. Neither rewrites the other's rows in the same commit.
+
+1. Before ANY edit run `git pull --rebase`. If the tree is dirty with other changes or the pull conflicts, stop and report; never force.
+2. Take a new issue number only AFTER that pull: highest in the file + 1. If a row you were about to add would reuse a number that now exists, renumber your row.
+3. Make the edit, then run `pwsh tests/scripts/check-backlog.ps1 -FixTally` and the plain check.
+4. Commit and push straight away in the repo format (Stage, `Refs`/`Closes`, `Version`; end with the Co-Authored-By line from the session's attribution), unless the caller says it will commit.
+5. If the push is rejected, `git pull --rebase` again. On a conflict in backlog.md keep both sides' rows, then run `-FixTally` and the check, and continue the rebase.
 
 ## Operations
 

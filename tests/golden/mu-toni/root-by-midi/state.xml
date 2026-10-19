@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MuToniState format="2" numVoices="1" voiceColours="0,1,2,3,4,5,6,7">
+    <Globals>
+      <p id="midiInCh" x="2"/>
+    </Globals>
+    <Slots>
+      <Slot idx="0">
+        <p id="acc" x="30"/>
+        <p id="accLen" x="4"/>
+        <p id="accPat" x="5"/>
+        <p id="chord" x="2"/>
+        <p id="gate" x="70"/>
+        <p id="rate" x="6"/>
+        <p id="roct" x="4"/>
+        <p id="root" x="0"/>
+        <p id="scale" x="0"/>
+      </Slot>
+    </Slots>
+</MuToniState>

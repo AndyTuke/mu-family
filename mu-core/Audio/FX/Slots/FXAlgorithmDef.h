@@ -69,6 +69,7 @@ struct FXAlgorithmRegistry
         static const std::vector<FXAlgorithmDef> s_defs = [] {
             const std::vector<FXParamDef> commonParams = {
                 { "size",      "Size",      0.0f, 1.0f, 0.5f, "" },
+                { "decay",     "Decay",     0.1f, 10.0f, 2.5f, "s" },
                 { "predelay",  "Pre-delay", 0.0f, 100.0f, 10.0f, "ms" },
                 { "diffusion", "Diffusion", 0.0f, 1.0f, 0.7f, "" },
                 { "damp",      "Damp",      0.0f, 1.0f, 0.4f, "" },

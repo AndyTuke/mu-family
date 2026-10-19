@@ -1,0 +1,12 @@
+{
+  "scenario": "transport-stop-start",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 120000,
+  "tempoBpm": 120.0,
+  "startBeat": 0.0,
+  "numStems": 1,
+  "script": [
+    "Loop mode with a long release (0.6 s). Host stops at block 25, restarts at 40, locates to beat 17.3 at 70, stops and locates to beat 0 at 100, restarts at 104."
+  ]
+}

@@ -6,6 +6,7 @@
 #include "Persistence/ModulatorSerialise.h" // serialiseModulators, deserialiseModulators, clearModulators
 #include "Persistence/PresetFiles.h"        // mu_pp::safePresetFileName + replaceFileAtomically
 #include "Persistence/EmbeddedSample.h"     // embedded samples: FLAC or raw file bytes
+#include "Persistence/LegacyReverbDecay.h"  // a pre-Decay-knob preset's reverb Decay
 #include "UI/Components/MuLookAndFeel.h" // kLayerPaletteSize
 #include <limits>               // std::numeric_limits for NaN sentinel
 
@@ -744,33 +745,41 @@ void PresetIO::restoreRhythmSample(int i, const juce::ValueTree& tree,
 
 void PresetIO::restoreGlobalState(const juce::ValueTree& root)
 {
-    // GlobalState child was added later; older files omit this and the loop
-    // simply does nothing. Stage 35: iterate kGlobalParamDefs so algorithm-
-    // selector params (eff_algo / rev_algo / mst_insChar / mst_ins2Char) use the
-    // name-string lookup path in v2.
-    for (int ci = 0; ci < root.getNumChildren(); ++ci)
-    {
-        auto child = root.getChild(ci);
-        if (child.getType() != juce::Identifier("GlobalState")) continue;
+    // GlobalState child was added later; older files omit it, which leaves every global where it
+    // was. Stage 35: iterate kGlobalParamDefs so algorithm-selector params (eff_algo / rev_algo /
+    // mst_insChar / mst_ins2Char) use the name-string lookup path in v2.
+    // Stage 36 v3 migration: collapse master-insert named fields → insP1..4 (algo-aware).
+    // Mutates a copy so the original child is untouched.
+    juce::ValueTree migrated = root.getChildWithName("GlobalState").createCopy();
+    if (! migrated.isValid()) migrated = juce::ValueTree("GlobalState");
+    migrateMasterInsertSlotsV3(migrated, 1);
+    migrateMasterInsertSlotsV3(migrated, 2);
 
-        // Stage 36 v3 migration: collapse master-insert named fields →
-        // insP1..4 (algo-aware). Mutates a copy so original child is untouched.
-        juce::ValueTree migrated = child.createCopy();
-        migrateMasterInsertSlotsV3(migrated, 1);
-        migrateMasterInsertSlotsV3(migrated, 2);
-
-        for (int gi = 0; gi < mu_clid::kGlobalParamDefCount; ++gi)
+    // A file saved before the reverb Decay knob: the Decay its algorithm had then (the saved
+    // algorithm, or the current one when the file leaves rev_algo alone), never the last preset's.
+    if (! migrated.hasProperty(mu_pp::kReverbDecayId))
+        if (auto* revAlgo = proc.apvts.getParameter(mu_pp::kReverbAlgoId))
         {
-            const auto& def = mu_clid::kGlobalParamDefs[gi];
-            if (auto* param = proc.apvts.getParameter(def.id))
-            {
-                const float actualVal = readGlobalPropertyAsActual(migrated, juce::String(def.id),
-                                                                   *param, def);
-                if (! std::isnan(actualVal))
-                    param->setValueNotifyingHost(param->convertTo0to1(actualVal));
-            }
+            int algorithm = mu_pp::currentReverbAlgorithm(*revAlgo);
+            for (int gi = 0; gi < mu_clid::kGlobalParamDefCount; ++gi)
+                if (juce::String(mu_clid::kGlobalParamDefs[gi].id) == mu_pp::kReverbAlgoId)
+                    if (const float saved = readGlobalPropertyAsActual(migrated, mu_pp::kReverbAlgoId, *revAlgo,
+                                                                       mu_clid::kGlobalParamDefs[gi]);
+                        ! std::isnan(saved))
+                        algorithm = juce::roundToInt(saved);
+            migrated.setProperty(mu_pp::kReverbDecayId, mu_pp::legacyReverbDecay(algorithm), nullptr);
         }
-        return;
+
+    for (int gi = 0; gi < mu_clid::kGlobalParamDefCount; ++gi)
+    {
+        const auto& def = mu_clid::kGlobalParamDefs[gi];
+        if (auto* param = proc.apvts.getParameter(def.id))
+        {
+            const float actualVal = readGlobalPropertyAsActual(migrated, juce::String(def.id),
+                                                               *param, def);
+            if (! std::isnan(actualVal))
+                param->setValueNotifyingHost(param->convertTo0to1(actualVal));
+        }
     }
 }
 
@@ -918,8 +927,15 @@ bool PresetIO::loadPreset(const juce::File& file)
     // format), not a .muclid preset — restore it directly.
     if (root.getType() != juce::Identifier("MuClidPreset"))
     {
-        restoreStateFromTree(root);
-        return true;
+        // Only this product's own state root is legacy host state; another product's file is rejected.
+        if (root.hasType(proc.apvts.state.getType()))
+        {
+            restoreStateFromTree(root);
+            return true;
+        }
+        proc.noteFullPresetLoadFailed();
+        if (proc.onLoadError) proc.onLoadError("Not a mu-Clid preset: " + file.getFileName());
+        return false;
     }
 
     // Full .muclid preset — ONE unified path. Pre-build every Rhythm + VoiceEngine +
@@ -972,12 +988,13 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     std::array<std::unique_ptr<VoiceEngine>, RhythmSequencer::MaxRhythms> cutVictims, shrunkEngines;
     proc.suspendProcessing(true);
     {
+        const juce::ScopedLock lw(proc.layoutWriteLock);   // first: the count stores below advance the layout serial
         const juce::ScopedLock sl(proc.layersLock);
 
     proc.setRhythmCount(n);
 
     if (n < oldN)
-        proc.numLayers.store(n, std::memory_order_release);  // shrink: drop count first
+        proc.storeLayerCount(n, std::memory_order_release);  // shrink: drop count first
 
     for (int i = 0; i < n; ++i)
     {
@@ -1004,7 +1021,7 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     }
 
     if (n > oldN)
-        proc.numLayers.store(n, std::memory_order_release);  // grow: publish after slots ready
+        proc.storeLayerCount(n, std::memory_order_release);  // grow: publish after slots ready
     }   // release layersLock before resuming
     proc.suspendProcessing(false);
 

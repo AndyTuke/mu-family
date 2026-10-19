@@ -3,7 +3,9 @@
 How μ-Tant loads a preset *while playing* and switches it at a musical loop
 boundary with no audible glitch (no transport hitch, no silence gap). Read this
 before touching `swapLoopBeats`, `ProcessorBase::layerSwapper`, the staging/commit paths in
-`PluginProcessor`, or the wavetable bank load path.
+`PluginProcessor`, or the wavetable bank load path. Since stage E4 (2026-10-16) the voice is the `Pattern` layer type
+(library `mu-tant-layer`, [../mu-tronic/design.md](../mu-tronic/design.md) 2.1.10): the layer supplies only its loop length
+(`Pattern::loopBeats()`), and the swap rule below stays the standalone's own policy in `Plugin/`.
 
 This is the **product-side** sibling of mu-clid's hot-swap. The shared *pattern*
 and the cross-product lessons live in
@@ -35,7 +37,7 @@ mu-tant is **APVTS-centric**, not engine-object-centric:
 | Payload | pre-built `Rhythm` + `VoiceEngine` (+ sample) | parsed `juce::ValueTree` (the APVTS state / `.muPattern`) |
 | Commit mechanism | `std::move` engine into slot + retire old (`installRhythm`) | apply the composed state / voice node (`applyComposedState` / `applyLayerNode`, mu-core LayerState) |
 | Commit isolation | `suspendProcessing` + `rhythmsLock` (µs, work pre-built) | **no blanket lock** — relies on the audio render's existing fine-grained locks |
-| Outgoing-voice tail | **retire-then-swap**: old `VoiceEngine` plays out its sample/release tail | **none** — oscillators are continuous (free-running drones), there is no note tail to preserve, so the new params simply take over |
+| Outgoing-voice tail | **retire-then-swap**: old `VoiceEngine` plays out its sample/release tail | **none for a swap** — oscillators are continuous (free-running drones), there is no note tail to preserve, so the new params simply take over. The one exception is a count-reducing full preset: the dropped voices fade over 25 ms in place in the shared `RetireBin` (`RenderPastCount`, the Pattern's `renderRetiring`) |
 | Boundary | master loop / per-rhythm wrap (shared `mstr_swap`) | full → voice 0's gate wrap; per-voice → that voice's gate wrap |
 
 **Why no `suspendProcessing` / blanket lock in mu-tant.** mu-clid suspends for a
@@ -58,7 +60,8 @@ across a swap, mu-clid's retire-then-swap (see its doc §8) is the pattern to po
 | File | Role |
 |---|---|
 | [mu-core/Plugin/HotSwap.h](../../mu-core/Plugin/HotSwap.h) | The shared `Stager` (per-slot pending payloads + one full-preset slot, the store-release/load-acquire handshake), `LayerSwapper` (stage / commit / `flagBoundaries`) and the pure predicates (`loopWrapped` / `boundaryReached`) — unit-testable without a processor. `ProcessorBase` holds one as `layerSwapper` (`ValueTree` payload, 8 slots) and calls it through `flagSwapBoundaries` and `commitDeferredWork`. |
-| [Source/Plugin/PluginProcessor.cpp](../../mu-tant/Source/Plugin/PluginProcessor.cpp) | `swapLoopBeats` (the mu-tant boundary rule), `layerSwapper.setAppliers` (commit bodies `applyFullPresetTree` / `applyVoicePresetTree`), `runDeferredWork` (commit drain), boundary flagging in `processBlock`. |
+| [Source/Plugin/SwapBoundary.h](../../mu-tant/Source/Plugin/SwapBoundary.h) | `swapLoopBeats` (the mu-tant boundary rule). It stays in `Plugin/`, outside the `mu-tant-layer` library: it is host policy (swap timing, master loop, live count) built on `mu_hotswap`. |
+| [Source/Plugin/PluginProcessor.cpp](../../mu-tant/Source/Plugin/PluginProcessor.cpp) | `layerSwapper.setAppliers` (commit bodies `applyFullPresetTree` / `applyVoicePresetTree`), `runDeferredWork` (commit drain), `flagPatternSwapBoundaries` (calls `swapLoopBeats` over the per-slot lengths `layerLoopBeats(slot)` the shared driver cached), called from `processBlock`. |
 | [Source/Plugin/PluginProcessor_Preset.cpp](../../mu-tant/Source/Plugin/PluginProcessor_Preset.cpp) | `loadPreset` / `loadLayerPreset` (`layerSwapper.useFull` / `useSlot` make the stage-or-apply call on the resolved transport; `layerSwapper.isRunning()` gates the wavetable preload), `preloadWavetablesFrom*`. |
 | [Source/Audio/WavetableBank.{h,cpp}](../../mu-core/Audio/Wavetable/WavetableBank.h) | `findByPath` (lock-free resolve), `decodeFile` (off-lock decode) + `appendTable` (locked append) — the two-phase load that keeps the swap real-time-safe. |
 | [Source/Tests/HotSwapBoundaryTests.cpp](../../mu-tant/Source/Tests/HotSwapBoundaryTests.cpp) | Swap loop-length rule (`swapLoopBeats`, all three `SwapTiming` values) + stager handshake tests. |
@@ -90,10 +93,10 @@ serialises those); the audio thread touches **only the two atomic flags**
 
 Runs **outside** the render try-lock so the transport never freezes during a commit:
 
-1. Compute the transport snapshot (`blkPlaying`, `blkBeatStart`, `blkBeatsPerSample`).
-2. Render under `ScopedTryLock(voicesLock)` — on contention leave the block silent
-   (a voice add/remove is the *only* thing that takes that lock; a hot-swap does not).
-3. **Always** advance `internalBeatPos` (atomic) and run the boundary check.
+1. Resolve the transport (`resolveBlockTransport`, the 64-beat ceiling below).
+2. `renderAndMix` renders under the driver's one try-lock of `layersLock` — on contention the block is silent
+   (a voice add/remove is the *only* thing that takes that lock; a hot-swap does not). It also caches each slot's `Pattern::loopBeats()`.
+3. **Always** advance the transport and run the boundary check (`flagPatternSwapBoundaries`) from the cached lengths.
 
 `internalBeatPos` wraps at a fixed 64-beat ceiling (float-precision guard, *not* a
 musical loop). The boundary is computed on the **raw pre-ceiling** advanced position
@@ -109,7 +112,7 @@ boundaryReached(playing, wasPlaying, oldPos, newPos, patBeats)
 
 The loop length that ends each pending swap comes from `mu_tant::swapLoopBeats(slot, numActive,
 onMasterLoop, masterLoopBeats, patBeats)`, passed to `flagSwapBoundaries` as the boundary callable: voice *v*'s own
-gate-pattern length (`gatePatterns[v].patternLengthBars*4`) for a per-voice swap, voice 0's for the full preset, the
+gate-pattern length (`Pattern::loopBeats()`, the gate's `patternLengthBars*4`) for a per-voice swap, voice 0's for the full preset, the
 master loop when one is set (and, for a per-voice swap, when the swap timing is OnMasterLoop); a negative result
 (inactive voice) never commits. "Playing" in the flagging is the **resolved** transport (`blkPlaying`).
 
@@ -125,7 +128,7 @@ every structure they touch is independently guarded by a lock the render respect
 |---|---|---|
 | APVTS params (`setValueNotifyingHost`, once per changed param) | per-param `std::atomic<float>` | cached `getRawParameterValue` atomic reads |
 | Gate / filter / pitch patterns (`deserialiseGate`) | `GatePattern.editLock` (spin) | `applyGateBlock` tryLock → passthrough on contention |
-| Modulators (`deserialise/clearModulators`) | `Layer.modLock` (spin) | `applyModulation` tryLock → skip on contention |
+| Modulators (`deserialise/clearModulators`) | `Layer.modLock` (spin) | `Pattern::render` try-locks; on a miss it holds the last modulated values (never the raw ones) |
 | Wavetable index (`findByPath` resolve) | none needed — **lock-free** | preloaded at stage; commit only reads |
 | `numVoices` | `std::atomic<int>` | read once per block |
 | Mixer / FX (`syncAllFxParams`) | same path as live automation | already concurrent-safe |

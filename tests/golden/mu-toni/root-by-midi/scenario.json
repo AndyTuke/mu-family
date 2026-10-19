@@ -1,0 +1,13 @@
+{
+  "scenario": "root-by-midi",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 96000,
+  "tempoBpm": 120.0,
+  "startBeat": 0.0,
+  "numStems": 1,
+  "script": [
+    "Loop mode; the newest held MIDI note becomes the arp root (root-by-MIDI). MIDI In channel is 2.",
+    "Channel 1 note 50 at block 2 is ignored. Channel 2: 62 on (5), 67 on (25, offset 300), 62 off (40), 67 off (55), 69 on (70), 71 on (72), all-notes-off (85)."
+  ]
+}

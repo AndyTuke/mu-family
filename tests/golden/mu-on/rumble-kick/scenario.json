@@ -1,0 +1,12 @@
+{
+  "name": "rumble-kick",
+  "notes": "Kick plus a Rumble track whose source is the Kick; tail past the last hit.",
+  "sampleRate": 48000,
+  "preparedBlockSize": 1024,
+  "lengthFrames": 120000,
+  "tempoBpm": 120,
+  "startBeat": 0,
+  "numStems": 2,
+  "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
+  "events": []
+}

@@ -119,6 +119,9 @@ private:
     juce::ADSR  ampEnv;
     juce::ADSR  filterEnv;
     juce::ADSR  pitchEnv;
+    // Set at each envelope's noteOff, cleared at its noteOn: syncEnvelopes leaves the parameters alone while
+    // one is set and the envelope is still running (mu_env::applyParameters).
+    bool ampReleasing = false, filterReleasing = false, pitchReleasing = false;
     MultiModeFilter voiceFilter;             // drive + main filter + lo-cut, all owned here
     juce::AudioBuffer<float> tempBuffer;     // voice sum → filter → insert → env-gate → output
 
