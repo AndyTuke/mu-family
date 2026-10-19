@@ -207,9 +207,8 @@ void ShellChrome::startVersionCheck()
     refreshUpdateLink();   // show the stored answer while the fetch runs
     if (fetchInFlight) return;
     fetchInFlight = true;
-    juce::SharedResourcePointer<uc::UpdateChecker> checker;
     juce::WeakReference<ShellChrome> safeSelf(this);
-    checker->request([safe = safeSelf, slug](const juce::String& body)
+    updateChecker->request([safe = safeSelf, slug](const juce::String& body)
     {
         if (safe == nullptr) return;   // the host closed mid-check
         safe->fetchInFlight = false;

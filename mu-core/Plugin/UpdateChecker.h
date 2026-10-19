@@ -21,8 +21,8 @@ public:
     UpdateChecker() : juce::Thread("mu update check") {}
     ~UpdateChecker() override { stopThread(4000); }
 
-    // `onBody` runs once on the message thread with the raw JSON, or never if the fetch failed.
-    // Callers guard their own lifetime (a WeakReference) inside the callback.
+    // `onBody` runs once on the message thread with the raw JSON, or with an empty string if the
+    // fetch failed. Callers guard their own lifetime (a WeakReference) inside the callback.
     void request(std::function<void(const juce::String&)> onBody)
     {
         {
@@ -63,11 +63,16 @@ private:
             juce::MessageManager::callAsync([cb, body] { cb(body); });
     }
 
-    // A failed fetch drops its waiters; the next editor open asks again (the stored timestamp is unchanged).
+    // A failed fetch tells its waiters with an empty body and caches nothing, so a later request tries again.
     void clearWaiting()
     {
-        const juce::ScopedLock sl(lock);
-        waiting.clear();
+        std::vector<std::function<void(const juce::String&)>> toCall;
+        {
+            const juce::ScopedLock sl(lock);
+            toCall.swap(waiting);
+        }
+        for (auto& cb : toCall)
+            juce::MessageManager::callAsync([cb] { cb({}); });
     }
 
     juce::CriticalSection lock;

@@ -111,10 +111,10 @@ void StatusBar::paint(juce::Graphics& g)
         g.drawText("Support", supportLinkBounds(), juce::Justification::centred, false);
     }
 
-    // Update link: underlined.
+    // Update link: plain text, underlined on hover.
     if (updateLinkVisible)
     {
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))).withStyle(juce::Font::underlined));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))).withStyle(updateLinkHover ? juce::Font::underlined : juce::Font::plain));
         g.setColour(MuLookAndFeel::colour(Id::statusBarValue));
         g.drawText("Update available", updateLinkBounds(), juce::Justification::centred, false);
     }
@@ -144,15 +144,20 @@ void StatusBar::paint(juce::Graphics& g)
         ga.addLineOfText(font, t, 0.0f, 0.0f);
         return ga.getBoundingBox(0, ga.getNumGlyphs(), true).getWidth();
     };
+    // The parameter text never runs under the links at the right edge: it is cut with an ellipsis there.
+    const int rightLimit = (updateLinkVisible ? updateLinkBounds().getX()
+                                              : supportLinkVisible ? supportLinkBounds().getX() : getWidth()) - s(8);
     const float nameW = measureW(currentName);
     const float sepW  = measureW("  ");
     const float valW  = measureW(currentValue);
     const int   startX = juce::jmax(textX, (int)(((float)getWidth() - nameW - sepW - valW) * 0.5f));
 
     g.setColour(MuLookAndFeel::colour(Id::statusBarText));
-    g.drawText(currentName,  startX,                                   0,
-               (int)std::ceil(nameW),     h, juce::Justification::centredLeft, false);
+    const int nameX = startX;
+    const int valX  = startX + (int) std::ceil(nameW + sepW);
+    g.drawText(currentName,  nameX, 0, juce::jlimit(0, (int) std::ceil(nameW), rightLimit - nameX), h,
+               juce::Justification::centredLeft, true);
     g.setColour(MuLookAndFeel::colour(Id::statusBarValue));
-    g.drawText(currentValue, startX + (int)std::ceil(nameW + sepW),    0,
-               (int)std::ceil(valW) + 1, h, juce::Justification::centredLeft, false);
+    g.drawText(currentValue, valX,  0, juce::jlimit(0, (int) std::ceil(valW) + 1, rightLimit - valX), h,
+               juce::Justification::centredLeft, true);
 }

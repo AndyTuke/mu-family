@@ -243,6 +243,7 @@ private:
     mu_core::update_check::Entry updateEntry;   // this product's latest build (stored or just fetched)
     bool updateWanted  = false;
     bool fetchInFlight = false;
+    juce::SharedResourcePointer<mu_core::update_check::UpdateChecker> updateChecker;   // held for the editor's life so the fetch is not cancelled
     void refreshUpdateLink();
     void dismissUpdateNotice();
 
