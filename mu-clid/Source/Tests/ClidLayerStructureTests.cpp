@@ -4,6 +4,7 @@
 // sidechain source) so each moved piece can be traced to the slot it must land on.
 
 #include "Plugin/PluginProcessor.h"
+#include "Sequencer/SampleRhythm.h"
 #include "Tests/ProcessorSeamHelpers.h"
 
 #include <array>
@@ -88,6 +89,7 @@ struct ClidLayerStructureTests : juce::UnitTest
         removedSlotsOwedNoteOff();
         editsCancelPendingSwaps();
         addedSlotIsClean();
+        everyLayerIsASampleRhythm();
     }
 
     void fillAndRemoveMiddle()
@@ -455,6 +457,33 @@ struct ClidLayerStructureTests : juce::UnitTest
         for (int i = 0; i < 8; ++i) { block.clear(); midi.clear(); p.processBlock(block, midi); }
         expect(bufferIsSane(block));
         p.setPlayHead(nullptr);
+    }
+
+    // Every slot holds mu-Clid's layer type, from construction and through each structural edit.
+    void everyLayerIsASampleRhythm()
+    {
+        beginTest("every layer is a SampleRhythm: at construction and after add, remove, swap and reset");
+        TempStorage storage;
+        StructureProcessor p;
+        p.prepareToPlay(48000.0, 256);
+        auto allSampleRhythms = [&p]
+        {
+            for (int i = 0; i < kMax; ++i)
+                if (dynamic_cast<mu_clid::SampleRhythm*>(p.getLayer(i)) == nullptr
+                    && i < p.getNumRhythms())
+                    return false;
+            return true;
+        };
+        expect(allSampleRhythms(), "at construction");
+        p.addLayer();
+        p.addLayer();
+        expect(allSampleRhythms(), "after adds");
+        expect(p.swapLayers(0, 2));
+        expect(allSampleRhythms(), "after a swap");
+        p.resetLayer(1);
+        expect(allSampleRhythms(), "after a reset");
+        expect(p.removeLayer(0));
+        expect(allSampleRhythms(), "after a remove");
     }
 };
 

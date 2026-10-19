@@ -7,16 +7,17 @@
 #include "Persistence/ScopedApvtsLoading.h"
 #include "PluginProcessor.h"
 #include "Sequencer/GeneratorAliases.h"
+#include "Sequencer/SampleRhythm.h"
 
 #include <algorithm>
 
 namespace mu_clid {
 
-// A default rhythm named for its slot. The palette colour follows the slot, as at construction; an add
-// replaces it with the first colour no live rhythm uses.
+// A default rhythm named for its slot, as mu-Clid's layer type. The palette colour follows the slot, as at
+// construction; an add replaces it with the first colour no live rhythm uses.
 std::unique_ptr<Layer> PluginProcessor::makeRhythm(int slot) const
 {
-    auto r = std::make_unique<Rhythm>();
+    auto r = std::make_unique<SampleRhythm>();
     r->name        = ("Rhythm " + juce::String(slot + 1)).toStdString();
     r->colourIndex = slot % MuLookAndFeel::kLayerPaletteSize;
     return r;
