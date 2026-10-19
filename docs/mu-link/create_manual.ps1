@@ -88,6 +88,12 @@ P "Audio and MIDI devices are not chosen in the main window. Click the gear to o
 
 Pic "The window showing the transport bar, the Clients mixer, and the Scenes panel." "window-overview.png"
 
+H2 "Update Check"
+P "mu-link can tell you when a newer version is available. Once a day it asks the transwarp.me website for the latest version number. When a newer version exists, a small Update available link appears at the right of the Status Bar, beside the Support link. Hover over it to see which version is out and which one you have."
+Bullet "Click the link to open the download page in your web browser. mu-link never downloads or installs anything itself. The link then stays hidden for that version and comes back only when a still newer one is released."
+Bullet "Right-click the link and choose Hide this notice to hide it for that version without opening the page."
+P "Privacy: the check is a plain request for a public file. It sends nothing about you: no name, no identifier, no version number and no details of your computer. As with any request to a website, the site can see your internet (IP) address, as it would if you opened the page in a browser. The app compares the answer with its own version on your machine. To switch the check off, open Settings and, under General, untick the Check for updates box. With the box unticked, mu-link sends no request at all and shows no link. The box is ticked by default."
+
 # ── 5. Choosing an Audio Device ───────────────────────────────────────────────
 H1 "5. Choosing an Audio Device"
 P "Click the gear button at the right of the transport bar to open the Settings page. In the General group, click Choose devices... under Audio / MIDI devices. A device dialog opens. Pick the output device mu-link plays through here; this is the device the whole rig is summed to. Changes apply at once, and you can close the dialog when you are done."
