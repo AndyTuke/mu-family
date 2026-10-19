@@ -284,7 +284,7 @@ unique", legitimate because the type is one `mu-core` class (§1).
 
 ## 4. Audit — where the code differs from §3 (2026-10-09)
 
-**Status: done (layer extraction closed at E6, 2026-10-19).** The layer-noun, parent-class, `Slot`-in-layer-API, folder, namespace, panel and main-panel rows are delivered: every product's layer is a `mu_core::Layer` subclass (`SampleRhythm`, `Pattern`, `Arp`, `Track`) with its own `mu-<product>-layer` library, and the four `Source/` roots have unique relative paths (`ToniScales.h`, `TantScales.h`; `mu-layer-link-test` builds all four together). What stays open is listed in the rows that are not marked Done (Acronyms, Members, Enums, the `ArpParams` double name) and the shared `HeldNoteStack`, still owed before mu-Tronic T1.
+**Status: done (layer extraction closed at E6, 2026-10-19).** The rows below for the layer noun, parent class, `Slot` in layer APIs and mu-core vocabulary describe the pre-extraction state and are history: every product's layer is a `mu_core::Layer` subclass (`SampleRhythm`, `Pattern`, `Arp`, `Track`) with its own `mu-<product>-layer` library, and the four `Source/` roots have unique relative paths (`ToniScales.h`, `TantScales.h`; `mu-layer-link-test` builds all four together). Still open: the Acronyms, Members and Enums rows, and the shared held-key helper (Held-key helper row), owed before mu-Tronic T1.
 
 | Area | Finding |
 |---|---|
