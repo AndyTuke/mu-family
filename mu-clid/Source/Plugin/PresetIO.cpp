@@ -513,7 +513,7 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
                                           originEff, frameEpoch, &cutVictims[(size_t) i]);
         // Prepare MIDI engines for freshly-grown slots; existing slots keep theirs.
         if (i >= oldN && proc.currentSampleRate > 0 && proc.currentBlockSize > 0)
-            proc.midiEngines[(size_t) i].prepare(proc.currentSampleRate, proc.currentBlockSize);
+            proc.sampleRhythm(i).midi.prepare(proc.currentSampleRate, proc.currentBlockSize);
     }
 
     // Tear down slots that are no longer active (shrink case). The voice engine is parked for a free
@@ -523,8 +523,8 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     for (int i = n; i < oldN; ++i)
     {
         shrunkEngines[(size_t) i] = std::move(proc.voiceEngines[(size_t) i]);
-        proc.parkPendingMidiOff(i);   // keep the owed note-off; the audio thread no longer visits this slot
-        proc.midiEngines[(size_t) i] = MidiOutputEngine{};
+        proc.parkPendingMidiOff(proc.sampleRhythm(i).midi);   // keep the owed note-off; the audio thread no longer visits this slot
+        proc.sampleRhythm(i).midi = MidiOutputEngine{};
         proc.mixerEngine.channels[(size_t) i].reset();
     }
 

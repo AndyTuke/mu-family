@@ -155,6 +155,13 @@ public:
     // moves it here; like layersMoved it must only move and reset, never allocate or wait.
     virtual void layersReordered(LayerEdit kind, int a, int b) { juce::ignoreUnused(kind, a, b); }
 
+    // Called by removeLayer only, under layoutWriteLock and layersLock with processing suspended, after the
+    // layer has left its slot and before layersReordered(Remove, index, -1): `removed` is the layer that was
+    // at `index` and is destroyed after the locks are released. A product whose layers carry state that must
+    // outlive them (something still owed to the output) moves it into storage it owns here. Like
+    // layersReordered it must only move and reset, never allocate or wait. Default: nothing.
+    virtual void layerRemoved(Layer& removed, int index) { juce::ignoreUnused(removed, index); }
+
     // True when the product's own layer data, not the parameter tree, is the truth for the slot's
     // sound (mu-Clid's Rhythm, where the parameters mirror it). The edits then do not copy parameter
     // values between slots in the tree: they call syncSlotParams for every slot the edit touched

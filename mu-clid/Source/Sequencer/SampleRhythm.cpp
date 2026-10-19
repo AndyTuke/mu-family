@@ -6,14 +6,13 @@
 
 namespace mu_clid {
 
-void SampleRhythm::fireHit(bool accented, bool tied, juce::MidiBuffer& midiOut, MidiOutputEngine& midiEngine,
-                           VoiceEngine* engine)
+void SampleRhythm::fireHit(bool accented, bool tied, juce::MidiBuffer& midiOut, VoiceEngine* engine)
 {
     // A hit in MIDI output mode becomes one MIDI note-on and never reaches the voice. The settings are
     // relaxed atomics on the Rhythm.
     if (outputMode.load() == (int) mu_core::OutputMode::Midi)
     {
-        midiEngine.trigger(midiOut, 0, midiNote.load(), midiChannel.load(),
+        midi.trigger(midiOut, 0, midiNote.load(), midiChannel.load(),
                      mu_core::midiOutVelocity(midiVelocity.load(), (float) midiAccent.load(), accented));
     }
     else if (engine != nullptr)

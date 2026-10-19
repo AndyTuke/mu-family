@@ -374,7 +374,7 @@ struct ClidLayerStructureTests : juce::UnitTest
         p.addLayer();
 
         juce::MidiBuffer scratch;
-        p.midiEngines[1].trigger(scratch, 0, 61, 5, 1.0f);   // slot 1 has a note-on out and its off still owed
+        p.sampleRhythm(1).midi.trigger(scratch, 0, 61, 5, 1.0f);   // slot 1 has a note-on out and its off still owed
         expect(p.removeLayer(1));
         expectEquals(p.numOrphanOffs, 1, "the owed note-off was parked");
 

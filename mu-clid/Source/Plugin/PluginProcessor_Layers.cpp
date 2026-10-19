@@ -29,7 +29,6 @@ void PluginProcessor::prepareSlotEngines(int slot)
     voiceEngines[(size_t) slot] = std::make_unique<VoiceEngine>();
     voiceEngines[(size_t) slot]->insertProc.setSlotIndex(slot);   // per-slot noise seed
     voiceEngines[(size_t) slot]->prepareToPlay(currentSampleRate, currentBlockSize);
-    midiEngines[(size_t) slot].prepare(currentSampleRate, currentBlockSize);
     samples.clearPath(slot);                                      // the new slot carries no sample
 }
 
@@ -41,9 +40,13 @@ std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
     // Every edit that parks engines under the lock builds a layer first, so anything an earlier edit
     // left parked is freed here, and layersReordered never frees one under the lock.
     releaseParkedEngines();
-    if (slot >= numLayers.load(std::memory_order_relaxed))
+    const bool adding = slot >= numLayers.load(std::memory_order_relaxed);
+    if (adding)
         prepareSlotEngines(slot);
-    return makeRhythm(slot);
+    auto layer = makeRhythm(slot);
+    if (adding)
+        static_cast<SampleRhythm&>(*layer).midi.prepare(currentSampleRate, currentBlockSize);   // the new rhythm's MIDI engine
+    return layer;
 }
 
 void PluginProcessor::resetPlayState(int idx)
@@ -127,7 +130,6 @@ void PluginProcessor::layersReordered(LayerEdit kind, int a, int b)
         sampleRhythm(a).cursor.requestAbsorb();   // each cursor moved with its rhythm: absorb the current step
         sampleRhythm(b).cursor.requestAbsorb();
         std::swap(voiceEngines[(size_t) a], voiceEngines[(size_t) b]);
-        std::swap(midiEngines[(size_t) a],  midiEngines[(size_t) b]);
         resetPlayState(a);
         resetPlayState(b);
         samples.swapPaths(a, b);
@@ -143,7 +145,6 @@ void PluginProcessor::layersReordered(LayerEdit kind, int a, int b)
     sequencer.removeSlotState(a);
     for (int i = a; i < newN; ++i)
         sampleRhythm(i).cursor.requestAbsorb();   // the rhythms that moved down absorb the current step
-    parkPendingMidiOff(a);   // the removed slot's engine is overwritten below; keep its owed note-off
     samples.shiftPathsDown(a, n);
 
     parkedEngines[0] = std::move(voiceEngines[(size_t) a]);
@@ -151,7 +152,6 @@ void PluginProcessor::layersReordered(LayerEdit kind, int a, int b)
     {
         voiceEngines[(size_t) i] = std::move(voiceEngines[(size_t) i + 1]);
         if (voiceEngines[(size_t) i]) voiceEngines[(size_t) i]->insertProc.setSlotIndex(i);   // the moved engine takes its new slot's noise seed
-        midiEngines[(size_t) i] = std::move(midiEngines[(size_t) i + 1]);
     }
 
     // A retired tail renders into the channel of the slot that holds it, so each slot's tails (and
@@ -172,7 +172,14 @@ void PluginProcessor::layersReordered(LayerEdit kind, int a, int b)
         }
     for (int k = 0; k < K; ++k)
         retiredReadyForCleanup[(size_t) newN][(size_t) k].store(false, std::memory_order_release);
-    midiEngines[(size_t) newN] = MidiOutputEngine{};
+}
+
+// Under layoutWriteLock and layersLock, before layersReordered(Remove): the removed rhythm's MIDI engine
+// may still owe a note-off (its 20 ms hold); it goes to the host's orphan list, drained by the next block.
+void PluginProcessor::layerRemoved(Layer& removed, int index)
+{
+    juce::ignoreUnused(index);
+    parkPendingMidiOff(static_cast<SampleRhythm&>(removed).midi);
 }
 
 //==============================================================================

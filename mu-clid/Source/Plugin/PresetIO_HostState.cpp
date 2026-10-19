@@ -152,8 +152,8 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
         for (int i = n; i < oldN; ++i)
         {
             proc.voiceEngines[i].reset();
-            proc.parkPendingMidiOff(i);   // keep the owed note-off (under layersLock, held above)
-            proc.midiEngines[i] = MidiOutputEngine{};
+            proc.parkPendingMidiOff(proc.sampleRhythm(i).midi);   // keep the owed note-off (under layersLock, held above)
+            proc.sampleRhythm(i).midi = MidiOutputEngine{};
         }
     }
     else
@@ -165,7 +165,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
             if (proc.currentSampleRate > 0 && proc.currentBlockSize > 0)
             {
                 proc.voiceEngines[i]->prepareToPlay(proc.currentSampleRate, proc.currentBlockSize);
-                proc.midiEngines[i].prepare(proc.currentSampleRate, proc.currentBlockSize);
+                proc.sampleRhythm(i).midi.prepare(proc.currentSampleRate, proc.currentBlockSize);
             }
         }
         proc.storeLayerCount(n, std::memory_order_release);  // increment after slots ready

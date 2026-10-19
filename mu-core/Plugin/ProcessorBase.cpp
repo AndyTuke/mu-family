@@ -933,6 +933,8 @@ bool ProcessorBase::removeLayer(int idx)
         const juce::ScopedLock sl(layersLock);
         mixerEngine.renumberSidechainsAfterRemove(idx);   // before the strips shift down
         retired = unpublishLayerLocked(idx, std::move(spare));
+        if (retired != nullptr)
+            layerRemoved(*retired, idx);   // before anything below moves the slots' state
         for (int d = idx; d < n - 1; ++d)
         {
             mixerEngine.channels[(size_t) d].copyFrom(mixerEngine.channels[(size_t) (d + 1)]);

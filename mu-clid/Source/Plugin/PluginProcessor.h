@@ -190,20 +190,23 @@ public:
     // structural edit on the message thread. The layer count (ProcessorCore::numLayers) is the
     // authoritative count; processBlock reads it atomically once per block, under layersLock.
     std::array<std::unique_ptr<VoiceEngine>, RhythmSequencer::MaxRhythms> voiceEngines;
-    std::array<MidiOutputEngine,             RhythmSequencer::MaxRhythms> midiEngines;
+    // Each rhythm's MidiOutputEngine is SampleRhythm::midi (E5.5c): it moves with its layer.
 
-    // Note-offs owed by MIDI-mode slots that were torn down inside their 20 ms hold. Written only
-    // under layersLock (message thread, audio excluded); the audio thread drains it at the top of
-    // the next block under its layersLock try-lock. Fixed size, so nothing allocates.
+    // Note-offs owed by MIDI-mode rhythms that were removed or dropped inside their 20 ms hold: a removed
+    // layer hands its owed note-off over in layerRemoved. Written only under layersLock (message thread,
+    // audio excluded); the audio thread drains it at the top of the next block under its layersLock
+    // try-lock. Fixed size, so nothing allocates; an owed note-off past the 16th is dropped.
     static constexpr int kMaxOrphanOffs = 16;
     struct OrphanOff { int note = 0; int channel = 1; };
     std::array<OrphanOff, kMaxOrphanOffs> orphanOffs;
     int numOrphanOffs = 0;
-    // Call under layersLock before a slot's MidiOutputEngine is overwritten, moved over or reset.
-    void parkPendingMidiOff(int slot)
+    // Call under layersLock before a MidiOutputEngine is discarded or reset: its owed note-off is kept.
+    void parkPendingMidiOff(MidiOutputEngine& engine)
     {
         int note = 0, chan = 1;
-        if (midiEngines[(size_t) slot].takePending(note, chan) && numOrphanOffs < kMaxOrphanOffs)
+        if (! engine.takePending(note, chan)) return;
+        jassert(numOrphanOffs < kMaxOrphanOffs);   // more than 16 owed note-offs in one block: the rest are dropped
+        if (numOrphanOffs < kMaxOrphanOffs)
             orphanOffs[(size_t) numOrphanOffs++] = { note, chan };
     }
     // fxChain and mixerEngine are inherited from ProcessorBase.
@@ -436,6 +439,8 @@ private:
     void layersMoved(int firstIndex, int lastIndex) override;
     // Under layersLock, before layersMoved: moves the per-slot audio state with the rhythms.
     void layersReordered(LayerEdit kind, int a, int b) override;
+    // Under layersLock, before layersReordered: the removed rhythm's owed MIDI note-off is kept.
+    void layerRemoved(Layer& removed, int index) override;
     // After the unlock: pushes the slot's rhythm and strip into the parameters, rebuilds a new or
     // reset rhythm's pattern and engine parameters, and releases what the edit parked.
     void syncSlotParams(int slot) override;

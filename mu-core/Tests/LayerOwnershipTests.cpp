@@ -118,6 +118,17 @@ namespace
             reorderedHoldingLock.push_back(lockHeldByOtherThread() ? 1 : 0);
             order.push_back("reordered");
         }
+        // layerRemoved: the layer handed over, its index, and whether the locks were held.
+        void layerRemoved(Layer& removed, int index) override
+        {
+            removedLayers.push_back(&removed);
+            removedIndices.push_back(index);
+            removedHoldingLock.push_back(lockHeldByOtherThread() ? 1 : 0);
+            removedSuspended.push_back(isSuspended() ? 1 : 0);
+            order.push_back("removed");
+        }
+        std::vector<Layer*> removedLayers;
+        std::vector<int> removedIndices, removedHoldingLock, removedSuspended;
         std::vector<int> synced, syncedHoldingLock, reorderedHoldingLock, syncedFlagUp, syncedSuspended, addedFlagUp;
         std::vector<Reorder> reordered;
         std::vector<juce::String> order;          // layersReordered / layersMoved / syncSlotParams, in call order
@@ -665,7 +676,8 @@ struct LayerOwnershipTests : juce::UnitTest
             expectEquals((int) p.reordered.size(), 1);
             expect(p.reordered[0].kind == ProcessorBase::LayerEdit::Remove && p.reordered[0].a == 1 && p.reordered[0].b == -1);
             expectEquals(p.reorderedHoldingLock[0], 1, "called under layersLock");
-            expect(p.order.size() >= 2 && p.order[0] == "reordered" && p.order[1] == "moved", "before layersMoved");
+            expect(p.order.size() >= 3 && p.order[0] == "removed" && p.order[1] == "reordered" && p.order[2] == "moved",
+                   "after layerRemoved, before layersMoved");
             expect(p.synced.empty(), "a product whose parameters are the truth is not asked to sync");
 
             p.clearLogs();
@@ -679,6 +691,30 @@ struct LayerOwnershipTests : juce::UnitTest
             p.clearLogs();
             p.resetLayer(1); p.addLayer();
             expect(p.reordered.empty(), "reset and add reorder nothing");
+        }
+
+        beginTest("layerRemoved hands over the removed layer once, under the lock, suspended, before layersReordered");
+        {
+            EditableProcessor p(true);
+            p.addLayer(); p.addLayer(); p.addLayer();
+            Layer* const atOne = p.getLayer(1);
+            p.clearLogs(); p.moved.clear();
+
+            expect(p.removeLayer(1));
+            expectEquals((int) p.removedLayers.size(), 1);
+            expect(p.removedLayers[0] == atOne, "the layer that was at the index, not its replacement");
+            expectEquals(p.removedIndices[0], 1);
+            expectEquals(p.removedHoldingLock[0], 1, "called under layersLock");
+            expectEquals(p.removedSuspended[0], 1, "with processing suspended");
+            expect(p.order.size() >= 2 && p.order[0] == "removed" && p.order[1] == "reordered", "before layersReordered");
+
+            p.removedLayers.clear();
+            expect(p.swapLayers(0, 1));
+            p.resetLayer(0);
+            p.addLayer();
+            expect(p.removedLayers.empty(), "swap, reset and add remove nothing");
+            expect(! p.removeLayer(7), "a bad index changes nothing");
+            expect(p.removedLayers.empty(), "and hands nothing over");
         }
 
         beginTest("layerHoldsParamTruth: removeLayer syncs the shifted and the vacated slots instead of copying values");

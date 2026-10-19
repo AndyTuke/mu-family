@@ -46,10 +46,10 @@ struct SampleRhythm : Rhythm
                          RhythmSequencer& sequencer, int slot, const RhythmStepClock& clock, bool cursorDrives,
                          VoiceEngine* engine);
 
-    // Audio thread: the hit the sequencer fired for this rhythm this block. In MIDI output mode it becomes one
-    // note-on in `midiOut` through `midiEngine` (never the voice); otherwise `engine` (null: none) retriggers, tied when
-    // the sequencer marked the hit tied and the rhythm has pattern legato on. Allocates nothing itself.
-    void fireHit(bool accented, bool tied, juce::MidiBuffer& midiOut, MidiOutputEngine& midiEngine, VoiceEngine* engine);
+    // Audio thread: the hit fired for this rhythm this block. In MIDI output mode it becomes one note-on in
+    // `midiOut` through the rhythm's own `midi` engine (never the voice); otherwise `engine` (null: none)
+    // retriggers, tied when the hit is tied and the rhythm has pattern legato on. Allocates nothing itself.
+    void fireHit(bool accented, bool tied, juce::MidiBuffer& midiOut, VoiceEngine* engine);
 
     // Audio thread, once per playing block: the play state the UI draws (step and fraction as one snapshot, the
     // pattern and ring lengths, and the monotonic hit counter when `fired`).
@@ -66,7 +66,9 @@ struct SampleRhythm : Rhythm
     void resetModulationMemory() noexcept;
 
     std::unique_ptr<VoiceEngine> voice;   // the engine the rhythm's hits play (null until prepared)
-    MidiOutputEngine             midi;    // used instead of the voice while the rhythm is in MIDI output mode
+    // Sends the note-on and, 20 ms later, the note-off while the rhythm is in MIDI output mode. Live state
+    // (E5.5c): it moves with the layer; a removed layer's owed note-off is handed to the host (layerRemoved).
+    MidiOutputEngine             midi;
 
     // Written by the audio thread, read by the UI.
     RhythmPlayState                          playState;

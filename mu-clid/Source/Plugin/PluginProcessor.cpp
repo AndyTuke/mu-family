@@ -160,7 +160,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     for (int i = 0; i < n; ++i)
     {
         voiceEngines[i]->prepareToPlay(sampleRate, samplesPerBlock);
-        midiEngines[i].prepare(sampleRate, samplesPerBlock);
+        sampleRhythm(i).midi.prepare(sampleRate, samplesPerBlock);
     }
     // Stage 34: re-prepare any populated retired engines too so a mid-stream
     // sample-rate or block-size change doesn't leave a tail-out engine
@@ -354,7 +354,7 @@ void PluginProcessor::advanceSequencer(int numRhythms, double beatPos, juce::Mid
     for (int r = 0; r < numRhythms; ++r)
         if (blockResult.firedMask & (1 << r))
             sampleRhythm(r).fireHit((blockResult.accentMask & (1 << r)) != 0, (blockResult.tiedMask & (1 << r)) != 0,
-                                    midiMessages, midiEngines[(size_t) r], voiceEngines[(size_t) r].get());
+                                    midiMessages, voiceEngines[(size_t) r].get());
 
     // Hot-swap: check if any staged rhythm preset should be committed at this boundary.
     if (hotSwapStager.checkBoundaries(numRhythms, blockResult.masterLoopWrapped,
@@ -480,7 +480,7 @@ void PluginProcessor::renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::M
     }
 
     for (int r = 0; r < numRhythms; ++r)
-        midiEngines[r].processBlock(midiMessages, buffer.getNumSamples());
+        sampleRhythm(r).midi.processBlock(midiMessages, buffer.getNumSamples());
 }
 
 //==============================================================================
