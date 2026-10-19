@@ -73,6 +73,16 @@ option(MUFAMILY_FOCUSED_BUILD "Build without incrementing the build number (focu
 #   cmake -B build -DMUFAMILY_WITH_CONTROL=ON      (add -DMUFAMILY_FOCUSED_BUILD=ON to keep the build number)
 option(MUFAMILY_WITH_CONTROL "Link mu-control (hardware controller support) into the standalone apps" OFF)
 
+# ASIO audio devices in the standalone apps (Windows). Off by default: using ASIO means accepting
+# Steinberg's ASIO licence (the headers JUCE bundles are covered by it); turn it on once that is done.
+#   cmake -B build -DMUFAMILY_WITH_ASIO=ON
+option(MUFAMILY_WITH_ASIO "Offer ASIO audio devices in the standalone apps (Windows; needs the Steinberg ASIO licence)" OFF)
+function(mu_asio_attach target)
+    if(MUFAMILY_WITH_ASIO AND WIN32)
+        target_compile_definitions(${target} PRIVATE JUCE_ASIO=1)
+    endif()
+endfunction()
+
 # ── Family-wide version metadata ────────────────────────────────────────────
 # Read the current build number at configure time so PLUGIN_VERSION in every
 # juce_add_plugin call reflects the real release number rather than the cmake

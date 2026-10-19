@@ -125,6 +125,7 @@ target_sources(mu-clid_Standalone PRIVATE
 )
 # Hardware controller support (mu-control) in this Standalone only; a no-op unless MUFAMILY_WITH_CONTROL is ON.
 mu_control_attach(mu-clid_Standalone)
+mu_asio_attach(mu-clid_Standalone)   # ASIO devices when -DMUFAMILY_WITH_ASIO=ON
 
 # ── Build-number increment (runs every build; Debug bumps, Release reuses) ────
 # Writes mu-core/BuildNumber.h (About panel) AND regenerates the Windows version

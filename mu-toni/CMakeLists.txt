@@ -99,6 +99,7 @@ target_sources(mu-toni_Standalone PRIVATE
 
 # Hardware controller support (mu-control) in this Standalone only; a no-op unless MUFAMILY_WITH_CONTROL is ON.
 mu_control_attach(mu-toni_Standalone)
+mu_asio_attach(mu-toni_Standalone)   # ASIO devices when -DMUFAMILY_WITH_ASIO=ON
 
 # CLAP format via clap-juce-extensions (mirrors mu-clid / mu-tant). Creates mu-toni_CLAP.
 clap_juce_extensions_plugin(TARGET mu-toni

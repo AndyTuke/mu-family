@@ -126,6 +126,7 @@ target_sources(mu-tant_Standalone PRIVATE
 
 # Hardware controller support (mu-control) in this Standalone only; a no-op unless MUFAMILY_WITH_CONTROL is ON.
 mu_control_attach(mu-tant_Standalone)
+mu_asio_attach(mu-tant_Standalone)   # ASIO devices when -DMUFAMILY_WITH_ASIO=ON
 
 # CLAP format via clap-juce-extensions (mirrors mu-clid). Creates mu-tant_CLAP.
 clap_juce_extensions_plugin(TARGET mu-tant
