@@ -16,10 +16,14 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
       apvts(*this, nullptr, stateTreeType, std::move(layout))
 {
     // The block driver's mixer hook: channel r is slot r's scratch, copied exactly (raw pointers, so a
-    // buffer's "cleared" flag can never turn the copy into a clear). Built once here: no allocation per block.
+    // buffer's "cleared" flag can never turn the copy into a clear). A slot that nothing wrote this call (its
+    // view still carries the cleared flag) is not copied: the mixer's channel stays cleared, as a voice that
+    // renders nothing leaves it, so the mixer skips it exactly as before and adds no zeros (which would turn a
+    // later channel's -0 into +0). Built once here: no allocation per block.
     renderState.copyToMixer = [this](int r, juce::AudioBuffer<float>& buf, int n)
     {
         if (r < 0 || r >= mu_limits::kMaxLayers) return;
+        if (renderState.view[(size_t) r].hasBeenCleared()) return;
         const auto& src = renderState.scratch[(size_t) r];
         const int nCh = juce::jmin(buf.getNumChannels(), src.getNumChannels());
         const int len = juce::jmin(n, src.getNumSamples());

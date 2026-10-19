@@ -678,6 +678,43 @@ struct MuClidLayerEquivalenceTests : juce::UnitTest
             sc.events.push_back(setParamAt(220, "mstrLoop", 0.0f));
             check(sc);
         }
+
+        // The reorder hand-over (E5.5d): on a swap or remove the RhythmSequencer moves each slot's step state with
+        // its rhythm (swapSlotState / removeSlotState), while each RhythmCursor moves with its layer and absorbs the
+        // step it lands on (requestAbsorb). Equal hits on every block after reorders at many step phases, on rhythms
+        // of different lengths (some mid-pass, some at their wrap), with a master loop and with Euclid modulation.
+        auto edit = [](int block, const char* label, std::function<void(PluginProcessor&)> fn)
+        {
+            return mu_golden::ScriptedEvent { block, label, [fn](mu_golden::ScriptContext& c) { fn(clid(c)); } };
+        };
+        beginTest("equivalence: reorders (swaps, removes, adds) at many step phases");
+        {
+            auto sc = makeScenario(byName("eight-rhythms-polyrhythm"));
+            const int swaps[][2] = { { 0, 7 }, { 1, 2 }, { 3, 6 }, { 0, 1 }, { 4, 5 }, { 2, 6 }, { 5, 0 }, { 6, 3 } };
+            int b = 9;
+            for (const auto& s : swaps)
+            {
+                const int x = s[0], y = s[1];
+                sc.events.push_back(edit(b, "swapLayers", [x, y](PluginProcessor& p) { p.swapLayers(x, y); }));
+                b += 11 + (b % 7);   // irregular gaps, so the edits fall at different step phases
+            }
+            sc.events.push_back(edit(b,      "removeLayer(2)", [](PluginProcessor& p) { p.removeLayer(2); }));
+            sc.events.push_back(edit(b + 13, "removeLayer(0)", [](PluginProcessor& p) { p.removeLayer(0); }));
+            sc.events.push_back(edit(b + 29, "addLayer",       [](PluginProcessor& p) { p.addLayer(); }));
+            sc.events.push_back(edit(b + 41, "swapLayers(5, 1)", [](PluginProcessor& p) { p.swapLayers(5, 1); }));
+            sc.events.push_back(edit(b + 58, "removeLayer(5)", [](PluginProcessor& p) { p.removeLayer(5); }));
+            sc.events.push_back(edit(b + 77, "swapLayers(0, 4)", [](PluginProcessor& p) { p.swapLayers(0, 4); }));
+            check(sc);
+        }
+        beginTest("equivalence: reorders of modulated rhythms");
+        {
+            auto sc = makeScenario(byName("modulation-geometry-voice"));
+            for (int b = 15; b < 300; b += 23)
+                sc.events.push_back(edit(b, "swapLayers(0, 2)", [](PluginProcessor& p) { p.swapLayers(0, 2); }));
+            sc.events.push_back(edit(140, "removeLayer(1)", [](PluginProcessor& p) { p.removeLayer(1); }));
+            sc.events.push_back(edit(190, "addLayer", [](PluginProcessor& p) { p.addLayer(); }));
+            check(sc);
+        }
     }
 };
 

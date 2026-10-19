@@ -142,10 +142,28 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
     applyPendingParams();
 
     // A try-lock: the audio thread never waits for a buffer swap on the message thread (loadFile reads the
-    // file outside the lock and holds it only to move the new buffer in). On contention: a silent block.
+    // file outside the lock and holds it only to move the new buffer in). On contention: a silent block that
+    // still keeps time, so the envelopes and a retired engine's drain countdown advance as a rendered block's do.
     const juce::SpinLock::ScopedTryLockType bufferGuard(bufferLock);
-    if (! bufferGuard.isLocked())
+    bool contended = ! bufferGuard.isLocked();
+#if defined(MU_VOICE_ENGINE_TEST_SEAM) && MU_VOICE_ENGINE_TEST_SEAM
+    contended = contended || forceBufferContention.load(std::memory_order_relaxed);   // test seam, mu-core-tests only
+#endif
+    if (contended)
+    {
+        if (! sampleLoaded.load(std::memory_order_relaxed))
+            return;   // a block with no sample advances nothing either
+        const int skipped = juce::jmin(numSamples, tempBuffer.getNumSamples());
+        for (int s = 0; s < skipped; ++s)
+        {
+            pitchEnv.getNextSample();
+            filterEnv.getNextSample();
+            ampEnv.getNextSample();
+        }
+        if (retired && retireDrainBlocks > 0)
+            --retireDrainBlocks;
         return;
+    }
 
     if (! sampleLoaded.load(std::memory_order_relaxed) || buffer.getNumSamples() == 0 || buffer.getNumChannels() == 0)
         return;

@@ -1192,3 +1192,73 @@ struct LayerContractMiscTests : juce::UnitTest
     }
 };
 static LayerContractMiscTests sLayerContractMiscTests;
+
+// The driver's per-block product hooks (layersBlockStarting / layersBlockRendered): once each per rendered host
+// block, the start before any layer renders and with the block's view and transport, the end after the mixer; a
+// block that renders nothing (a held lock, an edit in flight, 0 frames) calls neither.
+namespace
+{
+    struct HookedHost : FakeLayerHost
+    {
+        HookedHost() : FakeLayerHost(2) {}
+        void layersBlockStarting(const mu_core::LayerView& view, const mu_core::BlockTransport& t, juce::MidiBuffer& midi) override
+        {
+            ++starts;
+            startLive = view.numLive;
+            startBeat = t.startBeat;
+            rendersAtStart = fake(0).renders;
+            midi.addEvent(juce::MidiMessage::noteOn(1, 64, (juce::uint8) 100), 0);   // the host buffer is the one the block got
+        }
+        void layersBlockRendered(const mu_core::LayerView& view, juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) override
+        {
+            ++ends;
+            endLive = view.numLive;
+            rendersAtEnd = fake(0).renders;
+            endFrames = buffer.getNumSamples();
+            endPeak = buffer.getMagnitude(0, 0, buffer.getNumSamples());
+        }
+        int starts = 0, ends = 0, startLive = -1, endLive = -1, rendersAtStart = -1, rendersAtEnd = -1, endFrames = 0;
+        double startBeat = -1.0;
+        float endPeak = 0.0f;
+    };
+}
+
+struct LayerBlockHookTests : juce::UnitTest
+{
+    LayerBlockHookTests() : juce::UnitTest("Render contract: the product's per-block hooks", "mu-core") {}
+
+    void runTest() override
+    {
+        beginTest("start before any layer renders, end after the mixer, once each per rendered block; none on a skipped block");
+        auto pBox = std::make_unique<HookedHost>();
+        auto& p = *pBox;
+        p.setUseLayerRenderForTest(true);
+        Driver d(p, 48000.0, 256);
+        d.host.ppq = 2.0;
+        const auto& out = d.block(256);
+        expectEquals(p.starts, 1);
+        expectEquals(p.ends, 1);
+        expectEquals(p.startLive, 2, "the start sees the block's view");
+        expectEquals(p.startBeat, 2.0, "and its transport");
+        expectEquals(p.rendersAtStart, 0, "no layer had rendered at the start");
+        expectEquals(p.rendersAtEnd, 1, "every layer had rendered by the end");
+        expectEquals(p.endFrames, 256, "the end gets the host buffer the block rendered");
+        expect(p.endPeak > 0.0f && p.endPeak == out.getMagnitude(0, 0, 256), "after the mixer wrote it");
+        int noteOns = 0;
+        for (const auto m : d.midi) noteOns += m.getMessage().isNoteOn() ? 1 : 0;
+        expectEquals(noteOns, 1, "the start's MIDI went into the block's host buffer");
+
+        {
+            const juce::ScopedLock held(p.layersLock);   // the audio thread's try-lock misses: nothing renders
+            std::thread t([&] { d.block(256); });
+            t.join();
+        }
+        d.block(0);
+        expectEquals(p.starts, 1, "a skipped block and a 0-frame block call no hook");
+        expectEquals(p.ends, 1);
+        d.block(128);
+        expectEquals(p.starts, 2);
+        expectEquals(p.ends, 2);
+    }
+};
+static LayerBlockHookTests sLayerBlockHookTests;

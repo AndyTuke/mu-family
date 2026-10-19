@@ -44,6 +44,8 @@ public:
     // called by setParams while it holds the pending-params lock, so a test can hold the lock open and
     // check the audio thread neither blocks nor loses the update. Absent from every shipping target.
     static inline std::atomic<void (*)()> setParamsHoldHook { nullptr };
+    // Test seam: while true, process() takes its contended-block path, as when the sample-buffer try-lock misses.
+    static inline std::atomic<bool> forceBufferContention { false };
 #endif
 
     // Called from audio thread only (PluginProcessor::processBlock).

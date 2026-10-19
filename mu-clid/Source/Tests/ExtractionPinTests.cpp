@@ -143,7 +143,7 @@ namespace
 
     bool slotHolds(mu_clid::PluginProcessor& p, int slot, const VoiceEngine* e)
     {
-        for (auto& t : p.retiredVoiceEngines[(size_t) slot])
+        for (auto& t : p.sampleRhythm(slot).retiredEngines)
             if (t.get() == e) return true;
         return false;
     }
@@ -151,7 +151,7 @@ namespace
     int tailCount(mu_clid::PluginProcessor& p, int slot)
     {
         int n = 0;
-        for (auto& t : p.retiredVoiceEngines[(size_t) slot]) n += t != nullptr ? 1 : 0;
+        for (auto& t : p.sampleRhythm(slot).retiredEngines) n += t != nullptr ? 1 : 0;
         return n;
     }
 
@@ -200,8 +200,8 @@ struct MuClidExtractionPinTests : juce::UnitTest
                 // A second swap on a silent rhythm: the boundary that flags it is the only thing that asks for a deferred-work pass.
                 if (b == 700) p.stageRhythmPreset(0, silent);
                 const auto out = rig.block(512);
-                if (tail == nullptr && p.retiredVoiceEngines[0][0] != nullptr) { tail = p.retiredVoiceEngines[0][0].get(); placedBlock = b; }
-                if (tail != nullptr && flaggedBlock < 0 && p.retiredReadyForCleanup[0][0].load()) flaggedBlock = b;
+                if (tail == nullptr && p.sampleRhythm(0).retiredEngines[0] != nullptr) { tail = p.sampleRhythm(0).retiredEngines[0].get(); placedBlock = b; }
+                if (tail != nullptr && flaggedBlock < 0 && p.sampleRhythm(0).retiredReadyForCleanup[0].load()) flaggedBlock = b;
                 if (tail != nullptr && flaggedBlock >= 0 && freedBlock < 0)
                 {
                     if (! slotHolds(p, 0, tail)) freedBlock = b;
@@ -235,8 +235,8 @@ struct MuClidExtractionPinTests : juce::UnitTest
                 {
                     if (b == 4) p.stageRhythmPreset(0, silent);
                     rig.block(hostBlock);
-                    if (placed < 0 && p.retiredVoiceEngines[0][0] != nullptr) placed = b;
-                    if (placed >= 0 && p.retiredReadyForCleanup[0][0].load()) flagged = b;
+                    if (placed < 0 && p.sampleRhythm(0).retiredEngines[0] != nullptr) placed = b;
+                    if (placed >= 0 && p.sampleRhythm(0).retiredReadyForCleanup[0].load()) flagged = b;
                 }
                 logMessage("P2 host block " + juce::String(hostBlock) + ": drained " + juce::String(flagged - placed) + " calls after the retire");
                 return flagged - placed;
@@ -259,7 +259,7 @@ struct MuClidExtractionPinTests : juce::UnitTest
                 rig.block(512);
             }
             expectEquals(tailCount(p, 0), 1, "the engine retired by the swap is held");
-            expect(! p.retiredReadyForCleanup[0][0].load(), "and 16 s later it still has not reported drained: its drain budget only counts down in a process() that has a sample");
+            expect(! p.sampleRhythm(0).retiredReadyForCleanup[0].load(), "and 16 s later it still has not reported drained: its drain budget only counts down in a process() that has a sample");
         }
 
         beginTest("P2: prepareToPlay zeroes a ringing Karplus loop without freeing its retired engine");
@@ -276,12 +276,12 @@ struct MuClidExtractionPinTests : juce::UnitTest
                 rig.block(512);
             }
             const auto before = rig.block(512);
-            expect(p.retiredVoiceEngines[0][0] != nullptr, "a tail is retired and ringing");
+            expect(p.sampleRhythm(0).retiredEngines[0] != nullptr, "a tail is retired and ringing");
             expect(peakOf(before, 0, 512) > 0.05f, "audibly");
             p.prepareToPlay(kSr, 512);
             const auto after = rig.render(4 * 512);
             logMessage("P2 prepareToPlay on a ringing tail: peak before " + juce::String(peakOf(before, 0, 512), 5) + ", after " + juce::String(peakOf(after, 0, 4 * 512), 6));
-            expect(p.retiredVoiceEngines[0][0] != nullptr, "the retired engine is still in its slot");
+            expect(p.sampleRhythm(0).retiredEngines[0] != nullptr, "the retired engine is still in its slot");
             expectEquals(peakOf(after, 0, 4 * 512), 0.0f, "but the re-prepare cleared the delay line: the tail is gone");
         }
     }
@@ -322,14 +322,14 @@ struct MuClidExtractionPinTests : juce::UnitTest
                 if (b == 4) for (int r = 0; r < 3; ++r) p.stageRhythmPreset(r, silent);
                 if (b == 60)
                 {
-                    for (int r = 0; r < 3; ++r) tails[(size_t) r] = p.retiredVoiceEngines[(size_t) r][0].get();
+                    for (int r = 0; r < 3; ++r) tails[(size_t) r] = p.sampleRhythm(r).retiredEngines[0].get();
                     p.loadPreset(silentFull);   // playing: staged, lands at the next loop boundary
                 }
                 if (b == 150)
                 {
                     expectEquals(p.getNumRhythms(), 1, "the full preset has landed: one rhythm");
                     expect(slotHolds(p, 1, tails[1]) && slotHolds(p, 2, tails[2]), "the tails of the dropped slots 1 and 2 are still held in their slots");
-                    expect(! p.retiredReadyForCleanup[1][0].load() && ! p.retiredReadyForCleanup[2][0].load(), "and are not flagged: nothing visits them");
+                    expect(! p.sampleRhythm(1).retiredReadyForCleanup[0].load() && ! p.sampleRhythm(2).retiredReadyForCleanup[0].load(), "and are not flagged: nothing visits them");
                     expectEquals(chPeak(p, 1), 0.0f, "slot 1's channel is silent");
                     expectEquals(chPeak(p, 2), 0.0f, "slot 2's channel is silent");
                     expect(chPeak(p, 0) > 0.01f, "slot 0's own tail goes on ringing");
@@ -359,7 +359,7 @@ struct MuClidExtractionPinTests : juce::UnitTest
             for (int b = 0; b < 100; ++b)
             {
                 if (b == 4) for (int r = 0; r < 3; ++r) p.stageRhythmPreset(r, silent);
-                if (b == 60) for (int r = 0; r < 3; ++r) tails[(size_t) r] = p.retiredVoiceEngines[(size_t) r][0].get();
+                if (b == 60) for (int r = 0; r < 3; ++r) tails[(size_t) r] = p.sampleRhythm(r).retiredEngines[0].get();
                 if (b == 70) p.removeLayer(0);
                 rig.block(512);
             }
@@ -401,9 +401,9 @@ struct MuClidExtractionPinTests : juce::UnitTest
                     for (int i = 0; i < 4; ++i)
                     {
                         auto& l = life[s][i];
-                        const VoiceEngine* now = p.retiredVoiceEngines[(size_t) s][(size_t) i].get();
+                        const VoiceEngine* now = p.sampleRhythm(s).retiredEngines[(size_t) i].get();
                         if (now != l.e) { l = Life{}; l.e = now; l.start = b; }
-                        if (now != nullptr && l.end < 0 && p.retiredReadyForCleanup[(size_t) s][(size_t) i].load()) l.end = b;
+                        if (now != nullptr && l.end < 0 && p.sampleRhythm(s).retiredReadyForCleanup[(size_t) i].load()) l.end = b;
                     }
             }
             for (int s = 0; s < 8; ++s)
@@ -506,7 +506,7 @@ struct MuClidExtractionPinTests : juce::UnitTest
                 if (b == 150) p.layerEditInFlight.store(true);
                 if (b == 220) p.layerEditInFlight.store(false);
                 rig.block(512);
-                if (committed < 0 && p.retiredVoiceEngines[0][0] != nullptr) committed = b;
+                if (committed < 0 && p.sampleRhythm(0).retiredEngines[0] != nullptr) committed = b;
             }
             logMessage("P6 swap boundary at block ~188 inside the skipped blocks 150-219: committed at block " + juce::String(committed));
             expectEquals(committed, 220, "the missed boundary is acted on at once when blocks run again, not a loop later");

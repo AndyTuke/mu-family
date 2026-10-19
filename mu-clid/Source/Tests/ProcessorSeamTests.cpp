@@ -180,30 +180,30 @@ struct MuClidProcessorSeamTests : juce::UnitTest
         expectEquals(p.getNumRhythms(), 3);
 
         // One tail on each slot (two on slot 1), the drained flag raised on slot 2's.
-        auto put = [&](int slot, int i) { p.retiredVoiceEngines[(size_t) slot][(size_t) i] = std::make_unique<VoiceEngine>(); return p.retiredVoiceEngines[(size_t) slot][(size_t) i].get(); };
+        auto put = [&](int slot, int i) { p.sampleRhythm(slot).retiredEngines[(size_t) i] = std::make_unique<VoiceEngine>(); return p.sampleRhythm(slot).retiredEngines[(size_t) i].get(); };
         auto* t0   = put(0, 0);
         auto* t1a  = put(1, 0);
         auto* t1b  = put(1, 1);
         auto* t2   = put(2, 0);
-        p.retiredReadyForCleanup[2][0].store(true);
+        p.sampleRhythm(2).retiredReadyForCleanup[0].store(true);
         juce::ignoreUnused(t0);
 
         p.removeLayer(0);
         expectEquals(p.getNumRhythms(), 2);
 
-        expect(p.retiredVoiceEngines[0][0].get() == t1a && p.retiredVoiceEngines[0][1].get() == t1b,
+        expect(p.sampleRhythm(0).retiredEngines[0].get() == t1a && p.sampleRhythm(0).retiredEngines[1].get() == t1b,
                "slot 1's tails now sit on slot 0 (the channel their rhythm moved to)");
-        expect(p.retiredVoiceEngines[1][0].get() == t2 && p.retiredVoiceEngines[1][1] == nullptr,
+        expect(p.sampleRhythm(1).retiredEngines[0].get() == t2 && p.sampleRhythm(1).retiredEngines[1] == nullptr,
                "slot 2's tail now sits on slot 1");
-        expect(p.retiredVoiceEngines[2][0] == nullptr && p.retiredVoiceEngines[2][1] == nullptr,
+        expect(p.sampleRhythm(2).retiredEngines[0] == nullptr && p.sampleRhythm(2).retiredEngines[1] == nullptr,
                "the vacated top slot holds no tail");
-        expect(! p.retiredReadyForCleanup[0][0].load() && p.retiredReadyForCleanup[1][0].load() && ! p.retiredReadyForCleanup[2][0].load(),
+        expect(! p.sampleRhythm(0).retiredReadyForCleanup[0].load() && p.sampleRhythm(1).retiredReadyForCleanup[0].load() && ! p.sampleRhythm(2).retiredReadyForCleanup[0].load(),
                "the drained flag moved with its engine");
 
         // Removing the last slot drops its tails and leaves the others alone.
         p.removeLayer(1);
-        expect(p.retiredVoiceEngines[0][0].get() == t1a, "the lower slot keeps its tail");
-        expect(p.retiredVoiceEngines[1][0] == nullptr && ! p.retiredReadyForCleanup[1][0].load(), "the removed last slot holds no tail and no flag");
+        expect(p.sampleRhythm(0).retiredEngines[0].get() == t1a, "the lower slot keeps its tail");
+        expect(p.sampleRhythm(1).retiredEngines[0] == nullptr && ! p.sampleRhythm(1).retiredReadyForCleanup[0].load(), "the removed last slot holds no tail and no flag");
     }
 
     // remove() shifts tails, drained flags and channel strips under layersLock while processBlock renders
@@ -227,11 +227,11 @@ struct MuClidProcessorSeamTests : juce::UnitTest
             for (int s = 0; s < n; ++s)
                 for (int i = 0; i < kTails; ++i)
                 {
-                    auto& slot = p.retiredVoiceEngines[(size_t) s][(size_t) i];
+                    auto& slot = p.sampleRhythm((int) s).retiredEngines[(size_t) i];
                     slot = std::make_unique<VoiceEngine>();
                     slot->prepareToPlay(48000.0, kBlock);
                     expected[(size_t) s][(size_t) i] = slot.get();
-                    p.retiredReadyForCleanup[(size_t) s][(size_t) i].store(i == 0);
+                    p.sampleRhythm((int) s).retiredReadyForCleanup[(size_t) i].store(i == 0);
                 }
 
             p.setPlayHead(&host);
@@ -253,12 +253,12 @@ struct MuClidProcessorSeamTests : juce::UnitTest
             for (size_t s = 0; s < expected.size(); ++s)
                 for (size_t i = 0; i < (size_t) kTails; ++i)
                 {
-                    expect(p.retiredVoiceEngines[s][i].get() == expected[s][i], "each tail sits on the slot its rhythm moved to");
-                    expect(i != 0 || p.retiredReadyForCleanup[s][i].load(), "a raised flag moved with its engine");
+                    expect(p.sampleRhythm((int) s).retiredEngines[i].get() == expected[s][i], "each tail sits on the slot its rhythm moved to");
+                    expect(i != 0 || p.sampleRhythm((int) s).retiredReadyForCleanup[i].load(), "a raised flag moved with its engine");
                 }
             for (size_t s = 1; s < (size_t) mu_limits::kMaxLayers; ++s)
                 for (size_t i = 0; i < (size_t) kTails; ++i)
-                    expect(p.retiredVoiceEngines[s][i] == nullptr && ! p.retiredReadyForCleanup[s][i].load(),
+                    expect(p.sampleRhythm((int) s).retiredEngines[i] == nullptr && ! p.sampleRhythm((int) s).retiredReadyForCleanup[i].load(),
                            "vacated slots hold no tail and no flag");
         }
     }
@@ -300,11 +300,11 @@ struct MuClidProcessorSeamTests : juce::UnitTest
         };
 
         // The engine at slot 2 moves to slot 1 when slot 0 goes; prepare it for the block size first.
-        p.voiceEngines[2]->prepareToPlay(48000.0, kLen);
+        p.voiceEngine(2)->prepareToPlay(48000.0, kLen);
         p.removeLayer(0);
         expectEquals(p.getNumRhythms(), 2);
 
-        const auto shifted = render(p.voiceEngines[1]->insertProc);
+        const auto shifted = render(p.voiceEngine(1)->insertProc);
         expect(shifted == freshAt(1), "the shifted engine renders like a fresh engine at its new index");
         expect(shifted != freshAt(2), "and not like one at its old index");
     }

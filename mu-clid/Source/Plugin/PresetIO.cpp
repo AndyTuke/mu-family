@@ -363,9 +363,9 @@ void PresetIO::restoreRhythmSample(int i, const juce::ValueTree& tree,
 {
     // A slot without an engine has nothing to load a sample into. (Mirrors the null guard
     // in forceSyncRhythmFromApvts.)
-    if (! proc.voiceEngines[i]) return;
+    if (! proc.voiceEngine(i)) return;
 
-    if (const auto path = rhythm_preset::restoreSample(*proc.voiceEngines[i], tree, i, samplePathProp,
+    if (const auto path = rhythm_preset::restoreSample(*proc.voiceEngine(i), tree, i, samplePathProp,
                                                        sampleDataProp, sampleNameProp, presetContext()))
         proc.samples.setPath(i, *path);
 }
@@ -522,7 +522,7 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     // cleared after the lock, so its string free never sits under it.
     for (int i = n; i < oldN; ++i)
     {
-        shrunkEngines[(size_t) i] = std::move(proc.voiceEngines[(size_t) i]);
+        shrunkEngines[(size_t) i] = std::move(proc.voiceEngine(i));
         proc.parkPendingMidiOff(proc.sampleRhythm(i).midi);   // keep the owed note-off; the audio thread no longer visits this slot
         proc.sampleRhythm(i).midi = MidiOutputEngine{};
         proc.mixerEngine.channels[(size_t) i].reset();

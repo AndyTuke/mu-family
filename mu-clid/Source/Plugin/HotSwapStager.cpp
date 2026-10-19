@@ -115,8 +115,9 @@ void HotSwapStager::installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceE
     if (voice) voice->insertProc.setSlotIndex(r);
 
     // Retire-then-swap: the old engine continues rendering its in-flight tail from a retired slot.
-    auto oldEngine = std::move(proc.voiceEngines[(size_t) r]);
-    proc.voiceEngines[(size_t) r] = std::move(voice);
+    auto& layer = proc.sampleRhythm(r);
+    auto oldEngine = std::move(layer.voice);
+    layer.voice = std::move(voice);
 
     if (oldEngine)
     {
@@ -125,16 +126,16 @@ void HotSwapStager::installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceE
         oldEngine->markRetired();
 
         bool placed = false;
-        for (auto& slot : proc.retiredVoiceEngines[(size_t) r])
+        for (auto& slot : layer.retiredEngines)
             if (! slot) { slot = std::move(oldEngine); placed = true; break; }
         if (! placed)
         {
             // All retired slots full — spam-swap back-pressure: force-cut slot 0. The engine it held
             // goes to the caller's slot when given, so its teardown runs after the caller's unlock.
-            auto victim = std::move(proc.retiredVoiceEngines[(size_t) r][0]);
-            proc.retiredVoiceEngines[(size_t) r][0] = std::move(oldEngine);
+            auto victim = std::move(layer.retiredEngines[0]);
+            layer.retiredEngines[0] = std::move(oldEngine);
             if (cutVictim != nullptr) *cutVictim = std::move(victim);
-            proc.retiredReadyForCleanup[(size_t) r][0].store(false, std::memory_order_release);
+            layer.retiredReadyForCleanup[0].store(false, std::memory_order_release);
         }
     }
 
@@ -158,13 +159,11 @@ void HotSwapStager::processSwaps()
     // suspendProcessing fences the audio thread so it cannot be mid-process() on
     // the engine when the unique_ptr is yanked.
     // Empty-fast-path: skip the suspend cost when no engines need cleanup.
+    // (The flags are read without the layer lock: every slot always holds a layer, and a flag is an atomic.)
     bool anyCleanupNeeded = false;
-    for (auto& slotArr : proc.retiredReadyForCleanup)
-    {
-        for (auto& flag : slotArr)
+    for (int r = 0; r < RhythmSequencer::MaxRhythms && ! anyCleanupNeeded; ++r)
+        for (auto& flag : proc.sampleRhythm(r).retiredReadyForCleanup)
             if (flag.load(std::memory_order_acquire)) { anyCleanupNeeded = true; break; }
-        if (anyCleanupNeeded) break;
-    }
     if (anyCleanupNeeded)
     {
         std::array<std::unique_ptr<VoiceEngine>,
@@ -175,17 +174,15 @@ void HotSwapStager::processSwaps()
             // layersLock as for an install: suspend is no barrier in every host, and a structural edit
             // moves these tail slots under the same lock.
             const juce::ScopedLock sl(proc.layersLock);
-            for (int r = 0; r < (int)proc.retiredReadyForCleanup.size(); ++r)
+            for (int r = 0; r < RhythmSequencer::MaxRhythms; ++r)
             {
+                auto& layer = proc.sampleRhythm(r);
                 for (int i = 0; i < mu_limits::kMaxRetiredVoiceEngines; ++i)
                 {
-                    if (!proc.retiredReadyForCleanup[(size_t)r][(size_t)i]
-                            .load(std::memory_order_acquire))
+                    if (! layer.retiredReadyForCleanup[(size_t) i].load(std::memory_order_acquire))
                         continue;
-                    orphans[(size_t)orphanCount++] =
-                        std::move(proc.retiredVoiceEngines[(size_t)r][(size_t)i]);
-                    proc.retiredReadyForCleanup[(size_t)r][(size_t)i]
-                        .store(false, std::memory_order_release);
+                    orphans[(size_t) orphanCount++] = std::move(layer.retiredEngines[(size_t) i]);
+                    layer.retiredReadyForCleanup[(size_t) i].store(false, std::memory_order_release);
                 }
             }
         }

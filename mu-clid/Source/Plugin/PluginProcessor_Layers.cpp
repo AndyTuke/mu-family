@@ -23,13 +23,13 @@ std::unique_ptr<Layer> PluginProcessor::makeRhythm(int slot) const
     return r;
 }
 
-// Message thread, outside every lock: the engines a slot needs once it is live.
-void PluginProcessor::prepareSlotEngines(int slot)
+// Message thread, outside every lock: the voice engine a slot needs once it is live.
+std::unique_ptr<VoiceEngine> PluginProcessor::makeSlotEngine(int slot) const
 {
-    voiceEngines[(size_t) slot] = std::make_unique<VoiceEngine>();
-    voiceEngines[(size_t) slot]->insertProc.setSlotIndex(slot);   // per-slot noise seed
-    voiceEngines[(size_t) slot]->prepareToPlay(currentSampleRate, currentBlockSize);
-    samples.clearPath(slot);                                      // the new slot carries no sample
+    auto engine = std::make_unique<VoiceEngine>();
+    engine->insertProc.setSlotIndex(slot);   // per-slot noise seed
+    engine->prepareToPlay(currentSampleRate, currentBlockSize);
+    return engine;
 }
 
 // ProcessorBase builds a layer before it takes any lock: for an add (a slot at or above the live count)
@@ -37,15 +37,32 @@ void PluginProcessor::prepareSlotEngines(int slot)
 // are for slots that are already live and keep their engines.
 std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
 {
-    // Every edit that parks engines under the lock builds a layer first, so anything an earlier edit
-    // left parked is freed here, and layersReordered never frees one under the lock.
-    releaseParkedEngines();
     const bool adding = slot >= numLayers.load(std::memory_order_relaxed);
+    std::unique_ptr<VoiceEngine> engine;
     if (adding)
-        prepareSlotEngines(slot);
+    {
+        engine = makeSlotEngine(slot);
+        samples.clearPath(slot);   // the new slot carries no sample
+    }
     auto layer = makeRhythm(slot);
     if (adding)
-        static_cast<SampleRhythm&>(*layer).midi.prepare(currentSampleRate, currentBlockSize);   // the new rhythm's MIDI engine
+    {
+        auto& fresh = static_cast<SampleRhythm&>(*layer);
+        fresh.voice = std::move(engine);
+        fresh.midi.prepare(currentSampleRate, currentBlockSize);   // the new rhythm's MIDI engine
+
+        // The tails a count-reducing load left in the slot stay with the slot, as they did when the processor
+        // held them: the new rhythm takes them over from the spare it replaces (which is not live, so no block
+        // renders it meanwhile).
+        auto& spare = sampleRhythm(slot);
+        for (int k = 0; k < kMaxRetiredEngines; ++k)
+        {
+            fresh.retiredEngines[(size_t) k] = std::move(spare.retiredEngines[(size_t) k]);
+            fresh.retiredReadyForCleanup[(size_t) k].store(spare.retiredReadyForCleanup[(size_t) k].load(std::memory_order_acquire),
+                                                           std::memory_order_release);
+            spare.retiredReadyForCleanup[(size_t) k].store(false, std::memory_order_release);
+        }
+    }
     return layer;
 }
 
@@ -103,7 +120,7 @@ void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
         // A reset slot keeps its engine, whose last hit would otherwise sit at the envelope's sustain
         // until the next trigger. Done here, under the lock and before the new pattern exists, so a
         // fresh hit can never be released; nothing is allocated or freed.
-        if (auto& engine = voiceEngines[(size_t) firstIndex])
+        if (auto& engine = voiceEngine(firstIndex))
             engine->releaseHeldNote();
     }
 
@@ -129,49 +146,46 @@ void PluginProcessor::layersReordered(LayerEdit kind, int a, int b)
         sequencer.swapSlotState(a, b);
         sampleRhythm(a).cursor.requestAbsorb();   // each cursor moved with its rhythm: absorb the current step
         sampleRhythm(b).cursor.requestAbsorb();
-        std::swap(voiceEngines[(size_t) a], voiceEngines[(size_t) b]);
         resetPlayState(a);
         resetPlayState(b);
         samples.swapPaths(a, b);
+
+        // The voice engines moved with their rhythms. The retired tails stay in their slot's channel on a swap,
+        // so the two layers hand theirs back (nothing is allocated or freed).
+        auto& ra = sampleRhythm(a);
+        auto& rb = sampleRhythm(b);
+        for (int k = 0; k < kMaxRetiredEngines; ++k)
+        {
+            std::swap(ra.retiredEngines[(size_t) k], rb.retiredEngines[(size_t) k]);
+            const bool flagA = ra.retiredReadyForCleanup[(size_t) k].load(std::memory_order_acquire);
+            ra.retiredReadyForCleanup[(size_t) k].store(rb.retiredReadyForCleanup[(size_t) k].load(std::memory_order_acquire),
+                                                        std::memory_order_release);
+            rb.retiredReadyForCleanup[(size_t) k].store(flagA, std::memory_order_release);
+        }
         return;
     }
 
-    // Remove slot `a`: everything above it moves down one.
+    // Remove slot `a`: everything above it moved down one, each rhythm with its voice and retired engines (a
+    // retired tail renders into the channel of the slot that holds it, so it follows the rhythm whose swap left
+    // it); the removed rhythm's go with it, destroyed by the base after the unlock, and the vacated top slot's
+    // spare holds none.
     const int n    = sequencer.getNumRhythms();   // the count before the removal
     const int newN = n - 1;
     reorderLastSlot = newN;
-    jassert(std::all_of(parkedEngines.begin(), parkedEngines.end(), [](const auto& p) { return p == nullptr; }));
 
     sequencer.removeSlotState(a);
     for (int i = a; i < newN; ++i)
         sampleRhythm(i).cursor.requestAbsorb();   // the rhythms that moved down absorb the current step
     samples.shiftPathsDown(a, n);
 
-    parkedEngines[0] = std::move(voiceEngines[(size_t) a]);
+    // A moved engine takes its new slot's noise seed.
     for (int i = a; i < newN; ++i)
     {
-        voiceEngines[(size_t) i] = std::move(voiceEngines[(size_t) i + 1]);
-        if (voiceEngines[(size_t) i]) voiceEngines[(size_t) i]->insertProc.setSlotIndex(i);   // the moved engine takes its new slot's noise seed
+        auto& r = sampleRhythm(i);
+        if (r.voice) r.voice->insertProc.setSlotIndex(i);
+        for (auto& tail : r.retiredEngines)
+            if (tail) tail->insertProc.setSlotIndex(i);
     }
-
-    // A retired tail renders into the channel of the slot that holds it, so each slot's tails (and
-    // their drained flags) move down with the rhythm whose swap left them; the removed slot's tails
-    // are parked and the vacated top slot is left empty.
-    constexpr int K = kMaxRetiredEngines;
-    for (int k = 0; k < K; ++k)
-        parkedEngines[(size_t) (1 + k)] = std::move(retiredVoiceEngines[(size_t) a][(size_t) k]);
-    for (int i = a; i < newN; ++i)
-        for (int k = 0; k < K; ++k)
-        {
-            auto& dst = retiredVoiceEngines[(size_t) i][(size_t) k];
-            dst = std::move(retiredVoiceEngines[(size_t) i + 1][(size_t) k]);
-            if (dst) dst->insertProc.setSlotIndex(i);
-            retiredReadyForCleanup[(size_t) i][(size_t) k].store(
-                retiredReadyForCleanup[(size_t) i + 1][(size_t) k].load(std::memory_order_acquire),
-                std::memory_order_release);
-        }
-    for (int k = 0; k < K; ++k)
-        retiredReadyForCleanup[(size_t) newN][(size_t) k].store(false, std::memory_order_release);
 }
 
 // Under layoutWriteLock and layersLock, before layersReordered(Remove): the removed rhythm's MIDI engine
@@ -183,13 +197,6 @@ void PluginProcessor::layerRemoved(Layer& removed, int index)
 }
 
 //==============================================================================
-// Frees what a remove parked, after the lock is dropped.
-void PluginProcessor::releaseParkedEngines()
-{
-    for (auto& e : parkedEngines)
-        e.reset();
-}
-
 // Message thread, processing suspended, not under layersLock: brings the parameters (and the pieces
 // that depend on the rhythm's data) in step with the slot's rhythm and strip. The pushes stay outside
 // the lock on purpose: each setValueNotifyingHost runs the host's own parameter-change code, and inside
@@ -213,17 +220,12 @@ void PluginProcessor::syncSlotParams(int slot)
     {
         rebuildSlot = -1;
         updateRhythmPattern(slot);
-        if (voiceEngines[(size_t) slot])
-        {
-            voiceEngines[(size_t) slot]->setParams(getRhythm(slot).voiceParams);
-        }
+        if (voiceEngine(slot))
+            voiceEngine(slot)->setParams(getRhythm(slot).voiceParams);
     }
 
     if (slot == reorderLastSlot)
-    {
         reorderLastSlot = -1;
-        releaseParkedEngines();
-    }
 }
 
 } // namespace mu_clid

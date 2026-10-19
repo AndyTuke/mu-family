@@ -445,9 +445,8 @@ void SampleRhythm::writeBackModulation(VoiceParams& modParams)
     lastEuclidOverrides.c.insertLength = modPropToSteps(md::euclid_c_insLen, padMaxC.insertLength);
 }
 
-void SampleRhythm::applyModulation(double beatPos, MixerEngine::ChannelState& strip,
-                                   RhythmSequencer& sequencer, int slot, const RhythmStepClock& clock,
-                                   bool cursorDrives, VoiceEngine* engine)
+void SampleRhythm::applyModulation(double beatPos, MixerEngine::ChannelState& strip, int lastEffectiveStep,
+                                   RhythmSequencer* sequencer, int slot, VoiceEngine* engine)
 {
     Rhythm& rhythm = *this;
 
@@ -505,9 +504,9 @@ void SampleRhythm::applyModulation(double beatPos, MixerEngine::ChannelState& st
     // advances when the recompute actually applied so the change-detection retries.
     if (lastEuclidOverrides != prevEuclidOverrides)
     {
-        const bool applied = cursorDrives
-            ? cursor.tryApplyModulatedPattern(*this, lastEuclidOverrides, clock.lastEffective())
-            : sequencer.tryUpdatePatternFromModulation(slot, lastEuclidOverrides);
+        const bool applied = sequencer == nullptr
+            ? cursor.tryApplyModulatedPattern(*this, lastEuclidOverrides, lastEffectiveStep)
+            : sequencer->tryUpdatePatternFromModulation(slot, lastEuclidOverrides);
         if (applied)
             prevEuclidOverrides = lastEuclidOverrides;
     }

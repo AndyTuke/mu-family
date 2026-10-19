@@ -185,7 +185,7 @@ void PluginProcessor::applyPendingRhythmParams(int ri)
     if (!apvtsLoading.load(std::memory_order_acquire))
     {
         if (patternDirty) updateRhythmPattern(ri);
-        if (voiceDirty && voiceEngines[ri]) voiceEngines[ri]->setParams(r.voiceParams);
+        if (voiceDirty && voiceEngine(ri)) voiceEngine(ri)->setParams(r.voiceParams);
     }
 }
 
@@ -224,7 +224,7 @@ void PluginProcessor::forceSyncRhythmFromApvts(int ri)
     }
 
     if (patternDirty) updateRhythmPattern(ri);
-    if (voiceEngines[ri]) voiceEngines[ri]->setParams(r.voiceParams);
+    if (voiceEngine(ri)) voiceEngine(ri)->setParams(r.voiceParams);
 }
 
 // syncFXParam / syncMixerParam removed — mu-clid now routes its FX / return /
