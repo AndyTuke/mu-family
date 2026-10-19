@@ -97,8 +97,7 @@ private:
     KnobWithLabel  masterVolKnob { "Master Vol", MuLookAndFeel::knobLevel };
     juce::Label    uiSizeLabel;
     SegmentControl uiSizeCtrl { { "Medium", "Large" } };
-    juce::Label    updateCheckLabel;
-    SegmentControl updateCheckCtrl { { "On", "Off" }, SegmentControl::ActiveStyle::Positive };
+    juce::ToggleButton updateCheckToggle { "Check for updates" };
     juce::Label    bpmLabel;
     NudgeInput     bpmInput { "BPM", 20, 300, 120 };
     juce::Label    clockSourceLabel, midiMessagesLabel, syncOffsetLabel, timeSigLabel;
