@@ -160,6 +160,17 @@ cmake --build build --target mu-core-tests --config Debug && build/mu-core/Tests
 
 Note: the real product processors are built headless in each product's test target (the seam in [design-plugin-family.md](docs/design-plugin-family.md), "Headless product processors": `createEditor()` lives in `PluginEditor.cpp`, tests supply a one-line stand-in, `ProcessorBase::ScopedStorageRoot`, shared source list `mu-core/cmake/ProcessorTestSources.cmake`). Run one product's real-processor tests with `<exe> mu-<product>-processor`. Real-processor tests: mu-Tant `mu-tant/Source/Tests/ProcessorSeamTests.cpp` (construction, `resetLayer` equals a fresh voice across block sizes and insert algorithms, add / remove / swap / reset and `loadUserWavetable` against `processBlock` on a worker thread, `layerEditInFlight` skip), mu-Toni and mu-On `Source/Tests/ProcessorSeamTests.cpp` (layer ownership: `getLayer(i) == &getArp(i)`, `laneOf(voiceSlot(i)) == i`), mu-Clid `mu-clid/Source/Tests/ProcessorSeamTests.cpp` (rhythm edits and the loop-boundary swap commit against `processBlock`). Known gap logged by the mu-Tant test: `RingModInsert::reset()` leaves its frequency smoother. Known behaviour: a staged per-rhythm swap with "On master loop" timing and no master loop never commits. Status: Pass (build 1306).
 
+### Layer libraries (library-only tests and the combined link test)
+
+Each product's layer type is an INTERFACE library (`mu-clid-layer`, `mu-tant-layer`, `mu-toni-layer`, `mu-on-layer`). Two kinds of target guard them; neither is in ALL_BUILD, so build them by name.
+
+| Coverage | Target / file | Status |
+|---|---|---|
+| Each layer renders and persists with no processor: compiled from the library, mu-core's layer-side sources and the test alone (no `Plugin/` source, so a layer that secretly needs the processor fails to link); the rendered stream is compared with the one the product's own suite records through the real processor | `mu-clid-layer-tests`, `mu-tant-layer-tests`, `mu-toni-layer-tests`, `mu-on-layer-tests` (each `Source/Tests/LayerLibraryTests.cpp`; a dependency of the product's plugin target, so a normal build links them) | Built in E2 to E5.7b; not re-run for E6 |
+| **Combined link test**: all four libraries compiled and linked into one throw-away console target, one header of each (plus its Params header) included, nothing run. It is the first build in which four `Source/` roots share one include path and four sets of sources share one link, so it exposes include-path collisions (a relative path present in two roots) and duplicate symbols. The last guard before mu-Tronic T1 | `mu-layer-link-test` (`tests/layer-link/`; `cmake --build build --target mu-layer-link-test --config Debug`) | Pass (builds and links, no collision found; 2026-10-19, build 1419). Build-only: the program just returns 0 |
+| Static guard behind both: relative paths unique across mu-core and the four libraries (rule 3), no `Plugin/` or `License/` include, no global-namespace type, library source lists name only layer files (rule 9) | `tests/scripts/check-layer-boundary.ps1`, self-test `test-check-layer-boundary.ps1` | Pass (472 files, 4 layer libraries, 0 violations; self-test 22 cases, 0 failed; 2026-10-19) |
+| The shared core suites at the 16-layer capacity (`MU_MAX_LAYERS=16`), one source list with `mu-core-tests` | `mu-core-tests-16` | Pass (683 results, 0 failures, Debug, 2026-10-19) |
+
 ---
 
 ## C++ unit tests — audit-fix behavioural and spectral suite

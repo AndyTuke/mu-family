@@ -332,6 +332,8 @@ Docs: design-naming §4/§5 marked done; design-plugin-family Stage 7 amended; p
 `mu-layer-link-test` console target that links all four `INTERFACE` libraries and includes one header of each, no code run). That target is the last
 guard that mu-Tronic T1 can start.
 
+**E6 as built (2026-10-19).** `tests/layer-link/` defines `mu-layer-link-test` (a console target, on demand, not in ALL_BUILD) linking the four libraries with the union of the four layer-tests' mu-core source lists and including `Sequencer/<Type>.h` and `Persistence/<Type>Params.h` of each. It built and linked first time in Debug (focused configuration, build 1419): **no include collision and no duplicate symbol was found**, which confirms the E2.6 and E4.7 renames and checker rule 3 did their job. `check-layer-boundary.ps1` registers all four libraries automatically (a registered product is one whose `mu-<p>-layer` library exists): 472 files, 4 layer libraries, 0 violations; the fixture self-test passes (22 cases). `mu-core-tests-16` exists (one source list through `mu_core_add_test_target`) and passes (683 results). Docs closed: design-naming 4/5, design-plugin-family Stage 7, design.md section 6, `tests.md`.
+
 ### 2.7 Order and rationale
 
 **Recommended order: E0, E1, E2 (Toni), E3 (On), E4 (Tant), E5 (Clid), E6.**
