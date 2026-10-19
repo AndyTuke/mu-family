@@ -45,7 +45,7 @@ target_sources(mu-clid
     PRIVATE
         Source/Plugin/PluginProcessor.cpp
         Source/Plugin/PluginProcessor_APVTS.cpp
-        Source/Plugin/PluginProcessor_Modulation.cpp
+        Source/Sequencer/SampleRhythm_Modulation.cpp
         Source/Plugin/PluginProcessor_Layers.cpp
         Source/Plugin/PluginProcessor_Content.cpp
         Source/Persistence/RhythmParams.cpp
@@ -273,7 +273,7 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/ExtractionPinTests.cpp        # pins: drained tails, count policy, longest tail, edit mid-play, oversize, trigger source
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_APVTS.cpp
-    Source/Plugin/PluginProcessor_Modulation.cpp
+    Source/Sequencer/SampleRhythm_Modulation.cpp
     Source/Plugin/PluginProcessor_Content.cpp
     Source/Plugin/PluginProcessor_Layers.cpp
     Source/Persistence/RhythmParams.cpp

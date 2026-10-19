@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Modulation/ModulationDestinations.h"   // ModDest::kTableSize (modSlot)
 #include <array>
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "Plugin/ProcessorBase.h"
@@ -18,6 +17,7 @@
 #include "Plugin/MidiClockSync.h"   // shared mu-core MIDI-clock slave
 #include "Plugin/PresetIO.h"
 #include "UI/RhythmHost.h"   // what the Rhythm layer's UI reads from its host
+#include "Sequencer/SampleRhythm.h"   // mu-Clid's layer type
 #include "HotSwapStager.h"
 
 #include <memory>
@@ -213,41 +213,22 @@ public:
     // Snapshot accessor for UI panels (see Modulation/ModulationSnapshot.h for index enum).
     float getModSnapshot(int rhythmIndex, int snapIndex) const noexcept
     {
-        return modSnapshot[rhythmIndex][snapIndex].load();
+        return sampleRhythm(rhythmIndex).modSnapshot[(size_t) snapIndex].load();
     }
+
+    // Slot `slot`'s layer as mu-Clid's layer type (every slot holds one for the processor's lifetime).
+    SampleRhythm&       sampleRhythm(int slot) noexcept       { return layerAs<SampleRhythm>(slot); }
+    const SampleRhythm& sampleRhythm(int slot) const noexcept { return layerAs<SampleRhythm>(slot); }
 
     // UI accessor for the per-rhythm modulated euclid overrides — read by RhythmContent +
     // SidebarItem on a timer so the visual circles reflect modulation of hits/rotate/etc.
-    //. Returns a struct copy; fields are integer-rounded by the audio thread so
-    // torn reads are benign for visual display. Pre-fix the audio thread only
-    // wrote `lastEuclidOverrides[r]` when the modulation pass actually ran, leaving the
-    // overrides at C++-default zeros for any rhythm with no assignments — so the default
-    // rhythm at startup drew no hits. Fall back to the rhythm's base gen values when no
-    // modulation pass has touched the entry so `HitGenerator::getStepTypes(ov)` yields
-    // the rhythm's actual pattern for unmodulated cases.
+    // A struct copy (see SampleRhythm::modulatedEuclidOverrides); empty for a slot that is not live.
     EuclidOverrides getModulatedEuclidOverrides(int rhythmIndex) const noexcept
     {
-        if (rhythmIndex < 0 || rhythmIndex >= (int) lastEuclidOverrides.size()
+        if (rhythmIndex < 0 || rhythmIndex >= RhythmSequencer::MaxRhythms
                           || rhythmIndex >= sequencer.getNumRhythms())
             return {};
-        const Rhythm& r = sequencer.getRhythm(rhythmIndex);
-        if (r.modulationMatrix.getAssignments().empty())
-        {
-            EuclidOverrides ov;
-            auto fill = [](EuclidGenOverrides& g, const HitGenerator& src) {
-                g.hits         = src.hits;
-                g.rotate       = src.rotate;
-                g.prePad       = src.prePad;
-                g.postPad      = src.postPad;
-                g.insertStart  = src.insertStart;
-                g.insertLength = src.insertLength;
-            };
-            fill(ov.a, r.genA);
-            fill(ov.b, r.genB);
-            fill(ov.c, r.genC);
-            return ov;
-        }
-        return lastEuclidOverrides[(size_t) rhythmIndex];
+        return sampleRhythm(rhythmIndex).modulatedEuclidOverrides();
     }
 
     // GR-meter pointer for the per-voice compressor/limiter insert UI knob.
@@ -292,8 +273,6 @@ public:
     juce::PropertiesFile* getSampleSettingsFile() const noexcept override    { return appSettings.get(); }
 
 private:
-    std::array<std::atomic<float>, kSnapCount> modSnapshot[RhythmSequencer::MaxRhythms];
-
     const std::atomic<float>* swapTimingParam { nullptr };   // `mstr_swap`, resolved once in the constructor
 
     void commitDeferredWork() override;   // hot-swap engine retire + swap commits
@@ -356,15 +335,6 @@ private:
     // midiMessages), check hot-swap boundaries, and
     // publish per-rhythm UI play-state. Called only while playing.
     void advanceSequencer(int numRhythms, double beatPos, juce::MidiBuffer& midiMessages);
-    // Modulation pass for one rhythm: snapshot voiceParams, run the matrix,
-    // snapshot for the UI live-arc, write modulated values + euclid overrides back.
-    void applyRhythmModulation(int r, double beatPos);
-    // applyRhythmModulation's phases (all audio thread, under the rhythm's modLock up to phase 3).
-    struct StripMod { float pan, effect, delay, reverb; };   // modulated mixer-strip values
-    void     seedModulation(int r, const Rhythm& rhythm, const VoiceParams& modParams);
-    StripMod applyStripModulation(int r);
-    void     publishModSnapshot(int r, const Rhythm& rhythm, const VoiceParams& modParams, const StripMod& stripMod);
-    void     writeBackModulation(int r, const Rhythm& rhythm, VoiceParams& modParams);
     // Gather output buses, run the core mixer/voice render, mix the sample
     // preview, and emit per-rhythm MIDI.
     void renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages,
@@ -379,35 +349,6 @@ private:
     std::atomic<int>    midiHeldNotes   { 0 };   // count of currently held MIDI notes (Note mode)
     std::atomic<bool>   noteModePlaying { false };
     std::atomic<double> noteModeBeatPos { 0.0 };
-
-    // Pre-allocated modulation parameter map — reused every block to avoid audio-thread allocation.
-    // Keys match ModDest::ids. Values are initialised in constructor and updated each block.
-    // keyed by `std::string_view` rather than `std::string`. All write/read sites use
-    // `const char*` string literals (`modParamValues["amp.attack"] = …`), which previously
-    // constructed a temp std::string per access (~30 × N rhythms × 690 blocks/sec on the
-    // audio thread). string_view of a literal is alloc-free; the literal's static storage
-    // guarantees the view stays valid for the lifetime of the map entry. ModulationMatrix's
-    // `find(a.destinationId)` still works because std::string converts implicitly.
-    std::unordered_map<std::string_view, float> modParamValues;
-    // modParamValues' value for each ModDest::kTable index, resolved once in the constructor.
-    std::array<float*, ModDest::kTableSize> modSlot {};
-    float& mv(int destIndex) noexcept { jassert(modSlot[(size_t) destIndex] != nullptr); return *modSlot[(size_t) destIndex]; }
-
-    // per-rhythm modulated euclid pattern overrides — written by the audio thread
-    // after ModulationMatrix::process(). Used by the audio-thread pattern recompute path
-    // (Stage B) and the UI live-arc indicator (Stage C). Values are integer-rounded so
-    // change-detection skips no-op recomputes. Struct definitions live in Rhythm.h /
-    // HitGenerator.h so Sequencer-layer code can reuse them.
-    std::array<EuclidOverrides, RhythmSequencer::MaxRhythms> lastEuclidOverrides;
-    // Previous block's overrides per rhythm — Stage B compares against this to skip
-    // pattern recomputes when nothing crossed an integer boundary.
-    std::array<EuclidOverrides, RhythmSequencer::MaxRhythms> prevEuclidOverrides;
-    // tracks whether the rhythm's modulation matrix had any assignments LAST block.
-    // The modulation pass is gated on (matrix non-empty || transition-to-empty), so we
-    // skip the seed + matrix.process + write-back work for never-modulated rhythms but
-    // still run one final reset pass after assignment removal to flush lastEuclidOverrides
-    // back to base values, which Stage B then picks up via change-detection.
-    std::array<bool, RhythmSequencer::MaxRhythms> prevMatrixHadAssignments {};
 
     void parameterChanged(const juce::String& parameterID, float newValue) override;
 
@@ -499,7 +440,6 @@ private:
     friend class PresetIO;
     friend class HotSwapStager;
     friend struct ClipCommitProbe;         // tests drive the boundary scan and commit of a staged launch
-    friend struct ModulationMemoryProbe;   // tests read the per-slot modulation change-detection state
 
     // atomic for safe cross-thread access (audio writes, UI reads + clears).
     // Written in prepareToPlay; read in processBlock. JUCE calls prepareToPlay

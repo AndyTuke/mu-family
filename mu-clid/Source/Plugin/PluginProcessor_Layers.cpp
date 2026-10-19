@@ -102,11 +102,7 @@ void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
     // A slot's tenant changed, so the modulation change-detection starts clean: the next block re-runs a
     // modulated tenant's pass and pattern recompute instead of trusting the previous tenant's memory.
     for (int i = firstIndex; i <= lastIndex && i < RhythmSequencer::MaxRhythms; ++i)
-    {
-        prevMatrixHadAssignments[(size_t) i] = false;
-        prevEuclidOverrides[(size_t) i] = EuclidOverrides{};
-        lastEuclidOverrides[(size_t) i] = EuclidOverrides{};
-    }
+        sampleRhythm(i).resetModulationMemory();
 }
 
 // Called under layersLock, after the base moved the layer pointers and strip state and before

@@ -1,19 +1,17 @@
-// PluginProcessor — per-rhythm modulation (audio thread): seed each destination, run the
-// matrix, hand the mixer its strip values, publish the UI arcs, write the values back.
-// Partial-class TU split from PluginProcessor.cpp (like PluginProcessor_APVTS.cpp).
+// SampleRhythm — the per-block modulation pass (audio thread): seed each destination, run the
+// matrix, hand the mixer its strip values, publish the UI arcs, write the values back. Moved from
+// the processor (E5.4a); the processor still calls it once per live rhythm per block.
 
-#include "PluginProcessor.h"
-#include "PluginProcessor_Internal.h"
+#include "Sequencer/SampleRhythm.h"
 #include "Audio/SpinLock.h"            // mu-core: spin lock helpers
 #include "Audio/InsertSlotConfig.h"
 #include "Modulation/ModulationSkew.h"     // proportion-space skew helpers (shared with test C5)
 #include "Modulation/MuClidModDest.h"  // mu-clid modulation targets
-#include "Sequencer/GeneratorAliases.h"
 
 namespace mu_clid {
 
 // Each modulation destination this file reads or writes, as its ModDest::kTable index (compile
-// time). applyRhythmModulation reaches the values through modSlot[] — no per-block key hashing.
+// time). applyModulation reaches the values through modSlot[] — no per-block key hashing.
 namespace md
 {
     constexpr int accentDb          = ModDest::indexOf("accentDb");
@@ -98,6 +96,66 @@ namespace md
     static_assert(send_reverb >= 0, "send.reverb is not in ModDest::kTable");
 }
 
+SampleRhythm::SampleRhythm()
+{
+    // Pre-populate the modulation map so lookups never allocate on the audio thread.
+    modParamValues.reserve(50);
+    for (const char* key : { "amp.attack", "amp.decay", "amp.sustain",  // amp.release retired
+                              "filter.cutoff", "filter.resonance",
+                              "fenv.attack", "fenv.decay", "fenv.depth",
+                              "pitch.semitones", "pitch.octave",
+                              // Stage 36: 4 generic insert slots — semantics per
+                              // active algorithm via mu_ui::kInsertAlgoSlots.
+                              "insert.p1", "insert.p2", "insert.p3", "insert.p4",
+                              "pitch.envDepth", "amp.level", "accentDb",
+                              "euclid.a.hits", "euclid.a.rotate",
+                              "euclid.a.prePad", "euclid.a.postPad",
+                              "euclid.a.insSt", "euclid.a.insLen",
+                              "euclid.b.hits", "euclid.b.rotate",
+                              "euclid.b.prePad", "euclid.b.postPad",
+                              "euclid.b.insSt", "euclid.b.insLen",
+                              "euclid.c.hits", "euclid.c.rotate",
+                              "euclid.c.prePad", "euclid.c.postPad",
+                              "euclid.c.insSt", "euclid.c.insLen",
+                              "filter.lowCut",
+                              "amp.pan", "send.effect", "send.delay", "send.reverb" })
+        modParamValues[key] = 0.0f;
+    // Point each destination's slot at its map value (no rehash after this: keys are fixed).
+    for (auto& [key, value] : modParamValues)
+        if (const int i = ModDest::indexOf(key); i >= 0)
+            modSlot[(size_t) i] = &value;
+}
+
+EuclidOverrides SampleRhythm::modulatedEuclidOverrides() const noexcept
+{
+    // Before a modulation pass has written the overrides they are zeros, so with no assignment the
+    // rhythm's own generator values stand in: getStepTypes(ov) then yields the unmodulated pattern.
+    if (modulationMatrix.getAssignments().empty())
+    {
+        EuclidOverrides ov;
+        auto fill = [](EuclidGenOverrides& g, const HitGenerator& src) {
+            g.hits         = src.hits;
+            g.rotate       = src.rotate;
+            g.prePad       = src.prePad;
+            g.postPad      = src.postPad;
+            g.insertStart  = src.insertStart;
+            g.insertLength = src.insertLength;
+        };
+        fill(ov.a, genA);
+        fill(ov.b, genB);
+        fill(ov.c, genC);
+        return ov;
+    }
+    return lastEuclidOverrides;
+}
+
+void SampleRhythm::resetModulationMemory() noexcept
+{
+    prevMatrixHadAssignments = false;
+    prevEuclidOverrides = EuclidOverrides{};
+    lastEuclidOverrides = EuclidOverrides{};
+}
+
 // The Insert Start knob's range for a generator's current layout ([lo, hi], as EuclideanPanel sets it).
 // Modulation depth for Insert Start is a proportion of this range, like the pad knobs.
 static std::pair<int, int> insertStartKnobRange(const HitGenerator& g) noexcept
@@ -108,8 +166,9 @@ static std::pair<int, int> insertStartKnobRange(const HitGenerator& g) noexcept
 
 // Phase 1 — seed every destination with its knob value as the matrix expects it: a proportion
 // of the knob's range for skewed / step-count-dependent knobs, the offset 0 for pitch.
-void PluginProcessor::seedModulation(int r, const Rhythm& rhythm, const VoiceParams& modParams)
+void SampleRhythm::seedModulation(const VoiceParams& modParams, const MixerEngine::ChannelState& strip)
 {
+    const Rhythm& rhythm = *this;
     // PROPORTION-SPACE modulation for skewed-slider destinations:
     // additive-in-display-units modulation on a skewed slider gives
     // variable visual arc length (the same display delta covers a
@@ -188,7 +247,6 @@ void PluginProcessor::seedModulation(int r, const Rhythm& rhythm, const VoicePar
 
     // Mixer strip: pan + FX sends, seeded from the mixer channel as proportions of
     // their knobs (pan -1..+1 → 0..1; sends are 0..1 already).
-    auto& strip = mixerEngine.channels[(size_t) r];
     mv(md::amp_pan)     = (strip.pan.load(std::memory_order_relaxed) + 1.0f) * 0.5f;
     mv(md::send_effect) = strip.sendEffect.load(std::memory_order_relaxed);
     mv(md::send_delay)  = strip.sendDelay.load(std::memory_order_relaxed);
@@ -196,9 +254,8 @@ void PluginProcessor::seedModulation(int r, const Rhythm& rhythm, const VoicePar
 }
 
 // Phase 3 — hand the modulated pan / sends to the mixer channel for this block.
-PluginProcessor::StripMod PluginProcessor::applyStripModulation(int r)
+SampleRhythm::StripMod SampleRhythm::applyStripModulation(MixerEngine::ChannelState& strip)
 {
-    auto& strip = mixerEngine.channels[(size_t) r];
     // Hand the modulated strip values to the mixer for this block.
     const float modPan = juce::jlimit(-1.0f, 1.0f, mv(md::amp_pan) * 2.0f - 1.0f);
     const float modEff = juce::jlimit(0.0f, 1.0f, mv(md::send_effect));
@@ -212,9 +269,9 @@ PluginProcessor::StripMod PluginProcessor::applyStripModulation(int r)
 }
 
 // Phase 4 — publish each destination's modulated ACTUAL value for the knobs' live arcs.
-void PluginProcessor::publishModSnapshot(int r, const Rhythm& rhythm, const VoiceParams& modParams,
-                                         const StripMod& stripMod)
+void SampleRhythm::publishModSnapshot(const VoiceParams& modParams, const StripMod& stripMod)
 {
+    const Rhythm& rhythm = *this;
     using namespace mu_clid::mod_skew;
     const auto padMaxA = rhythm.genA.padKnobMaxima();
     const auto padMaxB = rhythm.genB.padKnobMaxima();
@@ -222,7 +279,7 @@ void PluginProcessor::publishModSnapshot(int r, const Rhythm& rhythm, const Voic
     const float modPan = stripMod.pan, modEff = stripMod.effect, modDly = stripMod.delay, modRev = stripMod.reverb;
     // Snapshot pre-normalised values for the UI live-arc indicator.
     {
-        auto& snap = modSnapshot[r];
+        auto& snap = modSnapshot;
         // Proportion-space destinations — modParamValues holds slider proportion 0..1.
         // Snap stores the ACTUAL value (seconds / Hz / dB) so the UI's setModulatedActual
         // routes via valueToProportionOfLength and matches the needle's visual position
@@ -315,8 +372,9 @@ void PluginProcessor::publishModSnapshot(int r, const Rhythm& rhythm, const Voic
 
 // Phase 5 — write the modulated values back: the voice params for this block, and the euclid
 // overrides (whole steps) that drive the pattern recompute.
-void PluginProcessor::writeBackModulation(int r, const Rhythm& rhythm, VoiceParams& modParams)
+void SampleRhythm::writeBackModulation(VoiceParams& modParams)
 {
+    const Rhythm& rhythm = *this;
     using namespace mu_clid::mod_skew;
     const auto padMaxA = rhythm.genA.padKnobMaxima();
     const auto padMaxB = rhythm.genB.padKnobMaxima();
@@ -361,46 +419,47 @@ void PluginProcessor::writeBackModulation(int r, const Rhythm& rhythm, VoicePara
     const int stepsA_wb = juce::jmax(1, rhythm.genA.steps);
     const int stepsB_wb = juce::jmax(1, rhythm.genB.steps);
     const int stepsC_wb = juce::jmax(1, rhythm.genC.steps);
-    lastEuclidOverrides[r].a.hits         = juce::jlimit(0, stepsA_wb,        modPropToSteps(md::euclid_a_hits,  stepsA_wb));
-    lastEuclidOverrides[r].a.rotate       = juce::jlimit(0, stepsA_wb - 1,    modPropToSteps(md::euclid_a_rotate, stepsA_wb - 1));
-    lastEuclidOverrides[r].a.prePad       = modPropToSteps(md::euclid_a_prePad, padMaxA.prePad);
-    lastEuclidOverrides[r].a.postPad      = modPropToSteps(md::euclid_a_postPad, padMaxA.postPad);
+    lastEuclidOverrides.a.hits         = juce::jlimit(0, stepsA_wb,        modPropToSteps(md::euclid_a_hits,  stepsA_wb));
+    lastEuclidOverrides.a.rotate       = juce::jlimit(0, stepsA_wb - 1,    modPropToSteps(md::euclid_a_rotate, stepsA_wb - 1));
+    lastEuclidOverrides.a.prePad       = modPropToSteps(md::euclid_a_prePad, padMaxA.prePad);
+    lastEuclidOverrides.a.postPad      = modPropToSteps(md::euclid_a_postPad, padMaxA.postPad);
     const auto insRangeA = insertStartKnobRange(rhythm.genA);
     const auto insRangeB = insertStartKnobRange(rhythm.genB);
     const auto insRangeC = insertStartKnobRange(rhythm.genC);
-    lastEuclidOverrides[r].a.insertStart  = juce::jlimit(insRangeA.first, insRangeA.second,
+    lastEuclidOverrides.a.insertStart  = juce::jlimit(insRangeA.first, insRangeA.second,
                                                 insRangeA.first + modPropToSteps(md::euclid_a_insSt, insRangeA.second - insRangeA.first));
-    lastEuclidOverrides[r].a.insertLength = modPropToSteps(md::euclid_a_insLen, padMaxA.insertLength);
-    lastEuclidOverrides[r].b.hits         = juce::jlimit(0, stepsB_wb,        modPropToSteps(md::euclid_b_hits,  stepsB_wb));
-    lastEuclidOverrides[r].b.rotate       = juce::jlimit(0, stepsB_wb - 1,    modPropToSteps(md::euclid_b_rotate, stepsB_wb - 1));
-    lastEuclidOverrides[r].b.prePad       = modPropToSteps(md::euclid_b_prePad, padMaxB.prePad);
-    lastEuclidOverrides[r].b.postPad      = modPropToSteps(md::euclid_b_postPad, padMaxB.postPad);
-    lastEuclidOverrides[r].b.insertStart  = juce::jlimit(insRangeB.first, insRangeB.second,
+    lastEuclidOverrides.a.insertLength = modPropToSteps(md::euclid_a_insLen, padMaxA.insertLength);
+    lastEuclidOverrides.b.hits         = juce::jlimit(0, stepsB_wb,        modPropToSteps(md::euclid_b_hits,  stepsB_wb));
+    lastEuclidOverrides.b.rotate       = juce::jlimit(0, stepsB_wb - 1,    modPropToSteps(md::euclid_b_rotate, stepsB_wb - 1));
+    lastEuclidOverrides.b.prePad       = modPropToSteps(md::euclid_b_prePad, padMaxB.prePad);
+    lastEuclidOverrides.b.postPad      = modPropToSteps(md::euclid_b_postPad, padMaxB.postPad);
+    lastEuclidOverrides.b.insertStart  = juce::jlimit(insRangeB.first, insRangeB.second,
                                                 insRangeB.first + modPropToSteps(md::euclid_b_insSt, insRangeB.second - insRangeB.first));
-    lastEuclidOverrides[r].b.insertLength = modPropToSteps(md::euclid_b_insLen, padMaxB.insertLength);
-    lastEuclidOverrides[r].c.hits         = juce::jlimit(0, stepsC_wb,        modPropToSteps(md::euclid_c_hits,  stepsC_wb));
-    lastEuclidOverrides[r].c.rotate       = juce::jlimit(0, stepsC_wb - 1,    modPropToSteps(md::euclid_c_rotate, stepsC_wb - 1));
-    lastEuclidOverrides[r].c.prePad       = modPropToSteps(md::euclid_c_prePad, padMaxC.prePad);
-    lastEuclidOverrides[r].c.postPad      = modPropToSteps(md::euclid_c_postPad, padMaxC.postPad);
-    lastEuclidOverrides[r].c.insertStart  = juce::jlimit(insRangeC.first, insRangeC.second,
+    lastEuclidOverrides.b.insertLength = modPropToSteps(md::euclid_b_insLen, padMaxB.insertLength);
+    lastEuclidOverrides.c.hits         = juce::jlimit(0, stepsC_wb,        modPropToSteps(md::euclid_c_hits,  stepsC_wb));
+    lastEuclidOverrides.c.rotate       = juce::jlimit(0, stepsC_wb - 1,    modPropToSteps(md::euclid_c_rotate, stepsC_wb - 1));
+    lastEuclidOverrides.c.prePad       = modPropToSteps(md::euclid_c_prePad, padMaxC.prePad);
+    lastEuclidOverrides.c.postPad      = modPropToSteps(md::euclid_c_postPad, padMaxC.postPad);
+    lastEuclidOverrides.c.insertStart  = juce::jlimit(insRangeC.first, insRangeC.second,
                                                 insRangeC.first + modPropToSteps(md::euclid_c_insSt, insRangeC.second - insRangeC.first));
-    lastEuclidOverrides[r].c.insertLength = modPropToSteps(md::euclid_c_insLen, padMaxC.insertLength);
+    lastEuclidOverrides.c.insertLength = modPropToSteps(md::euclid_c_insLen, padMaxC.insertLength);
 }
 
-void PluginProcessor::applyRhythmModulation(int r, double beatPos)
+void SampleRhythm::applyModulation(double beatPos, MixerEngine::ChannelState& strip,
+                                   RhythmSequencer& sequencer, int slot, VoiceEngine* engine)
 {
-    Rhythm& rhythm = sequencer.getRhythm(r);
+    Rhythm& rhythm = *this;
 
     // gate the modulation pass on "matrix has assignments now, OR had
     // assignments last block". The first half is the normal case. The second half
     // runs one final pass on the block AFTER assignment removal so the write-back
-    // re-seeds lastEuclidOverrides[r] to base values; Stage B's change-detection
+    // re-seeds lastEuclidOverrides to base values; Stage B's change-detection
     // then recomputes the safe pattern back to base. Without that transition pass,
     // a never-modulated rhythm pays no per-block cost, but a rhythm whose last
     // assignment was just removed would leave lastEuclidOverrides stuck on the old
     // modulated values, freezing the pattern.
     const bool matrixHasAssignments = !rhythm.modulationMatrix.getAssignments().empty();
-    const bool runModulationPass    = matrixHasAssignments || prevMatrixHadAssignments[r];
+    const bool runModulationPass    = matrixHasAssignments || prevMatrixHadAssignments;
 
     // Snapshot voiceParams under voiceParamsLock so a concurrent message-thread apply
     // (applyPendingRhythmParams / forceSyncRhythmFromApvts) can't interleave a torn write. Only
@@ -416,25 +475,24 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
         modParams = rhythm.voiceParams;
         mu_core::spinUnlock(rhythm.voiceParamsLock);
     }
-    prevMatrixHadAssignments[r] = matrixHasAssignments;
+    prevMatrixHadAssignments = matrixHasAssignments;
 
     if (runModulationPass)
     {
         if (mu_core::trySpinLock(rhythm.modLock))
         {
-            seedModulation(r, rhythm, modParams);                                      // phase 1
+            seedModulation(modParams, strip);                                          // phase 1
             rhythm.modulationMatrix.process(rhythm.controlSequences, beatPos, modParamValues);   // phase 2
-            const StripMod stripMod = applyStripModulation(r);                         // phase 3
+            const StripMod stripMod = applyStripModulation(strip);                     // phase 3
             mu_core::spinUnlock(rhythm.modLock);
-            publishModSnapshot(r, rhythm, modParams, stripMod);                        // phase 4
-            writeBackModulation(r, rhythm, modParams);                                 // phase 5
+            publishModSnapshot(modParams, stripMod);                                   // phase 4
+            writeBackModulation(modParams);                                            // phase 5
         }
     }
 
     // No modulation this block: the mixer uses the strip's own pan / sends.
     if (! runModulationPass)
     {
-        auto& strip = mixerEngine.channels[(size_t) r];
         for (auto* m : { &strip.panMod, &strip.sendEffectMod, &strip.sendDelayMod, &strip.sendReverbMod })
             m->store(MixerEngine::ChannelState::kNoMod, std::memory_order_relaxed);
     }
@@ -444,18 +502,18 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
     // (typical case for a slow LFO). tryUpdatePatternFromModulation is non-blocking —
     // a missed try-lock just defers to the next block; prevEuclidOverrides only
     // advances when the recompute actually applied so the change-detection retries.
-    if (lastEuclidOverrides[r] != prevEuclidOverrides[r])
+    if (lastEuclidOverrides != prevEuclidOverrides)
     {
-        if (sequencer.tryUpdatePatternFromModulation(r, lastEuclidOverrides[r]))
-            prevEuclidOverrides[r] = lastEuclidOverrides[r];
+        if (sequencer.tryUpdatePatternFromModulation(slot, lastEuclidOverrides))
+            prevEuclidOverrides = lastEuclidOverrides;
     }
 
     // only override activeParams when the modulation pass actually ran. For an
     // unmodulated rhythm modParams ≡ rhythm.voiceParams ≡ activeParams (already kept in
     // sync by VoiceEngine::applyPendingParams' dirty-flag path), so the call would be
     // pure waste — re-syncing ADSR + filter every block for no change.
-    if (runModulationPass && voiceEngines[r])
-        voiceEngines[r]->setActiveParams(modParams);
+    if (runModulationPass && engine != nullptr)
+        engine->setActiveParams(modParams);
 }
 
 } // namespace mu_clid

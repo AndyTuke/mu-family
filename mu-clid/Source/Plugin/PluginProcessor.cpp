@@ -83,33 +83,6 @@ PluginProcessor::PluginProcessor()
                 apvts.addParameterListener(p->getParameterID(), this);
     startFxParamSync();
 
-    // Pre-populate modulation param map so lookups never allocate on the audio thread.
-    modParamValues.reserve(50);
-    for (const char* key : { "amp.attack", "amp.decay", "amp.sustain",  // amp.release retired
-                              "filter.cutoff", "filter.resonance",
-                              "fenv.attack", "fenv.decay", "fenv.depth",
-                              "pitch.semitones", "pitch.octave",
-                              // Stage 36: 4 generic insert slots — semantics per
-                              // active algorithm via mu_ui::kInsertAlgoSlots.
-                              "insert.p1", "insert.p2", "insert.p3", "insert.p4",
-                              "pitch.envDepth", "amp.level", "accentDb",
-                              "euclid.a.hits", "euclid.a.rotate",
-                              "euclid.a.prePad", "euclid.a.postPad",
-                              "euclid.a.insSt", "euclid.a.insLen",
-                              "euclid.b.hits", "euclid.b.rotate",
-                              "euclid.b.prePad", "euclid.b.postPad",
-                              "euclid.b.insSt", "euclid.b.insLen",
-                              "euclid.c.hits", "euclid.c.rotate",
-                              "euclid.c.prePad", "euclid.c.postPad",
-                              "euclid.c.insSt", "euclid.c.insLen",
-                              "filter.lowCut",
-                              "amp.pan", "send.effect", "send.delay", "send.reverb" })
-        modParamValues[key] = 0.0f;
-    // Point each destination's slot at its map value (no rehash after this: keys are fixed).
-    for (auto& [key, value] : modParamValues)
-        if (const int i = ModDest::indexOf(key); i >= 0)
-            modSlot[(size_t) i] = &value;
-
     // Add default rhythm (16 steps, 4 hits) and sync its state to APVTS.
     // All eight rhythms exist for the processor's lifetime (a restored state writes into slots above
     // the live count before it sets the count); the sequencer binds to them.
@@ -251,10 +224,11 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     if (playing)
         advanceSequencer(numRhythms, beatPos, midiMessages);
 
-    // Apply modulation: compute per-rhythm modulated VoiceParams from the modulation matrix.
-    // Uses a try-lock so the audio thread never blocks on the message thread.
+    // Apply modulation: each rhythm computes its modulated VoiceParams, strip values and Euclid overrides
+    // from its matrix. Try-locks only, so the audio thread never blocks on the message thread.
     for (int r = 0; r < numRhythms; ++r)
-        applyRhythmModulation(r, beatPos);
+        sampleRhythm(r).applyModulation(beatPos, mixerEngine.channels[(size_t) r], sequencer, r,
+                                        voiceEngines[(size_t) r].get());
 
     renderAudioBuses(buffer, midiMessages, numRhythms, transport.bpm);
 }
