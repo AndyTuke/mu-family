@@ -43,6 +43,16 @@ struct SampleRhythm : Rhythm
     void applyModulation(double beatPos, MixerEngine::ChannelState& strip,
                          RhythmSequencer& sequencer, int slot, VoiceEngine* engine);
 
+    // Audio thread: the hit the sequencer fired for this rhythm this block. In MIDI output mode it becomes one
+    // note-on in `midiOut` through `midiEngine` (never the voice); otherwise `engine` (null: none) retriggers, tied when
+    // the sequencer marked the hit tied and the rhythm has pattern legato on. Allocates nothing itself.
+    void fireHit(bool accented, bool tied, juce::MidiBuffer& midiOut, MidiOutputEngine& midiEngine, VoiceEngine* engine);
+
+    // Audio thread, once per playing block: the play state the UI draws (step and fraction as one snapshot, the
+    // pattern and ring lengths, and the monotonic hit counter when `fired`).
+    void publishPlayState(RhythmPlayState& state, int step, int accentStep, int patternLength, float frac,
+                          bool fired) const noexcept;
+
     // The Euclid values after modulation, for the UI: the base values while nothing is assigned (the
     // overrides are only written when a pass runs). Integer-rounded by the audio thread, so a torn read is
     // harmless for display.

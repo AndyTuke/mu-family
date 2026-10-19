@@ -342,26 +342,11 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
 void PluginProcessor::advanceSequencer(int numRhythms, double beatPos, juce::MidiBuffer& midiMessages)
 {
     const auto blockResult = sequencer.processBlock(beatPos);
-    // Phase 1: a fired hit plays the rhythm's sample, or (MIDI output mode) becomes one MIDI note-on and
-    // never reaches the voice. The settings are relaxed atomics on the Rhythm; nothing here allocates.
+    // Phase 1: each rhythm the sequencer fired plays its hit (its sample, or in MIDI output mode one note-on).
     for (int r = 0; r < numRhythms; ++r)
-        if ((blockResult.firedMask & (1 << r)) && sequencer.getRhythm(r).outputMode.load() == (int) mu_core::OutputMode::Midi)
-        {
-            const Rhythm& rhy = sequencer.getRhythm(r);
-            const bool accented = (blockResult.accentMask & (1 << r)) != 0;
-            midiEngines[r].trigger(midiMessages, 0, rhy.midiNote.load(), rhy.midiChannel.load(),
-                                   mu_core::midiOutVelocity(rhy.midiVelocity.load(), (float) rhy.midiAccent.load(), accented));
-        }
-        else if ((blockResult.firedMask & (1 << r)) && voiceEngines[r])
-        {
-            // pattern-legato gating — tiedMask is always populated by
-            // the sequencer; the per-rhythm patternLegato flag decides
-            // whether to act on it. Untied / legato-off hits go through
-            // the standard retrigger path.
-            const bool tied = sequencer.getRhythm(r).patternLegato
-                           && (blockResult.tiedMask & (1 << r)) != 0;
-            voiceEngines[r]->trigger(blockResult.accentMask & (1 << r), tied);
-        }
+        if (blockResult.firedMask & (1 << r))
+            sampleRhythm(r).fireHit((blockResult.accentMask & (1 << r)) != 0, (blockResult.tiedMask & (1 << r)) != 0,
+                                    midiMessages, midiEngines[(size_t) r], voiceEngines[(size_t) r].get());
 
     // Hot-swap: check if any staged rhythm preset should be committed at this boundary.
     if (hotSwapStager.checkBoundaries(numRhythms, blockResult.masterLoopWrapped,
@@ -373,20 +358,9 @@ void PluginProcessor::advanceSequencer(int numRhythms, double beatPos, juce::Mid
         std::fmod(beatPos / RhythmSequencer::StepLengthBeats, 1.0));
     beatFraction.store(frac);
     for (int r = 0; r < numRhythms; ++r)
-    {
-        // Step and fraction go out as one snapshot so the ring never pairs a new fraction with an old step.
-        rhythmPlayState[r].publishPosition({ sequencer.getLastStepIndex(r),
-                                             sequencer.getLastAccentStepIndex(r), frac });
-        rhythmPlayState[r].patternLength.store(sequencer.getPatternLength(r));
-        const Rhythm& rhy = sequencer.getRhythm(r);
-        rhythmPlayState[r].stepsA.store(juce::jmax(1, rhy.genA.steps));
-        rhythmPlayState[r].stepsB.store(juce::jmax(1, rhy.genB.steps));
-        rhythmPlayState[r].stepsC.store(juce::jmax(1, rhy.genC.steps));
-        if (blockResult.firedMask & (1 << r))
-        {
-            rhythmPlayState[r].hitCount.store(rhythmPlayState[r].hitCount.load() + 1); // monotonic counter for race-free UI hit detection
-        }
-    }
+        sampleRhythm(r).publishPlayState(rhythmPlayState[(size_t) r], sequencer.getLastStepIndex(r),
+                                         sequencer.getLastAccentStepIndex(r), sequencer.getPatternLength(r), frac,
+                                         (blockResult.firedMask & (1 << r)) != 0);
 }
 
 
