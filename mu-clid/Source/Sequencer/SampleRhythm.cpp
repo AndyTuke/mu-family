@@ -68,9 +68,9 @@ void SampleRhythm::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<f
         voice->process(out, n);
 }
 
-void SampleRhythm::publishPlayState(RhythmPlayState& state, int step, int accentStep, int patternLength,
-                                    float frac, bool fired) const noexcept
+void SampleRhythm::publishPlayState(int step, int accentStep, int patternLength, float frac, bool fired) noexcept
 {
+    auto& state = playState;
     // Step and fraction go out as one snapshot so the ring never pairs a new fraction with an old step.
     state.publishPosition({ step, accentStep, frac });
     state.patternLength.store(patternLength);

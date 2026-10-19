@@ -467,7 +467,7 @@ struct MuClidExtractionPinTests : juce::UnitTest
             useSample(p, 2, "Kick 01.wav");
             ringA(p, 2, 16, 8);
         };
-        auto hits = [](Rig& rig, int r) { return rig.p.rhythmPlayState[(size_t) r].hitCount.load(); };
+        auto hits = [](Rig& rig, int r) { return rig.p.sampleRhythm(r).playState.hitCount.load(); };
 
         beginTest("Blocks skipped during an edit are silent, fire no step, emit no MIDI and leave the held note and the owed note-off untouched");
         {

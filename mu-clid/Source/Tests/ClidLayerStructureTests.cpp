@@ -89,6 +89,53 @@ struct ClidLayerStructureTests : juce::UnitTest
         editsCancelPendingSwaps();
         addedSlotIsClean();
         everyLayerIsASampleRhythm();
+        playStateFollowsTheLayer();
+    }
+
+    // The play state is the layer's (the UI's circles look it up through RhythmHost on every read): after add,
+    // swap, reset and remove the host hands out the live layer's own play state, and none for a slot not live.
+    void playStateFollowsTheLayer()
+    {
+        beginTest("the UI's play state is the live layer's after add, swap, reset and remove");
+        TempStorage storage;
+        StructureProcessor p;
+        p.prepareToPlay(48000.0, 256);
+        mu_clid::RhythmHost& host = p;
+        auto bound = [&](const char* when)
+        {
+            for (int i = 0; i < kMax; ++i)
+            {
+                auto* layer = dynamic_cast<mu_clid::SampleRhythm*>(p.getLayer(i));
+                if (i < p.getNumRhythms())
+                    expect(layer != nullptr && host.getRhythmPlayState(i) == &layer->playState,
+                           juce::String("slot ") + juce::String(i) + " reads its layer's play state " + when);
+                else
+                    expect(host.getRhythmPlayState(i) == nullptr,
+                           juce::String("slot ") + juce::String(i) + " not live reads none " + when);
+            }
+        };
+        bound("at construction");
+        p.addLayer();
+        p.addLayer();
+        bound("after adds");
+
+        // A swap moves the layers, play state included: each slot's play state is the one its new layer carries.
+        auto* const at0 = host.getRhythmPlayState(0);
+        auto* const at2 = host.getRhythmPlayState(2);
+        expect(p.swapLayers(0, 2));
+        bound("after a swap");
+        expect(host.getRhythmPlayState(0) == at2 && host.getRhythmPlayState(2) == at0, "the play states moved with their layers");
+
+        // A reset takes the defaults in place (adoptDefaults): the slot keeps its layer and so its play state.
+        const auto* const kept = p.getLayer(1);
+        auto* const keptState = host.getRhythmPlayState(1);
+        p.resetLayer(1);
+        bound("after a reset");
+        expect(p.getLayer(1) == kept && host.getRhythmPlayState(1) == keptState, "the reset slot keeps its layer");
+
+        expect(p.removeLayer(0));
+        bound("after a remove");
+        expect(host.getRhythmPlayState(1) == at0, "the layer that moved down (from slot 2) brought its play state");
     }
 
     void fillAndRemoveMiddle()

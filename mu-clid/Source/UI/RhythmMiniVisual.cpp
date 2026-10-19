@@ -13,8 +13,9 @@ RhythmMiniVisual::RhythmMiniVisual(RhythmHost& h, int index)
 
     const Rhythm& r = host.getRhythmLayer(rhythmIndex);
     miniCircle.setPatterns(r.genA.getStepTypes(), r.genB.getStepTypes(), r.genC.getStepTypes());
-    miniCircle.setPlayState(&host.getRhythmPlayState(rhythmIndex),
-                            &host.getRhythmTransportFlag(), colour);
+    // Looked up on every tick: the play state is the layer's, and an edit moves or replaces layers.
+    miniCircle.setPlayStateSource([this] { return host.getRhythmPlayState(rhythmIndex); },
+                                  &host.getRhythmTransportFlag(), colour);
     miniCircle.setSingleColour(colour);   // the sidebar icon shows the rhythm's own colour
 
     lastSigA = r.genA.signature();
@@ -33,7 +34,8 @@ void RhythmMiniVisual::resized()
 void RhythmMiniVisual::timerCallback()
 {
     // Step-hit edge detection (monotonic counter) → pulse the parent.
-    const int currentHitCount = host.getRhythmPlayState(rhythmIndex).hitCount.load();
+    const auto* playState = host.getRhythmPlayState(rhythmIndex);
+    const int currentHitCount = playState != nullptr ? playState->hitCount.load() : lastHitCount;
     if (currentHitCount != lastHitCount)
     {
         lastHitCount = currentHitCount;

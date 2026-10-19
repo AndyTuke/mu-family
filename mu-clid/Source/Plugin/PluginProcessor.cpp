@@ -274,7 +274,7 @@ void PluginProcessor::layersBlockStarting(const mu_core::LayerView& view, const 
         for (int r = 0; r < numRhythms; ++r)
         {
             const auto& cs = cursorSteps[(size_t) r];
-            sampleRhythm(r).publishPlayState(rhythmPlayState[(size_t) r], cs.step, cs.accentStep, cs.length, frac,
+            sampleRhythm(r).publishPlayState(cs.step, cs.accentStep, cs.length, frac,
                                              (blockResult.firedMask & (1 << r)) != 0);
         }
     }

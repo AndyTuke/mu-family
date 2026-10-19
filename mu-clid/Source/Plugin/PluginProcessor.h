@@ -228,9 +228,8 @@ public:
         retireEngine(slot, std::move(engine));
     }
 
-    // Play-state atomics: written by audio thread, read by UI at 30 Hz.
-    using RhythmPlayState = mu_clid::RhythmPlayState;
-    std::array<RhythmPlayState, RhythmSequencer::MaxRhythms> rhythmPlayState;
+    // Play-state atomics: written by audio thread, read by UI at 30 Hz. Each rhythm's own play state is its layer's
+    // (SampleRhythm::playState), looked up through getRhythmPlayState on every read.
     std::atomic<float>  beatFraction     { 0.0f }; // fractional position within the current 1/16 step
     std::atomic<bool>   sequencerPlaying { false };
     std::atomic<double> lastBeatPos      { 0.0 };  // most recent beat position (for UI playhead)
@@ -271,7 +270,10 @@ public:
     const Rhythm& getRhythmLayer(int layer) const noexcept override           { return getRhythm(layer); }
     bool                     isRhythmTransportPlaying() const noexcept override { return sequencerPlaying.load(); }
     const std::atomic<bool>& getRhythmTransportFlag() const noexcept override   { return sequencerPlaying; }
-    RhythmPlayState&         getRhythmPlayState(int layer) noexcept override    { return rhythmPlayState[(size_t) layer]; }
+    RhythmPlayState*         getRhythmPlayState(int layer) noexcept override
+    {
+        return getLayer(layer) != nullptr ? &sampleRhythm(layer).playState : nullptr;
+    }
     float getRhythmModLive(int layer, int snap) const noexcept override         { return getModSnapshot(layer, snap); }
     EuclidOverrides getRhythmEuclidOverrides(int layer) const noexcept override { return getModulatedEuclidOverrides(layer); }
     const std::atomic<float>* getRhythmInsertGainReduction(int layer) override  { return getInsertGRReductionPtr(layer); }

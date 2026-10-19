@@ -85,7 +85,7 @@ int PluginProcessor::retiredCountForTest(int slot) const noexcept
 void PluginProcessor::resetPlayState(int idx)
 {
     if (idx < 0 || idx >= RhythmSequencer::MaxRhythms) return;
-    auto& s = rhythmPlayState[(size_t) idx];
+    auto& s = sampleRhythm(idx).playState;
     s.patternLength.store(1);
     s.stepsA       .store(1);
     s.stepsB       .store(1);

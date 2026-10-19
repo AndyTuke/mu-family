@@ -24,8 +24,8 @@
 // mu-Clid MIDI, are untouched.
 //
 // Being built up stage by stage: the processor creates every layer as a SampleRhythm; the layer owns its voice and
-// MIDI engines (E5.5c, E5.5d) and renders through the render contract, while the processor still decides each
-// block's hit and keeps the play state the UI reads (to E5.7). Not copyable (atomics, owned engines). An assignment
+// MIDI engines (E5.5c, E5.5d) and its play state (E5.7a) and renders through the render contract, while the
+// processor's block-start hook hands it each block's hit from the host step clock. Not copyable (atomics, owned engines). An assignment
 // through Rhythm& (a preset install, a reset to defaults) changes only the Rhythm part, so what is below
 // stays with the slot; a reorder moves the whole layer, members included (the host then resets the moved
 // slots' modulation memory, resetModulationMemory).
@@ -83,9 +83,8 @@ struct SampleRhythm : Rhythm
     void takeHit(bool accented, bool tied, juce::MidiBuffer& midiOut);
 
     // Audio thread, once per playing block: the play state the UI draws (step and fraction as one snapshot, the
-    // pattern and ring lengths, and the monotonic hit counter when `fired`).
-    void publishPlayState(RhythmPlayState& state, int step, int accentStep, int patternLength, float frac,
-                          bool fired) const noexcept;
+    // pattern and ring lengths, and the monotonic hit counter when `fired`), into playState.
+    void publishPlayState(int step, int accentStep, int patternLength, float frac, bool fired) noexcept;
 
     // The Euclid values after modulation, for the UI: the base values while nothing is assigned (the
     // overrides are only written when a pass runs). Integer-rounded by the audio thread, so a torn read is
@@ -103,7 +102,8 @@ struct SampleRhythm : Rhythm
     // (E5.5c): it moves with the layer; a removed layer's owed note-off is handed to the host (layerRemoved).
     MidiOutputEngine             midi;
 
-    // Written by the audio thread, read by the UI.
+    // Written by the audio thread, read by the UI (through its host, on every read: a structural edit moves or
+    // replaces the layer, so the UI never keeps a pointer to it).
     RhythmPlayState                          playState;
     std::array<std::atomic<float>, kSnapCount> modSnapshot {};   // ModulationSnapshot.h indices
 

@@ -32,8 +32,9 @@ public:
     // The transport as the content shows it, and the flag itself for the circles' own animation.
     virtual bool                     isRhythmTransportPlaying() const noexcept = 0;
     virtual const std::atomic<bool>& getRhythmTransportFlag() const noexcept = 0;
-    // Layer `layer`'s play state (step, hit count), written by the audio thread.
-    virtual RhythmPlayState&         getRhythmPlayState(int layer) noexcept = 0;
+    // Layer `layer`'s play state (step, hit count), written by the audio thread; null for a slot with no layer.
+    // It lives in the layer, which an edit may move or free: look it up on every read, never keep the pointer.
+    virtual RhythmPlayState*         getRhythmPlayState(int layer) noexcept = 0;
     // Post-matrix value of live-arc snapshot `snap` (ModulationSnapshot.h) on layer `layer`, in the knob's units.
     virtual float getRhythmModLive(int layer, int snap) const noexcept = 0;
     // The Euclid generators' values after modulation (the base values when nothing is assigned).

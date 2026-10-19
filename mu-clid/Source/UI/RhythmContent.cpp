@@ -345,9 +345,11 @@ void RhythmContent::refreshCircle()
     const EuclidOverrides ov = host.getRhythmEuclidOverrides(currentRhythmIndex);
     circle.setPatterns(r.genA.getStepTypes(ov.a), r.genB.getStepTypes(ov.b), r.genC.getStepTypes(ov.c));
     lastCircleOverrides = ov;
-    circle.setPlayState(&host.getRhythmPlayState(currentRhythmIndex),
-                        &host.getRhythmTransportFlag(),
-                        currentColour());
+    // Looked up on every tick: the play state is the layer's, and an edit moves or replaces layers.
+    circle.setPlayStateSource([this] { return currentRhythmIndex >= 0 && currentRhythmIndex < host.getRhythmCount()
+                                                  ? host.getRhythmPlayState(currentRhythmIndex) : nullptr; },
+                              &host.getRhythmTransportFlag(),
+                              currentColour());
 }
 
 juce::Colour RhythmContent::currentColour() const
