@@ -23,9 +23,9 @@ public:
                  const double*                    ratios,
                  juce::AudioBuffer<float>&        output,
                  int                             numSamples);
-    // A block that keeps time without reading the sample (the engine's buffer lock was busy): a pending trigger
-    // starts as in process(), then the position and the fade-in advance by `ratios` as a rendered block would. The
-    // source's length is not known here, so a voice that passed its end stops at the next process().
+    // A block that keeps time without reading the sample (the engine's buffer lock was busy): a running voice's
+    // position and fade-in advance by `ratios` as a rendered block would; a pending trigger waits for the next
+    // process(). The source's length is not known here, so a voice that passed its end stops at the next process().
     void skip(const double* ratios, int numSamples) noexcept;
     bool isActive() const;
 

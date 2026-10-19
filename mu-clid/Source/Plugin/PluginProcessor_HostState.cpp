@@ -161,7 +161,10 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
     {
         for (int i = oldN; i < n; ++i)
         {
-            voiceEngine(i) = std::move(grownEngines[(size_t) i]);   // built above with its slot's noise seed
+            // Built above with its slot's noise seed; a slot the pre-lock count did not foresee is built here.
+            if (grownEngines[(size_t) i] == nullptr)
+                grownEngines[(size_t) i] = makeSlotEngine(i);
+            voiceEngine(i) = std::move(grownEngines[(size_t) i]);
             if (currentSampleRate > 0 && currentBlockSize > 0)
                 sampleRhythm(i).midi.prepare(currentSampleRate, currentBlockSize);
         }

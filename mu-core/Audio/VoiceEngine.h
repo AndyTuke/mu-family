@@ -146,6 +146,8 @@ private:
     int retireDrainBlocks = 0;
     // A retired engine's run of rendered output below kRetireSilentLevel, in samples (audio thread; reset by any
     // louder block, left alone by a contended one), and the run that counts as drained (50 ms, set by markRetired).
+    // The hold must outlast the longest silent gap a ringing insert can leave: the Karplus loop's period is at most
+    // about 31 ms (its lowest note, C1); a lower Karplus range or a delay-type insert needs a longer hold.
     static constexpr float kRetireSilentLevel = 1.0e-5f;   // -100 dBFS
     int retireSilentSamples = 0;
     int retireSilentHold    = 0;

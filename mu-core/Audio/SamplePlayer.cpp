@@ -13,13 +13,8 @@ void SamplePlayer::trigger(int fadeInSamples)
 
 void SamplePlayer::skip(const double* ratios, int numSamples) noexcept
 {
-    if (triggered.exchange(false, std::memory_order_acquire))
-    {
-        playPos = 0.0;
-        fadeInTotal     = pendingFadeInSamples.load(std::memory_order_relaxed);
-        fadeInRemaining = fadeInTotal;
-    }
-
+    // A pending trigger stays pending: the new hit starts at its sample 0 (with its fade-in) in the next rendered
+    // block, rather than losing its attack to a block that could not read the sample.
     if (playPos < 0.0 || ratios == nullptr)
         return;
 
