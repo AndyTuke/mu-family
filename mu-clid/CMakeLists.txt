@@ -46,6 +46,7 @@ target_sources(mu-clid
         Source/Plugin/PluginProcessor.cpp
         Source/Plugin/PluginProcessor_APVTS.cpp
         Source/Sequencer/SampleRhythm.cpp
+        Source/Sequencer/RhythmCursor.cpp
         Source/Sequencer/SampleRhythm_Modulation.cpp
         Source/Plugin/PluginProcessor_Layers.cpp
         Source/Plugin/PluginProcessor_Content.cpp
@@ -249,6 +250,7 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/RhythmSequencerWrapTests.cpp  # master-loop wrap detection
     Source/Tests/SwapCommitTimingTests.cpp     # a delayed swap commit still starts the new pattern on the next step
     Source/Tests/RhythmSequencerSlotTests.cpp  # slot binding and per-slot state moves
+    Source/Tests/RhythmCursorEqualityTests.cpp # the per-layer step cursor equals RhythmSequencer bit for bit
     Source/Tests/MidiOutputModeTests.cpp       # per-rhythm Sample / MIDI output: table, presets, render through the real processor
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/RhythmSequencer.cpp"        # under test by the wrap tests
     Source/Persistence/PresetMigrations.cpp    # under test by C1/C2
@@ -275,6 +277,7 @@ target_sources(mu-clid-tests PRIVATE
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_APVTS.cpp
     Source/Sequencer/SampleRhythm.cpp
+    Source/Sequencer/RhythmCursor.cpp
     Source/Sequencer/SampleRhythm_Modulation.cpp
     Source/Plugin/PluginProcessor_Content.cpp
     Source/Plugin/PluginProcessor_Layers.cpp
