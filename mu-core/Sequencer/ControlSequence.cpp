@@ -1,4 +1,5 @@
 #include "Sequencer/ControlSequence.h"
+#include "Modulation/SmoothCurve.h"   // the shared Smooth curve tangents
 
 #include <algorithm>
 #include <cmath>
@@ -75,7 +76,7 @@ float ControlSequence::evaluate(double songBeatPos) const
     else
         raw = haveCurve ? evaluateSmooth(phase)  : (haveStep  ? evaluateStepped(phase) : 0.0f);
 
-    // Clamp to the matrix's contract range so a bent curve / Catmull-Rom overshoot can't
+    // Clamp to the matrix's contract range so a bent curve can't
     // push the modulation past the destination's intended swing. Unipolar is floored at 0.
     raw = (polarity == Polarity::Unipolar) ? std::clamp(raw, 0.0f, 100.0f)
                                            : std::clamp(raw, -100.0f, 100.0f);
@@ -136,22 +137,12 @@ float ControlSequence::evaluateSmooth(double phase) const
 
     const float t = (x - p0.x) / segLen;
 
-    // Smooth (Catmull-Rom) cubic so the curve flows through the anchors without kinks.
-    // Control-point y-values come from Catmull-Rom tangents: interior points use centred
-    // differences, the boundary points use one-sided differences (so a 2-point curve stays
-    // exactly linear). An explicit per-segment bend (handleY, set by dragging a segment's
-    // grab handle) adds on top. handleX is ignored — t is chord progress, keeping the
-    // playhead-vs-time mapping simple. Must match LFOEditor::buildCurvePath.
-    const int n = static_cast<int>(curvePoints.size());
-    auto py = [&](int i) { return curvePoints[static_cast<size_t>(std::min(std::max(i, 0), n - 1))].y; };
-    const float m0 = (lo == 0)         ? (py(lo + 1) - py(lo)) : 0.5f * (py(lo + 1) - py(lo - 1));
-    const float m1 = (lo + 1 == n - 1) ? (py(lo + 1) - py(lo)) : 0.5f * (py(lo + 2) - py(lo));
-    // Clamp the bezier control points to the visible range. A bezier lies within the convex
-    // hull of its control points, so with the anchors + handles bounded the curve can't
-    // overshoot the range — and this matches LFOEditor::buildCurvePath exactly.
+    // Smooth cubic through the anchors (mu_mod::smoothControlY: monotone tangents, so it never swings past a
+    // neighbour). t is chord progress, which keeps the playhead-vs-time mapping simple; handleX is ignored. Must
+    // match LFOEditor::buildCurvePath, which draws from the same control heights.
     const float yFloor = (polarity == Polarity::Unipolar) ? 0.0f : -1.0f;
-    const float c1y = std::clamp(p0.y + m0 / 3.0f + (p0.hasBezierHandle ? p0.handleY : 0.0f), yFloor, 1.0f);
-    const float c2y = std::clamp(p1.y - m1 / 3.0f + (p1.hasBezierHandle ? p1.handleY : 0.0f), yFloor, 1.0f);
+    float c1y, c2y;
+    mu_mod::smoothControlY(curvePoints, lo, yFloor, c1y, c2y);
 
     const float one_t = 1.0f - t;
     const float b = one_t * one_t * one_t * p0.y

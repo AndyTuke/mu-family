@@ -112,7 +112,7 @@ Amp envelope is the SINGLE ADSR `ampEnv` ([VoiceEngine.h:93-104](../../mu-core/A
 
 ## Insert (post-amp-env)
 
-[mu-core/Audio/InsertProcessor.{h,cpp}](../../mu-core/Audio/InsertProcessor.h) dispatches over the 14 algorithms (count = `mu_audio::kInsertAlgorithmCount`). Each algorithm reads 4 generic slot parameters from `VoiceParams::insertParam[0..3]` (normalised 0..1) and de-normalises through `mu_ui::normToActual(insertParam[N], insertAlgo, N)` using the per-algo config in [mu-core/Audio/InsertSlotConfig.h](../../mu-core/Audio/InsertSlotConfig.h).
+[mu-core/Audio/InsertProcessor.{h,cpp}](../../mu-core/Audio/InsertProcessor.h) dispatches over the 15 algorithms (count = `mu_audio::kInsertAlgorithmCount`). Each algorithm reads 4 generic slot parameters from `VoiceParams::insertParam[0..3]` (normalised 0..1) and de-normalises through `mu_ui::normToActual(insertParam[N], insertAlgo, N)` using the per-algo config in [mu-core/Audio/InsertSlotConfig.h](../../mu-core/Audio/InsertSlotConfig.h).
 
 | #  | Algorithm | Slot 0      | Slot 1       | Slot 2       | Slot 3        |
 |----|-----------|-------------|--------------|--------------|---------------|
@@ -130,10 +130,13 @@ Amp envelope is the SINGLE ADSR `ampEnv` ([VoiceEngine.h:93-104](../../mu-core/A
 | 11 | Karplus   | Note 0–11 (C–B) | Octave 0–3 | Feedback 0–100 % | LPF       |
 | 12 | Vocoder   | Wave 0–3 (Sine/Saw/White/Pink) | Unison 0–6 | Octave 1–5 | Note 1–12 |
 | 13 | VocoderSt | (same as Vocoder)              |          |          |              |
+| 14 | Overdrive | Drive 0–100 | Output −24–0 dB | Bias 0–100 % | Tone 200–20k Hz (log) |
+
+**Overdrive (index 14, ruled 2026-10-20):** tube-style overdrive. Selector label "Overdrive", preset-name string `"Overdrive"`, appended at index 14 so no saved id shifts (APVTS stores the index, presets the name); it sits alphabetically between Limiter and Ring Mod in the dropdown (item id 15). Slots: Drive / Output / Bias / Tone, first-visit defaults 0 / 0 dB / 25 % / 20000 Hz. Bias is the asymmetry that adds even harmonics (0 = symmetric, odd only). No Mix knob: inserts are in-line (RingMod's Mix is the one exception, because the effect is a blend); parallel blending is what the Effect send is for. Output is trim only, with the same square-root drive make-up as SoftClip so Drive does not jump the level.
 
 | APVTS suffix | Storage           | Notes |
 |--------------|-------------------|-------|
-| `drvChar`    | Algorithm name (string in preset XML; int in APVTS)    | 0..13; index ≤ kInsertAlgorithmCount−1 |
+| `drvChar`    | Algorithm name (string in preset XML; int in APVTS)    | 0..14; index ≤ kInsertAlgorithmCount−1 |
 | `insP1..P4`  | float 0..1 normalised  | De-normalised per-algo at process time |
 
 The single generic-slot model (Stage 36 / #611) replaced an earlier 9-named-field design (`drvDrv`, `drvOut`, `drvTon`, `drvBits`, `drvRate`, `drvDit`, `eqMidGain`, `eqLowGain`, `eqHighGain`). The named-field design overloaded the same slots with different semantics depending on algorithm; the new model gives each algorithm clean independent slots with their own ranges + skews.

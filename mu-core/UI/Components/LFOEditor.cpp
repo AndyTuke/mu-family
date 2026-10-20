@@ -1,4 +1,5 @@
 #include "LFOEditor.h"
+#include "Modulation/SmoothCurve.h"   // the shared Smooth curve tangents
 
 static constexpr float kPointRadius  = 5.0f;
 static constexpr float kHitRadius    = 8.0f;
@@ -183,21 +184,10 @@ juce::Path LFOEditor::buildCurvePath() const
         }
         else
         {
-            // Smooth (Catmull-Rom) cubic through the anchors — matches
-            // ControlSequence::evaluateSmooth so the drawing and the audio agree. Interior
-            // tangents are centred differences; boundaries use one-sided (2-point → linear).
-            // An explicit per-segment bend (handleY) adds on top.
-            const int n  = (int) points.size();
-            const int lo = i - 1;
-            auto py = [&](int k) { return points[(size_t) juce::jlimit(0, n - 1, k)].y; };
-            const float m0 = (lo == 0)         ? (py(lo + 1) - py(lo)) : 0.5f * (py(lo + 1) - py(lo - 1));
-            const float m1 = (lo + 1 == n - 1) ? (py(lo + 1) - py(lo)) : 0.5f * (py(lo + 2) - py(lo));
-            // Clamp the bezier control points to the visible range (bottom = 0 unipolar / -1
-            // bipolar, top = 1) so the curve can't draw past the panel — the convex-hull
-            // property keeps the whole segment in range. Matches ControlSequence::evaluateSmooth.
-            const float yFloor = unipolar ? 0.0f : -1.0f;
-            const float c1y = juce::jlimit(yFloor, 1.0f, prev.y + m0 / 3.0f + (prev.hasBezierHandle ? prev.handleY : 0.0f));
-            const float c2y = juce::jlimit(yFloor, 1.0f, curr.y - m1 / 3.0f + (curr.hasBezierHandle ? curr.handleY : 0.0f));
+            // Smooth cubic through the anchors: the same control heights as ControlSequence::evaluateSmooth
+            // (mu_mod::smoothControlY), so the drawing and the audio agree and the line never swings past a neighbour.
+            float c1y, c2y;
+            mu_mod::smoothControlY(points, i - 1, unipolar ? 0.0f : -1.0f, c1y, c2y);
 
             const float c1x = prevS.x + (currS.x - prevS.x) * 0.33f;
             const float c2x = prevS.x + (currS.x - prevS.x) * 0.66f;

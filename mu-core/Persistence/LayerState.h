@@ -2,6 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Modulation/ModulatorSerialise.h"   // kChannelDataTag / kChannelNodeTag (the pre-format-2 shape)
+#include "Audio/AlgorithmNames.h"            // kLegacyNormalisedInsertAlgoMax
 #include <cmath>
 #include <functional>
 #include <map>
@@ -60,6 +61,13 @@ inline bool readRowValue(const juce::ValueTree& row, juce::RangedAudioParameter&
     {
         const auto v = (float) (double) row.getProperty("v");
         if (! std::isfinite(v)) return false;
+        // An insert algorithm (…Char, an int over the algorithm list) was a fraction of the list as it stood then.
+        if (auto* algo = dynamic_cast<juce::AudioParameterInt*>(&p); algo != nullptr && p.paramID.endsWith("Char"))
+        {
+            const int index = juce::roundToInt(juce::jlimit(0.0f, 1.0f, v) * (float) mu_audio::kLegacyNormalisedInsertAlgoMax);
+            normalised = p.convertTo0to1((float) juce::jlimit(algo->getRange().getStart(), algo->getRange().getEnd(), index));
+            return true;
+        }
         normalised = juce::jlimit(0.0f, 1.0f, v);
         return true;
     }

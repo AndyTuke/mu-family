@@ -29,6 +29,7 @@
 #include "Audio/FX/Insert/EqInsert.h"
 #include "Audio/FX/Insert/CompressorLimiterInsert.h"
 #include "Audio/FX/Insert/RingModInsert.h"
+#include "Audio/FX/Insert/OverdriveInsert.h"
 #include "Audio/FX/Insert/TapeSatInsert.h"
 #include "Audio/FX/Insert/KarplusStrongInsert.h"
 #include "Audio/FX/Insert/VocoderInsert.h"
@@ -1067,18 +1068,20 @@ struct InsertLatencyTests : juce::UnitTest
             NoneInsert a0; SoftClipInsert a1; HardClipInsert a2; FoldInsert a3; BitcrusherInsert a4; ClipperInsert a5;
             EqInsert a6; CompressorLimiterInsert a7; RingModInsert a9; TapeSatInsert a10; KarplusStrongInsert a11;
             VocoderInsert a12(false), a13(true);
+            OverdriveInsert a14;
             checkAlgorithm("None", a0);           checkAlgorithm("SoftClip", a1);   checkAlgorithm("HardClip", a2);
             checkAlgorithm("Fold", a3);           checkAlgorithm("Bitcrusher", a4); checkAlgorithm("Clipper", a5);
             checkAlgorithm("EQ", a6);             checkAlgorithm("Compressor/Limiter", a7);
             checkAlgorithm("RingMod", a9);        checkAlgorithm("TapeSat", a10);   checkAlgorithm("Karplus", a11);
             checkAlgorithm("Vocoder", a12);       checkAlgorithm("VocoderSt", a13);
+            checkAlgorithm("Overdrive", a14);
 
-            // The registry has 14 slots (Compressor and Limiter share one instance); the construction list
+            // The registry has 15 slots (Compressor and Limiter share one instance); the construction list
             // above must cover every name in the algorithm-name table, so a new algorithm cannot be skipped.
             int named = 0;
             while (mu_audio::kInsertAlgorithmNames[named] != nullptr) ++named;
             expectEquals(named, InsertProcessor::kNumInsertAlgos, "name table and dispatch table agree on the algorithm count");
-            expectEquals(named, 14, "this list constructs 13 classes for 14 slots; a new algorithm means extending it");
+            expectEquals(named, 15, "this list constructs 14 classes for 15 slots; a new algorithm means extending it");
         }
 
         beginTest("a step through every insert slot of the real processor shows its first output at sample 0");

@@ -131,12 +131,12 @@ eff_p1 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
 eff_p2 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
 eff_p3 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
 eff_p4 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
-mst_ins2Char | int | 0 | 13 | 1 | 1 | 0 | 0
+mst_ins2Char | int | 0 | 14 | 1 | 1 | 0 | 0
 mst_ins2P1 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_ins2P2 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_ins2P3 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_ins2P4 | float | 0 | 1 | 0 | 1 | 0 | 0
-mst_insChar | int | 0 | 13 | 1 | 1 | 0 | 0
+mst_insChar | int | 0 | 14 | 1 | 1 | 0 | 0
 mst_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0

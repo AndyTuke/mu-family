@@ -31,7 +31,7 @@ namespace mu_ui {
 inline constexpr int kInsertSlotCount = 4;
 // Number of insert algorithms (rows in kInsertAlgoSlots / kInsertAlgoDefaults).
 // Must equal InsertProcessor::kNumInsertAlgos.
-inline constexpr int kInsertAlgoCount = 14;
+inline constexpr int kInsertAlgoCount = 15;
 
 // Skew shape between the displayed actual value and the normalised 0..1
 // stored in VoiceParams + APVTS. Knobs apply the SAME skew on the slider
@@ -163,6 +163,12 @@ inline const SlotConfig kInsertAlgoSlots[kInsertAlgoCount][kInsertSlotCount] = {
       { "Unison", 0.0f, 6.0f,  SkewMode::IntStep, "",  kUnisonNames, 0, false, 2 },
       { "Octave", 1.0f, 5.0f,  SkewMode::IntStep, "",  nullptr,      0, false, 2 },
       { "Note",   1.0f, 12.0f, SkewMode::IntStep, "",  kNoteNames,   1, false, 2 } },
+
+    // ── 14 Overdrive ── Drive / Output / Bias / Tone ──────────────────
+    { { "Drive",  0.0f,  100.0f, SkewMode::Linear, "" },
+      { "Output", -24.0f, 0.0f,  SkewMode::Linear, "dB" },
+      { "Bias",   0.0f,  100.0f, SkewMode::Linear, "%" },
+      { "Tone",   200.0f, 20000.0f, SkewMode::Log, "Hz", nullptr, 0, true } },
 };
 
 // Whether a slot's knob is live, given slot 1's actual value (see SlotConfig::disabledFromP1).
@@ -196,6 +202,7 @@ inline const float kInsertAlgoDefaults[kInsertAlgoCount][kInsertSlotCount] = {
     /*11 Karplus     */ { 0.0f,    1.0f,    0.0f,   20000.0f },
     /*12 Vocoder     */ { 0.0f,    0.0f,    1.0f,   1.0f     },
     /*13 VocoderSt   */ { 0.0f,    0.0f,    1.0f,   1.0f     },
+    /*14 Overdrive   */ { 0.0f,    0.0f,    25.0f,  20000.0f },
 };
 
 // Convert a normalised 0..1 storage value to the algorithm's actual value

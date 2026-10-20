@@ -799,6 +799,8 @@ The screen half of the Launchpad surface mapping ([design-launchpad.md section 3
 
 ## Design rulings
 
+- 2026-10-20 - New tube-style Overdrive insert (Andy): name, parameters, list position? Selector "Overdrive", appended at algorithm index 14 (dropdown item 15, shown alphabetically between Limiter and Ring Mod); slots Drive / Output / Bias / Tone, no Mix (inserts are in-line; blend is the Effect send); Bias 0-100 % is the even-harmonic asymmetry knob. Table in [mu-clid/design-voice.md](mu-clid/design-voice.md) "Insert".
+
 - 2026-10-20 - How does a Track (Kick) or Arp layer's content sit in a mu-Tronic slot (T1b)? `LayerPanel` supplies all chrome; a type's content is one component filling the 464 band and painting its own metal panels, painted in the type's app primary via `LayerTypeInfo::appColourId`, with `typeTag` and `createContent` on the registry; Track content is mu-On's with the Engine selector hidden when locked (grid moves left), Swing / Accent kept in the Groove box on per-layer rows, and a one-row step component (no name gutter, no outline, row height as mu-On's) drawn by the same function as `StepRows`. Changed mu-tronic/design-ui.md section 4.5a and section 8.
 
 - 2026-10-19 - Update check extended to mu-Clid MIDI and mu-Link (Andy's instruction)? mu-Link uses the standard Settings tick box (own `update.xml`, slug `mu-link`); mu-Clid MIDI, with no Settings page, shows the same "Check for updates" lamp tick box on the About card bottom-left above the Close row (`AboutOverlay::setUpdateCheck`, hidden where a Settings page exists); both show the status-bar link via the shared `mu_ui::UpdateNotice`; privacy copy names that the website sees the IP address. Changed §6 "Update notice".

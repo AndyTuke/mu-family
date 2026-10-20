@@ -131,12 +131,12 @@ eff_p1 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
 eff_p2 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
 eff_p3 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
 eff_p4 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
-mst_ins2Char | int | 0 | 13 | 1 | 1 | 0 | 0
+mst_ins2Char | int | 0 | 14 | 1 | 1 | 0 | 0
 mst_ins2P1 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_ins2P2 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_ins2P3 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_ins2P4 | float | 0 | 1 | 0 | 1 | 0 | 0
-mst_insChar | int | 0 | 13 | 1 | 1 | 0 | 0
+mst_insChar | int | 0 | 14 | 1 | 1 | 0 | 0
 mst_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
@@ -181,7 +181,7 @@ rev_pre | float | 0 | 100 | 0 | 1 | 25 | 0.25
 rev_size | float | 0 | 1 | 0 | 1 | 0.75 | 0.75
 root | choice(12) | 0 | 11 | 1 | 1 | 0 | 0
 scale | choice(12) | 0 | 11 | 1 | 1 | 0 | 0
-v0_drvChar | int | 0 | 13 | 1 | 1 | 0 | 0
+v0_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
 v0_flt2_cut | float | 20 | 20000 | 0 | 0.199595 | 8000 | 0.832612
 v0_flt2_drv | float | 0 | 1 | 0.01 | 1 | 0 | 0
 v0_flt2_env_depth | float | -1 | 1 | 0.01 | 1 | 0 | 0.5
@@ -225,7 +225,7 @@ v0_xmod_fdbk | bool | 0 | 1 | 1 | 1 | 0 | 0
 v0_xmod_index | float | 0 | 100 | 1 | 1 | 0 | 0
 v0_xmod_phaseMode | choice(3) | 0 | 2 | 1 | 1 | 1 | 0.5
 v0_xmod_ssb | float | -2000 | 2000 | 1 | 1 | 0 | 0.5
-v1_drvChar | int | 0 | 13 | 1 | 1 | 0 | 0
+v1_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
 v1_flt2_cut | float | 20 | 20000 | 0 | 0.199595 | 8000 | 0.832612
 v1_flt2_drv | float | 0 | 1 | 0.01 | 1 | 0 | 0
 v1_flt2_env_depth | float | -1 | 1 | 0.01 | 1 | 0 | 0.5
@@ -269,7 +269,7 @@ v1_xmod_fdbk | bool | 0 | 1 | 1 | 1 | 0 | 0
 v1_xmod_index | float | 0 | 100 | 1 | 1 | 0 | 0
 v1_xmod_phaseMode | choice(3) | 0 | 2 | 1 | 1 | 1 | 0.5
 v1_xmod_ssb | float | -2000 | 2000 | 1 | 1 | 0 | 0.5
-v2_drvChar | int | 0 | 13 | 1 | 1 | 0 | 0
+v2_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
 v2_flt2_cut | float | 20 | 20000 | 0 | 0.199595 | 8000 | 0.832612
 v2_flt2_drv | float | 0 | 1 | 0.01 | 1 | 0 | 0
 v2_flt2_env_depth | float | -1 | 1 | 0.01 | 1 | 0 | 0.5
@@ -313,7 +313,7 @@ v2_xmod_fdbk | bool | 0 | 1 | 1 | 1 | 0 | 0
 v2_xmod_index | float | 0 | 100 | 1 | 1 | 0 | 0
 v2_xmod_phaseMode | choice(3) | 0 | 2 | 1 | 1 | 1 | 0.5
 v2_xmod_ssb | float | -2000 | 2000 | 1 | 1 | 0 | 0.5
-v3_drvChar | int | 0 | 13 | 1 | 1 | 0 | 0
+v3_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
 v3_flt2_cut | float | 20 | 20000 | 0 | 0.199595 | 8000 | 0.832612
 v3_flt2_drv | float | 0 | 1 | 0.01 | 1 | 0 | 0
 v3_flt2_env_depth | float | -1 | 1 | 0.01 | 1 | 0 | 0.5
@@ -357,7 +357,7 @@ v3_xmod_fdbk | bool | 0 | 1 | 1 | 1 | 0 | 0
 v3_xmod_index | float | 0 | 100 | 1 | 1 | 0 | 0
 v3_xmod_phaseMode | choice(3) | 0 | 2 | 1 | 1 | 1 | 0.5
 v3_xmod_ssb | float | -2000 | 2000 | 1 | 1 | 0 | 0.5
-v4_drvChar | int | 0 | 13 | 1 | 1 | 0 | 0
+v4_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
 v4_flt2_cut | float | 20 | 20000 | 0 | 0.199595 | 8000 | 0.832612
 v4_flt2_drv | float | 0 | 1 | 0.01 | 1 | 0 | 0
 v4_flt2_env_depth | float | -1 | 1 | 0.01 | 1 | 0 | 0.5
@@ -401,7 +401,7 @@ v4_xmod_fdbk | bool | 0 | 1 | 1 | 1 | 0 | 0
 v4_xmod_index | float | 0 | 100 | 1 | 1 | 0 | 0
 v4_xmod_phaseMode | choice(3) | 0 | 2 | 1 | 1 | 1 | 0.5
 v4_xmod_ssb | float | -2000 | 2000 | 1 | 1 | 0 | 0.5
-v5_drvChar | int | 0 | 13 | 1 | 1 | 0 | 0
+v5_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
 v5_flt2_cut | float | 20 | 20000 | 0 | 0.199595 | 8000 | 0.832612
 v5_flt2_drv | float | 0 | 1 | 0.01 | 1 | 0 | 0
 v5_flt2_env_depth | float | -1 | 1 | 0.01 | 1 | 0 | 0.5
@@ -445,7 +445,7 @@ v5_xmod_fdbk | bool | 0 | 1 | 1 | 1 | 0 | 0
 v5_xmod_index | float | 0 | 100 | 1 | 1 | 0 | 0
 v5_xmod_phaseMode | choice(3) | 0 | 2 | 1 | 1 | 1 | 0.5
 v5_xmod_ssb | float | -2000 | 2000 | 1 | 1 | 0 | 0.5
-v6_drvChar | int | 0 | 13 | 1 | 1 | 0 | 0
+v6_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
 v6_flt2_cut | float | 20 | 20000 | 0 | 0.199595 | 8000 | 0.832612
 v6_flt2_drv | float | 0 | 1 | 0.01 | 1 | 0 | 0
 v6_flt2_env_depth | float | -1 | 1 | 0.01 | 1 | 0 | 0.5
@@ -489,7 +489,7 @@ v6_xmod_fdbk | bool | 0 | 1 | 1 | 1 | 0 | 0
 v6_xmod_index | float | 0 | 100 | 1 | 1 | 0 | 0
 v6_xmod_phaseMode | choice(3) | 0 | 2 | 1 | 1 | 1 | 0.5
 v6_xmod_ssb | float | -2000 | 2000 | 1 | 1 | 0 | 0.5
-v7_drvChar | int | 0 | 13 | 1 | 1 | 0 | 0
+v7_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
 v7_flt2_cut | float | 20 | 20000 | 0 | 0.199595 | 8000 | 0.832612
 v7_flt2_drv | float | 0 | 1 | 0.01 | 1 | 0 | 0
 v7_flt2_env_depth | float | -1 | 1 | 0.01 | 1 | 0 | 0.5

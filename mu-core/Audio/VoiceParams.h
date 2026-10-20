@@ -41,7 +41,7 @@ struct VoiceParams
     // ─── Insert (after filter, before amp) ───────────────────────────────
     // 0=None, 1=SoftClip, 2=HardClip, 3=Fold, 4=Bitcrusher, 5=Clipper, 6=EQ,
     // 7=Compressor, 8=Limiter, 9=RingMod, 10=TapeSat, 11=Karplus, 12=Vocoder,
-    // 13=VocoderSt. Algorithm count is `mu_audio::kInsertAlgorithmCount`.
+    // 13=VocoderSt, 14=Overdrive. Algorithm count is `mu_audio::kInsertAlgorithmCount`.
     int   insertAlgo   = 0;
 
     // Generic 4-slot parameter array. Each algorithm interprets the slots

@@ -493,6 +493,14 @@ throughout; the stages marked **O** also wait for owner decisions on behaviour o
    mu-Clid's per-engine retire-tail and mu-Tant's count-reducing preset fade stay inside the product
    layer; a generic `Layer` tail is not in scope.
 
+### Hooks a hosted type may need beyond creation (ruled 2026-10-20, the Rhythm type in mu-Tronic)
+
+- **`LayerTypeInfo::presetFileToNode` / `presetNodeToFile`: accepted** as the one way for a type whose layer-preset file is not the composed node (mu-Clid's `.muRhythm` keeps `r0_` properties). Pure, message thread, null for every other type, called only inside `loadTypedLayerPreset` / `saveTypedLayerPreset`; the converted node keeps the file's root tag so the type test still reads it. The converters live with the type's description (`mu_clid::rhythmLayerTypeInfo()` in `Sequencer/RhythmType.h`) and reuse the product's own reader, never a second parser. Do not give the host a different file shape or tag: a `.muRhythm` saved by mu-Clid must load in a mu-Tronic slot and the reverse. mu-Clid MIDI shares only the extension; it neither reads nor writes through this path.
+- **`LayerServices::deferredWork()` and `mixIntoMaster()`: accepted**, both default to nothing. `deferredWork` runs on the message thread in the deferred-work pass `ProcessorBase::requestLayerServicesWork()` asks for (any thread, allocation-free). `mixIntoMaster` runs on the audio thread once per mixer chunk, never more frames than the prepared size, no allocation, no lock, through `ProcessorCore::audioServices` (a slot written once, release/acquire, never cleared). A services object stays opaque to the base: it may name `ProcessorBase`, never a product.
+- **Parameter sync for a type whose layer struct is the truth** (the Rhythm; the allowed difference in step 5 above): the type's services listen to its rows and apply a changed row to the layer on the message thread, queuing from other threads for `deferredWork`. This is the shape for such a type only. A type whose layer reads its rows on the audio thread (Arp, Track, Pattern) keeps `bindParams`; do not move the Rhythm onto `bindParams` (its pattern rebuild allocates) and do not copy the listener shape into a type that does not need it.
+- **`stageLayerPresetTree` calls `Layer::preloadStaged`** (message thread, before staging): the contract in the table above, now actually run. A layer keeps what it decoded for the commit at the boundary and keys it to the staged node; the commit does no file work.
+- **Swap boundary in a host with no master loop** (mu-Tronic): the layer's own `loopBeats()` (the pattern's length), as Arp, Track and Pattern. A Rhythm that clocks itself from `RenderContext` is therefore not on mu-Clid's master loop, and that is by design; mu-Clid's own behaviour is unchanged.
+
 ### Why virtual and not a table
 
 A table of function pointers re-implements the vtable and still needs a base type to hold the shared

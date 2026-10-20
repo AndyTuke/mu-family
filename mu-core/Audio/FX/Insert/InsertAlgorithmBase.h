@@ -21,7 +21,7 @@ inline float insertSlot(const VoiceParams& p, int slot) noexcept
 // Each concrete algorithm is one driveChar code (see VoiceParams::driveChar):
 //   1 = SoftClip, 2 = HardClip, 3 = Fold, 4 = Bitcrusher, 5 = Clipper,
 //   6 = 3-Band EQ, 7 = Compressor, 8 = Limiter, 9 = RingMod, 10 = TapeSat,
-//   11 = Karplus-Strong, 12 = Vocoder, 13 = VocoderSt.
+//   11 = Karplus-Strong, 12 = Vocoder, 13 = VocoderSt, 14 = Overdrive.
 //   0 = None — handled by NoneInsert (a no-op for dispatch consistency).
 //
 // All algorithms own their DSP state internally. process() runs in-place on the

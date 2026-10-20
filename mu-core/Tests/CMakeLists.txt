@@ -60,6 +60,8 @@ set(MU_CORE_TEST_SOURCES
     FxAlgoSwitchTests.cpp           # eff_algo / rev_algo by automation pushes the knob values
     ReverbDecayTests.cpp            # reverb Decay presets, tail length, Size independence
     LegacyReverbDecayTests.cpp      # a state saved before the Decay knob loads its algorithm's old Decay
+    LegacyInsertAlgoTests.cpp       # a legacy normalised insert-algorithm row keeps its algorithm after the list grew
+    SmoothCurveTests.cpp            # the Smooth modulator curve passes through its anchors and never overshoots
     ParamRefreshQueueTests.cpp      # the allocation-free listener hand-off
     MidiRawTests.cpp                # raw-byte note tests and the allocation-free MIDI clock scan
     MidiClockSyncTests.cpp

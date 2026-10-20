@@ -49,7 +49,7 @@ public:
     // Non-zero only during Compressor (7) / Limiter (8) modes.
     std::atomic<float> grReduction { 0.0f };
 
-    static constexpr int kNumInsertAlgos = 14;   // + Karplus + Vocoder + VocoderSt
+    static constexpr int kNumInsertAlgos = 15;   // + Karplus + Vocoder + VocoderSt + Overdrive
 
 private:
 
@@ -72,7 +72,7 @@ private:
 
     // Post-drive tone filter — runs after the algorithm dispatch ONLY for
     // insertAlgo < 6, where p.insertTone is interpreted as a 1-pole LP cutoff.
-    // EQ (6), Compressor/Limiter (7, 8), RingMod (9), TapeSat (10) repurpose
+    // EQ (6), Compressor/Limiter (7, 8), RingMod (9), TapeSat (10), Overdrive (14) repurpose
     // insertTone for other meanings and skip this step. Lives here (not in any
     // single algorithm) because it's a property of the drive-family, not of
     // any one algorithm's DSP.

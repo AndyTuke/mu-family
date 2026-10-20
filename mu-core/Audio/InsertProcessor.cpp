@@ -13,6 +13,7 @@
 #include "Audio/FX/Insert/TapeSatInsert.h"
 #include "Audio/FX/Insert/KarplusStrongInsert.h"
 #include "Audio/FX/Insert/VocoderInsert.h"
+#include "Audio/FX/Insert/OverdriveInsert.h"
 
 InsertProcessor::InsertProcessor()
 {
@@ -50,6 +51,7 @@ InsertProcessor::InsertProcessor()
     dispatch[11] = add(std::make_unique<KarplusStrongInsert>());
     dispatch[12] = add(std::make_unique<VocoderInsert>(false));
     dispatch[13] = add(std::make_unique<VocoderInsert>(true));
+    dispatch[14] = add(std::make_unique<OverdriveInsert>());
 }
 
 void InsertProcessor::prepare(double sampleRate, int blockSize)
@@ -87,7 +89,7 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh,
 
     // Post-drive 1-pole LP tone filter — only for the drive-family algorithms
     // (0..5) where slot 3 is the LPF cutoff. EQ / Comp / Limiter / RingMod /
-    // TapeSat / Karplus / Vocoder all consume slot 3 themselves (or repurpose
+    // TapeSat / Overdrive / Karplus / Vocoder all consume slot 3 themselves (or repurpose
     // it as Note / Release / Freq / Tone) and shouldn't get a second LPF.
     if (p.insertAlgo >= 1 && p.insertAlgo <= 5 && currentSampleRate > 0.0)
     {

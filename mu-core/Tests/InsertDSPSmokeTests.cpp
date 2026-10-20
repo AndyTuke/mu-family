@@ -24,6 +24,7 @@
 #include "Audio/FX/Insert/CompressorLimiterInsert.h"
 #include "Audio/FX/Insert/RingModInsert.h"
 #include "Audio/FX/Insert/TapeSatInsert.h"
+#include "Audio/FX/Insert/OverdriveInsert.h"
 #include "Audio/FX/Insert/KarplusStrongInsert.h"
 #include "Audio/FX/Insert/VocoderInsert.h"
 #include "Audio/VoiceParams.h"
@@ -347,6 +348,47 @@ public:
 
         beginTest ("algo 10: TapeSatInsert - no crash, no NaN");
         { TapeSatInsert a; smokeAlgo(a, "TapeSatInsert", makeParams(10, { 30.0f, 0.0f, 0.0f, 5000.0f })); }
+
+        beginTest ("algo 14: OverdriveInsert - no crash, no NaN");
+        { OverdriveInsert a; smokeAlgo(a, "OverdriveInsert", makeParams(14, { 60.0f, 0.0f, 50.0f, 5000.0f })); }
+
+        beginTest ("algo 14: OverdriveInsert - silence stays silent at any bias, and Bias adds even harmonics");
+        {
+            // Magnitude of `harmonic` x the test tone in a settled one-second render (Goertzel).
+            auto harmonicLevel = [&](float biasPercent, int harmonic, bool silentInput)
+            {
+                constexpr double sr = 48000.0;
+                constexpr int n = 48000;
+                const double f0 = 1000.0;
+                OverdriveInsert a;
+                a.prepare(sr, n);
+                juce::AudioBuffer<float> buf(2, n);
+                for (int i = 0; i < n; ++i)
+                    for (int c = 0; c < 2; ++c)
+                        buf.setSample(c, i, silentInput ? 0.0f : 0.25f * (float) std::sin(2.0 * juce::MathConstants<double>::pi * f0 * i / sr));
+                float gr = 0.0f;
+                a.process(buf, n, 2, makeParams(14, { 50.0f, 0.0f, biasPercent, 20000.0f }), gr);
+                if (silentInput)
+                {
+                    float peak = 0.0f;
+                    for (int i = 0; i < n; ++i) peak = juce::jmax(peak, std::abs(buf.getSample(0, i)));
+                    return (double) peak;
+                }
+                const double w = 2.0 * juce::MathConstants<double>::pi * f0 * harmonic / sr;
+                double re = 0.0, im = 0.0;
+                for (int i = n / 2; i < n; ++i)   // the second half: past the gain and DC-block settling
+                {
+                    re += buf.getSample(0, i) * std::cos(w * i);
+                    im += buf.getSample(0, i) * std::sin(w * i);
+                }
+                return std::sqrt(re * re + im * im) / (n / 2);
+            };
+            for (const float bias : { 0.0f, 50.0f, 100.0f })
+                expect(harmonicLevel(bias, 1, true) < 1.0e-3, "silence in gives silence out at bias " + juce::String(bias));
+            const double second0 = harmonicLevel(0.0f, 2, false), second100 = harmonicLevel(100.0f, 2, false);
+            expect(second0 < 1.0e-3, "no second harmonic from the symmetric curve");
+            expect(second100 > 20.0 * juce::jmax(second0, 1.0e-6), "Bias 100 % puts a clear second harmonic in");
+        }
     }
 
 private:

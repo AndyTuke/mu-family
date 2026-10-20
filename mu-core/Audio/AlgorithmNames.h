@@ -30,7 +30,7 @@
 
 namespace mu_audio {
 
-// driveChar 0..13. Order MUST match InsertProcessor::dispatch[] in
+// driveChar 0..14. Order MUST match InsertProcessor::dispatch[] in
 // Source/Audio/InsertProcessor.cpp — that's the audio-thread lookup. Nullptr-
 // terminated for size-introspection.
 inline const char* const kInsertAlgorithmNames[] = {
@@ -48,6 +48,7 @@ inline const char* const kInsertAlgorithmNames[] = {
     "Karplus",      // 11
     "Vocoder",      // 12
     "VocoderSt",    // 13
+    "Overdrive",    // 14
     nullptr
 };
 
@@ -190,6 +191,10 @@ inline constexpr int countNames(const char* const* table) noexcept
 // `std::size(arr) - 1` skips the trailing nullptr terminator. Works as a
 // constexpr because the array's bound is a compile-time constant.
 inline constexpr int kInsertAlgorithmCount = (int) (std::size(kInsertAlgorithmNames) - 1);
+// The last algorithm index when the algorithm list ended at VocoderSt. Preset files written before the format-2 rows
+// stored a parameter as a 0..1 fraction of its range, so an insert algorithm's fraction means "index / 13": appending
+// to the list (Overdrive) would read each of those as the next algorithm up. Such a row is read on this scale instead.
+inline constexpr int kLegacyNormalisedInsertAlgoMax = 13;
 inline constexpr int kFilterTypeCount      = (int) (std::size(kFilterTypeNames) - 1);
 inline constexpr int kLogicCount           = (int) (std::size(kLogicNames) - 1);
 
@@ -230,9 +235,10 @@ inline void populateInsertAlgoDropdown(AddItemFn&& addItem)
     addItem("Bitcrusher",  5);  addItem("Clipper",     6);
     addItem("Compressor",  8);  addItem("Fold",        4);
     addItem("Hard Clip",   3);  addItem("Karplus",    12);
-    addItem("Limiter",     9);  addItem("Ring Mod",   10);
-    addItem("Soft Clip",   2);  addItem("Tape Sat",   11);
-    addItem("Vocoder",    13);  addItem("Vocoder St", 14);
+    addItem("Limiter",     9);  addItem("Overdrive",  15);
+    addItem("Ring Mod",   10);  addItem("Soft Clip",   2);
+    addItem("Tape Sat",   11);  addItem("Vocoder",    13);
+    addItem("Vocoder St", 14);
 }
 
 } // namespace mu_audio

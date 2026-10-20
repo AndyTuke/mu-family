@@ -131,12 +131,12 @@ eff_p1 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
 eff_p2 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
 eff_p3 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
 eff_p4 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
-mst_ins2Char | int | 0 | 13 | 1 | 1 | 0 | 0
+mst_ins2Char | int | 0 | 14 | 1 | 1 | 0 | 0
 mst_ins2P1 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_ins2P2 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_ins2P3 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_ins2P4 | float | 0 | 1 | 0 | 1 | 0 | 0
-mst_insChar | int | 0 | 13 | 1 | 1 | 0 | 0
+mst_insChar | int | 0 | 14 | 1 | 1 | 0 | 0
 mst_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
@@ -151,7 +151,7 @@ r0_aEnvRel | float | 0 | 10 | 0 | 0.3 | 0.5 | 0.407091
 r0_aEnvSus | float | 0 | 100 | 0 | 1 | 80 | 0.8
 r0_accentDb | float | 0 | 12 | 0 | 1 | 0 | 0
 r0_ampLvl | float | -60 | 6 | 0 | 1 | 0 | 0.909091
-r0_drvChar | int | 0 | 13 | 1 | 1 | 0 | 0
+r0_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
 r0_fEnvAtk | float | 0 | 10 | 0 | 0.3 | 0.03 | 0.17504
 r0_fEnvDec | float | 0 | 10 | 0 | 0.3 | 0.09 | 0.243373
 r0_fEnvDep | float | 0 | 48 | 0 | 1 | 0 | 0
@@ -219,7 +219,7 @@ r1_aEnvRel | float | 0 | 10 | 0 | 0.3 | 0.5 | 0.407091
 r1_aEnvSus | float | 0 | 100 | 0 | 1 | 80 | 0.8
 r1_accentDb | float | 0 | 12 | 0 | 1 | 0 | 0
 r1_ampLvl | float | -60 | 6 | 0 | 1 | 0 | 0.909091
-r1_drvChar | int | 0 | 13 | 1 | 1 | 0 | 0
+r1_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
 r1_fEnvAtk | float | 0 | 10 | 0 | 0.3 | 0.03 | 0.17504
 r1_fEnvDec | float | 0 | 10 | 0 | 0.3 | 0.09 | 0.243373
 r1_fEnvDep | float | 0 | 48 | 0 | 1 | 0 | 0
@@ -287,7 +287,7 @@ r2_aEnvRel | float | 0 | 10 | 0 | 0.3 | 0.5 | 0.407091
 r2_aEnvSus | float | 0 | 100 | 0 | 1 | 80 | 0.8
 r2_accentDb | float | 0 | 12 | 0 | 1 | 0 | 0
 r2_ampLvl | float | -60 | 6 | 0 | 1 | 0 | 0.909091
-r2_drvChar | int | 0 | 13 | 1 | 1 | 0 | 0
+r2_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
 r2_fEnvAtk | float | 0 | 10 | 0 | 0.3 | 0.03 | 0.17504
 r2_fEnvDec | float | 0 | 10 | 0 | 0.3 | 0.09 | 0.243373
 r2_fEnvDep | float | 0 | 48 | 0 | 1 | 0 | 0
@@ -355,7 +355,7 @@ r3_aEnvRel | float | 0 | 10 | 0 | 0.3 | 0.5 | 0.407091
 r3_aEnvSus | float | 0 | 100 | 0 | 1 | 80 | 0.8
 r3_accentDb | float | 0 | 12 | 0 | 1 | 0 | 0
 r3_ampLvl | float | -60 | 6 | 0 | 1 | 0 | 0.909091
-r3_drvChar | int | 0 | 13 | 1 | 1 | 0 | 0
+r3_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
 r3_fEnvAtk | float | 0 | 10 | 0 | 0.3 | 0.03 | 0.17504
 r3_fEnvDec | float | 0 | 10 | 0 | 0.3 | 0.09 | 0.243373
 r3_fEnvDep | float | 0 | 48 | 0 | 1 | 0 | 0
@@ -423,7 +423,7 @@ r4_aEnvRel | float | 0 | 10 | 0 | 0.3 | 0.5 | 0.407091
 r4_aEnvSus | float | 0 | 100 | 0 | 1 | 80 | 0.8
 r4_accentDb | float | 0 | 12 | 0 | 1 | 0 | 0
 r4_ampLvl | float | -60 | 6 | 0 | 1 | 0 | 0.909091
-r4_drvChar | int | 0 | 13 | 1 | 1 | 0 | 0
+r4_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
 r4_fEnvAtk | float | 0 | 10 | 0 | 0.3 | 0.03 | 0.17504
 r4_fEnvDec | float | 0 | 10 | 0 | 0.3 | 0.09 | 0.243373
 r4_fEnvDep | float | 0 | 48 | 0 | 1 | 0 | 0
@@ -491,7 +491,7 @@ r5_aEnvRel | float | 0 | 10 | 0 | 0.3 | 0.5 | 0.407091
 r5_aEnvSus | float | 0 | 100 | 0 | 1 | 80 | 0.8
 r5_accentDb | float | 0 | 12 | 0 | 1 | 0 | 0
 r5_ampLvl | float | -60 | 6 | 0 | 1 | 0 | 0.909091
-r5_drvChar | int | 0 | 13 | 1 | 1 | 0 | 0
+r5_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
 r5_fEnvAtk | float | 0 | 10 | 0 | 0.3 | 0.03 | 0.17504
 r5_fEnvDec | float | 0 | 10 | 0 | 0.3 | 0.09 | 0.243373
 r5_fEnvDep | float | 0 | 48 | 0 | 1 | 0 | 0
@@ -559,7 +559,7 @@ r6_aEnvRel | float | 0 | 10 | 0 | 0.3 | 0.5 | 0.407091
 r6_aEnvSus | float | 0 | 100 | 0 | 1 | 80 | 0.8
 r6_accentDb | float | 0 | 12 | 0 | 1 | 0 | 0
 r6_ampLvl | float | -60 | 6 | 0 | 1 | 0 | 0.909091
-r6_drvChar | int | 0 | 13 | 1 | 1 | 0 | 0
+r6_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
 r6_fEnvAtk | float | 0 | 10 | 0 | 0.3 | 0.03 | 0.17504
 r6_fEnvDec | float | 0 | 10 | 0 | 0.3 | 0.09 | 0.243373
 r6_fEnvDep | float | 0 | 48 | 0 | 1 | 0 | 0
@@ -627,7 +627,7 @@ r7_aEnvRel | float | 0 | 10 | 0 | 0.3 | 0.5 | 0.407091
 r7_aEnvSus | float | 0 | 100 | 0 | 1 | 80 | 0.8
 r7_accentDb | float | 0 | 12 | 0 | 1 | 0 | 0
 r7_ampLvl | float | -60 | 6 | 0 | 1 | 0 | 0.909091
-r7_drvChar | int | 0 | 13 | 1 | 1 | 0 | 0
+r7_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
 r7_fEnvAtk | float | 0 | 10 | 0 | 0.3 | 0.03 | 0.17504
 r7_fEnvDec | float | 0 | 10 | 0 | 0.3 | 0.09 | 0.243373
 r7_fEnvDep | float | 0 | 48 | 0 | 1 | 0 | 0
