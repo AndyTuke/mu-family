@@ -121,7 +121,7 @@ edits](design-plugin-family.md#layer-ownership-and-structural-edits--family-stan
   `using mu_pp::name;` line must be re-pointed or removed. Otherwise a `Rhythm` silently binds to the `Layer`
   overload (derived-to-base) and compiles without error. After such a move, grep the product for unqualified
   calls to the name.
-- `mu-core` uses `mu_core`, `mu_ui`, `mu_audio`, `mu_mod`, `mu_pp`, `mu_link`, … by area. The ~130
+- `mu-core` uses `mu_core`, `mu_ui`, `mu_audio`, `mu_mod`, `mu_pp`, `mu_link`, … by area (UI components in `mu-core/UI/` use `mu_ui`, never `mu_core`; ruled 2026-10-20). The ~130
   `mu-core` types that are still global (filters, UI components) are left alone for now.
 - `createPluginFilter()` stays global (JUCE requires it).
 - Shared test helpers in `mu-core/Tests/` (headers products' tests include) use a topic namespace `mu_<topic>`: `mu_golden`, `mu_alloc`,

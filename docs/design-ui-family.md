@@ -129,6 +129,7 @@ JUCE font. No external typeface dependency.
 | Knob labels | 9–11pt (fits available height) | `labelText` |
 | Knob values | 9–10pt | `valueText` |
 | Row / slot labels | 11pt | `labelText` |
+| Chooser card descriptor / hint (`kCardTextFont`) | 12pt | `headingText` on a recessed screen (descriptor), `valueText` on metal (hint); empty-registry message `kChooserMessageFont` 14pt |
 | Status bar | 11pt name / 11pt value | `statusBarText` / `statusBarValue` |
 | dB readout in mixer | 9pt | `labelText` |
 | Button text | scaled to button height | `segmentInactiveBorder` (inactive) / `segmentActiveBorder` (active) |
@@ -893,3 +894,4 @@ The screen half of the Launchpad surface mapping ([design-launchpad.md section 3
 - 2026-10-20 — T1b sub-step 2a review (mu-Tronic Arp in a slot). Ruled: Pass with minors. The header dot, name LCD and preset box keep the layer identity colour while the rest of the main area takes the type primary (accent override). Changed docs/mu-tronic/design-ui.md section 2.
 - 2026-10-20 — Review of the Launchpad-matched layer palette (Red FF6259, Cyan 65EBFF, Orange FFB064, Magenta FF62FF, Lime C7FE6D, Rose FF5EC5, Silver DDDDDD, Blue 5B5DFD). Ruled: Pass with minors. Contrast measured (Blue 3.6:1 on the window, all others 5.8 or more); Blue is barred from small text and takes white ink on a Blue fill; Blue/Purple separation is by saturation only, to be checked on screen in mu-Clid; table is in MuLookAndFeel as required. Changed §8.
 - 2026-10-20 — T1b sub-step 2c review (Track Kick/Hat + Arp in slots). Ruled: Pass with minors. Blank steps box: ruling holds until the default groove is decided, no filler; Track sidebar picture is mu-On's initial disc (registry table corrected from "step row"); chooser cards must reach the card spec before T1b sign-off and before mu-Clid / mu-Tant are added. Changed docs/mu-tronic/design-ui.md 4.3, 4.5a.
+- 2026-10-20 — T1b step 3 review (mu-Tronic chooser cards, lit default Kick). Ruled: Pass with minors. Descriptor one line on a recessed screen in `headingText` at new `kCardTextFont` 12 (engraved `labelText` on the type wash was about 1.7:1); hint `valueText`; empty message `kChooserMessageFont` 14; card disc neutral not slot colour; titled group is a framed steel panel with its plate inside; no literal sizes; sidebars byte-identical; blank steps box ruling holds. Changed section 4 typography table and mu-tronic design-ui 4.3.
