@@ -69,7 +69,7 @@ namespace
     // Set while a create function runs: the hook plays the part of a host thread landing a prepareToPlay between the
     // new layer's build and its publication.
     std::function<void()>* gOnCreate = nullptr;
-    template <class T> std::unique_ptr<Layer> makeT(int)
+    template <class T> std::unique_ptr<Layer> makeT(int, LayerTypeId)
     {
         if (gOnCreate != nullptr && *gOnCreate) (*gOnCreate)();
         return std::make_unique<T>();
@@ -252,11 +252,12 @@ struct LayerTypeSwapTests : juce::UnitTest
         p.flushPendingAsyncUpdates();
     }
 
-    // C17: the strip's sidechain follower is zeroed by the audio thread at its next block start, never written from the
-    // message thread, after a type change and after a reset (also of an Empty slot).
+    // C17: a type change replaces neither the strip nor its sidechain source, so the follower is left as it is (zeroing
+    // it would only unduck a strip that is still being ducked); a reset returns the strip to defaults, so the audio
+    // thread zeroes it at its next block start, never written from the message thread (also for an Empty slot).
     void followerRestarts()
     {
-        beginTest("a type change or reset asks the audio thread to restart the strip's follower from zero");
+        beginTest("a type change leaves the strip's follower alone; a reset restarts it from zero on the audio thread");
         auto box = std::make_unique<TypedHost>(); auto& p = *box;
         expect(p.setLayerType(2, LayerTypeId::Empty));   // a silent source
         mu_seam_test::setParam(p.apvts, "ch1_scSrc", 3.0f);   // slot 2 (source numbers are 1-based)
@@ -272,7 +273,7 @@ struct LayerTypeSwapTests : juce::UnitTest
         expect(p.setLayerType(1, LayerTypeId::Kick));
         expectWithinAbsoluteError(p.mixerEngine.getSidechainEnv(1), 0.9f, 1.0e-6f, "setLayerType writes nothing the audio thread owns");
         run.block(256);
-        expectEquals(p.mixerEngine.getSidechainEnv(1), 0.0f, "the next block starts from zero");
+        expect(p.mixerEngine.getSidechainEnv(1) > 0.5f, "a type change does not restart the follower: it only decays a little");
 
         p.mixerEngine.setSidechainEnv(1, 0.9f);
         p.resetLayer(1);

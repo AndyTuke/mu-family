@@ -6,6 +6,7 @@
 // logged; the budget they are held to is generous (the log line is the record).
 
 #include "Plugin/PluginProcessor.h"
+#include "Persistence/TronicState.h"
 #include "Tests/ProcessorSeamHelpers.h"
 
 #include <chrono>
@@ -83,6 +84,42 @@ struct MuTronicLayoutTests : juce::UnitTest
                     expect(p.apvts.getParameter("ch" + juce::String(s) + "_" + suffix) != nullptr, "ch" + juce::String(s) + "_" + suffix);
             expect(p.apvts.getParameter("ch16_lvl") == nullptr, "no seventeenth strip");
             logMessage("mu-Tronic parameters today: " + juce::String((int) ids.size()));
+        }
+
+        beginTest("every registered type's prefix letter is a listed one, has rows in every slot, and its ids belong to their slot");
+        {
+            mu_seam_test::TempStorage storage;
+            mu_tronic::PluginProcessor p;
+            const auto layout = mu_pp::LayerLayout::withPrefixSets(p, mu_tronic::slotPrefixSets());   // the layout the processor saves by
+
+            // The ids of every parameter, once.
+            juce::StringArray ids;
+            for (auto* raw : p.getParameters())
+                if (auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*>(raw))
+                    ids.add(withId->getParameterID());
+
+            const auto& types = p.getLayerTypes();
+            expect(types.size() > 0, "a type is registered");
+            for (int t = 0; t < types.size(); ++t)
+            {
+                const auto& info = types.at(t);
+                const char letter = info.paramPrefixLetter;
+                expect(letter != 0 && juce::String(mu_tronic::kPrefixLetters).containsChar((juce::juce_wchar) letter),
+                       juce::String(info.name) + " names a letter missing from kPrefixLetters (its rows would be saved as globals)");
+
+                for (int slot = 0; slot < mu_limits::kMaxLayers; ++slot)
+                {
+                    const auto prefix = mu_tronic::slotPrefix(letter, slot);
+                    int rows = 0;
+                    for (const auto& id : ids)
+                        if (id.startsWith(prefix))
+                        {
+                            ++rows;
+                            expectEquals(layout.slotOf(id), slot, id + " belongs to its slot, not the globals");
+                        }
+                    expect(rows > 0, juce::String(info.name) + " declares rows under " + prefix);
+                }
+            }
         }
 
         beginTest("a strip's sidechain source reaches every slot and the external bus");

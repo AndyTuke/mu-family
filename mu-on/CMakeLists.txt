@@ -21,6 +21,8 @@ target_include_directories(mu-on-layer INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/So
 set(MU_ON_LAYER_UI_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/StepRows.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/TrackContent.cpp")
+# Also visible to the sibling directories added after this one (mu-Tronic hosts the layer types).
+set(MU_ON_LAYER_UI_SOURCES "${MU_ON_LAYER_UI_SOURCES}" PARENT_SCOPE)
 
 # ── mu-On — Standalone + VST3 + CLAP (+ AU on macOS) ────────────────────────
 juce_add_plugin(mu-on

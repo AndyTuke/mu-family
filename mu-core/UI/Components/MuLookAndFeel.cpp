@@ -780,8 +780,33 @@ bool MuLookAndFeel::isMetal(const juce::Component& c)
     return mlf != nullptr && mlf->isMetalStyle();
 }
 
+namespace { const juce::Identifier kAccentOverride { "muAccentOverride" }; }
+
+void MuLookAndFeel::setAccentOverride(juce::Component& root, juce::Colour colour)
+{
+    root.getProperties().set(kAccentOverride, (juce::int64) colour.getARGB());
+}
+
+void MuLookAndFeel::clearAccentOverride(juce::Component& root)
+{
+    root.getProperties().remove(kAccentOverride);
+}
+
+bool MuLookAndFeel::accentOverrideFor(const juce::Component& c, juce::Colour& out)
+{
+    for (const auto* p = &c; p != nullptr; p = p->getParentComponent())
+        if (const auto* v = p->getProperties().getVarPointer(kAccentOverride))
+        {
+            out = juce::Colour((juce::uint32) (juce::int64) *v);
+            return true;
+        }
+    return false;
+}
+
 juce::Colour MuLookAndFeel::appAccent(juce::Component& c)
 {
+    juce::Colour overridden;
+    if (accentOverrideFor(c, overridden)) return overridden;
     auto* mlf = dynamic_cast<MuLookAndFeel*>(&c.getLookAndFeel());
     return (mlf != nullptr && mlf->hasAppAccent) ? mlf->appAccentColour : colour(globalAccent);
 }
@@ -795,6 +820,12 @@ void MuLookAndFeel::useAppColourKnobs(juce::Component& root)
 
 juce::Colour MuLookAndFeel::knobColour(const juce::Slider& slider) const
 {
+    // A layer-type colour over the main page wins over the app colour.
+    juce::Colour overridden;
+    if (metalStyle && accentOverrideFor(slider, overridden))
+        for (auto* c = slider.getParentComponent(); c != nullptr; c = c->getParentComponent())
+            if (c->getProperties().contains(kAppColourKnobs))
+                return overridden;
     // Inside a marked main page, the app colour wins over the knob's category colour.
     if (metalStyle && hasAppAccent)
         for (auto* c = slider.getParentComponent(); c != nullptr; c = c->getParentComponent())
@@ -835,6 +866,8 @@ juce::Colour MuLookAndFeel::lcdLitColour(juce::Component& c)
     // A display lit in its own colour (DropdownSelect::setLcdColour) — e.g. a voice's.
     if (const auto* own = c.getProperties().getVarPointer("muLcdColour"))
         return juce::Colour((juce::uint32) (juce::int64) *own).brighter(lighting().lcdOwnLift);
+    juce::Colour overridden;
+    if (accentOverrideFor(c, overridden)) return overridden.brighter(lighting().lcdAccentLift);
     auto* mlf = dynamic_cast<MuLookAndFeel*>(&c.getLookAndFeel());
     return (mlf != nullptr && mlf->hasAppAccent) ? mlf->appAccentColour.brighter(lighting().lcdAccentLift) : lcdLitColour();
 }

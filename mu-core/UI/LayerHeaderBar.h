@@ -46,6 +46,9 @@ public:
     void setDeleteEnabled(bool enabled);              // greyed when only one layer remains
     void setNoun(const juce::String& n);              // the product's word for a layer (tooltips); lower-cased
     void setNameEditable(bool editable);              // fixed-name layers can't be renamed
+    // A small raised name plate between the colour dot and the name LCD naming the layer's type ("Toni", "On").
+    // Off by default; empty hides it. A host of several layer types sets it per shown layer.
+    void setTypeTag(const juce::String& text);
     // The layer's clip strip, between the preset dropdown and Save. Off by default: a product with no clip bank
     // (no hot-swap, so nothing to launch into) never shows it. It adds no height.
     void setShowClips(bool show);
@@ -90,6 +93,9 @@ private:
     bool         ghostName  = false;
     bool         showClips  = false;
     juce::String noun { "layer" };
+    juce::String typeTag;
+
+    int typeTagWidth() const;   // the plate and the gap after it, scaled; 0 with no tag
 
     static constexpr int kIconBtnW   = 22;
     static constexpr int kPresetBtnW = 38;

@@ -40,10 +40,9 @@ clock over a `StepPattern`) is test support in `Tests/`; the arithmetic is the s
 - **Accent** (`seq_accent`) sets the velocity of accented cells; plain cells use a lower fixed
   velocity. Velocity is passed to the engine trigger (louder hit / harder transient).
 
-Swing and accent are still the two global parameters: each track copies them into its row's own
-swing and accent at the top of every call, so the saved state is unchanged. The row holds the values so a
-host with per-layer groove (mu-Tronic) can set them per row; making them per-layer parameters is owed
-before mu-Tronic links the library ([design 2.1.9](../mu-tronic/design.md), point 8).
+Swing and accent are still the two global parameters until T1b step 2b: each track copies them into its row's own
+swing and accent at the top of every call. **Ruled 2026-10-20 ([design 2.1.11](../mu-tronic/design.md) point 4):** they become per-track parameters,
+`t{N}_swing` and `t{N}_accent`, in mu-On too; the global `seq_swing` / `seq_accent` rows go, and an older state's global values are ignored.
 
 `StepClock::currentStep(beat)` gives the playhead's local step
 for the UI grid.

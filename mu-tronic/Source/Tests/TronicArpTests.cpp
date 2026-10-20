@@ -234,10 +234,11 @@ struct MuTronicArpTests : juce::UnitTest
         p.flushPendingAsyncUpdates();
     }
 
-    // C17: a strip that ducks from another keeps its follower in the mixer; a new layer in the slot starts it at zero.
+    // C17: a strip that ducks from another keeps its follower in the mixer; a type change leaves it as it is (the strip
+    // and its source are unchanged), a reset zeroes it.
     void followerRestarts()
     {
-        beginTest("after a type change the strip's sidechain follower starts at zero, consumed by the audio thread");
+        beginTest("a type change leaves the strip's sidechain follower alone; a reset zeroes it on the audio thread");
         mu_seam_test::TempStorage storage;
         ArpProcessor p;
         p.prepareToPlay(48000.0, 256);
@@ -253,12 +254,12 @@ struct MuTronicArpTests : juce::UnitTest
 
         p.mixerEngine.setSidechainEnv(2, 0.9f);
         expect(p.setLayerType(2, LayerTypeId::Arp));
-        expectWithinAbsoluteError(p.mixerEngine.getSidechainEnv(2), 0.9f, 1.0e-6f, "the request is a flag: nothing writes the follower off the audio thread");
+        expectWithinAbsoluteError(p.mixerEngine.getSidechainEnv(2), 0.9f, 1.0e-6f, "setLayerType writes nothing the audio thread owns");
         buf.clear();
         p.processBlock(buf, midi);
-        expectEquals(p.mixerEngine.getSidechainEnv(2), 0.0f, "the next block starts the follower from zero");
+        expect(p.mixerEngine.getSidechainEnv(2) > 0.5f, "a type change does not restart the follower: it only decays a little");
 
-        // resetLayer on a Published host restarts it too, also for an Empty slot where no type change happens.
+        // resetLayer on a Published host returns the strip to defaults, so it restarts the follower (also for an Empty slot).
         p.mixerEngine.setSidechainEnv(2, 0.9f);
         p.resetLayer(2);
         buf.clear();

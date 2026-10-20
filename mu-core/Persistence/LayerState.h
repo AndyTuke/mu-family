@@ -91,7 +91,7 @@ public:
 
     // One prefix per slot: slot i owns the ids starting with layerPrefixes[i], always live.
     LayerLayout(juce::AudioProcessor& proc, const juce::StringArray& layerPrefixes)
-        : LayerLayout(proc, toSets(layerPrefixes), 0)
+        : LayerLayout(proc, toSets(layerPrefixes), SetsTag {})
     {
     }
 
@@ -99,7 +99,7 @@ public:
     // single prefix is live on it; a slot with several has none live until setLivePrefix names one.
     static LayerLayout withPrefixSets(juce::AudioProcessor& proc, const std::vector<juce::StringArray>& prefixSets)
     {
-        return LayerLayout(proc, prefixSets, 0);
+        return LayerLayout(proc, prefixSets, SetsTag {});
     }
 
     // Earlier parameter-id prefixes of the slots, in slot order (entry i belongs to slot i). Only
@@ -189,11 +189,12 @@ private:
         return sets;
     }
 
-    // `unused` only separates this from the public one-prefix-per-slot constructor.
-    LayerLayout(juce::AudioProcessor& proc, const std::vector<juce::StringArray>& sets, int unused)
+    // Tells the several-prefixes-per-slot constructor from the public one-prefix-per-slot one.
+    struct SetsTag {};
+
+    LayerLayout(juce::AudioProcessor& proc, const std::vector<juce::StringArray>& sets, SetsTag)
         : prefixSets(sets), live(sets.size(), -1), slots(sets.size())
     {
-        juce::ignoreUnused(unused);
         for (size_t s = 0; s < sets.size(); ++s)
         {
             slots[s].resize((size_t) sets[s].size());

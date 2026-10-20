@@ -28,7 +28,7 @@ public:
             expect(info.paramPrefixLetter == 't');
             expectEquals(juce::String(info.presetExtension), juce::String(".muTrack"));
             expect(info.addLayerParams == &addLayerParams && info.create != nullptr, "one table and one class for all five");
-            const auto layer = info.create(3);
+            const auto layer = info.create(3, info.id);
             const auto* track = dynamic_cast<const Track*>(layer.get());
             expect(track != nullptr && track->slot == 3, "create builds a Track for the slot");
             expect(track != nullptr && ! track->engineLocked, "engineLocked defaults off");

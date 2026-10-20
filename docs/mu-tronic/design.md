@@ -151,7 +151,7 @@ New hooks (defaults do nothing; all called once per layer per block or per edit,
 | `void onTransportStopped(const RenderContext&)` | audio | The play-to-stop edge (2.1.5): silence held notes and tails (Tant gates, On voices, Toni note-off). |
 | `void onTransportJump(const RenderContext&)` | audio | A discontinuity while playing (locate, host loop, clock snap): release or re-anchor pending notes (2.1.5). |
 | `void onParkedBlock(const RenderContext&)` | audio | Once per call for a layer parked above the live count (a kept spare): no audio, no output, no parameter; it may follow the call's MIDI and flags so input state it keeps (held keys) is current when the slot goes live (2.1.8). |
-| `RetirePolicy retirePolicy() const` | any | How this layer leaves: `None` (dropped after the grace period, mu-Toni and mu-On today), `Fade`, `Natural` (2.1.3). Replaces the earlier `tailBlocks()`: block counts depend on the block size. |
+| `RetirePolicy retirePolicy() const` | any | How this layer leaves: `None` (dropped after the grace period; no family layer type uses it from T1b, 2.1.11 point 3), `Fade`, `Natural` (2.1.3). Replaces the earlier `tailBlocks()`: block counts depend on the block size. |
 | `void beginRetire()` | message | Freeze what the tail needs (2.1.4). |
 | `void onRetireStart(const RenderContext&)` | audio, once | Audio-side freeze at the first tail block (2.1.4). |
 | `bool renderRetiring(const RenderContext&, juce::AudioBuffer<float>& out, int n, RetireState&)` | audio | **Add** the tail into `out` (or write it when `RetireState::exclusive`); return false once silent for good (2.1.3). |
@@ -324,7 +324,7 @@ muted):
 | 4 | `old->beginRetire()` when `old->retirePolicy().kind != None` (2.1.4). | The last moment the old layer may read its parameters: none has changed yet. |
 | 5 | Publish view **V1** with the slot set to null (Empty) and `bin.park(slot, std::move(old), V1.serial)` (or `None`: the old layer goes to the reclaim list). The bin entry is written before V1 is published (2.1.3, activation serial: a park outside `layersLock` uses the next serial, R4). | From V1 on, the old layer renders only as a tail. |
 | 6 | `epoch.waitFor(stampAfterV1, timeout)`; on timeout proceed (N2). | No block that still renders the old layer **live** (it reads the slot's parameters) can overlap step 7; a timeout costs at most one block of a parameter mix, no memory. |
-| 7 | Reset the new type's prefix of this slot to defaults, or apply `initial` (`applyLayerNode`), through the APVTS as any edit does; `fresh->bindParams(apvts, slot)`; the mixer strip `ch{N}_` is kept; request the follower reset for the strip (an atomic flag the audio thread consumes at block start, C17). | Nothing live reads these parameters now: the old layer is a tail reading its snapshot, the new one is not published. Same-prefix types (Kick to Bass, both `t{N}_`) are the reason. |
+| 7 | Reset the new type's prefix of this slot to defaults, or apply `initial` (`applyLayerNode`), through the APVTS as any edit does; `fresh->bindParams(apvts, slot)`; the mixer strip `ch{N}_` is kept **and its sidechain follower is left alone** (ruled 2026-10-20, 2.1.11 point 2: C17 as first written, a follower reset here, would pump; only `resetLayer` and a strip-defaults restore request one); then `fresh->completeSetup(apvts, slot)` (2.1.11 point 5). | Nothing live reads these parameters now: the old layer is a tail reading its snapshot, the new one is not published. Same-prefix types (Kick to Bass, both `t{N}_`) are the reason. |
 | 8 | Under the writers' mutex: if `prepareGeneration != g`, `fresh->prepare(sr, bs)` again with the current values (N1); then publish view **V2** with `fresh` in the slot. | One atomic pointer store; the new layer's first block is the first block that loads V2, and it is prepared for that block's rate and size (a grown block size would otherwise overrun). Parameter values are never moved after it. |
 | 9 | V0 and V1 return to the pool after their grace; the old layer is freed by the bin (2.1.3) or the reclaim list, on the message thread. | |
 
@@ -394,7 +394,7 @@ evicted.
 struct RetirePolicy
 {
     enum class Kind : uint8_t { None, Fade, Natural };
-    Kind  kind       = Kind::None;   // None: not parked; freed after the grace period (mu-Toni, mu-On today)
+    Kind  kind       = Kind::None;   // None: not parked; freed after the grace period (the default; Arp and Track move to Fade at T1b)
     float fadeMs     = 25.0f;        // Fade: linear ramp (mu-Tant), converted at park time with the prepared rate
     float maxSeconds = 2.0f;         // hard lifetime, clamped to kRetireHardCapSeconds (reverb and comb tails)
 };
@@ -1043,7 +1043,9 @@ host that creates the layer sets it, from the type, in the same function that se
 unlocked track with the engine its parameter names, which is right for mu-On. **Gap, owed at T1:** `LayerTypeInfo::create` is `(slot) -> Layer` and cannot say which of
 the five types it is making, so all five constants point at the same `createTrack`. The registry gets a message-thread `initParams(apvts, slot)` hook on `LayerTypeInfo`
 (called after `create`, before `bindParams`), and mu-On's five write `t{N}_eng` and set `engineLocked`; this is also where a restored session's type name and `t{N}_eng`
-are reconciled (the type wins and the parameter is rewritten). Not an E3 blocker: mu-On has one host and sets what it needs.
+are reconciled (the type wins and the parameter is rewritten). Not an E3 blocker: mu-On has one host and sets what it needs. **Superseded 2026-10-20 (2.1.11 points 5 and 6): no `initParams` on `LayerTypeInfo`.** `create` receives the type id and
+locks the Track to its engine; a locked Track reads its engine from that lock, not from `t{N}_eng`, so the type cannot drift; and a generic `Layer::completeSetup` writes the
+parameter (so saved rows and `.muTrack` presets carry the right engine) and builds the engine.
 
 **Point 7: engine history belongs to the track.** Consistent with the layer-state ownership design (1.3, 3.5): state that belongs to a layer lives in the layer and moves with it.
 The old arrangement, an engine per slot and per engine type, tied sound history to a slot number. Now the engines are the track's: a track keeps the history of each of its
@@ -1060,7 +1062,7 @@ ids; the plan's E3.3 seeding (global values seed each row on load) stays for the
 row, so a one-row component is split out of it (T1, `ux-controller` for the look). (c) `initParams` (point 6). (d) `Track::prepare` builds no engine: the host calls `syncEngine()`
 after `engineLocked` and the engine parameter are set, and (for a locked track the engine never changes, so only on a type change) builds on the message thread; mu-On needs the call at create, and
 its `engineParamChanged` listener is now only a safety net for the all-five policy. A generic message-thread service hook on `Layer` is the shape
-if mu-Tronic would otherwise copy that listener; decided at T1.
+if mu-Tronic would otherwise copy that listener; decided at T1. **All four decided 2026-10-20: 2.1.11 points 4 to 6.**
 
 #### 2.1.10 E4 as built: mu-Tant on the shared layer contract (2026-10-16)
 
@@ -1134,6 +1136,76 @@ covers hosts whose full-preset rule is one number; mu-Tant needs the callable fo
 **Other as-built points.** `mu-core` carries the E4 contract commit with its tests (`LayerRenderTests`, `RetireBinTests`, `LayerContractFixtures.h` exposing the two new members). The hold-last-value fix (C12) is `Pattern`'s, built on the `resolveLane` boolean of 2.1.8.
 `Pattern` names no processor; its `host` link is set by the creator (`createLayer`).
 
+#### 2.1.11 T1b step 2: registering the first Track type (architecture-steward rulings, 2026-10-20)
+
+Applies the E2 and E3 standards (2.1.8, 2.1.9) to the second registered type. Kick is the first; Bass, Hat and Snare differ from it by id only and may land in the
+same commit; Rumble follows with its `remapLayerReferences` override (2.1.9 point 4).
+
+1. **Hard gates before any Track type is registered** (each is a few lines; all are `mu-core` or build plumbing, so they land once for every later type).
+   - *Selected slot.* `selectedSlot` (an `std::atomic<int>`), `setSelectedSlot(int)` and `getSelectedSlot()` move into `ProcessorBase` (they are generic: any slot host
+     lists a typed folder). The one caller is **`LayerPanel::setLayer`** (`mu-core/UI/LayerPanel.cpp`), which every product's editor already routes the shown layer
+     through, sidebar click, page change and Performance-mode follow alike; `EditorShellBase` has no selection point of its own. mu-Tronic's `PluginEditor::showSlot`
+     drops its `setSelectedSlot` call. For the four list products it is a harmless store.
+   - *Typed preset folder.* `presetDirOf(info)`, the extension spelling and the typed listing (`slotPresetFiles` over the registry) move into `ProcessorBase` as protected
+     helpers over `getContentDir()` and `layerTypes`; mu-Tronic's three overrides become one-line calls. A type that shares an extension with others (the five Track types
+     share `.muTrack`) lists only the files `LayerTypeInfo::typeFromPreset` maps to its id (the field 2.5 already names; the five constants point at `mu_on::typeFromPreset`).
+     A Track type names `contentFolderName = "muOn"`, `presetFolder = "Tracks"`.
+   - *`LayerLayout` private constructor.* The `int unused` separator becomes a private nested tag type (`struct SetsTag {}`); `withPrefixSets` is the only caller.
+   - *`kPrefixLetters` test* (`TronicLayoutTests`): every registered type's `paramPrefixLetter` is in `kPrefixLetters`; for each slot the layout holds at least one parameter
+     under that letter's prefix; and `LayerLayout::slotOf` puts every `<letter><slot>_` id in its slot, never in the globals (a letter missing from the list would save
+     that family's rows in `<Globals>` and no test would notice).
+   - *`PARENT_SCOPE`.* Every `mu-<product>-layer` CMake file ends its UI-list declaration with `set(MU_<P>_LAYER_UI_SOURCES "${MU_<P>_LAYER_UI_SOURCES}" PARENT_SCOPE)`, as
+     mu-Toni's does. mu-On's was missing (mu-Tronic would have linked the library and silently compiled no Track UI); mu-Tant and mu-Clid get the line now, not when
+     each is registered (family consistency). The root `CMakeLists.txt` already adds the products before `mu-tronic`.
+   - *Services.* **Confirmed: the Track engines need no `LayerServices`.** `TrackEngine`'s five engines (Hat and Snare's `SampleChannel` is synthesised) read no wavetable bank
+     and no sample library and load no file. `LayerServices` and the shared bank wait for Pattern, whose registration builds them and moves Arp's `sharedArpBank()` onto
+     them in the same change (2.4). Do not build `LayerServices` for Kick.
+   - *Where per-type host glue lives.* Rule 10 of `check-layer-boundary.ps1` stands (mu-Tronic names a type's header only under `Persistence/` and `Tests/`). A type's
+     registration glue, its host adapter (`TrackHost`, `ArpHost`, over `ProcessorBase`, which is all they need), its `createContent` / `createMiniVisual` factories and its
+     `LayerTypeInfo` additions, therefore live in **`Persistence/<Type>LayerType.{h,cpp}`** (`ArpLayerType`, `TrackLayerTypes`), and `LayerTypes.cpp` stays the one-line
+     list. `LayerTypeInfo` gains `createContent(ProcessorBase&, int slot)` and `createMiniVisual(ProcessorBase&, int slot, pulse)` function pointers (null for a host that
+     builds its own UI, as the four list products do) and `typeFromPreset`; `CreateFn` becomes `(int slot, LayerTypeId type)` so one function can make five types.
+2. **The sidechain follower is not touched by `setLayerType`.** The follower is the *receiving strip's* smoother of its *source's* envelope; a type change replaces neither
+   the source nor the strip (`ch{N}_` is kept, step 7), so zeroing it only unducks a strip that is still being ducked and re-ducks it at the attack: an audible pump, and
+   the old layer's tail (also rendered through that strip) would be ducked differently from its live self. Rule: **`setLayerType` requests no reset.** `resetLayer`
+   (the strip returns to defaults) keeps its request, because there the sidechain setup itself changes. **Amended 2026-10-20 (T1b 2a review):** `applyStateTree` and a
+   stopped full-preset load never carried a follower request in code (only `resetLayer` does), and none is added: the follower is a millisecond smoother, a restore
+   rewrites every parameter at a silent moment, and a new request there would be a behaviour change in four shipped products for no audible gain. Design row 7 above and extraction-plan C17 are amended; `LayerTypeSwapTests::followerRestarts` and the matching `TronicArpTests` case
+   change to pin "unchanged by a type change, zeroed by reset" (test-steward). The `dsp-controller` signs the removal.
+3. **Retire policy.** A type change parks the old layer, which renders as a tail reading no parameters. `None` cuts it, a click for any sounding voice, so **every
+   registered layer type declares `Fade`**, with `fadeMs` and `maxSeconds` left at the `RetirePolicy` defaults (25 ms, 2 s: the one family value, `RetirePolicy`'s own
+   defaults, which `Pattern` already uses without writing a literal). A new literal in a layer type is wrong.
+   - *Track* (Kick to Bass is the same-prefix case, safe because the tail reads no parameter): `retirePolicy()` returns Fade; `beginRetire` copies nothing, because the
+     held engine keeps the parameters it was last given; `renderRetiring` renders that engine with no trigger and no `setParams`, through `applyLinearFade`, returning false
+     when the fade ends. A Rumble tail has no peer and processes the track's `silence` buffer (as a Rumble with no source does), and the fade cuts its reverb at 25 ms; a
+     `Natural` Rumble tail is a later, separate ruling. The tail must not call a `ParamBinding` (it asserts).
+   - *Arp* (the missing policy): the same, over the voice and its insert. This changes mu-Toni's own behaviour: a removed layer now fades 25 ms instead of cutting, so
+     the bin's count policy stays at its default and the structural-edit goldens that remove a sounding layer are re-recorded in a signed goldens-only commit (`dsp-controller`
+     reviews; presets and renders changing is accepted, Andy 2026-10-17).
+4. **Groove rows are per layer, in both products.** `t{N}_swing` (0 to 1, default 0) and `t{N}_accent` (0 to 1, default 1) are appended to `addLayerParams`'s `t{N}_`
+   table; `Track::bindParams` and `TrackContent` bind `layerParamId(slot, "swing")` / `"accent"` (the content rebinds its attachments when its layer changes, as it does for
+   the engine rows). `addTrackGlobalParams`, `seq_swing`, `seq_accent` and the processor's `seqSwingParam` / `seqAccentParam` / `seedRowGroove` are deleted: one
+   mechanism, not a host that names ids. This *is* a behaviour change in mu-On (the Swing and Accent knobs on a track's panel now move that track only, where they moved every
+   track) and matches 3.5; mu-On is pre-release. **No migration**: an older state's `seq_swing` / `seq_accent` rows are ignored on load (rows with no parameter are skipped), so
+   3.5's earlier "the global value seeds every track" is withdrawn (Andy: old presets sounding different does not matter). `ExtractionPinTests` swing/accent pins and the
+   `groove-five-swing-accent` goldens are rewritten to set the five per-track rows (signed goldens-only commit); the behaviour pinned is the same maths.
+5. **A generic `Layer::completeSetup(apvts, slot)`, not `LayerTypeInfo::initParams`.** A function pointer on the type cannot reach the layer it is about, and the work
+   (build an engine, write the layer's own parameter) is the layer's own message-thread setup, which Pattern's bank binding and Rhythm's sample load will need too.
+   Contract: virtual on `Layer`, default no-op; message thread; **called once, after the first `bindParams`, outside every lock, before the layer is published**; it may
+   allocate, build and prepare, and read or write the layer's own parameters through the APVTS. Call sites: `setLayerType` step 7 (after `bindParams`, which is already
+   outside `layersLock`) and each product's own create path (mu-On's `createLayer` replaces its `t->syncEngine()` with it). It is *not* folded into `bindParams`, which also
+   runs under `layersLock` on a reorder. `Track::completeSetup` writes `t{N}_eng` to the locked engine when it differs (so the saved rows and a saved `.muTrack` name the
+   right engine and mu-On loads it) and calls `syncEngine()` (2.1.9 point 8d). mu-Tronic installs **no** engine-parameter listener.
+6. **A locked Track's type cannot drift.** `create(slot, type)` calls `Track::lockEngine(engineOfType(type))`, which sets `engineLocked` and the engine; for a locked
+   track `engineSetting()` returns that engine and ignores `t{N}_eng`. The parameter is therefore only a record (point 5 keeps it right), a stray automation or a loaded row
+   cannot change the layer's type, and the "type wins on restore" reconciliation of 2.1.9 point 6 holds by construction. mu-On's tracks are never locked, so the standalone is unchanged.
+7. **UI additions of step 2a (ruled 2026-10-20).** (a) `mu-core/UI/LayerContent.h` is the content base: `setLayer`, `releaseModulationArcs`, `onStatusUpdate` and a virtual `getModDestProvider()` (null default). The provider stays on the content, not on `LayerTypeInfo`: `ModDestProvider` is a UI struct whose resolvers bind to the content's own matrix and widgets, and `LayerTypeInfo` is message-thread data that only forward-declares UI types. Every product's `<Type>Content` derives from it when its type is registered in mu-Tronic (`ArpContent` now; `TrackContent` at 2c; `PatternContent` and `RhythmContent` at their registration), not before. (b) `MuLookAndFeel::setAccentOverride(Component&, Colour)` / `clearAccentOverride` (a component property read up the parent chain by `appAccent`, the main-page knob colour and `lcdLitColour`) is the one mechanism for a host that paints the shown layer in its type's colour; `setAppAccent` stays one value per LookAndFeel. It covers knobs, lit LCDs and `appAccent` readers; segment and toggle selected-states keep the app colour (they read the theme's colour IDs), which is the `ux-controller`'s to confirm against design-ui-family section 11. (c) `LayerHeaderBar::setTypeTag` is accepted: off by default, no height, other products unaffected. (d) `MU_TRONIC_WITH_UI` is accepted as the headless split for T1b: defined on the app target only, and confined to the one `.cpp` per type (`Persistence/<Type>LayerType.cpp`), never a header or any other file, so the console test target registers the same engine description with null content and picture factories. If a second `#if` appears, split the factories into an app-only `<Type>LayerUi.cpp` instead. The factories are therefore unexercised by `mu-tronic-tests`; the preset helpers in `ProcessorBase` are pure and are tested (test-steward). (e) `ArpLayerType.{h,cpp}` under `Persistence/` is correct per point 1. (f) The `PARENT_SCOPE` lines in mu-On, mu-Tant and mu-Clid are correct and complete point 1.
+
+**Sub-steps (each builds, passes its suites and commits alone):** 2a the gates and the Arp content (`mu-core`, `mu-tronic`, `mu-toni` for the `create` signature, no Track
+code); 2b the mu-On library made ready (groove rows, `lockEngine` and `completeSetup`, the Track and Arp retire tails, the one-row step component split out of `StepRows`,
+`PARENT_SCOPE`); 2c Kick registered (`Persistence/TrackLayerTypes.cpp`, `TrackHost` adapter, the content in mu-Tronic, the equivalence test, the cost test re-run). The
+`ux-controller` rules the single-row STEPS layout inside a Track content for 2c; the split in 2b is pixel-identical in mu-On.
+
 ### 2.2 The product UI stops depending on the product processor
 
 Each `<Type>Content` takes `ProcessorBase&` plus one narrow host interface declared in the product's own `UI/` folder next to the content
@@ -1183,7 +1255,7 @@ product names; the one exception already made (`Rhythm`) is justified because **
   (3) **every relative path in a layer library is unique across mu-core and all four libraries** (new rule in design-naming §3, files). Both rules are
   enforced by a new `tests/scripts/check-layer-boundary.ps1` (run by `/build` beside `check-core-boundary.ps1`): fails on a `Plugin/`/`License/` include from a
   library file, on a duplicate relative path, and on a library file that includes another product's header.
-- **Library sources and the UI list (ruled 2026-10-16, built at E2.6).** `mu-<product>-layer` is an `INTERFACE` target whose sources are the engine files (`Persistence/<Type>Params.cpp`, `Sequencer/<Type>.cpp`). The layer's UI source is **not** on the target but in the CMake list `MU_<PRODUCT>_LAYER_UI_SOURCES`, which a GUI consumer adds to its own sources: an `INTERFACE` library that carried UI sources could not be linked by a console test target, since the UI needs `juce_gui_basics` and the mu-core UI sources. The list is the family convention (every product's library does the same); mu-Tronic adds the four lists to its target. If a second target (`mu-<product>-layer-ui`) proves cleaner at T1 it replaces the list in all four products at once. The library is declared in the product's own `CMakeLists.txt`, with no `mu-<product>-layer/` folder, and `check-layer-boundary.ps1` finds it from `add_library(mu-<product>-layer INTERFACE ...)` over `Audio/ Sequencer/ Modulation/ Persistence/ UI/` minus `UI/SettingsOverlay.*`.
+- **Library sources and the UI list (ruled 2026-10-16, built at E2.6).** `mu-<product>-layer` is an `INTERFACE` target whose sources are the engine files (`Persistence/<Type>Params.cpp`, `Sequencer/<Type>.cpp`). The layer's UI source is **not** on the target but in the CMake list `MU_<PRODUCT>_LAYER_UI_SOURCES`, which a GUI consumer adds to its own sources: an `INTERFACE` library that carried UI sources could not be linked by a console test target, since the UI needs `juce_gui_basics` and the mu-core UI sources. The list is the family convention (every product's library does the same, each re-exporting it with `PARENT_SCOPE` so the later-added mu-Tronic sees it, 2.1.11 point 1); mu-Tronic adds the four lists to its target. If a second target (`mu-<product>-layer-ui`) proves cleaner at T1 it replaces the list in all four products at once. The library is declared in the product's own `CMakeLists.txt`, with no `mu-<product>-layer/` folder, and `check-layer-boundary.ps1` finds it from `add_library(mu-<product>-layer INTERFACE ...)` over `Audio/ Sequencer/ Modulation/ Persistence/ UI/` minus `UI/SettingsOverlay.*`.
 - Namespaces are already per product (`mu_clid` ... `mu_on`, design-naming §3), so four engines coexist in one binary. Global-namespace names in a library
   are not allowed (the checker greps for them): the only global voice-side class today is mu-core's `::VoiceEngine`, which mu-Tant's `mu_tant::VoiceEngine`
   already coexists with.
@@ -1197,7 +1269,7 @@ Registry entry `LayerTypeInfo` in `mu-core/Sequencer/LayerTypeInfo.h`; ids `enum
 extensions are unchanged, so five ids (the mu-On engines) share the prefix `t` and the extension `.muTrack` (section 1.4); the id, not the prefix, identifies the type.
 
 `LayerTypeInfo` (all message-thread data): `id`, `name`, `group` (the product it belongs to, for the chooser), `paramPrefixLetter` (`r v a t`), `presetExtension`,
-`typeFromPreset(tree)`, `contentFolderName`, `modTargetTable`, `addLayerParams(layout, slot)` (called once per prefix, not once per id), `create(slot)`,
+`typeFromPreset(tree)`, `contentFolderName`, `modTargetTable`, `addLayerParams(layout, slot)` (called once per prefix, not once per id), `create(slot, type)` (the id lets one function make the five Track types, 2.1.11 point 6),
 `createServices()`, `createContent(...)`, `createMiniVisual(...)`, and the type's colour token (named by the `ux-controller`). It constructs and describes; it never
 dispatches (design-plugin-family "Why virtual and not a table" stands).
 
@@ -1361,7 +1433,7 @@ A voice that is self-contained cannot read a processor-wide setting. Moves (each
 |---|---|---|
 | Note mode (`midiNoteMode`, held-note stack, final-mix gate ramp) | Tant | **As built (2.1.10 point 5):** the held keys and pitch track are `Pattern` state; the setting stays an app setting pushed to every Pattern and the final-mix gate stays a mu-Tant shell post-stage (A3, D7). mu-Tronic sets `Pattern::gatesOwnOutput` (ramp on the layer's own output) and saves the choice per layer in its own layer node, never in `Pattern::writeExtras` |
 | Held-note stack, `ArpContext` root-by-MIDI, MIDI-trigger, `midiInChParam` | Toni | layer state |
-| One `StepPattern` + `GrooveSequencer`, global swing/accent, five-engine pool | On | one `StepRow` driver and one engine per `Track`; swing/accent per layer (`t{N}_swing`, `t{N}_accent`; the standalone's global value seeds all tracks on load; a unit test pins that); section 1.4 |
+| One `StepPattern` + `GrooveSequencer`, global swing/accent, five-engine pool | On | one `StepRow` driver and one engine per `Track`; swing/accent per layer (`t{N}_swing`, `t{N}_accent` rows of the `t{N}_` table, in the standalone too: the global rows are gone, 2.1.11 point 4); section 1.4 |
 | Master loop (`mstrLoop`), swap timing (`mstr_swap`) | Clid, all | stays a global (it is already a shared global parameter) |
 | MIDI input channel | Toni, Tant | one per-layer **MIDI in** setting in the shared strip params (`ch{N}_midiIn`, 0 Omni, 1-16) for every type; types that take notes read the filtered buffer in `RenderContext`; defaults reproduce today (Omni) |
 | MIDI output (Clid MIDI-out mode) | Clid | a layer appends to the block's MIDI output through the context; the standalone sends it to its MIDI output device (the path mu-Clid's standalone uses; no plugin `producesMidi` declaration is involved). Lands with the Clid layer. |

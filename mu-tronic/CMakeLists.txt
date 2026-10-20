@@ -30,6 +30,7 @@ target_sources(mu-tronic
         Source/Plugin/PluginProcessor_Preset.cpp
         Source/Plugin/PluginEditor.cpp
         Source/Persistence/LayerTypes.cpp
+        Source/Persistence/ArpLayerType.cpp
         Source/UI/EmptySlotChooser.cpp
         Source/UI/TronicSettingsOverlay.cpp
         ${MU_TONI_LAYER_UI_SOURCES}   # the Arp type's UI content (mu-toni-layer)
@@ -52,6 +53,7 @@ target_compile_definitions(mu-tronic
         MU_MAX_BUSES=3
         MU_BUS_INSERTS=2
         MU_EXT_SIDECHAIN=0
+        MU_TRONIC_WITH_UI=1   # the layer types build their content and sidebar pictures (Persistence/ArpLayerType.cpp)
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
@@ -112,6 +114,7 @@ target_sources(mu-tronic-tests PRIVATE
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp
     Source/Persistence/LayerTypes.cpp
+    Source/Persistence/ArpLayerType.cpp
     # The mu-core .cpps behind ProcessorBase (the console target can't link mu-core directly).
     ${MU_CORE_PROCESSOR_TEST_SOURCES}
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/Wavetable/WavetableBank.cpp"   # the Arp type's oscillator tables

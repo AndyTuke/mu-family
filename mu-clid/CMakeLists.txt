@@ -36,6 +36,8 @@ set(MU_CLID_LAYER_UI_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/RhythmContent.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/MidiOutSection.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/SampleBrowser.cpp")
+# Also visible to the sibling directories added after this one (mu-Tronic hosts the layer types).
+set(MU_CLID_LAYER_UI_SOURCES "${MU_CLID_LAYER_UI_SOURCES}" PARENT_SCOPE)
 
 # ── mu-Clid — full plugin (VST3 + CLAP + Standalone) ────────────────────────
 juce_add_plugin(mu-clid

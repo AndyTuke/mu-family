@@ -31,7 +31,7 @@ inline const mu_wavetable::WavetableBank& sharedArpBank()
 
 // A fresh Arp for `slot`, not yet bound or prepared: its voice reads the shared bank, and its noise is seeded
 // from a fresh salt and the slot, so no two layers share a noise sequence (the salt is 0 in deterministic mode).
-inline std::unique_ptr<Layer> createArp(int slot)
+inline std::unique_ptr<Layer> createArp(int slot, mu_core::LayerTypeId /*type*/)
 {
     auto a = std::make_unique<Arp>();
     a->runner.setBank(&sharedArpBank());

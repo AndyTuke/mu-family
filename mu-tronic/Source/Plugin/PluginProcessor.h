@@ -74,13 +74,11 @@ public:
     // ── Presets ───────────────────────────────────────────────────────────────
     // Full = .muTronic (the whole state, wrapped); a layer preset belongs to its type's own product and folder
     // (mu-Toni's Arps folder for Arp), found from the registry. The folder and extension answer for the selected
-    // slot's type (empty while that slot is Empty); the editor names the selected slot.
+    // slot's type (empty while that slot is Empty); the shown layer is the selected slot (ProcessorBase::setSelectedSlot).
     juce::File   getLayerPresetDir()       const override;
     juce::String getLayerPresetExtension() const override;
     juce::String getFullPresetExtension()  const override { return kFullPresetExtension; }
     juce::Array<juce::File> slotPresetFiles(int slot) const override;   // the slot type's folder; an Empty slot lists every type's
-    // Message thread. The slot whose type the layer-preset folder and extension follow.
-    void setSelectedSlot(int slot) noexcept;
 
     const char*     getFullPresetTag() const override { return kFullPresetTag; }
     juce::ValueTree captureFullPreset() override { return captureState(); }
@@ -110,9 +108,6 @@ private:
 
     void setupLayerState();
     juce::ValueTree toLayerState(const juce::ValueTree& tree) const;
-    juce::File presetDirOf(const mu_core::LayerTypeInfo& info) const;
-
-    std::atomic<int> selectedSlot { 0 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };

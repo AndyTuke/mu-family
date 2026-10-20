@@ -155,6 +155,14 @@ public:
     // setLayerType, which is the message thread (asserted): a state restore on a host thread must marshal to it
     // first, so the editor never sees this call from another thread.
     std::function<void(int slot)> onLayerTypeChanging;
+    // Message thread. The slot the editor shows: LayerPanel::setLayer stores it, every product's editor routing the
+    // shown layer through it. A typed host's layer-preset folder and extension follow the type of this slot
+    // (typedLayerPresetDir); for the four list products it is a harmless store.
+    void setSelectedSlot(int slot) noexcept
+    {
+        selectedSlot.store(juce::jlimit(0, mu_limits::kMaxLayers - 1, slot), std::memory_order_relaxed);
+    }
+    int  getSelectedSlot() const noexcept { return selectedSlot.load(std::memory_order_relaxed); }
     // The shell's delete: a list product removes the layer (the ones above shift down); a slot host empties it.
     bool         deleteLayer(int idx) { return layersAreSlots() ? setLayerType(idx, mu_core::LayerTypeId::Empty) : removeLayer(idx); }
     virtual bool swapLayers(int a, int b);
@@ -749,6 +757,20 @@ protected:
     mu_core::RetireBin& retireBin = *retireBinStorage;
     // The layer types this host offers a slot (see getLayerTypes). Filled in the product's constructor.
     mu_core::LayerTypeRegistry layerTypes;
+
+    // The typed layer-preset folders of a slot host (mu-Tronic): a type's presets are its product's own folder and
+    // extension, shared with the product and never copied, found from the registry next to getContentDir().
+    // <TDP>/<contentFolderName>/<presetFolder>; empty when the type names none or there is no content folder.
+    juce::File          presetDirOf(const mu_core::LayerTypeInfo& info) const;
+    // The type's extension without its dot, as getLayerPresetExtension is spelled.
+    static juce::String presetExtensionOf(const mu_core::LayerTypeInfo& info);
+    // The folder and extension of `slot`'s layer type (empty while the slot is Empty or its type is not offered).
+    mu_core::LayerTypeId slotTypeId(int slot) const;   // Empty for a slot out of range
+    juce::File          typedLayerPresetDir(int slot) const;
+    juce::String        typedLayerPresetExtension(int slot) const;
+    // A filled slot lists its own type's presets, an Empty one every offered type's, so any can be chosen. A type
+    // sharing its extension with others (the five Track types) lists only the files its typeFromPreset maps to it.
+    juce::Array<juce::File> typedSlotPresetFiles(int slot) const;
     // A Published-mode host's constructor, once layers[0..liveCount) are filled: stores the count and publishes the
     // first view of them. Nothing renders before this, and a TryLock host never calls it.
     void publishLayers(int liveCount);
@@ -1077,6 +1099,7 @@ private:
     void copyLayerParams (int from, int to);
     void swapLayerParams (int a, int b);
     void resetLayerParams(int slot);
+    std::atomic<int> selectedSlot { 0 };   // setSelectedSlot
     int  firstUnusedColourIndex() const;   // lowest palette index no live layer uses
 
     // syncGlobalFxParam dispatch helpers — one per ID family, so the public

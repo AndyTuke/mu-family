@@ -1,5 +1,6 @@
 #pragma once
 #include "UI/ParamChoices.h"   // mu-core: selector items from choice parameters
+#include "UI/LayerContent.h"   // mu-core: the base every layer type's content derives from
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "UI/ArpHost.h"                 // what the content needs from the layer's host
 #include "Sequencer/Arp.h"                // the layer: its modulation matrix
@@ -29,7 +30,7 @@ namespace mu_toni
 // Pitch·Filter·Amp·Effects) in the middle, and the Appergater below, which takes whatever
 // height the other two leave. The header strip and modulators belong to the LayerPanel.
 // All sizes come from MuLookAndFeel / VoiceBand — no arbitrary values.
-class ArpContent : public juce::Component,
+class ArpContent : public LayerContent,
                    private juce::Timer
 {
 public:
@@ -41,11 +42,16 @@ public:
 
     ~ArpContent() override { stopTimer(); }
 
-    void setLayer(int idx);
+    void setLayer(int idx) override;
 
-    // Let go of every knob's modulation binding; called before a layer is removed or moved, because the
-    // arcs hold the layer's matrix. setLayer rebinds.
-    void releaseModulationArcs() { for (auto& k : knobs) k.comp->clearModBinding(); }
+    // Let go of every knob's modulation binding and the insert's gain-reduction source; called before a layer is
+    // removed or moved, because the arcs hold the layer's matrix and the meter holds a pointer into its insert.
+    // setLayer rebinds both.
+    void releaseModulationArcs() override
+    {
+        for (auto& k : knobs) k.comp->clearModBinding();
+        insertSub.clearGRSource();
+    }
 
     int getLayer() const noexcept { return currentLayer; }
 
@@ -132,9 +138,6 @@ private:
                "Comb+","AP12","Notch24","HP6","Peak","LoShf","HiShf","Comb-" }; }
 
     void timerCallback() override;
-
-public:
-    std::function<void(const juce::String&, const juce::String&)> onStatusUpdate;
 
 private:
     ArpHost& host;

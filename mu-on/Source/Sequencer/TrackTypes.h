@@ -27,7 +27,7 @@ inline mu_core::LayerTypeId typeFromPreset(const juce::ValueTree& preset)
 
 // A fresh Track for `slot`, not yet bound or prepared. Which engine it runs is its slot's `t{N}_eng`
 // parameter: a host of the type sets that parameter to engineOfType(id) when it creates the layer.
-inline std::unique_ptr<Layer> createTrack(int slot)
+inline std::unique_ptr<Layer> createTrack(int slot, mu_core::LayerTypeId /*type*/)
 {
     auto t = std::make_unique<Track>();
     t->slot = slot;

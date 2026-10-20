@@ -3,14 +3,17 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include <cstring>
+#include <functional>
 #include <memory>
 
 struct Layer;
+class ProcessorBase;
+class LayerContent;   // mu-core/UI/LayerContent.h: a type's content component for the shown slot
 
 // Layer types: family vocabulary (as kMaxLayers is), so the ids live in mu-core. docs/mu-tronic/design.md
 // 2.5. A type is described and constructed by its LayerTypeInfo; it is never dispatched through it
-// (rendering stays virtual on Layer). No registry list yet: each product declares its one LayerTypeInfo
-// constant when it adopts the contract and uses create / addLayerParams itself.
+// (rendering stays virtual on Layer). A host of several types lists them in a LayerTypeRegistry; a product
+// that hosts one type uses create / addLayerParams itself.
 namespace mu_core
 {
     // Saved by NAME (layerTypeName), never by number, so the order here may change.
@@ -42,12 +45,18 @@ namespace mu_core
         return LayerTypeId::Empty;
     }
 
-    // What a host needs to know about a type, all message-thread data. Describe-only: the fields the four
-    // products use as they adopt the contract (the chooser, services and UI factories come with mu-Tronic).
+    // What a host needs to know about a type, all message-thread data. The UI factories are null for a host that
+    // builds its own UI (the four list products); mu-Tronic's editor builds the shown slot's UI through them.
     struct LayerTypeInfo
     {
         using AddParamsFn = void (*)(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot);
-        using CreateFn    = std::unique_ptr<Layer> (*)(int slot);
+        // `type` lets one function make several types of one class (the five mu-On Track types).
+        using CreateFn    = std::unique_ptr<Layer> (*)(int slot, LayerTypeId type);
+        // The type a layer-preset tree holds; Empty when the tree names none.
+        using TypeFromPresetFn = LayerTypeId (*)(const juce::ValueTree& preset);
+        using CreateContentFn = std::unique_ptr<LayerContent> (*)(ProcessorBase& host, int slot);
+        // The slot's picture in the sidebar; `pulse` asks the host to repaint the item.
+        using CreateMiniVisualFn = std::unique_ptr<juce::Component> (*)(ProcessorBase& host, int slot, std::function<void()> pulse);
 
         LayerTypeId id = LayerTypeId::Empty;
         const char* name = "Empty";            // display name ("Arp", "Kick")
@@ -59,5 +68,11 @@ namespace mu_core
                                                // are the product's own, shared with it and never copied
         AddParamsFn addLayerParams = nullptr;  // the type's parameter table for one slot (once per prefix)
         CreateFn    create = nullptr;          // a fresh default layer for `slot`, not yet prepared or bound
+        TypeFromPresetFn typeFromPreset = nullptr;   // set where several types share an extension (.muTrack): the folder
+                                               // listing then keeps only the files that map to this type; null = every file
+        CreateContentFn    createContent    = nullptr;   // the type's content component, built once per type by the editor
+        CreateMiniVisualFn createMiniVisual = nullptr;   // the type's sidebar picture
+        int         appColourId = 0;           // the MuLookAndFeel colour ID (appBlue ...) the slot's main area is painted in; 0 = the app's own
+        const char* typeTag = "";              // the header's type plate text ("Toni", "On"); empty = none
     };
 }

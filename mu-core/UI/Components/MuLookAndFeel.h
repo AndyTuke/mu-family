@@ -215,6 +215,11 @@ public:
     // colours and the global (mixer) accent follow it, so nothing stays in the family purple.
     void setAppAccent(juce::Colour c);
     static juce::Colour appAccent(juce::Component& c);
+    // A host of several layer types paints the main area of the shown layer in that type's colour while its
+    // chrome keeps the app's own: `root` and everything under it read `colour` from appAccent, from the main-page
+    // knobs and from lit LCDs instead of the LookAndFeel's app colour. clearAccentOverride restores it.
+    static void setAccentOverride(juce::Component& root, juce::Colour colour);
+    static void clearAccentOverride(juce::Component& root);
     // An app's main page: every knob under `root` is drawn in the app colour (metal style with
     // an app colour set) instead of its own category colour. The editor shell marks the main panel.
     static void useAppColourKnobs(juce::Component& root);
@@ -783,6 +788,9 @@ private:
     bool         screws       = false;
     bool         hasAppAccent = false;
     juce::Colour appAccentColour;
+    // The accent override that applies to `c` (the nearest ancestor's, itself included), if any.
+    static bool accentOverrideFor(const juce::Component& c, juce::Colour& out);
+
     // The colour a knob is drawn in: the app colour on a main page (useAppColourKnobs), else its own.
     juce::Colour knobColour(const juce::Slider&) const;
 };

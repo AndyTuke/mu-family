@@ -277,7 +277,10 @@ Built at T1a (2026-10-19): the eight folders, `Persistence/{LayerTypes.*, Tronic
 `kPrefixLetters`), each `LayerTypeInfo` naming its letter in `paramPrefixLetter`. Exactly one is **live** per slot, that of the slot's current type; only the live
 prefix is saved, applied, copied or reset (`LayerLayout::withPrefixSets`, `setLivePrefix`). These are the same four letters the list products use, not a new
 scheme; the mixer strip stays `ch{N}_`. A layer type that is hosted elsewhere also names `contentFolderName` and `presetFolder` (its product's own preset folder,
-shared, never copied: `<TDP>/muToni/Arps`).
+shared, never copied: `<TDP>/muToni/Arps`). In mu-Tronic `Persistence/` also holds each hosted type's registration glue, `<Type>LayerType.{h,cpp}` (`ArpLayerType`,
+`TrackLayerTypes`: host adapter, content and mini-visual factories, the `LayerTypeInfo` additions), because it is the one folder that may name a layer library's headers
+(`check-layer-boundary.ps1` rule 10; ruled 2026-10-20, [design 2.1.11](mu-tronic/design.md)). mu-On's `t{N}_` table gains `t{N}_swing` and `t{N}_accent` (the global
+`seq_swing` / `seq_accent` rows are retired).
 
 **Product naming pattern.** `mu-<Name>` in prose and artefacts (`mu-Clid`, `mu-Tant`), slug `mu-<name>` in
 folders and targets, namespace `mu_<name>`. A descriptive suffix (`mu-Clid MIDI`) is allowed only for a

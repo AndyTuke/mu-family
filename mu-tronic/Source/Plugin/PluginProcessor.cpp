@@ -1,6 +1,5 @@
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
-#include "Persistence/PresetFiles.h"    // mu-core: listPresetFiles
 
 #include <set>
 
@@ -154,54 +153,21 @@ void PluginProcessor::setLayerName(int idx, const juce::String& name)
         layer->name = trimmed.toStdString();
 }
 
-void PluginProcessor::setSelectedSlot(int slot) noexcept
-{
-    selectedSlot.store(juce::jlimit(0, mu_limits::kMaxLayers - 1, slot), std::memory_order_relaxed);
-}
-
-// mu-Tronic has no layer-preset tree of its own: a type's presets are its product's own folder, shared with it
-// (never copied), next to this app's content folder: <TDP>/muToni/Arps for Arp.
-juce::File PluginProcessor::presetDirOf(const mu_core::LayerTypeInfo& info) const
-{
-    const auto content = getContentDir();
-    if (content == juce::File() || juce::String(info.contentFolderName).isEmpty() || juce::String(info.presetFolder).isEmpty())
-        return {};
-    return content.getSiblingFile(info.contentFolderName).getChildFile(info.presetFolder);
-}
-
-// The extension without its dot, as ProcessorBase::getLayerPresetExtension is spelled.
-static juce::String extensionOf(const mu_core::LayerTypeInfo& info)
-{
-    return juce::String(info.presetExtension).trimCharactersAtStart(".");
-}
-
-// The folder of the selected slot's type (none while that slot is Empty).
+// A type's layer presets are its product's own folder, shared with it and never copied (ProcessorBase finds it from
+// the registry): <TDP>/muToni/Arps for Arp. The folder and extension answer for the selected slot's type.
 juce::File PluginProcessor::getLayerPresetDir() const
 {
-    const auto* info = layerTypes.find(getLayerTypeId(selectedSlot.load(std::memory_order_relaxed)));
-    return info != nullptr ? presetDirOf(*info) : juce::File();
+    return typedLayerPresetDir(getSelectedSlot());
 }
 
 juce::String PluginProcessor::getLayerPresetExtension() const
 {
-    const auto* info = layerTypes.find(getLayerTypeId(selectedSlot.load(std::memory_order_relaxed)));
-    return info != nullptr ? extensionOf(*info) : juce::String();
+    return typedLayerPresetExtension(getSelectedSlot());
 }
 
-// A filled slot lists its own type's presets; an Empty slot lists every offered type's, so any of them can be chosen.
 juce::Array<juce::File> PluginProcessor::slotPresetFiles(int slot) const
 {
-    juce::Array<juce::File> out;
-    auto addType = [&](const mu_core::LayerTypeInfo& info)
-    {
-        for (const auto& f : mu_pp::listPresetFiles(presetDirOf(info), extensionOf(info)))
-            out.addIfNotAlreadyThere(f);
-    };
-    if (const auto* own = layerTypes.find(getLayerTypeId(slot)))
-        addType(*own);
-    else
-        for (int t = 0; t < layerTypes.size(); ++t) addType(layerTypes.at(t));
-    return out;
+    return typedSlotPresetFiles(slot);
 }
 
 void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)

@@ -754,6 +754,61 @@ juce::Array<juce::File> ProcessorBase::slotPresetFiles(int /*slot*/) const
     return mu_pp::listPresetFiles(getLayerPresetDir(), getLayerPresetExtension());
 }
 
+juce::File ProcessorBase::presetDirOf(const mu_core::LayerTypeInfo& info) const
+{
+    const auto content = getContentDir();
+    if (content == juce::File() || juce::String(info.contentFolderName).isEmpty() || juce::String(info.presetFolder).isEmpty())
+        return {};
+    return content.getSiblingFile(info.contentFolderName).getChildFile(info.presetFolder);
+}
+
+juce::String ProcessorBase::presetExtensionOf(const mu_core::LayerTypeInfo& info)
+{
+    return juce::String(info.presetExtension).trimCharactersAtStart(".");
+}
+
+mu_core::LayerTypeId ProcessorBase::slotTypeId(int slot) const
+{
+    const auto* layer = getLayer(slot);
+    return layer != nullptr ? (mu_core::LayerTypeId) layer->typeId() : mu_core::LayerTypeId::Empty;
+}
+
+juce::File ProcessorBase::typedLayerPresetDir(int slot) const
+{
+    const auto* info = layerTypes.find(slotTypeId(slot));
+    return info != nullptr ? presetDirOf(*info) : juce::File();
+}
+
+juce::String ProcessorBase::typedLayerPresetExtension(int slot) const
+{
+    const auto* info = layerTypes.find(slotTypeId(slot));
+    return info != nullptr ? presetExtensionOf(*info) : juce::String();
+}
+
+juce::Array<juce::File> ProcessorBase::typedSlotPresetFiles(int slot) const
+{
+    juce::Array<juce::File> out;
+    auto addType = [&](const mu_core::LayerTypeInfo& info)
+    {
+        for (const auto& f : mu_pp::listPresetFiles(presetDirOf(info), presetExtensionOf(info)))
+        {
+            // Types that share an extension: keep the files that name this type (an unreadable file names none).
+            if (info.typeFromPreset != nullptr)
+            {
+                const auto xml = juce::XmlDocument::parse(f);
+                if (xml == nullptr || info.typeFromPreset(juce::ValueTree::fromXml(*xml)) != info.id) continue;
+            }
+            out.addIfNotAlreadyThere(f);
+        }
+    };
+    const auto* own = layerTypes.find(slotTypeId(slot));
+    if (own != nullptr)
+        addType(*own);
+    else
+        for (int t = 0; t < layerTypes.size(); ++t) addType(layerTypes.at(t));
+    return out;
+}
+
 juce::File ProcessorBase::getDefaultPresetFile() const
 {
     return getPresetsDir().getChildFile("_default." + getFullPresetExtension());
@@ -1325,7 +1380,7 @@ bool ProcessorBase::setLayerType(int slot, mu_core::LayerTypeId type, const juce
         rate  = layersPreparedRate;
         block = layersPreparedBlock;
     }
-    std::unique_ptr<Layer> fresh = info != nullptr ? info->create(slot) : createLayer(slot);
+    std::unique_ptr<Layer> fresh = info != nullptr ? info->create(slot, type) : createLayer(slot);
     if (fresh == nullptr) return false;
     if (rate > 0.0) fresh->prepare(rate, block);
     // The slot's identity stays with the slot: its colour and its name.
@@ -1358,9 +1413,10 @@ bool ProcessorBase::setLayerType(int slot, mu_core::LayerTypeId type, const juce
 
     // Step 7: the new type's parameters to defaults (or the initial node) while nothing live reads them, then the
     // layer binds them. Only the NEW type's prefix is touched (a same-prefix type, Kick to Bass, shares t{N}_; the
-    // old type's dormant rows are left alone and never saved). The mixer strip (ch{N}_) is not touched, but its
-    // sidechain follower is asked to restart from zero. The new layer sits in layers[] but is not in any view, so
-    // the audio thread cannot reach it.
+    // old type's dormant rows are left alone and never saved). The mixer strip (ch{N}_) is not touched, and neither
+    // is its sidechain follower: the strip and the source it ducks from are the same after a type change, so zeroing
+    // the follower would only unduck a strip that is still being ducked. The new layer sits in layers[] but is not in
+    // any view, so the audio thread cannot reach it.
     {
         const juce::ScopedLock sl(layersLock);
         layers[(size_t) slot] = std::move(fresh);
@@ -1368,7 +1424,6 @@ bool ProcessorBase::setLayerType(int slot, mu_core::LayerTypeId type, const juce
     layerLayout.setLivePrefix(slot, info != nullptr && info->paramPrefixLetter != 0
                                         ? juce::String::charToString((juce::juce_wchar) info->paramPrefixLetter) + juce::String(slot) + "_"
                                         : juce::String());
-    mixerEngine.requestSidechainEnvReset(slot);
     resetOwnLayerParams(slot);
     if (initial != nullptr && initial->isValid()) applyLayerNode(slot, *initial);
     layers[(size_t) slot]->bindParams(apvts, slot);

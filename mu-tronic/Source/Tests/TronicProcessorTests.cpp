@@ -45,7 +45,7 @@ namespace
                 info.id = kToneType;
                 info.name = "Snare";
                 info.group = "Test";
-                info.create = [](int) -> std::unique_ptr<Layer> { return std::make_unique<ToneLayer>(); };
+                info.create = [](int, mu_core::LayerTypeId) -> std::unique_ptr<Layer> { return std::make_unique<ToneLayer>(); };
                 layerTypes.add(info);
             }
         }

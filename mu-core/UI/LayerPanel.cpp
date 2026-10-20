@@ -63,6 +63,7 @@ void LayerPanel::setLayer(int idx)
 {
     header.commitNameEdit();   // a rename in progress belongs to the layer being left
     currentLayer = juce::jmax(0, idx);
+    proc.setSelectedSlot(currentLayer);   // a typed host's preset folder follows the shown layer's type (read below)
 
     modulatorPanel.setLayer(proc.getLayer(currentLayer));
     refreshHeader();

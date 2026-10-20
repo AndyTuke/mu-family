@@ -5,6 +5,7 @@
 #include "UI/LayerEditController.h"   // mu-core: delete glue
 #include "UI/MixerOverlay.h"          // mu-core shared mixer
 #include "UI/LayerPanel.h"            // mu-core shared per-layer panel shell
+#include "UI/LayerContent.h"          // mu-core: a layer type's content component
 #include "Plugin/PluginProcessor.h"
 #include "UI/EmptySlotChooser.h"
 #include "UI/TronicSettingsOverlay.h"
@@ -15,7 +16,8 @@ namespace mu_tronic
 // mu-Tronic editor: the shared mu-core shell (TransportBar / StatusBar / About / overlays / window sizing /
 // MuLookAndFeel) + the shared LayerSidebar (paged, eight slots at a time) + the shared MixerOverlay (its strips paged
 // the same way), around the shared LayerPanel (preset strip + modulators). An Empty slot shows the chooser in the
-// content area; a slot that holds a layer shows that type's content. No bespoke shell or mixer code.
+// content area; a slot that holds a layer shows that type's content, built through the registry (one instance per
+// type, rebound as the selection moves) and painted in the type's colour. No bespoke shell or mixer code.
 class PluginEditor : public EditorShellBase
 {
 public:
@@ -30,6 +32,10 @@ protected:
 private:
     // Shows slot `idx` in the main area: the chooser while it is Empty, else the type's content.
     void showSlot(int idx);
+    // The content instance for `type`, built on first use through the registry (null for a type with none).
+    LayerContent* contentFor(mu_core::LayerTypeId type);
+    // Every content lets go of its modulation arcs (before a layer is replaced or removed).
+    void releaseContentArcs();
     // The slot's layer was given a type: rebuild what depends on it.
     void layerTypeSet(int slot);
 
@@ -40,6 +46,8 @@ private:
     mu_ui::LayerEditController layerEdit;   // delete glue; after the sidebar and panel
     MixerOverlay     mixerOverlay;
     TronicSettingsOverlay settingsOverlay;
+    std::vector<std::pair<mu_core::LayerTypeId, std::unique_ptr<LayerContent>>> contents;   // one per type shown so far
+    LayerContent* shownContent = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };

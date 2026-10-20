@@ -38,6 +38,20 @@ void LayerHeaderBar::setNoun(const juce::String& n)
     deleteBtn.setTooltip(deleteBtn.isEnabled() ? "Delete this " + noun : "The last " + noun + " cannot be deleted");
 }
 
+void LayerHeaderBar::setTypeTag(const juce::String& text)
+{
+    if (typeTag == text) return;
+    typeTag = text;
+    resized();
+    repaint();
+}
+
+int LayerHeaderBar::typeTagWidth() const
+{
+    if (typeTag.isEmpty()) return 0;
+    return juce::roundToInt(MuLookAndFeel::namePlateWidth(typeTag, mu_ui::sf((float) MuLookAndFeel::kNamePlateH))) + mu_ui::s(MuLookAndFeel::kSpaceS);
+}
+
 void LayerHeaderBar::setLayerName(const juce::String& n)
 {
     nameLabel.setText(n, juce::dontSendNotification);
@@ -163,9 +177,10 @@ void LayerHeaderBar::resized()
 
     // Name occupies a fixed left slot; the preset dropdown fills the gap between.
     const int nameW  = s(120);
-    const int ddLeft = s(kNameX) + nameW + s(8);
+    const int nameX  = s(kNameX) + typeTagWidth();   // the type plate, when shown, sits between the dot and the name
+    const int ddLeft = nameX + nameW + s(8);
     presetDD.setBounds(ddLeft, btnY, juce::jmax(s(80), ddRight - ddLeft), btnH);
-    nameLabel.setBounds(s(kNameX), btnY, nameW, btnH);   // same row as the preset selector
+    nameLabel.setBounds(nameX, btnY, nameW, btnH);   // same row as the preset selector
 }
 
 void LayerHeaderBar::paint(juce::Graphics& g)
@@ -182,6 +197,13 @@ void LayerHeaderBar::paint(juce::Graphics& g)
         MuLookAndFeel::drawLcdGlass(g, nameDisplayBounds(), colour, true);
     else
         g.drawRoundedRectangle(nameLabel.getBounds().toFloat().reduced(1.0f), sf(4.0f), sf(1.5f));
+
+    // The layer's type plate, left of the name LCD.
+    if (typeTag.isNotEmpty())
+    {
+        const float plateH = sf((float) MuLookAndFeel::kNamePlateH);
+        MuLookAndFeel::drawNamePlate(g, { (float) s(kNameX), ((float) h - plateH) * 0.5f, MuLookAndFeel::namePlateWidth(typeTag, plateH), plateH }, typeTag);
+    }
 
     // Optional pending hot-swap "SWP" pill on the preset dropdown (mu-clid).
     if (staging)
