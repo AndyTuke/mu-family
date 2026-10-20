@@ -1,5 +1,6 @@
 #include "PluginEditor.h"
 #include "UI/Components/MuLookAndFeel.h"
+#include "Persistence/TrackLayerTypes.h"   // chooseRumbleSource
 
 namespace mu_tronic
 {
@@ -67,7 +68,10 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         const int slot = layerPanel.getLayer();
         layerPanel.getModulatorPanel().setLayer(nullptr);   // nothing may point into the layer being replaced
         if (proc.setLayerType(slot, type))
+        {
+            if (type == mu_core::LayerTypeId::Rumble) chooseRumbleSource(proc, slot);   // a new Rumble listens to something at once
             layerTypeSet(slot);
+        }
     };
 
     setMainArea(&sidebar, &layerPanel);

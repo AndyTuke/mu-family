@@ -164,7 +164,7 @@ struct MuTronicProcessorTests : juce::UnitTest
         expect(p.getLayerAccess() == mu_core::LayerAccess::Published);
         expect(p.layersAreSlots());
         expect(! p.canReorderLayers());
-        expect(p.getLayerTypes().size() == 6, "the product's Arp, Kick, Bass, Hat and Snare and the test type are offered");
+        expect(p.getLayerTypes().size() == 7, "the product's Arp, Kick, Bass, Hat, Snare and Rumble and the test type are offered");
         for (int i = 0; i < 16; ++i)
         {
             expect(p.getLayer(i) != nullptr);
@@ -182,7 +182,7 @@ struct MuTronicProcessorTests : juce::UnitTest
 
         mu_seam_test::TempStorage storage2;
         mu_tronic::PluginProcessor bare;   // the product as built: Arp, Kick, Bass, Hat and Snare
-        expect(bare.getLayerTypes().size() == 5 && bare.getLayerTypes().find(mu_core::LayerTypeId::Arp) != nullptr);
+        expect(bare.getLayerTypes().size() == 6 && bare.getLayerTypes().find(mu_core::LayerTypeId::Arp) != nullptr);
     }
 
     void namesAndColours()
@@ -328,7 +328,7 @@ struct MuTronicProcessorTests : juce::UnitTest
         ExposedProcessor withTone;
         expect(withTone.setLayerType(1, kToneType));
         auto state = withTone.captureState();
-        mu_pp::findLayerNode(state, 1).setProperty("type", "Rumble", nullptr);       // a name the build has no type for
+        mu_pp::findLayerNode(state, 1).setProperty("type", "Pattern", nullptr);       // a name the build has no type for
         mu_pp::findLayerNode(state, 5).removeProperty("type", nullptr);            // no attribute at all
 
         mu_seam_test::TempStorage storage2;

@@ -151,10 +151,12 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
 // A Rumble track's source (`t{N}_src`) names a layer, so it follows that layer through a remove or a reorder:
 // every slot's source is rewritten through `oldToNew` (a layer index as it was to the index it has now, -1 when
 // that layer is gone), and a gone source becomes the first Kick of the new order. `liveCount` is the live layer
-// count, `engineOfSlot` the engine each slot runs. Message thread, before the parameter values shift (the base's
+// count, `engineOfSlot` the engine each slot runs, `fallbackCandidate` (optional, by old slot) which slots may take over from
+// a gone source - the first Kick when not given. Message thread, before the parameter values shift (the base's
 // remapLayerReferences hook), so each value is rewritten at its old slot and moves with it.
 void remapRumbleSources(juce::AudioProcessorValueTreeState& apvts, int liveCount,
                         const std::function<EngineType(int)>& engineOfSlot,
-                        const std::function<int(int)>& oldToNew);
+                        const std::function<int(int)>& oldToNew,
+                        const std::function<bool(int)>& fallbackCandidate = {});
 
 } // namespace mu_on

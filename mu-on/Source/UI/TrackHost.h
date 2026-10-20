@@ -37,6 +37,9 @@ public:
     // The transport as the content shows it: playing, and the beat it is at.
     virtual bool   isTrackTransportPlaying() const noexcept = 0;
     virtual double getTrackTransportBeat() const noexcept = 0;
+    // Whether layer `layer` may be offered as a Rumble's source (the Source list). mu-On offers every layer; a host with
+    // layers that make no sound of their own (an empty slot) or are not sources (another Rumble) says no.
+    virtual bool canBeRumbleSource(int layer) const { juce::ignoreUnused(layer); return true; }
 };
 
 } // namespace mu_on

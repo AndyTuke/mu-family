@@ -1,6 +1,6 @@
 #include "Persistence/LayerTypes.h"
 #include "Persistence/ArpLayerType.h"     // the Arp type (mu-Toni's layer library)
-#include "Persistence/TrackLayerTypes.h"   // Kick, Bass, Hat, Snare (mu-On's layer library)
+#include "Persistence/TrackLayerTypes.h"   // Kick, Bass, Hat, Snare, Rumble (mu-On's layer library)
 
 namespace mu_tronic
 {
@@ -14,6 +14,7 @@ void registerLayerTypes(mu_core::LayerTypeRegistry& registry)
     registry.add(trackLayerType(mu_core::LayerTypeId::Bass));
     registry.add(trackLayerType(mu_core::LayerTypeId::Hat));
     registry.add(trackLayerType(mu_core::LayerTypeId::Snare));
+    registry.add(trackLayerType(mu_core::LayerTypeId::Rumble));
 }
 
 } // namespace mu_tronic

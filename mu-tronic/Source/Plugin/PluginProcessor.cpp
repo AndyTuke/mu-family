@@ -1,5 +1,6 @@
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
+#include "Persistence/TrackLayerTypes.h"  // the Rumble source remap
 
 #include <set>
 
@@ -110,6 +111,11 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
 
     // Hot-swap: flag staged presets whose boundary passed in this block (each slot's loop is its layer's loopBeats).
     flagLayerSwapBoundaries(transport);
+}
+
+void PluginProcessor::remapLayerReferences(const std::function<int(int)>& oldToNew)
+{
+    remapRumbleSources(*this, oldToNew);
 }
 
 std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)

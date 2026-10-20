@@ -66,12 +66,14 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
 
 void remapRumbleSources(juce::AudioProcessorValueTreeState& apvts, int liveCount,
                         const std::function<EngineType(int)>& engineOfSlot,
-                        const std::function<int(int)>& oldToNew)
+                        const std::function<int(int)>& oldToNew,
+                        const std::function<bool(int)>& fallbackCandidate)
 {
-    // The first Kick in the new order (a source that is gone falls back to it).
+    // The first fallback candidate in the new order (a source that is gone falls back to it): a Kick unless the host
+    // names its own candidates.
     int fallback = liveCount;
     for (int j = 0; j < mu_limits::kMaxLayers; ++j)
-        if (engineOfSlot(j) == EngineType::Kick)
+        if (fallbackCandidate ? fallbackCandidate(j) : engineOfSlot(j) == EngineType::Kick)
         {
             const int nj = oldToNew(j);
             if (nj >= 0 && nj < liveCount) fallback = juce::jmin(fallback, nj);

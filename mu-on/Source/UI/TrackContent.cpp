@@ -158,10 +158,10 @@ void TrackContent::rebuild()
     engineCaption.setVisible(! locked);
     engineSelect.setVisible(! locked);
     rows.setVisible(! locked);
-    soloRow.setVisible(locked);
+    const bool rumble = shownEngine == EngineType::Rumble;
+    soloRow.setVisible(locked && ! rumble);   // a locked Rumble has no steps: it follows its source
     soloRow.setLayer(currentLayer);
 
-    const bool rumble = shownEngine == EngineType::Rumble;
     sourceCaption.setVisible(rumble);
     sourceSelect.setVisible(rumble);
     swingKnob.setVisible(! rumble);
@@ -197,7 +197,7 @@ void TrackContent::refreshSourceList()
     for (int i = 0; i < host.getTrackCount(); ++i)
     {
         sig = sig * 131u + (juce::uint64) toIndex(host.getTrackEngine(i));
-        if (i != currentLayer)
+        if (i != currentLayer && host.canBeRumbleSource(i))
             sourceSelect.addItem(juce::String(i + 1) + "  " + host.getTrackName(i), i + 1);
     }
     shownLayerSignature = sig;
@@ -207,7 +207,7 @@ void TrackContent::refreshSourceList()
 void TrackContent::refreshSourceSelection()
 {
     const int src = (int) std::lround(host.getTrackParameters().getRawParameterValue(layerParamId(currentLayer, "src"))->load());
-    const bool usable = src >= 0 && src < host.getTrackCount() && src != currentLayer;
+    const bool usable = src >= 0 && src < host.getTrackCount() && src != currentLayer && host.canBeRumbleSource(src);
     sourceSelect.setSelectedId(usable ? src + 1 : 0, false);
 }
 
@@ -301,9 +301,11 @@ void TrackContent::resized()
     const int boxesY = slotR.getY() + padY + plateH;
     const int boxesH = juce::jmax(0, slotR.getHeight() - 2 * padY - plateH);
     // The left box of the second panel is as wide for Swing / Accent as for the Rumble envelope.
-    grooveBoxR = { padX, boxesY, s(MuLookAndFeel::kGrooveBoxW), boxesH };
+    // A locked Rumble has no step row, so its envelope takes the whole panel.
+    const bool noSteps = locked && rumble;
+    grooveBoxR = { padX, boxesY, noSteps ? juce::jmax(0, w - 2 * padX) : s(MuLookAndFeel::kGrooveBoxW), boxesH };
     const int stepsX = grooveBoxR.getRight() + s(LF::kVoiceDivW);
-    stepsBoxR  = { stepsX, boxesY, juce::jmax(0, w - padX - stepsX), boxesH };
+    stepsBoxR  = noSteps ? juce::Rectangle<int>() : juce::Rectangle<int>(stepsX, boxesY, juce::jmax(0, w - padX - stepsX), boxesH);
     const auto stepsInner = stepsBoxR.reduced(clear, s(LF::kSpaceS));
     rows.setBounds(stepsInner);
     // The lone row is as tall as one of the rows above is, top-aligned (the rest of the box stays blank metal).
@@ -340,9 +342,10 @@ void TrackContent::paint(juce::Graphics& g)
 
     const bool rumble = shownEngine == EngineType::Rumble;
     const juce::String name = juce::String(engineName(shownEngine)).toUpperCase();
-    MuLookAndFeel::drawSections(g, *this, { { engineBoxR, name + " ENGINE" },
-                                            { grooveBoxR, rumble ? juce::String("ENVELOPE") : juce::String("GROOVE") },
-                                            { stepsBoxR, "STEPS" } }, accent);
+    const MuLookAndFeel::Section engineSection { engineBoxR, name + " ENGINE" };
+    const MuLookAndFeel::Section grooveSection { grooveBoxR, rumble ? juce::String("ENVELOPE") : juce::String("GROOVE") };
+    if (stepsBoxR.isEmpty()) MuLookAndFeel::drawSections(g, *this, { engineSection, grooveSection }, accent);
+    else                     MuLookAndFeel::drawSections(g, *this, { engineSection, grooveSection, { stepsBoxR, "STEPS" } }, accent);
 
     // The shown track's colour on its engine box.
     g.setColour(layerColour());

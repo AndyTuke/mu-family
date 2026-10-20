@@ -1,16 +1,56 @@
 #include "Persistence/TrackLayerTypes.h"
+#include "Plugin/ProcessorBase.h"
 #include "Sequencer/TrackTypes.h"            // mu-On's layer library: the five Track type descriptions
 #include "UI/Components/MuLookAndFeel.h"     // the colour ID
 #include <limits>
 
 #if MU_TRONIC_WITH_UI
- #include "Plugin/ProcessorBase.h"
  #include "UI/TrackContent.h"                // mu-On's layer library: the content, its host interface
  #include "UI/Components/LayerDiscVisual.h"   // mu-core: the disc picture
 #endif
 
 namespace mu_tronic
 {
+
+namespace
+{
+    // A slot a Rumble can listen to: a filled slot that is not itself a Rumble (a Rumble renders after every other layer,
+    // so another Rumble is not a source).
+    bool isRumbleSourceSlot(const ProcessorBase& host, int slot)
+    {
+        const auto* l = host.getLayer(slot);
+        if (l == nullptr) return false;
+        const auto type = (mu_core::LayerTypeId) l->typeId();
+        return type != mu_core::LayerTypeId::Empty && type != mu_core::LayerTypeId::Rumble;
+    }
+}
+
+void remapRumbleSources(ProcessorBase& host, const std::function<int(int)>& oldToNew)
+{
+    mu_on::remapRumbleSources(host.apvts, host.getNumLayers(),
+        [&host](int j)
+        {
+            const auto* l = host.getLayer(j);
+            return l != nullptr && (mu_core::LayerTypeId) l->typeId() == mu_core::LayerTypeId::Rumble ? mu_on::EngineType::Rumble
+                                                                                                       : mu_on::EngineType::Kick;
+        },
+        oldToNew,
+        [&host](int j) { return isRumbleSourceSlot(host, j); });
+}
+
+void chooseRumbleSource(ProcessorBase& host, int slot)
+{
+    auto* p = host.apvts.getParameter(mu_on::layerParamId(slot, "src"));
+    if (p == nullptr) return;
+    const int current = juce::roundToInt(p->convertFrom0to1(p->getValue()));
+    if (current != slot && isRumbleSourceSlot(host, current)) return;
+    for (int j = 0; j < host.getNumLayers(); ++j)
+        if (j != slot && isRumbleSourceSlot(host, j))
+        {
+            p->setValueNotifyingHost(p->convertTo0to1((float) j));
+            return;
+        }
+}
 
 #if MU_TRONIC_WITH_UI
 namespace
@@ -38,9 +78,15 @@ namespace
             return standIn;
         }
 
-        // A mu-Tronic Track is locked to its type's engine and this content serves one type: the engine never changes
-        // underneath it (the content's timer would otherwise rebuild when a slot swaps to a sibling Track type).
-        mu_on::EngineType getTrackEngine(int) const noexcept override { return engine; }
+        // A slot that is a Track answers with the engine it runs (a Rumble's Source list reads them); any other slot answers
+        // with this content's own engine, so the shown slot's engine never changes underneath the content.
+        mu_on::EngineType getTrackEngine(int layer) const noexcept override
+        {
+            const auto* l = proc.getLayer(layer);
+            return l != nullptr && mu_on::isTrackType((mu_core::LayerTypeId) l->typeId())
+                       ? mu_on::engineOfType((mu_core::LayerTypeId) l->typeId()) : engine;
+        }
+        bool canBeRumbleSource(int layer) const override { return isRumbleSourceSlot(proc, layer); }
         void selectTrackEngine(int, mu_on::EngineType) override {}   // the Engine selector is hidden for a locked track
 
         int          getTrackCount() const override                 { return proc.getNumLayers(); }

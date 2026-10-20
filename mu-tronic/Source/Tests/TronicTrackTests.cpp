@@ -4,6 +4,7 @@
 // restore builds each Track's engine; and their presets come from mu-On's Tracks folder, told apart by engine.
 
 #include "Plugin/PluginProcessor.h"
+#include "Persistence/TrackLayerTypes.h"   // chooseRumbleSource
 #include "Sequencer/Track.h"             // mu-On's layer library: the layer a Track slot holds
 #include "Tests/TrackLayerFixture.h"     // mu-On: the recorded single-track streams shared with mu-On's own tests
 #include "Tests/GoldenRender.h"          // mu-core: MockHost
@@ -22,6 +23,7 @@ namespace
     struct TrackProcessor : mu_tronic::PluginProcessor
     {
         using mu_tronic::PluginProcessor::retireBin;
+    using mu_tronic::PluginProcessor::remapLayerReferences;
     };
 
     mu_on::Track& trackIn(ProcessorBase& p, int slot) { return static_cast<mu_on::Track&>(*p.getLayer(slot)); }
@@ -118,6 +120,8 @@ struct MuTronicTrackTests : juce::UnitTest
         kickToBassSwap();
         presetFolders();
         defaultGroove();
+        rumbleSourceFollows();
+        rumbleSoundsFromItsSource();
     }
 
     void layoutAndRegistry()
@@ -136,8 +140,7 @@ struct MuTronicTrackTests : juce::UnitTest
             expectEquals(juce::String(info->typeTag), juce::String("On"));
             expect(info->typeFromPreset != nullptr, "the shared .muTrack is told apart by engine");
         }
-        expect(p.getLayerTypes().find(LayerTypeId::Rumble) == nullptr, "Rumble is not registered yet");
-        expect(! p.setLayerType(0, LayerTypeId::Rumble), "a Rumble cannot be set in a slot");
+        expect(p.getLayerTypes().find(LayerTypeId::Rumble) != nullptr, "Rumble is offered too");
         for (int s : { 0, 7, 15 })
             expect(p.apvts.getParameter("t" + juce::String(s) + "_eng") != nullptr && p.apvts.getParameter("t" + juce::String(s) + "_swing") != nullptr);
         expect(p.apvts.getParameter("t16_eng") == nullptr, "no seventeenth slot");
@@ -376,6 +379,75 @@ struct MuTronicTrackTests : juce::UnitTest
 
     // A fresh Track starts on its engine's groove so a new slot makes a sound at once; a restored row, empty or not,
     // replaces it.
+    // A Rumble's source is a slot number: a new Rumble picks the first filled non-Rumble slot, and a swap or removal
+    // carries the number to wherever that layer went (a gone one falls to the first filled non-Rumble slot).
+    void rumbleSourceFollows()
+    {
+        beginTest("a Rumble picks a source, keeps following it through a remap, and falls back when it is gone");
+        mu_seam_test::TempStorage storage;
+        TrackProcessor p;
+        auto src = [&](int slot) { return (int) std::lround(getPlain(p.apvts, "t" + juce::String(slot) + "_src")); };
+        expect(p.setLayerType(5, LayerTypeId::Rumble));
+        mu_tronic::chooseRumbleSource(p, 5);
+        expectEquals(src(5), 0, "with nothing to listen to the source stays at slot 0 (silence)");
+        expect(p.setLayerType(3, LayerTypeId::Hat));
+        expect(p.setLayerType(8, LayerTypeId::Arp));
+        mu_tronic::chooseRumbleSource(p, 5);
+        expectEquals(src(5), 3, "the first filled non-Rumble slot");
+
+        // The layer in slot 3 moves to slot 8 and the one in 8 to 3.
+        p.remapLayerReferences([](int i) { return i == 3 ? 8 : (i == 8 ? 3 : i); });
+        expectEquals(src(5), 8, "the source follows its layer");
+        // Slot 8's layer is gone: the source falls to the first filled non-Rumble slot (the Hat in 3).
+        p.remapLayerReferences([](int i) { return i == 8 ? -1 : i; });
+        expectEquals(src(5), 3, "a gone source falls back");
+
+        // chooseRumbleSource leaves a source that works.
+        mu_seam_test::setParam(p.apvts, "t5_src", 8.0f);
+        mu_tronic::chooseRumbleSource(p, 5);
+        expectEquals(src(5), 8, "a working source is kept");
+        p.flushPendingAsyncUpdates();
+    }
+
+    void rumbleSoundsFromItsSource()
+    {
+        beginTest("a Rumble in a slot processes its source's block, and its state round trips");
+        mu_seam_test::TempStorage storage;
+        TrackProcessor p;
+        expect(p.setLayerType(0, LayerTypeId::Kick));
+        expect(p.setLayerType(1, LayerTypeId::Rumble));
+        mu_tronic::chooseRumbleSource(p, 1);
+        expectEquals((int) std::lround(getPlain(p.apvts, "t1_src")), 0);
+
+        // The Rumble's stream is silent without its source and sounds with it.
+        auto peakOfSlot1 = [&](bool sourceOn)
+        {
+            for (int s = 0; s < 16; ++s) trackIn(p, 0).row.setOn(s, sourceOn && s % 4 == 0);
+            ChannelTap tap(1, 48000 / 2);
+            p.setChannelTapForTest(&tap);
+            {
+                Player play(p, 512);
+                for (int b = 0; b < 40; ++b) play.block();
+            }
+            p.setChannelTapForTest(nullptr);
+            float peak = 0.0f;
+            for (int c = 0; c < 2; ++c) peak = juce::jmax(peak, tap.buf.getMagnitude(c, 0, tap.buf.getNumSamples()));
+            return peak;
+        };
+        expectWithinAbsoluteError(peakOfSlot1(false), 0.0f, 1.0e-6f, "no source hits: the Rumble is silent");
+        expect(peakOfSlot1(true) > 0.001f, "the source's kicks reach the Rumble");
+
+        juce::MemoryBlock block;
+        p.getStateInformation(block);
+        mu_seam_test::TempStorage storage2;
+        TrackProcessor q;
+        q.setStateInformation(block.getData(), (int) block.getSize());
+        expect(q.getLayerTypeId(1) == LayerTypeId::Rumble, "the Rumble type restores by name");
+        expectEquals((int) std::lround(getPlain(q.apvts, "t1_src")), 0, "and its source");
+        p.flushPendingAsyncUpdates();
+        q.flushPendingAsyncUpdates();
+    }
+
     void defaultGroove()
     {
         beginTest("a fresh Track starts on its engine's default groove, and a restored empty row stays empty");

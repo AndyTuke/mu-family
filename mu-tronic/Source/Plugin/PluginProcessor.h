@@ -100,6 +100,9 @@ protected:
     // A fresh Empty layer for slot `slot` (every other type comes from the registry).
     std::unique_ptr<Layer> createLayer(int slot) override;
 
+    // A Rumble's source follows its layer through a swap or removal (docs/mu-tronic/design.md 1.4).
+    void remapLayerReferences(const std::function<int(int)>& oldToNew) override;
+
     // The non-empty slots: what the CPU meter and a controller count.
     int getNumActiveLayers() const override;
 
