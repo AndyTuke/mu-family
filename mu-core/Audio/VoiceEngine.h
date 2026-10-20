@@ -24,6 +24,18 @@ public:
     void prepareToPlay(double sampleRate, int blockSize);
     void loadFile(const juce::File& file);
     void clearSample();
+
+    // A sample read from a file and kept, so a staged preset can do its file work early and install at its boundary
+    // (loadFile is decodeFile then installSample). Message thread; a default one holds nothing.
+    struct DecodedSample
+    {
+        juce::AudioBuffer<float> buffer;
+        double sampleRate = 0.0;
+        bool isValid() const noexcept { return buffer.getNumSamples() > 0 && buffer.getNumChannels() > 0 && sampleRate > 0.0; }
+    };
+    DecodedSample decodeFile(const juce::File& file);     // empty when the file cannot be read; the engine is untouched
+    void          installSample(DecodedSample&& sample);  // brief: only the buffer swap is under the lock; an empty one changes nothing
+    DecodedSample takeSample();                           // moves this engine's sample out, leaving it empty
     // `tied` (pattern-legato) — when true, skip the envelope retrigger
     // entirely (env state continues uninterrupted across contiguous hits) and
     // ask SamplePlayer for a longer fade-in ramp so the sample-voice restart

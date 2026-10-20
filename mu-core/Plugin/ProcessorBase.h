@@ -149,6 +149,9 @@ public:
     mu_core::LayerServices* ensureLayerServices(const mu_core::LayerTypeInfo& info);
     // The services already built for `id`, or null (none yet, or the type declares none). Message thread.
     mu_core::LayerServices* findLayerServices(mu_core::LayerTypeId id) const;
+    // Any thread, allocation-free: asks for a deferred-work pass, in which every built services object runs its
+    // LayerServices::deferredWork on the message thread.
+    void requestLayerServicesWork() noexcept { requestDeferredWork(); }
     // Message thread. Gives `slot` a fresh layer of `type` (Empty empties it) without muting anything: the
     // new layer is built and prepared first, the old one is published away and sounds out in the retire bin,
     // the slot's type parameters go back to defaults (or take `initial`, a layer node) while nothing live reads
@@ -722,6 +725,7 @@ protected:
             if (onPresetSwapCommitted) onPresetSwapCommitted();
         }
         commitDeferredWork();
+        runLayerServicesWork();
         settleLiveState();   // after the product's commits: a queued item or clip that landed or was superseded
         drainPendingMidiProgramChanges();
         // Left queued by a table edit in progress: ask for another pass so it is not stranded.
@@ -733,6 +737,8 @@ protected:
     // the swap poll; MIDI program changes and control actions, via the same mailbox). Runs before
     // queued program changes are loaded. Default: nothing.
     virtual void commitDeferredWork() {}
+    // Message thread: LayerServices::deferredWork of every services object built so far.
+    void runLayerServicesWork();
 
     // The staged preset swaps (a parsed state tree per layer plus one full preset), shared by every
     // product that does not need a richer payload. A product sets its appliers once in its
@@ -954,7 +960,10 @@ protected:
     virtual void stageLayerPresetTree(int slot, juce::ValueTree tree, bool keepIdentity)
     {
         juce::ignoreUnused(keepIdentity);
-        if (layersAreSlots() && tree.isValid()) layerSwapper.useSlot(slot, std::move(tree));   // typed slot host: lands on the slot's wrap
+        if (! layersAreSlots() || ! tree.isValid()) return;
+        // The layer's file work (a sample, a user wavetable) is done now, so the commit at the boundary does none.
+        if (auto* layer = getLayer(slot)) layer->preloadStaged(tree);
+        layerSwapper.useSlot(slot, std::move(tree));   // typed slot host: lands on the slot's wrap
     }
 
     // The one entry to the virtual above: a stage that is not a clip launch leaves no clip active.

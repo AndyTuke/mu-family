@@ -571,6 +571,7 @@ namespace
     struct ServicesLog
     {
         int built = 0, attached = 0, prepared = 0, destroyed = 0, layersDestroyed = 0, layersSawDeadServices = 0;
+        int deferred = 0, mixedChunks = 0, mixedFrames = 0, largestChunk = 0;
         double preparedRate = 0.0;
         int preparedBlock = 0;
         mu_core::LayerServices* attachedTo = nullptr;
@@ -584,6 +585,14 @@ namespace
         ProbeServices() { ++gLog.built; gLog.alive = true; }
         ~ProbeServices() override { ++gLog.destroyed; gLog.alive = false; }
         void prepare(double rate, int block) override { ++gLog.prepared; gLog.preparedRate = rate; gLog.preparedBlock = block; }
+        void deferredWork() override { ++gLog.deferred; }
+        void mixIntoMaster(juce::AudioBuffer<float>& master, int numSamples) noexcept override
+        {
+            ++gLog.mixedChunks;
+            gLog.mixedFrames += numSamples;
+            gLog.largestChunk = juce::jmax(gLog.largestChunk, numSamples);
+            juce::FloatVectorOperations::add(master.getWritePointer(0), 0.125f, numSamples);   // the service's own contribution
+        }
     };
 
     // A layer of the type that shares services; its destructor reads whether they are still there.
@@ -613,6 +622,7 @@ namespace
         bool layersAreSlots() const override { return true; }
         std::unique_ptr<Layer> createLayer(int) override { return std::make_unique<EmptyT>(); }
         using ProcessorBase::layerTypes;
+        using ProcessorBase::drainDeferredWork;
     };
 }
 
@@ -625,6 +635,41 @@ struct LayerServicesTests : juce::UnitTest
         builtWithTheFirstLayer();
         preparedWithTheProcessor();
         outlivesLayersAndTails();
+        deferredWorkAndMasterMix();
+    }
+
+    // A services object gets a message-thread pass when one is asked for (from any thread), and may add to the master bus
+    // itself, once per chunk the mixer ran in.
+    void deferredWorkAndMasterMix()
+    {
+        beginTest("services run deferred work on request, and mix into the master bus in chunks of the prepared size");
+        gLog = {};
+        auto box = std::make_unique<ServicesHost>(); auto& p = *box;
+        expect(p.setLayerType(1, LayerTypeId::Test));
+        p.drainDeferredWork();   // the type change asked for a pass of its own (the old layer's bin entry)
+        gLog.deferred = 0;
+        p.drainDeferredWork();
+        expectEquals(gLog.deferred, 0, "no pass without a request");
+        p.requestLayerServicesWork();
+        p.drainDeferredWork();
+        expectEquals(gLog.deferred, 1, "a requested pass reaches the services");
+        p.drainDeferredWork();
+        expectEquals(gLog.deferred, 1, "and only once");
+
+        p.prepareToPlay(48000.0, 128);
+        juce::AudioBuffer<float> buf(2, 300);
+        juce::MidiBuffer midi;
+        mu_core::BlockTransport t;
+        t.bpm = 120.0;
+        t.beatsPerSample = (t.bpm / 60.0) / 48000.0;
+        buf.clear();
+        p.renderAndMixForTest(buf, midi, t);
+        expectEquals(gLog.mixedFrames, 300, "every frame of the host block");
+        expectEquals(gLog.mixedChunks, 3, "in three chunks");
+        expect(gLog.largestChunk <= 128, "none longer than the prepared size");
+        expectEquals(buf.getSample(0, 299), 0.125f, "the service's contribution is in the master bus (nothing else sounds)");
+        p.releaseResources();
+        p.flushPendingAsyncUpdates();
     }
 
     // Built when the first layer of the type is added, once, and each layer is wired to it with its slot; a type that

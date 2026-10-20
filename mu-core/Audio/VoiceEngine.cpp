@@ -41,31 +41,56 @@ void VoiceEngine::prepareToPlay(double sampleRate, int blockSize)
     syncFilter();
 }
 
-void VoiceEngine::loadFile(const juce::File& file)
+VoiceEngine::DecodedSample VoiceEngine::decodeFile(const juce::File& file)
 {
+    DecodedSample out;
     std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(file));
     if (reader == nullptr)
-        return;
+        return out;
 
     if (reader->numChannels == 0 || reader->lengthInSamples <= 0)
-        return;
+        return out;
     if (reader->lengthInSamples > static_cast<juce::int64>(std::numeric_limits<int>::max()))
-        return;
+        return out;
 
     const int numSamples  = static_cast<int>(reader->lengthInSamples);
     const int numChannels = static_cast<int>(reader->numChannels);
     juce::AudioBuffer<float> temp(numChannels, numSamples);
     reader->read(&temp, 0, numSamples, 0, true, true);
 
-    const double srcRate = reader->sampleRate;
+    out.buffer     = std::move(temp);
+    out.sampleRate = reader->sampleRate;
+    return out;
+}
 
-    {
-        const juce::SpinLock::ScopedLockType sl(bufferLock);
-        buffer             = std::move(temp);
-        originalSampleRate = srcRate;
-        playbackRatio      = srcRate / currentSampleRate;
-        sampleLoaded.store(true, std::memory_order_relaxed);
-    }
+void VoiceEngine::installSample(DecodedSample&& sample)
+{
+    if (! sample.isValid())
+        return;
+
+    const juce::SpinLock::ScopedLockType sl(bufferLock);
+    buffer             = std::move(sample.buffer);
+    originalSampleRate = sample.sampleRate;
+    playbackRatio      = sample.sampleRate / currentSampleRate;
+    sampleLoaded.store(true, std::memory_order_relaxed);
+}
+
+VoiceEngine::DecodedSample VoiceEngine::takeSample()
+{
+    DecodedSample out;
+    const juce::SpinLock::ScopedLockType sl(bufferLock);
+    if (! sampleLoaded.load(std::memory_order_relaxed)) return out;
+    out.buffer     = std::move(buffer);
+    out.sampleRate = originalSampleRate;
+    buffer.setSize(0, 0);
+    sampleLoaded.store(false, std::memory_order_relaxed);
+    return out;
+}
+
+void VoiceEngine::loadFile(const juce::File& file)
+{
+    // The file is read outside the lock; installSample holds it only to move the new buffer in.
+    installSample(decodeFile(file));
 }
 
 void VoiceEngine::trigger(bool isAccented, bool tied)

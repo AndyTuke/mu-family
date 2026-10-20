@@ -831,7 +831,10 @@ void ProcessorBase::saveTypedLayerPreset(int slot, const juce::String& name)
     if (info == nullptr || juce::String(info->presetTag).isEmpty()) return;   // an Empty slot has nothing to save
     const auto dir = presetDirOf(*info);
     if (dir == juce::File()) return;
-    if (auto xml = captureLayerNode(slot, info->presetTag).createXml())
+    const auto node = captureLayerNode(slot, info->presetTag);
+    // A type whose file keeps another shape than the composed node converts it at the file boundary.
+    const auto fileTree = info->presetNodeToFile != nullptr ? info->presetNodeToFile(node, name) : node;
+    if (auto xml = fileTree.createXml())
         mu_pp::writeXmlAtomically(*xml, dir.getChildFile(mu_pp::safePresetFileName(name, info->name) + "." + presetExtensionOf(*info)),
                                   onLoadError);
 }
@@ -849,11 +852,19 @@ void ProcessorBase::loadTypedLayerPreset(int slot, const juce::File& file)
         return;
     }
 
+    // The composed node the slot applies: the file itself, or its conversion for a type with another file shape.
+    const auto node = fileInfo->presetFileToNode != nullptr ? fileInfo->presetFileToNode(tree, file.getFileNameWithoutExtension()) : tree;
+    if (! node.isValid())
+    {
+        if (onLoadError) onLoadError("Could not read \"" + file.getFileName() + "\"");
+        return;
+    }
+
     const auto slotType = slotTypeId(slot);
     if (slotType == mu_core::LayerTypeId::Empty)
     {
         // An Empty slot takes the file's type, with the file's rows as the new layer's first state.
-        if (setLayerType(slot, type, &tree) && onLayerPresetCommitted)
+        if (setLayerType(slot, type, &node) && onLayerPresetCommitted)
             onLayerPresetCommitted(slot);
         return;
     }
@@ -870,7 +881,7 @@ void ProcessorBase::loadTypedLayerPreset(int slot, const juce::File& file)
         }
         return;
     }
-    stageLayerPreset(slot, tree, false, false);
+    stageLayerPreset(slot, node, false, false);
 }
 
 void ProcessorBase::applyStagedTypedLayer(int slot, const juce::ValueTree& tree)
@@ -1419,7 +1430,21 @@ mu_core::LayerServices* ProcessorBase::ensureLayerServices(const mu_core::LayerT
     }
     if (rate > 0.0) built->prepare(rate, block);
     layerServices[(size_t) i] = std::move(built);
+    audioServices[(size_t) i].store(layerServices[(size_t) i].get(), std::memory_order_release);
     return layerServices[(size_t) i].get();
+}
+
+void ProcessorBase::runLayerServicesWork()
+{
+    // Copied out under the table's lock and run outside it: a services object's work may reach back into the table
+    // (a content asking for another type's services). Entries live until the processor is destroyed.
+    std::array<mu_core::LayerServices*, (size_t) mu_core::kLayerTypeIdCount> built {};
+    {
+        const juce::ScopedLock sl(layerServicesLock);
+        for (size_t i = 0; i < built.size(); ++i) built[i] = layerServices[i].get();
+    }
+    for (auto* s : built)
+        if (s != nullptr) s->deferredWork();
 }
 
 mu_core::LayerServices* ProcessorBase::findLayerServices(mu_core::LayerTypeId id) const

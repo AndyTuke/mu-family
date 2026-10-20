@@ -65,6 +65,10 @@ namespace mu_core
         using CreateFn    = std::unique_ptr<Layer> (*)(int slot, LayerTypeId type);
         // The type a layer-preset tree holds; Empty when the tree names none.
         using TypeFromPresetFn = LayerTypeId (*)(const juce::ValueTree& preset);
+        // A layer-preset FILE tree to the composed node a slot applies (rows + extras), and back, for a type whose file
+        // keeps another shape than the composed node (mu-Clid's .muRhythm keeps its r0_ properties). `name` is the preset's
+        // name when saving. Pure, message thread. The node keeps the file's root tag, so the type test still reads it.
+        using PresetConvertFn = juce::ValueTree (*)(const juce::ValueTree& tree, const juce::String& name);
         using CreateContentFn = std::unique_ptr<LayerContent> (*)(ProcessorBase& host, int slot);
         // The slot's picture in the sidebar; `pulse` asks the host to repaint the item.
         using CreateMiniVisualFn = std::unique_ptr<juce::Component> (*)(ProcessorBase& host, int slot, std::function<void()> pulse);
@@ -89,6 +93,8 @@ namespace mu_core
         CreateFn    create = nullptr;          // a fresh default layer for `slot`, not yet prepared or bound
         TypeFromPresetFn typeFromPreset = nullptr;   // set where several types share an extension (.muTrack): the folder
                                                // listing then keeps only the files that map to this type; null = every file
+        PresetConvertFn presetFileToNode = nullptr;   // load: file tree -> composed node; null = the file is the node
+        PresetConvertFn presetNodeToFile = nullptr;   // save: composed node -> file tree; null = the node is the file
         CreateContentFn    createContent    = nullptr;   // the type's content component, built once per type by the editor
         CreateMiniVisualFn createMiniVisual = nullptr;   // the type's sidebar picture
         CreateServicesFn   createServices   = nullptr;   // null = the type shares nothing between its layers

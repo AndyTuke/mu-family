@@ -100,6 +100,9 @@ protected:
     // its own rules. Message or host thread; the audio thread never touches it.
     std::array<std::unique_ptr<mu_core::LayerServices>, (size_t) mu_core::kLayerTypeIdCount> layerServices;
     mutable juce::CriticalSection layerServicesLock;
+    // The same objects as raw pointers the audio thread may read without the lock (LayerServices::mixIntoMaster). A slot is
+    // written once, after its services are built, and never cleared before the processor is destroyed.
+    std::array<std::atomic<mu_core::LayerServices*>, (size_t) mu_core::kLayerTypeIdCount> audioServices {};
 
     // Layer storage: fixed capacity, runtime count. A product whose count or layer order changes at
     // runtime must have its audio thread take a ScopedTryLock on `layersLock` once per block and read

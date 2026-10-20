@@ -244,6 +244,17 @@ void ProcessorBase::renderAndMix(juce::AudioBuffer<float>& buffer, juce::MidiBuf
                          nullptr, &renderState.copyToMixer);
     }
 
+    // What a type's services add to the master bus themselves (a sample browser's preview), in the chunks the mixer
+    // ran in, so a service never sees more frames than it was prepared for.
+    for (const auto& slot : audioServices)
+        if (auto* services = slot.load(std::memory_order_acquire))
+            for (int off = 0; off < n; off += renderState.prepared)
+            {
+                juce::AudioBuffer<float> chunk;
+                chunk.setDataToReferTo(buffer.getArrayOfWritePointers(), numCh, off, juce::jmin(renderState.prepared, n - off));
+                services->mixIntoMaster(chunk, chunk.getNumSamples());
+            }
+
     // The layers' MIDI out stays in the block's storage: the product merges it into the host buffer with
     // mergeLayerMidiOut and the room it knows that buffer has (design 2.1.5, R7; the mechanism is the
     // MIDI-output product's to settle when it adopts the driver).

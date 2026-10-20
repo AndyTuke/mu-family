@@ -302,3 +302,63 @@ struct VoiceEngineContendedBlockTests : juce::UnitTest
 };
 
 static VoiceEngineContendedBlockTests voiceEngineContendedBlockTests;
+
+// A sample read from a file and installed later (a staged preset's file work done at stage time): decodeFile touches
+// nothing, installSample puts the buffer in, takeSample moves it out, and an empty one changes nothing.
+struct VoiceEngineDecodedSampleTests : juce::UnitTest
+{
+    VoiceEngineDecodedSampleTests() : juce::UnitTest("VoiceEngine: a sample is decoded apart and installed or taken as a unit", "mu-core") {}
+
+    void runTest() override
+    {
+        beginTest("decodeFile, installSample and takeSample");
+        const auto file = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                              .getChildFile("mu-core-decoded-" + juce::String::toHexString(juce::Random().nextInt64()) + ".wav");
+        {
+            juce::AudioBuffer<float> tone(1, 4800);
+            for (int i = 0; i < tone.getNumSamples(); ++i)
+                tone.setSample(0, i, 0.5f * std::sin(juce::MathConstants<float>::twoPi * 440.0f * (float) i / 48000.0f));
+            juce::WavAudioFormat wav;
+            std::unique_ptr<juce::OutputStream> stream(file.createOutputStream());
+            expect(stream != nullptr);
+            if (stream == nullptr) return;
+            auto writer = wav.createWriterFor(stream, juce::AudioFormatWriterOptions().withSampleRate(48000.0)
+                                                                                         .withNumChannels(1)
+                                                                                         .withBitsPerSample(16));
+            expect(writer != nullptr);
+            if (writer == nullptr) return;
+            writer->writeFromAudioSampleBuffer(tone, 0, tone.getNumSamples());
+        }
+
+        VoiceEngine engine;
+        engine.prepareToPlay(48000.0, 256);
+        auto decoded = engine.decodeFile(file);
+        expect(decoded.isValid(), "the file reads");
+        expectEquals(decoded.buffer.getNumSamples(), 4800);
+        expectEquals(decoded.sampleRate, 48000.0);
+        expect(! engine.hasSample(), "decoding touches nothing");
+
+        engine.installSample(std::move(decoded));
+        expect(engine.hasSample(), "installed");
+        engine.installSample({});
+        expect(engine.hasSample(), "an empty sample changes nothing");
+
+        auto taken = engine.takeSample();
+        expect(taken.isValid() && taken.buffer.getNumSamples() == 4800, "taken whole");
+        expect(! engine.hasSample(), "and the engine is left empty");
+        expect(! engine.takeSample().isValid(), "an empty engine gives nothing");
+
+        VoiceEngine other;
+        other.installSample(std::move(taken));
+        expect(other.hasSample(), "it moves to another engine");
+        expect(! engine.decodeFile(file.getSiblingFile("does-not-exist.wav")).isValid(), "a missing file is no sample");
+
+        // loadFile is both steps.
+        VoiceEngine third;
+        third.loadFile(file);
+        expect(third.hasSample());
+        file.deleteFile();
+    }
+};
+
+static VoiceEngineDecodedSampleTests voiceEngineDecodedSampleTests;
