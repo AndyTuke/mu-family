@@ -54,9 +54,10 @@ struct Track : Layer
     int slot = 0;
 
     // True when the host fixes this track's engine (a mu-Tronic layer is created as one of the five types and
-    // keeps it): the content hides the Engine selector, and syncEngine keeps only that engine (one per layer,
-    // design 1.4). Message thread, before syncEngine; false in mu-On, so the standalone is unchanged. Not saved:
-    // the host that locks it sets it when it creates the layer.
+    // keeps it): the content hides the Engine selector, engineSetting() returns the locked engine whatever
+    // `t{N}_eng` holds, and syncEngine keeps only that engine (one per layer, design 1.4). Set by lockEngine
+    // on the message thread before the layer is published; false in mu-On, so the standalone is unchanged.
+    // Not saved: the host that locks it sets it when it creates the layer.
     bool engineLocked = false;
 
     Track();
@@ -82,6 +83,10 @@ struct Track : Layer
     // Message thread: the slot's t{slot}_ rows (engine, source, Bass wave), the groove rows and every engine's
     // modulation inputs.
     void bindParams(juce::AudioProcessorValueTreeState& apvts, int slot) override;
+    // Message thread, once, after the first bindParams: a locked track writes `t{N}_eng` to its engine when it
+    // differs (so the saved rows and a saved .muTrack name the right engine and mu-On loads it), then builds
+    // the engines it needs (syncEngine).
+    void completeSetup(juce::AudioProcessorValueTreeState& apvts, int slot) override;
     // Audio thread: the track's block into out[0, n) (handed over cleared).
     void render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n) override;
     // Audio thread: a parked spare's row clock keeps step with the transport, so it fires on time once live.
@@ -89,8 +94,26 @@ struct Track : Layer
     // A staged track preset lands on the 16-step row's wrap: the bar.
     double loopBeats() const override { return 4.0; }
 
+    // ── How the track leaves its slot ────────────────────────────────────────
+    // Fade (the family defaults, 25 ms and 2 s): the engine that last sounded keeps the parameters it was last
+    // given, so the tail copies nothing at beginRetire and never reads a parameter.
+    mu_core::RetirePolicy retirePolicy() const override
+    {
+        mu_core::RetirePolicy p;
+        p.kind = mu_core::RetirePolicy::Kind::Fade;
+        return p;
+    }
+    // Audio thread: the engine of the last rendered block rings on with no trigger and no setParams, through
+    // the bin's linear fade. A Rumble tail processes the track's silence buffer. False once nothing can sound.
+    bool renderRetiring(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n, mu_core::RetireState& rs) override;
+
     // ── The engine ───────────────────────────────────────────────────────────
-    // The engine the track's `t{N}_eng` parameter names (any thread; Kick before bindParams).
+    // Message thread, before the track is bound or published: fix the track to `engine` (see engineLocked).
+    // The audio thread reads the two plain members without a lock, so the layer's publication is what makes them
+    // visible: never call this on a track that is already live.
+    void lockEngine(EngineType engine) noexcept { engineLocked = true; lockedEngine = engine; }
+    // The engine the track runs: the locked one, else the one its `t{N}_eng` parameter names (any thread;
+    // Kick before bindParams).
     EngineType engineSetting() const noexcept;
     // Message thread: brings the engines the track holds to the set it needs (all five; with engineLocked only
     // the one its parameter names). Missing engines are built and prepared outside every lock and installed
@@ -145,7 +168,10 @@ private:
     double preparedRate  = 44100.0;
     int    preparedBlock = 512;
 
+    EngineType lockedEngine = EngineType::Kick;   // the engine of a locked track (engineLocked)
+
     juce::AudioBuffer<float> silence;          // a Rumble with no source processes this (sized at prepare)
+    juce::AudioBuffer<float> tailScratch;      // a tail that must add rather than write renders here (sized at prepare)
     juce::AudioBuffer<float> sourceView;       // a Rumble's view of its source's block (no allocation)
 
     int   current = -1;          // the engine the last rendered block resolved (-1: none, the next block resets)

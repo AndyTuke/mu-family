@@ -189,6 +189,11 @@ struct Layer : public mu_core::RetireTail
     // Message thread, before publication and again after every move to another slot (C9): cache the slot's
     // parameter atomics (mu_core::ParamBinding). render never looks a parameter up by id.
     virtual void bindParams(juce::AudioProcessorValueTreeState& apvts, int slot) { juce::ignoreUnused(apvts, slot); }
+    // Message thread, once, after the first bindParams and before the layer is published: setup that needs the bound
+    // parameters and may allocate, build and prepare (an engine, a bank binding, a file) or write the layer's own
+    // parameters through the APVTS. Called outside every lock, so it is not part of bindParams, which also runs under
+    // layersLock when a reorder rebinds a moved layer. Default: nothing.
+    virtual void completeSetup(juce::AudioProcessorValueTreeState& apvts, int slot) { juce::ignoreUnused(apvts, slot); }
     // Audio thread: frames [0, n) of `out` (two channels, handed over cleared) become the layer's block,
     // insert included. No allocation, no lock beyond the layer's own spin locks, no parameter lookup by id,
     // no call into the host: the only outputs are `out`, ctx.midiOut and the layer's own atomics.

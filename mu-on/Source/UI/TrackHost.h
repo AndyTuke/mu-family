@@ -18,7 +18,7 @@ class TrackHost
 public:
     virtual ~TrackHost() = default;
 
-    // The parameter tree the layer's t{N}_ rows and the groove rows (seq_swing, seq_accent) live in.
+    // The parameter tree the layer's t{N}_ rows and the track's groove rows (t{N}_swing, t{N}_accent) live in.
     virtual juce::AudioProcessorValueTreeState& getTrackParameters() noexcept = 0;
     // Layer `layer` as its Track (step row, Rumble envelope, modulation matrix).
     virtual Track& getTrack(int layer) noexcept = 0;

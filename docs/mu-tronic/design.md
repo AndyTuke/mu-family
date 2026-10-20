@@ -1056,7 +1056,7 @@ slot; a golden that depends on it is re-recorded in a signed goldens-only commit
 and prepares outside every lock, pointer moves under `engineLock`, old engine freed on the message thread, a try-lock miss renders that track silent for one call) is the R1 rule applied
 to a layer-internal engine.
 
-**Point 8: what mu-Tronic still needs from this library (owed, not E3 blockers).** (a) `TrackContent` and `Track::bindParams` bind to the global rows `seq_swing` and `seq_accent`;
+**Point 8: what mu-Tronic still needs from this library (owed, not E3 blockers; (a) to (d) built in T1b step 2b, 2026-10-20, per 2.1.11).** (a) `TrackContent` and `Track::bindParams` bind to the global rows `seq_swing` and `seq_accent`;
 mu-Tronic has no global groove, so before it links the library the groove parameters become per-layer rows (appended to the `t{N}_` table, pre-release) or the host names the
 ids; the plan's E3.3 seeding (global values seed each row on load) stays for the standalone. (b) `StepRows` draws every live layer; mu-Tronic's Track content shows only its own
 row, so a one-row component is split out of it (T1, `ux-controller` for the look). (c) `initParams` (point 6). (d) `Track::prepare` builds no engine: the host calls `syncEngine()`
@@ -1632,8 +1632,7 @@ has a fixture of its own. `mu-core-tests-16` runs the core suites at capacity 16
 
 ## 8. Relation to mu-link
 
-mu-link today is the **performance hub**: it owns the hardware output, sums the standalones' audio rings, is the master clock, offers Scenes, MIDI-clock out and
-(planned) a Link peer. mu-Tronic gives the same rig in one process: one transport (already sample-accurate in-process), a mixer with buses and the shared
+mu-link today is the **performance hub**: it owns the hardware output, sums the standalones' audio rings, is the master clock, offers Scenes, MIDI-clock out. (An Ableton Link peer was dropped 2026-10-20.) mu-Tronic gives the same rig in one process: one transport (already sample-accurate in-process), a mixer with buses and the shared
 FX, a performance file and scenes (section 3.6; the `Performance` level exists), hardware output owned by the standalone, and the controller work in `mu-control`.
 Andy's view (2026-10-15): "a new performance framework that might make mu-link redundant".
 
@@ -1643,12 +1642,12 @@ Not "absorb" because that would copy mu-link's server, IPC and registry into a p
 
 - mu-Tronic **is a mu-link client like the other standalones** (the bridge is one line in `StandaloneApp.cpp`), so the two can run together; when attached it
   slaves to the mu-link clock via `resolveTransport`.
-- **No duplicated clock/MIDI code.** MIDI clock out, the Link peer, the tempo PLL and the transport sources already live or are planned in `mu-core`
+- **No duplicated clock/MIDI code.** MIDI clock out, the tempo PLL and the transport sources already live in `mu-core`
   (`TimedMidiOut`, `MidiClockTempo`, `TransportResolver`); mu-Tronic and mu-link both use them. Anything mu-link would still need to build for performance
-  use (Scenes, a Link peer) is built in `mu-core` or the shell where it is generic, so the second product that wants it does not copy it. This is the
+  use (Scenes) is built in `mu-core` or the shell where it is generic, so the second product that wants it does not copy it. This is the
   standing one-framework rule, not a freeze: **no feature freeze on mu-link**.
 - **Revisit later.** When mu-Tronic's T8a is done, Andy may judge whether mu-link is redundant (the earlier draft's test: hardware output ownership, MIDI-clock out,
-  a Link peer if licensed, scenes, controller workflow). Nothing is scheduled and no decision is needed before then.
+  scenes, controller workflow). Nothing is scheduled and no decision is needed before then.
 
 ---
 

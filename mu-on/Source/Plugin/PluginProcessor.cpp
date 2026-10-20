@@ -17,10 +17,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     for (int i = 0; i < mu_limits::kMaxLayers; ++i)
         mu_mixfx::addChannelStripParams(layout, "ch" + String(i) + "_", "Track " + String(i + 1) + " Ch ");
 
-    // ── Sequencer (global groove controls) ────────────────────────────────────
-    addTrackGlobalParams(layout);
-
-    // ── Per track: the engine, the Rumble source, then every engine's parameters (t{N}_*) ──────
+    // ── Per track: the engine, the Rumble source, the groove, then every engine's parameters (t{N}_*) ──────
     for (int i = 0; i < mu_limits::kMaxLayers; ++i)
         addLayerParams(layout, i);
 
@@ -51,8 +48,6 @@ PluginProcessor::PluginProcessor()
     getTrack(0).row.loadDefaultGroove(EngineType::Kick);   // ...with the four-on-the-floor row
     unsavedLayerCount = kNumLegacyLanes;                   // a state saved before layers were variable held five lanes
 
-    seqSwingParam  = apvts.getRawParameterValue("seq_swing");
-    seqAccentParam = apvts.getRawParameterValue("seq_accent");
     for (int i = 0; i < mu_limits::kMaxLayers; ++i) engineParam[(size_t) i] = apvts.getRawParameterValue(layerParamId(i, "eng"));
 
     // Each track holds exactly one engine, the one its `t{N}_eng` parameter names: a change of that parameter
@@ -85,10 +80,8 @@ PluginProcessor::~PluginProcessor()
 }
 
 // A track's engine parameter changed. A mu-On track holds all five engines (it is never engineLocked), so it
-// switches in the same block whatever thread the change came from, and syncEngine finds nothing to build. The
-// path stays for a locked track (one engine, a mu-Tronic layer): on the message thread it builds the named engine
-// now; from any other thread nothing may allocate, so the slot is flagged and the deferred work (message thread)
-// builds it, the track rendering silence until then.
+// switches in the same block whatever thread the change came from, and syncEngine finds nothing to build. A
+// locked track (a mu-Tronic layer) ignores the parameter, so for it syncEngine finds nothing to build either.
 void PluginProcessor::engineParamChanged(int slot)
 {
     if (juce::MessageManager::existsAndIsCurrentThread())
@@ -152,23 +145,10 @@ std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
 {
     auto t = std::make_unique<Track>();
     t->slot      = slot;
-    seedRowGroove(t->row);
     t->bindParams(apvts, slot);
     t->prepare(currentSampleRate.load(std::memory_order_relaxed), currentBlockSize.load(std::memory_order_relaxed));
-    t->syncEngine();   // the engine the slot's parameter names, built and prepared now
+    t->completeSetup(apvts, slot);   // the engines the slot's parameter names, built and prepared now
     return t;
-}
-
-// The global groove into one row, and into every slot's row (spares included). Any thread: atomics only.
-void PluginProcessor::seedRowGroove(StepRow& row) const noexcept
-{
-    row.setGroove(seqSwingParam  != nullptr ? seqSwingParam->load(std::memory_order_relaxed)  : 0.0f,
-                  seqAccentParam != nullptr ? seqAccentParam->load(std::memory_order_relaxed) : 1.0f);
-}
-
-void PluginProcessor::seedRowGrooves() noexcept
-{
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i) seedRowGroove(getTrack(i).row);
 }
 
 // A track that moved to another slot starts there from silence, its engine as freshly prepared (as each

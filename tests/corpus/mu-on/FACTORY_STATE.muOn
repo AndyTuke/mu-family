@@ -99,8 +99,6 @@
       <p id="ch7_scAtk" x="5.0"/>
       <p id="ch7_scRel" x="100.0"/>
       <p id="ch7_outBus" x="0.0"/>
-      <p id="seq_swing" x="0.0"/>
-      <p id="seq_accent" x="1.0"/>
       <p id="eff_algo" x="0.0"/>
       <p id="eff_en" x="1.0"/>
       <p id="eff_p0" x="0.5"/>
@@ -212,6 +210,8 @@
         <p id="rumble_revlp" x="1200.0"/>
         <p id="rumble_cut" x="800.0"/>
         <p id="rumble_res" x="0.2000000029802322"/>
+        <p id="swing" x="0.0"/>
+        <p id="accent" x="1.0"/>
         <Track i="0" on="1000100010001000" accent="1000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -264,6 +264,8 @@
         <p id="rumble_revlp" x="1200.0"/>
         <p id="rumble_cut" x="800.0"/>
         <p id="rumble_res" x="0.2000000029802322"/>
+        <p id="swing" x="0.0"/>
+        <p id="accent" x="1.0"/>
         <Track i="1" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -316,6 +318,8 @@
         <p id="rumble_revlp" x="1200.0"/>
         <p id="rumble_cut" x="800.0"/>
         <p id="rumble_res" x="0.2000000029802322"/>
+        <p id="swing" x="0.0"/>
+        <p id="accent" x="1.0"/>
         <Track i="2" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -368,6 +372,8 @@
         <p id="rumble_revlp" x="1200.0"/>
         <p id="rumble_cut" x="800.0"/>
         <p id="rumble_res" x="0.2000000029802322"/>
+        <p id="swing" x="0.0"/>
+        <p id="accent" x="1.0"/>
         <Track i="3" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -420,6 +426,8 @@
         <p id="rumble_revlp" x="1200.0"/>
         <p id="rumble_cut" x="800.0"/>
         <p id="rumble_res" x="0.2000000029802322"/>
+        <p id="swing" x="0.0"/>
+        <p id="accent" x="1.0"/>
         <Track i="4" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -472,6 +480,8 @@
         <p id="rumble_revlp" x="1200.0"/>
         <p id="rumble_cut" x="800.0"/>
         <p id="rumble_res" x="0.2000000029802322"/>
+        <p id="swing" x="0.0"/>
+        <p id="accent" x="1.0"/>
         <Track i="5" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -524,6 +534,8 @@
         <p id="rumble_revlp" x="1200.0"/>
         <p id="rumble_cut" x="800.0"/>
         <p id="rumble_res" x="0.2000000029802322"/>
+        <p id="swing" x="0.0"/>
+        <p id="accent" x="1.0"/>
         <Track i="6" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -576,6 +588,8 @@
         <p id="rumble_revlp" x="1200.0"/>
         <p id="rumble_cut" x="800.0"/>
         <p id="rumble_res" x="0.2000000029802322"/>
+        <p id="swing" x="0.0"/>
+        <p id="accent" x="1.0"/>
         <Track i="7" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"

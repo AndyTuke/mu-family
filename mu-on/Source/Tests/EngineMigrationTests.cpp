@@ -156,7 +156,9 @@ struct MuOnEngineMigrationTests : juce::UnitTest
             // Saved mixer values are carried as saved; the pre-wired default is not applied on top of them.
             expectEquals((int) getParam(p.apvts, "ch1_scSrc"), 1, "the mixer sidechain source is as saved");
             expectWithinAbsoluteError(getParam(p.apvts, "ch1_scAmt"), 0.4f, 0.002f);
-            expectWithinAbsoluteError(getParam(p.apvts, "seq_swing"), 0.25f, 0.002f);
+            // The old global swing has no parameter now: the row is skipped and every track keeps its own default.
+            expect(p.apvts.getParameter("seq_swing") == nullptr, "no global groove row");
+            expectWithinAbsoluteError(getParam(p.apvts, "t0_swing"), 0.0f, 0.002f);
 
             // Step rows and the Rumble envelope are on their layer.
             expect(p.pattern().isOn(0, 0) && p.pattern().isOn(0, 4) && ! p.pattern().isOn(0, 1) && p.pattern().isAccent(0, 0), "Kick row");

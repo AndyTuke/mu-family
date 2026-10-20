@@ -1,5 +1,5 @@
 // mu-On's five layer types over the one Track class (docs/mu-tronic/design.md 1.4): the LayerTypeInfo
-// constants, the type of a track and of a saved track preset, and the engineLocked default.
+// constants, the type of a track and of a saved track preset, and the engine lock create applies.
 
 #include "Plugin/PluginProcessor.h"
 #include "Sequencer/TrackTypes.h"
@@ -31,7 +31,15 @@ public:
             const auto layer = info.create(3, info.id);
             const auto* track = dynamic_cast<const Track*>(layer.get());
             expect(track != nullptr && track->slot == 3, "create builds a Track for the slot");
-            expect(track != nullptr && ! track->engineLocked, "engineLocked defaults off");
+            expect(track != nullptr && track->engineLocked && track->engineSetting() == engine, "create locks the track to its type's engine");
+            expectEquals(juce::String(info.contentFolderName), juce::String("muOn"));
+            expectEquals(juce::String(info.presetFolder), juce::String("Tracks"));
+            expectEquals(juce::String(info.typeTag), juce::String("On"));
+            expect(info.appColourId == (int) MuLookAndFeel::appYellow, "painted in mu-On's yellow");
+            expect(info.typeFromPreset == &typeFromPreset, "the shared extension is told apart by the saved engine");
+            expect(track != nullptr && track->retirePolicy().kind == mu_core::RetirePolicy::Kind::Fade, "every Track type fades");
+            expectEquals(track->retirePolicy().fadeMs, 25.0f);
+            expectEquals(track->retirePolicy().maxSeconds, 2.0f);
         }
         expect(! isTrackType(mu_core::LayerTypeId::Arp) && ! isTrackType(mu_core::LayerTypeId::Empty));
 

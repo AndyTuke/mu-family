@@ -26,6 +26,8 @@ void Arp::prepare(double sampleRate, int blockSize)
 {
     runner.prepare(sampleRate, blockSize);
     insert->prepare(sampleRate, blockSize);
+    tailScratch.setSize(2, juce::jmax(1, blockSize));
+    tailScratch.clear();
     parked = true;
 }
 
@@ -156,6 +158,32 @@ void Arp::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& ou
 
     readParams(ctx.startBeat);   // the control-sequence playhead runs on the call's beat
     renderBlock(out, n);
+}
+
+// The tail of a layer that left its slot (docs/mu-tronic/design.md 2.1.11 point 3): the voice with no keys held
+// (its note is released and rings out its release), faded, then the insert with the configuration it last had.
+// Reads no parameter and no modulation: only the voice, the insert and its stored configuration.
+bool Arp::renderRetiring(const mu_core::RenderContext&, juce::AudioBuffer<float>& out, int n, mu_core::RetireState& rs)
+{
+    // The bin hands the tail the slot's block exclusively (write it) or not (render aside, then add).
+    juce::AudioBuffer<float> aside;
+    if (rs.exclusive == 0)
+    {
+        aside.setDataToReferTo(tailScratch.getArrayOfWritePointers(), juce::jmin(2, out.getNumChannels()),
+                               juce::jmin(n, tailScratch.getNumSamples()));
+        aside.clear();
+    }
+    auto& buf = rs.exclusive != 0 ? out : aside;
+    const int frames = juce::jmin(n, buf.getNumSamples());
+
+    const ArpContext idle;   // not playing, no key held: the runner only releases its note and renders the voice's tail
+    runner.render(buf, frames, idle);
+    mu_core::applyLinearFade(buf, frames, rs);
+    insert->process(buf, frames, buf.getNumChannels(), insertCfg);
+
+    if (rs.exclusive == 0)
+        for (int c = 0; c < buf.getNumChannels(); ++c) out.addFrom(c, 0, buf, c, 0, frames);
+    return true;   // the bin ends the fade when its ramp is spent
 }
 
 void Arp::onParkedBlock(const mu_core::RenderContext& ctx)

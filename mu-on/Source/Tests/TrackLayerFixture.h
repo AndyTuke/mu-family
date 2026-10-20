@@ -41,8 +41,8 @@ namespace mu_on_fixture
         set(mu_on::engineParamId(0, EngineType::Bass, "sus"), 0.3f);
         set(mu_on::engineParamId(1, EngineType::Rumble, "drive"), 0.5f);
         set(mu_on::engineParamId(1, EngineType::Rumble, "revmix"), 0.4f);
-        set("seq_swing", 0.3f);
-        set("seq_accent", 0.6f);
+        set(mu_on::layerParamId(0, "swing"), 0.3f);
+        set(mu_on::layerParamId(0, "accent"), 0.6f);
     }
 
     // Track 0's steps (track 1, a Rumble, does not step).

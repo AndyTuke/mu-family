@@ -36,13 +36,13 @@ transport scrubs or restarts, so it never burst-fires a backlog. A track parked 
 clock in step (`onParkedBlock`), so it fires on time once live. `GrooveSequencer` (the whole-grid
 clock over a `StepPattern`) is test support in `Tests/`; the arithmetic is the same.
 
-- **Swing** (`seq_swing`) delays the **odd** 16ths by up to half a step — the groove "shuffle".
-- **Accent** (`seq_accent`) sets the velocity of accented cells; plain cells use a lower fixed
+- **Swing** (`t{N}_swing`, per track) delays the **odd** 16ths by up to half a step — the groove "shuffle".
+- **Accent** (`t{N}_accent`, per track) sets the velocity of accented cells; plain cells use a lower fixed
   velocity. Velocity is passed to the engine trigger (louder hit / harder transient).
 
-Swing and accent are still the two global parameters until T1b step 2b: each track copies them into its row's own
-swing and accent at the top of every call. **Ruled 2026-10-20 ([design 2.1.11](../mu-tronic/design.md) point 4):** they become per-track parameters,
-`t{N}_swing` and `t{N}_accent`, in mu-On too; the global `seq_swing` / `seq_accent` rows go, and an older state's global values are ignored.
+Swing and accent are per-track parameters (`t{N}_swing` 0..1 default 0, `t{N}_accent` 0..1 default 1, the last rows of the `t{N}_` table): each track copies
+its own into its row at the top of every call. **Ruled and built 2026-10-20 ([design 2.1.11](../mu-tronic/design.md) point 4, T1b step 2b):** the global
+`seq_swing` / `seq_accent` rows are gone, an older state's global values are ignored (no migration), and the Swing and Accent knobs move the shown track only.
 
 `StepClock::currentStep(beat)` gives the playhead's local step
 for the UI grid.
@@ -56,8 +56,9 @@ outlined, a click in a row selects its track, and a Rumble row is dimmed and not
 Both read the processor only through `TrackHost` ([UI/TrackHost.h](../../mu-on/Source/UI/TrackHost.h)), which `PluginProcessor` implements; they are the `mu-on-layer` library's UI sources (`MU_ON_LAYER_UI_SOURCES`).
 `TrackContent` ([TrackContent.h](../../mu-on/Source/UI/TrackContent.h)) is the content band of the
 shared `LayerPanel`: the ENGINE box (Engine dropdown, the Rumble's Source, the engine's knobs) over
-the Groove box (the global **Swing** and **Accent**, bound to `seq_swing`/`seq_accent`, or the Rumble
-envelope) and the step rows. The shared sidebar pulses a track when the sequencer fires it.
+the Groove box (the track's own **Swing** and **Accent**, bound to `t{N}_swing`/`t{N}_accent`, or the Rumble
+envelope) and the step rows. The 16-cell drawing, hit test and edit gesture live once in `TrackStepRow` ([UI/TrackStepRow.h](../../mu-on/Source/UI/TrackStepRow.h)):
+`StepRows` calls its static `paintCells` / `stepAt` / `editStep` per row, and a locked track (a mu-Tronic layer) shows the one-row `TrackStepRow` component instead. The shared sidebar pulses a track when the sequencer fires it.
 
 ## Future
 Variable pattern length (1–N bars) + per-step velocity ramps; **pattern bank + chaining** (the

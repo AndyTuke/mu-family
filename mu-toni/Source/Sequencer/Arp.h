@@ -56,6 +56,19 @@ struct Arp : Layer
     // A staged layer preset lands on the 4/4 bar line (the arp has no loop of its own).
     double loopBeats() const override { return 4.0; }
 
+    // ── How the layer leaves its slot ────────────────────────────────────────
+    // Fade (the family defaults, 25 ms and 2 s): the voice and the insert keep the parameters they were last
+    // given, so the tail copies nothing at beginRetire and never reads a parameter.
+    mu_core::RetirePolicy retirePolicy() const override
+    {
+        mu_core::RetirePolicy p;
+        p.kind = mu_core::RetirePolicy::Kind::Fade;
+        return p;
+    }
+    // Audio thread: the voice (no keys, no steps: its held note is released) and then the insert, under the bin's
+    // linear fade. False never: the bin ends the tail when its ramp is spent.
+    bool renderRetiring(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n, mu_core::RetireState& rs) override;
+
     // ── The block's work in parts ────────────────────────────────────────────
     // Audio thread: the call's MIDI (its own frames) into the held keys, and the key fields of `context` from
     // them. The view's first ctx.midi.carried events are from earlier blocks that rendered nothing: their keys
@@ -101,6 +114,8 @@ private:
     LiveValues                                                modLive;
     std::array<float, kNumModDests>                           lastResolved {};   // the last block's out[] (C12)
     bool                                                      haveResolved = false;
+
+    juce::AudioBuffer<float> tailScratch;   // a tail that must add rather than write renders here (sized at prepare)
 
     bool parked = true;   // not rendered live in the last rendered block (or prepared since): start from silence
 };

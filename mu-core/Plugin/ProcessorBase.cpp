@@ -1427,6 +1427,7 @@ bool ProcessorBase::setLayerType(int slot, mu_core::LayerTypeId type, const juce
     resetOwnLayerParams(slot);
     if (initial != nullptr && initial->isValid()) applyLayerNode(slot, *initial);
     layers[(size_t) slot]->bindParams(apvts, slot);
+    layers[(size_t) slot]->completeSetup(apvts, slot);   // the layer's own message-thread setup, once, outside every lock
     clearLayerClips(slot);   // a type change empties the clip bank (a clip carries its type)
 
     // Step 8: V2 with the new layer. A prepare that ran since step 2 (a new rate or block size) is repeated for the

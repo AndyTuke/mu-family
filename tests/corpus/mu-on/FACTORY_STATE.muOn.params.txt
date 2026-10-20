@@ -1,6 +1,6 @@
 # frozen load result for fixture: FACTORY_STATE.muOn
 layers=1
 load_errors=0
-resave_bytes=29221
-resave_sha256=73a2f05313470c5e026133ee73bbb11adbdb56dc5387edf9a4fb91430f61227d
+resave_bytes=29686
+resave_sha256=83c295ab95414b775c0456294f1b8dc545b8c4bbee2b6fff84b0fd4d3c3c666e
 --- parameters differing from default (id=plain value)

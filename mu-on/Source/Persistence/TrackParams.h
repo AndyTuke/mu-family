@@ -12,6 +12,7 @@
 // (switching the engine keeps the other engines' settings), so a track's ids are:
 //   t{N}_eng             the engine (choice)
 //   t{N}_src             the layer a Rumble track processes (a layer index)
+//   t{N}_swing, _accent  the track's own groove (swing 0..1, accented-step velocity 0..1)
 //   t{N}_<engine>_<x>    one engine's parameter, <engine> = kick / bass / hat / snare / rumble
 // Saved data keys on these ids and their order, so they never change again and rows are only appended.
 namespace mu_on
@@ -140,12 +141,9 @@ inline std::vector<std::pair<juce::String, juce::String>> legacyLaneParamPrefixR
     return renames;
 }
 
-// The Track type's rows for one layer slot (t{slot}_*): the engine, the Rumble source, then every
-// engine's parameters.
+// The Track type's rows for one layer slot (t{slot}_*): the engine, the Rumble source, every engine's
+// parameters, then the groove (swing, accent).
 void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot);
-
-// mu-On's non-mixer global rows: the sequencer's groove controls (swing, accent).
-void addTrackGlobalParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout);
 
 // A Rumble track's source (`t{N}_src`) names a layer, so it follows that layer through a remove or a reorder:
 // every slot's source is rewritten through `oldToNew` (a layer index as it was to the index it has now, -1 when

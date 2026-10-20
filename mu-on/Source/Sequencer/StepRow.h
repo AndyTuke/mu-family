@@ -49,9 +49,8 @@ public:
     }
 
     // The row's groove: its swing (0..0.9, the share of half a 16th the odd steps are pushed later) and the
-    // velocity of its accented steps (0..1). mu-On's one Swing and Accent (seq_swing, seq_accent) stay the
-    // saved values: the processor seeds every row from them on a state load and every block, so all rows
-    // share them until a host gives each layer its own. Atomics: the message thread seeds, the audio thread reads.
+    // velocity of its accented steps (0..1). The track sets them from its own t{N}_swing and t{N}_accent rows
+    // at every block. Atomics: the message thread may seed, the audio thread reads.
     void setGroove(float swing01, float accentVelocity01) noexcept
     {
         swing.store(juce::jlimit(0.0f, 0.9f, swing01), std::memory_order_relaxed);

@@ -97,6 +97,100 @@ struct MuToniLayerLibraryTests : juce::UnitTest
         logMessage("Arp layer stream hash " + juce::String::toHexString((juce::int64) hash.h));
         expect(hash.h == fx::kRecordedHash, "the layer alone renders the stream the processor records");
         expect(hash.peak > 0.01f && hash.peak < 4.0f, "and it is a real, bounded sound");
+
+        retireTail();
+    }
+
+    // The Arp leaves its slot (docs/mu-tronic/design.md 2.1.11 point 3): a Fade tail on the voice and the insert as they
+    // were last configured, reading no parameter. Driven here as the bin drives it: a RetireState, the ramp counted down.
+    void retireTail()
+    {
+        namespace fx = mu_toni_fixture;
+        beginTest("Arp retire tail: Fade 25 ms / 2 s, rings out the held voice under the ramp, and reads no parameter");
+
+        mu_wavetable::WavetableBank bank;
+        bank.loadFactoryBank();
+
+        struct Rig
+        {
+            ParamHost host;
+            mu_toni::Arp arp;
+        };
+        auto makeRig = [&](const mu_wavetable::WavetableBank& b)
+        {
+            auto rig = std::make_unique<Rig>();
+            rig->arp.runner.setBank(&b);
+            rig->arp.runner.setSlotIndex(0, 0);
+            rig->arp.insert->setSlotIndex(0);
+            rig->arp.prepare(fx::kSampleRate, fx::kBlock);
+            rig->arp.bindParams(rig->host.apvts, 0);
+            fx::configure(rig->host.apvts, 0);
+            return rig;
+        };
+
+        // Both rigs play the same first block (the arp's first note, held for its gate), so a note is sounding when the layer leaves.
+        const double bps = (fx::kBpm / 60.0) / fx::kSampleRate;
+        auto play = [&](mu_toni::Arp& arp)
+        {
+            double ppq = 0.0;
+            juce::AudioBuffer<float> out(2, fx::kBlock);
+            std::vector<mu_core::MidiEvent> events;
+            for (int b = 0; b < 1; ++b)
+            {
+                events.clear();
+                auto ctx = mu_core::makeRenderContext();
+                ctx.sampleRate = fx::kSampleRate; ctx.blockSize = fx::kBlock; ctx.preparedBlockSize = fx::kBlock;
+                ctx.slot = 0; ctx.bpm = fx::kBpm; ctx.startBeat = ppq; ctx.beatsPerSample = bps;
+                ctx.callBeats = bps * (double) fx::kBlock; ctx.playing = 1; ctx.justStarted = b == 0 ? 1 : 0;
+                ctx.midi = { events.data(), (int32_t) events.size(), 0, 0xFFFF, 0, 0, 0 };
+                out.clear();
+                arp.render(ctx, out, fx::kBlock);
+                ppq += (double) fx::kBlock * fx::kBpm / (60.0 * fx::kSampleRate);
+            }
+        };
+
+        auto a = makeRig(bank), b = makeRig(bank);
+        play(a->arp);
+        play(b->arp);
+
+        const auto policy = a->arp.retirePolicy();
+        expect(policy.kind == mu_core::RetirePolicy::Kind::Fade, "Fade");
+        expectEquals(policy.fadeMs, 25.0f);
+        expectEquals(policy.maxSeconds, 2.0f);
+
+        // B's parameters move to extremes after the layer was last rendered: the tail must not notice.
+        for (const char* id : { "cut", "res", "aeR", "aeD", "gate", "drvChar", "insP1" })
+            if (auto* p = b->host.apvts.getParameter(mu_toni::layerParamId(0, id))) p->setValueNotifyingHost(1.0f);
+
+        // The ramp as the bin counts it: 25 ms at 48 kHz, in calls of kBlock frames.
+        const int ramp = (int) std::lround(0.025 * fx::kSampleRate);
+        auto tail = [&](mu_toni::Arp& arp)
+        {
+            std::vector<juce::AudioBuffer<float>> blocks;
+            mu_core::RetireState rs {};
+            rs.samplesLeft = ramp;
+            rs.gainStep = 1.0f / (float) ramp;
+            rs.exclusive = 1;
+            const auto ctx = mu_core::makeRenderContext();
+            while (rs.samplesLeft > 0)
+            {
+                blocks.emplace_back(2, fx::kBlock);
+                blocks.back().clear();
+                expect(arp.renderRetiring(ctx, blocks.back(), fx::kBlock, rs), "the tail stays alive until the bin ends the ramp");
+                rs.samplesLeft -= fx::kBlock;
+            }
+            return blocks;
+        };
+        const auto ta = tail(a->arp);
+        const auto tb = tail(b->arp);
+
+        expect(ta.size() >= 2, "the ramp spans several calls");
+        expect(ta.front().getMagnitude(0, fx::kBlock) > 0.01f, "the held voice rings on into the tail");
+        bool same = ta.size() == tb.size();
+        for (size_t i = 0; same && i < ta.size(); ++i)
+            for (int c = 0; c < 2 && same; ++c)
+                same = std::memcmp(ta[i].getReadPointer(c), tb[i].getReadPointer(c), sizeof(float) * (size_t) fx::kBlock) == 0;
+        expect(same, "parameters changed after the last render do not change the tail");
     }
 };
 

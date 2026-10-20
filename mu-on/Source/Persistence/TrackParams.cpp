@@ -56,13 +56,12 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     flt(E::Rumble, "revlp",  "Rumble Rev LP",    NormalisableRange<float>(200.0f, 18000.0f, 1.0f, 0.3f), 1200.0f);
     flt(E::Rumble, "cut",    "Rumble Cutoff",    NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f), 800.0f);
     flt(E::Rumble, "res",    "Rumble Resonance", f(0.0f, 1.0f, 0.001f), 0.2f);
-}
 
-void addTrackGlobalParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout)
-{
-    using namespace juce;
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"seq_swing",  1}, "Swing",  NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"seq_accent", 1}, "Accent", NormalisableRange<float>(0.0f, 1.0f, 0.001f), 1.0f));
+    // The track's own groove: its swing and the velocity of its accented steps. Not modulation targets.
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{ layerParamId(slot, "swing"), 1 }, lbl + "Swing",
+                                                     NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{ layerParamId(slot, "accent"), 1 }, lbl + "Accent",
+                                                     NormalisableRange<float>(0.0f, 1.0f, 0.001f), 1.0f));
 }
 
 void remapRumbleSources(juce::AudioProcessorValueTreeState& apvts, int liveCount,

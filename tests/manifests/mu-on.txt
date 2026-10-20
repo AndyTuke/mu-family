@@ -3,7 +3,7 @@
 product=mu-on
 layers_at_start=1
 max_layers=8
-param_count=423
+param_count=437
 ---
 ch0_lvl | float | 0 | 1 | 0.001 | 1 | 1 | 1
 ch0_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
@@ -178,8 +178,7 @@ rev_lvl | float | 0 | 1 | 0 | 1 | 1 | 1
 rev_mod | float | 0 | 1 | 0 | 1 | 0.15 | 0.15
 rev_pre | float | 0 | 100 | 0 | 1 | 25 | 0.25
 rev_size | float | 0 | 1 | 0 | 1 | 0.75 | 0.75
-seq_accent | float | 0 | 1 | 0.001 | 1 | 1 | 1
-seq_swing | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t0_accent | float | 0 | 1 | 0.001 | 1 | 1 | 1
 t0_bass_atk | float | 0.5 | 200 | 0.1 | 1 | 2 | 0.0075188
 t0_bass_cut | float | 40 | 4000 | 1 | 1 | 600 | 0.141414
 t0_bass_dec | float | 20 | 1500 | 1 | 1 | 200 | 0.121622
@@ -211,6 +210,8 @@ t0_rumble_size | float | 0 | 1 | 0.001 | 1 | 0.7 | 0.7
 t0_snare_dec | float | 20 | 600 | 1 | 1 | 160 | 0.241379
 t0_snare_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t0_src | int | 0 | 7 | 1 | 1 | 0 | 0
+t0_swing | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t1_accent | float | 0 | 1 | 0.001 | 1 | 1 | 1
 t1_bass_atk | float | 0.5 | 200 | 0.1 | 1 | 2 | 0.0075188
 t1_bass_cut | float | 40 | 4000 | 1 | 1 | 600 | 0.141414
 t1_bass_dec | float | 20 | 1500 | 1 | 1 | 200 | 0.121622
@@ -242,6 +243,8 @@ t1_rumble_size | float | 0 | 1 | 0.001 | 1 | 0.7 | 0.7
 t1_snare_dec | float | 20 | 600 | 1 | 1 | 160 | 0.241379
 t1_snare_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t1_src | int | 0 | 7 | 1 | 1 | 0 | 0
+t1_swing | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t2_accent | float | 0 | 1 | 0.001 | 1 | 1 | 1
 t2_bass_atk | float | 0.5 | 200 | 0.1 | 1 | 2 | 0.0075188
 t2_bass_cut | float | 40 | 4000 | 1 | 1 | 600 | 0.141414
 t2_bass_dec | float | 20 | 1500 | 1 | 1 | 200 | 0.121622
@@ -273,6 +276,8 @@ t2_rumble_size | float | 0 | 1 | 0.001 | 1 | 0.7 | 0.7
 t2_snare_dec | float | 20 | 600 | 1 | 1 | 160 | 0.241379
 t2_snare_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t2_src | int | 0 | 7 | 1 | 1 | 0 | 0
+t2_swing | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t3_accent | float | 0 | 1 | 0.001 | 1 | 1 | 1
 t3_bass_atk | float | 0.5 | 200 | 0.1 | 1 | 2 | 0.0075188
 t3_bass_cut | float | 40 | 4000 | 1 | 1 | 600 | 0.141414
 t3_bass_dec | float | 20 | 1500 | 1 | 1 | 200 | 0.121622
@@ -304,6 +309,8 @@ t3_rumble_size | float | 0 | 1 | 0.001 | 1 | 0.7 | 0.7
 t3_snare_dec | float | 20 | 600 | 1 | 1 | 160 | 0.241379
 t3_snare_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t3_src | int | 0 | 7 | 1 | 1 | 0 | 0
+t3_swing | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t4_accent | float | 0 | 1 | 0.001 | 1 | 1 | 1
 t4_bass_atk | float | 0.5 | 200 | 0.1 | 1 | 2 | 0.0075188
 t4_bass_cut | float | 40 | 4000 | 1 | 1 | 600 | 0.141414
 t4_bass_dec | float | 20 | 1500 | 1 | 1 | 200 | 0.121622
@@ -335,6 +342,8 @@ t4_rumble_size | float | 0 | 1 | 0.001 | 1 | 0.7 | 0.7
 t4_snare_dec | float | 20 | 600 | 1 | 1 | 160 | 0.241379
 t4_snare_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t4_src | int | 0 | 7 | 1 | 1 | 0 | 0
+t4_swing | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t5_accent | float | 0 | 1 | 0.001 | 1 | 1 | 1
 t5_bass_atk | float | 0.5 | 200 | 0.1 | 1 | 2 | 0.0075188
 t5_bass_cut | float | 40 | 4000 | 1 | 1 | 600 | 0.141414
 t5_bass_dec | float | 20 | 1500 | 1 | 1 | 200 | 0.121622
@@ -366,6 +375,8 @@ t5_rumble_size | float | 0 | 1 | 0.001 | 1 | 0.7 | 0.7
 t5_snare_dec | float | 20 | 600 | 1 | 1 | 160 | 0.241379
 t5_snare_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t5_src | int | 0 | 7 | 1 | 1 | 0 | 0
+t5_swing | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t6_accent | float | 0 | 1 | 0.001 | 1 | 1 | 1
 t6_bass_atk | float | 0.5 | 200 | 0.1 | 1 | 2 | 0.0075188
 t6_bass_cut | float | 40 | 4000 | 1 | 1 | 600 | 0.141414
 t6_bass_dec | float | 20 | 1500 | 1 | 1 | 200 | 0.121622
@@ -397,6 +408,8 @@ t6_rumble_size | float | 0 | 1 | 0.001 | 1 | 0.7 | 0.7
 t6_snare_dec | float | 20 | 600 | 1 | 1 | 160 | 0.241379
 t6_snare_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t6_src | int | 0 | 7 | 1 | 1 | 0 | 0
+t6_swing | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t7_accent | float | 0 | 1 | 0.001 | 1 | 1 | 1
 t7_bass_atk | float | 0.5 | 200 | 0.1 | 1 | 2 | 0.0075188
 t7_bass_cut | float | 40 | 4000 | 1 | 1 | 600 | 0.141414
 t7_bass_dec | float | 20 | 1500 | 1 | 1 | 200 | 0.121622
@@ -428,6 +441,7 @@ t7_rumble_size | float | 0 | 1 | 0.001 | 1 | 0.7 | 0.7
 t7_snare_dec | float | 20 | 600 | 1 | 1 | 160 | 0.241379
 t7_snare_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t7_src | int | 0 | 7 | 1 | 1 | 0 | 0
+t7_swing | float | 0 | 1 | 0.001 | 1 | 0 | 0
 --- ids per prefix
 (none)=3
 ch0=12
@@ -445,12 +459,11 @@ mst=10
 mstr=3
 ret=24
 rev=10
-seq=2
-t0=31
-t1=31
-t2=31
-t3=31
-t4=31
-t5=31
-t6=31
-t7=31
+t0=33
+t1=33
+t2=33
+t3=33
+t4=33
+t5=33
+t6=33
+t7=33

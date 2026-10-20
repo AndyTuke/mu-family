@@ -65,6 +65,20 @@ namespace
                  [id, value](mu_golden::ScriptContext& c) { setParam(c.proc.apvts, id, value); } };
     }
 
+    // The groove every track in [0, tracks) shares in a scenario, set at block 0: each track has its own swing and
+    // accent rows. The frozen state.xml of these scenarios predates the rows and carries the old global ones (which a
+    // load ignores, as this also pins), so the values come in as events rather than through a re-authored state.
+    std::vector<mu_golden::ScriptedEvent> grooveAtStart(int tracks, float swing, float accent, bool setSwing = true)
+    {
+        std::vector<mu_golden::ScriptedEvent> events;
+        for (int t = 0; t < tracks; ++t)
+        {
+            if (setSwing) events.push_back(setParamAt(0, mu_on::layerParamId(t, "swing"), swing));
+            events.push_back(setParamAt(0, mu_on::layerParamId(t, "accent"), accent));
+        }
+        return events;
+    }
+
     // ── The scenarios ────────────────────────────────────────────────────────
     std::vector<Def> makeDefs()
     {
@@ -109,8 +123,8 @@ namespace
                 setParam(p.apvts, mu_on::engineParamId(0, EngineType::Hat, "dec"), 90.0f);
                 setParam(p.apvts, mu_on::engineParamId(1, EngineType::Snare, "tune"), -2.0f);
                 setParam(p.apvts, mu_on::engineParamId(1, EngineType::Snare, "dec"), 220.0f);
-                setParam(p.apvts, "seq_accent", 0.9f);
             };
+            d.events = grooveAtStart(2, 0.0f, 0.9f, false);   // both tracks' accent 0.9 (the global one it replaces)
             defs.push_back(d);
         }
 
@@ -146,7 +160,7 @@ namespace
         // All five engine types at once with global swing and accent.
         {
             Def d; d.name = "groove-five-swing-accent"; d.numStems = 5;
-            d.notes = "Kick, Bass, Hat, Snare, Rumble(source Kick); seq_swing 0.35 and seq_accent 0.55 apply to every row.";
+            d.notes = "Kick, Bass, Hat, Snare, Rumble(source Kick); each track's t{N}_swing 0.35 and t{N}_accent 0.55, set at block 0.";
             d.author = [](PluginProcessor& p)
             {
                 useTrack(p, 1, EngineType::Bass);
@@ -158,9 +172,8 @@ namespace
                 setRow(p, 1, "0010001000100010", "0010000000100000");
                 setRow(p, 2, "0101010101010101", "0001000100010001");
                 setRow(p, 3, "0000100000001000", "0000100000000000");
-                setParam(p.apvts, "seq_swing", 0.35f);
-                setParam(p.apvts, "seq_accent", 0.55f);
             };
+            d.events = grooveAtStart(5, 0.35f, 0.55f);
             defs.push_back(d);
         }
 
@@ -333,9 +346,8 @@ namespace
                 setRow(p, 1, "0010001000100010", "0010000000100000");
                 setRow(p, 2, "0101010101010101", "0001000100010001");
                 setRow(p, 3, "0000100000001000", "0000100000000000");
-                setParam(p.apvts, "seq_swing", 0.35f);
-                setParam(p.apvts, "seq_accent", 0.55f);
             };
+            d.events = grooveAtStart(5, 0.35f, 0.55f);
             defs.push_back(d);
         }
 

@@ -44,7 +44,7 @@ namespace
 }
 
 TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
-    : host(trackHost), grid(trackHost.getTrackParameters()), rows(trackHost)
+    : host(trackHost), grid(trackHost.getTrackParameters()), rows(trackHost), soloRow(trackHost)
 {
     juce::ignoreUnused(base);
     for (int e = 0; e < kNumEngineTypes; ++e) engineSelect.addItem(engineName(engineFromIndex(e)), e + 1);
@@ -64,12 +64,13 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
 
     rows.onRowClicked = [this](int row) { if (onRowClicked) onRowClicked(row); };
     addAndMakeVisible(rows);
+    soloRow.onStatusUpdate = [this](const juce::String& name, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
+    addChildComponent(soloRow);
 
-    // Global Swing / Accent, shown in the Groove box (a Rumble track shows its envelope there instead).
+    // The track's own Swing / Accent, shown in the Groove box (a Rumble track shows its envelope there instead);
+    // setLayer attaches them to the shown track's rows.
     addAndMakeVisible(swingKnob);
     addAndMakeVisible(accentKnob);
-    swingAtt  = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(host.getTrackParameters(), "seq_swing",  swingKnob.getSlider());
-    accentAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(host.getTrackParameters(), "seq_accent", accentKnob.getSlider());
 
     // The Rumble track's drawable bar-volume envelope, edited under the track's own lock.
     rumbleEnvEditor.setUnipolar(true);
@@ -145,10 +146,20 @@ void TrackContent::rebuild()
     bindModulationArcs(specs);
     grid.setSpecs(specs);
 
-    // A host that fixes the track's engine (engineLocked) hides the Engine selector; mu-On never does.
-    const bool engineLocked = host.getTrack(currentLayer).engineLocked;
-    engineCaption.setVisible(! engineLocked);
-    engineSelect.setVisible(! engineLocked);
+    // The groove knobs follow the shown track's own rows (the old attachments go first).
+    swingAtt.reset();
+    accentAtt.reset();
+    swingAtt  = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(host.getTrackParameters(), layerParamId(currentLayer, "swing"),  swingKnob.getSlider());
+    accentAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(host.getTrackParameters(), layerParamId(currentLayer, "accent"), accentKnob.getSlider());
+
+    // A host that fixes the track's engine (engineLocked) hides the Engine selector and shows the track's one
+    // row of steps; mu-On never locks, so its own look is unchanged.
+    locked = host.getTrack(currentLayer).engineLocked;
+    engineCaption.setVisible(! locked);
+    engineSelect.setVisible(! locked);
+    rows.setVisible(! locked);
+    soloRow.setVisible(locked);
+    soloRow.setLayer(currentLayer);
 
     const bool rumble = shownEngine == EngineType::Rumble;
     sourceCaption.setVisible(rumble);
@@ -261,9 +272,12 @@ void TrackContent::resized()
     const bool rumble  = shownEngine == EngineType::Rumble;
     const int boxH     = s(mu_ui::ParamKnobGrid::kCellH + 2 * LF::kSpaceS);
     const int dropW    = s(MuLookAndFeel::kDropdownW);
-    const int leftW    = dropW + (rumble ? gap + dropW : 0);
+    // The dropdowns: Engine (not on a locked track) then, for a Rumble, Source; the grid follows them.
+    const int numDrops = (locked ? 0 : 1) + (rumble ? 1 : 0);
+    const int leftW    = numDrops * dropW + juce::jmax(0, numDrops - 1) * gap;
+    const int gridGap  = numDrops > 0 ? gap : 0;
     engineR    = { 0, 0, w, padY + plateH + boxH + padY };
-    const int boxW = juce::jmin(w - 2 * padX, 2 * clear + leftW + gap + grid.getPreferredWidth());
+    const int boxW = juce::jmin(w - 2 * padX, 2 * clear + leftW + gridGap + grid.getPreferredWidth());
     engineBoxR = { padX, padY + plateH, boxW, boxH };
 
     const auto inner = engineBoxR.reduced(clear, s(LF::kSpaceS));
@@ -277,9 +291,10 @@ void TrackContent::resized()
         caption.setBounds(x, inner.getY(), dropW, labelH);
         dropdown.setBounds(x, inner.getY() + labelH + (bandH - s(MuLookAndFeel::kDropdownH)) / 2, dropW, s(MuLookAndFeel::kDropdownH));
     };
-    place(engineCaption, engineSelect, inner.getX());
-    if (rumble) place(sourceCaption, sourceSelect, inner.getX() + dropW + gap);
-    grid.setBounds(inner.withTrimmedLeft(leftW + gap));
+    int dropX = inner.getX();
+    if (! locked) { place(engineCaption, engineSelect, dropX); dropX += dropW + gap; }
+    if (rumble)   place(sourceCaption, sourceSelect, dropX);
+    grid.setBounds(inner.withTrimmedLeft(leftW + gridGap));
 
     // Panel 2 (flex): Groove | Steps, both the full height left under their plates.
     slotR = { 0, engineR.getBottom(), w, juce::jmax(0, h - engineR.getBottom()) };
@@ -289,7 +304,10 @@ void TrackContent::resized()
     grooveBoxR = { padX, boxesY, s(MuLookAndFeel::kGrooveBoxW), boxesH };
     const int stepsX = grooveBoxR.getRight() + s(LF::kVoiceDivW);
     stepsBoxR  = { stepsX, boxesY, juce::jmax(0, w - padX - stepsX), boxesH };
-    rows.setBounds(stepsBoxR.reduced(clear, s(LF::kSpaceS)));
+    const auto stepsInner = stepsBoxR.reduced(clear, s(LF::kSpaceS));
+    rows.setBounds(stepsInner);
+    // The lone row is as tall as one of the rows above is, top-aligned (the rest of the box stays blank metal).
+    soloRow.setBounds(stepsInner.withHeight(stepsInner.getHeight() / mu_limits::kLayersPerPage));
 
     auto g = grooveBoxR.reduced(clear, s(LF::kSpaceS));
     if (rumble)

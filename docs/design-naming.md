@@ -279,8 +279,8 @@ prefix is saved, applied, copied or reset (`LayerLayout::withPrefixSets`, `setLi
 scheme; the mixer strip stays `ch{N}_`. A layer type that is hosted elsewhere also names `contentFolderName` and `presetFolder` (its product's own preset folder,
 shared, never copied: `<TDP>/muToni/Arps`). In mu-Tronic `Persistence/` also holds each hosted type's registration glue, `<Type>LayerType.{h,cpp}` (`ArpLayerType`,
 `TrackLayerTypes`: host adapter, content and mini-visual factories, the `LayerTypeInfo` additions), because it is the one folder that may name a layer library's headers
-(`check-layer-boundary.ps1` rule 10; ruled 2026-10-20, [design 2.1.11](mu-tronic/design.md)). mu-On's `t{N}_` table gains `t{N}_swing` and `t{N}_accent` (the global
-`seq_swing` / `seq_accent` rows are retired).
+(`check-layer-boundary.ps1` rule 10; ruled 2026-10-20, [design 2.1.11](mu-tronic/design.md)). mu-On's `t{N}_` table ends with `t{N}_swing` and `t{N}_accent` (the global
+`seq_swing` / `seq_accent` rows are retired; done 2026-10-20).
 
 **Product naming pattern.** `mu-<Name>` in prose and artefacts (`mu-Clid`, `mu-Tant`), slug `mu-<name>` in
 folders and targets, namespace `mu_<name>`. A descriptive suffix (`mu-Clid MIDI`) is allowed only for a

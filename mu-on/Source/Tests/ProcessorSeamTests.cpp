@@ -292,39 +292,48 @@ struct MuOnLayoutWordTests : juce::UnitTest
 };
 static MuOnLayoutWordTests sMuOnLayoutWordTests;
 
-// Per-layer step rows behind the global grid (extraction-plan E3.3): every row carries its own swing and
-// accent, but the saved data stays the two global parameters, which seed every row when a state loads.
+// Each track's step row takes its groove from the track's own rows (t{N}_swing, t{N}_accent), which are saved
+// with the track and followed by the next rendered block, spares included. No global row exists.
 struct MuOnRowGrooveTests : juce::UnitTest
 {
-    MuOnRowGrooveTests() : juce::UnitTest("mu-On rows take the global groove", "mu-on-processor") {}
+    MuOnRowGrooveTests() : juce::UnitTest("mu-On rows take their track's groove", "mu-on-processor") {}
     void runTest() override
     {
         using namespace mu_seam_test;
-        beginTest("seq_swing and seq_accent stay the saved values and seed every track's row on load, spares included");
+        beginTest("t{N}_swing and t{N}_accent are saved, restored and drive only that track's row, spares included");
         TempStorage storage;
         juce::MemoryBlock saved;
         {
             mu_on::PluginProcessor a;
-            setParam(a.apvts, "seq_swing", 0.35f);
-            setParam(a.apvts, "seq_accent", 0.55f);
+            setParam(a.apvts, "t3_swing", 0.35f);
+            setParam(a.apvts, "t3_accent", 0.55f);
             a.getStateInformation(saved);
-            const auto xml = juce::AudioProcessor::getXmlFromBinary(saved.getData(), (int) saved.getSize());
-            expect(xml != nullptr && ! xml->toString().contains("swing=\""), "a row saves no groove of its own");
         }
         mu_on::PluginProcessor b;
+        b.prepareToPlay(48000.0, 512);
+        auto block = [&b]
+        {
+            juce::AudioBuffer<float> buf(2, 512);
+            juce::MidiBuffer midi;
+            buf.clear();
+            b.processBlock(buf, midi);
+        };
+        block();
         for (int i = 0; i < mu_limits::kMaxLayers; ++i)
         {
             expectEquals(b.getTrack(i).row.swingAmount(), 0.0f, "a fresh row has the default swing");
             expectEquals(b.getTrack(i).row.accentVelocity(), 1.0f, "and the default accent");
         }
         b.setStateInformation(saved.getData(), (int) saved.getSize());
+        block();
         for (int i = 0; i < mu_limits::kMaxLayers; ++i)
         {
-            expectEquals(b.getTrack(i).row.swingAmount(), b.apvts.getRawParameterValue("seq_swing")->load(), "track " + juce::String(i) + " swing");
-            expectEquals(b.getTrack(i).row.accentVelocity(), b.apvts.getRawParameterValue("seq_accent")->load(), "track " + juce::String(i) + " accent");
+            const bool three = i == 3;
+            expectWithinAbsoluteError(b.getTrack(i).row.swingAmount(), three ? 0.35f : 0.0f, 1.0e-6f, "track " + juce::String(i) + " swing");
+            expectWithinAbsoluteError(b.getTrack(i).row.accentVelocity(), three ? 0.55f : 1.0f, 1.0e-6f, "track " + juce::String(i) + " accent");
         }
-        expectWithinAbsoluteError(b.getTrack(3).row.swingAmount(), 0.35f, 1.0e-6f);
-        expectWithinAbsoluteError(b.getTrack(3).row.accentVelocity(), 0.55f, 1.0e-6f);
+        expect(b.apvts.getParameter("seq_swing") == nullptr && b.apvts.getParameter("seq_accent") == nullptr, "no global groove row");
+        b.releaseResources();
     }
 };
 static MuOnRowGrooveTests sMuOnRowGrooveTests;

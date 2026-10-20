@@ -6,6 +6,8 @@
 #include "Modulation/MuOnModDest.h"        // the engines' modulation target tables
 #include "UI/ParamKnobGrid.h"                // mu-core: spec-driven knob/combo grid
 #include "UI/StepRows.h"
+#include "UI/TrackStepRow.h"
+#include "UI/LayerContent.h"                // mu-core: the base every layer type's content derives from
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/LFOEditor.h"          // mu-core: drawable smooth-curve editor
@@ -25,11 +27,16 @@ namespace mu_on
 // engine and its step rows. Two metal panels, the second the flex one:
 //   1. ENGINE   an "Engine" dropdown (and, for a Rumble, its "Source") first, then the selected engine's
 //               knobs. Switching engine asks nothing and keeps every engine's settings on the track.
-//   2. GROOVE | STEPS   the global Swing / Accent (a Rumble track shows its volume envelope instead) and
+//   2. GROOVE | STEPS   the track's own Swing / Accent (a Rumble track shows its volume envelope instead) and
 //               one row of steps per track (StepRows).
 // setLayer() rebinds it to the shown track; the engine can also change underneath it (host automation,
 // a preset), which the timer notices.
-class TrackContent : public juce::Component, private juce::Timer
+//
+// A track whose engine the host fixes (Track::engineLocked, a mu-Tronic layer) differs in two ways, both
+// subtractions: no Engine selector (the knob grid moves left into the freed width, a Rumble's Source selector
+// takes the first position), and the Steps box shows the one track's row (TrackStepRow) at the height
+// StepRows gives each of its rows, not the list of every track's rows.
+class TrackContent : public LayerContent, private juce::Timer
 {
 public:
     // `base` is for the shared mu-core sections that take the processor (this content uses none yet);
@@ -38,11 +45,11 @@ public:
     ~TrackContent() override { stopTimer(); }
 
     // Show track `idx`: its engine's controls, its Rumble source and envelope, its row selected.
-    void setLayer(int idx);
+    void setLayer(int idx) override;
 
     // Let go of every knob's modulation binding; called before a track is removed or moved, because the
     // arcs hold the track's matrix. setLayer rebinds.
-    void releaseModulationArcs() { grid.clearModBindings(); }
+    void releaseModulationArcs() override { grid.clearModBindings(); }
 
     // A click in a step row selected another track.
     std::function<void(int)> onRowClicked;
@@ -73,7 +80,9 @@ private:
     juce::Label    engineCaption { {}, "Engine" }, sourceCaption { {}, "Source" };
     DropdownSelect engineSelect, sourceSelect;
     mu_ui::ParamKnobGrid grid;
-    StepRows       rows;
+    StepRows       rows;                              // every track's row (a track the host does not lock)
+    TrackStepRow   soloRow;                           // the shown track's one row (a locked track)
+    bool           locked = false;                    // the shown track's engine is fixed by its host
 
     KnobWithLabel swingKnob { "Swing" }, accentKnob { "Accent" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> swingAtt, accentAtt;

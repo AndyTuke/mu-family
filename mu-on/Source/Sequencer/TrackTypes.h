@@ -4,6 +4,7 @@
 #include "Sequencer/LayerTypeInfo.h"   // mu-core: mu_core::LayerTypeId, LayerTypeInfo
 #include "Persistence/LayerState.h"    // mu-core: the saved row tag
 #include "Persistence/TrackParams.h"
+#include "UI/Components/MuLookAndFeel.h"   // mu-core: the colour IDs a type's look names (appYellow)
 
 #include <memory>
 
@@ -25,12 +26,14 @@ inline mu_core::LayerTypeId typeFromPreset(const juce::ValueTree& preset)
     return lane >= 0 ? layerTypeOf(engineFromIndex(lane)) : mu_core::LayerTypeId::Empty;
 }
 
-// A fresh Track for `slot`, not yet bound or prepared. Which engine it runs is its slot's `t{N}_eng`
-// parameter: a host of the type sets that parameter to engineOfType(id) when it creates the layer.
-inline std::unique_ptr<Layer> createTrack(int slot, mu_core::LayerTypeId /*type*/)
+// A fresh Track for `slot`, not yet bound or prepared, locked to the engine of `type`: its engineSetting() is
+// that engine whatever `t{N}_eng` holds, and its completeSetup writes the parameter to match (a record, so a
+// saved row or .muTrack names the right engine).
+inline std::unique_ptr<Layer> createTrack(int slot, mu_core::LayerTypeId type)
 {
     auto t = std::make_unique<Track>();
     t->slot = slot;
+    t->lockEngine(engineOfType(type));
     return t;
 }
 
@@ -43,8 +46,13 @@ inline mu_core::LayerTypeInfo makeTrackTypeInfo(EngineType engine) noexcept
     info.group = "mu-On";
     info.paramPrefixLetter = 't';
     info.presetExtension = ".muTrack";
+    info.contentFolderName = "muOn";   // the layer presets are mu-On's own, shared with it, not copied
+    info.presetFolder = "Tracks";
+    info.typeFromPreset = &typeFromPreset;   // the five types share .muTrack: the engine a preset saved names its type
     info.addLayerParams = &addLayerParams;   // one table per prefix: every engine's rows exist on every track
     info.create = &createTrack;
+    info.appColourId = (int) MuLookAndFeel::appYellow;   // the main area is painted in mu-On's yellow
+    info.typeTag = "On";
     return info;
 }
 

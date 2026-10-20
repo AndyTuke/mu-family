@@ -28,11 +28,15 @@ public:
         if (count == kCapacity)
         {
             if constexpr (Overflow == HeldNoteOverflow::IgnoreNew)
+            {
                 return;
-
-            // Full: shift everything down one slot, dropping the oldest.
-            for (int j = 0; j + 1 < count; ++j) stack[(size_t) j] = stack[(size_t) j + 1];
-            --count;
+            }
+            else
+            {
+                // Full: shift everything down one slot, dropping the oldest.
+                for (int j = 0; j + 1 < count; ++j) stack[(size_t) j] = stack[(size_t) j + 1];
+                --count;
+            }
         }
         stack[(size_t) count++] = note;
     }

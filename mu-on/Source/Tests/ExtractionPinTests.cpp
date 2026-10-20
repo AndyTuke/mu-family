@@ -297,10 +297,10 @@ struct MuOnExtractionPinTests : juce::UnitTest
         }
     }
 
-    // ── The global swing and accent ──────────────────────────────────────────────────────────────
+    // ── The per-track swing and accent ──────────────────────────────────────────────────────────────
     void swingAndAccentPins()
     {
-        beginTest("Global swing delays the odd 16ths of every track, by swing x half a 16th; even steps stay put");
+        beginTest("A track's swing delays its odd 16ths, by swing x half a 16th; even steps stay put");
         {
             auto onset = [](float swing, int step, const char* solo)
             {
@@ -310,7 +310,8 @@ struct MuOnExtractionPinTests : juce::UnitTest
                 onlySteps(rig.p, 0, { step });
                 onlySteps(rig.p, 1, { step });
                 setParam(rig.p.apvts, eng(0, EngineType::Kick, "drive"), 0.0f);
-                setParam(rig.p.apvts, "seq_swing", swing);
+                setParam(rig.p.apvts, mu_on::layerParamId(0, "swing"), swing);   // each track has its own row
+                setParam(rig.p.apvts, mu_on::layerParamId(1, "swing"), swing);
                 setParam(rig.p.apvts, solo, 1.0f);
                 return firstAbove(rig.render(24000));
             };
@@ -331,7 +332,7 @@ struct MuOnExtractionPinTests : juce::UnitTest
             }
         }
 
-        beginTest("Global accent sets the velocity of accented steps against 0.72 for plain ones, on the Kick and the Snare");
+        beginTest("A track's accent sets the velocity of its accented steps against 0.72 for plain ones, on the Kick and the Snare");
         {
             auto ratio = [](float accent, EngineType engine)
             {
@@ -339,7 +340,7 @@ struct MuOnExtractionPinTests : juce::UnitTest
                 useTrack(rig.p, 0, engine);
                 onlySteps(rig.p, 0, { 0, 4 }, { 0 });   // steps 0 and 4 are frames 0 and 24000; only step 0 is accented
                 setParam(rig.p.apvts, eng(0, EngineType::Kick, "drive"), 0.0f);
-                setParam(rig.p.apvts, "seq_accent", accent);
+                setParam(rig.p.apvts, mu_on::layerParamId(0, "accent"), accent);
                 const auto out = rig.render(48000);
                 return peakOf(out, 0, 3000) / peakOf(out, 24000, 27000);
             };

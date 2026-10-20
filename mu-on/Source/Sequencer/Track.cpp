@@ -126,6 +126,8 @@ void Track::prepare(double sampleRate, int blockSize)
     preparedBlock = juce::jmax(1, blockSize);
     silence.setSize(2, preparedBlock);
     silence.clear();
+    tailScratch.setSize(2, preparedBlock);
+    tailScratch.clear();
     for (auto& e : engines)
         if (e != nullptr) e->prepare(preparedRate, preparedBlock);
     // The next rendered block starts from silence and resolves its engine afresh (no held C12 values).
@@ -139,9 +141,9 @@ void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
     engineRow   = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "eng")), this);
     sourceRow   = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "src")), this);
     bassWaveRow = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::Bass, "wave")), this);   // a choice, not a target
-    swingRow    = mu_core::ParamBinding(apvts.getRawParameterValue("seq_swing"), this);
-    accentRow   = mu_core::ParamBinding(apvts.getRawParameterValue("seq_accent"), this);
-    jassert(engineRow.isBound() && sourceRow.isBound() && bassWaveRow.isBound());   // an id drift from the layout (debug)
+    swingRow    = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "swing")), this);
+    accentRow   = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "accent")), this);
+    jassert(engineRow.isBound() && sourceRow.isBound() && bassWaveRow.isBound() && swingRow.isBound() && accentRow.isBound());   // an id drift from the layout (debug)
     haveResolved = false;   // values held for C12 belong to the slot bound before
 
     // Every engine's modulation inputs for this slot, in its target table's order (the order setParams takes).
@@ -164,6 +166,17 @@ void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
     }
 }
 
+void Track::completeSetup(juce::AudioProcessorValueTreeState& apvts, int s)
+{
+    // A locked track's parameter is a record of its engine: write it so the saved rows and a saved .muTrack
+    // name the right engine. engineSetting() already ignores it, so this is not what makes the track run it.
+    if (engineLocked)
+        if (auto* p = apvts.getParameter(layerParamId(s, "eng")))
+            if (juce::roundToInt(p->convertFrom0to1(p->getValue())) != toIndex(lockedEngine))
+                p->setValueNotifyingHost(p->convertTo0to1((float) toIndex(lockedEngine)));
+    syncEngine();   // the engines the track needs, built and prepared now
+}
+
 int Track::typeId() const
 {
     return (int) layerTypeOf(engineSetting());
@@ -171,6 +184,7 @@ int Track::typeId() const
 
 EngineType Track::engineSetting() const noexcept
 {
+    if (engineLocked) return lockedEngine;   // the parameter is only a record on a locked track
     return engineFromIndex(juce::roundToInt(engineRow.load(0.0f)));
 }
 
@@ -273,7 +287,7 @@ float Track::evaluateRumbleEnv(double beat) noexcept
     return lastRumbleEnv;
 }
 
-// The row follows the global groove, then (while playing) its clock fires the steps of this call into the
+// The row follows the track's own groove rows (swing, accent), then (while playing) its clock fires the steps of this call into the
 // engine (`fireInto` null: the clock only keeps step, nothing sounds). A Rumble's row does not step.
 void Track::clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, int e, int n) noexcept
 {
@@ -345,6 +359,37 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
         eng->render(out, n, silence, false);
 
     mu_core::spinUnlock(engineLock);
+}
+
+// The tail of a track that left its slot (docs/mu-tronic/design.md 2.1.11 point 3). It reads no parameter: the
+// engine of the last rendered block (`current`, audio-thread state) still holds the parameters it was given, and
+// is rendered with no trigger and no setParams, so a ringing voice or reverb dies away under the bin's fade.
+bool Track::renderRetiring(const mu_core::RenderContext&, juce::AudioBuffer<float>& out, int n, mu_core::RetireState& rs)
+{
+    if (current < 0) return false;   // never rendered live: nothing can sound
+    if (! mu_core::trySpinLock(engineLock)) return true;   // an install is running: silent this call, the fade runs on
+    TrackEngine* eng = engines[(size_t) current].get();
+    if (eng == nullptr) { mu_core::spinUnlock(engineLock); return false; }
+
+    // The bin hands the tail the slot's block exclusively (write it) or not (render aside, then add).
+    juce::AudioBuffer<float> aside;
+    if (rs.exclusive == 0)
+    {
+        aside.setDataToReferTo(tailScratch.getArrayOfWritePointers(), juce::jmin(2, out.getNumChannels()),
+                               juce::jmin(n, tailScratch.getNumSamples()));
+        aside.clear();
+    }
+    auto& buf = rs.exclusive != 0 ? out : aside;
+    const int frames = juce::jmin(n, buf.getNumSamples(), silence.getNumSamples());
+
+    // A Rumble has no peer in a tail: it processes the silence buffer, as a Rumble with no source does.
+    eng->render(buf, frames, silence, false);
+    mu_core::applyLinearFade(buf, frames, rs);
+
+    if (rs.exclusive == 0)
+        for (int c = 0; c < buf.getNumChannels(); ++c) out.addFrom(c, 0, buf, c, 0, frames);
+    mu_core::spinUnlock(engineLock);
+    return true;   // the bin ends the fade when its ramp is spent
 }
 
 void Track::onParkedBlock(const mu_core::RenderContext& ctx)

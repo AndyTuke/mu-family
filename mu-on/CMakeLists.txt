@@ -20,6 +20,7 @@ target_sources(mu-on-layer INTERFACE
 target_include_directories(mu-on-layer INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
 set(MU_ON_LAYER_UI_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/StepRows.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/TrackStepRow.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/TrackContent.cpp")
 # Also visible to the sibling directories added after this one (mu-Tronic hosts the layer types).
 set(MU_ON_LAYER_UI_SOURCES "${MU_ON_LAYER_UI_SOURCES}" PARENT_SCOPE)
@@ -166,6 +167,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/PrefixMigrationTests.cpp   # data saved before the k/b/h/s/r -> t{N} id-prefix rename still loads
     Source/Tests/TrackTypesTests.cpp   # the five layer types over the one Track class
     Source/Tests/TrackRenderTests.cpp   # Track::render: every engine, the Rumble's peer source, the engine swap, the Rumble's tail
+    Source/Tests/TrackSlotHostTests.cpp   # the Track types in a typed-slot host: lock, completeSetup, Fade tails, the typed preset folder
     Source/Tests/EngineMigrationTests.cpp   # five-lane states and track presets load as engine-qualified layers
     Source/Tests/ClipLaunchTests.cpp   # clip store / launch on the real processor
     Source/Tests/ModArcTests.cpp   # every mod target publishes its live value for the knob arcs
