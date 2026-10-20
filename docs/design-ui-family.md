@@ -115,6 +115,15 @@ Three states: **General** (default), **Positive** (confirmation/on), **Warning**
 | Drifting (a locked source is off its grid and servoing back; mu-link's external clock, [mu-link/design-ui.md](mu-link/design-ui.md) section 4) | `segmentWarningBorder` amber | `lampOn` (lit, so it reads brighter than Waiting; the status text names it) |
 | Fault / lost | `indicatorFault` `#E24B4A` red (`MuTheme::Indicators::fault`) | `lampOn + lampPlayhead` (brightest, draws the eye) |
 
+**Curve display (`LFOEditor`, every product's modulator display and mu-On's Rumble envelope; ruled 2026-10-21).** A flat curve must read as a level, not as a filled block, and a curve at 0 or 1 must not hug the edge:
+
+- **Plot inset.** The curve's value range maps to the display height less `kPointRadius` at top and bottom (scaled), so a curve at level 1 or 0 is drawn whole, with its points fully visible.
+- **Baseline.** The zero line is drawn in `lfoEditorZeroLine` in every style. The metal branch no longer draws it as a black shadow on the lamp base (invisible); the colour token is the one rule.
+- **Level lines.** Horizontal lines at 25, 50 and 75 percent of the plot, in `stepEditorGridLine`, in unipolar and bipolar displays (bipolar: also the centre line, which is the baseline).
+- **Time lines.** Vertical lines at each step or loop unit as today (`stepFraction`); a display that has a unit (Rumble's Loop selector) sets it, so the beat lines show.
+- **Draw order.** Dim lit fill, then the grid and level lines over it (so they show inside the lit area), then the glow, then the lit curve line, then the points and playhead.
+- No new token: strengths and colours are the existing ones. A family-wide look change of one shared control; mu-Tronic review found it on the Rumble envelope, the other products' lanes pick it up for free.
+
 **StatusBar / AddButton / SampleBar:** see `MuLookAndFeel.h` for full token list — not repeated here.
 
 ---
@@ -799,6 +808,7 @@ The screen half of the Launchpad surface mapping ([design-launchpad.md section 3
 
 ## Design rulings
 
+- 2026-10-21 - mu-Tronic review of build 1425 (eight-card chooser, Rhythm, Pattern, Arp, Kick, Rumble, mixed page). (1) Rhythm and Rumble both "R": Rhythm becomes "E" (Euclid), Rumble stays mu-On's "R"; initials are registry data and unique across choices, an interim until the live mini-visuals return. (2) Sidebar disc stays the slot's palette colour, not the type colour. (3) Pattern Note mode: "MIDI" caption plus Free / Note Lcd `SegmentControl` right-aligned in the Root / Scale row, opt-in on `PatternContent`, hidden in mu-Tant, no mu-Tronic Settings row. (4) Rhythm Save in a slot is mu-Clid's own card (category, description, embed sample, save as default). (5) Effect-send name follows the mixer everywhere (amp send label and modulation target), re-applied on slot select. (6) MIDI-mode Rhythm strip inactive via `isChannelSilent`. (7) A fresh Rhythm with an unfindable default sample starts empty, no "Missing" banner (kept for loaded data). (8) `LFOEditor` curve display: plot inset, visible baseline, 25 / 50 / 75 level lines, loop-unit lines; family-wide. (9) Empty modulation lane stays blank. Also chooser order Clid, Tant, Toni, On and the mu-Tant descriptor without "voice". Changed §3.5 (Curve display), mu-tronic/design-ui.md 4.3, 4.3a, 4.5a table, 4.5b, 8.
 - 2026-10-20 - New tube-style Overdrive insert (Andy): name, parameters, list position? Selector "Overdrive", appended at algorithm index 14 (dropdown item 15, shown alphabetically between Limiter and Ring Mod); slots Drive / Output / Bias / Tone, no Mix (inserts are in-line; blend is the Effect send); Bias 0-100 % is the even-harmonic asymmetry knob. Table in [mu-clid/design-voice.md](mu-clid/design-voice.md) "Insert".
 
 - 2026-10-20 - How does a Track (Kick) or Arp layer's content sit in a mu-Tronic slot (T1b)? `LayerPanel` supplies all chrome; a type's content is one component filling the 464 band and painting its own metal panels, painted in the type's app primary via `LayerTypeInfo::appColourId`, with `typeTag` and `createContent` on the registry; Track content is mu-On's with the Engine selector hidden when locked (grid moves left), Swing / Accent kept in the Groove box on per-layer rows, and a one-row step component (no name gutter, no outline, row height as mu-On's) drawn by the same function as `StepRows`. Changed mu-tronic/design-ui.md section 4.5a and section 8.
