@@ -1,0 +1,25 @@
+# Text files are stored with LF and checked out with LF on every machine.
+# (core.autocrlf is ignored for paths that set eol, so no "LF will be replaced by CRLF" warning.)
+* text=auto eol=lf
+
+# Binary files are never converted.
+*.png  binary
+*.ico  binary
+*.icns binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.pdf  binary
+*.docx binary
+*.wav  binary
+*.aif  binary
+*.aiff binary
+*.flac binary
+*.mp3  binary
+*.ttf  binary
+*.otf  binary
+*.woff binary
+*.woff2 binary
+*.zip  binary
+
+# Folders with their own .gitattributes (tests/corpus, tests/golden, tests/manifests) override the above.
