@@ -168,6 +168,8 @@ add_custom_target(increment_build_number ALL
             "-DRC5_OUT=${CMAKE_BINARY_DIR}/mu-on/versioninfo.rc"
             "-DRC6_IN=${CMAKE_SOURCE_DIR}/mu-link/resources/versioninfo.rc.in"
             "-DRC6_OUT=${CMAKE_BINARY_DIR}/mu-link/versioninfo.rc"
+            "-DRC7_IN=${CMAKE_SOURCE_DIR}/mu-tronic/resources/versioninfo.rc.in"
+            "-DRC7_OUT=${CMAKE_BINARY_DIR}/mu-tronic/versioninfo.rc"
             -P "${CMAKE_SOURCE_DIR}/cmake/IncrementBuildNumber.cmake"
     COMMENT "Incrementing build number + regenerating version resources"
     VERBATIM

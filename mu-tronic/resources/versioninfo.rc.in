@@ -15,7 +15,7 @@ BEGIN
     BEGIN
       VALUE "CompanyName",    "Transwarp Development Project\0"
       VALUE "LegalCopyright", "@MUFAMILY_COPYRIGHT@\0"
-      VALUE "FileDescription","μ-Tronic\0"
+      VALUE "FileDescription","μ-Tronic@MUFAMILY_BUILD_SUFFIX@\0"
       VALUE "FileVersion",    "@MUFAMILY_PLUGIN_VERSION@\0"
       VALUE "ProductName",    "μ-Tronic\0"
       VALUE "ProductVersion", "@MUFAMILY_PLUGIN_VERSION@\0"
