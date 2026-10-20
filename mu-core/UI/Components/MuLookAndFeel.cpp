@@ -138,17 +138,24 @@ juce::Colour MuLookAndFeel::colour(ColourIds id) noexcept
 }
 
 // Fixed 8-colour voice palette indexed by channel (rhythm / voice / layer / track).
+// Each entry is a colour the Launchpad X can show (its palette index in the comment), so a layer's
+// on-screen colour and its pad colour are the same hue from one table.
 // The four app primaries (purple, green, blue, yellow — MuTheme::AppPrimaries) are left
 // out, so a voice's highlight never blends into its app's painted panels.
 const juce::Colour MuLookAndFeel::layerPalette[MuLookAndFeel::kLayerPaletteSize] = {
-    juce::Colour(0xffE5484D),   // 0 Red
-    juce::Colour(0xff2EC4C9),   // 1 Cyan
-    juce::Colour(0xffF28C28),   // 2 Orange
-    juce::Colour(0xffD04FC8),   // 3 Magenta
-    juce::Colour(0xffA6D63A),   // 4 Lime
-    juce::Colour(0xffF07CA6),   // 5 Rose
-    juce::Colour(0xffC9CCD1),   // 6 Silver
-    juce::Colour(0xff2B3FD6),   // 7 Navy
+    juce::Colour(0xffFF6259),   // 0 Red     (pad 5)
+    juce::Colour(0xff65EBFF),   // 1 Cyan    (pad 37)
+    juce::Colour(0xffFFB064),   // 2 Orange  (pad 9)
+    juce::Colour(0xffFF62FF),   // 3 Magenta (pad 53)
+    juce::Colour(0xffC7FE6D),   // 4 Lime    (pad 75)
+    juce::Colour(0xffFF5EC5),   // 5 Rose    (pad 57)
+    juce::Colour(0xffDDDDDD),   // 6 Silver  (pad 2)
+    juce::Colour(0xff5B5DFD),   // 7 Blue    (pad 45)
+};
+
+// The hue name of each palette entry; a controller driver maps these to its own device colours.
+const char* const MuLookAndFeel::layerPaletteNames[MuLookAndFeel::kLayerPaletteSize] = {
+    "red", "cyan", "orange", "magenta", "lime", "rose", "silver", "blue"
 };
 
 namespace

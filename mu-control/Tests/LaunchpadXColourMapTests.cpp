@@ -39,9 +39,9 @@ public:
         // The pad RGB each known screen colour gives (the table tuned by eye on the real pad), from the probe's swatch.
         struct Expected { uint32_t screen, pad; const char* name; };
         const Expected known[12] = {
-            { 0xE5484D, 0xFF0004, "red" },     { 0x2EC4C9, 0x00FFCF, "cyan" },   { 0xF28C28, 0xFF7700, "orange" },
-            { 0xD04FC8, 0xFF0084, "magenta" }, { 0xA6D63A, 0x8BFF00, "lime" },   { 0xF07CA6, 0xFF4656, "rose" },
-            { 0xC9CCD1, 0xB39A6D, "silver" },  { 0x2B3FD6, 0x0000B4, "navy" },   { 0x7F77DD, 0x2400FF, "app purple" },
+            { 0xFF6259, 0xFF0004, "red" },     { 0x65EBFF, 0x00FFCF, "cyan" },   { 0xFFB064, 0xFF7700, "orange" },
+            { 0xFF62FF, 0xFF0084, "magenta" }, { 0xC7FE6D, 0x8BFF00, "lime" },   { 0xFF5EC5, 0xFF4656, "rose" },
+            { 0xDDDDDD, 0xB39A6D, "silver" },  { 0x5B5DFD, 0x0000B4, "blue" },   { 0x7F77DD, 0x2400FF, "app purple" },
             { 0x4ADC8E, 0x50FF00, "app green" }, { 0x3D8BEB, 0x1028FF, "app blue" }, { 0xF2C53D, 0xFFD700, "app yellow" },
         };
 
@@ -60,8 +60,10 @@ public:
             const uint32_t go = launchpadx::padRgbFor(0x3CD070), red = launchpadx::padRgbFor(0xE24B4A), white = launchpadx::padRgbFor(0xFFFFFF);
             expect(chan(go, 16) < 24 && chan(go, 8) == 255 && chan(go, 0) < 24, "go green: green only, got " + juce::String::toHexString((int) go));
             expect(chan(red, 16) == 255 && chan(red, 8) < 24 && chan(red, 0) < 24, "red: red only, got " + juce::String::toHexString((int) red));
-            expectEquals(white, launchpadx::padRgbFor(0xC9CCD1), "white gets the value silver gets");
-            expectEquals(white, (uint32_t) 0xB39A6D);
+            // White matches the silver row (same hue at any brightness): silver's pad value lifted by 255/221.
+            const uint32_t silver = launchpadx::padRgbFor(0xDDDDDD);
+            expectEquals(silver, (uint32_t) 0xB39A6D);
+            expect(largestGap(white, scaled(silver, 255.0f / 221.0f)) <= 1 && maxOf(white) > maxOf(silver), "white is silver's pad hue, brighter");
             const uint32_t dimWhite = launchpadx::padRgbFor(scaled(0xFFFFFF, 0.45f));
             expect(largestGap(dimWhite, scaled(white, 0.45f)) <= 4 && maxOf(dimWhite) < maxOf(white), "a dim white stays white, only lower");
             expect(maxOf(launchpadx::padRgbFor(scaled(0xFFFFFF, 0.75f))) < maxOf(white), "the arrows' resting white is below the press flash");
@@ -99,8 +101,8 @@ public:
             LaunchpadXDriver d(false);
             expect(d.open(ports));
             ports.sent.clear();
-            d.setLeds({ { { ControlKind::Pad, 0, 7 }, 0xE5484D, LedMode::Static } });
-            const auto raw = launchpadx::lightingMessages({ { launchpadx::indexOf({ ControlKind::Pad, 0, 7 }).value(), LedMode::Static, 0xE5484D } }, false);
+            d.setLeds({ { { ControlKind::Pad, 0, 7 }, 0xFF6259, LedMode::Static } });
+            const auto raw = launchpadx::lightingMessages({ { launchpadx::indexOf({ ControlKind::Pad, 0, 7 }).value(), LedMode::Static, 0xFF6259 } }, false);
             expectEquals((int) ports.sent.size(), 1);
             if (ports.sent.size() == 1 && raw.size() == 1) expect(ports.sent[0] == raw[0]);
         }
