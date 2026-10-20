@@ -159,6 +159,11 @@ public:
     // publications with a grace wait between them (design 2.1.2). Published mode only; false for a slot out of
     // range, a type the host does not offer, or a host in TryLock mode. Setting the type the slot has is a no-op.
     bool         setLayerType(int slot, mu_core::LayerTypeId type, const juce::ValueTree* initial = nullptr);
+    // Message thread. A layer the user newly creates (the chooser): setLayerType, starting from the app's own default for
+    // the type when its preset folder holds `_default.<ext>` of that type, else from the type's built-in default. A missing,
+    // unreadable or other-type default file is ignored quietly. A state restore, a staged preset or a loaded file never
+    // come through here, so they always win.
+    bool         createLayerOfType(int slot, mu_core::LayerTypeId type);
     // Message thread, outside every lock, called by setLayerType (design step 3) before the old layer is retired: the
     // editor releases every pointer into slot `slot`'s layer (the modulator panel, the content's bindings). The
     // editor must clear it in its destructor, as the other shell callbacks. It runs on the thread that calls

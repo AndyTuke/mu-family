@@ -72,7 +72,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     {
         const int slot = layerPanel.getLayer();
         layerPanel.getModulatorPanel().setLayer(nullptr);   // nothing may point into the layer being replaced
-        if (proc.setLayerType(slot, type))
+        if (proc.createLayerOfType(slot, type))   // from the app's own _default file when it has one
         {
             if (type == mu_core::LayerTypeId::Rumble) chooseRumbleSource(proc, slot);   // a new Rumble listens to something at once
             layerTypeSet(slot);

@@ -150,6 +150,7 @@ private:
         VoiceEngine::DecodedSample sample;
     };
     StagedSample staged;
+    bool extrasApplied = false;   // a preset or restored state has been applied: the built-in start no longer applies
 };
 
 // What every Rhythm of one processor shares (design 2.4): the sample library (the user's primary folder, the browser's
@@ -308,7 +309,14 @@ inline void SlotRhythm::syncFromParameters(juce::AudioProcessorValueTreeState& a
 
 inline void SlotRhythm::completeSetup(juce::AudioProcessorValueTreeState& apvts, int slotIndex)
 {
-    // A fresh layer's fields meet the slot's rows (defaults, or the node a preset applied) before it is published.
+    // A layer nothing has been applied to (no preset, no restored state: applyExtras has not run) starts as mu-Clid's
+    // first rhythm does: sixteen steps with four hits and no sample. mu-Clid ships no default sample; an app default
+    // file (_default.muRhythm) reaches the layer as a node before this, through ProcessorBase::createLayerOfType.
+    if (! extrasApplied)
+        for (const auto& [suffix, plain] : { std::pair<const char*, float> { "stepsA", 16.0f }, { "hitsA", 4.0f } })
+            if (auto* p = apvts.getParameter("r" + juce::String(slotIndex) + "_" + suffix))
+                p->setValueNotifyingHost(p->convertTo0to1(plain));
+    // The layer's fields meet the slot's rows before it is published.
     syncFromParameters(apvts, slotIndex);
 }
 
@@ -408,6 +416,7 @@ inline void SlotRhythm::preloadStaged(const juce::ValueTree& stagedNode)
 
 inline void SlotRhythm::applyExtras(const juce::ValueTree& node)
 {
+    extrasApplied = true;
     SampleRhythm::applyExtras(node);   // the modulators
     if (services == nullptr || voice == nullptr) return;
 

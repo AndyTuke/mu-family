@@ -145,6 +145,7 @@ struct MuTronicRhythmTests : juce::UnitTest
         layoutAndRegistry();
         savedState();
         parameterRowsReachTheLayer();
+        newLayerDefaults();
         sameStreamAsMuClid();
         stoppedTransportAndRestart();
         sampleLibraryAndPreview();
@@ -287,9 +288,67 @@ struct MuTronicRhythmTests : juce::UnitTest
         mu_seam_test::setParam(p.apvts, "r5_hitsA", 11.0f);
         expect(p.getLayerTypeId(5) == LayerTypeId::Empty);
         expect(p.setLayerType(5, LayerTypeId::Rhythm));
-        expectEquals(getPlain(p.apvts, "r5_hitsA"), getPlain(p.apvts, "r6_hitsA"), "a new Rhythm's rows are at their defaults");
-        expectEquals(rhythmIn(p, 5).genA.hits, (int) getPlain(p.apvts, "r6_hitsA"));
+        expectEquals(getPlain(p.apvts, "r5_hitsA"), 4.0f, "a new Rhythm starts as mu-Clid's first rhythm: four hits");
+        expectEquals(getPlain(p.apvts, "r5_stepsA"), 16.0f, "in sixteen steps");
+        expectEquals(rhythmIn(p, 5).genA.hits, 4);
+        expectEquals(rhythmIn(p, 5).genA.steps, 16);
         p.flushPendingAsyncUpdates();
+    }
+
+    // A layer the user creates starts from the app's own default for its type: the _default file in the type's preset folder
+    // when it is that type's, else the built-in start. A restored state or a loaded file always wins.
+    void newLayerDefaults()
+    {
+        beginTest("a new layer starts from the app's _default file or the built-in default; restores and wrong-type files do not");
+        mu_seam_test::TempStorage storage;
+        RhythmProcessor p;
+        const auto rhythms = p.getContentDir().getSiblingFile("muClid").getChildFile("Rhythms");
+        const auto tracks  = p.getContentDir().getSiblingFile("muOn").getChildFile("Tracks");
+        const auto real = juce::File(MU_TRONIC_FIXTURE_DIR).getChildFile("REAL_rhythm.muRhythm");
+
+        // No default file: the built-in start, a pattern and no sample.
+        expect(p.createLayerOfType(1, LayerTypeId::Rhythm));
+        expectEquals(rhythmIn(p, 1).genA.hits, 4);
+        expectEquals(rhythmIn(p, 1).genA.steps, 16);
+        expect(! rhythmIn(p, 1).voice->hasSample());
+
+        // A default file: the new layer takes it, sample included.
+        putSample(p);
+        rhythms.createDirectory();
+        expect(real.copyFileTo(rhythms.getChildFile("_default.muRhythm")));
+        expect(p.createLayerOfType(2, LayerTypeId::Rhythm));
+        expectEquals(rhythmIn(p, 2).genA.hits, 5, "the default file's pattern");
+        expectEquals(rhythmIn(p, 2).genA.rotate, 1);
+        expect(rhythmIn(p, 2).voice->hasSample(), "and its sample");
+
+        // A plain setLayerType, a restored state and a loaded file ignore it.
+        expect(p.setLayerType(3, LayerTypeId::Rhythm));
+        expectEquals(rhythmIn(p, 3).genA.hits, 4, "setLayerType is not a creation from the chooser");
+        mu_seam_test::setParam(p.apvts, "r1_hitsA", 0.0f);
+        auto state = p.captureState();
+        expectEquals(mu_pp::findLayerNode(state, 1).getChildWithName("Modulators").isValid() ? 1 : 0, 1);
+        RhythmProcessor q;
+        q.applyStateTree(state);
+        expect(q.getLayerTypeId(1) == LayerTypeId::Rhythm);
+        expectEquals(rhythmIn(q, 1).genA.hits, 0, "an explicitly empty restored layer stays empty");
+        expect(! rhythmIn(q, 1).voice->hasSample(), "and has no sample");
+
+        // A corrupt default, and a default of another type, are ignored quietly.
+        rhythms.getChildFile("_default.muRhythm").replaceWithText("<not a preset");
+        expect(p.createLayerOfType(4, LayerTypeId::Rhythm));
+        expectEquals(rhythmIn(p, 4).genA.hits, 4, "a corrupt default falls back to the built-in start");
+        rhythms.getChildFile("_default.muRhythm").replaceWithText("<MuClidLayer/>");
+        expect(p.createLayerOfType(5, LayerTypeId::Rhythm));
+        expectEquals(rhythmIn(p, 5).genA.hits, 4, "a file with another type's tag is ignored");
+
+        tracks.createDirectory();
+        expect(juce::File(MU_TRONIC_FIXTURE_DIR).getChildFile("REAL_kick.muTrack").copyFileTo(tracks.getChildFile("_default.muTrack")));
+        expect(p.createLayerOfType(6, LayerTypeId::Bass), "a Kick default file is not a Bass's");
+        expect(p.getLayerTypeId(6) == LayerTypeId::Bass);
+        expect(p.createLayerOfType(7, LayerTypeId::Kick));
+        expect(p.getLayerTypeId(7) == LayerTypeId::Kick);
+        p.flushPendingAsyncUpdates();
+        q.flushPendingAsyncUpdates();
     }
 
     // The recorded Rhythm stream of mu-Clid (Tests/RhythmLayerFixture.h): the layer in a mu-Tronic slot must reproduce it bit

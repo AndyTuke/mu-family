@@ -1587,6 +1587,28 @@ bool ProcessorBase::setLayerType(int slot, mu_core::LayerTypeId type, const juce
     return true;
 }
 
+bool ProcessorBase::createLayerOfType(int slot, mu_core::LayerTypeId type)
+{
+    const auto* info = layerTypes.find(type);
+    if (info != nullptr && slotTypeId(slot) == mu_core::LayerTypeId::Empty)
+    {
+        const auto file = presetDirOf(*info).getChildFile("_default." + presetExtensionOf(*info));
+        if (file.existsAsFile())
+        {
+            const auto xml = juce::XmlDocument::parse(file);
+            const auto tree = xml != nullptr ? juce::ValueTree::fromXml(*xml) : juce::ValueTree();
+            // Only a file that is this type's (the five Track types share one extension; typeFromPreset tells them apart).
+            if (tree.isValid() && layerPresetType(tree, file.getFileExtension()) == type)
+            {
+                const auto node = info->presetFileToNode != nullptr ? info->presetFileToNode(tree, "_default") : tree;
+                if (node.isValid() && setLayerType(slot, type, &node))
+                    return true;
+            }
+        }
+    }
+    return setLayerType(slot, type);
+}
+
 void ProcessorBase::clearLayerClips(int slot)
 {
     if (slot < 0 || slot >= mu_limits::kMaxLayers || layers[(size_t) slot] == nullptr) return;
