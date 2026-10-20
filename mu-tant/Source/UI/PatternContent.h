@@ -8,6 +8,7 @@
 #include "UI/Components/SegmentControl.h"
 #include "UI/Voice/InsertSubsection.h"   // shared mu-core insert panel
 #include "UI/GatingDesigner.h"
+#include "UI/LayerContent.h"         // mu-core: the base every layer type's content derives from
 #include "UI/PatternHost.h"               // what the content reads from the layer's host
 
 #include <vector>
@@ -49,8 +50,8 @@ private:
 // LayerPanel. `setLayer(idx)` rebinds every APVTS attachment to the v{idx}_* param family so
 // clicking a different voice in the sidebar swaps the editor's target slot. Root + scale are
 // shared (global APVTS params) and stay bound across voice changes.
-class PatternContent : public juce::Component,
-                   private juce::Timer
+class PatternContent : public LayerContent,
+                       private juce::Timer
 {
 public:
     // `base` is handed to the shared mu-core sections that take the processor (the insert section);
@@ -60,7 +61,7 @@ public:
 
     // Rebind every per-voice attachment to the v{idx}_* family. Shared params
     // (root, scale) are unaffected.
-    void setLayer(int layerIndex);
+    void setLayer(int layerIndex) override;
     int  getLayer() const noexcept { return currentLayer; }
 
     // The insert algorithm changed: the editor re-labels the modulators' insert destinations.
@@ -78,6 +79,10 @@ public:
     // Call before removeLayer destroys the Layer so the
     // 30 Hz timers cannot dereference freed matrix or insert-meter memory.
     void clearAllModBindings();
+
+    // The same, for a host that keeps one content for every Pattern slot (LayerContent): the arcs, the insert's meter
+    // and the gate editor's envelopes all point into the shown layer. setLayer rebinds them.
+    void releaseModulationArcs() override { clearAllModBindings(); clearPatternBindings(); }
 
     void paint(juce::Graphics& g) override;
     void resized() override;

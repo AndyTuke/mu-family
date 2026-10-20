@@ -542,10 +542,9 @@ bool Pattern::renderRetiring(const mu_core::RenderContext& ctx, juce::AudioBuffe
     if (! bankTry.isLocked()) return true;   // contended: silent this call, the fade runs on
 
     // The slot is empty of a live layer (an in-place tail renders only then), so the tail writes `out`; a tail
-    // that shares the slot with something else renders aside and adds.
-    // Pattern tails are in-place only (a spare in its own slot, rendered only while the slot has no live layer and
-    // one in-place entry per row), so the bin always hands them the slot exclusively; the add path is a guard.
-    jassert(rs.exclusive != 0);
+    // that shares the slot with something else renders aside and adds. mu-Tant's tails are in-place (a spare in its
+    // own slot); a host that replaces the type of a slot (mu-Tronic) parks the whole layer, and its tail then adds
+    // to whatever the slot's new layer renders.
     juce::AudioBuffer<float> aside;
     if (rs.exclusive == 0)
     {

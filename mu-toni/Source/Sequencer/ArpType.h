@@ -2,6 +2,7 @@
 
 #include "Sequencer/Arp.h"
 #include "Sequencer/LayerTypeInfo.h"        // mu-core: mu_core::LayerTypeInfo
+#include "Sequencer/LayerServices.h"        // mu-core: what the type shares between its layers
 #include "Persistence/ArpParams.h"          // addLayerParams
 #include "Audio/NoiseSeed.h"                // mu-core: makeNoiseSalt
 #include "Audio/Wavetable/WavetableBank.h"  // mu-core: the oscillators' tables
@@ -15,29 +16,36 @@
 namespace mu_toni
 {
 
-// The factory wavetables every Arp built through arpLayerTypeInfo() reads: one process-wide, read-only bank,
-// built on first use (message thread) and outliving every layer, tail and processor. A stand-in for the
-// per-processor layer services of design 2.4; mu-Toni's own processor keeps its own member bank.
-inline const mu_wavetable::WavetableBank& sharedArpBank()
+// What every Arp of one processor shares (design 2.4): the factory wavetables, read-only, so the audio thread reads
+// them with no lock. Built when the processor's first Arp is added (message thread) and kept until the processor is
+// destroyed, after every Arp and tail. mu-Toni's own processor keeps its own member bank and does not use this.
+class ArpServices : public mu_core::LayerServices
 {
-    struct Holder
-    {
-        mu_wavetable::WavetableBank bank;
-        Holder() { bank.loadFactoryBank(); }
-    };
-    static const Holder holder;
-    return holder.bank;
+public:
+    ArpServices() { bank.loadFactoryBank(); }
+    mu_wavetable::WavetableBank bank;
+};
+
+inline std::unique_ptr<mu_core::LayerServices> createArpServices(ProcessorBase& /*host*/)
+{
+    return std::make_unique<ArpServices>();
 }
 
-// A fresh Arp for `slot`, not yet bound or prepared: its voice reads the shared bank, and its noise is seeded
-// from a fresh salt and the slot, so no two layers share a noise sequence (the salt is 0 in deterministic mode).
+// A fresh Arp for `slot`, not yet bound or prepared: its noise is seeded from a fresh salt and the slot, so no two
+// layers share a noise sequence (the salt is 0 in deterministic mode). Its voice reads the services' bank once
+// attachArpServices has run.
 inline std::unique_ptr<Layer> createArp(int slot, mu_core::LayerTypeId /*type*/)
 {
     auto a = std::make_unique<Arp>();
-    a->runner.setBank(&sharedArpBank());
     a->runner.setSlotIndex(slot, mu_core::makeNoiseSalt());
     a->insert->setSlotIndex(slot);
     return a;
+}
+
+// Points the Arp's voice at the shared factory bank.
+inline void attachArpServices(Layer& layer, mu_core::LayerServices& services, int /*slot*/)
+{
+    static_cast<Arp&>(layer).runner.setBank(&static_cast<ArpServices&>(services).bank);
 }
 
 inline mu_core::LayerTypeInfo arpLayerTypeInfo() noexcept
@@ -54,6 +62,8 @@ inline mu_core::LayerTypeInfo arpLayerTypeInfo() noexcept
     info.descriptor = "Generative arpeggiator";
     info.addLayerParams = &addLayerParams;
     info.create = &createArp;
+    info.createServices = &createArpServices;
+    info.attachServices = &attachArpServices;
     return info;
 }
 

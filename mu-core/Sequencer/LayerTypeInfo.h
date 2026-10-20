@@ -2,6 +2,8 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include "Sequencer/LayerServices.h"
+
 #include <cstring>
 #include <functional>
 #include <memory>
@@ -16,10 +18,15 @@ class LayerContent;   // mu-core/UI/LayerContent.h: a type's content component f
 // that hosts one type uses create / addLayerParams itself.
 namespace mu_core
 {
+    // How many ids there are: the size of a table indexed by LayerTypeId.
+    inline constexpr int kLayerTypeIdCount = 11;
+
     // Saved by NAME (layerTypeName), never by number, so the order here may change.
     // Test and Test2 are reserved for test layers: no product registers them, so a fake type can never collide with a
     // real one the day that product's type is registered.
     enum class LayerTypeId : int { Empty = 0, Rhythm, Pattern, Arp, Kick, Bass, Hat, Snare, Rumble, Test, Test2 };
+
+    static_assert(kLayerTypeIdCount == (int) LayerTypeId::Test2 + 1, "kLayerTypeIdCount follows the last LayerTypeId");
 
     inline const char* layerTypeName(LayerTypeId id) noexcept
     {
@@ -61,6 +68,13 @@ namespace mu_core
         using CreateContentFn = std::unique_ptr<LayerContent> (*)(ProcessorBase& host, int slot);
         // The slot's picture in the sidebar; `pulse` asks the host to repaint the item.
         using CreateMiniVisualFn = std::unique_ptr<juce::Component> (*)(ProcessorBase& host, int slot, std::function<void()> pulse);
+        // What the type's layers share (design 2.4), built once per processor when the first layer of the type is added.
+        using CreateServicesFn = std::unique_ptr<LayerServices> (*)(ProcessorBase& host);
+        // Wires a layer `create` just made to the type's services (its host link, its slot's engine). Called once on the
+        // message thread, after create and before the layer is prepared, bound or published.
+        using AttachServicesFn = void (*)(Layer& layer, LayerServices& services, int slot);
+        // The type's parameter rows that belong to no slot (a tonal centre every layer of the type reads), added once.
+        using AddGlobalParamsFn = void (*)(juce::AudioProcessorValueTreeState::ParameterLayout& layout);
 
         LayerTypeId id = LayerTypeId::Empty;
         const char* name = "Empty";            // display name ("Arp", "Kick")
@@ -71,11 +85,14 @@ namespace mu_core
         const char* presetFolder = "";         // the layer-preset subfolder inside it ("Arps"): the type's presets
                                                // are the product's own, shared with it and never copied
         AddParamsFn addLayerParams = nullptr;  // the type's parameter table for one slot (once per prefix)
+        AddGlobalParamsFn addGlobalParams = nullptr;   // rows shared by every slot of the type, once per type (null = none)
         CreateFn    create = nullptr;          // a fresh default layer for `slot`, not yet prepared or bound
         TypeFromPresetFn typeFromPreset = nullptr;   // set where several types share an extension (.muTrack): the folder
                                                // listing then keeps only the files that map to this type; null = every file
         CreateContentFn    createContent    = nullptr;   // the type's content component, built once per type by the editor
         CreateMiniVisualFn createMiniVisual = nullptr;   // the type's sidebar picture
+        CreateServicesFn   createServices   = nullptr;   // null = the type shares nothing between its layers
+        AttachServicesFn   attachServices   = nullptr;   // null = nothing to wire (a type that needs no services)
         int         appColourId = 0;           // the MuLookAndFeel colour ID (appBlue ...) the slot's main area is painted in; 0 = the app's own
         const char* typeTag = "";              // the header's type plate text ("Toni", "On"); empty = none
         const char* presetTag = "";            // the root tag of a layer-preset file ("MuToniLayer"): each product's existing tag,

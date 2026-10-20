@@ -39,6 +39,13 @@ void ProcessorBase::prepareLayerRender(double sampleRate, int maxBlockSize)
     renderState.midiIn = renderState.liveOut = renderState.tailOut = 0;
     renderState.dropped = 0;
 
+    // What the layer types share (their engines, tables), for this rate and size, before the layers that read it.
+    {
+        const juce::ScopedLock sl(layerServicesLock);
+        for (auto& s : layerServices)
+            if (s != nullptr) s->prepare(sampleRate, renderState.prepared);
+    }
+
     // Every slot's layer, spares included, for this rate and size. layersLock keeps a structural edit (message
     // thread) from moving them meanwhile; the audio thread is not running.
     {

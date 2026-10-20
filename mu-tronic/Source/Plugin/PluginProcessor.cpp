@@ -35,6 +35,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         for (int i = 0; i < mu_limits::kMaxLayers; ++i)
             info.addLayerParams(layout, i);
     }
+    // ── Rows a type shares between its slots (the Pattern's tonal centre), once per type.
+    for (int t = 0; t < types.size(); ++t)
+        if (const auto& info = types.at(t); info.addGlobalParams != nullptr)
+            info.addGlobalParams(layout);
 
     // ── Shared global FX rack + returns + master (mu-core) ────────────────────
     mu_mixfx::addGlobalFxParams(layout, 2);   // swaps land on the bar until a looping type is registered

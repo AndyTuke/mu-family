@@ -4,7 +4,7 @@
 # The target combines the product's shell (the 16-slot processor, the empty-slot chooser) with the shared
 # platform (ProcessorBase + MixerEngine + FXChain + the shared editor shell / sidebar / mixer). Shared
 # audio/UI/ProcessorBase come from mu-core via the link; the layer types come from the layer libraries
-# (mu-<product>-layer) as each is registered in Source/Persistence/LayerTypes.cpp. Registered: Arp (mu-toni-layer), Kick, Bass, Hat and Snare (mu-on-layer).
+# (mu-<product>-layer) as each is registered in Source/Persistence/LayerTypes.cpp. Registered: Arp (mu-toni-layer), Kick, Bass, Hat, Snare and Rumble (mu-on-layer), Pattern (mu-tant-layer).
 
 # ── mu-Tronic — Standalone only (no VST3, no CLAP, no AU) ────────────────────
 juce_add_plugin(mu-tronic
@@ -34,10 +34,12 @@ target_sources(mu-tronic
         Source/Persistence/LayerTypes.cpp
         Source/Persistence/ArpLayerType.cpp
         Source/Persistence/TrackLayerTypes.cpp
+        Source/Persistence/PatternLayerType.cpp
         Source/UI/EmptySlotChooser.cpp
         Source/UI/TronicSettingsOverlay.cpp
         ${MU_TONI_LAYER_UI_SOURCES}   # the Arp type's UI content (mu-toni-layer)
         ${MU_ON_LAYER_UI_SOURCES}     # the Track types' UI content: TrackContent, StepRows, TrackStepRow (mu-on-layer)
+        ${MU_TANT_LAYER_UI_SOURCES}   # the Pattern type's UI content: PatternContent, GatingDesigner (mu-tant-layer)
 )
 
 target_include_directories(mu-tronic
@@ -57,7 +59,7 @@ target_compile_definitions(mu-tronic
         MU_MAX_BUSES=3
         MU_BUS_INSERTS=2
         MU_EXT_SIDECHAIN=0
-        MU_TRONIC_WITH_UI=1   # the layer types build their content and sidebar pictures (Persistence/ArpLayerType.cpp, TrackLayerTypes.cpp)
+        MU_TRONIC_WITH_UI=1   # the layer types build their content and sidebar pictures (Persistence/ArpLayerType.cpp, TrackLayerTypes.cpp, PatternLayerType.cpp)
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
@@ -67,7 +69,8 @@ target_compile_definitions(mu-tronic
 target_link_libraries(mu-tronic
     PRIVATE
         mu-toni-layer   # the Arp type: its engine sources and the Source/ include path
-        mu-on-layer     # the Track types (Kick, Bass, Hat, Snare): the same
+        mu-on-layer     # the Track types (Kick, Bass, Hat, Snare, Rumble): the same
+        mu-tant-layer   # the Pattern type: the same
         mu-core
         juce::juce_audio_utils
         juce::juce_dsp
@@ -117,12 +120,14 @@ target_sources(mu-tronic-tests PRIVATE
     Source/Tests/TronicArpTests.cpp         # the Arp type in a slot: layout, saved rows, same stream as mu-Toni, follower, presets, stress
     Source/Tests/TronicTrackTests.cpp       # the Kick, Bass, Hat and Snare types in a slot: saved rows, same stream as mu-On, tails, presets
     Source/Tests/TronicLayerPresetTests.cpp # layer presets in a slot: save/load per type, Empty-slot adopt, cross-type refusal, staged load
+    Source/Tests/TronicPatternTests.cpp     # the Pattern type in a slot: saved rows, same stream as mu-Tant, Note mode per layer, services, wavetables, presets
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp
     Source/Persistence/LayerTypes.cpp
     Source/Persistence/ArpLayerType.cpp
     Source/Persistence/TrackLayerTypes.cpp
+    Source/Persistence/PatternLayerType.cpp
     # The mu-core .cpps behind ProcessorBase (the console target can't link mu-core directly).
     ${MU_CORE_PROCESSOR_TEST_SOURCES}
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/Wavetable/WavetableBank.cpp"   # the Arp type's oscillator tables
@@ -141,6 +146,7 @@ target_include_directories(mu-tronic-tests PRIVATE
 target_link_libraries(mu-tronic-tests PRIVATE
     mu-toni-layer
     mu-on-layer
+    mu-tant-layer
     juce::juce_core
     juce::juce_audio_basics
     juce::juce_audio_processors

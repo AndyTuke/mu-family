@@ -22,6 +22,10 @@ public:
     // The modulation destinations the shared modulator panel offers for this type's layers; null = none.
     virtual const ModDestProvider* getModDestProvider() const noexcept { return nullptr; }
 
+    // The modulators of the layer in `slot` were edited (an assignment, a mode or a destination): a type that caches
+    // something derived from them (the Pattern's stepped-pitch flags) refreshes it. Message thread. Default: nothing.
+    virtual void modulatorsChanged(int slot) { juce::ignoreUnused(slot); }
+
     // A knob hover or change: the control's name and value, for the shell's status bar.
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
 };
