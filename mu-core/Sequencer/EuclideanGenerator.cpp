@@ -1,6 +1,7 @@
 #include "EuclideanGenerator.h"
 
 #include <algorithm>
+#include <cassert>
 
 namespace mu_core {
 
@@ -82,6 +83,8 @@ void EuclideanGenerator::generate(int steps, int hits, std::vector<bool>& out)
             hitWords  = paired;
         }
     }
+
+    assert(plan.levels < kMaxLevels);   // the level tables were big enough for this step count
 
     size_t pos = 0;
     for (int i = 0; i < hitWords; ++i)  pos = emit(plan, plan.levels, false, out, pos);

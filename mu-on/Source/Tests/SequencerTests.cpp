@@ -121,6 +121,7 @@ public:
                 expect(! b.empty(), "the accented step fired");
                 expectWithinAbsoluteError(b[0].vel, 0.72f + knob * 0.28f, 1.0e-6f);
                 expect(b[0].vel >= StepClock::kNormalVelocity - 1.0e-6f, "never below a plain step");
+                expect(StepClock::accentedVelocity(1.0f) == 1.0f, "a full Accent knob is full velocity");
             }
         }
 

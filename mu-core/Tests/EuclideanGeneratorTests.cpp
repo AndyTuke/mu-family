@@ -156,12 +156,14 @@ struct EuclideanGeneratorTests : juce::UnitTest
         {
             std::vector<bool> scratch;
             scratch.reserve(256);
+            const auto capacity = scratch.capacity();
             for (int n = 1; n <= 64; ++n)
                 for (int k = 0; k <= n; ++k)
                 {
                     EuclideanGenerator::generate(n, k, scratch);
                     expect(scratch == EuclideanGenerator::generate(n, k));
                 }
+            expect(scratch.capacity() == capacity, "the reused buffer never reallocated");
         }
     }
 };
