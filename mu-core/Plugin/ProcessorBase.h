@@ -142,6 +142,13 @@ public:
     virtual bool layersAreSlots() const { return false; }
     // The layer types the host offers a slot (Empty is always available and is not listed).
     const mu_core::LayerTypeRegistry& getLayerTypes() const noexcept { return layerTypes; }
+    // Message thread. The services `info`'s layers share (design 2.4), built on first need by info.createServices and
+    // kept until the processor is destroyed; prepared at once when the processor has been prepared. Null for a type
+    // that declares none. setLayerType calls it before it creates the type's first layer; a type's host adapter and
+    // content call it to reach what the type shares.
+    mu_core::LayerServices* ensureLayerServices(const mu_core::LayerTypeInfo& info);
+    // The services already built for `id`, or null (none yet, or the type declares none). Message thread.
+    mu_core::LayerServices* findLayerServices(mu_core::LayerTypeId id) const;
     // Message thread. Gives `slot` a fresh layer of `type` (Empty empties it) without muting anything: the
     // new layer is built and prepared first, the old one is published away and sounds out in the retire bin,
     // the slot's type parameters go back to defaults (or take `initial`, a layer node) while nothing live reads

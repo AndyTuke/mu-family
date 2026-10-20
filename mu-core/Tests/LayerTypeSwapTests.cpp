@@ -562,3 +562,149 @@ struct LayerTypeSwapTests : juce::UnitTest
     }
 };
 static LayerTypeSwapTests sLayerTypeSwapTests;
+
+// ─── Layer services (design 2.4) ─────────────────────────────────────────────────────────────────────
+namespace
+{
+    // What the probe types record: how many services were built, which services each layer was wired to, and whether
+    // the services were still alive when a layer of the type was destroyed.
+    struct ServicesLog
+    {
+        int built = 0, attached = 0, prepared = 0, destroyed = 0, layersDestroyed = 0, layersSawDeadServices = 0;
+        double preparedRate = 0.0;
+        int preparedBlock = 0;
+        mu_core::LayerServices* attachedTo = nullptr;
+        int lastSlot = -1;
+        bool alive = false;
+    };
+    ServicesLog gLog;
+
+    struct ProbeServices : mu_core::LayerServices
+    {
+        ProbeServices() { ++gLog.built; gLog.alive = true; }
+        ~ProbeServices() override { ++gLog.destroyed; gLog.alive = false; }
+        void prepare(double rate, int block) override { ++gLog.prepared; gLog.preparedRate = rate; gLog.preparedBlock = block; }
+    };
+
+    // A layer of the type that shares services; its destructor reads whether they are still there.
+    struct ProbeLayer : KickT
+    {
+        int typeId() const override { return (int) LayerTypeId::Test; }
+        mu_core::RetirePolicy retirePolicy() const override { return { mu_core::RetirePolicy::Kind::Fade, 25.0f, 2.0f }; }
+        ~ProbeLayer() override { ++gLog.layersDestroyed; if (! gLog.alive) ++gLog.layersSawDeadServices; }
+    };
+
+    struct ServicesHost : FakeLayerHost
+    {
+        ServicesHost() : FakeLayerHost(4, mu_core::LayerAccess::Published)
+        {
+            mu_core::LayerTypeInfo shared;
+            shared.id = LayerTypeId::Test; shared.name = "Shared"; shared.group = "Test";
+            shared.create = [](int, LayerTypeId) -> std::unique_ptr<Layer> { return std::make_unique<ProbeLayer>(); };
+            shared.createServices = [](ProcessorBase&) -> std::unique_ptr<mu_core::LayerServices> { return std::make_unique<ProbeServices>(); };
+            shared.attachServices = [](Layer&, mu_core::LayerServices& s, int slot) { ++gLog.attached; gLog.attachedTo = &s; gLog.lastSlot = slot; };
+            layerTypes.add(shared);
+
+            mu_core::LayerTypeInfo plain;
+            plain.id = LayerTypeId::Test2; plain.name = "Plain"; plain.group = "Test";
+            plain.create = &makeT<KickT>;
+            layerTypes.add(plain);
+        }
+        bool layersAreSlots() const override { return true; }
+        std::unique_ptr<Layer> createLayer(int) override { return std::make_unique<EmptyT>(); }
+        using ProcessorBase::layerTypes;
+    };
+}
+
+struct LayerServicesTests : juce::UnitTest
+{
+    LayerServicesTests() : juce::UnitTest("LayerServices: what a layer type shares, owned by the processor", "mu-core") {}
+
+    void runTest() override
+    {
+        builtWithTheFirstLayer();
+        preparedWithTheProcessor();
+        outlivesLayersAndTails();
+    }
+
+    // Built when the first layer of the type is added, once, and each layer is wired to it with its slot; a type that
+    // declares none gets nothing.
+    void builtWithTheFirstLayer()
+    {
+        beginTest("services are built with the type's first layer, once, and each new layer is attached to them");
+        gLog = {};
+        auto box = std::make_unique<ServicesHost>(); auto& p = *box;
+        expectEquals(gLog.built, 0, "nothing is built for a type no layer uses");
+        expect(p.findLayerServices(LayerTypeId::Test) == nullptr);
+
+        expect(p.setLayerType(2, LayerTypeId::Test));
+        expectEquals(gLog.built, 1);
+        expectEquals(gLog.attached, 1);
+        expectEquals(gLog.lastSlot, 2);
+        expect(p.findLayerServices(LayerTypeId::Test) != nullptr && p.findLayerServices(LayerTypeId::Test) == gLog.attachedTo,
+               "the layer was wired to the processor's services");
+
+        expect(p.setLayerType(3, LayerTypeId::Test));
+        expectEquals(gLog.built, 1, "the second layer shares the first one's services");
+        expectEquals(gLog.attached, 2);
+        expectEquals(gLog.lastSlot, 3);
+
+        expect(p.setLayerType(1, LayerTypeId::Test2));
+        expect(p.findLayerServices(LayerTypeId::Test2) == nullptr, "a type with no services has none");
+        expectEquals(gLog.attached, 2);
+        p.flushPendingAsyncUpdates();
+    }
+
+    // Built before the processor is prepared: prepared with it. Built after: prepared at once with the same rate.
+    void preparedWithTheProcessor()
+    {
+        beginTest("services receive the processor's rate and block size, whether built before or after it was prepared");
+        gLog = {};
+        {
+            auto box = std::make_unique<ServicesHost>(); auto& p = *box;
+            expect(p.setLayerType(1, LayerTypeId::Test));
+            expectEquals(gLog.prepared, 0, "not prepared while the processor is not");
+            p.prepareToPlay(44100.0, 256);
+            expectEquals(gLog.prepared, 1);
+            expectEquals(gLog.preparedRate, 44100.0);
+            expectEquals(gLog.preparedBlock, 256);
+            p.releaseResources();
+            p.flushPendingAsyncUpdates();
+        }
+        gLog = {};
+        {
+            auto box = std::make_unique<ServicesHost>(); auto& p = *box;
+            p.prepareToPlay(48000.0, 128);
+            expectEquals(gLog.prepared, 0, "no services yet");
+            expect(p.setLayerType(1, LayerTypeId::Test));
+            expectEquals(gLog.prepared, 1, "built after the prepare: prepared at once");
+            expectEquals(gLog.preparedRate, 48000.0);
+            expectEquals(gLog.preparedBlock, 128);
+            p.releaseResources();
+            p.flushPendingAsyncUpdates();
+        }
+    }
+
+    // Layers and the tails the bin still holds are destroyed before the services they may read, and the services die
+    // exactly once with the processor.
+    void outlivesLayersAndTails()
+    {
+        beginTest("services outlive every layer, a replaced layer's tail included, and are destroyed once with the processor");
+        gLog = {};
+        {
+            auto box = std::make_unique<ServicesHost>(); auto& p = *box;
+            expect(p.setLayerType(0, LayerTypeId::Test));
+            expect(p.setLayerType(1, LayerTypeId::Test));
+            p.prepareToPlay(48000.0, 128);
+            expect(p.setLayerType(0, LayerTypeId::Empty));   // the old layer fades out in the bin, not yet freed
+            expect(p.setLayerType(2, LayerTypeId::Test));
+            expectEquals(gLog.destroyed, 0, "the services are still there while layers come and go");
+            box.reset();   // the processor goes with layers in slots and one possibly still in the bin
+        }
+        expectEquals(gLog.built, 1);
+        expectEquals(gLog.destroyed, 1, "destroyed exactly once");
+        expectEquals(gLog.layersDestroyed, 3, "every layer of the type was destroyed");
+        expectEquals(gLog.layersSawDeadServices, 0, "no layer was destroyed after its services");
+    }
+};
+static LayerServicesTests sLayerServicesTests;

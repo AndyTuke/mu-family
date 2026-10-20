@@ -1393,6 +1393,37 @@ void ProcessorBase::resetLayer(int idx)
 }
 
 // ─── Typed slots ─────────────────────────────────────────────────────────────────────────────
+
+mu_core::LayerServices* ProcessorBase::ensureLayerServices(const mu_core::LayerTypeInfo& info)
+{
+    const int i = (int) info.id;
+    if (info.createServices == nullptr || i < 0 || i >= mu_core::kLayerTypeIdCount) return nullptr;
+    const juce::ScopedLock sl(layerServicesLock);
+    if (layerServices[(size_t) i] != nullptr) return layerServices[(size_t) i].get();
+
+    auto built = info.createServices(*this);
+    if (built == nullptr) return nullptr;
+    // A processor already prepared hands its rate and block size to services built after it; prepareLayerRender
+    // reaches them through the table once they are in it, so a prepare racing this one still ends on the newest.
+    double rate = 0.0;
+    int block = 0;
+    {
+        const juce::ScopedLock ll(layersLock);
+        rate  = layersPreparedRate;
+        block = layersPreparedBlock;
+    }
+    if (rate > 0.0) built->prepare(rate, block);
+    layerServices[(size_t) i] = std::move(built);
+    return layerServices[(size_t) i].get();
+}
+
+mu_core::LayerServices* ProcessorBase::findLayerServices(mu_core::LayerTypeId id) const
+{
+    const int i = (int) id;
+    if (i < 0 || i >= mu_core::kLayerTypeIdCount) return nullptr;
+    const juce::ScopedLock sl(layerServicesLock);
+    return layerServices[(size_t) i].get();
+}
 // docs/mu-tronic/design.md 2.1.2: a slot's type changes in two view publications with a grace wait between
 // them, nothing suspended and nothing muted. The audio thread reaches layers only through the published view
 // (LayerAccess::Published), so every pointer move here is invisible to it until a view is published.
@@ -1453,8 +1484,11 @@ bool ProcessorBase::setLayerType(int slot, mu_core::LayerTypeId type, const juce
         rate  = layersPreparedRate;
         block = layersPreparedBlock;
     }
+    // The type's shared services exist before its first layer does; the layer is wired to them before it is prepared.
+    mu_core::LayerServices* services = info != nullptr ? ensureLayerServices(*info) : nullptr;
     std::unique_ptr<Layer> fresh = info != nullptr ? info->create(slot, type) : createLayer(slot);
     if (fresh == nullptr) return false;
+    if (services != nullptr && info->attachServices != nullptr) info->attachServices(*fresh, *services, slot);
     if (rate > 0.0) fresh->prepare(rate, block);
     // The slot's identity stays with the slot: its colour and its name.
     fresh->colourIndex = layers[(size_t) slot]->colourIndex;
