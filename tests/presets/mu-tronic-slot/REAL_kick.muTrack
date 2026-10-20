@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<MuOnTrack engine="Kick">
+  <p id="eng" x="0.0" c="Kick"/>
+  <p id="src" x="0.0"/>
+  <p id="kick_tune" x="50.0"/>
+  <p id="kick_ptch" x="220.0"/>
+  <p id="kick_pdec" x="50.0"/>
+  <p id="kick_adec" x="180.0"/>
+  <p id="kick_drive" x="0.2000000029802322"/>
+  <p id="bass_wave" x="0.0" c="Sine"/>
+  <p id="bass_sub" x="0.5"/>
+  <p id="bass_tune" x="41.20000076293945"/>
+  <p id="bass_cut" x="600.0"/>
+  <p id="bass_res" x="0.2000000029802322"/>
+  <p id="bass_env" x="0.4000000059604645"/>
+  <p id="bass_edec" x="180.0"/>
+  <p id="bass_atk" x="2.0"/>
+  <p id="bass_dec" x="200.0"/>
+  <p id="bass_sus" x="0.0"/>
+  <p id="bass_drive" x="0.2000000029802322"/>
+  <p id="hat_tune" x="0.0"/>
+  <p id="hat_dec" x="60.0"/>
+  <p id="snare_tune" x="0.0"/>
+  <p id="snare_dec" x="160.0"/>
+  <p id="rumble_drive" x="0.4000000059604645"/>
+  <p id="rumble_d1" x="0.5"/>
+  <p id="rumble_d2" x="0.3500000238418579"/>
+  <p id="rumble_d3" x="0.25"/>
+  <p id="rumble_size" x="0.7000000476837158"/>
+  <p id="rumble_revmix" x="0.5"/>
+  <p id="rumble_revlp" x="1200.0"/>
+  <p id="rumble_cut" x="800.0"/>
+  <p id="rumble_res" x="0.2000000029802322"/>
+  <p id="swing" x="0.4000000059604645"/>
+  <p id="accent" x="0.6000000238418579"/>
+  <Track i="0" on="1000010000100001" accent="0000010000000000"/>
+  <Modulators depthUnits="range">
+    <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+  </Modulators>
+</MuOnTrack>

@@ -154,6 +154,8 @@ target_link_libraries(mu-tronic-tests PRIVATE
     juce::juce_recommended_warning_flags
 )
 
+# Preset files written by the real mu-Toni and mu-On, round-tripped through a slot (Tests/TronicLayerPresetTests.cpp).
+target_compile_definitions(mu-tronic-tests PRIVATE "MU_TRONIC_FIXTURE_DIR=\"${CMAKE_SOURCE_DIR}/tests/presets/mu-tronic-slot\"")
 target_compile_definitions(mu-tronic-tests PRIVATE MU_MAX_LAYERS=16 MU_MAX_BUSES=3 MU_BUS_INSERTS=2 JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
 
 add_dependencies(mu-tronic mu-tronic-tests)

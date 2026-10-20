@@ -30,7 +30,8 @@ namespace
             // stand-in Arp (never rendered), so the content never reads another layer type as an Arp.
             if (auto* l = proc.getLayer(layer); l != nullptr && l->typeId() == (int) mu_core::LayerTypeId::Arp)
                 return static_cast<mu_toni::Arp&>(*l);
-            return standIn;
+            if (standIn == nullptr) standIn = std::make_unique<mu_toni::Arp>();   // built on first need, not per content
+            return *standIn;
         }
 
         float getModLive(int layer, int dest) const noexcept override
@@ -49,7 +50,7 @@ namespace
 
     private:
         ProcessorBase& proc;
-        mu_toni::Arp standIn;   // see getArp
+        std::unique_ptr<mu_toni::Arp> standIn;   // see getArp
     };
 
     // mu-Toni's Arp content with its host adapter and modulation destinations: the one content instance the editor
@@ -77,7 +78,7 @@ namespace
     {
         const auto colour = MuLookAndFeel::layerPalette[(size_t) (host.getLayerColourIndex(slot) % MuLookAndFeel::kLayerPaletteSize)];
         // The sidebar item's own label already carries the slot number ("Arp 3"), so the disc shows the type's initial.
-        return std::make_unique<mu_core::LayerDiscVisual>(colour, juce::String("A"));
+        return std::make_unique<mu_ui::LayerDiscVisual>(colour, juce::String("A"));
     }
 }
 #endif

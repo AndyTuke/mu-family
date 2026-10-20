@@ -1,7 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 
-namespace mu_core
+namespace mu_ui
 {
 
 // A layer's sidebar picture and chooser-card picture: a disc in the layer's colour with a short text in it (the
@@ -30,4 +30,4 @@ private:
     juce::String text;
 };
 
-} // namespace mu_core
+} // namespace mu_ui

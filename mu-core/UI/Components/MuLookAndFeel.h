@@ -561,6 +561,13 @@ public:
     static constexpr int   kKnobTopPad    = 4;    // pad above the rotary (room for mod ring)
     static constexpr float kKnobLabelFont = 10.0f;
     static constexpr float kKnobValueFont = 8.0f;
+    // The empty-slot chooser's typography and chrome (docs/mu-tronic/design-ui.md 4.3): the card descriptor and hint,
+    // the empty-registry message ("one size up"), the margin round the panel, the message inset and the card corner.
+    static constexpr float kCardTextFont        = 12.0f;
+    static constexpr float kChooserMessageFont  = 14.0f;
+    static constexpr int   kChooserPanelMargin  = 2;
+    static constexpr int   kChooserMessageInset = 20;
+    static constexpr float kCardCorner          = 4.0f;
     static constexpr int   kKnobValueH    = 11;   // value-text box height inside the rotary dead zone
 
     // The family's rotary sweep — the single source of truth for every angle a knob is

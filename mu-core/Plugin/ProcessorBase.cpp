@@ -862,8 +862,12 @@ void ProcessorBase::loadTypedLayerPreset(int slot, const juce::File& file)
         // A type changes only through the chooser or the header menu, never as a side effect of a preset.
         const auto* slotInfo = layerTypes.find(slotType);
         if (onLoadError)
-            onLoadError("This is a " + juce::String(fileInfo->name) + " preset; this slot is a "
-                        + juce::String(slotInfo != nullptr ? slotInfo->name : "layer"));
+        {
+            // "a Kick", "an Arp": the article follows the type name's first letter.
+            auto withArticle = [](const juce::String& name) { return (name.indexOfAnyOf("AEIOUaeiou") == 0 ? "an " : "a ") + name; };
+            onLoadError("This is " + withArticle(fileInfo->name) + " preset; this slot is "
+                        + withArticle(slotInfo != nullptr ? juce::String(slotInfo->name) : juce::String("layer")));
+        }
         return;
     }
     stageLayerPreset(slot, tree, false, false);
@@ -871,7 +875,9 @@ void ProcessorBase::loadTypedLayerPreset(int slot, const juce::File& file)
 
 void ProcessorBase::applyStagedTypedLayer(int slot, const juce::ValueTree& tree)
 {
-    if (layerPresetType(tree) != slotTypeId(slot)) return;
+    const bool sameType = layerPresetType(tree) == slotTypeId(slot);
+    jassert(sameType);   // a type change cancels the slot's stage, so a stage of another type cannot reach here
+    if (! sameType) return;
     applyLayerNode(slot, tree);
     if (onLayerPresetCommitted) onLayerPresetCommitted(slot);
 }

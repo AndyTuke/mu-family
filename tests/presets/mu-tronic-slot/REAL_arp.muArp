@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<MuToniLayer>
+  <p id="scale" x="1.0"/>
+  <p id="root" x="0.0"/>
+  <p id="roct" x="4.0"/>
+  <p id="chord" x="3.0"/>
+  <p id="inv" x="0.0"/>
+  <p id="octs" x="2.0"/>
+  <p id="dir" x="100.0"/>
+  <p id="rate" x="6.0"/>
+  <p id="gate" x="50.0"/>
+  <p id="leg" x="0.0"/>
+  <p id="porta" x="0.0"/>
+  <p id="snap" x="0.0"/>
+  <p id="trig" x="0.0"/>
+  <p id="acc" x="0.0"/>
+  <p id="accLen" x="4.0"/>
+  <p id="accPat" x="1.0"/>
+  <p id="stepMask" x="65535.0"/>
+  <p id="o1_wt" x="0.0"/>
+  <p id="o1o" x="0.0"/>
+  <p id="o1f" x="0.0"/>
+  <p id="o1_pos" x="170.0"/>
+  <p id="o1l" x="0.0"/>
+  <p id="o2_wt" x="0.0"/>
+  <p id="o2o" x="0.0"/>
+  <p id="o2s" x="0.0"/>
+  <p id="o2f" x="7.0"/>
+  <p id="o2_pos" x="170.0"/>
+  <p id="o2l" x="-3.0"/>
+  <p id="xmod_phaseMode" x="1.0" c="PM"/>
+  <p id="xmod_index" x="0.0"/>
+  <p id="sync" x="0.0"/>
+  <p id="xmod_fdbk" x="0.0"/>
+  <p id="xmod_ampMode" x="0.0" c="AM"/>
+  <p id="xmod_depth" x="0.0"/>
+  <p id="xmod_ssb" x="0.0"/>
+  <p id="noise" x="-60.0"/>
+  <p id="ntype" x="0.0"/>
+  <p id="ft" x="0.0"/>
+  <p id="cut" x="2200.0"/>
+  <p id="res" x="0.300000011920929"/>
+  <p id="drv" x="0.0"/>
+  <p id="locut" x="0.0"/>
+  <p id="aeA" x="0.004000000189989805"/>
+  <p id="aeD" x="0.1500000059604645"/>
+  <p id="aeS" x="0.5"/>
+  <p id="aeR" x="0.1500000059604645"/>
+  <p id="aeL" x="0.0"/>
+  <p id="feA" x="0.004000000189989805"/>
+  <p id="feD" x="0.2000000178813934"/>
+  <p id="feS" x="0.0"/>
+  <p id="feR" x="0.2000000178813934"/>
+  <p id="feDep" x="0.3000000715255737"/>
+  <p id="peA" x="0.004000000189989805"/>
+  <p id="peD" x="0.1000000089406967"/>
+  <p id="peS" x="0.0"/>
+  <p id="peR" x="0.1000000089406967"/>
+  <p id="peDep" x="0.0"/>
+  <p id="ptgt" x="1.0"/>
+  <p id="drvChar" x="0.0"/>
+  <p id="insP1" x="0.0"/>
+  <p id="insP2" x="0.0"/>
+  <p id="insP3" x="0.0"/>
+  <p id="insP4" x="0.0"/>
+  <Modulators depthUnits="range">
+    <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+  </Modulators>
+</MuToniLayer>

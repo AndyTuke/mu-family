@@ -122,7 +122,6 @@ void PluginEditor::showSlot(int idx)
     layerPanel.setLayerEmpty(empty);
     layerPanel.getHeader().setNameEditable(! empty);
     chooser.setSlot(idx);
-    chooser.setSlotColour(MuLookAndFeel::layerPalette[(size_t) (proc.getLayerColourIndex(idx) % MuLookAndFeel::kLayerPaletteSize)]);
 
     // An Empty slot shows the chooser over the content and modulator bands, in the shell's own colour.
     if (empty)

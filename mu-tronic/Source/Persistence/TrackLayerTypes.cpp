@@ -95,7 +95,7 @@ namespace
     std::unique_ptr<juce::Component> createTrackMiniVisual(ProcessorBase& host, int slot, std::function<void()>)
     {
         const auto colour = MuLookAndFeel::layerPalette[(size_t) (host.getLayerColourIndex(slot) % MuLookAndFeel::kLayerPaletteSize)];
-        return std::make_unique<mu_core::LayerDiscVisual>(colour, juce::String(mu_on::engineName(engineOfSlot(host, slot))).substring(0, 1));
+        return std::make_unique<mu_ui::LayerDiscVisual>(colour, juce::String(mu_on::engineName(engineOfSlot(host, slot))).substring(0, 1));
     }
 }
 #endif
