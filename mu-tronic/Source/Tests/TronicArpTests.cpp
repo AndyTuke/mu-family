@@ -320,6 +320,11 @@ struct MuTronicArpTests : juce::UnitTest
         p.prepareToPlay(48000.0, kBlock);
         expect(p.setLayerType(0, LayerTypeId::Arp));   // one Arp that stays, with held keys feeding it
 
+        {   // the first block after a prepare sizes the host MIDI buffer (one allocation, at start-up): not counted here
+            juce::AudioBuffer<float> warm(2, kBlock);
+            juce::MidiBuffer warmMidi;
+            p.processBlock(warm, warmMidi);
+        }
         std::atomic<bool> stop { false };
         std::atomic<int> blocks { 0 }, allocs { 0 }, frees { 0 };
         std::thread audio([&]

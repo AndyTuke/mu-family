@@ -89,6 +89,9 @@ public:
             return true;
         }
         // The slot's block already holds the new layer (or an earlier tail): render aside, fade, then add.
+        // A call is never longer than the prepared size tailScratch was sized to; asserted, and clamped (the fade then
+        // runs short for those frames) rather than chunked, since the bin's fade ramp is indexed from the call's first frame.
+        jassert(frames <= tailScratch.getNumSamples());
         juce::AudioBuffer<float> aside;
         const int channels = juce::jmin(2, out.getNumChannels());
         aside.setDataToReferTo(tailScratch.getArrayOfWritePointers(), channels, juce::jmin(frames, tailScratch.getNumSamples()));
@@ -103,7 +106,9 @@ public:
     // ── What the layer saves beyond its r{N}_ rows: the modulators (base) and the sample ──
     void writeExtras(juce::ValueTree& node) const override;
     void applyExtras(const juce::ValueTree& node) override;
-    // Message thread, a staged preset: its sample is read now, so the commit at the boundary does no file work.
+    // Message thread, a staged preset: its sample is read now, so the commit at the boundary does no file work. This
+    // writes `staged` on the live layer from the message thread, which is safe only because applyExtras (its one reader)
+    // also runs on the message thread; the audio thread never touches `staged`.
     void preloadStaged(const juce::ValueTree& staged) override;
 
     // Message thread: every r{N}_ row of the slot onto the layer, then the pattern and the voice's parameters.

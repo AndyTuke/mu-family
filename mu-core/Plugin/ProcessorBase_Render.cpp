@@ -248,10 +248,10 @@ void ProcessorBase::renderAndMix(juce::AudioBuffer<float>& buffer, juce::MidiBuf
     // ran in, so a service never sees more frames than it was prepared for.
     for (const auto& slot : audioServices)
         if (auto* services = slot.load(std::memory_order_acquire))
-            for (int off = 0; off < n; off += renderState.prepared)
+            for (int off = 0; off < n; off += juce::jmax(1, renderState.prepared))
             {
                 juce::AudioBuffer<float> chunk;
-                chunk.setDataToReferTo(buffer.getArrayOfWritePointers(), numCh, off, juce::jmin(renderState.prepared, n - off));
+                chunk.setDataToReferTo(buffer.getArrayOfWritePointers(), numCh, off, juce::jmin(juce::jmax(1, renderState.prepared), n - off));
                 services->mixIntoMaster(chunk, chunk.getNumSamples());
             }
 

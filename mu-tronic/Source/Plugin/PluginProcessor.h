@@ -109,6 +109,10 @@ protected:
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
+    // Cleared by prepareToPlay; the first block after it gives the host's MIDI buffer room for the layers' output, so the
+    // one allocation a MIDI merge can cost happens at start-up, before any note.
+    std::atomic<bool> midiBufferSized { false };
+
     void setupLayerState();
     juce::ValueTree toLayerState(const juce::ValueTree& tree) const;
 

@@ -68,11 +68,13 @@ void VoiceEngine::installSample(DecodedSample&& sample)
     if (! sample.isValid())
         return;
 
-    const juce::SpinLock::ScopedLockType sl(bufferLock);
-    buffer             = std::move(sample.buffer);
-    originalSampleRate = sample.sampleRate;
-    playbackRatio      = sample.sampleRate / currentSampleRate;
-    sampleLoaded.store(true, std::memory_order_relaxed);
+    {
+        const juce::SpinLock::ScopedLockType sl(bufferLock);
+        std::swap(buffer, sample.buffer);   // the old audio leaves in `sample` and is freed below, outside the lock the audio thread try-locks
+        originalSampleRate = sample.sampleRate;
+        playbackRatio      = sample.sampleRate / currentSampleRate;
+        sampleLoaded.store(true, std::memory_order_relaxed);
+    }
 }
 
 VoiceEngine::DecodedSample VoiceEngine::takeSample()

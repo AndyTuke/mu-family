@@ -715,6 +715,11 @@ struct MuTronicPatternTests : juce::UnitTest
         expect(p.setLayerType(0, LayerTypeId::Pattern));   // one Pattern that stays, held in Note mode by a key
         expect(mu_tronic::setPatternNoteMode(p, 0, 1));
 
+        {   // the first block after a prepare sizes the host MIDI buffer (one allocation, at start-up): not counted here
+            juce::AudioBuffer<float> warm(2, kBlock);
+            juce::MidiBuffer warmMidi;
+            p.processBlock(warm, warmMidi);
+        }
         std::atomic<bool> stop { false };
         std::atomic<int> blocks { 0 }, allocs { 0 }, frees { 0 };
         juce::String firstOffender;   // written by the audio thread, read after it has joined

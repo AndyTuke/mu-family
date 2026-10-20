@@ -154,6 +154,8 @@ struct MuTronicRhythmTests : juce::UnitTest
         stagedPreset();
         servicesLifetime();
         typeChangeStress();
+        midiBufferRoom();
+        retireWhileWritingParameters();
     }
 
     void layoutAndRegistry()
@@ -733,6 +735,11 @@ struct MuTronicRhythmTests : juce::UnitTest
         mu_seam_test::setParam(p.apvts, "r15_outMode", 1.0f);
         mu_seam_test::setParam(p.apvts, "r15_hitsA", 8.0f);
 
+        {   // the first block after a prepare sizes the host MIDI buffer (one allocation, at start-up): not counted here
+            juce::AudioBuffer<float> warm(2, kBlock);
+            juce::MidiBuffer warmMidi;
+            p.processBlock(warm, warmMidi);
+        }
         std::atomic<bool> stop { false };
         std::atomic<int> blocks { 0 }, allocs { 0 }, frees { 0 }, noteOns { 0 };
         juce::String firstOffender;   // written by the audio thread, read after it has joined
@@ -783,6 +790,128 @@ struct MuTronicRhythmTests : juce::UnitTest
         expectEquals(allocs.load() + frees.load(), 0, "the audio thread allocated or freed");
         expectGreaterThan(blocks.load(), 50, "audio blocks ran during the type changes");
         expectGreaterThan(noteOns.load(), 0, "the MIDI-mode Rhythm sent notes");
+    }
+
+    // A host MIDI buffer that has never held anything: the first block after prepare sizes it, so the merge of the layers'
+    // notes costs at most that one allocation, and none afterwards.
+    void midiBufferRoom()
+    {
+        beginTest("a zero-capacity host MIDI buffer: at most one allocation on block 1, none after, with notes sent");
+        mu_seam_test::TempStorage storage;
+        RhythmProcessor p;
+        mu_golden::MockHost host;
+        p.setPlayHead(&host);
+        p.setRateAndBufferSizeDetails(48000.0, 256);
+        p.prepareToPlay(48000.0, 256);
+        expect(p.setLayerType(0, LayerTypeId::Rhythm));
+        mu_seam_test::setParam(p.apvts, "r0_hitsA", 16.0f);
+        mu_seam_test::setParam(p.apvts, "r0_outMode", 1.0f);
+
+        juce::MidiBuffer midi;   // never sized
+        juce::AudioBuffer<float> buf(2, 256);
+        int firstBlockAllocs = 0, laterAllocs = 0, notes = 0;
+        mu_alloc::captureBudget = 3;
+        for (int b = 0; b < 200; ++b)
+        {
+            midi.clear();
+            buf.clear();
+            int a = 0;
+            {
+                mu_alloc::Armed armed;
+                p.processBlock(buf, midi);
+                armed.stop();
+                a = armed.allocs();
+            }
+            (b == 0 ? firstBlockAllocs : laterAllocs) += a;
+            for (const auto meta : midi) if (meta.getMessage().isNoteOn()) ++notes;
+            host.timeInSamples += 256;
+            host.ppq += 256.0 * host.bpm / (60.0 * 48000.0);
+        }
+        p.setPlayHead(nullptr);
+        p.releaseResources();
+        expect(firstBlockAllocs <= 1, "block 1: " + juce::String(firstBlockAllocs) + " allocations");
+        expectEquals(laterAllocs, 0, "no allocation after block 1");
+        expectGreaterThan(notes, 4, "and the notes went out");
+        p.flushPendingAsyncUpdates();
+    }
+
+    // A Rhythm retired and put back inside the fade, a sample loaded into the slot and rows written from a second thread
+    // the whole time, under a running audio thread: nothing of the tail is touched by the new layer's setup.
+    void retireWhileWritingParameters()
+    {
+        beginTest("retire and put back inside the fade while a second thread writes rows and a sample loads: no crash, no allocation");
+        constexpr int kRounds = 150;
+        constexpr int kBlock = 128;
+        mu_seam_test::TempStorage storage;
+        RhythmProcessor p;
+        mu_golden::MockHost host;
+        p.setPlayHead(&host);
+        p.setRateAndBufferSizeDetails(48000.0, kBlock);
+        p.prepareToPlay(48000.0, kBlock);
+        const auto wav = putSample(p);
+        expect(p.setLayerType(0, LayerTypeId::Rhythm));
+        servicesOf(p).samples.load(0, wav);
+        mu_seam_test::setParam(p.apvts, "r0_hitsA", 16.0f);
+
+        {
+            juce::AudioBuffer<float> warm(2, kBlock);
+            juce::MidiBuffer warmMidi;
+            p.processBlock(warm, warmMidi);   // the first block sizes the host MIDI buffer (not counted)
+        }
+        std::atomic<bool> stop { false }, stopWriter { false };
+        std::atomic<int> blocks { 0 }, allocs { 0 };
+        std::thread audio([&]
+        {
+            juce::AudioBuffer<float> buf(2, kBlock);
+            juce::MidiBuffer midi;
+            midi.ensureSize(2048);
+            while (! stop.load())
+            {
+                midi.clear();
+                buf.clear();
+                {
+                    mu_alloc::Armed armed;
+                    p.processBlock(buf, midi);
+                    armed.stop();
+                    allocs += armed.allocs() + armed.frees();
+                }
+                host.timeInSamples += kBlock;
+                host.ppq += (double) kBlock * host.bpm / (60.0 * 48000.0);
+                blocks.fetch_add(1);
+            }
+        });
+        std::thread writer([&]
+        {
+            int i = 0;
+            while (! stopWriter.load())
+            {
+                mu_seam_test::setParam(p.apvts, "r0_hitsA", (float) (1 + i % 16));
+                mu_seam_test::setParam(p.apvts, "r0_pitchSemi", (float) (i % 12));
+                mu_seam_test::setParam(p.apvts, "r0_fltCut", 400.0f + (float) (i % 30) * 200.0f);
+                ++i;
+                juce::Thread::sleep(1);
+            }
+        });
+        bool allOk = true;
+        for (int i = 0; i < kRounds; ++i)
+        {
+            allOk = p.setLayerType(0, LayerTypeId::Empty) && allOk;
+            allOk = p.setLayerType(0, LayerTypeId::Rhythm) && allOk;   // inside the tail's 25 ms fade
+            servicesOf(p).samples.load(0, wav);
+            p.drainDeferredWork();                                       // the queued rows reach the new layer
+            if (i % 25 == 0) p.flushPendingAsyncUpdates();
+        }
+        stopWriter.store(true);
+        writer.join();
+        stop.store(true);
+        audio.join();
+        p.drainDeferredWork();
+        p.flushPendingAsyncUpdates();
+        p.setPlayHead(nullptr);
+        p.releaseResources();
+        expect(allOk, "every type change succeeded");
+        expectEquals(allocs.load(), 0, "the audio thread allocated or freed");
+        expectGreaterThan(blocks.load(), 50, "audio blocks ran");
     }
 };
 

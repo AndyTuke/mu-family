@@ -92,6 +92,7 @@ PluginProcessor::~PluginProcessor()
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     resetSwapPlayState();   // no processBlock is running yet: loads apply at once, not staged
+    midiBufferSized.store(false);
     mixerEngine.prepare(sampleRate, samplesPerBlock);
     fxChain.prepare(sampleRate, samplesPerBlock);
 
@@ -108,6 +109,10 @@ void PluginProcessor::releaseResources()
 void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
+
+    // The first block after a prepare: room for a full block of layer MIDI out, once (the only allocation the merge below can cost).
+    if (! midiBufferSized.exchange(true))
+        midiMessages.ensureSize(kMidiOutEvents * midiEventBytes(3) * 2 + 2048);
 
     // MIDI program change → preset load: queue matching PCs for runDeferredWork to load on the message thread.
     queueMidiProgramChanges(midiMessages);
