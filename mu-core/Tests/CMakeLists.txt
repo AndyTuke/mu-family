@@ -28,6 +28,7 @@ set(MU_CORE_TEST_SOURCES
     ClipLaunchTests.cpp
     LayerOwnershipTests.cpp
     RhythmAdoptDefaultsTests.cpp
+    EuclideanGeneratorTests.cpp     # the textbook Bjorklund phase, pinned against Toussaint and the previous generator
     ../Sequencer/Rhythm.cpp
     ../Sequencer/HitGenerator.cpp
     ../Sequencer/EuclideanGenerator.cpp
