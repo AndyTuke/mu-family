@@ -22,6 +22,8 @@ juce_add_plugin(mu-tronic
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
     VERSION         "${MUFAMILY_PRE_PLUGIN_VERSION}"   # pre-release 0.1 line until it launches
     COMPANY_COPYRIGHT "${MUFAMILY_COPYRIGHT}"
+    ICON_BIG   "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png"
+    ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png"
 )
 
 target_sources(mu-tronic
