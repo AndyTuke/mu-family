@@ -72,7 +72,8 @@ namespace
     std::unique_ptr<juce::Component> createArpMiniVisual(ProcessorBase& host, int slot, std::function<void()>)
     {
         const auto colour = MuLookAndFeel::layerPalette[(size_t) (host.getLayerColourIndex(slot) % MuLookAndFeel::kLayerPaletteSize)];
-        return std::make_unique<mu_toni::ArpMiniVisual>(colour, slot);
+        // The sidebar item's own label already carries the slot number ("Arp 3"), so the disc shows the type's initial.
+        return std::make_unique<mu_toni::ArpMiniVisual>(colour, juce::String("A"));
     }
 }
 #endif

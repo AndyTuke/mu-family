@@ -146,8 +146,10 @@ struct MuTronicLayoutTests : juce::UnitTest
             logMessage("real mu-Tronic layout: " + juce::String(count) + " parameters, whole processor built in " + juce::String(ms, 1)
                        + " ms, about " + juce::String((memAfter - memBefore) / 1024) + " KiB of private memory");
             expect(ms < 1000.0, "building the real processor took " + juce::String(ms, 1) + " ms");
-            // 63 Arp rows in each of the sixteen slots, plus the mixer, FX, bus and global parameters (well under 400).
-            expect(count >= 16 * 63 && count < 16 * 63 + 400, "the Arp rows of all sixteen slots are in the layout, and no more");
+            // 63 Arp rows and 33 Track rows (the t{N}_ table the four mu-On types share) in each of the sixteen slots, plus
+            // the mixer, FX, bus and global parameters (well under 400).
+            constexpr int kRowsPerSlot = 63 + 33;
+            expect(count >= 16 * kRowsPerSlot && count < 16 * kRowsPerSlot + 400, "the Arp and Track rows of all sixteen slots are in the layout, and no more");
             p->flushPendingAsyncUpdates();
         }
 

@@ -71,6 +71,44 @@ struct MuOnTrackLayerRecordTests : juce::UnitTest
         logMessage("Track layer stream hash " + juce::String::toHexString((juce::int64) hash.h));
         expect(hash.h == fx::kRecordedHash, "the processor renders the recorded layer streams");
         expect(hash.peak > 0.01f && hash.peak < 4.0f, "and they are real, bounded sounds");
+
+        // One track alone per engine: the streams mu-Tronic's locked Kick, Bass, Hat and Snare layers must reproduce.
+        beginTest("Channel 0's stream for each non-Rumble engine alone is the recorded single-track stream");
+        for (int e = 0; e < 4; ++e)
+        {
+            const auto engine = mu_on::engineFromIndex(e);
+            mu_seam_test::TempStorage storage2;
+            mu_seam_test::ScopedEnvVar deterministic("MU_DETERMINISTIC_NOISE", "1");
+            mu_on::PluginProcessor q;
+            mu_golden::MockHost host2;
+            host2.bpm = fx::kBpm;
+            q.setPlayHead(&host2);
+            q.setRateAndBufferSizeDetails(fx::kSampleRate, fx::kBlock);
+            q.prepareToPlay(fx::kSampleRate, fx::kBlock);
+            fx::configureSingle(q.apvts, engine);
+            fx::configureRow(q.getTrack(0));
+
+            TwoChannelTap tap2(fx::kBlock * fx::kBlocks);
+            q.setChannelTapForTest(&tap2);
+            juce::AudioBuffer<float> buf2(2, fx::kBlock);
+            for (int b = 0; b < fx::kBlocks; ++b)
+            {
+                juce::MidiBuffer midi;
+                host2.timeInSamples = (juce::int64) b * fx::kBlock;
+                buf2.clear();
+                q.processBlock(buf2, midi);
+                host2.ppq += (double) fx::kBlock * fx::kBpm / (60.0 * fx::kSampleRate);
+            }
+            q.setChannelTapForTest(nullptr);
+            q.setPlayHead(nullptr);
+            q.releaseResources();
+
+            fx::StreamHash single;
+            for (int b = 0; b < fx::kBlocks; ++b) single.add(tap2.buf[0], fx::kBlock, b * fx::kBlock);
+            logMessage(juce::String(mu_on::engineName(engine)) + " single-track stream hash " + juce::String::toHexString((juce::int64) single.h));
+            expect(single.h == fx::kSingleHash[e], juce::String(mu_on::engineName(engine)) + " renders its recorded single-track stream");
+            expect(single.peak > 0.01f && single.peak < 4.0f, "and it is a real, bounded sound");
+        }
     }
 };
 

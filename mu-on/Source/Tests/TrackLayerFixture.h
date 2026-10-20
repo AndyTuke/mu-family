@@ -76,4 +76,47 @@ namespace mu_on_fixture
 
     // The streams' hash as recorded (both targets must reproduce it).
     constexpr std::uint64_t kRecordedHash = 0x23aa20ea9dbc74d8ull;
+
+    // ── One non-Rumble Track alone ───────────────────────────────────────────────────────────────────────────────
+    // The same scenario on slot 0 for each of the four engines a mu-Tronic slot can lock (Kick, Bass, Hat, Snare): the
+    // real mu-On processor (mu-on-tests, an unlocked track told its engine by `t0_eng`) and a mu-Tronic slot of the
+    // type (mu-tronic-tests, a locked track) must both hash channel 0's pre-mixer stream, kBlocks blocks long, to
+    // kSingleHash[engine index]. Rows as configureRow sets them; the same swing and accent.
+    inline void configureSingle(juce::AudioProcessorValueTreeState& apvts, mu_on::EngineType engine)
+    {
+        auto set = [&](const juce::String& id, float plain)
+        {
+            if (auto* p = apvts.getParameter(id)) p->setValueNotifyingHost(p->convertTo0to1(plain));
+        };
+        using mu_on::EngineType;
+        set(mu_on::layerParamId(0, "eng"), (float) mu_on::toIndex(engine));
+        switch (engine)
+        {
+            case EngineType::Kick:
+                set(mu_on::engineParamId(0, engine, "tune"), 55.0f);
+                set(mu_on::engineParamId(0, engine, "adec"), 300.0f);
+                set(mu_on::engineParamId(0, engine, "drive"), 0.5f);
+                break;
+            case EngineType::Bass:
+                set(mu_on::engineParamId(0, engine, "wave"), 1.0f);
+                set(mu_on::engineParamId(0, engine, "cut"), 500.0f);
+                set(mu_on::engineParamId(0, engine, "res"), 0.5f);
+                set(mu_on::engineParamId(0, engine, "drive"), 0.4f);
+                break;
+            case EngineType::Hat:
+                set(mu_on::engineParamId(0, engine, "tune"), 3.0f);
+                set(mu_on::engineParamId(0, engine, "dec"), 120.0f);
+                break;
+            case EngineType::Snare:
+                set(mu_on::engineParamId(0, engine, "tune"), -2.0f);
+                set(mu_on::engineParamId(0, engine, "dec"), 250.0f);
+                break;
+            case EngineType::Rumble: break;
+        }
+        set(mu_on::layerParamId(0, "swing"), 0.3f);
+        set(mu_on::layerParamId(0, "accent"), 0.6f);
+    }
+
+    // The hash of channel 0's stream for each engine, indexed by EngineType (Rumble has none: it processes another track).
+    constexpr std::uint64_t kSingleHash[4] = { 0x88143b709e30b501ull, 0xded9d3658248e36dull, 0xbdfe6ee087b0b895ull, 0xe4dcaa6501877e99ull };   // Kick, Bass, Hat, Snare
 }

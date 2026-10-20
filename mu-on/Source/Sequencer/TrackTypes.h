@@ -4,7 +4,6 @@
 #include "Sequencer/LayerTypeInfo.h"   // mu-core: mu_core::LayerTypeId, LayerTypeInfo
 #include "Persistence/LayerState.h"    // mu-core: the saved row tag
 #include "Persistence/TrackParams.h"
-#include "UI/Components/MuLookAndFeel.h"   // mu-core: the colour IDs a type's look names (appYellow)
 
 #include <memory>
 
@@ -51,8 +50,6 @@ inline mu_core::LayerTypeInfo makeTrackTypeInfo(EngineType engine) noexcept
     info.typeFromPreset = &typeFromPreset;   // the five types share .muTrack: the engine a preset saved names its type
     info.addLayerParams = &addLayerParams;   // one table per prefix: every engine's rows exist on every track
     info.create = &createTrack;
-    info.appColourId = (int) MuLookAndFeel::appYellow;   // the main area is painted in mu-On's yellow
-    info.typeTag = "On";
     return info;
 }
 

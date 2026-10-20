@@ -34,8 +34,7 @@ public:
             expect(track != nullptr && track->engineLocked && track->engineSetting() == engine, "create locks the track to its type's engine");
             expectEquals(juce::String(info.contentFolderName), juce::String("muOn"));
             expectEquals(juce::String(info.presetFolder), juce::String("Tracks"));
-            expectEquals(juce::String(info.typeTag), juce::String("On"));
-            expect(info.appColourId == (int) MuLookAndFeel::appYellow, "painted in mu-On's yellow");
+            expect(juce::String(info.typeTag).isEmpty() && info.appColourId == 0, "the look (tag, paint colour) is the slot host's to add");
             expect(info.typeFromPreset == &typeFromPreset, "the shared extension is told apart by the saved engine");
             expect(track != nullptr && track->retirePolicy().kind == mu_core::RetirePolicy::Kind::Fade, "every Track type fades");
             expectEquals(track->retirePolicy().fadeMs, 25.0f);

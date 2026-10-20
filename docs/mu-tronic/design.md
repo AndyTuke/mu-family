@@ -1206,6 +1206,39 @@ code); 2b the mu-On library made ready (groove rows, `lockEngine` and `completeS
 `PARENT_SCOPE`); 2c Kick registered (`Persistence/TrackLayerTypes.cpp`, `TrackHost` adapter, the content in mu-Tronic, the equivalence test, the cost test re-run). The
 `ux-controller` rules the single-row STEPS layout inside a Track content for 2c; the split in 2b is pixel-identical in mu-On.
 
+**Rulings from the 2c review (2026-10-20).**
+
+8. **Layer presets in a slot are not built yet; they are T1b step 3, before Pattern is registered (not T8a).** Today `ProcessorBase::loadLayerPreset` / `saveLayerPreset` are base
+   no-ops and mu-Tronic's layer-preset applier (`layerSwapper.setAppliers`, second lambda) is empty, so the typed folder, extension and listing (2.1.11 point 1) list files that
+   do nothing when chosen. It is a gap since Arp (step 1), not a 2c regression. It is generic, so it lands once in `mu-core`, not per type and not in `Persistence/<Type>LayerType`:
+   - *Load* (`ProcessorBase`, slot hosts): parse the file, take the type from `presetExtension` and, where set, `typeFromPreset`; stage `applyLayerNode(slot, node)` (the type's
+     prefix rows, then `Layer::applyExtras`) through `layerSwapper`'s layer applier, so it lands on the layer's `loopBeats()` wrap exactly as mu-On's `stageLayerPreset` does.
+     The same applier serves clips (T8a), which is why this precedes T8a.
+   - *Save*: the slot's rows with the type's prefix plus `writeExtras`, into `typedLayerPresetDir(slot)` with `typedLayerPresetExtension(slot)`; the root tag is a new
+     `LayerTypeInfo::presetTag` (each product's existing tag, so a file saved by the product loads in mu-Tronic and the reverse).
+   - *Mismatch.* A locked slot takes only its own type: loading a file whose type is not the slot's (a `.muTrack` that names Snare into a Kick, a `.muArp` into a Kick) is
+     **refused with no change**: `onLoadError("This is a Snare preset; this slot is a Kick")`. The typed listing never offers it, so it can only arrive by drop, MIDI preset or a
+     clip, and a type is changed only through the chooser or the header menu (never as a side effect of a preset). An **Empty** slot takes the file's type (the listing already
+     offers every type there): `setLayerType(slot, type, &node)`. This replaces the "type change (confirm, then stage)" wording of 3.4, which is withdrawn for T1b; a confirmed
+     preset-driven type change can be added later if Andy wants it.
+   - *Test* (test-steward): per registered type, a saved file round-trips through a slot; a mismatched file changes nothing; an Empty slot takes the file's type; `.muTrack`
+     files of the four engines land only in their own slot.
+9. **A fresh locked Track starts on its engine's default groove** (the family answer to "I picked Kick in an empty slot and it is silent"). mu-On gives a new track
+   `loadDefaultGroove(engine)` in `layerAdded`; mu-Tronic has no such hook, and putting it in `completeSetup` would clobber a restored empty row (`completeSetup` runs after
+   the saved rows are applied, step 7). The place is **`createTrack` in `mu-on/Source/Sequencer/TrackTypes.h`**: it runs before any saved row or `initial` node is applied, and
+   `Track::applyExtras` (`StepRow::deserialise`) overwrites every step, empty or not, so a restore is unaffected. `createTrack` calls `row.loadDefaultGroove(engineOfType(type))`;
+   Rumble gets nothing, as in mu-On. mu-On's unlocked tracks keep `layerAdded`. This is product behaviour only in that a new slot makes a sound at once; Andy may veto it
+   (one line to remove), nothing else depends on it. Tests that need an empty row clear it (the equivalence tests already set the row explicitly).
+10. **One disc picture in `mu-core`.** `mu_toni::ArpMiniVisual` (with 2c's text overload) and `mu_on::TrackMiniVisual` now draw the same disc. That is a second copy of shared
+    behaviour; Pattern and Rhythm would be a third and fourth. At step 3 add `mu_core::LayerDiscVisual(Colour, String)` in `mu-core/UI/Components/`, delete both classes
+    (mu-Toni's sidebar passes the number, mu-On's the engine initial, mu-Tronic the type's initial; pixel-identical in both apps), and have each type's picture factory use it.
+    Until then 2c's overload is accepted as the smaller step. The glyph itself (the step row design-ui 4.5a names) is the `ux-controller`'s.
+11. **A slot host adapter must not cast a foreign layer.** `ArpSlotHost::getArp` casts whatever the slot holds to `Arp`; with five types registered, slot 0 (which the
+    content's constructor binds) can be a Kick, and the cast is undefined behaviour. `TrackSlotHost::getTrack` answers with an unbound stand-in; the Arp adapter takes the same
+    pattern (a type check, else a stand-in `Arp`). Fix with step 3. Test layers use ids no product registers: see the reserved test id in `TronicProcessorTests` (use a
+    value `layerTypeName` can spell, e.g. a `LayerTypeId::Test` entry reserved in the enum and never registered by a product), not a real product's id, which collides the day that
+    product's type is registered.
+
 ### 2.2 The product UI stops depending on the product processor
 
 Each `<Type>Content` takes `ProcessorBase&` plus one narrow host interface declared in the product's own `UI/` folder next to the content
@@ -1387,6 +1420,10 @@ parameters (16 strips x 12, plus the globals). The test holds the Debug figure t
 slots, 1,008): the whole `PluginProcessor` builds in about 54 ms in a Debug build (measured while other suites ran on the same PC) and the synthetic 6,000-parameter layout still builds in
 about 520 to 560 ms, inside the 1,000 ms Debug budget. Lazy per-type declaration is still not needed. Re-run again when the fourth family is registered.
 
+**Re-run with Kick, Bass, Hat and Snare registered (T1b step 2c, 2026-10-20).** The four mu-On types share one `t{N}_` table of 33 rows, declared once per slot, so the real layout is
+1,887 parameters (the 1,359 above and 33 more on each of the sixteen slots, 528): the whole `PluginProcessor` builds in about 84 ms in a Debug build (about 15.5 MiB private) and the synthetic
+6,000-parameter layout still builds in about 530 ms. Lazy per-type declaration is still not needed. Two families are registered (mu-Toni, mu-On); re-run when Pattern (mu-Tant) and again when Rhythm (mu-Clid) is registered.
+
 **Interim at T1a (ruled 2026-10-19).** No type is registered, so no `r{N}_ a{N}_ v{N}_ t{N}_` parameter exists; `TronicState.h` reserves the placeholder prefix `mtrn{N}_`
 for the composed state (one prefix per slot, which is all `LayerLayout` holds). It never names a parameter. T1b replaces it: `LayerLayout` (mu-core, generic) takes a
 list of prefixes per slot, a slot's rows are saved with the prefix of its **live** type only (the type attribute selects it on load; the dormant prefixes keep defaults and are
@@ -1414,7 +1451,7 @@ with one addition, the `type` attribute, which is Stage 8 option B:
   mu-Tronic one library. **Ruled by Andy, 2026-10-15: the layer-preset folder is the product's own** (`<TDP>/muToni/Arps`, ...) via `contentFolderName`, shared,
   not copied; mu-Tronic has no separate layer-preset tree. A slot of type Kick lists the mu-On track presets whose engine is Kick. Only the full presets
   (`.muTronic`) and performances get a mu-Tronic folder.
-  Loading a preset whose type differs from the slot's is a type change (confirm, then stage like any swap).
+  Loading a preset whose type differs from the slot's is refused for a filled slot and takes the file's type for an Empty one (2.1.11 point 8, 2026-10-20; supersedes "confirm, then stage").
 - **Clips** (`Layer::clips`): a clip is the slot's type's layer preset and carries its type. A clip whose type differs from the slot's current type is not
   launchable; changing a slot's type clears its clip bank after a confirm. This keeps the clip bank "a launch is a staged layer swap, never a type change".
 - **Full presets** (`.muTronic`) are the state above wrapped as `<MuTronicPreset name description category>`; performance files (`.muPerformance`)
@@ -1590,7 +1627,7 @@ first type is registered); per-type prefixes and the multi-prefix layout (T1b); 
 **What is left, in order.** (1) The small owed items before T1b: one shared `mu_core::HeldNoteStack` (done: mu-Toni and mu-Tant share it), the mu-Tant wavetable bank service
 and the `PatternHost` adapter (both only before the Pattern type is registered). (2) **T1b** register real types, one at a time (Arp first, the cleanest, then the five Track types, then Pattern, then Rhythm): link the layer library and
 its `MU_<P>_LAYER_UI_SOURCES`, one line in `registerLayerTypes`, multi-prefix `LayerLayout` and the live-type-only save (3.4), C17 follower reset, the type's `addLayerParams` in the layout,
-`getLayerPresetDir`/`slotPresetFiles` from the slot's type (not a mu-Tronic `Layers` folder), a `TronicProcessorTests` case and an equivalence test per type, the cost test re-run;
+`getLayerPresetDir`/`slotPresetFiles` from the slot's type (not a mu-Tronic `Layers` folder; done at 2a), **layer-preset load and save in a slot (step 3, 2.1.11 point 8; before Pattern)**, a `TronicProcessorTests` case and an equivalence test per type, the cost test re-run;
 the `dsp-controller` reviews the C17 and multi-prefix changes. (3) **T1c** `swapLayers` on a Published host. (4) **T2** buses (`mu-core` mixer; it edits audio code every product renders
 through, so it follows E5, which has now closed). (5) **T8a** scenes, controller pages, per-layer MIDI in, type-carrying clips; **T8b** importers for `.muTant` and `.muClid`
 (`.muToni` and `.muOn` with T8a). (6) **T9** release: only with all four engines ready, freeware, no licence work. The cost measurement and the sidebar/mixer paging, T1's first
