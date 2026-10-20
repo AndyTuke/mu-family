@@ -203,7 +203,7 @@ Bullet "Level (-60 to +6 dB, default 0 dB) — the layer's output level."
 Bullet "A, D, S, R — the amplitude envelope, which shapes the volume of every note. Defaults: attack 4 ms, decay 150 ms, sustain 50 percent, release 150 ms."
 
 H2 "Effects"
-P "The Effects box holds the layer's insert effect and its three FX sends. Choose an algorithm from the dropdown (None, 3-Band EQ, Bitcrusher, Clipper, Compressor, Fold, Hard Clip, Karplus, Limiter, Ring Mod, Soft Clip, Tape Sat, Vocoder or Vocoder St); four knobs appear and are labelled to match the algorithm. The insert sits after the amplitude envelope, so effects with their own tail can ring on past the note. The Eff, Dly and Rev knobs are the layer's sends to the mixer's Effect, Delay and Reverb; they are the same sends as on the layer's channel strip."
+P "The Effects box holds the layer's insert effect and its three FX sends. Choose an algorithm from the dropdown (None, 3-Band EQ, Bitcrusher, Clipper, Compressor, Fold, Hard Clip, Karplus, Limiter, Overdrive, Ring Mod, Soft Clip, Tape Sat, Vocoder or Vocoder St); four knobs appear and are labelled to match the algorithm. The insert sits after the amplitude envelope, so effects with their own tail can ring on past the note. The Eff, Dly and Rev knobs are the layer's sends to the mixer's Effect, Delay and Reverb; they are the same sends as on the layer's channel strip."
 
 Pic "Pitch, Filter, Amp and Effects boxes with their envelope rows." "voice-section.png"
 
@@ -258,8 +258,8 @@ Pic "The Appergater: scale, chord, rate and trigger, the knob row and the step p
 # ── 11. Modulators ────────────────────────────────────────────────────────────
 H1 "11. Modulators"
 P "Each layer has eight independent modulators (Mod A through Mod H) plus a Matrix tab - the same shared engine as mu-Clid and mu-Tant. Each layer has its own modulator bank."
-P "Each modulator has a Mode dropdown (Stepped bar-graph or Smooth drawable curve), a Polarity switch (Uni 0 to +1, or Bi -1 to +1), and a loop length (a note-value dropdown times an integer multiplier). A playhead line shows the current loop position. In Smooth mode, click to add a node, drag to move, ALT-click a segment to bend it, right-click to remove. In Stepped mode, drag bars up or down. A dice button randomises the current modulator's values without changing its shape."
-P "Add destinations with the + Target button; the assignments are shown one at a time, so step through them with the up and down arrows and the counter at the right. Each assignment has a bipolar depth (-100 to +100 percent) and a source-side curve. A modulator can move the arpeggio controls listed in the Appergater chapter, Osc 2 Semi, the oscillator positions and levels, the noise level, X-Mod Index, Depth and SSB shift, the filter's Cutoff, Resonance, Drive and Env Depth, the Amp Level and the Pitch Env depth. When a knob is a destination, an arc around it shows the live modulated value."
+P "Each modulator has a Mode dropdown (Stepped bar-graph or Smooth drawable curve), a Polarity switch (Uni 0 to +1, or Bi -1 to +1), and a loop length (a note-value dropdown times an integer multiplier). A playhead line shows the current loop position. In Smooth mode the curve is a smooth line through each point that never swings past its neighbours; click to add a node, drag to move, ALT-click a segment to bend it, right-click to remove. In Stepped mode, drag bars up or down. A dice button randomises the current modulator's values without changing its shape."
+P "Add destinations with the + Target button; the assignments are shown one at a time, so step through them with the up and down arrows and the counter at the right. Each assignment has a bipolar depth (-100 to +100 percent) and a source-side curve. A modulator can move the arpeggio controls listed in the Appergater chapter, Osc 2 Semi, the oscillator positions and levels, the noise level, X-Mod Index, Depth and SSB shift, the filter's Cutoff, Resonance, Drive and Env Depth, the Amp Level and the Pitch Env depth. The Attack, Decay, Sustain and Release of the Amp, Filter and Pitch envelopes can be modulated too. When a knob is a destination, an arc around it shows the live modulated value."
 P "The Matrix tab lists every assignment across all eight modulators in one table."
 
 Pic "Modulator panel with the Stepped editor and the target list." "modulators.png"
@@ -397,7 +397,7 @@ Bullet "Layers: 1 to 8 (default 1), each a monophonic arpeggiator with two wavet
 Bullet "Scales: 12. Chords: about 35. Octaves: 1 to 4. Rates: 1/4 to 1/32, straight, dotted and triplet"
 Bullet "Envelopes: amplitude, filter and pitch ADSR, 1 ms to 4 s"
 Bullet "Filter types: LP / HP at 6, 12, 24 dB per octave; BP 12 / 24; Notch 12 / 24; AP 12; Comb + / Comb -; Peak; Lo Shelf; Hi Shelf"
-Bullet "Insert effects: 13 plus None per layer, and two on the master"
+Bullet "Insert effects: 14 plus None per layer, and two on the master"
 Bullet "Modulators per layer: 8 (smooth LFO or stepped), plus a matrix view"
 Bullet "Full preset format: .muToni (XML). Per-layer preset format: .muArp (XML)"
 Bullet "Third-party libraries: JUCE, Signalsmith Reverb (MIT), clap-juce-extensions (MIT)"

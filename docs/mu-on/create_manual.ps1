@@ -193,13 +193,13 @@ P "Every engine starts with its own groove: four-on-the-floor for the kick, off-
 H2 "Groove Box"
 P "Two controls on the left of the Steps panel apply to the whole pattern:"
 Bullet "Swing (default 0) — pushes every second sixteenth later, up to half a step, for a shuffle. 0 is straight."
-Bullet "Accent (default maximum) — how hard accented steps are played. Plain steps always play at a lower fixed level; lower Accent to make the accented steps less prominent."
+Bullet "Accent (default maximum) — how hard accented steps are played. Plain steps always play at a lower fixed level. Accent runs from that plain-step level up to full: at the minimum, accented steps play no harder than plain ones; at the maximum they play at full level."
 P "With a Rumble selected, the Groove box shows the Rumble's Envelope instead (see Rumble)."
 
 # ── 9. Modulators ─────────────────────────────────────────────────────────────
 H1 "9. Modulators"
 P "Each track has eight independent modulators (Mod A through Mod H) plus a Matrix tab - the same shared engine as mu-Clid and mu-Tant. Each track has its own modulator bank."
-P "Each modulator has a Mode dropdown (Stepped bar-graph or Smooth drawable curve), a Polarity switch (Uni 0 to +1, or Bi -1 to +1), and a loop length (a note-value dropdown times an integer multiplier). A playhead line shows the current loop position. In Smooth mode, click to add a node, drag to move, ALT-click a segment to bend it, right-click to remove. In Stepped mode, drag bars up or down. A dice button randomises the current modulator's values without changing its shape."
+P "Each modulator has a Mode dropdown (Stepped bar-graph or Smooth drawable curve), a Polarity switch (Uni 0 to +1, or Bi -1 to +1), and a loop length (a note-value dropdown times an integer multiplier). A playhead line shows the current loop position. In Smooth mode the curve is a smooth line through each point that never swings past its neighbours; click to add a node, drag to move, ALT-click a segment to bend it, right-click to remove. In Stepped mode, drag bars up or down. A dice button randomises the current modulator's values without changing its shape."
 P "Add destinations with the + Target button; the assignments are shown one at a time, so step through them with the up and down arrows and the counter at the right. Each assignment has a bipolar depth (-100 to +100 percent) and a source-side curve. The destinations are the controls of the track's engine. If you change a track's engine, the assignments for the old engine stay in place but do nothing until you switch back. When a knob is a destination, an arc around it shows the live modulated value."
 P "The Matrix tab lists every assignment across all eight modulators in one table."
 

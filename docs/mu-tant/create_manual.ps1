@@ -227,7 +227,7 @@ Pic "X-MOD, Filter and Effects boxes: the two filter rows, the series/parallel r
 
 # ── 12. Insert Effect ─────────────────────────────────────────────────────────
 H1 "12. Insert Effect"
-P "The EFFECTS box is the per-voice insert effect, placed after the gate (oscillators, then filters, then gate, then insert, then mixer). Select an algorithm from the dropdown; its four parameter knobs relabel to match. Available algorithms: None, Soft Clip, Hard Clip, Fold, Bitcrusher, Clipper, 3-Band EQ, Compressor, Limiter, Ring Mod, Tape Saturation, Karplus, Vocoder, and Vocoder Stereo. Insert parameters P1 to P4 are available as modulation destinations."
+P "The EFFECTS box is the per-voice insert effect, placed after the gate (oscillators, then filters, then gate, then insert, then mixer). Select an algorithm from the dropdown; its four parameter knobs relabel to match. Available algorithms: None, Soft Clip, Hard Clip, Fold, Bitcrusher, Clipper, 3-Band EQ, Compressor, Limiter, Ring Mod, Tape Saturation, Overdrive, Karplus, Vocoder, and Vocoder Stereo. Insert parameters P1 to P4 are available as modulation destinations."
 
 # ── 13. Gate Editor ───────────────────────────────────────────────────────────
 H1 "13. Gate Editor"
@@ -270,7 +270,7 @@ Pic "Gate editor with the GATE layer selected." "gate-editor.png"
 # ── 14. Modulators ────────────────────────────────────────────────────────────
 H1 "14. Modulators"
 P "Each voice has eight independent modulators (Mod A through Mod H) plus a Matrix tab - the same shared engine as mu-Clid. Each voice has its own modulator bank."
-P "Each modulator has a Mode dropdown (Stepped bar-graph or Smooth drawable curve), a Polarity switch (Uni 0 to +1, or Bi -1 to +1), and a loop length (a note-value dropdown times an integer multiplier, independent of any pattern length). A playhead line shows the current loop position. In Smooth mode, click to add a node, drag to move, ALT-click a segment to bend it, right-click to remove. In Stepped mode, drag bars up or down. A dice button randomises the current modulator's values without changing its shape."
+P "Each modulator has a Mode dropdown (Stepped bar-graph or Smooth drawable curve), a Polarity switch (Uni 0 to +1, or Bi -1 to +1), and a loop length (a note-value dropdown times an integer multiplier, independent of any pattern length). A playhead line shows the current loop position. In Smooth mode the curve is a smooth line through each point that never swings past its neighbours; click to add a node, drag to move, ALT-click a segment to bend it, right-click to remove. In Stepped mode, drag bars up or down. A dice button randomises the current modulator's values without changing its shape."
 P "Add destinations with the + Target button; the assignments are shown one at a time, so step through them with the up and down arrows and the counter at the right; each assignment has a bipolar depth (-100 to +100 percent) and a source-side curve. mu-Tant modulation destinations include: Osc 1/2 Octave, Semi, Fine, Position, and Pitch Env; Osc 1/2 and Noise levels; Filter 1 and Filter 2, each with Cutoff, Resonance, Drive, Low Cut, and Env Depth; the voice Level; X-Mod Index, Depth, and SSB shift; and Insert P1 to P4. When a knob is a destination, an arc around it shows the live modulated value."
 P "The Matrix tab lists every assignment across all eight modulators in one table."
 
@@ -414,7 +414,7 @@ Bullet "Voices: up to 8 simultaneous, each with two wavetable oscillators plus a
 Bullet "Cross-modulation: 2-lane X-Mod - phase/index (FM/PM/TZFM) with Sync and Feedback, plus amplitude (AM / RM / SSB frequency shift)"
 Bullet "Filters: two per voice (series or parallel), 16 algorithms each"
 Bullet "Filter types: LP / HP at 6, 12, 24 dB per octave; BP 12 / 24; Notch 12 / 24; AP 12; Comb + / Comb -; Peak; Lo Shelf; Hi Shelf"
-Bullet "Insert effects: 13 plus None (Soft Clip, Hard Clip, Fold, Bitcrusher, Clipper, 3-Band EQ, Compressor, Limiter, Ring Mod, Tape Sat, Karplus, Vocoder, Vocoder Stereo)"
+Bullet "Insert effects: 14 plus None (Soft Clip, Hard Clip, Fold, Bitcrusher, Clipper, 3-Band EQ, Compressor, Limiter, Ring Mod, Tape Sat, Overdrive, Karplus, Vocoder, Vocoder Stereo)"
 Bullet "Gate editor: 1 to 16 bar patterns, three layers (GATE / FILT / PITCH), subdivisions 1/4 to 1/32"
 Bullet "Modulators per voice: 8 (smooth LFO or stepped), plus a matrix view"
 Bullet "Full preset format: .muTant (XML). Per-voice preset format: .muPattern (XML)"
