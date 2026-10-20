@@ -21,10 +21,6 @@ For shipped features see [DevelopmentHistory.md](DevelopmentHistory.md).
 
 ## Unscheduled ideas
 
-### 🟢 Plain Overdrive insert
-
-Raised by Andy 2026-10-20: there is no plain Overdrive insert. The existing saturation inserts are Soft Clip, Hard Clip, Fold, Tape Sat, Clipper and Bitcrusher. A smooth, tube-style Overdrive (asymmetric soft saturation with a tone control) would fill the gap; it would be one more `mu-core` insert row, available to every product. Not scheduled.
-
 ### 🟢 Standalone: Bounce to WAV (user-facing render)
 
 Expose the headless render pipeline (introduced for the listening-test harness) as a user-facing "File → Bounce…" dialog in the standalone. User picks duration, sample rate, output file → gets a WAV of the currently-loaded patch playing for N seconds. Useful for sample-pack workflows where the user wants to commit a pattern to disk without round-tripping through a DAW.
