@@ -141,6 +141,9 @@ struct MuTronicPatternTests : juce::UnitTest
         servicesAndEngines();
         wavetablesThroughTheBank();
         swapLeavesNothingStuck();
+        successorInsideTheFade();
+        gatedTailIsSilent();
+        noteSwitchRamps();
         presets();
         typeChangeStress();
     }
@@ -355,7 +358,11 @@ struct MuTronicPatternTests : juce::UnitTest
 
         expect(p.setLayerType(1, LayerTypeId::Empty));
         expect(p.setLayerType(1, LayerTypeId::Pattern));
-        expect(host1->getPatternEngine(1) == e1, "the engine stays with the slot across a Pattern's replacement");
+        auto* e1b = host1->getPatternEngine(1);
+        expect(e1b != nullptr && e1b != e1, "a replacement takes the slot's other engine, so the old tail keeps its own");
+        expect(p.setLayerType(1, LayerTypeId::Empty));
+        expect(p.setLayerType(1, LayerTypeId::Pattern));
+        expect(host1->getPatternEngine(1) == e1, "and the pool of two alternates");
         expect(patternIn(p, 1).host.ptr == host1);
         p.flushPendingAsyncUpdates();
 
@@ -456,6 +463,158 @@ struct MuTronicPatternTests : juce::UnitTest
         }
         p.setChannelTapForTest(nullptr);
         p.flushPendingAsyncUpdates();
+    }
+
+
+    // The Goertzel magnitude of `frames` samples of channel 0 from `from` at `hz`.
+    static double goertzel(const juce::AudioBuffer<float>& b, int from, int frames, double hz)
+    {
+        const double w = 2.0 * juce::MathConstants<double>::pi * hz / 48000.0, c = 2.0 * std::cos(w);
+        double s1 = 0.0, s2 = 0.0;
+        const float* x = b.getReadPointer(0);
+        for (int i = 0; i < frames; ++i) { const double s0 = x[from + i] + c * s1 - s2; s2 = s1; s1 = s0; }
+        return std::sqrt(s1 * s1 + s2 * s2 - c * s1 * s2) / frames;
+    }
+
+    static float maxStep(const juce::AudioBuffer<float>& b, int from, int to)
+    {
+        float m = 0.0f;
+        const float* x = b.getReadPointer(0);
+        for (int i = from + 1; i < to; ++i) m = juce::jmax(m, std::abs(x[i] - x[i - 1]));
+        return m;
+    }
+
+    // A Pattern put back into a slot inside the 25 ms fade of the one before it: the tail and its successor each have an
+    // engine, so neither advances the other's phase. A shared engine made the tail a series of phase jumps at block edges.
+    void successorInsideTheFade()
+    {
+        beginTest("Pattern, Empty, Pattern inside one fade: the tail has no steps at block edges and the successor holds the pitch");
+        for (int block : { 64, 100, 128, 256, 512 })
+        {
+            mu_seam_test::TempStorage storage;
+            PatternProcessor p;
+            expect(p.setLayerType(0, LayerTypeId::Pattern));
+            openGate(p, 0);
+            const int preFrames = 8192, postFrames = 8192;
+            const int preBlocks = preFrames / block, postBlocks = postFrames / block;
+            Channel0Tap tap((preBlocks + postBlocks) * block);
+            p.setChannelTapForTest(&tap);
+            {
+                Run run(p, block);
+                for (int b = 0; b < preBlocks; ++b) run.block();
+                expect(p.setLayerType(0, LayerTypeId::Empty));
+                expect(p.setLayerType(0, LayerTypeId::Pattern));
+                openGate(p, 0);
+                for (int b = 0; b < postBlocks; ++b) run.block();
+            }
+            p.setChannelTapForTest(nullptr);
+
+            const int preEnd = preBlocks * block;
+            const float steady = maxStep(tap.buf, 4096, preEnd);
+            expect(steady > 1.0e-4f, "the pre-swap drone sounds");
+
+            double bestHz = 0.0, best = 0.0;
+            for (double hz = 20.0; hz < 4000.0; hz += 1.0)
+                if (const double m = goertzel(tap.buf, preEnd - 4096, 4096, hz); m > best) { best = m; bestHz = hz; }
+
+            // The tail's 25 ms (1200 frames), after the first block that carries the successor's own start.
+            const float overlap = maxStep(tap.buf, preEnd + block, preEnd + 1200);
+            logMessage("block " + juce::String(block) + ": fundamental " + juce::String(bestHz) + " Hz, steady step "
+                       + juce::String(steady) + ", step in the overlap " + juce::String(overlap));
+            expect(overlap <= 3.0f * steady + 1.0e-4f, "block " + juce::String(block) + ": a step at a block edge in the overlap");
+
+            // The successor alone, after the fade: the same fundamental as before the swap.
+            double postHz = 0.0, postBest = 0.0;
+            for (double hz = 20.0; hz < 4000.0; hz += 1.0)
+                if (const double m = goertzel(tap.buf, preEnd + 2400, 4096, hz); m > postBest) { postBest = m; postHz = hz; }
+            expectWithinAbsoluteError(postHz, bestHz, 1.0, "block " + juce::String(block) + ": the successor keeps the pitch");
+            p.flushPendingAsyncUpdates();
+        }
+    }
+
+    // A Pattern that was silent when it left (Note mode with no key held; a stopped transport) leaves a silent tail.
+    void gatedTailIsSilent()
+    {
+        beginTest("a gated Pattern swapped away leaves a silent tail: Note mode with no key, and a stopped transport");
+        const int block = 128;
+        for (int variant = 0; variant < 2; ++variant)
+        {
+            mu_seam_test::TempStorage storage;
+            PatternProcessor p;
+            expect(p.setLayerType(0, LayerTypeId::Pattern));
+            if (variant == 0)
+            {
+                openGate(p, 0);
+                expect(mu_tronic::setPatternNoteMode(p, 0, 1));   // no key is ever held
+            }   // variant 1: the gate stays closed (no bypass, no envelopes) while the transport plays
+            PeakTap peaks;
+            p.setChannelTapForTest(&peaks);
+            {
+                Run run(p, block);
+                for (int b = 0; b < 40; ++b) run.block();
+                expectEquals(peaks.peak[0], 0.0f, "silent before the swap");
+                expect(p.setLayerType(0, LayerTypeId::Empty));
+                peaks.reset();
+                for (int b = 0; b < 20; ++b) run.block();   // 20 blocks of 128 frames cover the 25 ms fade twice over
+                expectEquals(peaks.peak[0], 0.0f, juce::String(variant == 0 ? "Note mode, no key" : "closed gate") + ": the tail is silent");
+            }
+            p.setChannelTapForTest(nullptr);
+            p.flushPendingAsyncUpdates();
+        }
+
+        // The control: a sounding Pattern in Note mode with a key held does leave an audible, fading tail.
+        mu_seam_test::TempStorage storage;
+        PatternProcessor p;
+        expect(p.setLayerType(0, LayerTypeId::Pattern));
+        openGate(p, 0);
+        expect(mu_tronic::setPatternNoteMode(p, 0, 1));
+        PeakTap peaks;
+        p.setChannelTapForTest(&peaks);
+        {
+            Run run(p, block);
+            juce::MidiBuffer on;
+            on.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8) 100), 0);
+            run.block(on);
+            for (int b = 0; b < 40; ++b) run.block();
+            expect(peaks.peak[0] > 0.01f, "sounding before the swap");
+            expect(p.setLayerType(0, LayerTypeId::Empty));
+            peaks.reset();
+            run.block();
+            run.block();
+            expect(peaks.peak[0] > 0.01f, "a sounding Pattern keeps its tail");
+        }
+        p.setChannelTapForTest(nullptr);
+        p.flushPendingAsyncUpdates();
+    }
+
+    // Free to Note on a sounding layer closes the own-output gate over its 8 ms ramp, not in one sample.
+    void noteSwitchRamps()
+    {
+        beginTest("Free to Note on a sounding Pattern ramps the gate shut: no sample step beyond the drone's own");
+        for (int block : { 64, 256 })
+        {
+            mu_seam_test::TempStorage storage;
+            PatternProcessor p;
+            expect(p.setLayerType(0, LayerTypeId::Pattern));
+            openGate(p, 0);
+            const int pre = 4096 / block, post = 4096 / block;
+            Channel0Tap tap((pre + post) * block);
+            p.setChannelTapForTest(&tap);
+            {
+                Run run(p, block);
+                for (int b = 0; b < pre; ++b) run.block();
+                expect(mu_tronic::setPatternNoteMode(p, 0, 1));
+                for (int b = 0; b < post; ++b) run.block();
+            }
+            p.setChannelTapForTest(nullptr);
+            const int preEnd = pre * block;
+            const float steady = maxStep(tap.buf, 1024, preEnd);
+            const float across = maxStep(tap.buf, preEnd - 2, preEnd + 2 * block);
+            logMessage("block " + juce::String(block) + ": drone step " + juce::String(steady) + ", step across the switch " + juce::String(across));
+            expect(across <= 3.0f * steady + 1.0e-4f, "the gate closes by ramp");
+            expectEquals(tap.buf.getMagnitude(0, preEnd + 6 * block, block), 0.0f, "and is shut once the ramp is done");
+            p.flushPendingAsyncUpdates();
+        }
     }
 
     // Layer presets are mu-Tant's own folder and format; the Pattern's data and Note mode travel with them.

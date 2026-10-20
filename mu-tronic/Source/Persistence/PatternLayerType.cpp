@@ -164,12 +164,12 @@ namespace
         return std::make_unique<PatternSlotHost>(host);
     }
 
-    // The slot's engine exists before the Pattern binds (its bindParams takes it without allocating or locking), and the
+    // The slot's engine for this Pattern exists before it binds (its bindParams takes it without allocating or locking), and the
     // Pattern reads the shared bank through the services' adapter.
     void attachPatternServices(Layer& layer, mu_core::LayerServices& services, int slot)
     {
         auto& host = static_cast<PatternSlotHost&>(services);
-        host.engineFor(slot);
+        host.engineForNewLayer(slot);
         static_cast<TronicPattern&>(layer).host.ptr = &host;
     }
 

@@ -260,9 +260,12 @@ int Pattern::hearNotes(const mu_core::RenderContext& ctx) noexcept
     if (mode != notes.lastMode)
     {
         notes.held.clear();
-        notes.gateGain = (mode == 1) ? 0.0f : 1.0f;
+        // A layer that has not rendered yet starts with its gate settled for the mode; a live one keeps its gain on
+        // Free to Note, so the own-output ramp closes it over 8 ms instead of snapping a sounding drone to silence.
+        if (mode != 1 || ! notes.seeded) notes.gateGain = (mode == 1) ? 0.0f : 1.0f;
         notes.lastMode = mode;
     }
+    notes.seeded = true;
     if (mode != 1) return mode;
 
     // A note-on (velocity above 0) pushes, a note-off or a note-on at velocity 0 removes (juce::MidiMessage's
@@ -480,6 +483,7 @@ void Pattern::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>
     if (mode == 1 && notes.held.newest() >= 0)
         cfg.pitchOffsetSemis = (float) (notes.held.newest() - (cfg.root + 12 * kBaseOctave));
 
+    lastPitchOffset = cfg.pitchOffsetSemis;
     engine->setConfig(cfg);
     engine->process(out, n);
 
@@ -490,6 +494,7 @@ void Pattern::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>
     float* gl = out.getWritePointer(0);
     float* gr = out.getNumChannels() > 1 ? out.getWritePointer(1) : nullptr;
     applyGateBlock(gate, gl, gr, n, gateGap, gateBypass, playing, beat, ctx.beatsPerSample, ctx.sampleRate);
+    lastGateOpen = gateBypass || (playing && gate.hasEnvelopes.load(std::memory_order_relaxed));
 
     // The insert with its modulated slot parameters.
     VoiceParams ip;
@@ -554,9 +559,24 @@ bool Pattern::renderRetiring(const mu_core::RenderContext& ctx, juce::AudioBuffe
     auto& buf = rs.exclusive != 0 ? out : aside;
     const int frames = juce::jmin(n, buf.getNumSamples());
 
+    // The live layer's last block decides what the tail may sound: a closed pattern gate, or Note mode on the layer's
+    // own output with no key held, was silent, and a tail that droned on would be a burst. The held key's pitch is
+    // kept. (The gain is the one the live layer last rendered with: nothing advances it once the layer is parked.)
+    const bool  noteGated = gatesOwnOutput && noteMode.load(std::memory_order_relaxed) == 1;
+    const float tailGain  = noteGated ? notes.gateGain : 1.0f;
+    if (! lastGateOpen || tailGain <= 0.0f)
+    {
+        if (rs.exclusive != 0)
+            for (int c = 0; c < out.getNumChannels(); ++c) juce::FloatVectorOperations::clear(out.getWritePointer(c), n);
+        return true;   // the bin ends the fade when its ramp is spent
+    }
+
     const auto& s = retireSnap.value;
-    engine->setConfig(s.config);
+    auto cfg = s.config;
+    cfg.pitchOffsetSemis = lastPitchOffset;
+    engine->setConfig(cfg);
     engine->process(buf, frames);
+    if (tailGain < 1.0f) buf.applyGain(0, frames, tailGain);
     mu_core::applyLinearFade(buf, frames, rs);
 
     VoiceParams ip;

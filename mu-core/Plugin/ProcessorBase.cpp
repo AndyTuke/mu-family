@@ -1398,11 +1398,16 @@ mu_core::LayerServices* ProcessorBase::ensureLayerServices(const mu_core::LayerT
 {
     const int i = (int) info.id;
     if (info.createServices == nullptr || i < 0 || i >= mu_core::kLayerTypeIdCount) return nullptr;
-    const juce::ScopedLock sl(layerServicesLock);
-    if (layerServices[(size_t) i] != nullptr) return layerServices[(size_t) i].get();
+    {
+        const juce::ScopedLock sl(layerServicesLock);
+        if (layerServices[(size_t) i] != nullptr) return layerServices[(size_t) i].get();
+    }
 
+    // Built outside the table's lock (a type's services may load tables or allocate engines), inserted under it.
     auto built = info.createServices(*this);
     if (built == nullptr) return nullptr;
+    const juce::ScopedLock sl(layerServicesLock);
+    if (layerServices[(size_t) i] != nullptr) return layerServices[(size_t) i].get();   // another thread was first
     // A processor already prepared hands its rate and block size to services built after it; prepareLayerRender
     // reaches them through the table once they are in it, so a prepare racing this one still ends on the newest.
     double rate = 0.0;
