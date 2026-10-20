@@ -189,8 +189,8 @@ juce::Path LFOEditor::buildCurvePath() const
             float c1y, c2y;
             mu_mod::smoothControlY(points, i - 1, unipolar ? 0.0f : -1.0f, c1y, c2y);
 
-            const float c1x = prevS.x + (currS.x - prevS.x) * 0.33f;
-            const float c2x = prevS.x + (currS.x - prevS.x) * 0.66f;
+            const float c1x = prevS.x + (currS.x - prevS.x) * (1.0f / 3.0f);   // exact thirds, as the audio evaluator uses
+            const float c2x = prevS.x + (currS.x - prevS.x) * (2.0f / 3.0f);
             path.cubicTo(c1x, toScreen(0.0f, c1y).y, c2x, toScreen(0.0f, c2y).y, currS.x, currS.y);
         }
     }

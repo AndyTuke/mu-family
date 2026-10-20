@@ -50,8 +50,11 @@ public:
         smoothedPreGain.setTargetValue(preGain);
         smoothedOutGain.setTargetValue(outGain);
         smoothedBias.setTargetValue(bias);
-        for (int ch = 0; ch < nChState; ++ch)
-            toneFilter[ch].prepare(toneHz, (float) currentSampleRate);
+        // Tone fully open bypasses the low-pass, as the post-drive tone of the other drive inserts does.
+        const bool toneOpen = toneHz >= 19000.0f;
+        if (! toneOpen)
+            for (int ch = 0; ch < nChState; ++ch)
+                toneFilter[ch].prepare(toneHz, (float) currentSampleRate);
 
         // ADAA's antiderivative of tanh, log(cosh x), with the large-|x| form that cannot overflow.
         auto ad1Tanh = [](float x) -> float {
@@ -68,10 +71,16 @@ public:
             for (int ch = 0; ch < nChState; ++ch)
             {
                 float& xp = xPrev[ch];
-                const float x  = chans[ch][i] * pg + b;
+                float in = chans[ch][i];
+                if (! std::isfinite(in)) in = 0.0f;   // a NaN or Inf must not latch in the filter states
+                const float x  = in * pg + b;
                 const float dx = x - xp;
-                const float sat = std::abs(dx) < 1e-4f ? std::tanh(0.5f * (x + xp))
-                                                       : (ad1Tanh(x) - ad1Tanh(xp)) / dx;
+                // Both points past the knee on the same side: tanh is flat at exactly +-1, and the large-|x| ADAA form
+                // would divide a float rounding error by a tiny dx (noise on a loud low note's flat top).
+                const float sat = (x > 12.0f && xp > 12.0f)    ?  1.0f
+                                : (x < -12.0f && xp < -12.0f)  ? -1.0f
+                                : std::abs(dx) < 1e-4f         ? std::tanh(0.5f * (x + xp))
+                                                               : (ad1Tanh(x) - ad1Tanh(xp)) / dx;
                 xp = x;
                 const float centred = sat - restingOffset;
                 float& di   = dcIn [ch];
@@ -79,7 +88,7 @@ public:
                 const float dc = centred - di + dcCoeff * dout;
                 di   = centred;
                 dout = dc;
-                chans[ch][i] = toneFilter[ch].process(dc) * og;
+                chans[ch][i] = (toneOpen ? dc : toneFilter[ch].process(dc)) * og;
             }
         }
     }

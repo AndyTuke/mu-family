@@ -385,6 +385,23 @@ public:
             };
             for (const float bias : { 0.0f, 50.0f, 100.0f })
                 expect(harmonicLevel(bias, 1, true) < 1.0e-3, "silence in gives silence out at bias " + juce::String(bias));
+            // A loud low note at full drive: the clipped top is flat, not noisy (the ADAA large-|x| form's rounding error).
+            {
+                constexpr double sr = 48000.0;
+                constexpr int n = 24000;
+                OverdriveInsert a;
+                a.prepare(sr, n);
+                juce::AudioBuffer<float> buf(2, n);
+                for (int i = 0; i < n; ++i)
+                    for (int c = 0; c < 2; ++c)
+                        buf.setSample(c, i, (float) std::sin(2.0 * juce::MathConstants<double>::pi * 50.0 * i / sr));
+                float gr = 0.0f;
+                a.process(buf, n, 2, makeParams(14, { 100.0f, 0.0f, 0.0f, 20000.0f }), gr);
+                float worst = 0.0f;   // the largest sample-to-sample step inside the flat top
+                for (int i = 4990; i < 5090; ++i)   // around the crest, a quarter of the way into the fifth cycle
+                    worst = juce::jmax(worst, std::abs(buf.getSample(0, i) - buf.getSample(0, i - 1)));
+                expect(worst < 0.05f, "the flat top is smooth (largest step " + juce::String(worst) + ")");
+            }
             const double second0 = harmonicLevel(0.0f, 2, false), second100 = harmonicLevel(100.0f, 2, false);
             expect(second0 < 1.0e-3, "no second harmonic from the symmetric curve");
             expect(second100 > 20.0 * juce::jmax(second0, 1.0e-6), "Bias 100 % puts a clear second harmonic in");

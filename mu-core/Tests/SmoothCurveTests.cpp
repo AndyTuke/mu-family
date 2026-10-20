@@ -48,6 +48,37 @@ struct SmoothCurveTests : juce::UnitTest
             expectLessThan(worst, 1.0e-4f, "segment " + juce::String((int) i) + " leaves its anchors' range");
         }
 
+        beginTest("random anchor sets: every segment stays between its two anchors");
+        {
+            juce::Random rng(20261020);
+            int outside = 0;
+            for (int trial = 0; trial < 200; ++trial)
+            {
+                ControlSequence r;
+                r.polarity = ControlSequence::Polarity::Bipolar;
+                const int count = 2 + rng.nextInt(9);
+                float x = 0.0f;
+                for (int k = 0; k < count; ++k)
+                {
+                    r.curvePoints.push_back(pt(k == count - 1 ? 1.0f : x, rng.nextFloat() * 2.0f - 1.0f));
+                    x += (1.0f - x) * (0.05f + 0.6f * rng.nextFloat());
+                }
+                for (size_t i = 0; i + 1 < r.curvePoints.size(); ++i)
+                {
+                    const auto& a = r.curvePoints[i];
+                    const auto& b = r.curvePoints[i + 1];
+                    if (b.x - a.x < 1.0e-4f) continue;
+                    const float lo = std::min(a.y, b.y) - 1.0e-4f, hi = std::max(a.y, b.y) + 1.0e-4f;
+                    for (int k = 1; k < 20; ++k)
+                    {
+                        const float v = at(r, (double) (a.x + (b.x - a.x) * (float) k / 20.0f)) / 100.0f;
+                        if (v < lo || v > hi) ++outside;
+                    }
+                }
+            }
+            expectEquals(outside, 0, "samples outside their segment's anchors");
+        }
+
         beginTest("two anchors are a straight line");
         {
             ControlSequence line;
