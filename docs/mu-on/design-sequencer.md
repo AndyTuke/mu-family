@@ -38,7 +38,7 @@ clock over a `StepPattern`) is test support in `Tests/`; the arithmetic is the s
 
 - **Swing** (`t{N}_swing`, per track) delays the **odd** 16ths by up to half a step — the groove "shuffle".
 - **Accent** (`t{N}_accent`, per track) sets the velocity of accented cells; plain cells use a lower fixed
-  velocity. Velocity is passed to the engine trigger (louder hit / harder transient).
+  velocity (0.72; an accented cell plays at 0.72 + knob × 0.28, so an accent is never quieter than a plain step). Velocity is passed to the engine trigger (louder hit / harder transient).
 
 Swing and accent are per-track parameters (`t{N}_swing` 0..1 default 0, `t{N}_accent` 0..1 default 1, the last rows of the `t{N}_` table): each track copies
 its own into its row at the top of every call. **Ruled and built 2026-10-20 ([design 2.1.11](../mu-tronic/design.md) point 4, T1b step 2b):** the global
