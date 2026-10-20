@@ -264,7 +264,7 @@ standalone seam, threads, device ownership) is ruled in
 | The generic **MIDI CC / note to parameter mapping** (#1275): any MIDI-in feature needs it, it is not device-specific. | |
 
 Why separate: (1) it is **optional per build**, since controllers need OS MIDI ports that a plugin inside a DAW may not
-get (R2) and a freeware build may not want them, the same reason Link sits behind a build option; (2) it **keeps growing**
+get (R2) and a freeware build may not want them, the same kind of reason that keeps heavy optional parts out of `mu-core`; (2) it **keeps growing**
 with every new device, which `mu-core` should not; (3) the boundary can be **enforced**, as it is for products; (4) there is
 precedent: the small `MuLinkBridge.h` sits in `mu-core` and the heavy parts are in `mu-link`.
 

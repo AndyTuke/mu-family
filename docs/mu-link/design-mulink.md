@@ -48,7 +48,7 @@ When you own the clients, the proven model is a **local audio server with a shar
 - Each block, mu-link writes a **`TransportBlock`** to shared memory: absolute sample position, current tempo (BPM), bar/beat phase, and play/stop state.
 - Clients **read** that block and render exactly the sample range mu-link is about to consume. Because the position comes from the master and the clients are pulled in lockstep with it, sync is **sample-accurate with ±0 drift**.
 - We deliberately **do not** use MIDI clock internally. MIDI clock (24 ppqn) is jitter-prone — it shares a serial wire with other data and its timing is tied to buffer boundaries, giving milliseconds of jitter ([E-RM jitter report](https://www.e-rm.de/data/E-RM_report_Jitter_02_14_EN.pdf)). A sample-accurate audio-derived clock is the known fix (±1 sample).
-- **Outward bridges (optional, later):** mu-link *can* emit real MIDI-clock OUT to sync outboard hardware, and/or be an [Ableton Link](https://ableton.github.io/link/) peer so third-party apps can sync to us. These are *outputs* derived from the master clock, never the internal mechanism. (Ableton Link is GPLv2+/proprietary — the family is GPLv3, so Link under its GPL option is the chosen route; it stays opt-in.)
+- **Outward bridges (optional, later):** mu-link *can* emit real MIDI-clock OUT to sync outboard hardware, (an Ableton Link peer was considered and dropped 2026-10-20, see [design-ableton-link.md](../design-ableton-link.md)). These are *outputs* derived from the master clock, never the internal mechanism. (Ableton Link is GPLv2+/proprietary — the family is GPLv3, so Link under its GPL option is the chosen route; it stays opt-in.)
 
 ### 3.2 The audio path (low latency, no clicks)
 
@@ -94,7 +94,7 @@ mu-link/
     ├── Plugin/        (App entry + main window; standalone only — no plugin formats)
     ├── Server/        AudioServer (HW callback, summing), ClientRegistry, TransportClock
     ├── Ipc/           SharedMemoryBus, AudioRing (SPSC), TransportBlock, handshake/discovery
-    ├── Clock/         MidiClockOut (clock encoding over mu-core's TimedMidiOut), (optional) AbletonLink peer
+    ├── Clock/         MidiClockOut (clock encoding over mu-core's TimedMidiOut)
     ├── UI/            MuLinkComponent on the shared ShellChrome (via LinkShellBackend, see ../design-plugin-family.md): mixer of connected clients, Scenes, master tempo, device picker
     └── Tests/         ring-buffer SPSC tests, transport-advance tests, underrun handling
 ```
@@ -105,7 +105,7 @@ Client-side bus glue lives in **`mu-core/Link/MuLinkClient.*`** (shared by all p
 1. **Audio transport model** → **Shared-memory local bus** (mu-products only). No kernel driver.
 2. **Hardware backend** → **Support several, pick at runtime** — WASAPI (exclusive/shared) + ASIO via JUCE's `AudioDeviceManager` device picker. (ASIO only if the user installs the ASIO SDK; otherwise WASAPI exclusive is the low-latency default.)
 3. **Client↔server coupling** → **Async double-buffered rings** (click-resistant). Underrun → silence + log, never a pop on the master.
-4. **Clock outputs** → internal sample-accurate transport bus **+ MIDI-clock OUT** to outboard gear. **No Ableton Link** at first (the family is now GPLv3, so route B applies). *Superseded 2026-10-09: a Link peer is now planned, behind the same licence question — see [../design-ableton-link.md](../design-ableton-link.md).*
+4. **Clock outputs** → internal sample-accurate transport bus **+ MIDI-clock OUT** to outboard gear. **No Ableton Link** at first (the family is now GPLv3, so route B applies). *A Link peer was planned on 2026-10-09 and dropped 2026-10-20 by Andy; see [../design-ableton-link.md](../design-ableton-link.md).*
 5. **Clock source (amended, L7)** → mu-link is master **or** slaves to **external MIDI clock**, chosen by a manual GUI toggle (Internal / Ext MIDI). Slaving does **not** compromise sample-accuracy: incoming MIDI clock feeds a **tempo PLL** (smoothed estimate, jitter-rejected) that sets the transport's *tempo* only — the hardware word clock stays the timebase, so clients + MIDI-clock-OUT remain rock solid. This refines the original "master-only" intent: raw MIDI clock is never the timebase, just the tempo *reference* when slaved.
 
 ### Secondary decisions (resolved)
@@ -136,7 +136,7 @@ Numbered like mu-clid's v1 roadmap. Each stage ends green (tests + build) before
 ## 7. Licensing notes
 
 - **ASIO SDK** — free but under a Steinberg licence agreement; the SDK cannot be redistributed. Only relevant if we pick the ASIO backend.
-- **Ableton Link** — dual GPLv2+ / proprietary. The family is GPLv3 (owner decision 2026-10-11), so route B (GPL) applies if we become a Link peer; the internal clock is custom and licence-free.
+- **Ableton Link** — dropped 2026-10-20; the internal clock is custom and licence-free.
 
 ## Sources
 - JACK architecture / lock-free ring buffer — <https://jackaudio.org/api/> , <https://jackaudio.org/api/ringbuffer_8h.html>

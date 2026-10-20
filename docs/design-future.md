@@ -60,7 +60,7 @@ Today MIDI timing is block-quantised. Every note-on is emitted at sample offset 
 
 - **Idea:** carry the in-block step offset from the sequencer into `trigger`, so each note lands at its true sample offset and nothing collapses (the per-rhythm fired state would need to hold several offsets per block, not one bit).
 - **Why 🟡:** the sequencer's step-fired result and the trigger path both change shape (`firedMask` becomes a small per-block list of offsets). Keep it allocation-free on the audio thread.
-- **Fit with the other ideas:** the same offset-carrying path would serve the other products, and Ableton Link would expose the current jitter, so do this before or with the MIDI sync groundwork.
+- **Fit with the other ideas:** the same offset-carrying path would serve the other products, and it serves the MIDI sync groundwork. (Ableton Link, which would have exposed the jitter, was dropped 2026-10-20.)
 - **Feature, not a fix:** ask Andy before implementing.
 
 ### 🟡 MIDI CC remote control of knobs
@@ -79,12 +79,10 @@ Run multiple μ-family standalones and have them share a clock + summing bus for
 - **Already live:** mu-clid and mu-tant standalones consult `mu_core::readHostTransport()` and slave their beat to the mu-link clock when attached (the bridge is the header-only `mu-core/Link/MuLinkBridge.h`, compiled only into each `StandaloneApp.cpp`). mu-on / mu-toni are not yet bridge-wired (the hook is a one-liner per product when they are).
 - **Remaining gaps:** the Win32 shared-memory audio server + GUI; bridge-wiring the remaining siblings; and plugin-mode sync (mu-link is standalone-only by design — in a DAW the host owns the clock, so there is nothing to add).
 
-### 🔵 Ableton Link (planned)
+### Ableton Link (dropped)
 
-Join an Ableton Link session so the family stays in time with other musicians' laptops and apps (tempo, bar phase and start / stop, no master needed). **Planned by the owner (2026-10-09)** and gated on a licence decision — Link is GPLv2+ or a paid proprietary licence. The full plan, with the staged work, is [design-ableton-link.md](design-ableton-link.md). Shape: `mu-link` becomes a Link peer (a third clock source) and bridges Link to MIDI clock out; standalones without mu-link get a `Link` source in the shared `TransportResolver`; all behind a CMake option so licence-free builds stay possible.
+**Dropped by Andy on 2026-10-20.** Not planned and not to be built; the plan is kept as history in [design-ableton-link.md](design-ableton-link.md). Do not design for a Link clock source. The MIDI sync groundwork stands on its own merits.
 
-- **Do the MIDI sync groundwork first** (backlog #1261, #1260, #1259, #1253, #1256, #1254, #1258, #1251): Link would expose every timing flaw in the current clock path.
-- **Later idea — Link Audio** (new in Link 4.x): share audio channels between Link peers, for example a layer streamed into another Link app. It cannot be used at the same time as plain Link; look at it once Link itself is in.
 ### 🟡 One framework, one instance — combine the engines in one place
 
 **Scheduled 2026-10-15 as the fifth product mu-Tronic** (owner's brief): 16 layer slots (paged 1-8 / 9-16), any of the four layer types per slot, the shared mixer, FX and modulation, plus buses in the mixer; it may replace mu-link as a performance tool. Design, staged plan and open questions: [mu-tronic/design.md](mu-tronic/design.md). It answers the open questions below: a fifth product, 16 layers, **Standalone only and freeware (no licence key)**, and every mu-On engine is its own layer type. Andy's answers of 2026-10-15 are recorded in the design's section 9; the mu-Clid and mu-Tant extraction waits until after their next releases. The text below stays as the background.
@@ -100,11 +98,12 @@ Join an Ableton Link session so the family stays in time with other musicians' l
 
 ### 🟡 Android tablet app (standalone only, simplest scope)
 
-Run the family on an Android tablet. **Scope (owner, 2026-10-09): standalone only, no MIDI, no mu-link, no licence, keep it simple.** Start with mu-Toni (light), as a spike on one real tablet to measure latency and CPU. See backlog #1282.
+Run the family on an Android tablet. **Scope (owner, 2026-10-09): standalone only, no MIDI, no mu-link, no licence, keep it simple.** Start with mu-Toni (freeware, light; compile the licence path out), internal clock only, as a spike on one real tablet. **The goal is to measure, not ship:** an Android app target hosting the existing processor, a fit-to-screen scale of the current fixed-size editor, then latency and CPU on the tablet. Parked On Hold by the owner (confirmed 2026-10-11); the backlog row was closed on 2026-10-20 and this entry keeps the idea.
 
-- **Why 🟡:** the code is portable JUCE C++, so the engines, FX, modulation and sequencers carry over, but the editor is a fixed 1170×870 desktop layout built for mouse hover and right-click. **The UI is the main work**: first a fit-to-screen scale of the existing layout (enough for the spike), then touch-sized controls, no right-click or hover dependence, and a tablet layout driven by the standard sizing below.
-- **Smaller items:** an Android app target (the plugin targets do not apply; no VST3 or CLAP there), keeping audio alive when the screen locks, a file picker and storage for presets and samples, the licence path compiled out, and a JUCE licence check for mobile.
-- **Fit with the other ideas:** Android has no inter-app audio or shared MIDI, so one combined instance (above) suits it better than four apps. Sync, if ever wanted there, would be Ableton Link (Android is supported), not `mu-link`.
+- **Why 🟡:** the code is portable JUCE C++, so the engines, FX, modulation and sequencers carry over, but the editor is a fixed 1170×870 desktop layout built for mouse hover and right-click. **The UI is the main work** after the spike: touch-sized controls, no right-click or hover dependence, and a tablet layout driven by the standard sizing below (backlog #1172).
+- **Smaller items:** an Android app target (the plugin targets do not apply; no VST3 or CLAP there), Android SDK / NDK on the build PC, keeping audio alive when the screen locks, a file picker and storage for presets and samples, the licence path compiled out, and a JUCE licence check for mobile.
+- **Why on hold:** macOS and Linux are lower priority and untestable; Android would be testable on a device, so it is the likelier next platform when the owner schedules one.
+- **Fit with the other ideas:** Android has no inter-app audio or shared MIDI, so one combined instance (above) suits it better than four apps. No sync is planned there (Ableton Link was dropped 2026-10-20; `mu-link` does not apply).
 - **Rule for current work:** keep new shared UI code free of desktop-only assumptions (mouse-only input, hard-coded pixel sizes).
 
 ### 🟢 Standard UI sizing across the family

@@ -942,7 +942,7 @@ selector, mu-Tant's Root / Scale row): both go *inside* the content component, p
 **Design-future check.** Easier: this is the one-framework direction (per-product sidebar and panel copies
 become one class; product input is a mini-visual factory, a content component and a destination provider,
 all keyed by layer index, so a combined instance can answer them per layer type without a change to either
-class). Nothing here closes off Link, the controller work (`mu-control` reads the same `ProcessorBase`
+class). Nothing here closes off the controller work (`mu-control` reads the same `ProcessorBase`
 layer API) or the standard UI sizing (the three tokens are that standard). Risk to name: step 2 touches
 `mu-core` and all four products at once, so it is one mechanical commit with no behaviour change; do not mix
 the accessor rename (`getNumChannels` family to `getNumLayers`, done in its own commit 0338a05) into it.
