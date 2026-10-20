@@ -62,6 +62,11 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     layerPanel.setDefaultPresetName([this](int slot) { return proc.getLayerName(slot); });
     layerPanel.onLayerChanged = [this](int idx) { showSlot(idx); };
+    // A modulator edit: the shown type refreshes whatever it derives from the layer's modulators.
+    layerPanel.getModulatorPanel().onChange = [this]
+    {
+        if (shownContent != nullptr) shownContent->modulatorsChanged(layerPanel.getLayer());
+    };
 
     chooser.onChoose = [this](mu_core::LayerTypeId type)
     {

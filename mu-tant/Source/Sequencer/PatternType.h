@@ -1,0 +1,131 @@
+#pragma once
+
+#include "Sequencer/Pattern.h"
+#include "Sequencer/LayerTypeInfo.h"       // mu-core: mu_core::LayerTypeInfo
+#include "Sequencer/LayerServices.h"       // mu-core: what the type shares between its layers
+#include "Persistence/PatternParams.h"     // addLayerParams, addPatternGlobalParams
+#include "Audio/NoiseSeed.h"               // mu-core: makeNoiseSalt
+#include "Audio/Wavetable/WavetableBank.h" // mu-core: the oscillators' tables
+
+#include <array>
+#include <memory>
+
+// The Pattern layer type's description for a host that offers several layer types (docs/mu-tronic/design.md 2.5),
+// as mu-Toni's ArpType.h and mu-On's TrackTypes.h do. Header-only on purpose: only a host that registers the type
+// compiles it. Message-thread data only: it describes and constructs, it never dispatches (rendering stays virtual
+// on Layer). What the host adds is its adapter (a PatternHost over the services below), so the host also supplies
+// createServices and attachServices, and a Pattern subclass through `create` if it saves more than the type does.
+namespace mu_tant
+{
+
+// What every Pattern of one processor shares (design 2.4): the wavetable bank, the lock that guards its appends, and
+// the slots' engines. Built when the processor's first Pattern is added and kept until the processor is destroyed,
+// after every Pattern and tail. mu-Tant's own processor keeps the same members itself and does not use this.
+class PatternServices : public mu_core::LayerServices
+{
+public:
+    PatternServices() { bank.loadFactoryBank(); }
+
+    // Message thread (and prepareToPlay): the engines get the rate and block size the processor was prepared with.
+    void prepare(double sampleRate, int blockSize) override
+    {
+        const juce::ScopedLock sl(engineLock);
+        rate = sampleRate;
+        block = blockSize;
+        for (auto& e : engines)
+            if (e != nullptr) e->prepare(rate, block);
+    }
+
+    // Message thread, before the slot's Pattern binds: the engine of `slot`, built (and prepared) on the slot's first
+    // use. The engine belongs to the slot, not to a Pattern: a replaced Pattern's fade-out tail and its successor
+    // both render through it, and it stays until the processor goes (design 2.1.10 point 3).
+    VoiceEngine* engineFor(int slot)
+    {
+        if (slot < 0 || slot >= mu_limits::kMaxLayers) return nullptr;
+        const juce::ScopedLock sl(engineLock);
+        auto& e = engines[(size_t) slot];
+        if (e == nullptr)
+        {
+            e = std::make_unique<VoiceEngine>();
+            e->setBank(&bank);
+            e->setSlotIndex(slot, noiseSalt);
+            if (rate > 0.0) e->prepare(rate, block);
+        }
+        return e.get();
+    }
+
+    // Message thread, the engine already built by engineFor (null before): what the Pattern's bindParams is handed.
+    // Allocates nothing and takes no lock, as a bindParams under layersLock requires.
+    VoiceEngine* findEngine(int slot) const noexcept
+    {
+        return slot >= 0 && slot < mu_limits::kMaxLayers ? engines[(size_t) slot].get() : nullptr;
+    }
+
+    // The bank index of a wavetable file: found by path, else decoded OFF the lock (file read, WAV decode and FFT
+    // mip build are the slow part) and appended under it for microseconds, so an import never silences the render
+    // for the decode. -1 when unreadable. Message thread.
+    int bankIndexFor(const juce::File& file)
+    {
+        const juce::String path = file.getFullPathName();
+        {
+            const juce::ScopedLock sl(bankLock);   // the lookup walks the table list an append may reallocate
+            if (const int found = bank.findByPath(path); found >= 0) return found;
+        }
+        auto wt = bank.decodeFile(file);
+        if (wt.frames <= 0) return -1;
+
+        const juce::ScopedLock sl(bankLock);   // the append must exclude the audio thread
+        if (const int found = bank.findByPath(path); found >= 0) return found;   // loaded meanwhile
+        return bank.appendTable(std::move(wt));
+    }
+
+    // A saved wavetable path as a bank index (-1: none, or the file is gone). Lock-free lookup first: a staged load
+    // pre-loaded the table, so the commit at the boundary never takes bankLock (a try-lock miss silences the render
+    // for that call); only a path nobody pre-loaded takes the locked disk path. Message thread.
+    int resolveWavetable(const juce::String& path)
+    {
+        if (path.isEmpty()) return -1;
+        if (const int found = bank.findByPath(path); found >= 0) return found;
+        const juce::File f(path);
+        return f.existsAsFile() ? bankIndexFor(f) : -1;
+    }
+
+    mu_wavetable::WavetableBank bank;
+    juce::CriticalSection       bankLock;   // guards appends to `bank` against the audio render, which try-locks it
+
+private:
+    const juce::int64 noiseSalt = mu_core::makeNoiseSalt();   // per processor: slots of two instances do not share noise
+    juce::CriticalSection engineLock;                          // the table of engines (creation, prepare)
+    std::array<std::unique_ptr<VoiceEngine>, (size_t) mu_limits::kMaxLayers> engines;
+    double rate = 0.0;
+    int    block = 0;
+};
+
+// A fresh Pattern for `slot`, not yet bound or prepared. The insert's delay lines are allocated here, off the audio
+// thread and outside any lock; the per-slot seed keeps layers from sharing a noise sequence.
+inline std::unique_ptr<Layer> createPattern(int slot, mu_core::LayerTypeId /*type*/)
+{
+    auto p = std::make_unique<Pattern>();
+    p->insert->setSlotIndex(slot);
+    return p;
+}
+
+inline mu_core::LayerTypeInfo patternLayerTypeInfo() noexcept
+{
+    mu_core::LayerTypeInfo info;
+    info.id = mu_core::LayerTypeId::Pattern;
+    info.name = "Pattern";
+    info.group = "mu-Tant";
+    info.paramPrefixLetter = 'v';   // kept from mu-Tant's first release: the ids are users' automation targets
+    info.presetExtension = ".muPattern";
+    info.contentFolderName = "muTant";   // the layer presets are mu-Tant's own, shared with it, not copied
+    info.presetFolder = "Voices";        // the folder mu-Tant keeps its .muPattern files in (design-naming: a rename is on hold)
+    info.presetTag = kPatternPresetTag;
+    info.descriptor = "Wavetable drone voice";
+    info.addLayerParams = &addLayerParams;
+    info.addGlobalParams = &addPatternGlobalParams;   // the tonal centre (root, scale) every Pattern reads
+    info.create = &createPattern;
+    return info;
+}
+
+} // namespace mu_tant

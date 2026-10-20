@@ -131,7 +131,7 @@ juce::ValueTree PluginProcessor::toVoiceState(const juce::ValueTree& tree) const
 juce::ValueTree PluginProcessor::captureLayerPresetTree(int voice)
 {
     if (voice < 0 || voice >= mu_limits::kMaxLayers) return {};
-    return captureLayerNode(voice, "MuTantVoice");
+    return captureLayerNode(voice, kPatternPresetTag);
 }
 
 void PluginProcessor::saveLayerPreset(int voice, const juce::String& name)
@@ -146,7 +146,7 @@ void PluginProcessor::loadLayerPreset(int voice, const juce::File& file)
 {
     if (voice < 0 || voice >= mu_limits::kMaxLayers || ! file.existsAsFile()) return;
     auto xml = juce::XmlDocument::parse(file);
-    if (xml == nullptr || ! xml->hasTagName("MuTantVoice"))
+    if (xml == nullptr || ! xml->hasTagName(kPatternPresetTag))
     {
         if (onLoadError) onLoadError("Could not read \"" + file.getFileName() + "\"");
         return;
