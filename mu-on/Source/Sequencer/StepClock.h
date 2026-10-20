@@ -5,7 +5,7 @@
 
 // The 909 step clock of one row: it fires sample-accurate triggers at each 16th-note step boundary of the
 // host/internal transport beat. 16 steps = one bar (each step = a 16th = 0.25 beat). Swing delays the odd
-// 16ths; accented cells fire at the row's accent velocity. A Track owns one and clocks its own row with the
+// 16ths; accented cells fire at accentedVelocity(the row's Accent knob). A Track owns one and clocks its own row with the
 // beat it renders at. Pure logic, so it is unit-tested headless.
 namespace mu_on
 {
@@ -16,6 +16,13 @@ public:
     static constexpr double kStepBeats = 0.25;   // a 16th note
     static constexpr float  kNormalVelocity = 0.72f;
 
+    // Velocity of an accented cell for the Accent knob (0..1): from a plain cell's velocity at 0 up to full at 1,
+    // so an accent is never quieter than the plain steps beside it.
+    static constexpr float accentedVelocity(float accentKnob) noexcept
+    {
+        return kNormalVelocity + accentKnob * (1.0f - kNormalVelocity);
+    }
+
     // Realign to the top of the pattern.
     void reset() noexcept { nextGlobalStep = 0; }
 
@@ -25,7 +32,7 @@ public:
 
     // Fire every on-step of `row` (a StepRow, or anything with its isOn / isAccent) whose (swing-adjusted) beat lands in the block [beatStart, beatStart +
     // numSamples x beatsPerSample): fire(velocity, sampleOffsetWithinBlock). `swing` 0..0.9, `accentVelocity`
-    // 0..1 (StepRow::setGroove's ranges). The caller advances the transport itself; this only emits triggers.
+    // the Accent knob 0..1 (StepRow::setGroove's ranges). The caller advances the transport itself; this only emits triggers.
     // Under MIDI clock the transport hands each block the exact span the clock's beat model moved (not always
     // tempo x length); using it keeps consecutive blocks contiguous, so no step falls in a gap.
     // Audio thread: no allocation, `fire` is called inline.
@@ -56,7 +63,7 @@ public:
                 const int sampleOffset = juce::jlimit(0, numSamples - 1,
                                                       (int) std::round((t - beatStart) / beatsPerSample));
                 if (row.isOn(local))
-                    fire(row.isAccent(local) ? accentVelocity : kNormalVelocity, sampleOffset);
+                    fire(row.isAccent(local) ? accentedVelocity(accentVelocity) : kNormalVelocity, sampleOffset);
             }
             ++nextGlobalStep;
         }

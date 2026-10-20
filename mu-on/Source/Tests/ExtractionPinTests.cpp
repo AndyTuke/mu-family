@@ -332,7 +332,7 @@ struct MuOnExtractionPinTests : juce::UnitTest
             }
         }
 
-        beginTest("A track's accent sets the velocity of its accented steps against 0.72 for plain ones, on the Kick and the Snare");
+        beginTest("A track's Accent knob sets its accented steps from the plain 0.72 (knob 0) up to full (knob 1), on the Kick and the Snare");
         {
             auto ratio = [](float accent, EngineType engine)
             {
@@ -345,12 +345,13 @@ struct MuOnExtractionPinTests : juce::UnitTest
                 return peakOf(out, 0, 3000) / peakOf(out, 24000, 27000);
             };
             for (const auto engine : { EngineType::Kick, EngineType::Snare })
-                for (const float a : { 1.0f, 0.4f })
+                for (const float a : { 1.0f, 0.4f, 0.0f })
                 {
                     const float r = ratio(a, engine);
+                    const float expected = (0.72f + a * 0.28f) / 0.72f;
                     logMessage(juce::String(mu_on::engineName(engine)) + " accent " + juce::String(a) + ": accented / plain = " + juce::String(r, 4)
-                               + " (expected " + juce::String(a / 0.72f, 4) + ")");
-                    expectWithinAbsoluteError(r, a / 0.72f, 0.01f * (a / 0.72f));
+                               + " (expected " + juce::String(expected, 4) + ")");
+                    expectWithinAbsoluteError(r, expected, 0.01f * expected);
                 }
         }
     }
