@@ -11,7 +11,7 @@ namespace mu_toni
 
 namespace
 {
-    constexpr const char* kLayerPresetTag = "MuToniLayer";
+    constexpr const char* kLayerPresetTag = kArpPresetTag;
 
 }
 

@@ -116,6 +116,7 @@ target_sources(mu-tronic-tests PRIVATE
     Source/Tests/TronicLayoutTests.cpp      # the 16-slot parameter layout: size, build time, unique ids
     Source/Tests/TronicArpTests.cpp         # the Arp type in a slot: layout, saved rows, same stream as mu-Toni, follower, presets, stress
     Source/Tests/TronicTrackTests.cpp       # the Kick, Bass, Hat and Snare types in a slot: saved rows, same stream as mu-On, tails, presets
+    Source/Tests/TronicLayerPresetTests.cpp # layer presets in a slot: save/load per type, Empty-slot adopt, cross-type refusal, staged load
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp

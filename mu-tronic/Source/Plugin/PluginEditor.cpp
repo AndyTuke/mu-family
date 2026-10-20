@@ -50,6 +50,15 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         releaseContentArcs();   // unconditional: cheap, and safe even if a content's binding differs from the shown slot
     };
 
+    // A layer preset landed (a chosen file, a boundary commit): an Empty slot that took the file's type needs its
+    // sidebar picture and panel rebuilt, a filled slot rebinds its shown content.
+    proc.onLayerPresetCommitted = [this](int slot)
+    {
+        sidebar.refreshItems();
+        mixerOverlay.loadFromApvts();
+        if (layerPanel.getLayer() == slot) layerPanel.setLayer(slot);
+    };
+
     layerPanel.setDefaultPresetName([this](int slot) { return proc.getLayerName(slot); });
     layerPanel.onLayerChanged = [this](int idx) { showSlot(idx); };
 
@@ -83,6 +92,7 @@ PluginEditor::~PluginEditor()
     releaseContentArcs();
     layerPanel.getHeader().onNameChanged = nullptr;   // the processor can outlive the editor
     proc.onLayerTypeChanging = nullptr;
+    proc.onLayerPresetCommitted = nullptr;
 }
 
 LayerContent* PluginEditor::contentFor(mu_core::LayerTypeId type)
@@ -112,6 +122,7 @@ void PluginEditor::showSlot(int idx)
     layerPanel.setLayerEmpty(empty);
     layerPanel.getHeader().setNameEditable(! empty);
     chooser.setSlot(idx);
+    chooser.setSlotColour(MuLookAndFeel::layerPalette[(size_t) (proc.getLayerColourIndex(idx) % MuLookAndFeel::kLayerPaletteSize)]);
 
     // An Empty slot shows the chooser over the content and modulator bands, in the shell's own colour.
     if (empty)

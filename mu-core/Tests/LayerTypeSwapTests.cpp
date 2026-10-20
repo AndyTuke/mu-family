@@ -160,7 +160,7 @@ struct LayerTypeRegistryTests : juce::UnitTest
         mu_core::LayerTypeInfo kick = arp;
         kick.id = LayerTypeId::Kick; kick.name = "Kick"; kick.group = "mu-On";
         mu_core::LayerTypeInfo snare = kick;
-        snare.id = LayerTypeId::Snare; snare.name = "Snare";
+        snare.id = LayerTypeId::Test2; snare.name = "Snare";
 
         expect(r.add(arp));
         expect(r.add(kick));
@@ -188,7 +188,7 @@ struct LayerTypeRegistryTests : juce::UnitTest
         expectEquals((int) r.inGroup("mu-Clid").size(), 0);
 
         beginTest("the type names round trip by name, an unknown name is Empty");
-        for (int i = 0; i <= (int) LayerTypeId::Rumble; ++i)
+        for (int i = 0; i <= (int) LayerTypeId::Test2; ++i)
             expect((int) mu_core::layerTypeFromName(mu_core::layerTypeName((LayerTypeId) i)) == i);
         expect(mu_core::layerTypeFromName("Theremin") == LayerTypeId::Empty);
         expect(mu_core::layerTypeFromName(nullptr) == LayerTypeId::Empty);

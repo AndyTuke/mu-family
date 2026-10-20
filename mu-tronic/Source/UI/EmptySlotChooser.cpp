@@ -15,24 +15,51 @@ void EmptySlotChooser::setSlot(int s)
     repaint();
 }
 
-// One card per registered type, in registry order; the bands are the registry's groups.
+void EmptySlotChooser::setSlotColour(juce::Colour c)
+{
+    slotColour = c;
+    for (auto& card : cards) card.disc->setColour(c);   // not a rebuild: this runs inside a card's own click
+}
+
+// Bands: the first holds every product that offers a single type (its card is named for the product); each product
+// with several types is a titled band of its own (its cards are named for the types). Registry order within each.
 void EmptySlotChooser::rebuild()
 {
+    using LF = MuLookAndFeel;
     for (auto& c : cards)
+    {
         if (c.add != nullptr) removeChildComponent(c.add.get());
+        if (c.disc != nullptr) removeChildComponent(c.disc.get());
+    }
     cards.clear();
     bands.clear();
 
-    for (const auto& group : types.groups())
+    const auto groups = types.groups();
+    bool haveSingles = false;
+    for (const auto& group : groups)
+        if (types.inGroup(group).size() == 1) haveSingles = true;
+    if (haveSingles) bands.push_back({ {}, {}, false });
+
+    for (const auto& group : groups)
     {
-        bands.push_back({ group, {} });
-        for (const auto* info : types.inGroup(group))
+        const auto members = types.inGroup(group);
+        const bool single = members.size() == 1;
+        if (! single) bands.push_back({ group, {}, true });
+        const int bandIndex = single ? 0 : (int) bands.size() - 1;
+
+        for (const auto* info : members)
         {
             Card card;
-            card.id    = info->id;
-            card.name  = juce::String::fromUTF8(info->name);
-            card.group = group;
-            card.add   = std::make_unique<juce::TextButton>("Add");
+            card.id         = info->id;
+            card.band       = bandIndex;
+            card.name       = juce::String::fromUTF8(info->name);
+            card.plate      = single ? group : card.name;
+            card.descriptor = juce::String::fromUTF8(info->descriptor);
+            card.colour     = info->appColourId != 0 ? LF::colour((LF::ColourIds) info->appColourId) : LF::colour(LF::appIce);
+            card.disc       = std::make_unique<mu_core::LayerDiscVisual>(slotColour, card.name.substring(0, 1));
+            card.disc->setInterceptsMouseClicks(false, false);   // a click on the picture is a click on the card
+            addAndMakeVisible(*card.disc);
+            card.add        = std::make_unique<juce::TextButton>("Add");
             card.add->setTooltip("Add " + card.name + " to this slot");
             const auto id = info->id;
             card.add->onClick = [this, id] { if (onChoose) onChoose(id); };
@@ -62,19 +89,21 @@ void EmptySlotChooser::resized()
     if (nb == 0) return;
     const int bandH = juce::jmax(0, (body.getHeight() - (nb - 1) * gap) / nb);
 
-    constexpr int kMaxCols = 5;   // a band wraps after five cards, as the design's engine group does
+    constexpr int kSingleCols = 3;   // the single-type band is three cards wide, as the design's first band
+    constexpr int kMaxCols = 5;      // a grouped band wraps after five cards
     for (int b = 0; b < nb; ++b)
     {
         bands[(size_t) b].area = { body.getX(), body.getY() + b * (bandH + gap), body.getWidth(), bandH };
 
         std::vector<Card*> inBand;
-        for (auto& c : cards) if (c.group == bands[(size_t) b].title) inBand.push_back(&c);
+        for (auto& c : cards) if (c.band == b) inBand.push_back(&c);
         if (inBand.empty()) continue;
 
-        const int plateH = s(LF::kNamePlateH);
-        const int cardsTop = bands[(size_t) b].area.getY() + plateH + gap;
+        // A grouped band has a heading plate above its cards; the single-type band's cards carry their own plate.
+        const int headingH = bands[(size_t) b].grouped ? s(LF::kNamePlateH) + gap : 0;
+        const int cardsTop = bands[(size_t) b].area.getY() + headingH;
         const int cardsH = juce::jmax(0, bands[(size_t) b].area.getBottom() - cardsTop);
-        const int cols = juce::jmin(kMaxCols, (int) inBand.size());
+        const int cols = bands[(size_t) b].grouped ? juce::jmin(kMaxCols, (int) inBand.size()) : kSingleCols;
         const int rows = ((int) inBand.size() + cols - 1) / cols;
         const int cardW = juce::jmax(0, (body.getWidth() - (cols - 1) * gap) / cols);
         const int cardH = juce::jmax(0, (cardsH - (rows - 1) * gap) / rows);
@@ -82,8 +111,19 @@ void EmptySlotChooser::resized()
         {
             auto& card = *inBand[(size_t) i];
             card.box = { body.getX() + (i % cols) * (cardW + gap), cardsTop + (i / cols) * (cardH + gap), cardW, cardH };
-            const int btnH = juce::jmin(s(22), cardH / 2);
-            card.add->setBounds(card.box.getX() + gap, card.box.getBottom() - btnH - gap, juce::jmax(0, cardW - 2 * gap), btnH);
+
+            // Top to bottom: the type's plate, the picture, the descriptor line, the Add button.
+            const int btnH = s(LF::kClientNameH);
+            const int btnW = juce::jmin(juce::jmax(0, cardW - 2 * gap), s(LF::kAddButtonW));
+            const int btnY = card.box.getBottom() - btnH - gap;
+            card.add->setBounds(card.box.getCentreX() - btnW / 2, btnY, btnW, btnH);
+
+            const int plateBottom = card.box.getY() + gap + s(LF::kNamePlateH);
+            const int descH = s(LF::kClientNameH);
+            card.descriptorR = { card.box.getX() + gap, btnY - gap - descH, juce::jmax(0, cardW - 2 * gap), descH };
+            const int discTop = plateBottom + gap;
+            const int discSide = juce::jmax(0, juce::jmin(cardW / 2, card.descriptorR.getY() - gap - discTop));
+            card.disc->setBounds(card.box.getCentreX() - discSide / 2, discTop, discSide, discSide);
         }
     }
 }
@@ -116,18 +156,25 @@ void EmptySlotChooser::paint(juce::Graphics& g)
     // Band headings, then every card's shadow before any face so no shadow lands on a neighbouring card.
     for (const auto& band : bands)
     {
-        const float bh = sf((float) LF::kNamePlateH);
-        LF::drawNamePlate(g, { (float) band.area.getX() + sf(6.0f), (float) band.area.getY(), LF::namePlateWidth(band.title, bh), bh },
+        if (! band.grouped) continue;
+        LF::drawNamePlate(g, { (float) band.area.getX() + sf(6.0f), (float) band.area.getY(), LF::namePlateWidth(band.title, plateH), plateH },
                           band.title);
     }
     for (const auto& c : cards) LF::drawRaisedSubPanelShadow(g, c.box.toFloat());
     for (const auto& c : cards)
     {
-        LF::drawRaisedSubPanel(g, c.box.toFloat(), accent);
+        LF::drawRaisedSubPanel(g, c.box.toFloat(), c.colour);
+        LF::drawAccentPanel(g, c.box.toFloat(), c.colour, 4.0f);   // the colour wash and outline the type's own panel will have
         if (LF::hasScrews(*this)) LF::drawSubPanelScrews(g, c.box.toFloat());
-        LF::drawEngravedText(g, c.name, c.box.withTrimmedBottom(c.box.getHeight() / 2), juce::Justification::centred, ink);
+
+        const float pw = LF::namePlateWidth(c.plate, plateH);
+        LF::drawNamePlate(g, { (float) c.box.getCentreX() - pw * 0.5f, (float) c.box.getY() + (float) s(LF::kSpaceM), pw, plateH }, c.plate);
+
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(12.0f))));
+        LF::drawEngravedText(g, c.descriptor, c.descriptorR, juce::Justification::centred, ink);
     }
 
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(12.0f))));
     LF::drawEngravedText(g, "Or load a layer preset from the menu above.", hintR, juce::Justification::centred, ink);
 }
 

@@ -7,7 +7,7 @@
 #include "Plugin/PluginProcessor.h"
 #include "UI/LayerPanel.h"        // mu-core shared per-layer panel shell
 #include "UI/ArpContent.h"
-#include "UI/ArpMiniVisual.h"
+#include "UI/Components/LayerDiscVisual.h"   // mu-core: the sidebar disc
 #include "Modulation/MuToniModDest.h"
 #include "UI/SettingsOverlay.h"
 

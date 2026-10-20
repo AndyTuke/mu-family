@@ -1435,6 +1435,8 @@ about 520 to 560 ms, inside the 1,000 ms Debug budget. Lazy per-type declaration
 1,887 parameters (the 1,359 above and 33 more on each of the sixteen slots, 528): the whole `PluginProcessor` builds in about 84 ms in a Debug build (about 15.5 MiB private) and the synthetic
 6,000-parameter layout still builds in about 530 ms. Lazy per-type declaration is still not needed. Two families are registered (mu-Toni, mu-On); re-run when Pattern (mu-Tant) and again when Rhythm (mu-Clid) is registered.
 
+**Re-run at T1b step 3 (2026-10-20, layer presets).** No parameter was added: the real layout is still 1,887 parameters, the whole `PluginProcessor` builds in about 88 ms in a Debug build (about 15.6 MiB private) and the synthetic 6,000-parameter layout in about 558 ms (measured while other suites ran). Unchanged in substance; lazy per-type declaration is still not needed.
+
 **Interim at T1a (ruled 2026-10-19).** No type is registered, so no `r{N}_ a{N}_ v{N}_ t{N}_` parameter exists; `TronicState.h` reserves the placeholder prefix `mtrn{N}_`
 for the composed state (one prefix per slot, which is all `LayerLayout` holds). It never names a parameter. T1b replaces it: `LayerLayout` (mu-core, generic) takes a
 list of prefixes per slot, a slot's rows are saved with the prefix of its **live** type only (the type attribute selects it on load; the dormant prefixes keep defaults and are

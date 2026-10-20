@@ -5,7 +5,7 @@
 #if MU_TRONIC_WITH_UI
  #include "Plugin/ProcessorBase.h"
  #include "UI/ArpContent.h"                  // mu-Toni's layer library: the content, its host interface and picture
- #include "UI/ArpMiniVisual.h"
+ #include "UI/Components/LayerDiscVisual.h"   // mu-core: the disc picture
 #endif
 
 namespace mu_tronic
@@ -25,9 +25,12 @@ namespace
 
         mu_toni::Arp& getArp(int layer) noexcept override
         {
-            // The content's constructor binds slot 0 before the host rebinds it to the shown slot, and that slot may not
-            // hold an Arp yet; the reference is only used for the address of its modulation matrix until setLayer runs.
-            return static_cast<mu_toni::Arp&>(*proc.getLayer(layer));
+            // The content's constructor binds slot 0 before the host rebinds it to the shown slot, and a content kept for
+            // its type can be asked about a slot that has since become another type. Such a slot answers with an unbound
+            // stand-in Arp (never rendered), so the content never reads another layer type as an Arp.
+            if (auto* l = proc.getLayer(layer); l != nullptr && l->typeId() == (int) mu_core::LayerTypeId::Arp)
+                return static_cast<mu_toni::Arp&>(*l);
+            return standIn;
         }
 
         float getModLive(int layer, int dest) const noexcept override
@@ -46,6 +49,7 @@ namespace
 
     private:
         ProcessorBase& proc;
+        mu_toni::Arp standIn;   // see getArp
     };
 
     // mu-Toni's Arp content with its host adapter and modulation destinations: the one content instance the editor
@@ -73,7 +77,7 @@ namespace
     {
         const auto colour = MuLookAndFeel::layerPalette[(size_t) (host.getLayerColourIndex(slot) % MuLookAndFeel::kLayerPaletteSize)];
         // The sidebar item's own label already carries the slot number ("Arp 3"), so the disc shows the type's initial.
-        return std::make_unique<mu_toni::ArpMiniVisual>(colour, juce::String("A"));
+        return std::make_unique<mu_core::LayerDiscVisual>(colour, juce::String("A"));
     }
 }
 #endif

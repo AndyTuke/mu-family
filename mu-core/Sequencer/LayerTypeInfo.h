@@ -17,7 +17,9 @@ class LayerContent;   // mu-core/UI/LayerContent.h: a type's content component f
 namespace mu_core
 {
     // Saved by NAME (layerTypeName), never by number, so the order here may change.
-    enum class LayerTypeId : int { Empty = 0, Rhythm, Pattern, Arp, Kick, Bass, Hat, Snare, Rumble };
+    // Test and Test2 are reserved for test layers: no product registers them, so a fake type can never collide with a
+    // real one the day that product's type is registered.
+    enum class LayerTypeId : int { Empty = 0, Rhythm, Pattern, Arp, Kick, Bass, Hat, Snare, Rumble, Test, Test2 };
 
     inline const char* layerTypeName(LayerTypeId id) noexcept
     {
@@ -32,6 +34,8 @@ namespace mu_core
             case LayerTypeId::Hat:     return "Hat";
             case LayerTypeId::Snare:   return "Snare";
             case LayerTypeId::Rumble:  return "Rumble";
+            case LayerTypeId::Test:    return "Test";
+            case LayerTypeId::Test2:   return "Test2";
         }
         return "Empty";
     }
@@ -40,7 +44,7 @@ namespace mu_core
     inline LayerTypeId layerTypeFromName(const char* name) noexcept
     {
         if (name == nullptr) return LayerTypeId::Empty;
-        for (int i = 0; i <= (int) LayerTypeId::Rumble; ++i)
+        for (int i = 0; i <= (int) LayerTypeId::Test2; ++i)
             if (std::strcmp(name, layerTypeName((LayerTypeId) i)) == 0) return (LayerTypeId) i;
         return LayerTypeId::Empty;
     }
@@ -74,5 +78,8 @@ namespace mu_core
         CreateMiniVisualFn createMiniVisual = nullptr;   // the type's sidebar picture
         int         appColourId = 0;           // the MuLookAndFeel colour ID (appBlue ...) the slot's main area is painted in; 0 = the app's own
         const char* typeTag = "";              // the header's type plate text ("Toni", "On"); empty = none
+        const char* presetTag = "";            // the root tag of a layer-preset file ("MuToniLayer"): each product's existing tag,
+                                               // so a file saved by the product loads in a slot host and the reverse
+        const char* descriptor = "";           // one short line for the chooser card ("Generative arpeggiator")
     };
 }

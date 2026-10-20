@@ -50,6 +50,8 @@ inline mu_core::LayerTypeInfo arpLayerTypeInfo() noexcept
     info.presetExtension = ".muArp";
     info.contentFolderName = "muToni";   // the layer presets are mu-Toni's own, shared with it, not copied
     info.presetFolder = "Arps";
+    info.presetTag = kArpPresetTag;
+    info.descriptor = "Generative arpeggiator";
     info.addLayerParams = &addLayerParams;
     info.create = &createArp;
     return info;

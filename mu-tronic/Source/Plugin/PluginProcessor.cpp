@@ -68,7 +68,7 @@ PluginProcessor::PluginProcessor()
 
     setupLayerState();       // the layer layout every preset / session save and load uses
     layerSwapper.setAppliers([this](juce::ValueTree& t) { applyStateTree(t); },
-                             [](int, juce::ValueTree&) {});   // a layer preset belongs to its type (none yet)
+                             [this](int slot, juce::ValueTree& t) { applyStagedTypedLayer(slot, t); });   // a layer preset lands on its slot's wrap
     startFxParamSync();      // mixer / FX params → mixerEngine + fxChain (ProcessorBase)
     loadStartupDefault();    // restore a saved _default preset (skipped by render mode)
 }

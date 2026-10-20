@@ -25,7 +25,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     {
         const auto col = MuLookAndFeel::layerPalette[
             (size_t) (p.getLayerColourIndex(i) % MuLookAndFeel::kLayerPaletteSize)];
-        return std::make_unique<ArpMiniVisual>(col, i);
+        return std::make_unique<mu_core::LayerDiscVisual>(col, juce::String(i + 1));
     };
     sidebar.onLayerSelected = [this](int idx) { layerPanel.setLayer(idx); };
     sidebar.refreshItems();

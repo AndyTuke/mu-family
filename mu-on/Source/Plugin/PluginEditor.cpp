@@ -29,7 +29,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         const auto col = MuLookAndFeel::layerPalette[
             (size_t) (p.getLayerColourIndex(i) % MuLookAndFeel::kLayerPaletteSize)];
         const juce::String name = p.getLayerName(i);
-        return std::make_unique<TrackMiniVisual>(col, name.substring(0, 1));
+        return std::make_unique<mu_core::LayerDiscVisual>(col, name.substring(0, 1));
     };
     sidebar.onLayerSelected = [this](int idx) { showTrack(idx); };
     // Pulse a track in the sidebar when the sequencer fires it (polled ~5 Hz; the step rows' own

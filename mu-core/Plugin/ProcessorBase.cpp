@@ -809,6 +809,73 @@ juce::Array<juce::File> ProcessorBase::typedSlotPresetFiles(int slot) const
     return out;
 }
 
+mu_core::LayerTypeId ProcessorBase::layerPresetType(const juce::ValueTree& preset, const juce::String& extension) const
+{
+    auto found = mu_core::LayerTypeId::Empty;
+    int matches = 0;
+    for (int t = 0; t < layerTypes.size(); ++t)
+    {
+        const auto& info = layerTypes.at(t);
+        if (extension.isNotEmpty() && ! presetExtensionOf(info).equalsIgnoreCase(extension.trimCharactersAtStart("."))) continue;
+        if (juce::String(info.presetTag).isNotEmpty() && ! preset.hasType(info.presetTag)) continue;
+        if (info.typeFromPreset != nullptr && info.typeFromPreset(preset) != info.id) continue;
+        found = info.id;
+        ++matches;
+    }
+    return matches == 1 ? found : mu_core::LayerTypeId::Empty;
+}
+
+void ProcessorBase::saveTypedLayerPreset(int slot, const juce::String& name)
+{
+    const auto* info = layerTypes.find(slotTypeId(slot));
+    if (info == nullptr || juce::String(info->presetTag).isEmpty()) return;   // an Empty slot has nothing to save
+    const auto dir = presetDirOf(*info);
+    if (dir == juce::File()) return;
+    if (auto xml = captureLayerNode(slot, info->presetTag).createXml())
+        mu_pp::writeXmlAtomically(*xml, dir.getChildFile(mu_pp::safePresetFileName(name, info->name) + "." + presetExtensionOf(*info)),
+                                  onLoadError);
+}
+
+void ProcessorBase::loadTypedLayerPreset(int slot, const juce::File& file)
+{
+    if (getLayer(slot) == nullptr || ! file.existsAsFile()) return;
+    const auto xml = juce::XmlDocument::parse(file);
+    const auto tree = xml != nullptr ? juce::ValueTree::fromXml(*xml) : juce::ValueTree();
+    const auto type = tree.isValid() ? layerPresetType(tree, file.getFileExtension()) : mu_core::LayerTypeId::Empty;
+    const auto* fileInfo = layerTypes.find(type);
+    if (fileInfo == nullptr)
+    {
+        if (onLoadError) onLoadError("Could not read \"" + file.getFileName() + "\"");
+        return;
+    }
+
+    const auto slotType = slotTypeId(slot);
+    if (slotType == mu_core::LayerTypeId::Empty)
+    {
+        // An Empty slot takes the file's type, with the file's rows as the new layer's first state.
+        if (setLayerType(slot, type, &tree) && onLayerPresetCommitted)
+            onLayerPresetCommitted(slot);
+        return;
+    }
+    if (slotType != type)
+    {
+        // A type changes only through the chooser or the header menu, never as a side effect of a preset.
+        const auto* slotInfo = layerTypes.find(slotType);
+        if (onLoadError)
+            onLoadError("This is a " + juce::String(fileInfo->name) + " preset; this slot is a "
+                        + juce::String(slotInfo != nullptr ? slotInfo->name : "layer"));
+        return;
+    }
+    stageLayerPreset(slot, tree, false, false);
+}
+
+void ProcessorBase::applyStagedTypedLayer(int slot, const juce::ValueTree& tree)
+{
+    if (layerPresetType(tree) != slotTypeId(slot)) return;
+    applyLayerNode(slot, tree);
+    if (onLayerPresetCommitted) onLayerPresetCommitted(slot);
+}
+
 juce::File ProcessorBase::getDefaultPresetFile() const
 {
     return getPresetsDir().getChildFile("_default." + getFullPresetExtension());

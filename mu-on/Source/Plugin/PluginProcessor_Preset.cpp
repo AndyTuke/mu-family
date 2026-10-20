@@ -12,7 +12,6 @@ namespace mu_on
 
 namespace
 {
-    constexpr const char* kTrackPresetTag = "MuOnTrack";
 
     // The legacy five-lane colours: Kick red / Bass orange / Hat cyan / Snare magenta / Rumble lime, the
     // palette entries the lanes had, then the three unused slots.

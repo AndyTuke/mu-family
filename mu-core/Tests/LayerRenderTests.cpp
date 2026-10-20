@@ -1166,7 +1166,7 @@ struct LayerContractMiscTests : juce::UnitTest
         expectEquals(MixerEngine::MaxChannels, mu_limits::kMaxLayers);
 
         beginTest("LayerTypeId is saved by name and round-trips; an unknown name is Empty");
-        for (int i = 0; i <= (int) mu_core::LayerTypeId::Rumble; ++i)
+        for (int i = 0; i <= (int) mu_core::LayerTypeId::Test2; ++i)
         {
             const auto id = (mu_core::LayerTypeId) i;
             expect(mu_core::layerTypeFromName(mu_core::layerTypeName(id)) == id);

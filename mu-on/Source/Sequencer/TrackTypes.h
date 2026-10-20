@@ -33,7 +33,25 @@ inline std::unique_ptr<Layer> createTrack(int slot, mu_core::LayerTypeId type)
     auto t = std::make_unique<Track>();
     t->slot = slot;
     t->lockEngine(engineOfType(type));
+    // A new slot makes a sound at once: the engine's default groove (Rumble has none), as mu-On gives a new track.
+    // Set here, before any saved row or initial node is applied, and StepRow::deserialise rewrites every step, so a
+    // restore (an empty row included) is unaffected.
+    t->row.loadDefaultGroove(engineOfType(type));
     return t;
+}
+
+// The chooser card's line for an engine (one line, from the products' own doc wording).
+inline constexpr const char* trackDescriptor(EngineType e) noexcept
+{
+    switch (e)
+    {
+        case EngineType::Kick:   return "909 kick drum";
+        case EngineType::Bass:   return "Bass line";
+        case EngineType::Hat:    return "Hi-hat";
+        case EngineType::Snare:  return "Snare";
+        case EngineType::Rumble: return "Rumble tail from a kick";
+    }
+    return "";
 }
 
 // The five type descriptions over the one class.
@@ -47,6 +65,8 @@ inline mu_core::LayerTypeInfo makeTrackTypeInfo(EngineType engine) noexcept
     info.presetExtension = ".muTrack";
     info.contentFolderName = "muOn";   // the layer presets are mu-On's own, shared with it, not copied
     info.presetFolder = "Tracks";
+    info.presetTag = kTrackPresetTag;
+    info.descriptor = trackDescriptor(engine);
     info.typeFromPreset = &typeFromPreset;   // the five types share .muTrack: the engine a preset saved names its type
     info.addLayerParams = &addLayerParams;   // one table per prefix: every engine's rows exist on every track
     info.create = &createTrack;

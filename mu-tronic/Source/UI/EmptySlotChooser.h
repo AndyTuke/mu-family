@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Sequencer/LayerTypeRegistry.h"
 #include "UI/Components/MuLookAndFeel.h"
+#include "UI/Components/LayerDiscVisual.h"
 
 #include <functional>
 #include <memory>
@@ -12,8 +13,11 @@ namespace mu_tronic
 {
 
 // What an Empty slot shows in the main area (docs/mu-tronic/design-ui.md 4.3): one metal panel in the product colour
-// with a title ("Add a layer to slot 5") and a card for every layer type the build offers, grouped by product, each
-// with an Add button. Choosing a card calls onChoose with the type; the editor builds the layer and shows its panel.
+// with a title ("Add a layer to slot 5") and a card for every layer type the build offers. A product with one type
+// shares the first band with the other single-type products, its card named for the product; a product with several
+// types is a titled band of its own, its cards named for the types. A card is painted in its type's colour and holds
+// the type's disc picture in the slot's layer colour, a descriptor line and an Add button. Choosing a card calls
+// onChoose with the type; the editor builds the layer and shows its panel.
 // With nothing registered the panel says so. It only reads the registry: it names no layer type.
 class EmptySlotChooser : public juce::Component
 {
@@ -22,6 +26,8 @@ public:
 
     // The slot the title names (0-based; shown 1-based).
     void setSlot(int slot);
+    // The colour of the layer the slot would get: the cards' disc pictures wear it, as the sidebar's disc does.
+    void setSlotColour(juce::Colour c);
     int  getSlot() const noexcept { return slot; }
     // Re-reads the registry into cards (call after the registry changes).
     void rebuild();
@@ -37,16 +43,20 @@ private:
     struct Card
     {
         mu_core::LayerTypeId id = mu_core::LayerTypeId::Empty;
-        juce::String name, group;
-        juce::Rectangle<int> box;
+        int band = 0;   // index into bands
+        juce::String name, plate, descriptor;
+        juce::Colour colour;
+        juce::Rectangle<int> box, descriptorR;
+        std::unique_ptr<mu_core::LayerDiscVisual> disc;
         std::unique_ptr<juce::TextButton> add;
     };
 
     const mu_core::LayerTypeRegistry& types;
     int slot = 0;
+    juce::Colour slotColour;
     std::vector<Card> cards;
     // Per group (in registry order): its heading and its band.
-    struct Band { juce::String title; juce::Rectangle<int> area; };
+    struct Band { juce::String title; juce::Rectangle<int> area; bool grouped = false; };
     std::vector<Band> bands;
     juce::Rectangle<int> titleR, hintR;
 

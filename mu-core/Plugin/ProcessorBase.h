@@ -376,8 +376,10 @@ public:
     // the editor can refresh what APVTS attachments don't cover. The editor must clear it in its
     // destructor (the processor can outlive the editor).
     virtual juce::Array<juce::File> slotPresetFiles(int slot) const;   // default: every file in the per-slot dir
-    virtual void saveLayerPreset(int /*slot*/, const juce::String& /*name*/) {}
-    virtual void loadLayerPreset(int /*slot*/, const juce::File& /*file*/)   {}
+    // A typed slot host (layersAreSlots) saves and loads through the registry (saveTypedLayerPreset /
+    // loadTypedLayerPreset below); every other host does nothing here and the product overrides.
+    virtual void saveLayerPreset(int slot, const juce::String& name) { if (layersAreSlots()) saveTypedLayerPreset(slot, name); }
+    virtual void loadLayerPreset(int slot, const juce::File& file)   { if (layersAreSlots()) loadTypedLayerPreset(slot, file); }
 
     // The layer's state as the tree its layer-preset file holds (root tag included), without the file.
     // A clip is exactly this tree. Default: an invalid tree (the product has no clips).
@@ -771,6 +773,21 @@ protected:
     // A filled slot lists its own type's presets, an Empty one every offered type's, so any can be chosen. A type
     // sharing its extension with others (the five Track types) lists only the files its typeFromPreset maps to it.
     juce::Array<juce::File> typedSlotPresetFiles(int slot) const;
+    // The type a layer-preset tree holds, found in the registry: the types whose extension is `extension` (any, when
+    // empty) and whose presetTag is the tree's root tag (any, when the type names none), narrowed by typeFromPreset where
+    // the type has one. Empty unless exactly one type remains.
+    mu_core::LayerTypeId layerPresetType(const juce::ValueTree& preset, const juce::String& extension = {}) const;
+    // Layer presets of a typed slot host (message thread), one implementation for every type. Save writes the slot's
+    // rows (its live type's prefix) plus writeExtras, root tag LayerTypeInfo::presetTag, into the type's folder. Load
+    // parses the file and finds its type: a slot of that type stages it for its loop wrap (applyStagedTypedLayer);
+    // an Empty slot takes the file's type through setLayerType; a slot of another type refuses with onLoadError
+    // and changes nothing.
+    void saveTypedLayerPreset(int slot, const juce::String& name);
+    void loadTypedLayerPreset(int slot, const juce::File& file);
+    // The layerSwapper's layer applier for a typed slot host: applies a staged layer preset to the slot at its
+    // boundary, then tells the editor. Skips a tree whose type is no longer the slot's (a type change cancels
+    // the slot's stage, so this is only a guard).
+    void applyStagedTypedLayer(int slot, const juce::ValueTree& tree);
     // A Published-mode host's constructor, once layers[0..liveCount) are filled: stores the count and publishes the
     // first view of them. Nothing renders before this, and a TryLock host never calls it.
     void publishLayers(int liveCount);
@@ -928,7 +945,10 @@ protected:
     // `keepIdentity` is for products whose preset carries the layer's name and colour (mu-Clid).
     // Default: nothing. Callers use stageLayerPreset, never this directly.
     virtual void stageLayerPresetTree(int slot, juce::ValueTree tree, bool keepIdentity)
-    { juce::ignoreUnused(slot, tree, keepIdentity); }
+    {
+        juce::ignoreUnused(keepIdentity);
+        if (layersAreSlots() && tree.isValid()) layerSwapper.useSlot(slot, std::move(tree));   // typed slot host: lands on the slot's wrap
+    }
 
     // The one entry to the virtual above: a stage that is not a clip launch leaves no clip active.
     void stageLayerPreset(int slot, juce::ValueTree tree, bool keepIdentity, bool isClip)

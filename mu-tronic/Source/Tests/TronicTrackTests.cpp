@@ -117,6 +117,7 @@ struct MuTronicTrackTests : juce::UnitTest
         sameStreamAsMuOn();
         kickToBassSwap();
         presetFolders();
+        defaultGroove();
     }
 
     void layoutAndRegistry()
@@ -277,6 +278,13 @@ struct MuTronicTrackTests : juce::UnitTest
         expect(r.getLayerTypeId(0) == LayerTypeId::Kick);
         expect(trackIn(r, 0).engineSetting() == mu_on::EngineType::Kick && trackIn(r, 0).holdsEngine(mu_on::EngineType::Kick), "the type wins on restore");
         expectEquals((int) std::lround(getPlain(r.apvts, "t0_eng")), 0, "and the engine row is written back to match");
+        {
+            // The stray row did not leave a half-built engine behind: the restored Kick renders a block.
+            Player player(r, 256);
+            player.block();
+            expect(std::isfinite(player.buf.getMagnitude(0, 256)), "the restored slot renders a finite block");
+            expect(trackIn(r, 0).engineSetting() == mu_on::EngineType::Kick, "and is still a Kick afterwards");
+        }
         p.flushPendingAsyncUpdates();
         q.flushPendingAsyncUpdates();
         r.flushPendingAsyncUpdates();
@@ -364,6 +372,41 @@ struct MuTronicTrackTests : juce::UnitTest
         p.flushPendingAsyncUpdates();
         expectEquals(p.retireBin.countIn(mu_core::RetireBin::Parked) + p.retireBin.countIn(mu_core::RetireBin::Draining), 0, "the bin has drained");
         expectEquals(p.retireBin.reclaimPending(), 0, "the old Kick is freed");
+    }
+
+    // A fresh Track starts on its engine's groove so a new slot makes a sound at once; a restored row, empty or not,
+    // replaces it.
+    void defaultGroove()
+    {
+        beginTest("a fresh Track starts on its engine's default groove, and a restored empty row stays empty");
+        mu_seam_test::TempStorage storage;
+        TrackProcessor p;
+        auto stepsOf = [&](int slot)
+        {
+            juce::String on;
+            for (int s = 0; s < 16; ++s) on << (trackIn(p, slot).row.isOn(s) ? (trackIn(p, slot).row.isAccent(s) ? "A" : "x") : ".");
+            return on;
+        };
+        expect(p.setLayerType(0, LayerTypeId::Kick));
+        expect(p.setLayerType(1, LayerTypeId::Bass));
+        expect(p.setLayerType(2, LayerTypeId::Hat));
+        expect(p.setLayerType(3, LayerTypeId::Snare));
+        expectEquals(stepsOf(0), juce::String("A...x...x...x..."), "four on the floor, downbeat accented");
+        expectEquals(stepsOf(1), juce::String("..x...x...x...x."), "off-beat bass");
+        expectEquals(stepsOf(2), juce::String("x.x.x.x.x.x.x.x."), "straight eighths");
+        expectEquals(stepsOf(3), juce::String("....x.......x..."), "backbeat");
+
+        for (int s = 0; s < 16; ++s) { trackIn(p, 0).row.setOn(s, false); trackIn(p, 0).row.setAccent(s, false); }
+        juce::MemoryBlock block;
+        p.getStateInformation(block);
+        mu_seam_test::TempStorage storage2;
+        TrackProcessor q;
+        q.setStateInformation(block.getData(), (int) block.getSize());
+        bool any = false;
+        for (int s = 0; s < 16; ++s) any = any || trackIn(q, 0).row.isOn(s);
+        expect(! any, "the saved empty row is restored empty, not replaced by the groove");
+        p.flushPendingAsyncUpdates();
+        q.flushPendingAsyncUpdates();
     }
 
     // A Track type lists mu-On's own Tracks folder, only the presets whose saved engine is its own; a preset of another

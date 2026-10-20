@@ -6,7 +6,7 @@
 #if MU_TRONIC_WITH_UI
  #include "Plugin/ProcessorBase.h"
  #include "UI/TrackContent.h"                // mu-On's layer library: the content, its host interface
- #include "UI/TrackMiniVisual.h"
+ #include "UI/Components/LayerDiscVisual.h"   // mu-core: the disc picture
 #endif
 
 namespace mu_tronic
@@ -95,7 +95,7 @@ namespace
     std::unique_ptr<juce::Component> createTrackMiniVisual(ProcessorBase& host, int slot, std::function<void()>)
     {
         const auto colour = MuLookAndFeel::layerPalette[(size_t) (host.getLayerColourIndex(slot) % MuLookAndFeel::kLayerPaletteSize)];
-        return std::make_unique<mu_on::TrackMiniVisual>(colour, juce::String(mu_on::engineName(engineOfSlot(host, slot))).substring(0, 1));
+        return std::make_unique<mu_core::LayerDiscVisual>(colour, juce::String(mu_on::engineName(engineOfSlot(host, slot))).substring(0, 1));
     }
 }
 #endif

@@ -18,6 +18,9 @@
 namespace mu_on
 {
 
+// The root tag of a track-preset file (.muTrack), shared by mu-On's own presets and the slot hosts that load them.
+inline constexpr const char* kTrackPresetTag = "MuOnTrack";
+
 // The values are the saved `t{N}_eng` choice index, so they are fixed.
 enum class EngineType : int { Kick = 0, Bass, Hat, Snare, Rumble };
 inline constexpr int kNumEngineTypes = 5;
