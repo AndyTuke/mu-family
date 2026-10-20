@@ -115,9 +115,9 @@ void Arp::readParams(double modBeat) noexcept
     tv.xmod.ssbHz     = out[D_xmSsb];
     tv.filterType = (int) g(vpi::ft); tv.cutoff = out[D_cut]; tv.resonance = out[D_res]; tv.drive = out[D_drv]; tv.lowCutHz = g(vpi::locut);
 
-    tv.ampA = g(vpi::aeA); tv.ampD = g(vpi::aeD); tv.ampS = g(vpi::aeS); tv.ampR = g(vpi::aeR); tv.ampLevelDb = out[D_amp];
-    tv.fA = g(vpi::feA); tv.fD = g(vpi::feD); tv.fS = g(vpi::feS); tv.fR = g(vpi::feR); tv.filterEnvDepth = out[D_fenv];
-    tv.pA = g(vpi::peA); tv.pD = g(vpi::peD); tv.pS = g(vpi::peS); tv.pR = g(vpi::peR); tv.pitchEnvDepth = out[D_penv];
+    tv.ampA = out[D_aeA]; tv.ampD = out[D_aeD]; tv.ampS = out[D_aeS]; tv.ampR = out[D_aeR]; tv.ampLevelDb = out[D_amp];
+    tv.fA = out[D_feA]; tv.fD = out[D_feD]; tv.fS = out[D_feS]; tv.fR = out[D_feR]; tv.filterEnvDepth = out[D_fenv];
+    tv.pA = out[D_peA]; tv.pD = out[D_peD]; tv.pS = out[D_peS]; tv.pR = out[D_peR]; tv.pitchEnvDepth = out[D_penv];
     tv.pitchEnvTarget = (int) g(vpi::ptgt);
 
     tv.portamentoMs = out[D_porta];

@@ -53,6 +53,19 @@ inline constexpr ModDest kModDestTable[] = {
     { "amp.level",  "Amp Level",  "Amp", "aeL" },
     { "pitch.env",  "Pitch Env",  "Pitch", "peDep" },
     { "arp.accent", "Accent",     "Arp", "acc" },
+    // ── Envelope times and levels (as mu-Clid offers its envelopes; appended, so saved assignments stay valid) ──
+    { "amp.attack",   "Amp Attack",     "Amp",   "aeA" },
+    { "amp.decay",    "Amp Decay",      "Amp",   "aeD" },
+    { "amp.sustain",  "Amp Sustain",    "Amp",   "aeS" },
+    { "amp.release",  "Amp Release",    "Amp",   "aeR" },
+    { "fenv.attack",  "Filter Attack",  "Filter", "feA" },
+    { "fenv.decay",   "Filter Decay",   "Filter", "feD" },
+    { "fenv.sustain", "Filter Sustain", "Filter", "feS" },
+    { "fenv.release", "Filter Release", "Filter", "feR" },
+    { "penv.attack",  "Pitch Attack",   "Pitch", "peA" },
+    { "penv.decay",   "Pitch Decay",    "Pitch", "peD" },
+    { "penv.sustain", "Pitch Sustain",  "Pitch", "peS" },
+    { "penv.release", "Pitch Release",  "Pitch", "peR" },
 };
 
 // The out[] indices — MUST match kModDestTable order.
@@ -64,6 +77,7 @@ enum ModDestIndex
     D_cut, D_res, D_drv, D_fenv,
     D_amp, D_penv,
     D_acc,
+    D_aeA, D_aeD, D_aeS, D_aeR, D_feA, D_feD, D_feS, D_feR, D_peA, D_peD, D_peS, D_peR,
     kNumModDests
 };
 
