@@ -38,7 +38,9 @@ struct ChannelStateResetTests : juce::UnitTest
     {
         static const std::vector<juce::String> s { "lvl", "pan", "mute", "solo", "sendEff", "sendDly", "sendRev",
                                                    "scSrc", "scAmt", "scAtk", "scRel", "outBus" };
-        return s;
+        // A build with group buses also declares ch{n}_bus, the bus the strip feeds.
+        static const std::vector<juce::String> withBus = [] { auto v = s; v.push_back("bus"); return v; }();
+        return mu_limits::kMaxBuses > 0 ? withBus : s;
     }
 
     // Compares one channel's reset ChannelState against the APVTS default of every ch{n}_ parameter.
@@ -71,7 +73,7 @@ struct ChannelStateResetTests : juce::UnitTest
             st.level = 0.3f; st.pan = 0.7f; st.sendEffect = 0.4f; st.sendDelay = 0.5f; st.sendReverb = 0.6f;
             st.panMod = 0.1f; st.sendEffectMod = 0.2f; st.sendDelayMod = 0.3f; st.sendReverbMod = 0.4f;
             st.mute = true; st.solo = true; st.sidechainSource = 3; st.sidechainAmount = 0.9f;
-            st.sidechainAttackMs = 77.0f; st.sidechainReleaseMs = 777.0f; st.outputBus = 5;
+            st.sidechainAttackMs = 77.0f; st.sidechainReleaseMs = 777.0f; st.outputBus = 5; st.busAssign = 2;
             st.reset();
 
             const auto ctx = label + " ch" + juce::String(c);
@@ -88,6 +90,10 @@ struct ChannelStateResetTests : juce::UnitTest
             expectWithinAbsoluteError(st.sidechainAttackMs.load(),  def(c, "scAtk"), 1.0e-3f, ctx + " sidechainAttackMs");
             expectWithinAbsoluteError(st.sidechainReleaseMs.load(), def(c, "scRel"), 1.0e-3f, ctx + " sidechainReleaseMs");
             expectEquals(st.outputBus.load(), juce::roundToInt(def(c, "outBus")),       ctx + " outputBus");
+            if (mu_limits::kMaxBuses > 0)
+                expectEquals(st.busAssign.load(), juce::roundToInt(def(c, "bus")),      ctx + " busAssign");
+            else
+                expectEquals(st.busAssign.load(), 0,                                     ctx + " busAssign (no buses)");
             for (auto* m : { &st.panMod, &st.sendEffectMod, &st.sendDelayMod, &st.sendReverbMod })
                 expect(std::isnan(m->load()), ctx + " a modulated value was not cleared");
         }

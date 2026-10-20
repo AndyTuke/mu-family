@@ -44,6 +44,11 @@ public:
     DropdownSelect& getAlgorithmSelect(int slot)  { return slots[(size_t) slot].algo; }
     KnobWithLabel&  getKnob(int slot, int param)  { return slots[(size_t) slot].knobs[(size_t) param]; }
 
+    // How many of the boxes show (1..kSlots, default kSlots): a group bus with fewer inserts than the Master
+    // hides the rest. A hidden box takes no input from the setters.
+    void setNumSlots(int n);
+    int  getNumSlots() const noexcept { return numSlots; }
+
     // Height of the two boxes with their plates, at the current display size.
     static int preferredHeight();
 
@@ -75,5 +80,6 @@ private:
     juce::Rectangle<int> boxBounds(int slot) const;
 
     std::array<Slot, kSlots> slots;
+    int numSlots = kSlots;
 };
 } // namespace mu_ui

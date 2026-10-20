@@ -107,7 +107,8 @@ struct MixerPagingTests : juce::UnitTest
             auto box = std::make_unique<PagedHost>(4); auto& p = *box;
             MixerOverlay mixer(p, p.mixerEngine);
             mixer.setBounds(0, 0, 1088, 800);
-            expectEquals(mixer.getNumPages(), 1);
+            expectEquals(mixer.getNumChannelPages(), 1);
+            expectEquals(mixer.getNumPages(), 1 + (mu_limits::kMaxBuses > 0 ? 1 : 0), "the Buses page follows the channel pages where there are buses");
             expect(! mixer.showAdjacentPage(1));
             expectEquals(mixer.getShownPage(), 0);
         }
@@ -122,14 +123,23 @@ struct MixerPagingTests : juce::UnitTest
         auto box = std::make_unique<PagedHost>(mu_limits::kMaxLayers); auto& p = *box;
         MixerOverlay mixer(p, p.mixerEngine);
         mixer.setBounds(0, 0, 1088, 800);
-        expectEquals(mixer.getNumPages(), kPages);
+        const int busPages = mu_limits::kMaxBuses > 0 ? 1 : 0;
+        expectEquals(mixer.getNumChannelPages(), kPages);
+        expectEquals(mixer.getNumPages(), kPages + busPages);
         expect(! mixer.showAdjacentPage(-1));
         expect(mixer.showAdjacentPage(1));
         expectEquals(mixer.getShownPage(), 1);
         mixer.showPage(kPages - 1);
-        expect(! mixer.showAdjacentPage(1));
+        expect(! mixer.showAdjacentPage(1), "PageDown stops at the last channel page: the Buses page is reached by click");
         mixer.showPage(77);
-        expectEquals(mixer.getShownPage(), kPages - 1);
+        expectEquals(mixer.getShownPage(), kPages + busPages - 1);
+        if (busPages > 0)
+        {
+            expect(mixer.isBusPage(mixer.getShownPage()), "the last page is the Buses page");
+            expect(! mixer.showAdjacentPage(-1), "no paging off the Buses page");
+            mixer.showPage(0);
+            expect(! mixer.isBusPage(mixer.getShownPage()));
+        }
 
         beginTest("the mixer opens on the page the host names");
         int sidebarPage = 1;
@@ -145,3 +155,58 @@ struct MixerPagingTests : juce::UnitTest
     }
 };
 static MixerPagingTests sMixerPagingTests;
+
+// The Buses page (design-ui.md 5.4): with group buses the mixer's last page replaces the channel strips and the
+// returns with one unit per bus (strip + insert column) and keeps the Master where it was.
+struct MixerBusPageTests : juce::UnitTest
+{
+    MixerBusPageTests() : juce::UnitTest("MixerOverlay Buses page: one strip and insert column per bus, the Master stays", "mu-core") {}
+
+    static int visibleStrips(MixerOverlay& mixer, std::vector<juce::Rectangle<int>>* bounds = nullptr)
+    {
+        int n = 0;
+        for (auto* c : mixer.getChildren())
+            if (dynamic_cast<MixerChannel*>(c) != nullptr && c->isVisible())
+            {
+                ++n;
+                if (bounds != nullptr) bounds->push_back(c->getBounds());
+            }
+        return n;
+    }
+
+    void runTest() override
+    {
+        if (mu_limits::kMaxBuses == 0)
+        {
+            beginTest("(the Buses page exists in a build with group buses)");
+            MixerOverlay* none = nullptr;
+            expect(none == nullptr);
+            return;
+        }
+
+        beginTest("the Buses page shows the bus strips and the Master; the channel pages show the channels, returns and Master");
+        auto box = std::make_unique<PagedHost>(4); auto& p = *box;
+        MixerOverlay mixer(p, p.mixerEngine);
+        mixer.setBounds(0, 0, 1088, 800);
+
+        expectEquals(visibleStrips(mixer), kPerPage + 3 + 1, "channel page: a page of channel strips, 3 returns, the Master");
+        mixer.showPage(mixer.getNumPages() - 1);
+        expect(mixer.isBusPage(mixer.getShownPage()));
+        std::vector<juce::Rectangle<int>> bounds;
+        expectEquals(visibleStrips(mixer, &bounds), mu_limits::kMaxBuses + 1, "Buses page: one strip per bus and the Master");
+
+        // Nothing overlaps and everything lies inside the overlay; the strips are at least a channel strip wide.
+        for (size_t i = 0; i < bounds.size(); ++i)
+        {
+            expect(mixer.getLocalBounds().contains(bounds[i]), "strip " + juce::String((int) i) + " inside the overlay");
+            for (size_t j = i + 1; j < bounds.size(); ++j)
+                expect(! bounds[i].intersects(bounds[j]), "strips " + juce::String((int) i) + " and " + juce::String((int) j) + " do not overlap");
+        }
+        for (size_t i = 0; i + 1 < bounds.size(); ++i)
+            expect(bounds[i].getWidth() >= MuLookAndFeel::kMixerChanW, "a bus strip is at least a channel strip wide");
+
+        mixer.showPage(0);
+        expectEquals(visibleStrips(mixer), kPerPage + 3 + 1, "back on a channel page");
+    }
+};
+static MixerBusPageTests sMixerBusPageTests;

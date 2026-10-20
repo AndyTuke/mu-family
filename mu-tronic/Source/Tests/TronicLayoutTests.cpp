@@ -91,10 +91,10 @@ struct MuTronicLayoutTests : juce::UnitTest
             mu_tronic::PluginProcessor p;
             auto* sc = dynamic_cast<juce::AudioParameterInt*>(p.apvts.getParameter("ch0_scSrc"));
             expect(sc != nullptr);
-            if (sc != nullptr) expectEquals(sc->getNormalisableRange().end, (float) (mu_limits::kMaxLayers + 1), "0 off, 1..16 slots, 17 external");
+            if (sc != nullptr) expectEquals(sc->getNormalisableRange().end, (float) (mu_limits::kMaxLayers + 1 + mu_limits::kMaxBuses), "0 off, 1..16 slots, 17 external, 18.. the buses");
             auto* ret = dynamic_cast<juce::AudioParameterInt*>(p.apvts.getParameter("ret_eff_scSrc"));
             expect(ret != nullptr);
-            if (ret != nullptr) expectEquals(ret->getNormalisableRange().end, (float) (mu_limits::kMaxLayers + 1));
+            if (ret != nullptr) expectEquals(ret->getNormalisableRange().end, (float) (mu_limits::kMaxLayers + 1 + mu_limits::kMaxBuses));
         }
 
         beginTest("cost check: a 16-slot layout of the finished product's size builds well inside the budget");

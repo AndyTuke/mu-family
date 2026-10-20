@@ -42,11 +42,15 @@ target_include_directories(mu-tronic
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
 )
 
-# 16 layer slots: MU_MAX_LAYERS is a per-target capacity (mu-core is an INTERFACE library, so each binary
-# compiles its own copy); the four other products keep 8. Freeware: no licence code, no monocypher.
+# 16 layer slots and 3 group buses with 2 inserts each: MU_MAX_LAYERS / MU_MAX_BUSES / MU_BUS_INSERTS are
+# per-target capacities (mu-core is an INTERFACE library, so each binary compiles its own copy); the four
+# other products keep 8 layers and no buses. Freeware: no licence code, no monocypher.
 target_compile_definitions(mu-tronic
     PUBLIC
         MU_MAX_LAYERS=16
+        MU_MAX_BUSES=3
+        MU_BUS_INSERTS=2
+        MU_EXT_SIDECHAIN=0
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
@@ -133,6 +137,6 @@ target_link_libraries(mu-tronic-tests PRIVATE
     juce::juce_recommended_warning_flags
 )
 
-target_compile_definitions(mu-tronic-tests PRIVATE MU_MAX_LAYERS=16 JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+target_compile_definitions(mu-tronic-tests PRIVATE MU_MAX_LAYERS=16 MU_MAX_BUSES=3 MU_BUS_INSERTS=2 JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
 
 add_dependencies(mu-tronic mu-tronic-tests)

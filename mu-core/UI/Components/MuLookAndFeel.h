@@ -1,6 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "MuTheme.h"
+#include "MuLimits.h"   // mu_limits::kMaxBuses: the mixer's Buses page
 #include <cmath>
 #include <vector>
 
@@ -492,6 +493,17 @@ public:
     static constexpr int kMixerChanW       = (kMixerOverlayW - kMixerLabelPanelW
                                               - 2 * kMixerDivW - kMixerMasterTotalW
                                               - (8 - 1) * kMixerChanGap) / kMixerNumChans;    // 73
+
+    // The mixer's Buses page (a product with group buses): one unit per bus, a channel-style strip with its
+    // insert column beside it, a divider after each unit, then the Master. The strip width is whatever the
+    // page leaves after the units' insert columns; it must stay at least one channel strip wide, which holds
+    // for three buses (138) and not for four, by design: a fourth needs a layout ruling, not squeezed strips.
+    static constexpr int kMixerNumBuses    = mu_limits::kMaxBuses;
+    static constexpr int kMixerBusStripW   = kMixerNumBuses > 0
+        ? (kMixerOverlayW - kMixerLabelPanelW - kMixerMasterTotalW - kMixerNumBuses * kMixerDivW) / kMixerNumBuses - kMixerInsertPanelW
+        : 0;
+    static_assert(kMixerNumBuses == 0 || kMixerBusStripW >= kMixerChanW,
+                  "the Buses page cannot fit this many buses at the strip width: it needs a layout ruling");
 
     // ── Canonical knob sizes ──────────────────────────────────────────────
     // Four buckets — every knob in the plugin picks one.

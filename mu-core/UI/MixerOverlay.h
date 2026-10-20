@@ -15,7 +15,8 @@
 #include <array>
 
 // Full mixer view: rhythm channel strips | Effect/Delay/Reverb returns | Master
-// + three FX rows (Effect, Delay, Reverb) below the strips.
+// + three FX rows (Effect, Delay, Reverb) below the strips. A product with group buses
+// (mu_limits::kMaxBuses > 0) adds a last "Buses" page: one unit per bus (strip + insert column) and the Master.
 // Replaces the RhythmPanel in the editor when the mixer button is toggled.
 class MixerOverlay : public juce::Component,
                      public juce::AudioProcessorValueTreeState::Listener,
@@ -43,15 +44,17 @@ public:
     // Rebuild channel strips to match the current rhythm count.
     void refresh();
 
-    // ── Pages (a host with more layers than mu_limits::kLayersPerPage) ───────────────────────────────
-    // The strips of one page are shown at a time, the returns and the master always. The page selector sits in
-    // the header strip beside the meter mode; one page (every product but mu-Tronic) shows none. The mixer's page
-    // is independent of the sidebar's once open; `pageOnOpen` (optional) names the page to show each time the mixer
-    // opens (the sidebar's).
-    int  getNumPages() const noexcept;
+    // ── Pages (a host with more layers than mu_limits::kLayersPerPage, or with group buses) ──────────
+    // The strips of one page are shown at a time, the returns and the master on every channel page. The page
+    // selector sits in the header strip beside the meter mode; one page (every product but mu-Tronic) shows none.
+    // The channel pages come first, then (with buses) the Buses page. The mixer's page is independent of the
+    // sidebar's once open; `pageOnOpen` (optional) names the sidebar's page to show each time the mixer opens.
+    int  getNumPages() const noexcept;           // channel pages, plus the Buses page where there are buses
+    int  getNumChannelPages() const noexcept;    // pages of channel strips only
+    bool isBusPage(int page) const noexcept { return mu_limits::kMaxBuses > 0 && page == getNumChannelPages(); }
     int  getShownPage() const noexcept { return shownPage; }
     void showPage(int page);
-    bool showAdjacentPage(int delta);   // PageUp / PageDown: no wrap; false when there is nowhere to go
+    bool showAdjacentPage(int delta);   // PageUp / PageDown among the channel pages: no wrap; false when there is nowhere to go
     std::function<int()> pageOnOpen;
 
     // Reload all FX-row and mixer-channel UI from current APVTS values.
@@ -67,6 +70,11 @@ private:
     MixerEngine&     mixer;
 
     std::vector<std::unique_ptr<MixerChannel>> rhythmChannels;
+
+    // The Buses page: one strip and one insert column per bus (empty where a product has no buses).
+    std::vector<std::unique_ptr<MixerChannel>>               busStrips;
+    std::vector<std::unique_ptr<mu_ui::MasterInsertPanel>>   busInsertPanels;
+    std::vector<std::unique_ptr<mu_ui::BusInsertBinding>>    busInsertBindings;
 
     MixerChannel effectReturn  { MixerChannel::Type::EffectReturn, "Effect",  juce::Colour(0xffD85A30) };
     MixerChannel delayReturn   { MixerChannel::Type::DelayReturn,  "Delay",   juce::Colour(0xffD85A30) };
@@ -90,8 +98,7 @@ private:
 
     // Cached layout values updated each resized() call — read by paint().
     int lastChanW   = 64;
-    int lastDivX1   = 0;
-    int lastDivX2   = 0;
+    std::vector<int> dividerXs;   // x of each vertical divider on the shown page
     int lastFXAreaH = 278;
     int lastFXRowH  = 82;
     int lastStripH  = 400;
@@ -112,6 +119,8 @@ private:
     void propagateMeterMode(VUMeter::MeterMode m);
 
     void buildChannels();
+    void buildBuses();
+    MixerChannel* referenceStrip() const;   // the first strip of the shown page: its section bounds align the row labels
     void wireReturns();
     void wireFXRows();
     void updateEffectSendLabels();

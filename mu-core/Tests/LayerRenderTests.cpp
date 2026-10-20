@@ -1159,8 +1159,8 @@ struct LayerContractMiscTests : juce::UnitTest
                    + ", Layer " + juce::String((int) sizeof (Layer))
                    + " (information)");
         expectEquals(mu_limits::kMaxLayers, MU_MAX_LAYERS);
-        expectEquals(mu_limits::kMaxBuses, 0);
-        expectEquals(mu_limits::kBusInserts, 2);
+        expectEquals(mu_limits::kMaxBuses, MU_MAX_BUSES);
+        expectEquals(mu_limits::kBusInserts, MU_BUS_INSERTS);
         expectEquals(mu_limits::kLayersPerPage, 8);
         expectEquals(mu_limits::kRetireDepth, 4);
         expectEquals(MixerEngine::MaxChannels, mu_limits::kMaxLayers);

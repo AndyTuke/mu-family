@@ -57,10 +57,15 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
 
     if (hasOutputBus())
     {
-        // descriptive labels — "Main" + "Out 1" … "Out 8".
-        outBusBox.addItem("Main", 1);              // 0 -> Master
-        for (int i = 1; i <= 8; ++i)
-            outBusBox.addItem("Out " + juce::String(i), i + 1);
+        // Item id = value + 1: 0 -> Main. A product with group buses lists them ("Bus 1" ...); the others keep
+        // the DAW direct outs ("Out 1" ... "Out 8").
+        outBusBox.addItem("Main", 1);
+        if (mu_limits::kMaxBuses > 0)
+            for (int i = 0; i < mu_limits::kMaxBuses; ++i)
+                outBusBox.addItem(busName(i), i + 2);
+        else
+            for (int i = 1; i <= 8; ++i)
+                outBusBox.addItem("Out " + juce::String(i), i + 1);
         outBusBox.setSelectedId(1, juce::dontSendNotification);
         addAndMakeVisible(outBusBox);
     }
@@ -187,7 +192,7 @@ int MixerChannel::layoutSends(int stripW, int sendY)
     const int faderY = sendY + spH;
 
     // A return channel cannot send to itself (would create a feedback loop).
-    sendEffect.setVisible(hasSends() && channelType == Type::Channel);
+    sendEffect.setVisible(hasSends() && (channelType == Type::Channel || channelType == Type::Bus));
     sendDelay .setVisible(hasSends() && channelType != Type::DelayReturn
                                      && channelType != Type::ReverbReturn);
     sendReverb.setVisible(hasSends() && channelType != Type::ReverbReturn);
@@ -203,7 +208,7 @@ int MixerChannel::layoutSends(int stripW, int sendY)
 
     // Sends pane: from first visible send to end of pan.
     {
-        const int firstOff = (channelType == Type::Channel)      ? 0
+        const int firstOff = (channelType == Type::Channel || channelType == Type::Bus) ? 0
                            : (channelType == Type::EffectReturn) ? sendH
                            : (channelType == Type::DelayReturn)  ? sendH * 2
                            : sendH * 3;  // ReverbReturn / Master: pan only

@@ -364,11 +364,29 @@ bool ProcessorBase::isFxParamId(const juce::String& id)
     return id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id);
 }
 
+namespace
+{
+// For an id of the form ch{N}_{suffix} (N one or two digits), writes N to `index` and returns a pointer to the
+// suffix inside the id's own buffer; otherwise returns nullptr. Allocation-free (audio-thread automation path).
+const char* channelStripSuffix(const juce::String& id, int& index) noexcept
+{
+    const char* s = id.toRawUTF8();
+    if (s[0] != 'c' || s[1] != 'h' || s[2] < '0' || s[2] > '9') return nullptr;
+    int n = s[2] - '0';
+    const char* p = s + 3;
+    if (*p >= '0' && *p <= '9') { n = n * 10 + (*p - '0'); ++p; }
+    if (*p != '_' || p[1] == '\0') return nullptr;
+    index = n;
+    return p + 1;
+}
+}
+
 void ProcessorBase::onFxParamChanged(const juce::String& id, float v)
 {
     syncGlobalFxParam(id, v);
-    // ch{0-7}_mute: a flag for the message-thread poll (the lamps follow a mute made anywhere); alloc-free.
-    if (id.length() == 8 && id[0] == 'c' && id[1] == 'h' && id[3] == '_' && std::strcmp(id.toRawUTF8() + 4, "mute") == 0)
+    // ch{N}_mute: a flag for the message-thread poll (the lamps follow a mute made anywhere); alloc-free.
+    int stripIdx = -1;
+    if (const char* suffix = channelStripSuffix(id, stripIdx); suffix != nullptr && std::strcmp(suffix, "mute") == 0)
         muteChanged.store(true, std::memory_order_relaxed);
 }
 
@@ -465,13 +483,20 @@ void ProcessorBase::syncGlobalFxParam(const juce::String& id, float v)
 {
     // Prefix router → per-family helper. Keeps each automation tick a single
     // prefix test plus one bounded if/else inside the matching helper.
-    if (id.length() >= 6 && id[0] == 'c' && id[1] == 'h' && id[3] == '_')   // ch{0-7}_{param}
+    int stripIdx = -1;
+    if (const char* suffix = channelStripSuffix(id, stripIdx); suffix != nullptr)   // ch{N}_{param}
     {
-        const int i = id[2] - '0';
-        if (i >= 0 && i < MixerEngine::MaxChannels)
-            syncChannelStripParam(i, id.toRawUTF8() + 4, v);   // suffix into id buffer, no alloc
+        if (stripIdx < MixerEngine::MaxChannels)
+            syncChannelStripParam(stripIdx, suffix, v);   // suffix into id buffer, no alloc
         return;
     }
+
+    if constexpr (MixerEngine::kNumBuses > 0)
+        if (id.startsWith("bus"))                                           // bus{B}_{param}, bus{B}_i{I}_{param}
+        {
+            syncBusParam(id, v);
+            return;
+        }
 
     if (id.startsWith("ret_"))                                              // ret_{eff|dly|rev}_{param}
     {
@@ -508,6 +533,47 @@ void ProcessorBase::syncChannelStripParam(int channel, const char* param, float 
     else if (is("scAtk"))   ch.sidechainAttackMs.store(v, std::memory_order_relaxed);
     else if (is("scRel"))   ch.sidechainReleaseMs.store(v, std::memory_order_relaxed);
     else if (is("outBus"))  ch.outputBus.store(juce::jlimit(0, 8, juce::roundToInt(v)), std::memory_order_relaxed);
+    else if (is("bus"))     ch.busAssign.store(juce::jlimit(0, MixerEngine::kNumBuses, juce::roundToInt(v)), std::memory_order_relaxed);
+}
+
+// bus{B}_{suffix}: the strip's own suffixes, or i{I}_{drvChar|insP1..4} for an insert. Pointer arithmetic on the
+// id's buffer only, so the automation path allocates nothing.
+void ProcessorBase::syncBusParam(const juce::String& id, float v)
+{
+    const char* s = id.toRawUTF8();
+    if (s[3] < '0' || s[3] > '9') return;
+    const int b = s[3] - '0';
+    if (b >= MixerEngine::kNumBuses || s[4] != '_') return;
+    const char* rest = s + 5;
+    auto& bus = mixerEngine.buses[(size_t) b];
+
+    if (rest[0] == 'i' && rest[1] >= '0' && rest[1] <= '9' && rest[2] == '_')   // i{I}_{param}
+    {
+        const int i = rest[1] - '0';
+        if (i >= MixerEngine::kBusInserts) return;
+        auto& ins = bus.insert[i];
+        const char* param = rest + 3;
+        auto is = [param](const char* t) { return std::strcmp(param, t) == 0; };
+        if      (is("drvChar")) ins.insertAlgo.store(juce::jlimit(0, mu_audio::kInsertAlgorithmCount - 1, juce::roundToInt(v)), std::memory_order_relaxed);
+        else if (is("insP1"))   ins.insertParam[0].store(v, std::memory_order_relaxed);
+        else if (is("insP2"))   ins.insertParam[1].store(v, std::memory_order_relaxed);
+        else if (is("insP3"))   ins.insertParam[2].store(v, std::memory_order_relaxed);
+        else if (is("insP4"))   ins.insertParam[3].store(v, std::memory_order_relaxed);
+        return;
+    }
+
+    auto is = [rest](const char* t) { return std::strcmp(rest, t) == 0; };
+    if      (is("lvl"))     bus.level.store(v, std::memory_order_relaxed);
+    else if (is("pan"))     bus.pan.store(v, std::memory_order_relaxed);
+    else if (is("mute"))    bus.mute.store(v > 0.5f, std::memory_order_relaxed);
+    else if (is("solo"))    bus.solo.store(v > 0.5f, std::memory_order_relaxed);
+    else if (is("sendEff")) bus.sendEffect.store(v, std::memory_order_relaxed);
+    else if (is("sendDly")) bus.sendDelay.store(v, std::memory_order_relaxed);
+    else if (is("sendRev")) bus.sendReverb.store(v, std::memory_order_relaxed);
+    else if (is("scSrc"))   bus.sidechainSource.store(juce::jlimit(0, mu_mixfx::kScSrcMax, juce::roundToInt(v)) - 1, std::memory_order_relaxed);
+    else if (is("scAmt"))   bus.sidechainAmount.store(v, std::memory_order_relaxed);
+    else if (is("scAtk"))   bus.sidechainAttackMs.store(v, std::memory_order_relaxed);
+    else if (is("scRel"))   bus.sidechainReleaseMs.store(v, std::memory_order_relaxed);
 }
 
 void ProcessorBase::syncReturnStripParam(int retIndex, const char* rest, float v)
@@ -518,7 +584,7 @@ void ProcessorBase::syncReturnStripParam(int retIndex, const char* rest, float v
     else if (is("pan"))   ret.pan.store(v, std::memory_order_relaxed);
     else if (is("mute"))  ret.mute.store(v > 0.5f, std::memory_order_relaxed);
     else if (is("solo"))  ret.solo.store(v > 0.5f, std::memory_order_relaxed);
-    else if (is("scSrc")) ret.sidechainSource.store(juce::jlimit(0, mu_limits::kMaxLayers + 1, (int) v) - 1, std::memory_order_relaxed);
+    else if (is("scSrc")) ret.sidechainSource.store(juce::jlimit(0, mu_mixfx::kScSrcMax, (int) v) - 1, std::memory_order_relaxed);
     else if (is("scAmt")) ret.sidechainAmount.store(juce::jlimit(0.0f, 1.0f, v), std::memory_order_relaxed);
     else if (is("scAtk")) ret.sidechainAttackMs.store(v, std::memory_order_relaxed);
     else if (is("scRel")) ret.sidechainReleaseMs.store(v, std::memory_order_relaxed);
@@ -825,7 +891,7 @@ void ProcessorBase::remapSidechainSources(const std::function<int(int)>& remap)
         if (auto* p = apvts.getParameter(id))
         {
             const int v  = juce::roundToInt(p->convertFrom0to1(p->getValue()));
-            const int nv = juce::jlimit(0, mu_limits::kMaxLayers + 1, remap(v));   // 0 off, 1..kMaxLayers a channel, then external
+            const int nv = juce::jlimit(0, mu_mixfx::kScSrcMax, remap(v));   // 0 off, 1..kMaxLayers a channel, then external, then the buses
             if (nv != v) p->setValueNotifyingHost(p->convertTo0to1((float) nv));
         }
     };
@@ -833,6 +899,8 @@ void ProcessorBase::remapSidechainSources(const std::function<int(int)>& remap)
         remapOne("ch" + juce::String(c) + "_scSrc");
     for (const char* ret : { "ret_eff_scSrc", "ret_dly_scSrc", "ret_rev_scSrc" })
         remapOne(ret);
+    for (int b = 0; b < mu_limits::kMaxBuses; ++b)
+        remapOne("bus" + juce::String(b) + "_scSrc");
 }
 
 juce::ValueTree ProcessorBase::captureComposedState()

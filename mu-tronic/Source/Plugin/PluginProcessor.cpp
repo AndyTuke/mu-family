@@ -17,6 +17,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         mu_mixfx::addChannelStripParams(layout, c, n);
     }
 
+    // ── The group buses (mu_limits::kMaxBuses, defined for this target): bus{B}_ strips and their inserts.
+    mu_mixfx::addBusParams(layout);
+
     // A layer type's own rows join here, per slot, when the type is registered (its addLayerParams).
 
     // ── Shared global FX rack + returns + master (mu-core) ────────────────────

@@ -178,13 +178,13 @@ Eight channel strips, a divider, the three return strips, a divider, Master plus
 
 ### 5.3 Assigning a channel to a bus (the control)
 
-The strip's existing **Output selector** (`outBusBox`, `kOutBusH` 18, the LCD dropdown at the strip foot, channel strips only) is the control. It is extended, not duplicated: items **Main**, **Bus 1**, **Bus 2**, **Bus 3** (no Out items: Standalone only). Default Main. The label is "Output" in its tooltip and status text: `Output` / `Bus 2`. A channel routed to a bus shows the bus name lit in the LCD; Main shows the dimmer Main text, so a quick scan of a page shows what is grouped. A return strip has no selector (returns go to Main). Sends to the FX returns are unaffected by the assignment (what the channel sends to the returns is independent of its output; the signal path is the dsp-controller's and the architecture-steward's to confirm, the UI only shows the choices). **No bus-to-bus routing in version 1.**
+The strip's existing **Output selector** (`outBusBox`, `kOutBusH` 18, the LCD dropdown at the strip foot, channel strips only) is the control. It is extended, not duplicated: items **Main**, **Bus 1**, **Bus 2**, **Bus 3** (no Out items: Standalone only). Default Main. The label is **"Out"** in its tooltip and status text (`Out` / `Bus 2`; ruled 2026-10-20: "Out" is the family word for a strip's destination, as design.md section 1.2 renames the direct out, so "Output" is not used). A channel routed to a bus shows the bus name lit in the LCD; Main shows the dimmer Main text, so a quick scan of a page shows what is grouped. A return strip has no selector (returns go to Main). Sends to the FX returns are unaffected by the assignment (what the channel sends to the returns is independent of its output; the signal path is the dsp-controller's and the architecture-steward's to confirm, the UI only shows the choices). **No bus-to-bus routing in version 1.**
 
 ### 5.4 The Buses page (re-ruled: three buses, two inserts each)
 
 Three **bus units** and the Master. A bus unit is built exactly like the Master's unit: **a channel strip plus the existing `MasterInsertPanel` beside it** (Master strip 80 + insert panel 136 = 216 today), so a bus has **two inserts, "Insert 1" and "Insert 2"**, in the family's own two-box insert column, with no new insert widget and no extraction from `MasterInsertPanel` (the earlier plan of one extracted `InsertBox` per bus is withdrawn). The insert panel is reused as is; each bus gets its own binding, a bus counterpart of `MasterInsertBinding` (architecture-steward: parameter ids per bus). A new strip type `MixerChannel::Type::Bus` shares the name pill, sidechain section, fader group, VU, dB readout and mute / solo with the other types.
 
-**The returns are not shown on this page.** A bus has no sends, so the return strips (225 px) have nothing to do here, and without them the width works out exactly. Returns stay on both channel pages; the FX rack below is unchanged on every page.
+**The returns are not shown on this page.** The bus strip carries its own three send knobs (table below), and the return strips (225 px) take no part in a bus unit, and without them the width works out exactly. Returns stay on both channel pages; the FX rack below is unchanged on every page.
 
 **Width (Medium, from existing tokens).** One divider between each pair of units and one before the Master (3 dividers of `kMixerDivW` 4):
 
@@ -193,17 +193,17 @@ Three **bus units** and the Master. A bus unit is built exactly like the Master'
 
 Check: 38 + 3 x (138 + 136) + 3 x 4 + 216 = 38 + 822 + 12 + 216 = **1088**. Nothing is spare. Master and its insert panel stay at the same x as on the channel pages. At Large everything scales together.
 
-**Vertical budget.** Identical to the channel strip: the strip is the channel strip's layout with the Master's rule for the sends slot (pan only, bottom row), and the insert panel is the Master's, which already fits the strip area (`kMixerStripH` 531 Medium, 491 worst case). So the budget needs no recomputation: the fader keeps the height it has on the Master strip (and on a channel with its sends). The second insert costs the height the Master already pays; the missing fourth bus gave the width.
+**Vertical budget.** Identical to the channel strip: the strip is exactly the channel strip's layout (sends and pan as a channel, Output selector slot hidden), and the insert panel is the Master's, which already fits the strip area (`kMixerStripH` 531 Medium, 491 worst case). So the budget needs no recomputation: the fader keeps the height it has on the Master strip (and on a channel with its sends). The second insert costs the height the Master already pays; the missing fourth bus gave the width.
 
 | Part (top to bottom) | Spec |
 |---|---|
 | Name pill | "Bus 1" to "Bus 3", plain pill (no layer-colour outline: buses, like returns, have no layer). Fixed names in version 1 |
-| Sidechain | **the channel strip's section, unchanged** (`kSidechainH` 112): source selector across the strip, Amount, Attack, Release centred. Same wording and ranges. Sources: `-` and the layers by `"<slot> <name>"`. **Buses are not sources in version 1** (question 2) |
-| **Feeds panel** (replaces the three vacated send rows, 3 x `kSendKnobH`) | An LCD box with an engraved "Feeds" plate listing the layers assigned to the bus, one per line as `"<slot> <name>"` (`lcdFont(kLcdTextH)`, line pitch `kClientNameH` 18), as many lines as fit then `+n more`; `none` in ghost lettering when empty; the tooltip lists all. Replaces hunting across pages. It sits in the sends slot so pan stays on the Master's row and the page aligns |
+| Sidechain | **the channel strip's section, unchanged** (`kSidechainH` 112): source selector across the strip, Amount, Attack, Release centred. Same wording and ranges. Sources (ruled 2026-10-20, the engine's order rule, design.md section 5): `-`, every layer by `"<slot> <name>"`, and the buses **before** this one (Bus 2 lists Bus 1; Bus 3 lists Bus 1 and 2); never itself or a later bus. Channels never list a bus; the three returns list every bus. One rule for engine and UI: `mu_mix::isLegalSidechainSource` via `MixerChannel::setSidechainSources` |
+| **Sends** (3 x `kSendKnobH`) | The channel strip's three FX send knobs, unchanged (Effect / Delay / Reverb, the Effect label tracking the algorithm name), because a bus has the same three post-bus-fader sends as a channel (design.md section 5; ruled 2026-10-20). Pan is in the bottom row as on a channel. **The Feeds panel is withdrawn**: a channel's bus shows on its own Out selector (5.3), and a feeds list is an unscheduled idea |
 | Pan | the strip pan knob (`kMixerStripKnobH` 46), in the bottom row of the sends slot |
 | Fader + VU, dB readout, Mute / Solo | as the channel strip; the fader group keeps its natural width, centred in the 138 px strip (selectors, name pill, dB readout and Mute / Solo span the strip) |
 | Output selector slot | **hidden, slot reserved** (a bus can only go to Main in version 1; a one-item dropdown is noise). The slot stays so faders align; with bus-to-bus routing later it returns |
-| Insert column (136) | `MasterInsertPanel`: "Insert 1" over "Insert 2", the shared algorithm list, 2 x 2 knobs each (EQ included), exactly the Master's |
+| Insert column (136) | `MasterInsertPanel` bound by `BusInsertBinding` (ruled 2026-10-20: `InsertSubsection` is 216 px wide and cannot sit in the 136 px column; `setNumSlots(n)` hides boxes beyond the bus's insert count). At the mu-Tronic count (2): "Insert 1" over "Insert 2", the shared algorithm list, 2 x 2 knobs each (EQ included), exactly the Master's |
 
 Bus knob colours are the mixer's category colours (sidechain, inserts), never an app colour.
 
@@ -259,7 +259,7 @@ Name "μ-tronic" per [design-ui-family.md section 9](../design-ui-family.md#9-pl
 | `ControlAction` `PagePrev` / `PageNext`, `SceneLaunch(n)` | `mu-core/Control` | device-independent |
 | mu-tronic top-row map (5 = `PagePrev`, 6 = `PageNext`) | `mu-control` mapping profile | override of two family buttons |
 | Colour tokens, strengths | none new besides `ice` | everything else is an existing `MuTheme::Lighting` / `MuLookAndFeel` value |
-| Withdrawn | | `mu_ui::InsertBox` extraction, `kMixerBusFeedsH`, Out 1 to 8 items |
+| Withdrawn | | `mu_ui::InsertBox` extraction, `kMixerBusFeedsH`, Feeds panel, Out 1 to 8 items |
 
 ## 9. Do not
 

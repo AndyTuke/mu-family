@@ -10,8 +10,12 @@
 #include "VoiceParams.h"
 #include "Audio/FX/Insert/InsertAlgorithmBase.h"
 
-// Self-contained insert-effect processor used by both VoiceEngine (per-channel)
-// and MixerEngine (master bus). Owns all DSP state; parameters are passed in
+// Standing constraint: no insert algorithm reports latency. The group buses (MixerEngine::BusState) sum
+// channels on parallel paths without delay compensation, so an algorithm that ever adds latency would need
+// the buses to compensate (every channel path to the master delayed to the longest bus path) first.
+//
+// Self-contained insert-effect processor used by VoiceEngine (per-channel) and MixerEngine
+// (master bus and group buses). Owns all DSP state; parameters are passed in
 // as a const VoiceParams& each block so there is no internal copy to keep in
 // sync.
 //

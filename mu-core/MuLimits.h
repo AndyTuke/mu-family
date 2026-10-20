@@ -25,6 +25,9 @@
 #ifndef MU_BUS_INSERTS
  #define MU_BUS_INSERTS 2
 #endif
+#ifndef MU_EXT_SIDECHAIN
+ #define MU_EXT_SIDECHAIN 1
+#endif
 
 namespace mu_limits
 {
@@ -36,10 +39,15 @@ namespace mu_limits
     // The layer view's frozen mask and the bin's slot loops use 32-bit masks.
     static_assert(kMaxLayers >= 1 && kMaxLayers <= 32, "MU_MAX_LAYERS must be 1..32");
 
-    // Group buses in the shared mixer and the inserts on each. Declared for the bus stage; nothing reads
-    // them yet (0 buses everywhere).
+    // Group buses in the shared mixer and the inserts on each (MixerEngine::BusState). 0 buses declares no
+    // parameters and shows no UI; a target opts in with MU_MAX_BUSES. Loops, parameters, the mixer page and the
+    // sidechain source range all run to these, never to a literal.
     inline constexpr int kMaxBuses   = MU_MAX_BUSES;
     inline constexpr int kBusInserts = MU_BUS_INSERTS;
+
+    // Whether the DAW's external sidechain input is offered as a ducking source. A Standalone-only product
+    // (no host sidechain bus) sets MU_EXT_SIDECHAIN=0 so the mixer does not list a source that can never carry audio.
+    inline constexpr bool kExternalSidechain = MU_EXT_SIDECHAIN != 0;
 
     // Layers shown at once in the sidebar and the mixer (a 16-layer host pages them in two).
     inline constexpr int kLayersPerPage = 8;

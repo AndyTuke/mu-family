@@ -1077,6 +1077,7 @@ private:
     // juce::String substring) so the audio-thread automation path allocates nothing.
     void syncChannelStripParam(int channel, const char* param, float v);
     void syncReturnStripParam (int retIndex,  const char* rest,  float v);
+    void syncBusParam         (const juce::String& id, float v);
     bool syncMasterParam      (const juce::String& id, float v);
     void syncFxSlotParam      (const juce::String& id, float v);
 

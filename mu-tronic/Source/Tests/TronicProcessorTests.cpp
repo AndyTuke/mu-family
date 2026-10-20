@@ -90,6 +90,64 @@ struct MuTronicProcessorTests : juce::UnitTest
         deleteEmptiesSlot();
         stateRoundTrip();
         unknownTypeLoadsEmpty();
+        busChain();
+    }
+
+    // Test-tone layers on two slots (one with a two-digit index) routed through bus 2 and its insert chain, by
+    // the real processor's parameters: the engine sees the assignment, the bus fader and inserts act on the
+    // mix, a muted bus silences it, and the whole bus state survives a saved-state round trip.
+    void busChain()
+    {
+        static_assert(mu_limits::kMaxBuses == 3 && mu_limits::kBusInserts == 2, "mu-tronic compiles with 3 buses of 2 inserts");
+        beginTest("layers routed through a bus and its two inserts, by parameters, then saved and restored");
+        mu_seam_test::TempStorage storage;
+        ExposedProcessor p;
+        p.prepareToPlay(48000.0, 256);
+        p.toggleInternalPlay();
+        expect(p.setLayerType(0, mu_core::LayerTypeId::Arp));
+        expect(p.setLayerType(12, mu_core::LayerTypeId::Arp));
+        const float direct = renderPeak(p, 4);
+        expect(direct > 0.01f, "the two tones sound on the master");
+
+        mu_seam_test::setParam(p.apvts, "ch0_bus", 2.0f);
+        mu_seam_test::setParam(p.apvts, "ch12_bus", 2.0f);
+        expectEquals(p.mixerEngine.channels[0].busAssign.load(), 2, "ch0_bus reaches the engine");
+        expectEquals(p.mixerEngine.channels[12].busAssign.load(), 2, "ch12_bus (a two-digit strip) reaches the engine");
+        expectWithinAbsoluteError(renderPeak(p, 4), direct, 1.0e-5f, "through a plain bus the mix is unchanged");
+
+        mu_seam_test::setParam(p.apvts, "bus1_lvl", 0.5f);
+        expectWithinAbsoluteError(renderPeak(p, 4), direct * 0.5f, 1.0e-3f, "the bus fader scales the group");
+
+        mu_seam_test::setParam(p.apvts, "bus1_lvl", 1.0f);
+        mu_seam_test::setParam(p.apvts, "bus1_i0_drvChar", 2.0f);   // HardClip
+        mu_seam_test::setParam(p.apvts, "bus1_i0_insP1", 1.0f);
+        const float clipped = renderPeak(p, 30);
+        expect(std::abs(clipped - direct) > 1.0e-3f, "insert 1 changes the group's level (" + juce::String(clipped, 4) + " vs " + juce::String(direct, 4) + ")");
+        mu_seam_test::setParam(p.apvts, "bus1_i1_drvChar", 4.0f);   // Bitcrusher
+        mu_seam_test::setParam(p.apvts, "bus1_i1_insP1", 0.8f);
+        const float chained = renderPeak(p, 30);
+        expect(std::isfinite(chained), "the two-insert chain renders finite audio");
+        expectEquals(p.mixerEngine.buses[1].insert[1].insertAlgo.load(), 4, "bus1_i1_drvChar reaches the engine");
+
+        // The state keeps the assignment, the bus strip and both inserts.
+        mu_seam_test::setParam(p.apvts, "bus1_lvl", 0.7f);
+        juce::MemoryBlock block;
+        p.getStateInformation(block);
+        mu_seam_test::TempStorage storage2;
+        ExposedProcessor q;
+        q.setStateInformation(block.getData(), (int) block.getSize());
+        expectEquals(q.mixerEngine.channels[12].busAssign.load(), 2, "the restored strip is on bus 2");
+        expectWithinAbsoluteError(q.mixerEngine.buses[1].level.load(), 0.7f, 1.0e-3f, "the restored bus fader");
+        expectEquals(q.mixerEngine.buses[1].insert[0].insertAlgo.load(), 2, "the restored insert 1");
+        expectEquals(q.mixerEngine.buses[1].insert[1].insertAlgo.load(), 4, "the restored insert 2");
+
+        // A muted bus silences its channels' dry path.
+        mu_seam_test::setParam(p.apvts, "bus1_lvl", 1.0f);
+        mu_seam_test::setParam(p.apvts, "bus1_mute", 1.0f);
+        expectEquals(renderPeak(p, 4), 0.0f, "a muted bus is silent when every layer feeds it");
+        p.flushPendingAsyncUpdates();
+        p.releaseResources();
+        q.flushPendingAsyncUpdates();
     }
 
     // Sixteen slots, each an Empty layer, in Published mode; the driver sees all sixteen and the output is silent.

@@ -30,4 +30,31 @@ private:
     ProcessorBase&     proc;
     MasterInsertPanel& panel;
 };
+
+// The bus counterpart: wires a MasterInsertPanel to one group bus's insert chain (bus{B}_i{I}_drvChar and
+// _insP1.._insP4), the same insert as a layer's. A bus with fewer inserts than the panel has boxes hides the
+// rest. The panel must outlive the binding; message thread only.
+class BusInsertBinding
+{
+public:
+    BusInsertBinding(ProcessorBase& processor, MasterInsertPanel& insertPanel, int busIndex);
+    ~BusInsertBinding();
+
+    // Panel from the engine's insert state for this bus (message thread).
+    void refresh();
+
+    // The APVTS ids behind insert `insert` of bus `bus` (param 0..3 = P1..P4).
+    static juce::String algorithmParamId(int bus, int insert);
+    static juce::String paramId(int bus, int insert, int param);
+
+    // The boxes shown: the bus's inserts, up to what the panel holds.
+    static int numSlots() noexcept;
+
+private:
+    void write(const juce::String& parameterId, float plainValue);
+
+    ProcessorBase&     proc;
+    MasterInsertPanel& panel;
+    int                bus;
+};
 } // namespace mu_ui
