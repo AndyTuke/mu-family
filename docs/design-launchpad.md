@@ -276,6 +276,8 @@ controller support simply does not link `mu-control`.
 
 ### 3.2b Layer colours must come from the controller's palette (owner, 2026-10-09)
 
+**Update 2026-10-20 (Andy): the proposed table below is approved and built, with Blue 45 as layer 8.** `MuLookAndFeel::layerPalette` is now Red `FF6259` (5), Cyan `65EBFF` (37), Orange `FFB064` (9), Magenta `FF62FF` (53), Lime `C7FE6D` (75), Rose `FF5EC5` (57), Silver `DDDDDD` (2), Blue `5B5DFD` (45); this supersedes the "screen colours stay as designed" line in the 2026-10-14 decision below. The device correction table keeps the pad RGB tuned by eye on 2026-10-14 for each hue, now keyed by the new screen colours and set directly, so the pad look is unchanged; only the on-screen colours moved. The pad check of the new screen/pad pairing (and whether the lighter Blue wants a brighter pad value than the old Navy `0000B4`) is still for a hardware session (#1281).
+
 The pad for a layer must be the same colour as that layer on screen. The owner's rule: **pick the layer colours from
 the colours the controller can show, and stick to common hues** so most other pad controllers are covered too (some
 will not match exactly; a common hue still degrades gracefully).

@@ -27,14 +27,16 @@ struct KnownColour
 // control-surface colours (transport go green, fault red, white). Adjust here.
 inline constexpr int kKnownColourCount = 15;
 inline constexpr KnownColour kKnownColours[kKnownColourCount] = {
-    { 0xE5484D, { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },    0,          "red" },
-    { 0x2EC4C9, { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },    0,          "cyan" },
-    { 0xF28C28, { 1.0f, 1.0f, 1.35f, 1.0f, 1.0f },   0,          "orange" },       // more green so it leans yellow
-    { 0xD04FC8, { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },    0,          "magenta" },
-    { 0xA6D63A, { 1.0f, 0.55f, 1.0f, 1.0f, 1.0f },   0,          "lime" },         // less red so it reads green
-    { 0xF07CA6, { 0.4f, 1.0f, 1.0f, 1.0f, 1.0f },    0,          "rose" },         // keeps some grey: lighter and pinker than magenta
-    { 0xC9CCD1, { 0.0f, 0.70f, 0.85f, 0.75f, 0.70f }, 0,         "silver" },       // a dim white, red eased back so it is not pink
-    { 0x2B3FD6, { 1.0f, 1.0f, 1.0f, 1.0f, 0.85f },   0x010000B4, "navy" },         // deep blue, set directly
+    // The layer screen colours are the Launchpad palette picture's colours; their pad values are the ones tuned by
+    // eye on the real pad (against the earlier screen colours), set directly so the pad look is unchanged.
+    { 0xFF6259, { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },    0x01FF0004, "red" },
+    { 0x65EBFF, { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },    0x0100FFCF, "cyan" },
+    { 0xFFB064, { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },    0x01FF7700, "orange" },       // leans yellow
+    { 0xFF62FF, { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },    0x01FF0084, "magenta" },
+    { 0xC7FE6D, { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },    0x018BFF00, "lime" },         // less red so it reads green
+    { 0xFF5EC5, { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },    0x01FF4656, "rose" },         // lighter and pinker than magenta
+    { 0xDDDDDD, { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },    0x01B39A6D, "silver" },       // reads as a dim white (the pad's grey LED looks brown-ish without the trim)
+    { 0x5B5DFD, { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },    0x010000B4, "blue" },         // deep blue; re-tune against the lighter screen blue on the pad
     { 0x7F77DD, { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },    0,          "app purple" },
     { 0x4ADC8E, { 1.0f, 1.0f, 1.0f, 0.10f, 1.0f },   0x0150FF00, "app green" },    // some red against the pad's blue-ish green
     { 0x3D8BEB, { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },    0x011028FF, "app blue" },     // a little green, not so much it is cyan
