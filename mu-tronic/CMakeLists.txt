@@ -4,7 +4,7 @@
 # The target combines the product's shell (the 16-slot processor, the empty-slot chooser) with the shared
 # platform (ProcessorBase + MixerEngine + FXChain + the shared editor shell / sidebar / mixer). Shared
 # audio/UI/ProcessorBase come from mu-core via the link; the layer types come from the layer libraries
-# (mu-<product>-layer) as each is registered in Source/Persistence/LayerTypes.cpp. Registered: Arp (mu-toni-layer), Kick, Bass, Hat, Snare and Rumble (mu-on-layer), Pattern (mu-tant-layer).
+# (mu-<product>-layer) as each is registered in Source/Persistence/LayerTypes.cpp. Registered: Arp (mu-toni-layer), Kick, Bass, Hat, Snare and Rumble (mu-on-layer), Pattern (mu-tant-layer), Rhythm (mu-clid-layer).
 
 # ── mu-Tronic — Standalone only (no VST3, no CLAP, no AU) ────────────────────
 juce_add_plugin(mu-tronic
@@ -17,7 +17,7 @@ juce_add_plugin(mu-tronic
     PLUGIN_NAME  "μ-Tronic"
     IS_SYNTH TRUE
     NEEDS_MIDI_INPUT TRUE
-    NEEDS_MIDI_OUTPUT FALSE
+    NEEDS_MIDI_OUTPUT TRUE    # the Rhythm type's MIDI output mode sends notes to the Standalone's MIDI output device
     IS_MIDI_EFFECT FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
     VERSION         "${MUFAMILY_PRE_PLUGIN_VERSION}"   # pre-release 0.1 line until it launches
@@ -35,11 +35,13 @@ target_sources(mu-tronic
         Source/Persistence/ArpLayerType.cpp
         Source/Persistence/TrackLayerTypes.cpp
         Source/Persistence/PatternLayerType.cpp
+        Source/Persistence/RhythmLayerType.cpp
         Source/UI/EmptySlotChooser.cpp
         Source/UI/TronicSettingsOverlay.cpp
         ${MU_TONI_LAYER_UI_SOURCES}   # the Arp type's UI content (mu-toni-layer)
         ${MU_ON_LAYER_UI_SOURCES}     # the Track types' UI content: TrackContent, StepRows, TrackStepRow (mu-on-layer)
         ${MU_TANT_LAYER_UI_SOURCES}   # the Pattern type's UI content: PatternContent, GatingDesigner (mu-tant-layer)
+        ${MU_CLID_LAYER_UI_SOURCES}   # the Rhythm type's UI content: RhythmContent, VoiceSection, the sample browser (mu-clid-layer)
 )
 
 target_include_directories(mu-tronic
@@ -61,6 +63,7 @@ target_compile_definitions(mu-tronic
         MU_EXT_SIDECHAIN=0
         MU_TRONIC_WITH_UI=1   # the layer types build their content and sidebar pictures (Persistence/ArpLayerType.cpp, TrackLayerTypes.cpp, PatternLayerType.cpp)
         JUCE_WEB_BROWSER=0
+        JUCE_USE_MP3AUDIOFORMAT=1   # the Rhythm type loads the same sample formats as mu-Clid
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
         "MU_VERSION_BASE=\"${MUFAMILY_PRE_VERSION_BASE}\""   # pre-release 0.1 line shown in About
@@ -71,6 +74,7 @@ target_link_libraries(mu-tronic
         mu-toni-layer   # the Arp type: its engine sources and the Source/ include path
         mu-on-layer     # the Track types (Kick, Bass, Hat, Snare, Rumble): the same
         mu-tant-layer   # the Pattern type: the same
+        mu-clid-layer   # the Rhythm type: the same
         mu-core
         juce::juce_audio_utils
         juce::juce_dsp
@@ -121,6 +125,7 @@ target_sources(mu-tronic-tests PRIVATE
     Source/Tests/TronicTrackTests.cpp       # the Kick, Bass, Hat and Snare types in a slot: saved rows, same stream as mu-On, tails, presets
     Source/Tests/TronicLayerPresetTests.cpp # layer presets in a slot: save/load per type, Empty-slot adopt, cross-type refusal, staged load
     Source/Tests/TronicPatternTests.cpp     # the Pattern type in a slot: saved rows, same stream as mu-Tant, Note mode per layer, services, wavetables, presets
+    Source/Tests/TronicRhythmTests.cpp      # the Rhythm type in a slot: saved rows, same stream as mu-Clid, parameter sync, samples, MIDI out, tails, .muRhythm presets
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp
@@ -128,9 +133,14 @@ target_sources(mu-tronic-tests PRIVATE
     Source/Persistence/ArpLayerType.cpp
     Source/Persistence/TrackLayerTypes.cpp
     Source/Persistence/PatternLayerType.cpp
+    Source/Persistence/RhythmLayerType.cpp
     # The mu-core .cpps behind ProcessorBase (the console target can't link mu-core directly).
     ${MU_CORE_PROCESSOR_TEST_SOURCES}
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/Wavetable/WavetableBank.cpp"   # the Arp type's oscillator tables
+    # The Rhythm type's sequencer (the Euclid generators and the layer they make); its voice engine is in the list above.
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/Rhythm.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/HitGenerator.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/EuclideanGenerator.cpp"
 )
 
 target_compile_features(mu-tronic-tests PRIVATE cxx_std_17)
@@ -147,6 +157,7 @@ target_link_libraries(mu-tronic-tests PRIVATE
     mu-toni-layer
     mu-on-layer
     mu-tant-layer
+    mu-clid-layer
     juce::juce_core
     juce::juce_audio_basics
     juce::juce_audio_processors
@@ -156,6 +167,7 @@ target_link_libraries(mu-tronic-tests PRIVATE
     juce::juce_gui_basics
     juce::juce_dsp
     juce::juce_audio_formats
+    juce::juce_audio_utils   # the Rhythm type's sample library (SampleSlotHost) includes it
     juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags
 )

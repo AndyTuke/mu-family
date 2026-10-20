@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<MuClidRhythm presetName="REAL_rhythm" presetCategory="Fixture" presetDescription="Written by the real mu-Clid for mu-Tronic's slot tests"
+              presetEmbedSamples="0" r0_name="&lt;unnamed&gt;" r0_colour="0"
+              r0_sample="fixture-pluck.wav" r0_stepsA="16" r0_hitsA="5" r0_rotA="1"
+              r0_prePadA="0" r0_postPadA="0" r0_insStA="0" r0_insLenA="0" r0_insModeA="false"
+              r0_prePadModeA="false" r0_postPadModeA="false" r0_stepsB="8"
+              r0_hitsB="0" r0_rotB="0" r0_prePadB="0" r0_postPadB="0" r0_insStB="0"
+              r0_insLenB="0" r0_insModeB="false" r0_prePadModeB="false" r0_postPadModeB="false"
+              r0_stepsC="4" r0_hitsC="1" r0_rotC="0" r0_prePadC="0" r0_postPadC="0"
+              r0_insStC="0" r0_insLenC="0" r0_insModeC="false" r0_prePadModeC="false"
+              r0_postPadModeC="false" r0_logic="OR" r0_patLeg="true" r0_vMono="false"
+              r0_rstSt="-1" r0_pitchOct="0" r0_pitchSemi="3" r0_pitchFine="0"
+              r0_pEnvAtk="0.004999999888241291" r0_pEnvDec="0.1000000908970833"
+              r0_pEnvSus="0.0" r0_pEnvRel="0.1000000908970833" r0_pEnvDep="0.0"
+              r0_fltType="LP12" r0_fltCut="2500.0" r0_fltRes="0.300000011920929"
+              r0_fEnvAtk="0.009999999776482582" r0_fEnvDec="0.3000000417232513"
+              r0_fEnvSus="0.0" r0_fEnvRel="0.3000000417232513" r0_fEnvDep="0.0"
+              r0_fltLoCut="0.0" r0_fltDrv="0.0" r0_ampLvl="-3.0" r0_aEnvAtk="0.004999999888241291"
+              r0_aEnvDec="0.2500000596046448" r0_aEnvSus="40.0" r0_aEnvRel="0.3000000417232513"
+              r0_accentDb="4.0" r0_drvChar="None" r0_insP1="0.0" r0_insP2="0.0"
+              r0_insP3="0.0" r0_insP4="0.0" r0_outMode="0" r0_midiNote="36"
+              r0_midiChan="1" r0_midiVel="100" r0_midiAccent="0">
+  <Modulators depthUnits="range" padDepthUnits="knobMax">
+    <Seq id="cs0" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+      <Step v="-60.0"/>
+      <Step v="40.0"/>
+      <Step v="-20.0"/>
+      <Step v="80.0"/>
+    </Seq>
+    <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Asgn id="fixture" src="cs0_output" dest="filter.cutoff" depth="50.0"
+          curve="0.0"/>
+  </Modulators>
+</MuClidRhythm>

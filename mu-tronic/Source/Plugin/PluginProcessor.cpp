@@ -7,6 +7,12 @@
 namespace mu_tronic
 {
 
+namespace
+{
+    // How many MIDI events one block sends at most (16 slots of a note-on and a note-off, with room to spare).
+    constexpr int kMidiOutEvents = 64;
+}
+
 juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParameterLayout()
 {
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
@@ -112,6 +118,12 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // The shared block driver (docs/mu-tronic/design.md 2.1.1): the sidechain and the clear per chunk, the one
     // published view of the layers, every live layer's render into its slot's scratch, then the mixer and the FX.
     renderAndMix(buffer, midiMessages, transport);
+
+    // The layers' MIDI out (a Rhythm in MIDI output mode) is all this processor sends: the input was consumed above, and
+    // is not echoed to the MIDI output device. The budget is the room the host buffer is expected to have, so the merge
+    // adds at most that many events (juce::MidiBuffer keeps its storage after clear, so it grows once at worst).
+    midiMessages.clear();
+    mergeLayerMidiOut(midiMessages, kMidiOutEvents * midiEventBytes(3));
 
     // Hot-swap: flag staged presets whose boundary passed in this block (each slot's loop is its layer's loopBeats).
     flagLayerSwapBoundaries(transport);

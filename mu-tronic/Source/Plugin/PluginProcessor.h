@@ -38,7 +38,7 @@ public:
     const juce::String getName() const override { return juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Tronic")); }
     juce::String getProductSlug() const override { return "mu-tronic"; }
     bool acceptsMidi()  const override { return true; }
-    bool producesMidi() const override { return false; }
+    bool producesMidi() const override { return true; }   // a Rhythm layer in MIDI output mode sends notes
     bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override { return 0.0; }
 

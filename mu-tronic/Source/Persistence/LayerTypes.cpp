@@ -2,6 +2,7 @@
 #include "Persistence/ArpLayerType.h"     // the Arp type (mu-Toni's layer library)
 #include "Persistence/TrackLayerTypes.h"   // Kick, Bass, Hat, Snare, Rumble (mu-On's layer library)
 #include "Persistence/PatternLayerType.h"  // the Pattern type (mu-Tant's layer library)
+#include "Persistence/RhythmLayerType.h"   // the Rhythm type (mu-Clid's layer library)
 
 namespace mu_tronic
 {
@@ -17,6 +18,7 @@ void registerLayerTypes(mu_core::LayerTypeRegistry& registry)
     registry.add(trackLayerType(mu_core::LayerTypeId::Snare));
     registry.add(trackLayerType(mu_core::LayerTypeId::Rumble));
     registry.add(patternLayerType());
+    registry.add(rhythmLayerType());
 }
 
 } // namespace mu_tronic
