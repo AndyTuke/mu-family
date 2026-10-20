@@ -16,12 +16,15 @@ juce::AudioProcessorEditor* mu_tronic::PluginProcessor::createEditor() { return 
 namespace
 {
     static_assert(mu_limits::kMaxLayers == 16, "mu-tronic compiles with MU_MAX_LAYERS=16");
+
+    // The test layer's type: one the product does not register, so it never meets the real Arp.
+    constexpr mu_core::LayerTypeId kToneType = mu_core::LayerTypeId::Snare;
     static_assert(mu_limits::kMaxLayers % mu_limits::kLayersPerPage == 0, "the pages are whole");
 
     // A layer type the build does not have: a constant tone, so a type change is heard in the output.
     struct ToneLayer : Layer
     {
-        int typeId() const override { return (int) mu_core::LayerTypeId::Arp; }
+        int typeId() const override { return (int) kToneType; }
         void prepare(double, int blockSize) override { preparedBlock = blockSize; ++prepares; }
         void render(const mu_core::RenderContext&, juce::AudioBuffer<float>& out, int n) override
         {
@@ -39,8 +42,8 @@ namespace
             if (registerTone)
             {
                 mu_core::LayerTypeInfo info;
-                info.id = mu_core::LayerTypeId::Arp;
-                info.name = "Arp";
+                info.id = kToneType;
+                info.name = "Snare";
                 info.group = "Test";
                 info.create = [](int) -> std::unique_ptr<Layer> { return std::make_unique<ToneLayer>(); };
                 layerTypes.add(info);
@@ -104,8 +107,8 @@ struct MuTronicProcessorTests : juce::UnitTest
         ExposedProcessor p;
         p.prepareToPlay(48000.0, 256);
         p.toggleInternalPlay();
-        expect(p.setLayerType(0, mu_core::LayerTypeId::Arp));
-        expect(p.setLayerType(12, mu_core::LayerTypeId::Arp));
+        expect(p.setLayerType(0, kToneType));
+        expect(p.setLayerType(12, kToneType));
         const float direct = renderPeak(p, 4);
         expect(direct > 0.01f, "the two tones sound on the master");
 
@@ -161,7 +164,7 @@ struct MuTronicProcessorTests : juce::UnitTest
         expect(p.getLayerAccess() == mu_core::LayerAccess::Published);
         expect(p.layersAreSlots());
         expect(! p.canReorderLayers());
-        expect(p.getLayerTypes().size() == 1, "the test type is the only one offered");
+        expect(p.getLayerTypes().size() == 2, "the product's Arp and the test type are offered");
         for (int i = 0; i < 16; ++i)
         {
             expect(p.getLayer(i) != nullptr);
@@ -178,8 +181,8 @@ struct MuTronicProcessorTests : juce::UnitTest
         p.releaseResources();
 
         mu_seam_test::TempStorage storage2;
-        mu_tronic::PluginProcessor bare;   // the product as built: nothing registered, so only Empty exists
-        expect(bare.getLayerTypes().isEmpty());
+        mu_tronic::PluginProcessor bare;   // the product as built: Arp is the one type offered
+        expect(bare.getLayerTypes().size() == 1 && bare.getLayerTypes().find(mu_core::LayerTypeId::Arp) != nullptr);
     }
 
     void namesAndColours()
@@ -214,7 +217,7 @@ struct MuTronicProcessorTests : juce::UnitTest
         {
             mu_seam_test::TempStorage storage;
             mu_tronic::PluginProcessor bare;
-            expect(! bare.setLayerType(0, mu_core::LayerTypeId::Arp), "nothing is registered");
+            expect(! bare.setLayerType(0, kToneType), "the test type is not registered in the product as built");
             expect(bare.setLayerType(0, mu_core::LayerTypeId::Empty), "Empty to Empty is a no-op that succeeds");
             expect(! bare.setLayerType(16, mu_core::LayerTypeId::Empty));
             expect(! bare.setLayerType(-1, mu_core::LayerTypeId::Empty));
@@ -229,8 +232,8 @@ struct MuTronicProcessorTests : juce::UnitTest
         p.setLayerName(3, "Lead");
         expectEquals(renderPeak(p), 0.0f);
 
-        expect(p.setLayerType(3, mu_core::LayerTypeId::Arp));
-        expect(p.getLayerTypeId(3) == mu_core::LayerTypeId::Arp);
+        expect(p.setLayerType(3, kToneType));
+        expect(p.getLayerTypeId(3) == kToneType);
         expectEquals(p.getNumActiveLayers(), 1);
         expectEquals(p.getLayerName(3), juce::String("Lead"), "a typed name stays with the slot");
         expectEquals(p.tone(3).preparedBlock, 256, "the new layer is prepared for the running block size");
@@ -239,7 +242,7 @@ struct MuTronicProcessorTests : juce::UnitTest
 
         // The default name follows the type.
         p.setLayerName(3, "");
-        expectEquals(p.getLayerName(3), juce::String("Arp 4"));
+        expectEquals(p.getLayerName(3), juce::String("Snare 4"));
 
         expect(p.deleteLayer(3));
         expect(p.getLayerTypeId(3) == mu_core::LayerTypeId::Empty);
@@ -254,7 +257,7 @@ struct MuTronicProcessorTests : juce::UnitTest
         beginTest("deleting a layer leaves the layers around it where they were");
         mu_seam_test::TempStorage storage;
         ExposedProcessor p;
-        for (int s : { 1, 2, 3 }) expect(p.setLayerType(s, mu_core::LayerTypeId::Arp));
+        for (int s : { 1, 2, 3 }) expect(p.setLayerType(s, kToneType));
         p.setLayerName(1, "One");
         p.setLayerName(3, "Three");
         const auto* before1 = p.getLayer(1);
@@ -273,8 +276,8 @@ struct MuTronicProcessorTests : juce::UnitTest
         beginTest("a state round trip keeps types, typed names, colours and strip values");
         mu_seam_test::TempStorage storage;
         ExposedProcessor a;
-        expect(a.setLayerType(2, mu_core::LayerTypeId::Arp));
-        expect(a.setLayerType(9, mu_core::LayerTypeId::Arp));
+        expect(a.setLayerType(2, kToneType));
+        expect(a.setLayerType(9, kToneType));
         a.setLayerName(2, "Bass line");
         a.getLayer(9)->colourIndex = 5;
         mu_seam_test::setParam(a.apvts, "ch9_lvl", 0.25f);
@@ -286,7 +289,7 @@ struct MuTronicProcessorTests : juce::UnitTest
         expectEquals((int) state.getProperty("format"), 2);
         const auto slots = state.getChildWithName(mu_pp::kLayersTag);
         expectEquals(slots.getNumChildren(), 16);
-        expectEquals(mu_pp::findLayerNode(state, 2).getProperty("type").toString(), juce::String("Arp"));
+        expectEquals(mu_pp::findLayerNode(state, 2).getProperty("type").toString(), juce::String("Snare"));
         expectEquals(mu_pp::findLayerNode(state, 2).getProperty("name").toString(), juce::String("Bass line"));
         expectEquals(mu_pp::findLayerNode(state, 3).getProperty("type").toString(), juce::String("Empty"));
         expect(! mu_pp::findLayerNode(state, 3).hasProperty("name"), "a default name is not written");
@@ -298,19 +301,19 @@ struct MuTronicProcessorTests : juce::UnitTest
         mu_seam_test::TempStorage storage2;
         ExposedProcessor b;
         b.setStateInformation(block.getData(), (int) block.getSize());
-        expect(b.getLayerTypeId(2) == mu_core::LayerTypeId::Arp);
-        expect(b.getLayerTypeId(9) == mu_core::LayerTypeId::Arp);
+        expect(b.getLayerTypeId(2) == kToneType);
+        expect(b.getLayerTypeId(9) == kToneType);
         expect(b.getLayerTypeId(3) == mu_core::LayerTypeId::Empty);
         expectEquals(b.getNumActiveLayers(), 2);
         expectEquals(b.getLayerName(2), juce::String("Bass line"));
-        expectEquals(b.getLayerName(9), juce::String("Arp 10"));
+        expectEquals(b.getLayerName(9), juce::String("Snare 10"));
         expectEquals(b.getLayerColourIndex(9), 5);
         expectWithinAbsoluteError(mu_seam_test::getParam(b.apvts, "ch9_lvl"), 0.25f, 0.001f);
         expectWithinAbsoluteError(mu_seam_test::getParam(b.apvts, "mstr_lvl"), 0.6f, 0.001f);
         expectEquals(b.getNumLayers(), 16);
 
         beginTest("loading a state into a processor that already holds other layers replaces them");
-        expect(b.setLayerType(12, mu_core::LayerTypeId::Arp));
+        expect(b.setLayerType(12, kToneType));
         b.setLayerName(12, "Stray");
         b.setStateInformation(block.getData(), (int) block.getSize());
         expect(b.getLayerTypeId(12) == mu_core::LayerTypeId::Empty, "the stray layer is gone");
@@ -323,9 +326,9 @@ struct MuTronicProcessorTests : juce::UnitTest
         beginTest("a state naming a type the build does not offer, or none, loads that slot Empty");
         mu_seam_test::TempStorage storage;
         ExposedProcessor withTone;
-        expect(withTone.setLayerType(1, mu_core::LayerTypeId::Arp));
+        expect(withTone.setLayerType(1, kToneType));
         auto state = withTone.captureState();
-        mu_pp::findLayerNode(state, 1).setProperty("type", "Hat", nullptr);       // a name the build has no type for
+        mu_pp::findLayerNode(state, 1).setProperty("type", "Rumble", nullptr);       // a name the build has no type for
         mu_pp::findLayerNode(state, 5).removeProperty("type", nullptr);            // no attribute at all
 
         mu_seam_test::TempStorage storage2;

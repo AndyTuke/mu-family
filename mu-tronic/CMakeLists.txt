@@ -4,7 +4,7 @@
 # The target combines the product's shell (the 16-slot processor, the empty-slot chooser) with the shared
 # platform (ProcessorBase + MixerEngine + FXChain + the shared editor shell / sidebar / mixer). Shared
 # audio/UI/ProcessorBase come from mu-core via the link; the layer types come from the layer libraries
-# (mu-<product>-layer) as each is registered in Source/Persistence/LayerTypes.cpp. None is yet.
+# (mu-<product>-layer) as each is registered in Source/Persistence/LayerTypes.cpp. Registered: Arp (mu-toni-layer).
 
 # ── mu-Tronic — Standalone only (no VST3, no CLAP, no AU) ────────────────────
 juce_add_plugin(mu-tronic
@@ -32,6 +32,7 @@ target_sources(mu-tronic
         Source/Persistence/LayerTypes.cpp
         Source/UI/EmptySlotChooser.cpp
         Source/UI/TronicSettingsOverlay.cpp
+        ${MU_TONI_LAYER_UI_SOURCES}   # the Arp type's UI content (mu-toni-layer)
 )
 
 target_include_directories(mu-tronic
@@ -59,6 +60,7 @@ target_compile_definitions(mu-tronic
 
 target_link_libraries(mu-tronic
     PRIVATE
+        mu-toni-layer   # the Arp type: its engine sources and the Source/ include path
         mu-core
         juce::juce_audio_utils
         juce::juce_dsp
@@ -105,12 +107,14 @@ target_sources(mu-tronic-tests PRIVATE
     Source/Tests/TestMain.cpp
     Source/Tests/TronicProcessorTests.cpp   # the real PluginProcessor, headless: 16 empty slots, types, state round trip
     Source/Tests/TronicLayoutTests.cpp      # the 16-slot parameter layout: size, build time, unique ids
+    Source/Tests/TronicArpTests.cpp         # the Arp type in a slot: layout, saved rows, same stream as mu-Toni, follower, presets, stress
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp
     Source/Persistence/LayerTypes.cpp
     # The mu-core .cpps behind ProcessorBase (the console target can't link mu-core directly).
     ${MU_CORE_PROCESSOR_TEST_SOURCES}
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/Wavetable/WavetableBank.cpp"   # the Arp type's oscillator tables
 )
 
 target_compile_features(mu-tronic-tests PRIVATE cxx_std_17)
@@ -124,6 +128,7 @@ target_include_directories(mu-tronic-tests PRIVATE
 )
 
 target_link_libraries(mu-tronic-tests PRIVATE
+    mu-toni-layer
     juce::juce_core
     juce::juce_audio_basics
     juce::juce_audio_processors

@@ -146,6 +146,11 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
                                 const RetiredVoices*         retired,
                                 const RenderChannelFn*       renderChannel)
 {
+    // Strips whose follower a type change asked to be zeroed start this block from silence.
+    for (auto& request : scEnvResetRequest)
+        if (request.load(std::memory_order_acquire) && request.exchange(false, std::memory_order_acq_rel))
+            scEnv[&request - scEnvResetRequest] = 0.0f;
+
     output.clear();
     effectSendBuf.clear();
     delaySendBuf .clear();

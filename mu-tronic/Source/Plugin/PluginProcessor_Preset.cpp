@@ -11,7 +11,7 @@ namespace mu_tronic
 // Describe the slots once (constructor): the composed state is built and applied from this.
 void PluginProcessor::setupLayerState()
 {
-    initLayerState(slotPrefixes());
+    initLayerStatePrefixSets(slotPrefixSets());
 }
 
 // Any saved state in the composed shape (an older APVTS dump is rebuilt; mu-Tronic has none, so this is the identity).

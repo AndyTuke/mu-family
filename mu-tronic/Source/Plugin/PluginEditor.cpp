@@ -37,7 +37,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     };
 
     // Whoever changes a slot's type (the chooser, a state restore, a swap commit): nothing in the UI may point into the
-    // old layer once it is retired.
+    // old layer once it is retired. A type's own content panel (not yet shown by this editor: it comes through the
+    // registry) must drop its layer pointers and modulation bindings here, as the modulator panel does.
     proc.onLayerTypeChanging = [this](int) { layerPanel.getModulatorPanel().setLayer(nullptr); };
 
     layerPanel.setDefaultPresetName([this](int slot) { return proc.getLayerName(slot); });
@@ -75,6 +76,7 @@ PluginEditor::~PluginEditor()
 
 void PluginEditor::showSlot(int idx)
 {
+    proc.setSelectedSlot(idx);   // the preset strip lists this slot's type's presets
     const bool empty = proc.getLayerTypeId(idx) == mu_core::LayerTypeId::Empty;
     layerPanel.setLayerEmpty(empty);
     layerPanel.getHeader().setNameEditable(! empty);

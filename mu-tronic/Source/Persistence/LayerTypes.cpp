@@ -1,14 +1,14 @@
 #include "Persistence/LayerTypes.h"
+#include "Sequencer/ArpType.h"   // mu-Toni's layer library: the Arp type
 
 namespace mu_tronic
 {
 
 void registerLayerTypes(mu_core::LayerTypeRegistry& registry)
 {
-    // The empty unit: no layer library is linked yet, so a slot can only be Empty. A type is added here as
-    //     registry.add(mu_toni::arpLayerTypeInfo());
-    // once its library is in CMakeLists.txt; nothing else in mu-Tronic names the type.
-    juce::ignoreUnused(registry);
+    // One line per type, in chooser order; its library is linked in CMakeLists.txt and nothing else in mu-Tronic
+    // names the type. Empty is not listed: every slot can hold it.
+    registry.add(mu_toni::arpLayerTypeInfo());
 }
 
 } // namespace mu_tronic

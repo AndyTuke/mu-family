@@ -1228,6 +1228,7 @@ void ProcessorBase::resetLayer(int idx)
             setLayerType(idx, mu_core::LayerTypeId::Empty);
             setLayerType(idx, type);
         }
+        mixerEngine.requestSidechainEnvReset(idx);   // the strip returns to defaults, so its follower restarts too
         resetLayerParams(idx);
         layers[(size_t) idx]->name.clear();
         return;
@@ -1356,12 +1357,18 @@ bool ProcessorBase::setLayerType(int slot, mu_core::LayerTypeId type, const juce
     layerAccess.epoch.waitFor(afterV1, 50);
 
     // Step 7: the new type's parameters to defaults (or the initial node) while nothing live reads them, then the
-    // layer binds them. The mixer strip (ch{N}_) is not touched. The new layer sits in layers[] but is not in any
-    // view, so the audio thread cannot reach it.
+    // layer binds them. Only the NEW type's prefix is touched (a same-prefix type, Kick to Bass, shares t{N}_; the
+    // old type's dormant rows are left alone and never saved). The mixer strip (ch{N}_) is not touched, but its
+    // sidechain follower is asked to restart from zero. The new layer sits in layers[] but is not in any view, so
+    // the audio thread cannot reach it.
     {
         const juce::ScopedLock sl(layersLock);
         layers[(size_t) slot] = std::move(fresh);
     }
+    layerLayout.setLivePrefix(slot, info != nullptr && info->paramPrefixLetter != 0
+                                        ? juce::String::charToString((juce::juce_wchar) info->paramPrefixLetter) + juce::String(slot) + "_"
+                                        : juce::String());
+    mixerEngine.requestSidechainEnvReset(slot);
     resetOwnLayerParams(slot);
     if (initial != nullptr && initial->isValid()) applyLayerNode(slot, *initial);
     layers[(size_t) slot]->bindParams(apvts, slot);

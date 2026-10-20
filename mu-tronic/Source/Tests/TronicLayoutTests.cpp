@@ -97,6 +97,23 @@ struct MuTronicLayoutTests : juce::UnitTest
             if (ret != nullptr) expectEquals(ret->getNormalisableRange().end, (float) (mu_limits::kMaxLayers + 1 + mu_limits::kMaxBuses));
         }
 
+        beginTest("cost check on the real layout: the processor with every registered type's rows builds inside the budget");
+        {
+            mu_seam_test::TempStorage storage;
+            const auto memBefore = privateBytes();
+            const auto t0 = std::chrono::steady_clock::now();
+            auto p = std::make_unique<mu_tronic::PluginProcessor>();
+            const auto ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+            const auto memAfter = privateBytes();
+            const int count = (int) p->getParameters().size();
+            logMessage("real mu-Tronic layout: " + juce::String(count) + " parameters, whole processor built in " + juce::String(ms, 1)
+                       + " ms, about " + juce::String((memAfter - memBefore) / 1024) + " KiB of private memory");
+            expect(ms < 1000.0, "building the real processor took " + juce::String(ms, 1) + " ms");
+            // 63 Arp rows in each of the sixteen slots, plus the mixer, FX, bus and global parameters (well under 400).
+            expect(count >= 16 * 63 && count < 16 * 63 + 400, "the Arp rows of all sixteen slots are in the layout, and no more");
+            p->flushPendingAsyncUpdates();
+        }
+
         beginTest("cost check: a 16-slot layout of the finished product's size builds well inside the budget");
         {
             // The design's estimate is 4,000 to 6,000 parameters; take the top of it.

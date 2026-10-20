@@ -151,7 +151,9 @@ public:
     bool         setLayerType(int slot, mu_core::LayerTypeId type, const juce::ValueTree* initial = nullptr);
     // Message thread, outside every lock, called by setLayerType (design step 3) before the old layer is retired: the
     // editor releases every pointer into slot `slot`'s layer (the modulator panel, the content's bindings). The
-    // editor must clear it in its destructor, as the other shell callbacks.
+    // editor must clear it in its destructor, as the other shell callbacks. It runs on the thread that calls
+    // setLayerType, which is the message thread (asserted): a state restore on a host thread must marshal to it
+    // first, so the editor never sees this call from another thread.
     std::function<void(int slot)> onLayerTypeChanging;
     // The shell's delete: a list product removes the layer (the ones above shift down); a slot host empties it.
     bool         deleteLayer(int idx) { return layersAreSlots() ? setLayerType(idx, mu_core::LayerTypeId::Empty) : removeLayer(idx); }
@@ -637,6 +639,13 @@ protected:
     // The count a state without `numVoices` loads with: the product's count before layers were
     // editable. Set once in the product's constructor.
     int unsavedLayerCount = 1;
+    // A typed slot host (layersAreSlots): each slot has several prefixes, one per layer type that has its own rows
+    // (prefixSets[i] are slot i's). Only the live type's prefix is saved, applied and reset; setLayerType names it.
+    void initLayerStatePrefixSets(const std::vector<juce::StringArray>& prefixSets)
+    {
+        initLayerState({});
+        layerLayout = mu_pp::LayerLayout::withPrefixSets(*this, prefixSets);
+    }
     juce::ValueTree captureLayerNode(int slot, const juce::Identifier& type) { return mu_pp::captureLayer(layerLayout, layerExtras, slot, type); }
     void            applyLayerNode(int slot, const juce::ValueTree& node)    { mu_pp::applyLayer(layerLayout, layerExtras, slot, node); }
     // A state in the composed shape: an older APVTS-dump state is rebuilt (`otherChild` receives

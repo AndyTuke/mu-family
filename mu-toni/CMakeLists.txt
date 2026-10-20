@@ -17,6 +17,8 @@ target_sources(mu-toni-layer INTERFACE
 )
 target_include_directories(mu-toni-layer INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
 set(MU_TONI_LAYER_UI_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/ArpContent.cpp")
+# Also visible to the sibling directories added after this one (mu-Tronic hosts the Arp type).
+set(MU_TONI_LAYER_UI_SOURCES "${MU_TONI_LAYER_UI_SOURCES}" PARENT_SCOPE)
 
 # ── mu-Toni — Standalone + VST3 + CLAP ──────────────────────────────────────
 juce_add_plugin(mu-toni

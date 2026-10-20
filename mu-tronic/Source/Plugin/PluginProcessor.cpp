@@ -1,5 +1,8 @@
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
+#include "Persistence/PresetFiles.h"    // mu-core: listPresetFiles
+
+#include <set>
 
 namespace mu_tronic
 {
@@ -20,7 +23,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     // ── The group buses (mu_limits::kMaxBuses, defined for this target): bus{B}_ strips and their inserts.
     mu_mixfx::addBusParams(layout);
 
-    // A layer type's own rows join here, per slot, when the type is registered (its addLayerParams).
+    // ── Every registered type's own rows, for every slot. A type's table is added once per prefix (the five mu-On
+    //    engines will share t{N}_), so each prefix exists on all sixteen slots and the type only selects the live one.
+    mu_core::LayerTypeRegistry types;
+    registerLayerTypes(types);
+    std::set<char> declaredPrefixes;
+    for (int t = 0; t < types.size(); ++t)
+    {
+        const auto& info = types.at(t);
+        if (info.addLayerParams == nullptr || ! declaredPrefixes.insert(info.paramPrefixLetter).second) continue;
+        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            info.addLayerParams(layout, i);
+    }
 
     // ── Shared global FX rack + returns + master (mu-core) ────────────────────
     mu_mixfx::addGlobalFxParams(layout, 2);   // swaps land on the bar until a looping type is registered
@@ -140,13 +154,54 @@ void PluginProcessor::setLayerName(int idx, const juce::String& name)
         layer->name = trimmed.toStdString();
 }
 
-// mu-Tronic has no layer-preset tree of its own: a slot's presets are its type's product folder (none registered yet).
-juce::File PluginProcessor::getLayerPresetDir() const { return {}; }
+void PluginProcessor::setSelectedSlot(int slot) noexcept
+{
+    selectedSlot.store(juce::jlimit(0, mu_limits::kMaxLayers - 1, slot), std::memory_order_relaxed);
+}
 
+// mu-Tronic has no layer-preset tree of its own: a type's presets are its product's own folder, shared with it
+// (never copied), next to this app's content folder: <TDP>/muToni/Arps for Arp.
+juce::File PluginProcessor::presetDirOf(const mu_core::LayerTypeInfo& info) const
+{
+    const auto content = getContentDir();
+    if (content == juce::File() || juce::String(info.contentFolderName).isEmpty() || juce::String(info.presetFolder).isEmpty())
+        return {};
+    return content.getSiblingFile(info.contentFolderName).getChildFile(info.presetFolder);
+}
+
+// The extension without its dot, as ProcessorBase::getLayerPresetExtension is spelled.
+static juce::String extensionOf(const mu_core::LayerTypeInfo& info)
+{
+    return juce::String(info.presetExtension).trimCharactersAtStart(".");
+}
+
+// The folder of the selected slot's type (none while that slot is Empty).
+juce::File PluginProcessor::getLayerPresetDir() const
+{
+    const auto* info = layerTypes.find(getLayerTypeId(selectedSlot.load(std::memory_order_relaxed)));
+    return info != nullptr ? presetDirOf(*info) : juce::File();
+}
+
+juce::String PluginProcessor::getLayerPresetExtension() const
+{
+    const auto* info = layerTypes.find(getLayerTypeId(selectedSlot.load(std::memory_order_relaxed)));
+    return info != nullptr ? extensionOf(*info) : juce::String();
+}
+
+// A filled slot lists its own type's presets; an Empty slot lists every offered type's, so any of them can be chosen.
 juce::Array<juce::File> PluginProcessor::slotPresetFiles(int slot) const
 {
-    juce::ignoreUnused(slot);
-    return {};   // a slot's presets are its type's product folder; an Empty slot lists the types' (none registered yet)
+    juce::Array<juce::File> out;
+    auto addType = [&](const mu_core::LayerTypeInfo& info)
+    {
+        for (const auto& f : mu_pp::listPresetFiles(presetDirOf(info), extensionOf(info)))
+            out.addIfNotAlreadyThere(f);
+    };
+    if (const auto* own = layerTypes.find(getLayerTypeId(slot)))
+        addType(*own);
+    else
+        for (int t = 0; t < layerTypes.size(); ++t) addType(layerTypes.at(t));
+    return out;
 }
 
 void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)

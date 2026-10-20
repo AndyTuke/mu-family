@@ -1159,6 +1159,10 @@ the processor**, with its own `bankLock`, since both already use the mu-core cla
 that type is added, message thread). The type's host adapter (2.2) reads it. This keeps the per-type shared state out of `Layer` and out of the
 processor class.
 
+**Stop-gap ruled 2026-10-20 (T1b step 1).** Until `LayerServices` exists, `mu_toni::sharedArpBank()` in `mu-toni/Source/Sequencer/ArpType.h` is a process-wide,
+read-only factory bank built on first use (message thread). Accepted for Arp only. It is **not copied for another type**: the first type that needs a bank or a
+`SampleLibrary` beyond Arp (Pattern at T1b, Rhythm later) first builds `LayerServices` here and Arp moves onto it in the same change.
+
 ### 2.5 Library structure: per-product layer libraries, no moves into mu-core
 
 Options: (a) move all voice code into `mu-core`; (b) one CMake `INTERFACE` library per product, `mu-clid-layer`, `mu-tant-layer`, `mu-toni-layer`,
@@ -1306,6 +1310,10 @@ stays unchanged, so nothing that is built now closes that door.
 builds into an `AudioProcessorValueTreeState` in about 535 to 541 ms in a Debug build on the development PC, about 12 MB of private memory; the real T1a layout is 269
 parameters (16 strips x 12, plus the globals). The test holds the Debug figure to 1,000 ms; the under-a-second budget is for the whole editor opening in Release, so
 **lazy per-type declaration is not needed yet**. Re-run the test when the first layer type is registered (T1b) and again when the fourth is.
+
+**Re-run with Arp registered (T1b step 1, 2026-10-20).** The real layout is now 1,359 parameters (the 269 of T1a, the T2 bus rows, and Arp's 63 rows on each of the sixteen
+slots, 1,008): the whole `PluginProcessor` builds in about 54 ms in a Debug build (measured while other suites ran on the same PC) and the synthetic 6,000-parameter layout still builds in
+about 520 to 560 ms, inside the 1,000 ms Debug budget. Lazy per-type declaration is still not needed. Re-run again when the fourth family is registered.
 
 **Interim at T1a (ruled 2026-10-19).** No type is registered, so no `r{N}_ a{N}_ v{N}_ t{N}_` parameter exists; `TronicState.h` reserves the placeholder prefix `mtrn{N}_`
 for the composed state (one prefix per slot, which is all `LayerLayout` holds). It never names a parameter. T1b replaces it: `LayerLayout` (mu-core, generic) takes a

@@ -54,6 +54,9 @@ namespace mu_core
         const char* group = "";                // the product it belongs to, for the chooser ("mu-Toni")
         char        paramPrefixLetter = 0;     // r / v / a / t: the slot's parameter prefix is <letter><slot>_
         const char* presetExtension = "";      // the layer-preset extension (".muArp")
+        const char* contentFolderName = "";    // the product's content folder under the shared TDP folder ("muToni")
+        const char* presetFolder = "";         // the layer-preset subfolder inside it ("Arps"): the type's presets
+                                               // are the product's own, shared with it and never copied
         AddParamsFn addLayerParams = nullptr;  // the type's parameter table for one slot (once per prefix)
         CreateFn    create = nullptr;          // a fresh default layer for `slot`, not yet prepared or bound
     };

@@ -78,14 +78,24 @@ namespace
     // Four live slots (more spares), all ArpT, in Published mode with the test types offered.
     struct TypedHost : FakeLayerHost
     {
-        explicit TypedHost(int live = 4) : FakeLayerHost(live, mu_core::LayerAccess::Published)
+        // `prefixLetters`: the types name their parameter prefixes (Hat 'x', the others 'v') and each slot carries both
+        // v{N}_ and x{N}_, as a typed slot host does; the x rows hold no parameters.
+        explicit TypedHost(int live = 4, bool prefixLetters = false) : FakeLayerHost(live, mu_core::LayerAccess::Published)
         {
-            auto offer = [this](LayerTypeId id, const char* name, mu_core::LayerTypeInfo::CreateFn fn)
+            auto offer = [this, prefixLetters](LayerTypeId id, const char* name, mu_core::LayerTypeInfo::CreateFn fn)
             {
                 mu_core::LayerTypeInfo i;
                 i.id = id; i.name = name; i.group = "Test"; i.create = fn;
+                if (prefixLetters) i.paramPrefixLetter = id == LayerTypeId::Hat ? 'x' : 'v';
                 layerTypes.add(i);
             };
+            if (prefixLetters)
+            {
+                std::vector<juce::StringArray> sets;
+                for (int s = 0; s < mu_limits::kMaxLayers; ++s)
+                    sets.push_back(juce::StringArray { "v" + juce::String(s) + "_", "x" + juce::String(s) + "_" });
+                initLayerStatePrefixSets(sets);
+            }
             offer(LayerTypeId::Arp,  "Arp",  &makeT<ArpT>);
             offer(LayerTypeId::Kick, "Kick", &makeT<KickT>);
             offer(LayerTypeId::Hat,  "Hat",  &makeT<FadingT>);
@@ -203,7 +213,103 @@ struct LayerTypeSwapTests : juce::UnitTest
         deleteEmptiesTheSlot();
         listEditsRefused();
         uiLetsGoFirst();
+        typedPrefixes();
+        followerRestarts();
+        resetLetsATailFinish();
         stress();
+    }
+
+    // A slot with several prefixes: setLayerType makes the new type's prefix live and resets only that one; a type
+    // with another prefix leaves the old rows dormant (untouched, never saved).
+    void typedPrefixes()
+    {
+        beginTest("a type change resets only the new type's prefix; the old type's rows stay dormant and are not saved");
+        auto box = std::make_unique<TypedHost>(4, true); auto& p = *box;
+        const auto rows = [&](int slot)
+        {
+            int n = 0;
+            const auto node = mu_pp::findLayerNode(p.captureComposedState(), slot);
+            for (int i = 0; i < node.getNumChildren(); ++i) n += node.getChild(i).hasType(mu_pp::kRowTag) ? 1 : 0;
+            return n;
+        };
+        expectEquals(rows(1), 0, "no type has been set through setLayerType: no prefix is live");
+
+        mu_seam_test::setParam(p.apvts, "v1_a", 0.9f);
+        expect(p.setLayerType(1, LayerTypeId::Kick));   // 'v'
+        expectWithinAbsoluteError(mu_seam_test::getParam(p.apvts, "v1_a"), 0.25f, 0.001f);
+        expectEquals(rows(1), 1);
+
+        mu_seam_test::setParam(p.apvts, "v1_a", 0.9f);
+        expect(p.setLayerType(1, LayerTypeId::Arp));   // the same prefix: reset again
+        expectWithinAbsoluteError(mu_seam_test::getParam(p.apvts, "v1_a"), 0.25f, 0.001f);
+
+        mu_seam_test::setParam(p.apvts, "v1_a", 0.9f);
+        expect(p.setLayerType(1, LayerTypeId::Hat));   // 'x': v1_ goes dormant
+        expectWithinAbsoluteError(mu_seam_test::getParam(p.apvts, "v1_a"), 0.9f, 0.001f);
+        expectEquals(rows(1), 0, "the dormant prefix is not written");
+        expect(p.setLayerType(1, LayerTypeId::Empty));
+        expectEquals(rows(1), 0);
+        p.flushPendingAsyncUpdates();
+    }
+
+    // C17: the strip's sidechain follower is zeroed by the audio thread at its next block start, never written from the
+    // message thread, after a type change and after a reset (also of an Empty slot).
+    void followerRestarts()
+    {
+        beginTest("a type change or reset asks the audio thread to restart the strip's follower from zero");
+        auto box = std::make_unique<TypedHost>(); auto& p = *box;
+        expect(p.setLayerType(2, LayerTypeId::Empty));   // a silent source
+        mu_seam_test::setParam(p.apvts, "ch1_scSrc", 3.0f);   // slot 2 (source numbers are 1-based)
+        mu_seam_test::setParam(p.apvts, "ch1_scAmt", 1.0f);
+        Run run(p, 8 * 256);
+        run.block(256);
+
+        p.mixerEngine.setSidechainEnv(1, 0.9f);
+        run.block(256);
+        expect(p.mixerEngine.getSidechainEnv(1) > 0.5f, "no change, no restart: the follower only decays a little");
+
+        p.mixerEngine.setSidechainEnv(1, 0.9f);
+        expect(p.setLayerType(1, LayerTypeId::Kick));
+        expectWithinAbsoluteError(p.mixerEngine.getSidechainEnv(1), 0.9f, 1.0e-6f, "setLayerType writes nothing the audio thread owns");
+        run.block(256);
+        expectEquals(p.mixerEngine.getSidechainEnv(1), 0.0f, "the next block starts from zero");
+
+        p.mixerEngine.setSidechainEnv(1, 0.9f);
+        p.resetLayer(1);
+        run.block(256);
+        expectEquals(p.mixerEngine.getSidechainEnv(1), 0.0f, "reset restarts it as well");
+
+        expect(p.setLayerType(1, LayerTypeId::Empty));
+        run.block(256);
+        p.mixerEngine.setSidechainEnv(1, 0.9f);
+        p.resetLayer(1);   // an Empty slot: no type change happens, the reset itself asks
+        run.block(256);
+        expectEquals(p.mixerEngine.getSidechainEnv(1), 0.0f, "reset of an Empty slot restarts it");
+        p.flushPendingAsyncUpdates();
+    }
+
+    // resetLayer on a Published host publishes twice (Empty, then the type again): a tail the first one parked must
+    // still sound out, and be freed.
+    void resetLetsATailFinish()
+    {
+        beginTest("resetLayer on a Published host: the old layer's tail finishes after the two publications");
+        constexpr int kBlock = 256;
+        auto box = std::make_unique<TypedHost>(); auto& p = *box;
+        auto refBox = std::make_unique<TypedHost>(); auto& ref = *refBox;
+        expect(p.setLayerType(1, LayerTypeId::Hat));
+        expect(ref.setLayerType(1, LayerTypeId::Kick));   // the same tone, no tail
+        Run run(p, 40 * kBlock), refRun(ref, 40 * kBlock);
+        for (int b = 0; b < 4; ++b) { run.block(kBlock); refRun.block(kBlock); }
+
+        p.resetLayer(1);
+        ref.resetLayer(1);
+        for (int b = 4; b < 40; ++b) { run.block(kBlock); refRun.block(kBlock); }
+        const auto level = [&](const AppendTap& t, int block) { return t.bufs[1].getMagnitude(0, block * kBlock, kBlock); };
+        expect(level(run.tap, 4) > level(refRun.tap, 4) + 0.01f, "the first block after the reset carries the tail");
+        expect(std::abs(level(run.tap, 39) - level(refRun.tap, 39)) < 1.0e-6f, "the tail has faded out");
+        p.flushPendingAsyncUpdates();
+        expectEquals(p.retireBin.countIn(mu_core::RetireBin::Parked) + p.retireBin.countIn(mu_core::RetireBin::Draining), 0);
+        expectEquals(p.retireBin.reclaimPending(), 0, "the old layer is freed");
     }
 
     void refusalsAndIdentity()

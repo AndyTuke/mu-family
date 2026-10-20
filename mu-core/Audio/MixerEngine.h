@@ -367,6 +367,15 @@ public:
             scEnv[channelIndex] = 0.0f;
     }
 
+    // Ask for one strip's follower to be zeroed. Any thread: the audio thread consumes the request at the start
+    // of its next block, so the follower (plain audio-thread state) is never written from the message thread
+    // while a block runs. Used when a slot's layer type changes under a running host.
+    void requestSidechainEnvReset(int channelIndex) noexcept
+    {
+        if (channelIndex >= 0 && channelIndex < MaxChannels)
+            scEnvResetRequest[channelIndex].store(true, std::memory_order_release);
+    }
+
     // Supply the DAW sidechain input bus pointers for the upcoming processBlock call.
     // Call with (nullptr, nullptr) when the bus is inactive. Pointers must remain
     // valid for the duration of processBlock — they are raw views into the host buffer.
@@ -396,6 +405,7 @@ public:
 private:
     double sampleRate = 44100.0;
     float  scEnv[MaxChannels] {};     // per-channel sidechain envelope state
+    std::atomic<bool> scEnvResetRequest[MaxChannels] {};   // set by requestSidechainEnvReset, cleared by the next block
     float  scRetEnv[3] {};            // per-return sidechain envelope state
     float  scBusEnv[(size_t) (kNumBuses > 0 ? kNumBuses : 1)] {};   // per-bus sidechain envelope state
 

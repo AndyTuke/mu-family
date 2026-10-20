@@ -272,8 +272,12 @@ its own and no new layer extension; its slots hold `Rhythm`, `Pattern`, `Arp`, o
 engine ids share `Track`'s prefix `t` and extension `.muTrack`; the `LayerTypeId` identifies the type, the saved engine selects it from a `.muTrack` file
 ([mu-tronic/design.md §1.4](mu-tronic/design.md)). Bus parameters are `bus{B}_` with insert parameters `bus{B}_i{I}_`; capacity constants `MU_MAX_LAYERS`, `MU_MAX_BUSES`, `MU_BUS_INSERTS`.
 Built at T1a (2026-10-19): the eight folders, `Persistence/{LayerTypes.*, TronicState.h}`, `Sequencer/EmptyLayer.h`, `UI/{EmptySlotChooser, TronicSettingsOverlay}`. `mtrn{N}_` in
-`TronicState.h` is a **placeholder composed-state prefix only**: no APVTS parameter and no saved file may carry it, and it goes when the layer types' own prefixes (`r a v t`)
-are registered (design.md 3.4, T1b). It is not a fifth parameter scheme.
+`TronicState.h` held a placeholder prefix; **replaced at T1b step 1 (2026-10-20)**. A mu-Tronic slot `N` carries one prefix per layer-type family, `r{N}_` (Rhythm),
+`v{N}_` (Pattern), `a{N}_` (Arp), `t{N}_` (Track: the five mu-On engines share it), declared on all sixteen slots from the start (`slotPrefixSets()`, letters in
+`kPrefixLetters`), each `LayerTypeInfo` naming its letter in `paramPrefixLetter`. Exactly one is **live** per slot, that of the slot's current type; only the live
+prefix is saved, applied, copied or reset (`LayerLayout::withPrefixSets`, `setLivePrefix`). These are the same four letters the list products use, not a new
+scheme; the mixer strip stays `ch{N}_`. A layer type that is hosted elsewhere also names `contentFolderName` and `presetFolder` (its product's own preset folder,
+shared, never copied: `<TDP>/muToni/Arps`).
 
 **Product naming pattern.** `mu-<Name>` in prose and artefacts (`mu-Clid`, `mu-Tant`), slug `mu-<name>` in
 folders and targets, namespace `mu_<name>`. A descriptive suffix (`mu-Clid MIDI`) is allowed only for a
