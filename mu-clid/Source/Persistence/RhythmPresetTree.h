@@ -45,6 +45,10 @@ inline const char* const kChannelSuffixes[] = {
     nullptr
 };
 
+// A sample path inside the Samples content folder as a path relative to it ("kicks/kick.wav"), so presets carry no
+// machine-specific folder; any other path unchanged.
+juce::String toRelativeSamplePath(const juce::String& absPath, const juce::File& samplesDir);
+
 // True for a sample path inside the embedded-sample decode folder (%TEMP%/muClid_samples), which does
 // not survive the OS session, so a save must embed the sample instead of writing the path.
 bool isEmbeddedSampleTempPath(const juce::String& path);

@@ -20,6 +20,8 @@ public:
     VoiceSection(ProcessorBase& base, RhythmHost& host);
 
     void setRhythm(int rhythmIndex);
+    // Unbinds from the rhythm (its modulation arcs and the insert's meter): setRhythm binds again.
+    void releaseLayer();
     void loadFromRhythm();
     void refreshSuffix(const juce::String& suffix);
 

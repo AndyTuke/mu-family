@@ -292,6 +292,7 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/SamplePreviewTests.cpp        # an oversize host block is chunked to the prepared size
     Source/Tests/GoldenRenderTests.cpp         # golden renders of the real processor (tests/golden/mu-clid)
     Source/Tests/ExtractionPinTests.cpp        # pins: drained tails, count policy, longest tail, edit mid-play, oversize, trigger source
+    Source/Tests/RhythmLayerRecordTests.cpp    # the stream of Tests/RhythmLayerFixture.h through the real processor (mu-Tronic renders the same one from a slot)
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_APVTS.cpp
     Source/Plugin/PluginProcessor_Content.cpp

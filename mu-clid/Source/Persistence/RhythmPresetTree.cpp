@@ -160,18 +160,6 @@ juce::String applyPresetSample(const PresetSample& smp, VoiceEngine& voice,
     return smp.rememberPath;
 }
 
-// When the sample path is inside the Samples content folder, return a path
-// relative to that folder (e.g. "kicks/kick.wav") so presets are
-// machine-agnostic. Otherwise return absPath unchanged.
-juce::String toRelativeSamplePath(const juce::String& absPath, const juce::File& samplesDir)
-{
-    if (absPath.isEmpty()) return absPath;
-    juce::File f(absPath);
-    if (f.isAChildOf(samplesDir))
-        return f.getRelativePathFrom(samplesDir);
-    return absPath;
-}
-
 // The preset's identity onto `r`: its name — `presetName` (matches the dropdown entry and the
 // file name) over the older `r0_name`, the slot's short historical name — and its colour.
 void applyPresetIdentity(const juce::ValueTree& state, Rhythm& r)
@@ -218,6 +206,18 @@ void embedSampleAt(juce::ValueTree& node, const juce::String& path)
 }
 
 } // namespace
+
+// When the sample path is inside the Samples content folder, return a path
+// relative to that folder (e.g. "kicks/kick.wav") so presets are
+// machine-agnostic. Otherwise return absPath unchanged.
+juce::String toRelativeSamplePath(const juce::String& absPath, const juce::File& samplesDir)
+{
+    if (absPath.isEmpty()) return absPath;
+    juce::File f(absPath);
+    if (f.isAChildOf(samplesDir))
+        return f.getRelativePathFrom(samplesDir);
+    return absPath;
+}
 
 // detect a sample path that points into our embedded-sample decode temp
 // dir (%TEMP%/muClid_samples/). These paths come from loading a preset whose

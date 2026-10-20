@@ -10,6 +10,7 @@
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/SaveDialog.h"
 #include "UI/RhythmHost.h"   // what the content reads from the layer's host
+#include "UI/LayerContent.h"   // mu-core: the base every layer type's content derives from
 
 class ProcessorBase;
 
@@ -20,7 +21,7 @@ namespace mu_clid {
 //   | VoiceSection (or, in MIDI output mode, MidiOutSection)
 // The header strip (name, presets, reset / delete) and the modulators belong to the LayerPanel;
 // this band wires the rhythm-specific header behaviour (attachHeader).
-class RhythmContent : public juce::Component,
+class RhythmContent : public LayerContent,
                     public juce::FileDragAndDropTarget,
                     public juce::AudioProcessorValueTreeState::Listener,
                     private juce::Timer
@@ -32,8 +33,13 @@ public:
     ~RhythmContent() override;
 
     // Bind the band to rhythm `index` (the LayerPanel calls this on a layer change).
-    void setLayer(int index);
+    void setLayer(int index) override;
     int  getLayer() const noexcept { return currentRhythmIndex; }
+
+    // Lets go of every modulation arc and the insert meter, which point into the shown rhythm's matrix and engine,
+    // before that layer is removed, replaced or moved; setLayer rebinds them. For a host that keeps one content
+    // for every Rhythm slot (mu-Tronic).
+    void releaseModulationArcs() override;
 
     // Wire the shared header bar's rhythm-specific behaviour (rename, preset list / load / save,
     // reset, delete). The LayerPanel owns the bar; this band only supplies what the buttons do.
@@ -52,9 +58,11 @@ public:
     void setKnownCategories(const juce::StringArray& cats);
     juce::StringArray getKnownCategories() const { return knownRhythmCategories; }
 
+    // A knob hover or change with the shown rhythm's colour (mu-Clid's status bar tints with it). When unset the
+    // base's colourless onStatusUpdate gets the same name and value, which is what a slot host listens to.
     std::function<void(const juce::String& name,
                        const juce::String& value,
-                       juce::Colour rhythmColour)> onStatusUpdate;
+                       juce::Colour rhythmColour)> onColouredStatus;
 
     // Fired when the shown rhythm's output mode (Sample / MIDI) changes, so the mixer can show its strip
     // active or inactive.
@@ -123,6 +131,7 @@ private:
     int topH    = 300;
     juce::Rectangle<int> sampleRect, circleRect, euclidRect, voiceRect;
 
+    void reportStatus(const juce::String& name, const juce::String& value);
     void loadSample();
     void updateOutputModeUi();   // show the voice band or the MIDI Out section, and the selector, for the shown rhythm
     void refreshRhythmPresets();

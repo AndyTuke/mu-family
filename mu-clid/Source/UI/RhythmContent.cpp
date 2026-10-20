@@ -167,16 +167,16 @@ RhythmContent::RhythmContent(ProcessorBase& base, RhythmHost& h)
 
     euclidPanel.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
     {
-        if (onStatusUpdate) onStatusUpdate(name, val, currentColour());
+        reportStatus(name, val);
     };
 
     voiceSection.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
     {
-        if (onStatusUpdate) onStatusUpdate(name, val, currentColour());
+        reportStatus(name, val);
     };
     midiOutSection.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
     {
-        if (onStatusUpdate) onStatusUpdate(name, val, currentColour());
+        reportStatus(name, val);
     };
 
     // The output selector writes r{N}_outMode and switches this panel's view at once.
@@ -186,9 +186,8 @@ RhythmContent::RhythmContent(ProcessorBase& base, RhythmHost& h)
         if (auto* prm = host.getRhythmParameters().getParameter("r" + juce::String(currentRhythmIndex) + "_outMode"))
             prm->setValueNotifyingHost(prm->convertTo0to1((float) idx));
         updateOutputModeUi();
-        if (onStatusUpdate)
-            onStatusUpdate("Output", idx == 1 ? "MIDI (sends notes, no audio from this rhythm)"
-                                              : "Sample (plays the loaded sample)", currentColour());
+        reportStatus("Output", idx == 1 ? "MIDI (sends notes, no audio from this rhythm)"
+                                        : "Sample (plays the loaded sample)");
     };
 
     voiceSection.onInsertAlgorithmChanged = [this](int charId)
@@ -333,6 +332,19 @@ void RhythmContent::setLayer(int index)
         refreshCircle();
     }
     repaint();
+}
+
+void RhythmContent::releaseModulationArcs()
+{
+    // Rebinding to no rhythm clears every knob's modulation binding and the insert meter's source.
+    euclidPanel.setRhythm(-1);
+    voiceSection.releaseLayer();
+}
+
+void RhythmContent::reportStatus(const juce::String& name, const juce::String& value)
+{
+    if (onColouredStatus)    onColouredStatus(name, value, currentColour());
+    else if (onStatusUpdate) onStatusUpdate(name, value);
 }
 
 void RhythmContent::refreshCircle()

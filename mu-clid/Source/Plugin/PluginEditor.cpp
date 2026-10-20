@@ -75,7 +75,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // Add, delete and reorder are wired by layerEdit (the shared LayerEditController).
 
     // ── RhythmContent callbacks ─────────────────────────────────────────────
-    rhythmContent.onStatusUpdate = [this](const juce::String& name,
+    rhythmContent.onColouredStatus = [this](const juce::String& name,
                                         const juce::String& val,
                                         juce::Colour col)
     {

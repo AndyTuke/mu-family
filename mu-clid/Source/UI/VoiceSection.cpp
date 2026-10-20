@@ -66,6 +66,12 @@ void VoiceSection::setRhythm(int ri)
     insertSub.setChannel(ri);
 }
 
+void VoiceSection::releaseLayer()
+{
+    setRhythm(-1);
+    insertSub.clearGRSource();   // the meter reads an atomic inside the rhythm's voice engine
+}
+
 void VoiceSection::loadFromRhythm()
 {
     pitchSub .loadFromRhythm();
