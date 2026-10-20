@@ -104,11 +104,11 @@ struct MuTronicLayerPresetTests : juce::UnitTest
         typeChangeCancelsStage();
     }
 
-    // Saves the slot's layer under `name` and returns the file in its type's folder.
-    juce::File saveFrom(PresetProcessor& p, int slot, const juce::String& name)
+    // Saves the slot's layer under `presetName` and returns the file in its type's folder.
+    juce::File saveFrom(PresetProcessor& p, int slot, const juce::String& presetName)
     {
-        p.saveLayerPreset(slot, name);
-        return p.typedLayerPresetDir(slot).getChildFile(name + "." + p.typedLayerPresetExtension(slot));
+        p.saveLayerPreset(slot, presetName);
+        return p.typedLayerPresetDir(slot).getChildFile(presetName + "." + p.typedLayerPresetExtension(slot));
     }
 
     void everyTypeNamesItsFile()
