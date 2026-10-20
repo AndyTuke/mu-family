@@ -32,33 +32,39 @@ public:
         const juce::ScopedLock sl(engineLock);
         rate = sampleRate;
         block = blockSize;
-        for (auto& e : engines)
-            if (e != nullptr) e->prepare(rate, block);
+        for (auto& pair : engines)
+            for (auto& e : pair)
+                if (e != nullptr) e->prepare(rate, block);
     }
 
-    // Message thread, before the slot's Pattern binds: the engine of `slot`, built (and prepared) on the slot's first
-    // use. The engine belongs to the slot, not to a Pattern: a replaced Pattern's fade-out tail and its successor
-    // both render through it, and it stays until the processor goes (design 2.1.10 point 3).
-    VoiceEngine* engineFor(int slot)
+    // Message thread, once for each new Pattern of `slot`, before it binds: the slot's engine for that tenant. A slot has
+    // a pool of two engines (built and prepared on the slot's first use) and each new Pattern takes the one its
+    // predecessor did not, so a Pattern replaced by another type fades out through its own engine while a successor put
+    // back into the slot inside the fade renders through the other: two layers never advance one engine's phase and
+    // filters in the same block. Nothing is allocated on the audio thread; a third Pattern inside one 25 ms fade would
+    // reuse the engine of the oldest tail (not reachable from the UI).
+    VoiceEngine* engineForNewLayer(int slot)
     {
         if (slot < 0 || slot >= mu_limits::kMaxLayers) return nullptr;
         const juce::ScopedLock sl(engineLock);
-        auto& e = engines[(size_t) slot];
-        if (e == nullptr)
-        {
-            e = std::make_unique<VoiceEngine>();
-            e->setBank(&bank);
-            e->setSlotIndex(slot, noiseSalt);
-            if (rate > 0.0) e->prepare(rate, block);
-        }
-        return e.get();
+        auto& pair = engines[(size_t) slot];
+        for (auto& e : pair)
+            if (e == nullptr)
+            {
+                e = std::make_unique<VoiceEngine>();
+                e->setBank(&bank);
+                e->setSlotIndex(slot, noiseSalt);
+                if (rate > 0.0) e->prepare(rate, block);
+            }
+        current[(size_t) slot] ^= 1;
+        return pair[(size_t) current[(size_t) slot]].get();
     }
 
-    // Message thread, the engine already built by engineFor (null before): what the Pattern's bindParams is handed.
-    // Allocates nothing and takes no lock, as a bindParams under layersLock requires.
+    // Message thread, the slot's current engine (the newest Pattern's; null before the first): what a Pattern's
+    // bindParams is handed. Allocates nothing and takes no lock, as a bindParams under layersLock requires.
     VoiceEngine* findEngine(int slot) const noexcept
     {
-        return slot >= 0 && slot < mu_limits::kMaxLayers ? engines[(size_t) slot].get() : nullptr;
+        return slot >= 0 && slot < mu_limits::kMaxLayers ? engines[(size_t) slot][(size_t) current[(size_t) slot]].get() : nullptr;
     }
 
     // The bank index of a wavetable file: found by path, else decoded OFF the lock (file read, WAV decode and FFT
@@ -66,6 +72,7 @@ public:
     // for the decode. -1 when unreadable. Message thread.
     int bankIndexFor(const juce::File& file)
     {
+        assertMessageThread();
         const juce::String path = file.getFullPathName();
         {
             const juce::ScopedLock sl(bankLock);   // the lookup walks the table list an append may reallocate
@@ -85,6 +92,7 @@ public:
     int resolveWavetable(const juce::String& path)
     {
         if (path.isEmpty()) return -1;
+        assertMessageThread();   // the lock-free lookup is sound only because every append is made on this thread
         if (const int found = bank.findByPath(path); found >= 0) return found;
         const juce::File f(path);
         return f.existsAsFile() ? bankIndexFor(f) : -1;
@@ -94,9 +102,17 @@ public:
     juce::CriticalSection       bankLock;   // guards appends to `bank` against the audio render, which try-locks it
 
 private:
+    // Debug check (headless tests with no MessageManager skip it): the bank's lookups and appends are one thread.
+    static void assertMessageThread() noexcept
+    {
+        if (auto* mm = juce::MessageManager::getInstanceWithoutCreating())
+            jassert(mm->isThisTheMessageThread());
+    }
+
     const juce::int64 noiseSalt = mu_core::makeNoiseSalt();   // per processor: slots of two instances do not share noise
     juce::CriticalSection engineLock;                          // the table of engines (creation, prepare)
-    std::array<std::unique_ptr<VoiceEngine>, (size_t) mu_limits::kMaxLayers> engines;
+    std::array<std::array<std::unique_ptr<VoiceEngine>, 2>, (size_t) mu_limits::kMaxLayers> engines;
+    std::array<int, (size_t) mu_limits::kMaxLayers> current {};   // which of the slot's two engines the newest Pattern uses
     double rate = 0.0;
     int    block = 0;
 };

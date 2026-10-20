@@ -135,7 +135,7 @@ struct Pattern : Layer
     // 0 Free, 1 Note. Any thread (one atomic store); a change resets the held keys on the next block.
     void setNoteMode(int mode) noexcept { noteMode.store(mode, std::memory_order_relaxed); }
     // Message thread, at creation before the layer is rendered: the mode it starts in, already settled (no reset).
-    void initNoteMode(int mode) noexcept { noteMode.store(mode, std::memory_order_relaxed); notes.lastMode = mode; notes.gateGain = mode == 1 ? 0.0f : 1.0f; }
+    void initNoteMode(int mode) noexcept { noteMode.store(mode, std::memory_order_relaxed); notes.lastMode = mode; notes.gateGain = mode == 1 ? 0.0f : 1.0f; notes.seeded = true; }
     // When true the layer gates its own output with Note mode's 8 ms ramp (a host with no final-mix gate:
     // mu-Tronic). The mu-Tant standalone leaves it off and gates the final mix instead (decision A3).
     // Message thread, before publication.
@@ -232,7 +232,14 @@ private:
         HeldNoteStack held;
         int   lastMode = 0;
         float gateGain = 1.0f;
+        bool  seeded = false;   // the gate has been settled by a first block (or initNoteMode): a later mode switch ramps it
     } notes;
+
+    // What the last live block rendered, for a tail (audio thread only, frozen when the layer leaves its slot): the
+    // held key's transposition and whether the pattern gate let anything through. A tail that ignored them would
+    // drone at the root while the live layer was gated silent.
+    float lastPitchOffset = 0.0f;
+    bool  lastGateOpen    = true;
     bool inputSeeded = false;   // message thread: notes reflect every block since the processor started
 
     // The retire snapshot: the OLD unmodulated config and the insert, frozen by beginRetire.
