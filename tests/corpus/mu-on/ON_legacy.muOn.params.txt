@@ -1,8 +1,8 @@
 # frozen load result for fixture: ON_legacy.muOn
 layers=5
 load_errors=0
-resave_bytes=29714
-resave_sha256=a056884678627de02da6f019e536d34346bb08e6c1cd477eb11471815e3d5aaa
+resave_bytes=33842
+resave_sha256=be25dd23a7ae0fdb3a8f649506e9ee972e1b464bfb9669f6a5683c34e69d1ae3
 --- parameters differing from default (id=plain value)
 ch1_scAmt=0.4
 ch1_scRel=120
