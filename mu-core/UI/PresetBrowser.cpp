@@ -24,17 +24,11 @@ PresetBrowser::PresetBrowser()
 
     performancesBtn.onClick = [this] { if (onChoosePerformance) onChoosePerformance(); };
     addChildComponent(performancesBtn);
-
-    importBtn.onClick = [this] { if (onImportProductPreset) onImportProductPreset(); };
-    importBtn.setTooltip("Lay the layers of a mu-Clid, mu-Tant, mu-Toni or mu-On preset into empty slots");
-    addChildComponent(importBtn);
 }
 
 void PresetBrowser::refreshFooter()
 {
     performancesBtn.setVisible(static_cast<bool>(onChoosePerformance) && ! pickCallback);
-    importBtn.setVisible(static_cast<bool>(onImportProductPreset) && ! pickCallback);
-    resized();   // the centre buttons share the footer's middle
 }
 
 void PresetBrowser::beginPick(std::function<void(const juce::File&)> picked)
@@ -229,14 +223,7 @@ void PresetBrowser::resized()
     closeBtn.setBounds(pad, h - botH + pad, btnW, botH - pad * 2);
     loadBtn .setBounds(w - pad - btnW, h - botH + pad, btnW, botH - pad * 2);
     const int perfW = s(MuLookAndFeel::kPerfBrowserBtnW);
-    // The centre buttons (Performances, Import) sit side by side, centred as a group.
-    const int importW = perfW + s(60);
-    const bool perfShown = static_cast<bool>(onChoosePerformance), importShown = static_cast<bool>(onImportProductPreset);
-    const int groupW = (perfShown ? perfW : 0) + (importShown ? importW : 0) + (perfShown && importShown ? pad : 0);
-    int bx = (w - groupW) / 2;
-    performancesBtn.setBounds(bx, h - botH + pad, perfW, botH - pad * 2);
-    if (perfShown) bx += perfW + pad;
-    importBtn.setBounds(bx, h - botH + pad, importW, botH - pad * 2);
+    performancesBtn.setBounds((w - perfW) / 2, h - botH + pad, perfW, botH - pad * 2);
 
     // List box fills the middle
     listBox.setBounds(0, topH, w, h - topH - botH);

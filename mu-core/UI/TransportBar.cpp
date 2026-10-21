@@ -90,6 +90,12 @@ TransportBar::TransportBar(mu_core::ShellBackend& backend)
             if (onChoosePerformance) onChoosePerformance();
             return;
         }
+        if (id == kImportItemId)
+        {
+            setLoadedPreset(getLoadedPresetFile());
+            if (onImportProductPreset) onImportProductPreset();
+            return;
+        }
         int idx = id - 1;
         if (idx >= 0 && idx < (int)presetFiles.size())
         {
@@ -605,6 +611,13 @@ void TransportBar::populatePresetDropdown()
     {
         presetDropdown.addSectionHeading("Performance");
         presetDropdown.addItem("Performances...", kPerformancesItemId);
+    }
+
+    // A product that can import other products' presets offers it in the same menu.
+    if (onImportProductPreset)
+    {
+        presetDropdown.addSectionHeading("Import");
+        presetDropdown.addItem("Import product preset...", kImportItemId);
     }
 }
 

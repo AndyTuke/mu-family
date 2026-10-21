@@ -273,8 +273,8 @@ mu-tronic reads and writes the **same layer-preset folders as the products**: `.
 
 ### 4.7a Import product preset (ruled 2026-10-21, T8b)
 
-- **Where:** the shared `PresetBrowser` footer, beside Load / Close, exactly as the "Performances" button is done: a new `std::function<void()> onImportProductPreset` that shows the button only while set (`refreshFooter()` decides), a `juce::TextButton`, no new control. mu-tronic's editor sets it; the products never do. The transport preset group is not touched.
-- **Button:** `Import product preset...` (the dots because a file chooser follows). Tooltip: `Lay the layers of a mu-Clid, mu-Tant, mu-Toni or mu-On preset into empty slots`.
+- **Where (amended by the implementer, same day):** the transport preset dropdown, as a section "Import" with one item beside "Performances...", set by a new `TransportBar::onImportProductPreset` (the entry shows only while set; the products never set it). The ruling named the `PresetBrowser` footer, but the browser is reached only as the Performance chooser's pick list (the dropdown replaced its Browse path), where the footer is hidden, so the footer button would be unreachable. No new control.
+- **Menu item:** `Import product preset...` (the dots because a file chooser follows).
 - **Chooser title:** `Import a product preset`. Filter `*.muClid;*.muTant;*.muToni;*.muOn`.
 - **Confirm:** none. Filled slots are never touched, so nothing is overwritten; the refusal below is the only guard.
 - **Status lines (StatusBar, family style):**
@@ -282,7 +282,7 @@ mu-tronic reads and writes the **same layer-preset folders as the products**: `.
   - too few slots: `Needs N free slots, 3 free` (N and the free count are numbers; nothing is imported)
   - unreadable or legacy file: `Could not read <file>` (nothing is imported)
   - wrong extension: `Not a product preset: <file>` (nothing is imported)
-- The browser closes after a success and stays open after any refusal.
+- Nothing else changes on screen after a success: the sidebar, the shown slot and the mixer refresh through the layer-commit hook.
 
 ### 4.8 Notes In: the per-layer MIDI channel (ruled 2026-10-21)
 

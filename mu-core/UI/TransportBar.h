@@ -85,6 +85,9 @@ public:
     bool enterPerformanceMode();
     // Set by the shell: with no performance chosen, entering opens the chooser instead of saying so.
     std::function<void()> onChoosePerformance;
+    // Set by a product that imports other products' presets (mu-Tronic): adds an "Import product preset..." entry to the
+    // preset dropdown, beside "Performances...". Call refreshPresets() after setting or clearing it.
+    std::function<void()> onImportProductPreset;
     // Leaving: press and hold the lit Perf button for kPerfExitHoldMs. The caller supplies the clock;
     // the bar's timer ticks it at the UI refresh rate and release or drag-off cancels.
     void beginExitHold(double nowMs);
@@ -167,6 +170,8 @@ private:
 
     // Dropdown id of the "Performances..." entry (preset ids are positions in the file list, far below this).
     static constexpr int kPerformancesItemId = 100000;
+    // Dropdown id of the "Import product preset..." entry.
+    static constexpr int kImportItemId = 100001;
     void updatePresetGroupVisibility();
 
     static constexpr int kLogoW      = 88;

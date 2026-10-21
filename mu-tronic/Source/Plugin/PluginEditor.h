@@ -44,8 +44,8 @@ private:
     // The shown slot's MIDI-in channel (the header's Notes In control reads and writes ch{N}_midiIn).
     int  notesInChannel() const;
     void setNotesInChannel(int channel);
-    // The Preset Browser's "Import product preset..." button: asks for a product's full preset and lays its layers into the
-    // Empty slots (PluginProcessor::importProductPreset); the browser closes after a success, the status bar reports either way.
+    // The preset menu's "Import product preset..." entry: asks for a product's full preset and lays its layers into the
+    // Empty slots (PluginProcessor::importProductPreset); the status bar reports the outcome either way.
     void chooseProductPreset();
     void importProductPreset(const juce::File& file);
     // The status bar's CPU readout, refreshed from the processor's peak four times a second.

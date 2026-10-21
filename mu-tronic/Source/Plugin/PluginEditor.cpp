@@ -128,9 +128,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     forwardKnobStatus(layerPanel);
 
-    // The browser's footer offers the product-preset import.
-    presetBrowser.onImportProductPreset = [this] { chooseProductPreset(); };
-    presetBrowser.refreshFooter();
+    // The transport's preset menu offers the product-preset import.
+    getTransportBar().onImportProductPreset = [this] { chooseProductPreset(); };
+    getTransportBar().refreshPresets();
 
     // The CPU readout: shown in Performance mode too (the one figure a player needs on stage).
     getStatusBar().setCpuMeterVisible(true);
@@ -145,7 +145,7 @@ PluginEditor::~PluginEditor()
     layerPanel.getHeader().onNameChanged = nullptr;   // the processor can outlive the editor
     proc.onLayerLeaving = nullptr;
     proc.onLayerPresetCommitted = nullptr;
-    presetBrowser.onImportProductPreset = nullptr;
+    getTransportBar().onImportProductPreset = nullptr;
 }
 
 void PluginEditor::chooseProductPreset()
@@ -163,10 +163,7 @@ void PluginEditor::importProductPreset(const juce::File& file)
 {
     const auto result = proc.importProductPreset(file);
     if (result.ok)
-    {
-        showPresetBrowser(false);
         getStatusBar().showParam("Import", result.message);
-    }
     else
         getStatusBar().showParam("Import failed", result.message, MuLookAndFeel::colour(MuLookAndFeel::knobLevel));
 }
