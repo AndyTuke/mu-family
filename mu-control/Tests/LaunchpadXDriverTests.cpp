@@ -115,15 +115,16 @@ public:
             ports.inject({ 0xB0, 19, 127 });   // lowest side button
             ports.inject({ 0xB0, 99, 127 });   // the logo
             ports.inject({ 0xA0, 11, 70 });    // polyphonic aftertouch
-            expectEquals((int) got.size(), 2);
-            if (got.size() == 2)
+            expectEquals((int) got.size(), 3);
+            if (got.size() == 3)
             {
                 expect(got[0].id == SurfaceControlId { ControlKind::Pad, 0, 7 });
                 expect(got[1].id == SurfaceControlId { ControlKind::Side, 0, 7 });
+                expect(got[2].id == SurfaceControlId { ControlKind::Special, 0, 0 } && got[2].type == SurfaceEventType::Press, "the logo is reported");
             }
         }
 
-        beginTest("a frame goes out as ONE lighting SysEx (80 lights; the logo stays unlit)");
+        beginTest("a frame goes out as ONE lighting SysEx (81 lights: 80 controls and the logo)");
         {
             FakeDevicePorts ports;
             LaunchpadXDriver d;
@@ -139,7 +140,7 @@ public:
             if (ports.sent.size() == 1)
             {
                 const auto& m = ports.sent[0];
-                expectEquals(entriesIn(m, 5), 80);
+                expectEquals(entriesIn(m, 5), 81);
                 expect(Bytes(m.begin(), m.begin() + 7) == Bytes { 0xF0, 0x00, 0x20, 0x29, 0x02, 0x0C, 0x03 });
                 expect(m.back() == 0xF7);
                 expect(Bytes(m.begin() + 7, m.begin() + 12) == entryFor(81, 0xFF8000));   // pad row 8 col 1, colour-corrected
@@ -212,9 +213,9 @@ public:
             expectEquals((int) ports.sent.size(), 2);
             if (ports.sent.size() == 2)
             {
-                expectEquals(entriesIn(ports.sent[0], 5), 80);
+                expectEquals(entriesIn(ports.sent[0], 5), 81);   // 80 controls and the logo
                 bool allOff = true;
-                for (int i = 0; i < 80; ++i)
+                for (int i = 0; i < 81; ++i)
                 {
                     const auto* e = ports.sent[0].data() + 7 + i * 5;
                     allOff = allOff && e[0] == 0x03 && e[2] == 0 && e[3] == 0 && e[4] == 0;
@@ -277,7 +278,7 @@ public:
             {
                 expect(ports.sent[0] == kProgrammerOn);
                 expect(ports.sent[1] == kAftertouchOff);
-                expectEquals(entriesIn(ports.sent[2], 5), 80);
+                expectEquals(entriesIn(ports.sent[2], 5), 81);
                 // The refresh walks the controls pads first, top row first, so entry 0 is the red pad.
                 expect(Bytes(ports.sent[2].begin() + 7, ports.sent[2].begin() + 12) == Bytes { 0x03, 81, 127, 0, 0 });
             }

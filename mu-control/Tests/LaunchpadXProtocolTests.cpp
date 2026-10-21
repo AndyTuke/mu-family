@@ -61,7 +61,8 @@ public:
         expectEquals(*indexOf({ ControlKind::Top, 7, 0 }), 98);
         expectEquals(*indexOf({ ControlKind::Side, 0, 7 }), 19);  // bottom button
         expectEquals(*indexOf({ ControlKind::Side, 0, 0 }), 89);  // top button
-        expect(! indexOf({ ControlKind::Special, 0, 0 }), "the logo has no index");
+        expectEquals(*indexOf({ ControlKind::Special, 0, 0 }), 99);   // the logo
+        expect(! indexOf({ ControlKind::Special, 1, 0 }) && ! indexOf({ ControlKind::Special, 0, 1 }), "there is one logo");
         expect(! indexOf({ ControlKind::Pad, 8, 0 }) && ! indexOf({ ControlKind::Pad, 0, -1 }));
         expect(! indexOf({ ControlKind::Top, 8, 0 }) && ! indexOf({ ControlKind::Side, 0, 8 }));
 
@@ -98,17 +99,33 @@ public:
             expect(encodeInput({ ControlKind::Pad, 0, 7 }, false) == noteVel0);
             expect(encodeInput({ ControlKind::Top, 2, 0 }, true) == Bytes { 0xB0, 93, 127 });
             expect(encodeInput({ ControlKind::Side, 0, 7 }, false) == Bytes { 0xB0, 19, 0 });
-            expect(encodeInput({ ControlKind::Special, 0, 0 }, true).empty());
+            expect(encodeInput({ ControlKind::Special, 0, 0 }, true) == Bytes { 0xB0, 99, 127 });
+            expect(encodeInput({ ControlKind::Special, 0, 0 }, false) == Bytes { 0xB0, 99, 0 });
             expect(decodeInput(noteVel0.data(), noteVel0.size())[0].type == SurfaceEventType::Release);
             expect(decodeInput(noteOff.data(), noteOff.size())[0].type == SurfaceEventType::Release);
         }
 
-        beginTest("input that is not a pad or button is ignored: logo, aftertouch, SysEx, strays, truncated");
+        beginTest("the logo reports its press and release like a button");
         {
-            const Bytes logo { 0xB0, 99, 127 }, polyAt { 0xA0, 11, 50 }, chanAt { 0xD0, 50 }, unknownNote { 0x90, 9, 100 },
+            const Bytes down { 0xB0, 99, 127 }, up { 0xB0, 99, 0 }, notePad { 0x90, 99, 100 };
+            const auto pressed  = decodeInput(down.data(), down.size());
+            const auto released = decodeInput(up.data(), up.size());
+            expectEquals((int) pressed.size(), 1);
+            expectEquals((int) released.size(), 1);
+            if (pressed.size() == 1 && released.size() == 1)
+            {
+                expect(pressed[0].id == SurfaceControlId { ControlKind::Special, 0, 0 } && pressed[0].type == SurfaceEventType::Press);
+                expect(released[0].id == pressed[0].id && released[0].type == SurfaceEventType::Release);
+            }
+            expect(decodeInput(notePad.data(), notePad.size()).empty(), "99 as a note is not on the grid");
+        }
+
+        beginTest("input that is not a pad or button is ignored: aftertouch, SysEx, strays, truncated");
+        {
+            const Bytes polyAt { 0xA0, 11, 50 }, chanAt { 0xD0, 50 }, unknownNote { 0x90, 9, 100 },
                         outOfGrid { 0x90, 19, 100 }, unknownCc { 0xB0, 7, 127 }, sysex { 0xF0, 0x00, 0x20, 0x29, 0x02, 0x0C, 0x0E, 0x01, 0xF7 },
                         stray { 0x40, 0xF8 }, truncated { 0x90, 11 };
-            for (const auto* m : { &logo, &polyAt, &chanAt, &unknownNote, &outOfGrid, &unknownCc, &sysex, &stray, &truncated })
+            for (const auto* m : { &polyAt, &chanAt, &unknownNote, &outOfGrid, &unknownCc, &sysex, &stray, &truncated })
                 expect(decodeInput(m->data(), m->size()).empty());
             expect(decodeInput(nullptr, 0).empty());
         }

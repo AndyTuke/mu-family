@@ -9,6 +9,7 @@ target_sources(mu-control-tests PRIVATE
     SurfaceDescriptionTests.cpp
     SurfaceMappingTests.cpp
     SurfaceModelTests.cpp
+    SurfaceSceneTests.cpp
     LaunchpadXProtocolTests.cpp
     LaunchpadXDriverTests.cpp
     LaunchpadXColourMapTests.cpp

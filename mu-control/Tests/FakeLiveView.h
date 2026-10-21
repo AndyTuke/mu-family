@@ -26,6 +26,9 @@ struct FakeLiveView : mu_core::LiveView
     bool                   playing       = false;   // the internal clock runs
     bool                   outside       = false;   // a host / clock owns play
     bool                   otherApp      = false;   // another mu app could take the surface
+    bool                   sceneControls = false;   // the product offers the scene picker
+    SceneLaunch            lastScene;
+    std::array<uint8_t, 8> foreignClips {};         // bit n of layer l set = its clip n is of another layer type
 
     // Item n is in use (a preset of this product).
     void useItem(int n)
@@ -54,6 +57,10 @@ struct FakeLiveView : mu_core::LiveView
     bool isTransportPlaying() const override { return playing; }
     bool isTransportOwnedOutside() const override { return outside; }
     bool isOtherAppAvailable() const override { return otherApp; }
+    bool hasSceneControls() const override { return sceneControls; }
+    SceneLaunch getLastSceneLaunch() const override { return lastScene; }
+    bool isClipForLayer(int layer, int clip) const override
+    { return layer < 0 || layer >= 8 || clip < 0 || clip >= 8 || ((foreignClips[(size_t) layer] >> clip) & 1) == 0; }
     void addListener(Listener* l) const override    { listeners.add(l); }
     void removeListener(Listener* l) const override { listeners.remove(l); }
 

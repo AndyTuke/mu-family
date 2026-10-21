@@ -1,4 +1,5 @@
 #include "Surface/SurfaceModel.h"
+#include "Control/SceneState.h"
 #include <algorithm>
 #include <cmath>
 
@@ -61,9 +62,10 @@ float pulsePhase(double nowMs, float hz) noexcept
 }
 
 SurfaceModel::SurfaceModel(mu_core::ControlSink& s, const mu_core::LiveView& v, SurfaceMapping m,
-                           const mu_core::SurfaceLook& l, Clock c)
-    : sink(s), view(v), mapping(std::move(m)), bindings(mapping.bindings()), look(l), clock(std::move(c))
+                           const mu_core::SurfaceLook& l, Clock c, SurfaceProfile p)
+    : sink(s), view(v), mapping(std::move(m)), bindings(mapping.bindings()), look(l), clock(std::move(c)), profile(std::move(p))
 {
+    sceneFlashMs.fill(-1.0e12);
     lastPlaying.fill(-2);
     burstStartMs.fill(-1.0e12);
     arrowFlashMs.fill(-1.0e12);
@@ -85,9 +87,47 @@ void SurfaceModel::setMapping(SurfaceMapping m)
     if (onChanged) onChanged();
 }
 
+void SurfaceModel::closeScenePicker()
+{
+    if (! sceneHeld) return;
+    sceneHeld = false;
+    if (onChanged) onChanged();
+}
+
 bool SurfaceModel::handle(const SurfaceEvent& event)
 {
+    // The scene hold: its press opens the picker and its release closes it. Not a ControlAction, so it is read before the mapping.
+    if (profile.sceneHold && event.id == *profile.sceneHold)
+    {
+        const bool down = event.type == SurfaceEventType::Press && view.isPerformanceMode();
+        if (event.type != SurfaceEventType::Value && down != sceneHeld)
+        {
+            sceneHeld = down;
+            if (onChanged) onChanged();
+        }
+        return false;
+    }
+
     if (event.type != SurfaceEventType::Press) return false;
+
+    // While the hold is down a pad is a scene: column n launches clip n on every layer that stores one. A column nobody
+    // stores is dark and shows no light, but the press still goes to the sink so the screen can say the scene is empty.
+    if (sceneHeld && event.id.kind == ControlKind::Pad)
+    {
+        if (event.id.x < 0 || event.id.x >= mu_limits::kClipsPerLayer) return false;
+        mu_core::ControlAction scene;
+        scene.type  = mu_core::ControlActionType::LaunchScene;
+        scene.index = event.id.x;
+        const bool lit      = mu_core::sceneInfo(view, event.id.x).state != mu_core::SceneState::Empty;
+        const bool accepted = sink.perform(scene);
+        if (accepted && lit)
+        {
+            sceneFlashMs[(size_t) event.id.x] = clock();   // the column flashes white once
+            if (onChanged) onChanged();
+        }
+        return accepted;
+    }
+
     const auto action = mapping.actionFor(event.id);
     if (! action) return false;
 
@@ -246,13 +286,23 @@ std::vector<LedState> SurfaceModel::frame(double nowMs, bool* animating) const
     if (animating != nullptr) *animating = false;
     trackPlayingClips(nowMs);                     // before the mode test, so entering the mode does not burst every pad
     if (view.getQueuedItem() < 0) pulsingArrow = -1;   // the switch landed or was cancelled: the arrow stops pulsing
-    if (! view.isPerformanceMode()) return out;   // outside the mode the surface is dark
+    if (! view.isPerformanceMode()) { sceneHeld = false; return out; }   // outside the mode the surface is dark, and no hold survives it
 
     for (const auto& b : bindings)
     {
         const auto light = lightFor(b.action, nowMs);
         if (light.level == Level::Off) continue;
+        applyLight(out, b.id, light, nowMs, animating);
+    }
 
+    if (sceneHeld) lightScenePicker(out, nowMs, animating);   // over the grid: the picker replaces what the pads meant
+    return out;
+}
+
+void SurfaceModel::applyLight(std::vector<LedState>& out, const SurfaceControlId& id, const Light& light, double nowMs, bool* animating) const
+{
+    const auto& d = mapping.getDescription();
+    {
         // Phase: pick the final colour and mode for what the surface can show.
         uint32_t rgb  = light.rgb;
         LedMode  mode = LedMode::Static;
@@ -297,10 +347,44 @@ std::vector<LedState> SurfaceModel::frame(double nowMs, bool* animating) const
         }
         if (light.settle && d.colour == ColourSupport::Rgb && animating != nullptr) *animating = true;
 
-        const auto it = std::find_if(out.begin(), out.end(), [&](const LedState& l) { return l.id == b.id; });
+        const auto it = std::find_if(out.begin(), out.end(), [&](const LedState& l) { return l.id == id; });
         if (it != out.end()) { it->rgb = rgb; it->mode = mode; }
     }
-    return out;
+}
+
+// The scene picker (mu-Tronic): each grid column c is scene c, lit as a whole in white, the colour no layer uses. Playing
+// (every layer that stores the clip plays it) full white; stored on some layer white x kArrowRestScale; waiting on some
+// layer pulses; nobody stores it: dark. An accepted press flashes its column once. The logo is lit white while it is held.
+void SurfaceModel::lightScenePicker(std::vector<LedState>& out, double nowMs, bool* animating) const
+{
+    const auto& d = mapping.getDescription();
+    const int columns = std::min(d.gridWidth, (int) mu_limits::kClipsPerLayer);
+    for (int x = 0; x < columns; ++x)
+    {
+        Light light;   // Off: a column nobody stores is dark, and that also clears what the pad meant a moment ago
+        switch (mu_core::sceneInfo(view, x).state)
+        {
+            case mu_core::SceneState::Playing: light = { Level::Bright, look.whiteRgb }; break;
+            case mu_core::SceneState::Stored:  light = { Level::Bright, scaleRgb(look.whiteRgb, kArrowRestScale) }; break;
+            case mu_core::SceneState::Queued:  light = { Level::Pulse, look.whiteRgb }; break;
+            case mu_core::SceneState::Empty:   break;
+        }
+        const double since = nowMs - sceneFlashMs[(size_t) x];
+        if (light.level != Level::Off)
+        {
+            if (since >= 0.0 && since < (double) look.stepFlashMs) light = { Level::Burst, look.whiteRgb, false };
+            else light.settle = light.level == Level::Bright && since >= 0.0 && since < (double) look.stepFlashMs + kBurstTailMs;
+        }
+        for (int y = 0; y < d.gridHeight; ++y)
+        {
+            const SurfaceControlId pad { ControlKind::Pad, x, y };
+            const auto it = std::find_if(out.begin(), out.end(), [&](const LedState& l) { return l.id == pad; });
+            if (it != out.end()) { it->rgb = 0; it->mode = LedMode::Static; }
+            if (light.level != Level::Off) applyLight(out, pad, light, nowMs, animating);
+        }
+    }
+
+    if (profile.sceneHold && hasControl(d, *profile.sceneHold)) applyLight(out, *profile.sceneHold, { Level::Bright, look.whiteRgb }, nowMs, animating);
 }
 
 std::vector<LedState> SurfaceModel::render() const { return frame(clock(), nullptr); }

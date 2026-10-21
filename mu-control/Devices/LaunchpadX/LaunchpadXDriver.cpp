@@ -61,6 +61,7 @@ void LaunchpadXDriver::close()
             for (int x = 0; x < 8; ++x) off.push_back({ { ControlKind::Pad, x, y }, 0, LedMode::Static });
         for (int i = 0; i < 8; ++i) off.push_back({ { ControlKind::Top, i, 0 }, 0, LedMode::Static });
         for (int i = 0; i < 8; ++i) off.push_back({ { ControlKind::Side, 0, i }, 0, LedMode::Static });
+        off.push_back({ { ControlKind::Special, 0, 0 }, 0, LedMode::Static });   // the logo too, in case a scene hold lit it
         sendLights(off);
         ports->sendMessage(launchpadx::programmerMode(false));
         ports->flush();   // the Live-mode message must reach the pad before the port is torn down
@@ -87,7 +88,7 @@ bool LaunchpadXDriver::sendLights(const std::vector<LedState>& leds)
 {
     std::vector<launchpadx::PadLight> lights;
     for (const auto& l : leds)
-        if (const auto index = launchpadx::indexOf(l.id))   // the logo has no index and stays unlit
+        if (const auto index = launchpadx::indexOf(l.id))
             lights.push_back({ *index, l.mode, rgb ? launchpadx::padRgbFor(l.rgb) : l.rgb });   // RGB lighting gets the pad's colour correction
     if (lights.empty()) return true;
 
