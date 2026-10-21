@@ -516,7 +516,10 @@ struct LayerSwapPublishedTests : juce::UnitTest
     void noClickAtTheCut()
     {
         beginTest("a cut and a resume of steady layers make no step: decay into the silence, fade back in, at block sizes 1, 7, 64 and 512");
-        for (const int blockSize : { 1, 7, 64, 512 })
+        // (block size, blocks skipped): long skips at the sizes of before, and one skipped block at sizes where that block
+        // plus the first rendered one is shorter than the decay.
+        const std::pair<int, int> cases[] = { { 1, 300 }, { 7, 43 }, { 64, 5 }, { 512, 2 }, { 8, 1 }, { 16, 1 }, { 32, 1 }, { 64, 1 } };
+        for (const auto& [blockSize, skipCount] : cases)
         {
             auto box = std::make_unique<SwapHost>(); auto& p = *box;
             p.setUseLayerRenderForTest(true);
@@ -536,13 +539,13 @@ struct LayerSwapPublishedTests : juce::UnitTest
             for (int b = 0; b < 2000 / blockSize + 2; ++b) steady = feed(false);
             expect(std::abs(steady) > 0.05f, "the layers sound (" + juce::String(steady, 4) + ")");
 
-            const int skipBlocks = juce::jmax(2, 300 / blockSize);
+            const int skipBlocks = skipCount;
             p.layerEditInFlight.store(true);
             for (int b = 0; b < skipBlocks; ++b) feed(true);
             p.layerEditInFlight.store(false);
             for (int b = 0; b < 1000 / blockSize + 2; ++b) after = feed(true);
 
-            const juce::String tag = "block " + juce::String(blockSize) + ": ";
+            const juce::String tag = "block " + juce::String(blockSize) + ", " + juce::String(skipCount) + " skipped: ";
             expect(worst < 0.03f * std::abs(steady) + 0.002f, tag + "largest step " + juce::String(worst, 5) + " against a level of " + juce::String(steady, 4));
             expectWithinAbsoluteError(after, steady, 1.0e-4f, tag + "and the level comes back");
         }

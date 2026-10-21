@@ -38,7 +38,9 @@ void ProcessorBase::prepareLayerRender(double sampleRate, int maxBlockSize)
     renderState.mixCount = 0;
     renderState.midiIn = renderState.liveOut = renderState.tailOut = 0;
     renderState.dropped = 0;
-    renderState.inSkip = false;
+    renderState.inSkip = renderState.lastWasSkip = false;
+    renderState.carried = 0;   // events held for a block that will not come: a prepare starts a fresh stream
+    renderState.carryDropped = 0;
     renderState.fadePos = LayerRenderState::kFadeIn;
     for (int c = 0; c < 2; ++c) renderState.lastOut[c] = renderState.tailLevel[c] = renderState.tailStep[c] = 0.0f;
 
@@ -128,12 +130,12 @@ void ProcessorBase::noteSkippedBlock(const mu_core::BlockTransport& t, juce::Aud
     if (editSkip && layerAccess.mode == mu_core::LayerAccess::Published)
     {
         auto& rs = renderState;
-        if (! rs.inSkip)
+        if (! rs.lastWasSkip)
         {
-            rs.inSkip = true;
             rs.fadePos = 0;
             for (int c = 0; c < 2; ++c) { rs.tailLevel[c] = rs.lastOut[c]; rs.tailStep[c] = rs.lastOut[c] / (float) LayerRenderState::kSkipDecay; }
         }
+        rs.inSkip = rs.lastWasSkip = true;
         const int n = buffer.getNumSamples();
         for (int c = 0; c < juce::jmin(2, buffer.getNumChannels()); ++c)
         {
@@ -314,10 +316,13 @@ void ProcessorBase::declickMaster(juce::AudioBuffer<float>& buffer, int numSampl
                 level = std::abs(level) > std::abs(step) ? level - step : 0.0f;
                 d[i] = d[i] * gain + level;
             }
+            if (rs.inSkip) rs.tailLevel[c] = level;
         }
         rs.fadePos = juce::jmin(LayerRenderState::kFadeIn, rs.fadePos + numSamples);
-        rs.inSkip = false;
+        // The decay ends when it has reached zero: a short skipped block plus a short first block may not have run it out.
+        rs.inSkip = rs.tailLevel[0] != 0.0f || rs.tailLevel[1] != 0.0f;
     }
+    rs.lastWasSkip = false;
     for (int c = 0; c < numCh; ++c) rs.lastOut[c] = numSamples > 0 ? buffer.getSample(c, numSamples - 1) : 0.0f;
 }
 
