@@ -36,16 +36,30 @@ juce::Rectangle<int> StatusBar::linkBoundsFor(const juce::String& text, int righ
     return { rightEdge - w, 0, w, height };
 }
 
-// The Support link sits at the bar's right edge.
+// The CPU readout's fixed slot at the extreme right edge, so its digits never move the text beside it.
+juce::Rectangle<int> StatusBar::cpuBounds() const
+{
+    using mu_ui::s;
+    return { getWidth() - s(MuLookAndFeel::kSpaceS) - s(MuLookAndFeel::kStatusCpuW), 0, s(MuLookAndFeel::kStatusCpuW), getHeight() };
+}
+
+int StatusBar::linksRightEdgeFor(int width, bool cpuVisible) noexcept
+{
+    using mu_ui::s;
+    const int edge = width - s(4);
+    return cpuVisible ? edge - (s(MuLookAndFeel::kStatusCpuW) + s(MuLookAndFeel::kSpaceS)) : edge;
+}
+
+// The Support link sits at the bar's right edge (left of the CPU readout when that is on).
 juce::Rectangle<int> StatusBar::supportLinkBounds() const
 {
-    return linkBoundsFor("Support", getWidth() - mu_ui::s(4), getHeight());
+    return linkBoundsFor("Support", linksRightEdgeFor(getWidth(), cpuVisible), getHeight());
 }
 
 // The update link sits just left of the Support link, or at the right edge without one.
 juce::Rectangle<int> StatusBar::updateLinkBounds() const
 {
-    const int right = supportLinkVisible ? supportLinkBounds().getX() : getWidth() - mu_ui::s(4);
+    const int right = supportLinkVisible ? supportLinkBounds().getX() : linksRightEdgeFor(getWidth(), cpuVisible);
     return linkBoundsFor("Update available", right, getHeight());
 }
 
@@ -57,6 +71,46 @@ void StatusBar::setUpdateLinkVisible(bool visible, const juce::String& tooltip)
     updateLinkHover   = false;
     setMouseCursor(juce::MouseCursor::NormalCursor);
     repaint();
+}
+
+int StatusBar::cpuPercentFor(float load) noexcept
+{
+    return juce::jmax(0, juce::roundToInt(load * 100.0f));
+}
+
+// The band is read from the shown whole percent, so a number never turns amber while it still reads under the threshold.
+StatusBar::CpuLevel StatusBar::cpuLevelFor(float load) noexcept
+{
+    const int pct = cpuPercentFor(load);
+    if (pct >= juce::roundToInt(MuLookAndFeel::kCpuHotAt * 100.0f))  return CpuLevel::Hot;
+    if (pct >= juce::roundToInt(MuLookAndFeel::kCpuWarnAt * 100.0f)) return CpuLevel::Warn;
+    return CpuLevel::Normal;
+}
+
+void StatusBar::setCpuMeterVisible(bool visible)
+{
+    if (cpuVisible == visible) return;
+    cpuVisible = visible;
+    repaint();   // the links move with it
+}
+
+void StatusBar::setCpuLoad(float load)
+{
+    const int pct = cpuPercentFor(load);
+    if (pct == cpuPercent) return;
+    const auto now = juce::Time::getMillisecondCounter();
+    if (cpuVisible && now - cpuPaintedAt < (juce::uint32) kCpuRepaintMs) return;   // the next call catches up
+    cpuPercent   = pct;
+    cpuPaintedAt = now;
+    if (cpuVisible) repaint(cpuBounds());
+}
+
+juce::String StatusBar::getTooltip()
+{
+    if (updateLinkHover) return updateTooltip;
+    if (cpuVisible && cpuBounds().contains(getMouseXYRelative()))
+        return "Audio load: processing time as a share of the time available, peak of the last second.";
+    return {};
 }
 
 void StatusBar::mouseMove(const juce::MouseEvent& e)
@@ -102,7 +156,31 @@ void StatusBar::paint(juce::Graphics& g)
     g.setColour(MuLookAndFeel::colour(Id::statusBarBackground));
     g.fillAll();
 
-    // Support link at the right edge (unlicensed only); drawn first so the parameter text,
+    // CPU readout at the extreme right edge: "CPU" in the label colour, the number in the value colour, or amber / red
+    // once the load is high. Right-aligned in its fixed slot.
+    if (cpuVisible)
+    {
+        const juce::Font cpuFont(juce::FontOptions{}.withHeight(sf(11.0f)));
+        g.setFont(cpuFont);
+        auto width = [&cpuFont](const juce::String& t)
+        {
+            juce::GlyphArrangement ga;
+            ga.addLineOfText(cpuFont, t, 0.0f, 0.0f);
+            return (int) std::ceil(ga.getBoundingBox(0, ga.getNumGlyphs(), true).getWidth());
+        };
+        const auto slot = cpuBounds();
+        const juce::String number = juce::String(cpuPercent) + "%", label = "CPU ";
+        const int numberW = width(number), labelW = width(label);
+        const int x = slot.getRight() - numberW;
+        const float shown = (float) cpuPercent / 100.0f;
+        const auto level = cpuLevelFor(shown);
+        g.setColour(MuLookAndFeel::colour(Id::statusBarText));
+        g.drawText(label, x - labelW, 0, labelW, slot.getHeight(), juce::Justification::centredRight, false);
+        g.setColour(MuLookAndFeel::colour(level == CpuLevel::Hot ? Id::vuMeterClip : level == CpuLevel::Warn ? Id::vuMeterMid : Id::statusBarValue));
+        g.drawText(number, x, 0, numberW + 1, slot.getHeight(), juce::Justification::centredLeft, false);
+    }
+
+    // Support link (unlicensed only), left of the CPU readout when that is on; drawn first so the parameter text,
     // which is centred, never needs to know about it.
     if (supportLinkVisible)
     {
@@ -146,7 +224,8 @@ void StatusBar::paint(juce::Graphics& g)
     };
     // The parameter text never runs under the links at the right edge: it is cut with an ellipsis there.
     const int rightLimit = (updateLinkVisible ? updateLinkBounds().getX()
-                                              : supportLinkVisible ? supportLinkBounds().getX() : getWidth()) - s(8);
+                                              : supportLinkVisible ? supportLinkBounds().getX()
+                                              : cpuVisible ? cpuBounds().getX() : getWidth()) - s(8);
     const float nameW = measureW(currentName);
     const float sepW  = measureW("  ");
     const float valW  = measureW(currentValue);
