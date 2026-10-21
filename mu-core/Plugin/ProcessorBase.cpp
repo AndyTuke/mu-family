@@ -105,6 +105,8 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
         return l == nullptr || ! layersAreSlots() || ! l->clips->isOccupied(clip)
             || layerPresetType(l->clips->get(clip)) == slotTypeId(layer);   // the same test launchClip makes
     };
+    cb.clipboardEmpty   = [] { return ! mu_core::clipClipboard().hasClip(); };
+    cb.canPasteClip     = [this](int layer) { return canPasteClip(layer); };
     cb.hasSceneControls = [this] { return offersSceneControls(); };
     cb.hasLayerPages    = [this] { return offersLayerPages(); };
     cb.transportPlaying = [this] { return isInternalPlaying(); };

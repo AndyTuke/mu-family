@@ -48,6 +48,13 @@ public:
     // (it arrives only by loading a layer preset of another type over the slot). False = launching it does nothing.
     virtual bool                          isClipForLayer(int layer, int clip) const { juce::ignoreUnused(layer, clip); return true; }
 
+    // The clip clipboard as the clip menu enables its items: something is on it, and this layer would take it
+    // (the same type check a paste makes). Defaults suit a view with no clipboard.
+    virtual bool                          isClipboardEmpty() const { return true; }
+    virtual bool                          canPasteClip(int layer) const { juce::ignoreUnused(layer); return false; }
+    // A full preset is staged and not yet committed: it will replace every layer and bank, so the clip menu stays shut.
+    virtual bool                          isFullPresetStaged() const { return false; }
+
     // The last scene launch (LaunchScene), so the screen can say what a press did wherever it came from: which clip,
     // on how many layers it launched or already played, and a serial that changes with every launch (0 = none yet).
     struct SceneLaunch { int clip = -1; int layers = 0; uint32_t serial = 0; };

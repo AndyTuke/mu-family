@@ -32,6 +32,7 @@ struct FakeView : LiveView
     uint8_t mask[kLayers] {};
     uint8_t foreign[kLayers] {};   // bit n set = the layer's clip n is of another layer type than the layer's
     bool muted[kLayers] {};
+    bool clipboardEmpty = true, pasteFits = true, fullStaged = false;   // the clip clipboard and a staged full preset
     mu_pp::PerformanceFile performance;
     mutable juce::ListenerList<Listener> listeners;
 
@@ -50,6 +51,9 @@ struct FakeView : LiveView
     uint8_t getClipMask(int l) const override { return l >= 0 && l < kLayers ? mask[l] : (uint8_t) 0; }
     bool isLayerMuted(int l) const override { return l >= 0 && l < kLayers && muted[l]; }
     bool isClipForLayer(int l, int c) const override { return l < 0 || l >= kLayers || ((foreign[l] >> c) & 1) == 0; }
+    bool isClipboardEmpty() const override { return clipboardEmpty; }
+    bool canPasteClip(int) const override { return ! clipboardEmpty && pasteFits; }
+    bool isFullPresetStaged() const override { return fullStaged; }
     juce::String names[kLayers][8];
     juce::String getClipName(int l, int c) const override
     { return l >= 0 && l < kLayers && c >= 0 && c < 8 ? names[l][c] : juce::String(); }
@@ -192,7 +196,7 @@ public:
         {
             Rig r;
             r.set({ 0, 2, 4 }, 2);
-            r.strip.clickPad(4, false);
+            r.strip.clickPad(4);
             expect(r.sent(ControlActionType::LaunchClip, 4), "launch");
             expectEquals((int) r.sink.got.size(), 1);
             expect(r.asked.empty(), "no confirm");
@@ -200,61 +204,43 @@ public:
             // The playing pad: one LaunchClip, which the owner turns into a mute; the strip says what happened.
             r.sink.hook = [&](const ControlAction&) { r.view.muted[1] = ! r.view.muted[1]; r.view.changed(); };
             r.sink.got.clear();
-            r.strip.clickPad(2, false);
+            r.strip.clickPad(2);
             expect(r.sent(ControlActionType::LaunchClip, 2), "mute is a launch of the playing clip");
             expect(r.lines.contains("Mute|Kick muted"), "muted");
-            r.strip.clickPad(2, false);
+            r.strip.clickPad(2);
             expect(r.lines.contains("Mute|Kick unmuted"), "unmuted");
 
             // With another clip queued, the same press cancels the queue; it is not announced as a mute.
             r.sink.hook = nullptr;
             r.set({ 0, 2, 4 }, 2, 4);
             r.lines.clear();
-            r.strip.clickPad(2, false);
+            r.strip.clickPad(2);
             expect(r.sent(ControlActionType::LaunchClip, 2));
             expect(! r.lines.contains("Mute|Kick muted") && ! r.lines.contains("Mute|Kick unmuted"), "no mute line for a cancel");
 
             // The queued pad: nothing new for the strip to decide; the sink treats it as already on its way.
             r.sink.got.clear();
-            r.strip.clickPad(4, false);
+            r.strip.clickPad(4);
             expect(r.sent(ControlActionType::LaunchClip, 4));
         }
 
-        beginTest("click on an empty pad stores without asking; Shift+click stores anywhere, asking only when it would replace a stored, non-playing clip");
+        beginTest("click on an empty pad stores without asking; a stored pad is never overwritten by a store");
         {
             Rig r;
             r.set({ 0, 2 }, 2);
 
-            r.strip.clickPad(5, false);
+            r.strip.clickPad(5);
             expect(r.sent(ControlActionType::StoreClip, 5), "empty pad: store");
             expect(r.asked.empty(), "and no confirm: nothing is lost");
             expect(r.lines.contains("Clip|Stored Kick clip 6"), "status line");
 
             r.sink.got.clear();
-            r.strip.clickPad(6, true);
-            expect(r.sent(ControlActionType::StoreClip, 6) && r.asked.empty(), "Shift+click on an empty pad: no confirm");
-
-            r.sink.got.clear();
-            r.strip.clickPad(2, true);
-            expect(r.sent(ControlActionType::StoreClip, 2) && r.asked.empty(), "Shift+click on the playing clip updates it without asking");
-
-            r.sink.got.clear();
-            r.strip.clickPad(0, true);   // stored, not playing
-            expectEquals((int) r.sink.got.size(), 0, "nothing is written before the answer");
-            expectEquals((int) r.asked.size(), 1);
-            expectEquals(r.asked[0].title, juce::String("Replace Clip"));
-            expectEquals(r.asked[0].message, juce::String("Replace clip 1 of \"Kick\" with its current state?\nThis cannot be undone."));
-            expectEquals(r.asked[0].button, juce::String("Replace"));
-            r.asked[0].go();
-            expect(r.sent(ControlActionType::StoreClip, 0), "confirmed: stored");
-
-            r.sink.got.clear();
-            r.asked.clear();
-            r.strip.clickPad(0, true);   // asked again, then cancelled: the dialog never calls back
-            expect(r.sink.got.empty() && r.asked.size() == 1, "cancelled: nothing written");
+            r.strip.storePad(0);   // stored, not playing
+            r.strip.storePad(2);   // the playing clip
+            expect(r.sink.got.empty() && r.asked.empty(), "store only ever writes an empty pad");
         }
 
-        beginTest("clear asks first and only works on a stored clip; the right-click menu maps to store and clear");
+        beginTest("clear asks first and only works on a stored clip; the menu results map to their actions");
         {
             Rig r;
             r.set({ 0, 2 }, 2);
@@ -278,8 +264,7 @@ public:
             expect(r.sent(ControlActionType::StoreClip, 5) && r.asked.empty(), "menu Store here on an empty pad");
             r.sink.got.clear();
             r.strip.menuChosen(0, ClipStrip::menuStore);
-            expect(r.sink.got.empty() && r.asked.size() == 1 && r.asked[0].title == "Replace Clip", "menu Store here asks like Shift+click");
-            r.asked.clear();
+            expect(r.sink.got.empty() && r.asked.empty(), "Store here does nothing on a stored pad");
             r.strip.menuChosen(0, ClipStrip::menuClear);
             expect(r.asked.size() == 1 && r.asked[0].title == "Clear Clip", "menu Clear asks");
             r.asked.clear();
@@ -291,20 +276,18 @@ public:
         {
             Rig r;
             r.set({ 0 }, 0);
-            r.strip.clickPad(-1, false); r.strip.clickPad(8, false); r.strip.storePad(9); r.strip.clearPad(-3);
+            r.strip.clickPad(-1); r.strip.clickPad(8); r.strip.storePad(9); r.strip.clearPad(-3);
             expect(r.sink.got.empty() && r.asked.empty());
 
-            r.strip.clickPad(0, true);   // playing: stores at once
-            r.sink.got.clear();
             r.set({ 0, 1 }, 0);
-            r.strip.clickPad(1, true);   // stored, not playing: asks
+            r.strip.clearPad(1);   // stored, not playing: asks
             expectEquals((int) r.asked.size(), 1);
             r.strip.setLayer(2);
             r.asked[0].go();
             expect(r.sink.got.empty(), "the layer changed while the dialog was open");
 
             ClipStrip loose;
-            loose.clickPad(0, false); loose.storePad(0); loose.clearPad(0);   // nothing bound: no crash
+            loose.clickPad(0); loose.storePad(0); loose.clearPad(0); loose.pastePad(0); loose.copyPad(0); loose.cutPad(0);   // nothing bound: no crash
             expect(loose.getLamp(0) == Lamp::Empty);
         }
 
@@ -315,8 +298,10 @@ public:
             r.view.perf = true;
             r.view.changed();
             expect(r.strip.isReadOnly());
-            r.strip.clickPad(0, false); r.strip.clickPad(5, false); r.strip.clickPad(0, true);
-            r.strip.storePad(0); r.strip.clearPad(2); r.strip.menuChosen(2, ClipStrip::menuClear);
+            r.view.clipboardEmpty = false;
+            r.strip.clickPad(0); r.strip.clickPad(5);
+            r.strip.storePad(5); r.strip.copyPad(0); r.strip.cutPad(0); r.strip.pastePad(5); r.strip.clearPad(2);
+            r.strip.menuChosen(2, ClipStrip::menuClear);
             expect(r.sink.got.empty() && r.asked.empty(), "no press does anything");
 
             r.set({ 0, 2 }, 0, 2);   // the surface launched clip 0 and queued 2
@@ -327,7 +312,7 @@ public:
 
             r.view.perf = false;
             r.view.changed();
-            r.strip.clickPad(5, false);
+            r.strip.clickPad(5);
             expect(r.sent(ControlActionType::StoreClip, 5), "leaving the mode gives the strip back");
         }
 
@@ -422,20 +407,19 @@ public:
             r.view.changed();
             r.lines.clear();
             const auto before = r.strip.getLamp(4);
-            r.strip.clickPad(4, false);
+            r.strip.clickPad(4);
             expect(r.sink.got.empty(), "nothing is staged");
             expect(r.lines.contains("Clip|Clip 5 is for a different layer type"), r.lines.joinIntoString(" / "));
             expect(r.strip.getLamp(4) == before, "no light changes");
 
             r.lines.clear();
-            r.strip.clickPad(0, false);
+            r.strip.clickPad(0);
             expect(r.sent(ControlActionType::LaunchClip, 0), "a clip of the layer's own type still launches");
             expect(! r.lines.contains("Clip|Clip 1 is for a different layer type"));
 
-            r.strip.clickPad(4, true);   // Shift still stores over it, asking first as for any stored clip that is not playing
-            expectEquals((int) r.asked.size(), 1);
-            if (! r.asked.empty()) expectEquals(r.asked[0].title, juce::String("Replace Clip"));
         }
+
+        runMenuTests();
 
         beginTest("Reset confirm: the clips line appears only when the bank is not empty");
         {
@@ -530,6 +514,137 @@ public:
                                     + ", empty " + juce::String(brightness(5)) + ")";
             expect(brightness(0) > brightness(1), "playing brighter than stored" + seen);
             expect(brightness(1) > brightness(5), "stored brighter than empty" + seen);
+        }
+    }
+
+private:
+    // The right-click clip menu: which items are enabled per pad state, what each sends, the confirms, the lock.
+    // Kept apart from runTest so no single function grows a large stack frame.
+    void runMenuTests()
+    {
+        beginTest("menu states: empty pad, stored pad, playing pad");
+        {
+            Rig r;
+            r.set({ 0, 2 }, 2);
+            const auto empty = r.strip.menuStateFor(5);
+            expect(empty.store && ! empty.copy && ! empty.cut && ! empty.clear, "empty pad: only Store here");
+            const auto stored = r.strip.menuStateFor(0);
+            expect(! stored.store && stored.copy && stored.cut && stored.clear, "stored pad: Copy, Cut, Clear");
+            const auto playing = r.strip.menuStateFor(2);
+            expect(! playing.store && playing.copy && playing.cut && playing.clear, "the playing pad is a stored pad");
+            expect(! r.strip.menuStateFor(-1).store && ! r.strip.menuStateFor(8).copy, "no pad, no items");
+        }
+
+        beginTest("menu Paste: enabled with a fitting clip, otherwise disabled with the reason as its tooltip");
+        {
+            Rig r;
+            r.set({ 0 }, -1);
+            auto st = r.strip.menuStateFor(0);
+            expect(! st.paste && st.pasteTip == "Nothing copied", "clipboard empty");
+            r.view.clipboardEmpty = false;
+            r.view.pasteFits = false;
+            st = r.strip.menuStateFor(5);
+            expect(! st.paste && st.pasteTip == "Clip is for a different layer type", "clipboard holds another layer type");
+            r.view.pasteFits = true;
+            expect(r.strip.menuStateFor(5).paste && r.strip.menuStateFor(0).paste, "empty and stored pads both take it");
+            expect(r.strip.menuStateFor(5).pasteTip.isEmpty(), "no tooltip when enabled");
+        }
+
+        beginTest("menu items send their action; only Clear and Paste over a stored clip ask");
+        {
+            Rig r;
+            r.set({ 0, 2 }, 2);
+            r.view.clipboardEmpty = false;
+
+            r.strip.menuChosen(5, ClipStrip::menuStore);
+            expect(r.sent(ControlActionType::StoreClip, 5) && r.asked.empty());
+            expect(r.lines.contains("Clip|Stored Kick clip 6"));
+
+            r.strip.menuChosen(0, ClipStrip::menuCopy);
+            expect(r.sent(ControlActionType::CopyClip, 0) && r.asked.empty());
+            expect(r.lines.contains("Clip|Copied Kick clip 1"));
+
+            r.strip.menuChosen(0, ClipStrip::menuCut);
+            expect(r.sent(ControlActionType::CutClip, 0) && r.asked.empty(), "Cut does not ask");
+            expect(r.lines.contains("Clip|Cut Kick clip 1"));
+
+            r.sink.got.clear();
+            r.strip.menuChosen(6, ClipStrip::menuPaste);
+            expect(r.sent(ControlActionType::PasteClip, 6) && r.asked.empty(), "Paste onto an empty pad does not ask");
+            expect(r.lines.contains("Clip|Pasted Kick clip 7"));
+
+            r.sink.got.clear();
+            r.strip.menuChosen(0, ClipStrip::menuPaste);   // stored, not playing
+            expect(r.sink.got.empty() && r.asked.size() == 1, "nothing is written before the answer");
+            expectEquals(r.asked[0].title, juce::String("Replace Clip"));
+            expectEquals(r.asked[0].message, juce::String("Replace clip 1 of \"Kick\" with the copied clip?\nThis cannot be undone."));
+            expectEquals(r.asked[0].button, juce::String("Replace"));
+            r.asked[0].go();
+            expect(r.sent(ControlActionType::PasteClip, 0));
+
+            r.sink.got.clear();
+            r.asked.clear();
+            r.strip.menuChosen(2, ClipStrip::menuPaste);   // the playing pad asks too (the processor then relaunches it)
+            expect(r.asked.size() == 1 && r.asked[0].title == "Replace Clip" && r.sink.got.empty());
+            r.asked[0].go();
+            expect(r.sent(ControlActionType::PasteClip, 2));
+
+            r.sink.got.clear();
+            r.asked.clear();
+            r.strip.menuChosen(2, ClipStrip::menuClear);
+            expect(r.asked.size() == 1 && r.asked[0].title == "Clear Clip" && r.sink.got.empty());
+            r.asked[0].go();
+            expect(r.sent(ControlActionType::ClearClip, 2));
+            expect(r.lines.contains("Clip|Cleared Kick clip 3"));
+        }
+
+        beginTest("menu: a paste the layer would refuse says so and sends nothing; an empty clipboard is silent");
+        {
+            Rig r;
+            r.set({ 0 }, -1);
+            r.strip.pastePad(5);
+            expect(r.sink.got.empty() && r.asked.empty() && r.lines.isEmpty(), "nothing copied");
+
+            r.view.clipboardEmpty = false;
+            r.view.pasteFits = false;
+            r.strip.pastePad(5);
+            expect(r.sink.got.empty() && r.asked.empty(), "nothing sent");
+            expect(r.lines.contains("Clip|Clip 6 is for a different layer type"), r.lines.joinIntoString(" / "));
+        }
+
+        beginTest("menu is shut in Performance mode and while a full preset is staged, and a late answer writes nothing");
+        {
+            Rig r;
+            r.set({ 0, 2 }, 2);
+            r.view.clipboardEmpty = false;
+            r.strip.menuChosen(0, ClipStrip::menuClear);   // the dialog opens
+            expectEquals((int) r.asked.size(), 1);
+
+            r.view.fullStaged = true;
+            r.view.changed();
+            expect(r.strip.isMenuBlocked());
+            const auto st = r.strip.menuStateFor(0);
+            expect(! st.store && ! st.copy && ! st.cut && ! st.paste && ! st.clear, "every item off");
+            r.asked[0].go();
+            expect(r.sink.got.empty(), "the staged preset arrived while the dialog was open");
+            r.asked.clear();
+            for (int id : { (int) ClipStrip::menuStore, (int) ClipStrip::menuCopy, (int) ClipStrip::menuCut,
+                            (int) ClipStrip::menuPaste, (int) ClipStrip::menuClear })
+                r.strip.menuChosen(id == ClipStrip::menuStore ? 5 : 0, id);
+            expect(r.sink.got.empty() && r.asked.empty(), "no item does anything with a full preset staged");
+
+            r.view.fullStaged = false;
+            r.view.perf = true;
+            r.view.changed();
+            expect(r.strip.isMenuBlocked() && ! r.strip.menuStateFor(0).copy);
+            r.strip.menuChosen(0, ClipStrip::menuCopy);
+            r.strip.menuChosen(0, ClipStrip::menuPaste);
+            expect(r.sink.got.empty() && r.asked.empty(), "and none in Performance mode");
+
+            r.view.perf = false;
+            r.view.changed();
+            r.strip.menuChosen(0, ClipStrip::menuCopy);
+            expect(r.sent(ControlActionType::CopyClip, 0), "reopened");
         }
     }
 };
