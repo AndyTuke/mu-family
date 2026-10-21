@@ -45,6 +45,8 @@ public:
         std::function<bool(int, int)> launchClip;            // stage clip c on layer n (false = refused, nothing staged)
         std::function<void()>         beginStageBatch;       // a scene opens a staging batch (optional): its layers reach a boundary together
         std::function<void()>         endStageBatch;         // and closes it
+        std::function<void(int, int)> preloadClip;           // warm clip c of layer n (its files) before the batch opens (optional)
+        std::function<void(int)>      markSceneSlot;         // layer n's staged clip belongs to the scene (optional)
         std::function<bool(int)>      slotPending;           // layer n has a staged layer preset not yet committed
         std::function<uint32_t(int)>  slotSerial;            // changes whenever layer n is staged or cancelled (identity)
         std::function<void(int)>      cancelSlot;            // drop layer n's staged layer preset

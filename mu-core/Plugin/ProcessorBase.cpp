@@ -64,6 +64,11 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
     cb.launchClip   = [this](int layer, int clip) { return launchClip(layer, clip); };
     cb.beginStageBatch = [this] { layerSwapper.beginBatch(); };
     cb.endStageBatch   = [this] { layerSwapper.endBatch(); };
+    cb.markSceneSlot   = [this](int layer) { layerSwapper.markScene(layer); };
+    cb.preloadClip     = [this](int layer, int clip)
+    {
+        if (auto* l = getLayer(layer); l != nullptr && l->clips->isOccupied(clip)) l->preloadStaged(l->clips->get(clip));
+    };
     cb.slotPending  = [this](int layer) { return hasPendingSwap(layer); };
     cb.slotSerial   = [this](int layer) { return slotStageSerial(layer); };
     cb.cancelSlot   = [this](int layer) { cancelPendingSwap(layer); };

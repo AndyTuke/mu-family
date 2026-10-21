@@ -138,14 +138,21 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     midiMessages.clear();
     mergeLayerMidiOut(midiMessages, kMidiOutEvents * midiEventBytes(3));
 
-    // Hot-swap: flag staged presets whose boundary passed in this block. Swap timing "On bar" lands every staged layer on the
-    // bar line, so the layers of a scene share one boundary; the other two settings use each slot's own loop (loopBeats), as
-    // mu-Tronic has no master loop yet.
+    // Hot-swap: flag staged presets whose boundary passed in this block. The boundary is the bar line of the transport's meter
+    // when the swap timing is "On bar", and always for a layer staged by a scene, so a scene lands on one line whatever the
+    // timing; any other staged payload waits for its slot's own loop (mu-Tronic has no master loop yet). The timing and the
+    // bar length are read once per block.
     const float swapRaw = swapTimingParam != nullptr ? swapTimingParam->load(std::memory_order_relaxed) : 0.0f;
-    if (mu_hotswap::swapTimingFromIndex(std::isfinite(swapRaw) ? (int) std::lround(swapRaw) : 0) == mu_hotswap::SwapTiming::OnBar)
-        flagSwapBoundaries(transport.playing, transport.startBeat, transport.blockBeats);
-    else
-        flagLayerSwapBoundaries(transport);
+    const bool  onBar   = mu_hotswap::swapTimingFromIndex(std::isfinite(swapRaw) ? (int) std::lround(swapRaw) : 0) == mu_hotswap::SwapTiming::OnBar;
+    int meterNum = 4, meterDen = 4;
+    getTimeSignature(meterNum, meterDen);
+    const double barBeats = meterNum > 0 && meterDen > 0 ? (double) meterNum * 4.0 / (double) meterDen : mu_hotswap::kBarBeats;
+    flagSwapBoundaries(transport.playing, transport.startBeat, transport.blockBeats,
+                       [this, onBar, barBeats](int slot) noexcept
+                       {
+                           if (slot == mu_hotswap::kFullPreset) return onBar ? barBeats : 4.0;
+                           return onBar || layerSwapper.isSceneSlot(slot) ? barBeats : layerLoopBeats(slot);
+                       });
 
     cpuMeter.end(buffer.getNumSamples(), meterRate);
 }

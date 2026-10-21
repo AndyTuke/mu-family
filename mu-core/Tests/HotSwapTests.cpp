@@ -58,6 +58,57 @@ struct HotSwapTests : juce::UnitTest
             expectEquals((int) log.events.size(), 4);
         }
 
+        beginTest("a pass skipped by a batch does not advance the play state: the stop edge it could not act on is seen by the next pass");
+        {
+            Log log; Swapper sw; wire(log, sw);
+            sw.flagBoundaries(true, 0.0, 0.1);   // running
+            sw.beginBatch();
+            sw.stageSlot(2, 7);
+            expect(! sw.flagBoundaries(false, 1.0, 0.0), "the stop edge falls inside the batch: nothing flags");
+            sw.endBatch();
+            expect(sw.flagBoundaries(false, 1.0, 0.0), "the next pass still sees the play-to-stop edge and flags the slot");
+            sw.commit();
+            expectEquals((int) log.events.size(), 1);
+            expect(! sw.flagBoundaries(false, 1.0, 0.0), "and the edge is spent once it has been acted on");
+        }
+
+        beginTest("a pass whose batch began after its tokens were read does not advance the play state either");
+        {
+            Log log; Swapper sw; wire(log, sw);
+            sw.flagBoundaries(true, 0.0, 0.1);
+            sw.stageSlot(1, 9);
+            bool opened = false;
+            // The loop-length callback runs between the token reads and the second steadiness check: open a batch there.
+            const bool first = sw.flagBoundaries(false, 1.0, 0.0, [&](int) noexcept { if (! opened) { sw.beginBatch(); opened = true; } return 4.0; });
+            expect(! first, "the second check failed: nothing flagged");
+            sw.endBatch();
+            expect(sw.flagBoundaries(false, 1.0, 0.0), "the next pass sees the stop edge and flags the slot");
+        }
+
+        beginTest("scene membership: marked after its stage, ends with a commit, a cancel or a plain stage");
+        {
+            Log log; Swapper sw; wire(log, sw);
+            sw.flagBoundaries(true, 0.0, 0.1);
+            sw.stageSlot(0, 1);
+            expect(! sw.isSceneSlot(0));
+            sw.markScene(0);
+            expect(sw.isSceneSlot(0));
+            sw.markScene(1);
+            expect(! sw.isSceneSlot(1), "a slot with nothing pending cannot be marked");
+            sw.cancel(0);
+            expect(! sw.isSceneSlot(0));
+            sw.stageSlot(0, 2); sw.markScene(0);
+            sw.stageSlot(0, 3);
+            expect(! sw.isSceneSlot(0), "a later plain stage is not the scene's");
+            sw.markScene(0);
+            sw.flagBoundaries(true, 3.95, 0.2);
+            sw.commit();
+            expect(! sw.isSceneSlot(0), "the commit ends it");
+            sw.stageSlot(2, 4); sw.markScene(2);
+            sw.stageFull(5);
+            expect(! sw.isSceneSlot(2), "a full preset supersedes it");
+        }
+
         beginTest("a staging batch: stagings outside a batch behave as before");
         {
             Log log; Swapper sw; wire(log, sw);

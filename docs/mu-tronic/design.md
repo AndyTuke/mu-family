@@ -1520,15 +1520,20 @@ A scene is **an action across layers**, designed into the base now so no product
 
 - **Definition.** Scene n = launch clip n of every non-empty layer. The clip bank stays per layer (`Layer::clips`, 8 clips); a scene is only the index, so scenes are
   as many as clips (`ClipBank::kClips`, 8) and nothing new is saved. A layer with no clip n is left playing as it is (a scene never stops a layer; a pad on an empty
-  clip does nothing, as now). A layer whose clip n carries a different type from the slot cannot occur (section 3.4: the bank is cleared on a type change).
+  clip does nothing, as now). A layer whose clip n carries a different type from the slot is skipped: `launchClip` refuses a clip whose type differs from the slot's, the bank is cleared on a type change, and a state restore drops mismatched clips (section 3.4). A layer already playing clip n is left alone (a scene never mutes it) and a different clip it has queued is cancelled.
 - **Placement.** `ProcessorBase::launchScene(int clipIndex)` (message thread, generic, no product name), built on the existing per-layer clip launch. A new
   `ControlAction::LaunchScene(n)` in `mu-core/Control/` (device-independent; the Perf shield rules of the existing clip actions apply), so any controller or MIDI
   mapping can fire it, as `PerformanceItem(n)` can.
-- **Timing and atomicity.** Each layer's launch is the existing staged swap and commits at the boundary chosen by the global swap-timing (Master loop, Layer loop,
-  Bar). With Master loop or Bar all layers commit on the same line. To stop a boundary falling between the first and last staging call, the scene stages all layers
-  inside one `layersLock`-guarded batch (`LayerSwapper::stageBatch`, or an equivalent single "staging open" gate the audio thread honours): the audio thread sees
-  either none or all of a scene. **S-kind work for the `dsp-controller`** (Stage T8a); the proof is a test that stages a scene while blocks run and asserts all
-  commits share one boundary under Bar timing.
+- **Timing and atomicity (as built, T8a).** A scene lands on **one line whatever the swap-timing setting**: each layer's launch is the existing staged swap, but
+  the payloads a scene stages are marked (`LayerSwapper::markScene`, a bit per slot that ends with the payload) and mu-Tronic asks the bar line of the transport's
+  meter (`numerator * 4 / denominator` beats, read once per block) for those slots, and for every slot under "On bar"; an ordinary staged load keeps its slot's own
+  loop. The scene stages all layers inside one **sequence-gated batch** (`LayerSwapper::beginBatch` / `endBatch`, held by the `StageBatch` guard, not nestable): the
+  gate is a sequence number, odd while open. The audio thread's flag pass reads the sequence, reads every token, decides, and flags only if the sequence is unchanged
+  and even, so a boundary takes all of a scene's layers or none (a boundary that falls inside the window is lost and the scene waits for the next one, so the window
+  holds only the staging calls: clip files are preloaded before it opens). A skipped pass does not advance the pass's remembered play state, so a play-to-stop edge is
+  not lost. No lock is taken on the audio thread. **Not built:** the C7 commit. `runDeferredWork` still applies each flagged layer one by one on the message thread
+  (after the poll, up to about 10 ms late), so the layers of a scene are flagged at the same boundary but not applied in the same block; the `frozenMask` provision
+  exists in the view and in `RenderContext::frozen`, but no layer type honours it yet. Recorded as an open follow-up.
 - **Controller feedback.** A queued scene lights the clip column; surface and screen design is the `ux-controller`'s ([design-launchpad.md](../design-launchpad.md) lists the
   Launchpad mapping as still open).
 

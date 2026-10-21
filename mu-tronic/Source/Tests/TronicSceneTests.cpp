@@ -97,7 +97,9 @@ struct MuTronicSceneTests : juce::UnitTest
     {
         clipsCarryTheirType();
         sceneLaunchesEveryLayer();
-        sceneLandsTogetherOnTheBar();
+        sceneLandsTogetherOnTheBar(2, 4, 4);   // On bar, 4/4
+        sceneLandsTogetherOnTheBar(1, 4, 4);   // On layer loop: a scene still shares the bar line
+        sceneLandsTogetherOnTheBar(0, 3, 4);   // On master loop (no master loop here), 3/4
         stateKeepsTheBanks();
         performanceOfFullPresets();
     }
@@ -190,15 +192,17 @@ struct MuTronicSceneTests : juce::UnitTest
         p.flushPendingAsyncUpdates();
     }
 
-    void sceneLandsTogetherOnTheBar()
+    void sceneLandsTogetherOnTheBar(int timing, int numerator, int denominator)
     {
-        beginTest("a scene played at the bar timing: every launched layer is staged, and all land in the same block");
+        beginTest("a scene lands on one bar line whatever the swap timing (timing " + juce::String(timing) + ", meter "
+                  + juce::String(numerator) + "/" + juce::String(denominator) + "): all layers staged, all land in the same block");
         mu_seam_test::TempStorage storage;
         SceneProcessor p;
         build(p);
         std::vector<juce::String> rows;
         fillBanks(p, rows);
-        mu_seam_test::setParam(p.apvts, "mstr_swap", 2.0f);   // Bar
+        mu_seam_test::setParam(p.apvts, "mstr_swap", (float) timing);
+        p.setTimeSignature(numerator, denominator);
         p.flushPendingAsyncUpdates();
 
         Player player(p);
@@ -220,6 +224,10 @@ struct MuTronicSceneTests : juce::UnitTest
             if (pending == 0) landedBlock = b;
         }
         expect(landedBlock >= 0, "it landed");
+        const double barBeats = (double) numerator * 4.0 / (double) denominator;
+        const double landedBeat = (double) (landedBlock + 5) * Player::kBlock * 2.0 / 48000.0;   // 120 bpm
+        expect(std::abs(landedBeat - barBeats) < 0.1 || std::abs(landedBeat - 2.0 * barBeats) < 0.1,
+               "on the meter's bar line: beat " + juce::String(landedBeat) + " for a bar of " + juce::String(barBeats));
         for (int i = 0; i < 5; ++i)
         {
             expectEquals(p.getLiveView()->getPlayingClip(kSlots[i]), 1);

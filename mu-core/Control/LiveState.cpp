@@ -284,23 +284,40 @@ bool LiveState::launchScene(int clip)
     if (clip < 0 || clip >= mu_limits::kClipsPerLayer) return false;
     reconcileClips();   // first drop anything a full preset applied since the last settle has made stale
 
-    // One staging batch: the audio thread flags the scene's layers at the same boundary or not at all.
-    if (cb.beginStageBatch) cb.beginStageBatch();
-    bool any = false;
     const int layers = std::min(getLayerCount(), (int) mu_limits::kMaxLayers);
-    for (int layer = 0; layer < layers; ++layer)
+
+    // Everything slow first (a clip's files), so the batch window below holds only the staging calls.
+    if (cb.preloadClip)
+        for (int layer = 0; layer < layers; ++layer)
+            if ((clipState[(size_t) layer].mask & (1u << clip)) != 0 && clip != clipState[(size_t) layer].playing)
+                cb.preloadClip(layer, clip);
+
+    // One staging batch: the audio thread flags the scene's layers at the same boundary or not at all.
+    bool any = false;
     {
-        auto& c = clipState[(size_t) layer];
-        if ((c.mask & (1u << clip)) == 0) continue;   // a scene never stops a layer that has no such clip
-        if (clip == c.playing)
+        struct Batch
         {
-            if (c.queued >= 0 && cb.cancelSlot) { cb.cancelSlot(layer); c.queued = -1; }
-            any = true;   // already there: the scene does not mute it
-            continue;
+            explicit Batch(const Callbacks& c) : callbacks(c) { if (callbacks.beginStageBatch) callbacks.beginStageBatch(); }
+            ~Batch() { if (callbacks.endStageBatch) callbacks.endStageBatch(); }
+            const Callbacks& callbacks;
+        } batch(cb);
+        for (int layer = 0; layer < layers; ++layer)
+        {
+            auto& c = clipState[(size_t) layer];
+            if ((c.mask & (1u << clip)) == 0) continue;   // a scene never stops a layer that has no such clip
+            if (clip == c.playing)
+            {
+                if (c.queued >= 0 && cb.cancelSlot) { cb.cancelSlot(layer); c.queued = -1; }
+                any = true;   // already there: the scene does not mute it
+                continue;
+            }
+            if (startClip(layer, clip))
+            {
+                any = true;
+                if (cb.markSceneSlot) cb.markSceneSlot(layer);   // a payload staged for a boundary is the scene's, not the layer's own
+            }
         }
-        any |= startClip(layer, clip);
     }
-    if (cb.endStageBatch) cb.endStageBatch();
     changed();
     return any;
 }
