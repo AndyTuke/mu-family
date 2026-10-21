@@ -119,6 +119,7 @@ private:
     // Cleared by prepareToPlay; the first block after it gives the host's MIDI buffer room for the layers' output, so the
     // one allocation a MIDI merge can cost happens at start-up, before any note.
     std::atomic<bool> midiBufferSized { false };
+    const std::atomic<float>* swapTimingParam { nullptr };   // `mstr_swap`, resolved once in the constructor
 
     mu_core::CpuLoadMeter cpuMeter;
     double meterRate = 44100.0;   // the rate prepareToPlay was given; the block's duration for the meter

@@ -84,6 +84,7 @@ PluginProcessor::PluginProcessor()
     setupLayerState();       // the layer layout every preset / session save and load uses
     layerSwapper.setAppliers([this](juce::ValueTree& t) { applyStateTree(t); },
                              [this](int slot, juce::ValueTree& t) { applyStagedTypedLayer(slot, t); });   // a layer preset lands on its slot's wrap
+    swapTimingParam = apvts.getRawParameterValue(mu_hotswap::kSwapTimingParamId);
     startFxParamSync();      // mixer / FX params → mixerEngine + fxChain (ProcessorBase)
     loadStartupDefault();    // restore a saved _default preset (skipped by render mode)
 }
@@ -137,8 +138,14 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     midiMessages.clear();
     mergeLayerMidiOut(midiMessages, kMidiOutEvents * midiEventBytes(3));
 
-    // Hot-swap: flag staged presets whose boundary passed in this block (each slot's loop is its layer's loopBeats).
-    flagLayerSwapBoundaries(transport);
+    // Hot-swap: flag staged presets whose boundary passed in this block. Swap timing "On bar" lands every staged layer on the
+    // bar line, so the layers of a scene share one boundary; the other two settings use each slot's own loop (loopBeats), as
+    // mu-Tronic has no master loop yet.
+    const float swapRaw = swapTimingParam != nullptr ? swapTimingParam->load(std::memory_order_relaxed) : 0.0f;
+    if (mu_hotswap::swapTimingFromIndex(std::isfinite(swapRaw) ? (int) std::lround(swapRaw) : 0) == mu_hotswap::SwapTiming::OnBar)
+        flagSwapBoundaries(transport.playing, transport.startBeat, transport.blockBeats);
+    else
+        flagLayerSwapBoundaries(transport);
 
     cpuMeter.end(buffer.getNumSamples(), meterRate);
 }
