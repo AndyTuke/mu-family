@@ -48,6 +48,8 @@ struct FakeLiveView : mu_core::LiveView
     int  getQueuedItem() const noexcept override { return queued; }
     int  getSelectedLayer() const noexcept override { return selected; }
     int  getLayerCount() const override { return layers; }
+    int  notPresent = -1;   // an Empty slot of a slot host (counts in getLayerCount, holds nothing)
+    bool isLayerPresent(int layer) const override { return layer >= 0 && layer < layers && layer != notPresent; }
     int  getLayerColourIndex(int layer) const override { return colourIndex[(size_t) layer]; }
     bool isItemPlayable(int item) const override { return item >= 0 && item < 8 && playable[(size_t) item]; }
     uint32_t getRevision() const noexcept override { return revision; }

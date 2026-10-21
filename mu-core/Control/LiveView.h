@@ -31,6 +31,8 @@ public:
     virtual int                           getQueuedItem()     const noexcept = 0;   // -1 = nothing queued
     virtual int                           getSelectedLayer()  const noexcept = 0;
     virtual int                           getLayerCount()     const = 0;            // how many layers are live
+    // A layer that holds something: an Empty slot of a slot host counts in getLayerCount but is not present (surface lights stay off).
+    virtual bool                          isLayerPresent(int layer) const { return layer >= 0 && layer < getLayerCount(); }
     virtual int                           getLayerColourIndex(int layer) const = 0;   // index into the shared layer palette
     virtual bool                          isItemPlayable(int item) const = 0;           // this product's, and its file exists
     virtual uint32_t                      getRevision()       const noexcept = 0;   // bumped on every change

@@ -274,7 +274,7 @@ SurfaceModel::Light SurfaceModel::lightFor(const mu_core::ControlAction& a, doub
         case T::SelectLayer:
         {
             // Side column: the selected layer bright, every other existing layer dim, no layer off.
-            if (a.layer < 0 || a.layer >= view.getLayerCount()) return {};
+            if (! view.isLayerPresent(a.layer)) return {};
             return { view.getSelectedLayer() == a.layer ? Level::Bright : Level::Dim, layerRgb(a.layer) };
         }
         case T::LaunchClip:

@@ -58,6 +58,7 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
     cb.fullCommitCount = [this] { return fullCommitCount(); };
     cb.cancelItem = [this] { cancelPendingFullPreset(); };
     cb.layerCount = [this] { return getNumLayers(); };
+    cb.layerPresent = [this](int l) { return ! layersAreSlots() || slotTypeId(l) != mu_core::LayerTypeId::Empty; };
     cb.layerColourIndex = [this](int layer) { return layer >= 0 && layer < getNumLayers() ? getLayerColourIndex(layer) : 0; };
 
     // The clip bank's live half: a launch is this processor's own launchClip, a mute the MuteLayer action.

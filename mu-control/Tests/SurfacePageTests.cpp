@@ -158,6 +158,16 @@ public:
             expect(! r.press(kTop5));
             expect(before == r.model.render());
         }
+
+        beginTest("an Empty slot's side button stays off, the others keep their lights");
+        {
+            Rig r(launchpadStyle());
+            r.view.notPresent = 4;   // slot 5 of the first page holds nothing
+            r.view.notify();
+            expectEquals((int) r.led({ ControlKind::Side, 0, 4 }).rgb, 0, "slot 5 is off");
+            expect(r.led({ ControlKind::Side, 0, 3 }).rgb != 0, "slot 4 still lit");
+            expect(r.led({ ControlKind::Side, 0, 5 }).rgb != 0, "slot 6 still lit");
+        }
     }
 };
 
