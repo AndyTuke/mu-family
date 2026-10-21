@@ -65,6 +65,8 @@ public:
 private:
     void timerCallback() override;
     void rebuild();                         // rebind every control to the shown track and engine
+    void rebuildGrid();                     // the engine's knob grid alone (specs, arcs, tooltips)
+    int  shownAlgorithm() const;            // the shown FM Perc track's Algorithm index
     void bindModulationArcs(std::vector<mu_ui::ParamKnobGrid::Spec>& specs) const;   // live arcs on the knobs the target table drives
     void refreshSourceList();
     void refreshSourceSelection();
@@ -75,6 +77,7 @@ private:
     TrackHost& host;
     int        currentLayer = 0;
     EngineType shownEngine  = EngineType::Kick;
+    int        gridAlgorithm = -1;          // the FM Perc algorithm the grid's tooltips describe
     juce::uint64 shownLayerSignature = 0;   // the live layers' engines, for the Source list
 
     juce::Label    engineCaption { {}, "Engine" }, sourceCaption { {}, "Source" };

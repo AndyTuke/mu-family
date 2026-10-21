@@ -111,7 +111,8 @@ namespace mu_on_fixture
                 set(mu_on::engineParamId(0, engine, "tune"), -2.0f);
                 set(mu_on::engineParamId(0, engine, "dec"), 250.0f);
                 break;
-            case EngineType::Rumble: break;
+            case EngineType::Rumble:
+            case EngineType::FmPerc: break;
         }
         set(mu_on::layerParamId(0, "swing"), 0.3f);
         set(mu_on::layerParamId(0, "accent"), 0.6f);

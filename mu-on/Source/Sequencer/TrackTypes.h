@@ -7,8 +7,8 @@
 
 #include <memory>
 
-// mu-On's five layer types (docs/mu-tronic/design.md 1.4): Kick, Bass, Hat, Snare and Rumble are one class,
-// Track, whose type is the engine it runs. All five share the parameter prefix `t` and the extension .muTrack;
+// mu-On's six layer types (docs/mu-tronic/design.md 1.4): Kick, Bass, Hat, Snare, Rumble and FM Perc are one class,
+// Track, whose type is the engine it runs. All six share the parameter prefix `t` and the extension .muTrack;
 // the id, not the prefix, identifies the type. Message-thread data only: the constants describe and
 // construct, they never dispatch (rendering stays virtual on Layer).
 namespace mu_on
@@ -50,6 +50,7 @@ inline constexpr const char* trackDescriptor(EngineType e) noexcept
         case EngineType::Hat:    return "Hi-hat";
         case EngineType::Snare:  return "Snare";
         case EngineType::Rumble: return "Rumble tail from a kick";
+        case EngineType::FmPerc: return "FM toms and percussion";
     }
     return "";
 }
@@ -64,11 +65,12 @@ inline constexpr const char* trackInitial(EngineType e) noexcept
         case EngineType::Hat:    return "H";
         case EngineType::Snare:  return "S";
         case EngineType::Rumble: return "R";
+        case EngineType::FmPerc: return "F";
     }
     return "";
 }
 
-// The five type descriptions over the one class.
+// The six type descriptions over the one class.
 inline mu_core::LayerTypeInfo makeTrackTypeInfo(EngineType engine) noexcept
 {
     mu_core::LayerTypeInfo info;
@@ -82,7 +84,7 @@ inline mu_core::LayerTypeInfo makeTrackTypeInfo(EngineType engine) noexcept
     info.presetTag = kTrackPresetTag;
     info.descriptor = trackDescriptor(engine);
     info.discInitial = trackInitial(engine);
-    info.typeFromPreset = &typeFromPreset;   // the five types share .muTrack: the engine a preset saved names its type
+    info.typeFromPreset = &typeFromPreset;   // the six types share .muTrack: the engine a preset saved names its type
     info.addLayerParams = &addLayerParams;   // one table per prefix: every engine's rows exist on every track
     info.create = &createTrack;
     return info;
@@ -93,5 +95,6 @@ inline const mu_core::LayerTypeInfo kBassType   = makeTrackTypeInfo(EngineType::
 inline const mu_core::LayerTypeInfo kHatType    = makeTrackTypeInfo(EngineType::Hat);
 inline const mu_core::LayerTypeInfo kSnareType  = makeTrackTypeInfo(EngineType::Snare);
 inline const mu_core::LayerTypeInfo kRumbleType = makeTrackTypeInfo(EngineType::Rumble);
+inline const mu_core::LayerTypeInfo kFmPercType = makeTrackTypeInfo(EngineType::FmPerc);
 
 } // namespace mu_on

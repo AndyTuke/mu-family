@@ -13,21 +13,21 @@ public:
     void runTest() override
     {
         using namespace mu_on;
-        const mu_core::LayerTypeInfo* infos[] = { &kKickType, &kBassType, &kHatType, &kSnareType, &kRumbleType };
+        const mu_core::LayerTypeInfo* infos[] = { &kKickType, &kBassType, &kHatType, &kSnareType, &kRumbleType, &kFmPercType };
 
-        beginTest("five types, one per engine: id, name, group, the shared prefix t and extension .muTrack");
+        beginTest("six types, one per engine: id, name, group, the shared prefix t and extension .muTrack");
         for (int e = 0; e < kNumEngineTypes; ++e)
         {
             const auto engine = engineFromIndex(e);
             const auto& info = *infos[e];
             expect(info.id == layerTypeOf(engine), "type id of " + juce::String(engineName(engine)));
             expectEquals(juce::String(info.name), juce::String(engineName(engine)));
-            expectEquals(juce::String(mu_core::layerTypeName(info.id)), juce::String(engineName(engine)), "saved by the engine's name");
+            expectEquals(juce::String(mu_core::layerTypeName(info.id)), juce::String(engine == EngineType::FmPerc ? "FmPerc" : engineName(engine)), "saved by the engine's name (FM Perc is saved as FmPerc)");
             expect(engineOfType(info.id) == engine, "the type runs its engine");
             expectEquals(juce::String(info.group), juce::String("mu-On"));
             expect(info.paramPrefixLetter == 't');
             expectEquals(juce::String(info.presetExtension), juce::String(".muTrack"));
-            expect(info.addLayerParams == &addLayerParams && info.create != nullptr, "one table and one class for all five");
+            expect(info.addLayerParams == &addLayerParams && info.create != nullptr, "one table and one class for all six");
             const auto layer = info.create(3, info.id);
             const auto* track = dynamic_cast<const Track*>(layer.get());
             expect(track != nullptr && track->slot == 3, "create builds a Track for the slot");

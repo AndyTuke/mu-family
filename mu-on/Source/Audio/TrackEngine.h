@@ -6,10 +6,11 @@
 #include "Audio/BassEngine.h"
 #include "Audio/SampleChannel.h"
 #include "Audio/RumbleEngine.h"
+#include "Audio/FmPercEngine.h"
 
 #include <variant>
 
-// TrackEngine — the one sound engine a track runs (Kick, Bass, Hat, Snare or Rumble), behind one interface so
+// TrackEngine — the one sound engine a track runs (Kick, Bass, Hat, Snare, Rumble or FM Perc), behind one interface so
 // the track can render whichever it holds. A track owns exactly one (docs/mu-tronic/extraction-plan.md E3.5):
 // changing the engine builds a new TrackEngine on the message thread and swaps it in (Track::installEngine),
 // so nothing here is ever constructed, prepared or destroyed on the audio thread.
@@ -31,6 +32,7 @@ public:
             case EngineType::Hat:
             case EngineType::Snare:  engine.emplace<SampleChannel>(); break;
             case EngineType::Rumble: engine.emplace<RumbleEngine>();  break;
+            case EngineType::FmPerc: engine.emplace<FmPercEngine>();  break;
         }
     }
 
@@ -44,6 +46,7 @@ public:
         else if (auto* s = std::get_if<SampleChannel>(&engine)) s->prepare(sampleRate, maxBlock, kind == EngineType::Hat ? SampleChannel::Kind::HiHat
                                                                                                                          : SampleChannel::Kind::Snare);
         else if (auto* r = std::get_if<RumbleEngine>(&engine))  r->prepare(sampleRate, maxBlock);
+        else if (auto* f = std::get_if<FmPercEngine>(&engine))  f->prepare(sampleRate, maxBlock);
     }
 
     // Silence the voice at once: transport stop, a slot going live, an engine change. Allocation-free.
@@ -63,13 +66,13 @@ public:
         if (auto* b = std::get_if<BassEngine>(&engine)) b->resetFilterSmoothing();
     }
 
-    // This block's parameters, in the order of the engine's modulation target table (MuOnModDest.h). `bassWave` is
-    // the Bass wave choice (not a target); `bpm` and `rumbleEnvLevel` feed the Rumble's tempo-synced taps and its
+    // This block's parameters, in the order of the engine's modulation target table (MuOnModDest.h). `engineChoice` is
+    // the engine's choice row, which is not a target (the Bass wave, or the FM Perc algorithm); `bpm` and `rumbleEnvLevel` feed the Rumble's tempo-synced taps and its
     // bar envelope.
-    void setParams(const float* p, int bassWave, double bpm, float rumbleEnvLevel) noexcept
+    void setParams(const float* p, int engineChoice, double bpm, float rumbleEnvLevel) noexcept
     {
         if (auto* k = std::get_if<KickEngine>(&engine))         k->setParams(p[0], p[1], p[2], p[3], p[4]);
-        else if (auto* b = std::get_if<BassEngine>(&engine))    b->setParams(p[0], bassWave, p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9]);
+        else if (auto* b = std::get_if<BassEngine>(&engine))    b->setParams(p[0], engineChoice, p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9]);
         else if (auto* s = std::get_if<SampleChannel>(&engine)) s->setParams(p[0], p[1]);
         else if (auto* r = std::get_if<RumbleEngine>(&engine))
         {
@@ -77,6 +80,8 @@ public:
             r->setParams(bpm, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8]);
             r->setBarEnvLevel(rumbleEnvLevel);
         }
+        else if (auto* f = std::get_if<FmPercEngine>(&engine))
+            f->setParams(engineChoice, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9]);
     }
 
     // Fire the engine at `sampleOffset` in the block (a Rumble does not step).
@@ -85,6 +90,7 @@ public:
         if (auto* k = std::get_if<KickEngine>(&engine))         k->trigger(velocity, sampleOffset);
         else if (auto* b = std::get_if<BassEngine>(&engine))    b->trigger(velocity, sampleOffset);
         else if (auto* s = std::get_if<SampleChannel>(&engine)) s->trigger(velocity, sampleOffset);
+        else if (auto* f = std::get_if<FmPercEngine>(&engine))  f->trigger(velocity, sampleOffset);
     }
 
     // Add the engine's block into `out` (handed over cleared). A Rumble processes `rumbleInput`, its source's
@@ -100,7 +106,7 @@ public:
 
 private:
     EngineType kind;
-    std::variant<KickEngine, BassEngine, SampleChannel, RumbleEngine> engine;
+    std::variant<KickEngine, BassEngine, SampleChannel, RumbleEngine, FmPercEngine> engine;
 };
 
 } // namespace mu_on

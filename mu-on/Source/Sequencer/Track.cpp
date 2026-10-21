@@ -141,9 +141,10 @@ void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
     engineRow   = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "eng")), this);
     sourceRow   = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "src")), this);
     bassWaveRow = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::Bass, "wave")), this);   // a choice, not a target
+    algoRow     = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::FmPerc, "algo")), this);   // a choice, not a target
     swingRow    = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "swing")), this);
     accentRow   = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "accent")), this);
-    jassert(engineRow.isBound() && sourceRow.isBound() && bassWaveRow.isBound() && swingRow.isBound() && accentRow.isBound());   // an id drift from the layout (debug)
+    jassert(engineRow.isBound() && sourceRow.isBound() && bassWaveRow.isBound() && algoRow.isBound() && swingRow.isBound() && accentRow.isBound());   // an id drift from the layout (debug)
     haveResolved = false;   // values held for C12 belong to the slot bound before
 
     // Every engine's modulation inputs for this slot, in its target table's order (the order setParams takes).
@@ -330,7 +331,9 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
     float p[kMaxDests] {};
     resolve(e, ctx.startBeat, p);
     const bool rumble = e == toIndex(EngineType::Rumble);
-    eng->setParams(p, juce::roundToInt(bassWaveRow.load(0.0f)), ctx.bpm, rumble ? evaluateRumbleEnv(ctx.startBeat) : 1.0f);
+    // The engine's own choice row: the Bass wave, or the FM Perc algorithm (neither is a modulation target).
+    const int engineChoice = juce::roundToInt(e == toIndex(EngineType::FmPerc) ? algoRow.load(0.0f) : bassWaveRow.load(0.0f));
+    eng->setParams(p, engineChoice, ctx.bpm, rumble ? evaluateRumbleEnv(ctx.startBeat) : 1.0f);
 
     // Phase 3: the stop edge silences the voice after the block's parameters are in (a sustaining bass has no
     // note-off), so values set in the stop block survive the reset. A stop hidden in blocks that rendered

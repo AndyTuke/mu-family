@@ -40,6 +40,8 @@ void ParamKnobGrid::setSpecs(const std::vector<Spec>& specs)
                 apvts, spec.id, ctl->knob->getSlider());
             ctl->knob->onStatusUpdate = [this, c = ctl.get()](const juce::String&, const juce::String&) { reportStatus(*c); };
             ctl->knob->onValueChanged = [this, c = ctl.get()](double) { reportStatus(*c); };
+            if (spec.tooltip.isNotEmpty())
+                ctl->knob->getSlider().setTooltip(spec.tooltip);
             if (spec.modDestId != nullptr)
                 ctl->knob->bindModulation(spec.modDestId, spec.modMatrix, spec.modLive);
         }

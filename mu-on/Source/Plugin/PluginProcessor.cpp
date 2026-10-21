@@ -175,13 +175,13 @@ int PluginProcessor::firstKickTrack() const noexcept
 }
 
 // The new track takes the first engine (Kick, Bass, Hat, Snare, Rumble) that no live track runs, else
-// Kick, and starts on that engine's groove; a Rumble starts on the first Kick.
+// Kick, and starts on that engine's groove; a Rumble starts on the first Kick. FM Perc is never the automatic pick.
 void PluginProcessor::layerAdded(int index)
 {
     std::array<bool, kNumEngineTypes> used {};
     for (int i = 0; i < index; ++i) used[(size_t) toIndex(getTrackEngine(i))] = true;
     int pick = 0;
-    for (int e = 0; e < kNumEngineTypes; ++e)
+    for (int e = 0; e < toIndex(EngineType::FmPerc); ++e)
         if (! used[(size_t) e]) { pick = e; break; }
     const auto engine = engineFromIndex(pick);
 

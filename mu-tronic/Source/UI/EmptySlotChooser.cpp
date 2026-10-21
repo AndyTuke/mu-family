@@ -109,7 +109,7 @@ void EmptySlotChooser::resized()
     const int bandH = juce::jmax(0, (body.getHeight() - (nb - 1) * gap) / nb);
 
     constexpr int kSingleCols = 3;   // the single-type band is three cards wide, as the design's first band
-    constexpr int kMaxCols = 5;      // a grouped band wraps after five cards
+    constexpr int kMaxCols = 6;      // a grouped band wraps after six cards: mu-On's six engines sit on one row
     for (int b = 0; b < nb; ++b)
     {
         bands[(size_t) b].area = { body.getX(), body.getY() + b * (bandH + gap), body.getWidth(), bandH };
