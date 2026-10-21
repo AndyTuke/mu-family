@@ -37,7 +37,9 @@ inline std::unique_ptr<mu_core::LayerServices> createArpServices(ProcessorBase& 
 inline std::unique_ptr<Layer> createArp(int slot, mu_core::LayerTypeId /*type*/)
 {
     auto a = std::make_unique<Arp>();
-    a->runner.setSlotIndex(slot, mu_core::makeNoiseSalt());
+    a->noiseSalt = mu_core::makeNoiseSalt();
+    a->noiseSaltSet = true;
+    a->runner.setSlotIndex(slot, a->noiseSalt);
     a->insert->setSlotIndex(slot);
     return a;
 }

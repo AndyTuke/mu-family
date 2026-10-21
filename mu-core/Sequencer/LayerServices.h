@@ -24,6 +24,11 @@ namespace mu_core
         // applying a parameter change to a layer. Default: nothing.
         virtual void deferredWork() {}
 
+        // Message thread, a Published host's swapLayers: slots `a` and `b` have just exchanged their layers (the audio thread is
+        // excluded, the layers are not yet re-bound to their new slots). Move whatever the services keep per slot with the
+        // layer that used it, so the re-bind finds the moved layer's own state. Default: nothing.
+        virtual void slotsSwapped(int a, int b) { (void) a; (void) b; }
+
         // Audio thread, once per rendered chunk after the mixer (at most the prepared block size): what the type's services
         // add to the master bus themselves, such as a sample browser's preview. No allocation, no lock, no wait. Default:
         // nothing.

@@ -114,6 +114,9 @@ struct Pattern : Layer
     // and wavetable-bank lock from the host (the engine belongs to the slot: VoiceEngine::reset keeps the
     // oscillator phase, so a voice that moves keeps the slot's phase, as the per-slot engines always did).
     void bindParams(juce::AudioProcessorValueTreeState& apvts, int slot) override;
+    // The layer moved to another slot: its insert's noise seed follows the slot, as at creation. (The engine's own seed
+    // belongs to the engine, which a host that moves Patterns moves with them.)
+    void onMoved(int newIndex) override { insert->setSlotIndex(newIndex); }
     // Audio thread: the voice's block into out[0, n) (handed over cleared): modulation, engine, gate, insert.
     void render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n) override;
     // Audio thread: a spare above the live count keeps hearing the keys, so its Note-mode pitch is current
