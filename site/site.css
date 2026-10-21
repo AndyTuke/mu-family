@@ -28,6 +28,7 @@ nav .nm-tant { --c: #E8A878; }
 nav .nm-toni { --c: #2ECFA0; }
 nav .nm-on { --c: #E0C568; }
 nav .nm-link { --c: #5CCEE8; }
+nav .nm-tronic { --c: #EC8BAE; }
 
 nav .nav-toggle { display: none; background: none; border: 1px solid var(--border2); border-radius: 4px; width: 40px; height: 36px; cursor: pointer; padding: 0; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
 nav .nav-toggle span { display: block; width: 18px; height: 2px; background: var(--text); border-radius: 1px; }
