@@ -47,6 +47,24 @@ struct LegacyInsertAlgoTests : juce::UnitTest
             expect(mu_pp::readRowValue(row, other, normalised));
             expectWithinAbsoluteError(normalised, 0.25f, 1.0e-6f);
         }
+
+        beginTest("the insert menu lists every algorithm once, with None first, and follows the order column");
+        {
+            juce::Array<int> ids;
+            juce::StringArray names;
+            mu_audio::populateInsertAlgoDropdown([&] (const char* n, int id) { names.add(n); ids.add(id); });
+            expectEquals(ids.size(), mu_audio::kInsertAlgorithmCount);
+            for (int id = 1; id <= mu_audio::kInsertAlgorithmCount; ++id)
+                expect(ids.contains(id), "id " + juce::String(id) + " is in the menu exactly once");
+            expectEquals(names[0], juce::String("None"));
+            expectEquals(ids[0], 1);
+
+            // The order column drives the display: the shown order is ascending by it.
+            int last = -1;
+            for (int id : ids)
+                for (const auto& e : mu_audio::kInsertMenu)
+                    if (e.algoIndex + 1 == id) { expect(e.order > last, "ascending order"); last = e.order; }
+        }
     }
 };
 

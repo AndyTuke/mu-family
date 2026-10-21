@@ -178,7 +178,7 @@ struct MuTronicRhythmTests : juce::UnitTest
             expectEquals(juce::String(info->contentFolderName), juce::String("muClid"));
             expectEquals(juce::String(info->presetFolder), juce::String("Rhythms"));
             expectEquals(juce::String(info->presetTag), juce::String("MuClidRhythm"));
-            expectEquals(juce::String(info->typeTag), juce::String("Clid"));
+            expectEquals(juce::String::fromUTF8(info->typeTag), juce::String(juce::CharPointer_UTF8("Î¼-Clid")));
             expect(info->createServices != nullptr && info->attachServices != nullptr);
             expect(info->presetFileToNode != nullptr && info->presetNodeToFile != nullptr, "the file shape is converted at the boundary");
             expect(info->addGlobalParams == nullptr, "the Rhythm shares no row between its slots");

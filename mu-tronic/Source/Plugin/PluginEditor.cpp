@@ -255,7 +255,7 @@ void PluginEditor::showSlot(int idx)
     layerPanel.setContent(shownContent);
     if (shownContent != nullptr) shownContent->setEffectSendName(effectSendName);   // before the destination lists are built
     layerPanel.getModulatorPanel().setDestProvider(shownContent != nullptr ? shownContent->getModDestProvider() : nullptr);
-    layerPanel.getHeader().setTypeTag(info != nullptr ? juce::String(info->typeTag) : juce::String());
+    layerPanel.getHeader().setTypeTag(info != nullptr ? juce::String::fromUTF8(info->typeTag) : juce::String());
     if (info != nullptr && info->appColourId != 0)
         MuLookAndFeel::setAccentOverride(layerPanel, MuLookAndFeel::colour((MuLookAndFeel::ColourIds) info->appColourId));
     else

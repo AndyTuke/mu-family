@@ -87,7 +87,7 @@ mu_core::LayerTypeInfo arpLayerType()
 {
     auto info = mu_toni::arpLayerTypeInfo();
     info.appColourId = (int) MuLookAndFeel::appBlue;   // the main area is painted in mu-Toni's blue
-    info.typeTag = "Toni";
+    info.typeTag = "Î¼-Toni";   // UTF-8: the product name with the real mu
     info.takesNotes = true;   // the arpeggiator plays from the keys it is given
    #if MU_TRONIC_WITH_UI
     info.createContent = &createArpContent;

@@ -2,6 +2,7 @@
 
 #include <juce_core/juce_core.h>
 #include <cstring>
+#include <iterator>
 #include "Audio/InsertSlotConfig.h"   // for the kInsertAlgoCount cross-check below
 
 // Stage 35 Step 1: stable algorithm-name tables for the v2 preset format.
@@ -224,21 +225,54 @@ inline void populateFilterTypeDropdown(AddItemFn&& addItem)
     addItem("Lo Shf", 14);  addItem("Hi Shf",  15);
 }
 
-// Fill an insert-algorithm selector in the family's display order (alphabetical, None first),
-// shared by the voice insert, the master inserts and mu-link's master FX. Item ID = algorithm
-// index + 1 (kInsertAlgorithmNames order). Call as:
+// One row of the insert-algorithm selector: which algorithm (its index in kInsertAlgorithmNames), the name the menu shows,
+// and where it sits in the list. The menu is sorted by `order` (ties keep table order), so reordering the list is a
+// one-number edit here and a new algorithm is one appended row; nothing else (item ids, stored indices) is touched.
+struct InsertMenuEntry
+{
+    int         algoIndex;   // index in kInsertAlgorithmNames / InsertProcessor::dispatch[]
+    const char* menuName;    // the text shown in the selector
+    int         order;       // display position, ascending (gaps allowed, so a row can slot in between)
+};
+
+// The family's insert menu: alphabetical with None first. Item ID shown to the selector = algoIndex + 1.
+inline constexpr InsertMenuEntry kInsertMenu[] = {
+    {  0, "None",        10 },
+    {  6, "3-Band EQ",   20 },
+    {  4, "Bitcrusher",  30 },
+    {  5, "Clipper",     40 },
+    {  7, "Compressor",  50 },
+    {  3, "Fold",        60 },
+    {  2, "Hard Clip",   70 },
+    { 11, "Karplus",     80 },
+    {  8, "Limiter",     90 },
+    { 14, "Overdrive",  100 },
+    {  9, "Ring Mod",   110 },
+    {  1, "Soft Clip",  120 },
+    { 10, "Tape Sat",   130 },
+    { 12, "Vocoder",    140 },
+    { 13, "Vocoder St", 150 },
+};
+
+static_assert((int) std::size(kInsertMenu) == mu_ui::kInsertAlgoCount, "kInsertMenu must list every insert algorithm once");
+
+// Fill an insert-algorithm selector in kInsertMenu order, shared by the voice insert, the master inserts and mu-link's master
+// FX. Item ID = algorithm index + 1. Call as:
 //   mu_audio::populateInsertAlgoDropdown([&d](const char* n, int id){ d.addItem(n, id); });
 template <typename AddItemFn>
 inline void populateInsertAlgoDropdown(AddItemFn&& addItem)
 {
-    addItem("None",        1);  addItem("3-Band EQ",   7);
-    addItem("Bitcrusher",  5);  addItem("Clipper",     6);
-    addItem("Compressor",  8);  addItem("Fold",        4);
-    addItem("Hard Clip",   3);  addItem("Karplus",    12);
-    addItem("Limiter",     9);  addItem("Overdrive",  15);
-    addItem("Ring Mod",   10);  addItem("Soft Clip",   2);
-    addItem("Tape Sat",   11);  addItem("Vocoder",    13);
-    addItem("Vocoder St", 14);
+    // Visit the rows by ascending `order` (a selection pass, the table is tiny and this runs on the message thread).
+    bool used[std::size(kInsertMenu)] = {};
+    for (size_t n = 0; n < std::size(kInsertMenu); ++n)
+    {
+        size_t best = std::size(kInsertMenu);
+        for (size_t i = 0; i < std::size(kInsertMenu); ++i)
+            if (! used[i] && (best == std::size(kInsertMenu) || kInsertMenu[i].order < kInsertMenu[best].order))
+                best = i;
+        used[best] = true;
+        addItem(kInsertMenu[best].menuName, kInsertMenu[best].algoIndex + 1);
+    }
 }
 
 } // namespace mu_audio

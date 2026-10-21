@@ -217,7 +217,7 @@ mu_core::LayerTypeInfo rhythmLayerType()
     auto info = mu_clid::rhythmLayerTypeInfo();
     info.createServices = &createRhythmServices;
     info.appColourId = (int) MuLookAndFeel::appPurple;   // the main area is painted in mu-Clid's purple
-    info.typeTag = "Clid";
+    info.typeTag = "Î¼-Clid";   // UTF-8: the product name with the real mu
    #if MU_TRONIC_WITH_UI
     info.createContent = &createRhythmContent;
     info.createMiniVisual = &createRhythmMiniVisual;

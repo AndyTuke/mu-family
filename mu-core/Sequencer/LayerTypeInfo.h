@@ -100,7 +100,7 @@ namespace mu_core
         CreateServicesFn   createServices   = nullptr;   // null = the type shares nothing between its layers
         AttachServicesFn   attachServices   = nullptr;   // null = nothing to wire (a type that needs no services)
         int         appColourId = 0;           // the MuLookAndFeel colour ID (appBlue ...) the slot's main area is painted in; 0 = the app's own
-        const char* typeTag = "";              // the header's type plate text ("Toni", "On"); empty = none
+        const char* typeTag = "";              // the header's type plate text, UTF-8, the full product name ("Î¼-Toni"); empty = none
         const char* presetTag = "";            // the root tag of a layer-preset file ("MuToniLayer"): each product's existing tag,
                                                // so a file saved by the product loads in a slot host and the reverse
         const char* descriptor = "";           // one short line for the chooser card ("Generative arpeggiator")

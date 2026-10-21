@@ -150,7 +150,7 @@ mu_core::LayerTypeInfo trackLayerType(mu_core::LayerTypeId type)
 {
     auto info = mu_on::makeTrackTypeInfo(mu_on::engineOfType(type));
     info.appColourId = (int) MuLookAndFeel::appYellow;   // the main area is painted in mu-On's yellow
-    info.typeTag = "On";
+    info.typeTag = "Î¼-On";   // UTF-8: the product name with the real mu
     info.hasClipBank = info.id != mu_core::LayerTypeId::Rumble;   // Rumble has no step row: it processes another layer's audio
    #if MU_TRONIC_WITH_UI
     info.createContent = &createTrackContent;
