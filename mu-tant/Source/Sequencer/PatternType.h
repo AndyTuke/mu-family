@@ -137,7 +137,8 @@ inline mu_core::LayerTypeInfo patternLayerTypeInfo() noexcept
     info.contentFolderName = "muTant";   // the layer presets are mu-Tant's own, shared with it, not copied
     info.presetFolder = "Voices";        // the folder mu-Tant keeps its .muPattern files in (design-naming: a rename is on hold)
     info.presetTag = kPatternPresetTag;
-    info.descriptor = "Wavetable drone voice";
+    info.descriptor = "Wavetable drone, gate pattern";
+    info.discInitial = "P";
     info.addLayerParams = &addLayerParams;
     info.addGlobalParams = &addPatternGlobalParams;   // the tonal centre (root, scale) every Pattern reads
     info.create = &createPattern;

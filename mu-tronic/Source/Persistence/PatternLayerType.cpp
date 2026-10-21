@@ -179,7 +179,12 @@ namespace
     class PatternSlotContent : public mu_tant::PatternContent
     {
     public:
-        PatternSlotContent(ProcessorBase& p, PatternSlotHost& h) : mu_tant::PatternContent(p, h), slotHost(h) {}
+        PatternSlotContent(ProcessorBase& p, PatternSlotHost& h) : mu_tant::PatternContent(p, h), slotHost(h)
+        {
+            // Note mode is a per-layer choice here (mu-Tant keeps it as an app setting and shows no selector).
+            setNoteModeControl([&p](int slot) { return getPatternNoteMode(p, slot); },
+                               [&p](int slot, int mode) { setPatternNoteMode(p, slot, mode); });
+        }
 
         const ModDestProvider* getModDestProvider() const noexcept override { return &destinations; }
 
@@ -206,7 +211,7 @@ namespace
     {
         const auto colour = MuLookAndFeel::layerPalette[(size_t) (host.getLayerColourIndex(slot) % MuLookAndFeel::kLayerPaletteSize)];
         // The sidebar item's own label already carries the slot number ("Pattern 3"), so the disc shows the type's initial.
-        return std::make_unique<mu_ui::LayerDiscVisual>(colour, juce::String("P"));
+        return std::make_unique<mu_ui::LayerDiscVisual>(colour, host.getLayerTypes().discInitial(mu_core::LayerTypeId::Pattern));
     }
    #endif
 }

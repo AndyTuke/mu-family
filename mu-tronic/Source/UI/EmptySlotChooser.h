@@ -27,6 +27,9 @@ public:
     // The slot the title names (0-based; shown 1-based).
     void setSlot(int slot);
     int  getSlot() const noexcept { return slot; }
+    // The order the cards appear in (and so the bands: a group sits where its first card does). The registry's own order
+    // is whatever its host registered in; a type the list does not name follows the named ones.
+    void setOrder(std::vector<mu_core::LayerTypeId> ids);
     // Re-reads the registry into cards (call after the registry changes).
     void rebuild();
     int  getNumCards() const noexcept { return (int) cards.size(); }
@@ -51,6 +54,7 @@ private:
 
     const mu_core::LayerTypeRegistry& types;
     int slot = 0;
+    std::vector<mu_core::LayerTypeId> order;
     std::vector<Card> cards;
     // Per group (in registry order): its heading and its band.
     struct Band { juce::String title; juce::Rectangle<int> area; bool grouped = false; };

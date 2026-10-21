@@ -1,11 +1,19 @@
 #include "UI/EmptySlotChooser.h"
 
+#include <algorithm>
+
 namespace mu_tronic
 {
 
 EmptySlotChooser::EmptySlotChooser(const mu_core::LayerTypeRegistry& registry)
     : types(registry)
 {
+    rebuild();
+}
+
+void EmptySlotChooser::setOrder(std::vector<mu_core::LayerTypeId> ids)
+{
+    order = std::move(ids);
     rebuild();
 }
 
@@ -28,15 +36,32 @@ void EmptySlotChooser::rebuild()
     cards.clear();
     bands.clear();
 
-    const auto groups = types.groups();
+    // The cards in the chooser's own order (setOrder), then anything the registry offers that the order does not name.
+    std::vector<const mu_core::LayerTypeInfo*> ordered;
+    for (const auto id : order)
+        if (const auto* info = types.find(id)) ordered.push_back(info);
+    for (int i = 0; i < types.size(); ++i)
+        if (std::find(ordered.begin(), ordered.end(), &types.at(i)) == ordered.end()) ordered.push_back(&types.at(i));
+
+    // The groups in the order of their first card, each with its cards in that same order.
+    juce::StringArray groups;
+    for (const auto* info : ordered) groups.addIfNotAlreadyThere(juce::String::fromUTF8(info->group));
+    auto membersOf = [&ordered](const juce::String& group)
+    {
+        std::vector<const mu_core::LayerTypeInfo*> out;
+        for (const auto* info : ordered)
+            if (juce::String::fromUTF8(info->group) == group) out.push_back(info);
+        return out;
+    };
+
     bool haveSingles = false;
     for (const auto& group : groups)
-        if (types.inGroup(group).size() == 1) haveSingles = true;
+        if (membersOf(group).size() == 1) haveSingles = true;
     if (haveSingles) bands.push_back({ {}, {}, false });
 
     for (const auto& group : groups)
     {
-        const auto members = types.inGroup(group);
+        const auto members = membersOf(group);
         const bool single = members.size() == 1;
         if (! single) bands.push_back({ group, {}, true });
         const int bandIndex = single ? 0 : (int) bands.size() - 1;
@@ -50,7 +75,7 @@ void EmptySlotChooser::rebuild()
             card.plate      = single ? group : card.name;
             card.descriptor = juce::String::fromUTF8(info->descriptor);
             card.colour     = info->appColourId != 0 ? LF::colour((LF::ColourIds) info->appColourId) : LF::colour(LF::appIce);
-            card.disc       = std::make_unique<mu_ui::LayerDiscVisual>(LF::colour(LF::headingText), card.name.substring(0, 1));
+            card.disc       = std::make_unique<mu_ui::LayerDiscVisual>(LF::colour(LF::headingText), juce::String::fromUTF8(info->discInitial));
             card.disc->setInterceptsMouseClicks(false, false);   // a click on the picture is a click on the card
             addAndMakeVisible(*card.disc);
             card.add        = std::make_unique<juce::TextButton>("Add");

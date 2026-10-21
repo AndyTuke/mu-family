@@ -1,6 +1,7 @@
 #include "PluginEditor.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "Persistence/TrackLayerTypes.h"   // chooseRumbleSource
+#include "Persistence/RhythmLayerType.h"   // isRhythmMidiOutput, clearUnresolvedSample
 
 namespace mu_tronic
 {
@@ -75,8 +76,26 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         if (proc.createLayerOfType(slot, type))   // from the app's own _default file when it has one
         {
             if (type == mu_core::LayerTypeId::Rumble) chooseRumbleSource(proc, slot);   // a new Rumble listens to something at once
+            if (type == mu_core::LayerTypeId::Rhythm) clearUnresolvedSample(proc, slot);   // no "Missing" banner for a file nobody chose
             layerTypeSet(slot);
         }
+    };
+    // The cards in the design's order (design-ui 4.3): the three products, then mu-On's five.
+    chooser.setOrder({ mu_core::LayerTypeId::Rhythm, mu_core::LayerTypeId::Pattern, mu_core::LayerTypeId::Arp,
+                       mu_core::LayerTypeId::Kick, mu_core::LayerTypeId::Bass, mu_core::LayerTypeId::Hat,
+                       mu_core::LayerTypeId::Snare, mu_core::LayerTypeId::Rumble });
+
+    // A type with its own save card (the Rhythm's) is asked first by the header's Save.
+    layerPanel.setOwnSaveCard([this](int) { return shownContent != nullptr && shownContent->openSaveCard(); });
+
+    // The mixer: a Rhythm in MIDI output mode makes no audio, so its strip is drawn inactive; the effect's name follows
+    // the mixer to every place that labels the effect send.
+    mixerOverlay.isChannelSilent = [this](int slot) { return isRhythmMidiOutput(proc, slot); };
+    mixerOverlay.onEffectAlgorithmNameChanged = [this](const juce::String& name)
+    {
+        if (name == effectSendName) return;   // the mixer reports on every refresh; rebuild the lists only on a change
+        effectSendName = name;
+        applyEffectSendName();
     };
 
     setMainArea(&sidebar, &layerPanel);
@@ -114,8 +133,21 @@ LayerContent* PluginEditor::contentFor(mu_core::LayerTypeId type)
     auto content = info->createContent(proc, layerPanel.getLayer());
     // A knob hover or change shows on the shell's status bar.
     content->onStatusUpdate = [this](const juce::String& name, const juce::String& value) { getStatusBar().showParam(name, value); };
+    // A type with its own save card: the card sits over the whole panel, and a saved file refreshes the preset list.
+    content->onPresetFileSaved = [this] { layerPanel.refreshPresetList(); };
+    if (auto* card = content->getSaveCardOverlay()) layerPanel.addOverlay(*card);
+    // A change the mixer strip's look depends on (a Rhythm's output mode) refreshes the open mixer.
+    content->onMixerStateChanged = [this] { if (isMixerVisible()) mixerOverlay.loadFromApvts(); };
     contents.emplace_back(type, std::move(content));
     return contents.back().second.get();
+}
+
+void PluginEditor::applyEffectSendName()
+{
+    if (shownContent == nullptr) return;
+    shownContent->setEffectSendName(effectSendName);
+    // The destination lists are rebuilt so a target carries the new name.
+    layerPanel.getModulatorPanel().setDestProvider(shownContent->getModDestProvider());
 }
 
 void PluginEditor::releaseContentArcs()
@@ -149,6 +181,7 @@ void PluginEditor::showSlot(int idx)
     shownContent = contentFor(type);
     if (shownContent != nullptr) shownContent->setLayer(idx);
     layerPanel.setContent(shownContent);
+    if (shownContent != nullptr) shownContent->setEffectSendName(effectSendName);   // before the destination lists are built
     layerPanel.getModulatorPanel().setDestProvider(shownContent != nullptr ? shownContent->getModDestProvider() : nullptr);
     layerPanel.getHeader().setTypeTag(info != nullptr ? juce::String(info->typeTag) : juce::String());
     if (info != nullptr && info->appColourId != 0)

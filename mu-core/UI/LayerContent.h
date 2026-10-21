@@ -26,6 +26,21 @@ public:
     // something derived from them (the Pattern's stepped-pitch flags) refreshes it. Message thread. Default: nothing.
     virtual void modulatorsChanged(int slot) { juce::ignoreUnused(slot); }
 
+    // The mixer's effect now has this name ("Chorus", "Echo"): a type whose content labels the effect send (a knob, a
+    // modulation target) takes it here, and its ModDestProvider reads it when the host rebuilds the destination list.
+    // The host calls it on every setLayer and type swap as well, so the first paint is already right. Default: nothing.
+    virtual void setEffectSendName(const juce::String& name) { juce::ignoreUnused(name); }
+
+    // A type that has its own save card (a richer one than the header's name prompt) opens it here and returns true;
+    // the header's Save then asks nothing else. The card is a full-panel overlay the host adds once (getSaveCardOverlay).
+    // When the file has been written the content calls onPresetFileSaved so the header's preset list is re-read.
+    virtual bool openSaveCard() { return false; }
+    virtual juce::Component* getSaveCardOverlay() noexcept { return nullptr; }
+    std::function<void()> onPresetFileSaved;
+
+    // The content changed something the mixer strip's look depends on (a Rhythm's output mode): the host refreshes it.
+    std::function<void()> onMixerStateChanged;
+
     // A knob hover or change: the control's name and value, for the shell's status bar.
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
 };

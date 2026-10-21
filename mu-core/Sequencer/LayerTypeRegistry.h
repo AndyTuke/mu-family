@@ -32,6 +32,13 @@ namespace mu_core
             return nullptr;
         }
 
+        // The one character on the type's disc ("" for a type the host does not offer).
+        juce::String discInitial(LayerTypeId id) const
+        {
+            const auto* info = find(id);
+            return info != nullptr ? juce::String::fromUTF8(info->discInitial) : juce::String();
+        }
+
         int size() const noexcept { return (int) types.size(); }
         bool isEmpty() const noexcept { return types.empty(); }
         const LayerTypeInfo& at(int i) const { return types[(size_t) i]; }

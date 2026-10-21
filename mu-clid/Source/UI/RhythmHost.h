@@ -60,6 +60,12 @@ public:
     virtual void              saveRhythmPresetFile(int layer, const juce::File& dest, bool embedSample,
                                                    const juce::String& category, const juce::String& description) = 0;
     virtual void              stageRhythmPresetFile(int layer, const juce::File& file) = 0;
+    // The preset file layer `layer` came from, when the host knows it (the save card then starts from that file's
+    // category, description and embed setting); none by default.
+    virtual juce::File        getRhythmLoadedPresetFile(int layer) const { juce::ignoreUnused(layer); return {}; }
+    // The name the save card offers for a layer that came from no file: the layer's own name unless the host shows
+    // another (a slot host whose layer keeps no name until the user types one).
+    virtual juce::String      getRhythmSaveName(int layer) const { return juce::String(getRhythmLayer(layer).name); }
     virtual juce::StringArray getRhythmPresetCategories() const = 0;
     virtual void              addRhythmPresetCategory(const juce::String& category) = 0;
 

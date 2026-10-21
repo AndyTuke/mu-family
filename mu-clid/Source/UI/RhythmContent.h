@@ -88,6 +88,12 @@ public:
     // Amp "Effect" send knob tracks the mixer.
     void setVoiceEffectSendLabel(const juce::String& name);
 
+    // LayerContent: a slot host's own save card (the header's Save opens this instead of a name prompt) and the
+    // effect name, which labels the Amp send knob.
+    bool openSaveCard() override { saveRhythmPreset(); return true; }
+    juce::Component* getSaveCardOverlay() noexcept override { return &saveDialog; }
+    void setEffectSendName(const juce::String& name) override { setVoiceEffectSendLabel(name); }
+
 private:
     RhythmHost& host;
     int currentRhythmIndex = -1;
@@ -122,7 +128,7 @@ private:
                   "sample bar + circle + voice band must tile the layer content band");
     static constexpr int kPanelPad     = MuLookAndFeel::kPanelPad;
     static constexpr int kModeSelectorW = 80;
-    static constexpr int kOutputSelectorW = 112;   // the Sample / MIDI selector (two LCD windows) in the sample strip
+    static constexpr int kOutputSelectorW = 2 * MuLookAndFeel::kLcdSegmentW;   // 112:the Sample / MIDI selector (two LCD windows) in the sample strip
     static constexpr int kIconBtnW     = 22;
     static constexpr int kPresetBtnW   = 38;
 
