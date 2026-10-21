@@ -1015,19 +1015,30 @@ namespace
     // One slot's parameter rows moving to another slot's prefix: each id under `from` goes to the same suffix under `to`.
     struct RowMove { juce::String from, to; };
 
-    // Applies the moves. Every source value is read before any is written, so moves that overlap (two same-prefix slots
-    // exchanging rows) swap instead of copy. A row the destination lacks is skipped, and a value that is already right is
-    // not written again (no host notification, no listener work for nothing). Message thread.
-    void moveRows(juce::AudioProcessor& proc, juce::AudioProcessorValueTreeState& apvts, const std::vector<RowMove>& moves)
+    // Which parameter feeds which: the structure of a set of row moves, found by walking the parameter list. A row the
+    // destination lacks is left out. Done before the audio thread is excluded, because the walk is the slow part.
+    using RowPlan = std::vector<std::pair<juce::RangedAudioParameter*, juce::RangedAudioParameter*>>;   // source, destination
+    RowPlan planRows(juce::AudioProcessor& proc, juce::AudioProcessorValueTreeState& apvts, const std::vector<RowMove>& moves)
     {
-        std::vector<std::pair<juce::RangedAudioParameter*, float>> writes;
+        RowPlan plan;
         for (const auto& m : moves)
             forEachPrefixed(proc, m.from, [&](juce::RangedAudioParameter& rp, const juce::String& suffix)
             {
-                if (auto* dst = apvts.getParameter(m.to + suffix)) writes.emplace_back(dst, rp.getValue());
+                if (auto* dst = apvts.getParameter(m.to + suffix)) plan.emplace_back(&rp, dst);
             });
-        for (const auto& w : writes)
-            if (w.first->getValue() != w.second) w.first->setValueNotifyingHost(w.second);
+        return plan;
+    }
+
+    // Applies a plan. Every source value is read before any is written, so moves that overlap (two same-prefix slots
+    // exchanging rows) swap instead of copy; a value that is already right is not written again (no host notification,
+    // no listener work for nothing). Message thread.
+    void applyRows(const RowPlan& plan)
+    {
+        std::vector<float> values;
+        values.reserve(plan.size());
+        for (const auto& pr : plan) values.push_back(pr.first->getValue());
+        for (size_t i = 0; i < plan.size(); ++i)
+            if (plan[i].second->getValue() != values[i]) plan[i].second->setValueNotifyingHost(values[i]);
     }
 
     // The same prefix letters on another slot: "t3_" on slot 5 is "t5_". Empty stays empty (no live prefix).
@@ -1081,23 +1092,35 @@ void ProcessorBase::resetLayerParams(int slot)
         });
 }
 
-void ProcessorBase::remapSidechainSources(const std::function<int(int)>& remap)
+std::vector<juce::RangedAudioParameter*> ProcessorBase::sidechainSourceParams()
 {
-    auto remapOne = [this, &remap](const juce::String& id)
+    std::vector<juce::RangedAudioParameter*> out;
+    auto add = [this, &out](const juce::String& id)
     {
-        if (auto* p = apvts.getParameter(id))
-        {
-            const int v  = juce::roundToInt(p->convertFrom0to1(p->getValue()));
-            const int nv = juce::jlimit(0, mu_mixfx::kScSrcMax, remap(v));   // 0 off, 1..kMaxLayers a channel, then external, then the buses
-            if (nv != v) p->setValueNotifyingHost(p->convertTo0to1((float) nv));
-        }
+        if (auto* p = apvts.getParameter(id)) out.push_back(p);
     };
     for (int c = 0; c < mu_limits::kMaxLayers; ++c)
-        remapOne("ch" + juce::String(c) + "_scSrc");
+        add("ch" + juce::String(c) + "_scSrc");
     for (const char* ret : { "ret_eff_scSrc", "ret_dly_scSrc", "ret_rev_scSrc" })
-        remapOne(ret);
+        add(ret);
     for (int b = 0; b < mu_limits::kMaxBuses; ++b)
-        remapOne("bus" + juce::String(b) + "_scSrc");
+        add("bus" + juce::String(b) + "_scSrc");
+    return out;
+}
+
+void ProcessorBase::remapSidechainSources(const std::function<int(int)>& remap)
+{
+    remapSidechainSources(sidechainSourceParams(), remap);
+}
+
+void ProcessorBase::remapSidechainSources(const std::vector<juce::RangedAudioParameter*>& params, const std::function<int(int)>& remap)
+{
+    for (auto* p : params)
+    {
+        const int v  = juce::roundToInt(p->convertFrom0to1(p->getValue()));
+        const int nv = juce::jlimit(0, mu_mixfx::kScSrcMax, remap(v));   // 0 off, 1..kMaxLayers a channel, then external, then the buses
+        if (nv != v) p->setValueNotifyingHost(p->convertTo0to1((float) nv));
+    }
 }
 
 juce::ValueTree ProcessorBase::captureComposedState()
@@ -1424,6 +1447,17 @@ bool ProcessorBase::swapLayersPublished(int a, int b)
     // The editor lets go of both layers before they move (modulator panel, content bindings), outside every lock.
     if (onLayerLeaving) { onLayerLeaving(a); onLayerLeaving(b); }
 
+    // Everything that only reads is done before the audio thread is excluded, so the window in which its blocks render
+    // nothing holds only waits, writes and pointer moves: which rows move where, and which sidechain parameters to rewrite.
+    const auto liveA = layerLayout.prefix(a), liveB = layerLayout.prefix(b);
+    const juce::String stripA = "ch" + juce::String(a) + "_", stripB = "ch" + juce::String(b) + "_";
+    std::vector<RowMove> moves { { stripA, stripB }, { stripB, stripA } };
+    if (liveA.isNotEmpty()) moves.push_back({ liveA, prefixOnSlot(liveA, b) });
+    if (liveB.isNotEmpty()) moves.push_back({ liveB, prefixOnSlot(liveB, a) });
+    const RowPlan rowPlan = layerHoldsParamTruth() ? RowPlan() : planRows(*this, apvts, moves);
+    const auto sidechainParams = sidechainSourceParams();
+    const double raisedAt = juce::Time::getMillisecondCounterHiRes();
+
     // Phase 0: exclude the audio thread. A timeout moves nothing (strip state is never moved without the grace).
     ScopedQuiesce quiesce(layerEditInFlight, layerAccess.epoch, 50);
     if (! quiesce.ok()) return false;
@@ -1436,9 +1470,6 @@ bool ProcessorBase::swapLayersPublished(int a, int b)
     // moves, because the hook reads each slot's layer type: after the move the old indices would name the wrong layers.
     const auto oldToNew = [a, b](int i) { return mu_mix::sidechainAfterSwap(i, a, b, mu_limits::kMaxLayers); };
     remapLayerReferences(oldToNew);
-
-    // The rows each layer owns right now, read before the live prefixes change.
-    const auto liveA = layerLayout.prefix(a), liveB = layerLayout.prefix(b);
 
     // Phase 2: pointers, strip state, tails and the one published view, under the writers' locks (the count store
     // advances the serial, so the layout writer lock comes first).
@@ -1465,27 +1496,33 @@ bool ProcessorBase::swapLayersPublished(int a, int b)
         storeLayerCount(numLayers.load(std::memory_order_relaxed));
     }
 
+    // What a type's services keep per slot moves with the layers (a Pattern's engine), before they re-bind.
+    {
+        std::array<mu_core::LayerServices*, (size_t) mu_core::kLayerTypeIdCount> built {};
+        {
+            const juce::ScopedLock sl(layerServicesLock);
+            for (size_t i = 0; i < built.size(); ++i) built[i] = layerServices[i].get();
+        }
+        for (auto* services : built)
+            if (services != nullptr) services->slotsSwapped(a, b);
+    }
+
     // The moved layers re-bind their parameter pointers to the new slots (C9); the flag still keeps blocks out.
     layers[(size_t) a]->bindParams(apvts, a);
     layers[(size_t) b]->bindParams(apvts, b);
 
     // Phase 3: parameter values. A strip that ducked from one swapped layer now ducks from the other (translated
     // before the rows move, so each strip's own source moves with it), then each layer's rows follow it to its new slot.
-    remapSidechainSources([a, b](int v) { return mu_mix::sidechainParamAfterSwap(v, a, b, mu_limits::kMaxLayers); });
+    remapSidechainSources(sidechainParams, [a, b](int v) { return mu_mix::sidechainParamAfterSwap(v, a, b, mu_limits::kMaxLayers); });
     if (layerHoldsParamTruth())
     {
         syncSlotParams(a);
         syncSlotParams(b);
     }
     else
-    {
-        const juce::String stripA = "ch" + juce::String(a) + "_", stripB = "ch" + juce::String(b) + "_";
-        std::vector<RowMove> moves { { stripA, stripB }, { stripB, stripA } };
-        if (liveA.isNotEmpty()) moves.push_back({ liveA, prefixOnSlot(liveA, b) });
-        if (liveB.isNotEmpty()) moves.push_back({ liveB, prefixOnSlot(liveB, a) });
-        moveRows(*this, apvts, moves);
-    }
+        applyRows(rowPlan);
     quiesce.release();
+    lastEditWindowMs.store(juce::Time::getMillisecondCounterHiRes() - raisedAt, std::memory_order_relaxed);
 
     // The banks and playing clips moved with their layers. Last, after the audio thread is running again, so the
     // notification a surface acts on sees the finished edit.

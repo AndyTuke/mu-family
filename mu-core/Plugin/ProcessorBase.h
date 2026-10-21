@@ -689,6 +689,10 @@ protected:
     // strips) through `remap(paramValue)`. The parameter is 0 = off, 1..8 = channel 0..7, 9 = the
     // external bus; a structural edit renumbers the layers, so a strip must follow its source's new slot.
     void remapSidechainSources(const std::function<int(int)>& remap);
+    // The same over a parameter list found beforehand (sidechainSourceParams), so a caller can do the lookups outside a
+    // window in which the audio thread is excluded.
+    std::vector<juce::RangedAudioParameter*> sidechainSourceParams();
+    void remapSidechainSources(const std::vector<juce::RangedAudioParameter*>& params, const std::function<int(int)>& remap);
 
     // A parameter whose value names another layer (such as a processing layer's source layer) must follow its layer
     // through removeLayer and swapLayers, like the sidechain sources. Called in phase 3 of both, with
@@ -1146,6 +1150,11 @@ private:
     // swapLayers of a Published host (design 2.1.2): quiesce the audio thread, exchange the layers with their strips,
     // tails and parameter rows, publish one view, lower the flag. False when the audio thread did not quiesce in time.
     bool swapLayersPublished(int a, int b);
+    std::atomic<double> lastEditWindowMs { 0.0 };   // how long the last Published swap kept the audio thread out (flag raised to lowered)
+public:
+    // Milliseconds the audio thread's blocks rendered nothing during the last Published swapLayers (test probe).
+    double getLastEditWindowMsForTest() const noexcept { return lastEditWindowMs.load(std::memory_order_relaxed); }
+private:
     std::atomic<int> selectedSlot { 0 };   // setSelectedSlot
     int  firstUnusedColourIndex() const;   // lowest palette index no live layer uses
 
@@ -1228,6 +1237,14 @@ private:
 
         MixerEngine::RenderChannelFn copyToMixer;   // the mixer's channel r = scratch[r], an exact copy
 
+        // Published mode's declick around a block an edit keeps silent: the master's last sample per channel, the decay that
+        // continues it into the silence, and the fade-in of the first rendered blocks after it.
+        static constexpr int kSkipDecay = 48, kFadeIn = 64;   // samples
+        float lastOut[2] {};
+        float tailLevel[2] {}, tailStep[2] {};
+        bool  inSkip = false;
+        int   fadePos = kFadeIn;        // kFadeIn: no fade-in pending
+
         int lastBlockFrames = 0;        // frames of the last rendered host block (mergeLayerMidiOut clamps to it)
         int blocksRendered = 0, blocksSkipped = 0, largestCall = 0;   // test probe
     };
@@ -1248,7 +1265,12 @@ private:
     bool regrowCutsInPlaceTails = true;           // setRegrowCutsInPlaceTails (constructor only)
 
     void noteHostBlock(const mu_core::BlockTransport& t, int numSamples) noexcept;
-    void noteSkippedBlock(const mu_core::BlockTransport& t, juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi) noexcept;
+    // `editSkip`: the block was refused because an edit holds the flag (a Published host), so the master decays from its last
+    // sample instead of dropping to zero.
+    void noteSkippedBlock(const mu_core::BlockTransport& t, juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi, bool editSkip = false) noexcept;
+    // The master after the mixer: finishes the decay and fades the layers back in after a skipped block, and remembers
+    // the last sample for the next one. Published hosts only.
+    void declickMaster(juce::AudioBuffer<float>& buffer, int numSamples) noexcept;
     void decodeBlockMidi(const juce::MidiBuffer& midi, int numSamples) noexcept;
     void captureSidechainRegion(juce::AudioBuffer<float>& buffer, int offset, int numSamples) noexcept;
     void renderLayers(const mu_core::LayerBlock& block, const mu_core::BlockTransport& t,

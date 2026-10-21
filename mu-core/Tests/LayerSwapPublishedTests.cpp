@@ -11,6 +11,7 @@
 #include "LayerContractFixtures.h"
 #include "ProcessorSeamHelpers.h"
 #include "Sequencer/LayerTypeRegistry.h"
+#include "UI/LayerSidebar.h"
 
 #include <atomic>
 #include <cmath>
@@ -186,6 +187,8 @@ struct LayerSwapPublishedTests : juce::UnitTest
         referencesAndTheFlag();
         timeoutMovesNothing();
         tailFollowsItsStrip();
+        sidebarDrag();
+        noClickAtTheCut();
         mixIsUnchanged();
         stress();
     }
@@ -312,6 +315,8 @@ struct LayerSwapPublishedTests : juce::UnitTest
         p.flushPendingAsyncUpdates();
         p.mixerEngine.setSidechainEnv(1, 0.9f);
         p.mixerEngine.setSidechainEnv(3, 0.2f);
+        p.mixerEngine.channelPeaks[1].store(0.7f);
+        p.mixerEngine.sidechainGR[3].store(0.4f);
 
         expect(p.swapLayers(1, 3));
         p.flushPendingAsyncUpdates();
@@ -327,6 +332,8 @@ struct LayerSwapPublishedTests : juce::UnitTest
         expectEquals(p.mixerEngine.channels[3].outputBus.load(), 2);
         expectWithinAbsoluteError(p.mixerEngine.getSidechainEnv(3), 0.9f, 1.0e-6f);
         expectWithinAbsoluteError(p.mixerEngine.getSidechainEnv(1), 0.2f, 1.0e-6f);
+        expectWithinAbsoluteError(p.mixerEngine.channelPeaks[3].load(), 0.7f, 1.0e-6f, "the meter moved with the strip");
+        expectWithinAbsoluteError(p.mixerEngine.sidechainGR[1].load(), 0.4f, 1.0e-6f, "and so did the ducking read-out");
         expectEquals(juce::roundToInt(mu_seam_test::getParam(p.apvts, "ch0_scSrc")), 4, "a strip that ducked from layer 1 follows it to slot 3");
         expectEquals(juce::roundToInt(mu_seam_test::getParam(p.apvts, "ch5_scSrc")), 2, "and one that ducked from layer 3 follows it to slot 1");
         expectEquals(juce::roundToInt(mu_seam_test::getParam(p.apvts, "ch6_scSrc")), 7);
@@ -420,6 +427,125 @@ struct LayerSwapPublishedTests : juce::UnitTest
         expectEquals(p.retireBin.countIn(mu_core::RetireBin::Parked) + p.retireBin.countIn(mu_core::RetireBin::Draining), 0);
         expectEquals(p.retireBin.reclaimPending(), 0, "the faded tail was freed");
         expectEquals(gUseAfterFree.load(), 0);
+    }
+
+    // The shared sidebar's drop: a slot host exchanges exactly two slots with one swapLayers; a refusal leaves everything
+    // and tells the editor to rebind; a list host keeps its chain, which stops at the first refusal.
+    void sidebarDrag()
+    {
+        beginTest("a drag on a slot host is one swap of two slots (one publication); nothing in between moves; the selection follows");
+        {
+            auto box = std::make_unique<SwapHost>(); auto& p = *box;
+            LayerSidebar sidebar(p, "Layer");
+            sidebar.setBounds(0, 0, 82, 700);
+            sidebar.refreshItems();
+            std::vector<int> reordered;
+            sidebar.onLayersReordered = [&](int sel) { reordered.push_back(sel); };
+            sidebar.setSelectedIndex(0);
+            Layer* before[5];
+            for (int s = 0; s < 5; ++s) before[s] = p.getLayer(s);
+            const auto serial = p.layoutSerial();
+            sidebar.dropLayerForTest(0, 4);
+            expectEquals((int) (p.layoutSerial() - serial), 1, "a five-slot drag is one publication");
+            expect(p.getLayer(4) == before[0] && p.getLayer(0) == before[4]);
+            for (int s = 1; s < 4; ++s) expect(p.getLayer(s) == before[s], "slot " + juce::String(s) + " did not move");
+            expectEquals(sidebar.getSelectedIndex(), 4, "the selection follows the layer");
+            expect(reordered.size() == 1 && reordered[0] == 4);
+            p.flushPendingAsyncUpdates();
+        }
+
+        beginTest("a swap the audio thread did not allow moves nothing, keeps the selection and still tells the editor to rebind");
+        {
+            auto box = std::make_unique<SwapHost>(); auto& p = *box;
+            LayerSidebar sidebar(p, "Layer");
+            sidebar.setBounds(0, 0, 82, 700);
+            sidebar.refreshItems();
+            std::vector<int> reordered;
+            int leaving = 0;
+            sidebar.onLayersReordered = [&](int sel) { reordered.push_back(sel); };
+            p.onLayerLeaving = [&](int) { ++leaving; };
+            sidebar.setSelectedIndex(1);
+            std::atomic<bool> inside { false }, release { false };
+            std::thread audio([&]
+            {
+                p.layerAccess.epoch.enter();
+                inside.store(true);
+                while (! release.load()) std::this_thread::yield();
+                p.layerAccess.epoch.leave();
+            });
+            while (! inside.load()) std::this_thread::yield();
+            auto* l1 = p.getLayer(1);
+            auto* l3 = p.getLayer(3);
+            const auto serial = p.layoutSerial();
+            sidebar.dropLayerForTest(1, 3);
+            release.store(true);
+            audio.join();
+            p.onLayerLeaving = nullptr;
+            expect(p.getLayer(1) == l1 && p.getLayer(3) == l3 && p.layoutSerial() == serial, "nothing moved");
+            expectEquals(sidebar.getSelectedIndex(), 1, "the selection stays");
+            expect(reordered.size() == 1 && reordered[0] == 1, "the editor is told to rebind the shown layer");
+            expect(leaving > 0, "the editor had let go, so the rebind is needed");
+            expect(! p.layerEditInFlight.load());
+            p.flushPendingAsyncUpdates();
+        }
+
+        beginTest("a list host keeps its chain of adjacent swaps and stops at the first refusal");
+        {
+            auto box = std::make_unique<FakeLayerHost>(4); auto& p = *box;
+            LayerSidebar sidebar(p, "Layer");
+            sidebar.setBounds(0, 0, 82, 700);
+            sidebar.refreshItems();
+            Layer* before[4];
+            for (int s = 0; s < 4; ++s) before[s] = p.getLayer(s);
+            sidebar.setSelectedIndex(0);
+            sidebar.dropLayerForTest(0, 2);
+            expect(p.getLayer(2) == before[0] && p.getLayer(0) == before[1] && p.getLayer(1) == before[2], "the layers in between shifted");
+            expectEquals(sidebar.getSelectedIndex(), 2);
+
+            p.editable = false;   // every swap is refused
+            sidebar.dropLayerForTest(2, 0);
+            expect(p.getLayer(2) == before[0] && p.getLayer(0) == before[1], "a refused chain moves nothing");
+            expectEquals(sidebar.getSelectedIndex(), 2);
+            p.editable = true;
+            p.flushPendingAsyncUpdates();
+        }
+    }
+
+    // The blocks an edit keeps silent are declicked (Published mode): the master decays from its last sample and the
+    // layers fade back in. A steady tone cut dead would step by its whole level; here no step is larger than a slope.
+    void noClickAtTheCut()
+    {
+        beginTest("a cut and a resume of steady layers make no step: decay into the silence, fade back in, at block sizes 1, 7, 64 and 512");
+        for (const int blockSize : { 1, 7, 64, 512 })
+        {
+            auto box = std::make_unique<SwapHost>(); auto& p = *box;
+            p.setUseLayerRenderForTest(true);
+            Driver d(p, 48000.0, 512);
+            float last = 0.0f, steady = 0.0f, worst = 0.0f, after = 0.0f;
+            auto feed = [&](bool measure)
+            {
+                const auto& out = d.block(blockSize);
+                for (int i = 0; i < blockSize; ++i)
+                {
+                    const float x = out.getSample(0, i);
+                    if (measure) worst = juce::jmax(worst, std::abs(x - last));
+                    last = x;
+                }
+                return out.getSample(0, blockSize - 1);
+            };
+            for (int b = 0; b < 2000 / blockSize + 2; ++b) steady = feed(false);
+            expect(std::abs(steady) > 0.05f, "the layers sound (" + juce::String(steady, 4) + ")");
+
+            const int skipBlocks = juce::jmax(2, 300 / blockSize);
+            p.layerEditInFlight.store(true);
+            for (int b = 0; b < skipBlocks; ++b) feed(true);
+            p.layerEditInFlight.store(false);
+            for (int b = 0; b < 1000 / blockSize + 2; ++b) after = feed(true);
+
+            const juce::String tag = "block " + juce::String(blockSize) + ": ";
+            expect(worst < 0.03f * std::abs(steady) + 0.002f, tag + "largest step " + juce::String(worst, 5) + " against a level of " + juce::String(steady, 4));
+            expectWithinAbsoluteError(after, steady, 1.0e-4f, tag + "and the level comes back");
+        }
     }
 
     // The same layers and strips with the pair swapped between every block sum to the same master as with no swap:
