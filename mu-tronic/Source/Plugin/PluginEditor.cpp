@@ -108,6 +108,11 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         applyEffectSendName();
     };
 
+    // Scenes: eight pads at the sidebar's foot launch clip n on every layer that stores one. The Notes In channel sits in
+    // the header for the types that read notes (showSlot decides per slot).
+    sidebar.setShowScenes(true);
+    layerPanel.getHeader().setNotesInControl([this] { return notesInChannel(); }, [this](int ch) { setNotesInChannel(ch); });
+
     setMainArea(&sidebar, &layerPanel);
     setMixerOverlay(&mixerOverlay);
     setSettingsOverlay(&settingsOverlay);
@@ -122,10 +127,15 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     setScrews(true);
 
     forwardKnobStatus(layerPanel);
+
+    // The CPU readout: shown in Performance mode too (the one figure a player needs on stage).
+    getStatusBar().setCpuMeterVisible(true);
+    startTimerHz(4);
 }
 
 PluginEditor::~PluginEditor()
 {
+    stopTimer();
     layerPanel.setContent(nullptr);   // the panel must not keep a content this editor is about to destroy
     releaseContentArcs();
     layerPanel.getHeader().onNameChanged = nullptr;   // the processor can outlive the editor
@@ -152,6 +162,26 @@ LayerContent* PluginEditor::contentFor(mu_core::LayerTypeId type)
     return contents.back().second.get();
 }
 
+void PluginEditor::timerCallback()
+{
+    getStatusBar().setCpuLoad(proc.getCpuPeak());   // the worst figure of the last second: a plain average hides the spike that clicks
+}
+
+int PluginEditor::notesInChannel() const
+{
+    const auto* raw = proc.apvts.getRawParameterValue("ch" + juce::String(layerPanel.getLayer()) + "_midiIn");
+    return raw != nullptr ? juce::roundToInt(raw->load()) : 0;
+}
+
+void PluginEditor::setNotesInChannel(int channel)
+{
+    auto* param = proc.apvts.getParameter("ch" + juce::String(layerPanel.getLayer()) + "_midiIn");
+    if (param == nullptr) return;
+    param->beginChangeGesture();
+    param->setValueNotifyingHost(param->convertTo0to1((float) juce::jlimit(0, 16, channel)));
+    param->endChangeGesture();
+}
+
 void PluginEditor::applyEffectSendName()
 {
     if (shownContent == nullptr) return;
@@ -173,6 +203,13 @@ void PluginEditor::showSlot(int idx)
     layerPanel.setLayerEmpty(empty);
     layerPanel.getHeader().setNameEditable(! empty);
     chooser.setSlot(idx);
+
+    // The clip strip and the Notes In channel follow the slot's type: hidden (not disabled) for an Empty slot, for a type
+    // with no clip bank (Rumble) and, for Notes In, for a type that does not read notes.
+    const auto* typeInfo = proc.getLayerTypes().find(type);
+    layerPanel.setClipBankAvailable(typeInfo == nullptr || typeInfo->hasClipBank);
+    layerPanel.getHeader().setShowNotesIn(! empty && typeInfo != nullptr && typeInfo->takesNotes);
+    layerPanel.getHeader().refreshNotesIn();
 
     // An Empty slot shows the chooser over the content and modulator bands, in the shell's own colour.
     if (empty)

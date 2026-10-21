@@ -18,7 +18,8 @@ namespace mu_tronic
 // the same way), around the shared LayerPanel (preset strip + modulators). An Empty slot shows the chooser in the
 // content area; a slot that holds a layer shows that type's content, built through the registry (one instance per
 // type, rebound as the selection moves) and painted in the type's colour. No bespoke shell or mixer code.
-class PluginEditor : public EditorShellBase
+class PluginEditor : public EditorShellBase,
+                     private juce::Timer
 {
 public:
     explicit PluginEditor(PluginProcessor&);
@@ -40,6 +41,11 @@ private:
     void layerTypeSet(int slot);
     // The mixer's effect name reaches the shown content's send label and its modulation targets.
     void applyEffectSendName();
+    // The shown slot's MIDI-in channel (the header's Notes In control reads and writes ch{N}_midiIn).
+    int  notesInChannel() const;
+    void setNotesInChannel(int channel);
+    // The status bar's CPU readout, refreshed from the processor's peak four times a second.
+    void timerCallback() override;
 
     PluginProcessor& proc;
     LayerSidebar   sidebar;
