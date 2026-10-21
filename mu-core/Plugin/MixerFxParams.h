@@ -144,6 +144,7 @@ struct ChannelStripOptions
     float scAmt       = 0.0f;     // sidechain amount default
     float scRel       = 100.0f;   // sidechain release default (ms)
     bool  busAssign   = true;     // declare "bus" (the group bus this strip feeds); only where buses exist, never on a bus itself
+    bool  midiIn      = false;    // declare "midiIn" (the MIDI channel this strip's layer hears: 0 Omni, 1-16); only where each strip has its own layer
 };
 
 // One mixer channel strip's parameters — level / pan / mute / solo, the three FX sends,
@@ -186,6 +187,8 @@ inline void addChannelStripParams(juce::AudioProcessorValueTreeState::ParameterL
     if constexpr (mu_limits::kMaxBuses > 0)
         if (o.busAssign)
             addI("bus", "Bus", 0, mu_limits::kMaxBuses, 0);         // 0 = master, 1..kMaxBuses = group bus
+    if (o.midiIn)
+        addI("midiIn", "MIDI In", 0, 16, 0);                        // 0 = Omni, 1..16 = that channel only
 }
 
 // One insert's parameters under `prefix` (e.g. "bus0_i1_"): the algorithm and the four generic slot

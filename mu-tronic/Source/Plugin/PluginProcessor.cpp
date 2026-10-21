@@ -23,7 +23,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     {
         const juce::String c = "ch" + juce::String(i) + "_";
         const juce::String n = "Slot " + juce::String(i + 1) + " Ch ";
-        mu_mixfx::addChannelStripParams(layout, c, n);
+        mu_mixfx::ChannelStripOptions strip;
+        strip.midiIn = true;   // each slot's layer has its own MIDI In channel (Omni or 1-16)
+        mu_mixfx::addChannelStripParams(layout, c, n, strip);
     }
 
     // ── The group buses (mu_limits::kMaxBuses, defined for this target): bus{B}_ strips and their inserts.
@@ -97,6 +99,8 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     midiBufferSized.store(false);
     mixerEngine.prepare(sampleRate, samplesPerBlock);
     fxChain.prepare(sampleRate, samplesPerBlock);
+    meterRate = sampleRate;
+    cpuMeter.reset();
 
     // Every slot's layer, and the shared driver's buffers.
     prepareLayerRender(sampleRate, samplesPerBlock);
@@ -111,6 +115,7 @@ void PluginProcessor::releaseResources()
 void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
+    cpuMeter.begin();   // the whole block, to the load readout below
 
     // The first block after a prepare: room for a full block of layer MIDI out, once (the only allocation the merge below can cost).
     if (! midiBufferSized.exchange(true))
@@ -134,6 +139,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
 
     // Hot-swap: flag staged presets whose boundary passed in this block (each slot's loop is its layer's loopBeats).
     flagLayerSwapBoundaries(transport);
+
+    cpuMeter.end(buffer.getNumSamples(), meterRate);
 }
 
 void PluginProcessor::remapLayerReferences(const std::function<int(int)>& oldToNew)

@@ -770,6 +770,16 @@ protected:
     int lastTransportState = 0;                            // message thread: the transport state the live state was last told about
     std::atomic<bool> muteChanged { false };               // a strip mute parameter changed on some thread; the poll tells the live state
     std::array<juce::RangedAudioParameter*, mu_limits::kMaxLayers> muteParams {};   // ch{N}_mute, cached (null = none)
+    // ch{N}_midiIn raw values, cached (null = the product declares none: every layer hears every channel). The rows
+    // move with a layer through swap / remove, so slot N's atomic is always the channel of the layer now in slot N.
+    std::array<std::atomic<float>*, mu_limits::kMaxLayers> midiInRaw {};
+    // Audio thread. The MidiView channel mask for slot `s`: bit c = channel c+1; 0xFFFF for Omni or no such row.
+    uint16_t layerChannelMask(int s) const noexcept
+    {
+        const auto* raw = midiInRaw[(size_t) s];
+        const int ch = raw != nullptr ? juce::roundToInt(raw->load(std::memory_order_relaxed)) : 0;
+        return ch >= 1 && ch <= 16 ? (uint16_t) (1u << (ch - 1)) : (uint16_t) 0xFFFF;
+    }
     std::atomic<bool> fullPresetLoadFailed { false };   // set by a load that could not read its file
 
     // ─── The layer render contract (docs/mu-tronic/design.md 2.1; extraction stage E1) ────────────

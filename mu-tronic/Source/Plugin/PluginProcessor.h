@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Plugin/ProcessorBase.h"        // mu-core base
+#include "Plugin/CpuLoadMeter.h"        // mu-core: the processing-load readout
 #include "Plugin/MixerFxParams.h"        // mu-core: shared global-FX / mixer APVTS layout
 #include "Persistence/LayerTypes.h"      // the layer types this build offers
 #include "Persistence/TronicState.h"     // state names, slot prefixes
@@ -50,6 +51,12 @@ public:
 
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
+
+    // ── Processing load ──────────────────────────────────────────────────────
+    // Message thread. The time processBlock takes as a fraction of the time its block lasts (smoothed), and the recent
+    // worst block: what the transport bar's CPU readout shows. Measured around the whole block, 16 layers, buses and FX.
+    float getCpuLoad() const noexcept { return cpuMeter.load(); }
+    float getCpuPeak() const noexcept { return cpuMeter.peak(); }
 
     // ── Slots ────────────────────────────────────────────────────────────────
     // Sixteen fixed slots; a deleted layer leaves its slot Empty and nothing shifts. Two slots, empty or not, can
@@ -112,6 +119,9 @@ private:
     // Cleared by prepareToPlay; the first block after it gives the host's MIDI buffer room for the layers' output, so the
     // one allocation a MIDI merge can cost happens at start-up, before any note.
     std::atomic<bool> midiBufferSized { false };
+
+    mu_core::CpuLoadMeter cpuMeter;
+    double meterRate = 44100.0;   // the rate prepareToPlay was given; the block's duration for the meter
 
     void setupLayerState();
     juce::ValueTree toLayerState(const juce::ValueTree& tree) const;

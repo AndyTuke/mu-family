@@ -73,6 +73,8 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
         return perform(mute);
     };
     for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+        midiInRaw[(size_t) i] = apvts.getRawParameterValue("ch" + juce::String(i) + "_midiIn");
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
         muteParams[(size_t) i] = apvts.getParameter("ch" + juce::String(i) + "_mute");   // cached: the lamps ask per pad per frame
     cb.layerMuted   = [this](int layer)
     {
