@@ -37,7 +37,7 @@ Keep the workflow fast: before any check, test, build, review or agent call ask 
 1. **Take work.** Ask the `backlog-administrator` for the next task(s) from the top of Open; it returns a brief.
 2. **Prepare.** Once per batch of related work, get rulings from `ux-controller` / `architecture-steward` where the docs don't settle it, and do the `design-future` standing check.
 3. **Code.** Make the changes; run the static checks (`tests/scripts/check-*.ps1`).
-4. **Review the batch.** `dsp-controller` and any other applicable reviewer review the whole batch once. Their findings go onto the existing backlog row (via the `backlog-administrator`); fix them; each reviewer re-checks and answers Pass.
+4. **Review the batch (only where it pays; see Working pace).** `dsp-controller` is called only when the owner asks or the change is genuinely risky; other reviewers only for genuinely new decisions. Findings go onto the existing backlog row (via the `backlog-administrator`) and are fixed forward; no re-review rounds for minor findings.
 5. **Build when it is worth it** (see "Keep working until a build is worth it"), say in one line why, and report the number read from `mu-core/BuildNumber.h`.
 6. **Follow up.** `test-steward` for tests, `user-documentation-author` for the manuals, `/notes` for release notes: each once for the batch.
 7. **Close and commit.** Items with every applicable sign-off and build evidence are closed by the `backlog-administrator`; commit with `Closes` (signed off) or `Refs` (not yet) and push. Then back to step 1.
@@ -82,7 +82,7 @@ Seven agents each own one area and are the final word in it; none edits another'
 
 **Call the agents without asking** (owner rule, 2026-10-09). The main conversation invokes them on its own whenever their trigger applies, and does not ask the owner for permission first:
 
-Each agent's file says when to use it. Calls are once per batch of related work, not per small change; `dsp-controller` reviews before the build or commit that covers a batch, and a **Blocked** verdict is fixed first. `backlog-administrator` gets one batched call at the end of a round.
+Each agent's file says when to use it. Calls are once per batch of related work, not per small change, and subject to the Working pace rules (no routine `dsp-controller` review; a **Blocked** verdict, when one is requested, is fixed first). `backlog-administrator` gets one batched call at the end of a round.
 
 **Reviews update the item, they don't spawn new ones** (owner rule, 2026-10-12), for all reviewers (`dsp-controller`, `architecture-steward`, `test-steward`, `ux-controller`, `user-documentation-author`): when a change belongs to a backlog issue, the main conversation passes each reviewer's findings to the `backlog-administrator`, who records them on that row; the fixes are made; each reviewer re-checks and answers Pass; and only when every applicable reviewer has passed does the main conversation ask the `backlog-administrator` to close the row. A genuinely separate defect still gets its own row. A review never triggers another review.
 
