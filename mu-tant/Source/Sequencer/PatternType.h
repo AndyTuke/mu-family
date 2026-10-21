@@ -69,6 +69,10 @@ public:
         const juce::ScopedLock sl(engineLock);
         std::swap(engines[(size_t) a], engines[(size_t) b]);
         std::swap(current[(size_t) a], current[(size_t) b]);
+        // Each engine takes its new slot's noise seed, as one made for that slot does, so two Patterns never share a sequence.
+        for (const int slot : { a, b })
+            for (auto& e : engines[(size_t) slot])
+                if (e != nullptr) e->setSlotIndex(slot, noiseSalt);
     }
 
     // Message thread, the slot's current engine (the newest Pattern's; null before the first): what a Pattern's

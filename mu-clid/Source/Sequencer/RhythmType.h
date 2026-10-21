@@ -212,6 +212,10 @@ public:
     {
         samples.mixPreviewInto(master, numSamples);
     }
+    // A Published host's swap: the sample paths are kept per slot, so they move with the layers (mu-Clid's own host does
+    // the same in its layer edits). The voices, and so the audio, are the layers'.
+    void slotsSwapped(int a, int b) override { samples.swapPaths(a, b); }
+
     void deferredWork() override
     {
         // Rows that changed on another thread: each read from the parameter itself, so the newest value wins.

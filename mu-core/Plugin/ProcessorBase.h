@@ -1242,7 +1242,8 @@ private:
         static constexpr int kSkipDecay = 48, kFadeIn = 64;   // samples
         float lastOut[2] {};
         float tailLevel[2] {}, tailStep[2] {};
-        bool  inSkip = false;
+        bool  inSkip = false;           // a decay is still running (also into the first rendered blocks)
+        bool  lastWasSkip = false;      // the previous block was refused by an edit
         int   fadePos = kFadeIn;        // kFadeIn: no fade-in pending
 
         int lastBlockFrames = 0;        // frames of the last rendered host block (mergeLayerMidiOut clamps to it)

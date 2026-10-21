@@ -8,6 +8,8 @@
 #include "Plugin/PluginProcessor.h"
 #include "Persistence/TrackLayerTypes.h"   // chooseRumbleSource
 #include "Sequencer/Track.h"               // mu-On's layer library: the layer a Track slot holds
+#include "Sequencer/RhythmType.h"         // mu-Clid's layer library: the Rhythm and its services (sample paths)
+#include "Tests/RhythmLayerFixture.h"       // mu-Clid: writeSample
 #include "Sequencer/PatternType.h"        // mu-Tant's layer library: the Pattern engines the services keep
 #include "Tests/AllocationProbe.h"
 #include "Tests/GoldenRender.h"            // mu-core: MockHost
@@ -143,6 +145,8 @@ struct MuTronicSwapTests : juce::UnitTest
         rumbleSourceFollowsSwaps();
         keysSurviveASkippedBlock();
         patternKeepsItsEngine();
+        rhythmSamplesFollow();
+        patternNoiseDiffers();
         tailsFollowTheirStrip();
         flaggedWindow();
         mixIsUnchanged();
@@ -289,6 +293,15 @@ struct MuTronicSwapTests : juce::UnitTest
             expect(probe.events[1].status == 0x80 && probe.events[1].note == 60 && probe.events[1].frame == 0, "then the carried note-off at frame 0");
             expect(probe.events[2].status == 0x90 && probe.events[2].note == 64 && probe.events[2].frame == 10, "and the block's own note at its own frame");
         }
+
+        // Events held for a block that never came do not survive a prepare.
+        run({ { juce::MidiMessage::noteOn(1, 70, (juce::uint8) 90), 5 } }, true);
+        p.releaseResources();
+        p.prepareToPlay(48000.0, 512);
+        probe.events.clear();
+        run({}, false);
+        expectEquals(probe.carried, 0, "a prepare drops the carried events");
+        expect(probe.events.empty());
         p.setPlayHead(nullptr);
         p.releaseResources();
         p.flushPendingAsyncUpdates();
@@ -320,6 +333,95 @@ struct MuTronicSwapTests : juce::UnitTest
         expect(p.setLayerType(14, LayerTypeId::Empty));
         expect(p.setLayerType(1, LayerTypeId::Pattern));
         expect(services->findEngine(1) != e1 && services->findEngine(1) != e2 && services->findEngine(1) != nullptr);
+        p.flushPendingAsyncUpdates();
+    }
+
+    // The sample paths are kept per slot by the Rhythm services; a swap moves them with the layers.
+    void rhythmSamplesFollow()
+    {
+        beginTest("Rhythm layers swapped keep their own samples; the saved state restores each under its layer; a Rhythm swaps with an Empty slot");
+        mu_seam_test::TempStorage storage;
+        SwapProcessor p;
+        expect(p.setLayerType(3, LayerTypeId::Rhythm));
+        expect(p.setLayerType(9, LayerTypeId::Rhythm));
+        auto& services = *static_cast<mu_clid::RhythmSlotServices*>(p.findLayerServices(LayerTypeId::Rhythm));
+        const auto dir = p.getContentDir().getSiblingFile("muClid").getChildFile("Samples");
+        dir.createDirectory();
+        const auto first = mu_clid_fixture::writeSample(dir);
+        const auto second = dir.getChildFile("second-pluck.wav");
+        first.copyFileTo(second);
+        services.samples.load(3, first);
+        services.samples.load(9, second);
+        auto& rhythm3 = static_cast<mu_clid::SlotRhythm&>(*p.getLayer(3));
+        auto& rhythm9 = static_cast<mu_clid::SlotRhythm&>(*p.getLayer(9));
+        expect(rhythm3.voice->hasSample() && rhythm9.voice->hasSample());
+
+        expect(p.swapLayers(3, 9));
+        expect(p.getLayer(9) == &rhythm3 && p.getLayer(3) == &rhythm9);
+        expectEquals(services.samples.path(9), first.getFullPathName(), "slot 9 holds the first Rhythm and its sample");
+        expectEquals(services.samples.path(3), second.getFullPathName());
+        expectEquals(services.samples.getSampleName(9), juce::String("fixture-pluck.wav"));
+        expectEquals(services.samples.getSampleName(3), juce::String("second-pluck.wav"));
+        expect(! services.samples.isSampleMissing(9) && ! services.samples.isSampleMissing(3));
+
+        const auto state = p.captureState();
+        expectEquals(mu_pp::findLayerNode(state, 9).getProperty("sample").toString(), juce::String("fixture-pluck.wav"));
+        expectEquals(mu_pp::findLayerNode(state, 3).getProperty("sample").toString(), juce::String("second-pluck.wav"));
+        juce::MemoryBlock block;
+        p.getStateInformation(block);
+        mu_seam_test::TempStorage storage2;
+        SwapProcessor q;
+        const auto qdir = q.getContentDir().getSiblingFile("muClid").getChildFile("Samples");
+        qdir.createDirectory();
+        mu_clid_fixture::writeSample(qdir).copyFileTo(qdir.getChildFile("second-pluck.wav"));
+        q.setStateInformation(block.getData(), (int) block.getSize());
+        auto& qs = *static_cast<mu_clid::RhythmSlotServices*>(q.findLayerServices(LayerTypeId::Rhythm));
+        expectEquals(qs.samples.getSampleName(9), juce::String("fixture-pluck.wav"), "the restored slot 9 has the first layer's sample");
+        expectEquals(qs.samples.getSampleName(3), juce::String("second-pluck.wav"));
+        expect(q.captureState().isEquivalentTo(state), "and captures the same state");
+
+        // A Rhythm with a sample moves into an Empty slot, leaving none behind.
+        expect(p.swapLayers(9, 14));
+        expectEquals(services.samples.path(14), first.getFullPathName());
+        expectEquals(services.samples.path(9), juce::String(), "the Empty slot carries no path");
+        expect(p.getLayerTypeId(9) == LayerTypeId::Empty && p.getLayerTypeId(14) == LayerTypeId::Rhythm);
+        expect(! services.samples.isSampleMissing(14));
+        expect(static_cast<mu_clid::SlotRhythm&>(*p.getLayer(14)).voice->hasSample());
+        p.flushPendingAsyncUpdates();
+        q.flushPendingAsyncUpdates();
+    }
+
+    // Two Patterns never share a noise sequence after one moves and a new one is made where it was.
+    void patternNoiseDiffers()
+    {
+        beginTest("a Pattern moved to another slot and a new Pattern in its old slot have engines with different noise");
+        mu_seam_test::TempStorage storage;
+        SwapProcessor p;
+        p.prepareToPlay(48000.0, 256);
+        expect(p.setLayerType(1, LayerTypeId::Pattern));
+        const auto* info = p.getLayerTypes().find(LayerTypeId::Pattern);
+        auto* services = static_cast<mu_tant::PatternServices*>(p.ensureLayerServices(*info));
+        expect(p.swapLayers(1, 5));
+        expect(p.setLayerType(1, LayerTypeId::Pattern));
+        auto* moved = services->findEngine(5);
+        auto* fresh = services->findEngine(1);
+        expect(moved != nullptr && fresh != nullptr && moved != fresh);
+        auto noise = [](mu_tant::VoiceEngine& e)
+        {
+            mu_tant::VoiceConfig c;
+            c.osc1LevelDb = -60.0f; c.osc2LevelDb = -60.0f; c.noiseLevelDb = 0.0f; c.levelDb = 0.0f;
+            e.setConfig(c);
+            juce::AudioBuffer<float> out(2, 256);
+            out.clear();
+            e.process(out, 256);
+            return out;
+        };
+        const auto a = noise(*moved), b = noise(*fresh);
+        expect(a.getMagnitude(0, 0, 256) > 0.0f, "the engines make noise");
+        bool same = true;
+        for (int i = 0; i < 256; ++i) same = same && a.getSample(0, i) == b.getSample(0, i);
+        expect(! same, "and not the same noise");
+        p.releaseResources();
         p.flushPendingAsyncUpdates();
     }
 
