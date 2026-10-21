@@ -1,5 +1,6 @@
 #include "Plugin/ProcessorBase.h"
 #include "Plugin/MixerFxParams.h"           // mu_mixfx::isGlobalFxParamId
+#include "Sequencer/ClipClipboard.h"         // the process-wide clip clipboard
 #include "Persistence/PresetFiles.h"         // mu_pp full-preset files
 #include "Audio/FX/Slots/FXAlgorithmDef.h"   // FXAlgorithmRegistry
 #include "Audio/AlgorithmNames.h"             // mu_audio::kInsertAlgorithmCount
@@ -245,11 +246,17 @@ bool ProcessorBase::perform(const mu_core::ControlAction& a)
             return liveState.perform(a);
         case T::StoreClip:
         case T::ClearClip:
+        case T::CopyClip:
+        case T::CutClip:
+        case T::PasteClip:
         {
-            // Screen only: these write the bank, so the locked Performance mode refuses them and no map can name them.
+            // Screen only: these touch the bank or the clipboard, so the locked Performance mode refuses them and no map can name them.
             if (liveState.isPerformanceMode()) return false;
             if (hasPendingFullPreset()) return false;   // a staged full preset replaces the layers and their banks
             if (a.type == T::ClearClip) return clearClip(a.layer, a.index);
+            if (a.type == T::CopyClip)  return copyClip(a.layer, a.index);
+            if (a.type == T::CutClip)   return cutClip(a.layer, a.index);
+            if (a.type == T::PasteClip) return pasteClip(a.layer, a.index);
             if (! storeClip(a.layer, a.index)) return false;
             liveState.clipStored(a.layer, a.index);
             return true;
@@ -1930,7 +1937,7 @@ bool ProcessorBase::loadClipFromFile(int slot, int clip, const juce::File& layer
         const auto* info = layerTypes.find(type);
         const auto node = info != nullptr && info->presetFileToNode != nullptr
                               ? info->presetFileToNode(tree, layerPreset.getFileNameWithoutExtension()) : tree;
-        if (info == nullptr || type != slotTypeId(slot) || ! node.isValid())
+        if (info == nullptr || ! node.isValid() || ! clipFitsSlot(slot, node))
         {
             if (onLoadError) onLoadError("Could not read \"" + layerPreset.getFileName() + "\"");
             return false;
@@ -1941,18 +1948,82 @@ bool ProcessorBase::loadClipFromFile(int slot, int clip, const juce::File& layer
     }
 
     // The file must be this product's layer preset: its root tag is the tag a capture would write.
-    const auto expectedTag = captureLayerPresetTree(slot).getType();
     std::unique_ptr<juce::XmlElement> xml;
     if (layerPreset.existsAsFile())
         xml = juce::XmlDocument::parse(layerPreset);
-    if (xml == nullptr || expectedTag.toString().isEmpty() || ! xml->hasTagName(expectedTag.toString()))
+    const auto fileTree = xml != nullptr ? juce::ValueTree::fromXml(*xml) : juce::ValueTree();
+    if (! fileTree.isValid() || ! clipFitsSlot(slot, fileTree))
     {
         if (onLoadError) onLoadError("Could not read \"" + layerPreset.getFileName() + "\"");
         return false;
     }
 
     // Stored as read: any migration runs at launch, on a copy.
-    layer->clips->store(clip, juce::ValueTree::fromXml(*xml), layerPreset.getFileNameWithoutExtension());
+    layer->clips->store(clip, fileTree, layerPreset.getFileNameWithoutExtension());
+    publishClipMasks();
+    return true;
+}
+
+bool ProcessorBase::clipFitsSlot(int slot, const juce::ValueTree& tree)
+{
+    if (! tree.isValid() || getLayer(slot) == nullptr) return false;
+    if (layersAreSlots())
+        return layerPresetType(tree) == slotTypeId(slot);
+
+    // A list host: the layer's capture writes the root tag every clip of that layer carries.
+    const auto expected = captureLayerPresetTree(slot).getType();
+    return expected.toString().isNotEmpty() && tree.hasType(expected);
+}
+
+bool ProcessorBase::copyClip(int slot, int clip)
+{
+    mu_hotswap::assertMessageThread();   // the clip bank and the clipboard are message-thread only
+    auto* layer = getLayer(slot);
+    if (layer == nullptr || ! layer->clips->isOccupied(clip)) return false;   // an empty clip has nothing to copy
+
+    const auto tree = layer->clips->get(clip);
+    mu_core::clipClipboard().set(tree, layer->clips->getName(clip),
+                                 layersAreSlots() ? layerPresetType(tree) : mu_core::LayerTypeId::Empty);
+    return true;
+}
+
+bool ProcessorBase::cutClip(int slot, int clip)
+{
+    if (! copyClip(slot, clip)) return false;   // a failed copy clears nothing
+    return clearClip(slot, clip);
+}
+
+bool ProcessorBase::canPasteClip(int slot)
+{
+    const auto& board = mu_core::clipClipboard();
+    return board.hasClip() && clipFitsSlot(slot, board.get());
+}
+
+bool ProcessorBase::pasteClip(int slot, int clip)
+{
+    mu_hotswap::assertMessageThread();   // the clip bank and the clipboard are message-thread only
+    auto* layer = getLayer(slot);
+    if (layer == nullptr || ! mu_core::ClipBank::isValidIndex(clip)) return false;
+    if (hasPendingFullPreset()) return false;   // a staged full preset replaces the layers and their banks
+
+    const auto& board = mu_core::clipClipboard();
+    const auto  tree  = board.get();
+    if (! board.hasClip() || ! clipFitsSlot(slot, tree)) return false;
+
+    // Settle any landed launch first, then see whether the target is what the layer plays or is heading to.
+    liveState.reconcile();
+    const bool lit = liveState.getPlayingClip(slot) == clip || liveState.getQueuedClip(slot) == clip;
+
+    const auto previous     = layer->clips->get(clip);
+    const auto previousName = layer->clips->getName(clip);
+    layer->clips->store(clip, tree, board.getName());
+
+    // The lit clip's live layer must follow its new contents, so the lit pad still equals what plays.
+    if (lit && ! liveState.clipPasted(slot, clip))
+    {
+        layer->clips->store(clip, previous, previousName);   // the relaunch could not be staged: change nothing
+        return false;
+    }
     publishClipMasks();
     return true;
 }
@@ -1975,7 +2046,7 @@ bool ProcessorBase::launchClip(int slot, int clip)
 
     // A clip carries its type and loads only into a slot of that type: a launch is a staged swap of the same layer,
     // never a type change.
-    if (layersAreSlots() && layerPresetType(layer->clips->get(clip)) != slotTypeId(slot)) return false;
+    if (! clipFitsSlot(slot, layer->clips->get(clip))) return false;
 
     // The same stage path as a layer-preset load; get() deep-copies, so the stage can migrate the
     // copy and the bank is never written.

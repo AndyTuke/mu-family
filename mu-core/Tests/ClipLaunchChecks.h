@@ -6,6 +6,7 @@
 // read back; everything else is the shared ProcessorBase API.
 
 #include "Tests/ProcessorSeamHelpers.h"
+#include "Sequencer/ClipClipboard.h"
 
 #include <functional>
 #include <memory>
@@ -227,6 +228,45 @@ namespace mu_clip_test
             t.expect(p.getLayer(0)->clips->get(3).isEquivalentTo(stored), "the launch did not write the bank");
             t.expectEquals(p.getLayer(0)->clips->getName(3), juce::String("A"));
             t.expect(p.getLayer(0)->name == "keep" && p.getLayer(0)->colourIndex == 5, "identity untouched");
+        }
+
+        t.beginTest("copy, cut and paste: the clipboard clip pastes into another clip, the lit clip relaunches, a foreign tree is refused");
+        {
+            TempStorage storage;
+            mu_core::clipClipboard().clear();
+            Proc p;
+            x.set(p, x.a);
+            t.expect(p.storeClip(0, 1, "src"));
+            x.set(p, x.b);
+            t.expect(p.storeClip(0, 2, "lit"));   // clip 2 holds b
+            t.expect(! p.copyClip(0, 5), "an empty clip cannot be copied");
+            t.expect(p.copyClip(0, 1));
+            t.expect(p.canPasteClip(0));
+
+            // Not lit: written and named, nothing launched.
+            t.expect(p.pasteClip(0, 4));
+            t.expect(p.getLayer(0)->clips->get(4).isEquivalentTo(p.getLayer(0)->clips->get(1)));
+            t.expectEquals(p.getLayer(0)->clips->getName(4), juce::String("src"));
+            t.expect(! p.hasPendingSwap(0));
+            t.expectWithinAbsoluteError(x.get(p), x.b, x.tolerance);
+
+            // Lit (storeClip through the action lights it): the layer follows the pasted data.
+            mu_core::ControlAction lightIt;
+            lightIt.type = mu_core::ControlActionType::StoreClip; lightIt.layer = 0; lightIt.index = 2;
+            t.expect(p.perform(lightIt));
+            t.expect(p.pasteClip(0, 2));
+            t.expectEquals(p.getLiveState().getPlayingClip(0), 2, "it stays lit");
+            t.expectWithinAbsoluteError(x.get(p), x.a, x.tolerance);
+            t.expect(p.captureLayerPresetTree(0).isEquivalentTo(p.getLayer(0)->clips->get(2)), "what plays is what the pad holds");
+
+            // Cut keeps the data on the clipboard; a tree of another kind is refused and nothing is written.
+            t.expect(p.cutClip(0, 4));
+            t.expect(! p.getLayer(0)->clips->isOccupied(4));
+            t.expect(p.pasteClip(0, 6), "the cut clip pastes");
+            mu_core::clipClipboard().set(juce::ValueTree("NotThisProduct"), "alien");
+            t.expect(! p.canPasteClip(0) && ! p.pasteClip(0, 7));
+            t.expect(! p.getLayer(0)->clips->isOccupied(7));
+            mu_core::clipClipboard().clear();
         }
 
         t.beginTest("a clip stored from a layer-preset file launches exactly as loading that file; a layer-preset load clears activeClip");

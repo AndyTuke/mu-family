@@ -7,6 +7,7 @@
 #include "Persistence/PerformanceFile.h"
 #include "Tests/GoldenRender.h"          // mu-core: MockHost
 #include "Tests/ProcessorSeamHelpers.h"
+#include "Sequencer/ClipClipboard.h"
 
 #include <vector>
 
@@ -96,6 +97,7 @@ struct MuTronicSceneTests : juce::UnitTest
     void runTest() override
     {
         clipsCarryTheirType();
+        clipboardKeepsTheType();
         sceneLaunchesEveryLayer();
         sceneLandsTogetherOnTheBar(2, 4, 4);   // On bar, 4/4
         sceneLandsTogetherOnTheBar(1, 4, 4);   // On layer loop: a scene still shares the bar line
@@ -159,6 +161,46 @@ struct MuTronicSceneTests : juce::UnitTest
         // Changing the type empties the bank (a clip carries its type).
         expect(p.setLayerType(0, LayerTypeId::Bass));
         expectEquals((int) p.clipMask(0), 0, "the Kick's clips went with the Kick");
+        p.flushPendingAsyncUpdates();
+    }
+
+    void clipboardKeepsTheType()
+    {
+        beginTest("copy and paste carry a clip between slots of the same type only; the lit clip relaunches; an Empty slot takes nothing");
+        mu_seam_test::TempStorage storage;
+        mu_core::clipClipboard().clear();
+        SceneProcessor p;
+        build(p);
+        expect(p.setLayerType(4, LayerTypeId::Kick));   // a second Kick, slot 4
+        p.flushPendingAsyncUpdates();
+        std::vector<juce::String> rows;
+        fillBanks(p, rows);
+
+        // A Kick clip pastes into the other Kick, keeping name and data, and is refused by the Arp and an Empty slot.
+        expect(p.copyClip(0, 1));
+        expect(mu_core::clipClipboard().getLayerType() == LayerTypeId::Kick, "the clipboard carries the layer type");
+        expect(p.canPasteClip(4) && ! p.canPasteClip(2) && ! p.canPasteClip(1), "only a Kick slot takes it");
+        expect(! p.pasteClip(2, 6) && ! p.pasteClip(1, 6), "refused by the Arp and the Empty slot");
+        expectEquals((int) p.clipMask(2), 0b11, "nothing was written");
+        expect(p.pasteClip(4, 6));
+        expect(p.getLayer(4)->clips->get(6).isEquivalentTo(p.getLayer(0)->clips->get(1)));
+        expectEquals(p.getLayer(4)->clips->getName(6), juce::String("high"));
+        expectEquals(p.getLiveState().getPlayingClip(4), -1, "a paste does not light the pad");
+
+        // Paste onto the lit clip: the second Kick follows the pasted data.
+        expect(p.perform(act(T::StoreClip, 4, 3)));
+        const auto row = firstRow(p, 4);
+        setFirstRow(p, 4, 0.1f);
+        expect(p.pasteClip(4, 3));
+        expectEquals(p.getLiveState().getPlayingClip(4), 3, "it stays lit");
+        p.flushPendingAsyncUpdates();
+        expectWithinAbsoluteError(normalised(p, row), 0.8f, 0.02f, "what plays is the pasted clip (row 0.8, was 0.1)");
+
+        // Cut keeps the data on the clipboard.
+        expect(p.cutClip(0, 1));
+        expect(! p.getLayer(0)->clips->isOccupied(1));
+        expect(p.pasteClip(4, 7), "the cut clip pastes");
+        mu_core::clipClipboard().clear();
         p.flushPendingAsyncUpdates();
     }
 

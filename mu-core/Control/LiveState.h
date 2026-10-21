@@ -155,6 +155,10 @@ public:
     void clearLayerClips(int layer);
     // Clip c of layer n was cleared: if it was playing nothing plays; if it was queued the staged launch is cancelled.
     void clipCleared(int layer, int clip);
+    // Clip c of layer n was overwritten by a paste while it is the playing (or launch-waiting) one: its new contents are
+    // launched again as a normal staged launch (playing at once when stopped, queued otherwise), so the lit pad equals what
+    // plays. False, with no light changed, when the launch could not be staged.
+    bool clipPasted(int layer, int clip);
     // Layers were removed or swapped: playing clips and masks follow their layer (`oldToNew` gives the new index,
     // or -1 when the layer is gone); a moved layer's queued launch is dropped (the edit cancelled it).
     void remapLayers(const std::function<int(int)>& oldToNew);
@@ -183,6 +187,7 @@ private:
     };
     static bool inRange(int layer) noexcept { return layer >= 0 && layer < mu_limits::kMaxLayers; }
     bool startClip(int layer, int clip);
+    bool launchAndTrack(int layer, int clip);
     bool stepClip(int direction);
     bool stepPage(int direction);
     bool launchScene(int clip);

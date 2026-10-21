@@ -278,6 +278,12 @@ bool LiveState::startClip(int layer, int clip)
     }
     if (clip == c.queued) return true;                          // already on its way
     if ((c.mask & (1u << clip)) == 0) return false;              // an empty pad does nothing
+    return launchAndTrack(layer, clip);
+}
+
+bool LiveState::launchAndTrack(int layer, int clip)
+{
+    auto& c = clipState[(size_t) layer];
     if (! cb.launchClip || ! cb.launchClip(layer, clip)) return false;   // e.g. a full preset is staged
 
     // Stopped transport: the clip is applied inside launchClip and plays now. Otherwise it waits, and the
@@ -402,6 +408,17 @@ void LiveState::clipStored(int layer, int clip)
     }
     setPlaying(layer, clip);   // what was just stored is what the layer plays
     changed();
+}
+
+bool LiveState::clipPasted(int layer, int clip)
+{
+    if (! inRange(layer) || clip < 0 || clip >= mu_limits::kClipsPerLayer) return false;
+    reconcileClips();   // settle a landed or replaced launch before judging what is lit
+    const auto& c = clipState[(size_t) layer];
+    if (c.playing != clip && c.queued != clip) return true;   // not lit: the pasted data just sits in the bank
+
+    // Relaunch the new contents; the launch replaces whatever was staged on the layer, so the old wait is over.
+    return launchAndTrack(layer, clip);
 }
 
 void LiveState::setClipMask(int layer, uint8_t mask)

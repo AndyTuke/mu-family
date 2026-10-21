@@ -426,6 +426,23 @@ public:
     // preset is staged, or the stage hook staged nothing (a clip that cannot be built). The hook must change
     // slotStageSerial(slot) whenever it stages or applies a payload, as every stage path does.
     bool    launchClip(int slot, int clip);
+
+    // Clip clipboard (mu_core::clipClipboard(), one per process; message thread). Copy puts a deep copy of a stored clip on it
+    // (refused for an empty clip; the bank is unchanged). Cut is a copy and then a clear: when the copy fails nothing is cleared.
+    // Paste writes the clipboard clip into `clip` (name included), replacing what is there, and never lights it: a paste is not
+    // "what you are playing". Pasting onto the lit (or launch-waiting) clip is a staged relaunch of it, with launchClip's rules,
+    // so the lit pad still equals what plays; when that relaunch cannot be staged nothing is changed. The clipboard keeps its
+    // clip through a paste and a cut. A paste is refused for a clip of another layer type (see clipFitsSlot) or while a full
+    // preset is staged.
+    bool    copyClip(int slot, int clip);
+    bool    cutClip(int slot, int clip);
+    bool    pasteClip(int slot, int clip);
+    // Whether pasteClip would take the clipboard clip into layer `slot` (menu enabling): a clip is held and fits the layer.
+    bool    canPasteClip(int slot);
+    // The one type check every route into a bank shares (launch, file load, paste): `tree` is a layer preset of this
+    // layer's own kind. A list host compares the root tag with the one a capture of the layer writes; a typed slot host
+    // compares the layer type the tree carries with the slot's.
+    bool    clipFitsSlot(int slot, const juce::ValueTree& tree);
     // A scene: clip `clipIndex` launched on every layer that stores one, staged as one batch so the layers reach
     // their boundary together (the clip bank stays per layer; the scene is only the index). A layer without that clip,
     // or whose clip is of another type than its slot, keeps playing. Returns whether any layer launched or already
