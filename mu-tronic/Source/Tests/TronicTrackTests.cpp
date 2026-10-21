@@ -137,7 +137,7 @@ struct MuTronicTrackTests : juce::UnitTest
             expectEquals(juce::String(info->name), juce::String(mu_core::layerTypeName(type)));
             expectEquals((int) info->paramPrefixLetter, (int) 't');
             expectEquals(juce::String(info->group), juce::String("mu-On"));
-            expectEquals(juce::String::fromUTF8(info->typeTag), juce::String(juce::CharPointer_UTF8("Î¼-On")));
+            expectEquals(juce::String::fromUTF8(info->typeTag), juce::String(juce::CharPointer_UTF8("\xCE\xBC" "-On")));
             expect(info->typeFromPreset != nullptr, "the shared .muTrack is told apart by engine");
         }
         expect(p.getLayerTypes().find(LayerTypeId::Rumble) != nullptr, "Rumble is offered too");

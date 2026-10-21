@@ -223,7 +223,7 @@ mu_core::LayerTypeInfo patternLayerType()
     info.createServices = &createPatternServices;
     info.attachServices = &attachPatternServices;
     info.appColourId = (int) MuLookAndFeel::appGreen;   // the main area is painted in mu-Tant's green
-    info.typeTag = "Î¼-Tant";   // UTF-8: the product name with the real mu
+    info.typeTag = "\xCE\xBC" "-Tant";   // UTF-8: the product name with the real mu
     info.takesNotes = true;   // in Note mode a key starts the drone (the setting is kept in Free mode too)
    #if MU_TRONIC_WITH_UI
     info.createContent = &createPatternContent;

@@ -163,7 +163,7 @@ struct MuTronicPatternTests : juce::UnitTest
             expectEquals(juce::String(info->presetExtension), juce::String(".muPattern"));
             expectEquals(juce::String(info->presetFolder), juce::String("Voices"));
             expectEquals(juce::String(info->presetTag), juce::String("MuTantVoice"));
-            expectEquals(juce::String::fromUTF8(info->typeTag), juce::String(juce::CharPointer_UTF8("Î¼-Tant")));
+            expectEquals(juce::String::fromUTF8(info->typeTag), juce::String(juce::CharPointer_UTF8("\xCE\xBC" "-Tant")));
             expect(info->createServices != nullptr && info->attachServices != nullptr && info->addGlobalParams != nullptr);
         }
 
