@@ -212,7 +212,8 @@ target_link_libraries(mu-on-tests PRIVATE
     juce::juce_recommended_warning_flags
 )
 
-target_compile_definitions(mu-on-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+target_compile_definitions(mu-on-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0
+    MU_ON_FACTORY_TRACKS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/factory/Tracks")   # the FM Perc factory presets the preset test reads
 
 add_dependencies(mu-on mu-on-tests)
 
