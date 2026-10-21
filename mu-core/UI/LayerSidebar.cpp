@@ -277,8 +277,11 @@ void LayerSidebar::paint(juce::Graphics& g)
 void LayerSidebar::paintOverChildren(juce::Graphics& g)
 {
     if (pageSwitch.isVisible() && ! pageCaptionR.isEmpty())
+    {
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(MuLookAndFeel::kEngravedCaptionFont))));
         MuLookAndFeel::drawEngravedText(g, "Page", pageCaptionR, juce::Justification::centred,
                                         MuLookAndFeel::colour(MuLookAndFeel::ColourIds::labelText));
+    }
 
     // Panel screws over the items, set into the painted border.
     if (metal && MuLookAndFeel::hasScrews(*this))

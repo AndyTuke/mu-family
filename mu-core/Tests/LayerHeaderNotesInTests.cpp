@@ -173,7 +173,7 @@ public:
             expectEquals(sel.getWidth(), s(LF::kNotesInW), "the selector's ruled width");
             expectEquals(sel.getHeight(), s(LF::kStripDisplayH), "and height");
             expectEquals(plainW - dd.getWidth(), s(LF::kNotesInLabelW) + s(4) + s(LF::kNotesInW) + s(LF::kClipStripGap),
-                         "the dropdown gives up caption + 4 + selector + the strip gap (148 at Medium)");
+                         "the dropdown gives up caption + 4 + selector + the strip gap (162 at Medium)");
             expect(sel.getX() >= dd.getRight() + s(LF::kClipStripGap) + s(LF::kNotesInLabelW) + s(4), "caption and selector right of the dropdown");
             if (clips)
             {
@@ -193,7 +193,7 @@ public:
             bar.setShowClips(true);
             const int plainW = bar.getPresetDropdown().getWidth();
             bar.setNotesInControl([] { return 0; }, [](int) {});
-            expectEquals(plainW - bar.getPresetDropdown().getWidth(), 148, "148 at Medium, as ruled");
+            expectEquals(plainW - bar.getPresetDropdown().getWidth(), 162, "162 at Medium, as ruled");
         }
 
         beginTest("the longest item against the 92 px selector: measured, and reported (the ruling asks for a picture, not a local fix)");

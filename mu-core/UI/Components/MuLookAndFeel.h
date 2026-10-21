@@ -562,6 +562,7 @@ public:
     static constexpr int   kKnobTopPad    = 4;    // pad above the rotary (room for mod ring)
     static constexpr float kKnobLabelFont = 10.0f;
     static constexpr float kKnobValueFont = 8.0f;
+    static constexpr float kEngravedCaptionFont = 11.0f;   // sidebar and header engraved captions (Scene, Page, Notes In)
     // The empty-slot chooser's typography and chrome (docs/mu-tronic/design-ui.md 4.3): the card descriptor and hint,
     // the empty-registry message ("one size up"), the margin round the panel, the message inset and the card corner.
     static constexpr float kCardTextFont        = 12.0f;
@@ -792,7 +793,7 @@ public:
 
     // The layer's Notes In control in the header bar (docs/design-ui-family.md 13.10): an engraved caption and a channel selector.
     static constexpr int kNotesInLabelW = 44;
-    static constexpr int kNotesInW      = 92;
+    static constexpr int kNotesInW      = 106;
 
     // The StatusBar's CPU readout (docs/design-ui-family.md section 6): its slot, and the load fractions where the number
     // turns amber and red.

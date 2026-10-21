@@ -274,7 +274,7 @@ void LayerHeaderBar::paint(juce::Graphics& g)
     // The Notes In caption: engraved into the metal, or plain text in the flat look.
     if (! notesInCaptionR.isEmpty())
     {
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuLookAndFeel::kEngravedCaptionFont))));
         if (MuLookAndFeel::isMetal(*this))
             MuLookAndFeel::drawEngravedText(g, "Notes In", notesInCaptionR, juce::Justification::centredLeft,
                                             MuLookAndFeel::colour(Id::labelText));

@@ -221,8 +221,8 @@ void SceneGrid::paint(juce::Graphics& g)
     const double now    = juce::Time::getMillisecondCounterHiRes();
     const auto   layout = computeLayout(getLocalBounds());
 
-    // The caption: engraved into the metal, or plain text in the flat look. It keeps the graphics' default font, the same
-    // as the sidebar's "Page" caption beneath it, so the two read as one family of labels.
+    // The caption: engraved into the metal, or plain text in the flat look, in the same caption font as "Page" beneath it.
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(MuLookAndFeel::kEngravedCaptionFont))));
     if (MuLookAndFeel::isMetal(*this))
         MuLookAndFeel::drawEngravedText(g, "Scene", layout.caption, juce::Justification::centred, MuLookAndFeel::colour(Id::labelText));
     else

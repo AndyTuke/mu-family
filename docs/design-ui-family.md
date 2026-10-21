@@ -138,6 +138,7 @@ JUCE font. No external typeface dependency.
 | Knob labels | 9–11pt (fits available height) | `labelText` |
 | Knob values | 9–10pt | `valueText` |
 | Row / slot labels | 11pt | `labelText` |
+| Engraved block captions ("Scene", "Page", "Notes In", "Clip"; ruled 2026-10-21) | 11pt, token `kEngravedCaptionFont` (new in `MuLookAndFeel`, 11.0f), never the Graphics default font | `labelText` |
 | Chooser card descriptor / hint (`kCardTextFont`) | 12pt | `headingText` on a recessed screen (descriptor), `valueText` on metal (hint); empty-registry message `kChooserMessageFont` 14pt |
 | Status bar | 11pt name / 11pt value | `statusBarText` / `statusBarValue` |
 | dB readout in mixer | 9pt | `labelText` |
@@ -815,7 +816,7 @@ A **scene** is clip n launched on every layer that stores one (`ControlAction::L
 
 ### 13.10 Notes In: the per-layer MIDI channel in the header bar (ruled 2026-10-21; opt-in)
 
-For a product whose layers carry their own MIDI-in channel (mu-Tronic). An engraved caption "Notes In" (`kNotesInLabelW` 44) and a `DropdownSelect` (`kNotesInW` 92, height `kStripDisplayH`) in the `LayerHeaderBar` between the preset dropdown and the clip strip, items Omni then Channel 1 to 16 (mu-Toni's own Settings wording). Opt-in `LayerHeaderBar::setNotesInControl(get, set)`; hidden (not disabled) when unset or when the layer's type does not read notes. Spec, behaviour and wording: [mu-tronic/design-ui.md 4.8](mu-tronic/design-ui.md). Routing, not sound: a clip or layer preset never changes it.
+For a product whose layers carry their own MIDI-in channel (mu-Tronic). An engraved caption "Notes In" (`kNotesInLabelW` 44) and a `DropdownSelect` (`kNotesInW` **106**, widened from 92 on 2026-10-21 because "Channel 16" needs about 67 px of text room and the 92 px box left about 58; height `kStripDisplayH`) in the `LayerHeaderBar` between the preset dropdown and the clip strip, items Omni then Channel 1 to 16 (mu-Toni's own Settings wording). Opt-in `LayerHeaderBar::setNotesInControl(get, set)`; hidden (not disabled) when unset or when the layer's type does not read notes. Spec, behaviour and wording: [mu-tronic/design-ui.md 4.8](mu-tronic/design-ui.md). Routing, not sound: a clip or layer preset never changes it.
 
 ---
 
@@ -835,6 +836,8 @@ The screen half of the Launchpad surface mapping ([design-launchpad.md section 3
 ---
 
 ## Design rulings
+
+- 2026-10-21 - Review of the T8a UI (SceneGrid, Notes In, CPU readout, clip refusal, logo-hold picker). (1) "Channel 16" truncated in the 92 px Notes In selector: widen `kNotesInW` to 106 (all items keep one wording, no closed-display abbreviation, no smaller font); header total 148 to 162. (2) Sidebar item gap with the scene block is 6 px at Medium, not about 1: accepted (better than predicted, items clear of the block). (3) The scene caption used the default font while "Page" used another: both, and the "Notes In" caption, now use one explicit 11 pt token `kEngravedCaptionFont`; the default font is never relied on. Changed section 4, 13.10, mu-tronic/design-ui.md 3.7 and 4.8.
 
 - 2026-10-21 - mu-Tronic review of build 1425 (eight-card chooser, Rhythm, Pattern, Arp, Kick, Rumble, mixed page). (1) Rhythm and Rumble both "R": Rhythm becomes "E" (Euclid), Rumble stays mu-On's "R"; initials are registry data and unique across choices, an interim until the live mini-visuals return. (2) Sidebar disc stays the slot's palette colour, not the type colour. (3) Pattern Note mode: "MIDI" caption plus Free / Note Lcd `SegmentControl` right-aligned in the Root / Scale row, opt-in on `PatternContent`, hidden in mu-Tant, no mu-Tronic Settings row. (4) Rhythm Save in a slot is mu-Clid's own card (category, description, embed sample, save as default). (5) Effect-send name follows the mixer everywhere (amp send label and modulation target), re-applied on slot select. (6) MIDI-mode Rhythm strip inactive via `isChannelSilent`. (7) A fresh Rhythm with an unfindable default sample starts empty, no "Missing" banner (kept for loaded data). (8) `LFOEditor` curve display: plot inset, visible baseline, 25 / 50 / 75 level lines, loop-unit lines; family-wide. (9) Empty modulation lane stays blank. Also chooser order Clid, Tant, Toni, On and the mu-Tant descriptor without "voice". Changed §3.5 (Curve display), mu-tronic/design-ui.md 4.3, 4.3a, 4.5a table, 4.5b, 8.
 - 2026-10-20 - New tube-style Overdrive insert (Andy): name, parameters, list position? Selector "Overdrive", appended at algorithm index 14 (dropdown item 15, shown alphabetically between Limiter and Ring Mod); slots Drive / Output / Bias / Tone, no Mix (inserts are in-line; blend is the Effect send); Bias 0-100 % is the even-harmonic asymmetry knob. Table in [mu-clid/design-voice.md](mu-clid/design-voice.md) "Insert".

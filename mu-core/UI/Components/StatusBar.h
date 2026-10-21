@@ -41,7 +41,7 @@ public:
     enum class CpuLevel { Normal, Warn, Hot };
     static int      cpuPercentFor(float load) noexcept;
     static CpuLevel cpuLevelFor(float load) noexcept;
-    static constexpr int kCpuRepaintMs = 250;   // the shortest time between two repaints of the readout
+    static constexpr int kCpuRepaintMs = 200;   // the shortest time between two repaints of the readout
     // Where the Update and Support links' right edge is for a bar `width` wide: 4 px in from the edge, and with the readout
     // on, a further slot and gap to its left.
     static int linksRightEdgeFor(int width, bool cpuVisible) noexcept;
