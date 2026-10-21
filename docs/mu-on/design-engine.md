@@ -76,6 +76,14 @@ The reverb tone + the block-rate envelope are deliberately basic for now (framew
 distinct from the Bass lane's "rumble" voicing above, which is a tonal character of `BassEngine`,
 not this lane.)*
 
+### FM Perc — `FmPercEngine` (ruled 2026-10-21, not yet built)
+The sixth engine (`EngineType::FmPerc`, `t{N}_fmp_*`): toms and techno percussion by phase-modulation FM, **one engine with an Algorithm choice** of eight voice topologies (Tom, Conga, Zap,
+Click, Clank, Wood, Pluck, Burst) over one operator core, **ten knobs fixed for all algorithms**: Tune, Ratio, Index, FM Dec, Fdbk, Dive, D.Time, Decay, Fold, Noise. Sound design, source notes and the
+per-algorithm starting values are in [research-fm-drums.md](research-fm-drums.md) (every number there marked [D] is a listening-pass starting point). Structure and rulings (parameter shape, normalised
+knobs scaled per algorithm, no write on algorithm change, algorithm latched at the trigger, factory `.muTrack` presets, saved format, mu-Tronic) are in
+[design-plugin-family.md](../design-plugin-family.md) "mu-On FM Perc engine"; names in [design-naming.md](../design-naming.md). It steps like Kick and Bass (a step row, velocity scales Index and Dive and
+the level), takes no source, and is a valid Rumble source.
+
 ## Bass↔Kick sidechain (the key interaction)
 This is **not new DSP** — the shared `MixerEngine` already supports **channel-to-channel
 sidechain** (`sidechainSource` can point at another channel, with amount + attack/release + an

@@ -595,10 +595,10 @@ Stages 1-3 are order-independent between products (any product can go first). Fr
   user layer names. A product with fixed or derived names calls `setNameEditable(false)`; `LayerPanel` does the same for fixed layers; `.muTrack` presets carry their engine and every track lists all of them; Reset is a sound reset and keeps the
   engine, Rumble source, step row and envelope; a saved MIDI map is migrated only for the five original `k_ b_ h_ s_ r_` ids
   (the only ones that ever existed); an engine change never prunes modulation assignments, on any route (UI, automation, preset): the old engine's assignments stay in place, inert while another engine runs (the destination tables are per engine and the audio side reads only the running engine's) and live again on switching back; selecting Rumble on a track re-points every Rumble that processed it to the first Kick (else the first non-Rumble track).
-- **mu-On saved data (extends #1263):** each layer's block is `t{N}_eng` (choice: Kick, Bass, Hat, Snare, Rumble;
-  the existing five engines, Hat and Snare being the sample engine with different defaults), `t{N}_src` (Rumble
+- **mu-On saved data (extends #1263):** each layer's block is `t{N}_eng` (choice: Kick, Bass, Hat, Snare, Rumble, and from 2026-10-21 FM Perc;
+  the existing engines, Hat and Snare being the sample engine with different defaults), `t{N}_src` (Rumble
   source, a layer index), then every engine's parameters **engine-qualified**: `t{N}_kick_*`, `t{N}_bass_*`,
-  `t{N}_hat_*`, `t{N}_snare_*`, `t{N}_rumble_*` (the unqualified names collide: both Kick and Bass have `tune` and
+  `t{N}_hat_*`, `t{N}_snare_*`, `t{N}_rumble_*`, `t{N}_fmp_*` (the unqualified names collide: both Kick and Bass have `tune` and
   `drive`, Bass and the samplers `dec`). Legacy migration, through the existing mechanism: old `t{i}_x` becomes
   `t{i}_<engine of lane i>_x`, `t{i}_eng` = i, `numLayers` = 5, `t{i}_src` = 0 for the Rumble layer, layer names
   Kick / Bass / Hat / Snare / Rumble. The mixer sidechain values are carried as saved (they are mixer params); the Bass
@@ -613,6 +613,33 @@ Stages 1-3 are order-independent between products (any product can go first). Fr
   **Render order: all non-Rumble layers first, then Rumble layers**, so a Rumble source is always rendered this
   block regardless of layer order (to `dsp-controller` for review); a Rumble whose source is itself a Rumble or is out of range
   processes silence.
+- **mu-On FM Perc engine (ruled 2026-10-21; Andy approved; names in [design-naming.md](design-naming.md), sound design in [mu-on/research-fm-drums.md](mu-on/research-fm-drums.md)).**
+  A sixth Track engine, one engine with an **Algorithm** choice of eight voice topologies (Tom, Conga, Zap, Click, Clank, Wood, Pluck, Burst) over one operator core.
+  - *Shape.* `EngineType::FmPerc` appended after `Rumble` (value 5); `TrackEngine` gains a `FmPercEngine` arm; `LayerTypeId::FmPerc` between `Rumble` and `Test`;
+    rows `t{N}_fmp_*` appended to `addLayerParams` **after the existing last row (`accent`)**, never inserted among the engines (host parameter order is saved-data-adjacent); the
+    `t{N}_eng` choice gains a 6th item. Eleven rows: `algo` (choice, default Tom, not a target, like Bass `wave`) and ten floats. The ten floats are
+    the modulation table `kFmPercDests` in exactly the order `FmPercEngine::setParams` takes them: tune, ratio, index, idec, fdbk, dive, dtime, decay, fold, noise.
+    `TrackEngine::setParams`' `bassWave` argument becomes a generic `engineChoice` (the Bass wave, or the FM Perc algorithm; `Track` reads the right row per engine).
+  - *One fixed set of ten knobs for all eight algorithms* (Andy). Rule that makes it work: **every algorithm gives every knob an audible meaning of the same kind** (Tune = pitch,
+    Ratio = modulator ratio or inharmonic spread, Index = FM amount, FM Dec = index-envelope time, Fdbk = feedback, Dive = pitch sweep depth, D.Time = sweep time,
+    Decay = amp time, Fold = wavefolder, Noise = noise level). No algorithm hides or relabels a knob; a knob that an algorithm barely needs still has an effect.
+  - *Defaults per algorithm, with one APVTS default per parameter.* **Tune and Ratio are absolute** (Hz, and a ratio): they are musical quantities, a tom set is tuned in notes. **The other
+    eight floats are normalised 0..1 amounts** that each algorithm scales through its own constant table (`kAlgos[8]` inside `FmPercEngine.h`: ranges and curves in ms, rad, x-dive);
+    so the same knob position is a musical value in every algorithm, modulation depth (percent of range, family rule) means the same musical amount in each, and the single APVTS default
+    is the Tom's. **Changing the Algorithm never writes another parameter** (no hidden APVTS writes: automation, modulation and undo stay honest; same as switching a track's engine keeping the others' settings).
+    Each algorithm's starting set is a shipped **factory `.muTrack` preset** (the paper's tables), and the user loads it from the layer-preset menu. The algorithm is **latched at the trigger**: a hit
+    keeps the algorithm it started with, so a change (or an automation lane on `algo`) never clicks or cuts a ringing tail; the next hit uses the new one.
+  - *Where the helpers live.* Operators, the pitch-dive and index envelopes, the fold and the sine table stay inside mu-On (`Audio/FmPercEngine.h`, plus `FmPercCore.h` only if the file passes
+    about 400 lines) until a second product needs them; then the generic part (operator, oversampler wrapper) moves to `mu-core/Audio/` before the second copy. `ExpDecay`, `MultiModeFilter`,
+    `NoiseSeed` and `OversampledProcessor` are the existing mu-core pieces; none is copied. No new mu-core API is needed for the first build.
+  - *Saved format.* Additive only: a sixth choice item, eleven new rows per track slot, nothing renamed or reordered. Older projects and presets load unchanged (engine indices 0-4 keep their meaning).
+    A project saved with a FM Perc track and opened in an older build clamps the unknown engine; that direction is not supported. The legacy five-lane migration (`kNumLegacyLanes` = 5) is untouched.
+    Cost: 11 more host-visible parameters per slot (mu-On with 8 slots: 88; mu-Tronic standalone: 176).
+  - *Cost of holding the engine.* An unlocked mu-On track holds every engine (the sixth too), so `FmPercEngine::prepare` allocates only small fixed buffers and an idle voice returns early. The 2x
+    oversampling for Zap, Clank and Burst is `dsp-controller`'s call at the DSP review (use `OversampledProcessor` if it fits a per-voice pattern, else a small half-band); it must not
+    allocate outside `prepare`.
+  - *Interaction with mu-Tronic.* The engine is just a sixth Track type: `trackLayerType(LayerTypeId::FmPerc)` registered after `Rumble`, one line in the chooser order, `hasClipBank` true, `takesNotes` false,
+    a valid Rumble source (a Rumble on a tom is legal; `isRumbleSourceSlot` already excludes only Empty and Rumble). Per-step pitch does not exist (design-engine); tuned toms use separate tracks or a modulator on Tune.
 
 #### Count and colour persistence (ruled 2026-10-12, Architecture Steward)
 
@@ -892,7 +919,7 @@ each**; every mu-On engine (Kick, Bass, Hat, Snare, Rumble) is its own layer typ
   `MU_BUS_INSERTS` (default 2), `ChannelState::busAssign`,
   graph channels -> buses -> returns -> master, no bus-to-bus, a channel's sidechain source is never a bus. The existing `outputBus` is the DAW direct out and is relabelled
   "Out" in the UI (not offered in mu-Tronic). All of it is `mu-core`.
-- **Layer types are finer than products:** the registry lists each mu-On engine (Kick, Bass, Hat, Snare, Rumble) as its own `LayerTypeId` over the one `Track` class
+- **Layer types are finer than products:** the registry lists each mu-On engine (Kick, Bass, Hat, Snare, Rumble, and from 2026-10-21 FM Perc) as its own `LayerTypeId` over the one `Track` class
   (engine locked in mu-Tronic); `LayerTypeInfo::group` names the product for the chooser and `typeFromPreset` picks the type from a preset file. Hence mu-On goes
   per-layer (engine, step grid, swing/accent) in its own standalone too.
 - **Scenes:** `ProcessorBase::launchScene(n)` and `ControlAction::LaunchScene(n)` launch clip n on every layer in one staged batch; with `PagePrev` / `PageNext` they
@@ -1480,6 +1507,9 @@ layer preset is one clip's worth of state; carrying a bank would make loading it
 | C4 | S | mu-Clid: the same two hooks over `PresetIO`; `<Clips>` in `buildFullPresetTree`, the prepare and commit of a full preset, host session; sample-path-only rule; mu-Clid MIDI compiles and ignores the bank (Open question 5) | `mu-clid-tests` (build the target explicitly) and `mu-clid-midi-tests`: full-preset and session round trip with clips; an old `.muClid` loads empty; a staged full preset carries its banks and sets them at the commit; launch (stopped and staged) equals loading the same `.muRhythm`; the existing `HotSwapCancelTests` shape for a cancelled launch; `CLID_roundtrip` and the retire-tail listening test |
 | C5 | M | `LiveState` / `LiveView` clip fields, `slotStageSerial`, `remapLayers`, `publishClipMasks`, `LaunchClip` / `ClipNext` / `ClipPrev` in `perform` | `mu-core-tests` with fake callbacks, as the performance step 2: launch queues and commit moves `playingClip`; superseded and cancelled launches clear `queuedClip`; full-preset commit clears all clip state; remap on remove and swap; `ClipNext` / `ClipPrev` wrap and skip empties; mode off returns false; `perform` mute on the playing clip |
 | C6 | UX | `ClipStrip` in the layer header (built and reviewed 2026-10-14), store / clear commands, wording; then the `mu-control` grid mapping (performance step 4) | `ux-controller` ruling first; the grid is the controller tests of #1276 |
+| C7 | S | Clipboard (item 10): `ClipClipboard`, `copyClip` / `cutClip` / `pasteClip` / `canPasteClip`, the shared `clipFitsSlot` check, `CopyClip` / `CutClip` / `PasteClip` actions in `perform`; no UI | `mu-core-tests` with the fake product and the typed fake: copy leaves the bank, cut = copy + clear, paste type check (wrong root tag, wrong slot type, empty clipboard refuse and change nothing), paste deep-copies (a second paste after editing the source is unchanged), paste onto the lit clip relaunches it, Performance mode and a staged full preset refuse, the clipboard survives the source layer's removal |
+| C8 | M | Auto-save (item 10): per-layer tracker, 400 ms poll from `SwapPoll`, flush before a clip stage, before a structural edit and before a state capture, the `clipAutoSave` setting; `dsp-controller` reviews | `mu-core-tests`: edit then settle writes the playing clip and only it; an unchanged layer is never written (capture idempotence, **run for every product's real capture: Tant, Toni, On, Clid, each Tronic type**); a launch does not rewrite the clip it loaded (baseline after migration); edits during a queued launch land in the old clip; explicit Store while a preset is staged is not overwritten by the tick; structural edit, type change, Clear, Performance mode, setting off and offline render write nothing; flush on save puts a late edit into the saved bank |
+| C9 | UX | Right-click menu on a pad (Copy, Cut, Paste, Clear; enabled states), the "Auto-save clip edits" setting row, the edited-clip cue | `ux-controller` ruling first (wording, enabled states, whether Shift+click Store stays); `ClipStripTests` with the recording sender |
 
 **C3 brief (confirmed 2026-10-14, for the coder).** Reading the three composed products' `saveLayerPreset` / `loadLayerPreset`, the split in item 5 is exact; fixed details:
 - `ProcessorBase` virtuals (default empty): `juce::ValueTree captureLayerPresetTree(int layer)` and `void stageLayerPresetTree(int layer, juce::ValueTree tree, bool keepIdentity)`.
@@ -1537,6 +1567,71 @@ so each is demonstrable on its own.
 a layer preset of that layer's type; the node already carries the product's root tag) and the layer-type registry need nothing new; the Performance
 level, the launch surface and the screen share one path; no product gets a copy of the store.
 
+**10. Auto-save of edits and the clip clipboard (ruled 2026-10-21; Andy asked for both).** This changes one earlier rule ("only the screen's store / clear
+/ load-into-clip write the bank"): the bank is now also written by the **auto-save**, and only that, and only for the clip that is lit.
+
+*Auto-save: detection.* **Poll and compare, not listeners.** A dirty flag fed by APVTS or `ValueTree` listeners is not generic: mu-Clid's steps and a layer's
+extras live outside APVTS and have no listener, and mapping a parameter id to its layer needs product knowledge. The one definition of "the layer changed" that
+needs no product code is `captureLayerPresetTree(slot)`, the capture the clip itself is made from. So `ProcessorBase` runs a **message-thread poll** from the
+existing 100 Hz `SwapPoll` (no new timer, nothing on the audio thread):
+- **What is watched.** A layer with a *lit* clip: `liveState` `playingClip >= 0` (what the pad shows). `Layer::activeClip` stays the saved shadow and does not drive the
+  watch, so after a full-preset or session restore (pad dark) nothing is written until a launch, and what the user sees is what is saved. One layer per poll step,
+  round robin, every 400 ms per step (so with many lit layers each is visited every `n x 400 ms`; the flushes below close the gap where it matters).
+- **Per-layer tracker, message-thread, unsaved, in `ProcessorBase` beside `pendingPresetTree`:** `baseline` (the capture that the stored clip is known to equal
+  live), `candidate` (a differing capture seen last step) and the clip index it belongs to. Dirty means *capture differs from `baseline`* (`isEquivalentTo`), **not**
+  from the stored tree: a launch migrates a copy and a capture normalises, so comparing to the stored tree would rewrite every clip the moment it is launched
+  (the feedback loop). The baseline is **adopted, never written,** whenever there is none: after a launch commit, after a store, after a state restore, after
+  any structural edit.
+- **Debounce by settling.** A differing capture becomes `candidate`; it is written to the clip (`ClipBank::store` with the clip's existing name, then
+  `publishClipMasks`, baseline := candidate) only when the **next** step's capture equals the candidate, i.e. the layer has been still for 400 ms. A knob drag or a
+  step paint in flight is never stored half-way. No mouse-state test is needed.
+- **When it is skipped (tracker dropped or step passed over):** no lit clip; `activeClip` irrelevant; Performance mode on (the locked show must not mutate banks,
+  same reason `StoreClip` is refused there; **Andy 8**); a staged full preset (`hasPendingFullPreset()`); a pending swap that is **not** the clip launch (a
+  layer-preset load already cleared the lit clip through `noteNonClipStage`, and a store that adopted a staged tree leaves live != baseline until the commit, so
+  the step waits for the commit and re-adopts); the `clipAutoSave` setting off; offline render (`isNonRealtime`).
+  A **queued clip launch** (`liveState` `queuedClip` set) does *not* skip: the live layer is still the lit clip until the commit, so its edits keep being saved
+  and none are lost to the swap (at most the last 400 ms, see edge cases).
+- **Flush (a forced step for one layer: capture, and write if it differs, with no settle wait).** Before `launchClip` stages (so the edits of the clip being left are
+  in its bank), before `copyClip` / `cutClip` read the bank, before a structural edit (`addLayer`, `removeLayer`, `swapLayers`, `resetLayer`, a type change: flush all
+  lit layers, then drop all trackers; they re-adopt on the next step and `LiveState::remapLayers` already carries the lit clip), and before a state capture
+  (`captureComposedState`, full-preset and session save) **when on the message thread** (a host may call `getStateInformation` from another thread: there the bank is
+  read as it stands, at most one poll stale, and the flush is not attempted). One helper, `flushClipAutoSave(int slot = -1)`; no product calls it.
+- **Typed slot hosts (mu-Tronic).** The capture is the slot's own type's node, so a slot's tracker is keyed by slot index and re-adopted after a `swapLayers` or a type
+  change (both clear or move lit clips through `LiveState`, and both flush first). Only a clip of the slot's type can be lit (a launch cannot change type), so the
+  type check never fires in the tracker. A Published `swapLayers` exchanges two slots: flush both, drop both trackers.
+- **Cost and limits.** One capture and one tree compare per 400 ms step, only for lit layers; a clip capture carries no audio (mu-Clid never embeds a sample into a clip), so
+  trees are tens of kilobytes. Memory is two extra trees per lit layer. No new cap on clips. Back-off: if a layer's capture takes more than 4 ms, that layer's visit interval doubles
+  (message thread, so this is a UI-hitch limit, not an audio one); `dsp-controller` to confirm the budget on mu-Tant and a loaded mu-Tronic.
+- **Saved state.** No file change: the auto-saved bank is the existing `<Clips>` data and it rides every full preset and session (the flush above makes the save
+  current). Layer-preset files and performance files are unaffected. The only new persistent thing is the **`clipAutoSave` setting**, a shell preference beside the other
+  settings-overlay options (default **on**, as Andy asked), not a parameter, not in a preset or the APVTS, because it is a behaviour of the app, not part of any sound.
+- **Side effects of the bank to state plainly (ux-controller to word):** a tweak to a lit clip now overwrites it, so there is no "audition and return". Recommend the
+  strip shows a brief "saved" cue on the pad and the setting is easy to find; no history or undo in this round (**Andy 9**). Host automation moving a parameter of a lit
+  clip is indistinguishable from a hand edit and will be saved (accepted; switch the setting off for automated sessions).
+
+*Clipboard.* **One process-wide clipboard in mu-core:** `mu-core/Sequencer/ClipClipboard.h`, header-only, namespace `mu_core`, a function-local static accessor
+`mu_core::clipClipboard()` (the pattern of `controlAttachmentFactory()`: no static-init order hazard). It holds a deep-copied `ValueTree` (the layer-preset payload, root tag
+included), the clip's `name`, and the **payload kind** (the root tag; for a typed slot host also the `LayerTypeId` from `layerPresetType`). It names no processor, so every
+instance in a DAW process shares it (copy in one mu-Tant, paste in another) and a slot's removal cannot dangle it. It does not touch the OS clipboard (**Andy 10**); the
+accessor is the seam if that is added. Message thread only.
+- **Processor API** (non-virtual, message thread, `ProcessorBase`): `bool copyClip(slot, clip)` (refused for an empty clip; flushes the layer first; leaves the bank),
+  `bool cutClip(slot, clip)` (copy, then `clearClip`; if the copy fails nothing is cleared), `bool pasteClip(slot, clip)`, `bool canPasteClip(slot) const` (the same check, for
+  menu enabling). **Paste type check:** a single shared `clipFitsSlot(slot, tree)` that `launchClip`, `loadClipFromFile` and `pasteClip` all call (list hosts: the tree's root tag equals
+  `captureLayerPresetTree(slot).getType()`; typed hosts: `layerPresetType(tree) == slotTypeId(slot)`); the three existing inline checks move into it, so a clip of the wrong product or type
+  can never enter a bank by any route. Paste stores a deep copy with the clipboard's name, replacing whatever is there (confirm: the strip's existing overwrite confirm, `ux-controller`).
+  **Paste onto the lit clip relaunches it** (`launchClip`), so the lit pad still equals what plays and the tracker re-adopts at the commit; pasting onto any other clip does not launch.
+  Paste does not light the clip (a store lights it, a paste is not "what you are playing").
+- **Actions.** Three new `ControlActionType`s: `CopyClip`, `CutClip`, `PasteClip`, `layer` + `index` as `StoreClip`; **screen only, exactly like `StoreClip` / `ClearClip`**: absent from the
+  name list (no map or surface can name them), refused in Performance mode and while a full preset is staged, handled in `ProcessorBase::perform`. They are actions, not direct calls from
+  `ClipStrip`, so the strip keeps its single sender seam and the tests record them like the others. Auto-save has no action (it is not user-invoked).
+- **Where the menu lives.** `ClipStrip` (right-click on a pad): Copy, Cut, Paste, Clear; enabled states `ux-controller` rules (Copy, Cut, Clear need an occupied clip; Paste needs
+  `canPasteClip`).
+
+*Standing check.* **Easier**: auto-save is generic poll-and-compare over the existing capture, so the combined instance and every future layer type get it with no code
+(provided their capture is idempotent, which C8 pins per type); the clipboard being process-wide and payload-typed is the same shape a cross-instance layer move or a layer
+library would need. Harder: nothing, with one watch item: the no-product-code rule makes the poll depend on every product's capture being a pure function of live state.
+A product that captured a clock, counter or random value into its layer tree would be rewritten forever; that is a defect in the capture, not a reason for a per-product dirty flag.
+
 **Open questions.** Andy:
 1. **File format (Andy).** The `<Clips>`/`<Clip idx name>` shape, as an additive child of each layer node, `format` unchanged, clips in full presets and sessions
    only. Recommend as written. It becomes a commitment the day a build with it ships (live products are 1.1). Whether the per-clip `name` attribute is kept
@@ -1554,10 +1649,18 @@ level, the launch surface and the screen share one path; no product gets a copy 
 6. **Pressing the playing clip while another is queued on that layer** (`ux-controller` / Andy): mute (the design-launchpad rule as written) or cancel the queued
    launch (what `PerformanceItem` does for the current item). Recommend cancel, then mute on the next press; the surface semantics stay one rule.
 7. **A bank as a shareable file** (`.muClips`, eight clips for one layer): not scheduled; nothing here closes it off (the container is already self-contained).
+8. **Auto-save in Performance mode (Andy, 2026-10-21).** Recommend **off while locked**: a show tweak on a mapped knob is not written to the bank, the same reason `StoreClip` is refused
+   there. The alternative is to keep saving (Ableton-like: what you set is what the clip becomes). Build follows the answer; it is one condition in the tracker.
+9. **No undo for an auto-saved overwrite (Andy).** Recommend none now; the setting is the escape. A later single "previous version" per clip would be a `ClipBank` field and changes
+   nothing else.
+10. **Clipboard scope (Andy).** Recommend in-process only (Standalone to plug-in copy is not covered). The alternative is XML text on the system clipboard with a header, a second step
+   behind the same accessor.
 
 Do not: put the bank on `ProcessorBase`, `LiveState` or in the editor; store it as a plain `std::array<ValueTree, 8>` or a plain member of a copyable `Rhythm`;
 give clips their own file type or a per-product clip class; make `launchClip` a second load path beside `loadLayerPreset`; write a clip from the audio thread or
-read the bank there; let a pad, a launch or a layer-preset load write the bank (only the screen's store / clear / load-into-clip do); let a clip carry the mixer
+read the bank there; let a pad, a launch or a layer-preset load write the bank (only the screen's store / clear / load-into-clip / copy-cut-paste and the item-10 auto-save do);
+compare an auto-save capture with the stored clip instead of the baseline; put a per-product dirty flag, a parameter listener map or a second timer under the auto-save; skip the flush before a
+launch or a structural edit; give each instance its own clipboard or let a paste skip `clipFitsSlot`; map `CopyClip` / `CutClip` / `PasteClip` to a pad; let a clip carry the mixer
 strip, name or colour; clear banks under `layersLock`; store embedded sample bytes in a clip; add a `Clip` suffix type per product; edit the Layer virtuals
 for this.
 

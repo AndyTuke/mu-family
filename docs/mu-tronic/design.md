@@ -109,7 +109,7 @@ Andy: every mu-On voice engine can be added as a mu-Tronic layer. So the registr
 
 | Aspect | Ruling |
 |---|---|
-| Ids | `LayerTypeId` gains `Kick, Bass, Hat, Snare, Rumble` (section 2.5), saved by name. The enum order of `mu_on::EngineType` is not saved or relied on. |
+| Ids | `LayerTypeId` gains `Kick, Bass, Hat, Snare, Rumble` (section 2.5; `FmPerc` appended after `Rumble` on 2026-10-21, the sixth Track type, design-plugin-family "mu-On FM Perc engine"), saved by name. The enum order of `mu_on::EngineType` is not saved or relied on. |
 | One class | In mu-On the engine choice on a track stays and is changeable at any time (also by host automation, in the same block), so an unlocked `Track` holds all five prepared engines (as built at E3, 2.1.9). In mu-Tronic the entry creates the `Track` with the engine **locked**: the engine selector is hidden, the track holds exactly one engine, and changing the sound family is a type change (chooser, confirm, clip bank cleared). One code path, one flag (`engineLocked`) choosing the allocation policy. |
 | Parameters, prefix, preset | Unchanged: prefix `t{N}_`, extension `.muTrack`, `Persistence/TrackParams` (`addLayerParams`). The engine id stays a saved parameter, so a `.muTrack` saved by mu-On loads into a mu-Tronic slot of the right type: **type inference reads the extension for the family, then the saved engine for the member** (`LayerTypeInfo::typeFromPreset(tree)`). A mu-Tronic Kick preset loads in mu-On. |
 | Mod targets, content, mini-visual | Per entry: the mod-target table is the engine's own subset (mu-On already filters by engine), `TrackContent` shows only the locked engine's panel, the mini-visual is the step row. |
@@ -1332,7 +1332,7 @@ product names; the one exception already made (`Rhythm`) is justified because **
 
 **Naming.** Library target `mu-<product>-layer` (a library of that product's layer type: the Layer vocabulary, not "voice"). Layer classes keep the
 design-naming derived names (`Rhythm`, `Pattern`, `Arp`, `Track`); mu-Clid's engine-carrying subclass is `SampleRhythm`. Host interfaces `<Type>Host`.
-Registry entry `LayerTypeInfo` in `mu-core/Sequencer/LayerTypeInfo.h`; ids `enum class LayerTypeId : int { Empty = 0, Rhythm, Pattern, Arp, Kick, Bass, Hat, Snare, Rumble }` in
+Registry entry `LayerTypeInfo` in `mu-core/Sequencer/LayerTypeInfo.h`; ids `enum class LayerTypeId : int { Empty = 0, Rhythm, Pattern, Arp, Kick, Bass, Hat, Snare, Rumble, FmPerc }` (the Track engines stay contiguous, in `EngineType` order; later test ids follow) in
 `mu-core` (neutral: the ids are family vocabulary, as `kMaxLayers` is), values saved by name (`"Arp"`, `"Kick"`), never by number. The four products' prefixes and
 extensions are unchanged, so five ids (the mu-On engines) share the prefix `t` and the extension `.muTrack` (section 1.4); the id, not the prefix, identifies the type.
 
