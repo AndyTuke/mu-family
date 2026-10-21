@@ -94,6 +94,8 @@ struct MuClidClipLaunchTests : juce::UnitTest
     {
         storeAndLaunch();
         clipsHoldDifferentPresets();
+        clipsHoldStepEdits();
+        clipRestoresEveryParameter();
         dropdownThenStripGestures();
         samplePathOnly();
         launchEqualsFileLoad();
@@ -287,6 +289,118 @@ struct MuClidClipLaunchTests : juce::UnitTest
             }
         }
         p.sequencerPlaying.store(false);
+    }
+
+    // Every Rhythm parameter, not one: a state with each parameter moved off its default is stored, a different one is
+    // dialled in, and the launch must bring back all of them (live Rhythm and APVTS), stopped and playing.
+    void clipRestoresEveryParameter()
+    {
+        for (const bool playing : { false, true })
+        {
+            beginTest(juce::String("a clip restores every Rhythm parameter (") + (playing ? "playing" : "stopped") + ")");
+            TempStorage storage;
+            mu_clid::PluginProcessor p;
+            p.sequencerPlaying.store(playing);
+
+            // Sets each parameter to a fraction of its range; the order puts the step counts first so the others fit.
+            const auto dial = [&](float fraction)
+            {
+                for (int pass = 0; pass < 2; ++pass)
+                    for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
+                        if (auto* prm = p.apvts.getParameter("r0_" + juce::String(mu_clid::kRhythmParamDefs[i].suffix)))
+                            prm->setValueNotifyingHost(juce::jlimit(0.0f, 1.0f, fraction + 0.013f * (float) (i % 7)));
+            };
+            const auto snapshot = [&]
+            {
+                std::vector<float> v;
+                for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
+                    v.push_back(getParam(p.apvts, "r0_" + juce::String(mu_clid::kRhythmParamDefs[i].suffix)));
+                return v;
+            };
+
+            dial(0.3f);
+            const auto first = snapshot();
+            expect(p.storeClip(0, 0));
+            dial(0.7f);
+            const auto second = snapshot();
+            expect(p.storeClip(0, 1));
+            expect(first != second);
+
+            for (const int pad : { 0, 1, 0 })
+            {
+                expect(p.launchClip(0, pad));
+                if (playing) { Probe::scan(p); Probe::commit(p); }
+                const auto now = snapshot();
+                const auto& want = pad == 0 ? first : second;
+                for (size_t i = 0; i < want.size(); ++i)
+                    expectWithinAbsoluteError(now[i], want[i], 0.01f,
+                                              juce::String("pad ") + juce::String(pad) + " " + mu_clid::kRhythmParamDefs[i].suffix);
+                for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)   // the live Rhythm agrees with the parameters
+                    expectWithinAbsoluteError(mu_clid::kRhythmParamDefs[i].push(p.getRhythm(0)), want[(size_t) i], 0.5f,
+                                              juce::String("live rhythm, pad ") + juce::String(pad) + " " + mu_clid::kRhythmParamDefs[i].suffix);
+            }
+        }
+    }
+
+    // The gesture Andy reported: store a clip, edit the steps (the Euclid knobs, and a stepped modulator's cells),
+    // store another clip, then switch 1, 2, 1. Each launch must leave the live Rhythm (what the audio thread
+    // plays), the parameters (what the next store captures) and the modulator cells showing that clip's edits.
+    void clipsHoldStepEdits()
+    {
+        for (const bool playing : { false, true })
+        {
+            beginTest(juce::String("step edits made between two stores: each clip launches its own steps (") + (playing ? "playing" : "stopped") + ")");
+            TempStorage storage;
+            mu_clid::PluginProcessor p;
+            p.sequencerPlaying.store(playing);
+            using Type = mu_core::ControlActionType;
+            const auto act = [](Type type, int index)
+            {
+                mu_core::ControlAction a;
+                a.type = type; a.layer = 0; a.index = index;
+                return a;
+            };
+            const auto settle = [&]
+            {
+                if (playing) { Probe::scan(p); Probe::commit(p); }
+                p.getLiveState().reconcile();
+            };
+            const auto edit = [&](float steps, float hits, float rot, float cell)
+            {
+                setParam(p.apvts, "r0_stepsA", steps);
+                setParam(p.apvts, "r0_hitsA", hits);
+                setParam(p.apvts, "r0_rotA", rot);
+                auto& cs = p.getRhythm(0).controlSequences.front();
+                cs.stepValues.assign(4, 0.0f);
+                cs.stepValues[1] = cell;
+            };
+
+            edit(16.0f, 4.0f, 0.0f, 50.0f);
+            expect(p.perform(act(Type::StoreClip, 0)), "store clip 1");
+            settle();
+            edit(12.0f, 5.0f, 2.0f, -70.0f);
+            expect(p.perform(act(Type::StoreClip, 1)), "store clip 2");
+            settle();
+
+            struct Want { int steps, hits, rot; float cell; };
+            const Want want[2] = { { 16, 4, 0, 50.0f }, { 12, 5, 2, -70.0f } };
+            for (const int pad : { 0, 1, 0, 1, 0 })
+            {
+                const auto label = juce::String(playing ? "playing" : "stopped") + ", pad " + juce::String(pad);
+                expect(p.perform(act(Type::LaunchClip, pad)), label + " launch");
+                settle();
+                const auto& g = p.getRhythm(0).genA;
+                expectEquals(g.steps, want[pad].steps, label + " engine steps");
+                expectEquals(g.hits, want[pad].hits, label + " engine hits");
+                expectEquals(g.rotate, want[pad].rot, label + " engine rotate");
+                expectWithinAbsoluteError(getParam(p.apvts, "r0_hitsA"), (float) want[pad].hits, 0.01f, label + " APVTS hits");
+                const auto& live = p.getRhythm(0).controlSequences.front();
+                expect(live.stepValues.size() == 4, label + " cells kept");
+                if (live.stepValues.size() == 4)
+                    expectWithinAbsoluteError(live.stepValues[1], want[pad].cell, 0.01f, label + " modulator cell");
+                expectEquals(p.getLiveView()->getPlayingClip(0), pad, label + " lamp");
+            }
+        }
     }
 
     // The entry points the layer header's preset dropdown and the clip strip call, with real rhythm files that

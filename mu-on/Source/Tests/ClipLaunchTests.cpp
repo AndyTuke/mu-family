@@ -26,6 +26,46 @@ struct MuOnClipLaunchTests : juce::UnitTest
         mu_clip_test::runClipLaunchChecks<ExposedPluginProcessor>(*this, accessor);
         mu_clip_test::runRestoreCancelsStagedSwapChecks<ExposedPluginProcessor>(*this, accessor);   // a host restore drops staged swaps
 
+        // The step row is not a parameter: a grid edit writes the track's row directly, so each clip must carry its own.
+        for (const bool playing : { false, true })
+        {
+            beginTest(juce::String("clips hold the step edits made before each store; switching 1, 2, 1 swaps the live row (")
+                      + (playing ? "playing" : "stopped") + ")");
+            TempStorage storage;
+            ExposedPluginProcessor p;
+            auto& row = p.getTrack(0).row;
+            const auto pattern = [&row]
+            {
+                juce::String s;
+                for (int i = 0; i < mu_on::StepRow::kNumSteps; ++i) s += row.isOn(i) ? '1' : '0';
+                return s;
+            };
+            const auto edit = [&row](int step) { row.setOn(step, ! row.isOn(step)); };   // the grid's left click
+
+            edit(1); edit(5);
+            const auto first = pattern();
+            expect(p.storeClip(0, 0));
+            edit(1); edit(2); edit(9);
+            const auto second = pattern();
+            expect(first != second);
+            expect(p.storeClip(0, 1));
+
+            const auto go = [&](int clip, const juce::String& expected)
+            {
+                if (playing) p.layerSwapper.flagBoundaries(true, 0.0, 0.1);
+                expect(p.launchClip(0, clip));
+                if (playing)
+                {
+                    expectEquals(pattern(), clip == 0 ? second : first, "the old row plays until the boundary");
+                    expect(p.layerSwapper.flagBoundaries(true, 3.95, 0.2));
+                    p.layerSwapper.commit();
+                }
+                expectEquals(pattern(), expected, "clip " + juce::String(clip + 1) + " row is live");
+                expect(p.captureLayerPresetTree(0).getChildWithName("Track").getProperty("on").toString() == expected);
+            };
+            go(0, first); go(1, second); go(0, first);
+        }
+
         beginTest("a clip carries its engine: launching it onto a track running another engine switches it back");
         {
             TempStorage storage;
