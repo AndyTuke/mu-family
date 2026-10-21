@@ -10,6 +10,10 @@ namespace
 {
     using Spec = mu_ui::ParamKnobGrid::Spec;
 
+    // The Rumble envelope's time lines: one per loop unit (the "1/4" of a loop of four), so the beats show. A loop of
+    // one unit has none.
+    float loopUnitFraction(int multiplier) { return multiplier > 1 ? 1.0f / (float) multiplier : 0.0f; }
+
     // The selected engine's controls, bound to track `track` (in display order).
     std::vector<Spec> specsFor(int track, EngineType engine)
     {
@@ -92,6 +96,7 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
         t.rumbleEnv.loopNoteMod    = mod;
         t.rumbleEnv.loopMultiplier = mult;
         mu_core::spinUnlock(t.rumbleEnvLock);
+        rumbleEnvEditor.setStepFraction(loopUnitFraction(mult));
     };
     addChildComponent(rumbleLength);
 
@@ -181,6 +186,7 @@ void TrackContent::rebuild()
         const int mult = t.rumbleEnv.loopMultiplier;
         mu_core::spinUnlock(t.rumbleEnvLock);
         rumbleEnvEditor.setPoints(points);
+        rumbleEnvEditor.setStepFraction(loopUnitFraction(mult));
         rumbleLength.setLength(nv, mod, mult);
     }
 
