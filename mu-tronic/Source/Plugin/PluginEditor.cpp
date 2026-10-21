@@ -29,10 +29,20 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     sidebar.onLayerSelected = [this](int idx) { layerPanel.setLayer(idx); };
     sidebar.refreshItems();
 
-    // Delete empties the slot (nothing shifts) and the layers are never added or reordered from the sidebar:
-    // an Empty slot is the add affordance (the chooser).
+    // Delete empties the slot (nothing shifts) and layers are never added from the sidebar: an Empty slot is the
+    // add affordance (the chooser). A drag in the sidebar reorders (the family's, enabled by canReorderLayers); the
+    // strips moved with their layers, so the mixer reloads after it.
     layerEdit.setFixedLayers(false);
     sidebar.onAddLayer = nullptr;
+    {
+        auto reselect = std::move(sidebar.onLayersReordered);
+        sidebar.onLayersReordered = [this, reselect](int newSelected)
+        {
+            if (reselect) reselect(newSelected);
+            mixerOverlay.loadFromApvts();
+            mixerOverlay.refreshSidechainSources();
+        };
+    }
 
     // Names are editable and saved for every layer: a typed name stays, an emptied one returns to the default.
     layerPanel.getHeader().onNameChanged = [this](juce::String name)

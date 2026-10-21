@@ -19,8 +19,8 @@ mu_core::LayerTypeInfo trackLayerType(mu_core::LayerTypeId type);
 // A Rumble's source (its `t{N}_src` row) is a slot number, so it follows that slot's layer: called from the processor's
 // remapLayerReferences hook, it rewrites every Rumble slot's source through `oldToNew` (-1: the layer is gone). A gone
 // source falls to the first filled slot that is not a Rumble, else slot 0 (which then plays silence).
-// Inert while mu-Tronic runs Published (removeLayer and swapLayers refuse there, so the hook is never reached). When swapLayers
-// is built it must read each slot's type from the layer map as it was before the shift, as the hook's old-index contract needs.
+// Reached only from swapLayers (removeLayer refuses on a Published host: a delete empties its slot). The swap calls it
+// before the layer pointers move, so each slot's type is read at the old index the hook's `oldToNew` is keyed by.
 void remapRumbleSources(ProcessorBase& host, const std::function<int(int)>& oldToNew);
 
 // Message thread, after a slot became a Rumble: points its source at the first filled slot that is not a Rumble, if
