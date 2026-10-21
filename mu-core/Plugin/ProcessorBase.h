@@ -164,13 +164,12 @@ public:
     // unreadable or other-type default file is ignored quietly. A state restore, a staged preset or a loaded file never
     // come through here, so they always win.
     bool         createLayerOfType(int slot, mu_core::LayerTypeId type);
-    // Message thread, outside every lock, called by setLayerType (design step 3) before the old layer is retired: the
-    // editor releases every pointer into slot `slot`'s layer (the modulator panel, the content's bindings). The
-    // editor must clear it in its destructor, as the other shell callbacks. It runs on the thread that calls
-    // setLayerType, which is the message thread (asserted): a state restore on a host thread must marshal to it
-    // first, so the editor never sees this call from another thread. A Published host's swapLayers calls it for
-    // both slots too (the layers leave their slots, so a slot-keyed binding must let go before they move).
-    std::function<void(int slot)> onLayerTypeChanging;
+    // The layer in this slot is about to be retired or moved: drop every pointer into it. Message thread, outside every
+    // lock. Called by setLayerType (design step 3) before the old layer is retired, and by a Published host's swapLayers for
+    // both slots before they move. The editor releases the modulator panel and the content's bindings and rebinds when it
+    // shows the slot again; it must clear this in its destructor, as the other shell callbacks. It runs on the thread that
+    // calls the edit, which is the message thread (asserted): a state restore on a host thread must marshal to it first.
+    std::function<void(int slot)> onLayerLeaving;
     // Message thread. The slot the editor shows: LayerPanel::setLayer stores it, every product's editor routing the
     // shown layer through it. A typed host's layer-preset folder and extension follow the type of this slot
     // (typedLayerPresetDir); for the four list products it is a harmless store.

@@ -511,19 +511,19 @@ struct LayerTypeSwapTests : juce::UnitTest
     // Design step 3: the UI is told before the old layer is retired, while it is still the slot's layer.
     void uiLetsGoFirst()
     {
-        beginTest("onLayerTypeChanging runs before the old layer leaves its slot, once per real change");
+        beginTest("onLayerLeaving runs before the old layer leaves its slot, once per real change");
         auto box = std::make_unique<TypedHost>(); auto& p = *box;
         const auto* old = p.getLayer(2);
         int calls = 0, slot = -1;
         bool stillThere = false;
-        p.onLayerTypeChanging = [&](int s) { ++calls; slot = s; stillThere = p.getLayer(s) == old && p.layerAccess.views.load()->layer[(size_t) s] == old; };
+        p.onLayerLeaving = [&](int s) { ++calls; slot = s; stillThere = p.getLayer(s) == old && p.layerAccess.views.load()->layer[(size_t) s] == old; };
         expect(p.setLayerType(2, LayerTypeId::Arp));   // the type it has: no call
         expectEquals(calls, 0);
         expect(p.setLayerType(2, LayerTypeId::Kick));
         expectEquals(calls, 1);
         expectEquals(slot, 2);
         expect(stillThere, "the old layer was still in the slot and in the published view");
-        p.onLayerTypeChanging = nullptr;
+        p.onLayerLeaving = nullptr;
         p.flushPendingAsyncUpdates();
     }
 

@@ -55,7 +55,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // Whoever changes a slot's type (the chooser, a state restore, a swap commit): nothing in the UI may point into the
     // old layer once it is retired. The shown content drops its modulation arcs and the modulator panel its layer; the
     // editor rebinds both when it shows the slot again.
-    proc.onLayerTypeChanging = [this](int slot)
+    proc.onLayerLeaving = [this](int slot)
     {
         layerPanel.getModulatorPanel().setLayer(nullptr);
         juce::ignoreUnused(slot);
@@ -129,7 +129,7 @@ PluginEditor::~PluginEditor()
     layerPanel.setContent(nullptr);   // the panel must not keep a content this editor is about to destroy
     releaseContentArcs();
     layerPanel.getHeader().onNameChanged = nullptr;   // the processor can outlive the editor
-    proc.onLayerTypeChanging = nullptr;
+    proc.onLayerLeaving = nullptr;
     proc.onLayerPresetCommitted = nullptr;
 }
 

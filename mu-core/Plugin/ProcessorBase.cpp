@@ -1422,7 +1422,7 @@ bool ProcessorBase::swapLayersPublished(int a, int b)
     if (layers[(size_t) a] == nullptr || layers[(size_t) b] == nullptr) return false;
 
     // The editor lets go of both layers before they move (modulator panel, content bindings), outside every lock.
-    if (onLayerTypeChanging) { onLayerTypeChanging(a); onLayerTypeChanging(b); }
+    if (onLayerLeaving) { onLayerLeaving(a); onLayerLeaving(b); }
 
     // Phase 0: exclude the audio thread. A timeout moves nothing (strip state is never moved without the grace).
     ScopedQuiesce quiesce(layerEditInFlight, layerAccess.epoch, 50);
@@ -1641,7 +1641,7 @@ bool ProcessorBase::setLayerType(int slot, mu_core::LayerTypeId type, const juce
     mu_hotswap::assertMessageThread();   // one caller at a time: the editor, a state restore and a swap commit are all message-thread work
 
     // Step 3: the UI lets go of the old layer (modulator panel, content) before it can leave the view.
-    if (onLayerTypeChanging) onLayerTypeChanging(slot);
+    if (onLayerLeaving) onLayerLeaving(slot);
 
     // Step 1: a staged swap of the old type must not land on the new one.
     cancelPendingSwap(slot);
