@@ -39,8 +39,79 @@ struct HotSwapTests : juce::UnitTest
 {
     HotSwapTests() : juce::UnitTest("mu-core hot-swap swapper", "mu-core") {}
 
+    // A scene stages one payload per layer inside a batch: the audio thread flags all of them at one boundary, or none.
+    void stagingBatch()
+    {
+        using namespace mu_hotswap;
+
+        beginTest("a staging batch: a boundary inside the window flags nothing; the next one after it flags the whole batch");
+        {
+            Log log; Swapper sw; wire(log, sw);
+            sw.flagBoundaries(true, 0.0, 0.1);   // running
+            sw.beginBatch();
+            for (int i = 0; i < 4; ++i) sw.stageSlot(i, 10 + i);
+            expect(! sw.flagBoundaries(true, 3.95, 0.2), "the bar line falls inside the batch: nothing flags, not even slot 0");
+            for (int i = 0; i < 4; ++i) expect(! sw.commit() && sw.hasPending(i), "slot " + juce::String(i) + " still waits");
+            sw.endBatch();
+            expect(sw.flagBoundaries(true, 7.95, 0.2), "the next bar line flags the lot");
+            sw.commit();
+            expectEquals((int) log.events.size(), 4);
+        }
+
+        beginTest("a staging batch: stagings outside a batch behave as before");
+        {
+            Log log; Swapper sw; wire(log, sw);
+            sw.flagBoundaries(true, 0.0, 0.1);
+            sw.beginBatch(); sw.endBatch();
+            sw.stageSlot(1, 5);
+            expect(sw.flagBoundaries(true, 3.95, 0.2), "an empty batch leaves the gate open");
+        }
+
+        beginTest("a staging batch on another thread's flag passes: the flagged set seen after any pass is none or all of the batch");
+        {
+            Swapper sw; Log log; wire(log, sw);
+            constexpr int kN = 4;
+            std::atomic<bool> stop { false };
+            std::atomic<int>  phase { 0 };       // 1 while a batch is being staged and flagged, 0 otherwise
+            std::atomic<int>  passes { 0 }, violations { 0 };
+            sw.flagBoundaries(true, 0.0, 0.1);
+            std::thread audio([&]
+            {
+                while (! stop.load(std::memory_order_acquire))
+                {
+                    const bool open = phase.load(std::memory_order_acquire) == 1;
+                    sw.flagBoundaries(true, 3.95, 0.2);   // every pass is a bar line
+                    if (open)
+                    {
+                        int count = 0;
+                        for (int i = 0; i < kN; ++i) count += sw.isFlagged(i) ? 1 : 0;
+                        if (count != 0 && count != kN && phase.load(std::memory_order_acquire) == 1) ++violations;
+                    }
+                    ++passes;
+                }
+            });
+            for (int round = 0; round < 300; ++round)
+            {
+                phase.store(1, std::memory_order_release);
+                sw.beginBatch();
+                for (int i = 0; i < kN; ++i) { sw.stageSlot(i, i + 0); if (i == 1) std::this_thread::yield(); }
+                sw.endBatch();
+                const int seen = passes.load();
+                while (passes.load() < seen + 3) std::this_thread::yield();   // whole passes after the batch closed
+                phase.store(0, std::memory_order_release);
+                while (passes.load() < seen + 5) std::this_thread::yield();
+                sw.commit();
+                for (int i = 0; i < kN; ++i) sw.cancel(i);
+            }
+            stop.store(true, std::memory_order_release);
+            audio.join();
+            expectEquals(violations.load(), 0, "no pass ever left part of a batch flagged");
+        }
+    }
+
     void runTest() override
     {
+        stagingBatch();
         using namespace mu_hotswap;
 
         beginTest("loopWrapped and boundaryReached: wrap, stop edge, stopped");

@@ -162,6 +162,22 @@ public:
         ++fullSerial;
     }
 
+    // ── Message thread: a batch of stagings the audio thread must see whole ──
+    // A scene stages one payload per layer. Between beginBatch and endBatch the sequence is odd, and an
+    // audio-thread flag pass that overlaps any part of the window flags nothing (batchSteady), so a boundary
+    // never lands on some of the batch's layers and not the others. A pass that missed its boundary this way
+    // loses it: the whole batch waits for the next one.
+    void beginBatch() noexcept { assertMessageThread(); batchSeq.fetch_add(1, std::memory_order_seq_cst); }
+    void endBatch() noexcept   { assertMessageThread(); batchSeq.fetch_add(1, std::memory_order_seq_cst); }
+
+    // Audio thread: the sequence a flag pass reads before it reads any token, and the check after it that no batch
+    // began or ended meanwhile. Tokens read inside a steady window are either all of a finished batch or none of it.
+    uint32_t batchSeqBefore() const noexcept { return batchSeq.load(std::memory_order_seq_cst); }
+    bool     batchSteady(uint32_t before) const noexcept
+    {
+        return (before & 1u) == 0 && batchSeq.load(std::memory_order_seq_cst) == before;
+    }
+
     // Changes every time a full preset is staged (message thread): lets the owner tell its own staging
     // from someone else's.
     uint32_t fullStageSerial() const noexcept { return fullSerial; }
@@ -325,6 +341,7 @@ private:
     Slot<FullPayload>                         full;
     uint32_t                                  fullSerial = 0;   // message thread only
     std::array<uint32_t, (size_t) N>          slotSerials {};   // message thread only
+    std::atomic<uint32_t>                     batchSeq { 0 };   // odd while a staging batch is open
 };
 
 // Slot argument the boundary callable receives when asked about the full preset rather than a layer.
@@ -410,7 +427,11 @@ public:
     uint32_t fullCommitCount() const noexcept { return fullCommits; }
     uint32_t slotSerial(int i) const noexcept { return stager.slotStageSerial(i); }
     void cancel(int i)                    { stager.cancel(i); }
+    // Message thread: the stagings between these two calls reach their boundary together or not at all (Stager).
+    void beginBatch() noexcept            { stager.beginBatch(); }
+    void endBatch() noexcept              { stager.endBatch(); }
     bool hasPending(int i) const noexcept { return stager.hasPending(i); }
+    bool isFlagged(int i) noexcept        { return stager.isFlagged(i); }
     bool hasFullPending() const noexcept  { return stager.hasFullPending(); }
 
     // Commit what reached its boundary: the full preset first (it supersedes the slot swaps), then
@@ -449,11 +470,27 @@ public:
         // Tokens are read before the boundary rule runs, so a flag can only land on the payload
         // the rule was asked about (see Stager).
         bool flagged = false;
+        const auto seq = stager.batchSeqBefore();
         if (const auto token = stager.fullToken())
             flagged |= stager.flagFullIfReady(token, reached(kFullPreset));
+        if (! stager.batchSteady(seq))
+        {
+            // A staging batch (a scene) overlaps this pass: flag nothing. The slot loop below is not run, so no
+            // layer of the batch can land alone; the full preset above is not part of any batch and is unaffected.
+            wasPlaying = isPlaying;
+            return flagged;
+        }
+
+        // Pass 1: read every token and decide its boundary. Pass 2: flag them only if no batch began meanwhile.
+        std::array<typename Stager<Payload, Payload, N>::Token, (size_t) N> tokens {};
+        std::array<bool, (size_t) N> atBoundary {};
         for (int i = 0; i < N; ++i)
-            if (const auto token = stager.pendingToken(i))
-                flagged |= stager.flagIfReady(i, token, reached(i));
+            if ((tokens[(size_t) i] = stager.pendingToken(i)) != 0)
+                atBoundary[(size_t) i] = reached(i);
+        if (stager.batchSteady(seq))
+            for (int i = 0; i < N; ++i)
+                if (tokens[(size_t) i] != 0)
+                    flagged |= stager.flagIfReady(i, tokens[(size_t) i], atBoundary[(size_t) i]);
         wasPlaying = isPlaying;
         return flagged;
     }

@@ -16,7 +16,7 @@ bool LiveState::handles(ControlActionType t) noexcept
     return t == ControlActionType::PerformanceMode || t == ControlActionType::PerformanceItem
         || t == ControlActionType::PerformancePrev || t == ControlActionType::PerformanceNext
         || t == ControlActionType::SelectLayer || t == ControlActionType::LaunchClip
-        || t == ControlActionType::ClipNext || t == ControlActionType::ClipPrev
+        || t == ControlActionType::ClipNext || t == ControlActionType::ClipPrev || t == ControlActionType::LaunchScene
         || t == ControlActionType::AppPrev || t == ControlActionType::AppNext;
 }
 
@@ -110,6 +110,7 @@ bool LiveState::perform(const ControlAction& a)
         case T::PerformanceMode:
             return setMode(a.index < 0 ? ! performanceMode : a.index != 0, a.layer);   // `index` (a mapped button's value is the message's)
         case T::LaunchClip:      return startClip(a.layer, a.index);   // the on-screen clip strip launches with the mode off too
+        case T::LaunchScene:     return launchScene(a.index);          // so does the scene control
         default: break;
     }
 
@@ -276,6 +277,32 @@ bool LiveState::startClip(int layer, int clip)
     }
     changed();
     return true;
+}
+
+bool LiveState::launchScene(int clip)
+{
+    if (clip < 0 || clip >= mu_limits::kClipsPerLayer) return false;
+    reconcileClips();   // first drop anything a full preset applied since the last settle has made stale
+
+    // One staging batch: the audio thread flags the scene's layers at the same boundary or not at all.
+    if (cb.beginStageBatch) cb.beginStageBatch();
+    bool any = false;
+    const int layers = std::min(getLayerCount(), (int) mu_limits::kMaxLayers);
+    for (int layer = 0; layer < layers; ++layer)
+    {
+        auto& c = clipState[(size_t) layer];
+        if ((c.mask & (1u << clip)) == 0) continue;   // a scene never stops a layer that has no such clip
+        if (clip == c.playing)
+        {
+            if (c.queued >= 0 && cb.cancelSlot) { cb.cancelSlot(layer); c.queued = -1; }
+            any = true;   // already there: the scene does not mute it
+            continue;
+        }
+        any |= startClip(layer, clip);
+    }
+    if (cb.endStageBatch) cb.endStageBatch();
+    changed();
+    return any;
 }
 
 bool LiveState::stepClip(int direction)

@@ -398,7 +398,13 @@ public:
 
     // The layer's state as the tree its layer-preset file holds (root tag included), without the file.
     // A clip is exactly this tree. Default: an invalid tree (the product has no clips).
-    virtual juce::ValueTree captureLayerPresetTree(int /*slot*/)             { return {}; }
+    // A typed slot host (layersAreSlots) captures the node of the slot's type, which carries the type (its tag and rows).
+    virtual juce::ValueTree captureLayerPresetTree(int slot)
+    {
+        if (! layersAreSlots()) return {};
+        const auto* info = layerTypes.find(slotTypeId(slot));
+        return info != nullptr && juce::String(info->presetTag).isNotEmpty() ? captureLayerNode(slot, info->presetTag) : juce::ValueTree();
+    }
 
     // Clip bank (message thread only). A clip is a layer-preset tree kept in the layer's ClipBank;
     // launching one is a layer-preset load from that tree, so a stopped transport applies it now and a
@@ -419,6 +425,11 @@ public:
     // preset is staged, or the stage hook staged nothing (a clip that cannot be built). The hook must change
     // slotStageSerial(slot) whenever it stages or applies a payload, as every stage path does.
     bool    launchClip(int slot, int clip);
+    // A scene: clip `clipIndex` launched on every layer that stores one, staged as one batch so the layers reach
+    // their boundary together (the clip bank stays per layer; the scene is only the index). A layer without that clip,
+    // or whose clip is of another type than its slot, keeps playing. Returns whether any layer launched or already
+    // plays it. Message thread.
+    bool    launchScene(int clipIndex);
     uint8_t clipMask(int slot) const;
     // How many clips layer `slot` stores (0 for no such layer).
     int     clipCount(int slot) const

@@ -445,6 +445,66 @@ struct ClipLaunchTests : juce::UnitTest
             expect(! p.perform(up) && ! p.perform(down), "no multi-app hub: refused");
         }
 
+        beginTest("a scene launches clip n on every layer that stores one, together at the boundary, and leaves the others playing");
+        {
+            ClipProcessor p;
+            p.setParam("v0_a", 0.9f); p.setParam("v1_a", 0.8f); p.setParam("v2_a", 0.7f);
+            p.storeClip(0, 3); p.storeClip(1, 3);          // layer 2 stores no clip 3
+            p.setParam("v0_a", 0.1f); p.setParam("v1_a", 0.2f); p.setParam("v2_a", 0.3f);
+            expect(! p.launchScene(4), "a scene no layer stores does nothing");
+            expect(! p.launchScene(-1) && ! p.launchScene(8), "out of range");
+
+            p.startPlaying();
+            expect(p.launchScene(3));
+            expect(p.hasPendingSwap(0) && p.hasPendingSwap(1), "both layers staged");
+            expect(! p.hasPendingSwap(2), "the layer without that clip is left alone");
+            const auto* view = p.getLiveView();
+            expectEquals(view->getQueuedClip(0), 3);
+            expectEquals(view->getQueuedClip(1), 3);
+            expectEquals(view->getQueuedClip(2), -1);
+
+            expect(p.layerSwapper.flagBoundaries(true, 3.95, 0.2), "one bar line flags the scene");
+            p.layerSwapper.commit();
+            p.getLiveState().reconcile();
+            expectWithinAbsoluteError(p.param("v0_a"), 0.9f, 0.01f);
+            expectWithinAbsoluteError(p.param("v1_a"), 0.8f, 0.01f);
+            expectWithinAbsoluteError(p.param("v2_a"), 0.3f, 0.01f);
+            expectEquals(view->getPlayingClip(0), 3);
+            expectEquals(view->getPlayingClip(1), 3);
+
+            expect(p.launchScene(3), "the scene already playing is accepted");
+            expect(! p.hasPendingSwap(0) && ! p.hasPendingSwap(1), "and stages nothing");
+            expect(! view->isLayerMuted(0) && ! view->isLayerMuted(1), "a scene never mutes a layer");
+        }
+
+        beginTest("a scene is one staging batch: a boundary inside it flags no layer, and a full preset staged refuses it");
+        {
+            ClipProcessor p;
+            p.storeClip(0, 1); p.storeClip(1, 1);
+            p.startPlaying();
+            p.layerSwapper.beginBatch();
+            expect(p.launchClip(0, 1));
+            expect(! p.layerSwapper.flagBoundaries(true, 3.95, 0.2), "the bar line inside the batch flags nothing");
+            expect(p.launchClip(1, 1));
+            p.layerSwapper.endBatch();
+            expect(p.layerSwapper.flagBoundaries(true, 7.95, 0.2));
+            p.layerSwapper.commit();
+            expect(! p.hasPendingSwap(0) && ! p.hasPendingSwap(1), "both landed at the same boundary");
+
+            p.layerSwapper.stageFull(juce::ValueTree("Full"));
+            expect(! p.launchScene(1), "refused while a full preset is staged");
+        }
+
+        beginTest("LaunchScene is an action: allowed with Performance mode off, saved by name");
+        {
+            using T = mu_core::ControlActionType;
+            expect(mu_core::actionFromName(mu_core::actionName(T::LaunchScene)) == T::LaunchScene);
+            ClipProcessor p;
+            p.storeClip(0, 2);
+            mu_core::ControlAction a; a.type = T::LaunchScene; a.index = 2;
+            expect(p.perform(a));
+        }
+
         beginTest("TransportToggle plays and stops the internal clock, and the live view reports it");
         {
             using T = mu_core::ControlActionType;

@@ -62,6 +62,8 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
 
     // The clip bank's live half: a launch is this processor's own launchClip, a mute the MuteLayer action.
     cb.launchClip   = [this](int layer, int clip) { return launchClip(layer, clip); };
+    cb.beginStageBatch = [this] { layerSwapper.beginBatch(); };
+    cb.endStageBatch   = [this] { layerSwapper.endBatch(); };
     cb.slotPending  = [this](int layer) { return hasPendingSwap(layer); };
     cb.slotSerial   = [this](int layer) { return slotStageSerial(layer); };
     cb.cancelSlot   = [this](int layer) { cancelPendingSwap(layer); };
@@ -221,6 +223,7 @@ bool ProcessorBase::perform(const mu_core::ControlAction& a)
         case T::AppPrev:
         case T::AppNext:
         case T::LaunchClip:
+        case T::LaunchScene:
         case T::ClipNext:
         case T::ClipPrev:
             return liveState.perform(a);
@@ -1184,6 +1187,12 @@ void ProcessorBase::applyComposedState(const juce::ValueTree& state)
             const auto node = mu_pp::findLayerNode(state, i);
             auto& layer = *layers[(size_t) i];
             layer.clips->readFrom(node);
+            // A clip carries its type: one saved for another type than the slot now holds (a hand-edited file, an engine
+            // this build reads differently) is dropped rather than launched into the wrong layer.
+            if (layersAreSlots())
+                for (int c = 0; c < mu_limits::kClipsPerLayer; ++c)
+                    if (layer.clips->isOccupied(c) && layerPresetType(layer.clips->get(c)) != slotTypeId(i))
+                        layer.clips->clear(c);
             const int active = (int) node.getProperty("activeClip", -1);
             layer.activeClip = layer.clips->isOccupied(active) ? active : -1;
         }
@@ -1893,6 +1902,28 @@ bool ProcessorBase::loadClipFromFile(int slot, int clip, const juce::File& layer
     auto* layer = getLayer(slot);
     if (layer == nullptr || ! mu_core::ClipBank::isValidIndex(clip)) return false;
 
+    // A typed slot host takes a file of the slot's own type only (the clip carries that type), converted to the
+    // composed node a capture would write when the type's file has another shape.
+    if (layersAreSlots())
+    {
+        std::unique_ptr<juce::XmlElement> fileXml;
+        if (layerPreset.existsAsFile())
+            fileXml = juce::XmlDocument::parse(layerPreset);
+        const auto tree = fileXml != nullptr ? juce::ValueTree::fromXml(*fileXml) : juce::ValueTree();
+        const auto type = tree.isValid() ? layerPresetType(tree, layerPreset.getFileExtension()) : mu_core::LayerTypeId::Empty;
+        const auto* info = layerTypes.find(type);
+        const auto node = info != nullptr && info->presetFileToNode != nullptr
+                              ? info->presetFileToNode(tree, layerPreset.getFileNameWithoutExtension()) : tree;
+        if (info == nullptr || type != slotTypeId(slot) || ! node.isValid())
+        {
+            if (onLoadError) onLoadError("Could not read \"" + layerPreset.getFileName() + "\"");
+            return false;
+        }
+        layer->clips->store(clip, node, layerPreset.getFileNameWithoutExtension());
+        publishClipMasks();
+        return true;
+    }
+
     // The file must be this product's layer preset: its root tag is the tag a capture would write.
     const auto expectedTag = captureLayerPresetTree(slot).getType();
     std::unique_ptr<juce::XmlElement> xml;
@@ -1910,12 +1941,25 @@ bool ProcessorBase::loadClipFromFile(int slot, int clip, const juce::File& layer
     return true;
 }
 
+bool ProcessorBase::launchScene(int clipIndex)
+{
+    mu_hotswap::assertMessageThread();
+    mu_core::ControlAction a;
+    a.type  = mu_core::ControlActionType::LaunchScene;
+    a.index = clipIndex;
+    return liveState.perform(a);
+}
+
 bool ProcessorBase::launchClip(int slot, int clip)
 {
     mu_hotswap::assertMessageThread();   // the clip bank is message-thread only (a controller callback must marshal first)
     auto* layer = getLayer(slot);
     if (layer == nullptr || ! layer->clips->isOccupied(clip)) return false;
     if (hasPendingFullPreset()) return false;   // a staged full preset lands first and replaces the layers
+
+    // A clip carries its type and loads only into a slot of that type: a launch is a staged swap of the same layer,
+    // never a type change.
+    if (layersAreSlots() && layerPresetType(layer->clips->get(clip)) != slotTypeId(slot)) return false;
 
     // The same stage path as a layer-preset load; get() deep-copies, so the stage can migrate the
     // copy and the bank is never written.

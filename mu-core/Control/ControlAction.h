@@ -22,6 +22,7 @@ enum class ControlActionType
     LaunchClip,        // launch clip `index` on `layer` (allowed with Performance mode off, also when mapped to MIDI)
     ClipNext,          // the selected layer's next stored clip, wrapping
     ClipPrev,          // the selected layer's previous stored clip, wrapping
+    LaunchScene,       // launch clip `index` on every layer that stores one (allowed with Performance mode off, as LaunchClip)
     StoreClip,         // store `layer`'s current state as clip `index` (screen only: never mapped, refused in Performance mode)
     ClearClip,         // empty clip `index` of `layer` (screen only, as StoreClip)
     PresetNext,
@@ -43,7 +44,7 @@ struct ControlAction
 {
     ControlActionType type     = ControlActionType::None;
     int               layer    = 0;        // MuteLayer / SoloLayer / SelectLayer / LaunchClip / StoreClip / ClearClip: the layer index
-    int               index    = -1;       // PerformanceItem: the item index; PerformanceMode: -1 toggle, 0 off, 1 on; LaunchClip / StoreClip / ClearClip: the clip index (0..7)
+    int               index    = -1;       // PerformanceItem: the item index; PerformanceMode: -1 toggle, 0 off, 1 on; LaunchClip / LaunchScene / StoreClip / ClearClip: the clip index (0..7)
     juce::String      paramId;             // Parameter: the APVTS parameter id
     float             value    = 0.0f;     // Parameter: normalised 0..1
     Quantise          quantise = Quantise::Default;
@@ -64,6 +65,7 @@ inline const char* actionName(ControlActionType t) noexcept
         case ControlActionType::LaunchClip:      return "launchClip";
         case ControlActionType::ClipNext:        return "clipNext";
         case ControlActionType::ClipPrev:        return "clipPrev";
+        case ControlActionType::LaunchScene:     return "launchScene";
         case ControlActionType::StoreClip:       return "storeClip";
         case ControlActionType::ClearClip:       return "clearClip";
         case ControlActionType::PresetNext:      return "presetNext";
@@ -88,7 +90,7 @@ inline ControlActionType actionFromName(const juce::String& n) noexcept
     for (auto t : { ControlActionType::Parameter, ControlActionType::TransportToggle, ControlActionType::TransportPlay,
                     ControlActionType::TransportStop, ControlActionType::MuteLayer, ControlActionType::SoloLayer,
                     ControlActionType::SelectLayer, ControlActionType::LaunchClip, ControlActionType::ClipNext,
-                    ControlActionType::ClipPrev, ControlActionType::PresetNext,
+                    ControlActionType::ClipPrev, ControlActionType::LaunchScene, ControlActionType::PresetNext,
                     ControlActionType::PresetPrev, ControlActionType::Panic, ControlActionType::PerformanceMode,
                     ControlActionType::PerformanceItem, ControlActionType::PerformancePrev, ControlActionType::PerformanceNext,
                     ControlActionType::MuteSelectedLayer, ControlActionType::AppPrev, ControlActionType::AppNext })

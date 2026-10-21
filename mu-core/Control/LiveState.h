@@ -43,6 +43,8 @@ public:
 
         // The clip bank. All optional: without them every clip action is refused.
         std::function<bool(int, int)> launchClip;            // stage clip c on layer n (false = refused, nothing staged)
+        std::function<void()>         beginStageBatch;       // a scene opens a staging batch (optional): its layers reach a boundary together
+        std::function<void()>         endStageBatch;         // and closes it
         std::function<bool(int)>      slotPending;           // layer n has a staged layer preset not yet committed
         std::function<uint32_t(int)>  slotSerial;            // changes whenever layer n is staged or cancelled (identity)
         std::function<void(int)>      cancelSlot;            // drop layer n's staged layer preset
@@ -97,6 +99,10 @@ public:
     // layer's mute; an empty pad does nothing; any other stored clip launches (playing at once when the
     // transport is stopped, queued until its commit otherwise). ClipNext / ClipPrev step the SELECTED layer
     // to the next / previous stored clip, wrapping, and never mute.
+    // LaunchScene(index): clip `index` on every layer that stores one, staged as one batch so a boundary takes all or
+    // none. A layer already playing that clip is left alone (a scene never mutes), one with a different clip waiting
+    // has its wait cancelled, and a layer with no such clip, or whose clip is refused, keeps playing as it is.
+    // True when at least one layer launched or already plays the clip.
     bool perform(const ControlAction& action);
 
     // The owner's "a full-preset swap just committed" hook (message thread): the queued item becomes
@@ -163,6 +169,7 @@ private:
     static bool inRange(int layer) noexcept { return layer >= 0 && layer < mu_limits::kMaxLayers; }
     bool startClip(int layer, int clip);
     bool stepClip(int direction);
+    bool launchScene(int clip);
     void setPlaying(int layer, int clip);
     bool dropClipState();           // forgets every layer's playing and queued clip; true when something was set
     bool seedClipsFromLayers();     // each layer's saved playing clip becomes its playing clip; true when any did
