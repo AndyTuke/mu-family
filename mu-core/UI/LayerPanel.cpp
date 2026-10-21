@@ -17,7 +17,7 @@ LayerPanel::LayerPanel(ProcessorBase& processor, const juce::String& layerNoun)
 
     // The clip strip is shown only where the product can capture a layer (the hook is the clip bank's gate).
     header.bindClips(proc.getLiveView(), proc.getControlSink());
-    header.setShowClips(proc.getNumLayers() > 0 && proc.captureLayerPresetTree(0).isValid());
+    updateClipVisibility();
     addAndMakeVisible(header);
     addAndMakeVisible(modulatorPanel);
 
@@ -54,10 +54,22 @@ void LayerPanel::setLayerEmpty(bool empty)
     header.setShowSave(! empty);
     header.setShowReset(! empty);
     header.setShowDelete(! empty);
-    header.setShowClips(! empty && proc.getNumLayers() > 0 && proc.captureLayerPresetTree(currentLayer).isValid());
+    updateClipVisibility();
     modulatorPanel.setVisible(! empty);
     resized();
     repaint();
+}
+
+void LayerPanel::updateClipVisibility()
+{
+    header.setShowClips(! layerEmpty && clipBank && proc.getNumLayers() > 0 && proc.captureLayerPresetTree(currentLayer).isValid());
+}
+
+void LayerPanel::setClipBankAvailable(bool available)
+{
+    if (clipBank == available) return;
+    clipBank = available;
+    updateClipVisibility();
 }
 
 void LayerPanel::setLayer(int idx)
@@ -102,6 +114,7 @@ juce::Colour LayerPanel::layerColour() const
 void LayerPanel::timerCallback()
 {
     modulatorPanel.setPlayheadBeat(beatSource());
+    header.refreshNotesIn();   // the channel follows its parameter (a state load, another instance of the control)
     header.setDeleteEnabled(proc.getNumLayers() > 1 || proc.layersAreSlots());   // the last layer cannot be deleted: grey, not a silent no-op
     header.setStagingBadge(proc.hasPendingSwap(currentLayer));   // "SWP" while a layer preset waits for its boundary
 }

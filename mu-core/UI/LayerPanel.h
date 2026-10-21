@@ -56,6 +56,10 @@ public:
     void setLayerEmpty(bool empty);
     bool isLayerEmpty() const noexcept { return layerEmpty; }
 
+    // A host of several layer types says whether the shown layer's type keeps a clip bank: false (a type that processes
+    // another layer's audio) hides the clip strip, true (the default) leaves it to the usual rule.
+    void setClipBankAvailable(bool available);
+
     // Show layer `idx`: commit any rename in progress, refresh the header and the modulator
     // binding, then tell the product (onLayerChanged) so it rebinds its content.
     void setLayer(int idx);
@@ -80,6 +84,7 @@ public:
 private:
     void timerCallback() override;
     juce::Colour layerColour() const;
+    void updateClipVisibility();   // the clip strip shows for a filled slot of a type with a clip bank, where the product can capture a layer
 
     ProcessorBase& proc;
     juce::String   noun;
@@ -89,6 +94,7 @@ private:
     ModulatorPanel   modulatorPanel;
     juce::Component* content = nullptr;
     bool layerEmpty = false;
+    bool clipBank   = true;
     std::function<double()> beatSource;
     std::function<juce::String(int)> presetNameFn;
     std::function<bool(int)> ownSaveCardFn;

@@ -105,5 +105,7 @@ namespace mu_core
                                                // so a file saved by the product loads in a slot host and the reverse
         const char* descriptor = "";           // one short line for the chooser card ("Generative arpeggiator")
         const char* discInitial = "";          // one character on the type's disc (sidebar and chooser card); unique across a host's choices
+        bool        takesNotes = false;        // the type plays from MIDI notes, so a slot of it shows the Notes In channel control
+        bool        hasClipBank = true;        // a slot of the type stores clips; false (a type that processes another layer's audio) hides the strip
     };
 }
