@@ -230,8 +230,7 @@ struct MuTronicTrackTests : juce::UnitTest
         expectWithinAbsoluteError(getPlain(q.apvts, "t2_swing"), 0.4f, 0.001f);
         expectWithinAbsoluteError(getPlain(q.apvts, "t3_swing"), 0.6f, 0.001f);
         expect(q.captureState().isEquivalentTo(state), "restoring then capturing reproduces the mixed state");
-        // A mixed Arp/Kick swapLayers test is not written: swapLayers is not offered (canReorderLayers is false).
-        expect(! q.canReorderLayers());
+        expect(q.canReorderLayers(), "a mixed Arp/Kick swap is in TronicSwapTests");
         p.flushPendingAsyncUpdates();
         q.flushPendingAsyncUpdates();
     }
