@@ -49,6 +49,10 @@ public:
     // The page switch, so the shell can let the pointer reach it through its input shield.
     juce::Component& getPageSwitch() noexcept { return pageSwitch; }
 
+    // Drops layer `source` on `target` exactly as a finished drag does (the host's reorder, then the selection and the
+    // onLayersReordered callback). Exposed so a test can drive a drag without a mouse.
+    void dropLayerForTest(int source, int target) { dragSourceIndex = source; dragTargetIndex = target; dragPhase = DragPhase::Dragging; commitDrag(); }
+
     // Flash a layer's hit-pulse ring — product drives this from its play state.
     void pulseItem(int idx);
 

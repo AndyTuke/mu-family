@@ -38,6 +38,9 @@ void ProcessorBase::prepareLayerRender(double sampleRate, int maxBlockSize)
     renderState.mixCount = 0;
     renderState.midiIn = renderState.liveOut = renderState.tailOut = 0;
     renderState.dropped = 0;
+    renderState.inSkip = false;
+    renderState.fadePos = LayerRenderState::kFadeIn;
+    for (int c = 0; c < 2; ++c) renderState.lastOut[c] = renderState.tailLevel[c] = renderState.tailStep[c] = 0.0f;
 
     // What the layer types share (their engines, tables), for this rate and size, before the layers that read it.
     {
@@ -115,10 +118,36 @@ void ProcessorBase::noteHostBlock(const mu_core::BlockTransport& t, int numSampl
 // The buffer arrived as the host gave it, so a skipped block clears it: silence, as a missed try-lock always was.
 // With the carry on, its channel messages wait for the next rendered block (at frame 0, in arrival order).
 void ProcessorBase::noteSkippedBlock(const mu_core::BlockTransport& t, juce::AudioBuffer<float>& buffer,
-                                     const juce::MidiBuffer& midi) noexcept
+                                     const juce::MidiBuffer& midi, bool editSkip) noexcept
 {
     if (! t.playing && renderState.lastPlaying) renderState.jumpPending = renderState.stopPending = true;
     buffer.clear();
+
+    // A Published host's edit silences blocks it cannot render: the master decays from its last sample to zero over a few
+    // milliseconds instead of dropping, so the cut is not a click. The decay carries on across consecutive skipped blocks.
+    if (editSkip && layerAccess.mode == mu_core::LayerAccess::Published)
+    {
+        auto& rs = renderState;
+        if (! rs.inSkip)
+        {
+            rs.inSkip = true;
+            rs.fadePos = 0;
+            for (int c = 0; c < 2; ++c) { rs.tailLevel[c] = rs.lastOut[c]; rs.tailStep[c] = rs.lastOut[c] / (float) LayerRenderState::kSkipDecay; }
+        }
+        const int n = buffer.getNumSamples();
+        for (int c = 0; c < juce::jmin(2, buffer.getNumChannels()); ++c)
+        {
+            float* d = buffer.getWritePointer(c);
+            float level = rs.tailLevel[c];
+            const float step = rs.tailStep[c];
+            for (int i = 0; i < n; ++i)
+            {
+                level = std::abs(level) > std::abs(step) ? level - step : 0.0f;
+                d[i] = level;
+            }
+            rs.tailLevel[c] = level;
+        }
+    }
     if (renderState.carryMidi && renderState.midi.get() != nullptr)
         for (const auto meta : midi)
         {
@@ -201,7 +230,7 @@ void ProcessorBase::renderAndMix(juce::AudioBuffer<float>& buffer, juce::MidiBuf
 
     // Step 2: the block's one access to the layers (and its ScopedNoDenormals, C11).
     const mu_core::LayerBlock block(layerAccess, layersLock, layerEditInFlight, layers);
-    if (! block) { noteSkippedBlock(t, buffer, midi); return; }
+    if (! block) { noteSkippedBlock(t, buffer, midi, true); return; }
 
     // Step 3: one MIDI decode for every layer.
     decodeBlockMidi(midi, n);
@@ -255,12 +284,41 @@ void ProcessorBase::renderAndMix(juce::AudioBuffer<float>& buffer, juce::MidiBuf
                 services->mixIntoMaster(chunk, chunk.getNumSamples());
             }
 
+    if (layerAccess.mode == mu_core::LayerAccess::Published) declickMaster(buffer, n);
+
     // The layers' MIDI out stays in the block's storage: the product merges it into the host buffer with
     // mergeLayerMidiOut and the room it knows that buffer has (design 2.1.5, R7; the mechanism is the
     // MIDI-output product's to settle when it adopts the driver).
     layersBlockRendered(block.view(), buffer, midi);
     renderState.lastBlockFrames = n;
     ++renderState.blocksRendered;
+}
+
+void ProcessorBase::declickMaster(juce::AudioBuffer<float>& buffer, int numSamples) noexcept
+{
+    auto& rs = renderState;
+    const int numCh = juce::jmin(2, buffer.getNumChannels());
+    if (rs.inSkip || rs.fadePos < LayerRenderState::kFadeIn)
+    {
+        // The first rendered samples after a skipped block: the layers fade in linearly while what is left of the decay
+        // runs out, so the output is continuous with the silence it follows.
+        for (int c = 0; c < numCh; ++c)
+        {
+            float* d = buffer.getWritePointer(c);
+            float level = rs.inSkip ? rs.tailLevel[c] : 0.0f;
+            const float step = rs.tailStep[c];
+            for (int i = 0; i < numSamples; ++i)
+            {
+                const int pos = rs.fadePos + i;
+                const float gain = pos >= LayerRenderState::kFadeIn ? 1.0f : (float) (pos + 1) / (float) LayerRenderState::kFadeIn;
+                level = std::abs(level) > std::abs(step) ? level - step : 0.0f;
+                d[i] = d[i] * gain + level;
+            }
+        }
+        rs.fadePos = juce::jmin(LayerRenderState::kFadeIn, rs.fadePos + numSamples);
+        rs.inSkip = false;
+    }
+    for (int c = 0; c < numCh; ++c) rs.lastOut[c] = numSamples > 0 ? buffer.getSample(c, numSamples - 1) : 0.0f;
 }
 
 void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core::BlockTransport& t,
