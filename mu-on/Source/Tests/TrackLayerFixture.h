@@ -78,7 +78,7 @@ namespace mu_on_fixture
     constexpr std::uint64_t kRecordedHash = 0x2c7dc78498ada7deull;
 
     // ── One non-Rumble Track alone ───────────────────────────────────────────────────────────────────────────────
-    // The same scenario on slot 0 for each of the four engines a mu-Tronic slot can lock (Kick, Bass, Hat, Snare): the
+    // The same scenario on slot 0 for each of the five engines a mu-Tronic slot can lock (Kick, Bass, Hat, Snare, FM Perc): the
     // real mu-On processor (mu-on-tests, an unlocked track told its engine by `t0_eng`) and a mu-Tronic slot of the
     // type (mu-tronic-tests, a locked track) must both hash channel 0's pre-mixer stream, kBlocks blocks long, to
     // kSingleHash[engine index]. Rows as configureRow sets them; the same swing and accent.
@@ -111,13 +111,18 @@ namespace mu_on_fixture
                 set(mu_on::engineParamId(0, engine, "tune"), -2.0f);
                 set(mu_on::engineParamId(0, engine, "dec"), 250.0f);
                 break;
-            case EngineType::Rumble:
-            case EngineType::FmPerc: break;
+            case EngineType::FmPerc:   // a Tom at 110 Hz with the other knobs at their defaults
+                set(mu_on::engineParamId(0, engine, "algo"), 0.0f);
+                set(mu_on::engineParamId(0, engine, "tune"), 110.0f);
+                break;
+            case EngineType::Rumble: break;
         }
         set(mu_on::layerParamId(0, "swing"), 0.3f);
         set(mu_on::layerParamId(0, "accent"), 0.6f);
     }
 
     // The hash of channel 0's stream for each engine, indexed by EngineType (Rumble has none: it processes another track).
-    constexpr std::uint64_t kSingleHash[4] = { 0x215e638e585324c9ull, 0x07a54ecc63020cfdull, 0x537b9c40d4de34b1ull, 0xe84aea84dfaf666dull };   // Kick, Bass, Hat, Snare
+    constexpr std::uint64_t kSingleHash[6] = { 0x215e638e585324c9ull, 0x07a54ecc63020cfdull, 0x537b9c40d4de34b1ull, 0xe84aea84dfaf666dull,   // Kick, Bass, Hat, Snare
+                                               0ull,                                                                                      // Rumble: none
+                                               0xcf9d8b87c609bcd1ull };                                                                       // FM Perc
 }

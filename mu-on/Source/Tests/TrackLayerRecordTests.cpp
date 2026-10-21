@@ -72,9 +72,9 @@ struct MuOnTrackLayerRecordTests : juce::UnitTest
         expect(hash.h == fx::kRecordedHash, "the processor renders the recorded layer streams");
         expect(hash.peak > 0.01f && hash.peak < 4.0f, "and they are real, bounded sounds");
 
-        // One track alone per engine: the streams mu-Tronic's locked Kick, Bass, Hat and Snare layers must reproduce.
+        // One track alone per engine: the streams mu-Tronic's locked Kick, Bass, Hat, Snare and FM Perc layers must reproduce.
         beginTest("Channel 0's stream for each non-Rumble engine alone is the recorded single-track stream");
-        for (int e = 0; e < 4; ++e)
+        for (int e : { 0, 1, 2, 3, 5 })   // Kick, Bass, Hat, Snare, FM Perc
         {
             const auto engine = mu_on::engineFromIndex(e);
             mu_seam_test::TempStorage storage2;
