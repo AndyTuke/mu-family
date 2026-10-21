@@ -540,14 +540,14 @@ private:
             Rig r;
             r.set({ 0 }, -1);
             auto st = r.strip.menuStateFor(0);
-            expect(! st.paste && st.pasteTip == "Nothing copied", "clipboard empty");
+            expect(! st.paste && st.pasteLabel == "Paste (nothing copied)", "clipboard empty");
             r.view.clipboardEmpty = false;
             r.view.pasteFits = false;
             st = r.strip.menuStateFor(5);
-            expect(! st.paste && st.pasteTip == "Clip is for a different layer type", "clipboard holds another layer type");
+            expect(! st.paste && st.pasteLabel == "Paste (other layer type)", "clipboard holds another layer type");
             r.view.pasteFits = true;
             expect(r.strip.menuStateFor(5).paste && r.strip.menuStateFor(0).paste, "empty and stored pads both take it");
-            expect(r.strip.menuStateFor(5).pasteTip.isEmpty(), "no tooltip when enabled");
+            expect(r.strip.menuStateFor(5).pasteLabel == "Paste", "plain label when enabled");
         }
 
         beginTest("menu items send their action; only Clear and Paste over a stored clip ask");

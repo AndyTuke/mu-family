@@ -278,6 +278,14 @@ bool ClipStrip::isMenuBlocked() const
     return isReadOnly() || (view != nullptr && view->isFullPresetStaged());
 }
 
+// A refused gesture says why when a full preset is waiting; Performance mode refuses silently (the strip is read-only there).
+bool ClipStrip::blockedWithNote()
+{
+    if (! isMenuBlocked()) return false;
+    if (! isReadOnly()) say("Clip", "Full preset waiting; try again after it loads", true);
+    return true;
+}
+
 ClipStrip::MenuState ClipStrip::menuStateFor(int pad) const
 {
     MenuState m;
@@ -286,8 +294,7 @@ ClipStrip::MenuState ClipStrip::menuStateFor(int pad) const
     m.store = ! stored;
     m.copy = m.cut = m.clear = stored;
     m.paste = view->canPasteClip(layer);
-    if (! m.paste)
-        m.pasteTip = view->isClipboardEmpty() ? "Nothing copied" : "Clip is for a different layer type";
+    m.pasteLabel = m.paste ? "Paste" : (view->isClipboardEmpty() ? "Paste (nothing copied)" : "Paste (other layer type)");
     return m;
 }
 
@@ -312,25 +319,25 @@ void ClipStrip::runMenuAction(int pad, mu_core::ControlActionType type, const ju
 
 void ClipStrip::storePad(int pad)
 {
-    if (isMenuBlocked() || sink == nullptr || view == nullptr || pad < 0 || pad >= kPads || storedAt(pad)) return;
+    if (blockedWithNote() || sink == nullptr || view == nullptr || pad < 0 || pad >= kPads || storedAt(pad)) return;
     runMenuAction(pad, mu_core::ControlActionType::StoreClip, "Stored", false, {}, {}, {});
 }
 
 void ClipStrip::copyPad(int pad)
 {
-    if (isMenuBlocked() || sink == nullptr || view == nullptr || ! storedAt(pad)) return;
+    if (blockedWithNote() || sink == nullptr || view == nullptr || ! storedAt(pad)) return;
     runMenuAction(pad, mu_core::ControlActionType::CopyClip, "Copied", false, {}, {}, {});
 }
 
 void ClipStrip::cutPad(int pad)
 {
-    if (isMenuBlocked() || sink == nullptr || view == nullptr || ! storedAt(pad)) return;
+    if (blockedWithNote() || sink == nullptr || view == nullptr || ! storedAt(pad)) return;
     runMenuAction(pad, mu_core::ControlActionType::CutClip, "Cut", false, {}, {}, {});
 }
 
 void ClipStrip::pastePad(int pad)
 {
-    if (isMenuBlocked() || sink == nullptr || view == nullptr || pad < 0 || pad >= kPads) return;
+    if (blockedWithNote() || sink == nullptr || view == nullptr || pad < 0 || pad >= kPads) return;
     if (! view->canPasteClip(layer))
     {
         if (! view->isClipboardEmpty()) say("Clip", refusedText(pad), true);   // a clip of another layer type
@@ -342,7 +349,7 @@ void ClipStrip::pastePad(int pad)
 
 void ClipStrip::clearPad(int pad)
 {
-    if (isMenuBlocked() || sink == nullptr || view == nullptr || ! storedAt(pad)) return;
+    if (blockedWithNote() || sink == nullptr || view == nullptr || ! storedAt(pad)) return;
     runMenuAction(pad, mu_core::ControlActionType::ClearClip, "Cleared", true, "Clear Clip",
                   "Clear " + clipText(pad) + " of \"" + layerName + "\"?\nThis cannot be undone.", "Clear");
 }
@@ -360,44 +367,16 @@ void ClipStrip::menuChosen(int pad, int menuResult)
     }
 }
 
-namespace
-{
-// A greyed menu row that shows a tooltip, drawn by the look so it matches its plain neighbours.
-class DisabledItemWithTip : public juce::PopupMenu::CustomComponent, public juce::TooltipClient
-{
-public:
-    DisabledItemWithTip(const juce::String& t, const juce::String& tip) : CustomComponent(false), text(t), tooltip(tip) {}
-
-    void getIdealSize(int& w, int& h) override { getLookAndFeel().getIdealPopupMenuItemSize(text, false, -1, w, h); }
-    juce::String getTooltip() override { return tooltip; }
-    void paint(juce::Graphics& g) override
-    {
-        getLookAndFeel().drawPopupMenuItem(g, getLocalBounds(), false, false, false, false, false, text, {}, nullptr, nullptr);
-    }
-
-private:
-    juce::String text, tooltip;
-};
-}
-
 void ClipStrip::showPopup(int pad)
 {
-    if (isMenuBlocked()) return;
+    if (blockedWithNote()) return;
     const auto st = menuStateFor(pad);
 
     juce::PopupMenu menu;
     menu.addItem(menuStore, "Store here", st.store);
     menu.addItem(menuCopy, "Copy", st.copy);
     menu.addItem(menuCut, "Cut", st.cut);
-    if (st.paste)
-        menu.addItem(menuPaste, "Paste");
-    else
-    {
-        // A greyed Paste explains itself on hover; PopupMenu items carry no tooltip, so this one draws through the look.
-        juce::PopupMenu::Item paste("Paste");
-        paste.setID(menuPaste).setEnabled(false).setCustomComponent(new DisabledItemWithTip("Paste", st.pasteTip));
-        menu.addItem(paste);
-    }
+    menu.addItem(menuPaste, st.pasteLabel, st.paste);   // a greyed Paste names its reason in its own text
     menu.addSeparator();
     menu.addItem(menuClear, "Clear", st.clear);
 

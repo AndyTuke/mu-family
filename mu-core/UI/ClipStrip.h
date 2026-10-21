@@ -75,11 +75,12 @@ public:
     // The right-click menu: items are always listed, in this order, and greyed when they do not apply.
     enum MenuId { menuStore = 1, menuCopy, menuCut, menuPaste, menuClear };
     struct MenuState { bool store = false, copy = false, cut = false, paste = false, clear = false;
-                       juce::String pasteTip; };   // pasteTip explains a disabled Paste
+                       juce::String pasteLabel = "Paste"; };   // pasteLabel carries the reason when Paste is disabled
     MenuState menuStateFor(int pad) const;
     void menuChosen(int pad, int menuResult);  // the menu's result (0 = dismissed)
     // The clip menu and its actions stay shut in Performance mode and while a full preset is staged.
     bool isMenuBlocked() const;
+    bool blockedWithNote();   // isMenuBlocked, plus the status line when a full preset is the cause
 
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
