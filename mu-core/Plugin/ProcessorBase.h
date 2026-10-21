@@ -1273,6 +1273,7 @@ private:
         // skipped block that is not carried), and the scratch a seeded layer's call is given: the held keys as note-ons
         // followed by the block's events. Audio thread only.
         mu_core::HeldKeyTable heldKeys;
+        mu_core::HeldKeyTable seedTable;   // heldKeys with the earlier chunks' events applied, for a seed taken mid-block
         juce::HeapBlock<mu_core::MidiEvent> seedMidi;
 
         MixerEngine::RenderChannelFn copyToMixer;   // the mixer's channel r = scratch[r], an exact copy

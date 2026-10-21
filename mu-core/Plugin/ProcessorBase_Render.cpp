@@ -247,7 +247,17 @@ void ProcessorBase::applyLayerChannelMask(mu_core::RenderContext& ctx, Layer& la
     // call's first frame that count as carried (not as this block's presses), ahead of the block's own events.
     auto& rs = renderState;
     if (! rs.heldKeys.anyHeld() || rs.seedMidi.get() == nullptr) return;
-    const int seeded = rs.heldKeys.collect(rs.seedMidi.get(), mu_limits::kMaxCarriedMidiEvents, ctx.midi.firstFrame, mask);
+    // The table is the state at the start of the host block; a call that starts later in it (a block rendered in chunks)
+    // first applies what the earlier chunks of this block already did to the keys.
+    const mu_core::HeldKeyTable* keys = &rs.heldKeys;
+    if (ctx.midi.firstFrame > 0)
+    {
+        rs.seedTable = rs.heldKeys;
+        for (int i = 0; i < ctx.midi.count; ++i)
+            if (ctx.midi.events[i].frame < ctx.midi.firstFrame) rs.seedTable.apply(ctx.midi.events[i]);
+        keys = &rs.seedTable;
+    }
+    const int seeded = keys->collect(rs.seedMidi.get(), mu_limits::kMaxCarriedMidiEvents, ctx.midi.firstFrame, mask);
     if (seeded == 0) return;
     if (ctx.midi.count > 0)
         std::memcpy(rs.seedMidi.get() + seeded, ctx.midi.events, (size_t) ctx.midi.count * sizeof (mu_core::MidiEvent));

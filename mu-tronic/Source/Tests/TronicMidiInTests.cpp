@@ -52,6 +52,7 @@ struct MuTronicMidiInTests : juce::UnitTest
         rowsAndRouting();
         carriedKeysFollowTheChannel();
         layerCreatedWhileKeysHeld();
+        lateLayerKeepsPressOrder();
         changingTheChannelReleasesKeys();
         rowSavedAndMoves();
         cpuMeter();
@@ -160,6 +161,27 @@ struct MuTronicMidiInTests : juce::UnitTest
         expectEquals(arpIn(p, 4).heldNotes.newest(), 60);
         block(p, events({ juce::MidiMessage::noteOff(1, 60) }));
         expectEquals(arpIn(p, 4).heldNotes.numHeld(), 0, "and its release reaches the seeded layer");
+        p.flushPendingAsyncUpdates();
+        p.releaseResources();
+    }
+
+    void lateLayerKeepsPressOrder()
+    {
+        beginTest("a late layer's newest held key is the last one pressed, as on a layer that was there (press order, not note order)");
+        mu_seam_test::TempStorage storage;
+        MidiInProcessor p;
+        expect(p.setLayerType(0, LayerTypeId::Arp));
+        p.prepareToPlay(48000.0, 256);
+        p.toggleInternalPlay();
+        block(p, {});
+        for (int note : { 64, 60, 67, 62 })   // not ascending
+            block(p, events({ juce::MidiMessage::noteOn(1, note, (juce::uint8) 100) }));
+        block(p, events({ juce::MidiMessage::noteOff(1, 67) }));
+        expectEquals(arpIn(p, 0).heldNotes.newest(), 62);
+        expect(p.setLayerType(1, LayerTypeId::Arp));
+        block(p, {});
+        expectEquals(arpIn(p, 1).heldNotes.numHeld(), 3);
+        expectEquals(arpIn(p, 1).heldNotes.newest(), arpIn(p, 0).heldNotes.newest(), "the same newest key (it drives the root override)");
         p.flushPendingAsyncUpdates();
         p.releaseResources();
     }

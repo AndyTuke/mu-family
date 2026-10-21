@@ -1048,9 +1048,11 @@ struct LayerRenderDriverTests : juce::UnitTest
             expectEquals(t.numHeld(), 3, "a repeated note-on does not count twice");
             mu_core::MidiEvent out[8] {};
             expectEquals(t.collect(out, 8, 7, 0xFFFF), 3);
-            expectEquals((int) out[0].bytes[2], 90, "the latest velocity");
-            expectEquals((int) out[0].frame, 7);
-            expectEquals((int) (out[1].bytes[0] & 0x0f), 1);
+            expectEquals((int) out[2].bytes[1], 60, "the re-pressed key is the newest, last in the order");
+            expectEquals((int) (out[2].bytes[0] & 0x0f), 0);
+            expectEquals((int) out[2].bytes[2], 90, "with its latest velocity");
+            expectEquals((int) out[2].frame, 7);
+            expectEquals((int) (out[0].bytes[0] & 0x0f), 1, "oldest first");
             expectEquals(t.collect(out, 8, 0, 0x0001), 1, "mask: channel 1 only");
             expectEquals(t.collect(out, 2, 0, 0xFFFF), 2, "never past the capacity");
             t.apply(ev(0x80, 60, 0)); t.apply(ev(0x91, 61, 0));
@@ -1061,6 +1063,68 @@ struct LayerRenderDriverTests : juce::UnitTest
             t.apply(ev(0xf8, 0, 0));
             t.clear();
             expect(! t.anyHeld());
+
+            // Press order is kept across channels and past the capacity (the oldest press is forgotten, the count stays true).
+            for (int i = 0; i < mu_core::HeldKeyTable::kOrderCapacity + 10; ++i) t.apply(ev((uint8_t) (0x90 | (i / 128)), (uint8_t) (i % 128), 80));
+            expectEquals(t.numHeld(), mu_core::HeldKeyTable::kOrderCapacity);
+            mu_core::MidiEvent big[300] {};
+            expectEquals(t.collect(big, 300, 0, 0xFFFF), mu_core::HeldKeyTable::kOrderCapacity);
+            expectEquals((int) big[0].bytes[1], 10, "the first ten presses were dropped");
+            expectEquals((int) big[mu_core::HeldKeyTable::kOrderCapacity - 1].bytes[1], (mu_core::HeldKeyTable::kOrderCapacity + 9) % 128);
+            t.apply(ev(0x80, 10, 0));
+            expectEquals(t.numHeld(), mu_core::HeldKeyTable::kOrderCapacity - 1);
+        }
+
+        beginTest("Held keys: a late layer ends with the same newest key as one that was there (press order, not note order)");
+        {
+            auto pBox = std::make_unique<FakeLayerHost>(2); auto& p = *pBox;
+            p.setUseLayerRenderForTest(true);
+            Driver d(p);
+            d.block(256);
+            for (int note : { 64, 60, 67 })   // not ascending
+            {
+                d.pendingMidi.push_back(juce::MidiMessage::noteOn(1, note, (juce::uint8) 100));
+                d.block(256);
+                d.block(256);
+            }
+            d.pendingMidi.push_back(juce::MidiMessage::noteOn(1, 60, (juce::uint8) 100));   // re-press: 60 is now the newest
+            d.block(256);
+            p.layers[1] = std::make_unique<FakeBeatLayer>();
+            p.layers[1]->bindParams(p.apvts, 1);
+            d.block(256);
+            expectEquals(p.fake(1).lastEventNote, 60, "the late layer's newest key is the last one pressed");
+            expectEquals(p.fake(1).midiSeen, 3);
+        }
+
+        beginTest("Held keys: a MIDI In change in the second chunk of a block seeds from the keys as the first chunk left them");
+        {
+            for (const int target : { 2, 3 })
+            {
+                auto pBox = std::make_unique<FakeLayerHost>(2); auto& p = *pBox;
+                p.setUseLayerRenderForTest(true);
+                std::atomic<float> midiIn { 1.0f };
+                p.midiInRaw[0] = &midiIn;
+                bool armed = false;
+                p.fake(0).onRender = [&](const mu_core::RenderContext& c) { if (armed && c.midi.firstFrame == 0) midiIn.store((float) target); };
+                Driver d(p, 48000.0, 512);
+                d.block(256);
+                d.pendingMidi.push_back(juce::MidiMessage::noteOn(1, 60, (juce::uint8) 100));
+                d.pendingMidi.push_back(juce::MidiMessage::noteOn(2, 64, (juce::uint8) 100));
+                d.block(256);
+                // One 1024-frame block (two chunks of 512): chunk 0 releases channel 2's key and presses one on channel 3, then
+                // the layer's channel moves; the chunk-1 seed must not hold the released key and must hold the new one.
+                d.pendingMidi.push_back(juce::MidiMessage::noteOff(2, 64));
+                d.pendingMidi.push_back(juce::MidiMessage::noteOn(3, 70, (juce::uint8) 100));
+                d.midiOffset = 100;
+                armed = true;
+                d.block(1024);
+                if (target == 2) expectEquals(p.fake(0).lastCarried, 0, "channel 2: its key was released in chunk 0");
+                else
+                {
+                    expectEquals(p.fake(0).lastCarried, 1, "channel 3: the key pressed in chunk 0");
+                    expectEquals(p.fake(0).firstEventNote, 70);
+                }
+            }
         }
 
         beginTest("A parked spare above the live count follows the block's MIDI and renders nothing; live layers are never parked");

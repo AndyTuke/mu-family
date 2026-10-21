@@ -38,6 +38,10 @@ namespace mu_core
         uint16_t dropped;            // events the decoder had no room for; 0 expected
         uint16_t carried;            // the first `carried` events are from earlier host blocks that rendered nothing
                                      // (frame 0; only when the processor carries them, else 0)
+                                     // Also counts the note-ons the base seeds into a layer that is new or whose MIDI In
+                                     // changed (the keys already held, oldest press first). A layer that does not read
+                                     // `carried` takes those as presses of this block: a trigger-on-note layer would fire
+                                     // on creation, so it must skip the first `carried` events when it triggers.
         uint16_t inputReset;         // 1: this layer's channel mask changed since its last call, so the keys it holds were
                                      // filtered under the old mask: drop them (and settle what they gate) before applying
                                      // this call's events. One call only; always 0 where a product has no per-layer channel.
