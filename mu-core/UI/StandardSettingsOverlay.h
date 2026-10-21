@@ -98,6 +98,7 @@ private:
     juce::Label    uiSizeLabel;
     SegmentControl uiSizeCtrl { { "Medium", "Large" } };
     juce::ToggleButton updateCheckToggle { "Check for updates" };
+    juce::ToggleButton clipAutoSaveToggle { "Auto-save clip edits" };
     juce::Label    bpmLabel;
     NudgeInput     bpmInput { "BPM", 20, 300, 120 };
     juce::Label    clockSourceLabel, midiMessagesLabel, syncOffsetLabel, timeSigLabel;

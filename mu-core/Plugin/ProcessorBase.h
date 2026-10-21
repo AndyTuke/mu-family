@@ -460,9 +460,17 @@ public:
     // more step is stored. One layer is visited per step, about every 400 ms. Nothing runs on the audio thread.
     // Skipped while the setting is off, in Performance mode, while a full preset is staged, during an offline render,
     // and while a swap that is not our clip launch is pending.
-    bool isClipAutoSaveOn() const noexcept { return clipAutoSaveOn; }
+    bool isClipAutoSaveOn() const noexcept override { return clipAutoSaveOn; }
+    // True when any layer can be captured into a clip (every product with a clip strip).
+    bool hasClipBank() override
+    {
+        if (layersAreSlots()) return true;
+        for (int l = 0; l < getNumLayers(); ++l)
+            if (captureLayerPresetTree(l).isValid()) return true;
+        return false;
+    }
     // The shell preference "clipAutoSave" (default on): a behaviour of the app, kept in the app settings, not a parameter.
-    void setClipAutoSave(bool on);
+    void setClipAutoSave(bool on) override;
     // Captures layer `slot` (-1 = every lit layer) and writes it to its lit clip when it differs from the baseline, with no
     // settle wait. Called by the launch, copy / cut, structural edits and state captures so the bank is current when read.
     void flushClipAutoSave(int slot = -1);

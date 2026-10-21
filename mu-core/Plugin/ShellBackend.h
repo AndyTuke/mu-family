@@ -129,6 +129,11 @@ public:
     // The machine-wide app settings file and the product's slug in latest.json (mu-clid, mu-tant,
     // ...). An app with no settings file or no slug (mu-link) has no update check and no Settings row.
     virtual juce::PropertiesFile* getAppSettingsFile() noexcept { return nullptr; }
+
+    // Clip auto-save (a clip bank product only): the Settings window shows its toggle when hasClipBank() is true.
+    virtual bool hasClipBank() { return false; }
+    virtual bool isClipAutoSaveOn() const noexcept { return true; }
+    virtual void setClipAutoSave(bool) {}
     virtual juce::String          getProductSlug() const { return {}; }
 
     // ─── Shell callbacks (message thread, set by the shell) ──────────────────
