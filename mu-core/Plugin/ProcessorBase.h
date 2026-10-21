@@ -785,6 +785,15 @@ protected:
     // move with a layer through swap / remove, so slot N's atomic is always the channel of the layer now in slot N.
     std::array<std::atomic<float>*, mu_limits::kMaxLayers> midiInRaw {};
     // Audio thread. The MidiView channel mask for slot `s`: bit c = channel c+1; 0xFFFF for Omni or no such row.
+    // Audio thread. Sets the call's channel mask for the layer in slot `s`, and raises MidiView::inputReset for the one call
+    // after the mask changed: the keys the layer holds were filtered under the old mask, so a note-off the new mask no longer
+    // passes would strand them.
+    void applyLayerChannelMask(mu_core::RenderContext& ctx, Layer& layer, int s) const noexcept
+    {
+        const uint16_t mask = layerChannelMask(s);
+        ctx.midi.channelMask = mask;
+        if (mask != layer.lastMidiMask) { layer.lastMidiMask = mask; ctx.midi.inputReset = 1; }
+    }
     uint16_t layerChannelMask(int s) const noexcept
     {
         const auto* raw = midiInRaw[(size_t) s];

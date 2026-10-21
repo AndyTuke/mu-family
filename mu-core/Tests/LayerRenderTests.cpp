@@ -119,7 +119,7 @@ struct RenderContextLayoutTests : juce::UnitTest
                              + sizeof (mu_core::MidiSink) + sizeof (void*) + 4 + 4;
         expectEquals((int) members, (int) sizeof (RenderContext));
         expectEquals((int) offsetof(mu_core::MidiView, carried), 20);
-        expectEquals((int) offsetof(mu_core::MidiView, reserved) + 2, (int) sizeof (mu_core::MidiView));
+        expectEquals((int) offsetof(mu_core::MidiView, inputReset) + 2, (int) sizeof (mu_core::MidiView));
         expectEquals((int) offsetof(mu_core::MidiSink, count), 16);
         expectEquals((int) offsetof(mu_core::PeerTap, valid), 16);
        #endif

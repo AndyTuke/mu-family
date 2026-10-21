@@ -55,6 +55,7 @@ void Arp::hearMidi(const mu_core::RenderContext& ctx) noexcept
     const auto* first = ctx.midi.events;
     const int carried = ctx.midi.carried;
     context.noteOnEdge = false;
+    if (ctx.midi.inputReset) heldNotes.clear();   // MIDI In changed: a release on the old channel will not arrive
     mu_core::forEachMidi(ctx, [&](const mu_core::MidiEvent& e, int)
     {
         heldNotes.apply(e, inCh, (int) (&e - first) >= carried, context.noteOnEdge);

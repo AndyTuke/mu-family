@@ -38,6 +38,7 @@ public:
         else if (type == 0xb0 && (note == 123 || note == 120)) keys.clear();   // all notes off / all sound off
     }
 
+    void clear() noexcept           { keys.clear(); }   // the layer's MIDI In changed: the keys it held are not its own any more
     bool anyHeld() const noexcept   { return keys.anyHeld(); }
     int  newest() const noexcept    { return keys.newest(); }   // -1: none held
     int  numHeld() const noexcept   { return keys.numHeld(); }

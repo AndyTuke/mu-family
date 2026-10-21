@@ -123,6 +123,9 @@ struct Layer : public mu_core::RetireTail
     int activeClip = -1;
 
     std::string name        = "<unnamed>";
+    // Audio thread only: the channel mask this layer's last call carried, so the base can tell the layer once
+    // (MidiView::inputReset) that its MIDI In changed. It travels with the layer through a swap. Omni at birth.
+    uint16_t    lastMidiMask = 0xFFFF;
     int         colourIndex = 0;   // index into MuLookAndFeel::layerPalette (8 colours)
 
     // Persistence hooks (message thread; defined in Modulation/ModulatorSerialise.h). `writeExtras`

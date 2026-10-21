@@ -266,6 +266,7 @@ int Pattern::hearNotes(const mu_core::RenderContext& ctx) noexcept
         notes.lastMode = mode;
     }
     notes.seeded = true;
+    if (ctx.midi.inputReset) notes.held.clear();   // MIDI In changed: a release on the old channel will not arrive
     if (mode != 1) return mode;
 
     // A note-on (velocity above 0) pushes, a note-off or a note-on at velocity 0 removes (juce::MidiMessage's

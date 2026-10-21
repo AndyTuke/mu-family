@@ -402,7 +402,7 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
     {
         auto ctx = base;
         ctx.slot     = s;
-        ctx.midi.channelMask = layerChannelMask(s);   // this slot's MIDI In (Omni where the product declares none)
+        applyLayerChannelMask(ctx, *v.layer[(size_t) s], s);   // this slot's MIDI In (Omni where the product declares none)
         ctx.frozen   = (uint8_t) ((v.frozenMask >> s) & 1u);
         ctx.peers    = peers;
         ctx.numPeers = peers != nullptr ? K : 0;
@@ -425,7 +425,7 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
             {
                 auto ctx = base;
                 ctx.slot = s;
-                ctx.midi.channelMask = layerChannelMask(s);
+                applyLayerChannelMask(ctx, *v.layer[(size_t) s], s);
                 v.layer[(size_t) s]->onParkedBlock(ctx);
             }
             continue;
