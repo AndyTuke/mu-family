@@ -291,7 +291,7 @@ caller has its own fallback:
 |---|---|---|
 | Bin frees (`service`) | never: it tests `passed` and defers to the next pass | n/a |
 | `setLayerType` step 6 | yes | proceed: worst case one block in which the old live layer reads a parameter mix; no memory is at risk (nothing is freed by step 7) |
-| Quiesce (`Published` mode structural edits) | yes | give up, lower the flag, retry on the next deferred-work pass; **never move strip state** without the grace |
+| Quiesce (`Published` mode structural edits) | yes | give up, lower the flag, **never move strip state** without the grace. A user-initiated edit (a sidebar reorder) returns false and is **not retried** (ruled 2026-10-21: one `swapLayers` per drag, so it is all or nothing); only edits the system queues itself retry on the next deferred-work pass |
 | Bin eviction (2.1.3) | yes | drop the **incoming** tail (freed later by `service` after its own grace); the evicted entry stays Done |
 | Quiesce in `TryLock` mode | **skipped**: the blocking `layersLock` already excludes the audio thread, and the four products' timing stays as today | n/a |
 
@@ -1395,7 +1395,7 @@ class PluginProcessor : public ProcessorBase
 public:
     // Always 16 live layers (numLayers == kMaxLayers == 16); an unused slot holds an EmptyLayer.
     bool canEditLayers() const override    { return true; }
-    bool canReorderLayers() const override { return true; }   // swap two slots, empty or not (T1a: false; the Published-mode swap is T1c)
+    bool canReorderLayers() const override { return true; }   // swap two slots, empty or not (T1c, built: a drag is one swapLayers, not a chain; see design-plugin-family "Reorder semantics")
     int  getNumActiveLayers() const override;                 // non-empty layers (CPU meter, controller)
 
     // Base API added by this work (message thread, same protocol as resetLayer):
@@ -1660,7 +1660,7 @@ Each extraction kept the standalone's behaviour identical: `*_roundtrip` byte-id
 non-muting protocol of 2.1.2, Published mode only), `deleteLayer`, `publishLayers`, a state restore that keeps a slot host's count, sidebar and mixer **paging**, the empty-slot look,
 `MuTheme::apps.ice`, and the strip sidechain-source range sized by `kMaxLayers` (a latent 16-layer defect, identical at 8). `.muTronic` round-trips the type by name; an absent
 `<Slot>` is Empty. Rule 10 of `check-layer-boundary.ps1`: mu-Tronic names a layer type's header only under `Persistence/` and `Tests/`. **Deliberately not in T1a, and where each lands:**
-`swapLayers`/reorder (`canReorderLayers` is false until the Published-mode quiesce exists: T1c, before release); the mixer-follower reset after a type change (C17: T1b, before the
+`swapLayers`/reorder (`canReorderLayers` was false until the Published-mode quiesce existed: built at T1c, swap-two semantics ruled 2026-10-21; the cross-page `Move to slot...` menu is **not** needed for release: it is a shared `LayerSidebar` extra for slot hosts, built after T9 unless Andy wants it sooner); the mixer-follower reset after a type change (C17: T1b, before the
 first type is registered); per-type prefixes and the multi-prefix layout (T1b); mu-link bridge, controller pages, scenes, CPU meter (T8a); icon, installer, manual, site (T9).
 
 **What is left, in order.** (1) The small owed items before T1b: one shared `mu_core::HeldNoteStack` (done: mu-Toni and mu-Tant share it), the mu-Tant wavetable bank service
