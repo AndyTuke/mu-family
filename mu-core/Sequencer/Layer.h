@@ -126,6 +126,8 @@ struct Layer : public mu_core::RetireTail
     // Audio thread only: the channel mask this layer's last call carried, so the base can tell the layer once
     // (MidiView::inputReset) that its MIDI In changed. It travels with the layer through a swap. Omni at birth.
     uint16_t    lastMidiMask = 0xFFFF;
+    // Audio thread only: false until the base has handed this layer the keys already held on the MIDI In (its first call).
+    bool        heldKeysSeeded = false;
     int         colourIndex = 0;   // index into MuLookAndFeel::layerPalette (8 colours)
 
     // Persistence hooks (message thread; defined in Modulation/ModulatorSerialise.h). `writeExtras`

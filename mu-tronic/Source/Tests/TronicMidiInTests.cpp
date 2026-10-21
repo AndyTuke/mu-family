@@ -51,6 +51,7 @@ struct MuTronicMidiInTests : juce::UnitTest
     {
         rowsAndRouting();
         carriedKeysFollowTheChannel();
+        layerCreatedWhileKeysHeld();
         changingTheChannelReleasesKeys();
         rowSavedAndMoves();
         cpuMeter();
@@ -118,6 +119,47 @@ struct MuTronicMidiInTests : juce::UnitTest
         expectEquals(arpIn(p, 1).heldNotes.newest(), 61, "channel 2 holds only its own carried key");
         block(p, {});
         expectEquals(arpIn(p, 0).heldNotes.numHeld(), 1, "a carried message is delivered once");
+        p.flushPendingAsyncUpdates();
+        p.releaseResources();
+    }
+
+    void layerCreatedWhileKeysHeld()
+    {
+        beginTest("a layer created while keys are held is handed them, per its MIDI In; a released key is not; a channel change picks up the new channel's keys");
+        mu_seam_test::TempStorage storage;
+        MidiInProcessor p;
+        expect(p.setLayerType(0, LayerTypeId::Arp));
+        p.prepareToPlay(48000.0, 256);
+        p.toggleInternalPlay();
+        block(p, {});
+        block(p, events({ juce::MidiMessage::noteOn(1, 60, (juce::uint8) 100), juce::MidiMessage::noteOn(2, 64, (juce::uint8) 100) }));
+        block(p, {});
+        expectEquals(arpIn(p, 0).heldNotes.numHeld(), 2, "the layer that was there heard both");
+
+        // Created after the presses: Omni, channel 2 and channel 5 (nothing held there).
+        mu_seam_test::setParam(p.apvts, "ch2_midiIn", 2.0f);
+        mu_seam_test::setParam(p.apvts, "ch3_midiIn", 5.0f);
+        for (int s : { 1, 2, 3 }) expect(p.setLayerType(s, LayerTypeId::Arp));
+        block(p, {});
+        expectEquals(arpIn(p, 1).heldNotes.numHeld(), 2, "Omni: both held keys");
+        expectEquals(arpIn(p, 2).heldNotes.numHeld(), 1, "channel 2: its own key");
+        expectEquals(arpIn(p, 2).heldNotes.newest(), 64);
+        expectEquals(arpIn(p, 3).heldNotes.numHeld(), 0, "channel 5: nothing is held there");
+
+        // The slot's channel moves to 1: the key held there arrives, once.
+        mu_seam_test::setParam(p.apvts, "ch3_midiIn", 1.0f);
+        block(p, {});
+        expectEquals(arpIn(p, 3).heldNotes.numHeld(), 1);
+        expectEquals(arpIn(p, 3).heldNotes.newest(), 60);
+
+        // A key let go before the layer exists is not handed over.
+        block(p, events({ juce::MidiMessage::noteOff(2, 64) }));
+        expect(p.setLayerType(4, LayerTypeId::Arp));
+        block(p, {});
+        expectEquals(arpIn(p, 4).heldNotes.numHeld(), 1, "only channel 1's key is still down");
+        expectEquals(arpIn(p, 4).heldNotes.newest(), 60);
+        block(p, events({ juce::MidiMessage::noteOff(1, 60) }));
+        expectEquals(arpIn(p, 4).heldNotes.numHeld(), 0, "and its release reaches the seeded layer");
         p.flushPendingAsyncUpdates();
         p.releaseResources();
     }

@@ -33,6 +33,7 @@
 #include "Plugin/LayerBlock.h"      // the audio thread's one way to the layers (render contract)
 #include "Plugin/TransportResolver.h"
 #include "Sequencer/RenderContext.h"
+#include "Sequencer/HeldKeyTable.h"
 #include "Sequencer/LayerTypeRegistry.h"
 #include "Plugin/RetireBin.h"
 #include "Plugin/MidiClockSync.h"
@@ -790,16 +791,13 @@ protected:
     // ch{N}_midiIn raw values, cached (null = the product declares none: every layer hears every channel). The rows
     // move with a layer through swap / remove, so slot N's atomic is always the channel of the layer now in slot N.
     std::array<std::atomic<float>*, mu_limits::kMaxLayers> midiInRaw {};
-    // Audio thread. The MidiView channel mask for slot `s`: bit c = channel c+1; 0xFFFF for Omni or no such row.
     // Audio thread. Sets the call's channel mask for the layer in slot `s`, and raises MidiView::inputReset for the one call
     // after the mask changed: the keys the layer holds were filtered under the old mask, so a note-off the new mask no longer
-    // passes would strand them.
-    void applyLayerChannelMask(mu_core::RenderContext& ctx, Layer& layer, int s) const noexcept
-    {
-        const uint16_t mask = layerChannelMask(s);
-        ctx.midi.channelMask = mask;
-        if (mask != layer.lastMidiMask) { layer.lastMidiMask = mask; ctx.midi.inputReset = 1; }
-    }
+    // passes would strand them. On that call, and on a layer's first call, the keys physically held on the channels the mask
+    // passes are put in front of the call's events as carried note-ons (the layer was not there for their note-ons).
+    // Defined in ProcessorBase_Render.cpp.
+    void applyLayerChannelMask(mu_core::RenderContext& ctx, Layer& layer, int s) const noexcept;
+    // Audio thread. The MidiView channel mask for slot `s`: bit c = channel c+1; 0xFFFF for Omni or no such row.
     uint16_t layerChannelMask(int s) const noexcept
     {
         const auto* raw = midiInRaw[(size_t) s];
@@ -1270,6 +1268,12 @@ private:
         int32_t  carried = 0;
         uint16_t midiCarried = 0;
         uint16_t carryDropped = 0;      // channel messages the carry had no room for, reported with the next decode
+
+        // The keys held on the MIDI In as of the start of the current block (updated after each block renders, and by a
+        // skipped block that is not carried), and the scratch a seeded layer's call is given: the held keys as note-ons
+        // followed by the block's events. Audio thread only.
+        mu_core::HeldKeyTable heldKeys;
+        juce::HeapBlock<mu_core::MidiEvent> seedMidi;
 
         MixerEngine::RenderChannelFn copyToMixer;   // the mixer's channel r = scratch[r], an exact copy
 

@@ -204,6 +204,7 @@ namespace mu_contract_test
         using ProcessorBase::mergeLayerMidiOut;
         using ProcessorBase::setRetireCountPolicy;
         using ProcessorBase::setCarrySkippedMidi;
+        using ProcessorBase::midiInRaw;
         using ProcessorBase::setRegrowCutsInPlaceTails;
         using ProcessorBase::layerLoopBeats;
         using ProcessorBase::flushPendingAsyncUpdates;

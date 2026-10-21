@@ -10,6 +10,8 @@
 #include "Sequencer/BeatWrap.h"
 #include "Sequencer/LayerTypeInfo.h"   // mu_core::LayerTypeId
 
+#include <cstring>
+
 namespace
 {
     constexpr double kDefaultLoopBeats = 4.0;          // a slot with no live layer: the swapper's 4/4 bar rule
@@ -30,6 +32,9 @@ void ProcessorBase::prepareLayerRender(double sampleRate, int maxBlockSize)
     renderState.prepared = juce::jmax(1, maxBlockSize);
     for (auto& s : renderState.scratch) s.setSize(2, renderState.prepared, false, true, false);
     if (renderState.midi.get() == nullptr) renderState.midi.allocate((size_t) mu_limits::kMaxBlockMidiEvents, true);
+    if (renderState.seedMidi.get() == nullptr)
+        renderState.seedMidi.allocate((size_t) (mu_limits::kMaxCarriedMidiEvents + mu_limits::kMaxBlockMidiEvents), true);
+    renderState.heldKeys.clear();   // a fresh stream: a key's release during the suspension was never seen
     renderState.loopBeats.fill(kDefaultLoopBeats);
     renderState.live.fill(false);
     renderState.host = {};
@@ -150,6 +155,17 @@ void ProcessorBase::noteSkippedBlock(const mu_core::BlockTransport& t, juce::Aud
             rs.tailLevel[c] = level;
         }
     }
+    // Keys pressed or released in a block nothing renders still change what is held. A carried message reaches the held
+    // table with the block that delivers it instead, so it is not counted twice.
+    if (! renderState.carryMidi)
+        for (const auto meta : midi)
+        {
+            if (meta.numBytes < 2 || meta.numBytes > 3) continue;
+            mu_core::MidiEvent e {};
+            e.size = (uint8_t) meta.numBytes;
+            for (int b = 0; b < 3; ++b) e.bytes[b] = b < meta.numBytes ? meta.data[b] : (uint8_t) 0;
+            renderState.heldKeys.apply(e);
+        }
     if (renderState.carryMidi && renderState.midi.get() != nullptr)
         for (const auto meta : midi)
         {
@@ -216,6 +232,28 @@ void ProcessorBase::decodeBlockMidi(const juce::MidiBuffer& midi, int numSamples
     renderState.liveOut = 0;
     renderState.tailOut = 0;
     renderState.dropped = dropped;
+}
+
+void ProcessorBase::applyLayerChannelMask(mu_core::RenderContext& ctx, Layer& layer, int s) const noexcept
+{
+    const uint16_t mask = layerChannelMask(s);
+    ctx.midi.channelMask = mask;
+    const bool changed = mask != layer.lastMidiMask;
+    if (changed) { layer.lastMidiMask = mask; ctx.midi.inputReset = 1; }
+    if (! changed && layer.heldKeysSeeded) return;
+    layer.heldKeysSeeded = true;
+
+    // The layer is new, or listens to other channels now: tell it the keys already down on them, as note-ons at the
+    // call's first frame that count as carried (not as this block's presses), ahead of the block's own events.
+    auto& rs = renderState;
+    if (! rs.heldKeys.anyHeld() || rs.seedMidi.get() == nullptr) return;
+    const int seeded = rs.heldKeys.collect(rs.seedMidi.get(), mu_limits::kMaxCarriedMidiEvents, ctx.midi.firstFrame, mask);
+    if (seeded == 0) return;
+    if (ctx.midi.count > 0)
+        std::memcpy(rs.seedMidi.get() + seeded, ctx.midi.events, (size_t) ctx.midi.count * sizeof (mu_core::MidiEvent));
+    ctx.midi.events  = rs.seedMidi.get();
+    ctx.midi.count  += seeded;
+    ctx.midi.carried = (uint16_t) (ctx.midi.carried + seeded);
 }
 
 void ProcessorBase::renderAndMix(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi, const mu_core::BlockTransport& t,
@@ -292,6 +330,9 @@ void ProcessorBase::renderAndMix(juce::AudioBuffer<float>& buffer, juce::MidiBuf
     // mergeLayerMidiOut and the room it knows that buffer has (design 2.1.5, R7; the mechanism is the
     // MIDI-output product's to settle when it adopts the driver).
     layersBlockRendered(block.view(), buffer, midi);
+
+    // The block's keys are now history: a layer created from here on is told about them (applyLayerChannelMask).
+    for (int i = 0; i < renderState.midiIn; ++i) renderState.heldKeys.apply(renderState.midi[(size_t) i]);
     renderState.lastBlockFrames = n;
     ++renderState.blocksRendered;
 }
