@@ -28,6 +28,10 @@ $env:JUCE_PATH = "D:\JUCE"
 
 **JUCE is kept current** (owner rule, 2026-10-09): one pin in [juce-version.txt](juce-version.txt) that CMake and every CI workflow read; use current JUCE APIs and never build on deprecated ones. Bump procedure and the check script: [docs/design-plugin-family.md](docs/design-plugin-family.md#juce-version-policy).
 
+## Working pace (owner rule, 2026-10-21)
+
+Keep the workflow fast: before any check, test, build, review or agent call ask whether it is really required, or whether fixing forward is quicker. One full test sweep at the end of each day instead of per step, no routine `dsp-controller` reviews, no worktrees for small items, never build on C:. Full rules in [docs/workflow-pace.md](docs/workflow-pace.md); **where they conflict with the round procedure and build rules below, the pace rules win.**
+
 ## How a round works
 
 1. **Take work.** Ask the `backlog-administrator` for the next task(s) from the top of Open; it returns a brief.
