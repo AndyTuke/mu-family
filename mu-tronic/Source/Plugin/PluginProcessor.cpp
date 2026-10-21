@@ -62,6 +62,8 @@ PluginProcessor::PluginProcessor()
     // The audio thread reads layers only through the published view, so a type change mutes nothing.
     setLayerAccess(mu_core::LayerAccess::Published);
     keepSpareLayers = true;
+    // A key pressed or released in a block an edit keeps silent (a reorder, a type change) still reaches the layers' held keys.
+    setCarrySkippedMidi(true);
     registerLayerTypes(layerTypes);
 
     // Every slot holds a layer for the processor's lifetime (Empty until the user chooses a type); the live
