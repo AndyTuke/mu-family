@@ -4,7 +4,7 @@
 # The target combines the product's shell (the 16-slot processor, the empty-slot chooser) with the shared
 # platform (ProcessorBase + MixerEngine + FXChain + the shared editor shell / sidebar / mixer). Shared
 # audio/UI/ProcessorBase come from mu-core via the link; the layer types come from the layer libraries
-# (mu-<product>-layer) as each is registered in Source/Persistence/LayerTypes.cpp. Registered: Arp (mu-toni-layer), Kick, Bass, Hat, Snare and Rumble (mu-on-layer), Pattern (mu-tant-layer), Rhythm (mu-clid-layer).
+# (mu-<product>-layer) as each is registered in Source/Persistence/LayerTypes.cpp. Registered: Arp (mu-toni-layer), Kick, Bass, Hat, Snare, Rumble and FM Perc (mu-on-layer), Pattern (mu-tant-layer), Rhythm (mu-clid-layer).
 
 # ── mu-Tronic — Standalone only (no VST3, no CLAP, no AU) ────────────────────
 juce_add_plugin(mu-tronic
@@ -73,7 +73,7 @@ target_compile_definitions(mu-tronic
 target_link_libraries(mu-tronic
     PRIVATE
         mu-toni-layer   # the Arp type: its engine sources and the Source/ include path
-        mu-on-layer     # the Track types (Kick, Bass, Hat, Snare, Rumble): the same
+        mu-on-layer     # the Track types (Kick, Bass, Hat, Snare, Rumble, FM Perc): the same
         mu-tant-layer   # the Pattern type: the same
         mu-clid-layer   # the Rhythm type: the same
         mu-core

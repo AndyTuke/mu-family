@@ -9,10 +9,10 @@ class ProcessorBase;
 namespace mu_tronic
 {
 
-// The five Track layer types (Kick, Bass, Hat, Snare, Rumble) as mu-Tronic offers them: mu-On's description of the
+// The six Track layer types (Kick, Bass, Hat, Snare, Rumble, FM Perc) as mu-Tronic offers them: mu-On's description of the
 // type (its parameter table, its locked Track, its preset folder) plus what a slot host adds: the Track content and
 // sidebar picture, built over one host adapter on ProcessorBase for all four, and the type's paint colour (mu-On's
-// yellow) and header tag ("On"). The one place mu-Tronic names the Track's UI. `type` must be one of the five.
+// yellow) and header tag ("On"). The one place mu-Tronic names the Track's UI. `type` must be one of the six.
 // The content and picture factories exist in the app target only (MU_TRONIC_WITH_UI), as for the Arp.
 mu_core::LayerTypeInfo trackLayerType(mu_core::LayerTypeId type);
 

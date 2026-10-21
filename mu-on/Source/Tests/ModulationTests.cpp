@@ -103,6 +103,8 @@ public:
             pinLane(EngineType::Snare,  { "s.tune.prop", "s.dec.prop" });
             pinLane(EngineType::Rumble, { "r.drive.prop", "r.d1.prop", "r.d2.prop", "r.d3.prop", "r.size.prop",
                               "r.revmix.prop", "r.revlp.prop", "r.cut.prop", "r.res.prop" });
+            pinLane(EngineType::FmPerc, { "fp.tune.prop", "fp.ratio.prop", "fp.index.prop", "fp.idec.prop", "fp.fdbk.prop",
+                              "fp.dive.prop", "fp.dtime.prop", "fp.decay.prop", "fp.fold.prop", "fp.noise.prop" });
         }
 
         beginTest("modulator serialise round-trip drops foreign-engine destinations");

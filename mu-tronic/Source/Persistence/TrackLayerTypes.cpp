@@ -1,6 +1,6 @@
 #include "Persistence/TrackLayerTypes.h"
 #include "Plugin/ProcessorBase.h"
-#include "Sequencer/TrackTypes.h"            // mu-On's layer library: the five Track type descriptions
+#include "Sequencer/TrackTypes.h"            // mu-On's layer library: the six Track type descriptions
 #include "UI/Components/MuLookAndFeel.h"     // the colour ID
 #include <limits>
 
@@ -56,7 +56,7 @@ void chooseRumbleSource(ProcessorBase& host, int slot)
 namespace
 {
     // What the Track content reads from its host, answered from the processor's slots (message thread). One adapter
-    // serves the four types; it is told which engine its content shows, because a slot's type is fixed and the content
+    // serves the six types; it is told which engine its content shows, because a slot's type is fixed and the content
     // is kept per type. Nothing here holds a pointer into a layer: every call looks the slot's layer up afresh.
     class TrackSlotHost : public mu_on::TrackHost
     {

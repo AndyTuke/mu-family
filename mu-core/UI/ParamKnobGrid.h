@@ -32,6 +32,9 @@ public:
         const char*             modDestId = nullptr;
         const ModulationMatrix* modMatrix = nullptr;
         std::function<float()>  modLive;
+        // Optional one-line hint shown on hover over the knob (empty = none). It says what the knob does, never its
+        // name or value (the status bar carries those); a product whose knob changes meaning rebuilds the specs.
+        juce::String            tooltip;
     };
 
     explicit ParamKnobGrid(juce::AudioProcessorValueTreeState& state);

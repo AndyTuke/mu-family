@@ -31,7 +31,7 @@ public:
     }
 
     // The starting groove of an engine, so a new track plays something at once: four-on-the-floor kick
-    // (downbeat accented), off-beat bass under it, straight 8th hats, backbeat snare, nothing for Rumble.
+    // (downbeat accented), off-beat bass under it, straight 8th hats, backbeat snare, a sparse tom fill, nothing for Rumble.
     void loadDefaultGroove(EngineType engine) noexcept
     {
         clear();
@@ -45,6 +45,7 @@ public:
             case EngineType::Hat:    for (int s = 0; s < kNumSteps; s += 2) setOn(s, true); break;
             case EngineType::Snare:  setOn(4, true); setOn(12, true); break;
             case EngineType::Rumble: break;
+            case EngineType::FmPerc: setOn(4, true); setOn(10, true); setOn(14, true); break;
         }
     }
 

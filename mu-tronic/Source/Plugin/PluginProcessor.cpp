@@ -188,8 +188,11 @@ juce::String PluginProcessor::getLayerName(int idx) const
     if (layer == nullptr) return {};
     if (! layer->name.empty()) return juce::String(layer->name);
     const auto type = getLayerTypeId(idx);
-    // The default: "Slot 5" while Empty, "<Type> 5" once the slot holds a layer.
-    return juce::String(type == mu_core::LayerTypeId::Empty ? "Slot" : mu_core::layerTypeName(type)) + " " + juce::String(idx + 1);
+    // The default: "Slot 5" while Empty, "<Type> 5" once the slot holds a layer. The type's display name, not its saved
+    // name, so "FM Perc 5" reads as the card did.
+    const auto* info = getLayerTypes().find(type);
+    const char* typeName = type == mu_core::LayerTypeId::Empty ? "Slot" : (info != nullptr ? info->name : mu_core::layerTypeName(type));
+    return juce::String::fromUTF8(typeName) + " " + juce::String(idx + 1);
 }
 
 void PluginProcessor::setLayerName(int idx, const juce::String& name)

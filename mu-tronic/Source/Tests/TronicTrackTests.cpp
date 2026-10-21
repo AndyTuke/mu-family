@@ -17,7 +17,7 @@ namespace
 {
     using mu_core::LayerTypeId;
 
-    const LayerTypeId kTrackTypes[] = { LayerTypeId::Kick, LayerTypeId::Bass, LayerTypeId::Hat, LayerTypeId::Snare };
+    const LayerTypeId kTrackTypes[] = { LayerTypeId::Kick, LayerTypeId::Bass, LayerTypeId::Hat, LayerTypeId::Snare, LayerTypeId::FmPerc };
 
     // The processor with the retire bin exposed.
     struct TrackProcessor : mu_tronic::PluginProcessor
@@ -134,7 +134,7 @@ struct MuTronicTrackTests : juce::UnitTest
             const auto* info = p.getLayerTypes().find(type);
             expect(info != nullptr, juce::String(mu_core::layerTypeName(type)) + " is offered");
             if (info == nullptr) continue;
-            expectEquals(juce::String(info->name), juce::String(mu_core::layerTypeName(type)));
+            expectEquals(juce::String(info->name), juce::String(mu_on::engineName(mu_on::engineOfType(type))));
             expectEquals((int) info->paramPrefixLetter, (int) 't');
             expectEquals(juce::String(info->group), juce::String("mu-On"));
             expectEquals(juce::String::fromUTF8(info->typeTag), juce::String(juce::CharPointer_UTF8("\xCE\xBC" "-On")));
@@ -166,6 +166,8 @@ struct MuTronicTrackTests : juce::UnitTest
             TrackProcessor p;
             expect(p.setLayerType(slot, type), juce::String("set ") + mu_core::layerTypeName(type));
             expect(p.getLayerTypeId(slot) == type);
+            expectEquals(p.getLayerName(slot), juce::String(mu_on::engineName(mu_on::engineOfType(type))) + " " + juce::String(slot + 1),
+                         "the default name is the display name and the slot number (FM Perc, not FmPerc)");
             // Dormant prefixes: an Arp value on this slot, and a Track value on another (Empty) slot, are not written.
             mu_seam_test::setParam(p.apvts, "a" + juce::String(slot) + "_cut", 2200.0f);
             mu_seam_test::setParam(p.apvts, "t" + juce::String(slot + 4) + "_swing", 0.9f);
@@ -301,6 +303,7 @@ struct MuTronicTrackTests : juce::UnitTest
         namespace fx = mu_on_fixture;
         for (auto type : kTrackTypes)
         {
+            if (type == LayerTypeId::FmPerc) continue;   // no recorded stream until the engine's voice is built
             const auto engine = mu_on::engineOfType(type);
             beginTest(juce::String("a ") + mu_core::layerTypeName(type) + " in a mu-Tronic slot renders the stream mu-On records");
             mu_seam_test::TempStorage storage;

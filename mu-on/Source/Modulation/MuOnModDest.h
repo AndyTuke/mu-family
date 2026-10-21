@@ -10,7 +10,7 @@
 #include <cstring>
 #include <string>
 
-// μ-On modulation-destination registry — one table per ENGINE (Kick / Bass / Hat / Snare / Rumble).
+// μ-On modulation-destination registry — one table per ENGINE (Kick / Bass / Hat / Snare / Rumble / FM Perc).
 // Unlike mu-tant (every voice identical), μ-On's engines expose different params, so each engine has
 // its own destination set; a track's set is the one of the engine it runs, and the editor swaps the
 // ModulatorPanel's destination provider when the track's engine changes.
@@ -83,6 +83,22 @@ inline constexpr ModDestEntry kRumbleDests[] = {
     makeTarget("r.res.prop", "rumble_res", "Resonance"),
 };
 
+// FM Perc — order matches FmPercEngine::setParams(tune, ratio, index, idec, fdbk, dive, dtime, decay, fold, noise).
+// The Algorithm is a choice, not a target. Every row but Tune and Ratio is a normalised amount, so a depth means the
+// same musical share of the knob in every algorithm.
+inline constexpr ModDestEntry kFmPercDests[] = {
+    makeTarget("fp.tune.prop", "fmp_tune", "Tune"),
+    makeTarget("fp.ratio.prop", "fmp_ratio", "Ratio"),
+    makeTarget("fp.index.prop", "fmp_index", "Index"),
+    makeTarget("fp.idec.prop", "fmp_idec", "FM Env"),
+    makeTarget("fp.fdbk.prop", "fmp_fdbk", "Feedback"),
+    makeTarget("fp.dive.prop", "fmp_dive", "Dive"),
+    makeTarget("fp.dtime.prop", "fmp_dtime", "Dive Time"),
+    makeTarget("fp.decay.prop", "fmp_decay", "Decay"),
+    makeTarget("fp.fold.prop", "fmp_fold", "Fold"),
+    makeTarget("fp.noise.prop", "fmp_noise", "Noise"),
+};
+
 // Compile-time guard: every row of an engine's table names a parameter under that engine's tag
 // ("kick_..."), so a rename that misses a literal above fails the build instead of silencing a destination.
 template <std::size_t N>
@@ -98,6 +114,7 @@ static_assert(allUnderPrefix(kBassDests,   "bass_"),   "Bass targets must use th
 static_assert(allUnderPrefix(kHatDests,    "hat_"),    "Hat targets must use the hat_ parameters");
 static_assert(allUnderPrefix(kSnareDests,  "snare_"),  "Snare targets must use the snare_ parameters");
 static_assert(allUnderPrefix(kRumbleDests, "rumble_"), "Rumble targets must use the rumble_ parameters");
+static_assert(allUnderPrefix(kFmPercDests, "fmp_"),    "FM Perc targets must use the fmp_ parameters");
 
 // The destination table for an engine, plus its entry count.
 inline const ModDestEntry* destsForEngine(EngineType engine, int& count) noexcept
@@ -109,6 +126,7 @@ inline const ModDestEntry* destsForEngine(EngineType engine, int& count) noexcep
         case EngineType::Hat:    count = (int) std::size(kHatDests);    return kHatDests;
         case EngineType::Snare:  count = (int) std::size(kSnareDests);  return kSnareDests;
         case EngineType::Rumble: count = (int) std::size(kRumbleDests); return kRumbleDests;
+        case EngineType::FmPerc: count = (int) std::size(kFmPercDests); return kFmPercDests;
     }
     count = 0;
     return nullptr;

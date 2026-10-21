@@ -14,8 +14,46 @@ namespace
     // one unit has none.
     float loopUnitFraction(int multiplier) { return multiplier > 1 ? 1.0f / (float) multiplier : 0.0f; }
 
-    // The selected engine's controls, bound to track `track` (in display order).
-    std::vector<Spec> specsFor(int track, EngineType engine)
+    // What each FM Perc knob does in each algorithm (one line, no name or value: the status bar carries those).
+    // Rows are the ten knobs in grid order, columns the algorithms in stored order.
+    constexpr int kNumFmPercAlgorithms = 8;
+    constexpr const char* kFmPercTips[10][kNumFmPercAlgorithms] = {
+        // Tune
+        { "Pitch of the tom body", "Pitch of the drum", "Start pitch, before it falls", "Pitch of the tick", "Base pitch of the metal set",
+          "Pitch of the bar", "Pitch of the ping", "Pitch of the burst" },
+        // Ratio
+        { "Skin tone: 1.0 plain, 1.5 round, 1.59 natural head", "Overtone: 1.6 skin, 2.1 bongo, 2.3 timbale", "Low is smooth, high is metallic",
+          "Clave to block character", "Stretches the metal set: above 1 bell, below 1 hat", "About 4 gives a tuned mallet",
+          "Whole numbers ring clean, others go inharmonic", "Odd values make it rougher" },
+        // Index
+        { "Brightness of the knock", "Brightness of the slap", "Grit of the zap", "Hardness of the tick", "Amount of metal",
+          "Strength of the upper partial", "Brightness at the start of the ping", "Amount of crunch" },
+        // FM Env
+        { "How long the knock lasts", "How long the slap lasts", "Short is a blip, long is a screamer", "Length of the tick's edge",
+          "How long the metal stays bright", "How long the upper partial lasts", "How long the ping stays bright", "Length of the burst's bite" },
+        // Fdbk
+        { "Roughness in the knock", "Roughness in the slap", "Fuzz on the zap", "Grit on the tick", "Dirt in the metal",
+          "Rasp on the bar", "Sharper, more resonant ping", "High values turn to noise" },
+        // Dive
+        { "Pitch fall: subtle is a tonk, big is an electro tom", "Small pitch fall", "Depth of the pew", "Small pitch fall on the tick",
+          "Pitch fall of the hit", "Small pitch fall", "Below zero it rises, a chirp", "Depth of the swoop" },
+        // Dv Time
+        { "How fast the pitch falls", "How fast the pitch falls", "Short is a thud, long is a laser", "How fast the pitch falls",
+          "How fast the pitch falls", "How fast the pitch falls", "How fast it rises or falls", "How fast the swoop runs" },
+        // Decay
+        { "Length of the tom", "Length of the drum", "Length of the zap", "Length of the tick", "Short is closed, long is open",
+          "Length of the bar ring", "Length of the ping", "Length of the burst" },
+        // Fold
+        { "Bite on the attack", "Bite on the attack", "Edge on the zap", "Edge on the tick", "Industrial bite",
+          "Edge on the bar", "Edge on the ping", "Distortion of the burst" },
+        // Noise
+        { "Noise tail, the 808 \"fake reverb\"", "Noise under the hit", "Noise in the zap", "Noise in the tick", "Noise in the metal",
+          "Noise under the bar", "Noise under the ping", "Noise in the burst" },
+    };
+
+    // The selected engine's controls, bound to track `track` (in display order). `algorithm` picks the FM Perc
+    // tooltip column.
+    std::vector<Spec> specsFor(int track, EngineType engine, int algorithm)
     {
         auto id = [&](const char* p) { return engineParamId(track, engine, p); };
         switch (engine)
@@ -32,6 +70,21 @@ namespace
             case EngineType::Rumble:
                 return { { id("drive"), "Drive" }, { id("d1"), "1/16" }, { id("d2"), "2/16" }, { id("d3"), "3/16" },
                          { id("size"), "Rv Size" }, { id("revmix"), "Rv Mix" }, { id("revlp"), "Rv LP" }, { id("cut"), "Cutoff" }, { id("res"), "Reso" } };
+            // FM Perc: the Algorithm selector (two cells) then the ten fixed knobs; the tips follow the algorithm.
+            case EngineType::FmPerc:
+            {
+                const int col = juce::jlimit(0, kNumFmPercAlgorithms - 1, algorithm);
+                const char* ids[10]    = { "tune", "ratio", "index", "idec", "fdbk", "dive", "dtime", "decay", "fold", "noise" };
+                const char* labels[10] = { "Tune", "Ratio", "Index", "FM Env", "Fdbk", "Dive", "Dv Time", "Decay", "Fold", "Noise" };
+                std::vector<Spec> specs { { id("algo"), "Algorithm" } };
+                for (int k = 0; k < 10; ++k)
+                {
+                    Spec spec { id(ids[k]), labels[k] };
+                    spec.tooltip = kFmPercTips[k][col];
+                    specs.push_back(std::move(spec));
+                }
+                return specs;
+            }
         }
         return {};
     }
@@ -135,6 +188,21 @@ void TrackContent::bindModulationArcs(std::vector<mu_ui::ParamKnobGrid::Spec>& s
     }
 }
 
+int TrackContent::shownAlgorithm() const
+{
+    const auto* algo = host.getTrackParameters().getRawParameterValue(engineParamId(currentLayer, EngineType::FmPerc, "algo"));
+    return algo != nullptr ? juce::roundToInt(algo->load()) : 0;
+}
+
+// The knob grid for the shown engine; for FM Perc the tooltips describe the knobs in the current algorithm.
+void TrackContent::rebuildGrid()
+{
+    gridAlgorithm = shownEngine == EngineType::FmPerc ? shownAlgorithm() : -1;
+    auto specs = specsFor(currentLayer, shownEngine, juce::jmax(0, gridAlgorithm));
+    bindModulationArcs(specs);
+    grid.setSpecs(specs);
+}
+
 void TrackContent::setLayer(int idx)
 {
     currentLayer = juce::jlimit(0, mu_limits::kMaxLayers - 1, idx);
@@ -147,9 +215,7 @@ void TrackContent::rebuild()
 {
     shownEngine = host.getTrackEngine(currentLayer);
     engineSelect.setSelectedId(toIndex(shownEngine) + 1, false);
-    auto specs = specsFor(currentLayer, shownEngine);
-    bindModulationArcs(specs);
-    grid.setSpecs(specs);
+    rebuildGrid();
 
     // The groove knobs follow the shown track's own rows (the old attachments go first).
     swingAtt.reset();
@@ -240,6 +306,9 @@ void TrackContent::timerCallback()
         if (onEngineChanged) onEngineChanged();
         return;
     }
+    // A new FM Perc algorithm (picked here, by automation or a preset): the tooltips describe the new voice. Done from
+    // the timer, never from the selector's own callback, which must not destroy the selector it is running in.
+    if (shownEngine == EngineType::FmPerc && shownAlgorithm() != gridAlgorithm) rebuildGrid();
     if (shownEngine != EngineType::Rumble) return;
 
     // Keep the Source list current (layers added, deleted, re-engined) and the envelope's playhead moving.
