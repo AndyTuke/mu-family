@@ -231,9 +231,9 @@ struct LayerSwapPublishedTests : juce::UnitTest
         auto& b = p.tag(4);
         const int bindsA = a.binds, bindsB = b.binds;
         int uiCalls = 0;
-        p.onLayerTypeChanging = [&uiCalls](int) { ++uiCalls; };
+        p.onLayerLeaving = [&uiCalls](int) { ++uiCalls; };
         expect(p.swapLayers(1, 4));
-        p.onLayerTypeChanging = nullptr;
+        p.onLayerLeaving = nullptr;
         expectEquals(uiCalls, 2, "the editor is told about both slots");
         expect(p.getLayer(4) == &a && p.getLayer(1) == &b);
         expectEquals(juce::String(a.name), juce::String("L1"));
