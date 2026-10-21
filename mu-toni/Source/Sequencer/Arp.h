@@ -49,6 +49,15 @@ struct Arp : Layer
     void prepare(double sampleRate, int blockSize) override;
     // Message thread: the slot's a{slot}_ rows, the MIDI-in channel row and the modulation inputs.
     void bindParams(juce::AudioProcessorValueTreeState& apvts, int slot) override;
+    // The layer moved to another slot: its noise seeds (the insert's, and the voice's where the creating host recorded its
+    // salt) follow the slot, as at creation, so two layers never share a sequence after a delete and a create.
+    void onMoved(int newIndex) override
+    {
+        insert->setSlotIndex(newIndex);
+        if (noiseSaltSet) runner.setSlotIndex(newIndex, noiseSalt);
+    }
+    juce::int64 noiseSalt = 0;      // the per-instance salt the voice's seed was made with (set by a host that creates Arps by type)
+    bool        noiseSaltSet = false;
     // Audio thread: the layer's block, insert included, into out[0, n) (handed over cleared).
     void render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n) override;
     // Audio thread: a parked spare keeps hearing the keys, so it knows them when its slot goes live.

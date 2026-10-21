@@ -52,11 +52,11 @@ public:
     void setStateInformation(const void* data, int sizeInBytes) override;
 
     // ── Slots ────────────────────────────────────────────────────────────────
-    // Sixteen fixed slots; a deleted layer leaves its slot Empty and nothing shifts. Reordering is not offered
-    // yet (swapLayers needs the Published-mode quiesce).
+    // Sixteen fixed slots; a deleted layer leaves its slot Empty and nothing shifts. Two slots, empty or not, can
+    // swap (ProcessorBase::swapLayers, quiesced): the layer takes its strip, tails and rows with it.
     bool layersAreSlots() const override { return true; }
     bool canEditLayers() const override { return true; }
-    bool canReorderLayers() const override { return false; }
+    bool canReorderLayers() const override { return true; }
 
     // The slot's name: the one the user typed, else "Slot 5" while it is Empty and "<Type> 5" once it holds a layer.
     juce::String getLayerName(int idx) const override;

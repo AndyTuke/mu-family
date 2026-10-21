@@ -316,6 +316,13 @@ public:
         swapI(a.outputBus,          b.outputBus);
         swapI(a.busAssign,          b.busAssign);
         std::swap(scEnv[i], scEnv[j]);   // the ducking follower belongs to the strip and moves with it
+        // The meters and the ducking read-out belong to the strip too, and so does a follower reset still waiting for
+        // the audio thread (consumed at its next block start, so the bit is plain data while the audio thread is excluded).
+        swapF(channelPeaks[i],  channelPeaks[j]);
+        swapF(channelPeaksL[i], channelPeaksL[j]);
+        swapF(channelPeaksR[i], channelPeaksR[j]);
+        swapF(sidechainGR[i],   sidechainGR[j]);
+        swapB(scEnvResetRequest[i], scEnvResetRequest[j]);
     }
 
     // A layer was removed at `removed` and the ones above are about to shift down: re-point every

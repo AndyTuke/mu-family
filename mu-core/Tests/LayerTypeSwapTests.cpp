@@ -488,13 +488,12 @@ struct LayerTypeSwapTests : juce::UnitTest
     // The list edits are TryLock work: on a Published host they are refused and change nothing; reset re-creates the slot.
     void listEditsRefused()
     {
-        beginTest("a Published host refuses the list edits, leaves the view alone, and resets a slot without muting");
+        beginTest("a Published host refuses add and remove (swap is LayerSwapPublishedTests), leaves the view alone, and resets a slot without muting");
         auto box = std::make_unique<TypedHost>(); auto& p = *box;
         const auto* view = p.layerAccess.views.load();
         const auto serial = p.layoutSerial();
         expectEquals(p.addLayer(), -1);
         expect(! p.removeLayer(1));
-        expect(! p.swapLayers(0, 1));
         expect(p.layerAccess.views.load() == view && p.layoutSerial() == serial);
         expect(! p.layerEditInFlight.load());
 
@@ -512,19 +511,19 @@ struct LayerTypeSwapTests : juce::UnitTest
     // Design step 3: the UI is told before the old layer is retired, while it is still the slot's layer.
     void uiLetsGoFirst()
     {
-        beginTest("onLayerTypeChanging runs before the old layer leaves its slot, once per real change");
+        beginTest("onLayerLeaving runs before the old layer leaves its slot, once per real change");
         auto box = std::make_unique<TypedHost>(); auto& p = *box;
         const auto* old = p.getLayer(2);
         int calls = 0, slot = -1;
         bool stillThere = false;
-        p.onLayerTypeChanging = [&](int s) { ++calls; slot = s; stillThere = p.getLayer(s) == old && p.layerAccess.views.load()->layer[(size_t) s] == old; };
+        p.onLayerLeaving = [&](int s) { ++calls; slot = s; stillThere = p.getLayer(s) == old && p.layerAccess.views.load()->layer[(size_t) s] == old; };
         expect(p.setLayerType(2, LayerTypeId::Arp));   // the type it has: no call
         expectEquals(calls, 0);
         expect(p.setLayerType(2, LayerTypeId::Kick));
         expectEquals(calls, 1);
         expectEquals(slot, 2);
         expect(stillThere, "the old layer was still in the slot and in the published view");
-        p.onLayerTypeChanging = nullptr;
+        p.onLayerLeaving = nullptr;
         p.flushPendingAsyncUpdates();
     }
 

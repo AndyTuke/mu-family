@@ -164,12 +164,12 @@ public:
     // unreadable or other-type default file is ignored quietly. A state restore, a staged preset or a loaded file never
     // come through here, so they always win.
     bool         createLayerOfType(int slot, mu_core::LayerTypeId type);
-    // Message thread, outside every lock, called by setLayerType (design step 3) before the old layer is retired: the
-    // editor releases every pointer into slot `slot`'s layer (the modulator panel, the content's bindings). The
-    // editor must clear it in its destructor, as the other shell callbacks. It runs on the thread that calls
-    // setLayerType, which is the message thread (asserted): a state restore on a host thread must marshal to it
-    // first, so the editor never sees this call from another thread.
-    std::function<void(int slot)> onLayerTypeChanging;
+    // The layer in this slot is about to be retired or moved: drop every pointer into it. Message thread, outside every
+    // lock. Called by setLayerType (design step 3) before the old layer is retired, and by a Published host's swapLayers for
+    // both slots before they move. The editor releases the modulator panel and the content's bindings and rebinds when it
+    // shows the slot again; it must clear this in its destructor, as the other shell callbacks. It runs on the thread that
+    // calls the edit, which is the message thread (asserted): a state restore on a host thread must marshal to it first.
+    std::function<void(int slot)> onLayerLeaving;
     // Message thread. The slot the editor shows: LayerPanel::setLayer stores it, every product's editor routing the
     // shown layer through it. A typed host's layer-preset folder and extension follow the type of this slot
     // (typedLayerPresetDir); for the four list products it is a harmless store.
@@ -689,12 +689,19 @@ protected:
     // strips) through `remap(paramValue)`. The parameter is 0 = off, 1..8 = channel 0..7, 9 = the
     // external bus; a structural edit renumbers the layers, so a strip must follow its source's new slot.
     void remapSidechainSources(const std::function<int(int)>& remap);
+    // The same over a parameter list found beforehand (sidechainSourceParams), so a caller can do the lookups outside a
+    // window in which the audio thread is excluded.
+    std::vector<juce::RangedAudioParameter*> sidechainSourceParams();
+    void remapSidechainSources(const std::vector<juce::RangedAudioParameter*>& params, const std::function<int(int)>& remap);
 
     // A parameter whose value names another layer (such as a processing layer's source layer) must follow its layer
     // through removeLayer and swapLayers, like the sidechain sources. Called in phase 3 of both, with
     // processing suspended and before the parameter values shift; `oldToNew` maps a layer index as it
     // was to the index it has now, or -1 when that layer is gone. The product rewrites its own
     // parameters through it. Default: nothing to rewrite. addLayer and resetLayer do not call it.
+    // A Published host's swapLayers calls it earlier, with the audio thread quiesced but BEFORE the layer pointers
+    // move, so layers[] and every parameter still sit at their old indices: a hook that reads a slot's layer type
+    // sees the type of the old index, as `oldToNew` expects.
     virtual void remapLayerReferences(const std::function<int(int)>& oldToNew) { juce::ignoreUnused(oldToNew); }
 
 protected:
@@ -1140,6 +1147,14 @@ private:
     void copyLayerParams (int from, int to);
     void swapLayerParams (int a, int b);
     void resetLayerParams(int slot);
+    // swapLayers of a Published host (design 2.1.2): quiesce the audio thread, exchange the layers with their strips,
+    // tails and parameter rows, publish one view, lower the flag. False when the audio thread did not quiesce in time.
+    bool swapLayersPublished(int a, int b);
+    std::atomic<double> lastEditWindowMs { 0.0 };   // how long the last Published swap kept the audio thread out (flag raised to lowered)
+public:
+    // Milliseconds the audio thread's blocks rendered nothing during the last Published swapLayers (test probe).
+    double getLastEditWindowMsForTest() const noexcept { return lastEditWindowMs.load(std::memory_order_relaxed); }
+private:
     std::atomic<int> selectedSlot { 0 };   // setSelectedSlot
     int  firstUnusedColourIndex() const;   // lowest palette index no live layer uses
 
@@ -1222,6 +1237,14 @@ private:
 
         MixerEngine::RenderChannelFn copyToMixer;   // the mixer's channel r = scratch[r], an exact copy
 
+        // Published mode's declick around a block an edit keeps silent: the master's last sample per channel, the decay that
+        // continues it into the silence, and the fade-in of the first rendered blocks after it.
+        static constexpr int kSkipDecay = 48, kFadeIn = 64;   // samples
+        float lastOut[2] {};
+        float tailLevel[2] {}, tailStep[2] {};
+        bool  inSkip = false;
+        int   fadePos = kFadeIn;        // kFadeIn: no fade-in pending
+
         int lastBlockFrames = 0;        // frames of the last rendered host block (mergeLayerMidiOut clamps to it)
         int blocksRendered = 0, blocksSkipped = 0, largestCall = 0;   // test probe
     };
@@ -1242,7 +1265,12 @@ private:
     bool regrowCutsInPlaceTails = true;           // setRegrowCutsInPlaceTails (constructor only)
 
     void noteHostBlock(const mu_core::BlockTransport& t, int numSamples) noexcept;
-    void noteSkippedBlock(const mu_core::BlockTransport& t, juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi) noexcept;
+    // `editSkip`: the block was refused because an edit holds the flag (a Published host), so the master decays from its last
+    // sample instead of dropping to zero.
+    void noteSkippedBlock(const mu_core::BlockTransport& t, juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi, bool editSkip = false) noexcept;
+    // The master after the mixer: finishes the decay and fades the layers back in after a skipped block, and remembers
+    // the last sample for the next one. Published hosts only.
+    void declickMaster(juce::AudioBuffer<float>& buffer, int numSamples) noexcept;
     void decodeBlockMidi(const juce::MidiBuffer& midi, int numSamples) noexcept;
     void captureSidechainRegion(juce::AudioBuffer<float>& buffer, int offset, int numSamples) noexcept;
     void renderLayers(const mu_core::LayerBlock& block, const mu_core::BlockTransport& t,

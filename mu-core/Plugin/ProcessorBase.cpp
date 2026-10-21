@@ -979,6 +979,75 @@ namespace
             }
     }
 
+    // Published-mode exclusion for a structural edit (design 2.1.2): raise layerEditInFlight (seq_cst), then wait one grace
+    // period, so the block that may have started before the flag has ended and every later block renders nothing until the
+    // flag is lowered. On a timeout the flag is lowered again and ok() is false: the caller gives up and moves nothing.
+    // Unlike ScopedSuspend it does not suspend processing, so the host keeps calling processBlock (which renders nothing).
+    class ScopedQuiesce
+    {
+    public:
+        ScopedQuiesce(std::atomic<bool>& editFlag, const mu_core::AudioEpoch& epoch, int timeoutMs) : flag(editFlag)
+        {
+            jassert(! flag.load(std::memory_order_relaxed));   // edits do not nest
+            flag.store(true, std::memory_order_seq_cst);
+            raised = true;
+            granted = epoch.waitFor(epoch.stamp(), timeoutMs);
+            if (! granted) release();
+        }
+        ~ScopedQuiesce() { release(); }
+        ScopedQuiesce(const ScopedQuiesce&)            = delete;
+        ScopedQuiesce& operator=(const ScopedQuiesce&) = delete;
+
+        bool ok() const noexcept { return granted; }
+        // Lowers the flag; a second call does nothing.
+        void release() noexcept
+        {
+            if (! raised) return;
+            raised = false;
+            flag.store(false, std::memory_order_seq_cst);
+        }
+
+    private:
+        std::atomic<bool>& flag;
+        bool raised = false, granted = false;
+    };
+
+    // One slot's parameter rows moving to another slot's prefix: each id under `from` goes to the same suffix under `to`.
+    struct RowMove { juce::String from, to; };
+
+    // Which parameter feeds which: the structure of a set of row moves, found by walking the parameter list. A row the
+    // destination lacks is left out. Done before the audio thread is excluded, because the walk is the slow part.
+    using RowPlan = std::vector<std::pair<juce::RangedAudioParameter*, juce::RangedAudioParameter*>>;   // source, destination
+    RowPlan planRows(juce::AudioProcessor& proc, juce::AudioProcessorValueTreeState& apvts, const std::vector<RowMove>& moves)
+    {
+        RowPlan plan;
+        for (const auto& m : moves)
+            forEachPrefixed(proc, m.from, [&](juce::RangedAudioParameter& rp, const juce::String& suffix)
+            {
+                if (auto* dst = apvts.getParameter(m.to + suffix)) plan.emplace_back(&rp, dst);
+            });
+        return plan;
+    }
+
+    // Applies a plan. Every source value is read before any is written, so moves that overlap (two same-prefix slots
+    // exchanging rows) swap instead of copy; a value that is already right is not written again (no host notification,
+    // no listener work for nothing). Message thread.
+    void applyRows(const RowPlan& plan)
+    {
+        std::vector<float> values;
+        values.reserve(plan.size());
+        for (const auto& pr : plan) values.push_back(pr.first->getValue());
+        for (size_t i = 0; i < plan.size(); ++i)
+            if (plan[i].second->getValue() != values[i]) plan[i].second->setValueNotifyingHost(values[i]);
+    }
+
+    // The same prefix letters on another slot: "t3_" on slot 5 is "t5_". Empty stays empty (no live prefix).
+    juce::String prefixOnSlot(const juce::String& prefix, int slot)
+    {
+        if (prefix.isEmpty()) return {};
+        return prefix.dropLastCharacters(1).trimCharactersAtEnd("0123456789") + juce::String(slot) + "_";
+    }
+
     // The two id prefixes a layer slot's parameters sit under: the product's own (v3_) and the mixer strip's (ch3_).
     juce::StringArray layerParamPrefixes(const mu_pp::LayerLayout& layout, int slot)
     {
@@ -1023,23 +1092,35 @@ void ProcessorBase::resetLayerParams(int slot)
         });
 }
 
-void ProcessorBase::remapSidechainSources(const std::function<int(int)>& remap)
+std::vector<juce::RangedAudioParameter*> ProcessorBase::sidechainSourceParams()
 {
-    auto remapOne = [this, &remap](const juce::String& id)
+    std::vector<juce::RangedAudioParameter*> out;
+    auto add = [this, &out](const juce::String& id)
     {
-        if (auto* p = apvts.getParameter(id))
-        {
-            const int v  = juce::roundToInt(p->convertFrom0to1(p->getValue()));
-            const int nv = juce::jlimit(0, mu_mixfx::kScSrcMax, remap(v));   // 0 off, 1..kMaxLayers a channel, then external, then the buses
-            if (nv != v) p->setValueNotifyingHost(p->convertTo0to1((float) nv));
-        }
+        if (auto* p = apvts.getParameter(id)) out.push_back(p);
     };
     for (int c = 0; c < mu_limits::kMaxLayers; ++c)
-        remapOne("ch" + juce::String(c) + "_scSrc");
+        add("ch" + juce::String(c) + "_scSrc");
     for (const char* ret : { "ret_eff_scSrc", "ret_dly_scSrc", "ret_rev_scSrc" })
-        remapOne(ret);
+        add(ret);
     for (int b = 0; b < mu_limits::kMaxBuses; ++b)
-        remapOne("bus" + juce::String(b) + "_scSrc");
+        add("bus" + juce::String(b) + "_scSrc");
+    return out;
+}
+
+void ProcessorBase::remapSidechainSources(const std::function<int(int)>& remap)
+{
+    remapSidechainSources(sidechainSourceParams(), remap);
+}
+
+void ProcessorBase::remapSidechainSources(const std::vector<juce::RangedAudioParameter*>& params, const std::function<int(int)>& remap)
+{
+    for (auto* p : params)
+    {
+        const int v  = juce::roundToInt(p->convertFrom0to1(p->getValue()));
+        const int nv = juce::jlimit(0, mu_mixfx::kScSrcMax, remap(v));   // 0 off, 1..kMaxLayers a channel, then external, then the buses
+        if (nv != v) p->setValueNotifyingHost(p->convertTo0to1((float) nv));
+    }
 }
 
 juce::ValueTree ProcessorBase::captureComposedState()
@@ -1303,7 +1384,7 @@ bool ProcessorBase::swapLayers(int a, int b)
 {
     const int n = numLayers.load(std::memory_order_relaxed);
     if (! canEditLayers() || a < 0 || b < 0 || a >= n || b >= n || a == b) return false;
-    if (getLayerAccess() != mu_core::LayerAccess::TryLock) return false;   // the Published-mode quiesce is not built yet
+    if (getLayerAccess() == mu_core::LayerAccess::Published) return swapLayersPublished(a, b);
 
     // Phase 1: staged swaps are keyed by index, so swapping the two slots would misdirect them.
     cancelPendingSwap(a);
@@ -1350,6 +1431,105 @@ bool ProcessorBase::swapLayers(int a, int b)
     liveState.remapLayers([a, b](int i) { return mu_mix::sidechainAfterSwap(i, a, b, mu_limits::kMaxLayers); });
     std::swap(presetLabels[(size_t) a], presetLabels[(size_t) b]);
     publishClipMasks();
+    return true;
+}
+
+// A Published host reorders without suspending: the audio thread is quiesced (design 2.1.2), so for the few
+// moments the edit takes the host's blocks render nothing, the same silence a TryLock host's edit makes; nothing
+// else about the layers changes. What travels with a layer: its object (engine, state, modulators, clips, name,
+// colour), its mixer strip (level, sends, sidechain and bus assignment, follower), the tails owed to its strip, and its
+// parameter rows under its type's prefix. What stays with the slot: the slot number itself.
+bool ProcessorBase::swapLayersPublished(int a, int b)
+{
+    mu_hotswap::assertMessageThread();   // one writer at a time: the editor's drag and a state restore are message-thread work
+    if (layers[(size_t) a] == nullptr || layers[(size_t) b] == nullptr) return false;
+
+    // The editor lets go of both layers before they move (modulator panel, content bindings), outside every lock.
+    if (onLayerLeaving) { onLayerLeaving(a); onLayerLeaving(b); }
+
+    // Everything that only reads is done before the audio thread is excluded, so the window in which its blocks render
+    // nothing holds only waits, writes and pointer moves: which rows move where, and which sidechain parameters to rewrite.
+    const auto liveA = layerLayout.prefix(a), liveB = layerLayout.prefix(b);
+    const juce::String stripA = "ch" + juce::String(a) + "_", stripB = "ch" + juce::String(b) + "_";
+    std::vector<RowMove> moves { { stripA, stripB }, { stripB, stripA } };
+    if (liveA.isNotEmpty()) moves.push_back({ liveA, prefixOnSlot(liveA, b) });
+    if (liveB.isNotEmpty()) moves.push_back({ liveB, prefixOnSlot(liveB, a) });
+    const RowPlan rowPlan = layerHoldsParamTruth() ? RowPlan() : planRows(*this, apvts, moves);
+    const auto sidechainParams = sidechainSourceParams();
+    const double raisedAt = juce::Time::getMillisecondCounterHiRes();
+
+    // Phase 0: exclude the audio thread. A timeout moves nothing (strip state is never moved without the grace).
+    ScopedQuiesce quiesce(layerEditInFlight, layerAccess.epoch, 50);
+    if (! quiesce.ok()) return false;
+
+    // Phase 1: staged swaps are keyed by index, so swapping the two slots would misdirect them.
+    cancelPendingSwap(a);
+    cancelPendingSwap(b);
+
+    // A parameter that names a layer (a Rumble's source) is rewritten now, at the old slots and before any pointer
+    // moves, because the hook reads each slot's layer type: after the move the old indices would name the wrong layers.
+    const auto oldToNew = [a, b](int i) { return mu_mix::sidechainAfterSwap(i, a, b, mu_limits::kMaxLayers); };
+    remapLayerReferences(oldToNew);
+
+    // Phase 2: pointers, strip state, tails and the one published view, under the writers' locks (the count store
+    // advances the serial, so the layout writer lock comes first).
+    {
+        const juce::ScopedLock lw(layoutWriteLock);
+        const juce::ScopedLock sl(layersLock);
+        mixerEngine.renumberSidechainsAfterSwap(a, b);
+        swapLayersLocked(a, b);
+        mixerEngine.swapChannelState(a, b);
+        retireBin.swapRows(a, b);              // owned tails follow their strip, in-place ones are cut
+        layers[(size_t) a]->onMoved(a);
+        layers[(size_t) b]->onMoved(b);
+        layersReordered(LayerEdit::Swap, a, b);
+        layersMoved(a, a);
+        layersMoved(b, b);
+
+        // Each slot now holds the other's layer, so it is live on the other's type letters.
+        layerLayout.setLivePrefix(a, prefixOnSlot(liveB, a));
+        layerLayout.setLivePrefix(b, prefixOnSlot(liveA, b));
+
+        auto view = makeLayerView();
+        view.serial = nextLayoutSerial();
+        layerAccess.views.publish(view, layerAccess.epoch);   // the view first, then the word: the serial order of setLayerType
+        storeLayerCount(numLayers.load(std::memory_order_relaxed));
+    }
+
+    // What a type's services keep per slot moves with the layers (a Pattern's engine), before they re-bind.
+    {
+        std::array<mu_core::LayerServices*, (size_t) mu_core::kLayerTypeIdCount> built {};
+        {
+            const juce::ScopedLock sl(layerServicesLock);
+            for (size_t i = 0; i < built.size(); ++i) built[i] = layerServices[i].get();
+        }
+        for (auto* services : built)
+            if (services != nullptr) services->slotsSwapped(a, b);
+    }
+
+    // The moved layers re-bind their parameter pointers to the new slots (C9); the flag still keeps blocks out.
+    layers[(size_t) a]->bindParams(apvts, a);
+    layers[(size_t) b]->bindParams(apvts, b);
+
+    // Phase 3: parameter values. A strip that ducked from one swapped layer now ducks from the other (translated
+    // before the rows move, so each strip's own source moves with it), then each layer's rows follow it to its new slot.
+    remapSidechainSources(sidechainParams, [a, b](int v) { return mu_mix::sidechainParamAfterSwap(v, a, b, mu_limits::kMaxLayers); });
+    if (layerHoldsParamTruth())
+    {
+        syncSlotParams(a);
+        syncSlotParams(b);
+    }
+    else
+        applyRows(rowPlan);
+    quiesce.release();
+    lastEditWindowMs.store(juce::Time::getMillisecondCounterHiRes() - raisedAt, std::memory_order_relaxed);
+
+    // The banks and playing clips moved with their layers. Last, after the audio thread is running again, so the
+    // notification a surface acts on sees the finished edit.
+    liveState.remapLayers(oldToNew);
+    std::swap(presetLabels[(size_t) a], presetLabels[(size_t) b]);
+    publishClipMasks();
+    if (retireBin.hasPendingWork()) requestDeferredWork();
     return true;
 }
 
@@ -1498,7 +1678,7 @@ bool ProcessorBase::setLayerType(int slot, mu_core::LayerTypeId type, const juce
     mu_hotswap::assertMessageThread();   // one caller at a time: the editor, a state restore and a swap commit are all message-thread work
 
     // Step 3: the UI lets go of the old layer (modulator panel, content) before it can leave the view.
-    if (onLayerTypeChanging) onLayerTypeChanging(slot);
+    if (onLayerLeaving) onLayerLeaving(slot);
 
     // Step 1: a staged swap of the old type must not land on the new one.
     cancelPendingSwap(slot);

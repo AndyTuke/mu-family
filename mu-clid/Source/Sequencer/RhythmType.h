@@ -54,6 +54,8 @@ public:
     // The layer reads no parameter on the audio thread (the services apply a changed row to its fields), so binding
     // only learns the slot, which the services and the mixer strip are looked up by.
     void bindParams(juce::AudioProcessorValueTreeState&, int slotIndex) override { slot = slotIndex; }
+    // Moved to another slot: the voice's insert takes that slot's noise seed, as a layer created there does.
+    void onMoved(int newIndex) override { if (voice != nullptr) voice->insertProc.setSlotIndex(newIndex); }
     void completeSetup(juce::AudioProcessorValueTreeState& apvts, int slotIndex) override;
     void render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n) override;
     // A pattern's pass is the boundary a staged preset waits for; negative until the cursor holds a pattern.

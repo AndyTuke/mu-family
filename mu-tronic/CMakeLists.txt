@@ -125,6 +125,7 @@ target_sources(mu-tronic-tests PRIVATE
     Source/Tests/TronicTrackTests.cpp       # the Kick, Bass, Hat and Snare types in a slot: saved rows, same stream as mu-On, tails, presets
     Source/Tests/TronicLayerPresetTests.cpp # layer presets in a slot: save/load per type, Empty-slot adopt, cross-type refusal, staged load
     Source/Tests/TronicPatternTests.cpp     # the Pattern type in a slot: saved rows, same stream as mu-Tant, Note mode per layer, services, wavetables, presets
+    Source/Tests/TronicSwapTests.cpp        # swapLayers in a slot host: Kick, Arp, Rumble and Rhythm reorder with rows, strips, Rumble source and tails
     Source/Tests/TronicRhythmTests.cpp      # the Rhythm type in a slot: saved rows, same stream as mu-Clid, parameter sync, samples, MIDI out, tails, .muRhythm presets
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp

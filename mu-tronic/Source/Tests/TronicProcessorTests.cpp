@@ -163,7 +163,7 @@ struct MuTronicProcessorTests : juce::UnitTest
         expectEquals(p.layoutWordCountForTest(), 16);
         expect(p.getLayerAccess() == mu_core::LayerAccess::Published);
         expect(p.layersAreSlots());
-        expect(! p.canReorderLayers());
+        expect(p.canReorderLayers(), "two slots can swap (TronicSwapTests)");
         expect(p.getLayerTypes().size() == 9, "the product's Arp, Kick, Bass, Hat, Snare, Rumble, Pattern and Rhythm and the test type are offered");
         for (int i = 0; i < 16; ++i)
         {

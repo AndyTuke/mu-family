@@ -280,7 +280,17 @@ void LayerSidebar::paintOverChildren(juce::Graphics& g)
     const int viewY = viewport.getY();
     const int scrollY = viewport.getViewPositionY();
 
-    if (dragTargetIndex >= 0)
+    if (dragTargetIndex >= 0 && proc.layersAreSlots())
+    {
+        // A slot host exchanges the two slots, so the target is outlined (nothing in between moves) instead of marked by an insertion line.
+        if (dragTargetIndex != dragSourceIndex)
+        {
+            const auto r = itemBounds(dragTargetIndex).translated(viewX, viewY - scrollY).toFloat().reduced(1.0f);
+            g.setColour(MuLookAndFeel::appAccent(*this));
+            g.drawRoundedRectangle(r, 4.0f, 2.0f);
+        }
+    }
+    else if (dragTargetIndex >= 0)
     {
         const int lineY = viewY + itemBounds(dragTargetIndex).getY() - itemGap / 2 - scrollY;
         if (lineY >= viewY - 1 && lineY <= viewY + viewport.getHeight())
@@ -354,11 +364,22 @@ void LayerSidebar::commitDrag()
     const int dst = dragTargetIndex;
     int newSelected = selectedIndex;
 
-    if (src < dst)
+    if (proc.layersAreSlots())
     {
+        // Fixed slots: one exchange of exactly two slots (an Empty target takes the layer), all or nothing. A refused
+        // swap (the audio thread did not quiesce) leaves every slot and the selection as they were.
+        if (proc.swapLayers(src, dst))
+        {
+            if (newSelected == src)      newSelected = dst;
+            else if (newSelected == dst) newSelected = src;
+        }
+    }
+    else if (src < dst)
+    {
+        // A list: the layer moves by a chain of adjacent swaps, so the layers in between shift. The chain stops at the first refusal.
         for (int i = src; i < dst; ++i)
         {
-            proc.swapLayers(i, i + 1);
+            if (! proc.swapLayers(i, i + 1)) break;
             if (newSelected == i)          newSelected = i + 1;
             else if (newSelected == i + 1) newSelected = i;
         }
@@ -367,7 +388,7 @@ void LayerSidebar::commitDrag()
     {
         for (int i = src; i > dst; --i)
         {
-            proc.swapLayers(i - 1, i);
+            if (! proc.swapLayers(i - 1, i)) break;
             if (newSelected == i)          newSelected = i - 1;
             else if (newSelected == i - 1) newSelected = i;
         }
@@ -378,6 +399,7 @@ void LayerSidebar::commitDrag()
     dragTargetIndex = -1;
     dragGhostImage = juce::Image();
 
+    // Also after a refusal: the host's onLayerLeaving may have released the editor's bindings, and the callback rebinds the shown layer.
     refreshItems();
     setSelectedIndex(newSelected);
     if (onLayersReordered) onLayersReordered(newSelected);

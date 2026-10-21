@@ -60,6 +60,17 @@ public:
         return pair[(size_t) current[(size_t) slot]].get();
     }
 
+    // Message thread, a Published host's swap (audio excluded): the two slots' engine pools move with their Patterns, so a
+    // moved Pattern keeps its own engine (its oscillator phase and filters continue) and the pool's alternation, which
+    // is per slot, stays true for the Pattern a later edit puts in either slot. A tail in a swapped bin row moves with it.
+    void slotsSwapped(int a, int b) override
+    {
+        if (a < 0 || b < 0 || a >= mu_limits::kMaxLayers || b >= mu_limits::kMaxLayers || a == b) return;
+        const juce::ScopedLock sl(engineLock);
+        std::swap(engines[(size_t) a], engines[(size_t) b]);
+        std::swap(current[(size_t) a], current[(size_t) b]);
+    }
+
     // Message thread, the slot's current engine (the newest Pattern's; null before the first): what a Pattern's
     // bindParams is handed. Allocates nothing and takes no lock, as a bindParams under layersLock requires.
     VoiceEngine* findEngine(int slot) const noexcept

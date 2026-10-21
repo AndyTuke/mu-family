@@ -29,10 +29,20 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     sidebar.onLayerSelected = [this](int idx) { layerPanel.setLayer(idx); };
     sidebar.refreshItems();
 
-    // Delete empties the slot (nothing shifts) and the layers are never added or reordered from the sidebar:
-    // an Empty slot is the add affordance (the chooser).
+    // Delete empties the slot (nothing shifts) and layers are never added from the sidebar: an Empty slot is the
+    // add affordance (the chooser). A drag in the sidebar reorders (the family's, enabled by canReorderLayers); the
+    // strips moved with their layers, so the mixer reloads after it.
     layerEdit.setFixedLayers(false);
     sidebar.onAddLayer = nullptr;
+    {
+        auto reselect = std::move(sidebar.onLayersReordered);
+        sidebar.onLayersReordered = [this, reselect](int newSelected)
+        {
+            if (reselect) reselect(newSelected);
+            mixerOverlay.loadFromApvts();
+            mixerOverlay.refreshSidechainSources();
+        };
+    }
 
     // Names are editable and saved for every layer: a typed name stays, an emptied one returns to the default.
     layerPanel.getHeader().onNameChanged = [this](juce::String name)
@@ -45,7 +55,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // Whoever changes a slot's type (the chooser, a state restore, a swap commit): nothing in the UI may point into the
     // old layer once it is retired. The shown content drops its modulation arcs and the modulator panel its layer; the
     // editor rebinds both when it shows the slot again.
-    proc.onLayerTypeChanging = [this](int slot)
+    proc.onLayerLeaving = [this](int slot)
     {
         layerPanel.getModulatorPanel().setLayer(nullptr);
         juce::ignoreUnused(slot);
@@ -119,7 +129,7 @@ PluginEditor::~PluginEditor()
     layerPanel.setContent(nullptr);   // the panel must not keep a content this editor is about to destroy
     releaseContentArcs();
     layerPanel.getHeader().onNameChanged = nullptr;   // the processor can outlive the editor
-    proc.onLayerTypeChanging = nullptr;
+    proc.onLayerLeaving = nullptr;
     proc.onLayerPresetCommitted = nullptr;
 }
 
