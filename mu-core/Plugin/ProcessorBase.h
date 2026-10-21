@@ -168,7 +168,8 @@ public:
     // editor releases every pointer into slot `slot`'s layer (the modulator panel, the content's bindings). The
     // editor must clear it in its destructor, as the other shell callbacks. It runs on the thread that calls
     // setLayerType, which is the message thread (asserted): a state restore on a host thread must marshal to it
-    // first, so the editor never sees this call from another thread.
+    // first, so the editor never sees this call from another thread. A Published host's swapLayers calls it for
+    // both slots too (the layers leave their slots, so a slot-keyed binding must let go before they move).
     std::function<void(int slot)> onLayerTypeChanging;
     // Message thread. The slot the editor shows: LayerPanel::setLayer stores it, every product's editor routing the
     // shown layer through it. A typed host's layer-preset folder and extension follow the type of this slot
@@ -695,6 +696,9 @@ protected:
     // processing suspended and before the parameter values shift; `oldToNew` maps a layer index as it
     // was to the index it has now, or -1 when that layer is gone. The product rewrites its own
     // parameters through it. Default: nothing to rewrite. addLayer and resetLayer do not call it.
+    // A Published host's swapLayers calls it earlier, with the audio thread quiesced but BEFORE the layer pointers
+    // move, so layers[] and every parameter still sit at their old indices: a hook that reads a slot's layer type
+    // sees the type of the old index, as `oldToNew` expects.
     virtual void remapLayerReferences(const std::function<int(int)>& oldToNew) { juce::ignoreUnused(oldToNew); }
 
 protected:
@@ -1140,6 +1144,9 @@ private:
     void copyLayerParams (int from, int to);
     void swapLayerParams (int a, int b);
     void resetLayerParams(int slot);
+    // swapLayers of a Published host (design 2.1.2): quiesce the audio thread, exchange the layers with their strips,
+    // tails and parameter rows, publish one view, lower the flag. False when the audio thread did not quiesce in time.
+    bool swapLayersPublished(int a, int b);
     std::atomic<int> selectedSlot { 0 };   // setSelectedSlot
     int  firstUnusedColourIndex() const;   // lowest palette index no live layer uses
 

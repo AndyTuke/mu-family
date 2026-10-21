@@ -488,13 +488,12 @@ struct LayerTypeSwapTests : juce::UnitTest
     // The list edits are TryLock work: on a Published host they are refused and change nothing; reset re-creates the slot.
     void listEditsRefused()
     {
-        beginTest("a Published host refuses the list edits, leaves the view alone, and resets a slot without muting");
+        beginTest("a Published host refuses add and remove (swap is LayerSwapPublishedTests), leaves the view alone, and resets a slot without muting");
         auto box = std::make_unique<TypedHost>(); auto& p = *box;
         const auto* view = p.layerAccess.views.load();
         const auto serial = p.layoutSerial();
         expectEquals(p.addLayer(), -1);
         expect(! p.removeLayer(1));
-        expect(! p.swapLayers(0, 1));
         expect(p.layerAccess.views.load() == view && p.layoutSerial() == serial);
         expect(! p.layerEditInFlight.load());
 

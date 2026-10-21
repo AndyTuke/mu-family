@@ -142,10 +142,16 @@ namespace mu_contract_test
     {
         // `sidechainInput`: a stereo sidechain input bus sharing the output's buffer channels (an instrument's shape).
         explicit FakeLayerHost(int live = 2, mu_core::LayerAccess access = mu_core::LayerAccess::TryLock, bool sidechainInput = false)
+            : FakeLayerHost(live, access, sidechainInput, makeLayout())
+        {
+        }
+
+        // The same host over a parameter layout of the test's own (a second type prefix, say).
+        FakeLayerHost(int live, mu_core::LayerAccess access, bool sidechainInput, juce::AudioProcessorValueTreeState::ParameterLayout layout)
             : ProcessorBase(sidechainInput ? BusesProperties().withInput("Sidechain", juce::AudioChannelSet::stereo(), true)
                                                               .withOutput("Out", juce::AudioChannelSet::stereo())
                                            : BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo()),
-                            makeLayout())
+                            std::move(layout))
         {
             setLayerAccess(access);
             keepSpareLayers = true;
