@@ -132,6 +132,7 @@ target_sources(mu-tronic-tests PRIVATE
     Source/Tests/TronicSceneTests.cpp       # type-carrying clips, scenes (one boundary), clip banks in the saved state, performance files of full presets
     Source/Tests/TronicImportTests.cpp      # Import product preset: a real fixture per product, a Rumble source, sidechain remap, refusals, the saved state after
     Source/Tests/TronicSceneUiTests.cpp     # what the editor reads: Notes In and clip-bank types, the scene picker offer, scene launch reports
+    Source/Tests/TronicClipAutoSaveTests.cpp # clip auto-save: every type's capture is idempotent, an edit is stored, a slot swap re-adopts
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp

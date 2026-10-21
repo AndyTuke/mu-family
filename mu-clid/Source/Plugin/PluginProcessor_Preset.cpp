@@ -325,6 +325,7 @@ bool PluginProcessor::writeFullPresetFile(const juce::File& file, const juce::St
 juce::ValueTree PluginProcessor::buildFullPresetTree(const juce::String& name, const juce::String& description,
                                               const juce::String& category, bool embedSamples, bool forSession)
 {
+    flushClipAutoSaveForStateCapture();   // a late edit of a lit clip is in the saved bank
     const int n = getNumRhythms();
     juce::ValueTree root("MuClidPreset");
     root.setProperty("presetName",         name,                 nullptr);

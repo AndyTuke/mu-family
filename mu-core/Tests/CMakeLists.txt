@@ -28,6 +28,7 @@ set(MU_CORE_TEST_SOURCES
     ClipBankTests.cpp
     HeldNoteStackTests.cpp          # the shared held-key stack and its two overflow policies
     ClipLaunchTests.cpp
+    ClipAutoSaveTests.cpp           # clip auto-save: settle, flush, skips, trackers
     LayerOwnershipTests.cpp
     RhythmAdoptDefaultsTests.cpp
     EuclideanGeneratorTests.cpp     # the textbook Bjorklund phase, pinned against Toussaint and the previous generator

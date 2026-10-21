@@ -55,6 +55,7 @@ target_sources(mu-core INTERFACE
     # Shared plugin scaffolding
     "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_Render.cpp"   # the layer render contract's block driver
+    "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_ClipAutoSave.cpp"   # clip auto-save: poll and compare
     # The headless --render mode is header-only (Plugin/ProductRender.h), compiled
     # into each Standalone target through Plugin/StandaloneShell.h.
     # Persistence — MIDI PC preset maps (per-slot ch 1-8 + full-preset ch 9).

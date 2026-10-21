@@ -2,7 +2,7 @@
 // clip carrying its engine. (createEditor is defined in ProcessorSeamTests.cpp.)
 
 #include "Plugin/PluginProcessor.h"
-#include "Tests/ClipLaunchChecks.h"
+#include "Tests/ClipAutoSaveChecks.h"
 
 namespace
 {
@@ -25,6 +25,8 @@ struct MuOnClipLaunchTests : juce::UnitTest
             40.0f, 80.0f, 0.2f };
         mu_clip_test::runClipLaunchChecks<ExposedPluginProcessor>(*this, accessor);
         mu_clip_test::runRestoreCancelsStagedSwapChecks<ExposedPluginProcessor>(*this, accessor);   // a host restore drops staged swaps
+        mu_clip_test::runCaptureIdempotenceChecks<ExposedPluginProcessor>(*this, accessor, "mu-On");   // the auto-save poll rests on it
+        mu_clip_test::runAutoSaveChecks<ExposedPluginProcessor>(*this, accessor, "mu-On");
 
         // The step row is not a parameter: a grid edit writes the track's row directly, so each clip must carry its own.
         for (const bool playing : { false, true })

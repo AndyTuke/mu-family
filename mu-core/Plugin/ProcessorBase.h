@@ -454,6 +454,20 @@ public:
     // True for a product whose layers span several pages that a controller surface should page through (PagePrev / PageNext on
     // the top row): mu-Tronic. The page is the one the selected layer is on, so the screen and the surface share it.
     virtual bool offersLayerPages() const { return false; }
+    // Clip auto-save (message thread). A layer whose clip is lit (liveState playing clip) has its edits written back to
+    // that clip: the 100 Hz swap poll captures the layer (captureLayerPresetTree), and a capture that differs from the
+    // BASELINE (what the stored clip is known to equal live, never the stored tree itself) and then holds still for one
+    // more step is stored. One layer is visited per step, about every 400 ms. Nothing runs on the audio thread.
+    // Skipped while the setting is off, in Performance mode, while a full preset is staged, during an offline render,
+    // and while a swap that is not our clip launch is pending.
+    bool isClipAutoSaveOn() const noexcept { return clipAutoSaveOn; }
+    // The shell preference "clipAutoSave" (default on): a behaviour of the app, kept in the app settings, not a parameter.
+    void setClipAutoSave(bool on);
+    // Captures layer `slot` (-1 = every lit layer) and writes it to its lit clip when it differs from the baseline, with no
+    // settle wait. Called by the launch, copy / cut, structural edits and state captures so the bank is current when read.
+    void flushClipAutoSave(int slot = -1);
+    // One visit of the round-robin watch (the swap poll calls it on its 400 ms schedule). True when it wrote a clip.
+    bool stepClipAutoSave();
     uint8_t clipMask(int slot) const;
     // How many clips layer `slot` stores (0 for no such layer).
     int     clipCount(int slot) const
@@ -799,6 +813,42 @@ protected:
     // The tree of each layer's last non-clip stage that is still waiting for its boundary (invalid when none).
     // A store captures it instead of the live layer, which does not show that preset yet.
     std::array<juce::ValueTree, mu_limits::kMaxLayers> pendingPresetTree;
+
+    // Clip auto-save tracker of one layer (message thread only, never saved).
+    struct ClipWatch
+    {
+        int             clip = -1;        // the lit clip this tracker belongs to (-1 = nothing adopted)
+        juce::ValueTree baseline;         // the capture the stored clip is known to equal live
+        juce::ValueTree candidate;        // a differing capture seen last step, written when the next step sees it again
+        bool            expectSwap = false;   // a clip launch of this layer was staged: adopt a new baseline when it lands
+        bool            suspended  = false;   // a paste replaced the lit clip: no flush or write until its relaunch lands
+        uint32_t        serial = 0;       // the layer's stage serial right after that launch was staged
+        int             period = 1;       // visit every period-th round (doubles while a capture is slow)
+        int             wait   = 0;       // rounds still to skip before the next visit
+        void reset() { *this = ClipWatch(); }
+    };
+    std::array<ClipWatch, mu_limits::kMaxLayers> clipWatch;
+    int      clipWatchCursor     = 0;       // the next layer the round robin looks at
+    double   nextClipStepMs      = 0.0;     // when the poll next takes a step
+    uint32_t clipWatchFullCommits = 0;      // the full-commit count the trackers were last valid for
+    bool     clipAutoSaveOn      = true;
+    static constexpr double kClipAutoSaveStepMs = 400.0;
+    static constexpr double kClipCaptureBudgetMs = 4.0;   // a capture slower than this doubles that layer's visit interval
+
+    // Drops every tracker (structural edit, state restore, full preset): the next step re-adopts a baseline.
+    void dropClipWatches() { for (auto& w : clipWatch) w.reset(); }
+    void dropClipWatchesOnFullCommit();
+    // A structural edit moves, swaps or empties layers: save what is lit first, then forget every tracker.
+    void prepareClipWatchesForStructuralEdit() { flushClipAutoSave(); dropClipWatches(); }
+    // Message thread: flush + the state-capture rule (a host may call getStateInformation from another thread, where the
+    // bank is read as it stands and no flush is attempted).
+    void flushClipAutoSaveForStateCapture();
+    // The swap poll's hook: launch landings every tick, a step on the 400 ms schedule.
+    void pollClipAutoSave();
+    bool clipAutoSaveActive() const;
+    void resolveClipLaunches();
+    bool visitClipWatch(int slot, bool settle);
+    bool writeWatchedClip(int slot, int clip, const juce::ValueTree& capture);
     // Per slot, the preset (file stem or clip name) the layer's state last came from; empty = none known.
     // Message thread only; follows its layer through remove / swap, and is forgotten by a non-clip stage and a reset.
     std::array<juce::String, mu_limits::kMaxLayers> presetLabels;
@@ -968,6 +1018,7 @@ protected:
                 owner.retireBin.service();   // a Done tail whose grace had not passed at the last pass
             if (owner.liveState.needsSettling())
                 owner.settleLiveState();   // also catches a stopped-transport load, which never raises the mailbox
+            owner.pollClipAutoSave();      // after the settle: a landed launch is already the lit clip
         }
         ProcessorBase& owner;
     } swapPoll { *this };

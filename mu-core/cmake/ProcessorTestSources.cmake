@@ -8,6 +8,7 @@ set(_mu_core_dir "${CMAKE_CURRENT_LIST_DIR}/..")
 set(MU_CORE_PROCESSOR_TEST_SOURCES
     "${_mu_core_dir}/Plugin/ProcessorBase.cpp"
     "${_mu_core_dir}/Plugin/ProcessorBase_Render.cpp"
+    "${_mu_core_dir}/Plugin/ProcessorBase_ClipAutoSave.cpp"
     "${_mu_core_dir}/Audio/VoiceEngine.cpp"
     "${_mu_core_dir}/Audio/InsertProcessor.cpp"
     "${_mu_core_dir}/Audio/MultiModeFilter.cpp"

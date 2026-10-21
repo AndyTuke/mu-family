@@ -111,6 +111,87 @@ struct MuClidClipLaunchTests : juce::UnitTest
         oldFilesLoadEmpty();
         clipNamesFollowPresets();
         foreignRootRejected();
+        captureIsIdempotent();
+        autoSavesEdits();
+    }
+
+    // The auto-save poll compares captures, so a capture that changed by itself would be rewritten forever.
+    void captureIsIdempotent()
+    {
+        beginTest("mu-Clid Rhythm capture is idempotent: two captures with no edit between are identical");
+        TempStorage storage;
+        mu_clid::PluginProcessor p;
+        const auto twice = [&](const char* when)
+        {
+            const auto first = p.captureLayerPresetTree(0);
+            expect(first.isValid(), juce::String("a capture exists ") + when);
+            expect(first.isEquivalentTo(p.captureLayerPresetTree(0)), juce::String("two captures are identical ") + when);
+        };
+        twice("at the defaults");
+        setParam(p.apvts, kParam, 5.0f);
+        p.getRhythm(0).controlSequences.front().stepValues.assign(4, 0.0f);
+        twice("after an edit and a modulator row");
+        expect(p.storeClip(0, 0));
+        setParam(p.apvts, kParam, 3.0f);
+        expect(p.storeClip(0, 1));
+        expect(p.launchClip(0, 0));
+        twice("after a launch");
+    }
+
+    // An edit of the lit clip is stored once it holds still, including a step edit that is not a parameter; a launch is
+    // adopted and not rewritten, stopped and playing.
+    void autoSavesEdits()
+    {
+        for (const bool playing : { false, true })
+        {
+            beginTest(juce::String("auto-save: a parameter and a modulator-cell edit reach the lit clip, a launch is not rewritten (")
+                      + (playing ? "playing" : "stopped") + ")");
+            TempStorage storage;
+            mu_clid::PluginProcessor p;
+            p.sequencerPlaying.store(playing);
+            using Type = mu_core::ControlActionType;
+            const auto act = [](Type type, int index)
+            {
+                mu_core::ControlAction a;
+                a.type = type; a.layer = 0; a.index = index;
+                return a;
+            };
+            const auto settle = [&]
+            {
+                if (playing) { Probe::scan(p); Probe::commit(p); }
+                p.getLiveState().reconcile();
+            };
+
+            setParam(p.apvts, kParam, 3.0f);
+            expect(p.storeClip(0, 1, "other"));
+            setParam(p.apvts, kParam, 5.0f);
+            expect(p.perform(act(Type::StoreClip, 0)));
+            for (int i = 0; i < 3; ++i)
+                expect(! p.stepClipAutoSave(), "an unchanged rhythm is never written");
+
+            setParam(p.apvts, kParam, 7.0f);
+            p.getRhythm(0).controlSequences.front().stepValues.assign(4, 0.0f);
+            p.getRhythm(0).controlSequences.front().stepValues[2] = 33.0f;
+            expect(! p.stepClipAutoSave());
+            expect(p.stepClipAutoSave(), "the settled edit is stored");
+            expect(p.getLayer(0)->clips->get(0).isEquivalentTo(p.captureLayerPresetTree(0)));
+            for (int i = 0; i < 3; ++i)
+                expect(! p.stepClipAutoSave());
+
+            const auto other = p.getLayer(0)->clips->get(1);
+            expect(p.perform(act(Type::LaunchClip, 1)));
+            settle();
+            for (int i = 0; i < 4; ++i)
+                expect(! p.stepClipAutoSave(), "the launch is adopted, not written");
+            expect(p.getLayer(0)->clips->get(1).isEquivalentTo(other));
+            expectEquals(p.getLiveView()->getPlayingClip(0), 1);
+
+            expect(p.perform(act(Type::LaunchClip, 0)));
+            settle();
+            expectWithinAbsoluteError(getParam(p.apvts, kParam), 7.0f, 0.01f, "the edit comes back");
+            for (int i = 0; i < 3; ++i)
+                expect(! p.stepClipAutoSave());
+        }
     }
 
     // Another product's file, offered as a full preset or as host state, is refused and leaves the

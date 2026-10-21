@@ -245,6 +245,8 @@ bool ProcessorBase::perform(const mu_core::ControlAction& a)
         case T::LaunchScene:
         case T::ClipNext:
         case T::ClipPrev:
+            // Auto-save is off while the mode is on, so what was edited before it is put in the bank first.
+            if (a.type == T::PerformanceMode) flushClipAutoSave();
             return liveState.perform(a);
         case T::StoreClip:
         case T::ClearClip:
@@ -333,6 +335,7 @@ void ProcessorBase::initAppSettings(const juce::String& name)
     midiClockSync.setMessages(appSettings->getIntValue ("midiSyncMessages", 2));
     syncOffsetMs.store(juce::jlimit(kSyncOffsetMinMs, kSyncOffsetMaxMs, appSettings->getIntValue("syncOffsetMs", 0)));
     setTimeSignature(appSettings->getIntValue("timeSigNumerator", 4), appSettings->getIntValue("timeSigDenominator", 4));
+    clipAutoSaveOn = appSettings->getBoolValue("clipAutoSave", true);
 }
 
 juce::File ProcessorBase::getContentDir() const
@@ -1155,6 +1158,7 @@ void ProcessorBase::remapSidechainSources(const std::vector<juce::RangedAudioPar
 
 juce::ValueTree ProcessorBase::captureComposedState()
 {
+    flushClipAutoSaveForStateCapture();   // a late edit of a lit clip is in the saved bank
     auto state = mu_pp::captureState(apvts.state.getType(), layerLayout, layerExtras);
 
     // Each slot node gains its layer's clip bank and playing clip. Not part of captureLayer, so a layer
@@ -1182,6 +1186,7 @@ juce::ValueTree ProcessorBase::captureComposedState()
 
 void ProcessorBase::applyComposedState(const juce::ValueTree& state)
 {
+    dropClipWatches();   // the restored layers re-adopt a baseline; nothing is written for the restore
     // A restore that lowers the count publishes the new count BEFORE the parameters move: applyState
     // writes defaults into the slots the state lacks, and those slots must already be out of the count
     // by then or they would render with default parameters until the store below. A restore that grows
@@ -1290,6 +1295,7 @@ int ProcessorBase::addLayer()
     const int n = numLayers.load(std::memory_order_relaxed);
     if (! canEditLayers() || n >= mu_limits::kMaxLayers) return -1;
     if (getLayerAccess() != mu_core::LayerAccess::TryLock) return -1;   // refused, never half done: a Published host uses setLayerType
+    prepareClipWatchesForStructuralEdit();
 
     // Phase 1: build and prepare the new layer before anything is locked.
     auto fresh = createLayer(n);
@@ -1343,6 +1349,7 @@ bool ProcessorBase::removeLayer(int idx)
     const int n = numLayers.load(std::memory_order_relaxed);
     if (! canEditLayers() || n <= 1 || idx < 0 || idx >= n) return false;   // the last layer stays
     if (getLayerAccess() != mu_core::LayerAccess::TryLock) return false;   // the Published-mode quiesce is not built yet
+    prepareClipWatchesForStructuralEdit();
 
     // Phase 1: the down-shift renumbers every layer from idx upward, so every staged per-layer swap
     // (keyed by index) would land on the wrong slot. A staged full preset replaces all slots and wins.
@@ -1420,6 +1427,7 @@ bool ProcessorBase::swapLayers(int a, int b)
 {
     const int n = numLayers.load(std::memory_order_relaxed);
     if (! canEditLayers() || a < 0 || b < 0 || a >= n || b >= n || a == b) return false;
+    prepareClipWatchesForStructuralEdit();   // both slots of a Published exchange too: the trackers are keyed by slot
     if (getLayerAccess() == mu_core::LayerAccess::Published) return swapLayersPublished(a, b);
 
     // Phase 1: staged swaps are keyed by index, so swapping the two slots would misdirect them.
@@ -1572,6 +1580,7 @@ bool ProcessorBase::swapLayersPublished(int a, int b)
 void ProcessorBase::resetLayer(int idx)
 {
     if (idx < 0 || idx >= numLayers.load(std::memory_order_relaxed) || layers[(size_t) idx] == nullptr) return;
+    prepareClipWatchesForStructuralEdit();
 
     // A Published host never suspends: it gives the slot a fresh layer of the same type through two publications
     // (setLayerType, via Empty), then returns the strip and the name to defaults, as a reset always does.
@@ -1712,6 +1721,7 @@ bool ProcessorBase::setLayerType(int slot, mu_core::LayerTypeId type, const juce
     if (type != LayerTypeId::Empty && info == nullptr) return false;
     if ((LayerTypeId) layers[(size_t) slot]->typeId() == type) return true;
     mu_hotswap::assertMessageThread();   // one caller at a time: the editor, a state restore and a swap commit are all message-thread work
+    prepareClipWatchesForStructuralEdit();
 
     // Step 3: the UI lets go of the old layer (modulator panel, content) before it can leave the view.
     if (onLayerLeaving) onLayerLeaving(slot);
@@ -1830,6 +1840,7 @@ void ProcessorBase::clearLayerClips(int slot)
     if (slot < 0 || slot >= mu_limits::kMaxLayers || layers[(size_t) slot] == nullptr) return;
     layers[(size_t) slot]->clips->clearAll();
     layers[(size_t) slot]->activeClip = -1;
+    clipWatch[(size_t) slot].reset();
     presetLabels[(size_t) slot] = juce::String();   // a fresh or reset layer came from no preset
     liveState.clearLayerClips(slot);
     publishClipMasks();
@@ -1842,6 +1853,7 @@ void ProcessorBase::noteNonClipStage(int slot)
     {
         layers[(size_t) slot]->activeClip = -1;
         presetLabels[(size_t) slot] = juce::String();   // the product re-notes the new preset's label after staging it
+        clipWatch[(size_t) slot].reset();   // no clip is lit any more: nothing to track
     }
     liveState.clearLayerClips(slot);   // a plain layer-preset load also supersedes a queued clip
 }
@@ -1897,12 +1909,23 @@ bool ProcessorBase::storeClip(int slot, int clip, const juce::String& name)
     if (! tree.isValid())
         tree = captureLayerPresetTree(slot);
     if (! tree.isValid()) return false;
+    const bool storedLive = ! (hasPendingSwap(slot) && pendingPresetTree[(size_t) slot].isValid());
 
     // Named after the preset the layer came from unless the caller names it; the layer then carries that name.
     const juce::String stored = name.isNotEmpty() ? name : clipLabel(slot);
     layer->clips->store(clip, tree, stored);   // store deep-copies, so the capture is not aliased
     noteLayerPresetLabel(slot, stored);
     publishClipMasks();
+
+    // What was stored is the baseline for the layer's auto-save, adopted and not written. A staged tree stored instead
+    // of the live layer leaves live != baseline until it commits, so the tracker starts again from the commit.
+    auto& w = clipWatch[(size_t) slot];
+    w.reset();
+    if (storedLive)
+    {
+        w.clip     = clip;
+        w.baseline = tree;
+    }
     return true;
 }
 
@@ -1916,6 +1939,8 @@ bool ProcessorBase::clearClip(int slot, int clip)
     // waiting for its boundary is cancelled (it would land a clip that no longer exists).
     if (layer->activeClip == clip)
         layer->activeClip = -1;
+    if (clipWatch[(size_t) slot].clip == clip)
+        clipWatch[(size_t) slot].reset();
     liveState.clipCleared(slot, clip);
     publishClipMasks();
     return true;
@@ -1983,6 +2008,7 @@ bool ProcessorBase::copyClip(int slot, int clip)
     auto* layer = getLayer(slot);
     if (layer == nullptr || ! layer->clips->isOccupied(clip)) return false;   // an empty clip has nothing to copy
 
+    flushClipAutoSave(slot);   // a late edit of the lit clip is in the bank before it is read
     const auto tree = layer->clips->get(clip);
     mu_core::clipClipboard().set(tree, layer->clips->getName(clip),
                                  layersAreSlots() ? layerPresetType(tree) : mu_core::LayerTypeId::Empty);
@@ -2016,6 +2042,14 @@ bool ProcessorBase::pasteClip(int slot, int clip)
     liveState.reconcile();
     const bool lit = liveState.getPlayingClip(slot) == clip || liveState.getQueuedClip(slot) == clip;
 
+    // Pasting onto the playing clip: the live layer is the old contents until the relaunch lands, so auto-save must not
+    // write them over the paste (it stays suspended until the launch commits).
+    if (liveState.getPlayingClip(slot) == clip)
+    {
+        clipWatch[(size_t) slot].reset();
+        clipWatch[(size_t) slot].suspended = true;
+    }
+
     const auto previous     = layer->clips->get(clip);
     const auto previousName = layer->clips->getName(clip);
     layer->clips->store(clip, tree, board.getName());
@@ -2024,6 +2058,7 @@ bool ProcessorBase::pasteClip(int slot, int clip)
     if (lit && ! liveState.clipPasted(slot, clip))
     {
         layer->clips->store(clip, previous, previousName);   // the relaunch could not be staged: change nothing
+        clipWatch[(size_t) slot].suspended = false;
         return false;
     }
     publishClipMasks();
@@ -2054,11 +2089,21 @@ bool ProcessorBase::launchClip(int slot, int clip)
     // copy and the bank is never written.
     // A hook that could not build the clip stages nothing and leaves the serial alone; a stage, and the
     // stopped path's apply-at-once (which cancels first), both move it.
+    // The edits of the clip being left are in its bank before the stage (and before a stopped launch overwrites the layer).
+    flushClipAutoSave(slot);
+
     const auto serialBefore = slotStageSerial(slot);
     stageLayerPreset(slot, layer->clips->get(clip), true, true);
     const bool staged = slotStageSerial(slot) != serialBefore;
     if (staged)
+    {
         noteLayerPresetLabel(slot, layer->clips->getName(clip));   // the layer is now that clip: a re-store keeps its name
+
+        // The launch changes the layer without an edit: auto-save adopts a new baseline when it lands, writing nothing.
+        auto& w = clipWatch[(size_t) slot];
+        w.expectSwap = true;
+        w.serial     = slotStageSerial(slot);
+    }
     return staged;
 }
 

@@ -2,7 +2,7 @@
 // in ProcessorSeamTests.cpp.)
 
 #include "Plugin/PluginProcessor.h"
-#include "Tests/ClipLaunchChecks.h"
+#include "Tests/ClipAutoSaveChecks.h"
 
 namespace
 {
@@ -26,6 +26,8 @@ struct MuTantClipLaunchTests : juce::UnitTest
             0.2f, 0.8f, 0.02f };
         mu_clip_test::runClipLaunchChecks<ExposedPluginProcessor>(*this, accessor);
         mu_clip_test::runRestoreCancelsStagedSwapChecks<ExposedPluginProcessor>(*this, accessor);   // a host restore drops staged swaps
+        mu_clip_test::runCaptureIdempotenceChecks<ExposedPluginProcessor>(*this, accessor, "mu-Tant");   // the auto-save poll rests on it
+        mu_clip_test::runAutoSaveChecks<ExposedPluginProcessor>(*this, accessor, "mu-Tant");
     }
 };
 
