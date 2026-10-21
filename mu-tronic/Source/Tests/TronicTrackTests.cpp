@@ -303,7 +303,6 @@ struct MuTronicTrackTests : juce::UnitTest
         namespace fx = mu_on_fixture;
         for (auto type : kTrackTypes)
         {
-            if (type == LayerTypeId::FmPerc) continue;   // no recorded stream until the engine's voice is built
             const auto engine = mu_on::engineOfType(type);
             beginTest(juce::String("a ") + mu_core::layerTypeName(type) + " in a mu-Tronic slot renders the stream mu-On records");
             mu_seam_test::TempStorage storage;

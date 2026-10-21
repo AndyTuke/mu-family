@@ -351,6 +351,18 @@ namespace
             defs.push_back(d);
         }
 
+        // FM Perc: the default Tom (90 Hz, the APVTS defaults) on four steps with two accents.
+        {
+            Def d; d.name = "fmperc-tom-default"; d.numStems = 1;
+            d.notes = "One FM Perc track, algorithm Tom at its APVTS defaults (Tune 90 Hz); four hits, two accented.";
+            d.author = [](PluginProcessor& p)
+            {
+                useTrack(p, 0, EngineType::FmPerc);
+                setRow(p, 0, "1000001010000010", "1000000000000010");
+            };
+            defs.push_back(d);
+        }
+
         return defs;
     }
 

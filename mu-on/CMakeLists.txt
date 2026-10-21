@@ -158,6 +158,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/SequencerTests.cpp
     Source/Tests/GrooveSequencer.cpp   # the whole-grid clock the sequencer tests drive (test support)
     Source/Tests/EngineTests.cpp
+    Source/Tests/FmPercEngineTests.cpp   # FM Perc voice: silence, tails, extremes, latching, tuning, listening WAVs, CPU
     Source/Tests/ModulationTests.cpp
     Source/Tests/PresetTests.cpp
     Source/Tests/SlotStateTests.cpp

@@ -70,11 +70,11 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     flt(E::FmPerc, "tune",  "FM Perc Tune",      NormalisableRange<float>(40.0f, 4000.0f, 0.1f, 0.4f), 90.0f);
     flt(E::FmPerc, "ratio", "FM Perc Ratio",     NormalisableRange<float>(0.5f, 6.0f, 0.01f, 0.6f), 1.5f);
     flt(E::FmPerc, "index", "FM Perc Index",     f(0.0f, 1.0f, 0.001f), 0.35f);
-    flt(E::FmPerc, "idec",  "FM Perc FM Env",    f(0.0f, 1.0f, 0.001f), 0.5f);
+    flt(E::FmPerc, "idec",  "FM Perc FM Env",    f(0.0f, 1.0f, 0.001f), 0.57f);
     flt(E::FmPerc, "fdbk",  "FM Perc Feedback",  f(0.0f, 1.0f, 0.001f), 0.05f);
-    flt(E::FmPerc, "dive",  "FM Perc Dive",      f(0.0f, 1.0f, 0.001f), 0.45f);
-    flt(E::FmPerc, "dtime", "FM Perc Dive Time", f(0.0f, 1.0f, 0.001f), 0.4f);
-    flt(E::FmPerc, "decay", "FM Perc Decay",     f(0.0f, 1.0f, 0.001f), 0.35f);
+    flt(E::FmPerc, "dive",  "FM Perc Dive",      f(0.0f, 1.0f, 0.001f), 0.43f);
+    flt(E::FmPerc, "dtime", "FM Perc Dive Time", f(0.0f, 1.0f, 0.001f), 0.46f);
+    flt(E::FmPerc, "decay", "FM Perc Decay",     f(0.0f, 1.0f, 0.001f), 0.40f);
     flt(E::FmPerc, "fold",  "FM Perc Fold",      f(0.0f, 1.0f, 0.001f), 0.15f);
     flt(E::FmPerc, "noise", "FM Perc Noise",     f(0.0f, 1.0f, 0.001f), 0.15f);
 }
