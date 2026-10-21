@@ -104,6 +104,7 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
             || layerPresetType(l->clips->get(clip)) == slotTypeId(layer);   // the same test launchClip makes
     };
     cb.hasSceneControls = [this] { return offersSceneControls(); };
+    cb.hasLayerPages    = [this] { return offersLayerPages(); };
     cb.transportPlaying = [this] { return isInternalPlaying(); };
     cb.transportOutside = [this] { return midiControlRouter.playIsOutside(); };
     liveState.setCallbacks(std::move(cb));
@@ -234,6 +235,8 @@ bool ProcessorBase::perform(const mu_core::ControlAction& a)
         case T::PerformanceNext:
         case T::AppPrev:
         case T::AppNext:
+        case T::PagePrev:
+        case T::PageNext:
         case T::LaunchClip:
         case T::LaunchScene:
         case T::ClipNext:

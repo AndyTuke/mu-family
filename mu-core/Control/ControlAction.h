@@ -34,7 +34,9 @@ enum class ControlActionType
     PerformanceNext,   // the next loadable item, wrapping
     MuteSelectedLayer, // toggle the mute of the layer Performance mode has selected
     AppPrev,           // switch the surface to the previous mu app (no multi-app hub yet: always refused)
-    AppNext            // switch the surface to the next mu app (as AppPrev)
+    AppNext,           // switch the surface to the next mu app (as AppPrev)
+    PagePrev,          // show the previous page of layers: selects the layer at the same position on it (no wrap)
+    PageNext           // show the next page of layers (as PagePrev)
 };
 
 // When an action that changes what is heard lands: Default follows the app-wide setting.
@@ -78,6 +80,8 @@ inline const char* actionName(ControlActionType t) noexcept
         case ControlActionType::MuteSelectedLayer: return "muteSelectedLayer";
         case ControlActionType::AppPrev:         return "appPrev";
         case ControlActionType::AppNext:         return "appNext";
+        case ControlActionType::PagePrev:        return "pagePrev";
+        case ControlActionType::PageNext:        return "pageNext";
         case ControlActionType::None:            break;
     }
     return "none";
@@ -93,7 +97,8 @@ inline ControlActionType actionFromName(const juce::String& n) noexcept
                     ControlActionType::ClipPrev, ControlActionType::LaunchScene, ControlActionType::PresetNext,
                     ControlActionType::PresetPrev, ControlActionType::Panic, ControlActionType::PerformanceMode,
                     ControlActionType::PerformanceItem, ControlActionType::PerformancePrev, ControlActionType::PerformanceNext,
-                    ControlActionType::MuteSelectedLayer, ControlActionType::AppPrev, ControlActionType::AppNext })
+                    ControlActionType::MuteSelectedLayer, ControlActionType::AppPrev, ControlActionType::AppNext,
+                    ControlActionType::PagePrev, ControlActionType::PageNext })
         if (n == actionName(t)) return t;
     return ControlActionType::None;
 }

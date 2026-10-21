@@ -68,6 +68,9 @@ private:
 
     void     liveStateChanged() override;
     Light    lightFor(const mu_core::ControlAction& action, double nowMs) const;
+    // The mapped action as this product's profile reads it: with layer pages the clip arrows turn the page and the rows are
+    // the layers of the shown page.
+    mu_core::ControlAction resolve(mu_core::ControlAction action) const;
     void     trackPlayingClips(double nowMs) const;
     uint32_t layerRgb(int layer) const;
     Light    topLight(mu_core::ControlActionType type, double nowMs) const;
@@ -93,9 +96,9 @@ private:
     mutable std::array<int, (size_t) mu_limits::kMaxLayers>    lastPlaying;
     mutable std::array<double, (size_t) mu_limits::kMaxLayers> burstStartMs;
 
-    // The four arrow buttons (AppPrev, AppNext, PerformancePrev, PerformanceNext): when an accepted press last
+    // The arrow buttons (AppPrev, AppNext, PerformancePrev, PerformanceNext, PagePrev, PageNext): when an accepted press last
     // flashed each, and which preset arrow was pressed last (it pulses while its switch is queued).
-    static constexpr int kArrows = 4;
+    static constexpr int kArrows = 6;
     std::array<double, kArrows>  arrowFlashMs;
     mutable int                  pulsingArrow = -1;   // arrow slot, -1 = none; cleared once no switch is queued
 };

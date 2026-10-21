@@ -128,8 +128,9 @@ bool SurfaceModel::handle(const SurfaceEvent& event)
         return accepted;
     }
 
-    const auto action = mapping.actionFor(event.id);
-    if (! action) return false;
+    const auto mapped = mapping.actionFor(event.id);
+    if (! mapped) return false;
+    const auto action = std::optional<mu_core::ControlAction>(resolve(*mapped));
 
     // A layer that does not exist is a dark pad: pressing it does nothing.
     using T = mu_core::ControlActionType;
@@ -148,7 +149,7 @@ bool SurfaceModel::handle(const SurfaceEvent& event)
     if (accepted && arrow >= 0)
     {
         arrowFlashMs[(size_t) arrow] = clock();
-        if (arrow >= 2) pulsingArrow = arrow;
+        if (arrow == 2 || arrow == 3) pulsingArrow = arrow;   // only the preset arrows wait on a queued switch
         if (onChanged) onChanged();   // the lights now differ from the frame drawn while the sink performed
     }
     return accepted;
@@ -163,6 +164,8 @@ int SurfaceModel::arrowSlot(mu_core::ControlActionType type) const noexcept
         case T::AppNext:         return 1;
         case T::PerformancePrev: return 2;
         case T::PerformanceNext: return 3;
+        case T::PagePrev:        return 4;
+        case T::PageNext:        return 5;
         default:                 return -1;
     }
 }
@@ -183,6 +186,13 @@ SurfaceModel::Light SurfaceModel::topLight(mu_core::ControlActionType type, doub
         case T::PerformanceNext:   // white, dark when there is nothing to step to
             if (playableItems(view) >= 2) steady = { Level::Bright, scaleRgb(look.whiteRgb, kArrowRestScale) };
             break;
+        case T::PagePrev:
+        case T::PageNext:   // white while there is a page that way; dim at the end (no wrap), the on-pad page indicator
+        {
+            const bool more = type == T::PagePrev ? view.getShownPage() > 0 : view.getShownPage() < view.getPageCount() - 1;
+            steady = more ? Light { Level::Bright, scaleRgb(look.whiteRgb, kArrowRestScale) } : Light { Level::Dim, look.whiteRgb };
+            break;
+        }
         case T::ClipPrev:
         case T::ClipNext:   // dim white when the selected layer has two stored clips to step between
         {
@@ -211,9 +221,19 @@ SurfaceModel::Light SurfaceModel::topLight(mu_core::ControlActionType type, doub
     if (steady.level == Level::Off || arrow < 0) return steady;
     const double since = nowMs - arrowFlashMs[(size_t) arrow];
     if (since >= 0.0 && since < (double) look.stepFlashMs) return { Level::Burst, look.whiteRgb, false };
-    if (arrow >= 2 && pulsingArrow == arrow && view.getQueuedItem() >= 0) return { Level::Pulse, look.whiteRgb, false };
+    if ((arrow == 2 || arrow == 3) && pulsingArrow == arrow && view.getQueuedItem() >= 0) return { Level::Pulse, look.whiteRgb, false };
     steady.settle = since >= 0.0 && since < (double) look.stepFlashMs + kBurstTailMs;
     return steady;
+}
+
+mu_core::ControlAction SurfaceModel::resolve(mu_core::ControlAction a) const
+{
+    using T = mu_core::ControlActionType;
+    if (! profile.layerPages) return a;
+    if (a.type == T::ClipPrev) a.type = T::PagePrev;
+    else if (a.type == T::ClipNext) a.type = T::PageNext;
+    else if (a.type == T::SelectLayer || a.type == T::LaunchClip) a.layer += view.getShownPage() * mu_limits::kLayersPerPage;
+    return a;
 }
 
 uint32_t SurfaceModel::layerRgb(int layer) const
@@ -244,6 +264,8 @@ SurfaceModel::Light SurfaceModel::lightFor(const mu_core::ControlAction& a, doub
         case T::AppNext:
         case T::PerformancePrev:
         case T::PerformanceNext:
+        case T::PagePrev:
+        case T::PageNext:
         case T::ClipPrev:
         case T::ClipNext:
         case T::MuteSelectedLayer:
@@ -290,7 +312,7 @@ std::vector<LedState> SurfaceModel::frame(double nowMs, bool* animating) const
 
     for (const auto& b : bindings)
     {
-        const auto light = lightFor(b.action, nowMs);
+        const auto light = lightFor(resolve(b.action), nowMs);
         if (light.level == Level::Off) continue;
         applyLight(out, b.id, light, nowMs, animating);
     }

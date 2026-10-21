@@ -770,6 +770,49 @@ public:
             s.removeListener(&l);
         }
 
+        beginTest("PagePrev and PageNext move the selection one page at the same position, never wrap, and need the mode and a paged product");
+        {
+            Fake f; f.layers = 16; LiveState s; ready(f, s, 2);
+            bool paged = true;
+            auto cb = f.callbacks();
+            cb.hasLayerPages = [&paged] { return paged; };
+            s.setCallbacks(cb);
+            expect(LiveState::handles(ControlActionType::PagePrev) && LiveState::handles(ControlActionType::PageNext));
+            expect(actionFromName(actionName(ControlActionType::PagePrev)) == ControlActionType::PagePrev);
+            expect(actionFromName("pageNext") == ControlActionType::PageNext);
+            expectEquals(s.getPageCount(), 2);
+            expectEquals(s.getShownPage(), 0);
+            expect(! s.perform(act(ControlActionType::PagePrev)), "first page: no previous page");
+            expectEquals(s.getSelectedLayer(), 2);
+            CountingListener l; s.addListener(&l);
+            expect(s.perform(act(ControlActionType::PageNext)));
+            expectEquals(s.getSelectedLayer(), 10, "slot 3 goes to slot 11");
+            expectEquals(s.getShownPage(), 1);
+            expectEquals(l.calls, 1);
+            expect(! s.perform(act(ControlActionType::PageNext)), "last page: no next page");
+            expectEquals(l.calls, 1, "a refused page change notifies no one");
+            expect(s.perform(act(ControlActionType::PagePrev)));
+            expectEquals(s.getSelectedLayer(), 2);
+            s.removeListener(&l);
+
+            paged = false;
+            expect(! s.hasLayerPages());
+            expect(! s.perform(act(ControlActionType::PageNext)), "a product without pages refuses");
+            paged = true;
+            s.perform(mode(0));
+            expect(! s.perform(act(ControlActionType::PageNext)), "mode off: refused");
+        }
+
+        beginTest("a partial last page clamps the target to the last layer");
+        {
+            Fake f; f.layers = 10; LiveState s; ready(f, s, 5);
+            auto cb = f.callbacks();
+            cb.hasLayerPages = [] { return true; };
+            s.setCallbacks(cb);
+            expect(s.perform(act(ControlActionType::PageNext)));
+            expectEquals(s.getSelectedLayer(), 9, "slot 6 has no partner on a two-slot page: the last slot");
+        }
+
         beginTest("the transport state comes through the owner's callbacks; a change outside the pad refreshes the lamps");
         {
             LiveState bare;

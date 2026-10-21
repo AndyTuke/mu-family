@@ -17,7 +17,8 @@ bool LiveState::handles(ControlActionType t) noexcept
         || t == ControlActionType::PerformancePrev || t == ControlActionType::PerformanceNext
         || t == ControlActionType::SelectLayer || t == ControlActionType::LaunchClip
         || t == ControlActionType::ClipNext || t == ControlActionType::ClipPrev || t == ControlActionType::LaunchScene
-        || t == ControlActionType::AppPrev || t == ControlActionType::AppNext;
+        || t == ControlActionType::AppPrev || t == ControlActionType::AppNext
+        || t == ControlActionType::PagePrev || t == ControlActionType::PageNext;
 }
 
 void LiveState::changed()
@@ -132,8 +133,24 @@ bool LiveState::perform(const ControlAction& a)
         case T::AppNext:         return false;   // not available: there is no multi-app hub to switch to
         case T::ClipNext:        return stepClip(+1);
         case T::ClipPrev:        return stepClip(-1);
+        case T::PagePrev:        return stepPage(-1);
+        case T::PageNext:        return stepPage(+1);
         default: return false;
     }
+}
+
+// Moves the selection to the same position on the adjacent page. The page is the selection's, so this is the whole page change;
+// the last page may be partial, so the target is clamped to the last layer and must still land on the new page.
+bool LiveState::stepPage(int direction)
+{
+    if (! hasLayerPages()) return false;
+    const int layers  = cb.layerCount ? cb.layerCount() : 1;
+    const int perPage = mu_limits::kLayersPerPage;
+    const int page    = selectedLayer / perPage + direction;
+    if (page < 0 || page * perPage >= layers) return false;
+    const int target = juce::jmin(layers - 1, page * perPage + selectedLayer % perPage);
+    if (target != selectedLayer) { selectedLayer = target; changed(); }
+    return true;
 }
 
 void LiveState::cancelQueuedItem()

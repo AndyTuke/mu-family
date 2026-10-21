@@ -433,6 +433,9 @@ public:
     // True for a product that offers scenes on a controller surface (the Launchpad's scene picker): mu-Tronic. Every product can
     // launch a scene (LaunchScene is a ControlAction); this only says the surface should show the picker.
     virtual bool offersSceneControls() const { return false; }
+    // True for a product whose layers span several pages that a controller surface should page through (PagePrev / PageNext on
+    // the top row): mu-Tronic. The page is the one the selected layer is on, so the screen and the surface share it.
+    virtual bool offersLayerPages() const { return false; }
     uint8_t clipMask(int slot) const;
     // How many clips layer `slot` stores (0 for no such layer).
     int     clipCount(int slot) const

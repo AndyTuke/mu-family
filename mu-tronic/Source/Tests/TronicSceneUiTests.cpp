@@ -73,6 +73,9 @@ struct MuTronicSceneUiTests : juce::UnitTest
             mu_seam_test::TempStorage storage;
             UiProcessor p;
             expect(p.getLiveView()->hasSceneControls());
+            expect(p.getLiveView()->hasLayerPages(), "and the page buttons: sixteen slots, two pages");
+            expectEquals(p.getLiveView()->getPageCount(), 2);
+            expectEquals(p.getLiveView()->getShownPage(), 0);
             const auto launch = p.getLiveView()->getLastSceneLaunch();
             expectEquals((int) launch.serial, 0);
             expectEquals(launch.clip, -1);

@@ -58,6 +58,7 @@ public:
         std::function<int(int)>       savedClip;             // the clip layer n was saved playing (-1 = none, or it is not stored any more)
         std::function<bool(int, int)> clipFitsLayer;         // clip c of layer n is of the layer's own type (optional: absent = it is)
         std::function<bool()>         hasSceneControls;      // this product offers scenes on a surface (optional: absent = no)
+        std::function<bool()>         hasLayerPages;         // this product offers layer pages on a surface (optional: absent = no)
     };
 
     void setCallbacks(Callbacks c) { cb = std::move(c); }
@@ -85,6 +86,7 @@ public:
     { return ! cb.clipFitsLayer || cb.clipFitsLayer(layer, clip); }
     SceneLaunch                   getLastSceneLaunch() const override { return lastScene; }
     bool                          hasSceneControls() const override   { return cb.hasSceneControls && cb.hasSceneControls(); }
+    bool                          hasLayerPages() const override      { return cb.hasLayerPages && cb.hasLayerPages(); }
     bool isTransportPlaying() const override      { return cb.transportPlaying && cb.transportPlaying(); }
     bool isTransportOwnedOutside() const override { return cb.transportOutside && cb.transportOutside(); }
     void addListener(Listener* l) const override    { listeners.add(l); }
@@ -96,7 +98,7 @@ public:
 
     // ── Actions ──────────────────────────────────────────────────────────────
     // True for the types this class owns: PerformanceMode, PerformanceItem, PerformancePrev, PerformanceNext, SelectLayer,
-    // LaunchClip, ClipNext, ClipPrev.
+    // LaunchClip, ClipNext, ClipPrev, PagePrev, PageNext.
     static bool handles(ControlActionType t) noexcept;
 
     // Performs one of those. Every one but PerformanceMode and LaunchClip returns false while the mode is off
@@ -111,6 +113,8 @@ public:
     // none. A layer already playing that clip is left alone (a scene never mutes), one with a different clip waiting
     // has its wait cancelled, and a layer with no such clip, or whose clip is refused, keeps playing as it is.
     // True when at least one layer launched or already plays the clip.
+    // PagePrev / PageNext (mode on, product offers pages): select the layer at the same position on the adjacent page, clamped
+    // to the last layer; refused at the first / last page, so the page buttons do not wrap. The page itself is derived from the selection.
     bool perform(const ControlAction& action);
 
     // The owner's "a full-preset swap just committed" hook (message thread): the queued item becomes
@@ -177,6 +181,7 @@ private:
     static bool inRange(int layer) noexcept { return layer >= 0 && layer < mu_limits::kMaxLayers; }
     bool startClip(int layer, int clip);
     bool stepClip(int direction);
+    bool stepPage(int direction);
     bool launchScene(int clip);
     void setPlaying(int layer, int clip);
     bool dropClipState();           // forgets every layer's playing and queued clip; true when something was set

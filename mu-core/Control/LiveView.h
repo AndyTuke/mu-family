@@ -1,5 +1,6 @@
 #pragma once
 
+#include "MuLimits.h"
 #include "Persistence/PerformanceFile.h"
 #include <juce_core/juce_core.h>
 #include <cstdint>
@@ -51,6 +52,15 @@ public:
     virtual SceneLaunch                   getLastSceneLaunch() const { return {}; }
     // The product offers scenes on a surface (the picker): false for a product whose scenes are a screen and MIDI matter only.
     virtual bool                          hasSceneControls() const { return false; }
+
+    // Layer pages (a host with more layers than mu_limits::kLayersPerPage): the surface's rows are the layers of the shown page.
+    // The page is a view of the selection, never state of its own: it is the page of the selected layer, so the screen,
+    // which follows the selection, and the surface always agree. False for a product that does not offer pages on a surface.
+    virtual bool                          hasLayerPages() const { return false; }
+    int                                   getPageCount() const
+    { const int n = getLayerCount(); return n <= 0 ? 1 : (n + mu_limits::kLayersPerPage - 1) / mu_limits::kLayersPerPage; }
+    int                                   getShownPage() const
+    { const int sel = getSelectedLayer(); return sel <= 0 ? 0 : sel / mu_limits::kLayersPerPage; }
 
     // The transport as the surface lights it. Defaults suit a view with no transport (stopped, owned by nobody).
     virtual bool                          isTransportPlaying() const        { return false; }   // the internal clock runs

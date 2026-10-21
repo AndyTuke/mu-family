@@ -60,6 +60,8 @@ public:
 
     // The Launchpad's scene picker (hold the logo, press a column) belongs to this product.
     bool offersSceneControls() const override { return true; }
+    // Sixteen slots in two pages of eight: the Launchpad's top-row 5 and 6 turn the page.
+    bool offersLayerPages() const override { return true; }
 
     // ── Slots ────────────────────────────────────────────────────────────────
     // Sixteen fixed slots; a deleted layer leaves its slot Empty and nothing shifts. Two slots, empty or not, can
