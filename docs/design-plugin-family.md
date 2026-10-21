@@ -471,6 +471,35 @@ throughout; the stages marked **O** also wait for owner decisions on behaviour o
    *strip*, not the slot index: it travels with the strip on swap (exchanged) and remove (copied in the shift), so a
    ducked strip never un-ducks for ~90 ms when it lands on another ducked strip's slot. It is zeroed only where the
    strip itself is new or cleared: `addLayer`, `resetLayer`, and the vacated top slot after a remove.
+   **Reorder semantics follow the host kind (ruled 2026-10-21, T1c review).** A *list* host (`layersAreSlots()` false:
+   mu-Clid, mu-Tant, mu-Toni, mu-On) moves a layer by a chain of adjacent `swapLayers`, so the layers in between shift:
+   that is what a list means. A *slot* host (`layersAreSlots()` true: mu-Tronic) has fixed slots that are the
+   Launchpad rows and the player's muscle memory, so a drag exchanges **exactly two slots** with one `swapLayers(src, dst)`
+   (an Empty target takes the layer, the layer's slot becomes Empty) and nothing in between moves. The branch is in the one
+   shared `LayerSidebar::commitDrag` and is keyed on `layersAreSlots()`; the list branch is not changed. One call is also
+   atomic: a swap is all or nothing, so a timed-out quiesce (design 2.1.2) can never leave a half-rotated chain.
+   `swapLayers` returning false leaves every slot as it was; the sidebar then cancels the drag and keeps the selection.
+   **A user-initiated edit is not retried**: the grace is 50 ms and a miss means the audio thread is stuck in a very long block;
+   a queued reorder applied later would surprise the player. Only edits the system queues itself (bin service, a staged
+   commit) retry on the next deferred-work pass.
+   **Hook naming:** the "let go of this layer" callback is `onLayerLeaving(slot)` (was `onLayerTypeChanging`): called on the
+   message thread, outside every lock, for a slot whose layer is about to be retired (`setLayerType`) or moved
+   (a Published `swapLayers`, for both slots). It is a single hook for both because the editor's obligation is the same
+   (drop every pointer into that layer). List hosts' TryLock swap does not call it and need not.
+   **A layer's slot-tied state follows the layer through `Layer::onMoved(newIndex)`** (and `bindParams` for the cached
+   atomics): a noise seed derived from the slot is re-derived there with the same function the creation path uses, as the list
+   hosts' `layersMoved` already does for their engines, so two layers never share a seed after a delete and a create, and a
+   reset slot still equals a fresh one of its index. Never a product-level `layersMoved` override in a slot host: that would
+   switch on layer type in the processor (check-layer-boundary rule 10).
+   **Dormant parameter rows (accepted):** after a swap across type letters (Arp `a3_` with Kick `k5_`) the vacated letter's
+   rows keep their old values. They are not part of any layer's state, are never saved, and are reset by `setLayerType`
+   before any layer of that letter lands there. Automation lanes on a row address the slot, not the layer, so a lane that was on
+   a layer's old slot drives whatever sits there afterwards, as after a delete and re-create.
+   **Row listeners after a swap (accepted):** a service that listens to a type's rows (`RhythmSlotServices`) applies a row
+   write, queued or immediate, to whatever layer of that type now sits in the slot, reading the parameter's current value. The
+   swap moves the rows with the layers, so that value is the layer's own and the apply is redundant but harmless. Condition:
+   the row writes happen inside the quiesced window, so the dsp-controller checks the window's length with two Rhythm layers
+   swapped; if it is long, the writes move after the flag is lowered.
    **Reset layer** (`resetLayer`) means "back to a freshly added layer in this slot": layer data, parameters **and the
    mixer strip** (level, pan, sends, mute/solo, sidechain, output bus) all return to defaults, family-wide, as
    `addLayer` already does. The "mixer state stays with the slot" wording applies only to loading or saving a *layer
