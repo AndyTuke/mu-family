@@ -36,6 +36,7 @@ target_sources(mu-tronic
         Source/Persistence/TrackLayerTypes.cpp
         Source/Persistence/PatternLayerType.cpp
         Source/Persistence/RhythmLayerType.cpp
+        Source/Persistence/ProductImport.cpp
         Source/UI/EmptySlotChooser.cpp
         Source/UI/TronicSettingsOverlay.cpp
         ${MU_TONI_LAYER_UI_SOURCES}   # the Arp type's UI content (mu-toni-layer)
@@ -129,6 +130,7 @@ target_sources(mu-tronic-tests PRIVATE
     Source/Tests/TronicRhythmTests.cpp      # the Rhythm type in a slot: saved rows, same stream as mu-Clid, parameter sync, samples, MIDI out, tails, .muRhythm presets
     Source/Tests/TronicMidiInTests.cpp      # per-layer MIDI In: the strip row, channel routing, carried keys, save / swap, the load meter
     Source/Tests/TronicSceneTests.cpp       # type-carrying clips, scenes (one boundary), clip banks in the saved state, performance files of full presets
+    Source/Tests/TronicImportTests.cpp      # Import product preset: a real fixture per product, a Rumble source, sidechain remap, refusals, the saved state after
     Source/Tests/TronicSceneUiTests.cpp     # what the editor reads: Notes In and clip-bank types, the scene picker offer, scene launch reports
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
@@ -138,6 +140,7 @@ target_sources(mu-tronic-tests PRIVATE
     Source/Persistence/TrackLayerTypes.cpp
     Source/Persistence/PatternLayerType.cpp
     Source/Persistence/RhythmLayerType.cpp
+    Source/Persistence/ProductImport.cpp
     # The mu-core .cpps behind ProcessorBase (the console target can't link mu-core directly).
     ${MU_CORE_PROCESSOR_TEST_SOURCES}
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/Wavetable/WavetableBank.cpp"   # the Arp type's oscillator tables
@@ -178,6 +181,8 @@ target_link_libraries(mu-tronic-tests PRIVATE
 
 # Preset files written by the real mu-Toni and mu-On, round-tripped through a slot (Tests/TronicLayerPresetTests.cpp).
 target_compile_definitions(mu-tronic-tests PRIVATE "MU_TRONIC_FIXTURE_DIR=\"${CMAKE_SOURCE_DIR}/tests/presets/mu-tronic-slot\"")
+# Full presets written by the real mu-Clid, mu-Tant, mu-Toni and mu-On, imported into slots (Tests/TronicImportTests.cpp).
+target_compile_definitions(mu-tronic-tests PRIVATE "MU_TRONIC_IMPORT_FIXTURE_DIR=\"${CMAKE_SOURCE_DIR}/tests/presets/mu-tronic-import\"")
 target_compile_definitions(mu-tronic-tests PRIVATE MU_MAX_LAYERS=16 MU_MAX_BUSES=3 MU_BUS_INSERTS=2 JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
 
 add_dependencies(mu-tronic mu-tronic-tests)

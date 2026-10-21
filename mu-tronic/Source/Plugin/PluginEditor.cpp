@@ -128,6 +128,10 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     forwardKnobStatus(layerPanel);
 
+    // The browser's footer offers the product-preset import.
+    presetBrowser.onImportProductPreset = [this] { chooseProductPreset(); };
+    presetBrowser.refreshFooter();
+
     // The CPU readout: shown in Performance mode too (the one figure a player needs on stage).
     getStatusBar().setCpuMeterVisible(true);
     startTimerHz(4);
@@ -141,6 +145,30 @@ PluginEditor::~PluginEditor()
     layerPanel.getHeader().onNameChanged = nullptr;   // the processor can outlive the editor
     proc.onLayerLeaving = nullptr;
     proc.onLayerPresetCommitted = nullptr;
+    presetBrowser.onImportProductPreset = nullptr;
+}
+
+void PluginEditor::chooseProductPreset()
+{
+    importChooser = std::make_unique<juce::FileChooser>("Import a product preset", juce::File(), "*.muClid;*.muTant;*.muToni;*.muOn");
+    importChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                               [this](const juce::FileChooser& fc)
+                               {
+                                   const auto file = fc.getResult();
+                                   if (file != juce::File()) importProductPreset(file);
+                               });
+}
+
+void PluginEditor::importProductPreset(const juce::File& file)
+{
+    const auto result = proc.importProductPreset(file);
+    if (result.ok)
+    {
+        showPresetBrowser(false);
+        getStatusBar().showParam("Import", result.message);
+    }
+    else
+        getStatusBar().showParam("Import failed", result.message, MuLookAndFeel::colour(MuLookAndFeel::knobLevel));
 }
 
 LayerContent* PluginEditor::contentFor(mu_core::LayerTypeId type)

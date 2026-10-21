@@ -13,10 +13,13 @@ public:
     std::function<void()>                  onClose;
     // Opens the Performance chooser: a "Performances" button in the footer, shown only while this is set.
     std::function<void()>                  onChoosePerformance;
+    // Starts an import of a product's preset (mu-Tronic): an "Import product preset..." button in the footer, shown only
+    // while this is set and not while picking.
+    std::function<void()>                  onImportProductPreset;
 
     PresetBrowser();
 
-    // Call after setting or clearing onChoosePerformance.
+    // Call after setting or clearing onChoosePerformance or onImportProductPreset.
     void refreshFooter();
 
     // Pick mode: the next Pick (button or double-click) hands the chosen preset to `picked` instead of
@@ -67,6 +70,7 @@ private:
     juce::TextButton  loadBtn   { "Load" };
     juce::TextButton  closeBtn  { "Close" };
     juce::TextButton  performancesBtn { "Performances" };
+    juce::TextButton  importBtn { "Import product preset..." };
 
     std::vector<PresetInfo> allPresets;
     std::vector<int>        filteredIndices;

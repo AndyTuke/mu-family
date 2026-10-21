@@ -271,6 +271,19 @@ Reviewed on screen: chooser with eight choices, Rhythm, Pattern, Arp, Kick and R
 
 mu-tronic reads and writes the **same layer-preset folders as the products**: `.muRhythm` (mu-Clid), `.muPattern` (mu-Tant), `.muArp` (mu-Toni), `.muTrack` (mu-On), factory and user. A layer saved in mu-tronic appears in the product and the other way round; no copy, no mu-tronic-only folder. The preset browser and the header dropdown therefore show the same names, and the Save dialog's wording is the family's. The full-instance preset (`.muTronic`) is mu-tronic's own file type in its own folder (design.md). Folder paths and how a layer preset's type is recognised are the architecture-steward's; the UI only requires that the dropdown rules of 4.3 hold.
 
+### 4.7a Import product preset (ruled 2026-10-21, T8b)
+
+- **Where:** the shared `PresetBrowser` footer, beside Load / Close, exactly as the "Performances" button is done: a new `std::function<void()> onImportProductPreset` that shows the button only while set (`refreshFooter()` decides), a `juce::TextButton`, no new control. mu-tronic's editor sets it; the products never do. The transport preset group is not touched.
+- **Button:** `Import product preset...` (the dots because a file chooser follows). Tooltip: `Lay the layers of a mu-Clid, mu-Tant, mu-Toni or mu-On preset into empty slots`.
+- **Chooser title:** `Import a product preset`. Filter `*.muClid;*.muTant;*.muToni;*.muOn`.
+- **Confirm:** none. Filled slots are never touched, so nothing is overwritten; the refusal below is the only guard.
+- **Status lines (StatusBar, family style):**
+  - success: `Imported N layers from <name>` (`Imported 1 layer from <name>`)
+  - too few slots: `Needs N free slots, 3 free` (N and the free count are numbers; nothing is imported)
+  - unreadable or legacy file: `Could not read <file>` (nothing is imported)
+  - wrong extension: `Not a product preset: <file>` (nothing is imported)
+- The browser closes after a success and stays open after any refusal.
+
 ### 4.8 Notes In: the per-layer MIDI channel (ruled 2026-10-21)
 
 Not ruled before. Every layer has one MIDI-in channel (design.md: `ch{N}_midiIn`, 0 = Omni, 1 to 16; default Omni, which reproduces today's mu-Toni). It is the layer's routing, used by every type that reads notes, so it sits with the layer's identity and preset controls, not in Settings (one Settings row would be one control for sixteen layers; that is why the Note mode control also left Settings, 4.5b).

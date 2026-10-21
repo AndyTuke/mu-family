@@ -44,6 +44,10 @@ private:
     // The shown slot's MIDI-in channel (the header's Notes In control reads and writes ch{N}_midiIn).
     int  notesInChannel() const;
     void setNotesInChannel(int channel);
+    // The Preset Browser's "Import product preset..." button: asks for a product's full preset and lays its layers into the
+    // Empty slots (PluginProcessor::importProductPreset); the browser closes after a success, the status bar reports either way.
+    void chooseProductPreset();
+    void importProductPreset(const juce::File& file);
     // The status bar's CPU readout, refreshed from the processor's peak four times a second.
     void timerCallback() override;
 
@@ -57,6 +61,7 @@ private:
     std::vector<std::pair<mu_core::LayerTypeId, std::unique_ptr<LayerContent>>> contents;   // one per type shown so far
     LayerContent* shownContent = nullptr;
     juce::String  effectSendName;   // the mixer effect's current name; empty until the mixer reports it
+    std::unique_ptr<juce::FileChooser> importChooser;   // alive while the import file dialog is open
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };

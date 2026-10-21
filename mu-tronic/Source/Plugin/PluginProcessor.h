@@ -94,6 +94,19 @@ public:
     juce::ValueTree captureFullPreset() override { return captureState(); }
     void            useLoadedFullPreset(juce::ValueTree state) override;
 
+    // What importProductPreset did: `message` is the status line for the user either way.
+    struct ImportResult
+    {
+        bool         ok = false;
+        int          imported = 0;
+        juce::String message;
+    };
+    // Message thread. Lays the layers of a product's full preset (.muClid, .muTant, .muToni, .muOn) into the Empty slots, in
+    // order, each starting from the values the preset saved (Persistence/ProductImport.h). A filled slot is never touched:
+    // with fewer free slots than layers nothing is imported and the result says so. Strips follow their layers (a
+    // sidechain source is remapped to the slot its layer landed in); the preset's global FX and master are ignored.
+    ImportResult importProductPreset(const juce::File& file);
+
     // The state tree of a host session or a full preset (message thread).
     juce::ValueTree captureState();
     // Applies a composed state: each slot's type first (a changed type goes through setLayerType, so nothing is

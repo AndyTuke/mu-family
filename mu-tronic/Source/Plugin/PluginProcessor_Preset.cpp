@@ -1,5 +1,7 @@
 #include "Plugin/PluginProcessor.h"
 #include "Persistence/PresetFiles.h"   // mu-core: shared preset-file handling
+#include "Persistence/ProductImport.h" // reading a product's full preset as layers
+#include "Persistence/TrackLayerTypes.h" // chooseRumbleSource
 
 // mu-Tronic preset I/O on the family composed state (mu-core LayerState): full presets (.muTronic) and the standalone
 // session are the same state tree, with each slot's type and name added to its node (Persistence/TronicState.h).
@@ -63,6 +65,84 @@ void PluginProcessor::applyStateTree(const juce::ValueTree& state)
 void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
 {
     layerSwapper.useFull(toLayerState(state));
+}
+
+// Import a product's full preset into the Empty slots (see the header). Two steps: plan, which refuses before anything
+// changes, then lay each layer into its slot through the one path a loaded layer preset uses (setLayerType with the node).
+PluginProcessor::ImportResult PluginProcessor::importProductPreset(const juce::File& file)
+{
+    ImportResult result;
+    const auto imported = readProductPreset(file, layerTypes);
+    if (! imported.ok())
+    {
+        result.message = imported.error.isNotEmpty() ? imported.error : "Could not read " + file.getFileName();
+        return result;
+    }
+
+    // The free slots, in order: an Empty slot is the only kind an import may use.
+    std::vector<int> freeSlots;
+    bool hasPattern = false;
+    for (int s = 0; s < mu_limits::kMaxLayers; ++s)
+    {
+        const auto type = getLayerTypeId(s);
+        if (type == mu_core::LayerTypeId::Empty) freeSlots.push_back(s);
+        hasPattern = hasPattern || type == mu_core::LayerTypeId::Pattern;
+    }
+    const int needed = (int) imported.entries.size();
+    if (needed > (int) freeSlots.size())
+    {
+        result.message = "Needs " + juce::String(needed) + " free slots, " + juce::String((int) freeSlots.size()) + " free";
+        return result;
+    }
+
+    // Where each product layer lands, for the sidechain sources and a Rumble's source.
+    std::vector<int> slotOfSource((size_t) kProductLayers, -1);
+    for (int i = 0; i < needed; ++i)
+        slotOfSource[(size_t) imported.entries[(size_t) i].sourceIndex] = freeSlots[(size_t) i];
+
+    // Phase 1: the layers, each with the preset's own values as its first state.
+    for (int i = 0; i < needed; ++i)
+    {
+        auto layer = imported.entries[(size_t) i];
+        const int slot = freeSlots[(size_t) i];
+        if (layer.type == mu_core::LayerTypeId::Rumble && layer.rumbleSource >= 0 && layer.rumbleSource < kProductLayers
+            && slotOfSource[(size_t) layer.rumbleSource] >= 0)
+            setRumbleSourceRow(layer.node, slotOfSource[(size_t) layer.rumbleSource]);
+        if (! setLayerType(slot, layer.type, &layer.node)) continue;
+        if (auto* l = getLayer(slot)) l->name = layer.name.toStdString();
+        ++result.imported;
+    }
+
+    // Phase 2: a Rumble whose source was not imported (or is not usable) listens to the first filled slot that can be one.
+    for (int i = 0; i < needed; ++i)
+        if (imported.entries[(size_t) i].type == mu_core::LayerTypeId::Rumble)
+            chooseRumbleSource(*this, freeSlots[(size_t) i]);
+
+    // Phase 3: the mixer strips, then the Pattern layers' shared tonal centre when this import brings the first Pattern.
+    for (int i = 0; i < needed; ++i)
+    {
+        const int slot = freeSlots[(size_t) i];
+        for (const auto& row : imported.entries[(size_t) i].strip)
+        {
+            auto* param = apvts.getParameter("ch" + juce::String(slot) + "_" + row.suffix);
+            if (param == nullptr) continue;
+            double actual = row.normalised ? (double) param->convertFrom0to1((float) row.value) : row.value;
+            if (row.suffix == "scSrc") actual = remapImportedSidechain((int) std::lround(row.value), slot, slotOfSource);
+            param->setValueNotifyingHost(param->convertTo0to1((float) actual));
+        }
+    }
+    if (! hasPattern)
+        for (const auto& g : imported.globals)
+            if (auto* param = apvts.getParameter(g.id))
+                param->setValueNotifyingHost(param->convertTo0to1((float) g.value));
+
+    if (onLayerPresetCommitted)
+        for (int i = 0; i < needed; ++i) onLayerPresetCommitted(freeSlots[(size_t) i]);
+
+    result.ok = result.imported == needed;
+    result.message = "Imported " + juce::String(result.imported) + (result.imported == 1 ? " layer from " : " layers from ")
+                   + imported.presetName;
+    return result;
 }
 
 } // namespace mu_tronic

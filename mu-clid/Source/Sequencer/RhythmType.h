@@ -475,12 +475,15 @@ inline void attachRhythmServices(Layer& layer, mu_core::LayerServices& services,
 // file boundary, so a file saved by mu-Clid loads into a slot and the reverse (the sample, modulators and parameters
 // travel; the file's name, colour, category and embedded sample are not a slot's to take).
 
-inline juce::ValueTree rhythmPresetFileToNode(const juce::ValueTree& file, const juce::String& name)
+// The composed node of a rhythm read from `file`: a .muRhythm root (prefix "r0_", sample key "r0_sample") or a
+// .muClid <Rhythm> child (no prefix, sample key "sample"). `rootType` is the node's tag.
+inline juce::ValueTree rhythmSourceToNode(const juce::ValueTree& file, const juce::String& prefix, const juce::Identifier& rootType,
+                                          const juce::String& name)
 {
     // The same reader mu-Clid loads with (migrations included); no file work, nothing reported.
-    const Rhythm r = rhythm_preset::readRhythm(file, "r0_", RhythmPresetContext {}, name);
+    const Rhythm r = rhythm_preset::readRhythm(file, prefix, RhythmPresetContext {}, name);
 
-    juce::ValueTree node(file.getType());
+    juce::ValueTree node(rootType);
     for (int j = 0; j < kRhythmParamCount; ++j)
     {
         juce::ValueTree row(mu_pp::kRowTag);
@@ -489,11 +492,23 @@ inline juce::ValueTree rhythmPresetFileToNode(const juce::ValueTree& file, const
         node.appendChild(row, nullptr);
     }
     node.appendChild(mu_pp::serialiseModulators(r), nullptr);
-    node.setProperty("sample", file.getProperty("r0_sample"), nullptr);
+    node.setProperty("sample", file.getProperty(prefix.isEmpty() ? "sample" : prefix + "sample"), nullptr);
     for (const char* embedded : { "sampleData", "sampleDataCodec", "sampleDataBits", "sampleName" })
         if (file.hasProperty(embedded))
             node.setProperty(embedded, file.getProperty(embedded), nullptr);
     return node;
+}
+
+inline juce::ValueTree rhythmPresetFileToNode(const juce::ValueTree& file, const juce::String& name)
+{
+    return rhythmSourceToNode(file, "r0_", file.getType(), name);
+}
+
+// A .muClid full preset's <Rhythm> child as the composed node of a .muRhythm (root tag `rootType`): what a slot host
+// imports a product preset's rhythm through. The child's name, mixer strip and clips are the caller's to read.
+inline juce::ValueTree rhythmChildToNode(const juce::ValueTree& child, const juce::Identifier& rootType, const juce::String& name)
+{
+    return rhythmSourceToNode(child, {}, rootType, name);
 }
 
 inline juce::ValueTree rhythmPresetNodeToFile(const juce::ValueTree& node, const juce::String& name)
