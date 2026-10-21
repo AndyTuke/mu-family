@@ -129,6 +129,7 @@ target_sources(mu-tronic-tests PRIVATE
     Source/Tests/TronicRhythmTests.cpp      # the Rhythm type in a slot: saved rows, same stream as mu-Clid, parameter sync, samples, MIDI out, tails, .muRhythm presets
     Source/Tests/TronicMidiInTests.cpp      # per-layer MIDI In: the strip row, channel routing, carried keys, save / swap, the load meter
     Source/Tests/TronicSceneTests.cpp       # type-carrying clips, scenes (one boundary), clip banks in the saved state, performance files of full presets
+    Source/Tests/TronicSceneUiTests.cpp     # what the editor reads: Notes In and clip-bank types, the scene picker offer, scene launch reports
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp

@@ -41,6 +41,16 @@ public:
     virtual bool                          isLayerMuted(int layer)   const = 0;   // the layer strip's mute
     // The name a clip was stored under (empty = unnamed, empty, or out of range). Defaults suit a view with no names.
     virtual juce::String                  getClipName(int layer, int clip) const { juce::ignoreUnused(layer, clip); return {}; }
+    // A stored clip can still be one the layer will not take: a host of typed slots refuses a clip of another layer type
+    // (it arrives only by loading a layer preset of another type over the slot). False = launching it does nothing.
+    virtual bool                          isClipForLayer(int layer, int clip) const { juce::ignoreUnused(layer, clip); return true; }
+
+    // The last scene launch (LaunchScene), so the screen can say what a press did wherever it came from: which clip,
+    // on how many layers it launched or already played, and a serial that changes with every launch (0 = none yet).
+    struct SceneLaunch { int clip = -1; int layers = 0; uint32_t serial = 0; };
+    virtual SceneLaunch                   getLastSceneLaunch() const { return {}; }
+    // The product offers scenes on a surface (the picker): false for a product whose scenes are a screen and MIDI matter only.
+    virtual bool                          hasSceneControls() const { return false; }
 
     // The transport as the surface lights it. Defaults suit a view with no transport (stopped, owned by nobody).
     virtual bool                          isTransportPlaying() const        { return false; }   // the internal clock runs

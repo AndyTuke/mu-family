@@ -790,6 +790,16 @@ public:
     static constexpr int kClipLabelW    = 30;   // the engraved "Clip" caption's slot
     static constexpr int kClipStripGap  = 8;    // between the strip and the preset dropdown
 
+    // The layer's Notes In control in the header bar (docs/design-ui-family.md 13.10): an engraved caption and a channel selector.
+    static constexpr int kNotesInLabelW = 44;
+    static constexpr int kNotesInW      = 92;
+
+    // The StatusBar's CPU readout (docs/design-ui-family.md section 6): its slot, and the load fractions where the number
+    // turns amber and red.
+    static constexpr int   kStatusCpuW = 64;
+    static constexpr float kCpuWarnAt  = 0.70f;
+    static constexpr float kCpuHotAt   = 0.90f;
+
     // Name plates (drawNamePlate): section and row names
 
 private:

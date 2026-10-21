@@ -56,6 +56,8 @@ public:
         std::function<bool()>         transportPlaying;      // the internal clock runs (optional)
         std::function<bool()>         transportOutside;      // a host / MIDI clock / Link owns play (optional)
         std::function<int(int)>       savedClip;             // the clip layer n was saved playing (-1 = none, or it is not stored any more)
+        std::function<bool(int, int)> clipFitsLayer;         // clip c of layer n is of the layer's own type (optional: absent = it is)
+        std::function<bool()>         hasSceneControls;      // this product offers scenes on a surface (optional: absent = no)
     };
 
     void setCallbacks(Callbacks c) { cb = std::move(c); }
@@ -79,6 +81,10 @@ public:
     { return inRange(layer) && clip >= 0 && clip < mu_limits::kClipsPerLayer ? clipState[(size_t) layer].names[(size_t) clip] : juce::String(); }
     bool                          isLayerMuted(int layer)   const override
     { return layer >= 0 && layer < getLayerCount() && cb.layerMuted && cb.layerMuted(layer); }
+    bool                          isClipForLayer(int layer, int clip) const override
+    { return ! cb.clipFitsLayer || cb.clipFitsLayer(layer, clip); }
+    SceneLaunch                   getLastSceneLaunch() const override { return lastScene; }
+    bool                          hasSceneControls() const override   { return cb.hasSceneControls && cb.hasSceneControls(); }
     bool isTransportPlaying() const override      { return cb.transportPlaying && cb.transportPlaying(); }
     bool isTransportOwnedOutside() const override { return cb.transportOutside && cb.transportOutside(); }
     void addListener(Listener* l) const override    { listeners.add(l); }
@@ -191,6 +197,7 @@ private:
     uint32_t               queuedSerial    = 0;   // the stage serial when the queued item was staged
     uint32_t               revision        = 0;
     std::array<ClipState, (size_t) mu_limits::kMaxLayers> clipState {};
+    SceneLaunch            lastScene;             // what the last LaunchScene did
     uint32_t               seenFullCommits = 0;   // the full-preset commit count the clip state was last settled against
     mutable juce::ListenerList<Listener> listeners;
 };

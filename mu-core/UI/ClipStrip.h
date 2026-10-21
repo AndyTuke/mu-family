@@ -85,6 +85,8 @@ private:
     void refresh();
     void updateTimer();
     bool storedAt(int pad) const;
+    bool refusedAt(int pad) const;                             // stored, but of another layer type than this layer's
+    static juce::String refusedText(int pad);                  // "Clip 3 is for a different layer type"
     bool playingAt(int pad) const;
     juce::String clipText(int pad) const;                      // "clip 3"
     std::pair<juce::String, juce::String> hoverFor(int pad) const;

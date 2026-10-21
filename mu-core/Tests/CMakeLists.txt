@@ -16,6 +16,7 @@ set(MU_CORE_TEST_SOURCES
     LayerSwapPublishedTests.cpp     # swapLayers on a Published host: quiesce, strips, tails, rows, references
     LayerPagingTests.cpp            # the sidebar and the mixer page a host of more than one page of layers
     ../UI/LayerSidebar.cpp
+    ../UI/SceneGrid.cpp
     ../UI/SidebarItem.cpp
     ../UI/MixerOverlay.cpp
     ../UI/FXRow.cpp
@@ -89,6 +90,9 @@ set(MU_CORE_TEST_SOURCES
     ShellChromeTests.cpp
     PerformanceModeShellTests.cpp
     ClipStripTests.cpp
+    SceneGridTests.cpp
+    LayerHeaderNotesInTests.cpp
+    StatusBarCpuTests.cpp
     StepEditorTests.cpp
     ../UI/ClipStrip.cpp
     ../UI/RhythmCircle.cpp

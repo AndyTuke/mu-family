@@ -10,6 +10,8 @@ LayerSidebar::LayerSidebar(ProcessorBase& processor, const juce::String& addButt
     addAndMakeVisible(addButton);
     addChildComponent(layerIndicator);
     addChildComponent(pageSwitch);
+    addChildComponent(sceneGrid);
+    sceneGrid.bind(proc.getLiveView(), proc.getControlSink());
 
     addButton.onClick = [this] { if (onAddLayer) onAddLayer(); };
     pageSwitch.onChange = [this](int page) { showPage(page); };
@@ -240,6 +242,14 @@ void LayerSidebar::pulseItem(int idx)
         items[(size_t) idx]->pulse();
 }
 
+void LayerSidebar::setShowScenes(bool show)
+{
+    if (showScenes == show) return;
+    showScenes = show;
+    sceneGrid.setVisible(show);
+    resized();
+}
+
 void LayerSidebar::setMetalStyle(bool m)
 {
     metal = m;
@@ -456,6 +466,16 @@ void LayerSidebar::resized()
     else
     {
         viewport.setBounds(0, top, w, h - 2 * top);
+    }
+
+    // The scene block sits at the foot above that slot (kSpaceS clear of it) and the items give up the room it takes.
+    sceneGrid.setVisible(showScenes);
+    if (showScenes)
+    {
+        const int blockH   = SceneGrid::blockHeight();
+        const int blockBot = (showAdd ? addButton.getY() : h - edgeY) - s(LF::kSpaceS);
+        sceneGrid.setBounds(edgeX, blockBot - blockH, w - 2 * edgeX, blockH);
+        viewport.setSize(w, juce::jmax(0, sceneGrid.getY() - s(2) - viewport.getY()));
     }
 
     // Spread the items evenly: equal gaps above, between and below them, capped so a few

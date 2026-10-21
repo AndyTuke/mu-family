@@ -430,6 +430,9 @@ public:
     // or whose clip is of another type than its slot, keeps playing. Returns whether any layer launched or already
     // plays it. Message thread.
     bool    launchScene(int clipIndex);
+    // True for a product that offers scenes on a controller surface (the Launchpad's scene picker): mu-Tronic. Every product can
+    // launch a scene (LaunchScene is a ControlAction); this only says the surface should show the picker.
+    virtual bool offersSceneControls() const { return false; }
     uint8_t clipMask(int slot) const;
     // How many clips layer `slot` stores (0 for no such layer).
     int     clipCount(int slot) const

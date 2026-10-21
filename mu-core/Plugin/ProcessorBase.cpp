@@ -97,6 +97,13 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
     {
         if (auto* l = getLayer(layer)) l->activeClip = clip;   // the saved shadow of the live playing clip
     };
+    cb.clipFitsLayer = [this](int layer, int clip)
+    {
+        const auto* l = getLayer(layer);
+        return l == nullptr || ! layersAreSlots() || ! l->clips->isOccupied(clip)
+            || layerPresetType(l->clips->get(clip)) == slotTypeId(layer);   // the same test launchClip makes
+    };
+    cb.hasSceneControls = [this] { return offersSceneControls(); };
     cb.transportPlaying = [this] { return isInternalPlaying(); };
     cb.transportOutside = [this] { return midiControlRouter.playIsOutside(); };
     liveState.setCallbacks(std::move(cb));

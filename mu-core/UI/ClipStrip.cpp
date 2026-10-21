@@ -1,5 +1,6 @@
 #include "ClipStrip.h"
 #include "UI/ConfirmDialog.h"
+#include "UI/Components/PadLamp.h"
 #include "MuLimits.h"
 
 static_assert(ClipStrip::kPads == mu_limits::kClipsPerLayer, "the strip shows one pad per stored clip");
@@ -192,8 +193,18 @@ void ClipStrip::say(const juce::String& name, const juce::String& value, bool ti
     });
 }
 
+// A stored clip this layer will not take: a typed slot refuses a clip of another layer type, so the pad says so
+// instead of offering to play it.
+bool ClipStrip::refusedAt(int pad) const
+{
+    return view != nullptr && storedAt(pad) && ! view->isClipForLayer(layer, pad);
+}
+
+juce::String ClipStrip::refusedText(int pad) { return "Clip " + juce::String(pad + 1) + " is for a different layer type"; }
+
 std::pair<juce::String, juce::String> ClipStrip::hoverFor(int pad) const
 {
+    if (refusedAt(pad)) return { "Clip", refusedText(pad) };
     juce::String state;
     switch (getLamp(pad))
     {
@@ -212,6 +223,7 @@ juce::String ClipStrip::getTooltip()
     if (isReadOnly()) return {};
     const int pad = padAt(computeLayout(getLocalBounds()), getMouseXYRelative());
     if (pad < 0) return {};
+    if (refusedAt(pad)) return refusedText(pad);
     return storedAt(pad) ? "Play clip " + juce::String(pad + 1) + " (click again to mute)"
                          : "Store this " + noun + " here";
 }
@@ -241,6 +253,13 @@ void ClipStrip::clickPad(int pad, bool shift)
     if (shift || ! storedAt(pad))   // Shift stores anywhere; a plain click on an empty pad stores too
     {
         storePad(pad);
+        return;
+    }
+
+    // A clip of another layer type is never launched: nothing is staged and no light changes, the status line says why.
+    if (refusedAt(pad))
+    {
+        say("Clip", refusedText(pad), true);
         return;
     }
 
@@ -336,7 +355,6 @@ void ClipStrip::paint(juce::Graphics& g)
 {
     using Id = MuLookAndFeel::ColourIds;
     using mu_ui::sf;
-    const auto& L = MuLookAndFeel::lighting();
     const double now = juce::Time::getMillisecondCounterHiRes();
     const auto layout = computeLayout(getLocalBounds());
 
@@ -351,23 +369,10 @@ void ClipStrip::paint(juce::Graphics& g)
         g.drawText("Clip", layout.caption, juce::Justification::centredLeft, true);
     }
 
-    // The pads: a dark base with the lit lens a pixel inside it, lit by the clip's state, its number engraved on top.
-    const float corner = sf((float) MuLookAndFeel::kLampCellCorner);
+    // The pads, lit by each clip's state; the lens and number are drawn by the one shared pad function.
     for (int i = 0; i < kPads; ++i)
     {
-        const auto cell  = layout.pads[(size_t) i].toFloat();
         const bool flash = flashUntil[(size_t) i] > now;
-        const float lit  = mu_ui::lampLit(lamps[(size_t) i], now, flash);
-
-        g.setColour(MuLookAndFeel::lampBase());
-        g.fillRoundedRectangle(cell, corner);
-        juce::Path lens;
-        lens.addRoundedRectangle(cell.reduced(1.0f), corner);
-        MuLookAndFeel::drawLamp(g, lens, {}, MuLookAndFeel::lampColour(colour, lit), cell.getCentre(),
-                                juce::jmax(cell.getWidth(), cell.getHeight()) * L.lampHotSpotReach);
-
-        // Muted grey on an unlit or dim lens, the dark base colour once the lens is lit.
-        const auto ink = lit >= L.lampOn ? MuLookAndFeel::lampBase() : MuLookAndFeel::colour(Id::mutedText);
-        MuLookAndFeel::drawEngravedText(g, juce::String(i + 1), layout.pads[(size_t) i], juce::Justification::centred, ink);
+        mu_ui::drawNumberedPad(g, layout.pads[(size_t) i], i + 1, colour, mu_ui::lampLit(lamps[(size_t) i], now, flash));
     }
 }

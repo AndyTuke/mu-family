@@ -30,6 +30,7 @@ struct FakeView : LiveView
     bool perf = false;
     int playing[kLayers] { -1, -1, -1, -1 }, queued[kLayers] { -1, -1, -1, -1 };
     uint8_t mask[kLayers] {};
+    uint8_t foreign[kLayers] {};   // bit n set = the layer's clip n is of another layer type than the layer's
     bool muted[kLayers] {};
     mu_pp::PerformanceFile performance;
     mutable juce::ListenerList<Listener> listeners;
@@ -48,6 +49,7 @@ struct FakeView : LiveView
     int  getQueuedClip(int l) const override { return l >= 0 && l < kLayers ? queued[l] : -1; }
     uint8_t getClipMask(int l) const override { return l >= 0 && l < kLayers ? mask[l] : (uint8_t) 0; }
     bool isLayerMuted(int l) const override { return l >= 0 && l < kLayers && muted[l]; }
+    bool isClipForLayer(int l, int c) const override { return l < 0 || l >= kLayers || ((foreign[l] >> c) & 1) == 0; }
     juce::String names[kLayers][8];
     juce::String getClipName(int l, int c) const override
     { return l >= 0 && l < kLayers && c >= 0 && c < 8 ? names[l][c] : juce::String(); }
@@ -410,6 +412,29 @@ public:
             bar.setBounds(0, 0, s(420), s(LayerHeaderBar::kHeight));
             bar.setShowClips(true);
             expect(bar.getPresetDropdown().getWidth() >= s(80), "the dropdown's floor is untouched");
+        }
+
+        beginTest("a stored clip of another layer type is refused: the status line says so, nothing is staged, no light changes");
+        {
+            Rig r;
+            r.set({ 0, 2, 4 }, 2);
+            r.view.foreign[1] = 0b0001'0000;   // layer 2's clip 5 is another type's (a Kick clip in a slot that became a Snare)
+            r.view.changed();
+            r.lines.clear();
+            const auto before = r.strip.getLamp(4);
+            r.strip.clickPad(4, false);
+            expect(r.sink.got.empty(), "nothing is staged");
+            expect(r.lines.contains("Clip|Clip 5 is for a different layer type"), r.lines.joinIntoString(" / "));
+            expect(r.strip.getLamp(4) == before, "no light changes");
+
+            r.lines.clear();
+            r.strip.clickPad(0, false);
+            expect(r.sent(ControlActionType::LaunchClip, 0), "a clip of the layer's own type still launches");
+            expect(! r.lines.contains("Clip|Clip 1 is for a different layer type"));
+
+            r.strip.clickPad(4, true);   // Shift still stores over it, asking first as for any stored clip that is not playing
+            expectEquals((int) r.asked.size(), 1);
+            if (! r.asked.empty()) expectEquals(r.asked[0].title, juce::String("Replace Clip"));
         }
 
         beginTest("Reset confirm: the clips line appears only when the bank is not empty");

@@ -58,6 +58,9 @@ public:
     float getCpuLoad() const noexcept { return cpuMeter.load(); }
     float getCpuPeak() const noexcept { return cpuMeter.peak(); }
 
+    // The Launchpad's scene picker (hold the logo, press a column) belongs to this product.
+    bool offersSceneControls() const override { return true; }
+
     // ── Slots ────────────────────────────────────────────────────────────────
     // Sixteen fixed slots; a deleted layer leaves its slot Empty and nothing shifts. Two slots, empty or not, can
     // swap (ProcessorBase::swapLayers, quiesced): the layer takes its strip, tails and rows with it.

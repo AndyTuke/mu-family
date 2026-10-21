@@ -294,6 +294,7 @@ bool LiveState::launchScene(int clip)
 
     // One staging batch: the audio thread flags the scene's layers at the same boundary or not at all.
     bool any = false;
+    int  reached = 0;   // layers that launched the clip or already play it
     {
         struct Batch
         {
@@ -309,15 +310,18 @@ bool LiveState::launchScene(int clip)
             {
                 if (c.queued >= 0 && cb.cancelSlot) { cb.cancelSlot(layer); c.queued = -1; }
                 any = true;   // already there: the scene does not mute it
+                ++reached;
                 continue;
             }
             if (startClip(layer, clip))
             {
                 any = true;
+                ++reached;
                 if (cb.markSceneSlot) cb.markSceneSlot(layer);   // a payload staged for a boundary is the scene's, not the layer's own
             }
         }
     }
+    lastScene = { clip, reached, lastScene.serial + 1 };   // before changed(), so a listener reads this launch
     changed();
     return any;
 }

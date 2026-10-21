@@ -2,6 +2,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Plugin/ProcessorBase.h"
 #include "UI/SidebarItem.h"
+#include "UI/SceneGrid.h"
 #include "UI/Components/AddButton.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/StepIndicator.h"
@@ -49,6 +50,16 @@ public:
     // The page switch, so the shell can let the pointer reach it through its input shield.
     juce::Component& getPageSwitch() noexcept { return pageSwitch; }
 
+    // ── Scenes (docs/design-ui-family.md 13.9) ───────────────────────────────────────────────────────
+    // An engraved "Scene" caption and eight numbered pads at the foot of the sidebar, above the page switch: clip n on
+    // every layer that stores one. Off by default (only a host of several layers with clip banks asks for it); the
+    // items' spacing gives up the room it takes.
+    void setShowScenes(bool show);
+    bool getShowScenes() const noexcept { return showScenes; }
+    SceneGrid& getSceneGrid() noexcept { return sceneGrid; }
+    // The gap between (and above / below) the layer items after the last layout; the scene block costs it some of its room.
+    int getItemGap() const noexcept { return itemGap; }
+
     // Drops layer `source` on `target` exactly as a finished drag does (the host's reorder, then the selection and the
     // onLayersReordered callback). Exposed so a test can drive a drag without a mouse.
     void dropLayerForTest(int source, int target) { dragSourceIndex = source; dragTargetIndex = target; dragPhase = DragPhase::Dragging; commitDrag(); }
@@ -85,6 +96,8 @@ private:
     int  shownPage = 0;
     juce::Rectangle<int> pageCaptionR;   // the engraved "Page" caption over the page switch
     SegmentControl pageSwitch { {}, SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Lcd };
+    SceneGrid      sceneGrid;
+    bool           showScenes = false;
     void syncPageSwitch();     // labels and selection from the count and the shown page
     void applyPage();          // visibility + layout of the shown page
     int  firstOnPage() const noexcept { return shownPage * mu_limits::kLayersPerPage; }

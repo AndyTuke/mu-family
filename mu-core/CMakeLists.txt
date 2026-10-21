@@ -84,6 +84,8 @@ target_sources(mu-core INTERFACE
     # Shared left sidebar — product injects the per-layer mini-graphic.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/SidebarItem.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/LayerSidebar.cpp"
+    # Shared scene pads (eight lamp pads under a caption) at the sidebar's foot, opt-in.
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/SceneGrid.cpp"
     # Shared per-layer header bar (name / reset / delete / preset / save).
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/LayerHeaderBar.cpp"
     # Shared per-layer clip strip (eight lamp pads), a child of the header bar.
