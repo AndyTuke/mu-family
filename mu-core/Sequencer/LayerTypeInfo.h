@@ -104,5 +104,6 @@ namespace mu_core
         const char* presetTag = "";            // the root tag of a layer-preset file ("MuToniLayer"): each product's existing tag,
                                                // so a file saved by the product loads in a slot host and the reverse
         const char* descriptor = "";           // one short line for the chooser card ("Generative arpeggiator")
+        const char* discInitial = "";          // one character on the type's disc (sidebar and chooser card); unique across a host's choices
     };
 }

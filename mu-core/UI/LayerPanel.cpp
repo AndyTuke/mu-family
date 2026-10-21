@@ -11,7 +11,8 @@ LayerPanel::LayerPanel(ProcessorBase& processor, const juce::String& layerNoun)
         { layerNoun,
           [this] { return currentLayer; },
           [this] { setLayer(currentLayer); },   // rebind so the content and modulators show the new state
-          [this](int slot) { return presetNameFn ? presetNameFn(slot) : proc.getLayerName(slot); } });
+          [this](int slot) { return presetNameFn ? presetNameFn(slot) : proc.getLayerName(slot); },
+          [this](int slot) { return ownSaveCardFn && ownSaveCardFn(slot); } });
     header.setNoun(noun);
 
     // The clip strip is shown only where the product can capture a layer (the hook is the clip bank's gate).

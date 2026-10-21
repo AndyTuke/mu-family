@@ -54,6 +54,20 @@ inline constexpr const char* trackDescriptor(EngineType e) noexcept
     return "";
 }
 
+// The one letter on the engine's disc (mu-On's own sidebar picture).
+inline constexpr const char* trackInitial(EngineType e) noexcept
+{
+    switch (e)
+    {
+        case EngineType::Kick:   return "K";
+        case EngineType::Bass:   return "B";
+        case EngineType::Hat:    return "H";
+        case EngineType::Snare:  return "S";
+        case EngineType::Rumble: return "R";
+    }
+    return "";
+}
+
 // The five type descriptions over the one class.
 inline mu_core::LayerTypeInfo makeTrackTypeInfo(EngineType engine) noexcept
 {
@@ -67,6 +81,7 @@ inline mu_core::LayerTypeInfo makeTrackTypeInfo(EngineType engine) noexcept
     info.presetFolder = "Tracks";
     info.presetTag = kTrackPresetTag;
     info.descriptor = trackDescriptor(engine);
+    info.discInitial = trackInitial(engine);
     info.typeFromPreset = &typeFromPreset;   // the five types share .muTrack: the engine a preset saved names its type
     info.addLayerParams = &addLayerParams;   // one table per prefix: every engine's rows exist on every track
     info.create = &createTrack;

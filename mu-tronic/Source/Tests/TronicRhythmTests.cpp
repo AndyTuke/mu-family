@@ -146,6 +146,9 @@ struct MuTronicRhythmTests : juce::UnitTest
         savedState();
         parameterRowsReachTheLayer();
         newLayerDefaults();
+        freshLayerMissingSample();
+        slotSaveCard();
+        midiModeSilencesStrip();
         sameStreamAsMuClid();
         stoppedTransportAndRestart();
         sampleLibraryAndPreview();
@@ -349,6 +352,110 @@ struct MuTronicRhythmTests : juce::UnitTest
         expect(p.getLayerTypeId(7) == LayerTypeId::Kick);
         p.flushPendingAsyncUpdates();
         q.flushPendingAsyncUpdates();
+    }
+
+    // A layer made from the chooser whose default file names a sample that is not there starts with no sample (the bar's
+    // empty state); data that was loaded keeps its "missing" mark.
+    void freshLayerMissingSample()
+    {
+        beginTest("a fresh Rhythm whose default sample is not found starts with no sample; loaded data keeps the missing mark");
+        mu_seam_test::TempStorage storage;
+        RhythmProcessor p;
+        const auto rhythms = p.getContentDir().getSiblingFile("muClid").getChildFile("Rhythms");
+        rhythms.createDirectory();
+        const auto real = juce::File(MU_TRONIC_FIXTURE_DIR).getChildFile("REAL_rhythm.muRhythm");
+        expect(real.copyFileTo(rhythms.getChildFile("_default.muRhythm")));
+
+        // No sample folder: the default's sample cannot be found.
+        expect(p.createLayerOfType(0, LayerTypeId::Rhythm));
+        expect(servicesOf(p).samples.isSampleMissing(0), "the file names a sample that is not there");
+        mu_tronic::clearUnresolvedSample(p, 0);
+        expect(! servicesOf(p).samples.isSampleMissing(0), "the creation path clears it: no warning for a file nobody chose");
+        expect(servicesOf(p).samples.path(0).isEmpty() && servicesOf(p).samples.getSampleName(0).isEmpty(), "the bar is empty");
+        expectEquals(rhythmIn(p, 0).genA.hits, 5, "the default's pattern is kept");
+
+        // The same file loaded by the user is the user's choice: the mark stays.
+        expect(p.createLayerOfType(1, LayerTypeId::Rhythm));
+        mu_tronic::clearUnresolvedSample(p, 1);
+        p.loadLayerPreset(1, real);
+        expect(servicesOf(p).samples.isSampleMissing(1), "a loaded preset whose sample has gone shows it");
+
+        // With the sample in place nothing is cleared, and another type's slot is left alone.
+        putSample(p);
+        expect(p.createLayerOfType(2, LayerTypeId::Rhythm));
+        mu_tronic::clearUnresolvedSample(p, 2);
+        expect(rhythmIn(p, 2).voice->hasSample() && servicesOf(p).samples.path(2).isNotEmpty(), "a found sample stays");
+        mu_tronic::clearUnresolvedSample(p, 7);   // an Empty slot: nothing happens
+        p.flushPendingAsyncUpdates();
+    }
+
+    // The slot's Save is mu-Clid's own card: the host writes the file as mu-Clid does (category, description, embedded
+    // sample) and "Save as default" writes the file a new Rhythm starts from.
+    void slotSaveCard()
+    {
+        beginTest("a slot's Rhythm save writes mu-Clid's file with category, description and the embedded sample");
+        mu_seam_test::TempStorage storage;
+        RhythmProcessor p;
+        const auto wav = putSample(p);
+        expect(p.setLayerType(0, LayerTypeId::Rhythm));
+        servicesOf(p).samples.load(0, wav);
+        auto* host = dynamic_cast<mu_clid::RhythmHost*>(&servicesOf(p));
+        expect(host != nullptr);
+        if (host == nullptr) return;
+
+        const auto dir = host->getRhythmPresetsDir();
+        dir.createDirectory();
+        expect(host->getRhythmLoadedPresetFile(0) == juce::File(), "a fresh layer came from no file");
+
+        const auto file = dir.getChildFile("Saved.muRhythm");
+        host->saveRhythmPresetFile(0, file, true, "Drums", "a test");
+        const auto xml = juce::XmlDocument::parse(file);
+        expect(xml != nullptr);
+        if (xml == nullptr) return;
+        expectEquals(xml->getStringAttribute("presetCategory"), juce::String("Drums"));
+        expectEquals(xml->getStringAttribute("presetDescription"), juce::String("a test"));
+        expectEquals(xml->getIntAttribute("presetEmbedSamples"), 1);
+        expect(xml->getStringAttribute("sampleData").isNotEmpty(), "the audio travels in the file");
+        expect(host->getRhythmPresetCategories().contains("Drums"), "the category is offered to the next save");
+        expect(host->getRhythmLoadedPresetFile(0) == file, "the next save starts from that file");
+
+        // Not embedded: the sample is named, not carried.
+        const auto linked = dir.getChildFile("Linked.muRhythm");
+        host->saveRhythmPresetFile(0, linked, false, {}, {});
+        const auto linkedXml = juce::XmlDocument::parse(linked);
+        expect(linkedXml != nullptr && ! linkedXml->hasAttribute("sampleData") && linkedXml->getStringAttribute("r0_sample").isNotEmpty());
+
+        // The file opens in another slot (and so in mu-Clid): the pattern and the sample arrive.
+        expect(p.setLayerType(1, LayerTypeId::Rhythm));
+        p.loadLayerPreset(1, file);
+        expect(rhythmIn(p, 1).voice->hasSample(), "the embedded sample loads");
+
+        // "Save as default": the file a new Rhythm starts from, not a preset the layer is now named after.
+        host->saveRhythmPresetFile(0, dir.getChildFile("_default.muRhythm"), true, {}, {});
+        expect(host->getRhythmLoadedPresetFile(0) == linked, "a default is not the layer's preset");
+        expect(p.createLayerOfType(2, LayerTypeId::Rhythm));
+        expect(rhythmIn(p, 2).voice->hasSample(), "a new Rhythm starts from it, sample included");
+        p.flushPendingAsyncUpdates();
+    }
+
+    // A Rhythm set to send MIDI makes no audio, so its mixer strip is drawn inactive: the editor asks this per slot.
+    void midiModeSilencesStrip()
+    {
+        beginTest("a Rhythm in MIDI output mode is silent for the mixer; Sample mode and other types are not");
+        mu_seam_test::TempStorage storage;
+        RhythmProcessor p;
+        expect(p.setLayerType(0, LayerTypeId::Rhythm));
+        expect(p.setLayerType(1, LayerTypeId::Kick));
+        expect(! mu_tronic::isRhythmMidiOutput(p, 0), "Sample mode is the default");
+        mu_seam_test::setParam(p.apvts, "r0_outMode", 1.0f);
+        expect(mu_tronic::isRhythmMidiOutput(p, 0), "MIDI mode");
+        expect(! mu_tronic::isRhythmMidiOutput(p, 1), "a Kick has no output mode");
+        expect(! mu_tronic::isRhythmMidiOutput(p, 5), "an Empty slot has none either");
+        mu_seam_test::setParam(p.apvts, "r5_outMode", 1.0f);
+        expect(! mu_tronic::isRhythmMidiOutput(p, 5), "a row left behind in an Empty slot does not count");
+        mu_seam_test::setParam(p.apvts, "r0_outMode", 0.0f);
+        expect(! mu_tronic::isRhythmMidiOutput(p, 0), "back to Sample");
+        p.flushPendingAsyncUpdates();
     }
 
     // The recorded Rhythm stream of mu-Clid (Tests/RhythmLayerFixture.h): the layer in a mu-Tronic slot must reproduce it bit

@@ -124,6 +124,7 @@ RhythmContent::RhythmContent(ProcessorBase& base, RhythmHost& h)
                     safeThis->loadedRhythmPresetFile = destFile;
                     safeThis->saveDialog.setVisible(false);
                     safeThis->refreshRhythmPresets();
+                    if (safeThis->onPresetFileSaved) safeThis->onPresetFileSaved();
                     for (int i = 0; i < (int)safeThis->rhythmPresetFiles.size(); ++i)
                     {
                         if (safeThis->rhythmPresetFiles[i].getFullPathName()
@@ -143,6 +144,7 @@ RhythmContent::RhythmContent(ProcessorBase& base, RhythmHost& h)
         loadedRhythmPresetFile = destFile;
         saveDialog.setVisible(false);
         refreshRhythmPresets();
+        if (onPresetFileSaved) onPresetFileSaved();
         for (int i = 0; i < (int)rhythmPresetFiles.size(); ++i)
         {
             if (rhythmPresetFiles[i].getFullPathName() == destFile.getFullPathName())
@@ -394,6 +396,7 @@ void RhythmContent::updateOutputModeUi()
     midiOutSection.setVisible(midi);
     repaint();
     if (onOutputModeChanged) onOutputModeChanged();
+    if (onMixerStateChanged) onMixerStateChanged();
 }
 
 bool RhythmContent::isInterestedInFileDrag(const juce::StringArray& files)
@@ -488,17 +491,20 @@ void RhythmContent::saveRhythmPreset()
     juce::String defaultDesc;
     juce::String defaultCat;
     bool         defaultEmbed = false;
-    if (loadedRhythmPresetFile.existsAsFile())
+    // The file this content loaded, else (a slot host that loads through the header) the one the host knows.
+    const juce::File loadedFile = loadedRhythmPresetFile.existsAsFile() ? loadedRhythmPresetFile
+                                                                        : host.getRhythmLoadedPresetFile(currentRhythmIndex);
+    if (loadedFile.existsAsFile())
     {
-        defaultName = loadedRhythmPresetFile.getFileNameWithoutExtension();
-        const auto meta = mu_pp::readPresetMeta(loadedRhythmPresetFile);
+        defaultName = loadedFile.getFileNameWithoutExtension();
+        const auto meta = mu_pp::readPresetMeta(loadedFile);
         defaultCat   = meta.category;
         defaultDesc  = meta.description;
         defaultEmbed = meta.embedSamples;
     }
     else
     {
-        defaultName = mu_pp::safePresetFileName(juce::String(host.getRhythmLayer(currentRhythmIndex).name), {});
+        defaultName = mu_pp::safePresetFileName(host.getRhythmSaveName(currentRhythmIndex), {});
     }
 
     setKnownCategories(host.getRhythmPresetCategories());

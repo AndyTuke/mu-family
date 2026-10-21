@@ -84,6 +84,14 @@ public:
     // and the gate editor's envelopes all point into the shown layer. setLayer rebinds them.
     void releaseModulationArcs() override { clearAllModBindings(); clearPatternBindings(); }
 
+    // Opt-in "MIDI" Free | Note selector on the Root / Scale row, for a host where Note mode is a per-layer choice
+    // (mu-Tronic). `get(slot)` / `set(slot, mode)` read and write the layer's mode (0 Free, 1 Note); the selector
+    // is re-read in setLayer. Never called in mu-Tant (Note mode is an app setting there), so its row is unchanged.
+    using NoteModeGetter = std::function<int(int slot)>;
+    using NoteModeSetter = std::function<void(int slot, int mode)>;
+    void setNoteModeControl(NoteModeGetter get, NoteModeSetter set);
+    bool hasNoteModeControl() const noexcept { return noteModeGet != nullptr; }
+
     void paint(juce::Graphics& g) override;
     void resized() override;
     void paintOverChildren(juce::Graphics& g) override;   // panel screws, over the content
@@ -94,6 +102,22 @@ private:
     int currentLayer = 0;
 
     using APVTS = juce::AudioProcessorValueTreeState;
+
+    // The Free | Note selector: a tooltip, and the hovered segment for the status bar.
+    class NoteModeSelector : public SegmentControl, public juce::SettableTooltipClient
+    {
+    public:
+        NoteModeSelector() : SegmentControl({ "Free", "Note" }, ActiveStyle::General, DrawStyle::Lcd) {}
+        std::function<void(int segment)> onHover;
+        void mouseMove(const juce::MouseEvent& e) override
+        {
+            if (onHover && getWidth() > 0) onHover(juce::jlimit(0, getNumSegments() - 1, e.x * getNumSegments() / getWidth()));
+        }
+    };
+    juce::Label       noteModeLabel;
+    NoteModeSelector  noteModeCtrl;
+    NoteModeGetter    noteModeGet;
+    NoteModeSetter    noteModeSet;
 
     // ── Tonal centre (shared across voices) ─────────────────────────────────
     juce::Label    rootLabel;

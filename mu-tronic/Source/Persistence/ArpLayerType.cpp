@@ -78,7 +78,7 @@ namespace
     {
         const auto colour = MuLookAndFeel::layerPalette[(size_t) (host.getLayerColourIndex(slot) % MuLookAndFeel::kLayerPaletteSize)];
         // The sidebar item's own label already carries the slot number ("Arp 3"), so the disc shows the type's initial.
-        return std::make_unique<mu_ui::LayerDiscVisual>(colour, juce::String("A"));
+        return std::make_unique<mu_ui::LayerDiscVisual>(colour, host.getLayerTypes().discInitial(mu_core::LayerTypeId::Arp));
     }
 }
 #endif

@@ -38,6 +38,8 @@ private:
     void releaseContentArcs();
     // The slot's layer was given a type: rebuild what depends on it.
     void layerTypeSet(int slot);
+    // The mixer's effect name reaches the shown content's send label and its modulation targets.
+    void applyEffectSendName();
 
     PluginProcessor& proc;
     LayerSidebar   sidebar;
@@ -48,6 +50,7 @@ private:
     TronicSettingsOverlay settingsOverlay;
     std::vector<std::pair<mu_core::LayerTypeId, std::unique_ptr<LayerContent>>> contents;   // one per type shown so far
     LayerContent* shownContent = nullptr;
+    juce::String  effectSendName;   // the mixer effect's current name; empty until the mixer reports it
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };

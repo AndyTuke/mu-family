@@ -529,6 +529,7 @@ inline mu_core::LayerTypeInfo rhythmLayerTypeInfo() noexcept
     info.presetFolder = "Rhythms";
     info.presetTag = kRhythmPresetTag;
     info.descriptor = "Euclidean sample rhythm";
+    info.discInitial = "E";   // Euclid: "R" is Rumble's in a host that offers both
     info.addLayerParams = &addLayerParams;
     info.create = &createRhythm;
     info.attachServices = &attachRhythmServices;

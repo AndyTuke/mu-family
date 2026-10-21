@@ -122,6 +122,32 @@ struct MuTronicLayoutTests : juce::UnitTest
             }
         }
 
+        beginTest("every choosable type has its own one-character disc initial (a sixth engine cannot collide silently)");
+        {
+            mu_seam_test::TempStorage storage;
+            mu_tronic::PluginProcessor p;
+            const auto& types = p.getLayerTypes();
+            juce::StringArray seen;
+            for (int t = 0; t < types.size(); ++t)
+            {
+                const auto& info = types.at(t);
+                const juce::String initial = juce::String::fromUTF8(info.discInitial);
+                expectEquals(initial.length(), 1, juce::String(info.name) + " has a one-character initial");
+                expect(! seen.contains(initial), juce::String(info.name) + " shares its initial " + initial);
+                seen.add(initial);
+            }
+            using mu_core::LayerTypeId;
+            expectEquals(types.discInitial(LayerTypeId::Rhythm), juce::String("E"), "Rhythm is E (Euclid), so Rumble can be R");
+            expectEquals(types.discInitial(LayerTypeId::Pattern), juce::String("P"));
+            expectEquals(types.discInitial(LayerTypeId::Arp), juce::String("A"));
+            expectEquals(types.discInitial(LayerTypeId::Kick), juce::String("K"));
+            expectEquals(types.discInitial(LayerTypeId::Bass), juce::String("B"));
+            expectEquals(types.discInitial(LayerTypeId::Hat), juce::String("H"));
+            expectEquals(types.discInitial(LayerTypeId::Snare), juce::String("S"));
+            expectEquals(types.discInitial(LayerTypeId::Rumble), juce::String("R"));
+            expectEquals(seen.size(), 8, "eight choices");
+        }
+
         beginTest("a strip's sidechain source reaches every slot and the external bus");
         {
             mu_seam_test::TempStorage storage;

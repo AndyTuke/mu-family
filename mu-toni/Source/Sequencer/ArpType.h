@@ -60,6 +60,7 @@ inline mu_core::LayerTypeInfo arpLayerTypeInfo() noexcept
     info.presetFolder = "Arps";
     info.presetTag = kArpPresetTag;
     info.descriptor = "Generative arpeggiator";
+    info.discInitial = "A";
     info.addLayerParams = &addLayerParams;
     info.create = &createArp;
     info.createServices = &createArpServices;

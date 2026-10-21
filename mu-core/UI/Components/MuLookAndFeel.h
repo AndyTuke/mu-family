@@ -431,6 +431,7 @@ public:
     static constexpr int kTonalRootW  = 56;
     static constexpr int kTonalScaleW = 100;
     static constexpr int kTonalGap    = 12;
+    static constexpr int kLcdSegmentW = 56;   // one window of a two-option LCD selector (mu-Clid's Sample | MIDI; a Pattern's Free | Note)
     static constexpr int kAddButtonW      = 110;       // "+ Target" / "+ Assignment" (metal: a normal button, centred)
     static constexpr int kChannelInset     = kPanelPad + 1;                                     // 7
     static constexpr int kCircleInnerSize = kCircleSize     - 2 * kChannelInset;                // 274

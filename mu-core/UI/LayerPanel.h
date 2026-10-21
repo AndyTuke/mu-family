@@ -40,6 +40,10 @@ public:
     // save dialog) turns the shell's list off and fills the dropdown itself.
     void setOwnsPresetList(bool owns) { ownsPresetList = owns; }
 
+    // A type with its own save card (a host of several types): the header's Save asks it first; true = it opened its card
+    // and the generic name prompt is skipped.
+    void setOwnSaveCard(std::function<bool(int)> fn) { ownSaveCardFn = std::move(fn); }
+
     // A product overlay (a dialog) hosted over the whole panel, above every band.
     void addOverlay(juce::Component& overlay);
 
@@ -87,6 +91,7 @@ private:
     bool layerEmpty = false;
     std::function<double()> beatSource;
     std::function<juce::String(int)> presetNameFn;
+    std::function<bool(int)> ownSaveCardFn;
     bool ownsPresetList = true;
     juce::Array<juce::Component*> overlays;
 
