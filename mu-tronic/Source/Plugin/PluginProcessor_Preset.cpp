@@ -100,7 +100,32 @@ PluginProcessor::ImportResult PluginProcessor::importProductPreset(const juce::F
     for (int i = 0; i < needed; ++i)
         slotOfSource[(size_t) imported.entries[(size_t) i].sourceIndex] = freeSlots[(size_t) i];
 
+    // Writes one landed layer's mixer strip: every row back to its default first (the Empty slot may hold stale values and the
+    // preset may not carry every row), then the preset's own rows. Solo is never imported, or it would mute the layers already here.
+    auto writeStrip = [&] (int i)
+    {
+        const int slot = freeSlots[(size_t) i];
+        const juce::String prefix = "ch" + juce::String(slot) + "_";
+        for (const auto& row : imported.entries[(size_t) i].strip)
+            if (auto* param = apvts.getParameter(prefix + row.suffix))
+                param->setValueNotifyingHost(param->getDefaultValue());
+        for (const auto& row : imported.entries[(size_t) i].strip)
+        {
+            if (row.suffix == "solo") continue;
+            auto* param = apvts.getParameter(prefix + row.suffix);
+            if (param == nullptr) continue;
+            double actual = row.normalised ? (double) param->convertFrom0to1((float) row.value) : row.value;
+            if (row.suffix == "scSrc") actual = remapImportedSidechain((int) std::lround(row.value), slot, slotOfSource);
+            param->setValueNotifyingHost(param->convertTo0to1((float) actual));
+        }
+    };
+
+    // Phase 0: the strips go in before any layer is published, so no imported layer sounds at the Empty slot's old strip.
+    for (int i = 0; i < needed; ++i) writeStrip(i);
+
     // Phase 1: the layers, each with the preset's own values as its first state.
+    std::vector<bool> landed((size_t) needed, false);
+    bool anyFailed = false;
     for (int i = 0; i < needed; ++i)
     {
         auto layer = imported.entries[(size_t) i];
@@ -108,40 +133,55 @@ PluginProcessor::ImportResult PluginProcessor::importProductPreset(const juce::F
         if (layer.type == mu_core::LayerTypeId::Rumble && layer.rumbleSource >= 0 && layer.rumbleSource < kProductLayers
             && slotOfSource[(size_t) layer.rumbleSource] >= 0)
             setRumbleSourceRow(layer.node, slotOfSource[(size_t) layer.rumbleSource]);
-        if (! setLayerType(slot, layer.type, &layer.node)) continue;
+        if (! setLayerType(slot, layer.type, &layer.node))
+        {
+            slotOfSource[(size_t) layer.sourceIndex] = -1;   // nothing landed here: no sidechain or Rumble may point at it
+            anyFailed = true;
+            continue;
+        }
         if (auto* l = getLayer(slot)) l->name = layer.name.toStdString();
+        landed[(size_t) i] = true;
         ++result.imported;
     }
 
+    // A failed layer leaves its slot Empty with default strip rows, and the survivors' sidechain sources skip it.
+    if (anyFailed)
+        for (int i = 0; i < needed; ++i)
+        {
+            const juce::String prefix = "ch" + juce::String(freeSlots[(size_t) i]) + "_";
+            if (landed[(size_t) i])
+            {
+                if (auto* param = apvts.getParameter(prefix + "scSrc"))
+                    for (const auto& row : imported.entries[(size_t) i].strip)
+                        if (row.suffix == "scSrc")
+                            param->setValueNotifyingHost(param->convertTo0to1(
+                                (float) remapImportedSidechain((int) std::lround(row.value), freeSlots[(size_t) i], slotOfSource)));
+            }
+            else
+                for (const auto& row : imported.entries[(size_t) i].strip)
+                    if (auto* param = apvts.getParameter(prefix + row.suffix))
+                        param->setValueNotifyingHost(param->getDefaultValue());
+        }
+
     // Phase 2: a Rumble whose source was not imported (or is not usable) listens to the first filled slot that can be one.
     for (int i = 0; i < needed; ++i)
-        if (imported.entries[(size_t) i].type == mu_core::LayerTypeId::Rumble)
+        if (landed[(size_t) i] && imported.entries[(size_t) i].type == mu_core::LayerTypeId::Rumble)
             chooseRumbleSource(*this, freeSlots[(size_t) i]);
 
-    // Phase 3: the mixer strips, then the Pattern layers' shared tonal centre when this import brings the first Pattern.
-    for (int i = 0; i < needed; ++i)
-    {
-        const int slot = freeSlots[(size_t) i];
-        for (const auto& row : imported.entries[(size_t) i].strip)
-        {
-            auto* param = apvts.getParameter("ch" + juce::String(slot) + "_" + row.suffix);
-            if (param == nullptr) continue;
-            double actual = row.normalised ? (double) param->convertFrom0to1((float) row.value) : row.value;
-            if (row.suffix == "scSrc") actual = remapImportedSidechain((int) std::lround(row.value), slot, slotOfSource);
-            param->setValueNotifyingHost(param->convertTo0to1((float) actual));
-        }
-    }
+    // Phase 3: the Pattern layers' shared tonal centre when this import brings the first Pattern.
     if (! hasPattern)
         for (const auto& g : imported.globals)
             if (auto* param = apvts.getParameter(g.id))
                 param->setValueNotifyingHost(param->convertTo0to1((float) g.value));
 
     if (onLayerPresetCommitted)
-        for (int i = 0; i < needed; ++i) onLayerPresetCommitted(freeSlots[(size_t) i]);
+        for (int i = 0; i < needed; ++i)
+            if (landed[(size_t) i]) onLayerPresetCommitted(freeSlots[(size_t) i]);
 
     result.ok = result.imported == needed;
     result.message = "Imported " + juce::String(result.imported) + (result.imported == 1 ? " layer from " : " layers from ")
-                   + imported.presetName;
+                   + imported.presetName
+                   + (anyFailed ? " (" + juce::String(needed - result.imported) + " could not be created)" : juce::String());
     return result;
 }
 
