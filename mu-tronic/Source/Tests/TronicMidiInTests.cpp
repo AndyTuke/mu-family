@@ -6,6 +6,10 @@
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/CpuLoadMeter.h"
 #include "Sequencer/Arp.h"
+#include "Persistence/PatternLayerType.h"
+#include "Sequencer/PatternType.h"          // mu-Tant's layer library
+#include "UI/PatternHost.h"
+#include "Tests/GoldenRender.h"             // mu-core: MockHost
 #include "Tests/ProcessorSeamHelpers.h"
 
 namespace
@@ -47,6 +51,7 @@ struct MuTronicMidiInTests : juce::UnitTest
     {
         rowsAndRouting();
         carriedKeysFollowTheChannel();
+        changingTheChannelReleasesKeys();
         rowSavedAndMoves();
         cpuMeter();
     }
@@ -83,7 +88,7 @@ struct MuTronicMidiInTests : juce::UnitTest
 
         mu_seam_test::setParam(p.apvts, "ch0_midiIn", 16.0f);   // channel 16 is the top bit of the mask
         block(p, events({ juce::MidiMessage::noteOn(16, 72, (juce::uint8) 100) }));
-        expectEquals(arpIn(p, 0).heldNotes.numHeld(), 2, "the key held before the change stays; channel 16 is heard now");
+        expectEquals(arpIn(p, 0).heldNotes.numHeld(), 1, "the key held before the change is dropped; channel 16 is heard now");
         expectEquals(arpIn(p, 2).heldNotes.numHeld(), 2);
         p.flushPendingAsyncUpdates();
         p.releaseResources();
@@ -115,6 +120,74 @@ struct MuTronicMidiInTests : juce::UnitTest
         expectEquals(arpIn(p, 0).heldNotes.numHeld(), 1, "a carried message is delivered once");
         p.flushPendingAsyncUpdates();
         p.releaseResources();
+    }
+
+    void changingTheChannelReleasesKeys()
+    {
+        beginTest("changing a slot's MIDI In while a key is held drops the key: the release on the old channel is no longer heard");
+        mu_seam_test::TempStorage storage;
+        MidiInProcessor p;
+        expect(p.setLayerType(0, LayerTypeId::Arp));
+        expect(p.setLayerType(1, LayerTypeId::Arp));
+        mu_seam_test::setParam(p.apvts, "ch0_midiIn", 1.0f);   // slot 1 starts Omni
+        p.prepareToPlay(48000.0, 256);
+        p.toggleInternalPlay();
+        block(p, {});
+        block(p, events({ juce::MidiMessage::noteOn(1, 60, (juce::uint8) 100) }));
+        expectEquals(arpIn(p, 0).heldNotes.numHeld(), 1);
+        expectEquals(arpIn(p, 1).heldNotes.numHeld(), 1);
+
+        mu_seam_test::setParam(p.apvts, "ch0_midiIn", 2.0f);   // channel 1 to 2
+        mu_seam_test::setParam(p.apvts, "ch1_midiIn", 3.0f);   // Omni to 3
+        block(p, events({ juce::MidiMessage::noteOff(1, 60) }));
+        expectEquals(arpIn(p, 0).heldNotes.numHeld(), 0, "channel 1 to 2: nothing left held");
+        expectEquals(arpIn(p, 1).heldNotes.numHeld(), 0, "Omni to channel 3: nothing left held");
+
+        // The signal is for the one call after the change: keys pressed afterwards are kept.
+        block(p, events({ juce::MidiMessage::noteOn(2, 65, (juce::uint8) 100), juce::MidiMessage::noteOn(3, 67, (juce::uint8) 100) }));
+        block(p, {});
+        expectEquals(arpIn(p, 0).heldNotes.newest(), 65);
+        expectEquals(arpIn(p, 1).heldNotes.newest(), 67);
+        p.flushPendingAsyncUpdates();
+        p.releaseResources();
+
+        beginTest("the same for a Note mode Pattern: a key held on the old channel does not keep it sounding");
+        mu_seam_test::TempStorage storage2;
+        MidiInProcessor q;
+        expect(q.setLayerType(1, LayerTypeId::Pattern));
+        mu_seam_test::setParam(q.apvts, mu_tant::layerParamId(1, "gate_bypass"), 1.0f);
+        expect(mu_tronic::setPatternNoteMode(q, 1, 1));
+        mu_seam_test::setParam(q.apvts, "ch1_midiIn", 1.0f);
+
+        struct PeakTap : MixerEngine::ChannelTap
+        {
+            void capture(int ch, const juce::AudioBuffer<float>& b, int n) noexcept override
+            {
+                if (ch != 1) return;
+                for (int c = 0; c < 2 && c < b.getNumChannels(); ++c) peak = juce::jmax(peak, b.getMagnitude(c, 0, n));
+            }
+            float peak = 0.0f;
+        } tap;
+        q.setChannelTapForTest(&tap);
+        q.setRateAndBufferSizeDetails(48000.0, 256);
+        q.prepareToPlay(48000.0, 256);
+        q.toggleInternalPlay();
+        for (int i = 0; i < 20; ++i) block(q, {});
+        block(q, events({ juce::MidiMessage::noteOn(1, 60, (juce::uint8) 100) }));
+        for (int i = 0; i < 40; ++i) block(q, {});
+        tap.peak = 0.0f;
+        for (int i = 0; i < 10; ++i) block(q, {});
+        expect(tap.peak > 0.01f, "the held key opens the Note Pattern");
+
+        mu_seam_test::setParam(q.apvts, "ch1_midiIn", 2.0f);
+        block(q, events({ juce::MidiMessage::noteOff(1, 60) }));
+        for (int i = 0; i < 10; ++i) block(q, {});   // the 8 ms ramp has finished
+        tap.peak = 0.0f;
+        for (int i = 0; i < 20; ++i) block(q, {});
+        expectEquals(tap.peak, 0.0f, "the Pattern is silent: the key was dropped with the channel change");
+        q.setChannelTapForTest(nullptr);
+        q.flushPendingAsyncUpdates();
+        q.releaseResources();
     }
 
     void rowSavedAndMoves()
@@ -151,20 +224,44 @@ struct MuTronicMidiInTests : juce::UnitTest
 
     void cpuMeter()
     {
-        beginTest("the load meter reports busy time over block time, smoothed, with a falling peak");
-        mu_core::CpuLoadMeter m;
+        beginTest("the load meter reports busy time over block time, smoothed; the peak is the worst figure of the last second");
+        using M = mu_core::CpuLoadMeter;
+        M m;
         expectEquals(m.load(), 0.0f);
         const double blockSec = 256.0 / 48000.0;
-        for (int i = 0; i < 2000; ++i) m.update(blockSec * 0.25, blockSec);   // about 10 s at a steady 25 percent
+        for (int i = 0; i < 400; ++i) m.accumulate(blockSec * 0.25, blockSec);   // about 2 s at a steady 25 percent
+        for (int i = 0; i < 1600; ++i) m.accumulate(blockSec * 0.25, blockSec);
         expectWithinAbsoluteError(m.load(), 0.25f, 0.005f);
-        expect(m.peak() >= m.load() - 1.0e-4f && m.peak() < 0.3f);
-        m.update(blockSec * 0.9, blockSec);
-        expectWithinAbsoluteError(m.peak(), 0.9f, 1.0e-4f, "one slow block sets the peak at once");
+        expectWithinAbsoluteError(m.peak(), 0.25f, 1.0e-3f);
+
+        // A spike: the peak takes it at once, holds it for one second, then falls to the current figure.
+        m.accumulate(blockSec * 0.9, blockSec);
+        expectWithinAbsoluteError(m.peak(), 0.9f, 1.0e-3f, "one slow block sets the peak at once");
         expect(m.load() < 0.3f, "and moves the smoothed load only a little");
-        for (int i = 0; i < 4000; ++i) m.update(blockSec * 0.1, blockSec);    // about 20 s of light load
-        expect(m.peak() < 0.15f, "the peak falls back");
-        m.reset();
-        expectEquals(m.load(), 0.0f);
+        double elapsed = 0.0;
+        bool fell = false;
+        while (elapsed < 1.5 && ! fell)
+        {
+            m.accumulate(blockSec * 0.1, blockSec);
+            elapsed += blockSec;
+            fell = m.peak() < 0.5f;
+            if (! fell) expectWithinAbsoluteError(m.peak(), 0.9f, 1.0e-3f, "held until the second is up");
+        }
+        expect(fell, "the peak falls");
+        expectWithinAbsoluteError(elapsed, M::kPeakHoldSeconds, 2.0 * blockSec, "after one second, give or take a block");
+        expect(m.peak() < 0.15f, "to the current figure");
+
+        beginTest("blocks of a single frame are summed until they cover enough time: no thousand percent readings");
+        M tiny;
+        const double frameSec = 1.0 / 48000.0;
+        for (int i = 0; i < 48000; ++i)
+            tiny.accumulate(i == 24000 ? 0.0005 : frameSec * 0.2, frameSec);   // one frame that took half a millisecond
+        expect(tiny.load() < 1.0f && tiny.peak() < 1.0f, "load " + juce::String(tiny.load(), 3) + " peak " + juce::String(tiny.peak(), 3));
+        tiny.accumulate(0.01, 0.0);   // a block of no length is ignored
+        expect(std::isfinite(tiny.load()) && std::isfinite(tiny.peak()));
+        tiny.reset();
+        expectEquals(tiny.load(), 0.0f);
+        expectEquals(tiny.peak(), 0.0f);
 
         // The processor measures its own blocks: after some work the load is a real, finite fraction.
         mu_seam_test::TempStorage storage;
@@ -175,7 +272,7 @@ struct MuTronicMidiInTests : juce::UnitTest
         expectEquals(p.getCpuLoad(), 0.0f, "reset by prepareToPlay");
         for (int i = 0; i < 200; ++i) block(p, {});
         expect(p.getCpuLoad() > 0.0f && p.getCpuLoad() < 100.0f && std::isfinite(p.getCpuLoad()), "a measured load " + juce::String(p.getCpuLoad(), 5));
-        expect(p.getCpuPeak() >= p.getCpuLoad() - 1.0e-4f);
+        expect(std::isfinite(p.getCpuPeak()) && p.getCpuPeak() >= 0.0f);
         p.flushPendingAsyncUpdates();
         p.releaseResources();
     }
