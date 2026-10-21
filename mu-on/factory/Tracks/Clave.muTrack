@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<MuOnTrack engine="FM Perc">
+  <p id="eng" x="5.0" c="FM Perc"/>
+  <p id="fmp_algo" x="3.0" c="Click / Rim"/>
+  <p id="fmp_tune" x="2500.0"/>
+  <p id="fmp_ratio" x="1.4"/>
+  <p id="fmp_index" x="0.3"/>
+  <p id="fmp_idec" x="0.5"/>
+  <p id="fmp_fdbk" x="0.0"/>
+  <p id="fmp_dive" x="0.15"/>
+  <p id="fmp_dtime" x="0.4"/>
+  <p id="fmp_decay" x="0.55"/>
+  <p id="fmp_fold" x="0.05"/>
+  <p id="fmp_noise" x="0.05"/>
+  <Track i="0" on="0000100000100010" accent="0000100000000000"/>
+  <Modulators depthUnits="range">
+    <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+    <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
+         loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
+  </Modulators>
+</MuOnTrack>
