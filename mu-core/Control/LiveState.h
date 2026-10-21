@@ -58,6 +58,8 @@ public:
         std::function<bool()>         transportOutside;      // a host / MIDI clock / Link owns play (optional)
         std::function<int(int)>       savedClip;             // the clip layer n was saved playing (-1 = none, or it is not stored any more)
         std::function<bool(int, int)> clipFitsLayer;         // clip c of layer n is of the layer's own type (optional: absent = it is)
+        std::function<bool()>         clipboardEmpty;        // nothing on the clip clipboard (optional: absent = empty)
+        std::function<bool(int)>      canPasteClip;          // layer n would take the clipboard clip (optional: absent = no)
         std::function<bool()>         hasSceneControls;      // this product offers scenes on a surface (optional: absent = no)
         std::function<bool()>         hasLayerPages;         // this product offers layer pages on a surface (optional: absent = no)
     };
@@ -87,6 +89,9 @@ public:
     { return layer >= 0 && layer < getLayerCount() && cb.layerMuted && cb.layerMuted(layer); }
     bool                          isClipForLayer(int layer, int clip) const override
     { return ! cb.clipFitsLayer || cb.clipFitsLayer(layer, clip); }
+    bool                          isClipboardEmpty() const override { return ! cb.clipboardEmpty || cb.clipboardEmpty(); }
+    bool                          canPasteClip(int layer) const override { return cb.canPasteClip && cb.canPasteClip(layer); }
+    bool                          isFullPresetStaged() const override { return cb.fullPending && cb.fullPending(); }
     SceneLaunch                   getLastSceneLaunch() const override { return lastScene; }
     bool                          hasSceneControls() const override   { return cb.hasSceneControls && cb.hasSceneControls(); }
     bool                          hasLayerPages() const override      { return cb.hasLayerPages && cb.hasLayerPages(); }
