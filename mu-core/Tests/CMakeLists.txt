@@ -13,6 +13,7 @@ set(MU_CORE_TEST_SOURCES
     LayerRenderTests.cpp            # the layer render contract: driver, epoch, LayerBlock, time model
     RetireBinTests.cpp              # the shared retire bin and the retire isolation twin test
     LayerTypeSwapTests.cpp          # the layer type registry and setLayerType on a Published host
+    LayerSwapPublishedTests.cpp     # swapLayers on a Published host: quiesce, strips, tails, rows, references
     LayerPagingTests.cpp            # the sidebar and the mixer page a host of more than one page of layers
     ../UI/LayerSidebar.cpp
     ../UI/SidebarItem.cpp
