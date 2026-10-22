@@ -29,8 +29,7 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
     const float cellW = cells.getWidth() / (float) StepRow::kNumSteps;
     for (int s = 0; s < StepRow::kNumSteps; ++s)
     {
-        const juce::Rectangle<float> cell((float) cells.getX() + s * cellW + 1.5f, (float) cells.getY() + 1.5f,
-                                          cellW - 3.0f, (float) cells.getHeight() - 3.0f);
+        const auto cell = cellRect(cells, s);
         const bool on     = showSteps && row.isOn(s);
         const bool isBeat = (s % 4) == 0;
         float lit = on ? L.lampOn : (isBeat ? L.lampBeat : L.lampOff);
@@ -60,6 +59,16 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
         }
         MuLookAndFeel::drawRecessedScreen(g, cell);
 
+        // The accent button in the top-right corner: a small square, lit when the step is accented.
+        if (showSteps)
+        {
+            const auto btn = accentButtonRect(cell);
+            const bool accented = on && row.isAccent(s);
+            g.setColour(accented ? colour.brighter(0.4f) : MuLookAndFeel::colour(MuLookAndFeel::labelText).withAlpha(on ? 0.55f : 0.25f));
+            if (accented) g.fillRoundedRectangle(btn, 2.0f);
+            g.drawRoundedRectangle(btn, 2.0f, 1.0f);
+        }
+
         if (isBeat && beatNumbers)   // step numbers on the beat-group starts (1/5/9/13)
         {
             g.setFont(juce::Font(juce::FontOptions(mu_ui::sf(9.0f))));
@@ -74,29 +83,49 @@ int TrackStepRow::stepAt(juce::Rectangle<int> cells, juce::Point<int> p)
     return juce::jlimit(0, StepRow::kNumSteps - 1, (int) ((p.x - cells.getX()) / (cells.getWidth() / (float) StepRow::kNumSteps)));
 }
 
-// Right-click toggles accent, but only on an ON step (accent is invisible/inert otherwise); on an OFF step it
-// turns the step on so the gesture is never a no-op. Left-click is on/off.
-void TrackStepRow::editStep(StepRow& row, int step, bool accentGesture, bool hatStates)
+juce::Rectangle<float> TrackStepRow::cellRect(juce::Rectangle<int> cells, int step)
 {
-    if (hatStates && ! accentGesture)
+    const float cellW = cells.getWidth() / (float) StepRow::kNumSteps;
+    return { (float) cells.getX() + step * cellW + 1.5f, (float) cells.getY() + 1.5f, cellW - 3.0f, (float) cells.getHeight() - 3.0f };
+}
+
+juce::Rectangle<float> TrackStepRow::accentButtonRect(juce::Rectangle<float> cell)
+{
+    const float side = juce::jmax(6.0f, juce::jmin(cell.getWidth(), cell.getHeight()) * 0.30f);
+    return { cell.getRight() - side - 2.0f, cell.getY() + 2.0f, side, side };
+}
+
+void TrackStepRow::clickStep(StepRow& row, int step, juce::Rectangle<int> cells, juce::Point<int> p, bool rightClick,
+                             bool hat, std::function<void()> changed)
+{
+    if (rightClick)
     {
-        // Cycle: Off -> Closed -> Closed Accent -> Open -> Open Accent -> Off.
-        const bool on = row.isOn(step), ac = row.isAccent(step), op = row.isOpen(step);
-        if (! on)                { row.setOn(step, true);  row.setAccent(step, false); row.setOpen(step, false); }
-        else if (! op && ! ac)   { row.setAccent(step, true); }
-        else if (! op)           { row.setAccent(step, false); row.setOpen(step, true); }
-        else if (! ac)           { row.setAccent(step, true); }
-        else                     { row.setOn(step, false); row.setAccent(step, false); row.setOpen(step, false); }
+        // Select the step: its states as a menu (accent stays on the corner button). A Hat step is Closed or Open.
+        juce::PopupMenu menu;
+        const bool on = row.isOn(step), open = row.isOpen(step);
+        menu.addItem(1, "Off", true, ! on);
+        if (hat) { menu.addItem(2, "Closed", true, on && ! open); menu.addItem(3, "Open", true, on && open); }
+        else     menu.addItem(2, "On", true, on);
+        menu.showMenuAsync(juce::PopupMenu::Options(), [&row, step, changed](int id)
+        {
+            if (id == 0) return;
+            row.setOn(step, id != 1);
+            row.setOpen(step, id == 3);
+            if (id == 1) row.setAccent(step, false);
+            if (changed) changed();
+        });
         return;
     }
 
-    if (accentGesture)
+    if (accentButtonRect(cellRect(cells, step)).expanded(2.0f).contains(p.toFloat()))
     {
+        // Accent on or off; on an off step it turns the step on accented, so the click is never a no-op.
         if (row.isOn(step)) row.setAccent(step, ! row.isAccent(step));
         else                { row.setOn(step, true); row.setAccent(step, true); }
     }
     else
         row.setOn(step, ! row.isOn(step));
+    if (changed) changed();
 }
 
 void TrackStepRow::paint(juce::Graphics& g)
@@ -115,9 +144,9 @@ void TrackStepRow::mouseDown(const juce::MouseEvent& e)
 {
     // A Rumble row is not editable.
     if (host.getTrackEngine(slot) == EngineType::Rumble || ! getLocalBounds().contains(e.getPosition())) return;
-    editStep(host.getTrack(slot).row, stepAt(getLocalBounds(), e.getPosition()), e.mods.isRightButtonDown(),
-             host.getTrackEngine(slot) == EngineType::Hat);
-    repaint();
+    clickStep(host.getTrack(slot).row, stepAt(getLocalBounds(), e.getPosition()), getLocalBounds(), e.getPosition(),
+              e.mods.isPopupMenu(), host.getTrackEngine(slot) == EngineType::Hat,
+              [safe = juce::Component::SafePointer<TrackStepRow>(this)] { if (safe != nullptr) safe->repaint(); });
 }
 
 void TrackStepRow::mouseMove(const juce::MouseEvent& e)

@@ -65,10 +65,11 @@ inline constexpr ModDestEntry kHatDests[] = {
     makeTarget("h.odec.prop", "hat_odec", "Open Decay"),
 };
 
-// Snare — same SampleChannel::setParams order.
+// Snare — SampleChannel::setParams(tuneSemitones, decayMs, snap).
 inline constexpr ModDestEntry kSnareDests[] = {
     makeTarget("s.tune.prop", "snare_tune", "Tune"),
     makeTarget("s.dec.prop", "snare_dec", "Decay"),
+    makeTarget("s.snap.prop", "snare_snap", "Snap"),
 };
 
 // Rumble — order matches RumbleEngine::setParams(bpm, drive, d1, d2, d3, revSize, revMix, revLpHz, cutHz, res, inLpHz)

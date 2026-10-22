@@ -59,6 +59,7 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     flt(E::Hat,   "odec",  "Hat Open Decay", f(50.0f, 1200.0f, 1.0f), 300.0f);
     flt(E::Snare, "tune", "Snare Tune",  f(-12.0f, 12.0f, 0.1f), 0.0f);
     flt(E::Snare, "dec",  "Snare Decay", f(20.0f, 600.0f, 1.0f), 160.0f);
+    flt(E::Snare, "snap", "Snare Snap",  f(0.0f, 1.0f, 0.001f), 0.5f);   // wires against body; 0.5 is the original blend
 
     // Rumble engine (processes another track's audio: drive → delays → reverb → env → filter)
     flt(E::Rumble, "drive",  "Rumble Drive",     f(0.0f, 1.0f, 0.001f), 0.4f);

@@ -68,7 +68,7 @@ namespace
             case EngineType::Hat:   // two sets: the closed hat, then the open hat (the step row picks which a step plays)
                 return { { id("tune"), "Cl.Tune" }, { id("dec"), "Cl.Decay" }, { id("otune"), "Op.Tune" }, { id("odec"), "Op.Decay" } };
             case EngineType::Snare:
-                return { { id("tune"), "Tune" }, { id("dec"), "Decay" } };
+                return { { id("tune"), "Tune" }, { id("dec"), "Decay" }, { id("snap"), "Snap" } };
             // Rumble processes another track: input low-pass → input drive → 3 delay taps → reverb → filter.
             case EngineType::Rumble:
                 return { { id("inlp"), "In LP" }, { id("drive"), "Drive" }, { id("d1"), "1/16" }, { id("d2"), "2/16" }, { id("d3"), "3/16" },

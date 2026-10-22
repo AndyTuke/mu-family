@@ -110,8 +110,10 @@ void StepRows::mouseDown(const juce::MouseEvent& e)
     int r = 0, s = 0;
     if (! cellAt(e.getPosition(), r, s) || host.getTrackEngine(r) == EngineType::Rumble) return;
 
-    TrackStepRow::editStep(host.getTrack(r).row, s, e.mods.isRightButtonDown(), host.getTrackEngine(r) == EngineType::Hat);   // left on/off, right accent
-    repaint(rowArea(r));
+    // Left toggles the step (its corner button the accent); right opens the step's state menu.
+    TrackStepRow::clickStep(host.getTrack(r).row, s, cellsArea(r), e.getPosition(), e.mods.isPopupMenu(),
+                            host.getTrackEngine(r) == EngineType::Hat,
+                            [safe = juce::Component::SafePointer<StepRows>(this), r] { if (safe != nullptr) safe->repaint(safe->rowArea(r)); });
 }
 
 void StepRows::timerCallback()
