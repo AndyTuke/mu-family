@@ -183,7 +183,7 @@ struct MuTronicLayoutTests : juce::UnitTest
                     if (withId->getParameterID().startsWith("v0_")) ++patternRows;
                     if (withId->getParameterID().startsWith("r0_")) ++rhythmRows;
                 }
-            const int kRowsPerSlot = 63 + 44 + patternRows + rhythmRows;
+            const int kRowsPerSlot = 63 + 69 + patternRows + rhythmRows;
             expect(rhythmRows > 0, "the Rhythm's rows are declared");
             expect(count >= 16 * kRowsPerSlot && count < 16 * kRowsPerSlot + 400, "the Arp, Track, Pattern and Rhythm rows of all sixteen slots are in the layout, and no more");
             p->flushPendingAsyncUpdates();

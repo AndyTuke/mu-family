@@ -126,5 +126,5 @@ namespace mu_on_fixture
     constexpr std::uint64_t kSingleHash[7] = { 0x215e638e585324c9ull, 0x93a31986551d8985ull, 0x537b9c40d4de34b1ull, 0x14889ca97cbd63adull,   // Kick, Bass, Hat, Snare
                                                0ull,                                                                                      // Rumble: none
                                                0xcf9d8b87c609bcd1ull,                                                                      // FM Perc
-                                               0ull };                                                                                    // Chord
+                                               0x2c4893f931735151ull };                                                                     // Chord
 }
