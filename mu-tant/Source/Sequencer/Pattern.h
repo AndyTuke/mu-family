@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Modulation/StripMods.h"   // mu-core: the sends as modulation targets
+
 #include "Sequencer/Layer.h"          // mu-core: name, colour, modulation, the render contract
 #include "Sequencer/LayerTypeInfo.h"  // mu-core: mu_core::LayerTypeId
 #include "Sequencer/RetireTail.h"     // mu-core: ParamBinding, RetireSnapshot
@@ -72,6 +74,7 @@ struct Pattern : Layer
     // and clears it for the new slot (layersMoved).
     SlotBound<InsertProcessor> insert;
     const std::atomic<float>* insertGainReduction() const override { return &insert->grReduction; }
+    bool stripMods(float (&out)[4]) const noexcept override { return stripMod.read(out); }
 
     // The layer's host (the wavetable bank a saved path resolves into, the slot's engine); a copy keeps its own link.
     OwnerLink<PatternHost> host;
@@ -254,6 +257,7 @@ private:
     // has resolved once with the lock held, and whether the last rendered block had the layer parked (or none yet).
     // Cleared by prepare, bindParams, resetSlotState (a move or reset) and going live, so nothing held crosses a slot.
     std::array<float, kNumModDests> lastResolved {};
+    mu_mod::StripMods stripMod;   // the modulated pan and FX sends, for the mixer strip
     bool haveResolved = false;
     bool parked       = true;
 };

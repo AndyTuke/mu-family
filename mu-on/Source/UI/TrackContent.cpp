@@ -155,7 +155,7 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     {
         k.onStatusUpdate = [this, name](const juce::String&, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
     };
-    report(swingKnob, "Layer Swing");  report(accentKnob, "Layer Accent");  report(probKnob, "Layer Probability");
+    report(swingKnob, "Layer Swing");  report(accentKnob, "Layer Accent");  report(probKnob, "Layer Probability");  report(levelKnob, "Track Level");
     report(sendEffKnob, "FX Send");   report(sendDlyKnob, "Delay Send");   report(sendRevKnob, "Reverb Send");
     auto say = [this](const juce::String& name, DropdownSelect& d) { if (onStatusUpdate) onStatusUpdate(name, d.getText()); };
     rootSelect.getComboBox().onChange  = [this, say] { say("Key Root", rootSelect); };
@@ -170,7 +170,7 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     // setLayer attaches them to the shown track's rows.
     addAndMakeVisible(swingKnob);
     addAndMakeVisible(accentKnob);
-    for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob }) addAndMakeVisible(*k);
+    for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob, &levelKnob }) addAndMakeVisible(*k);
     // The STEP panel's controls edit the selected step of the shown track's row.
     for (auto* cap : { &loopCaption, &voiceCaption, &octaveCaption, &noteCaption })
     {
@@ -345,7 +345,7 @@ void TrackContent::rebuild()
     accentAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(host.getTrackParameters(), layerParamId(currentLayer, "accent"), accentKnob.getSlider());
 
     // The strip's sends and solo (ch{N}_), and the track's insert.
-    for (auto* a : { &sendEffAtt, &sendDlyAtt, &sendRevAtt, &probAtt }) a->reset();
+    for (auto* a : { &sendEffAtt, &sendDlyAtt, &sendRevAtt, &probAtt, &levelAtt }) a->reset();
     soloAtt.reset();
     const juce::String strip = "ch" + juce::String(currentLayer) + "_";
     auto& apvts = host.getTrackParameters();
@@ -354,6 +354,7 @@ void TrackContent::rebuild()
     sendRevAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, strip + "sendRev", sendRevKnob.getSlider());
     soloAtt    = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, strip + "solo", soloBtn);
     probAtt    = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerParamId(currentLayer, "prob"), probKnob.getSlider());
+    levelAtt   = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerParamId(currentLayer, "level"), levelKnob.getSlider());
     insertSub.setChannel(currentLayer);
 
     // A host that fixes the track's engine (engineLocked) hides the Engine selector and shows the track's one
@@ -372,7 +373,7 @@ void TrackContent::rebuild()
     for (auto* c : { (juce::Component*) &rootCaption, (juce::Component*) &rootSelect, (juce::Component*) &scaleCaption, (juce::Component*) &scaleSelect }) c->setVisible(showKey);
     swingKnob.setVisible(! rumble);
     accentKnob.setVisible(! rumble);
-    for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob }) k->setVisible(! rumble);   // a Rumble's box holds its envelope
+    for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob, &levelKnob }) k->setVisible(! rumble);   // a Rumble's box holds its envelope
     for (auto* c : { (juce::Component*) &stepProbKnob, (juce::Component*) &loopCaption, (juce::Component*) &loopSelect }) c->setVisible(! rumble);
     refreshStepPanel();
     soloBtn.setVisible(! rumble);
@@ -579,8 +580,9 @@ void TrackContent::resized()
         sendEffKnob.setBounds(blockX, row2Y, knobW, knobH);
         sendDlyKnob.setBounds(blockX + knobW + gap, row2Y, knobW, knobH);
         sendRevKnob.setBounds(blockX + 2 * (knobW + gap), row2Y, knobW, knobH);
-        // Third row: the layer's Probability.
+        // Third row: the layer's Probability and Level.
         probKnob.setBounds(blockX, row2Y + knobH + rowGap, knobW, knobH);
+        levelKnob.setBounds(blockX + knobW + gap, row2Y + knobH + rowGap, knobW, knobH);
     }
     layoutStepPanel();
 }

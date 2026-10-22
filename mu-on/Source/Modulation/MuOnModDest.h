@@ -4,6 +4,7 @@
 #include "UI/Components/DropdownSelect.h"   // mu-core
 #include "Persistence/TrackParams.h"            // EngineType
 #include "Modulation/ModTarget.h"         // mu-core: the standard target row
+#include "Modulation/StripMods.h"     // mu-core: the sends as modulation targets
 #include "UI/ModTargetDropdown.h"        // mu-core: the shared destination-dropdown builder
 
 #include <cstddef>
@@ -31,88 +32,160 @@ namespace mu_on
 // label, section (none: each engine is its own list), parameter. Rows below are written
 // { id, param, label } for readability, so they go through makeTarget.
 using ModDestEntry = mu_mod::ModTarget;
-constexpr ModDestEntry makeTarget(const char* id, const char* param, const char* label) { return { id, label, nullptr, param }; }
+constexpr ModDestEntry makeTarget(const char* id, const char* param, const char* label, const char* section = nullptr) { return { id, label, section, param }; }
 
 // Kick — order matches KickEngine::setParams(baseHz, pitchAmtHz, pitchDecMs, ampDecMs, drv).
 inline constexpr ModDestEntry kKickDests[] = {
-    makeTarget("k.tune.prop", "kick_tune", "Tune"),
-    makeTarget("k.ptch.prop", "kick_ptch", "Pitch Amt"),
-    makeTarget("k.pdec.prop", "kick_pdec", "Pitch Decay"),
-    makeTarget("k.adec.prop", "kick_adec", "Decay"),
-    makeTarget("k.drive.prop", "kick_drive", "Drive"),
+    makeTarget("k.tune.prop", "kick_tune", "Tune", "Kick"),
+    makeTarget("k.ptch.prop", "kick_ptch", "Pitch Amt", "Kick"),
+    makeTarget("k.pdec.prop", "kick_pdec", "Pitch Decay", "Kick"),
+    makeTarget("k.adec.prop", "kick_adec", "Decay", "Kick"),
+    makeTarget("k.drive.prop", "kick_drive", "Drive", "Kick"),
+    // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
+    // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
+    makeTarget("amp.level", "level", "Level", "Amp"),
+    makeTarget("amp.pan", "pan", "Pan", "Amp"),
+    makeTarget("insert.p1", "insP1", "Insert P1", "Insert"),
+    makeTarget("insert.p2", "insP2", "Insert P2", "Insert"),
+    makeTarget("insert.p3", "insP3", "Insert P3", "Insert"),
+    makeTarget("insert.p4", "insP4", "Insert P4", "Insert"),
+    makeTarget("send.effect", "sendEff", "Effect Send", "Effects"),
+    makeTarget("send.delay", "sendDly", "Delay Send", "Effects"),
+    makeTarget("send.reverb", "sendRev", "Reverb Send", "Effects"),
 };
 
 // Bass — order matches BassEngine::setParams(rootHz, [wave], sub, cutHz, res, env,
 // edecMs, atkMs, decMs, sus, drv, relMs, glideMs). Wave is a choice param — not modulatable, omitted.
 inline constexpr ModDestEntry kBassDests[] = {
-    makeTarget("b.tune.prop", "bass_tune", "Tune"),
-    makeTarget("b.sub.prop", "bass_sub", "Sub"),
-    makeTarget("b.cut.prop", "bass_cut", "Cutoff"),
-    makeTarget("b.res.prop", "bass_res", "Resonance"),
-    makeTarget("b.env.prop", "bass_env", "Filter Env"),
-    makeTarget("b.edec.prop", "bass_edec", "Env Decay"),
-    makeTarget("b.atk.prop", "bass_atk", "Attack"),
-    makeTarget("b.dec.prop", "bass_dec", "Decay"),
-    makeTarget("b.sus.prop", "bass_sus", "Sustain"),
-    makeTarget("b.drive.prop", "bass_drive", "Drive"),
-    makeTarget("b.rel.prop", "bass_rel", "Release"),     // appended last: saved destination indices stay valid
-    makeTarget("b.glide.prop", "bass_glide", "Glide"),
+    makeTarget("b.tune.prop", "bass_tune", "Tune", "Bass"),
+    makeTarget("b.sub.prop", "bass_sub", "Sub", "Bass"),
+    makeTarget("b.cut.prop", "bass_cut", "Cutoff", "Bass"),
+    makeTarget("b.res.prop", "bass_res", "Resonance", "Bass"),
+    makeTarget("b.env.prop", "bass_env", "Filter Env", "Bass"),
+    makeTarget("b.edec.prop", "bass_edec", "Env Decay", "Bass"),
+    makeTarget("b.atk.prop", "bass_atk", "Attack", "Bass"),
+    makeTarget("b.dec.prop", "bass_dec", "Decay", "Bass"),
+    makeTarget("b.sus.prop", "bass_sus", "Sustain", "Bass"),
+    makeTarget("b.drive.prop", "bass_drive", "Drive", "Bass"),
+    makeTarget("b.rel.prop", "bass_rel", "Release", "Bass"),     // appended last: saved destination indices stay valid
+    makeTarget("b.glide.prop", "bass_glide", "Glide", "Bass"),
+    // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
+    // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
+    makeTarget("amp.level", "level", "Level", "Amp"),
+    makeTarget("amp.pan", "pan", "Pan", "Amp"),
+    makeTarget("insert.p1", "insP1", "Insert P1", "Insert"),
+    makeTarget("insert.p2", "insP2", "Insert P2", "Insert"),
+    makeTarget("insert.p3", "insP3", "Insert P3", "Insert"),
+    makeTarget("insert.p4", "insP4", "Insert P4", "Insert"),
+    makeTarget("send.effect", "sendEff", "Effect Send", "Effects"),
+    makeTarget("send.delay", "sendDly", "Delay Send", "Effects"),
+    makeTarget("send.reverb", "sendRev", "Reverb Send", "Effects"),
 };
 
 // Hat — order matches SampleChannel::setParams(tuneSemitones, decayMs, openTuneSemitones, openDecayMs).
 inline constexpr ModDestEntry kHatDests[] = {
-    makeTarget("h.tune.prop", "hat_tune", "Tune"),
-    makeTarget("h.dec.prop", "hat_dec", "Decay"),
-    makeTarget("h.otune.prop", "hat_otune", "Open Tune"),
-    makeTarget("h.odec.prop", "hat_odec", "Open Decay"),
+    makeTarget("h.tune.prop", "hat_tune", "Tune", "Hat"),
+    makeTarget("h.dec.prop", "hat_dec", "Decay", "Hat"),
+    makeTarget("h.otune.prop", "hat_otune", "Open Tune", "Hat"),
+    makeTarget("h.odec.prop", "hat_odec", "Open Decay", "Hat"),
+    // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
+    // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
+    makeTarget("amp.level", "level", "Level", "Amp"),
+    makeTarget("amp.pan", "pan", "Pan", "Amp"),
+    makeTarget("insert.p1", "insP1", "Insert P1", "Insert"),
+    makeTarget("insert.p2", "insP2", "Insert P2", "Insert"),
+    makeTarget("insert.p3", "insP3", "Insert P3", "Insert"),
+    makeTarget("insert.p4", "insP4", "Insert P4", "Insert"),
+    makeTarget("send.effect", "sendEff", "Effect Send", "Effects"),
+    makeTarget("send.delay", "sendDly", "Delay Send", "Effects"),
+    makeTarget("send.reverb", "sendRev", "Reverb Send", "Effects"),
 };
 
 // Snare — SampleChannel::setParams(tuneSemitones, decayMs, snap).
 inline constexpr ModDestEntry kSnareDests[] = {
-    makeTarget("s.tune.prop", "snare_tune", "Tune"),
-    makeTarget("s.dec.prop", "snare_dec", "Decay"),
-    makeTarget("s.snap.prop", "snare_snap", "Snap"),
+    makeTarget("s.tune.prop", "snare_tune", "Tune", "Snare"),
+    makeTarget("s.dec.prop", "snare_dec", "Decay", "Snare"),
+    makeTarget("s.snap.prop", "snare_snap", "Snap", "Snare"),
+    // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
+    // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
+    makeTarget("amp.level", "level", "Level", "Amp"),
+    makeTarget("amp.pan", "pan", "Pan", "Amp"),
+    makeTarget("insert.p1", "insP1", "Insert P1", "Insert"),
+    makeTarget("insert.p2", "insP2", "Insert P2", "Insert"),
+    makeTarget("insert.p3", "insP3", "Insert P3", "Insert"),
+    makeTarget("insert.p4", "insP4", "Insert P4", "Insert"),
+    makeTarget("send.effect", "sendEff", "Effect Send", "Effects"),
+    makeTarget("send.delay", "sendDly", "Delay Send", "Effects"),
+    makeTarget("send.reverb", "sendRev", "Reverb Send", "Effects"),
 };
 
 // Rumble — order matches RumbleEngine::setParams(bpm, drive, d1, d2, d3, revSize, revMix, revLpHz, cutHz, res, inLpHz)
 // (bpm is the transport, not a dest — the 10 entries below are the modulatable args in order).
 inline constexpr ModDestEntry kRumbleDests[] = {
-    makeTarget("r.drive.prop", "rumble_drive", "Drive"),
-    makeTarget("r.d1.prop", "rumble_d1", "1/16"),
-    makeTarget("r.d2.prop", "rumble_d2", "2/16"),
-    makeTarget("r.d3.prop", "rumble_d3", "3/16"),
-    makeTarget("r.size.prop", "rumble_size", "Rev Size"),
-    makeTarget("r.revmix.prop", "rumble_revmix", "Rev Mix"),
-    makeTarget("r.revlp.prop", "rumble_revlp", "Rev LP"),
-    makeTarget("r.cut.prop", "rumble_cut", "Cutoff"),
-    makeTarget("r.res.prop", "rumble_res", "Resonance"),
-    makeTarget("r.inlp.prop", "rumble_inlp", "Input LP"),   // appended last: saved destination indices stay valid
+    makeTarget("r.drive.prop", "rumble_drive", "Drive", "Rumble"),
+    makeTarget("r.d1.prop", "rumble_d1", "1/16", "Rumble"),
+    makeTarget("r.d2.prop", "rumble_d2", "2/16", "Rumble"),
+    makeTarget("r.d3.prop", "rumble_d3", "3/16", "Rumble"),
+    makeTarget("r.size.prop", "rumble_size", "Rev Size", "Rumble"),
+    makeTarget("r.revmix.prop", "rumble_revmix", "Rev Mix", "Rumble"),
+    makeTarget("r.revlp.prop", "rumble_revlp", "Rev LP", "Rumble"),
+    makeTarget("r.cut.prop", "rumble_cut", "Cutoff", "Rumble"),
+    makeTarget("r.res.prop", "rumble_res", "Resonance", "Rumble"),
+    makeTarget("r.inlp.prop", "rumble_inlp", "Input LP", "Rumble"),   // appended last: saved destination indices stay valid
+    // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
+    // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
+    makeTarget("amp.level", "level", "Level", "Amp"),
+    makeTarget("amp.pan", "pan", "Pan", "Amp"),
+    makeTarget("insert.p1", "insP1", "Insert P1", "Insert"),
+    makeTarget("insert.p2", "insP2", "Insert P2", "Insert"),
+    makeTarget("insert.p3", "insP3", "Insert P3", "Insert"),
+    makeTarget("insert.p4", "insP4", "Insert P4", "Insert"),
+    makeTarget("send.effect", "sendEff", "Effect Send", "Effects"),
+    makeTarget("send.delay", "sendDly", "Delay Send", "Effects"),
+    makeTarget("send.reverb", "sendRev", "Reverb Send", "Effects"),
 };
 
 // FM Perc — order matches FmPercEngine::setParams(tune, ratio, index, idec, fdbk, dive, dtime, decay, fold, noise).
 // The Algorithm is a choice, not a target. Every row but Tune and Ratio is a normalised amount, so a depth means the
 // same musical share of the knob in every algorithm.
 inline constexpr ModDestEntry kFmPercDests[] = {
-    makeTarget("fp.tune.prop", "fmp_tune", "Tune"),
-    makeTarget("fp.ratio.prop", "fmp_ratio", "Ratio"),
-    makeTarget("fp.index.prop", "fmp_index", "Index"),
-    makeTarget("fp.idec.prop", "fmp_idec", "FM Env"),
-    makeTarget("fp.fdbk.prop", "fmp_fdbk", "Feedback"),
-    makeTarget("fp.dive.prop", "fmp_dive", "Dive"),
-    makeTarget("fp.dtime.prop", "fmp_dtime", "Dive Time"),
-    makeTarget("fp.decay.prop", "fmp_decay", "Decay"),
-    makeTarget("fp.fold.prop", "fmp_fold", "Fold"),
-    makeTarget("fp.noise.prop", "fmp_noise", "Noise"),
+    makeTarget("fp.tune.prop", "fmp_tune", "Tune", "FM Perc"),
+    makeTarget("fp.ratio.prop", "fmp_ratio", "Ratio", "FM Perc"),
+    makeTarget("fp.index.prop", "fmp_index", "Index", "FM Perc"),
+    makeTarget("fp.idec.prop", "fmp_idec", "FM Env", "FM Perc"),
+    makeTarget("fp.fdbk.prop", "fmp_fdbk", "Feedback", "FM Perc"),
+    makeTarget("fp.dive.prop", "fmp_dive", "Dive", "FM Perc"),
+    makeTarget("fp.dtime.prop", "fmp_dtime", "Dive Time", "FM Perc"),
+    makeTarget("fp.decay.prop", "fmp_decay", "Decay", "FM Perc"),
+    makeTarget("fp.fold.prop", "fmp_fold", "Fold", "FM Perc"),
+    makeTarget("fp.noise.prop", "fmp_noise", "Noise", "FM Perc"),
+    // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
+    // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
+    makeTarget("amp.level", "level", "Level", "Amp"),
+    makeTarget("amp.pan", "pan", "Pan", "Amp"),
+    makeTarget("insert.p1", "insP1", "Insert P1", "Insert"),
+    makeTarget("insert.p2", "insP2", "Insert P2", "Insert"),
+    makeTarget("insert.p3", "insP3", "Insert P3", "Insert"),
+    makeTarget("insert.p4", "insP4", "Insert P4", "Insert"),
+    makeTarget("send.effect", "sendEff", "Effect Send", "Effects"),
+    makeTarget("send.delay", "sendDly", "Delay Send", "Effects"),
+    makeTarget("send.reverb", "sendRev", "Reverb Send", "Effects"),
 };
 
 // Compile-time guard: every row of an engine's table names a parameter under that engine's tag
 // ("kick_..."), so a rename that misses a literal above fails the build instead of silencing a destination.
+// The closing rows every table shares: the track's Level and insert knobs (t{N}_) and the mixer strip's pan and sends (ch{N}_).
+constexpr bool isLayerWideParam(std::string_view p) noexcept
+{
+    return p == "level" || p == "insP1" || p == "insP2" || p == "insP3" || p == "insP4" || mu_mod::isMixerStripParam(p);
+}
+
 template <std::size_t N>
 constexpr bool allUnderPrefix(const ModDestEntry (&table)[N], const char* prefix) noexcept
 {
     for (const auto& row : table)
         for (std::size_t c = 0; prefix[c] != '\0'; ++c)
-            if (row.param[c] != prefix[c]) return false;   // a shorter param also stops here, at its terminator
+            if (! isLayerWideParam(row.param) && row.param[c] != prefix[c]) return false;   // a shorter param also stops here, at its terminator; the nine closing rows are not under the engine's tag
     return true;
 }
 static_assert(allUnderPrefix(kKickDests,   "kick_"),   "Kick targets must use the kick_ parameters");

@@ -83,10 +83,14 @@ public:
             // dispatch). An insert/reorder/delete in any one would re-route modulation to the
             // wrong engine param with no other failure - so pin the full ordered id list per
             // engine here. If a dest is added, update BOTH this list and the engine dispatch.
-            // Counts equal each engine's modulatable arity: Kick 5, Bass 12 (wave choice
+            // Counts equal each engine's modulatable arity plus Level, Pan, the 4 insert knobs and the 3 FX sends: Kick 5, Bass 12 (wave choice
             // omitted), Hat 4, Snare 3, Rumble 10 (bpm transport excluded).
-            auto pinLane = [this](EngineType engine, const std::vector<std::string>& expected)
+            auto pinLane = [this](EngineType engine, const std::vector<std::string>& engineDests)
             {
+                // Every engine's table ends with Level, Pan, the four insert knobs and the three FX sends.
+                std::vector<std::string> expected = engineDests;
+                expected.insert(expected.end(), { "amp.level", "amp.pan", "insert.p1", "insert.p2", "insert.p3", "insert.p4",
+                                                  "send.effect", "send.delay", "send.reverb" });
                 int n = 0;
                 const ModDestEntry* t = destsForEngine(engine, n);
                 expectEquals(n, (int) expected.size(),

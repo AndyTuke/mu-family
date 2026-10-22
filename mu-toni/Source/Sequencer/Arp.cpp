@@ -40,10 +40,12 @@ void Arp::bindParams(juce::AudioProcessorValueTreeState& apvts, int slot)
 
     for (int k = 0; k < kNumModDests; ++k)
     {
-        const auto id = layerParamId(slot, kModDestTable[k].param);
+        const bool strip = mu_mod::isMixerStripParam(kModDestTable[k].param);   // a pan or send is the mixer strip's parameter
+        const auto id = mu_mod::paramIdFor(layerParamId(slot, ""), slot, kModDestTable[k].param);
         modDestIds[(size_t) k]    = kModDestTable[k].id;
         modDestRanges[(size_t) k] = apvts.getParameterRange(id);
-        modDestAtoms[(size_t) k]  = apvts.getRawParameterValue(layerParamId(slot, vpi::suffix[vpSlotFor(kModDestTable[k].param)]));
+        modDestAtoms[(size_t) k]  = strip ? apvts.getRawParameterValue(id)
+                                          : apvts.getRawParameterValue(layerParamId(slot, vpi::suffix[vpSlotFor(kModDestTable[k].param)]));
         modParamValues[kModDestTable[k].id] = 0.0f;   // pre-size the map: the audio thread only overwrites
     }
 }
@@ -84,6 +86,8 @@ void Arp::readParams(double modBeat) noexcept
     }
     else
         std::copy(lastResolved.begin(), lastResolved.end(), out);
+
+    stripMod.publish(out[D_pan], out[D_sendEff], out[D_sendDly], out[D_sendRev]);   // the host gives these to the layer's mixer strip
 
     // Publish the post-matrix values for the knobs' live modulation arcs.
     for (int k = 0; k < kNumModDests; ++k)
@@ -133,10 +137,10 @@ void Arp::readParams(double modBeat) noexcept
 
     // Insert config (applied post-VCA by renderBlock).
     insertCfg.insertAlgo     = (int) g(vpi::drvChar);
-    insertCfg.insertParam[0] = g(vpi::insP1);
-    insertCfg.insertParam[1] = g(vpi::insP2);
-    insertCfg.insertParam[2] = g(vpi::insP3);
-    insertCfg.insertParam[3] = g(vpi::insP4);
+    insertCfg.insertParam[0] = out[D_insP1];   // modulated
+    insertCfg.insertParam[1] = out[D_insP2];
+    insertCfg.insertParam[2] = out[D_insP3];
+    insertCfg.insertParam[3] = out[D_insP4];
 
     runner.setAccent(accent);
     runner.setArp(ap);

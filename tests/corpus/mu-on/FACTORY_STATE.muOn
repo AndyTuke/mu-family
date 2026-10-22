@@ -225,6 +225,7 @@
         <p id="insP2" x="0.0"/>
         <p id="insP3" x="0.0"/>
         <p id="insP4" x="0.0"/>
+        <p id="level" x="1.0"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -304,6 +305,7 @@
         <p id="insP2" x="0.0"/>
         <p id="insP3" x="0.0"/>
         <p id="insP4" x="0.0"/>
+        <p id="level" x="1.0"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -383,6 +385,7 @@
         <p id="insP2" x="0.0"/>
         <p id="insP3" x="0.0"/>
         <p id="insP4" x="0.0"/>
+        <p id="level" x="1.0"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -462,6 +465,7 @@
         <p id="insP2" x="0.0"/>
         <p id="insP3" x="0.0"/>
         <p id="insP4" x="0.0"/>
+        <p id="level" x="1.0"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -541,6 +545,7 @@
         <p id="insP2" x="0.0"/>
         <p id="insP3" x="0.0"/>
         <p id="insP4" x="0.0"/>
+        <p id="level" x="1.0"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -620,6 +625,7 @@
         <p id="insP2" x="0.0"/>
         <p id="insP3" x="0.0"/>
         <p id="insP4" x="0.0"/>
+        <p id="level" x="1.0"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -699,6 +705,7 @@
         <p id="insP2" x="0.0"/>
         <p id="insP3" x="0.0"/>
         <p id="insP4" x="0.0"/>
+        <p id="level" x="1.0"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -778,6 +785,7 @@
         <p id="insP2" x="0.0"/>
         <p id="insP3" x="0.0"/>
         <p id="insP4" x="0.0"/>
+        <p id="level" x="1.0"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>

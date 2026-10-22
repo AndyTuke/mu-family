@@ -96,6 +96,7 @@ private:
 
     KnobWithLabel swingKnob { "Swing" }, accentKnob { "Accent" };
     KnobWithLabel sendEffKnob { "FX" }, sendDlyKnob { "Delay" }, sendRevKnob { "Reverb" };   // the strip's three sends
+    KnobWithLabel levelKnob { "Level" };                     // the track's own level (a modulation target; the mixer fader is separate)
     KnobWithLabel probKnob { "Prob" };                       // the layer's Probability: the share of its notes that play
     // The STEP panel: the selected step's own probability (multiplied with the layer's), loop ratio (the Nth of every M
     // passes of the row) and, on a Hat, which sound it plays. Not parameters: they edit the track's step row.
@@ -109,7 +110,7 @@ private:
     void selectStep(int step);
     void layoutStepPanel();
     juce::TextButton soloBtn { "Solo" };                                                      // the strip's solo
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> swingAtt, accentAtt, sendEffAtt, sendDlyAtt, sendRevAtt, probAtt;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> swingAtt, accentAtt, sendEffAtt, sendDlyAtt, sendRevAtt, probAtt, levelAtt;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> soloAtt;
     InsertSubsection insertSub;                       // the track's insert effect (t{N}_drvChar, t{N}_insP1..4)
     LFOEditor         rumbleEnvEditor;                // the Rumble track's drawable volume envelope

@@ -1,9 +1,9 @@
 # SHA-256, size, file. Fixtures are read-only copies (see tests/corpus/README.md); *.params.txt are the frozen
 # load results next to them. A change here is deliberate only via MU_REGENERATE_FROZEN=1.
 ede4cf0c87054526e291f6a90f510e7480e9c713436f9757aa9db96b23f14ba6  1367  CROSSLOAD.txt
-c45689845ba7db1d254cdceae6cdecdcaf37e66e79f0629570b8eae3fae1bbdb  38080  FACTORY_STATE.muOn
-82fbfa74e44e7627088a75592e11e6122d28cd1c0b70f4f6b98bb9bedd8694d1  229  FACTORY_STATE.muOn.params.txt
+67c9a4ef1493f0be4352916431d170aafaea86384fd6290fdd1cbdf9288f7101  38344  FACTORY_STATE.muOn
+1ffa59a1032b4ba73b159f5e2deb8eac0fb62a19ee34595ab451f8501b150507  229  FACTORY_STATE.muOn.params.txt
 d1f8532cbe8785319e663a406c3bb7aa140e68aac9f2dd2892503ae33f87f6d9  14501  ON_legacy.muOn
-0e622f59f9d93e43f4da62cf4c2afa3564899088ceef6ae71e883722b226dc2e  357  ON_legacy.muOn.params.txt
+00b2bd8c25c5b994d85333d2ef2509743abdd047af62d4bc3e6b9186be7f2b8d  357  ON_legacy.muOn.params.txt
 a354559682a907405fb9f959ce9ab6de723940b1e0ce5a73db4293e563ad52f7  234  ON_silent.muOn
-601468ee028b60ec3145a4de85d495b9eb566d59ab05abead951b36bee47d3e7  286  ON_silent.muOn.params.txt
+2922403a58bb6b783137b9f61a93f3fc1227eae73eaafc38bba5c40e252b3adc  286  ON_silent.muOn.params.txt

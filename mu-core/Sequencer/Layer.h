@@ -235,6 +235,11 @@ struct Layer : public mu_core::RetireTail
     // null when the layer has no insert or the algorithm shows none. Message thread only: the pointer
     // is into this layer, so a caller drops it before the layer is removed.
     virtual const std::atomic<float>* insertGainReduction() const { return nullptr; }
+
+    // The layer's modulated mixer-strip values for the block it just rendered, which the host gives to the layer's strip:
+    // pan (-1..+1), then the Effect, Delay and Reverb sends (0..1). False when the layer offers none of them as
+    // modulation targets (or has not resolved yet). Audio thread.
+    virtual bool stripMods(float (&out)[4]) const noexcept { juce::ignoreUnused(out); return false; }
 };
 
 // The base persistence hooks need the modulator (de)serialiser, which itself takes a Layer.

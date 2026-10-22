@@ -77,6 +77,7 @@ struct Track : Layer
     // ── The render contract ──────────────────────────────────────────────────
     // The type is the engine the track's parameter names (mu_core::LayerTypeId::Kick .. FmPerc).
     int  typeId() const override;
+    bool stripMods(float (&out)[4]) const noexcept override { return stripMod.read(out); }
     // A Rumble renders after every other track (it reads its source's block); everything else first.
     int  renderPriority() const override { return engineSetting() == EngineType::Rumble ? 1 : 0; }
     // Message thread, not processing: the engine's and the track's buffers for this rate and block size. The
@@ -136,7 +137,7 @@ struct Track : Layer
     float getModLive(EngineType engine, int dest) const noexcept;
 
     // The most targets any engine's table holds (Bass: 10).
-    static constexpr int kMaxDests = 16;
+    static constexpr int kMaxDests = 24;   // the engine's targets plus the nine closing rows
 
 private:
     // Cached modulation inputs for one engine: the destination ids (proportion-space keys), their backing
@@ -165,6 +166,10 @@ private:
     mu_core::ParamBinding insAlgoRow, insParamRow[VoiceParams::kInsertSlotCount];
     // The layer's Probability (percent, multiplies each step's own) and the audio thread's noise for the draw.
     mu_core::ParamBinding probRow;
+    float                 lastLevel = 1.0f;   // the Level the previous block ended at (the gain ramps from it)
+    // This block's Level and insert knobs after modulation (the closing rows of the engine's table), read by the render.
+    float                 levelNow = 1.0f, insertNow[VoiceParams::kInsertSlotCount] {};
+    mu_mod::StripMods     stripMod;     // the modulated pan and FX sends, for the mixer strip
     uint32_t              seed = 0x2545F491u;   // seeds the probability draw (per track, so two tracks do not draw alike)
 public:
     // Whether `step` plays in `pass` of the row: its loop ratio, then the draw against the step's probability times the

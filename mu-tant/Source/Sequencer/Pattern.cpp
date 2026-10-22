@@ -118,7 +118,7 @@ namespace
            D_xmIndex, D_xmDepth, D_xmSsb, D_o1Lvl, D_o2Lvl, D_nzLvl,
            D_fCut, D_fRes, D_fDrv, D_fLoCut, D_fEnv,
            D_f2Cut, D_f2Res, D_f2Drv, D_f2LoCut, D_f2Env, D_level,
-           D_insP1, D_insP2, D_insP3, D_insP4 };
+           D_insP1, D_insP2, D_insP3, D_insP4, D_pan, D_sendEff, D_sendDly, D_sendRev };
 
     // Compile-time guard: pin the D_* indices to the table rows, so an insert / reorder that would read the
     // wrong resolved value for a target fails to COMPILE.
@@ -131,7 +131,7 @@ namespace
     static_assert(cstrEq(kModDestTable[D_fCut].id,   "filter.cutoff"), "D_fCut desync");
     static_assert(cstrEq(kModDestTable[D_level].id,  "level"),         "D_level desync");
     static_assert(cstrEq(kModDestTable[D_insP4].id,  "insert.p4"),     "D_insP4 desync");
-    static_assert(D_insP4 + 1 == Pattern::kNumModDests, "every target has an index");
+    static_assert(D_sendRev + 1 == Pattern::kNumModDests, "every target has an index");
 
     constexpr float kNoteGateFadeSecs = 0.008f;   // Note mode's anti-click ramp (8 ms)
 
@@ -180,7 +180,7 @@ void Pattern::bindParams(juce::AudioProcessorValueTreeState& apvts, int slot)
     modMap.reserve((size_t) kNumModDests + 4);   // pre-sized: no audio-thread rehash
     for (int i = 0; i < kNumModDests; ++i)
     {
-        const auto id = layerParamId(slot, kModDestTable[i].param);
+        const auto id = mu_mod::paramIdFor(layerParamId(slot, ""), slot, kModDestTable[i].param);   // a pan or send is the strip's
         modIds[(size_t) i]    = kModDestTable[i].id;
         modRanges[(size_t) i] = apvts.getParameterRange(id);
         modAtoms[(size_t) i]  = apvts.getRawParameterValue(id);
@@ -301,6 +301,8 @@ void Pattern::applyModulation(double beat, VoiceConfig& cfg, std::array<float, 4
     }
     else
         std::copy(lastResolved.begin(), lastResolved.end(), out);
+
+    stripMod.publish(out[D_pan], out[D_sendEff], out[D_sendDly], out[D_sendRev]);   // the host gives these to the layer's mixer strip
 
     // Octave/fine pitch dests round to the nearest step (the proportion round-trip isn't bit-exact, so a plain
     // truncation could drop a step); the rest map straight across, already range-clamped by resolveLane.

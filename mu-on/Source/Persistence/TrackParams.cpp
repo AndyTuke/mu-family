@@ -88,6 +88,7 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     // The track's own groove: its swing and the velocity of its accented steps. Not modulation targets.
     // Probability: the share of the track's notes that play (0..100 %, every note, accents included). It multiplies each
     // step's own probability (StepRow).
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{ layerParamId(slot, "level"), 1 }, lbl + "Level", f(0.0f, 1.0f, 0.001f), 1.0f));   // the track's own level, a modulation target (the mixer fader is not)
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{ layerParamId(slot, "prob"), 1 }, lbl + "Probability",
                                                      NormalisableRange<float>(0.0f, 100.0f, 1.0f), 100.0f,
                                                      AudioParameterFloatAttributes().withStringFromValueFunction(

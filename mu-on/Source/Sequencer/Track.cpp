@@ -168,7 +168,7 @@ void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
         L.map.reserve((size_t) n);
         for (int i = 0; i < n; ++i)
         {
-            const auto id = layerParamPrefix(s) + t[i].param;
+            const auto id = mu_mod::paramIdFor(layerParamPrefix(s), s, t[i].param);   // a pan or send is the mixer strip's parameter
             L.ids[(size_t) i]    = t[i].id;
             L.atoms[(size_t) i]  = apvts.getRawParameterValue(id);
             jassert(L.atoms[(size_t) i] != nullptr);   // a target whose parameter drifted from the layout
@@ -283,6 +283,12 @@ void Track::resolve(int e, double beat, float* outValues) noexcept
     else
         std::copy(lastResolved.begin(), lastResolved.begin() + L.count, outValues);
 
+    // The last nine targets of every engine's table (Level, Pan, Insert P1..P4, the three sends): the track's Level and insert
+    // knobs for this block's render, and the mixer strip's Pan and sends for the host.
+    levelNow = outValues[L.count - 9];
+    for (int k = 0; k < VoiceParams::kInsertSlotCount; ++k) insertNow[k] = outValues[L.count - 7 + k];
+    stripMod.publish(outValues[L.count - 8], outValues[L.count - 3], outValues[L.count - 2], outValues[L.count - 1]);
+
     for (int k = 0; k < L.count; ++k)
         modLive[(size_t) k].store(outValues[k], std::memory_order_relaxed);
     modLiveEngine.store(e, std::memory_order_release);   // after the values: the tag publishes them
@@ -396,9 +402,14 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
     {
         VoiceParams vp;
         vp.insertAlgo = algo;
-        for (int k = 0; k < VoiceParams::kInsertSlotCount; ++k) vp.insertParam[k] = insParamRow[k].load(0.0f);
+        for (int k = 0; k < VoiceParams::kInsertSlotCount; ++k) vp.insertParam[k] = insertNow[k];
         insert.process(out, n, juce::jmin(2, out.getNumChannels()), vp);
     }
+
+    // The track's Level, ramped across the block from where the last one ended (unity leaves the block untouched).
+    if (levelNow != 1.0f || lastLevel != 1.0f)
+        for (int c = 0; c < juce::jmin(2, out.getNumChannels()); ++c) out.applyGainRamp(c, 0, n, lastLevel, levelNow);
+    lastLevel = levelNow;
 
     mu_core::spinUnlock(engineLock);
 }

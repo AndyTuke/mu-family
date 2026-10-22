@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Modulation/StripMods.h"
 #include "Modulation/ModTarget.h"
 #include "Modulation/ModulationMatrix.h"
 #include "Sequencer/Layer.h"
@@ -17,11 +18,11 @@ namespace mu_mod::checks
 // Returns the ids of any that don't (empty = pass).
 template <std::size_t N>
 juce::StringArray missingParams(const ModTarget (&table)[N], juce::AudioProcessorValueTreeState& apvts,
-                                const juce::String& prefix)
+                                const juce::String& prefix, const juce::String& stripPrefix = "ch0_")
 {
     juce::StringArray missing;
     for (const auto& t : table)
-        if (t.param != nullptr && apvts.getParameter(prefix + t.param) == nullptr)
+        if (t.param != nullptr && apvts.getParameter((isMixerStripParam(t.param) ? stripPrefix : prefix) + t.param) == nullptr)
             missing.add(t.id);
     return missing;
 }

@@ -66,6 +66,16 @@ inline constexpr ModDest kModDestTable[] = {
     { "penv.decay",   "Pitch Decay",    "Pitch", "peD" },
     { "penv.sustain", "Pitch Sustain",  "Pitch", "peS" },
     { "penv.release", "Pitch Release",  "Pitch", "peR" },
+    // ── Insert (normalised 0..1, as mu-Clid and mu-Tant offer them; appended) ──
+    { "insert.p1",    "Insert P1",      "Insert", "insP1" },
+    { "insert.p2",    "Insert P2",      "Insert", "insP2" },
+    { "insert.p3",    "Insert P3",      "Insert", "insP3" },
+    { "insert.p4",    "Insert P4",      "Insert", "insP4" },
+    // ── Mixer strip: pan and the FX sends (the strip's ch{N}_ parameters; same ids as mu-Clid; appended) ──
+    { "amp.pan",      "Pan",            "Amp", "pan" },
+    { "send.effect",  "Effect Send",    "Effects", "sendEff" },
+    { "send.delay",   "Delay Send",     "Effects", "sendDly" },
+    { "send.reverb",  "Reverb Send",    "Effects", "sendRev" },
 };
 
 // The out[] indices — MUST match kModDestTable order.
@@ -78,6 +88,8 @@ enum ModDestIndex
     D_amp, D_penv,
     D_acc,
     D_aeA, D_aeD, D_aeS, D_aeR, D_feA, D_feD, D_feS, D_feR, D_peA, D_peD, D_peS, D_peR,
+    D_insP1, D_insP2, D_insP3, D_insP4,
+    D_pan, D_sendEff, D_sendDly, D_sendRev,
     kNumModDests
 };
 

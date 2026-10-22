@@ -458,6 +458,16 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
         ctx.peers    = peers;
         ctx.numPeers = peers != nullptr ? K : 0;
         v.layer[(size_t) s]->render(ctx, openView(s), numSamples);
+
+        // A layer that offers Pan and the sends as modulation targets hands this block's values to its mixer strip.
+        if (float strip4[4]; v.layer[(size_t) s]->stripMods(strip4))
+        {
+            auto& strip = mixerEngine.channels[(size_t) s];
+            strip.panMod       .store(strip4[0], std::memory_order_relaxed);
+            strip.sendEffectMod.store(strip4[1], std::memory_order_relaxed);
+            strip.sendDelayMod .store(strip4[2], std::memory_order_relaxed);
+            strip.sendReverbMod.store(strip4[3], std::memory_order_relaxed);
+        }
     };
 
     // Phase 1: priority-0 live layers in slot order; every other slot below mixCount gets cleared scratch (an

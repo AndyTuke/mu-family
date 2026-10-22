@@ -7,6 +7,7 @@
 #include "Sequencer/RetireTail.h"       // mu-core: mu_core::ParamBinding
 #include "Audio/InsertProcessor.h"      // mu-core: shared per-voice insert FX
 #include "Modulation/MuToniModDest.h"   // isValidModDest, the modulation target table
+#include "Modulation/StripMods.h"   // mu-core: the sends as modulation targets
 #include "Persistence/ArpParams.h"      // the Arp type's parameter table (vpi)
 
 #include <array>
@@ -38,6 +39,7 @@ struct Arp : Layer
 
     // The compressor / limiter meter of this layer's insert.
     const std::atomic<float>* insertGainReduction() const override { return &insert->grReduction; }
+    bool stripMods(float (&out)[4]) const noexcept override { return stripMod.read(out); }
 
     // Saved modulators keep only destinations mu-Toni has.
     bool isValidDest(const std::string& id) const override { return isValidModDest(id); }
@@ -121,7 +123,8 @@ private:
     std::array<juce::NormalisableRange<float>, kNumModDests>  modDestRanges {};
     std::unordered_map<std::string_view, float>               modParamValues;
     LiveValues                                                modLive;
-    std::array<float, kNumModDests>                           lastResolved {};   // the last block's out[] (C12)
+    std::array<float, kNumModDests>                           lastResolved {};
+    mu_mod::StripMods                                         stripMod;   // the modulated pan and FX sends, for the mixer strip   // the last block's out[] (C12)
     bool                                                      haveResolved = false;
 
     juce::AudioBuffer<float> tailScratch;   // a tail that must add rather than write renders here (sized at prepare)

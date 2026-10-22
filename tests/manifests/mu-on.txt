@@ -3,7 +3,7 @@
 product=mu-on
 layers_at_start=1
 max_layers=8
-param_count=639
+param_count=647
 ---
 ch0_lvl | float | 0 | 1 | 0.001 | 1 | 1 | 1
 ch0_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
@@ -222,6 +222,7 @@ t0_kick_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
 t0_kick_pdec | float | 5 | 200 | 0.1 | 1 | 50 | 0.230769
 t0_kick_ptch | float | 0 | 600 | 1 | 1 | 220 | 0.366667
 t0_kick_tune | float | 30 | 120 | 0 | 1 | 50 | 0.368483
+t0_level | float | 0 | 1 | 0.001 | 1 | 1 | 1
 t0_prob | float | 0 | 100 | 1 | 1 | 100 | 1
 t0_rumble_cut | float | 20 | 20000 | 1 | 0.3 | 800 | 0.377963
 t0_rumble_d1 | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
@@ -280,6 +281,7 @@ t1_kick_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
 t1_kick_pdec | float | 5 | 200 | 0.1 | 1 | 50 | 0.230769
 t1_kick_ptch | float | 0 | 600 | 1 | 1 | 220 | 0.366667
 t1_kick_tune | float | 30 | 120 | 0 | 1 | 50 | 0.368483
+t1_level | float | 0 | 1 | 0.001 | 1 | 1 | 1
 t1_prob | float | 0 | 100 | 1 | 1 | 100 | 1
 t1_rumble_cut | float | 20 | 20000 | 1 | 0.3 | 800 | 0.377963
 t1_rumble_d1 | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
@@ -338,6 +340,7 @@ t2_kick_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
 t2_kick_pdec | float | 5 | 200 | 0.1 | 1 | 50 | 0.230769
 t2_kick_ptch | float | 0 | 600 | 1 | 1 | 220 | 0.366667
 t2_kick_tune | float | 30 | 120 | 0 | 1 | 50 | 0.368483
+t2_level | float | 0 | 1 | 0.001 | 1 | 1 | 1
 t2_prob | float | 0 | 100 | 1 | 1 | 100 | 1
 t2_rumble_cut | float | 20 | 20000 | 1 | 0.3 | 800 | 0.377963
 t2_rumble_d1 | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
@@ -396,6 +399,7 @@ t3_kick_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
 t3_kick_pdec | float | 5 | 200 | 0.1 | 1 | 50 | 0.230769
 t3_kick_ptch | float | 0 | 600 | 1 | 1 | 220 | 0.366667
 t3_kick_tune | float | 30 | 120 | 0 | 1 | 50 | 0.368483
+t3_level | float | 0 | 1 | 0.001 | 1 | 1 | 1
 t3_prob | float | 0 | 100 | 1 | 1 | 100 | 1
 t3_rumble_cut | float | 20 | 20000 | 1 | 0.3 | 800 | 0.377963
 t3_rumble_d1 | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
@@ -454,6 +458,7 @@ t4_kick_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
 t4_kick_pdec | float | 5 | 200 | 0.1 | 1 | 50 | 0.230769
 t4_kick_ptch | float | 0 | 600 | 1 | 1 | 220 | 0.366667
 t4_kick_tune | float | 30 | 120 | 0 | 1 | 50 | 0.368483
+t4_level | float | 0 | 1 | 0.001 | 1 | 1 | 1
 t4_prob | float | 0 | 100 | 1 | 1 | 100 | 1
 t4_rumble_cut | float | 20 | 20000 | 1 | 0.3 | 800 | 0.377963
 t4_rumble_d1 | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
@@ -512,6 +517,7 @@ t5_kick_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
 t5_kick_pdec | float | 5 | 200 | 0.1 | 1 | 50 | 0.230769
 t5_kick_ptch | float | 0 | 600 | 1 | 1 | 220 | 0.366667
 t5_kick_tune | float | 30 | 120 | 0 | 1 | 50 | 0.368483
+t5_level | float | 0 | 1 | 0.001 | 1 | 1 | 1
 t5_prob | float | 0 | 100 | 1 | 1 | 100 | 1
 t5_rumble_cut | float | 20 | 20000 | 1 | 0.3 | 800 | 0.377963
 t5_rumble_d1 | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
@@ -570,6 +576,7 @@ t6_kick_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
 t6_kick_pdec | float | 5 | 200 | 0.1 | 1 | 50 | 0.230769
 t6_kick_ptch | float | 0 | 600 | 1 | 1 | 220 | 0.366667
 t6_kick_tune | float | 30 | 120 | 0 | 1 | 50 | 0.368483
+t6_level | float | 0 | 1 | 0.001 | 1 | 1 | 1
 t6_prob | float | 0 | 100 | 1 | 1 | 100 | 1
 t6_rumble_cut | float | 20 | 20000 | 1 | 0.3 | 800 | 0.377963
 t6_rumble_d1 | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
@@ -628,6 +635,7 @@ t7_kick_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
 t7_kick_pdec | float | 5 | 200 | 0.1 | 1 | 50 | 0.230769
 t7_kick_ptch | float | 0 | 600 | 1 | 1 | 220 | 0.366667
 t7_kick_tune | float | 30 | 120 | 0 | 1 | 50 | 0.368483
+t7_level | float | 0 | 1 | 0.001 | 1 | 1 | 1
 t7_prob | float | 0 | 100 | 1 | 1 | 100 | 1
 t7_rumble_cut | float | 20 | 20000 | 1 | 0.3 | 800 | 0.377963
 t7_rumble_d1 | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
@@ -661,11 +669,11 @@ mst=10
 mstr=3
 ret=24
 rev=10
-t0=58
-t1=58
-t2=58
-t3=58
-t4=58
-t5=58
-t6=58
-t7=58
+t0=59
+t1=59
+t2=59
+t3=59
+t4=59
+t5=59
+t6=59
+t7=59

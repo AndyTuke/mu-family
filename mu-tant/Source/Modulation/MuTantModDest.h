@@ -71,6 +71,11 @@ inline constexpr ModDest kModDestTable[] = {
     { "insert.p2",    "Insert P2",     "Insert", "insP2" },
     { "insert.p3",    "Insert P3",     "Insert", "insP3" },
     { "insert.p4",    "Insert P4",     "Insert", "insP4" },
+    // ── Mixer strip: pan and the FX sends (the strip's ch{N}_ parameters; same ids as mu-Clid) ──
+    { "amp.pan",      "Pan",           "Amp", "pan" },
+    { "send.effect",  "Effect Send",   "Effects", "sendEff" },
+    { "send.delay",   "Delay Send",    "Effects", "sendDly" },
+    { "send.reverb",  "Reverb Send",   "Effects", "sendRev" },
 };
 
 inline constexpr int kModDestCount = (int) (sizeof(kModDestTable) / sizeof(kModDestTable[0]));
