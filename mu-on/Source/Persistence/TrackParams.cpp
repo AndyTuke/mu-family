@@ -54,6 +54,8 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     // Hat / Snare (sample engines, different defaults)
     flt(E::Hat,   "tune", "Hat Tune",    f(-12.0f, 12.0f, 0.1f), 0.0f);
     flt(E::Hat,   "dec",  "Hat Decay",   f(10.0f, 400.0f, 1.0f), 60.0f);
+    flt(E::Hat,   "otune", "Hat Open Tune",  f(-12.0f, 12.0f, 0.1f), 0.0f);    // the open hat: its own tune and decay
+    flt(E::Hat,   "odec",  "Hat Open Decay", f(50.0f, 1200.0f, 1.0f), 300.0f);
     flt(E::Snare, "tune", "Snare Tune",  f(-12.0f, 12.0f, 0.1f), 0.0f);
     flt(E::Snare, "dec",  "Snare Decay", f(20.0f, 600.0f, 1.0f), 160.0f);
 

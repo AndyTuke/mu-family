@@ -110,7 +110,7 @@ void StepRows::mouseDown(const juce::MouseEvent& e)
     int r = 0, s = 0;
     if (! cellAt(e.getPosition(), r, s) || host.getTrackEngine(r) == EngineType::Rumble) return;
 
-    TrackStepRow::editStep(host.getTrack(r).row, s, e.mods.isRightButtonDown());   // left on/off, right accent
+    TrackStepRow::editStep(host.getTrack(r).row, s, e.mods.isRightButtonDown(), host.getTrackEngine(r) == EngineType::Hat);   // left on/off, right accent
     repaint(rowArea(r));
 }
 

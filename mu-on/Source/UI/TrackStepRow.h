@@ -41,8 +41,9 @@ public:
                            juce::Colour colour, int playheadStep, bool beatNumbers);
     // The step under `p` in a row whose cells are `cells` (the caller has checked the point is inside).
     static int  stepAt(juce::Rectangle<int> cells, juce::Point<int> p);
-    // The edit a click makes: left toggles the step, right toggles its accent (an off step turns on with accent).
-    static void editStep(StepRow& row, int step, bool accentGesture);
+    // The edit a click makes: left toggles the step, right toggles its accent (an off step turns on with accent). On a
+    // Hat (`hatStates`) a left click steps through Off, Closed, Closed Accent, Open, Open Accent and back to Off.
+    static void editStep(StepRow& row, int step, bool accentGesture, bool hatStates = false);
 
 private:
     void timerCallback() override;

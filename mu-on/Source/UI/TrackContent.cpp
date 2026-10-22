@@ -63,7 +63,8 @@ namespace
             case EngineType::Bass:
                 return { { id("wave"), "Wave" }, { id("tune"), "Tune" }, { id("sub"), "Sub" }, { id("cut"), "Cutoff" }, { id("res"), "Reso" },
                          { id("env"), "F.Env" }, { id("edec"), "E.Dec" }, { id("atk"), "Atk" }, { id("dec"), "Dec" }, { id("sus"), "Sus" }, { id("drive"), "Drive" }, { id("fine"), "Fine" } };
-            case EngineType::Hat:
+            case EngineType::Hat:   // two sets: the closed hat, then the open hat (the step row picks which a step plays)
+                return { { id("tune"), "Cl.Tune" }, { id("dec"), "Cl.Decay" }, { id("otune"), "Op.Tune" }, { id("odec"), "Op.Decay" } };
             case EngineType::Snare:
                 return { { id("tune"), "Tune" }, { id("dec"), "Decay" } };
             // Rumble processes another track: input low-pass → input drive → 3 delay taps → reverb → filter.

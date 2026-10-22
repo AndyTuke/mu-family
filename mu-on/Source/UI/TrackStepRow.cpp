@@ -42,6 +42,11 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
         if (on)
         {
             MuLookAndFeel::drawLamp(g, shape, {}, lens, cell.getCentre(), juce::jmax(cell.getWidth(), cell.getHeight()) * 0.6f);
+            if (row.isOpen(s))   // open hat: a bright ring round the lamp
+            {
+                g.setColour(lens.brighter(L.lampHot * 2.0f));
+                g.drawRoundedRectangle(cell.reduced(1.0f), 3.0f, 1.5f);
+            }
             if (row.isAccent(s))   // accent: a hotter centre
             {
                 g.setColour(lens.brighter(L.lampHot * 2.0f));
@@ -71,8 +76,20 @@ int TrackStepRow::stepAt(juce::Rectangle<int> cells, juce::Point<int> p)
 
 // Right-click toggles accent, but only on an ON step (accent is invisible/inert otherwise); on an OFF step it
 // turns the step on so the gesture is never a no-op. Left-click is on/off.
-void TrackStepRow::editStep(StepRow& row, int step, bool accentGesture)
+void TrackStepRow::editStep(StepRow& row, int step, bool accentGesture, bool hatStates)
 {
+    if (hatStates && ! accentGesture)
+    {
+        // Cycle: Off -> Closed -> Closed Accent -> Open -> Open Accent -> Off.
+        const bool on = row.isOn(step), ac = row.isAccent(step), op = row.isOpen(step);
+        if (! on)                { row.setOn(step, true);  row.setAccent(step, false); row.setOpen(step, false); }
+        else if (! op && ! ac)   { row.setAccent(step, true); }
+        else if (! op)           { row.setAccent(step, false); row.setOpen(step, true); }
+        else if (! ac)           { row.setAccent(step, true); }
+        else                     { row.setOn(step, false); row.setAccent(step, false); row.setOpen(step, false); }
+        return;
+    }
+
     if (accentGesture)
     {
         if (row.isOn(step)) row.setAccent(step, ! row.isAccent(step));
@@ -98,7 +115,8 @@ void TrackStepRow::mouseDown(const juce::MouseEvent& e)
 {
     // A Rumble row is not editable.
     if (host.getTrackEngine(slot) == EngineType::Rumble || ! getLocalBounds().contains(e.getPosition())) return;
-    editStep(host.getTrack(slot).row, stepAt(getLocalBounds(), e.getPosition()), e.mods.isRightButtonDown());
+    editStep(host.getTrack(slot).row, stepAt(getLocalBounds(), e.getPosition()), e.mods.isRightButtonDown(),
+             host.getTrackEngine(slot) == EngineType::Hat);
     repaint();
 }
 
@@ -109,7 +127,7 @@ void TrackStepRow::mouseMove(const juce::MouseEvent& e)
     if (step == hoverStep) return;
     hoverStep = step;
     const auto& row = host.getTrack(slot).row;
-    onStatusUpdate("Step", "Step " + juce::String(step + 1) + (row.isOn(step) ? (row.isAccent(step) ? " on, accent" : " on") : " off"));
+    onStatusUpdate("Step", "Step " + juce::String(step + 1) + (row.isOn(step) ? (row.isOpen(step) ? (row.isAccent(step) ? " open, accent" : " open") : (row.isAccent(step) ? " on, accent" : " on")) : " off"));
 }
 
 void TrackStepRow::timerCallback()

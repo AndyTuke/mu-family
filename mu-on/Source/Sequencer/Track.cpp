@@ -300,10 +300,10 @@ void Track::clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, i
     if (! ctx.playing) return;
     if (ctx.justStarted) clock.seek(ctx.startBeat);   // the step the transport starts in fires, even on a quick replay
     clock.processSpan(row, ctx.startBeat, n, ctx.beatsPerSample, row.swingAmount(), row.accentVelocity(),
-                      [this, fireInto, e](float velocity, int offset)
+                      [this, fireInto, e](float velocity, int offset, bool open)
                       {
                           if (fireInto == nullptr || e == toIndex(EngineType::Rumble)) return;
-                          fireInto->trigger(velocity, offset);
+                          fireInto->trigger(velocity, offset, open);
                           triggers.fetch_add(1, std::memory_order_relaxed);
                       });
 }

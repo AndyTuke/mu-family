@@ -115,7 +115,7 @@ inline const std::vector<const char*>& engineParamNames(EngineType e)
 {
     static const std::vector<const char*> kKick   { "tune", "ptch", "pdec", "adec", "drive", "fine" };
     static const std::vector<const char*> kBass   { "wave", "sub", "tune", "cut", "res", "env", "edec", "atk", "dec", "sus", "drive", "fine" };
-    static const std::vector<const char*> kHat    { "tune", "dec" };
+    static const std::vector<const char*> kHat    { "tune", "dec", "otune", "odec" };
     static const std::vector<const char*> kSnare  { "tune", "dec" };
     static const std::vector<const char*> kRumble { "drive", "d1", "d2", "d3", "size", "revmix", "revlp", "cut", "res", "inlp" };
     static const std::vector<const char*> kFmPerc { "algo", "tune", "ratio", "index", "idec", "fdbk", "dive", "dtime", "decay", "fold", "noise" };

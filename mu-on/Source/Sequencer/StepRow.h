@@ -24,10 +24,14 @@ public:
     bool isAccent(int step) const noexcept { return valid(step) && cells[(size_t) step].accent.load(std::memory_order_relaxed); }
     void setOn    (int step, bool v) noexcept { if (valid(step)) cells[(size_t) step].on.store(v, std::memory_order_relaxed); }
     void setAccent(int step, bool v) noexcept { if (valid(step)) cells[(size_t) step].accent.store(v, std::memory_order_relaxed); }
+    // Open: a Hat step that plays the open hat (the other tracks ignore it). With on and accent it makes the four Hat
+    // states Closed / Closed Accent / Open / Open Accent.
+    bool isOpen  (int step) const noexcept { return valid(step) && cells[(size_t) step].open.load(std::memory_order_relaxed); }
+    void setOpen  (int step, bool v) noexcept { if (valid(step)) cells[(size_t) step].open.store(v, std::memory_order_relaxed); }
 
     void clear() noexcept
     {
-        for (auto& c : cells) { c.on.store(false, std::memory_order_relaxed); c.accent.store(false, std::memory_order_relaxed); }
+        for (auto& c : cells) { c.on.store(false, std::memory_order_relaxed); c.accent.store(false, std::memory_order_relaxed); c.open.store(false, std::memory_order_relaxed); }
     }
 
     // The starting groove of an engine, so a new track plays something at once: four-on-the-floor kick
@@ -65,10 +69,11 @@ public:
     {
         juce::ValueTree row("Track");
         row.setProperty("i", slot, nullptr);
-        juce::String on, ac;
-        for (int s = 0; s < kNumSteps; ++s) { on += isOn(s) ? '1' : '0'; ac += isAccent(s) ? '1' : '0'; }
+        juce::String on, ac, op;
+        for (int s = 0; s < kNumSteps; ++s) { on += isOn(s) ? '1' : '0'; ac += isAccent(s) ? '1' : '0'; op += isOpen(s) ? '1' : '0'; }
         row.setProperty("on", on, nullptr);
         row.setProperty("accent", ac, nullptr);
+        if (op.containsChar('1')) row.setProperty("open", op, nullptr);   // absent = every step closed
         return row;
     }
 
@@ -78,15 +83,17 @@ public:
     {
         const juce::String on = row.getProperty("on").toString();
         const juce::String ac = row.getProperty("accent").toString();
+        const juce::String op = row.getProperty("open").toString();
         for (int s = 0; s < kNumSteps; ++s)
         {
+            setOpen  (s, s < op.length() && op[s] == '1');
             setOn    (s, s < on.length() && on[s] == '1');
             setAccent(s, s < ac.length() && ac[s] == '1');
         }
     }
 
 private:
-    struct Cell { std::atomic<bool> on { false }; std::atomic<bool> accent { false }; };
+    struct Cell { std::atomic<bool> on { false }; std::atomic<bool> accent { false }; std::atomic<bool> open { false }; };
     static bool valid(int s) noexcept { return s >= 0 && s < kNumSteps; }
 
     std::array<Cell, kNumSteps> cells;

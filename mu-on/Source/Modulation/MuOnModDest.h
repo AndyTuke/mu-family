@@ -57,10 +57,12 @@ inline constexpr ModDestEntry kBassDests[] = {
     makeTarget("b.drive.prop", "bass_drive", "Drive"),
 };
 
-// Hat — order matches SampleChannel::setParams(tuneSemitones, decayMs).
+// Hat — order matches SampleChannel::setParams(tuneSemitones, decayMs, openTuneSemitones, openDecayMs).
 inline constexpr ModDestEntry kHatDests[] = {
     makeTarget("h.tune.prop", "hat_tune", "Tune"),
     makeTarget("h.dec.prop", "hat_dec", "Decay"),
+    makeTarget("h.otune.prop", "hat_otune", "Open Tune"),
+    makeTarget("h.odec.prop", "hat_odec", "Open Decay"),
 };
 
 // Snare — same SampleChannel::setParams order.

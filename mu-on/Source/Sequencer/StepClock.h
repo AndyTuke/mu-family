@@ -2,6 +2,7 @@
 
 #include "Sequencer/StepRow.h"
 #include <cmath>
+#include <type_traits>
 
 // The 909 step clock of one row: it fires sample-accurate triggers at each 16th-note step boundary of the
 // host/internal transport beat. 16 steps = one bar (each step = a 16th = 0.25 beat). Swing delays the odd
@@ -63,7 +64,12 @@ public:
                 const int sampleOffset = juce::jlimit(0, numSamples - 1,
                                                       (int) std::round((t - beatStart) / beatsPerSample));
                 if (row.isOn(local))
-                    fire(row.isAccent(local) ? accentedVelocity(accentVelocity) : kNormalVelocity, sampleOffset);
+                {
+                    const float velocity = row.isAccent(local) ? accentedVelocity(accentVelocity) : kNormalVelocity;
+                    // A firing that takes the step's Open flag (the Hat) gets it as a third argument; the others do not.
+                    if constexpr (std::is_invocable_v<Fire&, float, int, bool>) fire(velocity, sampleOffset, row.isOpen(local));
+                    else                                                         fire(velocity, sampleOffset);
+                }
             }
             ++nextGlobalStep;
         }
