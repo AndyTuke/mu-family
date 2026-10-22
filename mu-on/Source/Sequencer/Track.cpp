@@ -130,6 +130,8 @@ void Track::prepare(double sampleRate, int blockSize)
     tailScratch.clear();
     for (auto& e : engines)
         if (e != nullptr) e->prepare(preparedRate, preparedBlock);
+    insert.prepare(preparedRate, preparedBlock);
+    insert.setSlotIndex(slot);
     // The next rendered block starts from silence and resolves its engine afresh (no held C12 values).
     parked  = true;
     current = -1;
@@ -146,6 +148,9 @@ void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
     bassFineRow = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::Bass, "fine")), this);
     rootRow     = mu_core::ParamBinding(apvts.getRawParameterValue(kRootParamId), this);    // global; null where the host has none
     scaleRow    = mu_core::ParamBinding(apvts.getRawParameterValue(kScaleParamId), this);
+    insAlgoRow  = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "drvChar")), this);
+    for (int k = 0; k < VoiceParams::kInsertSlotCount; ++k)
+        insParamRow[k] = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "insP" + juce::String(k + 1))), this);
     swingRow    = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "swing")), this);
     accentRow   = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "accent")), this);
     jassert(engineRow.isBound() && sourceRow.isBound() && bassWaveRow.isBound() && algoRow.isBound() && swingRow.isBound() && accentRow.isBound());   // an id drift from the layout (debug)
@@ -234,6 +239,7 @@ void Track::resetEngines() noexcept
 {
     for (auto& e : engines)
         if (e != nullptr) e->reset();
+    insert.reset();   // a stop or an engine change also ends the insert's tail
 }
 
 void Track::resetEngineToPrepared() noexcept
@@ -369,6 +375,15 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
     }
     else
         eng->render(out, n, silence, false);
+
+    // Phase 6: the track's insert effect on the block just rendered (None skips it).
+    if (const int algo = juce::roundToInt(insAlgoRow.load(0.0f)); algo > 0)
+    {
+        VoiceParams vp;
+        vp.insertAlgo = algo;
+        for (int k = 0; k < VoiceParams::kInsertSlotCount; ++k) vp.insertParam[k] = insParamRow[k].load(0.0f);
+        insert.process(out, n, juce::jmin(2, out.getNumChannels()), vp);
+    }
 
     mu_core::spinUnlock(engineLock);
 }

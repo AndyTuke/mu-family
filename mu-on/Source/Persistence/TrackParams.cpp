@@ -1,5 +1,6 @@
 #include "Persistence/TrackParams.h"
 #include "MuLimits.h"   // mu-core: mu_limits::kMaxLayers (the Rumble source's range)
+#include "Plugin/MixerFxParams.h"   // mu-core: addInsertParams
 
 namespace mu_on
 {
@@ -70,6 +71,9 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     flt(E::Rumble, "cut",    "Rumble Cutoff",    NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f), 800.0f);
     flt(E::Rumble, "res",    "Rumble Resonance", f(0.0f, 1.0f, 0.001f), 0.2f);
     flt(E::Rumble, "inlp",   "Rumble Input LP",  NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f), 20000.0f);   // fully open = off
+
+    // The track's insert effect: algorithm and the four generic knobs (the shared insert layout, as a mixer bus insert).
+    mu_mixfx::addInsertParams(layout, layerParamPrefix(slot), lbl);   // t{N}_drvChar, t{N}_insP1..4: the ids the shared InsertSubsection reads
 
     // The track's own groove: its swing and the velocity of its accented steps. Not modulation targets.
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{ layerParamId(slot, "swing"), 1 }, lbl + "Swing",

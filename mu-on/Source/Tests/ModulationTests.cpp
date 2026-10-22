@@ -84,7 +84,7 @@ public:
             // wrong engine param with no other failure - so pin the full ordered id list per
             // engine here. If a dest is added, update BOTH this list and the engine dispatch.
             // Counts equal each engine's modulatable arity: Kick 5, Bass 10 (wave choice
-            // omitted), Hat 4, Snare 2, Rumble 9 (bpm transport excluded).
+            // omitted), Hat 4, Snare 2, Rumble 10 (bpm transport excluded).
             auto pinLane = [this](EngineType engine, const std::vector<std::string>& expected)
             {
                 int n = 0;

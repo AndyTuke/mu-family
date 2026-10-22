@@ -83,7 +83,7 @@ public:
         mu_on::addLayerParams (layout, 3);
         juce::AudioProcessorValueTreeState apvts (proc, nullptr, "PARAMS", std::move (layout));
 
-        int expected = 4;
+        int expected = 4 + 5;   // eng, src, swing, accent, and the insert (algorithm + four knobs)
         expect (apvts.getParameter ("t3_eng") != nullptr && apvts.getParameter ("t3_src") != nullptr, "the engine and source rows");
         expect (apvts.getParameter ("t3_swing") != nullptr && apvts.getParameter ("t3_accent") != nullptr, "the groove rows");
         for (int e = 0; e < mu_on::kNumEngineTypes; ++e)

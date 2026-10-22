@@ -102,9 +102,8 @@ namespace
 }
 
 TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
-    : host(trackHost), grid(trackHost.getTrackParameters()), rows(trackHost), soloRow(trackHost)
+    : host(trackHost), grid(trackHost.getTrackParameters()), rows(trackHost), soloRow(trackHost), insertSub(base, "t")
 {
-    juce::ignoreUnused(base);
     for (int e = 0; e < kNumEngineTypes; ++e) engineSelect.addItem(engineName(engineFromIndex(e)), e + 1);
     engineSelect.onChange = [this](int id) { engineChosen(id); };
     sourceSelect.onChange = [this](int id) { sourceChosen(id); };
@@ -129,6 +128,11 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     // setLayer attaches them to the shown track's rows.
     addAndMakeVisible(swingKnob);
     addAndMakeVisible(accentKnob);
+    for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob }) addAndMakeVisible(*k);
+    soloBtn.setClickingTogglesState(true);
+    addAndMakeVisible(soloBtn);
+    insertSub.onStatusUpdate = [this](const juce::String& name, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
+    addAndMakeVisible(insertSub);
 
     // The Rumble track's drawable bar-volume envelope, edited under the track's own lock.
     rumbleEnvEditor.setUnipolar(true);
@@ -224,6 +228,17 @@ void TrackContent::rebuild()
     swingAtt  = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(host.getTrackParameters(), layerParamId(currentLayer, "swing"),  swingKnob.getSlider());
     accentAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(host.getTrackParameters(), layerParamId(currentLayer, "accent"), accentKnob.getSlider());
 
+    // The strip's sends and solo (ch{N}_), and the track's insert.
+    for (auto* a : { &sendEffAtt, &sendDlyAtt, &sendRevAtt }) a->reset();
+    soloAtt.reset();
+    const juce::String strip = "ch" + juce::String(currentLayer) + "_";
+    auto& apvts = host.getTrackParameters();
+    sendEffAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, strip + "sendEff", sendEffKnob.getSlider());
+    sendDlyAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, strip + "sendDly", sendDlyKnob.getSlider());
+    sendRevAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, strip + "sendRev", sendRevKnob.getSlider());
+    soloAtt    = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, strip + "solo", soloBtn);
+    insertSub.setChannel(currentLayer);
+
     // A host that fixes the track's engine (engineLocked) hides the Engine selector and shows the track's one
     // row of steps; mu-On never locks, so its own look is unchanged.
     locked = host.getTrack(currentLayer).engineLocked;
@@ -238,6 +253,8 @@ void TrackContent::rebuild()
     sourceSelect.setVisible(rumble);
     swingKnob.setVisible(! rumble);
     accentKnob.setVisible(! rumble);
+    for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob }) k->setVisible(! rumble);   // a Rumble's box holds its envelope
+    soloBtn.setVisible(! rumble);
     rumbleLength.setVisible(rumble);
     rumbleEnvEditor.setVisible(rumble);
 
@@ -343,34 +360,42 @@ void TrackContent::resized()
     const int clear  = s(LF::kSubPanelScrewClear);  // content in from a box's sides
     const int gap    = s(LF::kSpaceS);
 
-    // Panel 1: the engine box. The dropdown(s) first, captioned on the knobs' label band and centred on
-    // the knob band, then the knob grid.
+    // Panel 1: ENGINE | voice | INSERT, left to right. The engine box holds the dropdown(s) (Engine, and a
+    // Rumble's Source) captioned on the knobs' label band; the voice box is the engine's knob grid and takes the
+    // width the other two leave; the insert box is the shared insert panel. All three are two knob rows tall.
     const bool rumble  = shownEngine == EngineType::Rumble;
-    const int boxH     = s(mu_ui::ParamKnobGrid::kCellH + 2 * LF::kSpaceS);
     const int dropW    = s(MuLookAndFeel::kDropdownW);
-    // The dropdowns: Engine (not on a locked track) then, for a Rumble, Source; the grid follows them.
+    const int divW     = s(LF::kVoiceDivW);
+    const int labelH   = s(mu_ui::ParamKnobGrid::kLabelH);
+    const int knobH    = s(LF::kKnobSize2H);
+    const int insertW  = 4 * s(LF::kKnobSize2W);
+    const int insertH  = 2 * knobH + s(LF::kVoiceGap);
+    const int boxH     = insertH + 2 * s(LF::kSpaceS);
     const int numDrops = (locked ? 0 : 1) + (rumble ? 1 : 0);
-    const int leftW    = numDrops * dropW + juce::jmax(0, numDrops - 1) * gap;
-    const int gridGap  = numDrops > 0 ? gap : 0;
+    const int engineW  = numDrops > 0 ? 2 * clear + dropW : 0;
     engineR    = { 0, 0, w, padY + plateH + boxH + padY };
-    const int boxW = juce::jmin(w - 2 * padX, 2 * clear + leftW + gridGap + grid.getPreferredWidth());
-    engineBoxR = { padX, padY + plateH, boxW, boxH };
+    const int boxY = padY + plateH;
+    int x = padX;
+    engineBoxR = engineW > 0 ? juce::Rectangle<int>(x, boxY, engineW, boxH) : juce::Rectangle<int>();
+    if (engineW > 0) x += engineW + divW;
+    const int insertBoxW = 2 * clear + insertW;
+    const int voiceW   = juce::jmax(0, w - padX - x - divW - insertBoxW);
+    voiceBoxR  = { x, boxY, voiceW, boxH };
+    insertBoxR = { voiceBoxR.getRight() + divW, boxY, insertBoxW, boxH };
 
-    const auto inner = engineBoxR.reduced(clear, s(LF::kSpaceS));
-    const int labelH = s(mu_ui::ParamKnobGrid::kLabelH);
-    const int knobH  = s(LF::kKnobSize2H);
-    const int bandH  = s(mu_ui::ParamKnobGrid::kCellH) - labelH;   // what the grid centres its controls in
     const juce::Font captionFont(juce::FontOptions{}.withHeight(mu_ui::sf(LF::kKnobLabelFont)));   // as the knob labels
-    auto place = [&](juce::Label& caption, DropdownSelect& dropdown, int x)
+    const int bandH = s(mu_ui::ParamKnobGrid::kCellH) - labelH;
+    auto place = [&](juce::Label& caption, DropdownSelect& dropdown, int y)
     {
         caption.setFont(captionFont);
-        caption.setBounds(x, inner.getY(), dropW, labelH);
-        dropdown.setBounds(x, inner.getY() + labelH + (bandH - s(MuLookAndFeel::kDropdownH)) / 2, dropW, s(MuLookAndFeel::kDropdownH));
+        caption.setBounds(engineBoxR.getX() + clear, y, dropW, labelH);
+        dropdown.setBounds(engineBoxR.getX() + clear, y + labelH + (bandH - s(MuLookAndFeel::kDropdownH)) / 2, dropW, s(MuLookAndFeel::kDropdownH));
     };
-    int dropX = inner.getX();
-    if (! locked) { place(engineCaption, engineSelect, dropX); dropX += dropW + gap; }
-    if (rumble)   place(sourceCaption, sourceSelect, dropX);
-    grid.setBounds(inner.withTrimmedLeft(leftW + gridGap));
+    int dropY = engineBoxR.getY() + s(LF::kSpaceS);
+    if (! locked) { place(engineCaption, engineSelect, dropY); dropY += s(mu_ui::ParamKnobGrid::kCellH) + gap; }
+    if (rumble)   place(sourceCaption, sourceSelect, dropY);
+    grid.setBounds(voiceBoxR.reduced(clear, s(LF::kSpaceS)));
+    insertSub.setBounds(insertBoxR.getX() + clear, insertBoxR.getY() + s(LF::kSpaceS), insertW, insertH);
 
     // Panel 2 (flex): Groove | Steps, both the full height left under their plates.
     slotR = { 0, engineR.getBottom(), w, juce::jmax(0, h - engineR.getBottom()) };
@@ -397,12 +422,18 @@ void TrackContent::resized()
     }
     else
     {
-        // The pair centred in the box, top-aligned, each on the standard knob cell.
-        const int knobW  = s(LF::kKnobSize2W);
-        const int pairW  = 2 * knobW + gap;
-        const int pairX  = g.getX() + (g.getWidth() - pairW) / 2;
-        swingKnob.setBounds(pairX, g.getY(), knobW, knobH);
-        accentKnob.setBounds(pairX + knobW + gap, g.getY(), knobW, knobH);
+        // The LAYER box: three columns on the standard knob cell, Swing / Accent / Solo over the three sends.
+        const int knobW = s(LF::kKnobSize2W);
+        const int rowGap = s(LF::kVoiceGap);
+        const int blockW = 3 * knobW + 2 * gap;
+        const int blockX = g.getX() + (g.getWidth() - blockW) / 2;
+        swingKnob.setBounds(blockX, g.getY(), knobW, knobH);
+        accentKnob.setBounds(blockX + knobW + gap, g.getY(), knobW, knobH);
+        soloBtn.setBounds(blockX + 2 * (knobW + gap), g.getY() + (knobH - s(LF::kClientButtonH)) / 2, knobW, s(LF::kClientButtonH));
+        const int row2Y = g.getY() + knobH + rowGap;
+        sendEffKnob.setBounds(blockX, row2Y, knobW, knobH);
+        sendDlyKnob.setBounds(blockX + knobW + gap, row2Y, knobW, knobH);
+        sendRevKnob.setBounds(blockX + 2 * (knobW + gap), row2Y, knobW, knobH);
     }
 }
 
@@ -418,14 +449,18 @@ void TrackContent::paint(juce::Graphics& g)
 
     const bool rumble = shownEngine == EngineType::Rumble;
     const juce::String name = juce::String(engineName(shownEngine)).toUpperCase();
-    const MuLookAndFeel::Section engineSection { engineBoxR, name + " ENGINE" };
-    const MuLookAndFeel::Section grooveSection { grooveBoxR, rumble ? juce::String("ENVELOPE") : juce::String("GROOVE") };
-    if (stepsBoxR.isEmpty()) MuLookAndFeel::drawSections(g, *this, { engineSection, grooveSection }, accent);
-    else                     MuLookAndFeel::drawSections(g, *this, { engineSection, grooveSection, { stepsBoxR, "STEPS" } }, accent);
+    // Sections left to right, then the Layer box and the Steps box: each a raised box named on a plate above it.
+    std::vector<MuLookAndFeel::Section> sections;
+    if (! engineBoxR.isEmpty()) sections.push_back({ engineBoxR, locked ? juce::String("SOURCE") : juce::String("ENGINE") });
+    sections.push_back({ voiceBoxR, name + " VOICE" });
+    sections.push_back({ insertBoxR, "INSERT" });
+    sections.push_back({ grooveBoxR, rumble ? juce::String("ENVELOPE") : juce::String("LAYER") });
+    if (! stepsBoxR.isEmpty()) sections.push_back({ stepsBoxR, "STEPS" });
+    MuLookAndFeel::drawSections(g, *this, sections, accent);
 
-    // The shown track's colour on its engine box.
+    // The shown track's colour on its voice box.
     g.setColour(layerColour());
-    g.drawRoundedRectangle(engineBoxR.toFloat().expanded(1.0f), 4.0f, 1.5f);
+    g.drawRoundedRectangle(voiceBoxR.toFloat().expanded(1.0f), 4.0f, 1.5f);
 }
 
 void TrackContent::paintOverChildren(juce::Graphics& g)

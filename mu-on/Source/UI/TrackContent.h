@@ -13,6 +13,7 @@
 #include "UI/Components/LFOEditor.h"          // mu-core: drawable smooth-curve editor
 #include "UI/Components/NoteLengthControl.h"  // mu-core: the Loop-style length row
 #include "UI/Components/MuLookAndFeel.h"
+#include "UI/Voice/InsertSubsection.h"   // mu-core: the shared per-channel insert panel
 
 #include <array>
 #include <functional>
@@ -25,10 +26,11 @@ namespace mu_on
 
 // What fills the content band (design-ui-family §5) of the shared LayerPanel: the shown track's
 // engine and its step rows. Two metal panels, the second the flex one:
-//   1. ENGINE   an "Engine" dropdown (and, for a Rumble, its "Source") first, then the selected engine's
-//               knobs. Switching engine asks nothing and keeps every engine's settings on the track.
-//   2. GROOVE | STEPS   the track's own Swing / Accent (a Rumble track shows its volume envelope instead) and
-//               one row of steps per track (StepRows).
+//   1. ENGINE | <NAME> VOICE | INSERT   the "Engine" dropdown (and, for a Rumble, its "Source") in a box of its
+//               own before the voice, then the selected engine's knobs, then the track's insert effect.
+//               Switching engine asks nothing and keeps every engine's settings on the track.
+//   2. LAYER | STEPS   the track's own Swing / Accent, its three FX sends and a Solo button (a Rumble track
+//               shows its volume envelope instead) and one row of steps per track (StepRows).
 // setLayer() rebinds it to the shown track; the engine can also change underneath it (host automation,
 // a preset), which the timer notices.
 //
@@ -49,7 +51,7 @@ public:
 
     // Let go of every knob's modulation binding; called before a track is removed or moved, because the
     // arcs hold the track's matrix. setLayer rebinds.
-    void releaseModulationArcs() override { grid.clearModBindings(); }
+    void releaseModulationArcs() override { grid.clearModBindings(); insertSub.clearGRSource(); }
 
     // A click in a step row selected another track.
     std::function<void(int)> onRowClicked;
@@ -88,12 +90,16 @@ private:
     bool           locked = false;                    // the shown track's engine is fixed by its host
 
     KnobWithLabel swingKnob { "Swing" }, accentKnob { "Accent" };
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> swingAtt, accentAtt;
+    KnobWithLabel sendEffKnob { "FX" }, sendDlyKnob { "Delay" }, sendRevKnob { "Reverb" };   // the strip's three sends
+    juce::TextButton soloBtn { "Solo" };                                                      // the strip's solo
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> swingAtt, accentAtt, sendEffAtt, sendDlyAtt, sendRevAtt;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> soloAtt;
+    InsertSubsection insertSub;                       // the track's insert effect (t{N}_drvChar, t{N}_insP1..4)
     LFOEditor         rumbleEnvEditor;                // the Rumble track's drawable volume envelope
     NoteLengthControl rumbleLength { "Loop" };        // its length: the same control as a modulator's Loop
 
     juce::Rectangle<int> engineR, slotR;              // the two panels
-    juce::Rectangle<int> engineBoxR, grooveBoxR, stepsBoxR;
+    juce::Rectangle<int> engineBoxR, voiceBoxR, insertBoxR, grooveBoxR, stepsBoxR;   // engineBoxR: the Engine / Source selectors
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TrackContent)
 };
