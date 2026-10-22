@@ -175,6 +175,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/GoldenRenderTests.cpp   # golden renders of the real processor (tests/golden/mu-on)
     Source/Tests/ExtractionPinTests.cpp   # pins: per-engine sound, swing/accent, Rumble source, sidechain, stop edge, edits, oversize
     Source/Tests/TrackLayerRecordTests.cpp   # the Track streams through the real processor (Tests/TrackLayerFixture.h)
+    Source/Tests/BassTieTests.cpp   # Bass gate, release, tied steps and the step row tie flag
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp

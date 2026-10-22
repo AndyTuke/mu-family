@@ -43,7 +43,7 @@ inline constexpr ModDestEntry kKickDests[] = {
 };
 
 // Bass — order matches BassEngine::setParams(rootHz, [wave], sub, cutHz, res, env,
-// edecMs, atkMs, decMs, sus, drv). Wave is a choice param — not modulatable, omitted.
+// edecMs, atkMs, decMs, sus, drv, relMs, glideMs). Wave is a choice param — not modulatable, omitted.
 inline constexpr ModDestEntry kBassDests[] = {
     makeTarget("b.tune.prop", "bass_tune", "Tune"),
     makeTarget("b.sub.prop", "bass_sub", "Sub"),
@@ -55,6 +55,8 @@ inline constexpr ModDestEntry kBassDests[] = {
     makeTarget("b.dec.prop", "bass_dec", "Decay"),
     makeTarget("b.sus.prop", "bass_sus", "Sustain"),
     makeTarget("b.drive.prop", "bass_drive", "Drive"),
+    makeTarget("b.rel.prop", "bass_rel", "Release"),     // appended last: saved destination indices stay valid
+    makeTarget("b.glide.prop", "bass_glide", "Glide"),
 };
 
 // Hat — order matches SampleChannel::setParams(tuneSemitones, decayMs, openTuneSemitones, openDecayMs).

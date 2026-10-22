@@ -111,12 +111,26 @@ void StepRows::mouseDown(const juce::MouseEvent& e)
     int r = 0, s = 0;
     if (! cellAt(e.getPosition(), r, s) || host.getTrackEngine(r) == EngineType::Rumble) return;
 
+    dragRow = e.mods.isPopupMenu() ? -1 : r;
+    dragStep = s;
+    dragStartedOn = host.getTrack(r).row.isOn(s);
+
     // Left toggles the step (its corner button the accent); right selects it for the Step panel.
     if (TrackStepRow::clickStep(host.getTrack(r).row, s, cellsArea(r), e.getPosition(), e.mods.isPopupMenu()))
     {
         selectedStep = s;
         if (onStepSelected) onStepSelected(r, s);
     }
+    repaint(rowArea(r));
+}
+
+void StepRows::mouseDrag(const juce::MouseEvent& e)
+{
+    int r = 0, s = 0;
+    if (dragRow < 0 || host.getTrackEngine(dragRow) == EngineType::Rumble || ! cellAt(e.getPosition(), r, s) || r != dragRow || s == dragStep) return;
+    TrackStepRow::dragTie(host.getTrack(r).row, dragStep, s, dragStartedOn);
+    dragStep = s;
+    dragStartedOn = true;
     repaint(rowArea(r));
 }
 

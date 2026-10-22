@@ -32,6 +32,7 @@ public:
 
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
+    void mouseDrag(const juce::MouseEvent&) override;
     void lookAndFeelChanged() override { repaint(); }
 
     // Unscaled width of the name gutter at the start of each row.
@@ -50,6 +51,8 @@ private:
     TrackHost& host;
     int selected      = 0;
     int selectedStep  = -1;
+    int dragRow = -1, dragStep = -1;   // a left-drag across steps (to tie them): the row and the step it has reached
+    bool dragStartedOn = false;
     int playheadStep  = -1;
     juce::uint64 shownSignature = 0;
 

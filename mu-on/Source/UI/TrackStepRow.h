@@ -34,6 +34,7 @@ public:
 
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
+    void mouseDrag(const juce::MouseEvent&) override;
     void mouseMove(const juce::MouseEvent&) override;
     void lookAndFeelChanged() override { repaint(); }
 
@@ -50,6 +51,10 @@ public:
     // the step on / off. Returns true for a right-click, which edits nothing: it selects the step (the caller shows its
     // Step panel).
     static bool clickStep(StepRow& row, int step, juce::Rectangle<int> cells, juce::Point<int> p, bool rightClick);
+    // Dragging from a step onto the one next to it ties them (a Bass slides from the first into the second): both turn on
+    // and the later one is marked tied; doing it again over a pair that was already tied (both on before the drag) unties
+    // them. `startedOn` is whether the step the drag began on was on before the click.
+    static void dragTie(StepRow& row, int from, int to, bool startedOn);
     // The cell of `step` and the accent button inside its top-right corner.
     static juce::Rectangle<float> cellRect(juce::Rectangle<int> cells, int step);
     static juce::Rectangle<float> accentButtonRect(juce::Rectangle<float> cell);
@@ -63,6 +68,8 @@ private:
     juce::uint64 shownSignature = 0;   // the colour and engine the row was last drawn with
     int hoverStep    = -1;
     int selectedStep = -1;
+    int dragStep     = -1;     // the step a left-drag has reached (-1: no drag)
+    bool dragStartedOn = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TrackStepRow)
 };

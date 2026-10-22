@@ -13,6 +13,7 @@ void ParamKnobGrid::setSpecs(const std::vector<Spec>& specs)
     {
         auto ctl = std::make_unique<Control>();
         ctl->label = spec.label;
+        ctl->newRow = spec.newRow;
 
         ctl->name.setText(spec.label, juce::dontSendNotification);
         ctl->name.setJustificationType(juce::Justification::centred);
@@ -73,18 +74,35 @@ void ParamKnobGrid::resized()
     if (controls.empty()) return;
 
     // Knobs are drawn at one of the family's standard sizes, not stretched to the cell. Size 2 (the per-channel
-    // default used across mu-clid/mu-tant) unless the controls would not fit the width on one row there and
-    // would on Size 3, the next size down. The grid then fits as many standard cells per row as the width allows
+    // default used across mu-clid/mu-tant) unless the controls would not fit the area (its rows, wrapped at the width) there, then
+    // the next standard size down that fits. The grid then fits as many standard cells per row as the width allows
     // and wraps.
     const int labelH = s(kLabelH);
-    auto rowWidthAt = [&](int knobCellW) { int w = 0; for (const auto& c : controls) w += c->combo ? 2 * (knobCellW + s(6)) : knobCellW + s(6); return w; };
-    const bool smaller = rowWidthAt(s(MuLookAndFeel::kKnobSize2W)) > area.getWidth()
-                         && rowWidthAt(s(MuLookAndFeel::kKnobSize3W)) <= area.getWidth();
-    const int knobW  = s(smaller ? MuLookAndFeel::kKnobSize3W : MuLookAndFeel::kKnobSize2W);
-    const int knobH  = s(smaller ? MuLookAndFeel::kKnobSize3H : MuLookAndFeel::kKnobSize2H);
+    // The height the controls need at one knob size: the cells flow left to right, wrapping at the width or at a row break.
+    auto heightAt = [&](int knobCellW, int knobCellH)
+    {
+        const int cellW = knobCellW + s(6), cellH = labelH + knobCellH + s(2);
+        int x = 0, rows = 1;
+        for (const auto& c : controls)
+        {
+            const int cw = c->combo ? 2 * cellW : cellW;
+            if (x > 0 && (c->newRow || x + cw > area.getWidth())) { x = 0; ++rows; }
+            x += cw;
+        }
+        return rows * cellH;
+    };
+    // Size 2 unless the controls do not fit the area there; then the first smaller standard size (3, then 4) that does.
+    int knobW = s(MuLookAndFeel::kKnobSize2W), knobH = s(MuLookAndFeel::kKnobSize2H);
+    if (heightAt(knobW, knobH) > area.getHeight())
+    {
+        const int sizesW[] = { s(MuLookAndFeel::kKnobSize3W), s(MuLookAndFeel::kKnobSize4W) };
+        const int sizesH[] = { s(MuLookAndFeel::kKnobSize3H), s(MuLookAndFeel::kKnobSize4H) };
+        for (int k = 0; k < 2; ++k)
+            if (heightAt(sizesW[k], sizesH[k]) <= area.getHeight()) { knobW = sizesW[k]; knobH = sizesH[k]; break; }
+    }
     const int comboH = s(24);
     const int cellW  = knobW + s(6);
-    const int cellH  = labelH + knobH + s(4);
+    const int cellH  = labelH + knobH + s(2);
 
     // Flow the cells left to right, wrapping at the width. A selector takes two cells so its
     // text fits (the metal style's LCD lettering is wider than one knob).
@@ -92,7 +110,7 @@ void ParamKnobGrid::resized()
     for (auto& ctl : controls)
     {
         const int cw = ctl->combo ? 2 * cellW : cellW;
-        if (x > area.getX() && x + cw > area.getRight()) { x = area.getX(); y += cellH; }
+        if (x > area.getX() && (ctl->newRow || x + cw > area.getRight())) { x = area.getX(); y += cellH; }
         juce::Rectangle<int> cell(x, y, cw, cellH);
         x += cw;
         ctl->name.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuLookAndFeel::kKnobLabelFont))));   // the knobs' own label size

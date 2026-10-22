@@ -51,6 +51,8 @@ at **block rate** from the current envelope value (per-sample cutoff modulation 
 **Release** — all three need a note-off / pitch event the 16-step on/off grid does not yet emit.
 They land with per-step pitch (below) so the UI never shows a control that can't act (audit rule).
 
+**Gate, release, tied steps and glide.** A step holds the note to the end of the step, or of the run of tied steps it starts (the clock passes the hold in samples), then the amp envelope releases (`rel`, 5 to 2000 ms). A step is tied by dragging across it and the step before (`StepRow` tie flag on the later step, saved as `tie`); a tied step does not retrigger, the voice carries on and slides to the new Tune over `glide` (0 to 500 ms, 0 = jump). `rel` and `glide` are appended modulation targets. The voice panel puts the oscillator and filter on the first row and the amp envelope (Atk, Dec, Sus, Rel) and Glide on a second row (`ParamKnobGrid::Spec::newRow`; the grid drops a knob size when its rows do not fit the height).
+
 **Roadmap to deepen the bass:** per-step pitch + glide (a pitched lane row or a piano-roll);
 note-off / gate-length per step (enables Release + sustained vs plucky without the sustain hack);
 a dedicated resonant **rumble** stage (saturated feedback / a second detuned sub); per-sample

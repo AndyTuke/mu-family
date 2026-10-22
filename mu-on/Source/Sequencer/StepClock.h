@@ -39,7 +39,8 @@ public:
     // Audio thread: no allocation, `fire` is called inline.
     // A step's loop ratio (the row's own, when the Row has one) picks which passes (16 steps, from the transport
     // start) it plays: "N:M" plays the Nth of every M. A firing that takes more arguments gets the step's Open flag
-    // and its probability (0..1), which the caller combines with the layer's and draws against.
+    // and its probability (0..1), which the caller combines with the layer's and draws against; one that takes six also gets whether
+    // the step is tied to the one before and how many samples the note is held (to the end of its tied run).
     template <class Row, class Fire>
     void processSpan(const Row& row, double beatStart, int numSamples, double beatsPerSample,
                      float swing, float accentVelocity, Fire&& fire) noexcept
@@ -73,7 +74,13 @@ public:
                 if (passPlays && row.isOn(local))
                 {
                     const float velocity = row.isAccent(local) ? accentedVelocity(accentVelocity) : kNormalVelocity;
-                    if constexpr (std::is_invocable_v<Fire&, float, int, bool, float>) fire(velocity, sampleOffset, row.isOpen(local), (float) row.stepProb(local) * 0.01f);
+                    // A tied run: how long the note is held (to the end of the last step tied to this one), for a Bass's release.
+                    int runSteps = 1;
+                    while (local + runSteps < StepRow::kNumSteps && row.tiedFrom(local + runSteps)) ++runSteps;
+                    if constexpr (std::is_invocable_v<Fire&, float, int, bool, float, bool, int>)
+                        fire(velocity, sampleOffset, row.isOpen(local), (float) row.stepProb(local) * 0.01f, row.tiedFrom(local),
+                             (int) (runSteps * kStepBeats / beatsPerSample));
+                    else if constexpr (std::is_invocable_v<Fire&, float, int, bool, float>) fire(velocity, sampleOffset, row.isOpen(local), (float) row.stepProb(local) * 0.01f);
                     else if constexpr (std::is_invocable_v<Fire&, float, int, bool>)   fire(velocity, sampleOffset, row.isOpen(local));
                     else                                                                fire(velocity, sampleOffset);
                 }

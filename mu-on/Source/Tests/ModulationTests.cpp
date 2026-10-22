@@ -83,7 +83,7 @@ public:
             // dispatch). An insert/reorder/delete in any one would re-route modulation to the
             // wrong engine param with no other failure - so pin the full ordered id list per
             // engine here. If a dest is added, update BOTH this list and the engine dispatch.
-            // Counts equal each engine's modulatable arity: Kick 5, Bass 10 (wave choice
+            // Counts equal each engine's modulatable arity: Kick 5, Bass 12 (wave choice
             // omitted), Hat 4, Snare 3, Rumble 10 (bpm transport excluded).
             auto pinLane = [this](EngineType engine, const std::vector<std::string>& expected)
             {
@@ -98,7 +98,7 @@ public:
             };
             pinLane(EngineType::Kick,   { "k.tune.prop", "k.ptch.prop", "k.pdec.prop", "k.adec.prop", "k.drive.prop" });
             pinLane(EngineType::Bass,   { "b.tune.prop", "b.sub.prop", "b.cut.prop", "b.res.prop", "b.env.prop",
-                              "b.edec.prop", "b.atk.prop", "b.dec.prop", "b.sus.prop", "b.drive.prop" });
+                              "b.edec.prop", "b.atk.prop", "b.dec.prop", "b.sus.prop", "b.drive.prop", "b.rel.prop", "b.glide.prop" });
             pinLane(EngineType::Hat,    { "h.tune.prop", "h.dec.prop", "h.otune.prop", "h.odec.prop" });
             pinLane(EngineType::Snare,  { "s.tune.prop", "s.dec.prop", "s.snap.prop" });
             pinLane(EngineType::Rumble, { "r.drive.prop", "r.d1.prop", "r.d2.prop", "r.d3.prop", "r.size.prop",

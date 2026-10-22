@@ -3,7 +3,7 @@
 product=mu-on
 layers_at_start=1
 max_layers=8
-param_count=623
+param_count=639
 ---
 ch0_lvl | float | 0 | 1 | 0.001 | 1 | 1 | 1
 ch0_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
@@ -188,6 +188,8 @@ t0_bass_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t0_bass_edec | float | 10 | 1000 | 1 | 1 | 180 | 0.171717
 t0_bass_env | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t0_bass_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t0_bass_glide | float | 0 | 500 | 1 | 1 | 80 | 0.16
+t0_bass_rel | float | 5 | 2000 | 1 | 1 | 300 | 0.14787
 t0_bass_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t0_bass_sub | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t0_bass_sus | float | 0 | 1 | 0.001 | 1 | 0 | 0
@@ -244,6 +246,8 @@ t1_bass_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t1_bass_edec | float | 10 | 1000 | 1 | 1 | 180 | 0.171717
 t1_bass_env | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t1_bass_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t1_bass_glide | float | 0 | 500 | 1 | 1 | 80 | 0.16
+t1_bass_rel | float | 5 | 2000 | 1 | 1 | 300 | 0.14787
 t1_bass_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t1_bass_sub | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t1_bass_sus | float | 0 | 1 | 0.001 | 1 | 0 | 0
@@ -300,6 +304,8 @@ t2_bass_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t2_bass_edec | float | 10 | 1000 | 1 | 1 | 180 | 0.171717
 t2_bass_env | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t2_bass_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t2_bass_glide | float | 0 | 500 | 1 | 1 | 80 | 0.16
+t2_bass_rel | float | 5 | 2000 | 1 | 1 | 300 | 0.14787
 t2_bass_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t2_bass_sub | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t2_bass_sus | float | 0 | 1 | 0.001 | 1 | 0 | 0
@@ -356,6 +362,8 @@ t3_bass_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t3_bass_edec | float | 10 | 1000 | 1 | 1 | 180 | 0.171717
 t3_bass_env | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t3_bass_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t3_bass_glide | float | 0 | 500 | 1 | 1 | 80 | 0.16
+t3_bass_rel | float | 5 | 2000 | 1 | 1 | 300 | 0.14787
 t3_bass_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t3_bass_sub | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t3_bass_sus | float | 0 | 1 | 0.001 | 1 | 0 | 0
@@ -412,6 +420,8 @@ t4_bass_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t4_bass_edec | float | 10 | 1000 | 1 | 1 | 180 | 0.171717
 t4_bass_env | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t4_bass_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t4_bass_glide | float | 0 | 500 | 1 | 1 | 80 | 0.16
+t4_bass_rel | float | 5 | 2000 | 1 | 1 | 300 | 0.14787
 t4_bass_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t4_bass_sub | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t4_bass_sus | float | 0 | 1 | 0.001 | 1 | 0 | 0
@@ -468,6 +478,8 @@ t5_bass_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t5_bass_edec | float | 10 | 1000 | 1 | 1 | 180 | 0.171717
 t5_bass_env | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t5_bass_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t5_bass_glide | float | 0 | 500 | 1 | 1 | 80 | 0.16
+t5_bass_rel | float | 5 | 2000 | 1 | 1 | 300 | 0.14787
 t5_bass_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t5_bass_sub | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t5_bass_sus | float | 0 | 1 | 0.001 | 1 | 0 | 0
@@ -524,6 +536,8 @@ t6_bass_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t6_bass_edec | float | 10 | 1000 | 1 | 1 | 180 | 0.171717
 t6_bass_env | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t6_bass_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t6_bass_glide | float | 0 | 500 | 1 | 1 | 80 | 0.16
+t6_bass_rel | float | 5 | 2000 | 1 | 1 | 300 | 0.14787
 t6_bass_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t6_bass_sub | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t6_bass_sus | float | 0 | 1 | 0.001 | 1 | 0 | 0
@@ -580,6 +594,8 @@ t7_bass_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t7_bass_edec | float | 10 | 1000 | 1 | 1 | 180 | 0.171717
 t7_bass_env | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t7_bass_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t7_bass_glide | float | 0 | 500 | 1 | 1 | 80 | 0.16
+t7_bass_rel | float | 5 | 2000 | 1 | 1 | 300 | 0.14787
 t7_bass_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t7_bass_sub | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t7_bass_sus | float | 0 | 1 | 0.001 | 1 | 0 | 0
@@ -645,11 +661,11 @@ mst=10
 mstr=3
 ret=24
 rev=10
-t0=56
-t1=56
-t2=56
-t3=56
-t4=56
-t5=56
-t6=56
-t7=56
+t0=58
+t1=58
+t2=58
+t3=58
+t4=58
+t5=58
+t6=58
+t7=58

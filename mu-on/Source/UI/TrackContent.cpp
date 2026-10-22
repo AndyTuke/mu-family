@@ -63,8 +63,15 @@ namespace
             case EngineType::Kick:
                 return { { id("tune"), "Tune" }, { id("ptch"), "Pitch" }, { id("pdec"), "P.Dec" }, { id("adec"), "Decay" }, { id("drive"), "Drive" }, { id("fine"), "Fine" } };
             case EngineType::Bass:
-                return { { id("wave"), "Wave" }, { id("tune"), "Tune" }, { id("sub"), "Sub" }, { id("cut"), "Cutoff" }, { id("res"), "Reso" },
-                         { id("env"), "F.Env" }, { id("edec"), "E.Dec" }, { id("atk"), "Atk" }, { id("dec"), "Dec" }, { id("sus"), "Sus" }, { id("drive"), "Drive" }, { id("fine"), "Fine" } };
+            {
+                // Row 1: the oscillator, filter and drive; row 2: the amp envelope (Attack to Release) and the Glide of tied steps.
+                std::vector<Spec> specs { { id("wave"), "Wave" }, { id("tune"), "Tune" }, { id("fine"), "Fine" }, { id("sub"), "Sub" }, { id("cut"), "Cutoff" },
+                                          { id("res"), "Reso" }, { id("env"), "F.Env" }, { id("edec"), "E.Dec" }, { id("drive"), "Drive" },
+                                          { id("atk"), "Atk" }, { id("dec"), "Dec" }, { id("sus"), "Sus" }, { id("rel"), "Rel" }, { id("glide"), "Glide" } };
+                specs[9].newRow = true;
+                specs[13].tooltip = "Slide time into a tied step (drag across two steps to tie them)";
+                return specs;
+            }
             case EngineType::Hat:   // two sets: the closed hat, then the open hat (the step row picks which a step plays)
                 return { { id("tune"), "Cl.Tune" }, { id("dec"), "Cl.Decay" }, { id("otune"), "Op.Tune" }, { id("odec"), "Op.Decay" } };
             case EngineType::Snare:

@@ -434,7 +434,9 @@ struct MuOnExtractionPinTests : juce::UnitTest
             Rig rig;
             useTrack(rig.p, 1, EngineType::Bass);
             onlySteps(rig.p, 0, { 8 });
-            onlySteps(rig.p, 1, { 0 });
+            // Every step on and tied: one note held for the whole bar (a Bass releases at the end of its gate).
+            onlySteps(rig.p, 1, { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 });
+            for (int s = 1; s < 16; ++s) rig.p.getTrack(1).row.setTied(s, true);
             setParam(rig.p.apvts, "ch0_lvl", 0.0f);
             setParam(rig.p.apvts, eng(1, EngineType::Bass, "sus"), 1.0f);
             setParam(rig.p.apvts, eng(1, EngineType::Bass, "sub"), 0.0f);

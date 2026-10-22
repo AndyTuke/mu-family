@@ -89,7 +89,7 @@ public:
     void setParams(const float* p, int engineChoice, double bpm, float rumbleEnvLevel, const TuneLock& lock = {}) noexcept
     {
         if (auto* k = std::get_if<KickEngine>(&engine))         k->setParams(lock.lockedHz(p[0], lock.kickFineCents), p[1], p[2], p[3], p[4]);
-        else if (auto* b = std::get_if<BassEngine>(&engine))    b->setParams(lock.lockedHz(p[0], lock.bassFineCents), engineChoice, p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9]);
+        else if (auto* b = std::get_if<BassEngine>(&engine))    b->setParams(lock.lockedHz(p[0], lock.bassFineCents), engineChoice, p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11]);
         else if (auto* s = std::get_if<SampleChannel>(&engine)) s->setParams(p[0], p[1], p[2], p[3]);   // the Hat's open pair follows the closed pair; a Snare ignores it
         else if (auto* r = std::get_if<RumbleEngine>(&engine))
         {
@@ -102,10 +102,10 @@ public:
     }
 
     // Fire the engine at `sampleOffset` in the block (a Rumble does not step). `open` is the step's Open flag: only the Hat uses it.
-    void trigger(float velocity, int sampleOffset, bool open = false) noexcept
+    void trigger(float velocity, int sampleOffset, bool open = false, bool tied = false, int gateSamples = 0) noexcept
     {
         if (auto* k = std::get_if<KickEngine>(&engine))         k->trigger(velocity, sampleOffset);
-        else if (auto* b = std::get_if<BassEngine>(&engine))    b->trigger(velocity, sampleOffset);
+        else if (auto* b = std::get_if<BassEngine>(&engine))    b->trigger(velocity, sampleOffset, tied, gateSamples);
         else if (auto* s = std::get_if<SampleChannel>(&engine)) s->trigger(velocity, sampleOffset, open);
         else if (auto* f = std::get_if<FmPercEngine>(&engine))  f->trigger(velocity, sampleOffset);
     }

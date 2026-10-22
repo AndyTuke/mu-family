@@ -57,6 +57,8 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     flt(E::Bass, "dec",   "Bass Decay",      f(20.0f, 1500.0f, 1.0f), 200.0f);
     flt(E::Bass, "sus",   "Bass Sustain",    f(0.0f, 1.0f, 0.001f), 0.0f);
     flt(E::Bass, "drive", "Bass Drive",      f(0.0f, 1.0f, 0.001f), 0.2f);
+    flt(E::Bass, "rel",   "Bass Release",    f(5.0f, 2000.0f, 1.0f), 300.0f);      // after the step's gate
+    flt(E::Bass, "glide", "Bass Glide",      f(0.0f, 500.0f, 1.0f), 80.0f);       // the slide into a tied step
     flt(E::Bass, "fine",  "Bass Fine",       f(-100.0f, 100.0f, 0.1f), 0.0f);   // cents off the locked note (not a modulation target)
 
     // Hat / Snare (sample engines, different defaults)

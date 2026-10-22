@@ -35,6 +35,8 @@ public:
         // Optional one-line hint shown on hover over the knob (empty = none). It says what the knob does, never its
         // name or value (the status bar carries those); a product whose knob changes meaning rebuilds the specs.
         juce::String            tooltip;
+        // Start a new row of the grid at this control (a group, such as an envelope, kept together on its own row).
+        bool                    newRow = false;
     };
 
     explicit ParamKnobGrid(juce::AudioProcessorValueTreeState& state);
@@ -65,6 +67,7 @@ private:
     struct Control
     {
         juce::String                    label;
+        bool                            newRow = false;   // starts a new row of the grid
         std::unique_ptr<KnobWithLabel>  knob;
         std::unique_ptr<juce::ComboBox> combo;
         juce::Label                     name;

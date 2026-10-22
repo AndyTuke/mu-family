@@ -22,7 +22,17 @@ public:
 
     bool isOn    (int step) const noexcept { return valid(step) && cells[(size_t) step].on.load(std::memory_order_relaxed); }
     bool isAccent(int step) const noexcept { return valid(step) && cells[(size_t) step].accent.load(std::memory_order_relaxed); }
-    void setOn    (int step, bool v) noexcept { if (valid(step)) cells[(size_t) step].on.store(v, std::memory_order_relaxed); }
+    void setOn    (int step, bool v) noexcept
+    {
+        if (! valid(step)) return;
+        cells[(size_t) step].on.store(v, std::memory_order_relaxed);
+        if (! v) { setTied(step, false); setTied(step + 1, false); }   // a step that goes off ends any tie into or out of it
+    }
+    // Tie: this step continues the note of the step before it (a Bass slides into it instead of retriggering).
+    // A tie only counts between two steps that are both on.
+    bool isTied  (int step) const noexcept { return valid(step) && cells[(size_t) step].tie.load(std::memory_order_relaxed); }
+    void setTied (int step, bool v) noexcept { if (valid(step)) cells[(size_t) step].tie.store(v, std::memory_order_relaxed); }
+    bool tiedFrom(int step) const noexcept { return step > 0 && isTied(step) && isOn(step) && isOn(step - 1); }
     void setAccent(int step, bool v) noexcept { if (valid(step)) cells[(size_t) step].accent.store(v, std::memory_order_relaxed); }
     // Open: a Hat step that plays the open hat (the other tracks ignore it). With on and accent it makes the four Hat
     // states Closed / Closed Accent / Open / Open Accent.
@@ -40,7 +50,7 @@ public:
 
     void clear() noexcept
     {
-        for (auto& c : cells) { c.on.store(false, std::memory_order_relaxed); c.accent.store(false, std::memory_order_relaxed); c.open.store(false, std::memory_order_relaxed); c.prob.store(100, std::memory_order_relaxed); c.loop.store(0, std::memory_order_relaxed); }
+        for (auto& c : cells) { c.on.store(false, std::memory_order_relaxed); c.accent.store(false, std::memory_order_relaxed); c.open.store(false, std::memory_order_relaxed); c.prob.store(100, std::memory_order_relaxed); c.loop.store(0, std::memory_order_relaxed); c.tie.store(false, std::memory_order_relaxed); }
     }
 
     // The starting groove of an engine, so a new track plays something at once: four-on-the-floor kick
@@ -78,11 +88,12 @@ public:
     {
         juce::ValueTree row("Track");
         row.setProperty("i", slot, nullptr);
-        juce::String on, ac, op;
-        for (int s = 0; s < kNumSteps; ++s) { on += isOn(s) ? '1' : '0'; ac += isAccent(s) ? '1' : '0'; op += isOpen(s) ? '1' : '0'; }
+        juce::String on, ac, op, tie;
+        for (int s = 0; s < kNumSteps; ++s) { on += isOn(s) ? '1' : '0'; ac += isAccent(s) ? '1' : '0'; op += isOpen(s) ? '1' : '0'; tie += tiedFrom(s) ? '1' : '0'; }
         row.setProperty("on", on, nullptr);
         row.setProperty("accent", ac, nullptr);
         if (op.containsChar('1')) row.setProperty("open", op, nullptr);   // absent = every step closed
+        if (tie.containsChar('1')) row.setProperty("tie", tie, nullptr);  // absent = no tied steps
         // Probability as a comma list and the loop ratio as one digit per step, each only when a step leaves its default.
         juce::StringArray probs; juce::String loops; bool anyProb = false, anyLoop = false;
         for (int s = 0; s < kNumSteps; ++s)
@@ -102,6 +113,7 @@ public:
         const juce::String on = row.getProperty("on").toString();
         const juce::String ac = row.getProperty("accent").toString();
         const juce::String op = row.getProperty("open").toString();
+        const juce::String tie = row.getProperty("tie").toString();
         const auto probs = juce::StringArray::fromTokens(row.getProperty("prob").toString(), ",", "");
         const juce::String loops = row.getProperty("loop").toString();
         for (int s = 0; s < kNumSteps; ++s)
@@ -111,11 +123,12 @@ public:
             setStepLoop(s, s < loops.length() && juce::CharacterFunctions::isDigit(loops[s]) ? (int) (loops[s] - '0') : 0);
             setOn    (s, s < on.length() && on[s] == '1');
             setAccent(s, s < ac.length() && ac[s] == '1');
+            setTied  (s, s < tie.length() && tie[s] == '1');
         }
     }
 
 private:
-    struct Cell { std::atomic<bool> on { false }; std::atomic<bool> accent { false }; std::atomic<bool> open { false }; std::atomic<int> prob { 100 }; std::atomic<int> loop { 0 }; };
+    struct Cell { std::atomic<bool> on { false }; std::atomic<bool> accent { false }; std::atomic<bool> open { false }; std::atomic<int> prob { 100 }; std::atomic<int> loop { 0 }; std::atomic<bool> tie { false }; };
     static bool valid(int s) noexcept { return s >= 0 && s < kNumSteps; }
 
     std::array<Cell, kNumSteps> cells;
