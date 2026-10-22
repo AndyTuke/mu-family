@@ -17,7 +17,7 @@ namespace
 {
     using mu_core::LayerTypeId;
 
-    const LayerTypeId kTrackTypes[] = { LayerTypeId::Kick, LayerTypeId::Bass, LayerTypeId::Hat, LayerTypeId::Snare, LayerTypeId::FmPerc };
+    const LayerTypeId kTrackTypes[] = { LayerTypeId::Kick, LayerTypeId::Bass, LayerTypeId::Hat, LayerTypeId::Snare, LayerTypeId::FmPerc, LayerTypeId::Chord };
 
     // The processor with the retire bin exposed.
     struct TrackProcessor : mu_tronic::PluginProcessor

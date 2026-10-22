@@ -176,6 +176,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/ExtractionPinTests.cpp   # pins: per-engine sound, swing/accent, Rumble source, sidechain, stop edge, edits, oversize
     Source/Tests/TrackLayerRecordTests.cpp   # the Track streams through the real processor (Tests/TrackLayerFixture.h)
     Source/Tests/BassTieTests.cpp   # Bass gate, release, tied steps and the step row tie flag
+    Source/Tests/ChordTests.cpp   # Chord voicing, the Chord engine and a step's chord data
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp

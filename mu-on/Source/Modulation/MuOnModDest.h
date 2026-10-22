@@ -172,6 +172,31 @@ inline constexpr ModDestEntry kFmPercDests[] = {
     makeTarget("send.reverb", "sendRev", "Reverb Send", "Effects"),
 };
 
+// Chord — order matches ChordEngine::setParams(wave, cutHz, res, drv, env, edecMs, atkMs, decMs, sus, relMs, ...); the wave is a
+// choice, not a target.
+inline constexpr ModDestEntry kChordDests[] = {
+    makeTarget("c.cut.prop", "chord_cut", "Cutoff", "Chord"),
+    makeTarget("c.res.prop", "chord_res", "Resonance", "Chord"),
+    makeTarget("c.drive.prop", "chord_drive", "Drive", "Chord"),
+    makeTarget("c.env.prop", "chord_env", "Filter Env", "Chord"),
+    makeTarget("c.edec.prop", "chord_edec", "Env Decay", "Chord"),
+    makeTarget("c.atk.prop", "chord_atk", "Attack", "Chord"),
+    makeTarget("c.dec.prop", "chord_dec", "Decay", "Chord"),
+    makeTarget("c.sus.prop", "chord_sus", "Sustain", "Chord"),
+    makeTarget("c.rel.prop", "chord_rel", "Release", "Chord"),
+    // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
+    // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
+    makeTarget("amp.level", "level", "Level", "Amp"),
+    makeTarget("amp.pan", "pan", "Pan", "Amp"),
+    makeTarget("insert.p1", "insP1", "Insert P1", "Insert"),
+    makeTarget("insert.p2", "insP2", "Insert P2", "Insert"),
+    makeTarget("insert.p3", "insP3", "Insert P3", "Insert"),
+    makeTarget("insert.p4", "insP4", "Insert P4", "Insert"),
+    makeTarget("send.effect", "sendEff", "Effect Send", "Effects"),
+    makeTarget("send.delay", "sendDly", "Delay Send", "Effects"),
+    makeTarget("send.reverb", "sendRev", "Reverb Send", "Effects"),
+};
+
 // Compile-time guard: every row of an engine's table names a parameter under that engine's tag
 // ("kick_..."), so a rename that misses a literal above fails the build instead of silencing a destination.
 // The closing rows every table shares: the track's Level and insert knobs (t{N}_) and the mixer strip's pan and sends (ch{N}_).
@@ -194,6 +219,7 @@ static_assert(allUnderPrefix(kHatDests,    "hat_"),    "Hat targets must use the
 static_assert(allUnderPrefix(kSnareDests,  "snare_"),  "Snare targets must use the snare_ parameters");
 static_assert(allUnderPrefix(kRumbleDests, "rumble_"), "Rumble targets must use the rumble_ parameters");
 static_assert(allUnderPrefix(kFmPercDests, "fmp_"),    "FM Perc targets must use the fmp_ parameters");
+static_assert(allUnderPrefix(kChordDests,  "chord_"),  "Chord targets must use the chord_ parameters");
 
 // The destination table for an engine, plus its entry count.
 inline const ModDestEntry* destsForEngine(EngineType engine, int& count) noexcept
@@ -206,6 +232,7 @@ inline const ModDestEntry* destsForEngine(EngineType engine, int& count) noexcep
         case EngineType::Snare:  count = (int) std::size(kSnareDests);  return kSnareDests;
         case EngineType::Rumble: count = (int) std::size(kRumbleDests); return kRumbleDests;
         case EngineType::FmPerc: count = (int) std::size(kFmPercDests); return kFmPercDests;
+        case EngineType::Chord:  count = (int) std::size(kChordDests);  return kChordDests;
     }
     count = 0;
     return nullptr;

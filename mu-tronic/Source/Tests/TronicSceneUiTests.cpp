@@ -50,7 +50,7 @@ struct MuTronicSceneUiTests : juce::UnitTest
             auto takes = [&](LayerTypeId id) { const auto* i = types.find(id); return i != nullptr && i->takesNotes; };
             expect(takes(LayerTypeId::Arp));
             expect(takes(LayerTypeId::Pattern));
-            for (auto id : { LayerTypeId::Rhythm, LayerTypeId::Kick, LayerTypeId::Bass, LayerTypeId::Hat, LayerTypeId::Snare, LayerTypeId::Rumble, LayerTypeId::FmPerc })
+            for (auto id : { LayerTypeId::Rhythm, LayerTypeId::Kick, LayerTypeId::Bass, LayerTypeId::Hat, LayerTypeId::Snare, LayerTypeId::Rumble, LayerTypeId::FmPerc, LayerTypeId::Chord })
                 expect(! takes(id), juce::String(mu_core::layerTypeName(id)) + " ignores notes");
         }
 
@@ -59,7 +59,7 @@ struct MuTronicSceneUiTests : juce::UnitTest
             mu_seam_test::TempStorage storage;
             UiProcessor p;
             const auto& types = p.getLayerTypes();
-            for (auto id : { LayerTypeId::Rhythm, LayerTypeId::Pattern, LayerTypeId::Arp, LayerTypeId::Kick, LayerTypeId::Bass, LayerTypeId::Hat, LayerTypeId::Snare, LayerTypeId::FmPerc })
+            for (auto id : { LayerTypeId::Rhythm, LayerTypeId::Pattern, LayerTypeId::Arp, LayerTypeId::Kick, LayerTypeId::Bass, LayerTypeId::Hat, LayerTypeId::Snare, LayerTypeId::FmPerc, LayerTypeId::Chord })
             {
                 const auto* i = types.find(id);
                 expect(i != nullptr && i->hasClipBank, juce::String(mu_core::layerTypeName(id)) + " has a clip bank");

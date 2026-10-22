@@ -17,6 +17,7 @@ namespace mu_on
 struct StepEvent
 {
     float velocity; int offset; bool open; float probability; bool tied; int gateSamples; float semitones; int step; long long pass;
+    ChordHit chord;   // a Chord track's step: chord, inversion, spread, root degree and octave
 };
 
 class StepClock
@@ -96,7 +97,7 @@ public:
                     while (local + runSteps < StepRow::kNumSteps && row.tiedFrom(local + runSteps)) ++runSteps;
                     if constexpr (std::is_invocable_v<Fire&, const StepEvent&>)
                         fire(StepEvent { velocity, sampleOffset, row.isOpen(local), (float) row.stepProb(local) * 0.01f, row.tiedFrom(local),
-                                         (int) (runSteps * kStepBeats / beatsPerSample), (float) row.stepSemitones(local), local, pass });
+                                         (int) (runSteps * kStepBeats / beatsPerSample), (float) row.stepSemitones(local), local, pass, row.stepChordHit(local) });
                     else if constexpr (std::is_invocable_v<Fire&, float, int, bool, float>) fire(velocity, sampleOffset, row.isOpen(local), (float) row.stepProb(local) * 0.01f);
                     else if constexpr (std::is_invocable_v<Fire&, float, int, bool>)   fire(velocity, sampleOffset, row.isOpen(local));
                     else                                                                fire(velocity, sampleOffset);

@@ -8,10 +8,11 @@
 #include "Audio/RumbleEngine.h"
 #include "Audio/MusicalScales.h"   // mu-core: snapMidiToScale for the Kick / Bass tune lock
 #include "Audio/FmPercEngine.h"
+#include "Audio/ChordEngine.h"
 
 #include <variant>
 
-// TrackEngine — the one sound engine a track runs (Kick, Bass, Hat, Snare, Rumble or FM Perc), behind one interface so
+// TrackEngine — the one sound engine a track runs (Kick, Bass, Hat, Snare, Rumble, FM Perc or Chord), behind one interface so
 // the track can render whichever it holds. A track owns exactly one (docs/mu-tronic/extraction-plan.md E3.5):
 // changing the engine builds a new TrackEngine on the message thread and swaps it in (Track::installEngine),
 // so nothing here is ever constructed, prepared or destroyed on the audio thread.
@@ -50,6 +51,7 @@ public:
             case EngineType::Snare:  engine.emplace<SampleChannel>(); break;
             case EngineType::Rumble: engine.emplace<RumbleEngine>();  break;
             case EngineType::FmPerc: engine.emplace<FmPercEngine>();  break;
+            case EngineType::Chord:  engine.emplace<ChordEngine>();   break;
         }
     }
 
@@ -64,6 +66,7 @@ public:
                                                                                                                          : SampleChannel::Kind::Snare);
         else if (auto* r = std::get_if<RumbleEngine>(&engine))  r->prepare(sampleRate, maxBlock);
         else if (auto* f = std::get_if<FmPercEngine>(&engine))  f->prepare(sampleRate, maxBlock);
+        else if (auto* c = std::get_if<ChordEngine>(&engine))   c->prepare(sampleRate, maxBlock);
     }
 
     // Silence the voice at once: transport stop, a slot going live, an engine change. Allocation-free.
@@ -81,6 +84,7 @@ public:
     {
         reset();
         if (auto* b = std::get_if<BassEngine>(&engine)) b->resetFilterSmoothing();
+        else if (auto* c = std::get_if<ChordEngine>(&engine)) c->resetFilterSmoothing();
     }
 
     // This block's parameters, in the order of the engine's modulation target table (MuOnModDest.h). `engineChoice` is
@@ -99,15 +103,19 @@ public:
         }
         else if (auto* f = std::get_if<FmPercEngine>(&engine))
             f->setParams(engineChoice, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9]);
+        else if (auto* ch = std::get_if<ChordEngine>(&engine))   // Chord dest order: cutoff, resonance, drive, filter env, env decay, attack, decay, sustain, release
+            ch->setParams(engineChoice, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], lock.root, lock.scale);
     }
 
     // Fire the engine at `sampleOffset` in the block (a Rumble does not step). `open` is the step's Open flag: only the Hat uses it.
-    void trigger(float velocity, int sampleOffset, bool open = false, bool tied = false, int gateSamples = 0, float semitones = 0.0f) noexcept
+    void trigger(float velocity, int sampleOffset, bool open = false, bool tied = false, int gateSamples = 0, float semitones = 0.0f,
+                 const ChordHit* chordHit = nullptr) noexcept
     {
         if (auto* k = std::get_if<KickEngine>(&engine))         k->trigger(velocity, sampleOffset, semitones);
         else if (auto* b = std::get_if<BassEngine>(&engine))    b->trigger(velocity, sampleOffset, tied, gateSamples, semitones);
         else if (auto* s = std::get_if<SampleChannel>(&engine)) s->trigger(velocity, sampleOffset, open);
         else if (auto* f = std::get_if<FmPercEngine>(&engine))  f->trigger(velocity, sampleOffset);
+        else if (auto* c = std::get_if<ChordEngine>(&engine))   c->trigger(velocity, sampleOffset, chordHit != nullptr ? *chordHit : ChordHit {}, gateSamples);
     }
 
     // Add the engine's block into `out` (handed over cleared). A Rumble processes `rumbleInput`, its source's
@@ -123,7 +131,7 @@ public:
 
 private:
     EngineType kind;
-    std::variant<KickEngine, BassEngine, SampleChannel, RumbleEngine, FmPercEngine> engine;
+    std::variant<KickEngine, BassEngine, SampleChannel, RumbleEngine, FmPercEngine, ChordEngine> engine;
 };
 
 } // namespace mu_on

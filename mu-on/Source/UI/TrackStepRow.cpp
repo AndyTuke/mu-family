@@ -1,5 +1,6 @@
 #include "TrackStepRow.h"
 #include "Audio/MusicalScales.h"   // mu-core: note names, scale membership
+#include "Audio/ChordVoicing.h"      // a Chord step's name
 #include "Sequencer/StepClock.h"   // currentStep
 #include "Sequencer/Track.h"       // the row the cells edit
 #include "UI/Components/MuLookAndFeel.h"
@@ -44,6 +45,14 @@ TrackStepRow::CellOptions TrackStepRow::optionsFor(TrackHost& host, int slot)
     {
         const int base = tuneKey(host, slot, engine).baseMidi;
         o.noteName = [base, &track](int step) { return mu_audio::midiNoteName(base + track.row.stepSemitones(step)); };
+    }
+    if (engine == EngineType::Chord)
+    {
+        const auto key = tuneKey(host, slot, engine);
+        o.noteName = [key, &track](int step)
+        {
+            return chordRootName(key.root, key.scale, track.row.stepNote(step)) + "\n" + kChords[(size_t) track.row.stepChord(step)].shortName;
+        };
     }
     if (engine != EngineType::Rumble && host.isTrackTransportPlaying())
     {
@@ -121,7 +130,7 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
             {
                 g.setFont(juce::Font(juce::FontOptions(mu_ui::sf(10.0f), juce::Font::bold)));
                 g.setColour(juce::Colours::white.withAlpha(0.92f));
-                g.drawText(opts.noteName(s), cell.toNearestInt(), juce::Justification::centred, false);
+                g.drawFittedText(opts.noteName(s), cell.toNearestInt().reduced(1), juce::Justification::centred, 2, 1.0f);
             }
             if (opts.hatIcons)
             {

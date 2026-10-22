@@ -240,6 +240,16 @@
         <p id="fmp_decay" x="0.4000000059604645"/>
         <p id="fmp_fold" x="0.1500000059604645"/>
         <p id="fmp_noise" x="0.1500000059604645"/>
+        <p id="chord_wave" x="0.0" c="Saw"/>
+        <p id="chord_cut" x="900.0001220703125"/>
+        <p id="chord_res" x="0.25"/>
+        <p id="chord_drive" x="0.2000000029802322"/>
+        <p id="chord_env" x="0.5"/>
+        <p id="chord_edec" x="300.0"/>
+        <p id="chord_atk" x="3.0"/>
+        <p id="chord_dec" x="400.0"/>
+        <p id="chord_sus" x="0.6000000238418579"/>
+        <p id="chord_rel" x="250.0"/>
         <Track i="0" on="1000100010001000" accent="1000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -320,6 +330,16 @@
         <p id="fmp_decay" x="0.4000000059604645"/>
         <p id="fmp_fold" x="0.1500000059604645"/>
         <p id="fmp_noise" x="0.1500000059604645"/>
+        <p id="chord_wave" x="0.0" c="Saw"/>
+        <p id="chord_cut" x="900.0001220703125"/>
+        <p id="chord_res" x="0.25"/>
+        <p id="chord_drive" x="0.2000000029802322"/>
+        <p id="chord_env" x="0.5"/>
+        <p id="chord_edec" x="300.0"/>
+        <p id="chord_atk" x="3.0"/>
+        <p id="chord_dec" x="400.0"/>
+        <p id="chord_sus" x="0.6000000238418579"/>
+        <p id="chord_rel" x="250.0"/>
         <Track i="1" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -400,6 +420,16 @@
         <p id="fmp_decay" x="0.4000000059604645"/>
         <p id="fmp_fold" x="0.1500000059604645"/>
         <p id="fmp_noise" x="0.1500000059604645"/>
+        <p id="chord_wave" x="0.0" c="Saw"/>
+        <p id="chord_cut" x="900.0001220703125"/>
+        <p id="chord_res" x="0.25"/>
+        <p id="chord_drive" x="0.2000000029802322"/>
+        <p id="chord_env" x="0.5"/>
+        <p id="chord_edec" x="300.0"/>
+        <p id="chord_atk" x="3.0"/>
+        <p id="chord_dec" x="400.0"/>
+        <p id="chord_sus" x="0.6000000238418579"/>
+        <p id="chord_rel" x="250.0"/>
         <Track i="2" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -480,6 +510,16 @@
         <p id="fmp_decay" x="0.4000000059604645"/>
         <p id="fmp_fold" x="0.1500000059604645"/>
         <p id="fmp_noise" x="0.1500000059604645"/>
+        <p id="chord_wave" x="0.0" c="Saw"/>
+        <p id="chord_cut" x="900.0001220703125"/>
+        <p id="chord_res" x="0.25"/>
+        <p id="chord_drive" x="0.2000000029802322"/>
+        <p id="chord_env" x="0.5"/>
+        <p id="chord_edec" x="300.0"/>
+        <p id="chord_atk" x="3.0"/>
+        <p id="chord_dec" x="400.0"/>
+        <p id="chord_sus" x="0.6000000238418579"/>
+        <p id="chord_rel" x="250.0"/>
         <Track i="3" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -560,6 +600,16 @@
         <p id="fmp_decay" x="0.4000000059604645"/>
         <p id="fmp_fold" x="0.1500000059604645"/>
         <p id="fmp_noise" x="0.1500000059604645"/>
+        <p id="chord_wave" x="0.0" c="Saw"/>
+        <p id="chord_cut" x="900.0001220703125"/>
+        <p id="chord_res" x="0.25"/>
+        <p id="chord_drive" x="0.2000000029802322"/>
+        <p id="chord_env" x="0.5"/>
+        <p id="chord_edec" x="300.0"/>
+        <p id="chord_atk" x="3.0"/>
+        <p id="chord_dec" x="400.0"/>
+        <p id="chord_sus" x="0.6000000238418579"/>
+        <p id="chord_rel" x="250.0"/>
         <Track i="4" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -640,6 +690,16 @@
         <p id="fmp_decay" x="0.4000000059604645"/>
         <p id="fmp_fold" x="0.1500000059604645"/>
         <p id="fmp_noise" x="0.1500000059604645"/>
+        <p id="chord_wave" x="0.0" c="Saw"/>
+        <p id="chord_cut" x="900.0001220703125"/>
+        <p id="chord_res" x="0.25"/>
+        <p id="chord_drive" x="0.2000000029802322"/>
+        <p id="chord_env" x="0.5"/>
+        <p id="chord_edec" x="300.0"/>
+        <p id="chord_atk" x="3.0"/>
+        <p id="chord_dec" x="400.0"/>
+        <p id="chord_sus" x="0.6000000238418579"/>
+        <p id="chord_rel" x="250.0"/>
         <Track i="5" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -720,6 +780,16 @@
         <p id="fmp_decay" x="0.4000000059604645"/>
         <p id="fmp_fold" x="0.1500000059604645"/>
         <p id="fmp_noise" x="0.1500000059604645"/>
+        <p id="chord_wave" x="0.0" c="Saw"/>
+        <p id="chord_cut" x="900.0001220703125"/>
+        <p id="chord_res" x="0.25"/>
+        <p id="chord_drive" x="0.2000000029802322"/>
+        <p id="chord_env" x="0.5"/>
+        <p id="chord_edec" x="300.0"/>
+        <p id="chord_atk" x="3.0"/>
+        <p id="chord_dec" x="400.0"/>
+        <p id="chord_sus" x="0.6000000238418579"/>
+        <p id="chord_rel" x="250.0"/>
         <Track i="6" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -800,6 +870,16 @@
         <p id="fmp_decay" x="0.4000000059604645"/>
         <p id="fmp_fold" x="0.1500000059604645"/>
         <p id="fmp_noise" x="0.1500000059604645"/>
+        <p id="chord_wave" x="0.0" c="Saw"/>
+        <p id="chord_cut" x="900.0001220703125"/>
+        <p id="chord_res" x="0.25"/>
+        <p id="chord_drive" x="0.2000000029802322"/>
+        <p id="chord_env" x="0.5"/>
+        <p id="chord_edec" x="300.0"/>
+        <p id="chord_atk" x="3.0"/>
+        <p id="chord_dec" x="400.0"/>
+        <p id="chord_sus" x="0.6000000238418579"/>
+        <p id="chord_rel" x="250.0"/>
         <Track i="7" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"

@@ -1,3 +1,4 @@
+#include "Audio/ChordVoicing.h"   // the chord list and note names
 #include "TrackContent.h"
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 
@@ -80,6 +81,18 @@ namespace
                 const char* const names[] = { "Bass Wave", "Bass Tune", "Bass Fine Tune", "Bass Sub", "Bass Glide", "Bass Filter Cutoff", "Bass Filter Resonance",
                                               "Bass Filter Envelope", "Bass Filter Env Decay", "Bass Drive", "Bass Amp Attack", "Bass Amp Decay", "Bass Amp Sustain", "Bass Amp Release" };
                 for (size_t i = 0; i < specs.size(); ++i) specs[i].statusName = names[i];
+                return specs;
+            }
+            case EngineType::Chord:
+            {
+                // One row: the oscillator, the filter (its input drive included) and the amp envelope, each group spread across the panel.
+                std::vector<Spec> specs { { id("wave"), "Wave" }, { id("cut"), "Cutoff" }, { id("res"), "Reso" }, { id("drive"), "Drive" }, { id("env"), "F.Env" },
+                                          { id("edec"), "E.Dec" }, { id("atk"), "Atk" }, { id("dec"), "Dec" }, { id("sus"), "Sus" }, { id("rel"), "Rel" } };
+                specs[0].groupStart = specs[1].groupStart = specs[6].groupStart = true;
+                const char* const names[] = { "Chord Wave", "Chord Filter Cutoff", "Chord Filter Resonance", "Chord Filter Drive", "Chord Filter Envelope",
+                                              "Chord Filter Env Decay", "Chord Amp Attack", "Chord Amp Decay", "Chord Amp Sustain", "Chord Amp Release" };
+                for (size_t i = 0; i < specs.size(); ++i) specs[i].statusName = names[i];
+                specs[4].tooltip = "How far the filter opens on each chord";
                 return specs;
             }
             case EngineType::Hat:   // two sets: the closed hat, then the open hat (the step row picks which a step plays)
@@ -172,7 +185,7 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     addAndMakeVisible(accentKnob);
     for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob, &levelKnob }) addAndMakeVisible(*k);
     // The STEP panel's controls edit the selected step of the shown track's row.
-    for (auto* cap : { &loopCaption, &voiceCaption, &octaveCaption, &noteCaption })
+    for (auto* cap : { &loopCaption, &voiceCaption, &octaveCaption, &noteCaption, &chordCaption })
     {
         cap->setJustificationType(juce::Justification::centred);
         cap->setInterceptsMouseClicks(false, false);
@@ -195,6 +208,17 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     addChildComponent(voiceSelect);
     addChildComponent(octaveSelect);
     addChildComponent(noteSelect);
+    for (int i = 0; i < kNumChords; ++i) chordSelect.addItem(kChords[(size_t) i].name, i + 1);
+    chordSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setStepChord(selectedStepOf[(size_t) currentLayer], id - 1); if (onStatusUpdate) onStatusUpdate("Step Chord", chordSelect.getText()); };
+    for (auto* k : { &invKnob, &spreadKnob }) addChildComponent(*k);
+    invKnob.setRange(0.0, (double) kMaxChordInversion, 1.0);
+    spreadKnob.setRange(0.0, (double) kMaxChordSpread, 1.0);
+    invKnob.onValueChanged = [this](double v) { host.getTrack(currentLayer).row.setStepInversion(selectedStepOf[(size_t) currentLayer], juce::roundToInt(v)); };
+    spreadKnob.onValueChanged = [this](double v) { host.getTrack(currentLayer).row.setStepSpread(selectedStepOf[(size_t) currentLayer], juce::roundToInt(v)); };
+    invKnob.onStatusUpdate = [this](const juce::String&, const juce::String& v) { if (onStatusUpdate) onStatusUpdate("Step Inversion", v); };
+    spreadKnob.onStatusUpdate = [this](const juce::String&, const juce::String& v) { if (onStatusUpdate) onStatusUpdate("Step Spread", v); };
+    addChildComponent(chordCaption);
+    addChildComponent(chordSelect);
     rows.onStepSelected = [this](int, int step) { selectStep(step); };
     soloRow.onStepSelected = [this](int step) { selectStep(step); };
     soloBtn.setClickingTogglesState(true);
@@ -287,10 +311,20 @@ void TrackContent::setLayer(int idx)
 // offset); a note outside the scale is red.
 void TrackContent::refreshNoteItems()
 {
-    if (shownEngine != EngineType::Kick && shownEngine != EngineType::Bass) return;
+    if (shownEngine != EngineType::Kick && shownEngine != EngineType::Bass && shownEngine != EngineType::Chord) return;
     const auto key = TrackStepRow::tuneKey(host, currentLayer, shownEngine);
     const auto& row = host.getTrack(currentLayer).row;
     const int step = selectedStepOf[(size_t) currentLayer];
+    if (shownEngine == EngineType::Chord)
+    {
+        // A Chord step's root is a degree of the master scale: the list is the scale's notes, named in the key.
+        noteSignature = key.root * 16 + key.scale + 100000 * (row.stepOctave(step) + 2);
+        noteSelect.clear();
+        const int count = mu_audio::kScales[(size_t) mu_audio::clampScaleIndex(key.scale)].count;
+        for (int d = 0; d < count; ++d) noteSelect.addItem(juce::String(d + 1) + "  " + chordRootName(key.root, key.scale, d), d + 13);
+        noteSelect.setSelectedId(juce::jlimit(0, count - 1, row.stepNote(step)) + 13, false);
+        return;
+    }
     const int octaveShift = row.stepOctave(step) * 12;
     noteSignature = (key.baseMidi * 16 + key.root) * 16 + key.scale + 100000 * (row.stepOctave(step) + 2);
     noteSelect.clear();
@@ -314,8 +348,14 @@ void TrackContent::refreshStepPanel()
     voiceCaption.setVisible(hat);
     voiceSelect.setVisible(hat);
     voiceSelect.setSelectedId(row.isOpen(step) ? 2 : 1, false);
-    const bool pitched = shownEngine == EngineType::Kick || shownEngine == EngineType::Bass;
+    const bool chordEng = shownEngine == EngineType::Chord;
+    const bool pitched = shownEngine == EngineType::Kick || shownEngine == EngineType::Bass || chordEng;
     for (auto* c : { (juce::Component*) &octaveCaption, (juce::Component*) &octaveSelect, (juce::Component*) &noteCaption, (juce::Component*) &noteSelect }) c->setVisible(pitched);
+    for (auto* c : { (juce::Component*) &chordCaption, (juce::Component*) &chordSelect, (juce::Component*) &invKnob, (juce::Component*) &spreadKnob }) c->setVisible(chordEng);
+    noteCaption.setText(chordEng ? "Root" : "Note", juce::dontSendNotification);
+    chordSelect.setSelectedId(row.stepChord(step) + 1, false);
+    invKnob.setValue(row.stepInversion(step), juce::dontSendNotification);
+    spreadKnob.setValue(row.stepSpread(step), juce::dontSendNotification);
     octaveSelect.setSelectedId(row.stepOctave(step) + 3, false);
     refreshNoteItems();
     rows.setSelectedStep(step);
@@ -453,6 +493,12 @@ void TrackContent::timerCallback()
         const int octave = host.getTrack(currentLayer).row.stepOctave(selectedStepOf[(size_t) currentLayer]);
         if ((key.baseMidi * 16 + key.root) * 16 + key.scale + 100000 * (octave + 2) != noteSignature) refreshNoteItems();
     }
+    else if (shownEngine == EngineType::Chord)
+    {
+        const auto key = TrackStepRow::tuneKey(host, currentLayer, shownEngine);
+        const int octave = host.getTrack(currentLayer).row.stepOctave(selectedStepOf[(size_t) currentLayer]);
+        if (key.root * 16 + key.scale + 100000 * (octave + 2) != noteSignature) refreshNoteItems();
+    }
     // A new FM Perc algorithm (picked here, by automation or a preset): the tooltips describe the new voice. Done from
     // the timer, never from the selector's own callback, which must not destroy the selector it is running in.
     if (shownEngine == EngineType::FmPerc && shownAlgorithm() != gridAlgorithm) rebuildGrid();
@@ -549,7 +595,7 @@ void TrackContent::resized()
     const int layerW = noSteps ? juce::jmax(0, w - 2 * padX) : (rumble ? s(MuLookAndFeel::kGrooveBoxW) : 3 * s(LF::kKnobSize2W) + 2 * gap + 2 * clear);
     grooveBoxR = { padX, boxesY, layerW, boxesH };
     int rightEdge = grooveBoxR.getRight();
-    stepBoxR   = (noSteps || rumble) ? juce::Rectangle<int>() : juce::Rectangle<int>(rightEdge + s(LF::kVoiceDivW), boxesY, s(MuLookAndFeel::kDropdownW) + 2 * clear, boxesH);
+    stepBoxR   = (noSteps || rumble) ? juce::Rectangle<int>() : juce::Rectangle<int>(rightEdge + s(LF::kVoiceDivW), boxesY, (s(MuLookAndFeel::kDropdownW) + 2 * clear) * (shownEngine == EngineType::Chord ? 2 : 1), boxesH);   // a Chord step has a second column
     if (! stepBoxR.isEmpty()) rightEdge = stepBoxR.getRight();
     const int stepsX = rightEdge + s(LF::kVoiceDivW);
     stepsBoxR  = noSteps ? juce::Rectangle<int>() : juce::Rectangle<int>(stepsX, boxesY, juce::jmax(0, w - padX - stepsX), boxesH);
@@ -595,23 +641,41 @@ void TrackContent::layoutStepPanel()
     const auto in = stepBoxR.reduced(s(LF::kSubPanelScrewClear), s(LF::kSpaceS));
     const int labelH = s(mu_ui::ParamKnobGrid::kLabelH), knobH = s(LF::kKnobSize2H), dd = s(LF::kDropdownH), gap = s(LF::kSpaceS);
     const juce::Font captionFont(juce::FontOptions{}.withHeight(mu_ui::sf(LF::kKnobLabelFont)));
+    auto placeDropdown = [&](juce::Label& caption, DropdownSelect& select, juce::Rectangle<int> column, int& y)
+    {
+        caption.setFont(captionFont);
+        caption.setBounds(column.getX(), y, column.getWidth(), labelH);
+        select.setBounds(column.getX(), y + labelH + s(2), column.getWidth(), dd);
+        y += labelH + s(2) + dd + gap;
+    };
+
+    // A Chord step has two columns: the Root, Octave, Chord and Play lists, then the Probability, Inversion and Spread knobs.
+    if (shownEngine == EngineType::Chord)
+    {
+        auto left = in.withTrimmedRight(in.getWidth() / 2 + gap / 2);
+        const int knobX = in.getX() + in.getWidth() / 2 + gap / 2 + (in.getWidth() / 2 - gap / 2 - s(LF::kKnobSize2W)) / 2;
+        int y = in.getY();
+        placeDropdown(noteCaption, noteSelect, left, y);
+        placeDropdown(octaveCaption, octaveSelect, left, y);
+        placeDropdown(chordCaption, chordSelect, left, y);
+        placeDropdown(loopCaption, loopSelect, left, y);
+        int ky = in.getY();
+        for (auto* k : { &stepProbKnob, &invKnob, &spreadKnob })
+        {
+            k->setBounds(knobX, ky, s(LF::kKnobSize2W), knobH);
+            ky += knobH + gap;
+        }
+        return;
+    }
+
     stepProbKnob.setBounds(in.getX() + (in.getWidth() - s(LF::kKnobSize2W)) / 2, in.getY(), s(LF::kKnobSize2W), knobH);
     int y = in.getY() + knobH + gap;
-    loopCaption.setFont(captionFont);
-    loopCaption.setBounds(in.getX(), y, in.getWidth(), labelH);
-    loopSelect.setBounds(in.getX(), y + labelH + s(2), in.getWidth(), dd);
-    y += labelH + s(2) + dd + gap;
-    voiceCaption.setFont(captionFont);
-    voiceCaption.setBounds(in.getX(), y, in.getWidth(), labelH);
-    voiceSelect.setBounds(in.getX(), y + labelH + s(2), in.getWidth(), dd);
-    // A Kick or Bass step's pitch takes the slots a Hat's Sound uses: Octave, then Note.
-    octaveCaption.setFont(captionFont);
-    octaveCaption.setBounds(in.getX(), y, in.getWidth(), labelH);
-    octaveSelect.setBounds(in.getX(), y + labelH + s(2), in.getWidth(), dd);
-    y += labelH + s(2) + dd + gap;
-    noteCaption.setFont(captionFont);
-    noteCaption.setBounds(in.getX(), y, in.getWidth(), labelH);
-    noteSelect.setBounds(in.getX(), y + labelH + s(2), in.getWidth(), dd);
+    placeDropdown(loopCaption, loopSelect, in, y);
+    // A Hat's Sound, or a Kick or Bass step's Octave then Note, in the slots after Play.
+    int yHat = y;
+    placeDropdown(voiceCaption, voiceSelect, in, yHat);
+    placeDropdown(octaveCaption, octaveSelect, in, y);
+    placeDropdown(noteCaption, noteSelect, in, y);
 }
 
 void TrackContent::paint(juce::Graphics& g)

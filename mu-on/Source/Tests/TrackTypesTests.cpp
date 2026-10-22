@@ -13,9 +13,9 @@ public:
     void runTest() override
     {
         using namespace mu_on;
-        const mu_core::LayerTypeInfo* infos[] = { &kKickType, &kBassType, &kHatType, &kSnareType, &kRumbleType, &kFmPercType };
+        const mu_core::LayerTypeInfo* infos[] = { &kKickType, &kBassType, &kHatType, &kSnareType, &kRumbleType, &kFmPercType, &kChordType };
 
-        beginTest("six types, one per engine: id, name, group, the shared prefix t and extension .muTrack");
+        beginTest("seven types, one per engine: id, name, group, the shared prefix t and extension .muTrack");
         for (int e = 0; e < kNumEngineTypes; ++e)
         {
             const auto engine = engineFromIndex(e);
@@ -27,7 +27,7 @@ public:
             expectEquals(juce::String(info.group), juce::String("mu-On"));
             expect(info.paramPrefixLetter == 't');
             expectEquals(juce::String(info.presetExtension), juce::String(".muTrack"));
-            expect(info.addLayerParams == &addLayerParams && info.create != nullptr, "one table and one class for all six");
+            expect(info.addLayerParams == &addLayerParams && info.create != nullptr, "one table and one class for all seven");
             const auto layer = info.create(3, info.id);
             const auto* track = dynamic_cast<const Track*>(layer.get());
             expect(track != nullptr && track->slot == 3, "create builds a Track for the slot");

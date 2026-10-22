@@ -116,13 +116,15 @@ namespace mu_on_fixture
                 set(mu_on::engineParamId(0, engine, "tune"), 110.0f);
                 break;
             case EngineType::Rumble: break;
+            case EngineType::Chord: break;   // its defaults
         }
         set(mu_on::layerParamId(0, "swing"), 0.3f);
         set(mu_on::layerParamId(0, "accent"), 0.6f);
     }
 
     // The hash of channel 0's stream for each engine, indexed by EngineType (Rumble has none: it processes another track).
-    constexpr std::uint64_t kSingleHash[6] = { 0x215e638e585324c9ull, 0x93a31986551d8985ull, 0x537b9c40d4de34b1ull, 0x14889ca97cbd63adull,   // Kick, Bass, Hat, Snare
+    constexpr std::uint64_t kSingleHash[7] = { 0x215e638e585324c9ull, 0x93a31986551d8985ull, 0x537b9c40d4de34b1ull, 0x14889ca97cbd63adull,   // Kick, Bass, Hat, Snare
                                                0ull,                                                                                      // Rumble: none
-                                               0xcf9d8b87c609bcd1ull };                                                                       // FM Perc
+                                               0xcf9d8b87c609bcd1ull,                                                                      // FM Perc
+                                               0ull };                                                                                    // Chord
 }

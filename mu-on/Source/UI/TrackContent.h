@@ -102,7 +102,11 @@ private:
     // passes of the row) and, on a Hat, which sound it plays. Not parameters: they edit the track's step row.
     KnobWithLabel  stepProbKnob { "Prob" };
     juce::Label    loopCaption { {}, "Play" }, voiceCaption { {}, "Sound" }, octaveCaption { {}, "Octave" }, noteCaption { {}, "Note" };
-    DropdownSelect loopSelect, voiceSelect, octaveSelect, noteSelect;   // Octave -2..+2 and Note -12..+12 (a Kick or Bass step's pitch)
+    DropdownSelect loopSelect, voiceSelect, octaveSelect, noteSelect;
+    // A Chord track's step: the chord (a dropdown), its inversion and its spread (knobs); the root is the Note list (scale degrees).
+    juce::Label    chordCaption { {}, "Chord" };
+    DropdownSelect chordSelect;
+    KnobWithLabel  invKnob { "Inv" }, spreadKnob { "Spread" };   // Octave -2..+2 and Note -12..+12 (a Kick or Bass step's pitch)
     std::array<int, mu_limits::kMaxLayers> selectedStepOf {};   // each layer's selected step (right-click), shown in the panel
     void refreshNoteItems();                                    // the Note list names the notes the key and tune give
     int  noteSignature = -1;                                    // what the list was last built for

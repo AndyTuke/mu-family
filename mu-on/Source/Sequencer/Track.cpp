@@ -145,6 +145,7 @@ void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
     sourceRow   = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "src")), this);
     bassWaveRow = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::Bass, "wave")), this);   // a choice, not a target
     algoRow     = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::FmPerc, "algo")), this);   // a choice, not a target
+    chordWaveRow = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::Chord, "wave")), this);   // a choice, not a target
     kickFineRow = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::Kick, "fine")), this);   // not targets
     bassFineRow = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::Bass, "fine")), this);
     rootRow     = mu_core::ParamBinding(apvts.getRawParameterValue(kRootParamId), this);    // global; null where the host has none
@@ -318,7 +319,7 @@ void Track::clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, i
                       {
                           if (fireInto == nullptr || e == toIndex(EngineType::Rumble)) return;
                           if (! stepPlays(ev.step, ev.pass)) return;   // the probability draw of this pass
-                          fireInto->trigger(ev.velocity, ev.offset, ev.open, ev.tied, ev.gateSamples, ev.semitones);
+                          fireInto->trigger(ev.velocity, ev.offset, ev.open, ev.tied, ev.gateSamples, ev.semitones, &ev.chord);
                           triggers.fetch_add(1, std::memory_order_relaxed);
                       });
 }
@@ -362,8 +363,9 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
     float p[kMaxDests] {};
     resolve(e, ctx.startBeat, p);
     const bool rumble = e == toIndex(EngineType::Rumble);
-    // The engine's own choice row: the Bass wave, or the FM Perc algorithm (neither is a modulation target).
-    const int engineChoice = juce::roundToInt(e == toIndex(EngineType::FmPerc) ? algoRow.load(0.0f) : bassWaveRow.load(0.0f));
+    // The engine's own choice row: the Bass or Chord wave, or the FM Perc algorithm (none is a modulation target).
+    const int engineChoice = juce::roundToInt(e == toIndex(EngineType::FmPerc) ? algoRow.load(0.0f)
+                                              : e == toIndex(EngineType::Chord) ? chordWaveRow.load(0.0f) : bassWaveRow.load(0.0f));
     TuneLock lock;
     if (rootRow.isBound())  lock.root  = juce::jlimit(0, 11, juce::roundToInt(rootRow.load(0.0f)));
     if (scaleRow.isBound()) lock.scale = mu_audio::clampScaleIndex(juce::roundToInt(scaleRow.load(0.0f)));

@@ -112,6 +112,18 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     flt(E::FmPerc, "decay", "FM Perc Decay",     f(0.0f, 1.0f, 0.001f), 0.40f);
     flt(E::FmPerc, "fold",  "FM Perc Fold",      f(0.0f, 1.0f, 0.001f), 0.15f);
     flt(E::FmPerc, "noise", "FM Perc Noise",     f(0.0f, 1.0f, 0.001f), 0.15f);
+
+    // Chord engine (a chord player for dub-techno stabs), appended after FM Perc. The chord itself is per step, in the step row.
+    layout.add(std::make_unique<AudioParameterChoice>(id(E::Chord, "wave"), lbl + "Chord Wave", juce::StringArray{ "Saw", "Square", "Pulse" }, 0));
+    flt(E::Chord, "cut",   "Chord Cutoff",     pitchRange(40.0f, 8000.0f), 900.0f);
+    flt(E::Chord, "res",   "Chord Resonance",  f(0.0f, 1.0f, 0.001f), 0.25f);
+    flt(E::Chord, "drive", "Chord Drive",      f(0.0f, 1.0f, 0.001f), 0.2f);       // on the filter's input
+    flt(E::Chord, "env",   "Chord Filter Env", f(0.0f, 1.0f, 0.001f), 0.5f);
+    flt(E::Chord, "edec",  "Chord Env Decay",  f(10.0f, 1500.0f, 1.0f), 300.0f);
+    flt(E::Chord, "atk",   "Chord Attack",     f(0.5f, 500.0f, 0.1f), 3.0f);
+    flt(E::Chord, "dec",   "Chord Decay",      f(20.0f, 2000.0f, 1.0f), 400.0f);
+    flt(E::Chord, "sus",   "Chord Sustain",    f(0.0f, 1.0f, 0.001f), 0.6f);
+    flt(E::Chord, "rel",   "Chord Release",    f(5.0f, 3000.0f, 1.0f), 250.0f);
 }
 
 void remapRumbleSources(juce::AudioProcessorValueTreeState& apvts, int liveCount,

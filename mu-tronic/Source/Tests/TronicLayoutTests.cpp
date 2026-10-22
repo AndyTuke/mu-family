@@ -146,7 +146,8 @@ struct MuTronicLayoutTests : juce::UnitTest
             expectEquals(types.discInitial(LayerTypeId::Snare), juce::String("S"));
             expectEquals(types.discInitial(LayerTypeId::Rumble), juce::String("R"));
             expectEquals(types.discInitial(LayerTypeId::FmPerc), juce::String("F"));
-            expectEquals(seen.size(), 9, "nine choices");
+            expectEquals(types.discInitial(LayerTypeId::Chord), juce::String("C"));
+            expectEquals(seen.size(), 10, "ten choices");
         }
 
         beginTest("a strip's sidechain source reaches every slot and the external bus");

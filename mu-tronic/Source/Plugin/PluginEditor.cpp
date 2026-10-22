@@ -93,7 +93,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // The cards in the design's order (design-ui 4.3): the three products, then mu-On's six.
     chooser.setOrder({ mu_core::LayerTypeId::Rhythm, mu_core::LayerTypeId::Pattern, mu_core::LayerTypeId::Arp,
                        mu_core::LayerTypeId::Kick, mu_core::LayerTypeId::Bass, mu_core::LayerTypeId::Hat,
-                       mu_core::LayerTypeId::Snare, mu_core::LayerTypeId::Rumble, mu_core::LayerTypeId::FmPerc });
+                       mu_core::LayerTypeId::Snare, mu_core::LayerTypeId::Rumble, mu_core::LayerTypeId::FmPerc, mu_core::LayerTypeId::Chord });
 
     // A type with its own save card (the Rhythm's) is asked first by the header's Save.
     layerPanel.setOwnSaveCard([this](int) { return shownContent != nullptr && shownContent->openSaveCard(); });

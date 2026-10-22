@@ -19,12 +19,12 @@ class LayerContent;   // mu-core/UI/LayerContent.h: a type's content component f
 namespace mu_core
 {
     // How many ids there are: the size of a table indexed by LayerTypeId.
-    inline constexpr int kLayerTypeIdCount = 12;
+    inline constexpr int kLayerTypeIdCount = 13;
 
     // Saved by NAME (layerTypeName), never by number, so the order here may change.
     // Test and Test2 are reserved for test layers: no product registers them, so a fake type can never collide with a
     // real one the day that product's type is registered.
-    enum class LayerTypeId : int { Empty = 0, Rhythm, Pattern, Arp, Kick, Bass, Hat, Snare, Rumble, FmPerc, Test, Test2 };
+    enum class LayerTypeId : int { Empty = 0, Rhythm, Pattern, Arp, Kick, Bass, Hat, Snare, Rumble, FmPerc, Chord, Test, Test2 };
 
     static_assert(kLayerTypeIdCount == (int) LayerTypeId::Test2 + 1, "kLayerTypeIdCount follows the last LayerTypeId");
 
@@ -42,6 +42,7 @@ namespace mu_core
             case LayerTypeId::Snare:   return "Snare";
             case LayerTypeId::Rumble:  return "Rumble";
             case LayerTypeId::FmPerc:  return "FmPerc";
+            case LayerTypeId::Chord:   return "Chord";
             case LayerTypeId::Test:    return "Test";
             case LayerTypeId::Test2:   return "Test2";
         }

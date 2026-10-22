@@ -3,7 +3,7 @@
 product=mu-on
 layers_at_start=1
 max_layers=8
-param_count=647
+param_count=727
 ---
 ch0_lvl | float | 0 | 1 | 0.001 | 1 | 1 | 1
 ch0_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
@@ -195,8 +195,18 @@ t0_bass_sub | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t0_bass_sus | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t0_bass_tune | float | 20 | 120 | 0 | 1 | 41.2 | 0.40335
 t0_bass_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
+t0_chord_atk | float | 0.5 | 500 | 0.1 | 1 | 3 | 0.005005
+t0_chord_cut | float | 40 | 8000 | 0 | 1 | 900 | 0.587642
+t0_chord_dec | float | 20 | 2000 | 1 | 1 | 400 | 0.191919
+t0_chord_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
+t0_chord_edec | float | 10 | 1500 | 1 | 1 | 300 | 0.194631
+t0_chord_env | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
+t0_chord_rel | float | 5 | 3000 | 1 | 1 | 250 | 0.081803
+t0_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
+t0_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
+t0_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
 t0_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
-t0_eng | choice(6) | 0 | 5 | 1 | 1 | 0 | 0
+t0_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t0_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t0_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t0_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
@@ -254,8 +264,18 @@ t1_bass_sub | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t1_bass_sus | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t1_bass_tune | float | 20 | 120 | 0 | 1 | 41.2 | 0.40335
 t1_bass_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
+t1_chord_atk | float | 0.5 | 500 | 0.1 | 1 | 3 | 0.005005
+t1_chord_cut | float | 40 | 8000 | 0 | 1 | 900 | 0.587642
+t1_chord_dec | float | 20 | 2000 | 1 | 1 | 400 | 0.191919
+t1_chord_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
+t1_chord_edec | float | 10 | 1500 | 1 | 1 | 300 | 0.194631
+t1_chord_env | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
+t1_chord_rel | float | 5 | 3000 | 1 | 1 | 250 | 0.081803
+t1_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
+t1_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
+t1_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
 t1_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
-t1_eng | choice(6) | 0 | 5 | 1 | 1 | 0 | 0
+t1_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t1_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t1_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t1_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
@@ -313,8 +333,18 @@ t2_bass_sub | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t2_bass_sus | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t2_bass_tune | float | 20 | 120 | 0 | 1 | 41.2 | 0.40335
 t2_bass_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
+t2_chord_atk | float | 0.5 | 500 | 0.1 | 1 | 3 | 0.005005
+t2_chord_cut | float | 40 | 8000 | 0 | 1 | 900 | 0.587642
+t2_chord_dec | float | 20 | 2000 | 1 | 1 | 400 | 0.191919
+t2_chord_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
+t2_chord_edec | float | 10 | 1500 | 1 | 1 | 300 | 0.194631
+t2_chord_env | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
+t2_chord_rel | float | 5 | 3000 | 1 | 1 | 250 | 0.081803
+t2_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
+t2_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
+t2_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
 t2_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
-t2_eng | choice(6) | 0 | 5 | 1 | 1 | 0 | 0
+t2_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t2_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t2_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t2_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
@@ -372,8 +402,18 @@ t3_bass_sub | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t3_bass_sus | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t3_bass_tune | float | 20 | 120 | 0 | 1 | 41.2 | 0.40335
 t3_bass_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
+t3_chord_atk | float | 0.5 | 500 | 0.1 | 1 | 3 | 0.005005
+t3_chord_cut | float | 40 | 8000 | 0 | 1 | 900 | 0.587642
+t3_chord_dec | float | 20 | 2000 | 1 | 1 | 400 | 0.191919
+t3_chord_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
+t3_chord_edec | float | 10 | 1500 | 1 | 1 | 300 | 0.194631
+t3_chord_env | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
+t3_chord_rel | float | 5 | 3000 | 1 | 1 | 250 | 0.081803
+t3_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
+t3_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
+t3_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
 t3_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
-t3_eng | choice(6) | 0 | 5 | 1 | 1 | 0 | 0
+t3_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t3_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t3_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t3_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
@@ -431,8 +471,18 @@ t4_bass_sub | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t4_bass_sus | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t4_bass_tune | float | 20 | 120 | 0 | 1 | 41.2 | 0.40335
 t4_bass_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
+t4_chord_atk | float | 0.5 | 500 | 0.1 | 1 | 3 | 0.005005
+t4_chord_cut | float | 40 | 8000 | 0 | 1 | 900 | 0.587642
+t4_chord_dec | float | 20 | 2000 | 1 | 1 | 400 | 0.191919
+t4_chord_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
+t4_chord_edec | float | 10 | 1500 | 1 | 1 | 300 | 0.194631
+t4_chord_env | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
+t4_chord_rel | float | 5 | 3000 | 1 | 1 | 250 | 0.081803
+t4_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
+t4_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
+t4_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
 t4_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
-t4_eng | choice(6) | 0 | 5 | 1 | 1 | 0 | 0
+t4_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t4_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t4_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t4_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
@@ -490,8 +540,18 @@ t5_bass_sub | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t5_bass_sus | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t5_bass_tune | float | 20 | 120 | 0 | 1 | 41.2 | 0.40335
 t5_bass_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
+t5_chord_atk | float | 0.5 | 500 | 0.1 | 1 | 3 | 0.005005
+t5_chord_cut | float | 40 | 8000 | 0 | 1 | 900 | 0.587642
+t5_chord_dec | float | 20 | 2000 | 1 | 1 | 400 | 0.191919
+t5_chord_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
+t5_chord_edec | float | 10 | 1500 | 1 | 1 | 300 | 0.194631
+t5_chord_env | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
+t5_chord_rel | float | 5 | 3000 | 1 | 1 | 250 | 0.081803
+t5_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
+t5_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
+t5_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
 t5_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
-t5_eng | choice(6) | 0 | 5 | 1 | 1 | 0 | 0
+t5_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t5_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t5_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t5_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
@@ -549,8 +609,18 @@ t6_bass_sub | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t6_bass_sus | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t6_bass_tune | float | 20 | 120 | 0 | 1 | 41.2 | 0.40335
 t6_bass_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
+t6_chord_atk | float | 0.5 | 500 | 0.1 | 1 | 3 | 0.005005
+t6_chord_cut | float | 40 | 8000 | 0 | 1 | 900 | 0.587642
+t6_chord_dec | float | 20 | 2000 | 1 | 1 | 400 | 0.191919
+t6_chord_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
+t6_chord_edec | float | 10 | 1500 | 1 | 1 | 300 | 0.194631
+t6_chord_env | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
+t6_chord_rel | float | 5 | 3000 | 1 | 1 | 250 | 0.081803
+t6_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
+t6_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
+t6_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
 t6_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
-t6_eng | choice(6) | 0 | 5 | 1 | 1 | 0 | 0
+t6_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t6_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t6_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t6_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
@@ -608,8 +678,18 @@ t7_bass_sub | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t7_bass_sus | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t7_bass_tune | float | 20 | 120 | 0 | 1 | 41.2 | 0.40335
 t7_bass_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
+t7_chord_atk | float | 0.5 | 500 | 0.1 | 1 | 3 | 0.005005
+t7_chord_cut | float | 40 | 8000 | 0 | 1 | 900 | 0.587642
+t7_chord_dec | float | 20 | 2000 | 1 | 1 | 400 | 0.191919
+t7_chord_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
+t7_chord_edec | float | 10 | 1500 | 1 | 1 | 300 | 0.194631
+t7_chord_env | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
+t7_chord_rel | float | 5 | 3000 | 1 | 1 | 250 | 0.081803
+t7_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
+t7_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
+t7_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
 t7_drvChar | int | 0 | 14 | 1 | 1 | 0 | 0
-t7_eng | choice(6) | 0 | 5 | 1 | 1 | 0 | 0
+t7_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t7_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t7_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t7_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
@@ -669,11 +749,11 @@ mst=10
 mstr=3
 ret=24
 rev=10
-t0=59
-t1=59
-t2=59
-t3=59
-t4=59
-t5=59
-t6=59
-t7=59
+t0=69
+t1=69
+t2=69
+t3=69
+t4=69
+t5=69
+t6=69
+t7=69

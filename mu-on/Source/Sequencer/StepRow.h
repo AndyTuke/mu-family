@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Persistence/TrackParams.h"   // EngineType (the default grooves)
+#include "Audio/ChordVoicing.h"        // kDefaultChord, the chord limits
 #include <juce_data_structures/juce_data_structures.h>
 #include <array>
 #include <atomic>
@@ -55,9 +56,20 @@ public:
     void setStepNote  (int step, int v) noexcept { if (valid(step)) cells[(size_t) step].note.store(juce::jlimit(-12, 12, v), std::memory_order_relaxed); }
     int  stepSemitones(int step) const noexcept { return stepOctave(step) * 12 + stepNote(step); }
 
+    // Per step chord (a Chord track): the chord (an index into kChords), its inversion and its spread. The root is the
+    // step's Note (a degree of the master scale: 0 is the key note) and its Octave.
+    int  stepChord    (int step) const noexcept { return valid(step) ? cells[(size_t) step].chord.load(std::memory_order_relaxed) : kDefaultChord; }
+    int  stepInversion(int step) const noexcept { return valid(step) ? cells[(size_t) step].inv.load(std::memory_order_relaxed) : 0; }
+    int  stepSpread   (int step) const noexcept { return valid(step) ? cells[(size_t) step].spread.load(std::memory_order_relaxed) : 0; }
+    void setStepChord    (int step, int v) noexcept { if (valid(step)) cells[(size_t) step].chord.store(juce::jlimit(0, kNumChords - 1, v), std::memory_order_relaxed); }
+    void setStepInversion(int step, int v) noexcept { if (valid(step)) cells[(size_t) step].inv.store(juce::jlimit(0, kMaxChordInversion, v), std::memory_order_relaxed); }
+    void setStepSpread   (int step, int v) noexcept { if (valid(step)) cells[(size_t) step].spread.store(juce::jlimit(0, kMaxChordSpread, v), std::memory_order_relaxed); }
+    ChordHit stepChordHit(int step) const noexcept { return { stepChord(step), stepInversion(step), stepSpread(step), stepNote(step), stepOctave(step) }; }
+
     void clear() noexcept
     {
-        for (auto& c : cells) { c.on.store(false, std::memory_order_relaxed); c.accent.store(false, std::memory_order_relaxed); c.open.store(false, std::memory_order_relaxed); c.prob.store(100, std::memory_order_relaxed); c.loop.store(0, std::memory_order_relaxed); c.tie.store(false, std::memory_order_relaxed); c.oct.store(0, std::memory_order_relaxed); c.note.store(0, std::memory_order_relaxed); }
+        for (auto& c : cells) { c.on.store(false, std::memory_order_relaxed); c.accent.store(false, std::memory_order_relaxed); c.open.store(false, std::memory_order_relaxed); c.prob.store(100, std::memory_order_relaxed); c.loop.store(0, std::memory_order_relaxed); c.tie.store(false, std::memory_order_relaxed); c.oct.store(0, std::memory_order_relaxed); c.note.store(0, std::memory_order_relaxed);
+                    c.chord.store(kDefaultChord, std::memory_order_relaxed); c.inv.store(0, std::memory_order_relaxed); c.spread.store(0, std::memory_order_relaxed); }
     }
 
     // The starting groove of an engine, so a new track plays something at once: four-on-the-floor kick
@@ -76,6 +88,7 @@ public:
             case EngineType::Snare:  setOn(4, true); setOn(12, true); break;
             case EngineType::Rumble: break;
             case EngineType::FmPerc: setOn(4, true); setOn(10, true); setOn(14, true); break;
+            case EngineType::Chord:  for (int s = 2; s < kNumSteps; s += 4) setOn(s, true); break;   // off-beat stabs
         }
     }
 
@@ -110,6 +123,13 @@ public:
         }
         juce::StringArray octs, notes; bool anyPitch = false;
         for (int s = 0; s < kNumSteps; ++s) { octs.add(juce::String(stepOctave(s))); notes.add(juce::String(stepNote(s))); anyPitch = anyPitch || stepSemitones(s) != 0; }
+        juce::StringArray chords, invs, spreads; bool anyChord = false;
+        for (int s = 0; s < kNumSteps; ++s)
+        {
+            chords.add(juce::String(stepChord(s))); invs.add(juce::String(stepInversion(s))); spreads.add(juce::String(stepSpread(s)));
+            anyChord = anyChord || stepChord(s) != kDefaultChord || stepInversion(s) != 0 || stepSpread(s) != 0;
+        }
+        if (anyChord) { row.setProperty("chord", chords.joinIntoString(","), nullptr); row.setProperty("inv", invs.joinIntoString(","), nullptr); row.setProperty("spread", spreads.joinIntoString(","), nullptr); }
         if (anyPitch) { row.setProperty("oct", octs.joinIntoString(","), nullptr); row.setProperty("note", notes.joinIntoString(","), nullptr); }
         if (anyProb) row.setProperty("prob", probs.joinIntoString(","), nullptr);
         if (anyLoop) row.setProperty("loop", loops, nullptr);
@@ -126,6 +146,9 @@ public:
         const juce::String tie = row.getProperty("tie").toString();
         const auto octs = juce::StringArray::fromTokens(row.getProperty("oct").toString(), ",", "");
         const auto notes = juce::StringArray::fromTokens(row.getProperty("note").toString(), ",", "");
+        const auto chordList = juce::StringArray::fromTokens(row.getProperty("chord").toString(), ",", "");
+        const auto invList = juce::StringArray::fromTokens(row.getProperty("inv").toString(), ",", "");
+        const auto spreadList = juce::StringArray::fromTokens(row.getProperty("spread").toString(), ",", "");
         const auto probs = juce::StringArray::fromTokens(row.getProperty("prob").toString(), ",", "");
         const juce::String loops = row.getProperty("loop").toString();
         for (int s = 0; s < kNumSteps; ++s)
@@ -138,11 +161,15 @@ public:
             setTied  (s, s < tie.length() && tie[s] == '1');
             setStepOctave(s, s < octs.size() ? octs[s].getIntValue() : 0);
             setStepNote  (s, s < notes.size() ? notes[s].getIntValue() : 0);
+            setStepChord    (s, s < chordList.size() ? chordList[s].getIntValue() : kDefaultChord);
+            setStepInversion(s, s < invList.size() ? invList[s].getIntValue() : 0);
+            setStepSpread   (s, s < spreadList.size() ? spreadList[s].getIntValue() : 0);
         }
     }
 
 private:
-    struct Cell { std::atomic<bool> on { false }; std::atomic<bool> accent { false }; std::atomic<bool> open { false }; std::atomic<int> prob { 100 }; std::atomic<int> loop { 0 }; std::atomic<bool> tie { false }; std::atomic<int> oct { 0 }; std::atomic<int> note { 0 }; };
+    struct Cell { std::atomic<bool> on { false }; std::atomic<bool> accent { false }; std::atomic<bool> open { false }; std::atomic<int> prob { 100 }; std::atomic<int> loop { 0 }; std::atomic<bool> tie { false }; std::atomic<int> oct { 0 }; std::atomic<int> note { 0 };
+                  std::atomic<int> chord { kDefaultChord }; std::atomic<int> inv { 0 }; std::atomic<int> spread { 0 }; };
     static bool valid(int s) noexcept { return s >= 0 && s < kNumSteps; }
 
     std::array<Cell, kNumSteps> cells;

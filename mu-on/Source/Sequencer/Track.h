@@ -22,7 +22,7 @@ namespace mu_on
 // One mu-On layer, a track. The shared Layer (colour, modulation) plus what is the track's own and moves
 // with it through add / delete / reorder: its step row and the row's clock, its Rumble volume envelope, the
 // trigger counter the audio thread bumps and the editor polls to pulse the sidebar item, and its sound engines
-// (Kick, Bass, Hat, Snare, Rumble, FM Perc; the one that plays is named by its `t{N}_eng` parameter). A track whose engine
+// (Kick, Bass, Hat, Snare, Rumble, FM Perc, Chord; the one that plays is named by its `t{N}_eng` parameter). A track whose engine
 // can change (every mu-On track) holds all five, built and prepared, so a change of the parameter from any thread
 // (host automation on the audio thread included) switches the engine in the same block, as the per-slot engines
 // always did. A track whose host fixes its engine (engineLocked: a mu-Tronic layer) holds only that one.
@@ -75,7 +75,7 @@ struct Track : Layer
     void onMoved(int newIndex) override { slot = newIndex; }
 
     // ── The render contract ──────────────────────────────────────────────────
-    // The type is the engine the track's parameter names (mu_core::LayerTypeId::Kick .. FmPerc).
+    // The type is the engine the track's parameter names (mu_core::LayerTypeId::Kick .. Chord).
     int  typeId() const override;
     bool stripMods(float (&out)[4]) const noexcept override { return stripMod.read(out); }
     // A Rumble renders after every other track (it reads its source's block); everything else first.
@@ -156,7 +156,7 @@ private:
     void  clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, int engine, int n) noexcept;
     void  resetEngines() noexcept;   // every held engine's voice silenced (the per-slot engines' reset rule)
 
-    mu_core::ParamBinding engineRow, sourceRow, bassWaveRow, algoRow, swingRow, accentRow;
+    mu_core::ParamBinding engineRow, sourceRow, bassWaveRow, algoRow, chordWaveRow, swingRow, accentRow;
     // The Kick / Bass Fine offsets (cents) and the master key and scale their tune is locked to. The key and scale are the
     // host's: a host without them (unbound) leaves the lock at C chromatic.
     mu_core::ParamBinding kickFineRow, bassFineRow, rootRow, scaleRow;

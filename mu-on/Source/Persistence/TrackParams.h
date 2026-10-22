@@ -22,8 +22,8 @@ namespace mu_on
 inline constexpr const char* kTrackPresetTag = "MuOnTrack";
 
 // The values are the saved `t{N}_eng` choice index, so they are fixed.
-enum class EngineType : int { Kick = 0, Bass, Hat, Snare, Rumble, FmPerc };
-inline constexpr int kNumEngineTypes = 6;
+enum class EngineType : int { Kick = 0, Bass, Hat, Snare, Rumble, FmPerc, Chord };
+inline constexpr int kNumEngineTypes = 7;
 
 inline constexpr EngineType engineFromIndex(int index) noexcept
 {
@@ -40,7 +40,7 @@ inline constexpr mu_core::LayerTypeId layerTypeOf(EngineType engine) noexcept
 }
 inline constexpr bool isTrackType(mu_core::LayerTypeId id) noexcept
 {
-    return (int) id >= (int) mu_core::LayerTypeId::Kick && (int) id <= (int) mu_core::LayerTypeId::FmPerc;
+    return (int) id >= (int) mu_core::LayerTypeId::Kick && (int) id <= (int) mu_core::LayerTypeId::Chord;
 }
 // The engine a Track type runs (Kick for a type that is not mu-On's).
 inline constexpr EngineType engineOfType(mu_core::LayerTypeId id) noexcept
@@ -53,19 +53,20 @@ static_assert(layerTypeOf(EngineType::Hat)    == mu_core::LayerTypeId::Hat,    "
 static_assert(layerTypeOf(EngineType::Snare)  == mu_core::LayerTypeId::Snare,  "LayerTypeId must list the engines in EngineType order");
 static_assert(layerTypeOf(EngineType::Rumble) == mu_core::LayerTypeId::Rumble, "LayerTypeId must list the engines in EngineType order");
 static_assert(layerTypeOf(EngineType::FmPerc) == mu_core::LayerTypeId::FmPerc, "LayerTypeId must list the engines in EngineType order");
-static_assert(kNumEngineTypes == (int) mu_core::LayerTypeId::FmPerc - (int) mu_core::LayerTypeId::Kick + 1, "one layer type per engine");
+static_assert(layerTypeOf(EngineType::Chord)  == mu_core::LayerTypeId::Chord,  "LayerTypeId must list the engines in EngineType order");
+static_assert(kNumEngineTypes == (int) mu_core::LayerTypeId::Chord - (int) mu_core::LayerTypeId::Kick + 1, "one layer type per engine");
 
 // The engine's display name (also the default name of a track running it).
 inline constexpr const char* engineName(EngineType e) noexcept
 {
-    constexpr const char* kNames[kNumEngineTypes] = { "Kick", "Bass", "Hat", "Snare", "Rumble", "FM Perc" };
+    constexpr const char* kNames[kNumEngineTypes] = { "Kick", "Bass", "Hat", "Snare", "Rumble", "FM Perc", "Chord" };
     return kNames[toIndex(e)];
 }
 
 // The engine's lower-case id tag, the middle of an engine parameter id.
 inline constexpr const char* engineTag(EngineType e) noexcept
 {
-    constexpr const char* kTags[kNumEngineTypes] = { "kick", "bass", "hat", "snare", "rumble", "fmp" };
+    constexpr const char* kTags[kNumEngineTypes] = { "kick", "bass", "hat", "snare", "rumble", "fmp", "chord" };
     return kTags[toIndex(e)];
 }
 
@@ -123,6 +124,7 @@ inline const std::vector<const char*>& engineParamNames(EngineType e)
     static const std::vector<const char*> kHat    { "tune", "dec", "otune", "odec" };
     static const std::vector<const char*> kSnare  { "tune", "dec", "snap" };
     static const std::vector<const char*> kRumble { "drive", "d1", "d2", "d3", "size", "revmix", "revlp", "cut", "res", "inlp" };
+    static const std::vector<const char*> kChord  { "wave", "cut", "res", "drive", "env", "edec", "atk", "dec", "sus", "rel" };
     static const std::vector<const char*> kFmPerc { "algo", "tune", "ratio", "index", "idec", "fdbk", "dive", "dtime", "decay", "fold", "noise" };
     switch (e)
     {
@@ -132,6 +134,7 @@ inline const std::vector<const char*>& engineParamNames(EngineType e)
         case EngineType::Snare:  return kSnare;
         case EngineType::Rumble: return kRumble;
         case EngineType::FmPerc: return kFmPerc;
+        case EngineType::Chord:  return kChord;
     }
     return kKick;
 }

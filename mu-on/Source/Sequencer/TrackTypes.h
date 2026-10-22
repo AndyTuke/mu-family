@@ -51,6 +51,7 @@ inline constexpr const char* trackDescriptor(EngineType e) noexcept
         case EngineType::Snare:  return "Snare";
         case EngineType::Rumble: return "Rumble tail from a kick";
         case EngineType::FmPerc: return "FM toms and percussion";
+        case EngineType::Chord:  return "Chord stabs and pads";
     }
     return "";
 }
@@ -66,6 +67,7 @@ inline constexpr const char* trackInitial(EngineType e) noexcept
         case EngineType::Snare:  return "S";
         case EngineType::Rumble: return "R";
         case EngineType::FmPerc: return "F";
+        case EngineType::Chord:  return "C";
     }
     return "";
 }
@@ -96,5 +98,6 @@ inline const mu_core::LayerTypeInfo kHatType    = makeTrackTypeInfo(EngineType::
 inline const mu_core::LayerTypeInfo kSnareType  = makeTrackTypeInfo(EngineType::Snare);
 inline const mu_core::LayerTypeInfo kRumbleType = makeTrackTypeInfo(EngineType::Rumble);
 inline const mu_core::LayerTypeInfo kFmPercType = makeTrackTypeInfo(EngineType::FmPerc);
+inline const mu_core::LayerTypeInfo kChordType  = makeTrackTypeInfo(EngineType::Chord);
 
 } // namespace mu_on

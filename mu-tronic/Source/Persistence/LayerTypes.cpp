@@ -18,6 +18,7 @@ void registerLayerTypes(mu_core::LayerTypeRegistry& registry)
     registry.add(trackLayerType(mu_core::LayerTypeId::Snare));
     registry.add(trackLayerType(mu_core::LayerTypeId::Rumble));
     registry.add(trackLayerType(mu_core::LayerTypeId::FmPerc));
+    registry.add(trackLayerType(mu_core::LayerTypeId::Chord));
     registry.add(patternLayerType());
     registry.add(rhythmLayerType());
 }
