@@ -55,9 +55,11 @@ public:
 
     // `tied`: the step continues the note before it (no retrigger, a glide to the new pitch). `gateSamples` is how long
     // the note is held before its release (0: held until the next trigger).
-    void trigger(float velocity, int onset = 0, bool tied = false, int gateSamples = 0) noexcept
+    // `semitones` transposes the step from the Tune (the Step panel's Octave and Note).
+    void trigger(float velocity, int onset = 0, bool tied = false, int gateSamples = 0, float semitones = 0.0f) noexcept
     {
         restart = true; pendingVel = velocity; pendingOnset = juce::jmax(0, onset); pendingTied = tied; pendingGate = juce::jmax(0, gateSamples);
+        pendingMul = std::exp2(semitones * (1.0f / 12.0f));
     }
 
     // Silence the voice + clear the filter ring immediately (e.g. transport stop).
@@ -74,7 +76,7 @@ public:
         // Block-rate filter envelope: cutoff sweeps from base+depth down to base. On the
         // block a trigger lands, t resets to 0 mid-loop — use 0 here too so the filter
         // envelope opens on the onset block instead of reading the previous block's t.
-        const float envT   = restart ? 0.0f : t;
+        const float envT   = (restart && ! (pendingTied && active)) ? 0.0f : t;   // a tied step does not reopen the filter
         const float fEnv   = (active || restart) ? std::exp(-envT * filterEnvInv) : 0.0f;
         const float cutoff = juce::jlimit(20.0f, (float) sampleRate * 0.45f,
                                           baseCut + fEnv * envDepth * 6000.0f);
@@ -86,28 +88,32 @@ public:
             if (restart && i >= pendingOnset)
             {
                 restart = false;
+                stepMul = pendingMul;
                 if (pendingTied && active && ! releasing)
                 {
-                    // A tied step: the note carries on (envelopes untouched) and slides to the new pitch.
+                    // A tied step: the note carries on (envelopes untouched; the level eases to the step's velocity) and
+                    // slides to the new pitch.
                     gliding = glideCoef > 0.0f;
-                    if (! gliding) curFreq = rootFreq;
-                    vel = pendingVel;
+                    if (! gliding) curFreq = rootFreq * stepMul;
+                    velTarget = pendingVel;
                 }
                 else
                 {
-                    active = true; phase = 0.0f; subPhase = 0.0f; t = 0.0f; amp = 0.0f; vel = pendingVel; decayEnv.reset(1.0f);
-                    curFreq = rootFreq; gliding = false; releasing = false; relGain = 1.0f; gateLeft = pendingGate;
+                    active = true; phase = 0.0f; subPhase = 0.0f; t = 0.0f; amp = 0.0f; vel = velTarget = pendingVel; decayEnv.reset(1.0f);
+                    curFreq = rootFreq * stepMul; gliding = false; releasing = false; relGain = 1.0f; gateLeft = pendingGate;
                 }
             }
+            vel += (velTarget - vel) * 0.004f;   // about 5 ms: a tied step's accent or ghost changes level without a click
 
             // Pitch: follows the Tune, or slides toward it after a tied step (held until a pending tie's own sample).
+            const float targetFreq = rootFreq * stepMul;
             if (gliding)
             {
-                curFreq += (rootFreq - curFreq) * glideCoef;
-                if (std::abs(rootFreq - curFreq) < 0.01f) { curFreq = rootFreq; gliding = false; }
+                curFreq += (targetFreq - curFreq) * glideCoef;
+                if (std::abs(targetFreq - curFreq) < 0.01f) { curFreq = targetFreq; gliding = false; }
             }
             else if (! (restart && pendingTied && active))
-                curFreq = rootFreq;
+                curFreq = targetFreq;
 
             float s = 0.0f;
             if (active)
@@ -159,6 +165,7 @@ private:
     mu_core::ExpDecay decayEnv;   // amp decay toward the sustain floor
     float  phase = 0.0f, subPhase = 0.0f, t = 0.0f, amp = 0.0f, vel = 1.0f, pendingVel = 1.0f;
     int    pendingOnset = 0, pendingGate = 0, gateLeft = 0;
+    float  stepMul = 1.0f, pendingMul = 1.0f, velTarget = 1.0f;   // the step's transposition (now, and for the trigger waiting); the level the velocity eases to
     float  curFreq = 41.2f, relGain = 1.0f, relMul = 0.999f, glideCoef = 0.0f;   // the sounding pitch; the release level and its per-sample step; the glide step
     bool   active = false, restart = false, pendingTied = false, gliding = false, releasing = false;
 };

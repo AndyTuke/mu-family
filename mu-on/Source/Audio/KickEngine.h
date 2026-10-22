@@ -27,7 +27,11 @@ public:
         drive    = juce::jlimit(0.0f, 1.0f, drv);
     }
 
-    void trigger(float velocity, int onset = 0) noexcept { restart = true; pendingVel = velocity; pendingOnset = juce::jmax(0, onset); }
+    // `semitones` transposes the hit from the Tune (the Step panel's Octave and Note).
+    void trigger(float velocity, int onset = 0, float semitones = 0.0f) noexcept
+    {
+        restart = true; pendingVel = velocity; pendingOnset = juce::jmax(0, onset); pendingMul = std::exp2(semitones * (1.0f / 12.0f));
+    }
 
     // Silence the voice immediately (e.g. transport stop). Allocation-free.
     void reset() noexcept { active = false; restart = false; }
@@ -40,7 +44,7 @@ public:
             // Sample-accurate onset: a step landing mid-block starts the voice at its offset.
             if (restart && i >= pendingOnset)
             {
-                active = true; phase = 0.0f; t = 0.0f; restart = false;
+                active = true; phase = 0.0f; t = 0.0f; restart = false; stepMul = pendingMul;
                 pitchEnv.reset(1.0f);
                 ampEnv.reset(pendingVel);
             }
@@ -49,7 +53,7 @@ public:
             if (active)
             {
                 const float pEnv = pitchEnv.next();
-                const float freq = baseFreq + pitchAmt * pEnv;
+                const float freq = (baseFreq + pitchAmt * pEnv) * stepMul;
                 const float aEnv = ampEnv.next();   // starts at the velocity
                 s = std::sin(phase) * aEnv;
                 if (drive > 0.0f) s = std::tanh(s * (1.0f + drive * 4.0f)) / (1.0f + drive * 0.5f);
@@ -68,7 +72,7 @@ private:
 
     double sampleRate = 44100.0;
     float  baseFreq = 50.0f, pitchAmt = 220.0f, drive = 0.2f;
-    float  phase = 0.0f, t = 0.0f, pendingVel = 1.0f;
+    float  phase = 0.0f, t = 0.0f, pendingVel = 1.0f, stepMul = 1.0f, pendingMul = 1.0f;
     mu_core::ExpDecay pitchEnv, ampEnv;   // pitch sweep (start tune → base) and amp decay
     int    pendingOnset = 0;
     bool   active = false, restart = false;

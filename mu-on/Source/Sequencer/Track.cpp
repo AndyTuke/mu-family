@@ -310,7 +310,7 @@ void Track::clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, i
     // ratio is applied by the clock.
     const float layerProb = juce::jlimit(0.0f, 1.0f, probRow.load(100.0f) * 0.01f);
     clock.processSpan(row, ctx.startBeat, n, ctx.beatsPerSample, row.swingAmount(), row.accentVelocity(),
-                      [this, fireInto, e, layerProb](float velocity, int offset, bool open, float stepProb, bool tied, int gateSamples)
+                      [this, fireInto, e, layerProb](float velocity, int offset, bool open, float stepProb, bool tied, int gateSamples, float semitones)
                       {
                           if (fireInto == nullptr || e == toIndex(EngineType::Rumble)) return;
                           const float chance = layerProb * stepProb;
@@ -320,7 +320,7 @@ void Track::clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, i
                               rngState ^= rngState << 13; rngState ^= rngState >> 17; rngState ^= rngState << 5;
                               if ((float) (rngState >> 8) * (1.0f / 16777216.0f) >= chance) return;
                           }
-                          fireInto->trigger(velocity, offset, open, tied, gateSamples);
+                          fireInto->trigger(velocity, offset, open, tied, gateSamples, semitones);
                           triggers.fetch_add(1, std::memory_order_relaxed);
                       });
 }

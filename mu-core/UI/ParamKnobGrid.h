@@ -37,6 +37,9 @@ public:
         juce::String            tooltip;
         // Start a new row of the grid at this control (a group, such as an envelope, kept together on its own row).
         bool                    newRow = false;
+        // Start a group (an oscillator, a filter, an envelope): a row that has groups shares its spare width equally as
+        // the space before the first group, between groups and after the last, so its sections sit spread across the panel.
+        bool                    groupStart = false;
     };
 
     explicit ParamKnobGrid(juce::AudioProcessorValueTreeState& state);
@@ -68,6 +71,7 @@ private:
     {
         juce::String                    label;
         bool                            newRow = false;   // starts a new row of the grid
+        bool                            groupStart = false;   // starts a group (see Spec)
         std::unique_ptr<KnobWithLabel>  knob;
         std::unique_ptr<juce::ComboBox> combo;
         juce::Label                     name;

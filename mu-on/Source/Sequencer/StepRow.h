@@ -48,9 +48,16 @@ public:
         if (valid(step)) cells[(size_t) step].loop.store(juce::jlimit(0, (int) std::size(kLoopRatios) - 1, ratioIndex), std::memory_order_relaxed);
     }
 
+    // Per step pitch (a Kick or Bass): the octave (-2 to +2) and the note offset (-12 to +12 semitones) from the Tune.
+    int  stepOctave(int step) const noexcept { return valid(step) ? cells[(size_t) step].oct.load(std::memory_order_relaxed) : 0; }
+    int  stepNote  (int step) const noexcept { return valid(step) ? cells[(size_t) step].note.load(std::memory_order_relaxed) : 0; }
+    void setStepOctave(int step, int v) noexcept { if (valid(step)) cells[(size_t) step].oct.store(juce::jlimit(-2, 2, v), std::memory_order_relaxed); }
+    void setStepNote  (int step, int v) noexcept { if (valid(step)) cells[(size_t) step].note.store(juce::jlimit(-12, 12, v), std::memory_order_relaxed); }
+    int  stepSemitones(int step) const noexcept { return stepOctave(step) * 12 + stepNote(step); }
+
     void clear() noexcept
     {
-        for (auto& c : cells) { c.on.store(false, std::memory_order_relaxed); c.accent.store(false, std::memory_order_relaxed); c.open.store(false, std::memory_order_relaxed); c.prob.store(100, std::memory_order_relaxed); c.loop.store(0, std::memory_order_relaxed); c.tie.store(false, std::memory_order_relaxed); }
+        for (auto& c : cells) { c.on.store(false, std::memory_order_relaxed); c.accent.store(false, std::memory_order_relaxed); c.open.store(false, std::memory_order_relaxed); c.prob.store(100, std::memory_order_relaxed); c.loop.store(0, std::memory_order_relaxed); c.tie.store(false, std::memory_order_relaxed); c.oct.store(0, std::memory_order_relaxed); c.note.store(0, std::memory_order_relaxed); }
     }
 
     // The starting groove of an engine, so a new track plays something at once: four-on-the-floor kick
@@ -101,6 +108,9 @@ public:
             probs.add(juce::String(stepProb(s))); loops += juce::String(stepLoop(s));
             anyProb = anyProb || stepProb(s) != 100; anyLoop = anyLoop || stepLoop(s) != 0;
         }
+        juce::StringArray octs, notes; bool anyPitch = false;
+        for (int s = 0; s < kNumSteps; ++s) { octs.add(juce::String(stepOctave(s))); notes.add(juce::String(stepNote(s))); anyPitch = anyPitch || stepSemitones(s) != 0; }
+        if (anyPitch) { row.setProperty("oct", octs.joinIntoString(","), nullptr); row.setProperty("note", notes.joinIntoString(","), nullptr); }
         if (anyProb) row.setProperty("prob", probs.joinIntoString(","), nullptr);
         if (anyLoop) row.setProperty("loop", loops, nullptr);
         return row;
@@ -114,6 +124,8 @@ public:
         const juce::String ac = row.getProperty("accent").toString();
         const juce::String op = row.getProperty("open").toString();
         const juce::String tie = row.getProperty("tie").toString();
+        const auto octs = juce::StringArray::fromTokens(row.getProperty("oct").toString(), ",", "");
+        const auto notes = juce::StringArray::fromTokens(row.getProperty("note").toString(), ",", "");
         const auto probs = juce::StringArray::fromTokens(row.getProperty("prob").toString(), ",", "");
         const juce::String loops = row.getProperty("loop").toString();
         for (int s = 0; s < kNumSteps; ++s)
@@ -124,11 +136,13 @@ public:
             setOn    (s, s < on.length() && on[s] == '1');
             setAccent(s, s < ac.length() && ac[s] == '1');
             setTied  (s, s < tie.length() && tie[s] == '1');
+            setStepOctave(s, s < octs.size() ? octs[s].getIntValue() : 0);
+            setStepNote  (s, s < notes.size() ? notes[s].getIntValue() : 0);
         }
     }
 
 private:
-    struct Cell { std::atomic<bool> on { false }; std::atomic<bool> accent { false }; std::atomic<bool> open { false }; std::atomic<int> prob { 100 }; std::atomic<int> loop { 0 }; std::atomic<bool> tie { false }; };
+    struct Cell { std::atomic<bool> on { false }; std::atomic<bool> accent { false }; std::atomic<bool> open { false }; std::atomic<int> prob { 100 }; std::atomic<int> loop { 0 }; std::atomic<bool> tie { false }; std::atomic<int> oct { 0 }; std::atomic<int> note { 0 }; };
     static bool valid(int s) noexcept { return s >= 0 && s < kNumSteps; }
 
     std::array<Cell, kNumSteps> cells;

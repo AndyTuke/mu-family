@@ -14,6 +14,7 @@ void ParamKnobGrid::setSpecs(const std::vector<Spec>& specs)
         auto ctl = std::make_unique<Control>();
         ctl->label = spec.label;
         ctl->newRow = spec.newRow;
+        ctl->groupStart = spec.groupStart;
 
         ctl->name.setText(spec.label, juce::dontSendNotification);
         ctl->name.setJustificationType(juce::Justification::centred);
@@ -106,26 +107,48 @@ void ParamKnobGrid::resized()
 
     // Flow the cells left to right, wrapping at the width. A selector takes two cells so its
     // text fits (the metal style's LCD lettering is wider than one knob).
-    int x = area.getX(), y = area.getY();
-    for (auto& ctl : controls)
+    int y = area.getY();
+    const int total = (int) controls.size();
+    for (int first = 0; first < total;)
     {
-        const int cw = ctl->combo ? 2 * cellW : cellW;
-        if (x > area.getX() && (ctl->newRow || x + cw > area.getRight())) { x = area.getX(); y += cellH; }
-        juce::Rectangle<int> cell(x, y, cw, cellH);
-        x += cw;
-        ctl->name.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuLookAndFeel::kKnobLabelFont))));   // the knobs' own label size
-        ctl->name.setBounds(cell.removeFromTop(labelH));
-        // Centre the standard-size control in the remaining cell.
-        if (ctl->combo)
-            ctl->combo->setBounds(cell.withSizeKeepingCentre(cw - 2 * s(MuLookAndFeel::kDropdownEdgeGap), comboH));
-        else if (ctl->knob)
+        // Phase 1: the run of cells that makes this row, its width and its number of groups.
+        auto cellWidth = [&](int k) { return controls[(size_t) k]->combo ? 2 * cellW : cellW; };
+        int last = first, rowW = 0, groups = 0;
+        while (last < total)
         {
-            // The dial itself keeps the standard knob size; the knob component adds the band above
-            // and the (empty) label band below that it reserves around the dial.
-            const auto dial = cell.withSizeKeepingCentre(knobW, knobH);
-            ctl->knob->setBounds(dial.withTrimmedTop(-s(MuLookAndFeel::kKnobTopPad))
-                                     .withTrimmedBottom(-s(MuLookAndFeel::kKnobLabelH)));
+            const int cw = cellWidth(last);
+            if (last > first && (controls[(size_t) last]->newRow || rowW + cw > area.getWidth())) break;
+            rowW += cw;
+            if (controls[(size_t) last]->groupStart) ++groups;
+            ++last;
         }
+
+        // Phase 2: a row with groups spreads its spare width as equal gaps before, between and after them.
+        const int gap = groups > 0 ? juce::jmax(0, (area.getWidth() - rowW) / (groups + 1)) : 0;
+        int x = area.getX() + (groups > 0 ? gap : 0);
+        for (int k = first; k < last; ++k)
+        {
+            auto& ctl = controls[(size_t) k];
+            if (ctl->groupStart && k > first) x += gap;
+            const int cw = cellWidth(k);
+            juce::Rectangle<int> cell(x, y, cw, cellH);
+            x += cw;
+            ctl->name.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuLookAndFeel::kKnobLabelFont))));   // the knobs' own label size
+            ctl->name.setBounds(cell.removeFromTop(labelH));
+            // Centre the standard-size control in the remaining cell.
+            if (ctl->combo)
+                ctl->combo->setBounds(cell.withSizeKeepingCentre(cw - 2 * s(MuLookAndFeel::kDropdownEdgeGap), comboH));
+            else if (ctl->knob)
+            {
+                // The dial itself keeps the standard knob size; the knob component adds the band above
+                // and the (empty) label band below that it reserves around the dial.
+                const auto dial = cell.withSizeKeepingCentre(knobW, knobH);
+                ctl->knob->setBounds(dial.withTrimmedTop(-s(MuLookAndFeel::kKnobTopPad))
+                                         .withTrimmedBottom(-s(MuLookAndFeel::kKnobLabelH)));
+            }
+        }
+        y += cellH;
+        first = last;
     }
 }
 

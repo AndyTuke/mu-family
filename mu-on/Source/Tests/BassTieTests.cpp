@@ -86,6 +86,33 @@ namespace
                 expect(hz < 100.0, "the first 5 ms of the slide is still below the new pitch (" + juce::String(hz, 1) + " Hz)");
             }
 
+            beginTest("A step's octave and note transpose the Bass from the Tune, and are saved");
+            {
+                auto hzAt = [](float semitones)
+                {
+                    mu_on::BassEngine bass;
+                    bass.prepare(kSr, 256);
+                    bass.setParams(55.0f, 0, 0.0f, 600.0f, 0.2f, 0.0f, 100.0f, 1.0f, 200.0f, 1.0f, 0.0f, 300.0f, 0.0f);
+                    bass.trigger(1.0f, 0, false, 0, semitones);
+                    Buf out(2, 24000);
+                    out.clear();
+                    for (int at = 0; at < 24000; at += 256) { Buf v(out.getArrayOfWritePointers(), 2, at, juce::jmin(256, 24000 - at)); bass.render(v, v.getNumSamples()); }
+                    int crossings = 0;
+                    for (int i = 1; i < 24000; ++i) if (out.getSample(0, i - 1) <= 0.0f && out.getSample(0, i) > 0.0f) ++crossings;
+                    return crossings * kSr / 24000.0;
+                };
+                expectWithinAbsoluteError(hzAt(12.0f) / hzAt(0.0f), 2.0, 0.1);
+                expectWithinAbsoluteError(hzAt(-12.0f) / hzAt(0.0f), 0.5, 0.05);
+
+                mu_on::StepRow row;
+                row.setStepOctave(3, 1); row.setStepNote(3, -5); row.setStepOctave(4, 9);
+                expectEquals(row.stepSemitones(3), 7);
+                expectEquals(row.stepOctave(4), 2);
+                mu_on::StepRow loaded;
+                loaded.deserialise(row.serialise(0));
+                expectEquals(loaded.stepSemitones(3), 7);
+            }
+
             beginTest("A tie needs two steps that are on, ends when either goes off, and is saved");
             {
                 mu_on::StepRow row;

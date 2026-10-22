@@ -100,8 +100,8 @@ private:
     // The STEP panel: the selected step's own probability (multiplied with the layer's), loop ratio (the Nth of every M
     // passes of the row) and, on a Hat, which sound it plays. Not parameters: they edit the track's step row.
     KnobWithLabel  stepProbKnob { "Prob" };
-    juce::Label    loopCaption { {}, "Play" }, voiceCaption { {}, "Sound" };
-    DropdownSelect loopSelect, voiceSelect;
+    juce::Label    loopCaption { {}, "Play" }, voiceCaption { {}, "Sound" }, octaveCaption { {}, "Octave" }, noteCaption { {}, "Note" };
+    DropdownSelect loopSelect, voiceSelect, octaveSelect, noteSelect;   // Octave -2..+2 and Note -12..+12 (a Kick or Bass step's pitch)
     std::array<int, mu_limits::kMaxLayers> selectedStepOf {};   // each layer's selected step (right-click), shown in the panel
     void refreshStepPanel();                                    // the controls follow the shown layer's selected step
     void selectStep(int step);

@@ -51,6 +51,7 @@ private:
         bool isOn(int s) const noexcept     { return p.isOn(track, s); }
         bool isAccent(int s) const noexcept { return p.isAccent(track, s); }
         bool tiedFrom(int) const noexcept   { return false; }
+        int  stepSemitones(int) const noexcept { return 0; }
         int  stepLoop(int) const noexcept   { return 0; }   // every pass (the test support has no per-step loop ratio)
     };
 

@@ -102,10 +102,10 @@ public:
     }
 
     // Fire the engine at `sampleOffset` in the block (a Rumble does not step). `open` is the step's Open flag: only the Hat uses it.
-    void trigger(float velocity, int sampleOffset, bool open = false, bool tied = false, int gateSamples = 0) noexcept
+    void trigger(float velocity, int sampleOffset, bool open = false, bool tied = false, int gateSamples = 0, float semitones = 0.0f) noexcept
     {
-        if (auto* k = std::get_if<KickEngine>(&engine))         k->trigger(velocity, sampleOffset);
-        else if (auto* b = std::get_if<BassEngine>(&engine))    b->trigger(velocity, sampleOffset, tied, gateSamples);
+        if (auto* k = std::get_if<KickEngine>(&engine))         k->trigger(velocity, sampleOffset, semitones);
+        else if (auto* b = std::get_if<BassEngine>(&engine))    b->trigger(velocity, sampleOffset, tied, gateSamples, semitones);
         else if (auto* s = std::get_if<SampleChannel>(&engine)) s->trigger(velocity, sampleOffset, open);
         else if (auto* f = std::get_if<FmPercEngine>(&engine))  f->trigger(velocity, sampleOffset);
     }

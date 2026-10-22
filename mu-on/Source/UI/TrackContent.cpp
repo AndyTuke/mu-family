@@ -64,12 +64,14 @@ namespace
                 return { { id("tune"), "Tune" }, { id("ptch"), "Pitch" }, { id("pdec"), "P.Dec" }, { id("adec"), "Decay" }, { id("drive"), "Drive" }, { id("fine"), "Fine" } };
             case EngineType::Bass:
             {
-                // Row 1: the oscillator, filter and drive; row 2: the amp envelope (Attack to Release) and the Glide of tied steps.
-                std::vector<Spec> specs { { id("wave"), "Wave" }, { id("tune"), "Tune" }, { id("fine"), "Fine" }, { id("sub"), "Sub" }, { id("cut"), "Cutoff" },
-                                          { id("res"), "Reso" }, { id("env"), "F.Env" }, { id("edec"), "E.Dec" }, { id("drive"), "Drive" },
-                                          { id("atk"), "Atk" }, { id("dec"), "Dec" }, { id("sus"), "Sus" }, { id("rel"), "Rel" }, { id("glide"), "Glide" } };
-                specs[9].newRow = true;
-                specs[13].tooltip = "Slide time into a tied step (drag across two steps to tie them)";
+                // Row 1: the oscillator (with its Glide) and the filter (with the Drive); row 2: the amp envelope. Each group's
+                // space is shared out across the panel.
+                std::vector<Spec> specs { { id("wave"), "Wave" }, { id("tune"), "Tune" }, { id("fine"), "Fine" }, { id("sub"), "Sub" }, { id("glide"), "Glide" },
+                                          { id("cut"), "Cutoff" }, { id("res"), "Reso" }, { id("env"), "F.Env" }, { id("edec"), "E.Dec" }, { id("drive"), "Drive" },
+                                          { id("atk"), "Atk" }, { id("dec"), "Dec" }, { id("sus"), "Sus" }, { id("rel"), "Rel" } };
+                specs[0].groupStart = specs[5].groupStart = specs[10].groupStart = true;
+                specs[10].newRow = true;
+                specs[4].tooltip = "Slide time into a tied step (drag across two steps to tie them)";
                 return specs;
             }
             case EngineType::Hat:   // two sets: the closed hat, then the open hat (the step row picks which a step plays)
@@ -149,7 +151,7 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     addAndMakeVisible(accentKnob);
     for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob }) addAndMakeVisible(*k);
     // The STEP panel's controls edit the selected step of the shown track's row.
-    for (auto* cap : { &loopCaption, &voiceCaption })
+    for (auto* cap : { &loopCaption, &voiceCaption, &octaveCaption, &noteCaption })
     {
         cap->setJustificationType(juce::Justification::centred);
         cap->setInterceptsMouseClicks(false, false);
@@ -165,8 +167,14 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     voiceSelect.addItem("Closed", 1);
     voiceSelect.addItem("Open", 2);
     voiceSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setOpen(selectedStepOf[(size_t) currentLayer], id == 2); };
+    for (int o = -2; o <= 2; ++o) octaveSelect.addItem((o > 0 ? "+" : "") + juce::String(o), o + 3);
+    for (int n = -12; n <= 12; ++n) noteSelect.addItem((n > 0 ? "+" : "") + juce::String(n), n + 13);
+    octaveSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setStepOctave(selectedStepOf[(size_t) currentLayer], id - 3); };
+    noteSelect.onChange   = [this](int id) { host.getTrack(currentLayer).row.setStepNote(selectedStepOf[(size_t) currentLayer], id - 13); };
     addAndMakeVisible(loopSelect);
     addChildComponent(voiceSelect);
+    addChildComponent(octaveSelect);
+    addChildComponent(noteSelect);
     rows.onStepSelected = [this](int, int step) { selectStep(step); };
     soloRow.onStepSelected = [this](int step) { selectStep(step); };
     soloBtn.setClickingTogglesState(true);
@@ -265,6 +273,10 @@ void TrackContent::refreshStepPanel()
     voiceCaption.setVisible(hat);
     voiceSelect.setVisible(hat);
     voiceSelect.setSelectedId(row.isOpen(step) ? 2 : 1, false);
+    const bool pitched = shownEngine == EngineType::Kick || shownEngine == EngineType::Bass;
+    for (auto* c : { (juce::Component*) &octaveCaption, (juce::Component*) &octaveSelect, (juce::Component*) &noteCaption, (juce::Component*) &noteSelect }) c->setVisible(pitched);
+    octaveSelect.setSelectedId(row.stepOctave(step) + 3, false);
+    noteSelect.setSelectedId(row.stepNote(step) + 13, false);
     rows.setSelectedStep(step);
     soloRow.setSelectedStep(step);
     repaint();
@@ -542,6 +554,14 @@ void TrackContent::layoutStepPanel()
     voiceCaption.setFont(captionFont);
     voiceCaption.setBounds(in.getX(), y, in.getWidth(), labelH);
     voiceSelect.setBounds(in.getX(), y + labelH + s(2), in.getWidth(), dd);
+    // A Kick or Bass step's pitch takes the slots a Hat's Sound uses: Octave, then Note.
+    octaveCaption.setFont(captionFont);
+    octaveCaption.setBounds(in.getX(), y, in.getWidth(), labelH);
+    octaveSelect.setBounds(in.getX(), y + labelH + s(2), in.getWidth(), dd);
+    y += labelH + s(2) + dd + gap;
+    noteCaption.setFont(captionFont);
+    noteCaption.setBounds(in.getX(), y, in.getWidth(), labelH);
+    noteSelect.setBounds(in.getX(), y + labelH + s(2), in.getWidth(), dd);
 }
 
 void TrackContent::paint(juce::Graphics& g)
