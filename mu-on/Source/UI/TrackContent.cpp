@@ -66,9 +66,9 @@ namespace
             case EngineType::Hat:
             case EngineType::Snare:
                 return { { id("tune"), "Tune" }, { id("dec"), "Decay" } };
-            // Rumble processes another track: input drive → 3 delay taps → reverb → filter.
+            // Rumble processes another track: input low-pass → input drive → 3 delay taps → reverb → filter.
             case EngineType::Rumble:
-                return { { id("drive"), "Drive" }, { id("d1"), "1/16" }, { id("d2"), "2/16" }, { id("d3"), "3/16" },
+                return { { id("inlp"), "In LP" }, { id("drive"), "Drive" }, { id("d1"), "1/16" }, { id("d2"), "2/16" }, { id("d3"), "3/16" },
                          { id("size"), "Rv Size" }, { id("revmix"), "Rv Mix" }, { id("revlp"), "Rv LP" }, { id("cut"), "Cutoff" }, { id("res"), "Reso" } };
             // FM Perc: the Algorithm selector (two cells) then the ten fixed knobs; the tips follow the algorithm.
             case EngineType::FmPerc:

@@ -69,8 +69,8 @@ inline constexpr ModDestEntry kSnareDests[] = {
     makeTarget("s.dec.prop", "snare_dec", "Decay"),
 };
 
-// Rumble — order matches RumbleEngine::setParams(bpm, drive, d1, d2, d3, revSize, revMix, revLpHz, cutHz, res)
-// (bpm is the transport, not a dest — the 9 entries below are the modulatable args in order).
+// Rumble — order matches RumbleEngine::setParams(bpm, drive, d1, d2, d3, revSize, revMix, revLpHz, cutHz, res, inLpHz)
+// (bpm is the transport, not a dest — the 10 entries below are the modulatable args in order).
 inline constexpr ModDestEntry kRumbleDests[] = {
     makeTarget("r.drive.prop", "rumble_drive", "Drive"),
     makeTarget("r.d1.prop", "rumble_d1", "1/16"),
@@ -81,6 +81,7 @@ inline constexpr ModDestEntry kRumbleDests[] = {
     makeTarget("r.revlp.prop", "rumble_revlp", "Rev LP"),
     makeTarget("r.cut.prop", "rumble_cut", "Cutoff"),
     makeTarget("r.res.prop", "rumble_res", "Resonance"),
+    makeTarget("r.inlp.prop", "rumble_inlp", "Input LP"),   // appended last: saved destination indices stay valid
 };
 
 // FM Perc — order matches FmPercEngine::setParams(tune, ratio, index, idec, fdbk, dive, dtime, decay, fold, noise).

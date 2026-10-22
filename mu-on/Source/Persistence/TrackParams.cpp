@@ -56,6 +56,7 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     flt(E::Rumble, "revlp",  "Rumble Rev LP",    NormalisableRange<float>(200.0f, 18000.0f, 1.0f, 0.3f), 1200.0f);
     flt(E::Rumble, "cut",    "Rumble Cutoff",    NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f), 800.0f);
     flt(E::Rumble, "res",    "Rumble Resonance", f(0.0f, 1.0f, 0.001f), 0.2f);
+    flt(E::Rumble, "inlp",   "Rumble Input LP",  NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f), 20000.0f);   // fully open = off
 
     // The track's own groove: its swing and the velocity of its accented steps. Not modulation targets.
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{ layerParamId(slot, "swing"), 1 }, lbl + "Swing",

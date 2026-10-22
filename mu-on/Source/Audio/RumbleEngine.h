@@ -7,6 +7,7 @@
 
 // RumbleEngine — a classic techno "rumble": takes the Kick's audio as input and runs it,
 // in order, through:
+//   0. input low-pass — a plain 12 dB LP (no resonance) on the feed, before anything else; fully open (20 kHz) = bypassed
 //   1. input drive   — the same valve saturation MultiModeFilter applies on its input
 //   2. delay taps    — 1/16, 2/16, 3/16 of the beat-grid (tempo-synced), each with a level
 //   3. dark reverb   — Signalsmith reverb (size param) into a low-pass (darkness)
@@ -38,6 +39,9 @@ public:
         dirty = false;
         tailLeft = 0;
 
+        inLp.prepare(sampleRate, maxBlockSize, 2);
+        inLp.setType(0);          // LP12 on the incoming feed
+        inLp.setResonance(0.0f);  // no resonance: a plain tone control
         filter.prepare(sampleRate, maxBlockSize, 2);
         filter.setType(0);   // LP12 final filter
         revLp.prepare(sampleRate, maxBlockSize, 2);
@@ -58,8 +62,11 @@ public:
     // Per-block params. `bpm` drives the tempo-synced delay taps; `revMix` is the reverb
     // dry/wet blend (0 = dry, 1 = fully wet).
     void setParams(double bpm_, float drive, float d1, float d2, float d3,
-                   float revSize, float revMix_, float revLpHz, float cutHz, float res) noexcept
+                   float revSize, float revMix_, float revLpHz, float cutHz, float res,
+                   float inLpHz = kInLpOpen) noexcept
     {
+        inLpCut = juce::jlimit(20.0f, kInLpOpen, inLpHz);
+        inLp.setCutoff(inLpCut);
         bpm    = bpm_ > 0.0 ? bpm_ : 120.0;
         drv    = juce::jlimit(0.0f, 1.0f, drive);
         lvl1   = juce::jlimit(0.0f, 1.0f, d1);
@@ -113,14 +120,22 @@ public:
         }
         dirty = true;
 
+        // Phase 0: the feed into the working buffer, low-passed first when the input LP is not fully open.
+        for (int c = 0; c < ch; ++c)
+            scratch.copyFrom(c, 0, in, c, 0, ns);
+        if (inLpCut < kInLpOpen)
+        {
+            juce::AudioBuffer<float> feed(scratch.getArrayOfWritePointers(), ch, 0, ns);
+            inLp.process(feed, ns, ch);
+        }
+
         // 1. Input drive (MultiModeFilter valve: 1+drv²·5 pre-gain, asymmetric soft-clip, √makeup).
         for (int c = 0; c < ch; ++c)
         {
-            const float* src = in.getReadPointer(c);
             float* s = scratch.getWritePointer(c);
             for (int i = 0; i < ns; ++i)
             {
-                float x = src[i];
+                float x = s[i];
                 if (drv > 0.0001f)
                 {
                     const float pre = 1.0f + drv * drv * 5.0f;
@@ -189,6 +204,7 @@ private:
     {
         delayBuf.clear();
         writePos = 0;
+        inLp.reset();
         filter.reset();
         revLp.reset();
         reverb.reset();
@@ -198,13 +214,16 @@ private:
     // reverb tail can still be audible; a generous fixed bound.
     int tailSamples() const noexcept { return (int) (sampleRate * 8.0); }
 
-    MultiModeFilter filter, revLp;
+    static constexpr float kInLpOpen = 20000.0f;   // the input LP's top: at or above it the filter is skipped
+
+    MultiModeFilter inLp, filter, revLp;
     ReverbSlot      reverb;
     juce::AudioBuffer<float> delayBuf, scratch, revWet;
 
     double sampleRate = 44100.0, bpm = 120.0;
     int    maxBlockSize = 512, writePos = 0, tailLeft = 0;
     bool   dirty = false;   // rendered since the last reset
+    float  inLpCut = kInLpOpen;
     float  drv = 0.0f, lvl1 = 0.0f, lvl2 = 0.0f, lvl3 = 0.0f, revMix = 0.5f, envLevel = 1.0f;
 };
 
