@@ -26,7 +26,6 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
                               juce::Colour colour, int playheadStep, bool beatNumbers)
 {
     const auto& L = MuLookAndFeel::lighting();
-    const float cellW = cells.getWidth() / (float) StepRow::kNumSteps;
     for (int s = 0; s < StepRow::kNumSteps; ++s)
     {
         const auto cell = cellRect(cells, s);
