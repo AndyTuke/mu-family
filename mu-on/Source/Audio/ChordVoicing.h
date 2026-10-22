@@ -40,7 +40,7 @@ inline constexpr std::array<ChordDef, kNumChords> kChords = {{
     { "Aug",       "aug",  { 0, 4, 8, 0, 0, 0 },    3 },
     { "Power",     "5",    { 0, 7, 12, 0, 0, 0 },   3 },
 }};
-inline constexpr int kDefaultChord = 6;   // Min7: the dub-techno staple
+inline constexpr int kDefaultChord = 0;   // Scale 7th: the chord the key and scale give the root, so a new step follows a change of scale
 
 inline constexpr int kMaxChordInversion = 5;
 inline constexpr int kMaxChordSpread = 4;
@@ -78,7 +78,7 @@ inline ChordNotes voiceChord(int keyRoot, int scaleIndex, const ChordHit& hit) n
     }
     else
     {
-        if (type == 0) { type = kDefaultChord; n = kChords[(size_t) type].count; }
+        if (type == 0) { type = 6; n = kChords[(size_t) type].count; }   // chromatic: Scale 7th is a Min7
         tones = kChords[(size_t) type].semitones;
     }
 
