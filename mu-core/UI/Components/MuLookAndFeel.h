@@ -329,6 +329,9 @@ public:
     struct Section { juce::Rectangle<int> box; juce::String name; };
     static void drawSections(juce::Graphics&, const juce::Component& owner,
                              std::initializer_list<Section> sections, juce::Colour accent);
+    // The same for a list built at run time (a panel whose boxes come and go with its content).
+    static void drawSections(juce::Graphics&, const juce::Component& owner,
+                             const std::vector<Section>& sections, juce::Colour accent);
 
     // Text buttons
     void drawButtonBackground(juce::Graphics&, juce::Button&,
