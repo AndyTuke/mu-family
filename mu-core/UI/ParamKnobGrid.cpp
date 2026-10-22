@@ -72,15 +72,19 @@ void ParamKnobGrid::resized()
     auto area = getLocalBounds();
     if (controls.empty()) return;
 
-    // Knobs are drawn at one of the family's standard sizes (Size 2 — the per-channel
-    // default used across mu-clid/mu-tant), not stretched to the cell. The grid fits as many
-    // standard cells per row as the width allows, then wraps.
+    // Knobs are drawn at one of the family's standard sizes, not stretched to the cell. Size 2 (the per-channel
+    // default used across mu-clid/mu-tant) unless the controls would not fit the width on one row there and
+    // would on Size 3, the next size down. The grid then fits as many standard cells per row as the width allows
+    // and wraps.
     const int labelH = s(kLabelH);
-    const int knobW  = s(MuLookAndFeel::kKnobSize2W);
-    const int knobH  = s(MuLookAndFeel::kKnobSize2H);
+    auto rowWidthAt = [&](int knobCellW) { int w = 0; for (const auto& c : controls) w += c->combo ? 2 * (knobCellW + s(6)) : knobCellW + s(6); return w; };
+    const bool smaller = rowWidthAt(s(MuLookAndFeel::kKnobSize2W)) > area.getWidth()
+                         && rowWidthAt(s(MuLookAndFeel::kKnobSize3W)) <= area.getWidth();
+    const int knobW  = s(smaller ? MuLookAndFeel::kKnobSize3W : MuLookAndFeel::kKnobSize2W);
+    const int knobH  = s(smaller ? MuLookAndFeel::kKnobSize3H : MuLookAndFeel::kKnobSize2H);
     const int comboH = s(24);
     const int cellW  = knobW + s(6);
-    const int cellH  = s(kCellH);
+    const int cellH  = labelH + knobH + s(4);
 
     // Flow the cells left to right, wrapping at the width. A selector takes two cells so its
     // text fits (the metal style's LCD lettering is wider than one knob).

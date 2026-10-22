@@ -219,8 +219,11 @@ void InsertSubsection::resized()
     constexpr int dg = LF::kDropdownEdgeGap;
     const int algoW = algoWidth > 0 ? algoWidth : algoColumns * kW;
     insertAlgo.setBounds(s(dg), s(rowH / 4), s(algoW - 2 * dg), s(rowH / 2));
-    insertParam1.setBounds(s(0 * kW), s(row2Y), s(kW), s(rowH));
-    insertParam2.setBounds(s(1 * kW), s(row2Y), s(kW), s(rowH));
-    insertParam3.setBounds(s(2 * kW), s(row2Y), s(kW), s(rowH));
-    insertParam4.setBounds(s(3 * kW), s(row2Y), s(kW), s(rowH));
+    // The knobs the algorithm uses fill from the left with no gap where an unused slot is hidden.
+    int column = 0;
+    for (auto* k : { &insertParam1, &insertParam2, &insertParam3, &insertParam4 })
+    {
+        k->setBounds(s(column * kW), s(row2Y), s(kW), s(rowH));
+        if (k->isVisible()) ++column;
+    }
 }
