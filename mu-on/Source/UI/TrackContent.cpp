@@ -141,10 +141,27 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     addAndMakeVisible(swingKnob);
     addAndMakeVisible(accentKnob);
     for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob }) addAndMakeVisible(*k);
-    loopCaption.setJustificationType(juce::Justification::centred);
-    loopCaption.setInterceptsMouseClicks(false, false);
-    addAndMakeVisible(loopCaption);
+    // The STEP panel's controls edit the selected step of the shown track's row.
+    for (auto* cap : { &loopCaption, &voiceCaption })
+    {
+        cap->setJustificationType(juce::Justification::centred);
+        cap->setInterceptsMouseClicks(false, false);
+        addAndMakeVisible(*cap);
+    }
+    stepProbKnob.setRange(0.0, 100.0, 1.0);
+    stepProbKnob.getSlider().setTextValueSuffix(" %");
+    stepProbKnob.onValueChanged = [this](double v) { host.getTrack(currentLayer).row.setStepProb(selectedStepOf[(size_t) currentLayer], juce::roundToInt(v)); };
+    stepProbKnob.onStatusUpdate = [this](const juce::String& name, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
+    addAndMakeVisible(stepProbKnob);
+    for (int i = 0; i < (int) std::size(kLoopRatios); ++i) loopSelect.addItem(juce::String(kLoopRatios[i].play) + ":" + juce::String(kLoopRatios[i].of), i + 1);
+    loopSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setStepLoop(selectedStepOf[(size_t) currentLayer], id - 1); };
+    voiceSelect.addItem("Closed", 1);
+    voiceSelect.addItem("Open", 2);
+    voiceSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setOpen(selectedStepOf[(size_t) currentLayer], id == 2); };
     addAndMakeVisible(loopSelect);
+    addChildComponent(voiceSelect);
+    rows.onStepSelected = [this](int, int step) { selectStep(step); };
+    soloRow.onStepSelected = [this](int step) { selectStep(step); };
     soloBtn.setClickingTogglesState(true);
     addAndMakeVisible(soloBtn);
     insertSub.onStatusUpdate = [this](const juce::String& name, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
@@ -230,6 +247,29 @@ void TrackContent::setLayer(int idx)
     rebuild();
 }
 
+// The STEP panel follows the shown layer's selected step: its probability, loop ratio and (a Hat) sound, read from the row.
+void TrackContent::refreshStepPanel()
+{
+    const auto& row = host.getTrack(currentLayer).row;
+    const int step = selectedStepOf[(size_t) currentLayer];
+    stepProbKnob.setValue(row.stepProb(step), juce::dontSendNotification);
+    loopSelect.setSelectedId(row.stepLoop(step) + 1, false);
+    const bool hat = shownEngine == EngineType::Hat;
+    voiceCaption.setVisible(hat);
+    voiceSelect.setVisible(hat);
+    voiceSelect.setSelectedId(row.isOpen(step) ? 2 : 1, false);
+    rows.setSelectedStep(step);
+    soloRow.setSelectedStep(step);
+    repaint();
+}
+
+// A right-click selected `step` in the shown layer's row (the row clicked has become the shown layer).
+void TrackContent::selectStep(int step)
+{
+    selectedStepOf[(size_t) currentLayer] = juce::jlimit(0, StepRow::kNumSteps - 1, step);
+    refreshStepPanel();
+}
+
 // Rebind every control to the shown track and its engine: the knob grid is rebuilt from the engine's
 // specs (re-attaching to this track's parameters), and the Rumble-only controls follow the engine.
 void TrackContent::rebuild()
@@ -246,7 +286,6 @@ void TrackContent::rebuild()
 
     // The strip's sends and solo (ch{N}_), and the track's insert.
     for (auto* a : { &sendEffAtt, &sendDlyAtt, &sendRevAtt, &probAtt }) a->reset();
-    loopAtt.reset();
     soloAtt.reset();
     const juce::String strip = "ch" + juce::String(currentLayer) + "_";
     auto& apvts = host.getTrackParameters();
@@ -255,8 +294,6 @@ void TrackContent::rebuild()
     sendRevAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, strip + "sendRev", sendRevKnob.getSlider());
     soloAtt    = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, strip + "solo", soloBtn);
     probAtt    = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerParamId(currentLayer, "prob"), probKnob.getSlider());
-    if (loopSelect.getComboBox().getNumItems() == 0) mu_ui::addChoiceItems(loopSelect, apvts, layerParamId(currentLayer, "loop"));
-    loopAtt = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, layerParamId(currentLayer, "loop"), loopSelect.getComboBox());
     insertSub.setChannel(currentLayer);
 
     // A host that fixes the track's engine (engineLocked) hides the Engine selector and shows the track's one
@@ -276,8 +313,8 @@ void TrackContent::rebuild()
     swingKnob.setVisible(! rumble);
     accentKnob.setVisible(! rumble);
     for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob }) k->setVisible(! rumble);   // a Rumble's box holds its envelope
-    loopCaption.setVisible(! rumble);
-    loopSelect.setVisible(! rumble);
+    for (auto* c : { (juce::Component*) &stepProbKnob, (juce::Component*) &loopCaption, (juce::Component*) &loopSelect }) c->setVisible(! rumble);
+    refreshStepPanel();
     soloBtn.setVisible(! rumble);
     rumbleLength.setVisible(rumble);
     rumbleEnvEditor.setVisible(rumble);
@@ -440,8 +477,13 @@ void TrackContent::resized()
     // The left box of the second panel is as wide for Swing / Accent as for the Rumble envelope.
     // A locked Rumble has no step row, so its envelope takes the whole panel.
     const bool noSteps = locked && rumble;
-    grooveBoxR = { padX, boxesY, noSteps ? juce::jmax(0, w - 2 * padX) : s(MuLookAndFeel::kGrooveBoxW), boxesH };
-    const int stepsX = grooveBoxR.getRight() + s(LF::kVoiceDivW);
+    // LAYER: three knob columns wide (Rumble: the envelope editor, a fixed wider box); STEP: one dropdown wide.
+    const int layerW = noSteps ? juce::jmax(0, w - 2 * padX) : (rumble ? s(MuLookAndFeel::kGrooveBoxW) : 3 * s(LF::kKnobSize2W) + 2 * gap + 2 * clear);
+    grooveBoxR = { padX, boxesY, layerW, boxesH };
+    int rightEdge = grooveBoxR.getRight();
+    stepBoxR   = (noSteps || rumble) ? juce::Rectangle<int>() : juce::Rectangle<int>(rightEdge + s(LF::kVoiceDivW), boxesY, s(MuLookAndFeel::kDropdownW) + 2 * clear, boxesH);
+    if (! stepBoxR.isEmpty()) rightEdge = stepBoxR.getRight();
+    const int stepsX = rightEdge + s(LF::kVoiceDivW);
     stepsBoxR  = noSteps ? juce::Rectangle<int>() : juce::Rectangle<int>(stepsX, boxesY, juce::jmax(0, w - padX - stepsX), boxesH);
     const auto stepsInner = stepsBoxR.reduced(clear, s(LF::kSpaceS));
     rows.setBounds(stepsInner);
@@ -470,14 +512,29 @@ void TrackContent::resized()
         sendEffKnob.setBounds(blockX, row2Y, knobW, knobH);
         sendDlyKnob.setBounds(blockX + knobW + gap, row2Y, knobW, knobH);
         sendRevKnob.setBounds(blockX + 2 * (knobW + gap), row2Y, knobW, knobH);
-        // Third row: Probability, then the loop ratio dropdown over the other two cells.
-        const int row3Y = row2Y + knobH + rowGap;
-        probKnob.setBounds(blockX, row3Y, knobW, knobH);
-        const int loopX = blockX + knobW + gap, loopW = 2 * knobW + gap;
-        loopCaption.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(LF::kKnobLabelFont))));
-        loopCaption.setBounds(loopX, row3Y, loopW, s(mu_ui::ParamKnobGrid::kLabelH));
-        loopSelect.setBounds(loopX, row3Y + s(mu_ui::ParamKnobGrid::kLabelH) + s(2), loopW, s(MuLookAndFeel::kDropdownH));
+        // Third row: the layer's Probability.
+        probKnob.setBounds(blockX, row2Y + knobH + rowGap, knobW, knobH);
     }
+    layoutStepPanel();
+}
+
+void TrackContent::layoutStepPanel()
+{
+    using LF = MuLookAndFeel;
+    using mu_ui::s;
+    if (stepBoxR.isEmpty()) return;
+    const auto in = stepBoxR.reduced(s(LF::kSubPanelScrewClear), s(LF::kSpaceS));
+    const int labelH = s(mu_ui::ParamKnobGrid::kLabelH), knobH = s(LF::kKnobSize2H), dd = s(LF::kDropdownH), gap = s(LF::kSpaceS);
+    const juce::Font captionFont(juce::FontOptions{}.withHeight(mu_ui::sf(LF::kKnobLabelFont)));
+    stepProbKnob.setBounds(in.getX() + (in.getWidth() - s(LF::kKnobSize2W)) / 2, in.getY(), s(LF::kKnobSize2W), knobH);
+    int y = in.getY() + knobH + gap;
+    loopCaption.setFont(captionFont);
+    loopCaption.setBounds(in.getX(), y, in.getWidth(), labelH);
+    loopSelect.setBounds(in.getX(), y + labelH + s(2), in.getWidth(), dd);
+    y += labelH + s(2) + dd + gap;
+    voiceCaption.setFont(captionFont);
+    voiceCaption.setBounds(in.getX(), y, in.getWidth(), labelH);
+    voiceSelect.setBounds(in.getX(), y + labelH + s(2), in.getWidth(), dd);
 }
 
 void TrackContent::paint(juce::Graphics& g)
@@ -498,6 +555,7 @@ void TrackContent::paint(juce::Graphics& g)
     sections.push_back({ voiceBoxR, name + " VOICE" });
     sections.push_back({ insertBoxR, "INSERT" });
     sections.push_back({ grooveBoxR, rumble ? juce::String("ENVELOPE") : juce::String("LAYER") });
+    if (! stepBoxR.isEmpty())  sections.push_back({ stepBoxR, "STEP " + juce::String(selectedStepOf[(size_t) currentLayer] + 1) });
     if (! stepsBoxR.isEmpty()) sections.push_back({ stepsBoxR, "STEPS" });
     MuLookAndFeel::drawSections(g, *this, sections, accent);
 

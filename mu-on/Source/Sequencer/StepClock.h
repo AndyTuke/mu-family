@@ -37,11 +37,12 @@ public:
     // Under MIDI clock the transport hands each block the exact span the clock's beat model moved (not always
     // tempo x length); using it keeps consecutive blocks contiguous, so no step falls in a gap.
     // Audio thread: no allocation, `fire` is called inline.
-    // `playPass` of `ofPasses`: the pass (16 steps, from the transport start) the row is in must be that one of every
-    // `ofPasses` for its steps to fire (1 of 1: every pass).
+    // A step's loop ratio (the row's own, when the Row has one) picks which passes (16 steps, from the transport
+    // start) it plays: "N:M" plays the Nth of every M. A firing that takes more arguments gets the step's Open flag
+    // and its probability (0..1), which the caller combines with the layer's and draws against.
     template <class Row, class Fire>
     void processSpan(const Row& row, double beatStart, int numSamples, double beatsPerSample,
-                     float swing, float accentVelocity, Fire&& fire, int playPass = 1, int ofPasses = 1) noexcept
+                     float swing, float accentVelocity, Fire&& fire) noexcept
     {
         if (numSamples <= 0 || beatsPerSample <= 0.0) return;
 
@@ -67,13 +68,14 @@ public:
                                                       (int) std::round((t - beatStart) / beatsPerSample));
                 const long long pass = nextGlobalStep >= 0 ? nextGlobalStep / StepRow::kNumSteps
                                                            : -((-nextGlobalStep + StepRow::kNumSteps - 1) / StepRow::kNumSteps);
-                const bool passPlays = ofPasses <= 1 || (((pass % ofPasses) + ofPasses) % ofPasses) == playPass - 1;
+                const auto ratio = kLoopRatios[(size_t) row.stepLoop(local)];
+                const bool passPlays = ratio.of <= 1 || (((pass % ratio.of) + ratio.of) % ratio.of) == ratio.play - 1;
                 if (passPlays && row.isOn(local))
                 {
                     const float velocity = row.isAccent(local) ? accentedVelocity(accentVelocity) : kNormalVelocity;
-                    // A firing that takes the step's Open flag (the Hat) gets it as a third argument; the others do not.
-                    if constexpr (std::is_invocable_v<Fire&, float, int, bool>) fire(velocity, sampleOffset, row.isOpen(local));
-                    else                                                         fire(velocity, sampleOffset);
+                    if constexpr (std::is_invocable_v<Fire&, float, int, bool, float>) fire(velocity, sampleOffset, row.isOpen(local), (float) row.stepProb(local) * 0.01f);
+                    else if constexpr (std::is_invocable_v<Fire&, float, int, bool>)   fire(velocity, sampleOffset, row.isOpen(local));
+                    else                                                                fire(velocity, sampleOffset);
                 }
             }
             ++nextGlobalStep;

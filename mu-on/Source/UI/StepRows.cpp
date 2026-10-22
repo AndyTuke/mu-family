@@ -86,7 +86,8 @@ void StepRows::paintRow(juce::Graphics& g, int row)
                                     juce::Justification::centredLeft, col, false);
 
     // The 16 steps; the step numbers on the first row only.
-    TrackStepRow::paintCells(g, cellsArea(row), host.getTrack(row).row, ! isRumble, col, playheadStep, row == 0);
+    TrackStepRow::paintCells(g, cellsArea(row), host.getTrack(row).row, ! isRumble, col, playheadStep, row == 0,
+                             row == selected ? selectedStep : -1);
 
     if (isRumble) g.endTransparencyLayer();
 
@@ -110,10 +111,13 @@ void StepRows::mouseDown(const juce::MouseEvent& e)
     int r = 0, s = 0;
     if (! cellAt(e.getPosition(), r, s) || host.getTrackEngine(r) == EngineType::Rumble) return;
 
-    // Left toggles the step (its corner button the accent); right opens the step's state menu.
-    TrackStepRow::clickStep(host.getTrack(r).row, s, cellsArea(r), e.getPosition(), e.mods.isPopupMenu(),
-                            host.getTrackEngine(r) == EngineType::Hat,
-                            [safe = juce::Component::SafePointer<StepRows>(this), r] { if (safe != nullptr) safe->repaint(safe->rowArea(r)); });
+    // Left toggles the step (its corner button the accent); right selects it for the Step panel.
+    if (TrackStepRow::clickStep(host.getTrack(r).row, s, cellsArea(r), e.getPosition(), e.mods.isPopupMenu()))
+    {
+        selectedStep = s;
+        if (onStepSelected) onStepSelected(r, s);
+    }
+    repaint(rowArea(r));
 }
 
 void StepRows::timerCallback()

@@ -28,10 +28,19 @@ public:
     // states Closed / Closed Accent / Open / Open Accent.
     bool isOpen  (int step) const noexcept { return valid(step) && cells[(size_t) step].open.load(std::memory_order_relaxed); }
     void setOpen  (int step, bool v) noexcept { if (valid(step)) cells[(size_t) step].open.store(v, std::memory_order_relaxed); }
+    // Per step: the chance it plays (0..100 %, 100 default; the layer's own probability multiplies it) and the loop
+    // ratio, an index into kLoopRatios (0 = 1:1, every pass; 1:2 plays the first of every two passes of the row).
+    int  stepProb(int step) const noexcept { return valid(step) ? cells[(size_t) step].prob.load(std::memory_order_relaxed) : 100; }
+    int  stepLoop(int step) const noexcept { return valid(step) ? cells[(size_t) step].loop.load(std::memory_order_relaxed) : 0; }
+    void setStepProb(int step, int percent) noexcept { if (valid(step)) cells[(size_t) step].prob.store(juce::jlimit(0, 100, percent), std::memory_order_relaxed); }
+    void setStepLoop(int step, int ratioIndex) noexcept
+    {
+        if (valid(step)) cells[(size_t) step].loop.store(juce::jlimit(0, (int) std::size(kLoopRatios) - 1, ratioIndex), std::memory_order_relaxed);
+    }
 
     void clear() noexcept
     {
-        for (auto& c : cells) { c.on.store(false, std::memory_order_relaxed); c.accent.store(false, std::memory_order_relaxed); c.open.store(false, std::memory_order_relaxed); }
+        for (auto& c : cells) { c.on.store(false, std::memory_order_relaxed); c.accent.store(false, std::memory_order_relaxed); c.open.store(false, std::memory_order_relaxed); c.prob.store(100, std::memory_order_relaxed); c.loop.store(0, std::memory_order_relaxed); }
     }
 
     // The starting groove of an engine, so a new track plays something at once: four-on-the-floor kick
@@ -74,6 +83,15 @@ public:
         row.setProperty("on", on, nullptr);
         row.setProperty("accent", ac, nullptr);
         if (op.containsChar('1')) row.setProperty("open", op, nullptr);   // absent = every step closed
+        // Probability as a comma list and the loop ratio as one digit per step, each only when a step leaves its default.
+        juce::StringArray probs; juce::String loops; bool anyProb = false, anyLoop = false;
+        for (int s = 0; s < kNumSteps; ++s)
+        {
+            probs.add(juce::String(stepProb(s))); loops += juce::String(stepLoop(s));
+            anyProb = anyProb || stepProb(s) != 100; anyLoop = anyLoop || stepLoop(s) != 0;
+        }
+        if (anyProb) row.setProperty("prob", probs.joinIntoString(","), nullptr);
+        if (anyLoop) row.setProperty("loop", loops, nullptr);
         return row;
     }
 
@@ -84,16 +102,20 @@ public:
         const juce::String on = row.getProperty("on").toString();
         const juce::String ac = row.getProperty("accent").toString();
         const juce::String op = row.getProperty("open").toString();
+        const auto probs = juce::StringArray::fromTokens(row.getProperty("prob").toString(), ",", "");
+        const juce::String loops = row.getProperty("loop").toString();
         for (int s = 0; s < kNumSteps; ++s)
         {
             setOpen  (s, s < op.length() && op[s] == '1');
+            setStepProb(s, s < probs.size() ? probs[s].getIntValue() : 100);
+            setStepLoop(s, s < loops.length() && juce::CharacterFunctions::isDigit(loops[s]) ? (int) (loops[s] - '0') : 0);
             setOn    (s, s < on.length() && on[s] == '1');
             setAccent(s, s < ac.length() && ac[s] == '1');
         }
     }
 
 private:
-    struct Cell { std::atomic<bool> on { false }; std::atomic<bool> accent { false }; std::atomic<bool> open { false }; };
+    struct Cell { std::atomic<bool> on { false }; std::atomic<bool> accent { false }; std::atomic<bool> open { false }; std::atomic<int> prob { 100 }; std::atomic<int> loop { 0 }; };
     static bool valid(int s) noexcept { return s >= 0 && s < kNumSteps; }
 
     std::array<Cell, kNumSteps> cells;

@@ -23,7 +23,7 @@ void TrackStepRow::setLayer(int layer)
 // The 16 steps as lamps behind dark lenses: on steps lit, accents brighter at the centre, beat starts marked by a
 // hint of colour; empty steps stay dark even under the playhead (family lamp rule).
 void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, const StepRow& row, bool showSteps,
-                              juce::Colour colour, int playheadStep, bool beatNumbers)
+                              juce::Colour colour, int playheadStep, bool beatNumbers, int selectedStep)
 {
     const auto& L = MuLookAndFeel::lighting();
     for (int s = 0; s < StepRow::kNumSteps; ++s)
@@ -57,6 +57,11 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
             g.fillPath(shape);
         }
         MuLookAndFeel::drawRecessedScreen(g, cell);
+        if (s == selectedStep)   // the step the Step panel edits
+        {
+            g.setColour(juce::Colours::white.withAlpha(0.85f));
+            g.drawRoundedRectangle(cell.reduced(0.5f), 3.0f, 1.5f);
+        }
 
         // The accent button in the top-right corner: a small square, lit when the step is accented.
         if (showSteps)
@@ -94,27 +99,9 @@ juce::Rectangle<float> TrackStepRow::accentButtonRect(juce::Rectangle<float> cel
     return { cell.getRight() - side - 2.0f, cell.getY() + 2.0f, side, side };
 }
 
-void TrackStepRow::clickStep(StepRow& row, int step, juce::Rectangle<int> cells, juce::Point<int> p, bool rightClick,
-                             bool hat, std::function<void()> changed)
+bool TrackStepRow::clickStep(StepRow& row, int step, juce::Rectangle<int> cells, juce::Point<int> p, bool rightClick)
 {
-    if (rightClick)
-    {
-        // Select the step: its states as a menu (accent stays on the corner button). A Hat step is Closed or Open.
-        juce::PopupMenu menu;
-        const bool on = row.isOn(step), open = row.isOpen(step);
-        menu.addItem(1, "Off", true, ! on);
-        if (hat) { menu.addItem(2, "Closed", true, on && ! open); menu.addItem(3, "Open", true, on && open); }
-        else     menu.addItem(2, "On", true, on);
-        menu.showMenuAsync(juce::PopupMenu::Options(), [&row, step, changed](int id)
-        {
-            if (id == 0) return;
-            row.setOn(step, id != 1);
-            row.setOpen(step, id == 3);
-            if (id == 1) row.setAccent(step, false);
-            if (changed) changed();
-        });
-        return;
-    }
+    if (rightClick) return true;   // selects: no edit
 
     if (accentButtonRect(cellRect(cells, step)).expanded(2.0f).contains(p.toFloat()))
     {
@@ -124,7 +111,7 @@ void TrackStepRow::clickStep(StepRow& row, int step, juce::Rectangle<int> cells,
     }
     else
         row.setOn(step, ! row.isOn(step));
-    if (changed) changed();
+    return false;
 }
 
 void TrackStepRow::paint(juce::Graphics& g)
@@ -135,7 +122,7 @@ void TrackStepRow::paint(juce::Graphics& g)
 
     const juce::Graphics::ScopedSaveState state(g);
     if (isRumble) g.beginTransparencyLayer(0.45f);
-    paintCells(g, getLocalBounds(), host.getTrack(slot).row, ! isRumble, colour, playheadStep, true);
+    paintCells(g, getLocalBounds(), host.getTrack(slot).row, ! isRumble, colour, playheadStep, true, selectedStep);
     if (isRumble) g.endTransparencyLayer();
 }
 
@@ -143,9 +130,13 @@ void TrackStepRow::mouseDown(const juce::MouseEvent& e)
 {
     // A Rumble row is not editable.
     if (host.getTrackEngine(slot) == EngineType::Rumble || ! getLocalBounds().contains(e.getPosition())) return;
-    clickStep(host.getTrack(slot).row, stepAt(getLocalBounds(), e.getPosition()), getLocalBounds(), e.getPosition(),
-              e.mods.isPopupMenu(), host.getTrackEngine(slot) == EngineType::Hat,
-              [safe = juce::Component::SafePointer<TrackStepRow>(this)] { if (safe != nullptr) safe->repaint(); });
+    const int step = stepAt(getLocalBounds(), e.getPosition());
+    if (clickStep(host.getTrack(slot).row, step, getLocalBounds(), e.getPosition(), e.mods.isPopupMenu()))
+    {
+        selectedStep = step;
+        if (onStepSelected) onStepSelected(step);
+    }
+    repaint();
 }
 
 void TrackStepRow::mouseMove(const juce::MouseEvent& e)

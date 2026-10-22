@@ -84,11 +84,12 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     mu_mixfx::addInsertParams(layout, layerParamPrefix(slot), lbl);   // t{N}_drvChar, t{N}_insP1..4: the ids the shared InsertSubsection reads
 
     // The track's own groove: its swing and the velocity of its accented steps. Not modulation targets.
-    // Probability: the share of the track's notes that play (every note, accents included); Loop: which of every
-    // 1 to 4 passes of the row play ("1:2" plays the first of every two).
+    // Probability: the share of the track's notes that play (0..100 %, every note, accents included). It multiplies each
+    // step's own probability (StepRow).
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{ layerParamId(slot, "prob"), 1 }, lbl + "Probability",
-                                                     NormalisableRange<float>(0.0f, 1.0f, 0.001f), 1.0f));
-    layout.add(std::make_unique<AudioParameterChoice>(ParameterID{ layerParamId(slot, "loop"), 1 }, lbl + "Loop", loopRatioNames(), 0));
+                                                     NormalisableRange<float>(0.0f, 100.0f, 1.0f), 100.0f,
+                                                     AudioParameterFloatAttributes().withStringFromValueFunction(
+                                                         [](float v, int) { return String(roundToInt(v)) + " %"; })));
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{ layerParamId(slot, "swing"), 1 }, lbl + "Swing",
                                                      NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{ layerParamId(slot, "accent"), 1 }, lbl + "Accent",

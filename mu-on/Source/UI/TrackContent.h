@@ -29,8 +29,9 @@ namespace mu_on
 //   1. ENGINE | <NAME> VOICE | INSERT   the "Engine" dropdown (and, for a Rumble, its "Source") in a box of its
 //               own before the voice, then the selected engine's knobs, then the track's insert effect.
 //               Switching engine asks nothing and keeps every engine's settings on the track.
-//   2. LAYER | STEPS   the track's own Swing / Accent, its three FX sends and a Solo button (a Rumble track
-//               shows its volume envelope instead) and one row of steps per track (StepRows).
+//   2. LAYER | STEP | STEPS   the track's own Swing / Accent, its three FX sends, its Probability and a Solo button
+//               (a Rumble track shows its volume envelope instead); the selected step's probability, loop ratio
+//               and sound; and one row of steps per track (StepRows).
 // setLayer() rebinds it to the shown track; the engine can also change underneath it (host automation,
 // a preset), which the timer notices.
 //
@@ -87,7 +88,7 @@ private:
     // The master key and scale (global root / scale, the family tonal row), under the Engine selector.
     juce::Label    rootCaption { {}, "Root" }, scaleCaption { {}, "Scale" };
     DropdownSelect rootSelect, scaleSelect;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> rootAtt, scaleAtt, loopAtt;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> rootAtt, scaleAtt;
     mu_ui::ParamKnobGrid grid;
     StepRows       rows;                              // every track's row (a track the host does not lock)
     TrackStepRow   soloRow;                           // the shown track's one row (a locked track)
@@ -95,9 +96,16 @@ private:
 
     KnobWithLabel swingKnob { "Swing" }, accentKnob { "Accent" };
     KnobWithLabel sendEffKnob { "FX" }, sendDlyKnob { "Delay" }, sendRevKnob { "Reverb" };   // the strip's three sends
-    KnobWithLabel probKnob { "Prob" };                       // the share of the layer's notes that play
-    juce::Label    loopCaption { {}, "Play" };                // the loop ratio: the Nth of every M passes
-    DropdownSelect loopSelect;
+    KnobWithLabel probKnob { "Prob" };                       // the layer's Probability: the share of its notes that play
+    // The STEP panel: the selected step's own probability (multiplied with the layer's), loop ratio (the Nth of every M
+    // passes of the row) and, on a Hat, which sound it plays. Not parameters: they edit the track's step row.
+    KnobWithLabel  stepProbKnob { "Prob" };
+    juce::Label    loopCaption { {}, "Play" }, voiceCaption { {}, "Sound" };
+    DropdownSelect loopSelect, voiceSelect;
+    std::array<int, mu_limits::kMaxLayers> selectedStepOf {};   // each layer's selected step (right-click), shown in the panel
+    void refreshStepPanel();                                    // the controls follow the shown layer's selected step
+    void selectStep(int step);
+    void layoutStepPanel();
     juce::TextButton soloBtn { "Solo" };                                                      // the strip's solo
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> swingAtt, accentAtt, sendEffAtt, sendDlyAtt, sendRevAtt, probAtt;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> soloAtt;
@@ -106,7 +114,7 @@ private:
     NoteLengthControl rumbleLength { "Loop" };        // its length: the same control as a modulator's Loop
 
     juce::Rectangle<int> engineR, slotR;              // the two panels
-    juce::Rectangle<int> engineBoxR, voiceBoxR, insertBoxR, grooveBoxR, stepsBoxR;   // engineBoxR: the Engine / Source selectors
+    juce::Rectangle<int> engineBoxR, voiceBoxR, insertBoxR, grooveBoxR, stepBoxR, stepsBoxR;   // engineBoxR: the Engine / Source selectors
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TrackContent)
 };
