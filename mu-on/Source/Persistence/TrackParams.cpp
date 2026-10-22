@@ -8,6 +8,15 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
 {
     using namespace juce;
     auto f = [](float lo, float hi, float step) { return NormalisableRange<float>(lo, hi, step); };
+    // A pitch in Hz whose knob travel is even in semitones (exponential), so every note takes the same turn and a
+    // modulation depth steps through the same number of notes anywhere on the knob.
+    auto pitchRange = [](float lo, float hi)
+    {
+        return NormalisableRange<float>(lo, hi,
+            [](float a, float b, float v) { return a * std::pow(b / a, v); },
+            [](float a, float b, float v) { return std::log(v / a) / std::log(b / a); },
+            [](float a, float b, float v) { return juce::jlimit(a, b, v); });
+    };
 
     const String lbl = "T" + String(slot + 1) + " ";
     auto id = [&](EngineType e, const char* p) { return ParameterID{ engineParamId(slot, e, p), 1 }; };
@@ -21,16 +30,17 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     layout.add(std::make_unique<AudioParameterInt>   (ParameterID{ layerParamId(slot, "src"), 1 }, lbl + "Rumble Source", 0, mu_limits::kMaxLayers - 1, 0));
 
     // Kick engine (synthesis)
-    flt(E::Kick, "tune",  "Kick Tune",        f(30.0f, 120.0f, 0.1f), 50.0f);
+    flt(E::Kick, "tune",  "Kick Tune",        pitchRange(30.0f, 120.0f), 50.0f);   // snapped to the master key and scale by the engine
     flt(E::Kick, "ptch",  "Kick Pitch Amt",   f(0.0f, 600.0f, 1.0f), 220.0f);
     flt(E::Kick, "pdec",  "Kick Pitch Decay", f(5.0f, 200.0f, 0.1f), 50.0f);
     flt(E::Kick, "adec",  "Kick Decay",       f(20.0f, 800.0f, 1.0f), 180.0f);
     flt(E::Kick, "drive", "Kick Drive",       f(0.0f, 1.0f, 0.001f), 0.2f);
+    flt(E::Kick, "fine",  "Kick Fine",        f(-100.0f, 100.0f, 0.1f), 0.0f);   // cents off the locked note (not a modulation target)
 
     // Bass engine (deep synth — the focus)
     layout.add(std::make_unique<AudioParameterChoice>(id(E::Bass, "wave"), lbl + "Bass Wave", juce::StringArray{ "Sine", "Saw", "Square" }, 0));
     flt(E::Bass, "sub",   "Bass Sub",        f(0.0f, 1.0f, 0.001f), 0.5f);
-    flt(E::Bass, "tune",  "Bass Tune",       f(20.0f, 120.0f, 0.1f), 41.2f);
+    flt(E::Bass, "tune",  "Bass Tune",       pitchRange(20.0f, 120.0f), 41.2f);   // snapped to the master key and scale by the engine
     flt(E::Bass, "cut",   "Bass Cutoff",     f(40.0f, 4000.0f, 1.0f), 600.0f);
     flt(E::Bass, "res",   "Bass Resonance",  f(0.0f, 1.0f, 0.001f), 0.2f);
     flt(E::Bass, "env",   "Bass Filter Env", f(0.0f, 1.0f, 0.001f), 0.4f);
@@ -39,6 +49,7 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     flt(E::Bass, "dec",   "Bass Decay",      f(20.0f, 1500.0f, 1.0f), 200.0f);
     flt(E::Bass, "sus",   "Bass Sustain",    f(0.0f, 1.0f, 0.001f), 0.0f);
     flt(E::Bass, "drive", "Bass Drive",      f(0.0f, 1.0f, 0.001f), 0.2f);
+    flt(E::Bass, "fine",  "Bass Fine",       f(-100.0f, 100.0f, 0.1f), 0.0f);   // cents off the locked note (not a modulation target)
 
     // Hat / Snare (sample engines, different defaults)
     flt(E::Hat,   "tune", "Hat Tune",    f(-12.0f, 12.0f, 0.1f), 0.0f);

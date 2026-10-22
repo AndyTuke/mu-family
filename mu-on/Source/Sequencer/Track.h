@@ -154,6 +154,9 @@ private:
     void  resetEngines() noexcept;   // every held engine's voice silenced (the per-slot engines' reset rule)
 
     mu_core::ParamBinding engineRow, sourceRow, bassWaveRow, algoRow, swingRow, accentRow;
+    // The Kick / Bass Fine offsets (cents) and the master key and scale their tune is locked to. The key and scale are the
+    // host's: a host without them (unbound) leaves the lock at C chromatic.
+    mu_core::ParamBinding kickFineRow, bassFineRow, rootRow, scaleRow;
     std::array<EngineMod, kNumEngineTypes> mods;
 
     // The UI's live modulation values, on their own cache line (C16): written by the audio thread.

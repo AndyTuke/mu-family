@@ -6,6 +6,7 @@
 #include "Audio/BassEngine.h"
 #include "Audio/SampleChannel.h"
 #include "Audio/RumbleEngine.h"
+#include "Audio/MusicalScales.h"   // mu-core: snapMidiToScale for the Kick / Bass tune lock
 #include "Audio/FmPercEngine.h"
 
 #include <variant>
@@ -19,6 +20,22 @@
 // other call is the audio thread's, inside the owning track's engine lock.
 namespace mu_on
 {
+
+// The master key and scale a Kick or Bass tune is locked to, and each engine's Fine offset. Default: C chromatic, so a
+// host with no key of its own (mu-Tronic today) snaps to the nearest semitone.
+struct TuneLock
+{
+    int   root  = 0;
+    int   scale = mu_audio::kNumScales - 1;
+    float kickFineCents = 0.0f, bassFineCents = 0.0f;
+
+    // `hz` snapped to the nearest note of the key and scale, then moved by `fineCents`.
+    float lockedHz(float hz, float fineCents) const noexcept
+    {
+        const float midi = 69.0f + 12.0f * std::log2(juce::jmax(1.0f, hz) / 440.0f);
+        return mu_audio::midiToFreq(mu_audio::snapMidiToScale(midi, root, scale) + fineCents * 0.01f);
+    }
+};
 
 class TrackEngine
 {
@@ -67,12 +84,12 @@ public:
     }
 
     // This block's parameters, in the order of the engine's modulation target table (MuOnModDest.h). `engineChoice` is
-    // the engine's choice row, which is not a target (the Bass wave, or the FM Perc algorithm); `bpm` and `rumbleEnvLevel` feed the Rumble's tempo-synced taps and its
+    // the engine's choice row, which is not a target (the Bass wave, or the FM Perc algorithm); `lock` snaps the Kick and Bass tune to the master key and scale; `bpm` and `rumbleEnvLevel` feed the Rumble's tempo-synced taps and its
     // bar envelope.
-    void setParams(const float* p, int engineChoice, double bpm, float rumbleEnvLevel) noexcept
+    void setParams(const float* p, int engineChoice, double bpm, float rumbleEnvLevel, const TuneLock& lock = {}) noexcept
     {
-        if (auto* k = std::get_if<KickEngine>(&engine))         k->setParams(p[0], p[1], p[2], p[3], p[4]);
-        else if (auto* b = std::get_if<BassEngine>(&engine))    b->setParams(p[0], engineChoice, p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9]);
+        if (auto* k = std::get_if<KickEngine>(&engine))         k->setParams(lock.lockedHz(p[0], lock.kickFineCents), p[1], p[2], p[3], p[4]);
+        else if (auto* b = std::get_if<BassEngine>(&engine))    b->setParams(lock.lockedHz(p[0], lock.bassFineCents), engineChoice, p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9]);
         else if (auto* s = std::get_if<SampleChannel>(&engine)) s->setParams(p[0], p[1]);
         else if (auto* r = std::get_if<RumbleEngine>(&engine))
         {

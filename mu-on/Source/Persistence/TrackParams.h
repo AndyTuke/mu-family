@@ -107,10 +107,14 @@ inline juce::String engineParamId(int track, EngineType e, const juce::String& p
 }
 
 // Every parameter of one engine (the id part after "<engine>_"), in display order.
+// The master key and scale (global, the ids mu-Tant uses): the Kick and Bass tune snaps to them.
+inline constexpr const char* kRootParamId  = "root";
+inline constexpr const char* kScaleParamId = "scale";
+
 inline const std::vector<const char*>& engineParamNames(EngineType e)
 {
-    static const std::vector<const char*> kKick   { "tune", "ptch", "pdec", "adec", "drive" };
-    static const std::vector<const char*> kBass   { "wave", "sub", "tune", "cut", "res", "env", "edec", "atk", "dec", "sus", "drive" };
+    static const std::vector<const char*> kKick   { "tune", "ptch", "pdec", "adec", "drive", "fine" };
+    static const std::vector<const char*> kBass   { "wave", "sub", "tune", "cut", "res", "env", "edec", "atk", "dec", "sus", "drive", "fine" };
     static const std::vector<const char*> kHat    { "tune", "dec" };
     static const std::vector<const char*> kSnare  { "tune", "dec" };
     static const std::vector<const char*> kRumble { "drive", "d1", "d2", "d3", "size", "revmix", "revlp", "cut", "res", "inlp" };

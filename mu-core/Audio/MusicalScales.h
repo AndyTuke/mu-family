@@ -85,6 +85,24 @@ inline int snapToScale(int semitoneAboveRoot, int scaleIndex) noexcept
     return oct * 12 + best;
 }
 
+// Snap a (fractional) MIDI note to the nearest note of the scale on `root` (0..11, C..B), keeping its octave.
+// Used where a continuous pitch knob or modulator must land on scale notes (mu-On's Kick and Bass tune).
+inline float snapMidiToScale(float midi, int root, int scaleIndex) noexcept
+{
+    const Scale& s = kScales[(size_t) clampScaleIndex(scaleIndex)];
+    const float rel  = midi - (float) root;
+    const float oct  = std::floor(rel / 12.0f);
+    const float in   = rel - oct * 12.0f;   // 0..12 above the root within this octave
+    float best = (float) s.offsets[0], bestDist = std::abs(in - best);
+    for (int i = 1; i < s.count; ++i)
+    {
+        const float d = std::abs(in - (float) s.offsets[(size_t) i]);
+        if (d < bestDist) { bestDist = d; best = (float) s.offsets[(size_t) i]; }
+    }
+    if (std::abs(in - 12.0f) < bestDist) best = 12.0f;   // the root an octave up can be nearer than any degree
+    return (float) root + oct * 12.0f + best;
+}
+
 inline float midiToFreq(float midi) noexcept
 {
     return 440.0f * std::pow(2.0f, (midi - 69.0f) / 12.0f);

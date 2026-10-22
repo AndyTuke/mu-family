@@ -2,6 +2,7 @@
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 #include "License/LicenseKey.h"
 #include "Modulation/MuOnModDest.h"
+#include "Audio/MusicalScales.h"   // mu-core: the family scale table (the master Scale choices)
 #include "Modulation/ModulatorSerialise.h"   // mu-core: shared modulator (de)serialise
 
 namespace mu_on
@@ -20,6 +21,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     // ── Per track: the engine, the Rumble source, the groove, then every engine's parameters (t{N}_*) ──────
     for (int i = 0; i < mu_limits::kMaxLayers; ++i)
         addLayerParams(layout, i);
+
+    // ── Master key and scale: the Kick and Bass tune snaps to them (the tonal row, as mu-Tant's) ────────────
+    {
+        StringArray roots { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" }, scales;
+        for (const auto& sc : mu_audio::kScales) scales.add(sc.name);
+        layout.add(std::make_unique<AudioParameterChoice>(ParameterID{ kRootParamId,  1 }, "Root",  roots,  0));
+        layout.add(std::make_unique<AudioParameterChoice>(ParameterID{ kScaleParamId, 1 }, "Scale", scales, mu_audio::kNumScales - 1));   // Chromatic: the old free tuning, to the nearest semitone
+    }
 
     // ── Shared global FX rack + returns + master (mu-core) ────────────────────
     mu_mixfx::addGlobalFxParams(layout, 2);   // no loop of its own: swaps land on the bar

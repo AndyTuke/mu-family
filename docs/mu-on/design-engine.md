@@ -72,6 +72,8 @@ low-pass, with size + dry/wet mix), a per-bar **volume envelope** (a drawable sm
 shared `LFOEditor` — held per track, persisted only when it is not the default flat curve, evaluated
 audio-side under a try-lock), and a final **multimode filter**. Params:
 `t{N}_rumble_drive`, `_d1`/`_d2`/`_d3`, `_size`, `_revmix`, `_revlp`, `_cut`, `_res`, `_inlp` (input low-pass, 20 Hz to 20 kHz, fully open = off; a plain 12 dB LP on the feed before the drive).
+
+**Master key and scale (global `root`, `scale`, the ids mu-Tant uses; default C Chromatic).** The Kick and Bass `tune` knobs stay Hz (exponential travel, so every semitone takes the same turn) and are snapped to the nearest note of the master key and scale in `TrackEngine::setParams` (`TuneLock`, `mu_audio::snapMidiToScale`), then moved by the engine's `fine` (cents, ±100, not a modulation target). A modulator on Tune therefore steps through the scale's notes. A host with no `root` / `scale` (unbound rows) locks to C Chromatic, a semitone snap. The tonal row UI (Root / Scale, `kTonal*` tokens, the mu-Tant layout) is placed with the per-track layout rework.
 The reverb tone + the block-rate envelope are deliberately basic for now (framework stage). *(Note:
 distinct from the Bass lane's "rumble" voicing above, which is a tonal character of `BassEngine`,
 not this lane.)*

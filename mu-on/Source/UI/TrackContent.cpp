@@ -59,10 +59,10 @@ namespace
         switch (engine)
         {
             case EngineType::Kick:
-                return { { id("tune"), "Tune" }, { id("ptch"), "Pitch" }, { id("pdec"), "P.Dec" }, { id("adec"), "Decay" }, { id("drive"), "Drive" } };
+                return { { id("tune"), "Tune" }, { id("ptch"), "Pitch" }, { id("pdec"), "P.Dec" }, { id("adec"), "Decay" }, { id("drive"), "Drive" }, { id("fine"), "Fine" } };
             case EngineType::Bass:
                 return { { id("wave"), "Wave" }, { id("tune"), "Tune" }, { id("sub"), "Sub" }, { id("cut"), "Cutoff" }, { id("res"), "Reso" },
-                         { id("env"), "F.Env" }, { id("edec"), "E.Dec" }, { id("atk"), "Atk" }, { id("dec"), "Dec" }, { id("sus"), "Sus" }, { id("drive"), "Drive" } };
+                         { id("env"), "F.Env" }, { id("edec"), "E.Dec" }, { id("atk"), "Atk" }, { id("dec"), "Dec" }, { id("sus"), "Sus" }, { id("drive"), "Drive" }, { id("fine"), "Fine" } };
             case EngineType::Hat:
             case EngineType::Snare:
                 return { { id("tune"), "Tune" }, { id("dec"), "Decay" } };

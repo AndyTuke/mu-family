@@ -142,6 +142,10 @@ void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
     sourceRow   = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "src")), this);
     bassWaveRow = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::Bass, "wave")), this);   // a choice, not a target
     algoRow     = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::FmPerc, "algo")), this);   // a choice, not a target
+    kickFineRow = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::Kick, "fine")), this);   // not targets
+    bassFineRow = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::Bass, "fine")), this);
+    rootRow     = mu_core::ParamBinding(apvts.getRawParameterValue(kRootParamId), this);    // global; null where the host has none
+    scaleRow    = mu_core::ParamBinding(apvts.getRawParameterValue(kScaleParamId), this);
     swingRow    = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "swing")), this);
     accentRow   = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "accent")), this);
     jassert(engineRow.isBound() && sourceRow.isBound() && bassWaveRow.isBound() && algoRow.isBound() && swingRow.isBound() && accentRow.isBound());   // an id drift from the layout (debug)
@@ -333,7 +337,12 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
     const bool rumble = e == toIndex(EngineType::Rumble);
     // The engine's own choice row: the Bass wave, or the FM Perc algorithm (neither is a modulation target).
     const int engineChoice = juce::roundToInt(e == toIndex(EngineType::FmPerc) ? algoRow.load(0.0f) : bassWaveRow.load(0.0f));
-    eng->setParams(p, engineChoice, ctx.bpm, rumble ? evaluateRumbleEnv(ctx.startBeat) : 1.0f);
+    TuneLock lock;
+    if (rootRow.isBound())  lock.root  = juce::jlimit(0, 11, juce::roundToInt(rootRow.load(0.0f)));
+    if (scaleRow.isBound()) lock.scale = mu_audio::clampScaleIndex(juce::roundToInt(scaleRow.load(0.0f)));
+    lock.kickFineCents = kickFineRow.load(0.0f);
+    lock.bassFineCents = bassFineRow.load(0.0f);
+    eng->setParams(p, engineChoice, ctx.bpm, rumble ? evaluateRumbleEnv(ctx.startBeat) : 1.0f, lock);
 
     // Phase 3: the stop edge silences the voice after the block's parameters are in (a sustaining bass has no
     // note-off), so values set in the stop block survive the reset. A stop hidden in blocks that rendered
