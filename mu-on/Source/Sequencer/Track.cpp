@@ -140,6 +140,7 @@ void Track::prepare(double sampleRate, int blockSize)
 
 void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
 {
+    seed ^= (uint32_t) (s + 1) * 0x9E3779B1u;
     engineRow   = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "eng")), this);
     sourceRow   = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "src")), this);
     bassWaveRow = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::Bass, "wave")), this);   // a choice, not a target
@@ -306,23 +307,26 @@ void Track::clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, i
     row.setGroove(swingRow.load(0.0f), accentRow.load(1.0f));
     if (! ctx.playing) return;
     if (ctx.justStarted) clock.seek(ctx.startBeat);   // the step the transport starts in fires, even on a quick replay
-    // The layer's Probability (percent) multiplies each step's own to give the chance the note plays; the step's loop
-    // ratio is applied by the clock.
-    const float layerProb = juce::jlimit(0.0f, 1.0f, probRow.load(100.0f) * 0.01f);
     clock.processSpan(row, ctx.startBeat, n, ctx.beatsPerSample, row.swingAmount(), row.accentVelocity(),
-                      [this, fireInto, e, layerProb](float velocity, int offset, bool open, float stepProb, bool tied, int gateSamples, float semitones)
+                      [this, fireInto, e](const StepEvent& ev)
                       {
                           if (fireInto == nullptr || e == toIndex(EngineType::Rumble)) return;
-                          const float chance = layerProb * stepProb;
-                          if (chance < 1.0f)
-                          {
-                              // xorshift32: a cheap draw on the audio thread; the note plays if it falls under the chance.
-                              rngState ^= rngState << 13; rngState ^= rngState >> 17; rngState ^= rngState << 5;
-                              if ((float) (rngState >> 8) * (1.0f / 16777216.0f) >= chance) return;
-                          }
-                          fireInto->trigger(velocity, offset, open, tied, gateSamples, semitones);
+                          if (! stepPlays(ev.step, ev.pass)) return;   // the probability draw of this pass
+                          fireInto->trigger(ev.velocity, ev.offset, ev.open, ev.tied, ev.gateSamples, ev.semitones);
                           triggers.fetch_add(1, std::memory_order_relaxed);
                       });
+}
+
+bool Track::stepPlays(int step, long long pass) const noexcept
+{
+    if (! StepClock::loopPlays(row, step, pass)) return false;
+    // The layer's Probability (percent) multiplies the step's own to give the chance the note plays.
+    const float chance = juce::jlimit(0.0f, 1.0f, probRow.load(100.0f) * 0.01f) * (float) row.stepProb(step) * 0.01f;
+    if (chance >= 1.0f) return true;
+    // A cheap integer hash (a finalizer in the style of lowbias32) of seed, pass and step, mapped to 0..1.
+    uint32_t x = seed ^ (uint32_t) (pass * 2654435761ll) ^ ((uint32_t) step * 0x9E3779B9u);
+    x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
+    return (float) (x >> 8) * (1.0f / 16777216.0f) < chance;
 }
 
 void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n)

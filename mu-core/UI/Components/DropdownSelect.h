@@ -15,6 +15,8 @@ public:
     void setSelectedId(int id, bool notify = false);
     int  getSelectedId() const;
     void clear();
+    // An item whose popup lettering is `textColour` (e.g. a note outside the scale in red).
+    void addItem(const juce::String& text, int id, juce::Colour textColour);
     void setPlaceholderText(const juce::String& text);
 
     // LCD look: dark glass with the value in glowing lettering (matches LCD tabs).

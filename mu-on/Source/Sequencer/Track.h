@@ -165,7 +165,13 @@ private:
     mu_core::ParamBinding insAlgoRow, insParamRow[VoiceParams::kInsertSlotCount];
     // The layer's Probability (percent, multiplies each step's own) and the audio thread's noise for the draw.
     mu_core::ParamBinding probRow;
-    uint32_t              rngState = 0x2545F491u;
+    uint32_t              seed = 0x2545F491u;   // seeds the probability draw (per track, so two tracks do not draw alike)
+public:
+    // Whether `step` plays in `pass` of the row: its loop ratio, then the draw against the step's probability times the
+    // layer's. The draw is a hash of (seed, pass, step), so the audio thread and the display agree on every note of a pass
+    // before it plays, and a pass always draws the same.
+    bool stepPlays(int step, long long pass) const noexcept;
+private:
     std::array<EngineMod, kNumEngineTypes> mods;
 
     // The UI's live modulation values, on their own cache line (C16): written by the audio thread.

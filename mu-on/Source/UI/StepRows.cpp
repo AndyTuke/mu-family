@@ -87,7 +87,7 @@ void StepRows::paintRow(juce::Graphics& g, int row)
 
     // The 16 steps; the step numbers on the first row only.
     TrackStepRow::paintCells(g, cellsArea(row), host.getTrack(row).row, ! isRumble, col, playheadStep, row == 0,
-                             row == selected ? selectedStep : -1);
+                             row == selected ? selectedStep : -1, TrackStepRow::optionsFor(host, row));
 
     if (isRumble) g.endTransparencyLayer();
 
@@ -111,12 +111,13 @@ void StepRows::mouseDown(const juce::MouseEvent& e)
     int r = 0, s = 0;
     if (! cellAt(e.getPosition(), r, s) || host.getTrackEngine(r) == EngineType::Rumble) return;
 
-    dragRow = e.mods.isPopupMenu() ? -1 : r;
-    dragStep = s;
     dragStartedOn = host.getTrack(r).row.isOn(s);
 
-    // Left toggles the step (its corner button the accent); right selects it for the Step panel.
-    if (TrackStepRow::clickStep(host.getTrack(r).row, s, cellsArea(r), e.getPosition(), e.mods.isPopupMenu()))
+    // A click selects the step for the Step panel (creating it if empty); its corner buttons set the accent or delete it.
+    const bool selects = TrackStepRow::clickStep(host.getTrack(r).row, s, cellsArea(r), e.getPosition(), e.mods.isPopupMenu());
+    dragRow = selects && ! e.mods.isPopupMenu() ? r : -1;
+    dragStep = s;
+    if (selects)
     {
         selectedStep = s;
         if (onStepSelected) onStepSelected(r, s);
@@ -127,7 +128,7 @@ void StepRows::mouseDown(const juce::MouseEvent& e)
 void StepRows::mouseDrag(const juce::MouseEvent& e)
 {
     int r = 0, s = 0;
-    if (dragRow < 0 || host.getTrackEngine(dragRow) == EngineType::Rumble || ! cellAt(e.getPosition(), r, s) || r != dragRow || s == dragStep) return;
+    if (dragRow < 0 || host.getTrackEngine(dragRow) != EngineType::Bass || ! cellAt(e.getPosition(), r, s) || r != dragRow || s == dragStep) return;
     TrackStepRow::dragTie(host.getTrack(r).row, dragStep, s, dragStartedOn);
     dragStep = s;
     dragStartedOn = true;
@@ -145,6 +146,9 @@ void StepRows::timerCallback()
 
     const int step = host.isTrackTransportPlaying()
                         ? StepClock::currentStep(host.getTrackTransportBeat()) : -1;
+    // A new pass draws new skips: redraw every row's dimmed steps.
+    const long long pass = step >= 0 ? StepClock::passOfBeat(host.getTrackTransportBeat()) : -1;
+    if (pass != shownPass) { shownPass = pass; repaint(); }
     if (step == playheadStep) return;
 
     // Repaint only the cells the playhead left and entered, not the whole grid.

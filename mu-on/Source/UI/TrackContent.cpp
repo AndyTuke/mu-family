@@ -168,8 +168,7 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     voiceSelect.addItem("Open", 2);
     voiceSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setOpen(selectedStepOf[(size_t) currentLayer], id == 2); };
     for (int o = -2; o <= 2; ++o) octaveSelect.addItem((o > 0 ? "+" : "") + juce::String(o), o + 3);
-    for (int n = -12; n <= 12; ++n) noteSelect.addItem((n > 0 ? "+" : "") + juce::String(n), n + 13);
-    octaveSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setStepOctave(selectedStepOf[(size_t) currentLayer], id - 3); };
+    octaveSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setStepOctave(selectedStepOf[(size_t) currentLayer], id - 3); refreshNoteItems(); };
     noteSelect.onChange   = [this](int id) { host.getTrack(currentLayer).row.setStepNote(selectedStepOf[(size_t) currentLayer], id - 13); };
     addAndMakeVisible(loopSelect);
     addChildComponent(voiceSelect);
@@ -263,6 +262,27 @@ void TrackContent::setLayer(int idx)
 }
 
 // The STEP panel follows the shown layer's selected step: its probability, loop ratio and (a Hat) sound, read from the row.
+// The Note list shows the note each offset gives (the tune after the master key and scale, plus the step's octave and the
+// offset); a note outside the scale is red.
+void TrackContent::refreshNoteItems()
+{
+    if (shownEngine != EngineType::Kick && shownEngine != EngineType::Bass) return;
+    const auto key = TrackStepRow::tuneKey(host, currentLayer, shownEngine);
+    const auto& row = host.getTrack(currentLayer).row;
+    const int step = selectedStepOf[(size_t) currentLayer];
+    const int octaveShift = row.stepOctave(step) * 12;
+    noteSignature = (key.baseMidi * 16 + key.root) * 16 + key.scale + 100000 * (row.stepOctave(step) + 2);
+    noteSelect.clear();
+    for (int n = -12; n <= 12; ++n)
+    {
+        const int midi = key.baseMidi + octaveShift + n;
+        const auto text = mu_audio::midiNoteName(midi) + (n == 0 ? juce::String() : " (" + juce::String(n > 0 ? "+" : "") + juce::String(n) + ")");
+        if (mu_audio::midiInScale(midi, key.root, key.scale)) noteSelect.addItem(text, n + 13);
+        else                                                  noteSelect.addItem(text, n + 13, juce::Colour(0xffff6060));   // out of the scale: red
+    }
+    noteSelect.setSelectedId(row.stepNote(step) + 13, false);
+}
+
 void TrackContent::refreshStepPanel()
 {
     const auto& row = host.getTrack(currentLayer).row;
@@ -276,7 +296,7 @@ void TrackContent::refreshStepPanel()
     const bool pitched = shownEngine == EngineType::Kick || shownEngine == EngineType::Bass;
     for (auto* c : { (juce::Component*) &octaveCaption, (juce::Component*) &octaveSelect, (juce::Component*) &noteCaption, (juce::Component*) &noteSelect }) c->setVisible(pitched);
     octaveSelect.setSelectedId(row.stepOctave(step) + 3, false);
-    noteSelect.setSelectedId(row.stepNote(step) + 13, false);
+    refreshNoteItems();
     rows.setSelectedStep(step);
     soloRow.setSelectedStep(step);
     repaint();
@@ -403,6 +423,13 @@ void TrackContent::timerCallback()
         rebuild();
         if (onEngineChanged) onEngineChanged();
         return;
+    }
+    // The Note list follows the tune, key and scale (a knob, automation or a preset moves them).
+    if (shownEngine == EngineType::Kick || shownEngine == EngineType::Bass)
+    {
+        const auto key = TrackStepRow::tuneKey(host, currentLayer, shownEngine);
+        const int octave = host.getTrack(currentLayer).row.stepOctave(selectedStepOf[(size_t) currentLayer]);
+        if ((key.baseMidi * 16 + key.root) * 16 + key.scale + 100000 * (octave + 2) != noteSignature) refreshNoteItems();
     }
     // A new FM Perc algorithm (picked here, by automation or a preset): the tooltips describe the new voice. Done from
     // the timer, never from the selector's own callback, which must not destroy the selector it is running in.

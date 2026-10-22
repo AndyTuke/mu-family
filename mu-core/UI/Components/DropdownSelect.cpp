@@ -68,6 +68,11 @@ int DropdownSelect::getSelectedId() const
     return combo.getSelectedId();
 }
 
+void DropdownSelect::addItem(const juce::String& text, int id, juce::Colour textColour)
+{
+    combo.getRootMenu()->addItem(juce::PopupMenu::Item(text).setID(id).setColour(textColour));
+}
+
 void DropdownSelect::clear()
 {
     combo.clear(juce::dontSendNotification);

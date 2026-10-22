@@ -1,4 +1,5 @@
 #include "TrackStepRow.h"
+#include "Audio/MusicalScales.h"   // mu-core: note names, scale membership
 #include "Sequencer/StepClock.h"   // currentStep
 #include "Sequencer/Track.h"       // the row the cells edit
 #include "UI/Components/MuLookAndFeel.h"
@@ -20,12 +21,47 @@ void TrackStepRow::setLayer(int layer)
     repaint();
 }
 
+TrackStepRow::TuneKey TrackStepRow::tuneKey(TrackHost& host, int slot, EngineType engine)
+{
+    TuneKey key;
+    auto& apvts = host.getTrackParameters();
+    if (auto* r = apvts.getRawParameterValue(kRootParamId))  key.root  = juce::jlimit(0, 11, juce::roundToInt(r->load()));
+    if (auto* sc = apvts.getRawParameterValue(kScaleParamId)) key.scale = mu_audio::clampScaleIndex(juce::roundToInt(sc->load()));
+    if (auto* tune = apvts.getRawParameterValue(engineParamId(slot, engine, "tune")))
+        key.baseMidi = juce::roundToInt(mu_audio::snapMidiToScale(mu_audio::freqToMidi(tune->load()), key.root, key.scale));
+    return key;
+}
+
+// What the row shows beyond the lamps, from the track's engine, tune and key and (while playing) this pass's draws.
+TrackStepRow::CellOptions TrackStepRow::optionsFor(TrackHost& host, int slot)
+{
+    CellOptions o;
+    const auto engine = host.getTrackEngine(slot);
+    auto& track = host.getTrack(slot);
+    o.ties = engine == EngineType::Bass;
+    o.hatIcons = engine == EngineType::Hat;
+    if (engine == EngineType::Bass)
+    {
+        const int base = tuneKey(host, slot, engine).baseMidi;
+        o.noteName = [base, &track](int step) { return mu_audio::midiNoteName(base + track.row.stepSemitones(step)); };
+    }
+    if (engine != EngineType::Rumble && host.isTrackTransportPlaying())
+    {
+        const long long pass = StepClock::passOfBeat(host.getTrackTransportBeat());
+        for (int s = 0; s < StepRow::kNumSteps; ++s)
+            if (track.row.isOn(s) && ! track.stepPlays(s, pass)) o.dimMask = (std::uint16_t) (o.dimMask | (1u << s));
+    }
+    return o;
+}
+
 // The 16 steps as lamps behind dark lenses: on steps lit, accents brighter at the centre, beat starts marked by a
-// hint of colour; empty steps stay dark even under the playhead (family lamp rule).
+// hint of colour; empty steps stay dark even under the playhead (family lamp rule). On a step that is on: the accent
+// button top left, the delete cross top right, and in the middle a Bass's note or a Hat's open / closed icon.
 void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, const StepRow& row, bool showSteps,
-                              juce::Colour colour, int playheadStep, bool beatNumbers, int selectedStep)
+                              juce::Colour colour, int playheadStep, bool beatNumbers, int selectedStep, const CellOptions& opts)
 {
     const auto& L = MuLookAndFeel::lighting();
+    const auto labelColour = MuLookAndFeel::colour(MuLookAndFeel::labelText);
     for (int s = 0; s < StepRow::kNumSteps; ++s)
     {
         const auto cell = cellRect(cells, s);
@@ -40,11 +76,6 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
         if (on)
         {
             MuLookAndFeel::drawLamp(g, shape, {}, lens, cell.getCentre(), juce::jmax(cell.getWidth(), cell.getHeight()) * 0.6f);
-            if (row.isOpen(s))   // open hat: a bright ring round the lamp
-            {
-                g.setColour(lens.brighter(L.lampHot * 2.0f));
-                g.drawRoundedRectangle(cell.reduced(1.0f), 3.0f, 1.5f);
-            }
             if (row.isAccent(s))   // accent: a hotter centre
             {
                 g.setColour(lens.brighter(L.lampHot * 2.0f));
@@ -57,7 +88,7 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
             g.fillPath(shape);
         }
         MuLookAndFeel::drawRecessedScreen(g, cell);
-        if (showSteps && row.tiedFrom(s))   // tied to the step before: a bar joins the two lamps
+        if (opts.ties && showSteps && row.tiedFrom(s))   // tied to the step before: a bar joins the two lamps
         {
             const auto prev = cellRect(cells, s - 1);
             const float h = cell.getHeight() * 0.45f;
@@ -70,21 +101,49 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
             g.drawRoundedRectangle(cell.reduced(0.5f), 3.0f, 1.5f);
         }
 
-        // The accent button in the top-right corner: a small square, lit when the step is accented.
-        if (showSteps)
+        if (on)
         {
+            // The accent button, top left: lit when the step is accented.
             const auto btn = accentButtonRect(cell);
-            const bool accented = on && row.isAccent(s);
-            g.setColour(accented ? colour.brighter(0.4f) : MuLookAndFeel::colour(MuLookAndFeel::labelText).withAlpha(on ? 0.55f : 0.25f));
+            const bool accented = row.isAccent(s);
+            g.setColour(accented ? colour.brighter(0.4f) : labelColour.withAlpha(0.55f));
             if (accented) g.fillRoundedRectangle(btn, 2.0f);
             g.drawRoundedRectangle(btn, 2.0f, 1.0f);
+
+            // The delete cross, top right.
+            const auto x = deleteButtonRect(cell).reduced(1.5f);
+            g.setColour(labelColour.withAlpha(0.7f));
+            g.drawLine(x.getX(), x.getY(), x.getRight(), x.getBottom(), 1.2f);
+            g.drawLine(x.getX(), x.getBottom(), x.getRight(), x.getY(), 1.2f);
+
+            // The middle: a Bass step's note; a Hat step's icon (a ring for open, a dot for closed).
+            if (opts.noteName)
+            {
+                g.setFont(juce::Font(juce::FontOptions(mu_ui::sf(10.0f), juce::Font::bold)));
+                g.setColour(juce::Colours::white.withAlpha(0.92f));
+                g.drawText(opts.noteName(s), cell.toNearestInt(), juce::Justification::centred, false);
+            }
+            if (opts.hatIcons)
+            {
+                const float d = juce::jmin(cell.getWidth(), cell.getHeight()) * 0.32f;
+                const auto icon = juce::Rectangle<float>(d, d).withCentre(cell.getCentre());
+                g.setColour(juce::Colours::white.withAlpha(0.92f));
+                if (row.isOpen(s)) g.drawEllipse(icon, 1.6f);
+                else               g.fillEllipse(icon.reduced(d * 0.2f));
+            }
         }
 
-        if (isBeat && beatNumbers)   // step numbers on the beat-group starts (1/5/9/13)
+        if (isBeat && beatNumbers)   // step numbers on the beat-group starts (1/5/9/13), bottom left
         {
             g.setFont(juce::Font(juce::FontOptions(mu_ui::sf(9.0f))));
             MuLookAndFeel::drawEngravedText(g, mu_ui::cachedIntLabel(s + 1), cell.reduced(2.0f).toNearestInt(),
-                                            juce::Justification::topLeft, MuLookAndFeel::colour(MuLookAndFeel::labelText), false);
+                                            juce::Justification::bottomLeft, labelColour, false);
+        }
+
+        if ((opts.dimMask >> s) & 1u)   // a step this pass will skip (its loop ratio or its probability): dimmed
+        {
+            g.setColour(juce::Colours::black.withAlpha(0.6f));
+            g.fillRoundedRectangle(cell, 3.0f);
         }
     }
 }
@@ -103,22 +162,25 @@ juce::Rectangle<float> TrackStepRow::cellRect(juce::Rectangle<int> cells, int st
 juce::Rectangle<float> TrackStepRow::accentButtonRect(juce::Rectangle<float> cell)
 {
     const float side = juce::jmax(6.0f, juce::jmin(cell.getWidth(), cell.getHeight()) * 0.30f);
+    return { cell.getX() + 2.0f, cell.getY() + 2.0f, side, side };
+}
+
+juce::Rectangle<float> TrackStepRow::deleteButtonRect(juce::Rectangle<float> cell)
+{
+    const float side = juce::jmax(6.0f, juce::jmin(cell.getWidth(), cell.getHeight()) * 0.30f);
     return { cell.getRight() - side - 2.0f, cell.getY() + 2.0f, side, side };
 }
 
 bool TrackStepRow::clickStep(StepRow& row, int step, juce::Rectangle<int> cells, juce::Point<int> p, bool rightClick)
 {
-    if (rightClick) return true;   // selects: no edit
-
-    if (accentButtonRect(cellRect(cells, step)).expanded(2.0f).contains(p.toFloat()))
+    const auto cell = cellRect(cells, step);
+    if (! rightClick && row.isOn(step))
     {
-        // Accent on or off; on an off step it turns the step on accented, so the click is never a no-op.
-        if (row.isOn(step)) row.setAccent(step, ! row.isAccent(step));
-        else                { row.setOn(step, true); row.setAccent(step, true); }
+        if (accentButtonRect(cell).expanded(2.0f).contains(p.toFloat())) { row.setAccent(step, ! row.isAccent(step)); return false; }
+        if (deleteButtonRect(cell).expanded(2.0f).contains(p.toFloat())) { row.setOn(step, false); return false; }   // its other settings stay for when it is recreated
     }
-    else
-        row.setOn(step, ! row.isOn(step));
-    return false;
+    if (! rightClick && ! row.isOn(step)) row.setOn(step, true);   // an empty step is created, as it was
+    return true;
 }
 
 void TrackStepRow::dragTie(StepRow& row, int from, int to, bool startedOn)
@@ -139,7 +201,7 @@ void TrackStepRow::paint(juce::Graphics& g)
 
     const juce::Graphics::ScopedSaveState state(g);
     if (isRumble) g.beginTransparencyLayer(0.45f);
-    paintCells(g, getLocalBounds(), host.getTrack(slot).row, ! isRumble, colour, playheadStep, true, selectedStep);
+    paintCells(g, getLocalBounds(), host.getTrack(slot).row, ! isRumble, colour, playheadStep, true, selectedStep, optionsFor(host, slot));
     if (isRumble) g.endTransparencyLayer();
 }
 
@@ -148,9 +210,10 @@ void TrackStepRow::mouseDown(const juce::MouseEvent& e)
     // A Rumble row is not editable.
     if (host.getTrackEngine(slot) == EngineType::Rumble || ! getLocalBounds().contains(e.getPosition())) return;
     const int step = stepAt(getLocalBounds(), e.getPosition());
-    dragStep = e.mods.isPopupMenu() ? -1 : step;
     dragStartedOn = host.getTrack(slot).row.isOn(step);
-    if (clickStep(host.getTrack(slot).row, step, getLocalBounds(), e.getPosition(), e.mods.isPopupMenu()))
+    const bool selects = clickStep(host.getTrack(slot).row, step, getLocalBounds(), e.getPosition(), e.mods.isPopupMenu());
+    dragStep = selects && ! e.mods.isPopupMenu() ? step : -1;
+    if (selects)
     {
         selectedStep = step;
         if (onStepSelected) onStepSelected(step);
@@ -160,7 +223,7 @@ void TrackStepRow::mouseDown(const juce::MouseEvent& e)
 
 void TrackStepRow::mouseDrag(const juce::MouseEvent& e)
 {
-    if (dragStep < 0 || host.getTrackEngine(slot) == EngineType::Rumble) return;
+    if (dragStep < 0 || host.getTrackEngine(slot) != EngineType::Bass) return;   // only a Bass sequence ties notes
     const int step = stepAt(getLocalBounds(), e.getPosition());
     if (step == dragStep) return;
     dragTie(host.getTrack(slot).row, dragStep, step, dragStartedOn);
@@ -191,6 +254,9 @@ void TrackStepRow::timerCallback()
 
     const int step = host.isTrackTransportPlaying()
                         ? StepClock::currentStep(host.getTrackTransportBeat()) : -1;
+    // A new pass draws new skips: redraw the dimmed steps.
+    const long long pass = step >= 0 ? StepClock::passOfBeat(host.getTrackTransportBeat()) : -1;
+    if (pass != shownPass) { shownPass = pass; repaint(); }
     if (step == playheadStep) return;
     playheadStep = step;
     repaint();

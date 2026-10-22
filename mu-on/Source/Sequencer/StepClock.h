@@ -11,6 +11,14 @@
 namespace mu_on
 {
 
+// What the clock hands a Track for one step that fires: its velocity, where in the block, the Hat's Open flag, its
+// probability (0..1), whether it is tied to the step before, how many samples the note is held, its transposition
+// in semitones, and which step of which pass of the row it is (the pass seeds the probability draw).
+struct StepEvent
+{
+    float velocity; int offset; bool open; float probability; bool tied; int gateSamples; float semitones; int step; long long pass;
+};
+
 class StepClock
 {
 public:
@@ -22,6 +30,16 @@ public:
     static constexpr float accentedVelocity(float accentKnob) noexcept
     {
         return kNormalVelocity + accentKnob * (1.0f - kNormalVelocity);
+    }
+
+    // The pass (one run through the 16 steps) a beat falls in, and whether step `step`'s loop ratio plays in it
+    // ("N:M" plays the Nth of every M passes).
+    static long long passOfBeat(double beat) noexcept { return (long long) std::floor(beat / (kStepBeats * StepRow::kNumSteps)); }
+    template <class Row>
+    static bool loopPlays(const Row& row, int step, long long pass) noexcept
+    {
+        const auto ratio = kLoopRatios[(size_t) row.stepLoop(step)];
+        return ratio.of <= 1 || (((pass % ratio.of) + ratio.of) % ratio.of) == ratio.play - 1;
     }
 
     // Realign to the top of the pattern.
@@ -39,9 +57,8 @@ public:
     // Audio thread: no allocation, `fire` is called inline.
     // A step's loop ratio (the row's own, when the Row has one) picks which passes (16 steps, from the transport
     // start) it plays: "N:M" plays the Nth of every M. A firing that takes more arguments gets the step's Open flag
-    // and its probability (0..1), which the caller combines with the layer's and draws against; one that takes six also gets whether
-    // the step is tied to the one before and how many samples the note is held (to the end of its tied run), and
-    // its transposition in semitones (a Kick or Bass).
+    // and its probability (0..1), which the caller combines with the layer's and draws against; one that takes a StepEvent gets all
+    // of it: tie, hold, transposition and which pass and step it is.
     template <class Row, class Fire>
     void processSpan(const Row& row, double beatStart, int numSamples, double beatsPerSample,
                      float swing, float accentVelocity, Fire&& fire) noexcept
@@ -70,17 +87,16 @@ public:
                                                       (int) std::round((t - beatStart) / beatsPerSample));
                 const long long pass = nextGlobalStep >= 0 ? nextGlobalStep / StepRow::kNumSteps
                                                            : -((-nextGlobalStep + StepRow::kNumSteps - 1) / StepRow::kNumSteps);
-                const auto ratio = kLoopRatios[(size_t) row.stepLoop(local)];
-                const bool passPlays = ratio.of <= 1 || (((pass % ratio.of) + ratio.of) % ratio.of) == ratio.play - 1;
+                const bool passPlays = loopPlays(row, local, pass);
                 if (passPlays && row.isOn(local))
                 {
                     const float velocity = row.isAccent(local) ? accentedVelocity(accentVelocity) : kNormalVelocity;
                     // A tied run: how long the note is held (to the end of the last step tied to this one), for a Bass's release.
                     int runSteps = 1;
                     while (local + runSteps < StepRow::kNumSteps && row.tiedFrom(local + runSteps)) ++runSteps;
-                    if constexpr (std::is_invocable_v<Fire&, float, int, bool, float, bool, int, float>)
-                        fire(velocity, sampleOffset, row.isOpen(local), (float) row.stepProb(local) * 0.01f, row.tiedFrom(local),
-                             (int) (runSteps * kStepBeats / beatsPerSample), (float) row.stepSemitones(local));
+                    if constexpr (std::is_invocable_v<Fire&, const StepEvent&>)
+                        fire(StepEvent { velocity, sampleOffset, row.isOpen(local), (float) row.stepProb(local) * 0.01f, row.tiedFrom(local),
+                                         (int) (runSteps * kStepBeats / beatsPerSample), (float) row.stepSemitones(local), local, pass });
                     else if constexpr (std::is_invocable_v<Fire&, float, int, bool, float>) fire(velocity, sampleOffset, row.isOpen(local), (float) row.stepProb(local) * 0.01f);
                     else if constexpr (std::is_invocable_v<Fire&, float, int, bool>)   fire(velocity, sampleOffset, row.isOpen(local));
                     else                                                                fire(velocity, sampleOffset);

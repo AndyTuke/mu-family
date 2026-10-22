@@ -54,6 +54,7 @@ private:
     int dragRow = -1, dragStep = -1;   // a left-drag across steps (to tie them): the row and the step it has reached
     bool dragStartedOn = false;
     int playheadStep  = -1;
+    long long shownPass = -2;          // the pass the dimmed steps were drawn for
     juce::uint64 shownSignature = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StepRows)
