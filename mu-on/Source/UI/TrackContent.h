@@ -84,6 +84,10 @@ private:
 
     juce::Label    engineCaption { {}, "Engine" }, sourceCaption { {}, "Source" };
     DropdownSelect engineSelect, sourceSelect;
+    // The master key and scale (global root / scale, the family tonal row), under the Engine selector.
+    juce::Label    rootCaption { {}, "Root" }, scaleCaption { {}, "Scale" };
+    DropdownSelect rootSelect, scaleSelect;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> rootAtt, scaleAtt;
     mu_ui::ParamKnobGrid grid;
     StepRows       rows;                              // every track's row (a track the host does not lock)
     TrackStepRow   soloRow;                           // the shown track's one row (a locked track)

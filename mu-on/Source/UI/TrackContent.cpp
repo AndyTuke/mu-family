@@ -2,6 +2,8 @@
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 
 #include <limits>
+#include "Audio/MusicalScales.h"   // mu-core: the scale names
+#include "UI/ParamChoices.h"          // mu-core: selector items from choice parameters
 
 namespace mu_on
 {
@@ -108,13 +110,23 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     engineSelect.onChange = [this](int id) { engineChosen(id); };
     sourceSelect.onChange = [this](int id) { sourceChosen(id); };
 
-    for (auto* cap : { &engineCaption, &sourceCaption })
+    for (auto* cap : { &engineCaption, &sourceCaption, &rootCaption, &scaleCaption })
     {
         cap->setJustificationType(juce::Justification::centred);
         cap->setInterceptsMouseClicks(false, false);
         addAndMakeVisible(*cap);
     }
     addAndMakeVisible(engineSelect);
+    // The master key and scale: global rows bound once (a host without them, none).
+    if (host.getTrackParameters().getParameter(kRootParamId) != nullptr)
+    {
+        for (int i = 0; i < mu_audio::kNumScales; ++i) scaleSelect.addItem(mu_audio::kScales[(size_t) i].name, i + 1);
+        mu_ui::addChoiceItems(rootSelect, host.getTrackParameters(), kRootParamId);   // items from the parameter's choices
+        rootAtt  = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(host.getTrackParameters(), kRootParamId,  rootSelect.getComboBox());
+        scaleAtt = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(host.getTrackParameters(), kScaleParamId, scaleSelect.getComboBox());
+    }
+    addChildComponent(rootSelect);
+    addChildComponent(scaleSelect);
     addChildComponent(sourceSelect);
     sourceCaption.setVisible(false);
     addAndMakeVisible(grid);
@@ -251,6 +263,8 @@ void TrackContent::rebuild()
 
     sourceCaption.setVisible(rumble);
     sourceSelect.setVisible(rumble);
+    const bool showKey = ! locked && ! rumble && rootAtt != nullptr;   // the Source takes a Rumble's second cell
+    for (auto* c : { (juce::Component*) &rootCaption, (juce::Component*) &rootSelect, (juce::Component*) &scaleCaption, (juce::Component*) &scaleSelect }) c->setVisible(showKey);
     swingKnob.setVisible(! rumble);
     accentKnob.setVisible(! rumble);
     for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob }) k->setVisible(! rumble);   // a Rumble's box holds its envelope
@@ -372,7 +386,8 @@ void TrackContent::resized()
     const int insertH  = 2 * knobH + s(LF::kVoiceGap);
     const int boxH     = insertH + 2 * s(LF::kSpaceS);
     const int numDrops = (locked ? 0 : 1) + (rumble ? 1 : 0);
-    const int engineW  = numDrops > 0 ? 2 * clear + dropW : 0;
+    const int tonalW   = s(LF::kTonalRootW) + gap + s(LF::kTonalScaleW);   // Root and Scale side by side
+    const int engineW  = numDrops > 0 ? 2 * clear + juce::jmax(dropW, tonalW) : 0;
     engineR    = { 0, 0, w, padY + plateH + boxH + padY };
     const int boxY = padY + plateH;
     int x = padX;
@@ -384,16 +399,27 @@ void TrackContent::resized()
     insertBoxR = { voiceBoxR.getRight() + divW, boxY, insertBoxW, boxH };
 
     const juce::Font captionFont(juce::FontOptions{}.withHeight(mu_ui::sf(LF::kKnobLabelFont)));   // as the knob labels
-    const int bandH = s(mu_ui::ParamKnobGrid::kCellH) - labelH;
     auto place = [&](juce::Label& caption, DropdownSelect& dropdown, int y)
     {
         caption.setFont(captionFont);
         caption.setBounds(engineBoxR.getX() + clear, y, dropW, labelH);
-        dropdown.setBounds(engineBoxR.getX() + clear, y + labelH + (bandH - s(MuLookAndFeel::kDropdownH)) / 2, dropW, s(MuLookAndFeel::kDropdownH));
+        dropdown.setBounds(engineBoxR.getX() + clear, y + labelH + s(2), dropW, s(MuLookAndFeel::kDropdownH));
     };
     int dropY = engineBoxR.getY() + s(LF::kSpaceS);
-    if (! locked) { place(engineCaption, engineSelect, dropY); dropY += s(mu_ui::ParamKnobGrid::kCellH) + gap; }
+    const int rowPitch = labelH + s(2) + s(MuLookAndFeel::kDropdownH) + 2 * gap;   // a caption over its dropdown, then a gap
+    if (! locked) { place(engineCaption, engineSelect, dropY); dropY += rowPitch; }
     if (rumble)   place(sourceCaption, sourceSelect, dropY);
+    else if (! locked)
+    {
+        // Key row under the Engine selector: Root then Scale, each captioned like the Engine dropdown.
+        const int ddY = dropY + labelH + s(2);
+        const int rootW = s(LF::kTonalRootW), scaleW = s(LF::kTonalScaleW), x0 = engineBoxR.getX() + clear;
+        for (auto* cap : { &rootCaption, &scaleCaption }) cap->setFont(captionFont);
+        rootCaption .setBounds(x0, dropY, rootW, labelH);
+        scaleCaption.setBounds(x0 + rootW + gap, dropY, scaleW, labelH);
+        rootSelect  .setBounds(x0, ddY, rootW, s(MuLookAndFeel::kDropdownH));
+        scaleSelect .setBounds(x0 + rootW + gap, ddY, scaleW, s(MuLookAndFeel::kDropdownH));
+    }
     grid.setBounds(voiceBoxR.reduced(clear, s(LF::kSpaceS)));
     insertSub.setBounds(insertBoxR.getX() + clear, insertBoxR.getY() + s(LF::kSpaceS), insertW, insertH);
 

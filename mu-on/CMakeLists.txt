@@ -230,6 +230,7 @@ target_sources(mu-on-layer-tests PRIVATE
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/MultiModeFilter.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/SamplePlayer.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/FX/Slots/ReverbSlot.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/InsertProcessor.cpp"   # the Track's insert effect
     "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/ControlSequence.cpp"
 )
