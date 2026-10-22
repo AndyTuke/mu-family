@@ -40,6 +40,8 @@ public:
         // Start a group (an oscillator, a filter, an envelope): a row that has groups shares its spare width equally as
         // the space before the first group, between groups and after the last, so its sections sit spread across the panel.
         bool                    groupStart = false;
+        // The name the status bar shows for the control (empty: the label), for a label that is abbreviated on the knob.
+        juce::String            statusName;
     };
 
     explicit ParamKnobGrid(juce::AudioProcessorValueTreeState& state);
@@ -72,6 +74,7 @@ private:
         juce::String                    label;
         bool                            newRow = false;   // starts a new row of the grid
         bool                            groupStart = false;   // starts a group (see Spec)
+        juce::String                    statusName;
         std::unique_ptr<KnobWithLabel>  knob;
         std::unique_ptr<juce::ComboBox> combo;
         juce::Label                     name;

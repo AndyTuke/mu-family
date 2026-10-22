@@ -15,6 +15,7 @@ void ParamKnobGrid::setSpecs(const std::vector<Spec>& specs)
         ctl->label = spec.label;
         ctl->newRow = spec.newRow;
         ctl->groupStart = spec.groupStart;
+        ctl->statusName = spec.statusName.isNotEmpty() ? spec.statusName : spec.label;
 
         ctl->name.setText(spec.label, juce::dontSendNotification);
         ctl->name.setJustificationType(juce::Justification::centred);
@@ -162,8 +163,8 @@ void ParamKnobGrid::mouseEnter(const juce::MouseEvent& e)
 void ParamKnobGrid::reportStatus(const Control& ctl) const
 {
     if (! onStatusUpdate) return;
-    if (ctl.knob)       onStatusUpdate(ctl.label, ctl.knob->getSlider().getTextFromValue(ctl.knob->getValue()));
-    else if (ctl.combo) onStatusUpdate(ctl.label, ctl.combo->getText());
+    if (ctl.knob)       onStatusUpdate(ctl.statusName, ctl.knob->getSlider().getTextFromValue(ctl.knob->getValue()));
+    else if (ctl.combo) onStatusUpdate(ctl.statusName, ctl.combo->getText());
 }
 
 } // namespace mu_ui

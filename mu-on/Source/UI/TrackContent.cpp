@@ -61,7 +61,12 @@ namespace
         switch (engine)
         {
             case EngineType::Kick:
-                return { { id("tune"), "Tune" }, { id("ptch"), "Pitch" }, { id("pdec"), "P.Dec" }, { id("adec"), "Decay" }, { id("drive"), "Drive" }, { id("fine"), "Fine" } };
+            {
+                std::vector<Spec> specs { { id("tune"), "Tune" }, { id("ptch"), "Pitch" }, { id("pdec"), "P.Dec" }, { id("adec"), "Decay" }, { id("drive"), "Drive" }, { id("fine"), "Fine" } };
+                specs[0].statusName = "Kick Tune";  specs[1].statusName = "Kick Pitch Drop";  specs[2].statusName = "Kick Pitch Decay";
+                specs[3].statusName = "Kick Decay"; specs[4].statusName = "Kick Drive";       specs[5].statusName = "Kick Fine Tune";
+                return specs;
+            }
             case EngineType::Bass:
             {
                 // Row 1: the oscillator (with its Glide) and the filter (with the Drive); row 2: the amp envelope. Each group's
@@ -72,12 +77,17 @@ namespace
                 specs[0].groupStart = specs[5].groupStart = specs[10].groupStart = true;
                 specs[10].newRow = true;
                 specs[4].tooltip = "Slide time into a tied step (drag across two steps to tie them)";
+                const char* const names[] = { "Bass Wave", "Bass Tune", "Bass Fine Tune", "Bass Sub", "Bass Glide", "Bass Filter Cutoff", "Bass Filter Resonance",
+                                              "Bass Filter Envelope", "Bass Filter Env Decay", "Bass Drive", "Bass Amp Attack", "Bass Amp Decay", "Bass Amp Sustain", "Bass Amp Release" };
+                for (size_t i = 0; i < specs.size(); ++i) specs[i].statusName = names[i];
                 return specs;
             }
             case EngineType::Hat:   // two sets: the closed hat, then the open hat (the step row picks which a step plays)
-                return { { id("tune"), "Cl.Tune" }, { id("dec"), "Cl.Decay" }, { id("otune"), "Op.Tune" }, { id("odec"), "Op.Decay" } };
+                return { { id("tune"), "Cl.Tune", {}, {}, {}, {}, false, false, "Hat Closed Tune" }, { id("dec"), "Cl.Decay", {}, {}, {}, {}, false, false, "Hat Closed Decay" },
+                         { id("otune"), "Op.Tune", {}, {}, {}, {}, false, false, "Hat Open Tune" }, { id("odec"), "Op.Decay", {}, {}, {}, {}, false, false, "Hat Open Decay" } };
             case EngineType::Snare:
-                return { { id("tune"), "Tune" }, { id("dec"), "Decay" }, { id("snap"), "Snap" } };
+                return { { id("tune"), "Tune", {}, {}, {}, {}, false, false, "Snare Tune" }, { id("dec"), "Decay", {}, {}, {}, {}, false, false, "Snare Decay" },
+                         { id("snap"), "Snap", {}, {}, {}, {}, false, false, "Snare Snap" } };
             // Rumble processes another track: input low-pass → input drive → 3 delay taps → reverb → filter.
             case EngineType::Rumble:
                 return { { id("inlp"), "In LP" }, { id("drive"), "Drive" }, { id("d1"), "1/16" }, { id("d2"), "2/16" }, { id("d3"), "3/16" },
@@ -139,6 +149,17 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     addChildComponent(sourceSelect);
     sourceCaption.setVisible(false);
     addAndMakeVisible(grid);
+    grid.onStatusUpdate = [this](const juce::String& name, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
+    // The Layer box's knobs and the selectors report to the status bar under their full names.
+    auto report = [this](KnobWithLabel& k, const juce::String& name)
+    {
+        k.onStatusUpdate = [this, name](const juce::String&, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
+    };
+    report(swingKnob, "Layer Swing");  report(accentKnob, "Layer Accent");  report(probKnob, "Layer Probability");
+    report(sendEffKnob, "FX Send");   report(sendDlyKnob, "Delay Send");   report(sendRevKnob, "Reverb Send");
+    auto say = [this](const juce::String& name, DropdownSelect& d) { if (onStatusUpdate) onStatusUpdate(name, d.getText()); };
+    rootSelect.getComboBox().onChange  = [this, say] { say("Key Root", rootSelect); };
+    scaleSelect.getComboBox().onChange = [this, say] { say("Key Scale", scaleSelect); };
 
     rows.onRowClicked = [this](int row) { if (onRowClicked) onRowClicked(row); };
     addAndMakeVisible(rows);
@@ -160,16 +181,16 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     stepProbKnob.setRange(0.0, 100.0, 1.0);
     stepProbKnob.getSlider().setTextValueSuffix(" %");
     stepProbKnob.onValueChanged = [this](double v) { host.getTrack(currentLayer).row.setStepProb(selectedStepOf[(size_t) currentLayer], juce::roundToInt(v)); };
-    stepProbKnob.onStatusUpdate = [this](const juce::String& name, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
+    stepProbKnob.onStatusUpdate = [this](const juce::String&, const juce::String& value) { if (onStatusUpdate) onStatusUpdate("Step Probability", value); };
     addAndMakeVisible(stepProbKnob);
     for (int i = 0; i < (int) std::size(kLoopRatios); ++i) loopSelect.addItem(juce::String(kLoopRatios[i].play) + ":" + juce::String(kLoopRatios[i].of), i + 1);
-    loopSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setStepLoop(selectedStepOf[(size_t) currentLayer], id - 1); };
+    loopSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setStepLoop(selectedStepOf[(size_t) currentLayer], id - 1); if (onStatusUpdate) onStatusUpdate("Step Play", loopSelect.getText()); };
     voiceSelect.addItem("Closed", 1);
     voiceSelect.addItem("Open", 2);
-    voiceSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setOpen(selectedStepOf[(size_t) currentLayer], id == 2); };
+    voiceSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setOpen(selectedStepOf[(size_t) currentLayer], id == 2); if (onStatusUpdate) onStatusUpdate("Step Sound", voiceSelect.getText()); };
     for (int o = -2; o <= 2; ++o) octaveSelect.addItem((o > 0 ? "+" : "") + juce::String(o), o + 3);
-    octaveSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setStepOctave(selectedStepOf[(size_t) currentLayer], id - 3); refreshNoteItems(); };
-    noteSelect.onChange   = [this](int id) { host.getTrack(currentLayer).row.setStepNote(selectedStepOf[(size_t) currentLayer], id - 13); };
+    octaveSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setStepOctave(selectedStepOf[(size_t) currentLayer], id - 3); refreshNoteItems(); if (onStatusUpdate) onStatusUpdate("Step Octave", octaveSelect.getText()); };
+    noteSelect.onChange   = [this](int id) { host.getTrack(currentLayer).row.setStepNote(selectedStepOf[(size_t) currentLayer], id - 13); if (onStatusUpdate) onStatusUpdate("Step Note", noteSelect.getText()); };
     addAndMakeVisible(loopSelect);
     addChildComponent(voiceSelect);
     addChildComponent(octaveSelect);
