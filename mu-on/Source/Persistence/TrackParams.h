@@ -111,6 +111,11 @@ inline juce::String engineParamId(int track, EngineType e, const juce::String& p
 inline constexpr const char* kRootParamId  = "root";
 inline constexpr const char* kScaleParamId = "scale";
 
+// Loop ratio choices: "play the `play`th of every `of` passes of the row" (1:1 plays every pass).
+struct LoopRatio { int play, of; };
+inline constexpr LoopRatio kLoopRatios[] = { {1,1}, {1,2}, {2,2}, {1,3}, {2,3}, {3,3}, {1,4}, {2,4}, {3,4}, {4,4} };
+juce::StringArray loopRatioNames();
+
 inline const std::vector<const char*>& engineParamNames(EngineType e)
 {
     static const std::vector<const char*> kKick   { "tune", "ptch", "pdec", "adec", "drive", "fine" };

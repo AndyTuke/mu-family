@@ -87,7 +87,7 @@ private:
     // The master key and scale (global root / scale, the family tonal row), under the Engine selector.
     juce::Label    rootCaption { {}, "Root" }, scaleCaption { {}, "Scale" };
     DropdownSelect rootSelect, scaleSelect;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> rootAtt, scaleAtt;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> rootAtt, scaleAtt, loopAtt;
     mu_ui::ParamKnobGrid grid;
     StepRows       rows;                              // every track's row (a track the host does not lock)
     TrackStepRow   soloRow;                           // the shown track's one row (a locked track)
@@ -95,8 +95,11 @@ private:
 
     KnobWithLabel swingKnob { "Swing" }, accentKnob { "Accent" };
     KnobWithLabel sendEffKnob { "FX" }, sendDlyKnob { "Delay" }, sendRevKnob { "Reverb" };   // the strip's three sends
+    KnobWithLabel probKnob { "Prob" };                       // the share of the layer's notes that play
+    juce::Label    loopCaption { {}, "Play" };                // the loop ratio: the Nth of every M passes
+    DropdownSelect loopSelect;
     juce::TextButton soloBtn { "Solo" };                                                      // the strip's solo
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> swingAtt, accentAtt, sendEffAtt, sendDlyAtt, sendRevAtt;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> swingAtt, accentAtt, sendEffAtt, sendDlyAtt, sendRevAtt, probAtt;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> soloAtt;
     InsertSubsection insertSub;                       // the track's insert effect (t{N}_drvChar, t{N}_insP1..4)
     LFOEditor         rumbleEnvEditor;                // the Rumble track's drawable volume envelope

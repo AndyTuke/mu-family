@@ -151,6 +151,8 @@ void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
     insAlgoRow  = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "drvChar")), this);
     for (int k = 0; k < VoiceParams::kInsertSlotCount; ++k)
         insParamRow[k] = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "insP" + juce::String(k + 1))), this);
+    probRow     = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "prob")), this);
+    loopRow     = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "loop")), this);
     swingRow    = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "swing")), this);
     accentRow   = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "accent")), this);
     jassert(engineRow.isBound() && sourceRow.isBound() && bassWaveRow.isBound() && algoRow.isBound() && swingRow.isBound() && accentRow.isBound());   // an id drift from the layout (debug)
@@ -305,13 +307,22 @@ void Track::clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, i
     row.setGroove(swingRow.load(0.0f), accentRow.load(1.0f));
     if (! ctx.playing) return;
     if (ctx.justStarted) clock.seek(ctx.startBeat);   // the step the transport starts in fires, even on a quick replay
+    // The layer's Probability thins every note; its loop ratio picks which passes of the row play.
+    const float probability = juce::jlimit(0.0f, 1.0f, probRow.load(1.0f));
+    const auto ratio = kLoopRatios[(size_t) juce::jlimit(0, (int) std::size(kLoopRatios) - 1, juce::roundToInt(loopRow.load(0.0f)))];
     clock.processSpan(row, ctx.startBeat, n, ctx.beatsPerSample, row.swingAmount(), row.accentVelocity(),
-                      [this, fireInto, e](float velocity, int offset, bool open)
+                      [this, fireInto, e, probability](float velocity, int offset, bool open)
                       {
                           if (fireInto == nullptr || e == toIndex(EngineType::Rumble)) return;
+                          if (probability < 1.0f)
+                          {
+                              // xorshift32: a cheap draw on the audio thread; the note plays if it falls under the probability.
+                              rngState ^= rngState << 13; rngState ^= rngState >> 17; rngState ^= rngState << 5;
+                              if ((float) (rngState >> 8) * (1.0f / 16777216.0f) >= probability) return;
+                          }
                           fireInto->trigger(velocity, offset, open);
                           triggers.fetch_add(1, std::memory_order_relaxed);
-                      });
+                      }, ratio.play, ratio.of);
 }
 
 void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n)

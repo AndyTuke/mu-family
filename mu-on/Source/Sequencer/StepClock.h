@@ -37,9 +37,11 @@ public:
     // Under MIDI clock the transport hands each block the exact span the clock's beat model moved (not always
     // tempo x length); using it keeps consecutive blocks contiguous, so no step falls in a gap.
     // Audio thread: no allocation, `fire` is called inline.
+    // `playPass` of `ofPasses`: the pass (16 steps, from the transport start) the row is in must be that one of every
+    // `ofPasses` for its steps to fire (1 of 1: every pass).
     template <class Row, class Fire>
     void processSpan(const Row& row, double beatStart, int numSamples, double beatsPerSample,
-                     float swing, float accentVelocity, Fire&& fire) noexcept
+                     float swing, float accentVelocity, Fire&& fire, int playPass = 1, int ofPasses = 1) noexcept
     {
         if (numSamples <= 0 || beatsPerSample <= 0.0) return;
 
@@ -63,7 +65,10 @@ public:
                 const int local = localStep(nextGlobalStep);
                 const int sampleOffset = juce::jlimit(0, numSamples - 1,
                                                       (int) std::round((t - beatStart) / beatsPerSample));
-                if (row.isOn(local))
+                const long long pass = nextGlobalStep >= 0 ? nextGlobalStep / StepRow::kNumSteps
+                                                           : -((-nextGlobalStep + StepRow::kNumSteps - 1) / StepRow::kNumSteps);
+                const bool passPlays = ofPasses <= 1 || (((pass % ofPasses) + ofPasses) % ofPasses) == playPass - 1;
+                if (passPlays && row.isOn(local))
                 {
                     const float velocity = row.isAccent(local) ? accentedVelocity(accentVelocity) : kNormalVelocity;
                     // A firing that takes the step's Open flag (the Hat) gets it as a third argument; the others do not.

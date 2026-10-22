@@ -163,6 +163,10 @@ private:
     // run on the engine's block after it renders. Algorithm 0 (None) skips it.
     InsertProcessor insert;
     mu_core::ParamBinding insAlgoRow, insParamRow[VoiceParams::kInsertSlotCount];
+    // Probability (the share of notes that play) and the loop ratio (which pass of every few plays), and the audio
+    // thread's noise for the probability draw.
+    mu_core::ParamBinding probRow, loopRow;
+    uint32_t              rngState = 0x2545F491u;
     std::array<EngineMod, kNumEngineTypes> mods;
 
     // The UI's live modulation values, on their own cache line (C16): written by the audio thread.

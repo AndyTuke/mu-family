@@ -140,7 +140,11 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     // setLayer attaches them to the shown track's rows.
     addAndMakeVisible(swingKnob);
     addAndMakeVisible(accentKnob);
-    for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob }) addAndMakeVisible(*k);
+    for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob }) addAndMakeVisible(*k);
+    loopCaption.setJustificationType(juce::Justification::centred);
+    loopCaption.setInterceptsMouseClicks(false, false);
+    addAndMakeVisible(loopCaption);
+    addAndMakeVisible(loopSelect);
     soloBtn.setClickingTogglesState(true);
     addAndMakeVisible(soloBtn);
     insertSub.onStatusUpdate = [this](const juce::String& name, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
@@ -241,7 +245,8 @@ void TrackContent::rebuild()
     accentAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(host.getTrackParameters(), layerParamId(currentLayer, "accent"), accentKnob.getSlider());
 
     // The strip's sends and solo (ch{N}_), and the track's insert.
-    for (auto* a : { &sendEffAtt, &sendDlyAtt, &sendRevAtt }) a->reset();
+    for (auto* a : { &sendEffAtt, &sendDlyAtt, &sendRevAtt, &probAtt }) a->reset();
+    loopAtt.reset();
     soloAtt.reset();
     const juce::String strip = "ch" + juce::String(currentLayer) + "_";
     auto& apvts = host.getTrackParameters();
@@ -249,6 +254,9 @@ void TrackContent::rebuild()
     sendDlyAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, strip + "sendDly", sendDlyKnob.getSlider());
     sendRevAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, strip + "sendRev", sendRevKnob.getSlider());
     soloAtt    = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, strip + "solo", soloBtn);
+    probAtt    = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerParamId(currentLayer, "prob"), probKnob.getSlider());
+    if (loopSelect.getComboBox().getNumItems() == 0) mu_ui::addChoiceItems(loopSelect, apvts, layerParamId(currentLayer, "loop"));
+    loopAtt = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, layerParamId(currentLayer, "loop"), loopSelect.getComboBox());
     insertSub.setChannel(currentLayer);
 
     // A host that fixes the track's engine (engineLocked) hides the Engine selector and shows the track's one
@@ -267,7 +275,9 @@ void TrackContent::rebuild()
     for (auto* c : { (juce::Component*) &rootCaption, (juce::Component*) &rootSelect, (juce::Component*) &scaleCaption, (juce::Component*) &scaleSelect }) c->setVisible(showKey);
     swingKnob.setVisible(! rumble);
     accentKnob.setVisible(! rumble);
-    for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob }) k->setVisible(! rumble);   // a Rumble's box holds its envelope
+    for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob }) k->setVisible(! rumble);   // a Rumble's box holds its envelope
+    loopCaption.setVisible(! rumble);
+    loopSelect.setVisible(! rumble);
     soloBtn.setVisible(! rumble);
     rumbleLength.setVisible(rumble);
     rumbleEnvEditor.setVisible(rumble);
@@ -460,6 +470,13 @@ void TrackContent::resized()
         sendEffKnob.setBounds(blockX, row2Y, knobW, knobH);
         sendDlyKnob.setBounds(blockX + knobW + gap, row2Y, knobW, knobH);
         sendRevKnob.setBounds(blockX + 2 * (knobW + gap), row2Y, knobW, knobH);
+        // Third row: Probability, then the loop ratio dropdown over the other two cells.
+        const int row3Y = row2Y + knobH + rowGap;
+        probKnob.setBounds(blockX, row3Y, knobW, knobH);
+        const int loopX = blockX + knobW + gap, loopW = 2 * knobW + gap;
+        loopCaption.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(LF::kKnobLabelFont))));
+        loopCaption.setBounds(loopX, row3Y, loopW, s(mu_ui::ParamKnobGrid::kLabelH));
+        loopSelect.setBounds(loopX, row3Y + s(mu_ui::ParamKnobGrid::kLabelH) + s(2), loopW, s(MuLookAndFeel::kDropdownH));
     }
 }
 
