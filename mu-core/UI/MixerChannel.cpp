@@ -24,6 +24,12 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
     panKnob.setRange(-1.0, 1.0, 0.01);
     panKnob.setValue(0.0);
     panKnob.getSlider().textFromValueFunction = [](double) { return juce::String(); };
+    panKnob.statusTextFromValue = [](double v) -> juce::String
+    {
+        const int pct = (int) std::round(std::abs(v) * 100.0);
+        return pct == 0 ? juce::String("Centre") : (v < 0.0 ? "Left " : "Right ") + juce::String(pct) + " %";
+    };
+    reportKnobStatus(panKnob, "Pan");
     if (! isClient())   // a client strip has no pan
         addAndMakeVisible(panKnob);
 
@@ -37,6 +43,10 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
         sendEffect.getSlider().textFromValueFunction = noValue;
         sendDelay.getSlider().textFromValueFunction  = noValue;
         sendReverb.getSlider().textFromValueFunction = noValue;
+        for (auto* k : { &sendEffect, &sendDelay, &sendReverb }) k->setStatusUnit(mu_fmt::Unit::Percent01);
+        reportKnobStatus(sendEffect, "Effect Send");
+        reportKnobStatus(sendDelay,  "Delay Send");
+        reportKnobStatus(sendReverb, "Reverb Send");
 
         addAndMakeVisible(sendEffect);
         addAndMakeVisible(sendDelay);
@@ -89,19 +99,34 @@ void MixerChannel::addSidechainControls()
     scAmount.setRange(0.0, 100.0, 1.0);
     scAmount.setValue(0.0);
     scAmount.getSlider().textFromValueFunction = noVal;
+    scAmount.setStatusUnit(mu_fmt::Unit::Percent100);
+    reportKnobStatus(scAmount, "Sidechain Amount");
     addAndMakeVisible(scAmount);
 
     scAttack.setRange(1.0, 500.0, 1.0);
     scAttack.getSlider().setSkewFactorFromMidPoint(22.0);
     scAttack.setValue(5.0);
     scAttack.getSlider().textFromValueFunction = noVal;
+    scAttack.setStatusUnit(mu_fmt::Unit::Ms);
+    reportKnobStatus(scAttack, "Sidechain Attack");
     addAndMakeVisible(scAttack);
 
     scRelease.setRange(10.0, 2000.0, 1.0);
     scRelease.getSlider().setSkewFactorFromMidPoint(141.0);
     scRelease.setValue(100.0);
     scRelease.getSlider().textFromValueFunction = noVal;
+    scRelease.setStatusUnit(mu_fmt::Unit::Ms);
+    reportKnobStatus(scRelease, "Sidechain Release");
     addAndMakeVisible(scRelease);
+}
+
+// A strip knob reports to the status bar as "<strip> <what>  <value + unit>", in the strip's colour.
+void MixerChannel::reportKnobStatus(KnobWithLabel& knob, const juce::String& what)
+{
+    knob.onStatusUpdate = [this, what](const juce::String&, const juce::String& value)
+    {
+        if (onStatusUpdate) onStatusUpdate(channelName + " " + what, value, channelColour);
+    };
 }
 
 //==============================================================================

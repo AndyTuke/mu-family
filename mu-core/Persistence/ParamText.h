@@ -55,4 +55,24 @@ inline juce::AudioParameterFloatAttributes floatText(const juce::NormalisableRan
         .withValueFromStringFunction([range, toText](const juce::String& text) { return valueFromText(text, range, toText); });
 }
 
+// A float parameter whose text is the value in `unit` ("180 ms", "1.3 kHz", "50 %"), with the inverse for typed text.
+inline juce::AudioParameterFloatAttributes floatUnit(const juce::NormalisableRange<float>& range, Unit unit)
+{
+    return floatText(range, [unit](float v, int) { return unitText(unit, v); });
+}
+
+// An integer parameter whose text is the value in `unit` ("C#", "+3 st", "+1 oct"); typed text finds the value that shows it.
+inline juce::AudioParameterIntAttributes intUnit(int lo, int hi, Unit unit)
+{
+    return juce::AudioParameterIntAttributes()
+        .withStringFromValueFunction([unit](int v, int) { return unitText(unit, v); })
+        .withValueFromStringFunction([lo, hi, unit](const juce::String& text)
+        {
+            const auto t = text.trim();
+            for (int v = lo; v <= hi; ++v)
+                if (unitText(unit, v).equalsIgnoreCase(t)) return v;
+            return juce::jlimit(lo, hi, t.getIntValue());
+        });
+}
+
 } // namespace mu_fmt

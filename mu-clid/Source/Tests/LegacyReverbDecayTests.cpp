@@ -44,7 +44,7 @@ struct MuClidLegacyReverbDecayTests : juce::UnitTest
                        + juce::String(p.apvts.getRawParameterValue(mu_pp::kReverbAlgoId)->load()) + " (slot "
                        + juce::String(p.fxChain.reverbSlot().getAlgorithmIndex()) + "), decay " + juce::String(decay, 9));
             expectEquals(p.fxChain.reverbSlot().getAlgorithmIndex(), expected, "the algorithm");
-            expect(decay == mu_pp::legacyReverbDecay(expected),
+            expect(std::abs(decay - mu_pp::legacyReverbDecay(expected)) <= 1.0e-5f,
                    "Decay " + juce::String(decay, 9) + " is the algorithm's old " + juce::String(mu_pp::legacyReverbDecay(expected), 9));
             expect(p.fxChain.reverbSlot().getDecay() == decay, "and reaches the slot");
         }

@@ -42,6 +42,12 @@ void PitchSubsection::apvtsSet(const char* suffix, float v)
 
 void PitchSubsection::wireCallbacks()
 {
+    // The status bar reads number and unit together.
+    pitchOctave.setStatusUnit(mu_fmt::Unit::Octaves);
+    pitchSemi  .setStatusUnit(mu_fmt::Unit::Semitones);
+    pitchFine  .setStatusUnit(mu_fmt::Unit::Cents);
+    pitchDepth .setStatusUnit(mu_fmt::Unit::Semitones);
+
     for (auto* k : { &pitchAtk, &pitchDec, &pitchRel })
     {
         k->getSlider().textFromValueFunction = [](double v) { return mu_fmt::time(v, false); };

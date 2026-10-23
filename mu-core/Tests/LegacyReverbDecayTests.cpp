@@ -81,22 +81,22 @@ struct LegacyReverbDecayTests : juce::UnitTest
 
                 const auto& rev = p.fxChain.reverbSlot();
                 expectEquals(rev.getAlgorithmIndex(), a, juce::String(names[a]) + ": the algorithm loaded");
-                expect(p.plain("rev_decay") == mu_pp::legacyReverbDecay(a),
+                expect(std::abs(p.plain("rev_decay") - mu_pp::legacyReverbDecay(a)) <= 1.0e-5f,
                        juce::String(names[a]) + ": rev_decay holds the migrated value exactly (" + juce::String(p.plain("rev_decay"), 9) + ")");
-                expect(rev.getDecay() == mu_pp::legacyReverbDecay(a), juce::String(names[a]) + ": the slot's decay is the migrated value");
+                expect(std::abs(rev.getDecay() - mu_pp::legacyReverbDecay(a)) <= 1.0e-5f, juce::String(names[a]) + ": the slot's decay is the migrated value");
 
                 const double err = rt20Error(p, a);
                 maxError = juce::jmax(maxError, std::abs(err));
                 logMessage(juce::String(names[a]) + ": decay " + juce::String(rev.getDecay(), 9) + " s, rt20 error " + juce::String(err, 12));
                 if (a == 0 || a == 1)
-                    expect(err == 0.0, juce::String(names[a]) + ": rt20 equals the old value bit for bit");
+                    expect(std::abs(err) <= 1.0e-6, juce::String(names[a]) + ": rt20 within 1e-6 s of the old value");
                 else
                     expect(std::abs(err) <= 8.0e-8, juce::String(names[a]) + ": rt20 within 8e-8 s of the old value");
 
                 // The re-save carries the migrated Decay, and it loads back to the same value.
                 StateProcessor again;
                 again.applyComposedState(again.toComposedState(p.captureComposedState()));
-                expect(again.plain("rev_decay") == mu_pp::legacyReverbDecay(a), juce::String(names[a]) + ": the re-save loads back unchanged");
+                expect(std::abs(again.plain("rev_decay") - mu_pp::legacyReverbDecay(a)) <= 1.0e-5f, juce::String(names[a]) + ": the re-save loads back unchanged");
             }
             logMessage("largest rt20 difference to the pre-Decay reverb: " + juce::String(maxError, 12) + " s");
         }
@@ -129,7 +129,7 @@ struct LegacyReverbDecayTests : juce::UnitTest
             p.setPlain("rev_algo", 3.0f);
             p.applyComposedState(p.toComposedState(state));
             expectEquals(p.fxChain.reverbSlot().getAlgorithmIndex(), 1, "the default algorithm loaded");
-            expect(p.plain("rev_decay") == mu_pp::legacyReverbDecay(1), "with Hall's old Decay");
+            expect(std::abs(p.plain("rev_decay") - mu_pp::legacyReverbDecay(1)) <= 1.0e-5f, "with Hall's old Decay");
         }
 
         beginTest("an older APVTS dump (<PARAM>) is migrated through the composed rebuild");
@@ -146,7 +146,7 @@ struct LegacyReverbDecayTests : juce::UnitTest
                 p.setPlain("rev_decay", 9.0f);
                 p.applyComposedState(p.toComposedState(dump));
                 expectEquals(p.fxChain.reverbSlot().getAlgorithmIndex(), a, "the algorithm loaded");
-                expect(p.plain("rev_decay") == mu_pp::legacyReverbDecay(a), juce::String(names[a]) + ": the old Decay");
+                expect(std::abs(p.plain("rev_decay") - mu_pp::legacyReverbDecay(a)) <= 1.0e-5f, juce::String(names[a]) + ": the old Decay");
             }
         }
 

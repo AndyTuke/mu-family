@@ -4,6 +4,7 @@
 #include <string>
 #include "MuLookAndFeel.h"
 #include "Modulation/ModulationMatrix.h"
+#include "ValueFormat.h"   // mu_fmt::Unit for the status text
 
 // Rotary slider + category colour + label below + optional status bar callback.
 class KnobWithLabel : public juce::Component, private juce::Timer
@@ -11,6 +12,11 @@ class KnobWithLabel : public juce::Component, private juce::Timer
 public:
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
     std::function<void(double value)> onValueChanged;
+
+    // What the status bar shows as the value: the number AND its unit ("180 ms", "1.3 kHz", "C#"). The knob's own
+    // readout may stay a bare number; unset, the status shows the slider's text.
+    std::function<juce::String(double value)> statusTextFromValue;
+    void setStatusUnit(mu_fmt::Unit unit) { statusTextFromValue = [unit](double v) { return mu_fmt::unitText(unit, v); }; }
 
     KnobWithLabel(const juce::String& label,
                   MuLookAndFeel::ColourIds categoryColour = MuLookAndFeel::knobEuclidean);
@@ -105,5 +111,6 @@ private:
     std::unique_ptr<juce::TextEditor> inlineEditor;
 
     void showInlineEditor();
+    juce::String statusValueText();   // the status bar's value text (see statusTextFromValue)
     void timerCallback() override;
 };

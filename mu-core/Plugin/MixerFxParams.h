@@ -34,6 +34,15 @@ inline void addGlobalFxParams(juce::AudioProcessorValueTreeState::ParameterLayou
         layout.add(std::make_unique<juce::AudioParameterFloat>(id, name, r, def,
                        mu_fmt::floatText(r, [](float v, int) { return juce::String(v, 3); })));
     };
+    // A time or rate range skewed so `centre` sits mid-knob, with text in its unit ("250 ms", "2.5 s"): the short end,
+    // where these are played, gets the travel (mu-Clid's envelope-time rule).
+    auto addSkewed = [&](const juce::String& id, const juce::String& name, float mn, float mx, float def, float centre,
+                         mu_fmt::Unit unit)
+    {
+        juce::NormalisableRange<float> r(mn, mx);
+        r.setSkewForCentre(centre);
+        layout.add(std::make_unique<juce::AudioParameterFloat>(id, name, r, def, mu_fmt::floatUnit(r, unit)));
+    };
     auto addB = [&](const juce::String& id, const juce::String& name, bool def)
     { layout.add(std::make_unique<juce::AudioParameterBool>(id, name, def)); };
     auto addI = [&](const juce::String& id, const juce::String& name, int mn, int mx, int def)
@@ -51,7 +60,7 @@ inline void addGlobalFxParams(juce::AudioProcessorValueTreeState::ParameterLayou
     // ── Delay slot ───────────────────────────────────────────────────────────
     addB("dly_en",        "Delay Enable",    true);
     addB("dly_mode",      "Delay Sync",      true);
-    addF("dly_ms",        "Delay Time (ms)", 1.0f, 4000.0f, 250.0f);
+    addSkewed("dly_ms",    "Delay Time (ms)", 1.0f, 4000.0f, 250.0f, 250.0f, mu_fmt::Unit::Ms);
     addI("dly_syncDenom", "Delay Denom",     0, 3, 2);
     addB("dly_syncDot",   "Delay Dotted",    true);
     addB("dly_syncTrip",  "Delay Triplet",   false);
@@ -65,8 +74,8 @@ inline void addGlobalFxParams(juce::AudioProcessorValueTreeState::ParameterLayou
     addB("rev_en",   "Reverb Enable",     true);
     addF("rev_lvl",  "Reverb Level",  0.0f,   1.0f,  1.0f);
     addF("rev_size", "Reverb Size",   0.0f,   1.0f,  0.75f);
-    addF("rev_decay", "Reverb Decay", 0.1f,  10.0f,  2.5f);    // RT60 in seconds; 2.5 is the Hall preset
-    addF("rev_pre",  "Reverb Pre-Delay", 0.0f, 100.0f, 25.0f);
+    addSkewed("rev_decay", "Reverb Decay", 0.1f, 10.0f, 2.5f, 1.5f, mu_fmt::Unit::Seconds);    // RT60 in seconds; 2.5 is the Hall preset
+    addSkewed("rev_pre",  "Reverb Pre-Delay", 0.0f, 100.0f, 25.0f, 20.0f, mu_fmt::Unit::Ms);
     addF("rev_diff", "Reverb Diffusion", 0.0f,   1.0f,  0.80f);
     addF("rev_damp", "Reverb Damp",   0.0f,   1.0f,  0.30f);
     addF("rev_mod",  "Reverb Mod",    0.0f,   1.0f,  0.15f);
@@ -80,7 +89,7 @@ inline void addGlobalFxParams(juce::AudioProcessorValueTreeState::ParameterLayou
     // ── Echo (embedded in the EFX slot when algo=Echo) ────────────────────────
     addB("echo_en",        "Echo Enable",      true);
     addF("echo_mode",      "Echo Mode",        0.0f, 1.0f, 0.0f);
-    addF("echo_ms",        "Echo Time Ms",     1.0f, 4000.0f, 250.0f);
+    addSkewed("echo_ms",   "Echo Time Ms",     1.0f, 4000.0f, 250.0f, 250.0f, mu_fmt::Unit::Ms);
     addI("echo_syncDenom", "Echo Sync Denom",  0, 3, 2);
     addB("echo_syncDot",   "Echo Dotted",      false);
     addB("echo_syncTrip",  "Echo Triplet",     false);

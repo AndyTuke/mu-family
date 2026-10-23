@@ -133,6 +133,7 @@ private:
     // Construction and layout in parts (constructor / resized()).
     void addSidechainControls();
     int  layoutSidechain(int stripW, int nameBottom);    // returns the section's height
+    void reportKnobStatus(KnobWithLabel& knob, const juce::String& what);   // route a strip knob to the status bar
     int  layoutSends(int stripW, int sendY);             // returns the fader's top
     void layoutFaderAndButtons(int stripW, int faderY);
     void layoutClient();

@@ -133,10 +133,10 @@ struct FxAlgoSwitchTests : juce::UnitTest
             reference.setAlgorithm(0);
             const auto& params = FXAlgorithmRegistry::effectAlgorithms()[0].params;
             for (size_t i = 0; i < params.size() && i < 5; ++i)
-                reference.setParam(params[i].id, params[i].minVal + 0.5f * (params[i].maxVal - params[i].minVal));
+                reference.setParam(params[i].id, params[i].actualFromNorm(0.5f));
             reference.prepare(kSr, kBlock);
             for (size_t i = 0; i < params.size() && i < 5; ++i)
-                reference.setParam(params[i].id, params[i].minVal + knobs[i] * (params[i].maxVal - params[i].minVal));
+                reference.setParam(params[i].id, params[i].actualFromNorm(knobs[i]));
 
             // The same deterministic input through both; they must agree sample for sample. With the old code the
             // processor's chorus kept the default-knob values (rate 4.05 Hz, depth 50 %, ...) instead of the new ones.

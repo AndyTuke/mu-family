@@ -56,6 +56,11 @@ void FilterSubsection::apvtsSet(const char* suffix, float v)
 
 void FilterSubsection::wireCallbacks()
 {
+    // The status bar reads number and unit together.
+    filterRes  .setStatusUnit(mu_fmt::Unit::Percent01);
+    filterDrive.setStatusUnit(mu_fmt::Unit::Percent100);
+    filterDepth.setStatusUnit(mu_fmt::Unit::Semitones);
+
     // Value display: number only. valueFromText still accepts "ms"/"s" suffixes for typed input.
     for (auto* k : { &filterAtk, &filterDec, &filterRel })
     {

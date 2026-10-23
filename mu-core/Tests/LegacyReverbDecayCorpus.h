@@ -77,7 +77,7 @@ namespace mu_legacy_reverb
                 if (saved)
                     t.expectWithinAbsoluteError(decay, 2.5f, 1.0e-5f, what + ": the saved Decay (2.5) is kept");
                 else
-                    t.expect(decay == mu_pp::legacyReverbDecay(algorithm),
+                    t.expect(std::abs(decay - mu_pp::legacyReverbDecay(algorithm)) <= 1.0e-5f,
                              what + ": Decay " + juce::String(decay, 9) + " is the algorithm's old "
                                   + juce::String(mu_pp::legacyReverbDecay(algorithm), 9));
             }

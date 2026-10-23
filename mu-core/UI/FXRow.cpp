@@ -180,6 +180,7 @@ void FXRow::rebuildKnobs(int algorithmIndex)
         if (hiddenParamIds.contains(param.id)) continue; // e.g. "mix" hidden in send/return rows
         auto knob = std::make_unique<KnobWithLabel>(param.name, knobColour);
         knob->setRange(param.minVal, param.maxVal);
+        if (param.isSkewed()) knob->getSlider().setSkewFactorFromMidPoint(param.centre);   // the curve the stored knob position maps through
         knob->setValue(param.defaultVal, juce::dontSendNotification);
         knob->getSlider().setName(param.id);
 
@@ -246,6 +247,13 @@ void FXRow::rebuildKnobs(int algorithmIndex)
         {
             knob->getSlider().setNumDecimalPlacesToDisplay(0);
         }
+
+        // The status bar reads number and unit together, whatever the knob's own (bare-number) readout shows.
+        if      (param.units == "Hz") knob->setStatusUnit(mu_fmt::Unit::Hz);
+        else if (param.units == "%")  knob->setStatusUnit(mu_fmt::Unit::Percent100);
+        else if (param.units == "ms") knob->setStatusUnit(mu_fmt::Unit::Ms);
+        else if (param.units == "s")  knob->setStatusUnit(mu_fmt::Unit::Seconds);
+        else if (param.minVal == 0.0f && param.maxVal == 1.0f) knob->setStatusUnit(mu_fmt::Unit::Percent01);
 
         knob->onStatusUpdate = [this](const juce::String& n, const juce::String& v)
         {

@@ -670,8 +670,7 @@ void ProcessorBase::syncFxSlotParam(const juce::String& id, float v)
             const auto& params = algos[(size_t) ai].params;
             for (int i = 0; i < (int) params.size() && i < 5; ++i)
                 if (auto* knob = apvts.getRawParameterValue(kEffKnobIds[i]))
-                    eff.setParam(params[(size_t) i].id,
-                                 params[(size_t) i].minVal + knob->load() * (params[(size_t) i].maxVal - params[(size_t) i].minVal));
+                    eff.setParam(params[(size_t) i].id, params[(size_t) i].actualFromNorm(knob->load()));
         }
     }
     else if (id == "eff_en")   eff.setEnabled(v > 0.5f);
@@ -683,7 +682,7 @@ void ProcessorBase::syncFxSlotParam(const juce::String& id, float v)
         if (ai < (int) algos.size() && idx < (int) algos[(size_t) ai].params.size())
         {
             const auto& pd = algos[(size_t) ai].params[(size_t) idx];
-            eff.setParam(pd.id, pd.minVal + v * (pd.maxVal - pd.minVal));
+            eff.setParam(pd.id, pd.actualFromNorm(v));
         }
     }
     else if (id == "dly_en")   dly.setEnabled(v > 0.5f);

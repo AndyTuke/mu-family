@@ -45,13 +45,13 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     // Per-oscillator pitch — all integer-stepped. Octave ±3 offset, Semi
     // ±12 (scale-degree, see TantScales.h), Fine ±100 cents. Wavetable position
     // is a 0..255 frame index (256-frame Serum/Vital tables).
-    layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o1_oct"),  1}, label("Osc1 Octave"),   -3, 3, 0));
-    layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o1_semi"), 1}, label("Osc1 Semi"),     -12, 12, 0));
-    layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o1_fine"), 1}, label("Osc1 Fine"),     -100, 100, 0));
+    layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o1_oct"),  1}, label("Osc1 Octave"),   -3, 3, 0, mu_fmt::intUnit(-3, 3, mu_fmt::Unit::Octaves)));
+    layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o1_semi"), 1}, label("Osc1 Semi"),     -12, 12, 0, mu_fmt::intUnit(-12, 12, mu_fmt::Unit::Semitones)));
+    layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o1_fine"), 1}, label("Osc1 Fine"),     -100, 100, 0, mu_fmt::intUnit(-100, 100, mu_fmt::Unit::Cents)));
     layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o1_pos"),  1}, label("Osc1 Position"), 0, 255, 0));
-    layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_oct"),  1}, label("Osc2 Octave"),   -3, 3, 0));
-    layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_semi"), 1}, label("Osc2 Semi"),     -12, 12, 2));
-    layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_fine"), 1}, label("Osc2 Fine"),     -100, 100, 0));
+    layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_oct"),  1}, label("Osc2 Octave"),   -3, 3, 0, mu_fmt::intUnit(-3, 3, mu_fmt::Unit::Octaves)));
+    layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_semi"), 1}, label("Osc2 Semi"),     -12, 12, 2, mu_fmt::intUnit(-12, 12, mu_fmt::Unit::Semitones)));
+    layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_fine"), 1}, label("Osc2 Fine"),     -100, 100, 0, mu_fmt::intUnit(-100, 100, mu_fmt::Unit::Cents)));
     layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_pos"),  1}, label("Osc2 Position"), 0, 255, 0));
 
     // Selected wavetable (index into the WavetableBank). Range tracks the
@@ -65,19 +65,24 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     //  Lane B (amplitude):   one bipolar depth knob (AM↔RM morph) + a mode switch (Mult/SSB)
     //                        + a separate SSB shift amount the knob drives in SSB mode.
     layout.add(std::make_unique<AudioParameterChoice>(ParameterID{id("xmod_phaseMode"), 1}, label("X-Mod Phase Mode"), StringArray{ "FM", "PM", "TZFM" }, 1));
-    layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("xmod_index"),     1}, label("X-Mod Index"),      f(0.0f, 100.0f, 1.0f), 0.0f));
+    layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("xmod_index"),     1}, label("X-Mod Index"),      f(0.0f, 100.0f, 1.0f), 0.0f,
+                mu_fmt::floatUnit(f(0.0f, 100.0f, 1.0f), mu_fmt::Unit::Percent100)));
     layout.add(std::make_unique<AudioParameterBool>  (ParameterID{id("sync"),           1}, label("Osc Sync"), false));
     layout.add(std::make_unique<AudioParameterBool>  (ParameterID{id("xmod_fdbk"),      1}, label("X-Mod Feedback"), false));
     layout.add(std::make_unique<AudioParameterChoice>(ParameterID{id("xmod_ampMode"),   1}, label("X-Mod Amp Mode"), StringArray{ "AM", "RM", "SSB" }, 0));
-    layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("xmod_depth"),     1}, label("X-Mod Depth"),     f(-100.0f, 100.0f, 1.0f), 0.0f));
+    layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("xmod_depth"),     1}, label("X-Mod Depth"),     f(-100.0f, 100.0f, 1.0f), 0.0f,
+                mu_fmt::floatUnit(f(-100.0f, 100.0f, 1.0f), mu_fmt::Unit::Percent100)));
     layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("xmod_ssb"),       1}, label("X-Mod SSB Shift"), f(-2000.0f, 2000.0f, 1.0f), 0.0f,
                 mu_fmt::floatText(f(-2000.0f, 2000.0f, 1.0f),
                     [](float v, int) -> juce::String { return juce::String((int) std::round(v)) + " Hz"; })));
 
     // Per-source levels (replace the old osc-balance "mix").
-    layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("o1_lvl"),   1}, label("Osc1 Level"),  f(-60.0f, 6.0f, 0.1f), 0.0f));
-    layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("o2_lvl"),   1}, label("Osc2 Level"),  f(-60.0f, 6.0f, 0.1f), -6.0f));
-    layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("noise_lvl"),1}, label("Noise Level"), f(-60.0f, 6.0f, 0.1f), -60.0f));
+    layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("o1_lvl"),   1}, label("Osc1 Level"),  f(-60.0f, 6.0f, 0.1f), 0.0f,
+                mu_fmt::floatUnit(f(-60.0f, 6.0f, 0.1f), mu_fmt::Unit::Db)));
+    layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("o2_lvl"),   1}, label("Osc2 Level"),  f(-60.0f, 6.0f, 0.1f), -6.0f,
+                mu_fmt::floatUnit(f(-60.0f, 6.0f, 0.1f), mu_fmt::Unit::Db)));
+    layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("noise_lvl"),1}, label("Noise Level"), f(-60.0f, 6.0f, 0.1f), -60.0f,
+                mu_fmt::floatUnit(f(-60.0f, 6.0f, 0.1f), mu_fmt::Unit::Db)));
     layout.add(std::make_unique<AudioParameterChoice>(ParameterID{id("noise_type"),1}, label("Noise Type"), StringArray{ "White", "Pink" }, 0));
 
     // Filter (mu-core) — match mu-clid's filter feel: cutoff 20..20000 Hz
@@ -88,8 +93,8 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     // slider-side formatter would be clobbered on every voice rebind.
     NormalisableRange<float> cutoff(20.0f, 20000.0f);
     cutoff.setSkewForCentre(640.0f);
-    auto cutoffText = [](float v, int) { return mu_fmt::freq(v, false, 1); };   // the knob label carries the unit
-    auto resText    = [](float v, int) { return mu_fmt::percent(v); };
+    auto cutoffText = [](float v, int) { return mu_fmt::freq(v, true, 1); };   // number and unit: the status bar and the host read "1.3 kHz"
+    auto resText    = [](float v, int) { return mu_fmt::unitText(mu_fmt::Unit::Percent01, v); };
     // AudioParameterInt(0..15): stores the algorithm index directly (same
     // normalisation as AudioParameterChoice(16) — both map 0..15 over 0..1).
     // The UI dropdown uses mu_audio::populateFilterTypeDropdown (item ID = index+1)
@@ -102,14 +107,15 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
                 mu_fmt::floatText(f(0.0f, 0.99f, 0.001f), resText)));
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_drv"), 1}, label("Filter Drive"), f(0.0f, 1.0f, 0.01f), 0.0f,
                 mu_fmt::floatText(f(0.0f, 1.0f, 0.01f),
-                    [](float v, int) { return mu_fmt::percent(v); })));
+                    [](float v, int) { return mu_fmt::unitText(mu_fmt::Unit::Percent01, v); })));
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_lo_cut"), 1}, label("Low Cut"),
                 juce::NormalisableRange<float>(0.0f, 1000.0f, 0.0f, 0.35f), 0.0f,
                 mu_fmt::floatText(juce::NormalisableRange<float>(0.0f, 1000.0f, 0.0f, 0.35f),
                     [](float v, int) { return mu_fmt::lowCut(v); })));
 
     // Filter 1 envelope depth.
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_env_depth"), 1}, label("Filter Env Depth"), f(-1.0f, 1.0f, 0.01f), 1.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_env_depth"), 1}, label("Filter Env Depth"), f(-1.0f, 1.0f, 0.01f), 1.0f,
+                mu_fmt::floatUnit(f(-1.0f, 1.0f, 0.01f), mu_fmt::Unit::Percent01)));
 
     // Filter 2 — same param set as Filter 1; cutoff defaults to 8 kHz (matching
     // Filter 1) so adding a second filter is audible out of the box, not transparent.
@@ -120,12 +126,13 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
                 mu_fmt::floatText(f(0.0f, 0.99f, 0.001f), resText)));
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt2_drv"), 1}, label("F2 Drive"), f(0.0f, 1.0f, 0.01f), 0.0f,
                 mu_fmt::floatText(f(0.0f, 1.0f, 0.01f),
-                    [](float v, int) { return mu_fmt::percent(v); })));
+                    [](float v, int) { return mu_fmt::unitText(mu_fmt::Unit::Percent01, v); })));
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt2_lo_cut"), 1}, label("F2 Low Cut"),
                 juce::NormalisableRange<float>(0.0f, 1000.0f, 0.0f, 0.35f), 0.0f,
                 mu_fmt::floatText(juce::NormalisableRange<float>(0.0f, 1000.0f, 0.0f, 0.35f),
                     [](float v, int) { return mu_fmt::lowCut(v); })));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt2_env_depth"), 1}, label("F2 Env Depth"), f(-1.0f, 1.0f, 0.01f), 0.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt2_env_depth"), 1}, label("F2 Env Depth"), f(-1.0f, 1.0f, 0.01f), 0.0f,
+                mu_fmt::floatUnit(f(-1.0f, 1.0f, 0.01f), mu_fmt::Unit::Percent01)));
 
     // Series (true) / Parallel (false) routing for the two filters.
     layout.add(std::make_unique<AudioParameterBool>(ParameterID{id("flt_series"), 1}, label("Filter Series"), true));
@@ -143,7 +150,8 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     // Per-voice slot output level — distinct from the mixer fader (engine-level
     // trim before the channel strip; the mixer adds its own per-channel level
     // / pan / mute / solo on top, matching the mu-clid signal flow).
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("level"), 1}, label("Level"), f(-60.0f, 6.0f, 0.1f), -6.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("level"), 1}, label("Level"), f(-60.0f, 6.0f, 0.1f), -6.0f,
+                mu_fmt::floatUnit(f(-60.0f, 6.0f, 0.1f), mu_fmt::Unit::Db)));
 
     // Gate Gap — percentage of every gate-envelope region forced to silence
     // at its end, for a cleaner gate. Integer 0..100 %; consumed as /100.

@@ -217,16 +217,14 @@ void PatternContent::setupFilterControls()
     addAndMakeVisible(fltTypeDropdown);
     addAndMakeVisible(flt2TypeDropdown);
 
-    // Cutoff / Resonance value formatting lives on the APVTS parameter (see
-    // createParameterLayout) so the SliderAttachment can't clobber it. The
-    // cutoff value reads as a bare number (Hz / kHz), so carry the unit in the
-    // knob label, switching it as the value crosses 1 kHz — matching mu-clid.
-    fltDrvKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::percent(v); };
-    fltLoCutKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::lowCut(v, false); };
+    // Cutoff / Resonance value formatting lives on the APVTS parameter (see createParameterLayout) so the
+    // SliderAttachment can't clobber it; Drive and Low Cut carry their unit here.
+    fltDrvKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::unitText(mu_fmt::Unit::Percent01, v); };
+    fltLoCutKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::lowCut(v); };
 
     // ── Filter 2 ────────────────────────────────────────────────────────────
-    flt2DrvKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::percent(v); };
-    flt2LoCutKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::lowCut(v, false); };
+    flt2DrvKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::unitText(mu_fmt::Unit::Percent01, v); };
+    flt2LoCutKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::lowCut(v); };
 
     addAndMakeVisible(fltSeriesBtn);
 }

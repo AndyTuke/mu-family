@@ -24,13 +24,18 @@ KnobWithLabel::KnobWithLabel(const juce::String& label,
         repaint();  // refresh value text in dead zone
         if (settingRange) return;   // suppress callbacks from setRange clip
         if (onStatusUpdate)
-            onStatusUpdate(labelText, slider.getTextFromValue(slider.getValue()));
+            onStatusUpdate(labelText, statusValueText());
         if (onValueChanged)
             onValueChanged(slider.getValue());
     };
 
     slider.addMouseListener(this, false);
     addAndMakeVisible(slider);
+}
+
+juce::String KnobWithLabel::statusValueText()
+{
+    return statusTextFromValue ? statusTextFromValue(slider.getValue()) : slider.getTextFromValue(slider.getValue());
 }
 
 bool KnobWithLabel::isSteppedControl() const
@@ -193,7 +198,7 @@ void KnobWithLabel::showInlineEditor()
 void KnobWithLabel::mouseEnter(const juce::MouseEvent&)
 {
     if (onStatusUpdate)
-        onStatusUpdate(labelText, slider.getTextFromValue(slider.getValue()));
+        onStatusUpdate(labelText, statusValueText());
 }
 
 void KnobWithLabel::paint(juce::Graphics& g)

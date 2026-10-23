@@ -327,7 +327,7 @@ void MixerOverlay::wireFXRows()
             for (int i = 0; i < (int)oldParams.size() && i < 5; ++i)
             {
                 float norm = *proc.apvts.getRawParameterValue(kEffParamIds[i]);
-                *pv[i] = oldParams[i].minVal + norm * (oldParams[i].maxVal - oldParams[i].minVal);
+                *pv[i] = oldParams[i].actualFromNorm(norm);
             }
             effSnapValid[oldIndex] = true;
         }
@@ -351,9 +351,7 @@ void MixerOverlay::wireFXRows()
             for (int i = 0; i < (int)newParams.size() && i < 5; ++i)
             {
                 const auto& pd = newParams[i];
-                float norm = (pd.maxVal > pd.minVal)
-                    ? juce::jlimit(0.0f, 1.0f, (vals[i] - pd.minVal) / (pd.maxVal - pd.minVal))
-                    : 0.0f;
+                const float norm = pd.normFromActual(vals[i]);
                 if (auto* p = proc.apvts.getParameter(kEffParamIds[i]))
                     p->setValueNotifyingHost(norm);
                 effectRow.setParamValue(pd.id, vals[i]);
@@ -386,9 +384,7 @@ void MixerOverlay::wireFXRows()
             if (params[i].id == id)
             {
                 const auto& pd = params[i];
-                float norm = (pd.maxVal > pd.minVal)
-                             ? juce::jlimit(0.0f, 1.0f, (v - pd.minVal) / (pd.maxVal - pd.minVal))
-                             : 0.0f;
+                const float norm = pd.normFromActual(v);
                 if (auto* p = proc.apvts.getParameter(kEffParamIds[i]))
                     p->setValueNotifyingHost(norm);
                 return;
@@ -534,7 +530,7 @@ void MixerOverlay::loadEffectParams()
     for (int i = 0; i < (int) params.size() && i < 5; ++i)
         if (auto* raw = proc.apvts.getRawParameterValue(kEffParamIds[i]))
             effectRow.setParamValue(params[(size_t) i].id,
-                params[(size_t) i].minVal + raw->load() * (params[(size_t) i].maxVal - params[(size_t) i].minVal));
+                params[(size_t) i].actualFromNorm(raw->load()));
 }
 
 void MixerOverlay::loadReverbParams()
