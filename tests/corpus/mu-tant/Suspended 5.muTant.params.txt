@@ -1,8 +1,8 @@
 # frozen load result for fixture: Suspended 5.muTant
 layers=4
 load_errors=0
-resave_bytes=37074
-resave_sha256=1eecf2b04fec0c010545b4b77d9c984b1ddbd7b4af672e32f565648044da502a
+resave_bytes=37101
+resave_sha256=b522274d30d23baa24c869418b14d18095dba23769cb8bda85bb166159fb1f23
 --- parameters differing from default (id=plain value)
 ch0_lvl=0.734
 ch0_pan=-0.6

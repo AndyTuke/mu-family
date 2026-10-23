@@ -1,9 +1,9 @@
 # SHA-256, size, file. Fixtures are read-only copies (see tests/corpus/README.md); *.params.txt are the frozen
 # load results next to them. A change here is deliberate only via MU_REGENERATE_FROZEN=1.
 569a87afc509fd67efbc90bd95dd61711fcb16614453bd7a509a58fd34a8bc02  2206  A3_filter.muClid
-c69c43adea45f55aab903eebdb5677f1df3fd0033d3f3401bb0c5eeed325c2d8  612  A3_filter.muClid.params.txt
+ec24baef1101f407090aa9597b74a53d0cc1b5ab4b7f374cf612c223fcc3d522  612  A3_filter.muClid.params.txt
 47ad12d4197a4d3ad6a3200289da6b8892db862060aad2d44493317ef0668e29  1406  A9_base.muClid
-c6719e6ba84680a34a50be49f10279540a7be0255584b29fed27a20a5e4de4c8  574  A9_base.muClid.params.txt
+42413d8e4b6fc14ec53ed1401337a8600063942520f91efabbe76273860d82b3  574  A9_base.muClid.params.txt
 515e793c5942146b43c77deb44d0b3422ec5c43feb36bfb04c494fd72890b790  1513  A9_hat.muRhythm
 3c8bb825b456951a2159eaa255878904d1dfab461788930111521f3d0b530e96  536  A9_hat.muRhythm.params.txt
 e12756a8445f82a6398c8d29c6c0ce5748e81811b4dff708b039bcd9f491fee6  93586  Big and Bad.muRhythm
@@ -22,7 +22,7 @@ d0edb5f112167b40197dfeae058b7fc252802e0cbb8427fde70875a1148b179c  699  Crusher P
 f1d616a3c2d5c588892097841126a3b7b343bf5d6f78791f3613fa73bb27bb33  474  Demo  Perf.muPerformance
 e7da6a8b7e96aa8eb78a337a94b1f038e4b2cd931ba33173234e6050c285e9ae  372  Demo  Perf.muPerformance.params.txt
 8dedba76cd9cd606512993f74e0f0a09d207002d7f705dc1b9cecc3ccc50b768  437652  Dubster.muClid
-fd30f88cf9b09881605470f85f587f6d9c9848dae5984f30c22a1a674b582483  920  Dubster.muClid.params.txt
+9353e26a33ee65fc18f1b3e239a241fb82b396e994c10f3a9944f422575ebc3c  920  Dubster.muClid.params.txt
 5dd351bb0d191a9958f239ac7435665e133adb398310b45c0a21e5f32d9c353a  4835  FACTORY_STATE.muClid
 b87cc2b8a77b5bdde1564c35ef6698d18080e8b229255c9c1c00659220dd5a85  347  FACTORY_STATE.muClid.params.txt
 71524872b4713b6cca242e77df18288c272c2038bbc62f325be3fa6243e6fd00  3949  Glitch Hat.muRhythm
@@ -34,31 +34,31 @@ afc2e7e8e0f8d46d79b02b0204e8d9923021d83413581ccc775423437371d092  699  Karplus C
 329ab6e59907744b4a72c0b51360adbd91971cb9b6ea136c602bbcea85184207  4821  Karplus Stab.muRhythm
 c7f4bafe59679a51c735231b9efb4ee86d868eb09936da1696e1d2583cb90a02  701  Karplus Stab.muRhythm.params.txt
 ca6642735d2cacc738a8dfa7dafd1f8c2af3a1451f1b2438adbd8552556af236  19144  Lost control.muClid
-a157051186d39ca5cc20853abb3bc91d8dbf83455d918852ccf717f8bbe494af  1725  Lost control.muClid.params.txt
+e7f923f026469f9bae9eff74c36bc8205050382b85b0857c2afd23ae6f80a4f8  1725  Lost control.muClid.params.txt
 2caac221011d56a38f50a369a46937ffe5e956002b3cb6c5583abfb18b7828e4  506188  Loving It.muClid
-5b2249e61e0573785f79a19c6a7da2dfac610f3bd07b9682c684b74f8b8f03ed  2682  Loving It.muClid.params.txt
+31c03eb0c6e68786ee8389d0fa3a2ddf36a55e5bd7d86bb024cf85d286943118  2682  Loving It.muClid.params.txt
 be1b38147818875c2ba1ac0fe0f14dad813389094a28e881dc41b01d6f18a06a  3591  Notched Clap.muRhythm
 b7681f0fa145f614e8a2ad4c31043bac672bf8aba02b7e0a6ec1d8e16b169fcf  709  Notched Clap.muRhythm.params.txt
 89d70dfd5efb0137362a2f64af1fbdd4f41104e1b51e1cd825d0ba35cc1feab7  3612  Resonant Drift.muRhythm
 f9114ff6af059a1517186758375709f819a2d82582d94b96e3c294dc7f828068  688  Resonant Drift.muRhythm.params.txt
 1d367643e63fde72ed45fdf7002406422036443a31464ffa76eba144fda5712e  92908  Simple Beat.muClid
-6b00660daf9a378fbf8dba4a7dca6fa2778b8d16cb7f72fb80d68d79170891d8  898  Simple Beat.muClid.params.txt
+d15820fd58b479ef9d06e1e396f1bddd1992c6282df4a8981543d185efe16497  898  Simple Beat.muClid.params.txt
 9807c971b49cc30331bd026ae9985e45aeff9ac452189780da4bf4a7c1373e0d  295760  Simple Hat.muRhythm
 8dbe0015cd52e1ff1229a614e34d5d373e153d7db755ac5dbbab74ba3c5ee2fe  526  Simple Hat.muRhythm.params.txt
 86dd7c1d1ced0b4adae64e669c20bbbb0e8d840bbb8f4ef93dd912c4c0bc0c12  2768  T11.muRhythm
 2488ee5b737fcbb86d12fb137a0e0971076592a0b18a5dc44ba76400abf4601b  503  T11.muRhythm.params.txt
 4270527c545df8ee0767bbff945ce9dab41f95ba2ac65abdb53eb69d6f8cfabe  1320  TS1.muClid
-1e6bc13a97ea65c5dffd441fc26109ebb61c6021676d2a8aa31cbe49b0513cde  576  TS1.muClid.params.txt
+7d886306bc08153efb77ea03ea8ea7cfd929d075af85c7d30ca2bfd1f05312c2  576  TS1.muClid.params.txt
 bbbff9b2702b4844d51284fc450a55b3e3eedc785993d0f8e9595588c482b476  3451  Tape Sub.muRhythm
 18b26bd128c612c4d4d5dec386cab20d877c32a5ae74b644ac4bb14ed57c5e3f  724  Tape Sub.muRhythm.params.txt
 f08538070adc3111e3ed157825d4658226b3c6a492b836e56ef2c04c0ca1fe33  400  Test.muPerformance
 86ed5093507d03580456b03c6b6ec18c071f0d6405bfe7ef6084e7a4c34b85c8  319  Test.muPerformance.params.txt
 3b2bdd2418b18a8ccfaa89c53972a20ff8ae7272e3e95510952b6bab708e032e  4920  Testing Preset.muClid
-3d41ef918d9c28180d169b3d44c37267d7a6e41ad5c5d2d0e93040fe6eacb9b3  1753  Testing Preset.muClid.params.txt
+8ee247d137c4cced5e1f2e71afc142ce7825ad580f03c5ecd556b2a003ab4a50  1753  Testing Preset.muClid.params.txt
 41ce872ebc99822c2d8f897a636c89ff71b38ff4f25a644b6cd95f37c869be01  4585  Vocoder Drift.muRhythm
 4095d3a1960636760374c094bae229b92bec6c88b5fe7c4499713a3924f17ef5  692  Vocoder Drift.muRhythm.params.txt
 dd68f0d085e16ce2b0f82850927c4c578348d4cd45fc1646180fc8e4ae954a37  673801  Well this is nice.muClid
-8eac9b00d1b18f0150555d74e4263392fdbfa772be12b4363fbb8fca89e58ec4  2566  Well this is nice.muClid.params.txt
+4e8fa512bc6921459e830682fe7b9d4b74376e51a4798097951aafed7ffbe52a  2566  Well this is nice.muClid.params.txt
 9882213e1992df4b82ce43915766dd4b5ea06f26f0faf6976f1a838e98496b36  92613  _default.muClid
 ee890a3596666e71cc6697b108951cc7318e6dacc6cbd824c3b055e9e0901f12  788  _default.muClid.params.txt
 13c165f7ead1818b092cf7e6ddf34bfba123039dc70c6892ba738cb087feb5e6  1448  _default.muRhythm

@@ -1,8 +1,8 @@
 # frozen load result for fixture: Glass Garden 3.muTant
 layers=3
 load_errors=0
-resave_bytes=35621
-resave_sha256=de9a797e6bb03e24dc5687705a0934bd4987135b643a064f7f0ceefb2b0e520f
+resave_bytes=35620
+resave_sha256=3b152f3cac91dd99054e9f5b43db098878312f220e1c475e103a478076346e4b
 --- parameters differing from default (id=plain value)
 ch0_lvl=0.804
 ch0_pan=-0.6

@@ -1,8 +1,8 @@
 # frozen load result for fixture: Event Horizon.muTant
 layers=3
 load_errors=0
-resave_bytes=36215
-resave_sha256=af08c27935911ab04011eea6c4754355ee6a38226a7d1d373c4252343b69ce3d
+resave_bytes=36242
+resave_sha256=15d3aaded20cdb7c05041adf80ad2271d31dcaa3b9ecf6ffe67e910877b12f84
 --- parameters differing from default (id=plain value)
 ch0_lvl=0.761
 ch0_pan=-0.6

@@ -107,7 +107,7 @@ dly_dirt | float | 0 | 1 | 0 | 1 | 0 | 0
 dly_en | bool | 0 | 1 | 1 | 1 | 1 | 1
 dly_fb | float | 0 | 0.98 | 0 | 1 | 0.3 | 0.306122
 dly_mode | bool | 0 | 1 | 1 | 1 | 1 | 1
-dly_ms | float | 1 | 4000 | 0 | 1 | 250 | 0.0622656
+dly_ms | float | 1 | 4000 | 0 | 0.249662 | 250 | 0.5
 dly_spread | float | 0 | 1 | 0 | 1 | 0 | 0
 dly_syncDenom | int | 0 | 3 | 1 | 1 | 2 | 0.666667
 dly_syncDot | bool | 0 | 1 | 1 | 1 | 1 | 1
@@ -117,7 +117,7 @@ echo_dirt | float | 0 | 1 | 0 | 1 | 0 | 0
 echo_en | bool | 0 | 1 | 1 | 1 | 1 | 1
 echo_fb | float | 0 | 1 | 0 | 1 | 0.45 | 0.45
 echo_mode | float | 0 | 1 | 0 | 1 | 0 | 0
-echo_ms | float | 1 | 4000 | 0 | 1 | 250 | 0.0622656
+echo_ms | float | 1 | 4000 | 0 | 0.249662 | 250 | 0.5
 echo_spread | float | 0 | 1 | 0 | 1 | 0 | 0
 echo_syncDenom | int | 0 | 3 | 1 | 1 | 2 | 0.666667
 echo_syncDot | bool | 0 | 1 | 1 | 1 | 0 | 0
@@ -170,13 +170,13 @@ ret_rev_scSrc | int | 0 | 9 | 1 | 1 | 0 | 0
 ret_rev_solo | bool | 0 | 1 | 1 | 1 | 0 | 0
 rev_algo | int | 0 | 3 | 1 | 1 | 1 | 0.333333
 rev_damp | float | 0 | 1 | 0 | 1 | 0.3 | 0.3
-rev_decay | float | 0.1 | 10 | 0 | 1 | 2.5 | 0.242424
+rev_decay | float | 0.1 | 10 | 0 | 0.354358 | 2.5 | 0.605228
 rev_diff | float | 0 | 1 | 0 | 1 | 0.8 | 0.8
 rev_dirt | float | 0 | 1 | 0 | 1 | 0 | 0
 rev_en | bool | 0 | 1 | 1 | 1 | 1 | 1
 rev_lvl | float | 0 | 1 | 0 | 1 | 1 | 1
 rev_mod | float | 0 | 1 | 0 | 1 | 0.15 | 0.15
-rev_pre | float | 0 | 100 | 0 | 1 | 25 | 0.25
+rev_pre | float | 0 | 100 | 0 | 0.430677 | 25 | 0.550436
 rev_size | float | 0 | 1 | 0 | 1 | 0.75 | 0.75
 root | choice(12) | 0 | 11 | 1 | 1 | 0 | 0
 scale | choice(12) | 0 | 11 | 1 | 1 | 11 | 1

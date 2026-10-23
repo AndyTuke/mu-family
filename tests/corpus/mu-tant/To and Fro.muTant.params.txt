@@ -1,8 +1,8 @@
 # frozen load result for fixture: To and Fro.muTant
 layers=2
 load_errors=0
-resave_bytes=45678
-resave_sha256=6c5f827028a87e8c5f45ed97805b43896b7847afa0e6440bd22e6ea8efeb5247
+resave_bytes=45692
+resave_sha256=34220965e96e2d60342b20525bcf924dee56b9604932aceb5958ac5ab3f32ac0
 --- parameters differing from default (id=plain value)
 ch0_scAtk=1
 ch0_scRel=10
