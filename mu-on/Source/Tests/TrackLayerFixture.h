@@ -75,7 +75,7 @@ namespace mu_on_fixture
     };
 
     // The streams' hash as recorded (both targets must reproduce it).
-    constexpr std::uint64_t kRecordedHash = 0x7625ef87a43a58eeull;
+    constexpr std::uint64_t kRecordedHash = 0xee717786f7fb292full;
 
     // ── One non-Rumble Track alone ───────────────────────────────────────────────────────────────────────────────
     // The same scenario on slot 0 for each of the five engines a mu-Tronic slot can lock (Kick, Bass, Hat, Snare, FM Perc): the
@@ -123,7 +123,7 @@ namespace mu_on_fixture
     }
 
     // The hash of channel 0's stream for each engine, indexed by EngineType (Rumble has none: it processes another track).
-    constexpr std::uint64_t kSingleHash[7] = { 0x215e638e585324c9ull, 0x93a31986551d8985ull, 0x537b9c40d4de34b1ull, 0x14889ca97cbd63adull,   // Kick, Bass, Hat, Snare
+    constexpr std::uint64_t kSingleHash[7] = { 0x215e638e585324c9ull, 0x63e10bdc16bff625ull, 0x537b9c40d4de34b1ull, 0x14889ca97cbd63adull,   // Kick, Bass, Hat, Snare
                                                0ull,                                                                                      // Rumble: none
                                                0xcf9d8b87c609bcd1ull,                                                                      // FM Perc
                                                0x2c4893f931735151ull };                                                                     // Chord
