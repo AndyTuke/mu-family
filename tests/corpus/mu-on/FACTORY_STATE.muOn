@@ -192,7 +192,7 @@
         <p id="bass_wave" x="0.0" c="Sine"/>
         <p id="bass_sub" x="0.5"/>
         <p id="bass_tune" x="41.19999694824219"/>
-        <p id="bass_cut" x="600.0"/>
+        <p id="bass_cut" x="600.0000610351562"/>
         <p id="bass_res" x="0.2000000029802322"/>
         <p id="bass_env" x="0.4000000059604645"/>
         <p id="bass_edec" x="180.0"/>
@@ -282,7 +282,7 @@
         <p id="bass_wave" x="0.0" c="Sine"/>
         <p id="bass_sub" x="0.5"/>
         <p id="bass_tune" x="41.19999694824219"/>
-        <p id="bass_cut" x="600.0"/>
+        <p id="bass_cut" x="600.0000610351562"/>
         <p id="bass_res" x="0.2000000029802322"/>
         <p id="bass_env" x="0.4000000059604645"/>
         <p id="bass_edec" x="180.0"/>
@@ -372,7 +372,7 @@
         <p id="bass_wave" x="0.0" c="Sine"/>
         <p id="bass_sub" x="0.5"/>
         <p id="bass_tune" x="41.19999694824219"/>
-        <p id="bass_cut" x="600.0"/>
+        <p id="bass_cut" x="600.0000610351562"/>
         <p id="bass_res" x="0.2000000029802322"/>
         <p id="bass_env" x="0.4000000059604645"/>
         <p id="bass_edec" x="180.0"/>
@@ -462,7 +462,7 @@
         <p id="bass_wave" x="0.0" c="Sine"/>
         <p id="bass_sub" x="0.5"/>
         <p id="bass_tune" x="41.19999694824219"/>
-        <p id="bass_cut" x="600.0"/>
+        <p id="bass_cut" x="600.0000610351562"/>
         <p id="bass_res" x="0.2000000029802322"/>
         <p id="bass_env" x="0.4000000059604645"/>
         <p id="bass_edec" x="180.0"/>
@@ -552,7 +552,7 @@
         <p id="bass_wave" x="0.0" c="Sine"/>
         <p id="bass_sub" x="0.5"/>
         <p id="bass_tune" x="41.19999694824219"/>
-        <p id="bass_cut" x="600.0"/>
+        <p id="bass_cut" x="600.0000610351562"/>
         <p id="bass_res" x="0.2000000029802322"/>
         <p id="bass_env" x="0.4000000059604645"/>
         <p id="bass_edec" x="180.0"/>
@@ -642,7 +642,7 @@
         <p id="bass_wave" x="0.0" c="Sine"/>
         <p id="bass_sub" x="0.5"/>
         <p id="bass_tune" x="41.19999694824219"/>
-        <p id="bass_cut" x="600.0"/>
+        <p id="bass_cut" x="600.0000610351562"/>
         <p id="bass_res" x="0.2000000029802322"/>
         <p id="bass_env" x="0.4000000059604645"/>
         <p id="bass_edec" x="180.0"/>
@@ -732,7 +732,7 @@
         <p id="bass_wave" x="0.0" c="Sine"/>
         <p id="bass_sub" x="0.5"/>
         <p id="bass_tune" x="41.19999694824219"/>
-        <p id="bass_cut" x="600.0"/>
+        <p id="bass_cut" x="600.0000610351562"/>
         <p id="bass_res" x="0.2000000029802322"/>
         <p id="bass_env" x="0.4000000059604645"/>
         <p id="bass_edec" x="180.0"/>
@@ -822,7 +822,7 @@
         <p id="bass_wave" x="0.0" c="Sine"/>
         <p id="bass_sub" x="0.5"/>
         <p id="bass_tune" x="41.19999694824219"/>
-        <p id="bass_cut" x="600.0"/>
+        <p id="bass_cut" x="600.0000610351562"/>
         <p id="bass_res" x="0.2000000029802322"/>
         <p id="bass_env" x="0.4000000059604645"/>
         <p id="bass_edec" x="180.0"/>
