@@ -26,6 +26,15 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
             [](float a, float b, float v) { return juce::jlimit(a, b, v); });
     };
 
+    // A range skewed so `centre` sits mid-knob: the part of a time or frequency range that is played with (short
+    // decays, low cutoffs) gets most of the travel, as in mu-Clid's envelope times (skew 0.3) and cutoff (centre 640 Hz).
+    auto centred = [](float lo, float hi, float step, float centre)
+    {
+        NormalisableRange<float> r(lo, hi, step);
+        r.setSkewForCentre(centre);
+        return r;
+    };
+
     const String lbl = "T" + String(slot + 1) + " ";
     auto id = [&](EngineType e, const char* p) { return ParameterID{ engineParamId(slot, e, p), 1 }; };
     auto flt = [&](EngineType e, const char* p, const String& name, NormalisableRange<float> r, float def)
@@ -39,9 +48,9 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
 
     // Kick engine (synthesis)
     flt(E::Kick, "tune",  "Kick Tune",        pitchRange(30.0f, 120.0f), 50.0f);   // snapped to the master key and scale by the engine
-    flt(E::Kick, "ptch",  "Kick Pitch Amt",   f(0.0f, 600.0f, 1.0f), 220.0f);
-    flt(E::Kick, "pdec",  "Kick Pitch Decay", f(5.0f, 200.0f, 0.1f), 50.0f);
-    flt(E::Kick, "adec",  "Kick Decay",       f(20.0f, 800.0f, 1.0f), 180.0f);
+    flt(E::Kick, "ptch",  "Kick Pitch Amt",   centred(0.0f, 600.0f, 1.0f, 150.0f), 220.0f);
+    flt(E::Kick, "pdec",  "Kick Pitch Decay", centred(5.0f, 200.0f, 0.1f, 30.0f), 50.0f);
+    flt(E::Kick, "adec",  "Kick Decay",       centred(20.0f, 800.0f, 1.0f, 150.0f), 180.0f);
     flt(E::Kick, "drive", "Kick Drive",       f(0.0f, 1.0f, 0.001f), 0.2f);
     flt(E::Kick, "fine",  "Kick Fine",        f(-100.0f, 100.0f, 0.1f), 0.0f);   // cents off the locked note (not a modulation target)
 
@@ -49,25 +58,25 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     layout.add(std::make_unique<AudioParameterChoice>(id(E::Bass, "wave"), lbl + "Bass Wave", juce::StringArray{ "Sine", "Saw", "Square" }, 0));
     flt(E::Bass, "sub",   "Bass Sub",        f(0.0f, 1.0f, 0.001f), 0.5f);
     flt(E::Bass, "tune",  "Bass Tune",       pitchRange(20.0f, 120.0f), 41.2f);   // snapped to the master key and scale by the engine
-    flt(E::Bass, "cut",   "Bass Cutoff",     f(40.0f, 4000.0f, 1.0f), 600.0f);
+    flt(E::Bass, "cut",   "Bass Cutoff",     pitchRange(40.0f, 4000.0f), 600.0f);
     flt(E::Bass, "res",   "Bass Resonance",  f(0.0f, 1.0f, 0.001f), 0.2f);
     flt(E::Bass, "env",   "Bass Filter Env", f(0.0f, 1.0f, 0.001f), 0.4f);
-    flt(E::Bass, "edec",  "Bass Env Decay",  f(10.0f, 1000.0f, 1.0f), 180.0f);
-    flt(E::Bass, "atk",   "Bass Attack",     f(0.5f, 200.0f, 0.1f), 2.0f);
-    flt(E::Bass, "dec",   "Bass Decay",      f(20.0f, 1500.0f, 1.0f), 200.0f);
+    flt(E::Bass, "edec",  "Bass Env Decay",  centred(10.0f, 1000.0f, 1.0f, 100.0f), 180.0f);
+    flt(E::Bass, "atk",   "Bass Attack",     centred(0.5f, 200.0f, 0.1f, 10.0f), 2.0f);
+    flt(E::Bass, "dec",   "Bass Decay",      centred(20.0f, 1500.0f, 1.0f, 200.0f), 200.0f);
     flt(E::Bass, "sus",   "Bass Sustain",    f(0.0f, 1.0f, 0.001f), 0.0f);
     flt(E::Bass, "drive", "Bass Drive",      f(0.0f, 1.0f, 0.001f), 0.2f);
-    flt(E::Bass, "rel",   "Bass Release",    f(5.0f, 2000.0f, 1.0f), 300.0f);      // after the step's gate
-    flt(E::Bass, "glide", "Bass Glide",      f(0.0f, 500.0f, 1.0f), 80.0f);       // the slide into a tied step
+    flt(E::Bass, "rel",   "Bass Release",    centred(5.0f, 2000.0f, 1.0f, 150.0f), 300.0f);      // after the step's gate
+    flt(E::Bass, "glide", "Bass Glide",      centred(0.0f, 500.0f, 1.0f, 80.0f), 80.0f);       // the slide into a tied step
     flt(E::Bass, "fine",  "Bass Fine",       f(-100.0f, 100.0f, 0.1f), 0.0f);   // cents off the locked note (not a modulation target)
 
     // Hat / Snare (sample engines, different defaults)
     flt(E::Hat,   "tune", "Hat Tune",    f(-12.0f, 12.0f, 0.1f), 0.0f);
-    flt(E::Hat,   "dec",  "Hat Decay",   f(10.0f, 400.0f, 1.0f), 60.0f);
+    flt(E::Hat,   "dec",  "Hat Decay",   centred(10.0f, 400.0f, 1.0f, 60.0f), 60.0f);
     flt(E::Hat,   "otune", "Hat Open Tune",  f(-12.0f, 12.0f, 0.1f), 0.0f);    // the open hat: its own tune and decay
-    flt(E::Hat,   "odec",  "Hat Open Decay", f(50.0f, 1200.0f, 1.0f), 300.0f);
+    flt(E::Hat,   "odec",  "Hat Open Decay", centred(50.0f, 1200.0f, 1.0f, 250.0f), 300.0f);
     flt(E::Snare, "tune", "Snare Tune",  f(-12.0f, 12.0f, 0.1f), 0.0f);
-    flt(E::Snare, "dec",  "Snare Decay", f(20.0f, 600.0f, 1.0f), 160.0f);
+    flt(E::Snare, "dec",  "Snare Decay", centred(20.0f, 600.0f, 1.0f, 120.0f), 160.0f);
     flt(E::Snare, "snap", "Snare Snap",  f(0.0f, 1.0f, 0.001f), 0.5f);   // wires against body; 0.5 is the original blend
 
     // Rumble engine (processes another track's audio: drive → delays → reverb → env → filter)
@@ -78,9 +87,9 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     flt(E::Rumble, "size",   "Rumble Rev Size",  f(0.0f, 1.0f, 0.001f), 0.7f);
     flt(E::Rumble, "revmix", "Rumble Rev Mix",   f(0.0f, 1.0f, 0.001f), 0.5f);
     flt(E::Rumble, "revlp",  "Rumble Rev LP",    NormalisableRange<float>(200.0f, 18000.0f, 1.0f, 0.3f), 1200.0f);
-    flt(E::Rumble, "cut",    "Rumble Cutoff",    NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f), 800.0f);
+    flt(E::Rumble, "cut",    "Rumble Cutoff",    centred(20.0f, 20000.0f, 1.0f, 640.0f), 800.0f);
     flt(E::Rumble, "res",    "Rumble Resonance", f(0.0f, 1.0f, 0.001f), 0.2f);
-    flt(E::Rumble, "inlp",   "Rumble Input LP",  NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f), 20000.0f);   // fully open = off
+    flt(E::Rumble, "inlp",   "Rumble Input LP",  centred(20.0f, 20000.0f, 1.0f, 640.0f), 20000.0f);   // fully open = off
 
     // The track's insert effect: algorithm and the four generic knobs (the shared insert layout, as a mixer bus insert).
     mu_mixfx::addInsertParams(layout, layerParamPrefix(slot), lbl);   // t{N}_drvChar, t{N}_insP1..4: the ids the shared InsertSubsection reads
@@ -119,11 +128,11 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     flt(E::Chord, "res",   "Chord Resonance",  f(0.0f, 1.0f, 0.001f), 0.25f);
     flt(E::Chord, "drive", "Chord Drive",      f(0.0f, 1.0f, 0.001f), 0.2f);       // on the filter's input
     flt(E::Chord, "env",   "Chord Filter Env", f(0.0f, 1.0f, 0.001f), 0.5f);
-    flt(E::Chord, "edec",  "Chord Env Decay",  f(10.0f, 1500.0f, 1.0f), 300.0f);
-    flt(E::Chord, "atk",   "Chord Attack",     f(0.5f, 500.0f, 0.1f), 3.0f);
-    flt(E::Chord, "dec",   "Chord Decay",      f(20.0f, 2000.0f, 1.0f), 400.0f);
+    flt(E::Chord, "edec",  "Chord Env Decay",  centred(10.0f, 1500.0f, 1.0f, 100.0f), 300.0f);
+    flt(E::Chord, "atk",   "Chord Attack",     centred(0.5f, 500.0f, 0.1f, 10.0f), 3.0f);
+    flt(E::Chord, "dec",   "Chord Decay",      centred(20.0f, 2000.0f, 1.0f, 200.0f), 400.0f);
     flt(E::Chord, "sus",   "Chord Sustain",    f(0.0f, 1.0f, 0.001f), 0.6f);
-    flt(E::Chord, "rel",   "Chord Release",    f(5.0f, 3000.0f, 1.0f), 250.0f);
+    flt(E::Chord, "rel",   "Chord Release",    centred(5.0f, 3000.0f, 1.0f, 150.0f), 250.0f);
 }
 
 void remapRumbleSources(juce::AudioProcessorValueTreeState& apvts, int liveCount,
