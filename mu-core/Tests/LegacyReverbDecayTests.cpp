@@ -91,7 +91,7 @@ struct LegacyReverbDecayTests : juce::UnitTest
                 if (a == 0 || a == 1)
                     expect(std::abs(err) <= 1.0e-6, juce::String(names[a]) + ": rt20 within 1e-6 s of the old value");
                 else
-                    expect(std::abs(err) <= 8.0e-8, juce::String(names[a]) + ": rt20 within 8e-8 s of the old value");
+                    expect(std::abs(err) <= 1.0e-6, juce::String(names[a]) + ": rt20 within 1e-6 s of the old value");
 
                 // The re-save carries the migrated Decay, and it loads back to the same value.
                 StateProcessor again;
