@@ -71,15 +71,21 @@ public:
     // them. `startedOn` is whether the step the drag began on was on before the click.
     static void dragTie(StepRow& row, int from, int to, bool startedOn);
 
-    // Dragging up or down on a Bass step moves its note through the notes of the master key's scale: every
-    // kPixelsPerDegree of travel is one scale degree, from the note the step had when the drag began. A drag that goes
-    // sideways more than it goes up or down stays a tie drag. `startSemis` is the step's offset (octave and note) at
-    // the press.
-    struct PitchDrag { bool active = false; int startSemis = 0; };
+    // Dragging up or down on a step edits it (a drag that goes sideways more than up or down stays a tie drag):
+    //   plain  - a Bass: its note moves through the master key's scale, kPixelsPerDegree of travel per degree;
+    //            a Hat: up makes it open, down closed;
+    //   Shift  - a Kick, Bass or Chord: its octave, kPixelsPerOctave of travel per octave;
+    //   Alt    - any engine: up accents the step, down clears the accent.
+    // The mode is fixed when the drag starts; values are taken from the step as it was at the press.
+    enum class DragMode { None, Note, Octave, Accent, Voice };
+    struct StepDrag { bool active = false; DragMode mode = DragMode::None; int startSemis = 0; int startOct = 0; };
     static constexpr int kPitchDragStartPx = 5;
     static constexpr int kPixelsPerDegree  = 8;
-    // Apply the drag `e` (from the press on `step`) to a Bass row; true while it is a pitch drag (the caller then skips the tie).
-    static bool dragPitch(TrackHost& host, int slot, int step, PitchDrag& drag, const juce::MouseEvent& e);
+    static constexpr int kPixelsPerOctave  = 20;
+    // Apply the drag `e` (from the press on `step`) to the row; true while it is an edit drag (the caller then skips the
+    // tie), with the status bar's name and value for what changed.
+    static bool dragStepValue(TrackHost& host, int slot, int step, StepDrag& drag, const juce::MouseEvent& e,
+                              juce::String& statusName, juce::String& statusValue);
     // The cell of `step`, the accent button inside its top-left corner and the delete cross inside its top-right.
     static juce::Rectangle<float> cellRect(juce::Rectangle<int> cells, int step);
     static juce::Rectangle<float> accentButtonRect(juce::Rectangle<float> cell);
@@ -97,7 +103,7 @@ private:
     int selectedStep = -1;
     int dragStep     = -1;     // the step a left-drag has reached (-1: no drag)
     bool dragStartedOn = false;
-    PitchDrag pitchDrag;
+    StepDrag stepDrag;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TrackStepRow)
 };

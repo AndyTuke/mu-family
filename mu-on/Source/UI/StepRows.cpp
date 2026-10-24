@@ -112,7 +112,7 @@ void StepRows::mouseDown(const juce::MouseEvent& e)
     if (! cellAt(e.getPosition(), r, s) || host.getTrackEngine(r) == EngineType::Rumble) return;
 
     dragStartedOn = host.getTrack(r).row.isOn(s);
-    pitchDrag = {};
+    stepDrag = {};
 
     // A click selects the step for the Step panel (creating it if empty); its corner buttons set the accent or delete it.
     const bool selects = TrackStepRow::clickStep(host.getTrack(r).row, s, cellsArea(r), e.getPosition(), e.mods.isPopupMenu());
@@ -129,12 +129,12 @@ void StepRows::mouseDown(const juce::MouseEvent& e)
 void StepRows::mouseDrag(const juce::MouseEvent& e)
 {
     int r = 0, s = 0;
-    if (dragRow >= 0 && host.getTrackEngine(dragRow) == EngineType::Bass)
+    if (dragRow >= 0 && host.getTrackEngine(dragRow) != EngineType::Rumble)
     {
-        if (! pitchDrag.active) pitchDrag.startSemis = host.getTrack(dragRow).row.stepSemitones(dragStep);
-        if (TrackStepRow::dragPitch(host, dragRow, dragStep, pitchDrag, e))
+        juce::String name, value;
+        if (TrackStepRow::dragStepValue(host, dragRow, dragStep, stepDrag, e, name, value))
         {
-            if (onStepSelected) onStepSelected(dragRow, dragStep);   // the Step panel shows the new note
+            if (onStepSelected) onStepSelected(dragRow, dragStep);   // the Step panel shows the new value
             repaint(rowArea(dragRow));
             return;
         }

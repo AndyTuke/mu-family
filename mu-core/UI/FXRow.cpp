@@ -19,6 +19,7 @@ FXRow::FXRow(const juce::String& name,
     {
         isEnabled = enableButton.getToggleState();
         if (onEnabledChanged) onEnabledChanged(isEnabled);
+        if (onStatusUpdate) onStatusUpdate(slotName + " Enable", isEnabled ? "On" : "Off");
     };
 
     addAndMakeVisible(algorithmDropdown);
@@ -32,6 +33,7 @@ FXRow::FXRow(const juce::String& name,
         currentAlgorithm = selectedId - 1;
         rebuildKnobs(currentAlgorithm);
         if (onAlgorithmChanged) onAlgorithmChanged(currentAlgorithm);
+        if (onStatusUpdate) onStatusUpdate(slotName + " Algorithm", algorithmDropdown.getText());
         resized();
         repaint();
     };

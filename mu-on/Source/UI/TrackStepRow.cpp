@@ -3,6 +3,7 @@
 #include "Audio/ChordVoicing.h"      // a Chord step's name
 #include "Sequencer/StepClock.h"   // currentStep
 #include "Sequencer/Track.h"       // the row the cells edit
+#include "ValueFormat.h"           // mu-core: the octave text for the status bar
 #include "UI/Components/MuLookAndFeel.h"
 
 namespace mu_on
@@ -202,19 +203,57 @@ void TrackStepRow::dragTie(StepRow& row, int from, int to, bool startedOn)
     row.setTied(later, ! untie);
 }
 
-bool TrackStepRow::dragPitch(TrackHost& host, int slot, int step, PitchDrag& drag, const juce::MouseEvent& e)
+bool TrackStepRow::dragStepValue(TrackHost& host, int slot, int step, StepDrag& d, const juce::MouseEvent& e,
+                                 juce::String& statusName, juce::String& statusValue)
 {
+    auto& row = host.getTrack(slot).row;
+    const auto engine = host.getTrackEngine(slot);
     const int dy = e.getDistanceFromDragStartY(), dx = e.getDistanceFromDragStartX();
-    if (! drag.active)
+    if (! d.active)
     {
+        d.startSemis = row.stepSemitones(step);   // the step as it was, until the drag takes hold
+        d.startOct = row.stepOctave(step);
         if (std::abs(dy) < kPitchDragStartPx || std::abs(dy) <= std::abs(dx)) return false;
-        drag.active = true;
+        const bool pitched = engine == EngineType::Bass || engine == EngineType::Kick || engine == EngineType::Chord;
+        if (e.mods.isAltDown())                         d.mode = DragMode::Accent;
+        else if (e.mods.isShiftDown() && pitched)       d.mode = DragMode::Octave;
+        else if (engine == EngineType::Bass)            d.mode = DragMode::Note;
+        else if (engine == EngineType::Hat)             d.mode = DragMode::Voice;
+        else return false;
+        d.active = true;
     }
-    const auto key = tuneKey(host, slot, EngineType::Bass);
-    const int degrees = juce::roundToInt(-dy / (float) kPixelsPerDegree);   // up is a higher note
-    const int midi = degrees == 0 ? key.baseMidi + drag.startSemis
-                                  : mu_audio::moveMidiInScale(key.baseMidi + drag.startSemis, degrees, key.root, key.scale);
-    host.getTrack(slot).row.setStepSemitones(step, midi - key.baseMidi);
+
+    statusName = "Step " + juce::String(step + 1);
+    switch (d.mode)
+    {
+        case DragMode::Note:
+        {
+            const auto key = tuneKey(host, slot, EngineType::Bass);
+            const int degrees = juce::roundToInt(-dy / (float) kPixelsPerDegree);   // up is a higher note
+            const int midi = degrees == 0 ? key.baseMidi + d.startSemis
+                                          : mu_audio::moveMidiInScale(key.baseMidi + d.startSemis, degrees, key.root, key.scale);
+            row.setStepSemitones(step, midi - key.baseMidi);
+            statusName += " Note";
+            statusValue = mu_audio::midiNoteName(key.baseMidi + row.stepSemitones(step));
+            break;
+        }
+        case DragMode::Octave:
+            row.setStepOctave(step, d.startOct + juce::roundToInt(-dy / (float) kPixelsPerOctave));
+            statusName += " Octave";
+            statusValue = mu_fmt::unitText(mu_fmt::Unit::Octaves, row.stepOctave(step));
+            break;
+        case DragMode::Accent:
+            row.setAccent(step, dy < 0);
+            statusName += " Accent";
+            statusValue = row.isAccent(step) ? "On" : "Off";
+            break;
+        case DragMode::Voice:
+            row.setOpen(step, dy < 0);
+            statusName += " Hat";
+            statusValue = row.isOpen(step) ? "Open" : "Closed";
+            break;
+        case DragMode::None: return false;
+    }
     return true;
 }
 
@@ -236,7 +275,7 @@ void TrackStepRow::mouseDown(const juce::MouseEvent& e)
     if (host.getTrackEngine(slot) == EngineType::Rumble || ! getLocalBounds().contains(e.getPosition())) return;
     const int step = stepAt(getLocalBounds(), e.getPosition());
     dragStartedOn = host.getTrack(slot).row.isOn(step);
-    pitchDrag = {};
+    stepDrag = {};
     const bool selects = clickStep(host.getTrack(slot).row, step, getLocalBounds(), e.getPosition(), e.mods.isPopupMenu());
     dragStep = selects && ! e.mods.isPopupMenu() ? step : -1;
     if (selects)
@@ -249,17 +288,16 @@ void TrackStepRow::mouseDown(const juce::MouseEvent& e)
 
 void TrackStepRow::mouseDrag(const juce::MouseEvent& e)
 {
-    if (dragStep < 0 || host.getTrackEngine(slot) != EngineType::Bass) return;   // only a Bass sequence ties and steps notes
-    if (! pitchDrag.active) pitchDrag.startSemis = host.getTrack(slot).row.stepSemitones(dragStep);
-    if (dragPitch(host, slot, dragStep, pitchDrag, e))
+    if (dragStep < 0 || host.getTrackEngine(slot) == EngineType::Rumble) return;
+    juce::String name, value;
+    if (dragStepValue(host, slot, dragStep, stepDrag, e, name, value))
     {
-        const auto key = tuneKey(host, slot, EngineType::Bass);
-        if (onStatusUpdate) onStatusUpdate("Step " + juce::String(dragStep + 1) + " Note",
-                                           mu_audio::midiNoteName(key.baseMidi + host.getTrack(slot).row.stepSemitones(dragStep)));
-        if (onStepSelected) onStepSelected(dragStep);   // the Step panel shows the new note
+        if (onStatusUpdate) onStatusUpdate(name, value);
+        if (onStepSelected) onStepSelected(dragStep);   // the Step panel shows the new value
         repaint();
         return;
     }
+    if (host.getTrackEngine(slot) != EngineType::Bass) return;   // only a Bass sequence ties notes
     const int step = stepAt(getLocalBounds(), e.getPosition());
     if (step == dragStep) return;
     dragTie(host.getTrack(slot).row, dragStep, step, dragStartedOn);

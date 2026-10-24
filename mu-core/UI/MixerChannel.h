@@ -31,6 +31,7 @@ public:
     static juce::String busName(int index) { return "Bus " + juce::String(index + 1); }
 
     MixerChannel(Type type, const juce::String& name, juce::Colour colour);
+    ~MixerChannel() override;
 
     // status-bar coverage for outBus + scSource dropdowns. Colour is the
     // channel's own colour (used as the status-bar rhythm tag for context).
@@ -134,6 +135,7 @@ private:
     void addSidechainControls();
     int  layoutSidechain(int stripW, int nameBottom);    // returns the section's height
     void reportKnobStatus(KnobWithLabel& knob, const juce::String& what);   // route a strip knob to the status bar
+    void reportStatus(const juce::String& what, const juce::String& value);  // "<strip> <what>  <value>" in the strip's colour
     int  layoutSends(int stripW, int sendY);             // returns the fader's top
     void layoutFaderAndButtons(int stripW, int faderY);
     void layoutClient();
@@ -240,4 +242,15 @@ private:
     juce::Rectangle<int> sidechainPaneBounds;
     juce::Rectangle<int> sendsPaneBounds;
     juce::Rectangle<int> faderPaneBounds;
+
+    // The fader and the mute / solo buttons report what the user does to the status bar (listeners run on user changes
+    // and notified ones, not on a silent reload of the strip).
+    struct StripStatus : public juce::Slider::Listener, public juce::Button::Listener
+    {
+        explicit StripStatus(MixerChannel& o) : owner(o) {}
+        void sliderValueChanged(juce::Slider* s) override;
+        void buttonClicked(juce::Button* b) override;
+        MixerChannel& owner;
+    };
+    StripStatus stripStatus { *this };   // declared last: it goes before the controls it listens to
 };

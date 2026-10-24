@@ -54,7 +54,7 @@ private:
     int selectedStep  = -1;
     int dragRow = -1, dragStep = -1;   // a left-drag across steps (to tie them): the row and the step it has reached
     bool dragStartedOn = false;
-    TrackStepRow::PitchDrag pitchDrag;   // a vertical drag on a Bass step: its note moves through the scale
+    TrackStepRow::StepDrag stepDrag;   // a vertical drag on a step edits it (note, octave, accent, Hat open / closed)
     int playheadStep  = -1;
     long long shownPass = -2;          // the pass the dimmed steps were drawn for
     juce::uint64 shownSignature = 0;

@@ -33,6 +33,7 @@ DelayRow::DelayRow()
     {
         isEnabled = enableButton.getToggleState();
         if (onEnabledChanged) onEnabledChanged(isEnabled);
+        if (onStatusUpdate) onStatusUpdate("Delay Enable", isEnabled ? "On" : "Off");
         repaint();
     };
     addAndMakeVisible(enableButton);
@@ -54,10 +55,16 @@ DelayRow::DelayRow()
         }
         if (syncMode)
             fireSyncParams();
+        if (onStatusUpdate) onStatusUpdate("Delay Time", modeDropdown.getText());
     };
     addAndMakeVisible(modeDropdown);
 
-    modifierSegment.onChange = [this](int) { fireSyncParams(); };
+    modifierSegment.onChange = [this](int index)
+    {
+        fireSyncParams();
+        static const char* const names[] = { "Straight", "Dotted", "Triplet" };
+        if (onStatusUpdate) onStatusUpdate("Delay Time Feel", names[juce::jlimit(0, 2, index)]);
+    };
     addAndMakeVisible(modifierSegment);
 
     multipleKnob.setRange(1.0, 8.0, 1.0);

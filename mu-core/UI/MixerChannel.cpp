@@ -17,6 +17,7 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
     fader.setColour(juce::Slider::rotarySliderFillColourId, MuLookAndFeel::colour(MuLookAndFeel::knobLevel));
     fader.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     addAndMakeVisible(fader);
+    fader.addListener(&stripStatus);
     addAndMakeVisible(vuMeter);
     if (hasSidechainControls())
         addAndMakeVisible(grMeter);
@@ -63,6 +64,8 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
         soloBtn.setClickingTogglesState(true);
         addAndMakeVisible(muteBtn);
         addAndMakeVisible(soloBtn);
+        muteBtn.addListener(&stripStatus);
+        soloBtn.addListener(&stripStatus);
     }
 
     if (hasOutputBus())
@@ -118,6 +121,33 @@ void MixerChannel::addSidechainControls()
     scRelease.setStatusUnit(mu_fmt::Unit::Ms);
     reportKnobStatus(scRelease, "Sidechain Release");
     addAndMakeVisible(scRelease);
+}
+
+MixerChannel::~MixerChannel()
+{
+    fader.removeListener(&stripStatus);
+    muteBtn.removeListener(&stripStatus);
+    soloBtn.removeListener(&stripStatus);
+}
+
+void MixerChannel::reportStatus(const juce::String& what, const juce::String& value)
+{
+    if (onStatusUpdate) onStatusUpdate(channelName + " " + what, value, channelColour);
+}
+
+void MixerChannel::StripStatus::sliderValueChanged(juce::Slider* s)
+{
+    if (s != &owner.fader) return;
+    const auto v = (float) owner.fader.getValue();
+    const juce::String db = owner.isClient() ? owner.formatClientDb(v)
+                                             : (v <= 0.0f ? juce::String("-inf dB") : juce::String(20.0f * std::log10(v), 1) + " dB");
+    owner.reportStatus("Level", db);
+}
+
+void MixerChannel::StripStatus::buttonClicked(juce::Button* b)
+{
+    if (b == &owner.muteBtn)      owner.reportStatus("Mute", owner.muteBtn.getToggleState() ? "On" : "Off");
+    else if (b == &owner.soloBtn) owner.reportStatus("Solo", owner.soloBtn.getToggleState() ? "On" : "Off");
 }
 
 // A strip knob reports to the status bar as "<strip> <what>  <value + unit>", in the strip's colour.
