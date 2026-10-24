@@ -796,7 +796,7 @@ The Launchpad and Performance mode are standalone only for now (12, availability
 
 1. **Decisions A, B and C**: settled (13.6).
 2. **Show "modified" on the playing pad?** Settled by auto-save (13.11): withdrawn; replaced by the brief saved cue.
-3. **Mute vs cancel on the playing pad** (13.3): the cancel-first rule adds a press to mute while a clip is queued. Recommendation: keep, for parity with the preset rule; revisit on hardware.
+3. **Mute vs cancel on the playing pad** (13.3): the cancel-first rule adds a press to mute while a clip is queued. **Decided 2026-10-24 (Andy delegated): keep**, for parity with the preset rule; revisit on hardware.
 4. **Should the surface get a "store" gesture later?** Owner ruled no (a pad never writes a preset); not planned.
 5. **Does the strip appear in mu-Clid MIDI later?** Only if it gets a stager (design-future "one instance" direction); nothing in the strip closes that off.
 6. **Large display on a pad-heavy gig**: the 20 px pad height is the family strip display height; if a touch screen is used, Large (1.25) is advised, no touch-specific size (12.4).

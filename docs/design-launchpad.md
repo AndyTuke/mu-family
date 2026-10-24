@@ -548,12 +548,14 @@ existing **hot-swap**; pad lights are playing = bright, available = dim, empty =
 
 **Decided (owner, 2026-10-13):** standalone only to start; rows = layers, columns = clips; top row = performance items, right column = select layer (3.6).
 
-**Open from the 3.6 ruling (Andy):**
+**Decided (2026-10-24, Andy delegated the open 3.6 questions: "make best recommendation decisions"; any can be changed later):**
 
-1. **Buttons 5, 6, 7** (3.6): recommended clip previous, clip next, mute selected layer. Tap and mute-all are flagged against the screen-lock list. (Transport is decided: button 8, 2026-10-14; Panic never on a pad.)
-2. **When does the device enter Programmer mode?** Recommendation: only while Performance mode is on (the device is a normal Launchpad the rest of the time and a crash cannot strand it in our mode, R1). The alternative is at app start whenever a device is found, so the pads light before you enter the mode; it needs the Release button to be the real escape.
-3. **Dim level (now 0.20, see §3.2b) and own-timer blink** are by-eye choices; confirm or adjust on the pad (R8, #1274).
-4. **Top-row colour:** buttons 1 and 2 use the app accent (Andy's table); 3 and 4 are white. If the app accent and a layer colour look alike on the real LEDs, say so.
-5. **A distinct "parsing" cue** on a top-row pad (for a slow preset load) is not in version 1; revisit after the load-time measurement (R6, R7).
-- Which other actions matter live besides clip launch and mute: tempo, a filter sweep on a pad?
+1. **Buttons 5, 6, 7** (3.6): 5 = previous clip, 6 = next clip, 7 = mute the selected layer. Tap tempo and mute-all stay off the pad in version 1 (they are on the screen-lock list). Transport is button 8; Panic is never on a pad.
+2. **Programmer mode:** the device enters it only while Performance mode is on. The rest of the time it is a normal Launchpad and a crash cannot strand it in our mode (R1); the Release button stays the escape.
+3. **Dim level (0.20) and own-timer blink:** keep the current values. They are by-eye choices; adjust at the next hardware session with the pad in hand (R8, #1274).
+4. **Top-row colour:** keep Andy's table (buttons 1 and 2 the app accent, 3 and 4 white). If the app accent and a layer colour look alike on the real LEDs, change the accent pad at the same hardware session.
+5. **"Parsing" cue** on a top-row pad for a slow preset load: not in version 1; revisit after the load-time measurement (R6, R7).
+6. **Other live actions:** version 1 stays at clip launch, mute, layer select, preset and transport. A tempo or filter sweep needs a continuous control, which belongs on a MIDI-learn knob (#1325), not a pad.
+
+**Still open (needs Andy's hardware):**
 - Which other controllers do you have or plan (so the first second driver is a real one)?
