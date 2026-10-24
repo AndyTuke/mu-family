@@ -1,6 +1,6 @@
 # Issues
 
-**Tally (updated 2026-10-24): Open 13 · On Hold 5 · Closed 1596 · Total 1614**
+**Tally (updated 2026-10-24): Open 14 · On Hold 5 · Closed 1596 · Total 1615**
 
 **Status key:** ✅ Closed &nbsp;|&nbsp; 🔴 Open &nbsp;|&nbsp; 🟡 On Hold (deferred, blocked, or pending external action)
 
@@ -12,6 +12,7 @@ Test pass/fail tracking lives in [tests.md](tests.md), not this backlog. Use thi
 
 | # | Description | Status | Closed Build |
 |---|---|---|---|
+| 1671 | **[mu-on/audio+ui] The drum and percussion filter (#1670) gets an AD envelope with a depth control, and the drum engines' knob layout is standardised.** P2 · logged by Andy, 2026-10-24 · Details: per engine (Kick, Hat, Snare, FM Perc) append Filter Env Attack, Decay and Depth params; the envelope restarts at every step trigger and moves the cutoff up or down by Depth. The three controls are smaller knobs on a second row under the filter. ParamKnobGrid gets pinned columns and a small-knob flag so the filter block sits in the same columns on every drum engine (voice knobs flow in the columns to its left, FM Perc's two rows included). Not built or run. · Needs: ux-controller, dsp-controller, test-steward | 🔴 Open | — |
 | 1670 | **[mu-on/audio] A filter on the drum and percussion engines (Kick, Hat, Snare, FM Perc).** P2 · logged by Andy, 2026-10-24 · Details: Type (low-pass, high-pass, band-pass, notch), Cutoff and Resonance, bypassed when open; new knob group laid out cleanly in each engine's control grid. Cutoff and Resonance are not modulation targets in this round (a later appended row each). Not built or run. · Updates: 2026-10-24 ftype/fcut/fres on Kick, Hat, Snare, FM Perc; names LP12/HP12/BP12/Notch12; bypassed when LP12 at top; cutoff/res not mod targets yet. Built (Debug 1443, commit 928a1406); Andy to test. · Needs: dsp-controller, ux-controller, test-steward | 🔴 Open | — |
 | 1669 | **[mu-on/sequencer] Ghost notes for the drum and percussion engines (Kick, Hat, Snare, FM Perc).** P2 · logged by Andy, 2026-10-24 · Details: Per-step ghost flag exclusive with accent; a Ghost level knob (0-100 % of the whole note, t{N}_ghost, default 35 %) in the LAYER box; Alt+drag down on a step sets a ghost (Alt+drag up still accents); a ghost step is drawn as an outline in its square; saved in the row; applies to mu-Tronic Track layers too. Not built or run. · Updates: 2026-10-24 Ghost flag, t{N}_ghost 35 %, Alt-drag, outline drawn; tests added. Built (Debug 1443, commit 928a1406); Andy to test. · Needs: test-steward, ux-controller | 🔴 Open | — |
 | 1668 | **[mu-on/bass] A Bass track's Tune left at its default (41.2 Hz) plays the master key's root note.** P2 · logged by Andy, 2026-10-24 · Details: Octave MIDI 28-39, so a new Bass sequence starts on the root; the Tune knob reads "Root" there. Done in code, untested in the app. · Updates: 2026-10-24 bassRootMidi / kBassTuneRootHz 41.2 = root; knob reads "Root". Built (Debug 1443, commit 928a1406); Andy to test. · Needs: check in the app; test-steward, ux-controller | 🔴 Open | — |
