@@ -129,7 +129,9 @@ Bullet "Delete  —  the Delete (×) button in the track header removes the sele
 Bullet "Reorder  —  drag an item up or down. A track keeps its settings, steps and colour when it moves."
 P "A track is named after its engine and the name cannot be edited, so two Kick tracks are both called Kick. Presets saved by the earlier five-lane version of mu-On, which had fixed Kick, Bass, Hat, Snare and Rumble lanes, open as five tracks."
 
-Pic "Track Sidebar with five tracks, the Rumble selected." "sidebar.png"
+Pic "Track Sidebar with eight tracks, the most mu-On holds, the Snare selected." "sidebar.png"
+
+Pic "The + Track menu asks which engine the new track runs." "engine-menu.png"
 
 # ── 6. Track Header ───────────────────────────────────────────────────────────
 H1 "6. Track Header"
@@ -146,6 +148,8 @@ P "The Engine box sits at the top of the track editor. Its first control is the 
 
 H2 "KEY (Root and Scale)"
 P "The KEY section is the leftmost section of the track editor. Its Root and Scale set the musical key for the whole of mu-On: they are global to all tracks, and the section is edged to show that it does not belong to the selected track. Kick and Bass tuning snap to the key, Bass steps move through its scale, and Chord steps are built from it."
+
+Pic "KEY and ENGINE sections: Root and Scale (global to all tracks, so the section is edged) and the Engine dropdown." "key-section.png"
 
 H2 "Kick"
 P "A synthesised kick: a sine body with a fast pitch drop for the thump, and a drive stage for click and punch."
@@ -174,6 +178,8 @@ Bullet "Cutoff and Reso — where the filter sits and how sharply it peaks."
 Bullet "Attack, Decay and Depth, in smaller knobs on a second row — an attack/decay envelope that sweeps the cutoff on each hit; Depth sets how far."
 P "All of the FILTER knobs can be modulated."
 
+Pic "FILTER section of a Snare: Type, Cutoff and Reso on the top row, and the Attack, Decay and Depth envelope knobs below." "filter-section.png"
+
 H2 "Hat and Snare"
 P "Hat and Snare are built-in drum sounds (a bright noise hat, and a snare made of noise and a body tone). They play in one shot on each step. You cannot load your own samples into them."
 Bullet "Tune (-12 to +12 semitones) — pitch of the sound."
@@ -187,6 +193,8 @@ P "Chord plays a chord on each step, for dub-techno stabs. Each step names its o
 Bullet "Wave — Saw, Square or Pulse. The amp envelope Atk, Dec, Sus and Rel are the smaller knobs under Wave."
 Bullet "FILTER section — Cutoff, Reso and Drive (saturation before the filter), and an A/D/S/R envelope for the cutoff: Atk, Dec, Sus, Rel and Depth."
 P "Chord steps can be ghosts (see Steps and Groove)."
+
+Pic "A Chord track: the Chord voice, its FILTER section, and the per-step panel with Root, Octave, Chord, Play, Inversion and Spread." "chord-panel.png"
 
 H2 "Rumble"
 P "Rumble is not a drum you step. It is the classic techno rumble: it takes the sound of another track, the Source, and runs it through a drive stage, three tempo-synced delay taps, a dark reverb, a volume envelope you draw, and a filter. Its step row is dimmed and ignored."
@@ -210,6 +218,8 @@ Bullet "On a Bass step, drag up or down to move its note through the scale; Shif
 Bullet "Click anywhere in a row to select that track. The selected track's row is outlined in its colour."
 Bullet "A playhead line runs through the rows with the transport. Every four steps (one beat) are tinted slightly differently so you can count."
 P "Every engine starts with its own groove: four-on-the-floor for the kick, off-beat for the bass, straight eighths for the hat, a backbeat for the snare and nothing for the rumble. A track keeps its row when you change its engine."
+
+Pic "Step rows with ghost steps: a ghost is drawn as an outline on a Kick, Snare, FM Perc or Hat step, next to the plain steps." "ghost-steps.png"
 
 H2 "Groove Box"
 P "These controls on the left of the Steps panel (the LAYER box) apply to the whole track:"
