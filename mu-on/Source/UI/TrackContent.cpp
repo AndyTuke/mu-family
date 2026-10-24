@@ -139,7 +139,7 @@ namespace
         type.groupStart = true;
         type.newRow = ownRow;
         type.statusName = juce::String(name) + " Filter Type";
-        type.tooltip = "Low-pass, high-pass, band-pass or notch. Low-pass at full cutoff is off.";
+        type.tooltip = "LP12, HP12, BP12 or Notch12. LP12 at full cutoff is off.";
         Spec cut { id("fcut"), "Cutoff" };
         cut.statusName = juce::String(name) + " Filter Cutoff";
         Spec res { id("fres"), "Reso" };

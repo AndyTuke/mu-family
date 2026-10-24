@@ -251,16 +251,16 @@
         <p id="chord_sus" x="0.6000000238418579"/>
         <p id="chord_rel" x="250.0"/>
         <p id="ghost" x="0.3500000238418579"/>
-        <p id="kick_ftype" x="0.0" c="Low-pass"/>
+        <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
         <p id="kick_fres" x="0.2000000029802322"/>
-        <p id="hat_ftype" x="0.0" c="Low-pass"/>
+        <p id="hat_ftype" x="0.0" c="LP12"/>
         <p id="hat_fcut" x="20000.0"/>
         <p id="hat_fres" x="0.2000000029802322"/>
-        <p id="snare_ftype" x="0.0" c="Low-pass"/>
+        <p id="snare_ftype" x="0.0" c="LP12"/>
         <p id="snare_fcut" x="20000.0"/>
         <p id="snare_fres" x="0.2000000029802322"/>
-        <p id="fmp_ftype" x="0.0" c="Low-pass"/>
+        <p id="fmp_ftype" x="0.0" c="LP12"/>
         <p id="fmp_fcut" x="20000.0"/>
         <p id="fmp_fres" x="0.2000000029802322"/>
         <Track i="0" on="1000100010001000" accent="1000000000000000"/>
@@ -354,16 +354,16 @@
         <p id="chord_sus" x="0.6000000238418579"/>
         <p id="chord_rel" x="250.0"/>
         <p id="ghost" x="0.3500000238418579"/>
-        <p id="kick_ftype" x="0.0" c="Low-pass"/>
+        <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
         <p id="kick_fres" x="0.2000000029802322"/>
-        <p id="hat_ftype" x="0.0" c="Low-pass"/>
+        <p id="hat_ftype" x="0.0" c="LP12"/>
         <p id="hat_fcut" x="20000.0"/>
         <p id="hat_fres" x="0.2000000029802322"/>
-        <p id="snare_ftype" x="0.0" c="Low-pass"/>
+        <p id="snare_ftype" x="0.0" c="LP12"/>
         <p id="snare_fcut" x="20000.0"/>
         <p id="snare_fres" x="0.2000000029802322"/>
-        <p id="fmp_ftype" x="0.0" c="Low-pass"/>
+        <p id="fmp_ftype" x="0.0" c="LP12"/>
         <p id="fmp_fcut" x="20000.0"/>
         <p id="fmp_fres" x="0.2000000029802322"/>
         <Track i="1" on="0000000000000000" accent="0000000000000000"/>
@@ -457,16 +457,16 @@
         <p id="chord_sus" x="0.6000000238418579"/>
         <p id="chord_rel" x="250.0"/>
         <p id="ghost" x="0.3500000238418579"/>
-        <p id="kick_ftype" x="0.0" c="Low-pass"/>
+        <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
         <p id="kick_fres" x="0.2000000029802322"/>
-        <p id="hat_ftype" x="0.0" c="Low-pass"/>
+        <p id="hat_ftype" x="0.0" c="LP12"/>
         <p id="hat_fcut" x="20000.0"/>
         <p id="hat_fres" x="0.2000000029802322"/>
-        <p id="snare_ftype" x="0.0" c="Low-pass"/>
+        <p id="snare_ftype" x="0.0" c="LP12"/>
         <p id="snare_fcut" x="20000.0"/>
         <p id="snare_fres" x="0.2000000029802322"/>
-        <p id="fmp_ftype" x="0.0" c="Low-pass"/>
+        <p id="fmp_ftype" x="0.0" c="LP12"/>
         <p id="fmp_fcut" x="20000.0"/>
         <p id="fmp_fres" x="0.2000000029802322"/>
         <Track i="2" on="0000000000000000" accent="0000000000000000"/>
@@ -560,16 +560,16 @@
         <p id="chord_sus" x="0.6000000238418579"/>
         <p id="chord_rel" x="250.0"/>
         <p id="ghost" x="0.3500000238418579"/>
-        <p id="kick_ftype" x="0.0" c="Low-pass"/>
+        <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
         <p id="kick_fres" x="0.2000000029802322"/>
-        <p id="hat_ftype" x="0.0" c="Low-pass"/>
+        <p id="hat_ftype" x="0.0" c="LP12"/>
         <p id="hat_fcut" x="20000.0"/>
         <p id="hat_fres" x="0.2000000029802322"/>
-        <p id="snare_ftype" x="0.0" c="Low-pass"/>
+        <p id="snare_ftype" x="0.0" c="LP12"/>
         <p id="snare_fcut" x="20000.0"/>
         <p id="snare_fres" x="0.2000000029802322"/>
-        <p id="fmp_ftype" x="0.0" c="Low-pass"/>
+        <p id="fmp_ftype" x="0.0" c="LP12"/>
         <p id="fmp_fcut" x="20000.0"/>
         <p id="fmp_fres" x="0.2000000029802322"/>
         <Track i="3" on="0000000000000000" accent="0000000000000000"/>
@@ -663,16 +663,16 @@
         <p id="chord_sus" x="0.6000000238418579"/>
         <p id="chord_rel" x="250.0"/>
         <p id="ghost" x="0.3500000238418579"/>
-        <p id="kick_ftype" x="0.0" c="Low-pass"/>
+        <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
         <p id="kick_fres" x="0.2000000029802322"/>
-        <p id="hat_ftype" x="0.0" c="Low-pass"/>
+        <p id="hat_ftype" x="0.0" c="LP12"/>
         <p id="hat_fcut" x="20000.0"/>
         <p id="hat_fres" x="0.2000000029802322"/>
-        <p id="snare_ftype" x="0.0" c="Low-pass"/>
+        <p id="snare_ftype" x="0.0" c="LP12"/>
         <p id="snare_fcut" x="20000.0"/>
         <p id="snare_fres" x="0.2000000029802322"/>
-        <p id="fmp_ftype" x="0.0" c="Low-pass"/>
+        <p id="fmp_ftype" x="0.0" c="LP12"/>
         <p id="fmp_fcut" x="20000.0"/>
         <p id="fmp_fres" x="0.2000000029802322"/>
         <Track i="4" on="0000000000000000" accent="0000000000000000"/>
@@ -766,16 +766,16 @@
         <p id="chord_sus" x="0.6000000238418579"/>
         <p id="chord_rel" x="250.0"/>
         <p id="ghost" x="0.3500000238418579"/>
-        <p id="kick_ftype" x="0.0" c="Low-pass"/>
+        <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
         <p id="kick_fres" x="0.2000000029802322"/>
-        <p id="hat_ftype" x="0.0" c="Low-pass"/>
+        <p id="hat_ftype" x="0.0" c="LP12"/>
         <p id="hat_fcut" x="20000.0"/>
         <p id="hat_fres" x="0.2000000029802322"/>
-        <p id="snare_ftype" x="0.0" c="Low-pass"/>
+        <p id="snare_ftype" x="0.0" c="LP12"/>
         <p id="snare_fcut" x="20000.0"/>
         <p id="snare_fres" x="0.2000000029802322"/>
-        <p id="fmp_ftype" x="0.0" c="Low-pass"/>
+        <p id="fmp_ftype" x="0.0" c="LP12"/>
         <p id="fmp_fcut" x="20000.0"/>
         <p id="fmp_fres" x="0.2000000029802322"/>
         <Track i="5" on="0000000000000000" accent="0000000000000000"/>
@@ -869,16 +869,16 @@
         <p id="chord_sus" x="0.6000000238418579"/>
         <p id="chord_rel" x="250.0"/>
         <p id="ghost" x="0.3500000238418579"/>
-        <p id="kick_ftype" x="0.0" c="Low-pass"/>
+        <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
         <p id="kick_fres" x="0.2000000029802322"/>
-        <p id="hat_ftype" x="0.0" c="Low-pass"/>
+        <p id="hat_ftype" x="0.0" c="LP12"/>
         <p id="hat_fcut" x="20000.0"/>
         <p id="hat_fres" x="0.2000000029802322"/>
-        <p id="snare_ftype" x="0.0" c="Low-pass"/>
+        <p id="snare_ftype" x="0.0" c="LP12"/>
         <p id="snare_fcut" x="20000.0"/>
         <p id="snare_fres" x="0.2000000029802322"/>
-        <p id="fmp_ftype" x="0.0" c="Low-pass"/>
+        <p id="fmp_ftype" x="0.0" c="LP12"/>
         <p id="fmp_fcut" x="20000.0"/>
         <p id="fmp_fres" x="0.2000000029802322"/>
         <Track i="6" on="0000000000000000" accent="0000000000000000"/>
@@ -972,16 +972,16 @@
         <p id="chord_sus" x="0.6000000238418579"/>
         <p id="chord_rel" x="250.0"/>
         <p id="ghost" x="0.3500000238418579"/>
-        <p id="kick_ftype" x="0.0" c="Low-pass"/>
+        <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
         <p id="kick_fres" x="0.2000000029802322"/>
-        <p id="hat_ftype" x="0.0" c="Low-pass"/>
+        <p id="hat_ftype" x="0.0" c="LP12"/>
         <p id="hat_fcut" x="20000.0"/>
         <p id="hat_fres" x="0.2000000029802322"/>
-        <p id="snare_ftype" x="0.0" c="Low-pass"/>
+        <p id="snare_ftype" x="0.0" c="LP12"/>
         <p id="snare_fcut" x="20000.0"/>
         <p id="snare_fres" x="0.2000000029802322"/>
-        <p id="fmp_ftype" x="0.0" c="Low-pass"/>
+        <p id="fmp_ftype" x="0.0" c="LP12"/>
         <p id="fmp_fcut" x="20000.0"/>
         <p id="fmp_fres" x="0.2000000029802322"/>
         <Track i="7" on="0000000000000000" accent="0000000000000000"/>

@@ -152,7 +152,7 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     // cutoff at its top, low-pass) leaves the sound untouched.
     auto drumFilter = [&](EngineType e, const String& name)
     {
-        layout.add(std::make_unique<AudioParameterChoice>(id(e, "ftype"), lbl + name + " Filter Type", juce::StringArray{ "Low-pass", "High-pass", "Band-pass", "Notch" }, 0));
+        layout.add(std::make_unique<AudioParameterChoice>(id(e, "ftype"), lbl + name + " Filter Type", juce::StringArray{ "LP12", "HP12", "BP12", "Notch12" }, 0));
         flt(e, "fcut", name + " Filter Cutoff",    centred(20.0f, 20000.0f, 1.0f, 640.0f), 20000.0f, mu_fmt::Unit::Hz);
         flt(e, "fres", name + " Filter Resonance", f(0.0f, 0.99f, 0.001f), 0.2f, mu_fmt::Unit::Percent01);
     };
