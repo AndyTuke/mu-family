@@ -192,6 +192,8 @@ void PluginProcessor::layerAdded(int index)
     int pick = 0;
     for (int e = 0; e < toIndex(EngineType::FmPerc); ++e)
         if (! used[(size_t) e]) { pick = e; break; }
+    if (const int chosen = nextTrackEngine.exchange(-1, std::memory_order_relaxed); chosen >= 0 && chosen < kNumEngineTypes)
+        pick = chosen;   // the user named the engine in the + Track menu
     const auto engine = engineFromIndex(pick);
 
     if (auto* p = apvts.getParameter(layerParamId(index, "eng")))

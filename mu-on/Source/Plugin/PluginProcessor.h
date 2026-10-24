@@ -201,6 +201,13 @@ private:
     // Hot-swap: parsed preset trees per track + one full preset, committed at the pattern wrap.
     void applyTrackTree(int track, const juce::ValueTree& tree);
 
+    // The engine the next added track takes (the editor's + Track menu sets it just before the add); unset, layerAdded picks the
+    // first engine no live track runs.
+public:
+    void setNextTrackEngine(EngineType e) noexcept { nextTrackEngine.store(toIndex(e), std::memory_order_relaxed); }
+private:
+    std::atomic<int> nextTrackEngine { -1 };
+
     // A Rumble track whose source is itself, gone, or another Rumble starts on the first Kick.
     void ensureRumbleSource(int track);
 

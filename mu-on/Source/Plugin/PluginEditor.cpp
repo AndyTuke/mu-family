@@ -14,7 +14,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
       // a layer's data, so there is nothing to release before a removal.
       // The knobs' live modulation arcs hold a track's matrix: release them before a removal frees it.
       layerEdit(p, sidebar, layerPanel, { [this] { trackContent.releaseModulationArcs(); },
-                                          [this](int idx) { showTrack(idx); } }),
+                                          [this](int idx) { showTrack(idx); },
+                                          [this](std::function<void()> add) { askNewTrackEngine(std::move(add)); } }),
       mixerOverlay(p, p.mixerEngine),
       settingsOverlay(p)
 {
@@ -90,6 +91,21 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 PluginEditor::~PluginEditor()
 {
     proc.onLayerPresetCommitted = nullptr;   // the processor can outlive the editor
+}
+
+// + Track asks which engine the new track runs (Kick, Bass, Hat, Snare, Rumble, FM Perc, Chord) before adding it; cancelling adds nothing.
+void PluginEditor::askNewTrackEngine(std::function<void()> add)
+{
+    juce::PopupMenu menu;
+    for (int e = 0; e < kNumEngineTypes; ++e) menu.addItem(e + 1, engineName(engineFromIndex(e)));
+    juce::Component::SafePointer<PluginEditor> safe(this);
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&sidebar),
+                       [safe, add = std::move(add)](int chosen)
+                       {
+                           if (safe == nullptr || chosen <= 0) return;
+                           safe->proc.setNextTrackEngine(engineFromIndex(chosen - 1));
+                           add();
+                       });
 }
 
 void PluginEditor::showTrack(int idx)

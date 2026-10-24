@@ -627,10 +627,11 @@ void TrackContent::resized()
     engineR    = { 0, 0, w, padY + plateH + boxH + padY };
     const int boxY = padY + plateH;
     int x = padX;
-    engineBoxR = engineW > 0 ? juce::Rectangle<int>(x, boxY, engineW, boxH) : juce::Rectangle<int>();
-    if (engineW > 0) x += engineW + divW;
+    // The KEY section comes first: the key and scale belong to the whole instrument, not to the shown track.
     keyBoxR = keyW > 0 ? juce::Rectangle<int>(x, boxY, keyW, boxH) : juce::Rectangle<int>();
     if (keyW > 0) x += keyW + divW;
+    engineBoxR = engineW > 0 ? juce::Rectangle<int>(x, boxY, engineW, boxH) : juce::Rectangle<int>();
+    if (engineW > 0) x += engineW + divW;
     const int insertBoxW = 2 * clear + insertW;
     // A drum or percussion engine's FILTER section sits between the voice and the insert, four knob cells wide: the same place, the
     // same size on each engine.
@@ -797,6 +798,16 @@ void TrackContent::paint(juce::Graphics& g)
     // The shown track's colour on its voice box.
     g.setColour(layerColour());
     g.drawRoundedRectangle(voiceBoxR.toFloat().expanded(1.0f), 4.0f, 1.5f);
+
+    // The KEY section is global (every track follows it): a pale double edge sets it apart from the per-track sections.
+    if (! keyBoxR.isEmpty())
+    {
+        const auto edge = MuLookAndFeel::colour(MuLookAndFeel::labelText);
+        g.setColour(edge.withAlpha(0.65f));
+        g.drawRoundedRectangle(keyBoxR.toFloat().expanded(1.0f), 4.0f, 1.5f);
+        g.setColour(edge.withAlpha(0.3f));
+        g.drawRoundedRectangle(keyBoxR.toFloat().expanded(3.5f), 5.5f, 1.0f);
+    }
 }
 
 void TrackContent::paintOverChildren(juce::Graphics& g)

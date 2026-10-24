@@ -38,6 +38,7 @@ private:
     void useDestinationsOf(int idx);  // the modulation destinations of track idx's engine
 
     PluginProcessor& proc;
+    void askNewTrackEngine(std::function<void()> add);   // the + Track engine menu
     LayerSidebar   sidebar;
     std::array<ModDestProvider, kNumEngineTypes> modProviders;   // one destination set per engine
     TrackContent   trackContent;

@@ -48,6 +48,12 @@ void LayerEditController::refreshAfterPresetLoad()
 // disables its button at the maximum, so this is only a safety net.
 void LayerEditController::addLayer()
 {
+    if (hooks.beforeAdd) { hooks.beforeAdd([this] { addLayerNow(); }); return; }
+    addLayerNow();
+}
+
+void LayerEditController::addLayerNow()
+{
     const int idx = proc.addLayer();
     if (idx < 0) return;
     sidebar.refreshItems();

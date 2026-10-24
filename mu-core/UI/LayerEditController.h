@@ -25,6 +25,9 @@ public:
         std::function<void()> unbindAll;
         // Show layer `index` (normally LayerPanel::setLayer plus any product rebind).
         std::function<void(int)> showLayer;
+        // Optional: asked before a layer is added (a product that wants to know what kind first, such as mu-On's engine menu).
+        // The product calls `add` when the user has chosen, and not at all if they cancel. Unset: the layer is added at once.
+        std::function<void(std::function<void()> add)> beforeAdd;
     };
 
     LayerEditController(ProcessorBase& processor, LayerSidebar& sidebar, LayerPanel& panel, Hooks hooks);
@@ -38,6 +41,7 @@ public:
 
 private:
     void addLayer();
+    void addLayerNow();
     void confirmDelete();
     void deleteShownLayer();
     void wire();
