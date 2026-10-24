@@ -557,5 +557,4 @@ existing **hot-swap**; pad lights are playing = bright, available = dim, empty =
 5. **"Parsing" cue** on a top-row pad for a slow preset load: not in version 1; revisit after the load-time measurement (R6, R7).
 6. **Other live actions:** version 1 stays at clip launch, mute, layer select, preset and transport. A tempo or filter sweep needs a continuous control, which belongs on a MIDI-learn knob (#1325), not a pad.
 
-**Still open (needs Andy's hardware):**
-- Which other controllers do you have or plan (so the first second driver is a real one)?
+**Other controllers (Andy, 2026-10-24):** none owned or planned. The `mu-control` framework stays device-independent so a second driver is easy to add if one ever turns up; nothing to schedule.
