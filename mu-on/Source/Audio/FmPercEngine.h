@@ -28,34 +28,36 @@
 namespace mu_on
 {
 
+// Per-algorithm constants: how each normalised knob maps to a musical amount for this voice.
+struct FmPercVoicing
+{
+    float indexMax;                       // Index 1.0 = this peak modulation index (rad)
+    float idecMinMs, idecMaxMs;           // FM Env: index decay time constant (geometric map)
+    float knockGain, knockMs;             // Extra attack index on top of the body, and its time constant
+    float diveLo, diveHi;                 // Dive: pitch multiplier added at the hit, 1 + d (negative = rises)
+    float dtMinMs, dtMaxMs;               // Dive Time (geometric map)
+    float decMinMs, decMaxMs;             // Decay: perceived length (geometric map); the time constant is a third of it
+    float tuneRefHz;                      // Pitch at which dive time and decay are as tabled; higher tunes get shorter
+    float fbMax;                          // Fdbk 1.0 = this much modulator self-phase (rad)
+    float foldMax;                        // Fold 1.0 = this much extra drive into the wavefolder
+    float noiseMax, noiseLpHz;            // Noise 1.0 = this level, shaped by a one-pole low-pass
+    float skinMix;                        // Level of the modulator heard directly (the drum-head partial)
+
+    // Trailing fields default so the Tom and Conga rows above keep their sound exactly.
+    float skinDecayMul = 1.0f;            // The directly heard partial decays this many times faster than the body
+    float noiseFm      = 0.0f;            // Noise 1.0 also phase-modulates the carrier by this many rad (noise-FM)
+    float hpHz         = 0.0f;            // Output high-pass (two one-pole stages, 12 dB/oct); 0 = none
+    float glitchDepth  = 0.0f;            // The modulator pitch is re-rolled by +/- this fraction ...
+    float glitchMs     = 3.0f;            // ... every this many ms (sample and hold)
+    float tameSlope    = 0.025f;          // Index reduction per semitone above C5 (Plaits FM engine: 0.025)
+    bool  metal        = false;           // Three carrier / modulator pairs on the 808 metal-ratio set
+    bool  oversample   = false;           // Run the operators at 2x and decimate through the half-band
+};
+
 class FmPercEngine
 {
 public:
-    // Per-algorithm constants: how each normalised knob maps to a musical amount for this voice.
-    struct Voicing
-    {
-        float indexMax;                       // Index 1.0 = this peak modulation index (rad)
-        float idecMinMs, idecMaxMs;           // FM Env: index decay time constant (geometric map)
-        float knockGain, knockMs;             // Extra attack index on top of the body, and its time constant
-        float diveLo, diveHi;                 // Dive: pitch multiplier added at the hit, 1 + d (negative = rises)
-        float dtMinMs, dtMaxMs;               // Dive Time (geometric map)
-        float decMinMs, decMaxMs;             // Decay: perceived length (geometric map); the time constant is a third of it
-        float tuneRefHz;                      // Pitch at which dive time and decay are as tabled; higher tunes get shorter
-        float fbMax;                          // Fdbk 1.0 = this much modulator self-phase (rad)
-        float foldMax;                        // Fold 1.0 = this much extra drive into the wavefolder
-        float noiseMax, noiseLpHz;            // Noise 1.0 = this level, shaped by a one-pole low-pass
-        float skinMix;                        // Level of the modulator heard directly (the drum-head partial)
-
-        // Trailing fields default so the Tom and Conga rows above keep their sound exactly.
-        float skinDecayMul = 1.0f;            // The directly heard partial decays this many times faster than the body
-        float noiseFm      = 0.0f;            // Noise 1.0 also phase-modulates the carrier by this many rad (noise-FM)
-        float hpHz         = 0.0f;            // Output high-pass (two one-pole stages, 12 dB/oct); 0 = none
-        float glitchDepth  = 0.0f;            // The modulator pitch is re-rolled by +/- this fraction ...
-        float glitchMs     = 3.0f;            // ... every this many ms (sample and hold)
-        float tameSlope    = 0.025f;          // Index reduction per semitone above C5 (Plaits FM engine: 0.025)
-        bool  metal        = false;           // Three carrier / modulator pairs on the 808 metal-ratio set
-        bool  oversample   = false;           // Run the operators at 2x and decimate through the half-band
-    };
+    using Voicing = FmPercVoicing;   // defined above the class: its member initializers must be complete before the constexpr rows below use it (GCC)
 
     // 0 Tom: 808-style, the modulator at Ratio into the carrier and heard at 0.25 as the skin partial, a short
     // high-index knock, a subtle dive and a noise tail a little longer than the body (Baratatronix 808 tom page).
