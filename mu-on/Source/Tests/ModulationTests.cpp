@@ -85,10 +85,12 @@ public:
             // engine here. If a dest is added, update BOTH this list and the engine dispatch.
             // Counts equal each engine's modulatable arity plus Level, Pan, the 4 insert knobs and the 3 FX sends: Kick 5, Bass 12 (wave choice
             // omitted), Hat 4, Snare 3, Rumble 10 (bpm transport excluded).
-            auto pinLane = [this](EngineType engine, const std::vector<std::string>& engineDests)
+            auto pinLane = [this](EngineType engine, const std::vector<std::string>& engineDests, bool drum = false)
             {
-                // Every engine's table ends with Level, Pan, the four insert knobs and the three FX sends.
+                // A drum or percussion table has the filter's five rows and the Ghost level before the closing nine.
                 std::vector<std::string> expected = engineDests;
+                if (drum) expected.insert(expected.end(), { "filter.cut", "filter.res", "filter.atk", "filter.dec", "filter.dep", "groove.ghost" });
+                // Every engine's table ends with Level, Pan, the four insert knobs and the three FX sends.
                 expected.insert(expected.end(), { "amp.level", "amp.pan", "insert.p1", "insert.p2", "insert.p3", "insert.p4",
                                                   "send.effect", "send.delay", "send.reverb" });
                 int n = 0;
@@ -100,15 +102,15 @@ public:
                            juce::String(engineName(engine)) + " dest[" + juce::String(i)
                                + "] == " + juce::String(expected[(size_t) i]));
             };
-            pinLane(EngineType::Kick,   { "k.tune.prop", "k.ptch.prop", "k.pdec.prop", "k.adec.prop", "k.drive.prop" });
+            pinLane(EngineType::Kick,   { "k.tune.prop", "k.ptch.prop", "k.pdec.prop", "k.adec.prop", "k.drive.prop" }, true);
             pinLane(EngineType::Bass,   { "b.tune.prop", "b.sub.prop", "b.cut.prop", "b.res.prop", "b.env.prop",
                               "b.edec.prop", "b.atk.prop", "b.dec.prop", "b.sus.prop", "b.drive.prop", "b.rel.prop", "b.glide.prop" });
-            pinLane(EngineType::Hat,    { "h.tune.prop", "h.dec.prop", "h.otune.prop", "h.odec.prop" });
-            pinLane(EngineType::Snare,  { "s.tune.prop", "s.dec.prop", "s.snap.prop" });
+            pinLane(EngineType::Hat,    { "h.tune.prop", "h.dec.prop", "h.otune.prop", "h.odec.prop" }, true);
+            pinLane(EngineType::Snare,  { "s.tune.prop", "s.dec.prop", "s.snap.prop" }, true);
             pinLane(EngineType::Rumble, { "r.drive.prop", "r.d1.prop", "r.d2.prop", "r.d3.prop", "r.size.prop",
                               "r.revmix.prop", "r.revlp.prop", "r.cut.prop", "r.res.prop", "r.inlp.prop" });
             pinLane(EngineType::FmPerc, { "fp.tune.prop", "fp.ratio.prop", "fp.index.prop", "fp.idec.prop", "fp.fdbk.prop",
-                              "fp.dive.prop", "fp.dtime.prop", "fp.decay.prop", "fp.fold.prop", "fp.noise.prop" });
+                              "fp.dive.prop", "fp.dtime.prop", "fp.decay.prop", "fp.fold.prop", "fp.noise.prop" }, true);
             pinLane(EngineType::Chord,  { "c.cut.prop", "c.res.prop", "c.drive.prop", "c.env.prop", "c.edec.prop",
                               "c.atk.prop", "c.dec.prop", "c.sus.prop", "c.rel.prop" });
         }

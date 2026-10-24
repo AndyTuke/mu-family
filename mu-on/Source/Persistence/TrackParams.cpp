@@ -155,6 +155,11 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
         layout.add(std::make_unique<AudioParameterChoice>(id(e, "ftype"), lbl + name + " Filter Type", juce::StringArray{ "LP12", "HP12", "BP12", "Notch12" }, 0));
         flt(e, "fcut", name + " Filter Cutoff",    centred(20.0f, 20000.0f, 1.0f, 640.0f), 20000.0f, mu_fmt::Unit::Hz);
         flt(e, "fres", name + " Filter Resonance", f(0.0f, 0.99f, 0.001f), 0.2f, mu_fmt::Unit::Percent01);
+        // The filter's AD envelope, restarted by every step: the attack and decay times and the depth it moves the cutoff by
+        // (up for positive, down for negative; full depth is kDrumFilterEnvOctaves octaves).
+        flt(e, "fatk", name + " Filter Env Attack", centred(0.5f, 200.0f, 0.1f, 10.0f), 0.5f, mu_fmt::Unit::Ms);
+        flt(e, "fdec", name + " Filter Env Decay",  centred(10.0f, 2000.0f, 1.0f, 150.0f), 150.0f, mu_fmt::Unit::Ms);
+        flt(e, "fdep", name + " Filter Env Depth",  f(-1.0f, 1.0f, 0.001f), 0.0f, mu_fmt::Unit::Percent01);
     };
     drumFilter(E::Kick, "Kick");  drumFilter(E::Hat, "Hat");  drumFilter(E::Snare, "Snare");  drumFilter(E::FmPerc, "FM Perc");
 }

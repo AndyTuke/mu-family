@@ -42,6 +42,8 @@ public:
         bool                    groupStart = false;
         // The name the status bar shows for the control (empty: the label), for a label that is abbreviated on the knob.
         juce::String            statusName;
+        // A smaller knob (the family's Size 4) in the same cell, for a secondary row such as an envelope under a filter.
+        bool                    small = false;
     };
 
     explicit ParamKnobGrid(juce::AudioProcessorValueTreeState& state);
@@ -54,6 +56,11 @@ public:
     // Drop every knob's modulation binding (matrix pointer + live-value callback), so no timer tick
     // can reach a layer's data while a structural edit moves or frees it. setSpecs rebinds.
     void clearModBindings();
+
+    // The standard knob size the controls fit at in the grid's current height, as an index: 0 = Size 2, 1 = Size 3, 2 = Size 4.
+    int  fitIndex() const;
+    // Never draw bigger than this size index: two grids side by side take the larger of their fitIndex so their knobs match.
+    void setMinSizeIndex(int index) { if (index != minSizeIndex) { minSizeIndex = index; resized(); } }
 
     // The width (pixels) the controls need on a single row — a selector takes two cells.
     int getPreferredWidth() const;
@@ -75,6 +82,7 @@ private:
         bool                            newRow = false;   // starts a new row of the grid
         bool                            groupStart = false;   // starts a group (see Spec)
         juce::String                    statusName;
+        bool                            small = false;   // a Size 4 knob (see Spec)
         std::unique_ptr<KnobWithLabel>  knob;
         std::unique_ptr<juce::ComboBox> combo;
         juce::Label                     name;
@@ -83,6 +91,8 @@ private:
     };
 
     void reportStatus(const Control&) const;
+    int  heightAt(int sizeIndex, int areaWidth) const;   // the height the controls need at a size index, wrapped at the width
+    int  minSizeIndex = 0;
 
     juce::AudioProcessorValueTreeState&   apvts;
     std::vector<std::unique_ptr<Control>> controls;

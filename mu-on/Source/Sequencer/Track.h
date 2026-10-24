@@ -138,7 +138,7 @@ struct Track : Layer
     float getModLive(EngineType engine, int dest) const noexcept;
 
     // The most targets any engine's table holds (Bass: 10).
-    static constexpr int kMaxDests = 24;   // the engine's targets plus the nine closing rows
+    static constexpr int kMaxDests = 32;   // the engine's targets plus the six drum rows and the nine closing rows
 
 private:
     // Cached modulation inputs for one engine: the destination ids (proportion-space keys), their backing
@@ -162,8 +162,13 @@ private:
     // host's: a host without them (unbound) leaves the lock at C chromatic.
     mu_core::ParamBinding kickFineRow, bassFineRow, rootRow, scaleRow;
     // The drum and percussion filter (not modulation targets): per engine its type, cutoff and resonance rows, and the filter.
-    std::array<mu_core::ParamBinding, kNumEngineTypes> filterTypeRow, filterCutRow, filterResRow;
+    std::array<mu_core::ParamBinding, kNumEngineTypes> filterTypeRow, filterCutRow;   // type (a choice) and a "is a drum engine" mark
+    float filterNow[5] { 20000.0f, 0.2f, 0.5f, 150.0f, 0.0f };   // this block's resolved cutoff, resonance, env attack, decay and depth
+    float ghostNow = 0.35f;                                      // this block's resolved Ghost level
     MultiModeFilter drumFilter;
+    int drumEnvAge = 1 << 30;                                    // samples since the filter envelope last restarted (huge: idle)
+    int drumTrigOffsets[16] {};                                  // where in this block steps fired (the envelope restarts there)
+    int drumTrigCount = 0;
     void applyDrumFilter(juce::AudioBuffer<float>& out, int n, int e) noexcept;
     // The track's insert effect (the shared InsertProcessor, as a mixer bus insert): algorithm and four generic knobs,
     // run on the engine's block after it renders. Algorithm 0 (None) skips it.

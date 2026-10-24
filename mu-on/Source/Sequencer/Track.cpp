@@ -163,7 +163,6 @@ void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
         const auto k = (size_t) toIndex(kind);
         filterTypeRow[k] = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, kind, "ftype")), this);
         filterCutRow[k]  = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, kind, "fcut")), this);
-        filterResRow[k]  = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, kind, "fres")), this);
     }
     jassert(engineRow.isBound() && sourceRow.isBound() && bassWaveRow.isBound() && algoRow.isBound() && swingRow.isBound() && accentRow.isBound());   // an id drift from the layout (debug)
     haveResolved = false;   // values held for C12 belong to the slot bound before
@@ -253,6 +252,7 @@ void Track::resetEngines() noexcept
         if (e != nullptr) e->reset();
     insert.reset();   // a stop or an engine change also ends the insert's tail
     drumFilter.reset();
+    drumEnvAge = 1 << 30;
 }
 
 void Track::resetEngineToPrepared() noexcept
@@ -274,19 +274,44 @@ float Track::getModLive(EngineType e, int dest) const noexcept
     return modLive[(size_t) dest].load(std::memory_order_relaxed);
 }
 
-// The drum and percussion filter on the block just rendered: low-pass, high-pass, band-pass or notch at the engine's
-// cutoff and resonance. A low-pass at the top of the range is the open position and skips the filter.
+// The drum and percussion filter on the block just rendered: LP12, HP12, BP12 or Notch12 at the cutoff and resonance this
+// block resolved, the cutoff moved by an AD envelope that every step restarts (Depth octaves up or down at full). The block runs
+// in short pieces so the envelope moves inside it. An LP12 at the top of the range with no depth is the open position and skips
+// the filter.
 void Track::applyDrumFilter(juce::AudioBuffer<float>& out, int n, int e) noexcept
 {
     const auto k = (size_t) e;
     if (! filterCutRow[k].isBound()) return;   // not a drum or percussion engine
+    constexpr int kIdle = 1 << 30, kSub = 32;
     const int type = juce::jlimit(0, 3, juce::roundToInt(filterTypeRow[k].load(0.0f)));
-    const float cut = filterCutRow[k].load(20000.0f);
-    if (type == 0 && cut >= 19990.0f) return;
+    const float cut = juce::jlimit(20.0f, 20000.0f, filterNow[0]);
+    const float depthOct = filterNow[4] * kDrumFilterEnvOctaves;
+    if (type == 0 && cut >= 19990.0f && std::abs(depthOct) < 0.01f) { drumEnvAge = kIdle; return; }
+
+    const float atkSamples = juce::jmax(1.0f, filterNow[2] * 0.001f * (float) preparedRate);
+    const float decSamples = juce::jmax(1.0f, filterNow[3] * 0.001f * (float) preparedRate);
     drumFilter.setType(type);
-    drumFilter.setCutoff(cut);
-    drumFilter.setResonance(filterResRow[k].load(0.2f));
-    drumFilter.process(out, n, juce::jmin(2, out.getNumChannels()));
+    drumFilter.setResonance(filterNow[1]);
+
+    const int nch = juce::jmin(2, out.getNumChannels());
+    float* chans[2] = { out.getWritePointer(0), nch > 1 ? out.getWritePointer(1) : nullptr };
+    for (int pos = 0; pos < n; pos += kSub)
+    {
+        const int len = juce::jmin(kSub, n - pos);
+        for (int t = 0; t < drumTrigCount; ++t)
+            if (drumTrigOffsets[t] >= pos && drumTrigOffsets[t] < pos + len) drumEnvAge = 0;   // a step fired in this piece
+        float env = 0.0f;
+        if (drumEnvAge < kIdle)
+        {
+            const float age = (float) drumEnvAge;
+            env = age < atkSamples ? age / atkSamples : std::exp(-4.6f * (age - atkSamples) / decSamples);   // linear attack, exponential decay (-40 dB over the decay time)
+            if (age >= atkSamples && env < 0.002f) { env = 0.0f; drumEnvAge = kIdle; }
+            else drumEnvAge = juce::jmin(kIdle - 1, drumEnvAge + len);
+        }
+        drumFilter.setCutoff(juce::jlimit(20.0f, 20000.0f, cut * std::exp2(depthOct * env)));
+        juce::AudioBuffer<float> piece(chans, nch, pos, len);   // a view of this piece: no allocation
+        drumFilter.process(piece, len, nch);
+    }
 }
 
 // The engine's parameters through the track's modulation matrix (the shared range-based resolve: proportion
@@ -312,6 +337,13 @@ void Track::resolve(int e, double beat, float* outValues) noexcept
     // The last nine targets of every engine's table (Level, Pan, Insert P1..P4, the three sends): the track's Level and insert
     // knobs for this block's render, and the mixer strip's Pan and sends for the host.
     levelNow = outValues[L.count - 9];
+    // A drum or percussion table has six rows before those nine: the filter's Cutoff, Resonance, Env Attack, Env Decay and
+    // Env Depth, then the Ghost level (see MuOnModDest.h). Any other engine has no ghosts and no drum filter.
+    if (filterCutRow[(size_t) e].isBound())
+    {
+        for (int k = 0; k < 5; ++k) filterNow[k] = outValues[L.count - 15 + k];
+        ghostNow = juce::jlimit(0.0f, 1.0f, outValues[L.count - 10]);
+    }
     for (int k = 0; k < VoiceParams::kInsertSlotCount; ++k) insertNow[k] = outValues[L.count - 7 + k];
     stripMod.publish(outValues[L.count - 8], outValues[L.count - 3], outValues[L.count - 2], outValues[L.count - 1]);
 
@@ -337,7 +369,7 @@ float Track::evaluateRumbleEnv(double beat) noexcept
 void Track::clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, int e, int n) noexcept
 {
     row.setGroove(swingRow.load(0.0f), accentRow.load(1.0f));
-    row.setGhostLevel(ghostRow.load(0.35f));
+    row.setGhostLevel(filterCutRow[(size_t) e].isBound() ? ghostNow : ghostRow.load(0.35f));
     if (! ctx.playing) return;
     if (ctx.justStarted) clock.seek(ctx.startBeat);   // the step the transport starts in fires, even on a quick replay
     clock.processSpan(row, ctx.startBeat, n, ctx.beatsPerSample, row.swingAmount(), row.accentVelocity(),
@@ -346,6 +378,7 @@ void Track::clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, i
                           if (fireInto == nullptr || e == toIndex(EngineType::Rumble)) return;
                           if (! stepPlays(ev.step, ev.pass)) return;   // the probability draw of this pass
                           fireInto->trigger(ev.velocity, ev.offset, ev.open, ev.tied, ev.gateSamples, ev.semitones, &ev.chord);
+                          if (drumTrigCount < 16) drumTrigOffsets[drumTrigCount++] = ev.offset;   // the filter envelope restarts here
                           triggers.fetch_add(1, std::memory_order_relaxed);
                       });
 }
@@ -405,6 +438,7 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
     if (ctx.justStopped || ctx.stoppedUnrendered) resetEngines();
 
     // Phase 4: the row's steps in this call trigger the engine (before the render, so a step sounds in its own block).
+    drumTrigCount = 0;
     clockRow(ctx, eng, e, n);
 
     // Phase 5: the engine's block. A Rumble processes its source track's block (a priority-0 peer, post-insert and

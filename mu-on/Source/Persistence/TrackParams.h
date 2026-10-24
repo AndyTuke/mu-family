@@ -116,6 +116,8 @@ inline constexpr const char* kScaleParamId = "scale";
 // from MIDI 28 (E1) to 39, so a new Bass sequence starts on the key's root whatever the key. Turn the Tune away from it
 // and the track plays that tuning snapped to the scale, as before.
 inline constexpr float kBassTuneRootHz = 41.2f;
+// The drum and percussion filter's envelope at full Depth moves the cutoff this many octaves (up or down).
+inline constexpr float kDrumFilterEnvOctaves = 6.0f;
 inline bool isBassTuneRoot(float tuneHz) noexcept { return tuneHz > kBassTuneRootHz - 0.05f && tuneHz < kBassTuneRootHz + 0.05f; }
 inline int  bassRootMidi(int root) noexcept        { return 28 + ((root % 12) - 4 + 12) % 12; }
 
@@ -126,13 +128,13 @@ juce::StringArray loopRatioNames();
 
 inline const std::vector<const char*>& engineParamNames(EngineType e)
 {
-    static const std::vector<const char*> kKick   { "tune", "ptch", "pdec", "adec", "drive", "fine", "ftype", "fcut", "fres" };
+    static const std::vector<const char*> kKick   { "tune", "ptch", "pdec", "adec", "drive", "fine", "ftype", "fcut", "fres", "fatk", "fdec", "fdep" };
     static const std::vector<const char*> kBass   { "wave", "sub", "tune", "cut", "res", "env", "edec", "atk", "dec", "sus", "drive", "fine", "rel", "glide" };
-    static const std::vector<const char*> kHat    { "tune", "dec", "otune", "odec", "ftype", "fcut", "fres" };
-    static const std::vector<const char*> kSnare  { "tune", "dec", "snap", "ftype", "fcut", "fres" };
+    static const std::vector<const char*> kHat    { "tune", "dec", "otune", "odec", "ftype", "fcut", "fres", "fatk", "fdec", "fdep" };
+    static const std::vector<const char*> kSnare  { "tune", "dec", "snap", "ftype", "fcut", "fres", "fatk", "fdec", "fdep" };
     static const std::vector<const char*> kRumble { "drive", "d1", "d2", "d3", "size", "revmix", "revlp", "cut", "res", "inlp" };
     static const std::vector<const char*> kChord  { "wave", "cut", "res", "drive", "env", "edec", "atk", "dec", "sus", "rel" };
-    static const std::vector<const char*> kFmPerc { "algo", "tune", "ratio", "index", "idec", "fdbk", "dive", "dtime", "decay", "fold", "noise", "ftype", "fcut", "fres" };
+    static const std::vector<const char*> kFmPerc { "algo", "tune", "ratio", "index", "idec", "fdbk", "dive", "dtime", "decay", "fold", "noise", "ftype", "fcut", "fres", "fatk", "fdec", "fdep" };
     switch (e)
     {
         case EngineType::Kick:   return kKick;

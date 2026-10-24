@@ -52,7 +52,7 @@ public:
 
     // Let go of every knob's modulation binding; called before a track is removed or moved, because the
     // arcs hold the track's matrix. setLayer rebinds.
-    void releaseModulationArcs() override { grid.clearModBindings(); insertSub.clearGRSource(); }
+    void releaseModulationArcs() override { grid.clearModBindings(); filterGrid.clearModBindings(); ghostKnob.clearModBinding(); insertSub.clearGRSource(); }
 
     // A click in a step row selected another track.
     std::function<void(int)> onRowClicked;
@@ -89,7 +89,8 @@ private:
     juce::Label    rootCaption { {}, "Root" }, scaleCaption { {}, "Scale" };
     DropdownSelect rootSelect, scaleSelect;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> rootAtt, scaleAtt;
-    mu_ui::ParamKnobGrid grid;
+    mu_ui::ParamKnobGrid grid;              // the engine's voice knobs (left-justified)
+    mu_ui::ParamKnobGrid filterGrid;        // a drum or percussion engine's FILTER section: type, cutoff, resonance, and the envelope's smaller knobs
     StepRows       rows;                              // every track's row (a track the host does not lock)
     TrackStepRow   soloRow;                           // the shown track's one row (a locked track)
     bool           locked = false;                    // the shown track's engine is fixed by its host
@@ -121,7 +122,7 @@ private:
     NoteLengthControl rumbleLength { "Loop" };        // its length: the same control as a modulator's Loop
 
     juce::Rectangle<int> engineR, slotR;              // the two panels
-    juce::Rectangle<int> engineBoxR, voiceBoxR, insertBoxR, grooveBoxR, stepBoxR, stepsBoxR;   // engineBoxR: the Engine / Source selectors
+    juce::Rectangle<int> engineBoxR, voiceBoxR, filterBoxR, insertBoxR, grooveBoxR, stepBoxR, stepsBoxR;   // engineBoxR: the Engine / Source selectors
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TrackContent)
 };

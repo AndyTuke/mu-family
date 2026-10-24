@@ -254,15 +254,27 @@
         <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
         <p id="kick_fres" x="0.2000000029802322"/>
+        <p id="kick_fatk" x="0.5"/>
+        <p id="kick_fdec" x="150.0"/>
+        <p id="kick_fdep" x="0.0"/>
         <p id="hat_ftype" x="0.0" c="LP12"/>
         <p id="hat_fcut" x="20000.0"/>
         <p id="hat_fres" x="0.2000000029802322"/>
+        <p id="hat_fatk" x="0.5"/>
+        <p id="hat_fdec" x="150.0"/>
+        <p id="hat_fdep" x="0.0"/>
         <p id="snare_ftype" x="0.0" c="LP12"/>
         <p id="snare_fcut" x="20000.0"/>
         <p id="snare_fres" x="0.2000000029802322"/>
+        <p id="snare_fatk" x="0.5"/>
+        <p id="snare_fdec" x="150.0"/>
+        <p id="snare_fdep" x="0.0"/>
         <p id="fmp_ftype" x="0.0" c="LP12"/>
         <p id="fmp_fcut" x="20000.0"/>
         <p id="fmp_fres" x="0.2000000029802322"/>
+        <p id="fmp_fatk" x="0.5"/>
+        <p id="fmp_fdec" x="150.0"/>
+        <p id="fmp_fdep" x="0.0"/>
         <Track i="0" on="1000100010001000" accent="1000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -357,15 +369,27 @@
         <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
         <p id="kick_fres" x="0.2000000029802322"/>
+        <p id="kick_fatk" x="0.5"/>
+        <p id="kick_fdec" x="150.0"/>
+        <p id="kick_fdep" x="0.0"/>
         <p id="hat_ftype" x="0.0" c="LP12"/>
         <p id="hat_fcut" x="20000.0"/>
         <p id="hat_fres" x="0.2000000029802322"/>
+        <p id="hat_fatk" x="0.5"/>
+        <p id="hat_fdec" x="150.0"/>
+        <p id="hat_fdep" x="0.0"/>
         <p id="snare_ftype" x="0.0" c="LP12"/>
         <p id="snare_fcut" x="20000.0"/>
         <p id="snare_fres" x="0.2000000029802322"/>
+        <p id="snare_fatk" x="0.5"/>
+        <p id="snare_fdec" x="150.0"/>
+        <p id="snare_fdep" x="0.0"/>
         <p id="fmp_ftype" x="0.0" c="LP12"/>
         <p id="fmp_fcut" x="20000.0"/>
         <p id="fmp_fres" x="0.2000000029802322"/>
+        <p id="fmp_fatk" x="0.5"/>
+        <p id="fmp_fdec" x="150.0"/>
+        <p id="fmp_fdep" x="0.0"/>
         <Track i="1" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -460,15 +484,27 @@
         <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
         <p id="kick_fres" x="0.2000000029802322"/>
+        <p id="kick_fatk" x="0.5"/>
+        <p id="kick_fdec" x="150.0"/>
+        <p id="kick_fdep" x="0.0"/>
         <p id="hat_ftype" x="0.0" c="LP12"/>
         <p id="hat_fcut" x="20000.0"/>
         <p id="hat_fres" x="0.2000000029802322"/>
+        <p id="hat_fatk" x="0.5"/>
+        <p id="hat_fdec" x="150.0"/>
+        <p id="hat_fdep" x="0.0"/>
         <p id="snare_ftype" x="0.0" c="LP12"/>
         <p id="snare_fcut" x="20000.0"/>
         <p id="snare_fres" x="0.2000000029802322"/>
+        <p id="snare_fatk" x="0.5"/>
+        <p id="snare_fdec" x="150.0"/>
+        <p id="snare_fdep" x="0.0"/>
         <p id="fmp_ftype" x="0.0" c="LP12"/>
         <p id="fmp_fcut" x="20000.0"/>
         <p id="fmp_fres" x="0.2000000029802322"/>
+        <p id="fmp_fatk" x="0.5"/>
+        <p id="fmp_fdec" x="150.0"/>
+        <p id="fmp_fdep" x="0.0"/>
         <Track i="2" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -563,15 +599,27 @@
         <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
         <p id="kick_fres" x="0.2000000029802322"/>
+        <p id="kick_fatk" x="0.5"/>
+        <p id="kick_fdec" x="150.0"/>
+        <p id="kick_fdep" x="0.0"/>
         <p id="hat_ftype" x="0.0" c="LP12"/>
         <p id="hat_fcut" x="20000.0"/>
         <p id="hat_fres" x="0.2000000029802322"/>
+        <p id="hat_fatk" x="0.5"/>
+        <p id="hat_fdec" x="150.0"/>
+        <p id="hat_fdep" x="0.0"/>
         <p id="snare_ftype" x="0.0" c="LP12"/>
         <p id="snare_fcut" x="20000.0"/>
         <p id="snare_fres" x="0.2000000029802322"/>
+        <p id="snare_fatk" x="0.5"/>
+        <p id="snare_fdec" x="150.0"/>
+        <p id="snare_fdep" x="0.0"/>
         <p id="fmp_ftype" x="0.0" c="LP12"/>
         <p id="fmp_fcut" x="20000.0"/>
         <p id="fmp_fres" x="0.2000000029802322"/>
+        <p id="fmp_fatk" x="0.5"/>
+        <p id="fmp_fdec" x="150.0"/>
+        <p id="fmp_fdep" x="0.0"/>
         <Track i="3" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -666,15 +714,27 @@
         <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
         <p id="kick_fres" x="0.2000000029802322"/>
+        <p id="kick_fatk" x="0.5"/>
+        <p id="kick_fdec" x="150.0"/>
+        <p id="kick_fdep" x="0.0"/>
         <p id="hat_ftype" x="0.0" c="LP12"/>
         <p id="hat_fcut" x="20000.0"/>
         <p id="hat_fres" x="0.2000000029802322"/>
+        <p id="hat_fatk" x="0.5"/>
+        <p id="hat_fdec" x="150.0"/>
+        <p id="hat_fdep" x="0.0"/>
         <p id="snare_ftype" x="0.0" c="LP12"/>
         <p id="snare_fcut" x="20000.0"/>
         <p id="snare_fres" x="0.2000000029802322"/>
+        <p id="snare_fatk" x="0.5"/>
+        <p id="snare_fdec" x="150.0"/>
+        <p id="snare_fdep" x="0.0"/>
         <p id="fmp_ftype" x="0.0" c="LP12"/>
         <p id="fmp_fcut" x="20000.0"/>
         <p id="fmp_fres" x="0.2000000029802322"/>
+        <p id="fmp_fatk" x="0.5"/>
+        <p id="fmp_fdec" x="150.0"/>
+        <p id="fmp_fdep" x="0.0"/>
         <Track i="4" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -769,15 +829,27 @@
         <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
         <p id="kick_fres" x="0.2000000029802322"/>
+        <p id="kick_fatk" x="0.5"/>
+        <p id="kick_fdec" x="150.0"/>
+        <p id="kick_fdep" x="0.0"/>
         <p id="hat_ftype" x="0.0" c="LP12"/>
         <p id="hat_fcut" x="20000.0"/>
         <p id="hat_fres" x="0.2000000029802322"/>
+        <p id="hat_fatk" x="0.5"/>
+        <p id="hat_fdec" x="150.0"/>
+        <p id="hat_fdep" x="0.0"/>
         <p id="snare_ftype" x="0.0" c="LP12"/>
         <p id="snare_fcut" x="20000.0"/>
         <p id="snare_fres" x="0.2000000029802322"/>
+        <p id="snare_fatk" x="0.5"/>
+        <p id="snare_fdec" x="150.0"/>
+        <p id="snare_fdep" x="0.0"/>
         <p id="fmp_ftype" x="0.0" c="LP12"/>
         <p id="fmp_fcut" x="20000.0"/>
         <p id="fmp_fres" x="0.2000000029802322"/>
+        <p id="fmp_fatk" x="0.5"/>
+        <p id="fmp_fdec" x="150.0"/>
+        <p id="fmp_fdep" x="0.0"/>
         <Track i="5" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -872,15 +944,27 @@
         <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
         <p id="kick_fres" x="0.2000000029802322"/>
+        <p id="kick_fatk" x="0.5"/>
+        <p id="kick_fdec" x="150.0"/>
+        <p id="kick_fdep" x="0.0"/>
         <p id="hat_ftype" x="0.0" c="LP12"/>
         <p id="hat_fcut" x="20000.0"/>
         <p id="hat_fres" x="0.2000000029802322"/>
+        <p id="hat_fatk" x="0.5"/>
+        <p id="hat_fdec" x="150.0"/>
+        <p id="hat_fdep" x="0.0"/>
         <p id="snare_ftype" x="0.0" c="LP12"/>
         <p id="snare_fcut" x="20000.0"/>
         <p id="snare_fres" x="0.2000000029802322"/>
+        <p id="snare_fatk" x="0.5"/>
+        <p id="snare_fdec" x="150.0"/>
+        <p id="snare_fdep" x="0.0"/>
         <p id="fmp_ftype" x="0.0" c="LP12"/>
         <p id="fmp_fcut" x="20000.0"/>
         <p id="fmp_fres" x="0.2000000029802322"/>
+        <p id="fmp_fatk" x="0.5"/>
+        <p id="fmp_fdec" x="150.0"/>
+        <p id="fmp_fdep" x="0.0"/>
         <Track i="6" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -975,15 +1059,27 @@
         <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
         <p id="kick_fres" x="0.2000000029802322"/>
+        <p id="kick_fatk" x="0.5"/>
+        <p id="kick_fdec" x="150.0"/>
+        <p id="kick_fdep" x="0.0"/>
         <p id="hat_ftype" x="0.0" c="LP12"/>
         <p id="hat_fcut" x="20000.0"/>
         <p id="hat_fres" x="0.2000000029802322"/>
+        <p id="hat_fatk" x="0.5"/>
+        <p id="hat_fdec" x="150.0"/>
+        <p id="hat_fdep" x="0.0"/>
         <p id="snare_ftype" x="0.0" c="LP12"/>
         <p id="snare_fcut" x="20000.0"/>
         <p id="snare_fres" x="0.2000000029802322"/>
+        <p id="snare_fatk" x="0.5"/>
+        <p id="snare_fdec" x="150.0"/>
+        <p id="snare_fdep" x="0.0"/>
         <p id="fmp_ftype" x="0.0" c="LP12"/>
         <p id="fmp_fcut" x="20000.0"/>
         <p id="fmp_fres" x="0.2000000029802322"/>
+        <p id="fmp_fatk" x="0.5"/>
+        <p id="fmp_fdec" x="150.0"/>
+        <p id="fmp_fdep" x="0.0"/>
         <Track i="7" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"

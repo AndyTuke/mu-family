@@ -124,28 +124,34 @@ namespace
         return {};
     }
 
-    // The selected engine's controls: the voice, then (a Kick, Hat, Snare or FM Perc) the filter as a group of its own, so the
-    // two sections spread across the row and a long FM Perc voice keeps its filter on a row below.
+    // The selected engine's voice knobs, left-justified in their own section. (A drum or percussion engine's filter has a section of
+    // its own, filterSpecsFor.)
     std::vector<Spec> specsFor(int track, EngineType engine, int algorithm)
     {
-        auto specs = voiceSpecsFor(track, engine, algorithm);
+        return voiceSpecsFor(track, engine, algorithm);
+    }
+
+    // A Kick, Hat, Snare or FM Perc filter section, the same on each: row one the type, cutoff and resonance, row two the
+    // envelope's attack, decay and depth as smaller knobs, so the controls sit in the same places whichever engine is shown.
+    std::vector<Spec> filterSpecsFor(int track, EngineType engine)
+    {
         const char* name = engine == EngineType::Kick ? "Kick" : engine == EngineType::Hat ? "Hat" : engine == EngineType::Snare ? "Snare"
                          : engine == EngineType::FmPerc ? "FM Perc" : nullptr;
-        if (name == nullptr || specs.empty()) return specs;
-        specs.front().groupStart = true;
-        const bool ownRow = engine == EngineType::FmPerc;   // its voice already fills two rows
+        if (name == nullptr) return {};
         auto id = [&](const char* p) { return engineParamId(track, engine, p); };
-        Spec type { id("ftype"), "Filter" };
-        type.groupStart = true;
-        type.newRow = ownRow;
-        type.statusName = juce::String(name) + " Filter Type";
+        const juce::String nm(name);
+        Spec type { id("ftype"), "Type" };
+        type.statusName = nm + " Filter Type";
         type.tooltip = "LP12, HP12, BP12 or Notch12. LP12 at full cutoff is off.";
-        Spec cut { id("fcut"), "Cutoff" };
-        cut.statusName = juce::String(name) + " Filter Cutoff";
-        Spec res { id("fres"), "Reso" };
-        res.statusName = juce::String(name) + " Filter Resonance";
-        specs.push_back(std::move(type)); specs.push_back(std::move(cut)); specs.push_back(std::move(res));
-        return specs;
+        Spec cut { id("fcut"), "Cutoff" };  cut.statusName = nm + " Filter Cutoff";
+        Spec res { id("fres"), "Reso" };    res.statusName = nm + " Filter Resonance";
+        Spec atk { id("fatk"), "Atk" };     atk.statusName = nm + " Filter Env Attack";   atk.newRow = true;  atk.small = true;
+        Spec dec { id("fdec"), "Dec" };     dec.statusName = nm + " Filter Env Decay";    dec.small = true;
+        Spec dep { id("fdep"), "Depth" };   dep.statusName = nm + " Filter Env Depth";    dep.small = true;
+        atk.tooltip = "The filter envelope: how fast the cutoff moves out on each step";
+        dec.tooltip = "The filter envelope: how long it takes to fall back";
+        dep.tooltip = "How far the envelope moves the cutoff: up for positive, down for negative";
+        return { std::move(type), std::move(cut), std::move(res), std::move(atk), std::move(dec), std::move(dep) };
     }
 
     void setParamPlain(juce::AudioProcessorValueTreeState& apvts, const juce::String& id, float plain)
@@ -160,7 +166,7 @@ namespace
 }
 
 TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
-    : host(trackHost), grid(trackHost.getTrackParameters()), rows(trackHost), soloRow(trackHost), insertSub(base, "t")
+    : host(trackHost), grid(trackHost.getTrackParameters()), filterGrid(trackHost.getTrackParameters()), rows(trackHost), soloRow(trackHost), insertSub(base, "t")
 {
     for (int e = 0; e < kNumEngineTypes; ++e) engineSelect.addItem(engineName(engineFromIndex(e)), e + 1);
     engineSelect.onChange = [this](int id) { engineChosen(id); };
@@ -187,6 +193,8 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     sourceCaption.setVisible(false);
     addAndMakeVisible(grid);
     grid.onStatusUpdate = [this](const juce::String& name, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
+    addAndMakeVisible(filterGrid);
+    filterGrid.onStatusUpdate = grid.onStatusUpdate;
     // The Layer box's knobs and the selectors report to the status bar under their full names.
     auto report = [this](KnobWithLabel& k, const juce::String& name)
     {
@@ -323,6 +331,28 @@ void TrackContent::rebuildGrid()
     auto specs = specsFor(currentLayer, shownEngine, juce::jmax(0, gridAlgorithm));
     bindModulationArcs(specs);
     grid.setSpecs(specs);
+
+    // The filter section (a drum or percussion engine) and the Ghost knob's live arc.
+    auto filterSpecs = filterSpecsFor(currentLayer, shownEngine);
+    bindModulationArcs(filterSpecs);
+    filterGrid.setSpecs(filterSpecs);
+    filterGrid.setVisible(! filterSpecs.empty());
+    ghostKnob.clearModBinding();
+    if (! filterSpecs.empty())
+    {
+        static const float kNaN = std::numeric_limits<float>::quiet_NaN();
+        int count = 0;
+        const ModDestEntry* table = destsForEngine(shownEngine, count);
+        const int dest = mu_mod::indexOfParam(table, (std::size_t) count, "ghost");
+        if (dest >= 0)
+        {
+            const int layer = currentLayer;
+            const EngineType engine = shownEngine;
+            ghostKnob.bindModulation(table[dest].id, &host.getTrack(currentLayer).modulationMatrix,
+                                     [this, layer, engine, dest]() -> float { return host.isTrackTransportPlaying() ? host.getModLive(layer, engine, dest) : kNaN; });
+        }
+    }
+    resized();   // the filter section comes and goes with the engine
 }
 
 void TrackContent::setLayer(int idx)
@@ -584,9 +614,14 @@ void TrackContent::resized()
     engineBoxR = engineW > 0 ? juce::Rectangle<int>(x, boxY, engineW, boxH) : juce::Rectangle<int>();
     if (engineW > 0) x += engineW + divW;
     const int insertBoxW = 2 * clear + insertW;
-    const int voiceW   = juce::jmax(0, w - padX - x - divW - insertBoxW);
+    // A drum or percussion engine's FILTER section sits between the voice and the insert, four knob cells wide: the same place, the
+    // same size on each engine.
+    const bool hasFilter = filterGrid.isVisible();
+    const int filterW  = hasFilter ? 2 * clear + 4 * (s(LF::kKnobSize2W) + s(6)) : 0;
+    const int voiceW   = juce::jmax(0, w - padX - x - divW - insertBoxW - (hasFilter ? divW + filterW : 0));
     voiceBoxR  = { x, boxY, voiceW, boxH };
-    insertBoxR = { voiceBoxR.getRight() + divW, boxY, insertBoxW, boxH };
+    filterBoxR = hasFilter ? juce::Rectangle<int>(voiceBoxR.getRight() + divW, boxY, filterW, boxH) : juce::Rectangle<int>();
+    insertBoxR = { (hasFilter ? filterBoxR : voiceBoxR).getRight() + divW, boxY, insertBoxW, boxH };
 
     const juce::Font captionFont(juce::FontOptions{}.withHeight(mu_ui::sf(LF::kKnobLabelFont)));   // as the knob labels
     auto place = [&](juce::Label& caption, DropdownSelect& dropdown, int y)
@@ -610,7 +645,14 @@ void TrackContent::resized()
         rootSelect  .setBounds(x0, ddY, rootW, s(MuLookAndFeel::kDropdownH));
         scaleSelect .setBounds(x0 + rootW + gap, ddY, scaleW, s(MuLookAndFeel::kDropdownH));
     }
+    grid.setMinSizeIndex(0);
+    filterGrid.setMinSizeIndex(0);
     grid.setBounds(voiceBoxR.reduced(clear, s(LF::kSpaceS)));
+    filterGrid.setBounds(filterBoxR.reduced(clear, s(LF::kSpaceS)));
+    // The two grids draw their knobs at one size: the smaller either needs to fit.
+    const int knobSize = juce::jmax(grid.fitIndex(), hasFilter ? filterGrid.fitIndex() : 0);
+    grid.setMinSizeIndex(knobSize);
+    filterGrid.setMinSizeIndex(knobSize);
     insertSub.setBounds(insertBoxR.getX() + clear, insertBoxR.getY() + s(LF::kSpaceS), insertW, insertH);
 
     // Panel 2 (flex): Groove | Steps, both the full height left under their plates.
@@ -724,6 +766,7 @@ void TrackContent::paint(juce::Graphics& g)
     std::vector<MuLookAndFeel::Section> sections;
     if (! engineBoxR.isEmpty()) sections.push_back({ engineBoxR, locked ? juce::String("SOURCE") : juce::String("ENGINE") });
     sections.push_back({ voiceBoxR, name + " VOICE" });
+    if (! filterBoxR.isEmpty()) sections.push_back({ filterBoxR, "FILTER" });
     sections.push_back({ insertBoxR, "INSERT" });
     sections.push_back({ grooveBoxR, rumble ? juce::String("ENVELOPE") : juce::String("LAYER") });
     if (! stepBoxR.isEmpty())  sections.push_back({ stepBoxR, "STEP " + juce::String(selectedStepOf[(size_t) currentLayer] + 1) });

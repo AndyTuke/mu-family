@@ -107,8 +107,14 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
         MuLookAndFeel::drawRecessedScreen(g, cell);
         if (ghost)
         {
-            g.setColour(colour.brighter(0.3f).withAlpha(0.95f));
-            g.drawRoundedRectangle(cell.reduced(2.5f), 2.5f, 1.8f);
+            // The ring's thickness is the Ghost level's share of half the square: nothing at 0 %, the whole square (no longer a
+            // ghost) at 100 %.
+            const float thick = row.ghostLevel() * 0.5f * juce::jmin(cell.getWidth(), cell.getHeight());
+            if (thick > 0.3f)
+            {
+                g.setColour(colour.brighter(0.3f).withAlpha(0.95f));
+                g.drawRoundedRectangle(cell.reduced(thick * 0.5f), juce::jmax(1.0f, 3.0f - thick * 0.5f), thick);
+            }
         }
         if (opts.ties && showSteps && row.tiedFrom(s))   // tied to the step before: a bar joins the two lamps
         {

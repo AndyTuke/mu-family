@@ -41,6 +41,14 @@ inline constexpr ModDestEntry kKickDests[] = {
     makeTarget("k.pdec.prop", "kick_pdec", "Pitch Decay", "Kick"),
     makeTarget("k.adec.prop", "kick_adec", "Decay", "Kick"),
     makeTarget("k.drive.prop", "kick_drive", "Drive", "Kick"),
+    // A drum or percussion table has six more rows just before those nine (Track::resolve reads them from the end): the
+    // filter's Cutoff, Resonance, Env Attack, Env Decay and Env Depth, then the track's Ghost level.
+    makeTarget("filter.cut", "kick_fcut", "Filter Cutoff", "Filter"),
+    makeTarget("filter.res", "kick_fres", "Filter Resonance", "Filter"),
+    makeTarget("filter.atk", "kick_fatk", "Filter Env Attack", "Filter"),
+    makeTarget("filter.dec", "kick_fdec", "Filter Env Decay", "Filter"),
+    makeTarget("filter.dep", "kick_fdep", "Filter Env Depth", "Filter"),
+    makeTarget("groove.ghost", "ghost", "Ghost", "Groove"),
     // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
     // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
     makeTarget("amp.level", "level", "Level", "Amp"),
@@ -88,6 +96,14 @@ inline constexpr ModDestEntry kHatDests[] = {
     makeTarget("h.dec.prop", "hat_dec", "Decay", "Hat"),
     makeTarget("h.otune.prop", "hat_otune", "Open Tune", "Hat"),
     makeTarget("h.odec.prop", "hat_odec", "Open Decay", "Hat"),
+    // A drum or percussion table has six more rows just before those nine (Track::resolve reads them from the end): the
+    // filter's Cutoff, Resonance, Env Attack, Env Decay and Env Depth, then the track's Ghost level.
+    makeTarget("filter.cut", "hat_fcut", "Filter Cutoff", "Filter"),
+    makeTarget("filter.res", "hat_fres", "Filter Resonance", "Filter"),
+    makeTarget("filter.atk", "hat_fatk", "Filter Env Attack", "Filter"),
+    makeTarget("filter.dec", "hat_fdec", "Filter Env Decay", "Filter"),
+    makeTarget("filter.dep", "hat_fdep", "Filter Env Depth", "Filter"),
+    makeTarget("groove.ghost", "ghost", "Ghost", "Groove"),
     // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
     // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
     makeTarget("amp.level", "level", "Level", "Amp"),
@@ -106,6 +122,14 @@ inline constexpr ModDestEntry kSnareDests[] = {
     makeTarget("s.tune.prop", "snare_tune", "Tune", "Snare"),
     makeTarget("s.dec.prop", "snare_dec", "Decay", "Snare"),
     makeTarget("s.snap.prop", "snare_snap", "Snap", "Snare"),
+    // A drum or percussion table has six more rows just before those nine (Track::resolve reads them from the end): the
+    // filter's Cutoff, Resonance, Env Attack, Env Decay and Env Depth, then the track's Ghost level.
+    makeTarget("filter.cut", "snare_fcut", "Filter Cutoff", "Filter"),
+    makeTarget("filter.res", "snare_fres", "Filter Resonance", "Filter"),
+    makeTarget("filter.atk", "snare_fatk", "Filter Env Attack", "Filter"),
+    makeTarget("filter.dec", "snare_fdec", "Filter Env Decay", "Filter"),
+    makeTarget("filter.dep", "snare_fdep", "Filter Env Depth", "Filter"),
+    makeTarget("groove.ghost", "ghost", "Ghost", "Groove"),
     // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
     // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
     makeTarget("amp.level", "level", "Level", "Amp"),
@@ -159,6 +183,14 @@ inline constexpr ModDestEntry kFmPercDests[] = {
     makeTarget("fp.decay.prop", "fmp_decay", "Decay", "FM Perc"),
     makeTarget("fp.fold.prop", "fmp_fold", "Fold", "FM Perc"),
     makeTarget("fp.noise.prop", "fmp_noise", "Noise", "FM Perc"),
+    // A drum or percussion table has six more rows just before those nine (Track::resolve reads them from the end): the
+    // filter's Cutoff, Resonance, Env Attack, Env Decay and Env Depth, then the track's Ghost level.
+    makeTarget("filter.cut", "fmp_fcut", "Filter Cutoff", "Filter"),
+    makeTarget("filter.res", "fmp_fres", "Filter Resonance", "Filter"),
+    makeTarget("filter.atk", "fmp_fatk", "Filter Env Attack", "Filter"),
+    makeTarget("filter.dec", "fmp_fdec", "Filter Env Decay", "Filter"),
+    makeTarget("filter.dep", "fmp_fdep", "Filter Env Depth", "Filter"),
+    makeTarget("groove.ghost", "ghost", "Ghost", "Groove"),
     // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
     // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
     makeTarget("amp.level", "level", "Level", "Amp"),
@@ -199,10 +231,10 @@ inline constexpr ModDestEntry kChordDests[] = {
 
 // Compile-time guard: every row of an engine's table names a parameter under that engine's tag
 // ("kick_..."), so a rename that misses a literal above fails the build instead of silencing a destination.
-// The closing rows every table shares: the track's Level and insert knobs (t{N}_) and the mixer strip's pan and sends (ch{N}_).
+// The closing rows every table shares (and a drum or percussion table's Ghost row): the track's Level and insert knobs (t{N}_) and the mixer strip's pan and sends (ch{N}_).
 constexpr bool isLayerWideParam(std::string_view p) noexcept
 {
-    return p == "level" || p == "insP1" || p == "insP2" || p == "insP3" || p == "insP4" || mu_mod::isMixerStripParam(p);
+    return p == "level" || p == "ghost" || p == "insP1" || p == "insP2" || p == "insP3" || p == "insP4" || mu_mod::isMixerStripParam(p);
 }
 
 template <std::size_t N>
