@@ -94,7 +94,7 @@ private:
     TrackStepRow   soloRow;                           // the shown track's one row (a locked track)
     bool           locked = false;                    // the shown track's engine is fixed by its host
 
-    KnobWithLabel swingKnob { "Swing" }, accentKnob { "Accent" };
+    KnobWithLabel swingKnob { "Swing" }, accentKnob { "Accent" }, ghostKnob { "Ghost" };   // Ghost: drum and percussion tracks only
     KnobWithLabel sendEffKnob { "FX" }, sendDlyKnob { "Delay" }, sendRevKnob { "Reverb" };   // the strip's three sends
     KnobWithLabel levelKnob { "Level" };                     // the track's own level (a modulation target; the mixer fader is separate)
     KnobWithLabel probKnob { "Prob" };                       // the layer's Probability: the share of its notes that play
@@ -114,7 +114,7 @@ private:
     void selectStep(int step);
     void layoutStepPanel();
     juce::TextButton soloBtn { "Solo" };                                                      // the strip's solo
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> swingAtt, accentAtt, sendEffAtt, sendDlyAtt, sendRevAtt, probAtt, levelAtt;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> swingAtt, accentAtt, ghostAtt, sendEffAtt, sendDlyAtt, sendRevAtt, probAtt, levelAtt;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> soloAtt;
     InsertSubsection insertSub;                       // the track's insert effect (t{N}_drvChar, t{N}_insP1..4)
     LFOEditor         rumbleEnvEditor;                // the Rumble track's drawable volume envelope

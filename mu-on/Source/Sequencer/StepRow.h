@@ -34,7 +34,20 @@ public:
     bool isTied  (int step) const noexcept { return valid(step) && cells[(size_t) step].tie.load(std::memory_order_relaxed); }
     void setTied (int step, bool v) noexcept { if (valid(step)) cells[(size_t) step].tie.store(v, std::memory_order_relaxed); }
     bool tiedFrom(int step) const noexcept { return step > 0 && isTied(step) && isOn(step) && isOn(step - 1); }
-    void setAccent(int step, bool v) noexcept { if (valid(step)) cells[(size_t) step].accent.store(v, std::memory_order_relaxed); }
+    void setAccent(int step, bool v) noexcept
+    {
+        if (! valid(step)) return;
+        cells[(size_t) step].accent.store(v, std::memory_order_relaxed);
+        if (v) cells[(size_t) step].ghost.store(false, std::memory_order_relaxed);   // accent and ghost exclude each other
+    }
+    // Ghost: a drum or percussion step played softly, at the row's Ghost level (a share of the normal note). Excludes accent.
+    bool isGhost (int step) const noexcept { return valid(step) && cells[(size_t) step].ghost.load(std::memory_order_relaxed); }
+    void setGhost(int step, bool v) noexcept
+    {
+        if (! valid(step)) return;
+        cells[(size_t) step].ghost.store(v, std::memory_order_relaxed);
+        if (v) cells[(size_t) step].accent.store(false, std::memory_order_relaxed);
+    }
     // Open: a Hat step that plays the open hat (the other tracks ignore it). With on and accent it makes the four Hat
     // states Closed / Closed Accent / Open / Open Accent.
     bool isOpen  (int step) const noexcept { return valid(step) && cells[(size_t) step].open.load(std::memory_order_relaxed); }
@@ -82,7 +95,7 @@ public:
 
     void clear() noexcept
     {
-        for (auto& c : cells) { c.on.store(false, std::memory_order_relaxed); c.accent.store(false, std::memory_order_relaxed); c.open.store(false, std::memory_order_relaxed); c.prob.store(100, std::memory_order_relaxed); c.loop.store(0, std::memory_order_relaxed); c.tie.store(false, std::memory_order_relaxed); c.oct.store(0, std::memory_order_relaxed); c.note.store(0, std::memory_order_relaxed);
+        for (auto& c : cells) { c.on.store(false, std::memory_order_relaxed); c.accent.store(false, std::memory_order_relaxed); c.ghost.store(false, std::memory_order_relaxed); c.open.store(false, std::memory_order_relaxed); c.prob.store(100, std::memory_order_relaxed); c.loop.store(0, std::memory_order_relaxed); c.tie.store(false, std::memory_order_relaxed); c.oct.store(0, std::memory_order_relaxed); c.note.store(0, std::memory_order_relaxed);
                     c.chord.store(kDefaultChord, std::memory_order_relaxed); c.inv.store(0, std::memory_order_relaxed); c.spread.store(0, std::memory_order_relaxed); }
     }
 
@@ -116,16 +129,20 @@ public:
     }
     float swingAmount()    const noexcept { return swing.load(std::memory_order_relaxed); }
     float accentVelocity() const noexcept { return accent.load(std::memory_order_relaxed); }
+    // The Ghost level: the velocity of a ghost step as a share (0..1) of a normal note's. The track sets it from t{N}_ghost.
+    void  setGhostLevel(float level01) noexcept { ghostShare.store(juce::jlimit(0.0f, 1.0f, level01), std::memory_order_relaxed); }
+    float ghostLevel() const noexcept { return ghostShare.load(std::memory_order_relaxed); }
 
     // The row as a <Track i on accent> node (also what a layer preset carries).
     juce::ValueTree serialise(int slot) const
     {
         juce::ValueTree row("Track");
         row.setProperty("i", slot, nullptr);
-        juce::String on, ac, op, tie;
-        for (int s = 0; s < kNumSteps; ++s) { on += isOn(s) ? '1' : '0'; ac += isAccent(s) ? '1' : '0'; op += isOpen(s) ? '1' : '0'; tie += tiedFrom(s) ? '1' : '0'; }
+        juce::String on, ac, op, tie, gh;
+        for (int s = 0; s < kNumSteps; ++s) { on += isOn(s) ? '1' : '0'; ac += isAccent(s) ? '1' : '0'; op += isOpen(s) ? '1' : '0'; tie += tiedFrom(s) ? '1' : '0'; gh += isGhost(s) ? '1' : '0'; }
         row.setProperty("on", on, nullptr);
         row.setProperty("accent", ac, nullptr);
+        if (gh.containsChar('1')) row.setProperty("ghost", gh, nullptr);  // absent = no ghost steps
         if (op.containsChar('1')) row.setProperty("open", op, nullptr);   // absent = every step closed
         if (tie.containsChar('1')) row.setProperty("tie", tie, nullptr);  // absent = no tied steps
         // Probability as a comma list and the loop ratio as one digit per step, each only when a step leaves its default.
@@ -158,6 +175,7 @@ public:
         const juce::String ac = row.getProperty("accent").toString();
         const juce::String op = row.getProperty("open").toString();
         const juce::String tie = row.getProperty("tie").toString();
+        const juce::String gh = row.getProperty("ghost").toString();
         const auto octs = juce::StringArray::fromTokens(row.getProperty("oct").toString(), ",", "");
         const auto notes = juce::StringArray::fromTokens(row.getProperty("note").toString(), ",", "");
         const auto chordList = juce::StringArray::fromTokens(row.getProperty("chord").toString(), ",", "");
@@ -172,6 +190,7 @@ public:
             setStepLoop(s, s < loops.length() && juce::CharacterFunctions::isDigit(loops[s]) ? (int) (loops[s] - '0') : 0);
             setOn    (s, s < on.length() && on[s] == '1');
             setAccent(s, s < ac.length() && ac[s] == '1');
+            setGhost (s, s < gh.length() && gh[s] == '1' && ! isAccent(s));
             setTied  (s, s < tie.length() && tie[s] == '1');
             setStepOctave(s, s < octs.size() ? octs[s].getIntValue() : 0);
             setStepNote  (s, s < notes.size() ? notes[s].getIntValue() : 0);
@@ -182,12 +201,12 @@ public:
     }
 
 private:
-    struct Cell { std::atomic<bool> on { false }; std::atomic<bool> accent { false }; std::atomic<bool> open { false }; std::atomic<int> prob { 100 }; std::atomic<int> loop { 0 }; std::atomic<bool> tie { false }; std::atomic<int> oct { 0 }; std::atomic<int> note { 0 };
+    struct Cell { std::atomic<bool> on { false }; std::atomic<bool> accent { false }; std::atomic<bool> ghost { false }; std::atomic<bool> open { false }; std::atomic<int> prob { 100 }; std::atomic<int> loop { 0 }; std::atomic<bool> tie { false }; std::atomic<int> oct { 0 }; std::atomic<int> note { 0 };
                   std::atomic<int> chord { kDefaultChord }; std::atomic<int> inv { 0 }; std::atomic<int> spread { 0 }; };
     static bool valid(int s) noexcept { return s >= 0 && s < kNumSteps; }
 
     std::array<Cell, kNumSteps> cells;
-    std::atomic<float> swing { 0.0f }, accent { 1.0f };   // the parameters' defaults
+    std::atomic<float> swing { 0.0f }, accent { 1.0f }, ghostShare { 0.35f };   // the parameters' defaults
 };
 
 } // namespace mu_on

@@ -56,7 +56,7 @@ namespace
 
     // The selected engine's controls, bound to track `track` (in display order). `algorithm` picks the FM Perc
     // tooltip column.
-    std::vector<Spec> specsFor(int track, EngineType engine, int algorithm)
+    std::vector<Spec> voiceSpecsFor(int track, EngineType engine, int algorithm)
     {
         auto id = [&](const char* p) { return engineParamId(track, engine, p); };
         switch (engine)
@@ -124,6 +124,30 @@ namespace
         return {};
     }
 
+    // The selected engine's controls: the voice, then (a Kick, Hat, Snare or FM Perc) the filter as a group of its own, so the
+    // two sections spread across the row and a long FM Perc voice keeps its filter on a row below.
+    std::vector<Spec> specsFor(int track, EngineType engine, int algorithm)
+    {
+        auto specs = voiceSpecsFor(track, engine, algorithm);
+        const char* name = engine == EngineType::Kick ? "Kick" : engine == EngineType::Hat ? "Hat" : engine == EngineType::Snare ? "Snare"
+                         : engine == EngineType::FmPerc ? "FM Perc" : nullptr;
+        if (name == nullptr || specs.empty()) return specs;
+        specs.front().groupStart = true;
+        const bool ownRow = engine == EngineType::FmPerc;   // its voice already fills two rows
+        auto id = [&](const char* p) { return engineParamId(track, engine, p); };
+        Spec type { id("ftype"), "Filter" };
+        type.groupStart = true;
+        type.newRow = ownRow;
+        type.statusName = juce::String(name) + " Filter Type";
+        type.tooltip = "Low-pass, high-pass, band-pass or notch. Low-pass at full cutoff is off.";
+        Spec cut { id("fcut"), "Cutoff" };
+        cut.statusName = juce::String(name) + " Filter Cutoff";
+        Spec res { id("fres"), "Reso" };
+        res.statusName = juce::String(name) + " Filter Resonance";
+        specs.push_back(std::move(type)); specs.push_back(std::move(cut)); specs.push_back(std::move(res));
+        return specs;
+    }
+
     void setParamPlain(juce::AudioProcessorValueTreeState& apvts, const juce::String& id, float plain)
     {
         if (auto* p = apvts.getParameter(id))
@@ -168,7 +192,7 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     {
         k.onStatusUpdate = [this, name](const juce::String&, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
     };
-    report(swingKnob, "Layer Swing");  report(accentKnob, "Layer Accent");  report(probKnob, "Layer Probability");  report(levelKnob, "Track Level");
+    report(swingKnob, "Layer Swing");  report(accentKnob, "Layer Accent");  report(ghostKnob, "Layer Ghost");  report(probKnob, "Layer Probability");  report(levelKnob, "Track Level");
     report(sendEffKnob, "FX Send");   report(sendDlyKnob, "Delay Send");   report(sendRevKnob, "Reverb Send");
     auto say = [this](const juce::String& name, DropdownSelect& d) { if (onStatusUpdate) onStatusUpdate(name, d.getText()); };
     rootSelect.getComboBox().onChange  = [this, say] { say("Key Root", rootSelect); };
@@ -183,6 +207,7 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     // setLayer attaches them to the shown track's rows.
     addAndMakeVisible(swingKnob);
     addAndMakeVisible(accentKnob);
+    addAndMakeVisible(ghostKnob);
     for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob, &levelKnob }) addAndMakeVisible(*k);
     // The STEP panel's controls edit the selected step of the shown track's row.
     for (auto* cap : { &loopCaption, &voiceCaption, &octaveCaption, &noteCaption, &chordCaption })
@@ -381,8 +406,10 @@ void TrackContent::rebuild()
     // The groove knobs follow the shown track's own rows (the old attachments go first).
     swingAtt.reset();
     accentAtt.reset();
+    ghostAtt.reset();
     swingAtt  = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(host.getTrackParameters(), layerParamId(currentLayer, "swing"),  swingKnob.getSlider());
     accentAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(host.getTrackParameters(), layerParamId(currentLayer, "accent"), accentKnob.getSlider());
+    ghostAtt  = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(host.getTrackParameters(), layerParamId(currentLayer, "ghost"),  ghostKnob.getSlider());
 
     // The strip's sends and solo (ch{N}_), and the track's insert.
     for (auto* a : { &sendEffAtt, &sendDlyAtt, &sendRevAtt, &probAtt, &levelAtt }) a->reset();
@@ -413,6 +440,8 @@ void TrackContent::rebuild()
     for (auto* c : { (juce::Component*) &rootCaption, (juce::Component*) &rootSelect, (juce::Component*) &scaleCaption, (juce::Component*) &scaleSelect }) c->setVisible(showKey);
     swingKnob.setVisible(! rumble);
     accentKnob.setVisible(! rumble);
+    // Ghost steps are for the drum and percussion engines.
+    ghostKnob.setVisible(shownEngine == EngineType::Kick || shownEngine == EngineType::Hat || shownEngine == EngineType::Snare || shownEngine == EngineType::FmPerc);
     for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob, &levelKnob }) k->setVisible(! rumble);   // a Rumble's box holds its envelope
     for (auto* c : { (juce::Component*) &stepProbKnob, (juce::Component*) &loopCaption, (juce::Component*) &loopSelect }) c->setVisible(! rumble);
     refreshStepPanel();
@@ -629,6 +658,7 @@ void TrackContent::resized()
         // Third row: the layer's Probability and Level.
         probKnob.setBounds(blockX, row2Y + knobH + rowGap, knobW, knobH);
         levelKnob.setBounds(blockX + knobW + gap, row2Y + knobH + rowGap, knobW, knobH);
+        ghostKnob.setBounds(blockX + 2 * (knobW + gap), row2Y + knobH + rowGap, knobW, knobH);
     }
     layoutStepPanel();
 }

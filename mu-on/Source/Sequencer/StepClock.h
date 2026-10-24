@@ -43,6 +43,15 @@ public:
         return ratio.of <= 1 || (((pass % ratio.of) + ratio.of) % ratio.of) == ratio.play - 1;
     }
 
+    // A ghost step's velocity (the Ghost level's share of a normal note) for a row that has ghosts; any other row keeps `v`.
+    template <class Row>
+    static auto ghostAdjusted(const Row& r, int step, float v, int) noexcept -> decltype(r.isGhost(step), r.ghostLevel(), float())
+    {
+        return r.isGhost(step) ? kNormalVelocity * r.ghostLevel() : v;
+    }
+    template <class Row>
+    static float ghostAdjusted(const Row&, int, float v, long) noexcept { return v; }
+
     // Realign to the top of the pattern.
     void reset() noexcept { nextGlobalStep = 0; }
 
@@ -91,7 +100,8 @@ public:
                 const bool passPlays = loopPlays(row, local, pass);
                 if (passPlays && row.isOn(local))
                 {
-                    const float velocity = row.isAccent(local) ? accentedVelocity(accentVelocity) : kNormalVelocity;
+                    float velocity = row.isAccent(local) ? accentedVelocity(accentVelocity) : kNormalVelocity;
+                    velocity = ghostAdjusted(row, local, velocity, 0);   // a ghost step: a share of the normal note
                     // A tied run: how long the note is held (to the end of the last step tied to this one), for a Bass's release.
                     int runSteps = 1;
                     while (local + runSteps < StepRow::kNumSteps && row.tiedFrom(local + runSteps)) ++runSteps;

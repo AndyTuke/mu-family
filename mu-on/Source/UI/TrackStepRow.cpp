@@ -85,10 +85,12 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
         float lit = on ? L.lampOn : (isBeat ? L.lampBeat : L.lampOff);
         if (on && s == playheadStep) lit = juce::jmin(1.0f, lit + L.lampPlayhead);
 
-        const auto lens = MuLookAndFeel::lampColour(colour, lit);
+        const bool ghost = on && row.isGhost(s);
+        // A ghost step is drawn as an outline in its square: the lens stays dark, a ring in the layer colour marks it.
+        const auto lens = MuLookAndFeel::lampColour(colour, ghost ? L.lampOff : lit);
         juce::Path shape;
         shape.addRoundedRectangle(cell, 3.0f);
-        if (on)
+        if (on && ! ghost)
         {
             MuLookAndFeel::drawLamp(g, shape, {}, lens, cell.getCentre(), juce::jmax(cell.getWidth(), cell.getHeight()) * 0.6f);
             if (row.isAccent(s))   // accent: a hotter centre
@@ -103,6 +105,11 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
             g.fillPath(shape);
         }
         MuLookAndFeel::drawRecessedScreen(g, cell);
+        if (ghost)
+        {
+            g.setColour(colour.brighter(0.3f).withAlpha(0.95f));
+            g.drawRoundedRectangle(cell.reduced(2.5f), 2.5f, 1.8f);
+        }
         if (opts.ties && showSteps && row.tiedFrom(s))   // tied to the step before: a bar joins the two lamps
         {
             const auto prev = cellRect(cells, s - 1);
@@ -248,10 +255,16 @@ bool TrackStepRow::dragStepValue(TrackHost& host, int slot, int step, StepDrag& 
             statusValue = mu_fmt::unitText(mu_fmt::Unit::Octaves, row.stepOctave(step));
             break;
         case DragMode::Accent:
-            row.setAccent(step, dy < 0);
-            statusName += " Accent";
-            statusValue = row.isAccent(step) ? "On" : "Off";
+        {
+            // Up accents; down ghosts a drum or percussion step (a Bass or Chord step just loses its accent); near the press it is normal.
+            const bool ghostable = engine == EngineType::Kick || engine == EngineType::Hat || engine == EngineType::Snare || engine == EngineType::FmPerc;
+            const bool up = dy <= -kPitchDragStartPx, down = dy >= kPitchDragStartPx;
+            row.setAccent(step, up);
+            if (ghostable) row.setGhost(step, down);
+            statusName += ghostable ? " Dynamics" : " Accent";
+            statusValue = row.isAccent(step) ? "Accent" : row.isGhost(step) ? "Ghost" : ghostable ? "Normal" : "Off";
             break;
+        }
         case DragMode::Voice:
             row.setOpen(step, dy < 0);
             statusName += " Hat";
@@ -318,7 +331,7 @@ void TrackStepRow::mouseMove(const juce::MouseEvent& e)
     if (step == hoverStep) return;
     hoverStep = step;
     const auto& row = host.getTrack(slot).row;
-    onStatusUpdate("Step", "Step " + juce::String(step + 1) + (row.isOn(step) ? (row.isOpen(step) ? (row.isAccent(step) ? " open, accent" : " open") : (row.isAccent(step) ? " on, accent" : " on")) : " off"));
+    onStatusUpdate("Step", "Step " + juce::String(step + 1) + (row.isOn(step) ? (row.isOpen(step) ? (row.isAccent(step) ? " open, accent" : row.isGhost(step) ? " open, ghost" : " open") : (row.isAccent(step) ? " on, accent" : row.isGhost(step) ? " on, ghost" : " on")) : " off"));
 }
 
 void TrackStepRow::timerCallback()

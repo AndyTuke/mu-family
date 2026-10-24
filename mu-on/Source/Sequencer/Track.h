@@ -8,6 +8,7 @@
 #include "Audio/TrackEngine.h"          // the engines the track runs
 #include "Audio/InsertProcessor.h"      // mu-core: the track's insert effect
 #include "Audio/VoiceParams.h"          // mu-core: the insert's parameter snapshot
+#include "Audio/MultiModeFilter.h"       // mu-core: the drum and percussion filter
 #include "Modulation/MuOnModDest.h"     // the engines' modulation target tables
 
 #include <array>
@@ -156,10 +157,14 @@ private:
     void  clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, int engine, int n) noexcept;
     void  resetEngines() noexcept;   // every held engine's voice silenced (the per-slot engines' reset rule)
 
-    mu_core::ParamBinding engineRow, sourceRow, bassWaveRow, algoRow, chordWaveRow, swingRow, accentRow;
+    mu_core::ParamBinding engineRow, sourceRow, bassWaveRow, algoRow, chordWaveRow, swingRow, accentRow, ghostRow;
     // The Kick / Bass Fine offsets (cents) and the master key and scale their tune is locked to. The key and scale are the
     // host's: a host without them (unbound) leaves the lock at C chromatic.
     mu_core::ParamBinding kickFineRow, bassFineRow, rootRow, scaleRow;
+    // The drum and percussion filter (not modulation targets): per engine its type, cutoff and resonance rows, and the filter.
+    std::array<mu_core::ParamBinding, kNumEngineTypes> filterTypeRow, filterCutRow, filterResRow;
+    MultiModeFilter drumFilter;
+    void applyDrumFilter(juce::AudioBuffer<float>& out, int n, int e) noexcept;
     // The track's insert effect (the shared InsertProcessor, as a mixer bus insert): algorithm and four generic knobs,
     // run on the engine's block after it renders. Algorithm 0 (None) skips it.
     InsertProcessor insert;

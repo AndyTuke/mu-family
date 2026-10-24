@@ -141,6 +141,22 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     flt(E::Chord, "dec",   "Chord Decay",      centred(20.0f, 2000.0f, 1.0f, 200.0f), 400.0f, mu_fmt::Unit::Ms);
     flt(E::Chord, "sus",   "Chord Sustain",    f(0.0f, 1.0f, 0.001f), 0.6f, mu_fmt::Unit::Percent01);
     flt(E::Chord, "rel",   "Chord Release",    centred(5.0f, 3000.0f, 1.0f, 150.0f), 250.0f, mu_fmt::Unit::Ms);
+
+    // Ghost level, appended after the engines: the velocity of a ghost step (drum and percussion engines) as a share of
+    // a normal note's.
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{ layerParamId(slot, "ghost"), 1 }, lbl + "Ghost",
+                                                     NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.35f,
+                                                     mu_fmt::floatUnit(NormalisableRange<float>(0.0f, 1.0f, 0.001f), mu_fmt::Unit::Percent01)));
+
+    // The drum and percussion filter (Kick, Hat, Snare, FM Perc): type, cutoff and resonance, after the voice. Open (the
+    // cutoff at its top, low-pass) leaves the sound untouched.
+    auto drumFilter = [&](EngineType e, const String& name)
+    {
+        layout.add(std::make_unique<AudioParameterChoice>(id(e, "ftype"), lbl + name + " Filter Type", juce::StringArray{ "Low-pass", "High-pass", "Band-pass", "Notch" }, 0));
+        flt(e, "fcut", name + " Filter Cutoff",    centred(20.0f, 20000.0f, 1.0f, 640.0f), 20000.0f, mu_fmt::Unit::Hz);
+        flt(e, "fres", name + " Filter Resonance", f(0.0f, 0.99f, 0.001f), 0.2f, mu_fmt::Unit::Percent01);
+    };
+    drumFilter(E::Kick, "Kick");  drumFilter(E::Hat, "Hat");  drumFilter(E::Snare, "Snare");  drumFilter(E::FmPerc, "FM Perc");
 }
 
 void remapRumbleSources(juce::AudioProcessorValueTreeState& apvts, int liveCount,

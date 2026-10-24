@@ -130,6 +130,7 @@ void Track::prepare(double sampleRate, int blockSize)
     tailScratch.clear();
     for (auto& e : engines)
         if (e != nullptr) e->prepare(preparedRate, preparedBlock);
+    drumFilter.prepare(preparedRate, preparedBlock, 2);
     insert.prepare(preparedRate, preparedBlock);
     insert.setSlotIndex(slot);
     // The next rendered block starts from silence and resolves its engine afresh (no held C12 values).
@@ -156,6 +157,14 @@ void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
     probRow     = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "prob")), this);
     swingRow    = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "swing")), this);
     accentRow   = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "accent")), this);
+    ghostRow    = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "ghost")), this);
+    for (auto kind : { EngineType::Kick, EngineType::Hat, EngineType::Snare, EngineType::FmPerc })   // a choice and two knobs each, not targets
+    {
+        const auto k = (size_t) toIndex(kind);
+        filterTypeRow[k] = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, kind, "ftype")), this);
+        filterCutRow[k]  = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, kind, "fcut")), this);
+        filterResRow[k]  = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, kind, "fres")), this);
+    }
     jassert(engineRow.isBound() && sourceRow.isBound() && bassWaveRow.isBound() && algoRow.isBound() && swingRow.isBound() && accentRow.isBound());   // an id drift from the layout (debug)
     haveResolved = false;   // values held for C12 belong to the slot bound before
 
@@ -243,6 +252,7 @@ void Track::resetEngines() noexcept
     for (auto& e : engines)
         if (e != nullptr) e->reset();
     insert.reset();   // a stop or an engine change also ends the insert's tail
+    drumFilter.reset();
 }
 
 void Track::resetEngineToPrepared() noexcept
@@ -262,6 +272,21 @@ float Track::getModLive(EngineType e, int dest) const noexcept
     // as the block that published this engine.
     if (modLiveEngine.load(std::memory_order_acquire) != toIndex(e)) return std::numeric_limits<float>::quiet_NaN();
     return modLive[(size_t) dest].load(std::memory_order_relaxed);
+}
+
+// The drum and percussion filter on the block just rendered: low-pass, high-pass, band-pass or notch at the engine's
+// cutoff and resonance. A low-pass at the top of the range is the open position and skips the filter.
+void Track::applyDrumFilter(juce::AudioBuffer<float>& out, int n, int e) noexcept
+{
+    const auto k = (size_t) e;
+    if (! filterCutRow[k].isBound()) return;   // not a drum or percussion engine
+    const int type = juce::jlimit(0, 3, juce::roundToInt(filterTypeRow[k].load(0.0f)));
+    const float cut = filterCutRow[k].load(20000.0f);
+    if (type == 0 && cut >= 19990.0f) return;
+    drumFilter.setType(type);
+    drumFilter.setCutoff(cut);
+    drumFilter.setResonance(filterResRow[k].load(0.2f));
+    drumFilter.process(out, n, juce::jmin(2, out.getNumChannels()));
 }
 
 // The engine's parameters through the track's modulation matrix (the shared range-based resolve: proportion
@@ -312,6 +337,7 @@ float Track::evaluateRumbleEnv(double beat) noexcept
 void Track::clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, int e, int n) noexcept
 {
     row.setGroove(swingRow.load(0.0f), accentRow.load(1.0f));
+    row.setGhostLevel(ghostRow.load(0.35f));
     if (! ctx.playing) return;
     if (ctx.justStarted) clock.seek(ctx.startBeat);   // the step the transport starts in fires, even on a quick replay
     clock.processSpan(row, ctx.startBeat, n, ctx.beatsPerSample, row.swingAmount(), row.accentVelocity(),
@@ -398,6 +424,7 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
     }
     else
         eng->render(out, n, silence, false);
+    applyDrumFilter(out, n, e);   // a Kick, Hat, Snare or FM Perc through its filter (open: untouched)
 
     // Phase 6: the track's insert effect on the block just rendered (None skips it).
     if (const int algo = juce::roundToInt(insAlgoRow.load(0.0f)); algo > 0)

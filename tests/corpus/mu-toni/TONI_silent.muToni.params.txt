@@ -1,8 +1,8 @@
 # frozen load result for fixture: TONI_silent.muToni
 layers=4
 load_errors=0
-resave_bytes=36165
-resave_sha256=708c6a913bbe02c99121181a6daee98c5f4b7867215e1795f980b6ed889f469d
+resave_bytes=36143
+resave_sha256=165d5e9c61f578dc3cf1a43e6ad05911ba583de36f784d0fc2a6150c20bc6bfa
 --- parameters differing from default (id=plain value)
 mstr_lvl=0
 rev_decay=7.5

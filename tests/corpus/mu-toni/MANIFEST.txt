@@ -1,11 +1,11 @@
 # SHA-256, size, file. Fixtures are read-only copies (see tests/corpus/README.md); *.params.txt are the frozen
 # load results next to them. A change here is deliberate only via MU_REGENERATE_FROZEN=1.
 75e9e50222e60d5ab0445c7c1a54afa263e179b2c59492e1b7da998893af172f  1231  CROSSLOAD.txt
-dca8e588fe99ba557463325ab8d141e7507e3fdaee507939ea653a7eb8de8653  36153  FACTORY_STATE.muToni
-849bdacbddf2e8cf5bf5985bb2d7a78aabcf448000d97cf7499e55e4a58cdd40  231  FACTORY_STATE.muToni.params.txt
+43f14ac57ee8eae4b98c45a5692064ad31646c7faa5674260b6610dbf1588f6a  36131  FACTORY_STATE.muToni
+73855e0784db614e4fcfdcf214fa6b7c6b44cb4b2125218a16069036170aa7bd  231  FACTORY_STATE.muToni.params.txt
 ec80e4cf00777a971391a6d447d855b345d30ac583c89d30ff63d084482b3631  20336  TONI_legacy.muToni
-a95a743b0a1a5cfba0e6d0fa34531922694a358f9bbbd8811104772e6c1d9a0c  397  TONI_legacy.muToni.params.txt
+b2bd74912dd6489f6ebb051e245f5448576b190040951454c6662c6f87c53181  603  TONI_legacy.muToni.params.txt
 1ad610830a1fe6d6d8e696946a772bedcd0c6537db3abbf0695c8440a6311084  121  TONI_mute_layer.muArp
 2cfd413cba28457e1c27fd30d87c2ca167c8c3670787df0c87859f1d265f252c  255  TONI_mute_layer.muArp.params.txt
 d8ebd39ca1960e12bd9fbdaa5e2c4c755506cff63bbc89ad0d6ddea2e437a0bb  242  TONI_silent.muToni
-6b110676371ca84163dd13449308323eba3410c4d60a5be561e6277818ba4f19  254  TONI_silent.muToni.params.txt
+844350dcbcbabb579f3a51df59755d20c8ee6542aa382fd393b8c7bc0fe15b27  254  TONI_silent.muToni.params.txt

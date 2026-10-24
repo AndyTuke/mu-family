@@ -3,15 +3,15 @@
 product=mu-on
 layers_at_start=1
 max_layers=8
-param_count=727
+param_count=831
 ---
 ch0_lvl | float | 0 | 1 | 0.001 | 1 | 1 | 1
 ch0_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
 ch0_outBus | int | 0 | 8 | 1 | 1 | 0 | 0
 ch0_pan | float | -1 | 1 | 0.001 | 1 | 0 | 0.5
 ch0_scAmt | float | 0 | 1 | 0.001 | 1 | 0 | 0
-ch0_scAtk | float | 1 | 500 | 0.1 | 1 | 5 | 0.00801603
-ch0_scRel | float | 10 | 2000 | 1 | 1 | 100 | 0.0452261
+ch0_scAtk | float | 0 | 500 | 0.1 | 1 | 0 | 0
+ch0_scRel | float | 0 | 2000 | 1 | 1 | 0 | 0
 ch0_scSrc | int | 0 | 9 | 1 | 1 | 0 | 0
 ch0_sendDly | float | 0 | 1 | 0.001 | 1 | 0 | 0
 ch0_sendEff | float | 0 | 1 | 0.001 | 1 | 0 | 0
@@ -22,8 +22,8 @@ ch1_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
 ch1_outBus | int | 0 | 8 | 1 | 1 | 0 | 0
 ch1_pan | float | -1 | 1 | 0.001 | 1 | 0 | 0.5
 ch1_scAmt | float | 0 | 1 | 0.001 | 1 | 0 | 0
-ch1_scAtk | float | 1 | 500 | 0.1 | 1 | 5 | 0.00801603
-ch1_scRel | float | 10 | 2000 | 1 | 1 | 100 | 0.0452261
+ch1_scAtk | float | 0 | 500 | 0.1 | 1 | 0 | 0
+ch1_scRel | float | 0 | 2000 | 1 | 1 | 0 | 0
 ch1_scSrc | int | 0 | 9 | 1 | 1 | 0 | 0
 ch1_sendDly | float | 0 | 1 | 0.001 | 1 | 0 | 0
 ch1_sendEff | float | 0 | 1 | 0.001 | 1 | 0 | 0
@@ -34,8 +34,8 @@ ch2_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
 ch2_outBus | int | 0 | 8 | 1 | 1 | 0 | 0
 ch2_pan | float | -1 | 1 | 0.001 | 1 | 0 | 0.5
 ch2_scAmt | float | 0 | 1 | 0.001 | 1 | 0 | 0
-ch2_scAtk | float | 1 | 500 | 0.1 | 1 | 5 | 0.00801603
-ch2_scRel | float | 10 | 2000 | 1 | 1 | 100 | 0.0452261
+ch2_scAtk | float | 0 | 500 | 0.1 | 1 | 0 | 0
+ch2_scRel | float | 0 | 2000 | 1 | 1 | 0 | 0
 ch2_scSrc | int | 0 | 9 | 1 | 1 | 0 | 0
 ch2_sendDly | float | 0 | 1 | 0.001 | 1 | 0 | 0
 ch2_sendEff | float | 0 | 1 | 0.001 | 1 | 0 | 0
@@ -46,8 +46,8 @@ ch3_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
 ch3_outBus | int | 0 | 8 | 1 | 1 | 0 | 0
 ch3_pan | float | -1 | 1 | 0.001 | 1 | 0 | 0.5
 ch3_scAmt | float | 0 | 1 | 0.001 | 1 | 0 | 0
-ch3_scAtk | float | 1 | 500 | 0.1 | 1 | 5 | 0.00801603
-ch3_scRel | float | 10 | 2000 | 1 | 1 | 100 | 0.0452261
+ch3_scAtk | float | 0 | 500 | 0.1 | 1 | 0 | 0
+ch3_scRel | float | 0 | 2000 | 1 | 1 | 0 | 0
 ch3_scSrc | int | 0 | 9 | 1 | 1 | 0 | 0
 ch3_sendDly | float | 0 | 1 | 0.001 | 1 | 0 | 0
 ch3_sendEff | float | 0 | 1 | 0.001 | 1 | 0 | 0
@@ -58,8 +58,8 @@ ch4_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
 ch4_outBus | int | 0 | 8 | 1 | 1 | 0 | 0
 ch4_pan | float | -1 | 1 | 0.001 | 1 | 0 | 0.5
 ch4_scAmt | float | 0 | 1 | 0.001 | 1 | 0 | 0
-ch4_scAtk | float | 1 | 500 | 0.1 | 1 | 5 | 0.00801603
-ch4_scRel | float | 10 | 2000 | 1 | 1 | 100 | 0.0452261
+ch4_scAtk | float | 0 | 500 | 0.1 | 1 | 0 | 0
+ch4_scRel | float | 0 | 2000 | 1 | 1 | 0 | 0
 ch4_scSrc | int | 0 | 9 | 1 | 1 | 0 | 0
 ch4_sendDly | float | 0 | 1 | 0.001 | 1 | 0 | 0
 ch4_sendEff | float | 0 | 1 | 0.001 | 1 | 0 | 0
@@ -70,8 +70,8 @@ ch5_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
 ch5_outBus | int | 0 | 8 | 1 | 1 | 0 | 0
 ch5_pan | float | -1 | 1 | 0.001 | 1 | 0 | 0.5
 ch5_scAmt | float | 0 | 1 | 0.001 | 1 | 0 | 0
-ch5_scAtk | float | 1 | 500 | 0.1 | 1 | 5 | 0.00801603
-ch5_scRel | float | 10 | 2000 | 1 | 1 | 100 | 0.0452261
+ch5_scAtk | float | 0 | 500 | 0.1 | 1 | 0 | 0
+ch5_scRel | float | 0 | 2000 | 1 | 1 | 0 | 0
 ch5_scSrc | int | 0 | 9 | 1 | 1 | 0 | 0
 ch5_sendDly | float | 0 | 1 | 0.001 | 1 | 0 | 0
 ch5_sendEff | float | 0 | 1 | 0.001 | 1 | 0 | 0
@@ -82,8 +82,8 @@ ch6_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
 ch6_outBus | int | 0 | 8 | 1 | 1 | 0 | 0
 ch6_pan | float | -1 | 1 | 0.001 | 1 | 0 | 0.5
 ch6_scAmt | float | 0 | 1 | 0.001 | 1 | 0 | 0
-ch6_scAtk | float | 1 | 500 | 0.1 | 1 | 5 | 0.00801603
-ch6_scRel | float | 10 | 2000 | 1 | 1 | 100 | 0.0452261
+ch6_scAtk | float | 0 | 500 | 0.1 | 1 | 0 | 0
+ch6_scRel | float | 0 | 2000 | 1 | 1 | 0 | 0
 ch6_scSrc | int | 0 | 9 | 1 | 1 | 0 | 0
 ch6_sendDly | float | 0 | 1 | 0.001 | 1 | 0 | 0
 ch6_sendEff | float | 0 | 1 | 0.001 | 1 | 0 | 0
@@ -94,8 +94,8 @@ ch7_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
 ch7_outBus | int | 0 | 8 | 1 | 1 | 0 | 0
 ch7_pan | float | -1 | 1 | 0.001 | 1 | 0 | 0.5
 ch7_scAmt | float | 0 | 1 | 0.001 | 1 | 0 | 0
-ch7_scAtk | float | 1 | 500 | 0.1 | 1 | 5 | 0.00801603
-ch7_scRel | float | 10 | 2000 | 1 | 1 | 100 | 0.0452261
+ch7_scAtk | float | 0 | 500 | 0.1 | 1 | 0 | 0
+ch7_scRel | float | 0 | 2000 | 1 | 1 | 0 | 0
 ch7_scSrc | int | 0 | 9 | 1 | 1 | 0 | 0
 ch7_sendDly | float | 0 | 1 | 0.001 | 1 | 0 | 0
 ch7_sendEff | float | 0 | 1 | 0.001 | 1 | 0 | 0
@@ -148,24 +148,24 @@ ret_dly_lvl | float | 0 | 1 | 0 | 1 | 0.75 | 0.75
 ret_dly_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
 ret_dly_pan | float | -1 | 1 | 0 | 1 | 0 | 0.5
 ret_dly_scAmt | float | 0 | 1 | 0 | 1 | 0 | 0
-ret_dly_scAtk | float | 1 | 500 | 0 | 1 | 5 | 0.00801603
-ret_dly_scRel | float | 10 | 2000 | 0 | 1 | 100 | 0.0452261
+ret_dly_scAtk | float | 0 | 500 | 0 | 1 | 0 | 0
+ret_dly_scRel | float | 0 | 2000 | 0 | 1 | 0 | 0
 ret_dly_scSrc | int | 0 | 9 | 1 | 1 | 0 | 0
 ret_dly_solo | bool | 0 | 1 | 1 | 1 | 0 | 0
 ret_eff_lvl | float | 0 | 1 | 0 | 1 | 0.75 | 0.75
 ret_eff_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
 ret_eff_pan | float | -1 | 1 | 0 | 1 | 0 | 0.5
 ret_eff_scAmt | float | 0 | 1 | 0 | 1 | 0 | 0
-ret_eff_scAtk | float | 1 | 500 | 0 | 1 | 5 | 0.00801603
-ret_eff_scRel | float | 10 | 2000 | 0 | 1 | 100 | 0.0452261
+ret_eff_scAtk | float | 0 | 500 | 0 | 1 | 0 | 0
+ret_eff_scRel | float | 0 | 2000 | 0 | 1 | 0 | 0
 ret_eff_scSrc | int | 0 | 9 | 1 | 1 | 0 | 0
 ret_eff_solo | bool | 0 | 1 | 1 | 1 | 0 | 0
 ret_rev_lvl | float | 0 | 1 | 0 | 1 | 0.75 | 0.75
 ret_rev_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
 ret_rev_pan | float | -1 | 1 | 0 | 1 | 0 | 0.5
 ret_rev_scAmt | float | 0 | 1 | 0 | 1 | 0 | 0
-ret_rev_scAtk | float | 1 | 500 | 0 | 1 | 5 | 0.00801603
-ret_rev_scRel | float | 10 | 2000 | 0 | 1 | 100 | 0.0452261
+ret_rev_scAtk | float | 0 | 500 | 0 | 1 | 0 | 0
+ret_rev_scRel | float | 0 | 2000 | 0 | 1 | 0 | 0
 ret_rev_scSrc | int | 0 | 9 | 1 | 1 | 0 | 0
 ret_rev_solo | bool | 0 | 1 | 1 | 1 | 0 | 0
 rev_algo | int | 0 | 3 | 1 | 1 | 1 | 0.333333
@@ -211,14 +211,21 @@ t0_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t0_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t0_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
 t0_fmp_dtime | float | 0 | 1 | 0.001 | 1 | 0.46 | 0.46
+t0_fmp_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t0_fmp_fdbk | float | 0 | 1 | 0.001 | 1 | 0.05 | 0.05
 t0_fmp_fold | float | 0 | 1 | 0.001 | 1 | 0.15 | 0.15
+t0_fmp_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t0_fmp_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t0_fmp_idec | float | 0 | 1 | 0.001 | 1 | 0.57 | 0.57
 t0_fmp_index | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t0_fmp_noise | float | 0 | 1 | 0.001 | 1 | 0.15 | 0.15
 t0_fmp_ratio | float | 0.5 | 6 | 0.01 | 0.6 | 1.5 | 0.359569
 t0_fmp_tune | float | 40 | 4000 | 0.1 | 0.4 | 90 | 0.173984
+t0_ghost | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t0_hat_dec | float | 10 | 400 | 1 | 0.337442 | 60 | 0.5
+t0_hat_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
+t0_hat_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t0_hat_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t0_hat_odec | float | 50 | 1200 | 1 | 0.396265 | 300 | 0.546226
 t0_hat_otune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t0_hat_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
@@ -228,7 +235,10 @@ t0_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
 t0_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
 t0_kick_adec | float | 20 | 800 | 1 | 0.386853 | 180 | 0.54182
 t0_kick_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
+t0_kick_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t0_kick_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t0_kick_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t0_kick_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t0_kick_pdec | float | 5 | 200 | 0.1 | 0.337442 | 50 | 0.609691
 t0_kick_ptch | float | 0 | 600 | 1 | 0.5 | 220 | 0.60553
 t0_kick_tune | float | 30 | 120 | 0 | 1 | 50 | 0.368483
@@ -245,6 +255,9 @@ t0_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
 t0_rumble_revmix | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t0_rumble_size | float | 0 | 1 | 0.001 | 1 | 0.7 | 0.7
 t0_snare_dec | float | 20 | 600 | 1 | 0.394314 | 160 | 0.57094
+t0_snare_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
+t0_snare_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t0_snare_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t0_snare_snap | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t0_snare_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t0_src | int | 0 | 7 | 1 | 1 | 0 | 0
@@ -280,14 +293,21 @@ t1_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t1_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t1_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
 t1_fmp_dtime | float | 0 | 1 | 0.001 | 1 | 0.46 | 0.46
+t1_fmp_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t1_fmp_fdbk | float | 0 | 1 | 0.001 | 1 | 0.05 | 0.05
 t1_fmp_fold | float | 0 | 1 | 0.001 | 1 | 0.15 | 0.15
+t1_fmp_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t1_fmp_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t1_fmp_idec | float | 0 | 1 | 0.001 | 1 | 0.57 | 0.57
 t1_fmp_index | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t1_fmp_noise | float | 0 | 1 | 0.001 | 1 | 0.15 | 0.15
 t1_fmp_ratio | float | 0.5 | 6 | 0.01 | 0.6 | 1.5 | 0.359569
 t1_fmp_tune | float | 40 | 4000 | 0.1 | 0.4 | 90 | 0.173984
+t1_ghost | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t1_hat_dec | float | 10 | 400 | 1 | 0.337442 | 60 | 0.5
+t1_hat_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
+t1_hat_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t1_hat_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t1_hat_odec | float | 50 | 1200 | 1 | 0.396265 | 300 | 0.546226
 t1_hat_otune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t1_hat_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
@@ -297,7 +317,10 @@ t1_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
 t1_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
 t1_kick_adec | float | 20 | 800 | 1 | 0.386853 | 180 | 0.54182
 t1_kick_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
+t1_kick_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t1_kick_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t1_kick_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t1_kick_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t1_kick_pdec | float | 5 | 200 | 0.1 | 0.337442 | 50 | 0.609691
 t1_kick_ptch | float | 0 | 600 | 1 | 0.5 | 220 | 0.60553
 t1_kick_tune | float | 30 | 120 | 0 | 1 | 50 | 0.368483
@@ -314,6 +337,9 @@ t1_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
 t1_rumble_revmix | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t1_rumble_size | float | 0 | 1 | 0.001 | 1 | 0.7 | 0.7
 t1_snare_dec | float | 20 | 600 | 1 | 0.394314 | 160 | 0.57094
+t1_snare_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
+t1_snare_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t1_snare_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t1_snare_snap | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t1_snare_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t1_src | int | 0 | 7 | 1 | 1 | 0 | 0
@@ -349,14 +375,21 @@ t2_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t2_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t2_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
 t2_fmp_dtime | float | 0 | 1 | 0.001 | 1 | 0.46 | 0.46
+t2_fmp_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t2_fmp_fdbk | float | 0 | 1 | 0.001 | 1 | 0.05 | 0.05
 t2_fmp_fold | float | 0 | 1 | 0.001 | 1 | 0.15 | 0.15
+t2_fmp_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t2_fmp_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t2_fmp_idec | float | 0 | 1 | 0.001 | 1 | 0.57 | 0.57
 t2_fmp_index | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t2_fmp_noise | float | 0 | 1 | 0.001 | 1 | 0.15 | 0.15
 t2_fmp_ratio | float | 0.5 | 6 | 0.01 | 0.6 | 1.5 | 0.359569
 t2_fmp_tune | float | 40 | 4000 | 0.1 | 0.4 | 90 | 0.173984
+t2_ghost | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t2_hat_dec | float | 10 | 400 | 1 | 0.337442 | 60 | 0.5
+t2_hat_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
+t2_hat_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t2_hat_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t2_hat_odec | float | 50 | 1200 | 1 | 0.396265 | 300 | 0.546226
 t2_hat_otune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t2_hat_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
@@ -366,7 +399,10 @@ t2_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
 t2_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
 t2_kick_adec | float | 20 | 800 | 1 | 0.386853 | 180 | 0.54182
 t2_kick_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
+t2_kick_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t2_kick_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t2_kick_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t2_kick_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t2_kick_pdec | float | 5 | 200 | 0.1 | 0.337442 | 50 | 0.609691
 t2_kick_ptch | float | 0 | 600 | 1 | 0.5 | 220 | 0.60553
 t2_kick_tune | float | 30 | 120 | 0 | 1 | 50 | 0.368483
@@ -383,6 +419,9 @@ t2_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
 t2_rumble_revmix | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t2_rumble_size | float | 0 | 1 | 0.001 | 1 | 0.7 | 0.7
 t2_snare_dec | float | 20 | 600 | 1 | 0.394314 | 160 | 0.57094
+t2_snare_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
+t2_snare_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t2_snare_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t2_snare_snap | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t2_snare_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t2_src | int | 0 | 7 | 1 | 1 | 0 | 0
@@ -418,14 +457,21 @@ t3_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t3_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t3_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
 t3_fmp_dtime | float | 0 | 1 | 0.001 | 1 | 0.46 | 0.46
+t3_fmp_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t3_fmp_fdbk | float | 0 | 1 | 0.001 | 1 | 0.05 | 0.05
 t3_fmp_fold | float | 0 | 1 | 0.001 | 1 | 0.15 | 0.15
+t3_fmp_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t3_fmp_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t3_fmp_idec | float | 0 | 1 | 0.001 | 1 | 0.57 | 0.57
 t3_fmp_index | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t3_fmp_noise | float | 0 | 1 | 0.001 | 1 | 0.15 | 0.15
 t3_fmp_ratio | float | 0.5 | 6 | 0.01 | 0.6 | 1.5 | 0.359569
 t3_fmp_tune | float | 40 | 4000 | 0.1 | 0.4 | 90 | 0.173984
+t3_ghost | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t3_hat_dec | float | 10 | 400 | 1 | 0.337442 | 60 | 0.5
+t3_hat_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
+t3_hat_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t3_hat_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t3_hat_odec | float | 50 | 1200 | 1 | 0.396265 | 300 | 0.546226
 t3_hat_otune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t3_hat_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
@@ -435,7 +481,10 @@ t3_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
 t3_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
 t3_kick_adec | float | 20 | 800 | 1 | 0.386853 | 180 | 0.54182
 t3_kick_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
+t3_kick_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t3_kick_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t3_kick_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t3_kick_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t3_kick_pdec | float | 5 | 200 | 0.1 | 0.337442 | 50 | 0.609691
 t3_kick_ptch | float | 0 | 600 | 1 | 0.5 | 220 | 0.60553
 t3_kick_tune | float | 30 | 120 | 0 | 1 | 50 | 0.368483
@@ -452,6 +501,9 @@ t3_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
 t3_rumble_revmix | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t3_rumble_size | float | 0 | 1 | 0.001 | 1 | 0.7 | 0.7
 t3_snare_dec | float | 20 | 600 | 1 | 0.394314 | 160 | 0.57094
+t3_snare_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
+t3_snare_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t3_snare_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t3_snare_snap | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t3_snare_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t3_src | int | 0 | 7 | 1 | 1 | 0 | 0
@@ -487,14 +539,21 @@ t4_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t4_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t4_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
 t4_fmp_dtime | float | 0 | 1 | 0.001 | 1 | 0.46 | 0.46
+t4_fmp_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t4_fmp_fdbk | float | 0 | 1 | 0.001 | 1 | 0.05 | 0.05
 t4_fmp_fold | float | 0 | 1 | 0.001 | 1 | 0.15 | 0.15
+t4_fmp_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t4_fmp_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t4_fmp_idec | float | 0 | 1 | 0.001 | 1 | 0.57 | 0.57
 t4_fmp_index | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t4_fmp_noise | float | 0 | 1 | 0.001 | 1 | 0.15 | 0.15
 t4_fmp_ratio | float | 0.5 | 6 | 0.01 | 0.6 | 1.5 | 0.359569
 t4_fmp_tune | float | 40 | 4000 | 0.1 | 0.4 | 90 | 0.173984
+t4_ghost | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t4_hat_dec | float | 10 | 400 | 1 | 0.337442 | 60 | 0.5
+t4_hat_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
+t4_hat_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t4_hat_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t4_hat_odec | float | 50 | 1200 | 1 | 0.396265 | 300 | 0.546226
 t4_hat_otune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t4_hat_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
@@ -504,7 +563,10 @@ t4_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
 t4_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
 t4_kick_adec | float | 20 | 800 | 1 | 0.386853 | 180 | 0.54182
 t4_kick_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
+t4_kick_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t4_kick_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t4_kick_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t4_kick_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t4_kick_pdec | float | 5 | 200 | 0.1 | 0.337442 | 50 | 0.609691
 t4_kick_ptch | float | 0 | 600 | 1 | 0.5 | 220 | 0.60553
 t4_kick_tune | float | 30 | 120 | 0 | 1 | 50 | 0.368483
@@ -521,6 +583,9 @@ t4_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
 t4_rumble_revmix | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t4_rumble_size | float | 0 | 1 | 0.001 | 1 | 0.7 | 0.7
 t4_snare_dec | float | 20 | 600 | 1 | 0.394314 | 160 | 0.57094
+t4_snare_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
+t4_snare_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t4_snare_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t4_snare_snap | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t4_snare_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t4_src | int | 0 | 7 | 1 | 1 | 0 | 0
@@ -556,14 +621,21 @@ t5_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t5_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t5_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
 t5_fmp_dtime | float | 0 | 1 | 0.001 | 1 | 0.46 | 0.46
+t5_fmp_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t5_fmp_fdbk | float | 0 | 1 | 0.001 | 1 | 0.05 | 0.05
 t5_fmp_fold | float | 0 | 1 | 0.001 | 1 | 0.15 | 0.15
+t5_fmp_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t5_fmp_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t5_fmp_idec | float | 0 | 1 | 0.001 | 1 | 0.57 | 0.57
 t5_fmp_index | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t5_fmp_noise | float | 0 | 1 | 0.001 | 1 | 0.15 | 0.15
 t5_fmp_ratio | float | 0.5 | 6 | 0.01 | 0.6 | 1.5 | 0.359569
 t5_fmp_tune | float | 40 | 4000 | 0.1 | 0.4 | 90 | 0.173984
+t5_ghost | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t5_hat_dec | float | 10 | 400 | 1 | 0.337442 | 60 | 0.5
+t5_hat_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
+t5_hat_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t5_hat_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t5_hat_odec | float | 50 | 1200 | 1 | 0.396265 | 300 | 0.546226
 t5_hat_otune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t5_hat_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
@@ -573,7 +645,10 @@ t5_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
 t5_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
 t5_kick_adec | float | 20 | 800 | 1 | 0.386853 | 180 | 0.54182
 t5_kick_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
+t5_kick_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t5_kick_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t5_kick_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t5_kick_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t5_kick_pdec | float | 5 | 200 | 0.1 | 0.337442 | 50 | 0.609691
 t5_kick_ptch | float | 0 | 600 | 1 | 0.5 | 220 | 0.60553
 t5_kick_tune | float | 30 | 120 | 0 | 1 | 50 | 0.368483
@@ -590,6 +665,9 @@ t5_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
 t5_rumble_revmix | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t5_rumble_size | float | 0 | 1 | 0.001 | 1 | 0.7 | 0.7
 t5_snare_dec | float | 20 | 600 | 1 | 0.394314 | 160 | 0.57094
+t5_snare_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
+t5_snare_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t5_snare_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t5_snare_snap | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t5_snare_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t5_src | int | 0 | 7 | 1 | 1 | 0 | 0
@@ -625,14 +703,21 @@ t6_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t6_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t6_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
 t6_fmp_dtime | float | 0 | 1 | 0.001 | 1 | 0.46 | 0.46
+t6_fmp_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t6_fmp_fdbk | float | 0 | 1 | 0.001 | 1 | 0.05 | 0.05
 t6_fmp_fold | float | 0 | 1 | 0.001 | 1 | 0.15 | 0.15
+t6_fmp_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t6_fmp_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t6_fmp_idec | float | 0 | 1 | 0.001 | 1 | 0.57 | 0.57
 t6_fmp_index | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t6_fmp_noise | float | 0 | 1 | 0.001 | 1 | 0.15 | 0.15
 t6_fmp_ratio | float | 0.5 | 6 | 0.01 | 0.6 | 1.5 | 0.359569
 t6_fmp_tune | float | 40 | 4000 | 0.1 | 0.4 | 90 | 0.173984
+t6_ghost | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t6_hat_dec | float | 10 | 400 | 1 | 0.337442 | 60 | 0.5
+t6_hat_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
+t6_hat_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t6_hat_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t6_hat_odec | float | 50 | 1200 | 1 | 0.396265 | 300 | 0.546226
 t6_hat_otune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t6_hat_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
@@ -642,7 +727,10 @@ t6_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
 t6_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
 t6_kick_adec | float | 20 | 800 | 1 | 0.386853 | 180 | 0.54182
 t6_kick_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
+t6_kick_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t6_kick_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t6_kick_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t6_kick_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t6_kick_pdec | float | 5 | 200 | 0.1 | 0.337442 | 50 | 0.609691
 t6_kick_ptch | float | 0 | 600 | 1 | 0.5 | 220 | 0.60553
 t6_kick_tune | float | 30 | 120 | 0 | 1 | 50 | 0.368483
@@ -659,6 +747,9 @@ t6_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
 t6_rumble_revmix | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t6_rumble_size | float | 0 | 1 | 0.001 | 1 | 0.7 | 0.7
 t6_snare_dec | float | 20 | 600 | 1 | 0.394314 | 160 | 0.57094
+t6_snare_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
+t6_snare_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t6_snare_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t6_snare_snap | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t6_snare_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t6_src | int | 0 | 7 | 1 | 1 | 0 | 0
@@ -694,14 +785,21 @@ t7_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t7_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t7_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
 t7_fmp_dtime | float | 0 | 1 | 0.001 | 1 | 0.46 | 0.46
+t7_fmp_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t7_fmp_fdbk | float | 0 | 1 | 0.001 | 1 | 0.05 | 0.05
 t7_fmp_fold | float | 0 | 1 | 0.001 | 1 | 0.15 | 0.15
+t7_fmp_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t7_fmp_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t7_fmp_idec | float | 0 | 1 | 0.001 | 1 | 0.57 | 0.57
 t7_fmp_index | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t7_fmp_noise | float | 0 | 1 | 0.001 | 1 | 0.15 | 0.15
 t7_fmp_ratio | float | 0.5 | 6 | 0.01 | 0.6 | 1.5 | 0.359569
 t7_fmp_tune | float | 40 | 4000 | 0.1 | 0.4 | 90 | 0.173984
+t7_ghost | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t7_hat_dec | float | 10 | 400 | 1 | 0.337442 | 60 | 0.5
+t7_hat_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
+t7_hat_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t7_hat_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t7_hat_odec | float | 50 | 1200 | 1 | 0.396265 | 300 | 0.546226
 t7_hat_otune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t7_hat_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
@@ -711,7 +809,10 @@ t7_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
 t7_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
 t7_kick_adec | float | 20 | 800 | 1 | 0.386853 | 180 | 0.54182
 t7_kick_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
+t7_kick_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t7_kick_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t7_kick_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t7_kick_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t7_kick_pdec | float | 5 | 200 | 0.1 | 0.337442 | 50 | 0.609691
 t7_kick_ptch | float | 0 | 600 | 1 | 0.5 | 220 | 0.60553
 t7_kick_tune | float | 30 | 120 | 0 | 1 | 50 | 0.368483
@@ -728,6 +829,9 @@ t7_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
 t7_rumble_revmix | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t7_rumble_size | float | 0 | 1 | 0.001 | 1 | 0.7 | 0.7
 t7_snare_dec | float | 20 | 600 | 1 | 0.394314 | 160 | 0.57094
+t7_snare_fcut | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
+t7_snare_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
+t7_snare_ftype | choice(4) | 0 | 3 | 1 | 1 | 0 | 0
 t7_snare_snap | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t7_snare_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t7_src | int | 0 | 7 | 1 | 1 | 0 | 0
@@ -749,11 +853,11 @@ mst=10
 mstr=3
 ret=24
 rev=10
-t0=69
-t1=69
-t2=69
-t3=69
-t4=69
-t5=69
-t6=69
-t7=69
+t0=82
+t1=82
+t2=82
+t3=82
+t4=82
+t5=82
+t6=82
+t7=82
