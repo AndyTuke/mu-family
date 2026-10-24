@@ -180,7 +180,7 @@ Bullet "Tune (-12 to +12 semitones) — pitch of the sound."
 Bullet "Decay — how long the sound lasts: 10 to 400 ms for the Hat (default 60), 20 to 600 ms for the Snare (default 160)."
 
 H2 "FM Perc"
-P "FM Perc makes toms and techno percussion by frequency modulation. An Algorithm choice (Tom, Conga, Zap, Click, Clank, Wood, Pluck or Burst) picks the character, and the same knobs shape every one: Tune, Ratio, Index, FM Dec, Fdbk, Dive, D.Time, Decay, Fold and Noise. It plays on its steps like the Kick, and has the FILTER section described above."
+P "FM Perc makes toms and techno percussion by frequency modulation. An Algorithm choice (Tom, Conga, Zap, Click / Rim, Clank, Wood / Mallet, Pluck / Ping or Burst / Glitch) picks the character, and the same knobs shape every one: Tune, Ratio, Index, FM Env, Fdbk, Dive, Dv Time, Decay, Fold and Noise. It plays on its steps like the Kick, and has the FILTER section described above."
 
 H2 "Chord"
 P "Chord plays a chord on each step, for dub-techno stabs. Each step names its own chord, inversion and spread, built in the key and scale of the KEY section."
