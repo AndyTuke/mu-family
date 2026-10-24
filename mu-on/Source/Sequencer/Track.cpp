@@ -339,11 +339,9 @@ void Track::resolve(int e, double beat, float* outValues) noexcept
     levelNow = outValues[L.count - 9];
     // A drum or percussion table has six rows before those nine: the filter's Cutoff, Resonance, Env Attack, Env Decay and
     // Env Depth, then the Ghost level (see MuOnModDest.h). Any other engine has no ghosts and no drum filter.
-    if (filterCutRow[(size_t) e].isBound())
-    {
-        for (int k = 0; k < 5; ++k) filterNow[k] = outValues[L.count - 15 + k];
-        ghostNow = juce::jlimit(0.0f, 1.0f, outValues[L.count - 10]);
-    }
+    const bool drum = filterCutRow[(size_t) e].isBound();
+    if (drum) for (int k = 0; k < 5; ++k) filterNow[k] = outValues[L.count - 15 + k];
+    if (drum || e == toIndex(EngineType::Chord)) ghostNow = juce::jlimit(0.0f, 1.0f, outValues[L.count - 10]);   // a Chord has ghosts too
     for (int k = 0; k < VoiceParams::kInsertSlotCount; ++k) insertNow[k] = outValues[L.count - 7 + k];
     stripMod.publish(outValues[L.count - 8], outValues[L.count - 3], outValues[L.count - 2], outValues[L.count - 1]);
 
@@ -369,7 +367,7 @@ float Track::evaluateRumbleEnv(double beat) noexcept
 void Track::clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, int e, int n) noexcept
 {
     row.setGroove(swingRow.load(0.0f), accentRow.load(1.0f));
-    row.setGhostLevel(filterCutRow[(size_t) e].isBound() ? ghostNow : ghostRow.load(0.35f));
+    row.setGhostLevel(filterCutRow[(size_t) e].isBound() || e == toIndex(EngineType::Chord) ? ghostNow : ghostRow.load(0.35f));
     if (! ctx.playing) return;
     if (ctx.justStarted) clock.seek(ctx.startBeat);   // the step the transport starts in fires, even on a quick replay
     clock.processSpan(row, ctx.startBeat, n, ctx.beatsPerSample, row.swingAmount(), row.accentVelocity(),

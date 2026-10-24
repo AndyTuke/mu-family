@@ -262,8 +262,8 @@ bool TrackStepRow::dragStepValue(TrackHost& host, int slot, int step, StepDrag& 
             break;
         case DragMode::Accent:
         {
-            // Up accents; down ghosts a drum or percussion step (a Bass or Chord step just loses its accent); near the press it is normal.
-            const bool ghostable = engine == EngineType::Kick || engine == EngineType::Hat || engine == EngineType::Snare || engine == EngineType::FmPerc;
+            // Up accents; down ghosts a drum, percussion or Chord step (a Bass step just loses its accent); near the press it is normal.
+            const bool ghostable = engine == EngineType::Kick || engine == EngineType::Hat || engine == EngineType::Snare || engine == EngineType::FmPerc || engine == EngineType::Chord;
             const bool up = dy <= -kPitchDragStartPx, down = dy >= kPitchDragStartPx;
             row.setAccent(step, up);
             if (ghostable) row.setGhost(step, down);

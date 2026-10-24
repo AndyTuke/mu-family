@@ -133,7 +133,7 @@ inline const std::vector<const char*>& engineParamNames(EngineType e)
     static const std::vector<const char*> kHat    { "tune", "dec", "otune", "odec", "ftype", "fcut", "fres", "fatk", "fdec", "fdep" };
     static const std::vector<const char*> kSnare  { "tune", "dec", "snap", "ftype", "fcut", "fres", "fatk", "fdec", "fdep" };
     static const std::vector<const char*> kRumble { "drive", "d1", "d2", "d3", "size", "revmix", "revlp", "cut", "res", "inlp" };
-    static const std::vector<const char*> kChord  { "wave", "cut", "res", "drive", "env", "edec", "atk", "dec", "sus", "rel" };
+    static const std::vector<const char*> kChord  { "wave", "cut", "res", "drive", "env", "edec", "atk", "dec", "sus", "rel", "fatk", "fsus", "frel" };
     static const std::vector<const char*> kFmPerc { "algo", "tune", "ratio", "index", "idec", "fdbk", "dive", "dtime", "decay", "fold", "noise", "ftype", "fcut", "fres", "fatk", "fdec", "fdep" };
     switch (e)
     {

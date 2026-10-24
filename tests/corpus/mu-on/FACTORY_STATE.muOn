@@ -250,6 +250,9 @@
         <p id="chord_dec" x="400.0"/>
         <p id="chord_sus" x="0.6000000238418579"/>
         <p id="chord_rel" x="250.0"/>
+        <p id="chord_fatk" x="0.5"/>
+        <p id="chord_fsus" x="0.0"/>
+        <p id="chord_frel" x="250.0"/>
         <p id="ghost" x="0.3500000238418579"/>
         <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
@@ -365,6 +368,9 @@
         <p id="chord_dec" x="400.0"/>
         <p id="chord_sus" x="0.6000000238418579"/>
         <p id="chord_rel" x="250.0"/>
+        <p id="chord_fatk" x="0.5"/>
+        <p id="chord_fsus" x="0.0"/>
+        <p id="chord_frel" x="250.0"/>
         <p id="ghost" x="0.3500000238418579"/>
         <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
@@ -480,6 +486,9 @@
         <p id="chord_dec" x="400.0"/>
         <p id="chord_sus" x="0.6000000238418579"/>
         <p id="chord_rel" x="250.0"/>
+        <p id="chord_fatk" x="0.5"/>
+        <p id="chord_fsus" x="0.0"/>
+        <p id="chord_frel" x="250.0"/>
         <p id="ghost" x="0.3500000238418579"/>
         <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
@@ -595,6 +604,9 @@
         <p id="chord_dec" x="400.0"/>
         <p id="chord_sus" x="0.6000000238418579"/>
         <p id="chord_rel" x="250.0"/>
+        <p id="chord_fatk" x="0.5"/>
+        <p id="chord_fsus" x="0.0"/>
+        <p id="chord_frel" x="250.0"/>
         <p id="ghost" x="0.3500000238418579"/>
         <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
@@ -710,6 +722,9 @@
         <p id="chord_dec" x="400.0"/>
         <p id="chord_sus" x="0.6000000238418579"/>
         <p id="chord_rel" x="250.0"/>
+        <p id="chord_fatk" x="0.5"/>
+        <p id="chord_fsus" x="0.0"/>
+        <p id="chord_frel" x="250.0"/>
         <p id="ghost" x="0.3500000238418579"/>
         <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
@@ -825,6 +840,9 @@
         <p id="chord_dec" x="400.0"/>
         <p id="chord_sus" x="0.6000000238418579"/>
         <p id="chord_rel" x="250.0"/>
+        <p id="chord_fatk" x="0.5"/>
+        <p id="chord_fsus" x="0.0"/>
+        <p id="chord_frel" x="250.0"/>
         <p id="ghost" x="0.3500000238418579"/>
         <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
@@ -940,6 +958,9 @@
         <p id="chord_dec" x="400.0"/>
         <p id="chord_sus" x="0.6000000238418579"/>
         <p id="chord_rel" x="250.0"/>
+        <p id="chord_fatk" x="0.5"/>
+        <p id="chord_fsus" x="0.0"/>
+        <p id="chord_frel" x="250.0"/>
         <p id="ghost" x="0.3500000238418579"/>
         <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>
@@ -1055,6 +1076,9 @@
         <p id="chord_dec" x="400.0"/>
         <p id="chord_sus" x="0.6000000238418579"/>
         <p id="chord_rel" x="250.0"/>
+        <p id="chord_fatk" x="0.5"/>
+        <p id="chord_fsus" x="0.0"/>
+        <p id="chord_frel" x="250.0"/>
         <p id="ghost" x="0.3500000238418579"/>
         <p id="kick_ftype" x="0.0" c="LP12"/>
         <p id="kick_fcut" x="20000.0"/>

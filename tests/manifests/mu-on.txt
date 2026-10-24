@@ -3,7 +3,7 @@
 product=mu-on
 layers_at_start=1
 max_layers=8
-param_count=927
+param_count=951
 ---
 ch0_lvl | float | 0 | 1 | 0.001 | 1 | 1 | 1
 ch0_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
@@ -201,6 +201,9 @@ t0_chord_dec | float | 20 | 2000 | 1 | 0.289065 | 400 | 0.620547
 t0_chord_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t0_chord_edec | float | 10 | 1500 | 1 | 0.24696 | 300 | 0.667519
 t0_chord_env | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
+t0_chord_fatk | float | 0.5 | 200 | 0.1 | 0.22767 | 0.5 | 0
+t0_chord_frel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
+t0_chord_fsus | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t0_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t0_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t0_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
@@ -295,6 +298,9 @@ t1_chord_dec | float | 20 | 2000 | 1 | 0.289065 | 400 | 0.620547
 t1_chord_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t1_chord_edec | float | 10 | 1500 | 1 | 0.24696 | 300 | 0.667519
 t1_chord_env | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
+t1_chord_fatk | float | 0.5 | 200 | 0.1 | 0.22767 | 0.5 | 0
+t1_chord_frel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
+t1_chord_fsus | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t1_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t1_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t1_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
@@ -389,6 +395,9 @@ t2_chord_dec | float | 20 | 2000 | 1 | 0.289065 | 400 | 0.620547
 t2_chord_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t2_chord_edec | float | 10 | 1500 | 1 | 0.24696 | 300 | 0.667519
 t2_chord_env | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
+t2_chord_fatk | float | 0.5 | 200 | 0.1 | 0.22767 | 0.5 | 0
+t2_chord_frel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
+t2_chord_fsus | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t2_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t2_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t2_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
@@ -483,6 +492,9 @@ t3_chord_dec | float | 20 | 2000 | 1 | 0.289065 | 400 | 0.620547
 t3_chord_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t3_chord_edec | float | 10 | 1500 | 1 | 0.24696 | 300 | 0.667519
 t3_chord_env | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
+t3_chord_fatk | float | 0.5 | 200 | 0.1 | 0.22767 | 0.5 | 0
+t3_chord_frel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
+t3_chord_fsus | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t3_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t3_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t3_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
@@ -577,6 +589,9 @@ t4_chord_dec | float | 20 | 2000 | 1 | 0.289065 | 400 | 0.620547
 t4_chord_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t4_chord_edec | float | 10 | 1500 | 1 | 0.24696 | 300 | 0.667519
 t4_chord_env | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
+t4_chord_fatk | float | 0.5 | 200 | 0.1 | 0.22767 | 0.5 | 0
+t4_chord_frel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
+t4_chord_fsus | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t4_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t4_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t4_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
@@ -671,6 +686,9 @@ t5_chord_dec | float | 20 | 2000 | 1 | 0.289065 | 400 | 0.620547
 t5_chord_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t5_chord_edec | float | 10 | 1500 | 1 | 0.24696 | 300 | 0.667519
 t5_chord_env | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
+t5_chord_fatk | float | 0.5 | 200 | 0.1 | 0.22767 | 0.5 | 0
+t5_chord_frel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
+t5_chord_fsus | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t5_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t5_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t5_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
@@ -765,6 +783,9 @@ t6_chord_dec | float | 20 | 2000 | 1 | 0.289065 | 400 | 0.620547
 t6_chord_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t6_chord_edec | float | 10 | 1500 | 1 | 0.24696 | 300 | 0.667519
 t6_chord_env | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
+t6_chord_fatk | float | 0.5 | 200 | 0.1 | 0.22767 | 0.5 | 0
+t6_chord_frel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
+t6_chord_fsus | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t6_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t6_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t6_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
@@ -859,6 +880,9 @@ t7_chord_dec | float | 20 | 2000 | 1 | 0.289065 | 400 | 0.620547
 t7_chord_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t7_chord_edec | float | 10 | 1500 | 1 | 0.24696 | 300 | 0.667519
 t7_chord_env | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
+t7_chord_fatk | float | 0.5 | 200 | 0.1 | 0.22767 | 0.5 | 0
+t7_chord_frel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
+t7_chord_fsus | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t7_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t7_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t7_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
@@ -949,11 +973,11 @@ mst=10
 mstr=3
 ret=24
 rev=10
-t0=94
-t1=94
-t2=94
-t3=94
-t4=94
-t5=94
-t6=94
-t7=94
+t0=97
+t1=97
+t2=97
+t3=97
+t4=97
+t5=97
+t6=97
+t7=97

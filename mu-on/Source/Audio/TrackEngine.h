@@ -110,8 +110,8 @@ public:
         }
         else if (auto* f = std::get_if<FmPercEngine>(&engine))
             f->setParams(engineChoice, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9]);
-        else if (auto* ch = std::get_if<ChordEngine>(&engine))   // Chord dest order: cutoff, resonance, drive, filter env, env decay, attack, decay, sustain, release
-            ch->setParams(engineChoice, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], lock.root, lock.scale);
+        else if (auto* ch = std::get_if<ChordEngine>(&engine))   // Chord dest order: cutoff, resonance, drive, filter env, env decay, attack, decay, sustain, release, filter env attack, sustain, release
+            ch->setParams(engineChoice, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], lock.root, lock.scale);
     }
 
     // Fire the engine at `sampleOffset` in the block (a Rumble does not step). `open` is the step's Open flag: only the Hat uses it.

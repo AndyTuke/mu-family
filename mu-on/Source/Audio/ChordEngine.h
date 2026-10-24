@@ -8,7 +8,7 @@
 
 // ChordEngine — a chord player for dub-techno stabs and pads: up to six notes of one chord on band-limited oscillators
 // (saw, square or a narrow pulse), summed into one low-pass MultiModeFilter (mu-core) with a drive on its input and its
-// own decay envelope on the cutoff, then one A/D/S/R amp envelope. A step names the chord (ChordVoicing.h); the notes
+// own A/D/S/R envelope on the cutoff, then one A/D/S/R amp envelope. A step names the chord (ChordVoicing.h); the notes
 // are held to the end of the step and then released. A new step replaces the chord that is sounding.
 //
 // Block-rate filter envelope (the cutoff is set once per block); oscillators and the amp envelope are per-sample.
@@ -29,10 +29,15 @@ public:
     }
 
     // wave 0..2; cutHz; res 0..1; drv 0..1 (the filter's input drive); env 0..1 (filter envelope depth); edecMs the
-    // filter envelope's decay; atkMs / decMs / relMs the amp times; sus 0..1; root 0..11 and scale: the master key.
+    // filter envelope's decay; atkMs / decMs / relMs the amp times; sus 0..1; fatkMs / fsus / frelMs the filter envelope's
+    // attack, sustain level and release; root 0..11 and scale: the master key.
     void setParams(int wave_, float cutHz, float res, float drv, float env_, float edecMs,
-                   float atkMs, float decMs, float sus_, float relMs, int root, int scale) noexcept
+                   float atkMs, float decMs, float sus_, float relMs, float fatkMs, float fsus_, float frelMs,
+                   int root, int scale) noexcept
     {
+        fAtkSamples = juce::jmax(1.0f, fatkMs * 0.001f * (float) sampleRate);
+        fSustain    = juce::jlimit(0.0f, 1.0f, fsus_);
+        fRelSamples = juce::jmax(1.0f, frelMs * 0.001f * (float) sampleRate);
         wave     = juce::jlimit(0, 2, wave_);
         baseCut  = cutHz;
         envDepth = juce::jlimit(0.0f, 1.0f, env_);
@@ -54,16 +59,31 @@ public:
         pendingGate = juce::jmax(0, gateSamples); pendingHit = hit;
     }
 
-    void reset() noexcept { active = false; restart = false; releasing = false; gateLeft = 0; filter.reset(); }
+    void reset() noexcept { active = false; restart = false; releasing = false; gateLeft = 0; feHold = 0.0f; feAtRelease = 0.0f; relT = 0.0f; filter.reset(); }
     void resetFilterSmoothing() noexcept { filter.resetSmoothers(); }
 
     void render(juce::AudioBuffer<float>& buf, int n)
     {
         const int chs = buf.getNumChannels();
 
-        // Block-rate filter envelope: the cutoff sweeps from base + depth down to base, restarting on a chord.
-        const float envT   = restart ? 0.0f : t;
-        const float fEnv   = (active || restart) ? std::exp(-envT * filterEnvInv) : 0.0f;
+        // Block-rate filter envelope (A/D/S/R): the cutoff rises to base + depth over the attack, falls to the sustain level over the
+        // decay, and after the gate falls away over the release; a new chord restarts it.
+        float fEnv = 0.0f;
+        if (active || restart)
+        {
+            if (releasing && ! restart)
+            {
+                fEnv = feAtRelease * std::exp(-relT / fRelSamples);   // from where it was when the gate ended
+                relT += (float) n;
+            }
+            else
+            {
+                const float envT = (restart ? 0.0f : t) + (float) n;   // read at the block's end, so a quick attack has opened by its first block
+                fEnv = envT < fAtkSamples ? envT / fAtkSamples
+                                          : fSustain + (1.0f - fSustain) * std::exp(-(envT - fAtkSamples) * filterEnvInv);
+                feHold = fEnv;
+            }
+        }
         filter.setCutoff(juce::jlimit(20.0f, (float) sampleRate * 0.45f, baseCut + fEnv * envDepth * 6000.0f));
 
         for (int i = 0; i < n; ++i)
@@ -80,7 +100,7 @@ public:
                     phase[(size_t) v] = 0.0f;
                 }
                 active = true; t = 0.0f; amp = 0.0f; vel = pendingVel; decayEnv.reset(1.0f);
-                releasing = false; relGain = 1.0f; gateLeft = pendingGate;
+                releasing = false; relGain = 1.0f; gateLeft = pendingGate; relT = 0.0f; feAtRelease = 0.0f;
             }
 
             float s = 0.0f;
@@ -91,6 +111,7 @@ public:
                 else                     amp = sustain + (1.0f - sustain) * decayEnv.next();
                 if (gateLeft > 0 && --gateLeft == 0) releasing = true;
                 if (releasing) relGain *= relMul;
+                if (releasing && relT == 0.0f && feAtRelease == 0.0f) feAtRelease = feHold;   // the filter envelope releases from here
 
                 float sum = 0.0f;
                 for (int v = 0; v < voices; ++v)
@@ -134,6 +155,7 @@ private:
     MultiModeFilter filter;
     double sampleRate = 44100.0;
     int    wave = Saw, keyRoot = 0, keyScale = mu_audio::kNumScales - 1;
+    float  fAtkSamples = 1.0f, fSustain = 0.0f, fRelSamples = 11025.0f, feHold = 0.0f, feAtRelease = 0.0f, relT = 0.0f;   // the filter envelope's A / S / R and where it stands
     float  baseCut = 900.0f, envDepth = 0.5f, filterEnvInv = 0.0005f, atkInv = 0.1f, sustain = 0.6f, relMul = 0.999f;
     mu_core::ExpDecay decayEnv;
     std::array<float, 6> phase {}, inc {};

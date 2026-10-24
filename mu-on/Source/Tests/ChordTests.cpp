@@ -61,7 +61,7 @@ namespace
             {
                 ChordEngine eng;
                 eng.prepare(kSr, 256);
-                eng.setParams(0, 8000.0f, 0.1f, 0.0f, 0.0f, 100.0f, 1.0f, 200.0f, 1.0f, 50.0f, 0, chromatic);
+                eng.setParams(0, 8000.0f, 0.1f, 0.0f, 0.0f, 100.0f, 1.0f, 200.0f, 1.0f, 50.0f, 0.5f, 0.0f, 250.0f, 0, chromatic);
                 eng.trigger(1.0f, 0, hit(6), 4800);   // held 100 ms
                 juce::AudioBuffer<float> out(2, 256);
                 auto rms = [&]

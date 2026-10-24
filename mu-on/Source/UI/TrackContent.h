@@ -122,7 +122,7 @@ private:
     NoteLengthControl rumbleLength { "Loop" };        // its length: the same control as a modulator's Loop
 
     juce::Rectangle<int> engineR, slotR;              // the two panels
-    juce::Rectangle<int> engineBoxR, voiceBoxR, filterBoxR, insertBoxR, grooveBoxR, stepBoxR, stepsBoxR;   // engineBoxR: the Engine / Source selectors
+    juce::Rectangle<int> engineBoxR, keyBoxR, voiceBoxR, filterBoxR, insertBoxR, grooveBoxR, stepBoxR, stepsBoxR;   // engineBoxR: the Engine / Source selectors
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TrackContent)
 };

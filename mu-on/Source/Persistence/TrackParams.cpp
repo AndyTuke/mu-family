@@ -141,6 +141,10 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     flt(E::Chord, "dec",   "Chord Decay",      centred(20.0f, 2000.0f, 1.0f, 200.0f), 400.0f, mu_fmt::Unit::Ms);
     flt(E::Chord, "sus",   "Chord Sustain",    f(0.0f, 1.0f, 0.001f), 0.6f, mu_fmt::Unit::Percent01);
     flt(E::Chord, "rel",   "Chord Release",    centred(5.0f, 3000.0f, 1.0f, 150.0f), 250.0f, mu_fmt::Unit::Ms);
+    // The filter envelope is A/D/S/R: the attack, sustain level and release join the existing decay (Env Decay) and depth (Filter Env).
+    flt(E::Chord, "fatk",  "Chord Filter Env Attack",  centred(0.5f, 200.0f, 0.1f, 10.0f), 0.5f, mu_fmt::Unit::Ms);
+    flt(E::Chord, "fsus",  "Chord Filter Env Sustain", f(0.0f, 1.0f, 0.001f), 0.0f, mu_fmt::Unit::Percent01);
+    flt(E::Chord, "frel",  "Chord Filter Env Release", centred(5.0f, 3000.0f, 1.0f, 150.0f), 250.0f, mu_fmt::Unit::Ms);
 
     // Ghost level, appended after the engines: the velocity of a ghost step (drum and percussion engines) as a share of
     // a normal note's.

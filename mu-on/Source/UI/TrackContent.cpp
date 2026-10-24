@@ -85,14 +85,13 @@ namespace
             }
             case EngineType::Chord:
             {
-                // One row: the oscillator, the filter (its input drive included) and the amp envelope, each group spread across the panel.
-                std::vector<Spec> specs { { id("wave"), "Wave" }, { id("cut"), "Cutoff" }, { id("res"), "Reso" }, { id("drive"), "Drive" }, { id("env"), "F.Env" },
-                                          { id("edec"), "E.Dec" }, { id("atk"), "Atk" }, { id("dec"), "Dec" }, { id("sus"), "Sus" }, { id("rel"), "Rel" } };
-                specs[0].groupStart = specs[1].groupStart = specs[6].groupStart = true;
-                const char* const names[] = { "Chord Wave", "Chord Filter Cutoff", "Chord Filter Resonance", "Chord Filter Drive", "Chord Filter Envelope",
-                                              "Chord Filter Env Decay", "Chord Amp Attack", "Chord Amp Decay", "Chord Amp Sustain", "Chord Amp Release" };
-                for (size_t i = 0; i < specs.size(); ++i) specs[i].statusName = names[i];
-                specs[4].tooltip = "How far the filter opens on each chord";
+                // The wave on the first row; the amp's attack, decay, sustain and release as smaller knobs on a second row.
+                std::vector<Spec> specs { { id("wave"), "Wave" }, { id("atk"), "Atk" }, { id("dec"), "Dec" }, { id("sus"), "Sus" }, { id("rel"), "Rel" } };
+                specs[0].statusName = "Chord Wave";
+                specs[1].statusName = "Chord Amp Attack";  specs[2].statusName = "Chord Amp Decay";
+                specs[3].statusName = "Chord Amp Sustain"; specs[4].statusName = "Chord Amp Release";
+                specs[1].newRow = true;
+                for (size_t k = 1; k < specs.size(); ++k) specs[k].small = true;
                 return specs;
             }
             case EngineType::Hat:   // two sets: the closed hat, then the open hat (the step row picks which a step plays)
@@ -135,6 +134,21 @@ namespace
     // envelope's attack, decay and depth as smaller knobs, so the controls sit in the same places whichever engine is shown.
     std::vector<Spec> filterSpecsFor(int track, EngineType engine)
     {
+        if (engine == EngineType::Chord)
+        {
+            // The same section, with an A/D/S/R envelope: Cutoff, Reso and Drive, then Atk, Dec, Sus, Rel and Depth as smaller knobs.
+            auto cid = [&](const char* p) { return engineParamId(track, engine, p); };
+            Spec cut { cid("cut"), "Cutoff" };  cut.statusName = "Chord Filter Cutoff";
+            Spec res { cid("res"), "Reso" };    res.statusName = "Chord Filter Resonance";
+            Spec drv { cid("drive"), "Drive" }; drv.statusName = "Chord Filter Drive";
+            Spec atk { cid("fatk"), "Atk" };    atk.statusName = "Chord Filter Env Attack";   atk.newRow = true;  atk.small = true;
+            Spec dec { cid("edec"), "Dec" };    dec.statusName = "Chord Filter Env Decay";    dec.small = true;
+            Spec sus { cid("fsus"), "Sus" };    sus.statusName = "Chord Filter Env Sustain";  sus.small = true;
+            Spec rel { cid("frel"), "Rel" };    rel.statusName = "Chord Filter Env Release";  rel.small = true;
+            Spec dep { cid("env"), "Depth" };   dep.statusName = "Chord Filter Env Depth";    dep.small = true;
+            dep.tooltip = "How far the filter envelope opens the cutoff on each chord";
+            return { std::move(cut), std::move(res), std::move(drv), std::move(atk), std::move(dec), std::move(sus), std::move(rel), std::move(dep) };
+        }
         const char* name = engine == EngineType::Kick ? "Kick" : engine == EngineType::Hat ? "Hat" : engine == EngineType::Snare ? "Snare"
                          : engine == EngineType::FmPerc ? "FM Perc" : nullptr;
         if (name == nullptr) return {};
@@ -338,7 +352,7 @@ void TrackContent::rebuildGrid()
     filterGrid.setSpecs(filterSpecs);
     filterGrid.setVisible(! filterSpecs.empty());
     ghostKnob.clearModBinding();
-    if (! filterSpecs.empty())
+    if (! filterSpecs.empty())   // a drum, percussion or Chord engine: all have ghost steps
     {
         static const float kNaN = std::numeric_limits<float>::quiet_NaN();
         int count = 0;
@@ -470,8 +484,8 @@ void TrackContent::rebuild()
     for (auto* c : { (juce::Component*) &rootCaption, (juce::Component*) &rootSelect, (juce::Component*) &scaleCaption, (juce::Component*) &scaleSelect }) c->setVisible(showKey);
     swingKnob.setVisible(! rumble);
     accentKnob.setVisible(! rumble);
-    // Ghost steps are for the drum and percussion engines.
-    ghostKnob.setVisible(shownEngine == EngineType::Kick || shownEngine == EngineType::Hat || shownEngine == EngineType::Snare || shownEngine == EngineType::FmPerc);
+    // Ghost steps are for the drum, percussion and Chord engines.
+    ghostKnob.setVisible(shownEngine == EngineType::Kick || shownEngine == EngineType::Hat || shownEngine == EngineType::Snare || shownEngine == EngineType::FmPerc || shownEngine == EngineType::Chord);
     for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob, &levelKnob }) k->setVisible(! rumble);   // a Rumble's box holds its envelope
     for (auto* c : { (juce::Component*) &stepProbKnob, (juce::Component*) &loopCaption, (juce::Component*) &loopSelect }) c->setVisible(! rumble);
     refreshStepPanel();
@@ -606,18 +620,23 @@ void TrackContent::resized()
     const int insertH  = 2 * knobH + s(LF::kVoiceGap);
     const int boxH     = insertH + 2 * s(LF::kSpaceS);
     const int numDrops = (locked ? 0 : 1) + (rumble ? 1 : 0);
-    const int tonalW   = s(LF::kTonalRootW) + gap + s(LF::kTonalScaleW);   // Root and Scale side by side
-    const int engineW  = numDrops > 0 ? 2 * clear + juce::jmax(dropW, tonalW) : 0;
+    const int engineW  = numDrops > 0 ? 2 * clear + dropW : 0;
+    // The master key and scale (global, not per track) have a KEY section of their own, Root over Scale.
+    const bool showKeyBox = ! locked && ! rumble && rootAtt != nullptr;
+    const int keyW     = showKeyBox ? 2 * clear + s(LF::kTonalScaleW) : 0;
     engineR    = { 0, 0, w, padY + plateH + boxH + padY };
     const int boxY = padY + plateH;
     int x = padX;
     engineBoxR = engineW > 0 ? juce::Rectangle<int>(x, boxY, engineW, boxH) : juce::Rectangle<int>();
     if (engineW > 0) x += engineW + divW;
+    keyBoxR = keyW > 0 ? juce::Rectangle<int>(x, boxY, keyW, boxH) : juce::Rectangle<int>();
+    if (keyW > 0) x += keyW + divW;
     const int insertBoxW = 2 * clear + insertW;
     // A drum or percussion engine's FILTER section sits between the voice and the insert, four knob cells wide: the same place, the
     // same size on each engine.
     const bool hasFilter = filterGrid.isVisible();
-    const int filterW  = hasFilter ? 2 * clear + 4 * (s(LF::kKnobSize2W) + s(6)) : 0;
+    const int filterCells = shownEngine == EngineType::Chord ? 5 : 4;   // a Chord's envelope row is Atk, Dec, Sus, Rel and Depth
+    const int filterW  = hasFilter ? 2 * clear + filterCells * (s(LF::kKnobSize2W) + s(6)) : 0;
     const int voiceW   = juce::jmax(0, w - padX - x - divW - insertBoxW - (hasFilter ? divW + filterW : 0));
     voiceBoxR  = { x, boxY, voiceW, boxH };
     filterBoxR = hasFilter ? juce::Rectangle<int>(voiceBoxR.getRight() + divW, boxY, filterW, boxH) : juce::Rectangle<int>();
@@ -636,14 +655,15 @@ void TrackContent::resized()
     if (rumble)   place(sourceCaption, sourceSelect, dropY);
     else if (! locked)
     {
-        // Key row under the Engine selector: Root then Scale, each captioned like the Engine dropdown.
-        const int ddY = dropY + labelH + s(2);
-        const int rootW = s(LF::kTonalRootW), scaleW = s(LF::kTonalScaleW), x0 = engineBoxR.getX() + clear;
+        // Root over Scale in the KEY section, each captioned like the Engine dropdown.
+        const int keyX = keyBoxR.getX() + clear, keyDdW = s(LF::kTonalScaleW);
+        int keyY = keyBoxR.getY() + s(LF::kSpaceS);
         for (auto* cap : { &rootCaption, &scaleCaption }) cap->setFont(captionFont);
-        rootCaption .setBounds(x0, dropY, rootW, labelH);
-        scaleCaption.setBounds(x0 + rootW + gap, dropY, scaleW, labelH);
-        rootSelect  .setBounds(x0, ddY, rootW, s(MuLookAndFeel::kDropdownH));
-        scaleSelect .setBounds(x0 + rootW + gap, ddY, scaleW, s(MuLookAndFeel::kDropdownH));
+        rootCaption .setBounds(keyX, keyY, keyDdW, labelH);
+        rootSelect  .setBounds(keyX, keyY + labelH + s(2), keyDdW, s(MuLookAndFeel::kDropdownH));
+        keyY += rowPitch;
+        scaleCaption.setBounds(keyX, keyY, keyDdW, labelH);
+        scaleSelect .setBounds(keyX, keyY + labelH + s(2), keyDdW, s(MuLookAndFeel::kDropdownH));
     }
     grid.setMinSizeIndex(0);
     filterGrid.setMinSizeIndex(0);
@@ -765,6 +785,7 @@ void TrackContent::paint(juce::Graphics& g)
     // Sections left to right, then the Layer box and the Steps box: each a raised box named on a plate above it.
     std::vector<MuLookAndFeel::Section> sections;
     if (! engineBoxR.isEmpty()) sections.push_back({ engineBoxR, locked ? juce::String("SOURCE") : juce::String("ENGINE") });
+    if (! keyBoxR.isEmpty()) sections.push_back({ keyBoxR, "KEY" });
     sections.push_back({ voiceBoxR, name + " VOICE" });
     if (! filterBoxR.isEmpty()) sections.push_back({ filterBoxR, "FILTER" });
     sections.push_back({ insertBoxR, "INSERT" });

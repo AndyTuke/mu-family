@@ -216,6 +216,11 @@ inline constexpr ModDestEntry kChordDests[] = {
     makeTarget("c.dec.prop", "chord_dec", "Decay", "Chord"),
     makeTarget("c.sus.prop", "chord_sus", "Sustain", "Chord"),
     makeTarget("c.rel.prop", "chord_rel", "Release", "Chord"),
+    // Then the filter envelope's attack, sustain and release and the track's Ghost level, just before those nine (Track::resolve reads them from the end).
+    makeTarget("c.fatk", "chord_fatk", "Filter Env Attack", "Chord"),
+    makeTarget("c.fsus", "chord_fsus", "Filter Env Sustain", "Chord"),
+    makeTarget("c.frel", "chord_frel", "Filter Env Release", "Chord"),
+    makeTarget("groove.ghost", "ghost", "Ghost", "Groove"),
     // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
     // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
     makeTarget("amp.level", "level", "Level", "Amp"),
