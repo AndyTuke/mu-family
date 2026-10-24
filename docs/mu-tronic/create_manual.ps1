@@ -62,7 +62,7 @@ Br
 # ── 1. Introduction ──────────────────────────────────────────────────────────
 H1 "1. Introduction"
 P "mu-Tronic is a performance unit from Transwarp Development Project. It is a standalone application: there is no VST3 or CLAP version. It is free."
-P "mu-Tronic starts empty. It has sixteen layer slots, shown eight at a time on two pages. Into each slot you put one layer, chosen from the instruments of the other mu apps: a Rhythm from mu-Clid, a Pattern from mu-Tant, an Arp from mu-Toni, or one of mu-On's five engines (Kick, Bass, Hat, Snare and Rumble). A layer in mu-Tronic is the same instrument you know from its own app, with the same controls, modulators and presets. Mix and match as you like: sixteen layers, any combination."
+P "mu-Tronic starts empty. It has sixteen layer slots, shown eight at a time on two pages. Into each slot you put one layer, chosen from the instruments of the other mu apps: a Rhythm from mu-Clid, a Pattern from mu-Tant, an Arp from mu-Toni, or one of mu-On's seven engines (Kick, Bass, Hat, Snare, Rumble, FM Perc and Chord). A layer in mu-Tronic is the same instrument you know from its own app, with the same controls, modulators and presets. Mix and match as you like: sixteen layers, any combination."
 P "Around the layers is the family you may know from the other apps: the same mixer, effects, modulators, presets and transport bar. mu-Tronic adds three buses to the mixer, so you can group layers and process the group, and scenes, so you can change the clip on every layer with one press."
 P "Because mu-Tronic hosts several instruments at once, it can stand in for mu-link as a performance tool: one window, one tempo, one mix."
 
@@ -91,7 +91,7 @@ Bullet "Layer Editor (centre)  -  the header, the controls and the modulators of
 Bullet "Mixer overlay  -  opened from the transport bar, replacing the editor"
 Bullet "Status Bar (bottom)  -  the name and value of the control you last touched, and the CPU readout at the right-hand end"
 P "The window has two sizes, Medium and Large, chosen in Settings (Display, Size). Everything scales with it."
-P "The main area takes the colour of the selected layer's type: purple for Rhythm, green for Pattern, blue for Arp and yellow for the five mu-On layers. The transport bar, sidebar, mixer and settings keep mu-Tronic's own ice-white and steel."
+P "The main area takes the colour of the selected layer's type: purple for Rhythm, green for Pattern, blue for Arp and yellow for the seven mu-On layers. The transport bar, sidebar, mixer and settings keep mu-Tronic's own ice-white and steel."
 
 H2 "CPU Readout"
 P "At the right-hand end of the Status Bar, mu-Tronic shows CPU followed by a percentage. It is how hard the audio engine is working, with all sixteen layers, the buses and the effects counted. The figure is the worst moment of the last second, because it is the brief spike that causes clicks. The number turns amber from 70 percent and red from 90 percent. If it goes red, remove a layer or a heavy effect. The readout stays visible in Performance mode."
@@ -135,11 +135,11 @@ P "Select an empty slot and the main area shows the layer chooser, titled Add a 
 Bullet "mu-Clid  -  Rhythm: Euclidean sample rhythm."
 Bullet "mu-Tant  -  Pattern: wavetable drone, gate pattern."
 Bullet "mu-Toni  -  Arp: generative arpeggiator."
-Bullet "mu-On  -  a framed group of five cards: Kick (909 kick drum), Bass (bass line), Hat (hi-hat), Snare (snare) and Rumble (rumble tail from a kick)."
+Bullet "mu-On  -  a framed group of seven cards: Kick (909 kick drum), Bass (bass line), Hat (hi-hat), Snare (snare), Rumble (rumble tail from a kick), FM Perc (FM toms and percussion) and Chord (a chord player for dub-techno stabs)."
 P "Click a card, or its Add button, to put that layer in the slot. The new layer starts from the default for its type (see Presets). The status bar confirms with Added followed by the layer's name."
 P "You can also load a layer preset into an empty slot: open the preset dropdown in the layer header and choose any layer preset. The slot takes the type of the preset you chose."
 P "Rumble works on the sound of another layer, called its Source. A new Rumble listens to the first Kick layer if there is one. If there is no Kick yet, the Rumble is added with no Source and the status bar says Source needed: add a Kick layer. Choose a Source in the Rumble's own Source dropdown. A Rumble can listen to any other layer that is not a Rumble."
-Pic "The layer chooser for an empty slot: three product cards and the mu-On group of five engine cards." "chooser.png"
+Pic "The layer chooser for an empty slot: three product cards and the mu-On group of seven engine cards (Kick, Bass, Hat, Snare, Rumble, FM Perc and Chord)." "chooser.png"
 
 # ── 7. The Layers ────────────────────────────────────────────────────────────
 H1 "7. The Layers"
