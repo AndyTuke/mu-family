@@ -202,6 +202,22 @@ void TrackStepRow::dragTie(StepRow& row, int from, int to, bool startedOn)
     row.setTied(later, ! untie);
 }
 
+bool TrackStepRow::dragPitch(TrackHost& host, int slot, int step, PitchDrag& drag, const juce::MouseEvent& e)
+{
+    const int dy = e.getDistanceFromDragStartY(), dx = e.getDistanceFromDragStartX();
+    if (! drag.active)
+    {
+        if (std::abs(dy) < kPitchDragStartPx || std::abs(dy) <= std::abs(dx)) return false;
+        drag.active = true;
+    }
+    const auto key = tuneKey(host, slot, EngineType::Bass);
+    const int degrees = juce::roundToInt(-dy / (float) kPixelsPerDegree);   // up is a higher note
+    const int midi = degrees == 0 ? key.baseMidi + drag.startSemis
+                                  : mu_audio::moveMidiInScale(key.baseMidi + drag.startSemis, degrees, key.root, key.scale);
+    host.getTrack(slot).row.setStepSemitones(step, midi - key.baseMidi);
+    return true;
+}
+
 void TrackStepRow::paint(juce::Graphics& g)
 {
     const bool isRumble = host.getTrackEngine(slot) == EngineType::Rumble;
@@ -220,6 +236,7 @@ void TrackStepRow::mouseDown(const juce::MouseEvent& e)
     if (host.getTrackEngine(slot) == EngineType::Rumble || ! getLocalBounds().contains(e.getPosition())) return;
     const int step = stepAt(getLocalBounds(), e.getPosition());
     dragStartedOn = host.getTrack(slot).row.isOn(step);
+    pitchDrag = {};
     const bool selects = clickStep(host.getTrack(slot).row, step, getLocalBounds(), e.getPosition(), e.mods.isPopupMenu());
     dragStep = selects && ! e.mods.isPopupMenu() ? step : -1;
     if (selects)
@@ -232,7 +249,17 @@ void TrackStepRow::mouseDown(const juce::MouseEvent& e)
 
 void TrackStepRow::mouseDrag(const juce::MouseEvent& e)
 {
-    if (dragStep < 0 || host.getTrackEngine(slot) != EngineType::Bass) return;   // only a Bass sequence ties notes
+    if (dragStep < 0 || host.getTrackEngine(slot) != EngineType::Bass) return;   // only a Bass sequence ties and steps notes
+    if (! pitchDrag.active) pitchDrag.startSemis = host.getTrack(slot).row.stepSemitones(dragStep);
+    if (dragPitch(host, slot, dragStep, pitchDrag, e))
+    {
+        const auto key = tuneKey(host, slot, EngineType::Bass);
+        if (onStatusUpdate) onStatusUpdate("Step " + juce::String(dragStep + 1) + " Note",
+                                           mu_audio::midiNoteName(key.baseMidi + host.getTrack(slot).row.stepSemitones(dragStep)));
+        if (onStepSelected) onStepSelected(dragStep);   // the Step panel shows the new note
+        repaint();
+        return;
+    }
     const int step = stepAt(getLocalBounds(), e.getPosition());
     if (step == dragStep) return;
     dragTie(host.getTrack(slot).row, dragStep, step, dragStartedOn);

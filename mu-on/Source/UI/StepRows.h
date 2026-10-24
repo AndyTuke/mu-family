@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "UI/TrackHost.h"   // what the rows read from the layer's host
+#include "UI/TrackStepRow.h"   // the shared row look and the step drag helpers
 #include "UI/Components/MuLookAndFeel.h"
 
 #include <array>
@@ -53,6 +54,7 @@ private:
     int selectedStep  = -1;
     int dragRow = -1, dragStep = -1;   // a left-drag across steps (to tie them): the row and the step it has reached
     bool dragStartedOn = false;
+    TrackStepRow::PitchDrag pitchDrag;   // a vertical drag on a Bass step: its note moves through the scale
     int playheadStep  = -1;
     long long shownPass = -2;          // the pass the dimmed steps were drawn for
     juce::uint64 shownSignature = 0;

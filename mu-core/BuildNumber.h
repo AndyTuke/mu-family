@@ -1,5 +1,5 @@
 #pragma once
-#define BUILD_NUMBER 1436
+#define BUILD_NUMBER 1437
 // Live products use this base; pre-release products override MU_VERSION_BASE per target.
 #ifndef MU_VERSION_BASE
 #define MU_VERSION_BASE "1.1"

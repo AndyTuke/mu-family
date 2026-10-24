@@ -121,6 +121,20 @@ inline bool midiInScale(int midi, int root, int scaleIndex) noexcept
     return false;
 }
 
+// The MIDI note `degrees` scale notes above `midi` (below when negative). From a note outside the scale the first move
+// lands on the nearest scale note in that direction.
+inline int moveMidiInScale(int midi, int degrees, int root, int scaleIndex) noexcept
+{
+    const int dir = degrees > 0 ? 1 : -1;
+    int m = midi;
+    for (int i = 0; i < (degrees < 0 ? -degrees : degrees); ++i)
+    {
+        int guard = 0;   // a scale always has a note within an octave; the guard only stops a bad table looping
+        do { m += dir; } while (! midiInScale(m, root, scaleIndex) && ++guard < 24);
+    }
+    return m;
+}
+
 inline float freqToMidi(float hz) noexcept
 {
     return 69.0f + 12.0f * std::log2(juce::jmax(1.0e-3f, hz) / 440.0f);

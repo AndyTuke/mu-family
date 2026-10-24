@@ -70,6 +70,16 @@ public:
     // and the later one is marked tied; doing it again over a pair that was already tied (both on before the drag) unties
     // them. `startedOn` is whether the step the drag began on was on before the click.
     static void dragTie(StepRow& row, int from, int to, bool startedOn);
+
+    // Dragging up or down on a Bass step moves its note through the notes of the master key's scale: every
+    // kPixelsPerDegree of travel is one scale degree, from the note the step had when the drag began. A drag that goes
+    // sideways more than it goes up or down stays a tie drag. `startSemis` is the step's offset (octave and note) at
+    // the press.
+    struct PitchDrag { bool active = false; int startSemis = 0; };
+    static constexpr int kPitchDragStartPx = 5;
+    static constexpr int kPixelsPerDegree  = 8;
+    // Apply the drag `e` (from the press on `step`) to a Bass row; true while it is a pitch drag (the caller then skips the tie).
+    static bool dragPitch(TrackHost& host, int slot, int step, PitchDrag& drag, const juce::MouseEvent& e);
     // The cell of `step`, the accent button inside its top-left corner and the delete cross inside its top-right.
     static juce::Rectangle<float> cellRect(juce::Rectangle<int> cells, int step);
     static juce::Rectangle<float> accentButtonRect(juce::Rectangle<float> cell);
@@ -87,6 +97,7 @@ private:
     int selectedStep = -1;
     int dragStep     = -1;     // the step a left-drag has reached (-1: no drag)
     bool dragStartedOn = false;
+    PitchDrag pitchDrag;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TrackStepRow)
 };

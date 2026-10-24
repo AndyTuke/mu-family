@@ -1,9 +1,10 @@
 // The Bass voice's gate, release and tied steps, and the step row's tie flag: a gated note releases after its hold and
 // an ungated one is held; a tied step carries the note on instead of retriggering; a tie needs two steps that are on,
-// ends when either goes off, and survives a save.
+// ends when either goes off, and survives a save. Dragging up or down on a Bass step steps its note through the master key's scale.
 
 #include "Audio/BassEngine.h"
 #include "Sequencer/StepRow.h"
+#include "Audio/MusicalScales.h"
 #include <juce_core/juce_core.h>
 
 namespace
@@ -134,4 +135,41 @@ namespace
     };
 
     static BassTieTest bassTieTest;
+
+    class BassStepDragTest : public juce::UnitTest
+    {
+    public:
+        BassStepDragTest() : juce::UnitTest("mu-on Bass step drag moves the note through the scale", "Sequencer") {}
+
+        void runTest() override
+        {
+            constexpr int kMajor = 0;   // kScales[0]: C major when the root is 0
+            beginTest("moveMidiInScale steps by scale degrees, up and down, across the octave");
+            {
+                expectEquals(mu_audio::moveMidiInScale(36, 1, 0, kMajor), 38, "C to D");
+                expectEquals(mu_audio::moveMidiInScale(40, 1, 0, kMajor), 41, "E to F: the semitone gap is one degree");
+                expectEquals(mu_audio::moveMidiInScale(36, 7, 0, kMajor), 48, "seven degrees is an octave");
+                expectEquals(mu_audio::moveMidiInScale(36, -1, 0, kMajor), 35, "C down to B");
+                expectEquals(mu_audio::moveMidiInScale(37, 1, 0, kMajor), 38, "from a note outside the scale, up lands on the next scale note");
+                expectEquals(mu_audio::moveMidiInScale(37, -1, 0, kMajor), 36, "and down on the one below");
+                expectEquals(mu_audio::moveMidiInScale(40, 3, 4, kMajor), 45, "the root shifts the scale: E major from E up three degrees");
+            }
+
+            beginTest("setStepSemitones keeps the octave when the note fits, else moves it");
+            {
+                mu_on::StepRow row;
+                row.setStepOctave(2, 1);
+                row.setStepSemitones(2, 12 + 5);
+                expectEquals(row.stepOctave(2), 1, "octave kept");
+                expectEquals(row.stepNote(2), 5, "note is the rest");
+                row.setStepSemitones(2, -30);
+                expectEquals(row.stepSemitones(2), -30, "the pair always sums to the target");
+                expect(std::abs(row.stepNote(2)) <= 12 && std::abs(row.stepOctave(2)) <= 2, "and stays in range");
+                row.setStepSemitones(2, 99);
+                expectEquals(row.stepSemitones(2), 36, "clamped to the top of the range");
+            }
+        }
+    };
+
+    static BassStepDragTest bassStepDragTest;
 }

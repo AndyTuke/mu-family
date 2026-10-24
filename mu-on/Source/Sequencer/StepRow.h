@@ -55,6 +55,20 @@ public:
     void setStepOctave(int step, int v) noexcept { if (valid(step)) cells[(size_t) step].oct.store(juce::jlimit(-2, 2, v), std::memory_order_relaxed); }
     void setStepNote  (int step, int v) noexcept { if (valid(step)) cells[(size_t) step].note.store(juce::jlimit(-12, 12, v), std::memory_order_relaxed); }
     int  stepSemitones(int step) const noexcept { return stepOctave(step) * 12 + stepNote(step); }
+    // Set the octave and note so that the step sounds `semitones` from its tune (octave kept when the note fits, -36 to +36).
+    void setStepSemitones(int step, int semitones) noexcept
+    {
+        semitones = juce::jlimit(-36, 36, semitones);
+        int oct = stepOctave(step);
+        int note = semitones - 12 * oct;
+        if (std::abs(note) > 12)
+        {
+            oct = juce::jlimit(-2, 2, juce::roundToInt(semitones / 12.0f));
+            note = semitones - 12 * oct;
+        }
+        setStepOctave(step, oct);
+        setStepNote(step, note);
+    }
 
     // Per step chord (a Chord track): the chord (an index into kChords), its inversion and its spread. The root is the
     // step's Note (a degree of the master scale: 0 is the key note) and its Octave.
