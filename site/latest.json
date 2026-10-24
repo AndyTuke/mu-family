@@ -1,36 +1,36 @@
 {
   "schema": 1,
-  "build": 1415,
-  "released": "2026-10-19",
+  "build": 1450,
+  "released": "2026-10-24",
   "products": {
     "mu-clid": {
-      "version": "v1.1.1415",
-      "build": 1415,
+      "version": "v1.1.1450",
+      "build": 1450,
       "download": "https://transwarp.me/download"
     },
     "mu-clid-midi": {
-      "version": "v1.1.1415",
-      "build": 1415,
+      "version": "v1.1.1450",
+      "build": 1450,
       "download": "https://transwarp.me/download"
     },
     "mu-tant": {
-      "version": "v1.1.1415",
-      "build": 1415,
+      "version": "v1.1.1450",
+      "build": 1450,
       "download": "https://transwarp.me/download"
     },
     "mu-toni": {
-      "version": "v1.1.1415",
-      "build": 1415,
+      "version": "v1.1.1450",
+      "build": 1450,
       "download": "https://transwarp.me/download"
     },
     "mu-on": {
-      "version": "v1.1.1415",
-      "build": 1415,
+      "version": "v1.1.1450",
+      "build": 1450,
       "download": "https://transwarp.me/download"
     },
     "mu-link": {
-      "version": "v1.1.1415",
-      "build": 1415,
+      "version": "v1.1.1450",
+      "build": 1450,
       "download": "https://transwarp.me/download"
     }
   }
