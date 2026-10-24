@@ -112,6 +112,13 @@ inline juce::String engineParamId(int track, EngineType e, const juce::String& p
 inline constexpr const char* kRootParamId  = "root";
 inline constexpr const char* kScaleParamId = "scale";
 
+// A Bass track's Tune left at its default (kBassTuneRootHz, E1) plays the master key's root note instead, in the octave
+// from MIDI 28 (E1) to 39, so a new Bass sequence starts on the key's root whatever the key. Turn the Tune away from it
+// and the track plays that tuning snapped to the scale, as before.
+inline constexpr float kBassTuneRootHz = 41.2f;
+inline bool isBassTuneRoot(float tuneHz) noexcept { return tuneHz > kBassTuneRootHz - 0.05f && tuneHz < kBassTuneRootHz + 0.05f; }
+inline int  bassRootMidi(int root) noexcept        { return 28 + ((root % 12) - 4 + 12) % 12; }
+
 // Loop ratio choices: "play the `play`th of every `of` passes of the row" (1:1 plays every pass).
 struct LoopRatio { int play, of; };
 inline constexpr LoopRatio kLoopRatios[] = { {1,1}, {1,2}, {2,2}, {1,3}, {2,3}, {3,3}, {1,4}, {2,4}, {3,4}, {4,4} };

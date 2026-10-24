@@ -58,7 +58,11 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     // Bass engine (deep synth — the focus)
     layout.add(std::make_unique<AudioParameterChoice>(id(E::Bass, "wave"), lbl + "Bass Wave", juce::StringArray{ "Sine", "Saw", "Square" }, 0));
     flt(E::Bass, "sub",   "Bass Sub",        f(0.0f, 1.0f, 0.001f), 0.5f, mu_fmt::Unit::Percent01);
-    flt(E::Bass, "tune",  "Bass Tune",       pitchRange(20.0f, 120.0f), 41.2f, mu_fmt::Unit::HzNote);   // snapped to the master key and scale by the engine
+    {   // snapped to the master key and scale by the engine; at its default it reads "Root" and plays the key's root note
+        const auto r = pitchRange(20.0f, 120.0f);
+        layout.add(std::make_unique<AudioParameterFloat>(id(E::Bass, "tune"), lbl + "Bass Tune", r, kBassTuneRootHz,
+            mu_fmt::floatText(r, [](float hz, int) { return isBassTuneRoot(hz) ? juce::String("Root") : mu_fmt::unitText(mu_fmt::Unit::HzNote, hz); })));
+    }
     flt(E::Bass, "cut",   "Bass Cutoff",     pitchRange(40.0f, 4000.0f), 600.0f, mu_fmt::Unit::Hz);
     flt(E::Bass, "res",   "Bass Resonance",  f(0.0f, 1.0f, 0.001f), 0.2f, mu_fmt::Unit::Percent01);
     flt(E::Bass, "env",   "Bass Filter Env", f(0.0f, 1.0f, 0.001f), 0.4f, mu_fmt::Unit::Percent01);

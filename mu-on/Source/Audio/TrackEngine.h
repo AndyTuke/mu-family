@@ -36,6 +36,13 @@ struct TuneLock
         const float midi = 69.0f + 12.0f * std::log2(juce::jmax(1.0f, hz) / 440.0f);
         return mu_audio::midiToFreq(mu_audio::snapMidiToScale(midi, root, scale) + fineCents * 0.01f);
     }
+
+    // A Bass tune: the key's root note while the Tune sits at its default, else lockedHz.
+    float lockedBassHz(float hz, float fineCents) const noexcept
+    {
+        if (! isBassTuneRoot(hz)) return lockedHz(hz, fineCents);
+        return mu_audio::midiToFreq((float) bassRootMidi(root) + fineCents * 0.01f);
+    }
 };
 
 class TrackEngine
@@ -93,7 +100,7 @@ public:
     void setParams(const float* p, int engineChoice, double bpm, float rumbleEnvLevel, const TuneLock& lock = {}) noexcept
     {
         if (auto* k = std::get_if<KickEngine>(&engine))         k->setParams(lock.lockedHz(p[0], lock.kickFineCents), p[1], p[2], p[3], p[4]);
-        else if (auto* b = std::get_if<BassEngine>(&engine))    b->setParams(lock.lockedHz(p[0], lock.bassFineCents), engineChoice, p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11]);
+        else if (auto* b = std::get_if<BassEngine>(&engine))    b->setParams(lock.lockedBassHz(p[0], lock.bassFineCents), engineChoice, p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11]);
         else if (auto* s = std::get_if<SampleChannel>(&engine)) s->setParams(p[0], p[1], p[2], p[3]);   // the Hat's open pair follows the closed pair; a Snare ignores it
         else if (auto* r = std::get_if<RumbleEngine>(&engine))
         {

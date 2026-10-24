@@ -174,8 +174,8 @@ void InsertSubsection::configureInsertAlgorithm(int charId)
             [this, suffix](float newNorm) { apvtsSet(suffix, newNorm); });
     }
 
-    // Compressor / Limiter expose a GR meter on P2.
-    if (charId == 7 || charId == 8)
+    // Clipper / Compressor / Limiter expose a GR meter on P2.
+    if (mu_ui::insertAlgoShowsGainReduction(charId))
         insertParam2.setGRSource(getInsertGR ? getInsertGR() : nullptr);
 
     // Vocoder: when Wave (P1) is noise (≥2), P2/P3/P4 don't apply.

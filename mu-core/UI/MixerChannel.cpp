@@ -106,17 +106,17 @@ void MixerChannel::addSidechainControls()
     reportKnobStatus(scAmount, "Sidechain Amount");
     addAndMakeVisible(scAmount);
 
-    scAttack.setRange(1.0, 500.0, 1.0);
+    scAttack.setRange(0.0, 500.0, 1.0);
     scAttack.getSlider().setSkewFactorFromMidPoint(22.0);
-    scAttack.setValue(5.0);
+    scAttack.setValue(0.0);
     scAttack.getSlider().textFromValueFunction = noVal;
     scAttack.setStatusUnit(mu_fmt::Unit::Ms);
     reportKnobStatus(scAttack, "Sidechain Attack");
     addAndMakeVisible(scAttack);
 
-    scRelease.setRange(10.0, 2000.0, 1.0);
+    scRelease.setRange(0.0, 2000.0, 1.0);
     scRelease.getSlider().setSkewFactorFromMidPoint(141.0);
-    scRelease.setValue(100.0);
+    scRelease.setValue(0.0);
     scRelease.getSlider().textFromValueFunction = noVal;
     scRelease.setStatusUnit(mu_fmt::Unit::Ms);
     reportKnobStatus(scRelease, "Sidechain Release");

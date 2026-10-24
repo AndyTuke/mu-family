@@ -195,6 +195,20 @@ struct BusInsertTests : juce::UnitTest
             expectEquals(r.insertAt(0, 0).processor.grReduction.load(), 0.0f, "None reports no reduction");
         }
 
+        beginTest("a Clipper on a bus insert reports how hard it clips; a signal under the threshold reports none");
+        {
+            Rig r;
+            r.dc[0] = 0.8f;
+            r.mixer.channels[0].busAssign.store(1);
+            setInsert(r.insertAt(0, 0), 5, 0.5f);   // Clipper, threshold at half scale: a 0.8 input is about 4 dB over
+            float gr = 0.0f;
+            for (int b = 0; b < 40; ++b) { r.run(); gr = juce::jmax(gr, r.insertAt(0, 0).processor.grReduction.load()); }
+            expect(gr > 0.05f && gr < 0.5f, "clipper GR " + juce::String(gr, 4));
+            r.dc[0] = 0.1f;
+            r.run(40);
+            expectEquals(r.insertAt(0, 0).processor.grReduction.load(), 0.0f, "no reduction under the threshold");
+        }
+
         beginTest("a block through buses, inserts and a bus sidechain allocates nothing");
         {
             Rig r;

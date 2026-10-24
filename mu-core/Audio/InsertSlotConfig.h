@@ -180,8 +180,8 @@ inline bool insertSlotEnabled(int algoIndex, int slot, float p1Actual) noexcept
     return from == 0 || std::round(p1Actual) < (float) from;
 }
 
-// The Compressor (7) and Limiter (8) show their gain reduction on slot 2 (Output).
-inline bool insertAlgoShowsGainReduction(int algoIndex) noexcept { return algoIndex == 7 || algoIndex == 8; }
+// The Clipper (5), Compressor (7) and Limiter (8) show their gain reduction on slot 2 (Output).
+inline bool insertAlgoShowsGainReduction(int algoIndex) noexcept { return algoIndex == 5 || algoIndex == 7 || algoIndex == 8; }
 
 // First-visit / cold-restore defaults per algorithm. Indexed [algo][slot],
 // stored as ACTUAL (not normalised) values so they read naturally. The init

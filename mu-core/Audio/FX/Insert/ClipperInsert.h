@@ -22,7 +22,7 @@ public:
     }
 
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh,
-                 const VoiceParams& p, float& /*grOut*/) override
+                 const VoiceParams& p, float& grOut) override
     {
         // Slot 0 = Threshold 0..100 (encoded as 0..1 internal); Slot 1 = Output -24..0 dB.
         const float thresh   = juce::jlimit(0.001f, 1.0f, insertSlot(p, 0) / 100.0f);
@@ -33,13 +33,22 @@ public:
         // Sample-major: each smoothed value advances once per sample and every channel uses it, so the
         // right channel ramps with the left (channel-major looping left the right one stepping per block).
         auto chans = buf.getArrayOfWritePointers();
+        float peakOver = 1.0f;   // the largest input / threshold ratio this block (1 = nothing clipped)
         for (int i = 0; i < ns; ++i)
         {
             const float t  = smoothedThresh .getNextValue();
             const float og = smoothedOutGain.getNextValue();
             for (int ch = 0; ch < nCh; ++ch)
-                chans[ch][i] = juce::jlimit(-t, t, chans[ch][i]) * og;
+            {
+                const float x = chans[ch][i];
+                const float over = std::abs(x) / t;
+                if (over > peakOver) peakOver = over;
+                chans[ch][i] = juce::jlimit(-t, t, x) * og;
+            }
         }
+        // How hard the clip bit this block, as the Compressor's meter reads: 0..1, 1 = 24 dB of reduction.
+        // One log per block, and only when something clipped. A NaN sample never raises it (the compare is false).
+        grOut = peakOver > 1.0f ? juce::jlimit(0.0f, 1.0f, 20.0f * std::log10(peakOver) / 24.0f) : 0.0f;
     }
 
 private:

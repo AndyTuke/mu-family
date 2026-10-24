@@ -109,8 +109,8 @@ inline void addGlobalFxParams(juce::AudioProcessorValueTreeState::ParameterLayou
         addB(q+"solo",  nm+"Solo",    false);
         addI(q+"scSrc", nm+"SC Src",  0,        kScSrcMax, 0);  // 0=off, 1..kMaxLayers=channels, kMaxLayers+1=external, then the buses
         addF(q+"scAmt", nm+"SC Amt",  0.0f,     1.0f,    0.0f);
-        addF(q+"scAtk", nm+"SC Atk",  1.0f,   500.0f,    5.0f);
-        addF(q+"scRel", nm+"SC Rel",  10.0f, 2000.0f,  100.0f);
+        addF(q+"scAtk", nm+"SC Atk",  0.0f,   500.0f,    0.0f);
+        addF(q+"scRel", nm+"SC Rel",  0.0f, 2000.0f,    0.0f);
     }
 
     // ── Master + master inserts ───────────────────────────────────────────────
@@ -151,7 +151,7 @@ struct ChannelStripOptions
     bool  continuous  = false;    // ranges without a snapping interval (mu-Clid's reference layout)
     int   scSrc       = 0;        // sidechain source default: 0 = off, 1..kMaxLayers = channels, kMaxLayers + 1 = external
     float scAmt       = 0.0f;     // sidechain amount default
-    float scRel       = 100.0f;   // sidechain release default (ms)
+    float scRel       = 0.0f;     // sidechain release default (ms): none, as the attack
     bool  busAssign   = true;     // declare "bus" (the group bus this strip feeds); only where buses exist, never on a bus itself
     bool  midiIn      = false;    // declare "midiIn" (the MIDI channel this strip's layer hears: 0 Omni, 1-16); only where each strip has its own layer
 };
@@ -190,8 +190,8 @@ inline void addChannelStripParams(juce::AudioProcessorValueTreeState::ParameterL
     addF("sendRev", "Send Rev",   0.0f,    1.0f, 0.001f, 0.0f);
     addI("scSrc",   "SC Src",     0, kScSrcMax, o.scSrc);   // 0 off, 1..kMaxLayers channels, the external input, then the buses
     addF("scAmt",   "SC Amount",  0.0f,    1.0f, 0.001f, o.scAmt);
-    addF("scAtk",   "SC Attack",  1.0f,  500.0f, 0.1f,   5.0f);
-    addF("scRel",   "SC Release", 10.0f, 2000.0f, 1.0f,  o.scRel);
+    addF("scAtk",   "SC Attack",  0.0f,  500.0f, 0.1f,   0.0f);
+    addF("scRel",   "SC Release", 0.0f, 2000.0f, 1.0f,  o.scRel);
     addI("outBus",  "Output Bus", 0, 8, 0);                     // 0 = master mix, 1..8 = direct out
     if constexpr (mu_limits::kMaxBuses > 0)
         if (o.busAssign)

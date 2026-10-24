@@ -108,8 +108,8 @@ public:
         // Sidechain ducking
         std::atomic<int>   sidechainSource   { -1 };     // -1=off, 0-7=channel index, kExtSidechainSrc=DAW bus
         std::atomic<float> sidechainAmount   { 0.0f };   // 0-1 ducking depth
-        std::atomic<float> sidechainAttackMs  { 5.0f };
-        std::atomic<float> sidechainReleaseMs { 100.0f };
+        std::atomic<float> sidechainAttackMs  { 0.0f };
+        std::atomic<float> sidechainReleaseMs { 0.0f };
         // Multi-bus output routing (DAW only): 0 = Master mix (default, applies master fader + FX),
         // 1..8 = direct out to Bus 1..8 (post-channel-fader, no master fader, no FX sends).
         std::atomic<int>   outputBus { 0 };
@@ -156,8 +156,8 @@ public:
             solo.store(false, std::memory_order_relaxed);
             sidechainSource.store(-1, std::memory_order_relaxed);
             sidechainAmount.store(0.0f, std::memory_order_relaxed);
-            sidechainAttackMs.store(5.0f, std::memory_order_relaxed);
-            sidechainReleaseMs.store(100.0f, std::memory_order_relaxed);
+            sidechainAttackMs.store(0.0f, std::memory_order_relaxed);
+            sidechainReleaseMs.store(0.0f, std::memory_order_relaxed);
             outputBus.store(0, std::memory_order_relaxed);
             busAssign.store(0, std::memory_order_relaxed);
         }
@@ -198,8 +198,8 @@ public:
         // Sidechain ducking (source = channel index, -1=off, kExtSidechainSrc=DAW bus)
         std::atomic<int>   sidechainSource   { -1 };
         std::atomic<float> sidechainAmount   { 0.0f };
-        std::atomic<float> sidechainAttackMs  { 5.0f };
-        std::atomic<float> sidechainReleaseMs { 100.0f };
+        std::atomic<float> sidechainAttackMs  { 0.0f };
+        std::atomic<float> sidechainReleaseMs { 0.0f };
     };
 
     std::array<ChannelState, MaxChannels> channels;

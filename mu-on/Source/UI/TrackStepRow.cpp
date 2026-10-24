@@ -30,7 +30,12 @@ TrackStepRow::TuneKey TrackStepRow::tuneKey(TrackHost& host, int slot, EngineTyp
     if (auto* r = apvts.getRawParameterValue(kRootParamId))  key.root  = juce::jlimit(0, 11, juce::roundToInt(r->load()));
     if (auto* sc = apvts.getRawParameterValue(kScaleParamId)) key.scale = mu_audio::clampScaleIndex(juce::roundToInt(sc->load()));
     if (auto* tune = apvts.getRawParameterValue(engineParamId(slot, engine, "tune")))
-        key.baseMidi = juce::roundToInt(mu_audio::snapMidiToScale(mu_audio::freqToMidi(tune->load()), key.root, key.scale));
+    {
+        const float hz = tune->load();
+        key.baseMidi = engine == EngineType::Bass && isBassTuneRoot(hz)
+                         ? bassRootMidi(key.root)   // the Tune at its default: the key's root note
+                         : juce::roundToInt(mu_audio::snapMidiToScale(mu_audio::freqToMidi(hz), key.root, key.scale));
+    }
     return key;
 }
 
