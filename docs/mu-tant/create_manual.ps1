@@ -112,7 +112,7 @@ Bullet "Transport Bar (top) — playback, BPM, presets, mixer, and settings"
 Bullet "Voice Sidebar (left) — one item per active voice, plus an Add button"
 Bullet "Voice Editor (centre) — oscillators, noise, cross-mod, filters, effects, gate editor, and modulators for the selected voice"
 Bullet "Mixer overlay — opened from the transport bar, replacing the editor"
-Bullet "Status Bar (bottom) — the name and value of the control you last touched, with a small Support link at the right-hand end. When a newer version is available, an Update available link appears beside Support (see Update Check in the Settings chapter)"
+Bullet "Status Bar (bottom) — the name, value and unit (ms, s, Hz, kHz, %, dB, semitones, cents, octaves or a note name) of the control you last touched, with a small Support link at the right-hand end. When a newer version is available, an Update available link appears beside Support (see Update Check in the Settings chapter)"
 P "The window has two sizes, Medium and Large, chosen in Settings (Display, Size). Everything scales with it. In the standalone application an Options button at the top left of the window opens the audio and MIDI device settings."
 
 Pic "The voice editor regions." "main-window.png"
@@ -227,7 +227,7 @@ Pic "X-MOD, Filter and Effects boxes: the two filter rows, the series/parallel r
 
 # ── 12. Insert Effect ─────────────────────────────────────────────────────────
 H1 "12. Insert Effect"
-P "The EFFECTS box is the per-voice insert effect, placed after the gate (oscillators, then filters, then gate, then insert, then mixer). Select an algorithm from the dropdown; its four parameter knobs relabel to match. Available algorithms: None, Soft Clip, Hard Clip, Fold, Bitcrusher, Clipper, 3-Band EQ, Compressor, Limiter, Ring Mod, Tape Saturation, Overdrive, Karplus, Vocoder, and Vocoder Stereo. Insert parameters P1 to P4 are available as modulation destinations."
+P "The EFFECTS box is the per-voice insert effect, placed after the gate (oscillators, then filters, then gate, then insert, then mixer). Select an algorithm from the dropdown; its four parameter knobs relabel to match. Available algorithms: None, Soft Clip, Hard Clip, Fold, Bitcrusher, Clipper, 3-Band EQ, Compressor, Limiter, Ring Mod, Tape Saturation, Overdrive, Karplus, Vocoder, and Vocoder Stereo. Insert parameters P1 to P4 are available as modulation destinations. The Clipper shows a gain-reduction meter like the Compressor. Time, rate and cutoff knobs give more of their travel to the short and low settings, so fine adjustments there are easier; this includes the time and rate knobs of the Effect, Delay and Reverb."
 
 # ── 13. Gate Editor ───────────────────────────────────────────────────────────
 H1 "13. Gate Editor"
@@ -281,7 +281,7 @@ H1 "15. Mixer"
 P "Click the Mixer button in the transport bar to open the mixer overlay. Each voice occupies one channel strip; to the right are the Effect, Delay, and Reverb return channels and the Master strip. This is the same shared mixer and FX rack as mu-Clid."
 P "Each voice strip has a fader with VU metering, pan, mute and solo, sidechain ducking (source, amount, attack, release), and Effect / Delay / Reverb sends. The sidechain source dropdown includes all other voice channels plus an External option — duck any voice from any other, or from a signal fed in through the host's sidechain bus (VST3 / CLAP). The FX return strips carry intra-FX routing (Effect to Delay, Effect to Reverb, Delay to Reverb), and the master strip has two inserts, Insert 1 and Insert 2, that the summed output passes through in that order. A row of buttons at the top right (Peak, VU, K-12, K-14) chooses the metering standard. The Effect send is named after the effect currently chosen (for example Chorus). The three FX unit rows (Effect / Delay / Reverb) sit below the strips with algorithm selectors and inline parameters."
 
-P "The faders use a rectangular cap like a small knob, with a pointer line across its middle that marks the level, running in a groove that lights up from the bottom to the cap. Every fader in the mixer looks and works the same way."
+P "The faders use a rectangular cap like a small knob, with a pointer line across its middle that marks the level, running in a groove that lights up from the bottom to the cap. Every fader in the mixer looks and works the same way. In the Status Bar the mixer's Pan, Send and Sidechain knobs, the Level fader, the Mute and Solo buttons and the Effect and Delay switches all show their name and value as you use them. The sidechain Attack and Release start at 0 and can go down to 0."
 Pic "Mixer overlay with voice channels, FX returns, and master." "mixer.png"
 Pic "Mixer fader with the knob-style cap and lit groove." "mixer-fader.png"
 
