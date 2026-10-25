@@ -31,7 +31,7 @@
 
 namespace mu_audio {
 
-// driveChar 0..14. Order MUST match InsertProcessor::dispatch[] in
+// driveChar 0..15. Order MUST match InsertProcessor::dispatch[] in
 // Source/Audio/InsertProcessor.cpp — that's the audio-thread lookup. Nullptr-
 // terminated for size-introspection.
 inline const char* const kInsertAlgorithmNames[] = {
@@ -50,6 +50,7 @@ inline const char* const kInsertAlgorithmNames[] = {
     "Vocoder",      // 12
     "VocoderSt",    // 13
     "Overdrive",    // 14
+    "TapeDelay",    // 15
     nullptr
 };
 
@@ -249,6 +250,7 @@ inline constexpr InsertMenuEntry kInsertMenu[] = {
     { 14, "Overdrive",  100 },
     {  9, "Ring Mod",   110 },
     {  1, "Soft Clip",  120 },
+    { 15, "Tape Delay", 125 },
     { 10, "Tape Sat",   130 },
     { 12, "Vocoder",    140 },
     { 13, "Vocoder St", 150 },

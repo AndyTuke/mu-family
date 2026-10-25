@@ -25,6 +25,7 @@
 #include "Audio/FX/Insert/RingModInsert.h"
 #include "Audio/FX/Insert/TapeSatInsert.h"
 #include "Audio/FX/Insert/OverdriveInsert.h"
+#include "Audio/FX/Insert/TapeDelayInsert.h"
 #include "Audio/FX/Insert/KarplusStrongInsert.h"
 #include "Audio/FX/Insert/VocoderInsert.h"
 #include "Audio/VoiceParams.h"
@@ -351,6 +352,9 @@ public:
 
         beginTest ("algo 14: OverdriveInsert - no crash, no NaN");
         { OverdriveInsert a; smokeAlgo(a, "OverdriveInsert", makeParams(14, { 60.0f, 0.0f, 50.0f, 5000.0f })); }
+
+        beginTest ("algo 15: TapeDelayInsert - no crash, no NaN, even at runaway feedback and full wear");
+        { TapeDelayInsert a; smokeAlgo(a, "TapeDelayInsert", makeParams(15, { 250.0f, 110.0f, 60.0f, 100.0f })); }
 
         beginTest ("algo 14: OverdriveInsert - silence stays silent at any bias, and Bias adds even harmonics");
         {

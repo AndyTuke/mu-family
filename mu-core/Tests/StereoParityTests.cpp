@@ -16,6 +16,7 @@
 #include "Audio/FX/Insert/ClipperInsert.h"
 #include "Audio/FX/Insert/TapeSatInsert.h"
 #include "Audio/FX/Insert/OverdriveInsert.h"
+#include "Audio/FX/Insert/TapeDelayInsert.h"
 #include "Audio/FX/Insert/RingModInsert.h"
 #include "Audio/FX/Insert/CompressorLimiterInsert.h"
 #include "Audio/FX/Insert/KarplusStrongInsert.h"
@@ -82,6 +83,7 @@ namespace
             case 10: return std::make_unique<TapeSatInsert>();
             case 11: return std::make_unique<KarplusStrongInsert>();
             case 14: return std::make_unique<OverdriveInsert>();
+            case 15: return std::make_unique<TapeDelayInsert>();
             default: return nullptr;
         }
     }
@@ -106,6 +108,7 @@ public:
             { 10, "TapeSat",    { 10.0f, 0.0f, 0.0f, 5000.0f },   { 70.0f, -6.0f, 0.0f, 2000.0f } },
             { 11, "Karplus",    { 0.0f, 1.0f, 50.0f, 5000.0f },   { 7.0f, 2.0f, 70.0f, 3000.0f } },
             { 14, "Overdrive",  { 20.0f, 0.0f, 25.0f, 8000.0f },  { 80.0f, -6.0f, 70.0f, 3000.0f } },
+            { 15, "TapeDelay",  { 120.0f, 40.0f, 50.0f, 20.0f },  { 400.0f, 70.0f, 30.0f, 80.0f } },
         };
 
         for (const auto& c : inserts)

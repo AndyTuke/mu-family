@@ -31,7 +31,7 @@ namespace mu_ui {
 inline constexpr int kInsertSlotCount = 4;
 // Number of insert algorithms (rows in kInsertAlgoSlots / kInsertAlgoDefaults).
 // Must equal InsertProcessor::kNumInsertAlgos.
-inline constexpr int kInsertAlgoCount = 15;
+inline constexpr int kInsertAlgoCount = 16;
 
 // Skew shape between the displayed actual value and the normalised 0..1
 // stored in VoiceParams + APVTS. Knobs apply the SAME skew on the slider
@@ -70,7 +70,7 @@ inline const char* const kNoteNames[12]    = { "C","C#","D","D#","E","F","F#","G
 inline const char* const kWaveNames[4]     = { "Saw","Square","White","Pink" };
 inline const char* const kUnisonNames[7]   = { "1","3","5","7","9","11","13" };
 
-// Per-algorithm slot table. 14 rows × 4 cols.
+// Per-algorithm slot table. 16 rows × 4 cols.
 //
 // Source order MUST match the index order of InsertProcessor::dispatch[] /
 // mu_audio::kInsertAlgorithmNames so a single integer dispatches the
@@ -169,6 +169,12 @@ inline const SlotConfig kInsertAlgoSlots[kInsertAlgoCount][kInsertSlotCount] = {
       { "Output", -24.0f, 0.0f,  SkewMode::Linear, "dB" },
       { "Bias",   0.0f,  100.0f, SkewMode::Linear, "%" },
       { "Tone",   200.0f, 20000.0f, SkewMode::Log, "Hz", nullptr, 0, true } },
+
+    // ── 15 TapeDelay ── Time / Feedback / Mix / Wear ──────────────────
+    { { "Time",     20.0f, 1000.0f, SkewMode::Log,    "ms", nullptr, 0, true },
+      { "Feedback", 0.0f,  110.0f,  SkewMode::Linear, "%" },
+      { "Mix",      0.0f,  100.0f,  SkewMode::Linear, "%" },
+      { "Wear",     0.0f,  100.0f,  SkewMode::Linear, "%" } },
 };
 
 // Whether a slot's knob is live, given slot 1's actual value (see SlotConfig::disabledFromP1).
@@ -203,6 +209,7 @@ inline const float kInsertAlgoDefaults[kInsertAlgoCount][kInsertSlotCount] = {
     /*12 Vocoder     */ { 0.0f,    0.0f,    1.0f,   1.0f     },
     /*13 VocoderSt   */ { 0.0f,    0.0f,    1.0f,   1.0f     },
     /*14 Overdrive   */ { 0.0f,    0.0f,    25.0f,  20000.0f },
+    /*15 TapeDelay   */ { 350.0f,  40.0f,   30.0f,  40.0f    },
 };
 
 // Convert a normalised 0..1 storage value to the algorithm's actual value
