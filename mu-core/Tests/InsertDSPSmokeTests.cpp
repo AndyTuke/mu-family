@@ -356,6 +356,44 @@ public:
         beginTest ("algo 15: TapeDelayInsert - no crash, no NaN, even at runaway feedback and full wear");
         { TapeDelayInsert a; smokeAlgo(a, "TapeDelayInsert", makeParams(15, { 250.0f, 110.0f, 60.0f, 100.0f })); }
 
+        beginTest ("algo 15: TapeDelayInsert - an impulse echoes at Time, each repeat is quieter, and runaway feedback stays bounded");
+        {
+            const double sr = 48000.0;
+            const int total = (int) (sr * 1.6), block = 256;
+            auto run = [&](float fbPct, float wearPct)
+            {
+                TapeDelayInsert a; a.prepare(sr, block);
+                auto p = makeParams(15, { 250.0f, fbPct, 100.0f, wearPct });
+                std::vector<float> out;
+                float gr = 0.0f;
+                for (int done = 0; done < total; done += block)
+                {
+                    juce::AudioBuffer<float> b(2, block); b.clear();
+                    if (done == 0) { b.setSample(0, 0, 1.0f); b.setSample(1, 0, 1.0f); }
+                    a.process(b, block, 2, p, gr);
+                    for (int i = 0; i < block; ++i) out.push_back(b.getSample(0, i));
+                }
+                return out;
+            };
+            auto peakNear = [](const std::vector<float>& o, int centre, int half)
+            {
+                float m = 0.0f;
+                for (int i = juce::jmax(0, centre - half); i < juce::jmin((int) o.size(), centre + half); ++i) m = juce::jmax(m, std::abs(o[(size_t) i]));
+                return m;
+            };
+            const auto o = run(60.0f, 0.0f);
+            const int t1 = (int) (0.25 * sr), t2 = 2 * t1;
+            const float e1 = peakNear(o, t1, 40), e2 = peakNear(o, t2, 40), gap = peakNear(o, t1 / 2, 40);
+            expect (e1 > 0.2f, "the first echo is missing at Time");
+            expect (e2 > 0.02f && e2 < e1, "the second echo is missing or not quieter than the first");
+            expect (gap < 0.05f, "there is signal between the echoes where a clean delay has none");
+
+            const auto r = run(110.0f, 100.0f);
+            float mx = 0.0f; bool finite = true;
+            for (float v : r) { mx = juce::jmax(mx, std::abs(v)); finite = finite && std::isfinite(v); }
+            expect (finite && mx < 2.0f, "runaway feedback grew without bound");
+        }
+
         beginTest ("algo 14: OverdriveInsert - silence stays silent at any bias, and Bias adds even harmonics");
         {
             // Magnitude of `harmonic` x the test tone in a settled one-second render (Goertzel).
