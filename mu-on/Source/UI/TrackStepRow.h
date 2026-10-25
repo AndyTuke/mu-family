@@ -57,8 +57,8 @@ public:
     struct TuneKey { int baseMidi = 36; int root = 0; int scale = 11; };
     static TuneKey tuneKey(TrackHost& host, int slot, EngineType engine);
     static void paintCells(juce::Graphics&, juce::Rectangle<int> cells, const StepRow& row, bool showSteps,
-                           juce::Colour colour, int playheadStep, bool beatNumbers, int selectedStep = -1,
-                           const CellOptions& options = {});
+                           juce::Colour colour, int playheadStep, bool beatNumbers, int selectedStep,
+                           const CellOptions& options);
     // The step under `p` in a row whose cells are `cells` (the caller has checked the point is inside).
     static int  stepAt(juce::Rectangle<int> cells, juce::Point<int> p);
     // A click on one step of a row whose cells are `cells`, at point `p` (the caller has checked the point is inside).
