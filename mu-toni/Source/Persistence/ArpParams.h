@@ -44,6 +44,9 @@ static_assert(kNumVoiceParams == 63, "a new row goes into vpi, suffix[] and addL
 // The id of mu-Toni's MIDI-in channel parameter (0 = Omni, 1..16 = that channel).
 inline constexpr const char* kMidiInChannelParamId = "midiInCh";
 
+// The root tag of a layer-preset file (.muArp), shared by mu-Toni's own presets and the slot hosts that load them.
+inline constexpr const char* kArpPresetTag = "MuToniLayer";
+
 // The Arp type's rows for one layer slot (a{slot}_*), in vpi order.
 void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot);
 

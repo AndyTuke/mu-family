@@ -12,20 +12,38 @@ set(MU_CORE_TEST_SOURCES
     GoldenRenderHarnessTests.cpp
     LayerRenderTests.cpp            # the layer render contract: driver, epoch, LayerBlock, time model
     RetireBinTests.cpp              # the shared retire bin and the retire isolation twin test
+    LayerTypeSwapTests.cpp          # the layer type registry and setLayerType on a Published host
+    LayerSwapPublishedTests.cpp     # swapLayers on a Published host: quiesce, strips, tails, rows, references
+    LayerPagingTests.cpp            # the sidebar and the mixer page a host of more than one page of layers
+    ../UI/LayerSidebar.cpp
+    ../UI/SceneGrid.cpp
+    ../UI/SidebarItem.cpp
+    ../UI/MixerOverlay.cpp
+    ../UI/FXRow.cpp
+    ../UI/DelayRow.cpp
     LayerEquivalenceTests.cpp       # the useLayerRender equivalence harness on the fake host
     LayerContractFixtures.h
     LayerEquivalence.h
     LayerAccessTests.cpp
     ClipBankTests.cpp
+    HeldNoteStackTests.cpp          # the shared held-key stack and its two overflow policies
     ClipLaunchTests.cpp
+    ClipAutoSaveTests.cpp           # clip auto-save: settle, flush, skips, trackers
     LayerOwnershipTests.cpp
     RhythmAdoptDefaultsTests.cpp
+    EuclideanGeneratorTests.cpp     # the textbook Bjorklund phase, pinned against Toussaint and the previous generator
     ../Sequencer/Rhythm.cpp
     ../Sequencer/HitGenerator.cpp
     ../Sequencer/EuclideanGenerator.cpp
     ScopedStorageRootTests.cpp
     ChannelStateResetTests.cpp
+    BusRoutingTests.cpp             # group buses: assignment, sums, mute / solo, direct out (skipped without buses)
+    BusSidechainTests.cpp           # group buses: legal sources, no loop, ducking, renumbering
+    BusInsertTests.cpp              # group buses: the insert chain equals the layer insert, order, GR, no allocation
+    BusStateResetTests.cpp          # group buses: copy / reset / swap and the parameter sync
+    BusTestRig.h
     MixerStereoPeakTests.cpp
+    AuditMinorsTests.cpp            # Layer reset locks, FX hand-off and sizing, NaN containment, activation worker
     MixerBlockValueTests.cpp
     SupportPromptPolicyTests.cpp
     UpdateCheckPolicyTests.cpp
@@ -45,6 +63,8 @@ set(MU_CORE_TEST_SOURCES
     FxAlgoSwitchTests.cpp           # eff_algo / rev_algo by automation pushes the knob values
     ReverbDecayTests.cpp            # reverb Decay presets, tail length, Size independence
     LegacyReverbDecayTests.cpp      # a state saved before the Decay knob loads its algorithm's old Decay
+    LegacyInsertAlgoTests.cpp       # a legacy normalised insert-algorithm row keeps its algorithm after the list grew
+    SmoothCurveTests.cpp            # the Smooth modulator curve passes through its anchors and never overshoots
     ParamRefreshQueueTests.cpp      # the allocation-free listener hand-off
     MidiRawTests.cpp                # raw-byte note tests and the allocation-free MIDI clock scan
     MidiClockSyncTests.cpp
@@ -71,6 +91,9 @@ set(MU_CORE_TEST_SOURCES
     ShellChromeTests.cpp
     PerformanceModeShellTests.cpp
     ClipStripTests.cpp
+    SceneGridTests.cpp
+    LayerHeaderNotesInTests.cpp
+    StatusBarCpuTests.cpp
     StepEditorTests.cpp
     ../UI/ClipStrip.cpp
     ../UI/RhythmCircle.cpp
@@ -102,8 +125,9 @@ foreach(_f ${MU_CORE_CHROME_SOURCES})
     endif()
 endforeach()
 
-# One mu-core test executable; `max_layers` is the MU_MAX_LAYERS it is built with (empty = the default).
-function(mu_core_add_test_target name max_layers)
+# One mu-core test executable; `max_layers` is the MU_MAX_LAYERS it is built with, `max_buses` the MU_MAX_BUSES
+# and `bus_inserts` the MU_BUS_INSERTS (each empty = the default).
+function(mu_core_add_test_target name max_layers max_buses bus_inserts)
     juce_add_console_app(${name} PRODUCT_NAME "${name}")
     target_sources(${name} PRIVATE ${MU_CORE_TEST_SOURCES} ${_chrome_extra})
     target_compile_features(${name} PRIVATE cxx_std_17)
@@ -132,7 +156,14 @@ function(mu_core_add_test_target name max_layers)
     if(NOT "${max_layers}" STREQUAL "")
         target_compile_definitions(${name} PRIVATE MU_MAX_LAYERS=${max_layers})
     endif()
+    if(NOT "${max_buses}" STREQUAL "")
+        target_compile_definitions(${name} PRIVATE MU_MAX_BUSES=${max_buses})
+    endif()
+    if(NOT "${bus_inserts}" STREQUAL "")
+        target_compile_definitions(${name} PRIVATE MU_BUS_INSERTS=${bus_inserts})
+    endif()
 endfunction()
 
-mu_core_add_test_target(mu-core-tests "")
-mu_core_add_test_target(mu-core-tests-16 16)   # the 16-layer build of the same sources
+mu_core_add_test_target(mu-core-tests "" "" "")                # the default: no group buses
+mu_core_add_test_target(mu-core-tests-16 16 3 2)               # the 16-layer build of the same sources, as mu-Tronic: 3 buses, 2 inserts each
+mu_core_add_test_target(mu-core-tests-bus1 "" 3 1)             # 3 buses with 1 insert each (MU_BUS_INSERTS is real), 8 layers

@@ -10,8 +10,12 @@
 #include "VoiceParams.h"
 #include "Audio/FX/Insert/InsertAlgorithmBase.h"
 
-// Self-contained insert-effect processor used by both VoiceEngine (per-channel)
-// and MixerEngine (master bus). Owns all DSP state; parameters are passed in
+// Standing constraint: no insert algorithm reports latency. The group buses (MixerEngine::BusState) sum
+// channels on parallel paths without delay compensation, so an algorithm that ever adds latency would need
+// the buses to compensate (every channel path to the master delayed to the longest bus path) first.
+//
+// Self-contained insert-effect processor used by VoiceEngine (per-channel) and MixerEngine
+// (master bus and group buses). Owns all DSP state; parameters are passed in
 // as a const VoiceParams& each block so there is no internal copy to keep in
 // sync.
 //
@@ -45,7 +49,7 @@ public:
     // Non-zero only during Compressor (7) / Limiter (8) modes.
     std::atomic<float> grReduction { 0.0f };
 
-    static constexpr int kNumInsertAlgos = 14;   // + Karplus + Vocoder + VocoderSt
+    static constexpr int kNumInsertAlgos = 16;   // + Karplus + Vocoder + VocoderSt + Overdrive + TapeDelay
 
 private:
 
@@ -68,7 +72,7 @@ private:
 
     // Post-drive tone filter — runs after the algorithm dispatch ONLY for
     // insertAlgo < 6, where p.insertTone is interpreted as a 1-pole LP cutoff.
-    // EQ (6), Compressor/Limiter (7, 8), RingMod (9), TapeSat (10) repurpose
+    // EQ (6), Compressor/Limiter (7, 8), RingMod (9), TapeSat (10), Overdrive (14) repurpose
     // insertTone for other meanings and skip this step. Lives here (not in any
     // single algorithm) because it's a property of the drive-family, not of
     // any one algorithm's DSP.

@@ -40,7 +40,7 @@ struct MuToniModArcTests : juce::UnitTest
 
             for (int i = 0; i < kNumModDests; ++i)
             {
-                const auto id = juce::String("a0_") + kModDestTable[i].param;
+                const auto id = mu_mod::paramIdFor("a0_", 0, kModDestTable[i].param);   // a pan or send is the strip's
                 const auto range = proc.apvts.getParameterRange(id);
 
                 // Park the knob mid-range so a positive depth has room to move it.

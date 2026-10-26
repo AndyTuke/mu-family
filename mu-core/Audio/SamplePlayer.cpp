@@ -11,6 +11,19 @@ void SamplePlayer::trigger(int fadeInSamples)
     triggered.store(true, std::memory_order_release);
 }
 
+void SamplePlayer::skip(const double* ratios, int numSamples) noexcept
+{
+    // A pending trigger stays pending: the new hit starts at its sample 0 (with its fade-in) in the next rendered
+    // block, rather than losing its attack to a block that could not read the sample.
+    if (playPos < 0.0 || ratios == nullptr)
+        return;
+
+    // The same per-sample advance as process(), with nothing read or written.
+    for (int s = 0; s < numSamples; ++s)
+        playPos += ratios[s];
+    fadeInRemaining = std::max(0, fadeInRemaining - numSamples);
+}
+
 bool SamplePlayer::isActive() const
 {
     return playPos >= 0.0 || triggered.load();

@@ -5,6 +5,7 @@
 #include "Link/MuLinkProtocol.h"        // readTransport
 #include "../Server/AudioServer.h"
 
+#include <juce_data_structures/juce_data_structures.h>
 #include <algorithm>
 #include <atomic>
 #include <functional>
@@ -32,7 +33,18 @@ public:
         : server(serverToDrive), rootDir(std::move(root)), settingsFile(rootDir.getChildFile("settings.xml"))
     {
         loadSettings();
+
+        // The update check keeps its keys (on / off, last check, dismissed build) in its own small file
+        // beside the settings, so the shared policy code can use the same PropertiesFile calls as the products.
+        rootDir.createDirectory();
+        juce::PropertiesFile::Options opts;
+        opts.millisecondsBeforeSaving = 0;
+        updateProps = std::make_unique<juce::PropertiesFile>(rootDir.getChildFile("update.xml"), opts);
     }
+
+    // ─── Update check ────────────────────────────────────────────────────────
+    juce::PropertiesFile* getAppSettingsFile() noexcept override { return updateProps.get(); }
+    juce::String          getProductSlug() const override { return "mu-link"; }   // key in latest.json
 
     static juce::File defaultRoot()
     {
@@ -210,6 +222,7 @@ private:
 
     AudioServer& server;
     juce::File   rootDir, settingsFile;
+    std::unique_ptr<juce::PropertiesFile> updateProps;
 
     bool   playRequested = false;
     double bpmRequested  = 120.0;

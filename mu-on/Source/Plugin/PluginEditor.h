@@ -4,7 +4,7 @@
 #include "UI/LayerSidebar.h"          // mu-core shared sidebar (select/add/delete/reorder)
 #include "UI/LayerEditController.h"   // mu-core: add / delete / reorder glue
 #include "UI/LayerPanel.h"            // mu-core shared per-layer panel shell
-#include "UI/TrackMiniVisual.h"
+#include "UI/Components/LayerDiscVisual.h"   // mu-core: the sidebar disc
 #include "UI/MixerOverlay.h"          // mu-core shared mixer
 #include "Plugin/PluginProcessor.h"
 #include "Modulation/MuOnModDest.h"
@@ -38,6 +38,7 @@ private:
     void useDestinationsOf(int idx);  // the modulation destinations of track idx's engine
 
     PluginProcessor& proc;
+    void askNewTrackEngine(std::function<void()> add);   // the + Track engine menu
     LayerSidebar   sidebar;
     std::array<ModDestProvider, kNumEngineTypes> modProviders;   // one destination set per engine
     TrackContent   trackContent;

@@ -37,6 +37,9 @@ static bool isMixerRelevantParam(const juce::String& id) noexcept
     // Return channels: ret_eff_*, ret_dly_*, ret_rev_*
     if (id.startsWith("ret_eff_") || id.startsWith("ret_dly_") || id.startsWith("ret_rev_"))
         return true;
+    // Group buses: bus{B}_* (strips and inserts).
+    if (id.startsWith("bus"))
+        return true;
     // Master strip + inserts: mstr_*, mst_ins*
     if (id.startsWith("mstr_") || id.startsWith("mst_ins"))
         return true;
@@ -56,6 +59,7 @@ MixerOverlay::MixerOverlay(ProcessorBase& p, MixerEngine& m)
       reverbRow("Reverb", FXAlgorithmRegistry::reverbAlgorithms(), MuLookAndFeel::knobReverb)
 {
     buildChannels();
+    buildBuses();
     wireReturns();
     wireFXRows();
 
@@ -75,6 +79,10 @@ MixerOverlay::MixerOverlay(ProcessorBase& p, MixerEngine& m)
         propagateMeterMode(static_cast<VUMeter::MeterMode>(idx));
     };
 
+    addChildComponent(pageCtrl);
+    pageCtrl.onChange = [this](int page) { showPage(page); };
+    syncPageCtrl();
+
     // subscribe only to mixer-relevant IDs (see isMixerRelevantParam above).
     // Rhythm/euclid/voice/mod params no longer trigger spurious mixer reloads.
     for (auto* param : proc.getParameters())
@@ -88,6 +96,7 @@ MixerOverlay::MixerOverlay(ProcessorBase& p, MixerEngine& m)
 MixerOverlay::~MixerOverlay()
 {
     stopTimer();
+    busInsertBindings.clear();   // before the panels they drive
     for (auto* param : proc.getParameters())
         if (auto* pid = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
             if (isMixerRelevantParam(pid->getParameterID()))
@@ -99,8 +108,69 @@ void MixerOverlay::parameterChanged(const juce::String& /*parameterID*/, float /
     apvtsDirty.store(true, std::memory_order_release);
 }
 
+int MixerOverlay::getNumChannelPages() const noexcept
+{
+    return juce::jmax(1, (proc.getNumLayers() + mu_limits::kLayersPerPage - 1) / mu_limits::kLayersPerPage);
+}
+
+int MixerOverlay::getNumPages() const noexcept
+{
+    return getNumChannelPages() + (mu_limits::kMaxBuses > 0 ? 1 : 0);
+}
+
+// "1-8" and "9-16" at two channel pages (four at most read as ranges, beyond that plain numbers), then "Buses".
+void MixerOverlay::syncPageCtrl()
+{
+    const int pages = getNumPages();
+    if (pages <= 1) { pageCtrl.setVisible(false); return; }
+    std::vector<juce::String> labels;
+    const int n = proc.getNumLayers();
+    const int channelPages = getNumChannelPages();
+    for (int p = 0; p < channelPages; ++p)
+    {
+        const int first = p * mu_limits::kLayersPerPage + 1;
+        const int last  = juce::jmin(n, (p + 1) * mu_limits::kLayersPerPage);
+        labels.push_back(channelPages <= 4 ? juce::String(first) + "-" + juce::String(last) : juce::String(p + 1));
+    }
+    if (mu_limits::kMaxBuses > 0)
+        labels.push_back("Buses");
+    pageCtrl.setLabels(labels);
+    shownPage = juce::jlimit(0, pages - 1, shownPage);
+    pageCtrl.setSelectedIndex(shownPage);
+    pageCtrl.setVisible(true);
+}
+
+void MixerOverlay::showPage(int page)
+{
+    page = juce::jlimit(0, getNumPages() - 1, page);
+    if (page == shownPage) { syncPageCtrl(); return; }
+    shownPage = page;
+    syncPageCtrl();
+    resized();
+    repaint();
+}
+
+bool MixerOverlay::showAdjacentPage(int delta)
+{
+    if (isBusPage(shownPage)) return false;   // Page Up / Down move among the channel pages; Buses is reached by click
+    const int page = shownPage + (delta < 0 ? -1 : 1);
+    if (page < 0 || page >= getNumChannelPages()) return false;
+    showPage(page);
+    return true;
+}
+
+bool MixerOverlay::channelIsEmpty(int r) const
+{
+    if (! proc.layersAreSlots()) return false;
+    const auto* layer = proc.getLayer(r);
+    return layer != nullptr && layer->typeId() == 0;
+}
+
 void MixerOverlay::visibilityChanged()
 {
+    if (isVisible() && pageOnOpen && getNumPages() > 1)
+        showPage(juce::jmin(pageOnOpen(), getNumChannelPages() - 1));
+
     // exchange so a parameterChanged firing between the read and the clear
     // is preserved for the next tick instead of being silently dropped.
     if (isVisible() && apvtsDirty.exchange(false, std::memory_order_acq_rel))
@@ -132,7 +202,7 @@ void MixerOverlay::buildChannels()
         ch->bindChannel(mixer.channels[r], mixer.channelPeaks[r], &proc, prefix,
                        &mixer.sidechainGR[r]);
         ch->bindClientMeter(mixer.channelPeaksL[r], mixer.channelPeaksR[r]);   // stereo bars
-        if (!hasRhythm || (isChannelSilent && isChannelSilent(r))) ch->setActive(false);
+        if (!hasRhythm || channelIsEmpty(r) || (isChannelSilent && isChannelSilent(r))) ch->setActive(false);
         // forward status updates to the global StatusBar via PluginEditor.
         ch->onStatusUpdate = [this](const juce::String& n, const juce::String& v, juce::Colour c) {
             if (onStatusUpdate) onStatusUpdate(n, v, c);
@@ -145,16 +215,52 @@ void MixerOverlay::buildChannels()
 
 void MixerOverlay::refreshSidechainSources()
 {
-    juce::StringArray names;
+    juce::StringArray names, busNames;
     const int numActive = proc.getNumLayers();
     for (int r = 0; r < MixerEngine::MaxChannels; ++r)
-        names.add((r < numActive) ? juce::String(proc.getLayerName(r)) : juce::String());
+        names.add((r < numActive && ! channelIsEmpty(r)) ? juce::String(proc.getLayerName(r)) : juce::String());
+    for (int b = 0; b < mu_limits::kMaxBuses; ++b)
+        busNames.add(MixerChannel::busName(b));
+    // Each strip lists only the sources its type may legally take (MixerChannel::setSidechainSources).
     for (int r = 0; r < (int)rhythmChannels.size(); ++r)
-        rhythmChannels[r]->setSidechainSources(r, names);
-    // Return channels can sidechain from any rhythm channel (no self-exclusion, pass -1).
-    effectReturn .setSidechainSources(-1, names);
-    delayReturn  .setSidechainSources(-1, names);
-    reverbReturn .setSidechainSources(-1, names);
+        rhythmChannels[r]->setSidechainSources(r, names, busNames);
+    for (int b = 0; b < (int)busStrips.size(); ++b)
+        busStrips[(size_t) b]->setSidechainSources(b, names, busNames);
+    // Return channels can sidechain from any rhythm channel or bus (no self-exclusion, pass -1).
+    effectReturn .setSidechainSources(-1, names, busNames);
+    delayReturn  .setSidechainSources(-1, names, busNames);
+    reverbReturn .setSidechainSources(-1, names, busNames);
+}
+
+// The Buses page: for each bus a strip bound to buses[b] and an insert column bound to its insert chain.
+void MixerOverlay::buildBuses()
+{
+    for (int b = 0; b < mu_limits::kMaxBuses; ++b)
+    {
+        auto strip = std::make_unique<MixerChannel>(MixerChannel::Type::Bus, MixerChannel::busName(b),
+                                                    MuLookAndFeel::colour(MuLookAndFeel::globalAccent));
+        strip->bindChannel(mixer.buses[(size_t) b], mixer.busPeaks[(size_t) b], &proc, "bus" + juce::String(b) + "_",
+                           &mixer.busSidechainGR[(size_t) b]);
+        strip->bindClientMeter(mixer.busPeaksL[(size_t) b], mixer.busPeaksR[(size_t) b]);   // stereo bars
+        strip->onStatusUpdate = [this](const juce::String& n, const juce::String& v, juce::Colour c) {
+            if (onStatusUpdate) onStatusUpdate(n, v, c);
+        };
+        addChildComponent(*strip);
+
+        auto panel = std::make_unique<mu_ui::MasterInsertPanel>();
+        busInsertBindings.push_back(std::make_unique<mu_ui::BusInsertBinding>(proc, *panel, b));
+        addChildComponent(*panel);
+
+        busStrips.push_back(std::move(strip));
+        busInsertPanels.push_back(std::move(panel));
+    }
+    refreshSidechainSources();
+}
+
+MixerChannel* MixerOverlay::referenceStrip() const
+{
+    if (isBusPage(shownPage)) return busStrips.empty() ? nullptr : busStrips[0].get();
+    return rhythmChannels.empty() ? nullptr : rhythmChannels[0].get();
 }
 
 void MixerOverlay::wireReturns()
@@ -221,7 +327,7 @@ void MixerOverlay::wireFXRows()
             for (int i = 0; i < (int)oldParams.size() && i < 5; ++i)
             {
                 float norm = *proc.apvts.getRawParameterValue(kEffParamIds[i]);
-                *pv[i] = oldParams[i].minVal + norm * (oldParams[i].maxVal - oldParams[i].minVal);
+                *pv[i] = oldParams[i].actualFromNorm(norm);
             }
             effSnapValid[oldIndex] = true;
         }
@@ -245,9 +351,7 @@ void MixerOverlay::wireFXRows()
             for (int i = 0; i < (int)newParams.size() && i < 5; ++i)
             {
                 const auto& pd = newParams[i];
-                float norm = (pd.maxVal > pd.minVal)
-                    ? juce::jlimit(0.0f, 1.0f, (vals[i] - pd.minVal) / (pd.maxVal - pd.minVal))
-                    : 0.0f;
+                const float norm = pd.normFromActual(vals[i]);
                 if (auto* p = proc.apvts.getParameter(kEffParamIds[i]))
                     p->setValueNotifyingHost(norm);
                 effectRow.setParamValue(pd.id, vals[i]);
@@ -280,9 +384,7 @@ void MixerOverlay::wireFXRows()
             if (params[i].id == id)
             {
                 const auto& pd = params[i];
-                float norm = (pd.maxVal > pd.minVal)
-                             ? juce::jlimit(0.0f, 1.0f, (v - pd.minVal) / (pd.maxVal - pd.minVal))
-                             : 0.0f;
+                const float norm = pd.normFromActual(v);
                 if (auto* p = proc.apvts.getParameter(kEffParamIds[i]))
                     p->setValueNotifyingHost(norm);
                 return;
@@ -428,7 +530,7 @@ void MixerOverlay::loadEffectParams()
     for (int i = 0; i < (int) params.size() && i < 5; ++i)
         if (auto* raw = proc.apvts.getRawParameterValue(kEffParamIds[i]))
             effectRow.setParamValue(params[(size_t) i].id,
-                params[(size_t) i].minVal + raw->load() * (params[(size_t) i].maxVal - params[(size_t) i].minVal));
+                params[(size_t) i].actualFromNorm(raw->load()));
 }
 
 void MixerOverlay::loadReverbParams()
@@ -455,7 +557,7 @@ void MixerOverlay::loadFromApvts()
     for (int r = 0; r < (int)rhythmChannels.size(); ++r)
     {
         const bool hasRhythm = r < numActive;
-        rhythmChannels[r]->setActive(hasRhythm && ! (isChannelSilent && isChannelSilent(r)));
+        rhythmChannels[r]->setActive(hasRhythm && ! channelIsEmpty(r) && ! (isChannelSilent && isChannelSilent(r)));
         rhythmChannels[r]->setChannelName(hasRhythm ? juce::String(proc.getLayerName(r)) : "-");
         rhythmChannels[r]->setChannelColour(
             hasRhythm ? palette[proc.getLayerColourIndex(r) % MuLookAndFeel::kLayerPaletteSize]
@@ -466,6 +568,11 @@ void MixerOverlay::loadFromApvts()
     {
         const juce::String prefix = "ch" + juce::String(r) + "_";
         rhythmChannels[r]->loadFromApvts(apvts, prefix);
+    }
+    for (int b = 0; b < (int) busStrips.size(); ++b)
+    {
+        busStrips[(size_t) b]->loadFromApvts(apvts, "bus" + juce::String(b) + "_");
+        busInsertBindings[(size_t) b]->refresh();
     }
     effectReturn .loadFromApvts(apvts, "ret_eff_");
     delayReturn  .loadFromApvts(apvts, "ret_dly_");
@@ -550,6 +657,8 @@ void MixerOverlay::updateEffectSendLabels()
     juce::String name = (ai < (int)algos.size()) ? algos[ai].name : "Effect";
     for (auto& ch : rhythmChannels)
         ch->setEffectSendLabel(name);
+    for (auto& bus : busStrips)
+        bus->setEffectSendLabel(name);
     effectReturn.setChannelName(name);
 
     // Voice-section Amp "Effect" send label tracks the same name. PluginEditor
@@ -585,27 +694,75 @@ void MixerOverlay::resized()
     lastFXRowH  = fxRowH;
     lastStripH  = stripH;
     lastChanW   = chanW;
+    dividerXs.clear();
 
     // Meter mode selector — right-aligned in the header strip
     const int modeW = s(176);
     const int modeBtnH = s(18);
     meterModeCtrl.setBounds(w - modeW - s(4), (hdrH - modeBtnH) / 2, modeW, modeBtnH);
-
-    int x = labelPanelW;
-    for (int i = 0; i < (int)rhythmChannels.size(); ++i)
+    if (pageCtrl.isVisible())
     {
-        rhythmChannels[i]->setBounds(x, hdrH, chanW, stripH);
-        x += chanW + (i + 1 < (int)rhythmChannels.size() ? chanGap : 0);
+        // The page selector to the left of the meter mode, one cell per page.
+        const int pageW = s(46) * getNumPages();
+        pageCtrl.setBounds(w - modeW - s(4) - s(8) - pageW, (hdrH - modeBtnH) / 2, pageW, modeBtnH);
     }
 
-    lastDivX1 = x;
-    x += divW;
-    effectReturn .setBounds(x, hdrH, chanW, stripH);  x += chanW;
-    delayReturn  .setBounds(x, hdrH, chanW, stripH);  x += chanW;
-    reverbReturn .setBounds(x, hdrH, chanW, stripH);  x += chanW;
+    // The strips of the shown page, left to right; the others are hidden. One page shows every strip, as before.
+    // The Buses page shows the bus units instead of the channels and returns.
+    const bool busPage = isBusPage(shownPage);
+    const int perPage = mu_limits::kLayersPerPage;
+    int shownCount = 0;
+    for (int i = 0; i < (int)rhythmChannels.size(); ++i)
+    {
+        const bool onShown = ! busPage && (i / perPage) == shownPage;
+        rhythmChannels[i]->setVisible(onShown);
+        shownCount += onShown ? 1 : 0;
+    }
+    for (auto* ret : { &effectReturn, &delayReturn, &reverbReturn })
+        ret->setVisible(! busPage);
+    for (size_t b = 0; b < busStrips.size(); ++b)
+    {
+        busStrips[b]->setVisible(busPage);
+        busInsertPanels[b]->setVisible(busPage);
+    }
 
-    lastDivX2 = x;
-    x += divW;
+    int x = labelPanelW;
+    if (busPage)
+    {
+        // One unit per bus: the strip and its insert column, a divider after each (the last one before the Master).
+        // The strip takes what the units' insert columns leave, never less than a channel strip. This is the live
+        // form of MuLookAndFeel::kMixerBusStripW (same formula at the actual window width, so it stretches).
+        const int numBuses = (int) busStrips.size();
+        const int insertW  = s(MuLookAndFeel::kMixerInsertPanelW);
+        const int busW     = juce::jmax(chanW, (w - labelPanelW - masterTotalW - numBuses * divW) / juce::jmax(1, numBuses) - insertW);
+        for (int b = 0; b < numBuses; ++b)
+        {
+            busStrips[(size_t) b]->setBounds(x, hdrH, busW, stripH);          x += busW;
+            busInsertPanels[(size_t) b]->setBounds(x, hdrH, insertW, stripH); x += insertW;
+            dividerXs.push_back(x);
+            x += divW;
+        }
+    }
+    else
+    {
+        int placed = 0;
+        for (int i = 0; i < (int)rhythmChannels.size(); ++i)
+        {
+            if ((i / perPage) != shownPage) continue;
+            rhythmChannels[i]->setBounds(x, hdrH, chanW, stripH);
+            ++placed;
+            x += chanW + (placed < shownCount ? chanGap : 0);
+        }
+
+        dividerXs.push_back(x);
+        x += divW;
+        effectReturn .setBounds(x, hdrH, chanW, stripH);  x += chanW;
+        delayReturn  .setBounds(x, hdrH, chanW, stripH);  x += chanW;
+        reverbReturn .setBounds(x, hdrH, chanW, stripH);  x += chanW;
+
+        dividerXs.push_back(x);
+        x += divW;
+    }
     const int masterActualW = juce::jmax(masterTotalW, w - x);
     const int insertW       = s(MuLookAndFeel::kMixerInsertPanelW);
     masterChannel.setBounds(x, hdrH, masterActualW - insertW, stripH);
@@ -636,6 +793,7 @@ void MixerOverlay::resized()
 void MixerOverlay::propagateMeterMode(VUMeter::MeterMode m)
 {
     for (auto& ch : rhythmChannels) ch->setMeterMode(m);
+    for (auto& bus : busStrips) bus->setMeterMode(m);
     effectReturn .setMeterMode(m);
     delayReturn  .setMeterMode(m);
     reverbReturn .setMeterMode(m);
@@ -654,9 +812,8 @@ void MixerOverlay::paintMetal(juce::Graphics& g)
         MuLookAndFeel::drawAccentPanel(g, r.reduced(2).toFloat(), accent);
 
     // Strip sections: labels engraved on the label panel, a groove across the strips above each.
-    if (! rhythmChannels.empty())
+    if (auto* refCh = referenceStrip())
     {
-        auto* refCh = rhythmChannels[0].get();
         const int chY = stripsPanelR.getY();
         const int lw  = s(kLabelPanelW);
         const int x2  = stripsPanelR.getRight() - s(2);
@@ -686,8 +843,8 @@ void MixerOverlay::paintMetal(juce::Graphics& g)
 
     // Grooves between the channels, the returns and the master.
     const int y1 = stripsPanelR.getY() + s(4), y2 = stripsPanelR.getBottom() - s(4);
-    MuLookAndFeel::drawGroove(g, { lastDivX1 + s(kDivW) / 2, y1 }, y2 - y1, true);
-    MuLookAndFeel::drawGroove(g, { lastDivX2 + s(kDivW) / 2, y1 }, y2 - y1, true);
+    for (const int dx : dividerXs)
+        MuLookAndFeel::drawGroove(g, { dx + s(kDivW) / 2, y1 }, y2 - y1, true);
 
     // FX rows: raised boxes (shadows first, then faces), with corner screws.
     for (const auto& b : fxRowBoxR)
@@ -720,9 +877,8 @@ void MixerOverlay::paint(juce::Graphics& g)
     g.fillRect(0, kHeaderH - 1, getWidth(), 1);
 
     // ── Row label panel (left of channel strips, labels aligned with strip sections) ─
-    if (!rhythmChannels.empty())
+    if (auto* refCh = referenceStrip())
     {
-        auto* refCh = rhythmChannels[0].get();
         const int lx  = 0;
         const int lw  = kLabelPanelW;
         const int chY = kHeaderH;  // channels start at kHeaderH in MixerOverlay space
@@ -782,8 +938,8 @@ void MixerOverlay::paint(juce::Graphics& g)
 
     // Dividers between rhythm channels and returns, and before master
     g.setColour(MuLookAndFeel::colour(MuLookAndFeel::segmentInactiveBorder));
-    g.fillRect(lastDivX1, kHeaderH, kDivW, lastStripH);
-    g.fillRect(lastDivX2, kHeaderH, kDivW, lastStripH);
+    for (const int dx : dividerXs)
+        g.fillRect(dx, kHeaderH, kDivW, lastStripH);
 
     // Mixer is a global view (not tied to a specific rhythm) so panel borders
     // use globalAccent (purple) — the rhythm palette's purple was retired so

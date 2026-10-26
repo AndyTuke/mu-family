@@ -31,7 +31,7 @@ SurfaceMapping mappingFor(const ControllerBackend& b, const juce::File& settings
 ControllerManager::ControllerManager(mu_core::ControlSink& s, const mu_core::LiveView& v, const mu_core::SurfaceLook& look,
                                      const juce::File& settingsFolder, ControllerBackendFactory backendFactory)
     : sink(s), view(v), backend(backendFactory()), ports(*backend.ports),
-      model(s, v, mappingFor(backend, settingsFolder), look)
+      model(s, v, mappingFor(backend, settingsFolder), look, {}, SurfaceProfile::forView(v, backend.driver->describe()))
 {
     // Decoded presses arrive on the message thread (ManagedPorts moved them there) and go to the sink.
     backend.driver->onEvent = [this](const SurfaceEvent& e) { if (backend.driver->isOpen()) model.handle(e); };
@@ -119,6 +119,7 @@ void ControllerManager::openDevice()
 void ControllerManager::closeDevice()
 {
     blinkTick.stopTimer();
+    model.closeScenePicker();   // a release that never arrives must not leave the picker open for the next connection
     const bool wasOpen = backend.driver->isOpen();
     backend.driver->close();
     lost = false;

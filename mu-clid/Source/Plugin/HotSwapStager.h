@@ -2,8 +2,8 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "Sequencer/GeneratorAliases.h"
+#include "Sequencer/RhythmCursor.h"   // RhythmCursor::kAnyFrameEpoch
 #include "Audio/VoiceEngine.h"
-#include "Sequencer/GeneratorAliases.h"
 #include "Plugin/HotSwap.h"   // mu-core: the shared staging state
 #include <array>
 #include <atomic>
@@ -47,11 +47,11 @@ public:
     explicit HotSwapStager(PluginProcessor& proc) : proc(proc) {}
 
     // Message-thread: cancel any existing staged swap for a slot without bounds check.
-    // Called from PresetIO::stageRhythmPreset before overwriting a pending swap.
+    // Called from PluginProcessor::stageLayerPresetTree before overwriting a pending swap.
     void cancelPendingIfAny(int rhythmIndex);
 
     // Message-thread: atomically commit all staged data for a slot.
-    // Called from PresetIO::stageRhythmPreset after preparing rhythm + voice.
+    // Called from PluginProcessor::stageLayerPresetTree after preparing rhythm + voice.
     void stage(int rhythmIndex, Rhythm&& rhythm, std::unique_ptr<VoiceEngine>&& voice,
                const juce::String& samplePath);
 
@@ -61,7 +61,7 @@ public:
 
     // Message-thread: stage a pre-built full preset for commit at the next MASTER
     // loop boundary. Supersedes any pending per-rhythm swaps (a full preset
-    // replaces every slot). Committed via PresetIO::commitStagedFullPreset from
+    // replaces every slot). Committed via PluginProcessor::commitStagedFullPreset from
     // processSwaps() once the boundary is reached.
     void stageFullPreset(PreparedFullPreset&& prepared);
 
@@ -78,19 +78,17 @@ public:
     bool checkBoundaries(int numRhythms, bool masterLoopWrapped, int rhythmLoopWrapMask);
 
     // Install a prepared rhythm into slot `r`: the outgoing engine retires (it keeps rendering its
-    // sample tail / amp release from a retired slot), the rhythm, engine and sample path move in and
+    // sample tail / amp release from the shared RetireBin), the rhythm, engine and sample path move in and
     // the pattern rebuilds. The one swap behind the loop-boundary commit, the stopped load and the
     // full-preset commit. Caller holds suspendProcessing (and layersLock where needed); the
     // APVTS push follows outside the suspend.
-    // originEff / frameEpoch say where the new pattern's step 0 falls (see RhythmSequencer::requestSwapStart);
+    // originEff / frameEpoch say where the new pattern's step 0 falls (see RhythmCursor::requestSwapStart);
     // the defaults start it on the step counter's own phase, for a load that has no boundary.
-    // `rhythm` comes back holding the outgoing rhythm, and a force-cut retired engine goes to
-    // *cutVictim when given, so the caller can let both destruct after it drops its locks.
+    // `rhythm` comes back holding the outgoing rhythm, so the caller can let it destruct after it drops its locks.
     void installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceEngine>&& voice, const juce::String& samplePath,
-                       int originEff = 0, uint32_t frameEpoch = RhythmSequencer::kAnyFrameEpoch,
-                       std::unique_ptr<VoiceEngine>* cutVictim = nullptr);
+                       int originEff = 0, uint32_t frameEpoch = RhythmCursor::kAnyFrameEpoch);
 
-    // Message-thread: drain retired-engine cleanup + commit all flagged swaps.
+    // Message-thread: commit all flagged swaps.
     // Called from PluginProcessor::runDeferredWork.
     void processSwaps();
 

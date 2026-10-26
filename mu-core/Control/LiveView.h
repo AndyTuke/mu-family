@@ -1,5 +1,6 @@
 #pragma once
 
+#include "MuLimits.h"
 #include "Persistence/PerformanceFile.h"
 #include <juce_core/juce_core.h>
 #include <cstdint>
@@ -30,6 +31,8 @@ public:
     virtual int                           getQueuedItem()     const noexcept = 0;   // -1 = nothing queued
     virtual int                           getSelectedLayer()  const noexcept = 0;
     virtual int                           getLayerCount()     const = 0;            // how many layers are live
+    // A layer that holds something: an Empty slot of a slot host counts in getLayerCount but is not present (surface lights stay off).
+    virtual bool                          isLayerPresent(int layer) const { return layer >= 0 && layer < getLayerCount(); }
     virtual int                           getLayerColourIndex(int layer) const = 0;   // index into the shared layer palette
     virtual bool                          isItemPlayable(int item) const = 0;           // this product's, and its file exists
     virtual uint32_t                      getRevision()       const noexcept = 0;   // bumped on every change
@@ -41,6 +44,32 @@ public:
     virtual bool                          isLayerMuted(int layer)   const = 0;   // the layer strip's mute
     // The name a clip was stored under (empty = unnamed, empty, or out of range). Defaults suit a view with no names.
     virtual juce::String                  getClipName(int layer, int clip) const { juce::ignoreUnused(layer, clip); return {}; }
+    // A stored clip can still be one the layer will not take: a host of typed slots refuses a clip of another layer type
+    // (it arrives only by loading a layer preset of another type over the slot). False = launching it does nothing.
+    virtual bool                          isClipForLayer(int layer, int clip) const { juce::ignoreUnused(layer, clip); return true; }
+
+    // The clip clipboard as the clip menu enables its items: something is on it, and this layer would take it
+    // (the same type check a paste makes). Defaults suit a view with no clipboard.
+    virtual bool                          isClipboardEmpty() const { return true; }
+    virtual bool                          canPasteClip(int layer) const { juce::ignoreUnused(layer); return false; }
+    // A full preset is staged and not yet committed: it will replace every layer and bank, so the clip menu stays shut.
+    virtual bool                          isFullPresetStaged() const { return false; }
+
+    // The last scene launch (LaunchScene), so the screen can say what a press did wherever it came from: which clip,
+    // on how many layers it launched or already played, and a serial that changes with every launch (0 = none yet).
+    struct SceneLaunch { int clip = -1; int layers = 0; uint32_t serial = 0; };
+    virtual SceneLaunch                   getLastSceneLaunch() const { return {}; }
+    // The product offers scenes on a surface (the picker): false for a product whose scenes are a screen and MIDI matter only.
+    virtual bool                          hasSceneControls() const { return false; }
+
+    // Layer pages (a host with more layers than mu_limits::kLayersPerPage): the surface's rows are the layers of the shown page.
+    // The page is a view of the selection, never state of its own: it is the page of the selected layer, so the screen,
+    // which follows the selection, and the surface always agree. False for a product that does not offer pages on a surface.
+    virtual bool                          hasLayerPages() const { return false; }
+    int                                   getPageCount() const
+    { const int n = getLayerCount(); return n <= 0 ? 1 : (n + mu_limits::kLayersPerPage - 1) / mu_limits::kLayersPerPage; }
+    int                                   getShownPage() const
+    { const int sel = getSelectedLayer(); return sel <= 0 ? 0 : sel / mu_limits::kLayersPerPage; }
 
     // The transport as the surface lights it. Defaults suit a view with no transport (stopped, owned by nobody).
     virtual bool                          isTransportPlaying() const        { return false; }   // the internal clock runs

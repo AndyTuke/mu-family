@@ -48,6 +48,12 @@ void LayerEditController::refreshAfterPresetLoad()
 // disables its button at the maximum, so this is only a safety net.
 void LayerEditController::addLayer()
 {
+    if (hooks.beforeAdd) { hooks.beforeAdd([this] { addLayerNow(); }); return; }
+    addLayerNow();
+}
+
+void LayerEditController::addLayerNow()
+{
     const int idx = proc.addLayer();
     if (idx < 0) return;
     sidebar.refreshItems();
@@ -59,7 +65,8 @@ void LayerEditController::addLayer()
 // here keeps a stale click from reaching the processor.
 void LayerEditController::confirmDelete()
 {
-    if (fixed || proc.getNumLayers() <= 1) return;
+    // A slot host may be left empty; a list product keeps its last layer.
+    if (fixed || (! proc.layersAreSlots() && proc.getNumLayers() <= 1)) return;
     const juce::String name = proc.getLayerName(panel.getLayer());
     confirmAsync(&panel, "Delete " + panel.getNoun(), "Delete \"" + name + "\"?\nThis cannot be undone.",
                  "Delete", [this] { deleteShownLayer(); });
@@ -68,15 +75,16 @@ void LayerEditController::confirmDelete()
 // Remove the shown layer; the selection stays on the same index, clamped to the new last layer.
 void LayerEditController::deleteShownLayer()
 {
-    if (proc.getNumLayers() <= 1) return;
+    if (! proc.layersAreSlots() && proc.getNumLayers() <= 1) return;
     const int idx = panel.getLayer();
 
     // Everything that points into a layer's data is released first (see Hooks::unbindAll).
     panel.getModulatorPanel().setLayer(nullptr);
     if (hooks.unbindAll) hooks.unbindAll();
 
-    proc.removeLayer(idx);
-    const int newIndex = juce::jlimit(0, proc.getNumLayers() - 1, idx);
+    // A slot host empties the slot and nothing shifts, so the selection stays exactly where it was.
+    proc.deleteLayer(idx);
+    const int newIndex = proc.layersAreSlots() ? idx : juce::jlimit(0, proc.getNumLayers() - 1, idx);
     sidebar.refreshItems();
     sidebar.setSelectedIndex(newIndex);
     if (hooks.showLayer) hooks.showLayer(newIndex);

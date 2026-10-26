@@ -17,6 +17,7 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
     fader.setColour(juce::Slider::rotarySliderFillColourId, MuLookAndFeel::colour(MuLookAndFeel::knobLevel));
     fader.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     addAndMakeVisible(fader);
+    fader.addListener(&stripStatus);
     addAndMakeVisible(vuMeter);
     if (hasSidechainControls())
         addAndMakeVisible(grMeter);
@@ -24,6 +25,12 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
     panKnob.setRange(-1.0, 1.0, 0.01);
     panKnob.setValue(0.0);
     panKnob.getSlider().textFromValueFunction = [](double) { return juce::String(); };
+    panKnob.statusTextFromValue = [](double v) -> juce::String
+    {
+        const int pct = (int) std::round(std::abs(v) * 100.0);
+        return pct == 0 ? juce::String("Centre") : (v < 0.0 ? "Left " : "Right ") + juce::String(pct) + " %";
+    };
+    reportKnobStatus(panKnob, "Pan");
     if (! isClient())   // a client strip has no pan
         addAndMakeVisible(panKnob);
 
@@ -37,6 +44,10 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
         sendEffect.getSlider().textFromValueFunction = noValue;
         sendDelay.getSlider().textFromValueFunction  = noValue;
         sendReverb.getSlider().textFromValueFunction = noValue;
+        for (auto* k : { &sendEffect, &sendDelay, &sendReverb }) k->setStatusUnit(mu_fmt::Unit::Percent01);
+        reportKnobStatus(sendEffect, "Effect Send");
+        reportKnobStatus(sendDelay,  "Delay Send");
+        reportKnobStatus(sendReverb, "Reverb Send");
 
         addAndMakeVisible(sendEffect);
         addAndMakeVisible(sendDelay);
@@ -53,14 +64,21 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
         soloBtn.setClickingTogglesState(true);
         addAndMakeVisible(muteBtn);
         addAndMakeVisible(soloBtn);
+        muteBtn.addListener(&stripStatus);
+        soloBtn.addListener(&stripStatus);
     }
 
     if (hasOutputBus())
     {
-        // descriptive labels — "Main" + "Out 1" … "Out 8".
-        outBusBox.addItem("Main", 1);              // 0 -> Master
-        for (int i = 1; i <= 8; ++i)
-            outBusBox.addItem("Out " + juce::String(i), i + 1);
+        // Item id = value + 1: 0 -> Main. A product with group buses lists them ("Bus 1" ...); the others keep
+        // the DAW direct outs ("Out 1" ... "Out 8").
+        outBusBox.addItem("Main", 1);
+        if (mu_limits::kMaxBuses > 0)
+            for (int i = 0; i < mu_limits::kMaxBuses; ++i)
+                outBusBox.addItem(busName(i), i + 2);
+        else
+            for (int i = 1; i <= 8; ++i)
+                outBusBox.addItem("Out " + juce::String(i), i + 1);
         outBusBox.setSelectedId(1, juce::dontSendNotification);
         addAndMakeVisible(outBusBox);
     }
@@ -84,19 +102,61 @@ void MixerChannel::addSidechainControls()
     scAmount.setRange(0.0, 100.0, 1.0);
     scAmount.setValue(0.0);
     scAmount.getSlider().textFromValueFunction = noVal;
+    scAmount.setStatusUnit(mu_fmt::Unit::Percent100);
+    reportKnobStatus(scAmount, "Sidechain Amount");
     addAndMakeVisible(scAmount);
 
-    scAttack.setRange(1.0, 500.0, 1.0);
+    scAttack.setRange(0.0, 500.0, 1.0);
     scAttack.getSlider().setSkewFactorFromMidPoint(22.0);
-    scAttack.setValue(5.0);
+    scAttack.setValue(0.0);
     scAttack.getSlider().textFromValueFunction = noVal;
+    scAttack.setStatusUnit(mu_fmt::Unit::Ms);
+    reportKnobStatus(scAttack, "Sidechain Attack");
     addAndMakeVisible(scAttack);
 
-    scRelease.setRange(10.0, 2000.0, 1.0);
+    scRelease.setRange(0.0, 2000.0, 1.0);
     scRelease.getSlider().setSkewFactorFromMidPoint(141.0);
-    scRelease.setValue(100.0);
+    scRelease.setValue(0.0);
     scRelease.getSlider().textFromValueFunction = noVal;
+    scRelease.setStatusUnit(mu_fmt::Unit::Ms);
+    reportKnobStatus(scRelease, "Sidechain Release");
     addAndMakeVisible(scRelease);
+}
+
+MixerChannel::~MixerChannel()
+{
+    fader.removeListener(&stripStatus);
+    muteBtn.removeListener(&stripStatus);
+    soloBtn.removeListener(&stripStatus);
+}
+
+void MixerChannel::reportStatus(const juce::String& what, const juce::String& value)
+{
+    if (onStatusUpdate) onStatusUpdate(channelName + " " + what, value, channelColour);
+}
+
+void MixerChannel::StripStatus::sliderValueChanged(juce::Slider* s)
+{
+    if (s != &owner.fader) return;
+    const auto v = (float) owner.fader.getValue();
+    const juce::String db = owner.isClient() ? owner.formatClientDb(v)
+                                             : (v <= 0.0f ? juce::String("-inf dB") : juce::String(20.0f * std::log10(v), 1) + " dB");
+    owner.reportStatus("Level", db);
+}
+
+void MixerChannel::StripStatus::buttonClicked(juce::Button* b)
+{
+    if (b == &owner.muteBtn)      owner.reportStatus("Mute", owner.muteBtn.getToggleState() ? "On" : "Off");
+    else if (b == &owner.soloBtn) owner.reportStatus("Solo", owner.soloBtn.getToggleState() ? "On" : "Off");
+}
+
+// A strip knob reports to the status bar as "<strip> <what>  <value + unit>", in the strip's colour.
+void MixerChannel::reportKnobStatus(KnobWithLabel& knob, const juce::String& what)
+{
+    knob.onStatusUpdate = [this, what](const juce::String&, const juce::String& value)
+    {
+        if (onStatusUpdate) onStatusUpdate(channelName + " " + what, value, channelColour);
+    };
 }
 
 //==============================================================================
@@ -187,7 +247,7 @@ int MixerChannel::layoutSends(int stripW, int sendY)
     const int faderY = sendY + spH;
 
     // A return channel cannot send to itself (would create a feedback loop).
-    sendEffect.setVisible(hasSends() && channelType == Type::Channel);
+    sendEffect.setVisible(hasSends() && (channelType == Type::Channel || channelType == Type::Bus));
     sendDelay .setVisible(hasSends() && channelType != Type::DelayReturn
                                      && channelType != Type::ReverbReturn);
     sendReverb.setVisible(hasSends() && channelType != Type::ReverbReturn);
@@ -203,7 +263,7 @@ int MixerChannel::layoutSends(int stripW, int sendY)
 
     // Sends pane: from first visible send to end of pan.
     {
-        const int firstOff = (channelType == Type::Channel)      ? 0
+        const int firstOff = (channelType == Type::Channel || channelType == Type::Bus) ? 0
                            : (channelType == Type::EffectReturn) ? sendH
                            : (channelType == Type::DelayReturn)  ? sendH * 2
                            : sendH * 3;  // ReverbReturn / Master: pan only

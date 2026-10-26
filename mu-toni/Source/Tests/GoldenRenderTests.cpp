@@ -315,7 +315,7 @@ struct MuToniLayerPinTests : juce::UnitTest
         for (int l = 0; l < 2; ++l)
             for (int d = 0; d < mu_toni::kNumModDests; ++d)
             {
-                const auto id = layerId(l, mu_toni::kModDestTable[d].param);
+                const auto id = mu_mod::paramIdFor(layerId(l, ""), l, mu_toni::kModDestTable[d].param);   // a pan or send is the strip's
                 const float raw = rig.p.apvts.getRawParameterValue(id)->load();
                 const float live = rig.p.getModLive(l, d);
                 if (std::abs(live - raw) > 1.0e-3f * std::max(1.0f, std::abs(raw)))

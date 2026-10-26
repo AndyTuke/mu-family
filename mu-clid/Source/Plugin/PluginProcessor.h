@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Modulation/ModulationDestinations.h"   // ModDest::kTableSize (modSlot)
 #include <array>
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "Plugin/ProcessorBase.h"
@@ -16,7 +15,9 @@
 #include "Audio/SampleLibrary.h"
 #include "Sequencer/RhythmPlayState.h"
 #include "Plugin/MidiClockSync.h"   // shared mu-core MIDI-clock slave
-#include "Persistence/PresetIO.h"
+#include "Persistence/RhythmPresetTree.h"   // the Rhythm type's saved form (PreparedRhythm, RhythmPresetContext)
+#include "UI/RhythmHost.h"   // what the Rhythm layer's UI reads from its host
+#include "Sequencer/SampleRhythm.h"   // mu-Clid's layer type
 #include "HotSwapStager.h"
 
 #include <memory>
@@ -27,6 +28,8 @@
 namespace mu_clid {
 
 class PluginProcessor : public ProcessorBase,
+                        public RhythmHost,
+                        public SampleSlotHost,
                         private juce::AudioProcessorValueTreeState::Listener
 {
 public:
@@ -62,8 +65,9 @@ public:
     const juce::String getProgramName(int index) override;
     void changeProgramName(int index, const juce::String& newName) override;
 
-    void getStateInformation(juce::MemoryBlock& d) override { presetIO.getStateInformation(d); }
-    void setStateInformation(const void* d, int s) override { presetIO.setStateInformation(d, s); notifyHostStateRestored(); }
+    // The host session (PluginProcessor_HostState.cpp): the .muClid tree plus the parameters it doesn't carry.
+    void getStateInformation(juce::MemoryBlock& d) override;
+    void setStateInformation(const void* d, int s) override { restoreHostState(d, s); notifyHostStateRestored(); }
 
 
     // Multi-bus output (DAW only). Toggle is read at host scan-time; toggling at runtime
@@ -87,9 +91,9 @@ public:
     // its own: it takes the layer lock, because the audio path may read the name.
     void renameRhythm(int index, const juce::String& newName);
 
-    Rhythm& getRhythm    (int index)       { return sequencer.getRhythm(index); }
-    const Rhythm& getRhythm(int index) const { return sequencer.getRhythm(index); }
-    int     getNumRhythms() const          { return sequencer.getNumRhythms(); }
+    Rhythm& getRhythm    (int index)       { return layerAs<Rhythm>(index); }
+    const Rhythm& getRhythm(int index) const { return layerAs<Rhythm>(index); }
+    int     getNumRhythms() const          { return liveRhythms.load(std::memory_order_relaxed); }
 
     // ProcessorBase channel-metadata interface — mu-clid maps "channel" → "rhythm"; the count and
     // getLayer come from the layer container.
@@ -101,22 +105,23 @@ public:
     {
         return (idx >= 0 && idx < getNumRhythms()) ? getRhythm(idx).colourIndex : 0;
     }
-    void    updatePattern (int index)      { sequencer.updatePattern(index); }
+    void    updatePattern (int index)      { updateRhythmPattern(index); }
 
     // Per-rhythm sample paths, load / missing queries, preview player and primary sample folder.
     SampleLibrary samples { *this };
 
     // Hot-swap staging: stages a rhythm preset for atomic commit at the next loop boundary.
     // If the sequencer is not playing, applies the preset immediately instead.
-    void stageRhythmPreset(int ri, const juce::File& f, bool keepIdentity = false)  { presetIO.stageRhythmPreset(ri, f, keepIdentity); }
+    // keepIdentity: the slot keeps its name and colour (a settings reset such as the default rhythm).
+    void stageRhythmPreset(int ri, const juce::File& f, bool keepIdentity = false);
     void cancelPendingSwap(int ri) override               { hotSwapStager.cancelStagedSwap(ri); }
     bool hasPendingSwap  (int ri) const override         { return hotSwapStager.hasPendingSwap(ri); }
     bool hasPendingFullPreset() const override            { return hotSwapStager.hasPendingFullPreset(); }
     void cancelPendingFullPreset() override               { hotSwapStager.cancelStagedFullPreset(); }
     uint32_t fullStageSerial() const override             { return hotSwapStager.fullStageSerial(); }
     uint32_t slotStageSerial(int ri) const override       { return hotSwapStager.slotStageSerial(ri); }
-    int  getMasterLoopSteps() const override              { return sequencer.getMasterLoopSteps(); }
-    int  getMasterLoopCurrentStep() const override        { return sequencer.getMasterLoopCurrentStep(); }
+    int  getMasterLoopSteps() const override              { return stepClock.getMasterLoopSteps(); }
+    int  getMasterLoopCurrentStep() const override        { return stepClock.getMasterLoopCurrentStep(); }
 
     // A rhythm hot-swap commit fires ProcessorBase::onLayerPresetCommitted: the editor refreshes
     // the non-APVTS UI state (name label, sample bar, colour-tinted bits) pushRhythmToApvts can't.
@@ -126,10 +131,11 @@ public:
     void loadLayerPreset(int ri, const juce::File& f) override { stageRhythmPreset(ri, f); }
     // The clip hooks: the tree a .muRhythm holds (without file metadata, name, colour) and the tail of a
     // .muRhythm load. Clips reach the sample by path only.
-    juce::ValueTree captureLayerPresetTree(int ri) override { return presetIO.captureRhythmPresetTree(ri); }
+    juce::ValueTree captureLayerPresetTree(int ri) override;
 protected:
-    void stageLayerPresetTree(int ri, juce::ValueTree tree, bool keepIdentity) override
-        { presetIO.stageRhythmPresetTree(ri, tree, keepIdentity); }
+    // Everything a .muRhythm load does after the parse (file or clip): installs at once when stopped, else commits
+    // at the rhythm's boundary. Callers go through ProcessorBase::stageLayerPreset.
+    void stageLayerPresetTree(int ri, juce::ValueTree tree, bool keepIdentity) override;
 public:
     // Where a staged swap lands: the shared `mstr_swap` parameter, read here on the audio thread from a
     // pointer resolved once. mu-Clid has no bar-line rule, so OnBar behaves as OnLayerLoop.
@@ -145,119 +151,158 @@ public:
     void setContentDir(const juce::File& dir);
     void ensureContentFoldersExist();
 
+    // Preset orchestration (PluginProcessor_Preset.cpp).
     void savePreset(const juce::String& n, const juce::String& d,
-                    const juce::String& c, bool e = false) override { presetIO.savePreset(n, d, c, e); }
-    void loadPreset(const juce::File& f) override { if (presetIO.loadPreset(f)) publishPresetName(f.getFileNameWithoutExtension()); }
-    bool saveFullPresetTo(const juce::File& f) override { return presetIO.saveFullPresetTo(f); }
+                    const juce::String& c, bool e = false) override;
+    void loadPreset(const juce::File& f) override { if (loadPresetFile(f)) publishPresetName(f.getFileNameWithoutExtension()); }
+    // A full preset or host-state file: a .muClid is prepared off the audio thread and committed at the next loop
+    // point when playing, at once when stopped; another state root of this product restores as legacy host state.
+    // False when nothing could be read (nothing was loaded or staged).
+    bool loadPresetFile(const juce::File& f);
+    bool saveFullPresetTo(const juce::File& f) override;   // headless render --save-preset
     void saveRhythmPresetToFile(int ri, const juce::File& dest,
                                 bool emb = false, const juce::String& cat = {},
-                                const juce::String& desc = {})
-                                { presetIO.saveRhythmPresetToFile(ri, dest, emb, cat, desc); }
+                                const juce::String& desc = {});
 
     // Shared preset category list.
-    juce::StringArray loadCategoryList() const override  { return presetIO.loadCategoryList(); }
-    void ensureCategoryInList(const juce::String& c) override { presetIO.ensureCategoryInList(c); }
-    bool applyRhythmPreset(const juce::File& f, int ri) { return presetIO.applyRhythmPreset(f, ri); }
-    bool applyDefaultRhythm(int ri)              { return presetIO.applyDefaultRhythm(ri); }
-    // _default.muClid, falling back to a single-rhythm _default.muRhythm (PresetIO).
-    void loadDefaultPreset() override            { presetIO.loadDefaultPreset(); }
+    juce::StringArray loadCategoryList() const override;
+    void ensureCategoryInList(const juce::String& c) override;
+    // A .muRhythm into slot `ri` at once, whatever the transport is doing.
+    bool applyRhythmPreset(const juce::File& f, int ri, bool keepIdentity = false);
+    bool applyDefaultRhythm(int ri);
+    // _default.muClid, falling back to a single-rhythm _default.muRhythm.
+    void loadDefaultPreset() override;
 
 
-    RhythmSequencer sequencer;
-    // Fixed-size arrays so the audio thread never races with a vector reallocation caused by a
-    // structural edit on the message thread. The layer count (ProcessorCore::numLayers) is the
-    // authoritative count; processBlock reads it atomically once per block, under layersLock.
-    std::array<std::unique_ptr<VoiceEngine>, RhythmSequencer::MaxRhythms> voiceEngines;
-    std::array<MidiOutputEngine,             RhythmSequencer::MaxRhythms> midiEngines;
+    // The rhythms' own step clocks: the host half here (it holds the master-loop length), a RhythmCursor in each
+    // SampleRhythm. They are handed every pattern, swap start, loop length and restart, and decide each block's hits.
+    RhythmStepClock stepClock;
+    static constexpr int kStepCap = HitGenerator::kMaxSteps;   // the Euclid step cap every pattern is built with
 
-    // Note-offs owed by MIDI-mode slots that were torn down inside their 20 ms hold. Written only
-    // under layersLock (message thread, audio excluded); the audio thread drains it at the top of
-    // the next block under its layersLock try-lock. Fixed size, so nothing allocates.
+    // Rebuilds slot `index`'s pattern in the rhythm's cursor (message thread).
+    void updateRhythmPattern(int index)
+    {
+        if (index >= 0 && index < mu_limits::kMaxLayers)
+            sampleRhythm(index).cursor.updatePattern(sampleRhythm(index), kStepCap);
+    }
+    // Where slot r's pattern last started a pass, and the step counter's run id (audio thread: the swap stager
+    // records both at a boundary).
+    int      swapBoundaryEff(int r) const noexcept { return sampleRhythm(r).cursor.boundaryEffective(); }
+    uint32_t swapFrameEpoch() const noexcept       { return stepClock.currentEpoch(); }
+    // Slot `slot`'s voice engine: SampleRhythm::voice (E5.5d), so it moves with its layer. Null in a slot that
+    // is not live. Each rhythm's MidiOutputEngine is SampleRhythm::midi (E5.5c); the engines its swaps retired
+    // sound out in the shared RetireBin (retireEngine).
+    std::unique_ptr<VoiceEngine>&       voiceEngine(int slot) noexcept       { return sampleRhythm(slot).voice; }
+    const std::unique_ptr<VoiceEngine>& voiceEngine(int slot) const noexcept { return sampleRhythm(slot).voice; }
+
+    // Note-offs owed by MIDI-mode rhythms that were removed or dropped inside their 20 ms hold: a removed
+    // layer hands its owed note-off over in layerRemoved. Written only under layersLock (message thread,
+    // audio excluded); the audio thread drains it at the top of the next block under its layersLock
+    // try-lock. Fixed size, so nothing allocates; an owed note-off past the 16th is dropped.
     static constexpr int kMaxOrphanOffs = 16;
     struct OrphanOff { int note = 0; int channel = 1; };
     std::array<OrphanOff, kMaxOrphanOffs> orphanOffs;
     int numOrphanOffs = 0;
-    // Call under layersLock before a slot's MidiOutputEngine is overwritten, moved over or reset.
-    void parkPendingMidiOff(int slot)
+    // Call under layersLock before a MidiOutputEngine is discarded or reset: its owed note-off is kept.
+    void parkPendingMidiOff(MidiOutputEngine& engine)
     {
         int note = 0, chan = 1;
-        if (midiEngines[(size_t) slot].takePending(note, chan) && numOrphanOffs < kMaxOrphanOffs)
+        if (! engine.takePending(note, chan)) return;
+        jassert(numOrphanOffs < kMaxOrphanOffs);   // more than 16 owed note-offs in one block: the rest are dropped
+        if (numOrphanOffs < kMaxOrphanOffs)
             orphanOffs[(size_t) numOrphanOffs++] = { note, chan };
     }
     // fxChain and mixerEngine are inherited from ProcessorBase.
 
-    // Stage 34: per-rhythm retired voice engines that continue rendering their
-    // in-flight sample / envelope tail after a hot-swap. Step 2 (this commit)
-    // wires the storage + render loop + cleanup-flag drain with nothing
-    // populating the slots, so behaviour is unchanged. Step 3 wires retire-on-
-    // swap, which is what actually populates these. When an engine reports
-    // isFullyDrained(), the audio thread store-releases retiredReadyForCleanup;
-    // the message thread (runDeferredWork) polls + clears the flag under
-    // suspendProcessing and destroys the engine off the RT thread.
-    static constexpr int kMaxRetiredEngines = mu_limits::kMaxRetiredVoiceEngines;
-    std::array<std::array<std::unique_ptr<VoiceEngine>, kMaxRetiredEngines>,
-               RhythmSequencer::MaxRhythms> retiredVoiceEngines;
-    std::array<std::array<std::atomic<bool>, kMaxRetiredEngines>,
-               RhythmSequencer::MaxRhythms> retiredReadyForCleanup;
+    // A hot-swap's outgoing voice engine keeps rendering its in-flight sample / envelope tail in slot `slot`'s
+    // channel from the shared RetireBin (an EngineTail, E5.5e) until it reports drained, at most 30 s; the bin frees
+    // it on the message thread. Call under layersLock (the audio thread is then outside the bin): it starts with the
+    // next rendered block; a full row evicts its entry 0, whose engine is freed later by a service pass.
+    void retireEngine(int slot, std::unique_ptr<VoiceEngine> engine);
 
-    // Play-state atomics: written by audio thread, read by UI at 30 Hz.
-    using RhythmPlayState = mu_clid::RhythmPlayState;
-    std::array<RhythmPlayState, RhythmSequencer::MaxRhythms> rhythmPlayState;
-    std::atomic<float>  beatFraction     { 0.0f }; // fractional position within the current 1/16 step
+    // Tests only (message thread, not processing): slot `slot`'s retire-bin entry `entry`: its engine while the
+    // entry still sounds (Parked or Draining; null otherwise) and its state.
+    const VoiceEngine*        retiredEngineForTest(int slot, int entry) const noexcept;
+    mu_core::RetireBin::State retiredStateForTest(int slot, int entry) const noexcept { return retireBin.stateOf(slot, entry); }
+    int                       retiredCountForTest(int slot) const noexcept;
+    // Tests only: retires `engine` into slot `slot`'s row now, as a swap's install does (takes the layer lock).
+    void retireEngineForTest(int slot, std::unique_ptr<VoiceEngine> engine)
+    {
+        const juce::ScopedLock sl(layersLock);
+        retireEngine(slot, std::move(engine));
+    }
+
+    // Play-state atomics: written by audio thread, read by UI at 30 Hz. Each rhythm's own play state is its layer's
+    // (SampleRhythm::playState), looked up through getRhythmPlayState on every read.
     std::atomic<bool>   sequencerPlaying { false };
     std::atomic<double> lastBeatPos      { 0.0 };  // most recent beat position (for UI playhead)
 
     // Snapshot accessor for UI panels (see Modulation/ModulationSnapshot.h for index enum).
     float getModSnapshot(int rhythmIndex, int snapIndex) const noexcept
     {
-        return modSnapshot[rhythmIndex][snapIndex].load();
+        return sampleRhythm(rhythmIndex).modSnapshot[(size_t) snapIndex].load();
     }
+
+    // Slot `slot`'s layer as mu-Clid's layer type (every slot holds one for the processor's lifetime).
+    SampleRhythm&       sampleRhythm(int slot) noexcept       { return layerAs<SampleRhythm>(slot); }
+    const SampleRhythm& sampleRhythm(int slot) const noexcept { return layerAs<SampleRhythm>(slot); }
 
     // UI accessor for the per-rhythm modulated euclid overrides — read by RhythmContent +
     // SidebarItem on a timer so the visual circles reflect modulation of hits/rotate/etc.
-    //. Returns a struct copy; fields are integer-rounded by the audio thread so
-    // torn reads are benign for visual display. Pre-fix the audio thread only
-    // wrote `lastEuclidOverrides[r]` when the modulation pass actually ran, leaving the
-    // overrides at C++-default zeros for any rhythm with no assignments — so the default
-    // rhythm at startup drew no hits. Fall back to the rhythm's base gen values when no
-    // modulation pass has touched the entry so `HitGenerator::getStepTypes(ov)` yields
-    // the rhythm's actual pattern for unmodulated cases.
+    // A struct copy (see SampleRhythm::modulatedEuclidOverrides); empty for a slot that is not live.
     EuclidOverrides getModulatedEuclidOverrides(int rhythmIndex) const noexcept
     {
-        if (rhythmIndex < 0 || rhythmIndex >= (int) lastEuclidOverrides.size()
-                          || rhythmIndex >= sequencer.getNumRhythms())
+        if (rhythmIndex < 0 || rhythmIndex >= mu_limits::kMaxLayers
+                          || rhythmIndex >= getNumRhythms())
             return {};
-        const Rhythm& r = sequencer.getRhythm(rhythmIndex);
-        if (r.modulationMatrix.getAssignments().empty())
-        {
-            EuclidOverrides ov;
-            auto fill = [](EuclidGenOverrides& g, const HitGenerator& src) {
-                g.hits         = src.hits;
-                g.rotate       = src.rotate;
-                g.prePad       = src.prePad;
-                g.postPad      = src.postPad;
-                g.insertStart  = src.insertStart;
-                g.insertLength = src.insertLength;
-            };
-            fill(ov.a, r.genA);
-            fill(ov.b, r.genB);
-            fill(ov.c, r.genC);
-            return ov;
-        }
-        return lastEuclidOverrides[(size_t) rhythmIndex];
+        return sampleRhythm(rhythmIndex).modulatedEuclidOverrides();
     }
 
     // GR-meter pointer for the per-voice compressor/limiter insert UI knob.
     // Returns nullptr when the rhythm index is out of range or the engine is null.
     std::atomic<float>* getInsertGRReductionPtr(int ri)
     {
-        if (ri < 0 || ri >= getNumRhythms() || !voiceEngines[(size_t)ri]) return nullptr;
-        return &voiceEngines[(size_t)ri]->insertProc.grReduction;
+        if (ri < 0 || ri >= getNumRhythms() || ! voiceEngine(ri)) return nullptr;
+        return &voiceEngine(ri)->insertProc.grReduction;
     }
 
-private:
-    std::array<std::atomic<float>, kSnapCount> modSnapshot[RhythmSequencer::MaxRhythms];
+    // ── RhythmHost: what RhythmContent and the sidebar's mini circle read (message thread) ─────────
+    juce::AudioProcessorValueTreeState& getRhythmParameters() noexcept override { return apvts; }
+    int           getRhythmCount() const noexcept override                    { return getNumRhythms(); }
+    Rhythm&       getRhythmLayer(int layer) noexcept override                 { return getRhythm(layer); }
+    const Rhythm& getRhythmLayer(int layer) const noexcept override           { return getRhythm(layer); }
+    bool                     isRhythmTransportPlaying() const noexcept override { return sequencerPlaying.load(); }
+    const std::atomic<bool>& getRhythmTransportFlag() const noexcept override   { return sequencerPlaying; }
+    RhythmPlayState*         getRhythmPlayState(int layer) noexcept override
+    {
+        return getLayer(layer) != nullptr ? &sampleRhythm(layer).playState : nullptr;
+    }
+    float getRhythmModLive(int layer, int snap) const noexcept override         { return getModSnapshot(layer, snap); }
+    EuclidOverrides getRhythmEuclidOverrides(int layer) const noexcept override { return getModulatedEuclidOverrides(layer); }
+    const std::atomic<float>* getRhythmInsertGainReduction(int layer) override  { return getInsertGRReductionPtr(layer); }
+    bool               isRhythmParamsLoading() const noexcept override          { return isApvtsLoading(); }
+    std::atomic<bool>& getRhythmParamsLoadingFlag() noexcept override           { return getApvtsLoadingFlag(); }
+    void               syncRhythmFromParameters(int layer) override             { forceSyncRhythmFromApvts(layer); }
+    void renameRhythmLayer(int layer, const juce::String& newName) override     { renameRhythm(layer, newName); }
+    void resetRhythmLayer(int layer) override                                   { resetLayer(layer); }
+    int  getRhythmClipCount(int layer) const override                           { return clipCount(layer); }
+    juce::File getRhythmPresetsDir() const override                             { return getRhythmsDir(); }
+    void saveRhythmPresetFile(int layer, const juce::File& dest, bool embedSample,
+                              const juce::String& category, const juce::String& description) override
+        { saveRhythmPresetToFile(layer, dest, embedSample, category, description); }
+    void stageRhythmPresetFile(int layer, const juce::File& file) override      { stageRhythmPreset(layer, file); }
+    juce::StringArray getRhythmPresetCategories() const override                { return loadCategoryList(); }
+    void addRhythmPresetCategory(const juce::String& category) override        { ensureCategoryInList(category); }
+    SampleLibrary& getRhythmSamples() noexcept override                         { return samples; }
+    juce::File     getRhythmSamplesDir() const override                         { return getSamplesDir(); }
 
+    // ── SampleSlotHost: the engines and the settings file the sample library uses (message thread) ──
+    int getSampleSlotCount() const noexcept override                         { return numLayers.load(std::memory_order_acquire); }
+    VoiceEngine*       getSampleSlotEngine(int slot) noexcept override       { return voiceEngine(slot).get(); }
+    const VoiceEngine* getSampleSlotEngine(int slot) const noexcept override { return voiceEngine(slot).get(); }
+    juce::PropertiesFile* getSampleSettingsFile() const noexcept override    { return appSettings.get(); }
+
+private:
     const std::atomic<float>* swapTimingParam { nullptr };   // `mstr_swap`, resolved once in the constructor
 
     void commitDeferredWork() override;   // hot-swap engine retire + swap commits
@@ -309,30 +354,27 @@ private:
 
     // ── processBlock phases ──────────────────────────────────────────────
     // processBlock is decomposed into private helpers invoked in order on the
-    // audio thread. None allocate or take locks beyond processBlock's own
-    // layersLock ScopedTryLock.
+    // audio thread. None allocate or take locks beyond the driver's layersLock try-lock.
     struct BlockTransport { bool playing; double beatPos; double bpm = 120.0; };   // bpm = the block's tempo (host > MIDI clock ticks > BPM field)
     // Scan MIDI clock + program changes, read the playhead / clock / internal
     // transport, reset the wrap detector on a stop->start edge, and publish
     // sequencerPlaying + lastBeatPos.
     BlockTransport deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages);
-    // Step the sequencer, fire voice triggers (or MIDI notes for rhythms in MIDI output mode, into
-    // midiMessages), check hot-swap boundaries, and
-    // publish per-rhythm UI play-state. Called only while playing.
-    void advanceSequencer(int numRhythms, double beatPos, juce::MidiBuffer& midiMessages);
-    // Modulation pass for one rhythm: snapshot voiceParams, run the matrix,
-    // snapshot for the UI live-arc, write modulated values + euclid overrides back.
-    void applyRhythmModulation(int r, double beatPos);
-    // applyRhythmModulation's phases (all audio thread, under the rhythm's modLock up to phase 3).
-    struct StripMod { float pan, effect, delay, reverb; };   // modulated mixer-strip values
-    void     seedModulation(int r, const Rhythm& rhythm, const VoiceParams& modParams);
-    StripMod applyStripModulation(int r);
-    void     publishModSnapshot(int r, const Rhythm& rhythm, const VoiceParams& modParams, const StripMod& stripMod);
-    void     writeBackModulation(int r, const Rhythm& rhythm, VoiceParams& modParams);
-    // Gather output buses, run the core mixer/voice render, mix the sample
-    // preview, and emit per-rhythm MIDI.
-    void renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages,
-                          int numRhythms, double effectiveBpm);
+    // The block's hits: the host clock's frame, each live rhythm's cursor walk, gathered as a BlockResult;
+    // `steps` gets each rhythm's step, accent step and length.
+    struct CursorSteps { int step = -1, accentStep = 0, length = 0; };
+    BlockResult advanceCursors(int numRhythms, double beatPos, std::array<CursorSteps, mu_limits::kMaxLayers>& steps);
+    // ── The render: the shared layer driver ──────────────────────────────────────────────────────────
+    // The host's buses, the block's transport, then the shared driver (ProcessorBase::renderAndMix): the
+    // rhythms render themselves (SampleRhythm::render) and the mixer runs, in chunks of the prepared size.
+    void driveLayers(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages, const BlockTransport& transport);
+    // The driver's per-block hooks (rendered blocks only, under the layer lock): the start sends the owed
+    // note-offs, finds each rhythm's hit with the host step clock and the rhythm cursors (MIDI hits go out
+    // now, sample hits wait for the rhythm's render), checks the swap boundaries, publishes the play state and
+    // hands each rhythm its block inputs; the end mixes the sample preview and counts down the MIDI note-offs.
+    void layersBlockStarting(const mu_core::LayerView& view, const mu_core::BlockTransport& t, juce::MidiBuffer& midi) override;
+    void layersBlockRendered(const mu_core::LayerView& view, juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) override;
+    void sendOrphanOffs(juce::MidiBuffer& midiMessages);
 
     // Multi-bus output (DAW). Read by isBusesLayoutSupported at host scan-time;
     // persisted to appSettings so it survives across plugin instances.
@@ -343,35 +385,6 @@ private:
     std::atomic<int>    midiHeldNotes   { 0 };   // count of currently held MIDI notes (Note mode)
     std::atomic<bool>   noteModePlaying { false };
     std::atomic<double> noteModeBeatPos { 0.0 };
-
-    // Pre-allocated modulation parameter map — reused every block to avoid audio-thread allocation.
-    // Keys match ModDest::ids. Values are initialised in constructor and updated each block.
-    // keyed by `std::string_view` rather than `std::string`. All write/read sites use
-    // `const char*` string literals (`modParamValues["amp.attack"] = …`), which previously
-    // constructed a temp std::string per access (~30 × N rhythms × 690 blocks/sec on the
-    // audio thread). string_view of a literal is alloc-free; the literal's static storage
-    // guarantees the view stays valid for the lifetime of the map entry. ModulationMatrix's
-    // `find(a.destinationId)` still works because std::string converts implicitly.
-    std::unordered_map<std::string_view, float> modParamValues;
-    // modParamValues' value for each ModDest::kTable index, resolved once in the constructor.
-    std::array<float*, ModDest::kTableSize> modSlot {};
-    float& mv(int destIndex) noexcept { jassert(modSlot[(size_t) destIndex] != nullptr); return *modSlot[(size_t) destIndex]; }
-
-    // per-rhythm modulated euclid pattern overrides — written by the audio thread
-    // after ModulationMatrix::process(). Used by the audio-thread pattern recompute path
-    // (Stage B) and the UI live-arc indicator (Stage C). Values are integer-rounded so
-    // change-detection skips no-op recomputes. Struct definitions live in Rhythm.h /
-    // HitGenerator.h so Sequencer-layer code can reuse them.
-    std::array<EuclidOverrides, RhythmSequencer::MaxRhythms> lastEuclidOverrides;
-    // Previous block's overrides per rhythm — Stage B compares against this to skip
-    // pattern recomputes when nothing crossed an integer boundary.
-    std::array<EuclidOverrides, RhythmSequencer::MaxRhythms> prevEuclidOverrides;
-    // tracks whether the rhythm's modulation matrix had any assignments LAST block.
-    // The modulation pass is gated on (matrix non-empty || transition-to-empty), so we
-    // skip the seed + matrix.process + write-back work for never-modulated rhythms but
-    // still run one final reset pass after assignment removal to flush lastEuclidOverrides
-    // back to base values, which Stage B then picks up via change-detection.
-    std::array<bool, RhythmSequencer::MaxRhythms> prevMatrixHadAssignments {};
 
     void parameterChanged(const juce::String& parameterID, float newValue) override;
 
@@ -395,12 +408,12 @@ private:
     void applyPendingRhythmParams(int ri);        // message thread: one rhythm
     void dropPendingRhythmParams(int ri) noexcept;
 
-    std::array<std::array<std::atomic<bool>, kRhythmParamCount>, RhythmSequencer::MaxRhythms> pendingDirty {};
-    std::array<std::atomic<bool>, RhythmSequencer::MaxRhythms> rhythmHasPending {};
+    std::array<std::array<std::atomic<bool>, kRhythmParamCount>, mu_limits::kMaxLayers> pendingDirty {};
+    std::array<std::atomic<bool>, mu_limits::kMaxLayers> rhythmHasPending {};
 
     // Per (rhythm, kRhythmParamDefs entry), the parameter's raw value (null if it has none); resolved
     // once in the constructor so the drain does no lookup by id.
-    std::array<std::array<std::atomic<float>*, kRhythmParamCount>, RhythmSequencer::MaxRhythms> rawParams {};
+    std::array<std::array<std::atomic<float>*, kRhythmParamCount>, mu_limits::kMaxLayers> rawParams {};
 
     // Suffix to index in kRhythmParamDefs, sorted by suffix, for the listener's lookup by binary
     // search (no String, no allocation). Built in the constructor and never changed.
@@ -418,21 +431,27 @@ private:
     // orchestrators (insert-algo dropdown) can call it after their own
     // apvtsLoading-guarded multi-writes.
     void pushMixerChannelToApvts(int idx);
-    // Sets the sequencer's live rhythm count; a dropped rhythm is reset so a later grow starts from a default one.
+    // Sets the live rhythm count; a dropped rhythm is reset so a later grow starts from a default one.
     void setRhythmCount(int n);
+    // The live rhythm count; a cursor whose slot becomes live or stops being live is cleared (message thread,
+    // layer lock held or not yet processing).
+    void setLiveRhythms(int n);
 
     // ── Layer container (ProcessorBase) ──────────────────────────────────────
-    // The engines, tails, play state and sample paths stay here, keyed by slot; the hooks below move
-    // them with the rhythms. All of them run on the message thread, processing suspended.
+    // The engines and tails are the layers' and move with them; the play state and sample paths stay here,
+    // keyed by slot, and the hooks below move them with the rhythms. All of them run on the message thread,
+    // processing suspended.
     bool canEditLayers() const override { return true; }
     bool layerHoldsParamTruth() const override { return true; }
     // A default rhythm for `slot`. For a slot at or above the live count it also readies that slot's
     // voice and MIDI engines (built here, outside every lock), so the publish only moves pointers.
     std::unique_ptr<Layer> createLayer(int slot) override;
-    // Under layersLock: the sequencer's count and rhythm bindings follow the layer set.
+    // Under layersLock: the live rhythm count follows the layer set.
     void layersMoved(int firstIndex, int lastIndex) override;
     // Under layersLock, before layersMoved: moves the per-slot audio state with the rhythms.
     void layersReordered(LayerEdit kind, int a, int b) override;
+    // Under layersLock, before layersReordered: the removed rhythm's owed MIDI note-off is kept.
+    void layerRemoved(Layer& removed, int index) override;
     // After the unlock: pushes the slot's rhythm and strip into the parameters, rebuilds a new or
     // reset rhythm's pattern and engine parameters, and releases what the edit parked.
     void syncSlotParams(int slot) override;
@@ -440,31 +459,60 @@ private:
     void layerAdded(int index) override { applyDefaultRhythm(index); }
 
     std::unique_ptr<Layer> makeRhythm(int slot) const;
-    void prepareSlotEngines(int slot);
+    // A prepared voice engine for live slot `slot` (message thread, outside every lock).
+    std::unique_ptr<VoiceEngine> makeSlotEngine(int slot) const;
     void resetPlayState(int slot);
-    void releaseParkedEngines();
 
-    // What the audio state moved out of a removed slot waits in until the unlock: its voice engine
-    // and the slot's retired tails. Never constructed or freed under layersLock.
-    static constexpr int kParkedEngines = 1 + kMaxRetiredEngines;
-    std::array<std::unique_ptr<VoiceEngine>, kParkedEngines> parkedEngines;
+    // A removed rhythm takes its voice engine with it: the base destroys the removed layer after the unlock, and
+    // the bin cuts the removed slot's tails and frees them later, so nothing is freed under layersLock.
     // Edit bookkeeping between the locked hooks and syncSlotParams: the slot whose rhythm is new
     // (add / reset) and so needs its pattern and engine parameters rebuilt, and, during a remove or
     // swap, the last slot syncSlotParams will be given.
     int rebuildSlot     = -1;
+    // The rhythms the parameter code treats as live: the layer count, except inside an edit (layersReordered sees
+    // the count before a remove) and the legacy host restore, which opens all eight slots while it replaces the
+    // parameter state so the listener applies every slot. Written on the message thread; read by the UI.
+    std::atomic<int> liveRhythms { 0 };
     int reorderLastSlot = -1;
-    void restoreStateFromTree(const juce::ValueTree& s) { presetIO.restoreStateFromTree(s); }
+    // ── Preset orchestration internals (PluginProcessor_Preset.cpp / _HostState.cpp, message thread) ───────
+    // Commit a pre-built full preset under suspend + layersLock, then finalise APVTS / mixer / globals: the
+    // stopped load, the host restore and the stager's boundary commit. `prepared` is consumed.
+    void commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepared, int originEff = 0,
+                                uint32_t frameEpoch = RhythmCursor::kAnyFrameEpoch);
+    // The legacy host-state format (the APVTS dump + r{i}_ properties), restored at once.
+    void restoreStateFromTree(const juce::ValueTree& state);
+    void restoreHostState(const void* data, int sizeInBytes);
+    void restoreSession(const juce::ValueTree& root);   // a .muClid session tree + its extra parameter rows
+    juce::ValueTree readRhythmPresetFile(const juce::File& file) const;
+    PreparedRhythm  prepareRhythmPresetTree(const juce::ValueTree& state, int rhythmIndex, bool keepIdentity,
+                                            const juce::String& source);
+    bool            applyRhythmPresetTree(const juce::ValueTree& state, int targetIndex, bool keepIdentity,
+                                          const juce::String& source);
+    // The .muRhythm tree: a file (forFile) adds its metadata, name and colour; a clip does not.
+    juce::ValueTree buildRhythmPresetTree(int rhythmIndex, bool embedSample, bool forFile,
+                                          const juce::String& presetName, const juce::String& category,
+                                          const juce::String& description);
+    HotSwapStager::PreparedFullPreset prepareFullPreset(const juce::ValueTree& root) const;
+    // The .muClid tree (shared by preset files and the host session) and its atomic write.
+    juce::ValueTree buildFullPresetTree(const juce::String& name, const juce::String& description,
+                                        const juce::String& category, bool embedSamples, bool forSession);
+    bool            writeFullPresetFile(const juce::File& file, const juce::String& name,
+                                        const juce::String& description, const juce::String& category,
+                                        bool embedSamples);
+    // The context a rhythm tree is read in: the Samples folder, the prepared rate and block size, onLoadError.
+    RhythmPresetContext presetContext() const;
+    // The legacy host-state sample restore for slot `slot` (the three property names to read).
+    void restoreRhythmSample(int slot, const juce::ValueTree& tree, const juce::String& samplePathProp,
+                             const juce::String& sampleDataProp, const juce::String& sampleNameProp);
+    // The file name of the .muRhythm being staged, so load messages can name it; empty for a clip.
+    juce::String loadSource;
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
-    PresetIO       presetIO      { *this };
     HotSwapStager  hotSwapStager { *this };
 
-    friend class PresetIO;
     friend class HotSwapStager;
-    friend class SampleLibrary;
     friend struct ClipCommitProbe;         // tests drive the boundary scan and commit of a staged launch
-    friend struct ModulationMemoryProbe;   // tests read the per-slot modulation change-detection state
 
     // atomic for safe cross-thread access (audio writes, UI reads + clears).
     // Written in prepareToPlay; read in processBlock. JUCE calls prepareToPlay

@@ -31,7 +31,7 @@ namespace mu_ui {
 inline constexpr int kInsertSlotCount = 4;
 // Number of insert algorithms (rows in kInsertAlgoSlots / kInsertAlgoDefaults).
 // Must equal InsertProcessor::kNumInsertAlgos.
-inline constexpr int kInsertAlgoCount = 14;
+inline constexpr int kInsertAlgoCount = 16;
 
 // Skew shape between the displayed actual value and the normalised 0..1
 // stored in VoiceParams + APVTS. Knobs apply the SAME skew on the slider
@@ -70,7 +70,7 @@ inline const char* const kNoteNames[12]    = { "C","C#","D","D#","E","F","F#","G
 inline const char* const kWaveNames[4]     = { "Saw","Square","White","Pink" };
 inline const char* const kUnisonNames[7]   = { "1","3","5","7","9","11","13" };
 
-// Per-algorithm slot table. 14 rows × 4 cols.
+// Per-algorithm slot table. 16 rows × 4 cols.
 //
 // Source order MUST match the index order of InsertProcessor::dispatch[] /
 // mu_audio::kInsertAlgorithmNames so a single integer dispatches the
@@ -163,6 +163,18 @@ inline const SlotConfig kInsertAlgoSlots[kInsertAlgoCount][kInsertSlotCount] = {
       { "Unison", 0.0f, 6.0f,  SkewMode::IntStep, "",  kUnisonNames, 0, false, 2 },
       { "Octave", 1.0f, 5.0f,  SkewMode::IntStep, "",  nullptr,      0, false, 2 },
       { "Note",   1.0f, 12.0f, SkewMode::IntStep, "",  kNoteNames,   1, false, 2 } },
+
+    // ── 14 Overdrive ── Drive / Output / Bias / Tone ──────────────────
+    { { "Drive",  0.0f,  100.0f, SkewMode::Linear, "" },
+      { "Output", -24.0f, 0.0f,  SkewMode::Linear, "dB" },
+      { "Bias",   0.0f,  100.0f, SkewMode::Linear, "%" },
+      { "Tone",   200.0f, 20000.0f, SkewMode::Log, "Hz", nullptr, 0, true } },
+
+    // ── 15 TapeDelay ── Time / Feedback / Mix / Wear ──────────────────
+    { { "Time",     20.0f, 1000.0f, SkewMode::Log,    "ms", nullptr, 0, true },
+      { "Feedback", 0.0f,  110.0f,  SkewMode::Linear, "%" },
+      { "Mix",      0.0f,  100.0f,  SkewMode::Linear, "%" },
+      { "Wear",     0.0f,  100.0f,  SkewMode::Linear, "%" } },
 };
 
 // Whether a slot's knob is live, given slot 1's actual value (see SlotConfig::disabledFromP1).
@@ -174,8 +186,8 @@ inline bool insertSlotEnabled(int algoIndex, int slot, float p1Actual) noexcept
     return from == 0 || std::round(p1Actual) < (float) from;
 }
 
-// The Compressor (7) and Limiter (8) show their gain reduction on slot 2 (Output).
-inline bool insertAlgoShowsGainReduction(int algoIndex) noexcept { return algoIndex == 7 || algoIndex == 8; }
+// The Clipper (5), Compressor (7) and Limiter (8) show their gain reduction on slot 2 (Output).
+inline bool insertAlgoShowsGainReduction(int algoIndex) noexcept { return algoIndex == 5 || algoIndex == 7 || algoIndex == 8; }
 
 // First-visit / cold-restore defaults per algorithm. Indexed [algo][slot],
 // stored as ACTUAL (not normalised) values so they read naturally. The init
@@ -196,6 +208,8 @@ inline const float kInsertAlgoDefaults[kInsertAlgoCount][kInsertSlotCount] = {
     /*11 Karplus     */ { 0.0f,    1.0f,    0.0f,   20000.0f },
     /*12 Vocoder     */ { 0.0f,    0.0f,    1.0f,   1.0f     },
     /*13 VocoderSt   */ { 0.0f,    0.0f,    1.0f,   1.0f     },
+    /*14 Overdrive   */ { 0.0f,    0.0f,    25.0f,  20000.0f },
+    /*15 TapeDelay   */ { 350.0f,  40.0f,   30.0f,  40.0f    },
 };
 
 // Convert a normalised 0..1 storage value to the algorithm's actual value

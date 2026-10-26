@@ -22,8 +22,12 @@ enum class ControlActionType
     LaunchClip,        // launch clip `index` on `layer` (allowed with Performance mode off, also when mapped to MIDI)
     ClipNext,          // the selected layer's next stored clip, wrapping
     ClipPrev,          // the selected layer's previous stored clip, wrapping
+    LaunchScene,       // launch clip `index` on every layer that stores one (allowed with Performance mode off, as LaunchClip)
     StoreClip,         // store `layer`'s current state as clip `index` (screen only: never mapped, refused in Performance mode)
     ClearClip,         // empty clip `index` of `layer` (screen only, as StoreClip)
+    CopyClip,          // put clip `index` of `layer` on the clip clipboard (screen only, as StoreClip)
+    CutClip,           // copy clip `index` of `layer`, then empty it (screen only)
+    PasteClip,         // write the clipboard clip into clip `index` of `layer` (screen only; onto the playing clip it relaunches it)
     PresetNext,
     PresetPrev,
     Panic,
@@ -33,7 +37,9 @@ enum class ControlActionType
     PerformanceNext,   // the next loadable item, wrapping
     MuteSelectedLayer, // toggle the mute of the layer Performance mode has selected
     AppPrev,           // switch the surface to the previous mu app (no multi-app hub yet: always refused)
-    AppNext            // switch the surface to the next mu app (as AppPrev)
+    AppNext,           // switch the surface to the next mu app (as AppPrev)
+    PagePrev,          // show the previous page of layers: selects the layer at the same position on it (no wrap)
+    PageNext           // show the next page of layers (as PagePrev)
 };
 
 // When an action that changes what is heard lands: Default follows the app-wide setting.
@@ -42,8 +48,8 @@ enum class Quantise { Default, Off, Beat, Bar };
 struct ControlAction
 {
     ControlActionType type     = ControlActionType::None;
-    int               layer    = 0;        // MuteLayer / SoloLayer / SelectLayer / LaunchClip / StoreClip / ClearClip: the layer index
-    int               index    = -1;       // PerformanceItem: the item index; PerformanceMode: -1 toggle, 0 off, 1 on; LaunchClip / StoreClip / ClearClip: the clip index (0..7)
+    int               layer    = 0;        // MuteLayer / SoloLayer / SelectLayer / LaunchClip / StoreClip / ClearClip / CopyClip / CutClip / PasteClip: the layer index
+    int               index    = -1;       // PerformanceItem: the item index; PerformanceMode: -1 toggle, 0 off, 1 on; LaunchClip / LaunchScene / StoreClip / ClearClip / CopyClip / CutClip / PasteClip: the clip index (0..7)
     juce::String      paramId;             // Parameter: the APVTS parameter id
     float             value    = 0.0f;     // Parameter: normalised 0..1
     Quantise          quantise = Quantise::Default;
@@ -64,8 +70,12 @@ inline const char* actionName(ControlActionType t) noexcept
         case ControlActionType::LaunchClip:      return "launchClip";
         case ControlActionType::ClipNext:        return "clipNext";
         case ControlActionType::ClipPrev:        return "clipPrev";
+        case ControlActionType::LaunchScene:     return "launchScene";
         case ControlActionType::StoreClip:       return "storeClip";
         case ControlActionType::ClearClip:       return "clearClip";
+        case ControlActionType::CopyClip:        return "copyClip";
+        case ControlActionType::CutClip:         return "cutClip";
+        case ControlActionType::PasteClip:       return "pasteClip";
         case ControlActionType::PresetNext:      return "presetNext";
         case ControlActionType::PresetPrev:      return "presetPrev";
         case ControlActionType::Panic:           return "panic";
@@ -76,22 +86,25 @@ inline const char* actionName(ControlActionType t) noexcept
         case ControlActionType::MuteSelectedLayer: return "muteSelectedLayer";
         case ControlActionType::AppPrev:         return "appPrev";
         case ControlActionType::AppNext:         return "appNext";
+        case ControlActionType::PagePrev:        return "pagePrev";
+        case ControlActionType::PageNext:        return "pageNext";
         case ControlActionType::None:            break;
     }
     return "none";
 }
 
-// StoreClip and ClearClip are deliberately absent from the list: they write data, so no saved map, surface
-// mapping or MIDI message can name them (a pad never writes a clip).
+// StoreClip, ClearClip, CopyClip, CutClip and PasteClip are deliberately absent from the list: they write data (or the
+// clipboard), so no saved map, surface mapping or MIDI message can name them (a pad never writes a clip).
 inline ControlActionType actionFromName(const juce::String& n) noexcept
 {
     for (auto t : { ControlActionType::Parameter, ControlActionType::TransportToggle, ControlActionType::TransportPlay,
                     ControlActionType::TransportStop, ControlActionType::MuteLayer, ControlActionType::SoloLayer,
                     ControlActionType::SelectLayer, ControlActionType::LaunchClip, ControlActionType::ClipNext,
-                    ControlActionType::ClipPrev, ControlActionType::PresetNext,
+                    ControlActionType::ClipPrev, ControlActionType::LaunchScene, ControlActionType::PresetNext,
                     ControlActionType::PresetPrev, ControlActionType::Panic, ControlActionType::PerformanceMode,
                     ControlActionType::PerformanceItem, ControlActionType::PerformancePrev, ControlActionType::PerformanceNext,
-                    ControlActionType::MuteSelectedLayer, ControlActionType::AppPrev, ControlActionType::AppNext })
+                    ControlActionType::MuteSelectedLayer, ControlActionType::AppPrev, ControlActionType::AppNext,
+                    ControlActionType::PagePrev, ControlActionType::PageNext })
         if (n == actionName(t)) return t;
     return ControlActionType::None;
 }

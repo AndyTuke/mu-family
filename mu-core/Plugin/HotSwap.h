@@ -162,6 +162,23 @@ public:
         ++fullSerial;
     }
 
+    // ── Message thread: a batch of stagings the audio thread must see whole ──
+    // A scene stages one payload per layer. Between beginBatch and endBatch the sequence is odd, and an
+    // audio-thread flag pass that overlaps any part of the window flags nothing (batchSteady), so a boundary
+    // never lands on some of the batch's layers and not the others. A pass that missed its boundary this way
+    // loses it: the whole batch waits for the next one.
+    // Not nestable: a second beginBatch before endBatch would make the sequence even again (open) while a batch is open.
+    void beginBatch() noexcept { assertMessageThread(); jassert((batchSeq.load(std::memory_order_relaxed) & 1u) == 0); batchSeq.fetch_add(1, std::memory_order_seq_cst); }
+    void endBatch() noexcept   { assertMessageThread(); batchSeq.fetch_add(1, std::memory_order_seq_cst); }
+
+    // Audio thread: the sequence a flag pass reads before it reads any token, and the check after it that no batch
+    // began or ended meanwhile. Tokens read inside a steady window are either all of a finished batch or none of it.
+    uint32_t batchSeqBefore() const noexcept { return batchSeq.load(std::memory_order_seq_cst); }
+    bool     batchSteady(uint32_t before) const noexcept
+    {
+        return (before & 1u) == 0 && batchSeq.load(std::memory_order_seq_cst) == before;
+    }
+
     // Changes every time a full preset is staged (message thread): lets the owner tell its own staging
     // from someone else's.
     uint32_t fullStageSerial() const noexcept { return fullSerial; }
@@ -325,6 +342,7 @@ private:
     Slot<FullPayload>                         full;
     uint32_t                                  fullSerial = 0;   // message thread only
     std::array<uint32_t, (size_t) N>          slotSerials {};   // message thread only
+    std::atomic<uint32_t>                     batchSeq { 0 };   // odd while a staging batch is open
 };
 
 // Slot argument the boundary callable receives when asked about the full preset rather than a layer.
@@ -352,6 +370,7 @@ public:
     // is taken back and applied here.
     void useFull(Payload&& p)
     {
+        sceneSlots.store(0, std::memory_order_relaxed);   // a full preset supersedes every slot's stage
         if (isRunning())
         {
             stager.stageFull(std::move(p));
@@ -367,6 +386,7 @@ public:
 
     void useSlot(int i, Payload&& p)
     {
+        clearScene(i);   // a plain stage on a slot ends its scene membership; markScene re-sets it after the scene's stage
         if (isRunning())
         {
             stager.stage(i, std::move(p));
@@ -399,8 +419,8 @@ public:
     bool isRunning() const noexcept       { return running.load(std::memory_order_relaxed); }
 
     // For tests and a product that decides stage-or-apply itself.
-    void stageFull(Payload&& p)           { stager.stageFull(std::move(p)); }
-    void stageSlot(int i, Payload&& p)    { stager.stage(i, std::move(p)); }
+    void stageFull(Payload&& p)           { sceneSlots.store(0, std::memory_order_relaxed); stager.stageFull(std::move(p)); }
+    void stageSlot(int i, Payload&& p)    { clearScene(i); stager.stage(i, std::move(p)); }
 
     void cancelFull()                     { stager.cancelFull(); }
     uint32_t fullSerial() const noexcept  { return stager.fullStageSerial(); }
@@ -409,8 +429,21 @@ public:
     // Message thread only.
     uint32_t fullCommitCount() const noexcept { return fullCommits; }
     uint32_t slotSerial(int i) const noexcept { return stager.slotStageSerial(i); }
-    void cancel(int i)                    { stager.cancel(i); }
+    void cancel(int i)                    { clearScene(i); stager.cancel(i); }
+    // Message thread: marks slot i's pending payload as part of a scene, so the audio thread asks for the scene's boundary
+    // (isSceneSlot) rather than the slot's own. Call it after the scene's stage, inside the batch; the mark ends with the
+    // payload (a later stage, a cancel, a commit or a full preset).
+    void markScene(int i) noexcept
+    {
+        if (i >= 0 && i < N && stager.hasPending(i)) sceneSlots.fetch_or(1u << i, std::memory_order_relaxed);
+    }
+    // Audio thread: slot i's pending payload belongs to a scene (asked only for pending slots).
+    bool isSceneSlot(int i) const noexcept { return i >= 0 && i < N && (sceneSlots.load(std::memory_order_relaxed) >> i & 1u) != 0; }
+    // Message thread: the stagings between these two calls reach their boundary together or not at all (Stager).
+    void beginBatch() noexcept            { stager.beginBatch(); }
+    void endBatch() noexcept              { stager.endBatch(); }
     bool hasPending(int i) const noexcept { return stager.hasPending(i); }
+    bool isFlagged(int i) noexcept        { return stager.isFlagged(i); }
     bool hasFullPending() const noexcept  { return stager.hasFullPending(); }
 
     // Commit what reached its boundary: the full preset first (it supersedes the slot swaps), then
@@ -419,7 +452,8 @@ public:
     {
         const bool full = stager.consumeFull([this](Payload& p) { runApplyFull(p); });
         for (int i = 0; i < N; ++i)
-            stager.consume(i, [this, i](Payload& p) { if (applySlot) applySlot(i, p); });
+            if (stager.consume(i, [this, i](Payload& p) { if (applySlot) applySlot(i, p); }))
+                clearScene(i);
         return full;
     }
 
@@ -449,11 +483,28 @@ public:
         // Tokens are read before the boundary rule runs, so a flag can only land on the payload
         // the rule was asked about (see Stager).
         bool flagged = false;
+        const auto seq = stager.batchSeqBefore();
         if (const auto token = stager.fullToken())
             flagged |= stager.flagFullIfReady(token, reached(kFullPreset));
+        if (! stager.batchSteady(seq))
+        {
+            // A staging batch (a scene) overlaps this pass: flag nothing. The slot loop below is not run, so no
+            // layer of the batch can land alone; the full preset above is not part of any batch and is unaffected.
+            // wasPlaying stays as it was, so a play-to-stop edge this pass could not act on is seen again by the next.
+            return flagged;
+        }
+
+        // Pass 1: read every token and decide its boundary. Pass 2: flag them only if no batch began meanwhile.
+        std::array<typename Stager<Payload, Payload, N>::Token, (size_t) N> tokens {};
+        std::array<bool, (size_t) N> atBoundary {};
         for (int i = 0; i < N; ++i)
-            if (const auto token = stager.pendingToken(i))
-                flagged |= stager.flagIfReady(i, token, reached(i));
+            if ((tokens[(size_t) i] = stager.pendingToken(i)) != 0)
+                atBoundary[(size_t) i] = reached(i);
+        if (! stager.batchSteady(seq))
+            return flagged;   // a batch began or ended meanwhile: the decisions above may predate it; wasPlaying stays (see above)
+        for (int i = 0; i < N; ++i)
+            if (tokens[(size_t) i] != 0)
+                flagged |= stager.flagIfReady(i, tokens[(size_t) i], atBoundary[(size_t) i]);
         wasPlaying = isPlaying;
         return flagged;
     }
@@ -477,12 +528,34 @@ private:
         if (applyFull) applyFull(p);
     }
 
+    void clearScene(int i) noexcept
+    {
+        if (i >= 0 && i < N) sceneSlots.fetch_and(~(1u << i), std::memory_order_relaxed);
+    }
+
+    static_assert(N <= 32, "the scene mask is one word");
+    std::atomic<uint32_t>       sceneSlots { 0 };   // bit i: slot i's pending payload is part of a scene
     Stager<Payload, Payload, N> stager;
     ApplyFull                   applyFull;
     ApplySlot                   applySlot;
     uint32_t                    fullCommits = 0;        // message thread only
     std::atomic<bool>           running    { false };   // audio thread's play state, read when a load decides
     bool                        wasPlaying = false;     // audio thread only — the play→stop edge
+};
+
+// Opens a staging batch for its scope (exception safe; not nestable). Keep the scope to the staging calls only: stage
+// and preload everything else before it, because a boundary that falls inside the window is lost to the batch.
+template <typename Swapper>
+class StageBatch
+{
+public:
+    explicit StageBatch(Swapper& s) noexcept : swapper(s) { swapper.beginBatch(); }
+    ~StageBatch() { swapper.endBatch(); }
+    StageBatch(const StageBatch&) = delete;
+    StageBatch& operator=(const StageBatch&) = delete;
+
+private:
+    Swapper& swapper;
 };
 
 } // namespace mu_hotswap

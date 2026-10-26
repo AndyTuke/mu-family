@@ -15,7 +15,7 @@
 class ProcessorBase;
 
 // One vertical channel strip.
-// Layout (top→bottom): colour bar | name | [sidechain] | sends+pan | fader+VU+GR | [outBus] | dB | [mute/solo]
+// Layout (top→bottom): colour bar | name | [sidechain] | sends+pan | fader+VU+GR | [Out] | dB | [mute/solo]
 // Master channel: the strip alone; its insert column is mu_ui::MasterInsertPanel, placed beside it by the owner.
 class MixerChannel : public juce::Component
 {
@@ -23,9 +23,15 @@ public:
     // A per-layer channel strip (Channel) vs the FX-return / master strips. The
     // product's layer is a rhythm in mu-clid, a voice in mu-tant.
     // Client is an external-app strip (mu-link): name LCD, four-knob EQ, fader, no sends or sidechain.
-    enum class Type { Channel, EffectReturn, DelayReturn, ReverbReturn, Master, Client };
+    // Bus is a group bus (mu_limits::kMaxBuses): a channel strip without a layer, its insert column
+    // beside it, and no Out selector (a bus goes to the master).
+    enum class Type { Channel, EffectReturn, DelayReturn, ReverbReturn, Master, Client, Bus };
+
+    // The name of group bus `index` (0-based) as the strips and the Out selector show it.
+    static juce::String busName(int index) { return "Bus " + juce::String(index + 1); }
 
     MixerChannel(Type type, const juce::String& name, juce::Colour colour);
+    ~MixerChannel() override;
 
     // status-bar coverage for outBus + scSource dropdowns. Colour is the
     // channel's own colour (used as the status-bar rhythm tag for context).
@@ -48,9 +54,12 @@ public:
                          const juce::String& dlySendParam,
                          const juce::String& revSendParam);
 
-    // Populate the sidechain source dropdown with rhythm channel names.
-    // ownChannelIndex is excluded (pass -1 for return channels to include all rhythm channels).
-    void setSidechainSources(int ownChannelIndex, const juce::StringArray& channelNames);
+    // Populate the sidechain source dropdown with the sources this strip type may legally take (see
+    // mu_mix::isLegalSidechainSource): a channel lists the other channels; a bus lists every channel and the
+    // buses before it; a return lists every channel and every bus. `ownIndex` is the channel index of a
+    // Channel strip or the bus index of a Bus strip (-1 for a return). The external input closes the list.
+    // `busNames` is empty in a product without buses.
+    void setSidechainSources(int ownIndex, const juce::StringArray& channelNames, const juce::StringArray& busNames = {});
 
     // Update the intra-FX send knob display values directly. Used by MixerOverlay::loadFromApvts
     // to refresh eff2dly / eff2rev / dly2rev into the return strips; those params live outside
@@ -125,6 +134,8 @@ private:
     // Construction and layout in parts (constructor / resized()).
     void addSidechainControls();
     int  layoutSidechain(int stripW, int nameBottom);    // returns the section's height
+    void reportKnobStatus(KnobWithLabel& knob, const juce::String& what);   // route a strip knob to the status bar
+    void reportStatus(const juce::String& what, const juce::String& value);  // "<strip> <what>  <value>" in the strip's colour
     int  layoutSends(int stripW, int sendY);             // returns the fader's top
     void layoutFaderAndButtons(int stripW, int faderY);
     void layoutClient();
@@ -170,7 +181,8 @@ private:
     juce::TextButton  soloBtn { "S" };
     StatusLamp        dropoutLamp;   // client strips: a dropout (underrun) indicator
 
-    // Output bus dropdown (layer channels only): M = Master, 1..8 = direct out.
+    // Out dropdown (layer channels only): Main, then the group buses where a product has them, otherwise
+    // Main and the DAW direct outs "Out 1".."Out 8".
     juce::ComboBox    outBusBox;
 
     // Sidechain controls (layer channels only)
@@ -180,11 +192,13 @@ private:
     KnobWithLabel     scRelease { "\\",  Id::knobFxSend };
 
     bool hasSends()            const { return channelType == Type::Channel
+                                             || channelType == Type::Bus
                                              || channelType == Type::EffectReturn
                                              || channelType == Type::DelayReturn; }
     bool isClient()            const { return channelType == Type::Client; }
     bool hasMuteSolo()         const { return channelType != Type::Master; }
     bool hasSidechainControls() const { return channelType == Type::Channel
+                                             || channelType == Type::Bus
                                              || channelType == Type::EffectReturn
                                              || channelType == Type::DelayReturn
                                              || channelType == Type::ReverbReturn; }
@@ -228,4 +242,15 @@ private:
     juce::Rectangle<int> sidechainPaneBounds;
     juce::Rectangle<int> sendsPaneBounds;
     juce::Rectangle<int> faderPaneBounds;
+
+    // The fader and the mute / solo buttons report what the user does to the status bar (listeners run on user changes
+    // and notified ones, not on a silent reload of the strip).
+    struct StripStatus : public juce::Slider::Listener, public juce::Button::Listener
+    {
+        explicit StripStatus(MixerChannel& o) : owner(o) {}
+        void sliderValueChanged(juce::Slider* s) override;
+        void buttonClicked(juce::Button* b) override;
+        MixerChannel& owner;
+    };
+    StripStatus stripStatus { *this };   // declared last: it goes before the controls it listens to
 };

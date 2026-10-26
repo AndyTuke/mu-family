@@ -7,6 +7,7 @@
 #include "Sequencer/RetireTail.h"       // mu-core: mu_core::ParamBinding
 #include "Audio/InsertProcessor.h"      // mu-core: shared per-voice insert FX
 #include "Modulation/MuToniModDest.h"   // isValidModDest, the modulation target table
+#include "Modulation/StripMods.h"   // mu-core: the sends as modulation targets
 #include "Persistence/ArpParams.h"      // the Arp type's parameter table (vpi)
 
 #include <array>
@@ -38,6 +39,7 @@ struct Arp : Layer
 
     // The compressor / limiter meter of this layer's insert.
     const std::atomic<float>* insertGainReduction() const override { return &insert->grReduction; }
+    bool stripMods(float (&out)[4]) const noexcept override { return stripMod.read(out); }
 
     // Saved modulators keep only destinations mu-Toni has.
     bool isValidDest(const std::string& id) const override { return isValidModDest(id); }
@@ -49,12 +51,34 @@ struct Arp : Layer
     void prepare(double sampleRate, int blockSize) override;
     // Message thread: the slot's a{slot}_ rows, the MIDI-in channel row and the modulation inputs.
     void bindParams(juce::AudioProcessorValueTreeState& apvts, int slot) override;
+    // The layer moved to another slot: its noise seeds (the insert's, and the voice's where the creating host recorded its
+    // salt) follow the slot, as at creation, so two layers never share a sequence after a delete and a create.
+    void onMoved(int newIndex) override
+    {
+        insert->setSlotIndex(newIndex);
+        if (noiseSaltSet) runner.setSlotIndex(newIndex, noiseSalt);
+    }
+    juce::int64 noiseSalt = 0;      // the per-instance salt the voice's seed was made with (set by a host that creates Arps by type)
+    bool        noiseSaltSet = false;
     // Audio thread: the layer's block, insert included, into out[0, n) (handed over cleared).
     void render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n) override;
     // Audio thread: a parked spare keeps hearing the keys, so it knows them when its slot goes live.
     void onParkedBlock(const mu_core::RenderContext& ctx) override;
     // A staged layer preset lands on the 4/4 bar line (the arp has no loop of its own).
     double loopBeats() const override { return 4.0; }
+
+    // ── How the layer leaves its slot ────────────────────────────────────────
+    // Fade (the family defaults, 25 ms and 2 s): the voice and the insert keep the parameters they were last
+    // given, so the tail copies nothing at beginRetire and never reads a parameter.
+    mu_core::RetirePolicy retirePolicy() const override
+    {
+        mu_core::RetirePolicy p;
+        p.kind = mu_core::RetirePolicy::Kind::Fade;
+        return p;
+    }
+    // Audio thread: the voice (no keys, no steps: its held note is released) and then the insert, under the bin's
+    // linear fade. False never: the bin ends the tail when its ramp is spent.
+    bool renderRetiring(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n, mu_core::RetireState& rs) override;
 
     // ── The block's work in parts ────────────────────────────────────────────
     // Audio thread: the call's MIDI (its own frames) into the held keys, and the key fields of `context` from
@@ -99,8 +123,11 @@ private:
     std::array<juce::NormalisableRange<float>, kNumModDests>  modDestRanges {};
     std::unordered_map<std::string_view, float>               modParamValues;
     LiveValues                                                modLive;
-    std::array<float, kNumModDests>                           lastResolved {};   // the last block's out[] (C12)
+    std::array<float, kNumModDests>                           lastResolved {};
+    mu_mod::StripMods                                         stripMod;   // the modulated pan and FX sends, for the mixer strip   // the last block's out[] (C12)
     bool                                                      haveResolved = false;
+
+    juce::AudioBuffer<float> tailScratch;   // a tail that must add rather than write renders here (sized at prepare)
 
     bool parked = true;   // not rendered live in the last rendered block (or prepared since): start from silence
 };

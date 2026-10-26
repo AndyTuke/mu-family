@@ -1,0 +1,215 @@
+// The 16-slot parameter layout: what the real layout holds, what a layout the size the finished product will have
+// costs to build, and that the strips of all sixteen slots are bound.
+//
+// The cost check is docs/mu-tronic/design.md 3.4: every slot will declare every layer type's parameters, about
+// 4,000 to 6,000 in all, and the editor must open in under a second. The numbers below are measured here and
+// logged; the budget they are held to is generous (the log line is the record).
+
+#include "Plugin/PluginProcessor.h"
+#include "Persistence/TronicState.h"
+#include "Tests/ProcessorSeamHelpers.h"
+
+#include <chrono>
+#include <set>
+
+#if JUCE_WINDOWS
+ #include <windows.h>
+ #include <psapi.h>
+ #pragma comment(lib, "psapi.lib")
+#endif
+
+namespace
+{
+    // The process's private memory in bytes (0 where it cannot be read).
+    juce::int64 privateBytes()
+    {
+       #if JUCE_WINDOWS
+        PROCESS_MEMORY_COUNTERS_EX info {};
+        if (GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&info), sizeof(info)))
+            return (juce::int64) info.PrivateUsage;
+       #endif
+        return 0;
+    }
+
+    // A layout of `perSlot` float parameters for each of the 16 slots (the shape of the finished product's, by count).
+    juce::AudioProcessorValueTreeState::ParameterLayout syntheticLayout(int perSlot)
+    {
+        juce::AudioProcessorValueTreeState::ParameterLayout layout;
+        for (int s = 0; s < mu_limits::kMaxLayers; ++s)
+            for (int p = 0; p < perSlot; ++p)
+                layout.add(std::make_unique<juce::AudioParameterFloat>(
+                    juce::ParameterID { "x" + juce::String(s) + "_p" + juce::String(p), 1 }, "Parameter " + juce::String(p),
+                    juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f));
+        return layout;
+    }
+
+    struct SilentProcessor : juce::AudioProcessor
+    {
+        SilentProcessor() : juce::AudioProcessor(BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo())) {}
+        const juce::String getName() const override { return "layout-probe"; }
+        void prepareToPlay(double, int) override {}
+        void releaseResources() override {}
+        void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override {}
+        juce::AudioProcessorEditor* createEditor() override { return nullptr; }
+        bool hasEditor() const override { return false; }
+        bool acceptsMidi() const override { return false; }
+        bool producesMidi() const override { return false; }
+        double getTailLengthSeconds() const override { return 0.0; }
+        int getNumPrograms() override { return 1; }
+        int getCurrentProgram() override { return 0; }
+        void setCurrentProgram(int) override {}
+        const juce::String getProgramName(int) override { return {}; }
+        void changeProgramName(int, const juce::String&) override {}
+        void getStateInformation(juce::MemoryBlock&) override {}
+        void setStateInformation(const void*, int) override {}
+    };
+}
+
+struct MuTronicLayoutTests : juce::UnitTest
+{
+    MuTronicLayoutTests() : juce::UnitTest("mu-Tronic 16-slot parameter layout", "mu-tronic-layout") {}
+
+    void runTest() override
+    {
+        beginTest("the real layout declares a full mixer strip for each of the sixteen slots, with unique ids");
+        {
+            mu_seam_test::TempStorage storage;
+            mu_tronic::PluginProcessor p;
+            std::set<juce::String> ids;
+            for (auto* raw : p.getParameters())
+                if (auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*>(raw))
+                    expect(ids.insert(withId->getParameterID()).second, "duplicate parameter id " + withId->getParameterID());
+            for (int s = 0; s < 16; ++s)
+                for (const char* suffix : { "lvl", "pan", "mute", "solo", "sendEff", "sendDly", "sendRev", "scSrc", "scAmt", "scAtk", "scRel", "outBus" })
+                    expect(p.apvts.getParameter("ch" + juce::String(s) + "_" + suffix) != nullptr, "ch" + juce::String(s) + "_" + suffix);
+            expect(p.apvts.getParameter("ch16_lvl") == nullptr, "no seventeenth strip");
+            logMessage("mu-Tronic parameters today: " + juce::String((int) ids.size()));
+        }
+
+        beginTest("every registered type's prefix letter is a listed one, has rows in every slot, and its ids belong to their slot");
+        {
+            mu_seam_test::TempStorage storage;
+            mu_tronic::PluginProcessor p;
+            const auto layout = mu_pp::LayerLayout::withPrefixSets(p, mu_tronic::slotPrefixSets());   // the layout the processor saves by
+
+            // The ids of every parameter, once.
+            juce::StringArray ids;
+            for (auto* raw : p.getParameters())
+                if (auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*>(raw))
+                    ids.add(withId->getParameterID());
+
+            const auto& types = p.getLayerTypes();
+            expect(types.size() > 0, "a type is registered");
+            for (int t = 0; t < types.size(); ++t)
+            {
+                const auto& info = types.at(t);
+                const char letter = info.paramPrefixLetter;
+                expect(letter != 0 && juce::String(mu_tronic::kPrefixLetters).containsChar((juce::juce_wchar) letter),
+                       juce::String(info.name) + " names a letter missing from kPrefixLetters (its rows would be saved as globals)");
+
+                for (int slot = 0; slot < mu_limits::kMaxLayers; ++slot)
+                {
+                    const auto prefix = mu_tronic::slotPrefix(letter, slot);
+                    int rows = 0;
+                    for (const auto& id : ids)
+                        if (id.startsWith(prefix))
+                        {
+                            ++rows;
+                            expectEquals(layout.slotOf(id), slot, id + " belongs to its slot, not the globals");
+                        }
+                    expect(rows > 0, juce::String(info.name) + " declares rows under " + prefix);
+                }
+            }
+        }
+
+        beginTest("every choosable type has its own one-character disc initial (a sixth engine cannot collide silently)");
+        {
+            mu_seam_test::TempStorage storage;
+            mu_tronic::PluginProcessor p;
+            const auto& types = p.getLayerTypes();
+            juce::StringArray seen;
+            for (int t = 0; t < types.size(); ++t)
+            {
+                const auto& info = types.at(t);
+                const juce::String initial = juce::String::fromUTF8(info.discInitial);
+                expectEquals(initial.length(), 1, juce::String(info.name) + " has a one-character initial");
+                expect(! seen.contains(initial), juce::String(info.name) + " shares its initial " + initial);
+                seen.add(initial);
+            }
+            using mu_core::LayerTypeId;
+            expectEquals(types.discInitial(LayerTypeId::Rhythm), juce::String("E"), "Rhythm is E (Euclid), so Rumble can be R");
+            expectEquals(types.discInitial(LayerTypeId::Pattern), juce::String("P"));
+            expectEquals(types.discInitial(LayerTypeId::Arp), juce::String("A"));
+            expectEquals(types.discInitial(LayerTypeId::Kick), juce::String("K"));
+            expectEquals(types.discInitial(LayerTypeId::Bass), juce::String("B"));
+            expectEquals(types.discInitial(LayerTypeId::Hat), juce::String("H"));
+            expectEquals(types.discInitial(LayerTypeId::Snare), juce::String("S"));
+            expectEquals(types.discInitial(LayerTypeId::Rumble), juce::String("R"));
+            expectEquals(types.discInitial(LayerTypeId::FmPerc), juce::String("F"));
+            expectEquals(types.discInitial(LayerTypeId::Chord), juce::String("C"));
+            expectEquals(seen.size(), 10, "ten choices");
+        }
+
+        beginTest("a strip's sidechain source reaches every slot and the external bus");
+        {
+            mu_seam_test::TempStorage storage;
+            mu_tronic::PluginProcessor p;
+            auto* sc = dynamic_cast<juce::AudioParameterInt*>(p.apvts.getParameter("ch0_scSrc"));
+            expect(sc != nullptr);
+            if (sc != nullptr) expectEquals(sc->getNormalisableRange().end, (float) (mu_limits::kMaxLayers + 1 + mu_limits::kMaxBuses), "0 off, 1..16 slots, 17 external, 18.. the buses");
+            auto* ret = dynamic_cast<juce::AudioParameterInt*>(p.apvts.getParameter("ret_eff_scSrc"));
+            expect(ret != nullptr);
+            if (ret != nullptr) expectEquals(ret->getNormalisableRange().end, (float) (mu_limits::kMaxLayers + 1 + mu_limits::kMaxBuses));
+        }
+
+        beginTest("cost check on the real layout: the processor with every registered type's rows builds inside the budget");
+        {
+            mu_seam_test::TempStorage storage;
+            const auto memBefore = privateBytes();
+            const auto t0 = std::chrono::steady_clock::now();
+            auto p = std::make_unique<mu_tronic::PluginProcessor>();
+            const auto ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+            const auto memAfter = privateBytes();
+            const int count = (int) p->getParameters().size();
+            logMessage("real mu-Tronic layout: " + juce::String(count) + " parameters, whole processor built in " + juce::String(ms, 1)
+                       + " ms, about " + juce::String((memAfter - memBefore) / 1024) + " KiB of private memory");
+            expect(ms < 1000.0, "building the real processor took " + juce::String(ms, 1) + " ms");
+            // 63 Arp rows, 44 Track rows (the t{N}_ table the six mu-On types share), the Pattern's rows and the Rhythm's
+            // rows in each of the sixteen slots, plus the mixer, FX, bus and global parameters (well under 400).
+            int patternRows = 0, rhythmRows = 0;
+            for (auto* raw : p->getParameters())
+                if (auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*>(raw))
+                {
+                    if (withId->getParameterID().startsWith("v0_")) ++patternRows;
+                    if (withId->getParameterID().startsWith("r0_")) ++rhythmRows;
+                }
+            const int kRowsPerSlot = 63 + 97 + patternRows + rhythmRows;
+            expect(rhythmRows > 0, "the Rhythm's rows are declared");
+            expect(count >= 16 * kRowsPerSlot && count < 16 * kRowsPerSlot + 400, "the Arp, Track, Pattern and Rhythm rows of all sixteen slots are in the layout, and no more");
+            p->flushPendingAsyncUpdates();
+        }
+
+        beginTest("cost check: a 16-slot layout of the finished product's size builds well inside the budget");
+        {
+            // The design's estimate is 4,000 to 6,000 parameters; take the top of it.
+            constexpr int kPerSlot = 6000 / 16;
+            SilentProcessor host;
+            const auto memBefore = privateBytes();
+            const auto t0 = std::chrono::steady_clock::now();
+            auto apvts = std::make_unique<juce::AudioProcessorValueTreeState>(host, nullptr, juce::Identifier("Probe"), syntheticLayout(kPerSlot));
+            const auto ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+            const auto memAfter = privateBytes();
+            const int count = (int) host.getParameters().size();
+            logMessage("16-slot layout cost check: " + juce::String(count) + " parameters, built in " + juce::String(ms, 1)
+                       + " ms, about " + juce::String((memAfter - memBefore) / 1024) + " KiB of private memory");
+            expectEquals(count, 16 * kPerSlot);
+            // Measured 2026-10-19 on the development PC, Debug: 6,000 parameters in about 530 ms and 12 MB. The design's
+            // budget (an editor opening in under a second) is for a Release build, which is several times faster; this Debug
+            // run is held to the full second, so a layout that has grown past what the budget allows fails here first.
+            expect(ms < 1000.0, "building 6,000 parameters took " + juce::String(ms, 1) + " ms");
+            apvts.reset();
+        }
+    }
+};
+
+static MuTronicLayoutTests muTronicLayoutTests;

@@ -41,9 +41,14 @@ public:
     void setStagingBadge(bool show);                  // optional hot-swap "SWP" pill
     void setShowReset(bool show);                     // some products may hide reset
     void setShowDelete(bool show);                    // products with fixed layers hide delete
+    void setShowSave(bool show);                      // a slot host hides Save on an empty slot
+    void setGhostName(bool ghost);                    // the name LCD unlit (an empty slot reads "Slot 5" in ghost lettering)
     void setDeleteEnabled(bool enabled);              // greyed when only one layer remains
     void setNoun(const juce::String& n);              // the product's word for a layer (tooltips); lower-cased
     void setNameEditable(bool editable);              // fixed-name layers can't be renamed
+    // A small raised name plate between the colour dot and the name LCD naming the layer's type ("Toni", "On").
+    // Off by default; empty hides it. A host of several layer types sets it per shown layer.
+    void setTypeTag(const juce::String& text);
     // The layer's clip strip, between the preset dropdown and Save. Off by default: a product with no clip bank
     // (no hot-swap, so nothing to launch into) never shows it. It adds no height.
     void setShowClips(bool show);
@@ -51,6 +56,21 @@ public:
     void bindClips(const mu_core::LiveView* view, mu_core::ControlSink* sink) { clipStrip.bind(view, sink); }
     void setClipLayer(int layerIndex)                 { clipStrip.setLayer(layerIndex); }
     ClipStrip& getClipStrip() noexcept                { return clipStrip; }
+
+    // The layer's MIDI-in channel (docs/design-ui-family.md 13.10): an engraved "Notes In" caption and a channel selector
+    // (Omni, Channel 1 to 16) between the preset dropdown and the clip strip. Opt-in: nothing shows until a product sets
+    // the accessors. `get` returns the layer's channel (0 = Omni, 1 to 16) and `set` writes it (the product points both
+    // at the shown layer's parameter and calls refreshNotesIn() when the selection moves). Routing, not sound: it is
+    // hidden (not disabled) while setShowNotesIn(false), for a type that does not read notes or an empty slot.
+    void setNotesInControl(std::function<int()> get, std::function<void(int channel)> set);
+    void setShowNotesIn(bool show);
+    bool isNotesInShown() const noexcept { return notesInDD.isVisible(); }
+    void refreshNotesIn();                            // re-reads the channel (a slot selected, or a state loaded)
+    DropdownSelect& getNotesInDropdown() noexcept { return notesInDD; }
+    // The status line's value for a channel: "Omni (all channels)" or "Channel 3 only".
+    static juce::String notesInText(int channel);
+    // What the status bar shows (name + value) while the pointer is over the control or after a change.
+    std::function<void(const juce::String& name, const juce::String& value)> onNotesInStatus;
     void commitNameEdit();                            // commit any in-progress rename (call before switching layer)
 
     DropdownSelect& getPresetDropdown() noexcept { return presetDD; }
@@ -74,6 +94,7 @@ private:
     juce::TextButton resetBtn  { juce::String::charToString(0x21BA) };  // ↺
     juce::TextButton deleteBtn { juce::String::charToString(0x2715) };  // ✕
     DropdownSelect   presetDD;
+    DropdownSelect   notesInDD;
     ClipStrip        clipStrip;
     juce::TextButton saveBtn   { "Save" };
 
@@ -84,8 +105,19 @@ private:
     bool         staging   = false;
     bool         showReset = true;
     bool         showDelete = true;
+    bool         showSave   = true;
+    bool         ghostName  = false;
     bool         showClips  = false;
+    bool         showNotesIn = true;
+    std::function<int()>     notesInGet;
+    std::function<void(int)> notesInSet;
+    juce::Rectangle<int>     notesInCaptionR;   // the engraved caption's slot, set by resized()
     juce::String noun { "layer" };
+    juce::String typeTag;
+
+    int typeTagWidth() const;   // the plate and the gap after it, scaled; 0 with no tag
+    void mouseEnter(const juce::MouseEvent&) override;   // the Notes In selector's hover text (it listens to its combo box)
+    void updateNotesInVisibility();
 
     static constexpr int kIconBtnW   = 22;
     static constexpr int kPresetBtnW = 38;

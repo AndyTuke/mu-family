@@ -146,7 +146,7 @@ struct MuOnPrefixMigrationTests : juce::UnitTest
                     expect(n > 0, juce::String(mu_on::engineName(engine)) + " has targets");
                     for (int i = 0; i < n; ++i)
                     {
-                        const auto id = mu_on::layerParamPrefix(track) + t[i].param;
+                        const auto id = mu_mod::paramIdFor(mu_on::layerParamPrefix(track), track, t[i].param);   // a pan or send is the strip's
                         expect(p.apvts.getParameter(id) != nullptr, "live parameter: " + id);
                     }
                 }

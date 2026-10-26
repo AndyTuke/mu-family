@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Plugin/PluginProcessor.h"
+#include <juce_gui_basics/juce_gui_basics.h>
+#include "UI/RhythmHost.h"
 #include "UI/Components/SegmentControl.h"
 #include "UI/Components/MuLookAndFeel.h"
 
@@ -13,7 +14,7 @@ class SampleBrowserContent : public juce::Component,
                               public juce::FileBrowserListener
 {
 public:
-    SampleBrowserContent(PluginProcessor& proc,
+    SampleBrowserContent(RhythmHost& host,
                          const juce::File& startDir,
                          std::function<void(const juce::File&)> onChosen);
     ~SampleBrowserContent() override;
@@ -30,7 +31,7 @@ public:
     void browserRootChanged(const juce::File&) override {}
 
 private:
-    PluginProcessor& proc;
+    RhythmHost& host;
     std::function<void(const juce::File&)> onChosen;
     juce::WildcardFileFilter fileFilter;
     juce::FileBrowserComponent browser;

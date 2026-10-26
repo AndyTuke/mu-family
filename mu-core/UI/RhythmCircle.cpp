@@ -43,11 +43,24 @@ void RhythmCircle::setPlayState(mu_core::RhythmPlayState*  state,
                                  juce::Colour                         colour)
 {
     playState     = state;
+    playStateSource = nullptr;
     isPlayingAtom = playing;
     rhythmColour  = colour;
 
     // Show the new rhythm's own step at once; while stopped the timer does not refresh it, so it
     // would otherwise keep the previous rhythm's highlight.
+    paintStep = state ? state->readPosition().step : 0;
+}
+
+void RhythmCircle::setPlayStateSource(PlayStateSource source, const std::atomic<bool>* playing, juce::Colour colour)
+{
+    playState       = nullptr;
+    playStateSource = std::move(source);
+    isPlayingAtom   = playing;
+    rhythmColour    = colour;
+
+    // As setPlayState: the new rhythm's own step shows at once.
+    const auto* state = currentPlayState();
     paintStep = state ? state->readPosition().step : 0;
 }
 
@@ -74,7 +87,8 @@ void RhythmCircle::timerCallback()
     bool dirty = false;
 
     // ── Read play state ──────────────────────────────────────────────────────
-    if (playState && isPlayingAtom)
+    auto* const live = currentPlayState();   // looked up per tick: a moved or replaced layer is never read
+    if (live && isPlayingAtom)
     {
         const bool playing = isPlayingAtom->load();
 
@@ -82,14 +96,14 @@ void RhythmCircle::timerCallback()
         {
             // One consistent snapshot: a fraction from the next step paired with the old step would
             // make the ring jump back a step at the moment a hit sounds.
-            const auto  pos   = playState->readPosition();
+            const auto  pos   = live->readPosition();
             const int   step  = pos.step;
             const int   stepC = pos.stepC;
             const float frac  = pos.frac;
             paintStep         = step;
-            const int   sA    = juce::jmax(1, playState->stepsA.load());
-            const int   sB    = juce::jmax(1, playState->stepsB.load());
-            const int   sC    = juce::jmax(1, playState->stepsC.load());
+            const int   sA    = juce::jmax(1, live->stepsA.load());
+            const int   sB    = juce::jmax(1, live->stepsB.load());
+            const int   sC    = juce::jmax(1, live->stepsC.load());
             const float twoPi = juce::MathConstants<float>::twoPi;
 
             // Each ring rotates at its own speed: one full turn per sX steps.
@@ -102,7 +116,7 @@ void RhythmCircle::timerCallback()
             // edge-detect via monotonic counter so multiple readers
             // (this circle + sidebar mini-circles + sidebar pulse) can all observe
             // the same hit without racing each other on a shared one-shot flag.
-            const int currentHitCount = playState->hitCount.load();
+            const int currentHitCount = live->hitCount.load();
             if (currentHitCount != lastHitCount)
             {
                 lastHitCount = currentHitCount;

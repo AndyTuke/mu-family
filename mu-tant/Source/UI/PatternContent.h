@@ -8,6 +8,7 @@
 #include "UI/Components/SegmentControl.h"
 #include "UI/Voice/InsertSubsection.h"   // shared mu-core insert panel
 #include "UI/GatingDesigner.h"
+#include "UI/LayerContent.h"         // mu-core: the base every layer type's content derives from
 #include "UI/PatternHost.h"               // what the content reads from the layer's host
 
 #include <vector>
@@ -49,8 +50,8 @@ private:
 // LayerPanel. `setLayer(idx)` rebinds every APVTS attachment to the v{idx}_* param family so
 // clicking a different voice in the sidebar swaps the editor's target slot. Root + scale are
 // shared (global APVTS params) and stay bound across voice changes.
-class PatternContent : public juce::Component,
-                   private juce::Timer
+class PatternContent : public LayerContent,
+                       private juce::Timer
 {
 public:
     // `base` is handed to the shared mu-core sections that take the processor (the insert section);
@@ -60,7 +61,7 @@ public:
 
     // Rebind every per-voice attachment to the v{idx}_* family. Shared params
     // (root, scale) are unaffected.
-    void setLayer(int layerIndex);
+    void setLayer(int layerIndex) override;
     int  getLayer() const noexcept { return currentLayer; }
 
     // The insert algorithm changed: the editor re-labels the modulators' insert destinations.
@@ -79,6 +80,18 @@ public:
     // 30 Hz timers cannot dereference freed matrix or insert-meter memory.
     void clearAllModBindings();
 
+    // The same, for a host that keeps one content for every Pattern slot (LayerContent): the arcs, the insert's meter
+    // and the gate editor's envelopes all point into the shown layer. setLayer rebinds them.
+    void releaseModulationArcs() override { clearAllModBindings(); clearPatternBindings(); }
+
+    // Opt-in "MIDI" Free | Note selector on the Root / Scale row, for a host where Note mode is a per-layer choice
+    // (mu-Tronic). `get(slot)` / `set(slot, mode)` read and write the layer's mode (0 Free, 1 Note); the selector
+    // is re-read in setLayer. Never called in mu-Tant (Note mode is an app setting there), so its row is unchanged.
+    using NoteModeGetter = std::function<int(int slot)>;
+    using NoteModeSetter = std::function<void(int slot, int mode)>;
+    void setNoteModeControl(NoteModeGetter get, NoteModeSetter set);
+    bool hasNoteModeControl() const noexcept { return noteModeGet != nullptr; }
+
     void paint(juce::Graphics& g) override;
     void resized() override;
     void paintOverChildren(juce::Graphics& g) override;   // panel screws, over the content
@@ -89,6 +102,22 @@ private:
     int currentLayer = 0;
 
     using APVTS = juce::AudioProcessorValueTreeState;
+
+    // The Free | Note selector: a tooltip, and the hovered segment for the status bar.
+    class NoteModeSelector : public SegmentControl, public juce::SettableTooltipClient
+    {
+    public:
+        NoteModeSelector() : SegmentControl({ "Free", "Note" }, ActiveStyle::General, DrawStyle::Lcd) {}
+        std::function<void(int segment)> onHover;
+        void mouseMove(const juce::MouseEvent& e) override
+        {
+            if (onHover && getWidth() > 0) onHover(juce::jlimit(0, getNumSegments() - 1, e.x * getNumSegments() / getWidth()));
+        }
+    };
+    juce::Label       noteModeLabel;
+    NoteModeSelector  noteModeCtrl;
+    NoteModeGetter    noteModeGet;
+    NoteModeSetter    noteModeSet;
 
     // ── Tonal centre (shared across voices) ─────────────────────────────────
     juce::Label    rootLabel;

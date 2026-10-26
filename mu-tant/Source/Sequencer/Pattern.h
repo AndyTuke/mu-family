@@ -1,10 +1,12 @@
 #pragma once
 
+#include "Modulation/StripMods.h"   // mu-core: the sends as modulation targets
+
 #include "Sequencer/Layer.h"          // mu-core: name, colour, modulation, the render contract
 #include "Sequencer/LayerTypeInfo.h"  // mu-core: mu_core::LayerTypeId
 #include "Sequencer/RetireTail.h"     // mu-core: ParamBinding, RetireSnapshot
 #include "Sequencer/GatePattern.h"    // the drawable gate / filter / pitch envelopes
-#include "Sequencer/HeldNoteStack.h"  // Note mode's held keys
+#include "Sequencer/HeldNoteStack.h"  // mu-core: the held-key stack Note mode uses
 #include "Audio/SynthVoice.h"         // VoiceEngine, VoiceConfig
 #include "Audio/VoiceRingBuffer.h"    // audio -> UI level tap for the sidebar glyph
 #include "Audio/InsertProcessor.h"    // mu-core: shared per-voice insert FX
@@ -18,6 +20,9 @@
 
 namespace mu_tant
 {
+
+// Note mode's held keys: last-note priority, 16 notes, a 17th drops the oldest.
+using HeldNoteStack = mu_core::HeldNoteStack<16, mu_core::HeldNoteOverflow::DropOldest>;
 
 class PatternHost;
 
@@ -69,6 +74,7 @@ struct Pattern : Layer
     // and clears it for the new slot (layersMoved).
     SlotBound<InsertProcessor> insert;
     const std::atomic<float>* insertGainReduction() const override { return &insert->grReduction; }
+    bool stripMods(float (&out)[4]) const noexcept override { return stripMod.read(out); }
 
     // The layer's host (the wavetable bank a saved path resolves into, the slot's engine); a copy keeps its own link.
     OwnerLink<PatternHost> host;
@@ -111,6 +117,9 @@ struct Pattern : Layer
     // and wavetable-bank lock from the host (the engine belongs to the slot: VoiceEngine::reset keeps the
     // oscillator phase, so a voice that moves keeps the slot's phase, as the per-slot engines always did).
     void bindParams(juce::AudioProcessorValueTreeState& apvts, int slot) override;
+    // The layer moved to another slot: its insert's noise seed follows the slot, as at creation. (The engine's own seed
+    // belongs to the engine, which a host that moves Patterns moves with them.)
+    void onMoved(int newIndex) override { insert->setSlotIndex(newIndex); }
     // Audio thread: the voice's block into out[0, n) (handed over cleared): modulation, engine, gate, insert.
     void render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n) override;
     // Audio thread: a spare above the live count keeps hearing the keys, so its Note-mode pitch is current
@@ -132,7 +141,7 @@ struct Pattern : Layer
     // 0 Free, 1 Note. Any thread (one atomic store); a change resets the held keys on the next block.
     void setNoteMode(int mode) noexcept { noteMode.store(mode, std::memory_order_relaxed); }
     // Message thread, at creation before the layer is rendered: the mode it starts in, already settled (no reset).
-    void initNoteMode(int mode) noexcept { noteMode.store(mode, std::memory_order_relaxed); notes.lastMode = mode; notes.gateGain = mode == 1 ? 0.0f : 1.0f; }
+    void initNoteMode(int mode) noexcept { noteMode.store(mode, std::memory_order_relaxed); notes.lastMode = mode; notes.gateGain = mode == 1 ? 0.0f : 1.0f; notes.seeded = true; }
     // When true the layer gates its own output with Note mode's 8 ms ramp (a host with no final-mix gate:
     // mu-Tronic). The mu-Tant standalone leaves it off and gates the final mix instead (decision A3).
     // Message thread, before publication.
@@ -229,7 +238,14 @@ private:
         HeldNoteStack held;
         int   lastMode = 0;
         float gateGain = 1.0f;
+        bool  seeded = false;   // the gate has been settled by a first block (or initNoteMode): a later mode switch ramps it
     } notes;
+
+    // What the last live block rendered, for a tail (audio thread only, frozen when the layer leaves its slot): the
+    // held key's transposition and whether the pattern gate let anything through. A tail that ignored them would
+    // drone at the root while the live layer was gated silent.
+    float lastPitchOffset = 0.0f;
+    bool  lastGateOpen    = true;
     bool inputSeeded = false;   // message thread: notes reflect every block since the processor started
 
     // The retire snapshot: the OLD unmodulated config and the insert, frozen by beginRetire.
@@ -241,6 +257,7 @@ private:
     // has resolved once with the lock held, and whether the last rendered block had the layer parked (or none yet).
     // Cleared by prepare, bindParams, resetSlotState (a move or reset) and going live, so nothing held crosses a slot.
     std::array<float, kNumModDests> lastResolved {};
+    mu_mod::StripMods stripMod;   // the modulated pan and FX sends, for the mixer strip
     bool haveResolved = false;
     bool parked       = true;
 };

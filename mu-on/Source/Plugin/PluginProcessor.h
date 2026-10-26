@@ -191,9 +191,7 @@ private:
     // track clocks its own row.
     StepPattern     stepPattern;
 
-    // Cached APVTS pointers for the product sequencer params and each track's engine choice.
-    std::atomic<float>* seqSwingParam  = nullptr;
-    std::atomic<float>* seqAccentParam = nullptr;
+    // Cached APVTS pointers for each track's engine choice.
     std::array<std::atomic<float>*, mu_limits::kMaxLayers> engineParam {};
 
     // Written by prepareToPlay (the host's thread), read by createLayer (the message thread).
@@ -203,13 +201,15 @@ private:
     // Hot-swap: parsed preset trees per track + one full preset, committed at the pattern wrap.
     void applyTrackTree(int track, const juce::ValueTree& tree);
 
+    // The engine the next added track takes (the editor's + Track menu sets it just before the add); unset, layerAdded picks the
+    // first engine no live track runs.
+public:
+    void setNextTrackEngine(EngineType e) noexcept { nextTrackEngine.store(toIndex(e), std::memory_order_relaxed); }
+private:
+    std::atomic<int> nextTrackEngine { -1 };
+
     // A Rumble track whose source is itself, gone, or another Rumble starts on the first Kick.
     void ensureRumbleSource(int track);
-
-    // The global groove (seq_swing, seq_accent) into one row, or into every slot's row: the grid is still
-    // global, so every row takes it on a state load and every block. Atomics only (any thread).
-    void seedRowGroove(StepRow& row) const noexcept;
-    void seedRowGrooves() noexcept;
 
     // Track engines follow their `t{N}_eng` parameter (engineParamChanged); a change from another thread
     // than the message thread is flagged here and built by commitDeferredWork.

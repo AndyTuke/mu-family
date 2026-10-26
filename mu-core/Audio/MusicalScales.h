@@ -3,6 +3,7 @@
 #include <array>
 #include <cmath>
 #include <cstdlib>
+#include <juce_core/juce_core.h>   // midiNoteName returns a juce::String
 
 // The family scale table — one copy for every product (mu-Tant's scale-quantised pitch,
 // mu-Toni's arp root palette + diatonic snap). Dropdown order is the table order.
@@ -83,6 +84,60 @@ inline int snapToScale(int semitoneAboveRoot, int scaleIndex) noexcept
     if (std::abs(within - 12) < bestDist) best = 12;
 
     return oct * 12 + best;
+}
+
+// Snap a (fractional) MIDI note to the nearest note of the scale on `root` (0..11, C..B), keeping its octave.
+// Used where a continuous pitch knob or modulator must land on scale notes (mu-On's Kick and Bass tune).
+inline float snapMidiToScale(float midi, int root, int scaleIndex) noexcept
+{
+    const Scale& s = kScales[(size_t) clampScaleIndex(scaleIndex)];
+    const float rel  = midi - (float) root;
+    const float oct  = std::floor(rel / 12.0f);
+    const float in   = rel - oct * 12.0f;   // 0..12 above the root within this octave
+    float best = (float) s.offsets[0], bestDist = std::abs(in - best);
+    for (int i = 1; i < s.count; ++i)
+    {
+        const float d = std::abs(in - (float) s.offsets[(size_t) i]);
+        if (d < bestDist) { bestDist = d; best = (float) s.offsets[(size_t) i]; }
+    }
+    if (std::abs(in - 12.0f) < bestDist) best = 12.0f;   // the root an octave up can be nearer than any degree
+    return (float) root + oct * 12.0f + best;
+}
+
+// Note name of a MIDI note ("C2", "F#3"; middle C = C4 = 60), and whether it belongs to the scale on `root`.
+inline juce::String midiNoteName(int midi)
+{
+    static const char* const kNames[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+    const int pc = ((midi % 12) + 12) % 12;
+    return juce::String(kNames[pc]) + juce::String((midi - pc) / 12 - 1);
+}
+
+inline bool midiInScale(int midi, int root, int scaleIndex) noexcept
+{
+    const Scale& s = kScales[(size_t) clampScaleIndex(scaleIndex)];
+    const int within = (((midi - root) % 12) + 12) % 12;
+    for (int i = 0; i < s.count; ++i)
+        if (s.offsets[(size_t) i] == within) return true;
+    return false;
+}
+
+// The MIDI note `degrees` scale notes above `midi` (below when negative). From a note outside the scale the first move
+// lands on the nearest scale note in that direction.
+inline int moveMidiInScale(int midi, int degrees, int root, int scaleIndex) noexcept
+{
+    const int dir = degrees > 0 ? 1 : -1;
+    int m = midi;
+    for (int i = 0; i < (degrees < 0 ? -degrees : degrees); ++i)
+    {
+        int guard = 0;   // a scale always has a note within an octave; the guard only stops a bad table looping
+        do { m += dir; } while (! midiInScale(m, root, scaleIndex) && ++guard < 24);
+    }
+    return m;
+}
+
+inline float freqToMidi(float hz) noexcept
+{
+    return 69.0f + 12.0f * std::log2(juce::jmax(1.0e-3f, hz) / 440.0f);
 }
 
 inline float midiToFreq(float midi) noexcept

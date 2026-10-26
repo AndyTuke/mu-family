@@ -17,6 +17,7 @@ struct SlotPresetHeaderConfig
     std::function<int()>             currentSlot;   // the slot the panel shows
     std::function<void()>            resync;        // re-bind the panel after a reset / load
     std::function<juce::String(int)> defaultName;   // suggested save name; empty = the slot's name
+    std::function<bool(int)>         ownSaveCard;   // the type's own save card for the slot: true = it opened, skip the name prompt
 };
 
 // Fill the header's preset dropdown with the slot's presets.
@@ -57,6 +58,7 @@ inline void wireSlotPresetHeader(LayerHeaderBar& header, juce::Component& owner,
     {
         if (safe == nullptr) return;
         const int slot = cfg.currentSlot();
+        if (cfg.ownSaveCard && cfg.ownSaveCard(slot)) return;
         promptTextAsync(safe.getComponent(), "Save " + cfg.noun + " Preset", "Preset name:",
                         cfg.defaultName ? cfg.defaultName(slot) : p->getLayerName(slot), "Save",
             [safe, hdr, p, slot](const juce::String& name)

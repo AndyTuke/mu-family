@@ -51,6 +51,14 @@ at **block rate** from the current envelope value (per-sample cutoff modulation 
 **Release** — all three need a note-off / pitch event the 16-step on/off grid does not yet emit.
 They land with per-step pitch (below) so the UI never shows a control that can't act (audit rule).
 
+**Gate, release, tied steps and glide.** A step holds the note to the end of the step, or of the run of tied steps it starts (the clock passes the hold in samples), then the amp envelope releases (`rel`, 5 to 2000 ms). A step is tied by dragging across it and the step before (`StepRow` tie flag on the later step, saved as `tie`); a tied step does not retrigger, the voice carries on and slides to the new Tune over `glide` (0 to 500 ms, 0 = jump). `rel` and `glide` are appended modulation targets. The voice panel puts the oscillator and filter on the first row and the amp envelope (Atk, Dec, Sus, Rel) and Glide on a second row (`ParamKnobGrid::Spec::newRow`; the grid drops a knob size when its rows do not fit the height).
+
+### Chord — `ChordEngine` (a chord player for dub-techno stabs)
+
+The seventh engine (`EngineType::Chord`, layer type `Chord`, ids `t{N}_chord_*`: `wave` Saw / Square / Pulse, `cut`, `res`, `drive` (on the filter input), `env`, `edec`, `atk`, `dec`, `sus`, `rel`; the same nine closing modulation rows as every engine). Up to six band-limited (PolyBLEP) oscillators, one for each tone of the chord, sum into one low-pass `MultiModeFilter` with its own decay envelope on the cutoff, then one A/D/S/R amp envelope; the chord is held to the end of its step (or tied run) and released. The track insert follows as for every engine.
+
+**The step names the chord** (`StepRow`: `chord`, `inv`, `spread`, plus the shared `note` and `oct`, saved only when not default). The Note is the root, a degree of the master scale (0 = the key note) and the Octave moves it; `mu_on::voiceChord` ([ChordVoicing.h](../../mu-on/Source/Audio/ChordVoicing.h)) turns the step into MIDI notes: the chord list (Scale 7th = stacked thirds of the scale, so the key gives the chord; then Major, Minor, Sus2, Sus4, Maj7, Min7, Dom7, Min9, Maj9, Dom9, Min11, 6th, Min6, Add9, Dim, Aug, Power, built on the root), each inversion lifts the lowest tone an octave, and Spread 0 to 4 lifts the tone at position i by floor(i x spread / 2) more octaves. A chromatic scale has no chord of its own, so Scale 7th is a minor 7th there. The Step panel of a Chord track has two columns (Root, Octave, Chord, Play; Prob, Inv, Spread) and a step cell shows its root and chord.
+
 **Roadmap to deepen the bass:** per-step pitch + glide (a pitched lane row or a piano-roll);
 note-off / gate-length per step (enables Release + sustained vs plucky without the sustain hack);
 a dedicated resonant **rumble** stage (saturated feedback / a second detuned sub); per-sample
@@ -71,10 +79,20 @@ Not sequenced — the classic techno **rumble**. It takes the **rendered audio o
 low-pass, with size + dry/wet mix), a per-bar **volume envelope** (a drawable smooth curve — the
 shared `LFOEditor` — held per track, persisted only when it is not the default flat curve, evaluated
 audio-side under a try-lock), and a final **multimode filter**. Params:
-`t{N}_rumble_drive`, `_d1`/`_d2`/`_d3`, `_size`, `_revmix`, `_revlp`, `_cut`, `_res`.
+`t{N}_rumble_drive`, `_d1`/`_d2`/`_d3`, `_size`, `_revmix`, `_revlp`, `_cut`, `_res`, `_inlp` (input low-pass, 20 Hz to 20 kHz, fully open = off; a plain 12 dB LP on the feed before the drive).
+
+**Master key and scale (global `root`, `scale`, the ids mu-Tant uses; default C Chromatic).** The Kick and Bass `tune` knobs stay Hz (exponential travel, so every semitone takes the same turn) and are snapped to the nearest note of the master key and scale in `TrackEngine::setParams` (`TuneLock`, `mu_audio::snapMidiToScale`), then moved by the engine's `fine` (cents, ±100, not a modulation target). A modulator on Tune therefore steps through the scale's notes. A host with no `root` / `scale` (unbound rows) locks to C Chromatic, a semitone snap. The tonal row UI (Root / Scale, `kTonal*` tokens, the mu-Tant layout) is placed with the per-track layout rework.
 The reverb tone + the block-rate envelope are deliberately basic for now (framework stage). *(Note:
 distinct from the Bass lane's "rumble" voicing above, which is a tonal character of `BassEngine`,
 not this lane.)*
+
+### FM Perc — `FmPercEngine` (ruled 2026-10-21, not yet built)
+The sixth engine (`EngineType::FmPerc`, `t{N}_fmp_*`): toms and techno percussion by phase-modulation FM, **one engine with an Algorithm choice** of eight voice topologies (Tom, Conga, Zap,
+Click, Clank, Wood, Pluck, Burst) over one operator core, **ten knobs fixed for all algorithms**: Tune, Ratio, Index, FM Dec, Fdbk, Dive, D.Time, Decay, Fold, Noise. Sound design, source notes and the
+per-algorithm starting values are in [research-fm-drums.md](research-fm-drums.md) (every number there marked [D] is a listening-pass starting point). Structure and rulings (parameter shape, normalised
+knobs scaled per algorithm, no write on algorithm change, algorithm latched at the trigger, factory `.muTrack` presets, saved format, mu-Tronic) are in
+[design-plugin-family.md](../design-plugin-family.md) "mu-On FM Perc engine"; names in [design-naming.md](../design-naming.md). It steps like Kick and Bass (a step row, velocity scales Index and Dive and
+the level), takes no source, and is a valid Rumble source.
 
 ## Bass↔Kick sidechain (the key interaction)
 This is **not new DSP** — the shared `MixerEngine` already supports **channel-to-channel

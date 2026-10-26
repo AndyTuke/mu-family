@@ -1,12 +1,12 @@
 #include "PitchSubsection.h"
-#include "Plugin/PluginProcessor.h"
+#include "UI/RhythmHost.h"
 #include "ValueFormat.h"   // mu-core: shared value text
 #include "Modulation/ModulationSnapshot.h"
 #include "Sequencer/Rhythm.h"
 
 namespace mu_clid {
 
-PitchSubsection::PitchSubsection(PluginProcessor& p) : proc(p)
+PitchSubsection::PitchSubsection(RhythmHost& h) : host(h)
 {
     for (auto* k : { &pitchOctave, &pitchSemi, &pitchFine,
                      &pitchAtk, &pitchDec, &pitchSus, &pitchRel, &pitchDepth })
@@ -34,7 +34,7 @@ void PitchSubsection::apvtsSet(const char* suffix, float v)
     if (it == paramPtrCache.end())
     {
         const auto id = "r" + juce::String(rhythmIndex) + "_" + suffix;
-        it = paramPtrCache.emplace(suffix, proc.apvts.getParameter(id)).first;
+        it = paramPtrCache.emplace(suffix, host.getRhythmParameters().getParameter(id)).first;
     }
     if (auto* p = it->second)
         p->setValueNotifyingHost(p->convertTo0to1(v));
@@ -42,6 +42,12 @@ void PitchSubsection::apvtsSet(const char* suffix, float v)
 
 void PitchSubsection::wireCallbacks()
 {
+    // The status bar reads number and unit together.
+    pitchOctave.setStatusUnit(mu_fmt::Unit::Octaves);
+    pitchSemi  .setStatusUnit(mu_fmt::Unit::Semitones);
+    pitchFine  .setStatusUnit(mu_fmt::Unit::Cents);
+    pitchDepth .setStatusUnit(mu_fmt::Unit::Semitones);
+
     for (auto* k : { &pitchAtk, &pitchDec, &pitchRel })
     {
         k->getSlider().textFromValueFunction = [](double v) { return mu_fmt::time(v, false); };
@@ -105,8 +111,8 @@ void PitchSubsection::setRhythm(int ri)
 
 void PitchSubsection::loadFromRhythm()
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
-    const auto& p = proc.getRhythm(rhythmIndex).voiceParams;
+    if (rhythmIndex < 0 || rhythmIndex >= host.getRhythmCount()) return;
+    const auto& p = host.getRhythmLayer(rhythmIndex).voiceParams;
     constexpr auto dn = juce::dontSendNotification;
 
     pitchOctave.setValue(p.pitchOctave,          dn);
@@ -118,8 +124,8 @@ void PitchSubsection::loadFromRhythm()
 
 void PitchSubsection::refreshSuffix(const juce::String& suffix)
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
-    const auto& p = proc.getRhythm(rhythmIndex).voiceParams;
+    if (rhythmIndex < 0 || rhythmIndex >= host.getRhythmCount()) return;
+    const auto& p = host.getRhythmLayer(rhythmIndex).voiceParams;
     constexpr auto dn = juce::dontSendNotification;
 
     if      (suffix == "pitchOct")  pitchOctave.setValue(p.pitchOctave,         dn);
@@ -134,28 +140,28 @@ void PitchSubsection::refreshSuffix(const juce::String& suffix)
 
 void PitchSubsection::bindModulationIndicators()
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms())
+    if (rhythmIndex < 0 || rhythmIndex >= host.getRhythmCount())
     {
         for (auto* k : { &pitchOctave, &pitchSemi, &pitchDepth })
             k->clearModBinding();
         return;
     }
-    const auto* mx = &proc.getRhythm(rhythmIndex).modulationMatrix;
+    const auto* mx = &host.getRhythmLayer(rhythmIndex).modulationMatrix;
     static const float kNaN = std::numeric_limits<float>::quiet_NaN();
 
     // pitch.octave: snap stores base+offset in octaves, slider linear -3..+3.
     pitchOctave.bindModulation("pitch.octave", mx,
-        [&proc = proc, ri = rhythmIndex]() -> float {
-            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapPitchOctave) : kNaN; });
+        [&host = host, ri = rhythmIndex]() -> float {
+            return host.isRhythmTransportPlaying() ? host.getRhythmModLive(ri, kSnapPitchOctave) : kNaN; });
     // pitch.semitones: snap stores base+offset in semitones, slider linear -12..+12.
     pitchSemi.bindModulation("pitch.semitones", mx,
-        [&proc = proc, ri = rhythmIndex]() -> float {
-            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapPitchSemi) : kNaN; });
+        [&host = host, ri = rhythmIndex]() -> float {
+            return host.isRhythmTransportPlaying() ? host.getRhythmModLive(ri, kSnapPitchSemi) : kNaN; });
     // pitchFine: not a modulation target — no binding.
     // pitch.envDepth: snap stores display 0..100 semitones.
     pitchDepth.bindModulation("pitch.envDepth", mx,
-        [&proc = proc, ri = rhythmIndex]() -> float {
-            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapPitchEnvDep) : kNaN; });
+        [&host = host, ri = rhythmIndex]() -> float {
+            return host.isRhythmTransportPlaying() ? host.getRhythmModLive(ri, kSnapPitchEnvDep) : kNaN; });
 }
 
 void PitchSubsection::resized()

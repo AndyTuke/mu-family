@@ -53,7 +53,7 @@ $sel.TypeParagraph()
 $sel.Style = $doc.Styles("Normal")
 $sel.TypeText("User Manual")
 $sel.TypeParagraph()
-$sel.TypeText("Version 0.1 (pre-release)")
+$sel.TypeText("Version 1.1 (pre-release)")
 $sel.TypeParagraph()
 $sel.TypeText("Transwarp Development Project")
 $sel.TypeParagraph()
@@ -62,7 +62,7 @@ Br
 # ── 1. Introduction ──────────────────────────────────────────────────────────
 H1 "1. Introduction"
 P "mu-On is a 909-style groove sequencer from Transwarp Development Project. It runs as a VST3 plug-in, a CLAP plug-in, and a standalone application."
-P "mu-On is built from tracks, one to eight of them. Every track has a row of sixteen steps and a sound engine that plays them: Kick and Bass are synthesised, Hat and Snare are built-in drum sounds, and Rumble is a special engine that does not play steps at all but turns another track's sound into the long, dark reverb tail of techno. You switch a track's engine at any time with the Engine dropdown, and the track keeps each engine's settings."
+P "mu-On is built from tracks, one to eight of them. Every track has a row of sixteen steps and a sound engine that plays them: Kick, Bass, FM Perc and Chord are synthesised, Hat and Snare are built-in drum sounds, and Rumble is a special engine that does not play steps at all but turns another track's sound into the long, dark reverb tail of techno. You switch a track's engine at any time with the Engine dropdown, and the track keeps each engine's settings."
 P "Around the tracks is the family you may know from mu-Clid and mu-Tant: eight modulators per track, a mixer with sidechain ducking, shared effects, presets and the transport bar. In the mixer you can make the bass duck from the kick, for the classic pumping groove."
 P "mu-On is Pay What You Want: pay what you like from £0 (suggested £20), and nothing is limited either way (see Supporting mu-On)."
 
@@ -89,7 +89,8 @@ Bullet "Maybe later  —  closes the window and carries on. It will appear again
 Bullet "Enter licence key  —  opens the 'Enter licence key - mu-On' panel, where you type in your key."
 Bullet "Pay what you like  —  opens the checkout page in your web browser. The suggested amount is £20, but £0 is fine. You receive a key either way."
 P "The window cannot be switched off for good. To bring it back at any time, click the Support link at the right of the Status Bar, or the Support button in the About panel."
-P "To enter your key, click Enter licence key in the Support window, or click the mu-On logo to open the About panel and click Enter a key. In the 'Enter licence key - mu-On' panel (it reads 'Enter your licence key to remove the support reminder. Everything works either way.'), paste your key into the Licence key box and click Activate (or press Return). If you do not have a key yet, click Pay what you like to open the checkout page in your web browser. mu-On needs an internet connection the first time, to register the key. One key can be used on up to 5 machines. When the key is accepted the panel shows a confirmation and closes, the About panel shows 'Thank you for your support', and the Support window and Support link no longer appear."
+P "To enter your key, click Enter licence key in the Support window, or click the mu-On logo to open the About panel and click Enter a key. In the 'Enter licence key - mu-On' panel (it reads 'Enter your licence key to remove the support reminder. Everything works either way.'), paste your key into the Licence key box and click Activate (or press Return). If you do not have a key yet, click Pay what you like to open the checkout page in your web browser. mu-On needs an internet connection the first time, to register the key. One key can be used on up to 5 machines. When the key is accepted the panel shows a confirmation and closes, the About panel thanks you for your support, and the Support window and Support link no longer appear."
+P "A licensed copy, even one with a £0 key, shows 'Thank you for supporting mu-On.' in the About panel, with a 'Want to give more?' link beneath it. The link opens the tip page in your web browser, where you can give any amount you like. It does not use up your key, and you do not have to give anything."
 P "Once activated, mu-On checks your key with the server now and then when it starts. If you are offline at that moment it carries on working as normal for up to 30 days."
 P "If activation fails, the panel tells you why. Check that you pasted the whole key and that you are online, then try again. A key that has already been used on 5 machines needs one of them released first; use Contact Support at the bottom of the Settings page. If the computer has no internet connection at all, the licence key panel shows a machine code at the bottom. Send that code to Contact Support and you can be sent an offline licence file for that computer, to place in the mu-On content folder."
 
@@ -98,9 +99,9 @@ H1 "3. Interface Overview"
 P "The mu-On window is divided into four regions:"
 Bullet "Transport Bar (top) — playback, BPM, presets, mixer, and settings"
 Bullet "Track Sidebar (left) — one item per track, plus an Add button"
-Bullet "Track Editor (centre) — the engine, the groove controls and the step rows, with the modulators below, for the selected track"
+Bullet "Track Editor (centre) — the engine, the KEY section, the groove controls and the step rows, with the modulators below, for the selected track"
 Bullet "Mixer overlay — opened from the transport bar, replacing the editor"
-Bullet "Status Bar (bottom) — the name and value of the control you last touched, with a small Support link at the right-hand end. When a newer version is available, an Update available link appears beside Support (see Update Check in the Settings chapter)"
+Bullet "Status Bar (bottom) — the name, value and unit (ms, s, Hz, kHz, %, dB, semitones, cents, octaves or a note name) of the control you last touched, with a small Support link at the right-hand end. When a newer version is available, an Update available link appears beside Support (see Update Check in the Settings chapter)"
 P "The window has two sizes, Medium and Large, chosen in Settings (Display, Size). Everything scales with it. In the standalone application an Options button at the top left of the window opens the audio and MIDI device settings."
 
 # ── 4. Transport Bar ──────────────────────────────────────────────────────────
@@ -122,13 +123,15 @@ Pic "Transport Bar — full width view." "transport-bar.png"
 
 # ── 5. Track Sidebar ──────────────────────────────────────────────────────────
 H1 "5. Track Sidebar"
-P "The sidebar shows one item per track, each with a letter for its engine (K for Kick, B for Bass, H for Hat, S for Snare, R for Rumble), its colour and its name. Click an item to select that track for editing."
-Bullet "Add  —  the + Track button at the bottom adds a track (maximum eight; the button is disabled at eight). A new mu-On starts with one Kick track. A new track takes the first engine of Kick, Bass, Hat, Snare and Rumble that no track is using yet (or Kick if all five are in use), with that engine's starting groove."
+P "The sidebar shows one item per track, each with a letter for its engine (K for Kick, B for Bass, H for Hat, S for Snare, R for Rumble, F for FM Perc, C for Chord), its colour and its name. Click an item to select that track for editing."
+Bullet "Add  —  the + Track button at the bottom adds a track (maximum eight; the button is disabled at eight). A new mu-On starts with one Kick track. + Track asks which engine the new track runs: Kick, Bass, Hat, Snare, Rumble, FM Perc or Chord. The new track starts with that engine's starting groove."
 Bullet "Delete  —  the Delete (×) button in the track header removes the selected track, after a confirmation. The last remaining track cannot be deleted."
 Bullet "Reorder  —  drag an item up or down. A track keeps its settings, steps and colour when it moves."
 P "A track is named after its engine and the name cannot be edited, so two Kick tracks are both called Kick. Presets saved by the earlier five-lane version of mu-On, which had fixed Kick, Bass, Hat, Snare and Rumble lanes, open as five tracks."
 
-Pic "Track Sidebar with five tracks, the Rumble selected." "sidebar.png"
+Pic "Track Sidebar with eight tracks, the most mu-On holds, the Snare selected." "sidebar.png"
+
+Pic "The + Track menu asks which engine the new track runs." "engine-menu.png"
 
 # ── 6. Track Header ───────────────────────────────────────────────────────────
 H1 "6. Track Header"
@@ -141,7 +144,12 @@ Bullet "Reset (circular arrow) / Delete (×) — reset to defaults / remove the 
 
 # ── 7. Engines ────────────────────────────────────────────────────────────────
 H1 "7. Engines"
-P "The Engine box sits at the top of the track editor. Its first control is the Engine dropdown: Kick, Bass, Hat, Snare or Rumble. The knobs next to it belong to the chosen engine. Changing the engine asks no questions: every engine remembers its own settings on that track, so you can switch away and back without losing a sound. The track is renamed to the new engine's name. Knob labels are fixed words with no units; the Status Bar shows the value and its units as you hover or turn."
+P "The Engine box sits at the top of the track editor. Its first control is the Engine dropdown: Kick, Bass, Hat, Snare, Rumble, FM Perc or Chord. The knobs next to it belong to the chosen engine. Changing the engine asks no questions: every engine remembers its own settings on that track, so you can switch away and back without losing a sound. The track is renamed to the new engine's name. Knob labels are fixed words with no units; the Status Bar shows the name, value and unit as you hover or turn. Time and cutoff knobs give more of their travel to the short and low settings, so fine adjustments there are easier."
+
+H2 "KEY (Root and Scale)"
+P "The KEY section is the leftmost section of the track editor. Its Root and Scale set the musical key for the whole of mu-On: they are global to all tracks, and the section is edged to show that it does not belong to the selected track. Kick and Bass tuning snap to the key, Bass steps move through its scale, and Chord steps are built from it."
+
+Pic "KEY and ENGINE sections: Root and Scale (global to all tracks, so the section is edged) and the Engine dropdown." "key-section.png"
 
 H2 "Kick"
 P "A synthesised kick: a sine body with a fast pitch drop for the thump, and a drive stage for click and punch."
@@ -161,12 +169,32 @@ Bullet "F.Env (0 to 1, default 0.4) — how far each hit opens the filter."
 Bullet "E.Dec (10 to 1000 ms, default 180) — how quickly the filter closes again."
 Bullet "Atk (0.5 to 200 ms, default 2), Dec (20 to 1500 ms, default 200) and Sus (0 to 1, default 0) — the volume envelope of each note."
 Bullet "Drive (0 to 1, default 0.2) — warm saturation. Raise Sub, Drive and Reso for a gritty rumble."
-P "Every step of the bass plays the same note (Tune). The step row decides when the bass plays, not what it plays."
+P "A new Bass sequence starts with every step on the key's root note, and Tune reads Root until you turn it. Each step then has its own note: drag up or down on a Bass step to move its note through the scale, and hold Shift while dragging to change its octave. Dragging sideways across two steps still ties them."
+
+H2 "FILTER (Kick, Hat, Snare and FM Perc)"
+P "Kick, Hat, Snare and FM Perc each have a FILTER section after the sound itself."
+Bullet "Type — LP12, HP12, BP12 or Notch12."
+Bullet "Cutoff and Reso — where the filter sits and how sharply it peaks."
+Bullet "Attack, Decay and Depth, in smaller knobs on a second row — an attack/decay envelope that sweeps the cutoff on each hit; Depth sets how far."
+P "All of the FILTER knobs can be modulated."
+
+Pic "FILTER section of a Snare: Type, Cutoff and Reso on the top row, and the Attack, Decay and Depth envelope knobs below." "filter-section.png"
 
 H2 "Hat and Snare"
 P "Hat and Snare are built-in drum sounds (a bright noise hat, and a snare made of noise and a body tone). They play in one shot on each step. You cannot load your own samples into them."
 Bullet "Tune (-12 to +12 semitones) — pitch of the sound."
 Bullet "Decay — how long the sound lasts: 10 to 400 ms for the Hat (default 60), 20 to 600 ms for the Snare (default 160)."
+
+H2 "FM Perc"
+P "FM Perc makes toms and techno percussion by frequency modulation. An Algorithm choice (Tom, Conga, Zap, Click / Rim, Clank, Wood / Mallet, Pluck / Ping or Burst / Glitch) picks the character, and the same knobs shape every one: Tune, Ratio, Index, FM Env, Fdbk, Dive, Dv Time, Decay, Fold and Noise. It plays on its steps like the Kick, and has the FILTER section described above."
+
+H2 "Chord"
+P "Chord plays a chord on each step, for dub-techno stabs. Each step names its own chord, inversion and spread, built in the key and scale of the KEY section."
+Bullet "Wave — Saw, Square or Pulse. The amp envelope Atk, Dec, Sus and Rel are the smaller knobs under Wave."
+Bullet "FILTER section — Cutoff, Reso and Drive (saturation before the filter), and an A/D/S/R envelope for the cutoff: Atk, Dec, Sus, Rel and Depth."
+P "Chord steps can be ghosts (see Steps and Groove)."
+
+Pic "A Chord track: the Chord voice, its FILTER section, and the per-step panel with Root, Octave, Chord, Play, Inversion and Spread." "chord-panel.png"
 
 H2 "Rumble"
 P "Rumble is not a drum you step. It is the classic techno rumble: it takes the sound of another track, the Source, and runs it through a drive stage, three tempo-synced delay taps, a dark reverb, a volume envelope you draw, and a filter. Its step row is dimmed and ignored."
@@ -185,20 +213,25 @@ H2 "Step Rows"
 P "The Steps box shows one row of sixteen steps for every track, in the sidebar order and in each track's colour. Sixteen steps make one bar; each step is a sixteenth note."
 Bullet "Left-click a step to switch it on or off."
 Bullet "Right-click a step to switch its accent on or off. An accented step is drawn with a hotter centre and plays harder."
+Bullet "Alt+drag a step up to accent it, on any engine. On a Kick, Hat, Snare, FM Perc or Chord step, Alt+drag down makes it a ghost: played softly, and drawn as an outline that fills out as the Ghost level rises. On a Hat step, a plain vertical drag switches it between open and closed."
+Bullet "On a Bass step, drag up or down to move its note through the scale; Shift+drag changes its octave. Drag sideways to tie notes."
 Bullet "Click anywhere in a row to select that track. The selected track's row is outlined in its colour."
 Bullet "A playhead line runs through the rows with the transport. Every four steps (one beat) are tinted slightly differently so you can count."
 P "Every engine starts with its own groove: four-on-the-floor for the kick, off-beat for the bass, straight eighths for the hat, a backbeat for the snare and nothing for the rumble. A track keeps its row when you change its engine."
 
+Pic "Step rows with ghost steps: a ghost is drawn as an outline on a Kick, Snare, FM Perc or Hat step, next to the plain steps." "ghost-steps.png"
+
 H2 "Groove Box"
-P "Two controls on the left of the Steps panel apply to the whole pattern:"
+P "These controls on the left of the Steps panel (the LAYER box) apply to the whole track:"
 Bullet "Swing (default 0) — pushes every second sixteenth later, up to half a step, for a shuffle. 0 is straight."
-Bullet "Accent (default maximum) — how hard accented steps are played. Plain steps always play at a lower fixed level; lower Accent to make the accented steps less prominent."
+Bullet "Ghost (default 35 percent) — how loud ghost steps play. It can be modulated."
+Bullet "Accent (default maximum) — how hard accented steps are played. Plain steps always play at a lower fixed level. Accent runs from that plain-step level up to full: at the minimum, accented steps play no harder than plain ones; at the maximum they play at full level."
 P "With a Rumble selected, the Groove box shows the Rumble's Envelope instead (see Rumble)."
 
 # ── 9. Modulators ─────────────────────────────────────────────────────────────
 H1 "9. Modulators"
 P "Each track has eight independent modulators (Mod A through Mod H) plus a Matrix tab - the same shared engine as mu-Clid and mu-Tant. Each track has its own modulator bank."
-P "Each modulator has a Mode dropdown (Stepped bar-graph or Smooth drawable curve), a Polarity switch (Uni 0 to +1, or Bi -1 to +1), and a loop length (a note-value dropdown times an integer multiplier). A playhead line shows the current loop position. In Smooth mode, click to add a node, drag to move, ALT-click a segment to bend it, right-click to remove. In Stepped mode, drag bars up or down. A dice button randomises the current modulator's values without changing its shape."
+P "Each modulator has a Mode dropdown (Stepped bar-graph or Smooth drawable curve), a Polarity switch (Uni 0 to +1, or Bi -1 to +1), and a loop length (a note-value dropdown times an integer multiplier). A playhead line shows the current loop position. In Smooth mode the curve is a smooth line through each point that never swings past its neighbours; click to add a node, drag to move, ALT-click a segment to bend it, right-click to remove. In Stepped mode, drag bars up or down. A dice button randomises the current modulator's values without changing its shape."
 P "Add destinations with the + Target button; the assignments are shown one at a time, so step through them with the up and down arrows and the counter at the right. Each assignment has a bipolar depth (-100 to +100 percent) and a source-side curve. The destinations are the controls of the track's engine. If you change a track's engine, the assignments for the old engine stay in place but do nothing until you switch back. When a knob is a destination, an arc around it shows the live modulated value."
 P "The Matrix tab lists every assignment across all eight modulators in one table."
 
@@ -208,7 +241,7 @@ Pic "Modulator panel with the Stepped editor and the target list." "modulators.p
 H1 "10. Mixer"
 P "Click the Mixer button in the transport bar to open the mixer overlay. Each track occupies one channel strip (the mixer always shows eight, with unused ones dimmed); to the right are the Effect, Delay, and Reverb return channels and the Master strip. This is the same shared mixer and FX rack as mu-Clid and mu-Tant."
 P "Each track strip has a fader with VU metering, pan, mute and solo, sidechain ducking (source, amount, attack, release), and Effect / Delay / Reverb sends. Ducking is set up here and nothing is wired in advance: to make the bass duck from the kick, open the bass track's sidechain source dropdown, choose the kick track, and raise Amount. The sidechain source dropdown includes all other track channels plus an External option — duck any track from any other, or from a signal fed in through the host's sidechain bus (VST3 / CLAP). The sources follow their tracks when you delete or reorder tracks. The FX return strips carry intra-FX routing (Effect to Delay, Effect to Reverb, Delay to Reverb), and the master strip has two inserts, Insert 1 and Insert 2, that the summed output passes through in that order. A row of buttons at the top right (Peak, VU, K-12, K-14) chooses the metering standard. The three FX rows (Effect / Delay / Reverb) sit below the strips with algorithm selectors and inline parameters."
-P "The faders use a rectangular cap like a small knob, with a pointer line across its middle that marks the level, running in a groove that lights up from the bottom to the cap. Every fader in the mixer looks and works the same way."
+P "The faders use a rectangular cap like a small knob, with a pointer line across its middle that marks the level, running in a groove that lights up from the bottom to the cap. Every fader in the mixer looks and works the same way. In the Status Bar the mixer's Pan, Send and Sidechain knobs, the Level fader, the Mute and Solo buttons and the Effect and Delay switches all show their name and value as you use them. The sidechain Attack and Release start at 0 and can go down to 0. The Clipper insert shows a gain-reduction meter like the Compressor. Time and rate knobs of the Effect, Delay and Reverb give more of their travel to the short settings."
 
 H2 "Effects"
 Bullet "Effect — Chorus (Rate, Depth, Voices, Spread), Flanger (Rate, Depth, Feedback), Phaser (Rate, Depth, Stages, Feedback) or Echo (Time, Feedback, Spread). The Effect is a pure send, like the Reverb, so it has no Mix knob; use each track's Effect send."
@@ -289,7 +322,7 @@ P "mu-On can tell you when a newer version is available. Once a day it asks the 
 Bullet "Click the link to open the download page in your web browser. mu-On never downloads or installs anything itself. The link then stays hidden for that version and comes back only when a still newer one is released."
 Bullet "Right-click the link and choose Hide this notice to hide it for that version without opening the page."
 Bullet "The link never appears in Performance mode."
-P "Privacy: the check is a plain request for a public file. It sends nothing about you: no name, no identifier, no version number and no details of your computer. The app compares the answer with its own version on your machine. To switch the check off, open Settings and, under General, untick the Check for updates box. With the box unticked, mu-On sends no request at all and shows no link. The box is ticked by default."
+P "Privacy: the check is a plain request for a public file. It sends nothing about you: no name, no identifier, no version number and no details of your computer. As with any request to a website, the site can see your internet (IP) address, as it would if you opened the page in a browser. The app compares the answer with its own version on your machine. To switch the check off, open Settings and, under General, untick the Check for updates box. With the box unticked, mu-On sends no request at all and shows no link. The box is ticked by default."
 
 H2 "MIDI Clock Sync (Standalone)"
 P "When running as a standalone application, mu-On can follow an external MIDI clock from a drum machine, groovebox, or DAW. First choose the MIDI input that carries the clock in the standalone's MIDI settings. Selecting the input does not turn sync on by itself. To follow the clock, open Settings and, in the MIDI Clock section, set Source to MIDI In; set it back to Internal to turn sync off and ignore any incoming clock. A Messages choice appears, which decides what mu-On takes from the clock:"
@@ -332,8 +365,8 @@ Bullet "Rumble shape: draw a curve in the Rumble envelope that dips on each beat
 # ── 15. Technical Specifications ──────────────────────────────────────────────
 H1 "15. Technical Specifications"
 Bullet "Formats: VST3, CLAP, Standalone (Windows)"
-Bullet "Tracks: 1 to 8 (default 1), each with one of five engines and a 16-step row"
-Bullet "Engines: Kick (synthesis), Bass (synthesis), Hat and Snare (built-in sounds), Rumble (processes another track)"
+Bullet "Tracks: 1 to 8 (default 1), each with one of seven engines and a 16-step row"
+Bullet "Engines: Kick, Bass, FM Perc and Chord (synthesis), Hat and Snare (built-in sounds), Rumble (processes another track)"
 Bullet "Modulators per track: 8 (smooth LFO or stepped), plus a matrix view"
 Bullet "Full preset format: .muOn (XML). Per-track preset format: .muTrack (XML)"
 Bullet "Third-party libraries: JUCE, Signalsmith Reverb (MIT), clap-juce-extensions (MIT)"

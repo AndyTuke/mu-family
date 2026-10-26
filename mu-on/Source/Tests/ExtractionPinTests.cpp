@@ -297,10 +297,10 @@ struct MuOnExtractionPinTests : juce::UnitTest
         }
     }
 
-    // ── The global swing and accent ──────────────────────────────────────────────────────────────
+    // ── The per-track swing and accent ──────────────────────────────────────────────────────────────
     void swingAndAccentPins()
     {
-        beginTest("Global swing delays the odd 16ths of every track, by swing x half a 16th; even steps stay put");
+        beginTest("A track's swing delays its odd 16ths, by swing x half a 16th; even steps stay put");
         {
             auto onset = [](float swing, int step, const char* solo)
             {
@@ -310,7 +310,8 @@ struct MuOnExtractionPinTests : juce::UnitTest
                 onlySteps(rig.p, 0, { step });
                 onlySteps(rig.p, 1, { step });
                 setParam(rig.p.apvts, eng(0, EngineType::Kick, "drive"), 0.0f);
-                setParam(rig.p.apvts, "seq_swing", swing);
+                setParam(rig.p.apvts, mu_on::layerParamId(0, "swing"), swing);   // each track has its own row
+                setParam(rig.p.apvts, mu_on::layerParamId(1, "swing"), swing);
                 setParam(rig.p.apvts, solo, 1.0f);
                 return firstAbove(rig.render(24000));
             };
@@ -331,7 +332,7 @@ struct MuOnExtractionPinTests : juce::UnitTest
             }
         }
 
-        beginTest("Global accent sets the velocity of accented steps against 0.72 for plain ones, on the Kick and the Snare");
+        beginTest("A track's Accent knob sets its accented steps from the plain 0.72 (knob 0) up to full (knob 1), on the Kick and the Snare");
         {
             auto ratio = [](float accent, EngineType engine)
             {
@@ -339,17 +340,18 @@ struct MuOnExtractionPinTests : juce::UnitTest
                 useTrack(rig.p, 0, engine);
                 onlySteps(rig.p, 0, { 0, 4 }, { 0 });   // steps 0 and 4 are frames 0 and 24000; only step 0 is accented
                 setParam(rig.p.apvts, eng(0, EngineType::Kick, "drive"), 0.0f);
-                setParam(rig.p.apvts, "seq_accent", accent);
+                setParam(rig.p.apvts, mu_on::layerParamId(0, "accent"), accent);
                 const auto out = rig.render(48000);
                 return peakOf(out, 0, 3000) / peakOf(out, 24000, 27000);
             };
             for (const auto engine : { EngineType::Kick, EngineType::Snare })
-                for (const float a : { 1.0f, 0.4f })
+                for (const float a : { 1.0f, 0.4f, 0.0f })
                 {
                     const float r = ratio(a, engine);
+                    const float expected = (0.72f + a * 0.28f) / 0.72f;
                     logMessage(juce::String(mu_on::engineName(engine)) + " accent " + juce::String(a) + ": accented / plain = " + juce::String(r, 4)
-                               + " (expected " + juce::String(a / 0.72f, 4) + ")");
-                    expectWithinAbsoluteError(r, a / 0.72f, 0.01f * (a / 0.72f));
+                               + " (expected " + juce::String(expected, 4) + ")");
+                    expectWithinAbsoluteError(r, expected, 0.01f * expected);
                 }
         }
     }
@@ -432,7 +434,9 @@ struct MuOnExtractionPinTests : juce::UnitTest
             Rig rig;
             useTrack(rig.p, 1, EngineType::Bass);
             onlySteps(rig.p, 0, { 8 });
-            onlySteps(rig.p, 1, { 0 });
+            // Every step on and tied: one note held for the whole bar (a Bass releases at the end of its gate).
+            onlySteps(rig.p, 1, { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 });
+            for (int s = 1; s < 16; ++s) rig.p.getTrack(1).row.setTied(s, true);
             setParam(rig.p.apvts, "ch0_lvl", 0.0f);
             setParam(rig.p.apvts, eng(1, EngineType::Bass, "sus"), 1.0f);
             setParam(rig.p.apvts, eng(1, EngineType::Bass, "sub"), 0.0f);

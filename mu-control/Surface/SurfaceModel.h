@@ -5,6 +5,7 @@
 #include "Control/SurfaceLook.h"
 #include "Surface/SurfaceEvent.h"
 #include "Surface/SurfaceMapping.h"
+#include "Surface/SurfaceProfile.h"
 #include "MuLimits.h"
 #include <array>
 #include <functional>
@@ -24,7 +25,7 @@ public:
     using Clock = std::function<double()>;
 
     SurfaceModel(mu_core::ControlSink& sink, const mu_core::LiveView& view, SurfaceMapping mapping,
-                 const mu_core::SurfaceLook& look, Clock clock = {});
+                 const mu_core::SurfaceLook& look, Clock clock = {}, SurfaceProfile profile = {});
     ~SurfaceModel() override;
 
     SurfaceModel(const SurfaceModel&) = delete;
@@ -32,7 +33,14 @@ public:
 
     // A press performs the mapped action (a release or value does nothing in version 1). True when the
     // control is bound, the target exists and the sink accepted the action.
+    // With the profile's scene hold down (the logo, in mu-Tronic) a pad press launches that column's scene instead, and the
+    // hold's own press and release only open and close the picker (they return false: no action was performed).
     bool handle(const SurfaceEvent& event);
+
+    // True while the scene picker is open (the hold is down in Performance mode).
+    bool isScenePickerOpen() const noexcept { return sceneHeld; }
+    // The device went away or the mode ended: a release that never arrived must not leave the picker open.
+    void closeScenePicker();
 
     // The whole frame: one LedState per control the surface has (0 = off), final colours with the dim
     // scale and the blink phase applied. The manager diffs it against the last frame.
@@ -60,11 +68,18 @@ private:
 
     void     liveStateChanged() override;
     Light    lightFor(const mu_core::ControlAction& action, double nowMs) const;
+    // The mapped action as this product's profile reads it: with layer pages the clip arrows turn the page and the rows are
+    // the layers of the shown page.
+    mu_core::ControlAction resolve(mu_core::ControlAction action) const;
     void     trackPlayingClips(double nowMs) const;
     uint32_t layerRgb(int layer) const;
     Light    topLight(mu_core::ControlActionType type, double nowMs) const;
     int      arrowSlot(mu_core::ControlActionType type) const noexcept;
     std::vector<LedState> frame(double nowMs, bool* animating) const;
+    // Turns a light's level into the final colour and mode the surface can show, and writes it to `id`'s entry of `out`.
+    void applyLight(std::vector<LedState>& out, const SurfaceControlId& id, const Light& light, double nowMs, bool* animating) const;
+    // The scene picker: every grid column as one scene, the logo lit while the hold is down.
+    void lightScenePicker(std::vector<LedState>& out, double nowMs, bool* animating) const;
 
     mu_core::ControlSink&       sink;
     const mu_core::LiveView&    view;
@@ -72,15 +87,18 @@ private:
     std::vector<SurfaceMapping::Binding> bindings;
     mu_core::SurfaceLook        look;
     Clock                       clock;
+    SurfaceProfile              profile;
+    mutable bool                sceneHeld = false;   // the scene hold is down (reset when the mode ends, hence mutable)
+    std::array<double, (size_t) mu_limits::kClipsPerLayer> sceneFlashMs;   // when an accepted press last flashed each scene's column
 
     // When each layer's playing clip last changed, to time the start-of-clip burst. Written while rendering
     // (message thread only), hence mutable. lastPlaying -2 = not seen yet, so the first frame does not burst.
     mutable std::array<int, (size_t) mu_limits::kMaxLayers>    lastPlaying;
     mutable std::array<double, (size_t) mu_limits::kMaxLayers> burstStartMs;
 
-    // The four arrow buttons (AppPrev, AppNext, PerformancePrev, PerformanceNext): when an accepted press last
+    // The arrow buttons (AppPrev, AppNext, PerformancePrev, PerformanceNext, PagePrev, PageNext): when an accepted press last
     // flashed each, and which preset arrow was pressed last (it pulses while its switch is queued).
-    static constexpr int kArrows = 4;
+    static constexpr int kArrows = 6;
     std::array<double, kArrows>  arrowFlashMs;
     mutable int                  pulsingArrow = -1;   // arrow slot, -1 = none; cleared once no switch is queued
 };

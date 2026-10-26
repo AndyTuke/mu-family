@@ -20,7 +20,7 @@ A **drone instrument**, not a note instrument. Each of 8 slots runs **two oscill
 - **FM and oscillator sync** between the two oscs, modulatable for timbral evolution
 - **A drawable gate pattern** that chops bursts out of the drone with per-step decay envelopes
 
-There is **no amp envelope**. Time-varying behaviour comes from: (1) the modulator section (LFOs, control sequences) driving osc pitch / filter / level, (2) the gate pattern that chops the drone into bursts, (3) a **filter envelope** layer (drawn on the filter grid tab — shapes filter cutoff 20 Hz..base over the same 2-bar grid), and (4) a **pitch envelope** layer (drawn on the pitch grid tab — adds ±24 semitones to osc1/osc2 pitch per block).
+There is **no amp envelope**. Time-varying behaviour comes from: (1) the modulator section (LFOs, control sequences) driving osc pitch / filter / level, (2) the gate pattern that chops the drone into bursts, (3) a **filter envelope** layer (drawn on the filter grid tab — adds to the filter cutoff above its base setting over the same 2-bar grid, scaled by the Env Depth knob), and (4) a **pitch envelope** layer (drawn on the pitch grid tab — adds ±24 semitones to osc1/osc2 pitch per block).
 
 ---
 

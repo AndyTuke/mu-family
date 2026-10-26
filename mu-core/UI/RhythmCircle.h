@@ -5,6 +5,7 @@
 #include "Sequencer/HitGenerator.h"
 #include "Sequencer/RhythmPlayState.h"
 #include <array>
+#include <functional>
 
 namespace mu_ui {
 
@@ -28,6 +29,15 @@ public:
                       const std::atomic<bool>*            playing,
                       juce::Colour                         colour);
 
+    // The same, for a play state that can move (a host whose layers are moved, replaced or freed by its edits):
+    // `source` is asked for the current play state on every read (message thread; null = none), so the circle
+    // never keeps a pointer across a layout change.
+    using PlayStateSource = std::function<mu_core::RhythmPlayState*()>;
+    void setPlayStateSource(PlayStateSource source, const std::atomic<bool>* playing, juce::Colour colour);
+
+    // The play state the circle reads now (the source's answer, else the fixed pointer); for tests.
+    mu_core::RhythmPlayState* currentPlayState() const { return playStateSource ? playStateSource() : playState; }
+
     // Draw all three rings in `c` (the sidebar's mini icon, lit in the rhythm's colour)
     // instead of the Euclid A / B / Accent colours. Transparent = the ring colours.
     void setSingleColour(juce::Colour c) { singleColour = c; repaint(); }
@@ -48,6 +58,7 @@ private:
 
     // Non-owning pointers to PluginProcessor atomics
     mu_core::RhythmPlayState*       playState     = nullptr;
+    PlayStateSource                 playStateSource;   // set: asked on every read, playState unused
     const std::atomic<bool>*               isPlayingAtom = nullptr;
     juce::Colour                            rhythmColour;
 

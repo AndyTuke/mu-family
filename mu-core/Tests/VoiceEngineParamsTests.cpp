@@ -112,9 +112,10 @@ struct VoiceEngineParamsTests : juce::UnitTest
             ve.process(block, kBlock);
 
             logMessage("audio blocks: " + juce::String(blocks) + ", max block time: " + juce::String(maxMs, 3) + " ms");
-            // A loop blocked on the lock would manage about one block per set (kSets); the 1 ms pacing sleep is
-            // ~15 ms at the default Windows timer resolution (about 50 blocks) and ~1 ms when another app raised it.
-            expect(blocks > 2 * kSets, "the audio loop ran throughout (" + juce::String(blocks) + " blocks)");
+            // A loop blocked on the lock would manage about one block per set (kSets). The bound is only "more than
+            // that", so it holds whatever the timer resolution makes of the 1 ms pacing sleep (about 15 ms at the
+            // default Windows resolution, ~1 ms when another app raised it); the max-block check below is the real one.
+            expect(blocks > kSets, "the audio loop ran throughout (" + juce::String(blocks) + " blocks)");
             expect(maxMs < 15.0, "an audio block waited for the lock: " + juce::String(maxMs, 3) + " ms");
             expectEquals(ve.getAppliedParams().filterCutoff, 1000.0f + (float) kSets);
         }
@@ -167,3 +168,197 @@ struct VoiceEngineParamsTests : juce::UnitTest
 };
 
 static VoiceEngineParamsTests voiceEngineParamsTests;
+
+//==============================================================================
+// A block whose sample-buffer try-lock misses (a sample load on the message thread holds it) is silent, but it
+// keeps time: the three envelopes and a retired engine's drain countdown advance by the block, as a rendered
+// block's do. So a retired engine drains after the same number of process() calls, contended or not.
+namespace
+{
+    // A 64-frame click written to a temporary WAV, so the engine has a sample that ends inside the first block.
+    juce::File writeClick(const juce::File& dir)
+    {
+        auto f = dir.getChildFile("click.wav");
+        f.deleteFile();
+        juce::AudioBuffer<float> click(1, 64);
+        for (int i = 0; i < 64; ++i) click.setSample(0, i, 0.5f);
+        {
+            juce::WavAudioFormat wav;
+            std::unique_ptr<juce::OutputStream> out = f.createOutputStream();
+            if (out == nullptr) return {};
+            auto writer = wav.createWriterFor(out, juce::AudioFormatWriterOptions{}.withSampleRate(48000.0)
+                                                                                   .withNumChannels(1)
+                                                                                   .withBitsPerSample(16));
+            if (writer == nullptr) return {};
+            writer->writeFromAudioSampleBuffer(click, 0, 64);
+        }   // the writer is destroyed here, which flushes the file
+        return f;
+    }
+
+    // process() calls from the retire until the engine reports drained; every other call contended when asked.
+    int callsToDrain(const juce::File& click, bool contendEveryOther)
+    {
+        constexpr int kBlock = 256;
+        VoiceEngine ve;
+        ve.prepareToPlay(48000.0, kBlock);
+        ve.loadFile(click);
+        VoiceParams p;
+        p.ampEnvRel = 4.0f;   // longer than the 2 s drain budget, so the drain waits on the release: contended blocks must move it on too
+        ve.setParams(p);
+        juce::AudioBuffer<float> block(2, kBlock);
+        ve.trigger(false, false);
+        block.clear();
+        ve.process(block, kBlock);   // the click plays out in this block
+        ve.markRetired();
+        int calls = 0;
+        while (! ve.isFullyDrained() && calls < 100000)
+        {
+            VoiceEngine::forceBufferContention.store(contendEveryOther && (calls % 2) == 0);
+            block.clear();
+            ve.process(block, kBlock);
+            VoiceEngine::forceBufferContention.store(false);
+            ++calls;
+        }
+        return calls;
+    }
+}
+
+struct VoiceEngineContendedBlockTests : juce::UnitTest
+{
+    VoiceEngineContendedBlockTests() : juce::UnitTest("VoiceEngine contended block keeps time", "mu-core") {}
+
+    void runTest() override
+    {
+        beginTest("a retired engine drains after the same number of process() calls when half of them are contended");
+        const juce::File dir = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("mu-core-voice-contention");
+        dir.createDirectory();
+        const auto click = writeClick(dir);
+        const int plain = callsToDrain(click, false);
+        const int contended = callsToDrain(click, true);
+        logMessage("drained after " + juce::String(plain) + " calls, and " + juce::String(contended) + " with every other call contended");
+        expect(plain > 2 && plain < 100000, "the engine drains");
+        expectEquals(contended, plain);
+        dir.deleteRecursively();
+
+        beginTest("a sample voice moves on through contended blocks: the block after them plays where it would have");
+        dir.createDirectory();
+        const auto ramp = writeRamp(dir);
+        constexpr int kBlocks = 10;
+        const auto plainLast     = lastBlockOf(ramp, kBlocks, false);
+        const auto contendedLast = lastBlockOf(ramp, kBlocks, true);
+        // The second half of the block: the filter, which skipped the contended blocks, has settled by then.
+        float maxDiff = 0.0f, peak = 0.0f;
+        for (int i = plainLast.getNumSamples() / 2; i < plainLast.getNumSamples(); ++i)
+        {
+            maxDiff = juce::jmax(maxDiff, std::abs(plainLast.getSample(0, i) - contendedLast.getSample(0, i)));
+            peak    = juce::jmax(peak, std::abs(plainLast.getSample(0, i)));
+        }
+        logMessage("last block peak " + juce::String(peak) + ", largest difference " + juce::String(maxDiff));
+        expect(peak > 0.02f, "the ramp is still sounding in the last block");
+        // A voice held at its old position would be (kBlocks - 2) blocks of ramp behind: about 0.017 here.
+        expect(maxDiff < 0.002f, "the voice played on from where an uncontended run would be");
+        dir.deleteRecursively();
+    }
+
+    // A one-second rising ramp (0 to 0.5), so a voice's position shows in its level.
+    static juce::File writeRamp(const juce::File& dir)
+    {
+        auto f = dir.getChildFile("ramp.wav");
+        f.deleteFile();
+        constexpr int kLen = 48000;
+        juce::AudioBuffer<float> ramp(1, kLen);
+        for (int i = 0; i < kLen; ++i) ramp.setSample(0, i, 0.5f * (float) i / (float) kLen);
+        juce::WavAudioFormat wav;
+        std::unique_ptr<juce::OutputStream> out = f.createOutputStream();
+        if (out == nullptr) return {};
+        auto writer = wav.createWriterFor(out, juce::AudioFormatWriterOptions{}.withSampleRate(48000.0)
+                                                                               .withNumChannels(1)
+                                                                               .withBitsPerSample(24));
+        if (writer == nullptr) return {};
+        writer->writeFromAudioSampleBuffer(ramp, 0, kLen);
+        return f;
+    }
+
+    // The last of `blocks` process() calls after one trigger; with `contendMiddle` every call but the first and
+    // the last misses the buffer lock.
+    static juce::AudioBuffer<float> lastBlockOf(const juce::File& sample, int blocks, bool contendMiddle)
+    {
+        constexpr int kBlock = 256;
+        VoiceEngine ve;
+        ve.prepareToPlay(48000.0, kBlock);
+        ve.loadFile(sample);
+        ve.setParams(VoiceParams{});
+        juce::AudioBuffer<float> block(2, kBlock);
+        ve.trigger(false, false);
+        for (int b = 0; b < blocks; ++b)
+        {
+            VoiceEngine::forceBufferContention.store(contendMiddle && b > 0 && b < blocks - 1);
+            block.clear();
+            ve.process(block, kBlock);
+            VoiceEngine::forceBufferContention.store(false);
+        }
+        return block;
+    }
+};
+
+static VoiceEngineContendedBlockTests voiceEngineContendedBlockTests;
+
+// A sample read from a file and installed later (a staged preset's file work done at stage time): decodeFile touches
+// nothing, installSample puts the buffer in, takeSample moves it out, and an empty one changes nothing.
+struct VoiceEngineDecodedSampleTests : juce::UnitTest
+{
+    VoiceEngineDecodedSampleTests() : juce::UnitTest("VoiceEngine: a sample is decoded apart and installed or taken as a unit", "mu-core") {}
+
+    void runTest() override
+    {
+        beginTest("decodeFile, installSample and takeSample");
+        const auto file = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                              .getChildFile("mu-core-decoded-" + juce::String::toHexString(juce::Random().nextInt64()) + ".wav");
+        {
+            juce::AudioBuffer<float> tone(1, 4800);
+            for (int i = 0; i < tone.getNumSamples(); ++i)
+                tone.setSample(0, i, 0.5f * std::sin(juce::MathConstants<float>::twoPi * 440.0f * (float) i / 48000.0f));
+            juce::WavAudioFormat wav;
+            std::unique_ptr<juce::OutputStream> stream(file.createOutputStream());
+            expect(stream != nullptr);
+            if (stream == nullptr) return;
+            auto writer = wav.createWriterFor(stream, juce::AudioFormatWriterOptions().withSampleRate(48000.0)
+                                                                                         .withNumChannels(1)
+                                                                                         .withBitsPerSample(16));
+            expect(writer != nullptr);
+            if (writer == nullptr) return;
+            writer->writeFromAudioSampleBuffer(tone, 0, tone.getNumSamples());
+        }
+
+        VoiceEngine engine;
+        engine.prepareToPlay(48000.0, 256);
+        auto decoded = engine.decodeFile(file);
+        expect(decoded.isValid(), "the file reads");
+        expectEquals(decoded.buffer.getNumSamples(), 4800);
+        expectEquals(decoded.sampleRate, 48000.0);
+        expect(! engine.hasSample(), "decoding touches nothing");
+
+        engine.installSample(std::move(decoded));
+        expect(engine.hasSample(), "installed");
+        engine.installSample({});
+        expect(engine.hasSample(), "an empty sample changes nothing");
+
+        auto taken = engine.takeSample();
+        expect(taken.isValid() && taken.buffer.getNumSamples() == 4800, "taken whole");
+        expect(! engine.hasSample(), "and the engine is left empty");
+        expect(! engine.takeSample().isValid(), "an empty engine gives nothing");
+
+        VoiceEngine other;
+        other.installSample(std::move(taken));
+        expect(other.hasSample(), "it moves to another engine");
+        expect(! engine.decodeFile(file.getSiblingFile("does-not-exist.wav")).isValid(), "a missing file is no sample");
+
+        // loadFile is both steps.
+        VoiceEngine third;
+        third.loadFile(file);
+        expect(third.hasSample());
+        file.deleteFile();
+    }
+};
+
+static VoiceEngineDecodedSampleTests voiceEngineDecodedSampleTests;

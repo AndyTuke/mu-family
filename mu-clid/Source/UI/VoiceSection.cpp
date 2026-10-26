@@ -1,12 +1,12 @@
 #include "VoiceSection.h"
-#include "Plugin/PluginProcessor.h"
 #include "Sequencer/Rhythm.h"
 #include "Persistence/ScopedApvtsLoading.h"
+#include "Modulation/ModulationSnapshot.h"
 
 namespace mu_clid {
 
-VoiceSection::VoiceSection(PluginProcessor& p)
-    : proc(p), pitchSub(p), filterSub(p), ampSub(p), insertSub(p, "r")
+VoiceSection::VoiceSection(ProcessorBase& base, RhythmHost& h)
+    : host(h), pitchSub(h), filterSub(h), ampSub(h), insertSub(base, "r")
 {
     // The FX sends are wired by AmpSubsection but sit in the Effects box (VoiceBand places them).
     const auto sends = ampSub.sendKnobs();
@@ -26,12 +26,12 @@ VoiceSection::VoiceSection(PluginProcessor& p)
     };
 
     // mu-clid-specific insert-panel hooks (the shared subsection is product-agnostic).
-    insertSub.isPlaying = [this] { return proc.sequencerPlaying.load(); };
+    insertSub.isPlaying = [this] { return host.isRhythmTransportPlaying(); };
     insertSub.isSlotModulated = [this](int slot) -> bool
     {
-        if (currentRhythm < 0 || currentRhythm >= proc.getNumRhythms()) return false;
+        if (currentRhythm < 0 || currentRhythm >= host.getRhythmCount()) return false;
         const char* const dest[4] = { "insert.p1", "insert.p2", "insert.p3", "insert.p4" };
-        const auto snap = proc.getRhythm(currentRhythm).modulationMatrix.assignedSnapshot();   // lock-free published copy
+        const auto snap = host.getRhythmLayer(currentRhythm).modulationMatrix.assignedSnapshot();   // lock-free published copy
         if (snap == nullptr) return false;
         for (const auto& d : snap->destinations)
             if (d == dest[slot]) return true;
@@ -40,20 +40,20 @@ VoiceSection::VoiceSection(PluginProcessor& p)
     insertSub.slotModValue = [this](int slot) -> float
     {
         const int snap[4] = { kSnapInsP1, kSnapInsP2, kSnapInsP3, kSnapInsP4 };
-        return proc.getModSnapshot(currentRhythm, snap[slot]);
+        return host.getRhythmModLive(currentRhythm, snap[slot]);
     };
     insertSub.getInsertGR = [this]() -> const std::atomic<float>*
     {
-        return proc.getInsertGRReductionPtr(currentRhythm);
+        return host.getRhythmInsertGainReduction(currentRhythm);
     };
     insertSub.runBulkChange = [this](std::function<void()> fn)
     {
         // Suppress the parameterChanged listener during the multi-write algo
         // switch, then resync the engine from APVTS (preset-load pattern).
-        mu_core::ScopedApvtsLoading guard(proc.getApvtsLoadingFlag());
+        mu_core::ScopedApvtsLoading guard(host.getRhythmParamsLoadingFlag());
         fn();
-        if (currentRhythm >= 0 && currentRhythm < proc.getNumRhythms())
-            proc.forceSyncRhythmFromApvts(currentRhythm);
+        if (currentRhythm >= 0 && currentRhythm < host.getRhythmCount())
+            host.syncRhythmFromParameters(currentRhythm);
     };
 }
 
@@ -64,6 +64,12 @@ void VoiceSection::setRhythm(int ri)
     filterSub.setRhythm(ri);
     ampSub   .setRhythm(ri);
     insertSub.setChannel(ri);
+}
+
+void VoiceSection::releaseLayer()
+{
+    setRhythm(-1);
+    insertSub.clearGRSource();   // the meter reads an atomic inside the rhythm's voice engine
 }
 
 void VoiceSection::loadFromRhythm()

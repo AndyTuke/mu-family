@@ -62,6 +62,7 @@ private:
     bool               isDraggingSegment = false;
     juce::Point<float> segDragLogical  { 0.0f, 0.0f };
 
+    float plotInset() const;   // the plot's margin above and below, one point radius (scaled)
     juce::Point<float> toScreen(float x, float y) const;
     juce::Point<float> fromScreen(float sx, float sy) const;
     int hitTest(juce::Point<float> screen) const;

@@ -2,6 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Modulation/ModulatorSerialise.h"   // kChannelDataTag / kChannelNodeTag (the pre-format-2 shape)
+#include "Audio/AlgorithmNames.h"            // kLegacyNormalisedInsertAlgoMax
 #include <cmath>
 #include <functional>
 #include <map>
@@ -60,6 +61,13 @@ inline bool readRowValue(const juce::ValueTree& row, juce::RangedAudioParameter&
     {
         const auto v = (float) (double) row.getProperty("v");
         if (! std::isfinite(v)) return false;
+        // An insert algorithm (…Char, an int over the algorithm list) was a fraction of the list as it stood then.
+        if (auto* algo = dynamic_cast<juce::AudioParameterInt*>(&p); algo != nullptr && p.paramID.endsWith("Char"))
+        {
+            const int index = juce::roundToInt(juce::jlimit(0.0f, 1.0f, v) * (float) mu_audio::kLegacyNormalisedInsertAlgoMax);
+            normalised = p.convertTo0to1((float) juce::jlimit(algo->getRange().getStart(), algo->getRange().getEnd(), index));
+            return true;
+        }
         normalised = juce::jlimit(0.0f, 1.0f, v);
         return true;
     }
@@ -79,23 +87,27 @@ inline void appendParamRow(juce::ValueTree& node, juce::RangedAudioParameter& p,
 
 // The product's split of its parameters into slots (by id prefix) and globals (the rest), built once
 // after the parameters exist. Message thread only.
+//
+// A slot normally has ONE prefix (the four list products). A slot host whose slot can hold different layer
+// types gives each slot several prefixes, one per type that has its own parameter rows. Exactly one of them
+// is LIVE at a time (the host names it with setLivePrefix); only the live prefix's rows are written, applied,
+// copied or reset, and the dormant ones keep their defaults and never reach a saved file.
 class LayerLayout
 {
 public:
     LayerLayout() = default;
 
+    // One prefix per slot: slot i owns the ids starting with layerPrefixes[i], always live.
     LayerLayout(juce::AudioProcessor& proc, const juce::StringArray& layerPrefixes)
-        : prefixes(layerPrefixes), slots((size_t) layerPrefixes.size())
+        : LayerLayout(proc, toSets(layerPrefixes), SetsTag {})
     {
-        // Sort every ranged parameter into its slot's group, or the globals.
-        for (auto* raw : proc.getParameters())
-            if (auto* p = dynamic_cast<juce::RangedAudioParameter*>(raw))
-            {
-                const auto id = p->getParameterID();
-                const int s = slotOf(id);
-                if (s < 0) globals.push_back({ p, id });
-                else       slots[(size_t) s].push_back({ p, id.substring(prefixes[s].length()) });
-            }
+    }
+
+    // Several prefixes per slot: prefixSets[i] are the prefixes slot i's parameters may carry. A slot with a
+    // single prefix is live on it; a slot with several has none live until setLivePrefix names one.
+    static LayerLayout withPrefixSets(juce::AudioProcessor& proc, const std::vector<juce::StringArray>& prefixSets)
+    {
+        return LayerLayout(proc, prefixSets, SetsTag {});
     }
 
     // Earlier parameter-id prefixes of the slots, in slot order (entry i belongs to slot i). Only
@@ -105,7 +117,7 @@ public:
     // The slot whose earlier prefix `id` carries (-1 = none), and `id` without that prefix.
     int legacySlotOf(const juce::String& id) const
     {
-        for (int s = 0; s < legacyPrefixes.size() && s < prefixes.size(); ++s)
+        for (int s = 0; s < legacyPrefixes.size() && s < numLayers(); ++s)
             if (legacyPrefixes[s].isNotEmpty() && id.startsWith(legacyPrefixes[s])) return s;
         return -1;
     }
@@ -114,21 +126,39 @@ public:
         return id.substring(legacyPrefixes[slot].length());
     }
 
-    int numLayers() const noexcept { return prefixes.size(); }
-    // The parameter-id prefix of `slot` (empty when the layout has no such slot).
-    juce::String prefix(int slot) const { return slot >= 0 && slot < prefixes.size() ? prefixes[slot] : juce::String(); }
+    int numLayers() const noexcept { return (int) prefixSets.size(); }
+    // The LIVE parameter-id prefix of `slot`: empty when the layout has no such slot or the slot has no live
+    // prefix (an Empty slot of a typed host). The prefix every per-slot parameter operation works on.
+    juce::String prefix(int slot) const
+    {
+        if (slot < 0 || slot >= numLayers()) return {};
+        const int l = live[(size_t) slot];
+        return l >= 0 ? prefixSets[(size_t) slot][l] : juce::String();
+    }
     int numParams(int slot) const { return (int) group(slot).size(); }
 
-    // The slot whose prefix `id` carries (-1 = a global), and `id` without it.
+    // Make `prefix` the slot's live one (it must be one of the slot's prefixes); none is live when it is empty
+    // or not the slot's. A slot with a lone prefix stays live on it whatever is asked. Message thread; a typed
+    // host calls it as the slot's layer type changes.
+    void setLivePrefix(int slot, const juce::String& prefix)
+    {
+        if (slot < 0 || slot >= numLayers() || prefixSets[(size_t) slot].size() == 1) return;
+        live[(size_t) slot] = prefix.isEmpty() ? -1 : prefixSets[(size_t) slot].indexOf(prefix);
+    }
+
+    // The slot whose prefix `id` carries (-1 = a global), and `id` without it. Any of a slot's prefixes
+    // matches, live or not, so a dormant parameter still belongs to its slot rather than the globals.
     int slotOf(const juce::String& id) const
     {
-        for (int s = 0; s < prefixes.size(); ++s)
-            if (id.startsWith(prefixes[s])) return s;
+        for (int s = 0; s < numLayers(); ++s)
+            if (matchingPrefix(id, s) >= 0) return s;
         return -1;
     }
     juce::String rowIdFor(const juce::String& id, int slot) const
     {
-        return slot < 0 ? id : id.substring(prefixes[slot].length());
+        if (slot < 0) return id;
+        const int k = matchingPrefix(id, slot);
+        return k >= 0 ? id.substring(prefixSets[(size_t) slot][k].length()) : id;
     }
 
     // A row per parameter of `slot` (-1 = globals), appended to `node`.
@@ -159,15 +189,61 @@ public:
 
 private:
     struct Entry { juce::RangedAudioParameter* param; juce::String rowId; };
-    const std::vector<Entry>& group(int slot) const
+
+    static std::vector<juce::StringArray> toSets(const juce::StringArray& onePerSlot)
     {
-        return slot < 0 ? globals : slots[(size_t) juce::jlimit(0, (int) slots.size() - 1, slot)];
+        std::vector<juce::StringArray> sets;
+        for (const auto& p : onePerSlot) sets.push_back(juce::StringArray(p));
+        return sets;
     }
 
-    juce::StringArray                prefixes;
-    juce::StringArray                legacyPrefixes;
-    std::vector<std::vector<Entry>>  slots;
-    std::vector<Entry>               globals;
+    // Tells the several-prefixes-per-slot constructor from the public one-prefix-per-slot one.
+    struct SetsTag {};
+
+    LayerLayout(juce::AudioProcessor& proc, const std::vector<juce::StringArray>& sets, SetsTag)
+        : prefixSets(sets), live(sets.size(), -1), slots(sets.size())
+    {
+        for (size_t s = 0; s < sets.size(); ++s)
+        {
+            slots[s].resize((size_t) sets[s].size());
+            if (sets[s].size() == 1) live[s] = 0;   // a lone prefix is always the live one
+        }
+
+        // Sort every ranged parameter into its slot's group (per prefix), or the globals.
+        for (auto* raw : proc.getParameters())
+            if (auto* p = dynamic_cast<juce::RangedAudioParameter*>(raw))
+            {
+                const auto id = p->getParameterID();
+                const int s = slotOf(id);
+                if (s < 0) { globals.push_back({ p, id }); continue; }
+                const int k = matchingPrefix(id, s);
+                slots[(size_t) s][(size_t) k].push_back({ p, id.substring(prefixSets[(size_t) s][k].length()) });
+            }
+    }
+
+    // The index of the slot's prefix that `id` starts with (-1 = none).
+    int matchingPrefix(const juce::String& id, int slot) const
+    {
+        const auto& set = prefixSets[(size_t) slot];
+        for (int k = 0; k < set.size(); ++k)
+            if (id.startsWith(set[k])) return k;
+        return -1;
+    }
+
+    // The rows of `slot`'s live prefix (-1 = the globals); none for a slot with no live prefix.
+    const std::vector<Entry>& group(int slot) const
+    {
+        if (slot < 0) return globals;
+        const auto s = (size_t) juce::jlimit(0, (int) slots.size() - 1, slot);
+        return live[s] >= 0 ? slots[s][(size_t) live[s]] : none;
+    }
+
+    std::vector<juce::StringArray>               prefixSets;
+    std::vector<int>                             live;    // per slot: index into its prefix set, -1 = none live
+    juce::StringArray                            legacyPrefixes;
+    std::vector<std::vector<std::vector<Entry>>> slots;   // [slot][prefix][row]
+    std::vector<Entry>                           globals;
+    std::vector<Entry>                           none;
 };
 
 // One slot as a node of `type` (the product's layer-preset tag, or kLayerTag inside a state).

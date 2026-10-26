@@ -14,6 +14,7 @@
 #include "UI/MidiFullPresetsOverlay.h"
 #include "UI/ShellChrome.h"
 #include "UI/LayerSidebar.h"
+#include "UI/MixerOverlay.h"
 
 // EditorShellBase — shared editor shell for every mu-family plugin.
 //
@@ -136,6 +137,8 @@ protected:
     // Performance mode: the shared sidebar (when the product mounts one), whose selection the mode
     // seeds and follows.
     juce::Component::SafePointer<LayerSidebar> layerSidebar;
+    // The shared mixer overlay when the product mounts one (its page follows PageUp / PageDown while it is open).
+    juce::Component::SafePointer<MixerOverlay> sharedMixer;
 
     // The plugin-only screens, registered with the chrome as extra screens.
     ActivationOverlay      activationOverlay;

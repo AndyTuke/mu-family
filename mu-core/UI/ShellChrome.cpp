@@ -51,7 +51,6 @@ ShellChrome::~ShellChrome()
     // callback into this object may survive it.
     backend.onLoadError           = nullptr;
     backend.onUiScaleChanged      = nullptr;
-    backend.onUpdateCheckToggled  = nullptr;
     backend.onSaveAndQuit         = nullptr;
     backend.onPresetSwapCommitted = nullptr;
     host.removeKeyListener(this);
@@ -94,25 +93,6 @@ void ShellChrome::wireBuiltIns()
     {
         statusBar.showParam("Load failed", msg, MuLookAndFeel::colour(MuLookAndFeel::knobLevel));
     };
-
-    // Update link: hidden until the update check finds a newer build. A click opens the download
-    // page and counts as seen; a right click offers to hide the notice for that build.
-    statusBar.onUpdateClicked = [this]
-    {
-        juce::URL(mu_core::update_check::safeUrl(updateEntry.download)).launchInDefaultBrowser();
-        dismissUpdateNotice();
-    };
-    statusBar.onUpdateHideRequested = [this]
-    {
-        juce::PopupMenu menu;
-        menu.addItem(1, "Hide this notice");
-        juce::WeakReference<ShellChrome> safe(this);
-        menu.showMenuAsync(juce::PopupMenu::Options(), [safe](int r)
-        {
-            if (r == 1 && safe != nullptr) safe->dismissUpdateNotice();
-        });
-    };
-    backend.onUpdateCheckToggled = [this] { startVersionCheck(); };
 }
 
 // The Performance chooser joins the state machine as a page over the main area, and its entry points
@@ -188,60 +168,7 @@ void ShellChrome::applyWindowSize()
     };
 }
 
-void ShellChrome::startVersionCheck()
-{
-    // Update check (docs/design-plugin-family.md, "Update check"). The link shows when this product's
-    // entry in the site's latest.json is a newer build than ours. The data is fetched at most once a
-    // day (the result is stored in the app settings) by the shared UpdateChecker thread; between
-    // fetches the stored answer decides, so the link also goes away as soon as the user updates.
-    namespace uc = mu_core::update_check;
-    auto* settings = backend.getAppSettingsFile();
-    const juce::String slug = backend.getProductSlug();
-    updateWanted = false;
-    if (settings == nullptr || slug.isEmpty() || ! uc::isEnabled(settings)) { refreshUpdateLink(); return; }
-
-    updateEntry = uc::storedLatest(settings);
-    const auto now = juce::Time::currentTimeMillis();
-    if (! uc::isDue(now, uc::lastCheck(settings))) { refreshUpdateLink(); return; }
-
-    refreshUpdateLink();   // show the stored answer while the fetch runs
-    if (fetchInFlight) return;
-    fetchInFlight = true;
-    juce::WeakReference<ShellChrome> safeSelf(this);
-    updateChecker->request([safe = safeSelf, slug](const juce::String& body)
-    {
-        if (safe == nullptr) return;   // the host closed mid-check
-        safe->fetchInFlight = false;
-        uc::Entry entry;
-        auto* s = safe->backend.getAppSettingsFile();
-        if (s == nullptr || ! uc::parse(body, slug, entry)) return;   // unreadable data: stay silent
-        uc::storeLatest(s, entry, juce::Time::currentTimeMillis());
-        safe->updateEntry = entry;
-        safe->refreshUpdateLink();
-    });
-}
-
-// Decides from the stored entry whether the link shows. It is never shown in Performance mode (it returns afterwards).
-void ShellChrome::refreshUpdateLink()
-{
-    namespace uc = mu_core::update_check;
-    auto* settings = backend.getAppSettingsFile();
-    updateWanted = settings != nullptr
-                   && uc::shouldShow(uc::isEnabled(settings), updateEntry.build,
-                                     uc::dismissedBuild(settings), BUILD_NUMBER);
-    const juce::String tip = juce::String(updateEntry.version.isNotEmpty() ? updateEntry.version
-                                                                          : "v1.1." + juce::String(updateEntry.build))
-                             + " is out (you have v" + juce::String(MU_VERSION_STRING)
-                             + "). Click to open the download page.";
-    statusBar.setUpdateLinkVisible(updateWanted && ! shieldUp, tip);
-}
-
-// A click or "Hide this notice": remember the build, so the link only returns for a newer one.
-void ShellChrome::dismissUpdateNotice()
-{
-    mu_core::update_check::setDismissedBuild(backend.getAppSettingsFile(), updateEntry.build);
-    refreshUpdateLink();
-}
+void ShellChrome::startVersionCheck() { updateNotice.start(); }
 
 void ShellChrome::setMainArea(juce::Component* newSidebar, juce::Component* newMainPanel)
 {
@@ -664,6 +591,11 @@ bool ShellChrome::keyPressed(const juce::KeyPress& key, juce::Component*)
         return true;
     }
 
+    // PageUp / PageDown page the sidebar, or the mixer's strips while the mixer is the open overlay.
+    if (onPageKey && (key == juce::KeyPress::pageUpKey || key == juce::KeyPress::pageDownKey)
+        && (! anyOverlayVisible() || (mixerVisible && ! aboutVisible && ! saveVisible && ! browserVisible && ! settingsVisible)))
+        return onPageKey(key == juce::KeyPress::pageUpKey ? -1 : 1);
+
     if (backend.isStandaloneApp() && key == keybindPlayStop)
     {
         backend.toggleInternalPlay();
@@ -736,7 +668,7 @@ void ShellChrome::syncPerformanceMode()
     if (on == shieldUp) return;
 
     shieldUp = on;
-    refreshUpdateLink();
+    updateNotice.setSuppressed(on);
     if (on) enterLock(); else leaveLock();
 }
 

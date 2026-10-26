@@ -7,7 +7,7 @@
 
 namespace mu_clid {
 
-class PluginProcessor;
+class RhythmHost;
 
 // What replaces the 144 px voice band while a rhythm is in MIDI output mode: one raised "MIDI Out"
 // section holding Note, Channel, Velocity and Accent, bound to the selected rhythm's
@@ -27,7 +27,7 @@ public:
     static constexpr int kDropH    = MuLookAndFeel::kKnobSize2H / 2;
     static constexpr int kRowH     = MuLookAndFeel::kKnobSize2H;   // a control row is one Size-2 knob high
 
-    explicit MidiOutSection(PluginProcessor& p);
+    explicit MidiOutSection(RhythmHost& host);
 
     void setRhythm(int ri);
     void loadFromRhythm();
@@ -44,7 +44,7 @@ public:
 private:
     using Id = MuLookAndFeel::ColourIds;
 
-    PluginProcessor& proc;
+    RhythmHost& host;
     int rhythmIndex = -1;
 
     DropdownSelect noteSelect;

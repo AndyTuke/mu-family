@@ -154,3 +154,114 @@ public:
 };
 
 static LegacyPrefixTest legacyPrefixTest;
+
+// A layout whose slots each carry several prefixes (a typed slot host): only the live prefix is written, applied
+// and reported; a lone prefix stays live on its own, as it always did.
+namespace
+{
+// Two slots, each with an "a" and a "t" row under its own prefixes, and one global.
+juce::AudioProcessorValueTreeState::ParameterLayout typedLayout()
+{
+    juce::AudioProcessorValueTreeState::ParameterLayout layout;
+    for (const char* pre : { "a0_", "t0_", "a1_", "t1_" })
+    {
+        const juce::String p(pre);
+        layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID { p + "tune", 1 }, p + "Tune",
+                                                               juce::NormalisableRange<float>(20.0f, 2000.0f), 100.0f));
+    }
+    layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID { "level", 1 }, "Level", -60.0f, 6.0f, 0.0f));
+    return layout;
+}
+
+int rowsOf(const juce::ValueTree& node)
+{
+    int n = 0;
+    for (int i = 0; i < node.getNumChildren(); ++i)
+        if (node.getChild(i).hasType(mu_pp::kRowTag)) ++n;
+    return n;
+}
+} // namespace
+
+class MultiPrefixLayoutTest : public juce::UnitTest
+{
+public:
+    MultiPrefixLayoutTest() : juce::UnitTest("Layer layout with several prefixes per slot", "Presets") {}
+
+    void runTest() override
+    {
+        const std::vector<juce::StringArray> sets { juce::StringArray { "a0_", "t0_" }, juce::StringArray { "a1_", "t1_" } };
+
+        beginTest("every prefix belongs to its slot; none is live until the host names one");
+        {
+            LegacyStubProcessor proc;
+            juce::AudioProcessorValueTreeState apvts(proc, nullptr, "StubState", typedLayout());
+            auto layout = mu_pp::LayerLayout::withPrefixSets(proc, sets);
+            expectEquals(layout.numLayers(), 2);
+            expectEquals(layout.slotOf("a0_tune"), 0);
+            expectEquals(layout.slotOf("t0_tune"), 0);
+            expectEquals(layout.slotOf("t1_tune"), 1);
+            expectEquals(layout.slotOf("level"), -1);
+            expectEquals(layout.rowIdFor("t1_tune", 1), juce::String("tune"));
+            expectEquals(layout.prefix(0), juce::String(), "no live prefix yet");
+            expectEquals(layout.numParams(0), 0);
+            juce::ValueTree node("N");
+            layout.writeParams(node, 0);
+            expectEquals(rowsOf(node), 0, "nothing is written for a slot with no live prefix");
+
+            layout.setLivePrefix(0, "t0_");
+            expectEquals(layout.prefix(0), juce::String("t0_"));
+            expectEquals(layout.numParams(0), 1);
+            layout.setLivePrefix(0, "zz_");   // not one of the slot's: none live
+            expectEquals(layout.prefix(0), juce::String());
+        }
+
+        beginTest("only the live prefix is written and applied; a dormant one keeps its value and never reaches the node");
+        {
+            LegacyStubProcessor proc;
+            juce::AudioProcessorValueTreeState apvts(proc, nullptr, "StubState", typedLayout());
+            auto layout = mu_pp::LayerLayout::withPrefixSets(proc, sets);
+            layout.setLivePrefix(0, "a0_");
+            layout.setLivePrefix(1, "t1_");
+            apvts.getParameter("a0_tune")->setValueNotifyingHost(apvts.getParameter("a0_tune")->convertTo0to1(500.0f));
+            apvts.getParameter("t0_tune")->setValueNotifyingHost(apvts.getParameter("t0_tune")->convertTo0to1(700.0f));   // dormant
+
+            const auto state = mu_pp::captureState("StubState", layout, {});
+            const auto node0 = mu_pp::findLayerNode(state, 0);
+            expectEquals(rowsOf(node0), 1, "one row: the live prefix's");
+            expectWithinAbsoluteError((float) (double) node0.getChild(0).getProperty("x"), 500.0f, 0.5f);
+
+            // Applying a node reaches the live prefix only.
+            juce::ValueTree node("Slot");
+            juce::ValueTree row(mu_pp::kRowTag);
+            row.setProperty("id", "tune", nullptr);
+            row.setProperty("x", 900.0, nullptr);
+            node.appendChild(row, nullptr);
+            mu_pp::applyLayer(layout, {}, 0, node);
+            expectWithinAbsoluteError(actual(apvts, "a0_tune"), 900.0f, 0.5f);
+            expectWithinAbsoluteError(actual(apvts, "t0_tune"), 700.0f, 0.5f);
+
+            // A node with no row defaults the live prefix only.
+            mu_pp::applyLayer(layout, {}, 0, juce::ValueTree("Slot"));
+            expectWithinAbsoluteError(actual(apvts, "a0_tune"), 100.0f, 0.5f);
+            expectWithinAbsoluteError(actual(apvts, "t0_tune"), 700.0f, 0.5f);
+        }
+
+        beginTest("a slot with a lone prefix is live on it from the start, as the one-prefix layout always was");
+        {
+            LegacyStubProcessor proc;
+            juce::AudioProcessorValueTreeState apvts(proc, nullptr, "StubState", currentLayout());
+            const mu_pp::LayerLayout single(proc, { "t0_", "t1_" });
+            const auto viaSets = mu_pp::LayerLayout::withPrefixSets(proc, { juce::StringArray { "t0_" }, juce::StringArray { "t1_" } });
+            for (const auto* l : { &single, &viaSets })
+            {
+                expectEquals(l->prefix(0), juce::String("t0_"));
+                expectEquals(l->prefix(1), juce::String("t1_"));
+                expectEquals(l->numParams(1), 1);
+            }
+            expectEquals(mu_pp::captureState("StubState", single, {}).toXmlString(),
+                         mu_pp::captureState("StubState", viaSets, {}).toXmlString(), "the same saved bytes");
+        }
+    }
+};
+
+static MultiPrefixLayoutTest multiPrefixLayoutTest;

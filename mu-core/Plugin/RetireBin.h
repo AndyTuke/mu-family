@@ -39,7 +39,7 @@
 // that sees the new layout renders it as a tail. No block has both and none has neither.
 //
 // Drain and free semantics (defined here for every product): an entry is Done when (a) renderRetiring returns
-// false, (b) a Fade policy's ramp is spent, (c) its hard lifetime (maxSeconds, clamped to 30 s) is over, with
+// false (at once; a Natural tail with closeWithDeclick after the same 10 ms declick as (c)), (b) a Fade policy's ramp is spent, (c) its hard lifetime (maxSeconds, clamped to 30 s) is over, with
 // a 10 ms linear declick in its last frames, or (d) the message thread cuts it. A tail that never reports
 // silence (an engine with nothing loaded that never says drained) therefore still ends at (c). Done entries
 // are freed only by service(), on the message thread, outside layersLock, once the grace passed: it runs at
@@ -306,6 +306,19 @@ namespace mu_core
             return wentDone;
         }
 
+        // Message thread, a structural edit with the audio thread excluded (layersLock held): fn(RetireTail&) for each
+        // entry of the slot that still sounds (Parked or Draining), under binMutex so no service pass frees one meanwhile.
+        // fn may only reset state the tail owns: it must not allocate, free, wait or take a lock.
+        template <class Fn>
+        void forEachActive(int slot, Fn&& fn)
+        {
+            if (slot < 0 || slot >= kRows) return;
+            BinLock g(binMutex);
+            for (auto& e : rows[(size_t) slot])
+                if (e.tail != nullptr && isActive(e.state.load(std::memory_order_seq_cst)))
+                    fn(*e.tail);
+        }
+
         // ─── Inspection (tests; message thread) ──────────────────────────────────────────────────────
         State stateOf(int slot, int entry) const noexcept
         {
@@ -336,6 +349,7 @@ namespace mu_core
             RetireTail* tail = nullptr;      // ditto
             RetireState rs {};               // ditto; the audio thread's after Parked
             RetirePolicy::Kind kind = RetirePolicy::Kind::None;   // ditto
+            uint8_t     closeDeclick = 0;    // ditto: RetirePolicy::closeWithDeclick
             bool        doneSeen = false;    // message thread: service has stamped this Done
             uint64_t    doneStamp = 0;
             uint64_t    parkSeq = 0;         // message thread: park order (global-budget eviction)
@@ -563,6 +577,7 @@ namespace mu_core
             e.rs.gainStep = 1.0f / (float) ramp;
             e.rs.maxSamples = juce::jmax<int64_t>(1, (int64_t) (sr * life));
             e.kind = pol.kind;
+            e.closeDeclick = pol.kind == RetirePolicy::Kind::Natural && pol.closeWithDeclick ? 1 : 0;
             e.doneSeen = false;
             e.doneStamp = 0;
             e.parkSeq = ++parkCounter;
@@ -598,6 +613,7 @@ namespace mu_core
             std::swap(a.tail, b.tail);
             std::swap(a.rs, b.rs);
             std::swap(a.kind, b.kind);
+            std::swap(a.closeDeclick, b.closeDeclick);
             std::swap(a.doneSeen, b.doneSeen);
             std::swap(a.doneStamp, b.doneStamp);
             std::swap(a.parkSeq, b.parkSeq);
@@ -644,6 +660,20 @@ namespace mu_core
             {
                 rs.samplesLeft = juce::jmax(0, rs.samplesLeft - n);
                 if (rs.samplesLeft == 0) alive = false;
+            }
+            else if (e.closeDeclick != 0)
+            {
+                // A Natural tail whose silence report is a drain criterion, not a level (closeWithDeclick): it is not
+                // cut there, its lifetime is shortened to this call plus the 10 ms declick, which then ramps whatever
+                // it still renders to zero. Once armed, its own report no longer matters.
+                if (rs.reserved[0] != 0)
+                    alive = true;
+                else if (! alive)
+                {
+                    rs.reserved[0] = 1;
+                    rs.maxSamples = juce::jmin(rs.maxSamples, rs.samplesLived + (int64_t) n + (int64_t) declickFrames);
+                    alive = true;
+                }
             }
             rs.samplesLived += n;
             if (rs.samplesLived >= rs.maxSamples) alive = false;

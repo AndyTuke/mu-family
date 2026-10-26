@@ -7,6 +7,7 @@ namespace mu_control::launchpadx
 namespace
 {
 constexpr uint8_t kSysExStart = 0xF0, kSysExEnd = 0xF7;
+constexpr int     kLogoCc     = 99;   // the Novation logo: a Special button in Programmer mode (a press reports CC 99, value 127 / 0)
 
 // F0 00 20 29 02 0C is the Novation Launchpad X SysEx header.
 std::vector<uint8_t> withHeader(std::initializer_list<uint8_t> body)
@@ -42,8 +43,9 @@ std::optional<int> indexOf(const SurfaceControlId& id)
         case ControlKind::Side:
             if (id.y < 0 || id.y > 7 || id.x != 0) return std::nullopt;
             return 10 * (8 - id.y) + 9;
-        case ControlKind::Special:
-            return std::nullopt;
+        case ControlKind::Special:   // the logo
+            if (id.x != 0 || id.y != 0) return std::nullopt;
+            return kLogoCc;
     }
     return std::nullopt;
 }
@@ -57,9 +59,10 @@ std::optional<SurfaceControlId> controlOf(int index, bool isCc)
         if (row < 1 || row > 8 || col < 1 || col > 8) return std::nullopt;
         return SurfaceControlId { ControlKind::Pad, col - 1, 8 - row };
     }
+    if (index == kLogoCc) return SurfaceControlId { ControlKind::Special, 0, 0 };
     if (row == 9 && col >= 1 && col <= 8) return SurfaceControlId { ControlKind::Top, col - 1, 0 };
     if (col == 9 && row >= 1 && row <= 8) return SurfaceControlId { ControlKind::Side, 0, 8 - row };
-    return std::nullopt;   // includes the logo (99)
+    return std::nullopt;
 }
 
 std::vector<uint8_t> programmerMode(bool on)   { return withHeader({ 0x0E, (uint8_t) (on ? 1 : 0) }); }

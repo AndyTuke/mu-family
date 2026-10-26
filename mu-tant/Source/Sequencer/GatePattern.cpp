@@ -214,11 +214,15 @@ void applyGateBlock(GatePattern& pattern, float* left, float* right, int numSamp
                                        !pattern.hasEnvelopes.load(std::memory_order_relaxed));
 
     if (mode == GateMode::Pass)
+    {
+        pattern.heldLevel = 1.0f;                  // a lock miss right after a bypass stays open
         return;                                    // leave the buffer untouched
+    }
 
     if (mode == GateMode::Silence)
     {
         pattern.gateLevel = 0.0f;                  // gate fully closed; re-open ramps from 0
+        pattern.heldLevel = 0.0f;
         for (int i = 0; i < numSamples; ++i)
         {
             if (left)  left[i]  = 0.0f;
@@ -235,8 +239,9 @@ void applyGateBlock(GatePattern& pattern, float* left, float* right, int numSamp
                         ? (float) (1.0 / ((double) GatePattern::kMinAttackMs * 0.001 * sampleRate))
                         : 1.0f;
 
-    // Envelope — tryLock so a concurrent UI edit can't tear the envelope vector
-    // mid-read. On contention, leave the block as-is (a brief, edit-time blip).
+    // Envelope — tryLock so a concurrent UI edit can't tear the envelope vector mid-read. On contention
+    // the block holds the gate level the previous block ended on (below), so an edit never opens a
+    // closed gate for a block.
     if (mu_core::trySpinLock(pattern.editLock))
     {
         pattern.resetGateCache();
@@ -251,7 +256,17 @@ void applyGateBlock(GatePattern& pattern, float* left, float* right, int numSamp
             if (left)  left[i]  *= g;
             if (right) right[i] *= g;
         }
+        pattern.heldLevel = pattern.gateLevel;
         mu_core::spinUnlock(pattern.editLock);
+    }
+    else
+    {
+        const float g = pattern.heldLevel;   // audio-thread state: no lock needed to read it
+        for (int i = 0; i < numSamples; ++i)
+        {
+            if (left)  left[i]  *= g;
+            if (right) right[i] *= g;
+        }
     }
 }
 

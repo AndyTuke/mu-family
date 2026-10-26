@@ -1,5 +1,6 @@
 #include "Plugin/ProcessorBase.h"
 #include "Plugin/MixerFxParams.h"
+#include "Sequencer/ClipClipboard.h"
 
 #include <vector>
 
@@ -121,6 +122,234 @@ namespace
 struct ClipLaunchTests : juce::UnitTest
 {
     ClipLaunchTests() : juce::UnitTest("ProcessorBase clip launch", "mu-core") {}
+
+    // Copy / Cut / Paste on the clip clipboard: one function each, so no frame holds many processors at once.
+    void copyPasteBetweenLayers()
+    {
+        beginTest("copy then paste moves a clip between two layers, keeps its name, and the clipboard survives several pastes");
+        {
+            mu_core::clipClipboard().clear();
+            ClipProcessor p;
+            p.setParam("v0_a", 0.9f);
+            expect(p.storeClip(0, 2, "loud"));
+            expect(! p.canPasteClip(1), "nothing on the clipboard yet");
+            expect(p.copyClip(0, 2));
+            expect(p.canPasteClip(1) && p.canPasteClip(0));
+            expectEquals(p.layers[0]->clips->getName(2), juce::String("loud"));
+            expect(p.layers[0]->clips->isOccupied(2), "a copy leaves the bank");
+
+            expect(p.pasteClip(1, 5));
+            expect(p.layers[1]->clips->get(5).isEquivalentTo(p.layers[0]->clips->get(2)), "the same data");
+            expectEquals(p.layers[1]->clips->getName(5), juce::String("loud"));
+            expectEquals((int) p.clipMask(1), 1 << 5);
+            expectEquals(p.getLiveState().getPlayingClip(1), -1, "a paste does not light the pad");
+
+            p.layers[1]->clips->clear(5);
+            expect(p.pasteClip(1, 6));
+            expect(p.pasteClip(2, 0));
+            expect(p.pasteClip(1, 6), "the same slot again, replacing what is there");
+            expectEquals((int) p.clipMask(1), 1 << 6);
+            expectEquals((int) p.clipMask(2), 1);
+            expect(mu_core::clipClipboard().hasClip(), "the clipboard keeps its clip");
+            mu_core::clipClipboard().clear();
+        }
+    }
+
+    void refusals()
+    {
+        beginTest("an empty clip cannot be copied or cut, a bad index or layer is refused, and a clip of another kind cannot be pasted");
+        {
+            mu_core::clipClipboard().clear();
+            ClipProcessor p;
+            expect(! p.copyClip(0, 3) && ! p.cutClip(0, 3), "empty");
+            expect(! mu_core::clipClipboard().hasClip(), "a refused copy puts nothing on the clipboard");
+            expect(! p.copyClip(0, 8) && ! p.copyClip(9, 0) && ! p.pasteClip(0, 8) && ! p.pasteClip(9, 0));
+
+            p.storeClip(0, 1);
+            mu_core::clipClipboard().set(juce::ValueTree("SomeoneElsesLayer"), "alien");
+            expect(! p.canPasteClip(0), "a clip of another kind");
+            expect(! p.pasteClip(0, 2));
+            expectEquals((int) p.clipMask(0), 1 << 1, "nothing was written");
+
+            // A refused copy leaves what is on the clipboard alone.
+            expect(! p.copyClip(0, 3));
+            expectEquals(mu_core::clipClipboard().getName(), juce::String("alien"));
+            mu_core::clipClipboard().clear();
+            expect(! p.pasteClip(0, 2), "an empty clipboard");
+        }
+    }
+
+    void cutKeepsClipboard()
+    {
+        beginTest("cut copies then clears; the clipboard keeps the data and pastes more than once");
+        {
+            mu_core::clipClipboard().clear();
+            ClipProcessor p;
+            p.setParam("v0_a", 0.8f);
+            p.storeClip(0, 4, "cutme");
+            const auto stored = p.layers[0]->clips->get(4);
+            expect(p.cutClip(0, 4));
+            expect(! p.layers[0]->clips->isOccupied(4));
+            expectEquals((int) p.clipMask(0), 0);
+            expectEquals(mu_core::clipClipboard().getName(), juce::String("cutme"));
+            expect(mu_core::clipClipboard().get().isEquivalentTo(stored));
+            expect(p.pasteClip(1, 0) && p.pasteClip(2, 0), "the cut clip pastes more than once");
+            expect(p.layers[1]->clips->get(0).isEquivalentTo(stored));
+            mu_core::clipClipboard().clear();
+        }
+    }
+
+    void actionsAreScreenOnly()
+    {
+        beginTest("Copy / Cut / Paste actions: screen only, refused in Performance mode and while a full preset is staged");
+        {
+            using T = mu_core::ControlActionType;
+            const auto act = [](T type, int layer, int index)
+            {
+                mu_core::ControlAction a;
+                a.type = type; a.layer = layer; a.index = index;
+                return a;
+            };
+            mu_core::clipClipboard().clear();
+            const auto dir = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                                 .getChildFile("mu_clipclip_" + juce::String(juce::Time::currentTimeMillis()));
+            dir.createDirectory();
+
+            juce::AudioProcessor::setTypeOfNextNewPlugin(juce::AudioProcessor::wrapperType_Standalone);
+            ClipProcessor p;
+            juce::AudioProcessor::setTypeOfNextNewPlugin(juce::AudioProcessor::wrapperType_Undefined);
+
+            p.setParam("v0_a", 0.9f);
+            expect(p.perform(act(T::StoreClip, 0, 1)));
+            expect(p.perform(act(T::CopyClip, 0, 1)), "copy");
+            expect(p.perform(act(T::PasteClip, 1, 3)), "paste");
+            expect(p.perform(act(T::CutClip, 1, 3)), "cut");
+            expectEquals((int) p.clipMask(1), 0);
+            expect(! p.perform(act(T::CopyClip, 0, 5)) && ! p.perform(act(T::CutClip, 0, 5)), "an empty clip");
+            expect(p.perform(act(T::PasteClip, 1, 3)), "the cut clip is still on the clipboard");
+
+            for (const auto t : { T::CopyClip, T::CutClip, T::PasteClip })
+                expect(mu_core::actionFromName(mu_core::actionName(t)) == T::None, "no saved map or surface can name it");
+
+            // A staged full preset refuses all three and changes nothing.
+            {
+                ClipProcessor q;
+                q.storeClip(0, 1);
+                q.layerSwapper.stageFull(juce::ValueTree("Full"));
+                expect(! q.perform(act(T::CopyClip, 0, 1)) && ! q.perform(act(T::CutClip, 0, 1)) && ! q.perform(act(T::PasteClip, 1, 0)));
+                expectEquals((int) q.clipMask(0), 1 << 1);
+                expectEquals((int) q.clipMask(1), 0);
+            }
+
+            mu_pp::PerformanceFile list;
+            list.setItem(0, p.getProductStateId(), dir.getChildFile("p.preset"), dir, "P");
+            p.loadPerformance(list, dir.getChildFile("live.muPerformance"));
+            expect(p.perform(act(T::PerformanceMode, 0, 1)), "Performance mode on");
+            expect(! p.perform(act(T::CopyClip, 0, 1)) && ! p.perform(act(T::CutClip, 0, 1)) && ! p.perform(act(T::PasteClip, 1, 4)),
+                   "locked: refused");
+            expectEquals((int) p.clipMask(0), 1 << 1, "the bank is unchanged");
+            expectEquals((int) p.clipMask(1), 1 << 3, "only the earlier paste is there");
+            mu_core::clipClipboard().clear();
+            dir.deleteRecursively();
+        }
+    }
+
+    void pasteOntoLitClip()
+    {
+        beginTest("paste onto the lit clip relaunches it (stopped: at once; playing: at the boundary); another clip is not launched");
+        {
+            using T = mu_core::ControlActionType;
+            const auto act = [](T type, int layer, int index)
+            {
+                mu_core::ControlAction a;
+                a.type = type; a.layer = layer; a.index = index;
+                return a;
+            };
+            mu_core::clipClipboard().clear();
+
+            // Stopped: the pasted data is live at once, and the lit pad is still the pasted clip.
+            {
+                ClipProcessor p;
+                p.setParam("v0_a", 0.9f);
+                p.storeClip(0, 0, "src");
+                p.setParam("v1_a", 0.2f);
+                expect(p.perform(act(T::StoreClip, 1, 2)), "layer 1 clip 2 is stored and lit");
+                expect(p.perform(act(T::CopyClip, 0, 0)));
+                expectEquals(p.getLiveState().getPlayingClip(1), 2);
+                expectWithinAbsoluteError(p.param("v1_a"), 0.2f, 0.01f);
+
+                expect(p.perform(act(T::PasteClip, 1, 2)), "paste onto the lit clip");
+                expectEquals(p.getLiveState().getPlayingClip(1), 2, "it stays lit");
+                expect(! p.hasPendingSwap(1));
+                expect(p.captureLayerPresetTree(1).isEquivalentTo(p.layers[1]->clips->get(2)), "what plays is what the lit pad holds");
+                expectWithinAbsoluteError(p.param("v1_a"), 0.9f, 0.01f);
+                expectEquals(p.layers[1]->clips->getName(2), juce::String("src"));
+            }
+
+            // Playing: a staged launch with the usual serial; the layer swaps at the boundary and the pad stays lit.
+            {
+                ClipProcessor p;
+                p.setParam("v0_a", 0.9f);
+                p.storeClip(0, 0);
+                p.setParam("v1_a", 0.2f);
+                expect(p.perform(act(T::StoreClip, 1, 2)));
+                expect(p.copyClip(0, 0));
+                p.startPlaying();
+                expect(p.perform(act(T::PasteClip, 1, 2)));
+                expect(p.hasPendingSwap(1), "staged for the boundary");
+                expectEquals(p.getLiveState().getQueuedClip(1), 2);
+                expectEquals(p.getLiveState().getPlayingClip(1), 2);
+                expectWithinAbsoluteError(p.param("v1_a"), 0.2f, 0.01f);
+                p.layerSwapper.flagBoundaries(true, 3.95, 0.2);
+                p.layerSwapper.commit();
+                p.getLiveState().reconcile();
+                expectWithinAbsoluteError(p.param("v1_a"), 0.9f, 0.01f);
+                expectEquals(p.getLiveState().getPlayingClip(1), 2);
+                expectEquals(p.getLiveState().getQueuedClip(1), -1);
+                expect(p.captureLayerPresetTree(1).isEquivalentTo(p.layers[1]->clips->get(2)), "the lit pad equals what plays");
+            }
+
+            // A clip that is not the lit one is just written: nothing is staged and the lit pad does not move.
+            {
+                ClipProcessor p;
+                p.setParam("v0_a", 0.9f);
+                p.storeClip(0, 0);
+                p.setParam("v1_a", 0.2f);
+                p.perform(act(T::StoreClip, 1, 2));
+                p.startPlaying();
+                p.copyClip(0, 0);
+                const int stagesBefore = p.stages;
+                expect(p.pasteClip(1, 5));
+                expectEquals(p.stages, stagesBefore, "no launch");
+                expect(! p.hasPendingSwap(1));
+                expectEquals(p.getLiveState().getPlayingClip(1), 2);
+                expectEquals((int) p.clipMask(1), (1 << 2) | (1 << 5));
+            }
+            mu_core::clipClipboard().clear();
+        }
+    }
+
+    void failedRelaunchChangesNothing()
+    {
+        beginTest("a paste onto the lit clip changes nothing when the relaunch cannot be staged");
+        {
+            using T = mu_core::ControlActionType;
+            mu_core::ControlAction store; store.type = T::StoreClip; store.layer = 1; store.index = 2;
+            mu_core::clipClipboard().clear();
+            ClipProcessor p;
+            p.setParam("v0_a", 0.9f);
+            p.storeClip(0, 0);
+            p.setParam("v1_a", 0.2f);
+            expect(p.perform(store));
+            const auto before = p.layers[1]->clips->get(2);
+            const auto storedName = p.layers[1]->clips->getName(2);
+            p.copyClip(0, 0);
+            p.layerSwapper.stageFull(juce::ValueTree("Full"));   // launchClip refuses while a full preset is staged
+            expect(! p.pasteClip(1, 2));
+            expect(p.layers[1]->clips->get(2).isEquivalentTo(before) && p.layers[1]->clips->getName(2) == storedName, "the bank is unchanged");
+            mu_core::clipClipboard().clear();
+        }
+    }
 
     void runTest() override
     {
@@ -419,6 +648,13 @@ struct ClipLaunchTests : juce::UnitTest
             }
         }
 
+        copyPasteBetweenLayers();
+        refusals();
+        cutKeepsClipboard();
+        actionsAreScreenOnly();
+        pasteOntoLitClip();
+        failedRelaunchChangesNothing();
+
         beginTest("a clip survives the layer's own parameter edits and is independent of the live layer");
         {
             ClipProcessor p;
@@ -443,6 +679,66 @@ struct ClipLaunchTests : juce::UnitTest
             mu_core::ControlAction up; up.type = T::AppPrev;
             mu_core::ControlAction down; down.type = T::AppNext;
             expect(! p.perform(up) && ! p.perform(down), "no multi-app hub: refused");
+        }
+
+        beginTest("a scene launches clip n on every layer that stores one, together at the boundary, and leaves the others playing");
+        {
+            ClipProcessor p;
+            p.setParam("v0_a", 0.9f); p.setParam("v1_a", 0.8f); p.setParam("v2_a", 0.7f);
+            p.storeClip(0, 3); p.storeClip(1, 3);          // layer 2 stores no clip 3
+            p.setParam("v0_a", 0.1f); p.setParam("v1_a", 0.2f); p.setParam("v2_a", 0.3f);
+            expect(! p.launchScene(4), "a scene no layer stores does nothing");
+            expect(! p.launchScene(-1) && ! p.launchScene(8), "out of range");
+
+            p.startPlaying();
+            expect(p.launchScene(3));
+            expect(p.hasPendingSwap(0) && p.hasPendingSwap(1), "both layers staged");
+            expect(! p.hasPendingSwap(2), "the layer without that clip is left alone");
+            const auto* view = p.getLiveView();
+            expectEquals(view->getQueuedClip(0), 3);
+            expectEquals(view->getQueuedClip(1), 3);
+            expectEquals(view->getQueuedClip(2), -1);
+
+            expect(p.layerSwapper.flagBoundaries(true, 3.95, 0.2), "one bar line flags the scene");
+            p.layerSwapper.commit();
+            p.getLiveState().reconcile();
+            expectWithinAbsoluteError(p.param("v0_a"), 0.9f, 0.01f);
+            expectWithinAbsoluteError(p.param("v1_a"), 0.8f, 0.01f);
+            expectWithinAbsoluteError(p.param("v2_a"), 0.3f, 0.01f);
+            expectEquals(view->getPlayingClip(0), 3);
+            expectEquals(view->getPlayingClip(1), 3);
+
+            expect(p.launchScene(3), "the scene already playing is accepted");
+            expect(! p.hasPendingSwap(0) && ! p.hasPendingSwap(1), "and stages nothing");
+            expect(! view->isLayerMuted(0) && ! view->isLayerMuted(1), "a scene never mutes a layer");
+        }
+
+        beginTest("a scene is one staging batch: a boundary inside it flags no layer, and a full preset staged refuses it");
+        {
+            ClipProcessor p;
+            p.storeClip(0, 1); p.storeClip(1, 1);
+            p.startPlaying();
+            p.layerSwapper.beginBatch();
+            expect(p.launchClip(0, 1));
+            expect(! p.layerSwapper.flagBoundaries(true, 3.95, 0.2), "the bar line inside the batch flags nothing");
+            expect(p.launchClip(1, 1));
+            p.layerSwapper.endBatch();
+            expect(p.layerSwapper.flagBoundaries(true, 7.95, 0.2));
+            p.layerSwapper.commit();
+            expect(! p.hasPendingSwap(0) && ! p.hasPendingSwap(1), "both landed at the same boundary");
+
+            p.layerSwapper.stageFull(juce::ValueTree("Full"));
+            expect(! p.launchScene(1), "refused while a full preset is staged");
+        }
+
+        beginTest("LaunchScene is an action: allowed with Performance mode off, saved by name");
+        {
+            using T = mu_core::ControlActionType;
+            expect(mu_core::actionFromName(mu_core::actionName(T::LaunchScene)) == T::LaunchScene);
+            ClipProcessor p;
+            p.storeClip(0, 2);
+            mu_core::ControlAction a; a.type = T::LaunchScene; a.index = 2;
+            expect(p.perform(a));
         }
 
         beginTest("TransportToggle plays and stops the internal clock, and the live view reports it");

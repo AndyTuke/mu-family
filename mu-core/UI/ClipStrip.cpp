@@ -1,5 +1,6 @@
 #include "ClipStrip.h"
 #include "UI/ConfirmDialog.h"
+#include "UI/Components/PadLamp.h"
 #include "MuLimits.h"
 
 static_assert(ClipStrip::kPads == mu_limits::kClipsPerLayer, "the strip shows one pad per stored clip");
@@ -146,8 +147,8 @@ void ClipStrip::refresh()
         }
     }
 
-    // Entering Performance mode cancels any clip menu that is open (a late pick is refused anyway).
-    if (isReadOnly()) juce::PopupMenu::dismissAllActiveMenus();
+    // Entering Performance mode, or staging a full preset, cancels any clip menu that is open (a late pick is refused anyway).
+    if (isMenuBlocked()) juce::PopupMenu::dismissAllActiveMenus();
 
     // The Queued status line stays while a clip waits for its boundary and goes when it lands or is cancelled.
     const juce::String q = queued >= 0 ? layerName + " " + clipText(queued) + " (at the next swap point)" : juce::String();
@@ -192,8 +193,18 @@ void ClipStrip::say(const juce::String& name, const juce::String& value, bool ti
     });
 }
 
+// A stored clip this layer will not take: a typed slot refuses a clip of another layer type, so the pad says so
+// instead of offering to play it.
+bool ClipStrip::refusedAt(int pad) const
+{
+    return view != nullptr && storedAt(pad) && ! view->isClipForLayer(layer, pad);
+}
+
+juce::String ClipStrip::refusedText(int pad) { return "Clip " + juce::String(pad + 1) + " is for a different layer type"; }
+
 std::pair<juce::String, juce::String> ClipStrip::hoverFor(int pad) const
 {
+    if (refusedAt(pad)) return { "Clip", refusedText(pad) };
     juce::String state;
     switch (getLamp(pad))
     {
@@ -212,8 +223,9 @@ juce::String ClipStrip::getTooltip()
     if (isReadOnly()) return {};
     const int pad = padAt(computeLayout(getLocalBounds()), getMouseXYRelative());
     if (pad < 0) return {};
-    return storedAt(pad) ? "Play clip " + juce::String(pad + 1) + " (click again to mute)"
-                         : "Store this " + noun + " here";
+    if (refusedAt(pad)) return refusedText(pad);
+    return storedAt(pad) ? "Play clip " + juce::String(pad + 1) + " (click again to mute). Right-click for more."
+                         : "Store this " + noun + " here. Right-click for more.";
 }
 
 // ── Gestures ─────────────────────────────────────────────────────────────────
@@ -234,13 +246,20 @@ void ClipStrip::confirm(const juce::String& title, const juce::String& message, 
     if (askConfirm) askConfirm(title, message, button, std::move(go));
 }
 
-void ClipStrip::clickPad(int pad, bool shift)
+void ClipStrip::clickPad(int pad)
 {
     if (isReadOnly() || sink == nullptr || view == nullptr || pad < 0 || pad >= kPads) return;
 
-    if (shift || ! storedAt(pad))   // Shift stores anywhere; a plain click on an empty pad stores too
+    if (! storedAt(pad))   // a plain click on an empty pad stores into it
     {
         storePad(pad);
+        return;
+    }
+
+    // A clip of another layer type is never launched: nothing is staged and no light changes, the status line says why.
+    if (refusedAt(pad))
+    {
+        say("Clip", refusedText(pad), true);
         return;
     }
 
@@ -254,58 +273,112 @@ void ClipStrip::clickPad(int pad, bool shift)
         say("Clip", "Launched " + layerName + " " + clipText(pad), true);
 }
 
-void ClipStrip::storePad(int pad)
+bool ClipStrip::isMenuBlocked() const
 {
-    if (isReadOnly() || sink == nullptr || view == nullptr || pad < 0 || pad >= kPads) return;
+    return isReadOnly() || (view != nullptr && view->isFullPresetStaged());
+}
 
+// A refused gesture says why when a full preset is waiting; Performance mode refuses silently (the strip is read-only there).
+bool ClipStrip::blockedWithNote()
+{
+    if (! isMenuBlocked()) return false;
+    if (! isReadOnly()) say("Clip", "Full preset waiting; try again after it loads", true);
+    return true;
+}
+
+ClipStrip::MenuState ClipStrip::menuStateFor(int pad) const
+{
+    MenuState m;
+    if (isMenuBlocked() || view == nullptr || pad < 0 || pad >= kPads) return m;
+    const bool stored = storedAt(pad);
+    m.store = ! stored;
+    m.copy = m.cut = m.clear = stored;
+    m.paste = view->canPasteClip(layer);
+    m.pasteLabel = m.paste ? "Paste" : (view->isClipboardEmpty() ? "Paste (nothing copied)" : "Paste (other layer type)");
+    return m;
+}
+
+// One menu action: ask first when `ask` is set, then send it and say what happened. The lock and the layer are
+// checked again when the answer arrives, so a Performance-mode switch or layer change during the dialog writes nothing.
+void ClipStrip::runMenuAction(int pad, mu_core::ControlActionType type, const juce::String& verb, bool ask,
+                              const juce::String& title, const juce::String& message, const juce::String& button)
+{
     const int          target = layer;
     const juce::String name   = layerName;
     juce::Component::SafePointer<ClipStrip> safe(this);
-    auto go = [safe, target, pad, name]
+    auto go = [safe, target, pad, name, type, verb]
     {
         auto* strip = safe.getComponent();
-        if (strip == nullptr || strip->isReadOnly() || strip->layer != target) return;   // the lock or a layer change cancels
-        if (strip->send(mu_core::ControlActionType::StoreClip, pad))
-            strip->say("Clip", "Stored " + name + " " + strip->clipText(pad), true);
+        if (strip == nullptr || strip->isMenuBlocked() || strip->layer != target) return;
+        if (strip->send(type, pad))
+            strip->say("Clip", verb + " " + name + " " + strip->clipText(pad), true);
     };
+    if (ask) confirm(title, message, button, std::move(go));
+    else     go();
+}
 
-    // Replacing a stored clip that is not the one playing asks first; updating the playing clip after a tweak does not.
-    if (storedAt(pad) && ! playingAt(pad))
-        confirm("Replace Clip", "Replace " + clipText(pad) + " of \"" + name + "\" with its current state?\nThis cannot be undone.",
-                "Replace", std::move(go));
-    else
-        go();
+void ClipStrip::storePad(int pad)
+{
+    if (blockedWithNote() || sink == nullptr || view == nullptr || pad < 0 || pad >= kPads || storedAt(pad)) return;
+    runMenuAction(pad, mu_core::ControlActionType::StoreClip, "Stored", false, {}, {}, {});
+}
+
+void ClipStrip::copyPad(int pad)
+{
+    if (blockedWithNote() || sink == nullptr || view == nullptr || ! storedAt(pad)) return;
+    runMenuAction(pad, mu_core::ControlActionType::CopyClip, "Copied", false, {}, {}, {});
+}
+
+void ClipStrip::cutPad(int pad)
+{
+    if (blockedWithNote() || sink == nullptr || view == nullptr || ! storedAt(pad)) return;
+    runMenuAction(pad, mu_core::ControlActionType::CutClip, "Cut", false, {}, {}, {});
+}
+
+void ClipStrip::pastePad(int pad)
+{
+    if (blockedWithNote() || sink == nullptr || view == nullptr || pad < 0 || pad >= kPads) return;
+    if (! view->canPasteClip(layer))
+    {
+        if (! view->isClipboardEmpty()) say("Clip", refusedText(pad), true);   // a clip of another layer type
+        return;
+    }
+    runMenuAction(pad, mu_core::ControlActionType::PasteClip, "Pasted", storedAt(pad), "Replace Clip",
+                  "Replace " + clipText(pad) + " of \"" + layerName + "\" with the copied clip?\nThis cannot be undone.", "Replace");
 }
 
 void ClipStrip::clearPad(int pad)
 {
-    if (isReadOnly() || sink == nullptr || view == nullptr || ! storedAt(pad)) return;
-
-    const int          target = layer;
-    const juce::String name   = layerName;
-    juce::Component::SafePointer<ClipStrip> safe(this);
-    confirm("Clear Clip", "Clear " + clipText(pad) + " of \"" + name + "\"?\nThis cannot be undone.", "Clear",
-            [safe, target, pad, name]
-            {
-                auto* strip = safe.getComponent();
-                if (strip == nullptr || strip->isReadOnly() || strip->layer != target) return;
-                if (strip->send(mu_core::ControlActionType::ClearClip, pad))
-                    strip->say("Clip", "Cleared " + name + " " + strip->clipText(pad), true);
-            });
+    if (blockedWithNote() || sink == nullptr || view == nullptr || ! storedAt(pad)) return;
+    runMenuAction(pad, mu_core::ControlActionType::ClearClip, "Cleared", true, "Clear Clip",
+                  "Clear " + clipText(pad) + " of \"" + layerName + "\"?\nThis cannot be undone.", "Clear");
 }
 
 void ClipStrip::menuChosen(int pad, int menuResult)
 {
-    if (menuResult == menuStore)      storePad(pad);
-    else if (menuResult == menuClear) clearPad(pad);
+    switch (menuResult)
+    {
+        case menuStore: storePad(pad); break;
+        case menuCopy:  copyPad(pad);  break;
+        case menuCut:   cutPad(pad);   break;
+        case menuPaste: pastePad(pad); break;
+        case menuClear: clearPad(pad); break;
+        default: break;
+    }
 }
 
 void ClipStrip::showPopup(int pad)
 {
-    if (isReadOnly()) return;
+    if (blockedWithNote()) return;
+    const auto st = menuStateFor(pad);
+
     juce::PopupMenu menu;
-    menu.addItem(menuStore, "Store here");
-    menu.addItem(menuClear, "Clear", storedAt(pad));
+    menu.addItem(menuStore, "Store here", st.store);
+    menu.addItem(menuCopy, "Copy", st.copy);
+    menu.addItem(menuCut, "Cut", st.cut);
+    menu.addItem(menuPaste, st.pasteLabel, st.paste);   // a greyed Paste names its reason in its own text
+    menu.addSeparator();
+    menu.addItem(menuClear, "Clear", st.clear);
 
     juce::Component::SafePointer<ClipStrip> safe(this);
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this)
@@ -318,7 +391,7 @@ void ClipStrip::mouseDown(const juce::MouseEvent& e)
     const int pad = padAt(computeLayout(getLocalBounds()), e.getPosition());
     if (pad < 0) return;
     if (e.mods.isPopupMenu() || e.mods.isCtrlDown()) showPopup(pad);
-    else                                             clickPad(pad, e.mods.isShiftDown());
+    else                                             clickPad(pad);
 }
 
 void ClipStrip::mouseMove(const juce::MouseEvent& e)
@@ -336,7 +409,6 @@ void ClipStrip::paint(juce::Graphics& g)
 {
     using Id = MuLookAndFeel::ColourIds;
     using mu_ui::sf;
-    const auto& L = MuLookAndFeel::lighting();
     const double now = juce::Time::getMillisecondCounterHiRes();
     const auto layout = computeLayout(getLocalBounds());
 
@@ -351,23 +423,10 @@ void ClipStrip::paint(juce::Graphics& g)
         g.drawText("Clip", layout.caption, juce::Justification::centredLeft, true);
     }
 
-    // The pads: a dark base with the lit lens a pixel inside it, lit by the clip's state, its number engraved on top.
-    const float corner = sf((float) MuLookAndFeel::kLampCellCorner);
+    // The pads, lit by each clip's state; the lens and number are drawn by the one shared pad function.
     for (int i = 0; i < kPads; ++i)
     {
-        const auto cell  = layout.pads[(size_t) i].toFloat();
         const bool flash = flashUntil[(size_t) i] > now;
-        const float lit  = mu_ui::lampLit(lamps[(size_t) i], now, flash);
-
-        g.setColour(MuLookAndFeel::lampBase());
-        g.fillRoundedRectangle(cell, corner);
-        juce::Path lens;
-        lens.addRoundedRectangle(cell.reduced(1.0f), corner);
-        MuLookAndFeel::drawLamp(g, lens, {}, MuLookAndFeel::lampColour(colour, lit), cell.getCentre(),
-                                juce::jmax(cell.getWidth(), cell.getHeight()) * L.lampHotSpotReach);
-
-        // Muted grey on an unlit or dim lens, the dark base colour once the lens is lit.
-        const auto ink = lit >= L.lampOn ? MuLookAndFeel::lampBase() : MuLookAndFeel::colour(Id::mutedText);
-        MuLookAndFeel::drawEngravedText(g, juce::String(i + 1), layout.pads[(size_t) i], juce::Justification::centred, ink);
+        mu_ui::drawNumberedPad(g, layout.pads[(size_t) i], i + 1, colour, mu_ui::lampLit(lamps[(size_t) i], now, flash));
     }
 }

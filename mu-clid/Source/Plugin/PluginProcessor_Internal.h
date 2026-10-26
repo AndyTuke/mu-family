@@ -11,6 +11,7 @@
 #include "Persistence/RhythmParamTable.h"     // declarative per-rhythm param def table.
 #include "Audio/AlgorithmNames.h" // kEffectAlgorithmNames / kReverbAlgorithmNames / kInsertAlgorithmNames
 #include "Persistence/PresetHelpers.h"        // writeKindedProperty, readKindedPropertyAsActualV2, GlobalParamDef, kGlobalParamDefs
+#include "Persistence/RhythmPresetTree.h"     // rhythm_preset::kChannelSuffixes
 
 namespace mu_clid {
 
@@ -24,13 +25,8 @@ inline float adsrSus (float v) noexcept { return mu_core::adsrSusLocal(v); }
 // Iterate that directly instead of a parallel string array. Callers that need
 // to enumerate suffixes use a range-for / index loop over kRhythmParamDefs[i].suffix.
 
-// Per-channel mixer APVTS parameter suffixes (prefix: "ch{i}_").
-// Saved in rhythm presets so sends/sidechain travel with the rhythm.
-inline const char* const kChannelSuffixes[] = {
-    "lvl","pan","mute","solo","sendEff","sendDly","sendRev",
-    "scSrc","scAmt","scAtk","scRel","outBus",
-    nullptr
-};
+// Per-channel mixer APVTS parameter suffixes (prefix: "ch{i}_"), as a .muClid <Rhythm> node carries them.
+using rhythm_preset::kChannelSuffixes;
 
 // Global APVTS parameter IDs are now declared once, in kGlobalParamDefs
 // (PresetHelpers.h). Previously a parallel null-terminated `kGlobalParams[]`

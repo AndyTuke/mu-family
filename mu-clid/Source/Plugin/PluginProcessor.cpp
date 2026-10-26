@@ -38,6 +38,10 @@ PluginProcessor::PluginProcessor()
 
     initAppSettings("muClid");   // settings file + saved UI size / MIDI clock (ProcessorBase)
 
+    // A hot-swap's retired engines sound out in the shared RetireBin only in live slots: a count-reducing store
+    // cuts the tails of the slots it drops (they were silent there before too, and a regrow starts clean).
+    setRetireCountPolicy(mu_core::RetireBin::CountPolicy::CutAtCount);
+
     midiNoteMode.store(appSettings->getIntValue("midiNoteMode", 0), std::memory_order_relaxed);
 
     // Load MIDI program-change preset maps (each lives in its own JSON file
@@ -58,11 +62,10 @@ PluginProcessor::PluginProcessor()
     // Offline licence + online activation (shared; after initAppSettings for getContentDir).
     initLicensing({ mu_clid::kLicenseProductId, mu_clid::kLicenseFilename,
                     mu_clid::kLicensePublicKey, "muclid.activation", mu_clid::kCheckoutUrl });
-    sequencer.setStepCap(HitGenerator::kMaxSteps);
 
     // Resolve each rhythm parameter once (its raw value pointer for the drain) and build the sorted
     // suffix table the listener searches, before any listener can fire.
-    for (int ri = 0; ri < RhythmSequencer::MaxRhythms; ++ri)
+    for (int ri = 0; ri < mu_limits::kMaxLayers; ++ri)
     {
         const juce::String prefix = "r" + juce::String(ri) + "_";
         for (int i = 0; i < kRhythmParamCount; ++i)
@@ -83,57 +86,22 @@ PluginProcessor::PluginProcessor()
                 apvts.addParameterListener(p->getParameterID(), this);
     startFxParamSync();
 
-    // Pre-populate modulation param map so lookups never allocate on the audio thread.
-    modParamValues.reserve(50);
-    for (const char* key : { "amp.attack", "amp.decay", "amp.sustain",  // amp.release retired
-                              "filter.cutoff", "filter.resonance",
-                              "fenv.attack", "fenv.decay", "fenv.depth",
-                              "pitch.semitones", "pitch.octave",
-                              // Stage 36: 4 generic insert slots — semantics per
-                              // active algorithm via mu_ui::kInsertAlgoSlots.
-                              "insert.p1", "insert.p2", "insert.p3", "insert.p4",
-                              "pitch.envDepth", "amp.level", "accentDb",
-                              "euclid.a.hits", "euclid.a.rotate",
-                              "euclid.a.prePad", "euclid.a.postPad",
-                              "euclid.a.insSt", "euclid.a.insLen",
-                              "euclid.b.hits", "euclid.b.rotate",
-                              "euclid.b.prePad", "euclid.b.postPad",
-                              "euclid.b.insSt", "euclid.b.insLen",
-                              "euclid.c.hits", "euclid.c.rotate",
-                              "euclid.c.prePad", "euclid.c.postPad",
-                              "euclid.c.insSt", "euclid.c.insLen",
-                              "filter.lowCut",
-                              "amp.pan", "send.effect", "send.delay", "send.reverb" })
-        modParamValues[key] = 0.0f;
-    // Point each destination's slot at its map value (no rehash after this: keys are fixed).
-    for (auto& [key, value] : modParamValues)
-        if (const int i = ModDest::indexOf(key); i >= 0)
-            modSlot[(size_t) i] = &value;
-
     // Add default rhythm (16 steps, 4 hits) and sync its state to APVTS.
     // All eight rhythms exist for the processor's lifetime (a restored state writes into slots above
-    // the live count before it sets the count); the sequencer binds to them.
+    // the live count before it sets the count).
     keepSpareLayers = true;
-    for (int ri = 0; ri < RhythmSequencer::MaxRhythms; ++ri)
+    for (int ri = 0; ri < mu_limits::kMaxLayers; ++ri)
     {
         layers[(size_t) ri] = makeRhythm(ri);
-        sequencer.bindRhythm(ri, &layerAs<Rhythm>(ri));
     }
     Rhythm& defaultRhythm = layerAs<Rhythm>(0);
     defaultRhythm.name       = "<unnamed>";
     defaultRhythm.genA.steps = 16;
     defaultRhythm.genA.hits  = 4;
-    sequencer.setNumRhythms(1);
-    sequencer.updatePattern(0);
-    voiceEngines[0] = std::make_unique<VoiceEngine>();
-    voiceEngines[0]->insertProc.setSlotIndex(0);   // per-slot noise seed: layers do not share one sequence
-    // Stage 34 Step 2: C++17 std::atomic<bool> default ctor leaves the value
-    // indeterminate. Initialise every retired-cleanup flag to false so the
-    // audio thread + drain block never observe a spurious "ready" state on an
-    // empty slot. Retired slots stay null and flags stay false until a swap retires an engine.
-    for (auto& slotArr : retiredReadyForCleanup)
-        for (auto& flag : slotArr)
-            flag.store(false, std::memory_order_relaxed);
+    setLiveRhythms(1);
+    updateRhythmPattern(0);
+    voiceEngine(0) = std::make_unique<VoiceEngine>();
+    voiceEngine(0)->insertProc.setSlotIndex(0);   // per-slot noise seed: layers do not share one sequence
     storeLayerCount(1, std::memory_order_release);   // through the packed layout word, as every count store
 
     {
@@ -183,85 +151,161 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     currentSampleRate = sampleRate;
     currentBlockSize  = samplesPerBlock;
     sequencerPlaying.store(false);   // no block has been processed since this prepare: a load now applies at once
-    const int n = numLayers.load(std::memory_order_acquire);
-    for (int i = 0; i < n; ++i)
-    {
-        voiceEngines[i]->prepareToPlay(sampleRate, samplesPerBlock);
-        midiEngines[i].prepare(sampleRate, samplesPerBlock);
-    }
-    // Stage 34: re-prepare any populated retired engines too so a mid-stream
-    // sample-rate or block-size change doesn't leave a tail-out engine
-    // operating on stale buffer sizing. No-op in Step 2 (all slots null).
-    for (auto& slotArr : retiredVoiceEngines)
-        for (auto& engine : slotArr)
-            if (engine)
-                engine->prepareToPlay(sampleRate, samplesPerBlock);
 
     fxChain.prepare(sampleRate, samplesPerBlock);
     mixerEngine.prepare(sampleRate, samplesPerBlock);
     samples.prepare(samplesPerBlock, sampleRate);
+
+    // The shared driver's buffers and every slot's rhythm (SampleRhythm::prepare: its voice and MIDI engines); the
+    // retire bin is flushed, so a mid-stream rate or block-size change leaves no tail on stale sizing.
+    prepareLayerRender(sampleRate, samplesPerBlock);
 }
 
 void PluginProcessor::releaseResources()
 {
     sequencerPlaying.store(false);   // the host stopped calling processBlock: nothing will flag a staged swap
     samples.releaseResources();
+    releaseLayerRender();            // the retire bin is flushed: no tail outlives the stream it played in
 }
 
+// One block: the transport (mu-Clid's own resolve, every host block), then the shared driver (renderAndMix): one
+// try-lock of the rhythms, their render in chunks of the prepared size, the mixer. The per-block glue (the step
+// clock, the hits, the swap boundaries, the play state, the MIDI out) runs in the driver's hooks below, only in a
+// block that renders; a block that misses the lock or meets an edit in flight is silent and nothing advances.
 void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                                    juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
 
-    // Preserve the DAW sidechain, then clear (shared — the SC input bus shares buffer
-    // channels with the master output, so a bare clear would wipe it → no ducking /
-    // dead GR). The mixer keeps a private copy.
-    captureSidechainAndClear(buffer);
+    // The driver captures the sidechain and clears the master bus chunk by chunk; the other buses are cleared here
+    // (the sidechain input shares only the master bus's channels).
+    const int masterChannels = getBusBuffer(buffer, false, kMasterBusIndex).getNumChannels();
+    for (int c = masterChannels; c < buffer.getNumChannels(); ++c)
+        buffer.clear(c, 0, buffer.getNumSamples());
 
-    const BlockTransport transport = deriveTransport(buffer, midiMessages);
-    const bool   playing = transport.playing;
-    const double beatPos = transport.beatPos;
+    driveLayers(buffer, midiMessages, deriveTransport(buffer, midiMessages));
+}
 
-    // layersLock is the barrier against a structural edit (suspendProcessing is not one in every host);
-    // layerEditInFlight additionally covers the edit's parameter moves after the lock is dropped. Either
-    // way the block is silent and nothing here advances, as on any missed lock.
-    const juce::ScopedTryLock rLock(layersLock);
-    if (!rLock.isLocked() || layerEditInFlight.load(std::memory_order_acquire))
-    {
-        buffer.clear();
-        return;
-    }
-
-    // An offline render applies the queued parameter changes here, at a block boundary, so the same
-    // automation lands on the same block every time instead of whenever the 100 Hz poll runs. It runs
-    // under layersLock because it writes Rhythm and VoiceEngine slots that structural edits and hot-swap
-    // commits replace. It may allocate and wait (bounded): nothing is playing in real time.
-    if (isNonRealtime())
-        servicePendingRhythmParams(true);
-
-    // Must read the layer count AFTER acquiring layersLock — otherwise the snapshot
-    // can be stale relative to the layer set and `sequencer.getRhythm(r)` indexes out of range.
-    const int numRhythms = numLayers.load(std::memory_order_acquire);
-
-    // Send the note-offs owed by slots torn down since the last block, ahead of any new hit.
+void PluginProcessor::sendOrphanOffs(juce::MidiBuffer& midiMessages)
+{
     for (int i = 0; i < numOrphanOffs; ++i)
         midiMessages.addEvent(juce::MidiMessage::noteOff(orphanOffs[(size_t) i].channel, orphanOffs[(size_t) i].note), 0);
     numOrphanOffs = 0;
+}
 
-    if (playing)
-        advanceSequencer(numRhythms, beatPos, midiMessages);
+// The layer chain: the block's transport as the driver reads it (the beat after mu-Clid's own resolve, so a
+// sub-step dip is held as before), the host's buses, then renderAndMix. The per-block glue runs in its hooks.
+void PluginProcessor::driveLayers(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages,
+                                  const BlockTransport& transport)
+{
+    const int n = buffer.getNumSamples();
+    mu_core::BlockTransport t;
+    t.playing        = transport.playing;
+    t.bpm            = transport.bpm;
+    t.startBeat      = transport.beatPos;
+    t.beatsPerSample = currentSampleRate > 0.0 ? (transport.bpm / 60.0) / currentSampleRate : 0.0;
+    t.blockBeats     = transport.playing ? t.beatsPerSample * (double) n : 0.0;
 
-    // Apply modulation: compute per-rhythm modulated VoiceParams from the modulation matrix.
-    // Uses a try-lock so the audio thread never blocks on the message thread.
+    auto masterBus = getBusBuffer(buffer, false, kMasterBusIndex);
+    std::array<juce::AudioBuffer<float>, MixerEngine::MaxChannels> directBufs;
+    std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels> directPtrs {};
+    for (int i = 0; i < MixerEngine::MaxChannels; ++i)
+    {
+        const int busIndex = kFirstDirectOutBus + i;
+        if (busIndex < getBusCount(false))
+            if (auto* bus = getBus(false, busIndex); bus != nullptr && bus->isEnabled())
+            {
+                directBufs[(size_t) i] = getBusBuffer(buffer, false, busIndex);
+                directPtrs[(size_t) i] = &directBufs[(size_t) i];
+            }
+    }
+    juce::AudioBuffer<float>  fxRetBuf;
+    juce::AudioBuffer<float>* fxRetPtr = nullptr;
+    if (kFXReturnsBusIndex < getBusCount(false))
+        if (auto* bus = getBus(false, kFXReturnsBusIndex); bus != nullptr && bus->isEnabled())
+        {
+            fxRetBuf = getBusBuffer(buffer, false, kFXReturnsBusIndex);
+            fxRetPtr = &fxRetBuf;
+        }
+
+    renderAndMix(masterBus, midiMessages, t, &directPtrs, fxRetPtr);
+}
+
+// Start of a rendered block (under the layer lock, before any rhythm renders), in the order the processor chain had:
+// the owed note-offs, the hits, the swap boundaries, the play state. The rhythms then fire their sample hits and run
+// the modulation pass in their render (SampleRhythm::render).
+void PluginProcessor::layersBlockStarting(const mu_core::LayerView& view, const mu_core::BlockTransport& t,
+                                          juce::MidiBuffer& midiMessages)
+{
+    // An offline render applies the queued parameter changes here, at a block boundary, so the same automation lands
+    // on the same block every time instead of whenever the 100 Hz poll runs. It runs under the layer lock because it
+    // writes Rhythm and VoiceEngine slots that structural edits and hot-swap commits replace. It may allocate and
+    // wait (bounded): nothing is playing in real time.
+    if (isNonRealtime())
+        servicePendingRhythmParams(true);
+
+    const int numRhythms = juce::jlimit(0, (int) mu_limits::kMaxLayers, (int) view.numLive);
+    sendOrphanOffs(midiMessages);
+
+    // Each live rhythm starts the block with no hit; the cursors then find this block's.
     for (int r = 0; r < numRhythms; ++r)
-        applyRhythmModulation(r, beatPos);
+        sampleRhythm(r).block = {};
 
-    renderAudioBuses(buffer, midiMessages, numRhythms, transport.bpm);
+    if (t.playing)
+    {
+        std::array<CursorSteps, mu_limits::kMaxLayers> cursorSteps;
+        const auto blockResult = advanceCursors(numRhythms, t.startBeat, cursorSteps);
+
+        // Phase 1: each rhythm that has a hit takes it (a MIDI note-on now, a sample hit at its render).
+        for (int r = 0; r < numRhythms; ++r)
+            if (blockResult.firedMask & (1 << r))
+                sampleRhythm(r).takeHit((blockResult.accentMask & (1 << r)) != 0, (blockResult.tiedMask & (1 << r)) != 0,
+                                        midiMessages);
+
+        // Hot-swap: check if any staged rhythm preset should be committed at this boundary.
+        if (hotSwapStager.checkBoundaries(numRhythms, blockResult.masterLoopWrapped, blockResult.rhythmLoopWrapMask))
+            requestDeferredWork();
+
+        // Update UI play-state atomics.
+        const float frac = static_cast<float>(std::fmod(t.startBeat / RhythmSequencer::StepLengthBeats, 1.0));
+        for (int r = 0; r < numRhythms; ++r)
+        {
+            const auto& cs = cursorSteps[(size_t) r];
+            sampleRhythm(r).publishPlayState(cs.step, cs.accentStep, cs.length, frac,
+                                             (blockResult.firedMask & (1 << r)) != 0);
+        }
+    }
+
+    // The modulation pass's inputs: the rhythm's mixer channel and the clock's step.
+    for (int r = 0; r < numRhythms; ++r)
+    {
+        auto& in = sampleRhythm(r).block;
+        in.strip = &mixerEngine.channels[(size_t) r];
+        in.lastEffectiveStep = stepClock.lastEffective();
+    }
+}
+
+// End of a rendered block (under the layer lock, after the mixer): the sample preview on the master bus, in the
+// chunks the driver rendered, then each live rhythm's MIDI note-off countdown over the host block.
+void PluginProcessor::layersBlockRendered(const mu_core::LayerView& view, juce::AudioBuffer<float>& masterBus,
+                                          juce::MidiBuffer& midiMessages)
+{
+    const int total = masterBus.getNumSamples();
+    const int chunkMax = juce::jmax(1, currentBlockSize);
+    for (int start = 0; start < total; start += chunkMax)
+    {
+        const int len = juce::jmin(chunkMax, total - start);
+        juce::AudioBuffer<float> masterView(masterBus.getArrayOfWritePointers(), masterBus.getNumChannels(), start, len);
+        samples.mixPreviewInto(masterView, len);
+    }
+
+    const int numRhythms = juce::jlimit(0, (int) mu_limits::kMaxLayers, (int) view.numLive);
+    for (int r = 0; r < numRhythms; ++r)
+        sampleRhythm(r).midi.processBlock(midiMessages, total);
 }
 
 //==============================================================================
-// processBlock phases. Behaviour-preserving extraction of the full-build
-// audio-thread path; called in order from processBlock under its layersLock.
+// The block's transport, read on every host block (rendered or not).
 //==============================================================================
 PluginProcessor::BlockTransport
 PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
@@ -346,7 +390,7 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
         noteBlockTransport(t);   // lets the next block's quantised control actions find the beat
     }
 
-    // detect transport stop→start edge and reset the sequencer's wrap detector
+    // detect transport stop→start edge and reset the step clock's wrap detector
     // so the first block after restart can't emit a false masterLoopWrapped from
     // a stale lastEffectiveStep.
     {
@@ -354,10 +398,10 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
         // backward jump resets the detector so it cannot read as a master-loop wrap and commit a staged
         // hot-swap early (see RhythmSequencer::resolveBlockBeat).
         const auto resolved = RhythmSequencer::resolveBlockBeat(lastBeatPos.load(), beatPos, playing,
-                                                                sequencerPlaying.load(), sequencer.getMasterLoopSteps());
+                                                                sequencerPlaying.load(), stepClock.getMasterLoopSteps());
         beatPos = resolved.beat;
         if (resolved.resetWrap)
-            sequencer.resetWrapDetector();
+            stepClock.resetWrapDetector();
     }
     sequencerPlaying.store(playing);
     lastBeatPos.store(beatPos);
@@ -365,112 +409,30 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
     return { playing, beatPos, bpm };
 }
 
-void PluginProcessor::advanceSequencer(int numRhythms, double beatPos, juce::MidiBuffer& midiMessages)
+// The host clock's frame for the block, then each live rhythm's cursor walk, gathered into the sequencer's
+// BlockResult shape. Like RhythmSequencer::processBlock, nothing runs (no history consumed) with no live rhythm, and
+// the frame's step becomes the previous one only after every cursor walked.
+BlockResult PluginProcessor::advanceCursors(int numRhythms, double beatPos,
+                                            std::array<CursorSteps, mu_limits::kMaxLayers>& steps)
 {
-    const auto blockResult = sequencer.processBlock(beatPos);
-    // Phase 1: a fired hit plays the rhythm's sample, or (MIDI output mode) becomes one MIDI note-on and
-    // never reaches the voice. The settings are relaxed atomics on the Rhythm; nothing here allocates.
-    for (int r = 0; r < numRhythms; ++r)
-        if ((blockResult.firedMask & (1 << r)) && sequencer.getRhythm(r).outputMode.load() == (int) mu_core::OutputMode::Midi)
-        {
-            const Rhythm& rhy = sequencer.getRhythm(r);
-            const bool accented = (blockResult.accentMask & (1 << r)) != 0;
-            midiEngines[r].trigger(midiMessages, 0, rhy.midiNote.load(), rhy.midiChannel.load(),
-                                   mu_core::midiOutVelocity(rhy.midiVelocity.load(), (float) rhy.midiAccent.load(), accented));
-        }
-        else if ((blockResult.firedMask & (1 << r)) && voiceEngines[r])
-        {
-            // pattern-legato gating — tiedMask is always populated by
-            // the sequencer; the per-rhythm patternLegato flag decides
-            // whether to act on it. Untied / legato-off hits go through
-            // the standard retrigger path.
-            const bool tied = sequencer.getRhythm(r).patternLegato
-                           && (blockResult.tiedMask & (1 << r)) != 0;
-            voiceEngines[r]->trigger(blockResult.accentMask & (1 << r), tied);
-        }
+    BlockResult result;
+    if (numRhythms <= 0)
+        return result;
 
-    // Hot-swap: check if any staged rhythm preset should be committed at this boundary.
-    if (hotSwapStager.checkBoundaries(numRhythms, blockResult.masterLoopWrapped,
-                                      blockResult.rhythmLoopWrapMask))
-        requestDeferredWork();
-
-    // Update UI play-state atomics.
-    const float frac = static_cast<float>(
-        std::fmod(beatPos / RhythmSequencer::StepLengthBeats, 1.0));
-    beatFraction.store(frac);
+    const StepFrame frame = stepClock.advance(beatPos);
+    result.masterLoopWrapped = frame.masterLoopWrapped;
     for (int r = 0; r < numRhythms; ++r)
     {
-        // Step and fraction go out as one snapshot so the ring never pairs a new fraction with an old step.
-        rhythmPlayState[r].publishPosition({ sequencer.getLastStepIndex(r),
-                                             sequencer.getLastAccentStepIndex(r), frac });
-        rhythmPlayState[r].patternLength.store(sequencer.getPatternLength(r));
-        const Rhythm& rhy = sequencer.getRhythm(r);
-        rhythmPlayState[r].stepsA.store(juce::jmax(1, rhy.genA.steps));
-        rhythmPlayState[r].stepsB.store(juce::jmax(1, rhy.genB.steps));
-        rhythmPlayState[r].stepsC.store(juce::jmax(1, rhy.genC.steps));
-        if (blockResult.firedMask & (1 << r))
-        {
-            rhythmPlayState[r].hitCount.store(rhythmPlayState[r].hitCount.load() + 1); // monotonic counter for race-free UI hit detection
-        }
+        auto& cursor = sampleRhythm(r).cursor;
+        const auto hit = cursor.advance(frame);
+        if (hit.fired)       result.firedMask          |= 1 << r;
+        if (hit.accented)    result.accentMask         |= 1 << r;
+        if (hit.tied)        result.tiedMask           |= 1 << r;
+        if (hit.loopWrapped) result.rhythmLoopWrapMask |= 1 << r;
+        steps[(size_t) r] = { cursor.lastStep(), cursor.lastAccentStep(), cursor.patternLength() };
     }
-}
-
-
-void PluginProcessor::renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages,
-                                       int numRhythms, double effectiveBpm)
-{
-    // Gather the host's output bus buffers. Buses we declared in BusesProperties may
-    // be disabled in the host's chosen layout — skip those (the channel routes silently).
-    auto masterBus = getBusBuffer(buffer, false, kMasterBusIndex);
-
-    std::array<juce::AudioBuffer<float>, 8> directBufs;
-    std::array<juce::AudioBuffer<float>*, 8> directPtrs {};
-    for (int i = 0; i < 8; ++i)
-    {
-        const int busIndex = kFirstDirectOutBus + i;
-        if (busIndex < getBusCount(false))
-            if (auto* bus = getBus(false, busIndex))
-                if (bus->isEnabled())
-                {
-                    directBufs[(size_t) i] = getBusBuffer(buffer, false, busIndex);
-                    directPtrs[(size_t) i] = &directBufs[(size_t) i];
-                }
-    }
-
-    juce::AudioBuffer<float>  fxRetBuf;
-    juce::AudioBuffer<float>* fxRetPtr = nullptr;
-    if (kFXReturnsBusIndex < getBusCount(false))
-        if (auto* bus = getBus(false, kFXReturnsBusIndex))
-            if (bus->isEnabled())
-            {
-                fxRetBuf = getBusBuffer(buffer, false, kFXReturnsBusIndex);
-                fxRetPtr = &fxRetBuf;
-            }
-
-    // (External DAW sidechain already captured at the top of processBlock, before the
-    // clear — the input bus shares channels with the master output, so reading it here
-    // post-clear would yield silence.)
-
-    // Stage 34 Step 2: pass the retired-voice descriptor through. The 2D arrays
-    // (MaxRhythms × kMaxRetiredEngines) are stored contiguously row-major in
-    // std::array<std::array<...>>, so taking .data() of row 0 yields the start
-    // of the flat matrix that MixerEngine indexes as `[r * perSlot + i]`. In
-    // Step 2 every slot is null and every flag is false, so the inner body never
-    // runs — descriptor is wired so Step 3 just has to populate slots.
-    RetiredVoices retiredDesc {
-        retiredVoiceEngines[0].data(),
-        retiredReadyForCleanup[0].data(),
-        kMaxRetiredEngines
-    };
-
-    processCoreBlock(masterBus, voiceEngines.data(), numRhythms,
-                     buffer.getNumSamples(), effectiveBpm, &directPtrs, fxRetPtr,
-                     &retiredDesc);
-
-    samples.mixPreviewInto(masterBus, buffer.getNumSamples());
-
-    for (int r = 0; r < numRhythms; ++r)
-        midiEngines[r].processBlock(midiMessages, buffer.getNumSamples());
+    stepClock.endBlock(frame);
+    return result;
 }
 
 //==============================================================================
@@ -537,7 +499,7 @@ void PluginProcessor::commitDeferredWork()
     // Apply the rhythm parameter changes that arrived off the message thread (VST3 automation).
     servicePendingRhythmParams();
 
-    // Drain retired engines + commit pending swaps (both sides of the hot-swap lifecycle).
+    // Commit the pending swaps (the retire bin has already freed what drained, at the top of this pass).
     // ProcessorBase then drains the MIDI program-change queue.
     hotSwapStager.processSwaps();
 }

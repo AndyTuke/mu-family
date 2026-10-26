@@ -5,6 +5,7 @@
 #include "Plugin/HostTransport.h"
 #include "Plugin/LayerBlock.h"
 #include "Sequencer/Layer.h"
+#include "Sequencer/LayerTypeInfo.h"   // LayerServices, kLayerTypeIdCount
 
 #include <atomic>
 #include <array>
@@ -92,11 +93,21 @@ public:
     }
 
 protected:
+    // What each layer type shares between its layers (design 2.4), one slot per LayerTypeId, null until the first layer
+    // of the type is added. Declared BEFORE the layers on purpose: members are destroyed in reverse order, so every
+    // layer (and, because ProcessorBase's retire bin is destroyed before this class, every retired tail) is gone before
+    // the services it read. The guard covers the table only (creating, finding, preparing); a service's own state has
+    // its own rules. Message or host thread; the audio thread never touches it.
+    std::array<std::unique_ptr<mu_core::LayerServices>, (size_t) mu_core::kLayerTypeIdCount> layerServices;
+    mutable juce::CriticalSection layerServicesLock;
+    // The same objects as raw pointers the audio thread may read without the lock (LayerServices::mixIntoMaster). A slot is
+    // written once, after its services are built, and never cleared before the processor is destroyed.
+    std::array<std::atomic<mu_core::LayerServices*>, (size_t) mu_core::kLayerTypeIdCount> audioServices {};
+
     // Layer storage: fixed capacity, runtime count. A product whose count or layer order changes at
     // runtime must have its audio thread take a ScopedTryLock on `layersLock` once per block and read
-    // layers only inside it (mu-Tant does); the message thread holds it only to change the count or
-    // move layers, and constructs and destroys layers outside it. A fixed-count product (mu-Toni,
-    // mu-On) never edits layers after construction and so reads them lock-free by design.
+    // layers only inside it (mu-Clid, mu-Tant, mu-Toni and mu-On all do, through LayerBlock); the message thread holds it
+    // only to change the count or move layers, and constructs and destroys layers outside it.
     std::array<std::unique_ptr<Layer>, mu_limits::kMaxLayers> layers;
     std::atomic<int>      numLayers { 0 };
 public:

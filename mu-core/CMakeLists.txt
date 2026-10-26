@@ -55,6 +55,7 @@ target_sources(mu-core INTERFACE
     # Shared plugin scaffolding
     "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_Render.cpp"   # the layer render contract's block driver
+    "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_ClipAutoSave.cpp"   # clip auto-save: poll and compare
     # The headless --render mode is header-only (Plugin/ProductRender.h), compiled
     # into each Standalone target through Plugin/StandaloneShell.h.
     # Persistence — MIDI PC preset maps (per-slot ch 1-8 + full-preset ch 9).
@@ -84,6 +85,8 @@ target_sources(mu-core INTERFACE
     # Shared left sidebar — product injects the per-layer mini-graphic.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/SidebarItem.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/LayerSidebar.cpp"
+    # Shared scene pads (eight lamp pads under a caption) at the sidebar's foot, opt-in.
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/SceneGrid.cpp"
     # Shared per-layer header bar (name / reset / delete / preset / save).
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/LayerHeaderBar.cpp"
     # Shared per-layer clip strip (eight lamp pads), a child of the header bar.

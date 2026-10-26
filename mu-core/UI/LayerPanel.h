@@ -40,11 +40,25 @@ public:
     // save dialog) turns the shell's list off and fills the dropdown itself.
     void setOwnsPresetList(bool owns) { ownsPresetList = owns; }
 
+    // A type with its own save card (a host of several types): the header's Save asks it first; true = it opened its card
+    // and the generic name prompt is skipped.
+    void setOwnSaveCard(std::function<bool(int)> fn) { ownSaveCardFn = std::move(fn); }
+
     // A product overlay (a dialog) hosted over the whole panel, above every band.
     void addOverlay(juce::Component& overlay);
 
     // Products whose layer set is fixed show neither delete nor rename on the header.
     void setFixedLayers(bool fixed);
+
+    // An empty slot (a host of typed slots): the header keeps the name and the preset box only (no Save, Reset,
+    // Delete or clips) and the content and modulator bands become one panel for the product's content, with no
+    // modulator panel. The product swaps the content to its chooser; false restores the normal stack.
+    void setLayerEmpty(bool empty);
+    bool isLayerEmpty() const noexcept { return layerEmpty; }
+
+    // A host of several layer types says whether the shown layer's type keeps a clip bank: false (a type that processes
+    // another layer's audio) hides the clip strip, true (the default) leaves it to the usual rule.
+    void setClipBankAvailable(bool available);
 
     // Show layer `idx`: commit any rename in progress, refresh the header and the modulator
     // binding, then tell the product (onLayerChanged) so it rebinds its content.
@@ -70,6 +84,7 @@ public:
 private:
     void timerCallback() override;
     juce::Colour layerColour() const;
+    void updateClipVisibility();   // the clip strip shows for a filled slot of a type with a clip bank, where the product can capture a layer
 
     ProcessorBase& proc;
     juce::String   noun;
@@ -78,8 +93,11 @@ private:
     LayerHeaderBar header;
     ModulatorPanel   modulatorPanel;
     juce::Component* content = nullptr;
+    bool layerEmpty = false;
+    bool clipBank   = true;
     std::function<double()> beatSource;
     std::function<juce::String(int)> presetNameFn;
+    std::function<bool(int)> ownSaveCardFn;
     bool ownsPresetList = true;
     juce::Array<juce::Component*> overlays;
 

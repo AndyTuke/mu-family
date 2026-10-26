@@ -118,7 +118,7 @@ namespace
            D_xmIndex, D_xmDepth, D_xmSsb, D_o1Lvl, D_o2Lvl, D_nzLvl,
            D_fCut, D_fRes, D_fDrv, D_fLoCut, D_fEnv,
            D_f2Cut, D_f2Res, D_f2Drv, D_f2LoCut, D_f2Env, D_level,
-           D_insP1, D_insP2, D_insP3, D_insP4 };
+           D_insP1, D_insP2, D_insP3, D_insP4, D_pan, D_sendEff, D_sendDly, D_sendRev };
 
     // Compile-time guard: pin the D_* indices to the table rows, so an insert / reorder that would read the
     // wrong resolved value for a target fails to COMPILE.
@@ -131,7 +131,7 @@ namespace
     static_assert(cstrEq(kModDestTable[D_fCut].id,   "filter.cutoff"), "D_fCut desync");
     static_assert(cstrEq(kModDestTable[D_level].id,  "level"),         "D_level desync");
     static_assert(cstrEq(kModDestTable[D_insP4].id,  "insert.p4"),     "D_insP4 desync");
-    static_assert(D_insP4 + 1 == Pattern::kNumModDests, "every target has an index");
+    static_assert(D_sendRev + 1 == Pattern::kNumModDests, "every target has an index");
 
     constexpr float kNoteGateFadeSecs = 0.008f;   // Note mode's anti-click ramp (8 ms)
 
@@ -180,7 +180,7 @@ void Pattern::bindParams(juce::AudioProcessorValueTreeState& apvts, int slot)
     modMap.reserve((size_t) kNumModDests + 4);   // pre-sized: no audio-thread rehash
     for (int i = 0; i < kNumModDests; ++i)
     {
-        const auto id = layerParamId(slot, kModDestTable[i].param);
+        const auto id = mu_mod::paramIdFor(layerParamId(slot, ""), slot, kModDestTable[i].param);   // a pan or send is the strip's
         modIds[(size_t) i]    = kModDestTable[i].id;
         modRanges[(size_t) i] = apvts.getParameterRange(id);
         modAtoms[(size_t) i]  = apvts.getRawParameterValue(id);
@@ -260,9 +260,13 @@ int Pattern::hearNotes(const mu_core::RenderContext& ctx) noexcept
     if (mode != notes.lastMode)
     {
         notes.held.clear();
-        notes.gateGain = (mode == 1) ? 0.0f : 1.0f;
+        // A layer that has not rendered yet starts with its gate settled for the mode; a live one keeps its gain on
+        // Free to Note, so the own-output ramp closes it over 8 ms instead of snapping a sounding drone to silence.
+        if (mode != 1 || ! notes.seeded) notes.gateGain = (mode == 1) ? 0.0f : 1.0f;
         notes.lastMode = mode;
     }
+    notes.seeded = true;
+    if (ctx.midi.inputReset) notes.held.clear();   // MIDI In changed: a release on the old channel will not arrive
     if (mode != 1) return mode;
 
     // A note-on (velocity above 0) pushes, a note-off or a note-on at velocity 0 removes (juce::MidiMessage's
@@ -271,8 +275,8 @@ int Pattern::hearNotes(const mu_core::RenderContext& ctx) noexcept
     {
         if (e.size < 1) return;
         const int type = e.bytes[0] & 0xf0;
-        if (type == 0x90 && e.bytes[2] != 0)       notes.held.noteOn(e.bytes[1]);
-        else if (type == 0x80 || type == 0x90)     notes.held.noteOff(e.bytes[1]);
+        if (type == 0x90 && e.bytes[2] != 0)       notes.held.push(e.bytes[1]);
+        else if (type == 0x80 || type == 0x90)     notes.held.remove(e.bytes[1]);
     });
     return mode;
 }
@@ -297,6 +301,8 @@ void Pattern::applyModulation(double beat, VoiceConfig& cfg, std::array<float, 4
     }
     else
         std::copy(lastResolved.begin(), lastResolved.end(), out);
+
+    stripMod.publish(out[D_pan], out[D_sendEff], out[D_sendDly], out[D_sendRev]);   // the host gives these to the layer's mixer strip
 
     // Octave/fine pitch dests round to the nearest step (the proportion round-trip isn't bit-exact, so a plain
     // truncation could drop a step); the rest map straight across, already range-clamped by resolveLane.
@@ -480,6 +486,7 @@ void Pattern::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>
     if (mode == 1 && notes.held.newest() >= 0)
         cfg.pitchOffsetSemis = (float) (notes.held.newest() - (cfg.root + 12 * kBaseOctave));
 
+    lastPitchOffset = cfg.pitchOffsetSemis;
     engine->setConfig(cfg);
     engine->process(out, n);
 
@@ -490,6 +497,7 @@ void Pattern::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>
     float* gl = out.getWritePointer(0);
     float* gr = out.getNumChannels() > 1 ? out.getWritePointer(1) : nullptr;
     applyGateBlock(gate, gl, gr, n, gateGap, gateBypass, playing, beat, ctx.beatsPerSample, ctx.sampleRate);
+    lastGateOpen = gateBypass || (playing && gate.hasEnvelopes.load(std::memory_order_relaxed));
 
     // The insert with its modulated slot parameters.
     VoiceParams ip;
@@ -542,10 +550,9 @@ bool Pattern::renderRetiring(const mu_core::RenderContext& ctx, juce::AudioBuffe
     if (! bankTry.isLocked()) return true;   // contended: silent this call, the fade runs on
 
     // The slot is empty of a live layer (an in-place tail renders only then), so the tail writes `out`; a tail
-    // that shares the slot with something else renders aside and adds.
-    // Pattern tails are in-place only (a spare in its own slot, rendered only while the slot has no live layer and
-    // one in-place entry per row), so the bin always hands them the slot exclusively; the add path is a guard.
-    jassert(rs.exclusive != 0);
+    // that shares the slot with something else renders aside and adds. mu-Tant's tails are in-place (a spare in its
+    // own slot); a host that replaces the type of a slot (mu-Tronic) parks the whole layer, and its tail then adds
+    // to whatever the slot's new layer renders.
     juce::AudioBuffer<float> aside;
     if (rs.exclusive == 0)
     {
@@ -555,9 +562,24 @@ bool Pattern::renderRetiring(const mu_core::RenderContext& ctx, juce::AudioBuffe
     auto& buf = rs.exclusive != 0 ? out : aside;
     const int frames = juce::jmin(n, buf.getNumSamples());
 
+    // The live layer's last block decides what the tail may sound: a closed pattern gate, or Note mode on the layer's
+    // own output with no key held, was silent, and a tail that droned on would be a burst. The held key's pitch is
+    // kept. (The gain is the one the live layer last rendered with: nothing advances it once the layer is parked.)
+    const bool  noteGated = gatesOwnOutput && noteMode.load(std::memory_order_relaxed) == 1;
+    const float tailGain  = noteGated ? notes.gateGain : 1.0f;
+    if (! lastGateOpen || tailGain <= 0.0f)
+    {
+        if (rs.exclusive != 0)
+            for (int c = 0; c < out.getNumChannels(); ++c) juce::FloatVectorOperations::clear(out.getWritePointer(c), n);
+        return true;   // the bin ends the fade when its ramp is spent
+    }
+
     const auto& s = retireSnap.value;
-    engine->setConfig(s.config);
+    auto cfg = s.config;
+    cfg.pitchOffsetSemis = lastPitchOffset;
+    engine->setConfig(cfg);
     engine->process(buf, frames);
+    if (tailGain < 1.0f) buf.applyGain(0, frames, tailGain);
     mu_core::applyLinearFade(buf, frames, rs);
 
     VoiceParams ip;

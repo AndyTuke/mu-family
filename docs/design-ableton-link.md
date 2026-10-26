@@ -1,6 +1,8 @@
 # μ Family — Ableton Link Plan
 
-**Status: planned, not started (owner, 2026-10-09).** Gated on a licence decision (§3). Facts below were
+**Dropped 2026-10-20 by Andy; kept as history. Nothing below is planned.**
+
+**Former status: planned, not started (owner, 2026-10-09).** Gated on a licence decision (§3). Facts below were
 checked on 2026-10-09 against Ableton's README, documentation and GitHub release list (Link 4.1,
 published 2026-09-23). Nothing here has been built or tried.
 

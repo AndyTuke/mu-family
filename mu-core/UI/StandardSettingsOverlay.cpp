@@ -114,6 +114,23 @@ StandardSettingsOverlay::StandardSettingsOverlay(mu_core::ShellBackend& backend,
                      r.labelX, r.area.getRight() - r.labelX); } });
     }
 
+    // ── Clips — whether edits to a playing clip are saved into it. Shown only where the product has a clip bank and
+    //    the backend has a settings file. Turning it off keeps clips as stored; the layer is simply no longer watched.
+    {
+        if (proc.hasClipBank() && proc.getAppSettingsFile() != nullptr)
+        {
+            clipAutoSaveToggle.setToggleState(proc.isClipAutoSaveOn(), juce::dontSendNotification);
+            clipAutoSaveToggle.onClick = [this] { proc.setClipAutoSave(clipAutoSaveToggle.getToggleState()); };
+            addAndMakeVisible(clipAutoSaveToggle);
+            general.push_back({ "Clips", 2 * kRowH + kRowGap, [this](const Rows& r) {
+                clipAutoSaveToggle.setBounds(r.labelX, r.area.getY(), s(200), r.rowH); },
+                [this](juce::Graphics& g, const Rows& r) {
+                drawHint(g, r.area.getY() + r.rowH + s(kRowGap) / 2 + r.rowH / 2,
+                         "Edits to a playing clip are saved to it. Turn off to keep clips as stored.",
+                         r.labelX, r.area.getRight() - r.labelX); } });
+        }
+    }
+
     // ── MIDI Clock (standalone only) — slave the beat / tempo to external MIDI clock. Without the
     //    Source and Messages rows (showClockSource off) only the Sync offset row remains.
     if (isStandalone && (opts.showClockSource || opts.syncOffsetAlways))

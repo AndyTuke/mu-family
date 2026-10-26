@@ -53,7 +53,7 @@ $sel.TypeParagraph()
 $sel.Style = $doc.Styles("Normal")
 $sel.TypeText("User Manual")
 $sel.TypeParagraph()
-$sel.TypeText("Version 0.1 (pre-release)")
+$sel.TypeText("Version 1.1 (pre-release)")
 $sel.TypeParagraph()
 $sel.TypeText("Transwarp Development Project")
 $sel.TypeParagraph()
@@ -104,7 +104,8 @@ Bullet "Maybe later  —  closes the window and carries on. It will appear again
 Bullet "Enter licence key  —  opens the 'Enter licence key - mu-Toni' panel, where you type in your key."
 Bullet "Pay what you like  —  opens the checkout page in your web browser. The suggested amount is £20, but £0 is fine. You receive a key either way."
 P "The window cannot be switched off for good. To bring it back at any time, click the Support link at the right of the Status Bar, or the Support button in the About panel."
-P "To enter your key, click Enter licence key in the Support window, or click the mu-Toni logo to open the About panel and click Enter a key. In the 'Enter licence key - mu-Toni' panel (it reads 'Enter your licence key to remove the support reminder. Everything works either way.'), paste your key into the Licence key box and click Activate (or press Return). If you do not have a key yet, click Pay what you like to open the checkout page in your web browser. mu-Toni needs an internet connection the first time, to register the key. One key can be used on up to 5 machines. When the key is accepted the panel shows a confirmation and closes, the About panel shows 'Thank you for your support', and the Support window and Support link no longer appear."
+P "To enter your key, click Enter licence key in the Support window, or click the mu-Toni logo to open the About panel and click Enter a key. In the 'Enter licence key - mu-Toni' panel (it reads 'Enter your licence key to remove the support reminder. Everything works either way.'), paste your key into the Licence key box and click Activate (or press Return). If you do not have a key yet, click Pay what you like to open the checkout page in your web browser. mu-Toni needs an internet connection the first time, to register the key. One key can be used on up to 5 machines. When the key is accepted the panel shows a confirmation and closes, the About panel thanks you for your support, and the Support window and Support link no longer appear."
+P "A licensed copy, even one with a £0 key, shows 'Thank you for supporting mu-Toni.' in the About panel, with a 'Want to give more?' link beneath it. The link opens the tip page in your web browser, where you can give any amount you like. It does not use up your key, and you do not have to give anything."
 P "Once activated, mu-Toni checks your key with the server now and then when it starts. If you are offline at that moment it carries on working as normal for up to 30 days."
 P "If activation fails, the panel tells you why. Check that you pasted the whole key and that you are online, then try again. A key that has already been used on 5 machines needs one of them released first; use Contact Support at the bottom of the Settings page. If the computer has no internet connection at all, the licence key panel shows a machine code at the bottom. Send that code to Contact Support and you can be sent an offline licence file for that computer, to place in the mu-Toni content folder."
 
@@ -115,7 +116,7 @@ Bullet "Transport Bar (top) — playback, BPM, presets, mixer, and settings"
 Bullet "Layer Sidebar (left) — one item per layer, plus an Add button"
 Bullet "Layer Editor (centre) — the oscillators, voice sections, Appergater and modulators for the selected layer"
 Bullet "Mixer overlay — opened from the transport bar, replacing the editor"
-Bullet "Status Bar (bottom) — the name and value of the control you last touched, with a small Support link at the right-hand end. When a newer version is available, an Update available link appears beside Support (see Update Check in the Settings chapter)"
+Bullet "Status Bar (bottom) — the name, value and unit (ms, s, Hz, kHz, %, dB, semitones, cents, octaves or a note name) of the control you last touched, with a small Support link at the right-hand end. When a newer version is available, an Update available link appears beside Support (see Update Check in the Settings chapter)"
 P "The window has two sizes, Medium and Large, chosen in Settings (Display, Size). Everything scales with it. In the standalone application an Options button at the top left of the window opens the audio and MIDI device settings."
 
 Pic "The layer editor regions." "main-window.png"
@@ -193,7 +194,7 @@ Bullet "A, D, S, R — attack, decay, sustain and release."
 H2 "Filter"
 Bullet "Type dropdown — sixteen filters: LP 6 / 12 / 24, HP 6 / 12 / 24, BP 12 / 24, Notch, Notch 24, AP 12, Comb +, Comb -, Peak, Lo Shf and Hi Shf."
 Bullet "Drive (0 to 100 percent) — valve saturation before the filter."
-Bullet "Cutoff (20 Hz to 18 kHz, default 3 kHz) and Reso (0 to 0.99, default 0.3)."
+Bullet "Cutoff (20 Hz to 18 kHz, default 3 kHz; the middle of the knob's travel is 640 Hz, so the low settings get more room) and Reso (0 to 0.99, default 0.3)."
 Bullet "Low Cut (0 to 1000 Hz, off at 0) — a high-pass after the filter that clears sub-bass build-up."
 Bullet "A, D, S, R and Depth — the filter envelope. Depth (-1 to +1, default 0.3) sets how far it sweeps the cutoff; negative values sweep it down."
 
@@ -202,7 +203,7 @@ Bullet "Level (-60 to +6 dB, default 0 dB) — the layer's output level."
 Bullet "A, D, S, R — the amplitude envelope, which shapes the volume of every note. Defaults: attack 4 ms, decay 150 ms, sustain 50 percent, release 150 ms."
 
 H2 "Effects"
-P "The Effects box holds the layer's insert effect and its three FX sends. Choose an algorithm from the dropdown (None, 3-Band EQ, Bitcrusher, Clipper, Compressor, Fold, Hard Clip, Karplus, Limiter, Ring Mod, Soft Clip, Tape Sat, Vocoder or Vocoder St); four knobs appear and are labelled to match the algorithm. The insert sits after the amplitude envelope, so effects with their own tail can ring on past the note. The Eff, Dly and Rev knobs are the layer's sends to the mixer's Effect, Delay and Reverb; they are the same sends as on the layer's channel strip."
+P "The Effects box holds the layer's insert effect and its three FX sends. Choose an algorithm from the dropdown (None, 3-Band EQ, Bitcrusher, Clipper, Compressor, Fold, Hard Clip, Karplus, Limiter, Overdrive, Ring Mod, Soft Clip, Tape Sat, Vocoder or Vocoder St); four knobs appear and are labelled to match the algorithm. The insert sits after the amplitude envelope, so effects with their own tail can ring on past the note. The Eff, Dly and Rev knobs are the layer's sends to the mixer's Effect, Delay and Reverb; they are the same sends as on the layer's channel strip. The Clipper shows a gain-reduction meter like the Compressor. Time, rate and cutoff knobs give more of their travel to the short and low settings, so fine adjustments there are easier; this includes the time and rate knobs of the Effect, Delay and Reverb."
 
 Pic "Pitch, Filter, Amp and Effects boxes with their envelope rows." "voice-section.png"
 
@@ -229,7 +230,7 @@ P "Direction (-100 to +100, default +100) decides how the arpeggio travels throu
 H2 "Gate, Legato and Glide"
 Bullet "Gate (1 to 100 percent of the step, default 50) — how long each note is held before it is released. Short values are staccato; 100 percent joins the notes."
 Bullet "Legato toggle — when on, a note with Gate at 100 percent is tied to the next one: the envelopes are not restarted across the join."
-Bullet "Glide (0 to 500 milliseconds, default 0) — how long the pitch takes to slide from one note to the next. You hear glide only on tied notes."
+Bullet "Glide (0 to 500 milliseconds, default 0; short glides get more of the knob's travel) — how long the pitch takes to slide from one note to the next. You hear glide only on tied notes."
 P "So the three work together:"
 Bullet "Legato on and Gate at 100 percent — tied notes that slide over the Glide time, like a 303 slide."
 Bullet "Legato on and Gate below 100 percent — separate plucked notes with gaps; no glide."
@@ -257,8 +258,8 @@ Pic "The Appergater: scale, chord, rate and trigger, the knob row and the step p
 # ── 11. Modulators ────────────────────────────────────────────────────────────
 H1 "11. Modulators"
 P "Each layer has eight independent modulators (Mod A through Mod H) plus a Matrix tab - the same shared engine as mu-Clid and mu-Tant. Each layer has its own modulator bank."
-P "Each modulator has a Mode dropdown (Stepped bar-graph or Smooth drawable curve), a Polarity switch (Uni 0 to +1, or Bi -1 to +1), and a loop length (a note-value dropdown times an integer multiplier). A playhead line shows the current loop position. In Smooth mode, click to add a node, drag to move, ALT-click a segment to bend it, right-click to remove. In Stepped mode, drag bars up or down. A dice button randomises the current modulator's values without changing its shape."
-P "Add destinations with the + Target button; the assignments are shown one at a time, so step through them with the up and down arrows and the counter at the right. Each assignment has a bipolar depth (-100 to +100 percent) and a source-side curve. A modulator can move the arpeggio controls listed in the Appergater chapter, Osc 2 Semi, the oscillator positions and levels, the noise level, X-Mod Index, Depth and SSB shift, the filter's Cutoff, Resonance, Drive and Env Depth, the Amp Level and the Pitch Env depth. When a knob is a destination, an arc around it shows the live modulated value."
+P "Each modulator has a Mode dropdown (Stepped bar-graph or Smooth drawable curve), a Polarity switch (Uni 0 to +1, or Bi -1 to +1), and a loop length (a note-value dropdown times an integer multiplier). A playhead line shows the current loop position. In Smooth mode the curve is a smooth line through each point that never swings past its neighbours; click to add a node, drag to move, ALT-click a segment to bend it, right-click to remove. In Stepped mode, drag bars up or down. A dice button randomises the current modulator's values without changing its shape."
+P "Add destinations with the + Target button; the assignments are shown one at a time, so step through them with the up and down arrows and the counter at the right. Each assignment has a bipolar depth (-100 to +100 percent) and a source-side curve. A modulator can move the arpeggio controls listed in the Appergater chapter, Osc 2 Semi, the oscillator positions and levels, the noise level, X-Mod Index, Depth and SSB shift, the filter's Cutoff, Resonance, Drive and Env Depth, the Amp Level and the Pitch Env depth. The Attack, Decay, Sustain and Release of the Amp, Filter and Pitch envelopes can be modulated too. When a knob is a destination, an arc around it shows the live modulated value."
 P "The Matrix tab lists every assignment across all eight modulators in one table."
 
 Pic "Modulator panel with the Stepped editor and the target list." "modulators.png"
@@ -267,7 +268,7 @@ Pic "Modulator panel with the Stepped editor and the target list." "modulators.p
 H1 "12. Mixer"
 P "Click the Mixer button in the transport bar to open the mixer overlay. Each layer occupies one channel strip (the mixer always shows eight, with unused ones dimmed); to the right are the Effect, Delay, and Reverb return channels and the Master strip. This is the same shared mixer and FX rack as mu-Clid and mu-Tant."
 P "Each layer strip has a fader with VU metering, pan, mute and solo, sidechain ducking (source, amount, attack, release), and Effect / Delay / Reverb sends. The sidechain source dropdown includes all other layer channels plus an External option — duck any layer from any other, or from a signal fed in through the host's sidechain bus (VST3 / CLAP). The FX return strips carry intra-FX routing (Effect to Delay, Effect to Reverb, Delay to Reverb), and the master strip has two inserts, Insert 1 and Insert 2, that the summed output passes through in that order. A row of buttons at the top right (Peak, VU, K-12, K-14) chooses the metering standard. The three FX rows (Effect / Delay / Reverb) sit below the strips with algorithm selectors and inline parameters."
-P "The faders use a rectangular cap like a small knob, with a pointer line across its middle that marks the level, running in a groove that lights up from the bottom to the cap. Every fader in the mixer looks and works the same way."
+P "The faders use a rectangular cap like a small knob, with a pointer line across its middle that marks the level, running in a groove that lights up from the bottom to the cap. Every fader in the mixer looks and works the same way. In the Status Bar the mixer's Pan, Send and Sidechain knobs, the Level fader, the Mute and Solo buttons and the Effect and Delay switches all show their name and value as you use them. The sidechain Attack and Release start at 0 and can go down to 0."
 
 H2 "Effects"
 Bullet "Effect — Chorus (Rate, Depth, Voices, Spread), Flanger (Rate, Depth, Feedback), Phaser (Rate, Depth, Stages, Feedback) or Echo (Time, Feedback, Spread). The Effect is a pure send, like the Reverb, so it has no Mix knob; use each layer's Effect send."
@@ -349,7 +350,7 @@ P "mu-Toni can tell you when a newer version is available. Once a day it asks th
 Bullet "Click the link to open the download page in your web browser. mu-Toni never downloads or installs anything itself. The link then stays hidden for that version and comes back only when a still newer one is released."
 Bullet "Right-click the link and choose Hide this notice to hide it for that version without opening the page."
 Bullet "The link never appears in Performance mode."
-P "Privacy: the check is a plain request for a public file. It sends nothing about you: no name, no identifier, no version number and no details of your computer. The app compares the answer with its own version on your machine. To switch the check off, open Settings and, under General, untick the Check for updates box. With the box unticked, mu-Toni sends no request at all and shows no link. The box is ticked by default."
+P "Privacy: the check is a plain request for a public file. It sends nothing about you: no name, no identifier, no version number and no details of your computer. As with any request to a website, the site can see your internet (IP) address, as it would if you opened the page in a browser. The app compares the answer with its own version on your machine. To switch the check off, open Settings and, under General, untick the Check for updates box. With the box unticked, mu-Toni sends no request at all and shows no link. The box is ticked by default."
 
 H2 "MIDI Clock Sync (Standalone)"
 P "When running as a standalone application, mu-Toni can follow an external MIDI clock from a drum machine, groovebox, or DAW. First choose the MIDI input that carries the clock in the standalone's MIDI settings. Selecting the input does not turn sync on by itself. To follow the clock, open Settings and, in the MIDI Clock section, set Source to MIDI In; set it back to Internal to turn sync off and ignore any incoming clock. A Messages choice appears, which decides what mu-Toni takes from the clock:"
@@ -396,7 +397,7 @@ Bullet "Layers: 1 to 8 (default 1), each a monophonic arpeggiator with two wavet
 Bullet "Scales: 12. Chords: about 35. Octaves: 1 to 4. Rates: 1/4 to 1/32, straight, dotted and triplet"
 Bullet "Envelopes: amplitude, filter and pitch ADSR, 1 ms to 4 s"
 Bullet "Filter types: LP / HP at 6, 12, 24 dB per octave; BP 12 / 24; Notch 12 / 24; AP 12; Comb + / Comb -; Peak; Lo Shelf; Hi Shelf"
-Bullet "Insert effects: 13 plus None per layer, and two on the master"
+Bullet "Insert effects: 14 plus None per layer, and two on the master"
 Bullet "Modulators per layer: 8 (smooth LFO or stepped), plus a matrix view"
 Bullet "Full preset format: .muToni (XML). Per-layer preset format: .muArp (XML)"
 Bullet "Third-party libraries: JUCE, Signalsmith Reverb (MIT), clap-juce-extensions (MIT)"

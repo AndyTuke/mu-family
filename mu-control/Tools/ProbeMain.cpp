@@ -130,8 +130,8 @@ private:
 // Colours ------------------------------------------------------------------------------------------------
 
 // The family layer palette (MuLookAndFeel::layerPalette), copied so the probe needs no UI header.
-constexpr uint32_t kLayerRgb[8] = { 0xE5484D, 0x2EC4C9, 0xF28C28, 0xD04FC8, 0xA6D63A, 0xF07CA6, 0xC9CCD1, 0x2B3FD6 };
-constexpr const char* kLayerName[8] = { "red", "cyan", "orange", "magenta", "lime", "rose", "silver", "navy" };
+constexpr uint32_t kLayerRgb[8] = { 0xFF6259, 0x65EBFF, 0xFFB064, 0xFF62FF, 0xC7FE6D, 0xFF5EC5, 0xDDDDDD, 0x5B5DFD };
+constexpr const char* kLayerName[8] = { "red", "cyan", "orange", "magenta", "lime", "rose", "silver", "blue" };
 
 uint32_t scale(uint32_t rgb, float s)
 {
@@ -274,7 +274,7 @@ void stepHues(double holdSeconds)
     if (! s.open()) return;
 
     Frame f;
-    say("Columns = the 8 layer colours (red cyan orange magenta lime rose silver navy). Rows from the bottom:");
+    say("Columns = the 8 layer colours (red cyan orange magenta lime rose silver blue). Rows from the bottom:");
     say("   1 bright RGB   2 dim x0.45   3 dim x0.30 (the planned level)   4 dim x0.20   5 palette-picture bright   6 palette-picture dim");
     for (int layer = 0; layer < 8; ++layer)
     {

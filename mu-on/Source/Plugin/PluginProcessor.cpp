@@ -2,6 +2,7 @@
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 #include "License/LicenseKey.h"
 #include "Modulation/MuOnModDest.h"
+#include "Audio/MusicalScales.h"   // mu-core: the family scale table (the master Scale choices)
 #include "Modulation/ModulatorSerialise.h"   // mu-core: shared modulator (de)serialise
 
 namespace mu_on
@@ -17,12 +18,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     for (int i = 0; i < mu_limits::kMaxLayers; ++i)
         mu_mixfx::addChannelStripParams(layout, "ch" + String(i) + "_", "Track " + String(i + 1) + " Ch ");
 
-    // ── Sequencer (global groove controls) ────────────────────────────────────
-    addTrackGlobalParams(layout);
-
-    // ── Per track: the engine, the Rumble source, then every engine's parameters (t{N}_*) ──────
+    // ── Per track: the engine, the Rumble source, the groove, then every engine's parameters (t{N}_*) ──────
     for (int i = 0; i < mu_limits::kMaxLayers; ++i)
         addLayerParams(layout, i);
+
+    // ── Master key and scale: the Kick and Bass tune snaps to them (the tonal row, as mu-Tant's) ────────────
+    {
+        StringArray roots { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" }, scales;
+        for (const auto& sc : mu_audio::kScales) scales.add(sc.name);
+        layout.add(std::make_unique<AudioParameterChoice>(ParameterID{ kRootParamId,  1 }, "Root",  roots,  0));
+        layout.add(std::make_unique<AudioParameterChoice>(ParameterID{ kScaleParamId, 1 }, "Scale", scales, mu_audio::kNumScales - 1));   // Chromatic: the old free tuning, to the nearest semitone
+    }
 
     // ── Shared global FX rack + returns + master (mu-core) ────────────────────
     mu_mixfx::addGlobalFxParams(layout, 2);   // no loop of its own: swaps land on the bar
@@ -51,8 +57,6 @@ PluginProcessor::PluginProcessor()
     getTrack(0).row.loadDefaultGroove(EngineType::Kick);   // ...with the four-on-the-floor row
     unsavedLayerCount = kNumLegacyLanes;                   // a state saved before layers were variable held five lanes
 
-    seqSwingParam  = apvts.getRawParameterValue("seq_swing");
-    seqAccentParam = apvts.getRawParameterValue("seq_accent");
     for (int i = 0; i < mu_limits::kMaxLayers; ++i) engineParam[(size_t) i] = apvts.getRawParameterValue(layerParamId(i, "eng"));
 
     // Each track holds exactly one engine, the one its `t{N}_eng` parameter names: a change of that parameter
@@ -85,10 +89,8 @@ PluginProcessor::~PluginProcessor()
 }
 
 // A track's engine parameter changed. A mu-On track holds all five engines (it is never engineLocked), so it
-// switches in the same block whatever thread the change came from, and syncEngine finds nothing to build. The
-// path stays for a locked track (one engine, a mu-Tronic layer): on the message thread it builds the named engine
-// now; from any other thread nothing may allocate, so the slot is flagged and the deferred work (message thread)
-// builds it, the track rendering silence until then.
+// switches in the same block whatever thread the change came from, and syncEngine finds nothing to build. A
+// locked track (a mu-Tronic layer) ignores the parameter, so for it syncEngine finds nothing to build either.
 void PluginProcessor::engineParamChanged(int slot)
 {
     if (juce::MessageManager::existsAndIsCurrentThread())
@@ -152,23 +154,10 @@ std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
 {
     auto t = std::make_unique<Track>();
     t->slot      = slot;
-    seedRowGroove(t->row);
     t->bindParams(apvts, slot);
     t->prepare(currentSampleRate.load(std::memory_order_relaxed), currentBlockSize.load(std::memory_order_relaxed));
-    t->syncEngine();   // the engine the slot's parameter names, built and prepared now
+    t->completeSetup(apvts, slot);   // the engines the slot's parameter names, built and prepared now
     return t;
-}
-
-// The global groove into one row, and into every slot's row (spares included). Any thread: atomics only.
-void PluginProcessor::seedRowGroove(StepRow& row) const noexcept
-{
-    row.setGroove(seqSwingParam  != nullptr ? seqSwingParam->load(std::memory_order_relaxed)  : 0.0f,
-                  seqAccentParam != nullptr ? seqAccentParam->load(std::memory_order_relaxed) : 1.0f);
-}
-
-void PluginProcessor::seedRowGrooves() noexcept
-{
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i) seedRowGroove(getTrack(i).row);
 }
 
 // A track that moved to another slot starts there from silence, its engine as freshly prepared (as each
@@ -195,14 +184,16 @@ int PluginProcessor::firstKickTrack() const noexcept
 }
 
 // The new track takes the first engine (Kick, Bass, Hat, Snare, Rumble) that no live track runs, else
-// Kick, and starts on that engine's groove; a Rumble starts on the first Kick.
+// Kick, and starts on that engine's groove; a Rumble starts on the first Kick. FM Perc is never the automatic pick.
 void PluginProcessor::layerAdded(int index)
 {
     std::array<bool, kNumEngineTypes> used {};
     for (int i = 0; i < index; ++i) used[(size_t) toIndex(getTrackEngine(i))] = true;
     int pick = 0;
-    for (int e = 0; e < kNumEngineTypes; ++e)
+    for (int e = 0; e < toIndex(EngineType::FmPerc); ++e)
         if (! used[(size_t) e]) { pick = e; break; }
+    if (const int chosen = nextTrackEngine.exchange(-1, std::memory_order_relaxed); chosen >= 0 && chosen < kNumEngineTypes)
+        pick = chosen;   // the user named the engine in the + Track menu
     const auto engine = engineFromIndex(pick);
 
     if (auto* p = apvts.getParameter(layerParamId(index, "eng")))

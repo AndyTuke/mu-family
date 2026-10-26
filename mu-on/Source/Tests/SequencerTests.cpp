@@ -108,6 +108,23 @@ public:
             expect(b1[0].vel < 0.9f, "plain step uses the lower normal velocity");
         }
 
+        beginTest("the Accent knob maps to 0.72 + knob x 0.28, so an accent is never quieter than a plain step");
+        {
+            for (const float knob : { 0.0f, 0.25f, 0.5f, 0.72f, 1.0f })
+            {
+                StepPattern p;
+                p.setOn(0, 0, true); p.setAccent(0, 0, true);
+                GrooveSequencer seq(p);
+                seq.prepare(48000.0);
+                seq.setAccentVelocity(knob);
+                auto b = run(seq, 0.0, 12000, 120.0);
+                expect(! b.empty(), "the accented step fired");
+                expectWithinAbsoluteError(b[0].vel, 0.72f + knob * 0.28f, 1.0e-6f);
+                expect(b[0].vel >= StepClock::kNormalVelocity - 1.0e-6f, "never below a plain step");
+                expect(StepClock::accentedVelocity(1.0f) == 1.0f, "a full Accent knob is full velocity");
+            }
+        }
+
         beginTest("swing delays the odd 16th");
         {
             auto fireBeatOfStep1 = [](float swing) -> double

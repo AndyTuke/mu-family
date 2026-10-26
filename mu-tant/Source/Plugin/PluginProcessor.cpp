@@ -322,8 +322,8 @@ void PluginProcessor::scanNoteMode(const juce::MidiBuffer& midi)
     // gate): a Note On pushes, a Note Off removes (HeldNoteStack, the same rule each Pattern applies).
     for (const auto meta : midi)
     {
-        if (mu_midi::isNoteOn (meta))       gateNotes.noteOn(mu_midi::noteNumber (meta));
-        else if (mu_midi::isNoteOff (meta)) gateNotes.noteOff(mu_midi::noteNumber (meta));
+        if (mu_midi::isNoteOn (meta))       gateNotes.push(mu_midi::noteNumber (meta));
+        else if (mu_midi::isNoteOff (meta)) gateNotes.remove(mu_midi::noteNumber (meta));
     }
 }
 

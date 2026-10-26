@@ -24,6 +24,18 @@ public:
     void prepareToPlay(double sampleRate, int blockSize);
     void loadFile(const juce::File& file);
     void clearSample();
+
+    // A sample read from a file and kept, so a staged preset can do its file work early and install at its boundary
+    // (loadFile is decodeFile then installSample). Message thread; a default one holds nothing.
+    struct DecodedSample
+    {
+        juce::AudioBuffer<float> buffer;
+        double sampleRate = 0.0;
+        bool isValid() const noexcept { return buffer.getNumSamples() > 0 && buffer.getNumChannels() > 0 && sampleRate > 0.0; }
+    };
+    DecodedSample decodeFile(const juce::File& file);     // empty when the file cannot be read; the engine is untouched
+    void          installSample(DecodedSample&& sample);  // brief: only the buffer swap is under the lock; an empty one changes nothing
+    DecodedSample takeSample();                           // moves this engine's sample out, leaving it empty
     // `tied` (pattern-legato) — when true, skip the envelope retrigger
     // entirely (env state continues uninterrupted across contiguous hits) and
     // ask SamplePlayer for a longer fade-in ramp so the sample-voice restart
@@ -44,6 +56,8 @@ public:
     // called by setParams while it holds the pending-params lock, so a test can hold the lock open and
     // check the audio thread neither blocks nor loses the update. Absent from every shipping target.
     static inline std::atomic<void (*)()> setParamsHoldHook { nullptr };
+    // Test seam: while true, process() takes its contended-block path, as when the sample-buffer try-lock misses.
+    static inline std::atomic<bool> forceBufferContention { false };
 #endif
 
     // Called from audio thread only (PluginProcessor::processBlock).
@@ -51,35 +65,19 @@ public:
     // message-thread pending mechanism.  Must be called before process().
     void setActiveParams(const VoiceParams& p);
 
-    // Stage 34 Step 1: True when no sample voice is mid-playback (or pending trigger)
-    // AND the amp envelope is in JUCE's idle state. A retired VoiceEngine that
-    // returns true has nothing left to render and is safe to destroy off the audio
-    // thread. Pure inspection — no state mutation, no side effects. Audio thread
-    // calls this each block on retired engines; message thread polls a cleanup flag
-    // set by the audio thread once this returns true.
+    // True when no sample voice is mid-playback (or pending trigger) AND the amp envelope is idle (a retired
+    // engine: and either its output has stayed below -100 dBFS for 50 ms, or its 2 s post-idle drain budget is
+    // spent; a retired ampRelToEnd engine: once its voices end). The budget bounds a feedback insert that still
+    // rings, which the retire bin closes with a short declick. Pure inspection, no side effects; the audio thread
+    // asks it after each retired block.
     bool isFullyDrained() const noexcept;
 
-    // Stage 34 Step 3 fix: prepare the engine for tail-out as a retired (frozen)
-    // engine. Must be called by the message thread under suspendProcessing — no
-    // audio-thread reads of the affected state can race with these mutations.
-    //
-    // Three things happen:
-    //   1. noteOff() on all three envelopes so the amp env actually progresses
-    //      to idle. Without this, the engine sits in the sustain state forever
-    //      (no triggers / no noteOffs anywhere else in the codebase) and
-    //      isFullyDrained() never returns true — the retired slot leaks and
-    //      the engine renders until plugin destruction.
-    //   2. voiceFilter.reset() + insertProc.reset() to clear comb-buffer /
-    //      compressor-envelope / DC-block / bitrate-hold state. Otherwise a
-    //      high-feedback comb or sustained insert state keeps ringing into the
-    //      channel buf for many seconds after retirement, audible as an
-    //      "effect overlay" on the new active rhythm — the symptom from the
-    //      first listening test on Step 3. The sample (SamplePlayer voices)
-    //      and the amp envelope release are preserved — those are the
-    //      legitimate "natural tail" Stage 34 is supposed to give.
-    //   3. retired flag — switches isFullyDrained() to a voices-only drain
-    //      criterion for ampRelToEnd engines (which don't get noteOff'd so
-    //      amp env never reaches idle).
+    // Prepares the engine for its tail as a retired engine: the envelopes enter their release (the amp envelope
+    // only when ampRelToEnd is off, so a release-to-end sample plays through at its level), the post-idle drain
+    // budget (2 s of prepared-size blocks) starts, and the retired flag switches isFullyDrained to its retired
+    // criteria. Filter and insert state are kept (their tails ring down under the amp envelope). Called once by
+    // whoever then owns the engine alone: mu-Clid's EngineTail at its first tail block, on the audio thread.
+    // Allocates nothing.
     void markRetired() noexcept;
 
     // Lets the held note of a LIVE engine go: the envelopes enter release (the amp env otherwise sits at
@@ -92,7 +90,10 @@ public:
 private:
     juce::AudioFormatManager formatManager;
 
-    juce::ReadWriteLock      bufferLock;
+    // Guards buffer / originalSampleRate / playbackRatio (and sampleLoaded's writes) between the message thread's swaps
+    // (prepareToPlay, loadFile, clearSample: brief, no I/O inside) and process(), which only try-locks it.
+    // A spin lock, not juce::ReadWriteLock, whose reader bookkeeping can allocate on the audio thread.
+    juce::SpinLock           bufferLock;
     juce::AudioBuffer<float> buffer;
     double originalSampleRate = 44100.0;
     double playbackRatio      = 1.0;
@@ -100,7 +101,8 @@ private:
     std::array<SamplePlayer, MaxVoices> voices;
     int    nextVoice         = 0;
     double currentSampleRate = 44100.0;
-    bool   sampleLoaded      = false;
+    // Written under bufferLock; atomic because hasSample() reads it without the lock.
+    std::atomic<bool> sampleLoaded { false };
 
     VoiceParams params;        // base params — updated from message thread via setParams()
     VoiceParams activeParams;  // audio thread only — what process() actually uses
@@ -154,6 +156,13 @@ private:
     // beyond env-idle so the insert's internal feedback decays audibly instead
     // of being cut by engine destruction during hot-swap.
     int retireDrainBlocks = 0;
+    // A retired engine's run of rendered output below kRetireSilentLevel, in samples (audio thread; reset by any
+    // louder block, left alone by a contended one), and the run that counts as drained (50 ms, set by markRetired).
+    // The hold must outlast the longest silent gap a ringing insert can leave: the Karplus loop's period is at most
+    // about 31 ms (its lowest note, C1); a lower Karplus range or a delay-type insert needs a longer hold.
+    static constexpr float kRetireSilentLevel = 1.0e-5f;   // -100 dBFS
+    int retireSilentSamples = 0;
+    int retireSilentHold    = 0;
 
     void applyPendingParams();   // audio thread only — syncs activeParams from pendingParams
     void syncEnvelopes();        // audio thread only — pushes activeParams into ADSR objects

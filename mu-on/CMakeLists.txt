@@ -20,7 +20,10 @@ target_sources(mu-on-layer INTERFACE
 target_include_directories(mu-on-layer INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
 set(MU_ON_LAYER_UI_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/StepRows.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/TrackStepRow.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/TrackContent.cpp")
+# Also visible to the sibling directories added after this one (mu-Tronic hosts the layer types).
+set(MU_ON_LAYER_UI_SOURCES "${MU_ON_LAYER_UI_SOURCES}" PARENT_SCOPE)
 
 # ── mu-On — Standalone + VST3 + CLAP (+ AU on macOS) ────────────────────────
 juce_add_plugin(mu-on
@@ -155,6 +158,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/SequencerTests.cpp
     Source/Tests/GrooveSequencer.cpp   # the whole-grid clock the sequencer tests drive (test support)
     Source/Tests/EngineTests.cpp
+    Source/Tests/FmPercEngineTests.cpp   # FM Perc voice: silence, tails, extremes, latching, tuning, listening WAVs, CPU
     Source/Tests/ModulationTests.cpp
     Source/Tests/PresetTests.cpp
     Source/Tests/SlotStateTests.cpp
@@ -164,12 +168,15 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/PrefixMigrationTests.cpp   # data saved before the k/b/h/s/r -> t{N} id-prefix rename still loads
     Source/Tests/TrackTypesTests.cpp   # the five layer types over the one Track class
     Source/Tests/TrackRenderTests.cpp   # Track::render: every engine, the Rumble's peer source, the engine swap, the Rumble's tail
+    Source/Tests/TrackSlotHostTests.cpp   # the Track types in a typed-slot host: lock, completeSetup, Fade tails, the typed preset folder
     Source/Tests/EngineMigrationTests.cpp   # five-lane states and track presets load as engine-qualified layers
     Source/Tests/ClipLaunchTests.cpp   # clip store / launch on the real processor
     Source/Tests/ModArcTests.cpp   # every mod target publishes its live value for the knob arcs
     Source/Tests/GoldenRenderTests.cpp   # golden renders of the real processor (tests/golden/mu-on)
     Source/Tests/ExtractionPinTests.cpp   # pins: per-engine sound, swing/accent, Rumble source, sidechain, stop edge, edits, oversize
     Source/Tests/TrackLayerRecordTests.cpp   # the Track streams through the real processor (Tests/TrackLayerFixture.h)
+    Source/Tests/BassTieTests.cpp   # Bass gate, release, tied steps and the step row tie flag
+    Source/Tests/ChordTests.cpp   # Chord voicing, the Chord engine and a step's chord data
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp
@@ -207,7 +214,8 @@ target_link_libraries(mu-on-tests PRIVATE
     juce::juce_recommended_warning_flags
 )
 
-target_compile_definitions(mu-on-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+target_compile_definitions(mu-on-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0
+    MU_ON_FACTORY_TRACKS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/factory/Tracks")   # the FM Perc factory presets the preset test reads
 
 add_dependencies(mu-on mu-on-tests)
 
@@ -224,6 +232,7 @@ target_sources(mu-on-layer-tests PRIVATE
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/MultiModeFilter.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/SamplePlayer.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/FX/Slots/ReverbSlot.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/InsertProcessor.cpp"   # the Track's insert effect
     "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/ControlSequence.cpp"
 )

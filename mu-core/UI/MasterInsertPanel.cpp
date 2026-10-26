@@ -70,6 +70,21 @@ void MasterInsertPanel::applyDependencies(int slot)
     }
 }
 
+void MasterInsertPanel::setNumSlots(int n)
+{
+    numSlots = juce::jlimit(1, kSlots, n);
+    for (int i = 0; i < kSlots; ++i)
+    {
+        auto& sl = slots[(size_t) i];
+        const bool shown = i < numSlots;
+        sl.algo.setVisible(shown);
+        if (shown) configureKnobs(i);   // the knobs show as the algorithm says
+        else for (auto& k : sl.knobs) k.setVisible(false);
+    }
+    resized();
+    repaint();
+}
+
 void MasterInsertPanel::setGainReductionSource(int slot, const std::atomic<float>* source)
 {
     if (slot < 0 || slot >= kSlots) return;
@@ -79,7 +94,7 @@ void MasterInsertPanel::setGainReductionSource(int slot, const std::atomic<float
 
 void MasterInsertPanel::setAlgorithm(int slot, int algorithm)
 {
-    if (slot < 0 || slot >= kSlots) return;
+    if (slot < 0 || slot >= numSlots) return;
     auto& sl = slots[(size_t) slot];
     sl.algorithm = juce::jlimit(0, kInsertAlgoCount - 1, algorithm);
     sl.algo.setSelectedId(sl.algorithm + 1, false);
@@ -88,7 +103,7 @@ void MasterInsertPanel::setAlgorithm(int slot, int algorithm)
 
 void MasterInsertPanel::setParam(int slot, int param, float normalised)
 {
-    if (slot < 0 || slot >= kSlots || param < 0 || param >= kParams) return;
+    if (slot < 0 || slot >= numSlots || param < 0 || param >= kParams) return;
     auto& sl = slots[(size_t) slot];
     sl.norm[param] = normalised;
     sl.knobs[(size_t) param].setValue((double) normToActual(normalised, sl.algorithm, param),
@@ -141,7 +156,7 @@ int MasterInsertPanel::preferredHeight()
 
 void MasterInsertPanel::resized()
 {
-    for (int i = 0; i < kSlots; ++i)
+    for (int i = 0; i < numSlots; ++i)
     {
         auto& sl = slots[(size_t) i];
         const int pad = s(kBoxPad);
@@ -169,8 +184,12 @@ void MasterInsertPanel::resized()
 
 void MasterInsertPanel::paint(juce::Graphics& g)
 {
-    MuLookAndFeel::drawSections(g, *this,
-        { { boxBounds(0), "Insert 1" }, { boxBounds(1), "Insert 2" } },
-        MuLookAndFeel::appAccent(*this));
+    // drawSections takes a fixed list: the first box always, the second when it shows.
+    static_assert(kSlots == 2, "paint() draws the Master insert column's two boxes");
+    if (numSlots >= 2)
+        MuLookAndFeel::drawSections(g, *this, { { boxBounds(0), "Insert 1" }, { boxBounds(1), "Insert 2" } },
+                                    MuLookAndFeel::appAccent(*this));
+    else
+        MuLookAndFeel::drawSections(g, *this, { { boxBounds(0), "Insert 1" } }, MuLookAndFeel::appAccent(*this));
 }
 } // namespace mu_ui

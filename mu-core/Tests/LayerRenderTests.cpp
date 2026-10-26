@@ -119,7 +119,7 @@ struct RenderContextLayoutTests : juce::UnitTest
                              + sizeof (mu_core::MidiSink) + sizeof (void*) + 4 + 4;
         expectEquals((int) members, (int) sizeof (RenderContext));
         expectEquals((int) offsetof(mu_core::MidiView, carried), 20);
-        expectEquals((int) offsetof(mu_core::MidiView, reserved) + 2, (int) sizeof (mu_core::MidiView));
+        expectEquals((int) offsetof(mu_core::MidiView, inputReset) + 2, (int) sizeof (mu_core::MidiView));
         expectEquals((int) offsetof(mu_core::MidiSink, count), 16);
         expectEquals((int) offsetof(mu_core::PeerTap, valid), 16);
        #endif
@@ -961,6 +961,172 @@ struct LayerRenderDriverTests : juce::UnitTest
             }
         }
 
+        beginTest("Held keys: a layer created while keys are down is told about them (per channel, once, no allocation)");
+        {
+            // A fresh layer in slot 0, as setLayerType leaves one: it was not there for the note-ons.
+            auto freshLayerIn = [](FakeLayerHost& host, int slot)
+            {
+                host.layers[(size_t) slot] = std::make_unique<FakeBeatLayer>();
+                host.layers[(size_t) slot]->bindParams(host.apvts, slot);
+                host.layers[(size_t) slot]->prepare(48000.0, 512);
+            };
+            auto pBox = std::make_unique<FakeLayerHost>(2); auto& p = *pBox;
+            p.setUseLayerRenderForTest(true);
+            Driver d(p);
+            d.block(256);
+            d.pendingMidi.push_back(juce::MidiMessage::noteOn(1, 60, (juce::uint8) 100));
+            d.pendingMidi.push_back(juce::MidiMessage::noteOn(2, 64, (juce::uint8) 90));
+            d.block(256);
+            expectEquals(p.fake(0).midiSeen, 2, "the layer that was there heard both presses live");
+
+            freshLayerIn(p, 0);
+            d.countAllocations = true;
+            d.block(256);
+            d.countAllocations = false;
+            expectEquals(d.allocations, 0, "seeding the new layer allocates nothing");
+            expectEquals(p.fake(0).midiSeen, 2, "Omni: both held keys reach the new layer");
+            expectEquals(p.fake(0).lastCarried, 2, "as carried note-ons, not as this block's presses");
+            expectEquals(p.fake(0).firstEventNote, 60);
+            d.block(256);
+            expectEquals(p.fake(0).midiSeen, 2, "once: the next block repeats nothing");
+            expectEquals(p.fake(0).lastCarried, 0);
+
+            // A release before the layer exists leaves nothing to seed; a key pressed in the same block is not doubled.
+            d.pendingMidi.push_back(juce::MidiMessage::noteOff(1, 60));
+            d.block(256);
+            freshLayerIn(p, 1);
+            d.pendingMidi.push_back(juce::MidiMessage::noteOn(3, 72, (juce::uint8) 100));
+            d.block(256);
+            expectEquals(p.fake(1).midiSeen, 2, "the key still down (64) plus the block's own press (72); 60 was released");
+            expectEquals(p.fake(1).lastCarried, 1);
+
+            // A per-layer MIDI In: only that channel's keys are seeded, and a change of channel seeds the new one.
+            std::atomic<float> midiIn { 2.0f };
+            p.midiInRaw[0] = &midiIn;
+            freshLayerIn(p, 0);
+            const int before = p.fake(0).midiSeen;
+            d.block(256);
+            expectEquals(p.fake(0).midiSeen - before, 1, "channel 2 gets its own key only");
+            expectEquals(p.fake(0).firstEventNote, 64);
+            midiIn.store(3.0f);
+            d.block(256);
+            expectEquals(p.fake(0).lastCarried, 1, "moved to channel 3: the key down there (72)");
+            expectEquals(p.fake(0).firstEventNote, 72);
+            midiIn.store(5.0f);
+            const int beforeEmpty = p.fake(0).midiSeen;
+            d.block(256);
+            expectEquals(p.fake(0).midiSeen - beforeEmpty, 0, "a channel with no key down gets nothing");
+            p.midiInRaw[0] = nullptr;
+        }
+
+        beginTest("Held keys: presses and releases in a block nothing renders still count");
+        {
+            auto pBox = std::make_unique<FakeLayerHost>(2); auto& p = *pBox;
+            p.setUseLayerRenderForTest(true);
+            Driver d(p);
+            d.block(256);
+            p.layerEditInFlight.store(true);
+            d.pendingMidi.push_back(juce::MidiMessage::noteOn(1, 60, (juce::uint8) 100));
+            d.pendingMidi.push_back(juce::MidiMessage::noteOn(1, 62, (juce::uint8) 100));
+            d.block(256);
+            d.pendingMidi.push_back(juce::MidiMessage::noteOff(1, 60));
+            d.block(256);
+            p.layerEditInFlight.store(false);
+            p.layers[0] = std::make_unique<FakeBeatLayer>();
+            p.layers[0]->bindParams(p.apvts, 0);
+            d.block(256);
+            expectEquals(p.fake(0).midiSeen, 1, "62 is held, 60 was let go in the skipped block");
+            expectEquals(p.fake(0).firstEventNote, 62);
+        }
+
+        beginTest("HeldKeyTable: velocity per channel and note, note-off and velocity-0 release, channel clears, capacity");
+        {
+            mu_core::HeldKeyTable t;
+            auto ev = [](uint8_t b0, uint8_t b1, uint8_t b2) { mu_core::MidiEvent e {}; e.size = 3; e.bytes[0] = b0; e.bytes[1] = b1; e.bytes[2] = b2; return e; };
+            expect(! t.anyHeld());
+            t.apply(ev(0x90, 60, 100)); t.apply(ev(0x91, 60, 50)); t.apply(ev(0x91, 61, 70)); t.apply(ev(0x90, 60, 90));
+            expectEquals(t.numHeld(), 3, "a repeated note-on does not count twice");
+            mu_core::MidiEvent out[8] {};
+            expectEquals(t.collect(out, 8, 7, 0xFFFF), 3);
+            expectEquals((int) out[2].bytes[1], 60, "the re-pressed key is the newest, last in the order");
+            expectEquals((int) (out[2].bytes[0] & 0x0f), 0);
+            expectEquals((int) out[2].bytes[2], 90, "with its latest velocity");
+            expectEquals((int) out[2].frame, 7);
+            expectEquals((int) (out[0].bytes[0] & 0x0f), 1, "oldest first");
+            expectEquals(t.collect(out, 8, 0, 0x0001), 1, "mask: channel 1 only");
+            expectEquals(t.collect(out, 2, 0, 0xFFFF), 2, "never past the capacity");
+            t.apply(ev(0x80, 60, 0)); t.apply(ev(0x91, 61, 0));
+            expectEquals(t.numHeld(), 1, "note-off and note-on at velocity 0 release (channel 2's 60 is left)");
+            t.apply(ev(0x90, 40, 100));
+            t.apply(ev(0xb1, 123, 0));
+            expectEquals(t.numHeld(), 1, "All Notes Off clears its channel only (channel 1's 40 is left)");
+            t.apply(ev(0xf8, 0, 0));
+            t.clear();
+            expect(! t.anyHeld());
+
+            // Press order is kept across channels and past the capacity (the oldest press is forgotten, the count stays true).
+            for (int i = 0; i < mu_core::HeldKeyTable::kOrderCapacity + 10; ++i) t.apply(ev((uint8_t) (0x90 | (i / 128)), (uint8_t) (i % 128), 80));
+            expectEquals(t.numHeld(), mu_core::HeldKeyTable::kOrderCapacity);
+            mu_core::MidiEvent big[300] {};
+            expectEquals(t.collect(big, 300, 0, 0xFFFF), mu_core::HeldKeyTable::kOrderCapacity);
+            expectEquals((int) big[0].bytes[1], 10, "the first ten presses were dropped");
+            expectEquals((int) big[mu_core::HeldKeyTable::kOrderCapacity - 1].bytes[1], (mu_core::HeldKeyTable::kOrderCapacity + 9) % 128);
+            t.apply(ev(0x80, 10, 0));
+            expectEquals(t.numHeld(), mu_core::HeldKeyTable::kOrderCapacity - 1);
+        }
+
+        beginTest("Held keys: a late layer ends with the same newest key as one that was there (press order, not note order)");
+        {
+            auto pBox = std::make_unique<FakeLayerHost>(2); auto& p = *pBox;
+            p.setUseLayerRenderForTest(true);
+            Driver d(p);
+            d.block(256);
+            for (int note : { 64, 60, 67 })   // not ascending
+            {
+                d.pendingMidi.push_back(juce::MidiMessage::noteOn(1, note, (juce::uint8) 100));
+                d.block(256);
+                d.block(256);
+            }
+            d.pendingMidi.push_back(juce::MidiMessage::noteOn(1, 60, (juce::uint8) 100));   // re-press: 60 is now the newest
+            d.block(256);
+            p.layers[1] = std::make_unique<FakeBeatLayer>();
+            p.layers[1]->bindParams(p.apvts, 1);
+            d.block(256);
+            expectEquals(p.fake(1).lastEventNote, 60, "the late layer's newest key is the last one pressed");
+            expectEquals(p.fake(1).midiSeen, 3);
+        }
+
+        beginTest("Held keys: a MIDI In change in the second chunk of a block seeds from the keys as the first chunk left them");
+        {
+            for (const int target : { 2, 3 })
+            {
+                auto pBox = std::make_unique<FakeLayerHost>(2); auto& p = *pBox;
+                p.setUseLayerRenderForTest(true);
+                std::atomic<float> midiIn { 1.0f };
+                p.midiInRaw[0] = &midiIn;
+                bool armed = false;
+                p.fake(0).onRender = [&](const mu_core::RenderContext& c) { if (armed && c.midi.firstFrame == 0) midiIn.store((float) target); };
+                Driver d(p, 48000.0, 512);
+                d.block(256);
+                d.pendingMidi.push_back(juce::MidiMessage::noteOn(1, 60, (juce::uint8) 100));
+                d.pendingMidi.push_back(juce::MidiMessage::noteOn(2, 64, (juce::uint8) 100));
+                d.block(256);
+                // One 1024-frame block (two chunks of 512): chunk 0 releases channel 2's key and presses one on channel 3, then
+                // the layer's channel moves; the chunk-1 seed must not hold the released key and must hold the new one.
+                d.pendingMidi.push_back(juce::MidiMessage::noteOff(2, 64));
+                d.pendingMidi.push_back(juce::MidiMessage::noteOn(3, 70, (juce::uint8) 100));
+                d.midiOffset = 100;
+                armed = true;
+                d.block(1024);
+                if (target == 2) expectEquals(p.fake(0).lastCarried, 0, "channel 2: its key was released in chunk 0");
+                else
+                {
+                    expectEquals(p.fake(0).lastCarried, 1, "channel 3: the key pressed in chunk 0");
+                    expectEquals(p.fake(0).firstEventNote, 70);
+                }
+            }
+        }
+
         beginTest("A parked spare above the live count follows the block's MIDI and renders nothing; live layers are never parked");
         {
             auto pBox = std::make_unique<FakeLayerHost>(2); auto& p = *pBox;
@@ -1159,14 +1325,14 @@ struct LayerContractMiscTests : juce::UnitTest
                    + ", Layer " + juce::String((int) sizeof (Layer))
                    + " (information)");
         expectEquals(mu_limits::kMaxLayers, MU_MAX_LAYERS);
-        expectEquals(mu_limits::kMaxBuses, 0);
-        expectEquals(mu_limits::kBusInserts, 2);
+        expectEquals(mu_limits::kMaxBuses, MU_MAX_BUSES);
+        expectEquals(mu_limits::kBusInserts, MU_BUS_INSERTS);
         expectEquals(mu_limits::kLayersPerPage, 8);
         expectEquals(mu_limits::kRetireDepth, 4);
         expectEquals(MixerEngine::MaxChannels, mu_limits::kMaxLayers);
 
         beginTest("LayerTypeId is saved by name and round-trips; an unknown name is Empty");
-        for (int i = 0; i <= (int) mu_core::LayerTypeId::Rumble; ++i)
+        for (int i = 0; i <= (int) mu_core::LayerTypeId::Test2; ++i)
         {
             const auto id = (mu_core::LayerTypeId) i;
             expect(mu_core::layerTypeFromName(mu_core::layerTypeName(id)) == id);
@@ -1192,3 +1358,73 @@ struct LayerContractMiscTests : juce::UnitTest
     }
 };
 static LayerContractMiscTests sLayerContractMiscTests;
+
+// The driver's per-block product hooks (layersBlockStarting / layersBlockRendered): once each per rendered host
+// block, the start before any layer renders and with the block's view and transport, the end after the mixer; a
+// block that renders nothing (a held lock, an edit in flight, 0 frames) calls neither.
+namespace
+{
+    struct HookedHost : FakeLayerHost
+    {
+        HookedHost() : FakeLayerHost(2) {}
+        void layersBlockStarting(const mu_core::LayerView& view, const mu_core::BlockTransport& t, juce::MidiBuffer& midi) override
+        {
+            ++starts;
+            startLive = view.numLive;
+            startBeat = t.startBeat;
+            rendersAtStart = fake(0).renders;
+            midi.addEvent(juce::MidiMessage::noteOn(1, 64, (juce::uint8) 100), 0);   // the host buffer is the one the block got
+        }
+        void layersBlockRendered(const mu_core::LayerView& view, juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) override
+        {
+            ++ends;
+            endLive = view.numLive;
+            rendersAtEnd = fake(0).renders;
+            endFrames = buffer.getNumSamples();
+            endPeak = buffer.getMagnitude(0, 0, buffer.getNumSamples());
+        }
+        int starts = 0, ends = 0, startLive = -1, endLive = -1, rendersAtStart = -1, rendersAtEnd = -1, endFrames = 0;
+        double startBeat = -1.0;
+        float endPeak = 0.0f;
+    };
+}
+
+struct LayerBlockHookTests : juce::UnitTest
+{
+    LayerBlockHookTests() : juce::UnitTest("Render contract: the product's per-block hooks", "mu-core") {}
+
+    void runTest() override
+    {
+        beginTest("start before any layer renders, end after the mixer, once each per rendered block; none on a skipped block");
+        auto pBox = std::make_unique<HookedHost>();
+        auto& p = *pBox;
+        p.setUseLayerRenderForTest(true);
+        Driver d(p, 48000.0, 256);
+        d.host.ppq = 2.0;
+        const auto& out = d.block(256);
+        expectEquals(p.starts, 1);
+        expectEquals(p.ends, 1);
+        expectEquals(p.startLive, 2, "the start sees the block's view");
+        expectEquals(p.startBeat, 2.0, "and its transport");
+        expectEquals(p.rendersAtStart, 0, "no layer had rendered at the start");
+        expectEquals(p.rendersAtEnd, 1, "every layer had rendered by the end");
+        expectEquals(p.endFrames, 256, "the end gets the host buffer the block rendered");
+        expect(p.endPeak > 0.0f && p.endPeak == out.getMagnitude(0, 0, 256), "after the mixer wrote it");
+        int noteOns = 0;
+        for (const auto m : d.midi) noteOns += m.getMessage().isNoteOn() ? 1 : 0;
+        expectEquals(noteOns, 1, "the start's MIDI went into the block's host buffer");
+
+        {
+            const juce::ScopedLock held(p.layersLock);   // the audio thread's try-lock misses: nothing renders
+            std::thread t([&] { d.block(256); });
+            t.join();
+        }
+        d.block(0);
+        expectEquals(p.starts, 1, "a skipped block and a 0-frame block call no hook");
+        expectEquals(p.ends, 1);
+        d.block(128);
+        expectEquals(p.starts, 2);
+        expectEquals(p.ends, 2);
+    }
+};
+static LayerBlockHookTests sLayerBlockHookTests;

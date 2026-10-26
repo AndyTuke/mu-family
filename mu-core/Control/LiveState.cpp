@@ -16,8 +16,9 @@ bool LiveState::handles(ControlActionType t) noexcept
     return t == ControlActionType::PerformanceMode || t == ControlActionType::PerformanceItem
         || t == ControlActionType::PerformancePrev || t == ControlActionType::PerformanceNext
         || t == ControlActionType::SelectLayer || t == ControlActionType::LaunchClip
-        || t == ControlActionType::ClipNext || t == ControlActionType::ClipPrev
-        || t == ControlActionType::AppPrev || t == ControlActionType::AppNext;
+        || t == ControlActionType::ClipNext || t == ControlActionType::ClipPrev || t == ControlActionType::LaunchScene
+        || t == ControlActionType::AppPrev || t == ControlActionType::AppNext
+        || t == ControlActionType::PagePrev || t == ControlActionType::PageNext;
 }
 
 void LiveState::changed()
@@ -110,6 +111,7 @@ bool LiveState::perform(const ControlAction& a)
         case T::PerformanceMode:
             return setMode(a.index < 0 ? ! performanceMode : a.index != 0, a.layer);   // `index` (a mapped button's value is the message's)
         case T::LaunchClip:      return startClip(a.layer, a.index);   // the on-screen clip strip launches with the mode off too
+        case T::LaunchScene:     return launchScene(a.index);          // so does the scene control
         default: break;
     }
 
@@ -131,8 +133,24 @@ bool LiveState::perform(const ControlAction& a)
         case T::AppNext:         return false;   // not available: there is no multi-app hub to switch to
         case T::ClipNext:        return stepClip(+1);
         case T::ClipPrev:        return stepClip(-1);
+        case T::PagePrev:        return stepPage(-1);
+        case T::PageNext:        return stepPage(+1);
         default: return false;
     }
+}
+
+// Moves the selection to the same position on the adjacent page. The page is the selection's, so this is the whole page change;
+// the last page may be partial, so the target is clamped to the last layer and must still land on the new page.
+bool LiveState::stepPage(int direction)
+{
+    if (! hasLayerPages()) return false;
+    const int layers  = cb.layerCount ? cb.layerCount() : 1;
+    const int perPage = mu_limits::kLayersPerPage;
+    const int page    = selectedLayer / perPage + direction;
+    if (page < 0 || page * perPage >= layers) return false;
+    const int target = juce::jmin(layers - 1, page * perPage + selectedLayer % perPage);
+    if (target != selectedLayer) { selectedLayer = target; changed(); }
+    return true;
 }
 
 void LiveState::cancelQueuedItem()
@@ -260,6 +278,12 @@ bool LiveState::startClip(int layer, int clip)
     }
     if (clip == c.queued) return true;                          // already on its way
     if ((c.mask & (1u << clip)) == 0) return false;              // an empty pad does nothing
+    return launchAndTrack(layer, clip);
+}
+
+bool LiveState::launchAndTrack(int layer, int clip)
+{
+    auto& c = clipState[(size_t) layer];
     if (! cb.launchClip || ! cb.launchClip(layer, clip)) return false;   // e.g. a full preset is staged
 
     // Stopped transport: the clip is applied inside launchClip and plays now. Otherwise it waits, and the
@@ -276,6 +300,53 @@ bool LiveState::startClip(int layer, int clip)
     }
     changed();
     return true;
+}
+
+bool LiveState::launchScene(int clip)
+{
+    if (clip < 0 || clip >= mu_limits::kClipsPerLayer) return false;
+    reconcileClips();   // first drop anything a full preset applied since the last settle has made stale
+
+    const int layers = std::min(getLayerCount(), (int) mu_limits::kMaxLayers);
+
+    // Everything slow first (a clip's files), so the batch window below holds only the staging calls.
+    if (cb.preloadClip)
+        for (int layer = 0; layer < layers; ++layer)
+            if ((clipState[(size_t) layer].mask & (1u << clip)) != 0 && clip != clipState[(size_t) layer].playing)
+                cb.preloadClip(layer, clip);
+
+    // One staging batch: the audio thread flags the scene's layers at the same boundary or not at all.
+    bool any = false;
+    int  reached = 0;   // layers that launched the clip or already play it
+    {
+        struct Batch
+        {
+            explicit Batch(const Callbacks& c) : callbacks(c) { if (callbacks.beginStageBatch) callbacks.beginStageBatch(); }
+            ~Batch() { if (callbacks.endStageBatch) callbacks.endStageBatch(); }
+            const Callbacks& callbacks;
+        } batch(cb);
+        for (int layer = 0; layer < layers; ++layer)
+        {
+            auto& c = clipState[(size_t) layer];
+            if ((c.mask & (1u << clip)) == 0) continue;   // a scene never stops a layer that has no such clip
+            if (clip == c.playing)
+            {
+                if (c.queued >= 0 && cb.cancelSlot) { cb.cancelSlot(layer); c.queued = -1; }
+                any = true;   // already there: the scene does not mute it
+                ++reached;
+                continue;
+            }
+            if (startClip(layer, clip))
+            {
+                any = true;
+                ++reached;
+                if (cb.markSceneSlot) cb.markSceneSlot(layer);   // a payload staged for a boundary is the scene's, not the layer's own
+            }
+        }
+    }
+    lastScene = { clip, reached, lastScene.serial + 1 };   // before changed(), so a listener reads this launch
+    changed();
+    return any;
 }
 
 bool LiveState::stepClip(int direction)
@@ -337,6 +408,17 @@ void LiveState::clipStored(int layer, int clip)
     }
     setPlaying(layer, clip);   // what was just stored is what the layer plays
     changed();
+}
+
+bool LiveState::clipPasted(int layer, int clip)
+{
+    if (! inRange(layer) || clip < 0 || clip >= mu_limits::kClipsPerLayer) return false;
+    reconcileClips();   // settle a landed or replaced launch before judging what is lit
+    const auto& c = clipState[(size_t) layer];
+    if (c.playing != clip && c.queued != clip) return true;   // not lit: the pasted data just sits in the bank
+
+    // Relaunch the new contents; the launch replaces whatever was staged on the layer, so the old wait is over.
+    return launchAndTrack(layer, clip);
 }
 
 void LiveState::setClipMask(int layer, uint8_t mask)

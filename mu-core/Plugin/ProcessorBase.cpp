@@ -1,9 +1,13 @@
 #include "Plugin/ProcessorBase.h"
 #include "Plugin/MixerFxParams.h"           // mu_mixfx::isGlobalFxParamId
+#include "Sequencer/ClipClipboard.h"         // the process-wide clip clipboard
 #include "Persistence/PresetFiles.h"         // mu_pp full-preset files
 #include "Audio/FX/Slots/FXAlgorithmDef.h"   // FXAlgorithmRegistry
 #include "Audio/AlgorithmNames.h"             // mu_audio::kInsertAlgorithmCount
 #include <cstring>                            // std::strcmp — alloc-free suffix compare
+#include <map>
+#include <memory>
+#include <mutex>
 
 #if MU_CORE_HAS_CLAP
  #pragma message("mu-core: ProcessorBase built WITH CLAP sidechain capability (isInputMain=false)")
@@ -16,10 +20,14 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
       apvts(*this, nullptr, stateTreeType, std::move(layout))
 {
     // The block driver's mixer hook: channel r is slot r's scratch, copied exactly (raw pointers, so a
-    // buffer's "cleared" flag can never turn the copy into a clear). Built once here: no allocation per block.
+    // buffer's "cleared" flag can never turn the copy into a clear). A slot that nothing wrote this call (its
+    // view still carries the cleared flag) is not copied: the mixer's channel stays cleared, as a voice that
+    // renders nothing leaves it, so the mixer skips it exactly as before and adds no zeros (which would turn a
+    // later channel's -0 into +0). Built once here: no allocation per block.
     renderState.copyToMixer = [this](int r, juce::AudioBuffer<float>& buf, int n)
     {
         if (r < 0 || r >= mu_limits::kMaxLayers) return;
+        if (renderState.view[(size_t) r].hasBeenCleared()) return;
         const auto& src = renderState.scratch[(size_t) r];
         const int nCh = juce::jmin(buf.getNumChannels(), src.getNumChannels());
         const int len = juce::jmin(n, src.getNumSamples());
@@ -51,10 +59,18 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
     cb.fullCommitCount = [this] { return fullCommitCount(); };
     cb.cancelItem = [this] { cancelPendingFullPreset(); };
     cb.layerCount = [this] { return getNumLayers(); };
+    cb.layerPresent = [this](int l) { return ! layersAreSlots() || slotTypeId(l) != mu_core::LayerTypeId::Empty; };
     cb.layerColourIndex = [this](int layer) { return layer >= 0 && layer < getNumLayers() ? getLayerColourIndex(layer) : 0; };
 
     // The clip bank's live half: a launch is this processor's own launchClip, a mute the MuteLayer action.
     cb.launchClip   = [this](int layer, int clip) { return launchClip(layer, clip); };
+    cb.beginStageBatch = [this] { layerSwapper.beginBatch(); };
+    cb.endStageBatch   = [this] { layerSwapper.endBatch(); };
+    cb.markSceneSlot   = [this](int layer) { layerSwapper.markScene(layer); };
+    cb.preloadClip     = [this](int layer, int clip)
+    {
+        if (auto* l = getLayer(layer); l != nullptr && l->clips->isOccupied(clip)) l->preloadStaged(l->clips->get(clip));
+    };
     cb.slotPending  = [this](int layer) { return hasPendingSwap(layer); };
     cb.slotSerial   = [this](int layer) { return slotStageSerial(layer); };
     cb.cancelSlot   = [this](int layer) { cancelPendingSwap(layer); };
@@ -65,6 +81,8 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
         mute.layer = layer;
         return perform(mute);
     };
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+        midiInRaw[(size_t) i] = apvts.getRawParameterValue("ch" + juce::String(i) + "_midiIn");
     for (int i = 0; i < mu_limits::kMaxLayers; ++i)
         muteParams[(size_t) i] = apvts.getParameter("ch" + juce::String(i) + "_mute");   // cached: the lamps ask per pad per frame
     cb.layerMuted   = [this](int layer)
@@ -81,6 +99,16 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
     {
         if (auto* l = getLayer(layer)) l->activeClip = clip;   // the saved shadow of the live playing clip
     };
+    cb.clipFitsLayer = [this](int layer, int clip)
+    {
+        const auto* l = getLayer(layer);
+        return l == nullptr || ! layersAreSlots() || ! l->clips->isOccupied(clip)
+            || layerPresetType(l->clips->get(clip)) == slotTypeId(layer);   // the same test launchClip makes
+    };
+    cb.clipboardEmpty   = [] { return ! mu_core::clipClipboard().hasClip(); };
+    cb.canPasteClip     = [this](int layer) { return canPasteClip(layer); };
+    cb.hasSceneControls = [this] { return offersSceneControls(); };
+    cb.hasLayerPages    = [this] { return offersLayerPages(); };
     cb.transportPlaying = [this] { return isInternalPlaying(); };
     cb.transportOutside = [this] { return midiControlRouter.playIsOutside(); };
     liveState.setCallbacks(std::move(cb));
@@ -211,17 +239,28 @@ bool ProcessorBase::perform(const mu_core::ControlAction& a)
         case T::PerformanceNext:
         case T::AppPrev:
         case T::AppNext:
+        case T::PagePrev:
+        case T::PageNext:
         case T::LaunchClip:
+        case T::LaunchScene:
         case T::ClipNext:
         case T::ClipPrev:
+            // Auto-save is off while the mode is on, so what was edited before it is put in the bank first.
+            if (a.type == T::PerformanceMode) flushClipAutoSave();
             return liveState.perform(a);
         case T::StoreClip:
         case T::ClearClip:
+        case T::CopyClip:
+        case T::CutClip:
+        case T::PasteClip:
         {
-            // Screen only: these write the bank, so the locked Performance mode refuses them and no map can name them.
+            // Screen only: these touch the bank or the clipboard, so the locked Performance mode refuses them and no map can name them.
             if (liveState.isPerformanceMode()) return false;
             if (hasPendingFullPreset()) return false;   // a staged full preset replaces the layers and their banks
             if (a.type == T::ClearClip) return clearClip(a.layer, a.index);
+            if (a.type == T::CopyClip)  return copyClip(a.layer, a.index);
+            if (a.type == T::CutClip)   return cutClip(a.layer, a.index);
+            if (a.type == T::PasteClip) return pasteClip(a.layer, a.index);
             if (! storeClip(a.layer, a.index)) return false;
             liveState.clipStored(a.layer, a.index);
             return true;
@@ -251,6 +290,25 @@ ProcessorBase::ScopedStorageRoot::~ScopedStorageRoot()
     storageRootOverride() = previous;
 }
 
+namespace
+{
+// One PropertiesFile per settings file per module: every instance in the host process shares it, so a
+// second instance's write can no longer revert a setting the first one saved (each used to hold its own
+// copy, loaded at construction and rewritten whole). PropertiesFile serialises its own accessors.
+std::shared_ptr<juce::PropertiesFile> sharedSettingsFile(const juce::File& file, const juce::PropertiesFile::Options& opts)
+{
+    static std::mutex registryLock;
+    static std::map<juce::String, std::weak_ptr<juce::PropertiesFile>> registry;
+
+    const std::lock_guard<std::mutex> guard(registryLock);
+    auto& slot = registry[file.getFullPathName()];
+    if (auto existing = slot.lock()) return existing;
+    auto created = std::make_shared<juce::PropertiesFile>(file, opts);
+    slot = created;
+    return created;
+}
+}
+
 void ProcessorBase::initAppSettings(const juce::String& name)
 {
     appName = name;
@@ -264,7 +322,7 @@ void ProcessorBase::initAppSettings(const juce::String& name)
                           ? testRoot.getChildFile("settings").getChildFile(name + ".xml")
                           : opts.getDefaultFile();
     settingsFile.getParentDirectory().createDirectory();
-    appSettings = std::make_unique<juce::PropertiesFile>(settingsFile, opts);
+    appSettings = sharedSettingsFile(settingsFile, opts);
 
     // The MIDI control map is per user and per product, beside the settings file.
     midiControlMap.setStorageFile(settingsFile.getParentDirectory().getChildFile(name + "_midiControl.json"));
@@ -277,6 +335,7 @@ void ProcessorBase::initAppSettings(const juce::String& name)
     midiClockSync.setMessages(appSettings->getIntValue ("midiSyncMessages", 2));
     syncOffsetMs.store(juce::jlimit(kSyncOffsetMinMs, kSyncOffsetMaxMs, appSettings->getIntValue("syncOffsetMs", 0)));
     setTimeSignature(appSettings->getIntValue("timeSigNumerator", 4), appSettings->getIntValue("timeSigDenominator", 4));
+    clipAutoSaveOn = appSettings->getBoolValue("clipAutoSave", true);
 }
 
 juce::File ProcessorBase::getContentDir() const
@@ -338,12 +397,85 @@ bool ProcessorBase::isFxParamId(const juce::String& id)
     return id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id);
 }
 
+namespace
+{
+// For an id of the form ch{N}_{suffix} (N one or two digits), writes N to `index` and returns a pointer to the
+// suffix inside the id's own buffer; otherwise returns nullptr. Allocation-free (audio-thread automation path).
+const char* channelStripSuffix(const juce::String& id, int& index) noexcept
+{
+    const char* s = id.toRawUTF8();
+    if (s[0] != 'c' || s[1] != 'h' || s[2] < '0' || s[2] > '9') return nullptr;
+    int n = s[2] - '0';
+    const char* p = s + 3;
+    if (*p >= '0' && *p <= '9') { n = n * 10 + (*p - '0'); ++p; }
+    if (*p != '_' || p[1] == '\0') return nullptr;
+    index = n;
+    return p + 1;
+}
+}
+
 void ProcessorBase::onFxParamChanged(const juce::String& id, float v)
 {
     syncGlobalFxParam(id, v);
-    // ch{0-7}_mute: a flag for the message-thread poll (the lamps follow a mute made anywhere); alloc-free.
-    if (id.length() == 8 && id[0] == 'c' && id[1] == 'h' && id[3] == '_' && std::strcmp(id.toRawUTF8() + 4, "mute") == 0)
+    // ch{N}_mute: a flag for the message-thread poll (the lamps follow a mute made anywhere); alloc-free.
+    int stripIdx = -1;
+    if (const char* suffix = channelStripSuffix(id, stripIdx); suffix != nullptr && std::strcmp(suffix, "mute") == 0)
         muteChanged.store(true, std::memory_order_relaxed);
+}
+
+namespace
+{
+// One online-activation call off the message thread. Owned and joined by the processor, so `fn` may capture it.
+struct ActivationWorker : juce::Thread
+{
+    using Done = std::function<void(const mu_core::OnlineActivationOutcome&)>;
+
+    ActivationWorker(std::function<mu_core::OnlineActivationOutcome(const juce::String&)> f, juce::String k, Done d,
+                     std::shared_ptr<std::atomic<bool>> aliveFlag)
+        : juce::Thread("mu activation"), fn(std::move(f)), key(std::move(k)), done(std::move(d)), alive(std::move(aliveFlag)) {}
+
+    void run() override
+    {
+        const auto outcome = fn(key);   // blocks on the network here
+        if (threadShouldExit()) return;
+        // The flag is only lowered on the message thread (prepareForDestruction), where this runs too.
+        juce::MessageManager::callAsync([alive = alive, done = done, outcome]
+        {
+            if (alive->load(std::memory_order_acquire) && done) done(outcome);
+        });
+    }
+
+    std::function<mu_core::OnlineActivationOutcome(const juce::String&)> fn;
+    juce::String key;
+    Done done;
+    std::shared_ptr<std::atomic<bool>> alive;
+};
+
+constexpr int kActivationJoinMs = 12000;   // longer than the activation request's own 8 s connection timeout
+}
+
+bool ProcessorBase::activateOnlineAsync(const juce::String& key,
+                                        std::function<void(const mu_core::OnlineActivationOutcome&)> done)
+{
+    if (! activateOnlineFn) return false;
+    if (activationWorker != nullptr)
+    {
+        if (activationWorker->isThreadRunning()) return false;
+        activationWorker.reset();   // a finished one: nothing to wait for
+    }
+    activationWorker = std::make_unique<ActivationWorker>(activateOnlineFn, key, std::move(done), activationAlive);
+    activationWorker->startThread();
+    return true;
+}
+
+void ProcessorBase::stopActivationWorker() noexcept
+{
+    activationAlive->store(false, std::memory_order_release);   // a reply already queued is dropped
+    if (activationWorker != nullptr)
+    {
+        activationWorker->stopThread(kActivationJoinMs);
+        activationWorker.reset();
+    }
 }
 
 ProcessorBase::~ProcessorBase()
@@ -384,13 +516,20 @@ void ProcessorBase::syncGlobalFxParam(const juce::String& id, float v)
 {
     // Prefix router → per-family helper. Keeps each automation tick a single
     // prefix test plus one bounded if/else inside the matching helper.
-    if (id.length() >= 6 && id[0] == 'c' && id[1] == 'h' && id[3] == '_')   // ch{0-7}_{param}
+    int stripIdx = -1;
+    if (const char* suffix = channelStripSuffix(id, stripIdx); suffix != nullptr)   // ch{N}_{param}
     {
-        const int i = id[2] - '0';
-        if (i >= 0 && i < MixerEngine::MaxChannels)
-            syncChannelStripParam(i, id.toRawUTF8() + 4, v);   // suffix into id buffer, no alloc
+        if (stripIdx < MixerEngine::MaxChannels)
+            syncChannelStripParam(stripIdx, suffix, v);   // suffix into id buffer, no alloc
         return;
     }
+
+    if constexpr (MixerEngine::kNumBuses > 0)
+        if (id.startsWith("bus"))                                           // bus{B}_{param}, bus{B}_i{I}_{param}
+        {
+            syncBusParam(id, v);
+            return;
+        }
 
     if (id.startsWith("ret_"))                                              // ret_{eff|dly|rev}_{param}
     {
@@ -427,6 +566,47 @@ void ProcessorBase::syncChannelStripParam(int channel, const char* param, float 
     else if (is("scAtk"))   ch.sidechainAttackMs.store(v, std::memory_order_relaxed);
     else if (is("scRel"))   ch.sidechainReleaseMs.store(v, std::memory_order_relaxed);
     else if (is("outBus"))  ch.outputBus.store(juce::jlimit(0, 8, juce::roundToInt(v)), std::memory_order_relaxed);
+    else if (is("bus"))     ch.busAssign.store(juce::jlimit(0, MixerEngine::kNumBuses, juce::roundToInt(v)), std::memory_order_relaxed);
+}
+
+// bus{B}_{suffix}: the strip's own suffixes, or i{I}_{drvChar|insP1..4} for an insert. Pointer arithmetic on the
+// id's buffer only, so the automation path allocates nothing.
+void ProcessorBase::syncBusParam(const juce::String& id, float v)
+{
+    const char* s = id.toRawUTF8();
+    if (s[3] < '0' || s[3] > '9') return;
+    const int b = s[3] - '0';
+    if (b >= MixerEngine::kNumBuses || s[4] != '_') return;
+    const char* rest = s + 5;
+    auto& bus = mixerEngine.buses[(size_t) b];
+
+    if (rest[0] == 'i' && rest[1] >= '0' && rest[1] <= '9' && rest[2] == '_')   // i{I}_{param}
+    {
+        const int i = rest[1] - '0';
+        if (i >= MixerEngine::kBusInserts) return;
+        auto& ins = bus.insert[i];
+        const char* param = rest + 3;
+        auto is = [param](const char* t) { return std::strcmp(param, t) == 0; };
+        if      (is("drvChar")) ins.insertAlgo.store(juce::jlimit(0, mu_audio::kInsertAlgorithmCount - 1, juce::roundToInt(v)), std::memory_order_relaxed);
+        else if (is("insP1"))   ins.insertParam[0].store(v, std::memory_order_relaxed);
+        else if (is("insP2"))   ins.insertParam[1].store(v, std::memory_order_relaxed);
+        else if (is("insP3"))   ins.insertParam[2].store(v, std::memory_order_relaxed);
+        else if (is("insP4"))   ins.insertParam[3].store(v, std::memory_order_relaxed);
+        return;
+    }
+
+    auto is = [rest](const char* t) { return std::strcmp(rest, t) == 0; };
+    if      (is("lvl"))     bus.level.store(v, std::memory_order_relaxed);
+    else if (is("pan"))     bus.pan.store(v, std::memory_order_relaxed);
+    else if (is("mute"))    bus.mute.store(v > 0.5f, std::memory_order_relaxed);
+    else if (is("solo"))    bus.solo.store(v > 0.5f, std::memory_order_relaxed);
+    else if (is("sendEff")) bus.sendEffect.store(v, std::memory_order_relaxed);
+    else if (is("sendDly")) bus.sendDelay.store(v, std::memory_order_relaxed);
+    else if (is("sendRev")) bus.sendReverb.store(v, std::memory_order_relaxed);
+    else if (is("scSrc"))   bus.sidechainSource.store(juce::jlimit(0, mu_mixfx::kScSrcMax, juce::roundToInt(v)) - 1, std::memory_order_relaxed);
+    else if (is("scAmt"))   bus.sidechainAmount.store(v, std::memory_order_relaxed);
+    else if (is("scAtk"))   bus.sidechainAttackMs.store(v, std::memory_order_relaxed);
+    else if (is("scRel"))   bus.sidechainReleaseMs.store(v, std::memory_order_relaxed);
 }
 
 void ProcessorBase::syncReturnStripParam(int retIndex, const char* rest, float v)
@@ -437,7 +617,7 @@ void ProcessorBase::syncReturnStripParam(int retIndex, const char* rest, float v
     else if (is("pan"))   ret.pan.store(v, std::memory_order_relaxed);
     else if (is("mute"))  ret.mute.store(v > 0.5f, std::memory_order_relaxed);
     else if (is("solo"))  ret.solo.store(v > 0.5f, std::memory_order_relaxed);
-    else if (is("scSrc")) ret.sidechainSource.store(juce::jlimit(0, 9, (int) v) - 1, std::memory_order_relaxed);
+    else if (is("scSrc")) ret.sidechainSource.store(juce::jlimit(0, mu_mixfx::kScSrcMax, (int) v) - 1, std::memory_order_relaxed);
     else if (is("scAmt")) ret.sidechainAmount.store(juce::jlimit(0.0f, 1.0f, v), std::memory_order_relaxed);
     else if (is("scAtk")) ret.sidechainAttackMs.store(v, std::memory_order_relaxed);
     else if (is("scRel")) ret.sidechainReleaseMs.store(v, std::memory_order_relaxed);
@@ -490,8 +670,7 @@ void ProcessorBase::syncFxSlotParam(const juce::String& id, float v)
             const auto& params = algos[(size_t) ai].params;
             for (int i = 0; i < (int) params.size() && i < 5; ++i)
                 if (auto* knob = apvts.getRawParameterValue(kEffKnobIds[i]))
-                    eff.setParam(params[(size_t) i].id,
-                                 params[(size_t) i].minVal + knob->load() * (params[(size_t) i].maxVal - params[(size_t) i].minVal));
+                    eff.setParam(params[(size_t) i].id, params[(size_t) i].actualFromNorm(knob->load()));
         }
     }
     else if (id == "eff_en")   eff.setEnabled(v > 0.5f);
@@ -503,7 +682,7 @@ void ProcessorBase::syncFxSlotParam(const juce::String& id, float v)
         if (ai < (int) algos.size() && idx < (int) algos[(size_t) ai].params.size())
         {
             const auto& pd = algos[(size_t) ai].params[(size_t) idx];
-            eff.setParam(pd.id, pd.minVal + v * (pd.maxVal - pd.minVal));
+            eff.setParam(pd.id, pd.actualFromNorm(v));
         }
     }
     else if (id == "dly_en")   dly.setEnabled(v > 0.5f);
@@ -607,6 +786,145 @@ juce::Array<juce::File> ProcessorBase::slotPresetFiles(int /*slot*/) const
     return mu_pp::listPresetFiles(getLayerPresetDir(), getLayerPresetExtension());
 }
 
+juce::File ProcessorBase::presetDirOf(const mu_core::LayerTypeInfo& info) const
+{
+    const auto content = getContentDir();
+    if (content == juce::File() || juce::String(info.contentFolderName).isEmpty() || juce::String(info.presetFolder).isEmpty())
+        return {};
+    return content.getSiblingFile(info.contentFolderName).getChildFile(info.presetFolder);
+}
+
+juce::String ProcessorBase::presetExtensionOf(const mu_core::LayerTypeInfo& info)
+{
+    return juce::String(info.presetExtension).trimCharactersAtStart(".");
+}
+
+mu_core::LayerTypeId ProcessorBase::slotTypeId(int slot) const
+{
+    const auto* layer = getLayer(slot);
+    return layer != nullptr ? (mu_core::LayerTypeId) layer->typeId() : mu_core::LayerTypeId::Empty;
+}
+
+juce::File ProcessorBase::typedLayerPresetDir(int slot) const
+{
+    const auto* info = layerTypes.find(slotTypeId(slot));
+    return info != nullptr ? presetDirOf(*info) : juce::File();
+}
+
+juce::String ProcessorBase::typedLayerPresetExtension(int slot) const
+{
+    const auto* info = layerTypes.find(slotTypeId(slot));
+    return info != nullptr ? presetExtensionOf(*info) : juce::String();
+}
+
+juce::Array<juce::File> ProcessorBase::typedSlotPresetFiles(int slot) const
+{
+    juce::Array<juce::File> out;
+    auto addType = [&](const mu_core::LayerTypeInfo& info)
+    {
+        for (const auto& f : mu_pp::listPresetFiles(presetDirOf(info), presetExtensionOf(info)))
+        {
+            // Types that share an extension: keep the files that name this type (an unreadable file names none).
+            if (info.typeFromPreset != nullptr)
+            {
+                const auto xml = juce::XmlDocument::parse(f);
+                if (xml == nullptr || info.typeFromPreset(juce::ValueTree::fromXml(*xml)) != info.id) continue;
+            }
+            out.addIfNotAlreadyThere(f);
+        }
+    };
+    const auto* own = layerTypes.find(slotTypeId(slot));
+    if (own != nullptr)
+        addType(*own);
+    else
+        for (int t = 0; t < layerTypes.size(); ++t) addType(layerTypes.at(t));
+    return out;
+}
+
+mu_core::LayerTypeId ProcessorBase::layerPresetType(const juce::ValueTree& preset, const juce::String& extension) const
+{
+    auto found = mu_core::LayerTypeId::Empty;
+    int matches = 0;
+    for (int t = 0; t < layerTypes.size(); ++t)
+    {
+        const auto& info = layerTypes.at(t);
+        if (extension.isNotEmpty() && ! presetExtensionOf(info).equalsIgnoreCase(extension.trimCharactersAtStart("."))) continue;
+        if (juce::String(info.presetTag).isNotEmpty() && ! preset.hasType(info.presetTag)) continue;
+        if (info.typeFromPreset != nullptr && info.typeFromPreset(preset) != info.id) continue;
+        found = info.id;
+        ++matches;
+    }
+    return matches == 1 ? found : mu_core::LayerTypeId::Empty;
+}
+
+void ProcessorBase::saveTypedLayerPreset(int slot, const juce::String& name)
+{
+    const auto* info = layerTypes.find(slotTypeId(slot));
+    if (info == nullptr || juce::String(info->presetTag).isEmpty()) return;   // an Empty slot has nothing to save
+    const auto dir = presetDirOf(*info);
+    if (dir == juce::File()) return;
+    const auto node = captureLayerNode(slot, info->presetTag);
+    // A type whose file keeps another shape than the composed node converts it at the file boundary.
+    const auto fileTree = info->presetNodeToFile != nullptr ? info->presetNodeToFile(node, name) : node;
+    if (auto xml = fileTree.createXml())
+        mu_pp::writeXmlAtomically(*xml, dir.getChildFile(mu_pp::safePresetFileName(name, info->name) + "." + presetExtensionOf(*info)),
+                                  onLoadError);
+}
+
+void ProcessorBase::loadTypedLayerPreset(int slot, const juce::File& file)
+{
+    if (getLayer(slot) == nullptr || ! file.existsAsFile()) return;
+    const auto xml = juce::XmlDocument::parse(file);
+    const auto tree = xml != nullptr ? juce::ValueTree::fromXml(*xml) : juce::ValueTree();
+    const auto type = tree.isValid() ? layerPresetType(tree, file.getFileExtension()) : mu_core::LayerTypeId::Empty;
+    const auto* fileInfo = layerTypes.find(type);
+    if (fileInfo == nullptr)
+    {
+        if (onLoadError) onLoadError("Could not read \"" + file.getFileName() + "\"");
+        return;
+    }
+
+    // The composed node the slot applies: the file itself, or its conversion for a type with another file shape.
+    const auto node = fileInfo->presetFileToNode != nullptr ? fileInfo->presetFileToNode(tree, file.getFileNameWithoutExtension()) : tree;
+    if (! node.isValid())
+    {
+        if (onLoadError) onLoadError("Could not read \"" + file.getFileName() + "\"");
+        return;
+    }
+
+    const auto slotType = slotTypeId(slot);
+    if (slotType == mu_core::LayerTypeId::Empty)
+    {
+        // An Empty slot takes the file's type, with the file's rows as the new layer's first state.
+        if (setLayerType(slot, type, &node) && onLayerPresetCommitted)
+            onLayerPresetCommitted(slot);
+        return;
+    }
+    if (slotType != type)
+    {
+        // A type changes only through the chooser or the header menu, never as a side effect of a preset.
+        const auto* slotInfo = layerTypes.find(slotType);
+        if (onLoadError)
+        {
+            // "a Kick", "an Arp": the article follows the type name's first letter.
+            auto withArticle = [](const juce::String& name) { return (name.indexOfAnyOf("AEIOUaeiou") == 0 ? "an " : "a ") + name; };
+            onLoadError("This is " + withArticle(fileInfo->name) + " preset; this slot is "
+                        + withArticle(slotInfo != nullptr ? juce::String(slotInfo->name) : juce::String("layer")));
+        }
+        return;
+    }
+    stageLayerPreset(slot, node, false, false);
+}
+
+void ProcessorBase::applyStagedTypedLayer(int slot, const juce::ValueTree& tree)
+{
+    const bool sameType = layerPresetType(tree) == slotTypeId(slot);
+    jassert(sameType);   // a type change cancels the slot's stage, so a stage of another type cannot reach here
+    if (! sameType) return;
+    applyLayerNode(slot, tree);
+    if (onLayerPresetCommitted) onLayerPresetCommitted(slot);
+}
+
 juce::File ProcessorBase::getDefaultPresetFile() const
 {
     return getPresetsDir().getChildFile("_default." + getFullPresetExtension());
@@ -693,6 +1011,75 @@ namespace
             }
     }
 
+    // Published-mode exclusion for a structural edit (design 2.1.2): raise layerEditInFlight (seq_cst), then wait one grace
+    // period, so the block that may have started before the flag has ended and every later block renders nothing until the
+    // flag is lowered. On a timeout the flag is lowered again and ok() is false: the caller gives up and moves nothing.
+    // Unlike ScopedSuspend it does not suspend processing, so the host keeps calling processBlock (which renders nothing).
+    class ScopedQuiesce
+    {
+    public:
+        ScopedQuiesce(std::atomic<bool>& editFlag, const mu_core::AudioEpoch& epoch, int timeoutMs) : flag(editFlag)
+        {
+            jassert(! flag.load(std::memory_order_relaxed));   // edits do not nest
+            flag.store(true, std::memory_order_seq_cst);
+            raised = true;
+            granted = epoch.waitFor(epoch.stamp(), timeoutMs);
+            if (! granted) release();
+        }
+        ~ScopedQuiesce() { release(); }
+        ScopedQuiesce(const ScopedQuiesce&)            = delete;
+        ScopedQuiesce& operator=(const ScopedQuiesce&) = delete;
+
+        bool ok() const noexcept { return granted; }
+        // Lowers the flag; a second call does nothing.
+        void release() noexcept
+        {
+            if (! raised) return;
+            raised = false;
+            flag.store(false, std::memory_order_seq_cst);
+        }
+
+    private:
+        std::atomic<bool>& flag;
+        bool raised = false, granted = false;
+    };
+
+    // One slot's parameter rows moving to another slot's prefix: each id under `from` goes to the same suffix under `to`.
+    struct RowMove { juce::String from, to; };
+
+    // Which parameter feeds which: the structure of a set of row moves, found by walking the parameter list. A row the
+    // destination lacks is left out. Done before the audio thread is excluded, because the walk is the slow part.
+    using RowPlan = std::vector<std::pair<juce::RangedAudioParameter*, juce::RangedAudioParameter*>>;   // source, destination
+    RowPlan planRows(juce::AudioProcessor& proc, juce::AudioProcessorValueTreeState& apvts, const std::vector<RowMove>& moves)
+    {
+        RowPlan plan;
+        for (const auto& m : moves)
+            forEachPrefixed(proc, m.from, [&](juce::RangedAudioParameter& rp, const juce::String& suffix)
+            {
+                if (auto* dst = apvts.getParameter(m.to + suffix)) plan.emplace_back(&rp, dst);
+            });
+        return plan;
+    }
+
+    // Applies a plan. Every source value is read before any is written, so moves that overlap (two same-prefix slots
+    // exchanging rows) swap instead of copy; a value that is already right is not written again (no host notification,
+    // no listener work for nothing). Message thread.
+    void applyRows(const RowPlan& plan)
+    {
+        std::vector<float> values;
+        values.reserve(plan.size());
+        for (const auto& pr : plan) values.push_back(pr.first->getValue());
+        for (size_t i = 0; i < plan.size(); ++i)
+            if (plan[i].second->getValue() != values[i]) plan[i].second->setValueNotifyingHost(values[i]);
+    }
+
+    // The same prefix letters on another slot: "t3_" on slot 5 is "t5_". Empty stays empty (no live prefix).
+    juce::String prefixOnSlot(const juce::String& prefix, int slot)
+    {
+        if (prefix.isEmpty()) return {};
+        return prefix.dropLastCharacters(1).trimCharactersAtEnd("0123456789") + juce::String(slot) + "_";
+    }
+
     // The two id prefixes a layer slot's parameters sit under: the product's own (v3_) and the mixer strip's (ch3_).
     juce::StringArray layerParamPrefixes(const mu_pp::LayerLayout& layout, int slot)
     {
@@ -737,25 +1124,40 @@ void ProcessorBase::resetLayerParams(int slot)
         });
 }
 
-void ProcessorBase::remapSidechainSources(const std::function<int(int)>& remap)
+std::vector<juce::RangedAudioParameter*> ProcessorBase::sidechainSourceParams()
 {
-    auto remapOne = [this, &remap](const juce::String& id)
+    std::vector<juce::RangedAudioParameter*> out;
+    auto add = [this, &out](const juce::String& id)
     {
-        if (auto* p = apvts.getParameter(id))
-        {
-            const int v  = juce::roundToInt(p->convertFrom0to1(p->getValue()));
-            const int nv = juce::jlimit(0, 9, remap(v));
-            if (nv != v) p->setValueNotifyingHost(p->convertTo0to1((float) nv));
-        }
+        if (auto* p = apvts.getParameter(id)) out.push_back(p);
     };
     for (int c = 0; c < mu_limits::kMaxLayers; ++c)
-        remapOne("ch" + juce::String(c) + "_scSrc");
+        add("ch" + juce::String(c) + "_scSrc");
     for (const char* ret : { "ret_eff_scSrc", "ret_dly_scSrc", "ret_rev_scSrc" })
-        remapOne(ret);
+        add(ret);
+    for (int b = 0; b < mu_limits::kMaxBuses; ++b)
+        add("bus" + juce::String(b) + "_scSrc");
+    return out;
+}
+
+void ProcessorBase::remapSidechainSources(const std::function<int(int)>& remap)
+{
+    remapSidechainSources(sidechainSourceParams(), remap);
+}
+
+void ProcessorBase::remapSidechainSources(const std::vector<juce::RangedAudioParameter*>& params, const std::function<int(int)>& remap)
+{
+    for (auto* p : params)
+    {
+        const int v  = juce::roundToInt(p->convertFrom0to1(p->getValue()));
+        const int nv = juce::jlimit(0, mu_mixfx::kScSrcMax, remap(v));   // 0 off, 1..kMaxLayers a channel, then external, then the buses
+        if (nv != v) p->setValueNotifyingHost(p->convertTo0to1((float) nv));
+    }
 }
 
 juce::ValueTree ProcessorBase::captureComposedState()
 {
+    flushClipAutoSaveForStateCapture();   // a late edit of a lit clip is in the saved bank
     auto state = mu_pp::captureState(apvts.state.getType(), layerLayout, layerExtras);
 
     // Each slot node gains its layer's clip bank and playing clip. Not part of captureLayer, so a layer
@@ -783,6 +1185,27 @@ juce::ValueTree ProcessorBase::captureComposedState()
 
 void ProcessorBase::applyComposedState(const juce::ValueTree& state)
 {
+    dropClipWatches();   // the restored layers re-adopt a baseline; nothing is written for the restore
+    // A restore that lowers the count publishes the new count BEFORE the parameters move: applyState
+    // writes defaults into the slots the state lacks, and those slots must already be out of the count
+    // by then or they would render with default parameters until the store below. A restore that grows
+    // the count keeps the count last, so no block sees a slot counted before its data is in.
+    const bool editsLayers = canEditLayers();
+    const int  newCount    = editsLayers ? savedLayerCount(state) : 0;
+    bool       shrinkStored = false;
+    if (editsLayers)
+    {
+        jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);
+        const juce::ScopedLock lw(layoutWriteLock);
+        if (newCount < numLayers.load(std::memory_order_relaxed))
+        {
+            storeLayerCount(newCount);
+            shrinkStored = true;
+        }
+    }
+    if (shrinkStored && retireBin.countPolicy() == mu_core::RetireBin::CountPolicy::CutAtCount)
+        retireBin.cutAtOrAbove(newCount);
+
     mu_pp::applyState(state, layerLayout, layerExtras);
 
     // Every slot takes its node's clips: a node without a <Clips> child (an older file, or a slot the
@@ -793,24 +1216,39 @@ void ProcessorBase::applyComposedState(const juce::ValueTree& state)
             const auto node = mu_pp::findLayerNode(state, i);
             auto& layer = *layers[(size_t) i];
             layer.clips->readFrom(node);
+            // A clip carries its type: one saved for another type than the slot now holds (a hand-edited file, an engine
+            // this build reads differently) is dropped rather than launched into the wrong layer.
+            if (layersAreSlots())
+                for (int c = 0; c < mu_limits::kClipsPerLayer; ++c)
+                    if (layer.clips->isOccupied(c) && layerPresetType(layer.clips->get(c)) != slotTypeId(i))
+                        layer.clips->clear(c);
             const int active = (int) node.getProperty("activeClip", -1);
             layer.activeClip = layer.clips->isOccupied(active) ? active : -1;
         }
     publishClipMasks();
 
-    if (! canEditLayers()) return;
+    if (! editsLayers) return;
 
-    // Count last, so the audio thread never sees a count ahead of the data; then the colours (a state without colours keeps the current ones).
+    // Count last on a grow, so the audio thread never sees a count ahead of the data; then the colours (a state without colours keeps the current ones).
     // Thread contract: hosts normally call setStateInformation on the message thread, and the editor's modulation
     // reads, the Stager and the products' lock-free paths all assume that. The layout store below is the one part
     // that is also safe from a host thread, so it goes through the packed layout word under layoutWriteLock: a lost
     // or misattached serial would break the retire bin's same-block hand-over. A product that parks a tail before this call holds layoutWriteLock
     // across both (it is re-entrant), so the park's nextLayoutSerial() is the serial this store carries.
+    // A slot host keeps its count (the capacity): only the colours are restored.
+    if (layersAreSlots())
+    {
+        const auto slotToks = juce::StringArray::fromTokens(state.getProperty("voiceColours", "").toString(), ",", "");
+        for (int i = 0; i < mu_limits::kMaxLayers && i < slotToks.size(); ++i)
+            if (layers[(size_t) i] != nullptr)
+                layers[(size_t) i]->colourIndex = juce::jlimit(0, mu_limits::kMaxLayers - 1, slotToks[i].getIntValue());
+        return;
+    }
+
     // TryLock mode only until Published-mode quiesce exists: this store and the parameter moves above assume
     // the audio thread's try-lock protocol.
-    jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);
-    const int newCount = savedLayerCount(state);
     int oldCount = 0;
+    if (! shrinkStored)
     {
         const juce::ScopedLock lw(layoutWriteLock);
         oldCount = numLayers.load(std::memory_order_relaxed);
@@ -823,7 +1261,7 @@ void ProcessorBase::applyComposedState(const juce::ValueTree& state)
             for (int s = oldCount; s < newCount; ++s)
                 retireBin.cutSlot(s);
     }
-    if (retireBin.countPolicy() == mu_core::RetireBin::CountPolicy::CutAtCount)
+    if (! shrinkStored && retireBin.countPolicy() == mu_core::RetireBin::CountPolicy::CutAtCount)
         retireBin.cutAtOrAbove(newCount);
     const auto toks = juce::StringArray::fromTokens(state.getProperty("voiceColours", "").toString(), ",", "");
     for (int i = 0; i < mu_limits::kMaxLayers && i < toks.size(); ++i)
@@ -855,7 +1293,8 @@ int ProcessorBase::addLayer()
 {
     const int n = numLayers.load(std::memory_order_relaxed);
     if (! canEditLayers() || n >= mu_limits::kMaxLayers) return -1;
-    jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);   // the edits' Published-mode quiesce is not built yet
+    if (getLayerAccess() != mu_core::LayerAccess::TryLock) return -1;   // refused, never half done: a Published host uses setLayerType
+    prepareClipWatchesForStructuralEdit();
 
     // Phase 1: build and prepare the new layer before anything is locked.
     auto fresh = createLayer(n);
@@ -908,7 +1347,8 @@ bool ProcessorBase::removeLayer(int idx)
 {
     const int n = numLayers.load(std::memory_order_relaxed);
     if (! canEditLayers() || n <= 1 || idx < 0 || idx >= n) return false;   // the last layer stays
-    jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);   // the edits' Published-mode quiesce is not built yet
+    if (getLayerAccess() != mu_core::LayerAccess::TryLock) return false;   // the Published-mode quiesce is not built yet
+    prepareClipWatchesForStructuralEdit();
 
     // Phase 1: the down-shift renumbers every layer from idx upward, so every staged per-layer swap
     // (keyed by index) would land on the wrong slot. A staged full preset replaces all slots and wins.
@@ -933,6 +1373,8 @@ bool ProcessorBase::removeLayer(int idx)
         const juce::ScopedLock sl(layersLock);
         mixerEngine.renumberSidechainsAfterRemove(idx);   // before the strips shift down
         retired = unpublishLayerLocked(idx, std::move(spare));
+        if (retired != nullptr)
+            layerRemoved(*retired, idx);   // before anything below moves the slots' state
         for (int d = idx; d < n - 1; ++d)
         {
             mixerEngine.channels[(size_t) d].copyFrom(mixerEngine.channels[(size_t) (d + 1)]);
@@ -984,7 +1426,8 @@ bool ProcessorBase::swapLayers(int a, int b)
 {
     const int n = numLayers.load(std::memory_order_relaxed);
     if (! canEditLayers() || a < 0 || b < 0 || a >= n || b >= n || a == b) return false;
-    jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);   // the edits' Published-mode quiesce is not built yet
+    prepareClipWatchesForStructuralEdit();   // both slots of a Published exchange too: the trackers are keyed by slot
+    if (getLayerAccess() == mu_core::LayerAccess::Published) return swapLayersPublished(a, b);
 
     // Phase 1: staged swaps are keyed by index, so swapping the two slots would misdirect them.
     cancelPendingSwap(a);
@@ -1034,9 +1477,125 @@ bool ProcessorBase::swapLayers(int a, int b)
     return true;
 }
 
+// A Published host reorders without suspending: the audio thread is quiesced (design 2.1.2), so for the few
+// moments the edit takes the host's blocks render nothing, the same silence a TryLock host's edit makes; nothing
+// else about the layers changes. What travels with a layer: its object (engine, state, modulators, clips, name,
+// colour), its mixer strip (level, sends, sidechain and bus assignment, follower), the tails owed to its strip, and its
+// parameter rows under its type's prefix. What stays with the slot: the slot number itself.
+bool ProcessorBase::swapLayersPublished(int a, int b)
+{
+    mu_hotswap::assertMessageThread();   // one writer at a time: the editor's drag and a state restore are message-thread work
+    if (layers[(size_t) a] == nullptr || layers[(size_t) b] == nullptr) return false;
+
+    // The editor lets go of both layers before they move (modulator panel, content bindings), outside every lock.
+    if (onLayerLeaving) { onLayerLeaving(a); onLayerLeaving(b); }
+
+    // Everything that only reads is done before the audio thread is excluded, so the window in which its blocks render
+    // nothing holds only waits, writes and pointer moves: which rows move where, and which sidechain parameters to rewrite.
+    const auto liveA = layerLayout.prefix(a), liveB = layerLayout.prefix(b);
+    const juce::String stripA = "ch" + juce::String(a) + "_", stripB = "ch" + juce::String(b) + "_";
+    std::vector<RowMove> moves { { stripA, stripB }, { stripB, stripA } };
+    if (liveA.isNotEmpty()) moves.push_back({ liveA, prefixOnSlot(liveA, b) });
+    if (liveB.isNotEmpty()) moves.push_back({ liveB, prefixOnSlot(liveB, a) });
+    const RowPlan rowPlan = layerHoldsParamTruth() ? RowPlan() : planRows(*this, apvts, moves);
+    const auto sidechainParams = sidechainSourceParams();
+    const double raisedAt = juce::Time::getMillisecondCounterHiRes();
+
+    // Phase 0: exclude the audio thread. A timeout moves nothing (strip state is never moved without the grace).
+    ScopedQuiesce quiesce(layerEditInFlight, layerAccess.epoch, 50);
+    if (! quiesce.ok()) return false;
+
+    // Phase 1: staged swaps are keyed by index, so swapping the two slots would misdirect them.
+    cancelPendingSwap(a);
+    cancelPendingSwap(b);
+
+    // A parameter that names a layer (a Rumble's source) is rewritten now, at the old slots and before any pointer
+    // moves, because the hook reads each slot's layer type: after the move the old indices would name the wrong layers.
+    const auto oldToNew = [a, b](int i) { return mu_mix::sidechainAfterSwap(i, a, b, mu_limits::kMaxLayers); };
+    remapLayerReferences(oldToNew);
+
+    // Phase 2: pointers, strip state, tails and the one published view, under the writers' locks (the count store
+    // advances the serial, so the layout writer lock comes first).
+    {
+        const juce::ScopedLock lw(layoutWriteLock);
+        const juce::ScopedLock sl(layersLock);
+        mixerEngine.renumberSidechainsAfterSwap(a, b);
+        swapLayersLocked(a, b);
+        mixerEngine.swapChannelState(a, b);
+        retireBin.swapRows(a, b);              // owned tails follow their strip, in-place ones are cut
+        layers[(size_t) a]->onMoved(a);
+        layers[(size_t) b]->onMoved(b);
+        layersReordered(LayerEdit::Swap, a, b);
+        layersMoved(a, a);
+        layersMoved(b, b);
+
+        // Each slot now holds the other's layer, so it is live on the other's type letters.
+        layerLayout.setLivePrefix(a, prefixOnSlot(liveB, a));
+        layerLayout.setLivePrefix(b, prefixOnSlot(liveA, b));
+
+        auto view = makeLayerView();
+        view.serial = nextLayoutSerial();
+        layerAccess.views.publish(view, layerAccess.epoch);   // the view first, then the word: the serial order of setLayerType
+        storeLayerCount(numLayers.load(std::memory_order_relaxed));
+    }
+
+    // What a type's services keep per slot moves with the layers (a Pattern's engine), before they re-bind.
+    {
+        std::array<mu_core::LayerServices*, (size_t) mu_core::kLayerTypeIdCount> built {};
+        {
+            const juce::ScopedLock sl(layerServicesLock);
+            for (size_t i = 0; i < built.size(); ++i) built[i] = layerServices[i].get();
+        }
+        for (auto* services : built)
+            if (services != nullptr) services->slotsSwapped(a, b);
+    }
+
+    // The moved layers re-bind their parameter pointers to the new slots (C9); the flag still keeps blocks out.
+    layers[(size_t) a]->bindParams(apvts, a);
+    layers[(size_t) b]->bindParams(apvts, b);
+
+    // Phase 3: parameter values. A strip that ducked from one swapped layer now ducks from the other (translated
+    // before the rows move, so each strip's own source moves with it), then each layer's rows follow it to its new slot.
+    remapSidechainSources(sidechainParams, [a, b](int v) { return mu_mix::sidechainParamAfterSwap(v, a, b, mu_limits::kMaxLayers); });
+    if (layerHoldsParamTruth())
+    {
+        syncSlotParams(a);
+        syncSlotParams(b);
+    }
+    else
+        applyRows(rowPlan);
+    quiesce.release();
+    lastEditWindowMs.store(juce::Time::getMillisecondCounterHiRes() - raisedAt, std::memory_order_relaxed);
+
+    // The banks and playing clips moved with their layers. Last, after the audio thread is running again, so the
+    // notification a surface acts on sees the finished edit.
+    liveState.remapLayers(oldToNew);
+    std::swap(presetLabels[(size_t) a], presetLabels[(size_t) b]);
+    publishClipMasks();
+    if (retireBin.hasPendingWork()) requestDeferredWork();
+    return true;
+}
+
 void ProcessorBase::resetLayer(int idx)
 {
     if (idx < 0 || idx >= numLayers.load(std::memory_order_relaxed) || layers[(size_t) idx] == nullptr) return;
+    prepareClipWatchesForStructuralEdit();
+
+    // A Published host never suspends: it gives the slot a fresh layer of the same type through two publications
+    // (setLayerType, via Empty), then returns the strip and the name to defaults, as a reset always does.
+    if (getLayerAccess() == mu_core::LayerAccess::Published)
+    {
+        const auto type = (mu_core::LayerTypeId) layers[(size_t) idx]->typeId();
+        if (type != mu_core::LayerTypeId::Empty)
+        {
+            setLayerType(idx, mu_core::LayerTypeId::Empty);
+            setLayerType(idx, type);
+        }
+        mixerEngine.requestSidechainEnvReset(idx);   // the strip returns to defaults, so its follower restarts too
+        resetLayerParams(idx);
+        layers[(size_t) idx]->name.clear();
+        return;
+    }
     cancelPendingSwap(idx);                     // a staged swap would re-fill what we are clearing
 
     // Phase 1: build the default data before anything is locked (constructing allocates).
@@ -1068,11 +1627,219 @@ void ProcessorBase::resetLayer(int idx)
     }
 }
 
+// ─── Typed slots ─────────────────────────────────────────────────────────────────────────────
+
+mu_core::LayerServices* ProcessorBase::ensureLayerServices(const mu_core::LayerTypeInfo& info)
+{
+    const int i = (int) info.id;
+    if (info.createServices == nullptr || i < 0 || i >= mu_core::kLayerTypeIdCount) return nullptr;
+    {
+        const juce::ScopedLock sl(layerServicesLock);
+        if (layerServices[(size_t) i] != nullptr) return layerServices[(size_t) i].get();
+    }
+
+    // Built outside the table's lock (a type's services may load tables or allocate engines), inserted under it.
+    auto built = info.createServices(*this);
+    if (built == nullptr) return nullptr;
+    const juce::ScopedLock sl(layerServicesLock);
+    if (layerServices[(size_t) i] != nullptr) return layerServices[(size_t) i].get();   // another thread was first
+    // A processor already prepared hands its rate and block size to services built after it; prepareLayerRender
+    // reaches them through the table once they are in it, so a prepare racing this one still ends on the newest.
+    double rate = 0.0;
+    int block = 0;
+    {
+        const juce::ScopedLock ll(layersLock);
+        rate  = layersPreparedRate;
+        block = layersPreparedBlock;
+    }
+    if (rate > 0.0) built->prepare(rate, block);
+    layerServices[(size_t) i] = std::move(built);
+    audioServices[(size_t) i].store(layerServices[(size_t) i].get(), std::memory_order_release);
+    return layerServices[(size_t) i].get();
+}
+
+void ProcessorBase::runLayerServicesWork()
+{
+    // Copied out under the table's lock and run outside it: a services object's work may reach back into the table
+    // (a content asking for another type's services). Entries live until the processor is destroyed.
+    std::array<mu_core::LayerServices*, (size_t) mu_core::kLayerTypeIdCount> built {};
+    {
+        const juce::ScopedLock sl(layerServicesLock);
+        for (size_t i = 0; i < built.size(); ++i) built[i] = layerServices[i].get();
+    }
+    for (auto* s : built)
+        if (s != nullptr) s->deferredWork();
+}
+
+mu_core::LayerServices* ProcessorBase::findLayerServices(mu_core::LayerTypeId id) const
+{
+    const int i = (int) id;
+    if (i < 0 || i >= mu_core::kLayerTypeIdCount) return nullptr;
+    const juce::ScopedLock sl(layerServicesLock);
+    return layerServices[(size_t) i].get();
+}
+// docs/mu-tronic/design.md 2.1.2: a slot's type changes in two view publications with a grace wait between
+// them, nothing suspended and nothing muted. The audio thread reaches layers only through the published view
+// (LayerAccess::Published), so every pointer move here is invisible to it until a view is published.
+
+mu_core::LayerView ProcessorBase::makeLayerView() const
+{
+    mu_core::LayerView v;
+    v.numLive = numLayers.load(std::memory_order_relaxed);
+    for (int s = 0; s < mu_limits::kMaxLayers; ++s) v.layer[(size_t) s] = layers[(size_t) s].get();
+    return v;
+}
+
+void ProcessorBase::resetOwnLayerParams(int slot)
+{
+    if (const auto own = layerLayout.prefix(slot); own.isNotEmpty())
+        forEachPrefixed(*this, own, [](juce::RangedAudioParameter& rp, const juce::String&)
+        {
+            rp.setValueNotifyingHost(rp.getDefaultValue());
+        });
+}
+
+void ProcessorBase::publishLayers(int liveCount)
+{
+    jassert(getLayerAccess() == mu_core::LayerAccess::Published);
+    const juce::ScopedLock lw(layoutWriteLock);
+    const juce::ScopedLock sl(layersLock);
+    auto v = makeLayerView();
+    v.numLive = liveCount;
+    v.serial = nextLayoutSerial();
+    layerAccess.views.publish(v, layerAccess.epoch);   // the view first, then the word: the serial order of setLayerType
+    storeLayerCount(liveCount);
+}
+
+bool ProcessorBase::setLayerType(int slot, mu_core::LayerTypeId type, const juce::ValueTree* initial)
+{
+    using mu_core::LayerTypeId;
+    if (getLayerAccess() != mu_core::LayerAccess::Published) return false;   // a TryLock host edits through add / remove
+    if (slot < 0 || slot >= numLayers.load(std::memory_order_relaxed) || layers[(size_t) slot] == nullptr) return false;
+    const mu_core::LayerTypeInfo* info = type == LayerTypeId::Empty ? nullptr : layerTypes.find(type);
+    if (type != LayerTypeId::Empty && info == nullptr) return false;
+    if ((LayerTypeId) layers[(size_t) slot]->typeId() == type) return true;
+    mu_hotswap::assertMessageThread();   // one caller at a time: the editor, a state restore and a swap commit are all message-thread work
+    prepareClipWatchesForStructuralEdit();
+
+    // Step 3: the UI lets go of the old layer (modulator panel, content) before it can leave the view.
+    if (onLayerLeaving) onLayerLeaving(slot);
+
+    // Step 1: a staged swap of the old type must not land on the new one.
+    cancelPendingSwap(slot);
+
+    // Step 2: build and prepare the new layer before anything is visible. A prepareToPlay on a host thread may
+    // land before step 8; the generation read here is compared again there.
+    uint32_t generation = 0;
+    double rate = 0.0;
+    int block = 0;
+    {
+        const juce::ScopedLock sl(layersLock);
+        generation = prepareGeneration;
+        rate  = layersPreparedRate;
+        block = layersPreparedBlock;
+    }
+    // The type's shared services exist before its first layer does; the layer is wired to them before it is prepared.
+    mu_core::LayerServices* services = info != nullptr ? ensureLayerServices(*info) : nullptr;
+    std::unique_ptr<Layer> fresh = info != nullptr ? info->create(slot, type) : createLayer(slot);
+    if (fresh == nullptr) return false;
+    if (services != nullptr && info->attachServices != nullptr) info->attachServices(*fresh, *services, slot);
+    if (rate > 0.0) fresh->prepare(rate, block);
+    // The slot's identity stays with the slot: its colour and its name.
+    fresh->colourIndex = layers[(size_t) slot]->colourIndex;
+    fresh->name        = layers[(size_t) slot]->name;
+
+    // Step 4: the last moment the old layer may read its parameters, none has changed yet.
+    if (layers[(size_t) slot]->retirePolicy().kind != mu_core::RetirePolicy::Kind::None)
+        layers[(size_t) slot]->beginRetire();
+
+    // Step 5: publish view V1 with the slot empty and park the old layer in the bin. The bin entry is written
+    // before V1 is published, with V1's serial as its activation, so the first block that loads V1 renders the
+    // old layer as a tail and no block has neither. Lock order: layoutWriteLock, layersLock, binMutex.
+    uint64_t afterV1 = 0;
+    {
+        const juce::ScopedLock lw(layoutWriteLock);
+        const juce::ScopedLock sl(layersLock);
+        std::unique_ptr<Layer> old = std::move(layers[(size_t) slot]);
+        auto v1 = makeLayerView();
+        v1.serial = nextLayoutSerial();
+        retireBin.park(slot, std::move(old), v1.serial, false);
+        layerAccess.views.publish(v1, layerAccess.epoch);
+        storeLayerCount(numLayers.load(std::memory_order_relaxed));   // the layout word follows the view: the same serial
+        afterV1 = layerAccess.epoch.stamp();
+    }
+
+    // Step 6: no block that still renders the old layer live can overlap step 7. A timeout costs at most one
+    // block of a parameter mix; nothing is freed by step 7.
+    layerAccess.epoch.waitFor(afterV1, 50);
+
+    // Step 7: the new type's parameters to defaults (or the initial node) while nothing live reads them, then the
+    // layer binds them. Only the NEW type's prefix is touched (a same-prefix type, Kick to Bass, shares t{N}_; the
+    // old type's dormant rows are left alone and never saved). The mixer strip (ch{N}_) is not touched, and neither
+    // is its sidechain follower: the strip and the source it ducks from are the same after a type change, so zeroing
+    // the follower would only unduck a strip that is still being ducked. The new layer sits in layers[] but is not in
+    // any view, so the audio thread cannot reach it.
+    {
+        const juce::ScopedLock sl(layersLock);
+        layers[(size_t) slot] = std::move(fresh);
+    }
+    layerLayout.setLivePrefix(slot, info != nullptr && info->paramPrefixLetter != 0
+                                        ? juce::String::charToString((juce::juce_wchar) info->paramPrefixLetter) + juce::String(slot) + "_"
+                                        : juce::String());
+    resetOwnLayerParams(slot);
+    if (initial != nullptr && initial->isValid()) applyLayerNode(slot, *initial);
+    layers[(size_t) slot]->bindParams(apvts, slot);
+    layers[(size_t) slot]->completeSetup(apvts, slot);   // the layer's own message-thread setup, once, outside every lock
+    clearLayerClips(slot);   // a type change empties the clip bank (a clip carries its type)
+
+    // Step 8: V2 with the new layer. A prepare that ran since step 2 (a new rate or block size) is repeated for the
+    // new layer first, so its first block is prepared for that block's rate and size.
+    {
+        const juce::ScopedLock lw(layoutWriteLock);
+        const juce::ScopedLock sl(layersLock);
+        if (prepareGeneration != generation && layersPreparedRate > 0.0)
+            layers[(size_t) slot]->prepare(layersPreparedRate, layersPreparedBlock);
+        auto v2 = makeLayerView();
+        v2.serial = nextLayoutSerial();
+        layerAccess.views.publish(v2, layerAccess.epoch);
+        storeLayerCount(numLayers.load(std::memory_order_relaxed));
+    }
+
+    // Step 9: the old view and the old layer are freed after their grace by the views' reclaim and the bin's
+    // service, on this side; ask for a pass.
+    if (retireBin.hasPendingWork()) requestDeferredWork();
+    publishClipMasks();
+    return true;
+}
+
+bool ProcessorBase::createLayerOfType(int slot, mu_core::LayerTypeId type)
+{
+    const auto* info = layerTypes.find(type);
+    if (info != nullptr && slotTypeId(slot) == mu_core::LayerTypeId::Empty)
+    {
+        const auto file = presetDirOf(*info).getChildFile("_default." + presetExtensionOf(*info));
+        if (file.existsAsFile())
+        {
+            const auto xml = juce::XmlDocument::parse(file);
+            const auto tree = xml != nullptr ? juce::ValueTree::fromXml(*xml) : juce::ValueTree();
+            // Only a file that is this type's (the five Track types share one extension; typeFromPreset tells them apart).
+            if (tree.isValid() && layerPresetType(tree, file.getFileExtension()) == type)
+            {
+                const auto node = info->presetFileToNode != nullptr ? info->presetFileToNode(tree, "_default") : tree;
+                if (node.isValid() && setLayerType(slot, type, &node))
+                    return true;
+            }
+        }
+    }
+    return setLayerType(slot, type);
+}
+
 void ProcessorBase::clearLayerClips(int slot)
 {
     if (slot < 0 || slot >= mu_limits::kMaxLayers || layers[(size_t) slot] == nullptr) return;
     layers[(size_t) slot]->clips->clearAll();
     layers[(size_t) slot]->activeClip = -1;
+    clipWatch[(size_t) slot].reset();
     presetLabels[(size_t) slot] = juce::String();   // a fresh or reset layer came from no preset
     liveState.clearLayerClips(slot);
     publishClipMasks();
@@ -1085,6 +1852,7 @@ void ProcessorBase::noteNonClipStage(int slot)
     {
         layers[(size_t) slot]->activeClip = -1;
         presetLabels[(size_t) slot] = juce::String();   // the product re-notes the new preset's label after staging it
+        clipWatch[(size_t) slot].reset();   // no clip is lit any more: nothing to track
     }
     liveState.clearLayerClips(slot);   // a plain layer-preset load also supersedes a queued clip
 }
@@ -1140,12 +1908,23 @@ bool ProcessorBase::storeClip(int slot, int clip, const juce::String& name)
     if (! tree.isValid())
         tree = captureLayerPresetTree(slot);
     if (! tree.isValid()) return false;
+    const bool storedLive = ! (hasPendingSwap(slot) && pendingPresetTree[(size_t) slot].isValid());
 
     // Named after the preset the layer came from unless the caller names it; the layer then carries that name.
     const juce::String stored = name.isNotEmpty() ? name : clipLabel(slot);
     layer->clips->store(clip, tree, stored);   // store deep-copies, so the capture is not aliased
     noteLayerPresetLabel(slot, stored);
     publishClipMasks();
+
+    // What was stored is the baseline for the layer's auto-save, adopted and not written. A staged tree stored instead
+    // of the live layer leaves live != baseline until it commits, so the tracker starts again from the commit.
+    auto& w = clipWatch[(size_t) slot];
+    w.reset();
+    if (storedLive)
+    {
+        w.clip     = clip;
+        w.baseline = tree;
+    }
     return true;
 }
 
@@ -1159,6 +1938,8 @@ bool ProcessorBase::clearClip(int slot, int clip)
     // waiting for its boundary is cancelled (it would land a clip that no longer exists).
     if (layer->activeClip == clip)
         layer->activeClip = -1;
+    if (clipWatch[(size_t) slot].clip == clip)
+        clipWatch[(size_t) slot].reset();
     liveState.clipCleared(slot, clip);
     publishClipMasks();
     return true;
@@ -1170,21 +1951,126 @@ bool ProcessorBase::loadClipFromFile(int slot, int clip, const juce::File& layer
     auto* layer = getLayer(slot);
     if (layer == nullptr || ! mu_core::ClipBank::isValidIndex(clip)) return false;
 
+    // A typed slot host takes a file of the slot's own type only (the clip carries that type), converted to the
+    // composed node a capture would write when the type's file has another shape.
+    if (layersAreSlots())
+    {
+        std::unique_ptr<juce::XmlElement> fileXml;
+        if (layerPreset.existsAsFile())
+            fileXml = juce::XmlDocument::parse(layerPreset);
+        const auto tree = fileXml != nullptr ? juce::ValueTree::fromXml(*fileXml) : juce::ValueTree();
+        const auto type = tree.isValid() ? layerPresetType(tree, layerPreset.getFileExtension()) : mu_core::LayerTypeId::Empty;
+        const auto* info = layerTypes.find(type);
+        const auto node = info != nullptr && info->presetFileToNode != nullptr
+                              ? info->presetFileToNode(tree, layerPreset.getFileNameWithoutExtension()) : tree;
+        if (info == nullptr || ! node.isValid() || ! clipFitsSlot(slot, node))
+        {
+            if (onLoadError) onLoadError("Could not read \"" + layerPreset.getFileName() + "\"");
+            return false;
+        }
+        layer->clips->store(clip, node, layerPreset.getFileNameWithoutExtension());
+        publishClipMasks();
+        return true;
+    }
+
     // The file must be this product's layer preset: its root tag is the tag a capture would write.
-    const auto expectedTag = captureLayerPresetTree(slot).getType();
     std::unique_ptr<juce::XmlElement> xml;
     if (layerPreset.existsAsFile())
         xml = juce::XmlDocument::parse(layerPreset);
-    if (xml == nullptr || expectedTag.toString().isEmpty() || ! xml->hasTagName(expectedTag.toString()))
+    const auto fileTree = xml != nullptr ? juce::ValueTree::fromXml(*xml) : juce::ValueTree();
+    if (! fileTree.isValid() || ! clipFitsSlot(slot, fileTree))
     {
         if (onLoadError) onLoadError("Could not read \"" + layerPreset.getFileName() + "\"");
         return false;
     }
 
     // Stored as read: any migration runs at launch, on a copy.
-    layer->clips->store(clip, juce::ValueTree::fromXml(*xml), layerPreset.getFileNameWithoutExtension());
+    layer->clips->store(clip, fileTree, layerPreset.getFileNameWithoutExtension());
     publishClipMasks();
     return true;
+}
+
+bool ProcessorBase::clipFitsSlot(int slot, const juce::ValueTree& tree)
+{
+    if (! tree.isValid() || getLayer(slot) == nullptr) return false;
+    if (layersAreSlots())
+        return layerPresetType(tree) == slotTypeId(slot);
+
+    // A list host: the layer's capture writes the root tag every clip of that layer carries.
+    const auto expected = captureLayerPresetTree(slot).getType();
+    return expected.toString().isNotEmpty() && tree.hasType(expected);
+}
+
+bool ProcessorBase::copyClip(int slot, int clip)
+{
+    mu_hotswap::assertMessageThread();   // the clip bank and the clipboard are message-thread only
+    auto* layer = getLayer(slot);
+    if (layer == nullptr || ! layer->clips->isOccupied(clip)) return false;   // an empty clip has nothing to copy
+
+    flushClipAutoSave(slot);   // a late edit of the lit clip is in the bank before it is read
+    const auto tree = layer->clips->get(clip);
+    mu_core::clipClipboard().set(tree, layer->clips->getName(clip),
+                                 layersAreSlots() ? layerPresetType(tree) : mu_core::LayerTypeId::Empty);
+    return true;
+}
+
+bool ProcessorBase::cutClip(int slot, int clip)
+{
+    if (! copyClip(slot, clip)) return false;   // a failed copy clears nothing
+    return clearClip(slot, clip);
+}
+
+bool ProcessorBase::canPasteClip(int slot)
+{
+    const auto& board = mu_core::clipClipboard();
+    return board.hasClip() && clipFitsSlot(slot, board.get());
+}
+
+bool ProcessorBase::pasteClip(int slot, int clip)
+{
+    mu_hotswap::assertMessageThread();   // the clip bank and the clipboard are message-thread only
+    auto* layer = getLayer(slot);
+    if (layer == nullptr || ! mu_core::ClipBank::isValidIndex(clip)) return false;
+    if (hasPendingFullPreset()) return false;   // a staged full preset replaces the layers and their banks
+
+    const auto& board = mu_core::clipClipboard();
+    const auto  tree  = board.get();
+    if (! board.hasClip() || ! clipFitsSlot(slot, tree)) return false;
+
+    // Settle any landed launch first, then see whether the target is what the layer plays or is heading to.
+    liveState.reconcile();
+    const bool lit = liveState.getPlayingClip(slot) == clip || liveState.getQueuedClip(slot) == clip;
+
+    // Pasting onto the playing clip: the live layer is the old contents until the relaunch lands, so auto-save must not
+    // write them over the paste (it stays suspended until the launch commits).
+    if (liveState.getPlayingClip(slot) == clip)
+    {
+        clipWatch[(size_t) slot].reset();
+        clipWatch[(size_t) slot].suspended = true;
+    }
+
+    const auto previous     = layer->clips->get(clip);
+    const auto previousName = layer->clips->getName(clip);
+    layer->clips->store(clip, tree, board.getName());
+
+    // The lit clip's live layer must follow its new contents, so the lit pad still equals what plays.
+    if (lit && ! liveState.clipPasted(slot, clip))
+    {
+        layer->clips->store(clip, previous, previousName);   // the relaunch could not be staged: change nothing
+        clipWatch[(size_t) slot].suspended = false;
+        return false;
+    }
+    publishClipMasks();
+    return true;
+}
+
+bool ProcessorBase::launchScene(int clipIndex)
+{
+    mu_hotswap::assertMessageThread();
+    mu_core::ControlAction a;
+    a.type  = mu_core::ControlActionType::LaunchScene;
+    a.index = clipIndex;
+    return liveState.perform(a);
 }
 
 bool ProcessorBase::launchClip(int slot, int clip)
@@ -1194,15 +2080,29 @@ bool ProcessorBase::launchClip(int slot, int clip)
     if (layer == nullptr || ! layer->clips->isOccupied(clip)) return false;
     if (hasPendingFullPreset()) return false;   // a staged full preset lands first and replaces the layers
 
+    // A clip carries its type and loads only into a slot of that type: a launch is a staged swap of the same layer,
+    // never a type change.
+    if (! clipFitsSlot(slot, layer->clips->get(clip))) return false;
+
     // The same stage path as a layer-preset load; get() deep-copies, so the stage can migrate the
     // copy and the bank is never written.
     // A hook that could not build the clip stages nothing and leaves the serial alone; a stage, and the
     // stopped path's apply-at-once (which cancels first), both move it.
+    // The edits of the clip being left are in its bank before the stage (and before a stopped launch overwrites the layer).
+    flushClipAutoSave(slot);
+
     const auto serialBefore = slotStageSerial(slot);
     stageLayerPreset(slot, layer->clips->get(clip), true, true);
     const bool staged = slotStageSerial(slot) != serialBefore;
     if (staged)
+    {
         noteLayerPresetLabel(slot, layer->clips->getName(clip));   // the layer is now that clip: a re-store keeps its name
+
+        // The launch changes the layer without an edit: auto-save adopts a new baseline when it lands, writing nothing.
+        auto& w = clipWatch[(size_t) slot];
+        w.expectSwap = true;
+        w.serial     = slotStageSerial(slot);
+    }
     return staged;
 }
 

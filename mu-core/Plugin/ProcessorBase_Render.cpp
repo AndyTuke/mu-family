@@ -10,6 +10,8 @@
 #include "Sequencer/BeatWrap.h"
 #include "Sequencer/LayerTypeInfo.h"   // mu_core::LayerTypeId
 
+#include <cstring>
+
 namespace
 {
     constexpr double kDefaultLoopBeats = 4.0;          // a slot with no live layer: the swapper's 4/4 bar rule
@@ -19,10 +21,20 @@ namespace
 void ProcessorBase::prepareLayerRender(double sampleRate, int maxBlockSize)
 {
     // Message or host thread; the host is not processing. Every allocation of the driver happens here.
+    {
+        // What setLayerType compares against: this prepare's rate and size, and a new generation.
+        const juce::ScopedLock sl(layersLock);
+        ++prepareGeneration;
+        layersPreparedRate  = sampleRate;
+        layersPreparedBlock = juce::jmax(1, maxBlockSize);
+    }
     renderState.rate     = sampleRate;
     renderState.prepared = juce::jmax(1, maxBlockSize);
     for (auto& s : renderState.scratch) s.setSize(2, renderState.prepared, false, true, false);
     if (renderState.midi.get() == nullptr) renderState.midi.allocate((size_t) mu_limits::kMaxBlockMidiEvents, true);
+    if (renderState.seedMidi.get() == nullptr)
+        renderState.seedMidi.allocate((size_t) (mu_limits::kMaxCarriedMidiEvents + mu_limits::kMaxBlockMidiEvents), true);
+    renderState.heldKeys.clear();   // a fresh stream: a key's release during the suspension was never seen
     renderState.loopBeats.fill(kDefaultLoopBeats);
     renderState.live.fill(false);
     renderState.host = {};
@@ -31,6 +43,18 @@ void ProcessorBase::prepareLayerRender(double sampleRate, int maxBlockSize)
     renderState.mixCount = 0;
     renderState.midiIn = renderState.liveOut = renderState.tailOut = 0;
     renderState.dropped = 0;
+    renderState.inSkip = renderState.lastWasSkip = false;
+    renderState.carried = 0;   // events held for a block that will not come: a prepare starts a fresh stream
+    renderState.carryDropped = 0;
+    renderState.fadePos = LayerRenderState::kFadeIn;
+    for (int c = 0; c < 2; ++c) renderState.lastOut[c] = renderState.tailLevel[c] = renderState.tailStep[c] = 0.0f;
+
+    // What the layer types share (their engines, tables), for this rate and size, before the layers that read it.
+    {
+        const juce::ScopedLock sl(layerServicesLock);
+        for (auto& s : layerServices)
+            if (s != nullptr) s->prepare(sampleRate, renderState.prepared);
+    }
 
     // Every slot's layer, spares included, for this rate and size. layersLock keeps a structural edit (message
     // thread) from moving them meanwhile; the audio thread is not running.
@@ -101,10 +125,47 @@ void ProcessorBase::noteHostBlock(const mu_core::BlockTransport& t, int numSampl
 // The buffer arrived as the host gave it, so a skipped block clears it: silence, as a missed try-lock always was.
 // With the carry on, its channel messages wait for the next rendered block (at frame 0, in arrival order).
 void ProcessorBase::noteSkippedBlock(const mu_core::BlockTransport& t, juce::AudioBuffer<float>& buffer,
-                                     const juce::MidiBuffer& midi) noexcept
+                                     const juce::MidiBuffer& midi, bool editSkip) noexcept
 {
     if (! t.playing && renderState.lastPlaying) renderState.jumpPending = renderState.stopPending = true;
     buffer.clear();
+
+    // A Published host's edit silences blocks it cannot render: the master decays from its last sample to zero over a few
+    // milliseconds instead of dropping, so the cut is not a click. The decay carries on across consecutive skipped blocks.
+    if (editSkip && layerAccess.mode == mu_core::LayerAccess::Published)
+    {
+        auto& rs = renderState;
+        if (! rs.lastWasSkip)
+        {
+            rs.fadePos = 0;
+            for (int c = 0; c < 2; ++c) { rs.tailLevel[c] = rs.lastOut[c]; rs.tailStep[c] = rs.lastOut[c] / (float) LayerRenderState::kSkipDecay; }
+        }
+        rs.inSkip = rs.lastWasSkip = true;
+        const int n = buffer.getNumSamples();
+        for (int c = 0; c < juce::jmin(2, buffer.getNumChannels()); ++c)
+        {
+            float* d = buffer.getWritePointer(c);
+            float level = rs.tailLevel[c];
+            const float step = rs.tailStep[c];
+            for (int i = 0; i < n; ++i)
+            {
+                level = std::abs(level) > std::abs(step) ? level - step : 0.0f;
+                d[i] = level;
+            }
+            rs.tailLevel[c] = level;
+        }
+    }
+    // Keys pressed or released in a block nothing renders still change what is held. A carried message reaches the held
+    // table with the block that delivers it instead, so it is not counted twice.
+    if (! renderState.carryMidi)
+        for (const auto meta : midi)
+        {
+            if (meta.numBytes < 2 || meta.numBytes > 3) continue;
+            mu_core::MidiEvent e {};
+            e.size = (uint8_t) meta.numBytes;
+            for (int b = 0; b < 3; ++b) e.bytes[b] = b < meta.numBytes ? meta.data[b] : (uint8_t) 0;
+            renderState.heldKeys.apply(e);
+        }
     if (renderState.carryMidi && renderState.midi.get() != nullptr)
         for (const auto meta : midi)
         {
@@ -173,6 +234,38 @@ void ProcessorBase::decodeBlockMidi(const juce::MidiBuffer& midi, int numSamples
     renderState.dropped = dropped;
 }
 
+void ProcessorBase::applyLayerChannelMask(mu_core::RenderContext& ctx, Layer& layer, int s) const noexcept
+{
+    const uint16_t mask = layerChannelMask(s);
+    ctx.midi.channelMask = mask;
+    const bool changed = mask != layer.lastMidiMask;
+    if (changed) { layer.lastMidiMask = mask; ctx.midi.inputReset = 1; }
+    if (! changed && layer.heldKeysSeeded) return;
+    layer.heldKeysSeeded = true;
+
+    // The layer is new, or listens to other channels now: tell it the keys already down on them, as note-ons at the
+    // call's first frame that count as carried (not as this block's presses), ahead of the block's own events.
+    auto& rs = renderState;
+    if (! rs.heldKeys.anyHeld() || rs.seedMidi.get() == nullptr) return;
+    // The table is the state at the start of the host block; a call that starts later in it (a block rendered in chunks)
+    // first applies what the earlier chunks of this block already did to the keys.
+    const mu_core::HeldKeyTable* keys = &rs.heldKeys;
+    if (ctx.midi.firstFrame > 0)
+    {
+        rs.seedTable = rs.heldKeys;
+        for (int i = 0; i < ctx.midi.count; ++i)
+            if (ctx.midi.events[i].frame < ctx.midi.firstFrame) rs.seedTable.apply(ctx.midi.events[i]);
+        keys = &rs.seedTable;
+    }
+    const int seeded = keys->collect(rs.seedMidi.get(), mu_limits::kMaxCarriedMidiEvents, ctx.midi.firstFrame, mask);
+    if (seeded == 0) return;
+    if (ctx.midi.count > 0)
+        std::memcpy(rs.seedMidi.get() + seeded, ctx.midi.events, (size_t) ctx.midi.count * sizeof (mu_core::MidiEvent));
+    ctx.midi.events  = rs.seedMidi.get();
+    ctx.midi.count  += seeded;
+    ctx.midi.carried = (uint16_t) (ctx.midi.carried + seeded);
+}
+
 void ProcessorBase::renderAndMix(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi, const mu_core::BlockTransport& t,
                                  std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels>* directOuts,
                                  juce::AudioBuffer<float>* fxReturnsOut) noexcept
@@ -187,10 +280,11 @@ void ProcessorBase::renderAndMix(juce::AudioBuffer<float>& buffer, juce::MidiBuf
 
     // Step 2: the block's one access to the layers (and its ScopedNoDenormals, C11).
     const mu_core::LayerBlock block(layerAccess, layersLock, layerEditInFlight, layers);
-    if (! block) { noteSkippedBlock(t, buffer, midi); return; }
+    if (! block) { noteSkippedBlock(t, buffer, midi, true); return; }
 
     // Step 3: one MIDI decode for every layer.
     decodeBlockMidi(midi, n);
+    layersBlockStarting(block.view(), t, midi);
 
     // Step 4: chunks of at most the prepared size (C8), each the layers then the mixer on a sub-buffer, so an
     // oversize host block never overruns the scratch, the mixer's channel buffers or the FX.
@@ -229,11 +323,58 @@ void ProcessorBase::renderAndMix(juce::AudioBuffer<float>& buffer, juce::MidiBuf
                          nullptr, &renderState.copyToMixer);
     }
 
+    // What a type's services add to the master bus themselves (a sample browser's preview), in the chunks the mixer
+    // ran in, so a service never sees more frames than it was prepared for.
+    for (const auto& slot : audioServices)
+        if (auto* services = slot.load(std::memory_order_acquire))
+            for (int off = 0; off < n; off += juce::jmax(1, renderState.prepared))
+            {
+                juce::AudioBuffer<float> chunk;
+                chunk.setDataToReferTo(buffer.getArrayOfWritePointers(), numCh, off, juce::jmin(juce::jmax(1, renderState.prepared), n - off));
+                services->mixIntoMaster(chunk, chunk.getNumSamples());
+            }
+
+    if (layerAccess.mode == mu_core::LayerAccess::Published) declickMaster(buffer, n);
+
     // The layers' MIDI out stays in the block's storage: the product merges it into the host buffer with
     // mergeLayerMidiOut and the room it knows that buffer has (design 2.1.5, R7; the mechanism is the
     // MIDI-output product's to settle when it adopts the driver).
+    layersBlockRendered(block.view(), buffer, midi);
+
+    // The block's keys are now history: a layer created from here on is told about them (applyLayerChannelMask).
+    for (int i = 0; i < renderState.midiIn; ++i) renderState.heldKeys.apply(renderState.midi[(size_t) i]);
     renderState.lastBlockFrames = n;
     ++renderState.blocksRendered;
+}
+
+void ProcessorBase::declickMaster(juce::AudioBuffer<float>& buffer, int numSamples) noexcept
+{
+    auto& rs = renderState;
+    const int numCh = juce::jmin(2, buffer.getNumChannels());
+    if (rs.inSkip || rs.fadePos < LayerRenderState::kFadeIn)
+    {
+        // The first rendered samples after a skipped block: the layers fade in linearly while what is left of the decay
+        // runs out, so the output is continuous with the silence it follows.
+        for (int c = 0; c < numCh; ++c)
+        {
+            float* d = buffer.getWritePointer(c);
+            float level = rs.inSkip ? rs.tailLevel[c] : 0.0f;
+            const float step = rs.tailStep[c];
+            for (int i = 0; i < numSamples; ++i)
+            {
+                const int pos = rs.fadePos + i;
+                const float gain = pos >= LayerRenderState::kFadeIn ? 1.0f : (float) (pos + 1) / (float) LayerRenderState::kFadeIn;
+                level = std::abs(level) > std::abs(step) ? level - step : 0.0f;
+                d[i] = d[i] * gain + level;
+            }
+            if (rs.inSkip) rs.tailLevel[c] = level;
+        }
+        rs.fadePos = juce::jmin(LayerRenderState::kFadeIn, rs.fadePos + numSamples);
+        // The decay ends when it has reached zero: a short skipped block plus a short first block may not have run it out.
+        rs.inSkip = rs.tailLevel[0] != 0.0f || rs.tailLevel[1] != 0.0f;
+    }
+    rs.lastWasSkip = false;
+    for (int c = 0; c < numCh; ++c) rs.lastOut[c] = numSamples > 0 ? buffer.getSample(c, numSamples - 1) : 0.0f;
 }
 
 void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core::BlockTransport& t,
@@ -312,10 +453,21 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
     {
         auto ctx = base;
         ctx.slot     = s;
+        applyLayerChannelMask(ctx, *v.layer[(size_t) s], s);   // this slot's MIDI In (Omni where the product declares none)
         ctx.frozen   = (uint8_t) ((v.frozenMask >> s) & 1u);
         ctx.peers    = peers;
         ctx.numPeers = peers != nullptr ? K : 0;
         v.layer[(size_t) s]->render(ctx, openView(s), numSamples);
+
+        // A layer that offers Pan and the sends as modulation targets hands this block's values to its mixer strip.
+        if (float strip4[4]; v.layer[(size_t) s]->stripMods(strip4))
+        {
+            auto& strip = mixerEngine.channels[(size_t) s];
+            strip.panMod       .store(strip4[0], std::memory_order_relaxed);
+            strip.sendEffectMod.store(strip4[1], std::memory_order_relaxed);
+            strip.sendDelayMod .store(strip4[2], std::memory_order_relaxed);
+            strip.sendReverbMod.store(strip4[3], std::memory_order_relaxed);
+        }
     };
 
     // Phase 1: priority-0 live layers in slot order; every other slot below mixCount gets cleared scratch (an
@@ -334,6 +486,7 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
             {
                 auto ctx = base;
                 ctx.slot = s;
+                applyLayerChannelMask(ctx, *v.layer[(size_t) s], s);
                 v.layer[(size_t) s]->onParkedBlock(ctx);
             }
             continue;
@@ -362,7 +515,16 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
         ctx.slot = s;
         ctx.midiOut = { renderState.midi.get() + reserveStart, mu_limits::kMidiNoteOffReserve, 0, &renderState.tailOut };
         auto& view = renderState.view[(size_t) s];
-        view.setDataToReferTo(renderState.scratch[(size_t) s].getArrayOfWritePointers(), 2, 0, numSamples);
+        // Every slot below mixCount was opened this call, so the view normally refers to its scratch already and is
+        // left alone (its cleared flag tells the mixer hook a silent slot from one that rendered). Re-pointing would
+        // drop that flag, so a re-point keeps it (the clear only re-zeroes zeros).
+        auto& scratch = renderState.scratch[(size_t) s];
+        if (view.getNumSamples() != numSamples || view.getNumChannels() != 2 || view.getReadPointer(0) != scratch.getReadPointer(0))
+        {
+            const bool untouched = view.hasBeenCleared();
+            view.setDataToReferTo(scratch.getArrayOfWritePointers(), 2, 0, numSamples);
+            if (untouched) view.clear();
+        }
         wentDone |= retireBin.render(s, ctx, view, numSamples, v.serial, renderState.live[(size_t) s]);
     }
     if (wentDone) requestDeferredWork();   // the free runs on the message thread after the grace period

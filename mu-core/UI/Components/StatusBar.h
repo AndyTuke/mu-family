@@ -28,7 +28,25 @@ public:
     std::function<void()> onUpdateClicked;
     std::function<void()> onUpdateHideRequested;
 
-    juce::String getTooltip() override { return updateLinkHover ? updateTooltip : juce::String(); }
+    // The CPU readout at the extreme right edge ("CPU 23%", docs/design-ui-family.md section 6). Off by default. `load` is
+    // the fraction of the audio callback's time used (1.0 = all of it), the peak of the last second; it shows as a whole
+    // percent, the number amber from kCpuWarnAt and red from kCpuHotAt. It repaints at most four times a second so the
+    // digits stay readable. When on, the Update and Support links sit left of it.
+    void setCpuMeterVisible(bool visible);
+    bool isCpuMeterVisible() const noexcept { return cpuVisible; }
+    void setCpuLoad(float load);
+    int  getCpuPercent() const noexcept { return cpuPercent; }
+
+    // The shown percent for a load fraction (rounded, never below 0) and the band its number is drawn in.
+    enum class CpuLevel { Normal, Warn, Hot };
+    static int      cpuPercentFor(float load) noexcept;
+    static CpuLevel cpuLevelFor(float load) noexcept;
+    static constexpr int kCpuRepaintMs = 200;   // the shortest time between two repaints of the readout
+    // Where the Update and Support links' right edge is for a bar `width` wide: 4 px in from the edge, and with the readout
+    // on, a further slot and gap to its left.
+    static int linksRightEdgeFor(int width, bool cpuVisible) noexcept;
+
+    juce::String getTooltip() override;
 
     void paint(juce::Graphics& g) override;
     void mouseMove(const juce::MouseEvent& e) override;
@@ -38,12 +56,16 @@ public:
 private:
     juce::Rectangle<int> supportLinkBounds() const;
     juce::Rectangle<int> updateLinkBounds() const;
+    juce::Rectangle<int> cpuBounds() const;
     static juce::Rectangle<int> linkBoundsFor(const juce::String& text, int rightEdge, int height);
 
     bool supportLinkVisible = false;
     bool supportLinkHover   = false;
     bool updateLinkVisible  = false;
     bool updateLinkHover    = false;
+    bool cpuVisible         = false;
+    int  cpuPercent         = 0;
+    juce::uint32 cpuPaintedAt = 0;   // millisecond counter at the readout's last repaint
     juce::String updateTooltip;
 
     juce::String currentName;

@@ -346,7 +346,7 @@ public:
                        + " of the corrected pad colour). Layer colours first (rows of the pad), then the app accents (top row).",
                    kMargin, kMargin, getWidth() - kMargin * 2, kHeaderH, juce::Justification::centredLeft, false);
 
-        static const char* layerNames[8] = { "1 red", "2 cyan", "3 orange", "4 magenta", "5 lime", "6 rose", "7 silver", "8 navy" };
+        static const char* layerNames[8] = { "1 red", "2 cyan", "3 orange", "4 magenta", "5 lime", "6 rose", "7 silver", "8 blue" };
         int y = kMargin + kHeaderH;
         drawBlock(g, y, "Layer colours", MuLookAndFeel::kLayerPaletteSize,
                   [](int i) { return MuLookAndFeel::layerPalette[i]; }, layerNames, dim);

@@ -20,6 +20,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <memory>
 
 namespace mu_contract_test
@@ -84,6 +85,8 @@ namespace mu_contract_test
             mu_core::forEachMidi(ctx, [this](const mu_core::MidiEvent&, int) { ++midiSeen; });
             lastCarried = ctx.midi.carried;
             if (ctx.midi.count > 0) firstEventNote = ctx.midi.events[0].bytes[1];
+            if (ctx.midi.count > 0) lastEventNote = ctx.midi.events[ctx.midi.count - 1].bytes[1];
+            if (onRender) onRender(ctx);
             if (! ctx.playing) return;   // stopped: silence (the scratch arrives cleared)
             const float g = gainParam.isBound() ? 0.25f + gainParam.load() : 0.5f;
             renderFakeEngine(absoluteFrame(ctx), ctx.slot, out, n, g);
@@ -113,6 +116,8 @@ namespace mu_contract_test
         int renders = 0, maxCall = 0, contractBreaks = 0, lastSlot = -1, useAfterFree = 0;
         int justStarted = 0, justStopped = 0, jumped = 0, hiddenStops = 0, stopHooks = 0, jumpHooks = 0;
         int midiSeen = 0, midiEmitted = 0, negativeInBoundedHost = 0;
+        std::function<void(const mu_core::RenderContext&)> onRender;   // a test hook run at the start of each render
+        int lastEventNote = -1;
         int lastCarried = 0, firstEventNote = -1, parkedCalls = 0, parkedSlot = -1, parkedMidiSeen = 0;
         bool emitNoteOn = false;
         double lastStartBeat = 0.0;
@@ -142,10 +147,16 @@ namespace mu_contract_test
     {
         // `sidechainInput`: a stereo sidechain input bus sharing the output's buffer channels (an instrument's shape).
         explicit FakeLayerHost(int live = 2, mu_core::LayerAccess access = mu_core::LayerAccess::TryLock, bool sidechainInput = false)
+            : FakeLayerHost(live, access, sidechainInput, makeLayout())
+        {
+        }
+
+        // The same host over a parameter layout of the test's own (a second type prefix, say).
+        FakeLayerHost(int live, mu_core::LayerAccess access, bool sidechainInput, juce::AudioProcessorValueTreeState::ParameterLayout layout)
             : ProcessorBase(sidechainInput ? BusesProperties().withInput("Sidechain", juce::AudioChannelSet::stereo(), true)
                                                               .withOutput("Out", juce::AudioChannelSet::stereo())
                                            : BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo()),
-                            makeLayout())
+                            std::move(layout))
         {
             setLayerAccess(access);
             keepSpareLayers = true;
@@ -198,6 +209,7 @@ namespace mu_contract_test
         using ProcessorBase::mergeLayerMidiOut;
         using ProcessorBase::setRetireCountPolicy;
         using ProcessorBase::setCarrySkippedMidi;
+        using ProcessorBase::midiInRaw;
         using ProcessorBase::setRegrowCutsInPlaceTails;
         using ProcessorBase::layerLoopBeats;
         using ProcessorBase::flushPendingAsyncUpdates;

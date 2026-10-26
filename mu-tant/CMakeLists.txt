@@ -27,6 +27,8 @@ target_include_directories(mu-tant-layer INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/
 set(MU_TANT_LAYER_UI_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/PatternContent.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/GatingDesigner.cpp")
+# Also visible to the sibling directories added after this one (mu-Tronic hosts the layer types).
+set(MU_TANT_LAYER_UI_SOURCES "${MU_TANT_LAYER_UI_SOURCES}" PARENT_SCOPE)
 
 # ── mu-Tant — Standalone + VST3 + CLAP ──────────────────────────────────────
 juce_add_plugin(mu-tant

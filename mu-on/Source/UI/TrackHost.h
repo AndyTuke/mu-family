@@ -18,7 +18,7 @@ class TrackHost
 public:
     virtual ~TrackHost() = default;
 
-    // The parameter tree the layer's t{N}_ rows and the groove rows (seq_swing, seq_accent) live in.
+    // The parameter tree the layer's t{N}_ rows and the track's groove rows (t{N}_swing, t{N}_accent) live in.
     virtual juce::AudioProcessorValueTreeState& getTrackParameters() noexcept = 0;
     // Layer `layer` as its Track (step row, Rumble envelope, modulation matrix).
     virtual Track& getTrack(int layer) noexcept = 0;
@@ -37,6 +37,9 @@ public:
     // The transport as the content shows it: playing, and the beat it is at.
     virtual bool   isTrackTransportPlaying() const noexcept = 0;
     virtual double getTrackTransportBeat() const noexcept = 0;
+    // Whether layer `layer` may be offered as a Rumble's source (the Source list). mu-On offers every layer; a host with
+    // layers that make no sound of their own (an empty slot) or are not sources (another Rumble) says no.
+    virtual bool canBeRumbleSource(int layer) const { juce::ignoreUnused(layer); return true; }
 };
 
 } // namespace mu_on

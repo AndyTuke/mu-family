@@ -1,6 +1,6 @@
 {
   "name": "groove-five-swing-accent",
-  "notes": "Kick, Bass, Hat, Snare, Rumble(source Kick); seq_swing 0.35 and seq_accent 0.55 apply to every row.",
+  "notes": "Kick, Bass, Hat, Snare, Rumble(source Kick); each track's t{N}_swing 0.35 and t{N}_accent 0.55, set at block 0.",
   "sampleRate": 48000,
   "preparedBlockSize": 1024,
   "lengthFrames": 96000,
@@ -8,5 +8,5 @@
   "startBeat": 0,
   "numStems": 5,
   "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
-  "events": []
+  "events": [{ "block": 0, "label": "set t0_swing = 0.35" }, { "block": 0, "label": "set t0_accent = 0.55" }, { "block": 0, "label": "set t1_swing = 0.35" }, { "block": 0, "label": "set t1_accent = 0.55" }, { "block": 0, "label": "set t2_swing = 0.35" }, { "block": 0, "label": "set t2_accent = 0.55" }, { "block": 0, "label": "set t3_swing = 0.35" }, { "block": 0, "label": "set t3_accent = 0.55" }, { "block": 0, "label": "set t4_swing = 0.35" }, { "block": 0, "label": "set t4_accent = 0.55" }]
 }

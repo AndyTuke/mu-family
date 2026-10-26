@@ -22,6 +22,10 @@ inline juce::String layerParamId(int slot, const juce::String& suffix)
     return layerParamPrefix(slot) + suffix;
 }
 
+// The root tag of a layer-preset file (.muPattern), mu-Tant's own since its first release: a file saved by the
+// product loads in a slot host and the reverse.
+inline constexpr const char* kPatternPresetTag = "MuTantVoice";
+
 // The tonal centre every Pattern quantises to (global rows, not per slot).
 inline constexpr const char* kRootParamId  = "root";
 inline constexpr const char* kScaleParamId = "scale";

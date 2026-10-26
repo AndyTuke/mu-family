@@ -2,19 +2,20 @@
 
 namespace mu_clid {
 
-RhythmMiniVisual::RhythmMiniVisual(PluginProcessor& p, int index)
-    : proc(p), rhythmIndex(index)
+RhythmMiniVisual::RhythmMiniVisual(RhythmHost& h, int index)
+    : host(h), rhythmIndex(index)
 {
     addAndMakeVisible(miniCircle);
     miniCircle.setInterceptsMouseClicks(false, false);
 
     const auto colour = MuLookAndFeel::layerPalette[
-        proc.getRhythm(rhythmIndex).colourIndex % MuLookAndFeel::kLayerPaletteSize];
+        host.getRhythmLayer(rhythmIndex).colourIndex % MuLookAndFeel::kLayerPaletteSize];
 
-    const Rhythm& r = proc.getRhythm(rhythmIndex);
+    const Rhythm& r = host.getRhythmLayer(rhythmIndex);
     miniCircle.setPatterns(r.genA.getStepTypes(), r.genB.getStepTypes(), r.genC.getStepTypes());
-    miniCircle.setPlayState(&proc.rhythmPlayState[rhythmIndex],
-                            &proc.sequencerPlaying, colour);
+    // Looked up on every tick: the play state is the layer's, and an edit moves or replaces layers.
+    miniCircle.setPlayStateSource([this] { return host.getRhythmPlayState(rhythmIndex); },
+                                  &host.getRhythmTransportFlag(), colour);
     miniCircle.setSingleColour(colour);   // the sidebar icon shows the rhythm's own colour
 
     lastSigA = r.genA.signature();
@@ -33,7 +34,8 @@ void RhythmMiniVisual::resized()
 void RhythmMiniVisual::timerCallback()
 {
     // Step-hit edge detection (monotonic counter) → pulse the parent.
-    const int currentHitCount = proc.rhythmPlayState[rhythmIndex].hitCount.load();
+    const auto* playState = host.getRhythmPlayState(rhythmIndex);
+    const int currentHitCount = playState != nullptr ? playState->hitCount.load() : lastHitCount;
     if (currentHitCount != lastHitCount)
     {
         lastHitCount = currentHitCount;
@@ -43,11 +45,11 @@ void RhythmMiniVisual::timerCallback()
     // Re-read the rhythm pattern (base + modulated overrides) only when a cheap
     // POD signature changes — keeps the mini-circle in sync with EuclideanPanel
     // edits + modulation without allocating a vector every tick.
-    const Rhythm& r = proc.getRhythm(rhythmIndex);
+    const Rhythm& r = host.getRhythmLayer(rhythmIndex);
     const auto sigA = r.genA.signature();
     const auto sigB = r.genB.signature();
     const auto sigC = r.genC.signature();
-    const EuclidOverrides ov = proc.getModulatedEuclidOverrides(rhythmIndex);
+    const EuclidOverrides ov = host.getRhythmEuclidOverrides(rhythmIndex);
 
     if (! lastSigValid || sigA != lastSigA || sigB != lastSigB || sigC != lastSigC
         || ov != lastAppliedOverrides)

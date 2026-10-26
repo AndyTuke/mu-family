@@ -66,5 +66,5 @@ namespace mu_toni_fixture
     };
 
     // The stream's hash as recorded (both targets must reproduce it).
-    constexpr std::uint64_t kRecordedHash = 0xc70f44b835212111ull;
+    constexpr std::uint64_t kRecordedHash = 0x2e00d6a1c09216c9ull;
 }

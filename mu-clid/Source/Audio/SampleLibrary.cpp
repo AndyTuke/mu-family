@@ -1,19 +1,22 @@
 #include "SampleLibrary.h"
-#include "Plugin/PluginProcessor.h"
+#include "Audio/VoiceEngine.h"
+#include "MuLimits.h"
+
+#include <utility>
 
 namespace mu_clid {
 
-SampleLibrary::SampleLibrary(PluginProcessor& p) : proc(p)
+SampleLibrary::SampleLibrary(SampleSlotHost& h) : host(h)
 {
     // One path slot per possible rhythm, so index writes never grow the array.
-    for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
         samplePaths.add(juce::String());
 }
 
 void SampleLibrary::load(int rhythmIndex, const juce::File& file)
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.numLayers.load(std::memory_order_acquire)) return;
-    proc.voiceEngines[(size_t) rhythmIndex]->loadFile(file);
+    if (rhythmIndex < 0 || rhythmIndex >= host.getSampleSlotCount()) return;
+    host.getSampleSlotEngine(rhythmIndex)->loadFile(file);
     samplePaths.set(rhythmIndex, file.getFullPathName());
 }
 
@@ -44,15 +47,15 @@ bool SampleLibrary::isSampleMissing(int rhythmIndex) const
 {
     if (rhythmIndex < 0 || rhythmIndex >= samplePaths.size()) return false;
     if (samplePaths[rhythmIndex].isEmpty()) return false;
-    const auto& engine = proc.voiceEngines[(size_t) rhythmIndex];
+    const auto* engine = std::as_const(host).getSampleSlotEngine(rhythmIndex);
     return engine == nullptr || ! engine->hasSample();
 }
 
 juce::File SampleLibrary::getPrimarySampleDir() const
 {
-    if (proc.appSettings != nullptr)
+    if (auto* settings = host.getSampleSettingsFile())
     {
-        const juce::String stored = proc.appSettings->getValue("primarySampleDir");
+        const juce::String stored = settings->getValue("primarySampleDir");
         if (stored.isNotEmpty())
             return juce::File(stored);
     }
@@ -61,12 +64,13 @@ juce::File SampleLibrary::getPrimarySampleDir() const
 
 void SampleLibrary::setPrimarySampleDir(const juce::File& dir)
 {
-    if (proc.appSettings == nullptr) return;
+    auto* settings = host.getSampleSettingsFile();
+    if (settings == nullptr) return;
 
     // An empty File clears the override so the SettingsOverlay "Default" button reuses this setter.
-    proc.appSettings->setValue("primarySampleDir",
-                                dir == juce::File{} ? juce::String{} : dir.getFullPathName());
-    proc.appSettings->saveIfNeeded();
+    settings->setValue("primarySampleDir",
+                       dir == juce::File{} ? juce::String{} : dir.getFullPathName());
+    settings->saveIfNeeded();
 }
 
 } // namespace mu_clid

@@ -21,13 +21,13 @@ void HotSwapStager::stage(int rhythmIndex, Rhythm&& rhythm,
 
 void HotSwapStager::cancelStagedSwap(int rhythmIndex)
 {
-    if (rhythmIndex < 0 || rhythmIndex >= RhythmSequencer::MaxRhythms) return;
+    if (rhythmIndex < 0 || rhythmIndex >= mu_limits::kMaxLayers) return;
     cancelPendingIfAny(rhythmIndex);
 }
 
 bool HotSwapStager::hasPendingSwap(int rhythmIndex) const
 {
-    if (rhythmIndex < 0 || rhythmIndex >= RhythmSequencer::MaxRhythms) return false;
+    if (rhythmIndex < 0 || rhythmIndex >= mu_limits::kMaxLayers) return false;
     return stager.hasPending(rhythmIndex);
 }
 
@@ -56,7 +56,7 @@ bool HotSwapStager::takeStagedFullPreset(PreparedFullPreset& out)
 void HotSwapStager::cancelAllStaged()
 {
     // Drop every per-rhythm swap, then the full preset: a full preset applied at once overwrites every slot.
-    for (int r = 0; r < RhythmSequencer::MaxRhythms; ++r) stager.cancel(r);
+    for (int r = 0; r < mu_limits::kMaxLayers; ++r) stager.cancel(r);
     stager.cancelFull();
 }
 
@@ -67,9 +67,9 @@ bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
     // Per-rhythm swaps: the master loop point, or each rhythm's own loop (the `mstr_swap` timing). With no
     // master loop set there is no master wrap, so the own loop is used whatever the timing says.
     const auto timing = proc.swapTiming();
-    const bool hasMasterLoop = proc.sequencer.getMasterLoopSteps() > 0;
+    const bool hasMasterLoop = proc.stepClock.getMasterLoopSteps() > 0;
     const bool onMasterLoop  = mu_hotswap::usesMasterLoop(timing, hasMasterLoop);
-    const uint32_t epoch = proc.sequencer.getFrameEpoch();
+    const uint32_t epoch = proc.swapFrameEpoch();
     bool needAsync = false;
     for (int r = 0; r < numRhythms; ++r)
     {
@@ -83,7 +83,7 @@ bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
         // is wherever that rhythm last wrapped).
         if (token != 0 && atBoundary)
         {
-            flaggedOrigin[(size_t) r].store(onMasterLoop ? 0 : proc.sequencer.getBoundaryEff(r), std::memory_order_relaxed);
+            flaggedOrigin[(size_t) r].store(onMasterLoop ? 0 : proc.swapBoundaryEff(r), std::memory_order_relaxed);
             flaggedEpoch [(size_t) r].store(epoch, std::memory_order_relaxed);
         }
         needAsync |= stager.flagIfReady(r, token, atBoundary);
@@ -99,7 +99,7 @@ bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
                                                                       rhythmLoopWrapMask, /*barWrapped*/ false);
     if (fullToken != 0 && fullAtBoundary)
     {
-        fullFlaggedOrigin.store(hasMasterLoop ? 0 : proc.sequencer.getBoundaryEff(0), std::memory_order_relaxed);
+        fullFlaggedOrigin.store(hasMasterLoop ? 0 : proc.swapBoundaryEff(0), std::memory_order_relaxed);
         fullFlaggedEpoch .store(epoch, std::memory_order_relaxed);
     }
     needAsync |= stager.flagFullIfReady(fullToken, fullAtBoundary);
@@ -108,94 +108,38 @@ bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
 
 //==============================================================================
 void HotSwapStager::installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceEngine>&& voice,
-                                  const juce::String& samplePath, int originEff, uint32_t frameEpoch,
-                                  std::unique_ptr<VoiceEngine>* cutVictim)
+                                  const juce::String& samplePath, int originEff, uint32_t frameEpoch)
 {
     // The incoming engine is not yet visible to the audio thread, so its noise seed can be set here.
     if (voice) voice->insertProc.setSlotIndex(r);
 
-    // Retire-then-swap: the old engine continues rendering its in-flight tail from a retired slot.
-    auto oldEngine = std::move(proc.voiceEngines[(size_t) r]);
-    proc.voiceEngines[(size_t) r] = std::move(voice);
-
-    if (oldEngine)
-    {
-        // Must happen BEFORE placement so the engine is already in its
-        // released / filter-reset state when the next audio block picks it up.
-        oldEngine->markRetired();
-
-        bool placed = false;
-        for (auto& slot : proc.retiredVoiceEngines[(size_t) r])
-            if (! slot) { slot = std::move(oldEngine); placed = true; break; }
-        if (! placed)
-        {
-            // All retired slots full — spam-swap back-pressure: force-cut slot 0. The engine it held
-            // goes to the caller's slot when given, so its teardown runs after the caller's unlock.
-            auto victim = std::move(proc.retiredVoiceEngines[(size_t) r][0]);
-            proc.retiredVoiceEngines[(size_t) r][0] = std::move(oldEngine);
-            if (cutVictim != nullptr) *cutVictim = std::move(victim);
-            proc.retiredReadyForCleanup[(size_t) r][0].store(false, std::memory_order_release);
-        }
-    }
+    // Retire-then-swap: the old engine continues rendering its in-flight tail from the shared RetireBin (its
+    // envelopes are released at its first tail block). A full row (spam-swap back-pressure) cuts its entry 0,
+    // whose engine is freed later, outside the lock.
+    auto& layer = proc.sampleRhythm(r);
+    auto oldEngine = std::move(layer.voice);
+    layer.voice = std::move(voice);
+    proc.retireEngine(r, std::move(oldEngine));
 
     // Swap rather than assign: the outgoing rhythm ends up in the caller's object, which the caller
     // destroys after releasing its locks. The clip bank stays with the slot (SlotBound); the playing
     // clip is the slot's too, so a clip launch keeps it and a non-clip load clears it before it gets here.
-    const int activeClip = proc.sequencer.getRhythm(r).activeClip;
-    std::swap(proc.sequencer.getRhythm(r), rhythm);
-    proc.sequencer.getRhythm(r).activeClip = activeClip;
+    const int activeClip = proc.getRhythm(r).activeClip;
+    std::swap(proc.getRhythm(r), rhythm);
+    proc.getRhythm(r).activeClip = activeClip;
     proc.samples.setPath(r, samplePath);
     // Rebuilds the pattern and hands the audio thread its start position in one step.
-    proc.sequencer.requestSwapStart(r, originEff, frameEpoch);
+    proc.sampleRhythm(r).cursor.requestSwapStart(proc.sampleRhythm(r), PluginProcessor::kStepCap, originEff, frameEpoch);
 }
 
 void HotSwapStager::processSwaps()
 {
-    // Drain retired-engine cleanup flags. Audio thread store-releases the per-slot
-    // flag once VoiceEngine::isFullyDrained() returns true; the move-out below
-    // transfers ownership to a local that destructs off the RT thread.
-    // suspendProcessing fences the audio thread so it cannot be mid-process() on
-    // the engine when the unique_ptr is yanked.
-    // Empty-fast-path: skip the suspend cost when no engines need cleanup.
-    bool anyCleanupNeeded = false;
-    for (auto& slotArr : proc.retiredReadyForCleanup)
-    {
-        for (auto& flag : slotArr)
-            if (flag.load(std::memory_order_acquire)) { anyCleanupNeeded = true; break; }
-        if (anyCleanupNeeded) break;
-    }
-    if (anyCleanupNeeded)
-    {
-        std::array<std::unique_ptr<VoiceEngine>,
-                   RhythmSequencer::MaxRhythms * mu_limits::kMaxRetiredVoiceEngines> orphans;
-        int orphanCount = 0;
-        proc.suspendProcessing(true);
-        {
-            // layersLock as for an install: suspend is no barrier in every host, and a structural edit
-            // moves these tail slots under the same lock.
-            const juce::ScopedLock sl(proc.layersLock);
-            for (int r = 0; r < (int)proc.retiredReadyForCleanup.size(); ++r)
-            {
-                for (int i = 0; i < mu_limits::kMaxRetiredVoiceEngines; ++i)
-                {
-                    if (!proc.retiredReadyForCleanup[(size_t)r][(size_t)i]
-                            .load(std::memory_order_acquire))
-                        continue;
-                    orphans[(size_t)orphanCount++] =
-                        std::move(proc.retiredVoiceEngines[(size_t)r][(size_t)i]);
-                    proc.retiredReadyForCleanup[(size_t)r][(size_t)i]
-                        .store(false, std::memory_order_release);
-                }
-            }
-        }
-        proc.suspendProcessing(false);
-        // `orphans` destructs at scope exit — fully off the audio thread.
-    }
+    // (The drained tails are freed by the RetireBin's service pass, which runDeferredWork runs before this one.)
 
     // Two-pass to suspend audio ONCE per call: collect all ready slots, then swap
     // them under one suspend, then do post-commit APVTS push + UI callback outside it.
     const int n = proc.numLayers.load(std::memory_order_acquire);
-    std::array<int, RhythmSequencer::MaxRhythms> readyRhythms {};
+    std::array<int, mu_limits::kMaxLayers> readyRhythms {};
     int readyCount = 0;
     for (int r = 0; r < n; ++r)
         if (stager.isFlagged(r))   // (a swap cancelled after it was flagged is skipped)
@@ -204,11 +148,10 @@ void HotSwapStager::processSwaps()
     if (readyCount > 0)
     {
         // Which slots consume actually applied: a swap cancelled between the scan and here is skipped.
-        std::array<bool, RhythmSequencer::MaxRhythms> applied {};
-        // Everything the commit retires or empties lives out here, so its destructors run after the
-        // lock and the suspend are released, not inside them.
-        std::array<PendingRhythm, RhythmSequencer::MaxRhythms>            spent;
-        std::array<std::unique_ptr<VoiceEngine>, RhythmSequencer::MaxRhythms> cutVictims;
+        std::array<bool, mu_limits::kMaxLayers> applied {};
+        // Everything the commit empties lives out here, so its destructors run after the lock and the suspend
+        // are released, not inside them (a retired engine goes to the RetireBin, which frees it later).
+        std::array<PendingRhythm, mu_limits::kMaxLayers>            spent;
         proc.suspendProcessing(true);
         {
             // suspendProcessing alone does not stop an in-flight callback in hosts that ignore it
@@ -224,8 +167,7 @@ void HotSwapStager::processSwaps()
                     auto& in = spent[(size_t) r];
                     installRhythm(r, std::move(in.rhythm), std::move(in.voice), in.samplePath,
                                   flaggedOrigin[(size_t) r].load(std::memory_order_relaxed),
-                                  flaggedEpoch [(size_t) r].load(std::memory_order_relaxed),
-                                  &cutVictims[(size_t) r]);
+                                  flaggedEpoch [(size_t) r].load(std::memory_order_relaxed));
                 });
             }
         }
@@ -252,7 +194,7 @@ void HotSwapStager::processSwaps()
     // (consumeFull releases the pre-built voices + tree afterwards.)
     const bool committed = stager.consumeFull([this](PreparedFullPreset& p)
     {
-        proc.presetIO.commitStagedFullPreset(p, fullFlaggedOrigin.load(std::memory_order_relaxed),
+        proc.commitStagedFullPreset(p, fullFlaggedOrigin.load(std::memory_order_relaxed),
                                              fullFlaggedEpoch.load(std::memory_order_relaxed));
     });
     if (committed)

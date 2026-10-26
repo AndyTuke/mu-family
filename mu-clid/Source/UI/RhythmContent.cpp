@@ -4,6 +4,8 @@
 #include "UI/ConfirmDialog.h"   // shared themed confirm dialogs (mu_ui::confirmAsync)
 #include "UI/OverlayHost.h"     // shared dimmed in-editor overlay host (sample browser)
 #include "Persistence/PresetFiles.h"   // mu_pp::safePresetFileName, readPresetMeta
+#include "Audio/SampleLibrary.h"
+#include "Modulation/ModulationSnapshot.h"
 
 #include <limits>
 #include <string_view>
@@ -64,8 +66,8 @@ const char* const kSendSuffixes[] = { "sendEff", "sendDly", "sendRev", "pan" };
 } // namespace
 
 //==============================================================================
-RhythmContent::RhythmContent(PluginProcessor& p)
-    : proc(p), euclidPanel(p), voiceSection(p), midiOutSection(p)
+RhythmContent::RhythmContent(ProcessorBase& base, RhythmHost& h)
+    : host(h), euclidPanel(base), voiceSection(base, h), midiOutSection(h)
 {
     startTimerHz(mu_ui::kUiRefreshHz);
     addAndMakeVisible(circle);
@@ -93,13 +95,13 @@ RhythmContent::RhythmContent(PluginProcessor& p)
         if (currentRhythmIndex < 0) return;
         const juce::String category = chosenCategory == "Uncategorised" ? juce::String() : chosenCategory;
 
-        juce::File destDir = proc.getRhythmsDir().isDirectory()
-                                 ? proc.getRhythmsDir()
+        juce::File destDir = host.getRhythmPresetsDir().isDirectory()
+                                 ? host.getRhythmPresetsDir()
                                  : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
 
         if (saveDialog.isSaveAsDefault())
         {
-            proc.saveRhythmPresetToFile(currentRhythmIndex,
+            host.saveRhythmPresetFile(currentRhythmIndex,
                                         destDir.getChildFile("_default.muRhythm"),
                                         embed, {}, {});
             saveDialog.setVisible(false);
@@ -116,12 +118,13 @@ RhythmContent::RhythmContent(PluginProcessor& p)
                 [safeThis, destFile, name, desc, category, embed]
                 {
                     if (!safeThis) return;
-                    safeThis->proc.ensureCategoryInList(category);
-                    safeThis->proc.saveRhythmPresetToFile(safeThis->currentRhythmIndex,
+                    safeThis->host.addRhythmPresetCategory(category);
+                    safeThis->host.saveRhythmPresetFile(safeThis->currentRhythmIndex,
                                                           destFile, embed, category, desc);
                     safeThis->loadedRhythmPresetFile = destFile;
                     safeThis->saveDialog.setVisible(false);
                     safeThis->refreshRhythmPresets();
+                    if (safeThis->onPresetFileSaved) safeThis->onPresetFileSaved();
                     for (int i = 0; i < (int)safeThis->rhythmPresetFiles.size(); ++i)
                     {
                         if (safeThis->rhythmPresetFiles[i].getFullPathName()
@@ -136,11 +139,12 @@ RhythmContent::RhythmContent(PluginProcessor& p)
             return;
         }
 
-        proc.ensureCategoryInList(category);
-        proc.saveRhythmPresetToFile(currentRhythmIndex, destFile, embed, category, desc);
+        host.addRhythmPresetCategory(category);
+        host.saveRhythmPresetFile(currentRhythmIndex, destFile, embed, category, desc);
         loadedRhythmPresetFile = destFile;
         saveDialog.setVisible(false);
         refreshRhythmPresets();
+        if (onPresetFileSaved) onPresetFileSaved();
         for (int i = 0; i < (int)rhythmPresetFiles.size(); ++i)
         {
             if (rhythmPresetFiles[i].getFullPathName() == destFile.getFullPathName())
@@ -154,7 +158,7 @@ RhythmContent::RhythmContent(PluginProcessor& p)
     // The Euclid knobs' live modulation arcs read the processor's snapshot while the sequencer plays.
     euclidPanel.modulationSnapshot = [this](int ri, int snapIndex)
     {
-        return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapEucAHits + snapIndex)   // EuclidSnap is the offset into the Euclid run
+        return host.isRhythmTransportPlaying() ? host.getRhythmModLive(ri, kSnapEucAHits + snapIndex)   // EuclidSnap is the offset into the Euclid run
                                             : std::numeric_limits<float>::quiet_NaN();
     };
 
@@ -165,28 +169,27 @@ RhythmContent::RhythmContent(PluginProcessor& p)
 
     euclidPanel.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
     {
-        if (onStatusUpdate) onStatusUpdate(name, val, currentColour());
+        reportStatus(name, val);
     };
 
     voiceSection.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
     {
-        if (onStatusUpdate) onStatusUpdate(name, val, currentColour());
+        reportStatus(name, val);
     };
     midiOutSection.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
     {
-        if (onStatusUpdate) onStatusUpdate(name, val, currentColour());
+        reportStatus(name, val);
     };
 
     // The output selector writes r{N}_outMode and switches this panel's view at once.
     outputCtrl.onChange = [this](int idx)
     {
         if (currentRhythmIndex < 0) return;
-        if (auto* prm = proc.apvts.getParameter("r" + juce::String(currentRhythmIndex) + "_outMode"))
+        if (auto* prm = host.getRhythmParameters().getParameter("r" + juce::String(currentRhythmIndex) + "_outMode"))
             prm->setValueNotifyingHost(prm->convertTo0to1((float) idx));
         updateOutputModeUi();
-        if (onStatusUpdate)
-            onStatusUpdate("Output", idx == 1 ? "MIDI (sends notes, no audio from this rhythm)"
-                                              : "Sample (plays the loaded sample)", currentColour());
+        reportStatus("Output", idx == 1 ? "MIDI (sends notes, no audio from this rhythm)"
+                                        : "Sample (plays the loaded sample)");
     };
 
     voiceSection.onInsertAlgorithmChanged = [this](int charId)
@@ -209,9 +212,9 @@ void RhythmContent::attachHeader(LayerHeaderBar& bar)
         if (idx >= 0 && idx < (int)rhythmPresetFiles.size() && currentRhythmIndex >= 0)
         {
             const juce::File presetFile = rhythmPresetFiles[idx];
-            proc.stageRhythmPreset(currentRhythmIndex, presetFile);
+            host.stageRhythmPresetFile(currentRhythmIndex, presetFile);
             loadedRhythmPresetFile = presetFile;
-            if (!proc.sequencerPlaying.load())
+            if (!host.isRhythmTransportPlaying())
             {
                 // The stopped load has already re-bound the panel (onLayerPresetCommitted), which refreshed
                 // rhythmPresetFiles and cleared the dropdown.
@@ -243,13 +246,13 @@ void RhythmContent::registerRhythmListeners(int ri)
     const auto rPfx  = "r"  + juce::String(ri) + "_";
     const auto chPfx = "ch" + juce::String(ri) + "_";
     for (auto* s : kEuclidSuffixes)
-        proc.apvts.addParameterListener(rPfx + s, this);
+        host.getRhythmParameters().addParameterListener(rPfx + s, this);
     for (auto* s : kVoiceSuffixes)
-        proc.apvts.addParameterListener(rPfx + s, this);
+        host.getRhythmParameters().addParameterListener(rPfx + s, this);
     for (auto* s : kOutputSuffixes)
-        proc.apvts.addParameterListener(rPfx + s, this);
+        host.getRhythmParameters().addParameterListener(rPfx + s, this);
     for (auto* s : kSendSuffixes)
-        proc.apvts.addParameterListener(chPfx + s, this);
+        host.getRhythmParameters().addParameterListener(chPfx + s, this);
 }
 
 void RhythmContent::deregisterRhythmListeners(int ri)
@@ -258,13 +261,13 @@ void RhythmContent::deregisterRhythmListeners(int ri)
     const auto rPfx  = "r"  + juce::String(ri) + "_";
     const auto chPfx = "ch" + juce::String(ri) + "_";
     for (auto* s : kEuclidSuffixes)
-        proc.apvts.removeParameterListener(rPfx + s, this);
+        host.getRhythmParameters().removeParameterListener(rPfx + s, this);
     for (auto* s : kVoiceSuffixes)
-        proc.apvts.removeParameterListener(rPfx + s, this);
+        host.getRhythmParameters().removeParameterListener(rPfx + s, this);
     for (auto* s : kOutputSuffixes)
-        proc.apvts.removeParameterListener(rPfx + s, this);
+        host.getRhythmParameters().removeParameterListener(rPfx + s, this);
     for (auto* s : kSendSuffixes)
-        proc.apvts.removeParameterListener(chPfx + s, this);
+        host.getRhythmParameters().removeParameterListener(chPfx + s, this);
 }
 
 void RhythmContent::parameterChanged(const juce::String& parameterID, float /*newValue*/)
@@ -280,7 +283,7 @@ void RhythmContent::parameterChanged(const juce::String& parameterID, float /*ne
     // per-param refresh during the push is pure waste — and worse, the marshalled
     // refreshes land AFTER setRhythm completes, re-running setValue on already-bound
     // sliders. Net cost was ~30 redundant refreshSuffix calls per swap commit.
-    if (proc.isApvtsLoading()) return;
+    if (host.isRhythmParamsLoading()) return;
 
     if (juce::MessageManager::getInstance()->isThisTheMessageThread())
         refreshForParameter(parameterID);
@@ -318,7 +321,7 @@ void RhythmContent::setLayer(int index)
     deregisterRhythmListeners(currentRhythmIndex);
     currentRhythmIndex = index;
     registerRhythmListeners(currentRhythmIndex);
-    if (index >= 0 && index < proc.getNumRhythms())
+    if (index >= 0 && index < host.getRhythmCount())
     {
         refreshRhythmPresets();
         euclidPanel.setRhythm(index);
@@ -333,26 +336,41 @@ void RhythmContent::setLayer(int index)
     repaint();
 }
 
+void RhythmContent::releaseModulationArcs()
+{
+    // Rebinding to no rhythm clears every knob's modulation binding and the insert meter's source.
+    euclidPanel.setRhythm(-1);
+    voiceSection.releaseLayer();
+}
+
+void RhythmContent::reportStatus(const juce::String& name, const juce::String& value)
+{
+    if (onColouredStatus)    onColouredStatus(name, value, currentColour());
+    else if (onStatusUpdate) onStatusUpdate(name, value);
+}
+
 void RhythmContent::refreshCircle()
 {
-    if (currentRhythmIndex < 0 || currentRhythmIndex >= proc.getNumRhythms()) return;
-    const Rhythm& r = proc.getRhythm(currentRhythmIndex);
+    if (currentRhythmIndex < 0 || currentRhythmIndex >= host.getRhythmCount()) return;
+    const Rhythm& r = host.getRhythmLayer(currentRhythmIndex);
     // Pass modulated euclid overrides through to getStepTypes so the ring reflects
     // active modulation of hits/rotate/prePad/postPad/insSt/insLen. When no modulation is
     // assigned, getModulatedEuclidOverrides falls back to the rhythm's base values.
-    const EuclidOverrides ov = proc.getModulatedEuclidOverrides(currentRhythmIndex);
+    const EuclidOverrides ov = host.getRhythmEuclidOverrides(currentRhythmIndex);
     circle.setPatterns(r.genA.getStepTypes(ov.a), r.genB.getStepTypes(ov.b), r.genC.getStepTypes(ov.c));
     lastCircleOverrides = ov;
-    circle.setPlayState(&proc.rhythmPlayState[currentRhythmIndex],
-                        &proc.sequencerPlaying,
-                        currentColour());
+    // Looked up on every tick: the play state is the layer's, and an edit moves or replaces layers.
+    circle.setPlayStateSource([this] { return currentRhythmIndex >= 0 && currentRhythmIndex < host.getRhythmCount()
+                                                  ? host.getRhythmPlayState(currentRhythmIndex) : nullptr; },
+                              &host.getRhythmTransportFlag(),
+                              currentColour());
 }
 
 juce::Colour RhythmContent::currentColour() const
 {
-    if (currentRhythmIndex >= 0 && currentRhythmIndex < proc.getNumRhythms())
+    if (currentRhythmIndex >= 0 && currentRhythmIndex < host.getRhythmCount())
     {
-        const Rhythm& r = proc.getRhythm(currentRhythmIndex);
+        const Rhythm& r = host.getRhythmLayer(currentRhythmIndex);
         return MuLookAndFeel::layerPalette[r.colourIndex % MuLookAndFeel::kLayerPaletteSize];
     }
     return juce::Colours::transparentBlack;
@@ -363,7 +381,7 @@ juce::Colour RhythmContent::currentColour() const
 bool RhythmContent::isMidiOutputMode() const
 {
     if (currentRhythmIndex < 0) return false;
-    if (auto* raw = proc.apvts.getRawParameterValue("r" + juce::String(currentRhythmIndex) + "_outMode"))
+    if (auto* raw = host.getRhythmParameters().getRawParameterValue("r" + juce::String(currentRhythmIndex) + "_outMode"))
         return raw->load() > 0.5f;
     return false;
 }
@@ -378,6 +396,7 @@ void RhythmContent::updateOutputModeUi()
     midiOutSection.setVisible(midi);
     repaint();
     if (onOutputModeChanged) onOutputModeChanged();
+    if (onMixerStateChanged) onMixerStateChanged();
 }
 
 bool RhythmContent::isInterestedInFileDrag(const juce::StringArray& files)
@@ -400,7 +419,7 @@ void RhythmContent::filesDropped(const juce::StringArray& files, int, int)
         juce::File file(f);
         if (file.existsAsFile() && currentRhythmIndex >= 0)
         {
-            proc.samples.load(currentRhythmIndex, file);
+            host.getRhythmSamples().load(currentRhythmIndex, file);
             repaint();
             return;
         }
@@ -417,7 +436,7 @@ void RhythmContent::loadSample()
     // back where they were if they're working through a library subfolder.
     // The Content/Samples folder is still one click away via the in-dialog
     // Library/Content toggle.
-    const juce::File primaryLib = proc.samples.getPrimarySampleDir();
+    const juce::File primaryLib = host.getRhythmSamples().getPrimarySampleDir();
     const juce::File startDir = lastBrowseDir.isDirectory()
                                     ? lastBrowseDir
                                     : (primaryLib.isDirectory()
@@ -431,12 +450,12 @@ void RhythmContent::loadSample()
     // rather than a floating DialogWindow. The browser brings its own Load/Cancel; OverlayHost
     // supplies the dim backdrop + centring + click-outside-to-dismiss.
     auto content = std::make_unique<SampleBrowserContent>(
-        proc, startDir,
+        host, startDir,
         [safeThis, rhythmIndex](const juce::File& f)
         {
             if (safeThis == nullptr) return;
             safeThis->lastBrowseDir = f.getParentDirectory();
-            safeThis->proc.samples.load(rhythmIndex, f);
+            safeThis->host.getRhythmSamples().load(rhythmIndex, f);
             safeThis->repaint();
         });
 
@@ -447,7 +466,7 @@ void RhythmContent::loadSample()
 
 void RhythmContent::refreshRhythmPresets()
 {
-    const auto entries = mu_pp::listPresetsByCategory(proc.getRhythmsDir(), "muRhythm");
+    const auto entries = mu_pp::listPresetsByCategory(host.getRhythmPresetsDir(), "muRhythm");
     if (headerBar != nullptr)
         mu_ui::fillPresetDropdown(rhythmPresetDropdown(), rhythmPresetFiles, entries);
 
@@ -472,20 +491,23 @@ void RhythmContent::saveRhythmPreset()
     juce::String defaultDesc;
     juce::String defaultCat;
     bool         defaultEmbed = false;
-    if (loadedRhythmPresetFile.existsAsFile())
+    // The file this content loaded, else (a slot host that loads through the header) the one the host knows.
+    const juce::File loadedFile = loadedRhythmPresetFile.existsAsFile() ? loadedRhythmPresetFile
+                                                                        : host.getRhythmLoadedPresetFile(currentRhythmIndex);
+    if (loadedFile.existsAsFile())
     {
-        defaultName = loadedRhythmPresetFile.getFileNameWithoutExtension();
-        const auto meta = mu_pp::readPresetMeta(loadedRhythmPresetFile);
+        defaultName = loadedFile.getFileNameWithoutExtension();
+        const auto meta = mu_pp::readPresetMeta(loadedFile);
         defaultCat   = meta.category;
         defaultDesc  = meta.description;
         defaultEmbed = meta.embedSamples;
     }
     else
     {
-        defaultName = mu_pp::safePresetFileName(juce::String(proc.getRhythm(currentRhythmIndex).name), {});
+        defaultName = mu_pp::safePresetFileName(host.getRhythmSaveName(currentRhythmIndex), {});
     }
 
-    setKnownCategories(proc.loadCategoryList());
+    setKnownCategories(host.getRhythmPresetCategories());
     saveDialog.setDefaultName(defaultName);
     saveDialog.setDefaultDescription(defaultDesc);
     saveDialog.setDefaultCategory(defaultCat);
@@ -516,8 +538,8 @@ void RhythmContent::paint(juce::Graphics& g)
         MuLookAndFeel::drawAccentPanel(g, r.reduced(2).toFloat(), appCol);
 
     // Sample bar — content inset from panel outline
-    const juce::String sampleName = proc.samples.getSampleName(currentRhythmIndex);
-    const bool         missing    = proc.samples.isSampleMissing(currentRhythmIndex);
+    const juce::String sampleName = host.getRhythmSamples().getSampleName(currentRhythmIndex);
+    const bool         missing    = host.getRhythmSamples().isSampleMissing(currentRhythmIndex);
     // Metal: an LCD — the file name in lit lettering, a missing sample lit in amber,
     // the empty-slot hint as faint unlit lettering, then the glass's glare + bezel.
     const auto& L    = MuLookAndFeel::lighting();
@@ -602,7 +624,7 @@ void RhythmContent::resized()
 // Writes the Label's text into the current rhythm and notifies listeners.
 void RhythmContent::commitNameFromLabel(const juce::String& rawName)
 {
-    if (currentRhythmIndex < 0 || currentRhythmIndex >= proc.getNumRhythms()) return;
+    if (currentRhythmIndex < 0 || currentRhythmIndex >= host.getRhythmCount()) return;
 
     auto newName = rawName.trim();
     if (newName.isEmpty())
@@ -612,25 +634,25 @@ void RhythmContent::commitNameFromLabel(const juce::String& rawName)
     }
 
     // renameRhythm writes the name under the layer lock instead of a raw message-thread mutation of the Rhythm struct.
-    proc.renameRhythm(currentRhythmIndex, newName);
+    host.renameRhythmLayer(currentRhythmIndex, newName);
     if (onRhythmRenamed) onRhythmRenamed();
 }
 
 void RhythmContent::confirmReset()
 {
-    if (currentRhythmIndex < 0 || currentRhythmIndex >= proc.getNumRhythms()) return;
+    if (currentRhythmIndex < 0 || currentRhythmIndex >= host.getRhythmCount()) return;
     const int idx = currentRhythmIndex;
-    const juce::String name(proc.getRhythm(idx).name);
+    const juce::String name(host.getRhythmLayer(idx).name);
 
     juce::Component::SafePointer<RhythmContent> safeThis(this);
     mu_ui::confirmAsync(this, "Reset Rhythm",
-                        LayerHeaderBar::resetConfirmMessage(name, proc.clipCount(idx)), "Reset",
+                        LayerHeaderBar::resetConfirmMessage(name, host.getRhythmClipCount(idx)), "Reset",
         [safeThis, idx]
         {
-            if (safeThis != nullptr && idx >= 0 && idx < safeThis->proc.getNumRhythms())
+            if (safeThis != nullptr && idx >= 0 && idx < safeThis->host.getRhythmCount())
             {
                 // resetLayer owns the concurrency dance (suspendProcessing + layersLock).
-                safeThis->proc.resetLayer(idx);
+                safeThis->host.resetRhythmLayer(idx);
                 if (safeThis->requestRebind) safeThis->requestRebind(idx);
             }
         });
@@ -639,16 +661,16 @@ void RhythmContent::confirmReset()
 void RhythmContent::timerCallback()
 {
     // Controls whose parameters changed on a non-message thread (host automation on the audio thread).
-    refreshQueue.drain([this](const juce::String& id) { if (! proc.isApvtsLoading()) refreshForParameter(id); });
+    refreshQueue.drain([this](const juce::String& id) { if (! host.isRhythmParamsLoading()) refreshForParameter(id); });
 
-    const bool playing = proc.sequencerPlaying.load();
+    const bool playing = host.isRhythmTransportPlaying();
 
     // Re-render the RhythmCircle when euclid modulation changes the pattern
     // (hits/rotate/prePad/etc.). Audio thread writes lastEuclidOverrides per block;
     // we compare against the most recently applied snapshot and refresh on change.
-    if (playing && currentRhythmIndex >= 0 && currentRhythmIndex < proc.getNumRhythms())
+    if (playing && currentRhythmIndex >= 0 && currentRhythmIndex < host.getRhythmCount())
     {
-        const EuclidOverrides ov = proc.getModulatedEuclidOverrides(currentRhythmIndex);
+        const EuclidOverrides ov = host.getRhythmEuclidOverrides(currentRhythmIndex);
         if (ov != lastCircleOverrides)
             refreshCircle();
     }

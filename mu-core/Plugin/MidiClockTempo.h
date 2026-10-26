@@ -4,9 +4,12 @@
 // MidiClockSync (timestamps from the audio sample clock) and mu-link's MidiClockEstimator
 // (timestamps from the MIDI thread), so every μ app follows an external clock the same way.
 //
-// Each 0xF8 pulse (24 per quarter-note) gives an instantaneous tempo from its interval; a
-// one-pole smoothing filter (a simple tempo PLL) tracks the average rate and rejects
-// per-pulse jitter. Out-of-range intervals (a dropped or doubled pulse) are ignored.
+// Each 0xF8 pulse (24 per quarter-note) is timestamped, and the tempo is the average rate over the
+// last four beats of pulses: the span from the oldest pulse in the window to the newest, divided into the
+// pulse count. A timestamp is only as exact as its audio block (pulses in one block bunch together),
+// and that error does not grow with the window, so averaging four beats settles the reading to a
+// fraction of a BPM where a pulse-to-pulse filter jitters. A gap too long to be a pulse (a dropout)
+// restarts the window. The cost is that a real tempo change is followed over about four beats.
 //
 // Pure logic, no JUCE and no atomics: the owner decides which thread calls it.
 namespace mu_core
@@ -21,41 +24,43 @@ public:
     // One pulse at `timestampSeconds` (monotonic). Returns true when the estimate moved.
     bool onPulse(double timestampSeconds) noexcept
     {
-        bool updated = false;
-        if (haveLast)
+        if (count > 0)
         {
-            const double interval = timestampSeconds - lastTimestamp;
-            if (interval > 1.0e-5)
-            {
-                const double inst = 60.0 / (24.0 * interval);   // 24 ppqn → BPM
-                if (inst >= kMinBpm && inst <= kMaxBpm)
-                {
-                    estBpm  = (estBpm <= 0.0) ? inst                            // seed on first valid
-                                              : estBpm + kAlpha * (inst - estBpm);   // smooth
-                    updated = true;
-                }
-            }
+            const double interval = timestampSeconds - stamp[(head + kWindow) % (kWindow + 1)];   // newest so far
+            if (interval < 0.0 || interval > 60.0 / (24.0 * kMinBpm)) count = 0;   // dropout or time jump
         }
-        lastTimestamp = timestampSeconds;
-        haveLast      = true;
-        return updated;
+
+        // Push into the ring: the newest sits at head-1, the oldest at head when full.
+        stamp[head] = timestampSeconds;
+        head  = (head + 1) % (kWindow + 1);
+        count = count < kWindow + 1 ? count + 1 : count;
+        if (count < 2) return false;
+
+        const double oldest = stamp[(head + (kWindow + 1) - count) % (kWindow + 1)];
+        const double span   = timestampSeconds - oldest;
+        if (span <= 1.0e-5) return false;
+        const double bpm = 60.0 * (count - 1) / (24.0 * span);   // 24 ppqn
+        if (bpm < kMinBpm || bpm > kMaxBpm) return false;
+        estBpm = bpm;
+        return true;
     }
 
-    // Forget the previous pulse (Start / Continue): the next pulse only re-seeds the interval.
-    void restartInterval() noexcept { haveLast = false; }
+    // Forget the previous pulses (Start / Continue): the next pulses re-seed the window.
+    void restartInterval() noexcept { count = 0; }
 
     // Forget the tempo as well (sync switched off and on again): the next two pulses re-seed it.
-    void reset() noexcept { haveLast = false; estBpm = 0.0; }
+    void reset() noexcept { count = 0; estBpm = 0.0; }
 
-    // Smoothed tempo, or 0 before the first valid interval.
+    // Averaged tempo, or 0 before the first valid interval.
     double bpm() const noexcept { return estBpm; }
 
 private:
-    static constexpr double kAlpha = 0.1;   // tempo-PLL smoothing (jitter rejection)
+    static constexpr int kWindow = 96;   // four beats of pulses
 
-    double lastTimestamp = 0.0;
-    double estBpm        = 0.0;
-    bool   haveLast      = false;
+    double stamp[kWindow + 1] {};
+    int    head   = 0;
+    int    count  = 0;
+    double estBpm = 0.0;
 };
 
 } // namespace mu_core

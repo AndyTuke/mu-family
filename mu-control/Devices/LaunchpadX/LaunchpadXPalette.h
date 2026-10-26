@@ -46,7 +46,7 @@ inline constexpr std::array<LayerHue, 8> kLayerHues {{
     { "lime",    75, 19 },
     { "rose",    57, 55 },
     { "silver",  2,  1  },
-    { "navy",    45, 47 },
+    { "blue",    45, 47 },
 }};
 
 // The palette index whose colour is nearest (squared RGB distance); 0 for black.

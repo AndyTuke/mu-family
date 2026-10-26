@@ -12,7 +12,6 @@ namespace mu_on
 
 namespace
 {
-    constexpr const char* kTrackPresetTag = "MuOnTrack";
 
     // The legacy five-lane colours: Kick red / Bass orange / Hat cyan / Snare magenta / Rumble lime, the
     // palette entries the lanes had, then the three unused slots.
@@ -123,7 +122,6 @@ juce::ValueTree PluginProcessor::toLayerState(const juce::ValueTree& tree) const
 void PluginProcessor::applyStateTree(const juce::ValueTree& state)
 {
     applyComposedState(state);
-    seedRowGrooves();    // the saved global Swing / Accent are every row's groove
     syncAllFxParams();   // re-seed mixer/FX (unchanged values skip listeners)
 }
 

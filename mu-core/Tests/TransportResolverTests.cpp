@@ -39,6 +39,13 @@ public:
         return m;
     }
 
+    // Block `b` of a 120 BPM clock at 48 kHz holds the pulses that fall in its samples (one every 1000).
+    static void pulsesIn(int b, juce::MidiBuffer& m)
+    {
+        for (int at = ((b * kBlock + 999) / 1000) * 1000; at < (b + 1) * kBlock; at += 1000)
+            m.addEvent(juce::MidiMessage((juce::uint8) 0xF8), at - b * kBlock);
+    }
+
     void runTest() override
     {
         beginTest ("Host with a position: play, tempo and beat follow it; Play mirrors it");
@@ -298,7 +305,7 @@ public:
             for (int b = 0; b < 200; ++b)
             {
                 juce::MidiBuffer m;
-                m.addEvent(juce::MidiMessage((juce::uint8) 0xF8), (b * 480) % 1000 < 480 ? (b * 480) % 1000 : 0);
+                pulsesIn(b, m);
                 clock.process(m, kBlock, kSr);   // keep the tempo estimate alive
             }
             const double clockBeat = clock.process(juce::MidiBuffer(), kBlock, kSr);
@@ -327,7 +334,7 @@ public:
             for (int b = 0; b < 60; ++b)
             {
                 juce::MidiBuffer m;
-                if ((b * 480) % 1000 < 480) m.addEvent(juce::MidiMessage((juce::uint8) 0xF8), (b * 480) % 1000);
+                pulsesIn(200 + b, m);
                 const double beat = clock.process(m, kBlock, kSr);   // the clock moves on, as in real blocks
                 mu_core::InternalTransport it { own.playing, own.bpm, own.beat, &phase, &dir, &applied };
                 const auto t2 = mu_core::resolveTransport({}, true, clock, beat, it, kBlock, kSr, 0.0, 100.0);

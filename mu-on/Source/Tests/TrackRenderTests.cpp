@@ -168,27 +168,41 @@ public:
             }
         }
 
-        beginTest("a locked track holds only its named engine; a message-thread change builds and swaps it, any other waits silent");
+        beginTest("a locked track holds only its locked engine and ignores t{N}_eng: a change from any thread builds nothing");
         {
             TempStorage storage;
             PluginProcessor p;
             auto& t = p.getTrack(0);
-            t.engineLocked = true;
-            expect(t.syncEngine(), "locking frees the other four");
+            t.lockEngine(EngineType::Snare);
+            expect(t.syncEngine(), "locking frees the other four and builds the Snare");
             for (int e = 0; e < kNumEngineTypes; ++e)
-                expect(t.holdsEngine(engineFromIndex(e)) == (e == 0), "only the Kick is held, engine " + juce::String(e));
-            setParam(p.apvts, layerParamId(0, "eng"), 1.0f);   // this (the message) thread: built now
-            expect(t.holdsEngine(EngineType::Bass) && ! t.holdsEngine(EngineType::Kick), "the Bass replaced the Kick");
-            t.prepare(sr, prepared);
-            juce::AudioBuffer<float> out(2, prepared);
+                expect(t.holdsEngine(engineFromIndex(e)) == (e == toIndex(EngineType::Snare)), "only the Snare is held, engine " + juce::String(e));
+            expect(t.engineSetting() == EngineType::Snare && t.typeId() == (int) mu_core::LayerTypeId::Snare, "the type is the locked engine");
+
+            setParam(p.apvts, layerParamId(0, "eng"), 1.0f);   // this (the message) thread
             std::thread host([&p] { setParam(p.apvts, layerParamId(0, "eng"), 2.0f); });   // not the message thread
             host.join();
-            expect(! t.holdsEngine(EngineType::Hat), "a change from another thread is not built there");
-            out.clear();
-            t.render(callAt(0, 0, prepared, sr, prepared), out, prepared);
-            expectEquals(out.getMagnitude(0, prepared), 0.0f, "the locked track is silent until the message thread builds it");
             p.flushPendingAsyncUpdates();
-            expect(t.holdsEngine(EngineType::Hat), "the deferred work built it");
+            expect(t.engineSetting() == EngineType::Snare, "the parameter does not change a locked track's engine");
+            expect(! t.holdsEngine(EngineType::Bass) && ! t.holdsEngine(EngineType::Hat) && t.holdsEngine(EngineType::Snare), "and nothing else is built");
+            expect(! t.syncEngine(), "nothing to build");
+        }
+
+        beginTest("completeSetup writes a locked track's engine into t{N}_eng (and builds it); an unlocked track's row is left alone");
+        {
+            TempStorage storage;
+            PluginProcessor p;
+            auto& t = p.getTrack(1);
+            t.lockEngine(EngineType::Hat);
+            setParam(p.apvts, layerParamId(1, "eng"), 4.0f);   // a stray value: Rumble
+            t.completeSetup(p.apvts, 1);
+            expectEquals((int) std::lround(getParam(p.apvts, layerParamId(1, "eng"))), toIndex(EngineType::Hat), "the record names the locked engine");
+            expect(t.holdsEngine(EngineType::Hat), "the engine is built");
+
+            auto& u = p.getTrack(2);
+            setParam(p.apvts, layerParamId(2, "eng"), 3.0f);
+            u.completeSetup(p.apvts, 2);
+            expectEquals((int) std::lround(getParam(p.apvts, layerParamId(2, "eng"))), toIndex(EngineType::Snare), "an unlocked track's row stays as set");
         }
 
         beginTest("host automation of the engine from another thread at a step: the step sounds in that block on the new engine, "

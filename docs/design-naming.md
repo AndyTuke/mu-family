@@ -27,7 +27,7 @@ Related: the family consistency rule in [CLAUDE.md](../CLAUDE.md), and the platf
 | **Preset** | A saved full state of one product: up to 8 layers with their mixer, FX and modulation (`.muClid`, `.muTant`, ...). | a layer preset |
 | **Layer preset** | One layer's saved state (`.muRhythm`, `.muPattern`, ...). | a full preset |
 | **Performance** (built 2026-10-13) | A list of up to 8 pointers to presets for a gig; the new top level (backlog #1279). ✔ owner. File `.muPerformance`, folder `Performances/`, type `mu_pp::PerformanceFile` (ruled 2026-10-12, [design-launchpad.md §3.2c](design-launchpad.md)). | a preset |
-| **Clip** ✔ owner | One of 8 stored states of a layer that a controller pad launches, as in Ableton Live and Bitwig; plays until another is chosen; pads never write presets (backlog #1277). Stored in `mu_core::ClipBank` (`Layer::clips`), saved as `<Clips>` / `<Clip>`; a clip has no per-product type, it is the product's layer preset. "Slot" stays for FX / insert slots only. | an audio clip, an FX slot |
+| **Clip** ✔ owner | One of 8 stored states of a layer that a controller pad launches, as in Ableton Live and Bitwig; plays until another is chosen; pads never write presets (backlog #1277). Stored in `mu_core::ClipBank` (`Layer::clips`), saved as `<Clips>` / `<Clip>`; a clip has no per-product type, it is the product's layer preset. The process-wide copy buffer is `mu_core::ClipClipboard` (`clipClipboard()`); actions `CopyClip` / `CutClip` / `PasteClip`; shell setting `clipAutoSave` (design-plugin-family, Clip bank item 10). "Slot" stays for FX / insert slots only. | an audio clip, an FX slot |
 
 Added 2026-10-15 for mu-Tronic ([mu-tronic/design.md §1](mu-tronic/design.md)): Andy's word "voice" for a mu-Tronic slot is a **layer** in code and docs. New terms: **Empty layer**
 (a slot with no type; `LayerTypeId::Empty`), **Page** (eight layers, `kLayersPerPage`, UI and controller only), **Bus** (an internal group strip,
@@ -121,7 +121,7 @@ edits](design-plugin-family.md#layer-ownership-and-structural-edits--family-stan
   `using mu_pp::name;` line must be re-pointed or removed. Otherwise a `Rhythm` silently binds to the `Layer`
   overload (derived-to-base) and compiles without error. After such a move, grep the product for unqualified
   calls to the name.
-- `mu-core` uses `mu_core`, `mu_ui`, `mu_audio`, `mu_mod`, `mu_pp`, `mu_link`, … by area. The ~130
+- `mu-core` uses `mu_core`, `mu_ui`, `mu_audio`, `mu_mod`, `mu_pp`, `mu_link`, … by area (UI components in `mu-core/UI/` use `mu_ui`, never `mu_core`; ruled 2026-10-20). The ~130
   `mu-core` types that are still global (filters, UI components) are left alone for now.
 - `createPluginFilter()` stays global (JUCE requires it).
 - Shared test helpers in `mu-core/Tests/` (headers products' tests include) use a topic namespace `mu_<topic>`: `mu_golden`, `mu_alloc`,
@@ -159,7 +159,7 @@ names. They are modal pop-ups, not `OverlayHost` screens, so the `Overlay` role 
   mu-Tant and mu-Toni: mu-Toni's is `ToniScales.h` since Stage E2, done 2026-10-16; mu-Tant's is `TantScales.h` since Stage E4, done 2026-10-16), none may include a `Plugin/` or `License/` header, and a product's parameter table lives in
   `Persistence/` (`<Type>Params.{h,cpp}` and `LayerParamIds.h`; done 2026-10-16 for mu-Toni, `ArpParams` and `LayerParamIds.h`, for mu-On, `TrackParams.{h,cpp}`, and for mu-Tant, `PatternParams.{h,cpp}`, which holds the `v{N}_` id helpers as `TrackParams.h` does). The library is declared in the product's own
   `CMakeLists.txt` as `add_library(mu-<product>-layer INTERFACE)` over those folders (no `mu-<product>-layer/` directory exists), and its UI source is exported as the CMake list
-  `MU_<PRODUCT>_LAYER_UI_SOURCES` (family convention, design 2.5; built for mu-Toni, mu-On and mu-Tant). A layer-side host interface is `UI/<Type>Host.h` with methods that carry the type name (`getPatternLayer`, `getTrackEngine`), so one adapter can implement several. The `LayerTypeInfo` constants sit with the layer class (`kPatternType` in `Pattern.h`, `kArpType` in `Arp.h`; **only mu-On has its constants so far, and `kPatternType` / `kArpType` are written with the registry hook at T1**: a type that needs a host link cannot be created from `create(slot)` alone); where several types share one class they get `Sequencer/<Class>Types.h` (`TrackTypes.h`: `kKickType` ... `kRumbleType`, `layerTypeOf`, `typeFromPreset`), a file of constants and free functions, which "file = class" does not cover; a header never holds two classes. Code a layer needs from `Plugin/` that is not processor state moves to a layer-side folder of `mu-core`
+  `MU_<PRODUCT>_LAYER_UI_SOURCES` (family convention, design 2.5; built for mu-Toni, mu-On and mu-Tant). A layer-side host interface is `UI/<Type>Host.h` with methods that carry the type name (`getPatternLayer`, `getTrackEngine`), so one adapter can implement several. The `LayerTypeInfo` constants sit with the layer class (`kPatternType` in `Pattern.h`, `kArpType` in `Arp.h`; **only mu-On has its constants so far, and `kPatternType` / `kArpType` are written with the registry hook at T1**: a type that needs a host link cannot be created from `create(slot)` alone); where several types share one class they get `Sequencer/<Class>Types.h` (`TrackTypes.h`: `kKickType` ... `kRumbleType`, `kFmPercType`, `layerTypeOf`, `typeFromPreset`), a file of constants and free functions, which "file = class" does not cover; a header never holds two classes. Code a layer needs from `Plugin/` that is not processor state moves to a layer-side folder of `mu-core`
   (`ParamText.h` moved to `Persistence/`). Checked by `check-layer-boundary.ps1`, which finds in-tree libraries from that `add_library`.
 - **Capacity constants:** `mu_limits::kMaxLayers` is a per-target compile-time value (`MU_MAX_LAYERS`, default 8, mu-Tronic 16); a product still does not redeclare it.
 - What goes where: `Audio/` the engine (voices, samplers, DSP specific to the product); `Sequencer/` the
@@ -216,9 +216,9 @@ layers).** What changes, and what deliberately does not. **Status 2026-10-12: th
 | Layer parameter-id prefix, mu-On | `k_ b_ h_ s_ r_` (by lane type; `r_` is Rumble, mu-Clid's `r0_` is a rhythm) | `t0_` ... `t4_` (`t` = Track, index = layer slot) | Variable layers and a per-layer engine selector (#1241) need index-based prefixes; this is the only change they require. Lane 0 Kick, 1 Bass, 2 Hat, 3 Snare, 4 Rumble keep their slot numbers, so `k_tune` becomes `t0_tune`, `r_x` becomes `t4_x`. Mod-target `id`s (saved in modulator assignments) do not change, only their `parameter` field. |
 | Layer parameter-id prefix, mu-Toni | `v0_` ... | `a0_` ... (`a` = Arp) | Pre-release (0.1). Makes the four prefixes unique (`r` Rhythm, `v` Pattern, `a` Arp, `t` Track), which the layer-type registry needs the day two types share an instance, and frees `v` for its vocabulary meaning (a voice inside an engine). |
 | mu-Clid `r0_`, mu-Tant `v0_` | — | **unchanged** | Live products (1.1). The ids are DAW automation targets and MIDI-map keys, nothing in the code needs them to change, and the registry holds a prefix per type (`Pattern` keeps `v`, a named legacy letter). Do not rename them without a reason that outweighs breaking users' automation lanes. |
-| Mixer / FX ids `ch{N}_`, `mstr_`, ... | — | unchanged | Already one family scheme. |
+| Mixer / FX ids `ch{N}_`, `mstr_`, ... | — | unchanged | Already one family scheme. `ch{N}_` takes one or two digits (16 layers). Group buses (ruled 2026-10-20): `bus{B}_{suffix}` (the strip's suffixes) and `bus{B}_i{I}_{drvChar,insP1..4}` per insert; a channel's assignment is `ch{N}_bus`; display names are "Bus 1".. (`MixerChannel::busName`, fixed in version 1). Sidechain source integer: `-1` off, `0..N-1` channel, `N` external, `N+1+b` bus b; the APVTS `scSrc` is that + 1, range `0..mu_mixfx::kScSrcMax`. |
 | Layer-preset extensions | `.muRhythm .muPattern .muArp .muTrack` | unchanged | Each already is `.mu<LayerType>`. |
-| Layer-preset folder, mu-Tant | `Voices/` | `Patterns/` | The only folder that disagrees (`Rhythms`, `Patterns`, `Arps`, `Tracks`). **Dropped for now (2026-10-12): optional, cosmetic, on hold pending Andy's confirmation; nothing depends on it.** |
+| Layer-preset folder, mu-Tant | `Voices/` | `Patterns/` | The only folder that disagrees (`Rhythms`, `Patterns`, `Arps`, `Tracks`). **Dropped for now (2026-10-12): optional, cosmetic, on hold pending Andy's confirmation; nothing depends on it.** Ruled 2026-10-20: mu-Tronic's Pattern type registers with `contentFolderName` "muTant" and `presetFolder` "Voices" (shared with mu-Tant, never copied); the rename, if it happens, changes the one `patternLayerTypeInfo()` line and the migration above for both products at once. |
 | Plugin codes `MCld MTnt MTni MuOn`, `MCLt` | — | **unchanged** | `MuOn` breaks the pattern but changing it only re-identifies the plugin to every host; no code needs it. |
 | State ids `Mu<Product>State` | — | unchanged | Already consistent. |
 
@@ -268,9 +268,37 @@ under its name, **mu-Clid MIDI** (owner, 2026-10-11).
 slug `mu-tronic`, namespace `mu_tronic`, JUCE `PLUGIN_CODE` **`MTrn`** (JUCE requires four characters with at least one upper-case letter, so `mtrn` is invalid; the family
 codes are `MCld MTnt MTni MuOn MCLt`), manufacturer `TDP1`, bundle id `com.transwarp.mu-tronic`, state `MuTronicState`, tag `MuTronicPreset`, extension `.muTronic`, docs
 `docs/mu-tronic/`. **Standalone only** (`FORMATS Standalone`) and **freeware** (empty `License/`). The codes are now data: they may not change. It has no layer type of
-its own and no new layer extension; its slots hold `Rhythm`, `Pattern`, `Arp`, or one of mu-On's five engines `Kick`, `Bass`, `Hat`, `Snare`, `Rumble` (or nothing). The
+its own and no new layer extension; its slots hold `Rhythm`, `Pattern`, `Arp`, or one of mu-On's six engines `Kick`, `Bass`, `Hat`, `Snare`, `Rumble`, `FmPerc` (or nothing; FM Perc added 2026-10-21, see "mu-On FM Perc" below). The
 engine ids share `Track`'s prefix `t` and extension `.muTrack`; the `LayerTypeId` identifies the type, the saved engine selects it from a `.muTrack` file
 ([mu-tronic/design.md §1.4](mu-tronic/design.md)). Bus parameters are `bus{B}_` with insert parameters `bus{B}_i{I}_`; capacity constants `MU_MAX_LAYERS`, `MU_MAX_BUSES`, `MU_BUS_INSERTS`.
+Built at T1a (2026-10-19): the eight folders, `Persistence/{LayerTypes.*, TronicState.h}`, `Sequencer/EmptyLayer.h`, `UI/{EmptySlotChooser, TronicSettingsOverlay}`. `mtrn{N}_` in
+`TronicState.h` held a placeholder prefix; **replaced at T1b step 1 (2026-10-20)**. A mu-Tronic slot `N` carries one prefix per layer-type family, `r{N}_` (Rhythm),
+`v{N}_` (Pattern), `a{N}_` (Arp), `t{N}_` (Track: the six mu-On engines share it), declared on all sixteen slots from the start (`slotPrefixSets()`, letters in
+`kPrefixLetters`), each `LayerTypeInfo` naming its letter in `paramPrefixLetter`. Exactly one is **live** per slot, that of the slot's current type; only the live
+prefix is saved, applied, copied or reset (`LayerLayout::withPrefixSets`, `setLivePrefix`). These are the same four letters the list products use, not a new
+scheme; the mixer strip stays `ch{N}_`. A layer type that is hosted elsewhere also names `contentFolderName` and `presetFolder` (its product's own preset folder,
+shared, never copied: `<TDP>/muToni/Arps`). In mu-Tronic `Persistence/` also holds each hosted type's registration glue, `<Type>LayerType.{h,cpp}` (`ArpLayerType`,
+`TrackLayerTypes`: host adapter, content and mini-visual factories, the `LayerTypeInfo` additions), because it is the one folder that may name a layer library's headers
+(`check-layer-boundary.ps1` rule 10; ruled 2026-10-20, [design 2.1.11](mu-tronic/design.md)). mu-On's `t{N}_` table ends with `t{N}_swing` and `t{N}_accent` (the global
+`seq_swing` / `seq_accent` rows are retired; done 2026-10-20).
+
+**mu-On FM Perc (ruled 2026-10-21, Andy approved the engine; paper [mu-on/research-fm-drums.md](mu-on/research-fm-drums.md)).** The sixth Track engine. Names, all saved data
+once shipped:
+
+| Thing | Name |
+|---|---|
+| Display name (engine dropdown, chooser plate, default layer name "FM Perc 5") | `FM Perc` |
+| `mu_on::EngineType` (value 5, the saved `t{N}_eng` index) | `FmPerc`, appended after `Rumble` |
+| `mu_core::LayerTypeId` | `FmPerc`, between `Rumble` and `Test` (so `Kick .. FmPerc` stays contiguous for `layerTypeOf`; `kLayerTypeIdCount` becomes 12). The saved type NAME is `FmPerc` (`layerTypeName`), not the display name |
+| Parameter tag (`engineTag`) | `fmp`: `t{N}_fmp_algo`, `_tune`, `_ratio`, `_index`, `_idec`, `_fdbk`, `_dive`, `_dtime`, `_decay`, `_fold`, `_noise`. Named exception to "the engine's lower-case name" (the tag `fmperc` is long and the ids are typed in mapping files and read in DAW lists); the exception is this row, not a licence |
+| Mod-target ids (`MuOnModDest.h`, `kFmPercDests`) | `fp.<id>.prop` (`fp.tune.prop` ...), parameters `fmp_*`, `allUnderPrefix(kFmPercDests, "fmp_")`; the `f` letter stays free |
+| Class and file | `mu_on::FmPercEngine` in `mu-on/Source/Audio/FmPercEngine.h` (header-only like `RumbleEngine`, one class per file; no helper file until a second product wants it, then the helper moves to `mu-core/Audio/` before the second copy) |
+| Disc initial | **F** (taken: E Rhythm, P Pattern, A Arp, K, B, H, S, R; "P" is Pattern's, "F" is FM's own letter) |
+| Chooser descriptor | one line, 20 characters or fewer: "FM percussion" proposed (`ux-controller` owns the final wording and the six-card group fit) |
+| Factory presets | `.muTrack` files in mu-On's `Tracks/` folder (`FmPerc <Algorithm>`), not a new extension |
+
+The ten knob labels are one fixed set for all eight algorithms (Andy's decision): proposed `Tune, Ratio, Index, FM Dec, Fdbk, Dive, D.Time, Decay, Fold, Noise` plus the `Algo` dropdown first
+(wording is `ux-controller`'s). The algorithm names are the choice items, appended only: Tom, Conga, Zap, Click, Clank, Wood, Pluck, Burst. Any later engine of mu-On follows this row's recipe.
 
 **Product naming pattern.** `mu-<Name>` in prose and artefacts (`mu-Clid`, `mu-Tant`), slug `mu-<name>` in
 folders and targets, namespace `mu_<name>`. A descriptive suffix (`mu-Clid MIDI`) is allowed only for a
@@ -283,6 +311,8 @@ unique", legitimate because the type is one `mu-core` class (§1).
 ---
 
 ## 4. Audit — where the code differs from §3 (2026-10-09)
+
+**Status: done (layer extraction closed at E6, 2026-10-19).** The rows below for the layer noun, parent class, `Slot` in layer APIs and mu-core vocabulary describe the pre-extraction state and are history: every product's layer is a `mu_core::Layer` subclass (`SampleRhythm`, `Pattern`, `Arp`, `Track`) with its own `mu-<product>-layer` library, and the four `Source/` roots have unique relative paths (`ToniScales.h`, `TantScales.h`; `mu-layer-link-test` builds all four together). Still open: the Acronyms, Members and Enums rows, and the shared held-key helper (Held-key helper row), owed before mu-Tronic T1.
 
 | Area | Finding |
 |---|---|
@@ -306,6 +336,8 @@ unique", legitimate because the type is one `mu-core` class (§1).
 ---
 
 ## 5. Migration order (safest first)
+
+**Status: done (2026-10-19, E6).** Steps 2 to 5 are complete, including 5.7 (mu-Clid's `Rhythm` takes its engine, MIDI engine, play state and samples as `mu_clid::SampleRhythm`, the extraction-plan E5) and 5.8 (the layer-type contract `Layer::render` / `renderLayers`, extraction-plan E1). Step 1 (cosmetic) was never a gate and remains optional. The text below is kept as the record of the order.
 
 C++ identifier changes never touch saved files; the data renames at the end do.
 

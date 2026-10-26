@@ -28,6 +28,9 @@ public:
     // Send-bus processing: runs delay with no dry/wet blend (wet-only output).
     void processReturn(juce::AudioBuffer<float>&);
 
+    // Silence the delay lines and the feedback state. Audio thread; no allocation.
+    void reset();
+
     // Free mode
     void setDelayMs(float ms);
 
@@ -42,14 +45,19 @@ public:
     // Spread sets the right-channel delay target, so it re-derives both targets (as a time change does).
     void setSpread(float s)     { spread.store(juce::jlimit(0.0f, 1.0f, s), std::memory_order_relaxed); updateDelayFromMode(); }
     void setDirt(float d)       { dirt.store(juce::jlimit(0.0f, 1.0f, d), std::memory_order_relaxed); }
-    void setHostBpm(double bpm) { hostBpm  = bpm; if (timeMode.load(std::memory_order_relaxed) == TimeMode::Sync) updateDelayFromMode(); }
+    void setHostBpm(double bpm) { hostBpm.store(bpm, std::memory_order_relaxed); if (timeMode.load(std::memory_order_relaxed) == TimeMode::Sync) updateDelayFromMode(); }
 
 private:
     void updateDelayFromMode();
     void setDelaySamplesLR(float sampL, float sampR);
     float processDirt(float x) const;
 
-    static constexpr int MaxDelaySamples = 4 * 192000;  // 4s at 192kHz
+    // Delay line length in samples. 4 s at 192 kHz was the old fixed size; that clamped a long sync time
+    // (8 quarters at 60 BPM) at high rates, so the length is at least this and at least kMinDelaySeconds
+    // at the prepared rate. Set by the constructor and prepare only.
+    static constexpr int    kBaseDelaySamples = 4 * 192000;
+    static constexpr double kMinDelaySeconds  = 8.5;
+    int maxDelaySamples = kBaseDelaySamples;
 
     // Fields read on the audio thread are atomic — setEnabled / setFeedback /
     // setDirt / setSpread / setTimeMode can be called from parameterChanged on
@@ -59,17 +67,19 @@ private:
     std::atomic<float>    spread   { 0.0f };
     std::atomic<float>    dirt     { 0.0f };
     double sr         = 44100.0;
-    double hostBpm    = 120.0;
+    std::atomic<double> hostBpm { 120.0 };
 
     std::atomic<TimeMode> timeMode { TimeMode::Free };
-    float    delayMs  = 250.0f;
-    int      syncDenominator = 4;
-    bool     syncDotted      = false;
-    bool     syncTriplet     = false;
-    int      syncCount        = 1;
+    // Time settings: written by automation or the UI on any thread (setDelayMs, setTimeDivision, setTimeCount,
+    // setSpread, setHostBpm), read by whichever thread re-derives the targets, so all atomic.
+    std::atomic<float> delayMs         { 250.0f };
+    std::atomic<int>   syncDenominator { 4 };
+    std::atomic<bool>  syncDotted      { false };
+    std::atomic<bool>  syncTriplet     { false };
+    std::atomic<int>   syncCount       { 1 };
 
-    float targetDelayL   = 0.0f;  // in samples (target)
-    float targetDelayR   = 0.0f;
+    std::atomic<float> targetDelayL { 0.0f };  // in samples (target); two writers, one audio reader
+    std::atomic<float> targetDelayR { 0.0f };
     float smoothedDelayL = 0.0f;  // exponentially smoothed toward target (50ms glide)
     float smoothedDelayR = 0.0f;
     float smoothCoeff    = 1.0f;  // per-block smoothing coefficient

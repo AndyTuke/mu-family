@@ -36,6 +36,7 @@ public:
         std::function<Stage(int)>  stageItem;                 // stage item n's full preset
         std::function<void()>      cancelItem;                // drop the staged full preset
         std::function<int()>       layerCount;                // how many layers are live (bounds SelectLayer)
+        std::function<bool(int)>   layerPresent;              // optional: false for an Empty slot of a slot host
         std::function<int(int)>    layerColourIndex;          // layer n's index into the shared layer palette
         std::function<bool()>      fullPending;               // some full preset is staged and not yet committed
         std::function<uint32_t()>  stageSerial;               // changes whenever ANY full preset is staged (identity)
@@ -43,6 +44,10 @@ public:
 
         // The clip bank. All optional: without them every clip action is refused.
         std::function<bool(int, int)> launchClip;            // stage clip c on layer n (false = refused, nothing staged)
+        std::function<void()>         beginStageBatch;       // a scene opens a staging batch (optional): its layers reach a boundary together
+        std::function<void()>         endStageBatch;         // and closes it
+        std::function<void(int, int)> preloadClip;           // warm clip c of layer n (its files) before the batch opens (optional)
+        std::function<void(int)>      markSceneSlot;         // layer n's staged clip belongs to the scene (optional)
         std::function<bool(int)>      slotPending;           // layer n has a staged layer preset not yet committed
         std::function<uint32_t(int)>  slotSerial;            // changes whenever layer n is staged or cancelled (identity)
         std::function<void(int)>      cancelSlot;            // drop layer n's staged layer preset
@@ -52,6 +57,11 @@ public:
         std::function<bool()>         transportPlaying;      // the internal clock runs (optional)
         std::function<bool()>         transportOutside;      // a host / MIDI clock / Link owns play (optional)
         std::function<int(int)>       savedClip;             // the clip layer n was saved playing (-1 = none, or it is not stored any more)
+        std::function<bool(int, int)> clipFitsLayer;         // clip c of layer n is of the layer's own type (optional: absent = it is)
+        std::function<bool()>         clipboardEmpty;        // nothing on the clip clipboard (optional: absent = empty)
+        std::function<bool(int)>      canPasteClip;          // layer n would take the clipboard clip (optional: absent = no)
+        std::function<bool()>         hasSceneControls;      // this product offers scenes on a surface (optional: absent = no)
+        std::function<bool()>         hasLayerPages;         // this product offers layer pages on a surface (optional: absent = no)
     };
 
     void setCallbacks(Callbacks c) { cb = std::move(c); }
@@ -64,6 +74,8 @@ public:
     int                           getQueuedItem()     const noexcept override { return queuedItem; }
     int                           getSelectedLayer()  const noexcept override { return selectedLayer; }
     int                           getLayerCount()     const override       { return cb.layerCount ? cb.layerCount() : 1; }
+    bool                          isLayerPresent(int layer) const override
+    { return layer >= 0 && layer < getLayerCount() && (! cb.layerPresent || cb.layerPresent(layer)); }
     int                           getLayerColourIndex(int layer) const override
     { return cb.layerColourIndex ? cb.layerColourIndex(layer) : (layer < 0 ? 0 : layer % 8); }
     bool                          isItemPlayable(int item) const override    { return itemLoadable(item); }
@@ -75,6 +87,14 @@ public:
     { return inRange(layer) && clip >= 0 && clip < mu_limits::kClipsPerLayer ? clipState[(size_t) layer].names[(size_t) clip] : juce::String(); }
     bool                          isLayerMuted(int layer)   const override
     { return layer >= 0 && layer < getLayerCount() && cb.layerMuted && cb.layerMuted(layer); }
+    bool                          isClipForLayer(int layer, int clip) const override
+    { return ! cb.clipFitsLayer || cb.clipFitsLayer(layer, clip); }
+    bool                          isClipboardEmpty() const override { return ! cb.clipboardEmpty || cb.clipboardEmpty(); }
+    bool                          canPasteClip(int layer) const override { return cb.canPasteClip && cb.canPasteClip(layer); }
+    bool                          isFullPresetStaged() const override { return cb.fullPending && cb.fullPending(); }
+    SceneLaunch                   getLastSceneLaunch() const override { return lastScene; }
+    bool                          hasSceneControls() const override   { return cb.hasSceneControls && cb.hasSceneControls(); }
+    bool                          hasLayerPages() const override      { return cb.hasLayerPages && cb.hasLayerPages(); }
     bool isTransportPlaying() const override      { return cb.transportPlaying && cb.transportPlaying(); }
     bool isTransportOwnedOutside() const override { return cb.transportOutside && cb.transportOutside(); }
     void addListener(Listener* l) const override    { listeners.add(l); }
@@ -86,7 +106,7 @@ public:
 
     // ── Actions ──────────────────────────────────────────────────────────────
     // True for the types this class owns: PerformanceMode, PerformanceItem, PerformancePrev, PerformanceNext, SelectLayer,
-    // LaunchClip, ClipNext, ClipPrev.
+    // LaunchClip, ClipNext, ClipPrev, PagePrev, PageNext.
     static bool handles(ControlActionType t) noexcept;
 
     // Performs one of those. Every one but PerformanceMode and LaunchClip returns false while the mode is off
@@ -97,6 +117,12 @@ public:
     // layer's mute; an empty pad does nothing; any other stored clip launches (playing at once when the
     // transport is stopped, queued until its commit otherwise). ClipNext / ClipPrev step the SELECTED layer
     // to the next / previous stored clip, wrapping, and never mute.
+    // LaunchScene(index): clip `index` on every layer that stores one, staged as one batch so a boundary takes all or
+    // none. A layer already playing that clip is left alone (a scene never mutes), one with a different clip waiting
+    // has its wait cancelled, and a layer with no such clip, or whose clip is refused, keeps playing as it is.
+    // True when at least one layer launched or already plays the clip.
+    // PagePrev / PageNext (mode on, product offers pages): select the layer at the same position on the adjacent page, clamped
+    // to the last layer; refused at the first / last page, so the page buttons do not wrap. The page itself is derived from the selection.
     bool perform(const ControlAction& action);
 
     // The owner's "a full-preset swap just committed" hook (message thread): the queued item becomes
@@ -134,6 +160,10 @@ public:
     void clearLayerClips(int layer);
     // Clip c of layer n was cleared: if it was playing nothing plays; if it was queued the staged launch is cancelled.
     void clipCleared(int layer, int clip);
+    // Clip c of layer n was overwritten by a paste while it is the playing (or launch-waiting) one: its new contents are
+    // launched again as a normal staged launch (playing at once when stopped, queued otherwise), so the lit pad equals what
+    // plays. False, with no light changed, when the launch could not be staged.
+    bool clipPasted(int layer, int clip);
     // Layers were removed or swapped: playing clips and masks follow their layer (`oldToNew` gives the new index,
     // or -1 when the layer is gone); a moved layer's queued launch is dropped (the edit cancelled it).
     void remapLayers(const std::function<int(int)>& oldToNew);
@@ -162,7 +192,10 @@ private:
     };
     static bool inRange(int layer) noexcept { return layer >= 0 && layer < mu_limits::kMaxLayers; }
     bool startClip(int layer, int clip);
+    bool launchAndTrack(int layer, int clip);
     bool stepClip(int direction);
+    bool stepPage(int direction);
+    bool launchScene(int clip);
     void setPlaying(int layer, int clip);
     bool dropClipState();           // forgets every layer's playing and queued clip; true when something was set
     bool seedClipsFromLayers();     // each layer's saved playing clip becomes its playing clip; true when any did
@@ -182,6 +215,7 @@ private:
     uint32_t               queuedSerial    = 0;   // the stage serial when the queued item was staged
     uint32_t               revision        = 0;
     std::array<ClipState, (size_t) mu_limits::kMaxLayers> clipState {};
+    SceneLaunch            lastScene;             // what the last LaunchScene did
     uint32_t               seenFullCommits = 0;   // the full-preset commit count the clip state was last settled against
     mutable juce::ListenerList<Listener> listeners;
 };

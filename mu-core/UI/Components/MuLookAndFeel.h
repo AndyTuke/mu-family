@@ -1,6 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "MuTheme.h"
+#include "MuLimits.h"   // mu_limits::kMaxBuses: the mixer's Buses page
 #include <cmath>
 #include <vector>
 
@@ -177,6 +178,7 @@ public:
         appGreen                = 0x100000d4,
         appBlue                 = 0x100000d5,
         appYellow               = 0x100000d6,
+        appIce                  = 0x100000da,   // mu-Tronic's near-white (the host of the other four)
 
         // Status lamps: a fault (e.g. MIDI clock lost) — its own red, not the VU clip red.
         indicatorFault          = 0x100000d7,
@@ -213,6 +215,11 @@ public:
     // colours and the global (mixer) accent follow it, so nothing stays in the family purple.
     void setAppAccent(juce::Colour c);
     static juce::Colour appAccent(juce::Component& c);
+    // A host of several layer types paints the main area of the shown layer in that type's colour while its
+    // chrome keeps the app's own: `root` and everything under it read `colour` from appAccent, from the main-page
+    // knobs and from lit LCDs instead of the LookAndFeel's app colour. clearAccentOverride restores it.
+    static void setAccentOverride(juce::Component& root, juce::Colour colour);
+    static void clearAccentOverride(juce::Component& root);
     // An app's main page: every knob under `root` is drawn in the app colour (metal style with
     // an app colour set) instead of its own category colour. The editor shell marks the main panel.
     static void useAppColourKnobs(juce::Component& root);
@@ -322,6 +329,9 @@ public:
     struct Section { juce::Rectangle<int> box; juce::String name; };
     static void drawSections(juce::Graphics&, const juce::Component& owner,
                              std::initializer_list<Section> sections, juce::Colour accent);
+    // The same for a list built at run time (a panel whose boxes come and go with its content).
+    static void drawSections(juce::Graphics&, const juce::Component& owner,
+                             const std::vector<Section>& sections, juce::Colour accent);
 
     // Text buttons
     void drawButtonBackground(juce::Graphics&, juce::Button&,
@@ -344,10 +354,12 @@ public:
     static juce::Colour colour(ColourIds id) noexcept;
 
     // Fixed 8-colour voice palette (Red / Cyan / Orange / Magenta / Lime / Rose / Silver /
-    // Navy), index = the voice's colour index. The app primaries (appPurple / appGreen /
-    // appBlue / appYellow) are kept out of it so a voice highlight never matches the paint.
+    // Blue), index = the voice's colour index. Every entry is a Launchpad X palette colour, so
+    // pad and screen agree. The app primaries (appPurple / appGreen / appBlue / appYellow) are
+    // kept out of it so a voice highlight never matches the paint.
     static constexpr int kLayerPaletteSize = 8;
     static const juce::Colour layerPalette[kLayerPaletteSize];
+    static const char* const layerPaletteNames[kLayerPaletteSize];   // lower-case hue name per entry
 
     // ──────────────────────────────────────────────────────────────────────
     // Medium-baseline sizing constants. Single source of truth — change the
@@ -422,6 +434,7 @@ public:
     static constexpr int kTonalRootW  = 56;
     static constexpr int kTonalScaleW = 100;
     static constexpr int kTonalGap    = 12;
+    static constexpr int kLcdSegmentW = 56;   // one window of a two-option LCD selector (mu-Clid's Sample | MIDI; a Pattern's Free | Note)
     static constexpr int kAddButtonW      = 110;       // "+ Target" / "+ Assignment" (metal: a normal button, centred)
     static constexpr int kChannelInset     = kPanelPad + 1;                                     // 7
     static constexpr int kCircleInnerSize = kCircleSize     - 2 * kChannelInset;                // 274
@@ -492,6 +505,17 @@ public:
                                               - 2 * kMixerDivW - kMixerMasterTotalW
                                               - (8 - 1) * kMixerChanGap) / kMixerNumChans;    // 73
 
+    // The mixer's Buses page (a product with group buses): one unit per bus, a channel-style strip with its
+    // insert column beside it, a divider after each unit, then the Master. The strip width is whatever the
+    // page leaves after the units' insert columns; it must stay at least one channel strip wide, which holds
+    // for three buses (138) and not for four, by design: a fourth needs a layout ruling, not squeezed strips.
+    static constexpr int kMixerNumBuses    = mu_limits::kMaxBuses;
+    static constexpr int kMixerBusStripW   = kMixerNumBuses > 0
+        ? (kMixerOverlayW - kMixerLabelPanelW - kMixerMasterTotalW - kMixerNumBuses * kMixerDivW) / kMixerNumBuses - kMixerInsertPanelW
+        : 0;
+    static_assert(kMixerNumBuses == 0 || kMixerBusStripW >= kMixerChanW,
+                  "the Buses page cannot fit this many buses at the strip width: it needs a layout ruling");
+
     // ── Canonical knob sizes ──────────────────────────────────────────────
     // Four buckets — every knob in the plugin picks one.
     //
@@ -541,6 +565,14 @@ public:
     static constexpr int   kKnobTopPad    = 4;    // pad above the rotary (room for mod ring)
     static constexpr float kKnobLabelFont = 10.0f;
     static constexpr float kKnobValueFont = 8.0f;
+    static constexpr float kEngravedCaptionFont = 11.0f;   // sidebar and header engraved captions (Scene, Page, Notes In)
+    // The empty-slot chooser's typography and chrome (docs/mu-tronic/design-ui.md 4.3): the card descriptor and hint,
+    // the empty-registry message ("one size up"), the margin round the panel, the message inset and the card corner.
+    static constexpr float kCardTextFont        = 12.0f;
+    static constexpr float kChooserMessageFont  = 14.0f;
+    static constexpr int   kChooserPanelMargin  = 2;
+    static constexpr int   kChooserMessageInset = 20;
+    static constexpr float kCardCorner          = 4.0f;
     static constexpr int   kKnobValueH    = 11;   // value-text box height inside the rotary dead zone
 
     // The family's rotary sweep — the single source of truth for every angle a knob is
@@ -762,6 +794,16 @@ public:
     static constexpr int kClipLabelW    = 30;   // the engraved "Clip" caption's slot
     static constexpr int kClipStripGap  = 8;    // between the strip and the preset dropdown
 
+    // The layer's Notes In control in the header bar (docs/design-ui-family.md 13.10): an engraved caption and a channel selector.
+    static constexpr int kNotesInLabelW = 44;
+    static constexpr int kNotesInW      = 106;
+
+    // The StatusBar's CPU readout (docs/design-ui-family.md section 6): its slot, and the load fractions where the number
+    // turns amber and red.
+    static constexpr int   kStatusCpuW = 64;
+    static constexpr float kCpuWarnAt  = 0.70f;
+    static constexpr float kCpuHotAt   = 0.90f;
+
     // Name plates (drawNamePlate): section and row names
 
 private:
@@ -770,6 +812,9 @@ private:
     bool         screws       = false;
     bool         hasAppAccent = false;
     juce::Colour appAccentColour;
+    // The accent override that applies to `c` (the nearest ancestor's, itself included), if any.
+    static bool accentOverrideFor(const juce::Component& c, juce::Colour& out);
+
     // The colour a knob is drawn in: the app colour on a main page (useAppColourKnobs), else its own.
     juce::Colour knobColour(const juce::Slider&) const;
 };

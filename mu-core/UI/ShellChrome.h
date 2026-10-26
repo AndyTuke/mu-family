@@ -5,7 +5,7 @@
 #include <vector>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Plugin/ShellBackend.h"
-#include "Plugin/UpdateChecker.h"
+#include "UI/UpdateNotice.h"
 #include "Control/LiveView.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/StatusBar.h"
@@ -166,6 +166,10 @@ public:
     bool keyStateChanged(bool isKeyDown, juce::Component* originator) override;
     void parentHierarchyChanged();
 
+    // PageUp (-1) / PageDown (+1): a host with paged panels (mu-Tronic) switches page. Called when no text field
+    // has focus and no overlay but the mixer is up; true = handled. Unset (the default): the keys are left alone.
+    std::function<bool(int delta)> onPageKey;
+
     // ─── Look ────────────────────────────────────────────────────────────────
     // The family's metal look; `appAccent` is the product's colour (transparent keeps globalAccent).
     void setMetalStyle(bool metal, juce::Colour appAccent = juce::Colours::transparentBlack);
@@ -240,12 +244,7 @@ private:
     void leaveLock();
     void raiseShield();   // back on top after a child was added above it
 
-    mu_core::update_check::Entry updateEntry;   // this product's latest build (stored or just fetched)
-    bool updateWanted  = false;
-    bool fetchInFlight = false;
-    juce::SharedResourcePointer<mu_core::update_check::UpdateChecker> updateChecker;   // held for the editor's life so the fetch is not cancelled
-    void refreshUpdateLink();
-    void dismissUpdateNotice();
+    UpdateNotice updateNotice { backend, statusBar };   // the status-bar update link
 
     // Opens the Preset Browser in pick mode for the chooser; closing it (picked or not) returns to the chooser.
     void pickPresetForChooser(std::function<void(const juce::File&)> picked);

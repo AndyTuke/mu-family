@@ -33,6 +33,8 @@
 #include "Plugin/LayerBlock.h"      // the audio thread's one way to the layers (render contract)
 #include "Plugin/TransportResolver.h"
 #include "Sequencer/RenderContext.h"
+#include "Sequencer/HeldKeyTable.h"
+#include "Sequencer/LayerTypeRegistry.h"
 #include "Plugin/RetireBin.h"
 #include "Plugin/MidiClockSync.h"
 #include "Plugin/ShellBackend.h"   // the interface the shared shell chrome consumes
@@ -132,6 +134,53 @@ public:
     virtual bool canReorderLayers() const { return canEditLayers(); }
     int          addLayer();
     bool         removeLayer(int idx);
+
+    // ─── Typed slots (a host whose slots each hold one of several layer types: mu-Tronic) ──────────
+    // True when the layers are fixed positions rather than a list: the live count never changes (it is the
+    // capacity), a deleted layer leaves its slot Empty and nothing above it shifts, and a state restore keeps
+    // the count. Such a host runs in LayerAccess::Published and changes a slot with setLayerType; the shared
+    // delete (deleteLayer) then empties the slot. Set by the product; the four list products leave it false.
+    virtual bool layersAreSlots() const { return false; }
+    // The layer types the host offers a slot (Empty is always available and is not listed).
+    const mu_core::LayerTypeRegistry& getLayerTypes() const noexcept { return layerTypes; }
+    // Message thread. The services `info`'s layers share (design 2.4), built on first need by info.createServices and
+    // kept until the processor is destroyed; prepared at once when the processor has been prepared. Null for a type
+    // that declares none. setLayerType calls it before it creates the type's first layer; a type's host adapter and
+    // content call it to reach what the type shares.
+    mu_core::LayerServices* ensureLayerServices(const mu_core::LayerTypeInfo& info);
+    // The services already built for `id`, or null (none yet, or the type declares none). Message thread.
+    mu_core::LayerServices* findLayerServices(mu_core::LayerTypeId id) const;
+    // Any thread, allocation-free: asks for a deferred-work pass, in which every built services object runs its
+    // LayerServices::deferredWork on the message thread.
+    void requestLayerServicesWork() noexcept { requestDeferredWork(); }
+    // Message thread. Gives `slot` a fresh layer of `type` (Empty empties it) without muting anything: the
+    // new layer is built and prepared first, the old one is published away and sounds out in the retire bin,
+    // the slot's type parameters go back to defaults (or take `initial`, a layer node) while nothing live reads
+    // them, and the new layer is published; the mixer strip, the colour and the name stay. Two view
+    // publications with a grace wait between them (design 2.1.2). Published mode only; false for a slot out of
+    // range, a type the host does not offer, or a host in TryLock mode. Setting the type the slot has is a no-op.
+    bool         setLayerType(int slot, mu_core::LayerTypeId type, const juce::ValueTree* initial = nullptr);
+    // Message thread. A layer the user newly creates (the chooser): setLayerType, starting from the app's own default for
+    // the type when its preset folder holds `_default.<ext>` of that type, else from the type's built-in default. A missing,
+    // unreadable or other-type default file is ignored quietly. A state restore, a staged preset or a loaded file never
+    // come through here, so they always win.
+    bool         createLayerOfType(int slot, mu_core::LayerTypeId type);
+    // The layer in this slot is about to be retired or moved: drop every pointer into it. Message thread, outside every
+    // lock. Called by setLayerType (design step 3) before the old layer is retired, and by a Published host's swapLayers for
+    // both slots before they move. The editor releases the modulator panel and the content's bindings and rebinds when it
+    // shows the slot again; it must clear this in its destructor, as the other shell callbacks. It runs on the thread that
+    // calls the edit, which is the message thread (asserted): a state restore on a host thread must marshal to it first.
+    std::function<void(int slot)> onLayerLeaving;
+    // Message thread. The slot the editor shows: LayerPanel::setLayer stores it, every product's editor routing the
+    // shown layer through it. A typed host's layer-preset folder and extension follow the type of this slot
+    // (typedLayerPresetDir); for the four list products it is a harmless store.
+    void setSelectedSlot(int slot) noexcept
+    {
+        selectedSlot.store(juce::jlimit(0, mu_limits::kMaxLayers - 1, slot), std::memory_order_relaxed);
+    }
+    int  getSelectedSlot() const noexcept { return selectedSlot.load(std::memory_order_relaxed); }
+    // The shell's delete: a list product removes the layer (the ones above shift down); a slot host empties it.
+    bool         deleteLayer(int idx) { return layersAreSlots() ? setLayerType(idx, mu_core::LayerTypeId::Empty) : removeLayer(idx); }
     virtual bool swapLayers(int a, int b);
     virtual void resetLayer(int layer);
 
@@ -154,6 +203,13 @@ public:
     // `b` exchanged. A product that keeps per-slot state of its own (engines, tails, play state)
     // moves it here; like layersMoved it must only move and reset, never allocate or wait.
     virtual void layersReordered(LayerEdit kind, int a, int b) { juce::ignoreUnused(kind, a, b); }
+
+    // Called by removeLayer only, under layoutWriteLock and layersLock with processing suspended, after the
+    // layer has left its slot and before layersReordered(Remove, index, -1): `removed` is the layer that was
+    // at `index` and is destroyed after the locks are released. A product whose layers carry state that must
+    // outlive them (something still owed to the output) moves it into storage it owns here. Like
+    // layersReordered it must only move and reset, never allocate or wait. Default: nothing.
+    virtual void layerRemoved(Layer& removed, int index) { juce::ignoreUnused(removed, index); }
 
     // True when the product's own layer data, not the parameter tree, is the truth for the slot's
     // sound (mu-Clid's Rhythm, where the parameters mirror it). The edits then do not copy parameter
@@ -336,12 +392,20 @@ public:
     // the editor can refresh what APVTS attachments don't cover. The editor must clear it in its
     // destructor (the processor can outlive the editor).
     virtual juce::Array<juce::File> slotPresetFiles(int slot) const;   // default: every file in the per-slot dir
-    virtual void saveLayerPreset(int /*slot*/, const juce::String& /*name*/) {}
-    virtual void loadLayerPreset(int /*slot*/, const juce::File& /*file*/)   {}
+    // A typed slot host (layersAreSlots) saves and loads through the registry (saveTypedLayerPreset /
+    // loadTypedLayerPreset below); every other host does nothing here and the product overrides.
+    virtual void saveLayerPreset(int slot, const juce::String& name) { if (layersAreSlots()) saveTypedLayerPreset(slot, name); }
+    virtual void loadLayerPreset(int slot, const juce::File& file)   { if (layersAreSlots()) loadTypedLayerPreset(slot, file); }
 
     // The layer's state as the tree its layer-preset file holds (root tag included), without the file.
     // A clip is exactly this tree. Default: an invalid tree (the product has no clips).
-    virtual juce::ValueTree captureLayerPresetTree(int /*slot*/)             { return {}; }
+    // A typed slot host (layersAreSlots) captures the node of the slot's type, which carries the type (its tag and rows).
+    virtual juce::ValueTree captureLayerPresetTree(int slot)
+    {
+        if (! layersAreSlots()) return {};
+        const auto* info = layerTypes.find(slotTypeId(slot));
+        return info != nullptr && juce::String(info->presetTag).isNotEmpty() ? captureLayerNode(slot, info->presetTag) : juce::ValueTree();
+    }
 
     // Clip bank (message thread only). A clip is a layer-preset tree kept in the layer's ClipBank;
     // launching one is a layer-preset load from that tree, so a stopped transport applies it now and a
@@ -362,6 +426,56 @@ public:
     // preset is staged, or the stage hook staged nothing (a clip that cannot be built). The hook must change
     // slotStageSerial(slot) whenever it stages or applies a payload, as every stage path does.
     bool    launchClip(int slot, int clip);
+
+    // Clip clipboard (mu_core::clipClipboard(), one per process; message thread). Copy puts a deep copy of a stored clip on it
+    // (refused for an empty clip; the bank is unchanged). Cut is a copy and then a clear: when the copy fails nothing is cleared.
+    // Paste writes the clipboard clip into `clip` (name included), replacing what is there, and never lights it: a paste is not
+    // "what you are playing". Pasting onto the lit (or launch-waiting) clip is a staged relaunch of it, with launchClip's rules,
+    // so the lit pad still equals what plays; when that relaunch cannot be staged nothing is changed. The clipboard keeps its
+    // clip through a paste and a cut. A paste is refused for a clip of another layer type (see clipFitsSlot) or while a full
+    // preset is staged.
+    bool    copyClip(int slot, int clip);
+    bool    cutClip(int slot, int clip);
+    bool    pasteClip(int slot, int clip);
+    // Whether pasteClip would take the clipboard clip into layer `slot` (menu enabling): a clip is held and fits the layer.
+    bool    canPasteClip(int slot);
+    // The one type check every route into a bank shares (launch, file load, paste): `tree` is a layer preset of this
+    // layer's own kind. A list host compares the root tag with the one a capture of the layer writes; a typed slot host
+    // compares the layer type the tree carries with the slot's.
+    bool    clipFitsSlot(int slot, const juce::ValueTree& tree);
+    // A scene: clip `clipIndex` launched on every layer that stores one, staged as one batch so the layers reach
+    // their boundary together (the clip bank stays per layer; the scene is only the index). A layer without that clip,
+    // or whose clip is of another type than its slot, keeps playing. Returns whether any layer launched or already
+    // plays it. Message thread.
+    bool    launchScene(int clipIndex);
+    // True for a product that offers scenes on a controller surface (the Launchpad's scene picker): mu-Tronic. Every product can
+    // launch a scene (LaunchScene is a ControlAction); this only says the surface should show the picker.
+    virtual bool offersSceneControls() const { return false; }
+    // True for a product whose layers span several pages that a controller surface should page through (PagePrev / PageNext on
+    // the top row): mu-Tronic. The page is the one the selected layer is on, so the screen and the surface share it.
+    virtual bool offersLayerPages() const { return false; }
+    // Clip auto-save (message thread). A layer whose clip is lit (liveState playing clip) has its edits written back to
+    // that clip: the 100 Hz swap poll captures the layer (captureLayerPresetTree), and a capture that differs from the
+    // BASELINE (what the stored clip is known to equal live, never the stored tree itself) and then holds still for one
+    // more step is stored. One layer is visited per step, about every 400 ms. Nothing runs on the audio thread.
+    // Skipped while the setting is off, in Performance mode, while a full preset is staged, during an offline render,
+    // and while a swap that is not our clip launch is pending.
+    bool isClipAutoSaveOn() const noexcept override { return clipAutoSaveOn; }
+    // True when any layer can be captured into a clip (every product with a clip strip).
+    bool hasClipBank() override
+    {
+        if (layersAreSlots()) return true;
+        for (int l = 0; l < getNumLayers(); ++l)
+            if (captureLayerPresetTree(l).isValid()) return true;
+        return false;
+    }
+    // The shell preference "clipAutoSave" (default on): a behaviour of the app, kept in the app settings, not a parameter.
+    void setClipAutoSave(bool on) override;
+    // Captures layer `slot` (-1 = every lit layer) and writes it to its lit clip when it differs from the baseline, with no
+    // settle wait. Called by the launch, copy / cut, structural edits and state captures so the bank is current when read.
+    void flushClipAutoSave(int slot = -1);
+    // One visit of the round-robin watch (the swap poll calls it on its 400 ms schedule). True when it wrote a clip.
+    bool stepClipAutoSave();
     uint8_t clipMask(int slot) const;
     // How many clips layer `slot` stores (0 for no such layer).
     int     clipCount(int slot) const
@@ -480,6 +594,13 @@ public:
     // products leave it null, so the overlay simply reports "unavailable". isLicensed() in a
     // licensed product returns true when the offline `.lic` OR the online activation is valid.
     std::function<mu_core::OnlineActivationOutcome(const juce::String& licenseKey)> activateOnlineFn;
+
+    // Runs activateOnlineFn on a worker this processor owns and joins in prepareForDestruction, so the call
+    // (which captures the processor and blocks on the network) can never outlive the processor or the plugin
+    // module. `done` runs on the message thread with the outcome, and not at all once the processor is being
+    // torn down. Message thread. One request at a time: false when none is set or one is already running.
+    bool activateOnlineAsync(const juce::String& licenseKey,
+                             std::function<void(const mu_core::OnlineActivationOutcome&)> done);
     std::atomic<bool> onlineActivated { false };
     bool isOnlineActivated() const noexcept { return onlineActivated.load(std::memory_order_relaxed); }
 
@@ -600,6 +721,13 @@ protected:
     // The count a state without `numVoices` loads with: the product's count before layers were
     // editable. Set once in the product's constructor.
     int unsavedLayerCount = 1;
+    // A typed slot host (layersAreSlots): each slot has several prefixes, one per layer type that has its own rows
+    // (prefixSets[i] are slot i's). Only the live type's prefix is saved, applied and reset; setLayerType names it.
+    void initLayerStatePrefixSets(const std::vector<juce::StringArray>& prefixSets)
+    {
+        initLayerState({});
+        layerLayout = mu_pp::LayerLayout::withPrefixSets(*this, prefixSets);
+    }
     juce::ValueTree captureLayerNode(int slot, const juce::Identifier& type) { return mu_pp::captureLayer(layerLayout, layerExtras, slot, type); }
     void            applyLayerNode(int slot, const juce::ValueTree& node)    { mu_pp::applyLayer(layerLayout, layerExtras, slot, node); }
     // A state in the composed shape: an older APVTS-dump state is rebuilt (`otherChild` receives
@@ -618,12 +746,19 @@ protected:
     // strips) through `remap(paramValue)`. The parameter is 0 = off, 1..8 = channel 0..7, 9 = the
     // external bus; a structural edit renumbers the layers, so a strip must follow its source's new slot.
     void remapSidechainSources(const std::function<int(int)>& remap);
+    // The same over a parameter list found beforehand (sidechainSourceParams), so a caller can do the lookups outside a
+    // window in which the audio thread is excluded.
+    std::vector<juce::RangedAudioParameter*> sidechainSourceParams();
+    void remapSidechainSources(const std::vector<juce::RangedAudioParameter*>& params, const std::function<int(int)>& remap);
 
     // A parameter whose value names another layer (such as a processing layer's source layer) must follow its layer
     // through removeLayer and swapLayers, like the sidechain sources. Called in phase 3 of both, with
     // processing suspended and before the parameter values shift; `oldToNew` maps a layer index as it
     // was to the index it has now, or -1 when that layer is gone. The product rewrites its own
     // parameters through it. Default: nothing to rewrite. addLayer and resetLayer do not call it.
+    // A Published host's swapLayers calls it earlier, with the audio thread quiesced but BEFORE the layer pointers
+    // move, so layers[] and every parameter still sit at their old indices: a hook that reads a slot's layer type
+    // sees the type of the old index, as `oldToNew` expects.
     virtual void remapLayerReferences(const std::function<int(int)>& oldToNew) { juce::ignoreUnused(oldToNew); }
 
 protected:
@@ -659,6 +794,7 @@ protected:
             if (onPresetSwapCommitted) onPresetSwapCommitted();
         }
         commitDeferredWork();
+        runLayerServicesWork();
         settleLiveState();   // after the product's commits: a queued item or clip that landed or was superseded
         drainPendingMidiProgramChanges();
         // Left queued by a table edit in progress: ask for another pass so it is not stranded.
@@ -670,6 +806,8 @@ protected:
     // the swap poll; MIDI program changes and control actions, via the same mailbox). Runs before
     // queued program changes are loaded. Default: nothing.
     virtual void commitDeferredWork() {}
+    // Message thread: LayerServices::deferredWork of every services object built so far.
+    void runLayerServicesWork();
 
     // The staged preset swaps (a parsed state tree per layer plus one full preset), shared by every
     // product that does not need a richer payload. A product sets its appliers once in its
@@ -683,12 +821,64 @@ protected:
     // The tree of each layer's last non-clip stage that is still waiting for its boundary (invalid when none).
     // A store captures it instead of the live layer, which does not show that preset yet.
     std::array<juce::ValueTree, mu_limits::kMaxLayers> pendingPresetTree;
+
+    // Clip auto-save tracker of one layer (message thread only, never saved).
+    struct ClipWatch
+    {
+        int             clip = -1;        // the lit clip this tracker belongs to (-1 = nothing adopted)
+        juce::ValueTree baseline;         // the capture the stored clip is known to equal live
+        juce::ValueTree candidate;        // a differing capture seen last step, written when the next step sees it again
+        bool            expectSwap = false;   // a clip launch of this layer was staged: adopt a new baseline when it lands
+        bool            suspended  = false;   // a paste replaced the lit clip: no flush or write until its relaunch lands
+        uint32_t        serial = 0;       // the layer's stage serial right after that launch was staged
+        int             period = 1;       // visit every period-th round (doubles while a capture is slow)
+        int             wait   = 0;       // rounds still to skip before the next visit
+        void reset() { *this = ClipWatch(); }
+    };
+    std::array<ClipWatch, mu_limits::kMaxLayers> clipWatch;
+    int      clipWatchCursor     = 0;       // the next layer the round robin looks at
+    double   nextClipStepMs      = 0.0;     // when the poll next takes a step
+    uint32_t clipWatchFullCommits = 0;      // the full-commit count the trackers were last valid for
+    bool     clipAutoSaveOn      = true;
+    static constexpr double kClipAutoSaveStepMs = 400.0;
+    static constexpr double kClipCaptureBudgetMs = 4.0;   // a capture slower than this doubles that layer's visit interval
+
+    // Drops every tracker (structural edit, state restore, full preset): the next step re-adopts a baseline.
+    void dropClipWatches() { for (auto& w : clipWatch) w.reset(); }
+    void dropClipWatchesOnFullCommit();
+    // A structural edit moves, swaps or empties layers: save what is lit first, then forget every tracker.
+    void prepareClipWatchesForStructuralEdit() { flushClipAutoSave(); dropClipWatches(); }
+    // Message thread: flush + the state-capture rule (a host may call getStateInformation from another thread, where the
+    // bank is read as it stands and no flush is attempted).
+    void flushClipAutoSaveForStateCapture();
+    // The swap poll's hook: launch landings every tick, a step on the 400 ms schedule.
+    void pollClipAutoSave();
+    bool clipAutoSaveActive() const;
+    void resolveClipLaunches();
+    bool visitClipWatch(int slot, bool settle);
+    bool writeWatchedClip(int slot, int clip, const juce::ValueTree& capture);
     // Per slot, the preset (file stem or clip name) the layer's state last came from; empty = none known.
     // Message thread only; follows its layer through remove / swap, and is forgotten by a non-clip stage and a reset.
     std::array<juce::String, mu_limits::kMaxLayers> presetLabels;
     int lastTransportState = 0;                            // message thread: the transport state the live state was last told about
     std::atomic<bool> muteChanged { false };               // a strip mute parameter changed on some thread; the poll tells the live state
     std::array<juce::RangedAudioParameter*, mu_limits::kMaxLayers> muteParams {};   // ch{N}_mute, cached (null = none)
+    // ch{N}_midiIn raw values, cached (null = the product declares none: every layer hears every channel). The rows
+    // move with a layer through swap / remove, so slot N's atomic is always the channel of the layer now in slot N.
+    std::array<std::atomic<float>*, mu_limits::kMaxLayers> midiInRaw {};
+    // Audio thread. Sets the call's channel mask for the layer in slot `s`, and raises MidiView::inputReset for the one call
+    // after the mask changed: the keys the layer holds were filtered under the old mask, so a note-off the new mask no longer
+    // passes would strand them. On that call, and on a layer's first call, the keys physically held on the channels the mask
+    // passes are put in front of the call's events as carried note-ons (the layer was not there for their note-ons).
+    // Defined in ProcessorBase_Render.cpp.
+    void applyLayerChannelMask(mu_core::RenderContext& ctx, Layer& layer, int s) const noexcept;
+    // Audio thread. The MidiView channel mask for slot `s`: bit c = channel c+1; 0xFFFF for Omni or no such row.
+    uint16_t layerChannelMask(int s) const noexcept
+    {
+        const auto* raw = midiInRaw[(size_t) s];
+        const int ch = raw != nullptr ? juce::roundToInt(raw->load(std::memory_order_relaxed)) : 0;
+        return ch >= 1 && ch <= 16 ? (uint16_t) (1u << (ch - 1)) : (uint16_t) 0xFFFF;
+    }
     std::atomic<bool> fullPresetLoadFailed { false };   // set by a load that could not read its file
 
     // ─── The layer render contract (docs/mu-tronic/design.md 2.1; extraction stage E1) ────────────
@@ -701,6 +891,40 @@ protected:
     // for hosts and tests that construct it on a stack.
     std::unique_ptr<mu_core::RetireBin> retireBinStorage = std::make_unique<mu_core::RetireBin>(layerAccess.epoch, layerAccess.layout);
     mu_core::RetireBin& retireBin = *retireBinStorage;
+    // The layer types this host offers a slot (see getLayerTypes). Filled in the product's constructor.
+    mu_core::LayerTypeRegistry layerTypes;
+
+    // The typed layer-preset folders of a slot host (mu-Tronic): a type's presets are its product's own folder and
+    // extension, shared with the product and never copied, found from the registry next to getContentDir().
+    // <TDP>/<contentFolderName>/<presetFolder>; empty when the type names none or there is no content folder.
+    juce::File          presetDirOf(const mu_core::LayerTypeInfo& info) const;
+    // The type's extension without its dot, as getLayerPresetExtension is spelled.
+    static juce::String presetExtensionOf(const mu_core::LayerTypeInfo& info);
+    // The folder and extension of `slot`'s layer type (empty while the slot is Empty or its type is not offered).
+    mu_core::LayerTypeId slotTypeId(int slot) const;   // Empty for a slot out of range
+    juce::File          typedLayerPresetDir(int slot) const;
+    juce::String        typedLayerPresetExtension(int slot) const;
+    // A filled slot lists its own type's presets, an Empty one every offered type's, so any can be chosen. A type
+    // sharing its extension with others (the five Track types) lists only the files its typeFromPreset maps to it.
+    juce::Array<juce::File> typedSlotPresetFiles(int slot) const;
+    // The type a layer-preset tree holds, found in the registry: the types whose extension is `extension` (any, when
+    // empty) and whose presetTag is the tree's root tag (any, when the type names none), narrowed by typeFromPreset where
+    // the type has one. Empty unless exactly one type remains.
+    mu_core::LayerTypeId layerPresetType(const juce::ValueTree& preset, const juce::String& extension = {}) const;
+    // Layer presets of a typed slot host (message thread), one implementation for every type. Save writes the slot's
+    // rows (its live type's prefix) plus writeExtras, root tag LayerTypeInfo::presetTag, into the type's folder. Load
+    // parses the file and finds its type: a slot of that type stages it for its loop wrap (applyStagedTypedLayer);
+    // an Empty slot takes the file's type through setLayerType; a slot of another type refuses with onLoadError
+    // and changes nothing.
+    void saveTypedLayerPreset(int slot, const juce::String& name);
+    void loadTypedLayerPreset(int slot, const juce::File& file);
+    // The layerSwapper's layer applier for a typed slot host: applies a staged layer preset to the slot at its
+    // boundary, then tells the editor. Skips a tree whose type is no longer the slot's (a type change cancels
+    // the slot's stage, so this is only a guard).
+    void applyStagedTypedLayer(int slot, const juce::ValueTree& tree);
+    // A Published-mode host's constructor, once layers[0..liveCount) are filled: stores the count and publishes the
+    // first view of them. Nothing renders before this, and a TryLock host never calls it.
+    void publishLayers(int liveCount);
     // The count policy (RetireBin::CountPolicy) for tails past the live count. Constructor only.
     void setRetireCountPolicy(mu_core::RetireBin::CountPolicy p) noexcept { retireBin.setCountPolicy(p); }
     // Constructor only. On: the channel messages of a host block that renders nothing (a missed try-lock, an
@@ -750,6 +974,17 @@ protected:
                       std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels>* directOuts = nullptr,
                       juce::AudioBuffer<float>* fxReturnsOut = nullptr) noexcept;
 
+    // Audio thread, called by renderAndMix only in a host block that renders (its LayerBlock succeeded), with
+    // `view` that block's layout: layersBlockStarting after the MIDI decode and before any layer or tail renders,
+    // layersBlockRendered after the last chunk's mixer. For a product whose layers share per-block state that
+    // must move only in a block that renders (mu-Clid's step clock, its swap boundaries and its MIDI out).
+    // `midi` is the host buffer renderAndMix was given, `buffer` the host buffer it rendered. Same rules as
+    // Layer::render: no allocation, no wait (an offline render may do bounded work). Default: nothing.
+    virtual void layersBlockStarting(const mu_core::LayerView& view, const mu_core::BlockTransport& t, juce::MidiBuffer& midi)
+    { juce::ignoreUnused(view, t, midi); }
+    virtual void layersBlockRendered(const mu_core::LayerView& view, juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
+    { juce::ignoreUnused(view, buffer, midi); }
+
     // Audio thread, after renderAndMix: appends the block's layer MIDI out (the tails' owed note-offs first)
     // to `midi`, adding at most `byteBudget` bytes of MidiBuffer storage (midiEventBytes per event): the room the
     // caller knows the buffer already has, so it never grows on the audio thread. Frames are clamped to the last
@@ -791,6 +1026,7 @@ protected:
                 owner.retireBin.service();   // a Done tail whose grace had not passed at the last pass
             if (owner.liveState.needsSettling())
                 owner.settleLiveState();   // also catches a stopped-transport load, which never raises the mailbox
+            owner.pollClipAutoSave();      // after the settle: a landed launch is already the lit clip
         }
         ProcessorBase& owner;
     } swapPoll { *this };
@@ -803,6 +1039,7 @@ protected:
     // the services a tail may read are still alive.
     void prepareForDestruction() noexcept
     {
+        stopActivationWorker();
         swapPoll.stop();
         retireBin.cutAll();
         retireBin.service(true);   // nothing processes again: even a tail still waiting for its store is freed
@@ -843,7 +1080,13 @@ protected:
     // `keepIdentity` is for products whose preset carries the layer's name and colour (mu-Clid).
     // Default: nothing. Callers use stageLayerPreset, never this directly.
     virtual void stageLayerPresetTree(int slot, juce::ValueTree tree, bool keepIdentity)
-    { juce::ignoreUnused(slot, tree, keepIdentity); }
+    {
+        juce::ignoreUnused(keepIdentity);
+        if (! layersAreSlots() || ! tree.isValid()) return;
+        // The layer's file work (a sample, a user wavetable) is done now, so the commit at the boundary does none.
+        if (auto* layer = getLayer(slot)) layer->preloadStaged(tree);
+        layerSwapper.useSlot(slot, std::move(tree));   // typed slot host: lands on the slot's wrap
+    }
 
     // The one entry to the virtual above: a stage that is not a clip launch leaves no clip active.
     void stageLayerPreset(int slot, juce::ValueTree tree, bool keepIdentity, bool isClip)
@@ -944,7 +1187,7 @@ protected:
     // constructor (before anything calls getContentDir); products read / write their own extra
     // keys through appSettings.
     void initAppSettings(const juce::String& appName);
-    std::unique_ptr<juce::PropertiesFile> appSettings;
+    std::shared_ptr<juce::PropertiesFile> appSettings;   // shared by every instance in the module (see initAppSettings)
     juce::String  appName;
     MidiClockSync midiClockSync;
 
@@ -959,6 +1202,11 @@ protected:
         const char*    activationFile;
         const char*    checkoutUrl = nullptr;   // pay-what-you-want page the support prompt opens
     };
+    // Joins the online-activation worker (bounded by the network timeout) and drops its pending reply.
+    void stopActivationWorker() noexcept;
+    std::unique_ptr<juce::Thread>         activationWorker;
+    std::shared_ptr<std::atomic<bool>>    activationAlive = std::make_shared<std::atomic<bool>>(true);
+
     // Check the offline licence + stored activation and wire activateOnlineFn. Call after
     // initAppSettings (it needs getContentDir). Defined in License/ProductLicensing.h — include
     // that only in a licensed product, which is the only kind that compiles the verifier.
@@ -1009,6 +1257,15 @@ private:
     void copyLayerParams (int from, int to);
     void swapLayerParams (int a, int b);
     void resetLayerParams(int slot);
+    // swapLayers of a Published host (design 2.1.2): quiesce the audio thread, exchange the layers with their strips,
+    // tails and parameter rows, publish one view, lower the flag. False when the audio thread did not quiesce in time.
+    bool swapLayersPublished(int a, int b);
+    std::atomic<double> lastEditWindowMs { 0.0 };   // how long the last Published swap kept the audio thread out (flag raised to lowered)
+public:
+    // Milliseconds the audio thread's blocks rendered nothing during the last Published swapLayers (test probe).
+    double getLastEditWindowMsForTest() const noexcept { return lastEditWindowMs.load(std::memory_order_relaxed); }
+private:
+    std::atomic<int> selectedSlot { 0 };   // setSelectedSlot
     int  firstUnusedColourIndex() const;   // lowest palette index no live layer uses
 
     // syncGlobalFxParam dispatch helpers — one per ID family, so the public
@@ -1018,6 +1275,7 @@ private:
     // juce::String substring) so the audio-thread automation path allocates nothing.
     void syncChannelStripParam(int channel, const char* param, float v);
     void syncReturnStripParam (int retIndex,  const char* rest,  float v);
+    void syncBusParam         (const juce::String& id, float v);
     bool syncMasterParam      (const juce::String& id, float v);
     void syncFxSlotParam      (const juce::String& id, float v);
 
@@ -1087,7 +1345,23 @@ private:
         uint16_t midiCarried = 0;
         uint16_t carryDropped = 0;      // channel messages the carry had no room for, reported with the next decode
 
+        // The keys held on the MIDI In as of the start of the current block (updated after each block renders, and by a
+        // skipped block that is not carried), and the scratch a seeded layer's call is given: the held keys as note-ons
+        // followed by the block's events. Audio thread only.
+        mu_core::HeldKeyTable heldKeys;
+        mu_core::HeldKeyTable seedTable;   // heldKeys with the earlier chunks' events applied, for a seed taken mid-block
+        juce::HeapBlock<mu_core::MidiEvent> seedMidi;
+
         MixerEngine::RenderChannelFn copyToMixer;   // the mixer's channel r = scratch[r], an exact copy
+
+        // Published mode's declick around a block an edit keeps silent: the master's last sample per channel, the decay that
+        // continues it into the silence, and the fade-in of the first rendered blocks after it.
+        static constexpr int kSkipDecay = 48, kFadeIn = 64;   // samples
+        float lastOut[2] {};
+        float tailLevel[2] {}, tailStep[2] {};
+        bool  inSkip = false;           // a decay is still running (also into the first rendered blocks)
+        bool  lastWasSkip = false;      // the previous block was refused by an edit
+        int   fadePos = kFadeIn;        // kFadeIn: no fade-in pending
 
         int lastBlockFrames = 0;        // frames of the last rendered host block (mergeLayerMidiOut clamps to it)
         int blocksRendered = 0, blocksSkipped = 0, largestCall = 0;   // test probe
@@ -1095,10 +1369,26 @@ private:
     std::unique_ptr<LayerRenderState> renderStateStorage = std::make_unique<LayerRenderState>();   // heap: see retireBinStorage
     LayerRenderState& renderState = *renderStateStorage;
     std::atomic<bool> useLayerRender { false };   // the test-controlled switch (see setUseLayerRenderForTest)
+
+    // What the last prepareLayerRender used, and a count of its calls, all guarded by layersLock: setLayerType
+    // prepares its new layer outside the lock and compares the count again before publishing, so a prepare that
+    // landed in between (a host thread) is not missed (design 2.1.2, N1).
+    uint32_t prepareGeneration = 0;
+    double   layersPreparedRate = 0.0;
+    int      layersPreparedBlock = 0;
+    // The slots' pointers as a view (layersLock held); the caller sets the serial.
+    mu_core::LayerView makeLayerView() const;
+    // A slot's own parameters (its layer-layout prefix) back to defaults; the mixer strip is left alone.
+    void resetOwnLayerParams(int slot);
     bool regrowCutsInPlaceTails = true;           // setRegrowCutsInPlaceTails (constructor only)
 
     void noteHostBlock(const mu_core::BlockTransport& t, int numSamples) noexcept;
-    void noteSkippedBlock(const mu_core::BlockTransport& t, juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi) noexcept;
+    // `editSkip`: the block was refused because an edit holds the flag (a Published host), so the master decays from its last
+    // sample instead of dropping to zero.
+    void noteSkippedBlock(const mu_core::BlockTransport& t, juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi, bool editSkip = false) noexcept;
+    // The master after the mixer: finishes the decay and fades the layers back in after a skipped block, and remembers
+    // the last sample for the next one. Published hosts only.
+    void declickMaster(juce::AudioBuffer<float>& buffer, int numSamples) noexcept;
     void decodeBlockMidi(const juce::MidiBuffer& midi, int numSamples) noexcept;
     void captureSidechainRegion(juce::AudioBuffer<float>& buffer, int offset, int numSamples) noexcept;
     void renderLayers(const mu_core::LayerBlock& block, const mu_core::BlockTransport& t,

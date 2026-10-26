@@ -8,5 +8,5 @@
   "startBeat": 0,
   "numStems": 2,
   "schedules": [{ "name": "fixed512", "blocks": [512] }, { "name": "ragged", "blocks": [1, 7, 63, 64, 129, 512, 1024, 3] }],
-  "events": []
+  "events": [{ "block": 0, "label": "set t0_accent = 0.9" }, { "block": 0, "label": "set t1_accent = 0.9" }]
 }

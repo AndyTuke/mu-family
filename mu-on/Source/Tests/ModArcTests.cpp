@@ -33,7 +33,7 @@ struct MuOnModArcTests : juce::UnitTest
             {
                 juce::StringArray missing;
                 for (int i = 0; i < count; ++i)
-                    if (proc.apvts.getParameter(layerParamPrefix(0) + table[i].param) == nullptr)
+                    if (proc.apvts.getParameter(mu_mod::paramIdFor(layerParamPrefix(0), 0, table[i].param)) == nullptr)   // a pan or send is the strip's
                         missing.add(table[i].id);
                 expect(missing.isEmpty(), "missing: " + missing.joinIntoString(", "));
             }

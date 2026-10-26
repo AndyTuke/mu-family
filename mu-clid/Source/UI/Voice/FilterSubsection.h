@@ -9,12 +9,12 @@
 
 namespace juce { class RangedAudioParameter; }
 namespace mu_clid {
-class PluginProcessor;
+class RhythmHost;
 
 class FilterSubsection : public juce::Component
 {
 public:
-    explicit FilterSubsection(PluginProcessor& p);
+    explicit FilterSubsection(RhythmHost& host);
 
     void setRhythm(int ri);
     void loadFromRhythm();
@@ -28,7 +28,7 @@ public:
 private:
     using Id = MuLookAndFeel::ColourIds;
 
-    PluginProcessor& proc;
+    RhythmHost& host;
     int rhythmIndex = -1;
 
     DropdownSelect filterType;

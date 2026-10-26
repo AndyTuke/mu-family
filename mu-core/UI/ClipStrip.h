@@ -10,8 +10,8 @@
 // The layer's clip strip (docs/design-ui-family.md section 13): an engraved "Clip" caption and eight numbered
 // lamp pads in the layer's colour, living in the shared LayerHeaderBar. It is the on-screen twin of that layer's
 // row of Launchpad pads: it shows what LiveView says, and every press goes to the ControlSink as the same
-// ControlActions the surface sends (LaunchClip, which also mutes and cancels; StoreClip / ClearClip, which only
-// the screen sends). It holds no switching logic of its own. While Performance mode is on it is read-only
+// ControlActions the surface sends (LaunchClip, which also mutes and cancels; StoreClip / ClearClip / CopyClip / CutClip /
+// PasteClip, which only the screen sends). It holds no switching logic of its own. While Performance mode is on it is read-only
 // (the shield swallows the pointer; the strip also refuses presses itself) but keeps animating.
 class ClipStrip : public juce::Component,
                   public juce::TooltipClient,
@@ -66,12 +66,21 @@ public:
 
     // ── Gestures (what a mouse press calls; public so they can be driven without a display) ──
     // A plain click: launch a stored clip (the sink mutes the playing one and cancels a queue), store into an empty pad.
-    // Shift: store here, asking first when it would replace a stored clip that is not the playing one.
-    void clickPad(int pad, bool shift);
-    void storePad(int pad);
+    void clickPad(int pad);
+    void storePad(int pad);                    // an empty pad only: a stored clip is never overwritten by a store
+    void copyPad(int pad);
+    void cutPad(int pad);                      // copy, then empty the pad; no confirm (the clipboard still holds it)
+    void pastePad(int pad);                    // asks first when the pad holds a clip
     void clearPad(int pad);                    // asks first
-    enum MenuId { menuStore = 1, menuClear = 2 };
-    void menuChosen(int pad, int menuResult);  // the right-click menu's result (0 = dismissed)
+    // The right-click menu: items are always listed, in this order, and greyed when they do not apply.
+    enum MenuId { menuStore = 1, menuCopy, menuCut, menuPaste, menuClear };
+    struct MenuState { bool store = false, copy = false, cut = false, paste = false, clear = false;
+                       juce::String pasteLabel = "Paste"; };   // pasteLabel carries the reason when Paste is disabled
+    MenuState menuStateFor(int pad) const;
+    void menuChosen(int pad, int menuResult);  // the menu's result (0 = dismissed)
+    // The clip menu and its actions stay shut in Performance mode and while a full preset is staged.
+    bool isMenuBlocked() const;
+    bool blockedWithNote();   // isMenuBlocked, plus the status line when a full preset is the cause
 
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
@@ -85,8 +94,14 @@ private:
     void refresh();
     void updateTimer();
     bool storedAt(int pad) const;
+    bool refusedAt(int pad) const;                             // stored, but of another layer type than this layer's
+    static juce::String refusedText(int pad);                  // "Clip 3 is for a different layer type"
     bool playingAt(int pad) const;
     juce::String clipText(int pad) const;                      // "clip 3"
+    // Runs `act` on a menu action's pad once it is allowed (and, for `question`, confirmed), re-checking the lock
+    // and the layer at the moment it runs so a late answer after a mode or layer change writes nothing.
+    void runMenuAction(int pad, mu_core::ControlActionType type, const juce::String& verb, bool ask,
+                       const juce::String& title, const juce::String& message, const juce::String& button);
     std::pair<juce::String, juce::String> hoverFor(int pad) const;
     void say(const juce::String& name, const juce::String& value, bool timed);
     void clearSay();

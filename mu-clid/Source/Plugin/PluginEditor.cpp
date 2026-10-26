@@ -9,7 +9,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
       proc(p),
       masterLoop(p),
       sidebar(p, "Rhythm"),
-      rhythmContent(p),
+      rhythmContent(p, p),
       layerPanel(p, "Rhythm"),
       layerEdit(p, sidebar, layerPanel,
                 { [this] { rhythmContent.setLayer(-1); },   // nothing stays bound into a layer that is about to move
@@ -75,7 +75,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // Add, delete and reorder are wired by layerEdit (the shared LayerEditController).
 
     // ── RhythmContent callbacks ─────────────────────────────────────────────
-    rhythmContent.onStatusUpdate = [this](const juce::String& name,
+    rhythmContent.onColouredStatus = [this](const juce::String& name,
                                         const juce::String& val,
                                         juce::Colour col)
     {
@@ -98,7 +98,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // refreshed when the shown rhythm's mode changes and, for host automation of any rhythm, below.
     mixerOverlay.isChannelSilent = [this](int r) { return isRhythmMidiOutput(r); };
     rhythmContent.onOutputModeChanged = [this] { if (isMixerVisible()) mixerOverlay.loadFromApvts(); };
-    for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
         proc.apvts.addParameterListener("r" + juce::String(i) + "_outMode", this);
     startTimerHz(mu_ui::kUiRefreshHz);   // drains the flags the parameter listener raises
 
@@ -142,7 +142,7 @@ PluginEditor::~PluginEditor()
     // contract as the shell base's destructor.
     stopTimer();
     proc.apvts.removeParameterListener("eff_algo", this);
-    for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
         proc.apvts.removeParameterListener("r" + juce::String(i) + "_outMode", this);
     proc.onLayerPresetCommitted = nullptr;
 }

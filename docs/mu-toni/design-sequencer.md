@@ -429,8 +429,8 @@ legato line re-roots the arp to each new note and reverts as fingers lift. In
 MIDI-triggered mode the arp keeps looping while *any* note is held; the loop only
 stops when the **last** note releases. (Whether re-rooting to a new latest note
 while already looping also **resets step index `i` to 0**, or continues the loop
-seamlessly, is a sub-choice — default: reset only on the note that starts from
-silence, continue on a re-root mid-loop.)
+seamlessly, is a sub-choice — as built: **every fresh note-on resets the pattern to
+step 0**, including a re-root mid-loop.)
 
 The played note sets the root by its **full pitch — pitch-class *and* octave**
 (C2 and C4 differ): the note drives both the **Root note** and the **Root

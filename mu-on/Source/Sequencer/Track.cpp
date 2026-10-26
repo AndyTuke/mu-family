@@ -23,7 +23,7 @@ namespace
         env.polarity       = ControlSequence::Polarity::Unipolar;
         env.loopNoteValue  = NoteValue::Quarter;
         env.loopNoteMod    = NoteMod::None;
-        env.loopMultiplier = 4;   // 1 bar (4 beats) so it cycles once per bar
+        env.loopMultiplier = 1;   // 1 beat (a quarter, times 1): the envelope cycles every beat
         env.curvePoints    = { { 0.0f, 1.0f }, { 1.0f, 1.0f } };
     }
 
@@ -111,7 +111,7 @@ void Track::applyExtras(const juce::ValueTree& node)
         rumbleEnv.curvePoints    = std::move(pts);
         rumbleEnv.loopNoteValue  = (NoteValue) mu_pp::readEnumIndex(env, "loopNV",  mu_audio::kNoteValueNames, (int) NoteValue::Quarter);
         rumbleEnv.loopNoteMod    = (NoteMod)   mu_pp::readEnumIndex(env, "loopMod", mu_audio::kNoteModNames,   (int) NoteMod::None);
-        rumbleEnv.loopMultiplier = juce::jmax(1, (int) env.getProperty("loopMult", 4));
+        rumbleEnv.loopMultiplier = juce::jmax(1, (int) env.getProperty("loopMult", 1));
         mu_core::spinUnlock(rumbleEnvLock);
     }
     Layer::applyExtras(node);
@@ -126,8 +126,13 @@ void Track::prepare(double sampleRate, int blockSize)
     preparedBlock = juce::jmax(1, blockSize);
     silence.setSize(2, preparedBlock);
     silence.clear();
+    tailScratch.setSize(2, preparedBlock);
+    tailScratch.clear();
     for (auto& e : engines)
         if (e != nullptr) e->prepare(preparedRate, preparedBlock);
+    drumFilter.prepare(preparedRate, preparedBlock, 2);
+    insert.prepare(preparedRate, preparedBlock);
+    insert.setSlotIndex(slot);
     // The next rendered block starts from silence and resolves its engine afresh (no held C12 values).
     parked  = true;
     current = -1;
@@ -136,12 +141,30 @@ void Track::prepare(double sampleRate, int blockSize)
 
 void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
 {
+    seed ^= (uint32_t) (s + 1) * 0x9E3779B1u;
     engineRow   = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "eng")), this);
     sourceRow   = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "src")), this);
     bassWaveRow = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::Bass, "wave")), this);   // a choice, not a target
-    swingRow    = mu_core::ParamBinding(apvts.getRawParameterValue("seq_swing"), this);
-    accentRow   = mu_core::ParamBinding(apvts.getRawParameterValue("seq_accent"), this);
-    jassert(engineRow.isBound() && sourceRow.isBound() && bassWaveRow.isBound());   // an id drift from the layout (debug)
+    algoRow     = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::FmPerc, "algo")), this);   // a choice, not a target
+    chordWaveRow = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::Chord, "wave")), this);   // a choice, not a target
+    kickFineRow = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::Kick, "fine")), this);   // not targets
+    bassFineRow = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::Bass, "fine")), this);
+    rootRow     = mu_core::ParamBinding(apvts.getRawParameterValue(kRootParamId), this);    // global; null where the host has none
+    scaleRow    = mu_core::ParamBinding(apvts.getRawParameterValue(kScaleParamId), this);
+    insAlgoRow  = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "drvChar")), this);
+    for (int k = 0; k < VoiceParams::kInsertSlotCount; ++k)
+        insParamRow[k] = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "insP" + juce::String(k + 1))), this);
+    probRow     = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "prob")), this);
+    swingRow    = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "swing")), this);
+    accentRow   = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "accent")), this);
+    ghostRow    = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "ghost")), this);
+    for (auto kind : { EngineType::Kick, EngineType::Hat, EngineType::Snare, EngineType::FmPerc })   // a choice and two knobs each, not targets
+    {
+        const auto k = (size_t) toIndex(kind);
+        filterTypeRow[k] = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, kind, "ftype")), this);
+        filterCutRow[k]  = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, kind, "fcut")), this);
+    }
+    jassert(engineRow.isBound() && sourceRow.isBound() && bassWaveRow.isBound() && algoRow.isBound() && swingRow.isBound() && accentRow.isBound());   // an id drift from the layout (debug)
     haveResolved = false;   // values held for C12 belong to the slot bound before
 
     // Every engine's modulation inputs for this slot, in its target table's order (the order setParams takes).
@@ -154,7 +177,7 @@ void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
         L.map.reserve((size_t) n);
         for (int i = 0; i < n; ++i)
         {
-            const auto id = layerParamPrefix(s) + t[i].param;
+            const auto id = mu_mod::paramIdFor(layerParamPrefix(s), s, t[i].param);   // a pan or send is the mixer strip's parameter
             L.ids[(size_t) i]    = t[i].id;
             L.atoms[(size_t) i]  = apvts.getRawParameterValue(id);
             jassert(L.atoms[(size_t) i] != nullptr);   // a target whose parameter drifted from the layout
@@ -164,6 +187,17 @@ void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
     }
 }
 
+void Track::completeSetup(juce::AudioProcessorValueTreeState& apvts, int s)
+{
+    // A locked track's parameter is a record of its engine: write it so the saved rows and a saved .muTrack
+    // name the right engine. engineSetting() already ignores it, so this is not what makes the track run it.
+    if (engineLocked)
+        if (auto* p = apvts.getParameter(layerParamId(s, "eng")))
+            if (juce::roundToInt(p->convertFrom0to1(p->getValue())) != toIndex(lockedEngine))
+                p->setValueNotifyingHost(p->convertTo0to1((float) toIndex(lockedEngine)));
+    syncEngine();   // the engines the track needs, built and prepared now
+}
+
 int Track::typeId() const
 {
     return (int) layerTypeOf(engineSetting());
@@ -171,6 +205,7 @@ int Track::typeId() const
 
 EngineType Track::engineSetting() const noexcept
 {
+    if (engineLocked) return lockedEngine;   // the parameter is only a record on a locked track
     return engineFromIndex(juce::roundToInt(engineRow.load(0.0f)));
 }
 
@@ -215,6 +250,9 @@ void Track::resetEngines() noexcept
 {
     for (auto& e : engines)
         if (e != nullptr) e->reset();
+    insert.reset();   // a stop or an engine change also ends the insert's tail
+    drumFilter.reset();
+    drumEnvAge = 1 << 30;
 }
 
 void Track::resetEngineToPrepared() noexcept
@@ -234,6 +272,46 @@ float Track::getModLive(EngineType e, int dest) const noexcept
     // as the block that published this engine.
     if (modLiveEngine.load(std::memory_order_acquire) != toIndex(e)) return std::numeric_limits<float>::quiet_NaN();
     return modLive[(size_t) dest].load(std::memory_order_relaxed);
+}
+
+// The drum and percussion filter on the block just rendered: LP12, HP12, BP12 or Notch12 at the cutoff and resonance this
+// block resolved, the cutoff moved by an AD envelope that every step restarts (Depth octaves up or down at full). The block runs
+// in short pieces so the envelope moves inside it. An LP12 at the top of the range with no depth is the open position and skips
+// the filter.
+void Track::applyDrumFilter(juce::AudioBuffer<float>& out, int n, int e) noexcept
+{
+    const auto k = (size_t) e;
+    if (! filterCutRow[k].isBound()) return;   // not a drum or percussion engine
+    constexpr int kIdle = 1 << 30, kSub = 32;
+    const int type = juce::jlimit(0, 3, juce::roundToInt(filterTypeRow[k].load(0.0f)));
+    const float cut = juce::jlimit(20.0f, 20000.0f, filterNow[0]);
+    const float depthOct = filterNow[4] * kDrumFilterEnvOctaves;
+    if (type == 0 && cut >= 19990.0f && std::abs(depthOct) < 0.01f) { drumEnvAge = kIdle; return; }
+
+    const float atkSamples = juce::jmax(1.0f, filterNow[2] * 0.001f * (float) preparedRate);
+    const float decSamples = juce::jmax(1.0f, filterNow[3] * 0.001f * (float) preparedRate);
+    drumFilter.setType(type);
+    drumFilter.setResonance(filterNow[1]);
+
+    const int nch = juce::jmin(2, out.getNumChannels());
+    float* chans[2] = { out.getWritePointer(0), nch > 1 ? out.getWritePointer(1) : nullptr };
+    for (int pos = 0; pos < n; pos += kSub)
+    {
+        const int len = juce::jmin(kSub, n - pos);
+        for (int t = 0; t < drumTrigCount; ++t)
+            if (drumTrigOffsets[t] >= pos && drumTrigOffsets[t] < pos + len) drumEnvAge = 0;   // a step fired in this piece
+        float env = 0.0f;
+        if (drumEnvAge < kIdle)
+        {
+            const float age = (float) drumEnvAge;
+            env = age < atkSamples ? age / atkSamples : std::exp(-4.6f * (age - atkSamples) / decSamples);   // linear attack, exponential decay (-40 dB over the decay time)
+            if (age >= atkSamples && env < 0.002f) { env = 0.0f; drumEnvAge = kIdle; }
+            else drumEnvAge = juce::jmin(kIdle - 1, drumEnvAge + len);
+        }
+        drumFilter.setCutoff(juce::jlimit(20.0f, 20000.0f, cut * std::exp2(depthOct * env)));
+        juce::AudioBuffer<float> piece(chans, nch, pos, len);   // a view of this piece: no allocation
+        drumFilter.process(piece, len, nch);
+    }
 }
 
 // The engine's parameters through the track's modulation matrix (the shared range-based resolve: proportion
@@ -256,6 +334,17 @@ void Track::resolve(int e, double beat, float* outValues) noexcept
     else
         std::copy(lastResolved.begin(), lastResolved.begin() + L.count, outValues);
 
+    // The last nine targets of every engine's table (Level, Pan, Insert P1..P4, the three sends): the track's Level and insert
+    // knobs for this block's render, and the mixer strip's Pan and sends for the host.
+    levelNow = outValues[L.count - 9];
+    // A drum or percussion table has six rows before those nine: the filter's Cutoff, Resonance, Env Attack, Env Decay and
+    // Env Depth, then the Ghost level (see MuOnModDest.h). Any other engine has no ghosts and no drum filter.
+    const bool drum = filterCutRow[(size_t) e].isBound();
+    if (drum) for (int k = 0; k < 5; ++k) filterNow[k] = outValues[L.count - 15 + k];
+    if (drum || e == toIndex(EngineType::Chord)) ghostNow = juce::jlimit(0.0f, 1.0f, outValues[L.count - 10]);   // a Chord has ghosts too
+    for (int k = 0; k < VoiceParams::kInsertSlotCount; ++k) insertNow[k] = outValues[L.count - 7 + k];
+    stripMod.publish(outValues[L.count - 8], outValues[L.count - 3], outValues[L.count - 2], outValues[L.count - 1]);
+
     for (int k = 0; k < L.count; ++k)
         modLive[(size_t) k].store(outValues[k], std::memory_order_relaxed);
     modLiveEngine.store(e, std::memory_order_release);   // after the values: the tag publishes them
@@ -273,20 +362,35 @@ float Track::evaluateRumbleEnv(double beat) noexcept
     return lastRumbleEnv;
 }
 
-// The row follows the global groove, then (while playing) its clock fires the steps of this call into the
+// The row follows the track's own groove rows (swing, accent), then (while playing) its clock fires the steps of this call into the
 // engine (`fireInto` null: the clock only keeps step, nothing sounds). A Rumble's row does not step.
 void Track::clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, int e, int n) noexcept
 {
     row.setGroove(swingRow.load(0.0f), accentRow.load(1.0f));
+    row.setGhostLevel(filterCutRow[(size_t) e].isBound() || e == toIndex(EngineType::Chord) ? ghostNow : ghostRow.load(0.35f));
     if (! ctx.playing) return;
     if (ctx.justStarted) clock.seek(ctx.startBeat);   // the step the transport starts in fires, even on a quick replay
     clock.processSpan(row, ctx.startBeat, n, ctx.beatsPerSample, row.swingAmount(), row.accentVelocity(),
-                      [this, fireInto, e](float velocity, int offset)
+                      [this, fireInto, e](const StepEvent& ev)
                       {
                           if (fireInto == nullptr || e == toIndex(EngineType::Rumble)) return;
-                          fireInto->trigger(velocity, offset);
+                          if (! stepPlays(ev.step, ev.pass)) return;   // the probability draw of this pass
+                          fireInto->trigger(ev.velocity, ev.offset, ev.open, ev.tied, ev.gateSamples, ev.semitones, &ev.chord);
+                          if (drumTrigCount < 16) drumTrigOffsets[drumTrigCount++] = ev.offset;   // the filter envelope restarts here
                           triggers.fetch_add(1, std::memory_order_relaxed);
                       });
+}
+
+bool Track::stepPlays(int step, long long pass) const noexcept
+{
+    if (! StepClock::loopPlays(row, step, pass)) return false;
+    // The layer's Probability (percent) multiplies the step's own to give the chance the note plays.
+    const float chance = juce::jlimit(0.0f, 1.0f, probRow.load(100.0f) * 0.01f) * (float) row.stepProb(step) * 0.01f;
+    if (chance >= 1.0f) return true;
+    // A cheap integer hash (a finalizer in the style of lowbias32) of seed, pass and step, mapped to 0..1.
+    uint32_t x = seed ^ (uint32_t) (pass * 2654435761ll) ^ ((uint32_t) step * 0x9E3779B9u);
+    x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
+    return (float) (x >> 8) * (1.0f / 16777216.0f) < chance;
 }
 
 void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n)
@@ -316,7 +420,15 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
     float p[kMaxDests] {};
     resolve(e, ctx.startBeat, p);
     const bool rumble = e == toIndex(EngineType::Rumble);
-    eng->setParams(p, juce::roundToInt(bassWaveRow.load(0.0f)), ctx.bpm, rumble ? evaluateRumbleEnv(ctx.startBeat) : 1.0f);
+    // The engine's own choice row: the Bass or Chord wave, or the FM Perc algorithm (none is a modulation target).
+    const int engineChoice = juce::roundToInt(e == toIndex(EngineType::FmPerc) ? algoRow.load(0.0f)
+                                              : e == toIndex(EngineType::Chord) ? chordWaveRow.load(0.0f) : bassWaveRow.load(0.0f));
+    TuneLock lock;
+    if (rootRow.isBound())  lock.root  = juce::jlimit(0, 11, juce::roundToInt(rootRow.load(0.0f)));
+    if (scaleRow.isBound()) lock.scale = mu_audio::clampScaleIndex(juce::roundToInt(scaleRow.load(0.0f)));
+    lock.kickFineCents = kickFineRow.load(0.0f);
+    lock.bassFineCents = bassFineRow.load(0.0f);
+    eng->setParams(p, engineChoice, ctx.bpm, rumble ? evaluateRumbleEnv(ctx.startBeat) : 1.0f, lock);
 
     // Phase 3: the stop edge silences the voice after the block's parameters are in (a sustaining bass has no
     // note-off), so values set in the stop block survive the reset. A stop hidden in blocks that rendered
@@ -324,6 +436,7 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
     if (ctx.justStopped || ctx.stoppedUnrendered) resetEngines();
 
     // Phase 4: the row's steps in this call trigger the engine (before the render, so a step sounds in its own block).
+    drumTrigCount = 0;
     clockRow(ctx, eng, e, n);
 
     // Phase 5: the engine's block. A Rumble processes its source track's block (a priority-0 peer, post-insert and
@@ -343,8 +456,54 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
     }
     else
         eng->render(out, n, silence, false);
+    applyDrumFilter(out, n, e);   // a Kick, Hat, Snare or FM Perc through its filter (open: untouched)
+
+    // Phase 6: the track's insert effect on the block just rendered (None skips it).
+    if (const int algo = juce::roundToInt(insAlgoRow.load(0.0f)); algo > 0)
+    {
+        VoiceParams vp;
+        vp.insertAlgo = algo;
+        for (int k = 0; k < VoiceParams::kInsertSlotCount; ++k) vp.insertParam[k] = insertNow[k];
+        insert.process(out, n, juce::jmin(2, out.getNumChannels()), vp);
+    }
+
+    // The track's Level, ramped across the block from where the last one ended (unity leaves the block untouched).
+    if (levelNow != 1.0f || lastLevel != 1.0f)
+        for (int c = 0; c < juce::jmin(2, out.getNumChannels()); ++c) out.applyGainRamp(c, 0, n, lastLevel, levelNow);
+    lastLevel = levelNow;
 
     mu_core::spinUnlock(engineLock);
+}
+
+// The tail of a track that left its slot (docs/mu-tronic/design.md 2.1.11 point 3). It reads no parameter: the
+// engine of the last rendered block (`current`, audio-thread state) still holds the parameters it was given, and
+// is rendered with no trigger and no setParams, so a ringing voice or reverb dies away under the bin's fade.
+bool Track::renderRetiring(const mu_core::RenderContext&, juce::AudioBuffer<float>& out, int n, mu_core::RetireState& rs)
+{
+    if (current < 0) return false;   // never rendered live: nothing can sound
+    if (! mu_core::trySpinLock(engineLock)) return true;   // an install is running: silent this call, the fade runs on
+    TrackEngine* eng = engines[(size_t) current].get();
+    if (eng == nullptr) { mu_core::spinUnlock(engineLock); return false; }
+
+    // The bin hands the tail the slot's block exclusively (write it) or not (render aside, then add).
+    juce::AudioBuffer<float> aside;
+    if (rs.exclusive == 0)
+    {
+        aside.setDataToReferTo(tailScratch.getArrayOfWritePointers(), juce::jmin(2, out.getNumChannels()),
+                               juce::jmin(n, tailScratch.getNumSamples()));
+        aside.clear();
+    }
+    auto& buf = rs.exclusive != 0 ? out : aside;
+    const int frames = juce::jmin(n, buf.getNumSamples(), silence.getNumSamples());
+
+    // A Rumble has no peer in a tail: it processes the silence buffer, as a Rumble with no source does.
+    eng->render(buf, frames, silence, false);
+    mu_core::applyLinearFade(buf, frames, rs);
+
+    if (rs.exclusive == 0)
+        for (int c = 0; c < buf.getNumChannels(); ++c) out.addFrom(c, 0, buf, c, 0, frames);
+    mu_core::spinUnlock(engineLock);
+    return true;   // the bin ends the fade when its ramp is spent
 }
 
 void Track::onParkedBlock(const mu_core::RenderContext& ctx)

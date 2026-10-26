@@ -15,7 +15,7 @@ void VoiceEngine::prepareToPlay(double sampleRate, int blockSize)
     currentSampleRate = sampleRate;
 
     {
-        juce::ScopedWriteLock sl(bufferLock);
+        const juce::SpinLock::ScopedLockType sl(bufferLock);
         playbackRatio = buffer.getNumSamples() > 0
                       ? originalSampleRate / currentSampleRate
                       : 1.0;
@@ -41,31 +41,58 @@ void VoiceEngine::prepareToPlay(double sampleRate, int blockSize)
     syncFilter();
 }
 
-void VoiceEngine::loadFile(const juce::File& file)
+VoiceEngine::DecodedSample VoiceEngine::decodeFile(const juce::File& file)
 {
+    DecodedSample out;
     std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(file));
     if (reader == nullptr)
-        return;
+        return out;
 
     if (reader->numChannels == 0 || reader->lengthInSamples <= 0)
-        return;
+        return out;
     if (reader->lengthInSamples > static_cast<juce::int64>(std::numeric_limits<int>::max()))
-        return;
+        return out;
 
     const int numSamples  = static_cast<int>(reader->lengthInSamples);
     const int numChannels = static_cast<int>(reader->numChannels);
     juce::AudioBuffer<float> temp(numChannels, numSamples);
     reader->read(&temp, 0, numSamples, 0, true, true);
 
-    const double srcRate = reader->sampleRate;
+    out.buffer     = std::move(temp);
+    out.sampleRate = reader->sampleRate;
+    return out;
+}
+
+void VoiceEngine::installSample(DecodedSample&& sample)
+{
+    if (! sample.isValid())
+        return;
 
     {
-        juce::ScopedWriteLock sl(bufferLock);
-        buffer             = std::move(temp);
-        originalSampleRate = srcRate;
-        playbackRatio      = srcRate / currentSampleRate;
-        sampleLoaded       = true;
+        const juce::SpinLock::ScopedLockType sl(bufferLock);
+        std::swap(buffer, sample.buffer);   // the old audio leaves in `sample` and is freed below, outside the lock the audio thread try-locks
+        originalSampleRate = sample.sampleRate;
+        playbackRatio      = sample.sampleRate / currentSampleRate;
+        sampleLoaded.store(true, std::memory_order_relaxed);
     }
+}
+
+VoiceEngine::DecodedSample VoiceEngine::takeSample()
+{
+    DecodedSample out;
+    const juce::SpinLock::ScopedLockType sl(bufferLock);
+    if (! sampleLoaded.load(std::memory_order_relaxed)) return out;
+    out.buffer     = std::move(buffer);
+    out.sampleRate = originalSampleRate;
+    buffer.setSize(0, 0);
+    sampleLoaded.store(false, std::memory_order_relaxed);
+    return out;
+}
+
+void VoiceEngine::loadFile(const juce::File& file)
+{
+    // The file is read outside the lock; installSample holds it only to move the new buffer in.
+    installSample(decodeFile(file));
 }
 
 void VoiceEngine::trigger(bool isAccented, bool tied)
@@ -141,14 +168,36 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
 {
     applyPendingParams();
 
-    // tryEnterRead avoids blocking the audio thread if loadFile() holds the
-    // write lock (file I/O + buffer allocation can be hundreds of ms). On
-    // contention: output a silent block rather than stalling the audio thread.
-    if (!bufferLock.tryEnterRead())
+    // A try-lock: the audio thread never waits for a buffer swap on the message thread (loadFile reads the
+    // file outside the lock and holds it only to move the new buffer in). On contention: a silent block that
+    // still keeps time, so the envelopes, the sample voices' positions and a retired engine's drain countdown
+    // advance as a rendered block's do.
+    const juce::SpinLock::ScopedTryLockType bufferGuard(bufferLock);
+    bool contended = ! bufferGuard.isLocked();
+#if defined(MU_VOICE_ENGINE_TEST_SEAM) && MU_VOICE_ENGINE_TEST_SEAM
+    contended = contended || forceBufferContention.load(std::memory_order_relaxed);   // test seam, mu-core-tests only
+#endif
+    if (contended)
+    {
+        if (! sampleLoaded.load(std::memory_order_relaxed))
+            return;   // a block with no sample advances nothing either
+        const int skipped = juce::jmin(numSamples, tempBuffer.getNumSamples());
+        for (int s = 0; s < skipped; ++s)
+        {
+            pitchEnv.getNextSample();
+            filterEnv.getNextSample();
+            ampEnv.getNextSample();
+        }
+        // The voices move on at the last rendered block's pitch ratios (the current ratio needs the buffer's rate,
+        // which the lock holder may be changing); pitchRatioBuffer is sized to the prepared block, as tempBuffer.
+        for (auto& v : voices)
+            v.skip(pitchRatioBuffer.data(), juce::jmin(skipped, (int) pitchRatioBuffer.size()));
+        if (retired && retireDrainBlocks > 0)
+            --retireDrainBlocks;
         return;
-    struct ReadGuard { juce::ReadWriteLock& l; ~ReadGuard() { l.exitRead(); } } readGuard { bufferLock };
+    }
 
-    if (!sampleLoaded || buffer.getNumSamples() == 0 || buffer.getNumChannels() == 0)
+    if (! sampleLoaded.load(std::memory_order_relaxed) || buffer.getNumSamples() == 0 || buffer.getNumChannels() == 0)
         return;
 
     // Guard against hosts that call process() with more samples than prepareToPlay() promised.
@@ -240,20 +289,25 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
 
     // ampLevel is dB-domain (-60..+6); convert to linear gain once per block.
     const float levelGain = juce::Decibels::decibelsToGain(activeParams.ampLevel, -60.0f);
+
+    // A retired engine measures what it adds: a run of silent blocks after the envelope is idle ends it early.
+    if (retired)
+    {
+        const float level = tempBuffer.getMagnitude(0, ns) * levelGain * accentGain;
+        retireSilentSamples = level < kRetireSilentLevel ? retireSilentSamples + ns : 0;
+    }
     for (int ch = 0; ch < nCh; ++ch)
         output.addFrom(ch, 0, tempBuffer, ch, 0, ns, levelGain * accentGain);
 }
 
 bool VoiceEngine::hasSample() const
 {
-    return sampleLoaded;
+    return sampleLoaded.load(std::memory_order_relaxed);
 }
 
 void VoiceEngine::markRetired() noexcept
 {
-    // Caller (runDeferredWork retire path) holds suspendProcessing — the
-    // audio thread cannot be mid-process() on this engine, so direct state
-    // mutation is safe.
+    // The caller owns the engine alone (the retire bin's tail, on the audio thread), so direct state mutation is safe.
 
     // Amp env noteOff is gated on ampRelToEnd:
     //  - ampRelToEnd == false: noteOff so the env enters release. ampEnv multiplies
@@ -278,11 +332,13 @@ void VoiceEngine::markRetired() noexcept
     pitchEnv.noteOff();
     filterReleasing = pitchReleasing = true;
 
-    // ~2 s drain budget for feedback-based inserts (Karplus loopGain cap 0.9999
-    // decays to noise floor in well under this). Sampled in blocks: 2 s × sampleRate
+    // ~2 s drain budget for feedback-based inserts (a typical Karplus tail decays within it; a full-feedback one
+    // rings longer and is closed by the retire bin's declick). Sampled in blocks: 2 s × sampleRate
     // / blockSize. tempBuffer.getNumSamples() == blockSize after prepareToPlay.
     const int blockSize = juce::jmax(1, tempBuffer.getNumSamples());
     retireDrainBlocks = (int) (2.0 * currentSampleRate / (double) blockSize);
+    retireSilentSamples = 0;
+    retireSilentHold    = juce::jmax(1, (int) (0.05 * currentSampleRate));
 
     retired = true;
 }
@@ -321,15 +377,15 @@ bool VoiceEngine::isFullyDrained() const noexcept
     // ringing past env idle from their own internal state. Wait the drain budget
     // so the audible tail completes before the engine is destroyed in hot-swap.
     if (ampEnv.isActive()) return false;
-    if (retired && retireDrainBlocks > 0) return false;
+    if (retired && retireDrainBlocks > 0 && retireSilentSamples < retireSilentHold) return false;
     return true;
 }
 
 void VoiceEngine::clearSample()
 {
-    juce::ScopedWriteLock sl(bufferLock);
+    const juce::SpinLock::ScopedLockType sl(bufferLock);
     buffer.setSize(0, 0);
-    sampleLoaded = false;
+    sampleLoaded.store(false, std::memory_order_relaxed);
 }
 
 void VoiceEngine::setParams(const VoiceParams& p)

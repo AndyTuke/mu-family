@@ -33,6 +33,7 @@ DelayRow::DelayRow()
     {
         isEnabled = enableButton.getToggleState();
         if (onEnabledChanged) onEnabledChanged(isEnabled);
+        if (onStatusUpdate) onStatusUpdate("Delay Enable", isEnabled ? "On" : "Off");
         repaint();
     };
     addAndMakeVisible(enableButton);
@@ -54,10 +55,16 @@ DelayRow::DelayRow()
         }
         if (syncMode)
             fireSyncParams();
+        if (onStatusUpdate) onStatusUpdate("Delay Time", modeDropdown.getText());
     };
     addAndMakeVisible(modeDropdown);
 
-    modifierSegment.onChange = [this](int) { fireSyncParams(); };
+    modifierSegment.onChange = [this](int index)
+    {
+        fireSyncParams();
+        static const char* const names[] = { "Straight", "Dotted", "Triplet" };
+        if (onStatusUpdate) onStatusUpdate("Delay Time Feel", names[juce::jlimit(0, 2, index)]);
+    };
     addAndMakeVisible(modifierSegment);
 
     multipleKnob.setRange(1.0, 8.0, 1.0);
@@ -73,6 +80,7 @@ DelayRow::DelayRow()
     addAndMakeVisible(multipleKnob);
 
     msKnob.setRange(1.0, 4000.0, 1.0);
+    msKnob.getSlider().setSkewFactorFromMidPoint(250.0);   // matches the parameter's curve
     msKnob.setValue(250.0, juce::dontSendNotification);
     msKnob.getSlider().textFromValueFunction = [](double v) -> juce::String {
         return juce::String((int)std::round(v));
@@ -96,6 +104,7 @@ DelayRow::DelayRow()
     {
         if (onFeedbackChanged) onFeedbackChanged(static_cast<float>(v) / 100.0f);
     };
+    feedbackKnob.setStatusUnit(mu_fmt::Unit::Percent100);
     feedbackKnob.onStatusUpdate = [this](const juce::String& n, const juce::String& v)
     {
         if (onStatusUpdate) onStatusUpdate(n, v);
@@ -111,6 +120,7 @@ DelayRow::DelayRow()
     {
         if (onSpreadChanged) onSpreadChanged(static_cast<float>(v) / 100.0f);
     };
+    spreadKnob.setStatusUnit(mu_fmt::Unit::Percent100);
     spreadKnob.onStatusUpdate = [this](const juce::String& n, const juce::String& v)
     {
         if (onStatusUpdate) onStatusUpdate(n, v);
@@ -126,6 +136,7 @@ DelayRow::DelayRow()
     {
         if (onDirtChanged) onDirtChanged(static_cast<float>(v) / 100.0f);
     };
+    dirtKnob.setStatusUnit(mu_fmt::Unit::Percent100);
     dirtKnob.onStatusUpdate = [this](const juce::String& n, const juce::String& v)
     {
         if (onStatusUpdate) onStatusUpdate(n, v);

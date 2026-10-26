@@ -1,10 +1,10 @@
-// Layer-extraction safety net for mu-Clid, part 2: pins. Each test describes what the unextracted tree
-// does TODAY about something a later stage will move (the retired-engine tails and when they are freed,
-// what a count-reducing preset does to them, how long the longest one lives, a structural edit mid-play,
-// a block larger than the prepared size, where a trigger lands in a block, where sample files are read,
-// and the order of the MIDI a block emits). Written and passing on the unmodified tree; a stage that
-// moves the behaviour must pass them unedited, and a stage that has to edit one has changed behaviour,
-// which goes to Andy as a deliberate, signed update.
+// Layer-extraction safety net for mu-Clid, part 2: pins. Each test describes what the tree does about something
+// a stage moves (the retired-engine tails and when they stop and are freed, what a count-reducing preset does to
+// them, how long the longest one lives, a structural edit mid-play, a block larger than the prepared size, where a
+// trigger lands in a block, where sample files are read, and the order of the MIDI a block emits). Written on the
+// unmodified tree; a stage that moves the behaviour must pass them unedited, and a stage that has to edit one has
+// changed behaviour, which goes to Andy as a deliberate, signed update. E5.5e (the tails into the shared RetireBin)
+// is such an update for P2 (stop at Done, the flush at prepare), P3 (count policy CutAtCount) and P4 (30 s cap).
 //
 // Part 1, the bit-exact golden renders, is GoldenRenderTests.cpp.
 
@@ -12,6 +12,7 @@
 #include "Audio/MidiOutputEngine.h"
 #include "Audio/VoiceEngine.h"
 #include "Tests/GoldenRender.h"
+#include "Tests/RetireIsolation.h"   // mu-core: the generic twin test
 
 namespace
 {
@@ -141,19 +142,15 @@ namespace
         return f;
     }
 
+    // True when slot `slot`'s retire-bin row holds engine `e` and it still sounds (Parked or Draining).
     bool slotHolds(mu_clid::PluginProcessor& p, int slot, const VoiceEngine* e)
     {
-        for (auto& t : p.retiredVoiceEngines[(size_t) slot])
-            if (t.get() == e) return true;
+        for (int k = 0; k < mu_core::RetireBin::kDepth; ++k)
+            if (p.retiredEngineForTest(slot, k) == e) return true;
         return false;
     }
 
-    int tailCount(mu_clid::PluginProcessor& p, int slot)
-    {
-        int n = 0;
-        for (auto& t : p.retiredVoiceEngines[(size_t) slot]) n += t != nullptr ? 1 : 0;
-        return n;
-    }
+    int tailCount(mu_clid::PluginProcessor& p, int slot) { return p.retiredCountForTest(slot); }
 
     // The mixer's per-channel peak (post strip) as of the last block.
     float chPeak(mu_clid::PluginProcessor& p, int ch)
@@ -178,10 +175,10 @@ struct MuClidExtractionPinTests : juce::UnitTest
         midiOrderingPins();
     }
 
-    // ── P2: a retired Karplus engine after isFullyDrained() ──────────────────────────────────────
+    // ── P2: a retired Karplus engine after isFullyDrained() (E5.5e: stop at Done) ──────────────────────
     void drainedTailPins()
     {
-        beginTest("P2: a retired Karplus engine keeps ringing after isFullyDrained(), and is freed only when some deferred-work pass runs");
+        beginTest("P2: a retired Karplus engine stops at Done: once it reports drained a 10 ms declick closes it, then it renders nothing and the bin frees it");
         {
             Rig rig;
             auto& p = rig.p;
@@ -191,37 +188,46 @@ struct MuClidExtractionPinTests : juce::UnitTest
             karplus(p, 0);
 
             const VoiceEngine* tail = nullptr;
-            int placedBlock = -1, flaggedBlock = -1, freedBlock = -1;
-            float peakAfterFlag = 0.0f, peakAfterFree = 0.0f;
-            int blocksRingingAfterFlag = 0;
-            for (int b = 0; b < 1300; ++b)
+            int placedBlock = -1, doneBlock = -1, freedBlock = -1;
+            float peakBeforeDone = 0.0f, peakAfterDone = 0.0f;
+            Buf lastBlocks(2, 4 * 512);   // the four blocks before Done, the declick's end among them
+            lastBlocks.clear();
+            for (int b = 0; b < 400; ++b)
             {
                 if (b == 4) p.stageRhythmPreset(0, silent);
-                // A second swap on a silent rhythm: the boundary that flags it is the only thing that asks for a deferred-work pass.
-                if (b == 700) p.stageRhythmPreset(0, silent);
                 const auto out = rig.block(512);
-                if (tail == nullptr && p.retiredVoiceEngines[0][0] != nullptr) { tail = p.retiredVoiceEngines[0][0].get(); placedBlock = b; }
-                if (tail != nullptr && flaggedBlock < 0 && p.retiredReadyForCleanup[0][0].load()) flaggedBlock = b;
-                if (tail != nullptr && flaggedBlock >= 0 && freedBlock < 0)
+                if (doneBlock < 0)
                 {
-                    if (! slotHolds(p, 0, tail)) freedBlock = b;
-                    else { peakAfterFlag = juce::jmax(peakAfterFlag, peakOf(out, 0, 512)); ++blocksRingingAfterFlag; }
+                    for (int c = 0; c < 2; ++c)
+                    {
+                        std::memmove(lastBlocks.getWritePointer(c), lastBlocks.getReadPointer(c) + 512, 3 * 512 * sizeof (float));
+                        lastBlocks.copyFrom(c, 3 * 512, out, c, 0, 512);
+                    }
                 }
-                if (freedBlock >= 0 && b > freedBlock) peakAfterFree = juce::jmax(peakAfterFree, peakOf(out, 0, 512));
+                if (tail == nullptr && p.retiredEngineForTest(0, 0) != nullptr) { tail = p.retiredEngineForTest(0, 0); placedBlock = b; }
+                if (tail != nullptr && doneBlock < 0 && ! slotHolds(p, 0, tail)) doneBlock = b;
+                if (doneBlock >= 0 && freedBlock < 0 && p.retiredStateForTest(0, 0) == mu_core::RetireBin::Empty) freedBlock = b;
+                if (tail != nullptr && doneBlock < 0) peakBeforeDone = juce::jmax(peakBeforeDone, peakOf(out, 0, 512));
+                if (doneBlock >= 0 && b > doneBlock) peakAfterDone = juce::jmax(peakAfterDone, peakOf(out, 0, 512));
             }
-            logMessage("P2 retired at block " + juce::String(placedBlock) + ", drained flag at " + juce::String(flaggedBlock)
-                       + " (" + juce::String(flaggedBlock - placedBlock) + " blocks later), freed at block " + juce::String(freedBlock)
-                       + "; " + juce::String(blocksRingingAfterFlag) + " blocks rendered after the flag, their peak "
-                       + juce::String(peakAfterFlag, 6) + "; peak after the free " + juce::String(peakAfterFree, 6));
-            expect(placedBlock > 0 && flaggedBlock > placedBlock, "the engine is retired, then reports drained");
-            expect(std::abs((flaggedBlock - placedBlock) - (int) (2.0 * kSr / 512.0)) <= 3, "drained about 2 s of process() calls after the retire (the drain budget)");
-            expect(freedBlock > flaggedBlock, "it is freed later, by a deferred-work pass");
-            expect(blocksRingingAfterFlag > 100, "and in between its slot goes on being rendered: no pass runs just because it drained");
-            expect(peakAfterFlag > 0.05f, "a full-feedback Karplus loop is still well above zero after isFullyDrained() (the tail outlives Done)");
-            expectEquals(peakAfterFree, 0.0f, "once freed, the output is exactly zero");
+            logMessage("P2 retired at block " + juce::String(placedBlock) + ", Done at " + juce::String(doneBlock)
+                       + " (" + juce::String(doneBlock - placedBlock) + " blocks later), freed by block " + juce::String(freedBlock)
+                       + "; peak while it sounded " + juce::String(peakBeforeDone, 6) + ", after Done " + juce::String(peakAfterDone, 6));
+            expect(placedBlock > 0 && doneBlock > placedBlock, "the engine is retired, then reports drained");
+            expect(std::abs((doneBlock - placedBlock) - (int) (2.0 * kSr / 512.0)) <= 3, "drained about 2 s of process() calls after the retire (the drain budget)");
+            expect(peakBeforeDone > 0.05f, "the full-feedback Karplus loop sounded while the tail lived");
+            expectEquals(peakAfterDone, 0.0f, "once Done, the output is exactly zero: no block renders a drained tail");
+            // The declick: the tail's last 24 non-zero frames are within the ramp's last 5 %, so it ends in a fade, not a step.
+            int last = -1;
+            for (int i = 0; i < lastBlocks.getNumSamples(); ++i)
+                if (lastBlocks.getSample(0, i) != 0.0f || lastBlocks.getSample(1, i) != 0.0f) last = i;
+            const float endLevel = last >= 24 ? peakOf(lastBlocks, last - 24, last + 1) : 1.0f;
+            logMessage("P2 level over the tail's last 24 frames: " + juce::String(endLevel, 6));
+            expect(endLevel < 0.05f * peakBeforeDone + 1.0e-6f, "the drained tail is faded out, not cut");
+            expect(freedBlock >= doneBlock && freedBlock <= doneBlock + 1, "the deferred-work pass the Done asks for frees it at once");
         }
 
-        beginTest("P2: the drain budget is counted in process() calls of the prepared block size, whatever size the host calls with");
+        beginTest("P2: a tail with nothing ringing drains on its measured silence, in the same time whatever size the host calls with");
         {
             auto drainBlocks = [this](int hostBlock)
             {
@@ -230,39 +236,48 @@ struct MuClidExtractionPinTests : juce::UnitTest
                 const auto silent = saveSilentPreset(rig);
                 useSample(p, 0, "Kick 01.wav");
                 ringA(p, 0, 4, 1);
-                int placed = -1, flagged = -1;
-                for (int b = 0; b < 4000 && flagged < 0; ++b)
+                const VoiceEngine* tail = nullptr;
+                int placed = -1, done = -1;
+                for (int b = 0; b < 4000 && done < 0; ++b)
                 {
                     if (b == 4) p.stageRhythmPreset(0, silent);
                     rig.block(hostBlock);
-                    if (placed < 0 && p.retiredVoiceEngines[0][0] != nullptr) placed = b;
-                    if (placed >= 0 && p.retiredReadyForCleanup[0][0].load()) flagged = b;
+                    if (tail == nullptr && p.retiredEngineForTest(0, 0) != nullptr) { tail = p.retiredEngineForTest(0, 0); placed = b; }
+                    if (tail != nullptr && ! slotHolds(p, 0, tail)) done = b;
                 }
-                logMessage("P2 host block " + juce::String(hostBlock) + ": drained " + juce::String(flagged - placed) + " calls after the retire");
-                return flagged - placed;
+                logMessage("P2 host block " + juce::String(hostBlock) + ": drained " + juce::String(done - placed) + " calls after the retire");
+                return done - placed;
             };
-            const int atPrepared = drainBlocks(512);
-            const int atQuarter  = drainBlocks(128);
-            expect(std::abs(atPrepared - 187) <= 3, "512-frame calls, prepared at 512: about 187 calls");
-            expect(std::abs(atQuarter - atPrepared) <= 3, "128-frame calls drain after the same number of calls, so in a quarter of the time");
+            // The Kick has nothing that rings past its envelope, so its tail ends on measured silence (50 ms below
+            // -100 dBFS after the 0.5 s release), not on the 2 s budget: the same time whatever the host block size.
+            const double atPrepared = drainBlocks(512) * 512.0 / kSr;
+            const double atQuarter  = drainBlocks(128) * 128.0 / kSr;
+            expect(atPrepared > 0.45 && atPrepared < 0.7, "512-frame calls: drained on silence, about 0.55 s after the retire");
+            expect(atQuarter > 0.45 && atQuarter < 0.7, "128-frame calls: drained on silence, about 0.5 s after the retire");
+            expect(std::abs(atPrepared - atQuarter) < 0.06, "the drain time does not follow the host block size");
         }
 
-        beginTest("P2: a retired engine that holds no sample never reports drained, so it stays in its slot");
+        beginTest("P2/P4: a retired engine that holds no sample renders nothing and ends at once (it no longer holds its entry)");
         {
             Rig rig;
             auto& p = rig.p;
             const auto silent = saveSilentPreset(rig);
             ringA(p, 0, 4, 4);   // the default rhythm has no sample
-            for (int b = 0; b < 800; ++b)
+            const VoiceEngine* tail = nullptr;
+            int placed = -1, ended = -1;
+            for (int b = 0; b < 3000 && ended < 0; ++b)
             {
                 if (b == 4) p.stageRhythmPreset(0, silent);
                 rig.block(512);
+                if (tail == nullptr && p.retiredEngineForTest(0, 0) != nullptr) { tail = p.retiredEngineForTest(0, 0); placed = b; }
+                if (tail != nullptr && ! slotHolds(p, 0, tail)) ended = b;
             }
-            expectEquals(tailCount(p, 0), 1, "the engine retired by the swap is held");
-            expect(! p.retiredReadyForCleanup[0][0].load(), "and 16 s later it still has not reported drained: its drain budget only counts down in a process() that has a sample");
+            const double life = (double) (ended - placed) * 512.0 / kSr;
+            logMessage("P2/P4 a sample-less retired engine ended " + juce::String(life, 3) + " s after the retire");
+            expect(ended > placed && life < 0.05, "it ends within its first tail blocks (the declick)");
         }
 
-        beginTest("P2: prepareToPlay zeroes a ringing Karplus loop without freeing its retired engine");
+        beginTest("P2: prepareToPlay flushes the retire bin: a ringing tail is cut and freed");
         {
             Rig rig;
             auto& p = rig.p;
@@ -276,17 +291,18 @@ struct MuClidExtractionPinTests : juce::UnitTest
                 rig.block(512);
             }
             const auto before = rig.block(512);
-            expect(p.retiredVoiceEngines[0][0] != nullptr, "a tail is retired and ringing");
+            expectEquals(tailCount(p, 0), 1, "a tail is retired and ringing");
             expect(peakOf(before, 0, 512) > 0.05f, "audibly");
             p.prepareToPlay(kSr, 512);
+            expectEquals(tailCount(p, 0), 0, "the prepare cut it");
+            expect(p.retiredStateForTest(0, 0) == mu_core::RetireBin::Empty, "and freed it (nothing processes during a prepare)");
             const auto after = rig.render(4 * 512);
             logMessage("P2 prepareToPlay on a ringing tail: peak before " + juce::String(peakOf(before, 0, 512), 5) + ", after " + juce::String(peakOf(after, 0, 4 * 512), 6));
-            expect(p.retiredVoiceEngines[0][0] != nullptr, "the retired engine is still in its slot");
-            expectEquals(peakOf(after, 0, 4 * 512), 0.0f, "but the re-prepare cleared the delay line: the tail is gone");
+            expectEquals(peakOf(after, 0, 4 * 512), 0.0f, "the tail is gone");
         }
     }
 
-    // ── P3: tails when the layer count moves ───────────────────────────────────────────────────────
+    // ── P3: tails when the layer count moves (E5.5e: count policy CutAtCount) ─────────────────────────────
     void countPolicyPins()
     {
         // Three rhythms of four steps, each on a Karplus that rings for minutes; at block 4 each is swapped for a
@@ -305,7 +321,7 @@ struct MuClidExtractionPinTests : juce::UnitTest
             return silent;
         };
 
-        beginTest("P3: a count-reducing full preset leaves the tails of the dropped slots in memory, silent; a regrow brings them back");
+        beginTest("P3: a count-reducing full preset cuts the tails of the dropped slots; a regrow starts silent");
         {
             Rig rig;
             auto& p = rig.p;
@@ -316,20 +332,19 @@ struct MuClidExtractionPinTests : juce::UnitTest
             const auto silent = setup(rig);
 
             std::array<const VoiceEngine*, 3> tails {};
-            float preShrink[3] = {}, postRegrow[3] = {};
+            float postRegrow[3] = {};
             for (int b = 0; b < 420; ++b)
             {
                 if (b == 4) for (int r = 0; r < 3; ++r) p.stageRhythmPreset(r, silent);
                 if (b == 60)
                 {
-                    for (int r = 0; r < 3; ++r) tails[(size_t) r] = p.retiredVoiceEngines[(size_t) r][0].get();
+                    for (int r = 0; r < 3; ++r) tails[(size_t) r] = p.retiredEngineForTest(r, 0);
                     p.loadPreset(silentFull);   // playing: staged, lands at the next loop boundary
                 }
                 if (b == 150)
                 {
                     expectEquals(p.getNumRhythms(), 1, "the full preset has landed: one rhythm");
-                    expect(slotHolds(p, 1, tails[1]) && slotHolds(p, 2, tails[2]), "the tails of the dropped slots 1 and 2 are still held in their slots");
-                    expect(! p.retiredReadyForCleanup[1][0].load() && ! p.retiredReadyForCleanup[2][0].load(), "and are not flagged: nothing visits them");
+                    expect(! slotHolds(p, 1, tails[1]) && ! slotHolds(p, 2, tails[2]), "the tails of the dropped slots 1 and 2 were cut at the count store");
                     expectEquals(chPeak(p, 1), 0.0f, "slot 1's channel is silent");
                     expectEquals(chPeak(p, 2), 0.0f, "slot 2's channel is silent");
                     expect(chPeak(p, 0) > 0.01f, "slot 0's own tail goes on ringing");
@@ -337,20 +352,15 @@ struct MuClidExtractionPinTests : juce::UnitTest
                 if (b == 400) { p.addLayer(); p.addLayer(); }
                 rig.block(512);
                 if (b == 401) for (int r = 0; r < 3; ++r) postRegrow[r] = chPeak(p, r);
-                // The tails ring on until the staged preset lands at a loop boundary, so the reference for "where they
-                // stopped" is the last block that still had three rhythms, not the block the preset was loaded in.
-                if (b >= 59 && b < 150 && p.getNumRhythms() == 3) for (int r = 0; r < 3; ++r) preShrink[r] = chPeak(p, r);
             }
-            logMessage("P3 channel peaks before the shrink " + juce::String(preShrink[1], 4) + "/" + juce::String(preShrink[2], 4)
-                       + ", just after the regrow " + juce::String(postRegrow[1], 4) + "/" + juce::String(postRegrow[2], 4));
-            expect(slotHolds(p, 1, tails[1]) && slotHolds(p, 2, tails[2]), "after the regrow the same tail engines are in the same slots");
-            expect(postRegrow[1] > 0.01f && postRegrow[2] > 0.01f, "the regrown slots, whose rhythms are silent, ring with the old tails (stale tails resume)");
-            // Only the landing block and the regrow block of ringing separate the two readings (about 1 % of decay); a tail
-            // that kept decaying through the ~300 dormant blocks would have lost about 15 % (slot 0's own tail does).
-            expect(postRegrow[1] > 0.97f * preShrink[1] && postRegrow[2] > 0.97f * preShrink[2], "from where they stopped: they did not decay while the slots were dormant");
+            logMessage("P3 just after the regrow: channel peaks " + juce::String(postRegrow[1], 4) + "/" + juce::String(postRegrow[2], 4));
+            expect(tails[0] != nullptr && tails[1] != nullptr && tails[2] != nullptr, "all three tails existed");
+            expect(tailCount(p, 1) == 0 && tailCount(p, 2) == 0, "after the regrow the slots hold no tail");
+            expectEquals(postRegrow[1], 0.0f, "the regrown slot 1, whose rhythm is silent, is silent (no stale tail resumes)");
+            expectEquals(postRegrow[2], 0.0f, "and so is slot 2");
         }
 
-        beginTest("P3: removeLayer shifts the tails down with their rhythms; the removed slot's tail is dropped and the top slot is empty");
+        beginTest("P3: removeLayer shifts the tails down with their rhythms; the removed slot's tail is cut and the top slot is empty");
         {
             Rig rig;
             auto& p = rig.p;
@@ -359,7 +369,7 @@ struct MuClidExtractionPinTests : juce::UnitTest
             for (int b = 0; b < 100; ++b)
             {
                 if (b == 4) for (int r = 0; r < 3; ++r) p.stageRhythmPreset(r, silent);
-                if (b == 60) for (int r = 0; r < 3; ++r) tails[(size_t) r] = p.retiredVoiceEngines[(size_t) r][0].get();
+                if (b == 60) for (int r = 0; r < 3; ++r) tails[(size_t) r] = p.retiredEngineForTest(r, 0);
                 if (b == 70) p.removeLayer(0);
                 rig.block(512);
             }
@@ -367,7 +377,6 @@ struct MuClidExtractionPinTests : juce::UnitTest
             expect(tails[0] != nullptr && tails[1] != nullptr && tails[2] != nullptr, "all three tails existed");
             expect(slotHolds(p, 0, tails[1]) && slotHolds(p, 1, tails[2]), "slot 1's and 2's tails now sit on slots 0 and 1");
             expectEquals(tailCount(p, 2), 0, "the vacated top slot holds none");
-            expect(! slotHolds(p, 0, tails[0]) && ! slotHolds(p, 1, tails[0]), "the removed slot's tail is gone");
             logMessage("P3 channel peaks after removeLayer(0): " + juce::String(chPeak(p, 0), 4) + " " + juce::String(chPeak(p, 1), 4) + " " + juce::String(chPeak(p, 2), 4));
             expect(chPeak(p, 0) > 0.01f && chPeak(p, 1) > 0.01f, "the shifted tails keep ringing in their new channels");
             expectEquals(chPeak(p, 2), 0.0f, "and the channel above is silent");
@@ -380,7 +389,7 @@ struct MuClidExtractionPinTests : juce::UnitTest
         struct Event { int block; std::function<void(Rig&)> apply; };
 
         // Loads a golden scenario's frozen state, replays its events on the 512-frame schedule and measures each
-        // retired engine's life: blocks from the retire to its drained flag (or to the end if it never drains).
+        // retired engine's life: blocks from the retire to the block it stopped sounding (Done), or to the end.
         struct TailStats { double longestDrained = 0.0; int undrainedWithSample = 0; int undrainedWithoutSample = 0; };
         auto longestTail = [this](const char* scenario, int blocks, const std::vector<Event>& events)
         {
@@ -391,7 +400,7 @@ struct MuClidExtractionPinTests : juce::UnitTest
                                   .getChildFile("tests/golden/mu-clid").getChildFile(scenario).getChildFile("state.xml").loadFileAsString();
             expect(text.isNotEmpty(), juce::String(scenario) + ": golden state.xml found");
             p.setStateInformation(text.toRawUTF8(), (int) text.getNumBytesAsUTF8());
-            struct Life { const VoiceEngine* e = nullptr; int start = 0; int end = -1; };
+            struct Life { const VoiceEngine* e = nullptr; int start = 0; };
             Life life[8][4];
             for (int b = 0; b < blocks; ++b)
             {
@@ -401,9 +410,13 @@ struct MuClidExtractionPinTests : juce::UnitTest
                     for (int i = 0; i < 4; ++i)
                     {
                         auto& l = life[s][i];
-                        const VoiceEngine* now = p.retiredVoiceEngines[(size_t) s][(size_t) i].get();
-                        if (now != l.e) { l = Life{}; l.e = now; l.start = b; }
-                        if (now != nullptr && l.end < 0 && p.retiredReadyForCleanup[(size_t) s][(size_t) i].load()) l.end = b;
+                        const VoiceEngine* now = p.retiredEngineForTest(s, i);
+                        if (now == l.e) continue;
+                        if (l.e != nullptr)   // the entry's engine stopped sounding: drained (the bin freed it)
+                            stats.longestDrained = juce::jmax(stats.longestDrained, (double) (b - l.start) * 512.0 / kSr);
+                        l = Life{};
+                        l.e = now;
+                        l.start = b;
                     }
             }
             for (int s = 0; s < 8; ++s)
@@ -411,12 +424,8 @@ struct MuClidExtractionPinTests : juce::UnitTest
                 {
                     const auto& l = life[s][i];
                     if (l.e == nullptr) continue;
-                    if (l.end >= 0)
-                        stats.longestDrained = juce::jmax(stats.longestDrained, (double) (l.end - l.start) * 512.0 / kSr);
-                    else if (l.e->hasSample())
-                        ++stats.undrainedWithSample;
-                    else
-                        ++stats.undrainedWithoutSample;
+                    if (l.e->hasSample()) ++stats.undrainedWithSample;
+                    else                  ++stats.undrainedWithoutSample;
                 }
             return stats;
         };
@@ -426,7 +435,7 @@ struct MuClidExtractionPinTests : juce::UnitTest
             return [slot, file](Rig& r) { r.p.stageRhythmPreset(slot, mu_golden_rig::presetsDir().getChildFile(file)); };
         };
 
-        beginTest("P4: the longest retired tail in the golden set is the 12 s Pad Long sample played to its end, well under a 30 s cap");
+        beginTest("P4: the longest retired tail in the golden set is the 12 s Pad Long sample played to its end, well under the 30 s cap");
         {
             const auto longS = longestTail("retire-long-amprel", 1407, { { 25, stage(0, "A9_hat.muRhythm") } });
             const auto clipS = longestTail("hotswap-clip", 563, { { 20, stage(1, "T11.muRhythm") },
@@ -438,9 +447,9 @@ struct MuClidExtractionPinTests : juce::UnitTest
                        + juce::String(clipS.undrainedWithSample) + ", without " + juce::String(clipS.undrainedWithoutSample));
             expectEquals(longS.undrainedWithSample + clipS.undrainedWithSample, 0, "every retired engine that holds a sample drains before its scenario ends");
             expect(longS.longestDrained > 11.8 && longS.longestDrained < 12.2, "the amp-release-at-maximum engine plays its whole 12 s sample from the retrigger at the swap boundary, on past the retire");
-            expect(clipS.longestDrained > 0.9 && clipS.longestDrained < 1.1, "the Kick engines of the hot-swap scenario drain after 93 calls (the 2 s budget counted in prepared-size blocks of 1024) of 512 frames: about 1 s");
-            expect(juce::jmax(longS.longestDrained, clipS.longestDrained) < 30.0, "so a 30 s cap would not cut anything the golden set plays");
-            expect(longS.undrainedWithoutSample > 0, "the engines that never held a sample (the slot's default engine, retired when the state loads) are never reported drained");
+            expect(clipS.longestDrained > 0.4 && clipS.longestDrained < 0.8, "the Kick engines of the hot-swap scenario drain on their measured silence after the release: about 0.55 s, well inside the 2 s budget");
+            expect(juce::jmax(longS.longestDrained, clipS.longestDrained) < 30.0, "so the 30 s cap cuts nothing the golden set plays");
+            expectEquals(longS.undrainedWithoutSample + clipS.undrainedWithoutSample, 0, "the engines that never held a sample (the slot's default engine, retired when the state loads) end at once");
         }
     }
 
@@ -460,7 +469,7 @@ struct MuClidExtractionPinTests : juce::UnitTest
             useSample(p, 2, "Kick 01.wav");
             ringA(p, 2, 16, 8);
         };
-        auto hits = [](Rig& rig, int r) { return rig.p.rhythmPlayState[(size_t) r].hitCount.load(); };
+        auto hits = [](Rig& rig, int r) { return rig.p.sampleRhythm(r).playState.hitCount.load(); };
 
         beginTest("Blocks skipped during an edit are silent, fire no step, emit no MIDI and leave the held note and the owed note-off untouched");
         {
@@ -506,7 +515,7 @@ struct MuClidExtractionPinTests : juce::UnitTest
                 if (b == 150) p.layerEditInFlight.store(true);
                 if (b == 220) p.layerEditInFlight.store(false);
                 rig.block(512);
-                if (committed < 0 && p.retiredVoiceEngines[0][0] != nullptr) committed = b;
+                if (committed < 0 && p.retiredEngineForTest(0, 0) != nullptr) committed = b;
             }
             logMessage("P6 swap boundary at block ~188 inside the skipped blocks 150-219: committed at block " + juce::String(committed));
             expectEquals(committed, 220, "the missed boundary is acted on at once when blocks run again, not a loop later");
@@ -592,11 +601,28 @@ struct MuClidExtractionPinTests : juce::UnitTest
             for (const auto meta : m) expectEquals(meta.samplePosition, 1024 - 64, "at frame 960 of the block");
         }
 
-        // Not exercised, only recorded: MixerEngine::processBlock applies pan, gain, sidechain and the peak readers
-        // to `numSamples` frames of channel buffers that prepare() sized at the prepared block, so an oversize block
-        // through PluginProcessor::processBlock runs off the end of them (it crashes a Debug heap). The contract has
-        // to say what an oversize block does (clamp or chunk) before a golden can include one; until then the golden
-        // schedules stay within the prepared size.
+        beginTest("An oversize host block (1024 frames on a 256 prepared size) is rendered in chunks: no overrun, finite sound across the whole block");
+        {
+            mu_seam_test::TempStorage storage;
+            Rig rig(256);
+            rig.host.playing = true;
+            useSample(rig.p, 0, "Kick 01.wav");
+            ringA(rig.p, 0, 16, 16);
+            const auto out = rig.block(1024);
+            float peak = 0.0f, tailPeak = 0.0f;
+            bool finite = true;
+            for (int c = 0; c < 2; ++c)
+                for (int i = 0; i < 1024; ++i)
+                {
+                    const float v = out.getSample(c, i);
+                    finite = finite && std::isfinite(v);
+                    peak = juce::jmax(peak, std::abs(v));
+                    if (i >= 768) tailPeak = juce::jmax(tailPeak, std::abs(v));
+                }
+            expect(finite);
+            expect(peak > 0.0f);
+            expect(tailPeak > 0.0f, "the last chunk is rendered too, not dropped");
+        }
     }
 
     // ── The trigger source and the step cursor ──────────────────────────────────────────────────────
@@ -816,3 +842,46 @@ struct MuClidExtractionPinTests : juce::UnitTest
 };
 
 static MuClidExtractionPinTests muClidExtractionPinTests;
+
+//==============================================================================
+// C3 (design 2.1.4) for mu-Clid's EngineTail: a hot-swap's retired engine reads nothing but its own engine. Two
+// identical processors retire the same ringing engine (a Kick through a full-feedback Karplus, swapped for a silent
+// rhythm while playing); then on ONE every parameter of the processor is scrambled. The slot's channel, which after
+// the swap holds only the tail (the new rhythm has no sample), must be bit-identical in both.
+struct MuClidRetireIsolationTests : juce::UnitTest
+{
+    MuClidRetireIsolationTests() : juce::UnitTest("mu-Clid retire tail isolation (C3 twin)", "mu-clid-pins") {}
+
+    static juce::File silentPreset(mu_clid::PluginProcessor& p) { return p.getRhythmsDir().getChildFile("silent-twin.muRhythm"); }
+
+    void runTest() override
+    {
+        beginTest("A retired engine's tail is the same whatever every parameter does meanwhile");
+        mu_contract_test::RetireIsolationCase c;
+        c.make = [] { return std::unique_ptr<ProcessorBase>(new mu_golden_rig::OwnedProcessor()); };
+        c.setup = [](ProcessorBase& pb)
+        {
+            auto& p = static_cast<mu_clid::PluginProcessor&>(pb);
+            mu_golden_rig::writeFixtureSamples(p);
+            ringA(p, 0, 4, 0);
+            p.saveRhythmPresetToFile(0, silentPreset(p));   // a silent 4-step rhythm, no sample
+            useSample(p, 0, "Kick 01.wav");
+            ringA(p, 0, 4, 1);
+            karplus(p, 0);
+        };
+        c.retire = [](ProcessorBase& pb)
+        {
+            auto& p = static_cast<mu_clid::PluginProcessor&>(pb);
+            p.applyRhythmPreset(silentPreset(p), 0);   // installs now: the ringing engine retires into the bin
+        };
+        c.slot = 0;
+        c.blocksBefore = 12;
+        c.blocksAfter = 40;
+        const auto r = mu_contract_test::checkRetireIsolation(c);
+        expect(r.tailFrames == 40 * 256, "the slot's channel kept rendering after the swap");
+        expect(r.sounded, "the tail is audible");
+        expect(r.ok, "the scrambled twin's tail is bit-identical (the tail reads only its engine): " + r.message);
+    }
+};
+
+static MuClidRetireIsolationTests muClidRetireIsolationTests;

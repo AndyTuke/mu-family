@@ -1,6 +1,7 @@
 #pragma once
 
 #include "EffectAlgorithmBase.h"
+#include <atomic>
 #include <cmath>
 #include <array>
 
@@ -32,7 +33,8 @@ public:
 
     void processInner(juce::dsp::AudioBlock<float>& block) override
     {
-        const int numStages = juce::jlimit(2, MaxStages, (static_cast<int>(stages) / 2) * 2);
+        // Whole all-pass pairs, rounded to the nearest even count.
+        const int numStages = juce::jlimit(2, MaxStages, 2 * juce::roundToInt(stages.load(std::memory_order_relaxed) * 0.5f));
         smoothedRate    .setTargetValue(rate);
         smoothedDepth   .setTargetValue(depth);
         smoothedFeedback.setTargetValue(feedback);
@@ -90,6 +92,13 @@ public:
         }
     }
 
+    void reset() override
+    {
+        stateL.fill(0.0f);
+        stateR.fill(0.0f);
+        feedbackL = feedbackR = 0.0f;
+    }
+
     void setParam(const juce::String& id, float value) override
     {
         if      (id == "rate")     rate     = value;
@@ -109,11 +118,12 @@ private:
 
     FXAlgorithmDef def;
 
-    float rate     = 0.5f;
-    float depth    = 0.5f;
-    float stages   = 6.0f;
-    float feedback = 0.5f;
-    float mix      = 0.5f;
+    // Written by the UI or host automation, read by the audio thread: relaxed atomics.
+    std::atomic<float> rate     { 0.5f };
+    std::atomic<float> depth    { 0.5f };
+    std::atomic<float> stages   { 6.0f };
+    std::atomic<float> feedback { 0.5f };
+    std::atomic<float> mix      { 0.5f };
     double sr      = 44100.0;
 
     std::array<float, MaxStages> stateL{};

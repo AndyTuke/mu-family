@@ -71,7 +71,9 @@ void EuclideanPanel::apvtsSet(const char* suffix, float v)
 const mu_core::Rhythm* EuclideanPanel::currentRhythm() const
 {
     if (rhythmIndex < 0 || rhythmIndex >= proc.getNumLayers()) return nullptr;
-    return static_cast<const mu_core::Rhythm*>(proc.getLayer(rhythmIndex));   // every layer of a Euclid product is a Rhythm
+    // A slot host can hold other layer types in the slot this panel is bound to (it is bound to slot 0 before the editor
+    // shows the real one), so the layer is checked, not assumed to be a Rhythm.
+    return dynamic_cast<const mu_core::Rhythm*>(proc.getLayer(rhythmIndex));
 }
 
 int EuclideanPanel::insertStartDisplayOffset(int ring) const

@@ -6,6 +6,13 @@ SegmentControl::SegmentControl(std::initializer_list<juce::String> labels,
 {
 }
 
+void SegmentControl::setLabels(const std::vector<juce::String>& labels)
+{
+    options = labels;
+    if (selectedIndex >= (int) options.size()) selectedIndex = 0;
+    repaint();
+}
+
 void SegmentControl::setSelectedIndex(int index, bool notify)
 {
     const bool same = (index == selectedIndex);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Audio/SpinLock.h"
 #include "Sequencer/ControlSequence.h"
 #include "Modulation/ModulationMatrix.h"
 #include "Audio/VoiceParams.h"
@@ -15,6 +16,7 @@ namespace juce { class AudioProcessorValueTreeState; }
 
 #include <atomic>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -121,6 +123,11 @@ struct Layer : public mu_core::RetireTail
     int activeClip = -1;
 
     std::string name        = "<unnamed>";
+    // Audio thread only: the channel mask this layer's last call carried, so the base can tell the layer once
+    // (MidiView::inputReset) that its MIDI In changed. It travels with the layer through a swap. Omni at birth.
+    uint16_t    lastMidiMask = 0xFFFF;
+    // Audio thread only: false until the base has handed this layer the keys already held on the MIDI In (its first call).
+    bool        heldKeysSeeded = false;
     int         colourIndex = 0;   // index into MuLookAndFeel::layerPalette (8 colours)
 
     // Persistence hooks (message thread; defined in Modulation/ModulatorSerialise.h). `writeExtras`
@@ -138,14 +145,38 @@ struct Layer : public mu_core::RetireTail
     // address); whatever `fresh` is left holding is destroyed by the caller after the lock is dropped.
     // A product extends it to take its own data. onMoved tells a layer its slot index changed, so
     // state tied to the slot (not the data) can be reset.
+    //
+    // The base takes voiceParamsLock around the parameter copy and modLock around the modulator exchange,
+    // so a reader that holds either lock (an editor, a host that renders while processing is not
+    // suspended) sees the old data or the new, never a mix. The caller already holds layersLock, which
+    // keeps the audio thread out of the layer in every product, so the wait is only for the message
+    // thread's own brief edits. The wait is bounded (kResetLockWaitMs): a holder that never lets go can
+    // never hang the message thread, the reset then proceeds as it did before the locks were taken.
     virtual void adoptDefaults(Layer& fresh)
     {
+        static constexpr juce::uint32 kResetLockWaitMs = 500;
+        auto acquire = [](CopyableSpinLock& lock)
+        {
+            const auto start = juce::Time::getMillisecondCounter();
+            while (! mu_core::trySpinLock(lock))
+            {
+                if (juce::Time::getMillisecondCounter() - start > kResetLockWaitMs) return false;
+                std::this_thread::yield();
+            }
+            return true;
+        };
+
+        const bool gotParams = acquire(voiceParamsLock);
         voiceParams = fresh.voiceParams;
+        if (gotParams) mu_core::spinUnlock(voiceParamsLock);
+
+        const bool gotMods = acquire(modLock);
         // Exchange the sequences one by one, not the vector: an editor holds pointers to these
         // elements, and a vector swap would leave them pointing into `fresh`, which dies after unlock.
         for (size_t i = 0; i < controlSequences.size() && i < fresh.controlSequences.size(); ++i)
             std::swap(controlSequences[i], fresh.controlSequences[i]);
         std::swap(modulationMatrix, fresh.modulationMatrix);
+        if (gotMods) mu_core::spinUnlock(modLock);
     }
     virtual void onMoved(int newIndex) { juce::ignoreUnused(newIndex); }
 
@@ -163,9 +194,16 @@ struct Layer : public mu_core::RetireTail
     // Message thread, before publication and again after every move to another slot (C9): cache the slot's
     // parameter atomics (mu_core::ParamBinding). render never looks a parameter up by id.
     virtual void bindParams(juce::AudioProcessorValueTreeState& apvts, int slot) { juce::ignoreUnused(apvts, slot); }
+    // Message thread, once, after the first bindParams and before the layer is published: setup that needs the bound
+    // parameters and may allocate, build and prepare (an engine, a bank binding, a file) or write the layer's own
+    // parameters through the APVTS. Called outside every lock, so it is not part of bindParams, which also runs under
+    // layersLock when a reorder rebinds a moved layer. Default: nothing.
+    virtual void completeSetup(juce::AudioProcessorValueTreeState& apvts, int slot) { juce::ignoreUnused(apvts, slot); }
     // Audio thread: frames [0, n) of `out` (two channels, handed over cleared) become the layer's block,
     // insert included. No allocation, no lock beyond the layer's own spin locks, no parameter lookup by id,
     // no call into the host: the only outputs are `out`, ctx.midiOut and the layer's own atomics.
+    // Write `out` only through its write accessors (getWritePointer, addFrom, ...), never through a cached or
+    // const-cast pointer: a call that wrote nothing that way reaches the mixer as a silent (cleared) channel.
     // A playing block may REPEAT the previous block's startBeat: a host that stalls its position while reporting
     // play (a freeze) is not a jump, so a transport-anchored layer keeps a last-evaluated-beat cursor and fires
     // nothing it already fired; the one discontinuity arrives as onTransportJump when the position moves again.
@@ -197,6 +235,11 @@ struct Layer : public mu_core::RetireTail
     // null when the layer has no insert or the algorithm shows none. Message thread only: the pointer
     // is into this layer, so a caller drops it before the layer is removed.
     virtual const std::atomic<float>* insertGainReduction() const { return nullptr; }
+
+    // The layer's modulated mixer-strip values for the block it just rendered, which the host gives to the layer's strip:
+    // pan (-1..+1), then the Effect, Delay and Reverb sends (0..1). False when the layer offers none of them as
+    // modulation targets (or has not resolved yet). Audio thread.
+    virtual bool stripMods(float (&out)[4]) const noexcept { juce::ignoreUnused(out); return false; }
 };
 
 // The base persistence hooks need the modulator (de)serialiser, which itself takes a Layer.

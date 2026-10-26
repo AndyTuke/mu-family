@@ -21,21 +21,40 @@ public:
     void prepare(double sr, int maxBlock, Kind k)
     {
         sampleRate = sr > 0.0 ? sr : 44100.0;
+        kind = k;
         generate(k);
         scratch.setSize(1, juce::jmax(1, maxBlock));
+        noiseScratch.setSize(1, juce::jmax(1, maxBlock));
         ratios.assign((size_t) juce::jmax(1, maxBlock), 1.0);
         filledRatio = -1.0;   // force the first render to fill ratios to the live tune
         active = false;
     }
 
-    // tuneSemitones: ± playback transpose; decayMs: gate length.
-    void setParams(float tuneSemitones, float decayMs) noexcept
+    // tuneSemitones: ± playback transpose; decayMs: gate length. The Hat has a second pair for its open sound
+    // (openTuneSemitones, openDecayMs); the Snare reads only the first extra value, snap01: the share of snare-wire
+    // noise against the drum body (0.5 is the original blend).
+    void setParams(float tuneSemitones, float decayMs) noexcept   // the single sound: the Snare at its default Snap
     {
-        ratio    = std::pow(2.0, (double) tuneSemitones / 12.0);
-        gateEnv.setTimeConstant(decayMs * 0.001f * (float) sampleRate);
+        setParams(tuneSemitones, decayMs, kind == Kind::Snare ? 0.5f : 0.0f, 0.0f);
     }
 
-    void trigger(float velocity, int onset = 0) noexcept { player.trigger(); restart = true; pendingVel = velocity; pendingOnset = juce::jmax(0, onset); }
+    void setParams(float tuneSemitones, float decayMs, float openTuneSemitones, float openDecayMs) noexcept
+    {
+        snap = juce::jlimit(0.0f, 1.0f, kind == Kind::Snare ? openTuneSemitones : 0.5f);
+        closedRatio = std::pow(2.0, (double) tuneSemitones / 12.0);
+        closedDecay = decayMs;
+        openRatio   = std::pow(2.0, (double) openTuneSemitones / 12.0);
+        openDecay   = openDecayMs;
+        applySound();
+    }
+
+    // `open`: play the open sound (Hat only). A new hit restarts the one voice, so a closed hat chokes a ringing open one.
+    void trigger(float velocity, int onset = 0, bool open = false) noexcept
+    {
+        playingOpen = open && kind == Kind::HiHat;
+        applySound();
+        player.trigger(); noisePlayer.trigger(); restart = true; pendingVel = velocity; pendingOnset = juce::jmax(0, onset);
+    }
 
     // Silence the lane immediately (e.g. transport stop). The next render adds nothing.
     void reset() noexcept { active = false; restart = false; }
@@ -56,7 +75,16 @@ public:
         if (playN > 0)
         {
             juce::AudioBuffer<float> sub(scratch.getArrayOfWritePointers(), 1, onset, playN);
-            player.process(sampleBuf, ratios.data(), sub, playN);
+            player.process(playingOpen ? openBuf : sampleBuf, ratios.data(), sub, playN);
+            if (kind == Kind::Snare)
+            {
+                // Blend: the body at (1 - snap) and the wires, played into their own scratch, at snap.
+                sub.applyGain(1.0f - snap);
+                noiseScratch.clear();
+                juce::AudioBuffer<float> nsub(noiseScratch.getArrayOfWritePointers(), 1, onset, playN);
+                noisePlayer.process(noiseBuf, ratios.data(), nsub, playN);
+                sub.addFrom(0, 0, nsub, 0, 0, playN, snap);
+            }
         }
 
         const int chs = buf.getNumChannels();
@@ -93,25 +121,54 @@ private:
                 const float hp = wn - prev; prev = wn;
                 d[i] = hp * std::exp(-(float) i * tau) * 0.8f;
             }
+
+            // The open hat: the same bright noise with a long ring (~250 ms time constant, 1.2 s buffer).
+            const int openLen = (int) (1.2 * sampleRate);
+            openBuf.setSize(1, openLen);
+            auto* o = openBuf.getWritePointer(0);
+            juce::Random openRng(0x6c9);
+            const float openTau = 1.0f / (0.25f * (float) sampleRate);
+            prev = 0.0f;
+            for (int i = 0; i < openLen; ++i)
+            {
+                const float wn = openRng.nextFloat() * 2.0f - 1.0f;
+                const float hp = wn - prev; prev = wn;
+                o[i] = hp * std::exp(-(float) i * openTau) * 0.8f;
+            }
         }
         else
         {
-            // Snare: noise body + a 180 Hz tone, medium decay.
+            // Snare: a 180 Hz tone body (sampleBuf) and the noise wires (noiseBuf, medium decay), kept apart so the
+            // Snap control can blend them; at Snap 0.5 their sum is the original single buffer.
             const float tauN = 1.0f / (0.12f * (float) sampleRate);
             const float tauT = 1.0f / (0.10f * (float) sampleRate);
+            noiseBuf.setSize(1, len);
+            auto* nz = noiseBuf.getWritePointer(0);
             for (int i = 0; i < len; ++i)
             {
                 const float wn   = rng.nextFloat() * 2.0f - 1.0f;
                 const float tone = std::sin(6.28318530718f * 180.0f * (float) i / (float) sampleRate);
-                d[i] = (wn * std::exp(-(float) i * tauN) * 0.7f
-                        + tone * std::exp(-(float) i * tauT) * 0.5f);
+                nz[i] = wn * std::exp(-(float) i * tauN) * 1.4f;                  // x snap: 0.7 at Snap 0.5
+                d[i]  = tone * std::exp(-(float) i * tauT) * 1.0f;                // x (1 - snap): 0.5 at Snap 0.5
             }
         }
     }
 
-    SamplePlayer            player;
-    juce::AudioBuffer<float> sampleBuf, scratch;
+    // The sound the next hit uses: the closed or open pair's tune and gate.
+    void applySound() noexcept
+    {
+        ratio = playingOpen ? openRatio : closedRatio;
+        gateEnv.setTimeConstant((playingOpen ? openDecay : closedDecay) * 0.001f * (float) sampleRate);
+    }
+
+    SamplePlayer            player, noisePlayer;   // the noise player is the Snare's wires
+    juce::AudioBuffer<float> sampleBuf, openBuf, noiseBuf, scratch, noiseScratch;
     std::vector<double>      ratios;
+    Kind   kind = Kind::HiHat;
+    bool   playingOpen = false;
+    float  snap = 0.5f;
+    double closedRatio = 1.0, openRatio = 1.0;
+    float  closedDecay = 60.0f, openDecay = 300.0f;
     double sampleRate = 44100.0, ratio = 1.0, filledRatio = -1.0;
     float  pendingVel = 1.0f;
     mu_core::ExpDecay gateEnv;   // the gate's exponential decay

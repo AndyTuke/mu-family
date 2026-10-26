@@ -2,10 +2,12 @@
 layers=1
 load_errors=1
 load_error=One or more samples originated from embedded data; saving with embed forced on.
-resave_bytes=60131
-resave_sha256=5f5e8fa718d7f510a7a4018441497719ce0c3dcc54c8f9fe3f811fd73517d797
+resave_bytes=60122
+resave_sha256=47a49b1a1ebc3197896cf75419163a7a3b57d55deff7165e06117d03cd63aad7
 --- parameters differing from default (id=plain value)
 ch0_lvl=0.619
+ch0_scAtk=4.00802
+ch0_scRel=90.4523
 dly2rev=0.18
 dly_dirt=0.688
 dly_fb=0.22

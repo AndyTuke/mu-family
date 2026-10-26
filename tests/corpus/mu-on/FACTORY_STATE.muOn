@@ -12,8 +12,8 @@
       <p id="ch0_sendRev" x="0.0"/>
       <p id="ch0_scSrc" x="0.0"/>
       <p id="ch0_scAmt" x="0.0"/>
-      <p id="ch0_scAtk" x="5.0"/>
-      <p id="ch0_scRel" x="100.0"/>
+      <p id="ch0_scAtk" x="0.0"/>
+      <p id="ch0_scRel" x="0.0"/>
       <p id="ch0_outBus" x="0.0"/>
       <p id="ch1_lvl" x="1.0"/>
       <p id="ch1_pan" x="0.0"/>
@@ -24,8 +24,8 @@
       <p id="ch1_sendRev" x="0.0"/>
       <p id="ch1_scSrc" x="0.0"/>
       <p id="ch1_scAmt" x="0.0"/>
-      <p id="ch1_scAtk" x="5.0"/>
-      <p id="ch1_scRel" x="100.0"/>
+      <p id="ch1_scAtk" x="0.0"/>
+      <p id="ch1_scRel" x="0.0"/>
       <p id="ch1_outBus" x="0.0"/>
       <p id="ch2_lvl" x="1.0"/>
       <p id="ch2_pan" x="0.0"/>
@@ -36,8 +36,8 @@
       <p id="ch2_sendRev" x="0.0"/>
       <p id="ch2_scSrc" x="0.0"/>
       <p id="ch2_scAmt" x="0.0"/>
-      <p id="ch2_scAtk" x="5.0"/>
-      <p id="ch2_scRel" x="100.0"/>
+      <p id="ch2_scAtk" x="0.0"/>
+      <p id="ch2_scRel" x="0.0"/>
       <p id="ch2_outBus" x="0.0"/>
       <p id="ch3_lvl" x="1.0"/>
       <p id="ch3_pan" x="0.0"/>
@@ -48,8 +48,8 @@
       <p id="ch3_sendRev" x="0.0"/>
       <p id="ch3_scSrc" x="0.0"/>
       <p id="ch3_scAmt" x="0.0"/>
-      <p id="ch3_scAtk" x="5.0"/>
-      <p id="ch3_scRel" x="100.0"/>
+      <p id="ch3_scAtk" x="0.0"/>
+      <p id="ch3_scRel" x="0.0"/>
       <p id="ch3_outBus" x="0.0"/>
       <p id="ch4_lvl" x="1.0"/>
       <p id="ch4_pan" x="0.0"/>
@@ -60,8 +60,8 @@
       <p id="ch4_sendRev" x="0.0"/>
       <p id="ch4_scSrc" x="0.0"/>
       <p id="ch4_scAmt" x="0.0"/>
-      <p id="ch4_scAtk" x="5.0"/>
-      <p id="ch4_scRel" x="100.0"/>
+      <p id="ch4_scAtk" x="0.0"/>
+      <p id="ch4_scRel" x="0.0"/>
       <p id="ch4_outBus" x="0.0"/>
       <p id="ch5_lvl" x="1.0"/>
       <p id="ch5_pan" x="0.0"/>
@@ -72,8 +72,8 @@
       <p id="ch5_sendRev" x="0.0"/>
       <p id="ch5_scSrc" x="0.0"/>
       <p id="ch5_scAmt" x="0.0"/>
-      <p id="ch5_scAtk" x="5.0"/>
-      <p id="ch5_scRel" x="100.0"/>
+      <p id="ch5_scAtk" x="0.0"/>
+      <p id="ch5_scRel" x="0.0"/>
       <p id="ch5_outBus" x="0.0"/>
       <p id="ch6_lvl" x="1.0"/>
       <p id="ch6_pan" x="0.0"/>
@@ -84,8 +84,8 @@
       <p id="ch6_sendRev" x="0.0"/>
       <p id="ch6_scSrc" x="0.0"/>
       <p id="ch6_scAmt" x="0.0"/>
-      <p id="ch6_scAtk" x="5.0"/>
-      <p id="ch6_scRel" x="100.0"/>
+      <p id="ch6_scAtk" x="0.0"/>
+      <p id="ch6_scRel" x="0.0"/>
       <p id="ch6_outBus" x="0.0"/>
       <p id="ch7_lvl" x="1.0"/>
       <p id="ch7_pan" x="0.0"/>
@@ -96,11 +96,11 @@
       <p id="ch7_sendRev" x="0.0"/>
       <p id="ch7_scSrc" x="0.0"/>
       <p id="ch7_scAmt" x="0.0"/>
-      <p id="ch7_scAtk" x="5.0"/>
-      <p id="ch7_scRel" x="100.0"/>
+      <p id="ch7_scAtk" x="0.0"/>
+      <p id="ch7_scRel" x="0.0"/>
       <p id="ch7_outBus" x="0.0"/>
-      <p id="seq_swing" x="0.0"/>
-      <p id="seq_accent" x="1.0"/>
+      <p id="root" x="0.0" c="C"/>
+      <p id="scale" x="11.0" c="Chromatic"/>
       <p id="eff_algo" x="0.0"/>
       <p id="eff_en" x="1.0"/>
       <p id="eff_p0" x="0.5"/>
@@ -147,24 +147,24 @@
       <p id="ret_eff_solo" x="0.0"/>
       <p id="ret_eff_scSrc" x="0.0"/>
       <p id="ret_eff_scAmt" x="0.0"/>
-      <p id="ret_eff_scAtk" x="5.0"/>
-      <p id="ret_eff_scRel" x="100.0"/>
+      <p id="ret_eff_scAtk" x="0.0"/>
+      <p id="ret_eff_scRel" x="0.0"/>
       <p id="ret_dly_lvl" x="0.75"/>
       <p id="ret_dly_pan" x="0.0"/>
       <p id="ret_dly_mute" x="0.0"/>
       <p id="ret_dly_solo" x="0.0"/>
       <p id="ret_dly_scSrc" x="0.0"/>
       <p id="ret_dly_scAmt" x="0.0"/>
-      <p id="ret_dly_scAtk" x="5.0"/>
-      <p id="ret_dly_scRel" x="100.0"/>
+      <p id="ret_dly_scAtk" x="0.0"/>
+      <p id="ret_dly_scRel" x="0.0"/>
       <p id="ret_rev_lvl" x="0.75"/>
       <p id="ret_rev_pan" x="0.0"/>
       <p id="ret_rev_mute" x="0.0"/>
       <p id="ret_rev_solo" x="0.0"/>
       <p id="ret_rev_scSrc" x="0.0"/>
       <p id="ret_rev_scAmt" x="0.0"/>
-      <p id="ret_rev_scAtk" x="5.0"/>
-      <p id="ret_rev_scRel" x="100.0"/>
+      <p id="ret_rev_scAtk" x="0.0"/>
+      <p id="ret_rev_scRel" x="0.0"/>
       <p id="mstr_lvl" x="1.0"/>
       <p id="mstr_pan" x="0.0"/>
       <p id="mstr_swap" x="2.0" c="On bar"/>
@@ -188,10 +188,11 @@
         <p id="kick_pdec" x="50.0"/>
         <p id="kick_adec" x="180.0"/>
         <p id="kick_drive" x="0.2000000029802322"/>
+        <p id="kick_fine" x="0.0"/>
         <p id="bass_wave" x="0.0" c="Sine"/>
         <p id="bass_sub" x="0.5"/>
-        <p id="bass_tune" x="41.20000076293945"/>
-        <p id="bass_cut" x="600.0"/>
+        <p id="bass_tune" x="41.19999694824219"/>
+        <p id="bass_cut" x="600.0000610351562"/>
         <p id="bass_res" x="0.2000000029802322"/>
         <p id="bass_env" x="0.4000000059604645"/>
         <p id="bass_edec" x="180.0"/>
@@ -199,10 +200,16 @@
         <p id="bass_dec" x="200.0"/>
         <p id="bass_sus" x="0.0"/>
         <p id="bass_drive" x="0.2000000029802322"/>
+        <p id="bass_rel" x="300.0"/>
+        <p id="bass_glide" x="80.0"/>
+        <p id="bass_fine" x="0.0"/>
         <p id="hat_tune" x="0.0"/>
         <p id="hat_dec" x="60.0"/>
+        <p id="hat_otune" x="0.0"/>
+        <p id="hat_odec" x="300.0"/>
         <p id="snare_tune" x="0.0"/>
         <p id="snare_dec" x="160.0"/>
+        <p id="snare_snap" x="0.5"/>
         <p id="rumble_drive" x="0.4000000059604645"/>
         <p id="rumble_d1" x="0.5"/>
         <p id="rumble_d2" x="0.3500000238418579"/>
@@ -212,6 +219,65 @@
         <p id="rumble_revlp" x="1200.0"/>
         <p id="rumble_cut" x="800.0"/>
         <p id="rumble_res" x="0.2000000029802322"/>
+        <p id="rumble_inlp" x="20000.0"/>
+        <p id="drvChar" x="0.0"/>
+        <p id="insP1" x="0.0"/>
+        <p id="insP2" x="0.0"/>
+        <p id="insP3" x="0.0"/>
+        <p id="insP4" x="0.0"/>
+        <p id="level" x="1.0"/>
+        <p id="prob" x="100.0"/>
+        <p id="swing" x="0.0"/>
+        <p id="accent" x="1.0"/>
+        <p id="fmp_algo" x="0.0" c="Tom"/>
+        <p id="fmp_tune" x="90.0"/>
+        <p id="fmp_ratio" x="1.5"/>
+        <p id="fmp_index" x="0.3500000238418579"/>
+        <p id="fmp_idec" x="0.5700000524520874"/>
+        <p id="fmp_fdbk" x="0.05000000074505806"/>
+        <p id="fmp_dive" x="0.4300000071525574"/>
+        <p id="fmp_dtime" x="0.4600000083446503"/>
+        <p id="fmp_decay" x="0.4000000059604645"/>
+        <p id="fmp_fold" x="0.1500000059604645"/>
+        <p id="fmp_noise" x="0.1500000059604645"/>
+        <p id="chord_wave" x="0.0" c="Saw"/>
+        <p id="chord_cut" x="900.0001220703125"/>
+        <p id="chord_res" x="0.25"/>
+        <p id="chord_drive" x="0.2000000029802322"/>
+        <p id="chord_env" x="0.5"/>
+        <p id="chord_edec" x="300.0"/>
+        <p id="chord_atk" x="3.0"/>
+        <p id="chord_dec" x="400.0"/>
+        <p id="chord_sus" x="0.6000000238418579"/>
+        <p id="chord_rel" x="250.0"/>
+        <p id="chord_fatk" x="0.5"/>
+        <p id="chord_fsus" x="0.0"/>
+        <p id="chord_frel" x="250.0"/>
+        <p id="ghost" x="0.3500000238418579"/>
+        <p id="kick_ftype" x="0.0" c="LP12"/>
+        <p id="kick_fcut" x="20000.0"/>
+        <p id="kick_fres" x="0.2000000029802322"/>
+        <p id="kick_fatk" x="0.5"/>
+        <p id="kick_fdec" x="150.0"/>
+        <p id="kick_fdep" x="0.0"/>
+        <p id="hat_ftype" x="0.0" c="LP12"/>
+        <p id="hat_fcut" x="20000.0"/>
+        <p id="hat_fres" x="0.2000000029802322"/>
+        <p id="hat_fatk" x="0.5"/>
+        <p id="hat_fdec" x="150.0"/>
+        <p id="hat_fdep" x="0.0"/>
+        <p id="snare_ftype" x="0.0" c="LP12"/>
+        <p id="snare_fcut" x="20000.0"/>
+        <p id="snare_fres" x="0.2000000029802322"/>
+        <p id="snare_fatk" x="0.5"/>
+        <p id="snare_fdec" x="150.0"/>
+        <p id="snare_fdep" x="0.0"/>
+        <p id="fmp_ftype" x="0.0" c="LP12"/>
+        <p id="fmp_fcut" x="20000.0"/>
+        <p id="fmp_fres" x="0.2000000029802322"/>
+        <p id="fmp_fatk" x="0.5"/>
+        <p id="fmp_fdec" x="150.0"/>
+        <p id="fmp_fdep" x="0.0"/>
         <Track i="0" on="1000100010001000" accent="1000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -240,10 +306,11 @@
         <p id="kick_pdec" x="50.0"/>
         <p id="kick_adec" x="180.0"/>
         <p id="kick_drive" x="0.2000000029802322"/>
+        <p id="kick_fine" x="0.0"/>
         <p id="bass_wave" x="0.0" c="Sine"/>
         <p id="bass_sub" x="0.5"/>
-        <p id="bass_tune" x="41.20000076293945"/>
-        <p id="bass_cut" x="600.0"/>
+        <p id="bass_tune" x="41.19999694824219"/>
+        <p id="bass_cut" x="600.0000610351562"/>
         <p id="bass_res" x="0.2000000029802322"/>
         <p id="bass_env" x="0.4000000059604645"/>
         <p id="bass_edec" x="180.0"/>
@@ -251,10 +318,16 @@
         <p id="bass_dec" x="200.0"/>
         <p id="bass_sus" x="0.0"/>
         <p id="bass_drive" x="0.2000000029802322"/>
+        <p id="bass_rel" x="300.0"/>
+        <p id="bass_glide" x="80.0"/>
+        <p id="bass_fine" x="0.0"/>
         <p id="hat_tune" x="0.0"/>
         <p id="hat_dec" x="60.0"/>
+        <p id="hat_otune" x="0.0"/>
+        <p id="hat_odec" x="300.0"/>
         <p id="snare_tune" x="0.0"/>
         <p id="snare_dec" x="160.0"/>
+        <p id="snare_snap" x="0.5"/>
         <p id="rumble_drive" x="0.4000000059604645"/>
         <p id="rumble_d1" x="0.5"/>
         <p id="rumble_d2" x="0.3500000238418579"/>
@@ -264,6 +337,65 @@
         <p id="rumble_revlp" x="1200.0"/>
         <p id="rumble_cut" x="800.0"/>
         <p id="rumble_res" x="0.2000000029802322"/>
+        <p id="rumble_inlp" x="20000.0"/>
+        <p id="drvChar" x="0.0"/>
+        <p id="insP1" x="0.0"/>
+        <p id="insP2" x="0.0"/>
+        <p id="insP3" x="0.0"/>
+        <p id="insP4" x="0.0"/>
+        <p id="level" x="1.0"/>
+        <p id="prob" x="100.0"/>
+        <p id="swing" x="0.0"/>
+        <p id="accent" x="1.0"/>
+        <p id="fmp_algo" x="0.0" c="Tom"/>
+        <p id="fmp_tune" x="90.0"/>
+        <p id="fmp_ratio" x="1.5"/>
+        <p id="fmp_index" x="0.3500000238418579"/>
+        <p id="fmp_idec" x="0.5700000524520874"/>
+        <p id="fmp_fdbk" x="0.05000000074505806"/>
+        <p id="fmp_dive" x="0.4300000071525574"/>
+        <p id="fmp_dtime" x="0.4600000083446503"/>
+        <p id="fmp_decay" x="0.4000000059604645"/>
+        <p id="fmp_fold" x="0.1500000059604645"/>
+        <p id="fmp_noise" x="0.1500000059604645"/>
+        <p id="chord_wave" x="0.0" c="Saw"/>
+        <p id="chord_cut" x="900.0001220703125"/>
+        <p id="chord_res" x="0.25"/>
+        <p id="chord_drive" x="0.2000000029802322"/>
+        <p id="chord_env" x="0.5"/>
+        <p id="chord_edec" x="300.0"/>
+        <p id="chord_atk" x="3.0"/>
+        <p id="chord_dec" x="400.0"/>
+        <p id="chord_sus" x="0.6000000238418579"/>
+        <p id="chord_rel" x="250.0"/>
+        <p id="chord_fatk" x="0.5"/>
+        <p id="chord_fsus" x="0.0"/>
+        <p id="chord_frel" x="250.0"/>
+        <p id="ghost" x="0.3500000238418579"/>
+        <p id="kick_ftype" x="0.0" c="LP12"/>
+        <p id="kick_fcut" x="20000.0"/>
+        <p id="kick_fres" x="0.2000000029802322"/>
+        <p id="kick_fatk" x="0.5"/>
+        <p id="kick_fdec" x="150.0"/>
+        <p id="kick_fdep" x="0.0"/>
+        <p id="hat_ftype" x="0.0" c="LP12"/>
+        <p id="hat_fcut" x="20000.0"/>
+        <p id="hat_fres" x="0.2000000029802322"/>
+        <p id="hat_fatk" x="0.5"/>
+        <p id="hat_fdec" x="150.0"/>
+        <p id="hat_fdep" x="0.0"/>
+        <p id="snare_ftype" x="0.0" c="LP12"/>
+        <p id="snare_fcut" x="20000.0"/>
+        <p id="snare_fres" x="0.2000000029802322"/>
+        <p id="snare_fatk" x="0.5"/>
+        <p id="snare_fdec" x="150.0"/>
+        <p id="snare_fdep" x="0.0"/>
+        <p id="fmp_ftype" x="0.0" c="LP12"/>
+        <p id="fmp_fcut" x="20000.0"/>
+        <p id="fmp_fres" x="0.2000000029802322"/>
+        <p id="fmp_fatk" x="0.5"/>
+        <p id="fmp_fdec" x="150.0"/>
+        <p id="fmp_fdep" x="0.0"/>
         <Track i="1" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -292,10 +424,11 @@
         <p id="kick_pdec" x="50.0"/>
         <p id="kick_adec" x="180.0"/>
         <p id="kick_drive" x="0.2000000029802322"/>
+        <p id="kick_fine" x="0.0"/>
         <p id="bass_wave" x="0.0" c="Sine"/>
         <p id="bass_sub" x="0.5"/>
-        <p id="bass_tune" x="41.20000076293945"/>
-        <p id="bass_cut" x="600.0"/>
+        <p id="bass_tune" x="41.19999694824219"/>
+        <p id="bass_cut" x="600.0000610351562"/>
         <p id="bass_res" x="0.2000000029802322"/>
         <p id="bass_env" x="0.4000000059604645"/>
         <p id="bass_edec" x="180.0"/>
@@ -303,10 +436,16 @@
         <p id="bass_dec" x="200.0"/>
         <p id="bass_sus" x="0.0"/>
         <p id="bass_drive" x="0.2000000029802322"/>
+        <p id="bass_rel" x="300.0"/>
+        <p id="bass_glide" x="80.0"/>
+        <p id="bass_fine" x="0.0"/>
         <p id="hat_tune" x="0.0"/>
         <p id="hat_dec" x="60.0"/>
+        <p id="hat_otune" x="0.0"/>
+        <p id="hat_odec" x="300.0"/>
         <p id="snare_tune" x="0.0"/>
         <p id="snare_dec" x="160.0"/>
+        <p id="snare_snap" x="0.5"/>
         <p id="rumble_drive" x="0.4000000059604645"/>
         <p id="rumble_d1" x="0.5"/>
         <p id="rumble_d2" x="0.3500000238418579"/>
@@ -316,6 +455,65 @@
         <p id="rumble_revlp" x="1200.0"/>
         <p id="rumble_cut" x="800.0"/>
         <p id="rumble_res" x="0.2000000029802322"/>
+        <p id="rumble_inlp" x="20000.0"/>
+        <p id="drvChar" x="0.0"/>
+        <p id="insP1" x="0.0"/>
+        <p id="insP2" x="0.0"/>
+        <p id="insP3" x="0.0"/>
+        <p id="insP4" x="0.0"/>
+        <p id="level" x="1.0"/>
+        <p id="prob" x="100.0"/>
+        <p id="swing" x="0.0"/>
+        <p id="accent" x="1.0"/>
+        <p id="fmp_algo" x="0.0" c="Tom"/>
+        <p id="fmp_tune" x="90.0"/>
+        <p id="fmp_ratio" x="1.5"/>
+        <p id="fmp_index" x="0.3500000238418579"/>
+        <p id="fmp_idec" x="0.5700000524520874"/>
+        <p id="fmp_fdbk" x="0.05000000074505806"/>
+        <p id="fmp_dive" x="0.4300000071525574"/>
+        <p id="fmp_dtime" x="0.4600000083446503"/>
+        <p id="fmp_decay" x="0.4000000059604645"/>
+        <p id="fmp_fold" x="0.1500000059604645"/>
+        <p id="fmp_noise" x="0.1500000059604645"/>
+        <p id="chord_wave" x="0.0" c="Saw"/>
+        <p id="chord_cut" x="900.0001220703125"/>
+        <p id="chord_res" x="0.25"/>
+        <p id="chord_drive" x="0.2000000029802322"/>
+        <p id="chord_env" x="0.5"/>
+        <p id="chord_edec" x="300.0"/>
+        <p id="chord_atk" x="3.0"/>
+        <p id="chord_dec" x="400.0"/>
+        <p id="chord_sus" x="0.6000000238418579"/>
+        <p id="chord_rel" x="250.0"/>
+        <p id="chord_fatk" x="0.5"/>
+        <p id="chord_fsus" x="0.0"/>
+        <p id="chord_frel" x="250.0"/>
+        <p id="ghost" x="0.3500000238418579"/>
+        <p id="kick_ftype" x="0.0" c="LP12"/>
+        <p id="kick_fcut" x="20000.0"/>
+        <p id="kick_fres" x="0.2000000029802322"/>
+        <p id="kick_fatk" x="0.5"/>
+        <p id="kick_fdec" x="150.0"/>
+        <p id="kick_fdep" x="0.0"/>
+        <p id="hat_ftype" x="0.0" c="LP12"/>
+        <p id="hat_fcut" x="20000.0"/>
+        <p id="hat_fres" x="0.2000000029802322"/>
+        <p id="hat_fatk" x="0.5"/>
+        <p id="hat_fdec" x="150.0"/>
+        <p id="hat_fdep" x="0.0"/>
+        <p id="snare_ftype" x="0.0" c="LP12"/>
+        <p id="snare_fcut" x="20000.0"/>
+        <p id="snare_fres" x="0.2000000029802322"/>
+        <p id="snare_fatk" x="0.5"/>
+        <p id="snare_fdec" x="150.0"/>
+        <p id="snare_fdep" x="0.0"/>
+        <p id="fmp_ftype" x="0.0" c="LP12"/>
+        <p id="fmp_fcut" x="20000.0"/>
+        <p id="fmp_fres" x="0.2000000029802322"/>
+        <p id="fmp_fatk" x="0.5"/>
+        <p id="fmp_fdec" x="150.0"/>
+        <p id="fmp_fdep" x="0.0"/>
         <Track i="2" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -344,10 +542,11 @@
         <p id="kick_pdec" x="50.0"/>
         <p id="kick_adec" x="180.0"/>
         <p id="kick_drive" x="0.2000000029802322"/>
+        <p id="kick_fine" x="0.0"/>
         <p id="bass_wave" x="0.0" c="Sine"/>
         <p id="bass_sub" x="0.5"/>
-        <p id="bass_tune" x="41.20000076293945"/>
-        <p id="bass_cut" x="600.0"/>
+        <p id="bass_tune" x="41.19999694824219"/>
+        <p id="bass_cut" x="600.0000610351562"/>
         <p id="bass_res" x="0.2000000029802322"/>
         <p id="bass_env" x="0.4000000059604645"/>
         <p id="bass_edec" x="180.0"/>
@@ -355,10 +554,16 @@
         <p id="bass_dec" x="200.0"/>
         <p id="bass_sus" x="0.0"/>
         <p id="bass_drive" x="0.2000000029802322"/>
+        <p id="bass_rel" x="300.0"/>
+        <p id="bass_glide" x="80.0"/>
+        <p id="bass_fine" x="0.0"/>
         <p id="hat_tune" x="0.0"/>
         <p id="hat_dec" x="60.0"/>
+        <p id="hat_otune" x="0.0"/>
+        <p id="hat_odec" x="300.0"/>
         <p id="snare_tune" x="0.0"/>
         <p id="snare_dec" x="160.0"/>
+        <p id="snare_snap" x="0.5"/>
         <p id="rumble_drive" x="0.4000000059604645"/>
         <p id="rumble_d1" x="0.5"/>
         <p id="rumble_d2" x="0.3500000238418579"/>
@@ -368,6 +573,65 @@
         <p id="rumble_revlp" x="1200.0"/>
         <p id="rumble_cut" x="800.0"/>
         <p id="rumble_res" x="0.2000000029802322"/>
+        <p id="rumble_inlp" x="20000.0"/>
+        <p id="drvChar" x="0.0"/>
+        <p id="insP1" x="0.0"/>
+        <p id="insP2" x="0.0"/>
+        <p id="insP3" x="0.0"/>
+        <p id="insP4" x="0.0"/>
+        <p id="level" x="1.0"/>
+        <p id="prob" x="100.0"/>
+        <p id="swing" x="0.0"/>
+        <p id="accent" x="1.0"/>
+        <p id="fmp_algo" x="0.0" c="Tom"/>
+        <p id="fmp_tune" x="90.0"/>
+        <p id="fmp_ratio" x="1.5"/>
+        <p id="fmp_index" x="0.3500000238418579"/>
+        <p id="fmp_idec" x="0.5700000524520874"/>
+        <p id="fmp_fdbk" x="0.05000000074505806"/>
+        <p id="fmp_dive" x="0.4300000071525574"/>
+        <p id="fmp_dtime" x="0.4600000083446503"/>
+        <p id="fmp_decay" x="0.4000000059604645"/>
+        <p id="fmp_fold" x="0.1500000059604645"/>
+        <p id="fmp_noise" x="0.1500000059604645"/>
+        <p id="chord_wave" x="0.0" c="Saw"/>
+        <p id="chord_cut" x="900.0001220703125"/>
+        <p id="chord_res" x="0.25"/>
+        <p id="chord_drive" x="0.2000000029802322"/>
+        <p id="chord_env" x="0.5"/>
+        <p id="chord_edec" x="300.0"/>
+        <p id="chord_atk" x="3.0"/>
+        <p id="chord_dec" x="400.0"/>
+        <p id="chord_sus" x="0.6000000238418579"/>
+        <p id="chord_rel" x="250.0"/>
+        <p id="chord_fatk" x="0.5"/>
+        <p id="chord_fsus" x="0.0"/>
+        <p id="chord_frel" x="250.0"/>
+        <p id="ghost" x="0.3500000238418579"/>
+        <p id="kick_ftype" x="0.0" c="LP12"/>
+        <p id="kick_fcut" x="20000.0"/>
+        <p id="kick_fres" x="0.2000000029802322"/>
+        <p id="kick_fatk" x="0.5"/>
+        <p id="kick_fdec" x="150.0"/>
+        <p id="kick_fdep" x="0.0"/>
+        <p id="hat_ftype" x="0.0" c="LP12"/>
+        <p id="hat_fcut" x="20000.0"/>
+        <p id="hat_fres" x="0.2000000029802322"/>
+        <p id="hat_fatk" x="0.5"/>
+        <p id="hat_fdec" x="150.0"/>
+        <p id="hat_fdep" x="0.0"/>
+        <p id="snare_ftype" x="0.0" c="LP12"/>
+        <p id="snare_fcut" x="20000.0"/>
+        <p id="snare_fres" x="0.2000000029802322"/>
+        <p id="snare_fatk" x="0.5"/>
+        <p id="snare_fdec" x="150.0"/>
+        <p id="snare_fdep" x="0.0"/>
+        <p id="fmp_ftype" x="0.0" c="LP12"/>
+        <p id="fmp_fcut" x="20000.0"/>
+        <p id="fmp_fres" x="0.2000000029802322"/>
+        <p id="fmp_fatk" x="0.5"/>
+        <p id="fmp_fdec" x="150.0"/>
+        <p id="fmp_fdep" x="0.0"/>
         <Track i="3" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -396,10 +660,11 @@
         <p id="kick_pdec" x="50.0"/>
         <p id="kick_adec" x="180.0"/>
         <p id="kick_drive" x="0.2000000029802322"/>
+        <p id="kick_fine" x="0.0"/>
         <p id="bass_wave" x="0.0" c="Sine"/>
         <p id="bass_sub" x="0.5"/>
-        <p id="bass_tune" x="41.20000076293945"/>
-        <p id="bass_cut" x="600.0"/>
+        <p id="bass_tune" x="41.19999694824219"/>
+        <p id="bass_cut" x="600.0000610351562"/>
         <p id="bass_res" x="0.2000000029802322"/>
         <p id="bass_env" x="0.4000000059604645"/>
         <p id="bass_edec" x="180.0"/>
@@ -407,10 +672,16 @@
         <p id="bass_dec" x="200.0"/>
         <p id="bass_sus" x="0.0"/>
         <p id="bass_drive" x="0.2000000029802322"/>
+        <p id="bass_rel" x="300.0"/>
+        <p id="bass_glide" x="80.0"/>
+        <p id="bass_fine" x="0.0"/>
         <p id="hat_tune" x="0.0"/>
         <p id="hat_dec" x="60.0"/>
+        <p id="hat_otune" x="0.0"/>
+        <p id="hat_odec" x="300.0"/>
         <p id="snare_tune" x="0.0"/>
         <p id="snare_dec" x="160.0"/>
+        <p id="snare_snap" x="0.5"/>
         <p id="rumble_drive" x="0.4000000059604645"/>
         <p id="rumble_d1" x="0.5"/>
         <p id="rumble_d2" x="0.3500000238418579"/>
@@ -420,6 +691,65 @@
         <p id="rumble_revlp" x="1200.0"/>
         <p id="rumble_cut" x="800.0"/>
         <p id="rumble_res" x="0.2000000029802322"/>
+        <p id="rumble_inlp" x="20000.0"/>
+        <p id="drvChar" x="0.0"/>
+        <p id="insP1" x="0.0"/>
+        <p id="insP2" x="0.0"/>
+        <p id="insP3" x="0.0"/>
+        <p id="insP4" x="0.0"/>
+        <p id="level" x="1.0"/>
+        <p id="prob" x="100.0"/>
+        <p id="swing" x="0.0"/>
+        <p id="accent" x="1.0"/>
+        <p id="fmp_algo" x="0.0" c="Tom"/>
+        <p id="fmp_tune" x="90.0"/>
+        <p id="fmp_ratio" x="1.5"/>
+        <p id="fmp_index" x="0.3500000238418579"/>
+        <p id="fmp_idec" x="0.5700000524520874"/>
+        <p id="fmp_fdbk" x="0.05000000074505806"/>
+        <p id="fmp_dive" x="0.4300000071525574"/>
+        <p id="fmp_dtime" x="0.4600000083446503"/>
+        <p id="fmp_decay" x="0.4000000059604645"/>
+        <p id="fmp_fold" x="0.1500000059604645"/>
+        <p id="fmp_noise" x="0.1500000059604645"/>
+        <p id="chord_wave" x="0.0" c="Saw"/>
+        <p id="chord_cut" x="900.0001220703125"/>
+        <p id="chord_res" x="0.25"/>
+        <p id="chord_drive" x="0.2000000029802322"/>
+        <p id="chord_env" x="0.5"/>
+        <p id="chord_edec" x="300.0"/>
+        <p id="chord_atk" x="3.0"/>
+        <p id="chord_dec" x="400.0"/>
+        <p id="chord_sus" x="0.6000000238418579"/>
+        <p id="chord_rel" x="250.0"/>
+        <p id="chord_fatk" x="0.5"/>
+        <p id="chord_fsus" x="0.0"/>
+        <p id="chord_frel" x="250.0"/>
+        <p id="ghost" x="0.3500000238418579"/>
+        <p id="kick_ftype" x="0.0" c="LP12"/>
+        <p id="kick_fcut" x="20000.0"/>
+        <p id="kick_fres" x="0.2000000029802322"/>
+        <p id="kick_fatk" x="0.5"/>
+        <p id="kick_fdec" x="150.0"/>
+        <p id="kick_fdep" x="0.0"/>
+        <p id="hat_ftype" x="0.0" c="LP12"/>
+        <p id="hat_fcut" x="20000.0"/>
+        <p id="hat_fres" x="0.2000000029802322"/>
+        <p id="hat_fatk" x="0.5"/>
+        <p id="hat_fdec" x="150.0"/>
+        <p id="hat_fdep" x="0.0"/>
+        <p id="snare_ftype" x="0.0" c="LP12"/>
+        <p id="snare_fcut" x="20000.0"/>
+        <p id="snare_fres" x="0.2000000029802322"/>
+        <p id="snare_fatk" x="0.5"/>
+        <p id="snare_fdec" x="150.0"/>
+        <p id="snare_fdep" x="0.0"/>
+        <p id="fmp_ftype" x="0.0" c="LP12"/>
+        <p id="fmp_fcut" x="20000.0"/>
+        <p id="fmp_fres" x="0.2000000029802322"/>
+        <p id="fmp_fatk" x="0.5"/>
+        <p id="fmp_fdec" x="150.0"/>
+        <p id="fmp_fdep" x="0.0"/>
         <Track i="4" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -448,10 +778,11 @@
         <p id="kick_pdec" x="50.0"/>
         <p id="kick_adec" x="180.0"/>
         <p id="kick_drive" x="0.2000000029802322"/>
+        <p id="kick_fine" x="0.0"/>
         <p id="bass_wave" x="0.0" c="Sine"/>
         <p id="bass_sub" x="0.5"/>
-        <p id="bass_tune" x="41.20000076293945"/>
-        <p id="bass_cut" x="600.0"/>
+        <p id="bass_tune" x="41.19999694824219"/>
+        <p id="bass_cut" x="600.0000610351562"/>
         <p id="bass_res" x="0.2000000029802322"/>
         <p id="bass_env" x="0.4000000059604645"/>
         <p id="bass_edec" x="180.0"/>
@@ -459,10 +790,16 @@
         <p id="bass_dec" x="200.0"/>
         <p id="bass_sus" x="0.0"/>
         <p id="bass_drive" x="0.2000000029802322"/>
+        <p id="bass_rel" x="300.0"/>
+        <p id="bass_glide" x="80.0"/>
+        <p id="bass_fine" x="0.0"/>
         <p id="hat_tune" x="0.0"/>
         <p id="hat_dec" x="60.0"/>
+        <p id="hat_otune" x="0.0"/>
+        <p id="hat_odec" x="300.0"/>
         <p id="snare_tune" x="0.0"/>
         <p id="snare_dec" x="160.0"/>
+        <p id="snare_snap" x="0.5"/>
         <p id="rumble_drive" x="0.4000000059604645"/>
         <p id="rumble_d1" x="0.5"/>
         <p id="rumble_d2" x="0.3500000238418579"/>
@@ -472,6 +809,65 @@
         <p id="rumble_revlp" x="1200.0"/>
         <p id="rumble_cut" x="800.0"/>
         <p id="rumble_res" x="0.2000000029802322"/>
+        <p id="rumble_inlp" x="20000.0"/>
+        <p id="drvChar" x="0.0"/>
+        <p id="insP1" x="0.0"/>
+        <p id="insP2" x="0.0"/>
+        <p id="insP3" x="0.0"/>
+        <p id="insP4" x="0.0"/>
+        <p id="level" x="1.0"/>
+        <p id="prob" x="100.0"/>
+        <p id="swing" x="0.0"/>
+        <p id="accent" x="1.0"/>
+        <p id="fmp_algo" x="0.0" c="Tom"/>
+        <p id="fmp_tune" x="90.0"/>
+        <p id="fmp_ratio" x="1.5"/>
+        <p id="fmp_index" x="0.3500000238418579"/>
+        <p id="fmp_idec" x="0.5700000524520874"/>
+        <p id="fmp_fdbk" x="0.05000000074505806"/>
+        <p id="fmp_dive" x="0.4300000071525574"/>
+        <p id="fmp_dtime" x="0.4600000083446503"/>
+        <p id="fmp_decay" x="0.4000000059604645"/>
+        <p id="fmp_fold" x="0.1500000059604645"/>
+        <p id="fmp_noise" x="0.1500000059604645"/>
+        <p id="chord_wave" x="0.0" c="Saw"/>
+        <p id="chord_cut" x="900.0001220703125"/>
+        <p id="chord_res" x="0.25"/>
+        <p id="chord_drive" x="0.2000000029802322"/>
+        <p id="chord_env" x="0.5"/>
+        <p id="chord_edec" x="300.0"/>
+        <p id="chord_atk" x="3.0"/>
+        <p id="chord_dec" x="400.0"/>
+        <p id="chord_sus" x="0.6000000238418579"/>
+        <p id="chord_rel" x="250.0"/>
+        <p id="chord_fatk" x="0.5"/>
+        <p id="chord_fsus" x="0.0"/>
+        <p id="chord_frel" x="250.0"/>
+        <p id="ghost" x="0.3500000238418579"/>
+        <p id="kick_ftype" x="0.0" c="LP12"/>
+        <p id="kick_fcut" x="20000.0"/>
+        <p id="kick_fres" x="0.2000000029802322"/>
+        <p id="kick_fatk" x="0.5"/>
+        <p id="kick_fdec" x="150.0"/>
+        <p id="kick_fdep" x="0.0"/>
+        <p id="hat_ftype" x="0.0" c="LP12"/>
+        <p id="hat_fcut" x="20000.0"/>
+        <p id="hat_fres" x="0.2000000029802322"/>
+        <p id="hat_fatk" x="0.5"/>
+        <p id="hat_fdec" x="150.0"/>
+        <p id="hat_fdep" x="0.0"/>
+        <p id="snare_ftype" x="0.0" c="LP12"/>
+        <p id="snare_fcut" x="20000.0"/>
+        <p id="snare_fres" x="0.2000000029802322"/>
+        <p id="snare_fatk" x="0.5"/>
+        <p id="snare_fdec" x="150.0"/>
+        <p id="snare_fdep" x="0.0"/>
+        <p id="fmp_ftype" x="0.0" c="LP12"/>
+        <p id="fmp_fcut" x="20000.0"/>
+        <p id="fmp_fres" x="0.2000000029802322"/>
+        <p id="fmp_fatk" x="0.5"/>
+        <p id="fmp_fdec" x="150.0"/>
+        <p id="fmp_fdep" x="0.0"/>
         <Track i="5" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -500,10 +896,11 @@
         <p id="kick_pdec" x="50.0"/>
         <p id="kick_adec" x="180.0"/>
         <p id="kick_drive" x="0.2000000029802322"/>
+        <p id="kick_fine" x="0.0"/>
         <p id="bass_wave" x="0.0" c="Sine"/>
         <p id="bass_sub" x="0.5"/>
-        <p id="bass_tune" x="41.20000076293945"/>
-        <p id="bass_cut" x="600.0"/>
+        <p id="bass_tune" x="41.19999694824219"/>
+        <p id="bass_cut" x="600.0000610351562"/>
         <p id="bass_res" x="0.2000000029802322"/>
         <p id="bass_env" x="0.4000000059604645"/>
         <p id="bass_edec" x="180.0"/>
@@ -511,10 +908,16 @@
         <p id="bass_dec" x="200.0"/>
         <p id="bass_sus" x="0.0"/>
         <p id="bass_drive" x="0.2000000029802322"/>
+        <p id="bass_rel" x="300.0"/>
+        <p id="bass_glide" x="80.0"/>
+        <p id="bass_fine" x="0.0"/>
         <p id="hat_tune" x="0.0"/>
         <p id="hat_dec" x="60.0"/>
+        <p id="hat_otune" x="0.0"/>
+        <p id="hat_odec" x="300.0"/>
         <p id="snare_tune" x="0.0"/>
         <p id="snare_dec" x="160.0"/>
+        <p id="snare_snap" x="0.5"/>
         <p id="rumble_drive" x="0.4000000059604645"/>
         <p id="rumble_d1" x="0.5"/>
         <p id="rumble_d2" x="0.3500000238418579"/>
@@ -524,6 +927,65 @@
         <p id="rumble_revlp" x="1200.0"/>
         <p id="rumble_cut" x="800.0"/>
         <p id="rumble_res" x="0.2000000029802322"/>
+        <p id="rumble_inlp" x="20000.0"/>
+        <p id="drvChar" x="0.0"/>
+        <p id="insP1" x="0.0"/>
+        <p id="insP2" x="0.0"/>
+        <p id="insP3" x="0.0"/>
+        <p id="insP4" x="0.0"/>
+        <p id="level" x="1.0"/>
+        <p id="prob" x="100.0"/>
+        <p id="swing" x="0.0"/>
+        <p id="accent" x="1.0"/>
+        <p id="fmp_algo" x="0.0" c="Tom"/>
+        <p id="fmp_tune" x="90.0"/>
+        <p id="fmp_ratio" x="1.5"/>
+        <p id="fmp_index" x="0.3500000238418579"/>
+        <p id="fmp_idec" x="0.5700000524520874"/>
+        <p id="fmp_fdbk" x="0.05000000074505806"/>
+        <p id="fmp_dive" x="0.4300000071525574"/>
+        <p id="fmp_dtime" x="0.4600000083446503"/>
+        <p id="fmp_decay" x="0.4000000059604645"/>
+        <p id="fmp_fold" x="0.1500000059604645"/>
+        <p id="fmp_noise" x="0.1500000059604645"/>
+        <p id="chord_wave" x="0.0" c="Saw"/>
+        <p id="chord_cut" x="900.0001220703125"/>
+        <p id="chord_res" x="0.25"/>
+        <p id="chord_drive" x="0.2000000029802322"/>
+        <p id="chord_env" x="0.5"/>
+        <p id="chord_edec" x="300.0"/>
+        <p id="chord_atk" x="3.0"/>
+        <p id="chord_dec" x="400.0"/>
+        <p id="chord_sus" x="0.6000000238418579"/>
+        <p id="chord_rel" x="250.0"/>
+        <p id="chord_fatk" x="0.5"/>
+        <p id="chord_fsus" x="0.0"/>
+        <p id="chord_frel" x="250.0"/>
+        <p id="ghost" x="0.3500000238418579"/>
+        <p id="kick_ftype" x="0.0" c="LP12"/>
+        <p id="kick_fcut" x="20000.0"/>
+        <p id="kick_fres" x="0.2000000029802322"/>
+        <p id="kick_fatk" x="0.5"/>
+        <p id="kick_fdec" x="150.0"/>
+        <p id="kick_fdep" x="0.0"/>
+        <p id="hat_ftype" x="0.0" c="LP12"/>
+        <p id="hat_fcut" x="20000.0"/>
+        <p id="hat_fres" x="0.2000000029802322"/>
+        <p id="hat_fatk" x="0.5"/>
+        <p id="hat_fdec" x="150.0"/>
+        <p id="hat_fdep" x="0.0"/>
+        <p id="snare_ftype" x="0.0" c="LP12"/>
+        <p id="snare_fcut" x="20000.0"/>
+        <p id="snare_fres" x="0.2000000029802322"/>
+        <p id="snare_fatk" x="0.5"/>
+        <p id="snare_fdec" x="150.0"/>
+        <p id="snare_fdep" x="0.0"/>
+        <p id="fmp_ftype" x="0.0" c="LP12"/>
+        <p id="fmp_fcut" x="20000.0"/>
+        <p id="fmp_fres" x="0.2000000029802322"/>
+        <p id="fmp_fatk" x="0.5"/>
+        <p id="fmp_fdec" x="150.0"/>
+        <p id="fmp_fdep" x="0.0"/>
         <Track i="6" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
@@ -552,10 +1014,11 @@
         <p id="kick_pdec" x="50.0"/>
         <p id="kick_adec" x="180.0"/>
         <p id="kick_drive" x="0.2000000029802322"/>
+        <p id="kick_fine" x="0.0"/>
         <p id="bass_wave" x="0.0" c="Sine"/>
         <p id="bass_sub" x="0.5"/>
-        <p id="bass_tune" x="41.20000076293945"/>
-        <p id="bass_cut" x="600.0"/>
+        <p id="bass_tune" x="41.19999694824219"/>
+        <p id="bass_cut" x="600.0000610351562"/>
         <p id="bass_res" x="0.2000000029802322"/>
         <p id="bass_env" x="0.4000000059604645"/>
         <p id="bass_edec" x="180.0"/>
@@ -563,10 +1026,16 @@
         <p id="bass_dec" x="200.0"/>
         <p id="bass_sus" x="0.0"/>
         <p id="bass_drive" x="0.2000000029802322"/>
+        <p id="bass_rel" x="300.0"/>
+        <p id="bass_glide" x="80.0"/>
+        <p id="bass_fine" x="0.0"/>
         <p id="hat_tune" x="0.0"/>
         <p id="hat_dec" x="60.0"/>
+        <p id="hat_otune" x="0.0"/>
+        <p id="hat_odec" x="300.0"/>
         <p id="snare_tune" x="0.0"/>
         <p id="snare_dec" x="160.0"/>
+        <p id="snare_snap" x="0.5"/>
         <p id="rumble_drive" x="0.4000000059604645"/>
         <p id="rumble_d1" x="0.5"/>
         <p id="rumble_d2" x="0.3500000238418579"/>
@@ -576,6 +1045,65 @@
         <p id="rumble_revlp" x="1200.0"/>
         <p id="rumble_cut" x="800.0"/>
         <p id="rumble_res" x="0.2000000029802322"/>
+        <p id="rumble_inlp" x="20000.0"/>
+        <p id="drvChar" x="0.0"/>
+        <p id="insP1" x="0.0"/>
+        <p id="insP2" x="0.0"/>
+        <p id="insP3" x="0.0"/>
+        <p id="insP4" x="0.0"/>
+        <p id="level" x="1.0"/>
+        <p id="prob" x="100.0"/>
+        <p id="swing" x="0.0"/>
+        <p id="accent" x="1.0"/>
+        <p id="fmp_algo" x="0.0" c="Tom"/>
+        <p id="fmp_tune" x="90.0"/>
+        <p id="fmp_ratio" x="1.5"/>
+        <p id="fmp_index" x="0.3500000238418579"/>
+        <p id="fmp_idec" x="0.5700000524520874"/>
+        <p id="fmp_fdbk" x="0.05000000074505806"/>
+        <p id="fmp_dive" x="0.4300000071525574"/>
+        <p id="fmp_dtime" x="0.4600000083446503"/>
+        <p id="fmp_decay" x="0.4000000059604645"/>
+        <p id="fmp_fold" x="0.1500000059604645"/>
+        <p id="fmp_noise" x="0.1500000059604645"/>
+        <p id="chord_wave" x="0.0" c="Saw"/>
+        <p id="chord_cut" x="900.0001220703125"/>
+        <p id="chord_res" x="0.25"/>
+        <p id="chord_drive" x="0.2000000029802322"/>
+        <p id="chord_env" x="0.5"/>
+        <p id="chord_edec" x="300.0"/>
+        <p id="chord_atk" x="3.0"/>
+        <p id="chord_dec" x="400.0"/>
+        <p id="chord_sus" x="0.6000000238418579"/>
+        <p id="chord_rel" x="250.0"/>
+        <p id="chord_fatk" x="0.5"/>
+        <p id="chord_fsus" x="0.0"/>
+        <p id="chord_frel" x="250.0"/>
+        <p id="ghost" x="0.3500000238418579"/>
+        <p id="kick_ftype" x="0.0" c="LP12"/>
+        <p id="kick_fcut" x="20000.0"/>
+        <p id="kick_fres" x="0.2000000029802322"/>
+        <p id="kick_fatk" x="0.5"/>
+        <p id="kick_fdec" x="150.0"/>
+        <p id="kick_fdep" x="0.0"/>
+        <p id="hat_ftype" x="0.0" c="LP12"/>
+        <p id="hat_fcut" x="20000.0"/>
+        <p id="hat_fres" x="0.2000000029802322"/>
+        <p id="hat_fatk" x="0.5"/>
+        <p id="hat_fdec" x="150.0"/>
+        <p id="hat_fdep" x="0.0"/>
+        <p id="snare_ftype" x="0.0" c="LP12"/>
+        <p id="snare_fcut" x="20000.0"/>
+        <p id="snare_fres" x="0.2000000029802322"/>
+        <p id="snare_fatk" x="0.5"/>
+        <p id="snare_fdec" x="150.0"/>
+        <p id="snare_fdep" x="0.0"/>
+        <p id="fmp_ftype" x="0.0" c="LP12"/>
+        <p id="fmp_fcut" x="20000.0"/>
+        <p id="fmp_fres" x="0.2000000029802322"/>
+        <p id="fmp_fatk" x="0.5"/>
+        <p id="fmp_fdec" x="150.0"/>
+        <p id="fmp_fdep" x="0.0"/>
         <Track i="7" on="0000000000000000" accent="0000000000000000"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"

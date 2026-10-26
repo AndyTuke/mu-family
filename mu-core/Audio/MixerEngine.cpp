@@ -16,28 +16,42 @@ MixerEngine::MixerEngine()
     masterPeakR.store(0.0f);
     for (auto& g : sidechainGR)        g.store(0.0f);
     for (auto& g : returnSidechainGR)  g.store(0.0f);
+    for (size_t b = 0; b < buses.size(); ++b)
+    {
+        busPeaks[b].store(0.0f);  busPeaksL[b].store(0.0f);  busPeaksR[b].store(0.0f);
+        busSidechainGR[b].store(0.0f);
+        // Each bus insert seeds its noise from its own index, apart from every layer's.
+        for (int i = 0; i < kBusInserts; ++i)
+            buses[b].insert[i].processor.setSlotIndex(MaxChannels + (int) b * kBusInserts + i);
+    }
 }
 
 void MixerEngine::prepare(double sr, int blockSize)
 {
+    blockSize = juce::jmax(1, blockSize);   // the block driver sizes its scratch the same way, so the two always agree
     sampleRate = sr;
     for (auto& e : scEnv)    e = 0.0f;
     for (auto& e : scRetEnv) e = 0.0f;
+    for (auto& e : scBusEnv) e = 0.0f;
     for (auto& buf : channelBufs)
         buf.setSize(2, blockSize, false, true, true);
     effectSendBuf.setSize(2, blockSize, false, true, true);
     delaySendBuf .setSize(2, blockSize, false, true, true);
     reverbSendBuf.setSize(2, blockSize, false, true, true);
+    for (auto& b : returnScSource)
+        b.setSize(2, blockSize, false, true, true);
     extScCapture .setSize(2, blockSize, false, true, true);
     masterInsert.prepare(sr, blockSize);
     masterInsert2.prepare(sr, blockSize);
-}
-
-bool MixerEngine::hasSolo(int numActive) const
-{
-    for (int i = 0; i < numActive; ++i)
-        if (channels[i].solo.load(std::memory_order_relaxed)) return true;
-    return false;
+    // Everything a bus needs is sized here, so the audio thread never allocates for one.
+    for (size_t b = 0; b < buses.size(); ++b)
+    {
+        busBufs[b]    .setSize(2, blockSize, false, true, true);
+        busTap[b]     .setSize(2, blockSize, false, true, true);
+        busScSource[b].setSize(2, blockSize, false, true, true);
+        for (auto& ins : buses[b].insert)
+            ins.processor.prepare(sr, blockSize);
+    }
 }
 
 float MixerEngine::peakOf(const juce::AudioBuffer<float>& buf, int numSamples)
@@ -90,13 +104,6 @@ void MixerEngine::applyPanGain(juce::AudioBuffer<float>& buf,
 
 namespace
 {
-// A channel is heard unless muted, or another channel is soloed and it isn't.
-bool isAudible(const MixerEngine::ChannelState& ch, bool anySolo) noexcept
-{
-    return ! ch.mute.load(std::memory_order_relaxed)
-        && ! (anySolo && ! ch.solo.load(std::memory_order_relaxed));
-}
-
 // Level-following sidechain duck: the envelope follows the source level relative to
 // kScFullDuckLevel (a full duck at or above it, proportional below) with the strip's attack and
 // release; the target is scaled by 1 - amount x envelope. A pure threshold gate held the duck at
@@ -139,12 +146,61 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
                                 const RetiredVoices*         retired,
                                 const RenderChannelFn*       renderChannel)
 {
+    // Strips whose follower a type change asked to be zeroed start this block from silence.
+    for (auto& request : scEnvResetRequest)
+        if (request.load(std::memory_order_acquire) && request.exchange(false, std::memory_order_acq_rel))
+            scEnv[&request - scEnvResetRequest] = 0.0f;
+
     output.clear();
     effectSendBuf.clear();
     delaySendBuf .clear();
     reverbSendBuf.clear();
+    for (auto& b : busBufs) b.clear();
 
-    const bool anySolo       = hasSolo(numActiveChannels);
+    // Routing and audibility, snapshotted once so the whole block agrees. A channel feeds bus chBus[r] (-1 =
+    // the master); a non-zero outputBus (DAW direct out) wins and feeds neither. Solo is judged over paths: a
+    // strip is on a soloed path when it, its bus or (for a bus) any of its channels is soloed, and with any
+    // solo active every strip off such a path is cut. A muted bus is cut from the output only: the channels'
+    // own sends are taken before it and are unaffected.
+    int  chBus[MaxChannels];
+    int  chOut[MaxChannels];
+    bool chAudible[MaxChannels];
+    int   busSrc[kNumBuses > 0 ? kNumBuses : 1] {};
+    float busAmt[kNumBuses > 0 ? kNumBuses : 1] {};
+    bool busAudible[kNumBuses > 0 ? kNumBuses : 1] {};
+    bool busSoloMember[kNumBuses > 0 ? kNumBuses : 1] {};
+    bool anySolo = false;
+    for (int r = 0; r < numActiveChannels; ++r)
+    {
+        const auto& ch = channels[r];
+        const int assign = ch.busAssign.load(std::memory_order_relaxed);
+        chOut[r] = ch.outputBus.load(std::memory_order_relaxed);
+        chBus[r] = (kNumBuses > 0 && chOut[r] == 0 && assign >= 1 && assign <= kNumBuses)
+                     ? assign - 1 : -1;
+        if (ch.solo.load(std::memory_order_relaxed))
+        {
+            anySolo = true;
+            if (chBus[r] >= 0) busSoloMember[chBus[r]] = true;
+        }
+    }
+    for (size_t b = 0; b < buses.size(); ++b)
+    {
+        if (buses[b].solo.load(std::memory_order_relaxed)) anySolo = true;
+        // A bus's sidechain source and amount are read once here, so phases 2c and 3b agree on them.
+        busSrc[b] = buses[b].sidechainSource.load(std::memory_order_relaxed);
+        busAmt[b] = buses[b].sidechainAmount.load(std::memory_order_relaxed);
+    }
+    for (int r = 0; r < numActiveChannels; ++r)
+    {
+        const auto& ch = channels[r];
+        const bool onSoloPath = ch.solo.load(std::memory_order_relaxed)
+                             || (chBus[r] >= 0 && buses[(size_t) chBus[r]].solo.load(std::memory_order_relaxed));
+        chAudible[r] = ! ch.mute.load(std::memory_order_relaxed) && ! (anySolo && ! onSoloPath);
+    }
+    for (size_t b = 0; b < buses.size(); ++b)
+        busAudible[b] = ! buses[b].mute.load(std::memory_order_relaxed)
+                     && ! (anySolo && ! (buses[b].solo.load(std::memory_order_relaxed) || busSoloMember[b]));
+
     // follow-up: when a return is soloed, the user wants to hear ONLY that wet
     // signal — the channels' dry passthrough to master must also be muted, but
     // their FX sends must still run so the soloed return has something to render.
@@ -226,27 +282,45 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
         float* tgtR = channelBufs[r].getNumChannels() > 1
                     ? channelBufs[r].getWritePointer(1) : nullptr;
         // External DAW sidechain always active; internal respects mute/solo state.
-        const bool sourceActive = isExt || isAudible(channels[src], anySolo);
+        const bool sourceActive = isExt || chAudible[src];
         sidechainGR[r].store(applySidechainDuck(srcL, srcR, sourceActive, tgtL, tgtR, numSamples, scAmt,
                                                 ch.sidechainAttackMs.load(std::memory_order_relaxed),
                                                 ch.sidechainReleaseMs.load(std::memory_order_relaxed),
                                                 sampleRate, scEnv[r]));
     }
 
-    // Phase 3: pan/gain, route to output bus, FX sends, peak capture.
+    // Phase 2b: a return that ducks from a channel listens to that channel before its fader and pan, so keep a
+    // copy now (Phase 3 applies them in place). Only the sources a return actually uses are copied.
+    for (int ri = 0; ri < 3; ++ri)
+    {
+        const int src = returns[ri].sidechainSource.load(std::memory_order_relaxed);
+        if (returns[ri].sidechainAmount.load(std::memory_order_relaxed) <= 0.0f) continue;
+        if (src < 0 || src >= numActiveChannels) continue;   // external or invalid: handled in the duck pass
+        for (int c = 0; c < returnScSource[ri].getNumChannels(); ++c)
+            returnScSource[ri].copyFrom(c, 0, channelBufs[src], juce::jmin(c, channelBufs[src].getNumChannels() - 1), 0, numSamples);
+    }
+
+    // Phase 2c: a bus that ducks from a channel listens to it before the channel's fader and pan, so keep a
+    // copy now too (a bus that ducks from a lower bus reads that bus's tap instead).
+    for (size_t b = 0; b < buses.size(); ++b)
+    {
+        const int src = busSrc[b];
+        if (busAmt[b] <= 0.0f) continue;
+        if (src < 0 || src >= numActiveChannels) continue;
+        for (int c = 0; c < busScSource[b].getNumChannels(); ++c)
+            busScSource[b].copyFrom(c, 0, channelBufs[src], juce::jmin(c, channelBufs[src].getNumChannels() - 1), 0, numSamples);
+    }
+
+    // Phase 3: pan/gain, route to a bus or the master, FX sends, peak capture.
     for (int r = 0; r < numActiveChannels; ++r)
     {
         const auto& ch  = channels[r];
         auto&       buf = channelBufs[r];
 
-        // Snapshot atomic fields once per channel per block.
-        const bool  chMute = ch.mute.load(std::memory_order_relaxed);
-        const bool  chSolo = ch.solo.load(std::memory_order_relaxed);
-
-        // hardMute: rhythm is fully silent — no master output, no FX sends.
+        // hardMute: rhythm is fully silent — no bus or master output, no FX sends.
         // skipMaster: dry passthrough to master suppressed (because a return is soloed),
         // but FX sends still run so the soloed return has source material to render.
-        const bool hardMute   = chMute || (anySolo && !chSolo);
+        const bool hardMute   = ! chAudible[r];
         const bool skipMaster = hardMute || anyReturnSolo;
 
         if (hardMute)
@@ -259,11 +333,19 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
                           ChannelState::effective(ch.pan, ch.panMod), numSamples);
         storePeak(buf, numSamples, channelPeaks[r], channelPeaksL[r], channelPeaksR[r]);
 
-        const int bus = ch.outputBus.load(std::memory_order_relaxed);  // 0 = master, 1..8 = direct out
+        const int bus = chOut[r];  // 0 = master, 1..8 = direct out (the block's snapshot)
         if (bus == 0)
         {
-            // Master mix — also feeds FX sends. skipMaster suppresses just the dry add.
-            if (!skipMaster)
+            // Dry path — also feeds FX sends. A bus-routed channel always sums into its bus (the bus decides
+            // what reaches the master, and its own sends need the signal even while a return is soloed);
+            // a master-routed one is added to the output unless skipMaster suppresses it.
+            if (chBus[r] >= 0)
+            {
+                auto& busBuf = busBufs[(size_t) chBus[r]];
+                for (int c = 0; c < numOutCh; ++c)
+                    busBuf.addFrom(c, 0, buf, c, 0, numSamples);
+            }
+            else if (!skipMaster)
                 for (int c = 0; c < numOutCh; ++c)
                     output.addFrom(c, 0, buf, c, 0, numSamples);
 
@@ -293,6 +375,92 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
                     outBuf->addFrom(c, 0, buf, c, 0, numSamples);
             }
         }
+    }
+
+    // Phase 3b: the group buses, in index order (channels -> buses -> returns -> master is the fixed order, so
+    // no loop can form). Per bus: sidechain duck, the insert chain, then fader / pan, peak, sends and the
+    // add to the output. First mark which buses a later strip ducks from, so only those keep a tap.
+    bool busTapNeeded[kNumBuses > 0 ? kNumBuses : 1] {};
+    {
+        auto markIfBus = [&](int src, float amount)
+        {
+            int sb = 0;
+            if (amount > 0.0f && mu_mix::isBusSource(src, MaxChannels, kNumBuses, &sb)) busTapNeeded[sb] = true;
+        };
+        for (size_t b = 0; b < buses.size(); ++b)
+            markIfBus(busSrc[b], busAmt[b]);
+        for (const auto& ret : returns)
+            markIfBus(ret.sidechainSource.load(std::memory_order_relaxed), ret.sidechainAmount.load(std::memory_order_relaxed));
+    }
+
+    for (int b = 0; b < kNumBuses; ++b)
+    {
+        auto& bus = buses[(size_t) b];
+        auto& buf = busBufs[(size_t) b];
+        busSidechainGR[(size_t) b].store(0.0f);
+
+        // Duck from a channel (its pre-fader copy), a LOWER bus (that bus's tap, already complete) or the
+        // external input; any other source (a later bus, itself) is ignored, which keeps the graph acyclic.
+        const float scAmt = busAmt[b];
+        const int   src   = busSrc[b];
+        if (scAmt > 0.0f)
+        {
+            int srcBus = -1;
+            const bool isExt = (src == kExtSidechainSrc);
+            const bool isBus = mu_mix::isBusSource(src, MaxChannels, kNumBuses, &srcBus) && srcBus < b;
+            const bool isCh  = src >= 0 && src < numActiveChannels;
+            if ((isExt && extScL != nullptr) || isBus || isCh)
+            {
+                const auto& scBuf = isBus ? busTap[(size_t) srcBus] : busScSource[(size_t) b];
+                const float* srcL = isExt ? extScL : scBuf.getReadPointer(0);
+                const float* srcR = isExt ? extScR : (scBuf.getNumChannels() > 1 ? scBuf.getReadPointer(1) : srcL);
+                float* tgtL = buf.getWritePointer(0);
+                float* tgtR = buf.getNumChannels() > 1 ? buf.getWritePointer(1) : nullptr;
+                const bool sourceActive = isExt || (isBus ? busAudible[srcBus] : chAudible[src]);
+                busSidechainGR[(size_t) b].store(applySidechainDuck(srcL, srcR, sourceActive, tgtL, tgtR, numSamples, scAmt,
+                                                                    bus.sidechainAttackMs.load(std::memory_order_relaxed),
+                                                                    bus.sidechainReleaseMs.load(std::memory_order_relaxed),
+                                                                    sampleRate, scBusEnv[b]));
+            }
+        }
+
+        // Insert chain: insert 0 then 1, each the layer insert, parameters read once for the block. They run
+        // even for a bus that is cut from the output, so their state and tails stay in step.
+        for (auto& ins : bus.insert)
+            ins.processor.process(buf, numSamples, buf.getNumChannels(), ins.snapshot());
+
+        if (busTapNeeded[b])
+            for (int c = 0; c < busTap[(size_t) b].getNumChannels(); ++c)
+                busTap[(size_t) b].copyFrom(c, 0, buf, juce::jmin(c, buf.getNumChannels() - 1), 0, numSamples);
+
+        // A muted bus (or one off the soloed path) is cut from the output and its sends; the channels'
+        // sends were taken in Phase 3 and are not touched.
+        if (! busAudible[b])
+        {
+            clearPeak(busPeaks[(size_t) b], busPeaksL[(size_t) b], busPeaksR[(size_t) b]);
+            continue;
+        }
+
+        applyPanGain(buf, bus.level.load(std::memory_order_relaxed),
+                          ChannelState::effective(bus.pan, bus.panMod), numSamples);
+        storePeak(buf, numSamples, busPeaks[(size_t) b], busPeaksL[(size_t) b], busPeaksR[(size_t) b]);
+
+        if (! anyReturnSolo)
+            for (int c = 0; c < numOutCh; ++c)
+                output.addFrom(c, 0, buf, c, 0, numSamples);
+
+        const float sEff = ChannelState::effective(bus.sendEffect, bus.sendEffectMod);
+        const float sDly = ChannelState::effective(bus.sendDelay,  bus.sendDelayMod);
+        const float sRev = ChannelState::effective(bus.sendReverb, bus.sendReverbMod);
+        if (sEff > 0.0f)
+            for (int c = 0; c < numOutCh; ++c)
+                effectSendBuf.addFrom(c, 0, buf, c, 0, numSamples, sEff);
+        if (sDly > 0.0f)
+            for (int c = 0; c < numOutCh; ++c)
+                delaySendBuf.addFrom(c, 0, buf, c, 0, numSamples, sDly);
+        if (sRev > 0.0f)
+            for (int c = 0; c < numOutCh; ++c)
+                reverbSendBuf.addFrom(c, 0, buf, c, 0, numSamples, sRev);
     }
 
     const bool doEffect = hasSignal(effectSendBuf, numSamples);
@@ -334,7 +502,9 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
         }
 
         const bool isExt = (src == kExtSidechainSrc);
-        if (!isExt && (src < 0 || src >= numActiveChannels))
+        int srcBus = -1;
+        const bool isBus = mu_mix::isBusSource(src, MaxChannels, kNumBuses, &srcBus);
+        if (!isExt && !isBus && (src < 0 || src >= numActiveChannels))
         {
             returnSidechainGR[ri].store(0.0f);
             continue;
@@ -349,13 +519,14 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
                      : (ri == 1) ? delaySendBuf
                                  : reverbSendBuf;
 
-        const float* srcL = isExt ? extScL : channelBufs[src].getReadPointer(0);
+        // Internal sources come from the pre-fader copy taken in Phase 2b (a channel) or the bus's tap (a bus).
+        const auto& scBuf = isBus ? busTap[(size_t) srcBus] : returnScSource[ri];
+        const float* srcL = isExt ? extScL : scBuf.getReadPointer(0);
         const float* srcR = isExt ? extScR
-                          : (channelBufs[src].getNumChannels() > 1
-                             ? channelBufs[src].getReadPointer(1) : srcL);
+                          : (scBuf.getNumChannels() > 1 ? scBuf.getReadPointer(1) : srcL);
         float* tgtL = retBuf.getWritePointer(0);
         float* tgtR = retBuf.getNumChannels() > 1 ? retBuf.getWritePointer(1) : nullptr;
-        const bool sourceActive = isExt || isAudible(channels[src], anySolo);
+        const bool sourceActive = isExt || (isBus ? busAudible[srcBus] : chAudible[src]);
         returnSidechainGR[ri].store(applySidechainDuck(srcL, srcR, sourceActive, tgtL, tgtR, numSamples, scAmt,
                                                        ret.sidechainAttackMs.load(std::memory_order_relaxed),
                                                        ret.sidechainReleaseMs.load(std::memory_order_relaxed),
@@ -433,5 +604,34 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     // post-insert, post-fader output that actually leaves the mixer.
     applyPanGain(output, masterLevel.load(std::memory_order_relaxed),
                          masterPan.load(std::memory_order_relaxed), numSamples);
+
+    // NaN / infinity containment: one non-finite sample in any feedback state (a delay line, a reverb tail, a
+    // master insert) would otherwise repeat forever. Adding x * 0 over the block gives NaN if any sample is
+    // NaN or infinite and exactly zero otherwise (one cheap pass, no branch per sample). On a hit the block is
+    // silenced and the master-bus state that can hold the poison is cleared; a strip's own engine state is
+    // not reachable from here.
+    float probe = 0.0f;
+    for (int c = 0; c < output.getNumChannels(); ++c)
+    {
+        const float* p = output.getReadPointer(c);
+        for (int i = 0; i < numSamples; ++i)
+            probe += p[i] * 0.0f;
+    }
+    if (! std::isfinite(probe))
+    {
+        output.clear(0, numSamples);
+        fxChain.resetState();
+        masterInsert.reset();
+        masterInsert2.reset();
+        for (auto& bus : buses)
+            for (auto& ins : bus.insert)
+                ins.processor.reset();
+        // A NaN that reached a ducking envelope would latch it, so clear those too.
+        for (auto& e : scEnv)    e = 0.0f;
+        for (auto& e : scRetEnv) e = 0.0f;
+        for (auto& e : scBusEnv) e = 0.0f;
+        nonFiniteBlocks.fetch_add(1, std::memory_order_relaxed);
+    }
+
     storePeak(output, numSamples, masterPeak, masterPeakL, masterPeakR);
 }

@@ -127,6 +127,30 @@ void PatternContent::setupTonalCentre()
     scaleAttachment = std::make_unique<APVTS::ComboBoxAttachment>(apvts, "scale", scaleDropdown.getComboBox());
 }
 
+// The opt-in Note mode selector: added on first use, hidden until then so mu-Tant's row is exactly as before.
+void PatternContent::setNoteModeControl(NoteModeGetter get, NoteModeSetter set)
+{
+    noteModeGet = std::move(get);
+    noteModeSet = std::move(set);
+    const bool on = noteModeGet != nullptr;
+    if (on && noteModeLabel.getParentComponent() == nullptr)
+    {
+        addLabel(noteModeLabel, "MIDI");
+        addAndMakeVisible(noteModeCtrl);
+        noteModeCtrl.setTooltip("Free: the drone plays on its own. Note: it sounds while a key is held, at the key's pitch.");
+        noteModeCtrl.onChange = [this](int mode) { if (noteModeSet) noteModeSet(currentLayer, mode); };
+        noteModeCtrl.onHover = [this](int segment)
+        {
+            if (onStatusUpdate)
+                onStatusUpdate("MIDI", segment == 0 ? "Free: plays on its own" : "Note: plays while a key is held");
+        };
+    }
+    noteModeLabel.setVisible(on);
+    noteModeCtrl.setVisible(on);
+    if (on) noteModeCtrl.setSelectedIndex(juce::jlimit(0, 1, noteModeGet(currentLayer)), false);
+    resized();
+}
+
 // Oscillator, X-Mod and level controls — added once, rebound per voice in rebindAttachments.
 void PatternContent::setupSourceControls()
 {
@@ -193,16 +217,14 @@ void PatternContent::setupFilterControls()
     addAndMakeVisible(fltTypeDropdown);
     addAndMakeVisible(flt2TypeDropdown);
 
-    // Cutoff / Resonance value formatting lives on the APVTS parameter (see
-    // createParameterLayout) so the SliderAttachment can't clobber it. The
-    // cutoff value reads as a bare number (Hz / kHz), so carry the unit in the
-    // knob label, switching it as the value crosses 1 kHz — matching mu-clid.
-    fltDrvKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::percent(v); };
-    fltLoCutKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::lowCut(v, false); };
+    // Cutoff / Resonance value formatting lives on the APVTS parameter (see createParameterLayout) so the
+    // SliderAttachment can't clobber it; Drive and Low Cut carry their unit here.
+    fltDrvKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::unitText(mu_fmt::Unit::Percent01, v); };
+    fltLoCutKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::lowCut(v); };
 
     // ── Filter 2 ────────────────────────────────────────────────────────────
-    flt2DrvKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::percent(v); };
-    flt2LoCutKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::lowCut(v, false); };
+    flt2DrvKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::unitText(mu_fmt::Unit::Percent01, v); };
+    flt2LoCutKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::lowCut(v); };
 
     addAndMakeVisible(fltSeriesBtn);
 }
@@ -313,6 +335,7 @@ void PatternContent::setLayer(int voiceIndex)
     // the rebindAttachments() guard above is skipped; the wavetable dropdowns are
     // not APVTS attachments, so they must be rebuilt here to reflect the loaded table.
     refreshWavetableDropdowns();
+    if (hasNoteModeControl()) noteModeCtrl.setSelectedIndex(juce::jlimit(0, 1, noteModeGet(currentLayer)), false);   // this layer's mode
     repaint();   // sub-panel borders + section titles paint in the active voice's palette colour
 }
 
@@ -566,6 +589,15 @@ int PatternContent::layoutTonal(const Grid& g)
     rootDropdown .setBounds(x, tonalY, s(LF::kTonalRootW),  g.ddH);  x += s(LF::kTonalRootW)  + s(LF::kTonalGap);
     scaleLabel   .setBounds(x, tonalY, labelW, g.ddH);   x += labelW + s(4);
     scaleDropdown.setBounds(x, tonalY, s(LF::kTonalScaleW), g.ddH);
+
+    // The Note mode selector (when the host opted in): caption then selector, the selector's right edge on the band's.
+    if (hasNoteModeControl())
+    {
+        const int ctrlW = 2 * s(LF::kLcdSegmentW);
+        const int ctrlX = g.right - ctrlW;
+        noteModeCtrl .setBounds(ctrlX, tonalY, ctrlW, g.ddH);
+        noteModeLabel.setBounds(ctrlX - s(4) - labelW, tonalY, labelW, g.ddH);
+    }
     return tonalY + g.ddH + g.plateH;
 }
 

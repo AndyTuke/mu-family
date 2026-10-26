@@ -264,7 +264,7 @@ standalone seam, threads, device ownership) is ruled in
 | The generic **MIDI CC / note to parameter mapping** (#1275): any MIDI-in feature needs it, it is not device-specific. | |
 
 Why separate: (1) it is **optional per build**, since controllers need OS MIDI ports that a plugin inside a DAW may not
-get (R2) and a freeware build may not want them, the same reason Link sits behind a build option; (2) it **keeps growing**
+get (R2) and a freeware build may not want them, the same kind of reason that keeps heavy optional parts out of `mu-core`; (2) it **keeps growing**
 with every new device, which `mu-core` should not; (3) the boundary can be **enforced**, as it is for products; (4) there is
 precedent: the small `MuLinkBridge.h` sits in `mu-core` and the heavy parts are in `mu-link`.
 
@@ -275,6 +275,8 @@ manager on the message thread and connects it to the sink and the "what to show"
 controller support simply does not link `mu-control`.
 
 ### 3.2b Layer colours must come from the controller's palette (owner, 2026-10-09)
+
+**Update 2026-10-20 (Andy): the proposed table below is approved and built, with Blue 45 as layer 8.** `MuLookAndFeel::layerPalette` is now Red `FF6259` (5), Cyan `65EBFF` (37), Orange `FFB064` (9), Magenta `FF62FF` (53), Lime `C7FE6D` (75), Rose `FF5EC5` (57), Silver `DDDDDD` (2), Blue `5B5DFD` (45); this supersedes the "screen colours stay as designed" line in the 2026-10-14 decision below. The device correction table keeps the pad RGB tuned by eye on 2026-10-14 for each hue, now keyed by the new screen colours and set directly, so the pad look is unchanged; only the on-screen colours moved. The pad check of the new screen/pad pairing (and whether the lighter Blue wants a brighter pad value than the old Navy `0000B4`) is still for a hardware session (#1281).
 
 The pad for a layer must be the same colour as that layer on screen. The owner's rule: **pick the layer colours from
 the colours the controller can show, and stick to common hues** so most other pad controllers are covered too (some
@@ -479,14 +481,14 @@ The multi-app switching mechanism (what "another app is available" means, how th
 - **Pages in mu-Tronic (Andy, 2026-10-15: "the Launchpad will be important for this").** In a product whose layer count exceeds `kLayersPerPage` (mu-Tronic: 16 layers, pages of 8),
   **buttons 5 and 6 are `PagePrev` / `PageNext`**, not `ClipPrev` / `ClipNext`; the grid rows and the right column then mean the layers of the current page. The rule is derived
   from the page count (more than one page), never from the product name, so the surface description stays generic. The four existing apps (one page) keep 5 and 6 as in the
-  table. Clips are launched from the grid, so mu-Tronic loses nothing. `PagePrev` / `PageNext` are new device-independent `ControlAction`s ([mu-tronic/design.md §4](mu-tronic/design.md)); scene
-  launch (`LaunchScene(n)`) has no default pad yet, which `ux-controller` proposes (still open).
+  table. Clips are launched from the grid, so mu-Tronic loses nothing. `PagePrev` / `PageNext` are new device-independent `ControlAction`s ([mu-tronic/design.md §4](mu-tronic/design.md)).
+- **Scenes in mu-Tronic (ruled 2026-10-21; the "no default pad" item is closed).** A scene is `LaunchScene` (built, `mu-core/Control`): clip n on every layer that stores one, across both pages. All 16 edge buttons are spoken for (1 and 2 stay `AppPrev` / `AppNext`, dark and inert until a second app exists but needed to leave mu-Tronic then; 3 and 4 presets; 5 and 6 pages; 7 mute; 8 transport) and no shift or second page exists, so the scene gesture is **hold the logo (CC 99) and press any pad in column n**. While the logo is held the grid shows the scenes as whole columns in white (playing full, stored x `kArrowRestScale`, queued pulsing at `queuedPulseHz`, none stored off) and the logo itself lights white; releasing it restores the grid. Pad releases during the hold do nothing; a logo tap does nothing. Status line `Scene` / `Clip 3 on 9 layers`. The hold is a surface-model state in the mu-Tronic profile in `mu-control`, not a `ControlAction`. **Hardware check still owed:** whether the logo reports a press (CC 99, value 127 / 0) on a Launchpad X, which is also the open item in 3.5. **Fallback if it does not:** hold top-row 7 and press a pad in column n, a tap on 7 still mutes (fires on release when no pad was pressed during the hold), lights unchanged. Full wording and the screen twin (the sidebar's Scene pads): [mu-tronic/design-ui.md 3.4a and 3.7](mu-tronic/design-ui.md). This is a documented per-product exception to "no modifier in version 1": a hold that only changes what a pad press means, and releases cleanly.
 - **Provisional, awaiting Andy:** buttons 5 to 7 above, the loss of direct jump to item n, and Performance-mode entry and exit being screen-only. Andy has not adopted any of them yet.
 - **Probe demo.** `ProbeMain.cpp` still shows the old top row; it is stale and the coder should update it to this table.
 - **Direct jump to preset n is gone** (provisional; the eight item pads are replaced by two arrows; Andy's table). The screen's `StepIndicator` still shows all eight lamps. `PerformanceItem(n)` stays in the `ControlAction` vocabulary for MIDI mapping; the Launchpad default no longer uses it.
 - **Play / Stop and a clock owner.** Button 8 goes through `mu_core::resolveTransport` like the screen Play (12.7). When a host, MIDI clock or Link owns the transport, button 8 is a **static dim white and the press is ignored** (no flash, no action); grey is the one colour no other state uses. In the Standalone with the internal clock it is always green or red.
 - **Where Performance mode is entered and left.** Not on the pad. The device is in Programmer mode only while the mode is on (3.5, question 2), so there is no lit pad to press before the mode starts, and an exit by a stray pad press on stage is the failure the 1 s hold on the screen exists to prevent. **Enter and exit stay on the screen** (the Perf button, Ctrl+P, the hold to exit, design-ui-family 12.5). The old purple Performance-mode button is removed with no replacement.
-- **The logo (CC 99) stays unlit and has no action in version 1** (its press is still unverified on hardware, 3.5). The earlier logo-as-Play/Stop plan is superseded by button 8. The logo is the one remaining candidate for a "hold to leave Performance mode" later; not recommended (point above).
+- **The logo (CC 99) stays unlit and has no action in version 1** (its press is still unverified on hardware, 3.5), **except in mu-Tronic, where holding it is the scene gesture above** (lit white while held). The earlier logo-as-Play/Stop plan is superseded by button 8. The logo is the one remaining candidate for a "hold to leave Performance mode" later; not recommended (point above).
 
 **Buttons 5, 6, 7: candidates (Andy picks one set; recommended first).** Each has to be safe to press by mistake on stage and stays inside the screen-lock list (design-ui-family 12.7): it may only do what a pad already does.
 
@@ -546,12 +548,13 @@ existing **hot-swap**; pad lights are playing = bright, available = dim, empty =
 
 **Decided (owner, 2026-10-13):** standalone only to start; rows = layers, columns = clips; top row = performance items, right column = select layer (3.6).
 
-**Open from the 3.6 ruling (Andy):**
+**Decided (2026-10-24, Andy delegated the open 3.6 questions: "make best recommendation decisions"; any can be changed later):**
 
-1. **Buttons 5, 6, 7** (3.6): recommended clip previous, clip next, mute selected layer. Tap and mute-all are flagged against the screen-lock list. (Transport is decided: button 8, 2026-10-14; Panic never on a pad.)
-2. **When does the device enter Programmer mode?** Recommendation: only while Performance mode is on (the device is a normal Launchpad the rest of the time and a crash cannot strand it in our mode, R1). The alternative is at app start whenever a device is found, so the pads light before you enter the mode; it needs the Release button to be the real escape.
-3. **Dim level (now 0.20, see §3.2b) and own-timer blink** are by-eye choices; confirm or adjust on the pad (R8, #1274).
-4. **Top-row colour:** buttons 1 and 2 use the app accent (Andy's table); 3 and 4 are white. If the app accent and a layer colour look alike on the real LEDs, say so.
-5. **A distinct "parsing" cue** on a top-row pad (for a slow preset load) is not in version 1; revisit after the load-time measurement (R6, R7).
-- Which other actions matter live besides clip launch and mute: tempo, a filter sweep on a pad?
-- Which other controllers do you have or plan (so the first second driver is a real one)?
+1. **Buttons 5, 6, 7** (3.6): 5 = previous clip, 6 = next clip, 7 = mute the selected layer. Tap tempo and mute-all stay off the pad in version 1 (they are on the screen-lock list). Transport is button 8; Panic is never on a pad.
+2. **Programmer mode:** the device enters it only while Performance mode is on. The rest of the time it is a normal Launchpad and a crash cannot strand it in our mode (R1); the Release button stays the escape.
+3. **Dim level (0.20) and own-timer blink:** keep the current values. They are by-eye choices; adjust at the next hardware session with the pad in hand (R8, #1274).
+4. **Top-row colour:** keep Andy's table (buttons 1 and 2 the app accent, 3 and 4 white). If the app accent and a layer colour look alike on the real LEDs, change the accent pad at the same hardware session.
+5. **"Parsing" cue** on a top-row pad for a slow preset load: not in version 1; revisit after the load-time measurement (R6, R7).
+6. **Other live actions:** version 1 stays at clip launch, mute, layer select, preset and transport. A tempo or filter sweep needs a continuous control, which belongs on a MIDI-learn knob (#1325), not a pad.
+
+**Other controllers (Andy, 2026-10-24):** none owned or planned. The `mu-control` framework stays device-independent so a second driver is easy to add if one ever turns up; nothing to schedule.

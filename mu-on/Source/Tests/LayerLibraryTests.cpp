@@ -36,7 +36,6 @@ namespace
         static juce::AudioProcessorValueTreeState::ParameterLayout layout()
         {
             juce::AudioProcessorValueTreeState::ParameterLayout l;
-            mu_on::addTrackGlobalParams(l);
             mu_on::addLayerParams(l, 0);
             mu_on::addLayerParams(l, 1);
             return l;
@@ -62,7 +61,7 @@ struct MuOnLayerLibraryTests : juce::UnitTest
             tracks[(size_t) s].slot = s;
             tracks[(size_t) s].bindParams(host.apvts, s);
             tracks[(size_t) s].prepare(fx::kSampleRate, fx::kBlock);
-            tracks[(size_t) s].syncEngine();   // the host's message thread builds the engine the slot names
+            tracks[(size_t) s].completeSetup(host.apvts, s);   // the host's message thread builds the engine the slot names
         }
         fx::configureRow(tracks[0]);
         expectEquals(tracks[0].renderPriority(), 0);

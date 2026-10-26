@@ -15,17 +15,17 @@
 
 namespace mu_clid
 {
-    // Befriended by PluginProcessor: reads (and for the retry case, sets) the per-slot change-detection state.
+    // Reads (and for the retry case, sets) the change-detection state of the layer in slot i.
     struct ModulationMemoryProbe
     {
-        static bool            prevHad (PluginProcessor& p, int i) { return p.prevMatrixHadAssignments[(size_t) i]; }
-        static EuclidOverrides last    (PluginProcessor& p, int i) { return p.lastEuclidOverrides[(size_t) i]; }
-        static EuclidOverrides prev    (PluginProcessor& p, int i) { return p.prevEuclidOverrides[(size_t) i]; }
+        static bool            prevHad (PluginProcessor& p, int i) { return p.sampleRhythm(i).prevMatrixHadAssignments; }
+        static EuclidOverrides last    (PluginProcessor& p, int i) { return p.sampleRhythm(i).lastEuclidOverrides; }
+        static EuclidOverrides prev    (PluginProcessor& p, int i) { return p.sampleRhythm(i).prevEuclidOverrides; }
 
         // A pending retry: the last block's overrides were not applied to the pattern yet (message thread, quiet).
         static void makeRetryPending(PluginProcessor& p, int i)
         {
-            p.prevEuclidOverrides[(size_t) i].a.hits = p.lastEuclidOverrides[(size_t) i].a.hits + 3;
+            p.sampleRhythm(i).prevEuclidOverrides.a.hits = p.sampleRhythm(i).lastEuclidOverrides.a.hits + 3;
         }
     };
 }
@@ -399,7 +399,7 @@ struct ClidEditContinuityTests : juce::UnitTest
                "the change-detection memory is clean");
         runBlocks(p, 6, kBlock);
         expect(! Probe::prevHad(p, 1) && Probe::prev(p, 1) == Probe::last(p, 1), "and stays idle: no stale retry rewrites the pattern");
-        expectEquals(p.sequencer.getPatternLength(1), p.layerAs<mu_clid::Rhythm>(1).genA.steps, "the pattern is the base one");
+        expectEquals(p.sampleRhythm(1).cursor.patternLength(), p.layerAs<mu_clid::Rhythm>(1).genA.steps, "the pattern is the base one");
         p.setPlayHead(nullptr);
     }
 };

@@ -1,5 +1,5 @@
 #include "FilterSubsection.h"
-#include "Plugin/PluginProcessor.h"
+#include "UI/RhythmHost.h"
 #include "ValueFormat.h"   // mu-core: shared value text
 #include "Modulation/ModulationSnapshot.h"
 #include "Sequencer/Rhythm.h"
@@ -7,7 +7,7 @@
 
 namespace mu_clid {
 
-FilterSubsection::FilterSubsection(PluginProcessor& p) : proc(p)
+FilterSubsection::FilterSubsection(RhythmHost& h) : host(h)
 {
     // Canonical family-wide filter display order (LP/BP/HP family → Notch → AP → Comb → EQ).
     // Defined once in mu_audio::populateFilterTypeDropdown so all products stay in sync.
@@ -48,7 +48,7 @@ void FilterSubsection::apvtsSet(const char* suffix, float v)
     if (it == paramPtrCache.end())
     {
         const auto id = "r" + juce::String(rhythmIndex) + "_" + suffix;
-        it = paramPtrCache.emplace(suffix, proc.apvts.getParameter(id)).first;
+        it = paramPtrCache.emplace(suffix, host.getRhythmParameters().getParameter(id)).first;
     }
     if (auto* p = it->second)
         p->setValueNotifyingHost(p->convertTo0to1(v));
@@ -56,6 +56,11 @@ void FilterSubsection::apvtsSet(const char* suffix, float v)
 
 void FilterSubsection::wireCallbacks()
 {
+    // The status bar reads number and unit together.
+    filterRes  .setStatusUnit(mu_fmt::Unit::Percent01);
+    filterDrive.setStatusUnit(mu_fmt::Unit::Percent100);
+    filterDepth.setStatusUnit(mu_fmt::Unit::Semitones);
+
     // Value display: number only. valueFromText still accepts "ms"/"s" suffixes for typed input.
     for (auto* k : { &filterAtk, &filterDec, &filterRel })
     {
@@ -166,8 +171,8 @@ void FilterSubsection::setRhythm(int ri)
 
 void FilterSubsection::loadFromRhythm()
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
-    const auto& p = proc.getRhythm(rhythmIndex).voiceParams;
+    if (rhythmIndex < 0 || rhythmIndex >= host.getRhythmCount()) return;
+    const auto& p = host.getRhythmLayer(rhythmIndex).voiceParams;
     constexpr auto dn = juce::dontSendNotification;
 
     filterType  .setSelectedId(p.filterType + 1, false);
@@ -181,8 +186,8 @@ void FilterSubsection::loadFromRhythm()
 
 void FilterSubsection::refreshSuffix(const juce::String& suffix)
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
-    const auto& p = proc.getRhythm(rhythmIndex).voiceParams;
+    if (rhythmIndex < 0 || rhythmIndex >= host.getRhythmCount()) return;
+    const auto& p = host.getRhythmLayer(rhythmIndex).voiceParams;
     constexpr auto dn = juce::dontSendNotification;
 
     if      (suffix == "fltType") filterType  .setSelectedId(p.filterType + 1, false);
@@ -199,40 +204,40 @@ void FilterSubsection::refreshSuffix(const juce::String& suffix)
 
 void FilterSubsection::bindModulationIndicators()
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms())
+    if (rhythmIndex < 0 || rhythmIndex >= host.getRhythmCount())
     {
         for (auto* k : { &filterCutoff, &filterRes, &filterAtk, &filterDec,
                          &filterDepth, &filterLowCut, &filterDrive })
             k->clearModBinding();
         return;
     }
-    const auto* mx = &proc.getRhythm(rhythmIndex).modulationMatrix;
+    const auto* mx = &host.getRhythmLayer(rhythmIndex).modulationMatrix;
     static const float kNaN = std::numeric_limits<float>::quiet_NaN();
 
     // filter.cutoff: snap stores ACTUAL Hz → setModulatedActual routes through midPoint skew.
     filterCutoff.bindModulation("filter.cutoff", mx,
-        [&proc = proc, ri = rhythmIndex]() -> float {
-            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapFilterCutoff) : kNaN; });
+        [&host = host, ri = rhythmIndex]() -> float {
+            return host.isRhythmTransportPlaying() ? host.getRhythmModLive(ri, kSnapFilterCutoff) : kNaN; });
     // filter.resonance: linear 0..0.99 — snap stores normalised 0..1.
     filterRes.bindModulation("filter.resonance", mx,
-        [&proc = proc, ri = rhythmIndex]() -> float {
-            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapFilterRes) : kNaN; },
+        [&host = host, ri = rhythmIndex]() -> float {
+            return host.isRhythmTransportPlaying() ? host.getRhythmModLive(ri, kSnapFilterRes) : kNaN; },
         true);
     // fenv ADSR: snap stores ACTUAL seconds → setModulatedActual respects skewFactor 0.3.
     filterAtk.bindModulation("fenv.attack", mx,
-        [&proc = proc, ri = rhythmIndex]() -> float {
-            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapFenvAtk) : kNaN; });
+        [&host = host, ri = rhythmIndex]() -> float {
+            return host.isRhythmTransportPlaying() ? host.getRhythmModLive(ri, kSnapFenvAtk) : kNaN; });
     filterDec.bindModulation("fenv.decay", mx,
-        [&proc = proc, ri = rhythmIndex]() -> float {
-            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapFenvDec) : kNaN; });
+        [&host = host, ri = rhythmIndex]() -> float {
+            return host.isRhythmTransportPlaying() ? host.getRhythmModLive(ri, kSnapFenvDec) : kNaN; });
     // fenv.depth: snap stores display 0..100 semitones.
     filterDepth.bindModulation("fenv.depth", mx,
-        [&proc = proc, ri = rhythmIndex]() -> float {
-            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapFenvDepth) : kNaN; });
+        [&host = host, ri = rhythmIndex]() -> float {
+            return host.isRhythmTransportPlaying() ? host.getRhythmModLive(ri, kSnapFenvDepth) : kNaN; });
     // filter.lowCut: snap stores actual Hz; slider runs 0..1000 Hz with skewFactor 0.35.
     filterLowCut.bindModulation("filter.lowCut", mx,
-        [&proc = proc, ri = rhythmIndex]() -> float {
-            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapFilterLowCut) : kNaN; });
+        [&host = host, ri = rhythmIndex]() -> float {
+            return host.isRhythmTransportPlaying() ? host.getRhythmModLive(ri, kSnapFilterLowCut) : kNaN; });
 }
 
 void FilterSubsection::resized()

@@ -114,12 +114,20 @@ void EditorShellBase::setMainArea(juce::Component* newSidebar, juce::Component* 
         shared->setLiveView(processorRef.supportsPerformanceMode() ? processorRef.getLiveView() : nullptr);
         chrome.addShieldExemption(shared->getLayerIndicator());
         transportBar.getEditorLayer = [this] { return layerSidebar != nullptr ? layerSidebar->getSelectedIndex() : 0; };
+        // The scene pads (when the product turns them on) talk to the status bar like the clip strip does.
+        shared->getSceneGrid().onStatusUpdate = [this](const juce::String& name, const juce::String& value)
+        { statusBar.showParam(name, value); };
     }
 
     // The layer panel's clip strip talks to the status bar (hover text, Stored / Cleared / Queued / Mute lines).
     if (auto* panel = dynamic_cast<LayerPanel*>(newMainPanel))
+    {
         panel->getHeader().getClipStrip().onStatusUpdate = [this](const juce::String& name, const juce::String& value)
         { statusBar.showParam(name, value); };
+        // So does the header's Notes In control, when the product turns it on.
+        panel->getHeader().onNotesInStatus = [this](const juce::String& name, const juce::String& value)
+        { statusBar.showParam(name, value); };
+    }
 }
 
 void EditorShellBase::forwardKnobStatus(juce::Component& root)
@@ -146,8 +154,19 @@ void EditorShellBase::setMixerOverlay(juce::Component* overlay)
     chrome.setMixerOverlay(overlay);
     // A mu-core MixerOverlay also reports its status messages to the status bar.
     if (auto* mixer = dynamic_cast<MixerOverlay*>(overlay))
+    {
+        sharedMixer = mixer;
         mixer->onStatusUpdate = [this](const juce::String& name, const juce::String& val, juce::Colour col)
         { statusBar.showParam(name, val, col); };
+        // The mixer opens on the sidebar's page (a paged host); after that the two are independent.
+        mixer->pageOnOpen = [this] { return layerSidebar != nullptr ? layerSidebar->getShownPage() : 0; };
+    }
+    // PageUp / PageDown page the mixer's strips while it is open, else the sidebar (a one-page host does nothing).
+    chrome.onPageKey = [this](int delta)
+    {
+        if (chrome.isMixerVisible()) return sharedMixer != nullptr && sharedMixer->showAdjacentPage(delta);
+        return layerSidebar != nullptr && layerSidebar->showAdjacentPage(delta);
+    };
 }
 
 void EditorShellBase::setMetalStyle(bool metal, juce::Colour appAccent)

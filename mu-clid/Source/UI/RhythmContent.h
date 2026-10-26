@@ -9,7 +9,10 @@
 #include "UI/Components/SegmentControl.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/SaveDialog.h"
-#include "Plugin/PluginProcessor.h"
+#include "UI/RhythmHost.h"   // what the content reads from the layer's host
+#include "UI/LayerContent.h"   // mu-core: the base every layer type's content derives from
+
+class ProcessorBase;
 
 namespace mu_clid {
 
@@ -18,18 +21,25 @@ namespace mu_clid {
 //   | VoiceSection (or, in MIDI output mode, MidiOutSection)
 // The header strip (name, presets, reset / delete) and the modulators belong to the LayerPanel;
 // this band wires the rhythm-specific header behaviour (attachHeader).
-class RhythmContent : public juce::Component,
+class RhythmContent : public LayerContent,
                     public juce::FileDragAndDropTarget,
                     public juce::AudioProcessorValueTreeState::Listener,
                     private juce::Timer
 {
 public:
-    explicit RhythmContent(PluginProcessor& p);
+    // `base` is handed only to the shared Euclid panel and insert section (mu-core components);
+    // everything the content itself reads comes through `host`.
+    RhythmContent(ProcessorBase& base, RhythmHost& host);
     ~RhythmContent() override;
 
     // Bind the band to rhythm `index` (the LayerPanel calls this on a layer change).
-    void setLayer(int index);
+    void setLayer(int index) override;
     int  getLayer() const noexcept { return currentRhythmIndex; }
+
+    // Lets go of every modulation arc and the insert meter, which point into the shown rhythm's matrix and engine,
+    // before that layer is removed, replaced or moved; setLayer rebinds them. For a host that keeps one content
+    // for every Rhythm slot (mu-Tronic).
+    void releaseModulationArcs() override;
 
     // Wire the shared header bar's rhythm-specific behaviour (rename, preset list / load / save,
     // reset, delete). The LayerPanel owns the bar; this band only supplies what the buttons do.
@@ -48,9 +58,11 @@ public:
     void setKnownCategories(const juce::StringArray& cats);
     juce::StringArray getKnownCategories() const { return knownRhythmCategories; }
 
+    // A knob hover or change with the shown rhythm's colour (mu-Clid's status bar tints with it). When unset the
+    // base's colourless onStatusUpdate gets the same name and value, which is what a slot host listens to.
     std::function<void(const juce::String& name,
                        const juce::String& value,
-                       juce::Colour rhythmColour)> onStatusUpdate;
+                       juce::Colour rhythmColour)> onColouredStatus;
 
     // Fired when the shown rhythm's output mode (Sample / MIDI) changes, so the mixer can show its strip
     // active or inactive.
@@ -76,8 +88,14 @@ public:
     // Amp "Effect" send knob tracks the mixer.
     void setVoiceEffectSendLabel(const juce::String& name);
 
+    // LayerContent: a slot host's own save card (the header's Save opens this instead of a name prompt) and the
+    // effect name, which labels the Amp send knob.
+    bool openSaveCard() override { saveRhythmPreset(); return true; }
+    juce::Component* getSaveCardOverlay() noexcept override { return &saveDialog; }
+    void setEffectSendName(const juce::String& name) override { setVoiceEffectSendLabel(name); }
+
 private:
-    PluginProcessor& proc;
+    RhythmHost& host;
     int currentRhythmIndex = -1;
 
     // Tracks the most recent euclid overrides applied to the RhythmCircle so the
@@ -110,7 +128,7 @@ private:
                   "sample bar + circle + voice band must tile the layer content band");
     static constexpr int kPanelPad     = MuLookAndFeel::kPanelPad;
     static constexpr int kModeSelectorW = 80;
-    static constexpr int kOutputSelectorW = 112;   // the Sample / MIDI selector (two LCD windows) in the sample strip
+    static constexpr int kOutputSelectorW = 2 * MuLookAndFeel::kLcdSegmentW;   // 112:the Sample / MIDI selector (two LCD windows) in the sample strip
     static constexpr int kIconBtnW     = 22;
     static constexpr int kPresetBtnW   = 38;
 
@@ -119,6 +137,7 @@ private:
     int topH    = 300;
     juce::Rectangle<int> sampleRect, circleRect, euclidRect, voiceRect;
 
+    void reportStatus(const juce::String& name, const juce::String& value);
     void loadSample();
     void updateOutputModeUi();   // show the voice band or the MIDI Out section, and the selector, for the shown rhythm
     void refreshRhythmPresets();

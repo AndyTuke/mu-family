@@ -49,8 +49,8 @@ function Get-RepoRelativePath([string]$full) {
     return $full.Replace('\', '/')
 }
 
-$includePlugin  = [regex]'#\s*include\s*[<"][^">]*\bmu-(clid-midi|clid|tant|toni|on)\b'
-$pluginNs       = [regex]'\bmu_(clid_midi|clid|tant|toni|on)::'
+$includePlugin  = [regex]'#\s*include\s*[<"][^">]*\bmu-(clid-midi|clid|tant|toni|on|tronic)\b'
+$pluginNs       = [regex]'\bmu_(clid_midi|clid|tant|toni|on|tronic)::'
 $includeControl = [regex]'#\s*include\s*[<"][^">]*\bmu-control\b'
 $blockComment   = [regex]'(?s)/\*.*?\*/'
 # mu-control is the device layer above mu-core: it may use the control interfaces (ControlAction, ControlSink,

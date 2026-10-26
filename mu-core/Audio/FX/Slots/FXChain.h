@@ -22,6 +22,9 @@ public:
 
     void setHostBpm(double bpm);
 
+    // Silence all three slots' tails and feedback (the mixer calls it after a non-finite block). Audio thread.
+    void resetState();
+
     EffectSlot& effectSlot() { return effect; }
     DelaySlot&  delaySlot()  { return delay;  }
     ReverbSlot& reverbSlot() { return reverb; }

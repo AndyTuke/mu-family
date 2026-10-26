@@ -1,4 +1,5 @@
 #include "LFOEditor.h"
+#include "Modulation/SmoothCurve.h"   // the shared Smooth curve tangents
 
 static constexpr float kPointRadius  = 5.0f;
 static constexpr float kHitRadius    = 8.0f;
@@ -72,21 +73,31 @@ juce::Point<float> LFOEditor::toScreen(float x, float y) const
     // CurvePoint::y is canonical -1..+1 (bipolar) or 0..1 (unipolar) — the DSP
     // multiplies by 100 in ControlSequence::evaluateSmooth to reach the matrix's
     // -100..+100 range. Display must match the data range, not the matrix range.
-    const float h = (float)getHeight();
+    // The value range maps to the plot: the display less a point's radius top and bottom, so a curve at level 1 or 0 is
+    // drawn whole with its points fully visible instead of half cut off by the edge.
+    const float pad = plotInset();
+    const float ph  = juce::jmax(1.0f, (float)getHeight() - 2.0f * pad);
     const float screenY = unipolar
-        ? (1.0f - y) * h                              // 0→bottom, 1→top
-        : (1.0f - (y + 1.0f) * 0.5f) * h;             // -1→bottom, +1→top
+        ? pad + (1.0f - y) * ph                       // 0→bottom, 1→top
+        : pad + (1.0f - (y + 1.0f) * 0.5f) * ph;      // -1→bottom, +1→top
     return { x * (float)getWidth(), screenY };
 }
 
 juce::Point<float> LFOEditor::fromScreen(float sx, float sy) const
 {
-    const float h = (float)getHeight();
+    const float pad = plotInset();
+    const float ph  = juce::jmax(1.0f, (float)getHeight() - 2.0f * pad);
+    const float norm = 1.0f - (sy - pad) / ph;   // 0 at the plot's bottom, 1 at its top
     float x = sx / (float)getWidth();
     float y = unipolar
-        ? juce::jlimit(0.0f,  1.0f, 1.0f - sy / h)
-        : juce::jlimit(-1.0f, 1.0f, (1.0f - sy / h) * 2.0f - 1.0f);
+        ? juce::jlimit(0.0f,  1.0f, norm)
+        : juce::jlimit(-1.0f, 1.0f, norm * 2.0f - 1.0f);
     return { juce::jlimit(0.0f, 1.0f, x), y };
+}
+
+float LFOEditor::plotInset() const
+{
+    return mu_ui::sf(kPointRadius);
 }
 
 float LFOEditor::snapX(float x) const
@@ -183,24 +194,13 @@ juce::Path LFOEditor::buildCurvePath() const
         }
         else
         {
-            // Smooth (Catmull-Rom) cubic through the anchors — matches
-            // ControlSequence::evaluateSmooth so the drawing and the audio agree. Interior
-            // tangents are centred differences; boundaries use one-sided (2-point → linear).
-            // An explicit per-segment bend (handleY) adds on top.
-            const int n  = (int) points.size();
-            const int lo = i - 1;
-            auto py = [&](int k) { return points[(size_t) juce::jlimit(0, n - 1, k)].y; };
-            const float m0 = (lo == 0)         ? (py(lo + 1) - py(lo)) : 0.5f * (py(lo + 1) - py(lo - 1));
-            const float m1 = (lo + 1 == n - 1) ? (py(lo + 1) - py(lo)) : 0.5f * (py(lo + 2) - py(lo));
-            // Clamp the bezier control points to the visible range (bottom = 0 unipolar / -1
-            // bipolar, top = 1) so the curve can't draw past the panel — the convex-hull
-            // property keeps the whole segment in range. Matches ControlSequence::evaluateSmooth.
-            const float yFloor = unipolar ? 0.0f : -1.0f;
-            const float c1y = juce::jlimit(yFloor, 1.0f, prev.y + m0 / 3.0f + (prev.hasBezierHandle ? prev.handleY : 0.0f));
-            const float c2y = juce::jlimit(yFloor, 1.0f, curr.y - m1 / 3.0f + (curr.hasBezierHandle ? curr.handleY : 0.0f));
+            // Smooth cubic through the anchors: the same control heights as ControlSequence::evaluateSmooth
+            // (mu_mod::smoothControlY), so the drawing and the audio agree and the line never swings past a neighbour.
+            float c1y, c2y;
+            mu_mod::smoothControlY(points, i - 1, unipolar ? 0.0f : -1.0f, c1y, c2y);
 
-            const float c1x = prevS.x + (currS.x - prevS.x) * 0.33f;
-            const float c2x = prevS.x + (currS.x - prevS.x) * 0.66f;
+            const float c1x = prevS.x + (currS.x - prevS.x) * (1.0f / 3.0f);   // exact thirds, as the audio evaluator uses
+            const float c2x = prevS.x + (currS.x - prevS.x) * (2.0f / 3.0f);
             path.cubicTo(c1x, toScreen(0.0f, c1y).y, c2x, toScreen(0.0f, c2y).y, currS.x, currS.y);
         }
     }
@@ -220,50 +220,55 @@ void LFOEditor::paint(juce::Graphics& g)
     g.setColour(lamps ? MuLookAndFeel::lampBase() : MuLookAndFeel::colour(Id::lfoEditorBackground));
     g.fillAll();
 
-    // Zero/baseline line
-    const float zeroY = unipolar ? (float)getHeight() : toScreen(0.0f, 0.0f).y;
-    g.setColour(lamps ? juce::Colours::black.withAlpha(L.shadow(L.ringTrack))
-                      : MuLookAndFeel::colour(Id::lfoEditorZeroLine));
-    g.drawHorizontalLine((int)zeroY, 0.0f, (float)getWidth());
+    // The plot's baseline (the curve's zero) and its top and bottom, inside the point-radius margin.
+    const float zeroY = unipolar ? (float)getHeight() - plotInset() : toScreen(0.0f, 0.0f).y;
+    const float plotTop = plotInset();
+    const float plotH   = juce::jmax(1.0f, (float)getHeight() - 2.0f * plotInset());
+    const bool  haveCurve = points.size() >= 2;
+    const juce::Path* curve = haveCurve ? &curvePath() : nullptr;
 
-    if (points.size() >= 2)
+    // Layer 1: the lit area under the curve (curve to baseline), dim.
+    if (haveCurve)
     {
-        if (stepFraction > 0.0f && stepFraction < 1.0f)
-        {
-            // Tile the loop with fixed-width steps: a line at each k·stepFraction below 1.0,
-            // so a step that doesn't divide the loop leaves a narrower final cell (e.g. 3/16
-            // in a 16/16 loop → lines at 3,6,9,12,15 sixteenths → 5 full cells + a 1/16 cell).
-            g.setColour(MuLookAndFeel::colour(Id::stepEditorGridLine));
-            const float w = (float)getWidth();
-            for (int k = 1; k * stepFraction < 0.9995f; ++k)
-                g.drawVerticalLine((int)(k * stepFraction * w), 0.0f, (float)getHeight());
-        }
-
-        const auto& curve = curvePath();
-
-        // Fill under curve (from curve to zero/baseline)
-        juce::Path fill = curve;
+        juce::Path fill = *curve;
         fill.lineTo((float)getWidth(), zeroY);
         fill.lineTo(0.0f, zeroY);
         fill.closeSubPath();
+        g.setColour(lamps ? MuLookAndFeel::lampColour(curveClr, L.lampDim) : MuLookAndFeel::colour(Id::lfoEditorCurveFill));
+        g.fillPath(fill);
+    }
+
+    // Layer 2: grid and level lines over the fill, so they also show inside the lit area. Time lines at each step or
+    // loop unit; level lines at 25, 50 and 75 percent of the plot; the baseline last, in its own colour.
+    g.setColour(MuLookAndFeel::colour(Id::stepEditorGridLine));
+    if (haveCurve && stepFraction > 0.0f && stepFraction < 1.0f)
+    {
+        // Tile the loop with fixed-width steps: a line at each k·stepFraction below 1.0,
+        // so a step that doesn't divide the loop leaves a narrower final cell (e.g. 3/16
+        // in a 16/16 loop → lines at 3,6,9,12,15 sixteenths → 5 full cells + a 1/16 cell).
+        const float w = (float)getWidth();
+        for (int k = 1; k * stepFraction < 0.9995f; ++k)
+            g.drawVerticalLine((int)(k * stepFraction * w), 0.0f, (float)getHeight());
+    }
+    for (const float level : { 0.25f, 0.5f, 0.75f })
+        g.drawHorizontalLine((int)(plotTop + (1.0f - level) * plotH), 0.0f, (float)getWidth());
+    g.setColour(MuLookAndFeel::colour(Id::lfoEditorZeroLine));
+    g.drawHorizontalLine((int)zeroY, 0.0f, (float)getWidth());
+
+    // Layer 3: the curve itself. Metal style: a soft glow round a lit line; otherwise a plain line.
+    if (haveCurve)
+    {
         if (lamps)
         {
-            // Dimly lit area, then a glow round the lit curve line.
-            g.setColour(MuLookAndFeel::lampColour(curveClr, L.lampDim));
-            g.fillPath(fill);
             g.setColour(curveClr.withAlpha(L.highlight(L.ringHitGlow)));
-            g.strokePath(curve, juce::PathStrokeType(mu_ui::sf(MuLookAndFeel::kLampCurveGlowW)));
+            g.strokePath(*curve, juce::PathStrokeType(mu_ui::sf(MuLookAndFeel::kLampCurveGlowW)));
             g.setColour(MuLookAndFeel::lampColour(curveClr, L.lampOn).brighter(L.highlight(L.lampHot)));
-            g.strokePath(curve, juce::PathStrokeType(mu_ui::sf(MuLookAndFeel::kLampCurveW)));
+            g.strokePath(*curve, juce::PathStrokeType(mu_ui::sf(MuLookAndFeel::kLampCurveW)));
         }
         else
         {
-            g.setColour(MuLookAndFeel::colour(Id::lfoEditorCurveFill));
-            g.fillPath(fill);
-
-            // Curve line
             g.setColour(curveClr);
-            g.strokePath(curve, juce::PathStrokeType(mu_ui::sf(1.5f)));
+            g.strokePath(*curve, juce::PathStrokeType(mu_ui::sf(1.5f)));
         }
     }
 

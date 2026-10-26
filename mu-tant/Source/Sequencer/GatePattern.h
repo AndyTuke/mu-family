@@ -225,6 +225,11 @@ public:
     // Reset to 0 on copyDataFrom + whenever the gate is held closed.
     float gateLevel = 0.0f;
 
+    // The gate level the last block ended on, kept only by the audio thread (never reset by an edit, so it
+    // needs no lock): a block that cannot take editLock multiplies by it instead of passing the voice
+    // through ungated.
+    float heldLevel = 0.0f;
+
     // Audio-thread slew state for filter envelope — applies the same kMinAttackMs
     // rise-limiting to prevent filter clicks when gate and filter envelopes are
     // out of sync. Persists across blocks; reset to 1.0 on copyDataFrom.

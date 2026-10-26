@@ -85,6 +85,43 @@ public:
             expectWithinAbsoluteError (sync.getBpm(), 128.0, 1.5, "jittered 128");
         }
 
+        beginTest ("Jittery clock: the displayed tempo holds steady pulse to pulse");
+        {
+            MidiClockSync sync;
+            sync.setEnabled(true);
+            Feeder f { sync };
+            f.run(128.0, 96, true, 100);   // heavy timing error, as from a bunched MIDI input
+            double lo = 1.0e9, hi = 0.0;
+            for (int i = 0; i < 48; ++i)
+            {
+                f.run(128.0, 1, false, 100);
+                lo = juce::jmin(lo, sync.getBpm());
+                hi = juce::jmax(hi, sync.getBpm());
+            }
+            expectLessThan(hi - lo, 1.0, "reading wanders by under 1 BPM");
+            expectWithinAbsoluteError (sync.getBpm(), 128.0, 0.5, "and sits on the true tempo");
+        }
+
+        beginTest ("A tempo change mid-play keeps the beat on the master's pulses");
+        {
+            // The beat is anchored to each pulse, so the lagging tempo estimate only fills the gaps:
+            // after a jump from 120 to 150 BPM the beat is never far from where the pulses say it is.
+            MidiClockSync sync;
+            sync.setEnabled(true);
+            Feeder f { sync };
+            f.run(120.0, 96, true);
+            double worst = 0.0;
+            int pulses = 96;
+            for (int i = 0; i < 96; ++i)
+            {
+                f.run(150.0, 1, false);
+                ++pulses;
+                const double lastPulse = (pulses - 1) / 24.0;
+                worst = juce::jmax(worst, std::abs(sync.getBeatPosUI() - lastPulse));
+            }
+            expectLessThan(worst, 0.12, "beat stays within about a tenth of a beat of the pulses through the change");
+        }
+
         beginTest ("Beat position advances one beat per 24 pulses");
         {
             // The first clock after Start is tick 0, so 48 clocks reach 47/24 beats; the UI beat

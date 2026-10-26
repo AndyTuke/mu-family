@@ -103,6 +103,12 @@ Pic "Transport bar." "transport-bar.png"
 H2 "Rhythm Circle"
 P "The Rhythm Circle shows concentric rings, one per generator: Ring A (outermost, purple), Ring B (coral) and the accent ring (amber, dashed). While your DAW plays, the rings rotate so the current step is at the top. Filled steps are hits. Padded steps are drawn in their own colours, so you can see at a glance where a gap came from."
 
+H2 "Update Check"
+P "mu-Clid MIDI can tell you when a newer version is available. Once a day it asks the transwarp.me website for the latest version number. When a newer version exists, a small Update available link appears at the right of the Status Bar. Hover over it to see which version is out and which one you have."
+Bullet "Click the link to open the download page in your web browser. mu-Clid MIDI never downloads or installs anything itself. The link then stays hidden for that version and comes back only when a still newer one is released."
+Bullet "Right-click the link and choose Hide this notice to hide it for that version without opening the page."
+P "Privacy: the check is a plain request for a public file. It sends nothing about you: no name, no identifier, no version number and no details of your computer. As with any request to a website, the site can see your internet (IP) address, as it would if you opened the page in a browser. The plug-in compares the answer with its own version on your machine. To switch the check off, click the mu-Clid MIDI logo to open the About card and untick the Check for updates box. With the box unticked, mu-Clid MIDI sends no request at all and shows no link. The box is ticked by default."
+
 # ── 6. The Euclidean Panel ───────────────────────────────────────────────────
 H1 "6. The Euclidean Panel"
 P "The Euclidean panel has three rows of knobs, named Euclid A, Euclid B and Accent. All three rows have the same controls, in three boxes."

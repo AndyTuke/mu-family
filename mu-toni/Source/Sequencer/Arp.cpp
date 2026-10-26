@@ -26,6 +26,8 @@ void Arp::prepare(double sampleRate, int blockSize)
 {
     runner.prepare(sampleRate, blockSize);
     insert->prepare(sampleRate, blockSize);
+    tailScratch.setSize(2, juce::jmax(1, blockSize));
+    tailScratch.clear();
     parked = true;
 }
 
@@ -38,10 +40,12 @@ void Arp::bindParams(juce::AudioProcessorValueTreeState& apvts, int slot)
 
     for (int k = 0; k < kNumModDests; ++k)
     {
-        const auto id = layerParamId(slot, kModDestTable[k].param);
+        const bool strip = mu_mod::isMixerStripParam(kModDestTable[k].param);   // a pan or send is the mixer strip's parameter
+        const auto id = mu_mod::paramIdFor(layerParamId(slot, ""), slot, kModDestTable[k].param);
         modDestIds[(size_t) k]    = kModDestTable[k].id;
         modDestRanges[(size_t) k] = apvts.getParameterRange(id);
-        modDestAtoms[(size_t) k]  = apvts.getRawParameterValue(layerParamId(slot, vpi::suffix[vpSlotFor(kModDestTable[k].param)]));
+        modDestAtoms[(size_t) k]  = strip ? apvts.getRawParameterValue(id)
+                                          : apvts.getRawParameterValue(layerParamId(slot, vpi::suffix[vpSlotFor(kModDestTable[k].param)]));
         modParamValues[kModDestTable[k].id] = 0.0f;   // pre-size the map: the audio thread only overwrites
     }
 }
@@ -53,6 +57,7 @@ void Arp::hearMidi(const mu_core::RenderContext& ctx) noexcept
     const auto* first = ctx.midi.events;
     const int carried = ctx.midi.carried;
     context.noteOnEdge = false;
+    if (ctx.midi.inputReset) heldNotes.clear();   // MIDI In changed: a release on the old channel will not arrive
     mu_core::forEachMidi(ctx, [&](const mu_core::MidiEvent& e, int)
     {
         heldNotes.apply(e, inCh, (int) (&e - first) >= carried, context.noteOnEdge);
@@ -81,6 +86,8 @@ void Arp::readParams(double modBeat) noexcept
     }
     else
         std::copy(lastResolved.begin(), lastResolved.end(), out);
+
+    stripMod.publish(out[D_pan], out[D_sendEff], out[D_sendDly], out[D_sendRev]);   // the host gives these to the layer's mixer strip
 
     // Publish the post-matrix values for the knobs' live modulation arcs.
     for (int k = 0; k < kNumModDests; ++k)
@@ -113,9 +120,9 @@ void Arp::readParams(double modBeat) noexcept
     tv.xmod.ssbHz     = out[D_xmSsb];
     tv.filterType = (int) g(vpi::ft); tv.cutoff = out[D_cut]; tv.resonance = out[D_res]; tv.drive = out[D_drv]; tv.lowCutHz = g(vpi::locut);
 
-    tv.ampA = g(vpi::aeA); tv.ampD = g(vpi::aeD); tv.ampS = g(vpi::aeS); tv.ampR = g(vpi::aeR); tv.ampLevelDb = out[D_amp];
-    tv.fA = g(vpi::feA); tv.fD = g(vpi::feD); tv.fS = g(vpi::feS); tv.fR = g(vpi::feR); tv.filterEnvDepth = out[D_fenv];
-    tv.pA = g(vpi::peA); tv.pD = g(vpi::peD); tv.pS = g(vpi::peS); tv.pR = g(vpi::peR); tv.pitchEnvDepth = out[D_penv];
+    tv.ampA = out[D_aeA]; tv.ampD = out[D_aeD]; tv.ampS = out[D_aeS]; tv.ampR = out[D_aeR]; tv.ampLevelDb = out[D_amp];
+    tv.fA = out[D_feA]; tv.fD = out[D_feD]; tv.fS = out[D_feS]; tv.fR = out[D_feR]; tv.filterEnvDepth = out[D_fenv];
+    tv.pA = out[D_peA]; tv.pD = out[D_peD]; tv.pS = out[D_peS]; tv.pR = out[D_peR]; tv.pitchEnvDepth = out[D_penv];
     tv.pitchEnvTarget = (int) g(vpi::ptgt);
 
     tv.portamentoMs = out[D_porta];
@@ -130,10 +137,10 @@ void Arp::readParams(double modBeat) noexcept
 
     // Insert config (applied post-VCA by renderBlock).
     insertCfg.insertAlgo     = (int) g(vpi::drvChar);
-    insertCfg.insertParam[0] = g(vpi::insP1);
-    insertCfg.insertParam[1] = g(vpi::insP2);
-    insertCfg.insertParam[2] = g(vpi::insP3);
-    insertCfg.insertParam[3] = g(vpi::insP4);
+    insertCfg.insertParam[0] = out[D_insP1];   // modulated
+    insertCfg.insertParam[1] = out[D_insP2];
+    insertCfg.insertParam[2] = out[D_insP3];
+    insertCfg.insertParam[3] = out[D_insP4];
 
     runner.setAccent(accent);
     runner.setArp(ap);
@@ -156,6 +163,32 @@ void Arp::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& ou
 
     readParams(ctx.startBeat);   // the control-sequence playhead runs on the call's beat
     renderBlock(out, n);
+}
+
+// The tail of a layer that left its slot (docs/mu-tronic/design.md 2.1.11 point 3): the voice with no keys held
+// (its note is released and rings out its release), faded, then the insert with the configuration it last had.
+// Reads no parameter and no modulation: only the voice, the insert and its stored configuration.
+bool Arp::renderRetiring(const mu_core::RenderContext&, juce::AudioBuffer<float>& out, int n, mu_core::RetireState& rs)
+{
+    // The bin hands the tail the slot's block exclusively (write it) or not (render aside, then add).
+    juce::AudioBuffer<float> aside;
+    if (rs.exclusive == 0)
+    {
+        aside.setDataToReferTo(tailScratch.getArrayOfWritePointers(), juce::jmin(2, out.getNumChannels()),
+                               juce::jmin(n, tailScratch.getNumSamples()));
+        aside.clear();
+    }
+    auto& buf = rs.exclusive != 0 ? out : aside;
+    const int frames = juce::jmin(n, buf.getNumSamples());
+
+    const ArpContext idle;   // not playing, no key held: the runner only releases its note and renders the voice's tail
+    runner.render(buf, frames, idle);
+    mu_core::applyLinearFade(buf, frames, rs);
+    insert->process(buf, frames, buf.getNumChannels(), insertCfg);
+
+    if (rs.exclusive == 0)
+        for (int c = 0; c < buf.getNumChannels(); ++c) out.addFrom(c, 0, buf, c, 0, frames);
+    return true;   // the bin ends the fade when its ramp is spent
 }
 
 void Arp::onParkedBlock(const mu_core::RenderContext& ctx)

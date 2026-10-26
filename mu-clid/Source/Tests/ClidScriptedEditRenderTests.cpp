@@ -276,3 +276,83 @@ struct ClidScriptedEditRenderTests : juce::UnitTest
 };
 
 static ClidScriptedEditRenderTests clidScriptedEditRenderTests;
+
+// The clip bank end to end with a running host transport, as the clip strip drives it: edit the steps, store two
+// clips, then launch 1, 2, 1 while the audio thread plays. After each boundary commit the rendered hits per bar
+// must be that clip's.
+struct ClidClipPlayingRenderTests : juce::UnitTest
+{
+    ClidClipPlayingRenderTests() : juce::UnitTest("mu-Clid clip switch while playing (rendered)", "mu-clid-processor") {}
+
+    void runTest() override
+    {
+        beginTest("steps edited between two stores: switching clips while the transport runs changes the rendered hits");
+        TempStorage storage;
+        ScriptedProcessor p;
+        constexpr int kBlock = 512;
+        p.prepareToPlay(48000.0, kBlock);
+        RunningPlayHead host(48000.0, kBlock);
+        p.setPlayHead(&host);
+
+        p.getSamplesDir().createDirectory();
+        writeSample(p, "Hat 01.wav", 5200.0);
+        p.samples.load(0, p.getSamplesDir().getChildFile("Hat 01.wav"));
+
+        juce::AudioBuffer<float> buf(2, kBlock);
+        juce::MidiBuffer midi;
+        bool prevLoud = false;
+        // Renders `blocks` blocks and returns the number of hit onsets in them.
+        const auto run = [&](int blocks)
+        {
+            int onsets = 0;
+            for (int b = 0; b < blocks; ++b)
+            {
+                buf.clear(); midi.clear();
+                p.processBlock(buf, midi);
+                p.drainDeferredWork();
+                const bool loud = buf.getMagnitude(0, kBlock) > 0.01f;
+                if (loud && ! prevLoud) ++onsets;
+                prevLoud = loud;
+            }
+            return onsets;
+        };
+        constexpr int kTwoBars = 190;   // one 16-step bar (2 s at 120 bpm)
+        using Type = mu_core::ControlActionType;
+        const auto act = [](Type type, int index)
+        {
+            mu_core::ControlAction a;
+            a.type = type; a.layer = 0; a.index = index;
+            return a;
+        };
+
+        setParam(p.apvts, "r0_stepsA", 16.0f);
+        setParam(p.apvts, "r0_aEnvRel", 0.02f);   // short release: hits stay separate
+        setParam(p.apvts, "r0_hitsA", 2.0f);
+        run(40);
+        expect(p.perform(act(Type::StoreClip, 0)));
+        setParam(p.apvts, "r0_hitsA", 4.0f);
+        run(40);
+        expect(p.perform(act(Type::StoreClip, 1)));
+        run(200);
+        const int base = run(kTwoBars);
+        logMessage("live (clip 2) hits in 2 bars: " + juce::String(base));
+
+        int hits[3] {};
+        int n = 0;
+        for (const int pad : { 0, 1, 0 })
+        {
+            expect(p.perform(act(Type::LaunchClip, pad)), "launch");
+            run(kTwoBars);                        // the boundary passes and the swap commits
+            hits[n++] = run(kTwoBars);
+            expectEquals((int) getParam(p.apvts, "r0_hitsA"), pad == 0 ? 2 : 4, "APVTS follows the clip");
+            expectEquals(p.getRhythm(0).genA.hits, pad == 0 ? 2 : 4, "live rhythm follows the clip");
+        }
+        logMessage("rendered hits per 2 bars after clip 1, 2, 1: " + juce::String(hits[0]) + ", " + juce::String(hits[1]) + ", " + juce::String(hits[2]));
+        expect(hits[0] < hits[1], "clip 2 sounds denser than clip 1");
+        expectEquals(hits[0], hits[2], "returning to clip 1 gives its pattern again");
+        p.setPlayHead(nullptr);
+        p.releaseResources();
+    }
+};
+
+static ClidClipPlayingRenderTests clidClipPlayingRenderTests;

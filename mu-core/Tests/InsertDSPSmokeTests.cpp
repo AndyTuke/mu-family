@@ -24,6 +24,8 @@
 #include "Audio/FX/Insert/CompressorLimiterInsert.h"
 #include "Audio/FX/Insert/RingModInsert.h"
 #include "Audio/FX/Insert/TapeSatInsert.h"
+#include "Audio/FX/Insert/OverdriveInsert.h"
+#include "Audio/FX/Insert/TapeDelayInsert.h"
 #include "Audio/FX/Insert/KarplusStrongInsert.h"
 #include "Audio/FX/Insert/VocoderInsert.h"
 #include "Audio/VoiceParams.h"
@@ -347,6 +349,105 @@ public:
 
         beginTest ("algo 10: TapeSatInsert - no crash, no NaN");
         { TapeSatInsert a; smokeAlgo(a, "TapeSatInsert", makeParams(10, { 30.0f, 0.0f, 0.0f, 5000.0f })); }
+
+        beginTest ("algo 14: OverdriveInsert - no crash, no NaN");
+        { OverdriveInsert a; smokeAlgo(a, "OverdriveInsert", makeParams(14, { 60.0f, 0.0f, 50.0f, 5000.0f })); }
+
+        beginTest ("algo 15: TapeDelayInsert - no crash, no NaN, even at runaway feedback and full wear");
+        { TapeDelayInsert a; smokeAlgo(a, "TapeDelayInsert", makeParams(15, { 250.0f, 110.0f, 60.0f, 100.0f })); }
+
+        beginTest ("algo 15: TapeDelayInsert - an impulse echoes at Time, each repeat is quieter, and runaway feedback stays bounded");
+        {
+            const double sr = 48000.0;
+            const int total = (int) (sr * 1.6), block = 256;
+            auto run = [&](float fbPct, float wearPct)
+            {
+                TapeDelayInsert a; a.prepare(sr, block);
+                auto p = makeParams(15, { 250.0f, fbPct, 100.0f, wearPct });
+                std::vector<float> out;
+                float gr = 0.0f;
+                for (int done = 0; done < total; done += block)
+                {
+                    juce::AudioBuffer<float> b(2, block); b.clear();
+                    if (done == 0) { b.setSample(0, 0, 1.0f); b.setSample(1, 0, 1.0f); }
+                    a.process(b, block, 2, p, gr);
+                    for (int i = 0; i < block; ++i) out.push_back(b.getSample(0, i));
+                }
+                return out;
+            };
+            auto peakNear = [](const std::vector<float>& o, int centre, int half)
+            {
+                float m = 0.0f;
+                for (int i = juce::jmax(0, centre - half); i < juce::jmin((int) o.size(), centre + half); ++i) m = juce::jmax(m, std::abs(o[(size_t) i]));
+                return m;
+            };
+            const auto o = run(60.0f, 0.0f);
+            const int t1 = (int) (0.25 * sr), t2 = 2 * t1;
+            const float e1 = peakNear(o, t1, 40), e2 = peakNear(o, t2, 40), gap = peakNear(o, t1 / 2, 40);
+            expect (e1 > 0.2f, "the first echo is missing at Time");
+            expect (e2 > 0.02f && e2 < e1, "the second echo is missing or not quieter than the first");
+            expect (gap < 0.05f, "there is signal between the echoes where a clean delay has none");
+
+            const auto r = run(110.0f, 100.0f);
+            float mx = 0.0f; bool finite = true;
+            for (float v : r) { mx = juce::jmax(mx, std::abs(v)); finite = finite && std::isfinite(v); }
+            expect (finite && mx < 2.0f, "runaway feedback grew without bound");
+        }
+
+        beginTest ("algo 14: OverdriveInsert - silence stays silent at any bias, and Bias adds even harmonics");
+        {
+            // Magnitude of `harmonic` x the test tone in a settled one-second render (Goertzel).
+            auto harmonicLevel = [&](float biasPercent, int harmonic, bool silentInput)
+            {
+                constexpr double sr = 48000.0;
+                constexpr int n = 48000;
+                const double f0 = 1000.0;
+                OverdriveInsert a;
+                a.prepare(sr, n);
+                juce::AudioBuffer<float> buf(2, n);
+                for (int i = 0; i < n; ++i)
+                    for (int c = 0; c < 2; ++c)
+                        buf.setSample(c, i, silentInput ? 0.0f : 0.25f * (float) std::sin(2.0 * juce::MathConstants<double>::pi * f0 * i / sr));
+                float gr = 0.0f;
+                a.process(buf, n, 2, makeParams(14, { 50.0f, 0.0f, biasPercent, 20000.0f }), gr);
+                if (silentInput)
+                {
+                    float peak = 0.0f;
+                    for (int i = 0; i < n; ++i) peak = juce::jmax(peak, std::abs(buf.getSample(0, i)));
+                    return (double) peak;
+                }
+                const double w = 2.0 * juce::MathConstants<double>::pi * f0 * harmonic / sr;
+                double re = 0.0, im = 0.0;
+                for (int i = n / 2; i < n; ++i)   // the second half: past the gain and DC-block settling
+                {
+                    re += buf.getSample(0, i) * std::cos(w * i);
+                    im += buf.getSample(0, i) * std::sin(w * i);
+                }
+                return std::sqrt(re * re + im * im) / (n / 2);
+            };
+            for (const float bias : { 0.0f, 50.0f, 100.0f })
+                expect(harmonicLevel(bias, 1, true) < 1.0e-3, "silence in gives silence out at bias " + juce::String(bias));
+            // A loud low note at full drive: the clipped top is flat, not noisy (the ADAA large-|x| form's rounding error).
+            {
+                constexpr double sr = 48000.0;
+                constexpr int n = 24000;
+                OverdriveInsert a;
+                a.prepare(sr, n);
+                juce::AudioBuffer<float> buf(2, n);
+                for (int i = 0; i < n; ++i)
+                    for (int c = 0; c < 2; ++c)
+                        buf.setSample(c, i, (float) std::sin(2.0 * juce::MathConstants<double>::pi * 50.0 * i / sr));
+                float gr = 0.0f;
+                a.process(buf, n, 2, makeParams(14, { 100.0f, 0.0f, 0.0f, 20000.0f }), gr);
+                float worst = 0.0f;   // the largest sample-to-sample step inside the flat top
+                for (int i = 4990; i < 5090; ++i)   // around the crest, a quarter of the way into the fifth cycle
+                    worst = juce::jmax(worst, std::abs(buf.getSample(0, i) - buf.getSample(0, i - 1)));
+                expect(worst < 0.05f, "the flat top is smooth (largest step " + juce::String(worst) + ")");
+            }
+            const double second0 = harmonicLevel(0.0f, 2, false), second100 = harmonicLevel(100.0f, 2, false);
+            expect(second0 < 1.0e-3, "no second harmonic from the symmetric curve");
+            expect(second100 > 20.0 * juce::jmax(second0, 1.0e-6), "Bias 100 % puts a clear second harmonic in");
+        }
     }
 
 private:

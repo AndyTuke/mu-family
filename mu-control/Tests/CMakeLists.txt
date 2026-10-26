@@ -9,6 +9,8 @@ target_sources(mu-control-tests PRIVATE
     SurfaceDescriptionTests.cpp
     SurfaceMappingTests.cpp
     SurfaceModelTests.cpp
+    SurfaceSceneTests.cpp
+    SurfacePageTests.cpp
     LaunchpadXProtocolTests.cpp
     LaunchpadXDriverTests.cpp
     LaunchpadXColourMapTests.cpp
@@ -54,4 +56,5 @@ target_link_libraries(mu-control-tests PRIVATE
     juce::juce_recommended_warning_flags
 )
 
-target_compile_definitions(mu-control-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0 JUCE_MODAL_LOOPS_PERMITTED=1)
+# 16 layers, as a paged host has them (the layer-page tests drive a second page of eight).
+target_compile_definitions(mu-control-tests PRIVATE MU_MAX_LAYERS=16 JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0 JUCE_MODAL_LOOPS_PERMITTED=1)

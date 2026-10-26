@@ -118,6 +118,7 @@ juce::Colour MuLookAndFeel::colour(ColourIds id) noexcept
         case appGreen:                return t.apps.green;
         case appBlue:                 return t.apps.blue;
         case appYellow:               return t.apps.yellow;
+        case appIce:                  return t.apps.ice;
         case indicatorFault:          return t.indicators.fault;
         case buttonDangerBg:          return t.indicators.buttonDangerBg;
         case queuedText:              return t.text.queued;
@@ -137,17 +138,24 @@ juce::Colour MuLookAndFeel::colour(ColourIds id) noexcept
 }
 
 // Fixed 8-colour voice palette indexed by channel (rhythm / voice / layer / track).
+// Each entry is a colour the Launchpad X can show (its palette index in the comment), so a layer's
+// on-screen colour and its pad colour are the same hue from one table.
 // The four app primaries (purple, green, blue, yellow — MuTheme::AppPrimaries) are left
 // out, so a voice's highlight never blends into its app's painted panels.
 const juce::Colour MuLookAndFeel::layerPalette[MuLookAndFeel::kLayerPaletteSize] = {
-    juce::Colour(0xffE5484D),   // 0 Red
-    juce::Colour(0xff2EC4C9),   // 1 Cyan
-    juce::Colour(0xffF28C28),   // 2 Orange
-    juce::Colour(0xffD04FC8),   // 3 Magenta
-    juce::Colour(0xffA6D63A),   // 4 Lime
-    juce::Colour(0xffF07CA6),   // 5 Rose
-    juce::Colour(0xffC9CCD1),   // 6 Silver
-    juce::Colour(0xff2B3FD6),   // 7 Navy
+    juce::Colour(0xffFF6259),   // 0 Red     (pad 5)
+    juce::Colour(0xff65EBFF),   // 1 Cyan    (pad 37)
+    juce::Colour(0xffFFB064),   // 2 Orange  (pad 9)
+    juce::Colour(0xffFF62FF),   // 3 Magenta (pad 53)
+    juce::Colour(0xffC7FE6D),   // 4 Lime    (pad 75)
+    juce::Colour(0xffFF5EC5),   // 5 Rose    (pad 57)
+    juce::Colour(0xffDDDDDD),   // 6 Silver  (pad 2)
+    juce::Colour(0xff5B5DFD),   // 7 Blue    (pad 45)
+};
+
+// The hue name of each palette entry; a controller driver maps these to its own device colours.
+const char* const MuLookAndFeel::layerPaletteNames[MuLookAndFeel::kLayerPaletteSize] = {
+    "red", "cyan", "orange", "magenta", "lime", "rose", "silver", "blue"
 };
 
 namespace
@@ -779,8 +787,33 @@ bool MuLookAndFeel::isMetal(const juce::Component& c)
     return mlf != nullptr && mlf->isMetalStyle();
 }
 
+namespace { const juce::Identifier kAccentOverride { "muAccentOverride" }; }
+
+void MuLookAndFeel::setAccentOverride(juce::Component& root, juce::Colour colour)
+{
+    root.getProperties().set(kAccentOverride, (juce::int64) colour.getARGB());
+}
+
+void MuLookAndFeel::clearAccentOverride(juce::Component& root)
+{
+    root.getProperties().remove(kAccentOverride);
+}
+
+bool MuLookAndFeel::accentOverrideFor(const juce::Component& c, juce::Colour& out)
+{
+    for (const auto* p = &c; p != nullptr; p = p->getParentComponent())
+        if (const auto* v = p->getProperties().getVarPointer(kAccentOverride))
+        {
+            out = juce::Colour((juce::uint32) (juce::int64) *v);
+            return true;
+        }
+    return false;
+}
+
 juce::Colour MuLookAndFeel::appAccent(juce::Component& c)
 {
+    juce::Colour overridden;
+    if (accentOverrideFor(c, overridden)) return overridden;
     auto* mlf = dynamic_cast<MuLookAndFeel*>(&c.getLookAndFeel());
     return (mlf != nullptr && mlf->hasAppAccent) ? mlf->appAccentColour : colour(globalAccent);
 }
@@ -794,6 +827,12 @@ void MuLookAndFeel::useAppColourKnobs(juce::Component& root)
 
 juce::Colour MuLookAndFeel::knobColour(const juce::Slider& slider) const
 {
+    // A layer-type colour over the main page wins over the app colour.
+    juce::Colour overridden;
+    if (metalStyle && accentOverrideFor(slider, overridden))
+        for (auto* c = slider.getParentComponent(); c != nullptr; c = c->getParentComponent())
+            if (c->getProperties().contains(kAppColourKnobs))
+                return overridden;
     // Inside a marked main page, the app colour wins over the knob's category colour.
     if (metalStyle && hasAppAccent)
         for (auto* c = slider.getParentComponent(); c != nullptr; c = c->getParentComponent())
@@ -834,6 +873,8 @@ juce::Colour MuLookAndFeel::lcdLitColour(juce::Component& c)
     // A display lit in its own colour (DropdownSelect::setLcdColour) — e.g. a voice's.
     if (const auto* own = c.getProperties().getVarPointer("muLcdColour"))
         return juce::Colour((juce::uint32) (juce::int64) *own).brighter(lighting().lcdOwnLift);
+    juce::Colour overridden;
+    if (accentOverrideFor(c, overridden)) return overridden.brighter(lighting().lcdAccentLift);
     auto* mlf = dynamic_cast<MuLookAndFeel*>(&c.getLookAndFeel());
     return (mlf != nullptr && mlf->hasAppAccent) ? mlf->appAccentColour.brighter(lighting().lcdAccentLift) : lcdLitColour();
 }
@@ -971,6 +1012,12 @@ void MuLookAndFeel::drawTitledPanel(juce::Graphics& g, juce::Rectangle<float> r,
 
 void MuLookAndFeel::drawSections(juce::Graphics& g, const juce::Component& owner,
                                  std::initializer_list<Section> sections, juce::Colour accent)
+{
+    drawSections(g, owner, std::vector<Section>(sections), accent);
+}
+
+void MuLookAndFeel::drawSections(juce::Graphics& g, const juce::Component& owner,
+                                 const std::vector<Section>& sections, juce::Colour accent)
 {
     for (const auto& sec : sections) drawRaisedSubPanelShadow(g, sec.box.toFloat());
     for (const auto& sec : sections) drawRaisedSubPanel(g, sec.box.toFloat(), accent);
