@@ -99,3 +99,5 @@ The advisor routines append a dated entry here for every suggestion they make, s
 2026-10-15: pre-commit static checks hook (.claude/hooks/pre_commit_checks.ps1, .claude/settings.json): PreToolUse hook on `git commit` running the check-*.ps1 scripts; reported in issue #4.
 2026-10-15: permission guard rails (.claude/settings.json): deny force-push, reset --hard, --no-verify; ask before `gh workflow run`; reported in issue #4.
 2026-10-19: sync-backlog.yml issue trigger (.github/workflows/sync-backlog.yml): drop `issues: opened` so it is dispatch-only (rule conflict, paid API key, bypasses backlog-administrator); reported in issue #5.
+2026-10-26: warning-scan hook (.claude/settings.json, .claude/hooks/scan_warnings.ps1): replace the per-build `type: agent` compiler-warning hook with a command hook (no tokens, instant); reported in issue #6.
+2026-10-26: SessionStart main-moved check (.claude/settings.json): fetch and report commits `origin/main` is ahead, supporting the two-PC `git pull --rebase` backlog rule; reported in issue #6.
