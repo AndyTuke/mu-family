@@ -61,7 +61,7 @@ Br
 
 # ── 1. Introduction ──────────────────────────────────────────────────────────
 H1 "1. Introduction"
-P "mu-Tronic is a performance unit from Transwarp Development Project. It is a standalone application: there is no VST3 or CLAP version. It is free."
+P "mu-Tronic is a performance unit from Transwarp Development Project. It is a standalone application: there is no VST3 or CLAP version. mu-Tronic is Pay What You Want: pay what you like from £0 (suggested £20), and nothing is limited either way (see Supporting mu-Tronic)."
 P "mu-Tronic starts empty. It has sixteen layer slots, shown eight at a time on two pages. Into each slot you put one layer, chosen from the instruments of the other mu apps: a Rhythm from mu-Clid, a Pattern from mu-Tant, an Arp from mu-Toni, or one of mu-On's seven engines (Kick, Bass, Hat, Snare, Rumble, FM Perc and Chord). A layer in mu-Tronic is the same instrument you know from its own app, with the same controls, modulators and presets. Mix and match as you like: sixteen layers, any combination."
 P "Around the layers is the family you may know from the other apps: the same mixer, effects, modulators, presets and transport bar. mu-Tronic adds three buses to the mixer, so you can group layers and process the group, and scenes, so you can change the clip on every layer with one press."
 P "Because mu-Tronic hosts several instruments at once, it can stand in for mu-link as a performance tool: one window, one tempo, one mix."
@@ -78,9 +78,21 @@ Pic "The mu-Tronic window: transport bar, layer sidebar with scene pads and page
 
 # ── 2. Installation ──────────────────────────────────────────────────────────
 H1 "2. Installation"
-P "mu-Tronic is a standalone application. Run mu-Tronic.exe from any location. It needs no licence key and shows no Support window."
+P "mu-Tronic is a standalone application. Run mu-Tronic.exe from any location."
 P "On first launch mu-Tronic creates a content folder at %USERPROFILE%\Documents\TDP\muTronic\. Full mu-Tronic presets (.muTronic) are kept there. Layer presets are not: mu-Tronic reads and writes the preset folders of the other apps (see Presets), so install the apps whose layers you want to use, or at least keep their folders."
-P "In the standalone application an Options button at the top left of the window opens the audio and MIDI device settings."
+P "An Options button at the top left of the window opens the audio and MIDI device settings: the audio output, and the MIDI inputs and outputs (see MIDI In and Out)."
+
+H2 "Supporting mu-Tronic"
+P "mu-Tronic is Pay What You Want. You choose what to pay, from £0 upwards (the suggested amount is £20), and nothing is limited either way: every feature works for everyone. Whatever you pay, even £0, you are sent a licence key by email from Lemon Squeezy, our payment provider. Entering the key removes the Support window. The key changes nothing else; mu-Tronic works the same with or without it."
+P "A copy without a key shows a polite 'Support mu-Tronic' window once per session, the first time you open mu-Tronic after starting the app. It has three buttons:"
+Bullet "Maybe later  -  closes the window and carries on. It will appear again next session."
+Bullet "Enter licence key  -  opens the 'Enter licence key - mu-Tronic' panel, where you type in your key."
+Bullet "Pay what you like  -  opens the checkout page in your web browser. The suggested amount is £20, but £0 is fine. You receive a key either way."
+P "The window cannot be switched off for good. To bring it back at any time, click the Support link at the right of the Status Bar, or the Support button in the About panel."
+P "To enter your key, click Enter licence key in the Support window, or click the mu-Tronic logo to open the About panel and click Enter a key. In the 'Enter licence key - mu-Tronic' panel (it reads 'Enter your licence key to remove the support reminder. Everything works either way.'), paste your key into the Licence key box and click Activate (or press Return). If you do not have a key yet, click Pay what you like to open the checkout page in your web browser. mu-Tronic needs an internet connection the first time, to register the key. One key can be used on up to 5 machines. When the key is accepted the panel shows a confirmation and closes, the About panel thanks you for your support, and the Support window and Support link no longer appear."
+P "A licensed copy, even one with a £0 key, shows 'Thank you for supporting mu-Tronic.' in the About panel, with a 'Want to give more?' link beneath it. The link opens the tip page in your web browser, where you can give any amount you like. It does not use up your key, and you do not have to give anything."
+P "Once activated, mu-Tronic checks your key with the server now and then when it starts. If you are offline at that moment it carries on working as normal for up to 30 days."
+P "If activation fails, the panel tells you why. Check that you pasted the whole key and that you are online, then try again. A key that has already been used on 5 machines needs one of them released first; use Contact Support at the bottom of the Settings page. If the computer has no internet connection at all, the licence key panel shows a machine code at the bottom. Send that code to Contact Support and you can be sent an offline licence file for that computer, to place in the mu-Tronic content folder."
 
 # ── 3. Interface Overview ─────────────────────────────────────────────────────
 H1 "3. Interface Overview"
@@ -89,7 +101,7 @@ Bullet "Transport Bar (top)  -  playback, BPM, presets, settings, performance mo
 Bullet "Layer Sidebar (left)  -  eight slots at a time, the scene pads and the page switch"
 Bullet "Layer Editor (centre)  -  the header, the controls and the modulators of the selected layer"
 Bullet "Mixer overlay  -  opened from the transport bar, replacing the editor"
-Bullet "Status Bar (bottom)  -  the name and value of the control you last touched, and the CPU readout at the right-hand end"
+Bullet "Status Bar (bottom)  -  the name and value of the control you last touched, a Support link (until a licence key is entered), and the CPU readout at the right-hand end"
 P "The window has two sizes, Medium and Large, chosen in Settings (Display, Size). Everything scales with it."
 P "The main area takes the colour of the selected layer's type: purple for Rhythm, green for Pattern, blue for Arp and yellow for the seven mu-On layers. The transport bar, sidebar, mixer and settings keep mu-Tronic's own ice-white and steel."
 
@@ -193,8 +205,8 @@ Bullet "Click a stored pad to launch it. While playing it waits for the next bar
 Bullet "Click the playing pad to mute the layer; click again to unmute."
 Bullet "Click an empty pad to store the layer's current state there."
 Bullet "Shift+click any pad to store the current state in it. If the pad holds a different clip from the one playing, mu-Tronic asks you to confirm with Replace."
-Bullet "Right-click a pad (or Ctrl+click) for a menu with Store here and Clear."
-P "Turning a knob changes only the playing layer, not the stored clip. To keep a tweak, store it again with Shift+click. Resetting a layer clears its clips; deleting a layer removes them with it. Clips are saved with the full preset and your session, but not in layer presets. A clip of a different layer type is never launched: the status bar says that the clip is for a different layer type."
+Bullet "Right-click a pad (or Ctrl+click) for a menu with Store here, Copy, Cut, Paste and Clear. Copy and Cut put the clip on a clipboard; Paste puts it in another pad, or in a pad of another layer of the same type, and asks first if the pad already holds a clip. Paste is greyed, with the reason in its text, when nothing has been copied or the copied clip is for a different layer type."
+P "Auto-save: by default, edits you make to a layer while one of its clips is playing are written back into that clip a moment after you stop moving the control, so the clip you launch next time is the one you left. Switch this off with Auto-save clip edits in Settings (General, Clips); with it off, turning a knob changes only the playing layer, not the stored clip, and you keep a tweak by storing it again with Shift+click. Auto-save does nothing in Performance mode. Resetting a layer clears its clips; deleting a layer removes them with it. Clips are saved with the full preset and your session, but not in layer presets. A clip of a different layer type is never launched: the status bar says that the clip is for a different layer type."
 
 H2 "Scenes"
 P "A scene launches clip n on every layer at once. It replaces the Scene buttons of mu-link. The eight Scene pads sit in the sidebar, under the layers and above the page switch, and they always act on all sixteen slots, whichever page you are looking at."
@@ -289,21 +301,16 @@ P "General:"
 Bullet "Audio, Master Vol  -  overall output level."
 Bullet "Display, Size  -  Medium or Large window."
 Bullet "Transport, Tempo and Time signature  -  the internal clock's tempo, and the time signature that the Position readout counts in."
+Bullet "Clips, Auto-save clip edits  -  a tick box, ticked by default. Whether edits to a playing clip are saved into it (see Clips)."
 Bullet "Updates, Check for updates  -  a tick box. When ticked, mu-Tronic asks the transwarp.me website once a day for the latest version number and shows an Update available link in the status bar when there is a newer one. It sends nothing about you. Untick to switch the check off."
 P "MIDI:"
 Bullet "MIDI Clock, Source  -  Internal, or MIDI In to follow an external MIDI clock. A Messages choice (Clock only, Transport only, Clock + Transport) and a Sync offset appear. They work as in the other mu apps."
 Bullet "MIDI Program Change  -  buttons that open the tables mapping incoming program-change messages to presets."
-Bullet "Controller  -  connects a Launchpad (see Launchpad)."
+P "At the foot of Settings, Contact Support opens the support page in your web browser."
 P "Notes In is not in Settings: each Arp and Pattern layer has its own, in the layer header."
 
-# ── 13. Launchpad ────────────────────────────────────────────────────────────
-H1 "13. Launchpad"
-P "mu-Tronic is designed to be played from a Novation Launchpad X as well as from the screen. The Launchpad's controller support is still being finished for mu-Tronic and has not yet been confirmed on real hardware, so treat the following as planned rather than promised."
-Bullet "Planned: hold the Launchpad's logo button and press any pad in a column to launch that scene, the same as clicking a Scene pad. While the logo is held, the pads show the scenes as white columns."
-P "Connect and disconnect the Launchpad from the Controller line in Settings."
-
 # ── 14. Connecting to mu-link ────────────────────────────────────────────────
-H1 "14. Connecting to mu-link"
+H1 "13. Connecting to mu-link"
 P "mu-link is a companion application from Transwarp Development Project: a local audio hub and master clock for the mu family. When mu-link is running, mu-Tronic connects to it automatically. Its audio is summed into mu-link's mix and its transport locks to mu-link's master clock."
 H2 "How to Connect"
 Bullet "Launch mu-link, then launch mu-Tronic, in either order. Within about a second the mu-Tronic title bar shows mu-link connected."
@@ -313,7 +320,7 @@ Bullet "Quit mu-link and mu-Tronic reverts to its own audio device and internal 
 P "Because mu-Tronic holds up to sixteen layers itself, you often do not need mu-link at all. Use mu-link when you want to combine mu-Tronic with other apps or with outboard gear. See the mu-link User Manual for the full picture."
 
 # ── 15. Tips and Workflow ────────────────────────────────────────────────────
-H1 "15. Tips and Workflow"
+H1 "14. Tips and Workflow"
 Bullet "Starting out: add a Kick to slot 1 and a Bass to slot 2, press Play, and turn on a few steps."
 Bullet "Rumble: add a Kick, then a Rumble, which listens to the Kick by default."
 Bullet "Group the drums: send the Kick, Hat and Snare to Bus 1 and put a Compressor in Bus 1's Insert 1 to glue them."
@@ -323,13 +330,13 @@ Bullet "Bring in an old idea: use Import product preset to pull a whole mu-Clid 
 Bullet "Keep an eye on the CPU readout as you add layers."
 
 # ── 16. Technical Specifications ─────────────────────────────────────────────
-H1 "16. Technical Specifications"
-Bullet "Format: Standalone (Windows). No VST3 or CLAP. Free; no licence key."
+H1 "15. Technical Specifications"
+Bullet "Format: Standalone (Windows). No VST3 or CLAP. Pay What You Want; every feature works with or without a key."
 Bullet "Layers: 16 slots on two pages of 8, starting empty"
-Bullet "Layer types: Rhythm, Pattern, Arp, Kick, Bass, Hat, Snare, Rumble"
+Bullet "Layer types: Rhythm, Pattern, Arp, Kick, Bass, Hat, Snare, Rumble, FM Perc, Chord"
 Bullet "Mixer: 16 channel strips, 3 buses with 2 inserts each, Effect / Delay / Reverb returns, master with 2 inserts"
 Bullet "Insert effects: 14 plus None, on every layer, bus and the master"
-Bullet "Clips: 8 per layer (none for Rumble); scenes 1 to 8"
+Bullet "Clips: 8 per layer (none for Rumble), with copy, cut, paste and auto-save; scenes 1 to 8"
 Bullet "Modulators per layer: 8, plus a matrix view"
 Bullet "Full preset format: .muTronic. Layer presets: .muRhythm, .muPattern, .muArp, .muTrack (shared with the other apps)"
 Bullet "Import: .muClid, .muTant, .muToni, .muOn full presets"

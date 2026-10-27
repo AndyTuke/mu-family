@@ -15,6 +15,7 @@ $map = [ordered]@{
     'mu-on'        = @{ Docx = 'mu-On User Manual.docx';        Pdf = 'mu-On-User-Manual.pdf' }
     'mu-clid-midi' = @{ Docx = 'mu-Clid MIDI User Manual.docx'; Pdf = 'mu-Clid-MIDI-User-Manual.pdf' }
     'mu-link'      = @{ Docx = 'mu-link User Manual.docx';      Pdf = 'mu-Link-User-Manual.pdf' }
+    'mu-tronic'    = @{ Docx = 'mu-Tronic User Manual.docx';    Pdf = 'mu-Tronic-User-Manual.pdf' }
 }
 
 New-Item -ItemType Directory -Force $OutDir | Out-Null
