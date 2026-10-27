@@ -17,7 +17,7 @@ CI checks out the pushed commit and reads `build_number.txt`. Commit + push the 
 
 ## 3. (b) GitHub release — all platforms via CI
 
-The repo is public, so Linux CI minutes are free — **always** publish a full cross-platform release. Dispatch the complete workflow (it builds Windows + Linux, packages the fixed-name zips the site links to, and creates/updates the GitHub Release `v1.1.0.NNN` from `build_number.txt`):
+**Windows only** (owner, 2026-10-27): Linux is no longer built or shipped. Dispatch the workflow (it builds Windows, packages the fixed-name zips the site links to, and creates/updates the GitHub Release `v1.1.0.NNN` from `build_number.txt`):
 
 `gh workflow run release.yml --ref main`
 
@@ -34,4 +34,4 @@ For each affected product (`site/mu-clid-releases.html`, `site/mu-tant-releases.
 
 ## 5. Report
 
-Report the build number (from `BuildNumber.h`), the dispatched CI run URL, and the site push. End with the `## Release builds` artefact list. Note that the GitHub release assets appear once CI finishes (Linux takes a few minutes).
+Report the build number (from `BuildNumber.h`), the dispatched CI run URL, and the site push. End with the `## Release builds` artefact list. Note that the GitHub release assets appear once CI finishes.
