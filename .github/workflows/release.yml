@@ -84,6 +84,7 @@ jobs:
           mu-tant_VST3 mu-tant_CLAP mu-tant_Standalone
           mu-on_VST3 mu-on_CLAP mu-on_Standalone
           mu-toni_VST3 mu-toni_CLAP mu-toni_Standalone
+          mu-tronic_Standalone
 
       # mu-link is a Windows desktop app (freeware); built and zipped on the Windows runner only.
       - name: Build mu-link (Windows)
@@ -138,6 +139,11 @@ jobs:
           Copy-Item "$r\mu-on\mu-on_artefacts\Release\Standalone\mu-On.exe" staging\mu-On\
           Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-On\"
           Compress-Archive -Path staging\mu-On\* -DestinationPath dist\mu-On-Windows.zip
+          # mu-Tronic (Standalone only)
+          New-Item -ItemType Directory -Path staging\mu-Tronic -Force | Out-Null
+          Copy-Item "$r\mu-tronic\mu-tronic_artefacts\Release\Standalone\mu-Tronic.exe" staging\mu-Tronic\
+          Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Tronic\"
+          Compress-Archive -Path staging\mu-Tronic\* -DestinationPath dist\mu-Tronic-Windows.zip
           # mu-Link (desktop app)
           New-Item -ItemType Directory -Path staging\mu-Link -Force | Out-Null
           Copy-Item "$r\mu-link\mu-link_artefacts\Release\mu-link.exe" staging\mu-Link\
@@ -217,6 +223,11 @@ jobs:
           cp -R "$R/mu-on/mu-on_artefacts/Release/Standalone/mu-On"           "staging/mu-On/" 2>/dev/null || true
           cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-On/"
           ( cd staging && zip -r -y "../dist/mu-On-Linux.zip" "mu-On" )
+          # mu-Tronic (Standalone only)
+          mkdir -p "staging/mu-Tronic"
+          cp -R "$R/mu-tronic/mu-tronic_artefacts/Release/Standalone/mu-Tronic"  "staging/mu-Tronic/" 2>/dev/null || true
+          cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-Tronic/"
+          ( cd staging && zip -r -y "../dist/mu-Tronic-Linux.zip" "mu-Tronic" )
 
       - name: Upload platform release zips
         uses: actions/upload-artifact@v4
