@@ -10,7 +10,7 @@ if (-not (Test-Path $file)) { Write-Host 'latest.json not present yet: nothing t
 
 $errors = @()
 $maxBuild = [int](Get-Content (Join-Path $Root 'build_number.txt') -Raw).Trim()
-$slugs = 'mu-clid', 'mu-clid-midi', 'mu-tant', 'mu-toni', 'mu-on', 'mu-link'
+$slugs = 'mu-clid', 'mu-clid-midi', 'mu-tant', 'mu-toni', 'mu-on', 'mu-link', 'mu-tronic'
 $trusted = 'https://transwarp.me/'
 
 try { $j = Get-Content $file -Raw | ConvertFrom-Json } catch { Write-Host "FAIL: not valid JSON"; exit 1 }
