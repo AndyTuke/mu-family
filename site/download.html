@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Download | Transwarp Development Project</title>
-  <meta name="description" content="Download μ-clid, μ-tant, μ-toni, μ-on, μ-clid MIDI and μ-link. μ-clid MIDI and μ-link are freeware, the rest are pay what you want. VST3, CLAP and Standalone for Windows, Linux in beta. Always the latest version.">
+  <meta name="description" content="Download μ-clid, μ-tant, μ-toni, μ-on, μ-tronic, μ-clid MIDI and μ-link. μ-clid MIDI and μ-link are freeware, the rest are pay what you want. VST3, CLAP and Standalone for Windows (μ-tronic is Standalone only), Linux in beta. Always the latest version.">
   <link rel="canonical" href="https://transwarp.me/download">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://transwarp.me/download">
@@ -69,6 +69,8 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px;
 .dl-card.tant { border-left: 3px solid var(--amber); }
 .dl-card.toni { border-left: 3px solid var(--teal); }
 .dl-card.on { border-left: 3px solid #C9A94A; }
+.dl-card.tronic { border-left: 3px solid #D4668F; }
+.dl-card.tronic .dl-name .mu { color: #EC8BAE; }
 .dl-card.toni .dl-name .mu { color: var(--teal-b); }
 .dl-card.on .dl-name .mu { color: #E0C568; }
 .dl-tag.dev { color: var(--amber-b); border: 1px solid var(--amber); }
@@ -100,6 +102,8 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px;
 .btn-dl.toni:hover { box-shadow: 0 0 22px var(--glow2); }
 .btn-dl.on { background: #C9A94A; color: #14100A; }
 .btn-dl.on:hover { box-shadow: 0 0 22px rgba(201,169,74,0.3); }
+.btn-dl.tronic { background: #D4668F; color: #1A0610; }
+.btn-dl.tronic:hover { box-shadow: 0 0 22px rgba(212,102,143,0.3); }
 .dl-sub { font-family: var(--ff-mono); font-size: 10px; color: var(--text3); margin-top: 8px; }
 .dl-win { margin-top: 10px; font-family: var(--ff-mono); font-size: 11px; }
 .dl-win a { color: var(--text2); text-decoration: underline; text-underline-offset: 3px; }
@@ -208,7 +212,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
           <a href="mu-on.html" class="nm nm-on"><span class="nm-name"><span class="mu-d">μ</span>-on</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">909-style groove sequencer</span></a>
           <a href="mu-clid-midi.html" class="nm nm-midi"><span class="nm-name"><span class="mu-d">μ</span>-clid MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Euclidean MIDI effect</span></a>
           <a href="mu-link.html" class="nm nm-link"><span class="nm-name"><span class="mu-d">μ</span>-link</span><span class="nm-tag free">Free</span><span class="nm-desc">Sync hub and performance mixer</span></a>
-          <a href="mu-tronic.html" class="nm nm-tronic"><span class="nm-name"><span class="mu-d">μ</span>-tronic</span><span class="nm-tag free">Free</span><span class="nm-desc">A performance instrument for live play</span></a>
+          <a href="mu-tronic.html" class="nm nm-tronic"><span class="nm-name"><span class="mu-d">μ</span>-tronic</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">A performance instrument for live play</span></a>
         </div></div>
       </div>
       <a href="index.html#live">Live</a>
@@ -223,7 +227,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
       <div class="container">
         <div class="dl-eyebrow">Downloads</div>
         <h1>Get the plugins.</h1>
-        <p>μ-clid MIDI and μ-link are freeware. μ-clid, μ-tant, μ-toni and μ-on are pay what you want, from £0, with £20 suggested. A licence key is issued even for £0 and removes the support prompt shown when the app starts. Nothing is limited without one. Every download is the current release. Windows VST3, CLAP and Standalone, with Linux in beta. macOS is on hold. Paid £0 and want to give more? <a href="https://transwarp.lemonsqueezy.com/checkout/buy/a6bc15b0-9e2d-4aad-a4d2-7327a8e56e7b" target="_blank" rel="noopener">Make a donation</a>.</p>
+        <p>μ-clid MIDI and μ-link are freeware. μ-clid, μ-tant, μ-toni, μ-on and μ-tronic are pay what you want, from £0, with £20 suggested. A licence key is issued even for £0 and removes the support prompt shown when the app starts. Nothing is limited without one. Every download is the current release. Windows VST3, CLAP and Standalone (μ-tronic is Standalone only), with Linux in beta. macOS is on hold. Paid £0 and want to give more? <a href="https://transwarp.lemonsqueezy.com/checkout/buy/a6bc15b0-9e2d-4aad-a4d2-7327a8e56e7b" target="_blank" rel="noopener">Make a donation</a>.</p>
         <div class="ver-banner">
           <span class="ver-dot"></span>
           <div>
@@ -326,6 +330,24 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
             </div>
           </div>
 
+          <!-- μ-tronic (pay what you want, Standalone only) -->
+          <div class="dl-card tronic" id="mu-tronic">
+            <div>
+              <div class="dl-name"><span class="mu">μ</span>-tronic<span class="dl-tag paid">Pay what you want</span></div>
+              <div class="dl-formats">Performance rig of up to 16 layers · Standalone only (no VST3 or CLAP) · Windows · Linux (beta)</div>
+              <div class="dl-meta"><span>Version <b data-version>v1.1.0.1451</b></span><span data-asset="mu-Tronic-Windows.zip">Windows zip</span><span>Pay what you want, from £0, suggested £20. A licence key removes the support prompt.</span></div>
+            </div>
+            <div class="dl-actions">
+              <!-- TODO (Andy): replace this placeholder with the mu-Tronic Lemon Squeezy checkout link once the product exists:
+                   <a class="btn-dl tronic" href="CHECKOUT_URL" target="_blank" rel="noopener">Pay what you want</a> -->
+              <span class="btn-dl soon" aria-disabled="true">Pay what you want (link coming)</span>
+              <!-- TODO: asset names must match the release zips mu-Tronic-Windows.zip and mu-Tronic-Linux.zip. -->
+              <div class="dl-win"><a href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Tronic-Windows.zip">Download for Windows ↓</a></div>
+              <div class="dl-os"><span class="beta">Beta</span><a href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Tronic-Linux.zip">Download for Linux ↓</a></div>
+              <div class="dl-sub">No registration required · <a href="mu-tronic.html" style="color:#EC8BAE">About</a> · <a href="mu-tronic-releases.html" style="color:#EC8BAE">Release notes</a> · <a href="manuals/mu-Tronic-User-Manual.pdf" target="_blank" rel="noopener" style="color:#EC8BAE">User manual (PDF)</a></div>
+            </div>
+          </div>
+
         </div>
 
         <div class="dl-note" style="border-style: solid; border-color: var(--amber);">
@@ -342,6 +364,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
             <li><a href="manuals/mu-Tant-User-Manual.pdf" target="_blank" rel="noopener"><span class="mu">μ</span>-tant user manual</a><span>PDF · 23 pages · 0.9 MB</span></li>
             <li><a href="manuals/mu-Toni-User-Manual.pdf" target="_blank" rel="noopener"><span class="mu">μ</span>-toni user manual</a><span>PDF · 21 pages · 0.7 MB</span></li>
             <li><a href="manuals/mu-On-User-Manual.pdf" target="_blank" rel="noopener"><span class="mu">μ</span>-on user manual</a><span>PDF · 19 pages · 0.8 MB</span></li>
+            <li><a href="manuals/mu-Tronic-User-Manual.pdf" target="_blank" rel="noopener"><span class="mu">μ</span>-tronic user manual</a><span>PDF</span></li>
             <li><a href="manuals/mu-Link-User-Manual.pdf" target="_blank" rel="noopener"><span class="mu">μ</span>-link user manual</a><span>PDF · 12 pages · 0.4 MB</span></li>
             <li><a href="manuals/mu-Clid-MIDI-User-Manual.pdf" target="_blank" rel="noopener"><span class="mu">μ</span>-clid MIDI user manual</a><span>PDF · 6 pages · 0.2 MB</span></li>
           </ul>

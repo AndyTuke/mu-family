@@ -21,6 +21,10 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://transwarp.me/mu-tronic</loc>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://transwarp.me/mu-clid-midi</loc>
     <priority>0.8</priority>
   </url>
@@ -35,6 +39,10 @@
   <url>
     <loc>https://transwarp.me/download</loc>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://transwarp.me/mu-tronic-releases</loc>
+    <priority>0.5</priority>
   </url>
   <url>
     <loc>https://transwarp.me/mu-clid-releases</loc>
