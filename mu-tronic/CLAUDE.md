@@ -10,7 +10,7 @@ Design: [docs/mu-tronic/design.md](../docs/mu-tronic/design.md) (architecture ru
 
 ## Release status
 
-A live release product (backlog #1678), released with the rest of the series: **pay what you want**, same terms as mu-Clid / mu-Tant / mu-Toni / mu-On; Windows Standalone, Linux in beta, macOS on hold. Version base and build number are the family's (`version-pre.txt` carries the same base as `version.txt`; the shared build number never resets). Manual: [docs/mu-tronic/create_manual.ps1](../docs/mu-tronic/create_manual.ps1) (edit the script, not the `.docx`). Site pages: `site/mu-tronic.html`, `site/mu-tronic-releases.html`.
+A live release product (backlog #1678), released with the rest of the series: **pay what you want**, same terms as mu-Clid / mu-Tant / mu-Toni / mu-On; Windows Standalone only (Linux is no longer built; macOS on hold). Version base and build number are the family's (`version-pre.txt` carries the same base as `version.txt`; the shared build number never resets). Manual: [docs/mu-tronic/create_manual.ps1](../docs/mu-tronic/create_manual.ps1) (edit the script, not the `.docx`). Site pages: `site/mu-tronic.html`, `site/mu-tronic-releases.html`.
 
 **Licensing is not wired yet.** The design ruling of 2026-10-15 made mu-Tronic freeware with no key code of its own; the owner then chose pay-what-you-want (2026-10-27), which needs a `License/LicenseKey.h`, the shared activation / support-prompt flow and a Lemon Squeezy product. Until that lands `Source/License/` is empty and the app runs unlimited with no prompt.
 
