@@ -6,7 +6,7 @@ namespace mu_tronic
 {
 
 // mu-Tronic's settings page: the family standard (master volume, UI size, tempo, standalone MIDI Clock), with no
-// licensing section — it is freeware. Rows of its own join here as the layer types register theirs.
+// licensing section: the Support prompt and the status-bar link belong to the shell. Rows of its own join here as the layer types register theirs.
 class TronicSettingsOverlay : public mu_ui::StandardSettingsOverlay
 {
 public:

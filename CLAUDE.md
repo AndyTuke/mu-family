@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Family-shared guidance for Claude Code working in this monorepo. **Product-specific rules live under each plugin's own CLAUDE.md** ([mu-clid/CLAUDE.md](mu-clid/CLAUDE.md), [mu-clid-midi/CLAUDE.md](mu-clid-midi/CLAUDE.md), [mu-tant/CLAUDE.md](mu-tant/CLAUDE.md), [mu-toni/CLAUDE.md](mu-toni/CLAUDE.md), [mu-on/CLAUDE.md](mu-on/CLAUDE.md)) — read the one matching the product you're working on, in addition to this file.
+Family-shared guidance for Claude Code working in this monorepo. **Product-specific rules live under each plugin's own CLAUDE.md** ([mu-clid/CLAUDE.md](mu-clid/CLAUDE.md), [mu-clid-midi/CLAUDE.md](mu-clid-midi/CLAUDE.md), [mu-tant/CLAUDE.md](mu-tant/CLAUDE.md), [mu-toni/CLAUDE.md](mu-toni/CLAUDE.md), [mu-on/CLAUDE.md](mu-on/CLAUDE.md), [mu-tronic/CLAUDE.md](mu-tronic/CLAUDE.md)) — read the one matching the product you're working on, in addition to this file.
 
 ## Monorepo layout
 
@@ -10,8 +10,9 @@ mu-control/     (planned, created with the first controller work) Controller dri
 mu-clid/        Euclidean rhythm sequencer + sample trigger plugin (VST3 + CLAP + Standalone)
 mu-clid-midi/   mu-Clid MIDI: Euclidean MIDI effect, the former mu-Clid Lite — no audio, free, VST3 + CLAP; shares Rhythm / .muRhythm with mu-Clid (see mu-clid-midi/CLAUDE.md)
 mu-tant/        Wavetable drone synth — 8 voices, mixer, modulators, gate-pattern grid (VST3 + CLAP + Standalone)
-mu-toni/        Generative arpeggiator mono-synth — scale/chord note pool, skewed-triangle scan, freeware (VST3 + CLAP + Standalone)
+mu-toni/        Generative arpeggiator mono-synth — scale/chord note pool, skewed-triangle scan, pay what you want (VST3 + CLAP + Standalone)
 mu-on/          909-style groove sequencer — Kick/Bass/Hat/Snare lanes, step grid, bass↔kick sidechain
+mu-tronic/      Performance unit — 16 layer slots hosting layers from the other products, buses, scenes (Standalone only)
 docs/           Family-shared design docs; product-specific docs under docs/<product>/
 tests/          Cross-plugin listening-test pipeline
 ```

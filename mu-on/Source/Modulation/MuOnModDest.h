@@ -293,12 +293,13 @@ inline ModDestProvider makeModDestProvider(EngineType engine)
 {
     ModDestProvider p;
 
-    p.populate = [engine](DropdownSelect& dd, int /*driveChar*/, bool /*steppedMode*/)
+    p.populate = [engine](DropdownSelect& dd, int driveChar, bool /*steppedMode*/)
     {
-        // The shared builder over this engine's table (engine tables have no sections).
+        // The shared builder over this engine's table (engine tables have no sections); the active
+        // insert algorithm decides which insert slots are offered.
         int n = 0;
         const ModDestEntry* t = destsForEngine(engine, n);
-        mu_mod::populateDropdown(dd, t, n);
+        mu_mod::populateDropdown(dd, t, n, { driveChar });
     };
 
     int count = 0;

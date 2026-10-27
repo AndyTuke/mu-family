@@ -196,6 +196,7 @@ void ArpContent::buildVoiceBand()
                           { findKnob("sendEff"), findKnob("sendDly"), findKnob("sendRev") });
     addAndMakeVisible(voiceBand);
     insertSub.getInsertGR = [this] { return host.getArpInsertGainReduction(currentLayer); };
+    insertSub.onInsertAlgorithmChanged = [this](int algo) { if (onInsertAlgorithmChanged) onInsertAlgorithmChanged(algo); };
     insertSub.onStatusUpdate = [this](const juce::String& n, const juce::String& val)
     { if (onStatusUpdate) onStatusUpdate(n, val); };
 }

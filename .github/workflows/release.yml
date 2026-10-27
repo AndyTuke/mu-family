@@ -1,13 +1,12 @@
 name: Release artifacts
 
-# Manual cross-platform release. Builds the mu-family plugins in RELEASE on Linux and Windows,
-# packages a per-platform demo zip on each runner, then a final `publish` job
-# collects all platform zips and creates/updates the GitHub Release. The fixed-name zips are
+# Manual release. Builds the mu-family plugins in RELEASE on Windows,
+# packages a demo zip on the runner, then a final `publish` job
+# collects the zips and creates/updates the GitHub Release. The fixed-name zips are
 # what the download site links to (releases/latest/download/<name>). Version comes from the
 # committed build_number.txt at the run's commit — pin/commit it before dispatching.
 #
-# Windows is also built + deployed locally with the installer; this workflow is the source of
-# the Linux (Beta) builds.
+# Windows only (owner decision, 2026-10-27): Linux is no longer built or shipped.
 #
 # macOS is ON HOLD (owner decision, 2026-10-02): without an Apple code-signing certificate the
 # builds can't be notarized, so they aren't shipped. macos-latest is out of the matrix; the
@@ -23,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]   # macos-latest on hold — see header
+        os: [windows-latest]   # macos-latest on hold — see header
 
     env:
       JUCE_PATH: ${{ github.workspace }}/JUCE
@@ -46,28 +45,7 @@ jobs:
           ref: ${{ steps.juce.outputs.version }}
           path: JUCE
 
-      - name: Install Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libasound2-dev libjack-jackd2-dev \
-            libx11-dev libxext-dev libxinerama-dev libxrandr-dev libxcursor-dev \
-            libxcomposite-dev libxrender-dev libxi-dev \
-            libfreetype6-dev libfontconfig1-dev libgl1-mesa-dev ccache
 
-      # Reuse compiled objects between runs: JUCE and mu-core are identical from one release to the next.
-      - name: Cache compiler output (Linux)
-        if: runner.os == 'Linux'
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ccache
-          key: ccache-${{ runner.os }}-${{ hashFiles('juce-version.txt') }}-${{ github.sha }}
-          restore-keys: ccache-${{ runner.os }}-${{ hashFiles('juce-version.txt') }}-
-
-      - name: Configure (Linux)
-        if: runner.os == 'Linux'
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DMUFAMILY_DEPLOY_TESTERS=OFF -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache
 
       # MSVC compiles one file at a time unless told otherwise: /MP spreads each project over the cores.
       - name: Configure (Windows)
@@ -84,6 +62,7 @@ jobs:
           mu-tant_VST3 mu-tant_CLAP mu-tant_Standalone
           mu-on_VST3 mu-on_CLAP mu-on_Standalone
           mu-toni_VST3 mu-toni_CLAP mu-toni_Standalone
+          mu-tronic_Standalone
 
       # mu-link is a Windows desktop app (freeware); built and zipped on the Windows runner only.
       - name: Build mu-link (Windows)
@@ -138,6 +117,11 @@ jobs:
           Copy-Item "$r\mu-on\mu-on_artefacts\Release\Standalone\mu-On.exe" staging\mu-On\
           Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-On\"
           Compress-Archive -Path staging\mu-On\* -DestinationPath dist\mu-On-Windows.zip
+          # mu-Tronic (Standalone only)
+          New-Item -ItemType Directory -Path staging\mu-Tronic -Force | Out-Null
+          Copy-Item "$r\mu-tronic\mu-tronic_artefacts\Release\Standalone\mu-Tronic.exe" staging\mu-Tronic\
+          Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Tronic\"
+          Compress-Archive -Path staging\mu-Tronic\* -DestinationPath dist\mu-Tronic-Windows.zip
           # mu-Link (desktop app)
           New-Item -ItemType Directory -Path staging\mu-Link -Force | Out-Null
           Copy-Item "$r\mu-link\mu-link_artefacts\Release\mu-link.exe" staging\mu-Link\
@@ -177,47 +161,6 @@ jobs:
           cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-Tant/"
           pack "mu-Tant" "mu-Tant-macOS.zip"
 
-      - name: Package demo zips (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          set -e
-          mkdir -p dist
-          R=build
-          # mu-Clid (VST3 + CLAP + Standalone)
-          mkdir -p "staging/mu-Clid"
-          cp -R "$R/mu-clid/mu-clid_artefacts/Release/VST3/mu-Clid.vst3"      "staging/mu-Clid/"
-          cp -R "$R/mu-clid/mu-clid_artefacts/Release/CLAP/mu-Clid.clap"      "staging/mu-Clid/"
-          cp -R "$R/mu-clid/mu-clid_artefacts/Release/Standalone/mu-Clid"     "staging/mu-Clid/" 2>/dev/null || true
-          cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-Clid/"
-          ( cd staging && zip -r -y "../dist/mu-Clid-Linux.zip" "mu-Clid" )
-          # mu-Clid MIDI (VST3 + CLAP)
-          mkdir -p "staging/mu-Clid MIDI"
-          cp -R "$R/mu-clid-midi/mu-clid-midi_artefacts/Release/VST3/mu-Clid MIDI.vst3" "staging/mu-Clid MIDI/"
-          cp -R "$R/mu-clid-midi/mu-clid-midi_artefacts/Release/CLAP/mu-Clid MIDI.clap" "staging/mu-Clid MIDI/"
-          cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-Clid MIDI/"
-          ( cd staging && zip -r -y "../dist/mu-Clid-MIDI-Linux.zip" "mu-Clid MIDI" )
-          # mu-Tant (VST3 + CLAP + Standalone)
-          mkdir -p "staging/mu-Tant"
-          cp -R "$R/mu-tant/mu-tant_artefacts/Release/VST3/mu-Tant.vst3"      "staging/mu-Tant/"
-          cp -R "$R/mu-tant/mu-tant_artefacts/Release/CLAP/mu-Tant.clap"      "staging/mu-Tant/"
-          cp -R "$R/mu-tant/mu-tant_artefacts/Release/Standalone/mu-Tant"     "staging/mu-Tant/" 2>/dev/null || true
-          cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-Tant/"
-          ( cd staging && zip -r -y "../dist/mu-Tant-Linux.zip" "mu-Tant" )
-          # mu-Toni (VST3 + CLAP + Standalone)
-          mkdir -p "staging/mu-Toni"
-          cp -R "$R/mu-toni/mu-toni_artefacts/Release/VST3/mu-Toni.vst3"      "staging/mu-Toni/"
-          cp -R "$R/mu-toni/mu-toni_artefacts/Release/CLAP/mu-Toni.clap"      "staging/mu-Toni/"
-          cp -R "$R/mu-toni/mu-toni_artefacts/Release/Standalone/mu-Toni"     "staging/mu-Toni/" 2>/dev/null || true
-          cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-Toni/"
-          ( cd staging && zip -r -y "../dist/mu-Toni-Linux.zip" "mu-Toni" )
-          # mu-On (VST3 + CLAP + Standalone)
-          mkdir -p "staging/mu-On"
-          cp -R "$R/mu-on/mu-on_artefacts/Release/VST3/mu-On.vst3"            "staging/mu-On/"
-          cp -R "$R/mu-on/mu-on_artefacts/Release/CLAP/mu-On.clap"            "staging/mu-On/"
-          cp -R "$R/mu-on/mu-on_artefacts/Release/Standalone/mu-On"           "staging/mu-On/" 2>/dev/null || true
-          cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-On/"
-          ( cd staging && zip -r -y "../dist/mu-On-Linux.zip" "mu-On" )
-
       - name: Upload platform release zips
         uses: actions/upload-artifact@v4
         with:
@@ -254,6 +197,6 @@ jobs:
           else
             gh release create "$tag" \
               --title "mu-family $tag" \
-              --notes "mu-family $tag — Windows release; Linux is Beta. macOS is on hold. Please report any issues." \
+              --notes "mu-family $tag — Windows release. macOS is on hold. Please report any issues." \
               dist/*.zip
           fi

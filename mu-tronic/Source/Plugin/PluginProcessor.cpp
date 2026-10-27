@@ -1,6 +1,8 @@
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
 #include "Persistence/TrackLayerTypes.h"  // the Rumble source remap
+#include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
+#include "License/LicenseKey.h"
 
 #include <set>
 
@@ -79,7 +81,10 @@ PluginProcessor::PluginProcessor()
     }
     publishLayers(mu_limits::kMaxLayers);
 
-    initAppSettings(kAppName);   // settings file + saved UI size / MIDI clock (ProcessorBase); no licence: freeware
+    initAppSettings(kAppName);   // settings file + saved UI size / MIDI clock (ProcessorBase)
+
+    // Offline licence + online activation (shared; after initAppSettings for getContentDir).
+    initLicensing({ mu_tronic::kLicenseProductId, mu_tronic::kLicenseFilename, mu_tronic::kLicensePublicKey, "mutronic.activation", mu_tronic::kCheckoutUrl, mu_tronic::kSuggestedPrice });
 
     setupLayerState();       // the layer layout every preset / session save and load uses
     layerSwapper.setAppliers([this](juce::ValueTree& t) { applyStateTree(t); },

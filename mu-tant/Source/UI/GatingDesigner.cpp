@@ -411,25 +411,28 @@ GatingDesigner::HandleHit GatingDesigner::hitTestHandles(juce::Point<float> p, G
 {
     using mu_ui::sf;
     if (pat == nullptr) return {};
-    const float r = sf(kHandleRadius);
+    const float r = sf(kHandleHitRadius);
     const auto& envs = pat->envelopes;
-    // Start/end grab handles tested first so they take priority over body drags.
+
+    // Pick the nearest handle within the grab radius, so overlapping handles on a short
+    // envelope resolve to the one under the pointer rather than the first one tested.
+    HandleHit best;
+    float bestDist = r;
+    auto consider = [&](int env, Handle h, juce::Point<float> pt)
+    {
+        const float d = p.getDistanceFrom(pt);
+        if (d <= bestDist) { bestDist = d; best = { env, h }; }
+    };
     for (int i = 0; i < (int)envs.size(); ++i)
     {
         const auto L = layoutFor(envs[(size_t)i]);
-        const auto startPt = juce::Point<float>(L.x0,           L.bot);
-        const auto endPt   = juce::Point<float>(L.x0 + L.wpx,  L.bot);
-        if (p.getDistanceFrom(startPt) <= r) return { i, Handle::StartGrab };
-        if (p.getDistanceFrom(endPt)   <= r) return { i, Handle::EndGrab };
+        consider(i, Handle::StartGrab, { L.x0,          L.bot });
+        consider(i, Handle::EndGrab,   { L.x0 + L.wpx,  L.bot });
+        consider(i, Handle::Split,     L.peak);
+        consider(i, Handle::RiseBend,  L.riseMid);
+        consider(i, Handle::FallBend,  L.fallMid);
     }
-    for (int i = 0; i < (int)envs.size(); ++i)
-    {
-        const auto L = layoutFor(envs[(size_t)i]);
-        if (p.getDistanceFrom(L.peak)    <= r) return { i, Handle::Split };
-        if (p.getDistanceFrom(L.riseMid) <= r) return { i, Handle::RiseBend };
-        if (p.getDistanceFrom(L.fallMid) <= r) return { i, Handle::FallBend };
-    }
-    return {};
+    return best;
 }
 
 template <typename Fn>
@@ -497,7 +500,8 @@ void GatingDesigner::mouseDown(const juce::MouseEvent& e)
     auto* pat = getActivePattern();
     if (pat == nullptr) return;
     const auto grid = gridBounds();
-    if (!grid.contains(e.position)) return;
+    // Extend the grab area past the top/bottom edge: the corner handles sit on the grid's bottom edge.
+    if (!grid.expanded(0.0f, mu_ui::sf(kHandleHitRadius)).contains(e.position)) return;
     const int cell = cellAtX(e.position.x);
     if (cell < 0) return;
 
@@ -526,6 +530,10 @@ void GatingDesigner::mouseDown(const juce::MouseEvent& e)
                 setMouseCursor(juce::MouseCursor::DraggingHandCursor);
                 return;
             }
+            // A click on an existing envelope that missed its handles must not draw a new one:
+            // addEnvelope would replace the whole envelope. New envelopes go on empty cells only.
+            if (pat->envelopeAtCell(cell) != nullptr)
+                return;
             withLock(pat, [&] { GateEnvelope env; env.startCell = cell; env.lengthCells = 1; pat->addEnvelope(env); });
             markPathsDirty();
             repaint();

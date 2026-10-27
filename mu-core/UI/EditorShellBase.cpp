@@ -278,7 +278,7 @@ void EditorShellBase::showSupportPrompt(bool userRequested)
     dlg->width(400)
         .title("Support " + productDisplayName)
         .message(productDisplayName + " is free, with every feature. If it's useful to you, pay what you "
-                 "like (suggested \xC2\xA3" "20, \xC2\xA3" "0 is fine) and you'll get a licence key that "
+                 "like (suggested \xC2\xA3" + juce::String(processorRef.getSuggestedPrice()) + ", \xC2\xA3" "0 is fine) and you'll get a licence key that "
                  "stops this reminder. Your support helps me keep building these.")
         .icon(mu_ui::ModalDialog::Icon::Info);
     dlg->button("Maybe later", maybeLater).button("Enter licence key", enterKey)

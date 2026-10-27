@@ -107,9 +107,9 @@ inline ModDestProvider makeModDestProvider()
     ModDestProvider p;
     p.unitsPerDirection = [](const std::string&) { return 0; };   // no stepped-snap graphic for MVP
 
-    p.populate = [](DropdownSelect& dd, int /*driveChar*/, bool /*steppedMode*/)
+    p.populate = [](DropdownSelect& dd, int driveChar, bool /*steppedMode*/)
     {
-        mu_mod::populateDropdown(dd, kModDestTable);   // the shared builder
+        mu_mod::populateDropdown(dd, kModDestTable, { driveChar });   // the shared builder; driveChar = active insert effect
     };
 
     wireTableModDestResolve(p,

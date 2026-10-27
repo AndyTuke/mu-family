@@ -59,6 +59,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     };
     trackContent.onRowClicked = [this](int row) { showTrack(row); };
     trackContent.onEngineChanged = [this] { engineChanged(); };
+    trackContent.onInsertAlgorithmChanged = [this](int algo) { layerPanel.getModulatorPanel().setInsertAlgorithm(algo); };
 
     setMainArea(&sidebar, &layerPanel);
     setMixerOverlay(&mixerOverlay);

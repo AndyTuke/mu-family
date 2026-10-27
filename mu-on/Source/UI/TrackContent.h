@@ -59,6 +59,8 @@ public:
     // The shown track's engine changed (the user picked one, or it changed underneath): the editor
     // refreshes everything that depends on it (sidebar names, modulation destinations).
     std::function<void()> onEngineChanged;
+    // The shown track's insert effect changed: the editor relabels the modulators' insert destinations.
+    std::function<void(int)> onInsertAlgorithmChanged;
 
     void paint(juce::Graphics&) override;
     void paintOverChildren(juce::Graphics&) override;

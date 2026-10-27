@@ -4,7 +4,7 @@ Product-specific guidance for working in `mu-toni/`. Read alongside the family-w
 
 ## Project overview
 
-**μ-Toni** is a JUCE/C++ **generative arpeggiator mono-synth** by Transwarp Development Project, and the family's first **freeware** product. Each voice is an independent monophonic arp: a note pool is derived from a **Scale × Chord × inversion × octave-span** (with optional diatonic snap), then scanned by a deterministic **skewed-triangle walk** (Direction −100 = down-arp, +100 = up-arp, 0 = up-down; the shorter sweep skips notes evenly to keep Rate timing uniform). The same parameters always produce the same sequence — the note is a pure function of the live parameter set, which is what makes every arp control a modulation destination.
+**μ-Toni** is a JUCE/C++ **generative arpeggiator mono-synth** by Transwarp Development Project, and a pay-what-you-want product. Each voice is an independent monophonic arp: a note pool is derived from a **Scale × Chord × inversion × octave-span** (with optional diatonic snap), then scanned by a deterministic **skewed-triangle walk** (Direction −100 = down-arp, +100 = up-arp, 0 = up-down; the shorter sweep skips notes evenly to keep Rate timing uniform). The same parameters always produce the same sequence — the note is a pure function of the live parameter set, which is what makes every arp control a modulation destination.
 
 The note drives a **note-triggered voice** ([Source/Audio/ToniVoice.h](Source/Audio/ToniVoice.h)): 2 oscillators + noise → mu-core `MultiModeFilter` → Amp / Filter / Pitch `juce::ADSR`, with portamento and legato, then the shared per-voice `InsertProcessor` post-VCA. Builds Standalone + VST3 + CLAP in the root build.
 
@@ -22,13 +22,13 @@ The editor inherits `mu-core/UI/EditorShellBase.h`, so TransportBar, StatusBar, 
 - **MIDI note input** — root note selectable by played note (latest note-on wins, held-note fallback stack); Loop vs MIDI-triggered run mode. μ-Toni is the first family member to consume played notes.
 - **mu-link** — standalone bridge via the shared `MuLinkBridge.h` one-liner in [Source/Plugin/StandaloneApp.cpp](Source/Plugin/StandaloneApp.cpp), identity "mu-Toni"; arp clock slaves to the master clock when attached.
 - **Standalone quit prompt** via the shared `mu_ui::confirmQuitAsync`.
-- **1–8 layers** — a fresh instance has one; the sidebar Add button, header delete (with confirm) and drag-reorder go through the shared `ProcessorBase::addLayer` / `removeLayer` / `swapLayers` and `mu_ui::LayerEditController`. All eight layers' parameters (`a{N}_`, `ch{N}_`), `Arp`s and mixer strips exist from construction (`keepSpareLayers`); `processBlock` try-locks `layersLock` and renders the live layers only. The count and palette colours save as `numVoices` / `voiceColours` (not APVTS parameters); a state without them (saved when the count was fixed at four) loads as four layers. No cap (freeware).
+- **1–8 layers** — a fresh instance has one; the sidebar Add button, header delete (with confirm) and drag-reorder go through the shared `ProcessorBase::addLayer` / `removeLayer` / `swapLayers` and `mu_ui::LayerEditController`. All eight layers' parameters (`a{N}_`, `ch{N}_`), `Arp`s and mixer strips exist from construction (`keepSpareLayers`); `processBlock` try-locks `layersLock` and renders the live layers only. The count and palette colours save as `numVoices` / `voiceColours` (not APVTS parameters); a state without them (saved when the count was fixed at four) loads as four layers. No cap.
 - **`mu-toni-tests`** — arp engine, oscillator, and global-FX APVTS layout coverage; builds every default build.
 - **Presets** — dirs + extensions wired: full = `.muToni`, per-slot = `.muArp`.
 
-### Freeware — the License subsystem is unused by design
+### Licensing — pay what you want
 
-μ-Toni ships with **no purchase, licence key, activation, or demo mode**. The mu-core License subsystem (`LicenseManager`, `ActivationStore`, `OnlineActivation`, `LemonSqueezyClient`) and the shell's `ActivationOverlay` are deliberately not wired, `Source/License/` holds only `.gitkeep` (no `LicenseKey.h`, unlike mu-clid / mu-tant), and the About panel shows no licence status. This is a settled design decision, **not** an unfinished task — don't "fix" it by adding licence gating.
+μ-Toni is pay-what-you-want like mu-Clid, mu-Tant, mu-On and mu-Tronic: nothing is limited, and a licence key (issued even for £0) only removes the Support prompt. It is wired the family way: `Source/License/LicenseKey.h` (product id, `mutoni.lic`, embedded public key, checkout URL), one `initLicensing` call in the processor, and the shared Support prompt / activation overlay from the shell. (Until 2026-10-15 it was freeware with no licence code; superseded when the pricing model was set.)
 
 ### Current placeholders / not yet wired
 
@@ -47,7 +47,7 @@ The editor inherits `mu-core/UI/EditorShellBase.h`, so TransportBar, StatusBar, 
 
 | Doc | Covers |
 |---|---|
-| [docs/mu-toni/design.md](../docs/mu-toni/design.md) | Product overview, shared-engine inheritance map, file formats, freeware/distribution |
+| [docs/mu-toni/design.md](../docs/mu-toni/design.md) | Product overview, shared-engine inheritance map, file formats, licensing/distribution |
 | [docs/mu-toni/design-sequencer.md](../docs/mu-toni/design-sequencer.md) | The arp model — scale/chord pool, skewed-triangle scan, gate/legato/portamento, MIDI control |
 | [docs/mu-toni/design-buildplan.md](../docs/mu-toni/design-buildplan.md) | The staged T1–T5 MVP build plan |
 

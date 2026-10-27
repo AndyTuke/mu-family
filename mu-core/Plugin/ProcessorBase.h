@@ -582,6 +582,8 @@ public:
     }
     // Where the prompt's "Pay what you like" button opens (empty when the product supplies none).
     juce::String getCheckoutUrl() const { return checkoutUrl; }
+    // The suggested amount (GBP) the prompt quotes.
+    int getSuggestedPrice() const noexcept { return suggestedPrice; }
     // "Don't show this again": kept in the app settings file, not APVTS, so it is never in a preset.
     bool isSupportPromptHidden() const { return mu_core::support_prompt::isHidden(appSettings.get()); }
     void setSupportPromptHidden(bool hidden) { mu_core::support_prompt::setHidden(appSettings.get(), hidden); }
@@ -1201,6 +1203,7 @@ protected:
         const uint8_t* publicKey;
         const char*    activationFile;
         const char*    checkoutUrl = nullptr;   // pay-what-you-want page the support prompt opens
+        int            suggestedPrice = 20;     // the amount (GBP) the prompt suggests; matches the store
     };
     // Joins the online-activation worker (bounded by the network timeout) and drops its pending reply.
     void stopActivationWorker() noexcept;
@@ -1217,6 +1220,7 @@ protected:
     bool licensingEnabled = false;
     bool offlineLicensed  = false;
     juce::String checkoutUrl;
+    int suggestedPrice = 20;
 
     // ─── Mixer / global-FX parameters ────────────────────────────────────────
     // The channel-strip (ch{N}_*) and global FX ids synced to the engine via syncGlobalFxParam.

@@ -44,6 +44,9 @@ public:
 
     void setLayer(int idx) override;
 
+    // The shown layer's insert effect changed: the editor relabels the modulators' insert destinations.
+    std::function<void(int)> onInsertAlgorithmChanged;
+
     // Let go of every knob's modulation binding and the insert's gain-reduction source; called before a layer is
     // removed or moved, because the arcs hold the layer's matrix and the meter holds a pointer into its insert.
     // setLayer rebinds both.

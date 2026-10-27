@@ -1,7 +1,7 @@
 name: CI build
 
 # Cross-platform safety net: builds the mu-family plugins (VST3/CLAP/Standalone) + the unit
-# tests on Linux and Windows, and runs the test suites + the static checks.
+# tests on Windows, and runs the test suites + the static checks.
 # Catches portability regressions early. No signing / installers / tester deploy here — those
 # stay on the local Windows release flow. mu-link (Win32 shared-memory bus) builds on Windows
 # only until the POSIX backend lands; off-Windows the standalone bridge is a no-op stub.
@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [windows-latest]
 
     env:
       JUCE_PATH: ${{ github.workspace }}/JUCE
@@ -65,16 +65,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-
-      - name: Install Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libasound2-dev libjack-jackd2-dev \
-            libx11-dev libxext-dev libxinerama-dev libxrandr-dev libxcursor-dev \
-            libxcomposite-dev libxrender-dev libxi-dev \
-            libfreetype6-dev libfontconfig1-dev libgl1-mesa-dev
 
       - name: Configure
         run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DMUFAMILY_DEPLOY_TESTERS=OFF
