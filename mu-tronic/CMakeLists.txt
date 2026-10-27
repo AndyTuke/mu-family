@@ -1,5 +1,5 @@
 # mu-tronic — μ-family performance unit: 16 layer slots, each holding a layer taken from the other products
-# (Standalone only, freeware). docs/mu-tronic/design.md.
+# (Standalone only, pay what you want). docs/mu-tronic/design.md.
 #
 # The target combines the product's shell (the 16-slot processor, the empty-slot chooser) with the shared
 # platform (ProcessorBase + MixerEngine + FXChain + the shared editor shell / sidebar / mixer). Shared
@@ -39,6 +39,11 @@ target_sources(mu-tronic
         Source/Persistence/ProductImport.cpp
         Source/UI/EmptySlotChooser.cpp
         Source/UI/TronicSettingsOverlay.cpp
+        # Offline-license verifier + online activation live in mu-core (shared); compiled here + monocypher.c.
+        "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
+        "${CMAKE_SOURCE_DIR}/mu-core/License/LemonSqueezyClient.cpp"
+        "${CMAKE_SOURCE_DIR}/mu-core/License/OnlineActivation.cpp"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
         ${MU_TONI_LAYER_UI_SOURCES}   # the Arp type's UI content (mu-toni-layer)
         ${MU_ON_LAYER_UI_SOURCES}     # the Track types' UI content: TrackContent, StepRows, TrackStepRow (mu-on-layer)
         ${MU_TANT_LAYER_UI_SOURCES}   # the Pattern type's UI content: PatternContent, GatingDesigner (mu-tant-layer)
@@ -51,11 +56,19 @@ target_include_directories(mu-tronic
     SYSTEM PRIVATE
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher"   # LicenseManager
 )
+
+# monocypher is vendored third-party crypto; silence its benign MSVC C4244 at the build level.
+if(MSVC)
+    set_source_files_properties(
+        "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
+        PROPERTIES COMPILE_OPTIONS "/wd4244")
+endif()
 
 # 16 layer slots and 3 group buses with 2 inserts each: MU_MAX_LAYERS / MU_MAX_BUSES / MU_BUS_INSERTS are
 # per-target capacities (mu-core is an INTERFACE library, so each binary compiles its own copy); the four
-# other products keep 8 layers and no buses. Freeware: no licence code, no monocypher.
+# other products keep 8 layers and no buses.
 target_compile_definitions(mu-tronic
     PUBLIC
         MU_MAX_LAYERS=16
@@ -142,6 +155,10 @@ target_sources(mu-tronic-tests PRIVATE
     Source/Persistence/PatternLayerType.cpp
     Source/Persistence/RhythmLayerType.cpp
     Source/Persistence/ProductImport.cpp
+    "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/License/LemonSqueezyClient.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/License/OnlineActivation.cpp"
+    "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
     # The mu-core .cpps behind ProcessorBase (the console target can't link mu-core directly).
     ${MU_CORE_PROCESSOR_TEST_SOURCES}
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/Wavetable/WavetableBank.cpp"   # the Arp type's oscillator tables
@@ -159,6 +176,7 @@ target_include_directories(mu-tronic-tests PRIVATE
     SYSTEM
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"   # ReverbSlot
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher"   # LicenseManager
 )
 
 target_link_libraries(mu-tronic-tests PRIVATE
