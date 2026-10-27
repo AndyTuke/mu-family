@@ -38,6 +38,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     layerPanel.setContent(&arpContent);
     layerPanel.setDestProvider(&modDestProvider);
     layerPanel.onLayerChanged = [this](int layer) { arpContent.setLayer(layer); };
+    arpContent.onInsertAlgorithmChanged = [this](int algo) { layerPanel.getModulatorPanel().setInsertAlgorithm(algo); };
 
     // Content-band knob hovers/changes → shared StatusBar.
     arpContent.onStatusUpdate = [this](const juce::String& name, const juce::String& val)

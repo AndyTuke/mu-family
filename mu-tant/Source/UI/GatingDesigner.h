@@ -181,7 +181,8 @@ private:
 
     template <typename Fn> void withLock(GatePattern* pat, Fn&& fn);
 
-    static constexpr float kHandleRadius = 6.0f;
+    static constexpr float kHandleRadius    = 6.0f;    // drawn size
+    static constexpr float kHandleHitRadius = 10.0f;   // grab area, larger than the drawn handle so a near miss still grabs
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GatingDesigner)
 };

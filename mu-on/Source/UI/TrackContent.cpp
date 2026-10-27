@@ -271,6 +271,7 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     soloBtn.setClickingTogglesState(true);
     addAndMakeVisible(soloBtn);
     insertSub.onStatusUpdate = [this](const juce::String& name, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
+    insertSub.onInsertAlgorithmChanged = [this](int algo) { if (onInsertAlgorithmChanged) onInsertAlgorithmChanged(algo); };
     addAndMakeVisible(insertSub);
 
     // The Rumble track's drawable bar-volume envelope, edited under the track's own lock.
