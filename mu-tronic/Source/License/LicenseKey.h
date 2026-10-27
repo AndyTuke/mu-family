@@ -6,13 +6,12 @@
 // PUBLIC key only — the private signing key never lives in the repo.
 namespace mu_tronic
 {
-    // Must match the `product=` field the signer writes + the Lemon Squeezy product.
+    // Must match the `product=` field the signer writes + the Lemon Squeezy product
+    // (LS product id 1478475).
     inline constexpr const char* kLicenseProductId = "mu-Tronic";
 
     // Lemon Squeezy pay-what-you-want page the support prompt opens (the same link the website uses).
-    // Placeholder: the store front until the mu-Tronic product exists; replace with its checkout link
-    // (and match the website's buy button).
-    inline constexpr const char* kCheckoutUrl = "https://transwarp.lemonsqueezy.com";
+    inline constexpr const char* kCheckoutUrl = "https://transwarp.lemonsqueezy.com/checkout/buy/44576a77-600a-4821-825e-3afaff5c886c";
 
     // License file the user drops into the content dir (getContentDir()).
     inline constexpr const char* kLicenseFilename  = "mutronic.lic";
