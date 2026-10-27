@@ -13,6 +13,9 @@ namespace mu_tronic
     // Lemon Squeezy pay-what-you-want page the support prompt opens (the same link the website uses).
     inline constexpr const char* kCheckoutUrl = "https://transwarp.lemonsqueezy.com/checkout/buy/44576a77-600a-4821-825e-3afaff5c886c";
 
+    // Suggested amount (GBP) the support prompt quotes; matches the Lemon Squeezy product.
+    inline constexpr int kSuggestedPrice = 25;
+
     // License file the user drops into the content dir (getContentDir()).
     inline constexpr const char* kLicenseFilename  = "mutronic.lic";
 
