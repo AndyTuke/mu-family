@@ -173,8 +173,16 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
 
         if (beyond)   // a step past the row's length is not part of the pattern: shaded out
         {
-            g.setColour(MuLookAndFeel::colour(MuLookAndFeel::panelBackground).darker(0.6f).withAlpha(0.92f));
+            // The lenses are already near black, so darkening is invisible: a flat pale veil with diagonal hatching reads as "not there".
+            g.setColour(labelColour.withAlpha(0.16f));
             g.fillRoundedRectangle(cell, 3.0f);
+            const juce::Graphics::ScopedSaveState hatch(g);
+            juce::Path clip;
+            clip.addRoundedRectangle(cell, 3.0f);
+            g.reduceClipRegion(clip);
+            g.setColour(labelColour.withAlpha(0.28f));
+            for (float d = -cell.getHeight(); d < cell.getWidth(); d += 6.0f)
+                g.drawLine(cell.getX() + d, cell.getBottom(), cell.getX() + d + cell.getHeight(), cell.getY(), 1.0f);
         }
         else if ((opts.dimMask >> pos) & 1u)   // a step this pass will skip (its loop ratio or its probability): dimmed
         {
