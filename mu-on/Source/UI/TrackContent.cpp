@@ -685,10 +685,14 @@ void TrackContent::resized()
     // A locked Rumble has no step row, so its envelope takes the whole panel.
     const bool noSteps = locked && rumble;
     // LAYER: three knob columns wide (Rumble: the envelope editor, a fixed wider box); STEP: one dropdown wide.
-    const int layerW = noSteps ? juce::jmax(0, w - 2 * padX) : (rumble ? s(MuLookAndFeel::kGrooveBoxW) : 3 * s(LF::kKnobSize2W) + 2 * gap + 2 * clear);
+    // The Steps box starts at the same x on every engine (the pane must not jump when the track changes): the left side
+    // always spans the widest Groove box plus the widest Step box (a Chord's two columns), and a narrower engine fills it.
+    const int grooveWidest = juce::jmax(s(MuLookAndFeel::kGrooveBoxW), 3 * s(LF::kKnobSize2W) + 2 * gap + 2 * clear);
+    const int stepWidest   = (s(MuLookAndFeel::kDropdownW) + 2 * clear) * 2;
+    const int layerW = noSteps ? juce::jmax(0, w - 2 * padX) : (rumble ? grooveWidest + s(LF::kVoiceDivW) + stepWidest : grooveWidest);
     grooveBoxR = { padX, boxesY, layerW, boxesH };
     int rightEdge = grooveBoxR.getRight();
-    stepBoxR   = (noSteps || rumble) ? juce::Rectangle<int>() : juce::Rectangle<int>(rightEdge + s(LF::kVoiceDivW), boxesY, (s(MuLookAndFeel::kDropdownW) + 2 * clear) * (shownEngine == EngineType::Chord ? 2 : 1), boxesH);   // a Chord step has a second column
+    stepBoxR   = (noSteps || rumble) ? juce::Rectangle<int>() : juce::Rectangle<int>(rightEdge + s(LF::kVoiceDivW), boxesY, stepWidest, boxesH);
     if (! stepBoxR.isEmpty()) rightEdge = stepBoxR.getRight();
     const int stepsX = rightEdge + s(LF::kVoiceDivW);
     stepsBoxR  = noSteps ? juce::Rectangle<int>() : juce::Rectangle<int>(stepsX, boxesY, juce::jmax(0, w - padX - stepsX), boxesH);
