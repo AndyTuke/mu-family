@@ -687,14 +687,16 @@ void TrackContent::resized()
     // LAYER: three knob columns wide (Rumble: the envelope editor, a fixed wider box); STEP: one dropdown wide.
     // The Steps box starts at the same x on every engine (the pane must not jump when the track changes): the left side
     // always spans the widest Groove box plus the widest Step box (a Chord's two columns), and a narrower engine fills it.
-    const int grooveWidest = juce::jmax(s(MuLookAndFeel::kGrooveBoxW), 3 * s(LF::kKnobSize2W) + 2 * gap + 2 * clear);
-    const int stepWidest   = (s(MuLookAndFeel::kDropdownW) + 2 * clear) * 2;
-    const int layerW = noSteps ? juce::jmax(0, w - 2 * padX) : (rumble ? grooveWidest + s(LF::kVoiceDivW) + stepWidest : grooveWidest);
+    // Each box is only as wide as the widest engine needs: the Layer box three knobs, the Step box a Chord's list column
+    // beside its knob column; a Rumble's envelope box spans both (or its own minimum, if that is wider).
+    const int grooveWidest = 3 * s(LF::kKnobSize2W) + 2 * gap + 2 * clear;
+    const int stepWidest   = 2 * clear + s(MuLookAndFeel::kDropdownW) + gap + s(LF::kKnobSize2W);
+    const int rumbleWidest = juce::jmax(grooveWidest + s(LF::kVoiceDivW) + stepWidest, 2 * clear + s(NoteLengthControl::kWidth));
+    const int layerW = noSteps ? juce::jmax(0, w - 2 * padX) : (rumble ? rumbleWidest : grooveWidest);
     grooveBoxR = { padX, boxesY, layerW, boxesH };
     int rightEdge = grooveBoxR.getRight();
     stepBoxR   = (noSteps || rumble) ? juce::Rectangle<int>() : juce::Rectangle<int>(rightEdge + s(LF::kVoiceDivW), boxesY, stepWidest, boxesH);
-    if (! stepBoxR.isEmpty()) rightEdge = stepBoxR.getRight();
-    const int stepsX = rightEdge + s(LF::kVoiceDivW);
+    if (! stepBoxR.isEmpty()) rightEdge = stepBoxR.getRight();    const int stepsX = rightEdge + s(LF::kVoiceDivW);
     stepsBoxR  = noSteps ? juce::Rectangle<int>() : juce::Rectangle<int>(stepsX, boxesY, juce::jmax(0, w - padX - stepsX), boxesH);
     const auto stepsInner = stepsBoxR.reduced(clear, s(LF::kSpaceS));
     rows.setBounds(stepsInner);
@@ -750,8 +752,8 @@ void TrackContent::layoutStepPanel()
     // A Chord step has two columns: the Root, Octave, Chord and Play lists, then the Probability, Inversion and Spread knobs.
     if (shownEngine == EngineType::Chord)
     {
-        auto left = in.withTrimmedRight(in.getWidth() / 2 + gap / 2);
-        const int knobX = in.getX() + in.getWidth() / 2 + gap / 2 + (in.getWidth() / 2 - gap / 2 - s(LF::kKnobSize2W)) / 2;
+        auto left = in.withWidth(s(LF::kDropdownW));
+        const int knobX = left.getRight() + gap;
         int y = in.getY();
         placeDropdown(noteCaption, noteSelect, left, y);
         placeDropdown(octaveCaption, octaveSelect, left, y);

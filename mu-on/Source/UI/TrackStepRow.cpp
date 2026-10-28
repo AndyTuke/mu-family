@@ -171,7 +171,12 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
                                             juce::Justification::bottomLeft, labelColour, false);
         }
 
-        if (beyond || ((opts.dimMask >> pos) & 1u))   // a step past the row's length, or one this pass will skip (its loop ratio or its probability): dimmed
+        if (beyond)   // a step past the row's length is not part of the pattern: shaded out
+        {
+            g.setColour(MuLookAndFeel::colour(MuLookAndFeel::panelBackground).darker(0.6f).withAlpha(0.92f));
+            g.fillRoundedRectangle(cell, 3.0f);
+        }
+        else if ((opts.dimMask >> pos) & 1u)   // a step this pass will skip (its loop ratio or its probability): dimmed
         {
             g.setColour(juce::Colours::black.withAlpha(0.6f));
             g.fillRoundedRectangle(cell, 3.0f);
