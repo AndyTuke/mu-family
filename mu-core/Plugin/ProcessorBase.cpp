@@ -421,6 +421,9 @@ void ProcessorBase::onFxParamChanged(const juce::String& id, float v)
     int stripIdx = -1;
     if (const char* suffix = channelStripSuffix(id, stripIdx); suffix != nullptr && std::strcmp(suffix, "mute") == 0)
         muteChanged.store(true, std::memory_order_relaxed);
+    // bus{B}_mute too: the bus lamps follow a mute made anywhere.
+    else if (id.startsWith("bus") && id.endsWith("_mute"))
+        muteChanged.store(true, std::memory_order_relaxed);
 }
 
 namespace

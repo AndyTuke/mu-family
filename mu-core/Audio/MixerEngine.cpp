@@ -5,6 +5,7 @@
 
 MixerEngine::MixerEngine()
 {
+    for (auto& b : channelLastBus)    b = kBusUnset;
     for (auto& p : channelPeaks)       p.store(0.0f);
     for (auto& p : returnPeaks)        p.store(0.0f);
     masterPeak.store(0.0f);
@@ -33,6 +34,10 @@ void MixerEngine::prepare(double sr, int blockSize)
     for (auto& e : scEnv)    e = 0.0f;
     for (auto& e : scRetEnv) e = 0.0f;
     for (auto& e : scBusEnv) e = 0.0f;
+    // Gains and bus routing start fresh: the first block after a prepare applies its targets without a ramp.
+    for (auto& g : channelRamp) g = GainRamp{};
+    for (auto& g : busRamp)     g = GainRamp{};
+    for (auto& b : channelLastBus) b = kBusUnset;
     for (auto& buf : channelBufs)
         buf.setSize(2, blockSize, false, true, true);
     effectSendBuf.setSize(2, blockSize, false, true, true);
@@ -100,6 +105,17 @@ void MixerEngine::applyPanGain(juce::AudioBuffer<float>& buf,
     const float gR = level * (1.0f + juce::jmin(0.0f,  pan));
     if (buf.getNumChannels() > 0) buf.applyGain(0, 0, numSamples, gL);
     if (buf.getNumChannels() > 1) buf.applyGain(1, 0, numSamples, gR);
+}
+
+void MixerEngine::applyPanGainRamped(juce::AudioBuffer<float>& buf, float level, float pan, int numSamples, GainRamp& ramp)
+{
+    const float tL = level * (1.0f - juce::jmax(0.0f, pan));
+    const float tR = level * (1.0f + juce::jmin(0.0f, pan));
+    if (! ramp.primed) { ramp.l = tL; ramp.r = tR; ramp.primed = true; }
+    if (buf.getNumChannels() > 0) buf.applyGainRamp(0, 0, numSamples, ramp.l, tL);
+    if (buf.getNumChannels() > 1) buf.applyGainRamp(1, 0, numSamples, ramp.r, tR);
+    ramp.l = tL;
+    ramp.r = tR;
 }
 
 namespace
@@ -320,17 +336,24 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
         // hardMute: rhythm is fully silent — no bus or master output, no FX sends.
         // skipMaster: dry passthrough to master suppressed (because a return is soloed),
         // but FX sends still run so the soloed return has source material to render.
+        // A strip that just went silent (muted, or off the soloed path) still renders this block with its gain
+        // ramping to zero, so the cut is not a click; from then on it is skipped.
+        auto& ramp = channelRamp[r];
+        const int prevBus = channelLastBus[r] == kBusUnset ? chBus[r] : channelLastBus[r];
+        channelLastBus[r] = chBus[r];
         const bool hardMute   = ! chAudible[r];
-        const bool skipMaster = hardMute || anyReturnSolo;
+        const bool fadingOut  = hardMute && ramp.primed && (ramp.l > 0.0f || ramp.r > 0.0f);
+        const bool skipMaster = (hardMute && ! fadingOut) || anyReturnSolo;
 
-        if (hardMute)
+        if (hardMute && ! fadingOut)
         {
+            if (! ramp.primed) { ramp.l = ramp.r = 0.0f; ramp.primed = true; }
             clearPeak(channelPeaks[r], channelPeaksL[r], channelPeaksR[r]);
             continue;
         }
 
-        applyPanGain(buf, ch.level.load(std::memory_order_relaxed),
-                          ChannelState::effective(ch.pan, ch.panMod), numSamples);
+        applyPanGainRamped(buf, hardMute ? 0.0f : ch.level.load(std::memory_order_relaxed),
+                                ChannelState::effective(ch.pan, ch.panMod), numSamples, ramp);
         storePeak(buf, numSamples, channelPeaks[r], channelPeaksL[r], channelPeaksR[r]);
 
         const int bus = chOut[r];  // 0 = master, 1..8 = direct out (the block's snapshot)
@@ -339,15 +362,16 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
             // Dry path — also feeds FX sends. A bus-routed channel always sums into its bus (the bus decides
             // what reaches the master, and its own sends need the signal even while a return is soloed);
             // a master-routed one is added to the output unless skipMaster suppresses it.
-            if (chBus[r] >= 0)
+            // A bus reassigned since the last block crossfades from the old destination to the new one.
+            auto routeTo = [&](int dest, float g0, float g1)
             {
-                auto& busBuf = busBufs[(size_t) chBus[r]];
+                if (dest < 0 && skipMaster) return;
+                auto& dst = dest >= 0 ? busBufs[(size_t) dest] : output;
                 for (int c = 0; c < numOutCh; ++c)
-                    busBuf.addFrom(c, 0, buf, c, 0, numSamples);
-            }
-            else if (!skipMaster)
-                for (int c = 0; c < numOutCh; ++c)
-                    output.addFrom(c, 0, buf, c, 0, numSamples);
+                    dst.addFromWithRamp(c, 0, buf.getReadPointer(c), numSamples, g0, g1);
+            };
+            if (prevBus != chBus[r]) { routeTo(prevBus, 1.0f, 0.0f); routeTo(chBus[r], 0.0f, 1.0f); }
+            else                     routeTo(chBus[r], 1.0f, 1.0f);
 
             const float sEff = ChannelState::effective(ch.sendEffect, ch.sendEffectMod);
             const float sDly = ChannelState::effective(ch.sendDelay,  ch.sendDelayMod);
@@ -435,14 +459,18 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
 
         // A muted bus (or one off the soloed path) is cut from the output and its sends; the channels'
         // sends were taken in Phase 3 and are not touched.
-        if (! busAudible[b])
+        // A bus that just went silent ramps to zero over this block first, as a channel does.
+        auto& busGain = busRamp[(size_t) b];
+        const bool busFading = ! busAudible[b] && busGain.primed && (busGain.l > 0.0f || busGain.r > 0.0f);
+        if (! busAudible[b] && ! busFading)
         {
+            if (! busGain.primed) { busGain.l = busGain.r = 0.0f; busGain.primed = true; }
             clearPeak(busPeaks[(size_t) b], busPeaksL[(size_t) b], busPeaksR[(size_t) b]);
             continue;
         }
 
-        applyPanGain(buf, bus.level.load(std::memory_order_relaxed),
-                          ChannelState::effective(bus.pan, bus.panMod), numSamples);
+        applyPanGainRamped(buf, busAudible[b] ? bus.level.load(std::memory_order_relaxed) : 0.0f,
+                                ChannelState::effective(bus.pan, bus.panMod), numSamples, busGain);
         storePeak(buf, numSamples, busPeaks[(size_t) b], busPeaksL[(size_t) b], busPeaksR[(size_t) b]);
 
         if (! anyReturnSolo)

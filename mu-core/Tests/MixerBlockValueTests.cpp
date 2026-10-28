@@ -236,6 +236,7 @@ struct MixerBlockValueTests : juce::UnitTest
             expectChannel(r.out, 0, 64, [&](int) { return trimmed(0.5f) * gainL(1.0f, -0.5f); }, "modulated L");
             expectChannel(r.out, 1, 64, [&](int) { return trimmed(0.5f) * gainR(1.0f, -0.5f); }, "modulated R");
             r.mixer.channels[0].panMod.store(MixerEngine::ChannelState::kNoMod);
+            r.run(1, 64);   // the pan ramps across this block, so the next one is steady
             r.run(1, 64);
             expectChannel(r.out, 0, 64, [&](int) { return trimmed(0.5f) * gainL(1.0f, 1.0f); }, "knob L");
             expectChannel(r.out, 1, 64, [&](int) { return trimmed(0.5f) * gainR(1.0f, 1.0f); }, "knob R");
@@ -770,6 +771,7 @@ struct MixerBlockValueTests : juce::UnitTest
             expectEquals(r.mixer.sidechainGR[0].load(), 0.0f, "GR meter");
             r.mixer.channels[1].solo.store(true);       // now the source is soloed too
             r.mixer.channels[0].solo.store(true);
+            r.run(3, 64);   // the newly audible source's gain ramps up across this block
             r.mixer.setSidechainEnv(0, 0.0f);
             r.run(3, 64);
             expectChannel(r.out, 0, 64, [&](int) { return trimmed(0.5f) * (1.0f - duckDepth) + trimmed(0.5f); }, "soloed source ducks");

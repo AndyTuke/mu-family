@@ -152,6 +152,7 @@ struct ChannelStripOptions
     int   scSrc       = 0;        // sidechain source default: 0 = off, 1..kMaxLayers = channels, kMaxLayers + 1 = external
     float scAmt       = 0.0f;     // sidechain amount default
     float scRel       = 0.0f;     // sidechain release default (ms): none, as the attack
+    bool  outBus      = true;     // declare "outBus" (DAW direct out); a group bus goes to the master, so it has none
     bool  busAssign   = true;     // declare "bus" (the group bus this strip feeds); only where buses exist, never on a bus itself
     bool  midiIn      = false;    // declare "midiIn" (the MIDI channel this strip's layer hears: 0 Omni, 1-16); only where each strip has its own layer
 };
@@ -192,7 +193,8 @@ inline void addChannelStripParams(juce::AudioProcessorValueTreeState::ParameterL
     addF("scAmt",   "SC Amount",  0.0f,    1.0f, 0.001f, o.scAmt);
     addF("scAtk",   "SC Attack",  0.0f,  500.0f, 0.1f,   0.0f);
     addF("scRel",   "SC Release", 0.0f, 2000.0f, 1.0f,  o.scRel);
-    addI("outBus",  "Output Bus", 0, 8, 0);                     // 0 = master mix, 1..8 = direct out
+    if (o.outBus)
+        addI("outBus",  "Output Bus", 0, 8, 0);                 // 0 = master mix, 1..8 = direct out
     if constexpr (mu_limits::kMaxBuses > 0)
         if (o.busAssign)
             addI("bus", "Bus", 0, mu_limits::kMaxBuses, 0);         // 0 = master, 1..kMaxBuses = group bus
@@ -214,11 +216,12 @@ inline void addInsertParams(juce::AudioProcessorValueTreeState::ParameterLayout&
 }
 
 // The group buses' parameters: bus{B}_ with the channel strip's suffixes (a bus has the same fader, pan,
-// mute / solo, sends and sidechain; "outBus" is declared but unused), and bus{B}_i{I}_ per insert. Nothing is
+// mute / solo, sends and sidechain; no "outBus": a bus goes to the master), and bus{B}_i{I}_ per insert. Nothing is
 // declared where mu_limits::kMaxBuses is 0. Buses have no modulators.
 inline void addBusParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, ChannelStripOptions o = {})
 {
     o.busAssign = false;
+    o.outBus    = false;
     for (int b = 0; b < mu_limits::kMaxBuses; ++b)
     {
         const juce::String prefix = "bus" + juce::String(b) + "_";

@@ -219,6 +219,17 @@ public:
     InsertProcessor    masterInsert;
     InsertProcessor    masterInsert2;
 
+    // The gain a strip applied at the end of its last block, so a fader step, a pan move or a mute / unmute
+    // ramps across the next block instead of stepping (audio thread only). `primed` is false until the strip's
+    // first block, which starts at its target.
+    struct GainRamp { float l = 1.0f, r = 1.0f; bool primed = false; };
+    GainRamp channelRamp[MaxChannels];
+    GainRamp busRamp[kNumBuses > 0 ? kNumBuses : 1];
+    // The bus (-1 = master) each channel's dry signal went to last block; kBusUnset until its first block.
+    // A change crossfades old to new across the block.
+    static constexpr int kBusUnset = -2;
+    int channelLastBus[MaxChannels];
+
     // Peak levels written from the audio thread, read by the UI at 30 Hz.
     // The combined peak (larger of left and right) plus the left / right peaks behind the stereo VU
     // meters, all post-fader and post-pan.
@@ -316,6 +327,8 @@ public:
         swapI(a.outputBus,          b.outputBus);
         swapI(a.busAssign,          b.busAssign);
         std::swap(scEnv[i], scEnv[j]);   // the ducking follower belongs to the strip and moves with it
+        std::swap(channelRamp[i], channelRamp[j]);   // so does the gain it ended its last block on, and its bus routing
+        std::swap(channelLastBus[i], channelLastBus[j]);
         // The meters and the ducking read-out belong to the strip too, and so does a follower reset still waiting for
         // the audio thread (consumed at its next block start, so the bit is plain data while the audio thread is excluded).
         swapF(channelPeaks[i],  channelPeaks[j]);
@@ -442,4 +455,6 @@ private:
     static bool  hasSignal(const juce::AudioBuffer<float>& buf, int numSamples);
     static void  applyPanGain(juce::AudioBuffer<float>& buf,
                               float level, float pan, int numSamples);
+    // The same, ramping from the gain the strip ended its last block on (`ramp`) to this block's target.
+    static void  applyPanGainRamped(juce::AudioBuffer<float>& buf, float level, float pan, int numSamples, GainRamp& ramp);
 };
