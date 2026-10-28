@@ -5,7 +5,7 @@
 #include <type_traits>
 
 // The 909 step clock of one row: it fires sample-accurate triggers at each 16th-note step boundary of the
-// host/internal transport beat. 16 steps = one bar (each step = a 16th = 0.25 beat). Swing delays the odd
+// host/internal transport beat. 16 steps = one bar (each step = a 16th = 0.25 beat); a row may be longer (its numSteps, up to 64). Swing delays the odd
 // 16ths; accented cells fire at accentedVelocity(the row's Accent knob). A Track owns one and clocks its own row with the
 // beat it renders at. Pure logic, so it is unit-tested headless.
 namespace mu_on
@@ -33,9 +33,15 @@ public:
         return kNormalVelocity + accentKnob * (1.0f - kNormalVelocity);
     }
 
-    // The pass (one run through the 16 steps) a beat falls in, and whether step `step`'s loop ratio plays in it
+    // A row's length in steps: its numSteps, or 16 for anything that is not a StepRow.
+    template <class Row>
+    static auto lengthOf(const Row& r, int) noexcept -> decltype(r.numSteps(), int()) { return r.numSteps(); }
+    template <class Row>
+    static int lengthOf(const Row&, long) noexcept { return StepRow::kNumSteps; }
+
+    // The pass (one run through a row's `length` steps) a beat falls in, and whether step `step`'s loop ratio plays in it
     // ("N:M" plays the Nth of every M passes).
-    static long long passOfBeat(double beat) noexcept { return (long long) std::floor(beat / (kStepBeats * StepRow::kNumSteps)); }
+    static long long passOfBeat(double beat, int length = StepRow::kNumSteps) noexcept { return (long long) std::floor(beat / (kStepBeats * length)); }
     template <class Row>
     static bool loopPlays(const Row& row, int step, long long pass) noexcept
     {
@@ -86,17 +92,18 @@ public:
         // Fire each step whose (swing-adjusted) beat lands within [beatStart, beatEnd). The start edge has a 1e-9
         // beat tolerance so a host reporting a block start an ulp past the previous block's end does not skip the step.
         constexpr double kBeatEpsilon = 1e-9;
-        for (int guard = 0; guard < StepRow::kNumSteps * 2; ++guard)
+        const int length = lengthOf(row, 0);
+        for (int guard = 0; guard < StepRow::kMaxSteps * 2; ++guard)
         {
-            const double t = stepBeat(nextGlobalStep, swing);
+            const double t = stepBeat(nextGlobalStep, swing, length);
             if (t >= beatEnd) break;
             if (t >= beatStart - kBeatEpsilon)
             {
-                const int local = localStep(nextGlobalStep);
+                const int local = localStep(nextGlobalStep, length);
                 const int sampleOffset = juce::jlimit(0, numSamples - 1,
                                                       (int) std::round((t - beatStart) / beatsPerSample));
-                const long long pass = nextGlobalStep >= 0 ? nextGlobalStep / StepRow::kNumSteps
-                                                           : -((-nextGlobalStep + StepRow::kNumSteps - 1) / StepRow::kNumSteps);
+                const long long pass = nextGlobalStep >= 0 ? nextGlobalStep / length
+                                                           : -((-nextGlobalStep + length - 1) / length);
                 const bool passPlays = loopPlays(row, local, pass);
                 if (passPlays && row.isOn(local))
                 {
@@ -104,7 +111,7 @@ public:
                     velocity = ghostAdjusted(row, local, velocity, 0);   // a ghost step: a share of the normal note
                     // A tied run: how long the note is held (to the end of the last step tied to this one), for a Bass's release.
                     int runSteps = 1;
-                    while (local + runSteps < StepRow::kNumSteps && row.tiedFrom(local + runSteps)) ++runSteps;
+                    while (local + runSteps < length && row.tiedFrom(local + runSteps)) ++runSteps;
                     if constexpr (std::is_invocable_v<Fire&, const StepEvent&>)
                         fire(StepEvent { velocity, sampleOffset, row.isOpen(local), (float) row.stepProb(local) * 0.01f, row.tiedFrom(local),
                                          (int) (runSteps * kStepBeats / beatsPerSample), (float) row.stepSemitones(local), local, pass, row.stepChordHit(local) });
@@ -117,22 +124,22 @@ public:
         }
     }
 
-    // Local step (0..15) the playhead sits in for a given beat (the grid's playhead column).
-    static int currentStep(double beat) noexcept
+    // Step (0..length-1) the playhead sits in for a given beat (the grid's playhead column).
+    static int currentStep(double beat, int length = StepRow::kNumSteps) noexcept
     {
-        return localStep((long long) std::floor(beat / kStepBeats));
+        return localStep((long long) std::floor(beat / kStepBeats), length);
     }
 
-    // Local step (0..15) of global step `g`.
-    static int localStep(long long g) noexcept
+    // Step (0..length-1) of global step `g`.
+    static int localStep(long long g, int length = StepRow::kNumSteps) noexcept
     {
-        return (int) (((g % StepRow::kNumSteps) + StepRow::kNumSteps) % StepRow::kNumSteps);
+        return (int) (((g % length) + length) % length);
     }
 
     // Beat at which global step `g` fires (odd local steps pushed later by swing).
-    static double stepBeat(long long g, float swing) noexcept
+    static double stepBeat(long long g, float swing, int length = StepRow::kNumSteps) noexcept
     {
-        const double swingOffset = (localStep(g) & 1) ? (double) swing * 0.5 * kStepBeats : 0.0;
+        const double swingOffset = (localStep(g, length) & 1) ? (double) swing * 0.5 * kStepBeats : 0.0;
         return (double) g * kStepBeats + swingOffset;
     }
 

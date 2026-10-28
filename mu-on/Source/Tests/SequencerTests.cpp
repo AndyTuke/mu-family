@@ -220,6 +220,32 @@ public:
                     expect(b.isAccent(t, s) == a.isAccent(t, s), "accent mismatch after round-trip");
                 }
         }
+
+        beginTest("a row longer than 16 steps wraps at its length and round-trips with it");
+        {
+            StepRow row;
+            row.setNumSteps(32);
+            row.setOn(0, true); row.setOn(20, true); row.setOn(31, true);
+            expectEquals(row.numPages(), 2);
+            expectEquals(StepClock::currentStep(7.75, 32), 31);   // 31 sixteenths in
+            expectEquals(StepClock::currentStep(8.0, 32),  0);    // wraps after 8 beats, not 4
+
+            // Two bars (8 beats) in one span: step 0, 20 and 31 each fire once, in order.
+            StepClock clock;
+            std::vector<int> steps;
+            clock.processSpan(row, 0.0, 96000, 8.0 / 96000.0, 0.0f, 1.0f,
+                              [&](const StepEvent& ev) { steps.push_back(ev.step); });
+            expectEquals((int) steps.size(), 3, "one hit per on-step");
+            if (steps.size() == 3) { expectEquals(steps[0], 0); expectEquals(steps[1], 20); expectEquals(steps[2], 31); }
+
+            StepRow loaded;
+            loaded.deserialise(row.serialise(0));
+            expectEquals(loaded.numSteps(), 32);
+            expect(loaded.isOn(20) && loaded.isOn(31) && ! loaded.isOn(21), "steps survive the round-trip");
+
+            StepRow plain;   // a 16-step row writes no length, and reads back as 16
+            expect(! plain.serialise(0).hasProperty("len"), "the default length is not saved");
+        }
     }
 };
 

@@ -26,6 +26,8 @@ public:
 
     // Show layer `slot`'s row.
     void setLayer(int slot);
+    // Show a page of a row longer than 16 steps: the row step its first cell stands for (a multiple of 16).
+    void setFirstStep(int step) { firstStep = juce::jmax(0, step); repaint(); }
 
     // The step outlined as selected (-1: none), and the callback for a right-click that selects another.
     void setSelectedStep(int step) { selectedStep = step; repaint(); }
@@ -50,22 +52,23 @@ public:
         bool ties = false;                              // draw the bar between tied steps (a Bass)
         bool hatIcons = false;                          // draw the open / closed icon (a Hat)
         std::function<juce::String(int)> noteName;      // the note a step plays, shown in its cell (a Bass); empty: none
-        std::uint16_t dimMask = 0;                      // bit s: step s is on but is skipped in this pass (loop ratio or probability)
+        std::uint16_t dimMask = 0;                      // bit s: the page's step s is on but is skipped in this pass (loop ratio or probability)
+        int firstStep = 0;                              // the row step the first of the 16 cells shows (the page start, 0, 16, 32 or 48)
     };
-    static CellOptions optionsFor(TrackHost& host, int slot);
+    static CellOptions optionsFor(TrackHost& host, int slot, int firstStep = 0);
     // The key a Kick's or Bass's tune sits in: its MIDI note after the master key and scale snap, and that root and scale.
     struct TuneKey { int baseMidi = 36; int root = 0; int scale = 11; };
     static TuneKey tuneKey(TrackHost& host, int slot, EngineType engine);
     static void paintCells(juce::Graphics&, juce::Rectangle<int> cells, const StepRow& row, bool showSteps,
                            juce::Colour colour, int playheadStep, bool beatNumbers, int selectedStep,
                            const CellOptions& options);
-    // The step under `p` in a row whose cells are `cells` (the caller has checked the point is inside).
-    static int  stepAt(juce::Rectangle<int> cells, juce::Point<int> p);
+    // The step under `p` in a row whose cells are `cells` (the caller has checked the point is inside), counted from `firstStep`.
+    static int  stepAt(juce::Rectangle<int> cells, juce::Point<int> p, int firstStep = 0);
     // A click on one step of a row whose cells are `cells`, at point `p` (the caller has checked the point is inside).
     // On a step that is on, the top-left button toggles its accent and the top-right cross deletes it (returns false: no
     // selection). Anywhere else the click selects the step (returns true; the caller shows its Step panel), and on an empty
     // step it first creates it.
-    static bool clickStep(StepRow& row, int step, juce::Rectangle<int> cells, juce::Point<int> p, bool rightClick);
+    static bool clickStep(StepRow& row, int step, juce::Rectangle<int> cells, juce::Point<int> p, bool rightClick, int firstStep = 0);
     // Dragging from a step onto the one next to it ties them (a Bass slides from the first into the second): both turn on
     // and the later one is marked tied; doing it again over a pair that was already tied (both on before the drag) unties
     // them. `startedOn` is whether the step the drag began on was on before the click.
@@ -86,7 +89,7 @@ public:
     // tie), with the status bar's name and value for what changed.
     static bool dragStepValue(TrackHost& host, int slot, int step, StepDrag& drag, const juce::MouseEvent& e,
                               juce::String& statusName, juce::String& statusValue);
-    // The cell of `step`, the accent button inside its top-left corner and the delete cross inside its top-right.
+    // The cell of page position `step` (0..15), the accent button inside its top-left corner and the delete cross inside its top-right.
     static juce::Rectangle<float> cellRect(juce::Rectangle<int> cells, int step);
     static juce::Rectangle<float> accentButtonRect(juce::Rectangle<float> cell);
     static juce::Rectangle<float> deleteButtonRect(juce::Rectangle<float> cell);
@@ -100,6 +103,7 @@ private:
     long long shownPass = -2;          // the pass the dimmed steps were drawn for
     juce::uint64 shownSignature = 0;   // the colour and engine the row was last drawn with
     int hoverStep    = -1;
+    int firstStep    = 0;      // the page shown
     int selectedStep = -1;
     int dragStep     = -1;     // the step a left-drag has reached (-1: no drag)
     bool dragStartedOn = false;

@@ -10,18 +10,76 @@ namespace mu_on
 StepRows::StepRows(TrackHost& trackHost)
     : host(trackHost)
 {
+    playheadSteps.fill(-1);
+    shownPasses.fill(-2);
+    prevButton.onClick = [this] { setPage(page - 1); };
+    nextButton.onClick = [this] { setPage(page + 1); };
+    pageLabel.setJustificationType(juce::Justification::centred);
+    lengthInput.setShowStepButtons(false);   // the arrows step by one; a double-click types a length
+    lengthInput.setLabelInline(true);
+    lengthInput.onChange = [this](int n)
+    {
+        if (selected < 0 || selected >= host.getTrackCount()) return;
+        host.getTrack(selected).row.setNumSteps(n);
+        refreshControls();
+        repaint();
+    };
+    addAndMakeVisible(prevButton);
+    addAndMakeVisible(nextButton);
+    addAndMakeVisible(pageLabel);
+    addAndMakeVisible(lengthInput);
+    refreshControls();
     startTimerHz(mu_ui::kUiRefreshHz);   // playhead
 }
 
 void StepRows::setSelected(int idx)
 {
     selected = idx;
+    refreshControls();
     repaint();
+}
+
+// The pages the longest live row needs: every row shows the same page.
+int StepRows::numPages() const
+{
+    int pages = 1;
+    for (int i = 0; i < host.getTrackCount(); ++i)
+        pages = juce::jmax(pages, host.getTrack(i).row.numPages());
+    return pages;
+}
+
+void StepRows::setPage(int p)
+{
+    page = juce::jlimit(0, numPages() - 1, p);
+    refreshControls();
+    repaint();
+}
+
+void StepRows::refreshControls()
+{
+    page = juce::jlimit(0, numPages() - 1, page);   // a row that got shorter may have taken its page away
+    pageLabel.setText("Page " + juce::String(page + 1) + " / " + juce::String(numPages()), juce::dontSendNotification);
+    prevButton.setEnabled(page > 0);
+    nextButton.setEnabled(page < numPages() - 1);
+    if (selected >= 0 && selected < host.getTrackCount())
+        lengthInput.setValue(host.getTrack(selected).row.numSteps(), false);
+}
+
+// The control strip under the rows, lined up with the step cells: Prev, the page, Next, and the Length at the right.
+void StepRows::resized()
+{
+    auto r = getLocalBounds().removeFromBottom(mu_ui::s(kControlsH)).withTrimmedLeft(mu_ui::s(kLabelW)).reduced(0, mu_ui::s(2));
+    prevButton.setBounds(r.removeFromLeft(mu_ui::s(64)));
+    r.removeFromLeft(mu_ui::s(6));
+    pageLabel.setBounds(r.removeFromLeft(mu_ui::s(90)));
+    r.removeFromLeft(mu_ui::s(6));
+    nextButton.setBounds(r.removeFromLeft(mu_ui::s(64)));
+    lengthInput.setBounds(r.removeFromRight(mu_ui::s(150)));
 }
 
 int StepRows::rowHeight() const noexcept
 {
-    return getHeight() / mu_limits::kMaxLayers;
+    return (getHeight() - mu_ui::s(kControlsH)) / mu_limits::kMaxLayers;
 }
 
 juce::Rectangle<int> StepRows::rowArea(int row) const
@@ -48,7 +106,7 @@ bool StepRows::cellAt(juce::Point<int> p, int& row, int& step) const
     if (row < 0 || row >= host.getTrackCount()) return false;
     const auto cells = cellsArea(row);
     if (! cells.contains(p)) return false;
-    step = TrackStepRow::stepAt(cells, p);
+    step = TrackStepRow::stepAt(cells, p, page * StepRow::kNumSteps);
     return true;
 }
 
@@ -57,7 +115,7 @@ juce::uint64 StepRows::signature() const
     // Count, then each live row's colour and engine, folded into one number.
     juce::uint64 h = (juce::uint64) host.getTrackCount();
     for (int i = 0; i < host.getTrackCount(); ++i)
-        h = h * 131u + (juce::uint64) (host.getTrackColourIndex(i) * 8 + toIndex(host.getTrackEngine(i)));
+        h = h * 131u + (juce::uint64) (host.getTrackColourIndex(i) * 8 + toIndex(host.getTrackEngine(i)) + 4096 * host.getTrack(i).row.numSteps());
     return h;
 }
 
@@ -85,9 +143,9 @@ void StepRows::paintRow(juce::Graphics& g, int row)
     MuLookAndFeel::drawEngravedText(g, label, area.withWidth(mu_ui::s(kLabelW)).reduced(mu_ui::s(2), 0),
                                     juce::Justification::centredLeft, col, false);
 
-    // The 16 steps; the step numbers on the first row only.
-    TrackStepRow::paintCells(g, cellsArea(row), host.getTrack(row).row, ! isRumble, col, playheadStep, row == 0,
-                             row == selected ? selectedStep : -1, TrackStepRow::optionsFor(host, row));
+    // The page's 16 steps; the step numbers on the first row only.
+    TrackStepRow::paintCells(g, cellsArea(row), host.getTrack(row).row, ! isRumble, col, playheadSteps[(size_t) row], row == 0,
+                             row == selected ? selectedStep : -1, TrackStepRow::optionsFor(host, row, page * StepRow::kNumSteps));
 
     if (isRumble) g.endTransparencyLayer();
 
@@ -111,11 +169,13 @@ void StepRows::mouseDown(const juce::MouseEvent& e)
     int r = 0, s = 0;
     if (! cellAt(e.getPosition(), r, s) || host.getTrackEngine(r) == EngineType::Rumble) return;
 
+    if (s >= host.getTrack(r).row.numSteps()) return;   // past the row's length: nothing to edit
     dragStartedOn = host.getTrack(r).row.isOn(s);
     stepDrag = {};
 
     // A click selects the step for the Step panel (creating it if empty); its corner buttons set the accent or delete it.
-    const bool selects = TrackStepRow::clickStep(host.getTrack(r).row, s, cellsArea(r), e.getPosition(), e.mods.isPopupMenu());
+    const bool selects = TrackStepRow::clickStep(host.getTrack(r).row, s, cellsArea(r), e.getPosition(), e.mods.isPopupMenu(),
+                                                 page * StepRow::kNumSteps);
     dragRow = selects && ! e.mods.isPopupMenu() ? r : -1;
     dragStep = s;
     if (selects)
@@ -139,7 +199,8 @@ void StepRows::mouseDrag(const juce::MouseEvent& e)
             return;
         }
     }
-    if (dragRow < 0 || host.getTrackEngine(dragRow) != EngineType::Bass || ! cellAt(e.getPosition(), r, s) || r != dragRow || s == dragStep) return;
+    if (dragRow < 0 || host.getTrackEngine(dragRow) != EngineType::Bass || ! cellAt(e.getPosition(), r, s) || r != dragRow || s == dragStep
+        || s >= host.getTrack(r).row.numSteps()) return;
     TrackStepRow::dragTie(host.getTrack(r).row, dragStep, s, dragStartedOn);
     dragStep = s;
     dragStartedOn = true;
@@ -152,23 +213,28 @@ void StepRows::timerCallback()
     if (const auto sig = signature(); sig != shownSignature)
     {
         shownSignature = sig;
+        refreshControls();
         repaint();
     }
 
-    const int step = host.isTrackTransportPlaying()
-                        ? StepClock::currentStep(host.getTrackTransportBeat()) : -1;
-    // A new pass draws new skips: redraw every row's dimmed steps.
-    const long long pass = step >= 0 ? StepClock::passOfBeat(host.getTrackTransportBeat()) : -1;
-    if (pass != shownPass) { shownPass = pass; repaint(); }
-    if (step == playheadStep) return;
-
-    // Repaint only the cells the playhead left and entered, not the whole grid.
-    const float cellW = (getWidth() - mu_ui::s(kLabelW)) / (float) StepRow::kNumSteps;
-    for (int s : { playheadStep, step })
-        if (s >= 0)
-            repaint(juce::Rectangle<float>((float) mu_ui::s(kLabelW) + s * cellW, 0.0f, cellW, (float) getHeight())
-                        .getSmallestIntegerContainer());
-    playheadStep = step;
+    // Each row's playhead step (rows have their own lengths). A moved playhead, or a new pass drawing new skips, redraws the rows.
+    bool changed = false;
+    const bool playing = host.isTrackTransportPlaying();
+    const double beat = playing ? host.getTrackTransportBeat() : 0.0;
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    {
+        int step = -1;
+        long long pass = -1;
+        if (playing && i < host.getTrackCount())
+        {
+            const int length = host.getTrack(i).row.numSteps();
+            step = StepClock::currentStep(beat, length);
+            pass = StepClock::passOfBeat(beat, length);
+        }
+        if (pass != shownPasses[(size_t) i]) { shownPasses[(size_t) i] = pass; changed = true; }
+        if (step != playheadSteps[(size_t) i]) { playheadSteps[(size_t) i] = step; changed = true; }
+    }
+    if (changed) repaint(getLocalBounds().withTrimmedBottom(mu_ui::s(kControlsH)));
 }
 
 } // namespace mu_on

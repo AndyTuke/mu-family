@@ -40,9 +40,10 @@ TrackStepRow::TuneKey TrackStepRow::tuneKey(TrackHost& host, int slot, EngineTyp
 }
 
 // What the row shows beyond the lamps, from the track's engine, tune and key and (while playing) this pass's draws.
-TrackStepRow::CellOptions TrackStepRow::optionsFor(TrackHost& host, int slot)
+TrackStepRow::CellOptions TrackStepRow::optionsFor(TrackHost& host, int slot, int firstStep)
 {
     CellOptions o;
+    o.firstStep = firstStep;
     const auto engine = host.getTrackEngine(slot);
     auto& track = host.getTrack(slot);
     o.ties = engine == EngineType::Bass;
@@ -62,9 +63,9 @@ TrackStepRow::CellOptions TrackStepRow::optionsFor(TrackHost& host, int slot)
     }
     if (engine != EngineType::Rumble && host.isTrackTransportPlaying())
     {
-        const long long pass = StepClock::passOfBeat(host.getTrackTransportBeat());
+        const long long pass = StepClock::passOfBeat(host.getTrackTransportBeat(), track.row.numSteps());
         for (int s = 0; s < StepRow::kNumSteps; ++s)
-            if (track.row.isOn(s) && ! track.stepPlays(s, pass)) o.dimMask = (std::uint16_t) (o.dimMask | (1u << s));
+            if (track.row.isOn(firstStep + s) && ! track.stepPlays(firstStep + s, pass)) o.dimMask = (std::uint16_t) (o.dimMask | (1u << s));
     }
     return o;
 }
@@ -77,10 +78,12 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
 {
     const auto& L = MuLookAndFeel::lighting();
     const auto labelColour = MuLookAndFeel::colour(MuLookAndFeel::labelText);
-    for (int s = 0; s < StepRow::kNumSteps; ++s)
+    for (int pos = 0; pos < StepRow::kNumSteps; ++pos)
     {
-        const auto cell = cellRect(cells, s);
-        const bool on     = showSteps && row.isOn(s);
+        const int s = opts.firstStep + pos;                       // the row step this cell shows
+        const auto cell = cellRect(cells, pos);
+        const bool beyond = s >= row.numSteps();                  // past the row's length: a blank, unlit lens
+        const bool on     = showSteps && ! beyond && row.isOn(s);
         const bool isBeat = (s % 4) == 0;
         float lit = on ? L.lampOn : (isBeat ? L.lampBeat : L.lampOff);
         if (on && s == playheadStep) lit = juce::jmin(1.0f, lit + L.lampPlayhead);
@@ -116,9 +119,9 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
                 g.drawRoundedRectangle(cell.reduced(thick * 0.5f), juce::jmax(1.0f, 3.0f - thick * 0.5f), thick);
             }
         }
-        if (opts.ties && showSteps && row.tiedFrom(s))   // tied to the step before: a bar joins the two lamps
+        if (opts.ties && showSteps && pos > 0 && ! beyond && row.tiedFrom(s))   // tied to the step before: a bar joins the two lamps
         {
-            const auto prev = cellRect(cells, s - 1);
+            const auto prev = cellRect(cells, pos - 1);
             const float h = cell.getHeight() * 0.45f;
             g.setColour(lens.brighter(L.lampHot * 2.0f));
             g.fillRect(juce::Rectangle<float>(prev.getRight() - 2.0f, cell.getCentreY() - h * 0.5f, cell.getX() - prev.getRight() + 4.0f, h));
@@ -168,7 +171,7 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
                                             juce::Justification::bottomLeft, labelColour, false);
         }
 
-        if ((opts.dimMask >> s) & 1u)   // a step this pass will skip (its loop ratio or its probability): dimmed
+        if (beyond || ((opts.dimMask >> pos) & 1u))   // a step past the row's length, or one this pass will skip (its loop ratio or its probability): dimmed
         {
             g.setColour(juce::Colours::black.withAlpha(0.6f));
             g.fillRoundedRectangle(cell, 3.0f);
@@ -176,9 +179,9 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
     }
 }
 
-int TrackStepRow::stepAt(juce::Rectangle<int> cells, juce::Point<int> p)
+int TrackStepRow::stepAt(juce::Rectangle<int> cells, juce::Point<int> p, int firstStep)
 {
-    return juce::jlimit(0, StepRow::kNumSteps - 1, (int) ((p.x - cells.getX()) / (cells.getWidth() / (float) StepRow::kNumSteps)));
+    return firstStep + juce::jlimit(0, StepRow::kNumSteps - 1, (int) ((p.x - cells.getX()) / (cells.getWidth() / (float) StepRow::kNumSteps)));
 }
 
 juce::Rectangle<float> TrackStepRow::cellRect(juce::Rectangle<int> cells, int step)
@@ -199,9 +202,10 @@ juce::Rectangle<float> TrackStepRow::deleteButtonRect(juce::Rectangle<float> cel
     return { cell.getRight() - side - 2.0f, cell.getY() + 2.0f, side, side };
 }
 
-bool TrackStepRow::clickStep(StepRow& row, int step, juce::Rectangle<int> cells, juce::Point<int> p, bool rightClick)
+bool TrackStepRow::clickStep(StepRow& row, int step, juce::Rectangle<int> cells, juce::Point<int> p, bool rightClick, int firstStep)
 {
-    const auto cell = cellRect(cells, step);
+    if (step >= row.numSteps()) return false;   // past the row's length: nothing to edit
+    const auto cell = cellRect(cells, step - firstStep);
     if (! rightClick && row.isOn(step))
     {
         if (accentButtonRect(cell).expanded(2.0f).contains(p.toFloat())) { row.setAccent(step, ! row.isAccent(step)); return false; }
@@ -289,7 +293,7 @@ void TrackStepRow::paint(juce::Graphics& g)
 
     const juce::Graphics::ScopedSaveState state(g);
     if (isRumble) g.beginTransparencyLayer(0.45f);
-    paintCells(g, getLocalBounds(), host.getTrack(slot).row, ! isRumble, colour, playheadStep, true, selectedStep, optionsFor(host, slot));
+    paintCells(g, getLocalBounds(), host.getTrack(slot).row, ! isRumble, colour, playheadStep, true, selectedStep, optionsFor(host, slot, firstStep));
     if (isRumble) g.endTransparencyLayer();
 }
 
@@ -297,10 +301,10 @@ void TrackStepRow::mouseDown(const juce::MouseEvent& e)
 {
     // A Rumble row is not editable.
     if (host.getTrackEngine(slot) == EngineType::Rumble || ! getLocalBounds().contains(e.getPosition())) return;
-    const int step = stepAt(getLocalBounds(), e.getPosition());
+    const int step = stepAt(getLocalBounds(), e.getPosition(), firstStep);
     dragStartedOn = host.getTrack(slot).row.isOn(step);
     stepDrag = {};
-    const bool selects = clickStep(host.getTrack(slot).row, step, getLocalBounds(), e.getPosition(), e.mods.isPopupMenu());
+    const bool selects = clickStep(host.getTrack(slot).row, step, getLocalBounds(), e.getPosition(), e.mods.isPopupMenu(), firstStep);
     dragStep = selects && ! e.mods.isPopupMenu() ? step : -1;
     if (selects)
     {
@@ -322,8 +326,8 @@ void TrackStepRow::mouseDrag(const juce::MouseEvent& e)
         return;
     }
     if (host.getTrackEngine(slot) != EngineType::Bass) return;   // only a Bass sequence ties notes
-    const int step = stepAt(getLocalBounds(), e.getPosition());
-    if (step == dragStep) return;
+    const int step = stepAt(getLocalBounds(), e.getPosition(), firstStep);
+    if (step == dragStep || step >= host.getTrack(slot).row.numSteps()) return;
     dragTie(host.getTrack(slot).row, dragStep, step, dragStartedOn);
     dragStep = step;
     dragStartedOn = true;   // the steps are on now: the next pair crossed in this drag toggles its tie the same way
@@ -333,7 +337,7 @@ void TrackStepRow::mouseDrag(const juce::MouseEvent& e)
 void TrackStepRow::mouseMove(const juce::MouseEvent& e)
 {
     if (! onStatusUpdate || host.getTrackEngine(slot) == EngineType::Rumble) return;
-    const int step = stepAt(getLocalBounds(), e.getPosition());
+    const int step = stepAt(getLocalBounds(), e.getPosition(), firstStep);
     if (step == hoverStep) return;
     hoverStep = step;
     const auto& row = host.getTrack(slot).row;
@@ -350,10 +354,11 @@ void TrackStepRow::timerCallback()
         repaint();
     }
 
+    const int length = host.getTrack(slot).row.numSteps();
     const int step = host.isTrackTransportPlaying()
-                        ? StepClock::currentStep(host.getTrackTransportBeat()) : -1;
+                        ? StepClock::currentStep(host.getTrackTransportBeat(), length) : -1;
     // A new pass draws new skips: redraw the dimmed steps.
-    const long long pass = step >= 0 ? StepClock::passOfBeat(host.getTrackTransportBeat()) : -1;
+    const long long pass = step >= 0 ? StepClock::passOfBeat(host.getTrackTransportBeat(), length) : -1;
     if (pass != shownPass) { shownPass = pass; repaint(); }
     if (step == playheadStep) return;
     playheadStep = step;

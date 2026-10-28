@@ -436,7 +436,7 @@ void TrackContent::refreshStepPanel()
 // A right-click selected `step` in the shown layer's row (the row clicked has become the shown layer).
 void TrackContent::selectStep(int step)
 {
-    selectedStepOf[(size_t) currentLayer] = juce::jlimit(0, StepRow::kNumSteps - 1, step);
+    selectedStepOf[(size_t) currentLayer] = juce::jlimit(0, StepRow::kMaxSteps - 1, step);
     refreshStepPanel();
 }
 

@@ -6,7 +6,7 @@
 #include <array>
 #include <atomic>
 
-// One 909 step row: 16 steps, each with an on/off and an accent flag, and the row's groove (swing, accent
+// One 909 step row: up to kMaxSteps steps (a row's length, 16 by default, is set per row; the editor shows 16 at a time), each with an on/off and an accent flag, and the row's groove (swing, accent
 // velocity). Cells are atomic so the message thread (grid edits) and the audio thread (the row's clock) share
 // them without a lock or a dropped block. A row belongs to its Track, not to the track's engine, so it is kept
 // when the engine changes (a Rumble track ignores its row). Rows serialise as <Track i on accent> nodes,
@@ -17,7 +17,13 @@ namespace mu_on
 class StepRow
 {
 public:
-    static constexpr int kNumSteps = 16;
+    static constexpr int kNumSteps = 16;   // steps per page: what the grid shows at once, and the default length
+    static constexpr int kMaxSteps = 64;   // the longest a row can be (four pages)
+
+    // How many steps the row plays before it wraps (1..kMaxSteps). Steps past it keep their settings for when the row grows.
+    int  numSteps() const noexcept { return length.load(std::memory_order_relaxed); }
+    void setNumSteps(int n) noexcept { length.store(juce::jlimit(1, kMaxSteps, n), std::memory_order_relaxed); }
+    int  numPages() const noexcept { return (numSteps() + kNumSteps - 1) / kNumSteps; }
 
     StepRow() { clear(); }
 
@@ -104,6 +110,7 @@ public:
     void loadDefaultGroove(EngineType engine) noexcept
     {
         clear();
+        setNumSteps(kNumSteps);
         switch (engine)
         {
             case EngineType::Kick:
@@ -137,25 +144,27 @@ public:
     juce::ValueTree serialise(int slot) const
     {
         juce::ValueTree row("Track");
+        const int n = numPages() * kNumSteps;   // whole pages; a longer row's hidden steps past its length are kept to the page end
         row.setProperty("i", slot, nullptr);
         juce::String on, ac, op, tie, gh;
-        for (int s = 0; s < kNumSteps; ++s) { on += isOn(s) ? '1' : '0'; ac += isAccent(s) ? '1' : '0'; op += isOpen(s) ? '1' : '0'; tie += tiedFrom(s) ? '1' : '0'; gh += isGhost(s) ? '1' : '0'; }
+        for (int s = 0; s < n; ++s) { on += isOn(s) ? '1' : '0'; ac += isAccent(s) ? '1' : '0'; op += isOpen(s) ? '1' : '0'; tie += tiedFrom(s) ? '1' : '0'; gh += isGhost(s) ? '1' : '0'; }
         row.setProperty("on", on, nullptr);
         row.setProperty("accent", ac, nullptr);
+        if (numSteps() != kNumSteps) row.setProperty("len", numSteps(), nullptr);   // absent = the default 16
         if (gh.containsChar('1')) row.setProperty("ghost", gh, nullptr);  // absent = no ghost steps
         if (op.containsChar('1')) row.setProperty("open", op, nullptr);   // absent = every step closed
         if (tie.containsChar('1')) row.setProperty("tie", tie, nullptr);  // absent = no tied steps
         // Probability as a comma list and the loop ratio as one digit per step, each only when a step leaves its default.
         juce::StringArray probs; juce::String loops; bool anyProb = false, anyLoop = false;
-        for (int s = 0; s < kNumSteps; ++s)
+        for (int s = 0; s < n; ++s)
         {
             probs.add(juce::String(stepProb(s))); loops += juce::String(stepLoop(s));
             anyProb = anyProb || stepProb(s) != 100; anyLoop = anyLoop || stepLoop(s) != 0;
         }
         juce::StringArray octs, notes; bool anyPitch = false;
-        for (int s = 0; s < kNumSteps; ++s) { octs.add(juce::String(stepOctave(s))); notes.add(juce::String(stepNote(s))); anyPitch = anyPitch || stepSemitones(s) != 0; }
+        for (int s = 0; s < n; ++s) { octs.add(juce::String(stepOctave(s))); notes.add(juce::String(stepNote(s))); anyPitch = anyPitch || stepSemitones(s) != 0; }
         juce::StringArray chords, invs, spreads; bool anyChord = false;
-        for (int s = 0; s < kNumSteps; ++s)
+        for (int s = 0; s < n; ++s)
         {
             chords.add(juce::String(stepChord(s))); invs.add(juce::String(stepInversion(s))); spreads.add(juce::String(stepSpread(s)));
             anyChord = anyChord || stepChord(s) != kDefaultChord || stepInversion(s) != 0 || stepSpread(s) != 0;
@@ -183,7 +192,8 @@ public:
         const auto spreadList = juce::StringArray::fromTokens(row.getProperty("spread").toString(), ",", "");
         const auto probs = juce::StringArray::fromTokens(row.getProperty("prob").toString(), ",", "");
         const juce::String loops = row.getProperty("loop").toString();
-        for (int s = 0; s < kNumSteps; ++s)
+        setNumSteps(row.hasProperty("len") ? (int) row.getProperty("len") : kNumSteps);
+        for (int s = 0; s < kMaxSteps; ++s)
         {
             setOpen  (s, s < op.length() && op[s] == '1');
             setStepProb(s, s < probs.size() ? probs[s].getIntValue() : 100);
@@ -203,9 +213,10 @@ public:
 private:
     struct Cell { std::atomic<bool> on { false }; std::atomic<bool> accent { false }; std::atomic<bool> ghost { false }; std::atomic<bool> open { false }; std::atomic<int> prob { 100 }; std::atomic<int> loop { 0 }; std::atomic<bool> tie { false }; std::atomic<int> oct { 0 }; std::atomic<int> note { 0 };
                   std::atomic<int> chord { kDefaultChord }; std::atomic<int> inv { 0 }; std::atomic<int> spread { 0 }; };
-    static bool valid(int s) noexcept { return s >= 0 && s < kNumSteps; }
+    static bool valid(int s) noexcept { return s >= 0 && s < kMaxSteps; }
 
-    std::array<Cell, kNumSteps> cells;
+    std::array<Cell, kMaxSteps> cells;
+    std::atomic<int> length { kNumSteps };
     std::atomic<float> swing { 0.0f }, accent { 1.0f }, ghostShare { 0.35f };   // the parameters' defaults
 };
 
