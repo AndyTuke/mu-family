@@ -51,7 +51,7 @@ public:
                 float& xp = xPrev[ch < 2 ? ch : 0];
                 const float x  = chans[ch][i] * pg;
                 const float dx = x - xp;
-                float y = std::abs(dx) < 1e-4f
+                float y = std::abs(dx) < 1e-3f
                             ? juce::jlimit(-1.0f, 1.0f, 0.5f * (x + xp))
                             : (ad1Clip(x) - ad1Clip(xp)) / dx;
                 chans[ch][i] = y * og;

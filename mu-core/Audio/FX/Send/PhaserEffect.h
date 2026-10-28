@@ -72,8 +72,9 @@ public:
             const float inL = (dataL != nullptr) ? dataL[i] : 0.0f;
             const float inR = (dataR != nullptr) ? dataR[i] : 0.0f;
 
-            float sigL = inL + feedbackL * fb;
-            float sigR = inR + feedbackR * fb;
+            // Soft-limit the fed-back signal so a near-unity feedback cannot build a huge resonance.
+            float sigL = inL + std::tanh(feedbackL * fb);
+            float sigR = inR + std::tanh(feedbackR * fb);
 
             for (int s = 0; s < numStages; ++s)
             {

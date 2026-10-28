@@ -54,7 +54,7 @@ public:
                 float& xp = xPrev[ch < 2 ? ch : 0];
                 const float x  = chans[ch][i] * pg;
                 const float dx = x - xp;
-                float y = std::abs(dx) < 1e-4f ? std::tanh(0.5f * (x + xp))
+                float y = std::abs(dx) < 1e-3f ? std::tanh(0.5f * (x + xp))
                                                : (ad1Tanh(x) - ad1Tanh(xp)) / dx;
                 chans[ch][i] = y * og;
                 xp           = x;
