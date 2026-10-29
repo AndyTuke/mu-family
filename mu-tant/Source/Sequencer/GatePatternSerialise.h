@@ -11,6 +11,8 @@
 
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include <juce_data_structures/juce_data_structures.h>
+#include <algorithm>
+#include <cmath>
 #include <thread>
 #include <limits>
 #include "Sequencer/GatePattern.h"
@@ -58,25 +60,49 @@ inline void deserialiseGate(const juce::ValueTree& t, GatePattern& g,
     g.envelopes.clear();
     if (valid)
     {
-        g.subdivision = (GatePattern::Subdivision)(int)
-            t.getProperty("subdiv", (int) GatePattern::Subdivision::Sixteenth);
+        // Only the four grid values are valid; anything else falls back to 1/16.
+        const int subdiv = (int) t.getProperty("subdiv", (int) GatePattern::Subdivision::Sixteenth);
+        g.subdivision = (subdiv == 4 || subdiv == 8 || subdiv == 16 || subdiv == 32)
+                            ? (GatePattern::Subdivision) subdiv
+                            : GatePattern::Subdivision::Sixteenth;
         g.patternLengthBars = juce::jlimit(1, GatePattern::kMaxPatternBars,
                                             (int) t.getProperty("bars", 2));
+        // A non-finite float (NaN would reach std::pow in the bend curve) becomes 0, then clamps to range.
+        auto cleanFloat = [](const juce::var& v, float lo, float hi)
+        {
+            const double d = (double) v;
+            return std::isfinite(d) ? juce::jlimit(lo, hi, (float) d) : 0.0f;
+        };
+        const int totalCells = g.totalCells();
         for (int i = 0; i < t.getNumChildren(); ++i)
         {
             auto c = t.getChild(i);
             if (c.getType() != juce::Identifier("Env")) continue;
             GateEnvelope e;
-            e.startCell   =        (int)    c.getProperty("start", 0);
-            e.lengthCells = juce::jmax(1, (int) c.getProperty("len", 1));
-            e.split       = (float)(double) c.getProperty("split", 0.0);
-            e.attackBend  = (float)(double) c.getProperty("atk",   0.0);
-            e.decayBend   = (float)(double) c.getProperty("dec",   0.0);
+            // Keep the region inside the grid so startCell + lengthCells cannot overflow.
+            e.startCell   = juce::jlimit(0, totalCells - 1, (int) c.getProperty("start", 0));
+            e.lengthCells = juce::jlimit(1, totalCells - e.startCell, (int) c.getProperty("len", 1));
+            e.split       = cleanFloat(c.getProperty("split", 0.0), 0.0f, 1.0f);
+            e.attackBend  = cleanFloat(c.getProperty("atk",   0.0), -1.0f, 1.0f);
+            e.decayBend   = cleanFloat(c.getProperty("dec",   0.0), -1.0f, 1.0f);
             e.reverse     =        (int)    c.getProperty("rev", 0) != 0;
             // prob/loopMask/loopM/loopN properties from older presets are silently
             // ignored (the per-envelope probability / loop-N-of-M feature was removed).
             g.envelopes.push_back(e);
         }
+
+        // Restore the sorted, non-overlapping invariant the gate lookup relies on.
+        std::sort(g.envelopes.begin(), g.envelopes.end(),
+                  [](const GateEnvelope& x, const GateEnvelope& y) { return x.startCell < y.startCell; });
+        int nextFree = 0;
+        g.envelopes.erase(std::remove_if(g.envelopes.begin(), g.envelopes.end(),
+                              [&nextFree](GateEnvelope& e)
+                              {
+                                  if (e.startCell < nextFree) return true;
+                                  nextFree = e.startCell + e.lengthCells;
+                                  return false;
+                              }),
+                          g.envelopes.end());
     }
     else
     {

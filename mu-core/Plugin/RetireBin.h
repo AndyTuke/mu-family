@@ -98,7 +98,7 @@ namespace mu_core
         {
             BinLock g(binMutex);
             preparedRate = sampleRate;
-            declick.setSize(2, juce::jmax(1, blockSize), false, true, false);
+            declick.setSize(2, juce::jmax(1, blockSize), false, true, false);   // rt-ok: message thread, prepare path
             declickFrames = juce::jmax(1, (int) (sampleRate * (mu_limits::kRetireDeclickMs / 1000.0)));
         }
 
@@ -373,12 +373,12 @@ namespace mu_core
         class BinLock
         {
         public:
-            explicit BinLock(std::mutex& m) : lock(m) { ++heldFlag(); }
+            explicit BinLock(std::mutex& m) : lock(m) { ++heldFlag(); }   // rt-ok: message and host threads only
             ~BinLock() { if (lock.owns_lock()) --heldFlag(); }
             void unlock() { lock.unlock(); --heldFlag(); }
             void relock() { lock.lock(); ++heldFlag(); }
         private:
-            std::unique_lock<std::mutex> lock;
+            std::unique_lock<std::mutex> lock;   // rt-ok: message and host threads only
         };
 
         // The tails one call frees, destroyed when the call returns: declared BEFORE the call's BinLock, so they
@@ -688,7 +688,7 @@ namespace mu_core
         std::array<std::array<Entry, kDepth>, kRows> rows;
         std::array<Reclaim, kReclaimCapacity> reclaim;
         int reclaimCount = 0;                // guarded by binMutex
-        mutable std::mutex binMutex;         // message and host threads only
+        mutable std::mutex binMutex;         // message and host threads only, rt-ok
         double preparedRate = 0.0;           // guarded by binMutex
         int    budget = kEntries;            // guarded by binMutex
         int    evictTimeoutMs = 50;          // guarded by binMutex

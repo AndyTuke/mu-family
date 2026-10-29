@@ -15,10 +15,6 @@ namespace mu_tronic
 
 namespace
 {
-    // The strip rows every product's layer carries, in the order they are listed.
-    constexpr const char* kStripSuffixes[] = { "lvl", "pan", "mute", "solo", "sendEff", "sendDly", "sendRev",
-                                               "scSrc", "scAmt", "scAtk", "scRel", "outBus" };
-
     struct KindInfo
     {
         const char*          presetTag;

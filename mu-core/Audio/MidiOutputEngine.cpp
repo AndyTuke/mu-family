@@ -19,7 +19,7 @@ void MidiOutputEngine::trigger(juce::MidiBuffer& midiOut, int sampleOffset,
     midiOut.addEvent(juce::MidiMessage::noteOn(midiChannel, midiNote, vel), sampleOffset);
     activeNote       = midiNote;
     activeChannel    = midiChannel;
-    noteOffCountdown = noteDurationSamples;
+    noteOffCountdown = noteDurationSamples + sampleOffset;   // counted from block start, so the off never precedes this on
 }
 
 void MidiOutputEngine::processBlock(juce::MidiBuffer& midiOut, int blockSize)

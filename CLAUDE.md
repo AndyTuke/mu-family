@@ -5,8 +5,10 @@ Family-shared guidance for Claude Code working in this monorepo. **Product-speci
 ## Monorepo layout
 
 ```
-mu-core/        Shared audio + FX + modulation + mixer UI + ProcessorBase + EditorShellBase (INTERFACE library)
-mu-control/     (planned, created with the first controller work) Controller drivers, mapping and surface model; depends on mu-core, never the reverse
+mu-core/        Shared audio + FX + modulation + mixer UI + ProcessorBase + EditorShellBase (INTERFACE library); includes Link/ (mu-link IPC contract + client) and Control/ (control interfaces, MIDI map, live state)
+mu-control/     Controller drivers, mapping and surface model (Devices / Driver / Surface / Manager); depends on mu-core, never the reverse
+mu-link/        Local audio receiver + master clock: mu standalones send audio over shared memory, mu-link sums it to one device (see mu-link/CLAUDE.md)
+ControlDesign/  Dev sandbox for control and knob design (not shipped)
 mu-clid/        Euclidean rhythm sequencer + sample trigger plugin (VST3 + CLAP + Standalone)
 mu-clid-midi/   mu-Clid MIDI: Euclidean MIDI effect, the former mu-Clid Lite — no audio, free, VST3 + CLAP; shares Rhythm / .muRhythm with mu-Clid (see mu-clid-midi/CLAUDE.md)
 mu-tant/        Wavetable drone synth — 8 voices, mixer, modulators, gate-pattern grid (VST3 + CLAP + Standalone)
@@ -140,7 +142,7 @@ These hold for everything in `mu-core` and every product that links it. Product-
 
 - **Everything in APVTS** — if a parameter isn't in the ValueTree it won't save. All parameters wire through APVTS.
 - **Audio thread never allocates** — all allocation in `prepareToPlay`, never in `processBlock`.
-- **mu-core never depends on a plugin** — strictly one-way: plugins link mu-core, never the reverse. The planned `mu-control` library (controller drivers) follows the same rule and `mu-core` must never include it. A `mu-core/**` file must not `#include` a plugin header or name a plugin symbol (`mu_clid::`, `mu_tant::`, …); mu-core knows only `ProcessorBase` + the shared interfaces. Enforced by `tests/scripts/check-core-boundary.ps1`. **When adding a file, decide its side first:** generic with no plugin-specific param IDs / semantics → `mu-core`; references product-specific concepts → that product's source tree. New plugin-specific code goes under the product's namespace (`mu_clid::`, `mu_tant::`) so the side is visible at every reference.
+- **mu-core never depends on a plugin** — strictly one-way: plugins link mu-core, never the reverse. The `mu-control` library (controller drivers) follows the same rule and `mu-core` must never include it. A `mu-core/**` file must not `#include` a plugin header or name a plugin symbol (`mu_clid::`, `mu_tant::`, …); mu-core knows only `ProcessorBase` + the shared interfaces. Enforced by `tests/scripts/check-core-boundary.ps1`. **When adding a file, decide its side first:** generic with no plugin-specific param IDs / semantics → `mu-core`; references product-specific concepts → that product's source tree. New plugin-specific code goes under the product's namespace (`mu_clid::`, `mu_tant::`) so the side is visible at every reference.
 - **mu-core stays plugin-agnostic** — no `#include` of any product header from mu-core, no product-specific symbol names. Naming uses neutral terms (`channel` / `slot` / `layer` over `rhythm`). Use `MuLookAndFeel` directly from mu-core code, never the `MuClidLookAndFeel` back-compat alias.
 - **Modulation depth = % of the target knob's range** — every product defines its modulation targets in one table of `mu_mod::ModTarget` rows (id, label, section, parameter); a new target is one appended row, never a hand-set scale. Rules + per-product tables in [docs/design-plugin-family.md](docs/design-plugin-family.md#modulation-targets--family-standard); enforced by `mu_mod::checks` in each product's tests and `tests/scripts/check-mod-targets.ps1`.
 - **ModulationMatrix is the single reader** — audio engine reads only from `ModulationMatrix`, never directly from APVTS or `ControlSequence`.

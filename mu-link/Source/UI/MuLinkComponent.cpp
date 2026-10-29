@@ -282,9 +282,9 @@ void MuLinkComponent::saveScenes() const
         }
         sceneArr.add(juce::var(cells));
     }
-    const auto f = scenesFile();
-    f.getParentDirectory().createDirectory();
-    f.replaceWithText(juce::JSON::toString(juce::var(sceneArr)));
+    // Atomic write: scenes are saved on every edit, so a mid-write failure must not truncate the file.
+    mu_pp::replaceFileAtomically(scenesFile(), juce::JSON::toString(juce::var(sceneArr)),
+                                 [](const juce::String& why) { juce::Logger::writeToLog("MuLink scenes: " + why); });
 }
 
 void MuLinkComponent::loadScenes()

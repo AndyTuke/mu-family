@@ -226,7 +226,7 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     addChildComponent(soloRow);
     soloPager.pageCount = [this] { return host.getTrack(currentLayer).row.numPages(); };
     soloPager.lengthRow = [this]() -> StepRow* { return &host.getTrack(currentLayer).row; };
-    soloPager.onChanged = [this] { soloRow.setFirstStep(soloPager.page() * StepRow::kNumSteps); };
+    soloPager.onChanged = [this] { soloRow.setFirstStep(soloPager.page() * StepRow::kNumSteps); refreshStepPanel(); };
     addChildComponent(soloPager);
 
     // The track's own Swing / Accent, shown in the Groove box (a Rumble track shows its envelope there instead);
@@ -271,6 +271,7 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     addChildComponent(chordCaption);
     addChildComponent(chordSelect);
     rows.onStepSelected = [this](int, int step) { selectStep(step); };
+    rows.onLengthChanged = [this] { refreshStepPanel(); };
     soloRow.onStepSelected = [this](int step) { selectStep(step); };
     soloBtn.setClickingTogglesState(true);
     addAndMakeVisible(soloBtn);
@@ -415,7 +416,15 @@ void TrackContent::refreshNoteItems()
 void TrackContent::refreshStepPanel()
 {
     const auto& row = host.getTrack(currentLayer).row;
-    const int step = selectedStepOf[(size_t) currentLayer];
+    // A shorter Length or a different preset can leave the selection past the row's end: pull it back to the last step.
+    int& selected = selectedStepOf[(size_t) currentLayer];
+    if (selected > row.numSteps() - 1)
+    {
+        selected = row.numSteps() - 1;
+        rows.setSelectedStep(selected);
+        soloRow.setSelectedStep(selected);
+    }
+    const int step = selected;
     stepProbKnob.setValue(row.stepProb(step), juce::dontSendNotification);
     loopSelect.setSelectedId(row.stepLoop(step) + 1, false);
     const bool hat = shownEngine == EngineType::Hat;

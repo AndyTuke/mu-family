@@ -1322,6 +1322,7 @@ int ProcessorBase::addLayer()
         retireBin.cutSlot(n);
         mixerEngine.channels[(size_t) n].reset();
         mixerEngine.resetSidechainEnv(n);
+        mixerEngine.resetStripRamp(n);
         layersMoved(n, n);
     }
 
@@ -1382,10 +1383,12 @@ bool ProcessorBase::removeLayer(int idx)
         {
             mixerEngine.channels[(size_t) d].copyFrom(mixerEngine.channels[(size_t) (d + 1)]);
             mixerEngine.moveSidechainEnv(d + 1, d);   // the follower moves with its strip
+            mixerEngine.moveStripRamp(d + 1, d);      // and so do its gain ramp and bus routing
             layers[(size_t) d]->onMoved(d);
         }
         mixerEngine.channels[(size_t) (n - 1)].reset();
         mixerEngine.resetSidechainEnv(n - 1);
+        mixerEngine.resetStripRamp(n - 1);
         // The removed slot's tails are cut; owned tails above it move down with their layers (empty bins in
         // every product today).
         retireBin.removeRow(idx, n);
@@ -1613,6 +1616,7 @@ void ProcessorBase::resetLayer(int idx)
         layers[(size_t) idx]->adoptDefaults(*fresh);
         mixerEngine.channels[(size_t) idx].reset();
         mixerEngine.resetSidechainEnv(idx);
+        mixerEngine.resetStripRamp(idx);
         layersMoved(idx, idx);
     }
 

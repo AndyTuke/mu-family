@@ -372,6 +372,12 @@ void PluginProcessor::restoreRhythmSample(int i, const juce::ValueTree& tree,
         samples.setPath(i, *path);
 }
 
+// A full preset or session needs at least one Rhythm child, else slot 0 would be left without a voice.
+static bool hasRhythmChild(const juce::ValueTree& root)
+{
+    return root.getChildWithName("Rhythm").isValid();
+}
+
 // Build the whole prepared payload from a parsed MuClidPreset root (at most `maxRhythms` rhythms:
 // an unlicensed build activates no more than its demo cap).
 static HotSwapStager::PreparedFullPreset
@@ -455,6 +461,13 @@ bool PluginProcessor::loadPresetFile(const juce::File& file)
     // build + same commit code — only the trigger differs, so stopped and playing loads
     // are identical by construction (no divergent second path) and the stopped
     // load is glitch-free with its sample disk I/O done off the layersLock.
+    if (! hasRhythmChild(root))
+    {
+        noteFullPresetLoadFailed();
+        if (onLoadError) onLoadError("Preset has no rhythms: " + file.getFileName());
+        return false;
+    }
+
     auto prepared = prepareFullPreset(root);
     if (sequencerPlaying.load())
     {

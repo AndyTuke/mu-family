@@ -14,7 +14,7 @@ StepRows::StepRows(TrackHost& trackHost)
     shownPasses.fill(-2);
     pager.pageCount = [this] { return numPages(); };
     pager.lengthRow = [this]() -> StepRow* { return selected >= 0 && selected < host.getTrackCount() ? &host.getTrack(selected).row : nullptr; };
-    pager.onChanged = [this] { repaint(); };
+    pager.onChanged = [this] { repaint(); if (onLengthChanged) onLengthChanged(); };
     addAndMakeVisible(pager);
     refreshControls();
     startTimerHz(mu_ui::kUiRefreshHz);   // playhead

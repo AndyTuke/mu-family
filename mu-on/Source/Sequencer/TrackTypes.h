@@ -7,8 +7,8 @@
 
 #include <memory>
 
-// mu-On's six layer types (docs/mu-tronic/design.md 1.4): Kick, Bass, Hat, Snare, Rumble and FM Perc are one class,
-// Track, whose type is the engine it runs. All six share the parameter prefix `t` and the extension .muTrack;
+// mu-On's seven layer types (docs/mu-tronic/design.md 1.4): Kick, Bass, Hat, Snare, Rumble, FM Perc and Chord are one class,
+// Track, whose type is the engine it runs. All seven share the parameter prefix `t` and the extension .muTrack;
 // the id, not the prefix, identifies the type. Message-thread data only: the constants describe and
 // construct, they never dispatch (rendering stays virtual on Layer).
 namespace mu_on
@@ -86,7 +86,7 @@ inline mu_core::LayerTypeInfo makeTrackTypeInfo(EngineType engine) noexcept
     info.presetTag = kTrackPresetTag;
     info.descriptor = trackDescriptor(engine);
     info.discInitial = trackInitial(engine);
-    info.typeFromPreset = &typeFromPreset;   // the six types share .muTrack: the engine a preset saved names its type
+    info.typeFromPreset = &typeFromPreset;   // the seven types share .muTrack: the engine a preset saved names its type
     info.addLayerParams = &addLayerParams;   // one table per prefix: every engine's rows exist on every track
     info.create = &createTrack;
     return info;

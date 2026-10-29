@@ -53,10 +53,17 @@ VoiceEngine::DecodedSample VoiceEngine::decodeFile(const juce::File& file)
     if (reader->lengthInSamples > static_cast<juce::int64>(std::numeric_limits<int>::max()))
         return out;
 
+    // Cap the decoded size so a huge file cannot exhaust memory (about 1 GB of floats) on the message thread.
+    constexpr juce::int64 kMaxDecodedFloats = 256ll * 1024 * 1024;
+    if (! (reader->sampleRate > 0.0)
+        || reader->lengthInSamples * static_cast<juce::int64>(reader->numChannels) > kMaxDecodedFloats)
+        return out;
+
     const int numSamples  = static_cast<int>(reader->lengthInSamples);
     const int numChannels = static_cast<int>(reader->numChannels);
     juce::AudioBuffer<float> temp(numChannels, numSamples);
-    reader->read(&temp, 0, numSamples, 0, true, true);
+    if (! reader->read(&temp, 0, numSamples, 0, true, true))
+        return out;
 
     out.buffer     = std::move(temp);
     out.sampleRate = reader->sampleRate;
@@ -89,15 +96,24 @@ VoiceEngine::DecodedSample VoiceEngine::takeSample()
     return out;
 }
 
-void VoiceEngine::loadFile(const juce::File& file)
+bool VoiceEngine::loadFile(const juce::File& file)
 {
     // The file is read outside the lock; installSample holds it only to move the new buffer in.
-    installSample(decodeFile(file));
+    auto decoded = decodeFile(file);
+    if (! decoded.isValid())
+        return false;
+    installSample(std::move(decoded));
+    return true;
 }
 
 void VoiceEngine::trigger(bool isAccented, bool tied)
 {
     applyPendingParams();
+
+    // Nothing to play: process() returns before running the voices, so a trigger here would leave the
+    // voices and envelopes active forever (a retired engine never drains) and fire a stale hit on a later load.
+    if (! sampleLoaded.load(std::memory_order_relaxed))
+        return;
 
     accentGain = isAccented ? juce::Decibels::decibelsToGain(activeParams.accentDb) : 1.0f;
 

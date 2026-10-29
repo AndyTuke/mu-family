@@ -142,7 +142,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     const auto t = resolveBlockTransport(midiMessages, buffer.getNumSamples());
     renderAndMix(buffer, midiMessages, t);
 
-    // Hot-swap: flag the staged presets whose bar line (each track's loopBeats, 4) passed in this block, or the
+    // Hot-swap: flag the staged presets whose wrap (each track's loopBeats, its row length) passed in this block, or the
     // transport stopped.
     flagLayerSwapBoundaries(t);
 }

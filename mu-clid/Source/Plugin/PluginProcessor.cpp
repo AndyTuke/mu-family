@@ -148,6 +148,11 @@ void PluginProcessor::changeProgramName(int, const juce::String&) {}
 //==============================================================================
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
+    // Swaps staged under the old rate / block size hold voices prepared for it; installRhythm does not
+    // re-prepare them, so drop them when the stream format changes.
+    if (sampleRate != currentSampleRate || samplesPerBlock != currentBlockSize)
+        hotSwapStager.cancelAllStaged();
+
     currentSampleRate = sampleRate;
     currentBlockSize  = samplesPerBlock;
     sequencerPlaying.store(false);   // no block has been processed since this prepare: a load now applies at once

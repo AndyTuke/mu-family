@@ -113,6 +113,7 @@ juce::Colour LayerPanel::layerColour() const
 
 void LayerPanel::timerCallback()
 {
+    if (! isShowing()) return;   // nothing to refresh while hidden (e.g. behind another overlay or tab)
     modulatorPanel.setPlayheadBeat(beatSource());
     header.refreshNotesIn();   // the channel follows its parameter (a state load, another instance of the control)
     header.setDeleteEnabled(proc.getNumLayers() > 1 || proc.layersAreSlots());   // the last layer cannot be deleted: grey, not a silent no-op

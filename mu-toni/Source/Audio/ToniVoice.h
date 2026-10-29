@@ -178,8 +178,10 @@ public:
         const float envPitch = params.pitchEnvDepth * envP;
         const float m1 = baseMidi + osc1Semis + (params.pitchEnvTarget == 0 ? envPitch : 0.0f);
         const float m2 = baseMidi + osc2Semis + envPitch;
-        oscs.osc1.setFrequency(midiToFreq(m1));
-        oscs.osc2.setFrequency(midiToFreq(m2));
+        // Keep both oscillators below ~0.45 sr so a high note plus pitch envelope cannot alias or run away.
+        const float maxHz = (float) (0.45 * sr);
+        oscs.osc1.setFrequency(juce::jmin(midiToFreq(m1), maxHz));
+        oscs.osc2.setFrequency(juce::jmin(midiToFreq(m2), maxHz));
 
         // Filter cutoff with envelope (depth in octaves), clamped to a safe range.
         const float accentNow = accentLevel.getCurrentValue();

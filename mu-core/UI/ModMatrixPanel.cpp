@@ -98,27 +98,32 @@ ModMatrixPanel::ModMatrixPanel()
         juce::PopupMenu menu;
         for (int i = 0; i < Layer::MaxControlSequences; ++i)
             menu.addItem(i + 1, "Mod " + juce::String::charToString('A' + i));
-        menu.showMenuAsync(juce::PopupMenu::Options{}, [this](int result)
+        // SafePointer: the panel can be closed or its layer swapped while the menu is open.
+        juce::Component::SafePointer<ModMatrixPanel> safe(this);
+        menu.showMenuAsync(juce::PopupMenu::Options{}, [safe](int result)
         {
-            if (result < 1 || !layer) return;
+            auto* self = safe.getComponent();
+            if (result < 1 || self == nullptr || self->layer == nullptr) return;
+            auto& lyr = *self->layer;
             const int csIndex = result - 1;
             ModulationAssignment a;
             a.id            = "cs" + std::to_string(csIndex) + "_assign_" +
                               juce::Uuid().toString().toStdString();
             a.sourceId      = "cs" + std::to_string(csIndex) + "_output";
-            a.destinationId = (destProvider && destProvider->resolveId)
-                                  ? destProvider->resolveId(1)
+            a.destinationId = (self->destProvider && self->destProvider->resolveId)
+                                  ? self->destProvider->resolveId(1)
                                   : std::string{};
             a.depth         = 0.0f;
-            if (lockMods(*layer))
+            // A refused add (cap reached) just leaves the list unchanged; the rebuild below shows the true state.
+            if (lockMods(lyr))
             {
-                layer->modulationMatrix.addAssignment(a);
-                unlockMods(*layer);
+                lyr.modulationMatrix.addAssignment(a);
+                unlockMods(lyr);
             }
-            rebuildRows();
-            resized();
-            repaint();
-            if (onChange) onChange();
+            self->rebuildRows();
+            self->resized();
+            self->repaint();
+            if (self->onChange) self->onChange();
         });
     };
 }
@@ -229,7 +234,6 @@ void ModMatrixPanel::rebuildRows()
         addAndMakeVisible(*row);
 
         const std::string rowId    = a.id;
-        const std::string sourceId = a.sourceId;
 
         row->onRemove = [this, rowId]
         {
@@ -246,22 +250,12 @@ void ModMatrixPanel::rebuildRows()
                     { p->rebuildRows(); p->resized(); p->repaint(); }
             });
         };
-        row->onDestChange = [this, rowId, sourceId](const std::string& dest)
+        row->onDestChange = [this, rowId](const std::string& dest)
         {
+            // On a refused retarget (cycle) the old routing stays, and the rebuild below resets the combo to it.
             if (lockMods(*layer))
             {
-                float d = 0.0f;
-                float c = 0.0f;
-                for (const auto& a2 : layer->modulationMatrix.getAssignments())
-                    if (a2.id == rowId) { d = a2.depth; c = a2.curve; break; }
-                layer->modulationMatrix.removeAssignment(rowId);
-                ModulationAssignment na;
-                na.id            = rowId;
-                na.sourceId      = sourceId;
-                na.destinationId = dest;
-                na.depth         = d;
-                na.curve         = c;
-                layer->modulationMatrix.addAssignment(na);
+                layer->modulationMatrix.retargetAssignment(rowId, dest);
                 unlockMods(*layer);
             }
             if (onChange) onChange();
@@ -274,12 +268,13 @@ void ModMatrixPanel::rebuildRows()
         };
         row->onDepthChange = [this, rowId](float d)
         {
+            // Skip onChange when the lock was not obtained, so nothing downstream sees a value the engine never got.
             if (lockMods(*layer))
             {
                 layer->modulationMatrix.setDepth(rowId, d);
                 unlockMods(*layer);
+                if (onChange) onChange();
             }
-            if (onChange) onChange();
         };
         row->onCurveChange = [this, rowId](float c)
         {
@@ -287,8 +282,8 @@ void ModMatrixPanel::rebuildRows()
             {
                 layer->modulationMatrix.setCurve(rowId, c);
                 unlockMods(*layer);
+                if (onChange) onChange();
             }
-            if (onChange) onChange();
         };
 
         row->destCombo.setLcdStyle(metal);

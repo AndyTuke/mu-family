@@ -269,7 +269,9 @@ void PatternContent::timerCallback()
     const double beat    = host.getPatternTransportBeat();
     const auto* gPat = &host.getPatternLayer(currentLayer).gate;
     const double patBeats = (double) gPat->patternLengthBars * 4.0;
-    const double beat01  = (patBeats > 0.0) ? std::fmod(beat, patBeats) / patBeats : 0.0;
+    double wrapped = (patBeats > 0.0) ? std::fmod(beat, patBeats) : 0.0;
+    if (wrapped < 0.0) wrapped += patBeats;   // a count-in before beat 0 still lands inside the pattern
+    const double beat01  = (patBeats > 0.0) ? wrapped / patBeats : 0.0;
     gatingDesigner.setPlayhead(beat01, playing);
 
     // Sync filter-type dropdown from APVTS so DAW automation is reflected in the UI.

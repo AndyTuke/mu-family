@@ -225,6 +225,8 @@ public:
     struct GainRamp { float l = 1.0f, r = 1.0f; bool primed = false; };
     GainRamp channelRamp[MaxChannels];
     GainRamp busRamp[kNumBuses > 0 ? kNumBuses : 1];
+    GainRamp returnRamp[3];   // effect, delay, reverb returns
+    GainRamp masterRamp;
     // The bus (-1 = master) each channel's dry signal went to last block; kBusUnset until its first block.
     // A change crossfades old to new across the block.
     static constexpr int kBusUnset = -2;
@@ -378,6 +380,25 @@ public:
 
     // Carry one strip's sidechain follower to another slot (a remove shifts the strips down).
     void moveSidechainEnv(int from, int to) noexcept { scEnv[to] = scEnv[from]; }
+
+    // Carry one strip's gain ramp and bus routing to another slot (a remove shifts the strips down), so the
+    // shifted strip continues from what it was playing instead of the old slot's gain and bus.
+    void moveStripRamp(int from, int to) noexcept
+    {
+        channelRamp[to]    = channelRamp[from];
+        channelLastBus[to] = channelLastBus[from];
+    }
+
+    // A slot got a fresh strip (add, reset, the vacated top slot after a remove): its next block starts at its
+    // target gain and bus, as a strip's first block does.
+    void resetStripRamp(int channelIndex) noexcept
+    {
+        if (channelIndex >= 0 && channelIndex < MaxChannels)
+        {
+            channelRamp[channelIndex]    = GainRamp {};
+            channelLastBus[channelIndex] = kBusUnset;
+        }
+    }
 
     // Reset the sidechain envelope follower for one channel slot: used when a slot gets a fresh strip
     // (add, reset, the vacated top slot after a remove), so no old ducking envelope carries over.

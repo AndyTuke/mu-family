@@ -69,7 +69,7 @@ namespace mu_core
                 if (! p.inUse) { p.inUse = true; p.retired = false; dst = &p.view; break; }
             if (dst == nullptr)
             {
-                overflow.push_back({ std::make_unique<LayerView>(), 0, false });
+                overflow.push_back({ std::make_unique<LayerView>(), 0, false });   // rt-ok: writer thread, never the audio block
                 dst = overflow.back().view.get();
                 ++overflowAllocations;
             }
@@ -143,7 +143,7 @@ namespace mu_core
                    const std::array<std::unique_ptr<Layer>, mu_limits::kMaxLayers>& layers) noexcept
             : access(state), lock(layersLock)
         {
-            access.epoch.enter();
+            access.epoch.enter();   // rt-ok: epoch counter, not a lock
             if (access.mode == LayerAccess::TryLock)
             {
                 if (! lock.tryEnter()) return;

@@ -119,12 +119,17 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
                 g.drawRoundedRectangle(cell.reduced(thick * 0.5f), juce::jmax(1.0f, 3.0f - thick * 0.5f), thick);
             }
         }
-        if (opts.ties && showSteps && pos > 0 && ! beyond && row.tiedFrom(s))   // tied to the step before: a bar joins the two lamps
+        if (opts.ties && showSteps && ! beyond && row.tiedFrom(s))   // tied to the step before: a bar joins the two lamps
         {
-            const auto prev = cellRect(cells, pos - 1);
             const float h = cell.getHeight() * 0.45f;
             g.setColour(lens.brighter(L.lampHot * 2.0f));
-            g.fillRect(juce::Rectangle<float>(prev.getRight() - 2.0f, cell.getCentreY() - h * 0.5f, cell.getX() - prev.getRight() + 4.0f, h));
+            if (pos > 0)
+            {
+                const auto prev = cellRect(cells, pos - 1);
+                g.fillRect(juce::Rectangle<float>(prev.getRight() - 2.0f, cell.getCentreY() - h * 0.5f, cell.getX() - prev.getRight() + 4.0f, h));
+            }
+            else   // the first cell of a page: the tie comes from the page before, so a short stub shows it
+                g.fillRect(juce::Rectangle<float>(cell.getX() - 2.0f, cell.getCentreY() - h * 0.5f, 6.0f, h));
         }
         if (s == selectedStep)   // the step the Step panel edits
         {

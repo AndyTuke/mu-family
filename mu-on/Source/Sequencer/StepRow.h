@@ -192,22 +192,27 @@ public:
         const auto spreadList = juce::StringArray::fromTokens(row.getProperty("spread").toString(), ",", "");
         const auto probs = juce::StringArray::fromTokens(row.getProperty("prob").toString(), ",", "");
         const juce::String loops = row.getProperty("loop").toString();
-        setNumSteps(row.hasProperty("len") ? (int) row.getProperty("len") : kNumSteps);
+        // The audio thread may be reading this row, so each cell is stored directly (setOn would clear the neighbouring
+        // ties, which flickers a Bass retrigger) and the length is written last, so a longer row never exposes cells
+        // that are not loaded yet.
         for (int s = 0; s < kMaxSteps; ++s)
         {
-            setOpen  (s, s < op.length() && op[s] == '1');
+            auto& c = cells[(size_t) s];
+            const bool isAcc = s < ac.length() && ac[s] == '1';
+            c.open.store(s < op.length() && op[s] == '1', std::memory_order_relaxed);
             setStepProb(s, s < probs.size() ? probs[s].getIntValue() : 100);
             setStepLoop(s, s < loops.length() && juce::CharacterFunctions::isDigit(loops[s]) ? (int) (loops[s] - '0') : 0);
-            setOn    (s, s < on.length() && on[s] == '1');
-            setAccent(s, s < ac.length() && ac[s] == '1');
-            setGhost (s, s < gh.length() && gh[s] == '1' && ! isAccent(s));
-            setTied  (s, s < tie.length() && tie[s] == '1');
+            c.on.store(s < on.length() && on[s] == '1', std::memory_order_relaxed);
+            c.accent.store(isAcc, std::memory_order_relaxed);
+            c.ghost.store(s < gh.length() && gh[s] == '1' && ! isAcc, std::memory_order_relaxed);
+            c.tie.store(s < tie.length() && tie[s] == '1', std::memory_order_relaxed);
             setStepOctave(s, s < octs.size() ? octs[s].getIntValue() : 0);
             setStepNote  (s, s < notes.size() ? notes[s].getIntValue() : 0);
             setStepChord    (s, s < chordList.size() ? chordList[s].getIntValue() : kDefaultChord);
             setStepInversion(s, s < invList.size() ? invList[s].getIntValue() : 0);
             setStepSpread   (s, s < spreadList.size() ? spreadList[s].getIntValue() : 0);
         }
+        setNumSteps(row.hasProperty("len") ? (int) row.getProperty("len") : kNumSteps);
     }
 
 private:

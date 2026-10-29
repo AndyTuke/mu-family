@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Plugin/ShellBackend.h"
+#include "Persistence/PresetFiles.h"     // replaceFileAtomically
 #include "Plugin/TransportResolver.h"   // kNudgeBendPercent
 #include "Link/MuLinkProtocol.h"        // readTransport
 #include "../Server/AudioServer.h"
@@ -204,7 +205,7 @@ private:
     {
         if (auto xml = juce::parseXML(settingsFile))
         {
-            uiScale = (float) xml->getDoubleAttribute("uiScale", (double) kUiScaleMedium);
+            uiScale = std::clamp((float) xml->getDoubleAttribute("uiScale", (double) kUiScaleMedium), kUiScaleMedium, kUiScaleLarge);
             server.setSyncOffsetMs(std::clamp(xml->getIntAttribute("syncOffsetMs", 0), kSyncOffsetMinMs, kSyncOffsetMaxMs));
             latencyIndex = std::clamp(xml->getIntAttribute("latency", 1), 0, 2);
         }
@@ -216,8 +217,9 @@ private:
         xml.setAttribute("uiScale", (double) uiScale);
         xml.setAttribute("syncOffsetMs", server.syncOffsetMs());
         xml.setAttribute("latency", latencyIndex);
-        rootDir.createDirectory();
-        xml.writeTo(settingsFile);
+        // Atomic write so a crash or lock mid-save never leaves a truncated settings file.
+        mu_pp::replaceFileAtomically(settingsFile, xml.toString(),
+                                     [](const juce::String& why) { juce::Logger::writeToLog("MuLink settings: " + why); });
     }
 
     AudioServer& server;

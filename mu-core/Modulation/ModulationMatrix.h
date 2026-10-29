@@ -34,6 +34,10 @@ public:
     // or if MaxAssignments is reached.
     bool addAssignment(const ModulationAssignment& a);
 
+    // Moves an existing assignment to a new destination, keeping its source, depth and curve. Returns false
+    // (and leaves the old assignment untouched) if it is not found or the new one would form a cycle.
+    bool retargetAssignment(const std::string& id, const std::string& newDestinationId);
+
     // Removes the assignment with the given ID. No-op if not found.
     void removeAssignment(const std::string& id);
 

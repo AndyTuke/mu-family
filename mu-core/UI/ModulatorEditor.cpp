@@ -500,20 +500,20 @@ void ModulatorEditor::rebuildRows()
         row->onDestChange = [this, rowId](const std::string& dest)
         {
             if (!matrix) return;
-            float d = 0.0f;
-            float c = 0.0f;
+            // retargetAssignment keeps source, depth and curve; on a refused move (cycle) the old routing stays.
             lockMod();
-            for (const auto& a2 : matrix->getAssignments())
-                if (a2.id == rowId) { d = a2.depth; c = a2.curve; break; }
-            matrix->removeAssignment(rowId);
-            ModulationAssignment na;
-            na.id            = rowId;
-            na.sourceId      = cs->id + "_output";
-            na.destinationId = dest;
-            na.depth         = d;
-            na.curve         = c;   // preserve curve through dest change
-            matrix->addAssignment(na);
+            const bool moved = matrix->retargetAssignment(rowId, dest);
             unlockMod();
+            if (! moved)
+            {
+                // Put the row's dropdown back to the routing that is actually in force.
+                juce::Component::SafePointer<ModulatorEditor> safe(this);
+                juce::MessageManager::callAsync([safe]
+                {
+                    if (auto* p = safe.getComponent())
+                        { p->rebuildRows(); p->resized(); p->repaint(); }
+                });
+            }
             updateStepQuantization();
             if (onChange) onChange();
         };

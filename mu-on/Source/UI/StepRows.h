@@ -30,6 +30,7 @@ public:
     // The step outlined in the selected row (-1: none), and the callback for a right-click that selects a step: (row, step).
     void setSelectedStep(int step) { selectedStep = step; repaint(); }
     std::function<void(int row, int step)> onStepSelected;
+    std::function<void()> onLengthChanged;   // a page or a row's Length changed: the Step panel may need to follow
 
     std::function<void(int)> onRowClicked;   // a click landed in layer idx's row: the editor selects it
 

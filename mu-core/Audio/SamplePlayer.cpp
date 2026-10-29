@@ -11,6 +11,12 @@ void SamplePlayer::trigger(int fadeInSamples)
     triggered.store(true, std::memory_order_release);
 }
 
+// A NaN, zero or negative ratio would stall or run backwards; NaN fails the > test so it maps to the floor.
+static double safeRatio(double r) noexcept
+{
+    return (r > 1.0e-3) ? std::min(r, 64.0) : 1.0e-3;
+}
+
 void SamplePlayer::skip(const double* ratios, int numSamples) noexcept
 {
     // A pending trigger stays pending: the new hit starts at its sample 0 (with its fade-in) in the next rendered
@@ -20,7 +26,7 @@ void SamplePlayer::skip(const double* ratios, int numSamples) noexcept
 
     // The same per-sample advance as process(), with nothing read or written.
     for (int s = 0; s < numSamples; ++s)
-        playPos += ratios[s];
+        playPos += safeRatio(ratios[s]);
     fadeInRemaining = std::max(0, fadeInRemaining - numSamples);
 }
 
@@ -81,6 +87,6 @@ void SamplePlayer::process(const juce::AudioBuffer<float>& source,
             output.addSample(ch, s, smp * fadeGain);
         }
 
-        playPos += ratios[s];
+        playPos += safeRatio(ratios[s]);
     }
 }

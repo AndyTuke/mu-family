@@ -2,7 +2,7 @@
 #
 # This is a cheap tripwire, not a proof. It reads source text, not call graphs: it cannot know which
 # function runs inside processBlock. It therefore scans the files that make up the audio path
-# (mu-core Audio/, Modulation/, Sequencer/ and the transport helpers; every product's Source/Audio,
+# (mu-core Audio/, Modulation/, Sequencer/, Control/, ProcessorBase*.cpp and the Plugin/ render, retire and transport helpers; every product's Source/Audio,
 # Source/Sequencer, Source/Modulation and Source/Plugin/PluginProcessor*) and reports lines that match one
 # of the rules below. Expect false positives; the dsp-controller reads the report, it decides nothing.
 # The exit code is ALWAYS 0 (setup errors excepted: exit 2), so the script can run in /build without
@@ -71,8 +71,10 @@ function Add-Tree([string]$dir) {
         Get-ChildItem -LiteralPath $dir -Recurse -File -Include '*.h', '*.cpp' | ForEach-Object { $scanFiles.Add($_.FullName) }
     }
 }
-foreach ($d in 'Audio', 'Modulation', 'Sequencer') { Add-Tree (Join-Path $Root "mu-core/$d") }
-foreach ($f in 'Plugin/TimedMidiOut.h', 'Plugin/TransportResolver.h', 'Plugin/HostTransport.h') {
+foreach ($d in 'Audio', 'Modulation', 'Sequencer', 'Control') { Add-Tree (Join-Path $Root "mu-core/$d") }
+foreach ($f in 'Plugin/TimedMidiOut.h', 'Plugin/TransportResolver.h', 'Plugin/HostTransport.h',
+          'Plugin/ProcessorBase.cpp', 'Plugin/ProcessorBase_Render.cpp', 'Plugin/RetireBin.h', 'Plugin/LayerBlock.h',
+          'Plugin/HotSwap.h', 'Plugin/ProductRender.h', 'Plugin/RenderSupport.h', 'Plugin/MidiClockSync.h') {
     $p = Join-Path $Root "mu-core/$f"
     if (Test-Path -LiteralPath $p -PathType Leaf) { $scanFiles.Add((Resolve-Path -LiteralPath $p).Path) }
 }

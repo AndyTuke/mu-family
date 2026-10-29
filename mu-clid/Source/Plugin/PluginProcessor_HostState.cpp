@@ -55,6 +55,11 @@ void PluginProcessor::restoreSession(const juce::ValueTree& root)
 {
     // A host restore applies at once (the project is loading, not a live swap), through the
     // full-preset prepare + commit; then the rows for the parameters the tree doesn't carry.
+    if (! root.getChildWithName("Rhythm").isValid())   // no rhythms: slot 0 would be left without a voice
+    {
+        if (onLoadError) onLoadError("Host state restore failed: no rhythms");
+        return;
+    }
     auto prepared = prepareFullPreset(root);
     commitStagedFullPreset(prepared);
 

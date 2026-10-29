@@ -51,6 +51,28 @@ bool ModulationMatrix::addAssignment(const ModulationAssignment& a)
     return true;
 }
 
+bool ModulationMatrix::retargetAssignment(const std::string& id, const std::string& newDestinationId)
+{
+    const auto it = std::find_if(assignments.begin(), assignments.end(),
+                                 [&id](const ModulationAssignment& a) { return a.id == id; });
+    if (it == assignments.end())
+        return false;
+
+    // Take the old row out, try the new one, and put the old one back at its place if it is refused.
+    const auto index = it - assignments.begin();
+    const ModulationAssignment old = *it;
+    assignments.erase(it);
+
+    ModulationAssignment moved = old;
+    moved.destinationId = newDestinationId;
+    if (addAssignment(moved))
+        return true;
+
+    assignments.insert(assignments.begin() + index, old);
+    rebuildCache();
+    return false;
+}
+
 void ModulationMatrix::removeAssignment(const std::string& id)
 {
     assignments.erase(
@@ -101,7 +123,7 @@ void ModulationMatrix::rebuildCache()
     //   - every assignment depth key (meta-modulation sources)
     // (A previous version cleared + re-inserted inside process(), which freed these
     // nodes every block and reallocated them on the audio thread.)
-    const std::size_t needed = (std::size_t) mu_limits::kMaxControlSequences + n + 4;
+    const std::size_t needed = (std::size_t) mu_limits::kMaxControlSequences + 2 * n + 4;
     workMap.clear();
     if (workMap.bucket_count() < needed)
         workMap.reserve(needed + 16);
@@ -110,6 +132,9 @@ void ModulationMatrix::rebuildCache()
         workMap.emplace("cs" + std::to_string(i) + "_output", 0.0f);
     for (std::size_t i = 0; i < n; ++i)
         workMap.emplace(cachedDepthKeys[i], 0.0f);
+    // Also seed every source an assignment reads, so custom/imported sequence ids are written in process().
+    for (const auto& a : assignments)
+        workMap.emplace(a.sourceId, 0.0f);
 }
 
 void ModulationMatrix::process(const std::vector<ControlSequence>& sequences,
@@ -122,8 +147,13 @@ void ModulationMatrix::process(const std::vector<ControlSequence>& sequences,
     // No clear()/insert here — rebuildCache() (message thread) pre-inserted every
     // CS-output and depth key, so these are pure overwrites: no audio-thread alloc.
     // CS output keys are short ("cs0_output" = 10 chars) and fit in SSO on all platforms.
+    // find-and-skip: an id that rebuildCache() did not seed (and no assignment reads) would insert a node here.
     for (const auto& cs : sequences)
-        workMap[cs.id + "_output"] = cs.evaluate(songBeatPos);
+    {
+        auto it = workMap.find(cs.id + "_output");
+        if (it != workMap.end())
+            it->second = cs.evaluate(songBeatPos);
+    }
 
     // Use pre-computed keys to avoid heap allocation for long UUID-based assignment IDs.
     for (std::size_t i = 0; i < assignments.size(); ++i)

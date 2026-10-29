@@ -106,8 +106,8 @@ PluginProcessor::ImportResult PluginProcessor::importProductPreset(const juce::F
     {
         const int slot = freeSlots[(size_t) i];
         const juce::String prefix = "ch" + juce::String(slot) + "_";
-        for (const auto& row : imported.entries[(size_t) i].strip)
-            if (auto* param = apvts.getParameter(prefix + row.suffix))
+        for (const char* suffix : kStripSuffixes)
+            if (auto* param = apvts.getParameter(prefix + suffix))
                 param->setValueNotifyingHost(param->getDefaultValue());
         for (const auto& row : imported.entries[(size_t) i].strip)
         {
@@ -158,8 +158,8 @@ PluginProcessor::ImportResult PluginProcessor::importProductPreset(const juce::F
                                 (float) remapImportedSidechain((int) std::lround(row.value), freeSlots[(size_t) i], slotOfSource)));
             }
             else
-                for (const auto& row : imported.entries[(size_t) i].strip)
-                    if (auto* param = apvts.getParameter(prefix + row.suffix))
+                for (const char* suffix : kStripSuffixes)
+                    if (auto* param = apvts.getParameter(prefix + suffix))
                         param->setValueNotifyingHost(param->getDefaultValue());
         }
 

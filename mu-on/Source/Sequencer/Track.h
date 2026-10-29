@@ -24,7 +24,7 @@ namespace mu_on
 // with it through add / delete / reorder: its step row and the row's clock, its Rumble volume envelope, the
 // trigger counter the audio thread bumps and the editor polls to pulse the sidebar item, and its sound engines
 // (Kick, Bass, Hat, Snare, Rumble, FM Perc, Chord; the one that plays is named by its `t{N}_eng` parameter). A track whose engine
-// can change (every mu-On track) holds all five, built and prepared, so a change of the parameter from any thread
+// can change (every mu-On track) holds all seven, built and prepared, so a change of the parameter from any thread
 // (host automation on the audio thread included) switches the engine in the same block, as the per-slot engines
 // always did. A track whose host fixes its engine (engineLocked: a mu-Tronic layer) holds only that one.
 //
@@ -56,7 +56,7 @@ struct Track : Layer
     // The slot this track sits in (kept current by the structural edits through onMoved).
     int slot = 0;
 
-    // True when the host fixes this track's engine (a mu-Tronic layer is created as one of the five types and
+    // True when the host fixes this track's engine (a mu-Tronic layer is created as one of the seven types and
     // keeps it): the content hides the Engine selector, engineSetting() returns the locked engine whatever
     // `t{N}_eng` holds, and syncEngine keeps only that engine (one per layer, design 1.4). Set by lockEngine
     // on the message thread before the layer is published; false in mu-On, so the standalone is unchanged.
@@ -95,8 +95,8 @@ struct Track : Layer
     void render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n) override;
     // Audio thread: a parked spare's row clock keeps step with the transport, so it fires on time once live.
     void onParkedBlock(const mu_core::RenderContext& ctx) override;
-    // A staged track preset lands on the 16-step row's wrap: the bar.
-    double loopBeats() const override { return 4.0; }
+    // A staged track preset lands on the row's wrap: its length in steps (16 steps is the bar).
+    double loopBeats() const override { return row.numSteps() * StepClock::kStepBeats; }
 
     // ── How the track leaves its slot ────────────────────────────────────────
     // Fade (the family defaults, 25 ms and 2 s): the engine that last sounded keeps the parameters it was last
@@ -119,7 +119,7 @@ struct Track : Layer
     // The engine the track runs: the locked one, else the one its `t{N}_eng` parameter names (any thread;
     // Kick before bindParams).
     EngineType engineSetting() const noexcept;
-    // Message thread: brings the engines the track holds to the set it needs (all five; with engineLocked only
+    // Message thread: brings the engines the track holds to the set it needs (all seven; with engineLocked only
     // the one its parameter names). Missing engines are built and prepared outside every lock and installed
     // under the engine lock; engines no longer needed are taken out under it and freed here. True when it
     // changed the set. For an unlocked track this runs once (at creation); later parameter changes need none.

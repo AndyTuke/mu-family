@@ -31,7 +31,7 @@ inline constexpr EngineType engineFromIndex(int index) noexcept
 }
 inline constexpr int toIndex(EngineType e) noexcept { return static_cast<int>(e); }
 
-// The layer type a track running each engine is (design 1.4: the five engines are five layer types over one
+// The layer type a track running each engine is (design 1.4: the seven engines are seven layer types over one
 // class). The one mapping: it relies on LayerTypeId's Kick .. FmPerc standing in EngineType's order, which the
 // asserts below keep true.
 inline constexpr mu_core::LayerTypeId layerTypeOf(EngineType engine) noexcept

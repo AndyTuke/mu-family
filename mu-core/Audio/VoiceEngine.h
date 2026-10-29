@@ -22,7 +22,7 @@ public:
     VoiceEngine();
 
     void prepareToPlay(double sampleRate, int blockSize);
-    void loadFile(const juce::File& file);
+    bool loadFile(const juce::File& file);   // false when the file cannot be decoded; the old sample keeps playing
     void clearSample();
 
     // A sample read from a file and kept, so a staged preset can do its file work early and install at its boundary

@@ -119,7 +119,13 @@ void MidiControlMap::load()
     if (storageFile == juce::File() || ! storageFile.existsAsFile()) return;
     const juce::var json = juce::JSON::parse(storageFile);
     auto* obj = json.getDynamicObject();
-    if (obj == nullptr) return;
+    if (obj == nullptr)
+    {
+        // The file exists but could not be read (locked or corrupt): keep it, and refuse to save over it.
+        loadFailed.store(true, std::memory_order_relaxed);
+        return;
+    }
+    loadFailed.store(false, std::memory_order_relaxed);
 
     bool renamed = false;
     {
@@ -167,6 +173,7 @@ void MidiControlMap::setIdPrefixRenames(std::vector<std::pair<juce::String, juce
 void MidiControlMap::save() const
 {
     if (storageFile == juce::File()) return;   // never before setStorageFile()
+    if (loadFailed.load(std::memory_order_relaxed)) return;   // the existing file was unreadable: do not overwrite the user's mappings
     storageFile.getParentDirectory().createDirectory();
 
     auto* obj = new juce::DynamicObject();
@@ -192,7 +199,8 @@ void MidiControlMap::save() const
         }
     }
     obj->setProperty("mappings", rows);
-    mu_pp::replaceFileAtomically(storageFile, juce::JSON::toString(json, true));
+    mu_pp::replaceFileAtomically(storageFile, juce::JSON::toString(json, true),
+                                 [](const juce::String& why) { juce::Logger::writeToLog("MidiControlMap: save failed: " + why); });
 }
 
 } // namespace mu_core

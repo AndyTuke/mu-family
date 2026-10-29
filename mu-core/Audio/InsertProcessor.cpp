@@ -1,4 +1,5 @@
 #include "InsertProcessor.h"
+#include <cmath>
 #include "Audio/InsertSlotConfig.h"
 
 #include "Audio/FX/Insert/NoneInsert.h"
@@ -110,5 +111,23 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh,
                     data[i] = postDriveTone[ch].process(data[i]);
             }
         }
+    }
+
+    // NaN / infinity containment at the source: several algorithms keep recursive state (filter, feedback line)
+    // that one bad sample would latch forever, and the master probe alone could only silence the whole plugin.
+    // Adding x * 0 over the block gives NaN if any sample is NaN or infinite and exactly zero otherwise (one
+    // cheap pass, no branch per sample). On a hit this layer's block is silenced and the insert state cleared.
+    float probe = 0.0f;
+    for (int ch = 0; ch < nCh; ++ch)
+    {
+        const float* data = buf.getReadPointer(ch);
+        for (int i = 0; i < ns; ++i)
+            probe += data[i] * 0.0f;
+    }
+    if (! std::isfinite(probe))
+    {
+        for (int ch = 0; ch < nCh; ++ch)
+            buf.clear(ch, 0, ns);
+        reset();
     }
 }

@@ -254,8 +254,12 @@ Wavetable WavetableBank::decodeWavData(const void* wavData, size_t numBytes, con
 
     if (total < frameSize || ch < 1) return {};
 
+    // Wavetables are short; refuse anything huge so a stray WAV cannot hang or exhaust the editor.
+    constexpr juce::int64 kMaxWavetableFloats = 32ll * 1024 * 1024;
+    if (reader->lengthInSamples * (juce::int64) ch > kMaxWavetableFloats) return {};
+
     juce::AudioBuffer<float> buf(ch, total);
-    reader->read(&buf, 0, total, 0, true, ch > 1);
+    if (! reader->read(&buf, 0, total, 0, true, ch > 1)) return {};
 
     const int usable = (total / frameSize) * frameSize;   // whole frames only
     std::vector<float> mono((size_t) usable);
@@ -283,6 +287,8 @@ int WavetableBank::addFromWav(const void* wavData, size_t numBytes, const juce::
 // Decode a file into a tagged Wavetable WITHOUT touching the bank — safe off-lock.
 Wavetable WavetableBank::decodeFile(const juce::File& file)
 {
+    // Cap the raw file size before reading it into memory.
+    if (file.getSize() > 128ll * 1024 * 1024) return {};
     juce::MemoryBlock mb;
     if (! file.loadFileAsData(mb)) return {};
     auto wt = decodeWavData(mb.getData(), mb.getSize(), file.getFileNameWithoutExtension());

@@ -37,6 +37,8 @@ void MixerEngine::prepare(double sr, int blockSize)
     // Gains and bus routing start fresh: the first block after a prepare applies its targets without a ramp.
     for (auto& g : channelRamp) g = GainRamp{};
     for (auto& g : busRamp)     g = GainRamp{};
+    for (auto& g : returnRamp)  g = GainRamp{};
+    masterRamp = GainRamp{};
     for (auto& b : channelLastBus) b = kBusUnset;
     for (auto& buf : channelBufs)
         buf.setSize(2, blockSize, false, true, true);
@@ -561,57 +563,42 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
                                                        sampleRate, scRetEnv[ri]));
     }
 
-    // Re-check after processSends: echo feedback may have produced output even with no
-    // channel send signal this block, so we cannot use the pre-processing doEffect flag.
-    if (hasSignal(effectSendBuf, numSamples))
+    // Mix one FX return: fader / pan ramped from the last block's gain, then added to the output (and bus 9).
+    // A return that just went silent (muted, or off the soloed path) ramps to zero over this block first, as a
+    // channel or bus does, so the cut is not a click. Echo feedback or intra-FX routing (delay to reverb,
+    // effect to reverb) may leave signal in a return even with no channel send this block, so the signal
+    // check comes after processSends, not from the pre-processing flags.
+    auto mixReturn = [&](int ri, juce::AudioBuffer<float>& retBuf)
     {
-        applyPanGain(effectSendBuf, returns[0].level.load(std::memory_order_relaxed),
-                                    returns[0].pan.load(std::memory_order_relaxed), numSamples);
-        if (!returns[0].mute.load(std::memory_order_relaxed)
-            && !(anyReturnSolo && !returns[0].solo.load(std::memory_order_relaxed)))
+        const auto& ret = returns[(size_t) ri];
+        auto& gain = returnRamp[ri];
+        if (! hasSignal(retBuf, numSamples))
         {
-            storePeak(effectSendBuf, numSamples, returnPeaks[0], returnPeaksL[0], returnPeaksR[0]);
-            for (int c = 0; c < numOutCh; ++c)
-                output.addFrom(c, 0, effectSendBuf, c, 0, numSamples);
-            fanOutToFxReturns(effectSendBuf);
+            gain.primed = false;   // nothing was sent: the next block starts at its target gain
+            clearPeak(returnPeaks[ri], returnPeaksL[ri], returnPeaksR[ri]);
+            return;
         }
-        else { clearPeak(returnPeaks[0], returnPeaksL[0], returnPeaksR[0]); }
-    }
-    else { clearPeak(returnPeaks[0], returnPeaksL[0], returnPeaksR[0]); }
 
-    if (hasSignal(delaySendBuf, numSamples))
-    {
-        applyPanGain(delaySendBuf, returns[1].level.load(std::memory_order_relaxed),
-                                   returns[1].pan.load(std::memory_order_relaxed), numSamples);
-        if (!returns[1].mute.load(std::memory_order_relaxed)
-            && !(anyReturnSolo && !returns[1].solo.load(std::memory_order_relaxed)))
+        const bool audible = ! ret.mute.load(std::memory_order_relaxed)
+                          && ! (anyReturnSolo && ! ret.solo.load(std::memory_order_relaxed));
+        const bool fading  = ! audible && gain.primed && (gain.l > 0.0f || gain.r > 0.0f);
+        if (! audible && ! fading)
         {
-            storePeak(delaySendBuf, numSamples, returnPeaks[1], returnPeaksL[1], returnPeaksR[1]);
-            for (int c = 0; c < numOutCh; ++c)
-                output.addFrom(c, 0, delaySendBuf, c, 0, numSamples);
-            fanOutToFxReturns(delaySendBuf);
+            gain.primed = false;
+            clearPeak(returnPeaks[ri], returnPeaksL[ri], returnPeaksR[ri]);
+            return;
         }
-        else { clearPeak(returnPeaks[1], returnPeaksL[1], returnPeaksR[1]); }
-    }
-    else { clearPeak(returnPeaks[1], returnPeaksL[1], returnPeaksR[1]); }
 
-    // Re-check after processSends: intra-FX routing (delay→reverb, effect→reverb) may have
-    // added signal to reverbSendBuf even when no channels had a direct reverb send.
-    if (hasSignal(reverbSendBuf, numSamples))
-    {
-        applyPanGain(reverbSendBuf, returns[2].level.load(std::memory_order_relaxed),
-                                    returns[2].pan.load(std::memory_order_relaxed), numSamples);
-        if (!returns[2].mute.load(std::memory_order_relaxed)
-            && !(anyReturnSolo && !returns[2].solo.load(std::memory_order_relaxed)))
-        {
-            storePeak(reverbSendBuf, numSamples, returnPeaks[2], returnPeaksL[2], returnPeaksR[2]);
-            for (int c = 0; c < numOutCh; ++c)
-                output.addFrom(c, 0, reverbSendBuf, c, 0, numSamples);
-            fanOutToFxReturns(reverbSendBuf);
-        }
-        else { clearPeak(returnPeaks[2], returnPeaksL[2], returnPeaksR[2]); }
-    }
-    else { clearPeak(returnPeaks[2], returnPeaksL[2], returnPeaksR[2]); }
+        applyPanGainRamped(retBuf, audible ? ret.level.load(std::memory_order_relaxed) : 0.0f,
+                                   ret.pan.load(std::memory_order_relaxed), numSamples, gain);
+        storePeak(retBuf, numSamples, returnPeaks[ri], returnPeaksL[ri], returnPeaksR[ri]);
+        for (int c = 0; c < numOutCh; ++c)
+            output.addFrom(c, 0, retBuf, c, 0, numSamples);
+        fanOutToFxReturns(retBuf);
+    };
+    mixReturn(0, effectSendBuf);
+    mixReturn(1, delaySendBuf);
+    mixReturn(2, reverbSendBuf);
 
     // Master inserts — run on the summed bus BEFORE the fader/meter (standard master-bus
     // processing, so a master compressor/limiter sees a consistent pre-fader level), chained
@@ -630,8 +617,8 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
 
     // Apply the master fader, then capture the peak — so the master VU reflects the true
     // post-insert, post-fader output that actually leaves the mixer.
-    applyPanGain(output, masterLevel.load(std::memory_order_relaxed),
-                         masterPan.load(std::memory_order_relaxed), numSamples);
+    applyPanGainRamped(output, masterLevel.load(std::memory_order_relaxed),
+                               masterPan.load(std::memory_order_relaxed), numSamples, masterRamp);
 
     // NaN / infinity containment: one non-finite sample in any feedback state (a delay line, a reverb tail, a
     // master insert) would otherwise repeat forever. Adding x * 0 over the block gives NaN if any sample is

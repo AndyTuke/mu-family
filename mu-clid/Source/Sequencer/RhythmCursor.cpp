@@ -267,11 +267,20 @@ bool RhythmCursor::tryApplyModulatedPattern(const Rhythm& rhy, const EuclidOverr
     if (! mu_core::trySpinLock(patternLock))
         return false;   // the message thread holds the lock: retry next block
 
-    const int oldLen  = (int) safePattern.size();
+    // The message thread writes the generators' fields under voiceParamsLock; hold it (try only) while the
+    // pattern is built so a Steps/Hits drag cannot change them between reads, else retry next block.
+    if (! mu_core::trySpinLock(rhy.voiceParamsLock))
+    {
+        mu_core::spinUnlock(patternLock);
+        return false;
+    }
+
+    const int oldLen = (int) safePattern.size();
     const int oldCLen = (int) safeCPattern.size();
     rhy.getCombinedPattern(ov, safePattern, scratchPatA, scratchPatB, scratchEuclid);
     ensureMinPatternLength(safePattern);
     rhy.genC.getPattern(ov.c, safeCPattern, scratchEuclidC);
+    mu_core::spinUnlock(rhy.voiceParamsLock);
 
     // Re-clamp the walked steps to the new lengths. A length change keeps the pattern's phase: the previous
     // block's position is re-derived under the new length from the step counter, so the next walk advances

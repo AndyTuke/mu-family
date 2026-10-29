@@ -98,6 +98,7 @@ private:
     std::atomic<uint32_t> epochCounter { 0 };
     std::atomic<int>      globalQuantise { (int) Quantise::Bar };
     std::atomic<bool>     learning { false };
+    std::atomic<bool>     loadFailed { false };   // set when an existing storage file could not be parsed; blocks save()
     std::atomic<uint32_t> learned  { 0 };   // 0 = nothing yet, else 1 | note<<1 | channel<<8 | number<<16
 };
 

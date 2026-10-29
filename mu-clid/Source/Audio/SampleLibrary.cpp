@@ -2,6 +2,7 @@
 #include "Audio/VoiceEngine.h"
 #include "MuLimits.h"
 
+#include <type_traits>
 #include <utility>
 
 namespace mu_clid {
@@ -16,8 +17,18 @@ SampleLibrary::SampleLibrary(SampleSlotHost& h) : host(h)
 void SampleLibrary::load(int rhythmIndex, const juce::File& file)
 {
     if (rhythmIndex < 0 || rhythmIndex >= host.getSampleSlotCount()) return;
-    host.getSampleSlotEngine(rhythmIndex)->loadFile(file);
-    samplePaths.set(rhythmIndex, file.getFullPathName());
+    auto* engine = host.getSampleSlotEngine(rhythmIndex);
+    if (engine == nullptr) return;   // a slot with no voice has nothing to load into
+
+    // Record the path only when the engine took the file: a failed decode keeps the old sample playing,
+    // so the UI and presets must keep naming that one. Works whether loadFile reports success or not yet.
+    if constexpr (std::is_void_v<decltype(engine->loadFile(file))>)
+    {
+        engine->loadFile(file);
+        samplePaths.set(rhythmIndex, file.getFullPathName());
+    }
+    else if (engine->loadFile(file))
+        samplePaths.set(rhythmIndex, file.getFullPathName());
 }
 
 void SampleLibrary::swapPaths(int i, int j)

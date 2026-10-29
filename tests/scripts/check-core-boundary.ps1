@@ -49,7 +49,9 @@ function Get-RepoRelativePath([string]$full) {
     return $full.Replace('\', '/')
 }
 
-$includePlugin  = [regex]'#\s*include\s*[<"][^">]*\bmu-(clid-midi|clid|tant|toni|on|tronic)\b'
+# mu-link (the server app) counts as a plugin here: its headers are reachable only from mu-link itself. The shared IPC
+# contract lives in mu-core/Link, so its mu_link:: namespace is deliberately not in $pluginNs.
+$includePlugin  = [regex]'#\s*include\s*[<"][^">]*\bmu-(clid-midi|clid|tant|toni|on|tronic|link)\b'
 $pluginNs       = [regex]'\bmu_(clid_midi|clid|tant|toni|on|tronic)::'
 $includeControl = [regex]'#\s*include\s*[<"][^">]*\bmu-control\b'
 $blockComment   = [regex]'(?s)/\*.*?\*/'

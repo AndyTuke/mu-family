@@ -7,7 +7,9 @@
 #include "Persistence/ModulatorSerialise.h"    // serialiseModulators, deserialiseModulators, clearModulators
 #include "Persistence/EmbeddedSample.h"        // embedded samples: FLAC or raw file bytes
 #include "Persistence/LegacyReverbDecay.h"     // a pre-Decay-knob preset's reverb Decay
-#include <limits>                              // std::numeric_limits for NaN sentinel
+#include <functional>                          // std::hash for the embedded-sample folder name
+#include <string_view>
+#include <limits>                            // std::numeric_limits for NaN sentinel
 
 namespace mu_clid::rhythm_preset {
 using mu_clid::migrate::migrateInsertSlotsV3;
@@ -87,10 +89,16 @@ PresetSample resolvePresetSample(const juce::String& data, const juce::String& n
     {
         juce::MemoryBlock mb;
         { juce::MemoryOutputStream mos(mb, false); juce::Base64::convertFromBase64(mos, data); }
-        auto tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("muClid_samples");
-        tempDir.createDirectory();
-        const auto tempFile = tempDir.getChildFile(name);
-        if (! mu_clid::embedded_sample::decodeTo(mb, codec, bits, tempFile))
+        // The name comes from the preset file, so keep only its file-name part; never trust it as a path.
+        const auto safeName = juce::File::createLegalFileName(juce::File(name.replaceCharacter('\\', '/')).getFileName());
+        r.fileName = safeName;
+        const auto root = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("muClid_samples");
+        // A content-hash subfolder keeps two embedded samples with the same name from sharing one temp file.
+        const auto tempDir = root.getChildFile(juce::String::toHexString((juce::int64) std::hash<std::string_view>{}(std::string_view((const char*) mb.getData(), mb.getSize()))));
+        const auto tempFile = tempDir.getChildFile(safeName);
+        if (safeName.isEmpty() || safeName == "." || safeName == ".." || ! tempFile.isAChildOf(root)
+            || ! tempDir.createDirectory().wasOk()
+            || ! mu_clid::embedded_sample::decodeTo(mb, codec, bits, tempFile))
         {
             r.kind = PresetSample::Kind::BadEmbed;
             return r;
@@ -379,7 +387,12 @@ std::optional<juce::String> loadPresetSample(VoiceEngine& voice, const juce::Val
                                          ctx.samplesDir,
                                          tree.getProperty(juce::Identifier(sampleDataProp + "Codec")).toString(),
                                          (int) tree.getProperty(juce::Identifier(sampleDataProp + "Bits"), 0));
-    if (smp.kind == PresetSample::Kind::BadEmbed) return std::nullopt;   // unreadable embedded data: leave the voice as it is
+    if (smp.kind == PresetSample::Kind::BadEmbed)   // unreadable embedded data: leave the voice as it is, but say so
+    {
+        if (ctx.onLoadError)
+            ctx.onLoadError("Embedded sample '" + smp.fileName + "' could not be read" + context + ".");
+        return std::nullopt;
+    }
     return applyPresetSample(smp, voice, ctx.onLoadError, reportMissing, context);
 }
 

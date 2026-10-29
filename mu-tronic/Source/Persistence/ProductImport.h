@@ -21,6 +21,10 @@ namespace mu_tronic
 
 enum class ProductKind { Clid, Tant, Toni, On };
 
+// The strip rows every product's layer carries, in the order they are listed.
+inline constexpr const char* kStripSuffixes[] = { "lvl", "pan", "mute", "solo", "sendEff", "sendDly", "sendRev",
+                                                  "scSrc", "scAmt", "scAtk", "scRel", "outBus" };
+
 // The product an extension belongs to (".muClid", case-insensitive, with or without the dot); false for any other.
 bool productKindFromExtension(const juce::String& extension, ProductKind& kind);
 

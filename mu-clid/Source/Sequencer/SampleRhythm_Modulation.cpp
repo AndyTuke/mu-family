@@ -477,10 +477,12 @@ void SampleRhythm::applyModulation(double beatPos, MixerEngine::ChannelState& st
     }
     prevMatrixHadAssignments = matrixHasAssignments;
 
+    bool modulationRan = false;
     if (runModulationPass)
     {
         if (mu_core::trySpinLock(rhythm.modLock))
         {
+            modulationRan = true;
             seedModulation(modParams, strip);                                          // phase 1
             rhythm.modulationMatrix.process(rhythm.controlSequences, beatPos, modParamValues);   // phase 2
             const StripMod stripMod = applyStripModulation(strip);                     // phase 3
@@ -512,7 +514,8 @@ void SampleRhythm::applyModulation(double beatPos, MixerEngine::ChannelState& st
     // unmodulated rhythm modParams ≡ rhythm.voiceParams ≡ activeParams (already kept in
     // sync by VoiceEngine::applyPendingParams' dirty-flag path), so the call would be
     // pure waste — re-syncing ADSR + filter every block for no change.
-    if (runModulationPass && engine != nullptr)
+    // A missed modLock leaves modParams at the unmodulated base, so pushing it would jump the voice for a block.
+    if (modulationRan && engine != nullptr)
         engine->setActiveParams(modParams);
 }
 
