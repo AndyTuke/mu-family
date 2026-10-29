@@ -19,6 +19,7 @@ target_sources(mu-on-layer INTERFACE
 )
 target_include_directories(mu-on-layer INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
 set(MU_ON_LAYER_UI_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/StepPager.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/StepRows.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/TrackStepRow.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/TrackContent.cpp")

@@ -12,22 +12,10 @@ StepRows::StepRows(TrackHost& trackHost)
 {
     playheadSteps.fill(-1);
     shownPasses.fill(-2);
-    prevButton.onClick = [this] { setPage(page - 1); };
-    nextButton.onClick = [this] { setPage(page + 1); };
-    pageLabel.setJustificationType(juce::Justification::centred);
-    lengthInput.setShowStepButtons(false);   // the arrows step by one; a double-click types a length
-    lengthInput.setLabelInline(true);
-    lengthInput.onChange = [this](int n)
-    {
-        if (selected < 0 || selected >= host.getTrackCount()) return;
-        host.getTrack(selected).row.setNumSteps(n);
-        refreshControls();
-        repaint();
-    };
-    addAndMakeVisible(prevButton);
-    addAndMakeVisible(nextButton);
-    addAndMakeVisible(pageLabel);
-    addAndMakeVisible(lengthInput);
+    pager.pageCount = [this] { return numPages(); };
+    pager.lengthRow = [this]() -> StepRow* { return selected >= 0 && selected < host.getTrackCount() ? &host.getTrack(selected).row : nullptr; };
+    pager.onChanged = [this] { repaint(); };
+    addAndMakeVisible(pager);
     refreshControls();
     startTimerHz(mu_ui::kUiRefreshHz);   // playhead
 }
@@ -48,33 +36,10 @@ int StepRows::numPages() const
     return pages;
 }
 
-void StepRows::setPage(int p)
-{
-    page = juce::jlimit(0, numPages() - 1, p);
-    refreshControls();
-    repaint();
-}
-
-void StepRows::refreshControls()
-{
-    page = juce::jlimit(0, numPages() - 1, page);   // a row that got shorter may have taken its page away
-    pageLabel.setText("Page " + juce::String(page + 1) + " / " + juce::String(numPages()), juce::dontSendNotification);
-    prevButton.setEnabled(page > 0);
-    nextButton.setEnabled(page < numPages() - 1);
-    if (selected >= 0 && selected < host.getTrackCount())
-        lengthInput.setValue(host.getTrack(selected).row.numSteps(), false);
-}
-
-// The control strip under the rows, lined up with the step cells: Prev, the page, Next, and the Length at the right.
+// The control strip under the rows, lined up with the step cells.
 void StepRows::resized()
 {
-    auto r = getLocalBounds().removeFromBottom(mu_ui::s(kControlsH)).withTrimmedLeft(mu_ui::s(kLabelW)).reduced(0, mu_ui::s(2));
-    prevButton.setBounds(r.removeFromLeft(mu_ui::s(64)));
-    r.removeFromLeft(mu_ui::s(6));
-    pageLabel.setBounds(r.removeFromLeft(mu_ui::s(90)));
-    r.removeFromLeft(mu_ui::s(6));
-    nextButton.setBounds(r.removeFromLeft(mu_ui::s(64)));
-    lengthInput.setBounds(r.removeFromRight(mu_ui::s(150)));
+    pager.setBounds(getLocalBounds().removeFromBottom(mu_ui::s(kControlsH)).withTrimmedLeft(mu_ui::s(kLabelW)));
 }
 
 int StepRows::rowHeight() const noexcept
@@ -106,7 +71,7 @@ bool StepRows::cellAt(juce::Point<int> p, int& row, int& step) const
     if (row < 0 || row >= host.getTrackCount()) return false;
     const auto cells = cellsArea(row);
     if (! cells.contains(p)) return false;
-    step = TrackStepRow::stepAt(cells, p, page * StepRow::kNumSteps);
+    step = TrackStepRow::stepAt(cells, p, pager.page() * StepRow::kNumSteps);
     return true;
 }
 
@@ -145,7 +110,7 @@ void StepRows::paintRow(juce::Graphics& g, int row)
 
     // The page's 16 steps; the step numbers on the first row only.
     TrackStepRow::paintCells(g, cellsArea(row), host.getTrack(row).row, ! isRumble, col, playheadSteps[(size_t) row], row == 0,
-                             row == selected ? selectedStep : -1, TrackStepRow::optionsFor(host, row, page * StepRow::kNumSteps));
+                             row == selected ? selectedStep : -1, TrackStepRow::optionsFor(host, row, pager.page() * StepRow::kNumSteps));
 
     if (isRumble) g.endTransparencyLayer();
 
@@ -175,7 +140,7 @@ void StepRows::mouseDown(const juce::MouseEvent& e)
 
     // A click selects the step for the Step panel (creating it if empty); its corner buttons set the accent or delete it.
     const bool selects = TrackStepRow::clickStep(host.getTrack(r).row, s, cellsArea(r), e.getPosition(), e.mods.isPopupMenu(),
-                                                 page * StepRow::kNumSteps);
+                                                 pager.page() * StepRow::kNumSteps);
     dragRow = selects && ! e.mods.isPopupMenu() ? r : -1;
     dragStep = s;
     if (selects)

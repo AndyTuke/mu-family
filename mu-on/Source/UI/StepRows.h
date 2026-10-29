@@ -4,7 +4,7 @@
 #include "UI/TrackHost.h"   // what the rows read from the layer's host
 #include "UI/TrackStepRow.h"   // the shared row look and the step drag helpers
 #include "UI/Components/MuLookAndFeel.h"
-#include "UI/Components/NudgeInput.h"
+#include "UI/StepPager.h"          // the Prev / Next / Length strip
 
 #include <array>
 #include <functional>
@@ -42,7 +42,7 @@ public:
     // Unscaled width of the name gutter at the start of each row.
     static constexpr int kLabelW = 62;
     // Unscaled height of the paging / length strip under the rows.
-    static constexpr int kControlsH = 28;
+    static constexpr int kControlsH = StepPager::kHeight;
 
 private:
     void timerCallback() override;
@@ -54,8 +54,7 @@ private:
     void paintRow(juce::Graphics&, int row);
     juce::uint64 signature() const;                   // changes when a row's colour, engine, length or the count does
     int  numPages() const;                            // pages the longest live row needs
-    void setPage(int p);
-    void refreshControls();                           // page text, button enables and the selected row's length
+    void refreshControls() { pager.refresh(); }       // page text, button enables and the selected row's length
 
     TrackHost& host;
     int selected      = 0;
@@ -65,10 +64,7 @@ private:
     TrackStepRow::StepDrag stepDrag;   // a vertical drag on a step edits it (note, octave, accent, Hat open / closed)
     std::array<int, mu_limits::kMaxLayers> playheadSteps;                 // each row's playhead step (-1: none)
     std::array<long long, mu_limits::kMaxLayers> shownPasses;             // each row's pass the dimmed steps were drawn for
-    int page = 0;                      // the 16-step page every row shows
-    juce::TextButton prevButton { "Prev" }, nextButton { "Next" };
-    juce::Label      pageLabel;
-    NudgeInput       lengthInput { "Length", 1, StepRow::kMaxSteps, StepRow::kNumSteps };
+    StepPager pager;                   // the page every row shows, and the selected row's length
     juce::uint64 shownSignature = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StepRows)

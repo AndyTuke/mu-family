@@ -224,6 +224,10 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     addAndMakeVisible(rows);
     soloRow.onStatusUpdate = [this](const juce::String& name, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
     addChildComponent(soloRow);
+    soloPager.pageCount = [this] { return host.getTrack(currentLayer).row.numPages(); };
+    soloPager.lengthRow = [this]() -> StepRow* { return &host.getTrack(currentLayer).row; };
+    soloPager.onChanged = [this] { soloRow.setFirstStep(soloPager.page() * StepRow::kNumSteps); };
+    addChildComponent(soloPager);
 
     // The track's own Swing / Accent, shown in the Groove box (a Rumble track shows its envelope there instead);
     // setLayer attaches them to the shown track's rows.
@@ -477,6 +481,9 @@ void TrackContent::rebuild()
     rows.setVisible(! locked);
     const bool rumble = shownEngine == EngineType::Rumble;
     soloRow.setVisible(locked && ! rumble);   // a locked Rumble has no steps: it follows its source
+    soloPager.setVisible(locked && ! rumble);
+    soloPager.refresh();
+    soloRow.setFirstStep(soloPager.page() * StepRow::kNumSteps);
     soloRow.setLayer(currentLayer);
 
     sourceCaption.setVisible(rumble);
@@ -702,6 +709,7 @@ void TrackContent::resized()
     rows.setBounds(stepsInner);
     // The lone row is as tall as one of the rows above is, top-aligned (the rest of the box stays blank metal).
     soloRow.setBounds(stepsInner.withHeight(stepsInner.getHeight() / mu_limits::kLayersPerPage));
+    soloPager.setBounds(stepsInner.withTop(stepsInner.getBottom() - s(StepPager::kHeight)));
 
     auto g = grooveBoxR.reduced(clear, s(LF::kSpaceS));
     if (rumble)

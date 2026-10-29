@@ -76,3 +76,7 @@ land when preset I/O / licensing do).
 - `Persistence/TrackParams.{h,cpp}` holds the parameter table, the type mapping and `mu_on::remapRumbleSources`. `UI/TrackHost.h` is the UI host interface (`getTrackEngine`, `selectTrackEngine`).
 - The Rumble reverb is pinned at RT60 1.8 s in `RumbleEngine::prepare`.
 - Library: `mu-on-layer` (INTERFACE; `MU_ON_LAYER_UI_SOURCES`); tests `mu-on-tests` and `mu-on-layer-tests`. `engineLocked` defaults to false and is not saved. See `design-engine.md`.
+
+## Mirror rule with mu-Tronic (Andy 2026-10-29)
+
+mu-On's sequencer and mu-Tronic's Track layers show the same step rows (`StepRows` / `TrackStepRow` / `StepPager` in `mu-on-layer`). Every sequencer change (step model, length and paging, shading, step panel, boxes and widths) must be made so it works in both products: put it in the shared layer code, and check the mu-Tronic Steps box as well as mu-On's before calling it done. Never fix one product only.

@@ -24,3 +24,7 @@ Static layer libraries compiled into the binary, registered in [Source/Persisten
 - Capacities are per-target compile definitions (`MU_MAX_LAYERS=16`, `MU_MAX_BUSES=3`, `MU_BUS_INSERTS=2`); the other products keep 8 layers and no buses. No code may assume 8 or 2 literally (`kLayersPerPage`).
 - Layer state is text, `RenderContext` mirrors a C struct, `render` makes no host callback (keeps a module ABI possible, design section 2).
 - Tests: `mu-tronic-tests` (builds every default build).
+
+## Mirror rule with mu-Tronic (Andy 2026-10-29)
+
+mu-Tronic's Track layers and mu-On's sequencer show the same step rows (`StepRows` / `TrackStepRow` / `StepPager` in `mu-on-layer`). Every sequencer change (step model, length and paging, shading, step panel, boxes and widths) must be made so it works in both products: put it in the shared layer code, and check the mu-Tronic Steps box as well as mu-On's before calling it done. Never fix one product only.

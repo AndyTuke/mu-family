@@ -6,6 +6,7 @@
 #include "Modulation/MuOnModDest.h"        // the engines' modulation target tables
 #include "UI/ParamKnobGrid.h"                // mu-core: spec-driven knob/combo grid
 #include "UI/StepRows.h"
+#include "UI/StepPager.h"
 #include "UI/TrackStepRow.h"
 #include "UI/LayerContent.h"                // mu-core: the base every layer type's content derives from
 #include "UI/Components/DropdownSelect.h"
@@ -95,6 +96,7 @@ private:
     mu_ui::ParamKnobGrid filterGrid;        // a drum or percussion engine's FILTER section: type, cutoff, resonance, and the envelope's smaller knobs
     StepRows       rows;                              // every track's row (a track the host does not lock)
     TrackStepRow   soloRow;                           // the shown track's one row (a locked track)
+    StepPager      soloPager;                         // its paging and Length strip, the same as StepRows' (mu-On and mu-Tronic mirror)
     bool           locked = false;                    // the shown track's engine is fixed by its host
 
     KnobWithLabel swingKnob { "Swing" }, accentKnob { "Accent" }, ghostKnob { "Ghost" };   // Ghost: drum and percussion tracks only
