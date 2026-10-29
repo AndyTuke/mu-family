@@ -1,6 +1,6 @@
 # Issues
 
-**Tally (updated 2026-10-28): Open 0 · On Hold 6 · Closed 1618 · Total 1624**
+**Tally (updated 2026-10-29): Open 1 · On Hold 6 · Closed 1618 · Total 1625**
 
 **Status key:** ✅ Closed &nbsp;|&nbsp; 🔴 Open &nbsp;|&nbsp; 🟡 On Hold (deferred, blocked, or pending external action)
 
@@ -12,6 +12,7 @@ Test pass/fail tracking lives in [tests.md](tests.md), not this backlog. Use thi
 
 | # | Description | Status | Closed Build |
 |---|---|---|---|
+| 1681 | **[mu-tronic/mu-on] Standardise mu-Tronic's Steps box with the mu-On sequencer, and keep the two mirrored from now on.** P1 · logged by Andy 2026-10-29 · Details: the mu-On sequencer changes (rows up to 64 steps, paged 16 at a time with Prev/Next, per-row Length control, steps past the length shaded as a hatched veil, narrower Layer/Step boxes with the freed width given to the Steps box) must be standardised to mu-Tronic, and any future sequencer change must be mirrored between the two products. Known gap from #1680: mu-Tronic's single-row Steps box has no paging UI (only TrackStepRow::setFirstStep exists), so a row longer than 16 shows page 1 only. Steps: add Prev/Next/page label/Length strip to mu-Tronic's layer content; mirror the box widths; put shared code in mu-core/mu-on-layer where possible so there is one implementation; add the mirror rule to mu-on/CLAUDE.md and mu-tronic/CLAUDE.md. Not built or run. · Needs: ux-controller, architecture-steward, test-steward sign-off | 🔴 Open | — |
 
 ## 🟡 On Hold
 
