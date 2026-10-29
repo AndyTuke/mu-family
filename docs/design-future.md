@@ -21,6 +21,10 @@ For shipped features see [DevelopmentHistory.md](DevelopmentHistory.md).
 
 ## Unscheduled ideas
 
+### 🟢 New product: loop slicer (name not chosen)
+
+Load a loop (usually drums), find its transients, cut it into slices, and place the slices on a timeline sequencer. First wireframe, parts and open questions: [design-slicer-wireframe.md](design-slicer-wireframe.md). Needs a new product on `mu-core` (a slice-player engine and a timeline sequencer; the shell, mixer, FX and sample playback are shared) plus an offline transient detector. Nothing scheduled; name, layer type and file extensions are Andy's call.
+
 ### 🟢 Standalone: Bounce to WAV (user-facing render)
 
 Expose the headless render pipeline (introduced for the listening-test harness) as a user-facing "File → Bounce…" dialog in the standalone. User picks duration, sample rate, output file → gets a WAV of the currently-loaded patch playing for N seconds. Useful for sample-pack workflows where the user wants to commit a pattern to disk without round-tripping through a DAW.
