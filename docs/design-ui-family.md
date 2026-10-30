@@ -130,7 +130,7 @@ Three states: **General** (default), **Positive** (confirmation/on), **Warning**
 
 ## 4. Typography
 
-JUCE font. No external typeface dependency.
+One bundled family typeface (see [Visual polish P1](#p1-one-bundled-typeface); the system default font is used until it lands).
 
 | Context | Size | Colour token |
 |---|---|---|
@@ -872,7 +872,75 @@ The screen half of the Launchpad surface mapping ([design-launchpad.md section 3
 
 ---
 
+## Visual polish (approved 2026-10-30)
+
+Six family-wide polish items approved by Andy. All are shared code in `mu-core`, none per product; sizes and colours stay in `MuLookAndFeel`, every depth, tint and motion strength in `MuTheme` ([section 11](#11-metal-style-family-standard) stays the family look; nothing here changes how it looks, only how crisp, consistent and smooth it is). Built on the laptop-reviewed code, not yet seen rendered: items marked "verify" must be checked on the build PC first.
+
+### P1. One bundled typeface
+
+- **Decision:** the family draws all text in one typeface embedded in `mu-core` (a proportional face plus a monospaced face with tabular digits for LCD readouts and value columns), so Windows, Linux and the DAW host show identical text. Today every font is `juce::FontOptions` with the system default (`MuLookAndFeel.cpp` about lines 269, 653, 1001, 1109, 1180, 1274, 1324) and the LCD face is `Font::getDefaultMonospacedFontName()` (about line 1070).
+- **Spec:** font files in `mu-core/UI/Fonts/` (TTF, one regular, one bold, one mono), compiled with `juce_add_binary_data` into a mu-core resource library. One accessor in `MuLookAndFeel` (`MuLookAndFeel::uiFont(height, bold)` and `lcdFont(height)`, using `Typeface::createSystemTypefaceFor` once, cached) is the only place a typeface is chosen; `lcdFont` already exists and keeps its name. All `FontOptions{}.withHeight(...)` calls route through it; no other file names a font. Sizes stay the tokens of section 4 (`kEngravedCaptionFont`, `kCardTextFont`, `kKnobLabelFont`, ...) and scale with `sf()`. Licence must allow redistribution inside a commercial plugin (SIL OFL 1.1 or similar); the notice goes in [THIRD_PARTY_NOTICES.txt](../THIRD_PARTY_NOTICES.txt) with the licence text, like the other credits. Changing section 4's "No external typeface dependency" line: now superseded by this section.
+- **Candidates (my recommendation first; Andy decides):**
+  1. **Inter** (+ **JetBrains Mono** for readouts). OFL 1.1 both. Designed for screens at 9 to 13 px, large x-height, clear numerals, tabular-figure feature; matches the small knob and status text best. **Recommended.**
+  2. **IBM Plex Sans** (+ **Plex Mono**). OFL 1.1. Slightly more engineered/industrial character that suits the metal look; a little wider, so labels may need checking against the "everything fits" rule.
+  3. **Roboto** (+ **Roboto Mono**). Apache 2.0. Familiar, compact; less distinctive.
+  4. **Source Sans 3** (+ **Source Code Pro**). OFL 1.1. Narrow and economical for tight rows; lighter at small sizes.
+- **Do not:** ship a font whose licence forbids embedding; fall back per platform; hardcode a font name outside the accessor; bundle more than regular, bold and mono (binary size). Re-check every fixed-width label (name plates, `namePlateWidth`, dropdowns) after the swap: text widths change, the "everything fits" rule (section 5) still decides.
+
+### P2. Sharp on high-DPI displays
+
+- **Finding (verify on the build PC first: it may already be correct):** `brushedGrain(w, h)` (about line 673) and the ellipse shadow mask cache (about line 182) are keyed on logical integer size, and no mu-core file asks for a scale factor. If JUCE hands these images out at logical size, a 150% or 200% display up-scales them and they look soft.
+- **Rule:** every generated or cached bitmap is built at physical pixel size (logical size x scale) and drawn back with a transform that maps it to logical bounds, with the scale part of the cache key. Obtain the scale in `paint` with `g.getInternalContext().getPhysicalPixelScaleFactor()` (the context already includes the peer's desktop scale and the global scale), or from a component with `juce::Component::getApproximateScaleFactorForComponent (this)` (a static in JUCE 9.0.4 `juce_Component.h`, which also folds in transforms). Do not read `Desktop::getGlobalScaleFactor()` alone: it misses per-monitor DPI. Draw with `g.drawImage(img, logicalBounds.toFloat())` (source rectangle in physical pixels), never `drawImageAt`, so no resampling happens at 100%.
+- **Spec:** one helper in `mu-core/UI/Components/` (`PixelCache`: key = logical size + scale, returns the image and its logical size; bounded like the current caches) used by P4 and P5 and by `brushedGrain`. The grain seed stays fixed, so the pattern is identical at every scale. Keep the "never destroyed" heap-allocation rule from the current cache comment.
+- **Do not:** multiply sizes by hand in each control; render at 2x always (wasteful at 100%); cache by component pointer.
+
+### P3. Smoother motion
+
+- **Decision:** adopt `juce_animation` (`Animator`, `ValueAnimatorBuilder`, `Easings`, including `createSpring`) and `VBlankAttachment` (already tracked, backlog #1706) as the only motion mechanism; no `Timer`-driven tweening. One shared driver per editor (`EditorShellBase`) so a whole window ticks once per display frame.
+- **What animates:** knob and fader value feedback (a short settle on programmatic or preset changes, never lag behind a user drag), switch and button press/release, hover and focus fades on controls, panel and overlay open/close (fade + small offset), meter ballistics (fast rise, smooth fall-off, held peak that decays), slice selection in mu-Tilate, playhead/step indicators at their existing rates.
+- **What does not:** anything that must be exact to the audio (step position, tempo, the Performance-mode shield and its lamps, section 12), parameter values themselves (animate the drawn value, never the parameter).
+- **Tokens (new `MuTheme::Motion`, in `MuTheme.h`, seconds and unitless):** `hoverMs` 90, `pressMs` 60, `settleMs` 140, `overlayMs` 180, `meterFallDbPerSec` 24, `peakHoldMs` 900, `peakFallDbPerSec` 12, `springStiffness` / `springDamping` for the settle easing (initial values to be tuned on the build PC), `reduceMotion` bool (default false). Easing choice is part of the same struct (one named easing per role); no per-product timing.
+- **Reduced motion:** when `reduceMotion` is set (a Settings toggle later; honour the OS "reduce animations" setting where JUCE exposes it) every duration becomes 0 and meters fall instantly; nothing blinks.
+- **Do not:** animate layout (bounds) of the fixed-size shell; run animations while the window is hidden or minimised; keep the VBlank callback running when nothing is animating.
+
+### P4. Cache the static layers
+
+- **Today:** `setOpaque` appears twice in mu-core and there is no `setBufferedToImage` or cached component image, so metal panels behind animated components repaint every frame.
+- **Rule:** static metal panels, name plates, sub-panels and engraved text are painted once into a `PixelCache` image (P2) and blitted; rebuilt only on resize or theme/accent change (`setMetalStyle`, a `MuTheme` change). Animated components (meters, playhead, knob indicators, lamps) are separate children, opaque where they fill their bounds, so JUCE can skip what is behind them. Panel bases use `setBufferedToImage(true)` where the content never changes between resizes; custom blits where the panel also hosts children.
+- **Do not:** buffer a component that changes every frame; keep per-instance images for identical panels (share by key); let the cache grow past the existing bound.
+
+### P5. Cached shadows
+
+- **Today:** the ellipse shadow already caches its blurred mask (`drawEllipseShadow`, about line 182) but at logical size, and `DropShadow` is still drawn live for the knob, switch, name plate, sub-panel and performance glow (about lines 507, 511, 626, 629, 1081, 1121, 1260).
+- **Rule:** every blurred shadow is rendered once into the shared `PixelCache` per (shape, size, radius, scale), then tinted and blitted. Strength (alpha), offset and radius stay `MuTheme::Lighting` fields; the colour is applied at draw time, so changing `shadowAmount` or an accent never rebuilds the blur. Generalise `drawEllipseShadow` to rectangles/rounded rectangles in `MuLookAndFeel`; remove direct `juce::DropShadow` calls from drawing code.
+- **Do not:** add a new shadow with its own blur; bake the alpha into the cached mask.
+
+### P6. Vector assets
+
+- **Rule:** icons, logos and decorative elements are SVG files in `mu-core/UI/Assets/` (product logos stay in the product), embedded as binary data, parsed once with `juce::Drawable::createFromImageData` / `Drawable::createFromSVG`, cached, and drawn with `Drawable::drawWithin` into the layout rectangle. They are sharp at every size and scale without raster variants. Today no SVG is used in the UI.
+- **Colour:** SVGs are authored with a single placeholder fill (`currentColor`-style, pure white). At draw time the colour comes from a token (`labelText`, `lampOn`, the app accent, ...) via `Drawable::replaceColour` on the cached copy, per token; never a colour baked in the file. Multi-tone art uses named fills mapped to named tokens in one table.
+- **Do not:** ship PNG icons at several sizes; keep a second copy of an icon per product; size an icon with a literal (use `sf()` and a layout token).
+
+### Rejected for now
+
+- Anti-banding noise on gradients (item 7): not approved.
+
+### How to verify on the build PC
+
+1. Screenshot harness at 100%, 150% and 200% Windows scale on the same editor state; compare grain, shadows, text and icons for softness (P1, P2, P5, P6).
+2. Text: same screenshot on Windows and Linux (or with the system font removed); text identical (P1).
+3. CPU and frame time on a full 8-layer editor, idle and while a meter and the playhead animate, before and after P4/P5; repaint rect count should drop (P3, P4, P5).
+4. Animation: hover, press, overlay open/close, meter fall-off and peak hold at 60 and 144 Hz; with `reduceMotion` all of it instant (P3).
+
+### Recommended order
+
+P2 (find out whether the images are already sharp; it defines `PixelCache`), then P5 and P4 (both use it, and give the frame-time headroom motion needs), then P1 (independent, touches every width check), then P6, then P3 (largest change, benefits from the caches). Backlog rows are the coder's to request.
+
+---
+
 ## Design rulings
+
+- 2026-10-30 - Six visual-polish items approved by Andy (bundled typeface, high-DPI bitmaps, motion, cached static layers, cached shadows, SVG assets): rulings written, font choice pending Andy. Added the "Visual polish" section; section 4 no-external-typeface line superseded by P1.
 
 - 2026-10-21 - Layer type name plate in the mu-Tronic header: short tag or full name (Andy)? Full product name with the real Greek mu (U+03BC): `μ-Clid`, `μ-Tant`, `μ-Toni`, `μ-On` (all mu-On engines show `μ-On`); registry `typeTag` is UTF-8, read with `String::fromUTF8`. Width stays `namePlateWidth(text, kNamePlateH)`: widest plate about 50 px, about 56 px with its gap, preset dropdown keeps about 545 px at Medium against an 80 px floor; no token change. Changed mu-tronic/design-ui.md section 1 (Type), 4.4, 4.5a.
 

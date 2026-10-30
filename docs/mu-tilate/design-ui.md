@@ -2,6 +2,8 @@
 
 Status: design only, nothing built (seeded 2026-10-30 from the first wireframe). Look and feel is owned by the `ux-controller`; this document records the wireframe and the behaviour of each panel. Family rules: [design-ui-family.md](../design-ui-family.md). Product overview and decisions: [design.md](design.md).
 
+Visual polish (bundled typeface, high-DPI bitmaps, motion tokens, cached layers and shadows, SVG assets) applies to this product as to the rest of the family: [design-ui-family.md, Visual polish](../design-ui-family.md#visual-polish-approved-2026-10-30); slice selection animates per P3.
+
 Sizes come from `MuLookAndFeel`, depth from `MuTheme::Lighting`, controls from the shared library (`KnobWithLabel`, `SegmentControl`, `DropdownSelect`, `NudgeInput`, `SlideSwitch`). The parts marked ★ are the product's own content band; everything else is the standard shell.
 
 ## Wireframe: main view
