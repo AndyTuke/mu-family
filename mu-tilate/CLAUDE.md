@@ -10,7 +10,7 @@ The editor will inherit `mu-core/UI/EditorShellBase.h` and use the shared `Layer
 
 ## Status
 
-**Design only. Nothing is built or scheduled** (Andy, 2026-10-30). This folder is the agreed scaffold: the eight `Source/` subfolders (each kept with a `.gitkeep`), `resources/`, `installer/` and `factory/` placeholders, this file and the docs under [docs/mu-tilate/](../docs/mu-tilate/). There is **no C++ source, no `CMakeLists.txt` and no CI or build wiring**, deliberately: the product is not in the root build. Ask Andy before implementing anything; the idea is also listed in [docs/design-future.md](../docs/design-future.md) under Unscheduled ideas.
+**Design complete; first build-PC steps approved by Andy 2026-10-30: (1) lift mu-Clid's sample-library mechanism into mu-core, (2) Signalsmith Stretch prototype (latency hiding, varying-rate drive, CPU/memory, dsp-controller review), (3) wire the CMake target per the checklist. Nothing is built** (Andy, 2026-10-30). This folder is the agreed scaffold: the eight `Source/` subfolders (each kept with a `.gitkeep`), `resources/`, `installer/` and `factory/` placeholders, this file and the docs under [docs/mu-tilate/](../docs/mu-tilate/). There is **no C++ source, no `CMakeLists.txt` and no CI or build wiring**, deliberately: the product is not in the root build. Ask Andy before implementing anything beyond those three steps; the idea is also listed in [docs/design-future.md](../docs/design-future.md) under Unscheduled ideas.
 
 ## Decisions (Andy, 2026-10-30)
 

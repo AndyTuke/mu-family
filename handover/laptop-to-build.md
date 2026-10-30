@@ -2,7 +2,7 @@
 
 Written only by the laptop. The build PC reads it and answers in [build-to-laptop.md](build-to-laptop.md). Protocol: [README.md](README.md).
 
-Next id: L-009
+Next id: L-012
 
 ## Status (laptop)
 
@@ -65,6 +65,21 @@ Changes to check: (1) new `mu-core/Modulation/LastResolved.h` (`mu_mod::LastReso
 Do: run mu-Clid `ModulationSkewTests`, mu-Tant tests and goldens (`SynthDSPTests`), mu-Toni tests, `mu-on-tests Sequencer` (new `clampPage` / `clampStep` cases in `StepPagingTests.cpp`), and the daily golden sweep.
 Note: mu-Toni's Arp never reset its held values on prepare or bind (mu-Tant and mu-On do); the lift kept that behaviour. Decide whether mu-Toni should reset like the others.
 Report: build result, test output, any golden that moved.
+
+### L-009 · 2026-10-30 · Approved build-PC sequence after the verification items (Andy accepted the refactor plan D1-D6)
+Rows: #1699, #1701, #1705, #1716 · Plan: docs/refactor-plan-2026-10.md · Needs: build, code
+Do (after L-001 to L-008 pass): Day 1: #1699 phase A (split `ProcessorBase.cpp` into topic files; code moves only, header untouched; fix forward). Days 2-4: mu-Tilate step 1, lift mu-Clid's sample-library mechanism (`SampleLibrary`, `SamplePreview`, `SampleBrowser`, `embedded_sample`, the path resolver) into mu-core with a per-product folder setting, mu-Clid refactored onto it, no duplicate. Day 5: #1699 phases B and C (`FxParamSync`, `ProgramChangeRouter`, `ActivationWorker`). Days 6-8: the Signalsmith Stretch prototype (latency hiding via Hold + seek, varying-rate drive, real CPU and memory; dsp-controller review; no refactoring on those days). Days 9-10: #1701 item 8 (step-edit state machine wired into `StepRows`, `TrackStepRow` and the mu-Tronic mirror) with #1699 phase J. Decided: stop at phases A to E; dsp-controller review required for #1701 item 2 and phases G/H; #1701 item 7 accepted as debt; item 6 waits; main checkout, no worktrees.
+Report: what landed, build number, tests, anything that moved.
+
+### L-010 · 2026-10-30 · mu-Toni Arp should reset its held modulation values like mu-Tant and mu-On
+Rows: #1701 · Needs: code, test
+Do: in mu-Toni `Arp` call `lastResolved.reset()` on prepare, bindParams, a slot move/reset and going live (as mu-Tant `Pattern.cpp` and mu-On `Track.cpp` do), so values held for a matrix-lock miss never cross a slot. Add a test that a lock-miss block right after a bind keeps the unmodulated values, not the previous slot's.
+Report: build and test result.
+
+### L-011 · 2026-10-30 · mu-Tant block-rate modulation and gate edge clicks, with Andy listening
+Rows: #1716 · Needs: code, listen, decide
+Do: ramp the per-block pitch/filter envelope and pitch modulation across the block (or smooth `osc*SemiMod`); slew the gate's falling edge with a 1-2 ms release and run `GateMode::Silence` through the same gater. Render one pattern at block sizes 64, 512 and 2048 and compare spectra; listen. Pre-release: sound changes are fine, update the goldens deliberately and record that they moved.
+Report: what changed audibly, which goldens were updated.
 
 ## Results
 

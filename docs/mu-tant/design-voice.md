@@ -153,6 +153,8 @@ The drawable pattern model, per-envelope options, audio-thread contract, and UI 
 
 The gate is **purely a 0..1 multiplier** — volume / pitch / filter modulation all live in the modulator section, not in the gate. Decoupling volume from the gate means a long-form crescendo can be sculpted independently of the rhythmic chops.
 
+Planned fix (Andy, 2026-10-30): the block-rate pitch/filter envelope that causes gate-edge clicks (#1716) is done on the build PC with Andy listening. Pre-release, so a sound change is fine; the goldens need a deliberate update.
+
 ---
 
 ## What's NOT in mu-tant

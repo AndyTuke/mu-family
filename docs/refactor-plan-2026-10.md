@@ -82,14 +82,16 @@ Order logic: the sample-library lift is first because mu-Tilate's later steps de
 
 ## 4. Decisions for Andy
 
+All six DECIDED (Andy, 2026-10-30): he accepted every recommendation below. Progress note: the laptop already wrote items 1, 3, 4, 5 and part of 8 (commit eb1d6687, not built or run); phase A is deliberately left for the build PC. Added finding: mu-Toni's Arp never resets its held modulation values on prepare/bind (mu-Tant and mu-On do); decided to make mu-Toni reset like the others, on the build PC with a test.
+
 | # | Decision | Recommendation |
 |---|---|---|
-| D1 | Rank rows 1699 and 1701 (both "Needs: owner ranking"; currently P2 and P3) and give the go for mu-Tilate step 1 and the Stretch prototype | Rank 1699 phases A to C and 1701 items 1, 3, 4, 5, 8 as the work in section 3; leave the rest on hold |
-| D2 | Pace rules say no routine `dsp-controller` review. Require one for the bit-exact moves of audio-thread code (1701 item 2, phases G and H), or waive it where goldens and `MixerBlockValueTests` prove bit-exactness? | Require one review per phase of G and H, and for item 2; waive for item 1 |
-| D3 | Item 7 (two copies of the sequencer step logic held equal by `RhythmCursorEqualityTests`): accept as known debt or schedule the rewrite | Accept as debt for now |
-| D4 | Shrink `ProcessorBase`'s public surface (phase F, touches every product) or stop at internal collaborators (phases A to E, no caller changes) | Stop at A to E; do F only if a second reason appears |
-| D5 | Item 6 (dirty-flag drain): lift now, or wait until mu-Clid is next opened | Wait |
-| D6 | The standing "no worktrees for small items" rule vs. this batch: all phases here are small and can be done in the main checkout | Main checkout |
+| D1 **DECIDED (Andy, 2026-10-30)** | Rank rows 1699 and 1701 (both "Needs: owner ranking"; currently P2 and P3) and give the go for mu-Tilate step 1 and the Stretch prototype | Rank 1699 phases A to C and 1701 items 1, 3, 4, 5, 8 as the next build-PC work; go GIVEN for mu-Tilate step 1 (lift mu-Clid sample-library mechanism into mu-core, mu-Clid refactored onto it) and the Stretch prototype |
+| D2 **DECIDED (Andy, 2026-10-30)** | Pace rules say no routine `dsp-controller` review. Require one for the bit-exact moves of audio-thread code (1701 item 2, phases G and H), or waive it where goldens and `MixerBlockValueTests` prove bit-exactness? | Required for bit-exact moves of audio-thread code (1701 item 2, phases G and H); waived for item 1 |
+| D3 **DECIDED (Andy, 2026-10-30)** | Item 7 (two copies of the sequencer step logic held equal by `RhythmCursorEqualityTests`): accept as known debt or schedule the rewrite | Accepted as debt |
+| D4 **DECIDED (Andy, 2026-10-30)** | Shrink `ProcessorBase`'s public surface (phase F, touches every product) or stop at internal collaborators (phases A to E, no caller changes) | Stop at phases A to E; no public-surface shrink |
+| D5 **DECIDED (Andy, 2026-10-30)** | Item 6 (dirty-flag drain): lift now, or wait until mu-Clid is next opened | Wait until mu-Clid is next opened |
+| D6 **DECIDED (Andy, 2026-10-30)** | The standing "no worktrees for small items" rule vs. this batch: all phases here are small and can be done in the main checkout | Edit in the main checkout, no worktrees |
 
 ## 5. Docs this plan touches when done
 
