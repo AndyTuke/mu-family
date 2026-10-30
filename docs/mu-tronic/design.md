@@ -1492,7 +1492,7 @@ with one addition, the `type` attribute, which is Stage 8 option B:
   (`.muTronic`) and performances get a mu-Tronic folder.
   Loading a preset whose type differs from the slot's is refused for a filled slot and takes the file's type for an Empty one (2.1.11 point 8, 2026-10-20; supersedes "confirm, then stage").
 - **Clips** (`Layer::clips`): a clip is the slot's type's layer preset and carries its type. A clip whose type differs from the slot's current type is not
-  launchable; changing a slot's type clears its clip bank after a confirm. This keeps the clip bank "a launch is a staged layer swap, never a type change".
+  launchable; changing a slot's type clears its clip bank after a confirm. This keeps the clip bank "a launch is a staged layer swap, never a type change". A Phrase clip stores its loop by reference (never embedded bytes); embedded loops live once in the session's `<EmbeddedLoops>` pool ([../mu-tilate/design.md](../mu-tilate/design.md#rulings-architecture-steward-2026-10-30)).
 - **Full presets** (`.muTronic`) are the state above wrapped as `<MuTronicPreset name description category>`; performance files (`.muPerformance`)
   point at them unchanged (`product` is `MuTronicState`).
 - **Import (Stage T8b).** "Import product preset" reads a `.muToni`/`.muOn`/`.muTant`/`.muClid` full preset and lays its layers into free slots (type from the
