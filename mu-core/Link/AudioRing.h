@@ -97,12 +97,16 @@ public:
         return (int) (header->capacity - (std::uint32_t) (w - r));
     }
 
-    // Consumer: drop every frame the producer has published so far (readPos jumps to writePos).
-    // Only the consumer may call this — it owns readPos — so it is safe while a producer writes.
-    void discard() noexcept
+    // Consumer: drop frames the producer has already published. The cursor comes from writeCursor();
+    // taking it first and discarding up to it later means frames written in between are kept. Only the
+    // consumer may call this — it owns readPos — so it is safe while a producer writes.
+    std::uint32_t writeCursor() const noexcept { return header->writePos.load(std::memory_order_acquire); }
+    void discardTo(std::uint32_t cursor) noexcept
     {
-        header->readPos.store(header->writePos.load(std::memory_order_acquire), std::memory_order_release);
+        if (header->readPos.load(std::memory_order_relaxed) != cursor)   // idle rings: no store, no cache-line traffic
+            header->readPos.store(cursor, std::memory_order_release);
     }
+    void discard() noexcept { discardTo(writeCursor()); }   // drop everything published so far
 
     // Producer: copy up to `numFrames` interleaved frames in. Returns frames actually
     // written (short when the ring is nearly full — the producer is running ahead, so a

@@ -192,6 +192,8 @@ struct ClientRegistry
     ClientSlot                 slots[kMaxClients];
 };
 
+static_assert(offsetof(ClientRegistry, slots) % 8 == 0, "ClientRegistry::slots must stay 8-byte aligned: bump kProtocolVersion if the layout changes");
+
 // Server side: target a program change at one client slot (scene switching). Write the
 // payload first, then bump the epoch (release) so the client's acquire-load of pcEpoch
 // observes a consistent (program, channel). program is clamped to 0-127, channel to 1-16.

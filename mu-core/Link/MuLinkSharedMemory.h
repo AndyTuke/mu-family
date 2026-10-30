@@ -5,6 +5,7 @@
 
 #include <cstring>
 #include <string>
+#include <utility>
 
 // Win32 shared-memory primitives for the mu-link bus — the CLIENT half + the generic
 // region wrapper, both used by every product's standalone via MuLinkClient. (The server
@@ -146,8 +147,8 @@ public:
                 continue;                                   // held by a live client
 
             SharedMemoryRegion ringMap = SharedMemoryRegion::open(ringMapName((std::uint32_t) slot), ringBytes);
-            if (! ringMap.valid() || ringViewOf(ringMap).readAvailable() > 0)
-                continue;                                   // ring missing, or stale audio not drained yet
+            if (! ringMap.valid() || ringViewOf(ringMap).readAvailable() != 0)
+                continue;                                   // ring missing, or stale audio not drained yet (the server drains a freed slot on its next block, and the bridge retries on its poll)
 
             std::uint32_t token = reg.nextAttachToken.fetch_add(1, std::memory_order_relaxed);
             if (token == 0)

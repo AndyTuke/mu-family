@@ -437,8 +437,13 @@ public:
                     staleFrames[slot]   = 0;
                     // Drop what the previous tenant left unread: a client claims a slot only once its ring
                     // is empty, so the next tenant never plays the last one's audio. We are the consumer,
-                    // so moving readPos is ours to do.
-                    mem->ring(slot).discard();
+                    // so moving readPos is ours to do. The cursor is taken BEFORE re-checking the slot is
+                    // still free, so a client that claims it meanwhile and starts writing loses nothing:
+                    // its frames come after the cursor.
+                    AudioRingView idleRing = mem->ring(slot);
+                    const std::uint32_t cursor = idleRing.writeCursor();
+                    if (reg.slots[slot].active.load(std::memory_order_acquire) == 0)
+                        idleRing.discardTo(cursor);
                     continue;
                 }
 
