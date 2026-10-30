@@ -56,18 +56,18 @@ Factory loops are included under the factory-loop licensing rule in [design-libr
 
 ## Rulings (architecture-steward, 2026-10-30)
 
-Items marked **(proposed, Andy to confirm)** are user-visible limits or defaults; the rest are structural and settled.
+The user-visible limits and defaults below are **DECIDED (Andy, 2026-10-30)**; the rest are structural and settled. Only the prototype items are still to prove.
 
 **1. Memory budget for decoded loops.**
 - **Format:** decoded to `float32`, in the file's channel count (a mono file stays mono, one channel, half the bytes; no forced stereo), at the file's own sample rate (the player resamples with the interpolator; nothing is resampled on load, so a rate change of the host needs no reload). Not 16-bit: the player, Stretch and the interpolators work in float and a per-sample convert on the audio thread buys only half the memory.
-- **Cap (proposed, Andy to confirm):** `kMaxLoopBytes = 11,520,000` per layer (30 s of stereo float32 at 48 kHz; 15 s at 96 kHz; 60 s if mono), a constant in `mu-core` beside `mu_limits`. About 16 bars at 128 BPM or 8 bars at 64 BPM. The limit is in bytes, shown to the user as seconds for the file in question.
+- **Cap (DECIDED, Andy, 2026-10-30):** `kMaxLoopBytes = 11,520,000` per layer (30 s of stereo float32 at 48 kHz; 15 s at 96 kHz; 60 s if mono), a constant in `mu-core` beside `mu_limits`. About 16 bars at 128 BPM or 8 bars at 64 BPM. The limit is in bytes, shown to the user as seconds for the file in question.
 - **Worst case:** 8 layers x 11.52 MB = 92.16 MB (87.9 MiB); 16 mu-Tronic slots x 11.52 MB = 184.32 MB (175.8 MiB), both at 48 kHz stereo. Typical use (2 to 4 bars, 5 to 10 s stereo = 1.9 to 3.8 MB) is a tenth of that. The cap is per layer and the total follows from the layer count (`kMaxLayers`), so there is no separate session cap to maintain.
 - **Over budget:** the file is **rejected** on the worker thread before decoding (the reader's `lengthInSamples x channels x 4` is checked against the cap), the layer keeps its previous loop, and the status bar says "Loop too long: N s, limit M s for this file". Never truncated (that would break bar length, tempo and slices) and never a silent partial load. Nothing is ever allocated on the audio thread: the buffer is allocated and filled on the worker, published read-only.
 - **Sharing:** yes. `mu-core` holds a `LoopCache` (per processor) of immutable decoded buffers keyed by content hash (hash of the file bytes, or of the embedded FLAC bytes). Layers and clips hold `std::shared_ptr<const LoopBuffer>`; the audio thread only reads through a raw pointer swapped at the staged boundary, and the last reference is dropped on the message thread (RetireBin), never the audio thread. Two layers loading the same file decode once.
 
 **2. Saved-state size and mu-Tronic scenes.**
-- **Embedding follows the mu-Clid mechanism** (shared `embedded_sample`, FLAC re-encode, same path-safety rules). **Limits (proposed, Andy to confirm):** at most **4 MiB per embedded loop** (about 25 to 30 s of typical 24-bit stereo drums as FLAC, matching the 30 s decode cap) and **32 MiB for the embedded loops of one saved state** (plugin/standalone state or one mu-Tronic session). A loop over its limit is stored **by path** and the save shows a one-line notice; nothing is dropped silently, and a path reference never fails a save.
-- **Default (proposed, Andy to confirm):** `Auto`. A loop inside the library folder or the content `Samples/` folder (including factory loops) is stored by path; any other file is embedded, so a preset or DAW project still plays when the file moves. A per-layer "Embed in preset" override (Auto / Embed / Path) is saved with the layer.
+- **Embedding follows the mu-Clid mechanism** (shared `embedded_sample`, FLAC re-encode, same path-safety rules). **Limits (DECIDED, Andy, 2026-10-30):** at most **4 MiB per embedded loop** (about 25 to 30 s of typical 24-bit stereo drums as FLAC, matching the 30 s decode cap) and **32 MiB for the embedded loops of one saved state** (plugin/standalone state or one mu-Tronic session). A loop over its limit is stored **by path** and the save shows a one-line notice; nothing is dropped silently, and a path reference never fails a save.
+- **Default (DECIDED, Andy, 2026-10-30):** `Auto`. A loop inside the library folder or the content `Samples/` folder (including factory loops) is stored by path; any other file is embedded, so a preset or DAW project still plays when the file moves. A per-layer "Embed in preset" override (Auto / Embed / Path) is saved with the layer.
 - **Scenes and clips:** a scene is only an index into the per-layer clip banks (mu-Tronic design 3.6), so it stores nothing. A **clip is the layer preset, so it stores the loop reference, never embedded bytes**: path, content hash, name, length and tempo. A session that embeds loops writes them **once each** into a state-level `<EmbeddedLoops>` pool keyed by content hash (counted against the 32 MiB), and layers and clips refer to the hash; 8 clips on 16 slots therefore cannot multiply the size. A standalone `.muPhrase` file embeds its own loop under the 4 MiB cap and carries no pool. A clip whose loop cannot be found (path gone, not in the pool) shows "missing, click to find" and is skipped by a scene launch, as a type-mismatched clip is.
 - **Launch:** a clip or scene launch is a staged swap; the decode runs on the worker pool from `preloadStaged` and the swap is taken at the boundary only if the buffer is ready, otherwise it waits for the next boundary. The boundary never blocks on I/O.
 
@@ -96,7 +96,10 @@ Items marked **(proposed, Andy to confirm)** are user-visible limits or defaults
 
 ## Open questions for Andy
 
-1. Loop cap 30 s at 48 kHz stereo float32 (11.52 MB, 92 MB for 8 layers, 184 MB for 16), reject on overflow. Recommended: yes.
-2. Embedded limits 4 MiB per loop and 32 MiB per saved state, over-limit loops fall back to path with a notice. Recommended: yes.
-3. Default embedding `Auto` (library and factory loops by path, other files embedded). Recommended: yes.
-4. Stretch applies a tempo change at the next slice start. Recommended: yes.
+None remaining. Loop cap, embedded limits, `Auto` embedding and Stretch latching the tempo at the next slice start are decided (Andy, 2026-10-30).
+
+## To prove in the prototype
+
+- Whether Signalsmith Stretch follows a varying local rate without artefacts (design-engine), and whether the Hold is long enough to hide the stretcher's latency.
+- Real CPU and memory of Stretch and `WindowedSinc` at 8 and 16 layers against the targets in ruling 5 (then `dsp-controller` review).
+- The exact JUCE 9 `ThreadPool` priority option name.
