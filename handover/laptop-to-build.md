@@ -41,7 +41,7 @@ Rows: #1704 (ModulationMatrix key allocation), #1715 (hot-swap while bypassed) �
 Do: build all products (together with L-001's build). Compile errors in mu-core/Modulation/ModulationMatrix.h/.cpp (new `outputKeyScratch`, reserved in rebuildCache) and mu-core/Plugin/ProcessorBase.h (new public `processBlockBypassed` override calling `resetSwapPlayState()`) are the first thing to look for.
 Do: run mu-core's unit tests (ModulationMatrix and HotSwap suites). Add or run a test that renders a ModulationMatrix whose control sequence has a 12-character id under an allocation counter (no allocation on the render path), and a processor-level check that a preset loaded while the host reports the plugin bypassed applies at once (HotSwapTests covers only the swapper).
 Do: in a host (or mu-On/mu-Tant standalone with a bypass), load a preset while bypassed and confirm it applies without un-bypassing; then un-bypass and confirm nothing jumps.
-Do: run `pwsh tests/scripts/check-rt-safety.ps1`; expect about 71 findings outside setup context (it was 342 before the script was retuned) and exit code 0; note any difference.
+Do: run `pwsh tests/scripts/check-rt-safety.ps1`; expect 0 findings outside setup context (132 in setup, 104 suppressed; it was 342 before the script was retuned and the code marked) and exit code 0; note any difference.
 Report: build result, test output, what was heard in the bypass check, the rt-safety count; then the backlog-administrator can close #1715 (and update #1704).
 
 ### L-006 · 2026-10-30 · Verify the Karplus-Strong gain limit (written without a compiler)
