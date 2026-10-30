@@ -35,6 +35,7 @@ Follows [design-plugin-family.md](design-plugin-family.md) and [design-ui-family
 │            │  ◄━━━━━━━━[ overview / scrollbar ]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━► Zoom ─●─ │
 │            │  Method [Transients|Soft-tonal|Even]  Sensitivity (•)  Min gap (•)  Pre-roll (•)  │
 │            │  Low-cut (•)  High-cut (•)   Snap [Off|1/16|1/8]   [Re-detect]   Slices: 12      │
+│            │  STRETCH (when Tempo = Stretch)  Transient hold (•) ms  Curve (•)  Strength (•)  ╱‾‾ │
 │            ├─────────────────────────────────────────────────────────────────────────────────┤
 │            │  SLICES ★                       │ SLICE PLAYER ★  slice 5 (selected)              │
 │            │  ┌───┬───┬───┬───┬───┬───┬───┬───┐ │ Start ▏0.412 s End ▏0.538 s  Fade in/out (•)(•) │
@@ -117,13 +118,16 @@ These are plain per-slice values (see the persistence note). Slice settings that
 
 ### Tempo matching and time-stretch
 - **Modes (per layer):** Off, Re-pitch (varispeed, cheap, pitch moves with tempo), Stretch (pitch preserved).
-- **Library candidates for Stretch:**
-  - **Signalsmith Stretch** (MIT, header-only): the preferred candidate; same author as the Signalsmith reverb already cited in code comments.
-  - Rubber Band: GPL or paid commercial licence, a licence problem for a closed product; not a candidate unless the licence terms change.
-  - SoundTouch: LGPL, and weaker on drums.
-  - **The licence must be re-confirmed before any library is adopted.**
-- **Scaling:** whatever the mode, slice start / end positions are multiplied by the tempo ratio so slices remain on the grid. For Stretch, each slice is stretched as its own short segment (transient preserved) rather than the whole loop being stretched once, which keeps drum attacks sharp; to be proven in a prototype.
-- **Real time:** Stretch runs per voice on the audio thread only with preallocated state (no allocation in `processBlock`); the `dsp-controller` reviews it before adoption.
+- **Library for Stretch: Signalsmith Stretch (MIT, header-only), decided (Andy, 2026-10-30).** Rubber Band (GPL / commercial) and SoundTouch (LGPL, weaker on drums) are rejected. The only licence obligation is to include Signalsmith Stretch's copyright and MIT notice. The family already ships third-party notices in `THIRD_PARTY_NOTICES.txt` (copied into every release package and installer) and credits them in the About overlay; the Signalsmith reverb headers live in `ThirdParty/signalsmith-basics/`. Add Signalsmith Stretch to `THIRD_PARTY_NOTICES.txt` and the About credits, and keep its headers beside the others in `ThirdParty/`. Andy's own licence is unaffected. The stretch engine is product-independent and lives in `mu-core`.
+- **Scaling:** whatever the mode, slice start / end positions are multiplied by the tempo ratio so slices remain on the grid. For Stretch each slice is stretched as its own short segment, never the whole loop in one go, and inside the segment the stretch is transient-weighted (next item).
+- **Transient-weighted stretch (modelled on Bitwig).** The stretch is not applied evenly across a slice. At the slice's start (its transient) the audio plays essentially unstretched, so the attack stays sharp, and the stretch grows with distance from the transient and settles into an even plateau for the rest of the slice. Per slice this is a **time-warp map from output time to input position**:
+  1. **Hold:** local rate 1.0 for the *Transient hold* period (a few ms to a few tens of ms).
+  2. **Ramp:** a smooth transition whose shape is the *Curve* control (linear to eased, for example an ease-in-out) from rate 1.0 to the plateau rate.
+  3. **Plateau:** a constant rate for the rest of the slice.
+  The plateau rate is **solved** so the slice's total output length equals the tempo-matched length (output length = input length x tempo ratio): the hold and ramp consume known output time and input span, and the plateau takes the remainder. Edge cases: a slice shorter than the hold plays at rate 1.0 for the hold's worth and the remaining difference is absorbed by the plateau or, if there is no room, by a plain uniform rate; ratio 1.0 is a pass-through (all rates 1.0); **compression** (ratio below 1) works the same way, the plateau rate then being above 1.0; if the solve has no positive plateau (extreme compression of a short slice) the hold is shortened until it does.
+- **Controls (per layer, shown under Stretch, in the Source area beside Tempo):** *Transient hold* (ms), *Curve* (shape), and *Strength* (0 = uniform stretch, 1 = full transient protection; it scales the hold and ramp so the user can fade the effect out; judged useful because slices with soft starts, such as pads and vocals, want it low). A small **curve preview** (local rate against slice time) sits beside the knobs, drawn with the shared curve-drawing look and `MuLookAndFeel` colours. All are shared `KnobWithLabel` controls and APVTS-backed layer parameters; Tempo mode, Hold, Curve and Strength are `ModTarget` candidates.
+- **How the stretcher is driven (unproven, prototype required).** Signalsmith Stretch's process call takes an input sample count and an output sample count per call, so a varying local rate should be reachable by feeding it a varying input count per output block, following the warp map (about rate 1.0 in the hold, then the ramp, then the plateau). This is **not proven**: it must be confirmed in a prototype that the stretcher's internal analysis follows such a rate change without artefacts (smeared attacks, phase flutter at the hold-to-ramp join), and what block size works. If it does not, fall back to a uniform plateau stretch of the tail with the first few ms played unstretched and cross-faded in. The `dsp-controller` must review it before adoption.
+- **Real time:** Stretch runs per voice on the audio thread only with preallocated state (no allocation in `processBlock`); the warp map is computed on the message thread when a slice or a control changes and read by the audio thread as a finished table.
 
 ## Layer vocabulary (decided by Andy, 2026-10-30; add to `design-naming.md` when scheduled)
 
