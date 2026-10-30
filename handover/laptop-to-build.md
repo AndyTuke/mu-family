@@ -2,7 +2,7 @@
 
 Written only by the laptop. The build PC reads it and answers in [build-to-laptop.md](build-to-laptop.md). Protocol: [README.md](README.md).
 
-Next id: L-008
+Next id: L-009
 
 ## Status (laptop)
 
@@ -57,6 +57,14 @@ Do: build (with L-001). Changes: `OnePoleLP::setState` in `mu-core/Audio/AudioFi
 Do: run mu-core tests (InsertDSPSmokeTests and any insert golden). Add a test: drive a steady signal, toggle the tone cutoff across 19 kHz mid-signal, assert no discontinuity (sample-to-sample step) at the switch.
 Do: listen: sweep the tone knob of a drive insert (e.g. Overdrive) across the fully-open end while a note sounds; there should be no click.
 Report: build result, test output, what was heard.
+
+### L-008 · 2026-10-30 · Verify the duplication lifts written without a compiler (#1701 items 1, 3, 4, 5 and the step clamps)
+Rows: #1701 (plan: docs/refactor-plan-2026-10.md) · Needs: build, run tests
+Do: focused builds of mu-Clid, mu-Tant, mu-Toni, mu-On (and mu-Tronic, which links mu-On's layer library), then the full Debug build with L-001. All changes are behaviour-preserving moves; goldens must NOT change. Fix compile errors first: this was written without a compiler.
+Changes to check: (1) new `mu-core/Modulation/LastResolved.h` (`mu_mod::LastResolved<N>`, included by `LaneModulation.h`) replacing the hand-copied hold-last-value block in mu-Tant `Pattern.cpp/.h`, mu-Toni `Arp.cpp/.h` and mu-On `Track.cpp/.h` (mu-On keeps its per-engine `lastResolvedEngine`). (3) `WavetableBank::indexForFile(file, lock)` in mu-core, now the body of mu-Tant `PluginProcessor::bankIndexFor` and `PatternType::bankIndexFor`. (4) new `mu-core/Modulation/ParamSkew.h` (`mu_mod::skew::propFromCutoff/cutoffFromProp`, named constants) used by mu-Tant `Pattern.cpp` and by mu-Clid `ModulationSkew.h` (whose cutoff pair now delegates). (5) new `mu-core/Control/ParamActual.h` (`mu_core::setParameterActual`) and mu-Clid `UI/Voice/RhythmParamCache.h` replacing four copies of `apvtsSet` (Amp/Filter/Pitch subsections, MidiOutSection) and the channel-send write in AmpSubsection. (8, partial) new `mu-on/Source/UI/StepPaging.h` (`clampPage`, `clampStep`) used by `StepPager.cpp` and `TrackContent.cpp`. Also `RumbleEngine.h` gained `jassert(n <= maxBlockSize)`.
+Do: run mu-Clid `ModulationSkewTests`, mu-Tant tests and goldens (`SynthDSPTests`), mu-Toni tests, `mu-on-tests Sequencer` (new `clampPage` / `clampStep` cases in `StepPagingTests.cpp`), and the daily golden sweep.
+Note: mu-Toni's Arp never reset its held values on prepare or bind (mu-Tant and mu-On do); the lift kept that behaviour. Decide whether mu-Toni should reset like the others.
+Report: build result, test output, any golden that moved.
 
 ## Results
 
