@@ -244,6 +244,7 @@ void PluginProcessor::seedInputState(int slot) noexcept
 // The bank index for a wavetable file: found by path, else decoded OFF bankLock (file read, WAV decode
 // and FFT mip build are the slow part) and appended under it for microseconds. Holding bankLock across
 // the decode would silence the audio render for the whole import.
+// rt-ok-fn: message thread; the audio thread reads the bank through BankTryLock
 int PluginProcessor::bankIndexFor(const juce::File& file)
 {
     const juce::String path = file.getFullPathName();

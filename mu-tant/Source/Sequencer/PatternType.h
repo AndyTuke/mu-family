@@ -27,6 +27,7 @@ public:
     PatternServices() { bank.loadFactoryBank(); }
 
     // Message thread (and prepareToPlay): the engines get the rate and block size the processor was prepared with.
+    // rt-ok-fn: message thread; the audio thread reads the bank through BankTryLock, never the blocking engineLock/bankLock
     void prepare(double sampleRate, int blockSize) override
     {
         const juce::ScopedLock sl(engineLock);
@@ -43,6 +44,7 @@ public:
     // back into the slot inside the fade renders through the other: two layers never advance one engine's phase and
     // filters in the same block. Nothing is allocated on the audio thread; a third Pattern inside one 25 ms fade would
     // reuse the engine of the oldest tail (not reachable from the UI).
+    // rt-ok-fn: message thread; the audio thread reads the bank through BankTryLock, never the blocking engineLock/bankLock
     VoiceEngine* engineForNewLayer(int slot)
     {
         if (slot < 0 || slot >= mu_limits::kMaxLayers) return nullptr;
@@ -63,6 +65,7 @@ public:
     // Message thread, a Published host's swap (audio excluded): the two slots' engine pools move with their Patterns, so a
     // moved Pattern keeps its own engine (its oscillator phase and filters continue) and the pool's alternation, which
     // is per slot, stays true for the Pattern a later edit puts in either slot. A tail in a swapped bin row moves with it.
+    // rt-ok-fn: message thread; the audio thread reads the bank through BankTryLock, never the blocking engineLock/bankLock
     void slotsSwapped(int a, int b) override
     {
         if (a < 0 || b < 0 || a >= mu_limits::kMaxLayers || b >= mu_limits::kMaxLayers || a == b) return;
@@ -85,6 +88,7 @@ public:
     // The bank index of a wavetable file: found by path, else decoded OFF the lock (file read, WAV decode and FFT
     // mip build are the slow part) and appended under it for microseconds, so an import never silences the render
     // for the decode. -1 when unreadable. Message thread.
+    // rt-ok-fn: message thread; the audio thread reads the bank through BankTryLock, never the blocking engineLock/bankLock
     int bankIndexFor(const juce::File& file)
     {
         assertMessageThread();

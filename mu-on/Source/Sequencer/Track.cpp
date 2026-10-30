@@ -89,6 +89,7 @@ bool Track::isValidDest(const std::string& id) const { return isValidEngineDest(
 
 // An absent <Track> clears the row and an absent envelope puts the default back, so a sparse or older
 // node never leaves the previous tenant's data behind.
+// rt-ok-fn: preset and state restore, message thread only
 void Track::applyExtras(const juce::ValueTree& node)
 {
     row.deserialise(node.getChildWithName("Track"));
@@ -209,6 +210,7 @@ EngineType Track::engineSetting() const noexcept
     return engineFromIndex(juce::roundToInt(engineRow.load(0.0f)));
 }
 
+// rt-ok-fn: engine swap on the message thread under engineBuild; the audio thread never calls it
 bool Track::syncEngine()
 {
     // Message thread. prepare (the host's thread, not processing) and this never overlap.

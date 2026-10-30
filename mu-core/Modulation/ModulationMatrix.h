@@ -80,6 +80,10 @@ private:
     // on the audio thread.  process() is audio-thread-only, so this is safe.
     mutable std::unordered_map<std::string, float> workMap;
 
+    // Scratch for the "<sequence id>_output" lookup key in process(): reserved in rebuildCache(), so
+    // building the key never allocates on the audio thread, whatever the id's length.
+    mutable std::string outputKeyScratch;
+
     // Cached on the message thread (under modLock) every time assignments change.
     // Read on the audio thread inside process() — protected by the same modLock.
     std::vector<int>         cachedSortOrder;      // topological indices into assignments

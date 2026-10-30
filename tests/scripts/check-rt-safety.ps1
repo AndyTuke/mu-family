@@ -16,6 +16,7 @@
 #                 allowed pattern and is not matched)
 #   string        juce::String construction (juce::String(...), `juce::String x...`, juce::String::),
 #                 .toString(), std::string construction, std::to_string
+#   str-concat    a std::string built with `+` from an id (`x.id + "_suffix"`): a heap temporary on every call
 #   raw-param     getRawParameterValue( (an APVTS string lookup; resolve to an atomic pointer once)
 #   std-function  constructing a std::function (declaration with an initialiser or a call-style
 #                 construction); a `const std::function<...>&` parameter is not matched
@@ -32,6 +33,16 @@
 #   - Strings and `#if` branches are not parsed. Member-function declarations returning juce::String and the
 #     plug-in factory's `new X::PluginProcessor()` are recognised and skipped.
 #   - Suppress a reviewed line by putting `rt-ok` (whole word, case-sensitive) anywhere on it, in a comment.
+#   - Suppress a whole function with `// rt-ok-fn: <reason>` on the definition line or the line above it: every
+#     hit inside the braced body counts as suppressed (.cpp and header alike). Use it for functions only the
+#     message / host thread calls, and give a real reason.
+#   - `// rt-ok-class: <reason>` on a class's opening line (or the line above) counts every hit inside the class
+#     body as setup context (not listed). Use it only for a class whose members are all message-thread.
+#   - Files that never run on the audio thread (preset / host-state / layers glue, serialisers, clip and table
+#     headers, render-support glue; the $notAudio list) are not scanned at all.
+#   - Setup names also include bind*, cache*, sync*FromParameters, sync*FromApvts, force*, completeSetup. Generic
+#     apply* / update* are NOT setup names: they can run on the audio thread.
+#   - A push_back / emplace_back with `capacity()` in the two lines above is treated as guarded growth.
 #
 # Usage:
 #   pwsh tests/scripts/check-rt-safety.ps1                 # report for the repo
@@ -86,17 +97,25 @@ foreach ($prod in (Get-ChildItem -LiteralPath $Root -Directory -Filter 'mu-*' | 
     }
 }
 
+# Files that never run on the audio thread (state serialisation, host-state, layer management, clip and
+# preset plumbing, tables, render-support glue): dropped from the scan so they do not drown the report.
+$notAudio = [regex]('(^|/)(PluginProcessor_(Preset|HostState|Layers)\.cpp|\w*Serialise\.h|StepRow\.h|ClipBank\.h|ClipClipboard\.h|ClipLibrary\w*\.\w+|LayerTypeRegistry\.h|FXAlgorithmDef\.h|MusicalScales\.h|MidiOutputMapping\.h|ChordVoicing\.h|StripMods\.h|ModulationAssignment\.h|ProductRender\.h|RenderSupport\.h)$|^mu-core/Control/MidiControlMap\.cpp$')
+$kept = New-Object System.Collections.Generic.List[string]
+foreach ($f in $scanFiles) { if (-not $notAudio.IsMatch((Get-RelPath $f))) { $kept.Add($f) } }
+$scanFiles = $kept
+
 $rules = @(
-    @{ Id = 'alloc';        Re = [regex]'(?<![\w.>])new\s+[A-Za-z_:]|(?<![\w=])delete\s*(\[\s*\])?\s*[A-Za-z_(]|\b(malloc|calloc|realloc|free)\s*\(' },
+    @{ Id = 'alloc';        Re = [regex]'(?<![\w.>])new\s+[A-Za-z_:]|(?<![\w.>])delete\b\s*(\[\s*\])?\s*[A-Za-z_(]|\b(malloc|calloc|realloc|free)\s*\(' },
     @{ Id = 'vector-grow';  Re = [regex]'\.\s*(push_back|emplace_back|resize|reserve|setSize)\s*\(|\.\s*insert\s*\(' },
     @{ Id = 'lock';         Re = [regex]'\bstd::(mutex|recursive_mutex|lock_guard|unique_lock|scoped_lock|shared_mutex)\b|\bScoped(Read|Write)?Lock\b(?!Type)|\bScopedLock\b|\.enter\(\s*\)|\bGenericScopedLock\b' },
     @{ Id = 'string';       Re = [regex]'\bjuce::String\s*\(|\bjuce::String\s+\w+\s*(=|\(|\{|;)|\bjuce::String::|\.toString\s*\(\s*\)|\bstd::string\s+\w+\s*(=|\(|\{|;)|\bstd::to_string\b|\bString\s*\(\s*"' },
     @{ Id = 'raw-param';    Re = [regex]'\bgetRawParameterValue\s*\(' },
+    @{ Id = 'str-concat';   Re = [regex]'\.\w*[iI]d\s*\+\s*"' },
     @{ Id = 'std-function'; Re = [regex]'\bstd::function\s*<[^;]*>\s+\w+\s*(=|\(|\{)|\bstd::function\s*<[^;]*>\s*[({]|\bstd::function\s*<[^;]*>\s*\w+\s*=\s*\[|\bmake_function\b' }
 )
 $mapIndex = 'map-index'
-$setupName = [regex]'^(prepare\w*|release\w*|reset\w*|load\w*|init\w*|setup\w*|set[A-Z]\w*|build\w*|create\w*|clear\w*|resize\w*|allocate\w*|~\w+)$'
-$funcDef = [regex]'^[A-Za-z_][^;=]*?\b(\w+)::(~?\w+)\s*\('
+$setupName = [regex]'^(prepare\w*|release\w*|reset\w*|load\w*|init\w*|setup\w*|set[A-Z]\w*|build\w*|create\w*|clear\w*|resize\w*|allocate\w*|bind\w*|cache\w*|sync\w*FromParameters|sync\w*FromApvts|force\w*|completeSetup|~\w+)$'
+$funcDef = [regex]'^(?=[A-Za-z_])[^;]*?\b(\w+)::(~?\w+)\s*\('
 $blockComment = [regex]'(?s)/\*.*?\*/'
 $blankBlock = [System.Text.RegularExpressions.MatchEvaluator] { param($m) $m.Value -replace '[^\r\n]+', '' }
 $mapDecl = [regex]'\bstd::(unordered_)?map\s*<\s*(const\s+)?(std::string|juce::String)\s*,[^;]*?>\s+(\w+)\s*[;{=(]'
@@ -118,22 +137,58 @@ foreach ($path in ($scanFiles | Sort-Object -Unique)) {
     $mapIdx = $null
     if ($maps.Count -gt 0) { $mapIdx = [regex]('(?<![\w.])(' + (($maps | Sort-Object -Unique) -join '|') + ')\s*\[') }
 
+    # Function / class regions marked `rt-ok-fn:` / `rt-ok-class:` (see header): 1 = fn, 2 = class.
+    $region = New-Object 'int[]' $cleaned.Count
+    for ($k = 0; $k -lt $cleaned.Count; $k++) {
+        $kind = 0
+        if ($rawLines[$k] -cmatch '\brt-ok-fn:') { $kind = 1 } elseif ($rawLines[$k] -cmatch '\brt-ok-class:') { $kind = 2 }
+        if ($kind -eq 0) { continue }
+        # Walk from the marker to the end of the next braced body; a `;` before any `{` means no body.
+        $depth = 0; $opened = $false; $end = -1
+        for ($e = $k; $e -lt $cleaned.Count -and $end -lt 0; $e++) {
+            $txt = ($cleaned[$e] -replace '"(\\.|[^"\\])*"', '""') -replace "'(\\.|[^'\\])'", "''"
+            foreach ($ch in $txt.ToCharArray()) {
+                if ($ch -eq '{') { $depth++; $opened = $true }
+                elseif ($ch -eq '}') { $depth--; if ($opened -and $depth -le 0) { $end = $e; break } }
+                elseif ($ch -eq ';' -and -not $opened) { $end = -2; break }
+            }
+            if ($end -eq -2) { break }
+        }
+        if ($end -ge 0) { for ($e = $k; $e -le $end; $e++) { if ($region[$e] -ne 1) { $region[$e] = $kind } } }
+    }
+
     for ($i = 0; $i -lt $cleaned.Count; $i++) {
         $line = $cleaned[$i]
         if ($line.Trim().Length -eq 0) { continue }
         if ($line -match '^\s*#\s*include') { continue }
         $matched = @()
         foreach ($rule in $rules) {
-            if (-not $rule.Re.IsMatch($line)) { continue }
+            $test = $line
+            if ($rule.Id -eq 'string') {
+                # Empty construction does not allocate; drop it before testing.
+                $test = $test -replace '\bjuce::String\s*\(\s*\)|\bstd::string\s*\{\s*\}', ''
+                # A bare member / local declaration without initialiser (`juce::String id;`) does not allocate.
+                if ($test -match '^\s*(const\s+|mutable\s+)*(juce::String|std::string)\s+\w+\s*(\{\s*\})?\s*;\s*$') { continue }
+            }
+            # A `using X = std::function<...>` alias constructs nothing.
+            if ($rule.Id -eq 'std-function' -and $line -match '^\s*using\s+\w+\s*=') { continue }
+            if (-not $rule.Re.IsMatch($test)) { continue }
+            # A push_back after a capacity() check (within 2 lines above) is the guarded-growth pattern.
+            if ($rule.Id -eq 'vector-grow' -and $line -match '\.\s*(push_back|emplace_back)\s*\(' -and
+                (($i -ge 1 -and $cleaned[$i - 1] -match 'capacity\s*\(\s*\)') -or ($i -ge 2 -and $cleaned[$i - 2] -match 'capacity\s*\(\s*\)'))) { continue }
             # The plug-in factory's `new X::PluginProcessor()` is the one allowed allocation (message thread, once).
             if ($rule.Id -eq 'alloc' -and $line -match 'new\s+([\w]+::)*PluginProcessor\s*\(') { continue }
             # A member-function declaration returning juce::String is not a construction.
             if ($rule.Id -eq 'string' -and $line -match '\bjuce::String\s+\w+\s*\([^)]*\)\s*(const\b|override\b|noexcept\b|;\s*$)' -and $line -notmatch '=\s*juce::String|juce::String\s*\(') { continue }
+            # So is a function definition starting inline / static / virtual whose signature ends the line or opens the body.
+            if ($rule.Id -eq 'string' -and $line -match '^\s*((inline|static|virtual|constexpr)\s+)+(const\s+)?juce::String\s+\w+\s*\(' -and
+                ($line -notmatch '\)' -or $line -match '\)\s*((const|override|noexcept)\s*)*(\{\s*)?$') -and $line -notmatch '=\s*juce::String|juce::String\s*\(') { continue }
             $matched += $rule.Id
         }
         if ($mapIdx -and $mapIdx.IsMatch($line)) { $matched += $mapIndex }
         if ($matched.Count -eq 0) { continue }
-        if ($rawLines[$i] -cmatch '\brt-ok\b') { $suppressed++; continue }
+        if ($rawLines[$i] -cmatch '\brt-ok\b(?!-)') { $suppressed++; continue }
+        if ($region[$i] -eq 1) { $suppressed++; continue }
 
         # Setup context: the nearest column-0 definition above the line, in a .cpp.
         $setup = $false
@@ -149,6 +204,8 @@ foreach ($path in ($scanFiles | Sort-Object -Unique)) {
                 }
             }
         }
+        # `rt-ok-class:` members are counted as setup context, headers included.
+        if ($region[$i] -eq 2) { $setup = $true }
         foreach ($id in $matched) {
             if ($setup) {
                 $setupHits[$id] = 1 + [int]$setupHits[$id]

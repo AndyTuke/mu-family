@@ -93,12 +93,14 @@ void HitGenerator::getPattern(const EuclidGenOverrides& requested,
     }
 }
 
+// rt-ok-fn: UI display and tests only, never called from the audio thread
 std::vector<StepType> HitGenerator::getStepTypes() const
 {
     // Delegate to the override-aware variant with current values — single source of truth.
     return getStepTypes(EuclidGenOverrides{ hits, rotate, prePad, postPad, insertStart, insertLength });
 }
 
+// rt-ok-fn: UI display and tests only, never called from the audio thread
 std::vector<StepType> HitGenerator::getStepTypes(const EuclidGenOverrides& requested) const
 {
     if (mute)

@@ -25,6 +25,7 @@ void SamplePreview::releaseResources()
     stop();
 }
 
+// rt-ok-fn: message-thread side of the hazard-pointer scheme; the audio thread never takes messageLock
 void SamplePreview::collectRetired()
 {
     const juce::ScopedLock sl(messageLock);
@@ -89,6 +90,7 @@ void SamplePreview::start(const juce::File& file)
     collectRetired();
 }
 
+// rt-ok-fn: message-thread side of the hazard-pointer scheme; the audio thread never takes messageLock
 void SamplePreview::stop()
 {
     const juce::ScopedLock sl(messageLock);

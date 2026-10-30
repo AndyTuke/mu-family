@@ -1127,6 +1127,7 @@ void ProcessorBase::resetLayerParams(int slot)
         });
 }
 
+// rt-ok-fn: builds the sidechain source list for the UI and setup, message thread only
 std::vector<juce::RangedAudioParameter*> ProcessorBase::sidechainSourceParams()
 {
     std::vector<juce::RangedAudioParameter*> out;
@@ -1158,6 +1159,7 @@ void ProcessorBase::remapSidechainSources(const std::vector<juce::RangedAudioPar
     }
 }
 
+// rt-ok-fn: state capture for save, message or host thread only
 juce::ValueTree ProcessorBase::captureComposedState()
 {
     flushClipAutoSaveForStateCapture();   // a late edit of a lit clip is in the saved bank
@@ -1186,6 +1188,7 @@ juce::ValueTree ProcessorBase::captureComposedState()
     return state;
 }
 
+// rt-ok-fn: structural layer edit on the message or host thread under layoutWriteLock/layersLock/layerServicesLock; the audio thread only try-locks or reads the published view
 void ProcessorBase::applyComposedState(const juce::ValueTree& state)
 {
     dropClipWatches();   // the restored layers re-adopt a baseline; nothing is written for the restore
@@ -1292,6 +1295,7 @@ int ProcessorBase::firstUnusedColourIndex() const
     return 0;
 }
 
+// rt-ok-fn: structural layer edit on the message or host thread under layoutWriteLock/layersLock/layerServicesLock; the audio thread only try-locks or reads the published view
 int ProcessorBase::addLayer()
 {
     const int n = numLayers.load(std::memory_order_relaxed);
@@ -1347,6 +1351,7 @@ int ProcessorBase::addLayer()
     return n;
 }
 
+// rt-ok-fn: structural layer edit on the message or host thread under layoutWriteLock/layersLock/layerServicesLock; the audio thread only try-locks or reads the published view
 bool ProcessorBase::removeLayer(int idx)
 {
     const int n = numLayers.load(std::memory_order_relaxed);
@@ -1428,6 +1433,7 @@ bool ProcessorBase::removeLayer(int idx)
     return true;
 }
 
+// rt-ok-fn: structural layer edit on the message or host thread under layoutWriteLock/layersLock/layerServicesLock; the audio thread only try-locks or reads the published view
 bool ProcessorBase::swapLayers(int a, int b)
 {
     const int n = numLayers.load(std::memory_order_relaxed);
@@ -1488,6 +1494,7 @@ bool ProcessorBase::swapLayers(int a, int b)
 // else about the layers changes. What travels with a layer: its object (engine, state, modulators, clips, name,
 // colour), its mixer strip (level, sends, sidechain and bus assignment, follower), the tails owed to its strip, and its
 // parameter rows under its type's prefix. What stays with the slot: the slot number itself.
+// rt-ok-fn: structural layer edit on the message or host thread under layoutWriteLock/layersLock/layerServicesLock; the audio thread only try-locks or reads the published view
 bool ProcessorBase::swapLayersPublished(int a, int b)
 {
     mu_hotswap::assertMessageThread();   // one writer at a time: the editor's drag and a state restore are message-thread work
@@ -1636,6 +1643,7 @@ void ProcessorBase::resetLayer(int idx)
 
 // ─── Typed slots ─────────────────────────────────────────────────────────────────────────────
 
+// rt-ok-fn: structural layer edit on the message or host thread under layoutWriteLock/layersLock/layerServicesLock; the audio thread only try-locks or reads the published view
 mu_core::LayerServices* ProcessorBase::ensureLayerServices(const mu_core::LayerTypeInfo& info)
 {
     const int i = (int) info.id;
@@ -1665,6 +1673,7 @@ mu_core::LayerServices* ProcessorBase::ensureLayerServices(const mu_core::LayerT
     return layerServices[(size_t) i].get();
 }
 
+// rt-ok-fn: structural layer edit on the message or host thread under layoutWriteLock/layersLock/layerServicesLock; the audio thread only try-locks or reads the published view
 void ProcessorBase::runLayerServicesWork()
 {
     // Copied out under the table's lock and run outside it: a services object's work may reach back into the table
@@ -1678,6 +1687,7 @@ void ProcessorBase::runLayerServicesWork()
         if (s != nullptr) s->deferredWork();
 }
 
+// rt-ok-fn: structural layer edit on the message or host thread under layoutWriteLock/layersLock/layerServicesLock; the audio thread only try-locks or reads the published view
 mu_core::LayerServices* ProcessorBase::findLayerServices(mu_core::LayerTypeId id) const
 {
     const int i = (int) id;
@@ -1706,6 +1716,7 @@ void ProcessorBase::resetOwnLayerParams(int slot)
         });
 }
 
+// rt-ok-fn: structural layer edit on the message or host thread under layoutWriteLock/layersLock/layerServicesLock; the audio thread only try-locks or reads the published view
 void ProcessorBase::publishLayers(int liveCount)
 {
     jassert(getLayerAccess() == mu_core::LayerAccess::Published);

@@ -542,7 +542,8 @@ Roughly 12 to 13 working days of test work; items 1 to 6 (about 6 days) are the 
 | `AllocationProbe.h`, lock probe, two-thread stress | Planned, not written |
 | `LayerEquivalence.h` | Planned (needs T3 and the path switch) |
 | mu-On engine, mu-Toni `readVoice`, mu-Tant Note-mode, mixer block-value pins | Planned, not written |
-| `check-rt-safety.ps1`, `check-layer-boundary.ps1` fixtures | Planned, not written |
+| `check-layer-boundary.ps1` fixtures | Planned, not written |
+| `check-rt-safety.ps1` (report-only, exit 0): written; 2026-10-30 triage tuning (delete/string/ctor-detection fixes, `str-concat` rule, `rt-ok-fn:` / `rt-ok-class:` markers, non-audio files dropped). 71 findings outside setup, 72 suppressed. Fixtures for it: planned, not written |
 | Contract pins P1-P7, measurements M1, M2 | Planned, not written |
 | Golden harness (`GoldenRender.h` and per-product `GoldenRenderTests.cpp`), branch `e0-harness`, commits 319cbb3, 7ad0466, 123fc59 | Built on branch, 482 mu-core results, not yet merged. Deviation: a scenario with `tolerance_abs` set compares only the per-segment peaks (not the max per-sample difference described in section 2), so the tolerance is a peak bound; keep `tolerance_abs` at 0 until the comparison is extended |
 | E0.2 seed fix (mu-Tant `NoiseGen`, mu-Toni `rng`), branch `e0-seed-fix`, commits 4605cb6, d353ff1 | Signed (dsp-controller Pass with notes), not yet merged. mu-Tant 184 and mu-Toni 62 results. Open note: `BitcrusherInsert` and `VocoderInsert` still seed per slot without a per-instance salt (pre-existing); to be done with the shared contract |

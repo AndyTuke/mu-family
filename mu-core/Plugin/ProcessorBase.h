@@ -1061,6 +1061,19 @@ protected:
     // processBlock, so the swapper must not believe the transport still runs (loads apply at once).
     void resetSwapPlayState() noexcept { layerSwapper.resetPlayState(); }
 
+    // A host bypass calls this instead of processBlock, so no block flags the swaps' boundaries and the swapper
+    // would still believe the last transport state: forget it, as prepareToPlay does, so a load while bypassed
+    // applies at once instead of staging for a boundary nobody flags (a swap already staged lands on the first
+    // real block after the bypass). This runs on the audio thread, which owns the play state.
+public:
+    using ProcessorCore::processBlockBypassed;
+    void processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) override
+    {
+        resetSwapPlayState();
+        ProcessorCore::processBlockBypassed(buffer, midi);
+    }
+protected:
+
     // The 4/4 bar-line rule shared by the products that step through layer presets.
     void flagSwapBoundaries(bool isPlaying, double blockStartBeat, double blockBeats) noexcept
     {

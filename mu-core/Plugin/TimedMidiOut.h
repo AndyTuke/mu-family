@@ -52,6 +52,7 @@ public:
     ~TimedMidiOut() override { stopThread(1000); }
 
     // Message thread. nullptr stops sending; messages queued meanwhile are dropped as they fall due.
+    // rt-ok-fn: portLock is shared by the message thread and the sender thread, never taken on the audio thread
     void setOutput(juce::MidiOutput* output)
     {
         const juce::ScopedLock sl(portLock);
@@ -114,6 +115,7 @@ private:
     struct Event { double dueMs; juce::uint8 data[3]; int size; };
 
     // Sender: wake about every millisecond and send what is due.
+    // rt-ok-fn: sender thread, not the audio thread; portLock is shared with the message thread only
     void run() override
     {
         while (! threadShouldExit())

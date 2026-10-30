@@ -111,6 +111,7 @@ void MidiRhythmCore::advanceSequencer(bool playing, double beatPos, juce::MidiBu
 }
 
 //==============================================================================
+// rt-ok-fn: session restore on the message thread; the rhythmsLock is the message-thread edit lock
 bool MidiRhythmCore::restoreSession(const juce::String& xml, juce::String& error)
 {
     bool ok = false;
@@ -200,6 +201,7 @@ void MidiRhythmCore::publishStepCounts()
 
 // Message thread. Applies every queued change and the pattern rebuild together, so the generator
 // fields never change under a rebuild. Lock order: rhythmsLock, then the sequencer's pattern lock.
+// rt-ok-fn: runs from the message-thread timer, not from processBlock
 void MidiRhythmCore::drainPendingParams()
 {
     bool any = false;
@@ -230,6 +232,7 @@ void MidiRhythmCore::drainPendingParams()
     publishStepCounts();
 }
 
+// rt-ok-fn: runs from the message-thread timer, not from processBlock
 void MidiRhythmCore::servicePendingRebuild()
 {
     drainPendingParams();

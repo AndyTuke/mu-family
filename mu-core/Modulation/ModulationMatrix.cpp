@@ -38,6 +38,7 @@ bool ModulationMatrix::isMetaSource(const std::string& src, std::string& outDepI
 // Public interface
 //==============================================================================
 
+// rt-ok-fn: message-thread assignment editing; allocation is deliberate here so process() stays allocation-free
 bool ModulationMatrix::addAssignment(const ModulationAssignment& a)
 {
     if (static_cast<int>(assignments.size()) >= MaxAssignments)
@@ -51,6 +52,7 @@ bool ModulationMatrix::addAssignment(const ModulationAssignment& a)
     return true;
 }
 
+// rt-ok-fn: message-thread assignment editing; allocation is deliberate here so process() stays allocation-free
 bool ModulationMatrix::retargetAssignment(const std::string& id, const std::string& newDestinationId)
 {
     const auto it = std::find_if(assignments.begin(), assignments.end(),
@@ -94,6 +96,7 @@ void ModulationMatrix::setCurve(const std::string& id, float curve)
         if (a.id == id) { a.curve = curve; return; }
 }
 
+// rt-ok-fn: message-thread assignment editing; allocation is deliberate here so process() stays allocation-free
 void ModulationMatrix::rebuildCache()
 {
     // Structural change — let UI know its cached "is assigned" flags are stale. Revisions come from one
@@ -109,6 +112,7 @@ void ModulationMatrix::rebuildCache()
     std::atomic_store(&published, std::shared_ptr<const AssignedSnapshot>(std::move(snap)));
 
     cachedSortOrder = getSortedOrder();
+    outputKeyScratch.reserve(128);   // room for a UUID-length sequence id plus "_output"
 
     const std::size_t n = assignments.size();
     cachedDepthKeys.resize(n);
@@ -146,11 +150,14 @@ void ModulationMatrix::process(const std::vector<ControlSequence>& sequences,
 
     // No clear()/insert here — rebuildCache() (message thread) pre-inserted every
     // CS-output and depth key, so these are pure overwrites: no audio-thread alloc.
-    // CS output keys are short ("cs0_output" = 10 chars) and fit in SSO on all platforms.
+    // The lookup key is built in a scratch string whose capacity rebuildCache() reserved, so a long custom or
+    // imported sequence id never heap-allocates a temporary here.
     // find-and-skip: an id that rebuildCache() did not seed (and no assignment reads) would insert a node here.
     for (const auto& cs : sequences)
     {
-        auto it = workMap.find(cs.id + "_output");
+        outputKeyScratch.assign(cs.id);
+        outputKeyScratch += "_output";
+        auto it = workMap.find(outputKeyScratch);
         if (it != workMap.end())
             it->second = cs.evaluate(songBeatPos);
     }
@@ -194,6 +201,7 @@ void ModulationMatrix::process(const std::vector<ControlSequence>& sequences,
 // Private — topological sort (Kahn's algorithm)
 //==============================================================================
 
+// rt-ok-fn: message-thread assignment editing; allocation is deliberate here so process() stays allocation-free
 std::vector<int> ModulationMatrix::getSortedOrder() const
 {
     const int n = static_cast<int>(assignments.size());
@@ -247,6 +255,7 @@ std::vector<int> ModulationMatrix::getSortedOrder() const
 // Private — cycle detection (DFS from the candidate's dependency)
 //==============================================================================
 
+// rt-ok-fn: message-thread assignment editing; allocation is deliberate here so process() stays allocation-free
 bool ModulationMatrix::wouldCreateCycle(const ModulationAssignment& candidate) const
 {
     std::string depId;
