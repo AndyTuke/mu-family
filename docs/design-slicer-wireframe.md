@@ -185,15 +185,43 @@ Following the one-framework direction, build these generically in `mu-core` rath
 ## Export ★ (Andy, 2026-10-30: wanted, in scope)
 
 - **Bounce to WAV:** the Standalone's bounce dialog from the Bounce idea in [design-future.md](design-future.md) (a shared `mu-core` dialog, standalone only), rendering the arrangement of all layers for N bars plus an FX tail. Depends on the generic render path being lifted to `mu-core`.
-- **Export slices to a folder:** writes each slice of the selected layer (or every layer) as its own WAV, named `<loop>_<nn>.wav`, with the layer's fade and pitch applied only if the user ticks "Render settings". The folder defaults to the sample-library folder so the result shows up in the browser.
+- **Export slices to a folder:** writes each slice of the selected layer (or every layer) as its own WAV into **one folder per loop** (decided), named `<loop>_<nn>.wav`, with the layer's fade and pitch applied only if the user ticks "Render settings". The folder defaults to the sample-library folder so the result shows up in the browser.
 
 ## Decisions (Andy, 2026-10-30)
 
 Name **mu-Tilate**; time-stretch is a per-layer option (Off / Re-pitch / Stretch); layer type `Phrase` with `.muPhrase` and `.muTilate`; 8 layers with one loop and one sample player each (single-row timeline, no lanes); each layer is **monophonic**: one slice at a time, the next slice cuts the previous one through the short automatic declick fade; no MIDI play; formats VST3 + CLAP + Standalone; automatic mu-Tronic integration; a sample library like mu-Clid's; Bounce to WAV and Export slices are in scope.
 
+## Factory loops and licensing (Andy, 2026-10-30: decided)
+
+mu-Tilate ships a small set of free loops in the content folder's `Samples/` so that factory presets can be shipped. Rules: only **CC0 / public-domain** material or material under a licence that **explicitly allows redistribution inside an app**; **no CC-BY-NC and no share-alike-restricted** (CC-BY-SA, GPL-style) material. Each loop has a **licence and credit manifest next to it** in `Samples/` (source, author, licence, URL, date checked). The actual pack choice is made later.
+
+## Tempo analysis ★ (research, 2026-10-30; decided: metadata first, then analysis)
+
+Used for library rows, for loading a loop into a layer, and for the Source `Set` control.
+
+**Order of trust.**
+1. **File metadata:** WAV `acid` chunk (beats, tempo) and `smpl` chunk, and AIFF / Apple Loops chunks. If present and plausible (inside the range prior), use it with full confidence.
+2. **Analysis** (below).
+3. **Filename hint** such as `120bpm`, lowest priority, used only when analysis confidence is low.
+
+**Why loops are a special case.** A loop is normally an exact whole number of beats (usually bars), so the tempo is `60 x beats / duration_seconds`. The problem reduces to finding the beat count, not tracking a drifting tempo.
+
+**Method.**
+1. Trim leading and trailing silence first (length must be the musical length).
+2. For each candidate beat count (for example 1 to 64), compute the implied BPM and **discard anything outside about 60 to 200 BPM**.
+3. Score each remaining candidate by how well the **onset detection curve** (the same cached spectral-flux curve as transient detection, so nothing is analysed twice) fits a beat grid of that tempo, using a comb-filter / autocorrelation / tempogram score. References: Scheirer 1998 (comb filters), Ellis 2007 (dynamic-programming beat tracking), Davies and Plumbley (beat tracking and tempo), and librosa's `beat_track` as a readable reference implementation.
+4. Pick the best score. The **range prior plus the loop length** resolves half-tempo and double-tempo errors (both candidates are whole beat counts; the range and the grid fit choose).
+5. Find the **downbeat offset** by correlating the curve with the beat grid, so beat 1 lines up with the first strong hit.
+6. Keep a **confidence value** (best score against the runner-up) and show it next to the tempo. Low confidence is shown plainly, never hidden.
+
+**Override.** The existing `Set` control in Source lets the user correct tempo and length; the override is **saved with the layer** and beats any later analysis.
+
+**Implementation.** Written in-house on the existing detection curve, about 150 lines, no new dependency. aubio is GPL and Essentia is AGPL, which do not suit a closed product. Runs on the same worker thread as detection, never on the audio thread; results are cached per file for the library list.
+
+## Decisions (Andy, 2026-10-30), addendum
+
+Factory loops are included under the licensing rule above; tempo comes from metadata first, then analysis; Export slices writes **one folder per loop**; Bounce to WAV is **Standalone only for now**, and because the dialog is the shared one in `mu-core` (see the Bounce idea), the option to offer it in the plugin formats later stays open at no extra cost.
+
 ## Open questions for Andy
 
-1. **Library scope:** does mu-Tilate ship a small factory loop pack in the content folder's `Samples/` (licensing of the loops needed), or start with an empty library?
-2. **Tempo detection of library files:** file metadata (acid / loop chunks) first, falling back to analysis, or analysis always? (Suggested: metadata first.)
-3. **Export slices:** one folder per loop (suggested) or a single flat folder?
-4. **Bounce in plugin formats:** Standalone only, as the Bounce idea suggests (suggested), or also from the plugins?
+None remaining.
