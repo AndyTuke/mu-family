@@ -1,12 +1,12 @@
 # μ-On — Sequencer design
 
-A 909-style step sequencer drives every track (layer), one row of 16 steps per layer slot. A track
+A 909-style step sequencer drives every track (layer), one row of up to 64 steps (16 by default) per layer slot. A track
 running the **Rumble** engine is not sequenced — it processes another track's audio (see
 [design-engine.md](design-engine.md)) — and ignores its row, which is kept for when the track's engine
 changes.
 
 ## Model — `StepRow`, and `StepPattern` as the grid view
-A row is 16 steps; each cell carries an **on/off** and an **accent** flag, as `std::atomic<bool>` so the
+A row holds up to `StepRow::kMaxSteps` (64) steps and has its own **length** (`numSteps()`, 1 to 64, default 16 = one bar); the steps past the length are not part of the pattern (they are not played, not edited, and not shown as steps; see "Length and paging" below). Each cell carries an **on/off** and an **accent** flag, as `std::atomic<bool>` so the
 message thread (grid editing) and the audio thread (clock read) share them without a lock or a dropped
 block. A `StepRow` is owned by its `Track` ([Sequencer/Track.h](../../mu-on/Source/Sequencer/Track.h)),
 so it travels with the track through add / delete / reorder, and the track's clock reads it inside the
@@ -48,7 +48,7 @@ its own into its row at the top of every call. **Ruled and built 2026-10-20 ([de
 for the UI grid.
 
 ## UI — `StepRows` / `TrackContent`
-[mu-on/Source/UI/StepRows.{h,cpp}](../../mu-on/Source/UI/StepRows.h) draws one 16-cell row per live
+[mu-on/Source/UI/StepRows.{h,cpp}](../../mu-on/Source/UI/StepRows.h) draws one 16-cell page of a row per live
 track in the track colours, every row the same height (steps-box height / `kMaxLayers`), top-aligned:
 **left-click toggles** a step on/off, **right-click toggles accent** (a hotter centre), beat groups
 are tinted, and a **30 Hz playhead** column tracks the transport; the selected track's row is
@@ -60,7 +60,16 @@ the Groove box (the track's own **Swing** and **Accent**, bound to `t{N}_swing`/
 envelope) and the step rows. The 16-cell drawing, hit test and edit gesture live once in `TrackStepRow` ([UI/TrackStepRow.h](../../mu-on/Source/UI/TrackStepRow.h)):
 `StepRows` calls its static `paintCells` / `stepAt` / `editStep` per row, and a locked track (a mu-Tronic layer) shows the one-row `TrackStepRow` component instead. The shared sidebar pulses a track when the sequencer fires it.
 
+## Length and paging (built 2026-10-29)
+- **Length:** each row has its own length, 1 to 64 steps, set by the **Length** control (a `NudgeInput`, arrows step by one, double-click types a number) in the `StepPager` strip under the grid. It sets the length of the **selected** row; other rows keep theirs.
+- **Paging:** the grid always shows 16 steps (`StepRow::kNumSteps`); a row longer than 16 is paged 16 at a time with **Prev** / **Next** and the label **"Page n / N"**. The page is shared by every row shown, so rows of different length stay aligned; a row shorter than the page shows the rest of it as shaded steps. The page is clamped when a shorter length takes it away; Prev is disabled on page 1, Next on the last page.
+- **Steps past the length** are drawn as a **hatched veil**: a flat pale wash over the near-black lens with diagonal hatching ("not there"), no lamp, no click or drag effect. The shading is for length only; a step skipped by its loop ratio or probability keeps the plain dim.
+- **Tie stub:** a Bass tie across a page edge draws a short stub into the first cell of the new page, so it does not read as two separate notes.
+- **Selected step** (the Step panel's target) is clamped to the row's last step whenever the Length shrinks or a preset swaps in a shorter row, so the panel never edits a hidden step; the grid selection follows and the panel refreshes on a Length or page change.
+- **One implementation:** the strip is the shared `StepPager` ([UI/StepPager.h](../../mu-on/Source/UI/StepPager.h)), used by `StepRows` and, under the single row of a locked layer, by `TrackContent`. mu-Tronic's Track layers use exactly this; their look is in [../mu-tronic/design-ui.md](../mu-tronic/design-ui.md#45c-the-steps-box-in-a-track-layer-mirrors-mu-on-built-2026-10-29).
+- **Mirror rule (Andy 2026-10-29):** any sequencer change (step model, length, paging, shading, step panel, box widths) is made once in the shared `mu-on-layer` code and checked in both mu-On and mu-Tronic; never fix one product only. Also in [../../mu-on/CLAUDE.md](../../mu-on/CLAUDE.md) and [../../mu-tronic/CLAUDE.md](../../mu-tronic/CLAUDE.md).
+
 ## Future
-Variable pattern length (1–N bars) + per-step velocity ramps; **pattern bank + chaining** (the
+Per-step velocity ramps; **pattern bank + chaining** (the
 classic 909 A/B + song mode); per-step **pitch** for the Bass engine (unlocks glide + note-off);
 sample-accurate onset using the per-trigger `sampleOffset` already computed.

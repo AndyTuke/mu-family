@@ -178,6 +178,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/TrackLayerRecordTests.cpp   # the Track streams through the real processor (Tests/TrackLayerFixture.h)
     Source/Tests/BassTieTests.cpp   # Bass gate, release, tied steps and the step row tie flag
     Source/Tests/ChordTests.cpp   # Chord voicing, the Chord engine and a step's chord data
+    Source/Tests/StepPagingTests.cpp   # step row paging, Length and the page-edge tie the paged Steps grid rests on
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp

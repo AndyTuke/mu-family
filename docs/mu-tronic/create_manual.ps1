@@ -70,7 +70,7 @@ H2 "The Layer Types"
 Bullet "Rhythm (from mu-Clid)  -  a Euclidean sample rhythm. It can also send MIDI notes instead of sound."
 Bullet "Pattern (from mu-Tant)  -  a wavetable drone with a gate pattern."
 Bullet "Arp (from mu-Toni)  -  a generative arpeggiator."
-Bullet "Kick, Bass, Hat and Snare (from mu-On)  -  a 909-style drum or bass sound with its own row of sixteen steps."
+Bullet "Kick, Bass, Hat and Snare (from mu-On)  -  a 909-style drum or bass sound with its own row of up to 64 steps (16 by default)."
 Bullet "Rumble (from mu-On)  -  a long, dark tail made from another layer's sound, usually a Kick."
 P "Each of these is described in the manual of the app it comes from. This manual covers what is different in mu-Tronic."
 
@@ -179,7 +179,8 @@ H2 "Pattern"
 P "On the Root and Scale row, at the right, is a MIDI switch with two choices, Free and Note. In Free, the drone plays on its own. In Note, it sounds while a key is held, at the key's pitch. Each Pattern layer has its own setting; it is saved with the layer but is not part of a layer preset. Free is the default."
 
 H2 "Kick, Bass, Hat and Snare"
-P "These are mu-On's engines, each with its own row of sixteen steps. Because the layer is a Kick, Bass, Hat or Snare, there is no Engine selector: to change the sound family, empty the slot and add a different layer. The Groove box holds Swing and Accent for this layer alone. The step row shows 16 steps; click a step to turn it on or off, right-click for an accent."
+P "These are mu-On's engines, each with its own row of steps. Because the layer is a Kick, Bass, Hat or Snare, there is no Engine selector: to change the sound family, empty the slot and add a different layer. The Groove box holds Swing and Accent for this layer alone. The step row shows 16 steps at a time; click a step to turn it on or off, right-click for an accent."
+P "A row can be up to 64 steps long. Under the row, Prev and Next show the previous or next sixteen steps, a label such as Page 2 / 4 says where you are, and the Length control (1 to 64, default 16) sets how many steps the row plays before it starts again. Use its arrows to change it by one, or double-click it and type a number. Steps past the Length are shaded with diagonal hatching and do not play; they keep their settings if you lengthen the row again. A tie that crosses a page edge shows as a short stub at the start of the next page. If you shorten the row past the selected step, the selection moves back to the last step, so the Step panel always edits a step you can see. The Layer box is narrow, leaving room for a wide Steps box. Paging and Length work the same way as in mu-On."
 
 H2 "Rumble"
 P "Rumble has an envelope and a Source dropdown instead of a step row. The envelope curve shows a baseline, level lines at 25, 50 and 75 percent, and beat lines that follow its loop length."

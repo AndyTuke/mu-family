@@ -230,6 +230,10 @@ The main area for a filled slot is the shared `LayerPanel` with the type's conte
 
 **Do not.** Show the Engine selector on a locked layer; add a frame or title around a content band; draw a second step-row look; leave a gutter for the name; give a type its own paint colour in the content; hard-code a size (everything above is `kGrooveBoxW`, `kKnobSize2W/H`, `kSubPanelScrewClear`, `kSpaceS`, `kSectionPlateH`, `kChannelInset`, `kScrewedPanelInset`, `ParamKnobGrid` constants, through `mu_ui::s()`).
 
+### 4.5c The Steps box in a Track layer mirrors mu-On (built 2026-10-29)
+
+A Track layer's single-row Steps box is mu-On's, not a copy: the same `TrackStepRow` and the same shared `StepPager` strip under the row (Prev, "Page n / N", Next, Length at the right, shown for every locked layer except Rumble), so a row of up to 64 steps pages 16 at a time, steps past the length are hatched, a tie across a page edge shows a stub, and the selected step is clamped to the length. The Layer and Step boxes have mu-On's widths, with the freed width in the Steps box. The row is one layer-row tall, top-aligned, the rest of the box blank metal (4.5a). Rules and wording are written once in [../mu-on/design-sequencer.md](../mu-on/design-sequencer.md#length-and-paging-built-2026-10-29) and [../mu-on/design-ui.md](../mu-on/design-ui.md); not repeated here. **Mirror rule (Andy 2026-10-29):** any sequencer change is made in the shared code and checked in both products.
+
 ### 4.5b Rhythm, Pattern and Rumble in a slot (ruled 2026-10-21, review of build 1425)
 
 Reviewed on screen: chooser with eight choices, Rhythm, Pattern, Arp, Kick and Rumble panels, the mixed page. Layout and paint of all of them follow 4.5a and the family (nothing off-token seen); the items below are what the built slots still need or leave open.

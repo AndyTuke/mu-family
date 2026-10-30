@@ -62,7 +62,7 @@ Br
 # ── 1. Introduction ──────────────────────────────────────────────────────────
 H1 "1. Introduction"
 P "mu-On is a 909-style groove sequencer from Transwarp Development Project. It runs as a VST3 plug-in, a CLAP plug-in, and a standalone application."
-P "mu-On is built from tracks, one to eight of them. Every track has a row of sixteen steps and a sound engine that plays them: Kick, Bass, FM Perc and Chord are synthesised, Hat and Snare are built-in drum sounds, and Rumble is a special engine that does not play steps at all but turns another track's sound into the long, dark reverb tail of techno. You switch a track's engine at any time with the Engine dropdown, and the track keeps each engine's settings."
+P "mu-On is built from tracks, one to eight of them. Every track has a row of steps (sixteen by default, up to 64) and a sound engine that plays them: Kick, Bass, FM Perc and Chord are synthesised, Hat and Snare are built-in drum sounds, and Rumble is a special engine that does not play steps at all but turns another track's sound into the long, dark reverb tail of techno. You switch a track's engine at any time with the Engine dropdown, and the track keeps each engine's settings."
 P "Around the tracks is the family you may know from mu-Clid and mu-Tant: eight modulators per track, a mixer with sidechain ducking, shared effects, presets and the transport bar. In the mixer you can make the bass duck from the kick, for the classic pumping groove."
 P "mu-On is Pay What You Want: pay what you like from £0 (suggested £20), and nothing is limited either way (see Supporting mu-On)."
 
@@ -210,19 +210,25 @@ Pic "A Rumble track: the Engine box with the Source dropdown, the Envelope edito
 # ── 8. Steps and Groove ───────────────────────────────────────────────────────
 H1 "8. Steps and Groove"
 H2 "Step Rows"
-P "The Steps box shows one row of sixteen steps for every track, in the sidebar order and in each track's colour. Sixteen steps make one bar; each step is a sixteenth note."
+P "The Steps box shows one row of steps for every track, in the sidebar order and in each track's colour. A row shows sixteen steps at a time. Sixteen steps make one bar; each step is a sixteenth note."
+P "A row can be longer than one bar, up to 64 steps (four pages of sixteen). Under the step rows, a strip lets you move around and set the length of the selected track:"
+Bullet "Prev and Next — show the previous or next sixteen steps. Prev is greyed out on the first page and Next on the last."
+Bullet "Page — reads, for example, Page 2 / 4: the page you are looking at, and how many pages the row has."
+Bullet "Length (1 to 64, default 16) — how many steps the row plays before it starts again. Use the arrows to change it by one, or double-click it and type a number. A row of 12 steps against a row of 16 makes a pattern that shifts against the others."
+P "Steps past the Length are shaded with diagonal hatching: they are not part of the pattern and do not play. They keep their settings, so making the row longer again brings them back. If a tie runs across the edge of a page, a short tie stub at the start of the next page shows that its first step is tied to the step before."
 Bullet "Left-click a step to switch it on or off."
 Bullet "Right-click a step to switch its accent on or off. An accented step is drawn with a hotter centre and plays harder."
 Bullet "Alt+drag a step up to accent it, on any engine. On a Kick, Hat, Snare, FM Perc or Chord step, Alt+drag down makes it a ghost: played softly, and drawn as an outline that fills out as the Ghost level rises. On a Hat step, a plain vertical drag switches it between open and closed."
 Bullet "On a Bass step, drag up or down to move its note through the scale; Shift+drag changes its octave. Drag sideways to tie notes."
 Bullet "Click anywhere in a row to select that track. The selected track's row is outlined in its colour."
+Bullet "The step you click is the selected step, and the per-step panel edits it. If you shorten a row so that the selected step falls past its end, the selection moves back to the row's last step, so the panel never edits a step you cannot see."
 Bullet "A playhead line runs through the rows with the transport. Every four steps (one beat) are tinted slightly differently so you can count."
 P "Every engine starts with its own groove: four-on-the-floor for the kick, off-beat for the bass, straight eighths for the hat, a backbeat for the snare and nothing for the rumble. A track keeps its row when you change its engine."
 
 Pic "Step rows with ghost steps: a ghost is drawn as an outline on a Kick, Snare, FM Perc or Hat step, next to the plain steps." "ghost-steps.png"
 
 H2 "Groove Box"
-P "These controls on the left of the Steps panel (the LAYER box) apply to the whole track:"
+P "These controls on the left of the Steps panel (the LAYER box, a narrow box beside the wider STEPS box) apply to the whole track:"
 Bullet "Swing (default 0) — pushes every second sixteenth later, up to half a step, for a shuffle. 0 is straight."
 Bullet "Ghost (default 35 percent) — how loud ghost steps play. It can be modulated."
 Bullet "Accent (default maximum) — how hard accented steps are played. Plain steps always play at a lower fixed level. Accent runs from that plain-step level up to full: at the minimum, accented steps play no harder than plain ones; at the maximum they play at full level."
@@ -365,7 +371,7 @@ Bullet "Rumble shape: draw a curve in the Rumble envelope that dips on each beat
 # ── 15. Technical Specifications ──────────────────────────────────────────────
 H1 "15. Technical Specifications"
 Bullet "Formats: VST3, CLAP, Standalone (Windows)"
-Bullet "Tracks: 1 to 8 (default 1), each with one of seven engines and a 16-step row"
+Bullet "Tracks: 1 to 8 (default 1), each with one of seven engines and a step row of 1 to 64 steps (16 by default, shown 16 at a time)"
 Bullet "Engines: Kick, Bass, FM Perc and Chord (synthesis), Hat and Snare (built-in sounds), Rumble (processes another track)"
 Bullet "Modulators per track: 8 (smooth LFO or stepped), plus a matrix view"
 Bullet "Full preset format: .muOn (XML). Per-track preset format: .muTrack (XML)"
