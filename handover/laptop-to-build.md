@@ -2,11 +2,11 @@
 
 Written only by the laptop. The build PC reads it and answers in [build-to-laptop.md](build-to-laptop.md). Protocol: [README.md](README.md).
 
-Next id: L-005
+Next id: L-008
 
 ## Status (laptop)
 
-- Written: 2026-10-30. Everything is pushed to `origin/main` (through backlog commit f1cb09e1; handover files follow it).
+- Written: 2026-10-30 (updated after the audit batch). Everything is pushed to `origin/main`; handover files follow the last source commit.
 - Nothing written on the laptop since the 1454 build has been compiled or run. The source below was written without a compiler.
 - Needs the build PC: only what is listed under Open.
 
@@ -35,6 +35,28 @@ Report: soft or sharp at each scale, with a screenshot if soft; that decides whe
 Rows: #1713 · Needs: build
 Do: run `pwsh tests/scripts/check-layer-boundary.ps1`; it should report exactly one violation (mu-on TrackParams.cpp including Plugin/MixerFxParams.h). It was last run on the laptop.
 Report: the output.
+
+### L-005 · 2026-10-30 · Verify two audio-thread fixes written without a compiler, and re-run the rt-safety scan
+Rows: #1704 (ModulationMatrix key allocation), #1715 (hot-swap while bypassed) · Commits: 850a90ff · Needs: build, listen
+Do: build all products (together with L-001's build). Compile errors in mu-core/Modulation/ModulationMatrix.h/.cpp (new `outputKeyScratch`, reserved in rebuildCache) and mu-core/Plugin/ProcessorBase.h (new public `processBlockBypassed` override calling `resetSwapPlayState()`) are the first thing to look for.
+Do: run mu-core's unit tests (ModulationMatrix and HotSwap suites). Add or run a test that renders a ModulationMatrix whose control sequence has a 12-character id under an allocation counter (no allocation on the render path), and a processor-level check that a preset loaded while the host reports the plugin bypassed applies at once (HotSwapTests covers only the swapper).
+Do: in a host (or mu-On/mu-Tant standalone with a bypass), load a preset while bypassed and confirm it applies without un-bypassing; then un-bypass and confirm nothing jumps.
+Do: run `pwsh tests/scripts/check-rt-safety.ps1`; expect about 71 findings outside setup context (it was 342 before the script was retuned) and exit code 0; note any difference.
+Report: build result, test output, what was heard in the bypass check, the rt-safety count; then the backlog-administrator can close #1715 (and update #1704).
+
+### L-006 · 2026-10-30 · Verify the Karplus-Strong gain limit (written without a compiler)
+Rows: #1714 · Commits: 1b15c987, 273737ce · Needs: build, listen
+Do: build (with L-001/L-005). Changes: new `mu-core/Audio/SoftLimit.h` (`mu_dsp::softLimit`), used by `KarplusStrongInsert.h` (soft limit on the feedback term only, so 0 % feedback stays an exact passthrough) and by `VocoderInsert.h` (its private copy now delegates).
+Do: run mu-core tests, especially `SpectralBehaviourTests` (Karplus pitch stays on the note, Vocoder stays in range) and `InsertDSPSmokeTests`; a Karplus golden or level test may need a deliberate update (pre-release: sound changes are fine, but record that it moved). Add a test: a 1 kHz sine and a DC offset through the insert at feedback 75 % and 100 %, assert the resonant part stays bounded (output peak <= input peak + 1).
+Do: listen to the insert at 75 % and 100 % feedback on a sustained note and on a plucked input; check it still sounds like a string and does not clamp harshly.
+Report: build result, test output, what was heard; then #1714 can be closed (the dsp-controller should re-check the limiter placement).
+
+### L-007 · 2026-10-30 · Verify the insert tone-filter state fix (written without a compiler)
+Rows: #1702 (InsertProcessor stale tone-filter state while bypassed) · Needs: build, listen
+Do: build (with L-001). Changes: `OnePoleLP::setState` in `mu-core/Audio/AudioFilters.h`; `InsertProcessor.cpp` copies the block's last sample into `postDriveTone` whenever the post-drive tone is not applied (tone open at 19 kHz or more, or an algorithm outside 1-5); `OverdriveInsert.h` follows the signal per sample while its tone is open.
+Do: run mu-core tests (InsertDSPSmokeTests and any insert golden). Add a test: drive a steady signal, toggle the tone cutoff across 19 kHz mid-signal, assert no discontinuity (sample-to-sample step) at the switch.
+Do: listen: sweep the tone knob of a drive insert (e.g. Overdrive) across the fully-open end while a note sounds; there should be no click.
+Report: build result, test output, what was heard.
 
 ## Results
 
