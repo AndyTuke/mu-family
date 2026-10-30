@@ -1,5 +1,7 @@
 # Windows code signing: options and recommendation
 
+> **Parked (Andy, 2026-10-30): no budget for signing, so nothing here is being pursued.** Kept as reference in case that changes.
+
 Research note, 2026-10-30 (laptop, review-only). Facts were checked against the sources listed at the end; anything not confirmed from a primary source is marked **unverified**. Prices move: re-check before buying.
 
 ## Why
