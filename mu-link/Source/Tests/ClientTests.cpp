@@ -60,7 +60,7 @@ public:
             });
             expect(client.attach("client-a", 2), "attach to running server failed");
             expectEquals(client.slotIndex(), 0);
-            expectEquals((int) mem.registry().slots[0].active.load(), 1);
+            expect(mem.registry().slots[0].active.load() != 0, "slot not marked claimed");
             expect(juce::String(mem.registry().slots[0].name) == "client-a", "registry name not written");
 
             // Wait for the producer thread to fill at least one block.

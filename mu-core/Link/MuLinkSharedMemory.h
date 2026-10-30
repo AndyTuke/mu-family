@@ -127,57 +127,86 @@ public:
     ClientRegistry&       registry()        noexcept { return *reinterpret_cast<ClientRegistry*>(registryRegion.data()); }
     const ClientRegistry& registry()  const noexcept { return *reinterpret_cast<const ClientRegistry*>(registryRegion.data()); }
 
-    // Claim the first free registry slot (atomic compare-exchange on `active`) and open
-    // that slot's ring as the producer. Returns the slot index, or -1 if all are taken.
+    // Claim the first free registry slot (atomic compare-exchange on `active`, which then holds this
+    // attach's unique token) and open that slot's ring as the producer. Returns the slot index, or
+    // -1 if none could be claimed.
+    //
+    // A freed slot's ring can still hold the previous tenant's unread audio, which the new producer
+    // would otherwise play. Only the consumer (the server) may move readPos, and it drains every free
+    // slot's ring each block, so a slot whose ring is not yet empty is skipped until that has happened.
     int claimSlot(const char* displayName, int numChannels)
     {
         auto& reg = registry();
+        const std::size_t ringBytes = AudioRingView::bytesFor(kMaxChannels, kRingCapacityFrames);
+
         for (int slot = 0; slot < kMaxClients; ++slot)
         {
-            std::uint32_t expected = 0;
-            if (reg.slots[slot].active.compare_exchange_strong(expected, 1,
-                                                               std::memory_order_acq_rel))
-            {
-                reg.slots[slot].clientId.store((std::uint32_t) slot + 1, std::memory_order_relaxed);
-                reg.slots[slot].numChannels.store((std::uint32_t) numChannels, std::memory_order_relaxed);
-                reg.slots[slot].heartbeat.store(0, std::memory_order_relaxed);
-                reg.slots[slot].pcEpoch.store(0, std::memory_order_relaxed);    // start clean: no stale scene PC
-                reg.slots[slot].pcProgram.store(0, std::memory_order_relaxed);
-                reg.slots[slot].pcChannel.store(9, std::memory_order_relaxed);
-                // requestedDepthFrames is the server's: a claim must not erase a request made as the slot went
-                // active, so it is left alone (the server re-sends its choice while the slot is active).
-                reg.slots[slot].underrunFrames.store(0, std::memory_order_relaxed);   // a new client starts clean
-                std::memset(reg.slots[slot].name, 0, sizeof(reg.slots[slot].name));
-                for (int i = 0; displayName != nullptr && displayName[i] != '\0' && i < kMaxNameChars - 1; ++i)
-                    reg.slots[slot].name[i] = displayName[i];   // bounded copy, always NUL-terminated
+            auto& s = reg.slots[slot];
+            if (s.active.load(std::memory_order_acquire) != 0)
+                continue;                                   // held by a live client
 
-                const std::size_t ringBytes = AudioRingView::bytesFor(kMaxChannels, kRingCapacityFrames);
-                ringRegion  = SharedMemoryRegion::open(ringMapName((std::uint32_t) slot), ringBytes);
-                claimedSlot = ringRegion.valid() ? slot : -1;
-                if (claimedSlot < 0)   // ring missing → undo the claim
-                    reg.slots[slot].active.store(0, std::memory_order_release);
-                return claimedSlot;
-            }
+            SharedMemoryRegion ringMap = SharedMemoryRegion::open(ringMapName((std::uint32_t) slot), ringBytes);
+            if (! ringMap.valid() || ringViewOf(ringMap).readAvailable() > 0)
+                continue;                                   // ring missing, or stale audio not drained yet
+
+            std::uint32_t token = reg.nextAttachToken.fetch_add(1, std::memory_order_relaxed);
+            if (token == 0)
+                token = reg.nextAttachToken.fetch_add(1, std::memory_order_relaxed);   // 0 means free; skip it on wrap
+
+            std::uint32_t expected = 0;
+            if (! s.active.compare_exchange_strong(expected, token, std::memory_order_acq_rel))
+                continue;                                   // another client took the slot first
+
+            s.clientId.store((std::uint32_t) slot + 1, std::memory_order_relaxed);
+            s.numChannels.store((std::uint32_t) numChannels, std::memory_order_relaxed);
+            s.heartbeat.store(0, std::memory_order_relaxed);
+            s.pcEpoch.store(0, std::memory_order_relaxed);    // start clean: no stale scene PC
+            s.pcProgram.store(0, std::memory_order_relaxed);
+            s.pcChannel.store(9, std::memory_order_relaxed);
+            // requestedDepthFrames is the server's: a claim must not erase a request made as the slot went
+            // active, so it is left alone (the server re-sends its choice while the slot is active).
+            s.underrunFrames.store(0, std::memory_order_relaxed);   // a new client starts clean
+            std::memset(s.name, 0, sizeof(s.name));
+            for (int i = 0; displayName != nullptr && displayName[i] != '\0' && i < kMaxNameChars - 1; ++i)
+                s.name[i] = displayName[i];   // bounded copy, always NUL-terminated
+
+            ringRegion  = std::move(ringMap);
+            claimedSlot = slot;
+            ownToken    = token;
+            return slot;
         }
         return -1;
     }
 
-    // Release the claimed slot back to the pool (marks it free; closes the ring view).
+    // Release the claimed slot back to the pool (marks it free; closes the ring view). Frees the slot
+    // only if it is still ours: after the server reaped it (a stall of two seconds or more) it may
+    // already belong to a new client, whose claim must not be wiped.
     void releaseSlot()
     {
         if (claimedSlot >= 0)
         {
-            registry().slots[claimedSlot].active.store(0, std::memory_order_release);
+            std::uint32_t expected = ownToken;
+            registry().slots[claimedSlot].active.compare_exchange_strong(expected, 0, std::memory_order_acq_rel);
             ringRegion  = SharedMemoryRegion{};
             claimedSlot = -1;
+            ownToken    = 0;
         }
+    }
+
+    // True while the claimed slot is still this client's: false once the server reaped it (the slot
+    // is free or another client's). The producer checks it before every write so it can never become
+    // a second producer on a ring that now belongs to someone else. Any thread.
+    bool ownsSlot() const noexcept
+    {
+        return claimedSlot >= 0
+            && registry().slots[claimedSlot].active.load(std::memory_order_acquire) == ownToken;
     }
 
     // Bump the claimed slot's liveness counter so the server can reap a client that died
     // without detaching (L6). No-op before claimSlot().
     void bumpHeartbeat() noexcept
     {
-        if (claimedSlot >= 0)
+        if (ownsSlot())   // a stalled client must not keep a new tenant's slot looking alive
             registry().slots[claimedSlot].heartbeat.fetch_add(1, std::memory_order_relaxed);
     }
 
@@ -187,16 +216,23 @@ public:
     AudioRingView ring() noexcept
     {
         if (claimedSlot < 0) return {};
-        auto* hdr  = reinterpret_cast<AudioRingHeader*>(ringRegion.data());
-        auto* data = reinterpret_cast<float*>(reinterpret_cast<char*>(ringRegion.data()) + sizeof(AudioRingHeader));
-        return AudioRingView(hdr, data);
+        return ringViewOf(ringRegion);
     }
 
 private:
+    // A view over a mapped ring region: [AudioRingHeader][interleaved float data].
+    static AudioRingView ringViewOf(SharedMemoryRegion& region) noexcept
+    {
+        auto* hdr  = reinterpret_cast<AudioRingHeader*>(region.data());
+        auto* data = reinterpret_cast<float*>(reinterpret_cast<char*>(region.data()) + sizeof(AudioRingHeader));
+        return AudioRingView(hdr, data);
+    }
+
     SharedMemoryRegion transportRegion;
     SharedMemoryRegion registryRegion;
     SharedMemoryRegion ringRegion;
     int                claimedSlot = -1;
+    std::uint32_t      ownToken    = 0;   // the `active` value this client's claim wrote (0 = none)
 };
 
 #endif // _WIN32

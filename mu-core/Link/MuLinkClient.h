@@ -84,6 +84,7 @@ public:
         lastPcEpoch  = 0;   // claimSlot reset the slot's pcEpoch to 0 — match it so no stale fire
         lastDepthRequest = 0;   // a request from before this attach is re-read and applied afresh
         defaultDepth = 0;
+        slotLostFlag.store(false, std::memory_order_relaxed);
         attached = true;
         if (startRendering)
             start();
@@ -112,13 +113,16 @@ public:
     bool isAttached()  const noexcept { return attached; }
     int  slotIndex()   const noexcept { return mem.claimedSlotIndex(); }
 
+    // True once the producer found its slot gone (mu-link reaped it after a stall of two seconds or
+    // more). The producer has stopped; the owner should detach() and, if it wants, attach() afresh.
+    bool slotLost() const noexcept { return slotLostFlag.load(std::memory_order_relaxed); }
+
     // Publish the client's current preset name into its registry slot (display-only; mu-link's
     // UI shows it). No-op when detached. Call from the message thread on each preset load.
     void setPresetName(const juce::String& name) noexcept
     {
-        if (! attached) return;
+        if (! attached || ! mem.ownsSlot()) return;   // never write into a slot that is now someone else's
         const int slot = mem.claimedSlotIndex();
-        if (slot < 0) return;
         auto& dst = mem.registry().slots[slot].presetName;
         const auto utf8 = name.toRawUTF8();
         const int n = juce::jmin((int) kMaxNameChars - 1, (int) std::strlen(utf8));
@@ -159,11 +163,9 @@ public:
     // stream → the existing scanMidiProgramChanges → preset hot-swap.
     bool pollProgramChange(int& program, int& channel) noexcept
     {
-        if (! attached)
+        if (! attached || ! mem.ownsSlot())
             return false;
         const int slot = mem.claimedSlotIndex();
-        if (slot < 0)
-            return false;
         auto& s = mem.registry().slots[slot];
         const std::uint32_t epoch = s.pcEpoch.load(std::memory_order_acquire);
         if (epoch == lastPcEpoch)
@@ -198,6 +200,14 @@ private:
             for (;;)
             {
                 if (threadShouldExit()) break;
+
+                // The server reaped our slot (we stalled two seconds or more): stop, rather than keep
+                // producing into a ring that may now belong to another client.
+                if (! mem.ownsSlot())
+                {
+                    slotLostFlag.store(true, std::memory_order_relaxed);
+                    return;
+                }
 
                 // The server may ask for a different depth (a Latency choice in mu-link); 0 = keep ours.
                 pollRequestedDepth();
@@ -237,6 +247,15 @@ private:
                     for (int c = 0; c < rc; ++c)
                         interleaved[(std::size_t) i * (std::size_t) rc + (std::size_t) c] = chanPtrs[(std::size_t) c][i];
 
+                // A render can itself stall long enough for the slot to be reaped and re-claimed, so check
+                // again right before the write: two producers on one single-producer ring corrupt it. (What
+                // remains is the few instructions between this check and the copy; the server only reaps
+                // a heartbeat frozen for two seconds, and the heartbeat is bumped every fill pass.)
+                if (! mem.ownsSlot())
+                {
+                    slotLostFlag.store(true, std::memory_order_relaxed);
+                    return;
+                }
                 const int wrote = ring.writeFrames(interleaved.data(), n);
                 if (wrote < n)
                     break;   // ring full for now
@@ -269,6 +288,7 @@ private:
     int                currentLead  = 0;   // producer thread: frames queued ahead of the block in render
     std::atomic<int>   targetDepth  { kDefaultTargetDepthFrames };   // see setTargetDepthFrames
     bool               attached     = false;
+    std::atomic<bool>  slotLostFlag { false };   // set by the producer thread when it finds its slot reaped
     int                ringChannels = kMaxChannels;
     std::uint32_t      lastPcEpoch  = 0;   // last scene PC epoch seen (pollProgramChange)
     std::uint32_t      lastDepthRequest = 0;   // last depth request seen (producer thread)

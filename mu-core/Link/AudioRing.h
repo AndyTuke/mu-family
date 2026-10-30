@@ -97,6 +97,13 @@ public:
         return (int) (header->capacity - (std::uint32_t) (w - r));
     }
 
+    // Consumer: drop every frame the producer has published so far (readPos jumps to writePos).
+    // Only the consumer may call this — it owns readPos — so it is safe while a producer writes.
+    void discard() noexcept
+    {
+        header->readPos.store(header->writePos.load(std::memory_order_acquire), std::memory_order_release);
+    }
+
     // Producer: copy up to `numFrames` interleaved frames in. Returns frames actually
     // written (short when the ring is nearly full — the producer is running ahead, so a
     // short write just means "buffered enough"). `src` holds numFrames*channels floats.

@@ -7,6 +7,7 @@
 //     the published transport, and pushes a ring payload the parent reads back.
 
 #include <juce_core/juce_core.h>
+#include <vector>
 #include "../Ipc/MuLinkServerMemory.h"
 #include "Link/MuLinkSharedMemory.h"
 #include "ShmTestVectors.h"
@@ -66,12 +67,71 @@ public:
             const int slot = client.claimSlot("voice-a", 2);
             expectEquals(slot, 0);                       // first free slot
             auto& reg = server.registry();
-            expectEquals((int) reg.slots[0].active.load(), 1);
+            expect(reg.slots[0].active.load() != 0, "slot not marked claimed");
             expectEquals((int) reg.slots[0].numChannels.load(), 2);
             expect(juce::String(reg.slots[0].name) == "voice-a", "registry name not written");
 
             client.releaseSlot();
             expectEquals((int) reg.slots[0].active.load(), 0);
+        }
+
+        beginTest("a new tenant never inherits the previous tenant's unread audio");
+        {
+            MuLinkServerMemory server;
+            expect(server.create(), "server failed to create regions");
+
+            // Tenant A produces a block, nobody reads it, then A leaves.
+            MuLinkClientMemory a;
+            expect(a.open(), "client A failed to attach");
+            expectEquals(a.claimSlot("a", 2), 0);
+            std::vector<float> stale(64 * 2, 0.9f);
+            expectEquals(a.ring().writeFrames(stale.data(), 64), 64);
+            a.releaseSlot();
+
+            // Slot 0's ring still holds A's audio and the server has not drained it yet, so B must not
+            // be given slot 0.
+            MuLinkClientMemory b;
+            expect(b.open(), "client B failed to attach");
+            expectEquals(b.claimSlot("b", 2), 1);
+
+            // Once the server has drained the freed slot (it does so every block), the slot is reusable
+            // and its ring starts empty.
+            server.ring(0).discard();
+            MuLinkClientMemory c;
+            expect(c.open(), "client C failed to attach");
+            expectEquals(c.claimSlot("c", 2), 0);
+            expectEquals(c.ring().readAvailable(), 0);
+        }
+
+        beginTest("every claim gets its own token; a stale owner cannot free or write into the new tenant's slot");
+        {
+            MuLinkServerMemory server;
+            expect(server.create(), "server failed to create regions");
+            auto& reg = server.registry();
+
+            MuLinkClientMemory a;
+            expect(a.open(), "client A failed to attach");
+            expectEquals(a.claimSlot("a", 2), 0);
+            expect(a.ownsSlot(), "A should own its slot");
+            const auto tokenA = reg.slots[0].active.load();
+
+            // The server reaps A (a stall of two seconds or more) and a new client takes the slot.
+            reg.slots[0].active.store(0);
+            expect(! a.ownsSlot(), "A must notice the slot was reaped");
+
+            MuLinkClientMemory b;
+            expect(b.open(), "client B failed to attach");
+            expectEquals(b.claimSlot("b", 2), 0);
+            const auto tokenB = reg.slots[0].active.load();
+            expect(tokenB != 0 && tokenB != tokenA, "each attach needs a fresh, non-zero token");
+            expect(! a.ownsSlot() && b.ownsSlot(), "only B owns the slot now");
+
+            // A wakes up and tidies: it must not free B's slot, nor keep B's heartbeat alive.
+            reg.slots[0].heartbeat.store(5);
+            a.bumpHeartbeat();
+            expectEquals((int) reg.slots[0].heartbeat.load(), 5);
+            a.releaseSlot();
+            expect(reg.slots[0].active.load() == tokenB, "a stale release freed another client's slot");
         }
 
         beginTest("ring round-trips frames in order across independent mappings");
@@ -142,7 +202,7 @@ public:
 
                 // The child claimed slot 0 and pushed the payload; read it back here.
                 auto& reg = server.registry();
-                expectEquals((int) reg.slots[0].active.load(), 1);
+                expect(reg.slots[0].active.load() != 0, "slot not marked claimed");
                 expect(juce::String(reg.slots[0].name) == mu_link_test::kClientName, "child name not in registry");
 
                 float out[mu_link_test::kRingFrames * mu_link_test::kRingChans] = {};

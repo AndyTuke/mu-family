@@ -200,6 +200,31 @@ public:
             expectEquals((int) engine.clientUnderrunFrames(0), 0);                // a new client starts clean
         }
 
+        beginTest("a freed slot's unread audio is drained, so the next client to attach starts on an empty ring");
+        {
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            engine.prepare(48000.0, 64, 120.0);
+            engine.setPlaying(true);
+
+            MuLinkClientMemory a;
+            expect(a.open(), "client failed to attach");
+            expectEquals(a.claimSlot("leaves-early", 2), 0);
+            produce(a, 500, [](int, int) { return 0.5f; });
+            a.releaseSlot();                                  // leaves with 500 frames unread
+
+            OutputBuffers out(2, 64);
+            engine.renderBlock(out.data(), 2, 64);            // the server sees the free slot and drains it
+            expectEquals(mem.ring(0).readAvailable(), 0);
+
+            MuLinkClientMemory b;
+            expect(b.open(), "client failed to attach");
+            expectEquals(b.claimSlot("next", 2), 0);          // the slot is claimable again, with nothing stale in it
+            expectEquals(b.ring().readAvailable(), 0);
+        }
+
         beginTest("the output latency is published in the transport; a depth request reaches the client slot");
         {
             MuLinkServerMemory mem;

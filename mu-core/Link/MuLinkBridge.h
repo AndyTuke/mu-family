@@ -125,6 +125,14 @@ private:
             return;
         }
 
+        // mu-link reaped our slot after a long stall: the producer has stopped, so hand the device
+        // back; the next poll tries to attach again.
+        if (client.slotLost())
+        {
+            detachFromMuLink();
+            return;
+        }
+
         // mu-link's transport generation advances every server block (even while stopped). A
         // frozen generation across polls means mu-link quit/closed its device → fall back.
         const auto gen = client.transportGeneration();

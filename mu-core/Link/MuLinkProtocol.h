@@ -21,7 +21,8 @@ namespace mu_link
 // Bump whenever the shared-memory layout changes incompatibly. A client whose version
 // doesn't match the server's refuses to attach (and falls back to its own audio device)
 // rather than reading a mismatched struct.
-inline constexpr std::uint32_t kProtocolVersion = 4;   // v4: transport carries the output latency; client slots carry a requested depth and an underrun counter
+inline constexpr std::uint32_t kProtocolVersion = 5;   // v5: a live slot's `active` holds its owner's attach token (not 1); the server drains free slots' rings
+                                                       // v4: transport carries the output latency; client slots carry a requested depth and an underrun counter
                                                        // v3: client publishes its current preset name
 
 inline constexpr int kMaxClients     = 8;     // family is ≤8 products in practice
@@ -144,7 +145,11 @@ inline TransportSnapshot readTransport(const TransportBlock& t) noexcept
 // the server can reap a client that died without detaching.
 struct ClientSlot
 {
-    std::atomic<std::uint32_t> active     { 0 };   // 0 = free slot, 1 = claimed
+    // 0 = free slot; otherwise the owner's attach token (never 0, unique per attach — see
+    // ClientRegistry::nextAttachToken). Anything non-zero means "claimed", so readers that only
+    // ask live-or-free need no change; the token lets a client tell its own claim from a later
+    // tenant's after the server reaped the slot.
+    std::atomic<std::uint32_t> active     { 0 };
     std::atomic<std::uint32_t> clientId   { 0 };   // unique per attach
     std::atomic<std::uint32_t> numChannels{ 0 };
     std::atomic<std::uint64_t> heartbeat  { 0 };   // liveness counter
@@ -183,6 +188,7 @@ static_assert(offsetof(ClientSlot, underrunFrames) % 8 == 0, "underrunFrames mus
 struct ClientRegistry
 {
     std::atomic<std::uint32_t> protocolVersion { kProtocolVersion };
+    std::atomic<std::uint32_t> nextAttachToken { 1 };   // handed out (fetch_add) to each claim; 0 is skipped because it means "free"
     ClientSlot                 slots[kMaxClients];
 };
 

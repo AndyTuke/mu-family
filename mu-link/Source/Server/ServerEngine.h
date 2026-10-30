@@ -435,6 +435,10 @@ public:
                     clientPeakLevelR[slot].store(0.0f, std::memory_order_relaxed);
                     lastHeartbeat[slot] = 0;
                     staleFrames[slot]   = 0;
+                    // Drop what the previous tenant left unread: a client claims a slot only once its ring
+                    // is empty, so the next tenant never plays the last one's audio. We are the consumer,
+                    // so moving readPos is ours to do.
+                    mem->ring(slot).discard();
                     continue;
                 }
 
@@ -451,7 +455,7 @@ public:
                     staleFrames[slot] += (std::uint64_t) numFrames;
                     if (staleFrames[slot] > reapThresholdFrames)
                     {
-                        reg.slots[slot].active.store(0, std::memory_order_release);   // reap
+                        reg.slots[slot].active.store(0, std::memory_order_release);   // reap (a stalled client sees its token gone and stops writing)
                         clientPeakLevel[slot].store(0.0f, std::memory_order_relaxed);
                         clientPeakLevelL[slot].store(0.0f, std::memory_order_relaxed);
                         clientPeakLevelR[slot].store(0.0f, std::memory_order_relaxed);
