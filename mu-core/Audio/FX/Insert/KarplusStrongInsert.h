@@ -2,6 +2,7 @@
 
 #include "InsertAlgorithmBase.h"
 #include "Audio/AudioFilters.h"
+#include "Audio/SoftLimit.h"
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <vector>
 #include <cmath>
@@ -65,6 +66,8 @@ public:
             std::fill(delayBuf[ch].begin(), delayBuf[ch].end(), 0.0f);
             writePos[ch] = 0;
             lpState[ch] = 0.0f;
+            dcIn[ch] = 0.0f;
+            dcOut[ch] = 0.0f;
         }
         // Snap the smoothers to their prepare() values so a reset slot ramps in exactly as a fresh one.
         smoothedFreq.setCurrentAndTargetValue(110.0f);
@@ -150,9 +153,17 @@ public:
                 // that gives K-S its decaying-pluck timbre).
                 lp += lpAlpha * (delayed - lp);
 
-                // Input excitation + filtered feedback. Output IS the loop
-                // signal so the user hears the resonant body.
-                const float out = chans[ch][i] + curGain * lp;
+                // DC blocker on the feedback (one-pole high-pass, y = x - x1 + R y1): the damping LP passes DC at
+                // unity, so an input offset would otherwise build up to 1 / (1 - gain) in the loop.
+                const float fb = lp - dcIn[ch] + kDcBlockR * dcOut[ch];
+                dcIn[ch]  = lp;
+                dcOut[ch] = fb;
+
+                // Input excitation + filtered feedback. Output IS the loop signal so the user hears the resonant
+                // body. The soft limiter bounds the resonant part to +/-1: a sustained note on a harmonic of the
+                // pitch would otherwise resonate up to 1 / (1 - gain), about +36 dB at 75 % feedback and +80 dB at
+                // 100 %. Only the feedback is limited, so 0 % feedback stays an exact passthrough.
+                const float out = chans[ch][i] + mu_dsp::softLimit(curGain * fb);
                 buffer[wPos]    = out;
                 chans[ch][i]    = out * outGain;
                 wPos = (wPos + 1) % bufSize;
@@ -168,6 +179,9 @@ private:
     std::vector<float> delayBuf[2];
     int                writePos[2] = { 0, 0 };
     float              lpState [2] = { 0.0f, 0.0f };
+    float              dcIn    [2] = { 0.0f, 0.0f };   // DC blocker: previous input and output, per channel
+    float              dcOut   [2] = { 0.0f, 0.0f };
+    static constexpr float kDcBlockR = 0.999f;          // corner about 7 Hz at 44.1 kHz
 
     // Shared across channels — stereo content has the same target pitch/gain.
     // Sample-accurate ramp (one tick per output sample on ch 0; ch 1 reads

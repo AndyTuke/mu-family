@@ -2,6 +2,7 @@
 
 #include "InsertAlgorithmBase.h"
 #include "Audio/AudioFilters.h"
+#include "Audio/SoftLimit.h"
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <array>
 #include <cmath>
@@ -287,12 +288,7 @@ private:
     // ~16 ms (a float64 port measured up to 1.95). A soft limiter keeps the output inside +/-1: linear up to
     // kKnee, then a tanh knee that approaches 1.0 (and saturates there in float), with unity slope at the knee.
     static constexpr float kKnee             = 0.8f;
-    static float softLimit(float x) noexcept
-    {
-        const float a = std::abs(x);
-        if (a <= kKnee) return x;
-        return std::copysign(kKnee + (1.0f - kKnee) * std::tanh((a - kKnee) / (1.0f - kKnee)), x);
-    }
+    static float softLimit(float x) noexcept { return mu_dsp::softLimit(x, kKnee); }
     static constexpr float kEnvAttackMs      = 5.0f;
     static constexpr float kEnvReleaseMs     = 30.0f;
     static constexpr float kLowestFreq       = 32.7f;     // SPN C1
