@@ -45,6 +45,10 @@ Keep the workflow fast: before any check, test, build, review or agent call ask 
 5. **Build when it is worth it** (see "Keep working until a build is worth it"), say in one line why, and report the number read from `mu-core/BuildNumber.h`.
 6. **Follow up.** `test-steward` for tests, `user-documentation-author` for the manuals, `/notes` for release notes: each once for the batch.
 7. **Close and commit.** Items with every applicable sign-off and build evidence are closed by the `backlog-administrator`; commit with `Closes` (signed off) or `Refs` (not yet) and push. Then back to step 1.
+## Handover between the two PCs (owner rule, 2026-10-30)
+
+Work is shared between the review-only laptop and the build PC through `origin/main`. The handover files in [handover/](handover/README.md) carry what the backlog cannot: the concrete steps one PC needs the other to do (build, run, listen, look) and the results that come back. **Start a session with `/handover start`** (pull, read the other PC's file, act on results) and **end it with `/handover end`** (write what the other PC must do, commit and push). Each PC writes only its own file; the backlog stays the record of the work and is still changed only through the `backlog-administrator`. Procedure: [.claude/commands/handover.md](.claude/commands/handover.md).
+
 ## Build workflow
 
 **Procedure lives in the `/build` and `/release` skills** ([.claude/commands/build.md](.claude/commands/build.md), [.claude/commands/release.md](.claude/commands/release.md)); full reference detail (plugin formats, deploy, artefact paths, three-way ship) is in [docs/design-plugin-family.md](docs/design-plugin-family.md#build--packaging-reference). The invariants that hold on every build:
