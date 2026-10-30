@@ -20,6 +20,9 @@ struct OnePoleLP
 
     void reset() noexcept { state = 0.0f; }
 
+    // A bypassed filter follows the signal so that switching it back on starts from it, not from a stale value.
+    void setState(float x) noexcept { state = x; }
+
 private:
     float coeff = 0.0f;
     float state = 0.0f;

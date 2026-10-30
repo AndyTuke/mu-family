@@ -94,13 +94,15 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh,
     // (0..5) where slot 3 is the LPF cutoff. EQ / Comp / Limiter / RingMod /
     // TapeSat / Overdrive / Karplus / Vocoder all consume slot 3 themselves (or repurpose
     // it as Note / Release / Freq / Tone) and shouldn't get a second LPF.
+    // State is kept for two channels; any further channel passes through unfiltered.
+    const int nToneCh = juce::jmin(nCh, 2);
+    bool toneApplied = false;
     if (p.insertAlgo >= 1 && p.insertAlgo <= 5 && currentSampleRate > 0.0)
     {
         const float lpfHz = mu_ui::normToActual(p.insertParam[3], p.insertAlgo, 3);
         if (lpfHz < 19000.0f)
         {
-            // State is kept for two channels; any further channel passes through unfiltered.
-            const int nToneCh = juce::jmin(nCh, 2);
+            toneApplied = true;
             for (int ch = 0; ch < nToneCh; ++ch)
                 postDriveTone[ch].prepare(lpfHz, (float) currentSampleRate);
 
@@ -112,6 +114,11 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh,
             }
         }
     }
+    // Not filtering this block (tone fully open, or another algorithm): follow the signal so the filter does not
+    // hold an old value and step when it is switched on again.
+    if (! toneApplied && ns > 0)
+        for (int ch = 0; ch < nToneCh; ++ch)
+            postDriveTone[ch].setState(buf.getReadPointer(ch)[ns - 1]);
 
     // NaN / infinity containment at the source: several algorithms keep recursive state (filter, feedback line)
     // that one bad sample would latch forever, and the master probe alone could only silence the whole plugin.

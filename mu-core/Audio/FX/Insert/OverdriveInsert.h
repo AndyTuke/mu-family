@@ -88,7 +88,10 @@ public:
                 const float dc = centred - di + dcCoeff * dout;
                 di   = centred;
                 dout = dc;
-                chans[ch][i] = (toneOpen ? dc : toneFilter[ch].process(dc)) * og;
+                float y = dc;
+                if (toneOpen) toneFilter[ch].setState(dc);   // bypassed: follow the signal, so closing the tone has no step
+                else          y = toneFilter[ch].process(dc);
+                chans[ch][i] = y * og;
             }
         }
     }
