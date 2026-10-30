@@ -42,12 +42,21 @@ Status: design only, nothing built (seeded 2026-10-30 from the first wireframe).
 - Slice playback reuses `SamplePlayer` and the shared retire-tail mechanism (so a slice that is cut off by the next one fades, no click), on top of the automatic few-millisecond declick fade.
 - Boundary edits (moving a marker while playing) use the same hot-swap approach as other products: staged on the message thread, applied at a loop boundary.
 
+## JUCE building blocks
+
+Verified in the JUCE 9.0.4 source (2026-10-30). **Each is approved for implementation (Andy, 2026-10-30), not yet scheduled.** The family-wide ones are in [JUCE features to adopt](../design-plugin-family.md#juce-features-to-adopt).
+
+- **Detection worker: `juce::ThreadPool`** (`juce_core/threads/juce_ThreadPool.h`). Since JUCE 9.0.2 `addJob` takes one callable returning exactly `void` or `ThreadPoolJob::JobStatus` (BREAKING_CHANGES.md, 9.0.2); write for that signature, not the old `ThreadPoolJob*` form. This is the worker for "Transient detection" and "Tempo analysis"; it ties into the open shared detection worker pool architecture item, so the pool lives in `mu-core`, not in mu-Tilate.
+- **Detector windows: `juce::dsp::WindowingFunction`** (`rectangular`, `triangular`, `hann`, `hamming`, `blackman`, `blackmanHarris`, `flatTop`, `kaiser`) with `juce::dsp::FFT` for the spectral-flux frames, instead of hand-written windows. The family uses `dsp::FFT` today (`mu-core/Audio/Wavetable/WavetableBank.cpp`, mu-Tant `PatternMiniVisual.h`) but has no use of `WindowingFunction`.
+- **Re-pitch (varispeed) resampling: `juce::Interpolators`** (`juce_audio_basics/utilities/juce_Interpolators.h`): `WindowedSinc` (memory size 200), `Lagrange` (5), `CatmullRom` (4), `Linear`, `ZeroOrderHold`; the aliases `juce::WindowedSincInterpolator` and `juce::LagrangeInterpolator` exist. The family uses only `LagrangeInterpolator` (one place). `WindowedSinc` is the highest quality but costs more per sample than Lagrange, so the `dsp-controller` must review the CPU cost for 8 layers (16 in mu-Tronic) before adoption; choose per use (for example quality at rest, cheaper while modulated).
+- **Timeline scrolling: `juce_animation`** (see the family list above).
+
 ## Tempo analysis ★ (research, 2026-10-30; decided: metadata first, then analysis)
 
 Used for library rows, for loading a loop into a layer, and for the Source `Set` control.
 
 **Order of trust.**
-1. **File metadata:** WAV `acid` chunk (beats, tempo) and `smpl` chunk, and AIFF / Apple Loops chunks. If present and plausible (inside the range prior), use it with full confidence.
+1. **File metadata:** WAV `acid` chunk (beats, tempo) and `smpl` chunk, and AIFF / Apple Loops chunks. If present and plausible (inside the range prior), use it with full confidence. *JUCE building block (approved for implementation, Andy, 2026-10-30, not yet scheduled):* `juce::WavAudioFormat` exposes the acid-chunk keys `acidBeats` and `acidTempo` (`juce_WavAudioFormat.h`, about lines 97 to 100) plus `aswgIsLoop` and `tracktionLoopInfo`; read them from `AudioFormatReader::metadataValues`. AIFF / Apple Loops chunks have **not yet been checked** against JUCE's readers; check before promising them.
 2. **Analysis** ("Method" below).
 3. **Filename hint** such as `120bpm`, lowest priority, used only when analysis confidence is low.
 
