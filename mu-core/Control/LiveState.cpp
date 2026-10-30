@@ -503,6 +503,7 @@ bool LiveState::modeSaved(const juce::ValueTree& state)
     return state.isValid() && (bool) state.getProperty(kPerformanceMode, false);
 }
 
+// rt-ok-fn: state restore, message thread
 void LiveState::restoreFrom(const juce::ValueTree& state)
 {
     cancelQueuedItem();

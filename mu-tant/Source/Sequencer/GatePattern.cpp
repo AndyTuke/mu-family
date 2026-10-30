@@ -89,6 +89,7 @@ void GatePattern::sortEnvelopes()
               [](const GateEnvelope& a, const GateEnvelope& b) { return a.startCell < b.startCell; });
 }
 
+// rt-ok-fn: message thread under editLock; the audio thread reads envelopes only under the same lock
 GateEnvelope* GatePattern::addEnvelope(const GateEnvelope& env)
 {
     const int newStart = env.startCell;

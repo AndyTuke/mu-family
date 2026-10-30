@@ -140,7 +140,7 @@ private:
     static void ensureMinPatternLength(std::vector<bool>& pattern)
     {
         if (pattern.size() == 1)
-            pattern.push_back(pattern.front());
+            pattern.push_back(pattern.front());   // rt-ok: size 1 to 2; every pattern vector is reserved to 256 steps in the constructor, so push_back cannot reallocate
     }
 };
 

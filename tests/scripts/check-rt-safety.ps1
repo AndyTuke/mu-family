@@ -22,13 +22,29 @@
 #                 construction); a `const std::function<...>&` parameter is not matched
 #   map-index     operator[] on a std::map / std::unordered_map declared in the same file with a
 #                 std::string or juce::String key (allocates on a miss, hashes a string every time)
+#   name-call     getName( / getLayerName( (they build a juce::String) inside a function named processBlock or render*
+#
+# Refinements (each one removes a known false-positive class; see the dsp-controller triage):
+#   C-1  Header functions get setup context too. A brace walk finds each function defined in a header (`inline T
+#        Class::name(` or an in-class `T name(...) {`, signature may span lines) and attributes hits to it. A
+#        constructor (name equal to the enclosing class, or Class::Class) or destructor is setup, as are the setup
+#        names below, now including generate*.
+#   C-2  The `string` rule is not applied inside the body of a function whose return type is a by-value juce::String or
+#        std::string (getName, getLayerName, sampleKey, FXSlotBase getName / getCategory): building one is its job. A
+#        declaration `virtual juce::String f() = 0;` / `... override` is not a construction. The new `name-call` rule
+#        covers the opposite risk: such a getter called from the audio path.
+#   C-3  A default-constructed String (`static const juce::String empty;`, `juce::String()`, `juce::String{}`) does not
+#        allocate and is skipped.
+#   C-4  getRawParameterValue("literal") / ((const char*) p) is a StringRef lookup that does not allocate: it is counted
+#        in a note line, not as a finding. A concatenation (`prefix + ...`) or a variable argument is still reported.
 #
 # Heuristic limits, stated plainly:
 #   - File-level, not function-level. For a .cpp, a hit is attributed to the nearest column-0 definition
-#     `Class::name(` above it; when that name looks like setup (prepare*, release*, reset*, load*, init*,
-#     setup*, set<Upper>*, build*, create*, clear*, resize*, allocate*, a constructor or destructor) the
-#     hit is counted as "setup context" and not listed. Headers get no such help, so inline members of a
-#     header are listed in full.
+#     `Class::name(` above it; for a header, to the function found by the brace walk (C-1). When that name looks
+#     like setup (prepare*, release*, reset*, load*, init*, setup*, set<Upper>*, build*, create*, generate*, clear*,
+#     resize*, allocate*, a constructor or destructor) the hit is counted as "setup context" and not listed. The
+#     brace walk is textual: a function whose head it cannot read (macros, unusual formatting) is listed in full.
+#     A default member initialiser at class scope (`std::string name = "x";`) is not attributed to a constructor.
 #   - A hit in a helper that only the message thread calls is a false positive; the reader judges.
 #   - Strings and `#if` branches are not parsed. Member-function declarations returning juce::String and the
 #     plug-in factory's `new X::PluginProcessor()` are recognised and skipped.
@@ -110,11 +126,115 @@ $rules = @(
     @{ Id = 'lock';         Re = [regex]'\bstd::(mutex|recursive_mutex|lock_guard|unique_lock|scoped_lock|shared_mutex)\b|\bScoped(Read|Write)?Lock\b(?!Type)|\bScopedLock\b|\.enter\(\s*\)|\bGenericScopedLock\b' },
     @{ Id = 'string';       Re = [regex]'\bjuce::String\s*\(|\bjuce::String\s+\w+\s*(=|\(|\{|;)|\bjuce::String::|\.toString\s*\(\s*\)|\bstd::string\s+\w+\s*(=|\(|\{|;)|\bstd::to_string\b|\bString\s*\(\s*"' },
     @{ Id = 'raw-param';    Re = [regex]'\bgetRawParameterValue\s*\(' },
+    @{ Id = 'name-call';    Re = [regex]'\b(getName|getLayerName)\s*\(' },
     @{ Id = 'str-concat';   Re = [regex]'\.\w*[iI]d\s*\+\s*"' },
     @{ Id = 'std-function'; Re = [regex]'\bstd::function\s*<[^;]*>\s+\w+\s*(=|\(|\{)|\bstd::function\s*<[^;]*>\s*[({]|\bstd::function\s*<[^;]*>\s*\w+\s*=\s*\[|\bmake_function\b' }
 )
 $mapIndex = 'map-index'
-$setupName = [regex]'^(prepare\w*|release\w*|reset\w*|load\w*|init\w*|setup\w*|set[A-Z]\w*|build\w*|create\w*|clear\w*|resize\w*|allocate\w*|bind\w*|cache\w*|sync\w*FromParameters|sync\w*FromApvts|force\w*|completeSetup|~\w+)$'
+$setupName = [regex]'^(prepare\w*|release\w*|reset\w*|load\w*|init\w*|setup\w*|set[A-Z]\w*|build\w*|create\w*|generate\w*|clear\w*|resize\w*|allocate\w*|bind\w*|cache\w*|sync\w*FromParameters|sync\w*FromApvts|force\w*|completeSetup|~\w+)$'
+$notFnWords = [regex]'^(if|for|while|switch|catch|else|return|sizeof|decltype|alignas|static_assert|void|do|case)$'
+# A by-value String return type: the text in front of a function name ends with it (a `&` or `*` return does not match).
+$retStringTail = [regex]'(?:^|[\s>])(juce::String|std::string)\s*$'
+
+# Header function contexts. A header has no column-0 `Class::name(` to look up, so walk the braces once: every `{`
+# whose head (the text since the last `{` `}` `;`, joined with earlier lines when the signature spans lines) looks
+# like a definition, outside any function body, opens a function scope. Returns one entry per line (null outside
+# a function body): the innermost function's display name, bare name, setup flag and by-value-String flag.
+function Get-HeaderContexts([string[]]$cleaned) {
+    $n = $cleaned.Count
+    $out = New-Object 'object[]' $n
+    $stack = New-Object System.Collections.Generic.List[object]
+    $bare = New-Object 'string[]' $n
+    for ($k = 0; $k -lt $n; $k++) {
+        $bare[$k] = (($cleaned[$k] -replace '"(\\.|[^"\\])*"', '""') -replace "'(\\.|[^'\\])'", "''")
+    }
+    $innermost = {
+        for ($q = $stack.Count - 1; $q -ge 0; $q--) { if ($stack[$q].Kind -eq 'fn') { return $stack[$q] } }
+        return $null
+    }
+    $cur = $null
+    for ($i = 0; $i -lt $n; $i++) {
+        $txt = $bare[$i]
+        if ($txt -match '^\s*#') { $out[$i] = $cur; continue }
+        $lineFn = $cur
+        if ($txt.IndexOf('{') -ge 0 -or $txt.IndexOf('}') -ge 0) {
+            $segStart = 0
+            for ($c = 0; $c -lt $txt.Length; $c++) {
+                $ch = $txt[$c]
+                if ($ch -eq ';') { $segStart = $c + 1 }
+                elseif ($ch -eq '}') {
+                    if ($stack.Count -gt 0) { $stack.RemoveAt($stack.Count - 1) }
+                    $segStart = $c + 1
+                    $cur = & $innermost
+                }
+                elseif ($ch -eq '{') {
+                    $head = $txt.Substring($segStart, $c - $segStart)
+                    # A brace on its own line, or an initialiser list / split signature: pull in the lines above.
+                    $k = $i - 1
+                    while ($k -ge 0 -and $i - $k -le 6 -and $segStart -eq 0) {
+                        $t = $head.Trim()
+                        $open = ([regex]::Matches($head, '\(')).Count; $close = ([regex]::Matches($head, '\)')).Count
+                        if ($t.Length -gt 0 -and $close -le $open -and $t -notmatch '^([:,]|(public|private|protected)\b)') { break }
+                        $prev = $bare[$k].Trim()
+                        if ($prev.Length -eq 0 -or $prev -match '[;{}]\s*$' -or $prev -match '^#') { break }
+                        $head = $prev + ' ' + $head
+                        $k--
+                    }
+                    $head = $head -replace '^\s*(public|private|protected)\s*:', ''
+                    $entry = [pscustomobject]@{ Kind = 'other'; Name = ''; Display = ''; Setup = $false; RetStr = $false }
+                    if ($cur -eq $null) {
+                        $classScope = $null
+                        for ($q = $stack.Count - 1; $q -ge 0; $q--) { if ($stack[$q].Kind -eq 'class') { $classScope = $stack[$q].Name; break } }
+                        $cm = [regex]::Match($head, '^\s*(template\s*<[^>]*>\s*)?(class|struct)\s+(?:\w+\s+)*?(\w+)\s*(final\s*)?(:[^;(]*)?$')
+                        $fm = [regex]::Match($head, '(?:^|[\s*&:>])(?:(\w+)::)?(~?\w+)\s*\([^{};]*\)\s*(?:(?:const|noexcept|override|final|mutable|volatile)\b\s*|->\s*[\w:<>&* ]+)*(?::[^{};]*)?\s*$')
+                        if ($head -notmatch '\benum\b' -and $cm.Success) {
+                            $entry.Kind = 'class'; $entry.Name = $cm.Groups[3].Value
+                        } elseif ($fm.Success -and -not $notFnWords.IsMatch($fm.Groups[2].Value)) {
+                            $cls = if ($fm.Groups[1].Success) { $fm.Groups[1].Value } else { $classScope }
+                            $nm = $fm.Groups[2].Value
+                            $entry.Kind = 'fn'; $entry.Name = $nm
+                            $entry.Display = if ($cls) { "$cls::$nm" } else { $nm }
+                            # Constructors (name equals the class) and destructors run at setup, like prepare*.
+                            $entry.Setup = ($cls -and $nm -eq $cls) -or $setupName.IsMatch($nm)
+                            $pre = $head.Substring(0, $fm.Groups[2].Index)
+                            if ($fm.Groups[1].Success) { $pre = $head.Substring(0, $fm.Groups[1].Index) }
+                            $entry.RetStr = $retStringTail.IsMatch($pre)
+                        }
+                    }
+                    $stack.Add($entry)
+                    $segStart = $c + 1
+                    $cur = & $innermost
+                    if ($cur -ne $null) { $lineFn = $cur }
+                }
+            }
+        }
+        $out[$i] = $lineFn
+    }
+    return $out
+}
+
+# Context of the hit at line $i: the enclosing function's display name, bare name, setup flag, by-value-String flag.
+# .cpp: the nearest column-0 `Class::name(` above; header: the brace walk above.
+function Get-LineContext([int]$i, [bool]$isCpp, [string[]]$cleaned, $hdrCtx) {
+    $res = [pscustomobject]@{ Display = ''; Name = ''; Setup = $false; RetStr = $false }
+    if ($isCpp) {
+        for ($j = $i; $j -ge 0; $j--) {
+            $mm = $funcDef.Match($cleaned[$j])
+            if ($mm.Success) {
+                $res.Display = $mm.Groups[1].Value + '::' + $mm.Groups[2].Value
+                $res.Name    = $mm.Groups[2].Value
+                $res.Setup   = ($mm.Groups[1].Value -eq $mm.Groups[2].Value) -or $setupName.IsMatch($mm.Groups[2].Value)
+                $pre = $cleaned[$j].Substring(0, $mm.Groups[1].Index)
+                $res.RetStr  = $retStringTail.IsMatch($pre)
+                break
+            }
+        }
+    } elseif ($hdrCtx -and $hdrCtx[$i]) {
+        $f = $hdrCtx[$i]
+        $res.Display = $f.Display; $res.Name = $f.Name; $res.Setup = $f.Setup; $res.RetStr = $f.RetStr
+    }
+    return $res
+}
 $funcDef = [regex]'^(?=[A-Za-z_])[^;]*?\b(\w+)::(~?\w+)\s*\('
 $blockComment = [regex]'(?s)/\*.*?\*/'
 $blankBlock = [System.Text.RegularExpressions.MatchEvaluator] { param($m) $m.Value -replace '[^\r\n]+', '' }
@@ -123,6 +243,7 @@ $mapDecl = [regex]'\bstd::(unordered_)?map\s*<\s*(const\s+)?(std::string|juce::S
 $hits = New-Object System.Collections.Generic.List[object]
 $setupHits = @{}
 $suppressed = 0
+$rawNoted = 0
 
 foreach ($path in ($scanFiles | Sort-Object -Unique)) {
     $raw     = [System.IO.File]::ReadAllText($path)
@@ -130,6 +251,7 @@ foreach ($path in ($scanFiles | Sort-Object -Unique)) {
     $cleaned = ($blockComment.Replace($raw, $blankBlock) -replace '//[^\r\n]*', '') -split "\r?\n"
     $rel     = Get-RelPath $path
     $isCpp   = $path.EndsWith('.cpp')
+    $hdrCtx  = if ($isCpp) { $null } else { Get-HeaderContexts $cleaned }
 
     # Names of string-keyed maps declared anywhere in this file (for the map-index rule).
     $maps = @()
@@ -166,20 +288,39 @@ foreach ($path in ($scanFiles | Sort-Object -Unique)) {
             $test = $line
             if ($rule.Id -eq 'string') {
                 # Empty construction does not allocate; drop it before testing.
-                $test = $test -replace '\bjuce::String\s*\(\s*\)|\bstd::string\s*\{\s*\}', ''
-                # A bare member / local declaration without initialiser (`juce::String id;`) does not allocate.
-                if ($test -match '^\s*(const\s+|mutable\s+)*(juce::String|std::string)\s+\w+\s*(\{\s*\})?\s*;\s*$') { continue }
+                $test = $test -replace '\bjuce::String\s*\(\s*\)|\bjuce::String\s*\{\s*\}|\bstd::string\s*\{\s*\}', ''
+                # A bare member / local declaration without initialiser (`juce::String id;`, `static const juce::String empty;`)
+                # is default-constructed: it does not allocate.
+                if ($test -match '^\s*((static|thread_local|inline|const|mutable)\s+)*(juce::String|std::string)\s+\w+\s*(\{\s*\})?\s*;\s*$') { continue }
             }
             # A `using X = std::function<...>` alias constructs nothing.
             if ($rule.Id -eq 'std-function' -and $line -match '^\s*using\s+\w+\s*=') { continue }
             if (-not $rule.Re.IsMatch($test)) { continue }
+            # getRawParameterValue("literal") / ((const char*) p) is a StringRef lookup: it does not allocate, so it is
+            # only noted. A concatenation (`prefix + ...`) or a variable argument is still reported.
+            if ($rule.Id -eq 'raw-param') {
+                $litCall = '\bgetRawParameterValue\s*\(\s*("(\\.|[^"\\])*"|\(\s*const\s+char\s*\*\s*\)\s*\w+)\s*\)'
+                if ($line -match $litCall -and ($line -replace $litCall, '') -notmatch '\bgetRawParameterValue\s*\(') {
+                    if ($rawLines[$i] -cmatch '\brt-ok\b(?!-)') { $suppressed++ } else { $rawNoted++ }
+                    continue
+                }
+            }
+            # New rule: getName( / getLayerName( build a juce::String; they belong in UI code, not in processBlock / render*.
+            if ($rule.Id -eq 'name-call') {
+                $nc = Get-LineContext $i $isCpp $cleaned $hdrCtx
+                if ($nc.Name -notmatch '^(processBlock|render\w*)$') { continue }
+            }
+            # No `string` hit inside a function that returns a juce::String / std::string by value: building it is the job.
+            if ($rule.Id -eq 'string') {
+                if ((Get-LineContext $i $isCpp $cleaned $hdrCtx).RetStr) { continue }
+            }
             # A push_back after a capacity() check (within 2 lines above) is the guarded-growth pattern.
             if ($rule.Id -eq 'vector-grow' -and $line -match '\.\s*(push_back|emplace_back)\s*\(' -and
                 (($i -ge 1 -and $cleaned[$i - 1] -match 'capacity\s*\(\s*\)') -or ($i -ge 2 -and $cleaned[$i - 2] -match 'capacity\s*\(\s*\)'))) { continue }
             # The plug-in factory's `new X::PluginProcessor()` is the one allowed allocation (message thread, once).
             if ($rule.Id -eq 'alloc' -and $line -match 'new\s+([\w]+::)*PluginProcessor\s*\(') { continue }
             # A member-function declaration returning juce::String is not a construction.
-            if ($rule.Id -eq 'string' -and $line -match '\bjuce::String\s+\w+\s*\([^)]*\)\s*(const\b|override\b|noexcept\b|;\s*$)' -and $line -notmatch '=\s*juce::String|juce::String\s*\(') { continue }
+            if ($rule.Id -eq 'string' -and $line -match '\bjuce::String\s+\w+\s*\([^)]*\)\s*(const\b|override\b|noexcept\b|=\s*0\s*;|;\s*$)' -and $line -notmatch '=\s*juce::String|juce::String\s*\(') { continue }
             # So is a function definition starting inline / static / virtual whose signature ends the line or opens the body.
             if ($rule.Id -eq 'string' -and $line -match '^\s*((inline|static|virtual|constexpr)\s+)+(const\s+)?juce::String\s+\w+\s*\(' -and
                 ($line -notmatch '\)' -or $line -match '\)\s*((const|override|noexcept)\s*)*(\{\s*)?$') -and $line -notmatch '=\s*juce::String|juce::String\s*\(') { continue }
@@ -190,20 +331,10 @@ foreach ($path in ($scanFiles | Sort-Object -Unique)) {
         if ($rawLines[$i] -cmatch '\brt-ok\b(?!-)') { $suppressed++; continue }
         if ($region[$i] -eq 1) { $suppressed++; continue }
 
-        # Setup context: the nearest column-0 definition above the line, in a .cpp.
-        $setup = $false
-        $fn = ''
-        if ($isCpp) {
-            for ($j = $i; $j -ge 0; $j--) {
-                $mm = $funcDef.Match($cleaned[$j])
-                if ($mm.Success) {
-                    $fn = $mm.Groups[1].Value + '::' + $mm.Groups[2].Value
-                    $isCtor = $mm.Groups[1].Value -eq $mm.Groups[2].Value
-                    $setup = $isCtor -or $setupName.IsMatch($mm.Groups[2].Value)
-                    break
-                }
-            }
-        }
+        # Setup context: the enclosing function (.cpp: nearest column-0 definition above; header: the brace walk).
+        $lc = Get-LineContext $i $isCpp $cleaned $hdrCtx
+        $setup = $lc.Setup
+        $fn = $lc.Display
         # `rt-ok-class:` members are counted as setup context, headers included.
         if ($region[$i] -eq 2) { $setup = $true }
         foreach ($id in $matched) {
@@ -225,6 +356,7 @@ if (-not $Quiet) {
         $setupN = [int]$setupHits[$rule]
         Write-Host ""
         Write-Host ("[{0}] {1} hit(s) outside setup functions, {2} in setup context (not listed)" -f $rule, $mine.Count, $setupN)
+        if ($rule -eq 'raw-param') { Write-Host ("    note: {0} getRawParameterValue(literal) lookup(s) not counted (no allocation)" -f $rawNoted) }
         if ($mine.Count -eq 0) { continue }
         $byFile = $mine | Group-Object File | Sort-Object Count -Descending
         foreach ($g in ($byFile | Select-Object -First $Top)) { Write-Host ("    {0,4}  {1}" -f $g.Count, $g.Name) }

@@ -189,6 +189,7 @@ void ProcessorBase::drainPendingMidiProgramChanges()
 
 // Performs one control action (message thread): a knob / button parameter, the transport, or a
 // layer's mute / solo. Returns false for actions not supported yet or whose target is gone.
+// rt-ok-fn: message thread; reached from MidiControlRouter::drain (SwapPoll timer), UI sinks and LiveState, never from processBlock
 bool ProcessorBase::perform(const mu_core::ControlAction& a)
 {
     using T = mu_core::ControlActionType;
@@ -503,6 +504,7 @@ void ProcessorBase::startFxParamSync()
     syncAllFxParams();   // JUCE doesn't fire parameterChanged on construction
 }
 
+// rt-ok-fn: constructor and state restore only (message thread); not the automation path
 void ProcessorBase::syncAllFxParams()
 {
     for (auto* p : getParameters())
@@ -643,6 +645,7 @@ bool ProcessorBase::syncMasterParam(const juce::String& id, float v)
     return false;
 }
 
+// rt-ok-fn: automation path, can run on the audio thread; getRawParameterValue(StringRef) is a non-allocating std::map find and ReverbSlot::setParam uses strcmp: bounded and alloc-free; a cached-pointer version is tracked
 void ProcessorBase::syncFxSlotParam(const juce::String& id, float v)
 {
     auto& eff = fxChain.effectSlot();
@@ -789,6 +792,7 @@ juce::Array<juce::File> ProcessorBase::slotPresetFiles(int /*slot*/) const
     return mu_pp::listPresetFiles(getLayerPresetDir(), getLayerPresetExtension());
 }
 
+// rt-ok-fn: preset/clip handling on the message thread
 juce::File ProcessorBase::presetDirOf(const mu_core::LayerTypeInfo& info) const
 {
     const auto content = getContentDir();
@@ -797,6 +801,7 @@ juce::File ProcessorBase::presetDirOf(const mu_core::LayerTypeInfo& info) const
     return content.getSiblingFile(info.contentFolderName).getChildFile(info.presetFolder);
 }
 
+// rt-ok-fn: preset/clip handling on the message thread
 juce::String ProcessorBase::presetExtensionOf(const mu_core::LayerTypeInfo& info)
 {
     return juce::String(info.presetExtension).trimCharactersAtStart(".");
@@ -844,6 +849,7 @@ juce::Array<juce::File> ProcessorBase::typedSlotPresetFiles(int slot) const
     return out;
 }
 
+// rt-ok-fn: preset/clip handling on the message thread
 mu_core::LayerTypeId ProcessorBase::layerPresetType(const juce::ValueTree& preset, const juce::String& extension) const
 {
     auto found = mu_core::LayerTypeId::Empty;
@@ -860,6 +866,7 @@ mu_core::LayerTypeId ProcessorBase::layerPresetType(const juce::ValueTree& prese
     return matches == 1 ? found : mu_core::LayerTypeId::Empty;
 }
 
+// rt-ok-fn: preset/clip handling on the message thread
 void ProcessorBase::saveTypedLayerPreset(int slot, const juce::String& name)
 {
     const auto* info = layerTypes.find(slotTypeId(slot));
@@ -1905,6 +1912,7 @@ void ProcessorBase::noteLayerPresetLabel(int slot, const juce::String& label)
         presetLabels[(size_t) slot] = label;
 }
 
+// rt-ok-fn: preset/clip handling on the message thread
 bool ProcessorBase::storeClip(int slot, int clip, const juce::String& name)
 {
     mu_hotswap::assertMessageThread();   // the clip bank is message-thread only (a controller callback must marshal first)
@@ -2008,6 +2016,7 @@ bool ProcessorBase::loadClipFromFile(int slot, int clip, const juce::File& layer
     return true;
 }
 
+// rt-ok-fn: preset/clip handling on the message thread
 bool ProcessorBase::clipFitsSlot(int slot, const juce::ValueTree& tree)
 {
     if (! tree.isValid() || getLayer(slot) == nullptr) return false;

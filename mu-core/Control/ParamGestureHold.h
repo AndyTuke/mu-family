@@ -10,6 +10,7 @@
 namespace mu_core
 {
 
+// rt-ok-class: juce::Timer on the message thread; controllers write through MidiControlRouter::drain
 class ParamGestureHold : private juce::Timer
 {
 public:

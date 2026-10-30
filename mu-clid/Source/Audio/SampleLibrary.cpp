@@ -31,6 +31,7 @@ void SampleLibrary::load(int rhythmIndex, const juce::File& file)
         samplePaths.set(rhythmIndex, file.getFullPathName());
 }
 
+// rt-ok-fn: sample-path bookkeeping, message thread
 void SampleLibrary::swapPaths(int i, int j)
 {
     // Called under layersLock: never grow the array there (the constructor sized it to every slot).
@@ -62,6 +63,7 @@ bool SampleLibrary::isSampleMissing(int rhythmIndex) const
     return engine == nullptr || ! engine->hasSample();
 }
 
+// rt-ok-fn: sample-path bookkeeping, message thread
 juce::File SampleLibrary::getPrimarySampleDir() const
 {
     if (auto* settings = host.getSampleSettingsFile())

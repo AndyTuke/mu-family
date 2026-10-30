@@ -16,6 +16,7 @@ namespace mu_on
 
 // The type a track preset (.muTrack) carries: its engine row ("eng"), or, in a preset saved when the lanes
 // were fixed, the instrument named by its "lane" property. Empty when the tree names neither.
+// rt-ok-fn: track preset load, message thread
 inline mu_core::LayerTypeId typeFromPreset(const juce::ValueTree& preset)
 {
     for (int i = 0; i < preset.getNumChildren(); ++i)

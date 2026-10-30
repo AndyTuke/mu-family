@@ -511,6 +511,7 @@ inline juce::ValueTree rhythmChildToNode(const juce::ValueTree& child, const juc
     return rhythmSourceToNode(child, {}, rootType, name);
 }
 
+// rt-ok-fn: preset file conversion, message thread
 inline juce::ValueTree rhythmPresetNodeToFile(const juce::ValueTree& node, const juce::String& name)
 {
     juce::ValueTree file(node.getType());

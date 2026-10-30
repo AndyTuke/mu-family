@@ -84,6 +84,7 @@ void VoiceEngine::installSample(DecodedSample&& sample)
     }
 }
 
+// rt-ok-fn: hot-swap staging on the message thread; setSize(0,0) acts on a moved-from buffer and the audio thread only try-locks bufferLock
 VoiceEngine::DecodedSample VoiceEngine::takeSample()
 {
     DecodedSample out;

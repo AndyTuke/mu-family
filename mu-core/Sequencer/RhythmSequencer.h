@@ -231,7 +231,7 @@ private:
     static void ensureMinPatternLength(std::vector<bool>& pattern)
     {
         if (pattern.size() == 1)
-            pattern.push_back(pattern.front());
+            pattern.push_back(pattern.front());   // rt-ok: size 1 to 2; every pattern vector is reserved to 256 steps in the constructor, so push_back cannot reallocate
     }
     static int floorMod(int a, int n) noexcept { const int m = a % n; return m < 0 ? m + n : m; }
     // Atomic because host automation can set the loop length off the audio thread.

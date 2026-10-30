@@ -37,6 +37,7 @@ void SamplePreview::collectRetired()
             owned.erase(owned.begin() + (std::ptrdiff_t) i);
 }
 
+// rt-ok-fn: message-thread decode and publish (preview button); the audio thread reads current/audioHolding and never takes messageLock
 void SamplePreview::start(const juce::File& file)
 {
     const juce::ScopedLock sl(messageLock);

@@ -231,6 +231,7 @@ void PluginProcessor::forceSyncRhythmFromApvts(int ri)
 // ProcessorBase::syncGlobalFxParam (mu-core), matching mu-tant. See the backlog.
 
 //==============================================================================
+// rt-ok-fn: layer install and hot-swap on the message thread
 void PluginProcessor::pushRhythmToApvts(int ri)
 {
     if (ri < 0 || ri >= getNumRhythms()) return;
@@ -255,6 +256,7 @@ void PluginProcessor::pushRhythmToApvts(int ri)
     }
 }
 
+// rt-ok-fn: layer install and hot-swap on the message thread
 void PluginProcessor::pushMixerChannelToApvts(int idx)
 {
     if (idx < 0 || idx >= mu_limits::kMaxLayers) return;

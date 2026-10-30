@@ -122,7 +122,7 @@ struct Layer : public mu_core::RetireTail
     // Rhythm install carries the slot's value across so a clip launch keeps it.
     int activeClip = -1;
 
-    std::string name        = "<unnamed>";
+    std::string name        = "<unnamed>";   // rt-ok: "<unnamed>" is 9 characters, inside the small-string buffer, so no heap allocation
     // Audio thread only: the channel mask this layer's last call carried, so the base can tell the layer once
     // (MidiView::inputReset) that its MIDI In changed. It travels with the layer through a swap. Omni at birth.
     uint16_t    lastMidiMask = 0xFFFF;

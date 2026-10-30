@@ -77,7 +77,7 @@ public:
     // step grid as mu-clid). UI-thread reads only (the shared MasterLoopSection timer).
     int getMasterLoopSteps() const override
     {
-        const auto* p = mstrLoopPtr ? mstrLoopPtr : apvts.getRawParameterValue("mstrLoop");
+        const auto* p = mstrLoopPtr ? mstrLoopPtr : apvts.getRawParameterValue("mstrLoop");   // rt-ok: UI-only fallback; processBlock uses the cached mstrLoopPtr
         return p ? (int) p->load() * 16 : 0;
     }
     int getMasterLoopCurrentStep() const override

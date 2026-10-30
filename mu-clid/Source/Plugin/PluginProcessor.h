@@ -228,7 +228,7 @@ public:
     // Tests only: retires `engine` into slot `slot`'s row now, as a swap's install does (takes the layer lock).
     void retireEngineForTest(int slot, std::unique_ptr<VoiceEngine> engine)
     {
-        const juce::ScopedLock sl(layersLock);
+        const juce::ScopedLock sl(layersLock);   // rt-ok: test-only helper, message thread
         retireEngine(slot, std::move(engine));
     }
 
