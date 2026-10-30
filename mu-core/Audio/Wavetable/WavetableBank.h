@@ -72,6 +72,11 @@ public:
     Wavetable decodeFile(const juce::File& file);
     int       appendTable(Wavetable&& wt);   // returns the new index (caller locks)
 
+    // The bank index of a wavetable file for a product that shares the bank with its audio thread through `lock`
+    // (its bankLock): found by path, else decoded OFF the lock and appended under it for microseconds, so an import
+    // never silences the render for the decode. -1 when the file is unreadable or the bank is full. Message thread.
+    int       indexForFile(const juce::File& file, juce::CriticalSection& lock);
+
     int  numTables() const noexcept { return (int) tables.size(); }
     const juce::String& tableName(int t) const noexcept;
     int  numFrames(int t) const noexcept;

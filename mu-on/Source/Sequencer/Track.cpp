@@ -137,7 +137,7 @@ void Track::prepare(double sampleRate, int blockSize)
     // The next rendered block starts from silence and resolves its engine afresh (no held C12 values).
     parked  = true;
     current = -1;
-    haveResolved = false;
+    lastResolved.reset();
 }
 
 void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
@@ -166,7 +166,7 @@ void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
         filterCutRow[k]  = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, kind, "fcut")), this);
     }
     jassert(engineRow.isBound() && sourceRow.isBound() && bassWaveRow.isBound() && algoRow.isBound() && swingRow.isBound() && accentRow.isBound());   // an id drift from the layout (debug)
-    haveResolved = false;   // values held for C12 belong to the slot bound before
+    lastResolved.reset();   // values held for C12 belong to the slot bound before
 
     // Every engine's modulation inputs for this slot, in its target table's order (the order setParams takes).
     for (int e = 0; e < kNumEngineTypes; ++e)
@@ -264,7 +264,7 @@ void Track::resetEngineToPrepared() noexcept
     for (auto& e : engines)
         if (e != nullptr) e->resetToPrepared();
     current = -1;
-    haveResolved = false;
+    lastResolved.reset();
 }
 
 float Track::getModLive(EngineType e, int dest) const noexcept
@@ -326,15 +326,9 @@ void Track::resolve(int e, double beat, float* outValues) noexcept
     // A block that misses the matrix lock (the message thread is editing this track's modulators) holds the last
     // values resolved for this engine, so no target snaps back to its unmodulated knob for a block (C12). Before
     // the engine's first resolve it takes the unmodulated values, as a miss always did.
-    if (lastResolvedEngine != e) haveResolved = false;
-    if (resolved || ! haveResolved)
-    {
-        std::copy(outValues, outValues + L.count, lastResolved.begin());
-        haveResolved = haveResolved || resolved;
-        lastResolvedEngine = e;
-    }
-    else
-        std::copy(lastResolved.begin(), lastResolved.begin() + L.count, outValues);
+    if (lastResolvedEngine != e) lastResolved.reset();
+    lastResolved.apply(resolved, outValues, (std::size_t) L.count);
+    lastResolvedEngine = e;
 
     // The last nine targets of every engine's table (Level, Pan, Insert P1..P4, the three sends): the track's Level and insert
     // knobs for this block's render, and the mixer strip's Pan and sends for the host.
@@ -415,7 +409,7 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
     // Phase 1: a slot that has just gone live (or was prepared since) starts from silence, so a tail left by
     // an earlier state (a sustaining bass has no note-off) never resumes; an engine change stops the old one dead.
     // Both silence every engine the track holds, as the per-slot engines' reset always did.
-    if (parked) { resetEngines(); current = -1; haveResolved = false; parked = false; }
+    if (parked) { resetEngines(); current = -1; lastResolved.reset(); parked = false; }
     if (current != e) { resetEngines(); current = e; }
 
     // Phase 2: this block's parameters through the modulation matrix, at the call's beat.

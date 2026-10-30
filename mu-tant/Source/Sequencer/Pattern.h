@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Modulation/LastResolved.h"  // mu-core: hold-last-value on a matrix-lock miss
 #include "Modulation/StripMods.h"   // mu-core: the sends as modulation targets
 
 #include "Sequencer/Layer.h"          // mu-core: name, colour, modulation, the render contract
@@ -256,9 +257,8 @@ private:
     // C12 (hold-last-value on a matrix-lock miss), audio thread: the last block's resolved values, whether this slot
     // has resolved once with the lock held, and whether the last rendered block had the layer parked (or none yet).
     // Cleared by prepare, bindParams, resetSlotState (a move or reset) and going live, so nothing held crosses a slot.
-    std::array<float, kNumModDests> lastResolved {};
+    mu_mod::LastResolved<kNumModDests> lastResolved;
     mu_mod::StripMods stripMod;   // the modulated pan and FX sends, for the mixer strip
-    bool haveResolved = false;
     bool parked       = true;
 };
 JUCE_END_IGNORE_WARNINGS_MSVC

@@ -5,6 +5,7 @@
 #include "Sequencer/RetireTail.h"       // mu-core: mu_core::ParamBinding
 #include "Sequencer/StepRow.h"         // the track's steps and groove
 #include "Sequencer/StepClock.h"       // the row's step cursor
+#include "Modulation/LastResolved.h"    // mu-core: hold-last-value on a matrix-lock miss
 #include "Audio/TrackEngine.h"          // the engines the track runs
 #include "Audio/InsertProcessor.h"      // mu-core: the track's insert effect
 #include "Audio/VoiceParams.h"          // mu-core: the insert's parameter snapshot
@@ -211,9 +212,8 @@ private:
     float lastRumbleEnv = 1.0f;  // reused while the envelope's lock is contended
     bool  parked = true;         // not rendered live in the last rendered block (or prepared since)
 
-    std::array<float, kMaxDests> lastResolved {};   // the last block's resolved values (C12: held on a matrix-lock miss)
+    mu_mod::LastResolved<kMaxDests> lastResolved;   // the last block's resolved values (C12: held on a matrix-lock miss)
     int   lastResolvedEngine = -1;                  // the engine they belong to
-    bool  haveResolved = false;                     // a resolve of that engine has run with the lock held
 };
 JUCE_END_IGNORE_WARNINGS_MSVC
 

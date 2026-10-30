@@ -241,24 +241,11 @@ void PluginProcessor::seedInputState(int slot) noexcept
     jassertfalse;   // unreachable: the constructor's Patterns are seeded and every later one is seeded here
 }
 
-// The bank index for a wavetable file: found by path, else decoded OFF bankLock (file read, WAV decode
-// and FFT mip build are the slow part) and appended under it for microseconds. Holding bankLock across
-// the decode would silence the audio render for the whole import.
-// rt-ok-fn: message thread; the audio thread reads the bank through BankTryLock
+// The bank index for a wavetable file: found by path, else decoded OFF bankLock and appended under it for
+// microseconds (the decode under the lock would silence the audio render for the whole import).
 int PluginProcessor::bankIndexFor(const juce::File& file)
 {
-    const juce::String path = file.getFullPathName();
-    {
-        const juce::ScopedLock sl(bankLock);   // the lookup walks the table list an append may reallocate
-        if (const int found = bank.findByPath(path); found >= 0) return found;
-    }
-
-    auto wt = bank.decodeFile(file);
-    if (wt.frames <= 0) return -1;
-
-    const juce::ScopedLock sl(bankLock);   // the bank append must exclude the audio thread
-    if (const int found = bank.findByPath(path); found >= 0) return found;   // loaded meanwhile
-    return bank.appendTable(std::move(wt));
+    return bank.indexForFile(file, bankLock);
 }
 
 void PluginProcessor::loadUserWavetable(int voice, int oscIndex, const juce::File& file)

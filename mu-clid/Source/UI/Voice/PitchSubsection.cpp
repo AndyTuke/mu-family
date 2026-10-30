@@ -1,4 +1,5 @@
 #include "PitchSubsection.h"
+#include "RhythmParamCache.h"
 #include "UI/RhythmHost.h"
 #include "ValueFormat.h"   // mu-core: shared value text
 #include "Modulation/ModulationSnapshot.h"
@@ -29,15 +30,7 @@ PitchSubsection::PitchSubsection(RhythmHost& h) : host(h)
 
 void PitchSubsection::apvtsSet(const char* suffix, float v)
 {
-    if (rhythmIndex < 0) return;
-    auto it = paramPtrCache.find(suffix);
-    if (it == paramPtrCache.end())
-    {
-        const auto id = "r" + juce::String(rhythmIndex) + "_" + suffix;
-        it = paramPtrCache.emplace(suffix, host.getRhythmParameters().getParameter(id)).first;
-    }
-    if (auto* p = it->second)
-        p->setValueNotifyingHost(p->convertTo0to1(v));
+    setRhythmParamCached(host.getRhythmParameters(), rhythmIndex, paramPtrCache, suffix, v);
 }
 
 void PitchSubsection::wireCallbacks()

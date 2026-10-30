@@ -1,5 +1,6 @@
 #include "MidiOutSection.h"
 #include "UI/RhythmHost.h"
+#include "UI/Voice/RhythmParamCache.h"
 #include "Audio/MidiOutputMapping.h"   // mu-core: note names
 
 namespace mu_clid {
@@ -42,9 +43,7 @@ MidiOutSection::MidiOutSection(RhythmHost& h) : host(h)
 
 void MidiOutSection::apvtsSet(const char* suffix, float v)
 {
-    if (rhythmIndex < 0) return;
-    if (auto* p = host.getRhythmParameters().getParameter("r" + juce::String(rhythmIndex) + "_" + suffix))
-        p->setValueNotifyingHost(p->convertTo0to1(v));
+    setRhythmParam(host.getRhythmParameters(), rhythmIndex, suffix, v);
 }
 
 float MidiOutSection::apvtsGet(const char* suffix, float fallback) const

@@ -31,7 +31,7 @@ static int parseSerumFrameSize(const void* data, size_t numBytes) noexcept
         if (std::memcmp(bytes + pos, "clm ", 4) == 0)
         {
             const size_t avail = std::min((size_t) sz, numBytes - body);
-            juce::String s (juce::CharPointer_UTF8 ((const char*) (bytes + body)),
+            juce::String s (juce::CharPointer_UTF8 ((const char*) (bytes + body)),   // rt-ok: RIFF clm chunk parse at table load (message/worker thread)
                             juce::CharPointer_UTF8 ((const char*) (bytes + body + avail)));
             const int marker = s.indexOf("<!>");
             return (marker >= 0 ? s.substring(marker + 3) : s).trimStart().getIntValue();
@@ -304,6 +304,23 @@ int WavetableBank::appendTable(Wavetable&& wt)
     if (wt.frames <= 0 || tables.size() >= tables.capacity()) return -1;
     tables.push_back(std::move(wt));
     return numTables() - 1;
+}
+
+// rt-ok-fn: message thread; the audio thread reads the bank through the product's try-lock, never the blocking lock
+int WavetableBank::indexForFile(const juce::File& file, juce::CriticalSection& lock)
+{
+    const juce::String path = file.getFullPathName();
+    {
+        const juce::ScopedLock sl(lock);   // the lookup walks the table list an append may reallocate
+        if (const int found = findByPath(path); found >= 0) return found;
+    }
+
+    auto wt = decodeFile(file);   // file read, WAV decode and FFT mip build: the slow part, off the lock
+    if (wt.frames <= 0) return -1;
+
+    const juce::ScopedLock sl(lock);   // the append must exclude the audio thread
+    if (const int found = findByPath(path); found >= 0) return found;   // loaded meanwhile
+    return appendTable(std::move(wt));
 }
 
 int WavetableBank::addFromFile(const juce::File& file)

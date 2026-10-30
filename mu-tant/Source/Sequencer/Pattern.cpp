@@ -6,6 +6,7 @@
 #include "Sequencer/BeatWrap.h"              // mu-core: wrapBeat
 #include "Persistence/PatternParams.h"       // the v{N}_ ids
 #include "Modulation/LaneModulation.h"       // mu-core: mu_mod::resolveLane
+#include "Modulation/ParamSkew.h"            // mu-core: the cutoff proportion conversions
 #include "Audio/SpinLock.h"                  // mu-core: the envelopes' spin locks
 #include "Audio/TantScales.h"                    // kBaseOctave
 
@@ -65,6 +66,7 @@ void Pattern::writeExtras(juce::ValueTree& node) const
 
 // The voice's non-parameter data from its node. Absent children clear (an invalid tree empties a gate / the
 // modulators); per-pattern spin locks and modLock guard the audio thread, so no layersLock is needed.
+// rt-ok-fn: pattern/preset load, message thread
 void Pattern::applyExtras(const juce::ValueTree& node)
 {
     mu_pp::clearModulators(*this);
@@ -100,17 +102,10 @@ void Pattern::refreshPitchQuantFlags()
 
 namespace
 {
-    // Filter-cutoff proportion-space helpers — same skew as mu-clid (cutoff range 20..20000 Hz, skewForCentre
-    // 640 Hz → skewFactor ≈ 0.2). The filter envelope adds in proportion space so a given depth always sweeps
-    // the same visual arc of the knob regardless of the base cutoff.
-    inline float tantPropFromCutoff(float hz)
-    {
-        return std::pow(juce::jlimit(0.0f, 1.0f, (hz - 20.0f) / 19980.0f), 0.2f);
-    }
-    inline float tantCutoffFromProp(float p)
-    {
-        return 20.0f + 19980.0f * std::pow(juce::jlimit(0.0f, 1.0f, p), 5.0f);
-    }
+    // The filter envelope adds in the cutoff knob's proportion space (mu_mod::skew, the same conversion as every
+    // product's modulation), so a given depth always sweeps the same visual arc of the knob regardless of the base cutoff.
+    using mu_mod::skew::propFromCutoff;
+    using mu_mod::skew::cutoffFromProp;
 
     // Index of each resolved value in the resolveLane `out` array (kModDestTable order).
     enum { D_o1Oct = 0, D_o1Semi, D_o1Fine, D_o1Pos, D_o1Penv,
@@ -153,7 +148,7 @@ void Pattern::prepare(double sampleRate, int blockSize)
 {
     insert->prepare(sampleRate, blockSize);
     tailScratch.setSize(2, juce::jmax(1, blockSize), false, true, false);
-    haveResolved = false;   // a prepare is a fresh start: no held modulated values (C12)
+    lastResolved.reset();   // a prepare is a fresh start: no held modulated values (C12)
 }
 
 void Pattern::bindParams(juce::AudioProcessorValueTreeState& apvts, int slot)
@@ -193,7 +188,7 @@ void Pattern::bindParams(juce::AudioProcessorValueTreeState& apvts, int slot)
         engine   = host.ptr->getPatternEngine(slot);
         bankLock = host.ptr->getPatternBankLock();
     }
-    haveResolved = false;   // values held for C12 belong to the slot bound before
+    lastResolved.reset();   // values held for C12 belong to the slot bound before
 }
 
 VoiceConfig Pattern::readConfig() const noexcept
@@ -294,13 +289,7 @@ void Pattern::applyModulation(double beat, VoiceConfig& cfg, std::array<float, 4
     // resolved values, so no target snaps back to its unmodulated knob for a block (C12). Before the first resolve
     // of this slot (a fresh bind, a prepare, a move, a voice that has just gone live) it takes the unmodulated
     // values, as every block of a miss did before.
-    if (resolved || ! haveResolved)
-    {
-        std::copy(out, out + kNumModDests, lastResolved.begin());
-        haveResolved = haveResolved || resolved;
-    }
-    else
-        std::copy(lastResolved.begin(), lastResolved.end(), out);
+    lastResolved.apply(resolved, out);
 
     stripMod.publish(out[D_pan], out[D_sendEff], out[D_sendDly], out[D_sendRev]);   // the host gives these to the layer's mixer strip
 
@@ -399,15 +388,15 @@ void Pattern::applyFilterEnvelope(bool playing, double beat, double sampleRate, 
             fPat.filterLevel = (target > fPat.filterLevel) ? std::min(target, fPat.filterLevel + maxRise) : target;
 
             const float depth    = juce::jlimit(-1.0f, 1.0f, cfg.filterEnvDepth);
-            const float baseProp = tantPropFromCutoff(cfg.filterCutoff);
+            const float baseProp = propFromCutoff(cfg.filterCutoff);
             const float modProp  = juce::jlimit(0.0f, 1.0f, baseProp + depth * fPat.filterLevel);
-            cfg.filterCutoff = juce::jlimit(20.0f, 20000.0f, tantCutoffFromProp(modProp));
+            cfg.filterCutoff = juce::jlimit(20.0f, 20000.0f, cutoffFromProp(modProp));
 
             // The same envelope on Filter 2 with its own depth.
             const float depth2    = juce::jlimit(-1.0f, 1.0f, cfg.filter2EnvDepth);
-            const float baseProp2 = tantPropFromCutoff(cfg.filter2Cutoff);
+            const float baseProp2 = propFromCutoff(cfg.filter2Cutoff);
             const float modProp2  = juce::jlimit(0.0f, 1.0f, baseProp2 + depth2 * fPat.filterLevel);
-            cfg.filter2Cutoff = juce::jlimit(20.0f, 20000.0f, tantCutoffFromProp(modProp2));
+            cfg.filter2Cutoff = juce::jlimit(20.0f, 20000.0f, cutoffFromProp(modProp2));
 
             mu_core::spinUnlock(fPat.editLock);
         }
@@ -462,7 +451,7 @@ void Pattern::applyOwnNoteGate(juce::AudioBuffer<float>& out, int n, int mode, d
 void Pattern::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n)
 {
     const int mode = hearNotes(ctx);
-    if (parked) { haveResolved = false; parked = false; }   // just gone live: hold nothing from before (C12)
+    if (parked) { lastResolved.reset(); parked = false; }   // just gone live: hold nothing from before (C12)
     if (engine == nullptr) return;
 
     // The engine reads the wavetable bank, which a user-wavetable import appends to under bankLock (same acquire
@@ -598,7 +587,7 @@ bool Pattern::renderRetiring(const mu_core::RenderContext& ctx, juce::AudioBuffe
 void Pattern::resetSlotState() noexcept
 {
     for (auto& v : modLive) v.store(0.0f, std::memory_order_relaxed);
-    haveResolved = false;
+    lastResolved.reset();
 }
 
 } // namespace mu_tant

@@ -2,8 +2,11 @@
 
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "Sequencer/Layer.h"
+#include "Modulation/LastResolved.h"
 
 #include <juce_audio_basics/juce_audio_basics.h>
+#include <algorithm>
+#include <array>
 #include <atomic>
 #include <string_view>
 #include <unordered_map>

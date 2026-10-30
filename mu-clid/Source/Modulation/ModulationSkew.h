@@ -2,6 +2,7 @@
 
 #include <juce_core/juce_core.h>
 #include <cmath>
+#include "Modulation/ParamSkew.h"
 
 // Proportion-space skew conversions for modulation. Skewed-slider
 // destinations (ADSR times, filter cutoff, filter low-cut) are modulated in the
@@ -26,8 +27,8 @@ inline float adsrFromProp   (float p)    { return 10.0f     * std::pow (juce::jl
 inline float propFromLowCut (float hz)   { return std::pow (juce::jlimit (0.0f, 1.0f, hz / 1000.0f),   0.35f); }
 inline float lowCutFromProp (float p)    { return 1000.0f   * std::pow (juce::jlimit (0.0f, 1.0f, p), 1.0f / 0.35f); }
 
-inline float propFromCutoff (float hz)   { return std::pow (juce::jlimit (0.0f, 1.0f, (hz - 20.0f) / 19980.0f), 0.2f); }
-inline float cutoffFromProp (float p)    { return 20.0f + 19980.0f * std::pow (juce::jlimit (0.0f, 1.0f, p), 1.0f / 0.2f); }
+inline float propFromCutoff (float hz)   { return mu_mod::skew::propFromCutoff (hz); }   // shared with mu-Tant (mu-core)
+inline float cutoffFromProp (float p)    { return mu_mod::skew::cutoffFromProp (p); }
 
 // Linear knob ranges of the remaining targets, in voiceParams units. Every target is seeded
 // as its knob's 0..1 proportion (depth = % of the knob's range). The APVTS layout is built

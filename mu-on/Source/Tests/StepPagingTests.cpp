@@ -5,6 +5,7 @@
 // is drawn only when tiedFrom() says the tie is real). The drawing, the buttons and the clamp call sites are in the smoke plan.
 
 #include "Sequencer/StepRow.h"
+#include "UI/StepPaging.h"
 #include <juce_core/juce_core.h>
 
 namespace
@@ -107,6 +108,35 @@ namespace
                 row.setOn(16, true);
                 row.setTied(16, true);                       // flag set but step 15 is off
                 expect(! row.tiedFrom(16), "a flag without a lit step before it is not drawn as a tie");
+            }
+
+            beginTest("clampPage: a page a shorter row took away falls back to the last page, never below the first");
+            {
+                expectEquals(mu_on::clampPage(0, 1), 0);
+                expectEquals(mu_on::clampPage(3, 1), 0);      // Length cut to one page
+                expectEquals(mu_on::clampPage(3, 2), 1);      // cut to two pages: the last one
+                expectEquals(mu_on::clampPage(2, 4), 2);      // still valid: unchanged
+                expectEquals(mu_on::clampPage(-1, 4), 0);
+                expectEquals(mu_on::clampPage(0, 0), 0);      // a row never reports fewer than one page
+                StepRow row;
+                row.setNumSteps(64);
+                expectEquals(mu_on::clampPage(3, row.numPages()), 3);
+                row.setNumSteps(20);
+                expectEquals(mu_on::clampPage(3, row.numPages()), 1);   // the page the Length edit took away
+            }
+
+            beginTest("clampStep: the selection never points past the Length (the Step panel edits only visible steps)");
+            {
+                expectEquals(mu_on::clampStep(40, 16), 15);
+                expectEquals(mu_on::clampStep(15, 16), 15);
+                expectEquals(mu_on::clampStep(3, 16), 3);
+                expectEquals(mu_on::clampStep(-2, 16), 0);
+                expectEquals(mu_on::clampStep(5, 0), 0);
+                StepRow longRow;
+                longRow.setNumSteps(64);
+                StepRow shortRow;                             // a 16-step preset swapped in
+                longRow.deserialise(shortRow.serialise(0));
+                expectEquals(mu_on::clampStep(60, longRow.numSteps()), 15);
             }
 
             beginTest("A tie across the page edge survives a save and load");

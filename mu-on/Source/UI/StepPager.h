@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Sequencer/StepRow.h"
 #include "UI/Components/NudgeInput.h"
+#include "UI/StepPaging.h"
 
 #include <functional>
 

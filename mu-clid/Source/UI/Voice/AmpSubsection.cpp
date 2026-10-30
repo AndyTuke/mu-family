@@ -1,4 +1,5 @@
 #include "AmpSubsection.h"
+#include "RhythmParamCache.h"
 #include "UI/RhythmHost.h"
 #include "ValueFormat.h"   // mu-core: shared value text
 #include "Modulation/ModulationSnapshot.h"
@@ -33,15 +34,7 @@ AmpSubsection::AmpSubsection(RhythmHost& h) : host(h)
 
 void AmpSubsection::apvtsSet(const char* suffix, float v)
 {
-    if (rhythmIndex < 0) return;
-    auto it = paramPtrCache.find(suffix);
-    if (it == paramPtrCache.end())
-    {
-        const auto id = "r" + juce::String(rhythmIndex) + "_" + suffix;
-        it = paramPtrCache.emplace(suffix, host.getRhythmParameters().getParameter(id)).first;
-    }
-    if (auto* p = it->second)
-        p->setValueNotifyingHost(p->convertTo0to1(v));
+    setRhythmParamCached(host.getRhythmParameters(), rhythmIndex, paramPtrCache, suffix, v);
 }
 
 void AmpSubsection::wireCallbacks()
@@ -159,8 +152,7 @@ void AmpSubsection::wireCallbacks()
 
     auto writeChannelSend = [this](const char* suffix, double v) {
         if (rhythmIndex < 0) return;
-        if (auto* p = host.getRhythmParameters().getParameter("ch" + juce::String(rhythmIndex) + "_" + suffix))
-            p->setValueNotifyingHost(p->convertTo0to1((float)v));
+        mu_core::setParameterActual(host.getRhythmParameters().getParameter("ch" + juce::String(rhythmIndex) + "_" + suffix), (float)v);
     };
     ampSendEff.onValueChanged = [writeChannelSend](double v) { writeChannelSend("sendEff", v); };
     ampSendDly.onValueChanged = [writeChannelSend](double v) { writeChannelSend("sendDly", v); };

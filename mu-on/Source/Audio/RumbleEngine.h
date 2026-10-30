@@ -101,6 +101,7 @@ public:
     {
         const int ch = juce::jmin(2, juce::jmin(out.getNumChannels(), in.getNumChannels()));
         if (ch <= 0 || n <= 0) return;
+        jassert(n <= maxBlockSize);   // the driver chunks to the prepared size; anything beyond it would be dropped silently
         const int ns = juce::jmin(n, maxBlockSize);
 
         // Tail bookkeeping: a real feed keeps the tail budget full; silence spends it, and the

@@ -7,6 +7,7 @@
 #include "Sequencer/RetireTail.h"       // mu-core: mu_core::ParamBinding
 #include "Audio/InsertProcessor.h"      // mu-core: shared per-voice insert FX
 #include "Modulation/MuToniModDest.h"   // isValidModDest, the modulation target table
+#include "Modulation/LastResolved.h"  // mu-core: hold-last-value on a matrix-lock miss
 #include "Modulation/StripMods.h"   // mu-core: the sends as modulation targets
 #include "Persistence/ArpParams.h"      // the Arp type's parameter table (vpi)
 
@@ -123,9 +124,8 @@ private:
     std::array<juce::NormalisableRange<float>, kNumModDests>  modDestRanges {};
     std::unordered_map<std::string_view, float>               modParamValues;
     LiveValues                                                modLive;
-    std::array<float, kNumModDests>                           lastResolved {};
+    mu_mod::LastResolved<kNumModDests>                        lastResolved;   // hold-last-value on a matrix-lock miss (C12)
     mu_mod::StripMods                                         stripMod;   // the modulated pan and FX sends, for the mixer strip   // the last block's out[] (C12)
-    bool                                                      haveResolved = false;
 
     juce::AudioBuffer<float> tailScratch;   // a tail that must add rather than write renders here (sized at prepare)
 

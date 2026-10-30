@@ -88,21 +88,10 @@ public:
     // The bank index of a wavetable file: found by path, else decoded OFF the lock (file read, WAV decode and FFT
     // mip build are the slow part) and appended under it for microseconds, so an import never silences the render
     // for the decode. -1 when unreadable. Message thread.
-    // rt-ok-fn: message thread; the audio thread reads the bank through BankTryLock, never the blocking engineLock/bankLock
     int bankIndexFor(const juce::File& file)
     {
         assertMessageThread();
-        const juce::String path = file.getFullPathName();
-        {
-            const juce::ScopedLock sl(bankLock);   // the lookup walks the table list an append may reallocate
-            if (const int found = bank.findByPath(path); found >= 0) return found;
-        }
-        auto wt = bank.decodeFile(file);
-        if (wt.frames <= 0) return -1;
-
-        const juce::ScopedLock sl(bankLock);   // the append must exclude the audio thread
-        if (const int found = bank.findByPath(path); found >= 0) return found;   // loaded meanwhile
-        return bank.appendTable(std::move(wt));
+        return bank.indexForFile(file, bankLock);
     }
 
     // A saved wavetable path as a bank index (-1: none, or the file is gone). Lock-free lookup first: a staged load

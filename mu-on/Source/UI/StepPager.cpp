@@ -34,7 +34,7 @@ void StepPager::setPage(int p)
 void StepPager::refresh()
 {
     const int pages = pageCount ? juce::jmax(1, pageCount()) : 1;
-    currentPage = juce::jlimit(0, pages - 1, currentPage);   // a row that got shorter may have taken its page away
+    currentPage = clampPage(currentPage, pages);   // a row that got shorter may have taken its page away
     pageLabel.setText("Page " + juce::String(currentPage + 1) + " / " + juce::String(pages), juce::dontSendNotification);
     prevButton.setEnabled(currentPage > 0);
     nextButton.setEnabled(currentPage < pages - 1);

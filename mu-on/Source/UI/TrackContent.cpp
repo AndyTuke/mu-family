@@ -1,5 +1,6 @@
 #include "Audio/ChordVoicing.h"   // the chord list and note names
 #include "TrackContent.h"
+#include "UI/StepPaging.h"
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 
 #include <limits>
@@ -418,9 +419,9 @@ void TrackContent::refreshStepPanel()
     const auto& row = host.getTrack(currentLayer).row;
     // A shorter Length or a different preset can leave the selection past the row's end: pull it back to the last step.
     int& selected = selectedStepOf[(size_t) currentLayer];
-    if (selected > row.numSteps() - 1)
+    if (const int clamped = mu_on::clampStep(selected, row.numSteps()); clamped != selected)
     {
-        selected = row.numSteps() - 1;
+        selected = clamped;
         rows.setSelectedStep(selected);
         soloRow.setSelectedStep(selected);
     }

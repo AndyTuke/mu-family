@@ -79,13 +79,7 @@ void Arp::readParams(double modBeat) noexcept
 
     // A block that misses the matrix lock (the message thread is editing this layer's modulators) holds the
     // last resolved values, so no target snaps back to its unmodulated knob for a block (C12).
-    if (resolved || ! haveResolved)
-    {
-        std::copy(out, out + kNumModDests, lastResolved.begin());
-        haveResolved = haveResolved || resolved;
-    }
-    else
-        std::copy(lastResolved.begin(), lastResolved.end(), out);
+    lastResolved.apply(resolved, out);
 
     stripMod.publish(out[D_pan], out[D_sendEff], out[D_sendDly], out[D_sendRev]);   // the host gives these to the layer's mixer strip
 
