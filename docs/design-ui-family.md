@@ -130,7 +130,7 @@ Three states: **General** (default), **Positive** (confirmation/on), **Warning**
 
 ## 4. Typography
 
-One bundled family typeface (see [Visual polish P1](#p1-one-bundled-typeface); the system default font is used until it lands).
+Decided 2026-10-30 (Andy): Inter for UI text, JetBrains Mono for LCD and monospaced readouts, both OFL 1.1, bundled in mu-core (see [Visual polish P1](#p1-one-bundled-typeface); the system default font is used until it lands).
 
 | Context | Size | Colour token |
 |---|---|---|
@@ -878,13 +878,12 @@ Six family-wide polish items approved by Andy. All are shared code in `mu-core`,
 
 ### P1. One bundled typeface
 
-- **Decision:** the family draws all text in one typeface embedded in `mu-core` (a proportional face plus a monospaced face with tabular digits for LCD readouts and value columns), so Windows, Linux and the DAW host show identical text. Today every font is `juce::FontOptions` with the system default (`MuLookAndFeel.cpp` about lines 269, 653, 1001, 1109, 1180, 1274, 1324) and the LCD face is `Font::getDefaultMonospacedFontName()` (about line 1070).
-- **Spec:** font files in `mu-core/UI/Fonts/` (TTF, one regular, one bold, one mono), compiled with `juce_add_binary_data` into a mu-core resource library. One accessor in `MuLookAndFeel` (`MuLookAndFeel::uiFont(height, bold)` and `lcdFont(height)`, using `Typeface::createSystemTypefaceFor` once, cached) is the only place a typeface is chosen; `lcdFont` already exists and keeps its name. All `FontOptions{}.withHeight(...)` calls route through it; no other file names a font. Sizes stay the tokens of section 4 (`kEngravedCaptionFont`, `kCardTextFont`, `kKnobLabelFont`, ...) and scale with `sf()`. Licence must allow redistribution inside a commercial plugin (SIL OFL 1.1 or similar); the notice goes in [THIRD_PARTY_NOTICES.txt](../THIRD_PARTY_NOTICES.txt) with the licence text, like the other credits. Changing section 4's "No external typeface dependency" line: now superseded by this section.
-- **Candidates (my recommendation first; Andy decides):**
-  1. **Inter** (+ **JetBrains Mono** for readouts). OFL 1.1 both. Designed for screens at 9 to 13 px, large x-height, clear numerals, tabular-figure feature; matches the small knob and status text best. **Recommended.**
-  2. **IBM Plex Sans** (+ **Plex Mono**). OFL 1.1. Slightly more engineered/industrial character that suits the metal look; a little wider, so labels may need checking against the "everything fits" rule.
-  3. **Roboto** (+ **Roboto Mono**). Apache 2.0. Familiar, compact; less distinctive.
-  4. **Source Sans 3** (+ **Source Code Pro**). OFL 1.1. Narrow and economical for tight rows; lighter at small sizes.
+- **Decision (DECIDED, Andy, 2026-10-30): Inter for all UI text, JetBrains Mono for LCD and monospaced readouts; both SIL OFL 1.1.** The family draws all text in these two faces embedded in `mu-core`, so Windows, Linux and the DAW host show identical text. Today every font is `juce::FontOptions` with the system default (`MuLookAndFeel.cpp` about lines 269, 653, 1001, 1109, 1180, 1274, 1324) and the LCD face is `Font::getDefaultMonospacedFontName()` (about line 1070).
+- **Spec:** font files in `mu-core/UI/Fonts/` (static TTF instances: Inter Regular, Medium and Bold; JetBrains Mono Regular and Bold; no other weights, for binary size), compiled with `juce_add_binary_data` into a mu-core resource library. One accessor in `MuLookAndFeel` (`MuLookAndFeel::uiFont(height, bold)` and `lcdFont(height)`, using `Typeface::createSystemTypefaceFor` once, cached) is the only place a typeface is chosen; `lcdFont` already exists and keeps its name. All `FontOptions{}.withHeight(...)` calls route through it; no other file names a font. Sizes stay the tokens of section 4 (`kEngravedCaptionFont`, `kCardTextFont`, `kKnobLabelFont`, ...) and scale with `sf()`. Section 4's "No external typeface dependency" line is superseded by this section.
+- **Licence obligations (OFL 1.1):** ship the full OFL text and each font's copyright notice in [THIRD_PARTY_NOTICES.txt](../THIRD_PARTY_NOTICES.txt), and credit both fonts in the About overlay credits like the other third-party items. Reserved Font Names apply: never rename-and-modify the fonts (subsetting or editing them would need a new name, so embed the unmodified upstream files). Fonts may not be sold on their own; bundling inside the plugin is allowed.
+- **Weights and format:** prefer static instances over a variable font, because JUCE's `Typeface::createSystemTypefaceFor` handling of variable fonts is unconfirmed (verify on the build PC; if a variable file loads with correct weights it may replace the static ones). Each weight is one embedded file and one accessor case.
+- **Numerals:** Inter's tabular figures are an OpenType feature (`tnum`) and JUCE's Font API may not expose OpenType features (verify on the build PC). Do not depend on it: every column of changing numbers (LCD readouts, tempo, position, dB, value columns) uses JetBrains Mono, which is already fixed-width. Inter is used for numbers only where they do not change in place (labels, names).
+- **Considered, not chosen:** IBM Plex Sans + Plex Mono (OFL, wider), Roboto + Roboto Mono (Apache 2.0, less distinctive), Source Sans 3 + Source Code Pro (OFL, lighter at small sizes).
 - **Do not:** ship a font whose licence forbids embedding; fall back per platform; hardcode a font name outside the accessor; bundle more than regular, bold and mono (binary size). Re-check every fixed-width label (name plates, `namePlateWidth`, dropdowns) after the swap: text widths change, the "everything fits" rule (section 5) still decides.
 
 ### P2. Sharp on high-DPI displays
@@ -940,7 +939,7 @@ P2 (find out whether the images are already sharp; it defines `PixelCache`), the
 
 ## Design rulings
 
-- 2026-10-30 - Six visual-polish items approved by Andy (bundled typeface, high-DPI bitmaps, motion, cached static layers, cached shadows, SVG assets): rulings written, font choice pending Andy. Added the "Visual polish" section; section 4 no-external-typeface line superseded by P1.
+- 2026-10-30 - Six visual-polish items approved by Andy (bundled typeface, high-DPI bitmaps, motion, cached static layers, cached shadows, SVG assets): rulings written; font decided by Andy the same day: Inter + JetBrains Mono. Added the "Visual polish" section; section 4 no-external-typeface line superseded by P1.
 
 - 2026-10-21 - Layer type name plate in the mu-Tronic header: short tag or full name (Andy)? Full product name with the real Greek mu (U+03BC): `μ-Clid`, `μ-Tant`, `μ-Toni`, `μ-On` (all mu-On engines show `μ-On`); registry `typeTag` is UTF-8, read with `String::fromUTF8`. Width stays `namePlateWidth(text, kNamePlateH)`: widest plate about 50 px, about 56 px with its gap, preset dropdown keeps about 545 px at Medium against an 80 px floor; no token change. Changed mu-tronic/design-ui.md section 1 (Type), 4.4, 4.5a.
 
