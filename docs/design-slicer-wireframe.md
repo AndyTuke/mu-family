@@ -12,7 +12,7 @@ Follows [design-plugin-family.md](design-plugin-family.md) and [design-ui-family
 
 - **Shell (shared, from `EditorShellBase`):** TransportBar, StatusBar, About / Save / Preset overlays, `MuLookAndFeel`, metal style.
 - **Mixer, FX and modulation (shared):** the same mu-family mixer, FX rack and modulation section as every other product, all from `mu-core`. The product adds only its modulation targets, as one `mu_mod::ModTarget` table (filter cutoff, pitch, gain, pan, tempo-match amount and so on; rules in [design-plugin-family.md](design-plugin-family.md#modulation-targets--family-standard)). Every knob that is a row of that table shows the live modulation arc.
-- **Layers:** one layer is one loop with its slices and its own placement lane set. Sidebar, add / delete / reorder, mixer strip and FX rack come from `mu-core` like the other products.
+- **Layers:** 8 layers as in every product; one layer is one loop with its slices, one sample player and one row of placed slices. Sidebar, add / delete / reorder, mixer strip and FX rack come from `mu-core` like the other products.
 - **Engine ★:** a slice player (a `SamplePlayer` per voice, each slice with its own start, end, gain, pitch, reverse, fade, filter and envelopes), plus an optional tempo-match stage.
 - **Sequencer ★:** a timeline (not a 16-step grid): slices placed as blocks on a beat grid.
 - **Transient detection ★:** an analysis step run on a worker thread when the loop is loaded or a detection control changes; the result is a list of slice points stored in the layer's state.
@@ -48,10 +48,8 @@ Follows [design-plugin-family.md](design-plugin-family.md) and [design-ui-family
 │            │  TIMELINE ★   Length [ 4 ] bars   Grid [1/16 ▾]   (Alt = no snap)   Zoom ─●─      │
 │            │  ┌────────────────────────────────────────────────────────────────────────────┐  │
 │            │  │ 1       2       3       4       5       6       7       8     ← time ruler  │  │
-│            │  │ Lane A │▐1█▌│▐2█▌│     │▐3█▌│▐1█▌│▐2█▌│▐4█▌│  │▐5█▌│▐6▌ │▐7█▌│▐8█▌│       │  │
-│            │  │ Lane B │      │▐5▌│          │  ▐9▌│          │▐9▌│            │▐12▌│     │  │
-│            │  │ Lane C │          (edges grabbable: ◄▐ block ▌►)       drag background = scroll │  │
-│            │  │ Lanes D–H: 8 lanes in all; the lane area scrolls vertically past 3 visible    │  │
+│            │  │ ▐1█▌│▐2█▌│     │▐3█▌│▐1█▌│▐2█▌│▐4█▌│  │▐5█▌│▐6▌ │▐7█▌│▐8█▌│     single row  │  │
+│            │  │ (edges grabbable: ◄▐ block ▌►)            drag background = scroll          │  │
 │            │  └────────────────────────────────────────────────────────────────────────────┘  │
 │            │  [Original order]  [Randomise]  [Clear]            playhead ▼ follows transport  │
 ├────────────┴─────────────────────────────────────────────────────────────────────────────────┤
@@ -107,14 +105,14 @@ A panel showing the current (selected) slice, built from shared knobs and the fa
 These are plain per-slice values (see the persistence note). Slice settings that are in the `ModTarget` table show the live modulation arc.
 
 ### Timeline ★
-- **Lanes:** 8 lanes (Andy, 2026-10-30, the family's usual eight) so slices can overlap (a hat slice over a kick slice). All lanes play together into the layer's voice pool. **Ruling: the mixer strip belongs to the layer, as in mu-On and mu-Clid (one strip per layer, 8 layers); lanes are timeline rows and have no strips of their own.** A lane has a mute and solo toggle only. Three lanes are visible at once and the lane area scrolls vertically; sizes come from `MuLookAndFeel`, no per-product row constant. Per-lane output or strip would need an architecture ruling (it breaks the one-strip-per-layer mixer).
+- **One row per layer** (Andy, 2026-10-30): each of the 8 layers has one mixer strip, FX sends and modulation, exactly one loop and one sample player. Its timeline is a single row of slice blocks played by that one player; there are no lanes. To layer sounds, use another layer. Overlap versus monophonic playback within a layer is an open question (default: monophonic, the next slice cuts the previous one through the short automatic fade).
 - **Length:** adjustable, 1 to 64 bars (the Length control). The timeline is **drag-scrollable** (drag the background, or wheel) and zoomable when longer than the view, and keeps its playhead in view while following the transport.
-- **Time ruler:** a ruler along the top shows bars and beats (and finer ticks as it is zoomed in); it scrolls and zooms with the lanes.
-- **Placing slices:** (a) click an empty cell to place the selected slice, (b) drag a pad or a slice region from the sample window onto a lane.
+- **Time ruler:** a ruler along the top shows bars and beats (and finer ticks as it is zoomed in); it scrolls and zooms with the row.
+- **Placing slices:** (a) click an empty cell to place the selected slice, (b) drag a pad or a slice region from the sample window onto the row.
 - **Snap:** drops snap to the **Grid** value (1/32 to 1/4, plus Off). **Holding Alt while dragging slides freely** (snap suspended); releasing Alt returns to the grid. The same rule applies to marker editing in the waveform and to block edges.
 - **Block edges:** a placed block's left and right edges can be grabbed with a held mouse click: dragging the right edge extends or trims the end (extending loops or holds per the slice's Play mode; trimming is an early stop), dragging the left edge trims or extends the start of the played part. Edge handles show on hover (resize cursor) and follow the same snap and Alt rules.
 - **Editing:** drag a block to move it; Alt is reserved for free sliding, so **Ctrl-drag copies**; Delete removes. Edits are staged and applied at a boundary like other products.
-- **Helpers:** *Original order* lays the slices out as they were in the source, *Randomise* shuffles them, *Clear* empties the lane.
+- **Helpers:** *Original order* lays the slices out as they were in the source, *Randomise* shuffles them, *Clear* empties the row.
 - **Playhead:** follows the transport; the timeline is internally clocked like the other products (mu-link and host sync as elsewhere).
 
 ### Tempo matching and time-stretch
@@ -129,7 +127,7 @@ These are plain per-slice values (see the persistence note). Slice settings that
 
 ## Layer vocabulary (decided by Andy, 2026-10-30; add to `design-naming.md` when scheduled)
 
-Product name **mu-Tilate**. The layer type is **`Phrase`** (not "Slice", because a slice is a section of the sample), layer preset **`.muPhrase`**, full preset **`.muTilate`**. A Phrase layer is one loop, its slices, its lanes and its timeline blocks.
+Product name **mu-Tilate**. The layer type is **`Phrase`** (not "Slice", because a slice is a section of the sample), layer preset **`.muPhrase`**, full preset **`.muTilate`**. A Phrase layer is one loop, its slices, one sample player and one row of timeline blocks.
 
 ## Formats
 
@@ -147,7 +145,7 @@ Andy: a Phrase layer must appear in mu-Tronic automatically. Per [docs/mu-tronic
 6. **Mirror rule** (mu-Tronic CLAUDE.md): any change to the shared timeline or waveform code must work in both hosts; never fix one only.
 
 **Needs an architecture ruling (`architecture-steward`) before scheduling:**
-- Layers sized to the product, not the host: a Phrase layer has 8 lanes and a sample, and mu-Tronic has 16 slots, so embedded loop memory and the per-layer sample cost across 16 slots need a budget.
+- Memory budget: every layer holds one loop, so the plugin can have up to 8 loops loaded and mu-Tronic up to 16 (one per slot). Decoded loop memory, and the size of embedded samples in saved state, need an explicit budget (maximum loop length or size, shared decode format).
 - The layer's embedded sample inside a mu-Tronic scene / preset (size of the saved state).
 - How the Phrase layer reads the host tempo under tempo matching in mu-Tronic's clock (including scenes), and the layer-owned worker thread for detection (one shared pool, not a thread per slot).
 - The Stretch engine's per-voice state in the pre-allocated layer budget (design-plugin-family real-time rules).
@@ -169,7 +167,7 @@ Following the one-framework direction, build these generically in `mu-core` rath
 
 ## Open questions for Andy
 
-Answered (2026-10-30): name **mu-Tilate**; time-stretch is a per-layer option (Off / Re-pitch / Stretch); layer type `Phrase` with `.muPhrase` and `.muTilate`; 8 lanes; no MIDI play; formats VST3 + CLAP + Standalone; automatic mu-Tronic integration (see above).
+Answered (2026-10-30): name **mu-Tilate**; time-stretch is a per-layer option (Off / Re-pitch / Stretch); layer type `Phrase` with `.muPhrase` and `.muTilate`; 8 layers with one loop and one sample player each (single-row timeline, no lanes); no MIDI play; formats VST3 + CLAP + Standalone; automatic mu-Tronic integration (see above).
 
-1. **One loop per layer, or several?** The wireframe has one loop per layer; a layer per loop keeps it consistent with the family.
+1. **Overlap or monophonic?** With one player per layer, can a slice's tail run into the next (overlap), or is each layer monophonic with the next slice cutting the previous one through the short automatic fade? Suggested default: monophonic with the declick fade. Andy's call.
 2. **Export:** a "Bounce to WAV" and "Export slices to a folder" fit the existing Bounce idea in design-future.md.
