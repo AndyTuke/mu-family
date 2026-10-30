@@ -1,20 +1,21 @@
-# Loop slicer: wireframe (working title, no product name yet)
+# mu-Tilate: loop slicer wireframe
 
-Status: **idea and first wireframe only** (Andy, 2026-10-29). Nothing is scheduled or built. It is listed under Unscheduled ideas in [design-future.md](design-future.md); ask before implementing.
+Status: **idea and first wireframe only** (Andy, 2026-10-29; named mu-Tilate and requirements added 2026-10-30). Nothing is scheduled or built. It is listed under Unscheduled ideas in [design-future.md](design-future.md); ask before implementing.
 
 ## The idea
 
-Load a loop (usually a drum loop, but any audio). The product finds the transients and cuts the loop into slices. A sequencer then places those slices on a timeline, so the loop can be rearranged, repeated, reversed, thinned out or re-pitched.
+Load a loop (usually a drum loop, but any audio). The product finds the transients and cuts the loop into slices. A sequencer then places those slices on a timeline, so the loop can be rearranged, repeated, reversed, thinned out, re-pitched or matched to a new tempo.
 
 ## How it fits the family
 
-Follows [design-plugin-family.md](design-plugin-family.md) and [design-ui-family.md](design-ui-family.md): a new product links `mu-core` and supplies only its own engine, sequencer and content band. The wireframe below uses the standard shell and shared components; the product-specific parts are marked ★.
+Follows [design-plugin-family.md](design-plugin-family.md) and [design-ui-family.md](design-ui-family.md): a new product links `mu-core` and supplies only its own engine, sequencer and content band. The wireframe below uses the standard shell and shared components; the product-specific parts are marked ★. No per-product layout constants: sizes come from `MuLookAndFeel`, depth from `MuTheme::Lighting`, controls from the shared library (`KnobWithLabel`, `SegmentControl`, `DropdownSelect`, `NudgeInput`, `SlideSwitch`).
 
 - **Shell (shared, from `EditorShellBase`):** TransportBar, StatusBar, About / Save / Preset overlays, `MuLookAndFeel`, metal style.
+- **Mixer, FX and modulation (shared):** the same mu-family mixer, FX rack and modulation section as every other product, all from `mu-core`. The product adds only its modulation targets, as one `mu_mod::ModTarget` table (filter cutoff, pitch, gain, pan, tempo-match amount and so on; rules in [design-plugin-family.md](design-plugin-family.md#modulation-targets--family-standard)). Every knob that is a row of that table shows the live modulation arc.
 - **Layers:** one layer is one loop with its slices and its own placement lane set. Sidebar, add / delete / reorder, mixer strip and FX rack come from `mu-core` like the other products.
-- **Engine ★:** a slice player (a `SamplePlayer` per voice, each slice with its own start, end, gain, pitch, reverse, fade).
+- **Engine ★:** a slice player (a `SamplePlayer` per voice, each slice with its own start, end, gain, pitch, reverse, fade, filter and envelopes), plus an optional tempo-match stage.
 - **Sequencer ★:** a timeline (not a 16-step grid): slices placed as blocks on a beat grid.
-- **Transient detection ★:** an analysis step run when the loop is loaded or the sensitivity changes, off the audio thread; the result is a list of slice points stored in the layer's state.
+- **Transient detection ★:** an analysis step run on a worker thread when the loop is loaded or a detection control changes; the result is a list of slice points stored in the layer's state.
 
 ## Wireframe: main view
 
@@ -23,29 +24,34 @@ Follows [design-plugin-family.md](design-plugin-family.md) and [design-ui-family
 │ TRANSPORT  [▶] [■]  BPM 124.0  Loop 2 bars  Sync [Host|Int]  ·····  Preset ▾  Save  Mixer  ⚙ │  shared
 ├────────────┬─────────────────────────────────────────────────────────────────────────────────┤
 │ LAYERS     │  SOURCE ★                                                                        │
-│            │  [Load loop…]  amen_break.wav   2 bars · 4 beats/bar · detected 124.0 BPM  [Set] │
+│            │  [Load loop…]  amen_break.wav   2 bars · detected 124.0 BPM [Set]  Tempo [Off|Pitch|Stretch] │
 │ ▣ Break    │  ┌────────────────────────────────────────────────────────────────────────────┐  │
-│   (lamp)   │  │ ▏█▌ ▏  ▌█▏   ▏█▌ ▏   ▌▏█  ▏  ▌█▏   ▏█▌  ▏  ▌▏█   ▏  ▌█▏   ▏█▌ ▏  ▌█   │  │
-│ ▢ Perc     │  │ ┃1    ┃2     ┃3     ┃4    ┃5     ┃6    ┃7     ┃8     ┃9    ┃10    ┃11 ┃12 │  │
-│ ▢ Vocal    │  │ waveform, with a marker ┃ at every slice point (drag to move, double-click    │  │
-│            │  │ to add, right-click to delete); the beat grid is a faint line behind it     │  │
-│ [ + ]      │  └────────────────────────────────────────────────────────────────────────────┘  │
-│            │  Sensitivity (•)   Min gap (•)   Snap to grid [Off|1/16|1/8]   [Re-detect] [Even] │
-│            │  Slices: 12     Mode [Transients | Even divisions | Manual]                      │
+│   (lamp)   │  │░░░░░░░▒▒▒▒▒▒▒░░░░░░░▒▒▒▒▒▒░░░░░░░░▒▒▒▒▒▒▒░░░░░░  tinted regions alternate;   │  │
+│ ▢ Perc     │  │ ▏█▌ ▏  ▌█▏   ▏█▌ ▏   ▌▏█  ▏  ▌█▏   ▏█▌  ▏  ▌▏█   ▏  ▌█▏   ▏█▌ ▏  ▌█   │  │
+│ ▢ Vocal    │  │ ┃1    ┃2     ┃3     ┃4    ┃5     ┃6    ┃7     ┃8     ┃9    ┃10    ┃11 ┃12 │  │
+│            │  │ selected slice (5) is brighter; marker ┃ per slice point (drag to move,     │  │
+│ [ + ]      │  │ double-click adds, right-click deletes). Scroll = pan, Ctrl+wheel = zoom.   │  │
+│            │  └────────────────────────────────────────────────────────────────────────────┘  │
+│            │  ◄━━━━━━━━[ overview / scrollbar ]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━► Zoom ─●─ │
+│            │  Method [Transients|Soft-tonal|Even]  Sensitivity (•)  Min gap (•)  Pre-roll (•)  │
+│            │  Low-cut (•)  High-cut (•)   Snap [Off|1/16|1/8]   [Re-detect]   Slices: 12      │
 │            ├─────────────────────────────────────────────────────────────────────────────────┤
-│            │  SLICES ★                                    │ SLICE 5 (selected) ★              │
-│            │  ┌───┬───┬───┬───┬───┬───┬───┬───┐           │ Start ▏ 0.412 s  End ▏ 0.538 s    │
-│            │  │ 1 │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │  pads,    │ Gain (•)  Pitch (•)  Pan (•)      │
-│            │  ├───┼───┼───┼───┼───┼───┼───┼───┤  click to │ Fade in (•) Fade out (•)          │
-│            │  │ 9 │10 │11 │12 │   │   │   │   │  audition │ [Reverse] [Loop] [Choke group ▾]  │
-│            │  └───┴───┴───┴───┴───┴───┴───┴───┘           │ Play: [One-shot | Gate]           │
+│            │  SLICES ★                       │ SLICE PLAYER ★  slice 5 (selected)              │
+│            │  ┌───┬───┬───┬───┬───┬───┬───┬───┐ │ Start ▏0.412 s End ▏0.538 s  Fade in/out (•)(•) │
+│            │  │ 1 │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │ │ Gain (•) Pan (•) │ Pitch (•) Fine (•)         │
+│            │  ├───┼───┼───┼───┼───┼───┼───┼───┤ │ FILTER  Type ▾ Cutoff (•) Res (•) EnvAmt (•)   │
+│            │  │ 9 │10 │11 │12 │   │   │   │   │ │ AMP ENV    A (•) D (•) S (•) R (•)             │
+│            │  └───┴───┴───┴───┴───┴───┴───┴───┘ │ FILTER ENV A (•) D (•) S (•) R (•)             │
+│            │  drag a pad onto the timeline,     │ [Reverse] [Loop] [Choke ▾] Play [One-shot|Gate] │
+│            │  click to audition                 │                                                 │
 │            ├─────────────────────────────────────────────────────────────────────────────────┤
-│            │  TIMELINE ★                         Length [ 4 ] bars   Grid [1/16 ▾]   Zoom ─●─  │
-│            │       1       2       3       4       5       6       7       8                  │
+│            │  TIMELINE ★   Length [ 4 ] bars   Grid [1/16 ▾]   (Alt = no snap)   Zoom ─●─      │
 │            │  ┌────────────────────────────────────────────────────────────────────────────┐  │
-│            │  │ Lane A │▐1█▌│▐2█▌│     │▐3█▌│▐1█▌│▐2█▌│▐4█▌│  │▐5█▌│▐6▌ │▐7█▌│▐8█▌│          │  │
-│            │  │ Lane B │      │▐5▌│          │  ▐9▌│          │▐9▌│            │▐12▌│        │  │
-│            │  │ Lane C │                                                                   │  │
+│            │  │ 1       2       3       4       5       6       7       8     ← time ruler  │  │
+│            │  │ Lane A │▐1█▌│▐2█▌│     │▐3█▌│▐1█▌│▐2█▌│▐4█▌│  │▐5█▌│▐6▌ │▐7█▌│▐8█▌│       │  │
+│            │  │ Lane B │      │▐5▌│          │  ▐9▌│          │▐9▌│            │▐12▌│     │  │
+│            │  │ Lane C │          (edges grabbable: ◄▐ block ▌►)       drag background = scroll │  │
+│            │  │ Lanes D–H: 8 lanes in all; the lane area scrolls vertically past 3 visible    │  │
 │            │  └────────────────────────────────────────────────────────────────────────────┘  │
 │            │  [Original order]  [Randomise]  [Clear]            playhead ▼ follows transport  │
 ├────────────┴─────────────────────────────────────────────────────────────────────────────────┤
@@ -57,43 +63,113 @@ Follows [design-plugin-family.md](design-plugin-family.md) and [design-ui-family
 
 ### Source ★
 - **Load loop:** drag-and-drop or button; WAV first (AIFF, FLAC later, via the existing decoders).
-- **Length and tempo:** the loop's length in bars and the detected tempo are shown; `Set` lets the user correct them. The timeline's time base is beats, so the loop can follow the host tempo (the slices are re-timed by the sequencer, not stretched, unless Stretch is turned on later; see open questions).
-- **Waveform:** the shared waveform drawing, with slice markers on top. Markers are grabbable, snap to the grid when Snap is on, and are shown in the layer colour.
-- **Detection controls:** *Sensitivity* (how strong a transient must be), *Min gap* (no slices closer than this), *Mode* (Transients, Even divisions of N, or Manual with no analysis). *Re-detect* re-runs the analysis and keeps manually moved markers locked (a locked marker shows a small pin).
+- **Length and tempo:** the loop's length in bars and the detected tempo are shown; `Set` lets the user correct them. The timeline's time base is beats.
+- **Tempo matching (per layer):** *Off* (slices play at their recorded speed and are only re-timed by the sequencer), *Re-pitch* (varispeed: speed and pitch follow the ratio of host tempo to loop tempo) or *Stretch* (time-stretch with pitch preserved). Slice start and end are scaled by the tempo ratio so slices stay on the grid in every mode. See "Tempo matching and time-stretch" below.
+- **Waveform with highlighted slices:** the shared waveform drawing. The regions between detected transients are tinted in alternating strengths (two tints, so neighbours are always distinguishable) and the selected slice is emphasised (brighter tint plus the layer-colour outline). Tints come from `MuLookAndFeel` colour tokens at `MuTheme::Lighting` strengths, never literal alphas. Markers show in the layer colour.
+- **Scroll and zoom:** a long loop gets a scrollable and zoomable waveform. Mouse wheel scrolls, Ctrl+wheel (and the Zoom slider) zooms around the pointer, and an overview strip with a draggable window sits under the waveform. Zoom and scroll position are view state, not saved with the preset. The same pan / zoom behaviour is reused by the timeline, so it is built once as a shared component (see shared pieces below).
+- **Marker editing:** markers are grabbable, snap to the grid when Snap is on (hold Alt for free movement, as in the timeline), and a manually moved marker is **pinned** (shows a small pin) and survives *Re-detect*.
+
+### Transient detection ★
+
+**Research summary (to be re-checked at design time).**
+- *Detection function:* spectral flux (Bello et al. 2005, "A Tutorial on Onset Detection in Music Signals"; Dixon 2006, "Onset Detection Revisited") is the standard general-purpose choice. **SuperFlux** (Böck and Widmer 2013) adds a max-filter over the frequency axis and a lag, which suppresses false onsets from vibrato and tonal material. An optional cheap **energy-envelope** mode suits pure drum loops.
+- *Adaptive threshold:* a moving median or mean of the detection function plus an offset, so quiet and loud passages are judged relatively.
+- *Peak picking:* local maxima above the threshold, with a minimum gap between picks.
+- *Slice start:* placed slightly before the peak (pre-roll) and snapped to the nearest zero crossing, so the attack is kept and the cut does not click.
+
+**Controls** (all shared knobs / segment controls):
+- *Method:* Transients (spectral flux), Soft-tonal (SuperFlux), Even divisions of N (no analysis); manual editing is always available on top.
+- *Sensitivity:* the threshold offset.
+- *Min gap:* no slices closer than this.
+- *Low-cut / High-cut:* the frequency band the detector looks at (for example ignore sub bass, or listen to hats only).
+- *Pre-roll:* how far before the peak each slice starts.
+
+**Behaviour.**
+- Detection runs on a **worker thread** (never on the audio thread) when the loop loads or a control changes.
+- The **detection curve is cached**: moving Sensitivity (and Min gap) only re-picks peaks from the cached curve, so markers update live while the knob moves. Changing Method, band or loop re-computes the curve.
+- Manually moved or added markers are pinned and stay put on re-detect; auto markers are replaced.
+- **Implementation plan:** write the detector in-house on `juce::dsp::FFT` (about 200 lines), no new dependency.
 
 ### Slices ★
-- A pad grid, one pad per slice, numbered in time order. Clicking a pad auditions it; the selected pad's settings show on the right.
-- **Per-slice settings:** start and end, gain, pitch, pan, fade in and out, reverse, loop, choke group, one-shot or gate play. These are plain APVTS-backed values per slice (see the persistence note below).
-- MIDI: pads map to consecutive notes from a base note (default C1), so the slices can also be played live.
+- A pad grid, one pad per slice, numbered in time order. Clicking a pad auditions it and selects it; the selected pad's settings show in the slice player.
+- **Drag to sequence:** a pad (or a slice region in the waveform) can be dragged onto the timeline, in addition to placing the selected slice by clicking an empty timeline cell.
+- **No MIDI play** (Andy, 2026-10-30): there is no pad-to-note mapping and no live play. mu-Tilate is a self-driven sequencer; pads only audition on click.
+
+### Slice player ★
+A panel showing the current (selected) slice, built from shared knobs and the family colour coding, in this order:
+- **Slice:** start and end (NudgeInput, decimals), fade in and out, gain, pan.
+- **Pitch:** semitones and fine.
+- **Filter:** type, cutoff, resonance, envelope amount.
+- **Envelopes:** amp envelope (ADSR, amber `knobLevel` colour) and filter envelope (ADSR, filter colour), as in the other synth products.
+- **Play:** reverse, loop, choke group, one-shot or gate.
+- **Automatic declick:** every slice always gets a short fade in and out of a few milliseconds (a fixed minimum, set once in the engine, not shown as a control). The user's Fade in / Fade out values add on top of it, never below it. This avoids clicks at cut points, including slice ends cut by the next slice.
+
+These are plain per-slice values (see the persistence note). Slice settings that are in the `ModTarget` table show the live modulation arc.
 
 ### Timeline ★
-- **Lanes:** a few lanes (3 to start) so slices can overlap (a hat slice over a kick slice). All lanes play together into the layer's voice pool.
-- **Blocks:** each block is a slice placed at a beat position. A block's length is the slice's length (it can be shortened by dragging its right edge, which acts as an early stop).
-- **Editing:** click an empty cell to place the selected slice; drag to move; drag the edge to trim; Alt-drag to copy; Delete to remove. Grid sets the snap (1/32 to 1/4, plus Off).
-- **Length:** 1 to 16 bars (the timeline wraps like a mu-On row; paging, if needed, uses the shared pager).
+- **Lanes:** 8 lanes (Andy, 2026-10-30, the family's usual eight) so slices can overlap (a hat slice over a kick slice). All lanes play together into the layer's voice pool. **Ruling: the mixer strip belongs to the layer, as in mu-On and mu-Clid (one strip per layer, 8 layers); lanes are timeline rows and have no strips of their own.** A lane has a mute and solo toggle only. Three lanes are visible at once and the lane area scrolls vertically; sizes come from `MuLookAndFeel`, no per-product row constant. Per-lane output or strip would need an architecture ruling (it breaks the one-strip-per-layer mixer).
+- **Length:** adjustable, 1 to 64 bars (the Length control). The timeline is **drag-scrollable** (drag the background, or wheel) and zoomable when longer than the view, and keeps its playhead in view while following the transport.
+- **Time ruler:** a ruler along the top shows bars and beats (and finer ticks as it is zoomed in); it scrolls and zooms with the lanes.
+- **Placing slices:** (a) click an empty cell to place the selected slice, (b) drag a pad or a slice region from the sample window onto a lane.
+- **Snap:** drops snap to the **Grid** value (1/32 to 1/4, plus Off). **Holding Alt while dragging slides freely** (snap suspended); releasing Alt returns to the grid. The same rule applies to marker editing in the waveform and to block edges.
+- **Block edges:** a placed block's left and right edges can be grabbed with a held mouse click: dragging the right edge extends or trims the end (extending loops or holds per the slice's Play mode; trimming is an early stop), dragging the left edge trims or extends the start of the played part. Edge handles show on hover (resize cursor) and follow the same snap and Alt rules.
+- **Editing:** drag a block to move it; Alt is reserved for free sliding, so **Ctrl-drag copies**; Delete removes. Edits are staged and applied at a boundary like other products.
 - **Helpers:** *Original order* lays the slices out as they were in the source, *Randomise* shuffles them, *Clear* empties the lane.
 - **Playhead:** follows the transport; the timeline is internally clocked like the other products (mu-link and host sync as elsewhere).
 
-## Proposed layer vocabulary (to confirm with `design-naming.md`)
+### Tempo matching and time-stretch
+- **Modes (per layer):** Off, Re-pitch (varispeed, cheap, pitch moves with tempo), Stretch (pitch preserved).
+- **Library candidates for Stretch:**
+  - **Signalsmith Stretch** (MIT, header-only): the preferred candidate; same author as the Signalsmith reverb already cited in code comments.
+  - Rubber Band: GPL or paid commercial licence, a licence problem for a closed product; not a candidate unless the licence terms change.
+  - SoundTouch: LGPL, and weaker on drums.
+  - **The licence must be re-confirmed before any library is adopted.**
+- **Scaling:** whatever the mode, slice start / end positions are multiplied by the tempo ratio so slices remain on the grid. For Stretch, each slice is stretched as its own short segment (transient preserved) rather than the whole loop being stretched once, which keeps drum attacks sharp; to be proven in a prototype.
+- **Real time:** Stretch runs per voice on the audio thread only with preallocated state (no allocation in `processBlock`); the `dsp-controller` reviews it before adoption.
 
-Layer type name and file extensions are not chosen. Following the existing pattern (per-layer preset = camelCase noun, full preset = product name camelCase), something like `Slicer` layers with a `.muSlices` layer preset. **The product name and these extensions are Andy's decision.**
+## Layer vocabulary (decided by Andy, 2026-10-30; add to `design-naming.md` when scheduled)
+
+Product name **mu-Tilate**. The layer type is **`Phrase`** (not "Slice", because a slice is a section of the sample), layer preset **`.muPhrase`**, full preset **`.muTilate`**. A Phrase layer is one loop, its slices, its lanes and its timeline blocks.
+
+## Formats
+
+VST3 + CLAP + Standalone, like mu-Clid, mu-Tant, mu-Toni and mu-On.
+
+## mu-Tronic integration (automatic)
+
+Andy: a Phrase layer must appear in mu-Tronic automatically. Per [docs/mu-tronic/design.md](mu-tronic/design.md) and [mu-tronic/CLAUDE.md](../mu-tronic/CLAUDE.md), mu-Tronic hosts other products' layers as static libraries compiled in and registered in its layer-type registry. "Automatic" therefore means the product is built so that adding it to mu-Tronic is a registry entry and nothing else:
+
+1. **A `mu-tilate-layer` library** holding the engine, sequencer, persistence and the layer's own UI panels, built exactly like `mu-clid-layer`, `mu-tant-layer`, `mu-toni-layer` and `mu-on-layer`; it never includes `Plugin/` or `License/` (`check-layer-boundary.ps1`). The plugin and the mu-Tronic slot are two hosts of the same `Layer` class.
+2. **One registry entry:** a `LayerTypeInfo` row for `Phrase` (group "mu-Tilate", display name "Phrase", parameter prefix, `.muPhrase` extension, `create`), registered in mu-Tronic's `LayerTypes.cpp`. A type is offered in the chooser only if registered in the build.
+3. **A `LayerTypeId::Phrase` value** in `mu-core` (naming the family's types in `mu-core` is the existing ruling in the mu-Tronic design, section 2.5), saved by name.
+4. **Shared preset format:** a `.muPhrase` saved by mu-Tilate loads into a mu-Tronic Phrase slot and back; type inference reads the extension.
+5. **No per-product UI in the host:** the host supplies shell, sidebar, mixer, FX and modulators; the Phrase panels (source waveform, slice player, timeline) are the layer's own components, shown in the host's content band like the other layer types.
+6. **Mirror rule** (mu-Tronic CLAUDE.md): any change to the shared timeline or waveform code must work in both hosts; never fix one only.
+
+**Needs an architecture ruling (`architecture-steward`) before scheduling:**
+- Layers sized to the product, not the host: a Phrase layer has 8 lanes and a sample, and mu-Tronic has 16 slots, so embedded loop memory and the per-layer sample cost across 16 slots need a budget.
+- The layer's embedded sample inside a mu-Tronic scene / preset (size of the saved state).
+- How the Phrase layer reads the host tempo under tempo matching in mu-Tronic's clock (including scenes), and the layer-owned worker thread for detection (one shared pool, not a thread per slot).
+- The Stretch engine's per-voice state in the pre-allocated layer budget (design-plugin-family real-time rules).
+- Whether mu-Tronic's step-row mirror rule needs extending to the Phrase timeline.
 
 ## Persistence note
 
-Per-slice values do not fit one APVTS parameter each (the number of slices varies, up to a maximum). Keep the slice list, as the mu-On step rows do, as ValueTree children of the layer node: start and end in samples, plus the slice settings. The timeline blocks are saved the same way. Everything the user can change is saved with the preset; the loop itself is either embedded or stored by path, following the mu-Clid embedded-sample approach (with the path-safety rules from the audit fix).
+Per-slice values do not fit one APVTS parameter each (the number of slices varies, up to a maximum). Keep the slice list, as the mu-On step rows do, as ValueTree children of the layer node: start and end in samples, plus the slice settings (including the filter and envelope values) and the pin flag for manual markers. The timeline blocks are saved the same way. Detection settings and the tempo-match mode are layer parameters in APVTS. Everything the user can change is saved with the preset; the loop itself is either embedded or stored by path, following the mu-Clid embedded-sample approach (with the path-safety rules from the audit fix).
 
 ## Real-time and engine notes
 
-- Transient analysis (onset detection, e.g. spectral flux or an energy-envelope detector with a peak-picking threshold) runs on the message or a worker thread when the loop loads or Sensitivity changes; never on the audio thread. The audio thread only reads the finished slice list.
-- Slice playback reuses `SamplePlayer` and the shared retire-tail mechanism (so a slice that is cut off by the next one fades, no click).
+- Transient analysis (detection function, cache and peak picking, above) runs on a worker thread; never on the audio thread. The audio thread only reads the finished slice list.
+- Slice playback reuses `SamplePlayer` and the shared retire-tail mechanism (so a slice that is cut off by the next one fades, no click), on top of the automatic few-millisecond declick fade.
 - Boundary edits (moving a marker while playing) use the same hot-swap approach as other products: staged on the message thread, applied at a loop boundary.
+
+## Shared pieces this suggests (for `mu-core`, not per-product)
+
+Following the one-framework direction, build these generically in `mu-core` rather than inside mu-Tilate: a **zoomable, scrollable waveform view with region tints and markers**, a **time ruler**, and a **drag-scroll / zoom viewport** helper (the timeline reuses it). A drag-and-drop payload for "slice onto timeline" stays product-side. A coded `ux-controller` ruling is needed on the exact tint tokens when this is scheduled.
 
 ## Open questions for Andy
 
-1. **Name** and the layer / file extension.
-2. **Time-stretch:** should the product follow a different host tempo by re-timing slices only (classic slice-and-rearrange), or also stretch each slice to keep its pitch? Re-timing only is the simpler first version.
-3. **Lanes:** how many lanes to start with, and whether each lane gets its own output / mixer strip.
-4. **One loop per layer, or several?** The wireframe has one loop per layer; a layer per loop keeps it consistent with the family.
-5. **Live play:** pads / MIDI note mapping in the first version, or timeline only?
-6. **Export:** a "Bounce to WAV" and "Export slices to a folder" fit the existing Bounce idea in design-future.md.
-7. **Plugin formats:** VST3 + CLAP + Standalone like the others, or Standalone first?
+Answered (2026-10-30): name **mu-Tilate**; time-stretch is a per-layer option (Off / Re-pitch / Stretch); layer type `Phrase` with `.muPhrase` and `.muTilate`; 8 lanes; no MIDI play; formats VST3 + CLAP + Standalone; automatic mu-Tronic integration (see above).
+
+1. **One loop per layer, or several?** The wireframe has one loop per layer; a layer per loop keeps it consistent with the family.
+2. **Export:** a "Bounce to WAV" and "Export slices to a folder" fit the existing Bounce idea in design-future.md.
