@@ -44,6 +44,7 @@ Each product's layer is a subclass of `Layer`, named for what that product's lay
 | mu-Tant | `Pattern` | gate / filter / pitch patterns, wavetable |
 | mu-Toni | `Arp` | scale / chord pool, scan, accent pattern |
 | mu-On | `Track` | step rows, lane engine selection |
+| mu-Tilate (planned) | `Phrase` | one loop, its slices, one sample player, one timeline row |
 
 Notes on these names:
 
@@ -60,6 +61,7 @@ Notes on these names:
   same `Rhythm` layer type and `.muRhythm` extension as mu-Clid, because both use one shared class in
   `mu-core`. This is the single named exception to "layer type names are unique"; see
   [design-plugin-family.md](design-plugin-family.md#the-midi-effect-product-the-former-mu-clid-lite--ruled-2026-10-11).
+- **mu-Tilate is `Phrase`** (Andy, 2026-10-30; planned, nothing built). Not "Slice": a slice is a section of the sample, and a Phrase layer contains several. Layer preset `.muPhrase`, full preset `.muTilate`. Details in "mu-Tilate (planned)" below.
 - **mu-On is `Track`** (owner); its extension is already `.muTrack`. The code mixes lane / channel /
   track today and collapses to Track.
 
@@ -110,7 +112,7 @@ edits](design-plugin-family.md#layer-ownership-and-structural-edits--family-stan
 ## 3. Rules
 
 ### Namespaces
-- Every product type lives in `mu_<product>` (`mu_tant`, `mu_toni`, `mu_on`, `mu_clid`). All four comply
+- Every product type lives in `mu_<product>` (`mu_tant`, `mu_toni`, `mu_on`, `mu_clid`; `mu_tilate` when built). All four comply
   (mu-Clid since build 1190); only `createPluginFilter()` and `StandaloneApp.cpp` glue stay global.
 - Product helpers that were once namespaced by area nest in the product namespace (`mu_clid::migrate`,
   `mu_clid::md`, `mu_clid::ModDest`).
@@ -196,6 +198,27 @@ names. They are modal pop-ups, not `OverlayHost` screens, so the `Overlay` role 
 - Capacity constants come from `mu_limits` (`kMaxLayers`); a product does not redeclare them.
 - Acronyms: caps in **type** names (`FXChain`, `LFOEditor`, `VUMeter`); word-case in functions and
   variables (`startFxParamSync`, `bindStripToApvts`, `getBpm`, `Midi…`).
+
+### mu-Tilate (planned, names decided 2026-10-30; nothing built)
+
+Design: [mu-tilate/design.md](mu-tilate/design.md). Names follow the pattern of the other products; rows marked "proposed" are not saved data until the product is built and may still change.
+
+| Name | Value |
+|---|---|
+| Product, display name | mu-Tilate |
+| Folder, CMake target, slug | `mu-tilate/`, `mu-tilate` (targets `mu-tilate_VST3`, `_CLAP`, `_Standalone`) |
+| Namespace | `mu_tilate` |
+| Layer type, class | `Phrase` (`mu_tilate::Phrase`, derived from `Layer`) |
+| Layer preset / full preset | `.muPhrase` / `.muTilate` |
+| Layer library | `mu-tilate-layer` (INTERFACE; UI sources `MU_TILATE_LAYER_UI_SOURCES`); tests `mu-tilate-tests`, `mu-tilate-layer-tests` |
+| Layer content, host interface | `PhraseContent`, `PhraseHost` (methods carry the type: `getPhrase...`) |
+| Parameter-id prefix | `p0_` ... `p7_` (`p` = Phrase; proposed; free of `r v a t`, so the mu-Tronic prefix sets gain a fifth letter when it registers the type) |
+| Per-slice and timeline data | ValueTree children of the layer node, not APVTS (see the design's persistence note) |
+| Layer-preset folder | `Phrases/` |
+| State identifier, tag | `MuTilateState`, `MuTilatePreset` (proposed) |
+| Plugin code | `MTil` (proposed; manufacturer `TDP1`, bundle id `com.transwarp.mu-tilate`) |
+| mu-Tronic | `LayerTypeId::Phrase` in `mu-core`, one `LayerTypeInfo` row (group "mu-Tilate", display name "Phrase") |
+| Shared parts | built in `mu-core`, never as `mu_tilate::` copies: library mechanism, waveform view, time ruler, drag-scroll viewport, detectors, Bounce dialog, stretch engine (Signalsmith Stretch in `ThirdParty/`) |
 
 ### Saved-data names (change only with a migration)
 Parameter-id prefixes (`r0_`, `v0_`, `a0_`, `t0_`), preset extensions (`.muRhythm`, `.muPattern`,

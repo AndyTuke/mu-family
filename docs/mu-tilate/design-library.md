@@ -1,0 +1,31 @@
+# mu-Tilate: sample library, export and factory loops
+
+Status: design only, nothing built (seeded 2026-10-30 from the first wireframe). Product overview: [design.md](design.md).
+
+## Sample library ★ (Andy, 2026-10-30: wanted, like mu-Clid)
+
+**Own library, shared mechanism where practical (decided).** mu-Tilate has its **own sample library, separate from mu-Clid's**: its own folder setting (a mu-Tilate Settings entry, not mu-Clid's), its own content (long phrases and loops, where mu-Clid's is mainly hit samples; little overlap) and its own browser instance. Nothing is shared at the content or setting level. Only the engine-independent mechanics are shared code (decided below), so there is no third copy.
+
+**How mu-Clid's library works today.** The user has a primary sample-library folder (a setting in the Settings overlay; unset means the OS Music folder) separate from the content folder, whose `Samples/` subfolder holds factory and preset-linked material. A `SampleBrowser` (a `juce::FileBrowserComponent` with a `FileBrowserListener`) scans and shows the folder; clicking a file previews it through the master output (`SamplePreview`) without assigning it, and choosing it loads it into the layer's voice engine and records its path (`SampleLibrary`, one path per layer). A preset stores the sample either by path (relative name resolved against `<contentDir>/Samples/`, or absolute with a fallback to the same file name in `Samples/`) or embedded (integer PCM WAV/AIFF re-encoded as FLAC, otherwise raw bytes, decoded to a temp file on load). A sample whose file is gone shows "missing, click to find". Path safety on embedded names: the name is reduced to a legal file name, rejected if empty, `.` or `..`, and the temp file must be a child of the temp root.
+
+**What mu-Tilate mirrors:** the primary library folder setting and content-folder `Samples/` resolution; the folder browser and click-to-preview; per-layer path recording with the "missing, click to find" affordance; path or embedded storage, with the FLAC embedding and the same path-safety rules; the same Settings overlay wording.
+
+**What is different for loops:**
+- The list shows each loop's **length in bars and detected tempo**, not just a name, so loops can be judged at a glance (detection results cached per file so scrolling stays cheap).
+- **Audition at project tempo:** preview plays the loop re-pitched or stretched to the current transport tempo (using the layer's Tempo mode), so it can be judged in context; a toggle plays it at its own tempo.
+- **Drag onto a layer:** dragging a loop from the library onto a layer in the sidebar (or the Source waveform) loads it into that layer and **runs transient detection automatically**, so slices appear without further clicks. Double-click on a file loads it into the selected layer the same way. Dropping onto a layer that already has a loop asks nothing and replaces it (hot-swapped at a boundary, undo is the preset).
+- Preview of a loop is also stoppable and shows its playhead in a mini waveform.
+- Export ("Export", below) is the other direction: slices go to a folder the library can then show.
+
+**Is the mechanism generic? No, not today.** The mu-Clid pieces are product code: `SampleLibrary` and `SampleSlotHost` in `mu_clid::` under `mu-clid/Source/Audio`, tied to mu-Clid's `VoiceEngine`; `SamplePreview` in the same folder; `SampleBrowser` in `mu-clid/Source/UI`; `embedded_sample` (`EmbeddedSample.h`) in `mu_clid::`; `resolveSamplePath` and `resolvePresetSample` in `RhythmPresetTree`. Per the one-framework direction, mu-Tilate must not copy them.
+
+**Decided (Andy's standing rule, 2026-10-30: shared code always goes in `mu-core` unless there is a very good reason not to):** the engine-independent parts live in `mu-core`, and mu-Clid's existing product-specific copies are lifted into `mu-core` as part of that work, with mu-Clid refactored to use them (no duplicate left behind). mu-Clid and mu-Tilate (and mu-Tronic's Rhythm and Phrase slots) share one implementation of the mechanism, each instantiated with its own folder setting and content (the library folder setting is a parameter of the shared service, not a shared value): a `SampleSource`/library-folder service (primary folder setting, content `Samples/` resolution, missing-file lookup), `SamplePreview`, the embedded-sample encode/decode and its path-safety helper, and a generic `SampleBrowser` component with an optional extra-info column hook (the loop length and tempo columns). mu-Clid then keeps only its binding to `VoiceEngine` (and mu-Tilate to the Phrase player) behind a small host interface like `SampleSlotHost`. Layout and colours of the shared browser come from `MuLookAndFeel`; the `ux-controller` rules on the extra columns when it is scheduled.
+
+## Export ★ (Andy, 2026-10-30: wanted, in scope)
+
+- **Bounce to WAV:** the Standalone's bounce dialog from the Bounce idea in [design-future.md](../design-future.md) (a shared `mu-core` dialog, standalone only), rendering the arrangement of all layers for N bars plus an FX tail. Depends on the generic render path being lifted to `mu-core`.
+- **Export slices to a folder:** writes each slice of the selected layer (or every layer) as its own WAV into **one folder per loop** (decided), named `<loop>_<nn>.wav`, with the layer's fade and pitch applied only if the user ticks "Render settings". The folder defaults to the sample-library folder so the result shows up in the browser.
+
+## Factory loops and licensing (Andy, 2026-10-30: decided)
+
+mu-Tilate ships a small set of free loops in the content folder's `Samples/` so that factory presets can be shipped. Rules: only **CC0 / public-domain** material or material under a licence that **explicitly allows redistribution inside an app**; **no CC-BY-NC and no share-alike-restricted** (CC-BY-SA, GPL-style) material. Each loop has a **licence and credit manifest next to it** in `Samples/` (source, author, licence, URL, date checked). The actual pack choice is made later.

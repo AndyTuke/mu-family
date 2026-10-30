@@ -2,7 +2,7 @@
 
 This document covers the shared-code strategy for building additional plugins in the μ-family (mu-tant, mu-toni, mu-on, and future siblings) that reuse mu-clid's voice chain, modulation system, and mixer.
 
-**Siblings already built on this platform:** **mu-tant** (wavetable drone synth — per-voice oscillators + gater), **mu-on** (909 groove sequencer — five fixed engine lanes + a per-lane `ModulationMatrix` resolved through the shared `mu_mod::resolveLane` helper), and **mu-toni** (generative arpeggiator mono-synth — a scale/chord note pool scanned by a deterministic skewed-triangle walk into a note-triggered voice, with a per-voice `ModulationMatrix`). Each supplies only its engine(s) + sequencer/trigger model and inherits `ProcessorBase`, `EditorShellBase`, the mixer/FX rack, and the modulation system unchanged.
+**Siblings already built on this platform:** **mu-tant** (wavetable drone synth — per-voice oscillators + gater), **mu-on** (909 groove sequencer — five fixed engine lanes + a per-lane `ModulationMatrix` resolved through the shared `mu_mod::resolveLane` helper), and **mu-toni** (generative arpeggiator mono-synth — a scale/chord note pool scanned by a deterministic skewed-triangle walk into a note-triggered voice, with a per-voice `ModulationMatrix`). Each supplies only its engine(s) + sequencer/trigger model and inherits `ProcessorBase`, `EditorShellBase`, the mixer/FX rack, and the modulation system unchanged. A planned sibling, **mu-tilate** (loop slicer: a Phrase layer is one loop, its slices, one sample player and a timeline row), is designed in [mu-tilate/design.md](mu-tilate/design.md); nothing is built.
 
 ---
 
@@ -344,6 +344,7 @@ The shared visual identity (`MuLookAndFeel`) ensures a consistent look across al
 | mu-Tant | `kModDestTable` — [MuTantModDest.h](../mu-tant/Source/Modulation/MuTantModDest.h) | `mu_mod::resolveLane` |
 | mu-Toni | `kModDestTable` — [MuToniModDest.h](../mu-toni/Source/Modulation/MuToniModDest.h) | `mu_mod::resolveLane` |
 | mu-On | one table per lane — [MuOnModDest.h](../mu-on/Source/Modulation/MuOnModDest.h) | `mu_mod::resolveLane` |
+| mu-Tilate (planned) | `kModDestTable` in `mu-tilate/Source/Modulation/MuTilateModDest.h`, to be created; targets listed in [mu-tilate/design.md](mu-tilate/design.md) | `mu_mod::resolveLane` |
 | mu-Clid | `ModDest::kTable` — [ModulationDestinations.h](../mu-clid/Source/Modulation/ModulationDestinations.h) | hand-written seed / write-back in `PluginProcessor.cpp` (values come from per-rhythm state and step-count-dependent ranges), using the knob ranges in [ModulationSkew.h](../mu-clid/Source/Modulation/ModulationSkew.h) — the APVTS layout is built from the same constants |
 
 **How it works.** Each target is seeded into the `ModulationMatrix` as its knob's 0..1 proportion; the matrix adds `source% × depth% / 10000`; the product converts back through the knob's range (clamped at the ends; stepped targets rounded to whole steps by the product). Offset-style targets (mu-Clid's pitch octave / semitones) are seeded 0 and read back as an offset of the same proportion of the knob's range.

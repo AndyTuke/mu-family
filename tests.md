@@ -309,6 +309,16 @@ cmake --build build --target mu-on-tests --config Debug && build/mu-on/mu-on-tes
 
 ---
 
+## C++ unit tests — μ-Tilate
+
+**Not built.** Design only (2026-10-30), no code, no test target. Planned targets are `mu-tilate-tests` and `mu-tilate-layer-tests` (see [mu-tilate/CLAUDE.md](mu-tilate/CLAUDE.md)); rows are added by the `test-steward` when the code exists. Shared pieces built in `mu-core` for it (waveform view, detectors, stretch engine, library mechanism) are tested under mu-core.
+
+| Coverage | File | Status | Verified Build |
+|---|---|---|---|
+| (none yet) | | not built | n/a |
+
+---
+
 ## C++ unit tests — μ-Clid MIDI
 
 Built on demand only (`EXCLUDE_FROM_ALL`, like mu-clid-tests):
