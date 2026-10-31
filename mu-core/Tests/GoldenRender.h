@@ -415,9 +415,12 @@ namespace mu_golden
 
         // Header keys (schema, config, scenarioHash, ...) have no dot and are checked by the store.
         auto isHeader = [](const juce::String& k) { return k.startsWith("meta.") || ! k.contains("."); };
+        // The saved-state hash is information, not a gate: it moves whenever a parameter row or default changes
+        // while the audio is identical. It stays in the golden and the dump; the audio and MIDI lines are the gate.
+        auto isInfoOnly = [](const juce::String& k) { return k.endsWith(".state.hash"); };
         for (const auto& [key, val] : actual)
         {
-            if (isHeader(key)) continue;
+            if (isHeader(key) || isInfoOnly(key)) continue;
             auto it = g.find(key);
             if (it == g.end()) { diffs.add(key + ": not in the golden"); continue; }
             const auto goldenVal = it->second;
@@ -435,7 +438,7 @@ namespace mu_golden
             if (val != goldenVal) diffs.add(describeKey(sc, key, goldenVal, val));
         }
         for (const auto& [key, val] : g)
-            if (! isHeader(key) && ! (tolerant && (key.endsWith(".whole") || key.contains(".end."))))
+            if (! isHeader(key) && ! isInfoOnly(key) && ! (tolerant && (key.endsWith(".whole") || key.contains(".end."))))
                 diffs.add(key + ": in the golden but not rendered");
         return diffs;
     }
