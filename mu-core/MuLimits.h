@@ -59,6 +59,10 @@ namespace mu_limits
     // ModulatorPanel mirrors this; the two must stay equal.
     inline constexpr int kMaxControlSequences = 8;
 
+    // The largest decoded loop a layer holds, in bytes (float32 x channels x frames): 30 s of stereo at 48 kHz, 15 s at
+    // 96 kHz, 60 s mono. A loop over it is rejected before decoding, never truncated (docs/mu-tilate/design.md).
+    inline constexpr long long kMaxLoopBytes = 11520000;
+
     // Maximum modulation assignments per ModulationMatrix (per channel).
     inline constexpr int kMaxModulationAssignments = 64;
 

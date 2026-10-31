@@ -16,6 +16,8 @@ target_sources(mu-tilate-layer INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/Timeline.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/PhrasePlayback.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/Phrase.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/PhraseAnalysis.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/PhraseAnalysis.cpp"
 )
 target_include_directories(mu-tilate-layer INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
 # Signalsmith Stretch (MIT, header-only) and its FFT library; SYSTEM so their warnings stay out of ours.
@@ -35,8 +37,12 @@ target_sources(mu-tilate-tests PRIVATE
     Source/Tests/PhraseParamsTests.cpp   # the parameter table and the modulation target table
     Source/Tests/PhraseLayerTests.cpp   # the Phrase layer through the shared render contract
     Source/Tests/PhraseStateTests.cpp   # saving and loading the slices, timeline and loop reference
+    Source/Tests/PhraseLoadTests.cpp   # loading a loop file (cap, errors) and detecting slices on it
+    Source/Tests/PhraseLoadTests.cpp   # loop decode and cap, detection into slices
     # mu-core's detector (the plugin targets get it through mu-core; a console target lists it).
     "${CMAKE_SOURCE_DIR}/mu-core/Analysis/OnsetDetector.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/LoopLoader.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/LoopLoader.cpp"
     # What the modulation-table checks need (as mu-toni-layer-tests lists them).
     "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/ControlSequence.cpp"
@@ -53,6 +59,7 @@ target_link_libraries(mu-tilate-tests PRIVATE
     mu-tilate-layer
     juce::juce_core
     juce::juce_audio_basics
+    juce::juce_audio_formats   # the loop loader
     juce::juce_audio_processors   # the parameter table tests build an APVTS
     juce::juce_data_structures
     juce::juce_events
