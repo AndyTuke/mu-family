@@ -16,7 +16,7 @@ Next id: B-003
 
 ### B-002 · 2026-10-31 · Frozen manifests, corpus params and goldens differ from the files in tests/
 Rows: none yet · Needs: decide
-Not goldens-only: the parameter manifests of mu-On, mu-Clid, mu-Tant and mu-Toni differ from `tests/manifests/*.txt` (mu-On: `*_drvChar` / `mst_insChar` / `mst_ins2Char` rows removed or changed), and the compat-corpus param dumps differ for mu-Clid (Big and Bad, Simple Hat) and 11 mu-Tant presets. These read as deliberate changes; re-run the owning test with `MU_REGENERATE_FROZEN=1` and review the diff if you agree. The comparison now ignores `*.state.hash` (information only), which took mu-On from 16 to 10 failures; the other golden cases moved as well (mu-On 9, 7 of them Bass-engine cases, plausibly the Bass Tune root-note change `8031495e`; mu-Clid 8+) and were left stale on purpose (Andy's rule), including `inserts-karplus-ring` (expected by L-006). I did not regenerate anything.
+Not goldens-only: the parameter manifests of mu-On, mu-Clid, mu-Tant and mu-Toni differ from `tests/manifests/*.txt` (mu-On: `*_drvChar` / `mst_insChar` / `mst_ins2Char` rows removed or changed), and the compat-corpus param dumps differ for mu-Clid (Big and Bad, Simple Hat) and 11 mu-Tant presets. These read as deliberate changes; re-run the owning test with `MU_REGENERATE_FROZEN=1` and review the diff if you agree. The comparison now ignores `*.state.hash` (information only), which took mu-On from 16 to 10 failures; the other golden cases moved as well (mu-On 9, 7 of them Bass-engine cases, plausibly the Bass Tune root-note change `8031495e`; mu-Clid 8+; mu-Toni 12 plus 3 behaviour pins) and were left stale on purpose (Andy's rule), including `inserts-karplus-ring` (expected by L-006). I did not regenerate anything.
 
 ## Results
 
@@ -47,12 +47,20 @@ Notes: the bounded-output test (1 kHz sine and DC at 75 / 100 % feedback, output
 Build: v1.1.0.1455 · Ran: `mu-core-tests` (InsertDSPSmokeTests passes) · Saw: Andy swept the tone knob of a drive insert through the open end in mu-Clid: sounds fine.
 Notes: a continuity test (tone open for 4 blocks, then 5 kHz, step < 0.05 at the switch) is written and passes; I did not check that it fails without the fix.
 
-### Re L-008 · 2026-10-31 · Partly
-Build: v1.1.0.1455 · Ran: full Debug build; `mu-clid-tests` (354 results, 17 failures), `mu-on-tests` (239, 16), `mu-core-tests`; `mu-tant-tests` and `mu-toni-tests` were cut off by my 300 s cap and did not finish (their first results were the manifest / corpus differences of B-002); `mu-clid-midi`, `mu-control`, `mu-tronic` (132 results) and all four `*-layer-tests` pass · Saw: goldens moved in mu-On and mu-Clid.
-Notes: everything compiles. I cannot say the goldens moved because of the lifts: they were already stale (no golden has been re-recorded since the sound changes), and the manifest differences are separate. To judge the lifts, re-record on a clean pre-lift commit and compare, or rerun mu-Tant and mu-Toni to the end (they need a longer cap than 300 s in Debug).
+### Re L-008 · 2026-10-31 · Done
+Build: v1.1.0.1456 · Ran: full Debug build (clean); `mu-core-tests` (847, 0 failures), `mu-toni-tests` run to the end (110 results, 16 failures), `mu-clid-tests` (354, 17), `mu-on-tests` (239, 16); `mu-clid-midi`, `mu-control`, `mu-tronic` (132) and all four `*-layer-tests` pass; `mu-tant-tests` not rerun to the end · Saw: nothing listened.
+Notes: everything compiles. I read the lift diffs (eb1d6687): `mu_mod::skew` carries the same constants and `LastResolved::apply` the same logic as the code it replaced, so they read as bit-identical; I found no sign the lifts moved audio. The failures are the stale golden, manifest and pin differences in B-002 (mu-Toni: manifest, 12 goldens, and 3 pins in `readVoice: a modulation assignment moves the published value`, cutoff 9499 / 3322 / 13520 Hz recorded 2026-10-15 against 11890 / 3618 / 17832 now, which pre-date the lifts: the modulation depth and skew work of 2026-10-20 to 22).
+
+### Re L-009 · 2026-10-31 · Partly
+Build: v1.1.0.1456 · Ran: day 1 and day 5 of the plan: #1699 phase A (`ProcessorBase.cpp` 2140 lines split into topic files, header untouched, commit 97fbc997), phase B (`mu_core::FxParamSync`, 7f7e72d6) and phase C (`mu_core::ActivationWorker` and `mu_core::ProgramChangeRouter`, 7e8f0e05) with new `ActivationAndProgramChangeTests` · Saw: `mu-core-tests` 0 failures of 847 after each phase; every product compiles; `check-core-boundary`, `check-comment-refs` pass; `check-rt-safety` 0 findings outside setup (setup count now 113 / suppressed 67 instead of 132 / 104: counted per file, so the split moved the numbers, not the code).
+Notes: not done yet: days 2 to 4 (sample library lift into mu-core), days 6 to 8 (Signalsmith Stretch prototype), days 9 to 10 (#1701 item 8, phase J). `ProcessorBase` keeps `isFxParamId`, `startFxParamSync`, `syncAllFxParams`, `syncGlobalFxParam`, `activateOnlineAsync`, `scanMidiProgramChanges` and `drainPendingMidiProgramChanges` as one-line forwarders, so no product changed.
+
+### Re L-010 · 2026-10-31 · Done
+Build: v1.1.0.1456 · Ran: `mu-toni-tests` to the end · Saw: `Arp` now calls `lastResolved.reset()` on prepare, bindParams and going live (a move goes through bindParams); new test "values held for a lock miss do not cross a rebind" passes. I did not check that it fails without the fix.
+Notes: commit after 7e8f0e05; the remaining mu-Toni failures are in B-002.
 
 ### Not started (no result entry)
-L-009, L-010, L-011: not touched; they need ears or the earlier items to pass first.
+L-011: not touched; it needs Andy listening to mu-Tant.
 
 ### Extra · 2026-10-31 · JUCE MIDI abort
 Every Debug Standalone aborted at startup on this PC: JUCE 9.0.4 crashes when `midiInOpen` fails (the MOTU port; likely after the 29 Oct Windows updates). Upstream JUCE issue 1769, fixed on `develop`, not in 9.0.4. A local guard is in `D:\JUCE` and logged in `docs/design-plugin-family.md` ("Local JUCE patches"), diff in `juce-patches/`. Only mu-Clid has been rebuilt with it; the others need a rebuild.
