@@ -19,6 +19,13 @@ void PhrasePlayback::reset() noexcept
     cutPending = false;
 }
 
+void PhrasePlayback::hardReset() noexcept
+{
+    player.reset();
+    anchored = false;
+    cutPending = false;
+}
+
 void PhrasePlayback::trigger(const PhraseLoop& loop, const PhraseSettings& s, const PhraseClock& c, const TimelineBlock& b) noexcept
 {
     SliceParams p;

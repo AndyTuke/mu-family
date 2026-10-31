@@ -52,6 +52,9 @@ public:
     void prepare(double sampleRate, int maxBlock, bool shortWindow = false);
     // Audio thread: forget the transport position and cut the sounding slice (a stop, a layer swap).
     void reset() noexcept;
+    // Audio thread: drop every voice at once, with no fade. For a loop that was replaced (the voices point into the old
+    // audio) or a slot that has just gone live; a stop uses reset.
+    void hardReset() noexcept;
 
     // Audio thread: adds the call's audio into out[0, n).
     void render(const PhraseLoop& loop, const PhraseSettings& settings, const PhraseClock& clock,

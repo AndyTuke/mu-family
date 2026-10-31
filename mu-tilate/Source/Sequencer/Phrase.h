@@ -1,0 +1,121 @@
+#pragma once
+
+#include "Audio/InsertProcessor.h"      // mu-core: shared per-voice insert FX
+#include "Audio/SpinLock.h"             // mu-core: the try-lock the audio thread takes around the loop data
+#include "Audio/VoiceParams.h"          // mu-core: the insert's parameter snapshot
+#include "Modulation/LastResolved.h"    // mu-core: hold-last-value on a matrix-lock miss
+#include "Modulation/MuTilateModDest.h" // the modulation target table
+#include "Persistence/PhraseParams.h"   // the Phrase type's parameter table (ppi)
+#include "Sequencer/Layer.h"            // mu-core: name, colour, modulation, the render contract
+#include "Sequencer/LayerTypeInfo.h"    // mu-core: mu_core::LayerTypeId
+#include "Sequencer/PhrasePlayback.h"   // the transport-anchored scheduler (timeline, slices, player)
+#include "Sequencer/RetireTail.h"       // mu-core: mu_core::ParamBinding
+
+#include <array>
+#include <atomic>
+#include <memory>
+#include <string_view>
+#include <unordered_map>
+
+namespace mu_tilate
+{
+
+// Everything about the loop that is not a parameter: the audio, its sample rate, the slices and the timeline. It is
+// immutable once a layer holds it; an edit builds a new one and hands it to Phrase::setData.
+struct PhraseData
+{
+    juce::AudioBuffer<float> audio;
+    double       fileSampleRate = 48000.0;
+    SliceList    slices { 0 };
+    Timeline     timeline;
+};
+
+// One mu-Tilate layer, a Phrase: the shared Layer plus its loop data, the scheduler and the insert, rendered through
+// the shared layer contract (docs/mu-tronic/design.md 2.1): bindParams caches the slot's parameter atomics; render
+// resolves the modulation, then the scheduler plays the timeline's slices and the insert follows.
+//
+// Threads. The audio thread renders inside the block's layer access. The loop data is shared with the message
+// thread through `data`, guarded by `dataLock`: the audio thread only ever try-locks it for one block (a miss renders
+// nothing and keeps time, as mu-Clid's sample buffer does), the message thread swaps the pointer under it. The voices
+// read the loop's audio by raw pointer, so a block that finds the pointer changed first drops them (hardReset); the
+// old data can therefore be destroyed on the message thread as soon as the swap returns, never on the audio thread.
+struct Phrase : Layer
+{
+    SlotBound<PhrasePlayback>  playback;   // belongs to the slot: a layer copy never carries two stretchers
+    SlotBound<InsertProcessor> insert;
+    VoiceParams                insertCfg;
+
+    Phrase() = default;
+
+    // ── The loop data ────────────────────────────────────────────────────────
+    // Message thread: publishes new loop data (nullptr = no loop). The previous one is released after the lock is dropped.
+    void setData(std::shared_ptr<const PhraseData> d);
+    // Message thread: the data now published (for the editor and for building an edited copy).
+    std::shared_ptr<const PhraseData> getData() const;
+
+    bool isValidDest(const std::string& id) const override { return isValidModDest(id); }
+    void onMoved(int newIndex) override { insert->setSlotIndex(newIndex); }
+    const std::atomic<float>* insertGainReduction() const override { return &insert->grReduction; }
+
+    // ── The render contract ──────────────────────────────────────────────────
+    int  typeId() const override { return (int) mu_core::LayerTypeId::Phrase; }
+    void prepare(double sampleRate, int blockSize) override;
+    void bindParams(juce::AudioProcessorValueTreeState& apvts, int slot) override;
+    void render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n) override;
+    void onParkedBlock(const mu_core::RenderContext&) override { parked = true; }
+    // The staged swap lands on the timeline's own loop point.
+    double loopBeats() const override { return loopLengthBeats.load(std::memory_order_relaxed); }
+    // A stop: the sounding slice leaves through the cut fade, and the next start re-anchors.
+    void onTransportStopped(const mu_core::RenderContext&) override { stopRequested = true; }
+
+    // ── How the layer leaves its slot ────────────────────────────────────────
+    mu_core::RetirePolicy retirePolicy() const override
+    {
+        mu_core::RetirePolicy p;
+        p.kind = mu_core::RetirePolicy::Kind::Fade;
+        return p;
+    }
+    bool renderRetiring(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n, mu_core::RetireState& rs) override;
+
+    // Audio thread: resolve this layer's modulation at `modBeat` into the scheduler's settings and the insert.
+    void readParams(double modBeat) noexcept;
+
+    // Post-modulation value of target `dest`, in the target's parameter units (any thread).
+    float getModLive(int dest) const noexcept
+    {
+        return modLive.v[(size_t) juce::jlimit(0, kNumModDests - 1, dest)].load(std::memory_order_relaxed);
+    }
+
+private:
+    struct LiveValues
+    {
+        alignas(64) std::array<std::atomic<float>, kNumModDests> v {};
+        LiveValues() = default;
+        LiveValues(const LiveValues&) noexcept {}
+        LiveValues& operator=(const LiveValues&) noexcept { return *this; }
+    };
+
+    // One block of the scheduler and the insert into `buf` (handed over cleared). `playing` false only fades.
+    void renderBlock(const PhraseData* d, PhraseClock clock, juce::AudioBuffer<float>& buf, int n) noexcept;
+
+    std::array<mu_core::ParamBinding, kNumPhraseParams> pp {};   // the slot's rows, in ppi order
+    std::array<const std::atomic<float>*, kNumModDests>       modDestAtoms {};
+    std::array<const char*, kNumModDests>                     modDestIds {};
+    std::array<juce::NormalisableRange<float>, kNumModDests>  modDestRanges {};
+    std::unordered_map<std::string_view, float>               modParamValues;
+    LiveValues                                                modLive;
+    mu_mod::LastResolved<kNumModDests>                        lastResolved;
+
+    PhraseSettings settings;                       // the block's settings, set by readParams
+
+    std::shared_ptr<const PhraseData> data;        // guarded by dataLock
+    mutable CopyableSpinLock          dataLock;
+    const PhraseData*                 lastData = nullptr;   // audio thread: the data the voices were started from
+    std::atomic<double>               loopLengthBeats { -1.0 };
+
+    juce::AudioBuffer<float> tailScratch;          // a tail that must add rather than write renders here
+    bool parked = true;                            // not rendered live in the last rendered block
+    bool stopRequested = false;                    // audio thread
+};
+
+} // namespace mu_tilate
