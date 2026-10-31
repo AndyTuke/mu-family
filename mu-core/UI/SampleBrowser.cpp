@@ -1,12 +1,15 @@
-#include "SampleBrowser.h"
-#include "Audio/SampleLibrary.h"
+#include "UI/SampleBrowser.h"
 
-namespace mu_clid {
+namespace mu_core {
 
-SampleBrowserContent::SampleBrowserContent(RhythmHost& host,
+SampleBrowserContent::SampleBrowserContent(SampleLibrary& lib,
+                                            const juce::File& content,
+                                            const juce::String& contentLabel,
                                             const juce::File& startDir,
                                             std::function<void(const juce::File&)> onChosen)
-    : host(host), onChosen(std::move(onChosen)),
+    : library(lib), contentDir(content), onChosen(std::move(onChosen)),
+      sourceToggle({ juce::String("Main Library"), contentLabel },
+                   SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Pills),
       fileFilter("*.wav;*.aiff;*.aif;*.mp3;*.flac", {}, "Audio files"),
       browser(juce::FileBrowserComponent::openMode |
               juce::FileBrowserComponent::canSelectFiles,
@@ -19,16 +22,16 @@ SampleBrowserContent::SampleBrowserContent(RhythmHost& host,
     browser.addListener(this);
 
     // source toggle — Library is the default landing folder; Content gives
-    // one-click access to the factory/preset-bundled samples folder. Selected
+    // one-click access to the product's factory/preset-bundled samples folder. Selected
     // index reflects the current root so the toggle stays honest when the user
     // navigates away via the browser, then jumps back via the toggle.
     sourceToggle.setSelectedIndex(
-        startDir == this->host.getRhythmSamplesDir() ? 1 : 0,
+        startDir == contentDir ? 1 : 0,
         juce::dontSendNotification);
     sourceToggle.onChange = [this](int idx)
     {
-        const juce::File target = (idx == 1) ? this->host.getRhythmSamplesDir()
-                                             : this->host.getRhythmSamples().getPrimarySampleDir();
+        const juce::File target = (idx == 1) ? contentDir
+                                             : library.getPrimarySampleDir();
         if (target.isDirectory())
             browser.setRoot(target);
     };
@@ -40,14 +43,14 @@ SampleBrowserContent::SampleBrowserContent(RhythmHost& host,
     };
     cancelBtn.onClick = [this]
     {
-        this->host.getRhythmSamples().stopPreview();
+        library.stopPreview();
         if (onDismiss) onDismiss();
     };
 
     setSize(mu_ui::s(560), mu_ui::s(470));
 }
 
-SampleBrowserContent::~SampleBrowserContent() { host.getRhythmSamples().stopPreview(); }
+SampleBrowserContent::~SampleBrowserContent() { library.stopPreview(); }
 
 void SampleBrowserContent::resized()
 {
@@ -68,16 +71,16 @@ void SampleBrowserContent::selectionChanged()
 {
     const auto f = browser.getSelectedFile(0);
     if (f.existsAsFile())
-        host.getRhythmSamples().startPreview(f);
+        library.startPreview(f);
 }
 
 void SampleBrowserContent::fileDoubleClicked(const juce::File& f) { commit(f); }
 
 void SampleBrowserContent::commit(const juce::File& f)
 {
-    host.getRhythmSamples().stopPreview();
+    library.stopPreview();
     onChosen(f);
     if (onDismiss) onDismiss();
 }
 
-} // namespace mu_clid
+} // namespace mu_core

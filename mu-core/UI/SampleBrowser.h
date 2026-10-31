@@ -1,20 +1,23 @@
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "UI/RhythmHost.h"
+#include "Audio/SampleLibrary.h"
 #include "UI/Components/SegmentControl.h"
 #include "UI/Components/MuLookAndFeel.h"
 
-namespace mu_clid {
+namespace mu_core {
 
-// Custom file browser used for sample loading so the user can audition files
-// before committing to a slot. Launched inside a DialogWindow (modal) from
-// RhythmContent::loadSample(). Self-contained — no access to RhythmContent internals.
+// Custom file browser used for sample loading so the user can audition files before committing to a slot (lifted
+// from mu-Clid). It previews through the SampleLibrary it is given and has two sources: the user's primary sample
+// folder ("Main Library") and the product's content folder, named by `contentLabel`. Shown by the caller inside an
+// OverlayHost. Self-contained: no access to the layer's UI internals.
 class SampleBrowserContent : public juce::Component,
                               public juce::FileBrowserListener
 {
 public:
-    SampleBrowserContent(RhythmHost& host,
+    SampleBrowserContent(SampleLibrary& library,
+                         const juce::File& contentDir,
+                         const juce::String& contentLabel,
                          const juce::File& startDir,
                          std::function<void(const juce::File&)> onChosen);
     ~SampleBrowserContent() override;
@@ -31,18 +34,15 @@ public:
     void browserRootChanged(const juce::File&) override {}
 
 private:
-    RhythmHost& host;
+    SampleLibrary& library;
+    juce::File     contentDir;
     std::function<void(const juce::File&)> onChosen;
     juce::WildcardFileFilter fileFilter;
     juce::FileBrowserComponent browser;
     juce::TextButton loadBtn { "Load" }, cancelBtn { "Cancel" };
-    SegmentControl sourceToggle {
-        { juce::String("Main Library"),
-          juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid Content")) },
-        SegmentControl::ActiveStyle::General,
-        SegmentControl::DrawStyle::Pills };
+    SegmentControl sourceToggle;
 
     void commit(const juce::File& f);
 };
 
-} // namespace mu_clid
+} // namespace mu_core

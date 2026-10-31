@@ -75,6 +75,7 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Persistence/MidiFullPresetMap.cpp"
     # Shared MIDI PC editor panels (the preset browser is in the chrome list).
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiPresetListPanel.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/SampleBrowser.cpp"   # the sample file browser with preview (lifted from mu-Clid)
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiPresetsOverlay.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiFullPresetsOverlay.cpp"
     # Shared settings page (the framework base is in the chrome list).

@@ -1,6 +1,6 @@
 #include "UI/PresetDropdown.h"   // mu-core: shared preset scan + selector fill
 #include "RhythmContent.h"
-#include "SampleBrowser.h"
+#include "UI/SampleBrowser.h"
 #include "UI/ConfirmDialog.h"   // shared themed confirm dialogs (mu_ui::confirmAsync)
 #include "UI/OverlayHost.h"     // shared dimmed in-editor overlay host (sample browser)
 #include "Persistence/PresetFiles.h"   // mu_pp::safePresetFileName, readPresetMeta
@@ -449,8 +449,9 @@ void RhythmContent::loadSample()
     // Host the sample browser as a dimmed in-editor overlay (consistent with the other modals)
     // rather than a floating DialogWindow. The browser brings its own Load/Cancel; OverlayHost
     // supplies the dim backdrop + centring + click-outside-to-dismiss.
-    auto content = std::make_unique<SampleBrowserContent>(
-        host, startDir,
+    auto content = std::make_unique<mu_core::SampleBrowserContent>(
+        host.getRhythmSamples(), host.getRhythmSamplesDir(),
+        juce::String(juce::CharPointer_UTF8("Î¼-Clid Content")), startDir,
         [safeThis, rhythmIndex](const juce::File& f)
         {
             if (safeThis == nullptr) return;
