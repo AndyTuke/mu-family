@@ -19,6 +19,8 @@ set(MU_CORE_PROCESSOR_TEST_SOURCES
     "${_mu_core_dir}/Audio/InsertProcessor.cpp"
     "${_mu_core_dir}/Audio/MultiModeFilter.cpp"
     "${_mu_core_dir}/Audio/SamplePlayer.cpp"
+    "${_mu_core_dir}/Audio/SamplePreview.cpp"
+    "${_mu_core_dir}/Audio/SampleLibrary.cpp"
     "${_mu_core_dir}/Audio/MixerEngine.cpp"
     "${_mu_core_dir}/Audio/MidiOutputEngine.cpp"
     "${_mu_core_dir}/Audio/FX/Slots/EffectSlot.cpp"

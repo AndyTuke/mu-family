@@ -145,7 +145,7 @@ namespace
         }
         void addRhythmPresetCategory(const juce::String&) override {}
 
-        mu_clid::SampleLibrary& getRhythmSamples() noexcept override { return samples; }
+        mu_core::SampleLibrary& getRhythmSamples() noexcept override { return samples; }
         juce::File getRhythmSamplesDir() const override { return getSamplesDir(); }
 
     private:

@@ -1,15 +1,15 @@
 #pragma once
 
 #include <juce_audio_utils/juce_audio_utils.h>
-#include "SamplePreview.h"
+#include "Audio/SamplePreview.h"
 
 class VoiceEngine;
 
-namespace mu_clid {
+namespace mu_core {
 
 // What the sample library loads into and keeps its one setting in: the voice engine of each slot, the live
 // slot count, and the host's app settings file (the storage root; null until the host has created it).
-// mu-Clid's PluginProcessor implements it. Message thread only.
+// A product's processor (or its layer services) implements it. Message thread only.
 class SampleSlotHost
 {
 public:
@@ -21,7 +21,7 @@ public:
     virtual juce::PropertiesFile* getSampleSettingsFile() const noexcept = 0;
 };
 
-// mu-Clid's per-rhythm sample bookkeeping: the sample path each rhythm slot plays, the
+// The per-slot sample bookkeeping shared by every product that loads samples (lifted from mu-Clid): the sample path each slot plays, the
 // load / name / missing queries the UI reads, the file-browser preview player and the
 // user's primary sample-library folder. Owned by PluginProcessor as `samples`.
 //
@@ -71,4 +71,4 @@ private:
     SamplePreview     preview;
 };
 
-} // namespace mu_clid
+} // namespace mu_core

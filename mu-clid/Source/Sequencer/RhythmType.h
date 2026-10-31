@@ -160,7 +160,7 @@ private:
 // host adapter derives from it and supplies the few things only the processor knows. A layer library never includes the
 // processor, so these arrive as virtuals.
 class RhythmSlotServices : public mu_core::LayerServices,
-                           public SampleSlotHost,
+                           public mu_core::SampleSlotHost,
                            private juce::AudioProcessorParameter::Listener
 {
 public:
@@ -199,7 +199,7 @@ public:
     virtual void reportLoadError(const juce::String& message) = 0;
 
     // ── Shared state ─────────────────────────────────────────────────────────
-    SampleLibrary samples { *this };
+    mu_core::SampleLibrary samples { *this };
     // Written by every Rhythm layer's render (the transport as the last rendered block saw it), read by the UI.
     std::atomic<bool> transportPlaying { false };
     // While set, a changed row is applied to the layer but its pattern and voice are not refreshed: the code that set it

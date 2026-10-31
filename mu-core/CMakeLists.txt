@@ -36,6 +36,8 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Audio/InsertProcessor.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Audio/MultiModeFilter.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Audio/SamplePlayer.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Audio/SamplePreview.cpp"   # the file browser's preview player (lifted from mu-Clid)
+    "${CMAKE_CURRENT_SOURCE_DIR}/Audio/SampleLibrary.cpp"   # per-slot sample paths and the primary sample folder
     "${CMAKE_CURRENT_SOURCE_DIR}/Audio/MixerEngine.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Audio/MidiOutputEngine.cpp"
     # FX slots

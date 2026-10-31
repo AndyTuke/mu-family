@@ -29,7 +29,7 @@ namespace mu_clid {
 
 class PluginProcessor : public ProcessorBase,
                         public RhythmHost,
-                        public SampleSlotHost,
+                        public mu_core::SampleSlotHost,
                         private juce::AudioProcessorValueTreeState::Listener
 {
 public:
@@ -108,7 +108,7 @@ public:
     void    updatePattern (int index)      { updateRhythmPattern(index); }
 
     // Per-rhythm sample paths, load / missing queries, preview player and primary sample folder.
-    SampleLibrary samples { *this };
+    mu_core::SampleLibrary samples { *this };
 
     // Hot-swap staging: stages a rhythm preset for atomic commit at the next loop boundary.
     // If the sequencer is not playing, applies the preset immediately instead.
@@ -293,7 +293,7 @@ public:
     void stageRhythmPresetFile(int layer, const juce::File& file) override      { stageRhythmPreset(layer, file); }
     juce::StringArray getRhythmPresetCategories() const override                { return loadCategoryList(); }
     void addRhythmPresetCategory(const juce::String& category) override        { ensureCategoryInList(category); }
-    SampleLibrary& getRhythmSamples() noexcept override                         { return samples; }
+    mu_core::SampleLibrary& getRhythmSamples() noexcept override                         { return samples; }
     juce::File     getRhythmSamplesDir() const override                         { return getSamplesDir(); }
 
     // ── SampleSlotHost: the engines and the settings file the sample library uses (message thread) ──

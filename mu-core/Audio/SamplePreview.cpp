@@ -1,6 +1,6 @@
-#include "SamplePreview.h"
+#include "Audio/SamplePreview.h"
 
-namespace mu_clid {
+namespace mu_core {
 
 SamplePreview::SamplePreview()
 {
@@ -126,7 +126,7 @@ void SamplePreview::mixInto(juce::AudioBuffer<float>& masterBus, int numSamples)
     audioHolding.store(nullptr);
 }
 
-} // namespace mu_clid
+} // namespace mu_core
 
 
 

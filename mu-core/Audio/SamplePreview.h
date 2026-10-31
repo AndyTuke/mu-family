@@ -6,7 +6,7 @@
 #include <memory>
 #include <vector>
 
-namespace mu_clid {
+namespace mu_core {
 
 // Sample-preview player used by the file browser (SampleBrowserContent). start() decodes the whole file (capped at
 // kMaxSeconds) into memory on the message thread, converted to the prepared sample rate; mixInto() on the audio thread
@@ -54,5 +54,5 @@ private:
     int                      readPos = 0;
 };
 
-} // namespace mu_clid
+} // namespace mu_core
 

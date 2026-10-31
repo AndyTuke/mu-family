@@ -23,8 +23,6 @@ target_sources(mu-clid-layer INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Persistence/RhythmParams.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Persistence/RhythmPresetTree.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Persistence/PresetMigrations.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Audio/SamplePreview.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Audio/SampleLibrary.cpp"
 )
 target_include_directories(mu-clid-layer INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
 set(MU_CLID_LAYER_UI_SOURCES
@@ -289,7 +287,6 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/HotSwapCancelTests.cpp        # staged swaps vs take-back, failed load, host restore, stopped load
     Source/Tests/ClipLaunchTests.cpp           # clip bank: store / launch / persistence on the real processor
     Source/Tests/FxTailTests.cpp               # a full-preset commit keeps the FX tail
-    Source/Tests/SamplePreviewTests.cpp        # an oversize host block is chunked to the prepared size
     Source/Tests/GoldenRenderTests.cpp         # golden renders of the real processor (tests/golden/mu-clid)
     Source/Tests/ExtractionPinTests.cpp        # pins: drained tails, count policy, longest tail, edit mid-play, oversize, trigger source
     Source/Tests/RhythmLayerRecordTests.cpp    # the stream of Tests/RhythmLayerFixture.h through the real processor (mu-Tronic renders the same one from a slot)
@@ -354,6 +351,8 @@ target_sources(mu-clid-layer-tests PRIVATE
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/InsertProcessor.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/MultiModeFilter.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/SamplePlayer.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/SamplePreview.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/SampleLibrary.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/MixerEngine.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/MidiOutputEngine.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/FX/Slots/EffectSlot.cpp"

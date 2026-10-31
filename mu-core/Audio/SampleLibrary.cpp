@@ -1,11 +1,11 @@
-#include "SampleLibrary.h"
+#include "Audio/SampleLibrary.h"
 #include "Audio/VoiceEngine.h"
 #include "MuLimits.h"
 
 #include <type_traits>
 #include <utility>
 
-namespace mu_clid {
+namespace mu_core {
 
 SampleLibrary::SampleLibrary(SampleSlotHost& h) : host(h)
 {
@@ -86,4 +86,4 @@ void SampleLibrary::setPrimarySampleDir(const juce::File& dir)
     settings->saveIfNeeded();
 }
 
-} // namespace mu_clid
+} // namespace mu_core

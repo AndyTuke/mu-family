@@ -12,10 +12,10 @@
 // library through it. mu-Clid's PluginProcessor implements it; a host of several layer types implements one
 // per type. The method names carry the type, so one class can implement several hosts.
 // Message thread only, except the play-state and transport atomics, which the audio thread writes.
+namespace mu_core { class SampleLibrary; }
+
 namespace mu_clid
 {
-
-class SampleLibrary;
 
 class RhythmHost
 {
@@ -70,7 +70,7 @@ public:
     virtual void              addRhythmPresetCategory(const juce::String& category) = 0;
 
     // Samples: the per-layer paths, loading, preview and the primary folder, and the content folder's samples.
-    virtual SampleLibrary& getRhythmSamples() noexcept = 0;
+    virtual mu_core::SampleLibrary& getRhythmSamples() noexcept = 0;
     virtual juce::File     getRhythmSamplesDir() const = 0;
 };
 

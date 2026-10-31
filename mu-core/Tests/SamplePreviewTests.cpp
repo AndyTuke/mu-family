@@ -41,7 +41,7 @@ namespace
 }
 struct SamplePreviewTests : juce::UnitTest
 {
-    SamplePreviewTests() : juce::UnitTest("mu-Clid SamplePreview chunks an oversize host block", "mu-clid") {}
+    SamplePreviewTests() : juce::UnitTest("SamplePreview chunks an oversize host block", "mu-core") {}
 
     void runTest() override
     {
@@ -59,7 +59,7 @@ struct SamplePreviewTests : juce::UnitTest
                       + ") equals the same audio in prepared-size blocks");
 
             // Reference: the audio the preview produces when the host honours the prepared size.
-            mu_clid::SamplePreview reference; reference.prepare(kPrepared, kSr);
+            mu_core::SamplePreview reference; reference.prepare(kPrepared, kSr);
             reference.start(tone); juce::AudioBuffer<float> expected(2, total);
             expected.clear();
             for (int done = 0; done < total; done += kPrepared)
@@ -70,7 +70,7 @@ struct SamplePreviewTests : juce::UnitTest
             }
 
             // Under test: one call with the whole oversize block.
-            mu_clid::SamplePreview oversize;
+            mu_core::SamplePreview oversize;
             oversize.prepare(kPrepared, kSr);
             oversize.start(tone);
             juce::AudioBuffer<float> actual(2, total);
@@ -106,7 +106,7 @@ static SamplePreviewTests samplePreviewTests;
 
 struct SamplePreviewDecodeTests : juce::UnitTest
 {
-    SamplePreviewDecodeTests() : juce::UnitTest("mu-Clid SamplePreview plays from memory", "mu-clid") {}
+    SamplePreviewDecodeTests() : juce::UnitTest("SamplePreview plays from memory", "mu-core") {}
 
     void runTest() override
     {
@@ -125,7 +125,7 @@ struct SamplePreviewDecodeTests : juce::UnitTest
         reader->read(&ref, 0, len, 0, true, true);
         reader.reset();
 
-        mu_clid::SamplePreview p;
+        mu_core::SamplePreview p;
         p.prepare(kPrepared, kSr);
         p.start(tone);
         tone.deleteFile();   // any file read in mixInto would now fail: playback must come from memory
@@ -169,7 +169,7 @@ struct SamplePreviewDecodeTests : juce::UnitTest
         for (const int frames : { 1, 100 })
         {
             const auto f192 = writeTone(dir, 192000.0, frames, "short192.wav");
-            mu_clid::SamplePreview q;
+            mu_core::SamplePreview q;
             q.prepare(kPrepared, 44100.0);
             q.start(f192);
             juce::AudioBuffer<float> o(2, 64);
@@ -183,7 +183,7 @@ struct SamplePreviewDecodeTests : juce::UnitTest
 
         beginTest("start() before prepare() is ignored");
         {
-            mu_clid::SamplePreview q;
+            mu_core::SamplePreview q;
             q.start(tone2);
             juce::AudioBuffer<float> o(2, 64);
             o.clear();
