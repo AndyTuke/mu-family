@@ -10,6 +10,7 @@
 add_library(mu-tilate-layer INTERFACE)
 target_sources(mu-tilate-layer INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Audio/SlicePlayer.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Persistence/PhraseParams.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/SliceList.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/Timeline.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/PhrasePlayback.cpp"
@@ -29,8 +30,12 @@ target_sources(mu-tilate-tests PRIVATE
     Source/Tests/SliceDetectionTests.cpp   # onset detection on synthetic loops, and the slice list
     Source/Tests/StretchSliceTests.cpp   # the stretched slice: length, dry head, pitch and level, no pre-echo, no allocation
     Source/Tests/PhraseTests.cpp   # the timeline model and the transport-anchored scheduler
+    Source/Tests/PhraseParamsTests.cpp   # the parameter table and the modulation target table
     # mu-core's detector (the plugin targets get it through mu-core; a console target lists it).
     "${CMAKE_SOURCE_DIR}/mu-core/Analysis/OnsetDetector.cpp"
+    # What the modulation-table checks need (as mu-toni-layer-tests lists them).
+    "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/ControlSequence.cpp"
 )
 target_include_directories(mu-tilate-tests PRIVATE "${CMAKE_SOURCE_DIR}/mu-core" "${CMAKE_SOURCE_DIR}/mu-core/Tests")   # Tests: AllocationProbe.h
 
@@ -40,7 +45,11 @@ target_link_libraries(mu-tilate-tests PRIVATE
     mu-tilate-layer
     juce::juce_core
     juce::juce_audio_basics
+    juce::juce_audio_processors   # the parameter table tests build an APVTS
+    juce::juce_data_structures
     juce::juce_events
+    juce::juce_graphics
+    juce::juce_gui_basics
     juce::juce_dsp   # FFT for the detector
     juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags
