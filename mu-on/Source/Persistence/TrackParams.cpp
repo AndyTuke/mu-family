@@ -1,7 +1,7 @@
 #include "Persistence/TrackParams.h"
 #include "MuLimits.h"   // mu-core: mu_limits::kMaxLayers (the Rumble source's range)
-#include "Plugin/MixerFxParams.h"
-#include "Persistence/ParamText.h"   // mu-core: mu_fmt::floatUnit   // mu-core: addInsertParams
+#include "Persistence/InsertParams.h"   // mu-core: mu_mixfx::addInsertParams
+#include "Persistence/ParamText.h"   // mu-core: mu_fmt::floatUnit
 
 namespace mu_on
 {

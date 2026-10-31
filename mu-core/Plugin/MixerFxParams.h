@@ -5,6 +5,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Audio/AlgorithmNames.h"   // mu_audio::kInsertAlgorithmCount
 #include "Audio/VoiceParams.h"      // VoiceParams::kInsertSlotCount
+#include "Persistence/InsertParams.h"   // mu_mixfx::addInsertParams (layer-safe: no Plugin/ include)
 #include "MuLimits.h"             // mu_limits::kMaxLayers / kMaxBuses: the sidechain source range
 
 // Shared global FX + return + master APVTS parameter layout for the family
@@ -200,19 +201,6 @@ inline void addChannelStripParams(juce::AudioProcessorValueTreeState::ParameterL
             addI("bus", "Bus", 0, mu_limits::kMaxBuses, 0);         // 0 = master, 1..kMaxBuses = group bus
     if (o.midiIn)
         addI("midiIn", "MIDI In", 0, 16, 0);                        // 0 = Omni, 1..16 = that channel only
-}
-
-// One insert's parameters under `prefix` (e.g. "bus0_i1_"): the algorithm and the four generic slot
-// knobs. The suffixes and ranges are the layer insert's (drvChar, insP1..insP4, stored normalised 0..1),
-// so the shared insert UI and the engine read a bus insert exactly as they read a layer's.
-inline void addInsertParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
-                            const juce::String& prefix, const juce::String& namePrefix = {}, int versionHint = 1)
-{
-    layout.add(std::make_unique<juce::AudioParameterInt>(juce::ParameterID { prefix + "drvChar", versionHint },
-                   namePrefix + "Insert Algo", 0, mu_audio::kInsertAlgorithmCount - 1, 0));
-    for (int p = 1; p <= VoiceParams::kInsertSlotCount; ++p)
-        layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID { prefix + "insP" + juce::String(p), versionHint },
-                       namePrefix + "Insert P" + juce::String(p), juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
 }
 
 // The group buses' parameters: bus{B}_ with the channel strip's suffixes (a bus has the same fader, pan,
