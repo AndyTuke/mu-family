@@ -138,7 +138,21 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
           <span class="rel-date">in testing</span>
           <span class="rel-pill testing">In testing</span>
         </div>
-        <p class="rel-note">Nothing in testing right now. Changes that are coming in the next version will appear here.</p>
+        <div class="rn-group improved">
+          <h3>Improved</h3>
+          <ul>
+            <li>Fast pitch and filter envelopes, and the modulation on them, now glide through each audio buffer instead of stepping once per buffer, so the sound no longer depends on your host&rsquo;s buffer size. <span class="ref">(1716)</span></li>
+            <li>The gate now fades out over about a millisecond when it closes (the end of a drawn region, stopping, switching the gater bypass off, or an empty pattern) instead of cutting, which removes the click. <span class="ref">(1716)</span></li>
+          </ul>
+        </div>
+        <div class="rn-group fixed">
+          <h3>Fixed</h3>
+          <ul>
+            <li>Loading a preset while the plugin is bypassed in your host now takes effect at once, so un-bypassing no longer makes the sound jump. <span class="ref">(1715)</span></li>
+            <li>Turning an insert&rsquo;s Tone knob to its fully open end no longer clicks as the filter switches in and out. <span class="ref">(1702)</span></li>
+            <li>The Karplus insert&rsquo;s feedback is now limited more gently, so high feedback settings ring on a sustained note without harsh clipping. <span class="ref">(1714)</span></li>
+          </ul>
+        </div>
       </section>
 
       <!-- ── v1.1.0.1452 ── -->
