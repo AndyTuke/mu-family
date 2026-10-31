@@ -2,7 +2,7 @@
 
 **Tally (updated 2026-10-31): Open 15 · On Hold 7 · Closed 1641 · Total 1663**
 
-**Status key:** ✅ Closed &nbsp;|&nbsp; 🔴 Open &nbsp;|&nbsp; 🟡 On Hold (deferred, blocked, or pending external action)
+**Status key:** ✅ Closed | 🔴 Open | 🟡 On Hold (deferred, blocked, or pending external action)
 
 Test pass/fail tracking lives in [tests.md](tests.md), not this backlog. Use this file for bugs / features / audit findings only.
 
