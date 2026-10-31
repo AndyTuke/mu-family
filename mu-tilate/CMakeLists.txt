@@ -11,6 +11,8 @@ add_library(mu-tilate-layer INTERFACE)
 target_sources(mu-tilate-layer INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Audio/SlicePlayer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/SliceList.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/Timeline.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/PhrasePlayback.cpp"
 )
 target_include_directories(mu-tilate-layer INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
 # Signalsmith Stretch (MIT, header-only) and its FFT library; SYSTEM so their warnings stay out of ours.
@@ -26,6 +28,7 @@ target_sources(mu-tilate-tests PRIVATE
     Source/Tests/SlicePlayerTests.cpp   # the monophonic slice player: native / re-pitch / reverse, fades, the cut fade
     Source/Tests/SliceDetectionTests.cpp   # onset detection on synthetic loops, and the slice list
     Source/Tests/StretchSliceTests.cpp   # the stretched slice: length, dry head, pitch and level, no pre-echo, no allocation
+    Source/Tests/PhraseTests.cpp   # the timeline model and the transport-anchored scheduler
     # mu-core's detector (the plugin targets get it through mu-core; a console target lists it).
     "${CMAKE_SOURCE_DIR}/mu-core/Analysis/OnsetDetector.cpp"
 )

@@ -1,0 +1,72 @@
+#pragma once
+
+#include "Audio/SlicePlayer.h"
+#include "Sequencer/SliceList.h"
+#include "Sequencer/Timeline.h"
+
+#include <juce_audio_basics/juce_audio_basics.h>
+
+// Plays a Phrase: the transport-anchored scheduler between the timeline and the slice player
+// (docs/mu-tilate/design.md, "Clocking and tempo matching"). Every position it uses is a function of the call's
+// start beat, so the output does not depend on the host block size; a jump of the transport re-anchors it (the
+// sounding slice is cut through the declick fade).
+namespace mu_tilate
+{
+
+enum class TempoMode { Off, Repitch, Stretch };
+
+// The loop and its edits, read-only here (the layer swaps them in at a loop boundary).
+struct PhraseLoop
+{
+    const juce::AudioBuffer<float>* audio = nullptr;
+    double         fileSampleRate = 48000.0;
+    const SliceList* slices   = nullptr;
+    const Timeline*  timeline = nullptr;
+};
+
+struct PhraseSettings
+{
+    TempoMode mode      = TempoMode::Off;
+    double    loopTempo = 120.0;   // the loop's own tempo in BPM (Set override, metadata or analysis)
+    float     holdMs    = 10.0f;   // Stretch: Transient hold
+    float     strength  = 1.0f;    // Stretch: Strength
+    float     fadeInMs  = 0.5f;
+    float     fadeOutMs = 0.5f;
+    float     gain      = 1.0f;
+};
+
+// The transport as one call sees it (a subset of mu_core::RenderContext; the layer fills it from there).
+struct PhraseClock
+{
+    bool   playing        = false;
+    double startBeat      = 0.0;    // song beat at the call's first frame
+    double beatsPerSample = 0.0;
+    double bpm            = 120.0;
+    double sampleRate     = 48000.0;
+};
+
+class PhrasePlayback
+{
+public:
+    // Message thread, not processing (see SlicePlayer::prepare).
+    void prepare(double sampleRate, int maxBlock, bool shortWindow = false);
+    // Audio thread: forget the transport position and cut the sounding slice (a stop, a layer swap).
+    void reset() noexcept;
+
+    // Audio thread: adds the call's audio into out[0, n).
+    void render(const PhraseLoop& loop, const PhraseSettings& settings, const PhraseClock& clock,
+                juce::AudioBuffer<float>& out, int n) noexcept;
+
+    bool isActive() const noexcept { return player.isActive(); }
+
+private:
+    void trigger(const PhraseLoop& loop, const PhraseSettings& s, const PhraseClock& c, const TimelineBlock& b) noexcept;
+
+    SlicePlayer player;
+    bool   anchored    = false;   // expectedBeat is valid
+    double expectedBeat = 0.0;    // where the next call should start if the transport ran on
+    bool   cutPending  = false;   // a block with its own length is sounding: cut at cutBeat (a timeline position)
+    double cutBeat     = 0.0;
+};
+
+} // namespace mu_tilate
