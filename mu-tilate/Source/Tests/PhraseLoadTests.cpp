@@ -32,9 +32,9 @@ juce::File writeLoop(const juce::File& dir, const juce::String& name, int frames
     auto file = dir.getChildFile(name);
     file.deleteFile();
     juce::WavAudioFormat wav;
-    std::unique_ptr<juce::FileOutputStream> stream(file.createOutputStream());
-    std::unique_ptr<juce::AudioFormatWriter> writer(wav.createWriterFor(stream.get(), rate, (unsigned) channels, 16, {}, 0));
-    if (writer != nullptr) { stream.release(); writer->writeFromAudioSampleBuffer(b, 0, frames); }
+    std::unique_ptr<juce::OutputStream> stream(file.createOutputStream());
+    auto writer = wav.createWriterFor(stream, juce::AudioFormatWriterOptions {}.withSampleRate(rate).withNumChannels(channels).withBitsPerSample(16));
+    if (writer != nullptr) writer->writeFromAudioSampleBuffer(b, 0, frames);
     return file;
 }
 }

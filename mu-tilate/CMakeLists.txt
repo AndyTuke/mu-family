@@ -119,6 +119,7 @@ if(WIN32)
 endif()
 
 # ── mu-tilate-tests — console UnitTests ─────────────────────────────────────
+include("${CMAKE_SOURCE_DIR}/mu-core/cmake/ProcessorTestSources.cmake")
 juce_add_console_app(mu-tilate-tests PRODUCT_NAME "mu-tilate-tests")
 
 target_sources(mu-tilate-tests PRIVATE
@@ -131,6 +132,12 @@ target_sources(mu-tilate-tests PRIVATE
     Source/Tests/PhraseLayerTests.cpp   # the Phrase layer through the shared render contract
     Source/Tests/PhraseStateTests.cpp   # saving and loading the slices, timeline and loop reference
     Source/Tests/PhraseLoadTests.cpp   # loading a loop file (cap, errors) and detecting slices on it
+    Source/Tests/ProcessorTests.cpp   # the real PluginProcessor, headless: load, play, restore
+    # The real PluginProcessor, built headless (createEditor is defined in ProcessorTests.cpp; PluginEditor.cpp is not linked).
+    Source/Plugin/PluginProcessor.cpp
+    Source/Plugin/PluginProcessor_Preset.cpp
+    # The mu-core .cpps behind ProcessorBase (the console target cannot link mu-core directly).
+    ${MU_CORE_PROCESSOR_TEST_SOURCES}
     Source/Tests/PhraseLoadTests.cpp   # loop decode and cap, detection into slices
     # mu-core's detector (the plugin targets get it through mu-core; a console target lists it).
     "${CMAKE_SOURCE_DIR}/mu-core/Analysis/OnsetDetector.cpp"
@@ -163,4 +170,5 @@ target_link_libraries(mu-tilate-tests PRIVATE
     juce::juce_recommended_warning_flags
 )
 
-target_compile_definitions(mu-tilate-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+target_compile_definitions(mu-tilate-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0
+    JUCE_MODAL_LOOPS_PERMITTED=1)   # the processor tests pump the message loop while a loop loads

@@ -63,6 +63,8 @@ struct Phrase : Layer
     // Persistence (message thread): the loop reference, slices and timeline as the Phrase child of the layer node.
     void writeExtras(juce::ValueTree& node) const override;
     void applyExtras(const juce::ValueTree& node) override;
+    // Message thread: true when the edits a saved file carried were made on a loop of this length, so installLoop applies them.
+    bool savedEditsFit(int loopLength) const noexcept { return loopLength > 0 && pending.loopLength == loopLength; }
     const juce::String& loopPath() const noexcept { return path; }
     const juce::String& loopName() const noexcept { return displayName; }
 

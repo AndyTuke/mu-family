@@ -24,6 +24,18 @@ void PluginProcessor::applyStateTree(const juce::ValueTree& state)
 {
     applyComposedState(state);
     syncAllFxParams();   // re-seed mixer/FX (unchanged values skip listeners)
+
+    // A restored layer names its loop by path: load it again, keeping the slices and timeline the file carried. (Embedding
+    // the loop in the preset is a later step.)
+    for (int l = 0; l < mu_limits::kMaxLayers; ++l)
+    {
+        const auto& ph = getPhrase(l);
+        const auto path = ph.loopPath();
+        if (path.isEmpty()) continue;
+        const auto d = ph.getData();
+        if (d != nullptr && d->audio != nullptr) continue;   // already loaded
+        loadLoopAsync(l, juce::File(path), true);
+    }
 }
 
 void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)

@@ -26,8 +26,10 @@ public:
     virtual int   getPhraseColourIndex(int layer) const = 0;
 
     // Decodes `file` on a worker, detects its slices and lays them out in their original order, then publishes the
-    // result to the layer. A newer request for the same layer supersedes an older one.
-    virtual void loadLoopAsync(int layer, const juce::File& file) = 0;
+    // result to the layer. A newer request for the same layer supersedes an older one. `keepSavedEdits` is for a
+    // session restore: the slices and timeline the saved file carried are kept when they were made on a loop of the
+    // same length, instead of being detected and laid out afresh.
+    virtual void loadLoopAsync(int layer, const juce::File& file, bool keepSavedEdits = false) = 0;
     // One line for the content: the loop's name and slice count, "Loading ...", or the last error.
     virtual juce::String getLoopStatus(int layer) const = 0;
 };

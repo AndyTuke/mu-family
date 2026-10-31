@@ -122,7 +122,7 @@ DetectSettings PluginProcessor::detectSettingsOf(int layer) const
 
 // Decode on a worker, detect, lay the slices out in their original order, then publish on the message thread. A newer
 // request for the layer (or a destroyed processor) makes an older completion do nothing.
-void PluginProcessor::loadLoopAsync(int layer, const juce::File& file)
+void PluginProcessor::loadLoopAsync(int layer, const juce::File& file, bool keepSavedEdits)
 {
     if (layer < 0 || layer >= mu_limits::kMaxLayers) return;
     const int gen = loopGeneration[(size_t) layer].fetch_add(1) + 1;
@@ -132,7 +132,7 @@ void PluginProcessor::loadLoopAsync(int layer, const juce::File& file)
     const double loopTempo = (double) apvts.getRawParameterValue(layerParamPrefix(layer) + ppi::suffix[ppi::ltempo])->load();
     auto flag = alive;
 
-    juce::Thread::launch([this, layer, gen, file, detect, loopTempo, flag]
+    juce::Thread::launch([this, layer, gen, file, detect, loopTempo, flag, keepSavedEdits]
     {
         auto loaded = std::make_shared<mu_core::LoadedLoop>(mu_core::loadLoop(file, mu_limits::kMaxLoopBytes));
         std::shared_ptr<SliceList> slices;
@@ -142,29 +142,34 @@ void PluginProcessor::loadLoopAsync(int layer, const juce::File& file)
             slices = std::make_shared<SliceList>(detectSlices(curve, *loaded->audio, detect));
         }
 
-        juce::MessageManager::callAsync([this, layer, gen, file, loaded, slices, loopTempo, flag]
+        juce::MessageManager::callAsync([this, layer, gen, file, loaded, slices, loopTempo, flag, keepSavedEdits]
         {
             if (! flag->load() || loopGeneration[(size_t) layer].load() != gen) return;   // gone, or superseded
             if (! loaded->ok()) { loopStatus[(size_t) layer] = loaded->error; return; }
 
-            // The timeline: the slices back to back in source order, as long as that takes (in bars of 4/4).
-            std::vector<double> beats;
+            auto& ph = getPhrase(layer);
+
+            // A restore whose saved edits fit this loop keeps them (installLoop applies them); anything else gets the
+            // detected slices laid out back to back in source order, as long as that takes (in bars of 4/4).
+            const bool keep = keepSavedEdits && ph.savedEditsFit(loaded->audio->getNumSamples());
+            ph.installLoop(loaded->audio, loaded->sampleRate, file.getFullPathName(), loaded->name);
             double total = 0.0;
             for (int i = 0; i < slices->size(); ++i)
+                total += (double) slices->slice(i).length() / loaded->sampleRate * loopTempo / 60.0;
+            if (! keep)
             {
-                beats.push_back((double) slices->slice(i).length() / loaded->sampleRate * loopTempo / 60.0);
-                total += beats.back();
+                std::vector<double> beats;
+                for (int i = 0; i < slices->size(); ++i)
+                    beats.push_back((double) slices->slice(i).length() / loaded->sampleRate * loopTempo / 60.0);
+                const int bars = juce::jlimit(1, 64, (int) std::ceil(total / 4.0 - 1.0e-6));
+                Timeline timeline((double) bars * 4.0);
+                timeline.originalOrder(beats);
+                ph.commitEdit(*slices, timeline);
+                if (auto* p = apvts.getParameter(layerParamPrefix(layer) + ppi::suffix[ppi::bars]))
+                    p->setValueNotifyingHost(p->convertTo0to1((float) bars));
             }
-            const int bars = juce::jlimit(1, 64, (int) std::ceil(total / 4.0 - 1.0e-6));
-            Timeline timeline((double) bars * 4.0);
-            timeline.originalOrder(beats);
-
-            auto& ph = getPhrase(layer);
-            ph.installLoop(loaded->audio, loaded->sampleRate, file.getFullPathName(), loaded->name);
-            ph.commitEdit(*slices, timeline);
-            if (auto* p = apvts.getParameter(layerParamPrefix(layer) + ppi::suffix[ppi::bars]))
-                p->setValueNotifyingHost(p->convertTo0to1((float) bars));
-            loopStatus[(size_t) layer] = loaded->name + ": " + juce::String(slices->size()) + " slices, "
+            const auto shown = ph.getData();
+            loopStatus[(size_t) layer] = loaded->name + ": " + juce::String(shown != nullptr ? shown->slices.size() : 0) + " slices, "
                                        + juce::String(total, 1) + " beats at " + juce::String(loopTempo, 0) + " BPM";
         });
     });
