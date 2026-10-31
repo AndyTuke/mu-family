@@ -54,6 +54,14 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MixerOverlay.cpp"
     # Shared plugin scaffolding
     "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_MidiPrograms.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_Settings.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_FxSync.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_Activation.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_Presets.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_LayerEdits.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_LayerTypes.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_Clips.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_Render.cpp"   # the layer render contract's block driver
     "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_ClipAutoSave.cpp"   # clip auto-save: poll and compare
     # The headless --render mode is header-only (Plugin/ProductRender.h), compiled
