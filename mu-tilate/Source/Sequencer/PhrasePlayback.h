@@ -19,7 +19,8 @@ enum class TempoMode { Off, Repitch, Stretch };
 struct PhraseLoop
 {
     const juce::AudioBuffer<float>* audio = nullptr;
-    double         fileSampleRate = 48000.0;
+    double         fileSampleRate = 48000.0;   // the rate of `audio` as given (the host rate when a resampled copy is passed)
+    double         sliceScale = 1.0;           // the slices are in the original file samples; this maps them to `audio`
     const SliceList* slices   = nullptr;
     const Timeline*  timeline = nullptr;
 };

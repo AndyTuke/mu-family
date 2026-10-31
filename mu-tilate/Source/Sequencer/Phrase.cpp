@@ -1,6 +1,7 @@
 #include "Sequencer/Phrase.h"
 
 #include "Modulation/LaneModulation.h"   // mu-core: mu_mod::resolveLane
+#include "Audio/LoopLoader.h"            // mu-core: resampleLoop
 #include "Modulation/StripMods.h"        // mu-core: paramIdFor
 
 #include <algorithm>
@@ -39,6 +40,15 @@ std::shared_ptr<const PhraseData> Phrase::getData() const
     return data;
 }
 
+void Phrase::attachResampled(PhraseData& d) const
+{
+    d.resampled.reset();
+    d.resampledRate = 0.0;
+    if (d.audio == nullptr || hostRate <= 0.0 || std::abs(hostRate - d.fileSampleRate) < 0.5) return;
+    d.resampled = mu_core::resampleLoop(*d.audio, d.fileSampleRate, hostRate);
+    d.resampledRate = hostRate;
+}
+
 void Phrase::installLoop(std::shared_ptr<const juce::AudioBuffer<float>> audio, double fileSampleRate,
                          const juce::String& newPath, const juce::String& newName)
 {
@@ -52,6 +62,7 @@ void Phrase::installLoop(std::shared_ptr<const juce::AudioBuffer<float>> audio, 
     const bool sameLoop = len > 0 && pending.loopLength == len;
     d->slices   = sameLoop ? pending.slices : SliceList(len);
     d->timeline = pending.timeline;
+    attachResampled(*d);
     setData(std::move(d));
 }
 
@@ -59,7 +70,11 @@ void Phrase::commitEdit(const SliceList& slices, const Timeline& timeline)
 {
     auto cur = getData();
     auto d = std::make_shared<PhraseData>();
-    if (cur != nullptr) { d->audio = cur->audio; d->fileSampleRate = cur->fileSampleRate; }
+    if (cur != nullptr)
+    {
+        d->audio = cur->audio; d->fileSampleRate = cur->fileSampleRate;
+        d->resampled = cur->resampled; d->resampledRate = cur->resampledRate;   // the audio is the same: so is its copy
+    }
     d->slices = slices;
     d->timeline = timeline;
     setData(std::move(d));
@@ -97,6 +112,7 @@ void Phrase::applyExtras(const juce::ValueTree& node)
         auto d = std::make_shared<PhraseData>();
         d->audio = cur->audio;
         d->fileSampleRate = cur->fileSampleRate;
+        d->resampled = cur->resampled; d->resampledRate = cur->resampledRate;
         d->slices = pending.loopLength == cur->audio->getNumSamples() ? pending.slices : SliceList(cur->audio->getNumSamples());
         d->timeline = pending.timeline;
         setData(std::move(d));
@@ -105,6 +121,19 @@ void Phrase::applyExtras(const juce::ValueTree& node)
 
 void Phrase::prepare(double sampleRate, int blockSize)
 {
+    // A host rate that differs from the one the loop was resampled for needs a new copy (Stretch plays only a loop at the host rate).
+    hostRate = sampleRate;
+    if (const auto cur = getData(); cur != nullptr && cur->audio != nullptr)
+    {
+        const bool needs = std::abs(sampleRate - cur->fileSampleRate) >= 0.5;
+        if ((needs && std::abs(cur->resampledRate - sampleRate) >= 0.5) || (! needs && cur->resampled != nullptr))
+        {
+            auto d = std::make_shared<PhraseData>(*cur);
+            attachResampled(*d);
+            setData(std::move(d));
+        }
+    }
+
     // The stretch window is a per-layer choice made here (Short for drums, Default for tonal loops).
     playback->prepare(sampleRate, juce::jmax(16, blockSize), pp[ppi::window].load(1.0f) < 0.5f);
     insert->prepare(sampleRate, blockSize);
@@ -166,8 +195,10 @@ void Phrase::renderBlock(const PhraseData* d, PhraseClock clock, juce::AudioBuff
     PhraseLoop loop;
     if (d != nullptr)
     {
-        loop.audio = d->audio.get();
-        loop.fileSampleRate = d->fileSampleRate;
+        const bool useCopy = d->resampled != nullptr && std::abs(d->resampledRate - clock.sampleRate) < 0.5;
+        loop.audio = useCopy ? d->resampled.get() : d->audio.get();
+        loop.fileSampleRate = useCopy ? d->resampledRate : d->fileSampleRate;
+        loop.sliceScale = useCopy ? d->resampledRate / d->fileSampleRate : 1.0;
         loop.slices = &d->slices;
         loop.timeline = &d->timeline;
     }

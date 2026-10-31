@@ -52,19 +52,20 @@ bool pumpUntil(Fn&& done, int ms = 15000)
 // A host that plays at 120 BPM from beat 0, advanced by the test one block at a time.
 struct Host : juce::AudioPlayHead
 {
+    double bpm = 120.0;
     double ppq = 0.0;
     juce::int64 samples = 0;
     juce::Optional<PositionInfo> getPosition() const override
     {
         PositionInfo info;
         info.setIsPlaying(true);
-        info.setBpm(120.0);
+        info.setBpm(bpm);
         info.setPpqPosition(ppq);
         info.setTimeInSamples(samples);
         info.setTimeSignature(TimeSignature { 4, 4 });
         return info;
     }
-    void advance(int n) { samples += n; ppq += (double) n / kSr * 2.0; }
+    void advance(int n) { samples += n; ppq += (double) n / kSr * bpm / 60.0; }
 };
 
 float renderPeak(PluginProcessor& p, Host& host, int blocks)
@@ -139,6 +140,60 @@ struct ProcessorTests : public juce::UnitTest
             expectEquals(d->slices.size(), slices);
             expectEquals(d->timeline.size(), blocks);                     // the edit was kept, not laid out afresh
             expect(q.getPhrase(0).loopPath().endsWith("bursts.wav"));
+        }
+
+        // Not a check: with MU_TILATE_DEMO_LOOP (a loop file), MU_TILATE_DEMO_TEMPO (its tempo) and MU_TILATE_DEMO_OUT (a folder)
+        // set, renders the loop at a faster project tempo in the three tempo modes to WAV files, to be listened to.
+        const auto demoLoop = juce::SystemStats::getEnvironmentVariable("MU_TILATE_DEMO_LOOP", {});
+        if (demoLoop.isNotEmpty())
+        {
+            beginTest("demo render (not a check)");
+            const auto out = juce::File(juce::SystemStats::getEnvironmentVariable("MU_TILATE_DEMO_OUT", "."));
+            out.createDirectory();
+            const double loopTempo = juce::SystemStats::getEnvironmentVariable("MU_TILATE_DEMO_TEMPO", "80").getDoubleValue();
+            const double projectTempo = loopTempo * 1.25;
+            for (int mode = 0; mode < 3; ++mode)
+            {
+                PluginProcessor p;
+                Host host;
+                host.bpm = projectTempo;
+                p.setPlayHead(&host);
+                p.setRateAndBufferSizeDetails(kSr, kBlock);
+                p.prepareToPlay(kSr, kBlock);
+                auto set = [&](int row, float v)
+                {
+                    auto* prm = p.apvts.getParameter(layerParamPrefix(0) + ppi::suffix[row]);
+                    prm->setValueNotifyingHost(prm->convertTo0to1(v));
+                };
+                set(ppi::mode, (float) mode);
+                set(ppi::ltempo, (float) loopTempo);
+                p.loadLoopAsync(0, juce::File(demoLoop));
+                pumpUntil([&] { return p.getPhrase(0).getData() != nullptr && p.getPhrase(0).getData()->timeline.size() > 0; }, 30000);
+                const auto d = p.getPhrase(0).getData();
+                if (d == nullptr) { logMessage("demo: the loop did not load: " + p.getLoopStatus(0)); continue; }
+
+                const int total = (int) (kSr * 12.0);
+                juce::AudioBuffer<float> all(2, total);
+                juce::AudioBuffer<float> blockBuf(2, kBlock);
+                juce::MidiBuffer midi;
+                for (int pos = 0; pos + kBlock <= total; pos += kBlock)
+                {
+                    blockBuf.clear();
+                    p.processBlock(blockBuf, midi);
+                    host.advance(kBlock);
+                    for (int c = 0; c < 2; ++c) all.copyFrom(c, pos, blockBuf, c, 0, kBlock);
+                }
+                const char* names[] = { "off", "repitch", "stretch" };
+                const auto demoFile = out.getChildFile(juce::String("demo_") + names[mode] + ".wav");
+                demoFile.deleteFile();
+                juce::WavAudioFormat wav;
+                std::unique_ptr<juce::OutputStream> stream(demoFile.createOutputStream());
+                if (auto w = wav.createWriterFor(stream, juce::AudioFormatWriterOptions {}.withSampleRate(kSr).withNumChannels(2).withBitsPerSample(24)))
+                    w->writeFromAudioSampleBuffer(all, 0, total);
+                logMessage(juce::String("demo ") + names[mode] + ": " + p.getLoopStatus(0) + ", peak " + juce::String(all.getMagnitude(0, total), 3)
+                           + ", rms " + juce::String(all.getRMSLevel(0, 0, total), 3) + " -> " + demoFile.getFullPathName());
+                p.setPlayHead(nullptr);
+            }
         }
 
         beginTest("a missing file reports itself and leaves the layer as it was");

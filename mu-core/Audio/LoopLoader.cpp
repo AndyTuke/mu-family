@@ -1,9 +1,32 @@
 #include "Audio/LoopLoader.h"
 
+#include <algorithm>
 #include <cmath>
+#include <vector>
 
 namespace mu_core
 {
+
+std::shared_ptr<const juce::AudioBuffer<float>> resampleLoop(const juce::AudioBuffer<float>& src, double fromRate, double toRate)
+{
+    const int n = src.getNumSamples();
+    const int outN = (int) std::ceil((double) n * toRate / fromRate);
+    auto out = std::make_shared<juce::AudioBuffer<float>>(src.getNumChannels(), outN);
+    out->clear();
+    if (n <= 0 || fromRate <= 0.0 || toRate <= 0.0) return out;
+
+    // The interpolator reads a window of input around each output sample, so the input is padded with silence at the end.
+    const int pad = 256;
+    std::vector<float> in((size_t) n + (size_t) pad, 0.0f);
+    for (int c = 0; c < src.getNumChannels(); ++c)
+    {
+        std::copy(src.getReadPointer(c), src.getReadPointer(c) + n, in.begin());
+        std::fill(in.begin() + n, in.end(), 0.0f);
+        juce::WindowedSincInterpolator interp;
+        interp.process(fromRate / toRate, in.data(), out->getWritePointer(c), outN);
+    }
+    return out;
+}
 
 LoadedLoop loadLoop(const juce::File& file, long long maxBytes)
 {

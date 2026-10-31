@@ -27,6 +27,10 @@ struct PhraseData
 {
     std::shared_ptr<const juce::AudioBuffer<float>> audio;   // shared: an edit of the slices or timeline reuses it
     double       fileSampleRate = 48000.0;
+    // The same loop at the host rate when that differs from the file's (a time-stretcher needs it there); the slices stay
+    // in the file's samples and are scaled when played. Null when the rates match.
+    std::shared_ptr<const juce::AudioBuffer<float>> resampled;
+    double       resampledRate = 0.0;
     SliceList    slices { 0 };
     Timeline     timeline;
 };
@@ -122,6 +126,9 @@ private:
     mu_mod::LastResolved<kNumModDests>                        lastResolved;
 
     PhraseSettings settings;                       // the block's settings, set by readParams
+    // Fills in the host-rate copy of the loop when its rate differs from the file's (message thread, not processing).
+    void attachResampled(PhraseData& d) const;
+    double hostRate = 0.0;                         // the rate prepare last ran at (message thread)
 
     // Message thread only: what a saved layer asked for before its loop was loaded, and where the loop came from.
     PhraseState  pending;

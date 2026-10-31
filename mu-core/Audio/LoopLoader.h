@@ -21,6 +21,11 @@ struct LoadedLoop
     bool ok() const noexcept { return audio != nullptr; }
 };
 
+// A copy of `src` resampled from `fromRate` to `toRate` (windowed-sinc, every channel), for a layer whose engine needs the loop
+// at the host rate (a time-stretcher). Allocates: a worker or message thread only. The copy is exactly
+// ceil(length * toRate / fromRate) samples long.
+std::shared_ptr<const juce::AudioBuffer<float>> resampleLoop(const juce::AudioBuffer<float>& src, double fromRate, double toRate);
+
 // Reads `file`. The size check uses the reader's length x channels x 4 bytes against `maxBytes` before anything is
 // decoded; a file over it is rejected with "Loop too long: N s, limit M s for this file".
 LoadedLoop loadLoop(const juce::File& file, long long maxBytes);

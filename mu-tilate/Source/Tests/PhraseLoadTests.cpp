@@ -97,6 +97,23 @@ struct PhraseLoadTests : public juce::UnitTest
             expect(analyseLoop(*l.audio, l.sampleRate, even).empty());
         }
 
+        beginTest("resampling keeps the pitch, the level and the length ratio");
+        {
+            const int n = 44100;
+            juce::AudioBuffer<float> src(2, n);
+            for (int c = 0; c < 2; ++c)
+                for (int i = 0; i < n; ++i) src.setSample(c, i, 0.5f * std::sin(2.0f * juce::MathConstants<float>::pi * 1000.0f * (float) i / 44100.0f));
+            const auto out = mu_core::resampleLoop(src, 44100.0, 48000.0);
+            expectEquals(out->getNumChannels(), 2);
+            expectEquals(out->getNumSamples(), 48000);
+            int zc = 0;
+            for (int i = 4001; i < 44000; ++i)
+                if ((out->getSample(0, i - 1) < 0.0f) != (out->getSample(0, i) < 0.0f)) ++zc;
+            expectGreaterOrEqual(zc, 2 * 1000 * 39999 / 48000 - 2);      // 1 kHz stays 1 kHz
+            expectLessOrEqual(zc, 2 * 1000 * 39999 / 48000 + 2);
+            expectWithinAbsoluteError(out->getMagnitude(0, 4000, 40000), 0.5f, 0.02f);
+        }
+
         dir.deleteRecursively();
     }
 };

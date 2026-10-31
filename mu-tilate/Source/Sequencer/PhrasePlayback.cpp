@@ -46,7 +46,13 @@ void PhrasePlayback::trigger(const PhraseLoop& loop, const PhraseSettings& s, co
     else if (s.mode == TempoMode::Stretch && std::abs(rateFromFile - 1.0) < 1.0e-6)   // the stretcher needs the file at the host rate
         p.timeRatio = (float) (1.0 / tempoRatio);
 
-    player.trigger(loop.audio, loop.slices->slice(b.slice), p);
+    auto range = loop.slices->slice(b.slice);
+    if (loop.sliceScale != 1.0)
+    {
+        range.start = (int) std::lround((double) range.start * loop.sliceScale);
+        range.end   = (int) std::lround((double) range.end   * loop.sliceScale);
+    }
+    player.trigger(loop.audio, range, p);
 }
 
 void PhrasePlayback::render(const PhraseLoop& loop, const PhraseSettings& s, const PhraseClock& c,
