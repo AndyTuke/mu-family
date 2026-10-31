@@ -1,17 +1,17 @@
-// ProcessorBase, part of the class split by topic (code moved unchanged from ProcessorBase.cpp).
-// Mixer and global-FX parameter sync: APVTS parameter changes into the engines (audio-thread automation path).
-#include "Plugin/ProcessorBase.h"
+#include "Plugin/FxParamSync.h"
 #include "Plugin/MixerFxParams.h"           // mu_mixfx::isGlobalFxParamId
-#include "Sequencer/ClipClipboard.h"         // the process-wide clip clipboard
-#include "Persistence/PresetFiles.h"         // mu_pp full-preset files
 #include "Audio/FX/Slots/FXAlgorithmDef.h"   // FXAlgorithmRegistry
 #include "Audio/AlgorithmNames.h"             // mu_audio::kInsertAlgorithmCount
 #include <cstring>                            // std::strcmp — alloc-free suffix compare
-#include <map>
-#include <memory>
-#include <mutex>
 
-bool ProcessorBase::isFxParamId(const juce::String& id)
+namespace mu_core
+{
+
+FxParamSync::FxParamSync(juce::AudioProcessor& p, juce::AudioProcessorValueTreeState& a, MixerEngine& m,
+                         FXChain& f, std::atomic<bool>& mute)
+    : proc(p), apvts(a), mixerEngine(m), fxChain(f), muteChanged(mute) {}
+
+bool FxParamSync::isFxParamId(const juce::String& id)
 {
     return id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id);
 }
@@ -33,9 +33,9 @@ const char* channelStripSuffix(const juce::String& id, int& index) noexcept
 }
 }
 
-void ProcessorBase::onFxParamChanged(const juce::String& id, float v)
+void FxParamSync::onChanged(const juce::String& id, float v)
 {
-    syncGlobalFxParam(id, v);
+    syncGlobal(id, v);
     // ch{N}_mute: a flag for the message-thread poll (the lamps follow a mute made anywhere); alloc-free.
     int stripIdx = -1;
     if (const char* suffix = channelStripSuffix(id, stripIdx); suffix != nullptr && std::strcmp(suffix, "mute") == 0)
@@ -46,31 +46,42 @@ void ProcessorBase::onFxParamChanged(const juce::String& id, float v)
 }
 
 // Listen to every mixer / global-FX parameter, then seed the engines from the current values.
-void ProcessorBase::startFxParamSync()
+void FxParamSync::start()
 {
     jassert(fxParamListener == nullptr);   // once per processor
-    fxParamListener = std::make_unique<FxParamListener>(*this);
-    for (auto* p : getParameters())
+    fxParamListener = std::make_unique<Listener>(*this);
+    for (auto* p : proc.getParameters())
         if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
             if (isFxParamId(rp->getParameterID()))
                 apvts.addParameterListener(rp->getParameterID(), fxParamListener.get());
-    syncAllFxParams();   // JUCE doesn't fire parameterChanged on construction
+    syncAll();   // JUCE doesn't fire parameterChanged on construction
+}
+
+// Stops listening (idempotent): the owner calls it from its destructor, before the members the listener touches die.
+void FxParamSync::stop()
+{
+    if (fxParamListener == nullptr) return;
+    for (auto* p : proc.getParameters())
+        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
+            if (isFxParamId(rp->getParameterID()))
+                apvts.removeParameterListener(rp->getParameterID(), fxParamListener.get());
+    fxParamListener.reset();
 }
 
 // rt-ok-fn: constructor and state restore only (message thread); not the automation path
-void ProcessorBase::syncAllFxParams()
+void FxParamSync::syncAll()
 {
-    for (auto* p : getParameters())
+    for (auto* p : proc.getParameters())
         if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
         {
             const auto id = rp->getParameterID();
             if (isFxParamId(id))
                 if (auto* a = apvts.getRawParameterValue(id))
-                    syncGlobalFxParam(id, a->load());
+                    syncGlobal(id, a->load());
         }
 }
 
-void ProcessorBase::syncGlobalFxParam(const juce::String& id, float v)
+void FxParamSync::syncGlobal(const juce::String& id, float v)
 {
     // Prefix router → per-family helper. Keeps each automation tick a single
     // prefix test plus one bounded if/else inside the matching helper.
@@ -108,7 +119,7 @@ void ProcessorBase::syncGlobalFxParam(const juce::String& id, float v)
 // param / rest are raw NUL-terminated suffixes pointing into the caller's id
 // buffer (param IDs are pure ASCII). std::strcmp avoids building any juce::String,
 // so this stays allocation-free on the audio-thread automation path.
-void ProcessorBase::syncChannelStripParam(int channel, const char* param, float v)
+void FxParamSync::syncChannelStripParam(int channel, const char* param, float v)
 {
     auto& ch = mixerEngine.channels[(size_t) channel];
     auto is = [param](const char* s) { return std::strcmp(param, s) == 0; };
@@ -129,7 +140,7 @@ void ProcessorBase::syncChannelStripParam(int channel, const char* param, float 
 
 // bus{B}_{suffix}: the strip's own suffixes, or i{I}_{drvChar|insP1..4} for an insert. Pointer arithmetic on the
 // id's buffer only, so the automation path allocates nothing.
-void ProcessorBase::syncBusParam(const juce::String& id, float v)
+void FxParamSync::syncBusParam(const juce::String& id, float v)
 {
     const char* s = id.toRawUTF8();
     if (s[3] < '0' || s[3] > '9') return;
@@ -167,7 +178,7 @@ void ProcessorBase::syncBusParam(const juce::String& id, float v)
     else if (is("scRel"))   bus.sidechainReleaseMs.store(v, std::memory_order_relaxed);
 }
 
-void ProcessorBase::syncReturnStripParam(int retIndex, const char* rest, float v)
+void FxParamSync::syncReturnStripParam(int retIndex, const char* rest, float v)
 {
     auto& ret = mixerEngine.returns[(size_t) retIndex];
     auto is = [rest](const char* s) { return std::strcmp(rest, s) == 0; };
@@ -181,7 +192,7 @@ void ProcessorBase::syncReturnStripParam(int retIndex, const char* rest, float v
     else if (is("scRel")) ret.sidechainReleaseMs.store(v, std::memory_order_relaxed);
 }
 
-bool ProcessorBase::syncMasterParam(const juce::String& id, float v)
+bool FxParamSync::syncMasterParam(const juce::String& id, float v)
 {
     if (id == "mstr_lvl")     { mixerEngine.masterLevel.store(v, std::memory_order_relaxed); return true; }
     if (id == "mstr_pan")     { mixerEngine.masterPan.store(v, std::memory_order_relaxed);   return true; }
@@ -199,7 +210,7 @@ bool ProcessorBase::syncMasterParam(const juce::String& id, float v)
 }
 
 // rt-ok-fn: automation path, can run on the audio thread; getRawParameterValue(StringRef) is a non-allocating std::map find and ReverbSlot::setParam uses strcmp: bounded and alloc-free; a cached-pointer version is tracked
-void ProcessorBase::syncFxSlotParam(const juce::String& id, float v)
+void FxParamSync::syncFxSlotParam(const juce::String& id, float v)
 {
     auto& eff = fxChain.effectSlot();
     auto& dly = fxChain.delaySlot();
@@ -289,3 +300,5 @@ void ProcessorBase::syncFxSlotParam(const juce::String& id, float v)
     else if (id == "echo_spread") eff.getEchoDelay().setSpread(v);
     else if (id == "echo_dirt")   eff.getEchoDelay().setDirt(v);
 }
+
+} // namespace mu_core

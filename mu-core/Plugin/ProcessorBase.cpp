@@ -200,12 +200,14 @@ bool ProcessorBase::perform(const mu_core::ControlAction& a)
 ProcessorBase::~ProcessorBase()
 {
     prepareForDestruction();   // backstop: the product destructors already ran it first
-    if (fxParamListener != nullptr)
-        for (auto* p : getParameters())
-            if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
-                if (isFxParamId(rp->getParameterID()))
-                    apvts.removeParameterListener(rp->getParameterID(), fxParamListener.get());
+    fxParamSync.stop();   // the listener must go before the members it touches
 }
+
+// ─── Mixer / global-FX parameters: forwarders to FxParamSync ──────────────────────────────────────────────────
+bool ProcessorBase::isFxParamId(const juce::String& id)     { return mu_core::FxParamSync::isFxParamId(id); }
+void ProcessorBase::startFxParamSync()                       { fxParamSync.start(); }
+void ProcessorBase::syncAllFxParams()                        { fxParamSync.syncAll(); }
+void ProcessorBase::syncGlobalFxParam(const juce::String& id, float v) { fxParamSync.syncGlobal(id, v); }
 
 void ProcessorBase::processCoreBlock(juce::AudioBuffer<float>&                masterBus,
                                      std::unique_ptr<VoiceEngine>*            voices,

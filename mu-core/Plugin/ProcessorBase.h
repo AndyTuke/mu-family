@@ -18,6 +18,7 @@
 
 #include "Audio/FX/Slots/FXChain.h"
 #include "Audio/MixerEngine.h"
+#include "Plugin/FxParamSync.h"
 #include "Audio/VoiceEngine.h"
 #include "Persistence/MidiPresetMap.h"
 #include "Persistence/MidiFullPresetMap.h"
@@ -1285,17 +1286,6 @@ private:
     std::atomic<int> selectedSlot { 0 };   // setSelectedSlot
     int  firstUnusedColourIndex() const;   // lowest palette index no live layer uses
 
-    // syncGlobalFxParam dispatch helpers — one per ID family, so the public
-    // entry point is a short prefix router rather than a ~100-line if/else chain.
-    // syncMaster returns true when it handled the id. The channel/return helpers
-    // take a raw `const char*` suffix pointing into the caller's id buffer (NOT a
-    // juce::String substring) so the audio-thread automation path allocates nothing.
-    void syncChannelStripParam(int channel, const char* param, float v);
-    void syncReturnStripParam (int retIndex,  const char* rest,  float v);
-    void syncBusParam         (const juce::String& id, float v);
-    bool syncMasterParam      (const juce::String& id, float v);
-    void syncFxSlotParam      (const juce::String& id, float v);
-
     // MIDI program-change queue: audio thread enqueues on incoming PC;
     // drainPendingMidiProgramChanges (message thread) drains and dispatches
     // to the virtual hooks.
@@ -1310,17 +1300,10 @@ private:
     mu_core::ParamGestureHold  gestureHold;
 
 private:
-    // Forwards mixer / global-FX parameter changes to syncGlobalFxParam (see startFxParamSync).
-    struct FxParamListener : juce::AudioProcessorValueTreeState::Listener
-    {
-        explicit FxParamListener(ProcessorBase& o) : owner(o) {}
-        void parameterChanged(const juce::String& id, float v) override { owner.onFxParamChanged(id, v); }
-        ProcessorBase& owner;
-    };
-    std::unique_ptr<FxParamListener> fxParamListener;
-    // The listener's one entry (any thread, audio thread included): the engine sync, plus a flag for the
-    // message thread when a strip mute moved. No allocation.
-    void onFxParamChanged(const juce::String& id, float v);
+    // Mixer / global-FX parameter sync: the listener, the dispatch and every engine write live in FxParamSync; the
+    // public isFxParamId / startFxParamSync / syncAllFxParams / syncGlobalFxParam above forward to it. Declared after
+    // apvts, fxChain, mixerEngine and muteChanged, which it references.
+    mu_core::FxParamSync fxParamSync { *this, apvts, mixerEngine, fxChain, muteChanged };
 
     // ─── The block driver's state (ProcessorBase_Render.cpp) ─────────────────────────────────────
     // Audio-thread state survives blocks as values only, never as addresses of layers, views or tails.
