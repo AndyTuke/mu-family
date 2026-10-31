@@ -11,7 +11,10 @@ namespace
     constexpr int kRulerH = 18;   // unscaled
 }
 
-void PhraseTimeline::setTimeline(const mu_tilate::Timeline& t, std::vector<double> beats)
+namespace mu_tilate
+{
+
+void PhraseTimeline::setTimeline(const Timeline& t, std::vector<double> beats)
 {
     timeline = t;
     sliceBeatsList = std::move(beats);
@@ -124,8 +127,8 @@ void PhraseTimeline::mouseDown(const juce::MouseEvent& e)
     const int slice = sliceToPlace ? sliceToPlace() : -1;
     if (slice >= 0 && onEdit)
     {
-        const double beat = e.mods.isAltDown() ? beatAt(e.x) : mu_tilate::Timeline::snap(beatAt(e.x), gridBeats);
-        onEdit([slice, beat](mu_tilate::Timeline& t) { t.place(slice, beat, 0.0); });
+        const double beat = e.mods.isAltDown() ? beatAt(e.x) : Timeline::snap(beatAt(e.x), gridBeats);
+        onEdit([slice, beat](Timeline& t) { t.place(slice, beat, 0.0); });
     }
     if (onBlockSelected) onBlockSelected(-1);
     repaint();
@@ -135,14 +138,14 @@ void PhraseTimeline::mouseDrag(const juce::MouseEvent& e)
 {
     if (dragBlock < 0 || ! onEdit) return;
     const double grid = e.mods.isAltDown() ? 0.0 : gridBeats;
-    const double target = mu_tilate::Timeline::snap(beatAt(e.x) - grabOffset, grid);
+    const double target = Timeline::snap(beatAt(e.x) - grabOffset, grid);
     const double current = timeline.blocks()[(size_t) dragBlock].start;
     if (std::abs(target - current) < 1.0e-9 && ! (e.mods.isCtrlDown() && ! dragMoved)) return;
 
     const int from = dragBlock;
     const bool copy = e.mods.isCtrlDown();
     int movedTo = -1;
-    onEdit([&](mu_tilate::Timeline& t) { movedTo = copy ? t.copy(from, target, 0.0) : t.move(from, target, 0.0); });
+    onEdit([&](Timeline& t) { movedTo = copy ? t.copy(from, target, 0.0) : t.move(from, target, 0.0); });
     if (movedTo >= 0 && ! copy)
     {
         dragBlock = movedTo; selected = movedTo;   // the timeline republishes; the block we hold is at its new index
@@ -163,9 +166,11 @@ bool PhraseTimeline::keyPressed(const juce::KeyPress& k)
     {
         const int at = selected;
         selected = -1;
-        onEdit([at](mu_tilate::Timeline& t) { t.remove(at); });
+        onEdit([at](Timeline& t) { t.remove(at); });
         if (onBlockSelected) onBlockSelected(-1);
         return true;
     }
     return false;
 }
+
+} // namespace mu_tilate

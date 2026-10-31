@@ -11,13 +11,16 @@
 // blocks. It shows the Timeline it is given and reports what the user asked for; it edits nothing itself. A click on empty row
 // asks to place the slice the host names, a drag moves a block (Alt = free, Ctrl = copy), Delete removes the selected block.
 // The whole timeline is shown (zoom and scroll for long ones come next).
+namespace mu_tilate
+{
+
 class PhraseTimeline : public juce::Component
 {
 public:
     PhraseTimeline() { setWantsKeyboardFocus(true); }
 
     // The timeline to show, how long each slice is in beats (index = slice), the snap grid in beats (0 = none) and the selected block.
-    void setTimeline(const mu_tilate::Timeline& timeline, std::vector<double> sliceBeats);
+    void setTimeline(const Timeline& timeline, std::vector<double> sliceBeats);
     void setGridBeats(double grid) { gridBeats = grid; }
     void setSelectedBlock(int index);
     // The playhead in beats from the timeline start, or a negative value for none.
@@ -26,7 +29,7 @@ public:
     // The slice a click on empty row places (the waveform's selected region); -1 = none selected.
     std::function<int()> sliceToPlace;
     // The user asked for an edit: `edit` is applied to a copy of the layer's timeline and published.
-    std::function<void(const std::function<void(mu_tilate::Timeline&)>& edit)> onEdit;
+    std::function<void(const std::function<void(Timeline&)>& edit)> onEdit;
     // A block was selected (-1 for none).
     std::function<void(int block)> onBlockSelected;
 
@@ -45,7 +48,7 @@ private:
     double blockBeats(int i) const;
     int    blockAt(int x) const;
 
-    mu_tilate::Timeline timeline;
+    Timeline timeline;
     std::vector<double> sliceBeatsList;
     double gridBeats = 0.25;
     int    selected = -1;
@@ -58,3 +61,5 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhraseTimeline)
 };
+
+} // namespace mu_tilate
