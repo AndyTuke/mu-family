@@ -36,8 +36,8 @@ Notes: #1709 is not a real defect at these scales; the backlog row is updated on
 Build: v1.1.0.1455 · Ran: `pwsh tests/scripts/check-layer-boundary.ps1` · Saw: exactly one violation, `mu-on-layer/Persistence/TrackParams.cpp:3` includes `Plugin/MixerFxParams.h`, as expected.
 
 ### Re L-005 · 2026-10-31 · Partly
-Build: v1.1.0.1455 · Ran: build (no compile errors in `ModulationMatrix` or `ProcessorBase`); `mu-core-tests`; `check-rt-safety.ps1` · Saw: rt-safety 0 findings outside setup, 132 in setup, 104 suppressed, exit 0 (as expected).
-Notes: the two extra tests (12-character id under an allocation counter; a processor-level load while bypassed) were NOT written, and the bypass listening check was not done.
+Build: v1.1.0.1456 (Release deployed to the VST3 folder) · Ran: build (no compile errors in `ModulationMatrix` or `ProcessorBase`); `mu-core-tests`; `check-rt-safety.ps1` · Saw: rt-safety 0 findings outside setup, 132 in setup, 104 suppressed, exit 0 (as expected). Andy loaded a preset while the plugin was bypassed in Bitwig (Release 1456), then un-bypassed: applied at once, sounds perfect, no jump.
+Notes: #1715 closed on the build PC. Still not written: the 12-character control-sequence id allocation-counter test (#1704) and a processor-level bypassed-load test.
 
 ### Re L-006 · 2026-10-31 · Done
 Build: v1.1.0.1455 · Ran: `mu-core-tests`, which includes `SpectralBehaviourTests` and `InsertDSPSmokeTests` (no failures in either) · Saw: `mu-clid` golden `inserts-karplus-ring` moved (292 differences, first at 3258 ms, RMS unchanged to 0.01 dB), as the item expected; not re-recorded. Andy listened to the Karplus insert in mu-Clid at 75 % and 100 % feedback: sounds fine.
