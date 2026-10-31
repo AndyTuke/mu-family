@@ -13,6 +13,10 @@ target_sources(mu-tilate-layer INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/SliceList.cpp"
 )
 target_include_directories(mu-tilate-layer INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
+# Signalsmith Stretch (MIT, header-only) and its FFT library; SYSTEM so their warnings stay out of ours.
+target_include_directories(mu-tilate-layer SYSTEM INTERFACE
+    "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-stretch"
+    "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-linear/include")
 
 # ── mu-tilate-tests — console UnitTests ─────────────────────────────────────
 juce_add_console_app(mu-tilate-tests PRODUCT_NAME "mu-tilate-tests")
@@ -21,10 +25,11 @@ target_sources(mu-tilate-tests PRIVATE
     Source/Tests/TestMain.cpp
     Source/Tests/SlicePlayerTests.cpp   # the monophonic slice player: native / re-pitch / reverse, fades, the cut fade
     Source/Tests/SliceDetectionTests.cpp   # onset detection on synthetic loops, and the slice list
+    Source/Tests/StretchSliceTests.cpp   # the stretched slice: length, dry head, pitch and level, no pre-echo, no allocation
     # mu-core's detector (the plugin targets get it through mu-core; a console target lists it).
     "${CMAKE_SOURCE_DIR}/mu-core/Analysis/OnsetDetector.cpp"
 )
-target_include_directories(mu-tilate-tests PRIVATE "${CMAKE_SOURCE_DIR}/mu-core")
+target_include_directories(mu-tilate-tests PRIVATE "${CMAKE_SOURCE_DIR}/mu-core" "${CMAKE_SOURCE_DIR}/mu-core/Tests")   # Tests: AllocationProbe.h
 
 target_compile_features(mu-tilate-tests PRIVATE cxx_std_17)
 
