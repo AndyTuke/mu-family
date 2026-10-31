@@ -8,7 +8,7 @@ Next id: B-003
 
 ## Status (build PC)
 
-- Written: 2026-10-31. Build number 1455 (`mu-core/BuildNumber.h`). HEAD is the commit that carries this file; everything is pushed.
+- Written: 2026-10-31. Build number 1456 (`mu-core/BuildNumber.h`; 1455 for results written earlier). HEAD is the commit that carries this file; everything is pushed.
 - Andy was away: nothing was listened to or looked at. Every listen / look step is still open.
 - Full Debug build of all products is clean (the code written without a compiler compiled). Release was not built.
 
@@ -20,9 +20,9 @@ Not goldens-only: the parameter manifests of mu-On, mu-Clid, mu-Tant and mu-Toni
 
 ## Results
 
-### Re L-001 · 2026-10-31 · Partly
-Build: v1.1.0.1455 · Ran: full Debug build of all products incl. mu-link; `mu-link-tests` (86 results, 0 failures) · Saw: nothing listened.
-Notes: not done: the two-apps attach / detach / re-attach check and listening for stale audio. #1703 stays open until that is done.
+### Re L-001 · 2026-10-31 · Done
+Build: v1.1.0.1456 · Ran: full Debug build of all products incl. mu-link; `mu-link-tests` (86 results, 0 failures) · Saw: Andy ran two apps on mu-link, detached and re-attached one, and repeated with the mu-link audio device stopped: all good, no stale audio, the freed slot was claimable again.
+Notes: #1703 closed on the build PC.
 
 ### Re L-002 · 2026-10-31 · Partly
 Build: v1.1.0.1455 · Ran: `mu-on-tests` (239 results, 16 failures; the StepPaging cases ran and none of the failures is in them, the 16 are the manifest and golden differences in B-002) · Saw: nothing.
