@@ -28,6 +28,10 @@ Notes: #1703 closed on the build PC.
 Build: v1.1.0.1455 · Ran: `mu-on-tests` (239 results, 16 failures; the StepPaging cases ran and none of the failures is in them, the 16 are the manifest and golden differences in B-002) · Saw: nothing.
 Notes: not done: smoke row MS2, manual regeneration, screenshots.
 
+### Re L-003 · 2026-10-31 · Done
+Build: v1.1.0.1456 · Ran: mu-Clid Debug at 100 %, 150 % and 200 % Windows display scale · Saw: Andy looked at the brushed-metal panels and knob shadows at each scale: all sharp, nothing soft. No screenshot needed.
+Notes: #1709 is not a real defect at these scales; the backlog row is updated on the build PC.
+
 ### Re L-004 · 2026-10-31 · Done
 Build: v1.1.0.1455 · Ran: `pwsh tests/scripts/check-layer-boundary.ps1` · Saw: exactly one violation, `mu-on-layer/Persistence/TrackParams.cpp:3` includes `Plugin/MixerFxParams.h`, as expected.
 
@@ -48,7 +52,7 @@ Build: v1.1.0.1455 · Ran: full Debug build; `mu-clid-tests` (354 results, 17 fa
 Notes: everything compiles. I cannot say the goldens moved because of the lifts: they were already stale (no golden has been re-recorded since the sound changes), and the manifest differences are separate. To judge the lifts, re-record on a clean pre-lift commit and compare, or rerun mu-Tant and mu-Toni to the end (they need a longer cap than 300 s in Debug).
 
 ### Not started (no result entry)
-L-003, L-009, L-010, L-011: not touched; they need eyes, ears or the earlier items to pass first.
+L-009, L-010, L-011: not touched; they need ears or the earlier items to pass first.
 
 ### Extra · 2026-10-31 · JUCE MIDI abort
 Every Debug Standalone aborted at startup on this PC: JUCE 9.0.4 crashes when `midiInOpen` fails (the MOTU port; likely after the 29 Oct Windows updates). Upstream JUCE issue 1769, fixed on `develop`, not in 9.0.4. A local guard is in `D:\JUCE` and logged in `docs/design-plugin-family.md` ("Local JUCE patches"), diff in `juce-patches/`. Only mu-Clid has been rebuilt with it; the others need a rebuild.
