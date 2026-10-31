@@ -39,6 +39,70 @@ std::shared_ptr<const PhraseData> Phrase::getData() const
     return data;
 }
 
+void Phrase::installLoop(std::shared_ptr<const juce::AudioBuffer<float>> audio, double fileSampleRate,
+                         const juce::String& newPath, const juce::String& newName)
+{
+    path = newPath;
+    displayName = newName;
+    auto d = std::make_shared<PhraseData>();
+    d->audio = std::move(audio);
+    d->fileSampleRate = fileSampleRate;
+    const int len = d->audio != nullptr ? d->audio->getNumSamples() : 0;
+    // Saved edits belong to the loop they were made on: the same length means the same loop.
+    const bool sameLoop = len > 0 && pending.loopLength == len;
+    d->slices   = sameLoop ? pending.slices : SliceList(len);
+    d->timeline = pending.timeline;
+    setData(std::move(d));
+}
+
+void Phrase::commitEdit(const SliceList& slices, const Timeline& timeline)
+{
+    auto cur = getData();
+    auto d = std::make_shared<PhraseData>();
+    if (cur != nullptr) { d->audio = cur->audio; d->fileSampleRate = cur->fileSampleRate; }
+    d->slices = slices;
+    d->timeline = timeline;
+    setData(std::move(d));
+}
+
+void Phrase::writeExtras(juce::ValueTree& node) const
+{
+    Layer::writeExtras(node);
+    PhraseState st;
+    const auto d = getData();
+    if (d != nullptr && d->audio != nullptr)
+    {
+        st.loopLength = d->audio->getNumSamples();
+        st.slices = d->slices;
+        st.timeline = d->timeline;
+    }
+    else
+        st = pending;          // no loop loaded yet: keep what the file said
+    st.loopPath = path;
+    st.loopName = displayName;
+    writePhraseState(node, st);
+}
+
+void Phrase::applyExtras(const juce::ValueTree& node)
+{
+    Layer::applyExtras(node);
+    pending = readPhraseState(node);
+    path = pending.loopPath;
+    displayName = pending.loopName;
+
+    // A loop already loaded keeps its audio; the saved slices apply if they fit it, and the timeline always does.
+    const auto cur = getData();
+    if (cur != nullptr && cur->audio != nullptr)
+    {
+        auto d = std::make_shared<PhraseData>();
+        d->audio = cur->audio;
+        d->fileSampleRate = cur->fileSampleRate;
+        d->slices = pending.loopLength == cur->audio->getNumSamples() ? pending.slices : SliceList(cur->audio->getNumSamples());
+        d->timeline = pending.timeline;
+        setData(std::move(d));
+    }
+}
+
 void Phrase::prepare(double sampleRate, int blockSize)
 {
     // The stretch window is a per-layer choice made here (Short for drums, Default for tonal loops).
@@ -102,7 +166,7 @@ void Phrase::renderBlock(const PhraseData* d, PhraseClock clock, juce::AudioBuff
     PhraseLoop loop;
     if (d != nullptr)
     {
-        loop.audio = &d->audio;
+        loop.audio = d->audio.get();
         loop.fileSampleRate = d->fileSampleRate;
         loop.slices = &d->slices;
         loop.timeline = &d->timeline;

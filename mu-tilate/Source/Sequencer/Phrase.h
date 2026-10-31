@@ -6,6 +6,7 @@
 #include "Modulation/LastResolved.h"    // mu-core: hold-last-value on a matrix-lock miss
 #include "Modulation/MuTilateModDest.h" // the modulation target table
 #include "Persistence/PhraseParams.h"   // the Phrase type's parameter table (ppi)
+#include "Persistence/PhraseState.h"    // the saved form of the loop reference, slices and timeline
 #include "Sequencer/Layer.h"            // mu-core: name, colour, modulation, the render contract
 #include "Sequencer/LayerTypeInfo.h"    // mu-core: mu_core::LayerTypeId
 #include "Sequencer/PhrasePlayback.h"   // the transport-anchored scheduler (timeline, slices, player)
@@ -24,7 +25,7 @@ namespace mu_tilate
 // immutable once a layer holds it; an edit builds a new one and hands it to Phrase::setData.
 struct PhraseData
 {
-    juce::AudioBuffer<float> audio;
+    std::shared_ptr<const juce::AudioBuffer<float>> audio;   // shared: an edit of the slices or timeline reuses it
     double       fileSampleRate = 48000.0;
     SliceList    slices { 0 };
     Timeline     timeline;
@@ -52,6 +53,18 @@ struct Phrase : Layer
     void setData(std::shared_ptr<const PhraseData> d);
     // Message thread: the data now published (for the editor and for building an edited copy).
     std::shared_ptr<const PhraseData> getData() const;
+    // Message thread: a loop has been decoded. The saved slices and timeline apply when they were made on a loop of this
+    // length, otherwise the slices start as the single slice from 0 and the caller detects. Publishes the new data.
+    void installLoop(std::shared_ptr<const juce::AudioBuffer<float>> audio, double fileSampleRate,
+                     const juce::String& path, const juce::String& name);
+    // Message thread: an edit of the slices or the timeline (the editor builds the edited copies). Reuses the audio.
+    void commitEdit(const SliceList& slices, const Timeline& timeline);
+
+    // Persistence (message thread): the loop reference, slices and timeline as the Phrase child of the layer node.
+    void writeExtras(juce::ValueTree& node) const override;
+    void applyExtras(const juce::ValueTree& node) override;
+    const juce::String& loopPath() const noexcept { return path; }
+    const juce::String& loopName() const noexcept { return displayName; }
 
     bool isValidDest(const std::string& id) const override { return isValidModDest(id); }
     void onMoved(int newIndex) override { insert->setSlotIndex(newIndex); }
@@ -107,6 +120,10 @@ private:
     mu_mod::LastResolved<kNumModDests>                        lastResolved;
 
     PhraseSettings settings;                       // the block's settings, set by readParams
+
+    // Message thread only: what a saved layer asked for before its loop was loaded, and where the loop came from.
+    PhraseState  pending;
+    juce::String path, displayName;
 
     std::shared_ptr<const PhraseData> data;        // guarded by dataLock
     mutable CopyableSpinLock          dataLock;

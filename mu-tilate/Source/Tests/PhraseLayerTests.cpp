@@ -20,9 +20,10 @@ constexpr int kBlock = 256;
 std::shared_ptr<PhraseData> makeData(std::initializer_list<int> placedSlices)
 {
     auto d = std::make_shared<PhraseData>();
-    d->audio.setSize(1, 96000);
+    auto audio = std::make_shared<juce::AudioBuffer<float>>(1, 96000);
     for (int k = 0; k < 4; ++k)
-        for (int i = 0; i < 24000; ++i) d->audio.setSample(0, k * 24000 + i, (float) (k + 1) / 10.0f);
+        for (int i = 0; i < 24000; ++i) audio->setSample(0, k * 24000 + i, (float) (k + 1) / 10.0f);
+    d->audio = audio;
     d->fileSampleRate = kSr;
     d->slices = SliceList(96000);
     d->slices.divideEvenly(4);

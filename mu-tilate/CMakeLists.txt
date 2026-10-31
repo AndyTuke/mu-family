@@ -11,6 +11,7 @@ add_library(mu-tilate-layer INTERFACE)
 target_sources(mu-tilate-layer INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Audio/SlicePlayer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Persistence/PhraseParams.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Persistence/PhraseState.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/SliceList.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/Timeline.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/PhrasePlayback.cpp"
@@ -33,6 +34,7 @@ target_sources(mu-tilate-tests PRIVATE
     Source/Tests/PhraseTests.cpp   # the timeline model and the transport-anchored scheduler
     Source/Tests/PhraseParamsTests.cpp   # the parameter table and the modulation target table
     Source/Tests/PhraseLayerTests.cpp   # the Phrase layer through the shared render contract
+    Source/Tests/PhraseStateTests.cpp   # saving and loading the slices, timeline and loop reference
     # mu-core's detector (the plugin targets get it through mu-core; a console target lists it).
     "${CMAKE_SOURCE_DIR}/mu-core/Analysis/OnsetDetector.cpp"
     # What the modulation-table checks need (as mu-toni-layer-tests lists them).
