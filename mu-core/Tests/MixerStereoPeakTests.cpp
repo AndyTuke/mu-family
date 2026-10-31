@@ -42,6 +42,7 @@ struct MixerStereoPeakTests : juce::UnitTest
             expectWithinAbsoluteError(mixer.masterPeak.load(), juce::jmax(mixer.masterPeakL.load(), mixer.masterPeakR.load()), 1.0e-6f);
 
             mixer.masterPan.store(0.0f);
+            mixer.processBlock(out, 1, nullptr, fx, kBlock, nullptr, nullptr, nullptr, &render);   // the pan ramps across this block
             mixer.processBlock(out, 1, nullptr, fx, kBlock, nullptr, nullptr, nullptr, &render);
             expect(mixer.masterPeakL.load() > 0.05f && std::abs(mixer.masterPeakL.load() - mixer.masterPeakR.load()) < 1.0e-3f,
                    "centred: both sides equal");

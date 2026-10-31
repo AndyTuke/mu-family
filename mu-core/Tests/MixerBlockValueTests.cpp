@@ -371,6 +371,7 @@ struct MixerBlockValueTests : juce::UnitTest
             r.run(1, 64);
             expectChannel(r.out, 0, 64, [&](int) { return trimmed(0.5f) + trimmed(0.5f); }, "return heard (control)");
             r.mixer.returns[1].mute.store(true);
+            r.run(1, 64);   // the muted return fades to zero across this block
             r.run(1, 64);
             expectChannel(r.out, 0, 64, [&](int) { return trimmed(0.5f); }, "return muted");
             expectEquals(r.mixer.returnPeaks[1].load(), 0.0f, "return peak cleared");
