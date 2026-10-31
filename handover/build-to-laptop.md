@@ -35,13 +35,13 @@ Build: v1.1.0.1455 · Ran: `pwsh tests/scripts/check-layer-boundary.ps1` · Saw:
 Build: v1.1.0.1455 · Ran: build (no compile errors in `ModulationMatrix` or `ProcessorBase`); `mu-core-tests`; `check-rt-safety.ps1` · Saw: rt-safety 0 findings outside setup, 132 in setup, 104 suppressed, exit 0 (as expected).
 Notes: the two extra tests (12-character id under an allocation counter; a processor-level load while bypassed) were NOT written, and the bypass listening check was not done.
 
-### Re L-006 · 2026-10-31 · Partly
-Build: v1.1.0.1455 · Ran: `mu-core-tests`, which includes `SpectralBehaviourTests` and `InsertDSPSmokeTests` (no failures in either) · Saw: `mu-clid` golden `inserts-karplus-ring` moved (292 differences, first at 3258 ms, RMS unchanged to 0.01 dB), as the item expected; not re-recorded.
-Notes: the bounded-output test (1 kHz sine and DC at 75 / 100 % feedback, output peak <= input peak + 1) is written and passes (`InsertDSPSmokeTests`); no listening.
+### Re L-006 · 2026-10-31 · Done
+Build: v1.1.0.1455 · Ran: `mu-core-tests`, which includes `SpectralBehaviourTests` and `InsertDSPSmokeTests` (no failures in either) · Saw: `mu-clid` golden `inserts-karplus-ring` moved (292 differences, first at 3258 ms, RMS unchanged to 0.01 dB), as the item expected; not re-recorded. Andy listened to the Karplus insert in mu-Clid at 75 % and 100 % feedback: sounds fine.
+Notes: the bounded-output test (1 kHz sine and DC at 75 / 100 % feedback, output peak <= input peak + 1) is written and passes (`InsertDSPSmokeTests`). The dsp-controller re-check of the limiter placement is still open.
 
-### Re L-007 · 2026-10-31 · Partly
-Build: v1.1.0.1455 · Ran: `mu-core-tests` (InsertDSPSmokeTests passes) · Saw: nothing.
-Notes: a continuity test (tone open for 4 blocks, then 5 kHz, step < 0.05 at the switch) is written and passes; I did not check that it fails without the fix; no listening.
+### Re L-007 · 2026-10-31 · Done
+Build: v1.1.0.1455 · Ran: `mu-core-tests` (InsertDSPSmokeTests passes) · Saw: Andy swept the tone knob of a drive insert through the open end in mu-Clid: sounds fine.
+Notes: a continuity test (tone open for 4 blocks, then 5 kHz, step < 0.05 at the switch) is written and passes; I did not check that it fails without the fix.
 
 ### Re L-008 · 2026-10-31 · Partly
 Build: v1.1.0.1455 · Ran: full Debug build; `mu-clid-tests` (354 results, 17 failures), `mu-on-tests` (239, 16), `mu-core-tests`; `mu-tant-tests` and `mu-toni-tests` were cut off by my 300 s cap and did not finish (their first results were the manifest / corpus differences of B-002); `mu-clid-midi`, `mu-control`, `mu-tronic` (132 results) and all four `*-layer-tests` pass · Saw: goldens moved in mu-On and mu-Clid.
@@ -49,6 +49,9 @@ Notes: everything compiles. I cannot say the goldens moved because of the lifts:
 
 ### Not started (no result entry)
 L-003, L-009, L-010, L-011: not touched; they need eyes, ears or the earlier items to pass first.
+
+### Extra · 2026-10-31 · JUCE MIDI abort
+Every Debug Standalone aborted at startup on this PC: JUCE 9.0.4 crashes when `midiInOpen` fails (the MOTU port; likely after the 29 Oct Windows updates). Upstream JUCE issue 1769, fixed on `develop`, not in 9.0.4. A local guard is in `D:\JUCE` and logged in `docs/design-plugin-family.md` ("Local JUCE patches"), diff in `juce-patches/`. Only mu-Clid has been rebuilt with it; the others need a rebuild.
 
 ### Extra · 2026-10-31
 `mu-core-tests` started at 4 failures; 3 were tests that did not expect the new gain ramps (master pan, return mute) and were fixed in `0af80996` by running one settle block. The remaining one (NaN counter) was a stale expectation: the insert stage now contains the NaN before the master probe (audit fix), so the test now expects the counter to stay 0; mu-core-tests is 0 failures of 836.
