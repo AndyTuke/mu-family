@@ -7,7 +7,7 @@ Build the mu-family. Default to **Debug** (a normal code change). Build **Releas
 2. **Focused Debug** (normal work on one or two apps — owner rule 2026-10-12): `cmake -B build -DMUFAMILY_FOCUSED_BUILD=ON`, then build only those apps' targets (e.g. `cmake --build build --config Debug --target mu-tant_Standalone mu-tant-tests`; add `mu-core-tests` when shared code changed). The number is **not** incremented. Build and test only when really required.
 2b. **Stage-boundary Debug** (a ruled stage closing, or when Andy says so; all products): `cmake -B build -DMUFAMILY_FOCUSED_BUILD=OFF`, then `cmake --build build --config Debug`. This increments the number by exactly 1. Do NOT build or run the test targets as part of a build: tests run in the **daily full sweep** (build the test targets then; `mu-clid-tests` and the others are not in ALL) or when a result is needed to decide the next step (owner rule 2026-10-21, docs/workflow-pace.md).
 3. **Full build** (only if asked — "full" or "release"): `cmake --build build --config Debug && cmake --build build --config Release`
-   - Release builds stay local; nothing is deployed.
+   - **After every Release build, deploy the VST3s** (owner rule, 2026-10-31): `pwsh tests/scripts/deploy-vst3.ps1` copies each `Release/VST3/*.vst3` bundle into `C:\Program Files\Common Files\VST3`. Debug builds are never deployed; the OneDrive tester share stays off. If a bundle fails to copy, a DAW has the plugin open: report it, don't force it.
 
 ## Build-number policy (owner rules — do not work around)
 
