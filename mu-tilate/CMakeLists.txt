@@ -26,6 +26,7 @@ target_include_directories(mu-tilate-layer SYSTEM INTERFACE
 
 set(MU_TILATE_LAYER_UI_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/PhraseContent.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/PhraseTimeline.cpp"
 )
 # Also visible to the sibling directories added after this one (mu-Tronic will host the Phrase type).
 set(MU_TILATE_LAYER_UI_SOURCES "${MU_TILATE_LAYER_UI_SOURCES}" PARENT_SCOPE)

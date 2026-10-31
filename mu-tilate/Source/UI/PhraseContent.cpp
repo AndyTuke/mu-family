@@ -34,7 +34,7 @@ PhraseContent::PhraseContent(PhraseHost& h)
     addKnob(ppi::gain,     "Level",  LF::knobLevel);
 
     addAndMakeVisible(waveform);
-    waveform.onRegionClicked = [this](int r) { waveform.setSelectedRegion(r); };
+    waveform.onRegionClicked = [this](int r) { waveform.setSelectedRegion(r); };   // the slice a click on the timeline places
     waveform.onMarkerMoved = [this](int idx, int pos)
     {
         editSlices([idx, pos](SliceList& sl, Timeline&) { sl.moveMarker(idx, pos); });
@@ -53,6 +53,14 @@ PhraseContent::PhraseContent(PhraseHost& h)
         waveform.setSelectedRegion(-1);
     };
 
+    addAndMakeVisible(timelineView);
+    timelineView.sliceToPlace = [this] { return waveform.getSelectedRegion(); };
+    timelineView.onEdit = [this](const std::function<void(Timeline&)>& edit)
+    {
+        editSlices([&edit](SliceList&, Timeline& t) { edit(t); });
+        refreshViews(true);   // the view shows the edit at once, not at the next tick
+    };
+
     startTimerHz(15);
 }
 
@@ -68,19 +76,29 @@ void PhraseContent::editSlices(const std::function<void(SliceList&, Timeline&)>&
     phrase.commitEdit(slices, timeline);
 }
 
-// Shows the layer's loop and slice markers; only reads what changed (the data pointer moves on every edit).
-void PhraseContent::refreshWaveform()
+// Shows the layer's loop, slice markers and timeline; only reads what changed (the data pointer moves on every edit).
+void PhraseContent::refreshViews(bool force)
 {
     const auto d = host.getPhrase(currentLayer).getData();
-    if (d.get() == shownData) return;
+    const double tempo = (double) apvts.getRawParameterValue(layerParamPrefix(currentLayer) + ppi::suffix[ppi::ltempo])->load();
+    timelineView.setGridBeats(gridBeats((int) apvts.getRawParameterValue(layerParamPrefix(currentLayer) + ppi::suffix[ppi::grid])->load()));
+    if (! force && d.get() == shownData && tempo == shownTempo) return;
     shownData = d.get();
+    shownTempo = tempo;
     if (d == nullptr || d->audio == nullptr)
     {
         shownAudio = nullptr;
         waveform.setAudio(nullptr);
         waveform.setMarkers({});
+        timelineView.setTimeline(Timeline(), {});
         return;
     }
+
+    // Each slice's own length in beats at the loop's tempo: the block widths the timeline draws.
+    std::vector<double> beats;
+    for (int i = 0; i < d->slices.size(); ++i)
+        beats.push_back((double) d->slices.slice(i).length() / d->fileSampleRate * tempo / 60.0);
+    timelineView.setTimeline(d->timeline, std::move(beats));
     if (d->audio.get() != shownAudio) { shownAudio = d->audio.get(); waveform.setAudio(d->audio); }
     std::vector<LoopWaveform::Marker> markers;
     for (int i = 0; i < d->slices.size(); ++i) markers.push_back({ d->slices.marker(i).position, d->slices.marker(i).pinned });
@@ -151,7 +169,7 @@ void PhraseContent::timerCallback()
 {
     const auto text = host.getLoopStatus(currentLayer);
     if (status.getText() != text) status.setText(text, juce::dontSendNotification);
-    refreshWaveform();
+    refreshViews();
 }
 
 void PhraseContent::paint(juce::Graphics& g)
@@ -178,8 +196,11 @@ void PhraseContent::resized()
     for (auto& k : knobs)
         k.comp->setBounds(row.removeFromLeft(s(LF::kKnobSize2W)));
 
-    // The source waveform takes the rest of the band (the slice player and the timeline come below it, next stage).
+    // The source waveform takes the upper part of the rest of the band, the timeline the lower (the slice player panel is next).
     area.removeFromTop(s(LF::kSpaceS));
+    const int timelineH = juce::jmax(s(70), area.getHeight() * 3 / 10);
+    timelineView.setBounds(area.removeFromBottom(timelineH));
+    area.removeFromBottom(s(LF::kSpaceS));
     waveform.setBounds(area);
 }
 

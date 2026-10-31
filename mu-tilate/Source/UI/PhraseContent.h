@@ -10,6 +10,7 @@
 #include "Sequencer/SliceList.h"
 #include "Sequencer/Timeline.h"
 #include "UI/PhraseHost.h"     // what the content needs from the layer's host
+#include "UI/PhraseTimeline.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -45,7 +46,7 @@ private:
                      std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> att; };
 
     void addKnob(int row, const char* label, MuLookAndFeel::ColourIds colour);
-    void refreshWaveform();                       // re-reads the layer's loop data when it changed
+    void refreshViews(bool force = false);        // re-reads the layer's loop data, slices and timeline when they changed
     void editSlices(const std::function<void(SliceList&, Timeline&)>& edit);   // one marker edit, published to the layer
     void chooseLoop();
     void timerCallback() override;
@@ -62,6 +63,8 @@ private:
     std::vector<KnobDef> knobs;
     std::unique_ptr<juce::FileChooser> chooser;
     LoopWaveform waveform;
+    PhraseTimeline timelineView;
+    double shownTempo = -1.0;                     // the loop tempo the timeline's block lengths were computed for
     const void* shownData = nullptr;              // the PhraseData the waveform last showed (identity only)
     const void* shownAudio = nullptr;
 
