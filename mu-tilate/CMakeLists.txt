@@ -10,6 +10,7 @@
 add_library(mu-tilate-layer INTERFACE)
 target_sources(mu-tilate-layer INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Audio/SlicePlayer.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/SliceList.cpp"
 )
 target_include_directories(mu-tilate-layer INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
 
@@ -19,7 +20,11 @@ juce_add_console_app(mu-tilate-tests PRODUCT_NAME "mu-tilate-tests")
 target_sources(mu-tilate-tests PRIVATE
     Source/Tests/TestMain.cpp
     Source/Tests/SlicePlayerTests.cpp   # the monophonic slice player: native / re-pitch / reverse, fades, the cut fade
+    Source/Tests/SliceDetectionTests.cpp   # onset detection on synthetic loops, and the slice list
+    # mu-core's detector (the plugin targets get it through mu-core; a console target lists it).
+    "${CMAKE_SOURCE_DIR}/mu-core/Analysis/OnsetDetector.cpp"
 )
+target_include_directories(mu-tilate-tests PRIVATE "${CMAKE_SOURCE_DIR}/mu-core")
 
 target_compile_features(mu-tilate-tests PRIVATE cxx_std_17)
 
@@ -28,6 +33,7 @@ target_link_libraries(mu-tilate-tests PRIVATE
     juce::juce_core
     juce::juce_audio_basics
     juce::juce_events
+    juce::juce_dsp   # FFT for the detector
     juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags
 )

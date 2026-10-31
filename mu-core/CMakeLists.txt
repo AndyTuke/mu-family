@@ -31,6 +31,8 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Sequencer/HitGenerator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Sequencer/Rhythm.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Sequencer/RhythmSequencer.cpp"
+    # Analysis
+    "${CMAKE_CURRENT_SOURCE_DIR}/Analysis/OnsetDetector.cpp"   # onset detection for loop slicing
     # Audio
     "${CMAKE_CURRENT_SOURCE_DIR}/Audio/VoiceEngine.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Audio/InsertProcessor.cpp"
