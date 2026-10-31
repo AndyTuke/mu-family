@@ -95,7 +95,12 @@ public:
             std::vector<float> L2(N, 1.0f), R2(N, 1.0f);
             applyGateBlock(p, L2.data(), R2.data(), N, 0.0f, false, /*playing*/true,
                            beatInEmptyCell, /*beatsPerSample*/0.0, SR);
-            expectWithinAbsoluteError(peak(L2, R2), 0.0f, 1.0e-6f, "empty cell -> silent while playing");
+            // The gate was open when the block began, so it closes at the release rate (kMinReleaseMs), not in one sample:
+            // silent from then on.
+            const int releaseSamples = (int) std::ceil((double) GatePattern::kMinReleaseMs * 0.001 * SR) + 1;
+            expectWithinAbsoluteError(peak(std::vector<float>(L2.begin() + releaseSamples, L2.end()),
+                                           std::vector<float>(R2.begin() + releaseSamples, R2.end())),
+                                      0.0f, 1.0e-6f, "empty cell -> silent while playing (after the release)");
         }
 
         beginTest("A block that cannot take the edit lock holds the previous gate level");
@@ -153,6 +158,69 @@ public:
                 maxStep = std::max(maxStep, std::abs(L[i]) - std::abs(L[i - 1]));
             const float cap = (float) (1.0 / ((double) GatePattern::kMinAttackMs * 0.001 * SR));
             expect(maxStep <= cap + 1.0e-4f, "no rising step exceeds the slew cap");
+        }
+
+        const float fallCap = (float) (1.0 / ((double) GatePattern::kMinReleaseMs * 0.001 * SR));
+
+        beginTest("a region ending at a non-zero level falls over ~kMinReleaseMs, not in one sample");
+        {
+            GatePattern p;
+            p.subdivision = GatePattern::Subdivision::Sixteenth;
+            GateEnvelope e; e.startCell = 0; e.lengthCells = 2; e.split = 0.0f;
+            p.addEnvelope(e);
+
+            const int M = 24000;   // two 6000-sample cells open, then closed
+            std::vector<float> L(M, 1.0f), R(M, 1.0f);
+            applyGateBlock(p, L.data(), R.data(), M, 0.0f, false, /*playing*/true, 0.0, bps, SR);
+
+            float maxDrop = 0.0f, lowest = 1.0f;
+            for (int i = 1; i < M; ++i)
+            {
+                maxDrop = std::max(maxDrop, L[i - 1] - L[i]);
+                lowest  = std::min(lowest, L[i]);
+            }
+            expect(lowest < 0.01f, "the gate does close after the region");
+            expect(maxDrop > 0.0f, "and it does fall");
+            expect(maxDrop <= fallCap + 1.0e-4f, "no falling step exceeds the release cap: " + juce::String(maxDrop));
+        }
+
+        beginTest("stopping fades the open gate to silence at the release rate instead of cutting it");
+        {
+            GatePattern p;
+            p.subdivision = GatePattern::Subdivision::Sixteenth;
+            GateEnvelope e; e.startCell = 0; e.lengthCells = 8; e.split = 0.0f;
+            p.addEnvelope(e);
+
+            const int M = 1500;   // past the attack ramp, well inside the first cell's decay
+            std::vector<float> L(M, 1.0f), R(M, 1.0f);
+            applyGateBlock(p, L.data(), R.data(), M, 0.0f, false, /*playing*/true, 0.0, bps, SR);
+            const float open = L[M - 1];
+            expect(open > 0.5f, "precondition: the gate is open: " + juce::String(open));
+
+            std::vector<float> L2(N, 1.0f), R2(N, 1.0f);
+            applyGateBlock(p, L2.data(), R2.data(), N, 0.0f, false, /*playing*/false, 0.0, bps, SR);
+            expect(L2[0] > open - fallCap - 1.0e-4f, "the first sample after the stop continues from the open level (no cut)");
+            expect(L2[N - 1] == 0.0f, "and the gate is fully closed by the end of the block");
+            float maxDrop = 0.0f;
+            for (int i = 1; i < N; ++i) maxDrop = std::max(maxDrop, L2[i - 1] - L2[i]);
+            expect(maxDrop <= fallCap + 1.0e-4f, "no step exceeds the release cap");
+
+            std::vector<float> L3(N, 1.0f), R3(N, 1.0f);
+            applyGateBlock(p, L3.data(), R3.data(), N, 0.0f, false, /*playing*/false, 0.0, bps, SR);
+            expect(peak(L3, R3) == 0.0f, "and it stays closed");
+        }
+
+        beginTest("Pass to Silence fades from fully open, not from a stale level");
+        {
+            GatePattern p;
+            std::vector<float> L(N, 1.0f), R(N, 1.0f);
+            applyGateBlock(p, L.data(), R.data(), N, 0.0f, /*bypassed*/true, false, 0.0, bps, SR);
+            expect(peak(L, R) == 1.0f, "bypass passes the drone");
+
+            std::vector<float> L2(N, 1.0f), R2(N, 1.0f);
+            applyGateBlock(p, L2.data(), R2.data(), N, 0.0f, /*bypassed*/false, /*playing*/false, 0.0, bps, SR);
+            expect(L2[0] > 0.9f, "bypass-off starts at the open level, so there is no click");
+            expect(L2[N - 1] == 0.0f, "and the gate has closed by the end of the block");
         }
     }
 };

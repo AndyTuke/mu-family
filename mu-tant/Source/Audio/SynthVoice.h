@@ -149,6 +149,16 @@ private:
     float                    osc1Gain = 1.0f;
     float                    osc2Gain = 0.5f;
     float                    noiseGain = 0.0f;
+
+    // Block-rate control values (pitch from the pitch envelope and modulation, filter cutoffs from the filter
+    // envelope) ramp from the last block's value to this block's across the block, so a fast envelope does not
+    // step once per block and the sound does not depend on the host buffer size. cur* is where the last block ended,
+    // tgt* what setConfig asked for; haveBlock is false until a block has run (and after reset), so the first
+    // block starts at its target instead of ramping from stale values.
+    static constexpr int kRampChunk = 32;   // samples between control updates inside a block
+    float curMidi1 = 0.0f, curMidi2 = 0.0f, tgtMidi1 = 0.0f, tgtMidi2 = 0.0f;
+    float curCut1  = 8000.0f, curCut2 = 8000.0f, tgtCut1 = 8000.0f, tgtCut2 = 8000.0f;
+    bool  haveBlock = false;
 };
 
 } // namespace mu_tant

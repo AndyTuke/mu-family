@@ -217,24 +217,33 @@ void applyGateBlock(GatePattern& pattern, float* left, float* right, int numSamp
     if (mode == GateMode::Pass)
     {
         pattern.heldLevel = 1.0f;                  // a lock miss right after a bypass stays open
+        pattern.gateLevel = 1.0f;                  // and a later Silence or Envelope falls from fully open, not from a stale level
         return;                                    // leave the buffer untouched
     }
 
+    // Max gate fall per sample: the falling edge is limited to kMinReleaseMs so a gate that closes (a drawn region
+    // ending, a stop, an emptied pattern, Pass to Silence) fades instead of clicking.
+    const float maxFall = (sampleRate > 0.0 && GatePattern::kMinReleaseMs > 0.0f)
+                        ? (float) (1.0 / ((double) GatePattern::kMinReleaseMs * 0.001 * sampleRate))
+                        : 1.0f;
+
     if (mode == GateMode::Silence)
     {
-        pattern.gateLevel = 0.0f;                  // gate fully closed; re-open ramps from 0
-        pattern.heldLevel = 0.0f;
+        // Silence goes through the same gater: the level falls to 0 at the release rate, then stays closed (and
+        // re-opening ramps from 0).
         for (int i = 0; i < numSamples; ++i)
         {
-            if (left)  left[i]  = 0.0f;
-            if (right) right[i] = 0.0f;
+            pattern.gateLevel = std::max(0.0f, pattern.gateLevel - maxFall);
+            if (left)  left[i]  *= pattern.gateLevel;
+            if (right) right[i] *= pattern.gateLevel;
         }
+        pattern.heldLevel = pattern.gateLevel;
         return;
     }
 
     // Max gate rise per sample — caps an instant (0-attack) open to kMinAttackMs
-    // so it ramps instead of clicking. Falling edges follow the envelope exactly
-    // (drawn decays are preserved); attacks drawn slower than the cap pass through
+    // so it ramps instead of clicking. Falling edges follow the envelope down to
+    // kMinReleaseMs (drawn decays are preserved); attacks drawn slower than the cap pass through
     // unchanged. sampleRate <= 0 disables the slew (rise == full scale).
     const float maxRise = (sampleRate > 0.0 && GatePattern::kMinAttackMs > 0.0f)
                         ? (float) (1.0 / ((double) GatePattern::kMinAttackMs * 0.001 * sampleRate))
@@ -249,10 +258,11 @@ void applyGateBlock(GatePattern& pattern, float* left, float* right, int numSamp
         for (int i = 0; i < numSamples; ++i)
         {
             const float target = pattern.gateAt(beatStart + beatsPerSample * (double) i, gap01);
-            // Slew-limit the rising edge only; fall instantly so decay shapes are exact.
+            // Slew-limit both edges: the rise to kMinAttackMs, the fall to kMinReleaseMs (drawn decays slower than that
+            // are exact).
             pattern.gateLevel = (target > pattern.gateLevel)
                               ? std::min(target, pattern.gateLevel + maxRise)
-                              : target;
+                              : std::max(target, pattern.gateLevel - maxFall);
             const float g = pattern.gateLevel;
             if (left)  left[i]  *= g;
             if (right) right[i] *= g;

@@ -26,6 +26,7 @@ void VoiceEngine::reset()
     noise.reset();
     mono.clear();               // work buffers: cleared in place, never resized
     mono2.clear();
+    haveBlock = false;          // the next block starts its pitch and cutoff at their targets
 }
 
 void VoiceEngine::setBank(const WavetableBank* b) noexcept
@@ -45,6 +46,10 @@ void VoiceEngine::setConfig(const VoiceConfig& c)
     const float midi2 = toneToMidi(cfg.scaleIndex, cfg.root, cfg.osc2Octave + kBaseOctave,
                                    (float) cfg.osc2Semi + cfg.osc2ToneMod, (float) cfg.osc2Fine)
                         + cfg.pitchOffsetSemis + cfg.osc2SemiMod;
+    tgtMidi1 = midi1;
+    tgtMidi2 = midi2;
+    tgtCut1  = cfg.filterCutoff;
+    tgtCut2  = cfg.filter2Cutoff;
     oscs.osc1.setFrequency(midiToFreq(midi1));
     oscs.osc2.setFrequency(midiToFreq(midi2));
     // Position is a 0..255 frame index; normalise to the osc's 0..1 scan input.
@@ -85,33 +90,68 @@ void VoiceEngine::process(juce::AudioBuffer<float>& out, int numSamples)
     xm.phaseMode = cfg.xmodPhaseMode;  xm.index = cfg.xmodIndex;  xm.sync    = cfg.sync;
     xm.feedback  = cfg.xmodFeedback;   xm.ampMode = cfg.xmodAmpMode; xm.depth = cfg.xmodDepth;
     xm.ssbHz     = cfg.xmodSsbHz;
-    oscs.beginBlock(xm, ns);
-    for (int i = 0; i < ns; ++i)
+    if (! haveBlock)
     {
-        const auto o = oscs.next();
-        const float n = noise.render(noiseType);
-        m[i] = (o.carrier * osc1Gain + o.modulator * osc2Gain + n * noiseGain) * gain;
+        curMidi1 = tgtMidi1;  curMidi2 = tgtMidi2;
+        curCut1  = tgtCut1;   curCut2  = tgtCut2;
+        haveBlock = true;
+    }
+    const bool pitchMoves = curMidi1 != tgtMidi1 || curMidi2 != tgtMidi2;
+    oscs.beginBlock(xm, ns);
+    for (int start = 0; start < ns; start += kRampChunk)
+    {
+        const int end = juce::jmin(ns, start + kRampChunk);
+        if (pitchMoves)
+        {
+            // Linear in semitones across the block: the value at the end of this chunk.
+            const float f = (float) end / (float) ns;
+            oscs.osc1.setFrequency(midiToFreq(curMidi1 + (tgtMidi1 - curMidi1) * f));
+            oscs.osc2.setFrequency(midiToFreq(curMidi2 + (tgtMidi2 - curMidi2) * f));
+        }
+        for (int i = start; i < end; ++i)
+        {
+            const auto o = oscs.next();
+            const float n = noise.render(noiseType);
+            m[i] = (o.carrier * osc1Gain + o.modulator * osc2Gain + n * noiseGain) * gain;
+        }
     }
     oscs.endBlock();
+    curMidi1 = tgtMidi1;  curMidi2 = tgtMidi2;
 
-    // Dual filter — series or parallel.
+    // Dual filter, series or parallel. When a cutoff moved since the last block (the filter envelope, modulation) it
+    // glides geometrically (in Hz) across the block in kRampChunk steps; otherwise one pass, as before.
+    const bool cutMoves = curCut1 != tgtCut1 || curCut2 != tgtCut2;
+    auto runFilter = [&](MultiModeFilter& flt, juce::AudioBuffer<float>& buf, float from, float to)
+    {
+        if (from == to) { flt.setCutoff(to); flt.process(buf, ns, 1); return; }
+        float* const chan[1] = { buf.getWritePointer(0) };
+        for (int start = 0; start < ns; start += kRampChunk)
+        {
+            const int len = juce::jmin(kRampChunk, ns - start);
+            const float f = (float) (start + len) / (float) ns;
+            flt.setCutoff(from * std::pow(to / from, f));
+            juce::AudioBuffer<float> view(chan, 1, start, len);   // a window onto the same samples: no allocation
+            flt.process(view, len, 1);
+        }
+    };
     if (cfg.filterSeries)
     {
         // Series: signal passes through filter1 then filter2.
-        filter1.process(mono, ns, 1);
-        filter2.process(mono, ns, 1);
+        runFilter(filter1, mono, curCut1, tgtCut1);
+        runFilter(filter2, mono, curCut2, tgtCut2);
     }
     else
     {
         // Parallel: both filters see the same input; outputs are averaged.
         mono2.copyFrom(0, 0, mono, 0, 0, ns);
-        filter1.process(mono,  ns, 1);
-        filter2.process(mono2, ns, 1);
+        runFilter(filter1, mono,  curCut1, tgtCut1);
+        runFilter(filter2, mono2, curCut2, tgtCut2);
         // Mix: 0.5× each so combined level matches a single filter.
         auto* a = mono .getWritePointer(0);
         const auto* b = mono2.getReadPointer(0);
         for (int i = 0; i < ns; ++i) a[i] = (a[i] + b[i]) * 0.5f;
     }
+    if (cutMoves) { curCut1 = tgtCut1; curCut2 = tgtCut2; }
 
     // Sum the mono voice into every output channel.
     for (int ch = 0; ch < out.getNumChannels(); ++ch)

@@ -281,6 +281,61 @@ public:
             expect(maxDiff > 1.0e-4f, "quarter-tone offset changes the waveform (fractional pitch)");
         }
 
+        beginTest("a pitch change between blocks ramps across the block instead of stepping at its start");
+        {
+            const int B = 4096;
+            VoiceEngine v; v.setBank(&bank); v.prepare(sr, B);
+            VoiceConfig c;
+            c.osc2LevelDb = -60.0f; c.noiseLevelDb = -60.0f;
+            c.osc1LevelDb = 0.0f; c.levelDb = 0.0f;
+            c.filterCutoff = 20000.0f;
+            v.setConfig(c);
+            juce::AudioBuffer<float> buf(2, B);
+            buf.clear(); v.process(buf, B);                // the first block runs at its own pitch
+
+            c.osc1SemiMod = 12.0f;                         // an octave up for the next block
+            v.setConfig(c);
+            buf.clear(); v.process(buf, B);
+
+            auto crossings = [&](int from, int to)
+            {
+                int n = 0;
+                const float* d = buf.getReadPointer(0);
+                for (int i = from + 1; i < to; ++i) if ((d[i - 1] < 0.0f) != (d[i] < 0.0f)) ++n;
+                return n;
+            };
+            const int firstQuarter = crossings(0, B / 4), lastQuarter = crossings(3 * B / 4, B);
+            expect(lastQuarter > firstQuarter + firstQuarter / 3,
+                   "the pitch rises through the block: " + juce::String(firstQuarter) + " crossings early, " + juce::String(lastQuarter) + " late");
+        }
+
+        beginTest("a cutoff change between blocks glides across the block instead of stepping at its start");
+        {
+            const int B = 4096;
+            VoiceEngine v; v.setBank(&bank); v.prepare(sr, B);
+            VoiceConfig c;
+            c.osc1LevelDb = -60.0f; c.osc2LevelDb = -60.0f;
+            c.noiseLevelDb = 0.0f; c.levelDb = 0.0f;       // white noise through the filter: its brightness shows the cutoff
+            c.filterCutoff = 400.0f;
+            v.setConfig(c);
+            juce::AudioBuffer<float> buf(2, B);
+            buf.clear(); v.process(buf, B);
+
+            c.filterCutoff = 12000.0f;
+            v.setConfig(c);
+            buf.clear(); v.process(buf, B);
+
+            auto brightness = [&](int from, int to)   // energy of the first difference: grows with high-frequency content
+            {
+                double e = 0.0;
+                const float* d = buf.getReadPointer(0);
+                for (int i = from + 1; i < to; ++i) { const double x = d[i] - d[i - 1]; e += x * x; }
+                return e;
+            };
+            const double early = brightness(0, B / 4), late = brightness(3 * B / 4, B);
+            expect(late > 2.0 * early, "the filter opens through the block: early " + juce::String(early) + ", late " + juce::String(late));
+        }
+
         beginTest("smooth Semi modulation (osc1ToneMod) moves in scale degrees, SemiMod stays chromatic");
         {
             // Renders osc1 alone for one block. Two voices at the same frequency start from the same phase and render the

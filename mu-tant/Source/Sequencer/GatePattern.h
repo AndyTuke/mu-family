@@ -83,6 +83,11 @@ public:
     // rises faster than the cap).
     static constexpr float kMinAttackMs = 10.0f;
 
+    // The falling edge is limited the same way, much faster: a region that ends at a non-zero level, a stop, a
+    // bypass-off or an emptied pattern would otherwise fall 1 -> 0 in one sample, an audible click. 1.5 ms is
+    // below a drawn decay anyone can hear as a shape, so drawn decays pass unchanged.
+    static constexpr float kMinReleaseMs = 1.5f;
+
     Subdivision subdivision = Subdivision::Sixteenth;
     std::vector<GateEnvelope> envelopes;   // sorted by startCell, non-overlapping
 
