@@ -8,6 +8,7 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/../cmake/ProcessorTestSources.cmake")
 
 set(MU_CORE_TEST_SOURCES
     TestMain.cpp
+    BypassSwapTests.cpp
     HostTransportPublishTests.cpp
     GoldenRenderHarnessTests.cpp
     LayerRenderTests.cpp            # the layer render contract: driver, epoch, LayerBlock, time model

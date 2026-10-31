@@ -6,6 +6,13 @@
 
 #include <juce_core/juce_core.h>
 #include "Modulation/ModulationMatrix.h"
+#include "Sequencer/ControlSequence.h"
+#include "AllocationProbe.h"   // the counting operators are in MidiControlTests.cpp (one TU per executable)
+
+#include <string_view>
+#include <unordered_map>
+#include <vector>
+
 static ModulationAssignment makeAssign(const std::string& id,
                                        const std::string& src,
                                        const std::string& dest)
@@ -149,6 +156,30 @@ public:
             std::swap(a, b);
             expect (a.assignmentsRevision() != before);
             expect (a.assignedSnapshot()->destinations[0] == "amp.level");
+        }
+
+        // ── Audio-thread allocation ───────────────────────────────────────────
+        beginTest ("process() with a 12-character sequence id allocates nothing");
+        {
+            // "<id>_output" is 19 characters: past the small-string buffer, so a temporary lookup key would heap-allocate.
+            ModulationMatrix m;
+            ControlSequence cs;
+            cs.id = "abcdefghijkl";
+            cs.stepValues = { 50.0f, -50.0f };
+            m.addAssignment(makeAssign("a1", "abcdefghijkl_output", "filter.cutoff"));
+
+            const std::vector<ControlSequence> sequences { cs };
+            std::unordered_map<std::string_view, float> values;
+            values["filter.cutoff"] = 0.5f;
+
+            m.process(sequences, 0.0, values);   // warm-up: the first block may touch the scratch once
+
+            mu_alloc::Armed region;
+            for (int i = 0; i < 16; ++i)
+                m.process(sequences, 0.25 * i, values);
+            region.stop();
+
+            expectEquals (region.allocs(), 0, "the render path built its lookup key without a heap allocation");
         }
     }
 };
