@@ -279,7 +279,8 @@ struct AuditMinorsTests : juce::UnitTest
                 lastPeak = out.getMagnitude(0, kBlock);
             }
             expect(allFinite, "no non-finite sample reached the output");
-            expectEquals(mixer.nonFiniteBlocks.load(), 1, "exactly one block was contained");
+            // The master inserts contain the NaN at the source, so it never reaches the master probe that counts.
+            expectEquals(mixer.nonFiniteBlocks.load(), 0, "the insert stage contained it before the master probe");
             expect(lastPeak > 0.01f, "the output sounds again after the hit");
         }
     }
