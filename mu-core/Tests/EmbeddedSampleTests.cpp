@@ -4,7 +4,7 @@
 #include <juce_audio_formats/juce_audio_formats.h>
 #include "Persistence/EmbeddedSample.h"
 
-using namespace mu_clid;
+using namespace mu_core;
 
 class EmbeddedSampleTest : public juce::UnitTest
 {
@@ -69,7 +69,7 @@ public:
             beginTest ("A " + juce::String(bits) + "-bit WAV embeds as FLAC and decodes sample-identical");
             const auto src = dir.getChildFile("kick" + juce::String(bits) + ".wav");
             expect (writeWav(src, audio, bits, false));
-            const auto e = mu_clid::embedded_sample::encode(src);
+            const auto e = mu_core::embedded_sample::encode(src);
             expectEquals (e.codec, juce::String("flac"));
             expectEquals (e.bits, bits);
             const auto saving = 1.0 - (double) e.data.getSize() / (double) src.getSize();
@@ -78,7 +78,7 @@ public:
             expect (saving > 0.2, "FLAC saved less than 20 %");
 
             const auto back = dir.getChildFile("back" + juce::String(bits) + ".wav");
-            expect (mu_clid::embedded_sample::decodeTo(e.data, e.codec, e.bits, back), "decode failed");
+            expect (mu_core::embedded_sample::decodeTo(e.data, e.codec, e.bits, back), "decode failed");
             expect (identical(src, back), "decoded audio differs from the source");
         }
 
@@ -86,7 +86,7 @@ public:
         {
             const auto src = dir.getChildFile("float.wav");
             expect (writeWav(src, audio, 32, true));
-            const auto e = mu_clid::embedded_sample::encode(src);
+            const auto e = mu_core::embedded_sample::encode(src);
             expect (e.codec.isEmpty(), "float data must not be re-encoded");
             expectEquals ((juce::int64) e.data.getSize(), src.getSize());
         }
@@ -98,9 +98,9 @@ public:
             juce::MemoryBlock raw;
             src.loadFileAsData(raw);
             const auto back = dir.getChildFile("old_back.wav");
-            expect (mu_clid::embedded_sample::decodeTo(raw, {}, 0, back));
+            expect (mu_core::embedded_sample::decodeTo(raw, {}, 0, back));
             expect (back.loadFileAsData(raw) && back.getSize() == src.getSize() && identical(src, back));
-            expect (! mu_clid::embedded_sample::decodeTo(raw, "opus", 0, dir.getChildFile("x.wav")),
+            expect (! mu_core::embedded_sample::decodeTo(raw, "opus", 0, dir.getChildFile("x.wav")),
                     "an unknown codec is refused, not written as garbage");
         }
 

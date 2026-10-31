@@ -2,14 +2,14 @@
 
 #include <juce_audio_formats/juce_audio_formats.h>
 
-// How a preset carries a rhythm's sample inside its file. Integer PCM WAV / AIFF (up to 24 bit,
+// How a preset carries a layer's sample inside its file (lifted from mu-Clid). Integer PCM WAV / AIFF (up to 24 bit,
 // 8 channels) is re-encoded as FLAC — lossless, so the decoded audio is bit-identical, and the
 // preset is usually 40–60 % smaller. Anything else (float data, 32-bit, MP3 / OGG / FLAC sources,
 // or a file FLAC wouldn't shrink) is stored as the original file bytes, as presets always were.
 // On load a FLAC sample is decoded back into a file of its original type and name, so the rest
 // of the sample path sees exactly what was embedded. Sample metadata (cue / loop chunks) is not
-// kept in the FLAC path; mu-Clid reads only the audio.
-namespace mu_clid::embedded_sample
+// kept in the FLAC path; the products read only the audio.
+namespace mu_core::embedded_sample
 {
 
 // The embedded form: `codec` is "" for raw file bytes or "flac"; `bits` is the source bit depth
@@ -104,4 +104,4 @@ inline bool decodeTo(const juce::MemoryBlock& data, const juce::String& codec, i
     return temp.overwriteTargetFileWithTemporary();
 }
 
-} // namespace mu_clid::embedded_sample
+} // namespace mu_core::embedded_sample

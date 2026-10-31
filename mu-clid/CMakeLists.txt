@@ -262,7 +262,6 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/PresetMigrationTests.cpp      # C1 + C2 (format migrations)
     Source/Tests/ModulationSkewTests.cpp       # C5 (proportion-space skew round-trips)
     Source/Tests/NoDemoCapsTests.cpp          # unlicensed is fully functional: 8 layers, 64 steps, saves
-    Source/Tests/EmbeddedSampleTests.cpp       # preset samples: FLAC round trip is sample-identical
     Source/Tests/RhythmSequencerWrapTests.cpp  # master-loop wrap detection
     Source/Tests/SwapCommitTimingTests.cpp     # a delayed swap commit still starts the new pattern on the next step
     Source/Tests/RhythmSequencerSlotTests.cpp  # slot binding and per-slot state moves

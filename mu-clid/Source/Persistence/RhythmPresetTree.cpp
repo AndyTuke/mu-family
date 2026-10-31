@@ -69,7 +69,7 @@ struct PresetSample
 // sample sampleDataCodec + sampleDataBits (see Persistence/EmbeddedSample.h).
 void embedSampleInto(juce::ValueTree& node, const juce::File& f)
 {
-    const auto e = mu_clid::embedded_sample::encode(f);
+    const auto e = mu_core::embedded_sample::encode(f);
     if (e.data.getSize() == 0) return;
     node.setProperty("sampleData", juce::Base64::toBase64(e.data.getData(), e.data.getSize()), nullptr);
     node.setProperty("sampleName", f.getFileName(), nullptr);
@@ -98,7 +98,7 @@ PresetSample resolvePresetSample(const juce::String& data, const juce::String& n
         const auto tempFile = tempDir.getChildFile(safeName);
         if (safeName.isEmpty() || safeName == "." || safeName == ".." || ! tempFile.isAChildOf(root)
             || ! tempDir.createDirectory().wasOk()
-            || ! mu_clid::embedded_sample::decodeTo(mb, codec, bits, tempFile))
+            || ! mu_core::embedded_sample::decodeTo(mb, codec, bits, tempFile))
         {
             r.kind = PresetSample::Kind::BadEmbed;
             return r;

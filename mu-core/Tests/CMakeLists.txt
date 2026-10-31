@@ -10,6 +10,7 @@ set(MU_CORE_TEST_SOURCES
     TestMain.cpp
     ActivationAndProgramChangeTests.cpp
     SamplePreviewTests.cpp
+    EmbeddedSampleTests.cpp   # preset samples: FLAC round trip is sample-identical
     BypassSwapTests.cpp
     HostTransportPublishTests.cpp
     GoldenRenderHarnessTests.cpp
