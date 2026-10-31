@@ -130,7 +130,7 @@ Render renderSlice(Stretch& st, const Buf& slice, int Lout, const Profile& pr, b
     {
         // Pre-roll: the stretcher consumes the first outputSeekLength() input samples to line its output up with the slice start.
         const float* ch[1] = { in.data() };
-        const int n = std::min((int) in.size(), st.outputSeekLength(1.0f / (float) p));
+        const int n = std::min((int) in.size(), st.outputSeekLength((float) p));
         st.outputSeek(ch, n);
         inPos = n;
     }
@@ -248,7 +248,7 @@ double onsetMs(const Buf& x)
 // +-3 ms (corr, 1 = identical waveform) and the lag it was found at (ms, positive = output late).
 void startMatch(const Buf& out, const Buf& src, double& corr, double& lagMs, double& energyRatio)
 {
-    const int n = (int) (0.012 * kSr), maxLag = (int) (0.003 * kSr);
+    const int n = (int) (0.012 * kSr), maxLag = (int) (0.010 * kSr);
     double best = -2; int bestLag = 0;
     for (int lag = -maxLag; lag <= maxLag; ++lag)
     {
@@ -262,7 +262,7 @@ void startMatch(const Buf& out, const Buf& src, double& corr, double& lagMs, dou
         const double c = ab / (std::sqrt(aa * bb) + 1e-12);
         if (c > best) { best = c; bestLag = lag; }
     }
-    corr = best; lagMs = bestLag * 1000.0 / kSr;
+    corr = best; lagMs = -bestLag * 1000.0 / kSr;   // out[i - lag] pairs with src[i]: a late output has a negative lag, so flip it (positive = late)
     double eo = 0, es = 0;
     const int m = (int) (0.010 * kSr);
     for (int i = 0; i < m; ++i) { eo += out[(size_t) i] * out[(size_t) i]; es += src[(size_t) i] * src[(size_t) i]; }
@@ -358,5 +358,61 @@ int main(int argc, char** argv)
     const double audioSecs = 8.0 * slices * Lout / kSr;
     std::printf("\nCPU: %d voices x %.1f s output = %.1f s of audio rendered in %.3f s: %.1f %% of one core for all voices, %.2f %% per voice (sink %.3f)\n",
                 8, slices * Lout / kSr, audioSecs, secs, 100.0 * secs / (audioSecs / 8.0), 100.0 * secs / audioSecs, sink);
+    // ── Worst case per audio block: eight voices started on the same output sample, interleaved block by block ──
+    // The average above hides spikes: a whole hop is computed inside whichever block crosses it, and outputSeek
+    // does a reset plus a pre-roll in one call. Report the slowest block against the time the block lasts.
+    {
+        struct V { Buf in; int inPos = 0, outPos = 0; double inAccum = 0; };
+        std::vector<V> vs(8);
+        std::vector<double> blockUs, seekUs;
+        const Profile uni { "uniform", 0, 0 };
+        for (int s = 0; s < slices; ++s)
+        {
+            const Buf& src = mats[(size_t) (s % 2)].buf;
+            const double plateau = solvePlateau(uni, Lin, Lout);
+            double seekTotal = 0;
+            for (int v = 0; v < 8; ++v)
+            {
+                vs[(size_t) v].in = src;
+                vs[(size_t) v].in.resize((size_t) Lin + 8 * (size_t) voices[(size_t) v].blockSamples(), 0.0f);   // zeros past the slice end
+                voices[(size_t) v].reset();
+                const auto a = std::chrono::steady_clock::now();
+                const float* ch[1] = { vs[(size_t) v].in.data() };
+                const int n = std::min((int) vs[(size_t) v].in.size(), voices[(size_t) v].outputSeekLength((float) plateau));
+                voices[(size_t) v].outputSeek(ch, n);
+                seekTotal += std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - a).count();
+                vs[(size_t) v].inPos = n; vs[(size_t) v].inAccum = n; vs[(size_t) v].outPos = 0;
+            }
+            seekUs.push_back(seekTotal);
+            for (int outPos = 0; outPos < Lout; outPos += block)
+            {
+                const int nOut = std::min(block, Lout - outPos);
+                double total = 0;
+                for (int v = 0; v < 8; ++v)
+                {
+                    auto& x = vs[(size_t) v];
+                    x.inAccum += plateau * nOut;
+                    const int want = std::min((int) std::lround(x.inAccum), (int) x.in.size());
+                    const int nIn = std::max(0, want - x.inPos);
+                    const float* inCh[1] = { x.in.data() + x.inPos };
+                    static Buf scratch(4096);
+                    float* outCh[1] = { scratch.data() };
+                    const auto a = std::chrono::steady_clock::now();
+                    voices[(size_t) v].process(inCh, nIn, outCh, nOut);
+                    total += std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - a).count();
+                    x.inPos += nIn;
+                }
+                blockUs.push_back(total);
+            }
+        }
+        std::sort(blockUs.begin(), blockUs.end());
+        const double blockMs = block * 1000.0 / kSr;
+        auto pct = [&](double q) { return blockUs[(size_t) std::min<double>((double) blockUs.size() - 1, q * (double) blockUs.size())]; };
+        double seekMax = 0; for (double u : seekUs) seekMax = std::max(seekMax, u);
+        std::printf("\nWorst case, 8 voices started on the same sample, %d-sample blocks (%.2f ms each), uniform drive:\n", block, blockMs);
+        std::printf("  process, all 8 voices in one block: median %.3f ms, p99 %.3f ms, max %.3f ms (%.0f %% of the block time)\n",
+                    pct(0.5) / 1000.0, pct(0.99) / 1000.0, blockUs.back() / 1000.0, 100.0 * blockUs.back() / 1000.0 / blockMs);
+        std::printf("  outputSeek at the slice start, 8 voices inline: max %.3f ms (%.0f %% of the block time)\n", seekMax / 1000.0, 100.0 * seekMax / 1000.0 / blockMs);
+    }
     return 0;
 }

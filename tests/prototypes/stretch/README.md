@@ -8,6 +8,6 @@ cmake --build build/stretch-proto --config Release
 build/stretch-proto/Release/stretch_prototype.exe [outputBlock=256] [splitComputation=0] [windowPreset=0]
 ```
 
-Window preset: 0 default (120 ms block), 1 cheaper (100 ms), 2 short (30 ms block, 7.5 ms hop). Build in Release for the CPU figures.
+The last section prints the worst per-block cost with eight voices started on the same sample (the real-time risk, not the average). Window preset: 0 default (120 ms block), 1 cheaper (100 ms), 2 short (30 ms block, 7.5 ms hop). Build in Release for the CPU figures.
 
 Libraries are vendored in `ThirdParty/signalsmith-stretch` and `ThirdParty/signalsmith-linear` (both MIT; keep their LICENSE files and the copyright notice in any shipped product).
