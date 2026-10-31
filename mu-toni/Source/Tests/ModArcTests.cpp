@@ -96,6 +96,38 @@ struct MuToniModArcTests : juce::UnitTest
             expect(std::abs(range.convertTo0to1(proc.getModLive(0, D_cut)) - 0.5f) < 0.02f, "and follows again once the lock is free");
         }
 
+        beginTest("values held for a lock miss do not cross a rebind: a miss right after bindParams reads the knob (C12)");
+        {
+            auto& layer = proc.getArp(0);
+            auto& cs = layer.controlSequences[0];
+            cs.mode       = ControlSequence::Mode::Stepped;
+            cs.polarity   = ControlSequence::Polarity::Unipolar;
+            cs.stepValues = { 100.0f };
+            const auto id = juce::String("a0_") + kModDestTable[D_cut].param;
+            const auto range = proc.apvts.getParameterRange(id);
+            setParam(proc.apvts, id, range.convertFrom0to1(0.5f));
+
+            juce::AudioBuffer<float> buf(2, 256);
+            juce::MidiBuffer midi;
+            const auto block = [&] { buf.clear(); midi.clear(); proc.processBlock(buf, midi); };
+
+            ModulationAssignment a;
+            a.id = "rebind"; a.sourceId = "cs0_output"; a.destinationId = kModDestTable[D_cut].id; a.depth = 40.0f;
+            expect(layer.modulationMatrix.addAssignment(a));
+            block();
+            expect(range.convertTo0to1(proc.getModLive(0, D_cut)) > 0.7f, "the assignment moves the cutoff up (a value is now held)");
+
+            layer.bindParams(proc.apvts, 0);   // the layer is bound to a slot again (a move, a load): its held values belong to the old binding
+
+            layer.modLock.store(true, std::memory_order_release);   // the very next block misses the matrix lock
+            block();
+            layer.modLock.store(false, std::memory_order_release);
+            expect(std::abs(range.convertTo0to1(proc.getModLive(0, D_cut)) - 0.5f) < 0.02f,
+                   "the missed block reads the knob, not the value held before the rebind");
+
+            layer.modulationMatrix.removeAssignment("rebind");
+        }
+
         proc.releaseResources();
     }
 };

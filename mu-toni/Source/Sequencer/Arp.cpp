@@ -29,6 +29,7 @@ void Arp::prepare(double sampleRate, int blockSize)
     tailScratch.setSize(2, juce::jmax(1, blockSize));
     tailScratch.clear();
     parked = true;
+    lastResolved.reset();   // a prepare is a fresh start: no held modulated values (C12)
 }
 
 void Arp::bindParams(juce::AudioProcessorValueTreeState& apvts, int slot)
@@ -48,6 +49,7 @@ void Arp::bindParams(juce::AudioProcessorValueTreeState& apvts, int slot)
                                           : apvts.getRawParameterValue(layerParamId(slot, vpi::suffix[vpSlotFor(kModDestTable[k].param)]));
         modParamValues[kModDestTable[k].id] = 0.0f;   // pre-size the map: the audio thread only overwrites
     }
+    lastResolved.reset();   // values held for C12 belong to the slot bound before
 }
 
 void Arp::hearMidi(const mu_core::RenderContext& ctx) noexcept
@@ -146,7 +148,7 @@ void Arp::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& ou
 {
     // A slot that has just gone live (or was prepared since its last block) starts from silence: a deleted
     // layer's held note or voice tail never resumes in it.
-    if (parked) { runner.reset(); parked = false; }
+    if (parked) { runner.reset(); lastResolved.reset(); parked = false; }   // nothing held (C12) from before
 
     hearMidi(ctx);
     context.playing        = ctx.playing != 0;
