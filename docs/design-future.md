@@ -119,6 +119,15 @@ Run the family on an Android tablet. **Scope (owner, 2026-10-09): standalone onl
 
 ---
 
+### 🟡 Layer types publish their modulation targets (one registry, one resolver)
+
+**The idea (Andy, 2026-10-31):** a layer type declares its list of modulatable values once, and the framework (modulator panel, target dropdown, `isValidDest`, the mixer strip) reads it from the layer-type registry instead of knowing each product. Plug a new type in and its targets appear everywhere with no framework edit.
+
+- **Today:** a `Layer` already owns its `ModulationMatrix`, control sequences and `voiceParams`, hands mixer-facing mods to its strip through `stripMods()` (pan, Effect / Delay / Reverb sends), and persists modulators gated by `isValidDest(id)`. But `LayerTypeInfo` ([mu-core/Sequencer/LayerTypeInfo.h](../mu-core/Sequencer/LayerTypeInfo.h)) carries no target list: the `mu_mod::ModTarget` tables are product-side constants (mu-Tant / mu-Toni `kModDestTable`, mu-On one table per lane, mu-Clid `ModDest::kTable`).
+- **Shape:** add a pointer + count of `ModTarget` rows to `LayerTypeInfo`; the dropdown, `isValidDest` and the serialiser read the shown layer's type through the registry. Each product's existing table is the data, so nothing about target ids or depth units changes.
+- **What stands in the way (why 🟡):** mu-Clid seeds and writes back its targets by hand in `PluginProcessor.cpp` (per-rhythm state and step-count-dependent ranges), not through `mu_mod::resolveLane`; that has to move onto the shared resolver first. Also unchecked: how the mu-Tronic modulator panel gets a slot's target list today.
+- **Why it matters:** it is the modulation half of the layer-type registry named under "One framework, one instance" and what a new product such as mu-Tilate needs to be self-describing. Direction for current work: new layer types keep their targets in one `ModTarget` table so the registry field can adopt it unchanged.
+
 ## Release & distribution (deferred until public release)
 
 These are understood and scoped but parked until the family ships publicly. They are
