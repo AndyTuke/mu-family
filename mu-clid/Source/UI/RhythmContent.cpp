@@ -451,7 +451,7 @@ void RhythmContent::loadSample()
     // supplies the dim backdrop + centring + click-outside-to-dismiss.
     auto content = std::make_unique<mu_core::SampleBrowserContent>(
         host.getRhythmSamples(), host.getRhythmSamplesDir(),
-        juce::String(juce::CharPointer_UTF8("Î¼-Clid Content")), startDir,
+        juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid Content")), startDir,
         [safeThis, rhythmIndex](const juce::File& f)
         {
             if (safeThis == nullptr) return;
