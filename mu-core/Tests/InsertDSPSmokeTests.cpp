@@ -30,6 +30,7 @@
 #include "Audio/FX/Insert/VocoderInsert.h"
 #include "Audio/VoiceParams.h"
 #include "Audio/InsertSlotConfig.h"
+#include "Audio/InsertProcessor.h"
 static float rmsOf(const juce::AudioBuffer<float>& buf, int ns)
 {
     float sum = 0.0f;
@@ -109,6 +110,79 @@ public:
             k.process(buf, kNs, 1, p, gr);
             const float rms = rmsOf(buf, kNs);
             expect (rms > 1e-6f, "Karplus produced no output - feedback may be broken (RMS=" + juce::String(rms) + ")");
+        }
+
+        beginTest ("Karplus: a sustained sine and a DC offset stay bounded at 75 % and 100 % feedback");
+        {
+            // The feedback term is soft-limited, so the resonant part cannot run away whatever the input holds.
+            for (const float feedback : { 75.0f, 100.0f })
+                for (const bool dc : { false, true })
+                {
+                    KarplusStrongInsert k;
+                    k.prepare(kSR, kNs);
+                    VoiceParams p;
+                    p.insertAlgo = 11;
+                    setSlot(p, 0, 0.0f);
+                    setSlot(p, 1, 2.0f);
+                    setSlot(p, 2, feedback);
+                    setSlot(p, 3, 10000.0f);
+
+                    constexpr float inPeak = 0.5f;
+                    float outPeak = 0.0f;
+                    bool finite = true;
+                    long n = 0;
+                    for (int block = 0; block < 200; ++block)
+                    {
+                        juce::AudioBuffer<float> buf(1, kNs);
+                        for (int i = 0; i < kNs; ++i, ++n)
+                            buf.setSample(0, i, dc ? inPeak : inPeak * std::sin(2.0f * juce::MathConstants<float>::pi * 1000.0f * (float) n / (float) kSR));
+                        float gr = 0.0f;
+                        k.process(buf, kNs, 1, p, gr);
+                        for (int i = 0; i < kNs; ++i)
+                        {
+                            finite = finite && std::isfinite(buf.getSample(0, i));
+                            outPeak = juce::jmax(outPeak, std::abs(buf.getSample(0, i)));
+                        }
+                    }
+                    const auto what = juce::String(dc ? "DC" : "1 kHz sine") + " at " + juce::String((int) feedback) + " % feedback";
+                    expect (finite, what + ": non-finite output");
+                    expect (outPeak <= inPeak + 1.0f, what + ": output peak " + juce::String(outPeak, 3) + " exceeds input peak + 1");
+                }
+        }
+
+        beginTest ("InsertProcessor: the post-drive tone filter has no step when the tone knob leaves the fully-open end");
+        {
+            // While the tone is open (19 kHz or more) the filter follows the signal, so switching it on starts from the
+            // signal rather than from a stale value.
+            InsertProcessor ip;
+            ip.prepare(kSR, kNs);
+            VoiceParams p;
+            p.insertAlgo = 1;                 // SoftClip, Drive 0 = near passthrough
+            setSlot(p, 0, 0.0f);
+            setSlot(p, 3, 20000.0f);          // tone open
+            auto sineBlock = [&](long start)
+            {
+                juce::AudioBuffer<float> b(2, kNs);
+                for (int i = 0; i < kNs; ++i)
+                    for (int c = 0; c < 2; ++c)
+                        b.setSample(c, i, 0.5f * std::sin(2.0f * juce::MathConstants<float>::pi * 200.0f * (float) (start + i) / (float) kSR));
+                return b;
+            };
+            long pos = 0;
+            float last = 0.0f;
+            for (int block = 0; block < 4; ++block)
+            {
+                auto b = sineBlock(pos);
+                ip.process(b, kNs, 2, p);
+                last = b.getSample(0, kNs - 1);
+                pos += kNs;
+            }
+            setSlot(p, 3, 5000.0f);           // tone closes to 5 kHz
+            auto b = sineBlock(pos);
+            ip.process(b, kNs, 2, p);
+            // A 200 Hz sine at 0.5 moves at most about 0.013 per sample; a stale filter would step by about 0.25.
+            expect (std::abs(b.getSample(0, 0) - last) < 0.05f,
+                    "tone switch-on stepped by " + juce::String(std::abs(b.getSample(0, 0) - last), 4));
         }
 
         // ── VocoderInsert (mono) ─────────────────────────────────────────────

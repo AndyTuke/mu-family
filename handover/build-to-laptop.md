@@ -37,11 +37,11 @@ Notes: the two extra tests (12-character id under an allocation counter; a proce
 
 ### Re L-006 · 2026-10-31 · Partly
 Build: v1.1.0.1455 · Ran: `mu-core-tests`, which includes `SpectralBehaviourTests` and `InsertDSPSmokeTests` (no failures in either) · Saw: `mu-clid` golden `inserts-karplus-ring` moved (292 differences, first at 3258 ms, RMS unchanged to 0.01 dB), as the item expected; not re-recorded.
-Notes: the bounded-output test (1 kHz sine and DC at 75 / 100 % feedback) was not written; no listening.
+Notes: the bounded-output test (1 kHz sine and DC at 75 / 100 % feedback, output peak <= input peak + 1) is written and passes (`InsertDSPSmokeTests`); no listening.
 
 ### Re L-007 · 2026-10-31 · Partly
 Build: v1.1.0.1455 · Ran: `mu-core-tests` (InsertDSPSmokeTests passes) · Saw: nothing.
-Notes: the tone-cutoff-across-19-kHz continuity test was not written; no listening.
+Notes: a continuity test (tone open for 4 blocks, then 5 kHz, step < 0.05 at the switch) is written and passes; I did not check that it fails without the fix; no listening.
 
 ### Re L-008 · 2026-10-31 · Partly
 Build: v1.1.0.1455 · Ran: full Debug build; `mu-clid-tests` (354 results, 17 failures), `mu-on-tests` (239, 16), `mu-core-tests`; `mu-tant-tests` and `mu-toni-tests` were cut off by my 300 s cap and did not finish (their first results were the manifest / corpus differences of B-002); `mu-clid-midi`, `mu-control`, `mu-tronic` (132 results) and all four `*-layer-tests` pass · Saw: goldens moved in mu-On and mu-Clid.
