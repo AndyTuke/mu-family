@@ -24,7 +24,7 @@ Sizes come from `MuLookAndFeel`, depth from `MuTheme::Lighting`, controls from t
 │            │  ◄━━━━━━━━[ overview / scrollbar ]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━► Zoom ─●─ │
 │            │  Method [Transients|Soft-tonal|Even]  Sensitivity (•)  Min gap (•)  Pre-roll (•)  │
 │            │  Low-cut (•)  High-cut (•)   Snap [Off|1/16|1/8]   [Re-detect]   Slices: 12      │
-│            │  STRETCH (when Tempo = Stretch)  Transient hold (•) ms  Curve (•)  Strength (•)  ╱‾‾ │
+│            │  STRETCH (when Tempo = Stretch)  Transient hold (•) ms  Strength (•)                │
 │            ├─────────────────────────────────────────────────────────────────────────────────┤
 │            │  SLICES ★                       │ SLICE PLAYER ★  slice 5 (selected)              │
 │            │  ┌───┬───┬───┬───┬───┬───┬───┬───┐ │ Start ▏0.412 s End ▏0.538 s  Fade in/out (•)(•) │
