@@ -170,6 +170,7 @@ void PhraseContent::timerCallback()
     const auto text = host.getLoopStatus(currentLayer);
     if (status.getText() != text) status.setText(text, juce::dontSendNotification);
     refreshViews();
+    timelineView.setPlayheadBeats(host.isPhraseTransportPlaying() ? host.getPhraseTransportBeat() : -1.0);
 }
 
 void PhraseContent::paint(juce::Graphics& g)

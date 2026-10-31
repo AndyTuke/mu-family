@@ -25,6 +25,10 @@ public:
     virtual float getModLive(int layer, int dest) const noexcept = 0;
     virtual int   getPhraseColourIndex(int layer) const = 0;
 
+    // The host transport as the content shows it: playing, and the beat it is at.
+    virtual bool   isPhraseTransportPlaying() const noexcept = 0;
+    virtual double getPhraseTransportBeat() const noexcept = 0;
+
     // Decodes `file` on a worker, detects its slices and lays them out in their original order, then publishes the
     // result to the layer. A newer request for the same layer supersedes an older one. `keepSavedEdits` is for a
     // session restore: the slices and timeline the saved file carried are kept when they were made on a loop of the

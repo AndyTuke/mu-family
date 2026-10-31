@@ -82,6 +82,8 @@ public:
         return getPhrase(juce::jlimit(0, mu_limits::kMaxLayers - 1, layer)).getModLive(dest);
     }
     int getPhraseColourIndex(int layer) const override { return getLayerColourIndex(layer); }
+    bool   isPhraseTransportPlaying() const noexcept override { return isInternalPlaying(); }
+    double getPhraseTransportBeat() const noexcept override   { return getInternalBeatPos(); }
     void loadLoopAsync(int layer, const juce::File& file, bool keepSavedEdits = false) override;
     juce::String getLoopStatus(int layer) const override;
 
