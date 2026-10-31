@@ -2,6 +2,8 @@
 
 #include "Sequencer/Phrase.h"
 
+#include <functional>
+
 namespace mu_tilate
 {
 
@@ -31,7 +33,58 @@ PhraseContent::PhraseContent(PhraseHost& h)
     addKnob(ppi::fadeOut,  "Out",    LF::knobModulation);
     addKnob(ppi::gain,     "Level",  LF::knobLevel);
 
-    startTimerHz(4);
+    addAndMakeVisible(waveform);
+    waveform.onRegionClicked = [this](int r) { waveform.setSelectedRegion(r); };
+    waveform.onMarkerMoved = [this](int idx, int pos)
+    {
+        editSlices([idx, pos](SliceList& sl, Timeline&) { sl.moveMarker(idx, pos); });
+    };
+    waveform.onMarkerAddRequested = [this](int pos)
+    {
+        editSlices([pos](SliceList& sl, Timeline& tl)
+        {
+            const int at = sl.addMarker(pos);
+            if (at >= 0) tl.sliceInserted(at);
+        });
+    };
+    waveform.onMarkerDeleteRequested = [this](int idx)
+    {
+        editSlices([idx](SliceList& sl, Timeline& tl) { if (sl.removeMarker(idx)) tl.sliceRemoved(idx); });
+        waveform.setSelectedRegion(-1);
+    };
+
+    startTimerHz(15);
+}
+
+// One marker edit: copy the layer's slices and timeline, apply the edit, publish the result (the audio is shared).
+void PhraseContent::editSlices(const std::function<void(SliceList&, Timeline&)>& edit)
+{
+    auto& phrase = host.getPhrase(currentLayer);
+    const auto d = phrase.getData();
+    if (d == nullptr || d->audio == nullptr) return;
+    SliceList slices = d->slices;
+    Timeline timeline = d->timeline;
+    edit(slices, timeline);
+    phrase.commitEdit(slices, timeline);
+}
+
+// Shows the layer's loop and slice markers; only reads what changed (the data pointer moves on every edit).
+void PhraseContent::refreshWaveform()
+{
+    const auto d = host.getPhrase(currentLayer).getData();
+    if (d.get() == shownData) return;
+    shownData = d.get();
+    if (d == nullptr || d->audio == nullptr)
+    {
+        shownAudio = nullptr;
+        waveform.setAudio(nullptr);
+        waveform.setMarkers({});
+        return;
+    }
+    if (d->audio.get() != shownAudio) { shownAudio = d->audio.get(); waveform.setAudio(d->audio); }
+    std::vector<LoopWaveform::Marker> markers;
+    for (int i = 0; i < d->slices.size(); ++i) markers.push_back({ d->slices.marker(i).position, d->slices.marker(i).pinned });
+    waveform.setMarkers(std::move(markers));
 }
 
 void PhraseContent::addKnob(int row, const char* label, MuLookAndFeel::ColourIds colour)
@@ -59,6 +112,8 @@ void PhraseContent::setLayer(int idx)
     modeAtt = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, prefix + ppi::suffix[ppi::mode], modeBox.getComboBox());
 
     bindModulationArcs();
+    shownData = nullptr; shownAudio = nullptr;   // another layer's loop: show it afresh
+    waveform.setSelectedRegion(-1);
     timerCallback();
     repaint();
 }
@@ -96,6 +151,7 @@ void PhraseContent::timerCallback()
 {
     const auto text = host.getLoopStatus(currentLayer);
     if (status.getText() != text) status.setText(text, juce::dontSendNotification);
+    refreshWaveform();
 }
 
 void PhraseContent::paint(juce::Graphics& g)
@@ -121,6 +177,10 @@ void PhraseContent::resized()
     row.removeFromLeft(s(LF::kSpaceS));
     for (auto& k : knobs)
         k.comp->setBounds(row.removeFromLeft(s(LF::kKnobSize2W)));
+
+    // The source waveform takes the rest of the band (the slice player and the timeline come below it, next stage).
+    area.removeFromTop(s(LF::kSpaceS));
+    waveform.setBounds(area);
 }
 
 } // namespace mu_tilate

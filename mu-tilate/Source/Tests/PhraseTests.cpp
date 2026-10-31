@@ -105,6 +105,19 @@ struct PhraseTests : public juce::UnitTest
             expectEquals(t.size(), 1);                                  // the blocks at 4 and 5 went, the copy at 1 stayed
         }
 
+        beginTest("timeline: blocks follow their slices when one is inserted or removed");
+        {
+            Timeline t(8.0);
+            t.place(0, 0.0, 0.0); t.place(1, 1.0, 0.0); t.place(2, 2.0, 0.0);
+            t.sliceInserted(1);                                         // a new slice 1: the old 1 and 2 become 2 and 3
+            expectEquals(t.blocks()[0].slice, 0);
+            expectEquals(t.blocks()[1].slice, 2);
+            expectEquals(t.blocks()[2].slice, 3);
+            t.sliceRemoved(2);                                          // slice 2 merged into slice 1
+            expectEquals(t.blocks()[1].slice, 1);
+            expectEquals(t.blocks()[2].slice, 2);
+        }
+
         beginTest("timeline: original order lays the slices back to back; randomise keeps the layout");
         {
             Timeline t(8.0);

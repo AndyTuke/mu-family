@@ -52,6 +52,13 @@ PluginProcessor::PluginProcessor()
                              [this](int i, juce::ValueTree& t) { applyLayerTree(i, t); });
     startFxParamSync();     // mixer / FX params -> mixerEngine + fxChain (ProcessorBase)
     loadStartupDefault();   // restore a saved _default preset (skipped by render mode)
+
+   #if JUCE_DEBUG
+    // Developer aid (Debug builds only): MU_TILATE_LOAD_LOOP names a loop to load into layer 1 at start, so the window can be
+    // captured with a loop in it without driving the file chooser.
+    if (const auto loop = juce::SystemStats::getEnvironmentVariable("MU_TILATE_LOAD_LOOP", {}); loop.isNotEmpty())
+        loadLoopAsync(0, juce::File(loop));
+   #endif
 }
 
 PluginProcessor::~PluginProcessor()

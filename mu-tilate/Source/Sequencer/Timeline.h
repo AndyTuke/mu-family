@@ -52,6 +52,11 @@ public:
     void originalOrder(const std::vector<double>& sliceBeats);                 // the slices back to back, in source order, from beat 0
     void randomise(const std::vector<double>& sliceBeats, juce::Random& rng);  // the same layout in a shuffled order
 
+    // The slice list changed under the blocks: a slice was inserted at `at` (blocks naming it or a later slice shift up), or
+    // the slice at `at` was removed and merged into the one before it (its blocks move to that slice, later ones shift down).
+    void sliceInserted(int at);
+    void sliceRemoved(int at);
+
     // The index of the last block starting at or before `beat`, or -1.
     int indexAt(double beat) const noexcept;
 

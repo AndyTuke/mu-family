@@ -20,6 +20,7 @@ set(MU_CORE_CHROME_SOURCES
     "${_mu_core_dir}/UI/Components/DropdownSelect.cpp"
     "${_mu_core_dir}/UI/Components/StepEditor.cpp"
     "${_mu_core_dir}/UI/Components/LFOEditor.cpp"
+    "${_mu_core_dir}/UI/Components/LoopWaveform.cpp"
     "${_mu_core_dir}/UI/Components/AddButton.cpp"
     "${_mu_core_dir}/UI/Components/StatusBar.cpp"
     "${_mu_core_dir}/UI/Components/VUMeter.cpp"

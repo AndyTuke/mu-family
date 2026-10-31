@@ -89,6 +89,21 @@ bool Timeline::remove(int index)
     return true;
 }
 
+void Timeline::sliceInserted(int at)
+{
+    for (auto& b : list)
+        if (b.slice >= at) ++b.slice;
+}
+
+void Timeline::sliceRemoved(int at)
+{
+    for (auto& b : list)
+    {
+        if (b.slice == at) b.slice = std::max(0, at - 1);
+        else if (b.slice > at) --b.slice;
+    }
+}
+
 void Timeline::originalOrder(const std::vector<double>& sliceBeats)
 {
     list.clear();
