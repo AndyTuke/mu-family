@@ -1,8 +1,8 @@
 # frozen load result for fixture: Simple Hat.muRhythm
 layers=1
 load_errors=0
-capture_bytes=6090
-capture_sha256=d098c7096d89eba81fde0bc1dcafce25a6a0d0b4dbaa1edcd64808dcc4ee8d2b
+capture_bytes=6107
+capture_sha256=b2b2012db0745c260e5570c89a7820a4dc72de2edcb1a9fc4e3ef35d3fe43d70
 --- parameters differing from default (id=plain value)
 r0_aEnvAtk=5.48903e-09
 r0_aEnvDec=0.11

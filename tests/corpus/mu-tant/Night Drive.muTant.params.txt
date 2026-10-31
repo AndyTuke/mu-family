@@ -2,7 +2,7 @@
 layers=4
 load_errors=0
 resave_bytes=35556
-resave_sha256=dc3c38a75b91458f552dbba6369113ebf88123186d0626445cf6bf1a7d0f3d18
+resave_sha256=a0168a90be1b1a3ae24a2088cb731ce2de0e45342abff4e44a9035cb9412f2f1
 --- parameters differing from default (id=plain value)
 ch0_lvl=0.814
 ch0_pan=-0.6
