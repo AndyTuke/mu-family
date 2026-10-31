@@ -203,6 +203,25 @@ ProcessorBase::~ProcessorBase()
     fxParamSync.stop();   // the listener must go before the members it touches
 }
 
+// ─── Online activation and MIDI program changes: forwarders to ActivationWorker and ProgramChangeRouter ──────────
+bool ProcessorBase::activateOnlineAsync(const juce::String& key,
+                                        std::function<void(const mu_core::OnlineActivationOutcome&)> done)
+{
+    return activationWorker.start(activateOnlineFn, key, std::move(done));
+}
+
+bool ProcessorBase::scanMidiProgramChanges(const juce::MidiBuffer& midi)
+{
+    return programChangeRouter.scan(midi, midiPresetMap, midiFullPresetMap);
+}
+
+void ProcessorBase::drainPendingMidiProgramChanges()
+{
+    programChangeRouter.drain(getNumActiveLayers(), midiPresetMap, midiFullPresetMap,
+                              [this](const juce::File& f) { applyFullMidiPreset(f); },
+                              [this](int slot, const juce::File& f) { applyMidiPresetLayer(slot, f); });
+}
+
 // ─── Mixer / global-FX parameters: forwarders to FxParamSync ──────────────────────────────────────────────────
 bool ProcessorBase::isFxParamId(const juce::String& id)     { return mu_core::FxParamSync::isFxParamId(id); }
 void ProcessorBase::startFxParamSync()                       { fxParamSync.start(); }

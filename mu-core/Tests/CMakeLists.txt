@@ -8,6 +8,7 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/../cmake/ProcessorTestSources.cmake")
 
 set(MU_CORE_TEST_SOURCES
     TestMain.cpp
+    ActivationAndProgramChangeTests.cpp
     BypassSwapTests.cpp
     HostTransportPublishTests.cpp
     GoldenRenderHarnessTests.cpp

@@ -7,10 +7,8 @@
 set(_mu_core_dir "${CMAKE_CURRENT_LIST_DIR}/..")
 set(MU_CORE_PROCESSOR_TEST_SOURCES
     "${_mu_core_dir}/Plugin/ProcessorBase.cpp"
-    "${_mu_core_dir}/Plugin/ProcessorBase_MidiPrograms.cpp"
     "${_mu_core_dir}/Plugin/ProcessorBase_Settings.cpp"
     "${_mu_core_dir}/Plugin/FxParamSync.cpp"
-    "${_mu_core_dir}/Plugin/ProcessorBase_Activation.cpp"
     "${_mu_core_dir}/Plugin/ProcessorBase_Presets.cpp"
     "${_mu_core_dir}/Plugin/ProcessorBase_LayerEdits.cpp"
     "${_mu_core_dir}/Plugin/ProcessorBase_LayerTypes.cpp"

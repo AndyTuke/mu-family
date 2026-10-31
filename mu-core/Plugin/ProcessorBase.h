@@ -19,6 +19,8 @@
 #include "Audio/FX/Slots/FXChain.h"
 #include "Audio/MixerEngine.h"
 #include "Plugin/FxParamSync.h"
+#include "Plugin/ActivationWorker.h"
+#include "Plugin/ProgramChangeRouter.h"
 #include "Audio/VoiceEngine.h"
 #include "Persistence/MidiPresetMap.h"
 #include "Persistence/MidiFullPresetMap.h"
@@ -1042,7 +1044,7 @@ protected:
     // the services a tail may read are still alive.
     void prepareForDestruction() noexcept
     {
-        stopActivationWorker();
+        activationWorker.stop();
         swapPoll.stop();
         retireBin.cutAll();
         retireBin.service(true);   // nothing processes again: even a tail still waiting for its store is freed
@@ -1220,9 +1222,7 @@ protected:
         int            suggestedPrice = 20;     // the amount (GBP) the prompt suggests; matches the store
     };
     // Joins the online-activation worker (bounded by the network timeout) and drops its pending reply.
-    void stopActivationWorker() noexcept;
-    std::unique_ptr<juce::Thread>         activationWorker;
-    std::shared_ptr<std::atomic<bool>>    activationAlive = std::make_shared<std::atomic<bool>>(true);
+    mu_core::ActivationWorker             activationWorker;
 
     // Check the offline licence + stored activation and wire activateOnlineFn. Call after
     // initAppSettings (it needs getContentDir). Defined in License/ProductLicensing.h — include
@@ -1286,13 +1286,9 @@ private:
     std::atomic<int> selectedSlot { 0 };   // setSelectedSlot
     int  firstUnusedColourIndex() const;   // lowest palette index no live layer uses
 
-    // MIDI program-change queue: audio thread enqueues on incoming PC;
-    // drainPendingMidiProgramChanges (message thread) drains and dispatches
-    // to the virtual hooks.
-    struct ProgramChangeEvent { int slot; int presetIndex; bool fullPreset; };
-    static constexpr int kPCFifoSize = mu_limits::kProgramChangeFifoSize;
-    juce::AbstractFifo                          pcFifo { kPCFifoSize };
-    std::array<ProgramChangeEvent, kPCFifoSize> pcQueue {};
+    // MIDI program changes: the audio thread enqueues (scanMidiProgramChanges), the message thread drains
+    // (drainPendingMidiProgramChanges) and dispatches to the virtual hooks.
+    mu_core::ProgramChangeRouter programChangeRouter;
 
     // MIDI control mapping: the saved table, the audio hand-off and the gesture-holding writer.
     mu_core::MidiControlMap    midiControlMap;

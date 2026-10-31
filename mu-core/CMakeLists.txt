@@ -54,10 +54,8 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MixerOverlay.cpp"
     # Shared plugin scaffolding
     "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_MidiPrograms.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_Settings.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/FxParamSync.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_Activation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_Presets.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_LayerEdits.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase_LayerTypes.cpp"
