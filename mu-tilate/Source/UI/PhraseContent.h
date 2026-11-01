@@ -6,11 +6,13 @@
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/LoopWaveform.h"
 #include "UI/Components/MuLookAndFeel.h"
+#include "UI/Components/SegmentControl.h"
 #include "UI/LayerContent.h"   // mu-core: the base every layer type's content derives from
 #include "Sequencer/SliceList.h"
 #include "Sequencer/Timeline.h"
 #include "UI/PhraseHost.h"     // what the content needs from the layer's host
 #include "UI/PhraseTimeline.h"
+#include "UI/SlicePanel.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -53,6 +55,9 @@ private:
     void refreshViews(bool force = false);        // re-reads the layer's loop data, slices and timeline when they changed
     void editSlices(const std::function<void(SliceList&, Timeline&)>& edit);   // one marker edit, published to the layer
     void chooseLoop();
+    void updateView();                            // shows the waveform or the slice player, whichever the switch says
+    void refreshSlicePanel(bool force);           // shows the selected slice's settings in the slice player
+    void selectSlice(int slice);                  // selects a slice (-1 for none) in the waveform and the slice player
     void timerCallback() override;
     void bindModulationArcs();
 
@@ -69,11 +74,14 @@ private:
     juce::TextButton detectButton { "Detect" };   // runs the detector again with the current settings
     std::vector<KnobDef> knobs;
     std::unique_ptr<juce::FileChooser> chooser;
+    SegmentControl viewSwitch { { "Waveform", "Slice player" }, SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Lcd };
     LoopWaveform waveform;
+    SlicePanel slicePanel;
     PhraseTimeline timelineView;
     double shownTempo = -1.0;                     // the loop tempo the timeline's block lengths were computed for
     const void* shownData = nullptr;              // the PhraseData the waveform last showed (identity only)
     const void* shownAudio = nullptr;
+    const void* shownPanelData = nullptr;         // the PhraseData the slice player last showed
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhraseContent)
 };

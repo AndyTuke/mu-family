@@ -47,7 +47,23 @@ PhraseContent::PhraseContent(PhraseHost& h)
     detectButton.onClick = [this] { host.redetectSlices(currentLayer); };
 
     addAndMakeVisible(waveform);
-    waveform.onRegionClicked = [this](int r) { waveform.setSelectedRegion(r); };   // the slice a click on the timeline places
+    addAndMakeVisible(viewSwitch);
+    viewSwitch.onChange = [this](int) { updateView(); };
+    addChildComponent(slicePanel);
+    slicePanel.onStatusUpdate = [this](const juce::String& n, const juce::String& v) { if (onStatusUpdate) onStatusUpdate(n, v); };
+    slicePanel.onChange = [this](const SliceSettings& settings)
+    {
+        const int idx = slicePanel.getSlice();
+        editSlices([idx, settings](SliceList& sl, Timeline&) { sl.setSettings(idx, settings); });
+    };
+    slicePanel.onStep = [this](int step)
+    {
+        const auto d = host.getPhrase(currentLayer).getData();
+        if (d == nullptr || d->slices.size() == 0) return;
+        const int from = waveform.getSelectedRegion();
+        selectSlice(from < 0 ? 0 : juce::jlimit(0, d->slices.size() - 1, from + step));
+    };
+    waveform.onRegionClicked = [this](int r) { selectSlice(r); };   // the slice a click on the timeline places
     waveform.onMarkerMoved = [this](int idx, int pos)
     {
         editSlices([idx, pos](SliceList& sl, Timeline&) { sl.moveMarker(idx, pos); });
@@ -63,11 +79,16 @@ PhraseContent::PhraseContent(PhraseHost& h)
     waveform.onMarkerDeleteRequested = [this](int idx)
     {
         editSlices([idx](SliceList& sl, Timeline& tl) { if (sl.removeMarker(idx)) tl.sliceRemoved(idx); });
-        waveform.setSelectedRegion(-1);
+        selectSlice(-1);
     };
 
     addAndMakeVisible(timelineView);
     timelineView.sliceToPlace = [this] { return waveform.getSelectedRegion(); };
+    timelineView.onBlockSelected = [this](int block)   // selecting a block selects its slice
+    {
+        const auto d = host.getPhrase(currentLayer).getData();
+        if (d != nullptr && block >= 0 && block < d->timeline.size()) selectSlice(d->timeline.blocks()[(size_t) block].slice);
+    };
     timelineView.onEdit = [this](const std::function<void(Timeline&)>& edit)
     {
         editSlices([&edit](SliceList&, Timeline& t) { edit(t); });
@@ -87,6 +108,39 @@ void PhraseContent::editSlices(const std::function<void(SliceList&, Timeline&)>&
     Timeline timeline = d->timeline;
     edit(slices, timeline);
     phrase.commitEdit(slices, timeline);
+}
+
+void PhraseContent::selectSlice(int slice)
+{
+    waveform.setSelectedRegion(slice);
+    refreshSlicePanel(true);
+}
+
+void PhraseContent::updateView()
+{
+    const bool player = viewSwitch.getSelectedIndex() == 1;
+    waveform.setVisible(! player);
+    slicePanel.setVisible(player);
+    if (player) refreshSlicePanel(true);
+}
+
+// The slice player shows the slice selected in the waveform: its settings and where it lies in the loop.
+void PhraseContent::refreshSlicePanel(bool force)
+{
+    const auto d = host.getPhrase(currentLayer).getData();
+    const int sel = waveform.getSelectedRegion();
+    if (d == nullptr || d->audio == nullptr || sel < 0 || sel >= d->slices.size())
+    {
+        if (slicePanel.getSlice() != -1) slicePanel.setSlice(-1, {}, {});
+        return;
+    }
+    if (! force && sel == slicePanel.getSlice() && d.get() == shownPanelData) return;
+    shownPanelData = d.get();
+    const auto r = d->slices.slice(sel);
+    slicePanel.setSlice(sel, d->slices.settings(sel),
+                        "Slice " + juce::String(sel + 1) + " of " + juce::String(d->slices.size()) + "   "
+                        + juce::String((double) r.start / d->fileSampleRate, 3) + " - " + juce::String((double) r.end / d->fileSampleRate, 3)
+                        + " s   (" + juce::String((double) r.length() / d->fileSampleRate * 1000.0, 0) + " ms)");
 }
 
 // Shows the layer's loop, slice markers and timeline; only reads what changed (the data pointer moves on every edit).
@@ -153,8 +207,8 @@ void PhraseContent::setLayer(int idx)
     detectAtt = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, prefix + ppi::suffix[ppi::dmethod], detectBox.getComboBox());
 
     bindModulationArcs();
-    shownData = nullptr; shownAudio = nullptr;   // another layer's loop: show it afresh
-    waveform.setSelectedRegion(-1);
+    shownData = nullptr; shownAudio = nullptr; shownPanelData = nullptr;   // another layer's loop: show it afresh
+    selectSlice(-1);
     timerCallback();
     repaint();
 }
@@ -193,6 +247,7 @@ void PhraseContent::timerCallback()
     const auto text = host.getLoopStatus(currentLayer);
     if (status.getText() != text) status.setText(text, juce::dontSendNotification);
     refreshViews();
+    refreshSlicePanel(false);
     timelineView.setPlayheadBeats(host.isPhraseTransportPlaying() ? host.getPhraseTransportBeat() : -1.0);
 }
 
@@ -210,6 +265,8 @@ void PhraseContent::resized()
     auto top = area.removeFromTop(s(kStatusH));
     loadButton.setBounds(top.removeFromLeft(s(112)));
     top.removeFromLeft(s(LF::kSpaceS));
+    viewSwitch.setBounds(top.removeFromRight(s(190)));
+    top.removeFromRight(s(LF::kSpaceS));
     status.setBounds(top);
     area.removeFromTop(s(LF::kSpaceS));
 
@@ -236,6 +293,7 @@ void PhraseContent::resized()
     timelineView.setBounds(area.removeFromBottom(timelineH));
     area.removeFromBottom(s(LF::kSpaceS));
     waveform.setBounds(area);
+    slicePanel.setBounds(area);
 }
 
 } // namespace mu_tilate
