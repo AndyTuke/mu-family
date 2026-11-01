@@ -151,8 +151,9 @@ struct ProcessorTests : public juce::UnitTest
             const auto out = juce::File(juce::SystemStats::getEnvironmentVariable("MU_TILATE_DEMO_OUT", "."));
             out.createDirectory();
             const double loopTempo = juce::SystemStats::getEnvironmentVariable("MU_TILATE_DEMO_TEMPO", "80").getDoubleValue();
-            const double projectTempo = loopTempo * 1.25;
-            for (int mode = 0; mode < 3; ++mode)
+
+            // Renders 12 s of the loop to demo_<name>.wav: tempo mode `mode` at `projectTempo`, after `prepare` has edited the layer.
+            auto renderDemo = [&](const juce::String& name, int mode, double projectTempo, const std::function<void(PluginProcessor&)>& prepare)
             {
                 PluginProcessor p;
                 Host host;
@@ -169,8 +170,8 @@ struct ProcessorTests : public juce::UnitTest
                 set(ppi::ltempo, (float) loopTempo);
                 p.loadLoopAsync(0, juce::File(demoLoop));
                 pumpUntil([&] { return p.getPhrase(0).getData() != nullptr && p.getPhrase(0).getData()->timeline.size() > 0; }, 30000);
-                const auto d = p.getPhrase(0).getData();
-                if (d == nullptr) { logMessage("demo: the loop did not load: " + p.getLoopStatus(0)); continue; }
+                if (p.getPhrase(0).getData() == nullptr) { logMessage("demo: the loop did not load: " + p.getLoopStatus(0)); return; }
+                if (prepare) prepare(p);
 
                 const int total = (int) (kSr * 12.0);
                 juce::AudioBuffer<float> all(2, total);
@@ -183,17 +184,49 @@ struct ProcessorTests : public juce::UnitTest
                     host.advance(kBlock);
                     for (int c = 0; c < 2; ++c) all.copyFrom(c, pos, blockBuf, c, 0, kBlock);
                 }
-                const char* names[] = { "off", "repitch", "stretch" };
-                const auto demoFile = out.getChildFile(juce::String("demo_") + names[mode] + ".wav");
+                const auto demoFile = out.getChildFile("demo_" + name + ".wav");
                 demoFile.deleteFile();
                 juce::WavAudioFormat wav;
                 std::unique_ptr<juce::OutputStream> stream(demoFile.createOutputStream());
                 if (auto w = wav.createWriterFor(stream, juce::AudioFormatWriterOptions {}.withSampleRate(kSr).withNumChannels(2).withBitsPerSample(24)))
                     w->writeFromAudioSampleBuffer(all, 0, total);
-                logMessage(juce::String("demo ") + names[mode] + ": " + p.getLoopStatus(0) + ", peak " + juce::String(all.getMagnitude(0, total), 3)
+                logMessage("demo " + name + ": " + p.getLoopStatus(0) + ", peak " + juce::String(all.getMagnitude(0, total), 3)
                            + ", rms " + juce::String(all.getRMSLevel(0, 0, total), 3) + " -> " + demoFile.getFullPathName());
                 p.setPlayHead(nullptr);
-            }
+            };
+
+            // The three tempo modes at a faster project tempo.
+            const char* names[] = { "off", "repitch", "stretch" };
+            for (int mode = 0; mode < 3; ++mode)
+                renderDemo(names[mode], mode, loopTempo * 1.25, {});
+
+            // The loop at its own tempo, plain and with a pre-fade on its loudest hits (a reversed swell of 200 ms at -9 dB, a little
+            // dark); and the same with the stretch at a faster tempo, which transposes nothing and keeps the swell in time.
+            auto addPreFade = [](PluginProcessor& p)
+            {
+                const auto d = p.getPhrase(0).getData();
+                SliceList slices = d->slices;
+                std::vector<float> attack((size_t) slices.size(), 0.0f);
+                float loudest = 0.0f;
+                for (int i = 0; i < slices.size(); ++i)
+                {
+                    const auto r = slices.slice(i);
+                    const int n = std::min(r.length(), (int) (0.03 * d->fileSampleRate));
+                    attack[(size_t) i] = d->audio->getMagnitude(0, r.start, n);
+                    loudest = std::max(loudest, attack[(size_t) i]);
+                }
+                for (int i = 1; i < slices.size(); ++i)
+                    if (attack[(size_t) i] > 0.6f * loudest)
+                    {
+                        SliceSettings s = slices.settings(i);
+                        s.preFade = true; s.preLengthMs = 200.0f; s.preLevelDb = -9.0f; s.preTone = -0.3f;
+                        slices.setSettings(i, s);
+                    }
+                p.getPhrase(0).commitEdit(slices, d->timeline);
+            };
+            renderDemo("plain", 0, loopTempo, {});
+            renderDemo("prefade", 0, loopTempo, addPreFade);
+            renderDemo("prefade_stretch", 2, loopTempo * 1.25, addPreFade);
         }
 
         beginTest("a missing file reports itself and leaves the layer as it was");
