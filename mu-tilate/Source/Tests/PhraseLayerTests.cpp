@@ -184,6 +184,28 @@ struct PhraseLayerTests : public juce::UnitTest
             expect(r.layer.renderRetiring(contextAt(r.beat), r.out, kBlock, rs));
         }
 
+        beginTest("the tail of a layer whose loop was replaced while it was parked does not read the old audio");
+        {
+            auto constant = [](float v)
+            {
+                auto d = makeData({ 0, 1, 2, 3 });
+                auto a = std::make_shared<juce::AudioBuffer<float>>(1, 96000);
+                for (int i = 0; i < 96000; ++i) a->setSample(0, i, v);
+                d->audio = a;
+                return d;
+            };
+            Rig r;
+            r.layer.setData(constant(0.9f));
+            r.block(); r.block();                                    // voices sounding the 0.9 loop
+            r.layer.onParkedBlock(contextAt(r.beat));                // the layer is parked ...
+            r.layer.setData(constant(0.2f));                         // ... and its loop is replaced (the old audio is freed)
+            mu_core::RetireState rs {};
+            rs.samplesLeft = 4800; rs.gainStep = 1.0f / 4800.0f; rs.exclusive = 1; rs.maxSamples = 96000;
+            r.out.clear();
+            expect(r.layer.renderRetiring(contextAt(r.beat), r.out, kBlock, rs));
+            expectLessOrEqual(r.out.getMagnitude(0, kBlock), 0.2f + 1.0e-3f);   // the dropped voices are silent; nothing of the 0.9 loop
+        }
+
         beginTest("a block with a loop allocates nothing");
         {
             Rig r;

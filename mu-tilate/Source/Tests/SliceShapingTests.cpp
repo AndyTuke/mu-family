@@ -157,6 +157,26 @@ struct SliceShapingTests : public juce::UnitTest
             expect(sp.isActive());
         }
 
+        beginTest("a looping slice that plays backwards has no jump at its loop point either");
+        {
+            const int n = 4000;
+            juce::AudioBuffer<float> src(1, n);
+            for (int i = 0; i < n; ++i) src.setSample(0, i, 0.5f * std::sin(2.0f * juce::MathConstants<float>::pi * 440.0f * (float) i / (float) kSr));
+            SlicePlayer sp; sp.prepare(kSr);
+            auto p = plain(); p.own.loop = true; p.reverse = true;
+            sp.trigger(&src, { 100, 3777 }, p);
+            juce::AudioBuffer<float> out(1, 20000); out.clear();
+            for (int pos = 0; pos < 20000; pos += 500)
+            {
+                juce::AudioBuffer<float> view(out.getArrayOfWritePointers(), 1, pos, 500);
+                sp.render(view, 500);
+            }
+            float worst = 0.0f;
+            for (int i = 300; i < 20000; ++i) worst = std::max(worst, std::abs(out.getSample(0, i) - out.getSample(0, i - 1)));
+            expectLessThan(worst, 0.04f);                                // the sine's own step is 0.029; one skipped sample at the seam was a visible bump
+            expect(sp.isActive());
+        }
+
         beginTest("a band-pass has the same level at any resonance");
         {
             // A sine at the cutoff: the peak gain is what the scaling fixes (noise would also change with the bandwidth).
@@ -195,6 +215,26 @@ struct SliceShapingTests : public juce::UnitTest
             }
             expectGreaterThan(peak, 0.3f);
             expectWithinAbsoluteError((double) total, 1.25 * n, 0.05 * n);
+        }
+
+        beginTest("more triggers than voices, each with a long amp release, stay finite and bounded");
+        {
+            auto src = constant(9600, 0.5f);
+            SlicePlayer sp; sp.prepare(kSr);
+            auto p = plain(); p.own.ampR = 2000.0f; p.own.filterType = 1; p.own.cutoffHz = 800.0f; p.own.fltR = 2000.0f;
+            juce::AudioBuffer<float> out(1, 100);
+            float peak = 0.0f;
+            bool finite = true;
+            for (int i = 0; i < 40; ++i)                                  // a retrigger every 100 samples: far more than four voices
+            {
+                sp.trigger(&src, { 0, 9600 }, p);
+                out.clear();
+                sp.render(out, 100);
+                for (int k = 0; k < 100; ++k) { finite = finite && std::isfinite(out.getSample(0, k)); peak = std::max(peak, std::abs(out.getSample(0, k))); }
+            }
+            expect(finite);
+            expectLessThan(peak, 4.0f * 0.5f + 0.01f);                   // at most four voices of 0.5 each
+            expect(sp.isActive());
         }
 
         beginTest("a pre-fade is a voice of its own: a slice trigger and a slice cut leave it playing");

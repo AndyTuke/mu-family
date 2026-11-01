@@ -287,7 +287,16 @@ struct PhraseTests : public juce::UnitTest
             const double perCallUs = ms * 1000.0 / calls, budgetUs = block / kSr * 1.0e6;
             logMessage("pre-fade scan, 1024 pre-fade blocks, 64-sample blocks: " + juce::String(perCallUs, 1) + " us per call, the block lasts "
                        + juce::String(budgetUs, 0) + " us (" + juce::String(100.0 * perCallUs / budgetUs, 1) + "% of it), Debug build");
-            expectLessThan(perCallUs, budgetUs * 0.5);                    // under half a block even in a Debug build on a loaded machine (it measured 213 us before the search, 9 after)
+            expectLessThan(perCallUs, budgetUs * 0.5);                    // a loose bound, timing is load-sensitive: the exact check follows
+
+            // The deterministic check: one call looks only at the blocks near it (the longest pre-fade reaches back one second =
+            // 2 beats = 8 blocks, plus the blocks of the segment itself), never at the thousand.
+            PhraseClock c1;
+            c1.playing = true; c1.bpm = 120.0; c1.sampleRate = kSr; c1.beatsPerSample = 120.0 / 60.0 / kSr; c1.startBeat = 100.0;
+            out.clear();
+            r.playback.render(r.loop, r.settings, c1, out, block);
+            expectLessThan(r.playback.preBlocksExamined(), 40);
+            expectGreaterThan(r.playback.preBlocksExamined(), 0);
         }
 
         beginTest("a transport jump re-anchors: the old slice fades and the new position plays");

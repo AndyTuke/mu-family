@@ -293,6 +293,7 @@ void SlicePlayer::renderNative(Voice& v, juce::AudioBuffer<float>& out, int offs
             v.pos += v.step > 0.0 ? -(loopLen - fadeSrc) : (loopLen - fadeSrc);
             double rel = std::fmod(v.pos - (double) v.range.start, loopLen);   // a step longer than the slice wraps more than once
             if (rel < 0.0) rel += loopLen;
+            rel = std::min(rel, std::nextafter(loopLen, 0.0));   // a tiny negative rel can round up to the length, which is out of range
             v.pos = (double) v.range.start + rel;
             if (! inRange(v)) { v.active = false; break; }
         }
@@ -304,7 +305,7 @@ void SlicePlayer::renderNative(Voice& v, juce::AudioBuffer<float>& out, int offs
             if (into > 0.0)
             {
                 blend = (float) std::min(1.0, into / fadeSrc);
-                other = v.step > 0.0 ? (double) v.range.start + into : (double) (v.range.end - 1) - into;
+                other = v.step > 0.0 ? (double) v.range.start + into : (double) v.range.end - into;   // the wrap lands at end - fadeSrc, so the material continues from end
             }
         }
 

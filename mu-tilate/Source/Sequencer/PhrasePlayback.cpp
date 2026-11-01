@@ -99,6 +99,7 @@ void PhrasePlayback::render(const PhraseLoop& loop, const PhraseSettings& s, con
         return;
     }
 
+    examined = 0;
     const double L   = loop.timeline->lengthBeats();
     const double bps = c.beatsPerSample;
 
@@ -158,6 +159,7 @@ void PhrasePlayback::render(const PhraseLoop& loop, const PhraseSettings& s, con
             int preBlock = -1, preFrame = std::numeric_limits<int>::max();
             auto consider = [&](int j)
             {
+                ++examined;
                 Pre pre;
                 if (! preFor(loop, s, c, blocks[(size_t) j], pre)) return;
                 double pb = blocks[(size_t) j].start - (double) pre.duration * bps;

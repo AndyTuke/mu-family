@@ -62,6 +62,8 @@ public:
                 juce::AudioBuffer<float>& out, int n) noexcept;
 
     bool isActive() const noexcept { return player.isActive(); }
+    // How many blocks the last render call looked at when scanning for pre-fades to start (a test of the scan's cost).
+    int  preBlocksExamined() const noexcept { return examined; }
 
 private:
     // The slice player's parameters for block `b` and the slice's range in the (possibly rescaled) audio.
@@ -75,6 +77,7 @@ private:
     SlicePlayer player;
     bool   anchored    = false;   // expectedBeat is valid
     double expectedBeat = 0.0;    // where the next call should start if the transport ran on
+    int    examined    = 0;       // see preBlocksExamined
     bool   cutPending  = false;   // a block with its own length is sounding: cut at cutBeat (a timeline position)
     double cutBeat     = 0.0;
 };
