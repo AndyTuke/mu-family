@@ -265,8 +265,11 @@ bool Phrase::renderRetiring(const mu_core::RenderContext& ctx, juce::AudioBuffer
         const uint64_t audioId = d != nullptr ? d->audioId : 0;
         if (audioId != lastAudioId) { playback->hardReset(); lastAudioId = audioId; }
     }
-    renderBlock(d, idle, buf, frames);
-    if (locked) mu_core::spinUnlock(dataLock);
+    if (locked)   // the voices read the loop's audio, which the lock protects: a missed lock leaves this block's tail silent
+    {
+        renderBlock(d, idle, buf, frames);
+        mu_core::spinUnlock(dataLock);
+    }
     mu_core::applyLinearFade(buf, frames, rs);
 
     if (rs.exclusive == 0)

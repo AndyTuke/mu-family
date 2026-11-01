@@ -125,7 +125,8 @@ private:
 
     // One output sample of the voice at its position (4-point Catmull-Rom, exact at integer positions), clamped to
     // the slice so a neighbouring slice never leaks in.
-    static float read(const Voice& v, int channel) noexcept;
+    static float read(const Voice& v, int channel) noexcept { return readAt(v, v.pos, channel); }
+    static float readAt(const Voice& v, double pos, int channel) noexcept;
     // True while the voice's read position is inside its slice.
     static bool inRange(const Voice& v) noexcept;
 
@@ -149,6 +150,7 @@ private:
     double sr = 48000.0;
     int    maxBlock = 512;
     float  cutStep = 1.0f / 144.0f;   // cutGain decrease per sample (1 / cut-fade samples)
+    static constexpr float kLoopFadeMs = 2.0f;   // the cross-fade at a loop point
     static constexpr int kFilterUpdate = 16;   // samples between filter coefficient updates
 };
 

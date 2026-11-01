@@ -33,8 +33,11 @@ void SlicePlayer::prepare(double sampleRate, int maxBlockSize, bool shortWindow)
     stretch = std::make_unique<StretchState>();
     for (auto& s : stretch->st)
     {
-        if (shortWindow) s.configure(2, (int) (0.03 * sr), (int) (0.0075 * sr));
-        else             s.presetDefault(2, (float) sr);
+        // At 88.2 kHz and above one hop's analysis and synthesis would be several large FFTs inside a single callback: the
+        // library can spread that over the hop instead (at the price of one hop more latency).
+        const bool split = sr >= 88200.0;
+        if (shortWindow) s.configure(2, (int) (0.03 * sr), (int) (0.0075 * sr), split);
+        else             s.presetDefault(2, (float) sr, split);
     }
 
     // Scratch: the largest seek (at the largest ratio) and the largest block's input at the smallest ratio.
@@ -112,7 +115,7 @@ void SlicePlayer::cutSlices() noexcept
             // The release: the amp fades out over the longer of the cut fade and the slice's amp release.
             v.fading = true;
             v.cutStep = std::min(cutStep, (float) (1.0 / std::max(1.0, (double) v.own.ampR * 0.001 * sr)));
-            v.fltRelStep = (float) (1.0 / std::max(1.0, (double) v.own.fltR * 0.001 * sr));
+            v.fltRelStep = std::min(cutStep, (float) (1.0 / std::max(1.0, (double) v.own.fltR * 0.001 * sr)));
         }
 }
 
@@ -152,7 +155,7 @@ void SlicePlayer::emit(Voice& v, juce::AudioBuffer<float>& out, int index, float
             const float v2 = v.ic2[ch] + v.fa2 * v.ic1[ch] + v.fa3 * v3;
             v.ic1[ch] = 2.0f * v1 - v.ic1[ch];
             v.ic2[ch] = 2.0f * v2 - v.ic2[ch];
-            frame[ch] = v.own.filterType == 1 ? v2 : (v.own.filterType == 2 ? in - v.fk * v1 - v2 : v1);
+            frame[ch] = v.own.filterType == 1 ? v2 : (v.own.filterType == 2 ? in - v.fk * v1 - v2 : v1 * v.fk);   // band-pass scaled to unity peak, whatever the resonance
         }
     }
     const float g = gain * envelope((double) v.age, v.own.ampA, v.own.ampD, v.own.ampS, sr);
@@ -234,14 +237,14 @@ bool SlicePlayer::inRange(const Voice& v) noexcept
     return v.pos >= (double) v.range.start && v.pos < (double) v.range.end;
 }
 
-float SlicePlayer::read(const Voice& v, int channel) noexcept
+float SlicePlayer::readAt(const Voice& v, double pos, int channel) noexcept
 {
     const int nch = v.src->getNumChannels();
     const float* d = v.src->getReadPointer(juce::jmin(channel, nch - 1));
 
     // Catmull-Rom through the four samples around the position; neighbours outside the slice repeat the edge sample.
-    const int   i0 = (int) std::floor(v.pos);
-    const float f  = (float) (v.pos - (double) i0);
+    const int   i0 = (int) std::floor(pos);
+    const float f  = (float) (pos - (double) i0);
     auto at = [&](int i) { return d[juce::jlimit(v.range.start, v.range.end - 1, i)]; };
     const float y0 = at(i0 - 1), y1 = at(i0), y2 = at(i0 + 1), y3 = at(i0 + 2);
     return y1 + 0.5f * f * (y2 - y0 + f * (2.0f * y0 - 5.0f * y1 + 4.0f * y2 - y3 + f * (3.0f * (y1 - y2) + y3 - y0)));
@@ -306,15 +309,30 @@ void SlicePlayer::renderNative(Voice& v, juce::AudioBuffer<float>& out, int offs
 
     for (int i = 0; i < n && v.active; ++i)
     {
-        // A looping slice wraps at its ends and plays until it is cut; any other leaves the slice and ends.
+        // A looping slice plays until it is cut, wrapping at its ends; any other leaves the slice and ends. The last couple of
+        // milliseconds before the end cross-fade into the start's material, and the wrap lands after that stretch, so the loop
+        // point is seamless instead of a jump from the last sample to the first.
+        const double loopLen = (double) v.range.length();
+        const double fadeSrc = v.loop ? std::min(0.25 * loopLen, (double) kLoopFadeMs * 0.001 * sr * std::fabs(v.step)) : 0.0;
         if (! inRange(v))
         {
             if (! v.loop) { v.active = false; break; }
-            const double len = (double) v.range.length();
-            double rel = std::fmod(v.pos - (double) v.range.start, len);   // a step longer than the slice wraps more than once
-            if (rel < 0.0) rel += len;
+            v.pos += v.step > 0.0 ? -(loopLen - fadeSrc) : (loopLen - fadeSrc);
+            double rel = std::fmod(v.pos - (double) v.range.start, loopLen);   // a step longer than the slice wraps more than once
+            if (rel < 0.0) rel += loopLen;
             v.pos = (double) v.range.start + rel;
             if (! inRange(v)) { v.active = false; break; }
+        }
+        float blend = 0.0f;       // how much of the start's material (`other`) is in the output
+        double other = 0.0;
+        if (fadeSrc > 0.0)
+        {
+            const double into = v.step > 0.0 ? v.pos - ((double) v.range.end - fadeSrc) : ((double) v.range.start + fadeSrc) - v.pos;
+            if (into > 0.0)
+            {
+                blend = (float) std::min(1.0, into / fadeSrc);
+                other = v.step > 0.0 ? (double) v.range.start + into : (double) (v.range.end - 1) - into;
+            }
         }
 
         // Fade-in from the start, fade-out over the last samples of the slice (in playback order).
@@ -332,7 +350,11 @@ void SlicePlayer::renderNative(Voice& v, juce::AudioBuffer<float>& out, int offs
         }
 
         float frame[2] = { 0.0f, 0.0f };
-        for (int ch = 0; ch < nc; ++ch) frame[ch] = read(v, nSrc == 1 ? 0 : ch);
+        for (int ch = 0; ch < nc; ++ch)
+        {
+            frame[ch] = read(v, nSrc == 1 ? 0 : ch);
+            if (blend > 0.0f) frame[ch] += blend * (readAt(v, other, nSrc == 1 ? 0 : ch) - frame[ch]);
+        }
         emit(v, out, offset + i, frame, nc, v.gain * env * v.cutGain);
         for (int ch = 2; ch < nOut; ++ch)   // outputs beyond a stereo pair get the plain source
             out.getWritePointer(ch)[offset + i] += v.gain * env * v.cutGain * read(v, nSrc == 1 ? 0 : ch);
