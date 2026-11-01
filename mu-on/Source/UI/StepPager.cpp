@@ -44,13 +44,14 @@ void StepPager::refresh()
 // Prev, the page, Next, and the Length at the right.
 void StepPager::resized()
 {
-    auto r = getLocalBounds().reduced(0, mu_ui::s(2));
-    prevButton.setBounds(r.removeFromLeft(mu_ui::s(64)));
-    r.removeFromLeft(mu_ui::s(6));
-    pageLabel.setBounds(r.removeFromLeft(mu_ui::s(90)));
-    r.removeFromLeft(mu_ui::s(6));
-    nextButton.setBounds(r.removeFromLeft(mu_ui::s(64)));
-    lengthInput.setBounds(r.removeFromRight(mu_ui::s(150)));
+    using LF = MuLookAndFeel;
+    auto r = getLocalBounds().reduced(0, mu_ui::s(LF::kPagerPad));
+    prevButton.setBounds(r.removeFromLeft(mu_ui::s(LF::kPagerButtonW)));
+    r.removeFromLeft(mu_ui::s(LF::kPagerGap));
+    pageLabel.setBounds(r.removeFromLeft(mu_ui::s(LF::kPagerLabelW)));
+    r.removeFromLeft(mu_ui::s(LF::kPagerGap));
+    nextButton.setBounds(r.removeFromLeft(mu_ui::s(LF::kPagerButtonW)));
+    lengthInput.setBounds(r.removeFromRight(mu_ui::s(LF::kPagerLengthW)));
 }
 
 } // namespace mu_on

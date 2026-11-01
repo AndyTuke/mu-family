@@ -121,15 +121,15 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
         }
         if (opts.ties && showSteps && ! beyond && row.tiedFrom(s))   // tied to the step before: a bar joins the two lamps
         {
-            const float h = cell.getHeight() * 0.45f;
+            const float h = cell.getHeight() * MuLookAndFeel::kTieBarFrac;
             g.setColour(lens.brighter(L.lampHot * 2.0f));
             if (pos > 0)
             {
                 const auto prev = cellRect(cells, pos - 1);
-                g.fillRect(juce::Rectangle<float>(prev.getRight() - 2.0f, cell.getCentreY() - h * 0.5f, cell.getX() - prev.getRight() + 4.0f, h));
+                g.fillRect(juce::Rectangle<float>(prev.getRight() - MuLookAndFeel::kTieOverlap, cell.getCentreY() - h * 0.5f, cell.getX() - prev.getRight() + 2.0f * MuLookAndFeel::kTieOverlap, h));
             }
             else   // the first cell of a page: the tie comes from the page before, so a short stub shows it
-                g.fillRect(juce::Rectangle<float>(cell.getX() - 2.0f, cell.getCentreY() - h * 0.5f, 6.0f, h));
+                g.fillRect(juce::Rectangle<float>(cell.getX() - MuLookAndFeel::kTieOverlap, cell.getCentreY() - h * 0.5f, MuLookAndFeel::kTieStubW, h));
         }
         if (s == selectedStep)   // the step the Step panel edits
         {
@@ -179,19 +179,19 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
         if (beyond)   // a step past the row's length is not part of the pattern: shaded out
         {
             // The lenses are already near black, so darkening is invisible: a flat pale veil with diagonal hatching reads as "not there".
-            g.setColour(labelColour.withAlpha(0.16f));
+            g.setColour(labelColour.withAlpha(L.stepBeyondVeil));
             g.fillRoundedRectangle(cell, 3.0f);
             const juce::Graphics::ScopedSaveState hatch(g);
             juce::Path clip;
             clip.addRoundedRectangle(cell, 3.0f);
             g.reduceClipRegion(clip);
-            g.setColour(labelColour.withAlpha(0.28f));
-            for (float d = -cell.getHeight(); d < cell.getWidth(); d += 6.0f)
+            g.setColour(labelColour.withAlpha(L.stepBeyondHatch));
+            for (float d = -cell.getHeight(); d < cell.getWidth(); d += MuLookAndFeel::kStepHatchGap)
                 g.drawLine(cell.getX() + d, cell.getBottom(), cell.getX() + d + cell.getHeight(), cell.getY(), 1.0f);
         }
         else if ((opts.dimMask >> pos) & 1u)   // a step this pass will skip (its loop ratio or its probability): dimmed
         {
-            g.setColour(juce::Colours::black.withAlpha(0.6f));
+            g.setColour(juce::Colours::black.withAlpha(L.stepDimmed));
             g.fillRoundedRectangle(cell, 3.0f);
         }
     }

@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Sequencer/StepRow.h"
+#include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/NudgeInput.h"
 #include "UI/StepPaging.h"
 
@@ -20,7 +21,7 @@ public:
     StepPager();
 
     // Unscaled height of the strip.
-    static constexpr int kHeight = 28;
+    static constexpr int kHeight = MuLookAndFeel::kPagerH;
 
     std::function<int()>      pageCount;    // pages the shown rows need (at least 1)
     std::function<StepRow*()> lengthRow;    // the row the Length edits (null: none)

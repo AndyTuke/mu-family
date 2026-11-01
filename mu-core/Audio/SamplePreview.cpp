@@ -40,7 +40,12 @@ void SamplePreview::collectRetired()
 // rt-ok-fn: message-thread decode and publish (preview button); the audio thread reads current/audioHolding and never takes messageLock
 void SamplePreview::start(const juce::File& file)
 {
-    const juce::ScopedLock sl(messageLock);
+    // The decode runs outside the lock (a long file would otherwise hold it); the lock covers only the rate read and the publish.
+    double sampleRate;
+    {
+        const juce::ScopedLock sl(messageLock);
+        sampleRate = this->sampleRate;
+    }
     if (sampleRate <= 0.0) return;   // not prepared yet: nothing to convert to, so ignore the request
     if (!file.existsAsFile()) return;
     std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(file));
@@ -83,8 +88,9 @@ void SamplePreview::start(const juce::File& file)
         for (int ch = 0; ch < 2; ++ch)
             dec->audio.copyFrom(ch, 0, src, ch, 0, srcLen);
     }
-    dec->id = nextId++;
     // Phase 3: publish; the audio thread restarts from zero when it sees the new id.
+    const juce::ScopedLock sl(messageLock);
+    dec->id = nextId++;
     Decoded* raw = dec.get();
     owned.push_back(std::move(dec));
     current.store(raw);

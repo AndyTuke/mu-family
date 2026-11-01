@@ -735,6 +735,18 @@ public:
     // The band above a raised section box that holds its name plate (drawSections).
     static constexpr int kSectionPlateH     = kVoiceLabelH;
 
+    // The step pager strip (mu-On, mu-Tronic) and the marks on a step row.
+    static constexpr int   kPagerH       = 28;
+    static constexpr int   kPagerPad     = 2;
+    static constexpr int   kPagerButtonW = 64;
+    static constexpr int   kPagerLabelW  = 90;
+    static constexpr int   kPagerLengthW = 150;
+    static constexpr int   kPagerGap     = 6;
+    static constexpr float kStepHatchGap = 6.0f;   // spacing of the hatching on a step past the length
+    static constexpr float kTieBarFrac   = 0.45f;  // a tie bar's height as a fraction of the lamp
+    static constexpr float kTieStubW     = 6.0f;   // the stub that shows a tie from the page before
+    static constexpr float kTieOverlap   = 2.0f;   // how far a tie bar reaches into each lamp
+
     // Channel sidebar edges: flat, metal, and metal with screws (items + Add button clear of them).
     static constexpr int kSidebarFlatEdge     = 4;
     static constexpr int kSidebarMetalEdge    = 7;

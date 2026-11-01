@@ -12,7 +12,8 @@ namespace mu_core {
 // folder ("Main Library") and the product's content folder, named by `contentLabel`. Shown by the caller inside an
 // OverlayHost. Self-contained: no access to the layer's UI internals.
 class SampleBrowserContent : public juce::Component,
-                              public juce::FileBrowserListener
+                              public juce::FileBrowserListener,
+                              private juce::Timer
 {
 public:
     SampleBrowserContent(SampleLibrary& library,
@@ -43,6 +44,9 @@ private:
     SegmentControl sourceToggle;
 
     void commit(const juce::File& f);
+    // A selection change previews after a short pause, so stepping through files does not decode each one in turn.
+    void timerCallback() override;
+    juce::File pendingPreview;
 };
 
 } // namespace mu_core

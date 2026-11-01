@@ -240,6 +240,11 @@ struct MuTheme
         float switchRingGlow     = 0.14f;   // disc ring glow (resting)
         float switchRingGlowHover= 0.22f;   //   … and when hovered
 
+        // Step rows (the grid of lamps)
+        float stepBeyondVeil     = 0.16f;   // pale veil over a step past the row's length
+        float stepBeyondHatch    = 0.28f;   //   and its diagonal hatching
+        float stepDimmed         = 0.6f;    // black over a step this pass will skip
+
         // Paint: the app colour as it looks painted on metal (paintColour) — dull, dark, washed out.
         float paintSaturation    = 0.60f;   // app colour's saturation scaled by this
         float paintBrightness    = 0.55f;   //   … and its brightness

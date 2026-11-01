@@ -69,15 +69,22 @@ void SampleBrowserContent::resized()
 
 void SampleBrowserContent::selectionChanged()
 {
-    const auto f = browser.getSelectedFile(0);
-    if (f.existsAsFile())
-        library.startPreview(f);
+    pendingPreview = browser.getSelectedFile(0);
+    startTimer(150);
+}
+
+void SampleBrowserContent::timerCallback()
+{
+    stopTimer();
+    if (pendingPreview.existsAsFile())
+        library.startPreview(pendingPreview);
 }
 
 void SampleBrowserContent::fileDoubleClicked(const juce::File& f) { commit(f); }
 
 void SampleBrowserContent::commit(const juce::File& f)
 {
+    stopTimer();
     library.stopPreview();
     onChosen(f);
     if (onDismiss) onDismiss();
