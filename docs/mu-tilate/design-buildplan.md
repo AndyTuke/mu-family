@@ -12,4 +12,6 @@ Staged so every stage compiles, is tested without listening where it can be, and
 | 6 | UI: source waveform, slice markers, slice player, timeline, on the shared `mu-core` waveform, ruler and viewport. | screenshots |
 | 7 | Sample library and factory loops, tempo analysis, mu-Tronic registry row, check-script and release wiring, manual. | per item |
 
+**Status 2026-11-01 (stage 6):** done: onset detector with a running-median threshold (finds soft hits) and the detection controls with a Detect button; per-slice settings (`SliceSettings`, saved with the session) and their engine (pan, pitch, filter, amp and filter envelopes, loop, the pre-fade on a voice of its own); the slice player panel toggled with the waveform; timeline zoom, scroll, playhead paging and edge-drag length; loop tempo guessed from the length; 74 test results. Still to do in 6: a playhead on the waveform, status text for the two combo boxes, block left-edge trim (needs a start offset in the slice), the choke group and gate play mode (stored, not played), pad grid. Nothing has been listened to; demo renders (including the pre-fade) are in build/mutilate-demo.
+
 Rules in force: shared code goes in `mu-core`; product symbols under `mu_tilate::`; no allocation in the audio thread; `check-layer-boundary.ps1` clean for this library.
