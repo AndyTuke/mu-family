@@ -57,6 +57,11 @@ const char* const kVoiceSuffixes[] = {
 };
 
 // Output mode + MIDI-output params shown in the sample strip and the MIDI Out section (r{ri}_ prefix).
+// The Sample / MIDI output selector and the MIDI Out section are hidden in the full mu-Clid for now (Andy, 2026-11-01: it is
+// an audio product). The parameters and the engine stay, so saved data keeps its shape and the selector can come back by setting
+// this to true; a rhythm that arrives in MIDI mode is put back to Sample.
+constexpr bool kMidiOutputUi = false;
+
 const char* const kOutputSuffixes[] = { "outMode", "midiNote", "midiChan", "midiVel", "midiAccent" };
 
 // Mixer-strip params shown in the voice band (FX sends + pan) — ch{ri}_ prefix, shared with
@@ -76,7 +81,8 @@ RhythmContent::RhythmContent(ProcessorBase& base, RhythmHost& h)
     addAndMakeVisible(euclidPanel.getLogicControl());
     addAndMakeVisible(voiceSection);
     addChildComponent(midiOutSection);   // shown instead of the voice band in MIDI output mode
-    addAndMakeVisible(outputCtrl);
+    if (kMidiOutputUi) addAndMakeVisible(outputCtrl);
+    else               addChildComponent(outputCtrl);
 
     // juce::Label provides bulletproof inline editing: handles single-click to edit,
     // Enter to commit, Escape to cancel, click-off to commit, focus management — all
@@ -390,7 +396,10 @@ bool RhythmContent::isMidiOutputMode() const
 // visible, and the sample LCD's wording. Message thread.
 void RhythmContent::updateOutputModeUi()
 {
-    const bool midi = isMidiOutputMode();
+    if (! kMidiOutputUi && isMidiOutputMode() && currentRhythmIndex >= 0)   // no way to see or undo MIDI mode: back to Sample
+        if (auto* prm = host.getRhythmParameters().getParameter("r" + juce::String(currentRhythmIndex) + "_outMode"))
+            prm->setValueNotifyingHost(0.0f);
+    const bool midi = kMidiOutputUi && isMidiOutputMode();
     outputCtrl.setSelectedIndex(midi ? 1 : 0, false);
     voiceSection.setVisible(! midi);
     midiOutSection.setVisible(midi);
