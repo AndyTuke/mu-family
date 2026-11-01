@@ -81,6 +81,7 @@ void SlicePlayer::triggerPre(const juce::AudioBuffer<float>* src, SliceRange ran
 
     const double pitch = pitchRatio(p.own);
     Voice v;
+    v.own = SliceParams().own;   // a flat gate: the swell shapes itself, the slice's envelopes are not its own
     v.src = src;
     v.range = range;
     // Played backwards ending at the slice's first sample; for a slice that itself plays backwards, forwards ending at its last.
@@ -129,6 +130,17 @@ bool SlicePlayer::filterModulation(float& octaves, float& resAdd) const noexcept
     const float env = mu_core::adsAtAge((double) newest->age, o.fltA, o.fltD, o.fltS, sr) * (1.0f - newest->fltRel);
     octaves = o.cutoffOct + o.filterEnvAmt * env * 5.0f;
     resAdd  = o.resOffset;
+    return true;
+}
+
+bool SlicePlayer::insertOffsets(float (&out)[4]) const noexcept
+{
+    for (auto& o : out) o = 0.0f;
+    const Voice* newest = nullptr;
+    for (const auto& v : voices)
+        if (v.active && ! v.swell && (newest == nullptr || v.age < newest->age)) newest = &v;
+    if (newest == nullptr) return false;
+    for (int i = 0; i < 4; ++i) out[i] = newest->own.insOff[i];
     return true;
 }
 

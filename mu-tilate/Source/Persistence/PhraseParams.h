@@ -19,6 +19,9 @@ namespace ppi
         dmethod, dsens, dgap, dpre, dlow, dhigh, snap,             // detection (7)
         drvChar, insP1, insP2, insP3, insP4,                       // insert (5)
         fType, fCut, fRes,                                         // the layer's filter (3)
+        pSemi, pFine, pPan,                                        // the layer's pitch and pan (3)
+        ampA, ampD, ampS, ampR,                                    // the layer's amp envelope (4)
+        fEnv, fltA, fltD, fltS, fltR,                              // the layer's filter envelope: amount, then A D S R (5)
         COUNT
     };
     inline constexpr const char* const suffix[COUNT] = {
@@ -27,11 +30,14 @@ namespace ppi
         "dmethod", "dsens", "dgap", "dpre", "dlow", "dhigh", "snap",
         "drvChar", "insP1", "insP2", "insP3", "insP4",
         "fType", "fCut", "fRes",
+        "pSemi", "pFine", "pPan",
+        "ampA", "ampD", "ampS", "ampR",
+        "fEnv", "fltA", "fltD", "fltS", "fltR",
     };
 }
 
 inline constexpr int kNumPhraseParams = ppi::COUNT;
-static_assert(kNumPhraseParams == 25, "a new row goes into ppi, suffix[] and addLayerParams together");
+static_assert(kNumPhraseParams == 37, "a new row goes into ppi, suffix[] and addLayerParams together");
 
 // "p{N}_": the prefix of every parameter of Phrase slot N.
 inline juce::String layerParamPrefix(int slot) { return "p" + juce::String(slot) + "_"; }

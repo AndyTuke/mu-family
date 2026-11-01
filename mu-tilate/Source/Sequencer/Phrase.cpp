@@ -194,6 +194,10 @@ void Phrase::readParams(double modBeat) noexcept
     settings.filterType = juce::jlimit(0, (int) filterChoices().size() - 1, (int) g(ppi::fType));   // the layer's filter: not modulated
     settings.cutoffHz   = g(ppi::fCut);
     settings.resonance  = g(ppi::fRes);
+    settings.pitchSemi  = g(ppi::pSemi);   settings.fineCents = g(ppi::pFine);   settings.pan = g(ppi::pPan);
+    settings.ampA = g(ppi::ampA);  settings.ampD = g(ppi::ampD);  settings.ampS = g(ppi::ampS);  settings.ampR = g(ppi::ampR);
+    settings.filterEnvAmt = g(ppi::fEnv);
+    settings.fltA = g(ppi::fltA);  settings.fltD = g(ppi::fltD);  settings.fltS = g(ppi::fltS);  settings.fltR = g(ppi::fltR);
 
     insertCfg.insertAlgo     = (int) g(ppi::drvChar);
     insertCfg.insertParam[0] = out[D_insP1];
@@ -215,7 +219,13 @@ void Phrase::renderBlock(const PhraseData* d, PhraseClock clock, juce::AudioBuff
         loop.timeline = &d->timeline;
     }
     playback->render(loop, settings, clock, buf, n);
+    // The newest sounding hit moves the insert's knobs by its own offsets (held to the knob's travel) for this block.
+    float held[4], off[4];
+    for (int i = 0; i < 4; ++i) held[i] = insertCfg.insertParam[i];
+    if (playback->insertOffsets(off))
+        for (int i = 0; i < 4; ++i) insertCfg.insertParam[i] = juce::jlimit(0.0f, 1.0f, held[i] + off[i]);
     insert->process(buf, n, buf.getNumChannels(), insertCfg);
+    for (int i = 0; i < 4; ++i) insertCfg.insertParam[i] = held[i];
 }
 
 void Phrase::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n)

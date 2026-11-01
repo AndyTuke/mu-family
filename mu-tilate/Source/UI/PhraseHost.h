@@ -29,14 +29,17 @@ public:
     virtual bool   isPhraseTransportPlaying() const noexcept = 0;
     virtual double getPhraseTransportBeat() const noexcept = 0;
 
-    // Decodes `file` on a worker, detects its slices and lays them out in their original order, then publishes the
-    // result to the layer. A newer request for the same layer supersedes an older one. `keepSavedEdits` is for a
+    // Decodes `file` on a worker, detects its slices and publishes them to the layer with an empty timeline (the sequence is
+    // the user's to build, or to lay out with layOutSlices). A newer request for the same layer supersedes an older one. `keepSavedEdits` is for a
     // session restore: the slices and timeline the saved file carried are kept when they were made on a loop of the
-    // same length, instead of being detected and laid out afresh.
+    // same length, instead of being detected afresh.
     virtual void loadLoopAsync(int layer, const juce::File& file, bool keepSavedEdits = false) = 0;
     // Runs the detector again on the layer's loaded loop with the layer's current detection settings (pinned markers
     // stay) and lays the new slices out in their original order, replacing the timeline.
     virtual void redetectSlices(int layer) = 0;
+    // Lays the layer's slices out one after another in source order from beat 0, replacing the hits, and sizes the sequence to
+    // fit (in whole bars). A loaded loop starts with an empty timeline; this is the one-press way to a starting sequence.
+    virtual void layOutSlices(int layer) = 0;
     // One line for the content: the loop's name and slice count, "Loading ...", or the last error.
     virtual juce::String getLoopStatus(int layer) const = 0;
 };

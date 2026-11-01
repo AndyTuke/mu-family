@@ -23,6 +23,12 @@ public:
     // The timeline to show, how long each slice is in beats (index = slice), the snap grid in beats (0 = none) and the selected block.
     void setTimeline(const Timeline& timeline, std::vector<double> sliceBeats);
     void setGridBeats(double grid) { gridBeats = grid; }
+    // The shape of each slice's sound (index = slice): columns of peak level 0..1, drawn inside its blocks and in the drop preview.
+    void setSlicePeaks(std::vector<std::vector<float>> peaks) { slicePeaksList = std::move(peaks); repaint(); }
+    // The slice being dragged over the timeline (-1 for none): the drop preview shows its waveform at the drop beat.
+    void setDropSlice(int slice) { if (slice != dropSlice) { dropSlice = slice; repaint(); } }
+    // How wide a slice is on screen at the current zoom, in pixels.
+    int  pixelsForSlice(int slice) const;
     void setSelectedBlock(int index);
     int  getSelectedBlock() const noexcept { return selected; }
     // Zoom by `factor` (above 1 zooms in) around the beat at `anchorX` pixels; showAll() fits the whole timeline again.
@@ -69,6 +75,8 @@ private:
 
     Timeline timeline;
     std::vector<double> sliceBeatsList;
+    std::vector<std::vector<float>> slicePeaksList;
+    int    dropSlice = -1;       // the slice a drop in progress would place
     double gridBeats = 0.25;
     int    selected = -1;
     double playhead = -1.0;

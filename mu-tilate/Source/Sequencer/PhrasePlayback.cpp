@@ -53,16 +53,24 @@ void PhrasePlayback::hardReset() noexcept
 SliceParams PhrasePlayback::paramsFor(const PhraseLoop& loop, const PhraseSettings& s, const PhraseClock& c, const TimelineBlock& b,
                                       SliceRange& range) const noexcept
 {
-    // The hit's own settings sit on top of the layer's: its level adds (in dB) and its fades add. They belong to this
-    // block, not to the slice it plays, so two hits of one slice can sound different.
+    // The hit's own settings are offsets on top of the layer's values: level, fades, pitch, pan and both envelopes add (each sum
+    // is held to its control's range). They belong to this block, not to the slice it plays, so two hits of one slice can sound different.
     const SliceSettings& own = b.own;
     SliceParams p;
     p.own       = own;
     // The filter is the layer's, run over the layer's output (renderPiece); a slice voice itself does not filter.
     p.own.filterType = 0;
-    p.gain      = s.gain * juce::Decibels::decibelsToGain(juce::jlimit(-24.0f, 12.0f, own.levelDb));
-    p.fadeInMs  = s.fadeInMs + own.fadeInMs;
-    p.fadeOutMs = s.fadeOutMs + own.fadeOutMs;
+    p.own.pitchSemi = juce::jlimit(-24.0f, 24.0f, s.pitchSemi + own.pitchSemi);
+    p.own.fineCents = juce::jlimit(-100.0f, 100.0f, s.fineCents + own.fineCents);
+    p.own.pan       = juce::jlimit(-1.0f, 1.0f, s.pan + own.pan);
+    p.own.ampA = juce::jmax(0.0f, s.ampA + own.ampA);   p.own.ampD = juce::jmax(0.0f, s.ampD + own.ampD);
+    p.own.ampS = juce::jlimit(0.0f, 1.0f, s.ampS + own.ampS);   p.own.ampR = juce::jmax(0.0f, s.ampR + own.ampR);
+    p.own.fltA = juce::jmax(0.0f, s.fltA + own.fltA);   p.own.fltD = juce::jmax(0.0f, s.fltD + own.fltD);
+    p.own.fltS = juce::jlimit(0.0f, 1.0f, s.fltS + own.fltS);   p.own.fltR = juce::jmax(0.0f, s.fltR + own.fltR);
+    p.own.filterEnvAmt = juce::jlimit(-1.0f, 1.0f, s.filterEnvAmt + own.filterEnvAmt);
+    p.gain      = s.gain * juce::Decibels::decibelsToGain(juce::jlimit(-12.0f, 12.0f, own.levelDb));
+    p.fadeInMs  = juce::jmax(0.0f, s.fadeInMs + own.fadeInMs);
+    p.fadeOutMs = juce::jmax(0.0f, s.fadeOutMs + own.fadeOutMs);
     p.reverse   = own.reverse;
     p.holdMs    = s.holdMs;
     p.strength  = s.strength;

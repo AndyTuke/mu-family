@@ -85,6 +85,7 @@ public:
     bool   isPhraseTransportPlaying() const noexcept override { return isInternalPlaying(); }
     double getPhraseTransportBeat() const noexcept override   { return getInternalBeatPos(); }
     void loadLoopAsync(int layer, const juce::File& file, bool keepSavedEdits = false) override;
+    void layOutSlices(int layer) override;
     juce::String getLoopStatus(int layer) const override;
 
 protected:
@@ -112,7 +113,8 @@ private:
     void redetectSlices(int layer) override;
     // Loads the loop a layer's preset or session names when the layer does not hold that file's audio (message thread).
     void reloadLoopIfNeeded(int layer);
-    double layOutInOrder(int layer, const SliceList& slices, double sampleRate, double loopTempo);
+    // Publishes `slices` with a timeline of the layer's length: empty, or (inOrder) the slices back to back from beat 0.
+    double layOutInOrder(int layer, const SliceList& slices, double sampleRate, double loopTempo, bool inOrder);
 
     std::atomic<double> currentSampleRate { 44100.0 };
     std::atomic<int>    currentBlockSize  { 512 };

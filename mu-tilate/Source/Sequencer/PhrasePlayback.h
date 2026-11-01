@@ -39,6 +39,11 @@ struct PhraseSettings
     int       filterType = 0;        // the layer's filter: 0 off, 1 low-pass, 2 high-pass, 3 band-pass
     float     cutoffHz   = 20000.0f;
     float     resonance  = 0.0f;     // 0..1
+    // The layer's own pitch, pan and envelopes: a hit adds its offsets to these.
+    float     pitchSemi  = 0.0f, fineCents = 0.0f, pan = 0.0f;
+    float     ampA = 0.0f, ampD = 100.0f, ampS = 1.0f, ampR = 0.0f;
+    float     filterEnvAmt = 0.0f;
+    float     fltA = 0.0f, fltD = 100.0f, fltS = 1.0f, fltR = 0.0f;
 };
 
 // The transport as one call sees it (a subset of mu_core::RenderContext; the layer fills it from there).
@@ -67,6 +72,8 @@ public:
                 juce::AudioBuffer<float>& out, int n) noexcept;
 
     bool isActive() const noexcept { return player.isActive(); }
+    // How far the newest sounding hit moves the layer's four insert knobs (fractions of their travel). False, with zeros, when none sounds.
+    bool insertOffsets(float (&out)[4]) const noexcept { return player.insertOffsets(out); }
     // How many blocks the last render call looked at when scanning for pre-fades to start (a test of the scan's cost).
     int  preBlocksExamined() const noexcept { return examined; }
 

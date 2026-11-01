@@ -1,17 +1,22 @@
 #include "VoiceBand.h"
 
 void VoiceBand::setSections(juce::Component& pitch, juce::Component& filter, juce::Component& amp,
-                            InsertSubsection& effects, std::array<juce::Component*, kSendCols> sends)
+                            juce::Component& effects, std::array<juce::Component*, kSendCols> sends)
 {
     pitchSec = &pitch; filterSec = &filter; ampSec = &amp; effectsSec = &effects;
     sendKnobs = sends;
-    for (auto* c : { pitchSec, filterSec, ampSec, static_cast<juce::Component*>(effectsSec) })
+    for (auto* c : { pitchSec, filterSec, ampSec, effectsSec })
         addAndMakeVisible(c);
     // The sends sit in the Effects box's top row, added after it so they're on top of it;
     // the insert dropdown takes the space to their left.
+    bool anySend = false;
     for (auto* k : sendKnobs)
-        if (k != nullptr) addAndMakeVisible(k);
-    effectsSec->setAlgoWidth(kSendsX);
+        if (k != nullptr) { addAndMakeVisible(k); anySend = true; }
+    if (auto* insert = dynamic_cast<InsertSubsection*>(effectsSec))
+    {
+        if (anySend) insert->setAlgoWidth(kSendsX);
+        else         insert->setAlgoColumns(4);   // no sends: the dropdown spans the four knob columns
+    }
     resized();
 }
 
@@ -47,8 +52,8 @@ void VoiceBand::paint(juce::Graphics& g)
     {
         // Metal: each section in its own raised box, its name plate just above it.
         if (pitchSec != nullptr)
-            LF::drawSections(g, *this, { { pitchSec->getBounds(), "PITCH" }, { filterSec->getBounds(), "FILTER" },
-                                         { ampSec->getBounds(), "AMP" }, { effectsSec->getBounds(), "EFFECTS" } },
+            LF::drawSections(g, *this, { { pitchSec->getBounds(), titlePrefix + "PITCH" }, { filterSec->getBounds(), titlePrefix + "FILTER" },
+                                         { ampSec->getBounds(), titlePrefix + "AMP" }, { effectsSec->getBounds(), titlePrefix + "EFFECTS" } },
                              LF::appAccent(*this));
         return;
     }
@@ -61,12 +66,12 @@ void VoiceBand::paint(juce::Graphics& g)
         const float dx = (float) (s(x) - s(LF::kVoiceDivW) / 2);
         g.drawLine(dx, inset, dx, (float) h - inset, 0.5f);
     }
-    auto plate = [&](const char* name, int x, int w)
+    auto plate = [&](const juce::String& name, int x, int w)
     { LF::drawCentredNamePlate(g, { (float) s(x), 0.0f, (float) s(w), (float) s(labelH) }, name); };
-    plate("PITCH",   kPitchX,   kPitchW);
-    plate("FILTER",  kFilterX,  kFilterW);
-    plate("AMP",     kAmpX,     kAmpW);
-    plate("EFFECTS", kEffectsX, kEffectsW);
+    plate(titlePrefix + "PITCH",   kPitchX,   kPitchW);
+    plate(titlePrefix + "FILTER",  kFilterX,  kFilterW);
+    plate(titlePrefix + "AMP",     kAmpX,     kAmpW);
+    plate(titlePrefix + "EFFECTS", kEffectsX, kEffectsW);
 }
 
 void VoiceBandSection::place(juce::Component& c, int row, int col, int span, bool dropdown)

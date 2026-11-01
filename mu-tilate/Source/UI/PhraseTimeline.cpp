@@ -113,6 +113,29 @@ int PhraseTimeline::blockAt(int x) const
     return -1;
 }
 
+namespace
+{
+    // A slice's waveform as mirrored bars across `r`, one pixel wide, from its columns of peak level (reversed when the hit plays backwards).
+    void drawPeaks(juce::Graphics& g, const std::vector<float>& peaks, juce::Rectangle<int> r, bool reversed, int clipLeft, int clipRight)
+    {
+        if (peaks.empty() || r.getWidth() < 2) return;
+        const int n = (int) peaks.size(), mid = r.getCentreY(), half = r.getHeight() / 2 - 2;
+        for (int x = std::max(r.getX(), clipLeft); x < std::min(r.getRight(), clipRight); ++x)
+        {
+            int i = std::min(n - 1, (x - r.getX()) * n / r.getWidth());
+            if (reversed) i = n - 1 - i;
+            const int h = std::max(1, (int) std::lround(peaks[(size_t) i] * (float) half));
+            g.fillRect(x, mid - h, 1, h * 2);
+        }
+    }
+}
+
+int PhraseTimeline::pixelsForSlice(int slice) const
+{
+    if (slice < 0 || slice >= (int) sliceBeatsList.size()) return 0;
+    return std::max(2, xOf(sliceBeatsList[(size_t) slice]) - xOf(0.0));
+}
+
 void PhraseTimeline::paint(juce::Graphics& g)
 {
     using mu_ui::s;
@@ -150,6 +173,11 @@ void PhraseTimeline::paint(juce::Graphics& g)
         g.fillRoundedRectangle(r.toFloat(), 3.0f);
         g.setColour(LF::colour(LF::lfoEditorPoint).withAlpha(i == selected ? 1.0f : 0.5f));
         g.drawRoundedRectangle(r.toFloat(), 3.0f, 1.0f);
+        if (b.slice >= 0 && b.slice < (int) slicePeaksList.size())
+        {
+            g.setColour(juce::Colours::black.withAlpha(0.45f));
+            drawPeaks(g, slicePeaksList[(size_t) b.slice], r.reduced(1), b.own.reverse, 0, getWidth());
+        }
         if (r.getWidth() > s(14))
         {
             g.setColour(juce::Colours::black.withAlpha(0.85f));
@@ -175,9 +203,23 @@ void PhraseTimeline::paint(juce::Graphics& g)
         }
     }
 
-    // The insertion line of a drop in progress.
+    // The insertion line of a drop in progress, with the dragged slice's waveform where it would land.
     if (dropBeat >= 0.0)
     {
+        if (dropSlice >= 0 && dropSlice < (int) sliceBeatsList.size())
+        {
+            const int gx0 = xOf(dropBeat), gx1 = xOf(dropBeat + sliceBeatsList[(size_t) dropSlice]);
+            const auto gr = juce::Rectangle<int>(gx0, row.getY() + s(3), std::max(2, gx1 - gx0 - 1), row.getHeight() - s(6));
+            g.setColour(accent.withAlpha(0.45f));
+            g.fillRoundedRectangle(gr.toFloat(), 3.0f);
+            g.setColour(accent);
+            g.drawRoundedRectangle(gr.toFloat(), 3.0f, 1.0f);
+            if (dropSlice < (int) slicePeaksList.size())
+            {
+                g.setColour(juce::Colours::black.withAlpha(0.55f));
+                drawPeaks(g, slicePeaksList[(size_t) dropSlice], gr.reduced(1), false, 0, getWidth());
+            }
+        }
         g.setColour(accent);
         g.fillRect(xOf(dropBeat) - 1, row.getY(), 3, row.getHeight());
     }

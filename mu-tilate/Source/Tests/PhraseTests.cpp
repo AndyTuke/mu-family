@@ -391,6 +391,61 @@ struct PhraseTests : public juce::UnitTest
             expectWithinAbsoluteError(out.getSample(0, 96000 + 84000 + 500), 0.2f, 1.0e-5f);   // pass two
         }
 
+        beginTest("a hit's settings are offsets added to the layer's values (pan, amp attack), held to the control's range");
+        {
+            // Pan: the layer pans hard left, the hit adds a full swing right: they cancel to the centre.
+            auto sides = [](float layerPan, float hitPan)
+            {
+                Rig r;
+                r.hitsStartWithSliceSettings = false;
+                r.timeline.place(1, 0.0, 0.0);
+                SliceSettings own; own.pan = hitPan;
+                r.timeline.setSettings(0, own);
+                r.settings.pan = layerPan;
+                juce::AudioBuffer<float> out(2, 12000);
+                out.clear();
+                PhraseClock c;
+                c.playing = true; c.bpm = 120.0; c.sampleRate = kSr; c.beatsPerSample = 120.0 / 60.0 / kSr; c.startBeat = 0.0;
+                r.playback.render(r.loop, r.settings, c, out, 12000);
+                return std::pair<double, double> { out.getRMSLevel(0, 2000, 8000), out.getRMSLevel(1, 2000, 8000) };
+            };
+            const auto leftOnly = sides(-1.0f, 0.0f), centred = sides(-1.0f, 1.0f);
+            expectGreaterThan(leftOnly.first, 0.1);
+            expectLessThan(leftOnly.second, 0.001);                       // the layer alone: all left
+            expectWithinAbsoluteError(centred.first, centred.second, 0.001);   // plus the hit's +1: back in the centre
+            const auto clamped = sides(1.0f, 1.0f);                       // 1 + 1 is held to the hard right
+            expectLessThan(clamped.first, 0.001);
+
+            // Amp attack: the layer sets 50 ms; a hit with -50 ms plays at once, a hit with +50 ms takes 100 ms.
+            auto early = [](float layerAttack, float hitOffset)
+            {
+                Rig r;
+                r.hitsStartWithSliceSettings = false;
+                r.timeline.place(1, 0.0, 0.0);
+                SliceSettings own; own.ampA = hitOffset;
+                r.timeline.setSettings(0, own);
+                r.settings.ampA = layerAttack;
+                return rms(r.run(4800, 256), 0, 480);                     // the first 10 ms
+            };
+            expectGreaterThan(early(50.0f, -50.0f), 3.0 * early(50.0f, 0.0f));   // the offset cancels the layer's attack
+            expectGreaterThan(early(50.0f, 0.0f), 1.6 * early(50.0f, 50.0f));    // and a longer one slows it further (twice the attack, half the level)
+        }
+
+        beginTest("the newest hit's insert offsets are reported while it sounds");
+        {
+            Rig r;
+            r.hitsStartWithSliceSettings = false;
+            r.timeline.place(0, 0.0, 0.0);
+            SliceSettings own; own.insOff[1] = 0.25f; own.insOff[3] = -0.5f;
+            r.timeline.setSettings(0, own);
+            float off[4] = { 9, 9, 9, 9 };
+            expect(! r.playback.insertOffsets(off));                      // nothing sounding yet
+            expectEquals(off[1], 0.0f);
+            r.run(2400, 256);
+            expect(r.playback.insertOffsets(off));
+            expectEquals(off[0], 0.0f); expectEquals(off[1], 0.25f); expectEquals(off[2], 0.0f); expectEquals(off[3], -0.5f);
+        }
+
         beginTest("a Stretch phrase renders without touching the heap");
         {
             Rig r;

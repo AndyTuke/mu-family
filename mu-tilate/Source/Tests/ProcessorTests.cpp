@@ -103,7 +103,9 @@ struct ProcessorTests : public juce::UnitTest
             expectEquals(renderPeak(p, host, 10), 0.0f);                 // no loop: silence
             p.loadLoopAsync(0, file);
             expect(pumpUntil([&] { return p.getPhrase(0).getData() != nullptr && p.getPhrase(0).getData()->audio != nullptr
-                                       && p.getPhrase(0).getData()->timeline.size() > 0; }), "the loop did not arrive");
+                                       && p.getPhrase(0).getData()->slices.size() > 0; }), "the loop did not arrive");
+            expectEquals(p.getPhrase(0).getData()->timeline.size(), 0);    // a new loop starts with no hits
+            p.layOutSlices(0);                                            // the Lay out button
             const auto d = p.getPhrase(0).getData();
             expectGreaterOrEqual(d->slices.size(), 3);                    // bursts at 0, 0.5, 1.0, 1.5 s
             expectGreaterThan(d->timeline.size(), 2);
@@ -122,7 +124,8 @@ struct ProcessorTests : public juce::UnitTest
                 PluginProcessor p;
                 p.prepareToPlay(kSr, kBlock);
                 p.loadLoopAsync(0, file);
-                expect(pumpUntil([&] { return p.getPhrase(0).getData() != nullptr && p.getPhrase(0).getData()->timeline.size() > 0; }));
+                expect(pumpUntil([&] { return p.getPhrase(0).getData() != nullptr && p.getPhrase(0).getData()->slices.size() > 0; }));
+                p.layOutSlices(0);
                 // An edit the file must carry: one block removed from the timeline.
                 auto d = p.getPhrase(0).getData();
                 Timeline tl = d->timeline;
@@ -149,7 +152,7 @@ struct ProcessorTests : public juce::UnitTest
                 PluginProcessor a;
                 a.prepareToPlay(kSr, kBlock);
                 a.loadLoopAsync(0, file);
-                expect(pumpUntil([&] { return a.getPhrase(0).getData() != nullptr && a.getPhrase(0).getData()->timeline.size() > 0; }));
+                expect(pumpUntil([&] { return a.getPhrase(0).getData() != nullptr && a.getPhrase(0).getData()->slices.size() > 0; }));
                 a.getStateInformation(saved);
             }
 
@@ -184,7 +187,7 @@ struct ProcessorTests : public juce::UnitTest
                 PluginProcessor a;
                 a.prepareToPlay(kSr, kBlock);
                 a.loadLoopAsync(0, file);
-                expect(pumpUntil([&] { return a.getPhrase(0).getData() != nullptr && a.getPhrase(0).getData()->timeline.size() > 0; }));
+                expect(pumpUntil([&] { return a.getPhrase(0).getData() != nullptr && a.getPhrase(0).getData()->slices.size() > 0; }));
                 tree = a.captureLayerPresetTree(0);
             }
             expect(tree.isValid());
@@ -248,8 +251,9 @@ struct ProcessorTests : public juce::UnitTest
                 set(ppi::mode, (float) mode);
                 set(ppi::ltempo, (float) loopTempo);
                 p.loadLoopAsync(0, juce::File(demoLoop));
-                pumpUntil([&] { return p.getPhrase(0).getData() != nullptr && p.getPhrase(0).getData()->timeline.size() > 0; }, 30000);
+                pumpUntil([&] { return p.getPhrase(0).getData() != nullptr && p.getPhrase(0).getData()->slices.size() > 0; }, 30000);
                 if (p.getPhrase(0).getData() == nullptr) { logMessage("demo: the loop did not load: " + p.getLoopStatus(0)); return; }
+                p.layOutSlices(0);
                 if (prepare) prepare(p);
 
                 const int total = (int) (kSr * 12.0);

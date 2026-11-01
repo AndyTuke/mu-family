@@ -44,6 +44,9 @@ struct SliceParams
     // The slice's own settings. The player uses pan, pitch, filter, both envelopes and loop; gain, fades and reverse are
     // the fields above (the caller has already combined them with the layer's and the block's).
     SliceSettings own;
+
+    // A bare SliceParams plays as a flat gate: the settings' envelopes are offsets, so the absolute ones start here.
+    SliceParams() { own.ampD = own.fltD = 100.0f; own.ampS = own.fltS = 1.0f; }
 };
 
 class SlicePlayer
@@ -87,6 +90,8 @@ public:
     // How the newest sounding slice moves the layer's filter: octaves added to its cutoff (the slice's offset plus its filter
     // envelope) and the resonance added. False, with no movement, when no slice sounds. Audio thread.
     bool filterModulation(float& octaves, float& resAdd) const noexcept;
+    // How far the newest sounding slice moves the layer's four insert knobs (fractions of their travel). False, with zeros, when none sounds.
+    bool insertOffsets(float (&out)[4]) const noexcept;
 
 private:
     struct StretchState;   // the two Signalsmith Stretch instances and their scratch (SlicePlayer.cpp)

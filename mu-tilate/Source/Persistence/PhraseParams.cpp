@@ -15,6 +15,10 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
         if (skewMid > 0.0f) r.setSkewForCentre(skewMid);
         layout.add(std::make_unique<juce::AudioParameterFloat>(id(row), name, r, def));
     };
+    auto addStepped = [&](int row, const char* name, float lo, float hi, float def, float step)
+    {
+        layout.add(std::make_unique<juce::AudioParameterFloat>(id(row), name, juce::NormalisableRange<float>(lo, hi, step), def));
+    };
     auto addC = [&](int row, const char* name, const juce::StringArray& choices, int def)
     {
         layout.add(std::make_unique<juce::AudioParameterChoice>(id(row), name, choices, def));
@@ -47,6 +51,20 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     addC(ppi::fType,    "Filter Type",    filterTypeNames(), 0);
     addF(ppi::fCut,     "Filter Cutoff",  20.0f, 20000.0f, 20000.0f, 1000.0f);
     addF(ppi::fRes,     "Filter Resonance", 0.0f, 1.0f, 0.0f);
+
+    // The layer's pitch, pan and envelopes: absolute values; a slice only adds its own offsets to them.
+    addStepped(ppi::pSemi, "Pitch",           -24.0f, 24.0f, 0.0f, 1.0f);
+    addStepped(ppi::pFine, "Fine Tune",       -100.0f, 100.0f, 0.0f, 1.0f);
+    addF(ppi::pPan,     "Pan",            -1.0f, 1.0f, 0.0f);
+    addF(ppi::ampA,     "Amp Attack",     0.0f, 2000.0f, 0.0f, 100.0f);
+    addF(ppi::ampD,     "Amp Decay",      0.0f, 2000.0f, 100.0f, 100.0f);
+    addF(ppi::ampS,     "Amp Sustain",    0.0f, 1.0f, 1.0f);
+    addF(ppi::ampR,     "Amp Release",    0.0f, 2000.0f, 0.0f, 100.0f);
+    addF(ppi::fEnv,     "Filter Envelope Amount", -1.0f, 1.0f, 0.0f);
+    addF(ppi::fltA,     "Filter Attack",  0.0f, 2000.0f, 0.0f, 100.0f);
+    addF(ppi::fltD,     "Filter Decay",   0.0f, 2000.0f, 100.0f, 100.0f);
+    addF(ppi::fltS,     "Filter Sustain", 0.0f, 1.0f, 1.0f);
+    addF(ppi::fltR,     "Filter Release", 0.0f, 2000.0f, 0.0f, 100.0f);
 
     // The layer's insert effect (the shared rows).
     mu_mixfx::addInsertParams(layout, prefix, "Phrase ");

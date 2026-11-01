@@ -36,9 +36,14 @@ public:
     static constexpr int kEffectsX    = kAmpX    + kAmpW    + LF::kVoiceDivW;
     static constexpr int kHeight      = LF::kVoiceLabelH + LF::kVoiceSubH;   // plate band + the two rows
 
-    // The four sections (not owned; made children here) and the three FX send knobs.
+    // The four sections (not owned; made children here) and the three FX send knobs (all null for a band without sends). The
+    // Effects section is normally an InsertSubsection; a product may give another component of the same size.
     void setSections(juce::Component& pitch, juce::Component& filter, juce::Component& amp,
-                     InsertSubsection& effects, std::array<juce::Component*, kSendCols> sends);
+                     juce::Component& effects, std::array<juce::Component*, kSendCols> sends);
+
+    // A word put before every section name ("LAYER" gives LAYER PITCH, LAYER FILTER...), for a band that sits beside another
+    // that edits the same controls in another way. Empty (the default) shows the plain names.
+    void setTitlePrefix(const juce::String& prefix) { titlePrefix = prefix.isEmpty() ? prefix : prefix + " "; repaint(); }
 
     void resized() override;
     void paint(juce::Graphics&) override;
@@ -47,7 +52,8 @@ private:
     juce::Component*  pitchSec  = nullptr;
     juce::Component*  filterSec = nullptr;
     juce::Component*  ampSec    = nullptr;
-    InsertSubsection* effectsSec = nullptr;
+    juce::Component*  effectsSec = nullptr;
+    juce::String      titlePrefix;
     std::array<juce::Component*, kSendCols> sendKnobs {};
 };
 

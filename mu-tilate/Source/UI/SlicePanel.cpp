@@ -1,6 +1,8 @@
 #include "UI/SlicePanel.h"
 
-#include "ValueFormat.h"   // mu-core: mu_fmt
+#include "Audio/AlgorithmNames.h"      // mu-core: the insert algorithm names
+#include "Audio/InsertSlotConfig.h"    // mu-core: each algorithm's four knobs
+#include "ValueFormat.h"               // mu-core: mu_fmt
 
 #include <cmath>
 
@@ -12,24 +14,28 @@ namespace
     using LF = MuLookAndFeel;
     constexpr int kHeaderH = 22;   // the description line and the step buttons (unscaled)
 
-    juce::String signedDb(double v)
+    juce::String signedNumber(double v, int decimals, const juce::String& unit)
     {
-        return (v > 0.0 ? "+" : "") + juce::String(v, 1) + " dB";
+        return (v > 0.0 ? "+" : "") + juce::String(v, decimals) + (unit.isEmpty() ? juce::String() : " " + unit);
     }
+    juce::String signedDb(double v)      { return signedNumber(v, 1, "dB"); }
+    juce::String signedMs(double v)      { return signedNumber(std::round(v), 0, "ms"); }
+    juce::String octaves(double v)       { return signedNumber(v, 2, "oct"); }
+    juce::String semitones(double v)     { return signedNumber(std::round(v), 0, "st"); }
+    juce::String cents(double v)         { return signedNumber(std::round(v), 0, "cents"); }
+    juce::String signedPercent(double v) { return signedNumber(std::round(v * 100.0), 0, "%"); }
+    juce::String percent(double v)       { return juce::String((int) std::lround(v * 100.0)) + "%"; }
     juce::String panText(double v)
     {
-        if (std::abs(v) < 0.005) return "Centre";
+        if (std::abs(v) < 0.005) return "No change";
         return (v < 0.0 ? "L " : "R ") + juce::String((int) std::lround(std::abs(v) * 100.0)) + "%";
     }
-    juce::String signedPercent(double v)
-    {
-        const int p = (int) std::lround(v * 100.0);
-        return (p > 0 ? "+" : "") + juce::String(p) + "%";
-    }
-    juce::String octaves(double v)   { return (v > 0.0 ? "+" : "") + juce::String(v, 2) + " oct"; }
-    juce::String percent(double v) { return juce::String((int) std::lround(v * 100.0)) + "%"; }
-    juce::String semitones(double v) { return (v > 0.0 ? "+" : "") + juce::String((int) std::lround(v)) + " st"; }
-    juce::String cents(double v)     { return (v > 0.0 ? "+" : "") + juce::String((int) std::lround(v)) + " cents"; }
+}
+
+int SlicePanel::preferredHeight() noexcept
+{
+    // The header, the band, then the play strip (its name plate and one knob row in a box).
+    return kHeaderH + LF::kSpaceS + VoiceBand::kHeight + LF::kSpaceS + LF::kSectionPlateH + LF::kKnobSize2H + LF::kSpaceS * 2;
 }
 
 SlicePanel::SlicePanel()
@@ -39,78 +45,141 @@ SlicePanel::SlicePanel()
     prevButton.onClick = [this] { if (onStep) onStep(-1); };
     nextButton.onClick = [this] { if (onStep) onStep(+1); };
 
-    // Slice: direction, level (a trim on the layer's), pan, and fades added to the layer's.
-    addSwitch(reverseSwitch, Slice);
-    addKnob(Slice, "Level", &SliceSettings::levelDb, -24.0, 12.0, 0.1, 0.0, LF::knobLevel,
-            "Slice Level: this slice's level added to the layer's", signedDb);
-    addKnob(Slice, "Pan", &SliceSettings::pan, -1.0, 1.0, 0.01, 0.0, LF::knobPan, "Slice Pan: where this slice sits in the stereo field", panText);
-    addKnob(Slice, "In", &SliceSettings::fadeInMs, 0.0, 50.0, 0.1, 5.0, LF::knobModulation,
-            "Fade In: extra fade at the start of this slice, on top of the layer's", [](double v) { return mu_fmt::unitText(mu_fmt::Unit::Ms, v); });
-    addKnob(Slice, "Out", &SliceSettings::fadeOutMs, 0.0, 50.0, 0.1, 5.0, LF::knobModulation,
-            "Fade Out: extra fade at the end of this slice, on top of the layer's", [](double v) { return mu_fmt::unitText(mu_fmt::Unit::Ms, v); });
+    // The layer's choices, shown where the Layer view has its dropdowns: greyed, as they are edited there.
+    for (int i = 0; i < filterTypeNames().size(); ++i) layerFilterName.addItem(filterTypeNames()[i], i + 1);
+    for (int i = 0; i < mu_ui::kInsertAlgoCount; ++i) layerInsertName.addItem(mu_audio::kInsertAlgorithmNames[i], i + 1);
+    for (auto* d : { &layerFilterName, &layerInsertName }) d->setEnabled(false);
+    layerFilterName.getComboBox().setTooltip("The layer's filter type (change it in the Layer view). The knobs here move its cutoff and resonance for this slice");
+    layerInsertName.getComboBox().setTooltip("The layer's insert effect (change it in the Layer view). The knobs here move its four knobs for this slice");
 
-    // Pitch.
-    addKnob(Pitch, "Pitch", &SliceSettings::pitchSemi, -24.0, 24.0, 1.0, 0.0, LF::knobEuclidean, "Slice Pitch: transposes this slice", semitones);
-    addKnob(Pitch, "Fine", &SliceSettings::fineCents, -100.0, 100.0, 1.0, 0.0, LF::knobEuclidean, "Slice Fine Tune: fine pitch of this slice", cents);
+    // Pitch: added to the layer's.
+    addKnob(&pitchSection, 0, 0, "Pitch", &SliceSettings::pitchSemi, -12.0, 12.0, 1.0, LF::knobEuclidean, "Slice Pitch: semitones added to the layer's pitch", semitones);
+    addKnob(&pitchSection, 0, 1, "Fine", &SliceSettings::fineCents, -50.0, 50.0, 1.0, LF::knobEuclidean, "Slice Fine Tune: cents added to the layer's", cents);
 
-    // Pre-fade: a quiet reversed copy of the start of the slice that swells into the hit.
-    addSwitch(preSwitch, Pre);
-    addKnob(Pre, "Level", &SliceSettings::preLevelDb, -36.0, 0.0, 0.1, -12.0, LF::knobFxSend,
-            "Pre-fade Level: how loud the reversed swell is, below the slice", [](double v) { return juce::String(v, 1) + " dB"; });
-    addKnob(Pre, "Length", &SliceSettings::preLengthMs, 10.0, 1000.0, 1.0, 150.0, LF::knobFxSend,
-            "Pre-fade Length: how long the swell runs before the hit", [](double v) { return mu_fmt::unitText(mu_fmt::Unit::Ms, v); });
-    addKnob(Pre, "Tone", &SliceSettings::preTone, -1.0, 1.0, 0.01, 0.0, LF::knobFxSend,
-            "Pre-fade Tone: darker to the left, thinner to the right", [](double v) { return std::abs(v) < 0.005 ? juce::String("Neutral") : (v < 0.0 ? "Dark " : "Thin ") + percent(std::abs(v)); });
+    // Filter: the layer chooses the type; the slice moves its cutoff and resonance and how far its envelope moves the cutoff.
+    filterSection.place(layerFilterName, 0, 0, 2, true);
+    addKnob(&filterSection, 0, 2, "Cutoff", &SliceSettings::cutoffOct, -4.0, 4.0, 0.01, LF::knobPostPad, "Slice Cutoff Offset: moves the layer's filter cutoff for this slice, in octaves", octaves);
+    addKnob(&filterSection, 0, 3, "Res", &SliceSettings::resOffset, -1.0, 1.0, 0.01, LF::knobPostPad, "Slice Resonance Offset: added to the layer's filter resonance", signedPercent);
+    addKnob(&filterSection, 0, 4, "Depth", &SliceSettings::filterEnvAmt, -1.0, 1.0, 0.01, LF::knobPostPad, "Slice Filter Envelope Depth: added to how far the layer's filter envelope moves the cutoff", signedPercent);
+    addKnob(&filterSection, 1, 0, "A", &SliceSettings::fltA, -1000.0, 1000.0, 1.0, LF::knobPostPad, "Filter Attack Offset: added to the layer's filter attack", signedMs);
+    addKnob(&filterSection, 1, 1, "D", &SliceSettings::fltD, -1000.0, 1000.0, 1.0, LF::knobPostPad, "Filter Decay Offset: added to the layer's filter decay", signedMs);
+    addKnob(&filterSection, 1, 2, "S", &SliceSettings::fltS, -1.0, 1.0, 0.01, LF::knobPostPad, "Filter Sustain Offset: added to the layer's filter sustain", signedPercent);
+    addKnob(&filterSection, 1, 3, "R", &SliceSettings::fltR, -1000.0, 1000.0, 1.0, LF::knobPostPad, "Filter Release Offset: added to the layer's filter release", signedMs);
 
-    // Filter: the layer chooses the filter; the slice only moves its cutoff and resonance, and sets how far its envelope moves it.
-    addKnob(Filter, "Cutoff", &SliceSettings::cutoffOct, -4.0, 4.0, 0.01, 0.0, LF::knobPostPad,
-            "Slice Cutoff Offset: moves the layer's filter cutoff for this slice, in octaves", octaves);
-    addKnob(Filter, "Res", &SliceSettings::resOffset, -1.0, 1.0, 0.01, 0.0, LF::knobPostPad,
-            "Slice Resonance Offset: added to the layer's filter resonance for this slice", signedPercent);
-    addKnob(Filter, "Env", &SliceSettings::filterEnvAmt, -1.0, 1.0, 0.01, 0.0, LF::knobPostPad,
-            "Slice Filter Envelope Amount: how far this slice's filter envelope moves the cutoff", signedPercent);
+    // Amp: level and pan, the fades, and the amp envelope.
+    auto fadeText = [](double v) { return signedNumber(v, 1, "ms"); };
+    addKnob(&ampSection, 0, 0, "Level", &SliceSettings::levelDb, -12.0, 12.0, 0.1, LF::knobLevel, "Slice Level: dB added to the layer's level", signedDb);
+    addKnob(&ampSection, 0, 1, "Pan", &SliceSettings::pan, -1.0, 1.0, 0.01, LF::knobPan, "Slice Pan: moves this slice from where the layer sits in the stereo field", panText);
+    addKnob(&ampSection, 0, 2, "In", &SliceSettings::fadeInMs, -25.0, 25.0, 0.1, LF::knobModulation, "Fade In Offset: added to the layer's fade in", fadeText);
+    addKnob(&ampSection, 0, 3, "Out", &SliceSettings::fadeOutMs, -25.0, 25.0, 0.1, LF::knobModulation, "Fade Out Offset: added to the layer's fade out", fadeText);
+    addKnob(&ampSection, 1, 0, "A", &SliceSettings::ampA, -1000.0, 1000.0, 1.0, LF::knobLevel, "Amp Attack Offset: added to the layer's amp attack", signedMs);
+    addKnob(&ampSection, 1, 1, "D", &SliceSettings::ampD, -1000.0, 1000.0, 1.0, LF::knobLevel, "Amp Decay Offset: added to the layer's amp decay", signedMs);
+    addKnob(&ampSection, 1, 2, "S", &SliceSettings::ampS, -1.0, 1.0, 0.01, LF::knobLevel, "Amp Sustain Offset: added to the layer's amp sustain", signedPercent);
+    addKnob(&ampSection, 1, 3, "R", &SliceSettings::ampR, -1000.0, 1000.0, 1.0, LF::knobLevel, "Amp Release Offset: added to the layer's amp release", signedMs);
 
-    auto ms = [](double v) { return mu_fmt::unitText(mu_fmt::Unit::Ms, v); };
-    addKnob(AmpEnv, "A", &SliceSettings::ampA, 0.0, 2000.0, 1.0, 100.0, LF::knobLevel, "Amp Attack: time for the slice to reach full level", ms);
-    addKnob(AmpEnv, "D", &SliceSettings::ampD, 0.0, 2000.0, 1.0, 100.0, LF::knobLevel, "Amp Decay: time to fall to the sustain level", ms);
-    addKnob(AmpEnv, "S", &SliceSettings::ampS, 0.0, 1.0, 0.01, 0.0, LF::knobLevel, "Amp Sustain: the level held after the decay", percent);
-    addKnob(AmpEnv, "R", &SliceSettings::ampR, 0.0, 2000.0, 1.0, 100.0, LF::knobLevel, "Amp Release: fade-out time when the slice is cut", ms);
-    addKnob(FilterEnv, "A", &SliceSettings::fltA, 0.0, 2000.0, 1.0, 100.0, LF::knobPostPad, "Filter Attack: time for the filter envelope to reach its peak", ms);
-    addKnob(FilterEnv, "D", &SliceSettings::fltD, 0.0, 2000.0, 1.0, 100.0, LF::knobPostPad, "Filter Decay: time to fall to the sustain level", ms);
-    addKnob(FilterEnv, "S", &SliceSettings::fltS, 0.0, 1.0, 0.01, 0.0, LF::knobPostPad, "Filter Sustain: the envelope level held after the decay", percent);
-    addKnob(FilterEnv, "R", &SliceSettings::fltR, 0.0, 2000.0, 1.0, 100.0, LF::knobPostPad, "Filter Release: how long the envelope takes to close when the slice is cut", ms);
+    // Effects: the layer's insert, and an offset for each of its (up to four) knobs.
+    insertSection.place(layerInsertName, 0, 0, 4, true);
+    for (int slot = 0; slot < mu_ui::kInsertSlotCount; ++slot)
+    {
+        auto k = std::make_unique<Knob>();
+        k->comp = std::make_unique<KnobWithLabel>("P" + juce::String(slot + 1), LF::knobInsertPad);
+        k->insSlot = slot;
+        k->comp->setRange(-1.0, 1.0, 0.01);
+        k->comp->statusTextFromValue = [this, slot](double v) { return insertOffsetText(slot, v); };
+        k->comp->onStatusUpdate = [this, slot](const juce::String&, const juce::String& v)
+        {
+            if (! onStatusUpdate) return;
+            const auto& cfg = mu_ui::kInsertAlgoSlots[juce::jlimit(0, mu_ui::kInsertAlgoCount - 1, insertAlgo)][slot];
+            onStatusUpdate(juce::String("Slice ") + (cfg.label != nullptr ? cfg.label : "Insert") + " Offset: added to the layer's insert knob", v);
+        };
+        k->comp->onValueChanged = [this](double) { changed(); };
+        insertSection.place(*k->comp, 1, slot);
+        knobs.push_back(std::move(k));
+    }
 
-    addSwitch(loopSwitch, FilterEnv);   // loop sits with the last group; it is placed on its own in resized()
+    band.setTitlePrefix("SLICE");
+    band.setSections(pitchSection, filterSection, ampSection, insertSection, { nullptr, nullptr, nullptr });
+    addAndMakeVisible(band);
+
+    // How the slice plays: direction, once or loop, and the pre-fade (a quiet reversed copy of its start that swells into the hit).
+    addSwitch(reverseSwitch);
+    addSwitch(loopSwitch);
+    addSwitch(preSwitch);
+    addKnob(nullptr, 0, 0, "Level", &SliceSettings::preLevelDb, -36.0, 0.0, 0.1, LF::knobFxSend, "Pre-fade Level: how loud the reversed swell is, below the slice",
+            [](double v) { return juce::String(v, 1) + " dB"; });
+    addKnob(nullptr, 0, 0, "Length", &SliceSettings::preLengthMs, 10.0, 1000.0, 1.0, LF::knobFxSend, "Pre-fade Length: how long the swell runs before the hit",
+            [](double v) { return mu_fmt::unitText(mu_fmt::Unit::Ms, v); });
+    addKnob(nullptr, 0, 0, "Tone", &SliceSettings::preTone, -1.0, 1.0, 0.01, LF::knobFxSend, "Pre-fade Tone: darker to the left, thinner to the right",
+            [](double v) { return std::abs(v) < 0.005 ? juce::String("Neutral") : (v < 0.0 ? "Dark " : "Thin ") + percent(std::abs(v)); });
+    for (size_t i = knobs.size() - 3; i < knobs.size(); ++i) playKnobs.push_back(knobs[i].get());
+    playKnobs[0]->comp->getSlider().setSkewFactorFromMidPoint(-12.0);   // level: finer near the loud end
+    playKnobs[1]->comp->getSlider().setSkewFactorFromMidPoint(150.0);   // length: finer for short swells
+
+    setLayerInsertAlgorithm(0);
+    setLayerFilterType(0);
 }
 
-void SlicePanel::addKnob(Group group, const char* label, float SliceSettings::* field, double lo, double hi, double step, double skewMid,
-                         MuLookAndFeel::ColourIds colour, const juce::String& statusName, std::function<juce::String(double)> format)
+// A knob of the band's section (or, with no section, of the play strip) at `row`, `col`, editing `field`.
+void SlicePanel::addKnob(VoiceBandSection* section, int row, int col, const char* label, float SliceSettings::* field, double lo, double hi,
+                         double step, MuLookAndFeel::ColourIds colour, const juce::String& statusName, std::function<juce::String(double)> format)
 {
-    Knob k;
-    k.comp = std::make_unique<KnobWithLabel>(label, colour);
-    k.field = field;
-    k.group = group;
-    k.comp->setRange(lo, hi, step);
-    if (skewMid > 0.0 && skewMid > lo && skewMid < hi) k.comp->getSlider().setSkewFactorFromMidPoint(skewMid);   // 0 = linear
-    k.comp->statusTextFromValue = std::move(format);
-    k.comp->onStatusUpdate = [this, statusName](const juce::String&, const juce::String& v) { if (onStatusUpdate) onStatusUpdate(statusName, v); };
-    k.comp->onValueChanged = [this](double) { changed(); };
-    addAndMakeVisible(*k.comp);
+    auto k = std::make_unique<Knob>();
+    k->comp = std::make_unique<KnobWithLabel>(label, colour);
+    k->field = field;
+    k->comp->setRange(lo, hi, step);
+    k->comp->statusTextFromValue = std::move(format);
+    k->comp->onStatusUpdate = [this, statusName](const juce::String&, const juce::String& v) { if (onStatusUpdate) onStatusUpdate(statusName, v); };
+    k->comp->onValueChanged = [this](double) { changed(); };
+    if (section != nullptr) section->place(*k->comp, row, col);
+    else                    addAndMakeVisible(*k->comp);
     knobs.push_back(std::move(k));
 }
 
-void SlicePanel::addSwitch(SegmentControl& control, Group group)
+void SlicePanel::addSwitch(SegmentControl& control)
 {
     addAndMakeVisible(control);
     control.onChange = [this](int) { changed(); };
-    switches.push_back({ &control, group });
+}
+
+// An insert knob's offset in the effect's own units where it has a plain linear range (dB, %), else as a share of the knob's travel.
+juce::String SlicePanel::insertOffsetText(int slot, double v) const
+{
+    const auto& cfg = mu_ui::kInsertAlgoSlots[juce::jlimit(0, mu_ui::kInsertAlgoCount - 1, insertAlgo)][slot];
+    if (cfg.label != nullptr && cfg.skew == mu_ui::SkewMode::Linear && cfg.maxVal > cfg.minVal)
+        return signedNumber(v * (double) (cfg.maxVal - cfg.minVal), 1, cfg.unitSuffix);
+    return signedPercent(v) + " of travel";
+}
+
+void SlicePanel::setLayerFilterType(int choice)
+{
+    layerFilterName.getComboBox().setSelectedId(juce::jlimit(0, filterTypeNames().size() - 1, choice) + 1, juce::dontSendNotification);
+}
+
+// Labels the four insert offsets from the algorithm's own slot table and hides the ones it does not use.
+void SlicePanel::setLayerInsertAlgorithm(int algo)
+{
+    insertAlgo = juce::jlimit(0, mu_ui::kInsertAlgoCount - 1, algo);
+    layerInsertName.getComboBox().setSelectedId(insertAlgo + 1, juce::dontSendNotification);
+    for (auto& k : knobs)
+    {
+        if (k->insSlot < 0) continue;
+        const auto& cfg = mu_ui::kInsertAlgoSlots[insertAlgo][k->insSlot];
+        k->comp->setVisible(cfg.label != nullptr);
+        if (cfg.label != nullptr) k->comp->setLabel(cfg.label);
+        k->comp->getSlider().updateText();
+    }
+    repaint();
 }
 
 // Reads every control into the settings and reports them as one change.
 void SlicePanel::changed()
 {
     if (updating || slice < 0) return;
-    for (auto& k : knobs) settings.*(k.field) = (float) k.comp->getValue();
+    for (auto& k : knobs)
+    {
+        if (k->field != nullptr) settings.*(k->field) = (float) k->comp->getValue();
+        else if (k->insSlot >= 0) settings.insOff[k->insSlot] = (float) k->comp->getValue();
+    }
     settings.reverse    = reverseSwitch.getSelectedIndex() == 1;
     settings.preFade    = preSwitch.getSelectedIndex() == 1;
     settings.loop       = loopSwitch.getSelectedIndex() == 1;
@@ -123,7 +192,11 @@ void SlicePanel::setSlice(int index, const SliceSettings& s, const juce::String&
     slice = index;
     settings = s;
     description = text;
-    for (auto& k : knobs) k.comp->setValue((double) (s.*(k.field)));
+    for (auto& k : knobs)
+    {
+        if (k->field != nullptr) k->comp->setValue((double) (s.*(k->field)));
+        else if (k->insSlot >= 0) k->comp->setValue((double) s.insOff[k->insSlot]);
+    }
     reverseSwitch.setSelectedIndex(s.reverse ? 1 : 0);
     preSwitch.setSelectedIndex(s.preFade ? 1 : 0);
     loopSwitch.setSelectedIndex(s.loop ? 1 : 0);
@@ -152,45 +225,28 @@ void SlicePanel::resized()
     nextButton.setBounds(header.removeFromLeft(s(26)));
     area.removeFromTop(s(LF::kSpaceS));
 
-    // Two rows of groups, each in a raised panel with its name plate above it.
+    // The band: the same Pitch | Filter | Amp | Effects boxes the Layer view has.
+    band.setBounds(area.removeFromTop(s(VoiceBand::kHeight)).withWidth(s(VoiceBand::kEffectsX + VoiceBand::kEffectsW)));
+    area.removeFromTop(s(LF::kSpaceS));
+
+    // The play strip: direction, once or loop, and the pre-fade with its three knobs, in one raised box under the band.
     sections.clear();
     const int pad = s(LF::kSpaceS), plate = s(LF::kSectionPlateH);
-    const int rowH = area.getHeight() / 2;
-    auto placeGroup = [&](int row, int& x, Group g, const char* title, int switchW)
+    const int boxTop = area.getY() + plate, top = boxTop + pad;
+    int x = s(VoiceBand::kLeftGap);
+    const int start = x;
+    x += pad;
+    auto switchAt = [&](SegmentControl& sw, int w)
     {
-        const int boxTop = area.getY() + row * rowH + plate;
-        const int top = boxTop + pad;
-        const int start = x;
-        x += pad;
-        for (auto& sw : switches)
-            if (sw.second == g && sw.first != &loopSwitch)
-            {
-                sw.first->setBounds(x, top + (s(LF::kKnobSize2H) - s(kHeaderH)) / 2, s(switchW), s(kHeaderH));
-                x += s(switchW) + pad;
-            }
-        for (auto& k : knobs)
-            if (k.group == g) { k.comp->setBounds(x, top, s(LF::kKnobSize2W), s(LF::kKnobSize2H)); x += s(LF::kKnobSize2W); }
-        x += pad;
-        sections.push_back({ juce::Rectangle<int>(start, boxTop, x - start, s(LF::kKnobSize2H) + pad * 2), title });
-        x += pad * 2;
+        sw.setBounds(x, top + (s(LF::kKnobSize2H) - s(kHeaderH)) / 2, s(w), s(kHeaderH));
+        x += s(w) + pad;
     };
-
-    int x = area.getX();
-    placeGroup(0, x, Slice, "SLICE LEVEL", 54);
-    placeGroup(0, x, Pitch, "SLICE PITCH", 0);
-    placeGroup(0, x, Pre, "SLICE PRE-FADE", 54);
-
-    // The second row starts after the layer's filter, which the host places in the indent, so the layer's filter and the slice's
-    // offsets of it sit side by side.
-    x = area.getX() + rowIndent;
-    indent = juce::Rectangle<int>(area.getX(), area.getY() + rowH, rowIndent, plate + s(LF::kKnobSize2H) + pad * 2);
-    placeGroup(1, x, Filter, "SLICE FILTER OFFSET", 0);
-    placeGroup(1, x, AmpEnv, "SLICE AMP ENV", 0);
-    placeGroup(1, x, FilterEnv, "SLICE FILTER ENV", 0);
-    // The play-mode switch (once or loop) gets its own small panel after the filter envelope.
-    const int loopTop = area.getY() + rowH + plate;
-    loopSwitch.setBounds(x + pad, loopTop + pad + (s(LF::kKnobSize2H) - s(kHeaderH)) / 2, s(80), s(kHeaderH));
-    sections.push_back({ juce::Rectangle<int>(x, loopTop, s(80) + pad * 2, s(LF::kKnobSize2H) + pad * 2), "SLICE PLAY" });
+    switchAt(reverseSwitch, 80);
+    switchAt(loopSwitch, 90);
+    switchAt(preSwitch, 80);
+    for (auto* k : playKnobs) { k->comp->setBounds(x, top, s(LF::kKnobSize2W), s(LF::kKnobSize2H)); x += s(LF::kKnobSize2W); }
+    x += pad;
+    sections.push_back({ juce::Rectangle<int>(start, boxTop, x - start, s(LF::kKnobSize2H) + pad * 2), "SLICE PLAY AND PRE-FADE" });
 }
 
 } // namespace mu_tilate

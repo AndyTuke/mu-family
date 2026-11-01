@@ -129,9 +129,9 @@ DetectSettings PluginProcessor::detectSettingsOf(int layer) const
     return s;
 }
 
-// Publishes `slices` with a timeline that plays them back to back in source order, as long as that takes (in bars of 4/4),
-// and sets the layer's length to match. Returns the total length in beats.
-double PluginProcessor::layOutInOrder(int layer, const SliceList& slices, double sampleRate, double loopTempo)
+// Publishes `slices` with a timeline as long as the slices take back to back (in bars of 4/4), and sets the layer's length to
+// match: empty, or with the slices laid out in source order from beat 0. Returns the total length in beats.
+double PluginProcessor::layOutInOrder(int layer, const SliceList& slices, double sampleRate, double loopTempo, bool inOrder)
 {
     std::vector<double> beats;
     double total = 0.0;
@@ -144,7 +144,7 @@ double PluginProcessor::layOutInOrder(int layer, const SliceList& slices, double
     Timeline timeline((double) bars * 4.0);
     std::vector<SliceSettings> startWith;   // each hit starts with its slice's settings
     for (int i = 0; i < slices.size(); ++i) startWith.push_back(slices.settings(i));
-    timeline.originalOrder(beats, startWith);
+    if (inOrder) timeline.originalOrder(beats, startWith);
     getPhrase(layer).commitEdit(slices, timeline);
     if (auto* p = apvts.getParameter(layerParamPrefix(layer) + ppi::suffix[ppi::bars]))
         p->setValueNotifyingHost(p->convertTo0to1((float) bars));
@@ -176,14 +176,24 @@ void PluginProcessor::redetectSlices(int layer)
                 loopStatus[(size_t) layer] = ph.loopName() + ": the slices changed while Detect ran, so it was not applied. Press Detect again.";
                 return;
             }
-            const double total = layOutInOrder(layer, *slices, data->fileSampleRate, loopTempo);
+            const double total = layOutInOrder(layer, *slices, data->fileSampleRate, loopTempo, true);
             loopStatus[(size_t) layer] = ph.loopName() + ": " + juce::String(slices->size()) + " slices, "
                                        + juce::String(total, 1) + " beats at " + juce::String(loopTempo, 0) + " BPM";
         });
     });
 }
 
-// Decode on a worker, detect, lay the slices out in their original order, then publish on the message thread. A newer
+// Lays the layer's slices out one after another in source order (the Sequencer's Lay out button).
+void PluginProcessor::layOutSlices(int layer)
+{
+    if (layer < 0 || layer >= mu_limits::kMaxLayers) return;
+    const auto data = getPhrase(layer).getData();
+    if (data == nullptr || data->audio == nullptr) return;
+    const double loopTempo = (double) apvts.getRawParameterValue(layerParamPrefix(layer) + ppi::suffix[ppi::ltempo])->load();
+    layOutInOrder(layer, data->slices, data->fileSampleRate, loopTempo, true);
+}
+
+// Decode on a worker, detect, then publish the slices on the message thread with an empty timeline. A newer
 // request for the layer (or a destroyed processor) makes an older completion do nothing.
 void PluginProcessor::loadLoopAsync(int layer, const juce::File& file, bool keepSavedEdits)
 {
@@ -213,7 +223,7 @@ void PluginProcessor::loadLoopAsync(int layer, const juce::File& file, bool keep
             auto& ph = getPhrase(layer);
 
             // A restore whose saved edits fit this loop keeps them (installLoop applies them); anything else gets the
-            // detected slices laid out back to back in source order, as long as that takes (in bars of 4/4).
+            // detected slices and an empty timeline of the loop's length (in bars of 4/4).
             const bool keep = keepSavedEdits && ph.savedEditsFit(loaded->audio->getNumSamples());
             ph.installLoop(loaded->audio, loaded->sampleRate, file.getFullPathName(), loaded->name);
 
@@ -235,7 +245,7 @@ void PluginProcessor::loadLoopAsync(int layer, const juce::File& file, bool keep
 
             double total = 0.0;
             if (! keep)
-                total = layOutInOrder(layer, *slices, loaded->sampleRate, tempo);
+                total = layOutInOrder(layer, *slices, loaded->sampleRate, tempo, false);   // a new loop starts with no hits
             else if (const auto kept = ph.getData(); kept != nullptr)   // the restored slices, not the freshly detected ones
                 for (int i = 0; i < kept->slices.size(); ++i)
                     total += (double) kept->slices.slice(i).length() / loaded->sampleRate * tempo / 60.0;
