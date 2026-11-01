@@ -12,7 +12,7 @@ namespace mu_tilate
 namespace
 {
     using LF = MuLookAndFeel;
-    constexpr int kHeaderH = 22;   // the description line and the step buttons (unscaled)
+    constexpr int kHeaderH = LF::kLoopRowH;   // the description line and the step buttons (unscaled)
 
     juce::String signedNumber(double v, int decimals, const juce::String& unit)
     {
@@ -220,9 +220,9 @@ void SlicePanel::resized()
     using mu_ui::s;
     auto area = getLocalBounds();
     auto header = area.removeFromTop(s(kHeaderH));
-    prevButton.setBounds(header.removeFromLeft(s(26)));
+    prevButton.setBounds(header.removeFromLeft(s(LF::kLoopStepButtonW)));
     header.removeFromLeft(s(4));
-    nextButton.setBounds(header.removeFromLeft(s(26)));
+    nextButton.setBounds(header.removeFromLeft(s(LF::kLoopStepButtonW)));
     area.removeFromTop(s(LF::kSpaceS));
 
     // The band: the same Pitch | Filter | Amp | Effects boxes the Layer view has.
@@ -241,9 +241,9 @@ void SlicePanel::resized()
         sw.setBounds(x, top + (s(LF::kKnobSize2H) - s(kHeaderH)) / 2, s(w), s(kHeaderH));
         x += s(w) + pad;
     };
-    switchAt(reverseSwitch, 80);
-    switchAt(loopSwitch, 90);
-    switchAt(preSwitch, 80);
+    switchAt(reverseSwitch, LF::kLoopSwitchW);
+    switchAt(loopSwitch, LF::kLoopSwitchWideW);
+    switchAt(preSwitch, LF::kLoopSwitchW);
     for (auto* k : playKnobs) { k->comp->setBounds(x, top, s(LF::kKnobSize2W), s(LF::kKnobSize2H)); x += s(LF::kKnobSize2W); }
     x += pad;
     sections.push_back({ juce::Rectangle<int>(start, boxTop, x - start, s(LF::kKnobSize2H) + pad * 2), "SLICE PLAY AND PRE-FADE" });

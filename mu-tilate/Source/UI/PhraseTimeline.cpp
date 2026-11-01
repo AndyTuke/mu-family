@@ -93,7 +93,7 @@ double PhraseTimeline::beatAt(int x) const noexcept
 bool PhraseTimeline::onRightEdge(int i, int x) const
 {
     const int edge = xOf(timeline.blocks()[(size_t) i].start + blockBeats(i));
-    return std::abs(x - edge) <= mu_ui::s(5);
+    return std::abs(x - edge) <= mu_ui::s(LF::kEdgeGrab);
 }
 
 double PhraseTimeline::blockBeats(int i) const
@@ -164,23 +164,24 @@ void PhraseTimeline::paint(juce::Graphics& g)
 
     // Phase 3: the blocks.
     const auto accent = LF::appAccent(*this);
+    const auto& lighting = LF::lighting();
     for (int i = 0; i < timeline.size(); ++i)
     {
         const auto& b = timeline.blocks()[(size_t) i];
         const int x0 = xOf(b.start), x1 = xOf(b.start + blockBeats(i));
-        const auto r = juce::Rectangle<int>(x0, row.getY() + s(3), std::max(2, x1 - x0 - 1), row.getHeight() - s(6));
-        g.setColour(accent.withAlpha(i == selected ? 0.9f : 0.55f));
-        g.fillRoundedRectangle(r.toFloat(), 3.0f);
+        const auto r = juce::Rectangle<int>(x0, row.getY() + s(LF::kBlockInset), std::max(2, x1 - x0 - 1), row.getHeight() - s(2 * LF::kBlockInset));
+        g.setColour(accent.withAlpha(i == selected ? lighting.blockFillSelected : lighting.blockFill));
+        g.fillRoundedRectangle(r.toFloat(), LF::kBlockRadius);
         g.setColour(LF::colour(LF::lfoEditorPoint).withAlpha(i == selected ? 1.0f : 0.5f));
-        g.drawRoundedRectangle(r.toFloat(), 3.0f, 1.0f);
+        g.drawRoundedRectangle(r.toFloat(), LF::kBlockRadius, 1.0f);
         if (b.slice >= 0 && b.slice < (int) slicePeaksList.size())
         {
-            g.setColour(juce::Colours::black.withAlpha(0.45f));
+            g.setColour(juce::Colours::black.withAlpha(lighting.blockWave));
             drawPeaks(g, slicePeaksList[(size_t) b.slice], r.reduced(1), b.own.reverse, 0, getWidth());
         }
-        if (r.getWidth() > s(14))
+        if (r.getWidth() > s(LF::kBlockLabelMinW))
         {
-            g.setColour(juce::Colours::black.withAlpha(0.85f));
+            g.setColour(juce::Colours::black.withAlpha(lighting.blockLabel));
             g.drawText(juce::String(b.slice + 1) + (b.own.reverse ? " <" : ""), r.reduced(s(3), 0), juce::Justification::centredLeft);
         }
     }
@@ -196,9 +197,9 @@ void PhraseTimeline::paint(juce::Graphics& g)
         for (long i = std::max(0L, first); i <= last; ++i)
         {
             const int x = xOf((double) i * gridBeats);
-            g.setColour(line.withAlpha(0.22f));
+            g.setColour(line.withAlpha(lighting.snapLine));
             g.fillRect(x, row.getY(), 1, row.getHeight());
-            g.setColour(line.withAlpha(0.6f));
+            g.setColour(line.withAlpha(lighting.snapTick));
             g.fillRect(x, ruler.getBottom() - s(3), 1, s(3));
         }
     }
@@ -209,14 +210,14 @@ void PhraseTimeline::paint(juce::Graphics& g)
         if (dropSlice >= 0 && dropSlice < (int) sliceBeatsList.size())
         {
             const int gx0 = xOf(dropBeat), gx1 = xOf(dropBeat + sliceBeatsList[(size_t) dropSlice]);
-            const auto gr = juce::Rectangle<int>(gx0, row.getY() + s(3), std::max(2, gx1 - gx0 - 1), row.getHeight() - s(6));
-            g.setColour(accent.withAlpha(0.45f));
-            g.fillRoundedRectangle(gr.toFloat(), 3.0f);
+            const auto gr = juce::Rectangle<int>(gx0, row.getY() + s(LF::kBlockInset), std::max(2, gx1 - gx0 - 1), row.getHeight() - s(2 * LF::kBlockInset));
+            g.setColour(accent.withAlpha(lighting.ghostFill));
+            g.fillRoundedRectangle(gr.toFloat(), LF::kBlockRadius);
             g.setColour(accent);
-            g.drawRoundedRectangle(gr.toFloat(), 3.0f, 1.0f);
+            g.drawRoundedRectangle(gr.toFloat(), LF::kBlockRadius, 1.0f);
             if (dropSlice < (int) slicePeaksList.size())
             {
-                g.setColour(juce::Colours::black.withAlpha(0.55f));
+                g.setColour(juce::Colours::black.withAlpha(lighting.ghostWave));
                 drawPeaks(g, slicePeaksList[(size_t) dropSlice], gr.reduced(1), false, 0, getWidth());
             }
         }

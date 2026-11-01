@@ -245,6 +245,16 @@ struct MuTheme
         float stepBeyondHatch    = 0.28f;   //   and its diagonal hatching
         float stepDimmed         = 0.6f;    // black over a step this pass will skip
 
+        // Loop timeline blocks (mu-Tilate)
+        float blockFill          = 0.55f;   // a hit's fill, in the app accent
+        float blockFillSelected  = 0.9f;
+        float blockWave          = 0.45f;   // the slice's waveform drawn in dark over the fill
+        float blockLabel         = 0.85f;
+        float ghostFill          = 0.45f;   // the drop preview of a dragged slice
+        float ghostWave          = 0.55f;
+        float snapLine           = 0.22f;   // a snap-grid line through the row
+        float snapTick           = 0.6f;    //   and its tick in the ruler
+
         // Paint: the app colour as it looks painted on metal (paintColour) — dull, dark, washed out.
         float paintSaturation    = 0.60f;   // app colour's saturation scaled by this
         float paintBrightness    = 0.55f;   //   … and its brightness

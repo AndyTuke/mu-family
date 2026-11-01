@@ -10,7 +10,7 @@ namespace mu_tilate
 namespace
 {
     using LF = MuLookAndFeel;
-    constexpr int kStatusH = 22;   // the status line, the load button and the toolbar buttons (unscaled)
+    constexpr int kStatusH = LF::kLoopRowH;   // the status line, the load button and the toolbar buttons (unscaled)
 
     // Each slice's waveform as columns of peak level 0..1 (the loudest sample of the loop is 1), sampled sparsely: the timeline
     // draws them inside its blocks and under the pointer while a slice is dragged.
@@ -229,7 +229,7 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
         dragGhost.setVisible(! overTimeline);
         if (! overTimeline)
         {
-            const int w = juce::jlimit(s(24), s(360), timelineView.pixelsForSlice(region)), h = s(34);
+            const int w = juce::jlimit(s(24), s(360), timelineView.pixelsForSlice(region)), h = s(LF::kLoopGhostH);
             dragGhost.setBounds(juce::Rectangle<int>(w, h).withCentre(getLocalPoint(nullptr, screen)));
             dragGhost.toFront(false);
             dragGhost.repaint();
@@ -614,9 +614,9 @@ void PhraseContent::resized()
 
     // Top row: the load button, the status line and the view switch.
     auto top = area.removeFromTop(s(kStatusH));
-    loadButton.setBounds(top.removeFromLeft(s(112)));
+    loadButton.setBounds(top.removeFromLeft(s(LF::kLoopLoadW)));
     top.removeFromLeft(s(LF::kSpaceS));
-    viewSwitch.setBounds(top.removeFromRight(s(270)));
+    viewSwitch.setBounds(top.removeFromRight(s(LF::kLoopViewSwitchW)));
     top.removeFromRight(s(LF::kSpaceS));
     status.setBounds(top);
     area.removeFromTop(s(LF::kSpaceS));
@@ -651,7 +651,7 @@ void PhraseContent::resized()
     }
 
     const int cellW = s(LF::kKnobSize2W), cellH = s(LF::kKnobSize2H), pad = s(LF::kSpaceS), plate = s(LF::kSectionPlateH);
-    const int boxW = s(108), buttonW = s(64);
+    const int boxW = s(LF::kLoopBoxW), buttonW = s(LF::kLoopButtonW);
     auto isDetect = [](int row) { return row >= ppi::dsens && row <= ppi::dhigh; };
 
     if (layerViewShown())
@@ -692,7 +692,7 @@ void PhraseContent::resized()
     // Below: the waveform, a slim timeline to pick a hit on, and the slice panel at the bottom.
     slicePanel.setBounds(area.removeFromBottom(s(SlicePanel::preferredHeight())));
     area.removeFromBottom(pad);
-    timelineView.setBounds(area.removeFromBottom(s(64)));
+    timelineView.setBounds(area.removeFromBottom(s(LF::kLoopSlimTimelineH)));
     area.removeFromBottom(pad);
     waveform.setBounds(area);
 }

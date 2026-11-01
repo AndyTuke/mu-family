@@ -747,6 +747,22 @@ public:
     static constexpr float kTieStubW     = 6.0f;   // the stub that shows a tie from the page before
     static constexpr float kTieOverlap   = 2.0f;   // how far a tie bar reaches into each lamp
 
+    // Loop editor views (mu-Tilate): the control row, the top row and the toolbar.
+    static constexpr int   kLoopRowH        = 22;    // status line, load button, toolbar buttons, step buttons
+    static constexpr int   kLoopLoadW       = 112;
+    static constexpr int   kLoopViewSwitchW = 270;
+    static constexpr int   kLoopBoxW        = 108;   // a dropdown inside a panel
+    static constexpr int   kLoopButtonW     = 64;
+    static constexpr int   kLoopSwitchW     = 80;    // a two-way switch in the play strip
+    static constexpr int   kLoopSwitchWideW = 90;
+    static constexpr int   kLoopStepButtonW = 26;
+    static constexpr int   kLoopSlimTimelineH = 64;  // the timeline under the waveform in the Slice view
+    static constexpr int   kLoopGhostH      = 34;    // the slice preview that follows the pointer in a drag
+    static constexpr int   kBlockInset      = 3;     // a timeline block's gap to the row's edge
+    static constexpr float kBlockRadius     = 3.0f;
+    static constexpr int   kEdgeGrab        = 5;     // how near a block's edge a press grabs it to resize
+    static constexpr int   kBlockLabelMinW  = 14;    // the narrowest block that shows its number
+
     // Channel sidebar edges: flat, metal, and metal with screws (items + Add button clear of them).
     static constexpr int kSidebarFlatEdge     = 4;
     static constexpr int kSidebarMetalEdge    = 7;
