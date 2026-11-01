@@ -21,6 +21,7 @@ enum class OnsetMethod
 struct OnsetCurve
 {
     std::vector<float> flux;
+    std::vector<float> level;      // the peak absolute sample in each frame's window: onsets in near-silence are ignored
     std::vector<float> baseline;   // the running median of flux (about 0.5 s either side): the level a peak must clear
     int    hop        = 256;      // samples between frames
     double sampleRate = 48000.0;
