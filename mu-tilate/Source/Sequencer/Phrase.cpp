@@ -191,6 +191,9 @@ void Phrase::readParams(double modBeat) noexcept
     settings.fadeInMs  = out[D_fadeIn];
     settings.fadeOutMs = out[D_fadeOut];
     settings.gain      = out[D_level];
+    settings.filterType = juce::jlimit(0, 3, (int) g(ppi::fType));   // the layer's filter: not modulated
+    settings.cutoffHz   = g(ppi::fCut);
+    settings.resonance  = g(ppi::fRes);
 
     insertCfg.insertAlgo     = (int) g(ppi::drvChar);
     insertCfg.insertParam[0] = out[D_insP1];

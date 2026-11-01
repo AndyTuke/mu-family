@@ -264,6 +264,26 @@ struct PhraseTests : public juce::UnitTest
             expectWithinAbsoluteError(out.getSample(0, 48100), 0.1f * 0.251189f, 1.0e-4f);            // hit two: -12 dB
         }
 
+        beginTest("the layer's filter applies to every hit and a hit's cutoff offset moves it, in octaves");
+        {
+            auto levelWith = [](int type, float offsetOct)
+            {
+                Rig r;
+                r.hitsStartWithSliceSettings = false;
+                juce::Random rng(5);
+                for (int i = 0; i < 24000; ++i) r.audio.setSample(0, i, 0.5f * (rng.nextFloat() * 2.0f - 1.0f));   // slice 0 is noise
+                r.timeline.place(0, 0.0, 0.0);
+                SliceSettings own; own.cutoffOct = offsetOct;
+                r.timeline.setSettings(0, own);
+                r.settings.filterType = type; r.settings.cutoffHz = 500.0f; r.settings.resonance = 0.0f;
+                return rms(r.run(24000, 256), 4000, 16000);
+            };
+            const double closed = levelWith(1, 0.0f), opened = levelWith(1, 3.0f), off = levelWith(0, 0.0f), offMoved = levelWith(0, 3.0f);
+            expectGreaterThan(opened, 1.5 * closed);                      // three octaves up lets much more of the noise through
+            expectLessThan(closed, 0.7 * off);                            // the layer's low-pass takes level off the noise
+            expectWithinAbsoluteError(off, offMoved, 1.0e-6);             // with the layer's filter off the offsets do nothing
+        }
+
         beginTest("a pre-fade of a slice that plays backwards swells in the end of the slice");
         {
             auto build = [](bool reversed)

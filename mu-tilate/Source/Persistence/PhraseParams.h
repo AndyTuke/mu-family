@@ -16,6 +16,7 @@ namespace ppi
         grid, bars, window,                                        // timeline and stretch window (3)
         dmethod, dsens, dgap, dpre, dlow, dhigh, snap,             // detection (7)
         drvChar, insP1, insP2, insP3, insP4,                       // insert (5)
+        fType, fCut, fRes,                                         // the layer's filter (3)
         COUNT
     };
     inline constexpr const char* const suffix[COUNT] = {
@@ -23,11 +24,12 @@ namespace ppi
         "grid", "bars", "window",
         "dmethod", "dsens", "dgap", "dpre", "dlow", "dhigh", "snap",
         "drvChar", "insP1", "insP2", "insP3", "insP4",
+        "fType", "fCut", "fRes",
     };
 }
 
 inline constexpr int kNumPhraseParams = ppi::COUNT;
-static_assert(kNumPhraseParams == 22, "a new row goes into ppi, suffix[] and addLayerParams together");
+static_assert(kNumPhraseParams == 25, "a new row goes into ppi, suffix[] and addLayerParams together");
 
 // "p{N}_": the prefix of every parameter of Phrase slot N.
 inline juce::String layerParamPrefix(int slot) { return "p" + juce::String(slot) + "_"; }
@@ -39,6 +41,7 @@ inline constexpr const char* kPhrasePresetTag = "MuTilateLayer";
 inline const juce::StringArray& tempoModeNames()  { static const juce::StringArray n { "Off", "Re-pitch", "Stretch" }; return n; }
 inline const juce::StringArray& gridNames()       { static const juce::StringArray n { "Off", "1/4", "1/8", "1/16", "1/32" }; return n; }
 inline const juce::StringArray& windowNames()     { static const juce::StringArray n { "Short", "Default" }; return n; }
+inline const juce::StringArray& filterTypeNames() { static const juce::StringArray n { "Off", "LP", "HP", "BP" }; return n; }
 inline const juce::StringArray& detectMethodNames() { static const juce::StringArray n { "Transients", "Soft-tonal", "Even" }; return n; }
 
 // The grid choice as beats (a quarter note is one beat); 0 is no snapping.

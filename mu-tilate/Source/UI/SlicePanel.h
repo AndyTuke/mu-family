@@ -33,6 +33,11 @@ public:
     // The status bar's name and value for the control being changed.
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
 
+    // Leaves `px` free at the left of the second row (the host puts the layer's filter there, beside the slice's filter offsets);
+    // indentBox() is that free box in this panel's coordinates, valid after resized().
+    void setRowIndent(int px) { if (px != rowIndent) { rowIndent = px; resized(); } }
+    juce::Rectangle<int> indentBox() const noexcept { return indent; }
+
     void paint(juce::Graphics&) override;
     void resized() override;
 
@@ -50,6 +55,8 @@ private:
     void addSwitch(SegmentControl& control, Group group);
     void changed();   // reads every control into `settings` and reports it
 
+    int rowIndent = 0;
+    juce::Rectangle<int> indent;
     int slice = -1;
     SliceSettings settings;
     bool updating = false;   // setSlice is writing the controls: they must not report back
@@ -58,7 +65,6 @@ private:
     juce::TextButton prevButton { "<" }, nextButton { ">" };
     SegmentControl reverseSwitch { { "Fwd", "Rev" },  SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Lcd };
     SegmentControl preSwitch     { { "Off", "On" },   SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Lcd };
-    SegmentControl filterSwitch  { { "Off", "LP", "HP", "BP" }, SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Lcd };
     SegmentControl loopSwitch    { { "Once", "Loop" }, SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Lcd };
     std::vector<Knob> knobs;
     std::vector<std::pair<SegmentControl*, int>> switches;   // each switch and its group

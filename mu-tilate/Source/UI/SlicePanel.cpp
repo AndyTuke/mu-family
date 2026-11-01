@@ -26,6 +26,7 @@ namespace
         const int p = (int) std::lround(v * 100.0);
         return (p > 0 ? "+" : "") + juce::String(p) + "%";
     }
+    juce::String octaves(double v)   { return (v > 0.0 ? "+" : "") + juce::String(v, 2) + " oct"; }
     juce::String percent(double v) { return juce::String((int) std::lround(v * 100.0)) + "%"; }
     juce::String semitones(double v) { return (v > 0.0 ? "+" : "") + juce::String((int) std::lround(v)) + " st"; }
     juce::String cents(double v)     { return (v > 0.0 ? "+" : "") + juce::String((int) std::lround(v)) + " cents"; }
@@ -61,13 +62,13 @@ SlicePanel::SlicePanel()
     addKnob(Pre, "Tone", &SliceSettings::preTone, -1.0, 1.0, 0.01, 0.0, LF::knobFxSend,
             "Pre-fade Tone: darker to the left, thinner to the right", [](double v) { return std::abs(v) < 0.005 ? juce::String("Neutral") : (v < 0.0 ? "Dark " : "Thin ") + percent(std::abs(v)); });
 
-    // Filter and its envelope.
-    addSwitch(filterSwitch, Filter);
-    addKnob(Filter, "Cutoff", &SliceSettings::cutoffHz, 20.0, 20000.0, 1.0, 1000.0, LF::knobPostPad,
-            "Filter Cutoff: the filter's corner frequency for this slice", [](double v) { return mu_fmt::unitText(mu_fmt::Unit::Hz, v); });
-    addKnob(Filter, "Res", &SliceSettings::resonance, 0.0, 1.0, 0.01, 0.0, LF::knobPostPad, "Filter Resonance: emphasis at the cutoff", percent);
+    // Filter: the layer chooses the filter; the slice only moves its cutoff and resonance, and sets how far its envelope moves it.
+    addKnob(Filter, "Cutoff", &SliceSettings::cutoffOct, -4.0, 4.0, 0.01, 0.0, LF::knobPostPad,
+            "Slice Cutoff Offset: moves the layer's filter cutoff for this slice, in octaves", octaves);
+    addKnob(Filter, "Res", &SliceSettings::resOffset, -1.0, 1.0, 0.01, 0.0, LF::knobPostPad,
+            "Slice Resonance Offset: added to the layer's filter resonance for this slice", signedPercent);
     addKnob(Filter, "Env", &SliceSettings::filterEnvAmt, -1.0, 1.0, 0.01, 0.0, LF::knobPostPad,
-            "Filter Envelope Amount: how far the filter envelope moves the cutoff", signedPercent);
+            "Slice Filter Envelope Amount: how far this slice's filter envelope moves the cutoff", signedPercent);
 
     auto ms = [](double v) { return mu_fmt::unitText(mu_fmt::Unit::Ms, v); };
     addKnob(AmpEnv, "A", &SliceSettings::ampA, 0.0, 2000.0, 1.0, 100.0, LF::knobLevel, "Amp Attack: time for the slice to reach full level", ms);
@@ -112,7 +113,6 @@ void SlicePanel::changed()
     for (auto& k : knobs) settings.*(k.field) = (float) k.comp->getValue();
     settings.reverse    = reverseSwitch.getSelectedIndex() == 1;
     settings.preFade    = preSwitch.getSelectedIndex() == 1;
-    settings.filterType = filterSwitch.getSelectedIndex();
     settings.loop       = loopSwitch.getSelectedIndex() == 1;
     if (onChange) onChange(settings);
 }
@@ -126,7 +126,6 @@ void SlicePanel::setSlice(int index, const SliceSettings& s, const juce::String&
     for (auto& k : knobs) k.comp->setValue((double) (s.*(k.field)));
     reverseSwitch.setSelectedIndex(s.reverse ? 1 : 0);
     preSwitch.setSelectedIndex(s.preFade ? 1 : 0);
-    filterSwitch.setSelectedIndex(juce::jlimit(0, 3, s.filterType));
     loopSwitch.setSelectedIndex(s.loop ? 1 : 0);
     updating = false;
     setEnabled(index >= 0);
@@ -177,18 +176,21 @@ void SlicePanel::resized()
     };
 
     int x = area.getX();
-    placeGroup(0, x, Slice, "SLICE", 54);
-    placeGroup(0, x, Pitch, "PITCH", 0);
-    placeGroup(0, x, Pre, "PRE-FADE", 54);
+    placeGroup(0, x, Slice, "SLICE LEVEL", 54);
+    placeGroup(0, x, Pitch, "SLICE PITCH", 0);
+    placeGroup(0, x, Pre, "SLICE PRE-FADE", 54);
 
-    x = area.getX();
-    placeGroup(1, x, Filter, "FILTER", 112);
-    placeGroup(1, x, AmpEnv, "AMP ENVELOPE", 0);
-    placeGroup(1, x, FilterEnv, "FILTER ENVELOPE", 0);
+    // The second row starts after the layer's filter, which the host places in the indent, so the layer's filter and the slice's
+    // offsets of it sit side by side.
+    x = area.getX() + rowIndent;
+    indent = juce::Rectangle<int>(area.getX(), area.getY() + rowH, rowIndent, plate + s(LF::kKnobSize2H) + pad * 2);
+    placeGroup(1, x, Filter, "SLICE FILTER OFFSET", 0);
+    placeGroup(1, x, AmpEnv, "SLICE AMP ENV", 0);
+    placeGroup(1, x, FilterEnv, "SLICE FILTER ENV", 0);
     // The play-mode switch (once or loop) gets its own small panel after the filter envelope.
     const int loopTop = area.getY() + rowH + plate;
     loopSwitch.setBounds(x + pad, loopTop + pad + (s(LF::kKnobSize2H) - s(kHeaderH)) / 2, s(80), s(kHeaderH));
-    sections.push_back({ juce::Rectangle<int>(x, loopTop, s(80) + pad * 2, s(LF::kKnobSize2H) + pad * 2), "PLAY" });
+    sections.push_back({ juce::Rectangle<int>(x, loopTop, s(80) + pad * 2, s(LF::kKnobSize2H) + pad * 2), "SLICE PLAY" });
 }
 
 } // namespace mu_tilate

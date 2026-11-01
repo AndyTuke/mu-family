@@ -43,6 +43,11 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     addF(ppi::dhigh,    "High Cut",       1000.0f, 20000.0f, 20000.0f, 6000.0f);
     layout.add(std::make_unique<juce::AudioParameterBool>(id(ppi::snap), "Snap Markers", false));
 
+    // The layer's filter: every slice uses it, moved by its own cutoff and resonance offsets.
+    addC(ppi::fType,    "Filter Type",    filterTypeNames(), 0);
+    addF(ppi::fCut,     "Filter Cutoff",  20.0f, 20000.0f, 20000.0f, 1000.0f);
+    addF(ppi::fRes,     "Filter Resonance", 0.0f, 1.0f, 0.0f);
+
     // The layer's insert effect (the shared rows).
     mu_mixfx::addInsertParams(layout, prefix, "Phrase ");
 }

@@ -35,6 +35,10 @@ SliceParams PhrasePlayback::paramsFor(const PhraseLoop& loop, const PhraseSettin
     const SliceSettings& own = b.own;
     SliceParams p;
     p.own       = own;
+    // The filter is the layer's, moved by this hit's offsets: cutoff in octaves, resonance added.
+    p.own.filterType = juce::jlimit(0, 3, s.filterType);
+    p.own.cutoffHz   = juce::jlimit(20.0f, 20000.0f, s.cutoffHz * std::exp2(own.cutoffOct));
+    p.own.resonance  = juce::jlimit(0.0f, 1.0f, s.resonance + own.resOffset);
     p.gain      = s.gain * juce::Decibels::decibelsToGain(juce::jlimit(-24.0f, 12.0f, own.levelDb));
     p.fadeInMs  = s.fadeInMs + own.fadeInMs;
     p.fadeOutMs = s.fadeOutMs + own.fadeOutMs;

@@ -34,6 +34,9 @@ struct PhraseSettings
     float     fadeInMs  = 0.5f;
     float     fadeOutMs = 0.5f;
     float     gain      = 1.0f;
+    int       filterType = 0;        // the layer's filter: 0 off, 1 low-pass, 2 high-pass, 3 band-pass
+    float     cutoffHz   = 20000.0f;
+    float     resonance  = 0.0f;     // 0..1
 };
 
 // The transport as one call sees it (a subset of mu_core::RenderContext; the layer fills it from there).

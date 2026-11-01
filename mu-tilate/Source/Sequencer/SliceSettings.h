@@ -28,11 +28,16 @@ struct SliceSettings
     float pitchSemi = 0.0f;     // -24..24 semitones
     float fineCents = 0.0f;     // -100..100 cents
 
-    // Filter: 0 off, 1 low-pass, 2 high-pass, 3 band-pass
+    // Filter: the layer chooses the type, cutoff and resonance; a slice only moves them. The offsets are what is saved.
+    float cutoffOct    = 0.0f;   // -4..4 octaves added to the layer's cutoff
+    float resOffset    = 0.0f;   // -1..1 added to the layer's resonance
+    float filterEnvAmt = 0.0f;   // -1..1: how far the filter envelope moves the cutoff
+    // The filter as the player runs it: the layer's setting with this slice's offsets applied. The scheduler fills these in
+    // when it starts a hit; they are not saved, and the pre-fade's tone filter writes them on its own voice. 0 off, 1 low-pass,
+    // 2 high-pass, 3 band-pass.
     int   filterType   = 0;
     float cutoffHz     = 20000.0f;
     float resonance    = 0.0f;   // 0..1
-    float filterEnvAmt = 0.0f;   // -1..1: how far the filter envelope moves the cutoff
 
     // Amp envelope and filter envelope: attack, decay and release in ms, sustain 0..1. The defaults are a flat gate.
     float ampA = 0.0f, ampD = 100.0f, ampS = 1.0f, ampR = 0.0f;
@@ -60,6 +65,8 @@ inline SliceSettings sanitised(SliceSettings s) noexcept
     s.preTone = fix(s.preTone, -1.0f, 1.0f, d.preTone);
     s.pitchSemi = fix(s.pitchSemi, -24.0f, 24.0f, d.pitchSemi);
     s.fineCents = fix(s.fineCents, -100.0f, 100.0f, d.fineCents);
+    s.cutoffOct = fix(s.cutoffOct, -4.0f, 4.0f, d.cutoffOct);
+    s.resOffset = fix(s.resOffset, -1.0f, 1.0f, d.resOffset);
     s.filterType = std::clamp(s.filterType, 0, 3);
     s.cutoffHz = fix(s.cutoffHz, 20.0f, 20000.0f, d.cutoffHz);
     s.resonance = fix(s.resonance, 0.0f, 1.0f, d.resonance);

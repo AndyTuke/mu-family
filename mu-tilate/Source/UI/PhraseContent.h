@@ -92,6 +92,8 @@ private:
     // The Sequencer's toolbar over the timeline.
     juce::Label      lengthCaption { {}, "Length" };
     juce::Label      lengthBox;                   // editable: "2 bars", "6 beats", "3/4"
+    DropdownSelect   filterTypeBox;               // the layer's filter type
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> filterTypeAtt;
     DropdownSelect   gridBox;                     // the snap grid
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> gridAtt;
     juce::TextButton deleteButton { "Delete hit" }, clearButton { "Clear" };
