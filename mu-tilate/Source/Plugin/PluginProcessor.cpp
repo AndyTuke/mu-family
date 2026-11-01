@@ -127,6 +127,53 @@ DetectSettings PluginProcessor::detectSettingsOf(int layer) const
     return s;
 }
 
+// Publishes `slices` with a timeline that plays them back to back in source order, as long as that takes (in bars of 4/4),
+// and sets the layer's length to match. Returns the total length in beats.
+double PluginProcessor::layOutInOrder(int layer, const SliceList& slices, double sampleRate, double loopTempo)
+{
+    std::vector<double> beats;
+    double total = 0.0;
+    for (int i = 0; i < slices.size(); ++i)
+    {
+        beats.push_back((double) slices.slice(i).length() / sampleRate * loopTempo / 60.0);
+        total += beats.back();
+    }
+    const int bars = juce::jlimit(1, 64, (int) std::ceil(total / 4.0 - 1.0e-6));
+    Timeline timeline((double) bars * 4.0);
+    timeline.originalOrder(beats);
+    getPhrase(layer).commitEdit(slices, timeline);
+    if (auto* p = apvts.getParameter(layerParamPrefix(layer) + ppi::suffix[ppi::bars]))
+        p->setValueNotifyingHost(p->convertTo0to1((float) bars));
+    return total;
+}
+
+// Detect again on the loaded loop (a worker), then publish the new slices and a timeline in source order.
+void PluginProcessor::redetectSlices(int layer)
+{
+    if (layer < 0 || layer >= mu_limits::kMaxLayers) return;
+    const auto data = getPhrase(layer).getData();
+    if (data == nullptr || data->audio == nullptr) return;
+    const int gen = loopGeneration[(size_t) layer].fetch_add(1) + 1;
+    const auto detect = detectSettingsOf(layer);
+    const double loopTempo = (double) apvts.getRawParameterValue(layerParamPrefix(layer) + ppi::suffix[ppi::ltempo])->load();
+    auto flag = alive;
+
+    juce::Thread::launch([this, layer, gen, data, detect, loopTempo, flag]
+    {
+        const auto curve = analyseLoop(*data->audio, data->fileSampleRate, detect);
+        auto slices = std::make_shared<SliceList>(detectSlices(curve, *data->audio, detect, &data->slices));
+        juce::MessageManager::callAsync([this, layer, gen, data, slices, loopTempo, flag]
+        {
+            if (! flag->load() || loopGeneration[(size_t) layer].load() != gen) return;
+            auto& ph = getPhrase(layer);
+            if (ph.getData() == nullptr || ph.getData()->audio != data->audio) return;   // another loop arrived meanwhile
+            const double total = layOutInOrder(layer, *slices, data->fileSampleRate, loopTempo);
+            loopStatus[(size_t) layer] = ph.loopName() + ": " + juce::String(slices->size()) + " slices, "
+                                       + juce::String(total, 1) + " beats at " + juce::String(loopTempo, 0) + " BPM";
+        });
+    });
+}
+
 // Decode on a worker, detect, lay the slices out in their original order, then publish on the message thread. A newer
 // request for the layer (or a destroyed processor) makes an older completion do nothing.
 void PluginProcessor::loadLoopAsync(int layer, const juce::File& file, bool keepSavedEdits)
@@ -161,20 +208,11 @@ void PluginProcessor::loadLoopAsync(int layer, const juce::File& file, bool keep
             const bool keep = keepSavedEdits && ph.savedEditsFit(loaded->audio->getNumSamples());
             ph.installLoop(loaded->audio, loaded->sampleRate, file.getFullPathName(), loaded->name);
             double total = 0.0;
-            for (int i = 0; i < slices->size(); ++i)
-                total += (double) slices->slice(i).length() / loaded->sampleRate * loopTempo / 60.0;
             if (! keep)
-            {
-                std::vector<double> beats;
+                total = layOutInOrder(layer, *slices, loaded->sampleRate, loopTempo);
+            else
                 for (int i = 0; i < slices->size(); ++i)
-                    beats.push_back((double) slices->slice(i).length() / loaded->sampleRate * loopTempo / 60.0);
-                const int bars = juce::jlimit(1, 64, (int) std::ceil(total / 4.0 - 1.0e-6));
-                Timeline timeline((double) bars * 4.0);
-                timeline.originalOrder(beats);
-                ph.commitEdit(*slices, timeline);
-                if (auto* p = apvts.getParameter(layerParamPrefix(layer) + ppi::suffix[ppi::bars]))
-                    p->setValueNotifyingHost(p->convertTo0to1((float) bars));
-            }
+                    total += (double) slices->slice(i).length() / loaded->sampleRate * loopTempo / 60.0;
             const auto shown = ph.getData();
             loopStatus[(size_t) layer] = loaded->name + ": " + juce::String(shown != nullptr ? shown->slices.size() : 0) + " slices, "
                                        + juce::String(total, 1) + " beats at " + juce::String(loopTempo, 0) + " BPM";

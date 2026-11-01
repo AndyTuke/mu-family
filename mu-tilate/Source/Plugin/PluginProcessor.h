@@ -109,6 +109,8 @@ private:
 
     // The detection settings from layer `layer`'s parameters (any thread: reads the raw atomics).
     DetectSettings detectSettingsOf(int layer) const;
+    void redetectSlices(int layer) override;
+    double layOutInOrder(int layer, const SliceList& slices, double sampleRate, double loopTempo);
 
     std::atomic<double> currentSampleRate { 44100.0 };
     std::atomic<int>    currentBlockSize  { 512 };

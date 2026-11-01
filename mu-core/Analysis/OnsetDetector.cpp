@@ -74,6 +74,18 @@ OnsetCurve computeCurve(const juce::AudioBuffer<float>& audio, double sampleRate
     const float peak = *std::max_element(curve.flux.begin(), curve.flux.end());
     if (peak > 1.0e-9f)
         for (auto& v : curve.flux) v /= peak;
+
+    // Phase 5: the baseline. A median ignores the loud hits around a quiet one, so a soft hat between two kicks is
+    // judged against the quiet floor, not against a mean the kicks have pulled up.
+    const int half = std::max(2, (int) std::lround(0.5 * curve.sampleRate / (double) kHop));
+    curve.baseline.assign((size_t) frames, 0.0f);
+    std::vector<float> win;
+    for (int i = 0; i < frames; ++i)
+    {
+        win.assign(curve.flux.begin() + std::max(0, i - half), curve.flux.begin() + std::min(frames, i + half + 1));
+        std::nth_element(win.begin(), win.begin() + (std::ptrdiff_t) win.size() / 2, win.end());
+        curve.baseline[(size_t) i] = win[win.size() / 2];
+    }
     return curve;
 }
 
@@ -83,21 +95,17 @@ std::vector<int> pickOnsets(const OnsetCurve& curve, const OnsetPickSettings& s,
     const int frames = (int) curve.flux.size();
     if (frames < 3) return out;
 
-    // Phase 1: adaptive threshold = a moving mean of the curve (about 0.4 s either side) plus an offset set by Sensitivity.
-    const int half = std::max(2, (int) std::lround(0.4 * curve.sampleRate / (double) curve.hop));
-    const float offset = 0.02f + (1.0f - juce::jlimit(0.0f, 1.0f, s.sensitivity)) * 0.4f;
-    std::vector<double> prefix((size_t) frames + 1, 0.0);
-    for (int i = 0; i < frames; ++i) prefix[(size_t) i + 1] = prefix[(size_t) i] + (double) curve.flux[(size_t) i];
+    // Phase 1: the threshold is the curve's running median plus an offset set by Sensitivity (0.5 = 0.12, 1 = 0.02, 0 = 0.42).
+    const float inv = 1.0f - juce::jlimit(0.0f, 1.0f, s.sensitivity);
+    const float offset = 0.02f + 0.4f * inv * inv;
 
     // Phase 2: local maxima above the threshold (a peak must be the largest within +-3 frames, about 16 ms).
     struct Peak { int frame; float strength; };
     std::vector<Peak> peaks;
     for (int i = 1; i < frames - 1; ++i)
     {
-        const int lo = std::max(0, i - half), hi = std::min(frames, i + half + 1);
-        const float mean = (float) ((prefix[(size_t) hi] - prefix[(size_t) lo]) / (double) (hi - lo));
         const float v = curve.flux[(size_t) i];
-        if (v <= mean + offset) continue;
+        if (v <= curve.baseline[(size_t) i] + offset) continue;
         bool isMax = true;
         for (int k = std::max(0, i - 3); k <= std::min(frames - 1, i + 3) && isMax; ++k)
             if (curve.flux[(size_t) k] > v || (curve.flux[(size_t) k] == v && k < i)) isMax = false;

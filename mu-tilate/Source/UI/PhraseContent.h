@@ -45,7 +45,11 @@ private:
     struct KnobDef { std::unique_ptr<KnobWithLabel> comp; int row; juce::String name;
                      std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> att; };
 
-    void addKnob(int row, const char* label, MuLookAndFeel::ColourIds colour);
+    // A knob on parameter `row`: its short label, the full name and what it does (the status bar's first part), and the
+    // unit its value is read in (the status bar's second part).
+    void addKnob(int row, const char* label, MuLookAndFeel::ColourIds colour, const juce::String& statusName, mu_fmt::Unit unit);
+    void addKnob(int row, const char* label, MuLookAndFeel::ColourIds colour, const juce::String& statusName,
+                 std::function<juce::String(double)> format);
     void refreshViews(bool force = false);        // re-reads the layer's loop data, slices and timeline when they changed
     void editSlices(const std::function<void(SliceList&, Timeline&)>& edit);   // one marker edit, published to the layer
     void chooseLoop();
@@ -60,6 +64,9 @@ private:
     juce::Label      status;
     DropdownSelect   modeBox;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> modeAtt;
+    DropdownSelect   detectBox;                   // the detection method
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> detectAtt;
+    juce::TextButton detectButton { "Detect" };   // runs the detector again with the current settings
     std::vector<KnobDef> knobs;
     std::unique_ptr<juce::FileChooser> chooser;
     LoopWaveform waveform;

@@ -34,6 +34,9 @@ public:
     // session restore: the slices and timeline the saved file carried are kept when they were made on a loop of the
     // same length, instead of being detected and laid out afresh.
     virtual void loadLoopAsync(int layer, const juce::File& file, bool keepSavedEdits = false) = 0;
+    // Runs the detector again on the layer's loaded loop with the layer's current detection settings (pinned markers
+    // stay) and lays the new slices out in their original order, replacing the timeline.
+    virtual void redetectSlices(int layer) = 0;
     // One line for the content: the loop's name and slice count, "Loading ...", or the last error.
     virtual juce::String getLoopStatus(int layer) const = 0;
 };
