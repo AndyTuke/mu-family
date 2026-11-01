@@ -126,8 +126,14 @@ void PhrasePlayback::render(const PhraseLoop& loop, const PhraseSettings& s, con
 
         // The first block that starts at or after this segment's start (a block exactly at the start fires).
         const auto& blocks = loop.timeline->blocks();
-        int bi = 0;
-        while (bi < (int) blocks.size() && blocks[(size_t) bi].start < pos - 1.0e-9) ++bi;
+        const auto startsAt = [&blocks](double beat) { return (int) (std::lower_bound(blocks.begin(), blocks.end(), beat, [](const TimelineBlock& b, double v) { return b.start < v; }) - blocks.begin()); };
+        int bi = startsAt(pos - 1.0e-9);   // the blocks are sorted by start
+
+        // The blocks whose pre-fade can start inside this segment: the longest pre-fade is a second, so only blocks starting
+        // within that of the segment (or, for the pre-fade that wraps back to the timeline's end, within that of its start).
+        const double maxLead = c.sampleRate * bps + 1.0e-9;
+        const int firstCandidate = startsAt(pos);
+        const bool wrapCandidates = segEndPos > L - maxLead;
 
         int at = done;
         int lastPreFrame = -1, lastPreBlock = -1;   // the latest pre-fade started in this segment
@@ -150,18 +156,21 @@ void PhrasePlayback::render(const PhraseLoop& loop, const PhraseSettings& s, con
             // A pre-fade starts its own length before its block (wrapping to the end of the timeline for a block near the start).
             // preBlock / preFrame order the ones that fall on the same frame, and never repeat one already started in this segment.
             int preBlock = -1, preFrame = std::numeric_limits<int>::max();
-            for (int j = 0; j < (int) blocks.size(); ++j)
+            auto consider = [&](int j)
             {
                 Pre pre;
-                if (! preFor(loop, s, c, blocks[(size_t) j], pre)) continue;
+                if (! preFor(loop, s, c, blocks[(size_t) j], pre)) return;
                 double pb = blocks[(size_t) j].start - (double) pre.duration * bps;
                 if (pb < 0.0) pb += L;
-                if (pb < pos - 1.0e-9 || pb >= segEndPos - 1.0e-9) continue;
+                if (pb < pos - 1.0e-9 || pb >= segEndPos - 1.0e-9) return;
                 const int f = done + std::max(0, (int) std::ceil((pb - pos) / bps - 1.0e-9));
-                if (f < at || f > preFrame) continue;
-                if (f < lastPreFrame || (f == lastPreFrame && j <= lastPreBlock)) continue;
+                if (f < at || f > preFrame) return;
+                if (f < lastPreFrame || (f == lastPreFrame && j <= lastPreBlock)) return;
                 if (f < preFrame || (f == preFrame && j < preBlock)) { preFrame = f; preBlock = j; }
-            }
+            };
+            for (int j = firstCandidate; j < (int) blocks.size() && blocks[(size_t) j].start <= segEndPos + maxLead; ++j) consider(j);
+            if (wrapCandidates)
+                for (int j = 0; j < (int) blocks.size() && blocks[(size_t) j].start <= maxLead; ++j) consider(j);
             if (preBlock >= 0 && preFrame <= nextFrame) { nextFrame = preFrame; what = PreFade; }
 
             if (nextFrame > at)

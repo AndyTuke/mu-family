@@ -265,6 +265,31 @@ struct PhraseTests : public juce::UnitTest
             expectGreaterThan(b.getSample(0, 47990), 0.3f);               // backwards: the swell is its end (about 0.9)
         }
 
+        beginTest("the pre-fade scan stays cheap with a thousand blocks that all have one (measured, logged)");
+        {
+            Rig r;
+            r.timeline = Timeline(256.0);                                 // 64 bars
+            for (int i = 0; i < 1024; ++i) r.timeline.place(i % 4, i * 0.25, 0.0);
+            SliceSettings own; own.preFade = true; own.preLengthMs = 50.0f;
+            for (int k = 0; k < 4; ++k) r.slices.setSettings(k, own);
+            const int block = 64, calls = 1500;
+            juce::AudioBuffer<float> out(1, block);
+            const auto t0 = juce::Time::getHighResolutionTicks();
+            for (int i = 0; i < calls; ++i)
+            {
+                out.clear();
+                PhraseClock c;
+                c.playing = true; c.bpm = 120.0; c.sampleRate = kSr; c.beatsPerSample = 120.0 / 60.0 / kSr;
+                c.startBeat = (double) i * block * c.beatsPerSample;
+                r.playback.render(r.loop, r.settings, c, out, block);
+            }
+            const double ms = juce::Time::highResolutionTicksToSeconds(juce::Time::getHighResolutionTicks() - t0) * 1000.0;
+            const double perCallUs = ms * 1000.0 / calls, budgetUs = block / kSr * 1.0e6;
+            logMessage("pre-fade scan, 1024 pre-fade blocks, 64-sample blocks: " + juce::String(perCallUs, 1) + " us per call, the block lasts "
+                       + juce::String(budgetUs, 0) + " us (" + juce::String(100.0 * perCallUs / budgetUs, 1) + "% of it), Debug build");
+            expectLessThan(perCallUs, budgetUs * 0.5);                    // under half a block even in a Debug build on a loaded machine (it measured 213 us before the search, 9 after)
+        }
+
         beginTest("a transport jump re-anchors: the old slice fades and the new position plays");
         {
             Rig r;
