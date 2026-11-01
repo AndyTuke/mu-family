@@ -84,6 +84,9 @@ public:
     void render(juce::AudioBuffer<float>& out, int n) noexcept;
 
     bool isActive() const noexcept;
+    // How the newest sounding slice moves the layer's filter: octaves added to its cutoff (the slice's offset plus its filter
+    // envelope) and the resonance added. False, with no movement, when no slice sounds. Audio thread.
+    bool filterModulation(float& octaves, float& resAdd) const noexcept;
 
 private:
     struct StretchState;   // the two Signalsmith Stretch instances and their scratch (SlicePlayer.cpp)

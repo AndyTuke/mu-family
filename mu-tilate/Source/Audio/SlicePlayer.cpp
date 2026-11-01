@@ -117,6 +117,21 @@ void SlicePlayer::cutSlices() noexcept
         }
 }
 
+bool SlicePlayer::filterModulation(float& octaves, float& resAdd) const noexcept
+{
+    octaves = 0.0f; resAdd = 0.0f;
+    const Voice* newest = nullptr;
+    for (const auto& v : voices)
+        if (v.active && ! v.swell && (newest == nullptr || v.age < newest->age)) newest = &v;
+    if (newest == nullptr) return false;
+    const auto& o = newest->own;
+    // The envelope moves the cutoff up to five octaves, and fades out over its release once the slice is cut.
+    const float env = mu_core::adsAtAge((double) newest->age, o.fltA, o.fltD, o.fltS, sr) * (1.0f - newest->fltRel);
+    octaves = o.cutoffOct + o.filterEnvAmt * env * 5.0f;
+    resAdd  = o.resOffset;
+    return true;
+}
+
 void SlicePlayer::updateFilter(Voice& v) noexcept
 {
     const auto& o = v.own;

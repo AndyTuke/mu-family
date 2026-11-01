@@ -10,7 +10,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     : EditorShellBase(p),
       proc(p),
       sidebar(p, "Layer"),
-      content(p),
+      content(p, p),
       layerPanel(p, "Layer"),
       // The knobs' live modulation arcs hold a layer's matrix: release them before a removal frees it.
       layerEdit(p, sidebar, layerPanel, { [this] { content.releaseModulationArcs(); },
@@ -36,6 +36,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     layerPanel.setDestProvider(&modDestProvider);
     layerPanel.onLayerChanged = [this](int layer) { content.setLayer(layer); };
 
+    content.onInsertAlgorithmChanged = [this](int algo) { layerPanel.getModulatorPanel().setInsertAlgorithm(algo); };
     content.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
     {
         getStatusBar().showParam(name, val, MuLookAndFeel::colour(MuLookAndFeel::knobEuclidean));

@@ -132,8 +132,9 @@ void PhraseTimeline::paint(juce::Graphics& g)
         if (bar) g.drawText(juce::String(beat / 4 + 1), x + s(3), ruler.getY(), s(24), ruler.getHeight(), juce::Justification::centredLeft);
     }
 
-    // Phase 2: grid lines through the row.
+    // Phase 2: the beat lines through the row (the snap grid's own lines are drawn over the blocks, phase 3b).
     const auto row = rowArea();
+    const double L = timeline.lengthBeats();
     g.setColour(LF::colour(LF::stepEditorGridLine));
     for (int beat = std::max(0, firstBeat); beat < lastBeat; ++beat)
         g.fillRect(xOf((double) beat), row.getY(), 1, row.getHeight());
@@ -156,6 +157,24 @@ void PhraseTimeline::paint(juce::Graphics& g)
         }
     }
 
+    // Phase 3b: the snap grid: a line for every step (sixteenths, triplets...) when the steps are far enough apart to read, over the blocks
+    // too, and a tick in the ruler. Triplet steps are drawn in the accent so they are not mistaken for straight ones.
+    const double pxPerBeat = (double) getWidth() / std::max(1.0e-6, viewBeats > 0.0 ? viewBeats : L);
+    if (gridBeats > 0.0 && gridBeats < 1.0 - 1.0e-9 && gridBeats * pxPerBeat >= (double) s(4))
+    {
+        const bool triplet = std::abs(std::log2(gridBeats) - std::round(std::log2(gridBeats))) > 1.0e-6;
+        const auto line = triplet ? LF::appAccent(*this).brighter(0.4f) : juce::Colours::white;
+        const long first = (long) std::floor(beatAt(0) / gridBeats), last = (long) std::ceil(std::min(L, beatAt(getWidth())) / gridBeats);
+        for (long i = std::max(0L, first); i <= last; ++i)
+        {
+            const int x = xOf((double) i * gridBeats);
+            g.setColour(line.withAlpha(0.22f));
+            g.fillRect(x, row.getY(), 1, row.getHeight());
+            g.setColour(line.withAlpha(0.6f));
+            g.fillRect(x, ruler.getBottom() - s(3), 1, s(3));
+        }
+    }
+
     // The insertion line of a drop in progress.
     if (dropBeat >= 0.0)
     {
@@ -173,7 +192,6 @@ void PhraseTimeline::paint(juce::Graphics& g)
     // A zoomed view shows which part of the timeline it is: a thin bar under the ruler.
     if (viewBeats > 0.0)
     {
-        const double L = timeline.lengthBeats();
         g.setColour(LF::colour(LF::labelText).withAlpha(0.35f));
         g.fillRect((int) std::lround(viewStart / L * getWidth()), ruler.getBottom() - 2, std::max(4, (int) std::lround(viewBeats / L * getWidth())), 2);
     }

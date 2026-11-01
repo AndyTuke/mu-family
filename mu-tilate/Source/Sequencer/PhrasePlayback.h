@@ -1,6 +1,8 @@
 #pragma once
 
+#include "Audio/MultiModeFilter.h"   // mu-core: the family's filter
 #include "Audio/SlicePlayer.h"
+#include "Sequencer/LayerFilterTypes.h"
 #include "Sequencer/SliceList.h"
 #include "Sequencer/Timeline.h"
 
@@ -77,7 +79,12 @@ private:
     struct Pre { SliceRange range; int duration = 0; SliceParams params; };
     bool preFor(const PhraseLoop& loop, const PhraseSettings& s, const PhraseClock& c, const TimelineBlock& b, Pre& pre) const noexcept;
 
+    // Renders `len` frames into `view`, the layer filter applied in pieces.
+    void renderPiece(juce::AudioBuffer<float>& view, int len, const PhraseSettings& s) noexcept;
+
+    static constexpr int kFilterPiece = 64;   // frames between updates of the layer filter's cutoff
     SlicePlayer player;
+    MultiModeFilter layerFilter;               // the layer's filter (the family's sixteen types)
     bool   anchored    = false;   // expectedBeat is valid
     double expectedBeat = 0.0;    // where the next call should start if the transport ran on
     int    examined    = 0;       // see preBlocksExamined

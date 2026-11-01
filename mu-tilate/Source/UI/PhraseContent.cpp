@@ -13,8 +13,8 @@ namespace
     constexpr int kStatusH = 22;   // the status line, the load button and the toolbar buttons (unscaled)
 }
 
-PhraseContent::PhraseContent(PhraseHost& h)
-    : host(h), apvts(h.getPhraseParameters())
+PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
+    : host(h), apvts(h.getPhraseParameters()), insertSub(base, "p")
 {
     addAndMakeVisible(loadButton);
     loadButton.onClick = [this] { chooseLoop(); };
@@ -49,6 +49,10 @@ PhraseContent::PhraseContent(PhraseHost& h)
     addAndMakeVisible(filterTypeBox);
     addKnob(ppi::fCut, "Cutoff", LF::knobPostPad, "Layer Filter Cutoff: the filter's corner frequency for the whole layer", mu_fmt::Unit::Hz);
     addKnob(ppi::fRes, "Res",    LF::knobPostPad, "Layer Filter Resonance: emphasis at the cutoff for the whole layer", mu_fmt::Unit::Percent01);
+
+    insertSub.onStatusUpdate = [this](const juce::String& n, const juce::String& v) { if (onStatusUpdate) onStatusUpdate(n, v); };
+    insertSub.onInsertAlgorithmChanged = [this](int algo) { if (onInsertAlgorithmChanged) onInsertAlgorithmChanged(algo); };
+    addAndMakeVisible(insertSub);
 
     addAndMakeVisible(detectButton);
     detectButton.setTooltip("Detect again with these settings. Slices you placed or moved by hand stay; the others are replaced (settings stay with a cut that moved a little) and the timeline is laid out in source order.");
@@ -266,16 +270,20 @@ void PhraseContent::updateToolbar()
 // Shows the Sequencer (waveform, toolbar, timeline) or the Sound Editor (panels, waveform, slim timeline, slice player).
 void PhraseContent::updateView()
 {
-    const bool editor = soundEditorShown();
-    for (auto& k : knobs) k.comp->setVisible(editor);
-    modeBox.setVisible(editor);
-    filterTypeBox.setVisible(editor);
+    const bool editor = soundEditorShown(), layerView = layerViewShown(), sequencer = ! editor && ! layerView;
+    // Which panel a knob belongs to: the detector (Sound Editor), or the layer's sound and filter (Layer).
+    for (auto& k : knobs) k.comp->setVisible(k.row >= ppi::dsens && k.row <= ppi::dhigh ? editor : layerView);
+    modeBox.setVisible(layerView);
+    filterTypeBox.setVisible(layerView);
+    insertSub.setVisible(layerView);
     detectBox.setVisible(editor);
     detectButton.setVisible(editor);
     slicePanel.setVisible(editor);
+    waveform.setVisible(! layerView);
+    timelineView.setVisible(! layerView);
     for (auto* c : std::initializer_list<juce::Component*> { &lengthCaption, &lengthBox, &gridBox, &deleteButton, &clearButton,
                                                               &waveFitButton, &tlOutButton, &tlInButton, &tlFitButton })
-        c->setVisible(! editor);
+        c->setVisible(sequencer);
     if (editor) refreshSlicePanel(true);
     updateToolbar();
     resized();
@@ -375,6 +383,7 @@ void PhraseContent::setLayer(int idx)
     detectAtt.reset();
     gridAtt.reset();
     filterTypeAtt.reset();
+    insertSub.setChannel(currentLayer);
 
     for (auto& k : knobs)
         k.att = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, prefix + k.name, k.comp->getSlider());
@@ -433,8 +442,8 @@ void PhraseContent::timerCallback()
 void PhraseContent::paint(juce::Graphics& g)
 {
     MuLookAndFeel::drawAccentPanel(g, getLocalBounds().reduced(2).toFloat(), MuLookAndFeel::appAccent(*this));
-    // The Sound Editor's two panels: the layer's sound and the transient detector.
-    if (soundEditorShown() && ! sections.empty()) LF::drawSections(g, *this, sections, LF::appAccent(*this));
+    // The panels of the Sound Editor (the detector) and the Layer view (sound, filter, insert).
+    if (! sections.empty()) LF::drawSections(g, *this, sections, LF::appAccent(*this));
 }
 
 void PhraseContent::resized()
@@ -446,13 +455,13 @@ void PhraseContent::resized()
     auto top = area.removeFromTop(s(kStatusH));
     loadButton.setBounds(top.removeFromLeft(s(112)));
     top.removeFromLeft(s(LF::kSpaceS));
-    viewSwitch.setBounds(top.removeFromRight(s(190)));
+    viewSwitch.setBounds(top.removeFromRight(s(270)));
     top.removeFromRight(s(LF::kSpaceS));
     status.setBounds(top);
     area.removeFromTop(s(LF::kSpaceS));
     sections.clear();
 
-    if (! soundEditorShown())
+    if (! soundEditorShown() && ! layerViewShown())
     {
         // Sequencer: the sample on top (to drag slices from), the toolbar, then the timeline.
         const int toolbarH = s(kStatusH) + s(LF::kSpaceS);
@@ -479,32 +488,53 @@ void PhraseContent::resized()
         return;
     }
 
-    // Sound Editor: the layer's sound and the detector in their own panels (side by side, or stacked when the window is narrow).
     const int cellW = s(LF::kKnobSize2W), cellH = s(LF::kKnobSize2H), pad = s(LF::kSpaceS), plate = s(LF::kSectionPlateH);
     const int boxW = s(108), buttonW = s(64);
-    int layerCells = 0, detectCells = 0;
     auto isDetect = [](int row) { return row >= ppi::dsens && row <= ppi::dhigh; };
     auto isFilter = [](int row) { return row >= ppi::fType; };
-    for (auto& k : knobs) { if (isFilter(k.row)) continue; (isDetect(k.row) ? detectCells : layerCells)++; }
-    const int layerW = pad * 3 + boxW + layerCells * cellW;
-    const int detectW = pad * 3 + boxW + detectCells * cellW + pad + buttonW;
-    const bool stacked = layerW + detectW + pad * 2 > area.getWidth();
-    const int boxH = cellH + pad * 2;
 
-    auto panelsArea = area.removeFromTop(plate + boxH + (stacked ? plate + boxH : 0));
-    const auto row1 = panelsArea.removeFromTop(plate + boxH);
-    const auto row2 = stacked ? panelsArea : row1;
-    const juce::Rectangle<int> layerBox(row1.getX(), row1.getY() + plate, layerW, boxH);
-    const juce::Rectangle<int> detectBoxArea = stacked ? juce::Rectangle<int>(row2.getX(), row2.getY() + plate, detectW, boxH)
-                                                       : juce::Rectangle<int>(layerBox.getRight() + pad * 2, layerBox.getY(), detectW, boxH);
-    sections.push_back({ layerBox, "LAYER SOUND" });
-    sections.push_back({ detectBoxArea, "LAYER TRANSIENT DETECTOR" });
-
+    if (layerViewShown())
     {
-        auto r = layerBox.reduced(pad, pad);
+        // Layer: the layer's sound, its filter and its insert effect, side by side, each in its own panel.
+        int layerCells = 0, filterCells = 0;
+        for (auto& k : knobs) { if (isDetect(k.row)) continue; (isFilter(k.row) ? filterCells : layerCells)++; }
+        const int insertW = 4 * cellW + pad * 2, insertH = 2 * cellH + s(LF::kVoiceGap);
+        const int soundW = pad * 3 + boxW + layerCells * cellW;
+        const int filterW = pad * 3 + s(96) + filterCells * cellW;
+        const int insertBoxW = insertW + pad * 2;
+        const int boxH = std::max(insertH + pad * 2, cellH + pad * 2);
+        const int y = area.getY() + plate;
+        int x = area.getX();
+        const juce::Rectangle<int> soundBox(x, y, soundW, boxH);        x += soundW + pad * 2;
+        const juce::Rectangle<int> filterBox(x, y, filterW, boxH);      x += filterW + pad * 2;
+        const juce::Rectangle<int> insertBox(x, y, insertBoxW, boxH);
+        sections.push_back({ soundBox, "LAYER SOUND" });
+        sections.push_back({ filterBox, "LAYER FILTER" });
+        sections.push_back({ insertBox, "LAYER INSERT" });
+
+        auto r = soundBox.reduced(pad, pad).removeFromTop(cellH);   // the controls sit in the top knob row of the (taller) boxes
         modeBox.setBounds(r.removeFromLeft(boxW).withSizeKeepingCentre(boxW, s(kStatusH)));
         r.removeFromLeft(pad);
         for (auto& k : knobs) if (! isDetect(k.row) && ! isFilter(k.row)) k.comp->setBounds(r.removeFromLeft(cellW).withHeight(cellH));
+        auto f = filterBox.reduced(pad, pad).removeFromTop(cellH);
+        filterTypeBox.setBounds(f.removeFromLeft(s(96)).withSizeKeepingCentre(s(96), s(kStatusH)));
+        f.removeFromLeft(pad);
+        for (auto& k : knobs) if (isFilter(k.row)) k.comp->setBounds(f.removeFromLeft(cellW).withHeight(cellH));
+        insertSub.setBounds(insertBox.getX() + pad * 2, insertBox.getY() + pad, insertW, insertH);
+        slicePanel.setBounds({});
+        return;
+    }
+
+    // Sound Editor: the transient detector in its own panel, then the waveform, a slim timeline to pick a hit on, and the slice panels.
+    int detectCells = 0;
+    for (auto& k : knobs) if (isDetect(k.row)) ++detectCells;
+    const int detectW = pad * 3 + boxW + detectCells * cellW + pad + buttonW;
+    const int boxH = cellH + pad * 2;
+    area.removeFromTop(plate);
+    const juce::Rectangle<int> detectBoxArea(area.getX(), area.getY(), detectW, boxH);
+    area.removeFromTop(boxH);
+    sections.push_back({ detectBoxArea, "LAYER TRANSIENT DETECTOR" });
+    {
         auto d = detectBoxArea.reduced(pad, pad);
         detectBox.setBounds(d.removeFromLeft(boxW).withSizeKeepingCentre(boxW, s(kStatusH)));
         d.removeFromLeft(pad);
@@ -514,21 +544,10 @@ void PhraseContent::resized()
     }
     area.removeFromTop(pad);
 
-    // Below: the waveform, a slim timeline to pick a hit on, and the slice player with what is left.
+    // Below: the waveform, a slim timeline to pick a hit on, and the slice panels with what is left.
     const int sliceH = juce::jmax(s(190), area.getHeight() * 5 / 10);
     slicePanel.setBounds(area.removeFromBottom(sliceH));
-    {
-        // The layer's filter sits at the left of the slice panel's second row, beside the slice's offsets of it.
-        const int filterW = pad * 3 + s(70) + 2 * cellW;
-        slicePanel.setRowIndent(filterW + pad * 2);
-        const auto ib = slicePanel.indentBox().translated(slicePanel.getX(), slicePanel.getY());
-        const juce::Rectangle<int> box(ib.getX(), ib.getY() + plate, filterW, cellH + pad * 2);
-        sections.push_back({ box, "LAYER FILTER" });
-        auto r = box.reduced(pad, pad);
-        filterTypeBox.setBounds(r.removeFromLeft(s(70)).withSizeKeepingCentre(s(70), s(kStatusH)));
-        r.removeFromLeft(pad);
-        for (auto& k : knobs) if (isFilter(k.row)) k.comp->setBounds(r.removeFromLeft(cellW).withHeight(cellH));
-    }
+    slicePanel.setRowIndent(0);
     area.removeFromBottom(pad);
     timelineView.setBounds(area.removeFromBottom(juce::jmax(s(56), area.getHeight() / 3)));
     area.removeFromBottom(pad);

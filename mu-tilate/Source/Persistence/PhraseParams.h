@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Sequencer/LayerFilterTypes.h"
+
 #include <juce_audio_processors/juce_audio_processors.h>
 
 // The Phrase layer type's parameter table: the per-slot rows under the slot's p{N}_ prefix. The slice list and the
@@ -39,16 +41,20 @@ inline constexpr const char* kPhrasePresetTag = "MuTilateLayer";
 
 // Choice rows: the order here is the saved index.
 inline const juce::StringArray& tempoModeNames()  { static const juce::StringArray n { "Off", "Re-pitch", "Stretch" }; return n; }
-inline const juce::StringArray& gridNames()       { static const juce::StringArray n { "Off", "1/4", "1/8", "1/16", "1/32" }; return n; }
+inline const juce::StringArray& gridNames()       { static const juce::StringArray n { "Off", "1/4", "1/8", "1/16", "1/32", "1/4T", "1/8T", "1/16T", "1/32T" }; return n; }
 inline const juce::StringArray& windowNames()     { static const juce::StringArray n { "Short", "Default" }; return n; }
-inline const juce::StringArray& filterTypeNames() { static const juce::StringArray n { "Off", "LP", "HP", "BP" }; return n; }
+inline const juce::StringArray& filterTypeNames()
+{
+    static const juce::StringArray n = [] { juce::StringArray a; for (const auto& f : filterChoices()) a.add(f.name); return a; }();
+    return n;
+}
 inline const juce::StringArray& detectMethodNames() { static const juce::StringArray n { "Transients", "Soft-tonal", "Even" }; return n; }
 
-// The grid choice as beats (a quarter note is one beat); 0 is no snapping.
+// The grid choice as beats (a quarter note is one beat); 0 is no snapping. The T choices are triplets: three in the time of two.
 inline double gridBeats(int choice)
 {
-    constexpr double v[] = { 0.0, 1.0, 0.5, 0.25, 0.125 };
-    return v[juce::jlimit(0, 4, choice)];
+    constexpr double v[] = { 0.0, 1.0, 0.5, 0.25, 0.125, 2.0 / 3.0, 1.0 / 3.0, 1.0 / 6.0, 1.0 / 12.0 };
+    return v[juce::jlimit(0, 8, choice)];
 }
 
 // The Phrase type's rows for one layer slot (p{slot}_*), in ppi order.

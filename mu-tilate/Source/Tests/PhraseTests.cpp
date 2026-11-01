@@ -266,7 +266,9 @@ struct PhraseTests : public juce::UnitTest
 
         beginTest("the layer's filter applies to every hit and a hit's cutoff offset moves it, in octaves");
         {
-            auto levelWith = [](int type, float offsetOct)
+            int lp12 = 0;
+            for (int i = 0; i < (int) filterChoices().size(); ++i) if (filterChoices()[(size_t) i].name == "LP 12") lp12 = i;
+            auto levelWith = [lp12](int type, float offsetOct)
             {
                 Rig r;
                 r.hitsStartWithSliceSettings = false;
@@ -275,7 +277,7 @@ struct PhraseTests : public juce::UnitTest
                 r.timeline.place(0, 0.0, 0.0);
                 SliceSettings own; own.cutoffOct = offsetOct;
                 r.timeline.setSettings(0, own);
-                r.settings.filterType = type; r.settings.cutoffHz = 500.0f; r.settings.resonance = 0.0f;
+                r.settings.filterType = type == 1 ? lp12 : 0; r.settings.cutoffHz = 500.0f; r.settings.resonance = 0.0f;
                 return rms(r.run(24000, 256), 4000, 16000);
             };
             const double closed = levelWith(1, 0.0f), opened = levelWith(1, 3.0f), off = levelWith(0, 0.0f), offMoved = levelWith(0, 3.0f);

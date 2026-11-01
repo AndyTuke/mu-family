@@ -7,6 +7,7 @@
 #include "UI/Components/LoopWaveform.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/SegmentControl.h"
+#include "UI/Voice/InsertSubsection.h"   // mu-core: the shared per-layer insert panel
 #include "UI/LayerContent.h"   // mu-core: the base every layer type's content derives from
 #include "Sequencer/SliceList.h"
 #include "Sequencer/Timeline.h"
@@ -29,14 +30,14 @@ namespace mu_tilate
 
 // mu-Tilate's content band inside the shared LayerPanel: the loop (load button and a status line) and two views of the same
 // parts. Sequencer: the waveform to drag slices from, the timeline toolbar (length, grid, delete, clear, zoom) and the timeline.
-// Sound Editor: the layer's sound controls and the transient detector in their own panels, the waveform, a slim timeline to pick a
-// hit on, and the slice player panel. The panel edits the selected hit (every hit on the timeline has its own settings); with no
+// Sound Editor: the transient detector, the waveform, a slim timeline to pick a hit on, and the slice panels. Layer: the layer's sound,
+// filter and insert effect, each in its own panel. The panel edits the selected hit (every hit on the timeline has its own settings); with no
 // hit selected it edits the selected slice, whose settings are what a new hit of that slice starts with.
 class PhraseContent : public LayerContent,
                       private juce::Timer
 {
 public:
-    explicit PhraseContent(PhraseHost& host);
+    PhraseContent(ProcessorBase& base, PhraseHost& host);
     ~PhraseContent() override { stopTimer(); }
 
     void setLayer(int idx) override;
@@ -44,6 +45,9 @@ public:
     const ModDestProvider* getModDestProvider() const noexcept override { return nullptr; }
 
     int getLayer() const noexcept { return currentLayer; }
+
+    // The layer's insert algorithm changed (the modulation panel's insert targets follow it).
+    std::function<void(int insertAlgo)> onInsertAlgorithmChanged;
 
     void lookAndFeelChanged() override { resized(); repaint(); }
     void paint(juce::Graphics& g) override;
@@ -68,6 +72,7 @@ private:
     void applyLength(const juce::String& text);   // the length box: parses it and sets the timeline length
     void updateToolbar();                         // enables Delete for a selected hit, shows the current length
     bool soundEditorShown() const noexcept { return viewSwitch.getSelectedIndex() == 1; }
+    bool layerViewShown() const noexcept { return viewSwitch.getSelectedIndex() == 2; }
     void timerCallback() override;
     void bindModulationArcs();
 
@@ -84,7 +89,7 @@ private:
     juce::TextButton detectButton { "Detect" };   // runs the detector again with the current settings
     std::vector<KnobDef> knobs;
     std::unique_ptr<juce::FileChooser> chooser;
-    SegmentControl viewSwitch { { "Sequencer", "Sound Editor" }, SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Lcd };
+    SegmentControl viewSwitch { { "Sequencer", "Sound Editor", "Layer" }, SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Lcd };
     LoopWaveform waveform;
     SlicePanel slicePanel;
     PhraseTimeline timelineView;
@@ -92,6 +97,7 @@ private:
     // The Sequencer's toolbar over the timeline.
     juce::Label      lengthCaption { {}, "Length" };
     juce::Label      lengthBox;                   // editable: "2 bars", "6 beats", "3/4"
+    InsertSubsection insertSub;                   // the layer's insert effect (p{N}_drvChar, p{N}_insP1..4)
     DropdownSelect   filterTypeBox;               // the layer's filter type
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> filterTypeAtt;
     DropdownSelect   gridBox;                     // the snap grid

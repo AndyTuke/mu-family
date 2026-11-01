@@ -10,11 +10,33 @@ namespace mu_tilate
 void PhrasePlayback::prepare(double sampleRate, int maxBlock, bool shortWindow)
 {
     player.prepare(sampleRate, maxBlock, shortWindow);
+    layerFilter.prepare(sampleRate, std::max(maxBlock, kFilterPiece), 2);
     reset();
+}
+
+// Renders `len` frames of the player into `view`, then runs the layer's filter over them in short pieces: each piece takes the
+// cutoff the layer sets, moved by the newest slice's offset and filter envelope, so the envelope sweeps the filter inside a block.
+void PhrasePlayback::renderPiece(juce::AudioBuffer<float>& view, int len, const PhraseSettings& s) noexcept
+{
+    const int code = filterCodeOfChoice(s.filterType);
+    if (code < 0) { player.render(view, len); return; }
+    layerFilter.setType(code);
+    for (int off = 0; off < len; off += kFilterPiece)
+    {
+        const int m = std::min(kFilterPiece, len - off);
+        juce::AudioBuffer<float> sub(view.getArrayOfWritePointers(), view.getNumChannels(), off, m);
+        player.render(sub, m);
+        float octaves = 0.0f, resAdd = 0.0f;
+        player.filterModulation(octaves, resAdd);
+        layerFilter.setCutoff(juce::jlimit(20.0f, 20000.0f, s.cutoffHz * std::exp2(octaves)));
+        layerFilter.setResonance(juce::jlimit(0.0f, 1.0f, s.resonance + resAdd));
+        layerFilter.process(sub, m, std::min(2, view.getNumChannels()));
+    }
 }
 
 void PhrasePlayback::reset() noexcept
 {
+    layerFilter.reset();
     player.cut();   // everything, the pre-fade too
     anchored = false;
     cutPending = false;
@@ -22,6 +44,7 @@ void PhrasePlayback::reset() noexcept
 
 void PhrasePlayback::hardReset() noexcept
 {
+    layerFilter.reset();
     player.reset();
     anchored = false;
     cutPending = false;
@@ -35,10 +58,8 @@ SliceParams PhrasePlayback::paramsFor(const PhraseLoop& loop, const PhraseSettin
     const SliceSettings& own = b.own;
     SliceParams p;
     p.own       = own;
-    // The filter is the layer's, moved by this hit's offsets: cutoff in octaves, resonance added.
-    p.own.filterType = juce::jlimit(0, 3, s.filterType);
-    p.own.cutoffHz   = juce::jlimit(20.0f, 20000.0f, s.cutoffHz * std::exp2(own.cutoffOct));
-    p.own.resonance  = juce::jlimit(0.0f, 1.0f, s.resonance + own.resOffset);
+    // The filter is the layer's, run over the layer's output (renderPiece); a slice voice itself does not filter.
+    p.own.filterType = 0;
     p.gain      = s.gain * juce::Decibels::decibelsToGain(juce::jlimit(-24.0f, 12.0f, own.levelDb));
     p.fadeInMs  = s.fadeInMs + own.fadeInMs;
     p.fadeOutMs = s.fadeOutMs + own.fadeOutMs;
@@ -99,7 +120,7 @@ void PhrasePlayback::render(const PhraseLoop& loop, const PhraseSettings& s, con
         || c.beatsPerSample <= 0.0 || loop.timeline->lengthBeats() <= 0.0)
     {
         if (anchored) { player.cut(); anchored = false; cutPending = false; }
-        player.render(out, n);
+        renderPiece(out, n, s);
         return;
     }
 
@@ -182,7 +203,7 @@ void PhrasePlayback::render(const PhraseLoop& loop, const PhraseSettings& s, con
             if (nextFrame > at)
             {
                 juce::AudioBuffer<float> view(out.getArrayOfWritePointers(), out.getNumChannels(), at, nextFrame - at);
-                player.render(view, nextFrame - at);
+                renderPiece(view, nextFrame - at, s);
                 at = nextFrame;
             }
             if (what == PreFade)
