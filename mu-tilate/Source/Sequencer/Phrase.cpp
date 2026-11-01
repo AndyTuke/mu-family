@@ -55,6 +55,7 @@ void Phrase::installLoop(std::shared_ptr<const juce::AudioBuffer<float>> audio, 
     path = newPath;
     displayName = newName;
     auto d = std::make_shared<PhraseData>();
+    d->version = nextPhraseId();
     d->audio = std::move(audio);
     d->fileSampleRate = fileSampleRate;
     const int len = d->audio != nullptr ? d->audio->getNumSamples() : 0;
@@ -63,6 +64,7 @@ void Phrase::installLoop(std::shared_ptr<const juce::AudioBuffer<float>> audio, 
     d->slices   = sameLoop ? pending.slices : SliceList(len);
     d->timeline = pending.timeline;
     attachResampled(*d);
+    d->audioId = nextPhraseId();
     setData(std::move(d));
 }
 
@@ -70,8 +72,10 @@ void Phrase::commitEdit(const SliceList& slices, const Timeline& timeline)
 {
     auto cur = getData();
     auto d = std::make_shared<PhraseData>();
+    d->version = nextPhraseId();
     if (cur != nullptr)
     {
+        d->audioId = cur->audioId;   // the same audio: the sounding slice plays on
         d->audio = cur->audio; d->fileSampleRate = cur->fileSampleRate;
         d->resampled = cur->resampled; d->resampledRate = cur->resampledRate;   // the audio is the same: so is its copy
     }
@@ -110,6 +114,8 @@ void Phrase::applyExtras(const juce::ValueTree& node)
     if (cur != nullptr && cur->audio != nullptr)
     {
         auto d = std::make_shared<PhraseData>();
+        d->version = nextPhraseId();
+        d->audioId = cur->audioId;
         d->audio = cur->audio;
         d->fileSampleRate = cur->fileSampleRate;
         d->resampled = cur->resampled; d->resampledRate = cur->resampledRate;
@@ -130,6 +136,8 @@ void Phrase::prepare(double sampleRate, int blockSize)
         {
             auto d = std::make_shared<PhraseData>(*cur);
             attachResampled(*d);
+            d->version = nextPhraseId();
+            d->audioId = nextPhraseId();   // a new host-rate copy: the voices may point into the old one
             setData(std::move(d));
         }
     }
@@ -140,7 +148,7 @@ void Phrase::prepare(double sampleRate, int blockSize)
     tailScratch.setSize(2, juce::jmax(1, blockSize));
     tailScratch.clear();
     parked = true;
-    lastData = nullptr;
+    lastAudioId = 0;
     lastResolved.reset();   // a prepare is a fresh start: no held modulated values
 }
 
@@ -209,7 +217,7 @@ void Phrase::renderBlock(const PhraseData* d, PhraseClock clock, juce::AudioBuff
 void Phrase::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n)
 {
     // A slot that has just gone live (or was prepared since) starts from silence.
-    if (parked) { playback->hardReset(); lastData = nullptr; lastResolved.reset(); parked = false; }
+    if (parked) { playback->hardReset(); lastAudioId = 0; lastResolved.reset(); parked = false; }
     if (stopRequested) { playback->reset(); stopRequested = false; }
 
     readParams(ctx.startBeat);
@@ -217,7 +225,8 @@ void Phrase::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>&
     // The loop data for this block, or nothing: a miss keeps time without sound, the next block carries on.
     if (! mu_core::trySpinLock(dataLock)) return;
     const PhraseData* d = data.get();
-    if (d != lastData) { playback->hardReset(); lastData = d; }   // the voices point into the old data: drop them
+    const uint64_t audioId = d != nullptr ? d->audioId : 0;
+    if (audioId != lastAudioId) { playback->hardReset(); lastAudioId = audioId; }   // the voices point into the old audio: drop them
 
     PhraseClock clock;
     clock.playing        = ctx.playing != 0;

@@ -34,7 +34,6 @@ target_sources(mu-core INTERFACE
     # Analysis
     "${CMAKE_CURRENT_SOURCE_DIR}/Analysis/OnsetDetector.cpp"   # onset detection for loop slicing
     "${CMAKE_CURRENT_SOURCE_DIR}/Audio/LoopLoader.cpp"   # decodes a whole-loop file for a layer (cap, no resample)
-    "${CMAKE_CURRENT_SOURCE_DIR}/Audio/LoopLoader.cpp"   # decodes a whole loop for a layer that plays one
     # Audio
     "${CMAKE_CURRENT_SOURCE_DIR}/Audio/VoiceEngine.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Audio/InsertProcessor.cpp"

@@ -23,8 +23,19 @@ namespace mu_tilate
 
 // Everything about the loop that is not a parameter: the audio, its sample rate, the slices and the timeline. It is
 // immutable once a layer holds it; an edit builds a new one and hands it to Phrase::setData.
+// A number that is never used twice: the identity of a PhraseData and of its audio. Addresses cannot serve, a freed
+// PhraseData's address can be handed to the next one.
+inline uint64_t nextPhraseId() noexcept
+{
+    static std::atomic<uint64_t> counter { 0 };
+    return counter.fetch_add(1, std::memory_order_relaxed) + 1;
+}
+
 struct PhraseData
 {
+    // Fresh numbers for every new PhraseData; a copy that keeps the audio carries the audio's number over (commitEdit).
+    uint64_t     version = nextPhraseId();   // the editor refreshes when it changes
+    uint64_t     audioId = nextPhraseId();   // the voices are dropped when it changes
     std::shared_ptr<const juce::AudioBuffer<float>> audio;   // shared: an edit of the slices or timeline reuses it
     double       fileSampleRate = 48000.0;
     // The same loop at the host rate when that differs from the file's (a time-stretcher needs it there); the slices stay
@@ -42,8 +53,9 @@ struct PhraseData
 // Threads. The audio thread renders inside the block's layer access. The loop data is shared with the message
 // thread through `data`, guarded by `dataLock`: the audio thread only ever try-locks it for one block (a miss renders
 // nothing and keeps time, as mu-Clid's sample buffer does), the message thread swaps the pointer under it. The voices
-// read the loop's audio by raw pointer, so a block that finds the pointer changed first drops them (hardReset); the
-// old data can therefore be destroyed on the message thread as soon as the swap returns, never on the audio thread.
+// read the loop's audio by raw pointer, so a block that finds the audio's identity changed first drops them (hardReset);
+// the old data can therefore be destroyed on the message thread as soon as the swap returns, never on the audio thread.
+// An edit of the slices or timeline keeps the audio's identity, so the sounding slice plays on through it.
 struct Phrase : Layer
 {
     SlotBound<PhrasePlayback>  playback;   // belongs to the slot: a layer copy never carries two stretchers
@@ -136,7 +148,7 @@ private:
 
     std::shared_ptr<const PhraseData> data;        // guarded by dataLock
     mutable CopyableSpinLock          dataLock;
-    const PhraseData*                 lastData = nullptr;   // audio thread: the data the voices were started from
+    uint64_t                          lastAudioId = 0;      // audio thread: the audio the voices were started from (0 = none)
     std::atomic<double>               loopLengthBeats { -1.0 };
 
     juce::AudioBuffer<float> tailScratch;          // a tail that must add rather than write renders here

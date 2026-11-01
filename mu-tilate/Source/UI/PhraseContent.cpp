@@ -55,6 +55,8 @@ PhraseContent::PhraseContent(PhraseHost& h)
     {
         const int idx = slicePanel.getSlice();
         editSlices([idx, settings](SliceList& sl, Timeline&) { sl.setSettings(idx, settings); });
+        // The panel made this edit: it already shows it, so it must not write the knobs again while one is being dragged.
+        if (const auto now = host.getPhrase(currentLayer).getData(); now != nullptr) shownPanelVersion = now->version;
     };
     slicePanel.onStep = [this](int step)
     {
@@ -67,14 +69,19 @@ PhraseContent::PhraseContent(PhraseHost& h)
     waveform.onMarkerMoved = [this](int idx, int pos)
     {
         editSlices([idx, pos](SliceList& sl, Timeline&) { sl.moveMarker(idx, pos); });
+        refreshViews(true);   // the marker follows the pointer at once, not at the next tick
     };
     waveform.onMarkerAddRequested = [this](int pos)
     {
-        editSlices([pos](SliceList& sl, Timeline& tl)
+        int at = -1;
+        editSlices([&at, pos](SliceList& sl, Timeline& tl)
         {
-            const int at = sl.addMarker(pos);
+            at = sl.addMarker(pos);
             if (at >= 0) tl.sliceInserted(at);
         });
+        // The slices after the new one moved up by one: the selection moves with its slice.
+        if (const int sel = waveform.getSelectedRegion(); at >= 0 && sel >= at) selectSlice(sel + 1);
+        refreshViews(true);
     };
     waveform.onMarkerDeleteRequested = [this](int idx)
     {
@@ -131,11 +138,12 @@ void PhraseContent::refreshSlicePanel(bool force)
     const int sel = waveform.getSelectedRegion();
     if (d == nullptr || d->audio == nullptr || sel < 0 || sel >= d->slices.size())
     {
+        if (sel >= 0) waveform.setSelectedRegion(-1);   // the slices changed under the selection: nothing is selected now
         if (slicePanel.getSlice() != -1) slicePanel.setSlice(-1, {}, {});
         return;
     }
-    if (! force && sel == slicePanel.getSlice() && d.get() == shownPanelData) return;
-    shownPanelData = d.get();
+    if (! force && sel == slicePanel.getSlice() && d->version == shownPanelVersion) return;
+    shownPanelVersion = d->version;
     const auto r = d->slices.slice(sel);
     slicePanel.setSlice(sel, d->slices.settings(sel),
                         "Slice " + juce::String(sel + 1) + " of " + juce::String(d->slices.size()) + "   "
@@ -149,12 +157,13 @@ void PhraseContent::refreshViews(bool force)
     const auto d = host.getPhrase(currentLayer).getData();
     const double tempo = (double) apvts.getRawParameterValue(layerParamPrefix(currentLayer) + ppi::suffix[ppi::ltempo])->load();
     timelineView.setGridBeats(gridBeats((int) apvts.getRawParameterValue(layerParamPrefix(currentLayer) + ppi::suffix[ppi::grid])->load()));
-    if (! force && d.get() == shownData && tempo == shownTempo) return;
-    shownData = d.get();
+    const uint64_t version = d != nullptr ? d->version : 0;
+    if (! force && version == shownVersion && tempo == shownTempo) return;
+    shownVersion = version;
     shownTempo = tempo;
     if (d == nullptr || d->audio == nullptr)
     {
-        shownAudio = nullptr;
+        shownAudioId = 0;
         waveform.setAudio(nullptr);
         waveform.setMarkers({});
         timelineView.setTimeline(Timeline(), {});
@@ -166,7 +175,7 @@ void PhraseContent::refreshViews(bool force)
     for (int i = 0; i < d->slices.size(); ++i)
         beats.push_back((double) d->slices.slice(i).length() / d->fileSampleRate * tempo / 60.0);
     timelineView.setTimeline(d->timeline, std::move(beats));
-    if (d->audio.get() != shownAudio) { shownAudio = d->audio.get(); waveform.setAudio(d->audio); }
+    if (d->audioId != shownAudioId) { shownAudioId = d->audioId; waveform.setAudio(d->audio); }
     std::vector<LoopWaveform::Marker> markers;
     for (int i = 0; i < d->slices.size(); ++i) markers.push_back({ d->slices.marker(i).position, d->slices.marker(i).pinned });
     waveform.setMarkers(std::move(markers));
@@ -207,7 +216,7 @@ void PhraseContent::setLayer(int idx)
     detectAtt = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, prefix + ppi::suffix[ppi::dmethod], detectBox.getComboBox());
 
     bindModulationArcs();
-    shownData = nullptr; shownAudio = nullptr; shownPanelData = nullptr;   // another layer's loop: show it afresh
+    shownVersion = ~(uint64_t) 0; shownAudioId = 0; shownPanelVersion = ~(uint64_t) 0;   // another layer's loop: show it afresh
     selectSlice(-1);
     timerCallback();
     repaint();
@@ -234,11 +243,12 @@ void PhraseContent::bindModulationArcs()
 void PhraseContent::chooseLoop()
 {
     chooser = std::make_unique<juce::FileChooser>("Load a loop", juce::File(), "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
+    const int layer = currentLayer;   // the layer the dialog was opened for, not the one showing when it closes
     chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                         [this](const juce::FileChooser& fc)
+                         [this, layer](const juce::FileChooser& fc)
                          {
                              const auto f = fc.getResult();
-                             if (f.existsAsFile()) host.loadLoopAsync(currentLayer, f);
+                             if (f.existsAsFile()) host.loadLoopAsync(layer, f);
                          });
 }
 

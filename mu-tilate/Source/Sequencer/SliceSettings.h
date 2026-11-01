@@ -3,6 +3,9 @@
 // What one slice plays like (docs/mu-tilate/design-ui.md, "Slice player"): the settings the slice player panel edits for the
 // selected slice, kept with the slice's marker so they follow it when markers are added, moved or removed. Plain values, saved
 // with the session. The defaults are neutral: a slice with default settings plays as the source.
+#include <algorithm>
+#include <cmath>
+
 namespace mu_tilate
 {
 
@@ -41,5 +44,12 @@ struct SliceSettings
     int   chokeGroup = 0;       // 0 = none; a slice cuts any sounding slice of the same group
 
 };
+
+// The pitch settings as a rate: source samples per output sample (1 = unchanged), semitones and cents clamped to their ranges.
+inline double pitchRatio(const SliceSettings& s) noexcept
+{
+    const double semis = std::clamp((double) s.pitchSemi, -24.0, 24.0) + std::clamp((double) s.fineCents, -100.0, 100.0) / 100.0;
+    return std::exp2(semis / 12.0);
+}
 
 } // namespace mu_tilate

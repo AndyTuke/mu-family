@@ -24,6 +24,23 @@ struct PhraseStateTests : public juce::UnitTest
 
     void runTest() override
     {
+        beginTest("an edit keeps the audio's identity and gets a new version, a new loop gets both");
+        {
+            Phrase ph;
+            auto audio = std::make_shared<juce::AudioBuffer<float>>(1, 4800);
+            audio->clear();
+            ph.installLoop(audio, 48000.0, "a.wav", "a");
+            const auto first = ph.getData();
+            ph.commitEdit(first->slices, first->timeline);
+            const auto edited = ph.getData();
+            expect(edited->audioId == first->audioId);                    // the sounding slice plays on through an edit
+            expect(edited->version != first->version);                    // but the editor sees it changed
+            ph.installLoop(audio, 48000.0, "a.wav", "a");                 // even the same buffer again is a new loop
+            const auto again = ph.getData();
+            expect(again->audioId != first->audioId);
+            expect(again->version != edited->version);
+        }
+
         beginTest("per-slice settings round-trip, and a slice cut from another starts with its settings");
         {
             PhraseState in;

@@ -19,6 +19,7 @@ void PhraseTimeline::setTimeline(const Timeline& t, std::vector<double> beats)
     timeline = t;
     sliceBeatsList = std::move(beats);
     if (selected >= timeline.size()) selected = -1;
+    if (dragBlock >= timeline.size()) { dragBlock = -1; resizing = false; }   // the timeline shrank under a drag
     if (timeline.lengthBeats() != lastLength) { lastLength = timeline.lengthBeats(); viewBeats = 0.0; viewStart = 0.0; }   // a new length: show all of it
     clampView();
     repaint();
@@ -28,13 +29,20 @@ void PhraseTimeline::setSelectedBlock(int i)   { selected = i; repaint(); }
 void PhraseTimeline::setPlayheadBeats(double b)
 {
     if (b == playhead) return;
+    const double before = playhead;
     playhead = b;
 
-    // While playing, page the view on when the playhead leaves it.
-    if (playhead >= 0.0 && viewBeats > 0.0 && viewBeats < timeline.lengthBeats() - 1.0e-9)
+    // While playing, page the view on when the playhead walks out of it (or starts outside it). A playhead that was already
+    // outside, because the user scrolled away, leaves the view alone.
+    const double L = timeline.lengthBeats();
+    if (playhead >= 0.0 && viewBeats > 0.0 && viewBeats < L - 1.0e-9)
     {
-        const double p = std::fmod(playhead, timeline.lengthBeats());
-        if (p < viewStart || p >= viewStart + viewBeats) { viewStart = std::floor(p / viewBeats) * viewBeats; clampView(); }
+        auto inside = [&](double beat) { const double p = std::fmod(beat, L); return p >= viewStart && p < viewStart + viewBeats; };
+        if (! inside(playhead) && (before < 0.0 || inside(before)))
+        {
+            viewStart = std::floor(std::fmod(playhead, L) / viewBeats) * viewBeats;
+            clampView();
+        }
     }
     repaint();
 }
@@ -191,19 +199,19 @@ void PhraseTimeline::mouseDrag(const juce::MouseEvent& e)
     const double grid = e.mods.isAltDown() ? 0.0 : gridBeats;
     const double target = Timeline::snap(beatAt(e.x) - grabOffset, grid);
     const double current = timeline.blocks()[(size_t) dragBlock].start;
-    if (std::abs(target - current) < 1.0e-9 && ! (e.mods.isCtrlDown() && ! dragMoved)) return;
+
+    // Ctrl-drag copies once, at the first move; the drag then carries the copy (a copy per grid step would leave a trail).
+    const bool copy = e.mods.isCtrlDown() && ! dragMoved;
+    if (std::abs(target - current) < 1.0e-9 && ! copy) return;
 
     const int from = dragBlock;
-    const bool copy = e.mods.isCtrlDown();
     int movedTo = -1;
     onEdit([&](Timeline& t) { movedTo = copy ? t.copy(from, target, 0.0) : t.move(from, target, 0.0); });
-    if (movedTo >= 0 && ! copy)
+    if (movedTo >= 0)
     {
         dragBlock = movedTo; selected = movedTo;   // the timeline republishes; the block we hold is at its new index
         dragMoved = true;
     }
-    else if (copy)
-        dragMoved = true;
 }
 
 void PhraseTimeline::mouseUp(const juce::MouseEvent&)

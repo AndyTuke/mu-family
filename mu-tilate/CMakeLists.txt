@@ -16,7 +16,6 @@ target_sources(mu-tilate-layer INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/PhrasePlayback.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/Phrase.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/PhraseAnalysis.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/PhraseAnalysis.cpp"
 )
 target_include_directories(mu-tilate-layer INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
 # Signalsmith Stretch (MIT, header-only) and its FFT library; SYSTEM so their warnings stay out of ours.
@@ -72,6 +71,7 @@ target_compile_definitions(mu-tilate
     PUBLIC
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
+        JUCE_USE_MP3AUDIOFORMAT=1   # the loop chooser offers .mp3
         JUCE_VST3_CAN_REPLACE_VST2=0
         "MU_VERSION_BASE=\"${MUFAMILY_PRE_VERSION_BASE}\""   # pre-release line shown in About
 )
@@ -141,10 +141,8 @@ target_sources(mu-tilate-tests PRIVATE
     Source/Plugin/PluginProcessor_Preset.cpp
     # The mu-core .cpps behind ProcessorBase (the console target cannot link mu-core directly).
     ${MU_CORE_PROCESSOR_TEST_SOURCES}
-    Source/Tests/PhraseLoadTests.cpp   # loop decode and cap, detection into slices
     # mu-core's detector (the plugin targets get it through mu-core; a console target lists it).
     "${CMAKE_SOURCE_DIR}/mu-core/Analysis/OnsetDetector.cpp"
-    "${CMAKE_SOURCE_DIR}/mu-core/Audio/LoopLoader.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/LoopLoader.cpp"
     # What the modulation-table checks need (as mu-toni-layer-tests lists them).
     "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"
@@ -173,5 +171,5 @@ target_link_libraries(mu-tilate-tests PRIVATE
     juce::juce_recommended_warning_flags
 )
 
-target_compile_definitions(mu-tilate-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0
+target_compile_definitions(mu-tilate-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0 JUCE_USE_MP3AUDIOFORMAT=1
     JUCE_MODAL_LOOPS_PERMITTED=1)   # the processor tests pump the message loop while a loop loads

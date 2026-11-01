@@ -218,6 +218,53 @@ struct PhraseTests : public juce::UnitTest
             expectWithinAbsoluteError(out.getSample(0, 96000 + 50), 0.2f, 1.0e-5f);
         }
 
+        beginTest("a block on the downbeat fires when a call starts a hair before the timeline's end");
+        {
+            Rig r;
+            r.timeline.place(2, 0.0, 0.0);                                // slice 2 (0.3) on the downbeat
+            for (double early : { 1.0e-12, 1.0e-10, 3.0e-12 })
+            {
+                Rig q;
+                q.timeline.place(2, 0.0, 0.0);
+                auto out = q.run(2000, 256, 4.0 - early);                 // the timeline is 4 beats long
+                expectWithinAbsoluteError(out.getSample(0, 100), 0.3f, 1.0e-5f);
+            }
+        }
+
+        beginTest("a stretched slice's transient hold does not depend on the host block size");
+        {
+            auto make = [](Rig& r)
+            {
+                for (int i = 0; i < 24000; ++i) r.audio.setSample(0, i, 0.5f * std::sin(2.0f * juce::MathConstants<float>::pi * 440.0f * (float) i / (float) kSr));
+                r.settings.mode = TempoMode::Stretch; r.settings.loopTempo = 120.0; r.settings.holdMs = 10.0f;
+                r.timeline.place(0, 0.0, 0.0);
+            };
+            Rig a, b;
+            make(a); make(b);
+            auto small = a.run(6000, 64, 0.0, 100.0);
+            auto large = b.run(6000, 1024, 0.0, 100.0);
+            double worst = 0.0;
+            for (int i = 0; i < 6000; ++i) worst = std::max(worst, (double) std::abs(small.getSample(0, i) - large.getSample(0, i)));
+            expectLessThan(worst, 0.02);
+        }
+
+        beginTest("a pre-fade of a slice that plays backwards swells in the end of the slice");
+        {
+            auto build = [](bool reversed)
+            {
+                auto r = std::make_unique<Rig>();
+                for (int i = 0; i < 24000; ++i) r->audio.setSample(0, 24000 + i, 0.1f + 0.8f * (float) i / 24000.0f);   // slice 1 rises 0.1 -> 0.9
+                r->timeline.place(1, 2.0, 0.0);
+                SliceSettings own; own.preFade = true; own.preLengthMs = 100.0f; own.preLevelDb = -6.0f; own.reverse = reversed;
+                r->slices.setSettings(1, own);
+                return r;
+            };
+            auto fwd = build(false), rev = build(true);
+            auto a = fwd->run(96000, 512), b = rev->run(96000, 512);
+            expectLessThan(a.getSample(0, 47990), 0.1f);                  // forwards: the swell is the start of the slice (about 0.1)
+            expectGreaterThan(b.getSample(0, 47990), 0.3f);               // backwards: the swell is its end (about 0.9)
+        }
+
         beginTest("a transport jump re-anchors: the old slice fades and the new position plays");
         {
             Rig r;

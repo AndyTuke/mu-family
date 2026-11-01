@@ -75,12 +75,13 @@ void SlicePlayer::triggerPre(const juce::AudioBuffer<float>* src, SliceRange ran
     range.end   = juce::jlimit(range.start, src->getNumSamples(), range.end);
     if (range.length() <= 0 || src->getNumChannels() <= 0) return;
 
-    const double pitch = std::exp2((double) (juce::jlimit(-24.0f, 24.0f, p.own.pitchSemi) + juce::jlimit(-100.0f, 100.0f, p.own.fineCents) / 100.0f) / 12.0);
+    const double pitch = pitchRatio(p.own);
     Voice v;
     v.src = src;
     v.range = range;
-    v.step = -(double) std::max(0.01f, p.rate) * pitch;
-    v.pos = (double) (range.end - 1);
+    // Played backwards ending at the slice's first sample; for a slice that itself plays backwards, forwards ending at its last.
+    v.step = (p.reverse ? 1.0 : -1.0) * (double) std::max(0.01f, p.rate) * pitch;
+    v.pos = p.reverse ? (double) range.start : (double) (range.end - 1);
     v.gain = p.gain;
     v.cutStep = cutStep;
     v.swell = true;
@@ -176,7 +177,7 @@ void SlicePlayer::trigger(const juce::AudioBuffer<float>* src, SliceRange range,
     }
 
     // The pitch settings as a rate: semitones and cents. A stretched slice takes them as the stretcher's transposition.
-    const double pitch = std::exp2((double) (juce::jlimit(-24.0f, 24.0f, p.own.pitchSemi) + juce::jlimit(-100.0f, 100.0f, p.own.fineCents) / 100.0f) / 12.0);
+    const double pitch = pitchRatio(p.own);
     const float rate = std::max(0.01f, p.rate);
     Voice v;
     v.own = p.own;
@@ -278,9 +279,12 @@ void SlicePlayer::render(juce::AudioBuffer<float>& out, int n) noexcept
     // Each voice runs the block in chunks no larger than the prepared size (the stretch scratch is sized by it).
     for (auto& v : voices)
     {
-        for (int done = 0; done < n && v.active; done += maxBlock)
+        for (int done = 0, len = 0; done < n && v.active; done += len)
         {
-            const int len = std::min(maxBlock, n - done);
+            len = std::min(maxBlock, n - done);
+            // The stretcher is primed at the end of the first chunk, which must be where the hold ends: otherwise the dry
+            // head would last as long as the host block happens to be.
+            if (v.stretcher >= 0 && ! v.primed && v.holdSamples > v.age) len = std::min(len, v.holdSamples - v.age);
             if (v.stretcher >= 0) renderStretched(v, out, done, len);
             else                  renderNative(v, out, done, len);
         }
@@ -301,7 +305,9 @@ void SlicePlayer::renderNative(Voice& v, juce::AudioBuffer<float>& out, int offs
         {
             if (! v.loop) { v.active = false; break; }
             const double len = (double) v.range.length();
-            v.pos += v.step > 0.0 ? -len : len;
+            double rel = std::fmod(v.pos - (double) v.range.start, len);   // a step longer than the slice wraps more than once
+            if (rel < 0.0) rel += len;
+            v.pos = (double) v.range.start + rel;
             if (! inRange(v)) { v.active = false; break; }
         }
 

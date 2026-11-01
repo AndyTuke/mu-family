@@ -76,11 +76,12 @@ bool PhrasePlayback::preFor(const PhraseLoop& loop, const PhraseSettings& s, con
     const auto& own = pre.params.own;
 
     // The pre-fade is the first part of the slice played backwards, as long as asked (output time) or as the slice allows.
-    const double step = std::max(0.01, (double) pre.params.rate * std::exp2((double) (own.pitchSemi + own.fineCents / 100.0f) / 12.0));
+    const double step = std::max(0.01, (double) std::max(0.01f, pre.params.rate) * pitchRatio(own));
     const double wanted = (double) juce::jlimit(10.0f, 1000.0f, own.preLengthMs) * 0.001 * c.sampleRate * step;   // in source samples
     const int src = (int) std::min((double) whole.length(), wanted);
     if (src < 2) return false;
-    pre.range = { whole.start, whole.start + src };
+    // The pre-fade is the first part of what the slice will play: its start, or its end when the slice plays backwards.
+    pre.range = pre.params.reverse ? SliceRange { whole.end - src, whole.end } : SliceRange { whole.start, whole.start + src };
     pre.duration = std::max(1, (int) std::lround((double) src / step));
     pre.params.gain *= juce::Decibels::decibelsToGain(juce::jlimit(-36.0f, 0.0f, own.preLevelDb));
     return true;
@@ -118,6 +119,7 @@ void PhrasePlayback::render(const PhraseLoop& loop, const PhraseSettings& s, con
         const double absBeat = c.startBeat + (double) done * bps;
         double pos = std::fmod(absBeat, L);
         if (pos < 0.0) pos += L;
+        if (pos > L - 1.0e-9) pos = 0.0;   // a hair below the end is the downbeat: its block must fire, not be skipped
         const int toWrap = std::max(1, (int) std::ceil((L - pos) / bps - 1.0e-9));
         const int segEnd = std::min(n, done + toWrap);
         const double segEndPos = pos + (double) (segEnd - done) * bps;

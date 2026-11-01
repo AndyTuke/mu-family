@@ -79,9 +79,10 @@ private:
     SlicePanel slicePanel;
     PhraseTimeline timelineView;
     double shownTempo = -1.0;                     // the loop tempo the timeline's block lengths were computed for
-    const void* shownData = nullptr;              // the PhraseData the waveform last showed (identity only)
-    const void* shownAudio = nullptr;
-    const void* shownPanelData = nullptr;         // the PhraseData the slice player last showed
+    // What the views last showed, by identity number (a freed PhraseData's address can be reused, a number never is).
+    uint64_t shownVersion = ~(uint64_t) 0;        // the PhraseData the waveform and timeline last showed
+    uint64_t shownAudioId = 0;                    // the audio the waveform last drew
+    uint64_t shownPanelVersion = ~(uint64_t) 0;   // the PhraseData the slice player last showed
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhraseContent)
 };

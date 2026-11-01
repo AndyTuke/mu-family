@@ -105,6 +105,19 @@ struct SliceShapingTests : public juce::UnitTest
             expect(! sp.isActive());
         }
 
+        beginTest("a looping slice shorter than the step keeps playing");
+        {
+            juce::AudioBuffer<float> src(1, 100);
+            for (int i = 0; i < 100; ++i) src.setSample(0, i, 0.5f);
+            SlicePlayer sp; sp.prepare(kSr);
+            auto p = plain(); p.own.loop = true; p.own.pitchSemi = 24.0f;   // four source samples per output sample
+            sp.trigger(&src, { 10, 13 }, p);                                // three samples long
+            juce::AudioBuffer<float> out(1, 200); out.clear();
+            sp.render(out, 200);
+            expect(sp.isActive());
+            expectGreaterThan(out.getSample(0, 150), 0.1f);
+        }
+
         beginTest("a pre-fade is a voice of its own: a slice trigger and a slice cut leave it playing");
         {
             auto src = constant(9600, 0.5f);

@@ -155,7 +155,7 @@ void PluginProcessor::redetectSlices(int layer)
     if (layer < 0 || layer >= mu_limits::kMaxLayers) return;
     const auto data = getPhrase(layer).getData();
     if (data == nullptr || data->audio == nullptr) return;
-    const int gen = loopGeneration[(size_t) layer].fetch_add(1) + 1;
+    const int gen = detectGeneration[(size_t) layer].fetch_add(1) + 1;
     const auto detect = detectSettingsOf(layer);
     const double loopTempo = (double) apvts.getRawParameterValue(layerParamPrefix(layer) + ppi::suffix[ppi::ltempo])->load();
     auto flag = alive;
@@ -166,9 +166,9 @@ void PluginProcessor::redetectSlices(int layer)
         auto slices = std::make_shared<SliceList>(detectSlices(curve, *data->audio, detect, &data->slices));
         juce::MessageManager::callAsync([this, layer, gen, data, slices, loopTempo, flag]
         {
-            if (! flag->load() || loopGeneration[(size_t) layer].load() != gen) return;
+            if (! flag->load() || detectGeneration[(size_t) layer].load() != gen) return;   // gone, or a newer Detect
             auto& ph = getPhrase(layer);
-            if (ph.getData() == nullptr || ph.getData()->audio != data->audio) return;   // another loop arrived meanwhile
+            if (ph.getData() == nullptr || ph.getData()->audioId != data->audioId) return;   // another loop arrived meanwhile
             const double total = layOutInOrder(layer, *slices, data->fileSampleRate, loopTempo);
             loopStatus[(size_t) layer] = ph.loopName() + ": " + juce::String(slices->size()) + " slices, "
                                        + juce::String(total, 1) + " beats at " + juce::String(loopTempo, 0) + " BPM";
@@ -229,9 +229,9 @@ void PluginProcessor::loadLoopAsync(int layer, const juce::File& file, bool keep
             double total = 0.0;
             if (! keep)
                 total = layOutInOrder(layer, *slices, loaded->sampleRate, tempo);
-            else
-                for (int i = 0; i < slices->size(); ++i)
-                    total += (double) slices->slice(i).length() / loaded->sampleRate * tempo / 60.0;
+            else if (const auto kept = ph.getData(); kept != nullptr)   // the restored slices, not the freshly detected ones
+                for (int i = 0; i < kept->slices.size(); ++i)
+                    total += (double) kept->slices.slice(i).length() / loaded->sampleRate * tempo / 60.0;
             const auto shown = ph.getData();
             loopStatus[(size_t) layer] = loaded->name + ": " + juce::String(shown != nullptr ? shown->slices.size() : 0) + " slices, "
                                        + juce::String(total, 1) + " beats at " + juce::String(tempo, estimated ? 1 : 0) + " BPM"

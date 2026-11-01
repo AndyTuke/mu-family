@@ -118,6 +118,8 @@ private:
     // Loop loading: a generation per layer (a newer request supersedes an older one), the status line, and a flag the
     // worker's completion checks so it never touches a processor that is gone.
     std::array<std::atomic<int>, (size_t) mu_limits::kMaxLayers> loopGeneration {};
+    // Detect has its own count, so it neither cancels a loop being loaded nor is cancelled by a load's start.
+    std::array<std::atomic<int>, (size_t) mu_limits::kMaxLayers> detectGeneration {};
     std::array<juce::String, (size_t) mu_limits::kMaxLayers>     loopStatus;   // message thread
     std::shared_ptr<std::atomic<bool>> alive = std::make_shared<std::atomic<bool>>(true);
 
