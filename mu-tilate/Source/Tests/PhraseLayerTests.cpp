@@ -104,6 +104,42 @@ struct PhraseLayerTests : public juce::UnitTest
             expectWithinAbsoluteError(r.out.getSample(1, 100), 0.3f, 1.0e-3f);   // mono source in both channels
         }
 
+        beginTest("a loop replaced twice between two blocks never leaks the old audio into the next one");
+        {
+            auto constant = [](float v)
+            {
+                auto d = makeData({ 0, 1, 2, 3 });
+                auto a = std::make_shared<juce::AudioBuffer<float>>(1, 96000);
+                for (int i = 0; i < 96000; ++i) a->setSample(0, i, v);
+                d->audio = a;
+                return d;
+            };
+            Rig r;
+            r.layer.setData(constant(0.9f));
+            r.block(); r.block();                                    // voices are playing the 0.9 loop
+            expectGreaterThan(r.out.getMagnitude(0, kBlock), 0.8f);
+            r.layer.setData(constant(0.5f));                         // two swaps, no block between: the first loop is freed, and its
+            r.layer.setData(constant(0.2f));                         // address may be handed to the next data
+            float peak = 0.0f;                                       // nothing sounds until the next slice starts (beat 1): run past it
+            for (int i = 0; i < 110; ++i) { r.block(); peak = std::max(peak, r.out.getMagnitude(0, kBlock)); }
+            expectLessOrEqual(peak, 0.2f + 1.0e-3f);                 // only the newest loop is heard
+            expectGreaterThan(peak, 0.1f);
+        }
+
+        beginTest("an edit of the slices leaves the sounding slice playing; a new loop does not");
+        {
+            Rig r;
+            auto d = makeData({ 3, 3, 3, 3 });
+            r.layer.setData(d);
+            r.block();
+            expectGreaterThan(r.out.getMagnitude(0, kBlock), 0.3f);  // slice 3 sounds
+            auto cur = r.layer.getData();
+            r.layer.commitEdit(cur->slices, cur->timeline);          // same audio: the slice plays on, no dropout in the next block
+            r.block();
+            expectWithinAbsoluteError(r.out.getSample(0, 5), r.out.getSample(0, 6), 1.0e-3f);   // continuous, not restarted or silent
+            expectGreaterThan(r.out.getMagnitude(0, kBlock), 0.3f);
+        }
+
         beginTest("level and fades come from the parameters");
         {
             Rig r;

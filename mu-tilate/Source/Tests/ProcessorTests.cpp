@@ -177,6 +177,50 @@ struct ProcessorTests : public juce::UnitTest
             expect(b.getPhrase(0).loadedLoopPath().endsWith("bursts.wav"));
         }
 
+        beginTest("a layer preset loaded onto a layer brings in the loop it names, onto an empty layer or one holding another");
+        {
+            juce::ValueTree tree;
+            {
+                PluginProcessor a;
+                a.prepareToPlay(kSr, kBlock);
+                a.loadLoopAsync(0, file);
+                expect(pumpUntil([&] { return a.getPhrase(0).getData() != nullptr && a.getPhrase(0).getData()->timeline.size() > 0; }));
+                tree = a.captureLayerPresetTree(0);
+            }
+            expect(tree.isValid());
+            const auto preset = storage.root.getChildFile("layer.muPhrase");
+            if (auto xml = tree.createXml()) preset.replaceWithText(xml->toString());
+
+            // Onto an empty layer.
+            {
+                PluginProcessor b;
+                b.prepareToPlay(kSr, kBlock);
+                b.loadLayerPreset(0, preset);
+                expect(pumpUntil([&] { return b.getPhrase(0).getData() != nullptr && b.getPhrase(0).getData()->audio != nullptr
+                                           && b.getPhrase(0).getData()->audio->getNumSamples() == 96000; }), "the preset's loop did not load onto an empty layer");
+            }
+
+            // Onto a layer holding a shorter loop.
+            {
+                juce::AudioBuffer<float> sb(1, 48000);
+                sb.clear();
+                const auto other = storage.root.getChildFile("other2.wav");
+                {
+                    juce::WavAudioFormat wav;
+                    std::unique_ptr<juce::OutputStream> stream(other.createOutputStream());
+                    if (auto w = wav.createWriterFor(stream, juce::AudioFormatWriterOptions {}.withSampleRate(kSr).withNumChannels(1).withBitsPerSample(16)))
+                        w->writeFromAudioSampleBuffer(sb, 0, 48000);
+                }
+                PluginProcessor b;
+                b.prepareToPlay(kSr, kBlock);
+                b.loadLoopAsync(0, other);
+                expect(pumpUntil([&] { return b.getPhrase(0).getData() != nullptr && b.getPhrase(0).getData()->audio != nullptr; }));
+                b.loadLayerPreset(0, preset);
+                expect(pumpUntil([&] { return b.getPhrase(0).getData() != nullptr && b.getPhrase(0).getData()->audio != nullptr
+                                           && b.getPhrase(0).getData()->audio->getNumSamples() == 96000; }), "the preset's loop did not replace the other one");
+            }
+        }
+
         // Not a check: with MU_TILATE_DEMO_LOOP (a loop file), MU_TILATE_DEMO_TEMPO (its tempo) and MU_TILATE_DEMO_OUT (a folder)
         // set, renders the loop at a faster project tempo in the three tempo modes to WAV files, to be listened to.
         const auto demoLoop = juce::SystemStats::getEnvironmentVariable("MU_TILATE_DEMO_LOOP", {});
