@@ -24,14 +24,20 @@ Facts (sources in brackets):
 - Free-running tape loop, one record head and three playback heads, a variable-speed motor, and a built-in spring reverb; the RE-201 was the first Space Echo to include the reverb. [Wikipedia: Roland Space Echo](https://en.wikipedia.org/wiki/Roland_Space_Echo), [Gearnews](https://www.gearnews.com/roland-space-echo-re-201)
 - Controls: Repeat Rate, Intensity, Echo Volume, Reverb Volume, Bass, Treble, and the Mode Selector. [Sound On Sound, RE-202/RE-2 review](https://www.soundonsound.com/reviews/boss-space-echo-re-202-re-2)
 - Mode Selector: 12 positions. Modes 1 to 4 are echo only; modes 5 to 11 add spring reverb to the echo; mode 12 is reverb only. [Sound On Sound](https://www.soundonsound.com/reviews/boss-space-echo-re-202-re-2), [MusicRadar producer's guide](https://musicradar.com/news/producers-guide-roland-space-echo)
-- Head map as reported: modes 1 to 3 use heads 1, 2, 3 singly; mode 4 uses heads 2 and 3; modes 8 to 10 are two-head combinations with reverb; mode 11 is all three with reverb. Sources disagree on the exact map, and one source puts the reverb-only position at 6 o'clock. UNVERIFIED: the full 12-position table. The Boss RE-2 manual is said to show 11 of the 12 head combinations and is the best next reference.
+- Head map (MusicRadar producer's guide, from the Boss RE-2 manual; consistent with the RE-201 service-manual mode table Andy supplied 2026-11-01): modes 1 to 3 use heads 1, 2, 3 singly; mode 4 uses heads 2 and 3; modes 5 to 7 are heads 1, 2, 3 singly plus reverb; modes 8 to 10 are two-head combinations plus reverb; mode 11 is all three heads plus reverb; mode 12 is reverb only (6 o'clock). The exact two-head pairs in 8 to 10 are still to be read off a zoomed crop of the service-manual table.
+- The three playback heads are equally spaced, so head 2 gives twice and head 3 three times head 1's delay. Repeat Rate (tape speed) scales all three together. [MusicRadar producer's guide]
+- Intensity at minimum gives a single repeat; at maximum the repeats never die away (self-oscillation), and the swell can be ridden with the rate control for pitch effects. [MusicRadar]
+- The input drive saturates the signal going onto tape, so it colours only the repeats, not the dry signal. [MusicRadar, Arturia Delay Tape 201 tutorial]
+- Echo Volume is the echo mix control; with the dry level down you hear only the echo. Reverb Volume is a separate mix for the spring. [MusicRadar]
+- Inputs: two mic inputs, an instrument input and a PA line input, each with its own level. [MusicRadar; service manual J1 to J4]
+- Service manual (RE-201 / OP-13 record amp, OP-14B playback amp, Z-3F spring unit), my reading at the supplied resolution: the spring is driven from the record-amp side through a driver stage and a transformer, and returns through a single-chip recovery amp (TA-7200P) to a level control (VR10 trimmer, VR9 user Reverb); the spring is therefore a separate send/return outside the tape loop, and echo repeats do not feed it. The playback amp feeds Intensity, Echo, Bass (VR7) and Treble (VR8) stages. Later production changes: C40 0.0022 uF added and R54 100 kOhm added around the spring, C26 100 pF changed to 47 pF. To be confirmed against a zoomed crop.
 - Repeat Rate changes tape speed, which changes the delay time and the pitch of repeats. Tone shifts with delay time. [Sound On Sound](https://www.soundonsound.com/reviews/boss-space-echo-re-202-re-2)
 - Intensity is feedback; at maximum it runs away into dub-style oscillation. [Sound On Sound](https://www.soundonsound.com/reviews/boss-space-echo-re-202-re-2)
 - The spring reverb is short with a "noticeably metallic" character. [Sound On Sound](https://www.soundonsound.com/reviews/boss-space-echo-re-202-re-2)
 - The RE-201's maximum delay is half that of the RE-202/RE-2. [Sound On Sound](https://www.soundonsound.com/reviews/boss-space-echo-re-202-re-2)
 - The original has tape hiss, which the Boss models omit. [Sound On Sound](https://www.soundonsound.com/reviews/boss-space-echo-re-202-re-2)
 
-UNVERIFIED (no source found): exact delay times in ms per head and speed; spring tank length, decay time (RT60) and bandwidth; whether the reverb send is taken before or after the tape loop, and whether echo repeats feed the tank (the Wikipedia article says the user sets "the ratio of the echo and reverb sounds", which suggests a parallel send, but this is not a circuit fact); Bass/Treble corner frequencies. I would not put numbers on these until we find a schematic or measure a unit.
+UNVERIFIED: exact delay times in ms per head and speed; spring tank length, decay time (RT60) and bandwidth (mechanical, not on the schematic); Bass/Treble corner frequencies (derivable from the OP-14B tone network once its component values are read from a zoomed crop). The reverb send position is now read from the schematic as record-side and outside the tape loop (see above), pending that crop.
 
 Emulations:
 
@@ -99,4 +105,6 @@ Honest summary: ours is a good generic tape echo, not an RE-201 model. Adding a 
 4. Should the reverb be mono-in with a stereo spread, or fully stereo?
 5. Do you have a real RE-201 or the RE-2/RE-202 to compare against? Without a reference or service manual, decay time and tank bandwidth will be set by ear.
 6. Is the "boing" at extremes (a loud, exaggerated drip) wanted, or a tamer vintage tone?
-7. May I spend a research pass on the original schematic or a service manual to settle the reverb-send position and the Bass/Treble corners?
+7. Andy supplied the service-manual schematic (2026-11-01), which settles the reverb-send position and the mode table. May I read the Bass/Treble corners and the spring recovery-amp network from a zoomed crop (a higher-resolution scan of the OP-14B and Z-3F areas would help)?
+
+Answers from the new sources: with the mode table known, question 2 is now cheap to answer either way. A 12-position Mode parameter is a lookup of which of three equally spaced taps are on plus a reverb flag, and the tape echo already has the loop and feedback.
