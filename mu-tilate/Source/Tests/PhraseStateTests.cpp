@@ -27,6 +27,60 @@ struct PhraseStateTests : public juce::UnitTest
 
     void runTest() override
     {
+        beginTest("settings stay with their markers through add, move, remove and a re-detect");
+        {
+            SliceList sl(96000);
+            sl.applyDetected({ 24000, 48000 });                           // slices at 0, 24000, 48000
+            SliceSettings a; a.reverse = true; a.levelDb = -3.0f;
+            SliceSettings b; b.pitchSemi = 5.0f;
+            sl.setSettings(1, a); sl.setSettings(2, b);
+
+            sl.moveMarker(1, 26000);                                      // moving a marker keeps its slice's settings
+            expect(sl.settings(1).reverse);
+            expect(sl.removeMarker(1));                                   // removing slice 1 takes its settings with it
+            expectEquals(sl.size(), 2);
+            expectEquals(sl.settings(1).pitchSemi, 5.0f);                 // the old slice 2 is slice 1 now
+            expect(! sl.settings(1).reverse);
+
+            const int at = sl.addMarker(60000);                           // cut slice 1: the new slice starts like it
+            expectEquals(sl.settings(at).pitchSemi, 5.0f);
+            sl.applyDetected({ 10000 });                                  // the hand-placed (pinned) marker survives, with its settings
+            const int idx = sl.indexAt(60000);
+            expectEquals(sl.marker(idx).position, 60000);
+            expectEquals(sl.settings(idx).pitchSemi, 5.0f);
+        }
+
+        beginTest("saved slices apply only to a loop of the length they were made on");
+        {
+            PhraseState in;
+            in.loopLength = 96000;
+            in.slices = SliceList(96000);
+            in.slices.applyDetected({ 24000, 48000 });
+            SliceSettings own; own.reverse = true;
+            in.slices.setSettings(1, own);
+            in.timeline = Timeline(4.0);
+            juce::ValueTree node("Layer");
+            writePhraseState(node, in);
+
+            auto audioOf = [](int n) { auto b = std::make_shared<juce::AudioBuffer<float>>(1, n); b->clear(); return b; };
+            {
+                Phrase ph;
+                ph.applyExtras(node);
+                ph.installLoop(audioOf(96000), 48000.0, "a.wav", "a");    // the same length: the slices and their settings come back
+                const auto d = ph.getData();
+                expectEquals(d->slices.size(), 3);
+                expect(d->slices.settings(1).reverse);
+            }
+            {
+                Phrase ph;
+                ph.applyExtras(node);
+                ph.installLoop(audioOf(48000), 48000.0, "b.wav", "b");    // another length: one slice from 0, nothing carried over
+                const auto d = ph.getData();
+                expectEquals(d->slices.size(), 1);
+                expect(! d->slices.settings(0).reverse);
+            }
+        }
+
         beginTest("damaged or out-of-range slice settings are brought into range, never NaN");
         {
             SliceSettings wild;
