@@ -28,11 +28,14 @@ void PhrasePlayback::hardReset() noexcept
 
 void PhrasePlayback::trigger(const PhraseLoop& loop, const PhraseSettings& s, const PhraseClock& c, const TimelineBlock& b) noexcept
 {
+    // The slice's own settings sit on top of the layer's: its gain multiplies, its fades add, and its reverse and the
+    // block's reverse cancel each other.
+    const SliceSettings& own = loop.slices->settings(b.slice);
     SliceParams p;
-    p.gain      = s.gain;
-    p.fadeInMs  = s.fadeInMs;
-    p.fadeOutMs = s.fadeOutMs;
-    p.reverse   = b.reverse;
+    p.gain      = s.gain * own.gain;
+    p.fadeInMs  = s.fadeInMs + own.fadeInMs;
+    p.fadeOutMs = s.fadeOutMs + own.fadeOutMs;
+    p.reverse   = b.reverse != own.reverse;
     p.holdMs    = s.holdMs;
     p.strength  = s.strength;
 

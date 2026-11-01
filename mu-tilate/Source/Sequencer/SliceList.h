@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Audio/SlicePlayer.h"   // SliceRange
+#include "Sequencer/SliceSettings.h"
 
 #include <vector>
 
@@ -14,6 +15,7 @@ struct SliceMarker
 {
     int  position = 0;     // source samples
     bool pinned   = false; // a hand-placed marker: kept when detection runs again
+    SliceSettings settings; // how the slice that starts here plays
 };
 
 class SliceList
@@ -43,6 +45,9 @@ public:
     int  moveMarker(int index, int position, int minLength = 32);
     bool removeMarker(int index);
     void setPinned(int index, bool pinned);
+    // The settings of slice `index`; an out-of-range index is refused (returns false) and changes nothing.
+    bool setSettings(int index, const SliceSettings& settings);
+    const SliceSettings& settings(int index) const;
 
     // The loop changed length (a new loop): the markers outside it are dropped.
     void setLoopLength(int newLength);

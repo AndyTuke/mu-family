@@ -3,6 +3,42 @@
 namespace mu_tilate
 {
 
+namespace
+{
+    // Every setting as a property of the slice's node; the names are short because a loop can have hundreds of slices.
+    void writeSettings(juce::ValueTree& m, const SliceSettings& s)
+    {
+        const SliceSettings d;
+        auto put = [&](const char* name, const auto& value, const auto& def) { if (value != def) m.setProperty(name, value, nullptr); };
+        put("rev", s.reverse ? 1 : 0, 0);       put("gain", s.gain, d.gain);          put("pan", s.pan, d.pan);
+        put("fi", s.fadeInMs, d.fadeInMs);      put("fo", s.fadeOutMs, d.fadeOutMs);
+        put("pit", s.pitchSemi, d.pitchSemi);   put("fine", s.fineCents, d.fineCents);
+        put("ft", s.filterType, d.filterType);  put("cut", s.cutoffHz, d.cutoffHz);   put("res", s.resonance, d.resonance);
+        put("fea", s.filterEnvAmt, d.filterEnvAmt);
+        put("aa", s.ampA, d.ampA); put("ad", s.ampD, d.ampD); put("as", s.ampS, d.ampS); put("ar", s.ampR, d.ampR);
+        put("fa", s.fltA, d.fltA); put("fd", s.fltD, d.fltD); put("fs", s.fltS, d.fltS); put("fr", s.fltR, d.fltR);
+        put("loop", s.loop ? 1 : 0, 0);         put("one", s.oneShot ? 1 : 0, 1);     put("chk", s.chokeGroup, d.chokeGroup);
+    }
+
+    SliceSettings readSettings(const juce::ValueTree& m)
+    {
+        SliceSettings s;
+        auto f = [&](const char* name, float def) { return (float) (double) m.getProperty(name, (double) def); };
+        s.reverse = (int) m.getProperty("rev", 0) != 0;
+        s.gain = f("gain", s.gain);  s.pan = f("pan", s.pan);
+        s.fadeInMs = f("fi", s.fadeInMs);  s.fadeOutMs = f("fo", s.fadeOutMs);
+        s.pitchSemi = f("pit", s.pitchSemi);  s.fineCents = f("fine", s.fineCents);
+        s.filterType = (int) m.getProperty("ft", s.filterType);  s.cutoffHz = f("cut", s.cutoffHz);
+        s.resonance = f("res", s.resonance);  s.filterEnvAmt = f("fea", s.filterEnvAmt);
+        s.ampA = f("aa", s.ampA); s.ampD = f("ad", s.ampD); s.ampS = f("as", s.ampS); s.ampR = f("ar", s.ampR);
+        s.fltA = f("fa", s.fltA); s.fltD = f("fd", s.fltD); s.fltS = f("fs", s.fltS); s.fltR = f("fr", s.fltR);
+        s.loop = (int) m.getProperty("loop", 0) != 0;
+        s.oneShot = (int) m.getProperty("one", 1) != 0;
+        s.chokeGroup = juce::jmax(0, (int) m.getProperty("chk", 0));
+        return s;
+    }
+}
+
 void writePhraseState(juce::ValueTree& node, const PhraseState& s)
 {
     node.removeChild(node.getChildWithName(kPhraseNodeTag), nullptr);
@@ -19,6 +55,7 @@ void writePhraseState(juce::ValueTree& node, const PhraseState& s)
         juce::ValueTree m("M");
         m.setProperty("p", s.slices.marker(i).position, nullptr);
         m.setProperty("pin", s.slices.marker(i).pinned ? 1 : 0, nullptr);
+        writeSettings(m, s.slices.settings(i));
         slices.appendChild(m, nullptr);
     }
     p.appendChild(slices, nullptr);
@@ -68,11 +105,12 @@ PhraseState readPhraseState(const juce::ValueTree& node)
         positions.push_back((int) m.getProperty("p", 0));
     s.slices.applyDetected(positions, 1);
     for (const auto& m : p.getChildWithName("Slices"))
-        if ((int) m.getProperty("pin", 0) != 0)
-        {
-            const int idx = s.slices.indexAt((int) m.getProperty("p", 0));
-            if (idx >= 0 && s.slices.marker(idx).position == (int) m.getProperty("p", 0)) s.slices.setPinned(idx, true);
-        }
+    {
+        const int idx = s.slices.indexAt((int) m.getProperty("p", 0));
+        if (idx < 0 || s.slices.marker(idx).position != (int) m.getProperty("p", 0)) continue;
+        if ((int) m.getProperty("pin", 0) != 0) s.slices.setPinned(idx, true);
+        s.slices.setSettings(idx, readSettings(m));
+    }
     return s;
 }
 

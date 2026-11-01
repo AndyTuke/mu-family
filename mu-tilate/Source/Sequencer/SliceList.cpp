@@ -75,7 +75,9 @@ int SliceList::addMarker(int position, int minLength)
     for (const auto& k : markers)
         if (std::abs(k.position - position) < minLength) return -1;
     auto m = markers;
-    m.push_back({ position, true });   // a hand-placed marker is pinned
+    // A hand-placed marker is pinned; the new slice starts out playing like the one it was cut from.
+    const int parent = indexAt(position);
+    m.push_back({ position, true, parent >= 0 ? markers[(size_t) parent].settings : SliceSettings {} });
     rebuild(std::move(m));
     return indexAt(position);
 }
@@ -102,6 +104,19 @@ bool SliceList::removeMarker(int index)
 void SliceList::setPinned(int index, bool pinned)
 {
     if (index > 0 && index < size()) markers[(size_t) index].pinned = pinned;
+}
+
+bool SliceList::setSettings(int index, const SliceSettings& settings)
+{
+    if (index < 0 || index >= size()) return false;
+    markers[(size_t) index].settings = settings;
+    return true;
+}
+
+const SliceSettings& SliceList::settings(int index) const
+{
+    static const SliceSettings kDefault;
+    return index >= 0 && index < size() ? markers[(size_t) index].settings : kDefault;
 }
 
 void SliceList::setLoopLength(int newLength)
