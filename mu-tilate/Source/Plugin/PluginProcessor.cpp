@@ -1,5 +1,7 @@
 #include "Plugin/PluginProcessor.h"
 
+#include "Analysis/LoopTempo.h"   // mu-core: a first tempo guess from the loop length
+
 #include "Audio/LoopLoader.h"              // mu-core: decode a loop file
 #include "Plugin/HostTransport.h"          // mu-core: DAW / mu-link transport read
 #include "Plugin/TransportResolver.h"      // mu-core: the family transport rule
@@ -207,15 +209,33 @@ void PluginProcessor::loadLoopAsync(int layer, const juce::File& file, bool keep
             // detected slices laid out back to back in source order, as long as that takes (in bars of 4/4).
             const bool keep = keepSavedEdits && ph.savedEditsFit(loaded->audio->getNumSamples());
             ph.installLoop(loaded->audio, loaded->sampleRate, file.getFullPathName(), loaded->name);
+
+            // A new loop sets the layer's loop tempo to the estimate from its length (a whole number of beats); the Tempo
+            // knob overrides it. A restore keeps the saved tempo.
+            double tempo = loopTempo;
+            bool estimated = false;
+            if (! keep)
+            {
+                const double guess = mu_core::estimateTempoFromLength((double) loaded->audio->getNumSamples() / loaded->sampleRate);
+                if (guess > 0.0)
+                {
+                    tempo = juce::jlimit(20.0, 300.0, guess);
+                    estimated = true;
+                    if (auto* p = apvts.getParameter(layerParamPrefix(layer) + ppi::suffix[ppi::ltempo]))
+                        p->setValueNotifyingHost(p->convertTo0to1((float) tempo));
+                }
+            }
+
             double total = 0.0;
             if (! keep)
-                total = layOutInOrder(layer, *slices, loaded->sampleRate, loopTempo);
+                total = layOutInOrder(layer, *slices, loaded->sampleRate, tempo);
             else
                 for (int i = 0; i < slices->size(); ++i)
-                    total += (double) slices->slice(i).length() / loaded->sampleRate * loopTempo / 60.0;
+                    total += (double) slices->slice(i).length() / loaded->sampleRate * tempo / 60.0;
             const auto shown = ph.getData();
             loopStatus[(size_t) layer] = loaded->name + ": " + juce::String(shown != nullptr ? shown->slices.size() : 0) + " slices, "
-                                       + juce::String(total, 1) + " beats at " + juce::String(loopTempo, 0) + " BPM";
+                                       + juce::String(total, 1) + " beats at " + juce::String(tempo, estimated ? 1 : 0) + " BPM"
+                                       + (estimated ? " (estimated from the length)" : "");
         });
     });
 }

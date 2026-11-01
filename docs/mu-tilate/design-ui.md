@@ -76,6 +76,14 @@ These are plain per-slice values (see the persistence note). Slice settings that
 
 **Placement (Andy, 2026-11-01):** the slice player shares the waveform's area and is toggled with it: a two-way switch (*Waveform* / *Slice player*) above the area swaps the two, so the player gets the full height (filter and envelopes need it) while the timeline stays on screen below. The player edits the slice selected in the waveform (or by its pad); selecting a slice while the player is showing keeps the player showing. Filter and both envelopes are in scope for the first version, so the engine work (per-slice filter, two ADSRs, pan, pitch, choke, play mode) and the per-slice data model come before the panel.
 
+**Slice level and sends (Andy, 2026-11-01):** FX sends belong to the layer; a slice has no sends of its own, only a **Level** that is added to or subtracted from the layer's level (a signed dB trim, -24 to +12 dB).
+
+**Pre-fade (Andy, 2026-11-01):** a per-slice switch. When on, a quiet reversed copy of the first part of the slice plays *before* the hit and swells into it (a squared ramp), ending exactly where the slice starts. Controls: **Level** (dB below the slice, -36 to 0), **Length** (10 to 1000 ms, shortened if the slice is shorter) and **Tone** (dark to thin: a low-pass down to 250 Hz or a high-pass up to 2 kHz). It is a voice of its own, so it **mixes over the previous slice** (which is not cut), and a block near the start of the timeline gets its pre-fade at the end of the previous pass.
+
+**Loop tempo (2026-11-01):** a new loop's tempo is estimated from its length as a whole number of beats (4, 8, 16, 32 or 64, the first that gives 75 to 165 BPM); the Tempo knob overrides it. A restored session keeps its saved tempo.
+
+**Not in the panel yet:** the choke group and the gate / one-shot play mode are stored with the slice but not shown or played (the player is monophonic, so a choke group has nothing to choke; the block length already trims a slice).
+
 ### Timeline ★
 - **One row per layer** (Andy, 2026-10-30): each of the 8 layers has one mixer strip, FX sends and modulation, exactly one loop and one sample player. Its timeline is a single row of slice blocks played by that one player; there are no lanes. To layer sounds, use another layer. Each layer is **monophonic** (decided): one slice at a time, the next slice cuts the previous one through the short automatic fade.
 - **Length:** adjustable, 1 to 64 bars (the Length control). The timeline is **drag-scrollable** (drag the background, or wheel) and zoomable when longer than the view, and keeps its playhead in view while following the transport.

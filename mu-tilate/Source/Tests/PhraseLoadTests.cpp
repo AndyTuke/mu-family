@@ -2,6 +2,7 @@
 // byte cap is rejected with the status-bar message and nothing decoded, a missing file says so, and detection on a
 // loaded loop gives slices that cover it (Even divisions, and onsets with a pinned marker kept).
 
+#include "Analysis/LoopTempo.h"
 #include "Audio/LoopLoader.h"
 #include "MuLimits.h"
 #include "Sequencer/PhraseAnalysis.h"
@@ -45,6 +46,16 @@ struct PhraseLoadTests : public juce::UnitTest
 
     void runTest() override
     {
+        beginTest("a loop's tempo is guessed from its length as a whole number of beats");
+        {
+            expectWithinAbsoluteError(mu_core::estimateTempoFromLength(12.0), 80.0, 1.0e-9);    // 16 beats (4 bars) at 80
+            expectWithinAbsoluteError(mu_core::estimateTempoFromLength(2.0), 120.0, 1.0e-9);    // 4 beats
+            expectWithinAbsoluteError(mu_core::estimateTempoFromLength(7.5), 128.0, 1.0e-9);    // 16 beats at 128
+            expectWithinAbsoluteError(mu_core::estimateTempoFromLength(1.5), 160.0, 1.0e-9);    // 4 beats at 160
+            expectEquals(mu_core::estimateTempoFromLength(0.2), 0.0);                           // a one-shot: no tempo
+            expectEquals(mu_core::estimateTempoFromLength(0.0), 0.0);
+        }
+
         const auto dir = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("mu-tilate-load-tests");
         dir.createDirectory();
 
