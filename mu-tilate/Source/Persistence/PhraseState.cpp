@@ -38,8 +38,8 @@ namespace
         s.preLevelDb = f("pfl", s.preLevelDb);  s.preLengthMs = f("pfn", s.preLengthMs);  s.preTone = f("pft", s.preTone);
         s.loop = (int) m.getProperty("loop", 0) != 0;
         s.oneShot = (int) m.getProperty("one", 1) != 0;
-        s.chokeGroup = juce::jmax(0, (int) m.getProperty("chk", 0));
-        return s;
+        s.chokeGroup = (int) m.getProperty("chk", 0);
+        return sanitised(s);   // a damaged file must not hand the engine a NaN
     }
 }
 

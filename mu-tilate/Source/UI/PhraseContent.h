@@ -16,6 +16,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -82,6 +83,8 @@ private:
     // What the views last showed, by identity number (a freed PhraseData's address can be reused, a number never is).
     uint64_t shownVersion = ~(uint64_t) 0;        // the PhraseData the waveform and timeline last showed
     uint64_t shownAudioId = 0;                    // the audio the waveform last drew
+    std::atomic<float>* tempoParam = nullptr;     // the current layer's Loop Tempo and Grid, for the 15 Hz refresh
+    std::atomic<float>* gridParam  = nullptr;
     uint64_t shownPanelVersion = ~(uint64_t) 0;   // the PhraseData the slice player last showed
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhraseContent)

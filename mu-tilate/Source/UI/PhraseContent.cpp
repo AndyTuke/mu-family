@@ -155,8 +155,8 @@ void PhraseContent::refreshSlicePanel(bool force)
 void PhraseContent::refreshViews(bool force)
 {
     const auto d = host.getPhrase(currentLayer).getData();
-    const double tempo = (double) apvts.getRawParameterValue(layerParamPrefix(currentLayer) + ppi::suffix[ppi::ltempo])->load();
-    timelineView.setGridBeats(gridBeats((int) apvts.getRawParameterValue(layerParamPrefix(currentLayer) + ppi::suffix[ppi::grid])->load()));
+    const double tempo = tempoParam != nullptr ? (double) tempoParam->load() : 120.0;
+    if (gridParam != nullptr) timelineView.setGridBeats(gridBeats((int) gridParam->load()));
     const uint64_t version = d != nullptr ? d->version : 0;
     if (! force && version == shownVersion && tempo == shownTempo) return;
     shownVersion = version;
@@ -212,8 +212,9 @@ void PhraseContent::setLayer(int idx)
     for (auto& k : knobs)
         k.att = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, prefix + k.name, k.comp->getSlider());
     modeAtt = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, prefix + ppi::suffix[ppi::mode], modeBox.getComboBox());
-    detectAtt.reset();
     detectAtt = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, prefix + ppi::suffix[ppi::dmethod], detectBox.getComboBox());
+    tempoParam = apvts.getRawParameterValue(prefix + ppi::suffix[ppi::ltempo]);   // read every tick: cached, not looked up by name
+    gridParam  = apvts.getRawParameterValue(prefix + ppi::suffix[ppi::grid]);
 
     bindModulationArcs();
     shownVersion = ~(uint64_t) 0; shownAudioId = 0; shownPanelVersion = ~(uint64_t) 0;   // another layer's loop: show it afresh
@@ -226,7 +227,6 @@ void PhraseContent::setLayer(int idx)
 // matrix and the value the audio thread published for that target.
 void PhraseContent::bindModulationArcs()
 {
-    static const float kNaN = std::numeric_limits<float>::quiet_NaN();
     const auto* matrix = &host.getPhrase(currentLayer).modulationMatrix;
     const int layer = currentLayer;
 
@@ -236,7 +236,6 @@ void PhraseContent::bindModulationArcs()
         if (dest < 0) { k.comp->clearModBinding(); continue; }
         k.comp->bindModulation(kModDestTable[dest].id, matrix, [this, layer, dest]
                                { return host.getModLive(layer, dest); });
-        juce::ignoreUnused(kNaN);
     }
 }
 

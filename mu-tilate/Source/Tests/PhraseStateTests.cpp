@@ -6,6 +6,9 @@
 
 #include <juce_core/juce_core.h>
 
+#include <cmath>
+#include <limits>
+
 using namespace mu_tilate;
 
 namespace
@@ -24,6 +27,26 @@ struct PhraseStateTests : public juce::UnitTest
 
     void runTest() override
     {
+        beginTest("damaged or out-of-range slice settings are brought into range, never NaN");
+        {
+            SliceSettings wild;
+            wild.cutoffHz = std::numeric_limits<float>::quiet_NaN(); wild.resonance = 7.0f; wild.pitchSemi = 1.0e9f;
+            wild.pan = -std::numeric_limits<float>::infinity(); wild.filterType = 9; wild.ampA = -5.0f; wild.chokeGroup = 99;
+            SliceList sl(1000);
+            sl.setSettings(0, wild);
+            const auto& g = sl.settings(0);
+            expect(std::isfinite(g.cutoffHz) && g.cutoffHz >= 20.0f && g.cutoffHz <= 20000.0f);
+            expectEquals(g.resonance, 1.0f); expectEquals(g.pitchSemi, 24.0f); expectEquals(g.pan, 0.0f);
+            expectEquals(g.filterType, 3); expectEquals(g.ampA, 0.0f); expectEquals(g.chokeGroup, 8);
+
+            // The same from a saved file that says "nan".
+            juce::ValueTree node("Layer"), p("Phrase"), slices("Slices"), m("M");
+            m.setProperty("p", 0, nullptr); m.setProperty("cut", "nan", nullptr); m.setProperty("ft", 2, nullptr);
+            slices.appendChild(m, nullptr); p.setProperty("loopLength", 1000, nullptr); p.appendChild(slices, nullptr); node.appendChild(p, nullptr);
+            const auto back = readPhraseState(node).slices.settings(0);
+            expect(std::isfinite(back.cutoffHz));
+        }
+
         beginTest("an edit keeps the audio's identity and gets a new version, a new loop gets both");
         {
             Phrase ph;

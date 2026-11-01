@@ -109,7 +109,7 @@ void SliceList::setPinned(int index, bool pinned)
 bool SliceList::setSettings(int index, const SliceSettings& settings)
 {
     if (index < 0 || index >= size()) return false;
-    markers[(size_t) index].settings = settings;
+    markers[(size_t) index].settings = sanitised(settings);
     return true;
 }
 

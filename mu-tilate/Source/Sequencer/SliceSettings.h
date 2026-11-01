@@ -45,6 +45,33 @@ struct SliceSettings
 
 };
 
+// Brings every setting inside its documented range and replaces NaN or infinity with the default: a saved file or a host can
+// hand over anything, and a NaN cutoff would turn the filter's state, and then the output, into NaN.
+inline SliceSettings sanitised(SliceSettings s) noexcept
+{
+    const SliceSettings d;
+    auto fix = [](float v, float lo, float hi, float def) { return std::isfinite(v) ? std::clamp(v, lo, hi) : def; };
+    s.levelDb = fix(s.levelDb, -24.0f, 12.0f, d.levelDb);
+    s.pan = fix(s.pan, -1.0f, 1.0f, d.pan);
+    s.fadeInMs = fix(s.fadeInMs, 0.0f, 1000.0f, d.fadeInMs);
+    s.fadeOutMs = fix(s.fadeOutMs, 0.0f, 1000.0f, d.fadeOutMs);
+    s.preLevelDb = fix(s.preLevelDb, -36.0f, 0.0f, d.preLevelDb);
+    s.preLengthMs = fix(s.preLengthMs, 10.0f, 1000.0f, d.preLengthMs);
+    s.preTone = fix(s.preTone, -1.0f, 1.0f, d.preTone);
+    s.pitchSemi = fix(s.pitchSemi, -24.0f, 24.0f, d.pitchSemi);
+    s.fineCents = fix(s.fineCents, -100.0f, 100.0f, d.fineCents);
+    s.filterType = std::clamp(s.filterType, 0, 3);
+    s.cutoffHz = fix(s.cutoffHz, 20.0f, 20000.0f, d.cutoffHz);
+    s.resonance = fix(s.resonance, 0.0f, 1.0f, d.resonance);
+    s.filterEnvAmt = fix(s.filterEnvAmt, -1.0f, 1.0f, d.filterEnvAmt);
+    s.ampA = fix(s.ampA, 0.0f, 10000.0f, d.ampA);   s.ampD = fix(s.ampD, 0.0f, 10000.0f, d.ampD);
+    s.ampS = fix(s.ampS, 0.0f, 1.0f, d.ampS);       s.ampR = fix(s.ampR, 0.0f, 10000.0f, d.ampR);
+    s.fltA = fix(s.fltA, 0.0f, 10000.0f, d.fltA);   s.fltD = fix(s.fltD, 0.0f, 10000.0f, d.fltD);
+    s.fltS = fix(s.fltS, 0.0f, 1.0f, d.fltS);       s.fltR = fix(s.fltR, 0.0f, 10000.0f, d.fltR);
+    s.chokeGroup = std::clamp(s.chokeGroup, 0, 8);
+    return s;
+}
+
 // The pitch settings as a rate: source samples per output sample (1 = unchanged), semitones and cents clamped to their ranges.
 inline double pitchRatio(const SliceSettings& s) noexcept
 {

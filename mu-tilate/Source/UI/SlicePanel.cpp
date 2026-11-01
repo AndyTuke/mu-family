@@ -185,11 +185,9 @@ void SlicePanel::resized()
     placeGroup(1, x, Filter, "FILTER", 112);
     placeGroup(1, x, AmpEnv, "AMP ENVELOPE", 0);
     // The filter envelope group also holds the loop switch, which is placed after its knobs.
-    const int fx = x;
     placeGroup(1, x, FilterEnv, "FILTER ENVELOPE", 0);
     loopSwitch.setBounds(x, area.getY() + rowH + s(kTitleH) + (s(LF::kKnobSize2H) - s(kHeaderH)) / 2, s(80), s(kHeaderH));
     titles.push_back({ "PLAY", { x, area.getY() + rowH, s(80), s(kTitleH) } });
-    juce::ignoreUnused(fx);
 }
 
 } // namespace mu_tilate
