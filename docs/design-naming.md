@@ -44,7 +44,7 @@ Each product's layer is a subclass of `Layer`, named for what that product's lay
 | mu-Tant | `Pattern` | gate / filter / pitch patterns, wavetable |
 | mu-Toni | `Arp` | scale / chord pool, scan, accent pattern |
 | mu-On | `Track` | step rows, lane engine selection |
-| mu-Tilate (planned) | `Phrase` | one loop, its slices, one sample player, one timeline row |
+| mu-Tilate | `Phrase` | one loop, its slices, one sample player, one timeline row |
 
 Notes on these names:
 
@@ -61,7 +61,7 @@ Notes on these names:
   same `Rhythm` layer type and `.muRhythm` extension as mu-Clid, because both use one shared class in
   `mu-core`. This is the single named exception to "layer type names are unique"; see
   [design-plugin-family.md](design-plugin-family.md#the-midi-effect-product-the-former-mu-clid-lite--ruled-2026-10-11).
-- **mu-Tilate is `Phrase`** (Andy, 2026-10-30; planned, nothing built). Not "Slice": a slice is a section of the sample, and a Phrase layer contains several. Layer preset `.muPhrase`, full preset `.muTilate`. Details in "mu-Tilate (planned)" below.
+- **mu-Tilate is `Phrase`** (Andy, 2026-10-30; built since 2026-10-31, `LayerTypeId::Phrase` registered). Not "Slice": a slice is a section of the sample, and a Phrase layer contains several. Layer preset `.muPhrase`, full preset `.muTilate`. Details in "mu-Tilate" below.
 - **mu-On is `Track`** (owner); its extension is already `.muTrack`. The code mixes lane / channel /
   track today and collapses to Track.
 
@@ -112,7 +112,7 @@ edits](design-plugin-family.md#layer-ownership-and-structural-edits--family-stan
 ## 3. Rules
 
 ### Namespaces
-- Every product type lives in `mu_<product>` (`mu_tant`, `mu_toni`, `mu_on`, `mu_clid`; `mu_tilate` when built). All four comply
+- Every product type lives in `mu_<product>` (`mu_tant`, `mu_toni`, `mu_on`, `mu_clid`; `mu_tilate`). All five comply
   (mu-Clid since build 1190); only `createPluginFilter()` and `StandaloneApp.cpp` glue stay global.
 - Product helpers that were once namespaced by area nest in the product namespace (`mu_clid::migrate`,
   `mu_clid::md`, `mu_clid::ModDest`).
@@ -199,9 +199,9 @@ names. They are modal pop-ups, not `OverlayHost` screens, so the `Overlay` role 
 - Acronyms: caps in **type** names (`FXChain`, `LFOEditor`, `VUMeter`); word-case in functions and
   variables (`startFxParamSync`, `bindStripToApvts`, `getBpm`, `Midi…`).
 
-### mu-Tilate (planned, names decided 2026-10-30; nothing built)
+### mu-Tilate (names decided 2026-10-30; built from 2026-10-31)
 
-Design: [mu-tilate/design.md](mu-tilate/design.md). Names follow the pattern of the other products; rows marked "proposed" are not saved data until the product is built and may still change.
+Design: [mu-tilate/design.md](mu-tilate/design.md). Names follow the pattern of the other products. Built: the plugin target (VST3, CLAP, Standalone), `mu-tilate-layer`, 96 tests in `mu-tilate-tests`, `LayerTypeId::Phrase` in `mu-core`. Rows still marked "proposed" are unconfirmed against the saved data and may change.
 
 | Name | Value |
 |---|---|
@@ -218,7 +218,8 @@ Design: [mu-tilate/design.md](mu-tilate/design.md). Names follow the pattern of 
 | State identifier, tag | `MuTilateState`, `MuTilatePreset` (proposed) |
 | Plugin code | `MTil` (proposed; manufacturer `TDP1`, bundle id `com.transwarp.mu-tilate`) |
 | mu-Tronic | `LayerTypeId::Phrase` in `mu-core`, one `LayerTypeInfo` row (group "mu-Tilate", display name "Phrase") |
-| Shared parts | built in `mu-core`, never as `mu_tilate::` copies: library mechanism, waveform view, time ruler, drag-scroll viewport, detectors, Bounce dialog, stretch engine (Signalsmith Stretch in `ThirdParty/`) |
+| Shared parts | built in `mu-core`, never as `mu_tilate::` copies: library mechanism, waveform view (`mu-core/UI/Components/LoopWaveform`, done), time ruler, drag-scroll viewport, detectors (`mu-core/Analysis/OnsetDetector.{h,cpp}`, `LoopTempo.h`, done), loop decode (`mu-core/Audio/LoopLoader.{h,cpp}`, done), Bounce dialog, stretch engine (Signalsmith Stretch in `ThirdParty/`) |
+| Shared voice DSP (ruled 2026-11-01) | moves from `mu-tilate/Source/Audio/SlicePlayer.cpp` to `mu-core/Audio/`, namespace `mu_core`, three header-only files: `EqualPowerPan.h` (`inline void equalPowerPan(float pan, float& gainL, float& gainR) noexcept`; pan clamped to -1..1; centre gives 1.0 on both, i.e. the cos/sin law times sqrt(2)), `TptSvf.h` (`class TptSvf`: `enum class Tap { lowpass, highpass, bandpass }`; `void setCoefficients(float cutoffHz, float resonance01, double sampleRate) noexcept` giving a1/a2/a3/k, k = 2 * (1 - 0.98 * resonance); `float process(float in, int channel) noexcept` for channels 0 and 1 with `Tap` chosen by `setTap`; `void reset() noexcept`; band-pass scaled by k so its peak is unity), `AgeEnvelope.h` (`inline float adsAtAge(double ageSamples, float attackMs, float decayMs, float sustain, double sampleRate) noexcept`, linear attack then linear decay to sustain, stateless). The block-based `SvfFilter12` in `Filters/` stays as it is: it is the JUCE-backed per-layer filter with block smoothing; `TptSvf` is the per-sample, per-voice one with cutoff changes every few samples, and is not a second copy of it. Tests in `mu-core/Tests/VoiceDspTests.cpp` (see the family doc). `SlicePlayer` then calls these; it keeps its voice struct and the age bookkeeping. |
 
 ### Saved-data names (change only with a migration)
 Parameter-id prefixes (`r0_`, `v0_`, `a0_`, `t0_`), preset extensions (`.muRhythm`, `.muPattern`,
