@@ -144,7 +144,7 @@ private:
 
     static constexpr int kVoices = 4;   // one playing plus the ones still fading out
     std::array<Voice, kVoices> voices {};
-    Voice preVoice;   // the pre-fade (one at a time; a newer one replaces it)
+    std::array<Voice, 2> preVoices {};   // the pre-fades: two, so one swelling into its hit is not cut off by the next (the older is replaced if both are busy)
     std::unique_ptr<StretchState> stretch;
     double sr = 48000.0;
     int    maxBlock = 512;

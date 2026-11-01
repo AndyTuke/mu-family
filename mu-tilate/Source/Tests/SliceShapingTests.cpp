@@ -118,6 +118,22 @@ struct SliceShapingTests : public juce::UnitTest
             expectGreaterThan(out.getSample(0, 150), 0.1f);
         }
 
+        beginTest("a second pre-fade does not cut the first one off");
+        {
+            auto src = constant(9600, 0.5f);
+            SlicePlayer sp; sp.prepare(kSr);
+            auto p = plain();
+            sp.triggerPre(&src, { 0, 4800 }, p);          // swells to 0.5 over 4800 samples
+            juce::AudioBuffer<float> out(1, 4800); out.clear();
+            juce::AudioBuffer<float> first(out.getArrayOfWritePointers(), 1, 0, 2400);
+            sp.render(first, 2400);
+            sp.triggerPre(&src, { 0, 4800 }, p);          // half way through, a second one starts
+            juce::AudioBuffer<float> second(out.getArrayOfWritePointers(), 1, 2400, 2400);
+            sp.render(second, 2400);
+            // The first reaches 0.5 at its end, with the second at a quarter of its swell (0.5 * 0.5^2) on top.
+            expectGreaterThan(out.getSample(0, 4790), 0.6f);
+        }
+
         beginTest("a pre-fade is a voice of its own: a slice trigger and a slice cut leave it playing");
         {
             auto src = constant(9600, 0.5f);

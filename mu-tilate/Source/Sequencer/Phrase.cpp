@@ -254,9 +254,19 @@ bool Phrase::renderRetiring(const mu_core::RenderContext& ctx, juce::AudioBuffer
     auto& buf = rs.exclusive != 0 ? out : aside;
     const int frames = juce::jmin(n, buf.getNumSamples());
 
+    // The tail takes the data under the same try-lock and identity check as a live block: a loop replaced since the voices
+    // started (they point into the old audio) drops them, and a missed lock renders the voices with no loop in hand.
     PhraseClock idle;
     idle.sampleRate = ctx.sampleRate;
-    renderBlock(data.get(), idle, buf, frames);
+    const bool locked = mu_core::trySpinLock(dataLock);
+    const PhraseData* d = locked ? data.get() : nullptr;
+    if (locked)
+    {
+        const uint64_t audioId = d != nullptr ? d->audioId : 0;
+        if (audioId != lastAudioId) { playback->hardReset(); lastAudioId = audioId; }
+    }
+    renderBlock(d, idle, buf, frames);
+    if (locked) mu_core::spinUnlock(dataLock);
     mu_core::applyLinearFade(buf, frames, rs);
 
     if (rs.exclusive == 0)

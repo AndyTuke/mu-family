@@ -52,20 +52,21 @@ void SlicePlayer::prepare(double sampleRate, int maxBlockSize, bool shortWindow)
 void SlicePlayer::reset() noexcept
 {
     for (auto& v : voices) v = Voice {};
-    preVoice = Voice {};
+    for (auto& v : preVoices) v = Voice {};
 }
 
 bool SlicePlayer::isActive() const noexcept
 {
     for (const auto& v : voices)
         if (v.active) return true;
-    return preVoice.active;
+    return preVoices[0].active || preVoices[1].active;
 }
 
 void SlicePlayer::cut() noexcept
 {
     cutSlices();
-    if (preVoice.active && ! preVoice.fading) { preVoice.fading = true; preVoice.cutStep = cutStep; }
+    for (auto& pv : preVoices)
+        if (pv.active && ! pv.fading) { pv.fading = true; pv.cutStep = cutStep; }
 }
 
 void SlicePlayer::triggerPre(const juce::AudioBuffer<float>* src, SliceRange range, const SliceParams& p) noexcept
@@ -96,7 +97,11 @@ void SlicePlayer::triggerPre(const juce::AudioBuffer<float>* src, SliceRange ran
     const float pa = (juce::jlimit(-1.0f, 1.0f, p.own.pan) + 1.0f) * 0.25f * juce::MathConstants<float>::pi;
     v.panL = std::cos(pa) * 1.41421356f;
     v.panR = std::sin(pa) * 1.41421356f;
-    preVoice = v;
+    // A free pre-fade voice, else the one furthest along (it is nearest its hit).
+    Voice* slot = &preVoices[0];
+    if (preVoices[0].active && preVoices[1].active) slot = preVoices[1].age > preVoices[0].age ? &preVoices[1] : &preVoices[0];
+    else if (preVoices[0].active) slot = &preVoices[1];
+    *slot = v;
 }
 
 void SlicePlayer::cutSlices() noexcept
@@ -289,7 +294,8 @@ void SlicePlayer::render(juce::AudioBuffer<float>& out, int n) noexcept
             else                  renderNative(v, out, done, len);
         }
     }
-    if (preVoice.active) renderNative(preVoice, out, 0, n);
+    for (auto& pv : preVoices)
+        if (pv.active) renderNative(pv, out, 0, n);
 }
 
 void SlicePlayer::renderNative(Voice& v, juce::AudioBuffer<float>& out, int offset, int n) noexcept
