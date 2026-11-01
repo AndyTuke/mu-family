@@ -34,10 +34,11 @@ public:
     int indexAt(int pos) const noexcept;
 
     // Replaces the unpinned markers with `detected` (source samples). Pinned markers stay where they are. Positions
-    // outside the loop, duplicates and positions closer than minLength to a neighbour are dropped.
-    void applyDetected(const std::vector<int>& detected, int minLength = 32);
-    // Evenly divides the loop into `parts` slices (the "Even divisions" method); pinned markers are kept.
-    void divideEvenly(int parts);
+    // outside the loop, duplicates and positions closer than minLength to a neighbour are dropped. A new marker within
+    // `carryWithin` samples of a marker it replaces takes that marker's slice settings (0 = none carried).
+    void applyDetected(const std::vector<int>& detected, int minLength = 32, int carryWithin = 0);
+    // Evenly divides the loop into `parts` slices (the "Even divisions" method); pinned markers are kept; settings carry as above.
+    void divideEvenly(int parts, int carryWithin = 0);
 
     // Manual editing. Each returns the index of the changed marker, or -1 when the edit is refused (a marker too
     // close to a neighbour, outside the loop, the first marker, or a missing index).
@@ -54,6 +55,8 @@ public:
 
 private:
     void rebuild(std::vector<SliceMarker> m);
+    // Gives each marker that has default settings the settings of the nearest marker in `before` within `within` samples.
+    void carrySettings(const std::vector<SliceMarker>& before, int within);
 
     int length = 0;
     std::vector<SliceMarker> markers;   // sorted, markers[0].position == 0 once there is a loop

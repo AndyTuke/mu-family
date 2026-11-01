@@ -50,6 +50,24 @@ struct PhraseStateTests : public juce::UnitTest
             expectEquals(sl.settings(idx).pitchSemi, 5.0f);
         }
 
+        beginTest("a re-detect carries settings to a cut that moved a little, and not to a new one");
+        {
+            SliceList sl(96000);
+            sl.applyDetected({ 24000, 48000 });
+            SliceSettings own; own.reverse = true; own.levelDb = -4.0f;
+            sl.setSettings(1, own);                                       // the cut at 24000
+            sl.applyDetected({ 24300, 70000 }, 32, 960);                  // 20 ms at 48 kHz: 24300 is the same hit, 70000 is new
+            expectEquals(sl.size(), 3);
+            expect(sl.settings(1).reverse);                               // 24300 inherits
+            expectEquals(sl.settings(1).levelDb, -4.0f);
+            expect(! sl.settings(2).reverse);                             // 70000 starts neutral
+            SliceList none(96000);
+            none.applyDetected({ 24000 });
+            none.setSettings(1, own);
+            none.applyDetected({ 24000 });                                // no tolerance given: nothing carried
+            expect(! none.settings(1).reverse);
+        }
+
         beginTest("saved slices apply only to a loop of the length they were made on");
         {
             PhraseState in;

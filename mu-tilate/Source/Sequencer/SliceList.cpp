@@ -41,8 +41,9 @@ void SliceList::rebuild(std::vector<SliceMarker> m)
     markers = std::move(out);
 }
 
-void SliceList::applyDetected(const std::vector<int>& detected, int minLength)
+void SliceList::applyDetected(const std::vector<int>& detected, int minLength, int carryWithin)
 {
+    const auto before = markers;
     // Phase 1: keep the pinned markers (and the one at 0), then add each detected position that is not too close to a kept one.
     std::vector<SliceMarker> kept;
     for (const auto& k : markers)
@@ -56,10 +57,12 @@ void SliceList::applyDetected(const std::vector<int>& detected, int minLength)
         if (clear) kept.push_back({ p, false });
     }
     rebuild(std::move(kept));
+    carrySettings(before, carryWithin);
 }
 
-void SliceList::divideEvenly(int parts)
+void SliceList::divideEvenly(int parts, int carryWithin)
 {
+    const auto before = markers;
     std::vector<SliceMarker> kept;
     for (const auto& k : markers)
         if (k.pinned) kept.push_back(k);
@@ -67,6 +70,21 @@ void SliceList::divideEvenly(int parts)
     for (int i = 0; i < parts; ++i)
         kept.push_back({ (int) ((long long) length * i / parts), false });
     rebuild(std::move(kept));
+    carrySettings(before, carryWithin);
+}
+
+void SliceList::carrySettings(const std::vector<SliceMarker>& before, int within)
+{
+    if (within <= 0) return;
+    for (auto& m : markers)
+    {
+        if (m.pinned) continue;   // a kept marker already has its own settings
+        const SliceMarker* nearest = nullptr;
+        for (const auto& b : before)
+            if (std::abs(b.position - m.position) <= within && (nearest == nullptr || std::abs(b.position - m.position) < std::abs(nearest->position - m.position)))
+                nearest = &b;
+        if (nearest != nullptr) m.settings = nearest->settings;
+    }
 }
 
 int SliceList::addMarker(int position, int minLength)

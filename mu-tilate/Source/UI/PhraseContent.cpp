@@ -44,6 +44,7 @@ PhraseContent::PhraseContent(PhraseHost& h)
     addKnob(ppi::dlow,  "Low",  LF::knobEuclidean, "Low Cut: sounds below this are ignored when looking for hits", mu_fmt::Unit::Hz);
     addKnob(ppi::dhigh, "High", LF::knobEuclidean, "High Cut: sounds above this are ignored when looking for hits", mu_fmt::Unit::Hz);
     addAndMakeVisible(detectButton);
+    detectButton.setTooltip("Detect again with these settings. Slices you placed or moved by hand stay; the others are replaced (settings stay with a cut that moved a little) and the timeline is laid out in source order.");
     detectButton.onClick = [this] { host.redetectSlices(currentLayer); };
 
     addAndMakeVisible(waveform);

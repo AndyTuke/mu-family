@@ -169,6 +169,11 @@ void PluginProcessor::redetectSlices(int layer)
             if (! flag->load() || detectGeneration[(size_t) layer].load() != gen) return;   // gone, or a newer Detect
             auto& ph = getPhrase(layer);
             if (ph.getData() == nullptr || ph.getData()->audioId != data->audioId) return;   // another loop arrived meanwhile
+            if (ph.getData()->version != data->version)   // edits made while it ran would be lost: leave them, say so
+            {
+                loopStatus[(size_t) layer] = ph.loopName() + ": the slices changed while Detect ran, so it was not applied. Press Detect again.";
+                return;
+            }
             const double total = layOutInOrder(layer, *slices, data->fileSampleRate, loopTempo);
             loopStatus[(size_t) layer] = ph.loopName() + ": " + juce::String(slices->size()) + " slices, "
                                        + juce::String(total, 1) + " beats at " + juce::String(loopTempo, 0) + " BPM";
