@@ -51,6 +51,7 @@ inline const char* const kInsertAlgorithmNames[] = {
     "VocoderSt",    // 13
     "Overdrive",    // 14
     "TapeDelay",    // 15
+    "TapeSpring",   // 16
     nullptr
 };
 
@@ -251,6 +252,7 @@ inline constexpr InsertMenuEntry kInsertMenu[] = {
     {  9, "Ring Mod",   110 },
     {  1, "Soft Clip",  120 },
     { 15, "Tape Delay", 125 },
+    { 16, "Tape Spring", 126 },
     { 10, "Tape Sat",   130 },
     { 12, "Vocoder",    140 },
     { 13, "Vocoder St", 150 },

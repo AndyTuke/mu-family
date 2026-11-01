@@ -16,6 +16,7 @@
 #include "Audio/FX/Insert/VocoderInsert.h"
 #include "Audio/FX/Insert/OverdriveInsert.h"
 #include "Audio/FX/Insert/TapeDelayInsert.h"
+#include "Audio/FX/Insert/TapeSpringInsert.h"
 
 InsertProcessor::InsertProcessor()
 {
@@ -55,6 +56,7 @@ InsertProcessor::InsertProcessor()
     dispatch[13] = add(std::make_unique<VocoderInsert>(true));
     dispatch[14] = add(std::make_unique<OverdriveInsert>());
     dispatch[15] = add(std::make_unique<TapeDelayInsert>());
+    dispatch[16] = add(std::make_unique<TapeSpringInsert>());
 }
 
 void InsertProcessor::prepare(double sampleRate, int blockSize)

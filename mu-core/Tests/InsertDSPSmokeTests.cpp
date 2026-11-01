@@ -26,6 +26,7 @@
 #include "Audio/FX/Insert/TapeSatInsert.h"
 #include "Audio/FX/Insert/OverdriveInsert.h"
 #include "Audio/FX/Insert/TapeDelayInsert.h"
+#include "Audio/FX/Insert/TapeSpringInsert.h"
 #include "Audio/FX/Insert/KarplusStrongInsert.h"
 #include "Audio/FX/Insert/VocoderInsert.h"
 #include "Audio/VoiceParams.h"
@@ -429,6 +430,12 @@ public:
 
         beginTest ("algo 15: TapeDelayInsert - no crash, no NaN, even at runaway feedback and full wear");
         { TapeDelayInsert a; smokeAlgo(a, "TapeDelayInsert", makeParams(15, { 250.0f, 110.0f, 60.0f, 100.0f })); }
+
+        beginTest ("algo 16: TapeSpringInsert - no crash, no NaN, in every mode and at full intensity");
+        {
+            for (float mode : { 1.0f, 4.0f, 7.0f, 11.0f, 12.0f })
+            { TapeSpringInsert a; smokeAlgo(a, "TapeSpringInsert", makeParams(16, { mode, 80.0f, 100.0f, 100.0f })); }
+        }
 
         beginTest ("algo 15: TapeDelayInsert - an impulse echoes at Time, each repeat is quieter, and runaway feedback stays bounded");
         {

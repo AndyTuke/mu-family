@@ -31,6 +31,7 @@
 #include "Audio/FX/Insert/RingModInsert.h"
 #include "Audio/FX/Insert/OverdriveInsert.h"
 #include "Audio/FX/Insert/TapeDelayInsert.h"
+#include "Audio/FX/Insert/TapeSpringInsert.h"
 #include "Audio/FX/Insert/TapeSatInsert.h"
 #include "Audio/FX/Insert/KarplusStrongInsert.h"
 #include "Audio/FX/Insert/VocoderInsert.h"
@@ -1074,6 +1075,7 @@ struct InsertLatencyTests : juce::UnitTest
             VocoderInsert a12(false), a13(true);
             OverdriveInsert a14;
             TapeDelayInsert a15;
+            TapeSpringInsert a16;
             checkAlgorithm("None", a0);           checkAlgorithm("SoftClip", a1);   checkAlgorithm("HardClip", a2);
             checkAlgorithm("Fold", a3);           checkAlgorithm("Bitcrusher", a4); checkAlgorithm("Clipper", a5);
             checkAlgorithm("EQ", a6);             checkAlgorithm("Compressor/Limiter", a7);
@@ -1081,13 +1083,14 @@ struct InsertLatencyTests : juce::UnitTest
             checkAlgorithm("Vocoder", a12);       checkAlgorithm("VocoderSt", a13);
             checkAlgorithm("Overdrive", a14);
             checkAlgorithm("TapeDelay", a15);
+            checkAlgorithm("TapeSpring", a16);
 
-            // The registry has 16 slots (Compressor and Limiter share one instance); the construction list
+            // The registry has 17 slots (Compressor and Limiter share one instance); the construction list
             // above must cover every name in the algorithm-name table, so a new algorithm cannot be skipped.
             int named = 0;
             while (mu_audio::kInsertAlgorithmNames[named] != nullptr) ++named;
             expectEquals(named, InsertProcessor::kNumInsertAlgos, "name table and dispatch table agree on the algorithm count");
-            expectEquals(named, 16, "this list constructs 15 classes for 16 slots; a new algorithm means extending it");
+            expectEquals(named, 17, "this list constructs 16 classes for 17 slots; a new algorithm means extending it");
         }
 
         beginTest("a step through every insert slot of the real processor shows its first output at sample 0");

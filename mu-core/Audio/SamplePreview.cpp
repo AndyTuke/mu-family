@@ -41,12 +41,12 @@ void SamplePreview::collectRetired()
 void SamplePreview::start(const juce::File& file)
 {
     // The decode runs outside the lock (a long file would otherwise hold it); the lock covers only the rate read and the publish.
-    double sampleRate;
+    double rate;
     {
         const juce::ScopedLock sl(messageLock);
-        sampleRate = this->sampleRate;
+        rate = sampleRate;
     }
-    if (sampleRate <= 0.0) return;   // not prepared yet: nothing to convert to, so ignore the request
+    if (rate <= 0.0) return;   // not prepared yet: nothing to convert to, so ignore the request
     if (!file.existsAsFile()) return;
     std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(file));
     if (!reader || reader->lengthInSamples <= 0) return;
@@ -54,7 +54,7 @@ void SamplePreview::start(const juce::File& file)
     const double srcRate = reader->sampleRate > 0.0 ? reader->sampleRate : 44100.0;
     const int srcLen = (int) juce::jmin<juce::int64>(reader->lengthInSamples, (juce::int64) (kMaxSeconds * srcRate));
     // The interpolator can read a few samples past the end when downsampling, so the buffer carries zero padding.
-    const double ratio = srcRate / sampleRate;
+    const double ratio = srcRate / rate;
     const int pad = (int) std::ceil(juce::jmax(1.0, ratio)) + 8;
     juce::AudioBuffer<float> src(2, srcLen + pad);
     src.clear();
@@ -71,7 +71,7 @@ void SamplePreview::start(const juce::File& file)
     }
     // Phase 2: convert to the device rate with Lagrange interpolation, as the transport's resampler did.
     auto dec = std::make_unique<Decoded>();
-    if (std::abs(srcRate - sampleRate) > 1.0e-6)
+    if (std::abs(srcRate - rate) > 1.0e-6)
     {
         const int outLen = (int) std::ceil((double) srcLen / ratio);
         dec->audio.setSize(2, outLen);

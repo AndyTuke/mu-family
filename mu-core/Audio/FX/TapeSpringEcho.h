@@ -95,6 +95,9 @@ public:
         for (auto& s : shelfHigh) s.setHighShelf(sr, 3500.0, 12.0 * params.treble);
     }
 
+    // Moves the tape speed to its target at once (the first block after a prepare or reset starts there instead of gliding).
+    void jumpToTarget() noexcept { spacing = targetSpacing; }
+
     // One sample in, the wet pair out.
     void process(float in, float& outL, float& outR) noexcept
     {
