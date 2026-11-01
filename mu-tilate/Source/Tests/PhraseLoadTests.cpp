@@ -1,8 +1,6 @@
-// Loading a loop file and cutting it into slices: a WAV decodes to the file's own channels and rate, a file over the
-// byte cap is rejected with the status-bar message and nothing decoded, a missing file says so, and detection on a
-// loaded loop gives slices that cover it (Even divisions, and onsets with a pinned marker kept).
+// Cutting a loaded loop into slices (loading itself is tested in mu-core, LoopLoaderTests): detection on a loaded loop gives
+// slices that cover it (Even divisions, and onsets with a pinned marker kept).
 
-#include "Analysis/LoopTempo.h"
 #include "Audio/LoopLoader.h"
 #include "MuLimits.h"
 #include "Sequencer/PhraseAnalysis.h"
@@ -46,47 +44,8 @@ struct PhraseLoadTests : public juce::UnitTest
 
     void runTest() override
     {
-        beginTest("a loop's tempo is guessed from its length as a whole number of beats");
-        {
-            expectWithinAbsoluteError(mu_core::estimateTempoFromLength(12.0), 80.0, 1.0e-9);    // 16 beats (4 bars) at 80
-            expectWithinAbsoluteError(mu_core::estimateTempoFromLength(2.0), 120.0, 1.0e-9);    // 4 beats
-            expectWithinAbsoluteError(mu_core::estimateTempoFromLength(7.5), 128.0, 1.0e-9);    // 16 beats at 128
-            expectWithinAbsoluteError(mu_core::estimateTempoFromLength(1.5), 160.0, 1.0e-9);    // 4 beats at 160
-            expectEquals(mu_core::estimateTempoFromLength(0.2), 0.0);                           // a one-shot: no tempo
-            expectEquals(mu_core::estimateTempoFromLength(0.0), 0.0);
-        }
-
         const auto dir = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("mu-tilate-load-tests");
         dir.createDirectory();
-
-        beginTest("a WAV decodes to its own channels and sample rate");
-        {
-            const auto f = writeLoop(dir, "stereo.wav", 48000, 2, 44100.0);
-            const auto l = mu_core::loadLoop(f, mu_limits::kMaxLoopBytes);
-            expect(l.ok(), l.error);
-            expectEquals(l.audio->getNumChannels(), 2);
-            expectEquals(l.audio->getNumSamples(), 48000);
-            expectEquals(l.sampleRate, 44100.0);
-            expectEquals(l.name, juce::String("stereo"));
-            const auto m = mu_core::loadLoop(writeLoop(dir, "mono.wav", 24000, 1), mu_limits::kMaxLoopBytes);
-            expectEquals(m.audio->getNumChannels(), 1);                // a mono file stays mono
-        }
-
-        beginTest("a file over the byte cap is rejected before decoding, with the status message");
-        {
-            const auto f = writeLoop(dir, "long.wav", 96000, 2);        // 2 s stereo = 768000 bytes
-            const auto l = mu_core::loadLoop(f, 400000);
-            expect(! l.ok());
-            expect(l.error.startsWith("Loop too long: 2.0 s, limit 1.0 s"), l.error);
-        }
-
-        beginTest("a missing or unreadable file says so");
-        {
-            expect(mu_core::loadLoop(dir.getChildFile("nope.wav"), 1000000).error.startsWith("File not found"));
-            const auto junk = dir.getChildFile("junk.wav");
-            junk.replaceWithText("not audio");
-            expect(mu_core::loadLoop(junk, 1000000).error.startsWith("Cannot read"));
-        }
 
         beginTest("detection on a loaded loop: onsets cover it, Even divides it, a pinned marker survives");
         {
@@ -106,23 +65,6 @@ struct PhraseLoadTests : public juce::UnitTest
             DetectSettings even; even.method = 2; even.evenParts = 8;
             expectEquals(detectSlices({}, *l.audio, even).size(), 8);
             expect(analyseLoop(*l.audio, l.sampleRate, even).empty());
-        }
-
-        beginTest("resampling keeps the pitch, the level and the length ratio");
-        {
-            const int n = 44100;
-            juce::AudioBuffer<float> src(2, n);
-            for (int c = 0; c < 2; ++c)
-                for (int i = 0; i < n; ++i) src.setSample(c, i, 0.5f * std::sin(2.0f * juce::MathConstants<float>::pi * 1000.0f * (float) i / 44100.0f));
-            const auto out = mu_core::resampleLoop(src, 44100.0, 48000.0);
-            expectEquals(out->getNumChannels(), 2);
-            expectEquals(out->getNumSamples(), 48000);
-            int zc = 0;
-            for (int i = 4001; i < 44000; ++i)
-                if ((out->getSample(0, i - 1) < 0.0f) != (out->getSample(0, i) < 0.0f)) ++zc;
-            expectGreaterOrEqual(zc, 2 * 1000 * 39999 / 48000 - 2);      // 1 kHz stays 1 kHz
-            expectLessOrEqual(zc, 2 * 1000 * 39999 / 48000 + 2);
-            expectWithinAbsoluteError(out->getMagnitude(0, 4000, 40000), 0.5f, 0.02f);
         }
 
         dir.deleteRecursively();

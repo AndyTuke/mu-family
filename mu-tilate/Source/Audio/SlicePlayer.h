@@ -1,5 +1,8 @@
 #pragma once
 
+#include "Audio/AgeEnvelope.h"      // mu-core: the stateless attack/decay/sustain envelope
+#include "Audio/EqualPowerPan.h"    // mu-core
+#include "Audio/TptSvf.h"            // mu-core: the per-voice state-variable filter
 #include "Sequencer/SliceSettings.h"
 
 #include <juce_audio_basics/juce_audio_basics.h>
@@ -108,8 +111,7 @@ private:
         float  cutStep    = 0.0f;      // cutGain decrease per sample once cut (the amp release, never faster than the cut fade)
         float  fltRel     = 0.0f;      // filter envelope release progress 0..1, runs once cut
         float  fltRelStep = 0.0f;
-        float  ic1[2] = { 0.0f, 0.0f }, ic2[2] = { 0.0f, 0.0f };   // state-variable filter state, per channel
-        float  fa1 = 0.0f, fa2 = 0.0f, fa3 = 0.0f, fk = 1.0f;      // its coefficients, refreshed every few samples
+        mu_core::TptSvf svf;           // the slice's filter; its coefficients are refreshed every few samples
 
         // Stretch (stretcher < 0 means a native or re-pitched voice).
         int    stretcher  = -1;    // which of the two stretchers this voice owns
@@ -134,7 +136,6 @@ private:
     void emit(Voice& v, juce::AudioBuffer<float>& out, int index, float* frame, int channels, float gain) noexcept;
     // Refreshes the filter's coefficients from the cutoff and the filter envelope at the voice's age.
     void updateFilter(Voice& v) noexcept;
-    static float envelope(double ageSamples, float aMs, float dMs, float sustain, double sampleRate) noexcept;
 
     void renderNative(Voice& v, juce::AudioBuffer<float>& out, int offset, int n) noexcept;
     void renderStretched(Voice& v, juce::AudioBuffer<float>& out, int offset, int n) noexcept;

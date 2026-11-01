@@ -97,9 +97,7 @@ void SlicePlayer::triggerPre(const juce::AudioBuffer<float>* src, SliceRange ran
     const float tone = juce::jlimit(-1.0f, 1.0f, p.own.preTone);
     if (tone < -0.01f)     { v.own.filterType = 1; v.own.cutoffHz = 20000.0f * std::pow(0.0125f, -tone); }
     else if (tone > 0.01f) { v.own.filterType = 2; v.own.cutoffHz = 20.0f * std::pow(100.0f, tone); }
-    const float pa = (juce::jlimit(-1.0f, 1.0f, p.own.pan) + 1.0f) * 0.25f * juce::MathConstants<float>::pi;
-    v.panL = std::cos(pa) * 1.41421356f;
-    v.panR = std::sin(pa) * 1.41421356f;
+    mu_core::equalPowerPan(p.own.pan, v.panL, v.panR);   // equal power; a mono output ignores it
     // A free pre-fade voice, else the one furthest along (it is nearest its hit).
     Voice* slot = &preVoices[0];
     if (preVoices[0].active && preVoices[1].active) slot = preVoices[1].age > preVoices[0].age ? &preVoices[1] : &preVoices[0];
@@ -119,26 +117,13 @@ void SlicePlayer::cutSlices() noexcept
         }
 }
 
-// ADSR value at `ageSamples` for a gate that stays on: linear attack and decay to the sustain level.
-float SlicePlayer::envelope(double ageSamples, float aMs, float dMs, float sustain, double sampleRate) noexcept
-{
-    const double a = (double) aMs * 0.001 * sampleRate, d = (double) dMs * 0.001 * sampleRate;
-    if (ageSamples < a) return (float) (ageSamples / a);
-    if (d <= 0.0) return sustain;
-    return (float) (1.0 - (1.0 - (double) sustain) * std::min(1.0, (ageSamples - a) / d));
-}
-
 void SlicePlayer::updateFilter(Voice& v) noexcept
 {
     const auto& o = v.own;
     // The cutoff moves up to five octaves with the filter envelope, which fades to 0 over its release once the slice is cut.
-    const float env = envelope((double) v.age, o.fltA, o.fltD, o.fltS, sr) * (1.0f - v.fltRel);
-    const double fc = std::clamp((double) o.cutoffHz * std::exp2((double) o.filterEnvAmt * (double) env * 5.0), 20.0, 0.45 * sr);
-    const float g = (float) std::tan(juce::MathConstants<double>::pi * fc / sr);
-    v.fk  = 2.0f * (1.0f - 0.98f * juce::jlimit(0.0f, 1.0f, o.resonance));
-    v.fa1 = 1.0f / (1.0f + g * (g + v.fk));
-    v.fa2 = g * v.fa1;
-    v.fa3 = g * v.fa2;
+    const float env = mu_core::adsAtAge((double) v.age, o.fltA, o.fltD, o.fltS, sr) * (1.0f - v.fltRel);
+    v.svf.setTap(o.filterType == 1 ? mu_core::TptSvf::Tap::lowpass : (o.filterType == 2 ? mu_core::TptSvf::Tap::highpass : mu_core::TptSvf::Tap::bandpass));
+    v.svf.setCoefficients(o.cutoffHz * (float) std::exp2((double) o.filterEnvAmt * (double) env * 5.0), o.resonance, sr);
 }
 
 // One frame through the slice's shaping. State-variable filter: Cytomic's linear trapezoidal (zero-delay) form.
@@ -147,18 +132,9 @@ void SlicePlayer::emit(Voice& v, juce::AudioBuffer<float>& out, int index, float
     if (v.own.filterType > 0)
     {
         if (v.age % kFilterUpdate == 0) updateFilter(v);
-        for (int ch = 0; ch < channels; ++ch)
-        {
-            const float in = frame[ch];
-            const float v3 = in - v.ic2[ch];
-            const float v1 = v.fa1 * v.ic1[ch] + v.fa2 * v3;
-            const float v2 = v.ic2[ch] + v.fa2 * v.ic1[ch] + v.fa3 * v3;
-            v.ic1[ch] = 2.0f * v1 - v.ic1[ch];
-            v.ic2[ch] = 2.0f * v2 - v.ic2[ch];
-            frame[ch] = v.own.filterType == 1 ? v2 : (v.own.filterType == 2 ? in - v.fk * v1 - v2 : v1 * v.fk);   // band-pass scaled to unity peak, whatever the resonance
-        }
+        for (int ch = 0; ch < channels; ++ch) frame[ch] = v.svf.process(frame[ch], ch);
     }
-    const float g = gain * envelope((double) v.age, v.own.ampA, v.own.ampD, v.own.ampS, sr);
+    const float g = gain * mu_core::adsAtAge((double) v.age, v.own.ampA, v.own.ampD, v.own.ampS, sr);
     for (int ch = 0; ch < channels; ++ch)
         out.getWritePointer(ch)[index] += g * frame[ch] * (channels == 2 ? (ch == 0 ? v.panL : v.panR) : 1.0f);
     if (v.fading) v.fltRel = std::min(1.0f, v.fltRel + v.fltRelStep);
@@ -192,10 +168,7 @@ void SlicePlayer::trigger(const juce::AudioBuffer<float>* src, SliceRange range,
     v.loop = p.own.loop;
     v.pitch = pitch;
     v.cutStep = cutStep;
-    // Equal-power pan; a mono output ignores it.
-    const float pa = (juce::jlimit(-1.0f, 1.0f, p.own.pan) + 1.0f) * 0.25f * juce::MathConstants<float>::pi;
-    v.panL = std::cos(pa) * 1.41421356f;
-    v.panR = std::sin(pa) * 1.41421356f;
+    mu_core::equalPowerPan(p.own.pan, v.panL, v.panR);   // equal power; a mono output ignores it
     v.src        = src;
     v.range      = range;
     v.step       = (p.reverse ? -(double) rate : (double) rate) * pitch;

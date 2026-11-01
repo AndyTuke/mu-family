@@ -8,6 +8,10 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/../cmake/ProcessorTestSources.cmake")
 
 set(MU_CORE_TEST_SOURCES
     TestMain.cpp
+    OnsetDetectorTests.cpp   # onset detection on synthetic loops (Analysis/OnsetDetector)
+    LoopTempoTests.cpp   # the tempo guess from a loop's length (Analysis/LoopTempo.h)
+    LoopLoaderTests.cpp   # loop decode, byte cap, errors and resampling (Audio/LoopLoader)
+    VoiceDspTests.cpp   # equal-power pan, the per-voice state-variable filter and the age envelope (Audio/*.h)
     ActivationAndProgramChangeTests.cpp
     SamplePreviewTests.cpp
     EmbeddedSampleTests.cpp   # preset samples: FLAC round trip is sample-identical
@@ -134,6 +138,8 @@ endforeach()
 function(mu_core_add_test_target name max_layers max_buses bus_inserts)
     juce_add_console_app(${name} PRODUCT_NAME "${name}")
     target_sources(${name} PRIVATE ${MU_CORE_TEST_SOURCES} ${_chrome_extra})
+    # The analysis and loop-decode sources under test (the mu-core library is sources compiled into each consumer).
+    target_sources(${name} PRIVATE "${CMAKE_SOURCE_DIR}/mu-core/Analysis/OnsetDetector.cpp" "${CMAKE_SOURCE_DIR}/mu-core/Audio/LoopLoader.cpp")
     target_compile_features(${name} PRIVATE cxx_std_17)
     target_include_directories(${name} PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}"
