@@ -74,6 +74,8 @@ A panel showing the current (selected) slice, built from shared knobs and the fa
 
 These are plain per-slice values (see the persistence note). Slice settings that are in the `ModTarget` table show the live modulation arc.
 
+**Placement (Andy, 2026-11-01):** the slice player shares the waveform's area and is toggled with it: a two-way switch (*Waveform* / *Slice player*) above the area swaps the two, so the player gets the full height (filter and envelopes need it) while the timeline stays on screen below. The player edits the slice selected in the waveform (or by its pad); selecting a slice while the player is showing keeps the player showing. Filter and both envelopes are in scope for the first version, so the engine work (per-slice filter, two ADSRs, pan, pitch, choke, play mode) and the per-slice data model come before the panel.
+
 ### Timeline ★
 - **One row per layer** (Andy, 2026-10-30): each of the 8 layers has one mixer strip, FX sends and modulation, exactly one loop and one sample player. Its timeline is a single row of slice blocks played by that one player; there are no lanes. To layer sounds, use another layer. Each layer is **monophonic** (decided): one slice at a time, the next slice cuts the previous one through the short automatic fade.
 - **Length:** adjustable, 1 to 64 bars (the Length control). The timeline is **drag-scrollable** (drag the background, or wheel) and zoomable when longer than the view, and keeps its playhead in view while following the transport.
