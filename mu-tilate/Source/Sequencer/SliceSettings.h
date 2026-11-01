@@ -10,10 +10,16 @@ struct SliceSettings
 {
     // Slice
     bool  reverse   = false;    // plays backwards; a timeline block that is reversed too cancels it out
-    float gain      = 1.0f;     // linear, 0..2
+    float levelDb   = 0.0f;     // -24..+12 dB, added to the layer's level (sends stay the layer's)
     float pan       = 0.0f;     // -1 (left) .. 1 (right)
     float fadeInMs  = 0.0f;     // added to the layer's fade in
     float fadeOutMs = 0.0f;     // added to the layer's fade out
+
+    // Pre-fade: a quiet reversed copy of the start of the slice that swells into the hit, mixed over whatever plays before it.
+    bool  preFade     = false;
+    float preLevelDb  = -12.0f;   // -36..0 dB below the slice's own level
+    float preLengthMs = 150.0f;   // 10..1000 ms, ending exactly where the slice starts
+    float preTone     = 0.0f;     // -1 (darker) .. 1 (thinner)
 
     // Pitch
     float pitchSemi = 0.0f;     // -24..24 semitones

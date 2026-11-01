@@ -170,6 +170,54 @@ struct PhraseTests : public juce::UnitTest
             expectEquals(out.getSample(0, 6000 + 400), 0.0f);
         }
 
+        beginTest("a slice's level adds to the layer's, in dB");
+        {
+            Rig r;
+            r.timeline.place(0, 0.0, 0.0);
+            SliceSettings own; own.levelDb = -6.0f;
+            r.slices.setSettings(0, own);
+            auto out = r.run(2000, 256);
+            expectWithinAbsoluteError(out.getSample(0, 100), 0.1f * 0.501187f, 1.0e-4f);
+        }
+
+        beginTest("a pre-fade swells in before the hit, ending where the slice starts");
+        {
+            Rig r;
+            r.timeline.place(1, 2.0, 0.0);                                // slice 1 (0.2) at beat 2 = sample 48000
+            SliceSettings own; own.preFade = true; own.preLengthMs = 100.0f; own.preLevelDb = -12.0f;
+            r.slices.setSettings(1, own);
+            auto out = r.run(96000, 333);
+            expectEquals(out.getSample(0, 40000), 0.0f);                  // before the swell: silence
+            expectLessOrEqual(std::abs(out.getSample(0, 43300)), 0.005f); // the swell has just begun
+            const float end = out.getSample(0, 47990);                    // the swell is at its full level (0.2 at -12 dB)
+            expectGreaterThan(end, 0.045f); expectLessThan(end, 0.052f);
+            expectWithinAbsoluteError(out.getSample(0, 48010), 0.2f, 1.0e-5f);   // then the hit itself
+        }
+
+        beginTest("a pre-fade mixes over the slice before it, which is not cut");
+        {
+            Rig r;
+            r.timeline.place(0, 1.0, 0.0);                                // slice 0 (0.1) from sample 24000
+            r.timeline.place(1, 1.5, 0.0);                                // slice 1 (0.2) at sample 36000
+            SliceSettings own; own.preFade = true; own.preLengthMs = 100.0f; own.preLevelDb = -12.0f;
+            r.slices.setSettings(1, own);
+            auto out = r.run(60000, 128);
+            expectWithinAbsoluteError(out.getSample(0, 30000), 0.1f, 1.0e-5f);          // before the swell: the old slice alone
+            const float both = out.getSample(0, 35990);                                  // the swell on top of the old slice
+            expectGreaterThan(both, 0.145f); expectLessThan(both, 0.152f);
+        }
+
+        beginTest("a pre-fade on a block near the start of the timeline sounds at the end of the previous pass");
+        {
+            Rig r;
+            r.timeline.place(1, 0.0, 0.0);
+            SliceSettings own; own.preFade = true; own.preLengthMs = 100.0f;
+            r.slices.setSettings(1, own);
+            auto out = r.run(96000 + 2000, 256);                          // one pass (4 beats = 96000 samples) and a little more
+            expectGreaterThan(out.getSample(0, 96000 - 10), 0.04f);       // the end of pass one carries the swell
+            expectWithinAbsoluteError(out.getSample(0, 96000 + 50), 0.2f, 1.0e-5f);
+        }
+
         beginTest("a transport jump re-anchors: the old slice fades and the new position plays");
         {
             Rig r;

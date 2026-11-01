@@ -64,7 +64,13 @@ public:
     bool isActive() const noexcept { return player.isActive(); }
 
 private:
+    // The slice player's parameters for block `b` and the slice's range in the (possibly rescaled) audio.
+    SliceParams paramsFor(const PhraseLoop& loop, const PhraseSettings& s, const PhraseClock& c, const TimelineBlock& b, SliceRange& range) const noexcept;
     void trigger(const PhraseLoop& loop, const PhraseSettings& s, const PhraseClock& c, const TimelineBlock& b) noexcept;
+
+    // A block's pre-fade: its source range, its length in output samples and its parameters. False when the slice has none.
+    struct Pre { SliceRange range; int duration = 0; SliceParams params; };
+    bool preFor(const PhraseLoop& loop, const PhraseSettings& s, const PhraseClock& c, const TimelineBlock& b, Pre& pre) const noexcept;
 
     SlicePlayer player;
     bool   anchored    = false;   // expectedBeat is valid

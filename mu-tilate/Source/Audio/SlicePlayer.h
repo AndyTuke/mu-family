@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Sequencer/SliceSettings.h"
+
 #include <juce_audio_basics/juce_audio_basics.h>
 
 #include <array>
@@ -35,6 +37,10 @@ struct SliceParams
     float timeRatio = 1.0f;
     float holdMs    = 10.0f;    // Transient hold: how long the slice starts as the source itself
     float strength  = 1.0f;     // 0 = no dry head (a uniform stretch from the first sample), 1 = the full hold
+
+    // The slice's own settings. The player uses pan, pitch, filter, both envelopes and loop; gain, fades and reverse are
+    // the fields above (the caller has already combined them with the layer's and the block's).
+    SliceSettings own;
 };
 
 class SlicePlayer
@@ -63,7 +69,13 @@ public:
     // Audio thread: starts `range` of `src` now. A slice already sounding is cut through the cut fade. `src` is
     // read until the voice ends, so the layer keeps the loop alive until then (the hot-swap boundary).
     void trigger(const juce::AudioBuffer<float>* src, SliceRange range, const SliceParams& p) noexcept;
-    // Audio thread: fades the slice that is sounding out through the cut fade (a gap in the timeline, a stop).
+    // Audio thread: starts a pre-fade now: `range` of `src` (the first part of a slice) played backwards, swelling from silence to
+    // p.gain over its whole length, so it ends at the slice's first sample. It is a voice of its own: it mixes over whatever
+    // is sounding and a slice trigger or a cutSlices does not touch it. p.rate and p.own.pan / preTone shape it.
+    void triggerPre(const juce::AudioBuffer<float>* src, SliceRange range, const SliceParams& p) noexcept;
+    // Audio thread: fades the slice that is sounding out through the cut fade (a gap in the timeline). A pre-fade runs on.
+    void cutSlices() noexcept;
+    // Audio thread: fades everything out, the pre-fade too (a stop, a locate).
     void cut() noexcept;
     // Audio thread: adds the sounding voices into out[0, n); a mono source goes to every output channel.
     void render(juce::AudioBuffer<float>& out, int n) noexcept;
@@ -87,6 +99,18 @@ private:
         float  cutGain    = 1.0f;
         bool   active     = false;
 
+        // The slice's own shaping (SliceSettings): pan gains, loop, the pitch ratio, the filter and the two envelopes.
+        float  panL = 1.0f, panR = 1.0f;
+        bool   loop = false;
+        bool   swell = false;          // the fade-in follows a squared ramp (the pre-fade)
+        double pitch = 1.0;            // source samples per output sample from the pitch settings (1 = unchanged)
+        SliceSettings own;
+        float  cutStep    = 0.0f;      // cutGain decrease per sample once cut (the amp release, never faster than the cut fade)
+        float  fltRel     = 0.0f;      // filter envelope release progress 0..1, runs once cut
+        float  fltRelStep = 0.0f;
+        float  ic1[2] = { 0.0f, 0.0f }, ic2[2] = { 0.0f, 0.0f };   // state-variable filter state, per channel
+        float  fa1 = 0.0f, fa2 = 0.0f, fa3 = 0.0f, fk = 1.0f;      // its coefficients, refreshed every few samples
+
         // Stretch (stretcher < 0 means a native or re-pitched voice).
         int    stretcher  = -1;    // which of the two stretchers this voice owns
         double ratio      = 1.0;
@@ -105,6 +129,12 @@ private:
     // True while the voice's read position is inside its slice.
     static bool inRange(const Voice& v) noexcept;
 
+    // The shaping of one output frame (up to two channels): the filter, then the amp envelope, pan and gain into `out`.
+    void emit(Voice& v, juce::AudioBuffer<float>& out, int index, float* frame, int channels, float gain) noexcept;
+    // Refreshes the filter's coefficients from the cutoff and the filter envelope at the voice's age.
+    void updateFilter(Voice& v) noexcept;
+    static float envelope(double ageSamples, float aMs, float dMs, float sustain, double sampleRate) noexcept;
+
     void renderNative(Voice& v, juce::AudioBuffer<float>& out, int offset, int n) noexcept;
     void renderStretched(Voice& v, juce::AudioBuffer<float>& out, int offset, int n) noexcept;
     // Seeks the voice's stretcher so its output at age `startAge` is the source at startAge / ratio.
@@ -114,10 +144,12 @@ private:
 
     static constexpr int kVoices = 4;   // one playing plus the ones still fading out
     std::array<Voice, kVoices> voices {};
+    Voice preVoice;   // the pre-fade (one at a time; a newer one replaces it)
     std::unique_ptr<StretchState> stretch;
     double sr = 48000.0;
     int    maxBlock = 512;
     float  cutStep = 1.0f / 144.0f;   // cutGain decrease per sample (1 / cut-fade samples)
+    static constexpr int kFilterUpdate = 16;   // samples between filter coefficient updates
 };
 
 } // namespace mu_tilate

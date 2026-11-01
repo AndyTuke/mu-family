@@ -126,6 +126,7 @@ juce_add_console_app(mu-tilate-tests PRODUCT_NAME "mu-tilate-tests")
 target_sources(mu-tilate-tests PRIVATE
     Source/Tests/TestMain.cpp
     Source/Tests/SlicePlayerTests.cpp   # the monophonic slice player: native / re-pitch / reverse, fades, the cut fade
+    Source/Tests/SliceShapingTests.cpp   # per-slice pan, pitch, filter, amp envelope, loop and the pre-fade voice
     Source/Tests/SliceDetectionTests.cpp   # onset detection on synthetic loops, and the slice list
     Source/Tests/StretchSliceTests.cpp   # the stretched slice: length, dry head, pitch and level, no pre-echo, no allocation
     Source/Tests/PhraseTests.cpp   # the timeline model and the transport-anchored scheduler

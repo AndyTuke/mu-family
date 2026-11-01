@@ -31,7 +31,7 @@ struct PhraseStateTests : public juce::UnitTest
             in.slices = SliceList(96000);
             in.slices.applyDetected({ 24000, 48000 });
             SliceSettings own;
-            own.reverse = true; own.gain = 0.5f; own.pan = -0.25f; own.pitchSemi = 7.0f; own.fineCents = 12.0f;
+            own.reverse = true; own.levelDb = -6.0f; own.preFade = true; own.preLengthMs = 200.0f; own.preTone = -0.5f; own.pan = -0.25f; own.pitchSemi = 7.0f; own.fineCents = 12.0f;
             own.filterType = 2; own.cutoffHz = 800.0f; own.resonance = 0.4f; own.ampA = 5.0f; own.fltR = 250.0f;
             own.oneShot = false; own.chokeGroup = 3;
             in.slices.setSettings(1, own);
@@ -44,10 +44,10 @@ struct PhraseStateTests : public juce::UnitTest
             const auto out = readPhraseState(node);
             const auto& g = out.slices.settings(1);
             expect(g.reverse && ! g.oneShot);
-            expectEquals(g.gain, 0.5f); expectEquals(g.pan, -0.25f); expectEquals(g.pitchSemi, 7.0f); expectEquals(g.fineCents, 12.0f);
+            expectEquals(g.levelDb, -6.0f); expect(g.preFade); expectEquals(g.preLengthMs, 200.0f); expectEquals(g.preTone, -0.5f); expectEquals(g.pan, -0.25f); expectEquals(g.pitchSemi, 7.0f); expectEquals(g.fineCents, 12.0f);
             expectEquals(g.filterType, 2); expectEquals(g.cutoffHz, 800.0f); expectEquals(g.resonance, 0.4f);
             expectEquals(g.ampA, 5.0f); expectEquals(g.fltR, 250.0f); expectEquals(g.chokeGroup, 3);
-            expect(! out.slices.settings(0).reverse && out.slices.settings(0).gain == 1.0f);
+            expect(! out.slices.settings(0).reverse && out.slices.settings(0).levelDb == 0.0f && ! out.slices.settings(0).preFade);
         }
 
         beginTest("slices, pins, blocks and the loop reference round-trip");
