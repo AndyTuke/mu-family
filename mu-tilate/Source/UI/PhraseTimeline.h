@@ -10,7 +10,8 @@
 // The Phrase layer's timeline view (docs/mu-tilate/design-ui.md, "Timeline"): a ruler in bars and beats over one row of slice
 // blocks. It shows the Timeline it is given and reports what the user asked for; it edits nothing itself. A click on empty row
 // asks to place the slice the host names, a drag moves a block (Alt = free, Ctrl = copy), Delete removes the selected block.
-// The whole timeline is shown (zoom and scroll for long ones come next).
+// A long timeline is zoomed and scrolled: the wheel scrolls, Ctrl+wheel zooms around the pointer, and while it plays the view
+// pages on to keep the playhead in sight. Dragging a block's right edge sets its length (Alt = free, else the grid).
 namespace mu_tilate
 {
 
@@ -37,6 +38,9 @@ public:
     void mouseDown(const juce::MouseEvent&) override;
     void mouseDrag(const juce::MouseEvent&) override;
     void mouseUp(const juce::MouseEvent&) override;
+    void mouseMove(const juce::MouseEvent&) override;
+    void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
+    void resized() override { clampView(); }
     bool keyPressed(const juce::KeyPress&) override;
 
 private:
@@ -47,17 +51,25 @@ private:
     // The beats block `i` covers on screen: its own length, else its slice's, cut short by the next block.
     double blockBeats(int i) const;
     int    blockAt(int x) const;
+    // True when x is on the right edge of block `i` (where a drag changes its length).
+    bool   onRightEdge(int i, int x) const;
+    // Keeps the view inside the timeline: at least two beats, at most all of it.
+    void   clampView();
 
     Timeline timeline;
     std::vector<double> sliceBeatsList;
     double gridBeats = 0.25;
     int    selected = -1;
     double playhead = -1.0;
+    double viewStart = 0.0;      // the beat at the left edge
+    double viewBeats = 0.0;      // how many beats the width shows (0 = the whole timeline)
+    double lastLength = 0.0;     // the timeline length the view was last fitted to
 
     // Drag state: which block, where in it the pointer grabbed it, and whether it copies.
     int    dragBlock = -1;
     double grabOffset = 0.0;
     bool   dragMoved = false;
+    bool   resizing = false;     // the drag changes the block's length, not its start
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhraseTimeline)
 };
