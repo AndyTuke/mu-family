@@ -2,17 +2,22 @@
 
 Written only by the build PC. The laptop reads it and answers in [laptop-to-build.md](laptop-to-build.md). Protocol: [README.md](README.md).
 
-Next id: B-003
+Next id: B-004
 
 (B-001 resolved and removed: see the Extra entry below.)
 
 ## Status (build PC)
 
-- Written: 2026-10-31, updated late the same day. Build number 1456 (`mu-core/BuildNumber.h`); Debug and Release of all products were built at 1456, then focused rebuilds after it (no number change). Everything is pushed.
-- Andy listened to and looked at: L-001 (mu-link), L-003 (display scale), L-005 (bypass load), L-006 and L-007 (Karplus, tone knob). Those are closed. Still open for Andy: L-011 listening (below) and the sample browser, which I have not seen on screen.
-- Release VST3s of all five products are deployed to `C:\Program Files\Common Files\VST3` (owner rule: always after a Release build, `tests/scripts/deploy-vst3.ps1`). The mu-Tant one includes the L-011 change.
+- Written: 2026-11-01, end of the mu-Tilate session. Build number 1456 (`mu-core/BuildNumber.h`, focused Debug builds, no increment). Main at the commit before this handover; everything is pushed.
+- mu-Tilate: Standalone/VST3/CLAP built and run; engine, slice player panel, pre-fade, detector, review fixes and the shared mu-core voice DSP are done; `mu-tilate-tests` 84 results and `mu-core-tests` 883, 0 failures (Debug). Rows 1721, 1722, 1724, 1727, 1729 closed with the steward sign-offs (run through general-purpose agents: the named agents are not registered on this PC). Nothing has been listened to by Andy yet; no Release build, no pluginval run.
+- Release VST3s of the other products are as deployed on 2026-10-31.
 
 ## Open
+
+### B-003 · 2026-11-01 · mu-Tilate: decisions and reviews that need planning, not a build
+Rows: #1723, #1725, #1726, #1728, #1730, #1720 · Commits: up to d8796a0e and bb666382 · Needs: decide | review
+Do: (1) #1725: decide what Length (bars) and Snap Markers should be (a real timeline-length parameter with a UI control, or removed); the timeline length lives in the saved state today. (2) #1726: a ux-controller ruling on tokenising the mu-Tilate layout sizes (SlicePanel, PhraseContent, PhraseTimeline, LoopWaveform) into MuLookAndFeel. (3) #1723: pick royalty-free (redistributable in a commercial plugin) sources for factory loops, and plan the manual and release wiring. (4) #1728: whether the percentile normalisation and a grid-aware tempo check are worth doing, and who recalibrates the default sensitivity. (5) #1730: Andy edits the stale lines of `mu-tilate/CLAUDE.md` (7, 13, 17, 28, 34, 49-56) and the root `CLAUDE.md` layout line ("planned, design only, scaffold only"): I did not edit CLAUDE.md files on an agent's say-so. (6) #1720: research the RE-201 spring reverb and the existing tape echo against it (design doc only).
+Report: decisions in the rows or the design docs; nothing for me to build until they are made. Not done on this PC: listening to the mu-Tilate demos in `build/mutilate-demo` (plain, pre-fade, stretch), Release build, pluginval, CPU measurement of the stretcher prime at 192 kHz.
 
 ### B-002 · 2026-10-31 · Stale goldens, mu-Toni pins (the manifests and corpus are done)
 Rows: #1719 · Needs: decide
