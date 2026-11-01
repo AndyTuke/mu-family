@@ -82,6 +82,8 @@ struct Phrase : Layer
     // Message thread: true when the edits a saved file carried were made on a loop of this length, so installLoop applies them.
     bool savedEditsFit(int loopLength) const noexcept { return loopLength > 0 && pending.loopLength == loopLength; }
     const juce::String& loopPath() const noexcept { return path; }
+    // The file the audio now loaded came from (empty when none): differs from loopPath() while a preset's loop is not loaded yet.
+    const juce::String& loadedLoopPath() const noexcept { return loadedPath; }
     const juce::String& loopName() const noexcept { return displayName; }
 
     bool isValidDest(const std::string& id) const override { return isValidModDest(id); }
@@ -145,6 +147,7 @@ private:
     // Message thread only: what a saved layer asked for before its loop was loaded, and where the loop came from.
     PhraseState  pending;
     juce::String path, displayName;
+    juce::String loadedPath;
 
     std::shared_ptr<const PhraseData> data;        // guarded by dataLock
     mutable CopyableSpinLock          dataLock;

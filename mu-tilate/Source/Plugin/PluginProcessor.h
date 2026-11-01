@@ -110,6 +110,8 @@ private:
     // The detection settings from layer `layer`'s parameters (any thread: reads the raw atomics).
     DetectSettings detectSettingsOf(int layer) const;
     void redetectSlices(int layer) override;
+    // Loads the loop a layer's preset or session names when the layer does not hold that file's audio (message thread).
+    void reloadLoopIfNeeded(int layer);
     double layOutInOrder(int layer, const SliceList& slices, double sampleRate, double loopTempo);
 
     std::atomic<double> currentSampleRate { 44100.0 };

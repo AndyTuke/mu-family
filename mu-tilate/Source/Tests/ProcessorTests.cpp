@@ -142,6 +142,41 @@ struct ProcessorTests : public juce::UnitTest
             expect(q.getPhrase(0).loopPath().endsWith("bursts.wav"));
         }
 
+        beginTest("a session restored onto a layer that holds another loop brings in the loop it names");
+        {
+            juce::MemoryBlock saved;
+            {
+                PluginProcessor a;
+                a.prepareToPlay(kSr, kBlock);
+                a.loadLoopAsync(0, file);
+                expect(pumpUntil([&] { return a.getPhrase(0).getData() != nullptr && a.getPhrase(0).getData()->timeline.size() > 0; }));
+                a.getStateInformation(saved);
+            }
+
+            // A shorter loop in the target layer.
+            const int shortFrames = 48000;
+            juce::AudioBuffer<float> sb(1, shortFrames);
+            sb.clear();
+            for (int i = 0; i < 4000; ++i) sb.setSample(0, i, 0.5f * (float) (i % 50) / 50.0f);
+            const auto other = storage.root.getChildFile("other.wav");
+            {
+                juce::WavAudioFormat wav;
+                std::unique_ptr<juce::OutputStream> stream(other.createOutputStream());
+                if (auto w = wav.createWriterFor(stream, juce::AudioFormatWriterOptions {}.withSampleRate(kSr).withNumChannels(1).withBitsPerSample(16)))
+                    w->writeFromAudioSampleBuffer(sb, 0, shortFrames);
+            }
+
+            PluginProcessor b;
+            b.prepareToPlay(kSr, kBlock);
+            b.loadLoopAsync(0, other);
+            expect(pumpUntil([&] { return b.getPhrase(0).getData() != nullptr && b.getPhrase(0).getData()->audio != nullptr
+                                       && b.getPhrase(0).getData()->audio->getNumSamples() == shortFrames; }));
+            b.setStateInformation(saved.getData(), (int) saved.getSize());
+            expect(pumpUntil([&] { return b.getPhrase(0).getData() != nullptr && b.getPhrase(0).getData()->audio != nullptr
+                                       && b.getPhrase(0).getData()->audio->getNumSamples() == 96000; }), "the named loop did not replace the other one");
+            expect(b.getPhrase(0).loadedLoopPath().endsWith("bursts.wav"));
+        }
+
         // Not a check: with MU_TILATE_DEMO_LOOP (a loop file), MU_TILATE_DEMO_TEMPO (its tempo) and MU_TILATE_DEMO_OUT (a folder)
         // set, renders the loop at a faster project tempo in the three tempo modes to WAV files, to be listened to.
         const auto demoLoop = juce::SystemStats::getEnvironmentVariable("MU_TILATE_DEMO_LOOP", {});

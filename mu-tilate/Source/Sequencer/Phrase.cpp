@@ -53,6 +53,7 @@ void Phrase::installLoop(std::shared_ptr<const juce::AudioBuffer<float>> audio, 
                          const juce::String& newPath, const juce::String& newName)
 {
     path = newPath;
+    loadedPath = newPath;
     displayName = newName;
     auto d = std::make_shared<PhraseData>();
     d->version = nextPhraseId();
