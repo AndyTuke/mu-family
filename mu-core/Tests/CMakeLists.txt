@@ -13,6 +13,7 @@ set(MU_CORE_TEST_SOURCES
     LoopLoaderTests.cpp   # loop decode, byte cap, errors and resampling (Audio/LoopLoader)
     VoiceDspTests.cpp   # equal-power pan, the per-voice state-variable filter and the age envelope (Audio/*.h)
     SpringReverbTests.cpp   # the spring-reverb engine (Audio/FX/SpringReverb.h)
+    TapeSpringEchoTests.cpp   # the tape echo with the spring (Audio/FX/TapeSpringEcho.h)
     ActivationAndProgramChangeTests.cpp
     SamplePreviewTests.cpp
     EmbeddedSampleTests.cpp   # preset samples: FLAC round trip is sample-identical
