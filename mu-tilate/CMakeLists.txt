@@ -134,6 +134,7 @@ target_sources(mu-tilate-tests PRIVATE
     Source/Tests/PhraseParamsTests.cpp   # the parameter table and the modulation target table
     Source/Tests/PhraseLayerTests.cpp   # the Phrase layer through the shared render contract
     Source/Tests/PhraseStateTests.cpp   # saving and loading the slices, timeline and loop reference
+    Source/Tests/LengthTextTests.cpp   # the timeline length box: what it accepts and shows
     Source/Tests/PhraseLoadTests.cpp   # loading a loop file (cap, errors) and detecting slices on it
     Source/Tests/ProcessorTests.cpp   # the real PluginProcessor, headless: load, play, restore
     # The real PluginProcessor, built headless (createEditor is defined in ProcessorTests.cpp; PluginEditor.cpp is not linked).

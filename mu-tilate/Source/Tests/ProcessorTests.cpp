@@ -294,14 +294,16 @@ struct ProcessorTests : public juce::UnitTest
                     attack[(size_t) i] = d->audio->getMagnitude(0, r.start, n);
                     loudest = std::max(loudest, attack[(size_t) i]);
                 }
-                for (int i = 1; i < slices.size(); ++i)
-                    if (attack[(size_t) i] > 0.6f * loudest)
-                    {
-                        SliceSettings s = slices.settings(i);
-                        s.preFade = true; s.preLengthMs = 200.0f; s.preLevelDb = -9.0f; s.preTone = -0.3f;
-                        slices.setSettings(i, s);
-                    }
-                p.getPhrase(0).commitEdit(slices, d->timeline);
+                Timeline timeline = d->timeline;
+                for (int b = 0; b < timeline.size(); ++b)   // each hit has its own settings: switch the pre-fade on for the loudest
+                {
+                    const int i = timeline.blocks()[(size_t) b].slice;
+                    if (i < 1 || attack[(size_t) i] <= 0.6f * loudest) continue;
+                    SliceSettings s = timeline.blocks()[(size_t) b].own;
+                    s.preFade = true; s.preLengthMs = 200.0f; s.preLevelDb = -9.0f; s.preTone = -0.3f;
+                    timeline.setSettings(b, s);
+                }
+                p.getPhrase(0).commitEdit(slices, timeline);
             };
             renderDemo("plain", 0, loopTempo, {});
             renderDemo("prefade", 0, loopTempo, addPreFade);

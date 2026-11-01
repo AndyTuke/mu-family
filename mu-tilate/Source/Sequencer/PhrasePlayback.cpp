@@ -30,15 +30,15 @@ void PhrasePlayback::hardReset() noexcept
 SliceParams PhrasePlayback::paramsFor(const PhraseLoop& loop, const PhraseSettings& s, const PhraseClock& c, const TimelineBlock& b,
                                       SliceRange& range) const noexcept
 {
-    // The slice's own settings sit on top of the layer's: its level adds (in dB), its fades add, and its reverse and the
-    // block's reverse cancel each other.
-    const SliceSettings& own = loop.slices->settings(b.slice);
+    // The hit's own settings sit on top of the layer's: its level adds (in dB) and its fades add. They belong to this
+    // block, not to the slice it plays, so two hits of one slice can sound different.
+    const SliceSettings& own = b.own;
     SliceParams p;
     p.own       = own;
     p.gain      = s.gain * juce::Decibels::decibelsToGain(juce::jlimit(-24.0f, 12.0f, own.levelDb));
     p.fadeInMs  = s.fadeInMs + own.fadeInMs;
     p.fadeOutMs = s.fadeOutMs + own.fadeOutMs;
-    p.reverse   = b.reverse != own.reverse;
+    p.reverse   = own.reverse;
     p.holdMs    = s.holdMs;
     p.strength  = s.strength;
 
@@ -70,7 +70,7 @@ void PhrasePlayback::trigger(const PhraseLoop& loop, const PhraseSettings& s, co
 
 bool PhrasePlayback::preFor(const PhraseLoop& loop, const PhraseSettings& s, const PhraseClock& c, const TimelineBlock& b, Pre& pre) const noexcept
 {
-    if (b.slice < 0 || b.slice >= loop.slices->size() || ! loop.slices->settings(b.slice).preFade) return false;
+    if (b.slice < 0 || b.slice >= loop.slices->size() || ! b.own.preFade) return false;
     SliceRange whole;
     pre.params = paramsFor(loop, s, c, b, whole);
     const auto& own = pre.params.own;

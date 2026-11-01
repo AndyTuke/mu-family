@@ -71,7 +71,7 @@ void writePhraseState(juce::ValueTree& node, const PhraseState& s)
         v.setProperty("s", b.start, nullptr);
         v.setProperty("l", b.length, nullptr);
         v.setProperty("i", b.slice, nullptr);
-        v.setProperty("r", b.reverse ? 1 : 0, nullptr);
+        writeSettings(v, b.own);   // each hit's own sound
         blocks.appendChild(v, nullptr);
     }
     p.appendChild(blocks, nullptr);
@@ -92,13 +92,9 @@ PhraseState readPhraseState(const juce::ValueTree& node)
     s.timeline = Timeline((double) p.getProperty("bars", 4.0) * 4.0);
     for (const auto& v : p.getChildWithName("Blocks"))
     {
-        s.timeline.place((int) v.getProperty("i", 0), (double) v.getProperty("s", 0.0), 0.0);
+        s.timeline.place((int) v.getProperty("i", 0), (double) v.getProperty("s", 0.0), 0.0, readSettings(v));
         const int at = s.timeline.indexAt((double) v.getProperty("s", 0.0));
-        if (at >= 0)
-        {
-            s.timeline.setBlockLength(at, (double) v.getProperty("l", 0.0), 0.0);
-            s.timeline.setReverse(at, (int) v.getProperty("r", 0) != 0);
-        }
+        if (at >= 0) s.timeline.setBlockLength(at, (double) v.getProperty("l", 0.0), 0.0);
     }
 
     // The markers are only meaningful against the loop they were made on; a saved length of 0 means no loop was

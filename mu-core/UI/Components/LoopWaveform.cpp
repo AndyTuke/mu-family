@@ -164,6 +164,7 @@ void LoopWaveform::mouseMove(const juce::MouseEvent& e)
 void LoopWaveform::mouseDown(const juce::MouseEvent& e)
 {
     if (length() <= 0) return;
+    if (e.mods.isMiddleButtonDown() || e.mods.isCtrlDown()) { panning = true; panStartView = viewStart; return; }
     const int m = markerNear(e.x);
     if (m > 0 && (e.mods.isAltDown() || e.mods.isRightButtonDown()))
     {
@@ -172,18 +173,38 @@ void LoopWaveform::mouseDown(const juce::MouseEvent& e)
     }
     if (m > 0) { dragging = m; return; }       // marker 0 is the loop's start: it stays
     const int r = regionAt(sampleAt(e.x));
+    pressedRegion = r;
+    regionDragging = false;
     if (r >= 0 && onRegionClicked) onRegionClicked(r);
 }
 
 void LoopWaveform::mouseDrag(const juce::MouseEvent& e)
 {
+    if (panning)
+    {
+        viewStart = panStartView - (double) e.getDistanceFromDragStartX() * samplesPerPixel();
+        clampView();
+        repaint();
+        return;
+    }
+    if (pressedRegion >= 0 && dragging < 0)
+    {
+        // A press inside a region that moves far enough is a drag of that region (to the timeline), not a click.
+        if (! regionDragging && e.getDistanceFromDragStart() > mu_ui::s(6)) regionDragging = true;
+        if (regionDragging && onRegionDragged) onRegionDragged(pressedRegion, e.getScreenPosition());
+        return;
+    }
     if (dragging < 0) return;
     const int pos = std::clamp(sampleAt(e.x), 1, std::max(1, length() - 1));
     if (onMarkerMoved) onMarkerMoved(dragging, pos);
 }
 
-void LoopWaveform::mouseUp(const juce::MouseEvent&)
+void LoopWaveform::mouseUp(const juce::MouseEvent& e)
 {
+    if (regionDragging && pressedRegion >= 0 && onRegionDropped) onRegionDropped(pressedRegion, e.getScreenPosition());
+    pressedRegion = -1;
+    regionDragging = false;
+    panning = false;
     dragging = -1;
     repaint();
 }
@@ -194,21 +215,29 @@ void LoopWaveform::mouseDoubleClick(const juce::MouseEvent& e)
     if (onMarkerAddRequested) onMarkerAddRequested(std::clamp(sampleAt(e.x), 1, std::max(1, length() - 1)));
 }
 
+void LoopWaveform::zoomBy(double factor, int anchorX)
+{
+    if (length() <= 0 || factor <= 0.0) return;
+    // The sample under the anchor stays under it.
+    const double at = viewStart + (double) anchorX * samplesPerPixel();
+    viewLength /= factor;
+    clampView();
+    viewStart = at - (double) anchorX * samplesPerPixel();
+    clampView();
+    repaint();
+}
+
 void LoopWaveform::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& w)
 {
     if (length() <= 0) return;
-    const float d = w.deltaY != 0.0f ? w.deltaY : w.deltaX;
-    if (e.mods.isCtrlDown())
+    const bool horizontal = e.mods.isShiftDown() || std::abs(w.deltaX) > std::abs(w.deltaY);
+    const float d = horizontal && std::abs(w.deltaX) > std::abs(w.deltaY) ? w.deltaX : w.deltaY;
+    if (horizontal)
     {
-        // Zoom around the pointer: the sample under it stays under it.
-        const double at = viewStart + (double) e.x * samplesPerPixel();
-        const double factor = std::pow(0.8, (double) d * 5.0);
-        viewLength *= factor;
+        viewStart -= (double) d * viewLength * 0.25;   // scroll a quarter of the view per notch
         clampView();
-        viewStart = at - (double) e.x * samplesPerPixel();
+        repaint();
     }
     else
-        viewStart -= (double) d * viewLength * 0.25;   // scroll a quarter of the view per notch
-    clampView();
-    repaint();
+        zoomBy(std::pow(1.25, (double) d * 5.0), e.x);   // the wheel zooms around the pointer
 }

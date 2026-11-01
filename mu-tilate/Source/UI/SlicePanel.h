@@ -11,8 +11,8 @@
 #include <memory>
 #include <vector>
 
-// The slice player panel (docs/mu-tilate/design-ui.md, "Slice player"): the settings of one slice as knobs and switches, in
-// groups: slice (direction, level, pan, fades), pitch, pre-fade, filter, amp envelope, filter envelope and loop. It shows the
+// The slice player panel (docs/mu-tilate/design-ui.md, "Slice player"): the settings of one hit or slice as knobs and switches, each
+// group in its own raised panel: slice (direction, level, pan, fades), pitch, pre-fade, filter, amp envelope, filter envelope and loop. It shows the
 // settings it is given and reports every change as a whole SliceSettings; it edits no data itself.
 namespace mu_tilate
 {
@@ -62,7 +62,7 @@ private:
     SegmentControl loopSwitch    { { "Once", "Loop" }, SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Lcd };
     std::vector<Knob> knobs;
     std::vector<std::pair<SegmentControl*, int>> switches;   // each switch and its group
-    std::vector<std::pair<juce::String, juce::Rectangle<int>>> titles;   // each group's title and where resized() put it
+    std::vector<MuLookAndFeel::Section> sections;   // each group's name and raised box, as resized() placed them
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SlicePanel)
 };

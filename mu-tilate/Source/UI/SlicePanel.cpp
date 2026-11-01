@@ -11,7 +11,6 @@ namespace
 {
     using LF = MuLookAndFeel;
     constexpr int kHeaderH = 22;   // the description line and the step buttons (unscaled)
-    constexpr int kTitleH  = 14;   // a group's title (unscaled)
 
     juce::String signedDb(double v)
     {
@@ -139,11 +138,9 @@ void SlicePanel::paint(juce::Graphics& g)
     using mu_ui::s;
     g.setFont(juce::Font(juce::FontOptions {}.withHeight(mu_ui::sf(11.0f))));
     g.setColour(LF::colour(LF::labelText));
-    g.drawText(slice >= 0 ? description : juce::String("Select a slice (click a block in the timeline, or use < >)"),
+    g.drawText(slice >= 0 ? description : juce::String("Select a hit on the timeline, or a slice in the waveform (or use < >)"),
                s(60), 0, getWidth() - s(60), s(kHeaderH), juce::Justification::centredLeft);
-    g.setColour(LF::colour(LF::labelText).withAlpha(0.7f));
-    g.setFont(juce::Font(juce::FontOptions {}.withHeight(mu_ui::sf(10.0f))));
-    for (const auto& t : titles) g.drawText(t.first, t.second, juce::Justification::centredLeft);
+    LF::drawSections(g, *this, sections, LF::appAccent(*this));
 }
 
 void SlicePanel::resized()
@@ -156,24 +153,27 @@ void SlicePanel::resized()
     nextButton.setBounds(header.removeFromLeft(s(26)));
     area.removeFromTop(s(LF::kSpaceS));
 
-    // Two rows of groups. A group is a title over an optional switch and its knobs.
-    titles.clear();
+    // Two rows of groups, each in a raised panel with its name plate above it.
+    sections.clear();
+    const int pad = s(LF::kSpaceS), plate = s(LF::kSectionPlateH);
     const int rowH = area.getHeight() / 2;
     auto placeGroup = [&](int row, int& x, Group g, const char* title, int switchW)
     {
-        const int y = area.getY() + row * rowH;
-        const int top = y + s(kTitleH);
+        const int boxTop = area.getY() + row * rowH + plate;
+        const int top = boxTop + pad;
         const int start = x;
+        x += pad;
         for (auto& sw : switches)
             if (sw.second == g && sw.first != &loopSwitch)
             {
                 sw.first->setBounds(x, top + (s(LF::kKnobSize2H) - s(kHeaderH)) / 2, s(switchW), s(kHeaderH));
-                x += s(switchW) + s(LF::kSpaceS);
+                x += s(switchW) + pad;
             }
         for (auto& k : knobs)
             if (k.group == g) { k.comp->setBounds(x, top, s(LF::kKnobSize2W), s(LF::kKnobSize2H)); x += s(LF::kKnobSize2W); }
-        titles.push_back({ title, { start, y, std::max(x - start, s(60)), s(kTitleH) } });
-        x += s(LF::kSpaceS) * 3;
+        x += pad;
+        sections.push_back({ juce::Rectangle<int>(start, boxTop, x - start, s(LF::kKnobSize2H) + pad * 2), title });
+        x += pad * 2;
     };
 
     int x = area.getX();
@@ -184,10 +184,11 @@ void SlicePanel::resized()
     x = area.getX();
     placeGroup(1, x, Filter, "FILTER", 112);
     placeGroup(1, x, AmpEnv, "AMP ENVELOPE", 0);
-    // The filter envelope group also holds the loop switch, which is placed after its knobs.
     placeGroup(1, x, FilterEnv, "FILTER ENVELOPE", 0);
-    loopSwitch.setBounds(x, area.getY() + rowH + s(kTitleH) + (s(LF::kKnobSize2H) - s(kHeaderH)) / 2, s(80), s(kHeaderH));
-    titles.push_back({ "PLAY", { x, area.getY() + rowH, s(80), s(kTitleH) } });
+    // The play-mode switch (once or loop) gets its own small panel after the filter envelope.
+    const int loopTop = area.getY() + rowH + plate;
+    loopSwitch.setBounds(x + pad, loopTop + pad + (s(LF::kKnobSize2H) - s(kHeaderH)) / 2, s(80), s(kHeaderH));
+    sections.push_back({ juce::Rectangle<int>(x, loopTop, s(80) + pad * 2, s(LF::kKnobSize2H) + pad * 2), "PLAY" });
 }
 
 } // namespace mu_tilate

@@ -40,12 +40,12 @@ int Timeline::insert(TimelineBlock b)
     return (int) (list.insert(it, b) - list.begin());
 }
 
-int Timeline::place(int slice, double beat, double grid)
+int Timeline::place(int slice, double beat, double grid, const SliceSettings& own)
 {
     const double s = snap(beat, grid);
     if (slice < 0 || s < 0.0 || s >= length) return -1;
     TimelineBlock b;
-    b.start = s; b.slice = slice;
+    b.start = s; b.slice = slice; b.own = sanitised(own);
     return insert(b);
 }
 
@@ -79,7 +79,12 @@ bool Timeline::setBlockLength(int index, double beats, double grid)
 
 void Timeline::setReverse(int index, bool reverse)
 {
-    if (index >= 0 && index < size()) list[(size_t) index].reverse = reverse;
+    if (index >= 0 && index < size()) list[(size_t) index].own.reverse = reverse;
+}
+
+void Timeline::setSettings(int index, const SliceSettings& own)
+{
+    if (index >= 0 && index < size()) list[(size_t) index].own = sanitised(own);
 }
 
 bool Timeline::remove(int index)
@@ -104,7 +109,7 @@ void Timeline::sliceRemoved(int at)
     }
 }
 
-void Timeline::originalOrder(const std::vector<double>& sliceBeats)
+void Timeline::originalOrder(const std::vector<double>& sliceBeats, const std::vector<SliceSettings>& sliceSettings)
 {
     list.clear();
     double at = 0.0;
@@ -112,12 +117,13 @@ void Timeline::originalOrder(const std::vector<double>& sliceBeats)
     {
         TimelineBlock b;
         b.start = at; b.slice = i;
+        if (i < (int) sliceSettings.size()) b.own = sanitised(sliceSettings[(size_t) i]);
         list.push_back(b);
         at += std::max(1.0e-6, sliceBeats[(size_t) i]);
     }
 }
 
-void Timeline::randomise(const std::vector<double>& sliceBeats, juce::Random& rng)
+void Timeline::randomise(const std::vector<double>& sliceBeats, juce::Random& rng, const std::vector<SliceSettings>& sliceSettings)
 {
     // Fisher-Yates over the slice order, then the same back-to-back layout with each slice's own duration.
     std::vector<int> order(sliceBeats.size());
@@ -132,6 +138,7 @@ void Timeline::randomise(const std::vector<double>& sliceBeats, juce::Random& rn
         if (at >= length) break;
         TimelineBlock b;
         b.start = at; b.slice = slice;
+        if (slice < (int) sliceSettings.size()) b.own = sanitised(sliceSettings[(size_t) slice]);
         list.push_back(b);
         at += std::max(1.0e-6, sliceBeats[(size_t) slice]);
     }

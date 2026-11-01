@@ -25,6 +25,7 @@ struct Rig
     PhraseLoop loop;
     PhraseSettings settings;
     PhrasePlayback playback;
+    bool hitsStartWithSliceSettings = true;   // a hit placed before the slice was set up still takes that slice's settings, as a hit placed after would
 
     Rig()
     {
@@ -49,6 +50,8 @@ struct Rig
     void runInto(juce::AudioBuffer<float>& out, int block, double startBeat = 0.0, double bpm = 120.0, bool playing = true)
     {
         const int total = out.getNumSamples();
+        if (hitsStartWithSliceSettings)
+            for (int i = 0; i < timeline.size(); ++i) timeline.setSettings(i, slices.settings(timeline.blocks()[(size_t) i].slice));
         for (int pos = 0; pos < total; pos += block)
         {
             const int n = std::min(block, total - pos);
@@ -246,6 +249,19 @@ struct PhraseTests : public juce::UnitTest
             double worst = 0.0;
             for (int i = 0; i < 6000; ++i) worst = std::max(worst, (double) std::abs(small.getSample(0, i) - large.getSample(0, i)));
             expectLessThan(worst, 0.02);
+        }
+
+        beginTest("two hits of one slice are two sounds: each plays with its own settings");
+        {
+            Rig r;
+            r.hitsStartWithSliceSettings = false;
+            r.timeline.place(0, 0.0, 0.0);                                // the same slice twice, one beat 0, one at beat 2
+            r.timeline.place(0, 2.0, 0.0);
+            SliceSettings quiet; quiet.levelDb = -12.0f;
+            r.timeline.setSettings(1, quiet);                             // only the second hit is turned down
+            auto out = r.run(96000, 256);
+            expectWithinAbsoluteError(out.getSample(0, 100), 0.1f, 1.0e-4f);                          // hit one: as the source
+            expectWithinAbsoluteError(out.getSample(0, 48100), 0.1f * 0.251189f, 1.0e-4f);            // hit two: -12 dB
         }
 
         beginTest("a pre-fade of a slice that plays backwards swells in the end of the slice");

@@ -142,7 +142,9 @@ double PluginProcessor::layOutInOrder(int layer, const SliceList& slices, double
     }
     const int bars = juce::jlimit(1, 64, (int) std::ceil(total / 4.0 - 1.0e-6));
     Timeline timeline((double) bars * 4.0);
-    timeline.originalOrder(beats);
+    std::vector<SliceSettings> startWith;   // each hit starts with its slice's settings
+    for (int i = 0; i < slices.size(); ++i) startWith.push_back(slices.settings(i));
+    timeline.originalOrder(beats, startWith);
     getPhrase(layer).commitEdit(slices, timeline);
     if (auto* p = apvts.getParameter(layerParamPrefix(layer) + ppi::suffix[ppi::bars]))
         p->setValueNotifyingHost(p->convertTo0to1((float) bars));

@@ -192,7 +192,7 @@ struct PhraseStateTests : public juce::UnitTest
             expectEquals(out.timeline.blocks()[0].slice, 2);
             expectEquals(out.timeline.blocks()[1].start, 1.5);
             expectEquals(out.timeline.blocks()[1].length, 0.5);
-            expect(out.timeline.blocks()[1].reverse);
+            expect(out.timeline.blocks()[1].own.reverse);
         }
 
         beginTest("a node with no Phrase child reads as the default");

@@ -9,7 +9,7 @@
 
 // A zoomable, scrollable waveform of a whole loop with editable markers (docs/mu-tilate/design-ui.md, "Source"): the audio
 // is summarised once into min/max blocks, so a repaint costs about one column of work per pixel whatever the loop's length.
-// Mouse wheel scrolls, Ctrl+wheel zooms around the pointer. A marker can be dragged, a double-click on empty waveform asks for a
+// The mouse wheel zooms around the pointer; Shift+wheel (or a horizontal wheel) scrolls; a middle-button or Ctrl drag pans. A marker can be dragged, a double-click on empty waveform asks for a
 // new one, Alt-click (or right-click) on a marker asks to delete it, and a click between markers selects that region. The
 // component edits nothing itself: it reports what the user asked for through the callbacks and shows what it is given.
 class LoopWaveform : public juce::Component
@@ -45,6 +45,13 @@ public:
     std::function<void(int index)> onMarkerDeleteRequested;
     // A click between markers: the region's index.
     std::function<void(int region)> onRegionClicked;
+    // A region was dragged away from where it was pressed: its index and the pointer in screen coordinates (while dragging),
+    // then the same once on release. The host decides what is under the pointer and whether a drop is accepted.
+    std::function<void(int region, juce::Point<int> screenPos)> onRegionDragged;
+    std::function<void(int region, juce::Point<int> screenPos)> onRegionDropped;
+
+    // Zooms by `factor` (above 1 zooms in) keeping the sample at x (pixels) where it is; for buttons and the wheel.
+    void zoomBy(double factor, int anchorX);
 
     void paint(juce::Graphics&) override;
     void resized() override { clampView(); }
@@ -75,6 +82,10 @@ private:
     double viewStart = 0.0;     // first visible sample
     double viewLength = 1.0;    // visible samples
     int    dragging = -1;       // marker being dragged
+    int    pressedRegion = -1;  // the region a press landed in, until the drag gesture is decided
+    bool   regionDragging = false;
+    bool   panning = false;
+    double panStartView = 0.0;
     int    hovered = -1;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LoopWaveform)

@@ -47,6 +47,26 @@ void PhraseTimeline::setPlayheadBeats(double b)
     repaint();
 }
 
+void PhraseTimeline::zoomBy(double factor, int anchorX)
+{
+    const double L = timeline.lengthBeats();
+    if (L <= 0.0 || factor <= 0.0) return;
+    const double shown = viewBeats > 0.0 ? viewBeats : L;
+    const double anchor = beatAt(anchorX);
+    const double frac = (double) anchorX / (double) std::max(1, getWidth());
+    viewBeats = shown / factor;
+    viewStart = anchor - frac * viewBeats;
+    clampView();
+    repaint();
+}
+
+double PhraseTimeline::dropBeatAt(juce::Point<int> p, bool free) const
+{
+    if (! rowArea().contains(p)) return -1.0;
+    const double beat = free ? beatAt(p.x) : Timeline::snap(beatAt(p.x), gridBeats);
+    return beat >= 0.0 && beat < timeline.lengthBeats() ? beat : -1.0;
+}
+
 void PhraseTimeline::clampView()
 {
     const double L = std::max(1.0e-6, timeline.lengthBeats());
@@ -132,8 +152,15 @@ void PhraseTimeline::paint(juce::Graphics& g)
         if (r.getWidth() > s(14))
         {
             g.setColour(juce::Colours::black.withAlpha(0.85f));
-            g.drawText(juce::String(b.slice + 1) + (b.reverse ? " <" : ""), r.reduced(s(3), 0), juce::Justification::centredLeft);
+            g.drawText(juce::String(b.slice + 1) + (b.own.reverse ? " <" : ""), r.reduced(s(3), 0), juce::Justification::centredLeft);
         }
+    }
+
+    // The insertion line of a drop in progress.
+    if (dropBeat >= 0.0)
+    {
+        g.setColour(accent);
+        g.fillRect(xOf(dropBeat) - 1, row.getY(), 3, row.getHeight());
     }
 
     // Phase 4: the playhead.
@@ -155,6 +182,12 @@ void PhraseTimeline::paint(juce::Graphics& g)
 void PhraseTimeline::mouseDown(const juce::MouseEvent& e)
 {
     grabKeyboardFocus();
+    if (e.mods.isMiddleButtonDown() || rulerArea().contains(e.getPosition()))   // a middle-button or ruler drag pans the view
+    {
+        panning = true;
+        panStartBeat = viewStart;
+        return;
+    }
     if (! rowArea().contains(e.getPosition())) return;
     const int hit = blockAt(e.x);
     dragMoved = false;
@@ -176,7 +209,13 @@ void PhraseTimeline::mouseDown(const juce::MouseEvent& e)
     if (slice >= 0 && onEdit)
     {
         const double beat = e.mods.isAltDown() ? beatAt(e.x) : Timeline::snap(beatAt(e.x), gridBeats);
-        onEdit([slice, beat](Timeline& t) { t.place(slice, beat, 0.0); });
+        const auto start = settingsOfSlice ? settingsOfSlice(slice) : SliceSettings();
+        onEdit([slice, beat, start](Timeline& t) { t.place(slice, beat, 0.0, start); });
+        selected = timeline.indexAt(beat);   // the edit has been published: the new hit is the one at this beat
+        if (selected >= 0 && std::abs(timeline.blocks()[(size_t) selected].start - beat) > 1.0e-6) selected = -1;
+        if (onBlockSelected) onBlockSelected(selected);
+        repaint();
+        return;
     }
     if (onBlockSelected) onBlockSelected(-1);
     repaint();
@@ -184,6 +223,16 @@ void PhraseTimeline::mouseDown(const juce::MouseEvent& e)
 
 void PhraseTimeline::mouseDrag(const juce::MouseEvent& e)
 {
+    if (panning)
+    {
+        const double L = timeline.lengthBeats();
+        const double shown = viewBeats > 0.0 ? viewBeats : L;
+        if (viewBeats <= 0.0) viewBeats = shown;   // clampView turns a full-length view back into "all of it"
+        viewStart = panStartBeat - (double) e.getDistanceFromDragStartX() / (double) std::max(1, getWidth()) * shown;
+        clampView();
+        repaint();
+        return;
+    }
     if (dragBlock < 0 || ! onEdit) return;
 
     // Dragging the right edge sets the block's length (at least a sixteenth of a beat), snapped to the grid unless Alt is held.
@@ -216,6 +265,7 @@ void PhraseTimeline::mouseDrag(const juce::MouseEvent& e)
 
 void PhraseTimeline::mouseUp(const juce::MouseEvent&)
 {
+    panning = false;
     dragBlock = -1;
     resizing = false;
 }
@@ -230,24 +280,19 @@ void PhraseTimeline::mouseWheelMove(const juce::MouseEvent& e, const juce::Mouse
 {
     const double L = timeline.lengthBeats();
     if (L <= 0.0) return;
-    const double shown = viewBeats > 0.0 ? viewBeats : L;
-    if (e.mods.isCtrlDown())
+    const bool horizontal = e.mods.isShiftDown() || std::abs(w.deltaX) > std::abs(w.deltaY);
+    if (horizontal)
     {
-        // Zoom around the beat under the pointer.
-        const double anchor = beatAt(e.x);
-        const double frac = (double) e.x / (double) std::max(1, getWidth());
-        viewBeats = shown * std::pow(0.8, (double) w.deltaY * 5.0);
-        viewStart = anchor - frac * viewBeats;
-    }
-    else
-    {
-        // Scroll by a tenth of the view (a trackpad's horizontal delta works too).
+        // Scroll by a fraction of the view (Shift+wheel or a trackpad's horizontal delta).
+        const double shown = viewBeats > 0.0 ? viewBeats : L;
         const double delta = std::abs(w.deltaX) > std::abs(w.deltaY) ? w.deltaX : w.deltaY;
         viewBeats = shown;
-        viewStart -= (double) delta * 2.0 * shown * 0.1 * 5.0;
+        viewStart -= (double) delta * shown * 0.5;
+        clampView();
+        repaint();
     }
-    clampView();
-    repaint();
+    else
+        zoomBy(std::pow(1.25, (double) w.deltaY * 5.0), e.x);   // the wheel zooms around the pointer
 }
 
 bool PhraseTimeline::keyPressed(const juce::KeyPress& k)

@@ -11,6 +11,7 @@
 #include "Sequencer/SliceList.h"
 #include "Sequencer/Timeline.h"
 #include "UI/PhraseHost.h"     // what the content needs from the layer's host
+#include "UI/LengthText.h"
 #include "UI/PhraseTimeline.h"
 #include "UI/SlicePanel.h"
 
@@ -21,12 +22,16 @@
 #include <memory>
 #include <vector>
 
+namespace mu_tilate { using LF_Section = MuLookAndFeel::Section; }
+
 namespace mu_tilate
 {
 
-// mu-Tilate's content band inside the shared LayerPanel. First version: the loop (load button and a status line) and
-// the playback controls (tempo mode, loop tempo, transient hold, strength, fades, level). The source waveform, the
-// slices, the slice player and the timeline (design-ui.md) are the next stage.
+// mu-Tilate's content band inside the shared LayerPanel: the loop (load button and a status line) and two views of the same
+// parts. Sequencer: the waveform to drag slices from, the timeline toolbar (length, grid, delete, clear, zoom) and the timeline.
+// Sound Editor: the layer's sound controls and the transient detector in their own panels, the waveform, a slim timeline to pick a
+// hit on, and the slice player panel. The panel edits the selected hit (every hit on the timeline has its own settings); with no
+// hit selected it edits the selected slice, whose settings are what a new hit of that slice starts with.
 class PhraseContent : public LayerContent,
                       private juce::Timer
 {
@@ -56,9 +61,13 @@ private:
     void refreshViews(bool force = false);        // re-reads the layer's loop data, slices and timeline when they changed
     void editSlices(const std::function<void(SliceList&, Timeline&)>& edit);   // one marker edit, published to the layer
     void chooseLoop();
-    void updateView();                            // shows the waveform or the slice player, whichever the switch says
-    void refreshSlicePanel(bool force);           // shows the selected slice's settings in the slice player
-    void selectSlice(int slice);                  // selects a slice (-1 for none) in the waveform and the slice player
+    void updateView();                            // shows the Sequencer or the Sound Editor, whichever the switch says
+    void refreshSlicePanel(bool force);           // shows the selected hit's (else the selected slice's) settings in the slice player
+    void selectRegion(int slice);                 // selects a slice (-1 for none) in the waveform; no hit is selected then
+    void placeSliceAt(int slice, double beat);    // a hit of `slice` at `beat`, starting with the slice's settings, and selects it
+    void applyLength(const juce::String& text);   // the length box: parses it and sets the timeline length
+    void updateToolbar();                         // enables Delete for a selected hit, shows the current length
+    bool soundEditorShown() const noexcept { return viewSwitch.getSelectedIndex() == 1; }
     void timerCallback() override;
     void bindModulationArcs();
 
@@ -75,10 +84,21 @@ private:
     juce::TextButton detectButton { "Detect" };   // runs the detector again with the current settings
     std::vector<KnobDef> knobs;
     std::unique_ptr<juce::FileChooser> chooser;
-    SegmentControl viewSwitch { { "Waveform", "Slice player" }, SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Lcd };
+    SegmentControl viewSwitch { { "Sequencer", "Sound Editor" }, SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Lcd };
     LoopWaveform waveform;
     SlicePanel slicePanel;
     PhraseTimeline timelineView;
+
+    // The Sequencer's toolbar over the timeline.
+    juce::Label      lengthCaption { {}, "Length" };
+    juce::Label      lengthBox;                   // editable: "2 bars", "6 beats", "3/4"
+    DropdownSelect   gridBox;                     // the snap grid
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> gridAtt;
+    juce::TextButton deleteButton { "Delete hit" }, clearButton { "Clear" };
+    juce::TextButton waveFitButton { "Fit sample" }, tlOutButton { "-" }, tlInButton { "+" }, tlFitButton { "Fit timeline" };
+    std::vector<LF_Section> sections;             // the Sound Editor's two panels, from resized() for paint()
+    bool shownPanelIsHit = false;                 // whether the slice player last showed a hit (else a slice)
+    double shownLengthBeats = -1.0;
     double shownTempo = -1.0;                     // the loop tempo the timeline's block lengths were computed for
     // What the views last showed, by identity number (a freed PhraseData's address can be reused, a number never is).
     uint64_t shownVersion = ~(uint64_t) 0;        // the PhraseData the waveform and timeline last showed

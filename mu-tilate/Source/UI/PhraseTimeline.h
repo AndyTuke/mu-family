@@ -10,8 +10,8 @@
 // The Phrase layer's timeline view (docs/mu-tilate/design-ui.md, "Timeline"): a ruler in bars and beats over one row of slice
 // blocks. It shows the Timeline it is given and reports what the user asked for; it edits nothing itself. A click on empty row
 // asks to place the slice the host names, a drag moves a block (Alt = free, Ctrl = copy), Delete removes the selected block.
-// A long timeline is zoomed and scrolled: the wheel scrolls, Ctrl+wheel zooms around the pointer, and while it plays the view
-// pages on to keep the playhead in sight. Dragging a block's right edge sets its length (Alt = free, else the grid).
+// The view is zoomed and scrolled: the wheel zooms around the pointer, Shift+wheel (or a horizontal wheel) scrolls, a middle-button
+// drag or a drag on the ruler pans, and while it plays the view pages on to keep the playhead in sight. Dragging a block's right edge sets its length (Alt = free, else the grid).
 namespace mu_tilate
 {
 
@@ -24,11 +24,22 @@ public:
     void setTimeline(const Timeline& timeline, std::vector<double> sliceBeats);
     void setGridBeats(double grid) { gridBeats = grid; }
     void setSelectedBlock(int index);
+    int  getSelectedBlock() const noexcept { return selected; }
+    // Zoom by `factor` (above 1 zooms in) around the beat at `anchorX` pixels; showAll() fits the whole timeline again.
+    void zoomBy(double factor, int anchorX);
+    void showAll() { viewBeats = 0.0; viewStart = 0.0; repaint(); }
+    // A drop in progress: shows an insertion line at this beat (negative for none). dropBeatAt turns a point in this
+    // component's coordinates into the beat a block dropped there would start on (snapped unless free), or a negative
+    // value when the point is outside the row.
+    void   setDropBeat(double beat) { if (beat != dropBeat) { dropBeat = beat; repaint(); } }
+    double dropBeatAt(juce::Point<int> p, bool free) const;
     // The playhead in beats from the timeline start, or a negative value for none.
     void setPlayheadBeats(double beats);
 
     // The slice a click on empty row places (the waveform's selected region); -1 = none selected.
     std::function<int()> sliceToPlace;
+    // The settings a new hit of this slice starts with (the slice's own); a hit is a separate sound from then on.
+    std::function<SliceSettings(int slice)> settingsOfSlice;
     // The user asked for an edit: `edit` is applied to a copy of the layer's timeline and published.
     std::function<void(const std::function<void(Timeline&)>& edit)> onEdit;
     // A block was selected (-1 for none).
@@ -64,6 +75,9 @@ private:
     double viewStart = 0.0;      // the beat at the left edge
     double viewBeats = 0.0;      // how many beats the width shows (0 = the whole timeline)
     double lastLength = 0.0;     // the timeline length the view was last fitted to
+    double dropBeat = -1.0;      // where a drop in progress would land
+    bool   panning = false;      // a middle-button or ruler drag is moving the view
+    double panStartBeat = 0.0;
 
     // Drag state: which block, where in it the pointer grabbed it, and whether it copies.
     int    dragBlock = -1;
