@@ -650,9 +650,9 @@ void PhraseContent::resized()
         place(waveOutButton, 30);
         place(waveInButton, 30);
         bar.removeFromLeft(s(LF::kSpaceS) * 2);
-        place(lengthCaption, 52);
-        place(barsInput, 78);
-        place(beatsInput, 78);
+        place(lengthCaption, 50);
+        place(barsInput, 104);
+        place(beatsInput, 108);
         place(gridBox, 78);
         place(layOutButton, 72);
         place(deleteButton, 82);
