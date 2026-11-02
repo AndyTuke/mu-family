@@ -16,11 +16,11 @@
           fEnvSus="0.0" fEnvRel="0.3000000417232513" fEnvDep="0.0" fltLoCut="0.0"
           fltDrv="0.0" ampLvl="0.0" aEnvAtk="0.004999999888241291" aEnvDec="0.3000000417232513"
           aEnvSus="80.0" aEnvRel="0.4999999701976776" accentDb="0.0" drvChar="None"
-          insP1="0.0" insP2="0.0" insP3="0.0" insP4="0.0" outMode="0" midiNote="36"
-          midiChan="1" midiVel="100" midiAccent="0" ch_lvl="1.0" ch_pan="0.5"
-          ch_mute="0.0" ch_solo="0.0" ch_sendEff="0.0" ch_sendDly="0.0"
-          ch_sendRev="0.0" ch_scSrc="0.0" ch_scAmt="0.0" ch_scAtk="0.0"
-          ch_scRel="0.0" ch_outBus="0.0">
+          insP1="0.0" insP2="0.0" insP3="0.0" insP4="0.0" insSync="false"
+          outMode="0" midiNote="36" midiChan="1" midiVel="100" midiAccent="0"
+          ch_lvl="1.0" ch_pan="0.5" ch_mute="0.0" ch_solo="0.0" ch_sendEff="0.0"
+          ch_sendDly="0.0" ch_sendRev="0.0" ch_scSrc="0.0" ch_scAmt="0.0"
+          ch_scAtk="0.0" ch_scRel="0.0" ch_outBus="0.0">
     <Modulators depthUnits="range" padDepthUnits="knobMax">
       <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
            loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
@@ -57,6 +57,7 @@
                ret_rev_mute="false" ret_rev_solo="false" ret_rev_scSrc="0" ret_rev_scAmt="0.0"
                ret_rev_scAtk="0.0" ret_rev_scRel="0.0" mstr_lvl="1.0" mstr_pan="0.0"
                mstrLoop="0" mstr_swap="0" mst_insChar="None" mst_insP1="0.0"
-               mst_insP2="0.0" mst_insP3="0.0" mst_insP4="0.0" mst_ins2Char="None"
-               mst_ins2P1="0.0" mst_ins2P2="0.0" mst_ins2P3="0.0" mst_ins2P4="0.0"/>
+               mst_insP2="0.0" mst_insP3="0.0" mst_insP4="0.0" mst_insSync="false"
+               mst_ins2Char="None" mst_ins2P1="0.0" mst_ins2P2="0.0" mst_ins2P3="0.0"
+               mst_ins2P4="0.0" mst_ins2Sync="false"/>
 </MuClidPreset>

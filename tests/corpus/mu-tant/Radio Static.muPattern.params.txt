@@ -1,8 +1,8 @@
 # frozen load result for fixture: Radio Static.muPattern
 layers=1
 load_errors=0
-capture_bytes=4525
-capture_sha256=32831304b7c14175303182ca2fa53f5298706352175286f27ea9db6ab392b056
+capture_bytes=4554
+capture_sha256=93b6ff5938e956a16f2e472df4c5353a52d6044c2e6d285fc86bed4df36a9b17
 --- parameters differing from default (id=plain value)
 v0_drvChar=10
 v0_flt_cut=1800

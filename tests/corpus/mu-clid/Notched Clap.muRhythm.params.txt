@@ -2,8 +2,8 @@
 layers=1
 load_errors=1
 load_error=Sample 'Clap 03.wav' missing from content folder — rhythm loaded without audio.
-capture_bytes=4218
-capture_sha256=d46fd53cba72d7989b2586c6c80c518aaa477061129b99250198e943b1308c6b
+capture_bytes=4237
+capture_sha256=ca1f495a4eba0369fe022a900cef452c84e3cc647bd5eec9cee93c2fa9b222bb
 --- parameters differing from default (id=plain value)
 r0_aEnvAtk=0
 r0_aEnvDec=0.18

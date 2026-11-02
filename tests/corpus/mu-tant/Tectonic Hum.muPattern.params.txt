@@ -1,8 +1,8 @@
 # frozen load result for fixture: Tectonic Hum.muPattern
 layers=1
 load_errors=0
-capture_bytes=3523
-capture_sha256=e390b5014a4655bbd48284d07e0d7f8c5c9d04356d2ef8de6e50a485a3f0ec35
+capture_bytes=3552
+capture_sha256=28e33982f64dafcf6da233ae8db628f14142ed4b05cbb9b84e39f0d72da0f0ea
 --- parameters differing from default (id=plain value)
 v0_flt_cut=420
 v0_flt_res=0.25

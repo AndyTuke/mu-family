@@ -1,8 +1,8 @@
 # frozen load result for fixture: Concrete Bass.muPattern
 layers=1
 load_errors=0
-capture_bytes=3092
-capture_sha256=9803fabc1e761738f4b30285f0b1958971d288e618509fe8aec78b00242d5ad0
+capture_bytes=3121
+capture_sha256=c0bbe80f4431fb983df9592a26ef736c4d4f476bbc7885267fc9d4f2633a93fb
 --- parameters differing from default (id=plain value)
 v0_drvChar=5
 v0_flt_cut=540

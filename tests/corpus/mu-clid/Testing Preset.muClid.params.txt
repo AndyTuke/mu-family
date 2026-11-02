@@ -1,8 +1,8 @@
 # frozen load result for fixture: Testing Preset.muClid
 layers=3
 load_errors=0
-resave_bytes=11257
-resave_sha256=a7744e8420456ab6fbf64cf9c9dbc84f1a46714094bf8a6d2b13470d776987cb
+resave_bytes=11362
+resave_sha256=f8632dec3d5b86773d6bbec4177b42999a37a7ae3c3745ae6aeeacf448e9c650
 --- parameters differing from default (id=plain value)
 ch0_lvl=0.619
 ch0_scAtk=4.00802

@@ -1,8 +1,8 @@
 # frozen load result for fixture: Heartland 5.muTant
 layers=3
 load_errors=0
-resave_bytes=34574
-resave_sha256=68e54b90878ed7dbdd0645e63fc41e121556517b02c1ea690382d5c7331a3299
+resave_bytes=34929
+resave_sha256=38c25159bc3698dbabb8bcc39330ad0d7e23217ef3932564374928bb1077d8c5
 --- parameters differing from default (id=plain value)
 ch0_lvl=0.757
 ch0_pan=-0.6

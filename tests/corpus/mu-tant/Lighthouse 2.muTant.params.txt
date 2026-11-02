@@ -1,8 +1,8 @@
 # frozen load result for fixture: Lighthouse 2.muTant
 layers=3
 load_errors=0
-resave_bytes=34970
-resave_sha256=a38d0008fb21e90171b6de9a52f0d2eba601f6fbe5d00a458c74ca097f0ef8ae
+resave_bytes=35325
+resave_sha256=14cb85666627a84e0db28ca2c9019f62ca2e9a817a26b800ef783b44c65b07b0
 --- parameters differing from default (id=plain value)
 ch0_lvl=0.794
 ch0_pan=-0.6

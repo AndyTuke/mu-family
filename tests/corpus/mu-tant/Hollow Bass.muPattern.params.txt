@@ -1,8 +1,8 @@
 # frozen load result for fixture: Hollow Bass.muPattern
 layers=1
 load_errors=0
-capture_bytes=3088
-capture_sha256=67f6921efc03fbd4f2cf54ded540bb8027f434698a10e53203bd7a17a03d19bb
+capture_bytes=3117
+capture_sha256=02bfe02dbcce3041e396272cf44899bb42dc2d9661fe577a939ed1cbf330414b
 --- parameters differing from default (id=plain value)
 v0_flt_cut=560
 v0_flt_res=0.3

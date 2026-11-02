@@ -1,8 +1,8 @@
 # frozen load result for fixture: Mechanism 4.muTant
 layers=3
 load_errors=0
-resave_bytes=35123
-resave_sha256=c204fd8520b0dc7e5b8d9a5f32e253695eb5643cad70e957dc04e7871dbec870
+resave_bytes=35478
+resave_sha256=0713d73682c043fb28eb57670eed553af4bbc2ef05af053baf96450268d12b77
 --- parameters differing from default (id=plain value)
 ch0_lvl=0.774
 ch0_pan=-0.6

@@ -1,8 +1,8 @@
 # frozen load result for fixture: Big and Bad.muRhythm
 layers=1
 load_errors=0
-capture_bytes=5162
-capture_sha256=87f42595395d8ec3d952b7e3f39174a365332fef328cd1e1e3fe41a029583ab5
+capture_bytes=5181
+capture_sha256=29d9db75d547221a9a86c01aa66cbd56c1c1a65cfcfb5e3297e6df0a80141a8b
 --- parameters differing from default (id=plain value)
 r0_aEnvAtk=0
 r0_aEnvDec=1.25088

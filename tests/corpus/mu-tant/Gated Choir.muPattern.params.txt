@@ -1,8 +1,8 @@
 # frozen load result for fixture: Gated Choir.muPattern
 layers=1
 load_errors=0
-capture_bytes=3377
-capture_sha256=deab9c9975140d99c7e7c93684e138ab1216a03d37a112e08a9d693eb5f14da6
+capture_bytes=3406
+capture_sha256=ba87eb5d940e42eac1609e20b7a977e060b9c9d67f198dbb5c457d9f15929e80
 --- parameters differing from default (id=plain value)
 v0_flt_cut=1800
 v0_flt_res=0.35

@@ -172,11 +172,13 @@
       <p id="mst_insP2" x="0.0"/>
       <p id="mst_insP3" x="0.0"/>
       <p id="mst_insP4" x="0.0"/>
+      <p id="mst_insSync" x="0.0"/>
       <p id="mst_ins2Char" x="0.0"/>
       <p id="mst_ins2P1" x="0.0"/>
       <p id="mst_ins2P2" x="0.0"/>
       <p id="mst_ins2P3" x="0.0"/>
       <p id="mst_ins2P4" x="0.0"/>
+      <p id="mst_ins2Sync" x="0.0"/>
     </Globals>
     <Slots>
       <Slot idx="0">
@@ -243,6 +245,7 @@
         <p id="insP2" x="0.0"/>
         <p id="insP3" x="0.0"/>
         <p id="insP4" x="0.0"/>
+        <p id="insSync" x="0.0"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
                loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
@@ -326,6 +329,7 @@
         <p id="insP2" x="0.0"/>
         <p id="insP3" x="0.0"/>
         <p id="insP4" x="0.0"/>
+        <p id="insSync" x="0.0"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
                loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
@@ -409,6 +413,7 @@
         <p id="insP2" x="0.0"/>
         <p id="insP3" x="0.0"/>
         <p id="insP4" x="0.0"/>
+        <p id="insSync" x="0.0"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
                loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
@@ -492,6 +497,7 @@
         <p id="insP2" x="0.0"/>
         <p id="insP3" x="0.0"/>
         <p id="insP4" x="0.0"/>
+        <p id="insSync" x="0.0"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
                loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
@@ -575,6 +581,7 @@
         <p id="insP2" x="0.0"/>
         <p id="insP3" x="0.0"/>
         <p id="insP4" x="0.0"/>
+        <p id="insSync" x="0.0"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
                loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
@@ -658,6 +665,7 @@
         <p id="insP2" x="0.0"/>
         <p id="insP3" x="0.0"/>
         <p id="insP4" x="0.0"/>
+        <p id="insSync" x="0.0"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
                loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
@@ -741,6 +749,7 @@
         <p id="insP2" x="0.0"/>
         <p id="insP3" x="0.0"/>
         <p id="insP4" x="0.0"/>
+        <p id="insSync" x="0.0"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
                loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>
@@ -824,6 +833,7 @@
         <p id="insP2" x="0.0"/>
         <p id="insP3" x="0.0"/>
         <p id="insP4" x="0.0"/>
+        <p id="insSync" x="0.0"/>
         <Modulators depthUnits="range">
           <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None"
                loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1"/>

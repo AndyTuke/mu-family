@@ -2,8 +2,8 @@
 layers=1
 load_errors=1
 load_error=Sample 'Synth C# 01.wav' missing from content folder — rhythm loaded without audio.
-capture_bytes=4596
-capture_sha256=57b407b944d5f6240408b08d60fb4b9bd4e2416122332dc2956eec25a721ac7c
+capture_bytes=4615
+capture_sha256=df412dbcae385924020a8b5e65a3e819c6e779882b8a8c35d75db86b11b1f308
 --- parameters differing from default (id=plain value)
 r0_aEnvAtk=0.3
 r0_aEnvDec=1.2

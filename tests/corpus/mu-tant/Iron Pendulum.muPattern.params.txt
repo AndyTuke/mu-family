@@ -1,8 +1,8 @@
 # frozen load result for fixture: Iron Pendulum.muPattern
 layers=1
 load_errors=0
-capture_bytes=3105
-capture_sha256=45a74534ce0e96945f92911888d70397e538ee346a09476095d69673ee5c1ad0
+capture_bytes=3134
+capture_sha256=e57128d82cac3c586180c7609a94e1c2416a5d02cc651c30bd89b21203b2e47d
 --- parameters differing from default (id=plain value)
 v0_drvChar=1
 v0_flt_cut=800

@@ -3,7 +3,7 @@
 product=mu-clid
 layers_at_start=1
 max_layers=8
-param_count=718
+param_count=728
 ---
 ch0_lvl | float | 0 | 1 | 0 | 1 | 1 | 1
 ch0_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
@@ -131,16 +131,18 @@ eff_p1 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
 eff_p2 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
 eff_p3 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
 eff_p4 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
-mst_ins2Char | int | 0 | 15 | 1 | 1 | 0 | 0
+mst_ins2Char | int | 0 | 16 | 1 | 1 | 0 | 0
 mst_ins2P1 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_ins2P2 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_ins2P3 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_ins2P4 | float | 0 | 1 | 0 | 1 | 0 | 0
-mst_insChar | int | 0 | 15 | 1 | 1 | 0 | 0
+mst_ins2Sync | bool | 0 | 1 | 1 | 1 | 0 | 0
+mst_insChar | int | 0 | 16 | 1 | 1 | 0 | 0
 mst_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
+mst_insSync | bool | 0 | 1 | 1 | 1 | 0 | 0
 mstrLoop | int | 0 | 16 | 1 | 1 | 0 | 0
 mstr_lvl | float | 0 | 1 | 0 | 1 | 1 | 1
 mstr_pan | float | -1 | 1 | 0 | 1 | 0 | 0.5
@@ -151,7 +153,7 @@ r0_aEnvRel | float | 0 | 10 | 0 | 0.3 | 0.5 | 0.407091
 r0_aEnvSus | float | 0 | 100 | 0 | 1 | 80 | 0.8
 r0_accentDb | float | 0 | 12 | 0 | 1 | 0 | 0
 r0_ampLvl | float | -60 | 6 | 0 | 1 | 0 | 0.909091
-r0_drvChar | int | 0 | 15 | 1 | 1 | 0 | 0
+r0_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
 r0_fEnvAtk | float | 0 | 10 | 0 | 0.3 | 0.03 | 0.17504
 r0_fEnvDec | float | 0 | 10 | 0 | 0.3 | 0.09 | 0.243373
 r0_fEnvDep | float | 0 | 48 | 0 | 1 | 0 | 0
@@ -178,6 +180,7 @@ r0_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
 r0_insStA | int | 0 | 63 | 1 | 1 | 0 | 0
 r0_insStB | int | 0 | 63 | 1 | 1 | 0 | 0
 r0_insStC | int | 0 | 63 | 1 | 1 | 0 | 0
+r0_insSync | bool | 0 | 1 | 1 | 1 | 0 | 0
 r0_logic | int | 0 | 4 | 1 | 1 | 0 | 0
 r0_midiAccent | int | 0 | 100 | 1 | 1 | 0 | 0
 r0_midiChan | int | 1 | 16 | 1 | 1 | 1 | 0
@@ -219,7 +222,7 @@ r1_aEnvRel | float | 0 | 10 | 0 | 0.3 | 0.5 | 0.407091
 r1_aEnvSus | float | 0 | 100 | 0 | 1 | 80 | 0.8
 r1_accentDb | float | 0 | 12 | 0 | 1 | 0 | 0
 r1_ampLvl | float | -60 | 6 | 0 | 1 | 0 | 0.909091
-r1_drvChar | int | 0 | 15 | 1 | 1 | 0 | 0
+r1_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
 r1_fEnvAtk | float | 0 | 10 | 0 | 0.3 | 0.03 | 0.17504
 r1_fEnvDec | float | 0 | 10 | 0 | 0.3 | 0.09 | 0.243373
 r1_fEnvDep | float | 0 | 48 | 0 | 1 | 0 | 0
@@ -246,6 +249,7 @@ r1_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
 r1_insStA | int | 0 | 63 | 1 | 1 | 0 | 0
 r1_insStB | int | 0 | 63 | 1 | 1 | 0 | 0
 r1_insStC | int | 0 | 63 | 1 | 1 | 0 | 0
+r1_insSync | bool | 0 | 1 | 1 | 1 | 0 | 0
 r1_logic | int | 0 | 4 | 1 | 1 | 0 | 0
 r1_midiAccent | int | 0 | 100 | 1 | 1 | 0 | 0
 r1_midiChan | int | 1 | 16 | 1 | 1 | 1 | 0
@@ -287,7 +291,7 @@ r2_aEnvRel | float | 0 | 10 | 0 | 0.3 | 0.5 | 0.407091
 r2_aEnvSus | float | 0 | 100 | 0 | 1 | 80 | 0.8
 r2_accentDb | float | 0 | 12 | 0 | 1 | 0 | 0
 r2_ampLvl | float | -60 | 6 | 0 | 1 | 0 | 0.909091
-r2_drvChar | int | 0 | 15 | 1 | 1 | 0 | 0
+r2_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
 r2_fEnvAtk | float | 0 | 10 | 0 | 0.3 | 0.03 | 0.17504
 r2_fEnvDec | float | 0 | 10 | 0 | 0.3 | 0.09 | 0.243373
 r2_fEnvDep | float | 0 | 48 | 0 | 1 | 0 | 0
@@ -314,6 +318,7 @@ r2_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
 r2_insStA | int | 0 | 63 | 1 | 1 | 0 | 0
 r2_insStB | int | 0 | 63 | 1 | 1 | 0 | 0
 r2_insStC | int | 0 | 63 | 1 | 1 | 0 | 0
+r2_insSync | bool | 0 | 1 | 1 | 1 | 0 | 0
 r2_logic | int | 0 | 4 | 1 | 1 | 0 | 0
 r2_midiAccent | int | 0 | 100 | 1 | 1 | 0 | 0
 r2_midiChan | int | 1 | 16 | 1 | 1 | 1 | 0
@@ -355,7 +360,7 @@ r3_aEnvRel | float | 0 | 10 | 0 | 0.3 | 0.5 | 0.407091
 r3_aEnvSus | float | 0 | 100 | 0 | 1 | 80 | 0.8
 r3_accentDb | float | 0 | 12 | 0 | 1 | 0 | 0
 r3_ampLvl | float | -60 | 6 | 0 | 1 | 0 | 0.909091
-r3_drvChar | int | 0 | 15 | 1 | 1 | 0 | 0
+r3_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
 r3_fEnvAtk | float | 0 | 10 | 0 | 0.3 | 0.03 | 0.17504
 r3_fEnvDec | float | 0 | 10 | 0 | 0.3 | 0.09 | 0.243373
 r3_fEnvDep | float | 0 | 48 | 0 | 1 | 0 | 0
@@ -382,6 +387,7 @@ r3_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
 r3_insStA | int | 0 | 63 | 1 | 1 | 0 | 0
 r3_insStB | int | 0 | 63 | 1 | 1 | 0 | 0
 r3_insStC | int | 0 | 63 | 1 | 1 | 0 | 0
+r3_insSync | bool | 0 | 1 | 1 | 1 | 0 | 0
 r3_logic | int | 0 | 4 | 1 | 1 | 0 | 0
 r3_midiAccent | int | 0 | 100 | 1 | 1 | 0 | 0
 r3_midiChan | int | 1 | 16 | 1 | 1 | 1 | 0
@@ -423,7 +429,7 @@ r4_aEnvRel | float | 0 | 10 | 0 | 0.3 | 0.5 | 0.407091
 r4_aEnvSus | float | 0 | 100 | 0 | 1 | 80 | 0.8
 r4_accentDb | float | 0 | 12 | 0 | 1 | 0 | 0
 r4_ampLvl | float | -60 | 6 | 0 | 1 | 0 | 0.909091
-r4_drvChar | int | 0 | 15 | 1 | 1 | 0 | 0
+r4_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
 r4_fEnvAtk | float | 0 | 10 | 0 | 0.3 | 0.03 | 0.17504
 r4_fEnvDec | float | 0 | 10 | 0 | 0.3 | 0.09 | 0.243373
 r4_fEnvDep | float | 0 | 48 | 0 | 1 | 0 | 0
@@ -450,6 +456,7 @@ r4_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
 r4_insStA | int | 0 | 63 | 1 | 1 | 0 | 0
 r4_insStB | int | 0 | 63 | 1 | 1 | 0 | 0
 r4_insStC | int | 0 | 63 | 1 | 1 | 0 | 0
+r4_insSync | bool | 0 | 1 | 1 | 1 | 0 | 0
 r4_logic | int | 0 | 4 | 1 | 1 | 0 | 0
 r4_midiAccent | int | 0 | 100 | 1 | 1 | 0 | 0
 r4_midiChan | int | 1 | 16 | 1 | 1 | 1 | 0
@@ -491,7 +498,7 @@ r5_aEnvRel | float | 0 | 10 | 0 | 0.3 | 0.5 | 0.407091
 r5_aEnvSus | float | 0 | 100 | 0 | 1 | 80 | 0.8
 r5_accentDb | float | 0 | 12 | 0 | 1 | 0 | 0
 r5_ampLvl | float | -60 | 6 | 0 | 1 | 0 | 0.909091
-r5_drvChar | int | 0 | 15 | 1 | 1 | 0 | 0
+r5_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
 r5_fEnvAtk | float | 0 | 10 | 0 | 0.3 | 0.03 | 0.17504
 r5_fEnvDec | float | 0 | 10 | 0 | 0.3 | 0.09 | 0.243373
 r5_fEnvDep | float | 0 | 48 | 0 | 1 | 0 | 0
@@ -518,6 +525,7 @@ r5_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
 r5_insStA | int | 0 | 63 | 1 | 1 | 0 | 0
 r5_insStB | int | 0 | 63 | 1 | 1 | 0 | 0
 r5_insStC | int | 0 | 63 | 1 | 1 | 0 | 0
+r5_insSync | bool | 0 | 1 | 1 | 1 | 0 | 0
 r5_logic | int | 0 | 4 | 1 | 1 | 0 | 0
 r5_midiAccent | int | 0 | 100 | 1 | 1 | 0 | 0
 r5_midiChan | int | 1 | 16 | 1 | 1 | 1 | 0
@@ -559,7 +567,7 @@ r6_aEnvRel | float | 0 | 10 | 0 | 0.3 | 0.5 | 0.407091
 r6_aEnvSus | float | 0 | 100 | 0 | 1 | 80 | 0.8
 r6_accentDb | float | 0 | 12 | 0 | 1 | 0 | 0
 r6_ampLvl | float | -60 | 6 | 0 | 1 | 0 | 0.909091
-r6_drvChar | int | 0 | 15 | 1 | 1 | 0 | 0
+r6_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
 r6_fEnvAtk | float | 0 | 10 | 0 | 0.3 | 0.03 | 0.17504
 r6_fEnvDec | float | 0 | 10 | 0 | 0.3 | 0.09 | 0.243373
 r6_fEnvDep | float | 0 | 48 | 0 | 1 | 0 | 0
@@ -586,6 +594,7 @@ r6_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
 r6_insStA | int | 0 | 63 | 1 | 1 | 0 | 0
 r6_insStB | int | 0 | 63 | 1 | 1 | 0 | 0
 r6_insStC | int | 0 | 63 | 1 | 1 | 0 | 0
+r6_insSync | bool | 0 | 1 | 1 | 1 | 0 | 0
 r6_logic | int | 0 | 4 | 1 | 1 | 0 | 0
 r6_midiAccent | int | 0 | 100 | 1 | 1 | 0 | 0
 r6_midiChan | int | 1 | 16 | 1 | 1 | 1 | 0
@@ -627,7 +636,7 @@ r7_aEnvRel | float | 0 | 10 | 0 | 0.3 | 0.5 | 0.407091
 r7_aEnvSus | float | 0 | 100 | 0 | 1 | 80 | 0.8
 r7_accentDb | float | 0 | 12 | 0 | 1 | 0 | 0
 r7_ampLvl | float | -60 | 6 | 0 | 1 | 0 | 0.909091
-r7_drvChar | int | 0 | 15 | 1 | 1 | 0 | 0
+r7_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
 r7_fEnvAtk | float | 0 | 10 | 0 | 0.3 | 0.03 | 0.17504
 r7_fEnvDec | float | 0 | 10 | 0 | 0.3 | 0.09 | 0.243373
 r7_fEnvDep | float | 0 | 48 | 0 | 1 | 0 | 0
@@ -654,6 +663,7 @@ r7_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
 r7_insStA | int | 0 | 63 | 1 | 1 | 0 | 0
 r7_insStB | int | 0 | 63 | 1 | 1 | 0 | 0
 r7_insStC | int | 0 | 63 | 1 | 1 | 0 | 0
+r7_insSync | bool | 0 | 1 | 1 | 1 | 0 | 0
 r7_logic | int | 0 | 4 | 1 | 1 | 0 | 0
 r7_midiAccent | int | 0 | 100 | 1 | 1 | 0 | 0
 r7_midiChan | int | 1 | 16 | 1 | 1 | 1 | 0
@@ -736,15 +746,15 @@ ch7=12
 dly=10
 echo=10
 eff=7
-mst=10
+mst=12
 mstr=3
-r0=68
-r1=68
-r2=68
-r3=68
-r4=68
-r5=68
-r6=68
-r7=68
+r0=69
+r1=69
+r2=69
+r3=69
+r4=69
+r5=69
+r6=69
+r7=69
 ret=24
 rev=10

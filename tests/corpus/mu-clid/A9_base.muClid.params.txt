@@ -2,8 +2,8 @@
 layers=1
 load_errors=1
 load_error=Sample 'Kick 01.wav' missing from content folder — rhythm loaded without audio.
-resave_bytes=4800
-resave_sha256=6f6800a0dfa6872d04c2a912c0c0fb2288f8e1e759ed463649571a6abb6cfe91
+resave_bytes=4873
+resave_sha256=f9e67fcc2844a1833fdde4d793d1697cff0a44b5606d1d998004a81156aa243c
 --- parameters differing from default (id=plain value)
 ch0_lvl=0.85
 mstrLoop=1

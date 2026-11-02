@@ -1,6 +1,6 @@
 # frozen load result for fixture: FACTORY_STATE.muTant
 layers=1
 load_errors=0
-resave_bytes=32423
-resave_sha256=dee211040e87187a5c04fab4b789e6a9b2626c34d157e9269e902bcc144daa41
+resave_bytes=32778
+resave_sha256=8e2098614d2e577548ecd4e80a939b65451b9b2a41107581b43b25b7ddae8903
 --- parameters differing from default (id=plain value)

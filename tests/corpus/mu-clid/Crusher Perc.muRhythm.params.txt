@@ -2,8 +2,8 @@
 layers=1
 load_errors=1
 load_error=Sample 'Perc 17.wav' missing from content folder — rhythm loaded without audio.
-capture_bytes=4905
-capture_sha256=162af9547c5a5082858c4e6bb72be7e62fd89f5982aaee58380c6ca1a7ea4b8b
+capture_bytes=4924
+capture_sha256=c8ea88c7be51754dfd529b154c6c9da86f069a36158dcaf062f6761096638cf5
 --- parameters differing from default (id=plain value)
 r0_aEnvAtk=0
 r0_aEnvDec=0.12

@@ -1,8 +1,8 @@
 # frozen load result for fixture: Night Drive.muTant
 layers=4
 load_errors=0
-resave_bytes=35556
-resave_sha256=a0168a90be1b1a3ae24a2088cb731ce2de0e45342abff4e44a9035cb9412f2f1
+resave_bytes=35911
+resave_sha256=79ced5be805a9652680a8d1918434ffe41034d6e37c78c64029bd76dba54044a
 --- parameters differing from default (id=plain value)
 ch0_lvl=0.814
 ch0_pan=-0.6

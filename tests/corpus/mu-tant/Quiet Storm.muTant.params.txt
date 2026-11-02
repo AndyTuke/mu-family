@@ -1,8 +1,8 @@
 # frozen load result for fixture: Quiet Storm.muTant
 layers=3
 load_errors=0
-resave_bytes=34945
-resave_sha256=8c8fd8331b0eab6401f4d99e0983ea64d40e491250ecb6e6401079a2397d30e4
+resave_bytes=35300
+resave_sha256=a06c63e72ee3922e2d0fd0f67c04d2bc2bffbd3b74cca3b2328b393d19568ed3
 --- parameters differing from default (id=plain value)
 ch0_lvl=0.837
 ch0_pan=-0.6

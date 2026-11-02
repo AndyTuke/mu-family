@@ -1,8 +1,8 @@
 # frozen load result for fixture: Subterranean.muPattern
 layers=1
 load_errors=0
-capture_bytes=3537
-capture_sha256=9e0aa3d8571892e14b65819fa3fdaff50b75c775c482e3092a939d6b17bdee6b
+capture_bytes=3566
+capture_sha256=ae374c27635c45d75a601aa948d942dbff0418a4ff738b25d00ad25595c3ceec
 --- parameters differing from default (id=plain value)
 v0_flt_cut=300
 v0_flt_type=7

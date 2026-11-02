@@ -1,8 +1,8 @@
 # frozen load result for fixture: Ring Bass.muPattern
 layers=1
 load_errors=0
-capture_bytes=3182
-capture_sha256=0bfb4298f4a314fc147ba6bff0ed6793fdbf0bd9ec404ef9333c516e231e4377
+capture_bytes=3211
+capture_sha256=8b827ab55a81c64e065fd1f240e4f4866a3ab85ea4e6f03b87d327426c67a6f6
 --- parameters differing from default (id=plain value)
 v0_drvChar=10
 v0_flt_cut=620

@@ -2,8 +2,8 @@
 layers=1
 load_errors=1
 load_error=Sample 'Synth E 02.wav' missing from content folder — rhythm loaded without audio.
-capture_bytes=3967
-capture_sha256=7ed394d4d51e5d9faf2fa1a945cad41b008103cda575f1cf4c0164d0ff74a4ff
+capture_bytes=4001
+capture_sha256=7a0d6b6d2fb067aabf2a30794e2641683cd3635f51f1269f2c2b21e4295f3c83
 --- parameters differing from default (id=plain value)
 r0_aEnvDec=0.6
 r0_aEnvRel=2

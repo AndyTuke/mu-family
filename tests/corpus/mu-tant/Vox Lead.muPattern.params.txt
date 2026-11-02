@@ -1,8 +1,8 @@
 # frozen load result for fixture: Vox Lead.muPattern
 layers=1
 load_errors=0
-capture_bytes=3756
-capture_sha256=407fe2c64bf46eeb957fab91d77c428d60d934f99f683a33596a33b936eb0579
+capture_bytes=3785
+capture_sha256=ef7af2204ecb955dc1be3905aee89eb9185d09ee1b1af3589e099a8d203bc326
 --- parameters differing from default (id=plain value)
 v0_flt_cut=2400
 v0_flt_res=0.35

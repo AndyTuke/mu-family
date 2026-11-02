@@ -1,8 +1,8 @@
 # frozen load result for fixture: Sub Cathedral 3.muTant
 layers=4
 load_errors=0
-resave_bytes=35517
-resave_sha256=ae32c579599b8e5e1c97e198ea46b2c93b77dd338e672f5df5b7bb4a09a0dcb9
+resave_bytes=35871
+resave_sha256=aa34df33ad6bee8bc17b9b64fab25301401879cfabe50626d6f8b9afee1e46fd
 --- parameters differing from default (id=plain value)
 ch0_lvl=0.83
 ch0_pan=-0.6

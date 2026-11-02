@@ -2,8 +2,8 @@
 layers=1
 load_errors=1
 load_error=Sample 'Synth E 04.wav' missing from content folder — rhythm loaded without audio.
-capture_bytes=4304
-capture_sha256=7b16e1c9f30fc18d0442af036e2d133f2635e4731827eaecee7099d8cece3d0e
+capture_bytes=4338
+capture_sha256=a6b278c1b3b2ecf2efbdb0dedca1706dc0ba3248406077398fdb42e646320931
 --- parameters differing from default (id=plain value)
 r0_aEnvAtk=0.3
 r0_aEnvDec=1.2

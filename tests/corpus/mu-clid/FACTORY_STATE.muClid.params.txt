@@ -1,8 +1,8 @@
 # frozen load result for fixture: FACTORY_STATE.muClid
 layers=1
 load_errors=0
-resave_bytes=4780
-resave_sha256=100e9d88b9714eb8bd440717b1e001fdadf9221f87964a4878617de8e2b38e44
+resave_bytes=4853
+resave_sha256=d7083dbf74c22f04d431b21ae7ece68ac87e834da70358dba6251e4f7799688c
 --- parameters differing from default (id=plain value)
 r0_fEnvAtk=0.01
 r0_fEnvDec=0.3

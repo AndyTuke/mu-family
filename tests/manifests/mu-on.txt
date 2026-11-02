@@ -3,7 +3,7 @@
 product=mu-on
 layers_at_start=1
 max_layers=8
-param_count=951
+param_count=961
 ---
 ch0_lvl | float | 0 | 1 | 0.001 | 1 | 1 | 1
 ch0_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
@@ -131,16 +131,18 @@ eff_p1 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
 eff_p2 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
 eff_p3 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
 eff_p4 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
-mst_ins2Char | int | 0 | 15 | 1 | 1 | 0 | 0
+mst_ins2Char | int | 0 | 16 | 1 | 1 | 0 | 0
 mst_ins2P1 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_ins2P2 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_ins2P3 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_ins2P4 | float | 0 | 1 | 0 | 1 | 0 | 0
-mst_insChar | int | 0 | 15 | 1 | 1 | 0 | 0
+mst_ins2Sync | bool | 0 | 1 | 1 | 1 | 0 | 0
+mst_insChar | int | 0 | 16 | 1 | 1 | 0 | 0
 mst_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
+mst_insSync | bool | 0 | 1 | 1 | 1 | 0 | 0
 mstr_lvl | float | 0 | 1 | 0 | 1 | 1 | 1
 mstr_pan | float | -1 | 1 | 0 | 1 | 0 | 0.5
 mstr_swap | choice(3) | 0 | 2 | 1 | 1 | 2 | 1
@@ -208,7 +210,7 @@ t0_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t0_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t0_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t0_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
-t0_drvChar | int | 0 | 15 | 1 | 1 | 0 | 0
+t0_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
 t0_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t0_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t0_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
@@ -242,6 +244,7 @@ t0_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 t0_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
 t0_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
 t0_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
+t0_insSync | bool | 0 | 1 | 1 | 1 | 0 | 0
 t0_kick_adec | float | 20 | 800 | 1 | 0.386853 | 180 | 0.54182
 t0_kick_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t0_kick_fatk | float | 0.5 | 200 | 0.1 | 0.22767 | 0.5 | 0
@@ -305,7 +308,7 @@ t1_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t1_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t1_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t1_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
-t1_drvChar | int | 0 | 15 | 1 | 1 | 0 | 0
+t1_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
 t1_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t1_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t1_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
@@ -339,6 +342,7 @@ t1_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 t1_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
 t1_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
 t1_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
+t1_insSync | bool | 0 | 1 | 1 | 1 | 0 | 0
 t1_kick_adec | float | 20 | 800 | 1 | 0.386853 | 180 | 0.54182
 t1_kick_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t1_kick_fatk | float | 0.5 | 200 | 0.1 | 0.22767 | 0.5 | 0
@@ -402,7 +406,7 @@ t2_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t2_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t2_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t2_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
-t2_drvChar | int | 0 | 15 | 1 | 1 | 0 | 0
+t2_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
 t2_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t2_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t2_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
@@ -436,6 +440,7 @@ t2_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 t2_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
 t2_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
 t2_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
+t2_insSync | bool | 0 | 1 | 1 | 1 | 0 | 0
 t2_kick_adec | float | 20 | 800 | 1 | 0.386853 | 180 | 0.54182
 t2_kick_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t2_kick_fatk | float | 0.5 | 200 | 0.1 | 0.22767 | 0.5 | 0
@@ -499,7 +504,7 @@ t3_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t3_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t3_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t3_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
-t3_drvChar | int | 0 | 15 | 1 | 1 | 0 | 0
+t3_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
 t3_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t3_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t3_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
@@ -533,6 +538,7 @@ t3_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 t3_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
 t3_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
 t3_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
+t3_insSync | bool | 0 | 1 | 1 | 1 | 0 | 0
 t3_kick_adec | float | 20 | 800 | 1 | 0.386853 | 180 | 0.54182
 t3_kick_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t3_kick_fatk | float | 0.5 | 200 | 0.1 | 0.22767 | 0.5 | 0
@@ -596,7 +602,7 @@ t4_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t4_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t4_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t4_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
-t4_drvChar | int | 0 | 15 | 1 | 1 | 0 | 0
+t4_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
 t4_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t4_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t4_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
@@ -630,6 +636,7 @@ t4_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 t4_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
 t4_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
 t4_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
+t4_insSync | bool | 0 | 1 | 1 | 1 | 0 | 0
 t4_kick_adec | float | 20 | 800 | 1 | 0.386853 | 180 | 0.54182
 t4_kick_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t4_kick_fatk | float | 0.5 | 200 | 0.1 | 0.22767 | 0.5 | 0
@@ -693,7 +700,7 @@ t5_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t5_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t5_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t5_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
-t5_drvChar | int | 0 | 15 | 1 | 1 | 0 | 0
+t5_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
 t5_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t5_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t5_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
@@ -727,6 +734,7 @@ t5_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 t5_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
 t5_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
 t5_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
+t5_insSync | bool | 0 | 1 | 1 | 1 | 0 | 0
 t5_kick_adec | float | 20 | 800 | 1 | 0.386853 | 180 | 0.54182
 t5_kick_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t5_kick_fatk | float | 0.5 | 200 | 0.1 | 0.22767 | 0.5 | 0
@@ -790,7 +798,7 @@ t6_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t6_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t6_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t6_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
-t6_drvChar | int | 0 | 15 | 1 | 1 | 0 | 0
+t6_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
 t6_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t6_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t6_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
@@ -824,6 +832,7 @@ t6_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 t6_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
 t6_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
 t6_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
+t6_insSync | bool | 0 | 1 | 1 | 1 | 0 | 0
 t6_kick_adec | float | 20 | 800 | 1 | 0.386853 | 180 | 0.54182
 t6_kick_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t6_kick_fatk | float | 0.5 | 200 | 0.1 | 0.22767 | 0.5 | 0
@@ -887,7 +896,7 @@ t7_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t7_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t7_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t7_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
-t7_drvChar | int | 0 | 15 | 1 | 1 | 0 | 0
+t7_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
 t7_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t7_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t7_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
@@ -921,6 +930,7 @@ t7_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 t7_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
 t7_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
 t7_insP4 | float | 0 | 1 | 0 | 1 | 0 | 0
+t7_insSync | bool | 0 | 1 | 1 | 1 | 0 | 0
 t7_kick_adec | float | 20 | 800 | 1 | 0.386853 | 180 | 0.54182
 t7_kick_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t7_kick_fatk | float | 0.5 | 200 | 0.1 | 0.22767 | 0.5 | 0
@@ -969,15 +979,15 @@ ch7=12
 dly=10
 echo=10
 eff=7
-mst=10
+mst=12
 mstr=3
 ret=24
 rev=10
-t0=97
-t1=97
-t2=97
-t3=97
-t4=97
-t5=97
-t6=97
-t7=97
+t0=98
+t1=98
+t2=98
+t3=98
+t4=98
+t5=98
+t6=98
+t7=98

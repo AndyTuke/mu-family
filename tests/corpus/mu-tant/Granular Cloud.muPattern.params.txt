@@ -1,8 +1,8 @@
 # frozen load result for fixture: Granular Cloud.muPattern
 layers=1
 load_errors=0
-capture_bytes=4061
-capture_sha256=5c0e17b6b042288f1b482d95eaba8d187820c0f5a22150696a6bbd0c13bd4220
+capture_bytes=4090
+capture_sha256=c4b65a4c64f48b2df4ae8f38dc236dc66f1ca3db4f6de83ea3b43af526712e68
 --- parameters differing from default (id=plain value)
 v0_drvChar=4
 v0_flt_cut=2400

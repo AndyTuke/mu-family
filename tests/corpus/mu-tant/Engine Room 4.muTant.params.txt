@@ -1,8 +1,8 @@
 # frozen load result for fixture: Engine Room 4.muTant
 layers=3
 load_errors=0
-resave_bytes=34467
-resave_sha256=d3402ab639ca60405773a698eae06c275aa2562464aedd4bf6b1ca93e5970784
+resave_bytes=34822
+resave_sha256=0c99f34e3fa8e7def8d1ac01f10436b1d808fbe3d7a01a21d8742c399f7161c7
 --- parameters differing from default (id=plain value)
 ch0_lvl=0.916
 ch0_pan=-0.6
