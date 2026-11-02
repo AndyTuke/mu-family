@@ -313,13 +313,17 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     };
     waveFitButton.setTooltip("Show the whole sample. The wheel zooms, Shift+wheel scrolls, a middle-button or Ctrl drag pans");
     waveFitButton.onClick = [this] { waveform.showAll(); };
+    waveOutButton.onClick = [this] { waveform.zoomBy(0.5, waveform.getWidth() / 2); };
+    waveInButton.onClick  = [this] { waveform.zoomBy(2.0, waveform.getWidth() / 2); };
+    waveOutButton.setTooltip("Zoom the sample out");
+    waveInButton.setTooltip("Zoom the sample in (the mouse wheel zooms around the pointer, Shift+wheel scrolls)");
     tlOutButton.setTooltip("Zoom the timeline out (the wheel zooms too)");
     tlOutButton.onClick = [this] { timelineView.zoomBy(1.0 / 1.5, timelineView.getWidth() / 2); };
     tlInButton.setTooltip("Zoom the timeline in (the wheel zooms too)");
     tlInButton.onClick = [this] { timelineView.zoomBy(1.5, timelineView.getWidth() / 2); };
     tlFitButton.setTooltip("Show the whole timeline. Shift+wheel scrolls, a drag on the ruler or a middle-button drag pans");
     tlFitButton.onClick = [this] { timelineView.showAll(); };
-    for (auto* b : { &deleteButton, &clearButton, &layOutButton, &waveFitButton, &tlOutButton, &tlInButton, &tlFitButton }) addAndMakeVisible(*b);
+    for (auto* b : { &deleteButton, &clearButton, &layOutButton, &waveFitButton, &waveOutButton, &waveInButton, &tlOutButton, &tlInButton, &tlFitButton }) addAndMakeVisible(*b);
 
     updateView();
     startTimerHz(15);
@@ -630,6 +634,8 @@ void PhraseContent::resized()
         bar.removeFromTop(s(LF::kSpaceS) / 2);
         auto place = [&](juce::Component& c, int w) { c.setBounds(bar.removeFromLeft(s(w))); bar.removeFromLeft(s(LF::kSpaceS)); };
         place(waveFitButton, 84);
+        place(waveOutButton, 30);
+        place(waveInButton, 30);
         bar.removeFromLeft(s(LF::kSpaceS) * 2);
         place(lengthCaption, 52);
         place(barsInput, 78);
