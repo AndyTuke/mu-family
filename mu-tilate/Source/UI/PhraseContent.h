@@ -125,6 +125,7 @@ private:
     DropdownSelect   gridBox;                     // the snap grid
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> gridAtt;
     juce::TextButton deleteButton { "Delete hit" }, clearButton { "Clear" }, layOutButton { "Lay out" };
+    juce::TextButton previewTempoButton { "Play at tempo" }, previewOriginalButton { "Play original" }, previewSliceButton { "Play slice" }, previewStopButton { "Stop" };
     juce::TextButton waveFitButton { "Fit sample" }, waveOutButton { "-" }, waveInButton { "+" }, tlOutButton { "-" }, tlInButton { "+" }, tlFitButton { "Fit timeline" };
     std::vector<LF_Section> sections;             // the panels of the Layer and Slice views, from resized() for paint()
     bool shownPanelIsHit = false;                 // whether the slice panel last showed a hit (else a slice)

@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Audio/InsertProcessor.h"      // mu-core: shared per-voice insert FX
+#include "Audio/InsertProcessor.h"
+#include "Audio/SamplePreview.h"        // mu-core: plays a decoded buffer on the audio thread      // mu-core: shared per-voice insert FX
 #include "Audio/SpinLock.h"             // mu-core: the try-lock the audio thread takes around the loop data
 #include "Audio/VoiceParams.h"          // mu-core: the insert's parameter snapshot
 #include "Modulation/LastResolved.h"    // mu-core: hold-last-value on a matrix-lock miss
@@ -80,6 +81,12 @@ struct Phrase : Layer
                      std::shared_ptr<const juce::AudioBuffer<float>> source = nullptr, int regionStart = 0, int regionEnd = 0);
     // Message thread: the section of the source file a saved layer uses (0, 0 = all of it).
     void savedRegion(int& start, int& end) const noexcept { start = pending.regionStart; end = pending.regionEnd; }
+    // Message thread: audition the loaded loop without the transport. Original plays the used section as it is, at its own tempo;
+    // AtTempo plays the slices back to back in source order at `bpm`, timed by the layer's Tempo Match and Pitch/Stretch; Slice
+    // plays one slice the same way. The matched ones are rendered here first (the audio thread only copies the result).
+    enum class PreviewKind { Original, AtTempo, Slice };
+    void startPreview(PreviewKind kind, int slice, double bpm);
+    void stopPreview() { preview.stop(); }
     // Message thread: an edit of the slices or the timeline (the editor builds the edited copies). Reuses the audio.
     void commitEdit(const SliceList& slices, const Timeline& timeline);
 
@@ -161,6 +168,7 @@ private:
     uint64_t                          lastAudioId = 0;      // audio thread: the audio the voices were started from (0 = none)
     std::atomic<double>               loopLengthBeats { -1.0 };
 
+    mu_core::SamplePreview preview;                // the audition (message thread starts it, the audio thread mixes it)
     juce::AudioBuffer<float> tailScratch;          // a tail that must add rather than write renders here
     bool parked = true;                            // not rendered live in the last rendered block
     bool stopRequested = false;                    // audio thread

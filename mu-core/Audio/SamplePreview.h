@@ -23,6 +23,8 @@ public:
     // Message-thread: begin/end playback of a file. Safe while the audio thread is mixing.
     void start(const juce::File& file);
     void stop();
+    // Message thread: plays decoded audio (any channel count, at `audioRate`) the same way, converted to the prepared rate.
+    void startBuffer(const juce::AudioBuffer<float>& audio, double audioRate);
 
     // Audio thread: mix preview output into masterBus if currently playing.
     void mixInto(juce::AudioBuffer<float>& masterBus, int numSamples);
@@ -35,6 +37,9 @@ private:
         juce::AudioBuffer<float> audio;   // 2 channels at the prepared sample rate
         juce::uint64             id = 0;  // unique per decode, so a recycled address is never mistaken for the same preview
     };
+
+    // Message thread: converts a stereo source (with zero padding after srcLen) to the prepared rate and publishes it.
+    void publish(juce::AudioBuffer<float>& src, int srcLen, double srcRate, double rate);
 
     // Message thread: free retired buffers the audio thread is no longer reading.
     void collectRetired();

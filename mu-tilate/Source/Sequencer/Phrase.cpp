@@ -73,6 +73,71 @@ void Phrase::installLoop(std::shared_ptr<const juce::AudioBuffer<float>> audio, 
     setData(std::move(d));
 }
 
+void Phrase::startPreview(PreviewKind kind, int slice, double bpm)
+{
+    const auto d = getData();
+    if (d == nullptr || d->audio == nullptr || d->audio->getNumSamples() < 2) return;
+    if (kind == PreviewKind::Original) { preview.startBuffer(*d->audio, d->fileSampleRate); return; }
+
+    // The settings that time the loop (the layer's unmodulated values), then the loop or one slice laid out from beat 0.
+    auto g = [this](int row) { return pp[(size_t) row].load(0.0f); };
+    PhraseSettings s;
+    s.mode = (TempoMode) juce::jlimit(0, 1, (int) g(ppi::mode));
+    s.stretchMix = g(ppi::tmix);
+    s.loopTempo = (double) g(ppi::ltempo);
+    s.holdMs = g(ppi::hold);
+    s.strength = g(ppi::strength);
+    s.fadeInMs = g(ppi::fadeIn);
+    s.fadeOutMs = g(ppi::fadeOut);
+    if (s.loopTempo <= 0.0 || bpm <= 0.0) return;
+    const double sr = hostRate > 0.0 ? hostRate : 48000.0;
+
+    std::vector<double> beats;
+    for (int i = 0; i < d->slices.size(); ++i)
+        beats.push_back((double) d->slices.slice(i).length() / d->fileSampleRate * s.loopTempo / 60.0);
+    Timeline tl(1.0);
+    double total = 0.0;
+    if (kind == PreviewKind::AtTempo)
+    {
+        for (double b : beats) total += b;
+        tl.setLengthBeats(std::ceil(std::max(1.0, total) - 1.0e-6));
+        tl.originalOrder(beats);
+    }
+    else
+    {
+        const int at = juce::jlimit(0, d->slices.size() - 1, slice);
+        total = beats[(size_t) at];
+        tl.setLengthBeats(std::ceil(std::max(1.0, total) - 1.0e-6));
+        tl.place(at, 0.0, 0.0);
+    }
+
+    PhraseLoop loop;
+    const bool useCopy = d->resampled != nullptr && std::abs(d->resampledRate - sr) < 0.5;
+    loop.audio = useCopy ? d->resampled.get() : d->audio.get();
+    loop.fileSampleRate = useCopy ? d->resampledRate : d->fileSampleRate;
+    loop.sliceScale = useCopy ? d->resampledRate / d->fileSampleRate : 1.0;
+    loop.slices = &d->slices;
+    loop.timeline = &tl;
+
+    // Offline: a scheduler of its own plays the layout through its blocks into a buffer, which is then published to the player.
+    PhrasePlayback pb;
+    pb.prepare(sr, 512, pp[ppi::window].load(1.0f) < 0.5f);
+    const int frames = juce::jmax(2, (int) std::lround(total * 60.0 / bpm * sr));
+    juce::AudioBuffer<float> out(2, frames);
+    out.clear();
+    for (int pos = 0; pos < frames; pos += 512)
+    {
+        const int n = juce::jmin(512, frames - pos);
+        PhraseClock c;
+        c.playing = true; c.bpm = bpm; c.sampleRate = sr;
+        c.beatsPerSample = bpm / 60.0 / sr;
+        c.startBeat = (double) pos * c.beatsPerSample;
+        juce::AudioBuffer<float> view(out.getArrayOfWritePointers(), 2, pos, n);
+        pb.render(loop, s, c, view, n);
+    }
+    preview.startBuffer(out, sr);
+}
+
 void Phrase::commitEdit(const SliceList& slices, const Timeline& timeline)
 {
     auto cur = getData();
@@ -156,6 +221,7 @@ void Phrase::prepare(double sampleRate, int blockSize)
     // The stretch window is a per-layer choice made here (Short for drums, Default for tonal loops).
     playback->prepare(sampleRate, juce::jmax(16, blockSize), pp[ppi::window].load(1.0f) < 0.5f);
     insert->prepare(sampleRate, blockSize);
+    preview.prepare(juce::jmax(16, blockSize), sampleRate);
     tailScratch.setSize(2, juce::jmax(1, blockSize));
     tailScratch.clear();
     parked = true;
@@ -261,6 +327,7 @@ void Phrase::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>&
     clock.sampleRate     = ctx.sampleRate;
     renderBlock(d, clock, out, n);
     mu_core::spinUnlock(dataLock);
+    preview.mixInto(out, n);   // an audition sounds with the layer, after its insert, with or without the transport
 }
 
 // The tail of a layer that left its slot: the scheduler with the transport stopped (the sounding slice fades through

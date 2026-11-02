@@ -69,6 +69,13 @@ void SamplePreview::start(const juce::File& file)
         for (int i = 0; i < srcLen; ++i)
             if (! std::isfinite(p[i])) p[i] = 0.0f;
     }
+    publish(src, srcLen, srcRate, rate);
+}
+
+// rt-ok-fn: message-thread conversion and publish; the audio thread reads current/audioHolding and never takes messageLock
+void SamplePreview::publish(juce::AudioBuffer<float>& src, int srcLen, double srcRate, double rate)
+{
+    const double ratio = srcRate / rate;
     // Phase 2: convert to the device rate with Lagrange interpolation, as the transport's resampler did.
     auto dec = std::make_unique<Decoded>();
     if (std::abs(srcRate - rate) > 1.0e-6)
@@ -95,6 +102,29 @@ void SamplePreview::start(const juce::File& file)
     owned.push_back(std::move(dec));
     current.store(raw);
     collectRetired();
+}
+
+// rt-ok-fn: message-thread copy and publish (preview button)
+void SamplePreview::startBuffer(const juce::AudioBuffer<float>& audio, double audioRate)
+{
+    double rate;
+    {
+        const juce::ScopedLock sl(messageLock);
+        rate = sampleRate;
+    }
+    const int srcLen = juce::jmin(audio.getNumSamples(), (int) (kMaxSeconds * (audioRate > 0.0 ? audioRate : 44100.0)));
+    if (rate <= 0.0 || srcLen <= 0 || audio.getNumChannels() <= 0 || audioRate <= 0.0) return;
+    const int pad = (int) std::ceil(juce::jmax(1.0, audioRate / rate)) + 8;
+    juce::AudioBuffer<float> src(2, srcLen + pad);
+    src.clear();
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        src.copyFrom(ch, 0, audio, juce::jmin(ch, audio.getNumChannels() - 1), 0, srcLen);
+        float* p = src.getWritePointer(ch);
+        for (int i = 0; i < srcLen; ++i)
+            if (! std::isfinite(p[i])) p[i] = 0.0f;
+    }
+    publish(src, srcLen, audioRate, rate);
 }
 
 // rt-ok-fn: message-thread side of the hazard-pointer scheme; the audio thread never takes messageLock

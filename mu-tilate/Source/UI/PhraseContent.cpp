@@ -315,6 +315,13 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     rangeBar.setTooltip("The whole sample: drag the ends to use only a section of it (the file is not changed), drag inside to slide the section");
     rangeBar.onRangeChanged = [this](int start, int end) { timelineView.setSelectedBlock(-1); host.setSourceRegion(currentLayer, start, end); };
     addAndMakeVisible(rangeBar);
+    previewTempoButton.setTooltip("Play the loop at the project tempo, as the layer's Tempo Match and Pitch/Stretch set it");
+    previewOriginalButton.setTooltip("Play the used section of the sample as it is, at its own tempo");
+    previewSliceButton.setTooltip("Play the selected slice");
+    previewTempoButton.onClick    = [this] { host.previewSource(currentLayer, 1, 0); };
+    previewOriginalButton.onClick = [this] { host.previewSource(currentLayer, 0, 0); };
+    previewSliceButton.onClick    = [this] { host.previewSource(currentLayer, 2, juce::jmax(0, waveform.getSelectedRegion())); };
+    previewStopButton.onClick     = [this] { host.stopPreview(currentLayer); };
     waveFitButton.onClick = [this] { waveform.showAll(); };
     waveOutButton.onClick = [this] { waveform.zoomBy(0.5, waveform.getWidth() / 2); };
     waveInButton.onClick  = [this] { waveform.zoomBy(2.0, waveform.getWidth() / 2); };
@@ -326,7 +333,7 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     tlInButton.onClick = [this] { timelineView.zoomBy(1.5, timelineView.getWidth() / 2); };
     tlFitButton.setTooltip("Show the whole timeline. Shift+wheel scrolls, a drag on the ruler or a middle-button drag pans");
     tlFitButton.onClick = [this] { timelineView.showAll(); };
-    for (auto* b : { &deleteButton, &clearButton, &layOutButton, &waveFitButton, &waveOutButton, &waveInButton, &tlOutButton, &tlInButton, &tlFitButton }) addAndMakeVisible(*b);
+    for (auto* b : { &deleteButton, &clearButton, &layOutButton, &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewStopButton, &waveFitButton, &waveOutButton, &waveInButton, &tlOutButton, &tlInButton, &tlFitButton }) addAndMakeVisible(*b);
 
     updateView();
     startTimerHz(15);
@@ -422,7 +429,7 @@ void PhraseContent::updateView()
     rangeBar.setVisible(sequencer);
     timelineView.setVisible(! layerView);
     for (auto* c : std::initializer_list<juce::Component*> { &lengthCaption, &barsInput, &beatsInput, &gridBox, &layOutButton, &deleteButton, &clearButton,
-                                                              &waveFitButton, &tlOutButton, &tlInButton, &tlFitButton })
+                                                              &waveFitButton, &waveOutButton, &waveInButton, &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewStopButton, &tlOutButton, &tlInButton, &tlFitButton })
         c->setVisible(sequencer);
     if (sliceView) refreshSlicePanel(true);
     updateToolbar();
@@ -641,6 +648,13 @@ void PhraseContent::resized()
         const int timelineH = juce::jmax(s(90), area.getHeight() * 4 / 10);
         timelineView.setBounds(area.removeFromBottom(timelineH));
         auto bar = area.removeFromBottom(toolbarH);
+        auto previewRow = area.removeFromTop(s(kStatusH));
+        for (auto* b : { &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewStopButton })
+        {
+            b->setBounds(previewRow.removeFromLeft(s(b == &previewStopButton ? 60 : 108)));
+            previewRow.removeFromLeft(s(LF::kSpaceS));
+        }
+        area.removeFromTop(s(LF::kSpaceS));
         rangeBar.setBounds(area.removeFromTop(s(40)));
         area.removeFromTop(s(LF::kSpaceS));
         waveform.setBounds(area.withTrimmedBottom(s(LF::kSpaceS)));

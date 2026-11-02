@@ -116,6 +116,27 @@ struct ProcessorTests : public juce::UnitTest
             p.setPlayHead(nullptr);
         }
 
+        beginTest("the audition plays the loop at the tempo, the original and a slice with no hits on the timeline, and stops");
+        {
+            PluginProcessor p;
+            Host host;
+            p.setPlayHead(&host);
+            p.setRateAndBufferSizeDetails(kSr, kBlock);
+            p.prepareToPlay(kSr, kBlock);
+            p.loadLoopAsync(0, file);
+            expect(pumpUntil([&] { return p.getPhrase(0).getData() != nullptr && p.getPhrase(0).getData()->slices.size() > 0; }), "the loop did not arrive");
+            expectEquals(renderPeak(p, host, 20), 0.0f);                    // no hits: silence
+            for (int kind = 0; kind < 3; ++kind)
+            {
+                p.previewSource(0, kind, 0);
+                expectGreaterThan(renderPeak(p, host, 40), 0.02f);          // each audition is heard
+                p.stopPreview(0);
+                renderPeak(p, host, 2);
+                expectEquals(renderPeak(p, host, 10), 0.0f);                // and stops
+            }
+            p.setPlayHead(nullptr);
+        }
+
         beginTest("a source region uses only that section: the source stays whole, the layer is laid out afresh, and the region is saved");
         {
             juce::MemoryBlock saved;

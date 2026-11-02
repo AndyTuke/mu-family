@@ -89,6 +89,12 @@ public:
     void loadLoopAsync(int layer, const juce::File& file, bool keepSavedEdits,
                        std::shared_ptr<const juce::AudioBuffer<float>> decoded, double decodedRate, int regionStart, int regionEnd);
     void layOutSlices(int layer) override;
+    void previewSource(int layer, int kind, int slice) override
+    {
+        if (layer >= 0 && layer < mu_limits::kMaxLayers)
+            getPhrase(layer).startPreview((Phrase::PreviewKind) juce::jlimit(0, 2, kind), slice, getInternalBpm());
+    }
+    void stopPreview(int layer) override { if (layer >= 0 && layer < mu_limits::kMaxLayers) getPhrase(layer).stopPreview(); }
     void setSourceRegion(int layer, int start, int end) override;
     juce::String getLoopStatus(int layer) const override;
 

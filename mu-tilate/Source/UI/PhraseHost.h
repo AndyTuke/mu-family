@@ -43,6 +43,10 @@ public:
     // Lays the layer's slices out one after another in source order from beat 0, replacing the hits, and sizes the sequence to
     // fit (in whole bars). A loaded loop starts with an empty timeline; this is the one-press way to a starting sequence.
     virtual void layOutSlices(int layer) = 0;
+    // Audition the layer's loop without the transport: 0 = the used section at its own tempo, 1 = the loop at the project tempo
+    // (timed by Tempo Match and Pitch/Stretch), 2 = slice `slice` the same way. stopPreview ends it.
+    virtual void previewSource(int layer, int kind, int slice) = 0;
+    virtual void stopPreview(int layer) = 0;
     // One line for the content: the loop's name and slice count, "Loading ...", or the last error.
     virtual juce::String getLoopStatus(int layer) const = 0;
 };
