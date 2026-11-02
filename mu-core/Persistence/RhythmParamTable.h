@@ -198,6 +198,8 @@ inline const RhythmParamDef kRhythmParamDefs[] = {
                    [](const Rhythm& r) -> float { return r.voiceParams.insertParam[2]; } },
     { "insP4",     [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.insertParam[3] = v; vd = true; },
                    [](const Rhythm& r) -> float { return r.voiceParams.insertParam[3]; } },
+    { "insSync",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.insertSync = v > 0.5f; vd = true; },
+                   [](const Rhythm& r) -> float { return r.voiceParams.insertSync ? 1.0f : 0.0f; },  ParamKind::Bool },
 
     // -- Output mode (Sample / MIDI) and the MIDI-output settings ---------------
     // Read by the audio thread at each hit straight from the Rhythm (RelaxedInt), so no engine sync.

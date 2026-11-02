@@ -9,6 +9,7 @@
 // choosing the heads and the spring, on the four generic insert knobs.
 //   - Mode       1..12: heads 1, 2, 3 singly, heads 2+3, the heads singly with spring, pairs with spring, all three with spring, spring alone.
 //   - Rate       the tape speed: 0 % slow (long repeats) .. 100 % fast (short repeats); turning it bends the repeats' pitch.
+//                With the insert's Sync on it is 1..16 sixteenth notes of the tempo for the first head's spacing instead.
 //   - Intensity  how much of the repeats is fed back.
 //   - Mix        the echo and spring level added to the dry (the dry is never touched, as on the unit).
 // The echo takes the sum of the channels; its wet pair is added to the left and right. Bass, Treble, Drive and Hiss are part of the
@@ -27,6 +28,9 @@ public:
         e.mode      = juce::jlimit(1, 12, (int) std::lround(insertSlot(p, 0)));
         e.rate      = juce::jlimit(0.0f, 1.0f, insertSlot(p, 1) * 0.01f);
         e.intensity = juce::jlimit(0.0f, 1.0f, insertSlot(p, 2) * 0.01f);
+        // Sync: Rate picks 1..16 sixteenth notes for the first head's spacing (the other heads stay at 2x and 3x it).
+        if (p.insertSync)
+            e.spacingSeconds = (float) (mu_ui::insertSyncStepFromNorm(p.insertParam[1]) * mu_ui::insertSixteenthSeconds(tempoBpm));
         const float mix = juce::jlimit(0.0f, 1.0f, insertSlot(p, 3) * 0.01f);
         e.echo = 1.0f; e.reverb = 0.7f;
         engine.setParameters(e);

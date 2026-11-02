@@ -7,7 +7,8 @@
 // insertAlgo = 15. Tape delay (Echoplex / Space Echo character): a delay line whose repeats are re-recorded through a
 // worn tape path, so each pass gets darker, thinner in the lows, softly compressed and slightly unsteady.
 //   - Time     the head spacing, 20 ms..1 s. It is glided (not jumped), so turning it bends the pitch of the repeats as
-//              changing the tape speed does.
+//              changing the tape speed does. With the insert's Sync on it is 1..16 sixteenth notes of the tempo instead
+//              (the knob's range in sixteen equal steps), glided the same way.
 //   - Feedback repeats; above 100 % the loop runs away but the tape saturation holds it (self-oscillation).
 //   - Mix      dry/wet crossfade.
 //   - Wear     how old the tape is: wow and flutter depth, saturation, and a lower loop treble cut.
@@ -20,7 +21,7 @@ public:
     void prepare(double sampleRate, int) override
     {
         sr = sampleRate > 0.0 ? sampleRate : 44100.0;
-        size = (int) (sr * 1.25) + 8;   // 1 s of delay plus the wobble and the interpolator's taps
+        size = (int) (sr * 4.25) + 8;   // 4 s (16 sixteenths at 60 bpm) plus the wobble and the interpolator's taps
         for (auto& l : line) l.assign((size_t) size, 0.0f);
         fb.reset(sr, 0.02);
         mix.reset(sr, 0.02);
@@ -50,7 +51,13 @@ public:
         const float mixAmt = juce::jlimit(0.0f, 1.0f, insertSlot(p, 2) * 0.01f);
         const float wear   = juce::jlimit(0.0f, 1.0f, insertSlot(p, 3) * 0.01f);
 
-        const float targetDelay = timeMs * 0.001f * (float) sr;
+        float targetDelay = timeMs * 0.001f * (float) sr;
+        if (p.insertSync)
+        {
+            // Sync: n sixteenth notes at the tempo, held inside the line for tempos slower than 60 bpm.
+            const int n = mu_ui::insertSyncStepFromNorm(p.insertParam[0]);
+            targetDelay = juce::jmin((float) (n * mu_ui::insertSixteenthSeconds(tempoBpm) * sr), (float) (size - 24));
+        }
         if (! started)
         {
             timeSmoothed = targetDelay; started = true;

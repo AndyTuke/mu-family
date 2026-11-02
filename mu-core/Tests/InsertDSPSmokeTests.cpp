@@ -475,6 +475,59 @@ public:
             expect (finite && mx < 2.0f, "runaway feedback grew without bound");
         }
 
+        beginTest ("tempo sync: Tape Delay Time and Tape Spring Rate become sixteenth-note steps of the tempo");
+        {
+            const double sr = 48000.0;
+            const int total = (int) (sr * 1.6), block = 256;
+            // An impulse through the insert at `bpm`; returns the left channel.
+            auto impulse = [&](InsertAlgorithmBase& a, VoiceParams p, double bpm)
+            {
+                a.prepare(sr, block);
+                a.tempoBpm = bpm;
+                std::vector<float> out;
+                float gr = 0.0f;
+                for (int done = 0; done < total; done += block)
+                {
+                    juce::AudioBuffer<float> b(2, block); b.clear();
+                    if (done == 0) { b.setSample(0, 0, 1.0f); b.setSample(1, 0, 1.0f); }
+                    a.process(b, block, 2, p, gr);
+                    for (int i = 0; i < block; ++i) out.push_back(b.getSample(0, i));
+                }
+                return out;
+            };
+            // The index of the largest sample after `from`.
+            auto peakAfter = [](const std::vector<float>& o, int from)
+            {
+                int best = from; float m = 0.0f;
+                for (int i = from; i < (int) o.size(); ++i) if (std::abs(o[(size_t) i]) > m) { m = std::abs(o[(size_t) i]); best = i; }
+                return best;
+            };
+
+            // Tape Delay, 4 sixteenths at 120 bpm = 0.5 s, whatever the Time knob's ms value would have been.
+            auto pd = makeParams(15, { 250.0f, 0.0f, 100.0f, 0.0f });
+            pd.insertSync = true;
+            pd.insertParam[0] = mu_ui::insertSyncStepToNorm(4);
+            const auto d = impulse(*std::make_unique<TapeDelayInsert>(), pd, 120.0);
+            expect (std::abs(peakAfter(d, 2000) - (int) (0.5 * sr)) < 40, "the synced Tape Delay echo is not 4 sixteenths after the input");
+
+            // The same step at 60 bpm is twice as long.
+            const auto d60 = impulse(*std::make_unique<TapeDelayInsert>(), pd, 60.0);
+            expect (std::abs(peakAfter(d60, 2000) - (int) (1.0 * sr)) < 40, "the synced Tape Delay echo does not follow the tempo");
+
+            // Sync off: Time in ms as before, the tempo and the step position ignored.
+            pd.insertSync = false;
+            pd.insertParam[0] = mu_ui::actualToNorm(250.0f, 15, 0);
+            const auto du = impulse(*std::make_unique<TapeDelayInsert>(), pd, 77.0);
+            expect (std::abs(peakAfter(du, 2000) - (int) (0.25 * sr)) < 40, "the unsynced Tape Delay echo moved");
+
+            // Tape Spring, mode 1 (head 1 only), Rate step 2 = 2 sixteenths = 0.25 s at 120 bpm.
+            auto ps = makeParams(16, { 1.0f, 50.0f, 0.0f, 100.0f });
+            ps.insertSync = true;
+            ps.insertParam[1] = mu_ui::insertSyncStepToNorm(2);
+            const auto sp = impulse(*std::make_unique<TapeSpringInsert>(), ps, 120.0);
+            expect (std::abs(peakAfter(sp, 3000) - (int) (0.25 * sr)) < 60, "the synced Tape Spring first head is not 2 sixteenths after the input");
+        }
+
         beginTest ("algo 14: OverdriveInsert - silence stays silent at any bias, and Bias adds even harmonics");
         {
             // Magnitude of `harmonic` x the test tone in a settled one-second render (Goertzel).

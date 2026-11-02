@@ -169,6 +169,7 @@ public:
     {
         std::atomic<int>   insertAlgo { 0 };
         std::atomic<float> insertParam[VoiceParams::kInsertSlotCount] {};
+        std::atomic<bool>  insertSync { false };
         InsertProcessor    processor;
 
         // The block's parameter snapshot, as the master inserts build theirs.
@@ -178,6 +179,7 @@ public:
             vp.insertAlgo = insertAlgo.load(std::memory_order_relaxed);
             for (int i = 0; i < VoiceParams::kInsertSlotCount; ++i)
                 vp.insertParam[i] = insertParam[i].load(std::memory_order_relaxed);
+            vp.insertSync = insertSync.load(std::memory_order_relaxed);
             return vp;
         }
     };
@@ -214,8 +216,10 @@ public:
     // writes never produce a torn value.
     std::atomic<int>   masterInsert1Algo    { 0 };
     std::atomic<float> masterInsert1Param[VoiceParams::kInsertSlotCount] {};
+    std::atomic<bool>  masterInsert1Sync    { false };
     std::atomic<int>   masterInsert2Algo    { 0 };
     std::atomic<float> masterInsert2Param[VoiceParams::kInsertSlotCount] {};
+    std::atomic<bool>  masterInsert2Sync    { false };
     InsertProcessor    masterInsert;
     InsertProcessor    masterInsert2;
 
@@ -268,7 +272,17 @@ public:
         vp.insertAlgo = algo.load(std::memory_order_relaxed);
         for (int i = 0; i < VoiceParams::kInsertSlotCount; ++i)
             vp.insertParam[i] = params[i].load(std::memory_order_relaxed);
+        vp.insertSync = ((slot == 0) ? masterInsert1Sync : masterInsert2Sync).load(std::memory_order_relaxed);
         return vp;
+    }
+
+    // The tempo for the master and bus inserts' tempo-synced algorithms; once per block, before processBlock.
+    void setInsertTempo(double bpm) noexcept
+    {
+        masterInsert.setTempo(bpm);
+        masterInsert2.setTempo(bpm);
+        for (auto& b : buses)
+            for (auto& ins : b.insert) ins.processor.setTempo(bpm);
     }
 
 

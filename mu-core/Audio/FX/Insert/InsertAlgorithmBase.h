@@ -50,4 +50,8 @@ public:
                          int ns, int nCh,
                          const VoiceParams& p,
                          float& grOut) = 0;
+
+    // The tempo (bpm) the owner runs at, set by InsertProcessor before each process(); read by the algorithms that
+    // can sync to it (see mu_ui::kInsertSyncSlot).
+    double tempoBpm = 120.0;
 };

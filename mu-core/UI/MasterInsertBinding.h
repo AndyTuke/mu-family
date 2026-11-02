@@ -23,6 +23,7 @@ public:
     // The APVTS ids behind a slot (0 = Insert 1, 1 = Insert 2).
     static const char* algorithmParamId(int slot) noexcept;
     static const char* paramId(int slot, int param) noexcept;
+    static const char* syncParamId(int slot) noexcept;   // the Sync switch (tempo-synced algorithms)
 
 private:
     void write(const char* parameterId, float plainValue);
@@ -46,6 +47,7 @@ public:
     // The APVTS ids behind insert `insert` of bus `bus` (param 0..3 = P1..P4).
     static juce::String algorithmParamId(int bus, int insert);
     static juce::String paramId(int bus, int insert, int param);
+    static juce::String syncParamId(int bus, int insert);
 
     // The boxes shown: the bus's inserts, up to what the panel holds.
     static int numSlots() noexcept;

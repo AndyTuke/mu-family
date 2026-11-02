@@ -28,6 +28,15 @@ MasterInsertPanel::MasterInsertPanel()
         sl.algo.setSelectedId(1, false);
         sl.algo.onChange = [this, i](int id) { userChangedAlgorithm(i, id - 1); };
         addAndMakeVisible(sl.algo);
+        addChildComponent(sl.syncButton);
+        sl.syncButton.setClickingTogglesState(true);
+        sl.syncButton.onClick = [this, i]
+        {
+            auto& s2 = slots[(size_t) i];
+            s2.sync = s2.syncButton.getToggleState();
+            configureKnobs(i);
+            if (onSync) onSync(i, s2.sync);
+        };
         for (auto& k : sl.knobs) addChildComponent(k);
         configureKnobs(i);
     }
@@ -45,7 +54,10 @@ void MasterInsertPanel::configureKnobs(int slot)
                 slots[(size_t) slot].norm[p] = n;
                 if (p == 0) applyDependencies(slot);
                 if (onParam) onParam(slot, p, n);
-            });
+            },
+            SlotLabelUnits::None, sl.sync);
+    sl.syncButton.setVisible(slot < numSlots && insertHasSync(sl.algorithm));
+    sl.syncButton.setToggleState(sl.sync, juce::dontSendNotification);
     applyDependencies(slot);
     resized();
 }
@@ -79,7 +91,7 @@ void MasterInsertPanel::setNumSlots(int n)
         const bool shown = i < numSlots;
         sl.algo.setVisible(shown);
         if (shown) configureKnobs(i);   // the knobs show as the algorithm says
-        else for (auto& k : sl.knobs) k.setVisible(false);
+        else { for (auto& k : sl.knobs) k.setVisible(false); sl.syncButton.setVisible(false); }
     }
     resized();
     repaint();
@@ -110,6 +122,17 @@ void MasterInsertPanel::setParam(int slot, int param, float normalised)
                                       juce::dontSendNotification);
     if (param == 0) applyDependencies(slot);
 }
+
+void MasterInsertPanel::setSync(int slot, bool on)
+{
+    if (slot < 0 || slot >= numSlots) return;
+    auto& sl = slots[(size_t) slot];
+    if (sl.sync == on) return;   // a steady refresh never restarts a knob that is being dragged
+    sl.sync = on;
+    configureKnobs(slot);
+}
+
+bool MasterInsertPanel::getSync(int slot) const { return slots[(size_t) slot].sync; }
 
 int MasterInsertPanel::getAlgorithm(int slot) const { return slots[(size_t) slot].algorithm; }
 float MasterInsertPanel::getParam(int slot, int param) const { return slots[(size_t) slot].norm[param]; }
@@ -161,7 +184,11 @@ void MasterInsertPanel::resized()
         auto& sl = slots[(size_t) i];
         const int pad = s(kBoxPad);
         const auto inner = boxBounds(i).reduced(pad, pad);
-        sl.algo.setBounds(inner.getX(), inner.getY(), inner.getWidth(), s(kSelectH));
+        // An algorithm with a Sync switch gives it the right end of the selector's row.
+        const int syncW = sl.syncButton.isVisible() ? s(MuLookAndFeel::kKnobSize2W - MuLookAndFeel::kDropdownEdgeGap) : 0;
+        const int gap   = s(MuLookAndFeel::kDropdownEdgeGap);
+        sl.algo.setBounds(inner.getX(), inner.getY(), inner.getWidth() - (syncW > 0 ? syncW + gap : 0), s(kSelectH));
+        if (syncW > 0) sl.syncButton.setBounds(inner.getRight() - syncW, inner.getY(), syncW, s(kSelectH));
 
         // The visible knobs pack into the 2 x 2 grid; an odd last one is centred.
         KnobWithLabel* vis[kParams];

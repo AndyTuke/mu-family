@@ -183,6 +183,35 @@ inline const SlotConfig kInsertAlgoSlots[kInsertAlgoCount][kInsertSlotCount] = {
       { "Mix",       0.0f, 100.0f, SkewMode::Linear,   "%" } },
 };
 
+// Tempo sync (the insert's own Sync switch, APVTS suffix insSync): which slot turns into sixteenth-note steps when it is on,
+// one row per algorithm, -1 = the algorithm has no sync. A new algorithm opts in by naming its time slot here.
+inline constexpr int kInsertSyncSlot[kInsertAlgoCount] = {
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    0,    // 15 TapeDelay : Time
+    1,    // 16 TapeSpring: Rate
+};
+inline bool insertHasSync(int algoIndex) noexcept
+{
+    return algoIndex >= 0 && algoIndex < kInsertAlgoCount && kInsertSyncSlot[algoIndex] >= 0;
+}
+
+// Synced, the slot's whole 0..1 range is split into sixteen equal bands: band n (1..16) is n sixteenth notes.
+inline constexpr int kInsertSyncSteps = 16;
+inline int   insertSyncStepFromNorm(float norm) noexcept
+{
+    return 1 + std::clamp((int) std::floor(std::clamp(norm, 0.0f, 1.0f) * (float) kInsertSyncSteps), 0, kInsertSyncSteps - 1);
+}
+inline float insertSyncStepToNorm(int step) noexcept   // the middle of the step's band
+{
+    return ((float) std::clamp(step, 1, kInsertSyncSteps) - 0.5f) / (float) kInsertSyncSteps;
+}
+// A sixteenth note's length at a tempo, in seconds (a non-finite or absurd tempo reads as 120 bpm).
+inline double insertSixteenthSeconds(double bpm) noexcept
+{
+    if (! (bpm >= 20.0 && bpm <= 999.0)) bpm = 120.0;
+    return 60.0 / bpm * 0.25;
+}
+
 // Whether a slot's knob is live, given slot 1's actual value (see SlotConfig::disabledFromP1).
 inline bool insertSlotEnabled(int algoIndex, int slot, float p1Actual) noexcept
 {

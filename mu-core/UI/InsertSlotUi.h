@@ -84,7 +84,8 @@ inline void configureKnobFromSlot(KnobWithLabel& k,
                                   int slotIndex,
                                   float currentNorm,
                                   std::function<void(float /*newNorm*/)> onWriteNorm,
-                                  SlotLabelUnits labelUnits = SlotLabelUnits::None)
+                                  SlotLabelUnits labelUnits = SlotLabelUnits::None,
+                                  bool tempoSynced = false)
 {
     if (algoIndex < 0 || algoIndex >= kInsertAlgoCount || slotIndex < 0 || slotIndex >= kInsertSlotCount)
     {
@@ -124,6 +125,13 @@ inline void configureKnobFromSlot(KnobWithLabel& k,
     };
     k.getSlider().valueFromTextFunction = nullptr;
 
+    // Tempo sync (the insert's Sync switch) turns the algorithm's time slot into sixteen steps of a sixteenth note.
+    const bool stepped = tempoSynced && kInsertSyncSlot[algoIndex] == slotIndex;
+    if (stepped)
+        k.getSlider().textFromValueFunction = [algoIndex, slotIndex](double v) -> juce::String {
+            return juce::String(insertSyncStepFromNorm(actualToNorm((float) v, algoIndex, slotIndex))) + " x 1/16";
+        };
+
     // Snap the value (actual scale).
     const double actual = (double) normToActual(currentNorm, algoIndex, slotIndex);
     k.setValue(actual, juce::dontSendNotification);
@@ -133,9 +141,15 @@ inline void configureKnobFromSlot(KnobWithLabel& k,
     // onValueChanged: convert back to normalised + tell caller. With unit
     // suffixes the label is also refreshed so dynamicUnit Hz->kHz flips track
     // the slider live; plain labels are set once above and never rewritten.
-    k.onValueChanged = [&k, cfg, algoIndex, slotIndex, onWriteNorm, suffix](double v)
+    k.onValueChanged = [&k, cfg, algoIndex, slotIndex, onWriteNorm, suffix, stepped](double v)
     {
-        onWriteNorm(actualToNorm((float) v, algoIndex, slotIndex));
+        float norm = actualToNorm((float) v, algoIndex, slotIndex);
+        if (stepped)   // the knob rests on the middle of its step
+        {
+            norm = insertSyncStepToNorm(insertSyncStepFromNorm(norm));
+            k.setValue((double) normToActual(norm, algoIndex, slotIndex), juce::dontSendNotification);
+        }
+        onWriteNorm(norm);
         if (suffix)
             k.setLabel(composeSlotLabel(cfg, v));
     };

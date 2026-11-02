@@ -161,6 +161,7 @@ void FxParamSync::syncBusParam(const juce::String& id, float v)
         else if (is("insP2"))   ins.insertParam[1].store(v, std::memory_order_relaxed);
         else if (is("insP3"))   ins.insertParam[2].store(v, std::memory_order_relaxed);
         else if (is("insP4"))   ins.insertParam[3].store(v, std::memory_order_relaxed);
+        else if (is("insSync")) ins.insertSync.store(v > 0.5f, std::memory_order_relaxed);
         return;
     }
 
@@ -201,6 +202,8 @@ bool FxParamSync::syncMasterParam(const juce::String& id, float v)
     if (id == "mst_insP2")    { mixerEngine.masterInsert1Param[1].store(v, std::memory_order_relaxed); return true; }
     if (id == "mst_insP3")    { mixerEngine.masterInsert1Param[2].store(v, std::memory_order_relaxed); return true; }
     if (id == "mst_insP4")    { mixerEngine.masterInsert1Param[3].store(v, std::memory_order_relaxed); return true; }
+    if (id == "mst_insSync")  { mixerEngine.masterInsert1Sync.store(v > 0.5f, std::memory_order_relaxed); return true; }
+    if (id == "mst_ins2Sync") { mixerEngine.masterInsert2Sync.store(v > 0.5f, std::memory_order_relaxed); return true; }
     if (id == "mst_ins2Char") { mixerEngine.masterInsert2Algo.store(juce::jlimit(0, mu_audio::kInsertAlgorithmCount - 1, (int) v), std::memory_order_relaxed); return true; }
     if (id == "mst_ins2P1")   { mixerEngine.masterInsert2Param[0].store(v, std::memory_order_relaxed); return true; }
     if (id == "mst_ins2P2")   { mixerEngine.masterInsert2Param[1].store(v, std::memory_order_relaxed); return true; }

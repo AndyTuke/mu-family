@@ -125,11 +125,13 @@ inline void addGlobalFxParams(juce::AudioProcessorValueTreeState::ParameterLayou
     addF("mst_insP2",   "Mst Insert P2",   0.0f, 1.0f, 0.0f);
     addF("mst_insP3",   "Mst Insert P3",   0.0f, 1.0f, 0.0f);
     addF("mst_insP4",   "Mst Insert P4",   0.0f, 1.0f, 0.0f);
+    addB("mst_insSync", "Mst Insert Sync", false);
     addI("mst_ins2Char","Mst Insert2 Algo",0, mu_audio::kInsertAlgorithmCount - 1, 0);
     addF("mst_ins2P1",  "Mst Insert2 P1",  0.0f, 1.0f, 0.0f);
     addF("mst_ins2P2",  "Mst Insert2 P2",  0.0f, 1.0f, 0.0f);
     addF("mst_ins2P3",  "Mst Insert2 P3",  0.0f, 1.0f, 0.0f);
     addF("mst_ins2P4",  "Mst Insert2 P4",  0.0f, 1.0f, 0.0f);
+    addB("mst_ins2Sync","Mst Insert2 Sync",false);
 }
 
 // IDs this helper declares — for products that want to register parameter

@@ -239,6 +239,7 @@ void ProcessorBase::processCoreBlock(juce::AudioBuffer<float>&                ma
                                      const MixerEngine::RenderChannelFn*      renderChannel)
 {
     fxChain.setHostBpm(effectiveBpm);
+    mixerEngine.setInsertTempo(effectiveBpm);
     mixerEngine.processBlock(masterBus, numVoices, voices, fxChain, numSamples,
                              directOuts, fxReturnsOut, retired, renderChannel);
 }

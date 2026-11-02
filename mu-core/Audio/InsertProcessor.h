@@ -44,6 +44,9 @@ public:
     // filter for cases 0–5) in place.
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh, const VoiceParams& p);
 
+    // The tempo the owner runs at, for the tempo-synced algorithms; set once per block (any thread).
+    void setTempo(double bpm) noexcept { tempo.store(bpm, std::memory_order_relaxed); }
+
     // Peak gain-reduction for the current block, 0..1 (1 ≡ 24 dB).
     // Written by the audio thread inside process(); read by the UI at 30 Hz.
     // Non-zero only during Compressor (7) / Limiter (8) modes.
@@ -69,6 +72,7 @@ private:
                   "InsertProcessor::kNumInsertAlgos != mu_ui::kInsertAlgoCount — update both");
 
     double currentSampleRate = 44100.0;
+    std::atomic<double> tempo { 120.0 };
 
     // Post-drive tone filter — runs after the algorithm dispatch ONLY for
     // insertAlgo < 6, where p.insertTone is interpreted as a 1-pole LP cutoff.

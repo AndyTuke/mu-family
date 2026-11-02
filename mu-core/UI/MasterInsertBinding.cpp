@@ -9,11 +9,17 @@ constexpr const char* kAlgoIds[MasterInsertPanel::kSlots] = { "mst_insChar", "ms
 constexpr const char* kParamIds[MasterInsertPanel::kSlots][MasterInsertPanel::kParams] = {
     { "mst_insP1",  "mst_insP2",  "mst_insP3",  "mst_insP4"  },
     { "mst_ins2P1", "mst_ins2P2", "mst_ins2P3", "mst_ins2P4" } };
+constexpr const char* kSyncIds[MasterInsertPanel::kSlots] = { "mst_insSync", "mst_ins2Sync" };
 } // namespace
 
 const char* MasterInsertBinding::algorithmParamId(int slot) noexcept
 {
     return kAlgoIds[juce::jlimit(0, MasterInsertPanel::kSlots - 1, slot)];
+}
+
+const char* MasterInsertBinding::syncParamId(int slot) noexcept
+{
+    return kSyncIds[juce::jlimit(0, MasterInsertPanel::kSlots - 1, slot)];
 }
 
 const char* MasterInsertBinding::paramId(int slot, int param) noexcept
@@ -28,6 +34,7 @@ MasterInsertBinding::MasterInsertBinding(ProcessorBase& processor, MasterInsertP
     // A new algorithm: the panel reports it first, then each of the four parameters it restored.
     panel.onAlgorithm = [this](int slot, int algorithm) { write(algorithmParamId(slot), (float) algorithm); };
     panel.onParam     = [this](int slot, int param, float norm) { write(paramId(slot, param), norm); };
+    panel.onSync      = [this](int slot, bool on) { write(syncParamId(slot), on ? 1.0f : 0.0f); };
 
     // The Compressor / Limiter gain-reduction meters read the engine's inserts.
     panel.setGainReductionSource(0, &proc.mixerEngine.masterInsert .grReduction);
@@ -40,6 +47,7 @@ MasterInsertBinding::~MasterInsertBinding()
 {
     panel.onAlgorithm = nullptr;
     panel.onParam     = nullptr;
+    panel.onSync      = nullptr;
     panel.setGainReductionSource(0, nullptr);
     panel.setGainReductionSource(1, nullptr);
 }
@@ -62,6 +70,7 @@ void MasterInsertBinding::refresh()
         if (panel.getAlgorithm(slot) != algorithm)
             panel.setAlgorithm(slot, algorithm);
 
+        panel.setSync(slot, ip.insertSync);
         for (int p = 0; p < MasterInsertPanel::kParams; ++p)
             panel.setParam(slot, p, ip.insertParam[p]);
     }
@@ -86,12 +95,18 @@ juce::String BusInsertBinding::paramId(int bus, int insert, int param)
     return "bus" + juce::String(bus) + "_i" + juce::String(insert) + "_insP" + juce::String(param + 1);
 }
 
+juce::String BusInsertBinding::syncParamId(int bus, int insert)
+{
+    return "bus" + juce::String(bus) + "_i" + juce::String(insert) + "_insSync";
+}
+
 BusInsertBinding::BusInsertBinding(ProcessorBase& processor, MasterInsertPanel& insertPanel, int busIndex)
     : proc(processor), panel(insertPanel), bus(busIndex)
 {
     panel.setNumSlots(numSlots());
     panel.onAlgorithm = [this](int slot, int algorithm) { write(algorithmParamId(bus, slot), (float) algorithm); };
     panel.onParam     = [this](int slot, int param, float norm) { write(paramId(bus, slot, param), norm); };
+    panel.onSync      = [this](int slot, bool on) { write(syncParamId(bus, slot), on ? 1.0f : 0.0f); };
 
     // The Compressor / Limiter gain-reduction meters read the bus's own inserts.
     if (bus >= 0 && bus < mu_limits::kMaxBuses)
@@ -105,6 +120,7 @@ BusInsertBinding::~BusInsertBinding()
 {
     panel.onAlgorithm = nullptr;
     panel.onParam     = nullptr;
+    panel.onSync      = nullptr;
     for (int slot = 0; slot < numSlots(); ++slot)
         panel.setGainReductionSource(slot, nullptr);
 }
@@ -126,6 +142,7 @@ void BusInsertBinding::refresh()
         const int algorithm = juce::jlimit(0, kInsertAlgoCount - 1, ip.insertAlgo);
         if (panel.getAlgorithm(slot) != algorithm)
             panel.setAlgorithm(slot, algorithm);
+        panel.setSync(slot, ip.insertSync);
         for (int p = 0; p < MasterInsertPanel::kParams; ++p)
             panel.setParam(slot, p, ip.insertParam[p]);
     }

@@ -105,6 +105,35 @@ struct MasterInsertBindingTests : juce::UnitTest
                                       mu_ui::normToActual(0.5f, 6, 1), 0.01f);
         }
 
+        beginTest("the Sync switch of a tempo-synced algorithm writes mst_insSync / mst_ins2Sync and reaches the engine");
+        {
+            expectEquals(juce::String(MasterInsertBinding::syncParamId(0)), juce::String("mst_insSync"));
+            expectEquals(juce::String(MasterInsertBinding::syncParamId(1)), juce::String("mst_ins2Sync"));
+            MixerParamProcessor p;
+            mu_ui::MasterInsertPanel panel;
+            MasterInsertBinding binding(p, panel);
+
+            // Tape Delay (15) offers Sync, Compressor (7) does not.
+            panel.getAlgorithmSelect(0).getComboBox().setSelectedId(15 + 1, juce::sendNotificationSync);
+            panel.getAlgorithmSelect(1).getComboBox().setSelectedId(7 + 1, juce::sendNotificationSync);
+            expect(panel.getSyncButton(0).isVisible());
+            expect(! panel.getSyncButton(1).isVisible());
+            expect(! p.mixerEngine.getMasterInsertParams(0).insertSync);
+
+            panel.getSyncButton(0).setToggleState(true, juce::dontSendNotification);   // what the click does first
+            panel.getSyncButton(0).onClick();
+            expect(panel.getSync(0));
+            expectWithinAbsoluteError(plain(p, "mst_insSync"), 1.0f, 0.001f);
+            expect(p.mixerEngine.getMasterInsertParams(0).insertSync);
+            expect(! p.mixerEngine.getMasterInsertParams(1).insertSync);
+
+            // The host switches it off; refresh brings the panel along.
+            auto* prm = p.apvts.getParameter("mst_insSync");
+            prm->setValueNotifyingHost(0.0f);
+            binding.refresh();
+            expect(! panel.getSync(0));
+        }
+
         beginTest("refresh greys out the Vocoder's P2 to P4 from the engine's Wave value");
         {
             MixerParamProcessor p;

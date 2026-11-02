@@ -609,9 +609,11 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     mi1.insertAlgo = masterInsert1Algo.load(std::memory_order_relaxed);
     for (int i = 0; i < VoiceParams::kInsertSlotCount; ++i)
         mi1.insertParam[i] = masterInsert1Param[i].load(std::memory_order_relaxed);
+    mi1.insertSync = masterInsert1Sync.load(std::memory_order_relaxed);
     mi2.insertAlgo = masterInsert2Algo.load(std::memory_order_relaxed);
     for (int i = 0; i < VoiceParams::kInsertSlotCount; ++i)
         mi2.insertParam[i] = masterInsert2Param[i].load(std::memory_order_relaxed);
+    mi2.insertSync = masterInsert2Sync.load(std::memory_order_relaxed);
     masterInsert.process(output, numSamples, output.getNumChannels(), mi1);
     masterInsert2.process(output, numSamples, output.getNumChannels(), mi2);
 

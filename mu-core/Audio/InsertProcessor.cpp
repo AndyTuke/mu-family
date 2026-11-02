@@ -89,7 +89,10 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh,
 
     float gr = 0.0f;
     if (auto* algo = dispatch[(size_t) idx])
+    {
+        algo->tempoBpm = tempo.load(std::memory_order_relaxed);
         algo->process(buf, ns, nCh, p, gr);
+    }
     grReduction.store(gr);
 
     // Post-drive 1-pole LP tone filter — only for the drive-family algorithms

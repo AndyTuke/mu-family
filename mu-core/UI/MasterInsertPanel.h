@@ -29,11 +29,14 @@ public:
     // fires onAlgorithm first, then onParam for each of the four parameters.
     std::function<void(int slot, int algorithm)>                onAlgorithm;
     std::function<void(int slot, int param, float normalised)>  onParam;
+    std::function<void(int slot, bool on)>                      onSync;   // the Sync switch (tempo-synced algorithms only)
 
     // Push state in (no callbacks). setAlgorithm re-configures the knobs for the algorithm from the
     // values held for the slot; call setParam afterwards to load the stored values.
     void  setAlgorithm(int slot, int algorithm);
     void  setParam(int slot, int param, float normalised);
+    void  setSync(int slot, bool on);
+    bool  getSync(int slot) const;
     int   getAlgorithm(int slot) const;
     float getParam(int slot, int param) const;
 
@@ -43,6 +46,7 @@ public:
 
     DropdownSelect& getAlgorithmSelect(int slot)  { return slots[(size_t) slot].algo; }
     KnobWithLabel&  getKnob(int slot, int param)  { return slots[(size_t) slot].knobs[(size_t) param]; }
+    juce::TextButton& getSyncButton(int slot)     { return slots[(size_t) slot].syncButton; }
 
     // How many of the boxes show (1..kSlots, default kSlots): a group bus with fewer inserts than the Master
     // hides the rest. A hidden box takes no input from the setters.
@@ -61,6 +65,8 @@ private:
     struct Slot
     {
         DropdownSelect algo;
+        juce::TextButton syncButton { "Sync" };   // shown for the algorithms that offer tempo sync
+        bool  sync = false;
         std::array<KnobWithLabel, kParams> knobs { KnobWithLabel("P1", Id::knobInsertPad),
                                                    KnobWithLabel("P2", Id::knobInsertPad),
                                                    KnobWithLabel("P3", Id::knobInsertPad),

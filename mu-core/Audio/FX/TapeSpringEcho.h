@@ -34,6 +34,7 @@ public:
         float treble    = 0.0f;    // -1..1: high shelf, about +-12 dB
         float drive     = 0.0f;    // 0..1: overload of the repeats (the dry is never touched)
         float hiss      = 0.0f;    // 0..1: tape hiss under the repeats
+        float spacingSeconds = 0.0f;   // > 0: the head spacing in seconds, in place of the rate (tempo sync)
     };
 
     // Which of the three heads sound in a mode (bit 0 head 1, bit 1 head 2, bit 2 head 3). Modes 1-3 are the heads singly, 4 is heads 2
@@ -55,7 +56,7 @@ public:
     void prepare(double sampleRate)
     {
         sr = sampleRate > 0.0 ? sampleRate : 44100.0;
-        line.assign((size_t) (sr * 3.0 * 0.225 + sr * 0.02) + 16, 0.0f);
+        line.assign((size_t) (sr * 6.2) + 16, 0.0f);   // three heads at 16 sixteenths of 120 bpm (2 s apart), and the rate range
         spring.prepare(sr);
         spring.setParameters(2.2f, 0.55f, 0.6f, 0.5f);
         smooth = 1.0f - (float) std::exp(-1.0 / (0.15 * sr));   // the tape motor's inertia: about 150 ms to follow a rate change
@@ -90,7 +91,10 @@ public:
         params.treble    = fin(p.treble, -1.0f, 1.0f, 0.0f);
         params.drive     = fin(p.drive, 0.0f, 1.0f, 0.0f);
         params.hiss      = fin(p.hiss, 0.0f, 1.0f, 0.0f);
+        params.spacingSeconds = fin(p.spacingSeconds, 0.0f, 60.0f, 0.0f);
         targetSpacing = headSpacingSeconds(params.rate) * (float) sr;
+        if (params.spacingSeconds > 0.0f)   // synced: the third head must still fit in the loop
+            targetSpacing = std::min(params.spacingSeconds * (float) sr, std::max(0.0f, (float) line.size() - 24.0f) / 3.0f);
         for (auto& s : shelfLow)  s.setLowShelf(sr, 110.0, 12.0 * params.bass);
         for (auto& s : shelfHigh) s.setHighShelf(sr, 3500.0, 12.0 * params.treble);
     }

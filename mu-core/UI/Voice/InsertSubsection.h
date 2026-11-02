@@ -68,6 +68,7 @@ private:
     bool  insertSnapshotValid [mu_ui::kInsertAlgoCount] = {};
 
     DropdownSelect insertAlgo;
+    juce::TextButton syncButton { "Sync" };   // tempo sync, shown for the algorithms that offer it (mu_ui::insertHasSync)
     KnobWithLabel  insertParam1 { "P1", Id::knobInsertPad };
     KnobWithLabel  insertParam2 { "P2", Id::knobInsertPad };
     KnobWithLabel  insertParam3 { "P3", Id::knobInsertPad };
@@ -76,6 +77,7 @@ private:
     juce::String paramFullId(const char* suffix) const;   // prefix + idx + "_" + suffix
     float        readSlot(int slot) const;                // normalised slot value from APVTS
     int          currentAlgo() const;                     // drvChar from APVTS
+    bool         currentSync() const;                     // insSync from APVTS
     bool         validChannel() const;
     void apvtsSet(const char* suffix, float v);
     void wireCallbacks();

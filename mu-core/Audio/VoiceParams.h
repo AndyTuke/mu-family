@@ -60,6 +60,10 @@ struct VoiceParams
     static constexpr int kInsertSlotCount = 4;
     float insertParam[kInsertSlotCount] = { 0.0f, 0.0f, 0.0f, 0.0f };
 
+    // Tempo-sync switch for the algorithms that offer one (`mu_ui::insertSyncSlot`): the time slot then reads as
+    // sixteenth-note steps of the current tempo instead of its own unit.
+    bool  insertSync = false;
+
     // ─── Polyphony ───────────────────────────────────────────────────────
     // When true, VoiceEngine::trigger forces every hit to claim voices[0]
     // (skips the inactive-slot search and the round-robin steal) and only

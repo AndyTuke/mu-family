@@ -20,6 +20,9 @@ inline void addInsertParams(juce::AudioProcessorValueTreeState::ParameterLayout&
     for (int p = 1; p <= VoiceParams::kInsertSlotCount; ++p)
         layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID { prefix + "insP" + juce::String(p), versionHint },
                        namePrefix + "Insert P" + juce::String(p), juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+    // Tempo sync for the algorithms that offer it (Tape Delay Time, Tape Spring Rate): sixteenth-note steps.
+    layout.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID { prefix + "insSync", versionHint },
+                   namePrefix + "Insert Sync", false));
 }
 
 } // namespace mu_mixfx

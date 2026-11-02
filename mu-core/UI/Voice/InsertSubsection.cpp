@@ -20,6 +20,15 @@ InsertSubsection::InsertSubsection(ProcessorBase& processor, juce::String channe
     for (auto* k : { &insertParam1, &insertParam2, &insertParam3, &insertParam4 })
         addAndMakeVisible(k);
 
+    addChildComponent(syncButton);
+    syncButton.setClickingTogglesState(true);
+    syncButton.onClick = [this]
+    {
+        apvtsSet("insSync", syncButton.getToggleState() ? 1.0f : 0.0f);
+        configureInsertAlgorithm(currentAlgo());   // the time knob re-reads as steps (or back to its own unit)
+        if (onStatusUpdate) onStatusUpdate("Insert Sync", syncButton.getToggleState() ? "On" : "Off");
+    };
+
     wireCallbacks();
 }
 
@@ -45,6 +54,13 @@ int InsertSubsection::currentAlgo() const
     if (auto* a = proc.apvts.getRawParameterValue(paramFullId("drvChar")))
         return (int) a->load();
     return 0;
+}
+
+bool InsertSubsection::currentSync() const
+{
+    if (auto* a = proc.apvts.getRawParameterValue(paramFullId("insSync")))
+        return a->load() > 0.5f;
+    return false;
 }
 
 void InsertSubsection::apvtsSet(const char* suffix, float v)
@@ -131,7 +147,7 @@ void InsertSubsection::loadFromChannel()
 void InsertSubsection::refreshSuffix(const juce::String& suffix)
 {
     if (! validChannel()) return;
-    if (suffix == "drvChar"
+    if (suffix == "drvChar" || suffix == "insSync"
      || suffix == "insP1" || suffix == "insP2" || suffix == "insP3" || suffix == "insP4")
     {
         if (suffix == "drvChar") insertAlgo.setSelectedId(currentAlgo() + 1, false);
@@ -165,14 +181,21 @@ void InsertSubsection::configureInsertAlgorithm(int charId)
 
     KnobWithLabel* knobs[mu_ui::kInsertSlotCount] = { &insertParam1, &insertParam2, &insertParam3, &insertParam4 };
     const char* const slotSuffix[mu_ui::kInsertSlotCount] = { "insP1", "insP2", "insP3", "insP4" };
+    const bool hasSync = mu_ui::insertHasSync(charId);
+    const bool synced  = validChannel() && currentSync();
 
     for (int slot = 0; slot < mu_ui::kInsertSlotCount; ++slot)
     {
         const float currentNorm = validChannel() ? readSlot(slot) : 0.0f;
         const char* suffix = slotSuffix[slot];
         mu_ui::configureKnobFromSlot(*knobs[slot], charId, slot, currentNorm,
-            [this, suffix](float newNorm) { apvtsSet(suffix, newNorm); });
+            [this, suffix](float newNorm) { apvtsSet(suffix, newNorm); },
+            mu_ui::SlotLabelUnits::None, hasSync && synced);
     }
+
+    // The Sync switch, for the algorithms that offer one.
+    syncButton.setVisible(hasSync);
+    syncButton.setToggleState(synced, juce::dontSendNotification);
 
     // Clipper / Compressor / Limiter expose a GR meter on P2.
     if (mu_ui::insertAlgoShowsGainReduction(charId))
@@ -218,7 +241,11 @@ void InsertSubsection::resized()
     // The dropdown keeps a gap from the box edge on both sides.
     constexpr int dg = LF::kDropdownEdgeGap;
     const int algoW = algoWidth > 0 ? algoWidth : algoColumns * kW;
-    insertAlgo.setBounds(s(dg), s(rowH / 4), s(algoW - 2 * dg), s(rowH / 2));
+    // An algorithm with a Sync switch gives the right end of the selector's row to it, one knob column less the edge gap.
+    const int syncW = syncButton.isVisible() ? kW - dg : 0;
+    insertAlgo.setBounds(s(dg), s(rowH / 4), s(algoW - 2 * dg - (syncW > 0 ? syncW + dg : 0)), s(rowH / 2));
+    if (syncW > 0)
+        syncButton.setBounds(s(algoW - dg - syncW), s(rowH / 4), s(syncW), s(rowH / 2));
     // The knobs the algorithm uses fill from the left with no gap where an unused slot is hidden.
     int column = 0;
     for (auto* k : { &insertParam1, &insertParam2, &insertParam3, &insertParam4 })

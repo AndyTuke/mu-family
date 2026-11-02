@@ -43,6 +43,8 @@ public:
     // claimed and (re)started normally — the rhythmic pulse stays.
     void trigger(bool isAccented = false, bool tied = false);
     void process(juce::AudioBuffer<float>& output, int numSamples);
+    // The tempo for a tempo-synced insert; once per block, before process().
+    void setTempo(double bpm) noexcept { insertProc.setTempo(bpm); }
     bool hasSample() const;
 
     // Called from message thread. Stores params; audio thread picks them up in process().
