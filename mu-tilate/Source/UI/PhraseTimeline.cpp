@@ -127,15 +127,18 @@ int PhraseTimeline::blockAt(int x) const
 
 namespace
 {
-    // A slice's waveform as mirrored bars across `r`, one pixel wide, from its columns of peak level (reversed when the hit plays backwards).
-    void drawPeaks(juce::Graphics& g, const std::vector<float>& peaks, juce::Rectangle<int> r, bool reversed, int clipLeft, int clipRight)
+    // The part [from, to] (0..1) of a slice's waveform as mirrored bars across `r`, one pixel wide, from its columns of peak level
+    // (reversed when the hit plays backwards).
+    void drawPeaks(juce::Graphics& g, const std::vector<float>& peaks, juce::Rectangle<int> r, bool reversed, int clipLeft, int clipRight,
+                   double from = 0.0, double to = 1.0)
     {
         if (peaks.empty() || r.getWidth() < 2) return;
         const int n = (int) peaks.size(), mid = r.getCentreY(), half = r.getHeight() / 2 - 2;
         for (int x = std::max(r.getX(), clipLeft); x < std::min(r.getRight(), clipRight); ++x)
         {
-            int i = std::min(n - 1, (x - r.getX()) * n / r.getWidth());
-            if (reversed) i = n - 1 - i;
+            double t = from + (to - from) * (double) (x - r.getX()) / (double) r.getWidth();
+            if (reversed) t = 1.0 - t;
+            const int i = std::clamp((int) (t * n), 0, n - 1);
             const int h = std::max(1, (int) std::lround(peaks[(size_t) i] * (float) half));
             g.fillRect(x, mid - h, 1, h * 2);
         }
@@ -189,7 +192,10 @@ void PhraseTimeline::paint(juce::Graphics& g)
         if (b.slice >= 0 && b.slice < (int) slicePeaksList.size())
         {
             g.setColour(juce::Colours::black.withAlpha(lighting.blockWave));
-            drawPeaks(g, slicePeaksList[(size_t) b.slice], r.reduced(1), b.own.reverse, 0, getWidth());
+            // Only the part of the slice that sounds is drawn: it starts after the trim and ends where the block does, at the hit's speed.
+            const double nat = std::max(1.0e-6, naturalBeatsOf(i)), from = std::clamp(b.own.trimInBeats / nat, 0.0, 1.0);
+            const double to = std::clamp(from + blockBeats(i) / std::max(0.25f, b.own.retime) / nat, from, 1.0);
+            drawPeaks(g, slicePeaksList[(size_t) b.slice], r.reduced(1), b.own.reverse, 0, getWidth(), from, to);
         }
         if (r.getWidth() > s(LF::kBlockLabelMinW))
         {
