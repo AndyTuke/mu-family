@@ -52,6 +52,16 @@ struct PhraseParamsTests : public juce::UnitTest
         {
             expectEquals(mu_mod::checks::missingParams(kModDestTable, apvts, "p0_").size(), 0);
             expectEquals(mu_mod::checks::depthNotProportional(kModDestTable).size(), 0);
+            // Every continuous layer parameter is a target unless it is exempt here, with the reason.
+            static constexpr mu_mod::checks::ModExemption exempt[] = {
+                { "dsens", "detector setting: used when Detect runs, not per block" },
+                { "dgap",  "detector setting: used when Detect runs, not per block" },
+                { "dpre",  "detector setting: used when Detect runs, not per block" },
+                { "dlow",  "detector setting: used when Detect runs, not per block" },
+                { "dhigh", "detector setting: used when Detect runs, not per block" },
+            };
+            const auto unlisted = mu_mod::checks::unlistedContinuousParams(kModDestTable, exempt, apvts, "p0_");
+            expect(unlisted.isEmpty(), "layer parameters that are not modulation targets: " + unlisted.joinIntoString(", "));
             expect(isValidModDest("stretch.hold"));
             expect(! isValidModDest("stretch.curve"));
         }

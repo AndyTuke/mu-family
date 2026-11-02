@@ -351,12 +351,14 @@ The shared visual identity (`MuLookAndFeel`) ensures a consistent look across al
 | mu-Tilate | `kModDestTable` in `mu-tilate/Source/Modulation/MuTilateModDest.h` (check the file exists before relying on this row); targets listed in [mu-tilate/design.md](mu-tilate/design.md) | `mu_mod::resolveLane` |
 | mu-Clid | `ModDest::kTable` — [ModulationDestinations.h](../mu-clid/Source/Modulation/ModulationDestinations.h) | hand-written seed / write-back in `PluginProcessor.cpp` (values come from per-rhythm state and step-count-dependent ranges), using the knob ranges in [ModulationSkew.h](../mu-clid/Source/Modulation/ModulationSkew.h) — the APVTS layout is built from the same constants |
 
+**Coverage rule (owner, 2026-11-02): every continuous layer parameter is a target.** A product ships its target table complete from the start: pitch, filter, envelopes, pan, level, sends, insert knobs and every product-specific knob. Not targets: choice, toggle and integer rows (mode, grid, filter type, insert algorithm) and settings that are not read per block (e.g. mu-Tilate's detector settings). Each exemption is written in the product's test next to its reason, and `mu_mod::checks::unlistedContinuousParams` fails the test for any continuous layer parameter that is neither a target nor exempt. A new parameter therefore brings its row, or an explained exemption, in the same change. The knob's modulation arc comes from the same table (the shared knob binds by name), so no extra UI step.
+
 **How it works.** Each target is seeded into the `ModulationMatrix` as its knob's 0..1 proportion; the matrix adds `source% × depth% / 10000`; the product converts back through the knob's range (clamped at the ends; stepped targets rounded to whole steps by the product). Offset-style targets (mu-Clid's pitch octave / semitones) are seeded 0 and read back as an offset of the same proportion of the knob's range.
 
 **Preset data.** `serialiseModulators` writes `depthUnits="range"` on every `<Modulators>` tree. Data without it predates the standard; mu-Clid upgrades it on load (Pre / Post Pad depth was % of 12 steps → rescaled to % of 0..63, so old presets move the same number of steps). No other target's old units differed.
 
 **Enforced by:**
-- [`mu_mod::checks`](../mu-core/Modulation/ModTargetChecks.h) in each product's unit tests — every row names a real parameter; 10% depth moves each target exactly 10% of its range.
+- [`mu_mod::checks`](../mu-core/Modulation/ModTargetChecks.h) in each product's unit tests — every row names a real parameter; 10% depth moves each target exactly 10% of its range; every continuous layer parameter is a target or an explained exemption (`unlistedContinuousParams`; mu-Tilate runs it, the other products adopt it as their tables are completed).
 - [tests/scripts/check-mod-targets.ps1](../tests/scripts/check-mod-targets.ps1) — fails if any code reintroduces per-target depth scales, defines its own target-row struct, or a product has no `ModTarget` table.
 
 ## Slot state (presets & sessions) — family standard
