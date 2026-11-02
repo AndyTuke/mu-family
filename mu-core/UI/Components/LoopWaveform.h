@@ -99,6 +99,12 @@ private:
     int    dragging = -1;       // marker being dragged
     int    pressedRegion = -1;  // the region a press landed in, until the drag gesture is decided
     bool   regionDragging = false;
+    // The scroll bar along the foot while zoomed in: its thumb is the part of the loop in view; drag it, or click the track to jump.
+    juce::Rectangle<int> scrollTrack() const;
+    juce::Rectangle<int> scrollThumb() const;
+    bool   scrollable() const noexcept { return length() > 0 && viewLength < (double) length() - 0.5; }
+    bool   scrolling = false;
+    double scrollGrab = 0.0;    // samples between the pointer and the view start when the thumb was grabbed
     bool   panning = false;
     double panStartView = 0.0;
     int    hovered = -1;

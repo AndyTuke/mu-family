@@ -99,10 +99,24 @@ void LoopWaveform::clampView() noexcept
     viewStart  = std::clamp(viewStart, 0.0, total - viewLength);
 }
 
+juce::Rectangle<int> LoopWaveform::scrollTrack() const
+{
+    return { 0, getHeight() - mu_ui::s(10), getWidth(), mu_ui::s(10) };
+}
+
+juce::Rectangle<int> LoopWaveform::scrollThumb() const
+{
+    const auto t = scrollTrack();
+    const double total = (double) std::max(1, length());
+    const int x = (int) std::lround(viewStart / total * t.getWidth());
+    const int w = std::max(mu_ui::s(24), (int) std::lround(viewLength / total * t.getWidth()));
+    return { std::min(x, t.getWidth() - w), t.getY() + 2, w, t.getHeight() - 4 };
+}
+
 juce::Rectangle<int> LoopWaveform::crossOf(int marker) const
 {
     const int size = mu_ui::s(12), x = xOf((double) markers[(size_t) marker].position);
-    return { x + mu_ui::s(2), getHeight() - size - mu_ui::s(2), size, size };
+    return { x + mu_ui::s(2), getHeight() - size - mu_ui::s(12), size, size };
 }
 
 int LoopWaveform::markerNear(int x) const noexcept
@@ -219,11 +233,24 @@ void LoopWaveform::paint(juce::Graphics& g)
         g.setColour(LF::colour(LF::lfoEditorPoint));
         g.fillRect(xOf(playhead), 0, 1, getHeight());
     }
+    if (scrollable())
+    {
+        g.setColour(LF::colour(LF::lfoEditorBackground).withAlpha(0.8f));
+        g.fillRect(scrollTrack());
+        g.setColour(LF::appAccent(*this).withAlpha(scrolling ? 0.9f : 0.6f));
+        g.fillRoundedRectangle(scrollThumb().toFloat(), 3.0f);
+    }
 }
 
 void LoopWaveform::mouseMove(const juce::MouseEvent& e)
 {
     // The cross sits beside its marker, so a pointer over it still counts as on that marker.
+    if (scrollable() && scrollTrack().contains(e.getPosition()))
+    {
+        if (hovered >= 0) { hovered = -1; repaint(); }
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+        return;
+    }
     int h = markerNear(e.x);
     if (h < 0 && hovered > 0 && hovered < (int) markers.size() && crossOf(hovered).expanded(mu_ui::s(2)).contains(e.getPosition())) h = hovered;
     if (h != hovered) { hovered = h; repaint(); }
@@ -235,6 +262,20 @@ void LoopWaveform::mouseDown(const juce::MouseEvent& e)
 {
     if (length() <= 0) return;
     if (e.mods.isMiddleButtonDown() || e.mods.isCtrlDown()) { panning = true; panStartView = viewStart; return; }
+    if (scrollable() && scrollTrack().contains(e.getPosition()))
+    {
+        // On the thumb: drag it. On the track: the thumb jumps to be centred there, and is then dragged.
+        const double perPixel = (double) length() / (double) std::max(1, getWidth());
+        if (! scrollThumb().contains(e.getPosition()))
+        {
+            viewStart = (double) e.x * perPixel - viewLength * 0.5;
+            clampView();
+        }
+        scrolling = true;
+        scrollGrab = (double) e.x * perPixel - viewStart;
+        repaint();
+        return;
+    }
     if (hovered > 0 && hovered < (int) markers.size() && crossOf(hovered).contains(e.getPosition()))
     {
         if (onMarkerDeleteRequested) onMarkerDeleteRequested(hovered);
@@ -242,12 +283,12 @@ void LoopWaveform::mouseDown(const juce::MouseEvent& e)
         return;
     }
     const int m = markerNear(e.x);
-    if (m > 0 && (e.mods.isAltDown() || e.mods.isRightButtonDown()))
+    if (m > 0 && (e.mods.isAltDown()))
     {
         if (onMarkerDeleteRequested) onMarkerDeleteRequested(m);
         return;
     }
-    if (m > 0) { dragging = m; return; }       // marker 0 is the loop's start: it stays
+    if (m > 0 && ! e.mods.isRightButtonDown()) { dragging = m; return; }       // marker 0 is the loop's start: it stays
     const int r = regionAt(sampleAt(e.x));
     if (e.mods.isRightButtonDown())
     {
@@ -261,6 +302,13 @@ void LoopWaveform::mouseDown(const juce::MouseEvent& e)
 
 void LoopWaveform::mouseDrag(const juce::MouseEvent& e)
 {
+    if (scrolling)
+    {
+        viewStart = (double) e.x * (double) length() / (double) std::max(1, getWidth()) - scrollGrab;
+        clampView();
+        repaint();
+        return;
+    }
     if (panning)
     {
         viewStart = panStartView - (double) e.getDistanceFromDragStartX() * samplesPerPixel();
@@ -288,6 +336,7 @@ void LoopWaveform::mouseUp(const juce::MouseEvent& e)
     pressedRegion = -1;
     regionDragging = false;
     panning = false;
+    scrolling = false;
     dragging = -1;
     repaint();
 }
