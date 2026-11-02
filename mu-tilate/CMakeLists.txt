@@ -131,6 +131,7 @@ target_sources(mu-tilate-tests PRIVATE
     Source/Tests/SliceDetectionTests.cpp   # onset detection on synthetic loops, and the slice list
     Source/Tests/StretchSliceTests.cpp   # the stretched slice: length, dry head, pitch and level, no pre-echo, no allocation
     Source/Tests/PhraseTests.cpp   # the timeline model and the transport-anchored scheduler
+    Source/Tests/AuditionTests.cpp   # audition renders: known tones through the tempo modes and timeline edits, measured, WAVs to tests/_out/tilate
     Source/Tests/PhraseParamsTests.cpp   # the parameter table and the modulation target table
     Source/Tests/PhraseLayerTests.cpp   # the Phrase layer through the shared render contract
     Source/Tests/PhraseStateTests.cpp   # saving and loading the slices, timeline and loop reference
