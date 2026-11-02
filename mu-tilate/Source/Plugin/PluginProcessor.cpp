@@ -195,6 +195,22 @@ void PluginProcessor::layOutSlices(int layer)
 // request for the layer (or a destroyed processor) makes an older completion do nothing.
 void PluginProcessor::loadLoopAsync(int layer, const juce::File& file, bool keepSavedEdits)
 {
+    loadLoopAsync(layer, file, keepSavedEdits, nullptr, 0.0, -1, -1);
+}
+
+// Uses the section [start, end) of the layer's source; the layer is laid out afresh, as for a new loop.
+void PluginProcessor::setSourceRegion(int layer, int start, int end)
+{
+    if (layer < 0 || layer >= mu_limits::kMaxLayers) return;
+    const auto d = getPhrase(layer).getData();
+    if (d == nullptr || d->audio == nullptr) return;
+    const auto src = d->source != nullptr ? d->source : d->audio;
+    loadLoopAsync(layer, juce::File(getPhrase(layer).loadedLoopPath()), false, src, d->fileSampleRate, start, end);
+}
+
+void PluginProcessor::loadLoopAsync(int layer, const juce::File& file, bool keepSavedEdits,
+                                    std::shared_ptr<const juce::AudioBuffer<float>> decoded, double decodedRate, int regionStart, int regionEnd)
+{
     if (layer < 0 || layer >= mu_limits::kMaxLayers) return;
     const int gen = loopGeneration[(size_t) layer].fetch_add(1) + 1;
     loopStatus[(size_t) layer] = "Loading " + file.getFileName() + " ...";
@@ -203,9 +219,37 @@ void PluginProcessor::loadLoopAsync(int layer, const juce::File& file, bool keep
     const double loopTempo = (double) apvts.getRawParameterValue(layerParamPrefix(layer) + ppi::suffix[ppi::ltempo])->load();
     auto flag = alive;
 
-    juce::Thread::launch([this, layer, gen, file, detect, loopTempo, flag, keepSavedEdits]
+    // The section of the source to use: asked for, or (a restore) the one the saved layer used.
+    int rStart = regionStart, rEnd = regionEnd;
+    if (rStart < 0 && keepSavedEdits) getPhrase(layer).savedRegion(rStart, rEnd);
+
+    juce::Thread::launch([this, layer, gen, file, detect, loopTempo, flag, keepSavedEdits, decoded, decodedRate, rStart, rEnd]
     {
-        auto loaded = std::make_shared<mu_core::LoadedLoop>(mu_core::loadLoop(file, mu_limits::kMaxLoopBytes));
+        auto loaded = std::make_shared<mu_core::LoadedLoop>();
+        if (decoded != nullptr)
+        {
+            loaded->audio = decoded; loaded->sampleRate = decodedRate; loaded->name = file.getFileNameWithoutExtension();
+        }
+        else
+            *loaded = mu_core::loadLoop(file, mu_limits::kMaxLoopBytes);
+
+        // Cut the used section out of the whole file (a copy; the source stays whole for the next trim).
+        std::shared_ptr<const juce::AudioBuffer<float>> source = loaded->audio;
+        int from = 0, to = source != nullptr ? source->getNumSamples() : 0;
+        if (source != nullptr && rStart >= 0)
+        {
+            const int total = source->getNumSamples();
+            const int a = juce::jlimit(0, juce::jmax(0, total - 2), rStart);
+            const int b = juce::jlimit(a + 1, total, rEnd <= 0 ? total : rEnd);
+            if (a > 0 || b < total)
+            {
+                auto cut = std::make_shared<juce::AudioBuffer<float>>(source->getNumChannels(), b - a);
+                for (int ch = 0; ch < cut->getNumChannels(); ++ch) cut->copyFrom(ch, 0, *source, ch, a, b - a);
+                loaded->audio = cut;
+                from = a; to = b;
+            }
+        }
+
         std::shared_ptr<SliceList> slices;
         if (loaded->ok())
         {
@@ -213,7 +257,7 @@ void PluginProcessor::loadLoopAsync(int layer, const juce::File& file, bool keep
             slices = std::make_shared<SliceList>(detectSlices(curve, *loaded->audio, detect));
         }
 
-        juce::MessageManager::callAsync([this, layer, gen, file, loaded, slices, loopTempo, flag, keepSavedEdits]
+        juce::MessageManager::callAsync([this, layer, gen, file, loaded, slices, loopTempo, flag, keepSavedEdits, source, from, to]
         {
             if (! flag->load() || loopGeneration[(size_t) layer].load() != gen) return;   // gone, or superseded
             if (! loaded->ok()) { loopStatus[(size_t) layer] = loaded->error; return; }
@@ -223,7 +267,7 @@ void PluginProcessor::loadLoopAsync(int layer, const juce::File& file, bool keep
             // A restore whose saved edits fit this loop keeps them (installLoop applies them); anything else gets the
             // detected slices and an empty timeline of the loop's length (in bars of 4/4).
             const bool keep = keepSavedEdits && ph.savedEditsFit(loaded->audio->getNumSamples());
-            ph.installLoop(loaded->audio, loaded->sampleRate, file.getFullPathName(), loaded->name);
+            ph.installLoop(loaded->audio, loaded->sampleRate, file.getFullPathName(), loaded->name, source, from, to);
 
             // A new loop sets the layer's loop tempo to the estimate from its length (a whole number of beats); the Tempo
             // knob overrides it. A restore keeps the saved tempo.

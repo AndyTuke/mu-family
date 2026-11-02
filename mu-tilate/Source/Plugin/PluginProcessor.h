@@ -85,7 +85,11 @@ public:
     bool   isPhraseTransportPlaying() const noexcept override { return isInternalPlaying(); }
     double getPhraseTransportBeat() const noexcept override   { return getInternalBeatPos(); }
     void loadLoopAsync(int layer, const juce::File& file, bool keepSavedEdits = false) override;
+    // The same from an already decoded source (no disk), using the section [regionStart, regionEnd) of it.
+    void loadLoopAsync(int layer, const juce::File& file, bool keepSavedEdits,
+                       std::shared_ptr<const juce::AudioBuffer<float>> decoded, double decodedRate, int regionStart, int regionEnd);
     void layOutSlices(int layer) override;
+    void setSourceRegion(int layer, int start, int end) override;
     juce::String getLoopStatus(int layer) const override;
 
 protected:

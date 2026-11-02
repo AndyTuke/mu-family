@@ -50,7 +50,8 @@ void Phrase::attachResampled(PhraseData& d) const
 }
 
 void Phrase::installLoop(std::shared_ptr<const juce::AudioBuffer<float>> audio, double fileSampleRate,
-                         const juce::String& newPath, const juce::String& newName)
+                         const juce::String& newPath, const juce::String& newName,
+                         std::shared_ptr<const juce::AudioBuffer<float>> src, int rStart, int rEnd)
 {
     path = newPath;
     loadedPath = newPath;
@@ -58,6 +59,9 @@ void Phrase::installLoop(std::shared_ptr<const juce::AudioBuffer<float>> audio, 
     auto d = std::make_shared<PhraseData>();
     d->version = nextPhraseId();
     d->audio = std::move(audio);
+    d->source = src != nullptr ? std::move(src) : d->audio;
+    d->regionStart = rStart;
+    d->regionEnd = rEnd > 0 ? rEnd : (d->source != nullptr ? d->source->getNumSamples() : 0);
     d->fileSampleRate = fileSampleRate;
     const int len = d->audio != nullptr ? d->audio->getNumSamples() : 0;
     // Saved edits belong to the loop they were made on: the same length means the same loop.
@@ -78,6 +82,7 @@ void Phrase::commitEdit(const SliceList& slices, const Timeline& timeline)
     {
         d->audioId = cur->audioId;   // the same audio: the sounding slice plays on
         d->audio = cur->audio; d->fileSampleRate = cur->fileSampleRate;
+        d->source = cur->source; d->regionStart = cur->regionStart; d->regionEnd = cur->regionEnd;
         d->resampled = cur->resampled; d->resampledRate = cur->resampledRate;   // the audio is the same: so is its copy
     }
     d->slices = slices;
@@ -93,6 +98,10 @@ void Phrase::writeExtras(juce::ValueTree& node) const
     if (d != nullptr && d->audio != nullptr)
     {
         st.loopLength = d->audio->getNumSamples();
+        const int srcLen = d->source != nullptr ? d->source->getNumSamples() : 0;
+        const bool whole = d->regionStart <= 0 && (d->regionEnd <= 0 || d->regionEnd >= srcLen);
+        st.regionStart = whole ? 0 : d->regionStart;
+        st.regionEnd = whole ? 0 : d->regionEnd;
         st.slices = d->slices;
         st.timeline = d->timeline;
     }
@@ -118,6 +127,7 @@ void Phrase::applyExtras(const juce::ValueTree& node)
         d->version = nextPhraseId();
         d->audioId = cur->audioId;
         d->audio = cur->audio;
+        d->source = cur->source; d->regionStart = cur->regionStart; d->regionEnd = cur->regionEnd;
         d->fileSampleRate = cur->fileSampleRate;
         d->resampled = cur->resampled; d->resampledRate = cur->resampledRate;
         d->slices = pending.loopLength == cur->audio->getNumSamples() ? pending.slices : SliceList(cur->audio->getNumSamples());

@@ -36,7 +36,11 @@ struct PhraseData
     // Fresh numbers for every new PhraseData; a copy that keeps the audio carries the audio's number over (commitEdit).
     uint64_t     version = nextPhraseId();   // the editor refreshes when it changes
     uint64_t     audioId = nextPhraseId();   // the voices are dropped when it changes
-    std::shared_ptr<const juce::AudioBuffer<float>> audio;   // shared: an edit of the slices or timeline reuses it
+    std::shared_ptr<const juce::AudioBuffer<float>> audio;   // shared: an edit of the slices or timeline reuses it; the used section of the source
+    // The whole decoded file, and the section of it that `audio` is (a copy; the same buffer when the whole file is used). The original
+    // file is never changed; trimming picks another section.
+    std::shared_ptr<const juce::AudioBuffer<float>> source;
+    int          regionStart = 0, regionEnd = 0;   // in the source's samples; the end is the source's length when it is all used
     double       fileSampleRate = 48000.0;
     // The same loop at the host rate when that differs from the file's (a time-stretcher needs it there); the slices stay
     // in the file's samples and are scaled when played. Null when the rates match.
@@ -72,7 +76,10 @@ struct Phrase : Layer
     // Message thread: a loop has been decoded. The saved slices and timeline apply when they were made on a loop of this
     // length, otherwise the slices start as the single slice from 0 and the caller detects. Publishes the new data.
     void installLoop(std::shared_ptr<const juce::AudioBuffer<float>> audio, double fileSampleRate,
-                     const juce::String& path, const juce::String& name);
+                     const juce::String& path, const juce::String& name,
+                     std::shared_ptr<const juce::AudioBuffer<float>> source = nullptr, int regionStart = 0, int regionEnd = 0);
+    // Message thread: the section of the source file a saved layer uses (0, 0 = all of it).
+    void savedRegion(int& start, int& end) const noexcept { start = pending.regionStart; end = pending.regionEnd; }
     // Message thread: an edit of the slices or the timeline (the editor builds the edited copies). Reuses the audio.
     void commitEdit(const SliceList& slices, const Timeline& timeline);
 

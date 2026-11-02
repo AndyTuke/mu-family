@@ -116,6 +116,32 @@ struct ProcessorTests : public juce::UnitTest
             p.setPlayHead(nullptr);
         }
 
+        beginTest("a source region uses only that section: the source stays whole, the layer is laid out afresh, and the region is saved");
+        {
+            juce::MemoryBlock saved;
+            int whole = 0;
+            {
+                PluginProcessor p;
+                p.prepareToPlay(kSr, kBlock);
+                p.loadLoopAsync(0, file);
+                expect(pumpUntil([&] { return p.getPhrase(0).getData() != nullptr && p.getPhrase(0).getData()->slices.size() > 0; }), "the loop did not arrive");
+                whole = p.getPhrase(0).getData()->audio->getNumSamples();
+                p.setSourceRegion(0, whole / 4, whole / 2);
+                expect(pumpUntil([&] { const auto d = p.getPhrase(0).getData(); return d != nullptr && d->audio != nullptr && d->audio->getNumSamples() == whole / 4; }), "the region did not arrive");
+                const auto d = p.getPhrase(0).getData();
+                expectEquals(d->source->getNumSamples(), whole);            // the original is whole
+                expectEquals(d->regionStart, whole / 4);
+                expectEquals(d->regionEnd, whole / 2);
+                expectEquals(d->timeline.size(), 0);                        // laid out afresh
+                p.getStateInformation(saved);
+            }
+            PluginProcessor q;
+            q.prepareToPlay(kSr, kBlock);
+            q.setStateInformation(saved.getData(), (int) saved.getSize());
+            expect(pumpUntil([&] { const auto d = q.getPhrase(0).getData(); return d != nullptr && d->audio != nullptr && d->audio->getNumSamples() == whole / 4; }), "the saved region did not come back");
+            expectEquals(q.getPhrase(0).getData()->source->getNumSamples(), whole);
+        }
+
         beginTest("a saved session restores the loop by path, with its slices and timeline");
         {
             juce::MemoryBlock saved;

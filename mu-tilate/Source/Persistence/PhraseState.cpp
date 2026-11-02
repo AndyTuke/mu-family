@@ -53,6 +53,8 @@ void writePhraseState(juce::ValueTree& node, const PhraseState& s)
     p.setProperty("loopPath", s.loopPath, nullptr);
     p.setProperty("loopName", s.loopName, nullptr);
     p.setProperty("loopLength", s.loopLength, nullptr);
+    p.setProperty("regionStart", s.regionStart, nullptr);
+    p.setProperty("regionEnd", s.regionEnd, nullptr);
     p.setProperty("bars", s.timeline.lengthBeats() / 4.0, nullptr);
 
     juce::ValueTree slices("Slices");
@@ -90,6 +92,8 @@ PhraseState readPhraseState(const juce::ValueTree& node)
     s.loopPath   = p.getProperty("loopPath").toString();
     s.loopName   = p.getProperty("loopName").toString();
     s.loopLength = juce::jmax(0, (int) p.getProperty("loopLength", 0));
+    s.regionStart = juce::jmax(0, (int) p.getProperty("regionStart", 0));
+    s.regionEnd = juce::jmax(0, (int) p.getProperty("regionEnd", 0));
 
     s.timeline = Timeline((double) p.getProperty("bars", 4.0) * 4.0);
     for (const auto& v : p.getChildWithName("Blocks"))

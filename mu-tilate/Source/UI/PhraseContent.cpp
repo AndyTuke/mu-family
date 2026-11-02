@@ -312,6 +312,9 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
         updateToolbar();
     };
     waveFitButton.setTooltip("Show the whole sample. The wheel zooms, Shift+wheel scrolls, a middle-button or Ctrl drag pans");
+    rangeBar.setTooltip("The whole sample: drag the ends to use only a section of it (the file is not changed), drag inside to slide the section");
+    rangeBar.onRangeChanged = [this](int start, int end) { timelineView.setSelectedBlock(-1); host.setSourceRegion(currentLayer, start, end); };
+    addAndMakeVisible(rangeBar);
     waveFitButton.onClick = [this] { waveform.showAll(); };
     waveOutButton.onClick = [this] { waveform.zoomBy(0.5, waveform.getWidth() / 2); };
     waveInButton.onClick  = [this] { waveform.zoomBy(2.0, waveform.getWidth() / 2); };
@@ -416,6 +419,7 @@ void PhraseContent::updateView()
     detectButton.setVisible(sliceView);
     slicePanel.setVisible(sliceView);
     waveform.setVisible(! layerView);
+    rangeBar.setVisible(sequencer);
     timelineView.setVisible(! layerView);
     for (auto* c : std::initializer_list<juce::Component*> { &lengthCaption, &barsInput, &beatsInput, &gridBox, &layOutButton, &deleteButton, &clearButton,
                                                               &waveFitButton, &tlOutButton, &tlInButton, &tlFitButton })
@@ -472,6 +476,7 @@ void PhraseContent::refreshViews(bool force)
     {
         shownAudioId = 0;
         waveform.setAudio(nullptr);
+        rangeBar.setAudio(nullptr);
         waveform.setMarkers({});
         timelineView.setTimeline(Timeline(), {});
         slicePeaks.clear();
@@ -487,7 +492,13 @@ void PhraseContent::refreshViews(bool force)
     timelineView.setTimeline(d->timeline, std::move(beats));
     slicePeaks = computeSlicePeaks(*d->audio, d->slices);
     timelineView.setSlicePeaks(slicePeaks);
-    if (d->audioId != shownAudioId) { shownAudioId = d->audioId; waveform.setAudio(d->audio); }
+    if (d->audioId != shownAudioId)
+    {
+        shownAudioId = d->audioId;
+        waveform.setAudio(d->audio);
+        rangeBar.setAudio(d->source != nullptr ? d->source : d->audio);
+        rangeBar.setRange(d->regionStart, d->regionEnd);
+    }
     std::vector<LoopWaveform::Marker> markers;
     for (int i = 0; i < d->slices.size(); ++i) markers.push_back({ d->slices.marker(i).position, d->slices.marker(i).pinned });
     waveform.setMarkers(std::move(markers));
@@ -630,6 +641,8 @@ void PhraseContent::resized()
         const int timelineH = juce::jmax(s(90), area.getHeight() * 4 / 10);
         timelineView.setBounds(area.removeFromBottom(timelineH));
         auto bar = area.removeFromBottom(toolbarH);
+        rangeBar.setBounds(area.removeFromTop(s(40)));
+        area.removeFromTop(s(LF::kSpaceS));
         waveform.setBounds(area.withTrimmedBottom(s(LF::kSpaceS)));
         bar.removeFromTop(s(LF::kSpaceS) / 2);
         auto place = [&](juce::Component& c, int w) { c.setBounds(bar.removeFromLeft(s(w))); bar.removeFromLeft(s(LF::kSpaceS)); };

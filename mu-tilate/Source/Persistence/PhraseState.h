@@ -19,7 +19,9 @@ struct PhraseState
 {
     juce::String loopPath;            // where the loop was loaded from (empty = none)
     juce::String loopName;            // its display name
-    int          loopLength = 0;      // samples at the loop's own rate: markers are only valid against the same length
+    int          loopLength = 0;      // samples at the loop's own rate: markers are only valid against the same length (of the used region)
+    int          regionStart = 0;     // the used section of the source file, in its samples; an end of 0 means the whole file
+    int          regionEnd = 0;
     SliceList    slices { 0 };
     Timeline     timeline;
 };

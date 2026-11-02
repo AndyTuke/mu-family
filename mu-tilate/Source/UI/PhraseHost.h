@@ -37,6 +37,9 @@ public:
     // Runs the detector again on the layer's loaded loop with the layer's current detection settings (pinned markers
     // stay) and lays the new slices out in their original order, replacing the timeline.
     virtual void redetectSlices(int layer) = 0;
+    // Uses only the section [start, end) of the loaded source file (its samples); the rest is ignored and the file is untouched. The
+    // section is cut out, detected again and laid out empty, like a new loop. End <= 0 or the file's length means all of it.
+    virtual void setSourceRegion(int layer, int start, int end) = 0;
     // Lays the layer's slices out one after another in source order from beat 0, replacing the hits, and sizes the sequence to
     // fit (in whole bars). A loaded loop starts with an empty timeline; this is the one-press way to a starting sequence.
     virtual void layOutSlices(int layer) = 0;
