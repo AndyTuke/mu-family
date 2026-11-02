@@ -25,6 +25,10 @@ public:
     void setGridBeats(double grid) { gridBeats = grid; }
     // The shape of each slice's sound (index = slice): columns of peak level 0..1, drawn inside its blocks and in the drop preview.
     void setSlicePeaks(std::vector<std::vector<float>> peaks) { slicePeaksList = std::move(peaks); repaint(); }
+    // The whole loop's peaks and where each slice sits in it (start and length as fractions 0..1), so a block longer than its slice
+    // can show the audio it runs on into.
+    struct SliceSpan { double start = 0.0, length = 0.0; };
+    void setLoopPeaks(std::vector<float> peaks, std::vector<SliceSpan> spans) { loopPeaks = std::move(peaks); sliceSpans = std::move(spans); repaint(); }
     // The slice being dragged over the timeline (-1 for none): the drop preview shows its waveform at the drop beat.
     void setDropSlice(int slice) { if (slice != dropSlice) { dropSlice = slice; repaint(); } }
     // How wide a slice is on screen at the current zoom, in pixels.
@@ -78,6 +82,8 @@ private:
     Timeline dragOrigin;   // the timeline as it was when a block drag began: each step is worked out from it, so passing over a block loses nothing
     std::vector<double> sliceBeatsList;
     std::vector<std::vector<float>> slicePeaksList;
+    std::vector<float> loopPeaks;
+    std::vector<SliceSpan> sliceSpans;
     int    dropSlice = -1;       // the slice a drop in progress would place
     double gridBeats = 0.25;
     int    selected = -1;

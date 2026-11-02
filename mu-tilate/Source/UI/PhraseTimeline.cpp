@@ -137,7 +137,7 @@ namespace
         for (int x = std::max(r.getX(), clipLeft); x < std::min(r.getRight(), clipRight); ++x)
         {
             double t = from + (to - from) * (double) (x - r.getX()) / (double) r.getWidth();
-            if (reversed) t = 1.0 - t;
+            if (reversed) t = to - (t - from);   // mirrored inside the part shown
             const int i = std::clamp((int) (t * n), 0, n - 1);
             const int h = std::max(1, (int) std::lround(peaks[(size_t) i] * (float) half));
             g.fillRect(x, mid - h, 1, h * 2);
@@ -189,7 +189,21 @@ void PhraseTimeline::paint(juce::Graphics& g)
         g.fillRoundedRectangle(r.toFloat(), LF::kBlockRadius);
         g.setColour(LF::colour(LF::lfoEditorPoint).withAlpha(i == selected ? 1.0f : 0.5f));
         g.drawRoundedRectangle(r.toFloat(), LF::kBlockRadius, 1.0f);
-        if (b.slice >= 0 && b.slice < (int) slicePeaksList.size())
+        if (! loopPeaks.empty() && b.slice >= 0 && b.slice < (int) sliceSpans.size())
+        {
+            // The part of the loop the hit plays: from the trim, for the block's width at the hit's speed; past the slice's end it is the
+            // audio that follows, and the picture stops where the audio does rather than stretching.
+            const auto& span = sliceSpans[(size_t) b.slice];
+            const double nat = std::max(1.0e-6, naturalBeatsOf(i));
+            const double u0 = b.own.trimInBeats, u1 = u0 + blockBeats(i) / std::max(0.25f, b.own.retime);
+            const double a = span.start + u0 / nat * span.length, e = span.start + u1 / nat * span.length;
+            const double avail = std::min(e, 1.0);
+            auto rr = r.reduced(1);
+            if (e > a) rr.setWidth(std::max(0, (int) std::lround((double) rr.getWidth() * (avail - a) / (e - a))));
+            g.setColour(juce::Colours::black.withAlpha(lighting.blockWave));
+            drawPeaks(g, loopPeaks, rr, b.own.reverse, 0, getWidth(), a, avail);
+        }
+        else if (b.slice >= 0 && b.slice < (int) slicePeaksList.size())
         {
             g.setColour(juce::Colours::black.withAlpha(lighting.blockWave));
             // Only the part of the slice that sounds is drawn: it starts after the trim and ends where the block does, at the hit's speed.

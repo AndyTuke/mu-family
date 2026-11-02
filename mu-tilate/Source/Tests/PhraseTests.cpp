@@ -428,6 +428,17 @@ struct PhraseTests : public juce::UnitTest
             expectWithinAbsoluteError(over.blocks()[1].start, 1.0, 1.0e-9);
         }
 
+        beginTest("a block longer than its slice runs on into the audio after it");
+        {
+            Rig r;
+            r.settings.loopTempo = 120.0;
+            r.timeline.place(0, 0.0, 0.0);
+            r.timeline.setBlockLength(0, 2.0, 0.0);                     // two beats over a one-beat slice
+            auto out = r.run(60000, 128, 0.0, 120.0);
+            expectWithinAbsoluteError(out.getSample(0, 12000), 0.1f, 1.0e-4f);   // the slice itself
+            expectWithinAbsoluteError(out.getSample(0, 36000), 0.2f, 1.0e-4f);   // then the next slice's audio
+        }
+
         beginTest("a block near the end of the timeline sounds again in the next pass");
         {
             Rig r;

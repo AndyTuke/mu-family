@@ -107,6 +107,14 @@ SliceParams PhrasePlayback::paramsFor(const PhraseLoop& loop, const PhraseSettin
         const int skip = (int) std::lround((double) own.trimInBeats * 60.0 / s.loopTempo * loop.fileSampleRate * loop.sliceScale);
         range.start = std::min(range.start + skip, std::max(range.start, range.end - 2));
     }
+    // A block made longer than its slice runs on into the loop after it: the range grows to cover the block's length (at the hit's own
+    // speed), up to the end of the audio. A block cannot be longer than the loop has audio for.
+    if (b.length > 0.0 && s.loopTempo > 0.0)
+    {
+        const double wantedBeats = b.length / std::max(0.25, (double) own.retime);   // loop beats the block consumes
+        const int wanted = (int) std::lround(wantedBeats * 60.0 / s.loopTempo * loop.fileSampleRate * loop.sliceScale);
+        range.end = std::max(range.end, std::min(loop.audio->getNumSamples(), range.start + wanted));
+    }
     return p;
 }
 

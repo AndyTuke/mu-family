@@ -530,6 +530,31 @@ void PhraseContent::refreshViews(bool force)
     timelineView.setTimeline(d->timeline, std::move(beats));
     slicePeaks = computeSlicePeaks(*d->audio, d->slices);
     timelineView.setSlicePeaks(slicePeaks);
+    {
+        // The whole loop's peaks, and each slice's place in it.
+        const int total = juce::jmax(1, d->audio->getNumSamples());
+        constexpr int kColumns = 2048, kProbes = 16;
+        std::vector<float> loop((size_t) kColumns, 0.0f);
+        float loudest = 1.0e-6f;
+        for (int col = 0; col < kColumns; ++col)
+        {
+            const int from = (int) ((int64_t) total * col / kColumns), to = (int) ((int64_t) total * (col + 1) / kColumns);
+            const int step = std::max(1, (to - from) / kProbes);
+            float peak = 0.0f;
+            for (int at = from; at < to; at += step)
+                for (int ch = 0; ch < d->audio->getNumChannels(); ++ch) peak = std::max(peak, std::abs(d->audio->getSample(ch, at)));
+            loop[(size_t) col] = peak;
+            loudest = std::max(loudest, peak);
+        }
+        for (auto& v : loop) v /= loudest;
+        std::vector<PhraseTimeline::SliceSpan> spans;
+        for (int i = 0; i < d->slices.size(); ++i)
+        {
+            const auto r = d->slices.slice(i);
+            spans.push_back({ (double) r.start / total, (double) r.length() / total });
+        }
+        timelineView.setLoopPeaks(std::move(loop), std::move(spans));
+    }
     if (d->audioId != shownAudioId)
     {
         shownAudioId = d->audioId;
