@@ -444,17 +444,17 @@ void PhraseContent::updateToolbar()
 void PhraseContent::updateView()
 {
     const bool layerView = layerViewShown(), sliceView = sliceViewShown(), sequencer = ! layerView && ! sliceView;
-    // Which view a knob belongs to: the detector's are in the Slice view, the sound strip's in the Layer view; the voice band's
+    // Which view a knob belongs to: the detector's are in the Sequencer view beside the waveform, the sound strip's in the Layer view; the voice band's
     // knobs follow the band.
     for (auto& k : knobs)
     {
-        if (k.row >= ppi::dsens && k.row <= ppi::dhigh) k.comp->setVisible(sliceView);
+        if (k.row >= ppi::dsens && k.row <= ppi::dhigh) k.comp->setVisible(sequencer);
         else if (k.row == ppi::ltempo || k.row == ppi::tmix || k.row == ppi::hold || k.row == ppi::strength) k.comp->setVisible(layerView);
     }
     modeBox.setVisible(layerView);
     layerBand.setVisible(layerView);
-    detectBox.setVisible(sliceView);
-    detectButton.setVisible(sliceView);
+    detectBox.setVisible(sequencer);
+    detectButton.setVisible(sequencer);
     slicePanel.setVisible(sliceView);
     waveform.setVisible(! layerView);
     rangeBar.setVisible(sequencer);
@@ -672,6 +672,10 @@ void PhraseContent::resized()
     area.removeFromTop(s(LF::kSpaceS));
     sections.clear();
 
+    const int cellW = s(LF::kKnobSize2W), cellH = s(LF::kKnobSize2H), pad = s(LF::kSpaceS), plate = s(LF::kSectionPlateH);
+    const int boxW = s(LF::kLoopBoxW), buttonW = s(LF::kLoopButtonW);
+    auto isDetect = [](int row) { return row >= ppi::dsens && row <= ppi::dhigh; };
+
     if (! sliceViewShown() && ! layerViewShown())
     {
         // Sequencer: the sample on top (to drag slices from), the toolbar, then the timeline.
@@ -679,12 +683,39 @@ void PhraseContent::resized()
         const int timelineH = juce::jmax(s(90), area.getHeight() * 4 / 10);
         timelineView.setBounds(area.removeFromBottom(timelineH));
         auto bar = area.removeFromBottom(toolbarH);
-        // The audition controls in their own panel under a PREVIEW plate.
+        // The transient detector and the audition controls, each in its own panel under a plate: side by side, or stacked when narrow.
         {
-            const int plate = s(LF::kSectionPlateH), padS = s(LF::kSpaceS);
+            const int padS = s(LF::kSpaceS);
+            int detectCells = 0;
+            for (auto& k : knobs) if (isDetect(k.row)) ++detectCells;
+            const int detectW = pad * 3 + boxW + detectCells * cellW + pad + buttonW;
+            const int detectH = cellH + pad * 2;
+            const int previewW = padS * 2 + 3 * s(108) + s(64) + s(60) + 4 * padS;
+            const int previewH = s(kStatusH) + padS * 2;
+            const bool sideBySide = detectW + padS * 2 + previewW <= area.getWidth();
+
             area.removeFromTop(plate);
-            const int boxW = padS * 2 + 3 * s(108) + s(64) + s(60) + 4 * padS;
-            auto box = area.removeFromTop(s(kStatusH) + padS * 2).withWidth(boxW);
+            const juce::Rectangle<int> detectBoxArea(area.getX(), area.getY(), detectW, detectH);
+            sections.push_back({ detectBoxArea, "LAYER TRANSIENT DETECTOR" });
+            {
+                auto d = detectBoxArea.reduced(pad, pad);
+                detectBox.setBounds(d.removeFromLeft(boxW).withSizeKeepingCentre(boxW, s(kStatusH)));
+                d.removeFromLeft(pad);
+                for (auto& k : knobs) if (isDetect(k.row)) k.comp->setBounds(d.removeFromLeft(cellW).withHeight(cellH));
+                d.removeFromLeft(pad);
+                detectButton.setBounds(d.removeFromLeft(buttonW).withSizeKeepingCentre(buttonW, s(kStatusH)));
+            }
+            juce::Rectangle<int> box;
+            if (sideBySide)
+            {
+                box = { detectBoxArea.getRight() + padS * 2, detectBoxArea.getY(), previewW, previewH };
+                area.removeFromTop(detectH);
+            }
+            else
+            {
+                area.removeFromTop(detectH + padS + plate);
+                box = area.removeFromTop(previewH).withWidth(previewW);
+            }
             sections.push_back({ box, "PREVIEW" });
             auto row = box.reduced(padS);
             for (auto* b : { &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewLoopButton, &previewStopButton })
@@ -721,10 +752,6 @@ void PhraseContent::resized()
         return;
     }
 
-    const int cellW = s(LF::kKnobSize2W), cellH = s(LF::kKnobSize2H), pad = s(LF::kSpaceS), plate = s(LF::kSectionPlateH);
-    const int boxW = s(LF::kLoopBoxW), buttonW = s(LF::kLoopButtonW);
-    auto isDetect = [](int row) { return row >= ppi::dsens && row <= ppi::dhigh; };
-
     if (layerViewShown())
     {
         // Layer: the sound strip (tempo match, tempo, pitch/stretch, hold, strength) in its own panel, then the voice band: Pitch | Filter | Amp | Effects.
@@ -741,26 +768,7 @@ void PhraseContent::resized()
         return;
     }
 
-    // Slice view: the transient detector in its own panel, then the waveform, a slim timeline to pick a hit on, and the slice panel.
-    int detectCells = 0;
-    for (auto& k : knobs) if (isDetect(k.row)) ++detectCells;
-    const int detectW = pad * 3 + boxW + detectCells * cellW + pad + buttonW;
-    const int boxH = cellH + pad * 2;
-    area.removeFromTop(plate);
-    const juce::Rectangle<int> detectBoxArea(area.getX(), area.getY(), detectW, boxH);
-    area.removeFromTop(boxH);
-    sections.push_back({ detectBoxArea, "LAYER TRANSIENT DETECTOR" });
-    {
-        auto d = detectBoxArea.reduced(pad, pad);
-        detectBox.setBounds(d.removeFromLeft(boxW).withSizeKeepingCentre(boxW, s(kStatusH)));
-        d.removeFromLeft(pad);
-        for (auto& k : knobs) if (isDetect(k.row)) k.comp->setBounds(d.removeFromLeft(cellW).withHeight(cellH));
-        d.removeFromLeft(pad);
-        detectButton.setBounds(d.removeFromLeft(buttonW).withSizeKeepingCentre(buttonW, s(kStatusH)));
-    }
-    area.removeFromTop(pad);
-
-    // Below: the waveform, a slim timeline to pick a hit on, and the slice panel at the bottom.
+    // Slice view: the waveform, a slim timeline to pick a hit on, and the slice panel.
     slicePanel.setBounds(area.removeFromBottom(s(SlicePanel::preferredHeight())));
     area.removeFromBottom(pad);
     timelineView.setBounds(area.removeFromBottom(s(LF::kLoopSlimTimelineH)));
