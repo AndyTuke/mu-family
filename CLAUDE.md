@@ -15,7 +15,7 @@ mu-tant/        Wavetable drone synth — 8 voices, mixer, modulators, gate-patt
 mu-toni/        Generative arpeggiator mono-synth — scale/chord note pool, skewed-triangle scan, pay what you want (VST3 + CLAP + Standalone)
 mu-on/          909-style groove sequencer — Kick/Bass/Hat/Snare lanes, step grid, bass↔kick sidechain
 mu-tronic/      Performance unit — 16 layer slots hosting layers from the other products, buses, scenes (Standalone only)
-mu-tilate/      (planned, design only, scaffold only) Loop slicer — 8 Phrase layers, one loop + one sample player each, timeline sequencer (VST3 + CLAP + Standalone)
+mu-tilate/      (in build, not yet released) Loop slicer — 8 Phrase layers, one loop + one sample player each, timeline sequencer (VST3 + CLAP + Standalone)
 docs/           Family-shared design docs; product-specific docs under docs/<product>/
 tests/          Cross-plugin listening-test pipeline
 ```
