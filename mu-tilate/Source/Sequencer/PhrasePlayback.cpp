@@ -78,9 +78,10 @@ SliceParams PhrasePlayback::paramsFor(const PhraseLoop& loop, const PhraseSettin
     // The tempo ratio is read now, at the slice start (a Stretch ratio is latched per slice). The file's own sample
     // rate is part of the re-pitch rate: nothing is resampled on load.
     const double rateFromFile = loop.fileSampleRate / c.sampleRate;
-    const double tempoRatio   = (s.loopTempo > 0.0 && c.bpm > 0.0) ? c.bpm / s.loopTempo : 1.0;   // project speed / loop speed
+    const double matchRatio   = (s.mode == TempoMode::Match && s.loopTempo > 0.0 && c.bpm > 0.0) ? c.bpm / s.loopTempo : 1.0;   // project speed / loop speed
+    const double tempoRatio   = matchRatio / (double) juce::jlimit(0.25f, 4.0f, own.retime);   // the hit's own retime (dragged edge) on top
     p.rate = (float) rateFromFile;
-    if (s.mode == TempoMode::Match && std::abs(tempoRatio - 1.0) > 1.0e-9)
+    if (std::abs(tempoRatio - 1.0) > 1.0e-9)
     {
         // The stretcher keeps the slice in time; the pitch share (1 - stretchMix) is its transposition, so the mix only moves the pitch.
         // Pure re-pitch (or a file not at the host rate, which the stretcher cannot take) is a plain rate change.
@@ -99,6 +100,12 @@ SliceParams PhrasePlayback::paramsFor(const PhraseLoop& loop, const PhraseSettin
     {
         range.start = (int) std::lround((double) range.start * loop.sliceScale);
         range.end   = (int) std::lround((double) range.end   * loop.sliceScale);
+    }
+    // The hit's own trim: the start of the slice skipped, in beats of the loop's own tempo.
+    if (own.trimInBeats > 0.0f && s.loopTempo > 0.0)
+    {
+        const int skip = (int) std::lround((double) own.trimInBeats * 60.0 / s.loopTempo * loop.fileSampleRate * loop.sliceScale);
+        range.start = std::min(range.start + skip, std::max(range.start, range.end - 2));
     }
     return p;
 }

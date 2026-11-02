@@ -9,9 +9,9 @@
 
 // The Phrase layer's timeline view (docs/mu-tilate/design-ui.md, "Timeline"): a ruler in bars and beats over one row of slice
 // blocks. It shows the Timeline it is given and reports what the user asked for; it edits nothing itself. A click on empty row
-// asks to place the slice the host names, a drag moves a block (Alt = free, Ctrl = copy), Delete removes the selected block.
+// asks to place the slice the host names, a drag moves a block (Shift = free, Ctrl = copy), Delete removes the selected block.
 // The view is zoomed and scrolled: the wheel zooms around the pointer, Shift+wheel (or a horizontal wheel) scrolls, a middle-button
-// drag or a drag on the ruler pans, and while it plays the view pages on to keep the playhead in sight. Dragging a block's right edge sets its length (Alt = free, else the grid).
+// drag or a drag on the ruler pans, and while it plays the view pages on to keep the playhead in sight. Dragging a block's edge trims it (Alt retimes it instead: the slice is stretched or pitched to the new width; Shift = free, else the grid).
 namespace mu_tilate
 {
 
@@ -68,8 +68,9 @@ private:
     // The beats block `i` covers on screen: its own length, else its slice's, cut short by the next block.
     double blockBeats(int i) const;
     int    blockAt(int x) const;
-    // True when x is on the right edge of block `i` (where a drag changes its length).
-    bool   onRightEdge(int i, int x) const;
+    // The block with an edge under x (`right` says which), or -1.
+    int    edgeAt(int x, bool& right) const;
+    double naturalBeatsOf(int i) const;   // the block's whole slice, in beats
     // Keeps the view inside the timeline: at least two beats, at most all of it.
     void   clampView();
 
@@ -91,7 +92,9 @@ private:
     int    dragBlock = -1;
     double grabOffset = 0.0;
     bool   dragMoved = false;
-    bool   resizing = false;     // the drag changes the block's length, not its start
+    enum class Edge { None, Left, Right };
+    Edge   dragEdge = Edge::None;   // the drag is on a block edge (trim, or with Alt retime), not moving the block
+    double dragAnchor = 0.0;        // the edge that stays put during an edge drag, in beats
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhraseTimeline)
 };

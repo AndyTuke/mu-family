@@ -77,6 +77,44 @@ bool Timeline::setBlockLength(int index, double beats, double grid)
     return true;
 }
 
+int Timeline::trimStart(int index, double newStart, double naturalBeats)
+{
+    if (index < 0 || index >= size()) return -1;
+    TimelineBlock b = list[(size_t) index];
+    constexpr double kMin = 1.0 / 16.0;
+    const double rt = b.own.retime, trimIn = b.own.trimInBeats;
+    const double span = std::max(kMin, (naturalBeats - trimIn) * rt);   // the block's natural width in beats
+    const double s = std::clamp(newStart, std::max(0.0, b.start - trimIn * rt), std::min(length - 1.0e-6, b.start + span - kMin));
+    for (int i = 0; i < size(); ++i)
+        if (i != index && std::abs(list[(size_t) i].start - s) < 1.0e-9) return -1;
+    const double d = s - b.start;
+    b.own.trimInBeats = (float) std::max(0.0, trimIn + d / rt);
+    if (b.length > 0.0) b.length = std::max(kMin, b.length - d);
+    b.start = s;
+    list.erase(list.begin() + index);
+    return insert(b);
+}
+
+int Timeline::retime(int index, double newStart, double newEnd, double naturalBeats)
+{
+    if (index < 0 || index >= size()) return -1;
+    TimelineBlock b = list[(size_t) index];
+    constexpr double kMin = 1.0 / 16.0;
+    const double remaining = std::max(kMin, naturalBeats - b.own.trimInBeats);
+    const double oldStart = b.start;
+    const double rt = std::clamp((newEnd - newStart) / remaining, 0.25, 4.0);
+    const double len = rt * remaining;
+    const double s = newStart != oldStart ? newEnd - len : newStart;   // a start-edge drag holds the end; an end-edge drag holds the start
+    if (s < 0.0 || s >= length) return -1;
+    for (int i = 0; i < size(); ++i)
+        if (i != index && std::abs(list[(size_t) i].start - s) < 1.0e-9) return -1;
+    b.own.retime = (float) rt;
+    b.length = len;
+    b.start = s;
+    list.erase(list.begin() + index);
+    return insert(b);
+}
+
 void Timeline::setReverse(int index, bool reverse)
 {
     if (index >= 0 && index < size()) list[(size_t) index].own.reverse = reverse;

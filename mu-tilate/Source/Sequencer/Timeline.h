@@ -48,6 +48,12 @@ public:
     int  move(int index, double beat, double grid);
     int  copy(int index, double beat, double grid);
     bool setBlockLength(int index, double beats, double grid);   // 0 = the slice's own length
+    // Edge drags. `naturalBeats` is the block's slice length in beats. trimStart moves the start edge to `newStart` and skips
+    // (or gives back) that much of the slice, the end edge staying where it is; retime sets the span to [newStart, newEnd], playing
+    // the rest of the slice in that time (a ratio of 0.25..4). Both return the block's new index, or -1 when refused (a collision
+    // with another block's start, or outside the timeline).
+    int  trimStart(int index, double newStart, double naturalBeats);
+    int  retime(int index, double newStart, double newEnd, double naturalBeats);
     void setReverse(int index, bool reverse);                   // the hit's own reverse setting
     void setSettings(int index, const SliceSettings& own);      // replaces the hit's own settings (brought into range)
     bool remove(int index);

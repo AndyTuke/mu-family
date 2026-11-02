@@ -29,7 +29,7 @@ The editor will inherit `mu-core/UI/EditorShellBase.h` and use the shared `Layer
 - Parameters are APVTS (detection settings, tempo mode, stretch controls, slice-player globals); the **slice list and timeline blocks are ValueTree children of the layer node**, not APVTS parameters, as mu-On's step rows are. Layer parameter prefix `p{N}_`. The loop is embedded (FLAC) or stored by path, with the mu-Clid path-safety rules.
 - Modulation targets are one `mu_mod::ModTarget` table; depth is a % of the knob's range. Channels are self-contained; `ModulationMatrix` is the single reader.
 - Transient and tempo analysis run on a worker thread, never the audio thread, results cached; the audio thread only reads finished slice lists and warp tables. The audio thread never allocates (stretch state preallocated in `prepare`).
-- Marker and block edits are staged on the message thread and applied at a loop boundary (shared hot-swap). Alt while dragging means free movement; Ctrl-drag copies.
+- Marker and block edits are staged on the message thread and applied at a loop boundary (shared hot-swap). Shift while dragging means free movement (no grid snap); Ctrl-drag copies; dragging a block edge trims it, Alt-drag on an edge retimes (stretches/pitches) it.
 - Mirror rule with mu-Tronic (as for mu-On's step rows): any change to the timeline or waveform code must work in both hosts; put it in shared layer code and never fix one host only.
 - Content dir `Documents/TDP/muTilate` with `Presets/`, `Phrases/` and `Samples/`.
 

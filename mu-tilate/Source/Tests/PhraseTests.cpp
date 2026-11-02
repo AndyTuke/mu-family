@@ -34,6 +34,7 @@ struct Rig
         slices.divideEvenly(4);
         loop.audio = &audio; loop.fileSampleRate = kSr; loop.slices = &slices; loop.timeline = &timeline;
         settings.fadeInMs = 0.0f; settings.fadeOutMs = 0.0f;
+        settings.mode = TempoMode::Off;   // the tests that want the tempo match switch it on
         playback.prepare(kSr, 512);
     }
 
@@ -380,6 +381,31 @@ struct PhraseTests : public juce::UnitTest
             auto out = r.run(40000, 128, 0.0, 100.0);
             expectGreaterThan(rms(out, 28000, 500), 0.05);                              // total 28800
             expectEquals(rms(out, 29200, 4000), 0.0);
+        }
+
+        beginTest("a trimmed hit skips the start of its slice; a retimed hit plays in the new time");
+        {
+            Rig r;
+            r.hitsStartWithSliceSettings = false;   // keep the hit's own trim
+            r.settings.loopTempo = 120.0;
+            r.timeline.place(0, 0.0, 0.0);
+            const int i = r.timeline.trimStart(0, 0.5, 1.0);                       // half a beat in: 12000 samples skipped
+            expectEquals(i, 0);
+            expectWithinAbsoluteError(r.timeline.blocks()[0].own.trimInBeats, 0.5f, 1.0e-6f);
+            auto out = r.run(30000, 128, 0.0, 120.0);
+            expectEquals(rms(out, 5000, 4000), 0.0);                               // the block starts half a beat in
+            expectGreaterThan(rms(out, 15000, 500), 0.05);
+            expectEquals(rms(out, 25000, 4000), 0.0);                              // only 12000 samples are left
+
+            Rig q;
+            q.hitsStartWithSliceSettings = false;
+            q.settings.loopTempo = 120.0;
+            q.timeline.place(0, 0.0, 0.0);
+            q.timeline.retime(0, 0.0, 2.0, 1.0);                                   // one beat of slice stretched over two
+            expectWithinAbsoluteError(q.timeline.blocks()[0].own.retime, 2.0f, 1.0e-6f);
+            auto out2 = q.run(60000, 128, 0.0, 120.0);
+            expectGreaterThan(rms(out2, 40000, 500), 0.05);                        // twice the 24000 samples
+            expectEquals(rms(out2, 49500, 4000), 0.0);
         }
 
         beginTest("a block near the end of the timeline sounds again in the next pass");

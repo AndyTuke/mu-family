@@ -35,7 +35,7 @@ Sizes come from `MuLookAndFeel`, depth from `MuTheme::Lighting`, controls from t
 │            │  drag a pad onto the timeline,     │ [Reverse] [Loop] [Choke ▾] Play [One-shot|Gate] │
 │            │  click to audition                 │                                                 │
 │            ├─────────────────────────────────────────────────────────────────────────────────┤
-│            │  TIMELINE ★   Length [ 4 ] bars   Grid [1/16 ▾]   (Alt = no snap)   Zoom ─●─      │
+│            │  TIMELINE ★   Length [ 4 ] bars   Grid [1/16 ▾]   (Shift = no snap)   Zoom ─●─      │
 │            │  ┌────────────────────────────────────────────────────────────────────────────┐  │
 │            │  │ 1       2       3       4       5       6       7       8     ← time ruler  │  │
 │            │  │ ▐1█▌│▐2█▌│     │▐3█▌│▐1█▌│▐2█▌│▐4█▌│  │▐5█▌│▐6▌ │▐7█▌│▐8█▌│     single row  │  │
@@ -55,7 +55,7 @@ Sizes come from `MuLookAndFeel`, depth from `MuTheme::Lighting`, controls from t
 - **Tempo matching (per layer):** *Off* (slices play at their recorded speed and are only re-timed by the sequencer), *Re-pitch* (varispeed: speed and pitch follow the ratio of host tempo to loop tempo) or *Stretch* (time-stretch with pitch preserved). Slice start and end are scaled by the tempo ratio so slices stay on the grid in every mode. See [design-engine.md](design-engine.md), "Tempo matching and time-stretch".
 - **Waveform with highlighted slices:** the shared waveform drawing. The regions between detected transients are tinted in alternating strengths (two tints, so neighbours are always distinguishable) and the selected slice is emphasised (brighter tint plus the layer-colour outline). Tints come from `MuLookAndFeel` colour tokens at `MuTheme::Lighting` strengths, never literal alphas. Markers show in the layer colour.
 - **Scroll and zoom:** a long loop gets a scrollable and zoomable waveform. Mouse wheel scrolls, Ctrl+wheel (and the Zoom slider) zooms around the pointer, and an overview strip with a draggable window sits under the waveform. Zoom and scroll position are view state, not saved with the preset. The same pan / zoom behaviour is reused by the timeline, so it is built once as a shared component (see shared pieces below).
-- **Marker editing:** markers are grabbable, snap to the grid when Snap is on (hold Alt for free movement, as in the timeline), and a manually moved marker is **pinned** (shows a small pin) and survives *Re-detect*.
+- **Marker editing:** markers are grabbable, snap to the grid when Snap is on (hold Shift for free movement, as in the timeline), and a manually moved marker is **pinned** (shows a small pin) and survives *Re-detect*.
 
 
 ### Slices ★
@@ -89,8 +89,8 @@ These are plain per-slice values (see the persistence note). Slice settings that
 - **Length:** adjustable, 1 to 64 bars (the Length control). The timeline is **drag-scrollable** (drag the background, or wheel) and zoomable when longer than the view, and keeps its playhead in view while following the transport.
 - **Time ruler:** a ruler along the top shows bars and beats (and finer ticks as it is zoomed in); it scrolls and zooms with the row.
 - **Placing slices:** (a) click an empty cell to place the selected slice, (b) drag a pad or a slice region from the sample window onto the row.
-- **Snap:** drops snap to the **Grid** value (1/32 to 1/4, plus Off). **Holding Alt while dragging slides freely** (snap suspended); releasing Alt returns to the grid. The same rule applies to marker editing in the waveform and to block edges.
-- **Block edges:** a placed block's left and right edges can be grabbed with a held mouse click: dragging the right edge extends or trims the end (extending loops or holds per the slice's Play mode; trimming is an early stop), dragging the left edge trims or extends the start of the played part. Edge handles show on hover (resize cursor) and follow the same snap and Alt rules.
-- **Editing:** drag a block to move it; Alt is reserved for free sliding, so **Ctrl-drag copies**; Delete removes. Edits are staged and applied at a boundary like other products.
+- **Snap:** drops snap to the **Grid** value (1/32 to 1/4, plus Off). **Holding Shift while dragging slides freely** (snap suspended); releasing Shift returns to the grid. The same rule applies to marker editing in the waveform and to block edges.
+- **Block edges:** a placed block's left and right edges can be grabbed with a held mouse click: dragging an edge **trims** (the right edge stops the slice early, the left edge skips its start); **Alt-drag on an edge retimes** the slice to the new width (stretched, or pitched, per the layer's Pitch/Stretch knob). Edge handles show on hover (resize cursor) and follow the same snap and Shift rules.
+- **Editing:** drag a block to move it; **Ctrl-drag copies**; Delete removes. Edits are staged and applied at a boundary like other products.
 - **Helpers:** *Original order* lays the slices out as they were in the source, *Randomise* shuffles them, *Clear* empties the row.
 - **Playhead:** follows the transport; the timeline is internally clocked like the other products (mu-link and host sync as elsewhere).

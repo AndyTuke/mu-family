@@ -217,7 +217,7 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     waveform.onRegionDragged = [this](int region, juce::Point<int> screen)
     {
         using mu_ui::s;
-        const double beat = timelineView.dropBeatAt(timelineView.getLocalPoint(nullptr, screen), juce::ModifierKeys::currentModifiers.isAltDown());
+        const double beat = timelineView.dropBeatAt(timelineView.getLocalPoint(nullptr, screen), juce::ModifierKeys::currentModifiers.isShiftDown());
         timelineView.setDropBeat(beat);
         if (draggedSlice != region)
         {
@@ -238,7 +238,7 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     };
     waveform.onRegionDropped = [this](int region, juce::Point<int> screen)
     {
-        const double beat = timelineView.dropBeatAt(timelineView.getLocalPoint(nullptr, screen), juce::ModifierKeys::currentModifiers.isAltDown());
+        const double beat = timelineView.dropBeatAt(timelineView.getLocalPoint(nullptr, screen), juce::ModifierKeys::currentModifiers.isShiftDown());
         timelineView.setDropBeat(-1.0);
         timelineView.setDropSlice(-1);
         dragGhost.setVisible(false);
@@ -278,7 +278,7 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     lengthBox.onTextChange = [this] { applyLength(lengthBox.getText()); };
     addAndMakeVisible(lengthBox);
     for (int i = 0; i < gridNames().size(); ++i) gridBox.addItem(gridNames()[i], i + 1);
-    gridBox.getComboBox().setTooltip("Snap: the grid hits and their edges snap to (Alt while dragging is free)");
+    gridBox.getComboBox().setTooltip("Snap: the grid hits and their edges snap to (Shift while dragging is free)");
     addAndMakeVisible(gridBox);
 
     deleteButton.setTooltip("Delete the selected hit (or press Delete)");

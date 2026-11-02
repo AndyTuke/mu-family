@@ -19,7 +19,7 @@ void PhraseTimeline::setTimeline(const Timeline& t, std::vector<double> beats)
     timeline = t;
     sliceBeatsList = std::move(beats);
     if (selected >= timeline.size()) selected = -1;
-    if (dragBlock >= timeline.size()) { dragBlock = -1; resizing = false; }   // the timeline shrank under a drag
+    if (dragBlock >= timeline.size()) { dragBlock = -1; dragEdge = Edge::None; }   // the timeline shrank under a drag
     if (timeline.lengthBeats() != lastLength) { lastLength = timeline.lengthBeats(); viewBeats = 0.0; viewStart = 0.0; }   // a new length: show all of it
     clampView();
     repaint();
@@ -90,17 +90,29 @@ double PhraseTimeline::beatAt(int x) const noexcept
     return viewStart + (double) x / (double) std::max(1, getWidth()) * shown;
 }
 
-bool PhraseTimeline::onRightEdge(int i, int x) const
+double PhraseTimeline::naturalBeatsOf(int i) const
 {
-    const int edge = xOf(timeline.blocks()[(size_t) i].start + blockBeats(i));
-    return std::abs(x - edge) <= mu_ui::s(LF::kEdgeGrab);
+    const auto& b = timeline.blocks()[(size_t) i];
+    return b.slice >= 0 && b.slice < (int) sliceBeatsList.size() ? sliceBeatsList[(size_t) b.slice] : 1.0;
+}
+
+int PhraseTimeline::edgeAt(int x, bool& right) const
+{
+    int best = -1, bestDist = mu_ui::s(LF::kEdgeGrab) + 1;
+    for (int i = 0; i < timeline.size(); ++i)
+    {
+        const double start = timeline.blocks()[(size_t) i].start;
+        const int dl = std::abs(x - xOf(start)), dr = std::abs(x - xOf(start + blockBeats(i)));
+        if (dl < bestDist) { best = i; bestDist = dl; right = false; }
+        if (dr < bestDist) { best = i; bestDist = dr; right = true; }
+    }
+    return best;
 }
 
 double PhraseTimeline::blockBeats(int i) const
 {
     const auto& b = timeline.blocks()[(size_t) i];
-    double len = b.length > 0.0 ? b.length
-               : (b.slice >= 0 && b.slice < (int) sliceBeatsList.size() ? sliceBeatsList[(size_t) b.slice] : 1.0);
+    double len = b.length > 0.0 ? b.length : std::max(0.0, naturalBeatsOf(i) - b.own.trimInBeats) * b.own.retime;
     const double end = i + 1 < timeline.size() ? timeline.blocks()[(size_t) i + 1].start : timeline.lengthBeats();
     return std::max(0.0, std::min(len, end - b.start));   // the next block cuts this one
 }
@@ -250,13 +262,17 @@ void PhraseTimeline::mouseDown(const juce::MouseEvent& e)
         return;
     }
     if (! rowArea().contains(e.getPosition())) return;
-    const int hit = blockAt(e.x);
     dragMoved = false;
+    bool onRight = false;
+    const int edgeBlock = edgeAt(e.x, onRight);
+    const int hit = edgeBlock >= 0 ? edgeBlock : blockAt(e.x);
     if (hit >= 0)
     {
         selected = hit;
         dragBlock = hit;
-        resizing = onRightEdge(hit, e.x);
+        dragEdge = edgeBlock >= 0 ? (onRight ? Edge::Right : Edge::Left) : Edge::None;
+        const auto& hb = timeline.blocks()[(size_t) hit];
+        dragAnchor = dragEdge == Edge::Left ? hb.start + blockBeats(hit) : hb.start;   // the edge that holds still
         grabOffset = beatAt(e.x) - timeline.blocks()[(size_t) hit].start;
         if (onBlockSelected) onBlockSelected(hit);
         repaint();
@@ -269,7 +285,7 @@ void PhraseTimeline::mouseDown(const juce::MouseEvent& e)
     const int slice = sliceToPlace ? sliceToPlace() : -1;
     if (slice >= 0 && onEdit)
     {
-        const double beat = e.mods.isAltDown() ? beatAt(e.x) : Timeline::snap(beatAt(e.x), gridBeats);
+        const double beat = e.mods.isShiftDown() ? beatAt(e.x) : Timeline::snap(beatAt(e.x), gridBeats);
         const auto start = settingsOfSlice ? settingsOfSlice(slice) : SliceSettings();
         onEdit([slice, beat, start](Timeline& t) { t.place(slice, beat, 0.0, start); });
         selected = timeline.indexAt(beat);   // the edit has been published: the new hit is the one at this beat
@@ -296,17 +312,34 @@ void PhraseTimeline::mouseDrag(const juce::MouseEvent& e)
     }
     if (dragBlock < 0 || ! onEdit) return;
 
-    // Dragging the right edge sets the block's length (at least a sixteenth of a beat), snapped to the grid unless Alt is held.
-    if (resizing)
+    // Dragging an edge trims the block (the start edge skips the start of the slice, the end edge stops it early); with Alt the
+    // slice is retimed to the new width instead. The edge snaps to the grid unless Shift is held; at least a sixteenth of a beat stays.
+    if (dragEdge != Edge::None)
     {
         const int at = dragBlock;
-        const double grid = e.mods.isAltDown() ? 0.0 : gridBeats;
-        const double len = std::max(0.0625, Timeline::snap(beatAt(e.x) - timeline.blocks()[(size_t) at].start, grid));
-        if (std::abs(len - blockBeats(at)) > 1.0e-9) onEdit([at, len](Timeline& t) { t.setBlockLength(at, len, 0.0); });
+        const double grid = e.mods.isShiftDown() ? 0.0 : gridBeats;
+        const double beat = Timeline::snap(beatAt(e.x), grid);
+        const double nat = naturalBeatsOf(at);
+        constexpr double kMin = 0.0625;
+        const bool left = dragEdge == Edge::Left;
+        int moved = -1;
+        if (e.mods.isAltDown())
+        {
+            const double a = left ? std::min(beat, dragAnchor - kMin) : dragAnchor, b = left ? dragAnchor : std::max(beat, dragAnchor + kMin);
+            onEdit([&](Timeline& t) { moved = t.retime(at, a, b, nat); });
+        }
+        else if (left)
+            onEdit([&](Timeline& t) { moved = t.trimStart(at, std::min(beat, dragAnchor - kMin), nat); });
+        else
+        {
+            const double len = std::max(kMin, beat - dragAnchor);
+            if (std::abs(len - blockBeats(at)) > 1.0e-9) onEdit([&](Timeline& t) { moved = t.setBlockLength(at, len, 0.0) ? at : -1; });
+        }
+        if (moved >= 0) { dragBlock = moved; selected = moved; }
         return;
     }
 
-    const double grid = e.mods.isAltDown() ? 0.0 : gridBeats;
+    const double grid = e.mods.isShiftDown() ? 0.0 : gridBeats;
     const double target = Timeline::snap(beatAt(e.x) - grabOffset, grid);
     const double current = timeline.blocks()[(size_t) dragBlock].start;
 
@@ -328,13 +361,14 @@ void PhraseTimeline::mouseUp(const juce::MouseEvent&)
 {
     panning = false;
     dragBlock = -1;
-    resizing = false;
+    dragEdge = Edge::None;
 }
 
 void PhraseTimeline::mouseMove(const juce::MouseEvent& e)
 {
-    const int hit = rowArea().contains(e.getPosition()) ? blockAt(e.x) : -1;
-    setMouseCursor(hit >= 0 && onRightEdge(hit, e.x) ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::NormalCursor);
+    bool right = false;
+    const int hit = rowArea().contains(e.getPosition()) ? edgeAt(e.x, right) : -1;
+    setMouseCursor(hit >= 0 ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::NormalCursor);
 }
 
 void PhraseTimeline::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& w)
