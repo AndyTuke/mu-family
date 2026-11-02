@@ -234,8 +234,8 @@ struct ProcessorTests : public juce::UnitTest
             out.createDirectory();
             const double loopTempo = juce::SystemStats::getEnvironmentVariable("MU_TILATE_DEMO_TEMPO", "80").getDoubleValue();
 
-            // Renders 12 s of the loop to demo_<name>.wav: tempo mode `mode` at `projectTempo`, after `prepare` has edited the layer.
-            auto renderDemo = [&](const juce::String& name, int mode, double projectTempo, const std::function<void(PluginProcessor&)>& prepare)
+            // Renders 12 s of the loop to demo_<demoName>.wav: tempo mode `mode` at `projectTempo`, after `prepare` has edited the layer.
+            auto renderDemo = [&](const juce::String& demoName, int mode, double projectTempo, const std::function<void(PluginProcessor&)>& prepare)
             {
                 PluginProcessor p;
                 Host host;
@@ -267,13 +267,13 @@ struct ProcessorTests : public juce::UnitTest
                     host.advance(kBlock);
                     for (int c = 0; c < 2; ++c) all.copyFrom(c, pos, blockBuf, c, 0, kBlock);
                 }
-                const auto demoFile = out.getChildFile("demo_" + name + ".wav");
+                const auto demoFile = out.getChildFile("demo_" + demoName + ".wav");
                 demoFile.deleteFile();
                 juce::WavAudioFormat wav;
                 std::unique_ptr<juce::OutputStream> stream(demoFile.createOutputStream());
                 if (auto w = wav.createWriterFor(stream, juce::AudioFormatWriterOptions {}.withSampleRate(kSr).withNumChannels(2).withBitsPerSample(24)))
                     w->writeFromAudioSampleBuffer(all, 0, total);
-                logMessage("demo " + name + ": " + p.getLoopStatus(0) + ", peak " + juce::String(all.getMagnitude(0, total), 3)
+                logMessage("demo " + demoName + ": " + p.getLoopStatus(0) + ", peak " + juce::String(all.getMagnitude(0, total), 3)
                            + ", rms " + juce::String(all.getRMSLevel(0, 0, total), 3) + " -> " + demoFile.getFullPathName());
                 p.setPlayHead(nullptr);
             };

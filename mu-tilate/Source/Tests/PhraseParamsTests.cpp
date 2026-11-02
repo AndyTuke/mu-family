@@ -35,7 +35,7 @@ struct PhraseParamsTests : public juce::UnitTest
             expectEquals(n, 2 * kNumPhraseParams);
         }
 
-        beginTest("defaults: Off, 120 BPM, a 10 ms hold at full strength, 1/16 grid, 4 bars");
+        beginTest("defaults: Off, 120 BPM, a 10 ms hold at full strength, 1/16 grid");
         {
             auto get = [&](int row) { return apvts.getParameter(layerParamPrefix(0) + ppi::suffix[row]); };
             expectEquals(get(ppi::mode)->getValue(), get(ppi::mode)->convertTo0to1(0.0f));
@@ -46,7 +46,6 @@ struct PhraseParamsTests : public juce::UnitTest
             expectWithinAbsoluteError(gridBeats(6), 1.0 / 3.0, 1.0e-12);          // 1/8T: three in the time of a quarter note
             expectWithinAbsoluteError(Timeline::snap(0.7, gridBeats(6)), 2.0 / 3.0, 1.0e-12);
             expectEquals(gridBeats(99), gridBeats(8));
-            expectEquals((int) std::lround(get(ppi::bars)->convertFrom0to1(get(ppi::bars)->getDefaultValue())), 4);
         }
 
         beginTest("every modulation target names a real row and its depth is a proportion of the range");

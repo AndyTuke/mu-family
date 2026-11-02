@@ -6,7 +6,7 @@
 
 // The Phrase layer type's parameter table: the per-slot rows under the slot's p{N}_ prefix. The slice list and the
 // timeline blocks are not parameters (they vary in number): they are ValueTree children of the layer node, as
-// mu-On's step rows are. Saved data keys on these ids and their order, so rows are only ever appended.
+// mu-On's step rows are. Saved data keys on these ids and their order, so rows are only ever appended. The timeline length is not a parameter: it is saved with the timeline.
 namespace mu_tilate
 {
 
@@ -15,8 +15,8 @@ namespace ppi
     enum
     {
         mode, ltempo, hold, strength, fadeIn, fadeOut, gain,       // playback (7)
-        grid, bars, window,                                        // timeline and stretch window (3)
-        dmethod, dsens, dgap, dpre, dlow, dhigh, snap,             // detection (7)
+        grid, window,                                              // timeline grid and stretch window (2)
+        dmethod, dsens, dgap, dpre, dlow, dhigh,                   // detection (6)
         drvChar, insP1, insP2, insP3, insP4,                       // insert (5)
         fType, fCut, fRes,                                         // the layer's filter (3)
         pSemi, pFine, pPan,                                        // the layer's pitch and pan (3)
@@ -26,8 +26,8 @@ namespace ppi
     };
     inline constexpr const char* const suffix[COUNT] = {
         "mode", "ltempo", "hold", "strength", "fadeIn", "fadeOut", "gain",
-        "grid", "bars", "window",
-        "dmethod", "dsens", "dgap", "dpre", "dlow", "dhigh", "snap",
+        "grid", "window",
+        "dmethod", "dsens", "dgap", "dpre", "dlow", "dhigh",
         "drvChar", "insP1", "insP2", "insP3", "insP4",
         "fType", "fCut", "fRes",
         "pSemi", "pFine", "pPan",
@@ -37,7 +37,7 @@ namespace ppi
 }
 
 inline constexpr int kNumPhraseParams = ppi::COUNT;
-static_assert(kNumPhraseParams == 37, "a new row goes into ppi, suffix[] and addLayerParams together");
+static_assert(kNumPhraseParams == 35, "a new row goes into ppi, suffix[] and addLayerParams together");
 
 // "p{N}_": the prefix of every parameter of Phrase slot N.
 inline juce::String layerParamPrefix(int slot) { return "p" + juce::String(slot) + "_"; }

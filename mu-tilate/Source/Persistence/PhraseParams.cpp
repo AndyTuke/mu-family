@@ -33,19 +33,17 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     addF(ppi::fadeOut,  "Fade Out",       0.0f, 50.0f, 0.5f, 5.0f);
     addF(ppi::gain,     "Level",          0.0f, 2.0f, 1.0f);
 
-    // Timeline: the grid, the length in bars, and the stretch window.
+    // Timeline: the grid and the stretch window (the length is saved with the timeline, not a parameter).
     addC(ppi::grid,     "Grid",           gridNames(), 3);
-    layout.add(std::make_unique<juce::AudioParameterInt>(id(ppi::bars), "Length (bars)", 1, 64, 4));
     addC(ppi::window,   "Stretch Window", windowNames(), 1);
 
-    // Detection: the method and its controls, and whether markers snap to the grid.
+    // Detection: the method and its controls, and its controls.
     addC(ppi::dmethod,  "Detect Method",  detectMethodNames(), 0);
     addF(ppi::dsens,    "Sensitivity",    0.0f, 1.0f, 0.5f);
     addF(ppi::dgap,     "Min Gap",        5.0f, 500.0f, 50.0f, 60.0f);
     addF(ppi::dpre,     "Pre-roll",       0.0f, 20.0f, 2.0f);
     addF(ppi::dlow,     "Low Cut",        20.0f, 2000.0f, 20.0f, 200.0f);
     addF(ppi::dhigh,    "High Cut",       1000.0f, 20000.0f, 20000.0f, 6000.0f);
-    layout.add(std::make_unique<juce::AudioParameterBool>(id(ppi::snap), "Snap Markers", false));
 
     // The layer's filter: every slice uses it, moved by its own cutoff and resonance offsets.
     addC(ppi::fType,    "Filter Type",    filterTypeNames(), 0);

@@ -129,8 +129,8 @@ DetectSettings PluginProcessor::detectSettingsOf(int layer) const
     return s;
 }
 
-// Publishes `slices` with a timeline as long as the slices take back to back (in bars of 4/4), and sets the layer's length to
-// match: empty, or with the slices laid out in source order from beat 0. Returns the total length in beats.
+// Publishes `slices` with a timeline as long as the slices take back to back (in bars of 4/4), with the length in whole bars:
+// empty, or with the slices laid out in source order from beat 0. Returns the total length in beats.
 double PluginProcessor::layOutInOrder(int layer, const SliceList& slices, double sampleRate, double loopTempo, bool inOrder)
 {
     std::vector<double> beats;
@@ -146,8 +146,6 @@ double PluginProcessor::layOutInOrder(int layer, const SliceList& slices, double
     for (int i = 0; i < slices.size(); ++i) startWith.push_back(slices.settings(i));
     if (inOrder) timeline.originalOrder(beats, startWith);
     getPhrase(layer).commitEdit(slices, timeline);
-    if (auto* p = apvts.getParameter(layerParamPrefix(layer) + ppi::suffix[ppi::bars]))
-        p->setValueNotifyingHost(p->convertTo0to1((float) bars));
     return total;
 }
 

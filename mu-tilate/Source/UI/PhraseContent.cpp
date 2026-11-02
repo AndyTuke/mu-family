@@ -373,8 +373,6 @@ void PhraseContent::applyLength(const juce::String& text)
     {
         const double value = juce::jlimit(Timeline::kMinLengthBeats, Timeline::kMaxLengthBeats, *beats);
         editSlices([value](SliceList&, Timeline& t) { t.setLengthBeats(value); });
-        if (auto* p = apvts.getParameter(layerParamPrefix(currentLayer) + ppi::suffix[ppi::bars]))   // the saved Length (bars) follows
-            p->setValueNotifyingHost(p->convertTo0to1((float) juce::jlimit(1.0, 64.0, std::ceil(value / 4.0 - 1.0e-6))));
         if (onStatusUpdate) onStatusUpdate("Sequence Length", formatLengthBeats(value));
     }
     else if (onStatusUpdate)
