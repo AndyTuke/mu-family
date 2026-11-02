@@ -22,12 +22,32 @@ inline constexpr ModDest kModDestTable[] = {
     { "insert.p2",     "Insert P2",      "Insert",   "insP2" },
     { "insert.p3",     "Insert P3",      "Insert",   "insP3" },
     { "insert.p4",     "Insert P4",      "Insert",   "insP4" },
+    // The rest of the layer's continuous parameters. Choice rows (tempo mode, grid, window, filter type, insert algorithm) and the
+    // detector's settings are not targets: they are not read per block.
+    { "play.tempo",    "Loop Tempo",     "Playback", "ltempo" },
+    { "stretch.mix",   "Pitch / Stretch", "Stretch", "tmix" },
+    { "pitch.semi",    "Pitch",          "Pitch",    "pSemi" },
+    { "pitch.fine",    "Fine",           "Pitch",    "pFine" },
+    { "play.pan",      "Pan",            "Playback", "pPan" },
+    { "filter.cut",    "Cutoff",         "Filter",   "fCut" },
+    { "filter.res",    "Resonance",      "Filter",   "fRes" },
+    { "filter.env",    "Envelope Depth", "Filter",   "fEnv" },
+    { "filter.attack", "Filter Attack",  "Filter",   "fltA" },
+    { "filter.decay",  "Filter Decay",   "Filter",   "fltD" },
+    { "filter.sus",    "Filter Sustain", "Filter",   "fltS" },
+    { "filter.rel",    "Filter Release", "Filter",   "fltR" },
+    { "amp.attack",    "Amp Attack",     "Amp",      "ampA" },
+    { "amp.decay",     "Amp Decay",      "Amp",      "ampD" },
+    { "amp.sustain",   "Amp Sustain",    "Amp",      "ampS" },
+    { "amp.release",   "Amp Release",    "Amp",      "ampR" },
 };
 
 // The out[] indices: MUST match kModDestTable order.
 enum ModDestIndex
 {
     D_level, D_hold, D_strength, D_fadeIn, D_fadeOut, D_insP1, D_insP2, D_insP3, D_insP4,
+    D_loopTempo, D_tempoMix, D_pitch, D_fine, D_pan, D_cutoff, D_res, D_filterEnv, D_fltA, D_fltD, D_fltS, D_fltR,
+    D_ampA, D_ampD, D_ampS, D_ampR,
     kNumModDests
 };
 

@@ -263,20 +263,20 @@ void Phrase::readParams(double modBeat) noexcept
         modLive.v[(size_t) k].store(out[k], std::memory_order_relaxed);
 
     settings.mode      = (TempoMode) juce::jlimit(0, 1, (int) g(ppi::mode));   // not modulated
-    settings.stretchMix = g(ppi::tmix);                                        // not modulated
-    settings.loopTempo = (double) g(ppi::ltempo);                              // not modulated
+    settings.stretchMix = out[D_tempoMix];
+    settings.loopTempo = (double) out[D_loopTempo];
     settings.holdMs    = out[D_hold];
     settings.strength  = out[D_strength];
     settings.fadeInMs  = out[D_fadeIn];
     settings.fadeOutMs = out[D_fadeOut];
     settings.gain      = out[D_level];
-    settings.filterType = juce::jlimit(0, (int) filterChoices().size() - 1, (int) g(ppi::fType));   // the layer's filter: not modulated
-    settings.cutoffHz   = g(ppi::fCut);
-    settings.resonance  = g(ppi::fRes);
-    settings.pitchSemi  = g(ppi::pSemi);   settings.fineCents = g(ppi::pFine);   settings.pan = g(ppi::pPan);
-    settings.ampA = g(ppi::ampA);  settings.ampD = g(ppi::ampD);  settings.ampS = g(ppi::ampS);  settings.ampR = g(ppi::ampR);
-    settings.filterEnvAmt = g(ppi::fEnv);
-    settings.fltA = g(ppi::fltA);  settings.fltD = g(ppi::fltD);  settings.fltS = g(ppi::fltS);  settings.fltR = g(ppi::fltR);
+    settings.filterType = juce::jlimit(0, (int) filterChoices().size() - 1, (int) g(ppi::fType));   // the filter's type is a choice: not modulated
+    settings.cutoffHz   = out[D_cutoff];
+    settings.resonance  = out[D_res];
+    settings.pitchSemi  = out[D_pitch];   settings.fineCents = out[D_fine];   settings.pan = out[D_pan];
+    settings.ampA = out[D_ampA];  settings.ampD = out[D_ampD];  settings.ampS = out[D_ampS];  settings.ampR = out[D_ampR];
+    settings.filterEnvAmt = out[D_filterEnv];
+    settings.fltA = out[D_fltA];  settings.fltD = out[D_fltD];  settings.fltS = out[D_fltS];  settings.fltR = out[D_fltR];
 
     insertCfg.insertAlgo     = (int) g(ppi::drvChar);
     insertCfg.insertParam[0] = out[D_insP1];
