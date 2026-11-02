@@ -22,6 +22,7 @@ namespace ppi
         pSemi, pFine, pPan,                                        // the layer's pitch and pan (3)
         ampA, ampD, ampS, ampR,                                    // the layer's amp envelope (4)
         fEnv, fltA, fltD, fltS, fltR,                              // the layer's filter envelope: amount, then A D S R (5)
+        tmix,                                                      // tempo match: pitch follows the tempo (0) .. pure time-stretch (1)
         COUNT
     };
     inline constexpr const char* const suffix[COUNT] = {
@@ -33,11 +34,12 @@ namespace ppi
         "pSemi", "pFine", "pPan",
         "ampA", "ampD", "ampS", "ampR",
         "fEnv", "fltA", "fltD", "fltS", "fltR",
+        "tmix",
     };
 }
 
 inline constexpr int kNumPhraseParams = ppi::COUNT;
-static_assert(kNumPhraseParams == 35, "a new row goes into ppi, suffix[] and addLayerParams together");
+static_assert(kNumPhraseParams == 36, "a new row goes into ppi, suffix[] and addLayerParams together");
 
 // "p{N}_": the prefix of every parameter of Phrase slot N.
 inline juce::String layerParamPrefix(int slot) { return "p" + juce::String(slot) + "_"; }
@@ -46,7 +48,7 @@ inline juce::String layerParamPrefix(int slot) { return "p" + juce::String(slot)
 inline constexpr const char* kPhrasePresetTag = "MuTilateLayer";
 
 // Choice rows: the order here is the saved index.
-inline const juce::StringArray& tempoModeNames()  { static const juce::StringArray n { "Off", "Re-pitch", "Stretch" }; return n; }
+inline const juce::StringArray& tempoModeNames()  { static const juce::StringArray n { "Off", "Match" }; return n; }
 inline const juce::StringArray& gridNames()       { static const juce::StringArray n { "Off", "1/4", "1/8", "1/16", "1/32", "1/4T", "1/8T", "1/16T", "1/32T" }; return n; }
 inline const juce::StringArray& windowNames()     { static const juce::StringArray n { "Short", "Default" }; return n; }
 inline const juce::StringArray& filterTypeNames()

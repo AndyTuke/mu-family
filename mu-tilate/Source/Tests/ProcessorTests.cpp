@@ -248,7 +248,7 @@ struct ProcessorTests : public juce::UnitTest
                     auto* prm = p.apvts.getParameter(layerParamPrefix(0) + ppi::suffix[row]);
                     prm->setValueNotifyingHost(prm->convertTo0to1(v));
                 };
-                set(ppi::mode, (float) mode);
+                set(ppi::mode, mode == 0 ? 0.0f : 1.0f); set(ppi::tmix, mode == 1 ? 0.0f : 1.0f);
                 set(ppi::ltempo, (float) loopTempo);
                 p.loadLoopAsync(0, juce::File(demoLoop));
                 pumpUntil([&] { return p.getPhrase(0).getData() != nullptr && p.getPhrase(0).getData()->slices.size() > 0; }, 30000);

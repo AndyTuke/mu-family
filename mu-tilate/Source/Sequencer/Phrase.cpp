@@ -184,7 +184,8 @@ void Phrase::readParams(double modBeat) noexcept
     for (int k = 0; k < kNumModDests; ++k)
         modLive.v[(size_t) k].store(out[k], std::memory_order_relaxed);
 
-    settings.mode      = (TempoMode) juce::jlimit(0, 2, (int) g(ppi::mode));   // not modulated
+    settings.mode      = (TempoMode) juce::jlimit(0, 1, (int) g(ppi::mode));   // not modulated
+    settings.stretchMix = g(ppi::tmix);                                        // not modulated
     settings.loopTempo = (double) g(ppi::ltempo);                              // not modulated
     settings.holdMs    = out[D_hold];
     settings.strength  = out[D_strength];

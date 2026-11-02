@@ -15,7 +15,8 @@
 namespace mu_tilate
 {
 
-enum class TempoMode { Off, Repitch, Stretch };
+// Match: the loop is timed to the project tempo; stretchMix sets how (see PhraseSettings).
+enum class TempoMode { Off, Match };
 
 // The loop and its edits, read-only here (the layer swaps them in at a loop boundary).
 struct PhraseLoop
@@ -29,7 +30,8 @@ struct PhraseLoop
 
 struct PhraseSettings
 {
-    TempoMode mode      = TempoMode::Off;
+    TempoMode mode      = TempoMode::Match;
+    float     stretchMix = 1.0f;   // Match: 0 = pure re-pitch (the pitch follows the tempo), 1 = pure time-stretch (the pitch stays)
     double    loopTempo = 120.0;   // the loop's own tempo in BPM (Set override, metadata or analysis)
     float     holdMs    = 10.0f;   // Stretch: Transient hold
     float     strength  = 1.0f;    // Stretch: Strength

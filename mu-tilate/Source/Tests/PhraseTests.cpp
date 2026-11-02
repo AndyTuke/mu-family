@@ -239,7 +239,7 @@ struct PhraseTests : public juce::UnitTest
             auto make = [](Rig& r)
             {
                 for (int i = 0; i < 24000; ++i) r.audio.setSample(0, i, 0.5f * std::sin(2.0f * juce::MathConstants<float>::pi * 440.0f * (float) i / (float) kSr));
-                r.settings.mode = TempoMode::Stretch; r.settings.loopTempo = 120.0; r.settings.holdMs = 10.0f;
+                r.settings.mode = TempoMode::Match; r.settings.stretchMix = 1.0f; r.settings.loopTempo = 120.0; r.settings.holdMs = 10.0f;
                 r.timeline.place(0, 0.0, 0.0);
             };
             Rig a, b;
@@ -364,7 +364,7 @@ struct PhraseTests : public juce::UnitTest
         beginTest("Re-pitch at twice the loop tempo plays the slice in half the time");
         {
             Rig r;
-            r.settings.mode = TempoMode::Repitch; r.settings.loopTempo = 120.0;
+            r.settings.mode = TempoMode::Match; r.settings.stretchMix = 0.0f; r.settings.loopTempo = 120.0;
             r.timeline.place(0, 0.0, 0.0);
             auto out = r.run(24000, 128, 0.0, 240.0);
             expectWithinAbsoluteError(out.getSample(0, 5000), 0.1f, 1.0e-4f);          // slice length 12000 at rate 2
@@ -375,7 +375,7 @@ struct PhraseTests : public juce::UnitTest
         beginTest("Stretch at 100 BPM for a 120 BPM loop makes the slice 1.2 times as long");
         {
             Rig r;
-            r.settings.mode = TempoMode::Stretch; r.settings.loopTempo = 120.0;
+            r.settings.mode = TempoMode::Match; r.settings.stretchMix = 1.0f; r.settings.loopTempo = 120.0;
             r.timeline.place(0, 0.0, 0.0);
             auto out = r.run(40000, 128, 0.0, 100.0);
             expectGreaterThan(rms(out, 28000, 500), 0.05);                              // total 28800
@@ -449,7 +449,7 @@ struct PhraseTests : public juce::UnitTest
         beginTest("a Stretch phrase renders without touching the heap");
         {
             Rig r;
-            r.settings.mode = TempoMode::Stretch; r.settings.loopTempo = 120.0;
+            r.settings.mode = TempoMode::Match; r.settings.stretchMix = 1.0f; r.settings.loopTempo = 120.0;
             r.timeline.place(0, 0.0, 0.0); r.timeline.place(1, 1.0, 0.0); r.timeline.place(2, 2.0, 0.0);
             r.run(512, 128, 0.0, 100.0);                                // warm-up of the first block
             juce::AudioBuffer<float> out(1, 96000);

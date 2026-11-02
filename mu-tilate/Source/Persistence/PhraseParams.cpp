@@ -25,7 +25,8 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     };
 
     // Playback: the tempo mode and the loop's tempo, the stretch's hold and strength, the slice fades and the level.
-    addC(ppi::mode,     "Tempo Mode",     tempoModeNames(), 0);
+    addC(ppi::mode,     "Tempo Match",    tempoModeNames(), 1);
+    addF(ppi::tmix,     "Pitch / Stretch", 0.0f, 1.0f, 1.0f);
     addF(ppi::ltempo,   "Loop Tempo",     20.0f, 300.0f, 120.0f);
     addF(ppi::hold,     "Transient Hold", 0.0f, 100.0f, 10.0f, 15.0f);
     addF(ppi::strength, "Strength",       0.0f, 1.0f, 1.0f);

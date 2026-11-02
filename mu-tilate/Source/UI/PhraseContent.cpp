@@ -88,6 +88,7 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
 
     // The layer's sound strip.
     addKnob(ppi::ltempo,   "Tempo",  LF::knobEuclidean,  "Loop Tempo: the tempo the loop was recorded at", bpm);
+    addKnob(ppi::tmix,     "Pitch/Str", LF::knobPostPad, "Tempo match: 0 % lets the pitch follow the tempo, 100 % time-stretches and keeps the pitch", mu_fmt::Unit::Percent01);
     addKnob(ppi::hold,     "Hold",   LF::knobPostPad,    "Transient Hold: how long each slice's attack plays unstretched", mu_fmt::Unit::Ms);
     addKnob(ppi::strength, "Str",    LF::knobPostPad,    "Strength: how much of the stretch is applied after the attack", mu_fmt::Unit::Percent01);
 
@@ -405,7 +406,7 @@ void PhraseContent::updateView()
     for (auto& k : knobs)
     {
         if (k.row >= ppi::dsens && k.row <= ppi::dhigh) k.comp->setVisible(sliceView);
-        else if (k.row == ppi::ltempo || k.row == ppi::hold || k.row == ppi::strength) k.comp->setVisible(layerView);
+        else if (k.row == ppi::ltempo || k.row == ppi::tmix || k.row == ppi::hold || k.row == ppi::strength) k.comp->setVisible(layerView);
     }
     modeBox.setVisible(layerView);
     layerBand.setVisible(layerView);
@@ -654,14 +655,14 @@ void PhraseContent::resized()
 
     if (layerViewShown())
     {
-        // Layer: the sound strip (tempo mode, tempo, hold, strength) in its own panel, then the voice band: Pitch | Filter | Amp | Effects.
-        const int soundW = pad * 3 + boxW + 3 * cellW;
+        // Layer: the sound strip (tempo match, tempo, pitch/stretch, hold, strength) in its own panel, then the voice band: Pitch | Filter | Amp | Effects.
+        const int soundW = pad * 3 + boxW + 4 * cellW;
         const juce::Rectangle<int> soundBox(area.getX() + s(VoiceBand::kLeftGap), area.getY() + plate, soundW, cellH + pad * 2);
         sections.push_back({ soundBox, "LAYER SOUND" });
         auto r = soundBox.reduced(pad, pad);
         modeBox.setBounds(r.removeFromLeft(boxW).withSizeKeepingCentre(boxW, s(kStatusH)));
         r.removeFromLeft(pad);
-        for (int row : { (int) ppi::ltempo, (int) ppi::hold, (int) ppi::strength })
+        for (int row : { (int) ppi::ltempo, (int) ppi::tmix, (int) ppi::hold, (int) ppi::strength })
             knobOf(row).setBounds(r.removeFromLeft(cellW).withHeight(cellH));
         layerBand.setBounds(area.getX(), soundBox.getBottom() + pad, s(VoiceBand::kEffectsX + VoiceBand::kEffectsW), s(VoiceBand::kHeight));
         slicePanel.setBounds({});

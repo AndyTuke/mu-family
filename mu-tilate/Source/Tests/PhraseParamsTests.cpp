@@ -35,10 +35,10 @@ struct PhraseParamsTests : public juce::UnitTest
             expectEquals(n, 2 * kNumPhraseParams);
         }
 
-        beginTest("defaults: Off, 120 BPM, a 10 ms hold at full strength, 1/16 grid");
+        beginTest("defaults: tempo match on, 120 BPM, a 10 ms hold at full strength, 1/16 grid");
         {
             auto get = [&](int row) { return apvts.getParameter(layerParamPrefix(0) + ppi::suffix[row]); };
-            expectEquals(get(ppi::mode)->getValue(), get(ppi::mode)->convertTo0to1(0.0f));
+            expectEquals(get(ppi::mode)->getValue(), get(ppi::mode)->convertTo0to1(1.0f));
             expectWithinAbsoluteError(get(ppi::ltempo)->convertFrom0to1(get(ppi::ltempo)->getDefaultValue()), 120.0f, 1.0e-3f);
             expectWithinAbsoluteError(get(ppi::hold)->convertFrom0to1(get(ppi::hold)->getDefaultValue()), 10.0f, 1.0e-3f);
             expectWithinAbsoluteError(get(ppi::strength)->convertFrom0to1(get(ppi::strength)->getDefaultValue()), 1.0f, 1.0e-6f);

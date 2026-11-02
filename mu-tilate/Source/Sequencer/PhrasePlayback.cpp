@@ -80,10 +80,19 @@ SliceParams PhrasePlayback::paramsFor(const PhraseLoop& loop, const PhraseSettin
     const double rateFromFile = loop.fileSampleRate / c.sampleRate;
     const double tempoRatio   = (s.loopTempo > 0.0 && c.bpm > 0.0) ? c.bpm / s.loopTempo : 1.0;   // project speed / loop speed
     p.rate = (float) rateFromFile;
-    if (s.mode == TempoMode::Repitch)
-        p.rate = (float) (rateFromFile * tempoRatio);
-    else if (s.mode == TempoMode::Stretch && std::abs(rateFromFile - 1.0) < 1.0e-6)   // the stretcher needs the file at the host rate
-        p.timeRatio = (float) (1.0 / tempoRatio);
+    if (s.mode == TempoMode::Match && std::abs(tempoRatio - 1.0) > 1.0e-9)
+    {
+        // The stretcher keeps the slice in time; the pitch share (1 - stretchMix) is its transposition, so the mix only moves the pitch.
+        // Pure re-pitch (or a file not at the host rate, which the stretcher cannot take) is a plain rate change.
+        const double mix = juce::jlimit(0.0, 1.0, (double) s.stretchMix);
+        if (mix < 1.0e-3 || std::abs(rateFromFile - 1.0) > 1.0e-6)
+            p.rate = (float) (rateFromFile * tempoRatio);
+        else
+        {
+            p.timeRatio = (float) (1.0 / tempoRatio);
+            p.own.pitchSemi += (float) (12.0 * std::log2(tempoRatio) * (1.0 - mix));
+        }
+    }
 
     range = loop.slices->slice(b.slice);
     if (loop.sliceScale != 1.0)
