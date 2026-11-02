@@ -270,13 +270,13 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     lengthCaption.setJustificationType(juce::Justification::centredRight);
     lengthCaption.setColour(juce::Label::textColourId, LF::colour(LF::labelText));
     addAndMakeVisible(lengthCaption);
-    lengthBox.setEditable(true);
-    lengthBox.setJustificationType(juce::Justification::centred);
-    lengthBox.setColour(juce::Label::backgroundColourId, LF::colour(LF::lfoEditorBackground));
-    lengthBox.setColour(juce::Label::textColourId, LF::colour(LF::labelText));
-    lengthBox.setTooltip("Sequence length: type bars, beats or a note value, e.g. 2 bars, 6 beats, 3/4");
-    lengthBox.onTextChange = [this] { applyLength(lengthBox.getText()); };
-    addAndMakeVisible(lengthBox);
+    for (auto* n : { &barsInput, &beatsInput })
+    {
+        n->setShowStepButtons(false);
+        n->setLabelInline(true);
+        n->onChange = [this](int) { applyLength(); };
+        addAndMakeVisible(*n);
+    }
     for (int i = 0; i < gridNames().size(); ++i) gridBox.addItem(gridNames()[i], i + 1);
     gridBox.getComboBox().setTooltip("Snap: the grid hits and their edges snap to (Shift while dragging is free)");
     addAndMakeVisible(gridBox);
@@ -363,21 +363,17 @@ void PhraseContent::placeSliceAt(int slice, double beat)
     updateToolbar();
 }
 
-// The length box: bars, beats or a note value. A bare number is in the unit the box was showing.
-void PhraseContent::applyLength(const juce::String& text)
+// The Bars and Beats toggles set the length: bars * 4 + beats, at least one beat.
+void PhraseContent::applyLength()
 {
     const auto d = host.getPhrase(currentLayer).getData();
-    const double current = d != nullptr ? d->timeline.lengthBeats() : 16.0;
-    const bool wholeBars = std::abs(current / 4.0 - std::round(current / 4.0)) < 1.0e-6;
-    const auto beats = parseLengthBeats(text, wholeBars ? 4.0 : 1.0);
-    if (beats.has_value() && d != nullptr && d->audio != nullptr)
+    if (d != nullptr && d->audio != nullptr)
     {
-        const double value = juce::jlimit(Timeline::kMinLengthBeats, Timeline::kMaxLengthBeats, *beats);
+        const double value = juce::jlimit(Timeline::kMinLengthBeats, Timeline::kMaxLengthBeats,
+                                          (double) barsInput.getValue() * 4.0 + (double) beatsInput.getValue());
         editSlices([value](SliceList&, Timeline& t) { t.setLengthBeats(value); });
         if (onStatusUpdate) onStatusUpdate("Sequence Length", formatLengthBeats(value));
     }
-    else if (onStatusUpdate)
-        onStatusUpdate("Sequence Length", "not understood: type bars, beats or a note value, e.g. 2 bars, 6 beats, 3/4");
     shownLengthBeats = -1.0;   // show what the timeline has, whatever was typed
     refreshViews(true);
     updateToolbar();
@@ -389,10 +385,12 @@ void PhraseContent::updateToolbar()
     const auto d = host.getPhrase(currentLayer).getData();
     clearButton.setEnabled(d != nullptr && d->timeline.size() > 0);
     layOutButton.setEnabled(d != nullptr && d->audio != nullptr && d->slices.size() > 0);
-    if (d != nullptr && d->timeline.lengthBeats() != shownLengthBeats && ! lengthBox.isBeingEdited())
+    if (d != nullptr && d->timeline.lengthBeats() != shownLengthBeats)
     {
         shownLengthBeats = d->timeline.lengthBeats();
-        lengthBox.setText(formatLengthBeats(shownLengthBeats), juce::dontSendNotification);
+        const int whole = (int) std::lround(shownLengthBeats);
+        barsInput.setValue(whole / 4);
+        beatsInput.setValue(whole % 4);
     }
 }
 
@@ -415,7 +413,7 @@ void PhraseContent::updateView()
     slicePanel.setVisible(sliceView);
     waveform.setVisible(! layerView);
     timelineView.setVisible(! layerView);
-    for (auto* c : std::initializer_list<juce::Component*> { &lengthCaption, &lengthBox, &gridBox, &layOutButton, &deleteButton, &clearButton,
+    for (auto* c : std::initializer_list<juce::Component*> { &lengthCaption, &barsInput, &beatsInput, &gridBox, &layOutButton, &deleteButton, &clearButton,
                                                               &waveFitButton, &tlOutButton, &tlInButton, &tlFitButton })
         c->setVisible(sequencer);
     if (sliceView) refreshSlicePanel(true);
@@ -634,7 +632,8 @@ void PhraseContent::resized()
         place(waveFitButton, 84);
         bar.removeFromLeft(s(LF::kSpaceS) * 2);
         place(lengthCaption, 52);
-        place(lengthBox, 90);
+        place(barsInput, 78);
+        place(beatsInput, 78);
         place(gridBox, 78);
         place(layOutButton, 72);
         place(deleteButton, 82);

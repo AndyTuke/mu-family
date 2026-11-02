@@ -6,6 +6,7 @@
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/LoopWaveform.h"
 #include "UI/Components/MuLookAndFeel.h"
+#include "UI/Components/NudgeInput.h"
 #include "UI/Components/SegmentControl.h"
 #include "UI/Voice/InsertSubsection.h"   // mu-core: the shared per-layer insert panel
 #include "UI/Voice/VoiceBand.h"          // mu-core: the shared Pitch | Filter | Amp | Effects band
@@ -79,7 +80,7 @@ private:
     void refreshSlicePanel(bool force);           // shows the selected hit's (else the selected slice's) settings in the slice panel
     void selectRegion(int slice);                 // selects a slice (-1 for none) in the waveform; no hit is selected then
     void placeSliceAt(int slice, double beat);    // a hit of `slice` at `beat`, starting with the slice's settings, and selects it
-    void applyLength(const juce::String& text);   // the length box: parses it and sets the timeline length
+    void applyLength();   // the Bars and Beats toggles: sets the timeline length from them
     void updateToolbar();                         // enables Delete for a selected hit, shows the current length
     void followLayerChoices();                    // tells the slice panel which filter type and insert effect the layer has
     bool layerViewShown() const noexcept { return viewSwitch.getSelectedIndex() == 1; }
@@ -117,7 +118,8 @@ private:
 
     // The Sequencer's toolbar over the timeline.
     juce::Label      lengthCaption { {}, "Length" };
-    juce::Label      lengthBox;                   // editable: "2 bars", "6 beats", "3/4"
+    NudgeInput       barsInput  { "Bars", 0, 64, 4 };   // the sequence length: whole bars plus extra beats
+    NudgeInput       beatsInput { "Beats", 0, 3, 0 };
     DropdownSelect   gridBox;                     // the snap grid
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> gridAtt;
     juce::TextButton deleteButton { "Delete hit" }, clearButton { "Clear" }, layOutButton { "Lay out" };
