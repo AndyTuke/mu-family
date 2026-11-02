@@ -66,7 +66,7 @@ public:
                 "xmod_phaseMode","xmod_index","sync","xmod_fdbk","xmod_ampMode","xmod_depth","xmod_ssb",
                 "o1_lvl","o2_lvl","noise_lvl","noise_type",
                 "flt_type","flt_cut","flt_res","level","gate_gap","gate_bypass",
-                "drvChar","insP1","insP2","insP3","insP4",
+                "drvChar","insP1","insP2","insP3","insP4","insSync",
             };
             for (int v = 0; v < mu_limits::kMaxLayers; ++v)
                 for (const char* b : base)

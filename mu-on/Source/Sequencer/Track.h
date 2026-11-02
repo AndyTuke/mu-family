@@ -174,7 +174,7 @@ private:
     // The track's insert effect (the shared InsertProcessor, as a mixer bus insert): algorithm and four generic knobs,
     // run on the engine's block after it renders. Algorithm 0 (None) skips it.
     InsertProcessor insert;
-    mu_core::ParamBinding insAlgoRow, insParamRow[VoiceParams::kInsertSlotCount];
+    mu_core::ParamBinding insAlgoRow, insSyncRow, insParamRow[VoiceParams::kInsertSlotCount];
     // The layer's Probability (percent, multiplies each step's own) and the audio thread's noise for the draw.
     mu_core::ParamBinding probRow;
     float                 lastLevel = 1.0f;   // the Level the previous block ended at (the gain ramps from it)

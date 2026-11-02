@@ -171,6 +171,7 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("insP2"), 1}, label("Insert P2"), f(0.0f, 1.0f, 0.0f), 0.0f));
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("insP3"), 1}, label("Insert P3"), f(0.0f, 1.0f, 0.0f), 0.0f));
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("insP4"), 1}, label("Insert P4"), f(0.0f, 1.0f, 0.0f), 0.0f));
+    layout.add(std::make_unique<AudioParameterBool> (ParameterID{id("insSync"), 1}, label("Insert Sync"), false));
 }
 
 } // namespace mu_tant

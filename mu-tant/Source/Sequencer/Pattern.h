@@ -213,7 +213,7 @@ private:
         mu_core::ParamBinding fltType, fltCut, fltRes, fltEnvDepth, fltDrv, fltLoCut;
         mu_core::ParamBinding flt2Type, flt2Cut, flt2Res, flt2EnvDepth, flt2Drv, flt2LoCut, fltSeries;
         mu_core::ParamBinding o1PenvDepth, o2PenvDepth, level, gateGap, gateBypass;
-        mu_core::ParamBinding drvChar, insP1, insP2, insP3, insP4;
+        mu_core::ParamBinding drvChar, insSync, insP1, insP2, insP3, insP4;
         mu_core::ParamBinding root, scale;
     } rows;
 
@@ -250,7 +250,7 @@ private:
     bool inputSeeded = false;   // message thread: notes reflect every block since the processor started
 
     // The retire snapshot: the OLD unmodulated config and the insert, frozen by beginRetire.
-    struct PatternRetire { VoiceConfig config; int insAlgo = 0; std::array<float, 4> insP {}; };
+    struct PatternRetire { VoiceConfig config; int insAlgo = 0; bool insSync = false; std::array<float, 4> insP {}; };
     mu_core::RetireSnapshot<PatternRetire> retireSnap;
     juce::AudioBuffer<float> tailScratch;   // a tail that must add rather than write renders here (sized at prepare)
 

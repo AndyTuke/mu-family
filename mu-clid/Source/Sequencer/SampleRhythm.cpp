@@ -65,7 +65,10 @@ void SampleRhythm::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<f
 
     // Phase 2, every call: the voice into this call's frames.
     if (voice != nullptr)
+    {
+        voice->setTempo(ctx.bpm);   // for a tempo-synced insert
         voice->process(out, n);
+    }
 }
 
 void SampleRhythm::publishPlayState(int step, int accentStep, int patternLength, float frac, bool fired) noexcept

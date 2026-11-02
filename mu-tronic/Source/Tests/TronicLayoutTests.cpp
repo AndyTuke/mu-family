@@ -174,7 +174,7 @@ struct MuTronicLayoutTests : juce::UnitTest
             logMessage("real mu-Tronic layout: " + juce::String(count) + " parameters, whole processor built in " + juce::String(ms, 1)
                        + " ms, about " + juce::String((memAfter - memBefore) / 1024) + " KiB of private memory");
             expect(ms < 1000.0, "building the real processor took " + juce::String(ms, 1) + " ms");
-            // 63 Arp rows, 44 Track rows (the t{N}_ table the six mu-On types share), the Pattern's rows and the Rhythm's
+            // 64 Arp rows, 44 Track rows (the t{N}_ table the six mu-On types share), the Pattern's rows and the Rhythm's
             // rows in each of the sixteen slots, plus the mixer, FX, bus and global parameters (well under 400).
             int patternRows = 0, rhythmRows = 0;
             for (auto* raw : p->getParameters())
@@ -183,7 +183,7 @@ struct MuTronicLayoutTests : juce::UnitTest
                     if (withId->getParameterID().startsWith("v0_")) ++patternRows;
                     if (withId->getParameterID().startsWith("r0_")) ++rhythmRows;
                 }
-            const int kRowsPerSlot = 63 + 97 + patternRows + rhythmRows;
+            const int kRowsPerSlot = 64 + 98 + patternRows + rhythmRows;
             expect(rhythmRows > 0, "the Rhythm's rows are declared");
             expect(count >= 16 * kRowsPerSlot && count < 16 * kRowsPerSlot + 400, "the Arp, Track, Pattern and Rhythm rows of all sixteen slots are in the layout, and no more");
             p->flushPendingAsyncUpdates();

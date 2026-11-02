@@ -137,6 +137,7 @@ void Arp::readParams(double modBeat) noexcept
     insertCfg.insertParam[1] = out[D_insP2];
     insertCfg.insertParam[2] = out[D_insP3];
     insertCfg.insertParam[3] = out[D_insP4];
+    insertCfg.insertSync     = g(vpi::insSync) > 0.5f;
 
     runner.setAccent(accent);
     runner.setArp(ap);
@@ -157,6 +158,7 @@ void Arp::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& ou
     context.startBeat      = ctx.startBeat;
     context.beatsPerSample = ctx.beatsPerSample;
 
+    insert->setTempo(ctx.bpm);   // for a tempo-synced insert
     readParams(ctx.startBeat);   // the control-sequence playhead runs on the call's beat
     renderBlock(out, n);
 }

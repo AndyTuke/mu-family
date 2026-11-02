@@ -22,7 +22,7 @@ namespace vpi
         xmPh, xmIdx, sync, xmFb, xmAm, xmDep, xmSsb,                                              // cross-mod (7)
         noise, ntype, ft, cut, res, drv, locut,                                                  // noise + filter (7)
         aeA, aeD, aeS, aeR, aeL, feA, feD, feS, feR, feDep, peA, peD, peS, peR, peDep, ptgt,      // envs (16)
-        drvChar, insP1, insP2, insP3, insP4,                                                     // insert (5)
+        drvChar, insP1, insP2, insP3, insP4, insSync,                                            // insert (6)
         acc, accLen, accPat, stepMask,                                                           // accent + step pattern (4)
         COUNT
     };
@@ -32,14 +32,14 @@ namespace vpi
         "xmod_phaseMode","xmod_index","sync","xmod_fdbk","xmod_ampMode","xmod_depth","xmod_ssb",
         "noise","ntype","ft","cut","res","drv","locut",
         "aeA","aeD","aeS","aeR","aeL","feA","feD","feS","feR","feDep","peA","peD","peS","peR","peDep","ptgt",
-        "drvChar","insP1","insP2","insP3","insP4",
+        "drvChar","insP1","insP2","insP3","insP4","insSync",
         "acc","accLen","accPat","stepMask",
     };
 }
 
 // Rows per layer slot.
 inline constexpr int kNumVoiceParams = vpi::COUNT;
-static_assert(kNumVoiceParams == 63, "a new row goes into vpi, suffix[] and addLayerParams together");
+static_assert(kNumVoiceParams == 64, "a new row goes into vpi, suffix[] and addLayerParams together");
 
 // The id of mu-Toni's MIDI-in channel parameter (0 = Omni, 1..16 = that channel).
 inline constexpr const char* kMidiInChannelParamId = "midiInCh";

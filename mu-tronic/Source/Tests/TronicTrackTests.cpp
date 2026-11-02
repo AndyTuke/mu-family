@@ -215,7 +215,7 @@ struct MuTronicTrackTests : juce::UnitTest
         mu_seam_test::setParam(p.apvts, "t3_swing", 0.6f);
 
         auto state = p.captureState();
-        expectEquals(rowCount(mu_pp::findLayerNode(state, 1)), 63, "the Arp slot saves its 63 rows");
+        expectEquals(rowCount(mu_pp::findLayerNode(state, 1)), 64, "the Arp slot saves its 64 rows");
         const int tRows = paramsWithPrefix(p, "t2_");
         expectEquals(rowCount(mu_pp::findLayerNode(state, 2)), tRows);
         expectEquals(rowCount(mu_pp::findLayerNode(state, 3)), tRows);

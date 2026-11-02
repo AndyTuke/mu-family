@@ -81,7 +81,7 @@ struct MuTronicArpTests : juce::UnitTest
 
     void layoutAndRegistry()
     {
-        beginTest("the Arp type is offered, and its 63 rows exist under a{N}_ for all sixteen slots");
+        beginTest("the Arp type is offered, and its 64 rows exist under a{N}_ for all sixteen slots");
         mu_seam_test::TempStorage storage;
         ArpProcessor p;
         expectEquals(p.getLayerTypes().size(), 10);
@@ -99,10 +99,10 @@ struct MuTronicArpTests : juce::UnitTest
         for (auto* raw : p.getParameters())
             if (auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*>(raw))
                 if (withId->getParameterID().startsWith("a3_")) ++arpRows;
-        expectEquals(arpRows, 63);
+        expectEquals(arpRows, 64);
     }
 
-    // A slot's node holds the rows of its live type only: an Arp slot's 63, an Empty slot's none, and a parameter
+    // A slot's node holds the rows of its live type only: an Arp slot's 64, an Empty slot's none, and a parameter
     // of a dormant prefix, even when changed, never reaches the file.
     void savedState()
     {
@@ -114,7 +114,7 @@ struct MuTronicArpTests : juce::UnitTest
         setPlain(p.apvts, "a7_cut", 900.0f);   // slot 7 is Empty: this prefix is dormant
 
         auto state = p.captureState();
-        expectEquals(rowCount(mu_pp::findLayerNode(state, 3)), 63, "an Arp slot saves its rows");
+        expectEquals(rowCount(mu_pp::findLayerNode(state, 3)), 64, "an Arp slot saves its rows");
         expectEquals(rowCount(mu_pp::findLayerNode(state, 7)), 0, "a dormant prefix is not written");
         expectEquals(rowCount(mu_pp::findLayerNode(state, 0)), 0, "an Empty slot writes no rows");
         bool anyPrefixed = false;
@@ -134,7 +134,7 @@ struct MuTronicArpTests : juce::UnitTest
                                   "the dormant value did not travel");
         auto again = q.captureState();
         expect(again.isEquivalentTo(state), "restoring then capturing reproduces the saved state");
-        expectEquals(rowCount(mu_pp::findLayerNode(again, 3)), 63);
+        expectEquals(rowCount(mu_pp::findLayerNode(again, 3)), 64);
 
         // A hand-made node: rows without a prefix, applied under the prefix of the type the node names.
         auto hand = p.captureState();

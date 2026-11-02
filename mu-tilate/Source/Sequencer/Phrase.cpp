@@ -283,6 +283,7 @@ void Phrase::readParams(double modBeat) noexcept
     insertCfg.insertParam[1] = out[D_insP2];
     insertCfg.insertParam[2] = out[D_insP3];
     insertCfg.insertParam[3] = out[D_insP4];
+    insertCfg.insertSync     = g(ppi::insSync) > 0.5f;
 }
 
 void Phrase::renderBlock(const PhraseData* d, PhraseClock clock, juce::AudioBuffer<float>& buf, int n) noexcept
@@ -327,6 +328,7 @@ void Phrase::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>&
     clock.beatsPerSample = ctx.beatsPerSample;
     clock.bpm            = ctx.bpm;
     clock.sampleRate     = ctx.sampleRate;
+    insert->setTempo(ctx.bpm);
     renderBlock(d, clock, out, n);
     mu_core::spinUnlock(dataLock);
     preview.mixInto(out, n);   // an audition sounds with the layer, after its insert, with or without the transport

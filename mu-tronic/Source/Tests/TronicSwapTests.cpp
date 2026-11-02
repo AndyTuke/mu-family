@@ -203,7 +203,7 @@ struct MuTronicSwapTests : juce::UnitTest
                "slot 1 saves the Kick's rows only");
         expect(rowIds(mu_pp::findLayerNode(state, 2)).contains("cut") && ! rowIds(mu_pp::findLayerNode(state, 2)).contains("swing"),
                "slot 2 saves the Arp's rows only");
-        expect(tRows > 0 && rowCount(mu_pp::findLayerNode(state, 2)) == 63);
+        expect(tRows > 0 && rowCount(mu_pp::findLayerNode(state, 2)) == 64);
 
         juce::MemoryBlock block;
         p.getStateInformation(block);

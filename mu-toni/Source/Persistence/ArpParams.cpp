@@ -119,6 +119,7 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     layout.add(std::make_unique<AudioParameterFloat>(pid("insP2"), lbl("Insert P2"), f(0.0f, 1.0f, 0.0f), 0.0f));
     layout.add(std::make_unique<AudioParameterFloat>(pid("insP3"), lbl("Insert P3"), f(0.0f, 1.0f, 0.0f), 0.0f));
     layout.add(std::make_unique<AudioParameterFloat>(pid("insP4"), lbl("Insert P4"), f(0.0f, 1.0f, 0.0f), 0.0f));
+    layout.add(std::make_unique<AudioParameterBool> (pid("insSync"), lbl("Insert Sync"), false));
 }
 
 void addArpGlobalParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout)

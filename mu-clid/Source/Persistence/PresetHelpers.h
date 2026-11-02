@@ -76,9 +76,11 @@ inline const GlobalParamDef kGlobalParamDefs[] = {
     // named master-insert fields. Single algo selector + algo-aware UI.
     { "mst_insChar",   ParamKind::AlgorithmIndex, mu_audio::kInsertAlgorithmNames },
     { "mst_insP1" }, { "mst_insP2" }, { "mst_insP3" }, { "mst_insP4" },
+    { "mst_insSync",   ParamKind::Bool   },
     // ── Master insert 2 ─────────────────────────────────────────────────
     { "mst_ins2Char",  ParamKind::AlgorithmIndex, mu_audio::kInsertAlgorithmNames },
     { "mst_ins2P1" }, { "mst_ins2P2" }, { "mst_ins2P3" }, { "mst_ins2P4" },
+    { "mst_ins2Sync",  ParamKind::Bool   },
 };
 
 inline constexpr int kGlobalParamDefCount = (int)(sizeof(kGlobalParamDefs) / sizeof(kGlobalParamDefs[0]));

@@ -153,6 +153,7 @@ void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
     rootRow     = mu_core::ParamBinding(apvts.getRawParameterValue(kRootParamId), this);    // global; null where the host has none
     scaleRow    = mu_core::ParamBinding(apvts.getRawParameterValue(kScaleParamId), this);
     insAlgoRow  = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "drvChar")), this);
+    insSyncRow  = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "insSync")), this);
     for (int k = 0; k < VoiceParams::kInsertSlotCount; ++k)
         insParamRow[k] = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "insP" + juce::String(k + 1))), this);
     probRow     = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "prob")), this);
@@ -459,7 +460,9 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
     {
         VoiceParams vp;
         vp.insertAlgo = algo;
+        vp.insertSync = insSyncRow.load(0.0f) > 0.5f;
         for (int k = 0; k < VoiceParams::kInsertSlotCount; ++k) vp.insertParam[k] = insertNow[k];
+        insert.setTempo(ctx.bpm);
         insert.process(out, n, juce::jmin(2, out.getNumChannels()), vp);
     }
 

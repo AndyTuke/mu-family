@@ -109,6 +109,7 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     addF(p+"insP2",   n+"Insert P2",   0.0f, 1.0f, 0.0f);
     addF(p+"insP3",   n+"Insert P3",   0.0f, 1.0f, 0.0f);
     addF(p+"insP4",   n+"Insert P4",   0.0f, 1.0f, 0.0f);
+    layout.add(std::make_unique<juce::AudioParameterBool>(p+"insSync", n+"Insert Sync", false));
     // Output mode (0 Sample, 1 MIDI) and the MIDI-output settings used in MIDI mode. Velocity and
     // Accent are percentages; Accent has the meaning of mu-Clid MIDI's Accent knob.
     addI(p+"outMode",    n+"Output Mode",   0, 1,   0);

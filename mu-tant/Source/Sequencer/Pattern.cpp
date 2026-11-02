@@ -166,7 +166,7 @@ void Pattern::bindParams(juce::AudioProcessorValueTreeState& apvts, int slot)
     r.flt2Drv = B("flt2_drv"); r.flt2LoCut = B("flt2_lo_cut"); r.fltSeries = B("flt_series");
     r.o1PenvDepth = B("o1_penv_depth"); r.o2PenvDepth = B("o2_penv_depth");
     r.level = B("level"); r.gateGap = B("gate_gap"); r.gateBypass = B("gate_bypass");
-    r.drvChar = B("drvChar"); r.insP1 = B("insP1"); r.insP2 = B("insP2"); r.insP3 = B("insP3"); r.insP4 = B("insP4");
+    r.drvChar = B("drvChar"); r.insSync = B("insSync"); r.insP1 = B("insP1"); r.insP2 = B("insP2"); r.insP3 = B("insP3"); r.insP4 = B("insP4");
     r.root  = mu_core::ParamBinding(apvts.getRawParameterValue(kRootParamId), this);
     r.scale = mu_core::ParamBinding(apvts.getRawParameterValue(kScaleParamId), this);
     jassert(r.o1Oct.isBound() && r.insP4.isBound() && r.root.isBound() && r.scale.isBound());   // an id drift from the layout (debug)
@@ -490,6 +490,8 @@ void Pattern::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>
 
     // The insert with its modulated slot parameters.
     VoiceParams ip;
+    insert->setTempo(ctx.bpm);
+    ip.insertSync     = rows.insSync.load() > 0.5f;
     ip.insertAlgo     = (int) rows.drvChar.load();
     ip.insertParam[0] = insP[0];
     ip.insertParam[1] = insP[1];
@@ -523,6 +525,7 @@ void Pattern::beginRetire()
     auto& s = retireSnap.value;
     s.config  = readConfig();   // the OLD osc + filter, unmodulated
     s.insAlgo = (int) rows.drvChar.load();
+    s.insSync = rows.insSync.load() > 0.5f;
     s.insP    = { juce::jlimit(0.0f, 1.0f, rows.insP1.load()), juce::jlimit(0.0f, 1.0f, rows.insP2.load()),
                   juce::jlimit(0.0f, 1.0f, rows.insP3.load()), juce::jlimit(0.0f, 1.0f, rows.insP4.load()) };
 }
@@ -572,6 +575,7 @@ bool Pattern::renderRetiring(const mu_core::RenderContext& ctx, juce::AudioBuffe
     mu_core::applyLinearFade(buf, frames, rs);
 
     VoiceParams ip;
+    ip.insertSync     = s.insSync;
     ip.insertAlgo     = s.insAlgo;
     ip.insertParam[0] = s.insP[0];
     ip.insertParam[1] = s.insP[1];

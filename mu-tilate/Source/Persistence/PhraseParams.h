@@ -17,7 +17,7 @@ namespace ppi
         mode, ltempo, hold, strength, fadeIn, fadeOut, gain,       // playback (7)
         grid, window,                                              // timeline grid and stretch window (2)
         dmethod, dsens, dgap, dpre, dlow, dhigh,                   // detection (6)
-        drvChar, insP1, insP2, insP3, insP4,                       // insert (5)
+        drvChar, insP1, insP2, insP3, insP4, insSync,              // insert (6)
         fType, fCut, fRes,                                         // the layer's filter (3)
         pSemi, pFine, pPan,                                        // the layer's pitch and pan (3)
         ampA, ampD, ampS, ampR,                                    // the layer's amp envelope (4)
@@ -29,7 +29,7 @@ namespace ppi
         "mode", "ltempo", "hold", "strength", "fadeIn", "fadeOut", "gain",
         "grid", "window",
         "dmethod", "dsens", "dgap", "dpre", "dlow", "dhigh",
-        "drvChar", "insP1", "insP2", "insP3", "insP4",
+        "drvChar", "insP1", "insP2", "insP3", "insP4", "insSync",
         "fType", "fCut", "fRes",
         "pSemi", "pFine", "pPan",
         "ampA", "ampD", "ampS", "ampR",
@@ -39,7 +39,7 @@ namespace ppi
 }
 
 inline constexpr int kNumPhraseParams = ppi::COUNT;
-static_assert(kNumPhraseParams == 36, "a new row goes into ppi, suffix[] and addLayerParams together");
+static_assert(kNumPhraseParams == 37, "a new row goes into ppi, suffix[] and addLayerParams together");
 
 // "p{N}_": the prefix of every parameter of Phrase slot N.
 inline juce::String layerParamPrefix(int slot) { return "p" + juce::String(slot) + "_"; }
