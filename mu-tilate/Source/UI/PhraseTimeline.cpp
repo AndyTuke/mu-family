@@ -343,7 +343,9 @@ void PhraseTimeline::mouseDrag(const juce::MouseEvent& e)
 
     const double grid = e.mods.isShiftDown() ? 0.0 : gridBeats;
     const double target = Timeline::snap(beatAt(e.x) - grabOffset, grid);
-    const double current = timeline.blocks()[(size_t) dragBlock].start;
+    // The block count can change under a drag (a drop splits what it covers), so the start comes from the drag's own record.
+    if (dragOriginIndex < 0 || dragOriginIndex >= dragOrigin.size()) return;
+    const double current = dragMoved ? lastDropStart : dragOrigin.blocks()[(size_t) dragOriginIndex].start;
 
     // Ctrl-drag copies (the original stays where it was). Every step starts again from the timeline as the drag began, so a block
     // dragged across others only overlays them for now; what it covers comes back when it moves on.
@@ -359,6 +361,7 @@ void PhraseTimeline::mouseDrag(const juce::MouseEvent& e)
     {
         dragBlock = movedTo; selected = movedTo;   // the timeline republishes; the block we hold is at its new index
         dragMoved = true;
+        lastDropStart = target;
     }
 }
 

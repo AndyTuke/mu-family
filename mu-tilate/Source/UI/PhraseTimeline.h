@@ -92,6 +92,7 @@ private:
     // Drag state: which block, where in it the pointer grabbed it, and whether it copies.
     int    dragBlock = -1;
     int    dragOriginIndex = -1;
+    double lastDropStart = 0.0;   // where the dragged block was last put (the view's timeline may be a step behind)
     double grabOffset = 0.0;
     bool   dragMoved = false;
     enum class Edge { None, Left, Right };
