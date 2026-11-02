@@ -94,6 +94,7 @@ public:
         if (layer >= 0 && layer < mu_limits::kMaxLayers)
             getPhrase(layer).startPreview((Phrase::PreviewKind) juce::jlimit(0, 2, kind), slice, getInternalBpm());
     }
+    void setPreviewLooping(int layer, bool loop) override { if (layer >= 0 && layer < mu_limits::kMaxLayers) getPhrase(layer).setPreviewLooping(loop); }
     void stopPreview(int layer) override { if (layer >= 0 && layer < mu_limits::kMaxLayers) getPhrase(layer).stopPreview(); }
     void setSourceRegion(int layer, int start, int end) override;
     juce::String getLoopStatus(int layer) const override;

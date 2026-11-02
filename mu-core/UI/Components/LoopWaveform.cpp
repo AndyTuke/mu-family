@@ -173,6 +173,11 @@ void LoopWaveform::mouseDown(const juce::MouseEvent& e)
     }
     if (m > 0) { dragging = m; return; }       // marker 0 is the loop's start: it stays
     const int r = regionAt(sampleAt(e.x));
+    if (e.mods.isRightButtonDown())
+    {
+        if (r >= 0 && onRegionPlayRequested) onRegionPlayRequested(r);
+        return;
+    }
     pressedRegion = r;
     regionDragging = false;
     if (r >= 0 && onRegionClicked) onRegionClicked(r);
@@ -195,7 +200,9 @@ void LoopWaveform::mouseDrag(const juce::MouseEvent& e)
         return;
     }
     if (dragging < 0) return;
-    const int pos = std::clamp(sampleAt(e.x), 1, std::max(1, length() - 1));
+    int pos = sampleAt(e.x);
+    if (snapMarker && ! e.mods.isShiftDown()) pos = snapMarker(pos, samplesPerPixel());
+    pos = std::clamp(pos, 1, std::max(1, length() - 1));
     if (onMarkerMoved) onMarkerMoved(dragging, pos);
 }
 

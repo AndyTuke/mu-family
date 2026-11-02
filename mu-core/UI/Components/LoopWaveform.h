@@ -45,6 +45,11 @@ public:
     std::function<void(int index)> onMarkerDeleteRequested;
     // A click between markers: the region's index.
     std::function<void(int region)> onRegionClicked;
+    // A right-click on a region (not on a marker) asked to play it.
+    std::function<void(int region)> onRegionPlayRequested;
+    // Called while a marker is dragged with where the pointer put it and the samples one pixel covers; returns the position to use
+    // (a grid offset when it is close enough, else the same). Holding Shift skips it, so the marker moves freely.
+    std::function<int(int position, double samplesPerPixel)> snapMarker;
     // A region was dragged away from where it was pressed: its index and the pointer in screen coordinates (while dragging),
     // then the same once on release. The host decides what is under the pointer and whether a drop is accepted.
     std::function<void(int region, juce::Point<int> screenPos)> onRegionDragged;

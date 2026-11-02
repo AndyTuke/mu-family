@@ -23,6 +23,8 @@ public:
     // Message-thread: begin/end playback of a file. Safe while the audio thread is mixing.
     void start(const juce::File& file);
     void stop();
+    // Whether the audition repeats from the start when it reaches its end (any thread).
+    void setLooping(bool shouldLoop) noexcept { looping.store(shouldLoop, std::memory_order_relaxed); }
     // Message thread: plays decoded audio (any channel count, at `audioRate`) the same way, converted to the prepared rate.
     void startBuffer(const juce::AudioBuffer<float>& audio, double audioRate);
 
@@ -53,6 +55,7 @@ private:
     std::atomic<Decoded*>    audioHolding { nullptr }; // buffer the audio thread is reading right now (hazard pointer)
     std::vector<std::unique_ptr<Decoded>> owned;    // message thread: every live buffer, including the published one
     juce::uint64             nextId = 1;
+    std::atomic<bool>        looping { false };
 
     // Audio-thread-owned play state.
     juce::uint64             playingId = 0;

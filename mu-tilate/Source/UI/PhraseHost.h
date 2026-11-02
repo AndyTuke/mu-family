@@ -47,6 +47,7 @@ public:
     // (timed by Tempo Match and Pitch/Stretch), 2 = slice `slice` the same way. stopPreview ends it.
     virtual void previewSource(int layer, int kind, int slice) = 0;
     virtual void stopPreview(int layer) = 0;
+    virtual void setPreviewLooping(int layer, bool loop) = 0;   // the audition repeats until stopped
     // One line for the content: the loop's name and slice count, "Loading ...", or the last error.
     virtual juce::String getLoopStatus(int layer) const = 0;
 };

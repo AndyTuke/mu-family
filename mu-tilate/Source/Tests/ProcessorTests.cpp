@@ -134,6 +134,13 @@ struct ProcessorTests : public juce::UnitTest
                 renderPeak(p, host, 2);
                 expectEquals(renderPeak(p, host, 10), 0.0f);                // and stops
             }
+            // A looping audition keeps sounding past its own length.
+            p.setPreviewLooping(0, true);
+            p.previewSource(0, 2, 0);
+            renderPeak(p, host, 400);
+            expectGreaterThan(renderPeak(p, host, 600), 0.02f);
+            p.setPreviewLooping(0, false);
+            p.stopPreview(0);
             p.setPlayHead(nullptr);
         }
 

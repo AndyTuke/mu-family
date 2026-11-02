@@ -87,6 +87,7 @@ struct Phrase : Layer
     enum class PreviewKind { Original, AtTempo, Slice };
     void startPreview(PreviewKind kind, int slice, double bpm);
     void stopPreview() { preview.stop(); }
+    void setPreviewLooping(bool loop) noexcept { preview.setLooping(loop); }
     // Message thread: an edit of the slices or the timeline (the editor builds the edited copies). Reuses the audio.
     void commitEdit(const SliceList& slices, const Timeline& timeline);
 

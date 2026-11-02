@@ -322,6 +322,25 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     previewOriginalButton.onClick = [this] { host.previewSource(currentLayer, 0, 0); };
     previewSliceButton.onClick    = [this] { host.previewSource(currentLayer, 2, juce::jmax(0, waveform.getSelectedRegion())); };
     previewStopButton.onClick     = [this] { host.stopPreview(currentLayer); };
+    previewLoopButton.setClickingTogglesState(true);
+    previewLoopButton.setTooltip("Repeat the audition until it is stopped");
+    previewLoopButton.onClick     = [this] { host.setPreviewLooping(currentLayer, previewLoopButton.getToggleState()); };
+    waveform.onRegionPlayRequested = [this](int r)
+    {
+        selectRegion(r);
+        host.previewSource(currentLayer, 2, r);
+    };
+    // A marker dragged close to a grid line (of the loop, at the loop's tempo) jumps onto it; Shift moves it freely.
+    waveform.snapMarker = [this](int position, double samplesPerPixel)
+    {
+        const auto d = host.getPhrase(currentLayer).getData();
+        const double grid = gridParam != nullptr ? gridBeats((int) gridParam->load()) : 0.0;
+        const double tempo = tempoParam != nullptr ? (double) tempoParam->load() : 0.0;
+        if (d == nullptr || grid <= 0.0 || tempo <= 0.0) return position;
+        const double step = grid * 60.0 / tempo * d->fileSampleRate;   // samples between grid lines
+        const double nearest = std::round((double) position / step) * step;
+        return std::abs(nearest - (double) position) <= (double) mu_ui::s(LF::kMarkerSnapPx) * samplesPerPixel ? (int) std::lround(nearest) : position;
+    };
     waveFitButton.onClick = [this] { waveform.showAll(); };
     waveOutButton.onClick = [this] { waveform.zoomBy(0.5, waveform.getWidth() / 2); };
     waveInButton.onClick  = [this] { waveform.zoomBy(2.0, waveform.getWidth() / 2); };
@@ -333,7 +352,7 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     tlInButton.onClick = [this] { timelineView.zoomBy(1.5, timelineView.getWidth() / 2); };
     tlFitButton.setTooltip("Show the whole timeline. Shift+wheel scrolls, a drag on the ruler or a middle-button drag pans");
     tlFitButton.onClick = [this] { timelineView.showAll(); };
-    for (auto* b : { &deleteButton, &clearButton, &layOutButton, &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewStopButton, &waveFitButton, &waveOutButton, &waveInButton, &tlOutButton, &tlInButton, &tlFitButton }) addAndMakeVisible(*b);
+    for (auto* b : { &deleteButton, &clearButton, &layOutButton, &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewLoopButton, &previewStopButton, &waveFitButton, &waveOutButton, &waveInButton, &tlOutButton, &tlInButton, &tlFitButton }) addAndMakeVisible(*b);
 
     updateView();
     startTimerHz(15);
@@ -429,7 +448,7 @@ void PhraseContent::updateView()
     rangeBar.setVisible(sequencer);
     timelineView.setVisible(! layerView);
     for (auto* c : std::initializer_list<juce::Component*> { &lengthCaption, &barsInput, &beatsInput, &gridBox, &layOutButton, &deleteButton, &clearButton,
-                                                              &waveFitButton, &waveOutButton, &waveInButton, &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewStopButton, &tlOutButton, &tlInButton, &tlFitButton })
+                                                              &waveFitButton, &waveOutButton, &waveInButton, &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewLoopButton, &previewStopButton, &tlOutButton, &tlInButton, &tlFitButton })
         c->setVisible(sequencer);
     if (sliceView) refreshSlicePanel(true);
     updateToolbar();
@@ -648,13 +667,22 @@ void PhraseContent::resized()
         const int timelineH = juce::jmax(s(90), area.getHeight() * 4 / 10);
         timelineView.setBounds(area.removeFromBottom(timelineH));
         auto bar = area.removeFromBottom(toolbarH);
-        auto previewRow = area.removeFromTop(s(kStatusH));
-        for (auto* b : { &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewStopButton })
+        // The audition controls in their own panel under a PREVIEW plate.
         {
-            b->setBounds(previewRow.removeFromLeft(s(b == &previewStopButton ? 60 : 108)));
-            previewRow.removeFromLeft(s(LF::kSpaceS));
+            const int plate = s(LF::kSectionPlateH), padS = s(LF::kSpaceS);
+            area.removeFromTop(plate);
+            const int boxW = padS * 2 + 3 * s(108) + s(64) + s(60) + 4 * padS;
+            auto box = area.removeFromTop(s(kStatusH) + padS * 2).withWidth(boxW);
+            sections.push_back({ box, "PREVIEW" });
+            auto row = box.reduced(padS);
+            for (auto* b : { &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewLoopButton, &previewStopButton })
+            {
+                const int w = b == &previewStopButton ? 60 : (b == &previewLoopButton ? 64 : 108);
+                b->setBounds(row.removeFromLeft(s(w)));
+                row.removeFromLeft(padS);
+            }
+            area.removeFromTop(padS);
         }
-        area.removeFromTop(s(LF::kSpaceS));
         rangeBar.setBounds(area.removeFromTop(s(40)));
         area.removeFromTop(s(LF::kSpaceS));
         waveform.setBounds(area.withTrimmedBottom(s(LF::kSpaceS)));

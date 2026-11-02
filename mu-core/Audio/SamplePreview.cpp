@@ -151,8 +151,10 @@ void SamplePreview::mixInto(juce::AudioBuffer<float>& masterBus, int numSamples)
 
     // Chunk to the prepared size, copying from the in-memory buffer.
     const int len = d->audio.getNumSamples();
-    for (int done = 0; done < numSamples && readPos < len; )
+    const bool wrap = looping.load(std::memory_order_relaxed) && len > 0;
+    for (int done = 0; done < numSamples && (readPos < len || wrap); )
     {
+        if (readPos >= len) readPos = 0;   // looping: start over
         const int n = juce::jmin(chunkMax, numSamples - done, len - readPos);
         for (int ch = 0; ch < masterBus.getNumChannels(); ++ch)
             masterBus.addFrom(ch, done, d->audio, ch % 2, readPos, n, 0.7f);

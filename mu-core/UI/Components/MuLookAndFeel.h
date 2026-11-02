@@ -757,6 +757,7 @@ public:
     static constexpr int   kLoopSwitchWideW = 90;
     static constexpr int   kLoopStepButtonW = 26;
     static constexpr int   kLoopSlimTimelineH = 64;  // the timeline under the waveform in the Slice view
+    static constexpr int   kMarkerSnapPx = 10;       // a dragged slice marker jumps onto a grid line this close (pixels)
     static constexpr int   kLoopGhostH      = 34;    // the slice preview that follows the pointer in a drag
     static constexpr int   kBlockInset      = 3;     // a timeline block's gap to the row's edge
     static constexpr float kBlockRadius     = 3.0f;
