@@ -408,6 +408,26 @@ struct PhraseTests : public juce::UnitTest
             expectEquals(rms(out2, 49500, 4000), 0.0);
         }
 
+        beginTest("dropping a block onto a longer one splits the remainder; the origin is untouched");
+        {
+            const std::vector<double> beats { 4.0, 1.0 };
+            Timeline origin(16.0);
+            origin.place(0, 0.0, 0.0);                                  // a four-beat block
+            origin.place(1, 8.0, 0.0);                                  // a one-beat block to drop
+            Timeline t = origin;
+            const int at = t.drop(1, 1.0, false, beats);                // one beat in, over the long block
+            expectEquals(t.size(), 3);
+            expectEquals(at, 1);
+            expectWithinAbsoluteError(t.blocks()[0].length, 1.0, 1.0e-9);                       // the head is shortened
+            expectWithinAbsoluteError(t.blocks()[2].start, 2.0, 1.0e-9);                        // the remainder starts after the drop
+            expectWithinAbsoluteError((double) t.blocks()[2].own.trimInBeats, 2.0, 1.0e-6);     // and skips what was covered
+            expectEquals(origin.size(), 2);                                                     // the drag's origin keeps both blocks
+            Timeline over = origin;
+            over.drop(1, 0.0, false, beats);                            // onto the start of the long block
+            expectEquals(over.size(), 2);                               // the dropped block plus the rest of the long one
+            expectWithinAbsoluteError(over.blocks()[1].start, 1.0, 1.0e-9);
+        }
+
         beginTest("a block near the end of the timeline sounds again in the next pass");
         {
             Rig r;

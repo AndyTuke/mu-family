@@ -60,6 +60,55 @@ int Timeline::move(int index, double beat, double grid)
     return insert(b);
 }
 
+int Timeline::drop(int index, double newStart, bool asCopy, const std::vector<double>& sliceBeats)
+{
+    if (index < 0 || index >= size() || newStart < 0.0 || newStart >= length) return -1;
+    constexpr double kMin = 1.0 / 16.0;
+    TimelineBlock m = list[(size_t) index];
+    if (! asCopy) list.erase(list.begin() + index);
+    m.start = newStart;
+
+    auto naturalWidth = [&](const TimelineBlock& b)
+    {
+        const double nat = b.slice >= 0 && b.slice < (int) sliceBeats.size() ? sliceBeats[(size_t) b.slice] : 1.0;
+        return b.length > 0.0 ? b.length : std::max(kMin, (nat - b.own.trimInBeats) * b.own.retime);
+    };
+    const double s = m.start, e = s + std::max(kMin, naturalWidth(m));
+
+    // Phase 1: for each block the dropped one overlaps, work out what survives of it (before the drop, after it, or both).
+    std::vector<TimelineBlock> result;
+    for (int i = 0; i < (int) list.size(); ++i)
+    {
+        const TimelineBlock& b = list[(size_t) i];
+        const double nextStart = i + 1 < (int) list.size() ? list[(size_t) i + 1].start : length;
+        const double bEnd = std::min(b.start + naturalWidth(b), nextStart);   // the next block cuts this one
+        if (bEnd <= s + 1.0e-9 || b.start >= e - 1.0e-9) { result.push_back(b); continue; }   // no overlap
+
+        if (b.start < s - 1.0e-9)   // the part before the drop stays, shortened
+        {
+            TimelineBlock head = b;
+            head.length = s - b.start;
+            if (head.length >= kMin) result.push_back(head);
+        }
+        if (bEnd > e + 1.0e-6 && e < length)   // the part after the drop continues from where the dropped block ends
+        {
+            TimelineBlock tail = b;
+            const double cut = e - b.start;
+            tail.start = e;
+            tail.own.trimInBeats = (float) (b.own.trimInBeats + cut / std::max(0.25f, b.own.retime));
+            tail.length = b.length > 0.0 ? b.length - cut : 0.0;
+            if (bEnd - e >= kMin && (tail.length == 0.0 || tail.length >= kMin)) result.push_back(tail);
+        }
+    }
+    result.push_back(m);
+    std::sort(result.begin(), result.end(), [](const TimelineBlock& x, const TimelineBlock& y) { return x.start < y.start; });
+    list = std::move(result);
+
+    for (int i = 0; i < size(); ++i)
+        if (std::abs(list[(size_t) i].start - s) < 1.0e-9 && list[(size_t) i].slice == m.slice) return i;
+    return -1;
+}
+
 int Timeline::copy(int index, double beat, double grid)
 {
     if (index < 0 || index >= size()) return -1;

@@ -87,7 +87,8 @@ struct Phrase : Layer
     enum class PreviewKind { Original, AtTempo, Slice };
     void startPreview(PreviewKind kind, int slice, double bpm);
     void stopPreview() { preview.stop(); }
-    void setPreviewLooping(bool loop) noexcept { preview.setLooping(loop); }
+    // Repeating applies to the whole-loop auditions only; a single slice plays once.
+    void setPreviewLooping(bool loop) noexcept { previewLoop = loop; preview.setLooping(previewLoop && ! previewIsSlice); }
     // Message thread: an edit of the slices or the timeline (the editor builds the edited copies). Reuses the audio.
     void commitEdit(const SliceList& slices, const Timeline& timeline);
 
@@ -169,6 +170,7 @@ private:
     uint64_t                          lastAudioId = 0;      // audio thread: the audio the voices were started from (0 = none)
     std::atomic<double>               loopLengthBeats { -1.0 };
 
+    bool previewLoop = false, previewIsSlice = false;
     mu_core::SamplePreview preview;                // the audition (message thread starts it, the audio thread mixes it)
     juce::AudioBuffer<float> tailScratch;          // a tail that must add rather than write renders here
     bool parked = true;                            // not rendered live in the last rendered block

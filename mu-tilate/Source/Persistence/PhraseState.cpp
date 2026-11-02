@@ -63,6 +63,7 @@ void writePhraseState(juce::ValueTree& node, const PhraseState& s)
         juce::ValueTree m("M");
         m.setProperty("p", s.slices.marker(i).position, nullptr);
         m.setProperty("pin", s.slices.marker(i).pinned ? 1 : 0, nullptr);
+        if (s.slices.marker(i).name.isNotEmpty()) m.setProperty("nm", s.slices.marker(i).name, nullptr);
         writeSettings(m, s.slices.settings(i));
         slices.appendChild(m, nullptr);
     }
@@ -116,6 +117,7 @@ PhraseState readPhraseState(const juce::ValueTree& node)
         if (idx < 0 || s.slices.marker(idx).position != (int) m.getProperty("p", 0)) continue;
         if ((int) m.getProperty("pin", 0) != 0) s.slices.setPinned(idx, true);
         s.slices.setSettings(idx, readSettings(m));
+        s.slices.setName(idx, m.getProperty("nm", "").toString());
     }
     return s;
 }

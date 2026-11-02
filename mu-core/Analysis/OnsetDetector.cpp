@@ -190,4 +190,30 @@ std::vector<int> pickOnsets(const OnsetCurve& curve, const OnsetPickSettings& s,
     return out;
 }
 
+int nearestOnset(const juce::AudioBuffer<float>& audio, double sampleRate, int position, float searchMs)
+{
+    const int n = audio.getNumSamples(), nch = audio.getNumChannels();
+    if (n < 4 || nch < 1 || sampleRate <= 0.0) return position;
+    auto mono = [&](int i) { float v = 0.0f; for (int c = 0; c < nch; ++c) v += audio.getSample(c, juce::jlimit(0, n - 1, i)); return v / (float) nch; };
+    const int step = std::max(8, (int) (sampleRate * 0.001));
+    const int range = (int) (sampleRate * searchMs / 1000.0);
+    const int lo = std::max(step, position - range), hi = std::min(n - step, position + range);
+
+    // Phase 1: the 1 ms step with the largest rise in energy over the step before it.
+    auto energy = [&](int from) { float e = 0.0f; for (int i = from; i < from + step; ++i) { const float v = mono(i); e += v * v; } return e; };
+    int best = -1;
+    float bestRise = 1.0e-6f;
+    for (int at = lo; at < hi; at += step)
+    {
+        const float rise = energy(at) - energy(at - step);
+        if (rise > bestRise) { bestRise = rise; best = at; }
+    }
+    if (best < 0) return position;
+
+    // Phase 2: back to the nearest zero crossing before the attack.
+    for (int k = best; k > std::max(1, best - step * 2); --k)
+        if ((mono(k - 1) <= 0.0f) != (mono(k) <= 0.0f)) return k;
+    return best;
+}
+
 } // namespace mu_core

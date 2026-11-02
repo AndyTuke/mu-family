@@ -1,6 +1,7 @@
 #include "UI/PhraseContent.h"
 
 #include "Sequencer/Phrase.h"
+#include "Analysis/OnsetDetector.h"
 
 #include <functional>
 
@@ -204,6 +205,17 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
         if (const int sel = waveform.getSelectedRegion(); at >= 0 && sel >= at) selectRegion(sel + 1);
         refreshViews(true);
     };
+    // A double-click adds a marker on the nearest attack.
+    waveform.snapNewMarker = [this](int pos)
+    {
+        const auto d = host.getPhrase(currentLayer).getData();
+        return d != nullptr && d->audio != nullptr ? mu_core::nearestOnset(*d->audio, d->fileSampleRate, pos) : pos;
+    };
+    waveform.onRegionRenamed = [this](int region, const juce::String& name)
+    {
+        editSlices([region, name](SliceList& sl, Timeline&) { sl.setName(region, name); });
+        refreshViews(true);
+    };
     waveform.onMarkerDeleteRequested = [this](int idx)
     {
         editSlices([idx](SliceList& sl, Timeline& tl) { if (sl.removeMarker(idx)) tl.sliceRemoved(idx); });
@@ -323,7 +335,7 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     previewSliceButton.onClick    = [this] { host.previewSource(currentLayer, 2, juce::jmax(0, waveform.getSelectedRegion())); };
     previewStopButton.onClick     = [this] { host.stopPreview(currentLayer); };
     previewLoopButton.setClickingTogglesState(true);
-    previewLoopButton.setTooltip("Repeat the audition until it is stopped");
+    previewLoopButton.setTooltip("Repeat the whole-loop auditions until stopped (a single slice plays once)");
     previewLoopButton.onClick     = [this] { host.setPreviewLooping(currentLayer, previewLoopButton.getToggleState()); };
     waveform.onRegionPlayRequested = [this](int r)
     {
@@ -483,7 +495,7 @@ void PhraseContent::refreshSlicePanel(bool force)
     }
     const auto r = d->slices.slice(sel);
     slicePanel.setSlice(sel, d->slices.settings(sel),
-                        "Slice " + juce::String(sel + 1) + " of " + juce::String(d->slices.size()) + "   "
+                        d->slices.displayName(sel) + " (" + juce::String(sel + 1) + " of " + juce::String(d->slices.size()) + ")   "
                         + juce::String((double) r.start / d->fileSampleRate, 3) + " - " + juce::String((double) r.end / d->fileSampleRate, 3)
                         + " s.  New hits of this slice start with these settings; select a hit on the timeline to edit it.");
 }
@@ -526,7 +538,7 @@ void PhraseContent::refreshViews(bool force)
         rangeBar.setRange(d->regionStart, d->regionEnd);
     }
     std::vector<LoopWaveform::Marker> markers;
-    for (int i = 0; i < d->slices.size(); ++i) markers.push_back({ d->slices.marker(i).position, d->slices.marker(i).pinned });
+    for (int i = 0; i < d->slices.size(); ++i) markers.push_back({ d->slices.marker(i).position, d->slices.marker(i).pinned, d->slices.marker(i).name });
     waveform.setMarkers(std::move(markers));
     updateToolbar();
 }

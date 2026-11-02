@@ -44,4 +44,8 @@ OnsetCurve computeCurve(const juce::AudioBuffer<float>& audio, double sampleRate
 // Onset positions in source samples, ascending, from a cached curve. `audio` is used only for the zero-crossing snap.
 std::vector<int> pickOnsets(const OnsetCurve& curve, const OnsetPickSettings& settings, const juce::AudioBuffer<float>* audio = nullptr);
 
+// The attack nearest `position` within +-searchMs: the 1 ms step where the energy rises most, moved back to the last zero crossing
+// so a cut there does not click. Returns `position` when the audio is silent there. For placing a slice marker by hand.
+int nearestOnset(const juce::AudioBuffer<float>& audio, double sampleRate, int position, float searchMs = 40.0f);
+
 } // namespace mu_core

@@ -77,6 +77,8 @@ void Phrase::startPreview(PreviewKind kind, int slice, double bpm)
 {
     const auto d = getData();
     if (d == nullptr || d->audio == nullptr || d->audio->getNumSamples() < 2) return;
+    previewIsSlice = kind == PreviewKind::Slice;
+    preview.setLooping(previewLoop && ! previewIsSlice);
     if (kind == PreviewKind::Original) { preview.startBuffer(*d->audio, d->fileSampleRate); return; }
 
     // The settings that time the loop (the layer's unmodulated values), then the loop or one slice laid out from beat 0.

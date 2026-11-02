@@ -75,6 +75,7 @@ private:
     void   clampView();
 
     Timeline timeline;
+    Timeline dragOrigin;   // the timeline as it was when a block drag began: each step is worked out from it, so passing over a block loses nothing
     std::vector<double> sliceBeatsList;
     std::vector<std::vector<float>> slicePeaksList;
     int    dropSlice = -1;       // the slice a drop in progress would place
@@ -90,6 +91,7 @@ private:
 
     // Drag state: which block, where in it the pointer grabbed it, and whether it copies.
     int    dragBlock = -1;
+    int    dragOriginIndex = -1;
     double grabOffset = 0.0;
     bool   dragMoved = false;
     enum class Edge { None, Left, Right };

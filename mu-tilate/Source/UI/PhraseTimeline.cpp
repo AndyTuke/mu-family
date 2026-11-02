@@ -274,6 +274,8 @@ void PhraseTimeline::mouseDown(const juce::MouseEvent& e)
         const auto& hb = timeline.blocks()[(size_t) hit];
         dragAnchor = dragEdge == Edge::Left ? hb.start + blockBeats(hit) : hb.start;   // the edge that holds still
         grabOffset = beatAt(e.x) - timeline.blocks()[(size_t) hit].start;
+        dragOrigin = timeline;
+        dragOriginIndex = hit;
         if (onBlockSelected) onBlockSelected(hit);
         repaint();
         return;
@@ -343,13 +345,16 @@ void PhraseTimeline::mouseDrag(const juce::MouseEvent& e)
     const double target = Timeline::snap(beatAt(e.x) - grabOffset, grid);
     const double current = timeline.blocks()[(size_t) dragBlock].start;
 
-    // Ctrl-drag copies once, at the first move; the drag then carries the copy (a copy per grid step would leave a trail).
-    const bool copy = e.mods.isCtrlDown() && ! dragMoved;
-    if (std::abs(target - current) < 1.0e-9 && ! copy) return;
+    // Ctrl-drag copies (the original stays where it was). Every step starts again from the timeline as the drag began, so a block
+    // dragged across others only overlays them for now; what it covers comes back when it moves on.
+    const bool copy = e.mods.isCtrlDown();
+    if (std::abs(target - current) < 1.0e-9 && (dragMoved || ! copy)) return;
 
-    const int from = dragBlock;
     int movedTo = -1;
-    onEdit([&](Timeline& t) { movedTo = copy ? t.copy(from, target, 0.0) : t.move(from, target, 0.0); });
+    const Timeline origin = dragOrigin;
+    const int from = dragOriginIndex;
+    const auto beats = sliceBeatsList;
+    onEdit([&](Timeline& t) { t = origin; movedTo = t.drop(from, target, copy, beats); });
     if (movedTo >= 0)
     {
         dragBlock = movedTo; selected = movedTo;   // the timeline republishes; the block we hold is at its new index

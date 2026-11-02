@@ -11,6 +11,47 @@ namespace
     constexpr int kGrab = 5;   // pixels either side of a marker that grab it (unscaled)
 }
 
+LoopWaveform::LoopWaveform()
+{
+    nameEditor.setMultiLine(false);
+    nameEditor.setSelectAllWhenFocused(true);
+    nameEditor.setIndents(2, 0);
+    nameEditor.onReturnKey = [this] { endRename(true); };
+    nameEditor.onEscapeKey = [this] { endRename(false); };
+    nameEditor.onFocusLost = [this] { endRename(true); };
+    addChildComponent(nameEditor);
+}
+
+juce::Rectangle<int> LoopWaveform::labelOf(int region) const
+{
+    const int a = std::max(0, xOf((double) markers[(size_t) region].position));
+    const int b = region + 1 < (int) markers.size() ? xOf((double) markers[(size_t) region + 1].position) : getWidth();
+    return { a + 2, 1, std::max(0, std::min(b, getWidth()) - a - 4), mu_ui::s(16) };
+}
+
+void LoopWaveform::beginRename(int region)
+{
+    if (region < 0 || region >= (int) markers.size()) return;
+    renaming = region;
+    auto r = labelOf(region);
+    r.setWidth(std::max(r.getWidth(), mu_ui::s(90)));
+    nameEditor.setBounds(r.withRight(std::min(r.getRight(), getWidth() - 1)));
+    nameEditor.setText(markers[(size_t) region].name.isNotEmpty() ? markers[(size_t) region].name : "Slice " + juce::String(region + 1), false);
+    nameEditor.setVisible(true);
+    nameEditor.grabKeyboardFocus();
+    nameEditor.selectAll();
+}
+
+void LoopWaveform::endRename(bool commit)
+{
+    if (renaming < 0) return;
+    const int region = renaming;
+    renaming = -1;
+    const auto text = nameEditor.getText();
+    nameEditor.setVisible(false);
+    if (commit && onRegionRenamed) onRegionRenamed(region, text);
+}
+
 void LoopWaveform::setAudio(std::shared_ptr<const juce::AudioBuffer<float>> newAudio)
 {
     audio = std::move(newAudio);
@@ -56,6 +97,12 @@ void LoopWaveform::clampView() noexcept
     const double total = (double) std::max(1, length());
     viewLength = std::clamp(viewLength, std::min(total, 64.0), total);   // at most the whole loop, at least a few samples
     viewStart  = std::clamp(viewStart, 0.0, total - viewLength);
+}
+
+juce::Rectangle<int> LoopWaveform::crossOf(int marker) const
+{
+    const int size = mu_ui::s(12), x = xOf((double) markers[(size_t) marker].position);
+    return { x + mu_ui::s(2), getHeight() - size - mu_ui::s(2), size, size };
 }
 
 int LoopWaveform::markerNear(int x) const noexcept
@@ -133,7 +180,16 @@ void LoopWaveform::paint(juce::Graphics& g)
         g.fillRect((float) x, y0, 1.0f, std::max(1.0f, y1 - y0));
     }
 
-    // Phase 3: the markers, then the playhead.
+    // Phase 3: the region names, then the markers and the playhead.
+    g.setFont(juce::FontOptions((float) s(11)));
+    for (int i = 0; i < (int) markers.size(); ++i)
+    {
+        if (i == renaming) continue;
+        const auto r = labelOf(i);
+        if (r.getWidth() < s(24)) continue;
+        g.setColour(LF::colour(LF::labelText).withAlpha(i == selected ? 1.0f : 0.7f));
+        g.drawText(markers[(size_t) i].name.isNotEmpty() ? markers[(size_t) i].name : "Slice " + juce::String(i + 1), r, juce::Justification::centredLeft, true);
+    }
     for (int i = 0; i < (int) markers.size(); ++i)
     {
         const int x = xOf((double) markers[(size_t) i].position);
@@ -141,6 +197,17 @@ void LoopWaveform::paint(juce::Graphics& g)
         const bool hot = i == hovered || i == dragging;
         g.setColour(hot ? LF::colour(LF::lfoEditorPointHover) : LF::colour(LF::lfoEditorPlayhead).withAlpha(0.85f));
         g.fillRect(x, 0, hot ? 2 : 1, getHeight());
+        if (i == hovered && i > 0)
+        {
+            // The delete cross, at the marker's foot.
+            const auto c = crossOf(i).toFloat();
+            g.setColour(LF::colour(LF::lfoEditorBackground).withAlpha(0.85f));
+            g.fillEllipse(c);
+            g.setColour(LF::colour(LF::lfoEditorPointHover));
+            const auto k = c.reduced(c.getWidth() * 0.3f);
+            g.drawLine(k.getX(), k.getY(), k.getRight(), k.getBottom(), 1.5f);
+            g.drawLine(k.getX(), k.getBottom(), k.getRight(), k.getY(), 1.5f);
+        }
         if (markers[(size_t) i].pinned)
         {
             g.setColour(LF::colour(LF::lfoEditorPoint));
@@ -156,15 +223,24 @@ void LoopWaveform::paint(juce::Graphics& g)
 
 void LoopWaveform::mouseMove(const juce::MouseEvent& e)
 {
-    const int h = markerNear(e.x);
+    // The cross sits beside its marker, so a pointer over it still counts as on that marker.
+    int h = markerNear(e.x);
+    if (h < 0 && hovered > 0 && hovered < (int) markers.size() && crossOf(hovered).expanded(mu_ui::s(2)).contains(e.getPosition())) h = hovered;
     if (h != hovered) { hovered = h; repaint(); }
-    setMouseCursor(h > 0 ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::NormalCursor);
+    const bool onCross = h > 0 && crossOf(h).contains(e.getPosition());
+    setMouseCursor(onCross ? juce::MouseCursor::PointingHandCursor : h > 0 ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::NormalCursor);
 }
 
 void LoopWaveform::mouseDown(const juce::MouseEvent& e)
 {
     if (length() <= 0) return;
     if (e.mods.isMiddleButtonDown() || e.mods.isCtrlDown()) { panning = true; panStartView = viewStart; return; }
+    if (hovered > 0 && hovered < (int) markers.size() && crossOf(hovered).contains(e.getPosition()))
+    {
+        if (onMarkerDeleteRequested) onMarkerDeleteRequested(hovered);
+        hovered = -1;
+        return;
+    }
     const int m = markerNear(e.x);
     if (m > 0 && (e.mods.isAltDown() || e.mods.isRightButtonDown()))
     {
@@ -219,7 +295,12 @@ void LoopWaveform::mouseUp(const juce::MouseEvent& e)
 void LoopWaveform::mouseDoubleClick(const juce::MouseEvent& e)
 {
     if (length() <= 0 || markerNear(e.x) >= 0) return;
-    if (onMarkerAddRequested) onMarkerAddRequested(std::clamp(sampleAt(e.x), 1, std::max(1, length() - 1)));
+    // A double-click on a region's name strip renames it; elsewhere it adds a marker.
+    for (int i = 0; i < (int) markers.size(); ++i)
+        if (labelOf(i).contains(e.getPosition())) { beginRename(i); return; }
+    int pos = sampleAt(e.x);
+    if (snapNewMarker) pos = snapNewMarker(pos);
+    if (onMarkerAddRequested) onMarkerAddRequested(std::clamp(pos, 1, std::max(1, length() - 1)));
 }
 
 void LoopWaveform::zoomBy(double factor, int anchorX)

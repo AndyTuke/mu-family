@@ -3,6 +3,8 @@
 #include "Audio/SlicePlayer.h"   // SliceRange
 #include "Sequencer/SliceSettings.h"
 
+#include <juce_core/juce_core.h>
+
 #include <vector>
 
 // The slices of one loop (docs/mu-tilate/design.md): ordered start markers that cover the loop, each slice
@@ -16,6 +18,7 @@ struct SliceMarker
     int  position = 0;     // source samples
     bool pinned   = false; // a hand-placed marker: kept when detection runs again
     SliceSettings settings; // how the slice that starts here plays
+    juce::String name;      // the user's name for the slice; empty = the default "Slice N"
 };
 
 class SliceList
@@ -49,6 +52,9 @@ public:
     // The settings of slice `index`; an out-of-range index is refused (returns false) and changes nothing.
     bool setSettings(int index, const SliceSettings& settings);
     const SliceSettings& settings(int index) const;
+    // The slice's name (empty = default). A name equal to the default is stored as empty.
+    void setName(int index, const juce::String& name);
+    juce::String displayName(int index) const { return index >= 0 && index < size() && marker(index).name.isNotEmpty() ? marker(index).name : "Slice " + juce::String(index + 1); }
 
     // The loop changed length (a new loop): the markers outside it are dropped.
     void setLoopLength(int newLength);

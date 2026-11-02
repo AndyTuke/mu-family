@@ -47,6 +47,11 @@ public:
     int  place(int slice, double beat, double grid, const SliceSettings& own = SliceSettings());
     int  move(int index, double beat, double grid);
     int  copy(int index, double beat, double grid);
+    // Drops block `index` (or a copy of it) with its start at `newStart`, laying it over whatever is there without losing it: a block
+    // it covers whole goes, one it covers the start or end of is shortened or trimmed to what is left, and one it covers the middle
+    // of is split, the part after the dropped block becoming a new block. `sliceBeats[i]` is slice i's natural length in beats.
+    // Returns the dropped block's new index, or -1 when refused (outside the timeline).
+    int  drop(int index, double newStart, bool asCopy, const std::vector<double>& sliceBeats);
     bool setBlockLength(int index, double beats, double grid);   // 0 = the slice's own length
     // Edge drags. `naturalBeats` is the block's slice length in beats. trimStart moves the start edge to `newStart` and skips
     // (or gives back) that much of the slice, the end edge staying where it is; retime sets the span to [newStart, newEnd], playing

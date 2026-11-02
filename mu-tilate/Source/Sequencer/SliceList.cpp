@@ -119,6 +119,13 @@ bool SliceList::removeMarker(int index)
     return true;
 }
 
+void SliceList::setName(int index, const juce::String& name)
+{
+    if (index < 0 || index >= size()) return;
+    const auto trimmed = name.trim().substring(0, 40);
+    markers[(size_t) index].name = trimmed == "Slice " + juce::String(index + 1) ? juce::String() : trimmed;
+}
+
 void SliceList::setPinned(int index, bool pinned)
 {
     if (index > 0 && index < size()) markers[(size_t) index].pinned = pinned;

@@ -19,9 +19,10 @@ public:
     {
         int  position = 0;      // samples
         bool pinned   = false;  // a hand-placed marker: drawn with a pin
+        juce::String name;      // the region that starts here, shown at its top; double-click it to rename
     };
 
-    LoopWaveform() = default;
+    LoopWaveform();
 
     // The audio to show (mono mix of every channel for display); nullptr clears it.
     void setAudio(std::shared_ptr<const juce::AudioBuffer<float>> audio);
@@ -43,6 +44,10 @@ public:
     std::function<void(int position)> onMarkerAddRequested;
     // Alt-click or right-click on this marker asked to delete it.
     std::function<void(int index)> onMarkerDeleteRequested;
+    // Where a double-click's new marker really goes (e.g. the nearest transient); unset = where it was clicked.
+    std::function<int(int position)> snapNewMarker;
+    // The user renamed the region (an empty name asks for the default).
+    std::function<void(int region, const juce::String& name)> onRegionRenamed;
     // A click between markers: the region's index.
     std::function<void(int region)> onRegionClicked;
     // A right-click on a region (not on a marker) asked to play it.
@@ -66,6 +71,7 @@ public:
     void mouseDoubleClick(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
     void mouseMove(const juce::MouseEvent&) override;
+    void mouseExit(const juce::MouseEvent&) override { if (hovered >= 0) { hovered = -1; repaint(); } }
 
 private:
     static constexpr int kBlock = 64;       // samples per summary block
@@ -74,6 +80,10 @@ private:
     double samplesPerPixel() const noexcept { return getWidth() > 0 ? viewLength / (double) getWidth() : 1.0; }
     int  xOf(double sample) const noexcept { return (int) std::lround((sample - viewStart) / samplesPerPixel()); }
     int  sampleAt(int x) const noexcept { return (int) std::lround(viewStart + (double) x * samplesPerPixel()); }
+    void beginRename(int region);
+    void endRename(bool commit);
+    juce::Rectangle<int> labelOf(int region) const;   // the name strip at the top of a region
+    juce::Rectangle<int> crossOf(int marker) const;   // the delete cross at the foot of a hovered marker
     int  markerNear(int x) const noexcept;   // index of the marker within the grab distance of x, or -1
     int  regionAt(int sample) const noexcept;
     void clampView() noexcept;
@@ -92,6 +102,8 @@ private:
     bool   panning = false;
     double panStartView = 0.0;
     int    hovered = -1;
+    juce::TextEditor nameEditor;
+    int    renaming = -1;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LoopWaveform)
 };

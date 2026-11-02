@@ -136,9 +136,16 @@ struct ProcessorTests : public juce::UnitTest
             }
             // A looping audition keeps sounding past its own length.
             p.setPreviewLooping(0, true);
-            p.previewSource(0, 2, 0);
+            p.previewSource(0, 0, 0);
             renderPeak(p, host, 400);
             expectGreaterThan(renderPeak(p, host, 600), 0.02f);
+            p.setPreviewLooping(0, false);
+            p.stopPreview(0);
+            // A single slice plays once, loop on or not.
+            p.setPreviewLooping(0, true);
+            p.previewSource(0, 2, 0);
+            renderPeak(p, host, 400);
+            expectEquals(renderPeak(p, host, 600), 0.0f);
             p.setPreviewLooping(0, false);
             p.stopPreview(0);
             p.setPlayHead(nullptr);
