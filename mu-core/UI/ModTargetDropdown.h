@@ -28,8 +28,9 @@ struct DropdownOptions
     juce::String                          effectSendName;   // effect bus's current effect ("" = keep the table label)
 };
 
+// `options` has no default here: with one, populateDropdown(dd, table, { insertAlgo }) would read the braces as `count` and list nothing.
 inline void populateDropdown(DropdownSelect& dd, const ModTarget* table, int count,
-                             const DropdownOptions& options = {})
+                             const DropdownOptions& options)
 {
     const bool algoActive = options.insertAlgo > 0 && options.insertAlgo < mu_audio::kInsertAlgorithmCount;
     juce::String currentHeading;
