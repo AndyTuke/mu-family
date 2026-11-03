@@ -207,8 +207,10 @@ void PhraseTimeline::paint(juce::Graphics& g)
         const auto r = juce::Rectangle<int>(x0, row.getY() + s(LF::kBlockInset), std::max(2, x1 - x0 - 1), row.getHeight() - s(2 * LF::kBlockInset));
         // A hit whose slice was cropped off has no sound: it stays on the timeline, dimmed.
         const bool cropped = b.slice < 0;
-        const float dim = cropped ? 0.3f : 1.0f;
-        g.setColour(accent.withAlpha((i == selected ? lighting.blockFillSelected : lighting.blockFill) * dim));
+        const float dim = cropped ? 0.12f : 1.0f;
+        // The part above the hit's level is the dim one; the coloured part below it is drawn over at full strength.
+        const float unlit = cropped || b.own.volume >= 0.995f ? 1.0f : 0.3f;
+        g.setColour(accent.withAlpha((i == selected ? lighting.blockFillSelected : lighting.blockFill) * dim * unlit));
         g.fillRoundedRectangle(r.toFloat(), LF::kBlockRadius);
         // The hit's volume: the block is coloured in from the foot up to its level (0..100 %), and a line marks the top of it.
         const float vol = b.own.volume;
