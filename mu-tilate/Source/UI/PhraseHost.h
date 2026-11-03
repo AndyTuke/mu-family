@@ -52,6 +52,7 @@ public:
     // [start, end): the slices and hits stay, and a hit whose slice is cut off is silent.
     virtual void setPlayArea(int layer, int start, int end) = 0;
     virtual void cropLoop(int layer, int start, int end) = 0;
+    virtual double getPreviewPlayhead(int layer) const = 0;   // where the audition is, in samples of the loop; negative when none
     // One line for the content: the loop's name and slice count, "Loading ...", or the last error.
     virtual juce::String getLoopStatus(int layer) const = 0;
 };

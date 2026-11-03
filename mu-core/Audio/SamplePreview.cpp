@@ -132,6 +132,7 @@ void SamplePreview::stop()
 {
     const juce::ScopedLock sl(messageLock);
     current.store(nullptr);
+    position.store(-1.0f, std::memory_order_relaxed);
     collectRetired();
 }
 
@@ -145,22 +146,31 @@ void SamplePreview::mixInto(juce::AudioBuffer<float>& masterBus, int numSamples)
         audioHolding.store(d);
         if (current.load() == d) break;
     }
-    if (d == nullptr || chunkMax <= 0) { audioHolding.store(nullptr); return; }
+    if (d == nullptr || chunkMax <= 0) { position.store(-1.0f, std::memory_order_relaxed); audioHolding.store(nullptr); return; }
 
-    if (d->id != playingId) { playingId = d->id; readPos = 0; }
-
-    // Chunk to the prepared size, copying from the in-memory buffer.
+    // The play area, read every block so that moving it mid-play takes effect at once.
     const int len = d->audio.getNumSamples();
+    const float ra = juce::jlimit(0.0f, 1.0f, regionStart.load(std::memory_order_relaxed));
+    const float rb = juce::jlimit(ra, 1.0f, regionEnd.load(std::memory_order_relaxed));
+    const int rs = juce::jlimit(0, juce::jmax(0, len - 1), (int) (ra * (float) len)), re = juce::jlimit(rs + 1, juce::jmax(rs + 1, len), (int) (rb * (float) len));
+
+    if (d->id != playingId) { playingId = d->id; readPos = rs; finished = false; }
+    if (! finished && readPos < rs) readPos = rs;   // the start was moved past us: jump to it
+
+    // Chunk to the prepared size, copying from the in-memory buffer between the area's ends.
     const bool wrap = looping.load(std::memory_order_relaxed) && len > 0;
-    for (int done = 0; done < numSamples && (readPos < len || wrap); )
+    if (readPos >= re && wrap) readPos = rs;        // the end was moved behind us: repeat from the start
+    for (int done = 0; done < numSamples && ! finished && (readPos < re || wrap); )
     {
-        if (readPos >= len) readPos = 0;   // looping: start over
-        const int n = juce::jmin(chunkMax, numSamples - done, len - readPos);
+        if (readPos >= re) readPos = rs;   // looping: start over
+        const int n = juce::jmin(chunkMax, numSamples - done, re - readPos);
         for (int ch = 0; ch < masterBus.getNumChannels(); ++ch)
             masterBus.addFrom(ch, done, d->audio, ch % 2, readPos, n, 0.7f);
         readPos += n;
         done += n;
     }
+    if (! wrap && readPos >= re) finished = true;
+    position.store(finished || len <= 0 ? -1.0f : (float) readPos / (float) len, std::memory_order_relaxed);
     audioHolding.store(nullptr);
 }
 

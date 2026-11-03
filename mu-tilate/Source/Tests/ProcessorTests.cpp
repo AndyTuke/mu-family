@@ -128,11 +128,30 @@ struct ProcessorTests : public juce::UnitTest
             expectEquals(renderPeak(p, host, 20), 0.0f);                    // no hits: silence
             for (int kind = 0; kind < 3; ++kind)
             {
+                const double t0 = juce::Time::getMillisecondCounterHiRes();
                 p.previewSource(0, kind, 0);
+                logMessage("audition kind " + juce::String(kind) + " took " + juce::String(juce::Time::getMillisecondCounterHiRes() - t0, 1) + " ms to start");
                 expectGreaterThan(renderPeak(p, host, 40), 0.02f);          // each audition is heard
                 p.stopPreview(0);
                 renderPeak(p, host, 2);
                 expectEquals(renderPeak(p, host, 10), 0.0f);                // and stops
+            }
+            // The play area bounds the audition and follows the handles while it sounds; the playhead shows where it is.
+            {
+                const int len = p.getPhrase(0).getData()->audio->getNumSamples();
+                expect(p.getPreviewPlayhead(0) < 0.0, "no playhead before a play");
+                p.setPlayArea(0, len / 4, len / 2);
+                p.previewSource(0, 0, 0);
+                renderPeak(p, host, 20);
+                const double at = p.getPreviewPlayhead(0);
+                expect(at >= (double) (len / 4) - 1.0 && at <= (double) (len / 2), "the playhead is inside the play area: " + juce::String(at));
+                p.setPlayArea(0, len / 2, len);                             // moved ahead of the playhead while it plays
+                renderPeak(p, host, 20);
+                expect(p.getPreviewPlayhead(0) >= (double) (len / 2) - 1.0, "the playhead followed the moved start");
+                renderPeak(p, host, 3000);
+                expect(p.getPreviewPlayhead(0) < 0.0, "a play that reached the end of the area stops");
+                p.setPlayArea(0, 0, 0);
+                p.stopPreview(0);
             }
             // A looping audition keeps sounding past its own length.
             p.setPreviewLooping(0, true);

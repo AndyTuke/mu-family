@@ -90,7 +90,9 @@ struct Phrase : Layer
     // Repeating applies to the whole-loop auditions only; a single slice plays once.
     void setPreviewLooping(bool loop) noexcept { previewLoop = loop; preview.setLooping(previewLoop && ! previewIsSlice); }
     // Message thread: the play area, in samples of the loop (0, 0 = all of it). The whole-loop auditions play only this part.
-    void setPlayArea(int start, int end) noexcept { areaStart = start; areaEnd = end; }
+    void setPlayArea(int start, int end) noexcept { areaStart = start; areaEnd = end; applyPlayArea(); }
+    // Message thread: where the audition is in the loop (samples of the loop), or a negative value when none sounds.
+    double previewPlayhead() const noexcept;
     // Message thread: cuts the loop to [start, end). The slices are cut with it, and the hits keep their places; a hit whose slice is
     // gone has none and is silent. The source file stays whole, so the section can be widened again from the range bar.
     void cropTo(int start, int end);
@@ -163,6 +165,8 @@ private:
     PhraseSettings settings;                       // the block's settings, set by readParams
     std::shared_ptr<const PhraseData> croppedData(const PhraseData& d, int start, int end, std::vector<int>* sliceMap) const;
     int areaStart = 0, areaEnd = 0;                // the play area (message thread)
+    int previewAudioLen = 0, previewSliceStart = 0, previewSliceLen = 0;   // what the audition now plays (message thread)
+    void applyPlayArea() noexcept;
     // Fills in the host-rate copy of the loop when its rate differs from the file's (message thread, not processing).
     void attachResampled(PhraseData& d) const;
     double hostRate = 0.0;                         // the rate prepare last ran at (message thread)

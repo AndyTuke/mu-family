@@ -384,7 +384,7 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     for (auto* b : { &deleteButton, &clearButton, &layOutButton, &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewLoopButton, &previewStopButton, &cropButton, &waveFitButton, &waveOutButton, &waveInButton, &tlOutButton, &tlInButton, &tlFitButton }) addAndMakeVisible(*b);
 
     updateView();
-    startTimerHz(15);
+    startTimerHz(30);
 }
 
 // One edit: copy the layer's slices and timeline, apply the edit, publish the result (the audio is shared).
@@ -691,6 +691,7 @@ void PhraseContent::timerCallback()
     refreshSlicePanel(false);
     followLayerChoices();
     updateToolbar();
+    waveform.setPlayhead(host.getPreviewPlayhead(currentLayer));
     timelineView.setPlayheadBeats(host.isPhraseTransportPlaying() ? host.getPhraseTransportBeat() : -1.0);
 }
 

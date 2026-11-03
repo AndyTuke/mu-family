@@ -75,13 +75,18 @@ void Phrase::installLoop(std::shared_ptr<const juce::AudioBuffer<float>> audio, 
 
 void Phrase::startPreview(PreviewKind kind, int slice, double bpm)
 {
-    const auto whole = getData();
-    if (whole == nullptr || whole->audio == nullptr || whole->audio->getNumSamples() < 2) return;
-    // The whole-loop auditions play only the play area; a single slice plays as it is.
-    const int wholeLen = whole->audio->getNumSamples();
-    const bool onlyArea = kind != PreviewKind::Slice && areaEnd - areaStart >= 2 && (areaStart > 0 || areaEnd < wholeLen);
-    const auto d = onlyArea ? croppedData(*whole, areaStart, areaEnd, nullptr) : whole;
+    const auto d = getData();
+    if (d == nullptr || d->audio == nullptr || d->audio->getNumSamples() < 2) return;
     previewIsSlice = kind == PreviewKind::Slice;
+    previewAudioLen = d->audio->getNumSamples();
+    previewSliceStart = 0; previewSliceLen = 0;
+    if (previewIsSlice)
+    {
+        const auto r = d->slices.slice(juce::jlimit(0, d->slices.size() - 1, slice));
+        previewSliceStart = r.start; previewSliceLen = r.length();
+    }
+    // The whole-loop auditions play the play area (which can move while they sound); a single slice plays all of itself.
+    applyPlayArea();
     preview.setLooping(previewLoop && ! previewIsSlice);
     if (kind == PreviewKind::Original) { preview.startBuffer(*d->audio, d->fileSampleRate); return; }
 
@@ -167,6 +172,20 @@ std::shared_ptr<const PhraseData> Phrase::croppedData(const PhraseData& d, int s
     attachResampled(*c);
     if (sliceMap != nullptr) *sliceMap = std::move(map);
     return c;
+}
+
+// Gives the audition the play area as fractions of what it plays (a slice plays all of itself).
+void Phrase::applyPlayArea() noexcept
+{
+    if (previewIsSlice || previewAudioLen <= 0 || areaEnd - areaStart < 2) { preview.setRegion(0.0f, 1.0f); return; }
+    preview.setRegion((float) areaStart / (float) previewAudioLen, (float) areaEnd / (float) previewAudioLen);
+}
+
+double Phrase::previewPlayhead() const noexcept
+{
+    const float f = preview.getPosition();
+    if (f < 0.0f) return -1.0;
+    return previewIsSlice ? (double) previewSliceStart + (double) f * (double) previewSliceLen : (double) f * (double) previewAudioLen;
 }
 
 void Phrase::cropTo(int start, int end)

@@ -28,6 +28,12 @@ public:
     // Message thread: plays decoded audio (any channel count, at `audioRate`) the same way, converted to the prepared rate.
     void startBuffer(const juce::AudioBuffer<float>& audio, double audioRate);
 
+    // The part of the published audio that plays, as fractions of its length (any thread, takes effect at once, also mid-play): the
+    // start is where a new play begins and where a repeat returns to, the end is where it stops or repeats. Default 0 to 1.
+    void setRegion(float start, float end) noexcept { regionStart.store(start, std::memory_order_relaxed); regionEnd.store(end, std::memory_order_relaxed); }
+    // Where the audition is, as a fraction of the published audio (0..1), or a negative value when nothing sounds (any thread).
+    float getPosition() const noexcept { return position.load(std::memory_order_relaxed); }
+
     // Audio thread: mix preview output into masterBus if currently playing.
     void mixInto(juce::AudioBuffer<float>& masterBus, int numSamples);
 
@@ -56,10 +62,13 @@ private:
     std::vector<std::unique_ptr<Decoded>> owned;    // message thread: every live buffer, including the published one
     juce::uint64             nextId = 1;
     std::atomic<bool>        looping { false };
+    std::atomic<float>       regionStart { 0.0f }, regionEnd { 1.0f };
+    std::atomic<float>       position { -1.0f };
 
     // Audio-thread-owned play state.
     juce::uint64             playingId = 0;
     int                      readPos = 0;
+    bool                     finished = false;   // a play that has reached the region's end and does not repeat
 };
 
 } // namespace mu_core
