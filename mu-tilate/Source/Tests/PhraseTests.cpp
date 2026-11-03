@@ -473,6 +473,23 @@ struct PhraseTests : public juce::UnitTest
             expectGreaterThan(rms(out, 24000 + 100, 4000), 0.05);                    // beat 1: slice 0 of the cut loop
         }
 
+        beginTest("a hit's volume (the dragged top of its block) scales its level, 0 is silent");
+        {
+            Rig r;
+            r.hitsStartWithSliceSettings = false;
+            r.timeline.place(0, 0.0, 0.0);
+            r.timeline.place(1, 1.0, 0.0);
+            r.timeline.place(2, 2.0, 0.0);
+            auto half = r.timeline.blocks()[0].own; half.volume = 0.5f; r.timeline.setSettings(0, half);
+            auto none = r.timeline.blocks()[2].own; none.volume = 0.0f; r.timeline.setSettings(2, none);
+            auto out = r.run(96000, 128);
+            expectWithinAbsoluteError(out.getSample(0, 12000), 0.05f, 1.0e-4f);   // slice 0 holds 0.1: half of it
+            expectWithinAbsoluteError(out.getSample(0, 36000), 0.2f, 1.0e-4f);    // slice 1 untouched
+            expectEquals(out.getSample(0, 60000), 0.0f);                         // slice 2 at volume 0
+            auto s2 = sanitised(half); s2.volume = 7.0f;
+            expectEquals(sanitised(s2).volume, 1.0f);
+        }
+
         beginTest("a block near the end of the timeline sounds again in the next pass");
         {
             Rig r;

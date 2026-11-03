@@ -1,6 +1,7 @@
 // The Phrase parameter table: every row the suffix table names exists under the slot's prefix (and only there),
 // the rows' defaults are what the design says, and every modulation target names a real row with a proportional depth.
 
+#include "Plugin/MixerFxParams.h"   // mu-core: addChannelStripParams
 #include "Modulation/ModTargetChecks.h"   // mu-core: missingParams, depthNotProportional
 #include "Modulation/MuTilateModDest.h"
 #include "Persistence/PhraseParams.h"
@@ -50,7 +51,14 @@ struct PhraseParamsTests : public juce::UnitTest
 
         beginTest("every modulation target names a real row and its depth is a proportion of the range");
         {
-            expectEquals(mu_mod::checks::missingParams(kModDestTable, apvts, "p0_").size(), 0);
+            {
+                // The layer's rows plus its mixer strip (the pan and send targets are the strip's parameters).
+                juce::AudioProcessorValueTreeState::ParameterLayout withStrip;
+                addLayerParams(withStrip, 0);
+                mu_mixfx::addChannelStripParams(withStrip, "ch0_", "Layer 1 Ch ");
+                ParamHost stripHost(std::move(withStrip));
+                expectEquals(mu_mod::checks::missingParams(kModDestTable, stripHost.apvts, "p0_").size(), 0);
+            }
             expectEquals(mu_mod::checks::depthNotProportional(kModDestTable).size(), 0);
             // Every continuous layer parameter is a target unless it is exempt here, with the reason.
             static constexpr mu_mod::checks::ModExemption exempt[] = {

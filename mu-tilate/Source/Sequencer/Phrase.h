@@ -5,6 +5,7 @@
 #include "Audio/SpinLock.h"             // mu-core: the try-lock the audio thread takes around the loop data
 #include "Audio/VoiceParams.h"          // mu-core: the insert's parameter snapshot
 #include "Modulation/LastResolved.h"    // mu-core: hold-last-value on a matrix-lock miss
+#include "Modulation/StripMods.h"       // mu-core: the mixer strip's pan and sends as targets
 #include "Modulation/MuTilateModDest.h" // the modulation target table
 #include "Persistence/PhraseParams.h"   // the Phrase type's parameter table (ppi)
 #include "Persistence/PhraseState.h"    // the saved form of the loop reference, slices and timeline
@@ -109,6 +110,7 @@ struct Phrase : Layer
     const juce::String& loadedLoopPath() const noexcept { return loadedPath; }
     const juce::String& loopName() const noexcept { return displayName; }
 
+    bool stripMods(float (&out)[4]) const noexcept override { return stripMod.read(out); }
     bool isValidDest(const std::string& id) const override { return isValidModDest(id); }
     void onMoved(int newIndex) override { insert->setSlotIndex(newIndex); }
     const std::atomic<float>* insertGainReduction() const override { return &insert->grReduction; }
@@ -160,6 +162,7 @@ private:
     std::array<juce::NormalisableRange<float>, kNumModDests>  modDestRanges {};
     std::unordered_map<std::string_view, float>               modParamValues;
     LiveValues                                                modLive;
+    mu_mod::StripMods                                         stripMod;   // the modulated pan and FX sends, for the mixer strip
     mu_mod::LastResolved<kNumModDests>                        lastResolved;
 
     PhraseSettings settings;                       // the block's settings, set by readParams

@@ -109,6 +109,26 @@ int PhraseTimeline::edgeAt(int x, bool& right) const
     return best;
 }
 
+juce::Rectangle<int> PhraseTimeline::blockRect(int i) const
+{
+    const auto row = rowArea();
+    const auto& b = timeline.blocks()[(size_t) i];
+    const int x0 = xOf(b.start), x1 = xOf(b.start + blockBeats(i));
+    return { x0, row.getY() + mu_ui::s(LF::kBlockInset), std::max(2, x1 - x0 - 1), row.getHeight() - mu_ui::s(2 * LF::kBlockInset) };
+}
+
+int PhraseTimeline::levelHandleAt(juce::Point<int> p) const
+{
+    // The line sits at the hit's volume up from the foot of the block; a few pixels either side of it grab it.
+    for (int i = 0; i < timeline.size(); ++i)
+    {
+        const auto r = blockRect(i);
+        const int y = r.getBottom() - (int) std::lround(timeline.blocks()[(size_t) i].own.volume * (float) r.getHeight());
+        if (r.contains(p.x, p.y) && std::abs(p.y - y) <= mu_ui::s(5)) return i;
+    }
+    return -1;
+}
+
 double PhraseTimeline::blockBeats(int i) const
 {
     const auto& b = timeline.blocks()[(size_t) i];
@@ -190,6 +210,22 @@ void PhraseTimeline::paint(juce::Graphics& g)
         const float dim = cropped ? 0.3f : 1.0f;
         g.setColour(accent.withAlpha((i == selected ? lighting.blockFillSelected : lighting.blockFill) * dim));
         g.fillRoundedRectangle(r.toFloat(), LF::kBlockRadius);
+        // The hit's volume: the block is coloured in from the foot up to its level (0..100 %), and a line marks the top of it.
+        const float vol = b.own.volume;
+        if (! cropped && vol > 0.0f)
+        {
+            const auto lit = r.withTop(r.getBottom() - std::max(1, (int) std::lround(vol * (float) r.getHeight())));
+            g.saveState();
+            g.reduceClipRegion(lit);
+            g.setColour(accent.withAlpha(lighting.blockFillSelected));
+            g.fillRoundedRectangle(r.toFloat(), LF::kBlockRadius);
+            g.restoreState();
+            if (vol < 0.995f)
+            {
+                g.setColour(accent.brighter(0.5f));
+                g.fillRect(lit.getX() + 1, lit.getY(), lit.getWidth() - 2, 2);
+            }
+        }
         g.setColour(LF::colour(LF::lfoEditorPoint).withAlpha((i == selected ? 1.0f : 0.5f) * dim));
         g.drawRoundedRectangle(r.toFloat(), LF::kBlockRadius, 1.0f);
         if (! loopPeaks.empty() && b.slice >= 0 && b.slice < (int) sliceSpans.size())
@@ -202,6 +238,7 @@ void PhraseTimeline::paint(juce::Graphics& g)
             const double a = span.start + u0 / nat * span.length, e = span.start + u1 / nat * span.length;
             const double avail = std::min(e, 1.0);
             auto rr = r.reduced(1);
+            rr = rr.withSizeKeepingCentre(rr.getWidth(), std::max(2, (int) std::lround((float) rr.getHeight() * vol)));   // the picture follows the level
             if (e > a) rr.setWidth(std::max(0, (int) std::lround((double) rr.getWidth() * (avail - a) / (e - a))));
             g.setColour(juce::Colours::black.withAlpha(lighting.blockWave));
             drawPeaks(g, loopPeaks, rr, b.own.reverse, 0, getWidth(), a, avail);
@@ -212,7 +249,8 @@ void PhraseTimeline::paint(juce::Graphics& g)
             // Only the part of the slice that sounds is drawn: it starts after the trim and ends where the block does, at the hit's speed.
             const double nat = std::max(1.0e-6, naturalBeatsOf(i)), from = std::clamp(b.own.trimInBeats / nat, 0.0, 1.0);
             const double to = std::clamp(from + blockBeats(i) / std::max(0.25f, b.own.retime) / nat, from, 1.0);
-            drawPeaks(g, slicePeaksList[(size_t) b.slice], r.reduced(1), b.own.reverse, 0, getWidth(), from, to);
+            const auto pr = r.reduced(1);
+            drawPeaks(g, slicePeaksList[(size_t) b.slice], pr.withSizeKeepingCentre(pr.getWidth(), std::max(2, (int) std::lround((float) pr.getHeight() * vol))), b.own.reverse, 0, getWidth(), from, to);
         }
         if (r.getWidth() > s(LF::kBlockLabelMinW))
         {
@@ -288,11 +326,13 @@ void PhraseTimeline::mouseDown(const juce::MouseEvent& e)
     dragMoved = false;
     bool onRight = false;
     const int edgeBlock = edgeAt(e.x, onRight);
-    const int hit = edgeBlock >= 0 ? edgeBlock : blockAt(e.x);
+    const int levelBlock = edgeBlock < 0 ? levelHandleAt(e.getPosition()) : -1;
+    const int hit = edgeBlock >= 0 ? edgeBlock : levelBlock >= 0 ? levelBlock : blockAt(e.x);
     if (hit >= 0)
     {
         selected = hit;
         dragBlock = hit;
+        dragLevel = levelBlock >= 0;
         dragEdge = edgeBlock >= 0 ? (onRight ? Edge::Right : Edge::Left) : Edge::None;
         const auto& hb = timeline.blocks()[(size_t) hit];
         dragAnchor = dragEdge == Edge::Left ? hb.start + blockBeats(hit) : hb.start;   // the edge that holds still
@@ -336,6 +376,23 @@ void PhraseTimeline::mouseDrag(const juce::MouseEvent& e)
         return;
     }
     if (dragBlock < 0 || ! onEdit) return;
+
+    // Dragging the top of a block up or down sets the hit's volume: 0 at the foot, 100 % at the top (Shift for no snap to 100 %).
+    if (dragLevel)
+    {
+        const int at = dragBlock;
+        const auto r = blockRect(at);
+        float v = juce::jlimit(0.0f, 1.0f, (float) (r.getBottom() - e.y) / (float) std::max(1, r.getHeight()));
+        if (! e.mods.isShiftDown() && v > 0.97f) v = 1.0f;
+        if (! e.mods.isShiftDown() && v < 0.03f) v = 0.0f;
+        onEdit([at, v](Timeline& t)
+        {
+            auto own = t.blocks()[(size_t) at].own;
+            own.volume = v;
+            t.setSettings(at, own);
+        });
+        return;
+    }
 
     // Dragging an edge trims the block (the start edge skips the start of the slice, the end edge stops it early); with Alt the
     // slice is retimed to the new width instead. The edge snaps to the grid unless Shift is held; at least a sixteenth of a beat stays.
@@ -392,6 +449,7 @@ void PhraseTimeline::mouseUp(const juce::MouseEvent&)
 {
     panning = false;
     dragBlock = -1;
+    dragLevel = false;
     dragEdge = Edge::None;
 }
 
@@ -399,7 +457,8 @@ void PhraseTimeline::mouseMove(const juce::MouseEvent& e)
 {
     bool right = false;
     const int hit = rowArea().contains(e.getPosition()) ? edgeAt(e.x, right) : -1;
-    setMouseCursor(hit >= 0 ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::NormalCursor);
+    const bool onLevel = hit < 0 && levelHandleAt(e.getPosition()) >= 0;
+    setMouseCursor(hit >= 0 ? juce::MouseCursor::LeftRightResizeCursor : onLevel ? juce::MouseCursor::UpDownResizeCursor : juce::MouseCursor::NormalCursor);
 }
 
 void PhraseTimeline::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& w)

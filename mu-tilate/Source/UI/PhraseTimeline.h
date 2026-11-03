@@ -72,6 +72,9 @@ private:
     // The beats block `i` covers on screen: its own length, else its slice's, cut short by the next block.
     double blockBeats(int i) const;
     int    blockAt(int x) const;
+    // Where block `i` is drawn, and the block whose level line (the top of its coloured part) is under `p`, or -1.
+    juce::Rectangle<int> blockRect(int i) const;
+    int    levelHandleAt(juce::Point<int> p) const;
     // The block with an edge under x (`right` says which), or -1.
     int    edgeAt(int x, bool& right) const;
     double naturalBeatsOf(int i) const;   // the block's whole slice, in beats
@@ -102,6 +105,7 @@ private:
     double grabOffset = 0.0;
     bool   dragMoved = false;
     enum class Edge { None, Left, Right };
+    bool   dragLevel = false;       // the drag is on a block's level line: up and down set the hit's volume
     Edge   dragEdge = Edge::None;   // the drag is on a block edge (trim, or with Alt retime), not moving the block
     double dragAnchor = 0.0;        // the edge that stays put during an edge drag, in beats
 

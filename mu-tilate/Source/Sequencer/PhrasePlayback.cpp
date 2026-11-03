@@ -68,7 +68,7 @@ SliceParams PhrasePlayback::paramsFor(const PhraseLoop& loop, const PhraseSettin
     p.own.fltA = juce::jmax(0.0f, s.fltA + own.fltA);   p.own.fltD = juce::jmax(0.0f, s.fltD + own.fltD);
     p.own.fltS = juce::jlimit(0.0f, 1.0f, s.fltS + own.fltS);   p.own.fltR = juce::jmax(0.0f, s.fltR + own.fltR);
     p.own.filterEnvAmt = juce::jlimit(-1.0f, 1.0f, s.filterEnvAmt + own.filterEnvAmt);
-    p.gain      = s.gain * juce::Decibels::decibelsToGain(juce::jlimit(-12.0f, 12.0f, own.levelDb));
+    p.gain      = s.gain * juce::Decibels::decibelsToGain(juce::jlimit(-12.0f, 12.0f, own.levelDb)) * juce::jlimit(0.0f, 1.0f, own.volume);
     p.fadeInMs  = juce::jmax(0.0f, s.fadeInMs + own.fadeInMs);
     p.fadeOutMs = juce::jmax(0.0f, s.fadeOutMs + own.fadeOutMs);
     p.reverse   = own.reverse;

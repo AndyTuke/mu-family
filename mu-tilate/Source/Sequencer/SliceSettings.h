@@ -56,6 +56,7 @@ struct SliceSettings
     // This hit's own trim and retime, set by dragging the block's edges on the timeline (absolute, not offsets).
     float trimInBeats = 0.0f;   // >= 0: beats of the slice (at the loop's tempo) skipped at its start
     float retime      = 1.0f;   // 0.25..4: the hit plays in this many times its natural length (2 = twice as long); pitch follows the layer's Pitch/Stretch knob
+    float volume      = 1.0f;   // 0..1: this hit's level as a fraction of full, set by dragging the top of the block on the timeline (multiplies the gain)
 
 };
 
@@ -88,6 +89,7 @@ inline SliceSettings sanitised(SliceSettings s) noexcept
     s.chokeGroup = std::clamp(s.chokeGroup, 0, 8);
     s.trimInBeats = fix(s.trimInBeats, 0.0f, 4096.0f, 0.0f);
     s.retime = fix(s.retime, 0.25f, 4.0f, 1.0f);
+    s.volume = fix(s.volume, 0.0f, 1.0f, 1.0f);
     return s;
 }
 

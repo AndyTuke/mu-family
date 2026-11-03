@@ -319,6 +319,7 @@ void Phrase::readParams(double modBeat) noexcept
     lastResolved.apply(resolved, out);
     for (int k = 0; k < kNumModDests; ++k)
         modLive.v[(size_t) k].store(out[k], std::memory_order_relaxed);
+    stripMod.publish(out[D_stripPan], out[D_sendEff], out[D_sendDly], out[D_sendRev]);   // the host gives these to the layer's mixer strip
 
     settings.mode      = (TempoMode) juce::jlimit(0, 1, (int) g(ppi::mode));   // not modulated
     settings.stretchMix = out[D_tempoMix];

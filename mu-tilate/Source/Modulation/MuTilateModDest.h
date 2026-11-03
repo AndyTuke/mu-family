@@ -40,6 +40,11 @@ inline constexpr ModDest kModDestTable[] = {
     { "amp.decay",     "Amp Decay",      "Amp",      "ampD" },
     { "amp.sustain",   "Amp Sustain",    "Amp",      "ampS" },
     { "amp.release",   "Amp Release",    "Amp",      "ampR" },
+    // The mixer strip: pan and the FX sends (the strip's ch{N}_ parameters; same ids as mu-Clid and mu-Toni; appended).
+    { "amp.pan",       "Mixer Pan",      "Mixer",    "pan" },
+    { "send.effect",   "Effect Send",    "Effects",  "sendEff" },
+    { "send.delay",    "Delay Send",     "Effects",  "sendDly" },
+    { "send.reverb",   "Reverb Send",    "Effects",  "sendRev" },
 };
 
 // The out[] indices: MUST match kModDestTable order.
@@ -48,6 +53,7 @@ enum ModDestIndex
     D_level, D_hold, D_strength, D_fadeIn, D_fadeOut, D_insP1, D_insP2, D_insP3, D_insP4,
     D_loopTempo, D_tempoMix, D_pitch, D_fine, D_pan, D_cutoff, D_res, D_filterEnv, D_fltA, D_fltD, D_fltS, D_fltR,
     D_ampA, D_ampD, D_ampS, D_ampR,
+    D_stripPan, D_sendEff, D_sendDly, D_sendRev,
     kNumModDests
 };
 
