@@ -101,9 +101,8 @@ SlicePanel::SlicePanel()
     band.setSections(pitchSection, filterSection, ampSection, insertSection, { nullptr, nullptr, nullptr });
     addAndMakeVisible(band);
 
-    // How the slice plays: direction, once or loop, and the pre-fade (a quiet reversed copy of its start that swells into the hit).
+    // How the slice plays: direction, and the pre-fade (a quiet reversed copy of its start that swells into the hit).
     addSwitch(reverseSwitch);
-    addSwitch(loopSwitch);
     addSwitch(preSwitch);
     addKnob(nullptr, 0, 0, "Level", &SliceSettings::preLevelDb, -36.0, 0.0, 0.1, LF::knobFxSend, "Pre-fade Level: how loud the reversed swell is, below the slice",
             [](double v) { return juce::String(v, 1) + " dB"; });
@@ -182,7 +181,6 @@ void SlicePanel::changed()
     }
     settings.reverse    = reverseSwitch.getSelectedIndex() == 1;
     settings.preFade    = preSwitch.getSelectedIndex() == 1;
-    settings.loop       = loopSwitch.getSelectedIndex() == 1;
     if (onChange) onChange(settings);
 }
 
@@ -199,7 +197,6 @@ void SlicePanel::setSlice(int index, const SliceSettings& s, const juce::String&
     }
     reverseSwitch.setSelectedIndex(s.reverse ? 1 : 0);
     preSwitch.setSelectedIndex(s.preFade ? 1 : 0);
-    loopSwitch.setSelectedIndex(s.loop ? 1 : 0);
     updating = false;
     setEnabled(index >= 0);
     repaint();
@@ -229,24 +226,33 @@ void SlicePanel::resized()
     band.setBounds(area.removeFromTop(s(VoiceBand::kHeight)).withWidth(s(VoiceBand::kEffectsX + VoiceBand::kEffectsW)));
     area.removeFromTop(s(LF::kSpaceS));
 
-    // The play strip: direction, once or loop, and the pre-fade with its three knobs, in one raised box under the band.
+    // Under the band, two raised boxes side by side: the slice's direction, and the pre-fade with its switch and three knobs.
     sections.clear();
     const int pad = s(LF::kSpaceS), plate = s(LF::kSectionPlateH);
     const int boxTop = area.getY() + plate, top = boxTop + pad;
     int x = s(VoiceBand::kLeftGap);
-    const int start = x;
-    x += pad;
     auto switchAt = [&](SegmentControl& sw, int w)
     {
         sw.setBounds(x, top + (s(LF::kKnobSize2H) - s(kHeaderH)) / 2, s(w), s(kHeaderH));
         x += s(w) + pad;
     };
+    auto closeBox = [&](int start, const char* title)
+    {
+        sections.push_back({ juce::Rectangle<int>(start, boxTop, x - start, s(LF::kKnobSize2H) + pad * 2), title });
+        x += pad;
+    };
+
+    int start = x;
+    x += pad;
     switchAt(reverseSwitch, LF::kLoopSwitchW);
-    switchAt(loopSwitch, LF::kLoopSwitchWideW);
+    closeBox(start, "SLICE PLAY");
+
+    start = x;
+    x += pad;
     switchAt(preSwitch, LF::kLoopSwitchW);
     for (auto* k : playKnobs) { k->comp->setBounds(x, top, s(LF::kKnobSize2W), s(LF::kKnobSize2H)); x += s(LF::kKnobSize2W); }
     x += pad;
-    sections.push_back({ juce::Rectangle<int>(start, boxTop, x - start, s(LF::kKnobSize2H) + pad * 2), "SLICE PLAY AND PRE-FADE" });
+    closeBox(start, "PRE-FADE");
 }
 
 } // namespace mu_tilate

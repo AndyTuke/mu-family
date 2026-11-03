@@ -16,7 +16,7 @@
 
 // The Slice view's control panel (docs/mu-tilate/design-ui.md, "Slice player"): the settings of one hit or slice, laid out exactly
 // like the Layer view (Pitch | Filter | Amp | Effects), but every knob is an OFFSET, -x to +x, added to the layer's own value. Below
-// the band: how the slice plays (direction, once or loop) and its pre-fade. It shows the settings it is given and reports every
+// the band: how the slice plays (direction) and its pre-fade, each in its own box. It shows the settings it is given and reports every
 // change as a whole SliceSettings; it edits no data itself.
 namespace mu_tilate
 {
@@ -78,7 +78,6 @@ private:
     DropdownSelect   layerInsertName;    // the layer's insert effect, likewise
     SegmentControl reverseSwitch { { "Fwd", "Rev" },  SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Lcd };
     SegmentControl preSwitch     { { "Off", "On" },   SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Lcd };
-    SegmentControl loopSwitch    { { "Once", "Loop" }, SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Lcd };
     std::vector<std::unique_ptr<Knob>> knobs;
     std::vector<Knob*> playKnobs;                   // the pre-fade's knobs, placed in the play strip
     std::vector<MuLookAndFeel::Section> sections;   // the play strip's box, as resized() placed it
