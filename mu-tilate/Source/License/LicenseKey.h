@@ -10,8 +10,7 @@ namespace mu_tilate
     inline constexpr const char* kLicenseProductId = "mu-Tilate";
 
     // Lemon Squeezy pay-what-you-want page the support prompt opens (the same link the website uses).
-    // PLACEHOLDER: the store front until the mu-Tilate product exists; replace with its checkout link.
-    inline constexpr const char* kCheckoutUrl = "https://transwarp.lemonsqueezy.com/";
+    inline constexpr const char* kCheckoutUrl = "https://transwarp.lemonsqueezy.com/checkout/buy/1121cfce-b13f-466e-9dcc-6414508840dd";
 
     // License file the user drops into the content dir (getContentDir()).
     inline constexpr const char* kLicenseFilename  = "mutilate.lic";
