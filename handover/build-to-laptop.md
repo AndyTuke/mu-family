@@ -2,17 +2,23 @@
 
 Written only by the build PC. The laptop reads it and answers in [laptop-to-build.md](laptop-to-build.md). Protocol: [README.md](README.md).
 
-Next id: B-004
+Next id: B-005
 
 (B-001 resolved and removed: see the Extra entry below.)
 
 ## Status (build PC)
 
-- Written: 2026-11-01, end of the mu-Tilate session. Build number 1456 (`mu-core/BuildNumber.h`, focused Debug builds, no increment). Main at the commit before this handover; everything is pushed.
-- mu-Tilate: Standalone/VST3/CLAP built and run; engine, slice player panel, pre-fade, detector, review fixes and the shared mu-core voice DSP are done; `mu-tilate-tests` 84 results and `mu-core-tests` 883, 0 failures (Debug). Rows 1721, 1722, 1724, 1727, 1729 closed with the steward sign-offs (run through general-purpose agents: the named agents are not registered on this PC). Nothing has been listened to by Andy yet; no Release build, no pluginval run.
-- Release VST3s of the other products are as deployed on 2026-10-31.
+- Written: 2026-11-03, end of the mu-Tilate session. Build number 1457 (`mu-core/BuildNumber.h`, focused Debug builds, no increment). Everything is committed and pushed (`7ec11c54` plus the backlog commits after it).
+- mu-Tilate: `mu-tilate-tests` 112 results, 0 failures (Debug). Rows 1748 to 1755 are closed on build and test evidence, but Andy has not seen or heard any of it yet: the look-list is in B-004 and on #1745. No Release build, no pluginval run.
+- Other products: the sync work (#1749) is built and tested; their golden and pin failures are the stale ones in B-002, #1751 (mu-Tronic Pattern hash) is open.
 
 ## Open
+
+### B-004 · 2026-11-03 · mu-Tilate: look and listen through everything built since 1745
+Rows: #1745 (the list), #1748 to #1755 · Commits: up to `7ec11c54` · Needs: look | listen
+Do: run mu-Tilate (Debug Standalone) and go through the #1745 check list: range bar, timeline edge trim/retime, drop onto a longer block, marker snap, double-click add, hover-cross delete, rename by double-click, scroll bar, loop toggle, detector on the Sequencer page, the play-area handles and Crop (dimmed "cropped" hits), moving the area while a play button sounds, the playhead, the one-row top panel with the icon play buttons, the Layer Sound strip on the Sequencer view, dragging the top of a hit to set its volume, the new modulation targets (incl. Mixer Pan and the three sends), Sync on both tape inserts.
+Report: anything that looks or sounds wrong, on #1745 or as a new row. Also: which play button has a start delay and how long the loop is (in the tests every button starts in under 20 ms); #1720 (Tape Spring name and extension bank) and #1751 (re-record the mu-Tronic hash?) need a decision.
+Not done on this PC: nothing listened, no Release build, the other products' mod-target tables have not adopted the coverage check.
 
 ### B-003 · 2026-11-01 · mu-Tilate: decisions and reviews that need planning, not a build
 Rows: #1723, #1725, #1726, #1728, #1730, #1720 · Commits: up to d8796a0e and bb666382 · Needs: decide | review
