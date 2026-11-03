@@ -97,7 +97,8 @@ SlicePanel::SlicePanel()
         knobs.push_back(std::move(k));
     }
 
-    // The three FX sends: how far this slice moves each of the strip's sends (the mixer's own knobs stay where they are).
+    // The three FX sends: how far this slice moves each of the strip's sends (the mixer's own knobs stay where they are). They sit in
+    // their own box under the band, not among the layer's send knobs, so they are not mistaken for them.
     static const char* const sendNames[3]  = { "Effect", "Delay", "Reverb" };
     for (int i = 0; i < 3; ++i)
     {
@@ -110,11 +111,12 @@ SlicePanel::SlicePanel()
         k->comp->onStatusUpdate = [this, name](const juce::String&, const juce::String& v) { if (onStatusUpdate) onStatusUpdate(name, v); };
         k->comp->onValueChanged = [this](double) { changed(); };
         sendKnobs[(size_t) i] = k->comp.get();
+        addAndMakeVisible(*k->comp);
         knobs.push_back(std::move(k));
     }
 
     band.setTitlePrefix("SLICE");
-    band.setSections(pitchSection, filterSection, ampSection, insertSection, { sendKnobs[0], sendKnobs[1], sendKnobs[2] });
+    band.setSections(pitchSection, filterSection, ampSection, insertSection, { nullptr, nullptr, nullptr });
     addAndMakeVisible(band);
 
     // How the slice plays: direction, and the pre-fade (a quiet reversed copy of its start that swells into the hit).
@@ -271,6 +273,12 @@ void SlicePanel::resized()
     for (auto* k : playKnobs) { k->comp->setBounds(x, top, s(LF::kKnobSize2W), s(LF::kKnobSize2H)); x += s(LF::kKnobSize2W); }
     x += pad;
     closeBox(start, "PRE-FADE");
+
+    start = x;
+    x += pad;
+    for (auto* k : sendKnobs) { k->setBounds(x, top, s(LF::kKnobSize2W), s(LF::kKnobSize2H)); x += s(LF::kKnobSize2W); }
+    x += pad;
+    closeBox(start, "SLICE SENDS");
 }
 
 } // namespace mu_tilate

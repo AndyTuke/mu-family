@@ -1,5 +1,8 @@
 #include "Plugin/PluginProcessor.h"
 
+#include "License/LicenseKey.h"
+#include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
+
 #include "Analysis/LoopTempo.h"   // mu-core: a first tempo guess from the loop length
 
 #include "Audio/LoopLoader.h"              // mu-core: decode a loop file
@@ -47,6 +50,9 @@ PluginProcessor::PluginProcessor()
     storeLayerCount(1, std::memory_order_relaxed);   // a fresh instance starts with one layer
 
     initAppSettings("muTilate");   // settings file + saved UI size / MIDI clock (ProcessorBase)
+
+    // Offline licence + online activation (shared; after initAppSettings for getContentDir).
+    initLicensing({ mu_tilate::kLicenseProductId, mu_tilate::kLicenseFilename, mu_tilate::kLicensePublicKey, "mutilate.activation", mu_tilate::kCheckoutUrl });
 
     for (int i = 0; i < mu_limits::kMaxLayers; ++i) layers[(size_t) i]->bindParams(apvts, i);
     setupLayerState();

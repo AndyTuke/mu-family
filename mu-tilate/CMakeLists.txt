@@ -57,7 +57,19 @@ target_sources(mu-tilate
         Source/Plugin/PluginProcessor_Preset.cpp
         Source/Plugin/PluginEditor.cpp
         ${MU_TILATE_LAYER_UI_SOURCES}   # the layer's UI content (mu-tilate-layer)
+        # Offline-license verifier + online activation live in mu-core (shared); compiled here + monocypher.c.
+        "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
+        "${CMAKE_SOURCE_DIR}/mu-core/License/LemonSqueezyClient.cpp"
+        "${CMAKE_SOURCE_DIR}/mu-core/License/OnlineActivation.cpp"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
 )
+
+# monocypher is vendored third-party crypto; silence its benign MSVC C4244 at the build level.
+if(MSVC)
+    set_source_files_properties(
+        "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
+        PROPERTIES COMPILE_OPTIONS "/wd4244")
+endif()
 
 target_include_directories(mu-tilate
     PRIVATE
@@ -65,6 +77,7 @@ target_include_directories(mu-tilate
     SYSTEM PRIVATE
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher"   # LicenseManager
 )
 
 target_compile_definitions(mu-tilate
@@ -141,6 +154,10 @@ target_sources(mu-tilate-tests PRIVATE
     # The real PluginProcessor, built headless (createEditor is defined in ProcessorTests.cpp; PluginEditor.cpp is not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp
+    "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/License/LemonSqueezyClient.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/License/OnlineActivation.cpp"
+    "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
     # The mu-core .cpps behind ProcessorBase (the console target cannot link mu-core directly).
     ${MU_CORE_PROCESSOR_TEST_SOURCES}
     # mu-core's detector (the plugin targets get it through mu-core; a console target lists it).
@@ -154,7 +171,7 @@ target_sources(mu-tilate-tests PRIVATE
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/MultiModeFilter.cpp"
 )
 target_include_directories(mu-tilate-tests PRIVATE "${CMAKE_SOURCE_DIR}/mu-core" "${CMAKE_SOURCE_DIR}/mu-core/Tests" "${CMAKE_CURRENT_SOURCE_DIR}/Source")
-target_include_directories(mu-tilate-tests SYSTEM PRIVATE "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include" "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include")   # Tests: AllocationProbe.h
+target_include_directories(mu-tilate-tests SYSTEM PRIVATE "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include" "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include" "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher")   # Tests: AllocationProbe.h; LicenseManager
 
 target_compile_features(mu-tilate-tests PRIVATE cxx_std_17)
 
