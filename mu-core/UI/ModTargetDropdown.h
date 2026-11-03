@@ -5,10 +5,8 @@
 #include "Audio/InsertSlotConfig.h"     // kInsertAlgoSlots — per-algorithm insert slot labels
 #include "Audio/AlgorithmNames.h"       // kInsertAlgorithmNames
 
-#include <algorithm>
 #include <cstring>
 #include <functional>
-#include <utility>
 #include <vector>
 
 // Fill a modulation-destination dropdown from a product's target table (the family standard,
@@ -28,7 +26,6 @@ struct DropdownOptions
     std::function<bool(const ModTarget&)> show;             // optional extra filter (e.g. stepped-only targets)
     std::vector<int>                      order;            // display order of row indices (empty = table order)
     juce::String                          effectSendName;   // effect bus's current effect ("" = keep the table label)
-    bool                                  sectionSubmenus = false;   // one submenu per section instead of one long list (a product with many targets)
 };
 
 inline void populateDropdown(DropdownSelect& dd, const ModTarget* table, int count,
@@ -37,7 +34,6 @@ inline void populateDropdown(DropdownSelect& dd, const ModTarget* table, int cou
     const bool algoActive = options.insertAlgo > 0 && options.insertAlgo < mu_audio::kInsertAlgorithmCount;
     juce::String currentHeading;
     bool first = true;
-    std::vector<std::pair<juce::String, juce::PopupMenu>> sections;   // the submenus, when options.sectionSubmenus
 
     // Add one row: filter it, swap in insert-slot labels, open a heading when the section changes.
     auto addRow = [&](int i)
@@ -60,13 +56,6 @@ inline void populateDropdown(DropdownSelect& dd, const ModTarget* table, int cou
         else if (options.effectSendName.isNotEmpty() && std::strcmp(t.param, "sendEff") == 0)
             label = options.effectSendName + " Send";
 
-        if (options.sectionSubmenus)
-        {
-            auto it = std::find_if(sections.begin(), sections.end(), [&](const auto& s) { return s.first == heading; });
-            if (it == sections.end()) { sections.emplace_back(heading, juce::PopupMenu()); it = sections.end() - 1; }
-            it->second.addItem(juce::PopupMenu::Item(label).setID(i + 1));
-            return;
-        }
         if (heading.isNotEmpty() && (first || heading != currentHeading))
             dd.addSectionHeading(heading);
         currentHeading = heading;
@@ -78,10 +67,6 @@ inline void populateDropdown(DropdownSelect& dd, const ModTarget* table, int cou
         for (int i = 0; i < count; ++i) addRow(i);
     else
         for (int i : options.order) addRow(i);
-
-    // A submenu per section: a long flat list does not fit a short window, and a popup that tall cannot be scrolled to the end.
-    for (auto& sec : sections)
-        dd.getComboBox().getRootMenu()->addSubMenu(sec.first, sec.second);
 }
 
 template <std::size_t N>

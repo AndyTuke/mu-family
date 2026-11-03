@@ -17,10 +17,7 @@ inline ModDestProvider makeModDestProvider()
 
     p.populate = [](DropdownSelect& dd, int driveChar, bool /*steppedMode*/)
     {
-        mu_mod::DropdownOptions options;
-        options.insertAlgo = driveChar;         // the active insert effect
-        options.sectionSubmenus = true;         // some thirty targets: one submenu per section
-        mu_mod::populateDropdown(dd, kModDestTable, options);
+        mu_mod::populateDropdown(dd, kModDestTable, { driveChar });   // driveChar = active insert effect
     };
 
     wireTableModDestResolve(p, [](int i) { return std::string(kModDestTable[i].id); }, kNumModDests);
