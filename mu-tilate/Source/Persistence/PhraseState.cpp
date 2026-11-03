@@ -18,9 +18,10 @@ namespace
         put("aa", s.ampA, d.ampA); put("ad", s.ampD, d.ampD); put("as", s.ampS, d.ampS); put("ar", s.ampR, d.ampR);
         put("fa", s.fltA, d.fltA); put("fd", s.fltD, d.fltD); put("fs", s.fltS, d.fltS); put("fr", s.fltR, d.fltR);
         put("tin", s.trimInBeats, 0.0f); put("rt", s.retime, 1.0f); put("vol", s.volume, 1.0f); put("io0", s.insOff[0], 0.0f); put("io1", s.insOff[1], 0.0f); put("io2", s.insOff[2], 0.0f); put("io3", s.insOff[3], 0.0f);
+        put("se0", s.sendOff[0], 0.0f); put("se1", s.sendOff[1], 0.0f); put("se2", s.sendOff[2], 0.0f);
         put("pf", s.preFade ? 1 : 0, 0);       put("pfl", s.preLevelDb, d.preLevelDb);
         put("pfn", s.preLengthMs, d.preLengthMs); put("pft", s.preTone, d.preTone);
-        put("loop", s.loop ? 1 : 0, 0);         put("one", s.oneShot ? 1 : 0, 1);     put("chk", s.chokeGroup, d.chokeGroup);
+        put("one", s.oneShot ? 1 : 0, 1);     put("chk", s.chokeGroup, d.chokeGroup);
     }
 
     SliceSettings readSettings(const juce::ValueTree& m)
@@ -36,9 +37,9 @@ namespace
         s.fltA = f("fa", s.fltA); s.fltD = f("fd", s.fltD); s.fltS = f("fs", s.fltS); s.fltR = f("fr", s.fltR);
         s.trimInBeats = f("tin", 0.0f); s.retime = f("rt", 1.0f); s.volume = f("vol", 1.0f);
         for (int i = 0; i < 4; ++i) s.insOff[i] = f(("io" + juce::String(i)).toRawUTF8(), 0.0f);
+        for (int i = 0; i < 3; ++i) s.sendOff[i] = f(("se" + juce::String(i)).toRawUTF8(), 0.0f);
         s.preFade = (int) m.getProperty("pf", 0) != 0;
         s.preLevelDb = f("pfl", s.preLevelDb);  s.preLengthMs = f("pfn", s.preLengthMs);  s.preTone = f("pft", s.preTone);
-        s.loop = (int) m.getProperty("loop", 0) != 0;
         s.oneShot = (int) m.getProperty("one", 1) != 0;
         s.chokeGroup = (int) m.getProperty("chk", 0);
         return sanitised(s);   // a damaged file must not hand the engine a NaN

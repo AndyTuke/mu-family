@@ -319,7 +319,8 @@ void Phrase::readParams(double modBeat) noexcept
     lastResolved.apply(resolved, out);
     for (int k = 0; k < kNumModDests; ++k)
         modLive.v[(size_t) k].store(out[k], std::memory_order_relaxed);
-    stripMod.publish(out[D_stripPan], out[D_sendEff], out[D_sendDly], out[D_sendRev]);   // the host gives these to the layer's mixer strip
+    stripBase[0] = out[D_stripPan]; stripBase[1] = out[D_sendEff]; stripBase[2] = out[D_sendDly]; stripBase[3] = out[D_sendRev];
+    stripMod.publish(stripBase[0], stripBase[1], stripBase[2], stripBase[3]);   // the host gives these to the layer's mixer strip
 
     settings.mode      = (TempoMode) juce::jlimit(0, 1, (int) g(ppi::mode));   // not modulated
     settings.stretchMix = out[D_tempoMix];
@@ -365,6 +366,11 @@ void Phrase::renderBlock(const PhraseData* d, PhraseClock clock, juce::AudioBuff
         for (int i = 0; i < 4; ++i) insertCfg.insertParam[i] = juce::jlimit(0.0f, 1.0f, held[i] + off[i]);
     insert->process(buf, n, buf.getNumChannels(), insertCfg);
     for (int i = 0; i < 4; ++i) insertCfg.insertParam[i] = held[i];
+
+    // The newest sounding hit's send offsets ride on the strip's sends like a modulation (the mixer's knobs do not move).
+    float sendOff[3];
+    if (playback->sendOffsets(sendOff))
+        stripMod.publish(stripBase[0], stripBase[1] + sendOff[0], stripBase[2] + sendOff[1], stripBase[3] + sendOff[2]);
 }
 
 void Phrase::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n)

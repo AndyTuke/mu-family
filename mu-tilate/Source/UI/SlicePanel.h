@@ -10,6 +10,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include <array>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -54,6 +55,7 @@ private:
         std::unique_ptr<KnobWithLabel> comp;
         float SliceSettings::* field = nullptr;   // null for an insert offset (SliceSettings::insOff[insSlot])
         int insSlot = -1;
+        int sendSlot = -1;                        // >= 0: SliceSettings::sendOff[sendSlot], the Effect / Delay / Reverb send offset
     };
 
     void addKnob(VoiceBandSection* section, int row, int col, const char* label, float SliceSettings::* field, double lo, double hi,
@@ -79,6 +81,7 @@ private:
     SegmentControl reverseSwitch { { "Fwd", "Rev" },  SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Lcd };
     SegmentControl preSwitch     { { "Off", "On" },   SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Lcd };
     std::vector<std::unique_ptr<Knob>> knobs;
+    std::array<juce::Component*, 3> sendKnobs {};   // the three send offsets, handed to the band
     std::vector<Knob*> playKnobs;                   // the pre-fade's knobs, placed in the play strip
     std::vector<MuLookAndFeel::Section> sections;   // the play strip's box, as resized() placed it
 

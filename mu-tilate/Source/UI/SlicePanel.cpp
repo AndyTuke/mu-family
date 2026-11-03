@@ -97,8 +97,24 @@ SlicePanel::SlicePanel()
         knobs.push_back(std::move(k));
     }
 
+    // The three FX sends: how far this slice moves each of the strip's sends (the mixer's own knobs stay where they are).
+    static const char* const sendNames[3]  = { "Effect", "Delay", "Reverb" };
+    for (int i = 0; i < 3; ++i)
+    {
+        auto k = std::make_unique<Knob>();
+        k->comp = std::make_unique<KnobWithLabel>(sendNames[i], LF::knobFxSend);
+        k->sendSlot = i;
+        k->comp->setRange(-1.0, 1.0, 0.01);
+        k->comp->statusTextFromValue = signedPercent;
+        const juce::String name = juce::String("Slice ") + sendNames[i] + " Send Offset: added to the layer's send while this slice sounds";
+        k->comp->onStatusUpdate = [this, name](const juce::String&, const juce::String& v) { if (onStatusUpdate) onStatusUpdate(name, v); };
+        k->comp->onValueChanged = [this](double) { changed(); };
+        sendKnobs[(size_t) i] = k->comp.get();
+        knobs.push_back(std::move(k));
+    }
+
     band.setTitlePrefix("SLICE");
-    band.setSections(pitchSection, filterSection, ampSection, insertSection, { nullptr, nullptr, nullptr });
+    band.setSections(pitchSection, filterSection, ampSection, insertSection, { sendKnobs[0], sendKnobs[1], sendKnobs[2] });
     addAndMakeVisible(band);
 
     // How the slice plays: direction, and the pre-fade (a quiet reversed copy of its start that swells into the hit).
@@ -178,6 +194,7 @@ void SlicePanel::changed()
     {
         if (k->field != nullptr) settings.*(k->field) = (float) k->comp->getValue();
         else if (k->insSlot >= 0) settings.insOff[k->insSlot] = (float) k->comp->getValue();
+        else if (k->sendSlot >= 0) settings.sendOff[k->sendSlot] = (float) k->comp->getValue();
     }
     settings.reverse    = reverseSwitch.getSelectedIndex() == 1;
     settings.preFade    = preSwitch.getSelectedIndex() == 1;
@@ -194,6 +211,7 @@ void SlicePanel::setSlice(int index, const SliceSettings& s, const juce::String&
     {
         if (k->field != nullptr) k->comp->setValue((double) (s.*(k->field)));
         else if (k->insSlot >= 0) k->comp->setValue((double) s.insOff[k->insSlot]);
+        else if (k->sendSlot >= 0) k->comp->setValue((double) s.sendOff[k->sendSlot]);
     }
     reverseSwitch.setSelectedIndex(s.reverse ? 1 : 0);
     preSwitch.setSelectedIndex(s.preFade ? 1 : 0);

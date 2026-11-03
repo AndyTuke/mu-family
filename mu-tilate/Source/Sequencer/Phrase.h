@@ -163,6 +163,7 @@ private:
     std::unordered_map<std::string_view, float>               modParamValues;
     LiveValues                                                modLive;
     mu_mod::StripMods                                         stripMod;   // the modulated pan and FX sends, for the mixer strip
+    float                                                     stripBase[4] = { 0.0f, 0.0f, 0.0f, 0.0f };   // those four before the sounding hit's send offsets
     mu_mod::LastResolved<kNumModDests>                        lastResolved;
 
     PhraseSettings settings;                       // the block's settings, set by readParams

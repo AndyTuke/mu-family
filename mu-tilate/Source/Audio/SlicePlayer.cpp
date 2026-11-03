@@ -144,6 +144,17 @@ bool SlicePlayer::insertOffsets(float (&out)[4]) const noexcept
     return true;
 }
 
+bool SlicePlayer::sendOffsets(float (&out)[3]) const noexcept
+{
+    for (auto& o : out) o = 0.0f;
+    const Voice* newest = nullptr;
+    for (const auto& v : voices)
+        if (v.active && ! v.swell && (newest == nullptr || v.age < newest->age)) newest = &v;
+    if (newest == nullptr) return false;
+    for (int i = 0; i < 3; ++i) out[i] = newest->own.sendOff[i];
+    return true;
+}
+
 void SlicePlayer::updateFilter(Voice& v) noexcept
 {
     const auto& o = v.own;
@@ -192,7 +203,6 @@ void SlicePlayer::trigger(const juce::AudioBuffer<float>* src, SliceRange range,
     const float rate = std::max(0.01f, p.rate);
     Voice v;
     v.own = p.own;
-    v.loop = p.own.loop;
     v.pitch = pitch;
     v.cutStep = cutStep;
     mu_core::equalPowerPan(p.own.pan, v.panL, v.panR);   // equal power; a mono output ignores it
@@ -309,41 +319,14 @@ void SlicePlayer::renderNative(Voice& v, juce::AudioBuffer<float>& out, int offs
 
     for (int i = 0; i < n && v.active; ++i)
     {
-        // A looping slice plays until it is cut, wrapping at its ends; any other leaves the slice and ends. The last couple of
-        // milliseconds before the end cross-fade into the start's material, and the wrap lands after that stretch, so the loop
-        // point is seamless instead of a jump from the last sample to the first.
-        const double loopLen = (double) v.range.length();
-        const double fadeSrc = v.loop ? std::min(0.25 * loopLen, (double) kLoopFadeMs * 0.001 * sr * std::fabs(v.step)) : 0.0;
-        if (! inRange(v))
-        {
-            if (! v.loop) { v.active = false; break; }
-            v.pos += v.step > 0.0 ? -(loopLen - fadeSrc) : (loopLen - fadeSrc);
-            double rel = std::fmod(v.pos - (double) v.range.start, loopLen);   // a step longer than the slice wraps more than once
-            if (rel < 0.0) rel += loopLen;
-            rel = std::min(rel, std::nextafter(loopLen, 0.0));   // a tiny negative rel can round up to the length, which is out of range
-            v.pos = (double) v.range.start + rel;
-            if (! inRange(v)) { v.active = false; break; }
-        }
-        float blend = 0.0f;       // how much of the start's material (`other`) is in the output
-        double other = 0.0;
-        if (fadeSrc > 0.0)
-        {
-            const double into = v.step > 0.0 ? v.pos - ((double) v.range.end - fadeSrc) : ((double) v.range.start + fadeSrc) - v.pos;
-            if (into > 0.0)
-            {
-                blend = (float) std::min(1.0, into / fadeSrc);
-                other = v.step > 0.0 ? (double) v.range.start + into : (double) v.range.end - into;   // the wrap lands at end - fadeSrc, so the material continues from end
-            }
-        }
+        // A slice plays through its range once and ends when it leaves it.
+        if (! inRange(v)) { v.active = false; break; }
 
         // Fade-in from the start, fade-out over the last samples of the slice (in playback order).
         float env = std::min(1.0f, (float) (v.age + 1) / (float) v.fadeInLen);
         if (v.swell) env *= env;
-        if (! v.loop)
-        {
-            const double remaining = v.step > 0.0 ? (double) v.range.end - v.pos : v.pos - (double) v.range.start + 1.0;
-            env *= std::min(1.0f, (float) ((int) (remaining / std::fabs(v.step)) + 1) / (float) v.fadeOutLen);
-        }
+        const double remaining = v.step > 0.0 ? (double) v.range.end - v.pos : v.pos - (double) v.range.start + 1.0;
+        env *= std::min(1.0f, (float) ((int) (remaining / std::fabs(v.step)) + 1) / (float) v.fadeOutLen);
         if (v.fading)
         {
             v.cutGain -= v.cutStep;
@@ -354,7 +337,6 @@ void SlicePlayer::renderNative(Voice& v, juce::AudioBuffer<float>& out, int offs
         for (int ch = 0; ch < nc; ++ch)
         {
             frame[ch] = read(v, nSrc == 1 ? 0 : ch);
-            if (blend > 0.0f) frame[ch] += blend * (readAt(v, other, nSrc == 1 ? 0 : ch) - frame[ch]);
         }
         emit(v, out, offset + i, frame, nc, v.gain * env * v.cutGain);
         for (int ch = 2; ch < nOut; ++ch)   // outputs beyond a stereo pair get the plain source

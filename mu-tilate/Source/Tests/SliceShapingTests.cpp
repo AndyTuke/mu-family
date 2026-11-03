@@ -88,37 +88,6 @@ struct SliceShapingTests : public juce::UnitTest
             expectWithinAbsoluteError(out.getSample(0, 800), 0.5f, 0.001f);
         }
 
-        beginTest("a looping slice keeps playing past its end until it is cut");
-        {
-            juce::AudioBuffer<float> src(1, 100);
-            for (int i = 0; i < 100; ++i) src.setSample(0, i, (float) (i + 1) / 1000.0f);
-            SlicePlayer sp; sp.prepare(kSr);
-            auto p = plain(); p.own.loop = true;
-            sp.trigger(&src, { 10, 30 }, p);
-            juce::AudioBuffer<float> out(1, 200); out.clear();
-            sp.render(out, 200);
-            expect(sp.isActive());
-            // The slice is 20 samples; the last 5 cross-fade into its start and the wrap lands 5 samples in: output 20 is source 15, 25 is 20.
-            expectWithinAbsoluteError(out.getSample(0, 25), src.getSample(0, 20), 1.0e-5f);
-            sp.cutSlices();
-            out.clear();
-            sp.render(out, 200);
-            expect(! sp.isActive());
-        }
-
-        beginTest("a looping slice shorter than the step keeps playing");
-        {
-            juce::AudioBuffer<float> src(1, 100);
-            for (int i = 0; i < 100; ++i) src.setSample(0, i, 0.5f);
-            SlicePlayer sp; sp.prepare(kSr);
-            auto p = plain(); p.own.loop = true; p.own.pitchSemi = 24.0f;   // four source samples per output sample
-            sp.trigger(&src, { 10, 13 }, p);                                // three samples long
-            juce::AudioBuffer<float> out(1, 200); out.clear();
-            sp.render(out, 200);
-            expect(sp.isActive());
-            expectGreaterThan(out.getSample(0, 150), 0.1f);
-        }
-
         beginTest("a second pre-fade does not cut the first one off");
         {
             auto src = constant(9600, 0.5f);
@@ -133,48 +102,6 @@ struct SliceShapingTests : public juce::UnitTest
             sp.render(second, 2400);
             // The first reaches 0.5 at its end, with the second at a quarter of its swell (0.5 * 0.5^2) on top.
             expectGreaterThan(out.getSample(0, 4790), 0.6f);
-        }
-
-        beginTest("a looping slice has no jump at its loop point");
-        {
-            // A 440 Hz sine, a slice that is not a whole number of cycles: a raw wrap would jump at every loop.
-            const int n = 4000;
-            juce::AudioBuffer<float> src(1, n);
-            for (int i = 0; i < n; ++i) src.setSample(0, i, 0.5f * std::sin(2.0f * juce::MathConstants<float>::pi * 440.0f * (float) i / (float) kSr));
-            SlicePlayer sp; sp.prepare(kSr);
-            auto p = plain(); p.own.loop = true;
-            sp.trigger(&src, { 100, 3777 }, p);               // 3677 samples, about 3.7 cycles
-            juce::AudioBuffer<float> out(1, 20000); out.clear();
-            for (int pos = 0; pos < 20000; pos += 500)
-            {
-                juce::AudioBuffer<float> view(out.getArrayOfWritePointers(), 1, pos, 500);
-                sp.render(view, 500);
-            }
-            // The sine's own largest step is 0.5 * 2*pi*440/48000 = 0.029; a jump at the seam would be several times that.
-            float worst = 0.0f;
-            for (int i = 300; i < 20000; ++i) worst = std::max(worst, std::abs(out.getSample(0, i) - out.getSample(0, i - 1)));
-            expectLessThan(worst, 0.06f);
-            expect(sp.isActive());
-        }
-
-        beginTest("a looping slice that plays backwards has no jump at its loop point either");
-        {
-            const int n = 4000;
-            juce::AudioBuffer<float> src(1, n);
-            for (int i = 0; i < n; ++i) src.setSample(0, i, 0.5f * std::sin(2.0f * juce::MathConstants<float>::pi * 440.0f * (float) i / (float) kSr));
-            SlicePlayer sp; sp.prepare(kSr);
-            auto p = plain(); p.own.loop = true; p.reverse = true;
-            sp.trigger(&src, { 100, 3777 }, p);
-            juce::AudioBuffer<float> out(1, 20000); out.clear();
-            for (int pos = 0; pos < 20000; pos += 500)
-            {
-                juce::AudioBuffer<float> view(out.getArrayOfWritePointers(), 1, pos, 500);
-                sp.render(view, 500);
-            }
-            float worst = 0.0f;
-            for (int i = 300; i < 20000; ++i) worst = std::max(worst, std::abs(out.getSample(0, i) - out.getSample(0, i - 1)));
-            expectLessThan(worst, 0.04f);                                // the sine's own step is 0.029; one skipped sample at the seam was a visible bump
-            expect(sp.isActive());
         }
 
         beginTest("a band-pass has the same level at any resonance");

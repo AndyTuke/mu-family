@@ -92,6 +92,8 @@ public:
     bool filterModulation(float& octaves, float& resAdd) const noexcept;
     // How far the newest sounding slice moves the layer's four insert knobs (fractions of their travel). False, with zeros, when none sounds.
     bool insertOffsets(float (&out)[4]) const noexcept;
+    // The same newest hit's offsets to the three FX sends.
+    bool sendOffsets(float (&out)[3]) const noexcept;
 
 private:
     struct StretchState;   // the two Signalsmith Stretch instances and their scratch (SlicePlayer.cpp)
@@ -110,9 +112,8 @@ private:
         float  cutGain    = 1.0f;
         bool   active     = false;
 
-        // The slice's own shaping (SliceSettings): pan gains, loop, the pitch ratio, the filter and the two envelopes.
+        // The slice's own shaping (SliceSettings): pan gains, the pitch ratio, the filter and the two envelopes.
         float  panL = 1.0f, panR = 1.0f;
-        bool   loop = false;
         bool   swell = false;          // the fade-in follows a squared ramp (the pre-fade)
         double pitch = 1.0;            // source samples per output sample from the pitch settings (1 = unchanged)
         SliceSettings own;
@@ -159,7 +160,6 @@ private:
     double sr = 48000.0;
     int    maxBlock = 512;
     float  cutStep = 1.0f / 144.0f;   // cutGain decrease per sample (1 / cut-fade samples)
-    static constexpr float kLoopFadeMs = 2.0f;   // the cross-fade at a loop point
     static constexpr int kFilterUpdate = 16;   // samples between filter coefficient updates
 };
 

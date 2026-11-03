@@ -48,8 +48,11 @@ struct SliceSettings
     // The layer's insert effect: how far this slice moves each of its four knobs, as a fraction of the knob's travel (-1..1).
     float insOff[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
 
+    // The layer's three FX sends (Effect, Delay, Reverb): how far this slice moves each, added to the strip's send for as long as the
+    // slice sounds (-1..1, the sum is held to 0..1). The mixer's own send knobs do not move.
+    float sendOff[3] = { 0.0f, 0.0f, 0.0f };
+
     // Play
-    bool  loop      = false;    // repeats the slice while the block lasts
     bool  oneShot   = true;     // plays to its end (true) or follows the block's length as a gate (false)
     int   chokeGroup = 0;       // 0 = none; a slice cuts any sounding slice of the same group
 
@@ -86,6 +89,7 @@ inline SliceSettings sanitised(SliceSettings s) noexcept
     s.fltA = fix(s.fltA, -1000.0f, 1000.0f, d.fltA);   s.fltD = fix(s.fltD, -1000.0f, 1000.0f, d.fltD);
     s.fltS = fix(s.fltS, -1.0f, 1.0f, d.fltS);         s.fltR = fix(s.fltR, -1000.0f, 1000.0f, d.fltR);
     for (auto& o : s.insOff) o = fix(o, -1.0f, 1.0f, 0.0f);
+    for (auto& o : s.sendOff) o = fix(o, -1.0f, 1.0f, 0.0f);
     s.chokeGroup = std::clamp(s.chokeGroup, 0, 8);
     s.trimInBeats = fix(s.trimInBeats, 0.0f, 4096.0f, 0.0f);
     s.retime = fix(s.retime, 0.25f, 4.0f, 1.0f);
