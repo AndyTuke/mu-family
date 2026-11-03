@@ -75,8 +75,12 @@ void Phrase::installLoop(std::shared_ptr<const juce::AudioBuffer<float>> audio, 
 
 void Phrase::startPreview(PreviewKind kind, int slice, double bpm)
 {
-    const auto d = getData();
-    if (d == nullptr || d->audio == nullptr || d->audio->getNumSamples() < 2) return;
+    const auto whole = getData();
+    if (whole == nullptr || whole->audio == nullptr || whole->audio->getNumSamples() < 2) return;
+    // The whole-loop auditions play only the play area; a single slice plays as it is.
+    const int wholeLen = whole->audio->getNumSamples();
+    const bool onlyArea = kind != PreviewKind::Slice && areaEnd - areaStart >= 2 && (areaStart > 0 || areaEnd < wholeLen);
+    const auto d = onlyArea ? croppedData(*whole, areaStart, areaEnd, nullptr) : whole;
     previewIsSlice = kind == PreviewKind::Slice;
     preview.setLooping(previewLoop && ! previewIsSlice);
     if (kind == PreviewKind::Original) { preview.startBuffer(*d->audio, d->fileSampleRate); return; }
@@ -138,6 +142,41 @@ void Phrase::startPreview(PreviewKind kind, int slice, double bpm)
         pb.render(loop, s, c, view, n);
     }
     preview.startBuffer(out, sr);
+}
+
+// The loop cut to [start, end): the audio copied, the slices cut with it and the hits remapped (a hit whose slice went has none).
+std::shared_ptr<const PhraseData> Phrase::croppedData(const PhraseData& d, int start, int end, std::vector<int>* sliceMap) const
+{
+    const int n = d.audio->getNumSamples();
+    const int a = juce::jlimit(0, n - 2, start), b = juce::jlimit(a + 2, n, end);
+    auto cut = std::make_shared<juce::AudioBuffer<float>>(d.audio->getNumChannels(), b - a);
+    for (int ch = 0; ch < cut->getNumChannels(); ++ch) cut->copyFrom(ch, 0, *d.audio, ch, a, b - a);
+
+    auto c = std::make_shared<PhraseData>();
+    c->audio = std::move(cut);
+    // The source stays whole, so the section can be widened again from the range bar.
+    c->source = d.source != nullptr ? d.source : d.audio;
+    const int base = d.source != nullptr ? d.regionStart : 0;
+    c->regionStart = base + a;
+    c->regionEnd = base + b;
+    c->fileSampleRate = d.fileSampleRate;
+    std::vector<int> map;
+    c->slices = d.slices.cropped(a, b, map);
+    c->timeline = d.timeline;
+    c->timeline.remapSlices(map);
+    attachResampled(*c);
+    if (sliceMap != nullptr) *sliceMap = std::move(map);
+    return c;
+}
+
+void Phrase::cropTo(int start, int end)
+{
+    const auto d = getData();
+    if (d == nullptr || d->audio == nullptr) return;
+    const int n = d->audio->getNumSamples();
+    if (end - start < 2 || (start <= 0 && end >= n)) return;
+    setData(croppedData(*d, start, end, nullptr));
+    areaStart = areaEnd = 0;
 }
 
 void Phrase::commitEdit(const SliceList& slices, const Timeline& timeline)

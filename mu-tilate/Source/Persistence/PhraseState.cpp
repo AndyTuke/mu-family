@@ -99,9 +99,14 @@ PhraseState readPhraseState(const juce::ValueTree& node)
     s.timeline = Timeline((double) p.getProperty("bars", 4.0) * 4.0);
     for (const auto& v : p.getChildWithName("Blocks"))
     {
-        s.timeline.place((int) v.getProperty("i", 0), (double) v.getProperty("s", 0.0), 0.0, readSettings(v));
+        const int slice = (int) v.getProperty("i", 0);   // -1: the slice was cropped off
+        s.timeline.place(std::max(0, slice), (double) v.getProperty("s", 0.0), 0.0, readSettings(v));
         const int at = s.timeline.indexAt((double) v.getProperty("s", 0.0));
-        if (at >= 0) s.timeline.setBlockLength(at, (double) v.getProperty("l", 0.0), 0.0);
+        if (at >= 0)
+        {
+            s.timeline.setBlockLength(at, (double) v.getProperty("l", 0.0), 0.0);
+            if (slice < 0) s.timeline.setSlice(at, -1);
+        }
     }
 
     // The markers are only meaningful against the loop they were made on; a saved length of 0 means no loop was

@@ -185,9 +185,12 @@ void PhraseTimeline::paint(juce::Graphics& g)
         const auto& b = timeline.blocks()[(size_t) i];
         const int x0 = xOf(b.start), x1 = xOf(b.start + blockBeats(i));
         const auto r = juce::Rectangle<int>(x0, row.getY() + s(LF::kBlockInset), std::max(2, x1 - x0 - 1), row.getHeight() - s(2 * LF::kBlockInset));
-        g.setColour(accent.withAlpha(i == selected ? lighting.blockFillSelected : lighting.blockFill));
+        // A hit whose slice was cropped off has no sound: it stays on the timeline, dimmed.
+        const bool cropped = b.slice < 0;
+        const float dim = cropped ? 0.3f : 1.0f;
+        g.setColour(accent.withAlpha((i == selected ? lighting.blockFillSelected : lighting.blockFill) * dim));
         g.fillRoundedRectangle(r.toFloat(), LF::kBlockRadius);
-        g.setColour(LF::colour(LF::lfoEditorPoint).withAlpha(i == selected ? 1.0f : 0.5f));
+        g.setColour(LF::colour(LF::lfoEditorPoint).withAlpha((i == selected ? 1.0f : 0.5f) * dim));
         g.drawRoundedRectangle(r.toFloat(), LF::kBlockRadius, 1.0f);
         if (! loopPeaks.empty() && b.slice >= 0 && b.slice < (int) sliceSpans.size())
         {
@@ -213,8 +216,8 @@ void PhraseTimeline::paint(juce::Graphics& g)
         }
         if (r.getWidth() > s(LF::kBlockLabelMinW))
         {
-            g.setColour(juce::Colours::black.withAlpha(lighting.blockLabel));
-            g.drawText(juce::String(b.slice + 1) + (b.own.reverse ? " <" : ""), r.reduced(s(3), 0), juce::Justification::centredLeft);
+            g.setColour(juce::Colours::black.withAlpha(lighting.blockLabel * dim));
+            g.drawText((cropped ? juce::String("cropped") : juce::String(b.slice + 1)) + (b.own.reverse ? " <" : ""), r.reduced(s(3), 0), juce::Justification::centredLeft);
         }
     }
 

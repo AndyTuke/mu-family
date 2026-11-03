@@ -55,6 +55,7 @@ void LoopWaveform::endRename(bool commit)
 void LoopWaveform::setAudio(std::shared_ptr<const juce::AudioBuffer<float>> newAudio)
 {
     audio = std::move(newAudio);
+    rangeStart = rangeEnd = 0;   // a new loop plays all of itself
     summaryMin.clear();
     summaryMax.clear();
     if (audio != nullptr && audio->getNumSamples() > 0)
@@ -117,6 +118,43 @@ juce::Rectangle<int> LoopWaveform::crossOf(int marker) const
 {
     const int size = mu_ui::s(12), x = xOf((double) markers[(size_t) marker].position);
     return { x + mu_ui::s(2), getHeight() - size - mu_ui::s(12), size, size };
+}
+
+void LoopWaveform::setPlayRange(int start, int end)
+{
+    if (start == rangeStart && end == rangeEnd) return;
+    rangeStart = std::max(0, start);
+    rangeEnd = end;
+    repaint();
+}
+
+int LoopWaveform::footY() const noexcept
+{
+    return getHeight() - (scrollable() ? mu_ui::s(10) : 0);
+}
+
+juce::Rectangle<int> LoopWaveform::arrowOf(int handle) const
+{
+    const int w = mu_ui::s(10), h = mu_ui::s(12);
+    const int x = xOf(handle == 0 ? (double) rangeStart : (double) getPlayEnd());
+    return { handle == 0 ? x : x - w + 1, footY() - h, w, h };
+}
+
+int LoopWaveform::rangeHandleAt(juce::Point<int> p) const noexcept
+{
+    if (length() <= 0) return -1;
+    // The arrows take the press first; the line itself grabs only where no slice marker is nearer.
+    for (int h = 1; h >= 0; --h)
+        if (arrowOf(h).expanded(mu_ui::s(2)).contains(p)) return h;
+    const int m = markerNear(p.x);
+    if (m > 0) return -1;
+    int best = -1, bestDist = mu_ui::s(3) + 1;
+    for (int h = 0; h < 2; ++h)
+    {
+        const int d = std::abs(xOf(h == 0 ? (double) rangeStart : (double) getPlayEnd()) - p.x);
+        if (d < bestDist) { bestDist = d; best = h; }
+    }
+    return best;
 }
 
 int LoopWaveform::markerNear(int x) const noexcept
@@ -228,6 +266,28 @@ void LoopWaveform::paint(juce::Graphics& g)
             g.fillEllipse((float) x - (float) s(3), 1.0f, (float) s(6), (float) s(6));
         }
     }
+    // Phase 4: the play area: what lies outside it is dimmed, and each end is a line with an arrow at the foot.
+    {
+        const int xs = xOf((double) rangeStart), xe = xOf((double) getPlayEnd());
+        g.setColour(LF::colour(LF::lfoEditorBackground).withAlpha(0.6f));
+        if (xs > 0) g.fillRect(0, 0, std::min(xs, getWidth()), getHeight());
+        if (xe < getWidth()) g.fillRect(std::max(0, xe), 0, getWidth() - std::max(0, xe), getHeight());
+        const auto accent = LF::appAccent(*this);
+        for (int h = 0; h < 2; ++h)
+        {
+            const int x = h == 0 ? xs : xe;
+            if (x < -2 || x > getWidth() + 2) continue;
+            const bool hot = draggingRange == h;
+            g.setColour(hot ? accent : accent.withAlpha(0.85f));
+            g.fillRect(x, 0, hot ? 2 : 1, footY());
+            const auto a = arrowOf(h).toFloat();
+            juce::Path arrow;
+            // A pennant at the foot, pointing into the area it bounds.
+            if (h == 0) arrow.addTriangle(a.getX(), a.getY(), a.getX(), a.getBottom(), a.getRight(), a.getCentreY());
+            else        arrow.addTriangle(a.getRight(), a.getY(), a.getRight(), a.getBottom(), a.getX(), a.getCentreY());
+            g.fillPath(arrow);
+        }
+    }
     if (playhead >= 0.0)
     {
         g.setColour(LF::colour(LF::lfoEditorPoint));
@@ -249,6 +309,12 @@ void LoopWaveform::mouseMove(const juce::MouseEvent& e)
     {
         if (hovered >= 0) { hovered = -1; repaint(); }
         setMouseCursor(juce::MouseCursor::NormalCursor);
+        return;
+    }
+    if (rangeHandleAt(e.getPosition()) >= 0)
+    {
+        if (hovered >= 0) { hovered = -1; repaint(); }
+        setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
         return;
     }
     int h = markerNear(e.x);
@@ -282,6 +348,8 @@ void LoopWaveform::mouseDown(const juce::MouseEvent& e)
         hovered = -1;
         return;
     }
+    if (! e.mods.isRightButtonDown())
+        if (const int h = rangeHandleAt(e.getPosition()); h >= 0) { draggingRange = h; repaint(); return; }
     const int m = markerNear(e.x);
     if (m > 0 && (e.mods.isAltDown()))
     {
@@ -316,6 +384,20 @@ void LoopWaveform::mouseDrag(const juce::MouseEvent& e)
         repaint();
         return;
     }
+    if (draggingRange >= 0)
+    {
+        int pos = sampleAt(e.x);
+        // Onto a slice marker when close to one (Shift moves freely).
+        if (! e.mods.isShiftDown())
+            for (const auto& m : markers)
+                if (std::abs(xOf((double) m.position) - e.x) <= mu_ui::s(kGrab)) { pos = m.position; break; }
+        const int minSpan = 2 * kBlock;
+        if (draggingRange == 0) rangeStart = std::clamp(pos, 0, std::max(0, getPlayEnd() - minSpan));
+        else                    rangeEnd = std::clamp(pos, std::min(length(), rangeStart + minSpan), length());
+        repaint();
+        if (onPlayRangeChanged) onPlayRangeChanged(rangeStart, getPlayEnd());
+        return;
+    }
     if (pressedRegion >= 0 && dragging < 0)
     {
         // A press inside a region that moves far enough is a drag of that region (to the timeline), not a click.
@@ -338,12 +420,13 @@ void LoopWaveform::mouseUp(const juce::MouseEvent& e)
     panning = false;
     scrolling = false;
     dragging = -1;
+    draggingRange = -1;
     repaint();
 }
 
 void LoopWaveform::mouseDoubleClick(const juce::MouseEvent& e)
 {
-    if (length() <= 0 || markerNear(e.x) >= 0) return;
+    if (length() <= 0 || markerNear(e.x) >= 0 || rangeHandleAt(e.getPosition()) >= 0) return;
     // A double-click on a region's name strip renames it; elsewhere it adds a marker.
     for (int i = 0; i < (int) markers.size(); ++i)
         if (labelOf(i).contains(e.getPosition())) { beginRename(i); return; }

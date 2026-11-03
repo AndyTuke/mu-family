@@ -120,6 +120,8 @@ SliceParams PhrasePlayback::paramsFor(const PhraseLoop& loop, const PhraseSettin
 
 void PhrasePlayback::trigger(const PhraseLoop& loop, const PhraseSettings& s, const PhraseClock& c, const TimelineBlock& b) noexcept
 {
+    // A hit whose slice was cropped off is silent, and still ends whatever sounds before it.
+    if (b.slice < 0 || b.slice >= loop.slices->size()) { player.cutSlices(); return; }
     SliceRange range;
     const auto p = paramsFor(loop, s, c, b, range);
     player.trigger(loop.audio, range, p);

@@ -40,6 +40,16 @@ int Timeline::insert(TimelineBlock b)
     return (int) (list.insert(it, b) - list.begin());
 }
 
+void Timeline::remapSlices(const std::vector<int>& map)
+{
+    for (auto& b : list) b.slice = b.slice >= 0 && b.slice < (int) map.size() ? map[(size_t) b.slice] : -1;
+}
+
+void Timeline::setSlice(int index, int slice)
+{
+    if (index >= 0 && index < size()) list[(size_t) index].slice = std::max(-1, slice);
+}
+
 int Timeline::place(int slice, double beat, double grid, const SliceSettings& own)
 {
     const double s = snap(beat, grid);

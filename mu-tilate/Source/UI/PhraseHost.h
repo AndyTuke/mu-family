@@ -48,6 +48,10 @@ public:
     virtual void previewSource(int layer, int kind, int slice) = 0;
     virtual void stopPreview(int layer) = 0;
     virtual void setPreviewLooping(int layer, bool loop) = 0;   // the audition repeats until stopped
+    // The play area (samples of the loop, 0, 0 = all): the whole-loop auditions play only this part. cropToPlayArea cuts the loop to
+    // [start, end): the slices and hits stay, and a hit whose slice is cut off is silent.
+    virtual void setPlayArea(int layer, int start, int end) = 0;
+    virtual void cropLoop(int layer, int start, int end) = 0;
     // One line for the content: the loop's name and slice count, "Loading ...", or the last error.
     virtual juce::String getLoopStatus(int layer) const = 0;
 };

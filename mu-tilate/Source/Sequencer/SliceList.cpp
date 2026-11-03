@@ -144,6 +144,37 @@ const SliceSettings& SliceList::settings(int index) const
     return index >= 0 && index < size() ? markers[(size_t) index].settings : kDefault;
 }
 
+SliceList SliceList::cropped(int from, int to, std::vector<int>& map, int minLength) const
+{
+    from = std::clamp(from, 0, length);
+    to = std::clamp(to, from, length);
+    SliceList out(to - from);
+    map.assign(markers.size(), -1);
+
+    // Phase 1: each slice's part inside [from, to), moved to the new start of the loop.
+    std::vector<SliceMarker> kept;
+    std::vector<int> keptFrom;
+    for (int i = 0; i < size(); ++i)
+    {
+        const auto r = slice(i);
+        const int a = std::max(r.start, from), b = std::min(r.end, to);
+        if (b - a < minLength) continue;
+        auto m = markers[(size_t) i];
+        m.position = a - from;
+        kept.push_back(m);
+        keptFrom.push_back(i);
+    }
+    out.rebuild(kept);
+
+    // Phase 2: where each kept slice ended up (rebuild may have put a default marker at 0 before the first).
+    for (size_t k = 0; k < kept.size(); ++k)
+    {
+        const int at = out.indexAt(kept[k].position);
+        if (at >= 0 && out.markers[(size_t) at].position == kept[k].position) map[(size_t) keptFrom[k]] = at;
+    }
+    return out;
+}
+
 void SliceList::setLoopLength(int newLength)
 {
     length = std::max(0, newLength);

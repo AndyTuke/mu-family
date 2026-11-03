@@ -439,6 +439,40 @@ struct PhraseTests : public juce::UnitTest
             expectWithinAbsoluteError(out.getSample(0, 36000), 0.2f, 1.0e-4f);   // then the next slice's audio
         }
 
+        beginTest("cropping the loop keeps the slices that remain; the hits of a slice that went are silent");
+        {
+            Rig r;
+            std::vector<int> map;
+            // Keep the middle: half of slice 1 to half of slice 2 (samples 36000..60000).
+            const auto cut = r.slices.cropped(36000, 60000, map);
+            expectEquals(cut.loopLength(), 24000);
+            expectEquals(cut.size(), 2);                                // the second half of slice 1, the first half of slice 2
+            expectEquals(cut.marker(1).position, 12000);
+            expectEquals(map[0], -1);
+            expectEquals(map[1], 0);
+            expectEquals(map[2], 1);
+            expectEquals(map[3], -1);
+
+            Timeline t(4.0);
+            t.place(0, 0.0, 0.0);
+            t.place(1, 1.0, 0.0);
+            t.remapSlices(map);
+            expectEquals(t.blocks()[0].slice, -1);                      // kept on the timeline without a slice
+            expectEquals(t.blocks()[1].slice, 0);
+
+            // The cut loop plays the hit with a slice and stays silent for the other.
+            juce::AudioBuffer<float> audio(1, 24000);
+            for (int i = 0; i < 24000; ++i) audio.setSample(0, i, r.audio.getSample(0, 36000 + i));
+            Rig c;
+            c.audio.setSize(1, 24000); c.audio.copyFrom(0, 0, audio, 0, 0, 24000);
+            c.slices = cut;
+            c.timeline = t;
+            c.loop.audio = &c.audio; c.loop.slices = &c.slices; c.loop.timeline = &c.timeline;
+            auto out = c.run(96000, 128);
+            expectEquals(rms(out, 100, 4000), 0.0);                                  // beat 0: the cropped-off hit
+            expectGreaterThan(rms(out, 24000 + 100, 4000), 0.05);                    // beat 1: slice 0 of the cut loop
+        }
+
         beginTest("a block near the end of the timeline sounds again in the next pass");
         {
             Rig r;

@@ -74,6 +74,11 @@ public:
     void sliceInserted(int at);
     void sliceRemoved(int at);
 
+    // The loop was cropped: block slices become map[slice]. A slice that went (-1) leaves its blocks in place without a slice: they are
+    // kept, shown dimmed and silent, and come back to life if a slice is assigned again.
+    void remapSlices(const std::vector<int>& map);
+    void setSlice(int index, int slice);   // -1 = no slice (a cropped-off one)
+
     // The index of the last block starting at or before `beat`, or -1.
     int indexAt(double beat) const noexcept;
 

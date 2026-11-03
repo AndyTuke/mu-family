@@ -353,6 +353,23 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
         const double nearest = std::round((double) position / step) * step;
         return std::abs(nearest - (double) position) <= (double) mu_ui::s(LF::kMarkerSnapPx) * samplesPerPixel ? (int) std::lround(nearest) : position;
     };
+    // The play area: the handles on the waveform bound what the whole-loop auditions play; Crop cuts the sample to it. Slices and hits
+    // stay; a hit whose slice is cut off is dimmed on the timeline and silent.
+    waveform.onPlayRangeChanged = [this](int start, int end)
+    {
+        host.setPlayArea(currentLayer, start, end);
+        cropButton.setEnabled(! waveform.playRangeIsAll());
+    };
+    cropButton.setEnabled(false);
+    cropButton.setTooltip("Crop the sample to the play area between the two arrows. Slices and hits stay; a hit whose slice is cut off is dimmed and silent. The range bar can widen the section again");
+    cropButton.onClick = [this]
+    {
+        const int start = waveform.getPlayStart(), end = waveform.getPlayEnd();
+        timelineView.setSelectedBlock(-1);
+        host.cropLoop(currentLayer, start, end);
+        cropButton.setEnabled(false);
+        refreshViews(true);
+    };
     waveFitButton.onClick = [this] { waveform.showAll(); };
     waveOutButton.onClick = [this] { waveform.zoomBy(0.5, waveform.getWidth() / 2); };
     waveInButton.onClick  = [this] { waveform.zoomBy(2.0, waveform.getWidth() / 2); };
@@ -364,7 +381,7 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     tlInButton.onClick = [this] { timelineView.zoomBy(1.5, timelineView.getWidth() / 2); };
     tlFitButton.setTooltip("Show the whole timeline. Shift+wheel scrolls, a drag on the ruler or a middle-button drag pans");
     tlFitButton.onClick = [this] { timelineView.showAll(); };
-    for (auto* b : { &deleteButton, &clearButton, &layOutButton, &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewLoopButton, &previewStopButton, &waveFitButton, &waveOutButton, &waveInButton, &tlOutButton, &tlInButton, &tlFitButton }) addAndMakeVisible(*b);
+    for (auto* b : { &deleteButton, &clearButton, &layOutButton, &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewLoopButton, &previewStopButton, &cropButton, &waveFitButton, &waveOutButton, &waveInButton, &tlOutButton, &tlInButton, &tlFitButton }) addAndMakeVisible(*b);
 
     updateView();
     startTimerHz(15);
@@ -460,7 +477,7 @@ void PhraseContent::updateView()
     rangeBar.setVisible(sequencer);
     timelineView.setVisible(! layerView);
     for (auto* c : std::initializer_list<juce::Component*> { &lengthCaption, &barsInput, &beatsInput, &gridBox, &layOutButton, &deleteButton, &clearButton,
-                                                              &waveFitButton, &waveOutButton, &waveInButton, &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewLoopButton, &previewStopButton, &tlOutButton, &tlInButton, &tlFitButton })
+                                                              &waveFitButton, &waveOutButton, &waveInButton, &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewLoopButton, &previewStopButton, &cropButton, &tlOutButton, &tlInButton, &tlFitButton })
         c->setVisible(sequencer);
     if (sliceView) refreshSlicePanel(true);
     updateToolbar();
@@ -561,6 +578,8 @@ void PhraseContent::refreshViews(bool force)
         waveform.setAudio(d->audio);
         rangeBar.setAudio(d->source != nullptr ? d->source : d->audio);
         rangeBar.setRange(d->regionStart, d->regionEnd);
+        host.setPlayArea(currentLayer, 0, 0);   // a new loop plays all of itself (the waveform reset its handles)
+        cropButton.setEnabled(false);
     }
     std::vector<LoopWaveform::Marker> markers;
     for (int i = 0; i < d->slices.size(); ++i) markers.push_back({ d->slices.marker(i).position, d->slices.marker(i).pinned, d->slices.marker(i).name });
@@ -759,6 +778,7 @@ void PhraseContent::resized()
         place(waveFitButton, 84);
         place(waveOutButton, 30);
         place(waveInButton, 30);
+        place(cropButton, 60);
         bar.removeFromLeft(s(LF::kSpaceS) * 2);
         place(lengthCaption, 50);
         place(barsInput, 104);

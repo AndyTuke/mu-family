@@ -96,6 +96,8 @@ public:
     }
     void setPreviewLooping(int layer, bool loop) override { if (layer >= 0 && layer < mu_limits::kMaxLayers) getPhrase(layer).setPreviewLooping(loop); }
     void stopPreview(int layer) override { if (layer >= 0 && layer < mu_limits::kMaxLayers) getPhrase(layer).stopPreview(); }
+    void setPlayArea(int layer, int start, int end) override { if (layer >= 0 && layer < mu_limits::kMaxLayers) getPhrase(layer).setPlayArea(start, end); }
+    void cropLoop(int layer, int start, int end) override { if (layer >= 0 && layer < mu_limits::kMaxLayers) getPhrase(layer).cropTo(start, end); }
     void setSourceRegion(int layer, int start, int end) override;
     juce::String getLoopStatus(int layer) const override;
 

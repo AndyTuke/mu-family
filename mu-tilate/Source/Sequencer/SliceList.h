@@ -56,6 +56,10 @@ public:
     void setName(int index, const juce::String& name);
     juce::String displayName(int index) const { return index >= 0 && index < size() && marker(index).name.isNotEmpty() ? marker(index).name : "Slice " + juce::String(index + 1); }
 
+    // The slices that remain when the loop is cut to [from, to): a slice cut at an end is kept shorter, one with less than minLength left
+    // goes. `map[i]` is the new index of old slice i, or -1 when it went. Names, pins and settings carry over.
+    SliceList cropped(int from, int to, std::vector<int>& map, int minLength = 32) const;
+
     // The loop changed length (a new loop): the markers outside it are dropped.
     void setLoopLength(int newLength);
 

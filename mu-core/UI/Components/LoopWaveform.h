@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <juce_audio_basics/juce_audio_basics.h>
 
+#include <algorithm>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -34,6 +35,15 @@ public:
     void setPlayhead(double samples);
 
     int getSelectedRegion() const noexcept { return selected; }
+
+    // The play area: a start and an end handle (a line with an arrow at the foot) mark the part of the loop that plays; the rest is
+    // dimmed. An end of 0 or less means the end of the loop. The handles snap onto a nearby slice marker; Shift moves them freely.
+    void setPlayRange(int start, int end);
+    int  getPlayStart() const noexcept { return rangeStart; }
+    int  getPlayEnd() const noexcept { return rangeEnd > 0 ? std::min(rangeEnd, length()) : length(); }
+    bool playRangeIsAll() const noexcept { return rangeStart <= 0 && getPlayEnd() >= length(); }
+    // A handle was dragged: the area's start and end (called while dragging).
+    std::function<void(int start, int end)> onPlayRangeChanged;
 
     // Zoom to show the whole loop again.
     void showAll();
@@ -84,6 +94,9 @@ private:
     void endRename(bool commit);
     juce::Rectangle<int> labelOf(int region) const;   // the name strip at the top of a region
     juce::Rectangle<int> crossOf(int marker) const;   // the delete cross at the foot of a hovered marker
+    int  footY() const noexcept;                              // the bottom of the drawing area (above the scroll bar when it shows)
+    juce::Rectangle<int> arrowOf(int handle) const;           // the arrow at the foot of the play area's start (0) or end (1) line
+    int  rangeHandleAt(juce::Point<int> p) const noexcept;    // 0 start, 1 end, or -1
     int  markerNear(int x) const noexcept;   // index of the marker within the grab distance of x, or -1
     int  regionAt(int sample) const noexcept;
     void clampView() noexcept;
@@ -108,6 +121,8 @@ private:
     bool   panning = false;
     double panStartView = 0.0;
     int    hovered = -1;
+    int    rangeStart = 0, rangeEnd = 0;   // the play area (samples; an end of 0 = the loop's end)
+    int    draggingRange = -1;             // the play-area handle being dragged
     juce::TextEditor nameEditor;
     int    renaming = -1;
 
