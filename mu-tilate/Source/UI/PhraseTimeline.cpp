@@ -377,14 +377,12 @@ void PhraseTimeline::mouseDrag(const juce::MouseEvent& e)
     }
     if (dragBlock < 0 || ! onEdit) return;
 
-    // Dragging the top of a block up or down sets the hit's volume: 0 at the foot, 100 % at the top (Shift for no snap to 100 %).
+    // Dragging the top of a block up or down sets the hit's volume: 0 at the foot, 100 % at the top, no snapping.
     if (dragLevel)
     {
         const int at = dragBlock;
         const auto r = blockRect(at);
-        float v = juce::jlimit(0.0f, 1.0f, (float) (r.getBottom() - e.y) / (float) std::max(1, r.getHeight()));
-        if (! e.mods.isShiftDown() && v > 0.97f) v = 1.0f;
-        if (! e.mods.isShiftDown() && v < 0.03f) v = 0.0f;
+        const float v = juce::jlimit(0.0f, 1.0f, (float) (r.getBottom() - e.y) / (float) std::max(1, r.getHeight()));
         onEdit([at, v](Timeline& t)
         {
             auto own = t.blocks()[(size_t) at].own;
