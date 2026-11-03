@@ -330,10 +330,8 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     previewStopButton.setTooltip("Stop the audition");
     previewTempoButton.setTooltip("Play the loop at the project tempo, as the layer's Tempo Match and Pitch/Stretch set it");
     previewOriginalButton.setTooltip("Play the used section of the sample as it is, at its own tempo");
-    previewSliceButton.setTooltip("Play the selected slice");
     previewTempoButton.onClick    = [this] { host.previewSource(currentLayer, 1, 0); };
     previewOriginalButton.onClick = [this] { host.previewSource(currentLayer, 0, 0); };
-    previewSliceButton.onClick    = [this] { host.previewSource(currentLayer, 2, juce::jmax(0, waveform.getSelectedRegion())); };
     previewStopButton.onClick     = [this] { host.stopPreview(currentLayer); };
     previewLoopButton.setClickingTogglesState(true);
     previewLoopButton.setTooltip("Repeat the whole-loop auditions until stopped (a single slice plays once)");
@@ -382,7 +380,7 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     tlInButton.onClick = [this] { timelineView.zoomBy(1.5, timelineView.getWidth() / 2); };
     tlFitButton.setTooltip("Show the whole timeline. Shift+wheel scrolls, a drag on the ruler or a middle-button drag pans");
     tlFitButton.onClick = [this] { timelineView.showAll(); };
-    for (auto* b : std::initializer_list<juce::Component*> { &deleteButton, &clearButton, &layOutButton, &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewLoopButton, &previewStopButton, &cropButton, &waveFitButton, &waveOutButton, &waveInButton, &tlOutButton, &tlInButton, &tlFitButton }) addAndMakeVisible(*b);
+    for (auto* b : std::initializer_list<juce::Component*> { &deleteButton, &clearButton, &layOutButton, &previewTempoButton, &previewOriginalButton, &previewLoopButton, &previewStopButton, &cropButton, &waveFitButton, &waveOutButton, &waveInButton, &tlOutButton, &tlInButton, &tlFitButton }) addAndMakeVisible(*b);
 
     updateView();
     startTimerHz(30);
@@ -478,7 +476,7 @@ void PhraseContent::updateView()
     rangeBar.setVisible(sequencer);
     timelineView.setVisible(! layerView);
     for (auto* c : std::initializer_list<juce::Component*> { &lengthCaption, &barsInput, &beatsInput, &gridBox, &layOutButton, &deleteButton, &clearButton,
-                                                              &waveFitButton, &waveOutButton, &waveInButton, &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewLoopButton, &previewStopButton, &cropButton, &tlOutButton, &tlInButton, &tlFitButton })
+                                                              &waveFitButton, &waveOutButton, &waveInButton, &previewTempoButton, &previewOriginalButton, &previewLoopButton, &previewStopButton, &cropButton, &tlOutButton, &tlInButton, &tlFitButton })
         c->setVisible(sequencer);
     if (sliceView) refreshSlicePanel(true);
     updateToolbar();
@@ -737,8 +735,8 @@ void PhraseContent::resized()
             const int detectW = pad * 3 + boxW + detectCells * cellW + pad + buttonW;
             const int detectH = cellH + pad * 2;
             const int soundW = pad * 3 + boxW + 4 * cellW;
-            const int playW[] = { s(80), s(92), s(74) }, iconW = s(32);
-            const int previewW = padS * 2 + playW[0] + playW[1] + playW[2] + 2 * iconW + 4 * padS;
+            const int playW = s(54), iconW = s(32);
+            const int previewW = padS * 2 + 2 * playW + 2 * iconW + 3 * padS;
             const int previewH = s(kStatusH) + padS * 2;
 
             // The detector, the layer's sound strip and the audition controls, each in its own panel under a plate: left to right, wrapping
@@ -780,9 +778,9 @@ void PhraseContent::resized()
             {
                 auto row = box.reduced(padS);
                 int k = 0;
-                for (auto* b : std::initializer_list<juce::Component*> { &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewStopButton, &previewLoopButton })
+                for (auto* b : std::initializer_list<juce::Component*> { &previewTempoButton, &previewOriginalButton, &previewStopButton, &previewLoopButton })
                 {
-                    b->setBounds(row.removeFromLeft(k < 3 ? playW[k] : iconW));
+                    b->setBounds(row.removeFromLeft(k < 2 ? playW : iconW));
                     row.removeFromLeft(padS);
                     ++k;
                 }

@@ -4,14 +4,17 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
-// A small transport-style button drawn from a path: play, stop or repeat, with an optional short caption beside the glyph. A toggle
+// A small transport-style button drawn from paths: play, stop or repeat, with an optional badge beside the glyph that says which kind of
+// play it is (a metronome for "at the tempo", a waveform for "the original"). A toggle
 // (setClickingTogglesState) shows its on state in the app accent. Colours come from MuLookAndFeel, so every product matches.
 class IconButton : public juce::Button
 {
 public:
     enum class Glyph { Play, Stop, Loop };
 
-    IconButton(Glyph g, const juce::String& captionText = {}) : juce::Button(captionText), glyph(g), caption(captionText) {}
+    enum class Badge { None, Metronome, Wave };
+
+    IconButton(Glyph g, Badge bg = Badge::None) : juce::Button({}), glyph(g), badge(bg) {}
 
     void paintButton(juce::Graphics& g, bool over, bool down) override
     {
@@ -26,7 +29,7 @@ public:
 
         // The glyph sits in a square at the left (centred when there is no caption).
         const float side = std::min(b.getHeight() - 8.0f, 14.0f * (float) mu_ui::s(1));
-        auto box = juce::Rectangle<float>(side, side).withCentre({ caption.isEmpty() ? b.getCentreX() : b.getX() + 6.0f + side * 0.5f, b.getCentreY() });
+        auto box = juce::Rectangle<float>(side, side).withCentre({ badge == Badge::None ? b.getCentreX() : b.getX() + 5.0f + side * 0.5f, b.getCentreY() });
         g.setColour(on ? accent : LF::colour(LF::labelText));
         juce::Path p;
         switch (glyph)
@@ -46,14 +49,37 @@ public:
                 break;
             }
         }
-        if (caption.isNotEmpty())
+        if (badge != Badge::None)
         {
-            g.setFont(juce::FontOptions((float) mu_ui::s(11)));
-            g.drawText(caption, b.withTrimmedLeft(side + 10.0f).withTrimmedRight(3.0f), juce::Justification::centredLeft, true);
+            const auto k = juce::Rectangle<float>(side, side).withCentre({ b.getRight() - 5.0f - side * 0.5f, b.getCentreY() });
+            const float t = std::max(1.2f, side * 0.1f);
+            if (badge == Badge::Metronome)
+            {
+                // A metronome: a tapering body with its pendulum.
+                juce::Path body;
+                body.startNewSubPath(k.getX() + side * 0.28f, k.getBottom());
+                body.lineTo(k.getX() + side * 0.42f, k.getY());
+                body.lineTo(k.getX() + side * 0.58f, k.getY());
+                body.lineTo(k.getX() + side * 0.72f, k.getBottom());
+                body.closeSubPath();
+                g.strokePath(body, juce::PathStrokeType(t));
+                g.drawLine(k.getCentreX(), k.getBottom() - side * 0.1f, k.getX() + side * 0.72f, k.getY() + side * 0.2f, t);
+            }
+            else
+            {
+                // A waveform: bars of rising and falling height.
+                static constexpr float heights[] = { 0.3f, 0.7f, 1.0f, 0.55f, 0.85f, 0.35f };
+                const float step = side / 6.0f;
+                for (int i = 0; i < 6; ++i)
+                {
+                    const float h = side * heights[i];
+                    g.fillRect(k.getX() + step * (float) i + step * 0.2f, k.getCentreY() - h * 0.5f, std::max(1.2f, step * 0.55f), h);
+                }
+            }
         }
     }
 
 private:
     Glyph glyph;
-    juce::String caption;
+    Badge badge;
 };
