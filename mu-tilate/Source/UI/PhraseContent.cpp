@@ -327,6 +327,7 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     rangeBar.setTooltip("The whole sample: drag the ends to use only a section of it (the file is not changed), drag inside to slide the section");
     rangeBar.onRangeChanged = [this](int start, int end) { timelineView.setSelectedBlock(-1); host.setSourceRegion(currentLayer, start, end); };
     addAndMakeVisible(rangeBar);
+    previewStopButton.setTooltip("Stop the audition");
     previewTempoButton.setTooltip("Play the loop at the project tempo, as the layer's Tempo Match and Pitch/Stretch set it");
     previewOriginalButton.setTooltip("Play the used section of the sample as it is, at its own tempo");
     previewSliceButton.setTooltip("Play the selected slice");
@@ -381,7 +382,7 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     tlInButton.onClick = [this] { timelineView.zoomBy(1.5, timelineView.getWidth() / 2); };
     tlFitButton.setTooltip("Show the whole timeline. Shift+wheel scrolls, a drag on the ruler or a middle-button drag pans");
     tlFitButton.onClick = [this] { timelineView.showAll(); };
-    for (auto* b : { &deleteButton, &clearButton, &layOutButton, &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewLoopButton, &previewStopButton, &cropButton, &waveFitButton, &waveOutButton, &waveInButton, &tlOutButton, &tlInButton, &tlFitButton }) addAndMakeVisible(*b);
+    for (auto* b : std::initializer_list<juce::Component*> { &deleteButton, &clearButton, &layOutButton, &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewLoopButton, &previewStopButton, &cropButton, &waveFitButton, &waveOutButton, &waveInButton, &tlOutButton, &tlInButton, &tlFitButton }) addAndMakeVisible(*b);
 
     updateView();
     startTimerHz(30);
@@ -466,9 +467,9 @@ void PhraseContent::updateView()
     for (auto& k : knobs)
     {
         if (k.row >= ppi::dsens && k.row <= ppi::dhigh) k.comp->setVisible(sequencer);
-        else if (k.row == ppi::ltempo || k.row == ppi::tmix || k.row == ppi::hold || k.row == ppi::strength) k.comp->setVisible(layerView);
+        else if (k.row == ppi::ltempo || k.row == ppi::tmix || k.row == ppi::hold || k.row == ppi::strength) k.comp->setVisible(sequencer);
     }
-    modeBox.setVisible(layerView);
+    modeBox.setVisible(sequencer);
     layerBand.setVisible(layerView);
     detectBox.setVisible(sequencer);
     detectButton.setVisible(sequencer);
@@ -735,12 +736,23 @@ void PhraseContent::resized()
             for (auto& k : knobs) if (isDetect(k.row)) ++detectCells;
             const int detectW = pad * 3 + boxW + detectCells * cellW + pad + buttonW;
             const int detectH = cellH + pad * 2;
-            const int previewW = padS * 2 + 3 * s(108) + s(64) + s(60) + 4 * padS;
+            const int soundW = pad * 3 + boxW + 4 * cellW;
+            const int playW[] = { s(80), s(92), s(74) }, iconW = s(32);
+            const int previewW = padS * 2 + playW[0] + playW[1] + playW[2] + 2 * iconW + 4 * padS;
             const int previewH = s(kStatusH) + padS * 2;
-            const bool sideBySide = detectW + padS * 2 + previewW <= area.getWidth();
 
-            area.removeFromTop(plate);
-            const juce::Rectangle<int> detectBoxArea(area.getX(), area.getY(), detectW, detectH);
+            // The detector, the layer's sound strip and the audition controls, each in its own panel under a plate: left to right, wrapping
+            // onto a new row when the next one does not fit.
+            int x = area.getX(), rowTop = area.getY() + plate;
+            auto nextPanel = [&](int w, int h)
+            {
+                if (x > area.getX() && x + w > area.getRight()) { x = area.getX(); rowTop += detectH + padS + plate; }
+                const juce::Rectangle<int> r(x, rowTop, w, h);
+                x += w + padS * 2;
+                return r;
+            };
+
+            const auto detectBoxArea = nextPanel(detectW, detectH);
             sections.push_back({ detectBoxArea, "LAYER TRANSIENT DETECTOR" });
             {
                 auto d = detectBoxArea.reduced(pad, pad);
@@ -750,25 +762,32 @@ void PhraseContent::resized()
                 d.removeFromLeft(pad);
                 detectButton.setBounds(d.removeFromLeft(buttonW).withSizeKeepingCentre(buttonW, s(kStatusH)));
             }
-            juce::Rectangle<int> box;
-            if (sideBySide)
+
+            // The sound strip: tempo match, tempo, pitch/stretch, hold, strength.
+            const auto soundBox = nextPanel(soundW, detectH);
+            sections.push_back({ soundBox, "LAYER SOUND" });
             {
-                box = { detectBoxArea.getRight() + padS * 2, detectBoxArea.getY(), previewW, previewH };
-                area.removeFromTop(detectH);
+                auto r = soundBox.reduced(pad, pad);
+                modeBox.setBounds(r.removeFromLeft(boxW).withSizeKeepingCentre(boxW, s(kStatusH)));
+                r.removeFromLeft(pad);
+                for (int row : { (int) ppi::ltempo, (int) ppi::tmix, (int) ppi::hold, (int) ppi::strength })
+                    knobOf(row).setBounds(r.removeFromLeft(cellW).withHeight(cellH));
             }
-            else
-            {
-                area.removeFromTop(detectH + padS + plate);
-                box = area.removeFromTop(previewH).withWidth(previewW);
-            }
+
+            // The audition: three plays, stop and repeat as small icon buttons.
+            const auto box = nextPanel(previewW, previewH);
             sections.push_back({ box, "PREVIEW" });
-            auto row = box.reduced(padS);
-            for (auto* b : { &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewLoopButton, &previewStopButton })
             {
-                const int w = b == &previewStopButton ? 60 : (b == &previewLoopButton ? 64 : 108);
-                b->setBounds(row.removeFromLeft(s(w)));
-                row.removeFromLeft(padS);
+                auto row = box.reduced(padS);
+                int k = 0;
+                for (auto* b : std::initializer_list<juce::Component*> { &previewTempoButton, &previewOriginalButton, &previewSliceButton, &previewStopButton, &previewLoopButton })
+                {
+                    b->setBounds(row.removeFromLeft(k < 3 ? playW[k] : iconW));
+                    row.removeFromLeft(padS);
+                    ++k;
+                }
             }
+            area.removeFromTop(rowTop + detectH - area.getY());
             area.removeFromTop(padS);
         }
         rangeBar.setBounds(area.removeFromTop(s(40)));
@@ -800,16 +819,8 @@ void PhraseContent::resized()
 
     if (layerViewShown())
     {
-        // Layer: the sound strip (tempo match, tempo, pitch/stretch, hold, strength) in its own panel, then the voice band: Pitch | Filter | Amp | Effects.
-        const int soundW = pad * 3 + boxW + 4 * cellW;
-        const juce::Rectangle<int> soundBox(area.getX() + s(VoiceBand::kLeftGap), area.getY() + plate, soundW, cellH + pad * 2);
-        sections.push_back({ soundBox, "LAYER SOUND" });
-        auto r = soundBox.reduced(pad, pad);
-        modeBox.setBounds(r.removeFromLeft(boxW).withSizeKeepingCentre(boxW, s(kStatusH)));
-        r.removeFromLeft(pad);
-        for (int row : { (int) ppi::ltempo, (int) ppi::tmix, (int) ppi::hold, (int) ppi::strength })
-            knobOf(row).setBounds(r.removeFromLeft(cellW).withHeight(cellH));
-        layerBand.setBounds(area.getX(), soundBox.getBottom() + pad, s(VoiceBand::kEffectsX + VoiceBand::kEffectsW), s(VoiceBand::kHeight));
+        // Layer: the voice band: Pitch | Filter | Amp | Effects (the tempo-match strip is on the Sequencer view).
+        layerBand.setBounds(area.getX(), area.getY() + plate, s(VoiceBand::kEffectsX + VoiceBand::kEffectsW), s(VoiceBand::kHeight));
         slicePanel.setBounds({});
         return;
     }

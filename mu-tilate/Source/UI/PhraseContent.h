@@ -7,6 +7,7 @@
 #include "UI/Components/LoopWaveform.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/NudgeInput.h"
+#include "UI/Components/IconButton.h"
 #include "UI/Components/SourceRangeBar.h"
 #include "UI/Components/SegmentControl.h"
 #include "UI/Voice/InsertSubsection.h"   // mu-core: the shared per-layer insert panel
@@ -125,7 +126,9 @@ private:
     DropdownSelect   gridBox;                     // the snap grid
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> gridAtt;
     juce::TextButton deleteButton { "Delete hit" }, clearButton { "Clear" }, layOutButton { "Lay out" };
-    juce::TextButton previewTempoButton { "Play at tempo" }, previewOriginalButton { "Play original" }, previewSliceButton { "Play slice" }, previewStopButton { "Stop" }, previewLoopButton { "Loop" };
+    // The audition controls are small icon buttons: three ways to play, stop, and repeat.
+    IconButton previewTempoButton { IconButton::Glyph::Play, "Tempo" }, previewOriginalButton { IconButton::Glyph::Play, "Original" },
+               previewSliceButton { IconButton::Glyph::Play, "Slice" }, previewStopButton { IconButton::Glyph::Stop }, previewLoopButton { IconButton::Glyph::Loop };
     juce::TextButton cropButton { "Crop" };       // cuts the sample to the play area (the handles on the waveform)
     juce::TextButton waveFitButton { "Fit sample" }, waveOutButton { "-" }, waveInButton { "+" }, tlOutButton { "-" }, tlInButton { "+" }, tlFitButton { "Fit timeline" };
     std::vector<LF_Section> sections;             // the panels of the Layer and Slice views, from resized() for paint()
