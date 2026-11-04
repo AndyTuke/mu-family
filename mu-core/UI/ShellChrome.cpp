@@ -21,8 +21,7 @@ ShellChrome::ShellChrome(juce::Component& hostComponent, mu_core::ShellBackend& 
     : host(hostComponent),
       backend(shellBackend),
       scaleInit(shellBackend),
-      transportBar(shellBackend),
-      tooltipWindow(&hostComponent, 700)
+      transportBar(shellBackend)
 {
     wireBuiltIns();
     wirePerformanceChooser();

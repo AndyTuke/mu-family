@@ -163,10 +163,12 @@ void PhrasePlayback::render(const PhraseLoop& loop, const PhraseSettings& s, con
     const double bps = c.beatsPerSample;
 
     // A transport jump (locate, host loop): re-anchor, the sounding slice leaves through the cut fade.
+    bool fresh = ! anchored;   // a start or a jump: a block just behind the first sample (a start a hair past its beat) still fires
     if (anchored && std::abs(c.startBeat - expectedBeat) > std::max(2.0 * bps, 1.0e-6))
     {
         player.cut();
         cutPending = false;
+        fresh = true;
     }
     anchored = true;
     expectedBeat = c.startBeat + (double) n * bps;
@@ -187,7 +189,8 @@ void PhrasePlayback::render(const PhraseLoop& loop, const PhraseSettings& s, con
         // The first block that starts at or after this segment's start (a block exactly at the start fires).
         const auto& blocks = loop.timeline->blocks();
         const auto startsAt = [&blocks](double beat) { return (int) (std::lower_bound(blocks.begin(), blocks.end(), beat, [](const TimelineBlock& b, double v) { return b.start < v; }) - blocks.begin()); };
-        int bi = startsAt(pos - 1.0e-9);   // the blocks are sorted by start
+        const double startTol = (fresh && done == 0) ? bps : 1.0e-9;
+        int bi = startsAt(pos - startTol);   // the blocks are sorted by start
 
         // The blocks whose pre-fade can start inside this segment: the longest pre-fade is a second, so only blocks starting
         // within that of the segment (or, for the pre-fade that wraps back to the timeline's end, within that of its start).

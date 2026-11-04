@@ -232,7 +232,36 @@ private:
     bool settingsVisible = false;
 
     juce::ComponentAnimator animator;
-    juce::TooltipWindow     tooltipWindow;   // parents itself to the host in its constructor
+
+    // Hint text goes to the status bar, never a popup over the UI: while the pointer rests on a control that has a tooltip,
+    // the bar shows it; when the pointer leaves, a hint the bar was showing is cleared.
+    class HintToStatus : private juce::Timer
+    {
+    public:
+        HintToStatus(juce::Component& hostComponent, StatusBar& bar) : host(hostComponent), status(bar) { startTimer(120); }
+        ~HintToStatus() override { stopTimer(); }
+
+    private:
+        void timerCallback() override
+        {
+            juce::String text;
+            if (auto* c = juce::Desktop::getInstance().getMainMouseSource().getComponentUnderMouse())
+            {
+                if (host.isParentOf(c) || c == &host)
+                    for (auto* p = c; p != nullptr && text.isEmpty(); p = p->getParentComponent())
+                        if (auto* client = dynamic_cast<juce::TooltipClient*>(p))
+                            text = client->getTooltip();
+            }
+            if (text == shown) return;
+            shown = text;
+            status.showParam(shown.isEmpty() ? juce::String() : "Hint", shown);
+        }
+
+        juce::Component& host;
+        StatusBar&       status;
+        juce::String     shown;
+    };
+    HintToStatus hintToStatus { host, statusBar };
     void fadeSwitch(juce::Component* outgoing, juce::Component* incoming, int durationMs = 80);
 
     InputShield      shield;
