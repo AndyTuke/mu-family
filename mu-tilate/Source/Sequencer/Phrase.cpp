@@ -412,7 +412,7 @@ void Phrase::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>&
     insert->setTempo(ctx.bpm);
     renderBlock(d, clock, out, n);
     mu_core::spinUnlock(dataLock);
-    preview.mixInto(out, n);   // an audition sounds with the layer, after its insert, with or without the transport
+    if (! clock.playing) preview.mixInto(out, n);   // an audition sounds with the layer, after its insert, only while the transport is stopped (never over the sequence)
 }
 
 // The tail of a layer that left its slot: the scheduler with the transport stopped (the sounding slice fades through
