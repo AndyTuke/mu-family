@@ -2,17 +2,23 @@
 
 Written only by the build PC. The laptop reads it and answers in [laptop-to-build.md](laptop-to-build.md). Protocol: [README.md](README.md).
 
-Next id: B-005
+Next id: B-006
 
 (B-001 resolved and removed: see the Extra entry below.)
 
 ## Status (build PC)
 
-- Written: 2026-11-03, end of the mu-Tilate session. Build number 1457 (`mu-core/BuildNumber.h`, focused Debug builds, no increment). Everything is committed and pushed (`7ec11c54` plus the backlog commits after it).
-- mu-Tilate: `mu-tilate-tests` 112 results, 0 failures (Debug). Rows 1748 to 1755 are closed on build and test evidence, but Andy has not seen or heard any of it yet: the look-list is in B-004 and on #1745. No Release build, no pluginval run.
-- Other products: the sync work (#1749) is built and tested; their golden and pin failures are the stale ones in B-002, #1751 (mu-Tronic Pattern hash) is open.
+- Written: 2026-11-05, end of the mu-Tilate session. Build number 1457 (`mu-core/BuildNumber.h`, focused Debug builds, no increment). Everything is committed and pushed (`5f57b642` plus the handover and backlog commits after it).
+- mu-Tilate: `mu-tilate-tests` 110 results, 0 failures (Debug). New this session and not yet seen or heard by Andy: rows #1759 to #1765 (see B-005). JUCE is now 9.0.5 (`D:\JUCE`, pin bumped, the local MIDI patch dropped); only mu-Tilate and its tests were rebuilt on it. No Release build, no pluginval run.
+- Other products: not rebuilt on JUCE 9.0.5 yet; their golden and pin failures are the stale ones in B-002, #1751 (mu-Tronic Pattern hash) is open.
+- `D:\JUCE-dev` is a scratch clone of JUCE `develop` for upstream work (L-012 is answered below).
 
 ## Open
+
+### B-005 · 2026-11-05 · mu-Tilate: look and listen to this session's changes, and measure one thing
+Rows: #1759 to #1765 (and #1745) · Commits: `c25d298f`, `7dfe426f`, `bb168712`, `ef4f5fdb`, `cc03ef84`, `26e4726b`, `9d13a47e`, `ff8ae934` · Needs: look | listen | measure
+Do: run mu-Tilate (Debug Standalone). Look: SAMPLE panel in the top row, SEQUENCER and TIMELINE VIEW panels, the walking-man follow toggle (zoom the timeline, play, switch it off), hints in the status bar only (no popups, in every product: mu-core ShellChrome), the fade corners and the bend handles on a hit. Listen: the audition starts at once (play button, tempo and slice), the sample browser (Load loop) auditions a selected file, sample play does nothing while the transport plays, the missing first hit (#1758 fix, and the loop-wrap downbeat fix in #1765). Measure (#1765 R1): the worst-case time of a stretcher trigger in the audio callback (Strength 0, Default window, 88.2 kHz).
+Report: anything wrong on #1745 or as a new row; the R1 number on #1765. Not done on this PC: nothing was listened to, the browser audition was not heard, the hint change was looked at in mu-Tilate only, no Release build.
 
 ### B-004 · 2026-11-03 · mu-Tilate: look and listen through everything built since 1745
 Rows: #1745 (the list), #1748 to #1755 · Commits: up to `7ec11c54` · Needs: look | listen
