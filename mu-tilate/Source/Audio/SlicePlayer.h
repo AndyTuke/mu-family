@@ -108,6 +108,7 @@ private:
         int    age        = 0;     // output samples since the start
         int    fadeInLen  = 1;
         int    fadeOutLen = 1;
+        int    hitLen     = 0;     // the hit's output length in samples, for its drawn envelope (SliceSettings::envIn / envOut); 0 = none
         bool   fading     = false; // being cut: cutGain falls to 0
         float  cutGain    = 1.0f;
         bool   active     = false;

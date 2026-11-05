@@ -60,6 +60,8 @@ struct SliceSettings
     float trimInBeats = 0.0f;   // >= 0: beats of the slice (at the loop's tempo) skipped at its start
     float retime      = 1.0f;   // 0.25..4: the hit plays in this many times its natural length (2 = twice as long); pitch follows the layer's Pitch/Stretch knob
     float volume      = 1.0f;   // 0..1: this hit's level as a fraction of full, set by dragging the top of the block on the timeline (multiplies the gain)
+    float envIn       = 0.0f;   // 0..1: the hit's fade-in as a fraction of its length, set by dragging the block's top-left corner in
+    float envOut      = 0.0f;   // 0..1: the fade-out as a fraction of its length, set by dragging the top-right corner in (envIn + envOut <= 1)
 
 };
 
@@ -94,6 +96,8 @@ inline SliceSettings sanitised(SliceSettings s) noexcept
     s.trimInBeats = fix(s.trimInBeats, 0.0f, 4096.0f, 0.0f);
     s.retime = fix(s.retime, 0.25f, 4.0f, 1.0f);
     s.volume = fix(s.volume, 0.0f, 1.0f, 1.0f);
+    s.envIn = fix(s.envIn, 0.0f, 1.0f, 0.0f);
+    s.envOut = std::min(fix(s.envOut, 0.0f, 1.0f, 0.0f), 1.0f - s.envIn);
     return s;
 }
 

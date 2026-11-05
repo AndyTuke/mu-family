@@ -45,6 +45,9 @@ public:
     double dropBeatAt(juce::Point<int> p, bool free) const;
     // The playhead in beats from the timeline start, or a negative value for none.
     void setPlayheadBeats(double beats);
+    // Whether the view pages on to keep the playhead in sight while it plays (on by default).
+    void setFollowPlayhead(bool follow) { followPlayhead = follow; }
+    bool getFollowPlayhead() const noexcept { return followPlayhead; }
 
     // The slice a click on empty row places (the waveform's selected region); -1 = none selected.
     std::function<int()> sliceToPlace;
@@ -75,6 +78,9 @@ private:
     // Where block `i` is drawn, and the block whose level line (the top of its coloured part) is under `p`, or -1.
     juce::Rectangle<int> blockRect(int i) const;
     int    levelHandleAt(juce::Point<int> p) const;
+    // Where a block's envelope corners sit (the ends of its level line), and the block whose corner is under `p` (`right` says which), or -1.
+    juce::Point<float> cornerOf(int i, bool right) const;
+    int    cornerAt(juce::Point<int> p, bool& right) const;
     // The block with an edge under x (`right` says which), or -1.
     int    edgeAt(int x, bool& right) const;
     double naturalBeatsOf(int i) const;   // the block's whole slice, in beats
@@ -105,6 +111,8 @@ private:
     double grabOffset = 0.0;
     bool   dragMoved = false;
     enum class Edge { None, Left, Right };
+    bool   followPlayhead = true;   // page the view on with the playhead
+    int    dragCorner = 0;          // 0 none, -1 the top-left corner (fade in), 1 the top-right corner (fade out)
     bool   dragLevel = false;       // the drag is on a block's level line: up and down set the hit's volume
     Edge   dragEdge = Edge::None;   // the drag is on a block edge (trim, or with Alt retime), not moving the block
     double dragAnchor = 0.0;        // the edge that stays put during an edge drag, in beats

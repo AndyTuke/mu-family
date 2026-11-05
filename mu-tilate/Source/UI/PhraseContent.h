@@ -129,6 +129,7 @@ private:
     // The audition controls are small icon buttons: play at the tempo (metronome), play the original (waveform), stop, and repeat.
     IconButton previewTempoButton { IconButton::Glyph::Play, IconButton::Badge::Metronome }, previewOriginalButton { IconButton::Glyph::Play, IconButton::Badge::Wave },
                previewStopButton { IconButton::Glyph::Stop }, previewLoopButton { IconButton::Glyph::Loop };
+    IconButton followButton { IconButton::Glyph::Walk };   // the timeline pages on with the playhead (on) or stays where it is (off)
     juce::TextButton cropButton { "Crop" };       // cuts the sample to the play area (the handles on the waveform)
     juce::TextButton waveFitButton { "Fit sample" }, waveOutButton { "-" }, waveInButton { "+" }, tlOutButton { "-" }, tlInButton { "+" }, tlFitButton { "Fit timeline" };
     std::vector<LF_Section> sections;             // the panels of the Layer and Slice views, from resized() for paint()

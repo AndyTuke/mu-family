@@ -333,6 +333,10 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     previewTempoButton.onClick    = [this] { host.previewSource(currentLayer, 1, 0); };
     previewOriginalButton.onClick = [this] { host.previewSource(currentLayer, 0, 0); };
     previewStopButton.onClick     = [this] { host.stopPreview(currentLayer); };
+    followButton.setClickingTogglesState(true);
+    followButton.setToggleState(timelineView.getFollowPlayhead(), juce::dontSendNotification);
+    followButton.setTooltip("Follow the playhead: when on, a zoomed timeline pages on to keep the playhead in sight; when off it stays where you put it");
+    followButton.onClick = [this] { timelineView.setFollowPlayhead(followButton.getToggleState()); };
     previewLoopButton.setClickingTogglesState(true);
     previewLoopButton.setTooltip("Repeat the whole-loop auditions until stopped (a single slice plays once)");
     previewLoopButton.onClick     = [this] { host.setPreviewLooping(currentLayer, previewLoopButton.getToggleState()); };
@@ -380,7 +384,7 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     tlInButton.onClick = [this] { timelineView.zoomBy(1.5, timelineView.getWidth() / 2); };
     tlFitButton.setTooltip("Show the whole timeline. Shift+wheel scrolls, a drag on the ruler or a middle-button drag pans");
     tlFitButton.onClick = [this] { timelineView.showAll(); };
-    for (auto* b : std::initializer_list<juce::Component*> { &deleteButton, &clearButton, &layOutButton, &previewTempoButton, &previewOriginalButton, &previewLoopButton, &previewStopButton, &cropButton, &waveFitButton, &waveOutButton, &waveInButton, &tlOutButton, &tlInButton, &tlFitButton }) addAndMakeVisible(*b);
+    for (auto* b : std::initializer_list<juce::Component*> { &deleteButton, &clearButton, &followButton, &layOutButton, &previewTempoButton, &previewOriginalButton, &previewLoopButton, &previewStopButton, &cropButton, &waveFitButton, &waveOutButton, &waveInButton, &tlOutButton, &tlInButton, &tlFitButton }) addAndMakeVisible(*b);
 
     updateView();
     startTimerHz(30);
@@ -475,7 +479,7 @@ void PhraseContent::updateView()
     waveform.setVisible(! layerView);
     rangeBar.setVisible(sequencer);
     timelineView.setVisible(! layerView);
-    for (auto* c : std::initializer_list<juce::Component*> { &lengthCaption, &barsInput, &beatsInput, &gridBox, &layOutButton, &deleteButton, &clearButton,
+    for (auto* c : std::initializer_list<juce::Component*> { &lengthCaption, &barsInput, &beatsInput, &gridBox, &layOutButton, &deleteButton, &clearButton, &followButton,
                                                               &waveFitButton, &waveOutButton, &waveInButton, &previewTempoButton, &previewOriginalButton, &previewLoopButton, &previewStopButton, &cropButton, &tlOutButton, &tlInButton, &tlFitButton })
         c->setVisible(sequencer);
     if (sliceView) refreshSlicePanel(true);
@@ -818,6 +822,7 @@ void PhraseContent::resized()
         place(layOutButton, 72);
         place(deleteButton, 82);
         place(clearButton, 60);
+        place(followButton, 30);
         auto tl = tlPanel.reduced(pad, pad);
         tlOutButton.setBounds(tl.removeFromLeft(s(30)));
         tl.removeFromLeft(pad);

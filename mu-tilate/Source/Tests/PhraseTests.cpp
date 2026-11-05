@@ -490,6 +490,20 @@ struct PhraseTests : public juce::UnitTest
             expectEquals(sanitised(s2).volume, 1.0f);
         }
 
+        beginTest("a hit's dragged envelope corners fade it in and out as a fraction of its length");
+        {
+            Rig r;
+            r.hitsStartWithSliceSettings = false;
+            r.timeline.place(1, 1.0, 0.0);
+            auto shaped = r.timeline.blocks()[0].own; shaped.envIn = 0.5f; shaped.envOut = 0.5f; r.timeline.setSettings(0, shaped);
+            auto out = r.run(96000, 128);
+            expectWithinAbsoluteError(out.getSample(0, 24000 + 6000), 0.1f, 2.0e-3f);    // half way up the fade in
+            expectWithinAbsoluteError(out.getSample(0, 24000 + 12000), 0.2f, 2.0e-3f);   // the corners meet: full level
+            expectWithinAbsoluteError(out.getSample(0, 24000 + 18000), 0.1f, 2.0e-3f);   // half way down the fade out
+            auto bad = shaped; bad.envIn = 0.8f; bad.envOut = 0.9f;
+            expectLessOrEqual(sanitised(bad).envIn + sanitised(bad).envOut, 1.0f);
+        }
+
         beginTest("a block near the end of the timeline sounds again in the next pass");
         {
             Rig r;

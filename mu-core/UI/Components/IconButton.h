@@ -10,7 +10,7 @@
 class IconButton : public juce::Button
 {
 public:
-    enum class Glyph { Play, Stop, Loop };
+    enum class Glyph { Play, Stop, Loop, Walk };
 
     enum class Badge { None, Metronome, Wave };
 
@@ -36,6 +36,19 @@ public:
         {
             case Glyph::Play: p.addTriangle(box.getX() + side * 0.1f, box.getY(), box.getX() + side * 0.1f, box.getBottom(), box.getRight(), box.getCentreY()); g.fillPath(p); break;
             case Glyph::Stop: g.fillRect(box.reduced(side * 0.1f)); break;
+            case Glyph::Walk:
+            {
+                // A walking figure: head, body, a swinging arm and two striding legs.
+                const float t = std::max(1.4f, side * 0.13f);
+                const float cx = box.getCentreX(), top = box.getY(), bot = box.getBottom();
+                g.fillEllipse(cx - side * 0.1f, top, side * 0.2f, side * 0.2f);
+                g.drawLine(cx, top + side * 0.24f, cx - side * 0.04f, top + side * 0.58f, t);                       // body
+                g.drawLine(cx - side * 0.02f, top + side * 0.32f, cx + side * 0.26f, top + side * 0.5f, t);        // arm forward
+                g.drawLine(cx - side * 0.02f, top + side * 0.32f, cx - side * 0.26f, top + side * 0.46f, t);       // arm back
+                g.drawLine(cx - side * 0.04f, top + side * 0.58f, cx + side * 0.2f, bot, t);                       // leg forward
+                g.drawLine(cx - side * 0.04f, top + side * 0.58f, cx - side * 0.24f, bot, t);                      // leg back
+                break;
+            }
             case Glyph::Loop:
             {
                 // An open ring with an arrowhead: the repeat sign.

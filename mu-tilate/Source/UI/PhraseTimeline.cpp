@@ -35,7 +35,7 @@ void PhraseTimeline::setPlayheadBeats(double b)
     // While playing, page the view on when the playhead walks out of it (or starts outside it). A playhead that was already
     // outside, because the user scrolled away, leaves the view alone.
     const double L = timeline.lengthBeats();
-    if (playhead >= 0.0 && viewBeats > 0.0 && viewBeats < L - 1.0e-9)
+    if (followPlayhead && playhead >= 0.0 && viewBeats > 0.0 && viewBeats < L - 1.0e-9)
     {
         auto inside = [&](double beat) { const double p = std::fmod(beat, L); return p >= viewStart && p < viewStart + viewBeats; };
         if (! inside(playhead) && (before < 0.0 || inside(before)))
@@ -129,6 +129,34 @@ int PhraseTimeline::levelHandleAt(juce::Point<int> p) const
     return -1;
 }
 
+juce::Point<float> PhraseTimeline::cornerOf(int i, bool right) const
+{
+    const auto r = blockRect(i);
+    const auto& own = timeline.blocks()[(size_t) i].own;
+    const float w = (float) r.getWidth();
+    return { right ? (float) r.getRight() - own.envOut * w : (float) r.getX() + own.envIn * w,
+             (float) r.getBottom() - own.volume * (float) r.getHeight() };
+}
+
+int PhraseTimeline::cornerAt(juce::Point<int> p, bool& right) const
+{
+    // The nearest top corner within a few pixels of the pointer; it wins over the block's edge and level line.
+    const float grab = (float) mu_ui::s(6);
+    int best = -1;
+    float bestDist = grab + 1.0f;
+    for (int i = 0; i < timeline.size(); ++i)
+    {
+        if (timeline.blocks()[(size_t) i].slice < 0) continue;   // a cropped hit has no sound to shape
+        for (const bool rt : { false, true })
+        {
+            const auto c = cornerOf(i, rt);
+            const float d = std::max(std::abs(c.x - (float) p.x), std::abs(c.y - (float) p.y));
+            if (d < bestDist) { best = i; bestDist = d; right = rt; }
+        }
+    }
+    return best;
+}
+
 double PhraseTimeline::blockBeats(int i) const
 {
     const auto& b = timeline.blocks()[(size_t) i];
@@ -216,16 +244,39 @@ void PhraseTimeline::paint(juce::Graphics& g)
         const float vol = b.own.volume;
         if (! cropped && vol > 0.0f)
         {
+            // The coloured part is the hit's envelope: up from the foot over the fade-in, level across the top, down over the fade-out.
             const auto lit = r.withTop(r.getBottom() - std::max(1, (int) std::lround(vol * (float) r.getHeight())));
+            const auto cl = cornerOf(i, false), cr = cornerOf(i, true);
+            juce::Path envelope;
+            envelope.startNewSubPath((float) r.getX(), (float) r.getBottom());
+            envelope.lineTo(cl.x, (float) lit.getY());
+            envelope.lineTo(cr.x, (float) lit.getY());
+            envelope.lineTo((float) r.getRight(), (float) r.getBottom());
+            envelope.closeSubPath();
             g.saveState();
             g.reduceClipRegion(lit);
+            g.reduceClipRegion(envelope, {});
             g.setColour(accent.withAlpha(lighting.blockFillSelected));
             g.fillRoundedRectangle(r.toFloat(), LF::kBlockRadius);
             g.restoreState();
-            if (vol < 0.995f)
+            const bool shaped = b.own.envIn > 0.0f || b.own.envOut > 0.0f;
+            if (vol < 0.995f || shaped)
             {
                 g.setColour(accent.brighter(0.5f));
-                g.fillRect(lit.getX() + 1, lit.getY(), lit.getWidth() - 2, 2);
+                g.drawLine(cl.x, (float) lit.getY() + 1.0f, cr.x, (float) lit.getY() + 1.0f, 2.0f);
+                if (shaped)
+                {
+                    g.drawLine((float) r.getX(), (float) r.getBottom(), cl.x, (float) lit.getY() + 1.0f, 1.5f);
+                    g.drawLine(cr.x, (float) lit.getY() + 1.0f, (float) r.getRight(), (float) r.getBottom(), 1.5f);
+                }
+            }
+            if (i == selected)
+            {
+                // The two corners, the handles that shape the envelope.
+                g.setColour(accent.brighter(0.7f));
+                const float hs = (float) s(5);
+                for (const auto& c : { cl, cr })
+                    g.fillEllipse(c.x - hs * 0.5f, (float) lit.getY() + 1.0f - hs * 0.5f, hs, hs);
             }
         }
         g.setColour(LF::colour(LF::lfoEditorPoint).withAlpha((i == selected ? 1.0f : 0.5f) * dim));
@@ -327,6 +378,22 @@ void PhraseTimeline::mouseDown(const juce::MouseEvent& e)
     if (! rowArea().contains(e.getPosition())) return;
     dragMoved = false;
     bool onRight = false;
+    // A corner of a block's envelope comes before its edge and level line.
+    bool cornerRight = false;
+    const int cornerBlock = cornerAt(e.getPosition(), cornerRight);
+    if (cornerBlock >= 0)
+    {
+        selected = cornerBlock;
+        dragBlock = cornerBlock;
+        dragCorner = cornerRight ? 1 : -1;
+        dragLevel = false;
+        dragEdge = Edge::None;
+        dragOrigin = timeline;
+        dragOriginIndex = cornerBlock;
+        if (onBlockSelected) onBlockSelected(cornerBlock);
+        repaint();
+        return;
+    }
     const int edgeBlock = edgeAt(e.x, onRight);
     const int levelBlock = edgeBlock < 0 ? levelHandleAt(e.getPosition()) : -1;
     const int hit = edgeBlock >= 0 ? edgeBlock : levelBlock >= 0 ? levelBlock : blockAt(e.x);
@@ -378,6 +445,25 @@ void PhraseTimeline::mouseDrag(const juce::MouseEvent& e)
         return;
     }
     if (dragBlock < 0 || ! onEdit) return;
+
+    // Dragging a top corner in or out sets the hit's fade in (left) or fade out (right) as a fraction of its length, no snapping.
+    if (dragCorner != 0)
+    {
+        const int at = dragBlock;
+        const auto r = blockRect(at);
+        const float w = (float) std::max(1, r.getWidth());
+        const float x = juce::jlimit((float) r.getX(), (float) r.getRight(), (float) e.x);
+        const bool right = dragCorner > 0;
+        const float frac = right ? ((float) r.getRight() - x) / w : (x - (float) r.getX()) / w;
+        onEdit([at, right, frac](Timeline& t)
+        {
+            auto own = t.blocks()[(size_t) at].own;
+            if (right) own.envOut = juce::jlimit(0.0f, 1.0f - own.envIn, frac);
+            else       own.envIn  = juce::jlimit(0.0f, 1.0f - own.envOut, frac);
+            t.setSettings(at, own);
+        });
+        return;
+    }
 
     // Dragging the top of a block up or down sets the hit's volume: 0 at the foot, 100 % at the top, no snapping.
     if (dragLevel)
@@ -450,15 +536,18 @@ void PhraseTimeline::mouseUp(const juce::MouseEvent&)
     panning = false;
     dragBlock = -1;
     dragLevel = false;
+    dragCorner = 0;
     dragEdge = Edge::None;
 }
 
 void PhraseTimeline::mouseMove(const juce::MouseEvent& e)
 {
     bool right = false;
-    const int hit = rowArea().contains(e.getPosition()) ? edgeAt(e.x, right) : -1;
+    const bool inRow = rowArea().contains(e.getPosition());
+    const int hit = inRow ? edgeAt(e.x, right) : -1;
+    const bool onCorner = inRow && cornerAt(e.getPosition(), right) >= 0;
     const bool onLevel = hit < 0 && levelHandleAt(e.getPosition()) >= 0;
-    setMouseCursor(hit >= 0 ? juce::MouseCursor::LeftRightResizeCursor : onLevel ? juce::MouseCursor::UpDownResizeCursor : juce::MouseCursor::NormalCursor);
+    setMouseCursor(onCorner ? juce::MouseCursor::LeftRightResizeCursor : hit >= 0 ? juce::MouseCursor::LeftRightResizeCursor : onLevel ? juce::MouseCursor::UpDownResizeCursor : juce::MouseCursor::NormalCursor);
 }
 
 void PhraseTimeline::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& w)
