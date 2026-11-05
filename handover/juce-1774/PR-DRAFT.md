@@ -25,8 +25,8 @@ so they are affected too.
 
 ### Change
 
-After `fromAscii`, the `name`, `vendor`, `version` and `sdkVersion` fields are decoded from UTF-8 by a
-small helper, `widenNonAsciiUtf8`.
+In `juce_VST3ModuleInfo.h`, after `fromAscii`, the `name`, `vendor`, `version` and `sdkVersion` fields
+are decoded from UTF-8 by a small helper, `widenNonAsciiUtf8`.
 
 - Text that is plain ASCII is left untouched (the helper returns early), so the output for existing
   ASCII plugins is unchanged.
@@ -39,7 +39,7 @@ small helper, `widenNonAsciiUtf8`.
 
 - `juce::String` can't be used here: this code has to avoid depending on `juce_core` (see the comment
   in `JucePluginCompatibility::getCompatibilityJSON`), and this header is also compiled into the
-  manifest helper, where `juce_core` is stubbed.
+  manifest helper, which is built without `juce_core`.
 - The SDK's `Steinberg::Vst::StringConvert::convert` is built on `std::wstring_convert`, which throws
   on invalid UTF-8, and it leaves the destination untouched when the text is too long.
 
@@ -60,6 +60,6 @@ Windows 11, MSVC 19.51 (Visual Studio 2026), Release, compiled with `/utf-8` unl
 
 Not tested: macOS, Linux, and compilers other than MSVC.
 
-Note: the example only shows the bug when compiled with `/utf-8`. Without it, MSVC turns the μ into `?`
-before JUCE sees it, so the name is wrong at compile time and this change has nothing to convert.
+Note: on MSVC the example only shows the bug when compiled with `/utf-8`. Without it, MSVC turns the μ
+into `?` before JUCE sees it, so the name is wrong at compile time and this change has nothing to convert.
 JUCE's CMake does not add `/utf-8` for a non-ASCII `PLUGIN_NAME`.
