@@ -1,4 +1,4 @@
-# PR draft (NOT posted – blanks marked TODO are filled in after the build-PC run)
+# PR draft (NOT posted – all test results are now filled in from the build-PC run)
 
 Base branch: `develop`
 
@@ -45,7 +45,7 @@ small helper, `widenNonAsciiUtf8`.
 
 ### Testing
 
-Windows, MSVC (TODO: version), compiled with `/utf-8`:
+Windows 11, MSVC 19.51 (Visual Studio 2026), Release, compiled with `/utf-8` unless stated:
 
 - Built JUCE's `examples/CMake/AudioPlugin` as a VST3 with `PLUGIN_NAME "μ-Test"`.
   - Before the change, both classes in the generated `moduleinfo.json` are named with the code points
@@ -56,9 +56,9 @@ Windows, MSVC (TODO: version), compiled with `/utf-8`:
   surrogate pair at the end of the buffer; malformed input (stray, truncated, overlong and surrogate
   encodings, and values above U+10FFFF).
 - Loaded in Bitwig: the plugin loads, and the window title and plugin browser show `μ-Test`.
+- A plugin named `Ascii-Test` (built without `/utf-8`) is unaffected: both classes keep the same ASCII name.
 
-Not tested: macOS and Linux, and a plugin built from an ASCII name (the early return for ASCII is
-covered by the standalone test only).
+Not tested: macOS, Linux, and compilers other than MSVC.
 
 Note: the example only shows the bug when compiled with `/utf-8`. Without it, MSVC turns the μ into `?`
 before JUCE sees it, so the name is wrong at compile time and this change has nothing to convert.
