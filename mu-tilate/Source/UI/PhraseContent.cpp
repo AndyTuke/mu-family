@@ -735,10 +735,10 @@ void PhraseContent::resized()
             const int detectW = pad * 3 + boxW + detectCells * cellW + pad + buttonW;
             const int detectH = cellH + pad * 2;
             const int soundW = pad * 3 + boxW + 4 * cellW;
-            const int playW = s(54), iconW = s(32);
+            const int playW = s(50), iconW = s(30);
             // The sample panel: the audition row, and under it the view row (fit, zoom, crop) that belongs to the sample.
             const int auditionW = 2 * playW + 2 * iconW + 3 * padS;
-            const int viewW = s(84) + 2 * s(30) + s(60) + 3 * padS;
+            const int viewW = s(66) + 2 * s(26) + s(50) + 3 * padS;
             const int previewW = padS * 2 + juce::jmax(auditionW, viewW);
             const int previewH = detectH;
 
@@ -791,10 +791,10 @@ void PhraseContent::resized()
                 inner.removeFromTop(padS);
                 auto view = inner.removeFromTop(s(kStatusH));
                 auto put = [&](juce::Component& c, int w) { c.setBounds(view.removeFromLeft(s(w))); view.removeFromLeft(padS); };
-                put(waveFitButton, 84);
-                put(waveOutButton, 30);
-                put(waveInButton, 30);
-                put(cropButton, 60);
+                put(waveFitButton, 66);
+                put(waveOutButton, 26);
+                put(waveInButton, 26);
+                put(cropButton, 50);
             }
             area.removeFromTop(rowTop + detectH - area.getY());
             area.removeFromTop(padS);
