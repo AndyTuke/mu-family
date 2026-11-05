@@ -75,6 +75,18 @@ void Phrase::installLoop(std::shared_ptr<const juce::AudioBuffer<float>> audio, 
 
 Phrase::~Phrase() { ++previewGen; if (previewWorker.joinable()) previewWorker.join(); }
 
+void Phrase::auditionFile(const juce::File& file)
+{
+    ++previewGen;   // a loop audition still rendering gives way
+    if (previewWorker.joinable()) previewWorker.join();
+    previewIsFile = true;
+    previewIsSlice = false;
+    previewAudioLen = 0;
+    preview.setLooping(false);
+    preview.setRegion(0.0f, 1.0f);
+    preview.start(file);
+}
+
 void Phrase::finishPreviewRender() { if (previewWorker.joinable()) previewWorker.join(); }
 
 void Phrase::startPreview(PreviewKind kind, int slice, double bpm)
@@ -85,6 +97,7 @@ void Phrase::startPreview(PreviewKind kind, int slice, double bpm)
     const auto d = getData();
     if (d == nullptr || d->audio == nullptr || d->audio->getNumSamples() < 2) return;
     previewIsSlice = kind == PreviewKind::Slice;
+    previewIsFile = false;
     previewAudioLen = d->audio->getNumSamples();
     previewSliceStart = 0; previewSliceLen = 0;
     if (previewIsSlice)
@@ -200,6 +213,7 @@ void Phrase::applyPlayArea() noexcept
 double Phrase::previewPlayhead() const noexcept
 {
     const float f = preview.getPosition();
+    if (previewIsFile) return -1.0;   // a browser audition is not part of this loop
     if (f < 0.0f) return -1.0;
     return previewIsSlice ? (double) previewSliceStart + (double) f * (double) previewSliceLen : (double) f * (double) previewAudioLen;
 }

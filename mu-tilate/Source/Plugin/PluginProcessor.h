@@ -95,6 +95,21 @@ public:
         if (layer >= 0 && layer < mu_limits::kMaxLayers && ! isInternalPlaying())
             getPhrase(layer).startPreview((Phrase::PreviewKind) juce::jlimit(0, 2, kind), slice, getInternalBpm());
     }
+    void auditionFile(int layer, const juce::File& file) override
+    {
+        if (layer >= 0 && layer < mu_limits::kMaxLayers && ! isInternalPlaying()) getPhrase(layer).auditionFile(file);
+    }
+    juce::File getPrimarySampleDir() const override
+    {
+        // The same setting the other products use for the user's sample folder (the Music folder until one is chosen).
+        if (auto* settings = const_cast<PluginProcessor*>(this)->getAppSettingsFile())
+        {
+            const auto stored = settings->getValue("primarySampleDir");
+            if (stored.isNotEmpty()) return juce::File(stored);
+        }
+        return juce::File::getSpecialLocation(juce::File::userMusicDirectory);
+    }
+    juce::File getSamplesDir() const override { auto dir = getContentDir().getChildFile("Samples"); dir.createDirectory(); return dir; }
     void setPreviewLooping(int layer, bool loop) override { if (layer >= 0 && layer < mu_limits::kMaxLayers) getPhrase(layer).setPreviewLooping(loop); }
     void stopPreview(int layer) override { if (layer >= 0 && layer < mu_limits::kMaxLayers) getPhrase(layer).stopPreview(); }
     void setPlayArea(int layer, int start, int end) override { if (layer >= 0 && layer < mu_limits::kMaxLayers) getPhrase(layer).setPlayArea(start, end); }

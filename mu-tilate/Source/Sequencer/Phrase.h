@@ -89,6 +89,8 @@ struct Phrase : Layer
     enum class PreviewKind { Original, AtTempo, Slice };
     void startPreview(PreviewKind kind, int slice, double bpm);
     void stopPreview() { ++previewGen; preview.stop(); }
+    // Message thread: plays a file from disk through the layer, once, without loading it (the sample browser's audition).
+    void auditionFile(const juce::File& file);
     // Waits for the worker that is rendering an audition to finish (a test, or a teardown).
     void finishPreviewRender();
     ~Phrase();
@@ -190,6 +192,7 @@ private:
     std::atomic<double>               loopLengthBeats { -1.0 };
 
     bool previewLoop = false, previewIsSlice = false;
+    bool previewIsFile = false;                    // the audition is a file from the sample browser, not this loop (no playhead on the waveform)
     // The matched auditions are rendered on a worker, a block at a time into the audition's buffer, so they start at once and play as they
     // are made. A new audition or a stop moves previewGen on, which tells the old worker to give up.
     void renderAudition(std::shared_ptr<const PhraseData> d, PhraseSettings s, Timeline tl, double sr, double bpm, int frames,

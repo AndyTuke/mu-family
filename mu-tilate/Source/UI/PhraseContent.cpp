@@ -2,6 +2,8 @@
 
 #include "Sequencer/Phrase.h"
 #include "Analysis/OnsetDetector.h"
+#include "UI/OverlayHost.h"      // mu-core: the dimmed in-editor overlay the sample browser sits in
+#include "UI/SampleBrowser.h"    // mu-core: the shared browser with its audition
 
 #include <functional>
 
@@ -676,14 +678,27 @@ void PhraseContent::bindModulationArcs()
 
 void PhraseContent::chooseLoop()
 {
-    chooser = std::make_unique<juce::FileChooser>("Load a loop", juce::File(), "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
-    const int layer = currentLayer;   // the layer the dialog was opened for, not the one showing when it closes
-    chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                         [this, layer](const juce::FileChooser& fc)
-                         {
-                             const auto f = fc.getResult();
-                             if (f.existsAsFile()) host.loadLoopAsync(layer, f);
-                         });
+    // The family's sample browser as a dimmed in-editor overlay: a selected file is auditioned through the layer (the transport stopped),
+    // Load commits it. It opens where the last loop came from, else in the user's sample folder.
+    const int layer = currentLayer;   // the layer the browser was opened for, not the one showing when it closes
+    const auto primary = host.getPrimarySampleDir();
+    const auto startDir = lastBrowseDir.isDirectory() ? lastBrowseDir : primary.isDirectory() ? primary : juce::File::getSpecialLocation(juce::File::userMusicDirectory);
+    juce::Component::SafePointer<PhraseContent> safeThis(this);
+    mu_core::SampleBrowserSource source;
+    source.primaryDir   = [safeThis, primary] { return safeThis != nullptr ? safeThis->host.getPrimarySampleDir() : primary; };
+    source.startPreview = [safeThis, layer](const juce::File& f) { if (safeThis != nullptr) safeThis->host.auditionFile(layer, f); };
+    source.stopPreview  = [safeThis, layer] { if (safeThis != nullptr) safeThis->host.stopPreview(layer); };
+    auto content = std::make_unique<mu_core::SampleBrowserContent>(
+        std::move(source), host.getSamplesDir(), juce::String(juce::CharPointer_UTF8("\xce\xbc-Tilate Content")), startDir,
+        [safeThis, layer](const juce::File& f)
+        {
+            if (safeThis == nullptr) return;
+            safeThis->lastBrowseDir = f.getParentDirectory();
+            safeThis->host.loadLoopAsync(layer, f);
+        });
+    auto* overlay = new mu_ui::OverlayHost();
+    content->onDismiss = [overlay] { overlay->dismiss(); };
+    overlay->show(this, std::move(content));
 }
 
 void PhraseContent::timerCallback()

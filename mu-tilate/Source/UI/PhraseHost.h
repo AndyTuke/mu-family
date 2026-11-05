@@ -47,6 +47,11 @@ public:
     // (timed by Tempo Match and Pitch/Stretch), 2 = slice `slice` the same way. stopPreview ends it.
     virtual void previewSource(int layer, int kind, int slice) = 0;
     virtual void stopPreview(int layer) = 0;
+    // The sample browser's audition: plays a file from disk through the layer without loading it (only while the transport is stopped).
+    // stopPreview ends it. The browser's two sources: the user's primary sample folder and the product's own Samples folder.
+    virtual void auditionFile(int layer, const juce::File& file) = 0;
+    virtual juce::File getPrimarySampleDir() const = 0;
+    virtual juce::File getSamplesDir() const = 0;
     virtual void setPreviewLooping(int layer, bool loop) = 0;   // the audition repeats until stopped
     // The play area (samples of the loop, 0, 0 = all): the whole-loop auditions play only this part. cropToPlayArea cuts the loop to
     // [start, end): the slices and hits stay, and a hit whose slice is cut off is silent.

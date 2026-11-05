@@ -11,12 +11,26 @@ namespace mu_core {
 // from mu-Clid). It previews through the SampleLibrary it is given and has two sources: the user's primary sample
 // folder ("Main Library") and the product's content folder, named by `contentLabel`. Shown by the caller inside an
 // OverlayHost. Self-contained: no access to the layer's UI internals.
+// What the browser needs from its product: the user's primary sample folder and the audition (start / stop a file). A SampleLibrary
+// supplies it for the products that have one; a product without one (mu-Tilate) fills it from its own layer.
+struct SampleBrowserSource
+{
+    std::function<juce::File()>                primaryDir;
+    std::function<void(const juce::File&)>     startPreview;
+    std::function<void()>                      stopPreview;
+};
+
 class SampleBrowserContent : public juce::Component,
                               public juce::FileBrowserListener,
                               private juce::Timer
 {
 public:
     SampleBrowserContent(SampleLibrary& library,
+                         const juce::File& contentDir,
+                         const juce::String& contentLabel,
+                         const juce::File& startDir,
+                         std::function<void(const juce::File&)> onChosen);
+    SampleBrowserContent(SampleBrowserSource source,
                          const juce::File& contentDir,
                          const juce::String& contentLabel,
                          const juce::File& startDir,
@@ -35,7 +49,7 @@ public:
     void browserRootChanged(const juce::File&) override {}
 
 private:
-    SampleLibrary& library;
+    SampleBrowserSource source;
     juce::File     contentDir;
     std::function<void(const juce::File&)> onChosen;
     juce::WildcardFileFilter fileFilter;

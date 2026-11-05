@@ -7,7 +7,19 @@ SampleBrowserContent::SampleBrowserContent(SampleLibrary& lib,
                                             const juce::String& contentLabel,
                                             const juce::File& startDir,
                                             std::function<void(const juce::File&)> onChosen)
-    : library(lib), contentDir(content), onChosen(std::move(onChosen)),
+    : SampleBrowserContent(SampleBrowserSource { [&lib] { return lib.getPrimarySampleDir(); },
+                                                 [&lib](const juce::File& f) { lib.startPreview(f); },
+                                                 [&lib] { lib.stopPreview(); } },
+                           content, contentLabel, startDir, std::move(onChosen))
+{
+}
+
+SampleBrowserContent::SampleBrowserContent(SampleBrowserSource src,
+                                            const juce::File& content,
+                                            const juce::String& contentLabel,
+                                            const juce::File& startDir,
+                                            std::function<void(const juce::File&)> onChosen)
+    : source(std::move(src)), contentDir(content), onChosen(std::move(onChosen)),
       sourceToggle({ juce::String("Main Library"), contentLabel },
                    SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Pills),
       fileFilter("*.wav;*.aiff;*.aif;*.mp3;*.flac", {}, "Audio files"),
@@ -31,7 +43,7 @@ SampleBrowserContent::SampleBrowserContent(SampleLibrary& lib,
     sourceToggle.onChange = [this](int idx)
     {
         const juce::File target = (idx == 1) ? contentDir
-                                             : library.getPrimarySampleDir();
+                                             : source.primaryDir();
         if (target.isDirectory())
             browser.setRoot(target);
     };
@@ -43,14 +55,14 @@ SampleBrowserContent::SampleBrowserContent(SampleLibrary& lib,
     };
     cancelBtn.onClick = [this]
     {
-        library.stopPreview();
+        source.stopPreview();
         if (onDismiss) onDismiss();
     };
 
     setSize(mu_ui::s(560), mu_ui::s(470));
 }
 
-SampleBrowserContent::~SampleBrowserContent() { library.stopPreview(); }
+SampleBrowserContent::~SampleBrowserContent() { source.stopPreview(); }
 
 void SampleBrowserContent::resized()
 {
@@ -77,7 +89,7 @@ void SampleBrowserContent::timerCallback()
 {
     stopTimer();
     if (pendingPreview.existsAsFile())
-        library.startPreview(pendingPreview);
+        source.startPreview(pendingPreview);
 }
 
 void SampleBrowserContent::fileDoubleClicked(const juce::File& f) { commit(f); }
@@ -85,7 +97,7 @@ void SampleBrowserContent::fileDoubleClicked(const juce::File& f) { commit(f); }
 void SampleBrowserContent::commit(const juce::File& f)
 {
     stopTimer();
-    library.stopPreview();
+    source.stopPreview();
     onChosen(f);
     if (onDismiss) onDismiss();
 }

@@ -102,7 +102,7 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> detectAtt;
     juce::TextButton detectButton { "Detect" };   // runs the detector again with the current settings
     std::vector<KnobDef> knobs;
-    std::unique_ptr<juce::FileChooser> chooser;
+    juce::File lastBrowseDir;   // where the sample browser opens: the folder of the last loop loaded
     SegmentControl viewSwitch { { "Sequencer", "Layer", "Slice" }, SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Lcd };
     LoopWaveform waveform;
     SlicePanel slicePanel;
