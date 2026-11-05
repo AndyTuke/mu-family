@@ -338,9 +338,9 @@ void LFOEditor::mouseDown(const juce::MouseEvent& e)
     if (dragIndex < 0)
     {
         // Add a new point — on empty space or on the hovered segment alike — at the click
-        // (x snapped to the grid unless Alt is held), kept in x order between the fixed ends.
+        // (x snapped to the grid unless Shift is held), kept in x order between the fixed ends.
         auto logPos = fromScreen(pos.x, pos.y);
-        if (!e.mods.isAltDown())
+        if (!e.mods.isShiftDown())
             logPos.x = snapX(logPos.x);
 
         ControlSequence::CurvePoint newPt;
@@ -376,7 +376,7 @@ void LFOEditor::mouseDrag(const juce::MouseEvent& e)
     if (dragIndex < 0 || dragIndex >= (int)points.size()) return;
 
     auto logPos = fromScreen(e.position.x, e.position.y);
-    if (!e.mods.isAltDown())
+    if (!e.mods.isShiftDown())
         logPos.x = snapX(logPos.x);
 
     // Clamp x between neighbours (first/last anchors are pinned to 0/1)

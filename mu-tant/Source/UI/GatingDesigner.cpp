@@ -428,9 +428,13 @@ GatingDesigner::HandleHit GatingDesigner::hitTestHandles(juce::Point<float> p, G
         const auto L = layoutFor(envs[(size_t)i]);
         consider(i, Handle::StartGrab, { L.x0,          L.bot });
         consider(i, Handle::EndGrab,   { L.x0 + L.wpx,  L.bot });
-        consider(i, Handle::Split,     L.peak);
-        consider(i, Handle::RiseBend,  L.riseMid);
-        consider(i, Handle::FallBend,  L.fallMid);
+        // The bend handles sit on the peak when the peak is at the start or end (no rise or no fall to bend), so they
+        // are tested first and the peak last: on a tie the peak, which can be moved, wins.
+        const float split    = juce::jlimit(0.0f, 1.0f, envs[(size_t)i].split);
+        const float peakFrac = envs[(size_t)i].reverse ? (1.0f - split) : split;
+        if (peakFrac > 0.0f)  consider(i, Handle::RiseBend, L.riseMid);
+        if (peakFrac < 1.0f)  consider(i, Handle::FallBend, L.fallMid);
+        consider(i, Handle::Split, L.peak);
     }
     return best;
 }
@@ -565,10 +569,10 @@ void GatingDesigner::mouseDrag(const juce::MouseEvent& e)
             if (dragEnvIndex < 0 || dragEnvIndex >= envCount) return;
             const auto L  = layoutFor(pat->envelopes[(size_t)dragEnvIndex]);
             float pf = juce::jlimit(0.0f, 1.0f, (e.position.x - L.x0) / juce::jmax(1.0f, L.activeW));
-            if (!e.mods.isAltDown())
+            if (!e.mods.isShiftDown())
             {
                 // Snap peak to cell boundaries within the envelope (same as corner handles).
-                // ALT held = free fine control.
+                // SHIFT held = free fine control.
                 const int cells = pat->envelopes[(size_t)dragEnvIndex].lengthCells;
                 if (cells > 0)
                     pf = std::round(pf * (float)cells) / (float)cells;

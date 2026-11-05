@@ -91,7 +91,7 @@ struct PhraseTests : public juce::UnitTest
             expectEquals(t.place(0, 4.0, 0.25), -1);
             expectEquals(t.place(0, -1.0, 0.25), -1);
             expectEquals(t.blocks()[1].start, 2.0);
-            expectEquals(Timeline::snap(2.13, 0.0), 2.13);              // Alt: no snap
+            expectEquals(Timeline::snap(2.13, 0.0), 2.13);              // Shift: no snap
         }
 
         beginTest("timeline: move, copy, length, remove, shortening the timeline drops blocks beyond it");

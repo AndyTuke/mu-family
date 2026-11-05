@@ -38,7 +38,7 @@ public:
     const std::vector<TimelineBlock>& blocks() const noexcept { return list; }
     int size() const noexcept { return (int) list.size(); }
 
-    // `grid` is the snap in beats (1 = quarter, 0.25 = sixteenth); 0 means no snapping (Alt held).
+    // `grid` is the snap in beats (1 = quarter, 0.25 = sixteenth); 0 means no snapping (Shift held).
     static double snap(double beat, double grid) noexcept;
 
     // Edits. Each returns the index of the changed block, or -1 when the edit is refused (outside the timeline, a
