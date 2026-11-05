@@ -1,0 +1,2 @@
+# The patch contains CRLF line endings as part of its content; never convert it.
+*.patch binary
