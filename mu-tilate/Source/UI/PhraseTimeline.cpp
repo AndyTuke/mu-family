@@ -98,15 +98,17 @@ double PhraseTimeline::naturalBeatsOf(int i) const
 
 int PhraseTimeline::edgeAt(int x, bool& right) const
 {
-    int best = -1, bestDist = mu_ui::s(LF::kEdgeGrab) + 1;
+    // The grab zone lies just inside each block, so where two blocks touch the pointer's side of the seam picks the edge;
+    // a narrow block keeps its middle third free for moving it.
     for (int i = 0; i < timeline.size(); ++i)
     {
         const double start = timeline.blocks()[(size_t) i].start;
-        const int dl = std::abs(x - xOf(start)), dr = std::abs(x - xOf(start + blockBeats(i)));
-        if (dl < bestDist) { best = i; bestDist = dl; right = false; }
-        if (dr < bestDist) { best = i; bestDist = dr; right = true; }
+        const int x0 = xOf(start), x1 = xOf(start + blockBeats(i));
+        const int zone = std::min(mu_ui::s(LF::kEdgeGrab), (x1 - x0) / 3);
+        if (x >= x0 && x <= x0 + zone)  { right = false; return i; }
+        if (x <= x1 && x >= x1 - zone)  { right = true;  return i; }
     }
-    return best;
+    return -1;
 }
 
 juce::Rectangle<int> PhraseTimeline::blockRect(int i) const
