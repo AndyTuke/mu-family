@@ -338,7 +338,43 @@ cmake --build build --target mu-tilate-tests --config Debug && build/mu-tilate/m
 
 **Weak or known-soft tests:** the pre-fade scan cost test asserts under half a block (about 667 us) while the unfixed code measured 213 us, so it would not fail on a regression to the old scan; it only catches something much worse. The renderRetiring test only asserts the call returns true.
 
-**Not covered:** listening tests (none for mu-Tilate), pluginval and clap-validator, Release build, any UI interaction (timeline Ctrl-drag copy, `setTimeline` shrinking mid-drag, marker add / remove with the selection, the waveform view, zero-crossing snap on stereo, the Detect warning text), voice stealing click, tempo-dependent pre-fade lead, a missed try-lock reading as a transport jump, `renderRetiring` after a swap on a parked layer, four voices with a long amp release, a layer-preset target (`mu-tilate-layer-tests`), mu-Tronic hosting of the Phrase layer.
+**Not covered:** listening tests (none for mu-Tilate), pluginval and clap-validator, Release build, any automated UI interaction test (the manual steps below, MT1 to MT5, cover timeline Ctrl-drag copy, `setTimeline` shrinking mid-drag, marker add / remove with the selection and zero-crossing snap on stereo; the waveform view and the Detect warning text are still unchecked), voice stealing click, tempo-dependent pre-fade lead, a missed try-lock reading as a transport jump, `renderRetiring` after a swap on a parked layer, four voices with a long amp release, a layer-preset target (`mu-tilate-layer-tests`), mu-Tronic hosting of the Phrase layer.
+
+**Manual smoke steps, mu-Tilate UI (build PC, standalone; no headless test reaches these; status: not yet run).** Load a loop with at least 4 slices and place several hits on the timeline with grid 1/4 or finer. Format: action -> expected.
+
+*MT1 Timeline block moves and copies* (`PhraseTimeline::mouseDrag`)
+1. Drag a block's middle sideways -> it moves, start snaps to the grid, other blocks it passes over are only overlaid; move on and what it covered comes back.
+2. Same drag holding Shift -> the start moves freely, no grid snap.
+3. Same drag holding Ctrl -> a copy: the original stays where it was and the copy follows the pointer. The first drag event with Ctrl makes the copy even before the pointer has left the start position.
+4. Release the copy -> both blocks remain; a long copy drag across other blocks restores what it covered once it moves on.
+5. Select a block and press Delete or Backspace -> it is removed and nothing is selected.
+
+*MT2 Block edges* (`edgeAt`, `kEdgeGrab` = 5 px, narrow blocks use a third of their width)
+1. Place two blocks touching (one starts where the other ends). Hover just left of the seam -> resize cursor, and a press there grabs the right edge of the left block; hover just right of the seam -> a press grabs the left edge of the right block. Both edges are reachable.
+2. Zoom out until a block is only a few pixels wide -> its middle third still moves the block; the outer thirds grab the edges.
+3. Drag a right edge -> the block's end moves, snapped to the grid; the sound stops early. Drag a left edge -> the start of the slice is skipped (trim), the right end stays fixed.
+4. Same edge drags holding Shift -> no grid snap.
+5. Same edge drags holding Alt -> the slice is retimed to the new width (it plays faster or slower to fill it) instead of trimmed. At least a sixteenth of a beat always remains.
+
+*MT3 Timeline changes under an active drag* (`setTimeline`)
+1. Start dragging a block, and while holding the button change the timeline from elsewhere so it has fewer blocks than the dragged index (Undo of the placement, a preset load or a loop swap) -> no crash; the drag stops following the pointer (the held block is dropped) and the selection clears if its block no longer exists.
+2. Release the button -> nothing further changes. The next press starts a normal drag.
+3. Change the loop length (loop swap) while zoomed in -> the view resets to show the whole timeline.
+
+*MT4 Waveform markers and selection* (`LoopWaveform`)
+1. Single click in a region between two markers -> that region is selected (tinted) and its slice becomes the one a timeline click places. A plain click adds no marker.
+2. Double-click on empty waveform -> a marker is added, jumping to the nearest attack within the search window and back to the zero crossing just before it; the new region is named "Slice n". Double-click on a region's name strip (top 16 px) renames it instead.
+3. With slice 3 selected, add a marker before it -> the selection stays on the same sound (it becomes slice 4); timeline hits keep their sounds.
+4. Hover a marker (not the first) -> a cross appears at its foot; click the cross, or Alt-click the marker -> the marker is removed, the selection clears, hits on the timeline follow the removed slice.
+5. Right-click inside a region -> it selects and auditions the region; it does NOT delete a marker. The first marker (loop start) cannot be deleted or dragged.
+6. Drag a marker -> it follows the pointer, jumping onto a grid line (loop tempo) when within a few pixels; Shift moves it freely. Ctrl-drag or middle-drag on the waveform pans the view and moves nothing.
+
+*MT5 Zero-crossing snap on a stereo loop* (`mu_core::nearestOnset`, `OnsetDetector`)
+1. Load a stereo loop whose left and right differ (e.g. hard-panned parts). Run Detect -> each cut sits on a sign change of the mono mix (left+right)/2, found within the snap range of the onset.
+2. Zoom the waveform right in on a detected marker and a double-click-added marker -> the drawn waveform (the mono mix) crosses zero at the marker; on the individual channels it may not, which is expected.
+3. Load a mono loop and repeat -> the same, exactly on a crossing.
+4. Marker dragging does not zero-snap (grid snap only).
+
 
 ---
 
