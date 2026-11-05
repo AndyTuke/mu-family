@@ -5,7 +5,7 @@ Facts about this repo for the scheduled advisor routines. Each fact names the fi
 ## Stack
 
 **Framework and language**
-- JUCE 9.0.4, pinned in `juce-version.txt`. CMake aborts if the checkout at `JUCE_PATH` differs from the pin, and every CI workflow checks out the same tag (`CMakeLists.txt`, `.github/workflows/release.yml`). JUCE is not vendored; locally it is `D:\JUCE` via the `JUCE_PATH` environment variable (`CLAUDE.md`).
+- JUCE 9.0.5, pinned in `juce-version.txt`. CMake aborts if the checkout at `JUCE_PATH` differs from the pin, and every CI workflow checks out the same tag (`CMakeLists.txt`, `.github/workflows/release.yml`). JUCE is not vendored; locally it is `D:\JUCE` via the `JUCE_PATH` environment variable (`CLAUDE.md`).
 - C++17 (`mu-core/CMakeLists.txt`: `cxx_std_17`).
 - Owner rule: keep JUCE current and use current JUCE APIs, never deprecated ones (`CLAUDE.md`).
 

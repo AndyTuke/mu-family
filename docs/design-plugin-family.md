@@ -2201,7 +2201,7 @@ signing (the Apple side of #99).
 
 ### JUCE version policy
 
-Owner rule, 2026-10-09. The family tracks the latest stable JUCE release rather than staying on an old one. The version is pinned in **one place**, [juce-version.txt](juce-version.txt): every CI workflow checks out that tag and configure fails if the local `JUCE_PATH` checkout differs, so a bump is a one-line edit and local builds cannot drift from CI. To bump: read JUCE's `BREAKING_CHANGES.md` between the old and new version, grep the tree for each affected API, review the [local patch register](#local-juce-patches-register), bump the pin, then run the unit tests, the round-trip listening tests and pluginval on the build PC. When writing code, use current JUCE APIs and do not build on deprecated ones. Version in use: JUCE 9.0.4 today. `pwsh tests/scripts/check-juce-version.ps1` reports how far the pin is behind the latest release.
+Owner rule, 2026-10-09. The family tracks the latest stable JUCE release rather than staying on an old one. The version is pinned in **one place**, [juce-version.txt](juce-version.txt): every CI workflow checks out that tag and configure fails if the local `JUCE_PATH` checkout differs, so a bump is a one-line edit and local builds cannot drift from CI. To bump: read JUCE's `BREAKING_CHANGES.md` between the old and new version, grep the tree for each affected API, review the [local patch register](#local-juce-patches-register), bump the pin, then run the unit tests, the round-trip listening tests and pluginval on the build PC. When writing code, use current JUCE APIs and do not build on deprecated ones. Version in use: JUCE 9.0.5 today. `pwsh tests/scripts/check-juce-version.ps1` reports how far the pin is behind the latest release.
 
 #### Local JUCE patches (register)
 
@@ -2209,7 +2209,7 @@ A local patch to `JUCE_PATH` is a last resort (Andy, 2026-10-31) and is always r
 
 | Patch file | What and why | Upstream | Remove when |
 |---|---|---|---|
-| `0001-midi-windows-joinable-guard.patch` | `juce_Midi_windows.cpp`: `~InputDevice` joins `blockQueueThread` only if joinable. A failed `midiInOpen` otherwise aborts every Standalone at startup (found 2026-10-31 with the MOTU M Series MIDI port). | JUCE issue 1769, fixed on `develop` 2026-10-13 (commit 5a318999 removes the thread) | the pin moves to a release that contains 5a318999 |
+| *(none)* | The MIDI joinable guard (JUCE issue 1769) was dropped at the 9.0.5 bump: 9.0.5 contains the upstream fix 5a318999. | | |
 
 #### JUCE features to adopt
 
