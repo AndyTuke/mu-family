@@ -45,10 +45,21 @@ small helper, `widenNonAsciiUtf8`.
 
 ### Testing
 
-- TODO: Windows / MSVC <version>: built JUCE's `examples/CMake/AudioPlugin` as a VST3 with
-  `PLUGIN_NAME "μ-Test"`. Before the change the class names in `moduleinfo.json` are garbled
-  (TODO: code points); after it they are `μ-Test`.
-- TODO: standalone test of the helper: ASCII output identical to the old behaviour; 2-, 3- and 4-byte
-  characters; truncation; surrogate pair at the end of the buffer; malformed input.
-- TODO: loaded in <host> and the name displays correctly.
-- Not tested: macOS and Linux.
+Windows, MSVC (TODO: version), compiled with `/utf-8`:
+
+- Built JUCE's `examples/CMake/AudioPlugin` as a VST3 with `PLUGIN_NAME "μ-Test"`.
+  - Before the change, both classes in the generated `moduleinfo.json` are named with the code points
+    `FFCE FFBC 002D 0054 0065 0073 0074` (the two UTF-8 bytes of the μ widened separately).
+  - After the change they are `03BC 002D 0054 0065 0073 0074`, which is `μ-Test`.
+- A standalone test of `widenNonAsciiUtf8` passes, with no warnings at `/W4`: ASCII output is identical to
+  the old behaviour; 2-, 3- and 4-byte characters; truncation to 63 characters plus the terminator; a
+  surrogate pair at the end of the buffer; malformed input (stray, truncated, overlong and surrogate
+  encodings, and values above U+10FFFF).
+- Loaded in Bitwig: the plugin loads, and the window title and plugin browser show `μ-Test`.
+
+Not tested: macOS and Linux, and a plugin built from an ASCII name (the early return for ASCII is
+covered by the standalone test only).
+
+Note: the example only shows the bug when compiled with `/utf-8`. Without it, MSVC turns the μ into `?`
+before JUCE sees it, so the name is wrong at compile time and this change has nothing to convert.
+JUCE's CMake does not add `/utf-8` for a non-ASCII `PLUGIN_NAME`.
