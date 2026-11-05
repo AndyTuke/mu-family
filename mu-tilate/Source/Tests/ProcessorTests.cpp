@@ -173,6 +173,18 @@ struct ProcessorTests : public juce::UnitTest
             expectEquals(renderPeak(p, host, 600), 0.0f);
             p.setPreviewLooping(0, false);
             p.stopPreview(0);
+            // The sample browser's audition plays a file from disk through the layer, once, with no playhead on the loop's waveform.
+            host.playing = false;
+            p.auditionFile(0, file);
+            expectGreaterThan(renderPeak(p, host, 40), 0.02f);
+            expect(p.getPreviewPlayhead(0) < 0.0, "a file audition has no loop playhead");
+            p.stopPreview(0);
+            renderPeak(p, host, 2);
+            expectEquals(renderPeak(p, host, 10), 0.0f);
+            host.playing = true;
+            p.auditionFile(0, file);
+            expectEquals(renderPeak(p, host, 40), 0.0f);                    // and does nothing over a playing transport
+            host.playing = false;
             // With the transport playing the sample play does nothing (the sequence and an audition never sound together).
             host.playing = true;
             p.previewSource(0, 0, 0);
