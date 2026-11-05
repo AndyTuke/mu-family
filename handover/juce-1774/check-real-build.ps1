@@ -5,13 +5,14 @@ param(
     [Parameter(Mandatory)][string]$JuceRoot,   # the JUCE checkout to test
     [Parameter(Mandatory)][string]$WorkDir,    # scratch folder, not on C:
     [Parameter(Mandatory)][string]$Label,      # e.g. unpatched / patched, keeps the two builds apart
+    [switch]$Ascii,                            # name the plugin 'Ascii-Test' instead: the patch must leave plain ASCII names exactly as they were
     [switch]$Utf8                              # compile with /utf-8, as a real project that names its plugin non-ASCII must (without it MSVC turns the mu into '?' before JUCE sees it)
 )
 
 $ErrorActionPreference = 'Stop'
 
 $mu       = [string][char]0x03BC
-$expected = "$mu-Test"
+$expected = if ($Ascii) { 'Ascii-Test' } else { "$mu-Test" }
 
 $src  = Join-Path $JuceRoot 'examples/CMake/AudioPlugin'
 $proj = Join-Path $WorkDir "proj-$Label"
@@ -50,5 +51,5 @@ foreach ($class in $json.Classes) {
     Write-Host ("{0}  class '{1}'  code points: {2}" -f ($(if ($pass) { 'PASS' } else { 'FAIL' }), $name, $codes))
 }
 
-Write-Host ("Expected '{0}' = code points 03BC 002D 0054 0065 0073 0074" -f $expected)
+Write-Host ("Expected '{0}' = code points {1}" -f $expected, (($expected.ToCharArray() | ForEach-Object { '{0:X4}' -f [int]$_ }) -join ' '))
 if ($allPass) { Write-Host "[$Label] all class names correct" } else { Write-Host "[$Label] garbled class names found" }

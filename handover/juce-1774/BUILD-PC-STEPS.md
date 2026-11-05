@@ -67,3 +67,11 @@ name as UTF-8) – stop and report, do not continue to a PR.
 
 Write the results into `handover/build-to-laptop.md` under `## Results` as `### Re L-012` (format in
 `handover/README.md`): for steps 2, 3 (both runs) and 4, whether it passed, plus any warnings or odd output. The PR draft has blanks for exactly these results.
+
+## Results seen on the build PC (2026-11-05)
+
+- Step 2 passed, no warnings (needed `/utf-8` on its `cl` line).
+- Step 3 needs `-Utf8` (compile with `/utf-8`): unpatched FAIL (`FFCE FFBC ...`), patched PASS (`03BC ...`). Without `/utf-8` both give `?-Test`.
+- ASCII check: `.\check-real-build.ps1 -Ascii ...` on the patched branch passes (`Ascii-Test`).
+- Step 4, Bitwig: title bar and plug-in browser show `μ-Test` correctly.
+- Toolchain: MSVC `cl` 19.51.36260 x64 (Visual Studio 2026, toolset 14.51.36231), CMake 4.3.1, Windows 11 Pro 10.0.26300.
