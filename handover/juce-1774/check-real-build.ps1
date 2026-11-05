@@ -4,7 +4,8 @@
 param(
     [Parameter(Mandatory)][string]$JuceRoot,   # the JUCE checkout to test
     [Parameter(Mandatory)][string]$WorkDir,    # scratch folder, not on C:
-    [Parameter(Mandatory)][string]$Label       # e.g. unpatched / patched, keeps the two builds apart
+    [Parameter(Mandatory)][string]$Label,      # e.g. unpatched / patched, keeps the two builds apart
+    [switch]$Utf8                              # compile with /utf-8, as a real project that names its plugin non-ASCII must (without it MSVC turns the mu into '?' before JUCE sees it)
 )
 
 $ErrorActionPreference = 'Stop'
@@ -27,6 +28,7 @@ $text = $text -replace '(PRODUCT_NAME "Audio Plugin Example")', ('$1' + "`n    P
 [IO.File]::WriteAllText($cmake, $text, [Text.UTF8Encoding]::new($false))
 
 $build = Join-Path $proj 'build'
+if ($Utf8) { $env:CXXFLAGS = '/utf-8' } else { Remove-Item Env:CXXFLAGS -ErrorAction SilentlyContinue }
 & cmake -S $proj -B $build
 if ($LASTEXITCODE -ne 0) { throw 'CMake configure failed.' }
 

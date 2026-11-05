@@ -34,7 +34,7 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'widen_test.cpp') -Destination $
 Push-Location $OutDir
 try {
     Write-Host "Extracted lines $($start + 1)-$($end + 1) of the header. Compiling..."
-    & cl /nologo /std:c++17 /EHsc /W4 /Fe:widen_test.exe widen_test.cpp
+    & cl /nologo /std:c++17 /utf-8 /EHsc /W4 /Fe:widen_test.exe widen_test.cpp
     if ($LASTEXITCODE -ne 0) { throw 'Compile failed.' }
 
     & .\widen_test.exe
