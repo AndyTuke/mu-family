@@ -723,7 +723,7 @@ void PhraseContent::resized()
     if (! sliceViewShown() && ! layerViewShown())
     {
         // Sequencer: the sample on top (to drag slices from), the toolbar, then the timeline.
-        const int toolbarH = s(kStatusH) + s(LF::kSpaceS);
+        const int toolbarH = plate + s(kStatusH) + pad * 2;
         const int timelineH = juce::jmax(s(90), area.getHeight() * 4 / 10);
         timelineView.setBounds(area.removeFromBottom(timelineH));
         auto bar = area.removeFromBottom(toolbarH);
@@ -736,8 +736,11 @@ void PhraseContent::resized()
             const int detectH = cellH + pad * 2;
             const int soundW = pad * 3 + boxW + 4 * cellW;
             const int playW = s(54), iconW = s(32);
-            const int previewW = padS * 2 + 2 * playW + 2 * iconW + 3 * padS;
-            const int previewH = s(kStatusH) + padS * 2;
+            // The sample panel: the audition row, and under it the view row (fit, zoom, crop) that belongs to the sample.
+            const int auditionW = 2 * playW + 2 * iconW + 3 * padS;
+            const int viewW = s(84) + 2 * s(30) + s(60) + 3 * padS;
+            const int previewW = padS * 2 + juce::jmax(auditionW, viewW);
+            const int previewH = detectH;
 
             // The detector, the layer's sound strip and the audition controls, each in its own panel under a plate: left to right, wrapping
             // onto a new row when the next one does not fit.
@@ -774,9 +777,10 @@ void PhraseContent::resized()
 
             // The audition: three plays, stop and repeat as small icon buttons.
             const auto box = nextPanel(previewW, previewH);
-            sections.push_back({ box, "PREVIEW" });
+            sections.push_back({ box, "SAMPLE" });
             {
-                auto row = box.reduced(padS);
+                auto inner = box.reduced(padS);
+                auto row = inner.removeFromTop(s(kStatusH));
                 int k = 0;
                 for (auto* b : std::initializer_list<juce::Component*> { &previewTempoButton, &previewOriginalButton, &previewStopButton, &previewLoopButton })
                 {
@@ -784,6 +788,13 @@ void PhraseContent::resized()
                     row.removeFromLeft(padS);
                     ++k;
                 }
+                inner.removeFromTop(padS);
+                auto view = inner.removeFromTop(s(kStatusH));
+                auto put = [&](juce::Component& c, int w) { c.setBounds(view.removeFromLeft(s(w))); view.removeFromLeft(padS); };
+                put(waveFitButton, 84);
+                put(waveOutButton, 30);
+                put(waveInButton, 30);
+                put(cropButton, 60);
             }
             area.removeFromTop(rowTop + detectH - area.getY());
             area.removeFromTop(padS);
@@ -791,13 +802,15 @@ void PhraseContent::resized()
         rangeBar.setBounds(area.removeFromTop(s(40)));
         area.removeFromTop(s(LF::kSpaceS));
         waveform.setBounds(area.withTrimmedBottom(s(LF::kSpaceS)));
-        bar.removeFromTop(s(LF::kSpaceS) / 2);
+        // The sequencer controls and the timeline's zoom, each in its own panel under a plate like the ones above.
+        const int tlW = pad * 2 + s(100) + s(30) * 2 + pad * 2;
+        const auto tlPanel = bar.removeFromRight(tlW).withTrimmedTop(plate);
+        sections.push_back({ tlPanel, "TIMELINE VIEW" });
+        bar.removeFromRight(pad * 2);
+        const auto seqPanel = bar.withTrimmedTop(plate);
+        sections.push_back({ seqPanel, "SEQUENCER" });
+        bar = seqPanel.reduced(pad, pad);
         auto place = [&](juce::Component& c, int w) { c.setBounds(bar.removeFromLeft(s(w))); bar.removeFromLeft(s(LF::kSpaceS)); };
-        place(waveFitButton, 84);
-        place(waveOutButton, 30);
-        place(waveInButton, 30);
-        place(cropButton, 60);
-        bar.removeFromLeft(s(LF::kSpaceS) * 2);
         place(lengthCaption, 50);
         place(barsInput, 104);
         place(beatsInput, 108);
@@ -805,12 +818,12 @@ void PhraseContent::resized()
         place(layOutButton, 72);
         place(deleteButton, 82);
         place(clearButton, 60);
-        // The timeline's zoom sits at the right.
-        tlFitButton.setBounds(bar.removeFromRight(s(100)));
-        bar.removeFromRight(s(LF::kSpaceS));
-        tlInButton.setBounds(bar.removeFromRight(s(30)));
-        bar.removeFromRight(s(LF::kSpaceS));
-        tlOutButton.setBounds(bar.removeFromRight(s(30)));
+        auto tl = tlPanel.reduced(pad, pad);
+        tlOutButton.setBounds(tl.removeFromLeft(s(30)));
+        tl.removeFromLeft(pad);
+        tlInButton.setBounds(tl.removeFromLeft(s(30)));
+        tl.removeFromLeft(pad);
+        tlFitButton.setBounds(tl.removeFromLeft(s(100)));
         slicePanel.setBounds({});
         return;
     }
