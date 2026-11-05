@@ -109,6 +109,7 @@ private:
         int    fadeInLen  = 1;
         int    fadeOutLen = 1;
         int    hitLen     = 0;     // the hit's output length in samples, for its drawn envelope (SliceSettings::envIn / envOut); 0 = none
+        float  envInExp = 1.0f, envOutExp = 1.0f;   // the two fades' curve exponents, worked out once at the trigger
         bool   fading     = false; // being cut: cutGain falls to 0
         float  cutGain    = 1.0f;
         bool   active     = false;

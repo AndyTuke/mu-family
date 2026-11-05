@@ -12,7 +12,7 @@ namespace
 {
     // The hit's envelope: a linear fade in over the first `envIn` of its length and a fade out over the last `envOut` (the corners
     // dragged on the timeline). 1 when the hit has none.
-    float hitEnvelope(int hitLen, const SliceSettings& own, int age) noexcept
+    float hitEnvelope(int hitLen, const SliceSettings& own, float expIn, float expOut, int age) noexcept
     {
         if (hitLen <= 0 || (own.envIn <= 0.0f && own.envOut <= 0.0f)) return 1.0f;
         float env = 1.0f;
@@ -21,13 +21,13 @@ namespace
         if (inLen > 1.0f && (float) age < inLen)
         {
             const float x = std::min(1.0f, (float) (age + 1) / inLen);
-            env = own.envInCurve == 0.0f ? x : std::pow(x, envCurveExponent(own.envInCurve));
+            env = expIn == 1.0f ? x : std::pow(x, expIn);
         }
         const float left = (float) (hitLen - age - 1);   // 0 on the hit's last sample, so a fade-out ends at silence
         if (outLen > 1.0f && left < outLen)
         {
             const float x = std::max(0.0f, left / outLen);
-            env *= own.envOutCurve == 0.0f ? x : std::pow(x, envCurveExponent(own.envOutCurve));
+            env *= expOut == 1.0f ? x : std::pow(x, expOut);
         }
         return env;
     }
@@ -239,6 +239,8 @@ void SlicePlayer::trigger(const juce::AudioBuffer<float>* src, SliceRange range,
     v.fadeInLen  = std::max(1, (int) std::lround((double) p.fadeInMs  * 0.001 * sr));
     v.fadeOutLen = std::max(1, (int) std::lround((double) p.fadeOutMs * 0.001 * sr));
     v.hitLen     = std::max(1, (int) std::lround((double) range.length() / std::fabs(v.step)));
+    v.envInExp   = envCurveExponent(p.own.envInCurve);
+    v.envOutExp  = envCurveExponent(p.own.envOutCurve);
     v.active     = true;
 
     // A stretched slice: rate 1, forwards, a ratio that is not 1, and a stretcher free to take (one is always free
@@ -352,7 +354,7 @@ void SlicePlayer::renderNative(Voice& v, juce::AudioBuffer<float>& out, int offs
         // Fade-in from the start, fade-out over the last samples of the slice (in playback order).
         float env = std::min(1.0f, (float) (v.age + 1) / (float) v.fadeInLen);
         if (v.swell) env *= env;
-        env *= hitEnvelope(v.hitLen, v.own, v.age);
+        env *= hitEnvelope(v.hitLen, v.own, v.envInExp, v.envOutExp, v.age);
         const double remaining = v.step > 0.0 ? (double) v.range.end - v.pos : v.pos - (double) v.range.start + 1.0;
         env *= std::min(1.0f, (float) ((int) (remaining / std::fabs(v.step)) + 1) / (float) v.fadeOutLen);
         if (v.fading)
@@ -409,7 +411,7 @@ void SlicePlayer::renderStretched(Voice& v, juce::AudioBuffer<float>& out, int o
 
         float env = std::min(1.0f, (float) (age + 1) / (float) v.fadeInLen);
         env      *= std::min(1.0f, (float) (v.total - age) / (float) v.fadeOutLen);
-        env      *= hitEnvelope(v.hitLen, v.own, age);
+        env      *= hitEnvelope(v.hitLen, v.own, v.envInExp, v.envOutExp, age);
         if (v.fading)
         {
             v.cutGain -= v.cutStep;
