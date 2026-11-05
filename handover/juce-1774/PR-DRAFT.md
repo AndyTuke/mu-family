@@ -1,4 +1,4 @@
-# PR draft (NOT posted – all test results are now filled in from the build-PC run)
+# PR draft (NOT posted – all test results are filled in from the build-PC run)
 
 Base branch: `develop`
 
@@ -10,56 +10,25 @@ VST3 Client: Convert non-ASCII plugin text to UTF-16 correctly in PClassInfoW
 
 Refs #1774
 
-### Problem
+If `JucePlugin_Name` contains a non-ASCII character (mine has a Greek mu, `μ-Test`), the wide class name in `PClassInfoW` comes out garbled, and so do the class names in the generated `moduleinfo.json`. The narrow `PClassInfo2` name is fine.
 
-If `JucePlugin_Name` contains a non-ASCII character (for example `μ-Test`), the plugin's wide class
-name (`PClassInfoW`) is garbled, and so are the class names written to `moduleinfo.json`. The narrow
-`PClassInfo2` name is correct.
+The cause is in `juce_VST3ModuleInfo.h`. `ClassEntry` builds `infoW` with `PClassInfoW::fromAscii (info2)`, but the strings in `info2` are UTF-8 and `fromAscii` widens one byte at a time, so a two-byte character such as U+03BC turns into two unrelated characters. `moduleinfo.json` takes its class names from the same `PClassInfoW`, so it ends up wrong as well.
 
-### Cause
+This adds a small helper, `widenNonAsciiUtf8`, which runs over the `name`, `vendor`, `version` and `sdkVersion` fields after `fromAscii`:
 
-`JucePluginFactoryBase::ClassEntry` builds `infoW` with `PClassInfoW::fromAscii (info2)`. The strings
-in `info2` are UTF-8, but `fromAscii` widens each byte on its own, so a multi-byte character becomes
-several unrelated characters. The class names in `moduleinfo.json` come from the same `PClassInfoW`,
-so they are affected too.
+- Plain ASCII text returns early, so existing plugins get exactly the same output as before.
+- Bad UTF-8 becomes U+FFFD rather than throwing, as the constructor is `noexcept`.
+- Text that is too long is cut at a character boundary, never in the middle of a surrogate pair, and the buffer is always terminated.
 
-### Change
+I wrote the decoder by hand because nothing else seemed to fit. `juce::String` is out, as this code is meant to avoid `juce_core` (there's a comment saying so in `getCompatibilityJSON`) and the header is also built into the manifest helper, which doesn't use `juce_core`. The SDK's `StringConvert::convert` uses `std::wstring_convert`, which throws on invalid UTF-8, and it leaves the buffer untouched if the text doesn't fit. I'm happy to change the approach if you'd prefer something different.
 
-In `juce_VST3ModuleInfo.h`, after `fromAscii`, the `name`, `vendor`, `version` and `sdkVersion` fields
-are decoded from UTF-8 by a small helper, `widenNonAsciiUtf8`.
+Testing was on Windows 11 with MSVC 19.51 (Visual Studio 2026), Release, compiled with `/utf-8` unless I say otherwise:
 
-- Text that is plain ASCII is left untouched (the helper returns early), so the output for existing
-  ASCII plugins is unchanged.
-- Malformed UTF-8 becomes U+FFFD. Nothing throws, which matters because the `ClassEntry` constructor
-  is `noexcept`.
-- Text that does not fit is cut on a character boundary (a surrogate pair is never split), and the
-  buffer is always terminated.
+- I built the `examples/CMake/AudioPlugin` example as a VST3 with `PLUGIN_NAME "μ-Test"`. Before the change, both classes in `moduleinfo.json` have the code points `FFCE FFBC 002D 0054 0065 0073 0074`, which is the two UTF-8 bytes of the mu widened separately. After it they are `03BC 002D 0054 0065 0073 0074`, which is `μ-Test`.
+- A standalone test of the helper passes with no warnings at `/W4`. It covers ASCII output matching the old behaviour, 2-, 3- and 4-byte characters, truncation to 63 characters plus the terminator, a surrogate pair at the end of the buffer, and malformed input (stray, truncated, overlong and surrogate encodings, and values above U+10FFFF).
+- The plugin loads in Bitwig, and the window title and plugin browser show `μ-Test`.
+- A plugin named `Ascii-Test`, built without `/utf-8`, is unaffected: both classes keep the same ASCII name.
 
-### Why a hand-written helper
+I haven't tried macOS, Linux or any compiler other than MSVC.
 
-- `juce::String` can't be used here: this code has to avoid depending on `juce_core` (see the comment
-  in `JucePluginCompatibility::getCompatibilityJSON`), and this header is also compiled into the
-  manifest helper, which is built without `juce_core`.
-- The SDK's `Steinberg::Vst::StringConvert::convert` is built on `std::wstring_convert`, which throws
-  on invalid UTF-8, and it leaves the destination untouched when the text is too long.
-
-### Testing
-
-Windows 11, MSVC 19.51 (Visual Studio 2026), Release, compiled with `/utf-8` unless stated:
-
-- Built JUCE's `examples/CMake/AudioPlugin` as a VST3 with `PLUGIN_NAME "μ-Test"`.
-  - Before the change, both classes in the generated `moduleinfo.json` are named with the code points
-    `FFCE FFBC 002D 0054 0065 0073 0074` (the two UTF-8 bytes of the μ widened separately).
-  - After the change they are `03BC 002D 0054 0065 0073 0074`, which is `μ-Test`.
-- A standalone test of `widenNonAsciiUtf8` passes, with no warnings at `/W4`: ASCII output is identical to
-  the old behaviour; 2-, 3- and 4-byte characters; truncation to 63 characters plus the terminator; a
-  surrogate pair at the end of the buffer; malformed input (stray, truncated, overlong and surrogate
-  encodings, and values above U+10FFFF).
-- Loaded in Bitwig: the plugin loads, and the window title and plugin browser show `μ-Test`.
-- A plugin named `Ascii-Test` (built without `/utf-8`) is unaffected: both classes keep the same ASCII name.
-
-Not tested: macOS, Linux, and compilers other than MSVC.
-
-Note: on MSVC the example only shows the bug when compiled with `/utf-8`. Without it, MSVC turns the μ
-into `?` before JUCE sees it, so the name is wrong at compile time and this change has nothing to convert.
-JUCE's CMake does not add `/utf-8` for a non-ASCII `PLUGIN_NAME`.
+One thing I noticed along the way: on MSVC the bug only shows if the project is compiled with `/utf-8`. Without it, MSVC turns the mu into a `?` before JUCE sees the string, so there is nothing for this change to fix. JUCE's CMake doesn't add `/utf-8` for a non-ASCII `PLUGIN_NAME`, which may be worth a separate look.
