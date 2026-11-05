@@ -189,7 +189,8 @@ void PhrasePlayback::render(const PhraseLoop& loop, const PhraseSettings& s, con
         // The first block that starts at or after this segment's start (a block exactly at the start fires).
         const auto& blocks = loop.timeline->blocks();
         const auto startsAt = [&blocks](double beat) { return (int) (std::lower_bound(blocks.begin(), blocks.end(), beat, [](const TimelineBlock& b, double v) { return b.start < v; }) - blocks.begin()); };
-        const double startTol = (fresh && done == 0) ? bps : 1.0e-9;
+        // A segment that begins at a start, a jump or a wrap (its first frame a fraction of a sample past the beat) still fires a block on that beat.
+        const double startTol = (fresh || done > 0) ? bps : 1.0e-9;
         int bi = startsAt(pos - startTol);   // the blocks are sorted by start
 
         // The blocks whose pre-fade can start inside this segment: the longest pre-fade is a second, so only blocks starting

@@ -20,10 +20,10 @@ namespace
         // Each fade is a power curve (envCurveExponent), straight when its bend is 0.
         if (inLen > 1.0f && (float) age < inLen)
         {
-            const float x = (float) (age + 1) / inLen;
+            const float x = std::min(1.0f, (float) (age + 1) / inLen);
             env = own.envInCurve == 0.0f ? x : std::pow(x, envCurveExponent(own.envInCurve));
         }
-        const float left = (float) (hitLen - age);
+        const float left = (float) (hitLen - age - 1);   // 0 on the hit's last sample, so a fade-out ends at silence
         if (outLen > 1.0f && left < outLen)
         {
             const float x = std::max(0.0f, left / outLen);

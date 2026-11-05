@@ -143,7 +143,8 @@ void Phrase::startPreview(PreviewKind kind, int slice, double bpm)
     }
 
     // A scheduler of its own plays the layout through its blocks, on a worker, into the audition's buffer, which starts sounding at once.
-    const int frames = juce::jmax(2, (int) std::lround(total * 60.0 / bpm * sr));
+    // Capped like a file audition (SamplePreview::kMaxSeconds): a very low tempo or a long loop must not ask for a huge buffer.
+    const int frames = (int) juce::jlimit(2.0, mu_core::SamplePreview::kMaxSeconds * sr, std::round(total * 60.0 / bpm * sr));
     const bool shortWindow = pp[ppi::window].load(1.0f) < 0.5f;
     const auto id = std::abs(preview.getPreparedRate() - sr) < 0.5 ? preview.startProgressive(frames) : juce::uint64 { 0 };
     if (id == 0) return;   // not prepared (no audio rate yet): nothing to play it at
@@ -153,6 +154,7 @@ void Phrase::startPreview(PreviewKind kind, int slice, double bpm)
 void Phrase::renderAudition(std::shared_ptr<const PhraseData> d, PhraseSettings s, Timeline tl, double sr, double bpm, int frames,
                             bool shortWindow, juce::uint64 id, int gen)
 {
+    juce::ScopedNoDenormals noDenormals;   // the stretchers and filters must not slow to a crawl on a decaying tail
     PhraseLoop loop;
     const bool useCopy = d->resampled != nullptr && std::abs(d->resampledRate - sr) < 0.5;
     loop.audio = useCopy ? d->resampled.get() : d->audio.get();
@@ -311,6 +313,8 @@ void Phrase::prepare(double sampleRate, int blockSize)
     // The stretch window is a per-layer choice made here (Short for drums, Default for tonal loops).
     playback->prepare(sampleRate, juce::jmax(16, blockSize), pp[ppi::window].load(1.0f) < 0.5f);
     insert->prepare(sampleRate, blockSize);
+    stopPreview();   // an audition still rendering was made at the old rate
+    finishPreviewRender();
     preview.prepare(juce::jmax(16, blockSize), sampleRate);
     tailScratch.setSize(2, juce::jmax(1, blockSize));
     tailScratch.clear();

@@ -508,6 +508,22 @@ struct PhraseTests : public juce::UnitTest
             expectLessOrEqual(sanitised(bad).envIn + sanitised(bad).envOut, 1.0f);
         }
 
+        beginTest("a block on the downbeat sounds on every pass when the timeline's length is not a whole number of samples");
+        {
+            // 126 bpm: four beats are 91428.57 samples, so the wrap falls between two samples.
+            Rig r;
+            r.hitsStartWithSliceSettings = false;
+            r.timeline.place(0, 0.0, 0.0);
+            auto out = r.run(3 * 91429, 128, 0.0, 126.0);
+            int passes = 0;
+            for (int pass = 0; pass < 3; ++pass)
+            {
+                const int at = (int) std::lround(pass * 4.0 * 60.0 / 126.0 * kSr);
+                if (std::abs(out.getSample(0, at + 200)) > 0.01f) ++passes;
+            }
+            expectEquals(passes, 3);
+        }
+
         beginTest("a block near the end of the timeline sounds again in the next pass");
         {
             Rig r;
