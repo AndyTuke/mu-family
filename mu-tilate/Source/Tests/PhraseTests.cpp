@@ -500,6 +500,10 @@ struct PhraseTests : public juce::UnitTest
             expectWithinAbsoluteError(out.getSample(0, 24000 + 6000), 0.1f, 2.0e-3f);    // half way up the fade in
             expectWithinAbsoluteError(out.getSample(0, 24000 + 12000), 0.2f, 2.0e-3f);   // the corners meet: full level
             expectWithinAbsoluteError(out.getSample(0, 24000 + 18000), 0.1f, 2.0e-3f);   // half way down the fade out
+            auto bent = shaped; bent.envInCurve = 1.0f; r.timeline.setSettings(0, bent);
+            auto outBent = r.run(96000, 128);
+            expectWithinAbsoluteError(outBent.getSample(0, 24000 + 6000), 0.2f * 0.0625f, 2.0e-3f);   // x^4 at half way: a slow start
+            expectWithinAbsoluteError(outBent.getSample(0, 24000 + 18000), 0.1f, 2.0e-3f);           // the fade-out stays straight
             auto bad = shaped; bad.envIn = 0.8f; bad.envOut = 0.9f;
             expectLessOrEqual(sanitised(bad).envIn + sanitised(bad).envOut, 1.0f);
         }

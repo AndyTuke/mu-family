@@ -694,8 +694,13 @@ void PhraseContent::timerCallback()
     refreshSlicePanel(false);
     followLayerChoices();
     updateToolbar();
+    // The audition and the sequence never sound together: starting the transport ends an audition, and the play buttons wait for a stop.
+    const bool transportPlaying = host.isPhraseTransportPlaying();
+    if (transportPlaying && host.getPreviewPlayhead(currentLayer) >= 0.0) host.stopPreview(currentLayer);
+    for (auto* b : { &previewTempoButton, &previewOriginalButton })
+        b->setEnabled(! transportPlaying);
     waveform.setPlayhead(host.getPreviewPlayhead(currentLayer));
-    timelineView.setPlayheadBeats(host.isPhraseTransportPlaying() ? host.getPhraseTransportBeat() : -1.0);
+    timelineView.setPlayheadBeats(transportPlaying ? host.getPhraseTransportBeat() : -1.0);
 }
 
 void PhraseContent::paint(juce::Graphics& g)

@@ -62,6 +62,8 @@ struct SliceSettings
     float volume      = 1.0f;   // 0..1: this hit's level as a fraction of full, set by dragging the top of the block on the timeline (multiplies the gain)
     float envIn       = 0.0f;   // 0..1: the hit's fade-in as a fraction of its length, set by dragging the block's top-left corner in
     float envOut      = 0.0f;   // 0..1: the fade-out as a fraction of its length, set by dragging the top-right corner in (envIn + envOut <= 1)
+    float envInCurve  = 0.0f;   // -1..1: how the fade-in bends (0 straight, above 0 slow start, below 0 fast start), the handle in the middle of the fade
+    float envOutCurve = 0.0f;   // -1..1: the same for the fade-out
 
 };
 
@@ -98,8 +100,14 @@ inline SliceSettings sanitised(SliceSettings s) noexcept
     s.volume = fix(s.volume, 0.0f, 1.0f, 1.0f);
     s.envIn = fix(s.envIn, 0.0f, 1.0f, 0.0f);
     s.envOut = std::min(fix(s.envOut, 0.0f, 1.0f, 0.0f), 1.0f - s.envIn);
+    s.envInCurve = fix(s.envInCurve, -1.0f, 1.0f, 0.0f);
+    s.envOutCurve = fix(s.envOutCurve, -1.0f, 1.0f, 0.0f);
     return s;
 }
+
+// A fade's bend (-1..1) as the exponent of its ramp: the gain is x^exponent for x rising 0..1 along the fade. 0 is a straight line, 1 is
+// x^4 (slow start), -1 is x^0.25 (fast start).
+inline float envCurveExponent(float curve) noexcept { return std::pow(4.0f, std::clamp(curve, -1.0f, 1.0f)); }
 
 // The pitch settings as a rate: source samples per output sample (1 = unchanged), semitones and cents clamped to their ranges.
 inline double pitchRatio(const SliceSettings& s) noexcept

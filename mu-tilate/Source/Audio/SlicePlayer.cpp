@@ -12,14 +12,23 @@ namespace
 {
     // The hit's envelope: a linear fade in over the first `envIn` of its length and a fade out over the last `envOut` (the corners
     // dragged on the timeline). 1 when the hit has none.
-    float hitEnvelope(int hitLen, float envIn, float envOut, int age) noexcept
+    float hitEnvelope(int hitLen, const SliceSettings& own, int age) noexcept
     {
-        if (hitLen <= 0 || (envIn <= 0.0f && envOut <= 0.0f)) return 1.0f;
+        if (hitLen <= 0 || (own.envIn <= 0.0f && own.envOut <= 0.0f)) return 1.0f;
         float env = 1.0f;
-        const float inLen = envIn * (float) hitLen, outLen = envOut * (float) hitLen;
-        if (inLen > 1.0f && (float) age < inLen) env = (float) (age + 1) / inLen;
+        const float inLen = own.envIn * (float) hitLen, outLen = own.envOut * (float) hitLen;
+        // Each fade is a power curve (envCurveExponent), straight when its bend is 0.
+        if (inLen > 1.0f && (float) age < inLen)
+        {
+            const float x = (float) (age + 1) / inLen;
+            env = own.envInCurve == 0.0f ? x : std::pow(x, envCurveExponent(own.envInCurve));
+        }
         const float left = (float) (hitLen - age);
-        if (outLen > 1.0f && left < outLen) env *= std::max(0.0f, left / outLen);
+        if (outLen > 1.0f && left < outLen)
+        {
+            const float x = std::max(0.0f, left / outLen);
+            env *= own.envOutCurve == 0.0f ? x : std::pow(x, envCurveExponent(own.envOutCurve));
+        }
         return env;
     }
 }
@@ -343,7 +352,7 @@ void SlicePlayer::renderNative(Voice& v, juce::AudioBuffer<float>& out, int offs
         // Fade-in from the start, fade-out over the last samples of the slice (in playback order).
         float env = std::min(1.0f, (float) (v.age + 1) / (float) v.fadeInLen);
         if (v.swell) env *= env;
-        env *= hitEnvelope(v.hitLen, v.own.envIn, v.own.envOut, v.age);
+        env *= hitEnvelope(v.hitLen, v.own, v.age);
         const double remaining = v.step > 0.0 ? (double) v.range.end - v.pos : v.pos - (double) v.range.start + 1.0;
         env *= std::min(1.0f, (float) ((int) (remaining / std::fabs(v.step)) + 1) / (float) v.fadeOutLen);
         if (v.fading)
@@ -400,7 +409,7 @@ void SlicePlayer::renderStretched(Voice& v, juce::AudioBuffer<float>& out, int o
 
         float env = std::min(1.0f, (float) (age + 1) / (float) v.fadeInLen);
         env      *= std::min(1.0f, (float) (v.total - age) / (float) v.fadeOutLen);
-        env      *= hitEnvelope(v.hitLen, v.own.envIn, v.own.envOut, age);
+        env      *= hitEnvelope(v.hitLen, v.own, age);
         if (v.fading)
         {
             v.cutGain -= v.cutStep;

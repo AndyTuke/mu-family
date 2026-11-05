@@ -18,6 +18,7 @@
 #include <atomic>
 #include <memory>
 #include <string_view>
+#include <thread>
 #include <unordered_map>
 
 namespace mu_tilate
@@ -87,7 +88,10 @@ struct Phrase : Layer
     // plays one slice the same way. The matched ones are rendered here first (the audio thread only copies the result).
     enum class PreviewKind { Original, AtTempo, Slice };
     void startPreview(PreviewKind kind, int slice, double bpm);
-    void stopPreview() { preview.stop(); }
+    void stopPreview() { ++previewGen; preview.stop(); }
+    // Waits for the worker that is rendering an audition to finish (a test, or a teardown).
+    void finishPreviewRender();
+    ~Phrase();
     // Repeating applies to the whole-loop auditions only; a single slice plays once.
     void setPreviewLooping(bool loop) noexcept { previewLoop = loop; preview.setLooping(previewLoop && ! previewIsSlice); }
     // Message thread: the play area, in samples of the loop (0, 0 = all of it). The whole-loop auditions play only this part.
@@ -186,6 +190,12 @@ private:
     std::atomic<double>               loopLengthBeats { -1.0 };
 
     bool previewLoop = false, previewIsSlice = false;
+    // The matched auditions are rendered on a worker, a block at a time into the audition's buffer, so they start at once and play as they
+    // are made. A new audition or a stop moves previewGen on, which tells the old worker to give up.
+    void renderAudition(std::shared_ptr<const PhraseData> d, PhraseSettings s, Timeline tl, double sr, double bpm, int frames,
+                        bool shortWindow, juce::uint64 id, int gen);
+    std::thread        previewWorker;
+    std::atomic<int>   previewGen { 0 };
     mu_core::SamplePreview preview;                // the audition (message thread starts it, the audio thread mixes it)
     juce::AudioBuffer<float> tailScratch;          // a tail that must add rather than write renders here
     bool parked = true;                            // not rendered live in the last rendered block

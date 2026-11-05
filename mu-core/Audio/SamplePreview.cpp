@@ -127,6 +127,43 @@ void SamplePreview::startBuffer(const juce::AudioBuffer<float>& audio, double au
     publish(src, srcLen, audioRate, rate);
 }
 
+// rt-ok-fn: message-thread publish of a buffer that is filled in afterwards; the audio thread reads current/audioHolding and never takes messageLock
+juce::uint64 SamplePreview::startProgressive(int frames)
+{
+    const juce::ScopedLock sl(messageLock);
+    if (sampleRate <= 0.0 || frames <= 0) return 0;
+    auto dec = std::make_unique<Decoded>();
+    dec->audio.setSize(2, frames);
+    dec->audio.clear();
+    dec->filled.store(0, std::memory_order_relaxed);
+    dec->id = nextId++;
+    const juce::uint64 id = dec->id;
+    Decoded* raw = dec.get();
+    owned.push_back(std::move(dec));
+    current.store(raw);
+    collectRetired();
+    return id;
+}
+
+// rt-ok-fn: renderer-thread copy under messageLock; the audio thread never takes it and reads only what `filled` has released
+bool SamplePreview::appendProgressive(juce::uint64 id, const juce::AudioBuffer<float>& run, int numFrames, int dstPos)
+{
+    const juce::ScopedLock sl(messageLock);
+    Decoded* d = current.load();
+    if (d == nullptr || d->id != id || run.getNumChannels() <= 0) return false;
+    const int n = juce::jlimit(0, d->audio.getNumSamples() - dstPos, numFrames);
+    for (int ch = 0; ch < 2; ++ch)
+        d->audio.copyFrom(ch, dstPos, run, juce::jmin(ch, run.getNumChannels() - 1), 0, n);
+    d->filled.store(dstPos + n, std::memory_order_release);
+    return true;
+}
+
+double SamplePreview::getPreparedRate() const
+{
+    const juce::ScopedLock sl(messageLock);
+    return sampleRate;
+}
+
 // rt-ok-fn: message-thread side of the hazard-pointer scheme; the audio thread never takes messageLock
 void SamplePreview::stop()
 {
@@ -157,13 +194,16 @@ void SamplePreview::mixInto(juce::AudioBuffer<float>& masterBus, int numSamples)
     if (d->id != playingId) { playingId = d->id; readPos = rs; finished = false; }
     if (! finished && readPos < rs) readPos = rs;   // the start was moved past us: jump to it
 
-    // Chunk to the prepared size, copying from the in-memory buffer between the area's ends.
+    // Chunk to the prepared size, copying from the in-memory buffer between the area's ends. A progressive audition is read only as far as
+    // it has been made (`made`); a play that gets there waits for the rest.
+    const int made = juce::jmin(len, d->filled.load(std::memory_order_acquire));
     const bool wrap = looping.load(std::memory_order_relaxed) && len > 0;
     if (readPos >= re && wrap) readPos = rs;        // the end was moved behind us: repeat from the start
     for (int done = 0; done < numSamples && ! finished && (readPos < re || wrap); )
     {
         if (readPos >= re) readPos = rs;   // looping: start over
-        const int n = juce::jmin(chunkMax, numSamples - done, re - readPos);
+        if (readPos >= made) break;        // not rendered yet
+        const int n = juce::jmin(chunkMax, numSamples - done, re - readPos, made - readPos);
         for (int ch = 0; ch < masterBus.getNumChannels(); ++ch)
             masterBus.addFrom(ch, done, d->audio, ch % 2, readPos, n, 0.7f);
         readPos += n;

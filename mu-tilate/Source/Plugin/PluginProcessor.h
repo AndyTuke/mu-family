@@ -91,7 +91,8 @@ public:
     void layOutSlices(int layer) override;
     void previewSource(int layer, int kind, int slice) override
     {
-        if (layer >= 0 && layer < mu_limits::kMaxLayers)
+        // An audition and the sequence never sound together: it plays only while the transport is stopped.
+        if (layer >= 0 && layer < mu_limits::kMaxLayers && ! isInternalPlaying())
             getPhrase(layer).startPreview((Phrase::PreviewKind) juce::jlimit(0, 2, kind), slice, getInternalBpm());
     }
     void setPreviewLooping(int layer, bool loop) override { if (layer >= 0 && layer < mu_limits::kMaxLayers) getPhrase(layer).setPreviewLooping(loop); }

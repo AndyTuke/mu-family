@@ -138,6 +138,35 @@ juce::Point<float> PhraseTimeline::cornerOf(int i, bool right) const
              (float) r.getBottom() - own.volume * (float) r.getHeight() };
 }
 
+juce::Point<float> PhraseTimeline::curveHandleOf(int i, bool right) const
+{
+    const auto r = blockRect(i);
+    const auto& own = timeline.blocks()[(size_t) i].own;
+    const auto corner = cornerOf(i, right);
+    const float foot = (float) r.getBottom(), top = corner.y;
+    const float x0 = right ? corner.x : (float) r.getX(), x1 = right ? (float) r.getRight() : corner.x;
+    // The fade's middle sits on its curve: the gain there is 0.5 to the exponent, rising along the fade-in and falling along the fade-out.
+    const float h = std::pow(0.5f, envCurveExponent(right ? own.envOutCurve : own.envInCurve));
+    return { (x0 + x1) * 0.5f, foot - h * (foot - top) };
+}
+
+int PhraseTimeline::curveHandleAt(juce::Point<int> p, bool& right) const
+{
+    const float grab = (float) mu_ui::s(6);
+    for (int i = 0; i < timeline.size(); ++i)
+    {
+        const auto& b = timeline.blocks()[(size_t) i];
+        if (b.slice < 0) continue;
+        for (const bool rt : { false, true })
+        {
+            if ((rt ? b.own.envOut : b.own.envIn) <= 0.0f) continue;
+            const auto c = curveHandleOf(i, rt);
+            if (std::max(std::abs(c.x - (float) p.x), std::abs(c.y - (float) p.y)) <= grab) { right = rt; return i; }
+        }
+    }
+    return -1;
+}
+
 int PhraseTimeline::cornerAt(juce::Point<int> p, bool& right) const
 {
     // The nearest top corner within a few pixels of the pointer; it wins over the block's edge and level line.
@@ -247,11 +276,23 @@ void PhraseTimeline::paint(juce::Graphics& g)
             // The coloured part is the hit's envelope: up from the foot over the fade-in, level across the top, down over the fade-out.
             const auto lit = r.withTop(r.getBottom() - std::max(1, (int) std::lround(vol * (float) r.getHeight())));
             const auto cl = cornerOf(i, false), cr = cornerOf(i, true);
+            const float foot = (float) r.getBottom(), topY = (float) lit.getY();
+            const float expIn = envCurveExponent(b.own.envInCurve), expOut = envCurveExponent(b.own.envOutCurve);
             juce::Path envelope;
-            envelope.startNewSubPath((float) r.getX(), (float) r.getBottom());
-            envelope.lineTo(cl.x, (float) lit.getY());
-            envelope.lineTo(cr.x, (float) lit.getY());
-            envelope.lineTo((float) r.getRight(), (float) r.getBottom());
+            envelope.startNewSubPath((float) r.getX(), foot);
+            for (int k = 1; k <= 16 && b.own.envIn > 0.0f; ++k)   // the fade-in's curve, foot to corner
+            {
+                const float u = (float) k / 16.0f;
+                envelope.lineTo((float) r.getX() + (cl.x - (float) r.getX()) * u, foot - (foot - topY) * std::pow(u, expIn));
+            }
+            envelope.lineTo(cl.x, topY);
+            envelope.lineTo(cr.x, topY);
+            for (int k = 1; k <= 16 && b.own.envOut > 0.0f; ++k)   // the fade-out's curve, corner to foot
+            {
+                const float u = (float) k / 16.0f;
+                envelope.lineTo(cr.x + ((float) r.getRight() - cr.x) * u, foot - (foot - topY) * std::pow(1.0f - u, expOut));
+            }
+            envelope.lineTo((float) r.getRight(), foot);
             envelope.closeSubPath();
             g.saveState();
             g.reduceClipRegion(lit);
@@ -264,11 +305,27 @@ void PhraseTimeline::paint(juce::Graphics& g)
             {
                 g.setColour(accent.brighter(0.5f));
                 g.drawLine(cl.x, (float) lit.getY() + 1.0f, cr.x, (float) lit.getY() + 1.0f, 2.0f);
-                if (shaped)
+                // The fades' edges: the curves themselves.
+                juce::Path edges;
+                if (b.own.envIn > 0.0f)
                 {
-                    g.drawLine((float) r.getX(), (float) r.getBottom(), cl.x, (float) lit.getY() + 1.0f, 1.5f);
-                    g.drawLine(cr.x, (float) lit.getY() + 1.0f, (float) r.getRight(), (float) r.getBottom(), 1.5f);
+                    edges.startNewSubPath((float) r.getX(), foot);
+                    for (int k = 1; k <= 16; ++k)
+                    {
+                        const float u = (float) k / 16.0f;
+                        edges.lineTo((float) r.getX() + (cl.x - (float) r.getX()) * u, foot - (foot - topY) * std::pow(u, expIn));
+                    }
                 }
+                if (b.own.envOut > 0.0f)
+                {
+                    edges.startNewSubPath(cr.x, topY);
+                    for (int k = 1; k <= 16; ++k)
+                    {
+                        const float u = (float) k / 16.0f;
+                        edges.lineTo(cr.x + ((float) r.getRight() - cr.x) * u, foot - (foot - topY) * std::pow(1.0f - u, expOut));
+                    }
+                }
+                g.strokePath(edges, juce::PathStrokeType(1.5f));
             }
             if (i == selected)
             {
@@ -277,6 +334,13 @@ void PhraseTimeline::paint(juce::Graphics& g)
                 const float hs = (float) s(5);
                 for (const auto& c : { cl, cr })
                     g.fillEllipse(c.x - hs * 0.5f, (float) lit.getY() + 1.0f - hs * 0.5f, hs, hs);
+                // The bend handle of each fade, a ring in the middle of its curve.
+                for (const bool rt : { false, true })
+                    if ((rt ? b.own.envOut : b.own.envIn) > 0.0f)
+                    {
+                        const auto h = curveHandleOf(i, rt);
+                        g.drawEllipse(h.x - hs * 0.5f, h.y - hs * 0.5f, hs, hs, 1.5f);
+                    }
             }
         }
         g.setColour(LF::colour(LF::lfoEditorPoint).withAlpha((i == selected ? 1.0f : 0.5f) * dim));
@@ -380,12 +444,14 @@ void PhraseTimeline::mouseDown(const juce::MouseEvent& e)
     bool onRight = false;
     // A corner of a block's envelope comes before its edge and level line.
     bool cornerRight = false;
-    const int cornerBlock = cornerAt(e.getPosition(), cornerRight);
+    bool curveRight = false;
+    const int curveBlock = curveHandleAt(e.getPosition(), curveRight);
+    const int cornerBlock = curveBlock >= 0 ? curveBlock : cornerAt(e.getPosition(), cornerRight);
     if (cornerBlock >= 0)
     {
         selected = cornerBlock;
         dragBlock = cornerBlock;
-        dragCorner = cornerRight ? 1 : -1;
+        dragCorner = curveBlock >= 0 ? (curveRight ? 2 : -2) : (cornerRight ? 1 : -1);
         dragLevel = false;
         dragEdge = Edge::None;
         dragOrigin = timeline;
@@ -447,6 +513,23 @@ void PhraseTimeline::mouseDrag(const juce::MouseEvent& e)
     if (dragBlock < 0 || ! onEdit) return;
 
     // Dragging a top corner in or out sets the hit's fade in (left) or fade out (right) as a fraction of its length, no snapping.
+    if (std::abs(dragCorner) == 2)
+    {
+        // The bend handle: its height on the fade sets the curve, the gain half way along the fade is 0.5^exponent.
+        const int at = dragBlock;
+        const bool right = dragCorner > 0;
+        const auto r = blockRect(at);
+        const float foot = (float) r.getBottom(), top = cornerOf(at, right).y;
+        const float h = juce::jlimit(0.04f, 0.96f, (foot - (float) e.y) / std::max(1.0f, foot - top));
+        const float bend = juce::jlimit(-1.0f, 1.0f, std::log(std::log(h) / std::log(0.5f)) / std::log(4.0f));
+        onEdit([at, right, bend](Timeline& t)
+        {
+            auto own = t.blocks()[(size_t) at].own;
+            (right ? own.envOutCurve : own.envInCurve) = bend;
+            t.setSettings(at, own);
+        });
+        return;
+    }
     if (dragCorner != 0)
     {
         const int at = dragBlock;
@@ -545,7 +628,7 @@ void PhraseTimeline::mouseMove(const juce::MouseEvent& e)
     bool right = false;
     const bool inRow = rowArea().contains(e.getPosition());
     const int hit = inRow ? edgeAt(e.x, right) : -1;
-    const bool onCorner = inRow && cornerAt(e.getPosition(), right) >= 0;
+    const bool onCorner = inRow && (cornerAt(e.getPosition(), right) >= 0 || curveHandleAt(e.getPosition(), right) >= 0);
     const bool onLevel = hit < 0 && levelHandleAt(e.getPosition()) >= 0;
     setMouseCursor(onCorner ? juce::MouseCursor::LeftRightResizeCursor : hit >= 0 ? juce::MouseCursor::LeftRightResizeCursor : onLevel ? juce::MouseCursor::UpDownResizeCursor : juce::MouseCursor::NormalCursor);
 }

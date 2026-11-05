@@ -53,12 +53,13 @@ bool pumpUntil(Fn&& done, int ms = 15000)
 struct Host : juce::AudioPlayHead
 {
     double bpm = 120.0;
+    bool   playing = true;
     double ppq = 0.0;
     juce::int64 samples = 0;
     juce::Optional<PositionInfo> getPosition() const override
     {
         PositionInfo info;
-        info.setIsPlaying(true);
+        info.setIsPlaying(playing);
         info.setBpm(bpm);
         info.setPpqPosition(ppq);
         info.setTimeInSamples(samples);
@@ -120,6 +121,7 @@ struct ProcessorTests : public juce::UnitTest
         {
             PluginProcessor p;
             Host host;
+            host.playing = false;                                           // an audition plays only while the transport is stopped
             p.setPlayHead(&host);
             p.setRateAndBufferSizeDetails(kSr, kBlock);
             p.prepareToPlay(kSr, kBlock);
@@ -130,6 +132,7 @@ struct ProcessorTests : public juce::UnitTest
             {
                 const double t0 = juce::Time::getMillisecondCounterHiRes();
                 p.previewSource(0, kind, 0);
+                p.getPhrase(0).finishPreviewRender();
                 logMessage("audition kind " + juce::String(kind) + " took " + juce::String(juce::Time::getMillisecondCounterHiRes() - t0, 1) + " ms to start");
                 expectGreaterThan(renderPeak(p, host, 40), 0.02f);          // each audition is heard
                 p.stopPreview(0);
@@ -142,6 +145,7 @@ struct ProcessorTests : public juce::UnitTest
                 expect(p.getPreviewPlayhead(0) < 0.0, "no playhead before a play");
                 p.setPlayArea(0, len / 4, len / 2);
                 p.previewSource(0, 0, 0);
+                p.getPhrase(0).finishPreviewRender();
                 renderPeak(p, host, 20);
                 const double at = p.getPreviewPlayhead(0);
                 expect(at >= (double) (len / 4) - 1.0 && at <= (double) (len / 2), "the playhead is inside the play area: " + juce::String(at));
@@ -156,6 +160,7 @@ struct ProcessorTests : public juce::UnitTest
             // A looping audition keeps sounding past its own length.
             p.setPreviewLooping(0, true);
             p.previewSource(0, 0, 0);
+            p.getPhrase(0).finishPreviewRender();
             renderPeak(p, host, 400);
             expectGreaterThan(renderPeak(p, host, 600), 0.02f);
             p.setPreviewLooping(0, false);
@@ -163,10 +168,16 @@ struct ProcessorTests : public juce::UnitTest
             // A single slice plays once, loop on or not.
             p.setPreviewLooping(0, true);
             p.previewSource(0, 2, 0);
+            p.getPhrase(0).finishPreviewRender();
             renderPeak(p, host, 400);
             expectEquals(renderPeak(p, host, 600), 0.0f);
             p.setPreviewLooping(0, false);
             p.stopPreview(0);
+            // With the transport playing the sample play does nothing (the sequence and an audition never sound together).
+            host.playing = true;
+            p.previewSource(0, 0, 0);
+            p.getPhrase(0).finishPreviewRender();
+            expectEquals(renderPeak(p, host, 40), 0.0f);
             p.setPlayHead(nullptr);
         }
 

@@ -81,6 +81,9 @@ private:
     // Where a block's envelope corners sit (the ends of its level line), and the block whose corner is under `p` (`right` says which), or -1.
     juce::Point<float> cornerOf(int i, bool right) const;
     int    cornerAt(juce::Point<int> p, bool& right) const;
+    // The handle in the middle of a fade (it bends the fade's curve) and the block whose handle is under `p`, or -1. Only a fade that has width has one.
+    juce::Point<float> curveHandleOf(int i, bool right) const;
+    int    curveHandleAt(juce::Point<int> p, bool& right) const;
     // The block with an edge under x (`right` says which), or -1.
     int    edgeAt(int x, bool& right) const;
     double naturalBeatsOf(int i) const;   // the block's whole slice, in beats
@@ -112,7 +115,7 @@ private:
     bool   dragMoved = false;
     enum class Edge { None, Left, Right };
     bool   followPlayhead = true;   // page the view on with the playhead
-    int    dragCorner = 0;          // 0 none, -1 the top-left corner (fade in), 1 the top-right corner (fade out)
+    int    dragCorner = 0;          // 0 none, -1 / 1 the top-left / top-right corner (fade in / out), -2 / 2 the handle bending the fade in / out
     bool   dragLevel = false;       // the drag is on a block's level line: up and down set the hit's volume
     Edge   dragEdge = Edge::None;   // the drag is on a block edge (trim, or with Alt retime), not moving the block
     double dragAnchor = 0.0;        // the edge that stays put during an edge drag, in beats

@@ -73,8 +73,15 @@ void Phrase::installLoop(std::shared_ptr<const juce::AudioBuffer<float>> audio, 
     setData(std::move(d));
 }
 
+Phrase::~Phrase() { ++previewGen; if (previewWorker.joinable()) previewWorker.join(); }
+
+void Phrase::finishPreviewRender() { if (previewWorker.joinable()) previewWorker.join(); }
+
 void Phrase::startPreview(PreviewKind kind, int slice, double bpm)
 {
+    // An audition still being rendered is replaced: its worker sees the new generation and ends.
+    const int gen = ++previewGen;
+    if (previewWorker.joinable()) previewWorker.join();
     const auto d = getData();
     if (d == nullptr || d->audio == nullptr || d->audio->getNumSamples() < 2) return;
     previewIsSlice = kind == PreviewKind::Slice;
@@ -122,6 +129,17 @@ void Phrase::startPreview(PreviewKind kind, int slice, double bpm)
         tl.place(at, 0.0, 0.0);
     }
 
+    // A scheduler of its own plays the layout through its blocks, on a worker, into the audition's buffer, which starts sounding at once.
+    const int frames = juce::jmax(2, (int) std::lround(total * 60.0 / bpm * sr));
+    const bool shortWindow = pp[ppi::window].load(1.0f) < 0.5f;
+    const auto id = std::abs(preview.getPreparedRate() - sr) < 0.5 ? preview.startProgressive(frames) : juce::uint64 { 0 };
+    if (id == 0) return;   // not prepared (no audio rate yet): nothing to play it at
+    previewWorker = std::thread([this, d, s, tl, sr, bpm, frames, shortWindow, id, gen] { renderAudition(d, s, tl, sr, bpm, frames, shortWindow, id, gen); });
+}
+
+void Phrase::renderAudition(std::shared_ptr<const PhraseData> d, PhraseSettings s, Timeline tl, double sr, double bpm, int frames,
+                            bool shortWindow, juce::uint64 id, int gen)
+{
     PhraseLoop loop;
     const bool useCopy = d->resampled != nullptr && std::abs(d->resampledRate - sr) < 0.5;
     loop.audio = useCopy ? d->resampled.get() : d->audio.get();
@@ -130,23 +148,21 @@ void Phrase::startPreview(PreviewKind kind, int slice, double bpm)
     loop.slices = &d->slices;
     loop.timeline = &tl;
 
-    // Offline: a scheduler of its own plays the layout through its blocks into a buffer, which is then published to the player.
     PhrasePlayback pb;
-    pb.prepare(sr, 512, pp[ppi::window].load(1.0f) < 0.5f);
-    const int frames = juce::jmax(2, (int) std::lround(total * 60.0 / bpm * sr));
-    juce::AudioBuffer<float> out(2, frames);
-    out.clear();
+    pb.prepare(sr, 512, shortWindow);
+    juce::AudioBuffer<float> run(2, 512);
     for (int pos = 0; pos < frames; pos += 512)
     {
+        if (gen != previewGen.load()) return;   // replaced or stopped
         const int n = juce::jmin(512, frames - pos);
+        run.clear();
         PhraseClock c;
         c.playing = true; c.bpm = bpm; c.sampleRate = sr;
         c.beatsPerSample = bpm / 60.0 / sr;
         c.startBeat = (double) pos * c.beatsPerSample;
-        juce::AudioBuffer<float> view(out.getArrayOfWritePointers(), 2, pos, n);
-        pb.render(loop, s, c, view, n);
+        pb.render(loop, s, c, run, n);
+        if (! preview.appendProgressive(id, run, n, pos)) return;   // the audition was replaced or stopped
     }
-    preview.startBuffer(out, sr);
 }
 
 // The loop cut to [start, end): the audio copied, the slices cut with it and the hits remapped (a hit whose slice went has none).

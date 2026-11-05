@@ -3,6 +3,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 
 #include <atomic>
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -28,6 +29,15 @@ public:
     // Message thread: plays decoded audio (any channel count, at `audioRate`) the same way, converted to the prepared rate.
     void startBuffer(const juce::AudioBuffer<float>& audio, double audioRate);
 
+    // Message thread: starts an audition whose audio is still being made: `frames` of silence at the prepared rate, played from the first
+    // frame as the audio arrives (a play that catches up with the render is silent until more has come). Returns its id, or 0 when
+    // nothing could start. The renderer then hands each finished run to appendProgressive, from any thread; that returns false once
+    // the audition has been replaced or stopped, which is the renderer's cue to give up.
+    juce::uint64 startProgressive(int frames);
+    bool appendProgressive(juce::uint64 id, const juce::AudioBuffer<float>& run, int numFrames, int dstPos);
+    // The rate the audition plays at (what a progressive render must be made at), 0 until prepared.
+    double getPreparedRate() const;
+
     // The part of the published audio that plays, as fractions of its length (any thread, takes effect at once, also mid-play): the
     // start is where a new play begins and where a repeat returns to, the end is where it stops or repeats. Default 0 to 1.
     void setRegion(float start, float end) noexcept { regionStart.store(start, std::memory_order_relaxed); regionEnd.store(end, std::memory_order_relaxed); }
@@ -44,6 +54,7 @@ private:
     {
         juce::AudioBuffer<float> audio;   // 2 channels at the prepared sample rate
         juce::uint64             id = 0;  // unique per decode, so a recycled address is never mistaken for the same preview
+        std::atomic<int>         filled { std::numeric_limits<int>::max() };   // frames made so far (a progressive audition); all of it otherwise
     };
 
     // Message thread: converts a stereo source (with zero padding after srcLen) to the prepared rate and publishes it.
