@@ -47,7 +47,7 @@ void ModulatorEditor::AssignmentRow::paint(juce::Graphics& g)
     using mu_ui::s;
     using mu_ui::sf;
     g.setColour(MuLookAndFeel::colour(MuLookAndFeel::mutedText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
+    g.setFont(MuLookAndFeel::uiFont(sf(9.0f)));
     g.drawText(juce::String(rowNumber) + ".",
                s(2), 0, s(18), getHeight(), juce::Justification::centred, false);
 }
@@ -78,7 +78,7 @@ ModulatorEditor::ModulatorEditor()
     addAndMakeVisible(rowsViewport);
 
     rowPageLabel.setJustificationType(juce::Justification::centred);
-    rowPageLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
+    rowPageLabel.setFont(MuLookAndFeel::uiFont(10.0f));
     rowPageLabel.setColour(juce::Label::textColourId,
                            MuLookAndFeel::colour(MuLookAndFeel::mutedText));
     addAndMakeVisible(rowPrevBtn);
@@ -711,7 +711,7 @@ void ModulatorEditor::paint(juce::Graphics& g)
         g.setColour(modColour);
         g.fillEllipse(sf(8.0f), dotY, dotSize, dotSize);
         g.setColour(MuLookAndFeel::colour(MuLookAndFeel::headingText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
+        g.setFont(MuLookAndFeel::uiFont(sf(11.0f)));
         g.drawText("Mod " + juce::String::charToString(char('A' + modIndex)),
                    s(20), 0, s(54), headerH, juce::Justification::centredLeft, false);
     }
@@ -725,7 +725,7 @@ void ModulatorEditor::paint(juce::Graphics& g)
         const int textW     = juce::jmax(0, rightEdge - stepReadoutX);
         if (textW > 0)
         {
-            g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
+            g.setFont(MuLookAndFeel::uiFont(sf(9.0f)));
             const juce::String readout = juce::String(cs->getStepCount()) + " steps";
             const juce::Rectangle<int> area(stepReadoutX, m, textW, headerH);
             if (metal)

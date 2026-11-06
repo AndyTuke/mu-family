@@ -4,17 +4,17 @@
 SaveDialog::SaveDialog()
 {
     nameEditor.setTextToShowWhenEmpty("Preset name", juce::Colours::grey);
-    nameEditor.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
+    nameEditor.setFont(MuLookAndFeel::uiFont(13.0f));
     addAndMakeVisible(nameEditor);
 
     descEditor.setTextToShowWhenEmpty("Description (optional)", juce::Colours::grey);
-    descEditor.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+    descEditor.setFont(MuLookAndFeel::uiFont(11.0f));
     addAndMakeVisible(descEditor);
 
     addAndMakeVisible(categoryDropdown);
 
     newCategoryEditor.setTextToShowWhenEmpty("New category name", juce::Colours::grey);
-    newCategoryEditor.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+    newCategoryEditor.setFont(MuLookAndFeel::uiFont(11.0f));
     newCategoryEditor.setVisible(false);
     addAndMakeVisible(newCategoryEditor);
 
@@ -237,7 +237,7 @@ void SaveDialog::paint(juce::Graphics& g)
                     0, 0, logoImage.getWidth(), logoImage.getHeight());
     }
     g.setColour(MuLookAndFeel::colour(Id::headingText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(14.0f))));
+    g.setFont(MuLookAndFeel::uiFont(sf(14.0f)));
     // Title beside the logo, or along the top when there is none.
     if (logoImage.isValid())
         g.drawText(title, cardX + s(120), cardY + s(40), cardW - s(136), s(20),

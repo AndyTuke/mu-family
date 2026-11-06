@@ -53,7 +53,7 @@ inline void promptTextAsync(juce::Component* anchor,
     auto* d = new ModalDialog();
 
     auto editor = std::make_unique<juce::TextEditor>();
-    editor->setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
+    editor->setFont(MuLookAndFeel::uiFont(13.0f));
     editor->setText(defaultText, false);
     editor->selectAll();
     auto* ed = editor.get();

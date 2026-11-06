@@ -130,7 +130,7 @@ void LayerHeaderBar::lookAndFeelChanged()
     if (ghostName) lit = lit.withAlpha(MuLookAndFeel::lighting().lcdGhost * 2.5f);   // unlit, but legible
     nameLabel.setColour(juce::Label::textColourId, lit);
     nameLabel.setFont(metal ? MuLookAndFeel::lcdFont(mu_ui::sf((float) MuLookAndFeel::kLcdNameTextH))
-                            : juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(15.0f))));
+                            : MuLookAndFeel::uiFont(mu_ui::sf(15.0f)));
     repaint();
 }
 
@@ -274,7 +274,7 @@ void LayerHeaderBar::paint(juce::Graphics& g)
     // The Notes In caption: engraved into the metal, or plain text in the flat look.
     if (! notesInCaptionR.isEmpty())
     {
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuLookAndFeel::kEngravedCaptionFont))));
+        g.setFont(MuLookAndFeel::uiFont(sf(MuLookAndFeel::kEngravedCaptionFont)));
         if (MuLookAndFeel::isMetal(*this))
             MuLookAndFeel::drawEngravedText(g, "Notes In", notesInCaptionR, juce::Justification::centredLeft,
                                             MuLookAndFeel::colour(Id::labelText));
@@ -294,7 +294,7 @@ void LayerHeaderBar::paint(juce::Graphics& g)
         g.setColour(juce::Colours::orange.withAlpha(0.85f));
         g.fillRoundedRectangle((float) bx, (float) by, (float) bw, (float) bh, sf(3.0f));
         g.setColour(juce::Colours::black);
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(8.0f))));
+        g.setFont(MuLookAndFeel::uiFont(sf(8.0f)));
         g.drawText("SWP", bx, by, bw, bh, juce::Justification::centred, false);
     }
 }

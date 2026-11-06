@@ -15,6 +15,19 @@
 
 add_library(mu-core INTERFACE)
 
+# The family typefaces (docs/design-ui-family.md, Visual polish P1): Inter for UI text, JetBrains Mono for LCD and
+# monospaced readouts, both SIL OFL 1.1, the unmodified upstream static files. Embedded once here; every consumer of
+# mu-core links it, and MuLookAndFeel::uiFont / lcdFont are the only places a typeface is chosen.
+juce_add_binary_data(mu-core-fonts HEADER_NAME "MuFontData.h" NAMESPACE MuFontData
+    SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/UI/Fonts/Inter-Regular.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/UI/Fonts/Inter-Medium.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/UI/Fonts/Inter-Bold.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/UI/Fonts/JetBrainsMono-Regular.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/UI/Fonts/JetBrainsMono-Bold.ttf")
+set_target_properties(mu-core-fonts PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+target_link_libraries(mu-core INTERFACE mu-core-fonts)
+
 # The processor-free UI sources (components, TransportBar, dialogs): one list, shared with mu-link
 # and mu-core-tests. Defines MU_CORE_CHROME_SOURCES.
 include("${CMAKE_CURRENT_SOURCE_DIR}/UIChromeSources.cmake")

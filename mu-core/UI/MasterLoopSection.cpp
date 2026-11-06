@@ -7,7 +7,7 @@ MasterLoopSection::MasterLoopSection(ProcessorBase& p)
 {
     loopLabel.setText("Loop:", juce::dontSendNotification);
     loopLabel.setJustificationType(juce::Justification::centredRight);
-    loopLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+    loopLabel.setFont(MuLookAndFeel::uiFont(11.0f));
     addAndMakeVisible(loopLabel);
 
     loopDropdown.addItem(juce::String::charToString(0x221E), 1); // ∞ = pattern reset length disabled
@@ -26,14 +26,14 @@ MasterLoopSection::MasterLoopSection(ProcessorBase& p)
     addAndMakeVisible(loopDropdown);
 
     loopStepLabel.setJustificationType(juce::Justification::centredLeft);
-    loopStepLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+    loopStepLabel.setFont(MuLookAndFeel::uiFont(11.0f));
     syncLoopDropdownFromApvts();
     addAndMakeVisible(loopStepLabel);
 
     // The Swap group stays hidden until the product lists the timings it offers.
     swapLabel.setText("Swap:", juce::dontSendNotification);
     swapLabel.setJustificationType(juce::Justification::centredRight);
-    swapLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+    swapLabel.setFont(MuLookAndFeel::uiFont(11.0f));
     swapLabel.setTooltip("When a queued preset change takes effect");
     swapDropdown.getComboBox().setTooltip("When a queued preset change takes effect");
     addChildComponent(swapLabel);

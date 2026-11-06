@@ -183,6 +183,8 @@ void EditorShellBase::setProductIdentity(const juce::String& displayName, const 
     if (processorRef.hasLicensing())
         credits.add(credit("Monocypher \xe2\x80\x94 BSD-2-Clause"));
     credits.add(credit("clap-juce-extensions \xe2\x80\x94 MIT"));
+    credits.add(credit("Inter \xe2\x80\x94 OFL 1.1"));
+    credits.add(credit("JetBrains Mono \xe2\x80\x94 OFL 1.1"));
     credits.addArray(extraCredits);
 
     productDisplayName = displayName;

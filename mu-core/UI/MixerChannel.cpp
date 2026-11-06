@@ -55,7 +55,7 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
     }
 
     dbLabel.setJustificationType(juce::Justification::centred);
-    dbLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
+    dbLabel.setFont(MuLookAndFeel::uiFont(9.0f));
     addAndMakeVisible(dbLabel);
 
     if (hasMuteSolo())
@@ -347,7 +347,7 @@ void MixerChannel::paint(juce::Graphics& g)
 
     g.setColour(active ? MuLookAndFeel::colour(Id::headingText)
                        : MuLookAndFeel::colour(Id::mutedText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
+    g.setFont(MuLookAndFeel::uiFont(10.0f));
     g.drawText(channelName, 0, kNamePadding, stripW, kNameH,
                juce::Justification::centred, true);
 
@@ -377,7 +377,7 @@ void MixerChannel::paint(juce::Graphics& g)
         g.drawRoundedRectangle(faderPaneBounds.toFloat(), 2.0f, 1.0f);
 
     // Section labels (tiny, top-right of each pane)
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(8.0f)));
+    g.setFont(MuLookAndFeel::uiFont(8.0f));
     g.setColour(MuLookAndFeel::colour(Id::mutedText));
     if (!sidechainPaneBounds.isEmpty() && hasOutputBus())  // "SC" tag only on rhythm strips (others have no output bus label)
         g.drawText("SC", sidechainPaneBounds.getRight() - 14, sidechainPaneBounds.getY() + 1,

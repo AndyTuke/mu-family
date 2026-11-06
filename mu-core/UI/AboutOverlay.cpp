@@ -16,7 +16,7 @@ AboutOverlay::AboutOverlay()
     tipLink.setButtonText("Want to give more?");
     tipLink.setURL(juce::URL(mu_core::support_prompt::kTipUrl));
     tipLink.setTooltip("Opens the tip page in your browser");
-    tipLink.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(12.0f))), false,
+    tipLink.setFont(MuLookAndFeel::uiFont(mu_ui::sf(12.0f)), false,
                     juce::Justification::centredLeft);
     tipLink.setColour(juce::HyperlinkButton::textColourId,
                       MuLookAndFeel::colour(MuLookAndFeel::ColourIds::globalAccent));
@@ -109,12 +109,12 @@ void AboutOverlay::paint(juce::Graphics& g)
 
     // Title — falls back to a neutral label if the product hasn't set its info yet.
     g.setColour(MuLookAndFeel::colour(Id::headingText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(28.0f))));
+    g.setFont(MuLookAndFeel::uiFont(sf(28.0f)));
     g.drawText(productName.isNotEmpty() ? productName : juce::String("mu-Family"),
                tx, ty, textW, s(36), juce::Justification::centredLeft, false);
     ty += s(40);
 
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
+    g.setFont(MuLookAndFeel::uiFont(sf(11.0f)));
     g.setColour(MuLookAndFeel::colour(Id::mutedText));
     g.drawText("v" + juce::String(MU_VERSION_STRING), tx, ty, textW, s(18),
                juce::Justification::centredLeft, false);
@@ -126,7 +126,7 @@ void AboutOverlay::paint(juce::Graphics& g)
 
     // Credits — supplied by the product.
     g.setColour(MuLookAndFeel::colour(Id::labelText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.0f))));
+    g.setFont(MuLookAndFeel::uiFont(sf(10.0f)));
     for (const auto& line : productCredits)
     {
         g.drawText(line, tx, ty, textW, s(16), juce::Justification::centredLeft, false);
@@ -137,7 +137,7 @@ void AboutOverlay::paint(juce::Graphics& g)
     if (supportState == SupportState::Supporter)
     {
         g.setColour(MuLookAndFeel::colour(Id::mutedText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
+        g.setFont(MuLookAndFeel::uiFont(sf(11.0f)));
         g.drawText("Thank you for supporting " + productName + ".", cardX + s(24), cardY + cardH - s(62),
                    cardW - s(48), s(18), juce::Justification::centredLeft, false);
     }

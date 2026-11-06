@@ -145,7 +145,7 @@ void KnobWithLabel::showInlineEditor()
     inlineEditor = std::make_unique<juce::TextEditor>();
     auto* ed = inlineEditor.get();
 
-    ed->setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuLookAndFeel::kKnobValueFont))));
+    ed->setFont(MuLookAndFeel::uiFont(sf(MuLookAndFeel::kKnobValueFont)));
     ed->setJustification(juce::Justification::centred);
     ed->setColour(juce::TextEditor::backgroundColourId,
                   MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
@@ -216,7 +216,7 @@ void KnobWithLabel::paint(juce::Graphics& g)
     }
 
     // Label below knob
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuLookAndFeel::kKnobLabelFont))));
+    g.setFont(MuLookAndFeel::uiFont(sf(MuLookAndFeel::kKnobLabelFont)));
     g.setColour(MuLookAndFeel::colour(MuLookAndFeel::labelText));
     const juce::Rectangle<int> labelArea(0, getHeight() - labelH, getWidth(), labelH);
     if (MuLookAndFeel::isMetal(*this))

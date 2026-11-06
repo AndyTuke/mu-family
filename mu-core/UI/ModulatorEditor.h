@@ -137,7 +137,7 @@ private:
             if (down)       fg = fg.brighter(0.30f);
             else if (over)  fg = fg.brighter(0.15f);
             g.setColour(fg);
-            g.setFont(juce::Font(juce::FontOptions{}.withHeight((float) r.getHeight() * 0.78f)));
+            g.setFont(MuLookAndFeel::uiFont((float) r.getHeight() * 0.78f));
             g.drawText(juce::String::fromUTF8("\xe2\x9a\x80"), r, juce::Justification::centred, false);
         }
     };

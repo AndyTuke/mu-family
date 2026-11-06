@@ -170,7 +170,7 @@ void EmptySlotChooser::paint(juce::Graphics& g)
 
     if (cards.empty())
     {
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(LF::kChooserMessageFont))));
+        g.setFont(MuLookAndFeel::uiFont(sf(LF::kChooserMessageFont)));
         LF::drawEngravedText(g, "No layer types are installed in this build.", getLocalBounds().reduced(s(LF::kChooserMessageInset)),
                              juce::Justification::centred, LF::colour(Id::valueText));
         return;
@@ -200,12 +200,12 @@ void EmptySlotChooser::paint(juce::Graphics& g)
 
         // The descriptor sits on a dark recessed screen so it reads on any type colour.
         LF::drawRecessedScreen(g, c.descriptorR.toFloat());
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(LF::kCardTextFont))));
+        g.setFont(MuLookAndFeel::uiFont(sf(LF::kCardTextFont)));
         g.setColour(LF::colour(Id::headingText));
         g.drawText(c.descriptor, c.descriptorR, juce::Justification::centred, true);
     }
 
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(LF::kCardTextFont))));
+    g.setFont(MuLookAndFeel::uiFont(sf(LF::kCardTextFont)));
     LF::drawEngravedText(g, "Or load a layer preset from the menu above.", hintR, juce::Justification::centred, LF::colour(Id::valueText));
 }
 

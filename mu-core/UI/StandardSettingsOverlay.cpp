@@ -266,7 +266,7 @@ void StandardSettingsOverlay::visibilityChanged()
 void StandardSettingsOverlay::makeFieldLabel(juce::Label& lbl, const juce::String& text)
 {
     lbl.setText(text, juce::dontSendNotification);
-    lbl.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(12.0f))));
+    lbl.setFont(MuLookAndFeel::uiFont(sf(12.0f)));
     lbl.setColour(juce::Label::textColourId, MuLookAndFeel::colour(MuLookAndFeel::labelText));
     lbl.setJustificationType(juce::Justification::centredLeft);
     addAndMakeVisible(lbl);

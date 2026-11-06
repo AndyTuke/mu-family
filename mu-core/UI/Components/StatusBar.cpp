@@ -28,7 +28,7 @@ juce::Rectangle<int> StatusBar::linkBoundsFor(const juce::String& text, int righ
 {
     using mu_ui::s;
     using mu_ui::sf;
-    const juce::Font font(juce::FontOptions{}.withHeight(sf(11.0f)));
+    const juce::Font font(MuLookAndFeel::uiFont(sf(11.0f)));
     juce::GlyphArrangement ga;
     ga.addLineOfText(font, text, 0.0f, 0.0f);
     const int textW = (int) std::ceil(ga.getBoundingBox(0, ga.getNumGlyphs(), true).getWidth());
@@ -160,7 +160,7 @@ void StatusBar::paint(juce::Graphics& g)
     // once the load is high. Right-aligned in its fixed slot.
     if (cpuVisible)
     {
-        const juce::Font cpuFont(juce::FontOptions{}.withHeight(sf(11.0f)));
+        const juce::Font cpuFont(MuLookAndFeel::uiFont(sf(11.0f)));
         g.setFont(cpuFont);
         auto width = [&cpuFont](const juce::String& t)
         {
@@ -184,7 +184,7 @@ void StatusBar::paint(juce::Graphics& g)
     // which is centred, never needs to know about it.
     if (supportLinkVisible)
     {
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
+        g.setFont(MuLookAndFeel::uiFont(sf(11.0f)));
         g.setColour(MuLookAndFeel::colour(supportLinkHover ? Id::statusBarValue : Id::statusBarText));
         g.drawText("Support", supportLinkBounds(), juce::Justification::centred, false);
     }
@@ -192,7 +192,7 @@ void StatusBar::paint(juce::Graphics& g)
     // Update link: plain text, underlined on hover.
     if (updateLinkVisible)
     {
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))).withStyle(updateLinkHover ? juce::Font::underlined : juce::Font::plain));
+        g.setFont(MuLookAndFeel::uiFont(sf(11.0f)).withStyle(updateLinkHover ? juce::Font::underlined : juce::Font::plain));
         g.setColour(MuLookAndFeel::colour(Id::statusBarValue));
         g.drawText("Update available", updateLinkBounds(), juce::Justification::centred, false);
     }
@@ -211,7 +211,7 @@ void StatusBar::paint(juce::Graphics& g)
 
     if (currentName.isEmpty() && currentValue.isEmpty()) return;
 
-    const juce::Font font(juce::FontOptions{}.withHeight(sf(11.0f)));
+    const juce::Font font(MuLookAndFeel::uiFont(sf(11.0f)));
     g.setFont(font);
 
     // Measure and centre the name + value pair as a unit inside the bar.

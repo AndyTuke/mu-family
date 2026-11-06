@@ -103,7 +103,7 @@ void StepRows::paintRow(juce::Graphics& g, int row)
     if (isRumble) g.beginTransparencyLayer(0.45f);
 
     // Name gutter: "1  Kick" in the layer's colour.
-    g.setFont(juce::Font(juce::FontOptions(mu_ui::sf(11.0f), juce::Font::bold)));
+    g.setFont(MuLookAndFeel::uiFont(mu_ui::sf(11.0f), true));
     const auto label = juce::String(row + 1) + "  " + host.getTrackName(row);
     MuLookAndFeel::drawEngravedText(g, label, area.withWidth(mu_ui::s(kLabelW)).reduced(mu_ui::s(2), 0),
                                     juce::Justification::centredLeft, col, false);

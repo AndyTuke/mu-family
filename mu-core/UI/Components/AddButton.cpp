@@ -35,7 +35,7 @@ void AddButton::paintButton(juce::Graphics& g, bool isOver, bool isDown)
     g.strokePath(border, stroke);
 
     g.setColour(MuLookAndFeel::colour(Id::addButtonText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
+    g.setFont(MuLookAndFeel::uiFont(sf(11.0f)));
     g.drawText(getButtonText(), getLocalBounds(), juce::Justification::centred, true);
 }
 

@@ -233,7 +233,7 @@ void LoopWaveform::paint(juce::Graphics& g)
     }
 
     // Phase 3: the region names, then the markers and the playhead.
-    g.setFont(juce::FontOptions((float) s(11)));
+    g.setFont(MuLookAndFeel::uiFont((float) s(11)));
     for (int i = 0; i < (int) markers.size(); ++i)
     {
         if (i == renaming) continue;

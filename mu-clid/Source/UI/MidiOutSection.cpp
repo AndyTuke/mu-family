@@ -128,7 +128,7 @@ void MidiOutSection::paint(juce::Graphics& g)
     }
 
     // Captions over the two dropdowns, as the knobs carry theirs below them.
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(MuLookAndFeel::kKnobLabelFont))));
+    g.setFont(MuLookAndFeel::uiFont(mu_ui::sf(MuLookAndFeel::kKnobLabelFont)));
     for (int i = 0; i < 2; ++i)
     {
         const auto c = cell(i);

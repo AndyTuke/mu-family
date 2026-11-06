@@ -159,7 +159,7 @@ void ParamKnobGrid::resized()
             const int cw = cellWidth(k);
             juce::Rectangle<int> cell(x, y, cw, rowH);
             x += cw;
-            ctl->name.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuLookAndFeel::kKnobLabelFont))));   // the knobs' own label size
+            ctl->name.setFont(MuLookAndFeel::uiFont(sf(MuLookAndFeel::kKnobLabelFont)));   // the knobs' own label size
             ctl->name.setBounds(cell.removeFromTop(labelH));
             // Centre the standard-size control in the remaining cell.
             if (ctl->combo)

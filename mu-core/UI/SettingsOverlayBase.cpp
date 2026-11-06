@@ -11,7 +11,7 @@ SettingsOverlayBase::SettingsOverlayBase()
     // Contact Support footer link (shared across every product's settings page).
     supportLink.setButtonText("Contact Support");
     supportLink.setURL(juce::URL("mailto:support@transwarp.me"));
-    supportLink.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(12.0f))), false,
+    supportLink.setFont(MuLookAndFeel::uiFont(sf(12.0f)), false,
                         juce::Justification::centredLeft);
     supportLink.setColour(juce::HyperlinkButton::textColourId,
                           MuLookAndFeel::colour(MuLookAndFeel::ColourIds::globalAccent));
@@ -64,7 +64,7 @@ void SettingsOverlayBase::paint(juce::Graphics& g)
 
     // Top "Settings" bar — title + full-width divider.
     g.setColour(MuLookAndFeel::colour(Id::headingText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(15.0f))));
+    g.setFont(MuLookAndFeel::uiFont(sf(15.0f)));
     g.drawText("Settings", s(kPad), 0, s(200), headerH, juce::Justification::centredLeft, false);
 
     g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
@@ -79,7 +79,7 @@ void SettingsOverlayBase::drawGroupHeader(juce::Graphics& g, int headerY, const 
     if (w < 0) w = colW;
     using Id = MuLookAndFeel::ColourIds;
     g.setColour(MuLookAndFeel::colour(Id::headingText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(15.0f))));
+    g.setFont(MuLookAndFeel::uiFont(sf(15.0f)));
     g.drawText(title, x, headerY, w, s(20), juce::Justification::centredLeft, false);
 
     g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
@@ -93,7 +93,7 @@ void SettingsOverlayBase::drawSectionHeader(juce::Graphics& g, int headerY, cons
     if (w < 0) w = colW;
     using Id = MuLookAndFeel::ColourIds;
     g.setColour(MuLookAndFeel::colour(Id::headingText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(12.0f))));
+    g.setFont(MuLookAndFeel::uiFont(sf(12.0f)));
     g.drawText(title, x, headerY, w, s(16), juce::Justification::centredLeft, false);
 
     g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
@@ -106,7 +106,7 @@ void SettingsOverlayBase::drawHint(juce::Graphics& g, int yCentre, const juce::S
 {
     using Id = MuLookAndFeel::ColourIds;
     g.setColour(MuLookAndFeel::colour(Id::labelText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
+    g.setFont(MuLookAndFeel::uiFont(sf(11.0f)));
     g.drawText(text, x, yCentre - s(7), w, s(14), juce::Justification::centredLeft, false);
 }
 

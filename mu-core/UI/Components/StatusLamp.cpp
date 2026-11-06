@@ -35,7 +35,7 @@ void StatusLamp::paint(juce::Graphics& g)
 
     // The label to its right: engraved on metal, plain text otherwise.
     const auto textArea = getLocalBounds().withTrimmedLeft((int) std::ceil(d) + s(MuLookAndFeel::kSpaceXS));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
+    g.setFont(MuLookAndFeel::uiFont(sf(11.0f)));
     if (MuLookAndFeel::isMetal(*this))
         MuLookAndFeel::drawEngravedText(g, label, textArea, juce::Justification::centredLeft,
                                         MuLookAndFeel::colour(Id::labelText));

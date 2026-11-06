@@ -4,6 +4,7 @@
 #include <tuple>
 #include "MuTheme.h"
 #include "FaderThumbGeometry.h"
+#include "MuFontData.h"   // the embedded Inter and JetBrains Mono files (mu-core-fonts)
 
 // every colour now lives in the MuTheme singleton (grouped by category for
 // the future Theme Editor). This switch just maps the legacy ColourIds tokens to
@@ -275,7 +276,7 @@ void MuLookAndFeel::drawKnobValueText(juce::Graphics& g, juce::Rectangle<int> sl
 
     const float faceR = outerR * kRotaryFaceScale;
     g.setColour(colour(valueText));
-    g.setFont(juce::Font(juce::FontOptions(juce::jmax(9.0f, outerR * 0.34f), juce::Font::bold)));
+    g.setFont(MuLookAndFeel::uiFont(juce::jmax(9.0f, outerR * 0.34f), true));
     g.drawText(text, juce::Rectangle<float>(b.getCentreX() - faceR, b.getCentreY() - faceR,
                                             faceR * 2.0f, faceR * 2.0f).toNearestInt(),
                juce::Justification::centred, false);
@@ -656,7 +657,7 @@ void MuLookAndFeel::drawSlideSwitch(juce::Graphics& g, juce::Rectangle<float> bo
     g.strokePath(ring, juce::PathStrokeType(juce::jmax(1.0f, thR * 0.14f)));
 
     // Labels level with each end: the selected one in the accent, the other dimmed.
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(kKnobLabelFont))));
+    g.setFont(uiFont(sf(kKnobLabelFont)));
     const float lx = tr.getRight() + sf(3.0f);
     const float lw = bounds.getRight() - lx;
     const float lh = sf(12.0f);
@@ -1004,7 +1005,7 @@ void MuLookAndFeel::drawEngravedText(juce::Graphics& g, const juce::String& text
 
 float MuLookAndFeel::namePlateWidth(const juce::String& text, float h)
 {
-    const juce::Font f(juce::FontOptions{}.withHeight(h * 0.78f));
+    const juce::Font f(MuLookAndFeel::uiFont(h * 0.78f));
     return juce::GlyphArrangement::getStringWidth(f, text) + h * 2.2f;
 }
 
@@ -1071,9 +1072,55 @@ juce::Colour MuLookAndFeel::lcdLitColour()
     return colour(segmentActiveBorder).brighter(0.6f);
 }
 
+namespace
+{
+    // The embedded typefaces, parsed once. Heap-allocated and never destroyed, like the image caches: nothing runs from a
+    // static destructor when a plug-in DLL unloads.
+    struct FamilyTypefaces
+    {
+        juce::Typeface::Ptr regular, bold, mono;
+        FamilyTypefaces()
+        {
+            regular = juce::Typeface::createSystemTypefaceFor(MuFontData::InterRegular_ttf, (size_t) MuFontData::InterRegular_ttfSize);
+            bold    = juce::Typeface::createSystemTypefaceFor(MuFontData::InterBold_ttf, (size_t) MuFontData::InterBold_ttfSize);
+            mono    = juce::Typeface::createSystemTypefaceFor(MuFontData::JetBrainsMonoRegular_ttf, (size_t) MuFontData::JetBrainsMonoRegular_ttfSize);
+        }
+    };
+    const FamilyTypefaces& familyTypefaces()
+    {
+        static const auto* const faces = new FamilyTypefaces();
+        return *faces;
+    }
+}
+
 juce::Font MuLookAndFeel::lcdFont(float height)
 {
-    return juce::Font(juce::FontOptions{}.withName(juce::Font::getDefaultMonospacedFontName()).withHeight(height));
+    const auto& t = familyTypefaces();
+    return t.mono != nullptr ? juce::Font(juce::FontOptions{}.withTypeface(t.mono).withHeight(height))
+                             : juce::Font(juce::FontOptions{}.withName(juce::Font::getDefaultMonospacedFontName()).withHeight(height));
+}
+
+juce::Font MuLookAndFeel::uiFont(float height, bool bold)
+{
+    const auto& t = familyTypefaces();
+    const auto& face = bold ? t.bold : t.regular;
+    return face != nullptr ? juce::Font(juce::FontOptions{}.withTypeface(face).withHeight(height))
+                           : (bold ? juce::Font(juce::FontOptions{}.withHeight(height)).boldened() : juce::Font(juce::FontOptions{}.withHeight(height)));
+}
+
+juce::Font MuLookAndFeel::getTextButtonFont(juce::TextButton&, int buttonHeight)
+{
+    return uiFont(juce::jmin(16.0f, (float) buttonHeight * 0.6f));
+}
+
+juce::Font MuLookAndFeel::getComboBoxFont(juce::ComboBox& box)
+{
+    return uiFont(juce::jmin(15.0f, (float) box.getHeight() * 0.85f));
+}
+
+juce::Font MuLookAndFeel::getPopupMenuFont()
+{
+    return uiFont(17.0f);
 }
 
 void MuLookAndFeel::drawNamePlate(juce::Graphics& g, juce::Rectangle<float> r, const juce::String& text)
@@ -1111,7 +1158,7 @@ void MuLookAndFeel::drawNamePlate(juce::Graphics& g, juce::Rectangle<float> r, c
     }
 
     // Engraved text: a dark cut offset down-left, the lettering over it.
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(h * 0.78f)));
+    g.setFont(uiFont(h * 0.78f));
     g.setColour(juce::Colours::black.withAlpha(L.shadow(L.namePlateEngrave)));
     g.drawText(text, r.translated(-0.5f, 1.0f), juce::Justification::centred, false);
     g.setColour(colour(labelText).brighter(0.25f));
@@ -1179,7 +1226,7 @@ void MuLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButton& b, b
     drawLamp(g, lens, {}, lampColour(appAccent(b), lit), disc.getCentre(), d * L.lampHotSpotReach);
 
     // Phase 3: the label, engraved to the right of the lamp.
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(11.0f))));
+    g.setFont(uiFont(mu_ui::sf(11.0f)));
     drawEngravedText(g, b.getButtonText(), box.withTrimmedLeft(disc.getRight() - box.getX() + 4.0f).toNearestInt(),
                      juce::Justification::centredLeft, colour(labelText));
 }
@@ -1273,7 +1320,7 @@ void MuLookAndFeel::drawButtonText(juce::Graphics& g, juce::TextButton& button,
                 : on && button.getProperties().contains("muDanger") ? colour(indicatorFault)
                 : on ? button.findColour(juce::TextButton::textColourOnId)
                      : button.findColour(juce::TextButton::textColourOffId));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(12.0f)));
+    g.setFont(uiFont(12.0f));
     g.drawText(button.getButtonText(), button.getLocalBounds(),
                juce::Justification::centred, true);
 }
@@ -1323,7 +1370,7 @@ void MuLookAndFeel::positionComboBoxText(juce::ComboBox& box, juce::Label& label
 {
     label.setBounds(6, 0, box.getWidth() - 24, box.getHeight());
     if (lcdCombo(box)) label.setColour(juce::Label::textColourId, lcdLitColour(box));
-    label.setFont(lcdCombo(box) ? lcdFont(mu_ui::sf((float) kLcdTextH)) : juce::Font(juce::FontOptions{}.withHeight(12.0f)));
+    label.setFont(lcdCombo(box) ? lcdFont(mu_ui::sf((float) kLcdTextH)) : uiFont(12.0f));
 }
 
 void MuLookAndFeel::drawLabel(juce::Graphics& g, juce::Label& label)

@@ -39,7 +39,7 @@ int noteToId(NoteValue nv, NoteMod mod)
 NoteLengthControl::NoteLengthControl(const juce::String& labelText)
 {
     label.setText(labelText, juce::dontSendNotification);
-    label.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
+    label.setFont(MuLookAndFeel::uiFont(10.0f));
     label.setJustificationType(juce::Justification::centredRight);
     label.setColour(juce::Label::textColourId, MuLookAndFeel::colour(MuLookAndFeel::mutedText));
     addAndMakeVisible(label);

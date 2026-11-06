@@ -21,7 +21,7 @@ public:
         g.fillEllipse(r);
         g.setColour(colour);
         g.drawEllipse(r, 1.5f);
-        g.setFont(juce::Font(juce::FontOptions(r.getHeight() * 0.42f, juce::Font::bold)));
+        g.setFont(MuLookAndFeel::uiFont(r.getHeight() * 0.42f, true));
         g.drawText(text, getLocalBounds(), juce::Justification::centred, false);
     }
 

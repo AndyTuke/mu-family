@@ -661,7 +661,7 @@ void TrackContent::resized()
     filterBoxR = hasFilter ? juce::Rectangle<int>(voiceBoxR.getRight() + divW, boxY, filterW, boxH) : juce::Rectangle<int>();
     insertBoxR = { (hasFilter ? filterBoxR : voiceBoxR).getRight() + divW, boxY, insertBoxW, boxH };
 
-    const juce::Font captionFont(juce::FontOptions{}.withHeight(mu_ui::sf(LF::kKnobLabelFont)));   // as the knob labels
+    const juce::Font captionFont(MuLookAndFeel::uiFont(mu_ui::sf(LF::kKnobLabelFont)));   // as the knob labels
     auto place = [&](juce::Label& caption, DropdownSelect& dropdown, int y)
     {
         caption.setFont(captionFont);
@@ -758,7 +758,7 @@ void TrackContent::layoutStepPanel()
     if (stepBoxR.isEmpty()) return;
     const auto in = stepBoxR.reduced(s(LF::kSubPanelScrewClear), s(LF::kSpaceS));
     const int labelH = s(mu_ui::ParamKnobGrid::kLabelH), knobH = s(LF::kKnobSize2H), dd = s(LF::kDropdownH), gap = s(LF::kSpaceS);
-    const juce::Font captionFont(juce::FontOptions{}.withHeight(mu_ui::sf(LF::kKnobLabelFont)));
+    const juce::Font captionFont(MuLookAndFeel::uiFont(mu_ui::sf(LF::kKnobLabelFont)));
     auto placeDropdown = [&](juce::Label& caption, DropdownSelect& select, juce::Rectangle<int> column, int& y)
     {
         caption.setFont(captionFont);

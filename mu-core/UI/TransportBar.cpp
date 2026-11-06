@@ -71,7 +71,7 @@ TransportBar::TransportBar(mu_core::ShellBackend& backend)
     }
 
     posLabel.setJustificationType(juce::Justification::centred);
-    posLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+    posLabel.setFont(MuLookAndFeel::uiFont(11.0f));
     posLabel.setText("1.1.1", juce::dontSendNotification);
     addAndMakeVisible(posLabel);
 
@@ -112,7 +112,7 @@ TransportBar::TransportBar(mu_core::ShellBackend& backend)
     // Added after (on top of) the dropdown; mouse-transparent so it doesn't block it.
     presetStagingBadge.setText("SWP", juce::dontSendNotification);
     presetStagingBadge.setJustificationType(juce::Justification::centred);
-    presetStagingBadge.setFont(juce::Font(juce::FontOptions{}.withHeight(8.0f)));
+    presetStagingBadge.setFont(MuLookAndFeel::uiFont(8.0f));
     presetStagingBadge.setColour(juce::Label::backgroundColourId, juce::Colours::orange.withAlpha(0.85f));
     presetStagingBadge.setColour(juce::Label::textColourId, juce::Colours::black);
     presetStagingBadge.setInterceptsMouseClicks(false, false);
@@ -693,7 +693,7 @@ void TransportBar::paint(juce::Graphics& g)
         g.drawRoundedRectangle(loopPaneBounds.toFloat(), mu_ui::sf(3.0f), 1.0f);
 
     g.setColour(MuLookAndFeel::colour(Id::headingText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(14.0f))));
+    g.setFont(MuLookAndFeel::uiFont(mu_ui::sf(14.0f)));
     g.drawText(logoText, mu_ui::s(8), 0, mu_ui::s(kLogoW - 8), getHeight(),
                juce::Justification::centredLeft, false);
 

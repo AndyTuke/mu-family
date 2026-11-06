@@ -413,7 +413,7 @@ void ClipStrip::paint(juce::Graphics& g)
     const auto layout = computeLayout(getLocalBounds());
 
     // The caption: engraved into the metal, or plain text in the flat look.
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
+    g.setFont(MuLookAndFeel::uiFont(sf(11.0f)));
     if (MuLookAndFeel::isMetal(*this))
         MuLookAndFeel::drawEngravedText(g, "Clip", layout.caption, juce::Justification::centredLeft,
                                         MuLookAndFeel::colour(Id::labelText));

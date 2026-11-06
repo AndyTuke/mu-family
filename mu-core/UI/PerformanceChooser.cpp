@@ -364,7 +364,7 @@ void PerformanceChooser::paintListBoxItem(int row, juce::Graphics& g, int w, int
         g.fillRect(0, 0, w, h);
     }
     g.setColour(MuLookAndFeel::colour(selected ? Id::headingText : Id::labelText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf((float) MuLookAndFeel::kLcdTextH))));
+    g.setFont(MuLookAndFeel::uiFont(sf((float) MuLookAndFeel::kLcdTextH)));
     g.drawText(model.library()[(size_t) row].name, s(MuLookAndFeel::kPanelPad), 0, w - s(MuLookAndFeel::kPanelPad) * 2, h,
                juce::Justification::centredLeft, true);
     g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
@@ -440,7 +440,7 @@ void PerformanceChooser::paint(juce::Graphics& g)
     g.drawLine(0.0f, (float) lay.footer.getY(), (float) getWidth(), (float) lay.footer.getY(), 0.5f);
 
     g.setColour(MuLookAndFeel::colour(Id::headingText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf((float) MuLookAndFeel::kLcdNameTextH))));
+    g.setFont(MuLookAndFeel::uiFont(sf((float) MuLookAndFeel::kLcdNameTextH)));
     g.drawText(titleText(), lay.header.withRight(juce::jmax(lay.header.getX(), newBtn.getX() - mu_ui::s(MuLookAndFeel::kPanelPad))),
                juce::Justification::centredLeft, true);
 }

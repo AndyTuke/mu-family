@@ -112,7 +112,7 @@ void ScenesPanel::paint(juce::Graphics& g)
     LF::drawNamePlate(g, { (float) cols.x0, (float) s(LF::kChannelInset), plateW, plateH }, "Scenes");
 
     // Each field's caption, engraved to its left in the room the column has beside the field.
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(LF::kKnobLabelFont))));
+    g.setFont(MuLookAndFeel::uiFont(mu_ui::sf(LF::kKnobLabelFont)));
     for (int i = 0; i < kNumClients; ++i)
     {
         const auto& c = cells[(size_t) i];

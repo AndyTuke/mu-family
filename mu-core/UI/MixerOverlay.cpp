@@ -817,7 +817,7 @@ void MixerOverlay::paintMetal(juce::Graphics& g)
         const int chY = stripsPanelR.getY();
         const int lw  = s(kLabelPanelW);
         const int x2  = stripsPanelR.getRight() - s(2);
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+        g.setFont(MuLookAndFeel::uiFont(11.0f));
         auto section = [&](const juce::String& text, juce::Rectangle<int> b)
         {
             if (b.isEmpty()) return;
@@ -892,7 +892,7 @@ void MixerOverlay::paint(juce::Graphics& g)
         g.fillRect(lw - 1, chY, 1, lastStripH);
 
         g.setColour(MuLookAndFeel::colour(MuLookAndFeel::mutedText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+        g.setFont(MuLookAndFeel::uiFont(11.0f));
 
         // Draw a label rotated 90° CCW, centred in 'bounds' (component-space rect).
         auto drawVLabel = [&](const juce::String& text, juce::Rectangle<int> bounds)

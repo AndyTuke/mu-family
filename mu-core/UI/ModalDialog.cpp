@@ -73,7 +73,7 @@ namespace {
         juce::AttributedString as;
         as.setText(text);
         as.setJustification(juce::Justification::topLeft);
-        as.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(13.0f))));
+        as.setFont(MuLookAndFeel::uiFont(mu_ui::sf(13.0f)));
         as.setColour(MuLookAndFeel::colour(Id::headingText).withMultipliedAlpha(0.85f));
         return as;
     }
@@ -238,7 +238,7 @@ void ModalDialog::resized()
     const int gap  = s(8);
     const int by   = card.getBottom() - pad - btnH;
     int bx = inner.getRight();
-    const juce::Font f(juce::FontOptions{}.withHeight(mu_ui::sf(13.0f)));
+    const juce::Font f(MuLookAndFeel::uiFont(mu_ui::sf(13.0f)));
     for (int i = (int) buttons.size() - 1; i >= 0; --i)
     {
         const int bw = juce::jmax(s(72), textWidth(f, buttonSpecs[(size_t) i].label) + s(28));
@@ -269,7 +269,7 @@ void ModalDialog::paint(juce::Graphics& g)
         if (iconType == Icon::Question)
         {
             g.setColour(MuLookAndFeel::colour(Id::globalAccent));
-            g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(20.0f)).withStyle("Bold")));
+            g.setFont(MuLookAndFeel::uiFont(sf(20.0f), true));
             g.drawText(iconGlyph(iconType), iconBox, juce::Justification::centredLeft, false);
         }
         else
@@ -281,7 +281,7 @@ void ModalDialog::paint(juce::Graphics& g)
         titleX += iconSize + s(MuLookAndFeel::kDialogIconGap);
     }
     g.setColour(MuLookAndFeel::colour(Id::headingText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(15.0f)).withStyle("Bold")));
+    g.setFont(MuLookAndFeel::uiFont(sf(15.0f), true));
     g.drawText(titleText, titleX, inner.getY(), inner.getRight() - titleX, s(26),
                juce::Justification::centredLeft, false);
 

@@ -266,7 +266,7 @@ void ArpContent::paint(juce::Graphics& g)
                                             { arpR, "APPERGATER" } }, accent);
 
     // Dropdown captions: engraved into the metal, or plain text in the flat look.
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(11.0f))));
+    g.setFont(MuLookAndFeel::uiFont(mu_ui::sf(11.0f)));
     for (auto& c : combos)
         if (c.caption.isNotEmpty())
         {

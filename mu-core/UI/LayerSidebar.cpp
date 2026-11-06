@@ -278,7 +278,7 @@ void LayerSidebar::paintOverChildren(juce::Graphics& g)
 {
     if (pageSwitch.isVisible() && ! pageCaptionR.isEmpty())
     {
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(MuLookAndFeel::kEngravedCaptionFont))));
+        g.setFont(MuLookAndFeel::uiFont(mu_ui::sf(MuLookAndFeel::kEngravedCaptionFont)));
         MuLookAndFeel::drawEngravedText(g, "Page", pageCaptionR, juce::Justification::centred,
                                         MuLookAndFeel::colour(MuLookAndFeel::ColourIds::labelText));
     }

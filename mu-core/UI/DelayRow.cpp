@@ -268,7 +268,7 @@ void DelayRow::paint(juce::Graphics& g)
     if (showHeader)
     {
         const int nameX = kPad + kToggleW + kPad;
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+        g.setFont(MuLookAndFeel::uiFont(11.0f));
         if (metal)
             MuLookAndFeel::drawEngravedText(g, "Delay", { nameX, 0, kNameW, getHeight() },
                                             juce::Justification::centredLeft,

@@ -41,7 +41,7 @@ void MidiPresetListPanel::paintListBoxItem(int row, juce::Graphics& g, int width
 
     // Index column (0-127, zero-padded = program number).
     g.setColour(MuLookAndFeel::colour(Id::mutedText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(11.0f))));
+    g.setFont(MuLookAndFeel::uiFont(mu_ui::sf(11.0f)));
     g.drawText(juce::String(row).paddedLeft('0', 3), mu_ui::s(kPad), 0, mu_ui::s(kIndexW), height,
                juce::Justification::centredLeft, false);
 
@@ -142,14 +142,14 @@ void MidiPresetListPanel::paint(juce::Graphics& g)
     const int headerH = s(kHeaderH);
 
     g.setColour(MuLookAndFeel::colour(Id::headingText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(14.0f))));
+    g.setFont(MuLookAndFeel::uiFont(sf(14.0f)));
     g.drawText(title, pad, 0, s(420), headerH, juce::Justification::centredLeft, false);
 
     g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
     g.drawLine(0.0f, (float) headerH, (float) getWidth(), (float) headerH, 0.5f);
 
     g.setColour(MuLookAndFeel::colour(Id::mutedText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.0f))));
+    g.setFont(MuLookAndFeel::uiFont(sf(10.0f)));
     g.drawText(hint, pad, headerH + pad + s(kTopRowH) + s(2), getWidth() - pad * 2, s(kHintH),
                juce::Justification::centredLeft, false);
 }

@@ -312,7 +312,10 @@ public:
     static void drawLcdGlass(juce::Graphics&, juce::Rectangle<float> bounds, juce::Colour lit, bool backlit);
     static void drawLcdFront(juce::Graphics&, juce::Rectangle<float> bounds);
     static juce::Colour lcdLitColour();     // lettering colour on a lit LCD
-    static juce::Font   lcdFont(float height);
+    static juce::Font   lcdFont(float height);   // JetBrains Mono (embedded): LCD text and every column of changing numbers
+    // Inter (embedded), the family's one UI face: regular, or bold. `height` is the JUCE font height in pixels. The only place
+    // the UI chooses a typeface besides lcdFont; drawing code never builds a juce::Font from FontOptions itself.
+    static juce::Font   uiFont(float height, bool bold = false);
 
     // A small name plate fixed to a panel: raised dark face, bevelled edge, a screw head
     // at each end and the text engraved in the middle, lit from the top right.
@@ -349,6 +352,12 @@ public:
 
     // Label
     void drawLabel(juce::Graphics&, juce::Label&) override;
+
+    // The fonts JUCE asks the look-and-feel for (button text, a dropdown's text, popup menu items): the family face, at
+    // JUCE's usual sizes.
+    juce::Font getTextButtonFont(juce::TextButton&, int buttonHeight) override;
+    juce::Font getComboBoxFont(juce::ComboBox&) override;
+    juce::Font getPopupMenuFont() override;
 
     // Static palette helpers
     static juce::Colour colour(ColourIds id) noexcept;

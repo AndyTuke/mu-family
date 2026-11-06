@@ -24,7 +24,7 @@ target_include_directories(ControlDesign PRIVATE
     "${MU_CORE_DIR}"
 )
 
-target_link_libraries(ControlDesign PRIVATE
+target_link_libraries(ControlDesign PRIVATE mu-core-fonts
     juce::juce_gui_extra
     juce::juce_gui_basics
     juce::juce_audio_basics

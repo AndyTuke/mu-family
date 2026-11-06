@@ -678,7 +678,7 @@ void GatingDesigner::paint(juce::Graphics& g)
     const auto& light = MuLookAndFeel::lighting();
 
     // Header row: a raised box (metal) or a flat strip, with the "Gap" and "Bars" labels.
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.5f))));
+    g.setFont(MuLookAndFeel::uiFont(sf(10.5f)));
     if (metal)
     {
         const auto box = headerBox();
@@ -799,7 +799,7 @@ void GatingDesigner::paint(juce::Graphics& g)
     if (cw > 0.0f)
     {
         g.setColour(MuLookAndFeel::colour(Id::mutedText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
+        g.setFont(MuLookAndFeel::uiFont(sf(9.0f)));
         const int firstBar = (int)viewStartBar;
         const int lastBar  = firstBar + kViewBars + 1;
         for (int absBar = firstBar; absBar <= lastBar; ++absBar)

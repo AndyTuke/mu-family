@@ -222,7 +222,7 @@ void SceneGrid::paint(juce::Graphics& g)
     const auto   layout = computeLayout(getLocalBounds());
 
     // The caption: engraved into the metal, or plain text in the flat look, in the same caption font as "Page" beneath it.
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(MuLookAndFeel::kEngravedCaptionFont))));
+    g.setFont(MuLookAndFeel::uiFont(mu_ui::sf(MuLookAndFeel::kEngravedCaptionFont)));
     if (MuLookAndFeel::isMetal(*this))
         MuLookAndFeel::drawEngravedText(g, "Scene", layout.caption, juce::Justification::centred, MuLookAndFeel::colour(Id::labelText));
     else

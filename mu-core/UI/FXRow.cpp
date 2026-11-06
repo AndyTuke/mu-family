@@ -139,7 +139,7 @@ void FXRow::paint(juce::Graphics& g)
     // Metal style: the row sits in a raised box the mixer paints behind it, its name engraved.
     const bool metal = MuLookAndFeel::isMetal(*this);
     const int  nameX = kPadding + kToggleW + kPadding;
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+    g.setFont(MuLookAndFeel::uiFont(11.0f));
     if (metal)
     {
         MuLookAndFeel::drawEngravedText(g, slotName, { nameX, 0, kNameW, getHeight() },

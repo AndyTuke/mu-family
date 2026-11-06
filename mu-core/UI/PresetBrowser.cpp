@@ -158,11 +158,11 @@ void PresetBrowser::paintListBoxItem(int row, juce::Graphics& g, int w, int h, b
     const auto& info = allPresets[filteredIndices[row]];
 
     g.setColour(MuLookAndFeel::colour(selected ? Id::headingText : Id::labelText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(12.0f))));
+    g.setFont(MuLookAndFeel::uiFont(sf(12.0f)));
     g.drawText(info.name, s(8), 0, w / 2, h, juce::Justification::centredLeft, true);
 
     g.setColour(MuLookAndFeel::colour(Id::mutedText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.0f))));
+    g.setFont(MuLookAndFeel::uiFont(sf(10.0f)));
     g.drawText(info.category, w / 2, 0, w / 4, h,
                juce::Justification::centredLeft, true);
     g.drawText(info.description, w * 3 / 4, 0, w / 4 - s(4), h,

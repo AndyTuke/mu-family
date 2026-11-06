@@ -33,7 +33,7 @@ ModMatrixPanel::MatrixRow::MatrixRow(const ModulationAssignment& a, int csIndex,
     sourceLabel.setText("Mod " + juce::String::charToString('A' + csIndex), juce::dontSendNotification);
     sourceLabel.setColour(juce::Label::textColourId,
                           MuLookAndFeel::colour(MuLookAndFeel::mutedText));
-    sourceLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
+    sourceLabel.setFont(MuLookAndFeel::uiFont(10.0f));
 
     if (provider && provider->populate)
         provider->populate(destCombo, driveChar, steppedMode);
@@ -85,7 +85,7 @@ ModMatrixPanel::ModMatrixPanel()
     addAndMakeVisible(matPrevBtn);
     addAndMakeVisible(matNextBtn);
     matPageLabel.setJustificationType(juce::Justification::centred);
-    matPageLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
+    matPageLabel.setFont(MuLookAndFeel::uiFont(10.0f));
     matPageLabel.setColour(juce::Label::textColourId,
                            MuLookAndFeel::colour(MuLookAndFeel::mutedText));
     addAndMakeVisible(matPageLabel);
@@ -354,7 +354,7 @@ void ModMatrixPanel::paint(juce::Graphics& g)
     const int pagerH  = s(kPagerH);
 
     g.setColour(MuLookAndFeel::colour(MuLookAndFeel::mutedText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.0f))));
+    g.setFont(MuLookAndFeel::uiFont(sf(10.0f)));
     g.drawText("SOURCE",      ox,         oy, s(46),  headerH, juce::Justification::centredLeft, false);
     g.drawText("DESTINATION", ox + s(48), oy, s(200), headerH, juce::Justification::centredLeft, false);
     g.drawText("DEPTH",       ox + w - s(22) - s(120) - s(4), oy, s(120),
@@ -362,7 +362,7 @@ void ModMatrixPanel::paint(juce::Graphics& g)
 
     if (matrixRows.empty())
     {
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
+        g.setFont(MuLookAndFeel::uiFont(sf(11.0f)));
         // rowsStart = headerH + pagerH + 2; draw hint below that with enough clearance
         g.drawText(juce::String::fromUTF8("No assignments \xe2\x80\x94 use the Mod tabs or Add Assignment below"),
                    ox, oy + headerH + pagerH + s(8), w, s(20),

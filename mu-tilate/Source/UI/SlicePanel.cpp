@@ -225,7 +225,7 @@ void SlicePanel::setSlice(int index, const SliceSettings& s, const juce::String&
 void SlicePanel::paint(juce::Graphics& g)
 {
     using mu_ui::s;
-    g.setFont(juce::Font(juce::FontOptions {}.withHeight(mu_ui::sf(11.0f))));
+    g.setFont(MuLookAndFeel::uiFont(mu_ui::sf(11.0f)));
     g.setColour(LF::colour(LF::labelText));
     g.drawText(slice >= 0 ? description : juce::String("Select a hit on the timeline, or a slice in the waveform (or use < >)"),
                s(60), 0, getWidth() - s(60), s(kHeaderH), juce::Justification::centredLeft);

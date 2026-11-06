@@ -111,25 +111,24 @@ void ActivationOverlay::paint (juce::Graphics& g)
 
     // Title.
     g.setColour (MuLookAndFeel::colour (Id::headingText));
-    g.setFont (juce::Font (juce::FontOptions{}.withHeight (sf (22.0f))));
+    g.setFont (MuLookAndFeel::uiFont(sf (22.0f)));
     g.drawText ("Enter licence key" + (productName.isNotEmpty() ? " - " + productName : juce::String()),
                 tx, card.getY() + s (22), textW, s (28), juce::Justification::centredLeft, false);
 
     // Subtitle.
     g.setColour (MuLookAndFeel::colour (Id::mutedText));
-    g.setFont (juce::Font (juce::FontOptions{}.withHeight (sf (11.0f))));
+    g.setFont (MuLookAndFeel::uiFont(sf (11.0f)));
     g.drawText ("Enter your licence key to remove the support reminder. Everything works either way.",
                 tx, card.getY() + s (48), textW, s (16), juce::Justification::centredLeft, false);
 
     // Offline fallback — the machine challenge code for an offline `.lic`.
     const int oy = statusLabel.getBottom() + s (8);
     g.setColour (MuLookAndFeel::colour (Id::mutedText));
-    g.setFont (juce::Font (juce::FontOptions{}.withHeight (sf (10.0f))));
+    g.setFont (MuLookAndFeel::uiFont(sf (10.0f)));
     g.drawText ("No internet? Quote this machine code for an offline licence file:",
                 tx, oy, textW, s (14), juce::Justification::centredLeft, false);
     g.setColour (MuLookAndFeel::colour (Id::headingText));
-    g.setFont (juce::Font (juce::FontOptions{}.withName (juce::Font::getDefaultMonospacedFontName())
-                                              .withHeight (sf (13.0f))));
+    g.setFont (MuLookAndFeel::lcdFont (sf (13.0f)));
     g.drawText (processorRef.licenseChallengeCode(),
                 tx, oy + s (15), textW, s (16), juce::Justification::centredLeft, false);
 }

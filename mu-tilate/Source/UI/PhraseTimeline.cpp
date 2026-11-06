@@ -238,7 +238,7 @@ void PhraseTimeline::paint(juce::Graphics& g)
 
     // Phase 1: the ruler: a tick per beat, the bar numbers on every fourth.
     const auto ruler = rulerArea();
-    g.setFont(juce::Font(juce::FontOptions {}.withHeight(mu_ui::sf(10.0f))));
+    g.setFont(MuLookAndFeel::uiFont(mu_ui::sf(10.0f)));
     const int firstBeat = (int) std::floor(beatAt(0)), lastBeat = std::min((int) std::ceil(timeline.lengthBeats()), (int) std::ceil(beatAt(getWidth())) + 1);
     for (int beat = std::max(0, firstBeat); beat < lastBeat; ++beat)
     {

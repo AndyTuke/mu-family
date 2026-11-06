@@ -155,7 +155,7 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
             // The middle: a Bass step's note; a Hat step's icon (a ring for open, a dot for closed).
             if (opts.noteName)
             {
-                g.setFont(juce::Font(juce::FontOptions(mu_ui::sf(10.0f), juce::Font::bold)));
+                g.setFont(MuLookAndFeel::uiFont(mu_ui::sf(10.0f), true));
                 g.setColour(juce::Colours::white.withAlpha(0.92f));
                 g.drawFittedText(opts.noteName(s), cell.toNearestInt().reduced(1), juce::Justification::centred, 2, 1.0f);
             }
@@ -171,7 +171,7 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
 
         if (isBeat && beatNumbers)   // step numbers on the beat-group starts (1/5/9/13), bottom left
         {
-            g.setFont(juce::Font(juce::FontOptions(mu_ui::sf(9.0f))));
+            g.setFont(MuLookAndFeel::uiFont(mu_ui::sf(9.0f)));
             MuLookAndFeel::drawEngravedText(g, mu_ui::cachedIntLabel(s + 1), cell.reduced(2.0f).toNearestInt(),
                                             juce::Justification::bottomLeft, labelColour, false);
         }

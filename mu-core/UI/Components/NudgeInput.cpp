@@ -86,22 +86,22 @@ void NudgeInput::paint(juce::Graphics& g)
         const auto lblArea = displayBounds.withWidth(inlineLblW);
         const auto valArea = displayBounds.withTrimmedLeft(inlineLblW);
         g.setColour(MuLookAndFeel::colour(Id::labelText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
+        g.setFont(MuLookAndFeel::uiFont(sf(9.0f)));
         g.drawText(label, lblArea, juce::Justification::centred, false);
         g.setColour(MuLookAndFeel::colour(Id::valueText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(13.0f))));
+        g.setFont(MuLookAndFeel::uiFont(sf(13.0f)));
         g.drawText(valueText(), valArea, juce::Justification::centred, false);
     }
     else
     {
         g.setColour(MuLookAndFeel::colour(Id::valueText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(13.0f))));
+        g.setFont(MuLookAndFeel::uiFont(sf(13.0f)));
         g.drawText(valueText(), displayBounds, juce::Justification::centred, false);
     }
 
     // Label below display
     g.setColour(MuLookAndFeel::colour(Id::labelText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
+    g.setFont(MuLookAndFeel::uiFont(sf(9.0f)));
 
     // Up/down arrows
     auto drawArrow = [&](juce::Rectangle<int> bounds, bool up)
@@ -133,7 +133,7 @@ void NudgeInput::paint(juce::Graphics& g)
     if (!label.isEmpty() && !showStepBtns && !labelInline && labelBounds.getHeight() > 0)
     {
         g.setColour(MuLookAndFeel::colour(Id::labelText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
+        g.setFont(MuLookAndFeel::uiFont(sf(9.0f)));
         g.drawText(label, labelBounds, juce::Justification::centred, false);
     }
 
@@ -148,7 +148,7 @@ void NudgeInput::paint(juce::Graphics& g)
             g.drawRect(b, 1);
             g.setColour(active ? MuLookAndFeel::colour(Id::segmentActiveBorder)
                                : MuLookAndFeel::colour(Id::segmentInactiveText));
-            g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
+            g.setFont(MuLookAndFeel::uiFont(sf(9.0f)));
             g.drawText(txt, b, juce::Justification::centred, false);
         };
         drawStep(step1Bounds,  "1",  stepSize == 1);

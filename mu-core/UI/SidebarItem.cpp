@@ -148,7 +148,7 @@ void SidebarItem::paint(juce::Graphics& g)
         if (metal)
         {
             g.setColour(MuLookAndFeel::colour(selected ? Id::valueText : Id::labelText));
-            g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
+            g.setFont(MuLookAndFeel::uiFont(sf(9.0f)));
             g.drawText(name, box.toNearestInt().withY(nameY).withHeight(nameRowH).reduced(s(4), 0),
                        juce::Justification::centred, true);
         }
@@ -158,7 +158,7 @@ void SidebarItem::paint(juce::Graphics& g)
             g.fillEllipse(sf(5.0f), (float) (nameY + (nameRowH - s(6)) / 2), sf(6.0f), sf(6.0f));
 
             g.setColour(MuLookAndFeel::colour(selected ? Id::valueText : Id::labelText));
-            g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
+            g.setFont(MuLookAndFeel::uiFont(sf(9.0f)));
             g.drawText(name, s(14), nameY, w - s(18), nameRowH, juce::Justification::centredLeft, true);
         }
     }
@@ -168,7 +168,7 @@ void SidebarItem::paint(juce::Graphics& g)
     {
         const int plusSize = metal ? juce::jmin(w - s(20), h - s(26)) : juce::jmin(w - s(8), h - s(20));
         g.setColour(MuLookAndFeel::colour(Id::labelText).withAlpha(MuLookAndFeel::lighting().emptyPlus));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(30.0f))));
+        g.setFont(MuLookAndFeel::uiFont(sf(30.0f)));
         g.drawText("+", juce::Rectangle<int>((w - plusSize) / 2, metal ? s(7) : s(4), plusSize, plusSize),
                    juce::Justification::centred, false);
     }
@@ -178,7 +178,7 @@ void SidebarItem::paint(juce::Graphics& g)
     {
         const int clear = MuLookAndFeel::hasScrews(*this) ? s(MuLookAndFeel::kSubPanelScrewClear) : s(4);
         g.setColour(MuLookAndFeel::colour(Id::labelText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
+        g.setFont(MuLookAndFeel::uiFont(sf(9.0f)));
         g.drawText(juce::String(slotNumber), juce::Rectangle<int>((int) box.getX() + clear, (int) box.getY() + s(3), s(18), s(11)),
                    juce::Justification::topLeft, false);
     }
@@ -190,7 +190,7 @@ void SidebarItem::paint(juce::Graphics& g)
         g.setColour(juce::Colours::orange.withAlpha(0.85f));
         g.fillRoundedRectangle(b.toFloat(), sf(3.0f));
         g.setColour(juce::Colours::black);
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(8.0f))));
+        g.setFont(MuLookAndFeel::uiFont(sf(8.0f)));
         g.drawText("SWP", b, juce::Justification::centred, false);
     }
 

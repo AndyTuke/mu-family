@@ -107,7 +107,7 @@ void PatternContent::addLabel(juce::Label& l, const juce::String& text)
 {
     l.setText(text, juce::dontSendNotification);
     l.setJustificationType(juce::Justification::centredRight);
-    l.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+    l.setFont(MuLookAndFeel::uiFont(11.0f));
     addAndMakeVisible(l);
 }
 
