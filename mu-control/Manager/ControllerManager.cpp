@@ -41,6 +41,12 @@ ControllerManager::ControllerManager(mu_core::ControlSink& s, const mu_core::Liv
     scanTick.fn  = [this] { rescan(); };
     blinkTick.fn = [this] { refresh(); };
 
+    deviceList = juce::MidiDeviceListConnection::make([this, weak = std::weak_ptr<bool>(alive)]
+    {
+        // The notice may come from any thread; the scan belongs on the message thread.
+        juce::MessageManager::callAsync([this, weak] { if (weak.lock() && ! quitting) rescan(); });
+    });
+
     detect();
     lastStatus = getStatus();
     lastLabel = deviceLabel;
@@ -50,6 +56,7 @@ ControllerManager::ControllerManager(mu_core::ControlSink& s, const mu_core::Liv
 
 ControllerManager::~ControllerManager()
 {
+    deviceList.reset();
     scanTick.stopTimer();
     blinkTick.stopTimer();
     closeDevice();   // own mode back whatever state we were in

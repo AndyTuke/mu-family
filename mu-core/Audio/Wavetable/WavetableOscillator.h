@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include "WavetableBank.h"
 #include <cmath>
 
@@ -17,7 +18,7 @@ public:
     void prepare(double sampleRate) noexcept { sr = sampleRate > 0 ? sampleRate : 44100.0; }
     void setBank(const WavetableBank* b) noexcept { bank = b; }
     void setTable(int t) noexcept { tableIndex = t < 0 ? 0 : t; }
-    void setFrequency(float hz) noexcept { inc = (double) hz / sr; }
+    void setFrequency(float hz) noexcept { inc = std::clamp((double) hz / sr, -0.45, 0.45); }   // never past Nyquist
     void setPosition(float p01) noexcept { position = p01 < 0 ? 0.0f : (p01 > 1 ? 1.0f : p01); }
     void resetPhase() noexcept { phase = 0.0; }
 

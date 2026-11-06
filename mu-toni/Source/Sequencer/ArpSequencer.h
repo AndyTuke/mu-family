@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include "Audio/Chords.h"
 #include "Audio/ToniScales.h"
 #include <cmath>
@@ -143,7 +144,7 @@ inline int stepMidi(const ArpParams& p, int stepIndex) noexcept
 
     const int semi     = pool[scan[i]];
     const int rootMidi = 12 * (p.rootOctave + 1) + p.rootNote;  // C4 = 60
-    return rootMidi + semi;
+    return std::clamp(rootMidi + semi, 0, 127);   // a high root with a wide chord would otherwise pass the MIDI range
 }
 
 } // namespace mu_toni

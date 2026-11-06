@@ -5,6 +5,7 @@
 #include "Manager/ManagedPorts.h"
 #include "Surface/SurfaceModel.h"
 #include <functional>
+#include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_events/juce_events.h>
 #include <memory>
 
@@ -72,6 +73,10 @@ private:
     juce::String              lastLabel;
 
     Tick scanTick, blinkTick;
+
+    // The system's own plug/unplug notice: it asks for a scan at once, so the slow scan timer is only the fallback.
+    std::shared_ptr<bool>             alive = std::make_shared<bool>(true);
+    juce::MidiDeviceListConnection    deviceList;
 };
 
 } // namespace mu_control

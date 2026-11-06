@@ -87,8 +87,8 @@ public:
 
                 const float lfoVal  = std::sin(phase[v] * juce::MathConstants<float>::twoPi);
                 const float spreadV = (v % 2 == 0) ? 1.0f : (1.0f + spreadNow * 0.5f);
-                const float delaySL = baseSamp + lfoVal * depthSamp;
-                const float delaySR = baseSamp + lfoVal * depthSamp * spreadV;
+                const float delaySL = juce::jmax(2.0f, baseSamp + lfoVal * depthSamp);   // the swing never reaches zero delay
+                const float delaySR = juce::jmax(2.0f, baseSamp + lfoVal * depthSamp * spreadV);
 
                 wetL += hermiteDelay(delayL[v], writePos[v], delaySL);
                 wetR += hermiteDelay(delayR[v], writePos[v], delaySR);
