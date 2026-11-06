@@ -313,7 +313,7 @@ target_include_directories(mu-clid-tests PRIVATE
     "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher"   # LicenseManager
 )
 
-target_link_libraries(mu-clid-tests PRIVATE mu-core-fonts
+target_link_libraries(mu-clid-tests PRIVATE mu-core-assets
     mu-clid-layer
     juce::juce_core
     juce::juce_graphics

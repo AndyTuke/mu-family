@@ -45,7 +45,7 @@ target_include_directories(mu-link-tests PRIVATE
     "${MU_CORE_DIR}"
 )
 
-target_link_libraries(mu-link-tests PRIVATE mu-core-fonts
+target_link_libraries(mu-link-tests PRIVATE mu-core-assets
     juce::juce_core
     juce::juce_audio_basics   # ServerEngine now embeds the mu-core EqInsert (AudioBuffer/SmoothedValue)
     juce::juce_audio_devices  # MidiClockOut (the sample-accurate MIDI clock sender)
@@ -125,7 +125,7 @@ target_include_directories(mu-link-harness PRIVATE
     "${MU_CORE_DIR}"
 )
 
-target_link_libraries(mu-link-harness PRIVATE mu-core-fonts
+target_link_libraries(mu-link-harness PRIVATE mu-core-assets
     juce::juce_audio_formats
     juce::juce_audio_basics
     juce::juce_recommended_config_flags
@@ -177,7 +177,7 @@ if(WIN32)
     add_dependencies(mu-link increment_build_number)
 endif()
 
-target_link_libraries(mu-link PRIVATE mu-core-fonts
+target_link_libraries(mu-link PRIVATE mu-core-assets
     juce::juce_audio_utils
     juce::juce_audio_devices
     juce::juce_audio_basics

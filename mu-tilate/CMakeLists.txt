@@ -175,7 +175,7 @@ target_include_directories(mu-tilate-tests SYSTEM PRIVATE "${CMAKE_SOURCE_DIR}/T
 
 target_compile_features(mu-tilate-tests PRIVATE cxx_std_17)
 
-target_link_libraries(mu-tilate-tests PRIVATE mu-core-fonts
+target_link_libraries(mu-tilate-tests PRIVATE mu-core-assets
     mu-tilate-layer
     juce::juce_core
     juce::juce_audio_basics

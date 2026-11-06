@@ -191,7 +191,7 @@ target_include_directories(mu-toni-tests PRIVATE
         "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher"   # LicenseManager
 )
 
-target_link_libraries(mu-toni-tests PRIVATE mu-core-fonts
+target_link_libraries(mu-toni-tests PRIVATE mu-core-assets
     mu-toni-layer
     juce::juce_core
     juce::juce_audio_basics

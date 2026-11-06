@@ -9,6 +9,7 @@ set(MU_CORE_CHROME_SOURCES
     # Look and feel, theme, standard controls
     "${_mu_core_dir}/UI/Components/MuLookAndFeel.cpp"
     "${_mu_core_dir}/UI/Components/MuTheme.cpp"
+    "${_mu_core_dir}/UI/Components/SvgIcon.cpp"   # the family vector icons (embedded SVG, tinted at draw time)
     "${_mu_core_dir}/UI/Components/BipolarSliderRow.cpp"
     "${_mu_core_dir}/UI/Components/KnobWithLabel.cpp"
     "${_mu_core_dir}/UI/Components/SegmentControl.cpp"

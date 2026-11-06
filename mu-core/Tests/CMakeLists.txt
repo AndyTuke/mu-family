@@ -149,7 +149,7 @@ function(mu_core_add_test_target name max_layers max_buses bus_inserts)
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"   # ReverbSlot
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
     )
-    target_link_libraries(${name} PRIVATE mu-core-fonts
+    target_link_libraries(${name} PRIVATE mu-core-assets
         juce::juce_core
         juce::juce_audio_basics
         juce::juce_audio_processors

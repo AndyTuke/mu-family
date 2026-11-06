@@ -179,7 +179,7 @@ target_include_directories(mu-tronic-tests PRIVATE
         "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher"   # LicenseManager
 )
 
-target_link_libraries(mu-tronic-tests PRIVATE mu-core-fonts
+target_link_libraries(mu-tronic-tests PRIVATE mu-core-assets
     mu-toni-layer
     mu-on-layer
     mu-tant-layer

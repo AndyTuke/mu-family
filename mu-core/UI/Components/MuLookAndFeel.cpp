@@ -4,7 +4,7 @@
 #include <tuple>
 #include "MuTheme.h"
 #include "FaderThumbGeometry.h"
-#include "MuFontData.h"   // the embedded Inter and JetBrains Mono files (mu-core-fonts)
+#include "MuAssetData.h"   // the embedded Inter and JetBrains Mono files (mu-core-assets)
 
 // every colour now lives in the MuTheme singleton (grouped by category for
 // the future Theme Editor). This switch just maps the legacy ColourIds tokens to
@@ -1081,9 +1081,9 @@ namespace
         juce::Typeface::Ptr regular, bold, mono;
         FamilyTypefaces()
         {
-            regular = juce::Typeface::createSystemTypefaceFor(MuFontData::InterRegular_ttf, (size_t) MuFontData::InterRegular_ttfSize);
-            bold    = juce::Typeface::createSystemTypefaceFor(MuFontData::InterBold_ttf, (size_t) MuFontData::InterBold_ttfSize);
-            mono    = juce::Typeface::createSystemTypefaceFor(MuFontData::JetBrainsMonoRegular_ttf, (size_t) MuFontData::JetBrainsMonoRegular_ttfSize);
+            regular = juce::Typeface::createSystemTypefaceFor(MuAssetData::InterRegular_ttf, (size_t) MuAssetData::InterRegular_ttfSize);
+            bold    = juce::Typeface::createSystemTypefaceFor(MuAssetData::InterBold_ttf, (size_t) MuAssetData::InterBold_ttfSize);
+            mono    = juce::Typeface::createSystemTypefaceFor(MuAssetData::JetBrainsMonoRegular_ttf, (size_t) MuAssetData::JetBrainsMonoRegular_ttfSize);
         }
     };
     const FamilyTypefaces& familyTypefaces()

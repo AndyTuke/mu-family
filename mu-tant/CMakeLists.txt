@@ -246,7 +246,7 @@ target_include_directories(mu-tant-tests PRIVATE
         "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher"   # LicenseManager
 )
 
-target_link_libraries(mu-tant-tests PRIVATE mu-core-fonts
+target_link_libraries(mu-tant-tests PRIVATE mu-core-assets
     mu-tant-layer
     juce::juce_core
     juce::juce_audio_basics
