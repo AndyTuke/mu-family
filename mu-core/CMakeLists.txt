@@ -33,6 +33,8 @@ juce_add_binary_data(mu-core-assets HEADER_NAME "MuAssetData.h" NAMESPACE MuAsse
         "${CMAKE_CURRENT_SOURCE_DIR}/UI/Assets/metronome.svg"
         "${CMAKE_CURRENT_SOURCE_DIR}/UI/Assets/wave.svg")
 set_target_properties(mu-core-assets PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+# juce_animation rides with the asset target because every target that compiles the shell chrome already links it.
+target_link_libraries(mu-core-assets INTERFACE juce::juce_animation)
 target_link_libraries(mu-core INTERFACE mu-core-assets)
 
 # The processor-free UI sources (components, TransportBar, dialogs): one list, shared with mu-link

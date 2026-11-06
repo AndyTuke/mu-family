@@ -21,7 +21,8 @@ ShellChrome::ShellChrome(juce::Component& hostComponent, mu_core::ShellBackend& 
     : host(hostComponent),
       backend(shellBackend),
       scaleInit(shellBackend),
-      transportBar(shellBackend)
+      transportBar(shellBackend),
+      animator(hostComponent)
 {
     wireBuiltIns();
     wirePerformanceChooser();
@@ -285,12 +286,12 @@ void ShellChrome::hideAllOverlays()
 {
     returnToChooser = false;
     // Cancel any in-progress fade animations before forcing visibility states.
-    if (mainPanel)         animator.cancelAnimation(mainPanel, true);
-    if (mixerOverlay)      animator.cancelAnimation(mixerOverlay, true);
-    if (settingsOverlay)   animator.cancelAnimation(settingsOverlay, true);
-    animator.cancelAnimation(&presetBrowser, true);
+    if (mainPanel)         animator.cancel(mainPanel, true);
+    if (mixerOverlay)      animator.cancel(mixerOverlay, true);
+    if (settingsOverlay)   animator.cancel(settingsOverlay, true);
+    animator.cancel(&presetBrowser, true);
     for (auto& e : extras)
-        if (e.kind == ExtraKind::Page) animator.cancelAnimation(e.screen, true);
+        if (e.kind == ExtraKind::Page) animator.cancel(e.screen, true);
 
     auto setOne = [](juce::Component* c) { if (c) { c->setAlpha(1.0f); c->setVisible(false); } };
     setOne(mixerOverlay);
@@ -326,9 +327,9 @@ void ShellChrome::fadeSwitch(juce::Component* outgoing, juce::Component* incomin
         incoming->setVisible(true);
     }
     if (outgoing)
-        animator.animateComponent(outgoing, outgoing->getBounds(), 0.0f, durationMs, false, 1.0, 1.0);
+        animator.animate(outgoing, outgoing->getBounds(), 0.0f, durationMs);
     if (incoming)
-        animator.animateComponent(incoming, incoming->getBounds(), 1.0f, durationMs, false, 1.0, 1.0);
+        animator.animate(incoming, incoming->getBounds(), 1.0f, durationMs);
 
     if (outgoing)
     {

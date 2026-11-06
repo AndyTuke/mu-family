@@ -199,11 +199,11 @@ void LayerSidebar::layoutItems(bool animate, int newItemIndex)
         {
             items[(size_t) i]->setAlpha(0.0f);
             items[(size_t) i]->setBounds(itemBounds(i + 1));
-            animator.animateComponent(items[(size_t) i].get(), target, 1.0f, 120, false, 0.0, 1.0);
+            animator.animate(items[(size_t) i].get(), target, 1.0f, 120);
         }
         else if (animate)
         {
-            animator.animateComponent(items[(size_t) i].get(), target, 1.0f, 80, false, 1.0, 1.0);
+            animator.animate(items[(size_t) i].get(), target, 1.0f, 80);
         }
         else
         {

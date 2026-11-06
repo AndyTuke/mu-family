@@ -4,6 +4,7 @@
 #include "UI/SidebarItem.h"
 #include "UI/SceneGrid.h"
 #include "UI/Components/AddButton.h"
+#include "UI/Components/ComponentMotion.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/StepIndicator.h"
 #include "UI/Components/SegmentControl.h"
@@ -122,7 +123,7 @@ private:
     bool shownFollowing = false;                // the Add slot currently shows the indicator
     void liveStateChanged() override { followLiveState(); }
     void followLiveState();                     // selection + indicator from the live state
-    juce::ComponentAnimator animator;
+    mu_ui::ComponentMotion animator { *this };
 
     int selectedIndex = 0;
 

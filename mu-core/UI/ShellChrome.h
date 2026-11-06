@@ -4,6 +4,7 @@
 #include <functional>
 #include <vector>
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "UI/Components/ComponentMotion.h"
 #include "Plugin/ShellBackend.h"
 #include "UI/UpdateNotice.h"
 #include "Control/LiveView.h"
@@ -93,7 +94,6 @@ public:
     SaveDialog&           getSaveDialog()   { return saveDialog; }
     PresetBrowser&        getPresetBrowser(){ return presetBrowser; }
     PerformanceChooser&   getPerformanceChooser() { return performanceChooser; }
-    juce::ComponentAnimator& getAnimator()  { return animator; }
 
     // ─── Main area ───────────────────────────────────────────────────────────
     // The shell takes pointers, not ownership; the host owns the component instances.
@@ -231,7 +231,7 @@ private:
     bool browserVisible  = false;
     bool settingsVisible = false;
 
-    juce::ComponentAnimator animator;
+    mu_ui::ComponentMotion animator;
 
     // Hint text goes to the status bar, never a popup over the UI: while the pointer rests on a control that has a tooltip,
     // the bar shows it; when the pointer leaves, a hint the bar was showing is cleared.
