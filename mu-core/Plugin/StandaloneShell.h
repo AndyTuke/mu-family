@@ -133,6 +133,14 @@ protected:
 public:
     void initialise (const juce::String& commandLine) override
     {
+        // A crash leaves its call stack in Documents/TDP/mu-crash.txt (the OS event log keeps only the faulting address).
+        juce::SystemStats::setApplicationCrashHandler ([] (void*)
+        {
+            const auto file = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("TDP").getChildFile ("mu-crash.txt");
+            file.getParentDirectory().createDirectory();
+            file.replaceWithText (juce::Time::getCurrentTime().toString (true, true) + "\n" + juce::SystemStats::getStackBacktrace());
+        });
+
         // Headless render (listening tests / CI smoke): `--render --out <wav> [...]` renders
         // offline with no window or audio device, then quits.
         const auto renderArgs = mu_core::render_mode::parseProduct (commandLine, renderName().toRawUTF8());
