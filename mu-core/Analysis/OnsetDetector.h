@@ -24,6 +24,7 @@ struct OnsetCurve
     std::vector<float> level;      // the peak absolute sample in each frame's window: onsets in near-silence are ignored
     std::vector<float> baseline;   // the running median of flux (about 0.5 s either side): the level a peak must clear
     int    hop        = 256;      // samples between frames
+    int    fftSize    = 1024;     // the analysis window in samples (about 21 ms: it scales with the sample rate)
     double sampleRate = 48000.0;
     int    numSamples = 0;        // length of the analysed audio
     bool   empty() const noexcept { return flux.empty(); }

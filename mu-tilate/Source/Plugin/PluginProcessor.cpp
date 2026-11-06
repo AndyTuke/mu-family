@@ -281,7 +281,11 @@ void PluginProcessor::loadLoopAsync(int layer, const juce::File& file, bool keep
             bool estimated = false;
             if (! keep)
             {
-                const double guess = mu_core::estimateTempoFromLength((double) loaded->audio->getNumSamples() / loaded->sampleRate);
+                // The detected attacks (marker 0 is always at the start, so it is no evidence) pick between the readings the length allows.
+                std::vector<double> attacks;
+                for (int i = 1; slices != nullptr && i < slices->size(); ++i)
+                    attacks.push_back((double) slices->marker(i).position / loaded->sampleRate);
+                const double guess = mu_core::estimateTempoFromOnsets((double) loaded->audio->getNumSamples() / loaded->sampleRate, attacks);
                 if (guess > 0.0)
                 {
                     tempo = juce::jlimit(20.0, 300.0, guess);

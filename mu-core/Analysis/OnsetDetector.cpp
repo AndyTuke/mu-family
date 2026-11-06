@@ -10,18 +10,25 @@ namespace mu_core
 
 namespace
 {
-constexpr int kFftOrder = 10;               // 1024-point frames
-constexpr int kFftSize  = 1 << kFftOrder;
-constexpr int kHop      = 256;
-constexpr int kBins     = kFftSize / 2;
+// The analysis window is about 21 ms whatever the sample rate (1024 points at 44.1 and 48 kHz), so the time resolution and the
+// attack estimates stay the same; the hop is a quarter of it.
+int fftOrderFor(double sampleRate)
+{
+    return juce::jlimit(9, 13, (int) std::lround(std::log2(0.0213 * std::max(8000.0, sampleRate))));
+}
 }
 
 OnsetCurve computeCurve(const juce::AudioBuffer<float>& audio, double sampleRate, OnsetMethod method,
                         float lowCutHz, float highCutHz)
 {
     OnsetCurve curve;
-    curve.hop = kHop;
     curve.sampleRate = sampleRate > 0.0 ? sampleRate : 48000.0;
+    const int kFftOrder = fftOrderFor(curve.sampleRate);
+    const int kFftSize  = 1 << kFftOrder;
+    const int kHop      = kFftSize / 4;
+    const int kBins     = kFftSize / 2;
+    curve.hop = kHop;
+    curve.fftSize = kFftSize;
     curve.numSamples = audio.getNumSamples();
     const int n = audio.getNumSamples();
     if (n < kFftSize || audio.getNumChannels() <= 0) return curve;
@@ -99,6 +106,7 @@ std::vector<int> pickOnsets(const OnsetCurve& curve, const OnsetPickSettings& s,
     std::vector<int> out;
     const int frames = (int) curve.flux.size();
     if (frames < 3) return out;
+    const int kFftSize = curve.fftSize;
 
     // Phase 1: the threshold is the curve's running median plus an offset set by Sensitivity (0.5 = 0.12, 1 = 0.02, 0 = 0.42).
     const float inv = 1.0f - juce::jlimit(0.0f, 1.0f, s.sensitivity);
