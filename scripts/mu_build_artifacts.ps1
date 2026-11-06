@@ -28,7 +28,10 @@ $items = @(
     [pscustomobject]@{ Name='mu-Tant Standalone'; Path="$buildRoot\mu-tant\mu-tant_artefacts\{0}\Standalone\mu-Tant.exe"         },
     [pscustomobject]@{ Name='mu-Toni VST3';       Path="$buildRoot\mu-toni\mu-toni_artefacts\{0}\VST3\mu-Toni.vst3"              },
     [pscustomobject]@{ Name='mu-Toni CLAP';       Path="$buildRoot\mu-toni\mu-toni_artefacts\{0}\CLAP\mu-Toni.clap"              },
-    [pscustomobject]@{ Name='mu-Toni Standalone'; Path="$buildRoot\mu-toni\mu-toni_artefacts\{0}\Standalone\mu-Toni.exe"         }
+    [pscustomobject]@{ Name='mu-Toni Standalone'; Path="$buildRoot\mu-toni\mu-toni_artefacts\{0}\Standalone\mu-Toni.exe"         },
+    [pscustomobject]@{ Name='mu-Tilate VST3';      Path="$buildRoot\mu-tilate\mu-tilate_artefacts\{0}\VST3\mu-Tilate.vst3"            },
+    [pscustomobject]@{ Name='mu-Tilate CLAP';      Path="$buildRoot\mu-tilate\mu-tilate_artefacts\{0}\CLAP\mu-Tilate.clap"            },
+    [pscustomobject]@{ Name='mu-Tilate Standalone'; Path="$buildRoot\mu-tilate\mu-tilate_artefacts\{0}\Standalone\mu-Tilate.exe"      }
 )
 
 $verBase    = (Get-Content -Raw (Join-Path $PSScriptRoot '..\version.txt')).Trim()   # live products' major.minor (mu-On / mu-Toni show version-pre.txt)

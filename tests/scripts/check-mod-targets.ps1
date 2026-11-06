@@ -24,7 +24,7 @@ $ErrorActionPreference = 'Stop'
 try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch { }
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$products = @('mu-clid', 'mu-clid-midi', 'mu-tant', 'mu-toni', 'mu-on')
+$products = @('mu-clid', 'mu-clid-midi', 'mu-tant', 'mu-toni', 'mu-on', 'mu-tilate')
 # Products with no modulation (no ModulationMatrix use): they get the scale-API and own-row checks but need no table.
 $noModulation = @('mu-clid-midi')
 

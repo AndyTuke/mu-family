@@ -39,7 +39,8 @@ $vst3Dirs = @(
     "mu-clid-midi/mu-clid-midi_artefacts/$Config/VST3",
     "mu-tant/mu-tant_artefacts/$Config/VST3",
     "mu-toni/mu-toni_artefacts/$Config/VST3",
-    "mu-on/mu-on_artefacts/$Config/VST3"
+    "mu-on/mu-on_artefacts/$Config/VST3",
+    "mu-tilate/mu-tilate_artefacts/$Config/VST3"
 )
 
 # --- Locate (or fetch) the pluginval executable -----------------------------------------

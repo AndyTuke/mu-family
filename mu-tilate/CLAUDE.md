@@ -10,7 +10,7 @@ The editor will inherit `mu-core/UI/EditorShellBase.h` and use the shared `Layer
 
 ## Status
 
-**In build, staged (Andy, 2026-10-31: "start it now"); the plan and stage status are in [docs/mu-tilate/design-buildplan.md](../docs/mu-tilate/design-buildplan.md). Built: the `mu-tilate-layer` library, the `mu-tilate` plugin target (VST3 + CLAP + Standalone), `mu-tilate-tests`, the slice player, detection, Phrase and timeline engine, persistence, and the editor (Sequencer / Layer / Slice views). Layer controls are absolute, slice controls are offsets from them. Not done: mu-Tronic hosting, licensing, installer and CI wiring, factory loops, the manual and a release.** Ask Andy before starting any of those; open work is in [backlog.md](../backlog.md).
+**In build, staged (Andy, 2026-10-31: "start it now"); the plan and stage status are in [docs/mu-tilate/design-buildplan.md](../docs/mu-tilate/design-buildplan.md). Built: the `mu-tilate-layer` library, the `mu-tilate` plugin target (VST3 + CLAP + Standalone), `mu-tilate-tests`, the slice player, detection, Phrase and timeline engine, persistence, and the editor (Sequencer / Layer / Slice views). Layer controls are absolute, slice controls are offsets from them. Not done: mu-Tronic hosting, the manual and the release itself.** Ask Andy before starting any of those; open work is in [backlog.md](../backlog.md).
 
 ## Decisions (Andy, 2026-10-30)
 
@@ -44,11 +44,8 @@ The editor will inherit `mu-core/UI/EditorShellBase.h` and use the shared `Layer
 
 ## Still to wire (checklist)
 
-Done: the CMake target (`mu-tilate`, `mu-tilate-layer`, `mu-tilate-tests`), the root `add_subdirectory`, the product source and tests. Remaining, each only when Andy schedules it, on the build PC:
+Done: the CMake target, product source and tests; licensing (`Source/License/LicenseKey.h`, key in OneDrive secrets); Signalsmith Stretch notice and About credit; the product-listing scripts, `ci.yml`, `release.yml` (fixed-name `mu-Tilate-Windows.zip` with factory loops); six original CC0 factory loops in `factory/` (regenerate with `scripts/make-tilate-factory-loops.py`). There is no installer, as for mu-Toni and mu-On (zip only). Remaining:
 
-1. Signalsmith Stretch notice in `THIRD_PARTY_NOTICES.txt` and the About credits (if not yet there).
-2. mu-Tronic: link `mu-tilate-layer`, add the `Phrase` `LayerTypeInfo` row in `LayerTypes.cpp` and a `PhraseLayerType` glue file, `LayerTypeId::Phrase` in `mu-core`, prefix letter `p` in `kPrefixLetters` / `slotPrefixSets()`; update [mu-tronic/CLAUDE.md](../mu-tronic/CLAUDE.md) and the mu-Tronic docs.
-3. Scripts that list products: [tests/scripts/check-mod-targets.ps1](../tests/scripts/check-mod-targets.ps1), [tests/scripts/check-layer-boundary.ps1](../tests/scripts/check-layer-boundary.ps1), [tests/scripts/check-latest-json.ps1](../tests/scripts/check-latest-json.ps1), [tests/scripts/run-pluginval.ps1](../tests/scripts/run-pluginval.ps1); [scripts/mu_build_artifacts.ps1](../scripts/mu_build_artifacts.ps1), [scripts/write-latest-json.ps1](../scripts/write-latest-json.ps1); `site/latest.json`.
-4. CI and packaging (workflow_dispatch only, never add push triggers): `ci.yml`, `release.yml`, the installer, the website and release-notes page via the `web-designer`.
-5. Licensing: pay-what-you-want like mu-Toni/mu-On means `Source/License/LicenseKey.h` with its own product id and embedded public key (Andy generates the key pair); until then keep `License/` empty.
-6. Manual via the `user-documentation-author` (`docs/mu-tilate/create_manual.ps1` and `images/`).
+1. mu-Tronic: link `mu-tilate-layer`, add the `Phrase` `LayerTypeInfo` row in `LayerTypes.cpp` and a `PhraseLayerType` glue file, `LayerTypeId::Phrase` in `mu-core`, prefix letter `p` in `kPrefixLetters` / `slotPrefixSets()`; update [mu-tronic/CLAUDE.md](../mu-tronic/CLAUDE.md) and the mu-Tronic docs.
+2. At release time: `scripts/write-latest-json.ps1 -Products mu-tilate` (supported), the website and release-notes page via the `web-designer`.
+3. Manual via the `user-documentation-author` (`docs/mu-tilate/create_manual.ps1` and `images/`).

@@ -76,8 +76,9 @@ jobs:
           mu-tant_VST3 mu-tant_CLAP mu-tant_Standalone
           mu-on_VST3 mu-on_CLAP mu-on_Standalone
           mu-toni_VST3 mu-toni_CLAP mu-toni_Standalone
+          mu-tilate_VST3 mu-tilate_CLAP mu-tilate_Standalone
           mu-core-tests mu-control-tests mu-clid-tests mu-clid-midi-tests
-          mu-tant-tests mu-on-tests mu-toni-tests
+          mu-tant-tests mu-on-tests mu-toni-tests mu-tilate-tests
 
       - name: Build mu-link (Windows only)
         if: runner.os == 'Windows'

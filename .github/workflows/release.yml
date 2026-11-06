@@ -62,6 +62,7 @@ jobs:
           mu-tant_VST3 mu-tant_CLAP mu-tant_Standalone
           mu-on_VST3 mu-on_CLAP mu-on_Standalone
           mu-toni_VST3 mu-toni_CLAP mu-toni_Standalone
+          mu-tilate_VST3 mu-tilate_CLAP mu-tilate_Standalone
           mu-tronic_Standalone
 
       # mu-link is a Windows desktop app (freeware); built and zipped on the Windows runner only.
@@ -74,7 +75,7 @@ jobs:
         if: runner.os == 'macOS'
         run: >
           cmake --build build --config Release --target
-          mu-clid_AU mu-clid-midi_AU mu-tant_AU mu-on_AU mu-toni_AU
+          mu-clid_AU mu-clid-midi_AU mu-tant_AU mu-on_AU mu-toni_AU mu-tilate_AU
 
       # ── Package per-platform demo zips (fixed names the download site links to) ──
       - name: Package demo zips (Windows)
@@ -110,6 +111,14 @@ jobs:
           Copy-Item "$r\mu-toni\mu-toni_artefacts\Release\Standalone\mu-Toni.exe" staging\mu-Toni\
           Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Toni\"
           Compress-Archive -Path staging\mu-Toni\* -DestinationPath dist\mu-Toni-Windows.zip
+          # mu-Tilate (VST3 + CLAP + Standalone + factory loops)
+          New-Item -ItemType Directory -Path staging\mu-Tilate -Force | Out-Null
+          Copy-Item "$r\mu-tilate\mu-tilate_artefacts\Release\VST3\mu-Tilate.vst3" staging\mu-Tilate\ -Recurse
+          Copy-Item "$r\mu-tilate\mu-tilate_artefacts\Release\CLAP\mu-Tilate.clap" staging\mu-Tilate\
+          Copy-Item "$r\mu-tilate\mu-tilate_artefacts\Release\Standalone\mu-Tilate.exe" staging\mu-Tilate\
+          Copy-Item mu-tilate\factory "staging\mu-Tilate\Factory Loops" -Recurse
+          Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Tilate\"
+          Compress-Archive -Path staging\mu-Tilate\* -DestinationPath dist\mu-Tilate-Windows.zip
           # mu-On (VST3 + CLAP + Standalone)
           New-Item -ItemType Directory -Path staging\mu-On -Force | Out-Null
           Copy-Item "$r\mu-on\mu-on_artefacts\Release\VST3\mu-On.vst3" staging\mu-On\ -Recurse

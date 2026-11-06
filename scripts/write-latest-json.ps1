@@ -7,7 +7,7 @@
   so a product that did not ship does not claim the new build. Schema: docs/design-plugin-family.md, "Update check".
 #>
 param(
-    [string[]]$Products = @('mu-clid', 'mu-clid-midi', 'mu-tant', 'mu-toni', 'mu-on', 'mu-link', 'mu-tronic'),
+    [string[]]$Products = @('mu-clid', 'mu-clid-midi', 'mu-tant', 'mu-toni', 'mu-on', 'mu-tilate', 'mu-link', 'mu-tronic'),
     [string]$Root = (Split-Path -Parent $PSScriptRoot)
 )
 $ErrorActionPreference = 'Stop'
@@ -16,7 +16,7 @@ $Products = @($Products | ForEach-Object { $_ -split ',' })   # -File passes a c
 $build   = [int](Get-Content (Join-Path $Root 'build_number.txt') -Raw).Trim()
 $live    = (Get-Content (Join-Path $Root 'version.txt') -Raw).Trim()
 $pre     = (Get-Content (Join-Path $Root 'version-pre.txt') -Raw).Trim()
-$preSlugs = @('mu-toni', 'mu-on')   # pre-release products use version-pre.txt
+$preSlugs = @('mu-toni', 'mu-on', 'mu-tilate')   # pre-release products use version-pre.txt
 $outFile = Join-Path $Root 'site/latest.json'
 
 $existing = @{}
@@ -26,7 +26,7 @@ if (Test-Path $outFile) {
 }
 
 $entries = [ordered]@{}
-foreach ($slug in 'mu-clid', 'mu-clid-midi', 'mu-tant', 'mu-toni', 'mu-on', 'mu-link', 'mu-tronic') {
+foreach ($slug in 'mu-clid', 'mu-clid-midi', 'mu-tant', 'mu-toni', 'mu-on', 'mu-tilate', 'mu-link', 'mu-tronic') {
     if ($Products -contains $slug) {
         $base = if ($preSlugs -contains $slug) { $pre } else { $live }
         $entries[$slug] = [ordered]@{

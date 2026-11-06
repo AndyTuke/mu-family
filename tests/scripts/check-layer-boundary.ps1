@@ -2,7 +2,7 @@
 #
 # The detachable-layer extraction (docs/mu-tronic/extraction-plan.md, section 4.5) moves each product's layer
 # code (its sound engine, sequencer, modulation, persistence and layer UI) into an INTERFACE library next to
-# mu-core: mu-clid-layer, mu-tant-layer, mu-toni-layer, mu-on-layer. A layer library is what a future
+# mu-core: mu-clid-layer, mu-tant-layer, mu-toni-layer, mu-on-layer, mu-tilate-layer. A layer library is what a future
 # standalone host links, so it must not reach back into a product shell. This script enforces the shape:
 #
 #   Rule 1  A layer-library file must not #include anything under Plugin/ or License/ (mu-core's Plugin/
@@ -100,7 +100,7 @@ foreach ($d in (Get-ChildItem -LiteralPath $Root -Directory -Filter 'mu-*' | Sor
 $blockComment = [regex]'(?s)/\*.*?\*/'
 $blankBlock = [System.Text.RegularExpressions.MatchEvaluator] { param($m) $m.Value -replace '[^\r\n]+', '' }
 $includePluginOrLicense = [regex]'#\s*include\s*[<"]([^">]*/)?(Plugin|License)/'
-$includeProduct = [regex]'#\s*include\s*[<"]([^">]*/)?(mu-(clid-midi|clid|tant|toni|on|tronic))/'
+$includeProduct = [regex]'#\s*include\s*[<"]([^">]*/)?(mu-(clid-midi|clid|tant|toni|on|tilate|tronic))/'
 $includeLayerLib = [regex]'#\s*include\s*[<"]([^">]*/)?(mu-[a-z-]+-layer)/'
 $namesProcessor = [regex]'\bPluginProcessor\b'
 $includeAppUi = [regex]'#\s*include\s*[<"]([^">]*/)?(PluginEditor|SettingsOverlay)\.h[">]'

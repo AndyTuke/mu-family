@@ -51,8 +51,8 @@ function Get-RepoRelativePath([string]$full) {
 
 # mu-link (the server app) counts as a plugin here: its headers are reachable only from mu-link itself. The shared IPC
 # contract lives in mu-core/Link, so its mu_link:: namespace is deliberately not in $pluginNs.
-$includePlugin  = [regex]'#\s*include\s*[<"][^">]*\bmu-(clid-midi|clid|tant|toni|on|tronic|link)\b'
-$pluginNs       = [regex]'\bmu_(clid_midi|clid|tant|toni|on|tronic)::'
+$includePlugin  = [regex]'#\s*include\s*[<"][^">]*\bmu-(clid-midi|clid|tant|toni|on|tilate|tronic|link)\b'
+$pluginNs       = [regex]'\bmu_(clid_midi|clid|tant|toni|on|tilate|tronic)::'
 $includeControl = [regex]'#\s*include\s*[<"][^">]*\bmu-control\b'
 $blockComment   = [regex]'(?s)/\*.*?\*/'
 # mu-control is the device layer above mu-core: it may use the control interfaces (ControlAction, ControlSink,

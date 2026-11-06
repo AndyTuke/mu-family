@@ -18,7 +18,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
       mixerOverlay(p, p.mixerEngine),
       settingsOverlay(p)
 {
-    setProductIdentity(juce::String(juce::CharPointer_UTF8("\xce\xbc-Tilate")));
+    // Signalsmith Stretch (with its FFT library) time-stretches the slices: credited like the reverb.
+    setProductIdentity(juce::String(juce::CharPointer_UTF8("\xce\xbc-Tilate")),
+                       { juce::String(juce::CharPointer_UTF8("Signalsmith Stretch \xe2\x80\x94 MIT")) });
 
     sidebar.createMiniVisual = [&p](int i, std::function<void()>) -> std::unique_ptr<juce::Component>
     {
