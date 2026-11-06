@@ -160,12 +160,12 @@ const char* const MuLookAndFeel::layerPaletteNames[MuLookAndFeel::kLayerPaletteS
 
 namespace
 {
-    // Blurred single-channel shadow masks by ellipse size, sub-pixel position, blur and offset.
+    // Blurred single-channel shadow masks by shape (ellipse or rounded rectangle), size, sub-pixel position, blur and offset.
     // Message thread only (painting); shared by every MuLookAndFeel, freed with the last one.
     struct ShadowMaskCache
     {
         struct Mask { juce::Image image; juce::Point<int> origin; };
-        std::map<std::tuple<float, float, float, float, int, int, int>, Mask> masks;
+        std::map<std::tuple<float, float, float, float, float, int, int, int>, Mask> masks;
     };
 
     std::shared_ptr<ShadowMaskCache> sharedShadowMasks()
@@ -177,18 +177,25 @@ namespace
     }
 }
 
-// Same result as juce::DropShadow::drawForPath on the ellipse, but the box-blurred mask is
-// built once per key and blitted after that.
 void MuLookAndFeel::drawEllipseShadow(juce::Graphics& g, juce::Rectangle<float> ellipse,
                                       juce::Colour colour, int radius, juce::Point<int> offset)
 {
+    drawShapeShadow(g, ellipse, -1.0f, colour, radius, offset);
+}
+
+// Same result as juce::DropShadow::drawForPath on the shape, but the box-blurred mask is
+// built once per key and blitted after that.
+void MuLookAndFeel::drawShapeShadow(juce::Graphics& g, juce::Rectangle<float> bounds, float corner,
+                                    juce::Colour colour, int radius, juce::Point<int> offset)
+{
     jassert(radius > 0);
+    const auto ellipse = bounds;   // the shape's bounding box (the ellipse itself when corner < 0)
     const auto cache = sharedShadowMasks();
 
     // Split the position into whole pixels (where the mask is drawn) and the fraction the mask bakes in.
     const float ix = std::floor(ellipse.getX()), iy = std::floor(ellipse.getY());
     const auto key = std::make_tuple(ellipse.getWidth(), ellipse.getHeight(), ellipse.getX() - ix, ellipse.getY() - iy,
-                                     radius, offset.x, offset.y);
+                                     corner, radius, offset.x, offset.y);
 
     auto it = cache->masks.find(key);
     if (it == cache->masks.end())
@@ -196,7 +203,9 @@ void MuLookAndFeel::drawEllipseShadow(juce::Graphics& g, juce::Rectangle<float> 
         if (cache->masks.size() >= 256) cache->masks.clear();   // bound it: layouts only use a handful
 
         juce::Path path;
-        path.addEllipse(ellipse.withPosition(ellipse.getX() - ix, ellipse.getY() - iy));
+        const auto local = ellipse.withPosition(ellipse.getX() - ix, ellipse.getY() - iy);
+        if (corner < 0.0f) path.addEllipse(local);
+        else               path.addRoundedRectangle(local, corner);
         const auto area = (path.getBounds().getSmallestIntegerContainer() + offset).expanded(radius + 1);
 
         juce::Image mask(juce::Image::SingleChannel, area.getWidth(), area.getHeight(), true,
@@ -504,14 +513,12 @@ void MuLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, int width,
     const float corner = sf(kFaderCapCorner);
     juce::Path capPath;
     capPath.addRoundedRectangle(cap, corner);
-    juce::DropShadow(juce::Colours::black.withAlpha(L.shadow(L.knobCastShadow)),
-                     (int) juce::jmax(2.0f, r * L.knobCastBlur),
-                     { -(int) juce::jmax(2.0f, r * L.knobCastOffset), (int) juce::jmax(2.0f, r * L.knobCastOffset) })
-        .drawForPath(g, capPath);
-    juce::DropShadow(juce::Colours::black.withAlpha(L.shadow(L.knobDiscShadow)),
-                     (int) juce::jmax(2.0f, r * 0.18f),
-                     { -(int) (r * 0.06f), (int) juce::jmax(1.0f, r * 0.09f) })
-        .drawForPath(g, capPath);
+    drawShapeShadow(g, cap, corner, juce::Colours::black.withAlpha(L.shadow(L.knobCastShadow)),
+                    (int) juce::jmax(2.0f, r * L.knobCastBlur),
+                    { -(int) juce::jmax(2.0f, r * L.knobCastOffset), (int) juce::jmax(2.0f, r * L.knobCastOffset) });
+    drawShapeShadow(g, cap, corner, juce::Colours::black.withAlpha(L.shadow(L.knobDiscShadow)),
+                    (int) juce::jmax(2.0f, r * 0.18f),
+                    { -(int) (r * 0.06f), (int) juce::jmax(1.0f, r * 0.09f) });
 
     // Phase 4: face gradient shared with the knob disc, then specular, occlusion and the
     // pointer halo as radial gradients clipped to the cap.
@@ -623,12 +630,11 @@ void MuLookAndFeel::drawSlideSwitch(juce::Graphics& g, juce::Rectangle<float> bo
     disc.addEllipse(cx - thR, cy - thR, thR * 2.0f, thR * 2.0f);
     // Cast shadow, falling down-left away from the top-right light: a soft outer shadow
     // that lands on the panel beside the near-black track, plus a crisp contact shadow.
-    juce::DropShadow(juce::Colours::black.withAlpha(L.shadow(L.switchShadow)), (int) juce::jmax(3.0f, thR * 0.75f),
-                     { -(int) juce::jmax(2.0f, thR * 0.45f), (int) juce::jmax(2.0f, thR * 0.6f) })
-        .drawForPath(g, disc);
-    juce::DropShadow(juce::Colours::black.withAlpha(L.shadow(L.switchContact)), (int) juce::jmax(2.0f, thR * 0.3f),
-                     { -(int) juce::jmax(1.0f, thR * 0.25f), (int) juce::jmax(1.0f, thR * 0.35f) })
-        .drawForPath(g, disc);
+    const juce::Rectangle<float> discBox(cx - thR, cy - thR, thR * 2.0f, thR * 2.0f);
+    drawEllipseShadow(g, discBox, juce::Colours::black.withAlpha(L.shadow(L.switchShadow)), (int) juce::jmax(3.0f, thR * 0.75f),
+                      { -(int) juce::jmax(2.0f, thR * 0.45f), (int) juce::jmax(2.0f, thR * 0.6f) });
+    drawEllipseShadow(g, discBox, juce::Colours::black.withAlpha(L.shadow(L.switchContact)), (int) juce::jmax(2.0f, thR * 0.3f),
+                      { -(int) juce::jmax(1.0f, thR * 0.25f), (int) juce::jmax(1.0f, thR * 0.35f) });
 
     juce::ColourGradient face(juce::Colour(0xff4a3a58), cx + thR * 0.45f, cy - thR * 0.45f,
                               knobFaceDark, cx - thR * 0.8f,  cy + thR * 0.9f, true);
@@ -1078,9 +1084,8 @@ void MuLookAndFeel::drawNamePlate(juce::Graphics& g, juce::Rectangle<float> r, c
     shape.addRoundedRectangle(r, h * 0.22f);
 
     // Cast shadow, falling down-left away from the top-right light.
-    juce::DropShadow(juce::Colours::black.withAlpha(L.shadow(L.namePlateShadow)),
-                     (int) juce::jmax(2.0f, h * 0.3f), { -1, 1 })
-        .drawForPath(g, shape);
+    drawShapeShadow(g, r, h * 0.22f, juce::Colours::black.withAlpha(L.shadow(L.namePlateShadow)),
+                    (int) juce::jmax(2.0f, h * 0.3f), { -1, 1 });
 
     // Face: dark enamel, lit at the top right.
     const auto face = colour(panelBackground).darker(L.namePlateDarken);
@@ -1116,11 +1121,8 @@ void MuLookAndFeel::drawNamePlate(juce::Graphics& g, juce::Rectangle<float> r, c
 void MuLookAndFeel::drawRaisedSubPanelShadow(juce::Graphics& g, juce::Rectangle<float> r, float cornerSize)
 {
     const auto& L = lighting();
-    juce::Path shape;
-    shape.addRoundedRectangle(r, cornerSize);
-    juce::DropShadow(juce::Colours::black.withAlpha(L.shadow(L.subPanelShadow)),
-                     (int) mu_ui::sf(6.0f), { -(int) mu_ui::sf(2.0f), (int) mu_ui::sf(3.0f) })
-        .drawForPath(g, shape);
+    drawShapeShadow(g, r, cornerSize, juce::Colours::black.withAlpha(L.shadow(L.subPanelShadow)),
+                    (int) mu_ui::sf(6.0f), { -(int) mu_ui::sf(2.0f), (int) mu_ui::sf(3.0f) });
 }
 
 // The face of a raised sub-panel: lifted a touch above the panel, lit from the top
@@ -1257,7 +1259,7 @@ void MuLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& button
 // Halo around a lit control, drawn behind it by its parent (a button cannot paint outside its own bounds).
 void MuLookAndFeel::drawLitGlow(juce::Graphics& g, juce::Rectangle<int> r, juce::Colour accent, int radius)
 {
-    juce::DropShadow(accent.withAlpha(lighting().performanceGlow), radius, {}).drawForRectangle(g, r);
+    drawShapeShadow(g, r.toFloat(), 0.0f, accent.withAlpha(lighting().performanceGlow), radius, {});
 }
 
 void MuLookAndFeel::drawButtonText(juce::Graphics& g, juce::TextButton& button,

@@ -614,6 +614,11 @@ public:
     static void drawEllipseShadow(juce::Graphics& g, juce::Rectangle<float> ellipse,
                                   juce::Colour colour, int radius, juce::Point<int> offset);
 
+    // The same for a rounded rectangle of `bounds` (corner 0 = square corners; a negative corner is an ellipse). Every blurred
+    // shadow in drawing code goes through this or drawEllipseShadow, never a live juce::DropShadow.
+    static void drawShapeShadow(juce::Graphics& g, juce::Rectangle<float> bounds, float corner,
+                                juce::Colour colour, int radius, juce::Point<int> offset);
+
     // Below this radius a centred value would crowd the disc, so it is left to the
     // knob's label. Size 3 clears it; Size 4 does not, and nothing ships a stepped
     // control that small.

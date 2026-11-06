@@ -446,10 +446,9 @@ void RhythmCircle::paint(juce::Graphics& g)
         hubPath.addEllipse(hub);
 
         // Cast shadow, falling down-left.
-        juce::DropShadow(juce::Colours::black.withAlpha(L.shadow(L.ringHubShadow)),
-                         (int) juce::jmax(3.0f, hr * 0.22f),
-                         { -(int) juce::jmax(1.0f, hr * 0.07f), (int) juce::jmax(1.0f, hr * 0.09f) })
-            .drawForPath(g, hubPath);
+        MuLookAndFeel::drawEllipseShadow(g, hub, juce::Colours::black.withAlpha(L.shadow(L.ringHubShadow)),
+                                         (int) juce::jmax(3.0f, hr * 0.22f),
+                                         { -(int) juce::jmax(1.0f, hr * 0.07f), (int) juce::jmax(1.0f, hr * 0.09f) });
 
         // Face: lit crown at the top right shading to the lower left.
         const auto base = MuLookAndFeel::colour(Id::panelBackground);
