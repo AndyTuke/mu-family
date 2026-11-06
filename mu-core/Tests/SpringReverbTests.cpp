@@ -69,6 +69,21 @@ struct SpringReverbTests : public juce::UnitTest
                         }
         }
 
+        beginTest("sweeping Tension for a long run never reads outside the delay line (Debug asserts on a bad index)");
+        {
+            mu_core::SpringReverb sp;
+            sp.prepare(kSr);
+            bool finite = true;
+            for (int i = 0; i < (int) (kSr * 20.0); ++i)
+            {
+                if (i % 64 == 0) sp.setParameters(2.0f, 0.5f, 0.5f, 0.5f + 0.5f * std::sin((float) i * 0.00007f));
+                float l = 0, r = 0;
+                sp.process(i % 977 == 0 ? 1.0f : 0.0f, l, r);
+                finite = finite && std::isfinite(l) && std::isfinite(r);
+            }
+            expect(finite);
+        }
+
         beginTest("non-finite parameters fall back to defaults");
         {
             mu_core::SpringReverb sp; sp.prepare(kSr);

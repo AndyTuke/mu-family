@@ -163,8 +163,9 @@ private:
         const float d = std::clamp(delaySamples, 2.0f, (float) (size - 4));
         float rp = (float) write - d;
         if (rp < 0.0f) rp += (float) size;
-        const int i0 = (int) rp;
-        const float f = rp - (float) i0;
+        int i0 = (int) rp;
+        if (i0 >= size || i0 < 0) i0 = 0;   // adding size to a tiny negative position can round up to exactly size
+        const float f = std::clamp(rp - (float) i0, 0.0f, 1.0f);
         const int i1 = i0 + 1 >= size ? 0 : i0 + 1;
         return line[(size_t) i0] + f * (line[(size_t) i1] - line[(size_t) i0]);
     }

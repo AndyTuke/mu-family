@@ -142,8 +142,9 @@ private:
         const float d = std::clamp(b.delay + b.wobble, 4.0f, (float) (size - 4));
         float rp = (float) b.write - d;
         if (rp < 0.0f) rp += (float) size;
-        const int i0 = (int) rp;
-        const float f = rp - (float) i0;
+        int i0 = (int) rp;
+        if (i0 >= size || i0 < 0) i0 = 0;   // adding size to a tiny negative position can round up to exactly size
+        const float f = std::clamp(rp - (float) i0, 0.0f, 1.0f);
         const int i1 = i0 + 1 >= size ? 0 : i0 + 1;
         float v = b.line[(size_t) i0] + f * (b.line[(size_t) i1] - b.line[(size_t) i0]);
 
