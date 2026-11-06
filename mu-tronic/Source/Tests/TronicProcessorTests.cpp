@@ -164,7 +164,7 @@ struct MuTronicProcessorTests : juce::UnitTest
         expect(p.getLayerAccess() == mu_core::LayerAccess::Published);
         expect(p.layersAreSlots());
         expect(p.canReorderLayers(), "two slots can swap (TronicSwapTests)");
-        expect(p.getLayerTypes().size() == 11, "the product's Arp, Kick, Bass, Hat, Snare, Rumble, FM Perc, Chord, Pattern and Rhythm and the test type are offered");
+        expect(p.getLayerTypes().size() == 12, "the product's Arp, Kick, Bass, Hat, Snare, Rumble, FM Perc, Chord, Pattern, Rhythm and Phrase and the test type are offered");
         for (int i = 0; i < 16; ++i)
         {
             expect(p.getLayer(i) != nullptr);
@@ -182,7 +182,7 @@ struct MuTronicProcessorTests : juce::UnitTest
 
         mu_seam_test::TempStorage storage2;
         mu_tronic::PluginProcessor bare;   // the product as built: Arp, Kick, Bass, Hat, Snare, Rumble, FM Perc, Chord, Pattern and Rhythm
-        expect(bare.getLayerTypes().size() == 10 && bare.getLayerTypes().find(mu_core::LayerTypeId::Arp) != nullptr);
+        expect(bare.getLayerTypes().size() == 11 && bare.getLayerTypes().find(mu_core::LayerTypeId::Arp) != nullptr);
     }
 
     void namesAndColours()

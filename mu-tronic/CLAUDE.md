@@ -16,7 +16,7 @@ A live release product (backlog #1678), released with the rest of the series: **
 
 ## Layer types
 
-Static layer libraries compiled into the binary, registered in [Source/Persistence/LayerTypes.cpp](Source/Persistence/LayerTypes.cpp): Arp (`mu-toni-layer`), Kick / Bass / Hat / Snare / Rumble / FM Perc (`mu-on-layer`), Pattern (`mu-tant-layer`), Rhythm (`mu-clid-layer`). Engines do not update independently: suite-wide releases, and mu-Tronic is rebuilt and released whenever an app's engine changes.
+Static layer libraries compiled into the binary, registered in [Source/Persistence/LayerTypes.cpp](Source/Persistence/LayerTypes.cpp): Arp (`mu-toni-layer`), Kick / Bass / Hat / Snare / Rumble / FM Perc (`mu-on-layer`), Pattern (`mu-tant-layer`), Rhythm (`mu-clid-layer`), Phrase (`mu-tilate-layer`; the loop loading and auditions are `PhraseSlotHost`, built over mu-core's `LayerHostView`, with a short timer that loads the loop a restored slot names). Engines do not update independently: suite-wide releases, and mu-Tronic is rebuilt and released whenever an app's engine changes.
 
 ## Rules
 

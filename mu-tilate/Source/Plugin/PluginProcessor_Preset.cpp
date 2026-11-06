@@ -31,15 +31,6 @@ void PluginProcessor::applyStateTree(const juce::ValueTree& state)
         reloadLoopIfNeeded(l);
 }
 
-void PluginProcessor::reloadLoopIfNeeded(int layer)
-{
-    const auto& ph = getPhrase(layer);
-    const auto path = ph.loopPath();
-    if (path.isEmpty()) return;
-    const auto d = ph.getData();
-    if (d != nullptr && d->audio != nullptr && ph.loadedLoopPath() == path) return;   // already holds that file's audio
-    loadLoopAsync(layer, juce::File(path), true);
-}
 
 void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
 {

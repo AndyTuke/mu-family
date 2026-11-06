@@ -3,6 +3,7 @@
 #include "Persistence/TrackLayerTypes.h"   // Kick, Bass, Hat, Snare, Rumble, FM Perc (mu-On's layer library)
 #include "Persistence/PatternLayerType.h"  // the Pattern type (mu-Tant's layer library)
 #include "Persistence/RhythmLayerType.h"   // the Rhythm type (mu-Clid's layer library)
+#include "Persistence/PhraseLayerType.h"   // the Phrase type (mu-Tilate's layer library)
 
 namespace mu_tronic
 {
@@ -21,6 +22,7 @@ void registerLayerTypes(mu_core::LayerTypeRegistry& registry)
     registry.add(trackLayerType(mu_core::LayerTypeId::Chord));
     registry.add(patternLayerType());
     registry.add(rhythmLayerType());
+    registry.add(phraseLayerType());
 }
 
 } // namespace mu_tronic

@@ -33,11 +33,11 @@ inline constexpr const char* kFullPresetExtension = "muTronic";
 inline constexpr const char* kAppName             = "muTronic";   // the settings file and content folder
 
 // The parameter-id prefixes a slot's own rows may carry: one per layer-type family, `<letter><slot>_`
-// (r Rhythm, v Pattern, a Arp, t Track: the five mu-On engines share t). Every family is listed from the start,
+// (r Rhythm, v Pattern, a Arp, t Track: the seven mu-On engines share t, p Phrase). Every family is listed from the start,
 // so the layout does not change as the types are registered one at a time; a family with no registered type
 // simply has no parameters. Exactly one prefix is live per slot, the one of the slot's current type
 // (ProcessorBase::setLayerType names it), and only that prefix is saved or applied.
-inline constexpr const char* kPrefixLetters = "rvat";
+inline constexpr const char* kPrefixLetters = "rvatp";
 
 inline juce::String slotPrefix(char letter, int slot)
 {

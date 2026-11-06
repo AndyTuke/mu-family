@@ -147,7 +147,7 @@ struct MuTronicLayoutTests : juce::UnitTest
             expectEquals(types.discInitial(LayerTypeId::Rumble), juce::String("R"));
             expectEquals(types.discInitial(LayerTypeId::FmPerc), juce::String("F"));
             expectEquals(types.discInitial(LayerTypeId::Chord), juce::String("C"));
-            expectEquals(seen.size(), 10, "ten choices");
+            expectEquals(seen.size(), 11, "eleven choices");
         }
 
         beginTest("a strip's sidechain source reaches every slot and the external bus");
@@ -183,7 +183,7 @@ struct MuTronicLayoutTests : juce::UnitTest
                     if (withId->getParameterID().startsWith("v0_")) ++patternRows;
                     if (withId->getParameterID().startsWith("r0_")) ++rhythmRows;
                 }
-            const int kRowsPerSlot = 64 + 98 + patternRows + rhythmRows;
+            const int kRowsPerSlot = 64 + 98 + patternRows + rhythmRows + 37;   // 37 = the Phrase rows
             expect(rhythmRows > 0, "the Rhythm's rows are declared");
             expect(count >= 16 * kRowsPerSlot && count < 16 * kRowsPerSlot + 400, "the Arp, Track, Pattern and Rhythm rows of all sixteen slots are in the layout, and no more");
             p->flushPendingAsyncUpdates();

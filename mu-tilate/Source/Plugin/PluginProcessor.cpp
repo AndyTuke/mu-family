@@ -3,9 +3,7 @@
 #include "License/LicenseKey.h"
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 
-#include "Analysis/LoopTempo.h"   // mu-core: a first tempo guess from the loop length
 
-#include "Audio/LoopLoader.h"              // mu-core: decode a loop file
 #include "Plugin/HostTransport.h"          // mu-core: DAW / mu-link transport read
 #include "Plugin/TransportResolver.h"      // mu-core: the family transport rule
 
@@ -36,7 +34,9 @@ PluginProcessor::PluginProcessor()
                         .withInput ("Sidechain", juce::AudioChannelSet::stereo(), false)
                         .withOutput("Output",    juce::AudioChannelSet::stereo(), true),
                     createParameterLayout(),
-                    juce::Identifier("MuTilateState"))
+                    juce::Identifier("MuTilateState")),
+      mu_core::ProcessorLayerHostView(static_cast<ProcessorBase&>(*this)),
+      PhraseSlotHost(static_cast<mu_core::ProcessorLayerHostView&>(*this))
 {
     // All eight Phrases exist for the processor's lifetime (capacity is fixed, only the count is runtime).
     keepSpareLayers = true;
@@ -45,7 +45,6 @@ PluginProcessor::PluginProcessor()
         layers[(size_t) i] = createLayer(i);
         layers[(size_t) i]->colourIndex = i;   // each layer starts on its own palette colour
         jassert(dynamic_cast<Phrase*>(layers[(size_t) i].get()) != nullptr);
-        loopGeneration[(size_t) i].store(0);
     }
     storeLayerCount(1, std::memory_order_relaxed);   // a fresh instance starts with one layer
 
@@ -71,7 +70,6 @@ PluginProcessor::PluginProcessor()
 
 PluginProcessor::~PluginProcessor()
 {
-    alive->store(false);        // a loop load still running on a worker must not reach this object
     prepareForDestruction();    // first: no deferred-work tick may reach this half-destroyed object
 }
 
@@ -120,200 +118,6 @@ void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
         ph.insert->setSlotIndex(d);
         ph.insert->reset();
     }
-}
-
-DetectSettings PluginProcessor::detectSettingsOf(int layer) const
-{
-    auto raw = [&](int row) { return apvts.getRawParameterValue(layerParamPrefix(layer) + ppi::suffix[row])->load(); };
-    DetectSettings s;
-    s.method      = (int) raw(ppi::dmethod);
-    s.sensitivity = raw(ppi::dsens);
-    s.minGapMs    = raw(ppi::dgap);
-    s.preRollMs   = raw(ppi::dpre);
-    s.lowCutHz    = raw(ppi::dlow);
-    s.highCutHz   = raw(ppi::dhigh);
-    return s;
-}
-
-// Publishes `slices` with a timeline as long as the slices take back to back (in bars of 4/4), with the length in whole bars:
-// empty, or with the slices laid out in source order from beat 0. Returns the total length in beats.
-double PluginProcessor::layOutInOrder(int layer, const SliceList& slices, double sampleRate, double loopTempo, bool inOrder)
-{
-    std::vector<double> beats;
-    double total = 0.0;
-    for (int i = 0; i < slices.size(); ++i)
-    {
-        beats.push_back((double) slices.slice(i).length() / sampleRate * loopTempo / 60.0);
-        total += beats.back();
-    }
-    const int bars = juce::jlimit(1, 64, (int) std::ceil(total / 4.0 - 1.0e-6));
-    Timeline timeline((double) bars * 4.0);
-    std::vector<SliceSettings> startWith;   // each hit starts with its slice's settings
-    for (int i = 0; i < slices.size(); ++i) startWith.push_back(slices.settings(i));
-    if (inOrder) timeline.originalOrder(beats, startWith);
-    getPhrase(layer).commitEdit(slices, timeline);
-    return total;
-}
-
-// Detect again on the loaded loop (a worker), then publish the new slices and a timeline in source order.
-void PluginProcessor::redetectSlices(int layer)
-{
-    if (layer < 0 || layer >= mu_limits::kMaxLayers) return;
-    const auto data = getPhrase(layer).getData();
-    if (data == nullptr || data->audio == nullptr) return;
-    const int gen = detectGeneration[(size_t) layer].fetch_add(1) + 1;
-    const auto detect = detectSettingsOf(layer);
-    const double loopTempo = (double) apvts.getRawParameterValue(layerParamPrefix(layer) + ppi::suffix[ppi::ltempo])->load();
-    auto flag = alive;
-
-    juce::Thread::launch([this, layer, gen, data, detect, loopTempo, flag]
-    {
-        const auto curve = analyseLoop(*data->audio, data->fileSampleRate, detect);
-        auto slices = std::make_shared<SliceList>(detectSlices(curve, *data->audio, detect, &data->slices));
-        juce::MessageManager::callAsync([this, layer, gen, data, slices, loopTempo, flag]
-        {
-            if (! flag->load() || detectGeneration[(size_t) layer].load() != gen) return;   // gone, or a newer Detect
-            auto& ph = getPhrase(layer);
-            if (ph.getData() == nullptr || ph.getData()->audioId != data->audioId) return;   // another loop arrived meanwhile
-            if (ph.getData()->version != data->version)   // edits made while it ran would be lost: leave them, say so
-            {
-                loopStatus[(size_t) layer] = ph.loopName() + ": the slices changed while Detect ran, so it was not applied. Press Detect again.";
-                return;
-            }
-            const double total = layOutInOrder(layer, *slices, data->fileSampleRate, loopTempo, true);
-            loopStatus[(size_t) layer] = ph.loopName() + ": " + juce::String(slices->size()) + " slices, "
-                                       + juce::String(total, 1) + " beats at " + juce::String(loopTempo, 0) + " BPM";
-        });
-    });
-}
-
-// Lays the layer's slices out one after another in source order (the Sequencer's Lay out button).
-void PluginProcessor::layOutSlices(int layer)
-{
-    if (layer < 0 || layer >= mu_limits::kMaxLayers) return;
-    const auto data = getPhrase(layer).getData();
-    if (data == nullptr || data->audio == nullptr) return;
-    const double loopTempo = (double) apvts.getRawParameterValue(layerParamPrefix(layer) + ppi::suffix[ppi::ltempo])->load();
-    layOutInOrder(layer, data->slices, data->fileSampleRate, loopTempo, true);
-}
-
-// Decode on a worker, detect, then publish the slices on the message thread with an empty timeline. A newer
-// request for the layer (or a destroyed processor) makes an older completion do nothing.
-void PluginProcessor::loadLoopAsync(int layer, const juce::File& file, bool keepSavedEdits)
-{
-    loadLoopAsync(layer, file, keepSavedEdits, nullptr, 0.0, -1, -1);
-}
-
-// Uses the section [start, end) of the layer's source; the layer is laid out afresh, as for a new loop.
-void PluginProcessor::setSourceRegion(int layer, int start, int end)
-{
-    if (layer < 0 || layer >= mu_limits::kMaxLayers) return;
-    const auto d = getPhrase(layer).getData();
-    if (d == nullptr || d->audio == nullptr) return;
-    const auto src = d->source != nullptr ? d->source : d->audio;
-    loadLoopAsync(layer, juce::File(getPhrase(layer).loadedLoopPath()), false, src, d->fileSampleRate, start, end);
-}
-
-void PluginProcessor::loadLoopAsync(int layer, const juce::File& file, bool keepSavedEdits,
-                                    std::shared_ptr<const juce::AudioBuffer<float>> decoded, double decodedRate, int regionStart, int regionEnd)
-{
-    if (layer < 0 || layer >= mu_limits::kMaxLayers) return;
-    const int gen = loopGeneration[(size_t) layer].fetch_add(1) + 1;
-    loopStatus[(size_t) layer] = "Loading " + file.getFileName() + " ...";
-
-    const auto detect = detectSettingsOf(layer);
-    const double loopTempo = (double) apvts.getRawParameterValue(layerParamPrefix(layer) + ppi::suffix[ppi::ltempo])->load();
-    auto flag = alive;
-
-    // The section of the source to use: asked for, or (a restore) the one the saved layer used.
-    int rStart = regionStart, rEnd = regionEnd;
-    if (rStart < 0 && keepSavedEdits) getPhrase(layer).savedRegion(rStart, rEnd);
-
-    juce::Thread::launch([this, layer, gen, file, detect, loopTempo, flag, keepSavedEdits, decoded, decodedRate, rStart, rEnd]
-    {
-        auto loaded = std::make_shared<mu_core::LoadedLoop>();
-        if (decoded != nullptr)
-        {
-            loaded->audio = decoded; loaded->sampleRate = decodedRate; loaded->name = file.getFileNameWithoutExtension();
-        }
-        else
-            *loaded = mu_core::loadLoop(file, mu_limits::kMaxLoopBytes);
-
-        // Cut the used section out of the whole file (a copy; the source stays whole for the next trim).
-        std::shared_ptr<const juce::AudioBuffer<float>> source = loaded->audio;
-        int from = 0, to = source != nullptr ? source->getNumSamples() : 0;
-        if (source != nullptr && rStart >= 0)
-        {
-            const int total = source->getNumSamples();
-            const int a = juce::jlimit(0, juce::jmax(0, total - 2), rStart);
-            const int b = juce::jlimit(a + 1, total, rEnd <= 0 ? total : rEnd);
-            if (a > 0 || b < total)
-            {
-                auto cut = std::make_shared<juce::AudioBuffer<float>>(source->getNumChannels(), b - a);
-                for (int ch = 0; ch < cut->getNumChannels(); ++ch) cut->copyFrom(ch, 0, *source, ch, a, b - a);
-                loaded->audio = cut;
-                from = a; to = b;
-            }
-        }
-
-        std::shared_ptr<SliceList> slices;
-        if (loaded->ok())
-        {
-            const auto curve = analyseLoop(*loaded->audio, loaded->sampleRate, detect);
-            slices = std::make_shared<SliceList>(detectSlices(curve, *loaded->audio, detect));
-        }
-
-        juce::MessageManager::callAsync([this, layer, gen, file, loaded, slices, loopTempo, flag, keepSavedEdits, source, from, to]
-        {
-            if (! flag->load() || loopGeneration[(size_t) layer].load() != gen) return;   // gone, or superseded
-            if (! loaded->ok()) { loopStatus[(size_t) layer] = loaded->error; return; }
-
-            auto& ph = getPhrase(layer);
-
-            // A restore whose saved edits fit this loop keeps them (installLoop applies them); anything else gets the
-            // detected slices and an empty timeline of the loop's length (in bars of 4/4).
-            const bool keep = keepSavedEdits && ph.savedEditsFit(loaded->audio->getNumSamples());
-            ph.installLoop(loaded->audio, loaded->sampleRate, file.getFullPathName(), loaded->name, source, from, to);
-
-            // A new loop sets the layer's loop tempo to the estimate from its length (a whole number of beats); the Tempo
-            // knob overrides it. A restore keeps the saved tempo.
-            double tempo = loopTempo;
-            bool estimated = false;
-            if (! keep)
-            {
-                // The detected attacks (marker 0 is always at the start, so it is no evidence) pick between the readings the length allows.
-                std::vector<double> attacks;
-                for (int i = 1; slices != nullptr && i < slices->size(); ++i)
-                    attacks.push_back((double) slices->marker(i).position / loaded->sampleRate);
-                const double guess = mu_core::estimateTempoFromOnsets((double) loaded->audio->getNumSamples() / loaded->sampleRate, attacks);
-                if (guess > 0.0)
-                {
-                    tempo = juce::jlimit(20.0, 300.0, guess);
-                    estimated = true;
-                    if (auto* p = apvts.getParameter(layerParamPrefix(layer) + ppi::suffix[ppi::ltempo]))
-                        p->setValueNotifyingHost(p->convertTo0to1((float) tempo));
-                }
-            }
-
-            double total = 0.0;
-            if (! keep)
-                total = layOutInOrder(layer, *slices, loaded->sampleRate, tempo, false);   // a new loop starts with no hits
-            else if (const auto kept = ph.getData(); kept != nullptr)   // the restored slices, not the freshly detected ones
-                for (int i = 0; i < kept->slices.size(); ++i)
-                    total += (double) kept->slices.slice(i).length() / loaded->sampleRate * tempo / 60.0;
-            const auto shown = ph.getData();
-            loopStatus[(size_t) layer] = loaded->name + ": " + juce::String(shown != nullptr ? shown->slices.size() : 0) + " slices, "
-                                       + juce::String(total, 1) + " beats at " + juce::String(tempo, estimated ? 1 : 0) + " BPM"
-                                       + (estimated ? " (estimated from the length)" : "");
-        });
-    });
-}
-
-juce::String PluginProcessor::getLoopStatus(int layer) const
-{
-    if (layer < 0 || layer >= mu_limits::kMaxLayers) return {};
-    const auto& s = loopStatus[(size_t) layer];
-    return s.isNotEmpty() ? s : (getPhrase(layer).loopName().isNotEmpty() ? getPhrase(layer).loopName() : juce::String("No loop"));
 }
 
 void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)

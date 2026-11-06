@@ -4,8 +4,8 @@
 #include "Persistence/PhraseParams.h"    // the Phrase type's parameter table (ppi, addLayerParams)
 #include "Plugin/MixerFxParams.h"        // mu-core: shared global-FX / mixer APVTS layout
 #include "Sequencer/Phrase.h"            // the Phrase layer
-#include "Sequencer/PhraseAnalysis.h"    // slice detection
-#include "UI/PhraseHost.h"               // what the Phrase layer's UI reads from its host
+#include "Plugin/ProcessorLayerHostView.h"   // mu-core: the layer host view over this processor
+#include "Sequencer/PhraseSlotHost.h"      // the Phrase layers' host adapter: loop loading, and what the UI reads
 
 #include <array>
 #include <atomic>
@@ -18,7 +18,8 @@ namespace mu_tilate
 {
 
 class PluginProcessor : public ProcessorBase,
-                        public PhraseHost
+                        private mu_core::ProcessorLayerHostView,   // before PhraseSlotHost: its host view
+                        public PhraseSlotHost
 {
 public:
     PluginProcessor();
@@ -73,50 +74,7 @@ public:
     void loadLayerPreset(int layer, const juce::File& file) override;
     juce::ValueTree captureLayerPresetTree(int layer) override;
 
-    // ── PhraseHost: what PhraseContent reads (message thread) ─────────────────
-    juce::AudioProcessorValueTreeState& getPhraseParameters() noexcept override { return apvts; }
-    Phrase&       getPhrase(int i) noexcept override { return layerAs<Phrase>(i); }
-    const Phrase& getPhrase(int i) const noexcept    { return layerAs<Phrase>(i); }
-    float getModLive(int layer, int dest) const noexcept override
-    {
-        return getPhrase(juce::jlimit(0, mu_limits::kMaxLayers - 1, layer)).getModLive(dest);
-    }
-    int getPhraseColourIndex(int layer) const override { return getLayerColourIndex(layer); }
-    bool   isPhraseTransportPlaying() const noexcept override { return isInternalPlaying(); }
-    double getPhraseTransportBeat() const noexcept override   { return getInternalBeatPos(); }
-    void loadLoopAsync(int layer, const juce::File& file, bool keepSavedEdits = false) override;
-    // The same from an already decoded source (no disk), using the section [regionStart, regionEnd) of it.
-    void loadLoopAsync(int layer, const juce::File& file, bool keepSavedEdits,
-                       std::shared_ptr<const juce::AudioBuffer<float>> decoded, double decodedRate, int regionStart, int regionEnd);
-    void layOutSlices(int layer) override;
-    void previewSource(int layer, int kind, int slice) override
-    {
-        // An audition and the sequence never sound together: it plays only while the transport is stopped.
-        if (layer >= 0 && layer < mu_limits::kMaxLayers && ! isInternalPlaying())
-            getPhrase(layer).startPreview((Phrase::PreviewKind) juce::jlimit(0, 2, kind), slice, getInternalBpm());
-    }
-    void auditionFile(int layer, const juce::File& file) override
-    {
-        if (layer >= 0 && layer < mu_limits::kMaxLayers && ! isInternalPlaying()) getPhrase(layer).auditionFile(file);
-    }
-    juce::File getPrimarySampleDir() const override
-    {
-        // The same setting the other products use for the user's sample folder (the Music folder until one is chosen).
-        if (auto* settings = const_cast<PluginProcessor*>(this)->getAppSettingsFile())
-        {
-            const auto stored = settings->getValue("primarySampleDir");
-            if (stored.isNotEmpty()) return juce::File(stored);
-        }
-        return juce::File::getSpecialLocation(juce::File::userMusicDirectory);
-    }
-    juce::File getSamplesDir() const override { auto dir = getContentDir().getChildFile("Samples"); dir.createDirectory(); return dir; }
-    void setPreviewLooping(int layer, bool loop) override { if (layer >= 0 && layer < mu_limits::kMaxLayers) getPhrase(layer).setPreviewLooping(loop); }
-    void stopPreview(int layer) override { if (layer >= 0 && layer < mu_limits::kMaxLayers) getPhrase(layer).stopPreview(); }
-    void setPlayArea(int layer, int start, int end) override { if (layer >= 0 && layer < mu_limits::kMaxLayers) getPhrase(layer).setPlayArea(start, end); }
-    double getPreviewPlayhead(int layer) const override { return layer >= 0 && layer < mu_limits::kMaxLayers ? getPhrase(layer).previewPlayhead() : -1.0; }
-    void cropLoop(int layer, int start, int end) override { if (layer >= 0 && layer < mu_limits::kMaxLayers) getPhrase(layer).cropTo(start, end); }
-    void setSourceRegion(int layer, int start, int end) override;
-    juce::String getLoopStatus(int layer) const override;
+
 
 protected:
     void stageLayerPresetTree(int layer, juce::ValueTree tree, bool keepIdentity) override;
@@ -138,24 +96,8 @@ private:
     void            applyStateTree(const juce::ValueTree& state);
     void            applyLayerTree(int layer, const juce::ValueTree& tree);
 
-    // The detection settings from layer `layer`'s parameters (any thread: reads the raw atomics).
-    DetectSettings detectSettingsOf(int layer) const;
-    void redetectSlices(int layer) override;
-    // Loads the loop a layer's preset or session names when the layer does not hold that file's audio (message thread).
-    void reloadLoopIfNeeded(int layer);
-    // Publishes `slices` with a timeline of the layer's length: empty, or (inOrder) the slices back to back from beat 0.
-    double layOutInOrder(int layer, const SliceList& slices, double sampleRate, double loopTempo, bool inOrder);
-
     std::atomic<double> currentSampleRate { 44100.0 };
     std::atomic<int>    currentBlockSize  { 512 };
-
-    // Loop loading: a generation per layer (a newer request supersedes an older one), the status line, and a flag the
-    // worker's completion checks so it never touches a processor that is gone.
-    std::array<std::atomic<int>, (size_t) mu_limits::kMaxLayers> loopGeneration {};
-    // Detect has its own count, so it neither cancels a loop being loaded nor is cancelled by a load's start.
-    std::array<std::atomic<int>, (size_t) mu_limits::kMaxLayers> detectGeneration {};
-    std::array<juce::String, (size_t) mu_limits::kMaxLayers>     loopStatus;   // message thread
-    std::shared_ptr<std::atomic<bool>> alive = std::make_shared<std::atomic<bool>>(true);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };

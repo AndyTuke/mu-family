@@ -10,7 +10,7 @@ The editor will inherit `mu-core/UI/EditorShellBase.h` and use the shared `Layer
 
 ## Status
 
-**In build, staged (Andy, 2026-10-31: "start it now"); the plan and stage status are in [docs/mu-tilate/design-buildplan.md](../docs/mu-tilate/design-buildplan.md). Built: the `mu-tilate-layer` library, the `mu-tilate` plugin target (VST3 + CLAP + Standalone), `mu-tilate-tests`, the slice player, detection, Phrase and timeline engine, persistence, and the editor (Sequencer / Layer / Slice views). Layer controls are absolute, slice controls are offsets from them. Not done: mu-Tronic hosting, the manual and the release itself.** Ask Andy before starting any of those; open work is in [backlog.md](../backlog.md).
+**In build, staged (Andy, 2026-10-31: "start it now"); the plan and stage status are in [docs/mu-tilate/design-buildplan.md](../docs/mu-tilate/design-buildplan.md). Built: the `mu-tilate-layer` library, the `mu-tilate` plugin target (VST3 + CLAP + Standalone), `mu-tilate-tests`, the slice player, detection, Phrase and timeline engine, persistence, and the editor (Sequencer / Layer / Slice views). Layer controls are absolute, slice controls are offsets from them. mu-Tronic hosting is wired (headless tests pass).** Ask Andy before starting any of those; open work is in [backlog.md](../backlog.md).
 
 ## Decisions (Andy, 2026-10-30)
 
@@ -46,6 +46,6 @@ The editor will inherit `mu-core/UI/EditorShellBase.h` and use the shared `Layer
 
 Done: the CMake target, product source and tests; licensing (`Source/License/LicenseKey.h`, key in OneDrive secrets); Signalsmith Stretch notice and About credit; the product-listing scripts, `ci.yml`, `release.yml` (fixed-name `mu-Tilate-Windows.zip` with factory loops); six original CC0 factory loops in `factory/` (regenerate with `scripts/make-tilate-factory-loops.py`). There is no installer, as for mu-Toni and mu-On (zip only). Remaining:
 
-1. mu-Tronic: link `mu-tilate-layer`, add the `Phrase` `LayerTypeInfo` row in `LayerTypes.cpp` and a `PhraseLayerType` glue file, `LayerTypeId::Phrase` in `mu-core`, prefix letter `p` in `kPrefixLetters` / `slotPrefixSets()`; update [mu-tronic/CLAUDE.md](../mu-tronic/CLAUDE.md) and the mu-Tronic docs.
+1. ~~mu-Tronic hosting~~ done (Phrase registered, prefix `p`, `PhraseSlotHost`); built and tested headless, not yet seen or heard in the mu-Tronic window.
 2. At release time: `scripts/write-latest-json.ps1 -Products mu-tilate` (supported), the website and release-notes page via the `web-designer`.
 3. Manual via the `user-documentation-author` (`docs/mu-tilate/create_manual.ps1` and `images/`).

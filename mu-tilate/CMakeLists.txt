@@ -16,6 +16,7 @@ target_sources(mu-tilate-layer INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/PhrasePlayback.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/Phrase.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/PhraseAnalysis.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/PhraseSlotHost.cpp"
 )
 target_include_directories(mu-tilate-layer INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
 # Signalsmith Stretch (MIT, header-only) and its FFT library; SYSTEM so their warnings stay out of ours.

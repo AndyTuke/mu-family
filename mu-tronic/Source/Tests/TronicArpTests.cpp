@@ -84,7 +84,7 @@ struct MuTronicArpTests : juce::UnitTest
         beginTest("the Arp type is offered, and its 64 rows exist under a{N}_ for all sixteen slots");
         mu_seam_test::TempStorage storage;
         ArpProcessor p;
-        expectEquals(p.getLayerTypes().size(), 10);
+        expectEquals(p.getLayerTypes().size(), 11);
         const auto* info = p.getLayerTypes().find(LayerTypeId::Arp);
         expect(info != nullptr);
         if (info != nullptr)

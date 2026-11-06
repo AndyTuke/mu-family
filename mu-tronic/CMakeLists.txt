@@ -36,6 +36,7 @@ target_sources(mu-tronic
         Source/Persistence/TrackLayerTypes.cpp
         Source/Persistence/PatternLayerType.cpp
         Source/Persistence/RhythmLayerType.cpp
+        Source/Persistence/PhraseLayerType.cpp
         Source/Persistence/ProductImport.cpp
         Source/UI/EmptySlotChooser.cpp
         Source/UI/TronicSettingsOverlay.cpp
@@ -48,6 +49,7 @@ target_sources(mu-tronic
         ${MU_ON_LAYER_UI_SOURCES}     # the Track types' UI content: TrackContent, StepRows, TrackStepRow (mu-on-layer)
         ${MU_TANT_LAYER_UI_SOURCES}   # the Pattern type's UI content: PatternContent, GatingDesigner (mu-tant-layer)
         ${MU_CLID_LAYER_UI_SOURCES}   # the Rhythm type's UI content: RhythmContent, VoiceSection, the sample browser (mu-clid-layer)
+        ${MU_TILATE_LAYER_UI_SOURCES} # the Phrase type's UI content: PhraseContent, PhraseTimeline, SlicePanel (mu-tilate-layer)
 )
 
 target_include_directories(mu-tronic
@@ -89,6 +91,7 @@ target_link_libraries(mu-tronic
         mu-on-layer     # the Track types (Kick, Bass, Hat, Snare, Rumble, FM Perc): the same
         mu-tant-layer   # the Pattern type: the same
         mu-clid-layer   # the Rhythm type: the same
+        mu-tilate-layer # the Phrase type: the same
         mu-core
         juce::juce_audio_utils
         juce::juce_dsp
@@ -139,6 +142,7 @@ target_sources(mu-tronic-tests PRIVATE
     Source/Tests/TronicTrackTests.cpp       # the Kick, Bass, Hat and Snare types in a slot: saved rows, same stream as mu-On, tails, presets
     Source/Tests/TronicLayerPresetTests.cpp # layer presets in a slot: save/load per type, Empty-slot adopt, cross-type refusal, staged load
     Source/Tests/TronicPatternTests.cpp     # the Pattern type in a slot: saved rows, same stream as mu-Tant, Note mode per layer, services, wavetables, presets
+    Source/Tests/TronicPhraseTests.cpp      # the Phrase type in a slot: registry row, rows by type, loop load through the services, session restore
     Source/Tests/TronicSwapTests.cpp        # swapLayers in a slot host: Kick, Arp, Rumble and Rhythm reorder with rows, strips, Rumble source and tails
     Source/Tests/TronicRhythmTests.cpp      # the Rhythm type in a slot: saved rows, same stream as mu-Clid, parameter sync, samples, MIDI out, tails, .muRhythm presets
     Source/Tests/TronicMidiInTests.cpp      # per-layer MIDI In: the strip row, channel routing, carried keys, save / swap, the load meter
@@ -154,6 +158,7 @@ target_sources(mu-tronic-tests PRIVATE
     Source/Persistence/TrackLayerTypes.cpp
     Source/Persistence/PatternLayerType.cpp
     Source/Persistence/RhythmLayerType.cpp
+    Source/Persistence/PhraseLayerType.cpp
     Source/Persistence/ProductImport.cpp
     "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/License/LemonSqueezyClient.cpp"
@@ -166,6 +171,9 @@ target_sources(mu-tronic-tests PRIVATE
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/Rhythm.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/HitGenerator.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/EuclideanGenerator.cpp"
+    # The Phrase type's loop decode and onset detection (the plugin targets get them through mu-core).
+    "${CMAKE_SOURCE_DIR}/mu-core/Analysis/OnsetDetector.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/LoopLoader.cpp"
 )
 
 target_compile_features(mu-tronic-tests PRIVATE cxx_std_17)
@@ -184,6 +192,7 @@ target_link_libraries(mu-tronic-tests PRIVATE mu-core-assets
     mu-on-layer
     mu-tant-layer
     mu-clid-layer
+    mu-tilate-layer
     juce::juce_core
     juce::juce_audio_basics
     juce::juce_audio_processors
@@ -202,6 +211,6 @@ target_link_libraries(mu-tronic-tests PRIVATE mu-core-assets
 target_compile_definitions(mu-tronic-tests PRIVATE "MU_TRONIC_FIXTURE_DIR=\"${CMAKE_SOURCE_DIR}/tests/presets/mu-tronic-slot\"")
 # Full presets written by the real mu-Clid, mu-Tant, mu-Toni and mu-On, imported into slots (Tests/TronicImportTests.cpp).
 target_compile_definitions(mu-tronic-tests PRIVATE "MU_TRONIC_IMPORT_FIXTURE_DIR=\"${CMAKE_SOURCE_DIR}/tests/presets/mu-tronic-import\"")
-target_compile_definitions(mu-tronic-tests PRIVATE MU_MAX_LAYERS=16 MU_MAX_BUSES=3 MU_BUS_INSERTS=2 JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+target_compile_definitions(mu-tronic-tests PRIVATE MU_MAX_LAYERS=16 MU_MAX_BUSES=3 MU_BUS_INSERTS=2 JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0 JUCE_MODAL_LOOPS_PERMITTED=1)   # the Phrase tests pump the message loop while a loop loads
 
 add_dependencies(mu-tronic mu-tronic-tests)
