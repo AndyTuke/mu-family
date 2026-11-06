@@ -21,6 +21,10 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://transwarp.me/mu-tilate</loc>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://transwarp.me/mu-tronic</loc>
     <priority>0.7</priority>
   </url>
@@ -66,6 +70,10 @@
   </url>
   <url>
     <loc>https://transwarp.me/mu-on-releases</loc>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://transwarp.me/mu-tilate-releases</loc>
     <priority>0.4</priority>
   </url>
   <url>
