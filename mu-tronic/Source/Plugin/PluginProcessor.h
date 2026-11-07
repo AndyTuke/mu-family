@@ -22,10 +22,19 @@
 namespace mu_tronic
 {
 
+// What a product built on this shell names itself (mu-Host is the one that does): the saved state's root tag, the settings /
+// content folder, and whether the shell asks for mu-Tronic's own licence (a product that licenses per engine switches it off).
+struct ProcessorIdentity
+{
+    const char* stateType = kStateType;
+    const char* appName   = kAppName;
+    bool        ownLicence = true;
+};
+
 class PluginProcessor : public ProcessorBase
 {
 public:
-    PluginProcessor();
+    explicit PluginProcessor(const ProcessorIdentity& identity = ProcessorIdentity());
     ~PluginProcessor() override;
 
     // ── AudioProcessor ───────────────────────────────────────────────────────
@@ -36,13 +45,8 @@ public:
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
 
-   #ifdef MU_HOST
-    const juce::String getName() const override { return juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Host")); }
-    juce::String getProductSlug() const override { return "mu-host"; }
-   #else
     const juce::String getName() const override { return juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Tronic")); }
     juce::String getProductSlug() const override { return "mu-tronic"; }
-   #endif
     bool acceptsMidi()  const override { return true; }
     bool producesMidi() const override { return true; }   // a Rhythm layer in MIDI output mode sends notes
     bool isMidiEffect() const override { return false; }
@@ -64,24 +68,11 @@ public:
     float getCpuPeak() const noexcept { return cpuMeter.peak(); }
 
     // The Launchpad's scene picker (hold the logo, press a column) belongs to this product.
-   #ifdef MU_HOST
-    bool offersSceneControls() const override { return false; }   // one slot: no scenes, no pages
-    bool offersLayerPages() const override { return false; }
-   #else
     bool offersSceneControls() const override { return true; }
     // Sixteen slots in two pages of eight: the Launchpad's top-row 5 and 6 turn the page.
     bool offersLayerPages() const override { return true; }
-   #endif
 
-   #ifdef MU_HOST
-    // mu-Host has no licence of its own: opening an engine runs the licence check of the PRODUCT that engine belongs to, and from
-    // then on it behaves as that product's own app (its key, its activation, its checkout page, its support prompt). A product's
-    // key covers all its engines (mu-On: Kick, Bass, Hat, Snare, Rumble, FM Perc and Chord). Message thread; returns the product's
-    // display name, or empty for an Empty slot (no licensing, no prompt).
-    juce::String licenseEngine(mu_core::LayerTypeId type);
-   #endif
-
-    // ── Slots ────────────────────────────────────────────────────────────
+    // ── Slots ────────────────────────────────────────────────────────────────
     // Sixteen fixed slots; a deleted layer leaves its slot Empty and nothing shifts. Two slots, empty or not, can
     // swap (ProcessorBase::swapLayers, quiesced): the layer takes its strip, tails and rows with it.
     bool layersAreSlots() const override { return true; }

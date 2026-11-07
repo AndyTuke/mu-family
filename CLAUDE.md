@@ -16,6 +16,7 @@ mu-toni/        Generative arpeggiator mono-synth — scale/chord note pool, ske
 mu-toni-midi/   mu-Toni MIDI: the arpeggiator as a MIDI effect — no audio, shares the arp code with mu-Toni (VST3 + CLAP; see mu-toni-midi/CLAUDE.md)
 mu-on/          909-style groove sequencer — Kick/Bass/Hat/Snare lanes, step grid, bass↔kick sidechain
 mu-tronic/      Performance unit — 16 layer slots hosting layers from the other products, buses, scenes (Standalone only)
+mu-host/        mu-Host: one mu instrument channel as a plug-in (VST3 + CLAP), on the mu-Tronic shell with one slot; the engine is picked from a drop-down, licensing follows the engine's product (see mu-host/CLAUDE.md)
 mu-tilate/      (in build, not yet released) Loop slicer — 8 Phrase layers, one loop + one sample player each, timeline sequencer (VST3 + CLAP + Standalone)
 docs/           Family-shared design docs; product-specific docs under docs/<product>/
 tests/          Cross-plugin listening-test pipeline

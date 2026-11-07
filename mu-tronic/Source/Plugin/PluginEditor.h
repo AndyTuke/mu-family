@@ -9,7 +9,6 @@
 #include "Plugin/PluginProcessor.h"
 #include "UI/EmptySlotChooser.h"
 #include "UI/TronicSettingsOverlay.h"
-#include "UI/Components/DropdownSelect.h"
 
 namespace mu_tronic
 {
@@ -19,17 +18,31 @@ namespace mu_tronic
 // the same way), around the shared LayerPanel (preset strip + modulators). An Empty slot shows the chooser in the
 // content area; a slot that holds a layer shows that type's content, built through the registry (one instance per
 // type, rebound as the selection moves) and painted in the type's colour. No bespoke shell or mixer code.
+// How a product built on this shell asks for it (mu-Host: one slot, no sidebar, no scenes, no clips, no mixer, no full-preset controls).
+struct EditorOptions
+{
+    bool singleSlot = false;
+};
+
 class PluginEditor : public EditorShellBase,
                      private juce::Timer
 {
 public:
-    explicit PluginEditor(PluginProcessor&);
+    explicit PluginEditor(PluginProcessor&, const EditorOptions& options = EditorOptions());
     ~PluginEditor() override;
 
 protected:
     // Shell hooks: after a full preset loads (or New), re-read every panel from the state.
     void onPresetLoaded(const juce::File& file) override;
     void onPresetNew() override;
+
+    // For a product built on this shell: called whenever a slot is shown (a selection, a type change, a restore), before the
+    // main area is set up for it. Not called to a derived class while this one is still being constructed.
+    virtual void slotShown(int slot, mu_core::LayerTypeId type) { juce::ignoreUnused(slot, type); }
+    // Gives the slot being shown the chosen type, exactly as the chooser's cards do.
+    void chooseType(mu_core::LayerTypeId type) { if (chooser.onChoose) chooser.onChoose(type); }
+    PluginProcessor& proc;
+    const bool singleSlot;
 
 private:
     // Shows slot `idx` in the main area: the chooser while it is Empty, else the type's content.
@@ -52,7 +65,6 @@ private:
     // The status bar's CPU readout, refreshed from the processor's peak four times a second.
     void timerCallback() override;
 
-    PluginProcessor& proc;
     LayerSidebar   sidebar;
     EmptySlotChooser chooser;
     LayerPanel       layerPanel;
@@ -63,20 +75,6 @@ private:
     LayerContent* shownContent = nullptr;
     juce::String  effectSendName;   // the mixer effect's current name; empty until the mixer reports it
     std::unique_ptr<juce::FileChooser> importChooser;   // alive while the import file dialog is open
-   #ifdef MU_HOST
-    // mu-Host: the one slot's engine, chosen from this list in the transport bar (the same choice the chooser cards make).
-    // The drop-down sits in a holder that fills the transport bar's loop pane and leaves it a margin, as the other products' loop sections do.
-    struct EngineHolder : juce::Component
-    {
-        DropdownSelect box;
-        EngineHolder() { addAndMakeVisible(box); }
-        void resized() override { box.setBounds(getLocalBounds().reduced(mu_ui::s(6), mu_ui::s(4))); }
-    };
-    EngineHolder engineHolder;
-    DropdownSelect& engineBox = engineHolder.box;
-    std::vector<mu_core::LayerTypeId> engineTypes;
-    void refreshEngineBox();
-   #endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };

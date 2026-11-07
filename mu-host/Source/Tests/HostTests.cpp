@@ -1,25 +1,22 @@
-// Tests of mu-Host: the mu-Tronic shell built with ONE slot (MU_HOST, MU_MAX_LAYERS=1, no buses), on the REAL PluginProcessor, headless.
+// Tests of mu-Host: the mu-Tronic shell built with ONE slot (MU_MAX_LAYERS=1, no buses), on the REAL mu_host::PluginProcessor, headless.
 // One slot that starts Empty, every engine the editor's drop-down offers, saved state under mu-Host's own names, and a rendering audio
 // thread that survives engine changes.
 
-#include "Plugin/PluginProcessor.h"
+#include "../Plugin/PluginProcessor.h"
 #include "Tests/ProcessorSeamHelpers.h"
 
 #include <cmath>
 
-#ifndef MU_HOST
- #error "HostTests.cpp belongs to the mu-host-tests target (MU_HOST=1)"
-#endif
-
-// The product class names its editor in a virtual, defined in PluginEditor.cpp, which this headless target does not link.
+// The product classes name their editors in a virtual, defined in PluginEditor.cpp, which this headless target does not link.
 juce::AudioProcessorEditor* mu_tronic::PluginProcessor::createEditor() { return nullptr; }
+juce::AudioProcessorEditor* mu_host::PluginProcessor::createEditor() { return nullptr; }
 
 namespace
 {
     static_assert(mu_limits::kMaxLayers == 1, "mu-host compiles with MU_MAX_LAYERS=1");
     static_assert(mu_limits::kMaxBuses == 0, "mu-host has no buses");
 
-    struct HostProcessor : mu_tronic::PluginProcessor
+    struct HostProcessor : mu_host::PluginProcessor
     {
         bool isStandaloneApp() const noexcept override { return true; }   // a headless run is not a plug-in host
     };
@@ -40,7 +37,7 @@ namespace
         return true;
     }
 
-    // The engines the editor's drop-down lists (PluginEditor.cpp, MU_HOST).
+    // The engines the editor's drop-down lists (Plugin/PluginEditor.cpp).
     const mu_core::LayerTypeId kEngines[] = {
         mu_core::LayerTypeId::Rhythm, mu_core::LayerTypeId::Pattern, mu_core::LayerTypeId::Arp, mu_core::LayerTypeId::Kick,
         mu_core::LayerTypeId::Bass, mu_core::LayerTypeId::Hat, mu_core::LayerTypeId::Snare, mu_core::LayerTypeId::Rumble,

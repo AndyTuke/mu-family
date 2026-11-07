@@ -27,18 +27,10 @@
 namespace mu_tronic
 {
 
-#ifdef MU_HOST
-// mu-Host is this same shell built with one slot, under its own saved names.
-inline constexpr const char* kStateType           = "MuHostState";
-inline constexpr const char* kFullPresetTag       = "MuHostPreset";
-inline constexpr const char* kFullPresetExtension = "muHost";
-inline constexpr const char* kAppName             = "muHost";   // the settings file and content folder
-#else
 inline constexpr const char* kStateType           = "MuTronicState";
 inline constexpr const char* kFullPresetTag       = "MuTronicPreset";
 inline constexpr const char* kFullPresetExtension = "muTronic";
 inline constexpr const char* kAppName             = "muTronic";   // the settings file and content folder
-#endif
 
 // The parameter-id prefixes a slot's own rows may carry: one per layer-type family, `<letter><slot>_`
 // (r Rhythm, v Pattern, a Arp, t Track: the seven mu-On engines share t, p Phrase). Every family is listed from the start,

@@ -5,7 +5,13 @@
 //   mu-tronic-uisoak.exe <seconds> <seed>      exit 0 = survived; a crash leaves its stack in the file named by MU_UISOAK_CRASH.
 // Failed jasserts are counted (a Debug build logs them) and reported at the end.
 
-#include "Plugin/PluginProcessor.h"
+#ifdef UISOAK_HOST   // the mu-host-uisoak target drives mu-Host's processor and editor; the default is mu-Tronic's
+ #include "../../../mu-host/Source/Plugin/PluginProcessor.h"
+namespace { using SoakProcessor = mu_host::PluginProcessor; }
+#else
+ #include "Plugin/PluginProcessor.h"
+namespace { using SoakProcessor = mu_tronic::PluginProcessor; }
+#endif
 #include "Tests/ProcessorSeamHelpers.h"
 #include "UI/ExternalLink.h"
 #include "Sequencer/PhraseSlotHost.h"   // mu-Tilate's layer library: loads a loop into a Phrase slot
@@ -67,7 +73,7 @@ public:
         });
 
         storage = std::make_unique<mu_seam_test::TempStorage>();
-        processor = std::make_unique<mu_tronic::PluginProcessor>();
+        processor = std::make_unique<SoakProcessor>();
         processor->prepareToPlay(48000.0, 256);
         loopFile = makeLoop(storage->root);
         // Slot 0 starts as a Phrase holding a loop, so the waveform / slice / timeline views have something to act on.
@@ -230,7 +236,7 @@ private:
     std::atomic<bool> stopWorker { false }, insane { false };
     std::thread worker;
     std::unique_ptr<mu_seam_test::TempStorage> storage;
-    std::unique_ptr<mu_tronic::PluginProcessor> processor;
+    std::unique_ptr<SoakProcessor> processor;
     std::unique_ptr<mu_seam_test::RunningPlayHead> playHead;
     std::unique_ptr<juce::AudioProcessorEditor> editor;
     std::unique_ptr<SoakWindow> window;
