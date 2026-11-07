@@ -33,6 +33,10 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://transwarp.me/mu-toni-midi</loc>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://transwarp.me/mu-link</loc>
     <priority>0.8</priority>
   </url>
@@ -58,6 +62,10 @@
   </url>
   <url>
     <loc>https://transwarp.me/mu-clid-midi-releases</loc>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://transwarp.me/mu-toni-midi-releases</loc>
     <priority>0.5</priority>
   </url>
   <url>

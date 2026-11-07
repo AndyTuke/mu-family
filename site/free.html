@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Freeware | Transwarp Development Project</title>
-  <meta name="description" content="μ-clid MIDI and μ-link are freeware from Transwarp Development Project: a Euclidean MIDI effect and the sync hub and performance mixer for the μ-series.">
+  <meta name="description" content="μ-clid MIDI, μ-toni MIDI and μ-link are freeware from Transwarp Development Project: two MIDI effects (Euclidean rhythm and arpeggiator) and the sync hub and performance mixer for the μ-series.">
   <link rel="canonical" href="https://transwarp.me/free">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://transwarp.me/free">
   <meta property="og:title" content="Freeware | Transwarp Development Project">
-  <meta property="og:description" content="μ-clid MIDI and μ-link are freeware from Transwarp Development Project: a Euclidean MIDI effect and the sync hub and performance mixer for the μ-series.">
+  <meta property="og:description" content="μ-clid MIDI, μ-toni MIDI and μ-link are freeware from Transwarp Development Project: two MIDI effects (Euclidean rhythm and arpeggiator) and the sync hub and performance mixer for the μ-series.">
   <meta property="og:image" content="https://transwarp.me/mu-link_window.png?v=1411">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -241,6 +241,12 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     .free-eyebrow::before { content:''; display:block; width:24px; height:1px; }
     .clid-midi .free-eyebrow { color: var(--accent-b); }
     .clid-midi .free-eyebrow::before { background: var(--accent-b); }
+    .toni-midi .free-eyebrow { color: var(--teal-b); }
+    .toni-midi .free-eyebrow::before { background: var(--teal-b); }
+    .toni-midi .free-title .mu { color: var(--teal-b); }
+    .toni-midi .free-features li .ffi { background: rgba(46,207,160,0.15); }
+    .btn-free-toni { display: inline-flex; align-items: center; gap: 8px; background: var(--teal); color: #06120E; font-family: var(--ff-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 13px 28px; border-radius: 4px; border: none; cursor: pointer; transition: all .2s; margin-bottom: 10px; }
+    .btn-free-toni:hover { background: var(--teal-b); box-shadow: 0 0 28px var(--glow2); }
     .mu-link .free-eyebrow { color: var(--cyan-b); }
     .mu-link .free-eyebrow::before { background: var(--cyan-b); }
     .free-title { font-family: var(--ff-disp); font-size: clamp(34px,4vw,52px); font-weight: 800; letter-spacing: -0.025em; margin-bottom: 8px; }
@@ -294,6 +300,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
           <a href="mu-on.html" class="nm nm-on"><span class="nm-name"><span class="mu-d">μ</span>-on</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">909-style groove sequencer</span></a>
           <a href="mu-tilate.html" class="nm nm-tilate"><span class="nm-name"><span class="mu-d">μ</span>-tilate</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">Loop slicer</span></a>
           <a href="mu-clid-midi.html" class="nm nm-midi"><span class="nm-name"><span class="mu-d">μ</span>-clid MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Euclidean MIDI effect</span></a>
+          <a href="mu-toni-midi.html" class="nm nm-toni-midi"><span class="nm-name"><span class="mu-d">μ</span>-toni MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Arpeggiator MIDI effect</span></a>
           <a href="mu-link.html" class="nm nm-link"><span class="nm-name"><span class="mu-d">μ</span>-link</span><span class="nm-tag free">Free</span><span class="nm-desc">Sync hub and performance mixer</span></a>
           <a href="mu-tronic.html" class="nm nm-tronic"><span class="nm-name"><span class="mu-d">μ</span>-tronic</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">A performance instrument for live play</span></a>
         </div></div>
@@ -312,7 +319,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
         Freeware from Transwarp
       </div>
       <h1 class="page-title fade-2">Freeware.</h1>
-      <p class="page-sub fade-3">Two of the μ-series are freeware: μ-clid MIDI and μ-link. No key, no support prompt, nothing to unlock, and the source is open (GPLv3). Each has its own page. The other apps are pay what you want, from £0.</p>
+      <p class="page-sub fade-3">Three of the μ-series are freeware: μ-clid MIDI, μ-toni MIDI and μ-link. No key, no support prompt, nothing to unlock, and the source is open (GPLv3). Each has its own page. The other apps are pay what you want, from £0.</p>
     </div>
   </section>
 
@@ -336,6 +343,31 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
         <div>
           <div class="free-visual">
             <img src="mu-clid-midi_window.png?v=1411" alt="The μ-clid MIDI editor: Euclidean rhythm rings with step, hit and rotation controls" width="1110" height="420">
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── μ-toni MIDI (not released yet: no download link until the release assets exist) ── -->
+  <section class="free-section toni-midi" id="mu-toni-midi">
+    <div class="container">
+      <div class="free-section-inner">
+        <div class="free-info">
+          <div class="free-eyebrow">Freeware · MIDI effect</div>
+          <div class="free-title"><span class="mu">μ</span>-toni MIDI</div>
+          <div class="free-subtitle">Generative Arpeggiator MIDI Effect · VST3 · CLAP · Windows · Coming with the next release</div>
+          <div class="free-desc">
+            <p>The μ-toni arpeggiator as a MIDI effect. Hold keys and it plays scale and chord notes as MIDI, in time with your DAW, to any synth you like. It makes no sound of its own.</p>
+          </div>
+          <div class="free-cta-block">
+            <a href="mu-toni-midi.html" class="btn-free-toni">About <span style="font-family:var(--ff-disp);text-transform:none">μ</span>-toni MIDI →</a>
+            <div class="coming-note">Download coming with the next release · <a href="mu-toni-midi-releases.html" style="text-decoration:underline">Release notes</a></div>
+          </div>
+        </div>
+        <div>
+          <div class="free-visual">
+            <img src="mu-toni_appergater.png" alt="The μ-toni Appergater, the arpeggiator that μ-toni MIDI uses" width="1088" height="190" loading="lazy">
           </div>
         </div>
       </div>
@@ -375,8 +407,8 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
           <div class="fb-sub">Development Project</div>
           <p>Indie audio plugin development from Bath, UK. Building the <span class="mu-d">μ</span>-series: creative instruments for electronic music producers, made for the DAW and for the stage.</p>
         </div>
-        <div class="footer-col"><h4>Products</h4><ul><li><a href="mu-clid.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-tilate.html"><span class="mu-d">μ</span>-tilate</a></li><li><a href="mu-clid-midi.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-link.html"><span class="mu-d">μ</span>-link</a></li><li><a href="mu-tronic.html"><span class="mu-d">μ</span>-tronic</a></li></ul></div>
-        <div class="footer-col"><h4>Release notes</h4><ul><li><a href="mu-clid-releases.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant-releases.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni-releases.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on-releases.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-tilate-releases.html"><span class="mu-d">μ</span>-tilate</a></li><li><a href="mu-clid-midi-releases.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-link-releases.html"><span class="mu-d">μ</span>-link</a></li><li><a href="mu-tronic-releases.html"><span class="mu-d">μ</span>-tronic</a></li></ul></div>
+        <div class="footer-col"><h4>Products</h4><ul><li><a href="mu-clid.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-tilate.html"><span class="mu-d">μ</span>-tilate</a></li><li><a href="mu-clid-midi.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-toni-midi.html"><span class="mu-d">μ</span>-toni MIDI</a></li><li><a href="mu-link.html"><span class="mu-d">μ</span>-link</a></li><li><a href="mu-tronic.html"><span class="mu-d">μ</span>-tronic</a></li></ul></div>
+        <div class="footer-col"><h4>Release notes</h4><ul><li><a href="mu-clid-releases.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant-releases.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni-releases.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on-releases.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-tilate-releases.html"><span class="mu-d">μ</span>-tilate</a></li><li><a href="mu-clid-midi-releases.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-toni-midi-releases.html"><span class="mu-d">μ</span>-toni MIDI</a></li><li><a href="mu-link-releases.html"><span class="mu-d">μ</span>-link</a></li><li><a href="mu-tronic-releases.html"><span class="mu-d">μ</span>-tronic</a></li></ul></div>
         <div class="footer-col"><h4>Company</h4><ul><li><a href="download.html">Download</a></li><li><a href="index.html#pricing">Pricing</a></li><li><a href="index.html#community">Community</a></li><li><a href="contact.html">Contact</a></li><li><a href="https://github.com/AndyTuke/mu-family">Source (GPLv3)</a></li><li><a href="mailto:info@transwarp.me">info@transwarp.me</a></li></ul></div>
       </div>
       <div class="footer-bottom">

@@ -25,7 +25,7 @@ nav .nm-tag { grid-column: 2; grid-row: 1; font-family: var(--ff-mono); font-siz
 nav .nm-tag.free { color: var(--cyan-b); border-color: rgba(60,184,212,0.35); }
 nav .nm-clid, nav .nm-midi { --c: #8B80F0; }
 nav .nm-tant { --c: #E8A878; }
-nav .nm-toni { --c: #2ECFA0; }
+nav .nm-toni, nav .nm-toni-midi { --c: #2ECFA0; }
 nav .nm-on { --c: #E0C568; }
 nav .nm-tilate { --c: #6FAEF5; }
 nav .nm-link { --c: #5CCEE8; }

@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Transwarp Development Project — The μ-series</title>
-  <meta name="description" content="Transwarp Development Project makes the μ-series: sequencing synths and sequencers for your DAW and, above all, for live performance. μ-clid, μ-tant, μ-toni, μ-on, μ-tilate, μ-tronic, μ-clid MIDI and μ-link. VST3, CLAP & standalone for Windows.">
+  <meta name="description" content="Transwarp Development Project makes the μ-series: sequencing synths and sequencers for your DAW and, above all, for live performance. μ-clid, μ-tant, μ-toni, μ-on, μ-tilate, μ-tronic, μ-clid MIDI, μ-toni MIDI and μ-link. VST3, CLAP & standalone for Windows.">
   <link rel="canonical" href="https://transwarp.me/">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://transwarp.me/">
   <meta property="og:title" content="Transwarp Development Project — The μ-series">
-  <meta property="og:description" content="Transwarp Development Project makes the μ-series: sequencing synths and sequencers for your DAW and, above all, for live performance. μ-clid, μ-tant, μ-toni, μ-on, μ-tilate, μ-tronic, μ-clid MIDI and μ-link. VST3, CLAP & standalone for Windows.">
+  <meta property="og:description" content="Transwarp Development Project makes the μ-series: sequencing synths and sequencers for your DAW and, above all, for live performance. μ-clid, μ-tant, μ-toni, μ-on, μ-tilate, μ-tronic, μ-clid MIDI, μ-toni MIDI and μ-link. VST3, CLAP & standalone for Windows.">
   <meta property="og:image" content="https://transwarp.me/Full_Screen.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -272,6 +272,8 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     .pcard.on { --c: #C9A94A; --cb: #E0C568; --ct: #14100A; }
     .pcard.tilate { --c: #3A86E0; --cb: #6FAEF5; --ct: #06101C; }
     .pcard.tronic { --c: #D4668F; --cb: #EC8BAE; --ct: #1A0610; }
+    .pcard.tmidi { --c: var(--teal); --cb: var(--teal-b); --ct: #06120E; }
+    .pcard.tmidi .pc-shot.ring { background: radial-gradient(ellipse at center, rgba(46,207,160,0.16), var(--bg) 70%); }
     .pcard.link { --c: var(--cyan); --cb: var(--cyan-b); --ct: #06121A; }
     .pc-accent-bar { height: 3px; background: linear-gradient(90deg, var(--c), var(--cb)); }
     .pc-shot { display: block; background: var(--bg); aspect-ratio: 16 / 10; overflow: hidden; border-bottom: 1px solid var(--border); }
@@ -354,6 +356,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
           <a href="mu-on.html" class="nm nm-on"><span class="nm-name"><span class="mu-d">μ</span>-on</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">909-style groove sequencer</span></a>
           <a href="mu-tilate.html" class="nm nm-tilate"><span class="nm-name"><span class="mu-d">μ</span>-tilate</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">Loop slicer</span></a>
           <a href="mu-clid-midi.html" class="nm nm-midi"><span class="nm-name"><span class="mu-d">μ</span>-clid MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Euclidean MIDI effect</span></a>
+          <a href="mu-toni-midi.html" class="nm nm-toni-midi"><span class="nm-name"><span class="mu-d">μ</span>-toni MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Arpeggiator MIDI effect</span></a>
           <a href="mu-link.html" class="nm nm-link"><span class="nm-name"><span class="mu-d">μ</span>-link</span><span class="nm-tag free">Free</span><span class="nm-desc">Sync hub and performance mixer</span></a>
           <a href="mu-tronic.html" class="nm nm-tronic"><span class="nm-name"><span class="mu-d">μ</span>-tronic</span><span class="nm-tag ">Pay what you want</span><span class="nm-desc">A performance instrument for live play</span></a>
         </div></div>
@@ -372,7 +375,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
           <div class="hero-eyebrow fade-1">Transwarp Development Project</div>
           <h1 class="hero-title fade-2">The <span class="mu">μ</span>-series.<span class="tagline">Instruments for electronic music.</span></h1>
           <p class="hero-sub fade-3">We build sequencing synths and sequencers that sit happily in your DAW and come into their own on stage. Every <span class="mu-d">μ</span>-series app is made to be played live: swap a rhythm without stopping the music, lock the screen for performance, and tie the whole rig together with a free sync hub and mixer.</p>
-          <p class="hero-sub hero-sub2 fade-3"><span class="mu-d">μ</span>-clid MIDI and <span class="mu-d">μ</span>-link are freeware. The rest, including <span class="mu-d">μ</span>-tronic, are pay what you want, from £0, with £20 suggested (£25 for <span class="mu-d">μ</span>-tronic and <span class="mu-d">μ</span>-tilate). Nothing is ever limited, and the source is open (GPLv3).</p>
+          <p class="hero-sub hero-sub2 fade-3"><span class="mu-d">μ</span>-clid MIDI, <span class="mu-d">μ</span>-toni MIDI and <span class="mu-d">μ</span>-link are freeware. The rest, including <span class="mu-d">μ</span>-tronic, are pay what you want, from £0, with £20 suggested (£25 for <span class="mu-d">μ</span>-tronic and <span class="mu-d">μ</span>-tilate). Nothing is ever limited, and the source is open (GPLv3).</p>
           <div class="hero-pills fade-4">
             <span class="pill purple">Made for live performance</span>
             <span class="pill teal">Pay what you want · from £0</span>
@@ -521,6 +524,17 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
             <div class="pc-ctas"><a href="mu-clid-midi.html" class="btn-pc">Learn more</a><a href="mu-clid-midi.html#download" class="btn-pc-outline">Download</a></div>
           </div>
         </article>
+        <article class="pcard tmidi">
+          <div class="pc-accent-bar"></div>
+          <a class="pc-shot ring" href="mu-toni-midi.html" tabindex="-1" aria-hidden="true"><img src="mu-toni_appergater.png" alt="The μ-toni Appergater, the arpeggiator that μ-toni MIDI uses" width="1088" height="190" loading="lazy"></a>
+          <div class="pc-body">
+            <div class="pc-top"><div class="pc-label">Arpeggiator MIDI effect</div><span class="pc-badge free">Freeware</span></div>
+            <h3 class="pc-name"><span class="mu-d">μ</span>-toni MIDI</h3>
+            <p class="pc-desc">The μ-toni arpeggiator as a MIDI effect. Hold keys and it plays scale and chord notes as MIDI to any synth in your DAW. Freeware, with no support prompt. Coming with the next release.</p>
+            <div class="pc-meta">MIDI effect · VST3 · CLAP</div>
+            <div class="pc-ctas"><a href="mu-toni-midi.html" class="btn-pc">Learn more</a><a href="mu-toni-midi.html#download" class="btn-pc-outline">Download</a></div>
+          </div>
+        </article>
         <article class="pcard link">
           <div class="pc-accent-bar"></div>
           <a class="pc-shot" href="mu-link.html" tabindex="-1" aria-hidden="true"><img src="mu-link_window.png?v=1411" alt="The μ-link mixer with two connected apps and eight scenes" width="1172" height="880" loading="lazy"></a>
@@ -549,7 +563,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
           <li><strong>Pay what you want.</strong> From £0, suggested £20 (£25 for μ-tronic and μ-tilate), in GBP, through Lemon Squeezy. You get a licence key even for £0.</li>
           <li><strong>A key removes the support prompt.</strong> Copies without a key show a polite prompt when the app starts, once per session. "Maybe later" hides it for that session, and it comes back next time.</li>
           <li><strong>Open source.</strong> The source is GPLv3 on <a href="https://github.com/AndyTuke/mu-family">GitHub</a>.</li>
-          <li><strong>μ-clid MIDI and μ-link</strong> are freeware, with no support prompt and no key at all.</li>
+          <li><strong>μ-clid MIDI, μ-toni MIDI and μ-link</strong> are freeware, with no support prompt and no key at all.</li>
         </ul>
       </div>
       <div class="pay-ctas">
@@ -677,8 +691,8 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
           <div class="fb-sub">Development Project</div>
           <p>Indie audio plugin development from Bath, UK. Building the <span class="mu-d">μ</span>-series: creative instruments for electronic music producers, made for the DAW and for the stage.</p>
         </div>
-        <div class="footer-col"><h4>Products</h4><ul><li><a href="mu-clid.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-tilate.html"><span class="mu-d">μ</span>-tilate</a></li><li><a href="mu-clid-midi.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-link.html"><span class="mu-d">μ</span>-link</a></li><li><a href="mu-tronic.html"><span class="mu-d">μ</span>-tronic</a></li></ul></div>
-        <div class="footer-col"><h4>Release notes</h4><ul><li><a href="mu-clid-releases.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant-releases.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni-releases.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on-releases.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-tilate-releases.html"><span class="mu-d">μ</span>-tilate</a></li><li><a href="mu-clid-midi-releases.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-link-releases.html"><span class="mu-d">μ</span>-link</a></li><li><a href="mu-tronic-releases.html"><span class="mu-d">μ</span>-tronic</a></li></ul></div>
+        <div class="footer-col"><h4>Products</h4><ul><li><a href="mu-clid.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-tilate.html"><span class="mu-d">μ</span>-tilate</a></li><li><a href="mu-clid-midi.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-toni-midi.html"><span class="mu-d">μ</span>-toni MIDI</a></li><li><a href="mu-link.html"><span class="mu-d">μ</span>-link</a></li><li><a href="mu-tronic.html"><span class="mu-d">μ</span>-tronic</a></li></ul></div>
+        <div class="footer-col"><h4>Release notes</h4><ul><li><a href="mu-clid-releases.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant-releases.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni-releases.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on-releases.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-tilate-releases.html"><span class="mu-d">μ</span>-tilate</a></li><li><a href="mu-clid-midi-releases.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-toni-midi-releases.html"><span class="mu-d">μ</span>-toni MIDI</a></li><li><a href="mu-link-releases.html"><span class="mu-d">μ</span>-link</a></li><li><a href="mu-tronic-releases.html"><span class="mu-d">μ</span>-tronic</a></li></ul></div>
         <div class="footer-col"><h4>Company</h4><ul><li><a href="download.html">Download</a></li><li><a href="index.html#pricing">Pricing</a></li><li><a href="index.html#community">Community</a></li><li><a href="contact.html">Contact</a></li><li><a href="https://github.com/AndyTuke/mu-family">Source (GPLv3)</a></li><li><a href="mailto:info@transwarp.me">info@transwarp.me</a></li></ul></div>
       </div>
       <div class="footer-bottom">
