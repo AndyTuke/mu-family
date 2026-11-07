@@ -356,6 +356,51 @@ public:
             out.clear(); r.render(in, out, prepared);
             expect(rmsOf(out, prepared) > 1.0e-6f, "a real feed plays again after the idle spell");
         }
+
+        beginTest("RumbleEngine: Feedback sends the output back into the delay line (the echoes keep coming) and stays bounded");
+        {
+            // Dry (no reverb), one tap at 1/16 up full: without feedback the echoes of a burst end after the three taps.
+            auto tailRms = [&](float feedback)
+            {
+                RumbleEngine r;
+                r.prepare(sr, prepared);
+                r.setParams(120.0, 0.0f, 1.0f, 0.0f, 0.0f, 0.5f, 0.0f, 18000.0f, 20000.0f, 0.0f, 20000.0f, feedback);
+                juce::AudioBuffer<float> in(2, prepared), silent(2, prepared), out(2, prepared);
+                fillBurst(in, prepared);
+                silent.clear();
+                out.clear(); r.render(in, out, prepared);
+                const int blocksPerSecond = (int) (sr / prepared);
+                float later = 0.0f;
+                for (int b = 0; b < 3 * blocksPerSecond; ++b)
+                {
+                    out.clear(); r.render(silent, out, prepared);
+                    if (b > blocksPerSecond) later = juce::jmax(later, rmsOf(out, prepared));   // after the first second
+                }
+                return later;
+            };
+            expectEquals(tailRms(0.0f), 0.0f, "no feedback: the echoes are long gone");
+            expect(tailRms(0.9f) > 1.0e-4f, "feedback: the echoes are still going after a second");
+
+            // At full Feedback with every tap up and a loud feed for 20 s, nothing runs away.
+            RumbleEngine r;
+            r.prepare(sr, prepared);
+            r.setParams(120.0, 0.0f, 1.0f, 1.0f, 1.0f, 0.5f, 1.0f, 18000.0f, 20000.0f, 0.9f, 20000.0f, 1.0f);
+            juce::AudioBuffer<float> in(2, prepared), out(2, prepared);
+            fillBurst(in, prepared);
+            float peak = 0.0f;
+            bool finite = true;
+            for (int b = 0; b < (int) (20.0 * sr / prepared); ++b)
+            {
+                out.clear(); r.render(in, out, prepared);
+                for (int c = 0; c < 2; ++c)
+                {
+                    const float m = out.getMagnitude(c, 0, prepared);
+                    finite = finite && std::isfinite(m);
+                    peak = juce::jmax(peak, m);
+                }
+            }
+            expect(finite && peak < 20.0f, "full feedback stays bounded (peak " + juce::String(peak, 2) + ")");
+        }
     }
 };
 
