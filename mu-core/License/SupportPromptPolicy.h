@@ -3,6 +3,9 @@
 #include <juce_data_structures/juce_data_structures.h>
 
 #include <atomic>
+#include <mutex>
+#include <set>
+#include <string>
 
 // When the "support mu" prompt is shown. The apps are free and fully functional; an unlicensed
 // copy asks politely, once per session, for a pay-what-you-want contribution. Header-only and
@@ -32,8 +35,36 @@ inline std::atomic<bool>& shownThisProcess() noexcept
     return shown;
 }
 
+// The same rule per product: "once per session" for a host that carries several products' engines (mu-Host) is once per
+// product, as if each engine ran in its own app. A normal product has one key (its product id), so nothing changes for it.
+inline std::set<std::string>& shownProducts() noexcept
+{
+    static std::set<std::string> shown;
+    return shown;
+}
+inline std::mutex& shownProductsLock() noexcept
+{
+    static std::mutex m;
+    return m;
+}
+inline bool alreadyShownFor(const std::string& productKey)
+{
+    std::lock_guard<std::mutex> lock(shownProductsLock());
+    return shownProducts().count(productKey) != 0;
+}
+inline void markShownFor(const std::string& productKey)
+{
+    std::lock_guard<std::mutex> lock(shownProductsLock());
+    shownProducts().insert(productKey);
+}
+
 // Test-only: forget that the prompt was shown, so a test can exercise the first-show path again.
-inline void resetShownThisProcessForTesting() noexcept { shownThisProcess().store(false); }
+inline void resetShownThisProcessForTesting() noexcept
+{
+    shownThisProcess().store(false);
+    std::lock_guard<std::mutex> lock(shownProductsLock());
+    shownProducts().clear();
+}
 
 // Should the prompt appear now? Only a licensing product's unlicensed copy sees it, never after
 // "Don't show again", and never twice in one process.
@@ -45,6 +76,12 @@ inline bool shouldShow(bool hasLicensing, bool isSupporterNow, bool hiddenForeve
 inline bool shouldShowNow(bool hasLicensing, bool isSupporterNow, bool hiddenForever) noexcept
 {
     return shouldShow(hasLicensing, isSupporterNow, hiddenForever, shownThisProcess().load());
+}
+
+// As shouldShowNow, for the product `productKey` (the licensing product id): shown at most once per product per process.
+inline bool shouldShowNowFor(const std::string& productKey, bool hasLicensing, bool isSupporterNow, bool hiddenForever)
+{
+    return shouldShow(hasLicensing, isSupporterNow, hiddenForever, alreadyShownFor(productKey));
 }
 
 // Record that the prompt is on screen for this process.

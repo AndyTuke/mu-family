@@ -90,6 +90,10 @@ public:
     // (without the "Don't show again" tick); false for the once-per-session auto-show.
     void showSupportPrompt(bool userRequested);
 
+    // The licence now belongs to another product (mu-Host): rename the prompt's product, refresh the status-bar link and let the
+    // automatic prompt run once for this product. Message thread.
+    void licenseChanged(const juce::String& supportProductName);
+
     bool isMixerVisible() const noexcept { return chrome.isMixerVisible(); }
 
     void paint(juce::Graphics& g) override;

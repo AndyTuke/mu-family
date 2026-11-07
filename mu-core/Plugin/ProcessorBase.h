@@ -587,6 +587,15 @@ public:
     juce::String getCheckoutUrl() const { return checkoutUrl; }
     // The suggested amount (GBP) the prompt quotes.
     int getSuggestedPrice() const noexcept { return suggestedPrice; }
+    // The licensing product this copy is licensed as (empty with no licensing): the product id its .lic names.
+    juce::String getLicensingProductKey() const { return licensingProductKey; }
+    // Message thread. Back to "no licensing model": always counts as licensed, no prompt (mu-Host with no engine in its slot).
+    void disableLicensing()
+    {
+        licensingEnabled = false; offlineLicensed = false; licensingProductKey.clear(); checkoutUrl.clear();
+        onlineActivated.store(false, std::memory_order_relaxed);
+        activateOnlineFn = nullptr;
+    }
     // "Don't show this again": kept in the app settings file, not APVTS, so it is never in a preset.
     bool isSupportPromptHidden() const { return mu_core::support_prompt::isHidden(appSettings.get()); }
     void setSupportPromptHidden(bool hidden) { mu_core::support_prompt::setHidden(appSettings.get(), hidden); }
@@ -1220,6 +1229,8 @@ protected:
         const char*    activationFile;
         const char*    checkoutUrl = nullptr;   // pay-what-you-want page the support prompt opens
         int            suggestedPrice = 20;     // the amount (GBP) the prompt suggests; matches the store
+        juce::File     contentDir {};           // where the licence file and the activation record live; empty = this app's content folder
+        juce::File     alsoCheckDir {};         // a second folder whose licence file counts too (mu-Host: its own folder beside the product's)
     };
     // Joins the online-activation worker (bounded by the network timeout) and drops its pending reply.
     mu_core::ActivationWorker             activationWorker;
@@ -1233,6 +1244,7 @@ protected:
     virtual void onActivated() {}
     bool licensingEnabled = false;
     bool offlineLicensed  = false;
+    juce::String licensingProductKey;   // the product id initLicensing was given: the key the support prompt's once-per-session rule uses
     juce::String checkoutUrl;
     int suggestedPrice = 20;
 

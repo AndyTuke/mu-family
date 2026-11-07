@@ -39,6 +39,19 @@ struct SupportPromptPolicyTests : juce::UnitTest
             expect(sp::shouldShowNow(true, false, false));
         }
 
+        beginTest("once per product: a host that carries several products' engines asks once for each, never twice for one");
+        {
+            sp::resetShownThisProcessForTesting();
+            expect(sp::shouldShowNowFor("mu-On", true, false, false));
+            sp::markShownFor("mu-On");
+            expect(! sp::shouldShowNowFor("mu-On", true, false, false), "mu-On has been asked");
+            expect(sp::shouldShowNowFor("mu-Clid", true, false, false), "mu-Clid has not");
+            expect(! sp::shouldShowNowFor("mu-Clid", false, true, false), "a supporter of the product is never asked");
+            expect(! sp::shouldShowNowFor("mu-Clid", true, false, true), "nor after Don't show again");
+            sp::resetShownThisProcessForTesting();
+            expect(sp::shouldShowNowFor("mu-On", true, false, false), "a reset forgets every product");
+        }
+
         beginTest("the hidden flag round-trips through a settings file and defaults to not hidden");
         {
             juce::TemporaryFile tmp(".settings");

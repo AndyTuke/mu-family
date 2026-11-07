@@ -73,7 +73,15 @@ public:
     bool offersLayerPages() const override { return true; }
    #endif
 
-    // ── Slots ────────────────────────────────────────────────────────────────
+   #ifdef MU_HOST
+    // mu-Host has no licence of its own: opening an engine runs the licence check of the PRODUCT that engine belongs to, and from
+    // then on it behaves as that product's own app (its key, its activation, its checkout page, its support prompt). A product's
+    // key covers all its engines (mu-On: Kick, Bass, Hat, Snare, Rumble, FM Perc and Chord). Message thread; returns the product's
+    // display name, or empty for an Empty slot (no licensing, no prompt).
+    juce::String licenseEngine(mu_core::LayerTypeId type);
+   #endif
+
+    // ── Slots ────────────────────────────────────────────────────────────
     // Sixteen fixed slots; a deleted layer leaves its slot Empty and nothing shifts. Two slots, empty or not, can
     // swap (ProcessorBase::swapLayers, quiesced): the layer takes its strip, tails and rows with it.
     bool layersAreSlots() const override { return true; }

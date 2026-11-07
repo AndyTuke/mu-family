@@ -3,6 +3,15 @@
 #include "Persistence/TrackLayerTypes.h"  // the Rumble source remap
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 #include "License/LicenseKey.h"
+#ifdef MU_HOST
+// Each engine's product keeps its licence identity in its own License/LicenseKey.h (the same file name in every product), so the
+// five are reached from the repository root rather than through the include path.
+#include "mu-clid/Source/License/LicenseKey.h"
+#include "mu-tant/Source/License/LicenseKey.h"
+#include "mu-toni/Source/License/LicenseKey.h"
+#include "mu-on/Source/License/LicenseKey.h"
+#include "mu-tilate/Source/License/LicenseKey.h"
+#endif
 
 #include <set>
 
@@ -94,12 +103,61 @@ PluginProcessor::PluginProcessor()
     swapTimingParam = apvts.getRawParameterValue(mu_hotswap::kSwapTimingParamId);
     startFxParamSync();      // mixer / FX params → mixerEngine + fxChain (ProcessorBase)
     loadStartupDefault();    // restore a saved _default preset (skipped by render mode)
+   #ifdef MU_HOST
+    licenseEngine(getLayerTypeId(0));   // a restored engine counts at once, before any editor opens
+   #endif
 }
 
 PluginProcessor::~PluginProcessor()
 {
     prepareForDestruction();   // first: no deferred-work tick may reach this half-destroyed object
 }
+
+#ifdef MU_HOST
+juce::String PluginProcessor::licenseEngine(mu_core::LayerTypeId type)
+{
+    struct Product
+    {
+        const char* display;      // UTF-8, with the Greek mu
+        const char* appName;      // the product's own content folder under Documents/TDP
+        const char* id;
+        const char* file;
+        const uint8_t* key;
+        const char* activation;
+        const char* url;
+        int price;
+    };
+    static const Product clid   { "\xce\xbc-Clid",   "muClid",   mu_clid::kLicenseProductId,   mu_clid::kLicenseFilename,   mu_clid::kLicensePublicKey,   "muclid.activation",   mu_clid::kCheckoutUrl,   20 };
+    static const Product tant   { "\xce\xbc-Tant",   "muTant",   mu_tant::kLicenseProductId,   mu_tant::kLicenseFilename,   mu_tant::kLicensePublicKey,   "mutant.activation",   mu_tant::kCheckoutUrl,   20 };
+    static const Product toni   { "\xce\xbc-Toni",   "muToni",   mu_toni::kLicenseProductId,   mu_toni::kLicenseFilename,   mu_toni::kLicensePublicKey,   "mutoni.activation",   mu_toni::kCheckoutUrl,   20 };
+    static const Product on     { "\xce\xbc-On",     "muOn",     mu_on::kLicenseProductId,     mu_on::kLicenseFilename,     mu_on::kLicensePublicKey,     "muon.activation",     mu_on::kCheckoutUrl,     20 };
+    static const Product tilate { "\xce\xbc-Tilate", "muTilate", mu_tilate::kLicenseProductId, mu_tilate::kLicenseFilename, mu_tilate::kLicensePublicKey, "mutilate.activation", mu_tilate::kCheckoutUrl, mu_tilate::kSuggestedPrice };
+
+    using T = mu_core::LayerTypeId;
+    const Product* product = nullptr;
+    switch (type)
+    {
+        case T::Rhythm:  product = &clid;   break;
+        case T::Pattern: product = &tant;   break;
+        case T::Arp:     product = &toni;   break;
+        case T::Kick: case T::Bass: case T::Hat: case T::Snare: case T::Rumble: case T::FmPerc: case T::Chord:
+                         product = &on;     break;
+        case T::Phrase:  product = &tilate; break;
+        default: break;
+    }
+    if (product == nullptr) { disableLicensing(); return {}; }
+
+    // Already licensed as this product (another engine of the same product): nothing to redo.
+    if (getLicensingProductKey() != product->id)
+    {
+        // The product's own app keeps its key in its own folder beside this one's; a key dropped in this folder counts as well.
+        const auto here = getContentDir();
+        const auto productDir = here.getFileName() == kAppName ? here.getSiblingFile(product->appName) : here;
+        initLicensing({ product->id, product->file, product->key, product->activation, product->url, product->price, productDir, here });
+    }
+    return juce::String(juce::CharPointer_UTF8(product->display));
+}
+#endif
 
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {

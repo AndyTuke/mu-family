@@ -290,7 +290,7 @@ if(WIN32)
 endif()
 target_sources(mu-host PRIVATE ${MU_TRONIC_APP_SOURCES})
 target_include_directories(mu-host
-    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source" "${CMAKE_SOURCE_DIR}/mu-core"
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source" "${CMAKE_SOURCE_DIR}/mu-core" "${CMAKE_SOURCE_DIR}"   # the root: each product's License/LicenseKey.h
     SYSTEM PRIVATE
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
@@ -318,6 +318,7 @@ target_compile_features(mu-host-tests PRIVATE cxx_std_17)
 target_include_directories(mu-host-tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source"
     "${CMAKE_SOURCE_DIR}/mu-core"
+    "${CMAKE_SOURCE_DIR}"
     SYSTEM
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
@@ -350,7 +351,7 @@ juce_add_plugin(mu-host-uisoak
 )
 target_sources(mu-host-uisoak PRIVATE ${MU_TRONIC_APP_SOURCES})
 target_include_directories(mu-host-uisoak
-    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source" "${CMAKE_SOURCE_DIR}/mu-core"
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source" "${CMAKE_SOURCE_DIR}/mu-core" "${CMAKE_SOURCE_DIR}"
     SYSTEM PRIVATE
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"

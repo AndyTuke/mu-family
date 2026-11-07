@@ -93,6 +93,30 @@ struct MuHostTests : juce::UnitTest
             expect(q.apvts.state.getType() == juce::Identifier("MuHostState"));
         }
 
+        beginTest("opening an engine runs its own product's licence check (no key here, so unlicensed), and a product's key is for the whole product");
+        {
+            mu_seam_test::TempStorage storage;
+            HostProcessor p;
+            expect(! p.hasLicensing(), "no engine, no licensing");
+            auto checkAs = [&](mu_core::LayerTypeId type, const char* productId, const char* urlPart, int price)
+            {
+                const auto name = p.licenseEngine(type);
+                expect(name.isNotEmpty(), "a product name for engine " + juce::String((int) type));
+                expect(p.hasLicensing() && ! p.isSupporter(), juce::String(productId) + " is unlicensed without its key");
+                expectEquals(p.getLicensingProductKey(), juce::String(productId));
+                expect(p.getCheckoutUrl().contains(urlPart), juce::String(productId) + " opens its own checkout page");
+                expectEquals(p.getSuggestedPrice(), price);
+            };
+            checkAs(mu_core::LayerTypeId::Kick,    "mu-On",    "3dd813d9", 20);
+            checkAs(mu_core::LayerTypeId::Rumble,  "mu-On",    "3dd813d9", 20);   // another engine of the same product: the same licence
+            checkAs(mu_core::LayerTypeId::Rhythm,  "mu-Clid",  "12d18415", 20);
+            checkAs(mu_core::LayerTypeId::Pattern, "mu-Tant",  "a0354b49", 20);
+            checkAs(mu_core::LayerTypeId::Arp,     "mu-Toni",  "dbecc900", 20);
+            checkAs(mu_core::LayerTypeId::Phrase,  "mu-Tilate", "1121cfce", 25);
+            p.licenseEngine(mu_core::LayerTypeId::Empty);
+            expect(! p.hasLicensing() && p.isLicensed(), "an Empty slot has no licensing and no prompt");
+        }
+
         beginTest("changing the engine while the audio thread renders is safe");
         {
             mu_seam_test::TempStorage storage;

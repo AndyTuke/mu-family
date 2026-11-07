@@ -51,7 +51,7 @@ PluginProcessor::PluginProcessor()
     initAppSettings("muTilate");   // settings file + saved UI size / MIDI clock (ProcessorBase)
 
     // Offline licence + online activation (shared; after initAppSettings for getContentDir).
-    initLicensing({ mu_tilate::kLicenseProductId, mu_tilate::kLicenseFilename, mu_tilate::kLicensePublicKey, "mutilate.activation", mu_tilate::kCheckoutUrl });
+    initLicensing({ mu_tilate::kLicenseProductId, mu_tilate::kLicenseFilename, mu_tilate::kLicensePublicKey, "mutilate.activation", mu_tilate::kCheckoutUrl, mu_tilate::kSuggestedPrice });
 
     for (int i = 0; i < mu_limits::kMaxLayers; ++i) layers[(size_t) i]->bindParams(apvts, i);
     setupLayerState();

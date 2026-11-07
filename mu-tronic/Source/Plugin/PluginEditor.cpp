@@ -292,6 +292,11 @@ void PluginEditor::releaseContentArcs()
 void PluginEditor::showSlot(int idx)
 {
     const auto type = proc.getLayerTypeId(idx);
+   #ifdef MU_HOST
+    // Opening an engine runs its product's licence check; the pop-up, the Support link and the activation card are then that
+    // product's own (an unlicensed engine shows the polite prompt once per product per session, as in its own app).
+    licenseChanged(proc.licenseEngine(type));
+   #endif
     const bool empty = type == mu_core::LayerTypeId::Empty;
     layerPanel.setLayerEmpty(empty);
     layerPanel.getHeader().setNameEditable(! empty);

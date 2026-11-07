@@ -233,6 +233,17 @@ void EditorShellBase::parentHierarchyChanged()
         maybeShowSupportPromptOnStart();
 }
 
+// A host whose licence just changed product (mu-Host opening another product's engine): the status-bar link follows it, and the
+// automatic prompt gets its once-per-product chance again, exactly as when that product's own app opens.
+void EditorShellBase::licenseChanged(const juce::String& supportProductName)
+{
+    productDisplayName = supportProductName;
+    refreshSupportAffordances();
+    supportPromptChecked = false;
+    if (isShowing())
+        maybeShowSupportPromptOnStart();
+}
+
 void EditorShellBase::refreshSupportAffordances()
 {
     statusBar.setSupportLinkVisible(processorRef.hasLicensing() && ! processorRef.isSupporter());
@@ -244,8 +255,8 @@ void EditorShellBase::maybeShowSupportPromptOnStart()
 {
     supportPromptChecked = true;
     namespace sp = mu_core::support_prompt;
-    if (! sp::shouldShowNow(processorRef.hasLicensing(), processorRef.isSupporter(),
-                            processorRef.isSupportPromptHidden()))
+    if (! sp::shouldShowNowFor(processorRef.getLicensingProductKey().toStdString(), processorRef.hasLicensing(),
+                               processorRef.isSupporter(), processorRef.isSupportPromptHidden()))
         return;
 
     juce::Component::SafePointer<EditorShellBase> safe(this);
@@ -268,9 +279,9 @@ void EditorShellBase::showSupportPrompt(bool userRequested)
     if (! userRequested)
     {
         if (chrome.anyOverlayVisible()
-            || ! sp::shouldShowNow(true, false, processorRef.isSupportPromptHidden()))
+            || ! sp::shouldShowNowFor(processorRef.getLicensingProductKey().toStdString(), true, false, processorRef.isSupportPromptHidden()))
             return;
-        sp::markShown();
+        sp::markShownFor(processorRef.getLicensingProductKey().toStdString());
     }
 
     supportDialogOpen = true;
