@@ -95,6 +95,7 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     flt(E::Rumble, "cut",    "Rumble Cutoff",    centred(20.0f, 20000.0f, 1.0f, 640.0f), 800.0f, mu_fmt::Unit::Hz);
     flt(E::Rumble, "res",    "Rumble Resonance", f(0.0f, 1.0f, 0.001f), 0.2f, mu_fmt::Unit::Percent01);
     flt(E::Rumble, "inlp",   "Rumble Input LP",  centred(20.0f, 20000.0f, 1.0f, 640.0f), 20000.0f, mu_fmt::Unit::Hz);   // fully open = off
+    flt(E::Rumble, "fb",     "Rumble Feedback",  f(0.0f, 1.0f, 0.001f), 0.0f, mu_fmt::Unit::Percent01);   // output back into the delay line; appended last
 
     // The track's insert effect: algorithm and the four generic knobs (the shared insert layout, as a mixer bus insert).
     mu_mixfx::addInsertParams(layout, layerParamPrefix(slot), lbl);   // t{N}_drvChar, t{N}_insP1..4: the ids the shared InsertSubsection reads

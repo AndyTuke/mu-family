@@ -108,7 +108,7 @@ public:
             pinLane(EngineType::Hat,    { "h.tune.prop", "h.dec.prop", "h.otune.prop", "h.odec.prop" }, true);
             pinLane(EngineType::Snare,  { "s.tune.prop", "s.dec.prop", "s.snap.prop" }, true);
             pinLane(EngineType::Rumble, { "r.drive.prop", "r.d1.prop", "r.d2.prop", "r.d3.prop", "r.size.prop",
-                              "r.revmix.prop", "r.revlp.prop", "r.cut.prop", "r.res.prop", "r.inlp.prop" });
+                              "r.revmix.prop", "r.revlp.prop", "r.cut.prop", "r.res.prop", "r.inlp.prop", "r.fb.prop" });
             pinLane(EngineType::FmPerc, { "fp.tune.prop", "fp.ratio.prop", "fp.index.prop", "fp.idec.prop", "fp.fdbk.prop",
                               "fp.dive.prop", "fp.dtime.prop", "fp.decay.prop", "fp.fold.prop", "fp.noise.prop" }, true);
             pinLane(EngineType::Chord,  { "c.cut.prop", "c.res.prop", "c.drive.prop", "c.env.prop", "c.edec.prop",

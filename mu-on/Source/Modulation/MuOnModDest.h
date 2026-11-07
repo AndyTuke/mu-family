@@ -143,8 +143,8 @@ inline constexpr ModDestEntry kSnareDests[] = {
     makeTarget("send.reverb", "sendRev", "Reverb Send", "Effects"),
 };
 
-// Rumble — order matches RumbleEngine::setParams(bpm, drive, d1, d2, d3, revSize, revMix, revLpHz, cutHz, res, inLpHz)
-// (bpm is the transport, not a dest — the 10 entries below are the modulatable args in order).
+// Rumble — order matches RumbleEngine::setParams(bpm, drive, d1, d2, d3, revSize, revMix, revLpHz, cutHz, res, inLpHz, feedback)
+// (bpm is the transport, not a dest — the 11 entries below are the modulatable args in order).
 inline constexpr ModDestEntry kRumbleDests[] = {
     makeTarget("r.drive.prop", "rumble_drive", "Drive", "Rumble"),
     makeTarget("r.d1.prop", "rumble_d1", "1/16", "Rumble"),
@@ -156,6 +156,7 @@ inline constexpr ModDestEntry kRumbleDests[] = {
     makeTarget("r.cut.prop", "rumble_cut", "Cutoff", "Rumble"),
     makeTarget("r.res.prop", "rumble_res", "Resonance", "Rumble"),
     makeTarget("r.inlp.prop", "rumble_inlp", "Input LP", "Rumble"),   // appended last: saved destination indices stay valid
+    makeTarget("r.fb.prop", "rumble_fb", "Feedback", "Rumble"),
     // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
     // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
     makeTarget("amp.level", "level", "Level", "Amp"),

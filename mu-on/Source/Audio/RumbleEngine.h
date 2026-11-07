@@ -9,7 +9,9 @@
 // in order, through:
 //   0. input low-pass — a plain 12 dB LP (no resonance) on the feed, before anything else; fully open (20 kHz) = bypassed
 //   1. input drive   — the same valve saturation MultiModeFilter applies on its input
-//   2. delay taps    — 1/16, 2/16, 3/16 of the beat-grid (tempo-synced), each with a level
+//   2. delay taps    — 1/16, 2/16, 3/16 of the beat-grid (tempo-synced), each with a level; the Feedback knob sends the
+//                      final output (after the filter, so the envelope and the filter shape the repeats) back into the
+//                      delay line's input, one block late
 //   3. dark reverb   — Signalsmith reverb (size param) into a low-pass (darkness)
 //   4. bar envelope  — a per-bar volume shape from a drawable smooth curve (the shared
 //                      LFOEditor), evaluated per block by its Track and pushed via
@@ -35,6 +37,8 @@ public:
         const int maxDelay = (int) std::ceil(sampleRate * (60.0 / 20.0) * 1.0);   // ~1 beat @ 20 BPM
         delayBuf.setSize(2, juce::jmax(1, maxDelay));
         delayBuf.clear();
+        fbRing.setSize(2, juce::jmax(1, maxDelay));
+        fbRing.clear();
         writePos = 0;
         dirty = false;
         tailLeft = 0;
@@ -63,8 +67,9 @@ public:
     // dry/wet blend (0 = dry, 1 = fully wet).
     void setParams(double bpm_, float drive, float d1, float d2, float d3,
                    float revSize, float revMix_, float revLpHz, float cutHz, float res,
-                   float inLpHz = kInLpOpen) noexcept
+                   float inLpHz = kInLpOpen, float feedback = 0.0f) noexcept
     {
+        fbAmt  = juce::jlimit(0.0f, 1.0f, feedback) * kMaxFeedback;
         inLpCut = juce::jlimit(20.0f, kInLpOpen, inLpHz);
         inLp.setCutoff(inLpCut);
         bpm    = bpm_ > 0.0 ? bpm_ : 120.0;
@@ -155,6 +160,13 @@ public:
         const int t2 = juce::jlimit(1, cap - 1, (int) std::lround(spb * 0.50));
         const int t3 = juce::jlimit(1, cap - 1, (int) std::lround(spb * 0.75));
 
+        // Feedback: the final output of one block-length ago (so the loop is never zero-delay, whatever the block size)
+        // goes into the delay line with the input. Its gain is held under 1 even with all three taps up (the taps add), and
+        // tanh bounds what is written, so the loop cannot run away however the filter resonance and the reverb colour it.
+        const float fbGain = fbAmt / juce::jmax(1.0f, lvl1 + lvl2 + lvl3);
+        const int fbLag = juce::jmin(maxBlockSize, cap - 1);
+        const int blockStart = writePos;
+
         int wp = writePos;
         for (int i = 0; i < ns; ++i)
         {
@@ -162,7 +174,13 @@ public:
             {
                 float* dl = delayBuf.getWritePointer(c);
                 float* s  = scratch.getWritePointer(c);
-                dl[wp] = s[i];
+                if (fbGain > 0.0f)
+                {
+                    int fr = wp - fbLag; if (fr < 0) fr += cap;
+                    dl[wp] = std::tanh(s[i] + fbRing.getReadPointer(c)[fr] * fbGain);
+                }
+                else
+                    dl[wp] = s[i];
                 auto tap = [&](int d) { int r = wp - d; if (r < 0) r += cap; return dl[r]; };
                 s[i] += tap(t1) * lvl1 + tap(t2) * lvl2 + tap(t3) * lvl3;
             }
@@ -198,12 +216,23 @@ public:
         filter.process(work, ns, ch);
         for (int c = 0; c < ch; ++c)
             out.addFrom(c, 0, work, c, 0, ns);
+
+        // Keep this block's final output where the feedback will read it, one block later.
+        if (fbAmt > 0.0f)
+            for (int c = 0; c < ch; ++c)
+            {
+                float* ring = fbRing.getWritePointer(c);
+                const float* w = work.getReadPointer(c);
+                int pos = blockStart;
+                for (int i = 0; i < ns; ++i) { ring[pos] = w[i]; if (++pos >= cap) pos = 0; }
+            }
     }
 
 private:
     void clearState() noexcept
     {
         delayBuf.clear();
+        fbRing.clear();
         writePos = 0;
         inLp.reset();
         filter.reset();
@@ -216,15 +245,17 @@ private:
     int tailSamples() const noexcept { return (int) (sampleRate * 8.0); }
 
     static constexpr float kInLpOpen = 20000.0f;   // the input LP's top: at or above it the filter is skipped
+    static constexpr float kMaxFeedback = 0.95f;   // the Feedback knob's full travel
 
     MultiModeFilter inLp, filter, revLp;
     ReverbSlot      reverb;
-    juce::AudioBuffer<float> delayBuf, scratch, revWet;
+    juce::AudioBuffer<float> delayBuf, scratch, revWet, fbRing;   // fbRing: the final output, in step with delayBuf
 
     double sampleRate = 44100.0, bpm = 120.0;
     int    maxBlockSize = 512, writePos = 0, tailLeft = 0;
     bool   dirty = false;   // rendered since the last reset
     float  inLpCut = kInLpOpen;
+    float  fbAmt = 0.0f;
     float  drv = 0.0f, lvl1 = 0.0f, lvl2 = 0.0f, lvl3 = 0.0f, revMix = 0.5f, envLevel = 1.0f;
 };
 
