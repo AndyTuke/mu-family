@@ -152,6 +152,7 @@ target_sources(mu-tilate-tests PRIVATE
     Source/Tests/LengthTextTests.cpp   # the timeline length box: what it accepts and shows
     Source/Tests/PhraseLoadTests.cpp   # loading a loop file (cap, errors) and detecting slices on it
     Source/Tests/ProcessorTests.cpp   # the real PluginProcessor, headless: load, play, restore
+    Source/Tests/SoakTests.cpp   # random parameters, notes and state restores against a rendering audio thread (Tests/ParamSoak.h)
     # The real PluginProcessor, built headless (createEditor is defined in ProcessorTests.cpp; PluginEditor.cpp is not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp

@@ -143,6 +143,7 @@ target_sources(mu-tronic-tests PRIVATE
     Source/Tests/TronicLayerPresetTests.cpp # layer presets in a slot: save/load per type, Empty-slot adopt, cross-type refusal, staged load
     Source/Tests/TronicPatternTests.cpp     # the Pattern type in a slot: saved rows, same stream as mu-Tant, Note mode per layer, services, wavetables, presets
     Source/Tests/TronicPhraseTests.cpp      # the Phrase type in a slot: registry row, rows by type, loop load through the services, session restore
+    Source/Tests/SoakTests.cpp              # random parameters, notes, state restores and slot type changes against a rendering audio thread
     Source/Tests/TronicSwapTests.cpp        # swapLayers in a slot host: Kick, Arp, Rumble and Rhythm reorder with rows, strips, Rumble source and tails
     Source/Tests/TronicRhythmTests.cpp      # the Rhythm type in a slot: saved rows, same stream as mu-Clid, parameter sync, samples, MIDI out, tails, .muRhythm presets
     Source/Tests/TronicMidiInTests.cpp      # per-layer MIDI In: the strip row, channel routing, carried keys, save / swap, the load meter
@@ -214,3 +215,42 @@ target_compile_definitions(mu-tronic-tests PRIVATE "MU_TRONIC_IMPORT_FIXTURE_DIR
 target_compile_definitions(mu-tronic-tests PRIVATE MU_MAX_LAYERS=16 MU_MAX_BUSES=3 MU_BUS_INSERTS=2 JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0 JUCE_MODAL_LOOPS_PERMITTED=1)   # the Phrase tests pump the message loop while a loop loads
 
 add_dependencies(mu-tronic mu-tronic-tests)
+
+# mu-tronic-uisoak: the real editor driven in-process (built on demand, not in ALL_BUILD). A second Standalone-only target over the
+# same sources as mu-tronic with its own application (Tests/UiSoakApp.cpp): random mouse, key and slot-type actions are handed to the
+# window's peer from inside the process, so nothing reaches another window, and storage is a temporary root.
+juce_add_plugin(mu-tronic-uisoak
+    COMPANY_NAME "Transwarp Development Project"
+    BUNDLE_ID "com.transwarp.mu-tronic-uisoak"
+    PLUGIN_MANUFACTURER_CODE TDP1
+    PLUGIN_CODE MTsk
+    FORMATS Standalone
+    PRODUCT_NAME "mu-tronic-uisoak"
+    PLUGIN_NAME  "uisoak"
+    IS_SYNTH TRUE
+    NEEDS_MIDI_INPUT TRUE
+    NEEDS_MIDI_OUTPUT TRUE
+    IS_MIDI_EFFECT FALSE
+    EDITOR_WANTS_KEYBOARD_FOCUS FALSE
+    VERSION "${MUFAMILY_PRE_PLUGIN_VERSION}"
+    COMPANY_COPYRIGHT "${MUFAMILY_COPYRIGHT}"
+)
+get_target_property(MU_TRONIC_APP_SOURCES mu-tronic SOURCES)
+target_sources(mu-tronic-uisoak PRIVATE ${MU_TRONIC_APP_SOURCES})
+target_include_directories(mu-tronic-uisoak
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source" "${CMAKE_SOURCE_DIR}/mu-core"
+    SYSTEM PRIVATE
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher")
+target_compile_definitions(mu-tronic-uisoak PUBLIC
+    MU_MAX_LAYERS=16 MU_MAX_BUSES=3 MU_BUS_INSERTS=2 MU_EXT_SIDECHAIN=0 MU_TRONIC_WITH_UI=1
+    JUCE_WEB_BROWSER=0 JUCE_USE_MP3AUDIOFORMAT=1 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0
+    "MU_VERSION_BASE=\"${MUFAMILY_PRE_VERSION_BASE}\"")
+target_link_libraries(mu-tronic-uisoak
+    PRIVATE mu-toni-layer mu-on-layer mu-tant-layer mu-clid-layer mu-tilate-layer mu-core
+        juce::juce_audio_utils juce::juce_dsp juce::juce_gui_basics juce::juce_gui_extra juce::juce_audio_formats
+    PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
+target_compile_definitions(mu-tronic-uisoak_Standalone PRIVATE JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1)
+target_sources(mu-tronic-uisoak_Standalone PRIVATE Source/Tests/UiSoakApp.cpp)
+set_target_properties(mu-tronic-uisoak mu-tronic-uisoak_Standalone PROPERTIES EXCLUDE_FROM_ALL TRUE)
