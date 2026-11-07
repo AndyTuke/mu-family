@@ -25,15 +25,6 @@ For shipped features see [DevelopmentHistory.md](DevelopmentHistory.md).
 
 Load a loop (usually drums), find its transients automatically (spectral flux / SuperFlux detector with threshold, min gap, band and pre-roll controls, written in-house on `juce::dsp::FFT`), show the slices as tinted regions in a scrollable, zoomable waveform, and place them on a drag-scrollable timeline with a time ruler (drag from the sample window or the pad grid, grid snap with Alt for free placement, grabbable block edges). A slice player panel gives each slice filter, amp and filter envelopes and pitch; every slice has an automatic few-ms declick fade; per-layer tempo matching is Off / Re-pitch / Stretch (Signalsmith Stretch chosen, MIT: only its notice goes into the third-party notices and About; Rubber Band and SoundTouch rejected). Stretch is transient-weighted, modelled on Bitwig: the attack plays unstretched, then the stretch eases in to an even plateau, set by Transient hold, Curve and Strength controls; driving the stretcher with a varying rate is unproven and needs a prototype and `dsp-controller` review. Same mixer, FX and modulation as every other product via `mu-core`. Wireframe, parts and open questions: [mu-tilate/design.md](mu-tilate/design.md). Needs a new product on `mu-core` (a slice-player engine and a timeline sequencer) plus the detector. Layer type `Phrase`, layer preset `.muPhrase`, full preset `.muTilate`; 8 layers as elsewhere, each with one loop, one sample player and a single-row timeline (no lanes); no MIDI play (self-driven sequencer); VST3 + CLAP + Standalone; the `Phrase` layer must drop into mu-Tronic as a plain registry entry (`mu-tilate-layer` library, `LayerTypeId::Phrase`; items for an `architecture-steward` ruling are listed in the wireframe doc). Each layer is monophonic (the next slice cuts the previous through the declick fade). An own sample library (separate folder setting and content from mu-Clid's, shared mechanism where practical) is wanted (folder browser, preview, path or embedded storage; for loops it adds length and tempo columns, audition at project tempo, drag-to-layer with automatic slicing); mu-Clid's library code is product-specific today, so by Andy's standing rule (shared code always goes in `mu-core` unless there is a very good reason not to) it is lifted into `mu-core` as part of this work and mu-Clid is refactored to use it. The same goes for the waveform view, ruler, drag-scroll viewport, the product-independent detector code and the Bounce dialog. Only the byte budget and saved-state size policy remain for the architecture-steward. Bounce to WAV and Export slices to a folder are in scope. Decided: a small free factory loop pack (CC0 / redistributable only, licence manifest per loop), loop tempo from file metadata then in-house analysis on the detection curve (confidence shown, user override saved), one export folder per loop, Bounce Standalone-only for now. No open questions remain. Nothing scheduled.
 
-### 🟢 Standalone: Bounce to WAV (user-facing render)
-
-Expose the headless render pipeline (introduced for the listening-test harness) as a user-facing "File → Bounce…" dialog in the standalone. User picks duration, sample rate, output file → gets a WAV of the currently-loaded patch playing for N seconds. Useful for sample-pack workflows where the user wants to commit a pattern to disk without round-tripping through a DAW.
-
-- **Foundation in place:** [mu-core/Plugin/ProductRender.h](../mu-core/Plugin/ProductRender.h) already drives `processBlock` headlessly for every product and writes WAV via `juce::WavAudioFormat`. The CLI path (`--render`) bypasses the GUI; the user-facing version reuses `mu_core::render_mode::runProduct` from a dialog instead of from `JUCEApplication::initialise`.
-- **Suggested implementation:** new `BounceDialog` modal in the standalone's menu bar. Form fields — filename (default `<preset name>_bounced.wav`), duration (default 8 s), sample rate (default current device rate), tail length (extra silence past playback to capture FX tails). On confirm: temporarily pause the live transport, call `RenderMode::execute` against a fresh PluginProcessor seeded from the current APVTS state, write the WAV, resume.
-- **Plugin / standalone parity question:** does the VST3/CLAP plugin also expose Bounce? Probably no — most DAWs have their own bounce/render workflow; a plugin offering a competing one is confusing. Standalone-only is the right scope.
-- **Family reuse:** the dialog code can live in `mu-core/UI/` so every product inherits Bounce automatically (each plugin's own `RenderMode`, or the shared render path, plugs into the same dialog). Only mu-clid has a `RenderMode` today; generalising it to mu-core is the prerequisite.
-
 ### 🟢 Demo build (mu-clid)
 
 **Dropped 2026-10-11:** the apps are now free and fully functional when unlicensed, so no demo build or demo gate is wanted; see [design-plugin-family.md](design-plugin-family.md#licensing-and-the-support-prompt--family-standard-ruled-2026-10-11). The text below is kept only as history.
@@ -57,15 +48,6 @@ More than three generators per rhythm (currently `genA`, `genB`, `genC`). Useful
 ### 🟢 Longer sequences (mu-clid)
 
 Step counts above 64 per ring. The sequencer engine is not the bottleneck — `RhythmSequencer` uses `std::vector<bool>` patterns with no hard cap. Only constraint is the UI range in `EuclideanPanel` (1–64), trivially widened.
-
-### 🟡 Sample-accurate MIDI timing (mu-Clid MIDI)
-
-Today MIDI timing is block-quantised. Every note-on is emitted at sample offset 0 of the block, and several sequencer steps inside one block collapse into one note because there is one `firedMask` bit per rhythm. Jitter is up to one buffer (about 46 ms at 2048 samples / 44.1 kHz), and steps are dropped at fast tempos with large buffers.
-
-- **Idea:** carry the in-block step offset from the sequencer into `trigger`, so each note lands at its true sample offset and nothing collapses (the per-rhythm fired state would need to hold several offsets per block, not one bit).
-- **Why 🟡:** the sequencer's step-fired result and the trigger path both change shape (`firedMask` becomes a small per-block list of offsets). Keep it allocation-free on the audio thread.
-- **Fit with the other ideas:** the same offset-carrying path would serve the other products, and it serves the MIDI sync groundwork. (Ableton Link, which would have exposed the jitter, was dropped 2026-10-20.)
-- **Feature, not a fix:** ask Andy before implementing.
 
 ### 🟡 MIDI CC remote control of knobs
 
@@ -100,13 +82,6 @@ Run multiple μ-family standalones and have them share a clock + summing bus for
 
 These are understood and scoped but parked until the family ships publicly. They are
 release infrastructure, not features, and were moved here from the active backlog.
-
-### 🔵 Ship mu-tant factory wavetables with the installer
-
-The mu-tant wavetable **system** is shipped (Serum/Vital mono-WAV loader + FFT mip-mapping, oscillator/voice/APVTS wiring, user `.wav` disk import, the in-repo `tools/wavetable-gen` generator, `clm ` chunk parsing, and dropdown sub-folder categories — all landed across **v1.0.764–769**). What remains is **distribution**: bundle the 25 generated factory `.wav` tables *with the installer* so users get the library out of the box, instead of generating them into the user's own `…/muTant/Wavetables` content folder on first run.
-
-- Held until the artefacts are code-signed (the owner wants the installer + artefacts signed before shipping bundled content); code signing itself is not planned (owner, 2026-11-07).
-- Implementation when unblocked: add the generated `.wav` set to the installer payload (or embed via `juce_add_binary_data` + unpack on first run), pointing the loader's content-folder scan at the installed copy.
 
 ---
 
