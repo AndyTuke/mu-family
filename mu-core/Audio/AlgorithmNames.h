@@ -52,6 +52,11 @@ inline const char* const kInsertAlgorithmNames[] = {
     "Overdrive",    // 14
     "TapeDelay",    // 15
     "TapeSpring",   // 16
+    "Chorus",       // 17
+    "Flanger",      // 18
+    "Phaser",       // 19
+    "PitchDelay",   // 20
+    "Tremolo",      // 21
     nullptr
 };
 
@@ -242,18 +247,23 @@ inline constexpr InsertMenuEntry kInsertMenu[] = {
     {  0, "None",        10 },
     {  6, "3-Band EQ",   20 },
     {  4, "Bitcrusher",  30 },
+    { 17, "Chorus",      35 },
     {  5, "Clipper",     40 },
     {  7, "Compressor",  50 },
+    { 18, "Flanger",     55 },
     {  3, "Fold",        60 },
     {  2, "Hard Clip",   70 },
     { 11, "Karplus",     80 },
     {  8, "Limiter",     90 },
     { 14, "Overdrive",  100 },
+    { 19, "Phaser",     102 },
+    { 20, "Pitch Delay", 104 },
     {  9, "Ring Mod",   110 },
     {  1, "Soft Clip",  120 },
     { 15, "Tape Delay", 125 },
     { 16, "Tape Spring", 126 },
     { 10, "Tape Sat",   130 },
+    { 21, "Tremolo",    135 },
     { 12, "Vocoder",    140 },
     { 13, "Vocoder St", 150 },
 };

@@ -55,6 +55,7 @@ set(MU_CORE_TEST_SOURCES
     MixerStereoPeakTests.cpp
     AuditMinorsTests.cpp            # Layer reset locks, FX hand-off and sizing, NaN containment, activation worker
     MixerBlockValueTests.cpp
+    NewInsertTests.cpp              # chorus, flanger, phaser, pitch delay, tremolo inserts
     SupportPromptPolicyTests.cpp
     UpdateCheckPolicyTests.cpp
     SettingsOverlayFitTests.cpp

@@ -32,6 +32,11 @@
 #include "Audio/FX/Insert/OverdriveInsert.h"
 #include "Audio/FX/Insert/TapeDelayInsert.h"
 #include "Audio/FX/Insert/TapeSpringInsert.h"
+#include "Audio/FX/Insert/ChorusInsert.h"
+#include "Audio/FX/Insert/FlangerInsert.h"
+#include "Audio/FX/Insert/PhaserInsert.h"
+#include "Audio/FX/Insert/PitchDelayInsert.h"
+#include "Audio/FX/Insert/TremoloInsert.h"
 #include "Audio/FX/Insert/TapeSatInsert.h"
 #include "Audio/FX/Insert/KarplusStrongInsert.h"
 #include "Audio/FX/Insert/VocoderInsert.h"
@@ -1076,6 +1081,7 @@ struct InsertLatencyTests : juce::UnitTest
             OverdriveInsert a14;
             TapeDelayInsert a15;
             TapeSpringInsert a16;
+            ChorusInsert a17; FlangerInsert a18; PhaserInsert a19; PitchDelayInsert a20; TremoloInsert a21;
             checkAlgorithm("None", a0);           checkAlgorithm("SoftClip", a1);   checkAlgorithm("HardClip", a2);
             checkAlgorithm("Fold", a3);           checkAlgorithm("Bitcrusher", a4); checkAlgorithm("Clipper", a5);
             checkAlgorithm("EQ", a6);             checkAlgorithm("Compressor/Limiter", a7);
@@ -1084,13 +1090,15 @@ struct InsertLatencyTests : juce::UnitTest
             checkAlgorithm("Overdrive", a14);
             checkAlgorithm("TapeDelay", a15);
             checkAlgorithm("TapeSpring", a16);
+            checkAlgorithm("Chorus", a17);        checkAlgorithm("Flanger", a18);   checkAlgorithm("Phaser", a19);
+            checkAlgorithm("PitchDelay", a20);    checkAlgorithm("Tremolo", a21);
 
-            // The registry has 17 slots (Compressor and Limiter share one instance); the construction list
+            // The registry has 22 slots (Compressor and Limiter share one instance); the construction list
             // above must cover every name in the algorithm-name table, so a new algorithm cannot be skipped.
             int named = 0;
             while (mu_audio::kInsertAlgorithmNames[named] != nullptr) ++named;
             expectEquals(named, InsertProcessor::kNumInsertAlgos, "name table and dispatch table agree on the algorithm count");
-            expectEquals(named, 17, "this list constructs 16 classes for 17 slots; a new algorithm means extending it");
+            expectEquals(named, 22, "this list constructs 21 classes for 22 slots; a new algorithm means extending it");
         }
 
         beginTest("a step through every insert slot of the real processor shows its first output at sample 0");

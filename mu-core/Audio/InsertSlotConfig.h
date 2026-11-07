@@ -31,7 +31,7 @@ namespace mu_ui {
 inline constexpr int kInsertSlotCount = 4;
 // Number of insert algorithms (rows in kInsertAlgoSlots / kInsertAlgoDefaults).
 // Must equal InsertProcessor::kNumInsertAlgos.
-inline constexpr int kInsertAlgoCount = 17;
+inline constexpr int kInsertAlgoCount = 22;
 
 // Skew shape between the displayed actual value and the normalised 0..1
 // stored in VoiceParams + APVTS. Knobs apply the SAME skew on the slider
@@ -69,8 +69,9 @@ struct SlotConfig
 inline const char* const kNoteNames[12]    = { "C","C#","D","D#","E","F","F#","G","G#","A","A#","B" };
 inline const char* const kWaveNames[4]     = { "Saw","Square","White","Pink" };
 inline const char* const kUnisonNames[7]   = { "1","3","5","7","9","11","13" };
+inline const char* const kTremoloShapeNames[3] = { "Sine","Triangle","Square" };
 
-// Per-algorithm slot table. 17 rows × 4 cols.
+// Per-algorithm slot table. 22 rows × 4 cols.
 //
 // Source order MUST match the index order of InsertProcessor::dispatch[] /
 // mu_audio::kInsertAlgorithmNames so a single integer dispatches the
@@ -181,6 +182,36 @@ inline const SlotConfig kInsertAlgoSlots[kInsertAlgoCount][kInsertSlotCount] = {
       { "Rate",      0.0f, 100.0f, SkewMode::Linear,   "%" },
       { "Intensity", 0.0f, 100.0f, SkewMode::Linear,   "%" },
       { "Mix",       0.0f, 100.0f, SkewMode::Linear,   "%" } },
+
+    // ── 17 Chorus ── Rate / Depth / Delay / Mix ───────────────────────
+    { { "Rate",  0.05f, 8.0f,   SkewMode::Log,    "Hz" },
+      { "Depth", 0.0f,  100.0f, SkewMode::Linear, "%" },
+      { "Delay", 5.0f,  30.0f,  SkewMode::Linear, "ms" },
+      { "Mix",   0.0f,  100.0f, SkewMode::Linear, "%" } },
+
+    // ── 18 Flanger ── Rate / Depth / Feedback / Mix ───────────────────
+    { { "Rate",     0.05f, 5.0f,   SkewMode::Log,    "Hz" },
+      { "Depth",    0.0f,  100.0f, SkewMode::Linear, "%" },
+      { "Feedback", -95.0f, 95.0f, SkewMode::Linear, "%" },
+      { "Mix",      0.0f,  100.0f, SkewMode::Linear, "%" } },
+
+    // ── 19 Phaser ── Rate / Depth / Feedback / Mix ────────────────────
+    { { "Rate",     0.05f, 5.0f,   SkewMode::Log,    "Hz" },
+      { "Depth",    0.0f,  100.0f, SkewMode::Linear, "%" },
+      { "Feedback", 0.0f,  90.0f,  SkewMode::Linear, "%" },
+      { "Mix",      0.0f,  100.0f, SkewMode::Linear, "%" } },
+
+    // ── 20 PitchDelay ── Pitch / Time / Feedback / Mix ────────────────
+    { { "Pitch",    -12.0f, 12.0f,  SkewMode::IntStep, "st" },
+      { "Time",     20.0f,  1000.0f, SkewMode::Log,    "ms", nullptr, 0, true },
+      { "Feedback", 0.0f,   95.0f,  SkewMode::Linear,  "%" },
+      { "Mix",      0.0f,   100.0f, SkewMode::Linear,  "%" } },
+
+    // ── 21 Tremolo ── Rate / Depth / Shape / Phase ────────────────────
+    { { "Rate",  0.1f, 20.0f,  SkewMode::Log,     "Hz" },
+      { "Depth", 0.0f, 100.0f, SkewMode::Linear,  "%" },
+      { "Shape", 0.0f, 2.0f,   SkewMode::IntStep, "", kTremoloShapeNames, 0 },
+      { "Phase", 0.0f, 100.0f, SkewMode::Linear,  "%" } },
 };
 
 // Tempo sync (the insert's own Sync switch, APVTS suffix insSync): which slot turns into sixteenth-note steps when it is on,
@@ -189,6 +220,11 @@ inline constexpr int kInsertSyncSlot[kInsertAlgoCount] = {
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     0,    // 15 TapeDelay : Time
     1,    // 16 TapeSpring: Rate
+    -1,   // 17 Chorus
+    -1,   // 18 Flanger
+    -1,   // 19 Phaser
+    1,    // 20 PitchDelay: Time
+    0,    // 21 Tremolo   : Rate
 };
 inline bool insertHasSync(int algoIndex) noexcept
 {
@@ -246,6 +282,11 @@ inline const float kInsertAlgoDefaults[kInsertAlgoCount][kInsertSlotCount] = {
     /*14 Overdrive   */ { 0.0f,    0.0f,    25.0f,  20000.0f },
     /*15 TapeDelay   */ { 350.0f,  40.0f,   30.0f,  40.0f    },
     /*16 TapeSpring  */ { 7.0f,    50.0f,   35.0f,  50.0f    },
+    /*17 Chorus      */ { 0.8f,    50.0f,   15.0f,  50.0f    },
+    /*18 Flanger     */ { 0.3f,    70.0f,   50.0f,  50.0f    },
+    /*19 Phaser      */ { 0.4f,    80.0f,   40.0f,  50.0f    },
+    /*20 PitchDelay  */ { 7.0f,    350.0f,  40.0f,  30.0f    },
+    /*21 Tremolo     */ { 4.0f,    60.0f,   0.0f,   0.0f     },
 };
 
 // Convert a normalised 0..1 storage value to the algorithm's actual value
