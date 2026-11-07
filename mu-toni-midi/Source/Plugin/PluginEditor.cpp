@@ -78,6 +78,10 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     addSwitch(arpId("leg"),  "Legato");
     addSwitch(arpId("snap"), "Snap");
 
+    modulatorPanel.setDestProvider(&destProvider);
+    modulatorPanel.setLayer(&proc.getCore().getLayer());
+    addAndMakeVisible(modulatorPanel);
+
     sizeDropdown.addItem("Normal", 1);
     sizeDropdown.addItem("Large",  2);
     sizeDropdown.setSelectedId(proc.getUiScale() >= ProcessorBase::kUiScaleLarge ? 2 : 1, false);
@@ -107,6 +111,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 PluginEditor::~PluginEditor()
 {
     stopTimer();
+    modulatorPanel.setLayer(nullptr);   // before the editor goes: the panel must not keep a pointer into the core
     proc.onUiScaleChanged = nullptr;
     setLookAndFeel(nullptr);
 }
@@ -169,6 +174,7 @@ void PluginEditor::addSwitch(const juce::String& id, const juce::String& label)
 
 void PluginEditor::timerCallback()
 {
+    modulatorPanel.setPlayheadBeat(proc.getCore().lastBeat());
     // Host automation and preset loads change parameters behind the controls' backs; pull them in.
     for (auto& c : choices)
     {
@@ -231,6 +237,10 @@ void PluginEditor::resized()
     const int sh = switchCol.getHeight() / juce::jmax(1, (int) switches.size());
     for (auto& sw : switches)
         sw->button.setBounds(switchCol.removeFromTop(sh).reduced(s(4)));
+
+    // The modulators take the rest of the window.
+    content.removeFromTop(s(MuLookAndFeel::kSpaceL));
+    modulatorPanel.setBounds(content);
 }
 
 } // namespace mu_toni_midi

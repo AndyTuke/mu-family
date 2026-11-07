@@ -1,6 +1,7 @@
 #include "Sequencer/MidiArpCore.h"
 #include "Persistence/LayerParamIds.h"   // mu-toni: layerParamId
 #include "Persistence/ArpParams.h"       // mu-toni: vpi suffixes
+#include "Modulation/LaneModulation.h"   // mu-core: mu_mod::resolveLane
 
 namespace mu_toni_midi
 {
@@ -13,6 +14,15 @@ MidiArpCore::MidiArpCore(juce::AudioProcessorValueTreeState& apvts)
     inv   = row(vpi::inv);     octs = row(vpi::octs);   dir  = row(vpi::dir);    rate  = row(vpi::rate);
     gate  = row(vpi::gate);    leg  = row(vpi::leg);    snap = row(vpi::snap);   trig  = row(vpi::trig);
     acc   = row(vpi::acc);     accLen = row(vpi::accLen); accPat = row(vpi::accPat); stepMask = row(vpi::stepMask);
+    // The modulation targets: each one reads its parameter's raw value and range (the same ids mu-Toni's table uses).
+    for (int k = 0; k < kNumModDests; ++k)
+    {
+        const auto id = layerParamId(0, kModDestTable[k].param);
+        modDestIds[(size_t) k]    = kModDestTable[k].id;
+        modDestRanges[(size_t) k] = apvts.getParameterRange(id);
+        modDestAtoms[(size_t) k]  = apvts.getRawParameterValue(id);
+        modParamValues[kModDestTable[k].id] = 0.0f;
+    }
     inCh  = apvts.getRawParameterValue(kMidiInChId);
     outCh = apvts.getRawParameterValue(kMidiOutChId);
     vel   = apvts.getRawParameterValue(kMidiVelId);
@@ -20,6 +30,7 @@ MidiArpCore::MidiArpCore(juce::AudioProcessorValueTreeState& apvts)
 
 void MidiArpCore::prepare(double sr, int blockSize)
 {
+    lastResolved.reset();
     sampleRate = sr > 0.0 ? sr : 44100.0;
     maxBlock = juce::jmax(1, blockSize);
     runner.prepare(sampleRate, maxBlock);
@@ -32,6 +43,7 @@ void MidiArpCore::reset() noexcept
 {
     runner.reset();
     heldNotes.clear();
+    lastResolved.reset();
     lastInCh = -1;
     uiLastStep.store(-1);
     uiNote.store(-1);
@@ -75,24 +87,31 @@ void MidiArpCore::processBlock(bool playing, double startBeat, double bpm, juce:
             outBuf.addEvent(m, meta.samplePosition);
     }
 
-    // 2. The arp for this block, from the parameters.
+    // 2. The arp for this block: the parameters, with the modulators resolved at the block's beat over the targets (the integer
+    //    targets round, as in mu-Toni). A block that misses the modulator lock holds the last resolved values.
+    float mod[kNumModDests];
+    const bool resolved = mu_mod::resolveLane(&layer, startBeat, kNumModDests, modDestIds.data(), modDestAtoms.data(),
+                                              modDestRanges.data(), modParamValues, mod);
+    lastResolved.apply(resolved, mod);
+    uiBeat.store(startBeat, std::memory_order_relaxed);
+
     mu_toni::ArpParams ap;
-    ap.scale        = (int) p(scale, 1.0f);
-    ap.rootNote     = (int) p(root);
-    ap.rootOctave   = (int) p(roct, 4.0f);
-    ap.chord        = (int) p(chord, 3.0f);
-    ap.inversion    = (int) p(inv);
-    ap.octavesSpan  = (int) p(octs, 2.0f);
-    ap.direction    = p(dir, 100.0f);
-    ap.diatonicSnap = p(snap) > 0.5f;
+    ap.scale        = (int) p(scale, 1.0f);                  // not modulated
+    ap.rootNote     = juce::roundToInt(mod[D_root]);
+    ap.rootOctave   = juce::roundToInt(mod[D_roct]);
+    ap.chord        = juce::roundToInt(mod[D_chord]);
+    ap.inversion    = juce::roundToInt(mod[D_inv]);
+    ap.octavesSpan  = juce::roundToInt(mod[D_octs]);
+    ap.direction    = mod[D_dir];
+    ap.diatonicSnap = p(snap) > 0.5f;                        // not modulated
     mu_toni::ArpAccent accent;
-    accent.amount   = p(acc) * 0.01f;
+    accent.amount   = mod[D_acc] * 0.01f;
     accent.length   = (int) p(accLen, 4.0f);
     accent.pattern  = (unsigned) juce::jmax(0, (int) p(accPat, 1.0f));
     accent.stepMask = (unsigned) juce::jmax(0, (int) p(stepMask, 65535.0f));
     runner.setArp(ap);
     runner.setAccent(accent);
-    runner.setStep(juce::roundToInt(p(rate, 6.0f)), p(gate, 50.0f) * 0.01f, p(trig) > 0.5f);
+    runner.setStep(juce::roundToInt(mod[D_rate]), mod[D_gate] * 0.01f, p(trig) > 0.5f);
     runner.setLegato(p(leg) > 0.5f);
 
     mu_toni::ArpContext ctx;

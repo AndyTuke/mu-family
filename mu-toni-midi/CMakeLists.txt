@@ -104,6 +104,8 @@ target_sources(mu-toni-midi-tests PRIVATE
     # The audio path under test, as the plugin compiles it.
     Source/Sequencer/MidiArpCore.cpp
     ${MU_TONI_MIDI_SHARED_SOURCES}
+    "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"   # the modulators sit on a mu-core Layer
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/ControlSequence.cpp"
 )
 
 target_compile_features(mu-toni-midi-tests PRIVATE cxx_std_17)
@@ -138,3 +140,39 @@ target_compile_definitions(mu-toni-midi-tests PRIVATE
 )
 
 set_target_properties(mu-toni-midi-tests PROPERTIES EXCLUDE_FROM_ALL TRUE)
+
+# ── mu-toni-midi-shot — renders the real editor to a PNG (site screenshots) ──
+# Test-only tool: not in ALL, not packaged, not run by CI. The plug-in has no Standalone, so this builds the real processor and
+# editor into a small console app and snapshots the editor headless.
+#   cmake --build build --config Release --target mu-toni-midi-shot
+#   build/mu-toni-midi/mu-toni-midi-shot_artefacts/Release/mu-toni-midi-shot.exe out.png
+juce_add_console_app(mu-toni-midi-shot PRODUCT_NAME "mu-toni-midi-shot")
+target_sources(mu-toni-midi-shot PRIVATE
+    Source/Tests/ShotMain.cpp
+    Source/Plugin/PluginProcessor.cpp
+    Source/Plugin/PluginEditor.cpp
+    Source/Sequencer/MidiArpCore.cpp
+    ${MU_TONI_MIDI_SHARED_SOURCES}
+)
+target_include_directories(mu-toni-midi-shot
+    PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/Source"
+        "${CMAKE_SOURCE_DIR}/mu-toni/Source"
+    SYSTEM PRIVATE
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+)
+target_compile_definitions(mu-toni-midi-shot PUBLIC JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_USE_MP3AUDIOFORMAT=1)
+target_link_libraries(mu-toni-midi-shot
+    PRIVATE
+        mu-core
+        juce::juce_audio_utils
+        juce::juce_dsp
+        juce::juce_gui_basics
+        juce::juce_gui_extra
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags
+)
+set_target_properties(mu-toni-midi-shot PROPERTIES EXCLUDE_FROM_ALL TRUE)

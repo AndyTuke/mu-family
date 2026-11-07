@@ -9,6 +9,8 @@
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/AboutOverlay.h"
 #include "UI/UpdateNotice.h"
+#include "UI/ModulatorPanel.h"        // mu-core: the shared modulator panel (Mod A-H + Matrix)
+#include "Modulation/MuToniMidiModDestProvider.h"
 
 #include <memory>
 #include <vector>
@@ -48,13 +50,15 @@ private:
     mu_ui::UpdateNotice updateNotice { proc, statusBar };
     AboutOverlay  aboutOverlay;
     DropdownSelect sizeDropdown;
+    ModDestProvider destProvider = makeModDestProvider();
+    ModulatorPanel  modulatorPanel;   // the arp's modulators: eight control sequences and the matrix that aims them at the arp rows
 
     std::vector<std::unique_ptr<Choice>> choices;
     std::vector<std::unique_ptr<Amount>> amounts;
     std::vector<std::unique_ptr<Switch>> switches;
 
     static constexpr int kWindowW = 980;
-    static constexpr int kWindowH = 330;
+    static constexpr int kWindowH = 660;
     static constexpr int kTransportH = 40;
     static constexpr int kStatusH = 22;
 

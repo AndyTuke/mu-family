@@ -67,7 +67,14 @@ PluginProcessor::BlockTransport PluginProcessor::deriveTransport(int numSamples)
 
 void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
-    if (auto xml = apvts.copyState().createXml())
+    // The parameters, plus the modulators (control sequences and matrix) as a child node of their own.
+    auto tree = apvts.copyState();
+    for (auto stale = tree.getChildWithName(kModulatorNode); stale.isValid(); stale = tree.getChildWithName(kModulatorNode))
+        tree.removeChild(stale, nullptr);   // a restored state keeps its node in the live tree: never write two
+    juce::ValueTree extras(kModulatorNode);
+    core.getLayer().writeExtras(extras);
+    tree.appendChild(extras, nullptr);
+    if (auto xml = tree.createXml())
         copyXmlToBinary(*xml, destData);
 }
 
@@ -77,7 +84,11 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
     suspendProcessing(true);
     if (auto xml = getXmlFromBinary(data, sizeInBytes))
         if (xml->hasTagName(apvts.state.getType()))
-            apvts.replaceState(juce::ValueTree::fromXml(*xml));
+        {
+            const auto tree = juce::ValueTree::fromXml(*xml);
+            apvts.replaceState(tree);
+            core.getLayer().applyExtras(tree.getChildWithName(kModulatorNode));   // an absent node clears the modulators
+        }
     core.reset();
     suspendProcessing(false);
     notifyHostStateRestored();

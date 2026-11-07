@@ -277,6 +277,60 @@ struct MidiArpTests : juce::UnitTest
             expect(count(a.events, true) > 20);
         }
 
+        beginTest("a modulator aimed at Octaves widens the arp: the same keys, a four-octave sweep instead of one");
+        {
+            auto span = [](const std::vector<NoteEvent>& e)
+            {
+                int lo = 127, hi = 0;
+                for (auto& x : e) if (x.on) { lo = std::min(lo, x.note); hi = std::max(hi, x.note); }
+                return hi - lo;
+            };
+            Rig plain;
+            plain.set(arp("octs"), 1.0f);
+            plain.holdKey(48);
+            plain.run(3.0, true);
+
+            Rig modulated;
+            modulated.set(arp("octs"), 1.0f);
+            auto& layer = modulated.core.getLayer();
+            auto& cs = layer.controlSequences[0];
+            cs.mode = ControlSequence::Mode::Stepped;
+            cs.polarity = ControlSequence::Polarity::Unipolar;
+            cs.stepValues.assign((size_t) cs.getStepCount(), 100.0f);   // full output on every step
+            ModulationAssignment a;
+            a.id = "a1"; a.sourceId = "cs0_output"; a.destinationId = "arp.octs"; a.depth = 100.0f;
+            expect(layer.modulationMatrix.addAssignment(a), "the assignment is accepted");
+            modulated.holdKey(48);
+            modulated.run(3.0, true);
+
+            expect(span(plain.events) < 12, "one octave without the modulator (span " + juce::String(span(plain.events)) + ")");
+            expect(span(modulated.events) > 24, "the modulator opens it to four (span " + juce::String(span(modulated.events)) + ")");
+            expect(balanced(modulated.events));
+        }
+
+        beginTest("the modulators round-trip through the saved node, and a target this product has not got is dropped on load");
+        {
+            Rig a;
+            auto& layer = a.core.getLayer();
+            auto& cs = layer.controlSequences[0];
+            cs.stepValues.assign((size_t) cs.getStepCount(), 50.0f);
+            ModulationAssignment keep;
+            keep.id = "k1"; keep.sourceId = "cs0_output"; keep.destinationId = "arp.dir"; keep.depth = 40.0f;
+            ModulationAssignment synth;   // one of mu-Toni's synth targets: a MIDI effect has no cutoff
+            synth.id = "k2"; synth.sourceId = "cs0_output"; synth.destinationId = "flt.cutoff"; synth.depth = 10.0f;
+            expect(layer.modulationMatrix.addAssignment(keep) && layer.modulationMatrix.addAssignment(synth));
+
+            juce::ValueTree node("MidiArpLayer");
+            layer.writeExtras(node);
+
+            Rig b;
+            b.core.getLayer().applyExtras(node);
+            const auto& got = b.core.getLayer().modulationMatrix.getAssignments();
+            expectEquals((int) got.size(), 1, "only the arp target survives");
+            expect(got.size() == 1 && got[0].destinationId == "arp.dir" && std::abs(got[0].depth - 40.0f) < 0.01f);
+            expectEquals((int) b.core.getLayer().controlSequences[0].stepValues.size(), (int) cs.stepValues.size());
+        }
+
         beginTest("Legato with a full gate overlaps notes: the next note starts before the last one ends");
         {
             Rig r;

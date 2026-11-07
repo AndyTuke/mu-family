@@ -9,6 +9,9 @@ namespace mu_toni_midi
 
 // mu-Toni MIDI: mu-Toni's arpeggiator as a MIDI effect. The keys held on its input play the arp's scale / chord notes as MIDI
 // on the host transport. No audio, no licensing, no presets of its own; the arp is mu-Toni's (the same code).
+// The child node of the saved state that holds the modulators.
+inline const juce::Identifier kModulatorNode("MidiArpLayer");
+
 class PluginProcessor : public ProcessorBase
 {
     // First member: the editor reads the core through the processor.
@@ -60,6 +63,7 @@ public:
 
     // UI: the live arp (the editor polls these at 30 Hz).
     const MidiArpCore& getCore() const noexcept { return core; }
+    MidiArpCore&       getCore() noexcept       { return core; }
 
 protected:
     void applyFullMidiPreset(const juce::File&) override {}
