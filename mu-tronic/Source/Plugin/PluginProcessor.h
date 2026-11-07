@@ -36,8 +36,13 @@ public:
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
 
+   #ifdef MU_HOST
+    const juce::String getName() const override { return juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Host")); }
+    juce::String getProductSlug() const override { return "mu-host"; }
+   #else
     const juce::String getName() const override { return juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Tronic")); }
     juce::String getProductSlug() const override { return "mu-tronic"; }
+   #endif
     bool acceptsMidi()  const override { return true; }
     bool producesMidi() const override { return true; }   // a Rhythm layer in MIDI output mode sends notes
     bool isMidiEffect() const override { return false; }
@@ -59,9 +64,14 @@ public:
     float getCpuPeak() const noexcept { return cpuMeter.peak(); }
 
     // The Launchpad's scene picker (hold the logo, press a column) belongs to this product.
+   #ifdef MU_HOST
+    bool offersSceneControls() const override { return false; }   // one slot: no scenes, no pages
+    bool offersLayerPages() const override { return false; }
+   #else
     bool offersSceneControls() const override { return true; }
     // Sixteen slots in two pages of eight: the Launchpad's top-row 5 and 6 turn the page.
     bool offersLayerPages() const override { return true; }
+   #endif
 
     // ── Slots ────────────────────────────────────────────────────────────────
     // Sixteen fixed slots; a deleted layer leaves its slot Empty and nothing shifts. Two slots, empty or not, can

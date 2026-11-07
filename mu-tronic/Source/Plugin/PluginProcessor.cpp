@@ -83,8 +83,10 @@ PluginProcessor::PluginProcessor()
 
     initAppSettings(kAppName);   // settings file + saved UI size / MIDI clock (ProcessorBase)
 
-    // Offline licence + online activation (shared; after initAppSettings for getContentDir).
+    // Offline licence + online activation (shared; after initAppSettings for getContentDir). mu-Host has no licence yet.
+   #ifndef MU_HOST
     initLicensing({ mu_tronic::kLicenseProductId, mu_tronic::kLicenseFilename, mu_tronic::kLicensePublicKey, "mutronic.activation", mu_tronic::kCheckoutUrl, mu_tronic::kSuggestedPrice });
+   #endif
 
     setupLayerState();       // the layer layout every preset / session save and load uses
     layerSwapper.setAppliers([this](juce::ValueTree& t) { applyStateTree(t); },

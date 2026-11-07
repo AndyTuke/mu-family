@@ -17,7 +17,11 @@ PluginEditor::PluginEditor(PluginProcessor& p)
       mixerOverlay(p, p.mixerEngine),
       settingsOverlay(p)
 {
+   #ifdef MU_HOST
+    setProductIdentity(juce::String(juce::CharPointer_UTF8("\xce\xbc-Host")));
+   #else
     setProductIdentity(juce::String(juce::CharPointer_UTF8("\xce\xbc-Tronic")));
+   #endif
 
     // A filled slot shows its type's own mini-graphic; an Empty slot shows a "+" (the sidebar builds none for it).
     sidebar.createMiniVisual = [this](int slot, std::function<void()> pulse) -> std::unique_ptr<juce::Component>
@@ -111,10 +115,18 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     // Scenes: eight pads at the sidebar's foot launch clip n on every layer that stores one. The Notes In channel sits in
     // the header for the types that read notes (showSlot decides per slot).
+   #ifdef MU_HOST
+    sidebar.setShowScenes(false);   // one slot: no scene pads
+   #else
     sidebar.setShowScenes(true);
+   #endif
     layerPanel.getHeader().setNotesInControl([this] { return notesInChannel(); }, [this](int ch) { setNotesInChannel(ch); });
 
+   #ifdef MU_HOST
+    setMainArea(nullptr, &layerPanel);   // one slot: no sidebar (the engine drop-down in the transport bar picks it)
+   #else
     setMainArea(&sidebar, &layerPanel);
+   #endif
     setMixerOverlay(&mixerOverlay);
     setSettingsOverlay(&settingsOverlay);
 
@@ -135,6 +147,46 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     // The CPU readout: shown in Performance mode too (the one figure a player needs on stage).
     getStatusBar().setCpuMeterVisible(true);
+
+   #ifdef MU_HOST
+    // mu-Host: no mixer (the DAW mixes) and the engine is picked from a drop-down in the transport bar, where the other
+    // products have their loop section.
+    getTransportBar().setShowMixerToggle(false);
+    getTransportBar().setShowPresetControls(false);   // the DAW saves the plug-in's state; the layer's own presets stay in its header
+    engineTypes = { mu_core::LayerTypeId::Rhythm, mu_core::LayerTypeId::Pattern, mu_core::LayerTypeId::Arp,
+                    mu_core::LayerTypeId::Kick, mu_core::LayerTypeId::Bass, mu_core::LayerTypeId::Hat,
+                    mu_core::LayerTypeId::Snare, mu_core::LayerTypeId::Rumble, mu_core::LayerTypeId::FmPerc,
+                    mu_core::LayerTypeId::Chord, mu_core::LayerTypeId::Phrase };
+    for (size_t i = 0; i < engineTypes.size(); ++i)
+        if (const auto* info = proc.getLayerTypes().find(engineTypes[i]))
+            engineBox.addItem(juce::String::fromUTF8(info->name) + (juce::String(info->group).isNotEmpty() ? "  (" + juce::String::fromUTF8(info->group) + ")" : juce::String()), (int) i + 1);
+    engineBox.onChange = [this](int id)
+    {
+        const size_t i = (size_t) (id - 1);
+        if (i < engineTypes.size() && proc.getLayerTypeId(0) != engineTypes[i] && chooser.onChoose) chooser.onChoose(engineTypes[i]);
+    };
+    getTransportBar().setLoopSection(&engineHolder, 190);
+    engineBox.setPlaceholderText("Choose an engine");
+    engineBox.setLcdStyle(true);   // after it is parented, so the lettering lights in the shell's metal look like the preset box
+    refreshEngineBox();
+
+    // No sidebar, so the window is the standard one less the sidebar's width: the voice panels keep their standard size and the
+    // sidebar is simply cropped off the side. The shell sets the full width at construction and on a scale change; both are redone here.
+    const auto hostSize = [this] { setSize(mu_ui::s(MuLookAndFeel::kWindowWidth - MuLookAndFeel::kSidebarW), mu_ui::s(MuLookAndFeel::kWindowHeight)); };
+    hostSize();
+    juce::Component::SafePointer<PluginEditor> safeThis(this);
+    proc.onUiScaleChanged = [safeThis, hostSize](float scale)
+    {
+        if (auto* self = safeThis.getComponent())
+        {
+            mu_ui::scale = scale;
+            hostSize();
+            self->sendLookAndFeelChange();
+            self->resized();
+            self->repaint();
+        }
+    };
+   #endif
     startTimerHz(4);
 }
 
@@ -188,8 +240,23 @@ LayerContent* PluginEditor::contentFor(mu_core::LayerTypeId type)
     return contents.back().second.get();
 }
 
+#ifdef MU_HOST
+void PluginEditor::refreshEngineBox()
+{
+    // The drop-down shows the slot's current engine (also after a state restore); an Empty slot shows none.
+    const auto type = proc.getLayerTypeId(0);
+    int id = 0;
+    for (size_t i = 0; i < engineTypes.size(); ++i)
+        if (engineTypes[i] == type) id = (int) i + 1;
+    if (engineBox.getSelectedId() != id) engineBox.setSelectedId(id, false);
+}
+#endif
+
 void PluginEditor::timerCallback()
 {
+   #ifdef MU_HOST
+    refreshEngineBox();
+   #endif
     getStatusBar().setCpuLoad(proc.getCpuPeak());   // the worst figure of the last second: a plain average hides the spike that clicks
 }
 
@@ -233,7 +300,11 @@ void PluginEditor::showSlot(int idx)
     // The clip strip and the Notes In channel follow the slot's type: hidden (not disabled) for an Empty slot, for a type
     // with no clip bank (Rumble) and, for Notes In, for a type that does not read notes.
     const auto* typeInfo = proc.getLayerTypes().find(type);
+   #ifdef MU_HOST
+    layerPanel.setClipBankAvailable(false);   // clips and scenes are performance features: mu-Host is for a DAW
+   #else
     layerPanel.setClipBankAvailable(typeInfo == nullptr || typeInfo->hasClipBank);
+   #endif
     layerPanel.getHeader().setShowNotesIn(! empty && typeInfo != nullptr && typeInfo->takesNotes);
     layerPanel.getHeader().refreshNotesIn();
 

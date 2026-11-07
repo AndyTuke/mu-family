@@ -9,6 +9,7 @@
 #include "Plugin/PluginProcessor.h"
 #include "UI/EmptySlotChooser.h"
 #include "UI/TronicSettingsOverlay.h"
+#include "UI/Components/DropdownSelect.h"
 
 namespace mu_tronic
 {
@@ -62,6 +63,20 @@ private:
     LayerContent* shownContent = nullptr;
     juce::String  effectSendName;   // the mixer effect's current name; empty until the mixer reports it
     std::unique_ptr<juce::FileChooser> importChooser;   // alive while the import file dialog is open
+   #ifdef MU_HOST
+    // mu-Host: the one slot's engine, chosen from this list in the transport bar (the same choice the chooser cards make).
+    // The drop-down sits in a holder that fills the transport bar's loop pane and leaves it a margin, as the other products' loop sections do.
+    struct EngineHolder : juce::Component
+    {
+        DropdownSelect box;
+        EngineHolder() { addAndMakeVisible(box); }
+        void resized() override { box.setBounds(getLocalBounds().reduced(mu_ui::s(6), mu_ui::s(4))); }
+    };
+    EngineHolder engineHolder;
+    DropdownSelect& engineBox = engineHolder.box;
+    std::vector<mu_core::LayerTypeId> engineTypes;
+    void refreshEngineBox();
+   #endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };

@@ -25,6 +25,10 @@ Static layer libraries compiled into the binary, registered in [Source/Persisten
 - Layer state is text, `RenderContext` mirrors a C struct, `render` makes no host callback (keeps a module ABI possible, design section 2).
 - Tests: `mu-tronic-tests` (builds every default build).
 
+## mu-Host (the one-slot plug-in build)
+
+`mu-host` is this same shell and these same sources built with **one slot** under `MU_HOST` (target in [CMakeLists.txt](CMakeLists.txt): `MU_MAX_LAYERS=1`, no buses, VST3 + CLAP, no Standalone). It is one mu instrument channel in a DAW: an engine drop-down in the transport bar (in the loop-section slot; it picks the slot's type exactly as the chooser cards do), then that engine's voice, inserts, sequencer and modulation, with the output going straight to the host: no mixer toggle, no scenes, no pages, no licence (an open question for Andy). Saved names differ (`MuHostState`, `.muHost`, settings folder `muHost`; see `Persistence/TronicState.h`). Every `MU_HOST` difference is a small `#ifdef` in `PluginProcessor` / `PluginEditor` / `TronicState.h`; nothing is duplicated. Tests: `mu-host-tests` (on demand; `Source/Tests/HostTests.cpp`). Not yet released: no installer, site pages or release wiring (backlog #1775).
+
 ## Mirror rule with mu-On (Andy 2026-10-29)
 
 mu-Tronic's Track layers and mu-On's sequencer show the same step rows (`StepRows` / `TrackStepRow` / `StepPager` in `mu-on-layer`). Every sequencer change (step model, length and paging, shading, step panel, boxes and widths) must be made so it works in both products: put it in the shared layer code, and check the mu-Tronic Steps box as well as mu-On's before calling it done. Never fix one product only.

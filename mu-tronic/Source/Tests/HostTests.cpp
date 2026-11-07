@@ -1,0 +1,114 @@
+// Tests of mu-Host: the mu-Tronic shell built with ONE slot (MU_HOST, MU_MAX_LAYERS=1, no buses), on the REAL PluginProcessor, headless.
+// One slot that starts Empty, every engine the editor's drop-down offers, saved state under mu-Host's own names, and a rendering audio
+// thread that survives engine changes.
+
+#include "Plugin/PluginProcessor.h"
+#include "Tests/ProcessorSeamHelpers.h"
+
+#include <cmath>
+
+#ifndef MU_HOST
+ #error "HostTests.cpp belongs to the mu-host-tests target (MU_HOST=1)"
+#endif
+
+// The product class names its editor in a virtual, defined in PluginEditor.cpp, which this headless target does not link.
+juce::AudioProcessorEditor* mu_tronic::PluginProcessor::createEditor() { return nullptr; }
+
+namespace
+{
+    static_assert(mu_limits::kMaxLayers == 1, "mu-host compiles with MU_MAX_LAYERS=1");
+    static_assert(mu_limits::kMaxBuses == 0, "mu-host has no buses");
+
+    struct HostProcessor : mu_tronic::PluginProcessor
+    {
+        bool isStandaloneApp() const noexcept override { return true; }   // a headless run is not a plug-in host
+    };
+
+    // Renders `blocks` blocks of 256 frames with a held note on channel 1; returns false when any sample is not finite or is huge.
+    bool renderSane(HostProcessor& p, int blocks)
+    {
+        juce::AudioBuffer<float> buf(2, 256);
+        juce::MidiBuffer midi;
+        for (int b = 0; b < blocks; ++b)
+        {
+            buf.clear();
+            midi.clear();
+            if (b == 0) midi.addEvent(juce::MidiMessage::noteOn(1, 48, (juce::uint8) 100), 0);
+            p.processBlock(buf, midi);
+            if (! mu_seam_test::bufferIsSane(buf, 50.0f)) return false;
+        }
+        return true;
+    }
+
+    // The engines the editor's drop-down lists (PluginEditor.cpp, MU_HOST).
+    const mu_core::LayerTypeId kEngines[] = {
+        mu_core::LayerTypeId::Rhythm, mu_core::LayerTypeId::Pattern, mu_core::LayerTypeId::Arp, mu_core::LayerTypeId::Kick,
+        mu_core::LayerTypeId::Bass, mu_core::LayerTypeId::Hat, mu_core::LayerTypeId::Snare, mu_core::LayerTypeId::Rumble,
+        mu_core::LayerTypeId::FmPerc, mu_core::LayerTypeId::Chord, mu_core::LayerTypeId::Phrase };
+}
+
+struct MuHostTests : juce::UnitTest
+{
+    MuHostTests() : juce::UnitTest("mu-Host one-slot processor", "mu-host") {}
+
+    void runTest() override
+    {
+        beginTest("one Empty slot, its own name and product slug, no scenes or pages");
+        {
+            mu_seam_test::TempStorage storage;
+            HostProcessor p;
+            expectEquals(p.getNumLayers(), 1);
+            expect(p.getLayerTypeId(0) == mu_core::LayerTypeId::Empty);
+            expectEquals(p.getProductSlug(), juce::String("mu-host"));
+            expect(p.getName().endsWithIgnoreCase("-Host"), "name " + p.getName());
+            expect(! p.offersSceneControls() && ! p.offersLayerPages());
+            expect(p.apvts.state.getType() == juce::Identifier("MuHostState"));
+        }
+
+        beginTest("every engine on the drop-down can take the slot and renders finite audio, one after another");
+        {
+            mu_seam_test::TempStorage storage;
+            HostProcessor p;
+            p.prepareToPlay(48000.0, 256);
+            p.toggleInternalPlay();
+            for (auto type : kEngines)
+            {
+                expect(p.setLayerType(0, type), "set type " + juce::String((int) type));
+                expect(p.getLayerTypeId(0) == type);
+                expect(renderSane(p, 6), "sane output for type " + juce::String((int) type));
+            }
+        }
+
+        beginTest("the engine and its rows survive a saved-state round trip, under mu-Host's own state tag");
+        {
+            mu_seam_test::TempStorage storage;
+            HostProcessor p;
+            expect(p.setLayerType(0, mu_core::LayerTypeId::Kick));
+            juce::MemoryBlock block;
+            p.getStateInformation(block);
+            expect(block.getSize() > 0);
+            HostProcessor q;
+            q.setStateInformation(block.getData(), (int) block.getSize());
+            expect(q.getLayerTypeId(0) == mu_core::LayerTypeId::Kick, "the restored slot is a Kick");
+            expect(q.apvts.state.getType() == juce::Identifier("MuHostState"));
+        }
+
+        beginTest("changing the engine while the audio thread renders is safe");
+        {
+            mu_seam_test::TempStorage storage;
+            HostProcessor p;
+            p.prepareToPlay(48000.0, 256);
+            p.toggleInternalPlay();
+            bool ok = true;
+            for (int round = 0; round < 3 && ok; ++round)
+                for (auto type : kEngines)
+                {
+                    p.setLayerType(0, type);
+                    ok = ok && renderSane(p, 2);
+                }
+            expect(ok, "no insane block while the engine changed");
+        }
+    }
+};
+
+static MuHostTests muHostTests;

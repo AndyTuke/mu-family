@@ -122,8 +122,24 @@ public:
     }
 
 private:
+    // MU_UISOAK_SHOT=<file.png>: once the editor has settled, write a picture of it (a look at the real window), then carry on.
+    void maybeSnapshot()
+    {
+        static const auto path = juce::SystemStats::getEnvironmentVariable("MU_UISOAK_SHOT", {});
+        if (path.isEmpty() || shotDone || editor == nullptr) return;
+        if (juce::Time::getMillisecondCounter() + (juce::uint32) (seconds * 1000) - endTime < 1500) return;   // wait ~1.5 s
+        shotDone = true;
+        const auto image = editor->createComponentSnapshot(editor->getLocalBounds(), true, 1.0f);
+        juce::File f(path);
+        f.deleteFile();
+        if (auto out = f.createOutputStream())
+            juce::PNGImageFormat().writeImageToStream(image, *out);
+        std::fprintf(stdout, "snapshot %dx%d -> %s\n", editor->getWidth(), editor->getHeight(), path.toRawUTF8());
+    }
+
     void timerCallback() override
     {
+        maybeSnapshot();
         if (juce::Time::getMillisecondCounter() >= endTime) { quit(); return; }
         auto* peer = window != nullptr ? window->getPeer() : nullptr;
         if (peer == nullptr) return;
@@ -205,6 +221,7 @@ private:
 
     CountingLogger logger;
     bool sidebarDrags = juce::SystemStats::getEnvironmentVariable("MU_UISOAK_SIDEBAR_DRAG", {}) == "1";
+    bool shotDone = false;
     int seconds = 60, actions = 0;
     unsigned seed = 1;
     std::mt19937 rng;
