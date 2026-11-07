@@ -6,6 +6,7 @@
 #include "Plugin/ShellBackend.h"
 #include "Plugin/UpdateChecker.h"
 #include "UI/Components/StatusBar.h"
+#include "UI/ExternalLink.h"
 
 namespace mu_ui
 {
@@ -25,7 +26,7 @@ public:
     {
         statusBar.onUpdateClicked = [this]
         {
-            juce::URL(mu_core::update_check::safeUrl(entry.download)).launchInDefaultBrowser();
+            mu_core::openExternally(juce::URL(mu_core::update_check::safeUrl(entry.download)));
             dismiss();
         };
         statusBar.onUpdateHideRequested = [this]

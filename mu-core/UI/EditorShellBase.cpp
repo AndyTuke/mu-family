@@ -1,4 +1,5 @@
 #include "EditorShellBase.h"
+#include "UI/ExternalLink.h"
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Voice/InsertSubsection.h"
 #include "UI/ParamKnobGrid.h"
@@ -298,7 +299,7 @@ void EditorShellBase::showSupportPrompt(bool userRequested)
         {
             const auto url = shell->processorRef.getCheckoutUrl();
             if (url.isNotEmpty())
-                juce::URL(url).launchInDefaultBrowser();
+                mu_core::openExternally(juce::URL(url));
         }
     };
     dlg->show(this);

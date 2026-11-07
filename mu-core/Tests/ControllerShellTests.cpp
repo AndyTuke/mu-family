@@ -114,8 +114,8 @@ struct ControllerShellTests : juce::UnitTest
             SurfaceLook look; look.dimScale = 0.45f;
             const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory);
 
+            ControlAttachment* published = nullptr;   // declared before the host: the host's destructor still publishes
             ControlHost host;
-            ControlAttachment* published = nullptr;
             expect(host.start(b, look, folder, [&](ControlAttachment* a) { published = a; log.add(a != nullptr ? "publish" : "publish:null"); }));
             expect(gotSink == &sink && gotView == &view);
             expectWithinAbsoluteError(gotDim, 0.45f, 0.0001f);

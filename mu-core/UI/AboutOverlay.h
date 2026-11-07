@@ -1,6 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "UI/Components/MuLookAndFeel.h"
+#include "UI/ExternalLink.h"
 
 // Modal "About" overlay shared across the mu-family. Each product passes its
 // display name + third-party credits via setProductInfo() before showing.
@@ -37,7 +38,7 @@ private:
     juce::TextButton supportBtn { "Support" };
     juce::TextButton keyBtn     { "Enter a key" };
     juce::ToggleButton updateToggle { "Check for updates" };
-    juce::HyperlinkButton tipLink;   // supporters only: opens the shared tip page
+    mu_core::ExternalLinkButton tipLink;   // supporters only: opens the shared tip page
     SupportState     supportState = SupportState::None;
 
     juce::String      productName;

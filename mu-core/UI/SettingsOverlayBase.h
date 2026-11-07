@@ -1,6 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "UI/Components/MuLookAndFeel.h"
+#include "UI/ExternalLink.h"
 
 namespace mu_ui
 {
@@ -84,7 +85,7 @@ private:
     void computeColumn();   // populates colX/colW from the current width
 
     juce::TextButton closeBtn { "Close" };
-    juce::HyperlinkButton supportLink;   // "Contact Support" → mailto:support@transwarp.me (footer)
+    mu_core::ExternalLinkButton supportLink;   // "Contact Support" → mailto:support@transwarp.me (footer)
     int colX = 0;
     int colW = 0;
     int cols = 1;

@@ -230,13 +230,17 @@ void SidebarItem::mouseDrag(const juce::MouseEvent& e)
 
 void SidebarItem::mouseUp(const juce::MouseEvent& e)
 {
-    if (isDragging)
+    // The callbacks can rebuild the sidebar (a committed drag refreshes the items), which frees this item while it is still
+    // running: clear the state first, copy what the call needs, and touch no member afterwards.
+    const bool wasDragging = isDragging;
+    isDragging = false;
+    const int idx = index;
+    if (wasDragging)
     {
-        if (onDragEnd) onDragEnd(index, e);
-        isDragging = false;
+        if (auto cb = onDragEnd) cb(idx, e);
     }
-    else if (onSelected)
+    else if (auto cb = onSelected)
     {
-        onSelected(index);
+        cb(idx);
     }
 }

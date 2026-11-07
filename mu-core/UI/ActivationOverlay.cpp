@@ -1,4 +1,5 @@
 #include "ActivationOverlay.h"
+#include "UI/ExternalLink.h"
 #include "UI/ModalCard.h"
 #include "UI/Components/MuLookAndFeel.h"
 
@@ -16,7 +17,7 @@ ActivationOverlay::ActivationOverlay (ProcessorBase& proc)
     activateBtn.onClick = [this] { activatePressed(); };
     addAndMakeVisible (activateBtn);
 
-    getKeyBtn.onClick = [this] { juce::URL (processorRef.getCheckoutUrl()).launchInDefaultBrowser(); };
+    getKeyBtn.onClick = [this] { mu_core::openExternally(juce::URL(processorRef.getCheckoutUrl())); };
     getKeyBtn.setVisible (processorRef.getCheckoutUrl().isNotEmpty());
     addChildComponent (getKeyBtn);
 
