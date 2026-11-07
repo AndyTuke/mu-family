@@ -87,29 +87,6 @@ Run multiple μ-family standalones and have them share a clock + summing bus for
 
 **Dropped by Andy on 2026-10-20.** Not planned and not to be built; the plan is kept as history in [design-ableton-link.md](design-ableton-link.md). Do not design for a Link clock source. The MIDI sync groundwork stands on its own merits.
 
-### 🟡 One framework, one instance — combine the engines in one place
-
-**Scheduled 2026-10-15 as the fifth product mu-Tronic** (owner's brief): 16 layer slots (paged 1-8 / 9-16), any of the four layer types per slot, the shared mixer, FX and modulation, plus buses in the mixer; it may replace mu-link as a performance tool. Design, staged plan and open questions: [mu-tronic/design.md](mu-tronic/design.md). It answers the open questions below: a fifth product, 16 layers, **Standalone only and freeware (no licence key)**, and every mu-On engine is its own layer type. Andy's answers of 2026-10-15 are recorded in the design's section 9; the mu-Clid and mu-Tant extraction waits until after their next releases. The text below stays as the background.
-
-**The idea:** the four apps are already one framework wearing four faces. The mixer, FX, transport, modulation engine, preset logic, hot-swap, MIDI handling and editor shell are all shared `mu-core` code. The only things that differ per product are the **sound engine** and the **sequencer** (the pair a layer is made of). The aim is to make that literal: **a single instance (one plugin / one standalone) that can hold layers of any engine type side by side** — for example a mu-Tant drone layer, a mu-On kick layer, a mu-Toni arp layer and a mu-Clid rhythm layer in one session, through one mixer, on one transport, with one preset.
-
-- **Why:** one window, one clock, one set of presets for a whole live rig, without running four apps and a bus (mu-link would remain for combining separate apps and outboard gear). Every shared improvement (sync fixes, preset format, mixer) lands once and reaches every engine.
-- **Groundwork already in place:** `mu-core` owns `ProcessorBase`, `EditorShellBase`, the mixer and FX chain, the transport resolver, the modulation matrix and the composed slot state (one layer = one saved unit, so a layer preset is already engine-shaped, not product-shaped). The engine swap-point pattern in [design-plugin-family.md](design-plugin-family.md) is the intended seam. Variable 1–8 layers with a central add / reorder / delete (backlog #1240) and a per-layer engine selector (#1241) are the first steps toward it.
-- **The shape of it (owner, 2026-10-09):** `Layer` is the parent class; each product's layer type derives from it (mu-Clid `Rhythm`, mu-Tant `Pattern`, mu-Toni `Arp`, mu-On `Track`) and adds only its sequencer data and engine binding. Today only mu-Clid's `Rhythm` derives from the existing base (`Layer`); the other three keep parallel arrays. See [design-naming.md](design-naming.md).
-- **What stands in the way (why 🟡):** parameter ids are prefixed per product and layer count is capped by one shared limit (`mu_limits::kMaxLayers`, 8); each product's `Source/` tree, state layout and editor panels assume a single engine type; the sequencer and engine are paired inside each product rather than registered as a pluggable layer type; modulation targets are per-product tables (`mu_mod::ModTarget`). A layer-type registry (engine + sequencer + panel + param table + modulation targets) would be the central piece.
-- **Direction for current work:** put anything generic in `mu-core`, name product-specific code under the product namespace, and do not add new per-product copies of shared behaviour (the family consistency rule). The standalone products would stay as presets of the combined instance (one layer type each) rather than separate code.
-- Open questions for when this is scheduled: how a session's layers are limited (CPU, 8 layers), how per-engine sequencer panels share the main panel, which product's key covers a combined instance (all four paid products are Pay What You Want; mu-Clid MIDI is freeware), and whether the combined instance is a fifth product or a mode of an existing one.
-
-### 🟡 Android tablet app (standalone only, simplest scope)
-
-Run the family on an Android tablet. **Scope (owner, 2026-10-09): standalone only, no MIDI, no mu-link, no licence, keep it simple.** Start with mu-Toni (freeware, light; compile the licence path out), internal clock only, as a spike on one real tablet. **The goal is to measure, not ship:** an Android app target hosting the existing processor, a fit-to-screen scale of the current fixed-size editor, then latency and CPU on the tablet. Parked On Hold by the owner (confirmed 2026-10-11); the backlog row was closed on 2026-10-20 and this entry keeps the idea.
-
-- **Why 🟡:** the code is portable JUCE C++, so the engines, FX, modulation and sequencers carry over, but the editor is a fixed 1170×870 desktop layout built for mouse hover and right-click. **The UI is the main work** after the spike: touch-sized controls, no right-click or hover dependence, and a tablet layout driven by the standard sizing below (backlog #1172).
-- **Smaller items:** an Android app target (the plugin targets do not apply; no VST3 or CLAP there), Android SDK / NDK on the build PC, keeping audio alive when the screen locks, a file picker and storage for presets and samples, the licence path compiled out, and a JUCE licence check for mobile.
-- **Why on hold:** macOS and Linux are lower priority and untestable; Android would be testable on a device, so it is the likelier next platform when the owner schedules one.
-- **Fit with the other ideas:** Android has no inter-app audio or shared MIDI, so one combined instance (above) suits it better than four apps. No sync is planned there (Ableton Link was dropped 2026-10-20; `mu-link` does not apply).
-- **Rule for current work:** keep new shared UI code free of desktop-only assumptions (mouse-only input, hard-coded pixel sizes).
-
 ### 🟢 Standard UI sizing across the family
 
 **The aspiration:** every app has the same panel sizing in the layout — the same preset strip, main panel, modulator panel and mixer heights and proportions — so mu-Clid, mu-Tant, mu-Toni and mu-On line up when placed side by side, and a layer, a sidebar or a modulator panel is the same size wherever it appears.
@@ -126,26 +103,18 @@ Run the family on an Android tablet. **Scope (owner, 2026-10-09): standalone onl
 - **Today:** a `Layer` already owns its `ModulationMatrix`, control sequences and `voiceParams`, hands mixer-facing mods to its strip through `stripMods()` (pan, Effect / Delay / Reverb sends), and persists modulators gated by `isValidDest(id)`. But `LayerTypeInfo` ([mu-core/Sequencer/LayerTypeInfo.h](../mu-core/Sequencer/LayerTypeInfo.h)) carries no target list: the `mu_mod::ModTarget` tables are product-side constants (mu-Tant / mu-Toni `kModDestTable`, mu-On one table per lane, mu-Clid `ModDest::kTable`).
 - **Shape:** add a pointer + count of `ModTarget` rows to `LayerTypeInfo`; the dropdown, `isValidDest` and the serialiser read the shown layer's type through the registry. Each product's existing table is the data, so nothing about target ids or depth units changes.
 - **What stands in the way (why 🟡):** mu-Clid seeds and writes back its targets by hand in `PluginProcessor.cpp` (per-rhythm state and step-count-dependent ranges), not through `mu_mod::resolveLane`; that has to move onto the shared resolver first. Also unchecked: how the mu-Tronic modulator panel gets a slot's target list today.
-- **Why it matters:** it is the modulation half of the layer-type registry named under "One framework, one instance" and what a new product such as mu-Tilate needs to be self-describing. Direction for current work: new layer types keep their targets in one `ModTarget` table so the registry field can adopt it unchanged.
+- **Why it matters:** it is the modulation half of the layer-type registry that mu-Tronic introduced and what a new product such as mu-Tilate needs to be self-describing. Direction for current work: new layer types keep their targets in one `ModTarget` table so the registry field can adopt it unchanged.
 
 ## Release & distribution (deferred until public release)
 
 These are understood and scoped but parked until the family ships publicly. They are
 release infrastructure, not features, and were moved here from the active backlog.
 
-### 🔵 Code signing (EV certificate)
-
-The installer `.exe`, standalone `.exe`, VST3 `.vst3`, and CLAP `.clap` must be signed with an **EV (Extended Validation) code-signing certificate** to pass Windows Defender SmartScreen without user intervention.
-
-- Steps: (1) purchase EV cert from Sectigo or DigiCert (~£200/yr, delivered on a hardware token); (2) install `signtool.exe` (Windows SDK); (3) add a `SignTool=` directive to `installer/mu-Clid.iss` pointing at the cert; (4) add a post-build `signtool sign` step (in CMakeLists.txt or a separate signing script) for the VST3/CLAP/Standalone artefacts before the installer step. A placeholder comment is already in `mu-Clid.iss`.
-- macOS equivalent (Apple notarisation + signing for the AU/VST3/standalone) is the matching task on that platform.
-- **Gates the wavetable-library shipping item below.** Deferred until public release.
-
 ### 🔵 Ship mu-tant factory wavetables with the installer
 
 The mu-tant wavetable **system** is shipped (Serum/Vital mono-WAV loader + FFT mip-mapping, oscillator/voice/APVTS wiring, user `.wav` disk import, the in-repo `tools/wavetable-gen` generator, `clm ` chunk parsing, and dropdown sub-folder categories — all landed across **v1.0.764–769**). What remains is **distribution**: bundle the 25 generated factory `.wav` tables *with the installer* so users get the library out of the box, instead of generating them into the user's own `…/muTant/Wavetables` content folder on first run.
 
-- Blocked on the code-signing item above — the owner wants the installer + artefacts signed before shipping bundled content.
+- Held until the artefacts are code-signed (the owner wants the installer + artefacts signed before shipping bundled content); code signing itself is not planned (owner, 2026-11-07).
 - Implementation when unblocked: add the generated `.wav` set to the installer payload (or embed via `juce_add_binary_data` + unpack on first run), pointing the loader's content-folder scan at the installed copy.
 
 ---
