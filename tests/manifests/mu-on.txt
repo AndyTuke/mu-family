@@ -3,7 +3,7 @@
 product=mu-on
 layers_at_start=1
 max_layers=8
-param_count=961
+param_count=969
 ---
 ch0_lvl | float | 0 | 1 | 0.001 | 1 | 1 | 1
 ch0_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
@@ -131,13 +131,13 @@ eff_p1 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
 eff_p2 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
 eff_p3 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
 eff_p4 | float | 0 | 1 | 0 | 1 | 0.5 | 0.5
-mst_ins2Char | int | 0 | 16 | 1 | 1 | 0 | 0
+mst_ins2Char | int | 0 | 21 | 1 | 1 | 0 | 0
 mst_ins2P1 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_ins2P2 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_ins2P3 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_ins2P4 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_ins2Sync | bool | 0 | 1 | 1 | 1 | 0 | 0
-mst_insChar | int | 0 | 16 | 1 | 1 | 0 | 0
+mst_insChar | int | 0 | 21 | 1 | 1 | 0 | 0
 mst_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
 mst_insP3 | float | 0 | 1 | 0 | 1 | 0 | 0
@@ -210,7 +210,7 @@ t0_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t0_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t0_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t0_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
-t0_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
+t0_drvChar | int | 0 | 21 | 1 | 1 | 0 | 0
 t0_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t0_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t0_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
@@ -264,6 +264,7 @@ t0_rumble_d1 | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t0_rumble_d2 | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t0_rumble_d3 | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t0_rumble_drive | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
+t0_rumble_fb | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t0_rumble_inlp | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t0_rumble_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t0_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
@@ -308,7 +309,7 @@ t1_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t1_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t1_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t1_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
-t1_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
+t1_drvChar | int | 0 | 21 | 1 | 1 | 0 | 0
 t1_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t1_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t1_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
@@ -362,6 +363,7 @@ t1_rumble_d1 | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t1_rumble_d2 | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t1_rumble_d3 | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t1_rumble_drive | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
+t1_rumble_fb | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t1_rumble_inlp | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t1_rumble_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t1_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
@@ -406,7 +408,7 @@ t2_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t2_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t2_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t2_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
-t2_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
+t2_drvChar | int | 0 | 21 | 1 | 1 | 0 | 0
 t2_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t2_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t2_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
@@ -460,6 +462,7 @@ t2_rumble_d1 | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t2_rumble_d2 | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t2_rumble_d3 | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t2_rumble_drive | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
+t2_rumble_fb | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t2_rumble_inlp | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t2_rumble_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t2_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
@@ -504,7 +507,7 @@ t3_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t3_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t3_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t3_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
-t3_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
+t3_drvChar | int | 0 | 21 | 1 | 1 | 0 | 0
 t3_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t3_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t3_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
@@ -558,6 +561,7 @@ t3_rumble_d1 | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t3_rumble_d2 | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t3_rumble_d3 | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t3_rumble_drive | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
+t3_rumble_fb | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t3_rumble_inlp | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t3_rumble_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t3_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
@@ -602,7 +606,7 @@ t4_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t4_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t4_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t4_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
-t4_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
+t4_drvChar | int | 0 | 21 | 1 | 1 | 0 | 0
 t4_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t4_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t4_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
@@ -656,6 +660,7 @@ t4_rumble_d1 | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t4_rumble_d2 | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t4_rumble_d3 | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t4_rumble_drive | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
+t4_rumble_fb | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t4_rumble_inlp | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t4_rumble_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t4_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
@@ -700,7 +705,7 @@ t5_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t5_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t5_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t5_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
-t5_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
+t5_drvChar | int | 0 | 21 | 1 | 1 | 0 | 0
 t5_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t5_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t5_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
@@ -754,6 +759,7 @@ t5_rumble_d1 | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t5_rumble_d2 | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t5_rumble_d3 | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t5_rumble_drive | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
+t5_rumble_fb | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t5_rumble_inlp | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t5_rumble_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t5_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
@@ -798,7 +804,7 @@ t6_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t6_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t6_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t6_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
-t6_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
+t6_drvChar | int | 0 | 21 | 1 | 1 | 0 | 0
 t6_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t6_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t6_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
@@ -852,6 +858,7 @@ t6_rumble_d1 | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t6_rumble_d2 | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t6_rumble_d3 | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t6_rumble_drive | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
+t6_rumble_fb | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t6_rumble_inlp | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t6_rumble_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t6_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
@@ -896,7 +903,7 @@ t7_chord_rel | float | 5 | 3000 | 1 | 0.228915 | 250 | 0.563789
 t7_chord_res | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t7_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t7_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
-t7_drvChar | int | 0 | 16 | 1 | 1 | 0 | 0
+t7_drvChar | int | 0 | 21 | 1 | 1 | 0 | 0
 t7_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
 t7_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t7_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
@@ -950,6 +957,7 @@ t7_rumble_d1 | float | 0 | 1 | 0.001 | 1 | 0.5 | 0.5
 t7_rumble_d2 | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t7_rumble_d3 | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t7_rumble_drive | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
+t7_rumble_fb | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t7_rumble_inlp | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t7_rumble_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t7_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
@@ -983,11 +991,11 @@ mst=12
 mstr=3
 ret=24
 rev=10
-t0=98
-t1=98
-t2=98
-t3=98
-t4=98
-t5=98
-t6=98
-t7=98
+t0=99
+t1=99
+t2=99
+t3=99
+t4=99
+t5=99
+t6=99
+t7=99
