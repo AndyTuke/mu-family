@@ -16,6 +16,7 @@ StepPager::StepPager()
         if (auto* row = lengthRow ? lengthRow() : nullptr) row->setNumSteps(n);
         refresh();
         if (onChanged) onChanged();
+        if (onStatusUpdate) onStatusUpdate("Step Length", juce::String(n) + (n == 1 ? " step" : " steps"));
     };
     addAndMakeVisible(prevButton);
     addAndMakeVisible(nextButton);

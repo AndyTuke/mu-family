@@ -178,6 +178,18 @@ add_subdirectory(mu-on)       # 909-style groove sequencer: Kick/Bass/Hat/Snare 
 add_subdirectory(mu-tilate)   # loop slicer, built in stages: layer library + tests (docs/mu-tilate/design-buildplan.md)
 add_subdirectory(mu-tronic)   # performance unit: 16 layer slots (Standalone only, pay what you want); after the products whose layers it will host
 add_subdirectory(mu-host)     # one mu instrument channel as a plug-in (VST3 + CLAP): the mu-Tronic shell with one slot; after mu-tronic, whose sources it builds on
+
+# The status-bar hard rule, checked on each product's real editor (on demand: cmake --build build --target <product>-ui-audit).
+include(cmake/UiAudit.cmake)
+mu_add_ui_audit(mu-clid mu-clid)
+mu_add_ui_audit(mu-tant mu-tant)
+mu_add_ui_audit(mu-toni mu-toni)
+mu_add_ui_audit(mu-on mu-on)
+mu_add_ui_audit(mu-tilate mu-tilate)
+mu_add_ui_audit(mu-tronic mu-tronic SLOT_HOST)
+mu_add_ui_audit(mu-host mu-host SLOT_HOST)
+mu_add_ui_audit(mu-toni-midi mu-toni-midi)
+mu_add_ui_audit(mu-clid-midi mu-clid-midi)
 add_subdirectory(tests/layer-link)    # mu-layer-link-test: the four layer libraries in one link (after the products define them)
 add_subdirectory(mu-link)     # local audio receiver + master clock (foundation: IPC tests only)
 add_subdirectory(ControlDesign)       # knob-style design sandbox (dev tool, not shipped)

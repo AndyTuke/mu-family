@@ -133,6 +133,7 @@ GatingDesigner::GatingDesigner()
         if (id < 1 || id > kSubdivCount) return;
         setSubdivision(kSubdivOptions[id - 1].denom);
     };
+    subdivDropdown.setStatusName("Gate Subdivision");
     addAndMakeVisible(subdivDropdown);
 
     // ── Toolbox ──────────────────────────────────────────────────────────────
@@ -150,6 +151,7 @@ GatingDesigner::GatingDesigner()
     rebuildBarsDropdown();
     barsDropdown.setSelectedId(2, false);
     barsDropdown.onChange = [this](int id) { if (id >= 1) setPatternBars(id); };
+    barsDropdown.setStatusName("Pattern Bars");
     addAndMakeVisible(barsDropdown);
 
     // ── Scrollbar ────────────────────────────────────────────────────────────

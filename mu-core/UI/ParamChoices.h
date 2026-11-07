@@ -24,6 +24,10 @@ inline void addChoiceItems(DropdownSelect& dd, juce::AudioProcessorValueTreeStat
     const auto names = choiceNames(apvts, id);
     for (int i = 0; i < names.size(); ++i)
         dd.addItem(names[i], i + 1);
+    // The status bar names the selector after its parameter (without the per-slot prefix), unless the caller named it already.
+    if (dd.getStatusName().isEmpty())
+        if (auto* p = apvts.getParameter(id))
+            dd.setStatusName(statusNameOfParameter(p->getName(64)));
 }
 
 } // namespace mu_ui

@@ -13,6 +13,7 @@
 #include "UI/MidiPresetsOverlay.h"
 #include "UI/MidiFullPresetsOverlay.h"
 #include "UI/ShellChrome.h"
+#include "UI/StatusSink.h"
 #include "UI/LayerSidebar.h"
 #include "UI/MixerOverlay.h"
 
@@ -31,9 +32,13 @@
 // the product overrides the virtual on...() hooks to refresh its own panels.
 class EditorShellBase : public juce::AudioProcessorEditor,
                         public juce::KeyListener,
+                        public mu_ui::StatusSink,
                         private juce::ValueTree::Listener
 {
 public:
+    // A control with a status name (DropdownSelect / NudgeInput::setStatusName) reports here: the status bar shows it.
+    void showControlStatus(const juce::String& name, const juce::String& value) override { statusBar.showParam(name, value); }
+
     explicit EditorShellBase(ProcessorBase& proc);
     ~EditorShellBase() override;
 

@@ -56,6 +56,7 @@ set(MU_CORE_TEST_SOURCES
     AuditMinorsTests.cpp            # Layer reset locks, FX hand-off and sizing, NaN containment, activation worker
     MixerBlockValueTests.cpp
     NewInsertTests.cpp              # chorus, flanger, phaser, pitch delay, tremolo inserts
+    StatusRouteTests.cpp            # the status bar hard rule: a layer's content always reports to it
     SupportPromptPolicyTests.cpp
     UpdateCheckPolicyTests.cpp
     SettingsOverlayFitTests.cpp

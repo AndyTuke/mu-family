@@ -58,6 +58,8 @@ NoteLengthControl::NoteLengthControl(const juce::String& labelText)
 
     multiplier.setShowStepButtons(false);
     multiplier.setLabelInline(true);
+    noteDropdown.setStatusName(labelText + " Length");
+    multiplier.setStatusName(labelText + " Multiplier");
     multiplier.onChange = [this](int) { fire(); };
     addAndMakeVisible(multiplier);
 }

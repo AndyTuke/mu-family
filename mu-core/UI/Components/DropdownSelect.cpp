@@ -7,6 +7,7 @@ DropdownSelect::DropdownSelect()
     {
         setDisplayOverride({}, false);   // a pick takes over from a shown clip name
         if (onChange) onChange(combo.getSelectedId());
+        if (statusName.isNotEmpty()) mu_ui::reportStatus(*this, statusName, combo.getText());
     };
     addAndMakeVisible(combo);
 }

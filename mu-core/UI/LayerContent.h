@@ -44,3 +44,16 @@ public:
     // A knob hover or change: the control's name and value, for the shell's status bar.
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
 };
+
+namespace mu_ui
+{
+// The status bar shows the name and value of the last control touched, in every app, without fail. A content nobody gave a status hook
+// is given `report` (the panel's, which ends in the status bar); a content that has its own keeps it. `content` may be any component:
+// only a LayerContent has a hook.
+inline void routeContentStatus(juce::Component* content, std::function<void(const juce::String&, const juce::String&)> report)
+{
+    if (auto* layerContent = dynamic_cast<LayerContent*>(content))
+        if (! layerContent->onStatusUpdate)
+            layerContent->onStatusUpdate = std::move(report);
+}
+}

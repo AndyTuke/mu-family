@@ -29,6 +29,7 @@ void NudgeInput::setValueD(double v, bool notify)
     if (! notify) return;
     if (decimals > 0 && onChangeD) onChangeD(value);
     else if (onChange)             onChange((int) std::lround(value));
+    if (statusName.isNotEmpty()) mu_ui::reportStatus(*this, statusName, valueText());
 }
 
 juce::String NudgeInput::valueText() const

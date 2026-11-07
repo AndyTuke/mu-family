@@ -31,6 +31,7 @@ public:
     void setSelectedStep(int step) { selectedStep = step; repaint(); }
     std::function<void(int row, int step)> onStepSelected;
     std::function<void()> onLengthChanged;   // a page or a row's Length changed: the Step panel may need to follow
+    std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;   // the Length box reports to the status bar
 
     std::function<void(int)> onRowClicked;   // a click landed in layer idx's row: the editor selects it
 

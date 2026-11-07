@@ -400,6 +400,13 @@ void ArpContent::addCombo(int group, const char* suffix, const juce::StringArray
     ComboDef d;
     d.comp = std::make_unique<DropdownSelect>();
     d.suffix = suffix; d.group = group; d.caption = caption;
+    // The status bar names the selector (a pick reports to the editor, see StatusSink.h): its caption, else the row's own name.
+    static const std::pair<const char*, const char*> names[] = {
+        { "o1_wt", "Osc 1 Wavetable" }, { "o2_wt", "Osc 2 Wavetable" }, { "xmod_phaseMode", "X-Mod Phase Mode" },
+        { "xmod_ampMode", "X-Mod Amp Mode" }, { "ntype", "Noise Type" }, { "ptgt", "Pitch Env Target" }, { "ft", "Filter Type" } };
+    d.comp->setStatusName(caption != nullptr && caption[0] != '\0' ? juce::String(caption) : juce::String(suffix));
+    for (const auto& n : names)
+        if (juce::String(suffix) == n.first) d.comp->setStatusName(n.second);
     for (int i = 0; i < items.size(); ++i) d.comp->addItem(items[i], i + 1);
     addAndMakeVisible(*d.comp);
     combos.push_back(std::move(d));

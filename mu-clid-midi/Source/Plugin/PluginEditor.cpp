@@ -119,6 +119,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     startTimerHz(mu_ui::kUiRefreshHz);   // drains the flags the parameter listener raises
 
     // Size dropdown — Normal / Large, right-aligned in the transport bar row.
+    sizeDropdown.setStatusName("Size");
     sizeDropdown.addItem("Normal", 1);
     sizeDropdown.addItem("Large",  2);
     {

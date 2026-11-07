@@ -1,4 +1,5 @@
 #pragma once
+#include "UI/StatusSink.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "MuLookAndFeel.h"
 
@@ -14,6 +15,9 @@ public:
     NudgeInput(const juce::String& label, int minValue, int maxValue, int defaultValue = 0);
 
     void setValue(int v, bool notify = false);
+    // The name the status bar shows with the value when the user changes it ("Bars", "Step Length"): reported to the nearest
+    // StatusSink above this control. Empty = this control reports nothing by itself.
+    void setStatusName(const juce::String& name) { statusName = name; }
     int  getValue() const noexcept { return (int) std::lround(value); }
 
     // Decimal mode: the value is rounded to `n` places (0 = whole numbers, the default),
@@ -50,6 +54,7 @@ private:
     int stepSize   = 1;
     bool showStepBtns  = true;
     bool labelInline   = false;
+    juce::String statusName;
 
     enum class HitZone { None, Up, Down, Step1, Step5, Step10, Display };
     HitZone getZone(juce::Point<int> p) const;

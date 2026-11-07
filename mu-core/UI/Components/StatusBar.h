@@ -15,6 +15,10 @@ public:
                    const juce::String& value,
                    juce::Colour rhythmColour = juce::Colours::transparentBlack);
 
+    // What is shown now: the name and value of the last control reported (empty until one is).
+    juce::String getShownName() const  { return currentName; }
+    juce::String getShownValue() const { return currentValue; }
+
     // A small "Support" text link at the right edge (unlicensed copies only). Clicking it calls
     // onSupportClicked; hidden by default.
     void setSupportLinkVisible(bool visible);

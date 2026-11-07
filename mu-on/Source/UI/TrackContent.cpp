@@ -184,8 +184,8 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     : host(trackHost), grid(trackHost.getTrackParameters()), filterGrid(trackHost.getTrackParameters()), rows(trackHost), soloRow(trackHost), insertSub(base, "t")
 {
     for (int e = 0; e < kNumEngineTypes; ++e) engineSelect.addItem(engineName(engineFromIndex(e)), e + 1);
-    engineSelect.onChange = [this](int id) { engineChosen(id); };
-    sourceSelect.onChange = [this](int id) { sourceChosen(id); };
+    engineSelect.onChange = [this](int id) { engineChosen(id); if (onStatusUpdate) onStatusUpdate("Engine", engineSelect.getText()); };
+    sourceSelect.onChange = [this](int id) { sourceChosen(id); if (onStatusUpdate) onStatusUpdate("Rumble Source", sourceSelect.getText()); };
 
     for (auto* cap : { &engineCaption, &sourceCaption, &rootCaption, &scaleCaption })
     {
@@ -222,12 +222,14 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     scaleSelect.getComboBox().onChange = [this, say] { say("Key Scale", scaleSelect); };
 
     rows.onRowClicked = [this](int row) { if (onRowClicked) onRowClicked(row); };
+    rows.onStatusUpdate = [this](const juce::String& name, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
     addAndMakeVisible(rows);
     soloRow.onStatusUpdate = [this](const juce::String& name, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
     addChildComponent(soloRow);
     soloPager.pageCount = [this] { return host.getTrack(currentLayer).row.numPages(); };
     soloPager.lengthRow = [this]() -> StepRow* { return &host.getTrack(currentLayer).row; };
     soloPager.onChanged = [this] { soloRow.setFirstStep(soloPager.page() * StepRow::kNumSteps); refreshStepPanel(); };
+    soloPager.onStatusUpdate = [this](const juce::String& name, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
     addChildComponent(soloPager);
 
     // The track's own Swing / Accent, shown in the Groove box (a Rumble track shows its envelope there instead);

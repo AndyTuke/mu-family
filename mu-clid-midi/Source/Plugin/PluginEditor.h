@@ -19,9 +19,13 @@ namespace mu_clid_midi {
 // accent controls. No sidebar, voice section or mixer.
 class PluginEditor : public juce::AudioProcessorEditor,
                      public juce::AudioProcessorValueTreeState::Listener,
+                     public mu_ui::StatusSink,
                      private juce::Timer
 {
 public:
+    // A control with a status name (see StatusSink.h) reports here: the status bar shows it.
+    void showControlStatus(const juce::String& name, const juce::String& value) override { statusBar.showParam(name, value); }
+
     explicit PluginEditor(PluginProcessor&);
     ~PluginEditor() override;
 

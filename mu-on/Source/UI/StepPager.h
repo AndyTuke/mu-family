@@ -26,6 +26,7 @@ public:
     std::function<int()>      pageCount;    // pages the shown rows need (at least 1)
     std::function<StepRow*()> lengthRow;    // the row the Length edits (null: none)
     std::function<void()>     onChanged;    // the page or a length changed: redraw the grid
+    std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;   // the Length box reports to the status bar
 
     int  page() const noexcept { return currentPage; }
     void setPage(int p);

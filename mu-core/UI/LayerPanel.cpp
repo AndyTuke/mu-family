@@ -1,4 +1,5 @@
 #include "LayerPanel.h"
+#include "UI/LayerContent.h"
 #include "UI/LayerPresetHeader.h"
 
 LayerPanel::LayerPanel(ProcessorBase& processor, const juce::String& layerNoun)
@@ -37,6 +38,9 @@ void LayerPanel::setContent(juce::Component* c)
     if (content != nullptr) removeChildComponent(content);
     content = c;
     if (content != nullptr) addAndMakeVisible(*content);
+    // The status bar shows the name and value of the last control touched, in every app, without fail: a content with no hook of its
+    // own reports through the panel (read at call time, so the order of the shell's wiring does not matter).
+    mu_ui::routeContentStatus(content, [this](const juce::String& name, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); });
     resized();
 }
 

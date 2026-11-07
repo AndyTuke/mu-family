@@ -22,9 +22,13 @@ namespace mu_toni_midi
 // amounts, two switches) and a MIDI row (In / Out channel, Velocity). No sidebar, voice section or mixer: it makes no sound.
 // Every control reads and writes its a0_* / MIDI parameter directly; a 30 Hz timer pulls host automation back into the controls.
 class PluginEditor : public juce::AudioProcessorEditor,
+                     public mu_ui::StatusSink,
                      private juce::Timer
 {
 public:
+    // A control with a status name (see StatusSink.h) reports here: the status bar shows it.
+    void showControlStatus(const juce::String& name, const juce::String& value) override { statusBar.showParam(name, value); }
+
     explicit PluginEditor(PluginProcessor&);
     ~PluginEditor() override;
 

@@ -128,11 +128,18 @@ void EditorShellBase::setMainArea(juce::Component* newSidebar, juce::Component* 
         // So does the header's Notes In control, when the product turns it on.
         panel->getHeader().onNotesInStatus = [this](const juce::String& name, const juce::String& value)
         { statusBar.showParam(name, value); };
+        // And the panel's content reports through it: every content, wired or not (see LayerPanel::setContent).
+        panel->onStatusUpdate = [this](const juce::String& name, const juce::String& value)
+        { statusBar.showParam(name, value); };
     }
 }
 
 void EditorShellBase::forwardKnobStatus(juce::Component& root)
 {
+    // A layer panel's content reports through the panel: the panel ends in the status bar.
+    if (auto* panel = dynamic_cast<LayerPanel*>(&root))
+        panel->onStatusUpdate = [this](const juce::String& name, const juce::String& value) { statusBar.showParam(name, value); };
+
     // The chrome knows the plain knobs; these two panel types are plugin-side.
     chrome.forwardKnobStatus(root, [](juce::Component& c, const mu_ui::ShellChrome::StatusFn& show)
     {

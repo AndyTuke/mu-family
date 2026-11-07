@@ -82,6 +82,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     modulatorPanel.setLayer(&proc.getCore().getLayer());
     addAndMakeVisible(modulatorPanel);
 
+    sizeDropdown.setStatusName("Size");
     sizeDropdown.addItem("Normal", 1);
     sizeDropdown.addItem("Large",  2);
     sizeDropdown.setSelectedId(proc.getUiScale() >= ProcessorBase::kUiScaleLarge ? 2 : 1, false);

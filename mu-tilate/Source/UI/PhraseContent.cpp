@@ -79,6 +79,13 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     status.setColour(juce::Label::textColourId, LF::colour(LF::labelText));
     addAndMakeVisible(status);
 
+    // The status bar names each selector and number box (a change reports to the editor, see StatusSink.h).
+    modeBox.setStatusName("Tempo Mode");
+    detectBox.setStatusName("Detection Method");
+    filterTypeBox.setStatusName("Layer Filter Type");
+    gridBox.setStatusName("Snap Grid");
+    barsInput.setStatusName("Length Bars");
+    beatsInput.setStatusName("Length Beats");
     for (int i = 0; i < tempoModeNames().size(); ++i) modeBox.addItem(tempoModeNames()[i], i + 1);
     addAndMakeVisible(modeBox);
 

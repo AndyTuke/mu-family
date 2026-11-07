@@ -25,6 +25,10 @@ public:
     // swap the content (a combined instance can answer per layer type). Not owned.
     void setContent(juce::Component* content);
 
+    // Where the shown content's knob / control reports go (the shell sets it: the status bar). A content that has not been given a
+    // status hook of its own is given one that ends here when it is shown, so no content can silently report to nobody.
+    std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
+
     // The product's word for a layer ("Rhythm", "Voice", ...), for dialog titles.
     const juce::String& getNoun() const noexcept { return noun; }
 

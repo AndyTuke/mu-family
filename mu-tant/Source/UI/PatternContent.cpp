@@ -121,6 +121,9 @@ void PatternContent::setupTonalCentre()
     addLabel(scaleLabel, "Scale");
     mu_ui::addChoiceItems(rootDropdown, apvts, "root");   // items from the parameter's choices
     populateScales(scaleDropdown);
+    // The status bar names each selector (a pick reports to the editor, see StatusSink.h).
+    rootDropdown.setStatusName("Root");
+    scaleDropdown.setStatusName("Scale");
     addAndMakeVisible(rootDropdown);
     addAndMakeVisible(scaleDropdown);
     rootAttachment  = std::make_unique<APVTS::ComboBoxAttachment>(apvts, "root",  rootDropdown.getComboBox());
@@ -173,6 +176,8 @@ void PatternContent::setupSourceControls()
     // (factory names + optional user import + "Load .wav…"); onChange routes here.
     addAndMakeVisible(osc1WaveDropdown);
     addAndMakeVisible(osc2WaveDropdown);
+    osc1WaveDropdown.setStatusName("Osc 1 Wavetable");
+    osc2WaveDropdown.setStatusName("Osc 2 Wavetable");
     osc1WaveDropdown.onChange = [this](int itemId) { handleWtSelection(0, itemId); };
     osc2WaveDropdown.onChange = [this](int itemId) { handleWtSelection(1, itemId); };
 
@@ -214,6 +219,8 @@ void PatternContent::setupFilterControls()
     addLabel(flt2TypeLabel, "Type");
     populateFilterTypes(fltTypeDropdown);
     populateFilterTypes(flt2TypeDropdown);
+    fltTypeDropdown.setStatusName("Filter Type");
+    flt2TypeDropdown.setStatusName("Filter 2 Type");
     addAndMakeVisible(fltTypeDropdown);
     addAndMakeVisible(flt2TypeDropdown);
 

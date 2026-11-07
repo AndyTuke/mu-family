@@ -1,6 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "MuLookAndFeel.h"
+#include "UI/StatusSink.h"
 
 // Styled wrapper around juce::ComboBox.
 class DropdownSelect : public juce::Component
@@ -13,6 +14,10 @@ public:
     void addItem(const juce::String& text, int id);
     void addSectionHeading(const juce::String& text);
     void setSelectedId(int id, bool notify = false);
+    // The name the status bar shows with the chosen item when the user picks one ("Scale", "Filter Type"): the pick reports to the
+    // nearest StatusSink above this control (the editor). Empty = this control reports nothing by itself.
+    void setStatusName(const juce::String& name) { statusName = name; }
+    const juce::String& getStatusName() const noexcept { return statusName; }
     int  getSelectedId() const;
     void clear();
     // An item whose popup lettering is `textColour` (e.g. a note outside the scale in red).
@@ -45,6 +50,7 @@ private:
     void refreshTextColour();
 
     juce::ComboBox combo;
+    juce::String   statusName;
     juce::String   overrideText;
     bool           overrideQueued = false;
 };
