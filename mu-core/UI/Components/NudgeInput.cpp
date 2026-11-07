@@ -81,8 +81,10 @@ void NudgeInput::paint(juce::Graphics& g)
 
     if (labelInline && !label.isEmpty() && !showStepBtns)
     {
-        // Label on the left, value on the right — both inside the display area.
-        const int inlineLblW = s(14);
+        // Label on the left, value on the right — both inside the display area. The label gets the width its text needs plus a
+        // little air each side (so it is indented from the edge and a long word such as "Beats" is not cut off).
+        const auto lblFont = MuLookAndFeel::uiFont(sf(9.0f));
+        const int inlineLblW = juce::jmax(s(14), (int) std::ceil(juce::GlyphArrangement::getStringWidth(lblFont, label)) + s(10));
         const auto lblArea = displayBounds.withWidth(inlineLblW);
         const auto valArea = displayBounds.withTrimmedLeft(inlineLblW);
         g.setColour(MuLookAndFeel::colour(Id::labelText));
