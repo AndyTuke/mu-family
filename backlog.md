@@ -1,6 +1,6 @@
 # Issues
 
-**Tally (updated 2026-11-07): Open 10 · On Hold 4 · Closed 1709 · Total 1723**
+**Tally (updated 2026-11-07): Open 11 · On Hold 4 · Closed 1709 · Total 1724**
 
 **Status key:** ✅ Closed | 🔴 Open | 🟡 On Hold (deferred, blocked, or pending external action)
 
@@ -12,6 +12,7 @@ Test pass/fail tracking lives in [tests.md](tests.md), not this backlog. Use thi
 
 | # | Description | Status | Closed Build |
 |---|---|---|---|
+| 1780 | **[family/new product] mu-Toni MIDI (mu-toni-midi): MIDI-only version of mu-Toni.** P3 · logged by Andy 2026-11-07 ("We need a mu-toni-midi plugin as well") · Details: the same kind of product as mu-Clid MIDI (mu-clid-midi/, see mu-clid-midi/CLAUDE.md) for the generative arpeggiator: outputs MIDI notes only, no audio engine, VST3 + CLAP, shares the Arp layer / .muArp with mu-Toni. Suggested name mu-toni-midi, folder mu-toni-midi/. · Updates: none, not started · Needs: feature, ask Andy before implementing; Andy's answers on: freeware like mu-Clid MIDI? release, site and Lemon Squeezy treatment?; architecture-steward (new product, naming, placement); ux-controller; test-steward | 🔴 Open | — |
 | 1775 | **[family/new product] Plug-in host "mu-host": one mu instrument channel inside a DAW.** P3 · logged by Andy 2026-11-07 · Details: a lightweight wrapper that runs as a plugin in either format (VST3 and CLAP), plug-in only, no standalone. It has a drop-down to select any of the voice engines we have (mu-Clid, mu-Tant, mu-Toni, mu-On, mu-Tilate...). It gives a single channel of a mu instrument inside a DAW, with the voice, inserts, sequencer and modulation sections, but simply outputs to the DAW for mixing (no mu mixer/FX rack). · Updates: none, not started · Needs: feature, ask Andy before implementing; architecture-steward (new product, engine swap-point in mu-core, naming); ux-controller; dsp-controller (engine switching on the audio thread) | 🔴 Open | — |
 | 1776 | **[mu-core/inserts] Add chorus, flanger and phaser insert effects.** P3 · logged by Andy 2026-11-07 · Details: add chorus, flanger and phaser effects to the insert effects list. Ensure the number of controls fits the available insert space limit. Each needs a mix control too. Insert slots follow the existing insert slot conventions (see mu-core/Audio/FX/Insert and InsertSlotUi.h). Every continuous parameter must be a modulation target (add the target rows in the same change). Any new insert needs tests. · Updates: none, not started · Needs: feature, ask Andy before implementing; ux-controller (control count per insert); test-steward; dsp-controller | 🔴 Open | — |
 | 1777 | **[mu-core/inserts] Pitch-shifter delay insert.** P3 · logged by Andy 2026-11-07 · Details: a pitch-shifter delay insert. Insert slots follow the existing insert slot conventions (see mu-core/Audio/FX/Insert and InsertSlotUi.h); it needs a mix control and must fit the insert space limit. Every continuous parameter must be a modulation target (add the target rows in the same change). Any new insert needs tests. · Updates: none, not started · Needs: feature, ask Andy before implementing; ux-controller; test-steward; dsp-controller | 🔴 Open | — |
