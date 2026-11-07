@@ -96,6 +96,15 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     flt(E::Rumble, "res",    "Rumble Resonance", f(0.0f, 1.0f, 0.001f), 0.2f, mu_fmt::Unit::Percent01);
     flt(E::Rumble, "inlp",   "Rumble Input LP",  centred(20.0f, 20000.0f, 1.0f, 640.0f), 20000.0f, mu_fmt::Unit::Hz);   // fully open = off
     flt(E::Rumble, "fb",     "Rumble Feedback",  f(0.0f, 1.0f, 0.001f), 0.0f, mu_fmt::Unit::Percent01);   // output back into the delay line; appended last
+    {   // the feedback's filter, one bipolar knob: centre = none, left = low-pass (darker repeats), right = high-pass (thinner repeats)
+        const auto r = f(-1.0f, 1.0f, 0.001f);
+        layout.add(std::make_unique<AudioParameterFloat>(id(E::Rumble, "fbfilt"), lbl + "Rumble Feedback Filter", r, 0.0f,
+            mu_fmt::floatText(r, [](float v, int)
+            {
+                if (std::abs(v) < 0.02f) return juce::String("Off");
+                return juce::String(v < 0.0f ? "LP " : "HP ") + juce::String(juce::roundToInt(std::abs(v) * 100.0f)) + " %";
+            })));
+    }
 
     // The track's insert effect: algorithm and the four generic knobs (the shared insert layout, as a mixer bus insert).
     mu_mixfx::addInsertParams(layout, layerParamPrefix(slot), lbl);   // t{N}_drvChar, t{N}_insP1..4: the ids the shared InsertSubsection reads

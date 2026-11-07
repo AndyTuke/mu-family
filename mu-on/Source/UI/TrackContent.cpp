@@ -104,7 +104,7 @@ namespace
             // Rumble processes another track: input low-pass → input drive → 3 delay taps → reverb → filter.
             case EngineType::Rumble:
                 return { { id("inlp"), "In LP" }, { id("drive"), "Drive" }, { id("d1"), "1/16" }, { id("d2"), "2/16" }, { id("d3"), "3/16" },
-                         { id("size"), "Rv Size" }, { id("revmix"), "Rv Mix" }, { id("revlp"), "Rv LP" }, { id("cut"), "Cutoff" }, { id("res"), "Reso" }, { id("fb"), "Feedback" } };
+                         { id("size"), "Rv Size" }, { id("revmix"), "Rv Mix" }, { id("revlp"), "Rv LP" }, { id("cut"), "Cutoff" }, { id("res"), "Reso" }, { id("fb"), "Feedback" }, { id("fbfilt"), "Fb Filter" } };
             // FM Perc: the Algorithm selector (two cells) then the ten fixed knobs; the tips follow the algorithm.
             case EngineType::FmPerc:
             {

@@ -3,7 +3,7 @@
 product=mu-on
 layers_at_start=1
 max_layers=8
-param_count=969
+param_count=977
 ---
 ch0_lvl | float | 0 | 1 | 0.001 | 1 | 1 | 1
 ch0_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
@@ -265,6 +265,7 @@ t0_rumble_d2 | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t0_rumble_d3 | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t0_rumble_drive | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t0_rumble_fb | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t0_rumble_fbfilt | float | -1 | 1 | 0.001 | 1 | 0 | 0.5
 t0_rumble_inlp | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t0_rumble_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t0_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
@@ -364,6 +365,7 @@ t1_rumble_d2 | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t1_rumble_d3 | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t1_rumble_drive | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t1_rumble_fb | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t1_rumble_fbfilt | float | -1 | 1 | 0.001 | 1 | 0 | 0.5
 t1_rumble_inlp | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t1_rumble_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t1_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
@@ -463,6 +465,7 @@ t2_rumble_d2 | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t2_rumble_d3 | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t2_rumble_drive | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t2_rumble_fb | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t2_rumble_fbfilt | float | -1 | 1 | 0.001 | 1 | 0 | 0.5
 t2_rumble_inlp | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t2_rumble_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t2_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
@@ -562,6 +565,7 @@ t3_rumble_d2 | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t3_rumble_d3 | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t3_rumble_drive | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t3_rumble_fb | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t3_rumble_fbfilt | float | -1 | 1 | 0.001 | 1 | 0 | 0.5
 t3_rumble_inlp | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t3_rumble_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t3_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
@@ -661,6 +665,7 @@ t4_rumble_d2 | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t4_rumble_d3 | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t4_rumble_drive | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t4_rumble_fb | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t4_rumble_fbfilt | float | -1 | 1 | 0.001 | 1 | 0 | 0.5
 t4_rumble_inlp | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t4_rumble_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t4_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
@@ -760,6 +765,7 @@ t5_rumble_d2 | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t5_rumble_d3 | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t5_rumble_drive | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t5_rumble_fb | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t5_rumble_fbfilt | float | -1 | 1 | 0.001 | 1 | 0 | 0.5
 t5_rumble_inlp | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t5_rumble_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t5_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
@@ -859,6 +865,7 @@ t6_rumble_d2 | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t6_rumble_d3 | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t6_rumble_drive | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t6_rumble_fb | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t6_rumble_fbfilt | float | -1 | 1 | 0.001 | 1 | 0 | 0.5
 t6_rumble_inlp | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t6_rumble_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t6_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
@@ -958,6 +965,7 @@ t7_rumble_d2 | float | 0 | 1 | 0.001 | 1 | 0.35 | 0.35
 t7_rumble_d3 | float | 0 | 1 | 0.001 | 1 | 0.25 | 0.25
 t7_rumble_drive | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t7_rumble_fb | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t7_rumble_fbfilt | float | -1 | 1 | 0.001 | 1 | 0 | 0.5
 t7_rumble_inlp | float | 20 | 20000 | 1 | 0.199595 | 20000 | 1
 t7_rumble_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t7_rumble_revlp | float | 200 | 18000 | 1 | 0.3 | 1200 | 0.421574
@@ -991,11 +999,11 @@ mst=12
 mstr=3
 ret=24
 rev=10
-t0=99
-t1=99
-t2=99
-t3=99
-t4=99
-t5=99
-t6=99
-t7=99
+t0=100
+t1=100
+t2=100
+t3=100
+t4=100
+t5=100
+t6=100
+t7=100

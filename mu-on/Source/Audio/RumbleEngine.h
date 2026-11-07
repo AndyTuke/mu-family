@@ -11,7 +11,8 @@
 //   1. input drive   — the same valve saturation MultiModeFilter applies on its input
 //   2. delay taps    — 1/16, 2/16, 3/16 of the beat-grid (tempo-synced), each with a level; the Feedback knob sends the
 //                      final output (after the filter, so the envelope and the filter shape the repeats) back into the
-//                      delay line's input, one block late
+//                      delay line's input, one block late; the Feedback Filter knob shapes that fed-back signal (centre: none,
+//                      left: low-pass so the repeats darken, right: high-pass so they thin out)
 //   3. dark reverb   — Signalsmith reverb (size param) into a low-pass (darkness)
 //   4. bar envelope  — a per-bar volume shape from a drawable smooth curve (the shared
 //                      LFOEditor), evaluated per block by its Track and pushed via
@@ -67,9 +68,10 @@ public:
     // dry/wet blend (0 = dry, 1 = fully wet).
     void setParams(double bpm_, float drive, float d1, float d2, float d3,
                    float revSize, float revMix_, float revLpHz, float cutHz, float res,
-                   float inLpHz = kInLpOpen, float feedback = 0.0f) noexcept
+                   float inLpHz = kInLpOpen, float feedback = 0.0f, float fbFilter = 0.0f) noexcept
     {
         fbAmt  = juce::jlimit(0.0f, 1.0f, feedback) * kMaxFeedback;
+        setFeedbackFilter(fbFilter);
         inLpCut = juce::jlimit(20.0f, kInLpOpen, inLpHz);
         inLp.setCutoff(inLpCut);
         bpm    = bpm_ > 0.0 ? bpm_ : 120.0;
@@ -177,7 +179,7 @@ public:
                 if (fbGain > 0.0f)
                 {
                     int fr = wp - fbLag; if (fr < 0) fr += cap;
-                    dl[wp] = std::tanh(s[i] + fbRing.getReadPointer(c)[fr] * fbGain);
+                    dl[wp] = std::tanh(s[i] + shapeFeedback(c, fbRing.getReadPointer(c)[fr]) * fbGain);
                 }
                 else
                     dl[wp] = s[i];
@@ -229,10 +231,32 @@ public:
     }
 
 private:
+    // The Feedback Filter: -1..1, 0 = none. Below 0 a two-stage (12 dB) low-pass from 18 kHz down to 150 Hz; above 0 a two-stage
+    // high-pass from 20 Hz up to 3 kHz. A small dead zone at the centre switches the filter off exactly.
+    void setFeedbackFilter(float v) noexcept
+    {
+        v = juce::jlimit(-1.0f, 1.0f, v);
+        const float amount = std::abs(v);
+        fbFilterMode = amount < 0.02f ? 0 : (v < 0.0f ? -1 : 1);
+        if (fbFilterMode == 0) return;
+        const float hz = fbFilterMode < 0 ? 18000.0f * std::pow(150.0f / 18000.0f, amount)
+                                          : 20.0f * std::pow(3000.0f / 20.0f, amount);
+        fbFilterCoef = 1.0f - std::exp(-juce::MathConstants<float>::twoPi * hz / (float) sampleRate);
+    }
+    float shapeFeedback(int ch, float x) noexcept
+    {
+        if (fbFilterMode == 0) return x;
+        auto& z = fbFilterState[juce::jmin(ch, 1)];
+        z[0] += (x - z[0]) * fbFilterCoef;     // first one-pole low-pass
+        z[1] += (z[0] - z[1]) * fbFilterCoef;  // second
+        return fbFilterMode < 0 ? z[1] : x - z[1];   // high-pass = what the two poles let go of (the low part taken away)
+    }
+
     void clearState() noexcept
     {
         delayBuf.clear();
         fbRing.clear();
+        for (auto& z : fbFilterState) z[0] = z[1] = 0.0f;
         writePos = 0;
         inLp.reset();
         filter.reset();
@@ -255,7 +279,8 @@ private:
     int    maxBlockSize = 512, writePos = 0, tailLeft = 0;
     bool   dirty = false;   // rendered since the last reset
     float  inLpCut = kInLpOpen;
-    float  fbAmt = 0.0f;
+    float  fbAmt = 0.0f, fbFilterCoef = 0.0f, fbFilterState[2][2] = {};
+    int    fbFilterMode = 0;   // -1 low-pass, 0 none, 1 high-pass
     float  drv = 0.0f, lvl1 = 0.0f, lvl2 = 0.0f, lvl3 = 0.0f, revMix = 0.5f, envLevel = 1.0f;
 };
 

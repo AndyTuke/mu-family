@@ -401,6 +401,37 @@ public:
             }
             expect(finite && peak < 20.0f, "full feedback stays bounded (peak " + juce::String(peak, 2) + ")");
         }
+
+        beginTest("RumbleEngine: the Feedback Filter is none at the centre, darkens the repeats to the left and thins them to the right");
+        {
+            // A high tone and a low tone burst, repeated through the feedback; how much of each is left in the later repeats.
+            auto repeatsEnergy = [&](float filter, float freq)
+            {
+                RumbleEngine r;
+                r.prepare(sr, prepared);
+                r.setParams(120.0, 0.0f, 1.0f, 0.0f, 0.0f, 0.5f, 0.0f, 18000.0f, 20000.0f, 0.0f, 20000.0f, 0.8f, filter);
+                juce::AudioBuffer<float> in(2, prepared), silent(2, prepared), out(2, prepared);
+                for (int c = 0; c < 2; ++c)
+                    for (int i = 0; i < prepared; ++i)
+                        in.setSample(c, i, 0.5f * std::sin(juce::MathConstants<float>::twoPi * freq * (float) i / (float) sr));
+                silent.clear();
+                const int blocksPerSecond = (int) (sr / prepared);
+                float energy = 0.0f;
+                for (int b = 0; b < 2 * blocksPerSecond; ++b)
+                {
+                    out.clear(); r.render(b < 8 ? in : silent, out, prepared);
+                    if (b > blocksPerSecond / 2) energy += rmsOf(out, prepared);
+                }
+                return energy;
+            };
+            const float highNone = repeatsEnergy(0.0f, 6000.0f), lowNone = repeatsEnergy(0.0f, 80.0f);
+            expect(highNone > 0.0f && lowNone > 0.0f, "unfiltered repeats are audible");
+            expect(repeatsEnergy(-0.8f, 6000.0f) < highNone * 0.25f, "left (low-pass) takes the highs out of the repeats");
+            expect(repeatsEnergy(-0.8f, 80.0f) > lowNone * 0.5f, "left keeps the lows");
+            expect(repeatsEnergy(0.8f, 80.0f) < lowNone * 0.25f, "right (high-pass) takes the lows out of the repeats");
+            expect(repeatsEnergy(0.8f, 6000.0f) > highNone * 0.5f, "right keeps the highs");
+            expectEquals(repeatsEnergy(0.01f, 6000.0f), highNone, "a nudge inside the dead zone is no filter at all");
+        }
     }
 };
 
