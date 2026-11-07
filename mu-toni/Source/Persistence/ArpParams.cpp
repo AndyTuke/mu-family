@@ -9,21 +9,10 @@
 namespace mu_toni
 {
 
-void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot)
+void addArpRows(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot)
 {
     using namespace juce;
     auto f = [](float lo, float hi, float step) { return NormalisableRange<float>(lo, hi, step); };
-
-    // A time range (seconds) skewed so short attacks/decays get resolution.
-    auto tf = []
-    {
-        NormalisableRange<float> r(0.001f, 4.0f, 0.001f);
-        r.setSkewForCentre(0.2f);
-        return r;
-    };
-    NormalisableRange<float> cutR(20.0f, 18000.0f, 1.0f);
-    cutR.setSkewForCentre(640.0f);   // the family filter's centre, as mu-Clid and mu-Tant
-
     NormalisableRange<float> portaR(0.0f, 500.0f, 1.0f);
     portaR.setSkewForCentre(80.0f);   // glide times are mostly short
 
@@ -55,6 +44,28 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     // Step pattern: bit i = step i+1 is On (clear = Off, a rest). Default all On, so layers saved
     // before this existed play every step as before.
     layout.add(std::make_unique<AudioParameterInt>  (pid("stepMask"), lbl("Step Mask"), 0, (1 << ArpAccent::kMaxSteps) - 1, (1 << ArpAccent::kMaxSteps) - 1));
+}
+
+void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot)
+{
+    using namespace juce;
+    auto f = [](float lo, float hi, float step) { return NormalisableRange<float>(lo, hi, step); };
+
+    // A time range (seconds) skewed so short attacks/decays get resolution.
+    auto tf = []
+    {
+        NormalisableRange<float> r(0.001f, 4.0f, 0.001f);
+        r.setSkewForCentre(0.2f);
+        return r;
+    };
+    NormalisableRange<float> cutR(20.0f, 18000.0f, 1.0f);
+    cutR.setSkewForCentre(640.0f);   // the family filter's centre, as mu-Clid and mu-Tant
+
+    const String v = layerParamPrefix(slot);
+    auto pid = [&](const char* s) { return ParameterID{ v + s, 1 }; };
+    auto lbl = [&](const char* s) { return "V" + String(slot + 1) + " " + s; };
+
+    addArpRows(layout, slot);
 
     // Oscillators — mu-Tant's wavetable oscs: a table from the shared bank + its scan
     // position (frame 0..255), defaulting to Basic Shapes' saw.

@@ -30,6 +30,7 @@ project(mu-family VERSION ${MUFAMILY_VERSION_BASE}.0)
 #   mu-clid-midi/        mu-Clid MIDI: the single-rhythm Euclidean MIDI effect (the former mu-Clid Lite)
 #   mu-tant/             wavetable drone synth
 #   mu-toni/             generative arpeggiator mono-synth
+#   mu-toni-midi/        mu-Toni MIDI: the arpeggiator as a MIDI effect
 #   mu-on/               909-style groove sequencer
 #   mu-tilate/           loop slicer (plugin target, layer library, tests)
 #   mu-tronic/           performance unit of 16 layer slots (Standalone only, pay what you want)
@@ -171,6 +172,7 @@ add_subdirectory(mu-clid)
 add_subdirectory(mu-clid-midi) # mu-Clid MIDI: Euclidean MIDI effect (VST3 + CLAP); needs mu-clid's increment_build_number target
 add_subdirectory(mu-tant)     # wavetable drone synth (Standalone + VST3 + CLAP)
 add_subdirectory(mu-toni)     # generative arpeggiator mono-synth, freeware (Standalone + VST3 + CLAP)
+add_subdirectory(mu-toni-midi) # mu-Toni MIDI: the arpeggiator as a MIDI effect (VST3 + CLAP); compiles mu-toni's arp rows, needs mu-clid's increment_build_number target
 add_subdirectory(mu-on)       # 909-style groove sequencer: Kick/Bass/Hat/Snare (Standalone + VST3 + CLAP)
 add_subdirectory(mu-tilate)   # loop slicer, built in stages: layer library + tests (docs/mu-tilate/design-buildplan.md)
 add_subdirectory(mu-tronic)   # performance unit: 16 layer slots (Standalone only, pay what you want); after the products whose layers it will host

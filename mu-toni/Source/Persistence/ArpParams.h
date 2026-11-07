@@ -47,6 +47,10 @@ inline constexpr const char* kMidiInChannelParamId = "midiInCh";
 // The root tag of a layer-preset file (.muArp), shared by mu-Toni's own presets and the slot hosts that load them.
 inline constexpr const char* kArpPresetTag = "MuToniLayer";
 
+// Just the arp and accent rows of the slot (scale ... trig, acc, accLen, accPat, stepMask): what a MIDI-only host (mu-Toni MIDI)
+// needs. addLayerParams adds these first, then the voice rows, so the ids and their order are unchanged.
+void addArpRows(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot);
+
 // The Arp type's rows for one layer slot (a{slot}_*), in vpi order.
 void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot);
 
