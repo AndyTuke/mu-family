@@ -90,6 +90,44 @@ namespace
                 expect(around < held * 3.0f + 0.005f, "the retrigger steps " + juce::String(around) + " against " + juce::String(held) + " for the held tone");
             }
 
+            beginTest("The Bass filter envelope: an attack opens the filter slowly, a sustain holds it open, the type changes the sound");
+            {
+                // A saw through a low cutoff (no resonance) with the envelope fully open; the level around 150 ms and around 0.5 s shows how bright it is
+                // (the filter's own cutoff smoothing keeps the first 20 ms open whatever the envelope does).
+                auto render = [&](float fatkMs, float fsus, int type, float& mid, float& late)
+                {
+                    mu_on::BassEngine b;
+                    b.prepare(kSr, 256);
+                    b.setParams(110.0f, 1, 0.0f, 200.0f, 0.0f, 1.0f, 50.0f, 1.0f, 200.0f, 1.0f, 0.0f, 5000.0f, 0.0f, fatkMs, fsus, 0.0f, type);   // no resonance: its peak would offset the cut
+                    b.trigger(1.0f, 0, false, 0);
+                    // The level over a window several periods long (a single block's level depends on where it falls in the wave).
+                    std::vector<float> all;
+                    Buf out(2, 256);
+                    for (int at = 0; at < 96256; at += 256)
+                    {
+                        out.clear();
+                        b.render(out, 256);
+                        for (int k = 0; k < 256; ++k) all.push_back(out.getSample(0, k));
+                    }
+                    auto windowRms = [&](size_t from, size_t to)
+                    {
+                        double sum = 0.0;
+                        for (size_t k = from; k < to; ++k) sum += (double) all[k] * all[k];
+                        return (float) std::sqrt(sum / (double) (to - from));
+                    };
+                    mid  = windowRms(6000, 9600);     // about 125 to 200 ms
+                    late = windowRms(80000, 96000);   // about 1.7 to 2 s (the filter's own cutoff smoothing has settled by then)
+                };
+                float midFast = 0, lateClosed = 0, midSlow = 0, lateOpen = 0, ignored = 0, lateLp6 = 0;
+                render(0.0f, 0.0f, 0, midFast, lateClosed);
+                render(300.0f, 0.0f, 0, midSlow, ignored);
+                render(0.0f, 1.0f, 0, ignored, lateOpen);
+                render(0.0f, 0.0f, 7, ignored, lateLp6);   // LP6, a gentler slope, on the same note
+                expect(midSlow > midFast * 1.05f, "a 300 ms attack has the filter more open at 150 ms (" + juce::String(midSlow) + " against " + juce::String(midFast) + ")");
+                expect(lateOpen > lateClosed * 1.2f, "a sustain of 1 keeps the filter open (" + juce::String(lateOpen) + " against " + juce::String(lateClosed) + ")");
+                expect(std::abs(lateLp6 - lateClosed) > 0.015f, "another filter type changes the sound (" + juce::String(lateLp6) + " against " + juce::String(lateClosed) + ")");
+            }
+
             beginTest("A tied step glides to the new pitch");
             {
                 mu_on::BassEngine bass;

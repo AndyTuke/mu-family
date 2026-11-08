@@ -205,6 +205,10 @@
         <p id="bass_rel" x="300.0"/>
         <p id="bass_glide" x="80.0"/>
         <p id="bass_fine" x="0.0"/>
+        <p id="bass_ftype" x="0.0" c="LP12"/>
+        <p id="bass_fatk" x="0.0"/>
+        <p id="bass_fsus" x="0.0"/>
+        <p id="bass_frel" x="0.0"/>
         <p id="hat_tune" x="0.0"/>
         <p id="hat_dec" x="60.0"/>
         <p id="hat_otune" x="0.0"/>
@@ -326,6 +330,10 @@
         <p id="bass_rel" x="300.0"/>
         <p id="bass_glide" x="80.0"/>
         <p id="bass_fine" x="0.0"/>
+        <p id="bass_ftype" x="0.0" c="LP12"/>
+        <p id="bass_fatk" x="0.0"/>
+        <p id="bass_fsus" x="0.0"/>
+        <p id="bass_frel" x="0.0"/>
         <p id="hat_tune" x="0.0"/>
         <p id="hat_dec" x="60.0"/>
         <p id="hat_otune" x="0.0"/>
@@ -447,6 +455,10 @@
         <p id="bass_rel" x="300.0"/>
         <p id="bass_glide" x="80.0"/>
         <p id="bass_fine" x="0.0"/>
+        <p id="bass_ftype" x="0.0" c="LP12"/>
+        <p id="bass_fatk" x="0.0"/>
+        <p id="bass_fsus" x="0.0"/>
+        <p id="bass_frel" x="0.0"/>
         <p id="hat_tune" x="0.0"/>
         <p id="hat_dec" x="60.0"/>
         <p id="hat_otune" x="0.0"/>
@@ -568,6 +580,10 @@
         <p id="bass_rel" x="300.0"/>
         <p id="bass_glide" x="80.0"/>
         <p id="bass_fine" x="0.0"/>
+        <p id="bass_ftype" x="0.0" c="LP12"/>
+        <p id="bass_fatk" x="0.0"/>
+        <p id="bass_fsus" x="0.0"/>
+        <p id="bass_frel" x="0.0"/>
         <p id="hat_tune" x="0.0"/>
         <p id="hat_dec" x="60.0"/>
         <p id="hat_otune" x="0.0"/>
@@ -689,6 +705,10 @@
         <p id="bass_rel" x="300.0"/>
         <p id="bass_glide" x="80.0"/>
         <p id="bass_fine" x="0.0"/>
+        <p id="bass_ftype" x="0.0" c="LP12"/>
+        <p id="bass_fatk" x="0.0"/>
+        <p id="bass_fsus" x="0.0"/>
+        <p id="bass_frel" x="0.0"/>
         <p id="hat_tune" x="0.0"/>
         <p id="hat_dec" x="60.0"/>
         <p id="hat_otune" x="0.0"/>
@@ -810,6 +830,10 @@
         <p id="bass_rel" x="300.0"/>
         <p id="bass_glide" x="80.0"/>
         <p id="bass_fine" x="0.0"/>
+        <p id="bass_ftype" x="0.0" c="LP12"/>
+        <p id="bass_fatk" x="0.0"/>
+        <p id="bass_fsus" x="0.0"/>
+        <p id="bass_frel" x="0.0"/>
         <p id="hat_tune" x="0.0"/>
         <p id="hat_dec" x="60.0"/>
         <p id="hat_otune" x="0.0"/>
@@ -931,6 +955,10 @@
         <p id="bass_rel" x="300.0"/>
         <p id="bass_glide" x="80.0"/>
         <p id="bass_fine" x="0.0"/>
+        <p id="bass_ftype" x="0.0" c="LP12"/>
+        <p id="bass_fatk" x="0.0"/>
+        <p id="bass_fsus" x="0.0"/>
+        <p id="bass_frel" x="0.0"/>
         <p id="hat_tune" x="0.0"/>
         <p id="hat_dec" x="60.0"/>
         <p id="hat_otune" x="0.0"/>
@@ -1052,6 +1080,10 @@
         <p id="bass_rel" x="300.0"/>
         <p id="bass_glide" x="80.0"/>
         <p id="bass_fine" x="0.0"/>
+        <p id="bass_ftype" x="0.0" c="LP12"/>
+        <p id="bass_fatk" x="0.0"/>
+        <p id="bass_fsus" x="0.0"/>
+        <p id="bass_frel" x="0.0"/>
         <p id="hat_tune" x="0.0"/>
         <p id="hat_dec" x="60.0"/>
         <p id="hat_otune" x="0.0"/>

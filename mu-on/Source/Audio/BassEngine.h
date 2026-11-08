@@ -38,8 +38,14 @@ public:
     // (the default is so long that a note with no gate, e.g. a direct trigger, is unaffected); glideMs the slide time of a tied note.
     void setParams(float rootHz, int wave_, float sub_, float cutHz, float res,
                    float env_, float edecMs, float atkMs, float decMs, float sus_, float drv,
-                   float relMs = 5000.0f, float glideMs = 0.0f)
+                   float relMs = 5000.0f, float glideMs = 0.0f, float fatkMs = 0.0f, float fsus_ = 0.0f, float frelMs = 0.0f, int filterType = 0)
     {
+        // The filter's type and the rest of its envelope (attack, sustain level, release). With none set (attack 0, sustain 0,
+        // release 0) the envelope is the old one: an instant open that decays on over E.Dec, whatever the gate does.
+        filter.setType(filterType);
+        fAtkSamples = fatkMs < 0.1f ? 0.0f : fatkMs * 0.001f * (float) sampleRate;
+        fSustain    = juce::jlimit(0.0f, 1.0f, fsus_);
+        fRelSamples = frelMs < 1.0f ? 0.0f : frelMs * 0.001f * (float) sampleRate;
         relMul    = std::exp(-1.0f / juce::jmax(1.0f, relMs * 0.001f * (float) sampleRate));
         glideCoef = glideMs < 1.0f ? 0.0f : 1.0f - std::exp(-3.0f / (glideMs * 0.001f * (float) sampleRate));
         rootFreq = juce::jmax(10.0f, rootHz);
@@ -65,7 +71,7 @@ public:
     }
 
     // Silence the voice + clear the filter ring immediately (e.g. transport stop).
-    void reset() noexcept { carry = lastGain = 0.0f; active = false; restart = false; releasing = false; gliding = false; gateLeft = 0; filter.reset(); }
+    void reset() noexcept { feHold = feAtRelease = relT = 0.0f; carry = lastGain = 0.0f; active = false; restart = false; releasing = false; gliding = false; gateLeft = 0; filter.reset(); }
 
     // The filter's drive smoothing back to where prepare() leaves it (0), so the next block ramps the drive in
     // as a freshly prepared engine's does (a track arriving in another slot). Allocation-free.
@@ -78,8 +84,24 @@ public:
         // Block-rate filter envelope: cutoff sweeps from base+depth down to base. On the
         // block a trigger lands, t resets to 0 mid-loop — use 0 here too so the filter
         // envelope opens on the onset block instead of reading the previous block's t.
-        const float envT   = (restart && ! (pendingTied && active)) ? 0.0f : t;   // a tied step does not reopen the filter
-        const float fEnv   = (active || restart) ? std::exp(-envT * filterEnvInv) : 0.0f;
+        // The filter envelope: opens over its attack, falls to its sustain level over the decay, and after the gate falls away over
+        // its release (a release of 0 keeps the decay going). A tied step does not reopen it.
+        float fEnv = 0.0f;
+        if (active || restart)
+        {
+            if (releasing && ! restart && fRelSamples > 0.0f)
+            {
+                fEnv = feAtRelease * std::exp(-relT / fRelSamples);   // from where it was when the gate ended
+                relT += (float) n;
+            }
+            else
+            {
+                const float envT = (restart && ! (pendingTied && active)) ? 0.0f : t;
+                fEnv = envT < fAtkSamples ? envT / fAtkSamples
+                                          : fSustain + (1.0f - fSustain) * std::exp(-(envT - fAtkSamples) * filterEnvInv);
+                feHold = fEnv;
+            }
+        }
         const float cutoff = juce::jlimit(20.0f, (float) sampleRate * 0.45f,
                                           baseCut + fEnv * envDepth * 6000.0f);
         filter.setCutoff(cutoff);
@@ -130,7 +152,7 @@ public:
                 if (t < attackSamples()) amp = t * atkInv;
                 else                     amp = sustain + (1.0f - sustain) * decayEnv.next();   // decay starts after the attack
                 // Gate: when the held time is up the note releases (its level falls by the Release time).
-                if (gateLeft > 0 && --gateLeft == 0) releasing = true;
+                if (gateLeft > 0 && --gateLeft == 0) { releasing = true; feAtRelease = feHold; relT = 0.0f; }
                 if (releasing) relGain *= relMul;
                 amp *= vel * relGain;
 
@@ -174,6 +196,7 @@ private:
     float  filterEnvInv = 0.004f, atkInv = 0.2f, sustain = 0.0f;
     mu_core::ExpDecay decayEnv;   // amp decay toward the sustain floor
     float  phase = 0.0f, subPhase = 0.0f, t = 0.0f, amp = 0.0f, vel = 1.0f, pendingVel = 1.0f;
+    float  fAtkSamples = 0.0f, fSustain = 0.0f, fRelSamples = 0.0f, feHold = 0.0f, feAtRelease = 0.0f, relT = 0.0f;   // the filter envelope's attack, sustain, release and where it stood
     float  carry = 0.0f, lastGain = 0.0f, carryMul = 0.99f;   // the previous note's level at a retrigger, fading out under the new one
     int    pendingOnset = 0, pendingGate = 0, gateLeft = 0;
     float  stepMul = 1.0f, pendingMul = 1.0f, velTarget = 1.0f;   // the step's transposition (now, and for the trigger waiting); the level the velocity eases to

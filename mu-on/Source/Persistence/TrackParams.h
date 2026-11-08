@@ -125,7 +125,7 @@ inline int  bassRootMidi(int root) noexcept        { return 28 + ((root % 12) - 
 inline const std::vector<const char*>& engineParamNames(EngineType e)
 {
     static const std::vector<const char*> kKick   { "tune", "ptch", "pdec", "adec", "drive", "fine", "ftype", "fcut", "fres", "fatk", "fdec", "fdep" };
-    static const std::vector<const char*> kBass   { "wave", "sub", "tune", "cut", "res", "env", "edec", "atk", "dec", "sus", "drive", "fine", "rel", "glide" };
+    static const std::vector<const char*> kBass   { "wave", "sub", "tune", "cut", "res", "env", "edec", "atk", "dec", "sus", "drive", "fine", "rel", "glide", "ftype", "fatk", "fsus", "frel" };
     static const std::vector<const char*> kHat    { "tune", "dec", "otune", "odec", "ftype", "fcut", "fres", "fatk", "fdec", "fdep" };
     static const std::vector<const char*> kSnare  { "tune", "dec", "snap", "ftype", "fcut", "fres", "fatk", "fdec", "fdep" };
     static const std::vector<const char*> kRumble { "drive", "d1", "d2", "d3", "size", "revmix", "revlp", "cut", "res", "inlp", "fb", "fbfilt" };

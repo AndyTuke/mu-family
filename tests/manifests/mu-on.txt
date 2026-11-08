@@ -3,7 +3,7 @@
 product=mu-on
 layers_at_start=1
 max_layers=8
-param_count=977
+param_count=1009
 ---
 ch0_lvl | float | 0 | 1 | 0.001 | 1 | 1 | 1
 ch0_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
@@ -189,7 +189,11 @@ t0_bass_dec | float | 20 | 1500 | 1 | 0.328998 | 200 | 0.5
 t0_bass_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t0_bass_edec | float | 10 | 1000 | 1 | 0.289065 | 180 | 0.600913
 t0_bass_env | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
+t0_bass_fatk | float | 0 | 2000 | 0.1 | 0.177184 | 0 | 0
 t0_bass_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t0_bass_frel | float | 0 | 2000 | 1 | 0.267597 | 0 | 0
+t0_bass_fsus | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t0_bass_ftype | choice(16) | 0 | 15 | 1 | 1 | 0 | 0
 t0_bass_glide | float | 0 | 500 | 1 | 0.378235 | 80 | 0.5
 t0_bass_rel | float | 5 | 2000 | 1 | 0.264392 | 300 | 0.603285
 t0_bass_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
@@ -289,7 +293,11 @@ t1_bass_dec | float | 20 | 1500 | 1 | 0.328998 | 200 | 0.5
 t1_bass_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t1_bass_edec | float | 10 | 1000 | 1 | 0.289065 | 180 | 0.600913
 t1_bass_env | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
+t1_bass_fatk | float | 0 | 2000 | 0.1 | 0.177184 | 0 | 0
 t1_bass_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t1_bass_frel | float | 0 | 2000 | 1 | 0.267597 | 0 | 0
+t1_bass_fsus | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t1_bass_ftype | choice(16) | 0 | 15 | 1 | 1 | 0 | 0
 t1_bass_glide | float | 0 | 500 | 1 | 0.378235 | 80 | 0.5
 t1_bass_rel | float | 5 | 2000 | 1 | 0.264392 | 300 | 0.603285
 t1_bass_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
@@ -389,7 +397,11 @@ t2_bass_dec | float | 20 | 1500 | 1 | 0.328998 | 200 | 0.5
 t2_bass_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t2_bass_edec | float | 10 | 1000 | 1 | 0.289065 | 180 | 0.600913
 t2_bass_env | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
+t2_bass_fatk | float | 0 | 2000 | 0.1 | 0.177184 | 0 | 0
 t2_bass_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t2_bass_frel | float | 0 | 2000 | 1 | 0.267597 | 0 | 0
+t2_bass_fsus | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t2_bass_ftype | choice(16) | 0 | 15 | 1 | 1 | 0 | 0
 t2_bass_glide | float | 0 | 500 | 1 | 0.378235 | 80 | 0.5
 t2_bass_rel | float | 5 | 2000 | 1 | 0.264392 | 300 | 0.603285
 t2_bass_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
@@ -489,7 +501,11 @@ t3_bass_dec | float | 20 | 1500 | 1 | 0.328998 | 200 | 0.5
 t3_bass_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t3_bass_edec | float | 10 | 1000 | 1 | 0.289065 | 180 | 0.600913
 t3_bass_env | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
+t3_bass_fatk | float | 0 | 2000 | 0.1 | 0.177184 | 0 | 0
 t3_bass_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t3_bass_frel | float | 0 | 2000 | 1 | 0.267597 | 0 | 0
+t3_bass_fsus | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t3_bass_ftype | choice(16) | 0 | 15 | 1 | 1 | 0 | 0
 t3_bass_glide | float | 0 | 500 | 1 | 0.378235 | 80 | 0.5
 t3_bass_rel | float | 5 | 2000 | 1 | 0.264392 | 300 | 0.603285
 t3_bass_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
@@ -589,7 +605,11 @@ t4_bass_dec | float | 20 | 1500 | 1 | 0.328998 | 200 | 0.5
 t4_bass_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t4_bass_edec | float | 10 | 1000 | 1 | 0.289065 | 180 | 0.600913
 t4_bass_env | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
+t4_bass_fatk | float | 0 | 2000 | 0.1 | 0.177184 | 0 | 0
 t4_bass_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t4_bass_frel | float | 0 | 2000 | 1 | 0.267597 | 0 | 0
+t4_bass_fsus | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t4_bass_ftype | choice(16) | 0 | 15 | 1 | 1 | 0 | 0
 t4_bass_glide | float | 0 | 500 | 1 | 0.378235 | 80 | 0.5
 t4_bass_rel | float | 5 | 2000 | 1 | 0.264392 | 300 | 0.603285
 t4_bass_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
@@ -689,7 +709,11 @@ t5_bass_dec | float | 20 | 1500 | 1 | 0.328998 | 200 | 0.5
 t5_bass_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t5_bass_edec | float | 10 | 1000 | 1 | 0.289065 | 180 | 0.600913
 t5_bass_env | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
+t5_bass_fatk | float | 0 | 2000 | 0.1 | 0.177184 | 0 | 0
 t5_bass_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t5_bass_frel | float | 0 | 2000 | 1 | 0.267597 | 0 | 0
+t5_bass_fsus | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t5_bass_ftype | choice(16) | 0 | 15 | 1 | 1 | 0 | 0
 t5_bass_glide | float | 0 | 500 | 1 | 0.378235 | 80 | 0.5
 t5_bass_rel | float | 5 | 2000 | 1 | 0.264392 | 300 | 0.603285
 t5_bass_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
@@ -789,7 +813,11 @@ t6_bass_dec | float | 20 | 1500 | 1 | 0.328998 | 200 | 0.5
 t6_bass_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t6_bass_edec | float | 10 | 1000 | 1 | 0.289065 | 180 | 0.600913
 t6_bass_env | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
+t6_bass_fatk | float | 0 | 2000 | 0.1 | 0.177184 | 0 | 0
 t6_bass_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t6_bass_frel | float | 0 | 2000 | 1 | 0.267597 | 0 | 0
+t6_bass_fsus | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t6_bass_ftype | choice(16) | 0 | 15 | 1 | 1 | 0 | 0
 t6_bass_glide | float | 0 | 500 | 1 | 0.378235 | 80 | 0.5
 t6_bass_rel | float | 5 | 2000 | 1 | 0.264392 | 300 | 0.603285
 t6_bass_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
@@ -889,7 +917,11 @@ t7_bass_dec | float | 20 | 1500 | 1 | 0.328998 | 200 | 0.5
 t7_bass_drive | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
 t7_bass_edec | float | 10 | 1000 | 1 | 0.289065 | 180 | 0.600913
 t7_bass_env | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
+t7_bass_fatk | float | 0 | 2000 | 0.1 | 0.177184 | 0 | 0
 t7_bass_fine | float | -100 | 100 | 0.1 | 1 | 0 | 0.5
+t7_bass_frel | float | 0 | 2000 | 1 | 0.267597 | 0 | 0
+t7_bass_fsus | float | 0 | 1 | 0.001 | 1 | 0 | 0
+t7_bass_ftype | choice(16) | 0 | 15 | 1 | 1 | 0 | 0
 t7_bass_glide | float | 0 | 500 | 1 | 0.378235 | 80 | 0.5
 t7_bass_rel | float | 5 | 2000 | 1 | 0.264392 | 300 | 0.603285
 t7_bass_res | float | 0 | 1 | 0.001 | 1 | 0.2 | 0.2
@@ -999,11 +1031,11 @@ mst=12
 mstr=3
 ret=24
 rev=10
-t0=100
-t1=100
-t2=100
-t3=100
-t4=100
-t5=100
-t6=100
-t7=100
+t0=104
+t1=104
+t2=104
+t3=104
+t4=104
+t5=104
+t6=104
+t7=104

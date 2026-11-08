@@ -161,7 +161,7 @@ private:
     mu_core::ParamBinding engineRow, sourceRow, bassWaveRow, algoRow, chordWaveRow, swingRow, accentRow, ghostRow;
     // The Kick / Bass Fine offsets (cents) and the master key and scale their tune is locked to. The key and scale are the
     // host's: a host without them (unbound) leaves the lock at C chromatic.
-    mu_core::ParamBinding kickFineRow, bassFineRow, rootRow, scaleRow;
+    mu_core::ParamBinding kickFineRow, bassFineRow, bassFilterTypeRow, rootRow, scaleRow;
     // The drum and percussion filter (not modulation targets): per engine its type, cutoff and resonance rows, and the filter.
     std::array<mu_core::ParamBinding, kNumEngineTypes> filterTypeRow, filterCutRow;   // type (a choice) and a "is a drum engine" mark
     float filterNow[5] { 20000.0f, 0.2f, 0.5f, 150.0f, 0.0f };   // this block's resolved cutoff, resonance, env attack, decay and depth

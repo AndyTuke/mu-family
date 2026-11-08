@@ -71,16 +71,15 @@ namespace
             }
             case EngineType::Bass:
             {
-                // Row 1: the oscillator (with its Glide) and the filter (with the Drive); row 2: the amp envelope. Each group's
-                // space is shared out across the panel.
+                // The oscillator and the amp: row 1 the wave, Tune, Fine, Sub and Glide; row 2 the amp envelope. The filter (with the
+                // Drive and its own envelope) has a section of its own, filterSpecsFor. No pitch envelope.
                 std::vector<Spec> specs { { id("wave"), "Wave" }, { id("tune"), "Tune" }, { id("fine"), "Fine" }, { id("sub"), "Sub" }, { id("glide"), "Glide" },
-                                          { id("cut"), "Cutoff" }, { id("res"), "Reso" }, { id("env"), "F.Env" }, { id("edec"), "E.Dec" }, { id("drive"), "Drive" },
                                           { id("atk"), "Atk" }, { id("dec"), "Dec" }, { id("sus"), "Sus" }, { id("rel"), "Rel" } };
-                specs[0].groupStart = specs[5].groupStart = specs[10].groupStart = true;
-                specs[10].newRow = true;
+                specs[0].groupStart = specs[5].groupStart = true;
+                specs[5].newRow = true;
                 specs[4].tooltip = "Slide time into a tied step (drag across two steps to tie them)";
-                const char* const names[] = { "Bass Wave", "Bass Tune", "Bass Fine Tune", "Bass Sub", "Bass Glide", "Bass Filter Cutoff", "Bass Filter Resonance",
-                                              "Bass Filter Envelope", "Bass Filter Env Decay", "Bass Drive", "Bass Amp Attack", "Bass Amp Decay", "Bass Amp Sustain", "Bass Amp Release" };
+                const char* const names[] = { "Bass Wave", "Bass Tune", "Bass Fine Tune", "Bass Sub", "Bass Glide",
+                                              "Bass Amp Attack", "Bass Amp Decay", "Bass Amp Sustain", "Bass Amp Release" };
                 for (size_t i = 0; i < specs.size(); ++i) specs[i].statusName = names[i];
                 return specs;
             }
@@ -149,6 +148,24 @@ namespace
             Spec dep { cid("env"), "Depth" };   dep.statusName = "Chord Filter Env Depth";    dep.small = true;
             dep.tooltip = "How far the filter envelope opens the cutoff on each chord";
             return { std::move(cut), std::move(res), std::move(drv), std::move(atk), std::move(dec), std::move(sus), std::move(rel), std::move(dep) };
+        }
+        if (engine == EngineType::Bass)
+        {
+            // The Bass filter: the type (any of the family's sixteen), Cutoff, Reso and Drive, then its envelope: Atk, Dec, Sus, Rel and Depth.
+            auto bid = [&](const char* p) { return engineParamId(track, engine, p); };
+            Spec type { bid("ftype"), "Type" };  type.statusName = "Bass Filter Type";
+            type.tooltip = "Any of the family's sixteen filters";
+            Spec cut { bid("cut"), "Cutoff" };   cut.statusName = "Bass Filter Cutoff";
+            Spec res { bid("res"), "Reso" };     res.statusName = "Bass Filter Resonance";
+            Spec drv { bid("drive"), "Drive" };  drv.statusName = "Bass Drive";
+            Spec atk { bid("fatk"), "Atk" };     atk.statusName = "Bass Filter Env Attack";   atk.newRow = true;  atk.small = true;
+            Spec dec { bid("edec"), "Dec" };     dec.statusName = "Bass Filter Env Decay";    dec.small = true;
+            Spec sus { bid("fsus"), "Sus" };     sus.statusName = "Bass Filter Env Sustain";  sus.small = true;
+            Spec rel { bid("frel"), "Rel" };     rel.statusName = "Bass Filter Env Release";  rel.small = true;
+            rel.tooltip = "0 keeps the envelope decaying after the note ends";
+            Spec dep { bid("env"), "Depth" };    dep.statusName = "Bass Filter Env Depth";    dep.small = true;
+            dep.tooltip = "How far the filter envelope opens the cutoff on each note";
+            return { std::move(type), std::move(cut), std::move(res), std::move(drv), std::move(atk), std::move(dec), std::move(sus), std::move(rel), std::move(dep) };
         }
         const char* name = engine == EngineType::Kick ? "Kick" : engine == EngineType::Hat ? "Hat" : engine == EngineType::Snare ? "Snare"
                          : engine == EngineType::FmPerc ? "FM Perc" : nullptr;
@@ -940,7 +957,7 @@ void TrackContent::paint(juce::Graphics& g)
     std::vector<MuLookAndFeel::Section> sections;
     if (! engineBoxR.isEmpty()) sections.push_back({ engineBoxR, locked ? juce::String("SOURCE") : juce::String("ENGINE") });
     if (! keyBoxR.isEmpty()) sections.push_back({ keyBoxR, "KEY" });
-    sections.push_back({ voiceBoxR, name + " VOICE" });
+    sections.push_back({ voiceBoxR, shownEngine == EngineType::Bass ? juce::String("OSC / AMP") : name + " VOICE" });   // the Bass voice is its oscillator and amp: its filter has a box of its own
     if (! filterBoxR.isEmpty()) sections.push_back({ filterBoxR, "FILTER" });
     sections.push_back({ insertBoxR, "INSERT" });
     sections.push_back({ grooveBoxR, rumble ? juce::String("ENVELOPE") : juce::String("LAYER") });

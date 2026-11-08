@@ -63,7 +63,7 @@ inline constexpr ModDestEntry kKickDests[] = {
 };
 
 // Bass — order matches BassEngine::setParams(rootHz, [wave], sub, cutHz, res, env,
-// edecMs, atkMs, decMs, sus, drv, relMs, glideMs). Wave is a choice param — not modulatable, omitted.
+// edecMs, atkMs, decMs, sus, drv, relMs, glideMs, fatkMs, fsus, frelMs). Wave and the filter type are choice params — not modulatable, omitted.
 inline constexpr ModDestEntry kBassDests[] = {
     makeTarget("b.tune.prop", "bass_tune", "Tune", "Bass"),
     makeTarget("b.sub.prop", "bass_sub", "Sub", "Bass"),
@@ -77,6 +77,9 @@ inline constexpr ModDestEntry kBassDests[] = {
     makeTarget("b.drive.prop", "bass_drive", "Drive", "Bass"),
     makeTarget("b.rel.prop", "bass_rel", "Release", "Bass"),     // appended last: saved destination indices stay valid
     makeTarget("b.glide.prop", "bass_glide", "Glide", "Bass"),
+    makeTarget("b.fatk.prop", "bass_fatk", "Filter Attack", "Bass"),    // the filter envelope's attack, sustain and release, appended after Glide
+    makeTarget("b.fsus.prop", "bass_fsus", "Filter Sustain", "Bass"),
+    makeTarget("b.frel.prop", "bass_frel", "Filter Release", "Bass"),
     // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
     // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
     makeTarget("amp.level", "level", "Level", "Amp"),

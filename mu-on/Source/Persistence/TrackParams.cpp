@@ -76,6 +76,12 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     flt(E::Bass, "rel",   "Bass Release",    centred(5.0f, 2000.0f, 1.0f, 150.0f), 300.0f, mu_fmt::Unit::Ms);      // after the step's gate
     flt(E::Bass, "glide", "Bass Glide",      centred(0.0f, 500.0f, 1.0f, 80.0f), 80.0f, mu_fmt::Unit::Ms);       // the slide into a tied step
     flt(E::Bass, "fine",  "Bass Fine",       f(-100.0f, 100.0f, 0.1f), 0.0f, mu_fmt::Unit::Cents);   // cents off the locked note (not a modulation target)
+    // The filter's type (any of the family's sixteen) and the rest of its envelope: attack, sustain level and release. The defaults
+    // (no attack, sustain 0, release 0 = follow the decay) leave a Bass from before these existed sounding as it did.
+    layout.add(std::make_unique<AudioParameterChoice>(id(E::Bass, "ftype"), lbl + "Bass Filter Type", familyFilterTypes(), 0));
+    flt(E::Bass, "fatk",  "Bass Filter Env Attack",  centred(0.0f, 2000.0f, 0.1f, 40.0f), 0.0f, mu_fmt::Unit::Ms);
+    flt(E::Bass, "fsus",  "Bass Filter Env Sustain", f(0.0f, 1.0f, 0.001f), 0.0f, mu_fmt::Unit::Percent01);
+    flt(E::Bass, "frel",  "Bass Filter Env Release", centred(0.0f, 2000.0f, 1.0f, 150.0f), 0.0f, mu_fmt::Unit::Ms);   // 0: the envelope keeps decaying after the gate
 
     // Hat / Snare (sample engines, different defaults)
     flt(E::Hat,   "tune", "Hat Tune",    f(-12.0f, 12.0f, 0.1f), 0.0f, mu_fmt::Unit::Semitones);

@@ -29,6 +29,7 @@ struct TuneLock
     int   root  = 0;
     int   scale = mu_audio::kNumScales - 1;
     float kickFineCents = 0.0f, bassFineCents = 0.0f;
+    int   bassFilterType = 0;   // the Bass filter's type choice (a choice, so not in the target table)
 
     // `hz` snapped to the nearest note of the key and scale, then moved by `fineCents`.
     float lockedHz(float hz, float fineCents) const noexcept
@@ -100,7 +101,7 @@ public:
     void setParams(const float* p, int engineChoice, double bpm, float rumbleEnvLevel, const TuneLock& lock = {}) noexcept
     {
         if (auto* k = std::get_if<KickEngine>(&engine))         k->setParams(lock.lockedHz(p[0], lock.kickFineCents), p[1], p[2], p[3], p[4]);
-        else if (auto* b = std::get_if<BassEngine>(&engine))    b->setParams(lock.lockedBassHz(p[0], lock.bassFineCents), engineChoice, p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11]);
+        else if (auto* b = std::get_if<BassEngine>(&engine))    b->setParams(lock.lockedBassHz(p[0], lock.bassFineCents), engineChoice, p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], lock.bassFilterType);
         else if (auto* s = std::get_if<SampleChannel>(&engine)) s->setParams(p[0], p[1], p[2], p[3]);   // the Hat's open pair follows the closed pair; a Snare ignores it
         else if (auto* r = std::get_if<RumbleEngine>(&engine))
         {

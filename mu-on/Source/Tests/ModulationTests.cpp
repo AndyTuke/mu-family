@@ -83,8 +83,8 @@ public:
             // dispatch). An insert/reorder/delete in any one would re-route modulation to the
             // wrong engine param with no other failure - so pin the full ordered id list per
             // engine here. If a dest is added, update BOTH this list and the engine dispatch.
-            // Counts equal each engine's modulatable arity plus Level, Pan, the 4 insert knobs and the 3 FX sends: Kick 5, Bass 12 (wave choice
-            // omitted), Hat 4, Snare 3, Rumble 10 (bpm transport excluded).
+            // Counts equal each engine's modulatable arity plus Level, Pan, the 4 insert knobs and the 3 FX sends: Kick 5, Bass 15 (wave and filter type
+            // choices omitted), Hat 4, Snare 3, Rumble 10 (bpm transport excluded).
             auto pinLane = [this](EngineType engine, const std::vector<std::string>& engineDests, bool drum = false)
             {
                 // A drum or percussion table has the filter's five rows and the Ghost level before the closing nine.
@@ -104,7 +104,7 @@ public:
             };
             pinLane(EngineType::Kick,   { "k.tune.prop", "k.ptch.prop", "k.pdec.prop", "k.adec.prop", "k.drive.prop" }, true);
             pinLane(EngineType::Bass,   { "b.tune.prop", "b.sub.prop", "b.cut.prop", "b.res.prop", "b.env.prop",
-                              "b.edec.prop", "b.atk.prop", "b.dec.prop", "b.sus.prop", "b.drive.prop", "b.rel.prop", "b.glide.prop" });
+                              "b.edec.prop", "b.atk.prop", "b.dec.prop", "b.sus.prop", "b.drive.prop", "b.rel.prop", "b.glide.prop", "b.fatk.prop", "b.fsus.prop", "b.frel.prop" });
             pinLane(EngineType::Hat,    { "h.tune.prop", "h.dec.prop", "h.otune.prop", "h.odec.prop" }, true);
             pinLane(EngineType::Snare,  { "s.tune.prop", "s.dec.prop", "s.snap.prop" }, true);
             pinLane(EngineType::Rumble, { "r.drive.prop", "r.d1.prop", "r.d2.prop", "r.d3.prop", "r.size.prop",

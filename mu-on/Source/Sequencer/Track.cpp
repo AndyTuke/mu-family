@@ -150,6 +150,7 @@ void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
     chordWaveRow = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::Chord, "wave")), this);   // a choice, not a target
     kickFineRow = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::Kick, "fine")), this);   // not targets
     bassFineRow = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::Bass, "fine")), this);
+    bassFilterTypeRow = mu_core::ParamBinding(apvts.getRawParameterValue(engineParamId(s, EngineType::Bass, "ftype")), this);   // a choice, not a target
     rootRow     = mu_core::ParamBinding(apvts.getRawParameterValue(kRootParamId), this);    // global; null where the host has none
     scaleRow    = mu_core::ParamBinding(apvts.getRawParameterValue(kScaleParamId), this);
     insAlgoRow  = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "drvChar")), this);
@@ -498,6 +499,7 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
     if (scaleRow.isBound()) lock.scale = mu_audio::clampScaleIndex(juce::roundToInt(scaleRow.load(0.0f)));
     lock.kickFineCents = kickFineRow.load(0.0f);
     lock.bassFineCents = bassFineRow.load(0.0f);
+    lock.bassFilterType = juce::roundToInt(bassFilterTypeRow.load(0.0f));
     eng->setParams(p, engineChoice, ctx.bpm, rumble ? evaluateRumbleEnv(ctx.startBeat) : 1.0f, lock);
 
     // Phase 3: the stop edge silences the voice after the block's parameters are in (a sustaining bass has no
