@@ -62,6 +62,15 @@ public:
     // Never draw bigger than this size index: two grids side by side take the larger of their fitIndex so their knobs match.
     void setMinSizeIndex(int index) { if (index != minSizeIndex) { minSizeIndex = index; resized(); } }
 
+    // Where control `index` (in spec order) sits, in the grid's own coordinates; empty if there is none. For a decoration drawn
+    // beside the controls (a line joining two knobs).
+    juce::Rectangle<int> getControlBounds(int index) const
+    {
+        if (index < 0 || index >= (int) controls.size()) return {};
+        const auto& c = *controls[(size_t) index];
+        return c.knob != nullptr ? c.knob->getBounds() : c.combo != nullptr ? c.combo->getBounds() : juce::Rectangle<int>();
+    }
+
     // The width (pixels) the controls need on a single row — a selector takes two cells.
     int getPreferredWidth() const;
 

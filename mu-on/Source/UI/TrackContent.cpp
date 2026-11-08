@@ -224,6 +224,14 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     addChildComponent(sourceSelect);
     sourceCaption.setVisible(false);
     addAndMakeVisible(grid);
+    // The Hat's tune link: the lamp under the two tune knobs. Its state is a Hat parameter (saved with the layer).
+    tuneLink.isOn = [this] { const auto* v = host.getTrackParameters().getRawParameterValue(engineParamId(currentLayer, EngineType::Hat, "tlink")); return v != nullptr && v->load() > 0.5f; };
+    tuneLink.setOn = [this](bool on)
+    {
+        if (auto* p = host.getTrackParameters().getParameter(engineParamId(currentLayer, EngineType::Hat, "tlink")))
+            p->setValueNotifyingHost(on ? 1.0f : 0.0f);
+    };
+    addChildComponent(tuneLink);
     grid.onStatusUpdate = [this](const juce::String& name, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
     addAndMakeVisible(filterGrid);
     filterGrid.onStatusUpdate = grid.onStatusUpdate;
@@ -256,7 +264,7 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     addAndMakeVisible(ghostKnob);
     for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob, &levelKnob }) addAndMakeVisible(*k);
     // The STEP panel's controls edit the selected step of the shown track's row.
-    for (auto* cap : { &repeatCaption, &rateCaption, &condCaption, &barsCaption, &lengthCaption, &voiceCaption, &octaveCaption, &noteCaption, &chordCaption })
+    for (auto* cap : { &repeatCaption, &rateCaption, &condCaption, &barsCaption, &lengthCaption, &fadeCaption, &octaveCaption, &noteCaption, &chordCaption })
     {
         cap->setJustificationType(juce::Justification::centred);
         cap->setInterceptsMouseClicks(false, false);
@@ -272,12 +280,25 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     stepLevelKnob.getSlider().setTextValueSuffix(" %");
     stepLevelKnob.onValueChanged = [this](double v) { host.getTrack(currentLayer).row.setStepLevel(selectedStepOf[(size_t) currentLayer], juce::roundToInt(v)); };
     stepLevelKnob.onStatusUpdate = [this](const juce::String&, const juce::String& value) { if (onStatusUpdate) onStatusUpdate("Step Level", value); };
-    stepFadeKnob.setRange(-100.0, 100.0, 1.0);
-    stepFadeKnob.getSlider().setTextValueSuffix(" %");
-    stepFadeKnob.onValueChanged = [this](double v) { host.getTrack(currentLayer).row.setStepRepeatFade(selectedStepOf[(size_t) currentLayer], juce::roundToInt(v)); };
-    stepFadeKnob.onStatusUpdate = [this](const juce::String&, const juce::String& value) { if (onStatusUpdate) onStatusUpdate("Step Repeat Fade", value); };
     addChildComponent(stepLevelKnob);
-    addChildComponent(stepFadeKnob);
+    // The fade across the repeats is picked from preset curves, each drawn as the levels of five hits (louder or quieter along the run).
+    static constexpr int kFadePresets[5] = { 0, -50, -100, 50, 100 };
+    static const char* const kFadeNames[5] = { "Flat", "Out 50", "Out", "In 50", "In" };
+    for (int i = 0; i < 5; ++i) fadeSelect.addItem(kFadeNames[i], i + 1);
+    fadeSelect.setStatusName("Step Repeat Fade");
+    fadeSelect.setItemGlyph([](juce::Graphics& g, juce::Rectangle<float> area, int id, juce::Colour colour)
+    {
+        g.setColour(colour);
+        const float barW = area.getWidth() / 8.0f;
+        for (int k = 0; k < 5; ++k)
+        {
+            const float level = juce::jmax(0.12f, step_repeats::gain(k, 4, kFadePresets[juce::jlimit(0, 4, id - 1)]));
+            const float h = area.getHeight() * level;
+            g.fillRect(area.getX() + k * barW * 1.6f, area.getBottom() - h, barW, h);
+        }
+    });
+    fadeSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setStepRepeatFade(selectedStepOf[(size_t) currentLayer], kFadePresets[juce::jlimit(1, 5, id) - 1]); };
+    addChildComponent(fadeSelect);
     for (int n = 0; n <= step_repeats::kMaxRepeats; ++n) repeatSelect.addItem(juce::String(n), n + 1);
     repeatSelect.setStatusName("Step Repeats");
     repeatSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setStepRepeats(selectedStepOf[(size_t) currentLayer], id - 1); };
@@ -326,16 +347,12 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
         const int bit = 1 << (bar - 1);
         row.setStepLoopBars(step, on ? (row.stepLoopBars(step) | bit) : (row.stepLoopBars(step) & ~bit));
     };
-    voiceSelect.addItem("Closed", 1);
-    voiceSelect.addItem("Open", 2);
-    voiceSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setOpen(selectedStepOf[(size_t) currentLayer], id == 2); if (onStatusUpdate) onStatusUpdate("Step Sound", voiceSelect.getText()); };
     for (int o = -2; o <= 2; ++o) octaveSelect.addItem((o > 0 ? "+" : "") + juce::String(o), o + 3);
     octaveSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setStepOctave(selectedStepOf[(size_t) currentLayer], id - 3); refreshNoteItems(); if (onStatusUpdate) onStatusUpdate("Step Octave", octaveSelect.getText()); };
     noteSelect.onChange   = [this](int id) { host.getTrack(currentLayer).row.setStepNote(selectedStepOf[(size_t) currentLayer], id - 13); if (onStatusUpdate) onStatusUpdate("Step Note", noteSelect.getText()); };
     addAndMakeVisible(condSelect);
     addAndMakeVisible(barsSelect);
     addAndMakeVisible(lengthSelect);
-    addChildComponent(voiceSelect);
     addChildComponent(octaveSelect);
     addChildComponent(noteSelect);
     for (int i = 0; i < kNumChords; ++i) chordSelect.addItem(kChords[(size_t) i].name, i + 1);
@@ -537,19 +554,20 @@ void TrackContent::refreshStepPanel()
     const int step = selected;
     stepProbKnob.setValue(row.stepProb(step), juce::dontSendNotification);
     stepLevelKnob.setValue(row.stepLevel(step), juce::dontSendNotification);
-    stepFadeKnob.setValue(row.stepRepeatFade(step), juce::dontSendNotification);
+    {   // the preset curve nearest the step's fade
+        static constexpr int presets[5] = { 0, -50, -100, 50, 100 };
+        int nearest = 0;
+        for (int i = 1; i < 5; ++i) if (std::abs(presets[i] - row.stepRepeatFade(step)) < std::abs(presets[nearest] - row.stepRepeatFade(step))) nearest = i;
+        fadeSelect.setSelectedId(nearest + 1, false);
+    }
     repeatSelect.setSelectedId(row.stepRepeats(step) + 1, false);
     rateSelect.setSelectedId(row.stepRepeatRate(step) + 1, false);
     condSelect.setSelectedId(row.stepCondition(step) + 1, false);
     lengthSelect.setSelectedId(row.stepLoopLength(step), false);
     refreshBarsSelect(row, step);
-    const bool hat = shownEngine == EngineType::Hat;
-    voiceCaption.setVisible(hat);
-    voiceSelect.setVisible(hat);
-    voiceSelect.setSelectedId(row.isOpen(step) ? 2 : 1, false);
     const bool chordEng = shownEngine == EngineType::Chord;
     // Level and the repeats are for every engine but a Chord (its column has no room) and a Rumble (it has no steps).
-    for (auto* c : { (juce::Component*) &stepLevelKnob, (juce::Component*) &stepFadeKnob, (juce::Component*) &repeatCaption, (juce::Component*) &repeatSelect,
+    for (auto* c : { (juce::Component*) &stepLevelKnob, (juce::Component*) &fadeCaption, (juce::Component*) &fadeSelect, (juce::Component*) &repeatCaption, (juce::Component*) &repeatSelect,
                      (juce::Component*) &rateCaption, (juce::Component*) &rateSelect })
         c->setVisible(! chordEng && shownEngine != EngineType::Rumble);
     const bool pitched = shownEngine == EngineType::Kick || shownEngine == EngineType::Bass || chordEng;
@@ -685,6 +703,22 @@ void TrackContent::sourceChosen(int id)
     if (id > 0) setParamPlain(host.getTrackParameters(), layerParamId(currentLayer, "src"), (float) (id - 1));
 }
 
+// While the Hat's tune link is on, turning one of the two tunes turns the other by the same amount (knob, automation or preset alike).
+void TrackContent::followTuneLink()
+{
+    auto& apvts = host.getTrackParameters();
+    auto* tune  = apvts.getParameter(engineParamId(currentLayer, EngineType::Hat, "tune"));
+    auto* otune = apvts.getParameter(engineParamId(currentLayer, EngineType::Hat, "otune"));
+    if (tune == nullptr || otune == nullptr) return;
+    const float a = tune->convertFrom0to1(tune->getValue()), b = otune->convertFrom0to1(otune->getValue());
+    if (linkedLayer != currentLayer || ! tuneLink.isOn()) { linkedLayer = currentLayer; linkedTune[0] = a; linkedTune[1] = b; return; }
+    const float da = a - linkedTune[0], db = b - linkedTune[1];
+    if (da != 0.0f && db == 0.0f)       otune->setValueNotifyingHost(otune->convertTo0to1(juce::jlimit(-12.0f, 12.0f, b + da)));
+    else if (db != 0.0f && da == 0.0f)  tune->setValueNotifyingHost(tune->convertTo0to1(juce::jlimit(-12.0f, 12.0f, a + db)));
+    linkedTune[0] = tune->convertFrom0to1(tune->getValue());
+    linkedTune[1] = otune->convertFrom0to1(otune->getValue());
+}
+
 void TrackContent::timerCallback()
 {
     if (currentLayer >= host.getTrackCount()) return;   // between a delete and the editor reselecting
@@ -696,6 +730,7 @@ void TrackContent::timerCallback()
         if (onEngineChanged) onEngineChanged();
         return;
     }
+    if (shownEngine == EngineType::Hat) followTuneLink();
     // The Note list follows the tune, key and scale (a knob, automation or a preset moves them).
     if (shownEngine == EngineType::Kick || shownEngine == EngineType::Bass)
     {
@@ -806,6 +841,16 @@ void TrackContent::resized()
     grid.setMinSizeIndex(0);
     filterGrid.setMinSizeIndex(0);
     grid.setBounds(voiceBoxR.reduced(clear, s(LF::kSpaceS)));
+    {   // The Hat's link joins the Closed Tune (the first knob) and the Open Tune (the third) from below.
+        const auto a = grid.getControlBounds(0), b = grid.getControlBounds(2);
+        const bool show = shownEngine == EngineType::Hat && ! a.isEmpty() && ! b.isEmpty();
+        tuneLink.setVisible(show);
+        if (show)
+        {
+            const int top = a.getY() + s(LF::kKnobSize2H) + s(4);   // just under the knob itself (its component runs on below)
+            tuneLink.setBounds(a.getCentreX() + grid.getX(), top + grid.getY(), b.getCentreX() - a.getCentreX(), s(16));
+        }
+    }
     filterGrid.setBounds(filterBoxR.reduced(clear, s(LF::kSpaceS)));
     // The two grids draw their knobs at one size: the smaller either needs to fit.
     const int knobSize = juce::jmax(grid.fitIndex(), hasFilter ? filterGrid.fitIndex() : 0);
@@ -890,16 +935,15 @@ void TrackContent::layoutStepPanel()
         y += labelH + s(2) + dd + gap;
     };
     // The step's loop takes one row: Bars (the wider, it lists the ticked bars) beside Length.
-    auto placePair = [&](juce::Label& capA, DropdownSelect& selA, juce::Label& capB, DropdownSelect& selB, juce::Rectangle<int> column, int& y)
+    auto placePair = [&](juce::Label& capA, DropdownSelect& selA, juce::Label& capB, DropdownSelect& selB, juce::Rectangle<int> column, int& y, int aPercent = 55)
     {
         const int pairGap = gap;
-        const int aW = (column.getWidth() - pairGap) * 11 / 20;
+        const int aW = (column.getWidth() - pairGap) * aPercent / 100;
         int yB = y;
         placeDropdown(capA, selA, column.withWidth(aW), y);
         placeDropdown(capB, selB, column.withTrimmedLeft(aW + pairGap), yB);
     };
     auto placeLoopPair = [&](juce::Rectangle<int> column, int& y) { placePair(barsCaption, barsSelect, lengthCaption, lengthSelect, column, y); };
-    auto placeRepeatPair = [&](juce::Rectangle<int> column, int& y) { placePair(repeatCaption, repeatSelect, rateCaption, rateSelect, column, y); };
 
     // A Chord step has two columns: the Root, Octave, Chord and Play lists, then the Probability, Inversion and Spread knobs.
     if (shownEngine == EngineType::Chord)
@@ -921,24 +965,28 @@ void TrackContent::layoutStepPanel()
         return;
     }
 
-    // Every other engine: the lists on the left (the loop, the repeats, then a Hat's Sound or a Kick or Bass step's Octave and
-    // Note, then the Condition), the Prob, Level and Fade knobs in the column beside them.
-    auto left = in.withWidth(s(LF::kDropdownW));
-    const int knobX = left.getRight() + gap;
+    // Every other engine, across the whole box: Prob and Level on the top row; Bars and Length; Repeat, Rate and Fade (they work
+    // together); the Condition; then a Kick or Bass step's Octave and Note.
+    const int knobW = s(LF::kKnobSize2W);
     int y = in.getY();
-    placeLoopPair(left, y);
-    placeRepeatPair(left, y);
-    int yHat = y;
-    placeDropdown(voiceCaption, voiceSelect, left, yHat);
-    placeDropdown(octaveCaption, octaveSelect, left, y);
-    placeDropdown(noteCaption, noteSelect, left, y);
-    placeDropdown(condCaption, condSelect, left, y);
-    int ky = in.getY();
-    for (auto* k : { &stepProbKnob, &stepLevelKnob, &stepFadeKnob })
     {
-        k->setBounds(knobX, ky, s(LF::kKnobSize2W), knobH);
-        ky += knobH + gap;
+        const int pairW = 2 * knobW + gap;
+        const int x0 = in.getX() + (in.getWidth() - pairW) / 2;
+        stepProbKnob.setBounds(x0, y, knobW, knobH);
+        stepLevelKnob.setBounds(x0 + knobW + gap, y, knobW, knobH);
+        y += knobH + gap;
     }
+    placeLoopPair(in, y);
+    {
+        const int third = (in.getWidth() - 2 * gap) / 3;
+        int yRate = y, yFade = y;
+        const int x2 = in.getX() + third + gap, x3 = in.getX() + 2 * (third + gap);
+        placeDropdown(repeatCaption, repeatSelect, in.withWidth(third), y);
+        placeDropdown(rateCaption, rateSelect, juce::Rectangle<int>(x2, in.getY(), third, in.getHeight()), yRate);
+        placeDropdown(fadeCaption, fadeSelect, juce::Rectangle<int>(x3, in.getY(), in.getRight() - x3, in.getHeight()), yFade);
+    }
+    placeDropdown(condCaption, condSelect, in, y);
+    placePair(octaveCaption, octaveSelect, noteCaption, noteSelect, in, y, 38);
 }
 
 void TrackContent::paint(juce::Graphics& g)

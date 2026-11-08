@@ -78,6 +78,30 @@ Run multiple μ-family standalones and have them share a clock + summing bus for
 
 ---
 
+### 🟢 mu-On sequencer: what other machines offer (researched 2026-11-08)
+
+Andy asked what other sequencers have. This is the field, taken from the Elektron machines (Digitakt, Analog Rytm, Octatrack), Polyend Tracker, Torso T-1, Drambo and the Ableton-side tools, with what mu-On already has and a suggested order. Nothing here is scheduled; Andy picks.
+
+**Already in mu-On (after 2026-11-08):** per-step probability, loop conditions (Bars and Length, the A:B idea), Fill / Pre / !Pre conditions with a momentary Fill button, per-step Level, repeats with a Rate and a Fade (Elektron's retrig), per-track step length and paging (polymeter), ties and glide, accent and ghost steps, swing.
+
+**Worth considering, in the order I would do them**
+1. **Parameter locks (per-step knob values).** The feature people name first on Elektron machines: hold a step and turn a knob, and that step plays with that value (a filter cutoff, a decay, a tune). In mu-On this is a per-step override of a chosen voice parameter, shown on the step; it is the biggest sound-design gain per step and extends the Step panel's pattern (Octave and Note are already two per-step overrides).
+2. **Micro-timing (nudge a step off the grid).** A per-step offset of a fraction of a step, early or late, for human feel; swing is global, this is per hit. Cheap in the clock (an offset on the step's beat) and a single knob or drop-down in the Step panel.
+3. **Per-step gate length.** How long a step holds (Bass and Chord use it; drums are one-shot). Pairs with ties.
+4. **More conditions.** NEI (play depending on the neighbouring track's last step), 1ST (first pass only) and the negations, and a fill that is automatic on the last bar of a loop. The condition drop-down already has the slot.
+5. **Mutate / randomise.** Random a row, or nudge it a little each loop ("mutate"), with a depth knob; Torso's T-1 and Digitakt's randomise are popular for generating variations.
+6. **Euclidean and rotate tools for a row.** Fill a row with a Euclidean pattern and rotate it (mu-Clid already has the Euclid engine); one-click row shift left or right.
+7. **Pattern chaining and a song mode.** Chain patterns or scenes into a song with repeat counts (mu-Tronic already has scenes; mu-On has no pattern bank, listed on its page as not yet).
+8. **Per-track speed (a clock multiplier).** Play a track at 2x or half the master, another route to polyrhythm besides step length.
+9. **Step copy, paste, clear and a nudge-the-whole-row command.** Housekeeping people expect once rows get rich.
+10. **Per-step slide / accent shapes.** A slide flag on any step (Bass has glide on tied steps), a second accent level.
+
+**Not recommended for mu-On:** sample-slicing locks (that is mu-Tilate), a tracker-style grid (a different product), arpeggiator-style note repeat modes (mu-Toni).
+
+**Sources:** Elektron parameter locks, trig conditions and retrig behaviour from the Elektronauts forum threads and the Analog Rytm manual; Drambo's documentation (step components, parameter locks); MusicRadar's Torso T-1 review; Polyend Tracker comparisons.
+
+---
+
 ## Release & distribution (deferred until public release)
 
 These are understood and scoped but parked until the family ships publicly. They are

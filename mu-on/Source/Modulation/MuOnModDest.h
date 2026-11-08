@@ -49,8 +49,8 @@ inline constexpr ModDestEntry kKickDests[] = {
     makeTarget("filter.dec", "kick_fdec", "Filter Env Decay", "Filter"),
     makeTarget("filter.dep", "kick_fdep", "Filter Env Depth", "Filter"),
     makeTarget("groove.ghost", "ghost", "Ghost", "Groove"),
-    // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
-    // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
+    // The same ten rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
+    // strip's Pan, the insert's four knobs, the strip's three sends and Fill. Appended last: saved destination indices stay valid.
     makeTarget("amp.level", "level", "Level", "Amp"),
     makeTarget("amp.pan", "pan", "Pan", "Amp"),
     makeTarget("insert.p1", "insP1", "Insert P1", "Insert"),
@@ -60,6 +60,7 @@ inline constexpr ModDestEntry kKickDests[] = {
     makeTarget("send.effect", "sendEff", "Effect Send", "Effects"),
     makeTarget("send.delay", "sendDly", "Delay Send", "Effects"),
     makeTarget("send.reverb", "sendRev", "Reverb Send", "Effects"),
+    makeTarget("perf.fill", "fill", "Fill", "Performance"),   // the track's Fill, on while its modulated value is half or more (the Fill button does the same)
 };
 
 // Bass — order matches BassEngine::setParams(rootHz, [wave], sub, cutHz, res, env,
@@ -80,8 +81,8 @@ inline constexpr ModDestEntry kBassDests[] = {
     makeTarget("b.fatk.prop", "bass_fatk", "Filter Attack", "Bass"),    // the filter envelope's attack, sustain and release, appended after Glide
     makeTarget("b.fsus.prop", "bass_fsus", "Filter Sustain", "Bass"),
     makeTarget("b.frel.prop", "bass_frel", "Filter Release", "Bass"),
-    // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
-    // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
+    // The same ten rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
+    // strip's Pan, the insert's four knobs, the strip's three sends and Fill. Appended last: saved destination indices stay valid.
     makeTarget("amp.level", "level", "Level", "Amp"),
     makeTarget("amp.pan", "pan", "Pan", "Amp"),
     makeTarget("insert.p1", "insP1", "Insert P1", "Insert"),
@@ -91,6 +92,7 @@ inline constexpr ModDestEntry kBassDests[] = {
     makeTarget("send.effect", "sendEff", "Effect Send", "Effects"),
     makeTarget("send.delay", "sendDly", "Delay Send", "Effects"),
     makeTarget("send.reverb", "sendRev", "Reverb Send", "Effects"),
+    makeTarget("perf.fill", "fill", "Fill", "Performance"),   // the track's Fill, on while its modulated value is half or more (the Fill button does the same)
 };
 
 // Hat — order matches SampleChannel::setParams(tuneSemitones, decayMs, openTuneSemitones, openDecayMs).
@@ -107,8 +109,8 @@ inline constexpr ModDestEntry kHatDests[] = {
     makeTarget("filter.dec", "hat_fdec", "Filter Env Decay", "Filter"),
     makeTarget("filter.dep", "hat_fdep", "Filter Env Depth", "Filter"),
     makeTarget("groove.ghost", "ghost", "Ghost", "Groove"),
-    // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
-    // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
+    // The same ten rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
+    // strip's Pan, the insert's four knobs, the strip's three sends and Fill. Appended last: saved destination indices stay valid.
     makeTarget("amp.level", "level", "Level", "Amp"),
     makeTarget("amp.pan", "pan", "Pan", "Amp"),
     makeTarget("insert.p1", "insP1", "Insert P1", "Insert"),
@@ -118,6 +120,7 @@ inline constexpr ModDestEntry kHatDests[] = {
     makeTarget("send.effect", "sendEff", "Effect Send", "Effects"),
     makeTarget("send.delay", "sendDly", "Delay Send", "Effects"),
     makeTarget("send.reverb", "sendRev", "Reverb Send", "Effects"),
+    makeTarget("perf.fill", "fill", "Fill", "Performance"),   // the track's Fill, on while its modulated value is half or more (the Fill button does the same)
 };
 
 // Snare — SampleChannel::setParams(tuneSemitones, decayMs, snap).
@@ -133,8 +136,8 @@ inline constexpr ModDestEntry kSnareDests[] = {
     makeTarget("filter.dec", "snare_fdec", "Filter Env Decay", "Filter"),
     makeTarget("filter.dep", "snare_fdep", "Filter Env Depth", "Filter"),
     makeTarget("groove.ghost", "ghost", "Ghost", "Groove"),
-    // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
-    // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
+    // The same ten rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
+    // strip's Pan, the insert's four knobs, the strip's three sends and Fill. Appended last: saved destination indices stay valid.
     makeTarget("amp.level", "level", "Level", "Amp"),
     makeTarget("amp.pan", "pan", "Pan", "Amp"),
     makeTarget("insert.p1", "insP1", "Insert P1", "Insert"),
@@ -144,6 +147,7 @@ inline constexpr ModDestEntry kSnareDests[] = {
     makeTarget("send.effect", "sendEff", "Effect Send", "Effects"),
     makeTarget("send.delay", "sendDly", "Delay Send", "Effects"),
     makeTarget("send.reverb", "sendRev", "Reverb Send", "Effects"),
+    makeTarget("perf.fill", "fill", "Fill", "Performance"),   // the track's Fill, on while its modulated value is half or more (the Fill button does the same)
 };
 
 // Rumble — order matches RumbleEngine::setParams(bpm, drive, d1, d2, d3, revSize, revMix, revLpHz, cutHz, res, inLpHz, feedback, fbFilter)
@@ -161,8 +165,8 @@ inline constexpr ModDestEntry kRumbleDests[] = {
     makeTarget("r.inlp.prop", "rumble_inlp", "Input LP", "Rumble"),   // appended last: saved destination indices stay valid
     makeTarget("r.fb.prop", "rumble_fb", "Feedback", "Rumble"),
     makeTarget("r.fbfilt.prop", "rumble_fbfilt", "Fb Filter", "Rumble"),
-    // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
-    // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
+    // The same ten rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
+    // strip's Pan, the insert's four knobs, the strip's three sends and Fill. Appended last: saved destination indices stay valid.
     makeTarget("amp.level", "level", "Level", "Amp"),
     makeTarget("amp.pan", "pan", "Pan", "Amp"),
     makeTarget("insert.p1", "insP1", "Insert P1", "Insert"),
@@ -172,6 +176,7 @@ inline constexpr ModDestEntry kRumbleDests[] = {
     makeTarget("send.effect", "sendEff", "Effect Send", "Effects"),
     makeTarget("send.delay", "sendDly", "Delay Send", "Effects"),
     makeTarget("send.reverb", "sendRev", "Reverb Send", "Effects"),
+    makeTarget("perf.fill", "fill", "Fill", "Performance"),   // the track's Fill, on while its modulated value is half or more (the Fill button does the same)
 };
 
 // FM Perc — order matches FmPercEngine::setParams(tune, ratio, index, idec, fdbk, dive, dtime, decay, fold, noise).
@@ -196,8 +201,8 @@ inline constexpr ModDestEntry kFmPercDests[] = {
     makeTarget("filter.dec", "fmp_fdec", "Filter Env Decay", "Filter"),
     makeTarget("filter.dep", "fmp_fdep", "Filter Env Depth", "Filter"),
     makeTarget("groove.ghost", "ghost", "Ghost", "Groove"),
-    // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
-    // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
+    // The same ten rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
+    // strip's Pan, the insert's four knobs, the strip's three sends and Fill. Appended last: saved destination indices stay valid.
     makeTarget("amp.level", "level", "Level", "Amp"),
     makeTarget("amp.pan", "pan", "Pan", "Amp"),
     makeTarget("insert.p1", "insP1", "Insert P1", "Insert"),
@@ -207,6 +212,7 @@ inline constexpr ModDestEntry kFmPercDests[] = {
     makeTarget("send.effect", "sendEff", "Effect Send", "Effects"),
     makeTarget("send.delay", "sendDly", "Delay Send", "Effects"),
     makeTarget("send.reverb", "sendRev", "Reverb Send", "Effects"),
+    makeTarget("perf.fill", "fill", "Fill", "Performance"),   // the track's Fill, on while its modulated value is half or more (the Fill button does the same)
 };
 
 // Chord — order matches ChordEngine::setParams(wave, cutHz, res, drv, env, edecMs, atkMs, decMs, sus, relMs, ...); the wave is a
@@ -226,8 +232,8 @@ inline constexpr ModDestEntry kChordDests[] = {
     makeTarget("c.fsus", "chord_fsus", "Filter Env Sustain", "Chord"),
     makeTarget("c.frel", "chord_frel", "Filter Env Release", "Chord"),
     makeTarget("groove.ghost", "ghost", "Ghost", "Groove"),
-    // The same nine rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
-    // strip's Pan, the insert's four knobs and the strip's three sends. Appended last: saved destination indices stay valid.
+    // The same ten rows end every table, in this order (Track::resolve reads them from the end): the track's Level, the mixer
+    // strip's Pan, the insert's four knobs, the strip's three sends and Fill. Appended last: saved destination indices stay valid.
     makeTarget("amp.level", "level", "Level", "Amp"),
     makeTarget("amp.pan", "pan", "Pan", "Amp"),
     makeTarget("insert.p1", "insP1", "Insert P1", "Insert"),
@@ -237,6 +243,7 @@ inline constexpr ModDestEntry kChordDests[] = {
     makeTarget("send.effect", "sendEff", "Effect Send", "Effects"),
     makeTarget("send.delay", "sendDly", "Delay Send", "Effects"),
     makeTarget("send.reverb", "sendRev", "Reverb Send", "Effects"),
+    makeTarget("perf.fill", "fill", "Fill", "Performance"),   // the track's Fill, on while its modulated value is half or more (the Fill button does the same)
 };
 
 // Compile-time guard: every row of an engine's table names a parameter under that engine's tag
@@ -244,7 +251,7 @@ inline constexpr ModDestEntry kChordDests[] = {
 // The closing rows every table shares (and a drum or percussion table's Ghost row): the track's Level and insert knobs (t{N}_) and the mixer strip's pan and sends (ch{N}_).
 constexpr bool isLayerWideParam(std::string_view p) noexcept
 {
-    return p == "level" || p == "ghost" || p == "insP1" || p == "insP2" || p == "insP3" || p == "insP4" || mu_mod::isMixerStripParam(p);
+    return p == "level" || p == "ghost" || p == "fill" || p == "insP1" || p == "insP2" || p == "insP3" || p == "insP4" || mu_mod::isMixerStripParam(p);
 }
 
 template <std::size_t N>

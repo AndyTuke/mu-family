@@ -57,9 +57,19 @@ public:
     void toggle(int id);                          // what a pick does: flips the tick, refreshes the box, reports, calls onToggle
     std::function<void(int id, bool ticked)> onToggle;
 
+    // ── Glyph mode ──────────────────────────────────────────────────────────────────────────
+    // Each item is drawn with a small picture beside its name, in the popup and in the box (a curve, a shape): `draw` paints
+    // the picture for item `id` in `area` in `colour`. Items are added with addItem as usual.
+    using GlyphDrawer = std::function<void(juce::Graphics&, juce::Rectangle<float> area, int id, juce::Colour colour)>;
+    void setItemGlyph(GlyphDrawer draw);
+
     void resized() override;
+    void paintOverChildren(juce::Graphics& g) override;
 
 private:
+    class GlyphItem;
+    void showGlyphPopup();
+    GlyphDrawer glyphDrawer;
     // The ComboBox with its popup replaced in multi-select mode.
     class Combo : public juce::ComboBox
     {

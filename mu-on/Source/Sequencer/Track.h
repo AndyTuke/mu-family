@@ -139,7 +139,7 @@ struct Track : Layer
     float getModLive(EngineType engine, int dest) const noexcept;
 
     // The most targets any engine's table holds (Bass: 10).
-    static constexpr int kMaxDests = 32;   // the engine's targets plus the six drum rows and the nine closing rows
+    static constexpr int kMaxDests = 32;   // the engine's targets plus the six drum rows and the ten closing rows
 
 private:
     // Cached modulation inputs for one engine: the destination ids (proportion-space keys), their backing
@@ -174,6 +174,7 @@ private:
     struct PendingRepeat { double beat = 0.0; int hit = 0; StepEvent ev {}; };
     std::array<PendingRepeat, 32> pendingRepeats;
     int numPendingRepeats = 0;
+    std::atomic<bool> fillModNow { false };   // this block's modulated Fill (written by the audio thread): it acts like the Fill button
     void scheduleRepeats(const StepEvent& ev, double firstBeat) noexcept;
     void fireRepeats(const mu_core::RenderContext& ctx, TrackEngine* fireInto, int n) noexcept;
     void applyDrumFilter(juce::AudioBuffer<float>& out, int n, int e) noexcept;
@@ -195,6 +196,8 @@ public:
     // `fill` is whether the Fill button is held: a step conditioned on Fill plays only then. A step conditioned on Pre (NotPre)
     // plays only if the previous step on the row played (did not): see previousPlayed.
     bool stepPlays(int step, long long pass, bool fill = false) const noexcept;
+    // Whether a modulator is holding Fill on (the Fill target at half or more), for the display.
+    bool isFillModulated() const noexcept { return fillModNow.load(std::memory_order_relaxed); }
 private:
     // Whether the nearest earlier on-step whose own condition is not Pre or NotPre (looking back across the row's wrap, up to
     // one full pass) actually played in its pass. With no such step it is false, so Pre does not play and NotPre does.

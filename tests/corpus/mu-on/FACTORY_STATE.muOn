@@ -213,6 +213,7 @@
         <p id="hat_dec" x="60.0"/>
         <p id="hat_otune" x="0.0"/>
         <p id="hat_odec" x="300.0"/>
+        <p id="hat_tlink" x="0.0" c="Off"/>
         <p id="snare_tune" x="0.0"/>
         <p id="snare_dec" x="160.0"/>
         <p id="snare_snap" x="0.5"/>
@@ -235,6 +236,7 @@
         <p id="insP4" x="0.0"/>
         <p id="insSync" x="0.0"/>
         <p id="level" x="1.0"/>
+        <p id="fill" x="0.0"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -338,6 +340,7 @@
         <p id="hat_dec" x="60.0"/>
         <p id="hat_otune" x="0.0"/>
         <p id="hat_odec" x="300.0"/>
+        <p id="hat_tlink" x="0.0" c="Off"/>
         <p id="snare_tune" x="0.0"/>
         <p id="snare_dec" x="160.0"/>
         <p id="snare_snap" x="0.5"/>
@@ -360,6 +363,7 @@
         <p id="insP4" x="0.0"/>
         <p id="insSync" x="0.0"/>
         <p id="level" x="1.0"/>
+        <p id="fill" x="0.0"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -463,6 +467,7 @@
         <p id="hat_dec" x="60.0"/>
         <p id="hat_otune" x="0.0"/>
         <p id="hat_odec" x="300.0"/>
+        <p id="hat_tlink" x="0.0" c="Off"/>
         <p id="snare_tune" x="0.0"/>
         <p id="snare_dec" x="160.0"/>
         <p id="snare_snap" x="0.5"/>
@@ -485,6 +490,7 @@
         <p id="insP4" x="0.0"/>
         <p id="insSync" x="0.0"/>
         <p id="level" x="1.0"/>
+        <p id="fill" x="0.0"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -588,6 +594,7 @@
         <p id="hat_dec" x="60.0"/>
         <p id="hat_otune" x="0.0"/>
         <p id="hat_odec" x="300.0"/>
+        <p id="hat_tlink" x="0.0" c="Off"/>
         <p id="snare_tune" x="0.0"/>
         <p id="snare_dec" x="160.0"/>
         <p id="snare_snap" x="0.5"/>
@@ -610,6 +617,7 @@
         <p id="insP4" x="0.0"/>
         <p id="insSync" x="0.0"/>
         <p id="level" x="1.0"/>
+        <p id="fill" x="0.0"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -713,6 +721,7 @@
         <p id="hat_dec" x="60.0"/>
         <p id="hat_otune" x="0.0"/>
         <p id="hat_odec" x="300.0"/>
+        <p id="hat_tlink" x="0.0" c="Off"/>
         <p id="snare_tune" x="0.0"/>
         <p id="snare_dec" x="160.0"/>
         <p id="snare_snap" x="0.5"/>
@@ -735,6 +744,7 @@
         <p id="insP4" x="0.0"/>
         <p id="insSync" x="0.0"/>
         <p id="level" x="1.0"/>
+        <p id="fill" x="0.0"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -838,6 +848,7 @@
         <p id="hat_dec" x="60.0"/>
         <p id="hat_otune" x="0.0"/>
         <p id="hat_odec" x="300.0"/>
+        <p id="hat_tlink" x="0.0" c="Off"/>
         <p id="snare_tune" x="0.0"/>
         <p id="snare_dec" x="160.0"/>
         <p id="snare_snap" x="0.5"/>
@@ -860,6 +871,7 @@
         <p id="insP4" x="0.0"/>
         <p id="insSync" x="0.0"/>
         <p id="level" x="1.0"/>
+        <p id="fill" x="0.0"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -963,6 +975,7 @@
         <p id="hat_dec" x="60.0"/>
         <p id="hat_otune" x="0.0"/>
         <p id="hat_odec" x="300.0"/>
+        <p id="hat_tlink" x="0.0" c="Off"/>
         <p id="snare_tune" x="0.0"/>
         <p id="snare_dec" x="160.0"/>
         <p id="snare_snap" x="0.5"/>
@@ -985,6 +998,7 @@
         <p id="insP4" x="0.0"/>
         <p id="insSync" x="0.0"/>
         <p id="level" x="1.0"/>
+        <p id="fill" x="0.0"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -1088,6 +1102,7 @@
         <p id="hat_dec" x="60.0"/>
         <p id="hat_otune" x="0.0"/>
         <p id="hat_odec" x="300.0"/>
+        <p id="hat_tlink" x="0.0" c="Off"/>
         <p id="snare_tune" x="0.0"/>
         <p id="snare_dec" x="160.0"/>
         <p id="snare_snap" x="0.5"/>
@@ -1110,6 +1125,7 @@
         <p id="insP4" x="0.0"/>
         <p id="insSync" x="0.0"/>
         <p id="level" x="1.0"/>
+        <p id="fill" x="0.0"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>

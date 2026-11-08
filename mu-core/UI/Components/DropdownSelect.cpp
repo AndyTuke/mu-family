@@ -18,6 +18,69 @@ void DropdownSelect::addItem(const juce::String& text, int id)
     combo.addItem(text, id);
 }
 
+// ── Glyph mode ─────────────────────────────────────────────────────────────────────────────
+
+// A popup row: the item's picture, then its name; the highlighted row is lit.
+class DropdownSelect::GlyphItem : public juce::PopupMenu::CustomComponent
+{
+public:
+    GlyphItem(const juce::String& t, int id_, const GlyphDrawer& d) : juce::PopupMenu::CustomComponent(true), text(t), id(id_), draw(d) {}
+    void getIdealSize(int& w, int& h) override { w = 130; h = 24; }
+    void paint(juce::Graphics& g) override
+    {
+        const auto bounds = getLocalBounds().toFloat();
+        if (isItemHighlighted())
+        {
+            g.setColour(MuLookAndFeel::colour(MuLookAndFeel::segmentActiveBorder).withAlpha(0.25f));
+            g.fillRect(bounds);
+        }
+        const auto colour = MuLookAndFeel::colour(MuLookAndFeel::statusBarValue);
+        draw(g, bounds.withWidth(34.0f).reduced(4.0f, 3.0f), id, colour);
+        g.setColour(colour);
+        g.setFont(MuLookAndFeel::uiFont(12.0f));
+        g.drawText(text, bounds.withTrimmedLeft(40.0f), juce::Justification::centredLeft);
+    }
+private:
+    juce::String text;
+    int id;
+    GlyphDrawer draw;
+};
+
+void DropdownSelect::setItemGlyph(GlyphDrawer draw)
+{
+    glyphDrawer = std::move(draw);
+    combo.popupOverride = glyphDrawer ? std::function<void()>([this] { showGlyphPopup(); }) : std::function<void()>();
+    // The box shows the picture alone (the name is in the list and on the status bar): the combo's own text label is hidden.
+    for (auto* child : combo.getChildren())
+        if (dynamic_cast<juce::Label*>(child) != nullptr) child->setVisible(! glyphDrawer);
+    repaint();
+}
+
+void DropdownSelect::showGlyphPopup()
+{
+    juce::PopupMenu menu;
+    for (int i = 0; i < combo.getNumItems(); ++i)
+    {
+        const int id = combo.getItemId(i);
+        if (id <= 0) continue;
+        juce::PopupMenu::Item item(combo.getItemText(i));
+        item.setID(id).setTicked(id == combo.getSelectedId()).setCustomComponent(new GlyphItem(combo.getItemText(i), id, glyphDrawer));
+        menu.addItem(item);
+    }
+    juce::Component::SafePointer<DropdownSelect> safe(this);
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&combo).withMinimumWidth(combo.getWidth()),
+                       [safe](int picked) { if (safe != nullptr && picked > 0) safe->setSelectedId(picked, true); });
+}
+
+void DropdownSelect::paintOverChildren(juce::Graphics& g)
+{
+    if (! glyphDrawer || combo.getSelectedId() <= 0) return;
+    // Centred in the box, left of the drop-down arrow.
+    const auto box = getLocalBounds().toFloat().withTrimmedRight(18.0f);
+    const auto area = box.withSizeKeepingCentre(juce::jmin(30.0f, box.getWidth() - 6.0f), box.getHeight() - 10.0f);
+    glyphDrawer(g, area, combo.getSelectedId(), MuLookAndFeel::lcdCombo(combo) ? MuLookAndFeel::lcdLitColour(combo) : MuLookAndFeel::colour(MuLookAndFeel::statusBarValue));
+}
+
 // ── Multi-select mode ──────────────────────────────────────────────────────────────────────
 
 void DropdownSelect::setMultiSelect(bool on)

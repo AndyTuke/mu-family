@@ -3,7 +3,7 @@
 product=mu-on
 layers_at_start=1
 max_layers=8
-param_count=1009
+param_count=1025
 ---
 ch0_lvl | float | 0 | 1 | 0.001 | 1 | 1 | 1
 ch0_mute | bool | 0 | 1 | 1 | 1 | 0 | 0
@@ -216,6 +216,7 @@ t0_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t0_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
 t0_drvChar | int | 0 | 21 | 1 | 1 | 0 | 0
 t0_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
+t0_fill | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t0_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t0_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t0_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
@@ -243,6 +244,7 @@ t0_hat_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
 t0_hat_ftype | choice(16) | 0 | 15 | 1 | 1 | 0 | 0
 t0_hat_odec | float | 50 | 1200 | 1 | 0.396265 | 300 | 0.546226
 t0_hat_otune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
+t0_hat_tlink | choice(2) | 0 | 1 | 1 | 1 | 0 | 0
 t0_hat_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t0_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 t0_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
@@ -320,6 +322,7 @@ t1_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t1_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
 t1_drvChar | int | 0 | 21 | 1 | 1 | 0 | 0
 t1_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
+t1_fill | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t1_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t1_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t1_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
@@ -347,6 +350,7 @@ t1_hat_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
 t1_hat_ftype | choice(16) | 0 | 15 | 1 | 1 | 0 | 0
 t1_hat_odec | float | 50 | 1200 | 1 | 0.396265 | 300 | 0.546226
 t1_hat_otune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
+t1_hat_tlink | choice(2) | 0 | 1 | 1 | 1 | 0 | 0
 t1_hat_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t1_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 t1_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
@@ -424,6 +428,7 @@ t2_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t2_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
 t2_drvChar | int | 0 | 21 | 1 | 1 | 0 | 0
 t2_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
+t2_fill | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t2_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t2_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t2_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
@@ -451,6 +456,7 @@ t2_hat_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
 t2_hat_ftype | choice(16) | 0 | 15 | 1 | 1 | 0 | 0
 t2_hat_odec | float | 50 | 1200 | 1 | 0.396265 | 300 | 0.546226
 t2_hat_otune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
+t2_hat_tlink | choice(2) | 0 | 1 | 1 | 1 | 0 | 0
 t2_hat_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t2_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 t2_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
@@ -528,6 +534,7 @@ t3_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t3_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
 t3_drvChar | int | 0 | 21 | 1 | 1 | 0 | 0
 t3_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
+t3_fill | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t3_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t3_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t3_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
@@ -555,6 +562,7 @@ t3_hat_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
 t3_hat_ftype | choice(16) | 0 | 15 | 1 | 1 | 0 | 0
 t3_hat_odec | float | 50 | 1200 | 1 | 0.396265 | 300 | 0.546226
 t3_hat_otune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
+t3_hat_tlink | choice(2) | 0 | 1 | 1 | 1 | 0 | 0
 t3_hat_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t3_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 t3_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
@@ -632,6 +640,7 @@ t4_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t4_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
 t4_drvChar | int | 0 | 21 | 1 | 1 | 0 | 0
 t4_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
+t4_fill | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t4_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t4_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t4_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
@@ -659,6 +668,7 @@ t4_hat_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
 t4_hat_ftype | choice(16) | 0 | 15 | 1 | 1 | 0 | 0
 t4_hat_odec | float | 50 | 1200 | 1 | 0.396265 | 300 | 0.546226
 t4_hat_otune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
+t4_hat_tlink | choice(2) | 0 | 1 | 1 | 1 | 0 | 0
 t4_hat_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t4_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 t4_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
@@ -736,6 +746,7 @@ t5_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t5_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
 t5_drvChar | int | 0 | 21 | 1 | 1 | 0 | 0
 t5_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
+t5_fill | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t5_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t5_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t5_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
@@ -763,6 +774,7 @@ t5_hat_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
 t5_hat_ftype | choice(16) | 0 | 15 | 1 | 1 | 0 | 0
 t5_hat_odec | float | 50 | 1200 | 1 | 0.396265 | 300 | 0.546226
 t5_hat_otune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
+t5_hat_tlink | choice(2) | 0 | 1 | 1 | 1 | 0 | 0
 t5_hat_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t5_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 t5_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
@@ -840,6 +852,7 @@ t6_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t6_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
 t6_drvChar | int | 0 | 21 | 1 | 1 | 0 | 0
 t6_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
+t6_fill | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t6_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t6_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t6_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
@@ -867,6 +880,7 @@ t6_hat_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
 t6_hat_ftype | choice(16) | 0 | 15 | 1 | 1 | 0 | 0
 t6_hat_odec | float | 50 | 1200 | 1 | 0.396265 | 300 | 0.546226
 t6_hat_otune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
+t6_hat_tlink | choice(2) | 0 | 1 | 1 | 1 | 0 | 0
 t6_hat_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t6_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 t6_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
@@ -944,6 +958,7 @@ t7_chord_sus | float | 0 | 1 | 0.001 | 1 | 0.6 | 0.6
 t7_chord_wave | choice(3) | 0 | 2 | 1 | 1 | 0 | 0
 t7_drvChar | int | 0 | 21 | 1 | 1 | 0 | 0
 t7_eng | choice(7) | 0 | 6 | 1 | 1 | 0 | 0
+t7_fill | float | 0 | 1 | 0.001 | 1 | 0 | 0
 t7_fmp_algo | choice(8) | 0 | 7 | 1 | 1 | 0 | 0
 t7_fmp_decay | float | 0 | 1 | 0.001 | 1 | 0.4 | 0.4
 t7_fmp_dive | float | 0 | 1 | 0.001 | 1 | 0.43 | 0.43
@@ -971,6 +986,7 @@ t7_hat_fres | float | 0 | 0.99 | 0.001 | 1 | 0.2 | 0.20202
 t7_hat_ftype | choice(16) | 0 | 15 | 1 | 1 | 0 | 0
 t7_hat_odec | float | 50 | 1200 | 1 | 0.396265 | 300 | 0.546226
 t7_hat_otune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
+t7_hat_tlink | choice(2) | 0 | 1 | 1 | 1 | 0 | 0
 t7_hat_tune | float | -12 | 12 | 0.1 | 1 | 0 | 0.5
 t7_insP1 | float | 0 | 1 | 0 | 1 | 0 | 0
 t7_insP2 | float | 0 | 1 | 0 | 1 | 0 | 0
@@ -1031,11 +1047,11 @@ mst=12
 mstr=3
 ret=24
 rev=10
-t0=104
-t1=104
-t2=104
-t3=104
-t4=104
-t5=104
-t6=104
-t7=104
+t0=106
+t1=106
+t2=106
+t3=106
+t4=106
+t5=106
+t6=106
+t7=106

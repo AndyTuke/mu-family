@@ -332,16 +332,17 @@ void Track::resolve(int e, double beat, float* outValues) noexcept
     lastResolved.apply(resolved, outValues, (std::size_t) L.count);
     lastResolvedEngine = e;
 
-    // The last nine targets of every engine's table (Level, Pan, Insert P1..P4, the three sends): the track's Level and insert
-    // knobs for this block's render, and the mixer strip's Pan and sends for the host.
-    levelNow = outValues[L.count - 9];
-    // A drum or percussion table has six rows before those nine: the filter's Cutoff, Resonance, Env Attack, Env Decay and
+    // The last ten targets of every engine's table (Level, Pan, Insert P1..P4, the three sends, Fill): the track's Level and insert
+    // knobs for this block's render, the mixer strip's Pan and sends for the host, and Fill for the step clock.
+    levelNow = outValues[L.count - 10];
+    // A drum or percussion table has six rows before those ten: the filter's Cutoff, Resonance, Env Attack, Env Decay and
     // Env Depth, then the Ghost level (see MuOnModDest.h). Any other engine has no ghosts and no drum filter.
     const bool drum = filterCutRow[(size_t) e].isBound();
-    if (drum) for (int k = 0; k < 5; ++k) filterNow[k] = outValues[L.count - 15 + k];
-    if (drum || e == toIndex(EngineType::Chord)) ghostNow = juce::jlimit(0.0f, 1.0f, outValues[L.count - 10]);   // a Chord has ghosts too
-    for (int k = 0; k < VoiceParams::kInsertSlotCount; ++k) insertNow[k] = outValues[L.count - 7 + k];
-    stripMod.publish(outValues[L.count - 8], outValues[L.count - 3], outValues[L.count - 2], outValues[L.count - 1]);
+    if (drum) for (int k = 0; k < 5; ++k) filterNow[k] = outValues[L.count - 16 + k];
+    if (drum || e == toIndex(EngineType::Chord)) ghostNow = juce::jlimit(0.0f, 1.0f, outValues[L.count - 11]);   // a Chord has ghosts too
+    for (int k = 0; k < VoiceParams::kInsertSlotCount; ++k) insertNow[k] = outValues[L.count - 8 + k];
+    stripMod.publish(outValues[L.count - 9], outValues[L.count - 4], outValues[L.count - 3], outValues[L.count - 2]);
+    fillModNow.store(outValues[L.count - 1] >= 0.5f, std::memory_order_relaxed);   // modulated Fill: on while the target is half or more
 
     for (int k = 0; k < L.count; ++k)
         modLive[(size_t) k].store(outValues[k], std::memory_order_relaxed);
@@ -370,7 +371,7 @@ void Track::clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, i
     if (ctx.justStarted) { clock.seek(ctx.startBeat); numPendingRepeats = 0; }   // the step the transport starts in fires, even on a quick replay
     if (fireInto != nullptr && e != toIndex(EngineType::Rumble)) fireRepeats(ctx, fireInto, n);   // repeats owed by steps that fired earlier
     clock.processSpan(row, ctx.startBeat, n, ctx.beatsPerSample, row.swingAmount(), row.accentVelocity(),
-                      [this, fireInto, e, fill = ctx.fill != 0, startBeat = ctx.startBeat, beatsPerSample = ctx.beatsPerSample](const StepEvent& ev)
+                      [this, fireInto, e, fill = ctx.fill != 0 || fillModNow.load(std::memory_order_relaxed), startBeat = ctx.startBeat, beatsPerSample = ctx.beatsPerSample](const StepEvent& ev)
                       {
                           if (fireInto == nullptr || e == toIndex(EngineType::Rumble)) return;
                           if (! stepPlays(ev.step, ev.pass, fill)) return;   // the loop, condition and probability draw of this pass

@@ -90,9 +90,9 @@ public:
                 // A drum or percussion table has the filter's five rows and the Ghost level before the closing nine.
                 std::vector<std::string> expected = engineDests;
                 if (drum) expected.insert(expected.end(), { "filter.cut", "filter.res", "filter.atk", "filter.dec", "filter.dep", "groove.ghost" });
-                // Every engine's table ends with Level, Pan, the four insert knobs and the three FX sends.
+                // Every engine's table ends with Level, Pan, the four insert knobs, the three FX sends and Fill.
                 expected.insert(expected.end(), { "amp.level", "amp.pan", "insert.p1", "insert.p2", "insert.p3", "insert.p4",
-                                                  "send.effect", "send.delay", "send.reverb" });
+                                                  "send.effect", "send.delay", "send.reverb", "perf.fill" });
                 int n = 0;
                 const ModDestEntry* t = destsForEngine(engine, n);
                 expectEquals(n, (int) expected.size(),

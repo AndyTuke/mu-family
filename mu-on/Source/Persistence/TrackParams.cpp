@@ -88,6 +88,7 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     flt(E::Hat,   "dec",  "Hat Decay",   centred(10.0f, 400.0f, 1.0f, 60.0f), 60.0f, mu_fmt::Unit::Ms);
     flt(E::Hat,   "otune", "Hat Open Tune",  f(-12.0f, 12.0f, 0.1f), 0.0f, mu_fmt::Unit::Semitones);    // the open hat: its own tune and decay
     flt(E::Hat,   "odec",  "Hat Open Decay", centred(50.0f, 1200.0f, 1.0f, 250.0f), 300.0f, mu_fmt::Unit::Ms);
+    layout.add(std::make_unique<AudioParameterChoice>(id(E::Hat, "tlink"), lbl + "Hat Tune Link", juce::StringArray{ "Off", "On" }, 0));   // on: the closed and open tunes turn together (a UI link; not a target)
     flt(E::Snare, "tune", "Snare Tune",  f(-12.0f, 12.0f, 0.1f), 0.0f, mu_fmt::Unit::Semitones);
     flt(E::Snare, "dec",  "Snare Decay", centred(20.0f, 600.0f, 1.0f, 120.0f), 160.0f, mu_fmt::Unit::Ms);
     flt(E::Snare, "snap", "Snare Snap",  f(0.0f, 1.0f, 0.001f), 0.5f, mu_fmt::Unit::Percent01);   // wires against body; 0.5 is the original blend
@@ -122,6 +123,9 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     // step's own probability (StepRow).
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{ layerParamId(slot, "level"), 1 }, lbl + "Level", f(0.0f, 1.0f, 0.001f), 1.0f,
                                                      mu_fmt::floatUnit(f(0.0f, 1.0f, 0.001f), mu_fmt::Unit::Percent01)));   // the track's own level, a modulation target (the mixer fader is not)
+    // Fill as a modulation target: the track plays its Fill steps while this is half or more (the Fill button does the same).
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{ layerParamId(slot, "fill"), 1 }, lbl + "Fill", f(0.0f, 1.0f, 0.001f), 0.0f,
+                                                     AudioParameterFloatAttributes().withStringFromValueFunction([](float v, int) { return v >= 0.5f ? String("On") : String("Off"); })));
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{ layerParamId(slot, "prob"), 1 }, lbl + "Probability",
                                                      NormalisableRange<float>(0.0f, 100.0f, 1.0f), 100.0f,
                                                      AudioParameterFloatAttributes().withStringFromValueFunction(

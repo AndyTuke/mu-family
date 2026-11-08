@@ -92,6 +92,31 @@ namespace
                 expect(! plain.serialise(0).hasProperty("cond"));
             }
 
+            beginTest("the Fill target switches Fill on at half or more, like the button, and a Fill step then plays");
+            {
+                constexpr double bpm = 120.0, sr = 48000.0, bps = bpm / 60.0 / sr;
+                constexpr int kBlock = 512;
+                auto renderBlock = [&]
+                {
+                    juce::AudioBuffer<float> out(2, kBlock);
+                    auto ctx = mu_core::makeRenderContext();
+                    ctx.sampleRate = sr;  ctx.blockSize = kBlock;  ctx.preparedBlockSize = kBlock;  ctx.bpm = bpm;
+                    ctx.startBeat = 0.0;  ctx.beatsPerSample = bps;  ctx.callBeats = bps * kBlock;  ctx.playing = 1;  ctx.justStarted = 1;
+                    track.render(ctx, out, kBlock);
+                };
+                auto setFill = [&](float v)
+                {
+                    if (auto* prm = p.getTrackParameters().getParameter(mu_on::layerParamId(0, "fill"))) prm->setValueNotifyingHost(prm->convertTo0to1(v));
+                };
+                setFill(0.0f);   renderBlock();
+                expect(! track.isFillModulated(), "Fill target at 0: off");
+                setFill(0.4f);   renderBlock();
+                expect(! track.isFillModulated(), "Fill target below half: off");
+                setFill(0.6f);   renderBlock();
+                expect(track.isFillModulated(), "Fill target at 0.6: on");
+                setFill(0.0f);   renderBlock();
+            }
+
             beginTest("the Fill button's state reaches the processor and is not left held");
             {
                 expect(! p.isTrackFillHeld());

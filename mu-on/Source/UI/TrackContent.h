@@ -15,6 +15,7 @@
 #include "UI/Components/NoteLengthControl.h"  // mu-core: the Loop-style length row
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Voice/InsertSubsection.h"   // mu-core: the shared per-channel insert panel
+#include "HatTuneLink.h"
 
 #include <array>
 #include <functional>
@@ -105,9 +106,13 @@ private:
     KnobWithLabel probKnob { "Prob" };                       // the layer's Probability: the share of its notes that play
     // The STEP panel: the selected step's own probability (multiplied with the layer's), loop ratio (the Nth of every M
     // passes of the row) and, on a Hat, which sound it plays. Not parameters: they edit the track's step row.
-    KnobWithLabel  stepProbKnob { "Prob" }, stepLevelKnob { "Level" }, stepFadeKnob { "Fade" };   // a step's chance, its level and the fade across its repeats
-    juce::Label    repeatCaption { {}, "Repeat" }, rateCaption { {}, "Rate" }, condCaption { {}, "Condition" }, barsCaption { {}, "Bars" }, lengthCaption { {}, "Length" }, voiceCaption { {}, "Sound" }, octaveCaption { {}, "Octave" }, noteCaption { {}, "Note" };
-    DropdownSelect repeatSelect, rateSelect, condSelect, barsSelect, lengthSelect, voiceSelect, octaveSelect, noteSelect;
+    KnobWithLabel  stepProbKnob { "Prob" }, stepLevelKnob { "Level" };   // a step's chance to play and its level
+    juce::Label    fadeCaption { {}, "Fade" }, repeatCaption { {}, "Repeat" }, rateCaption { {}, "Rate" }, condCaption { {}, "Condition" }, barsCaption { {}, "Bars" }, lengthCaption { {}, "Length" }, octaveCaption { {}, "Octave" }, noteCaption { {}, "Note" };
+    HatTuneLink tuneLink;                                             // a Hat: the line and lamp joining its Closed and Open tune
+    float linkedTune[2] { 0.0f, 0.0f };                               // the two tunes as last seen, for the link
+    int   linkedLayer = -1;
+    void followTuneLink();
+    DropdownSelect repeatSelect, rateSelect, fadeSelect, condSelect, barsSelect, lengthSelect, octaveSelect, noteSelect;   // fadeSelect: preset curves for the level across the repeats
     juce::TextButton fillButton { "Fill" };                           // held, never latched: steps conditioned on Fill play while it is down
     // A Chord track's step: the chord (a dropdown), its inversion and its spread (knobs); the root is the Note list (scale degrees).
     juce::Label    chordCaption { {}, "Chord" };
