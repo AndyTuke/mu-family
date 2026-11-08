@@ -69,6 +69,27 @@ namespace
                 expect(b < a * 0.5f, "a retriggered note starts its attack over");
             }
 
+            beginTest("A sine note retriggered while the last one is still held steps no harder than the held tone (no click)");
+            {
+                mu_on::BassEngine bass;
+                bass.prepare(kSr, 1000);
+                bass.setParams(55.0f, 0, 0.0f, 2000.0f, 0.0f, 0.0f, 100.0f, 1.0f, 200.0f, 0.6f, 0.0f, 300.0f, 0.0f);   // sine, sustain 0.6
+                bass.trigger(1.0f, 0, false, 0);   // no gate: held until the next trigger
+                std::vector<float> all;
+                Buf out(2, 1000);
+                for (int block = 0; block < 10; ++block)
+                {
+                    if (block == 5) bass.trigger(1.0f, 0, false, 0);   // 5000 samples in: the held sine is far from its zero crossing
+                    out.clear();
+                    bass.render(out, 1000);
+                    for (int i = 0; i < 1000; ++i) all.push_back(out.getSample(0, i));
+                }
+                float held = 0.0f, around = 0.0f;
+                for (size_t i = 3000; i < 4900; ++i) held = std::max(held, std::abs(all[i + 1] - all[i]));
+                for (size_t i = 4990; i < 5300; ++i) around = std::max(around, std::abs(all[i + 1] - all[i]));
+                expect(around < held * 3.0f + 0.005f, "the retrigger steps " + juce::String(around) + " against " + juce::String(held) + " for the held tone");
+            }
+
             beginTest("A tied step glides to the new pitch");
             {
                 mu_on::BassEngine bass;

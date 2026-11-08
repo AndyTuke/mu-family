@@ -29,6 +29,8 @@ public:
         filter.prepare(sampleRate, maxBlock, 2);
         filter.setType(0);   // LP12
         active = false;
+        carryMul = std::exp(-1.0f / (0.0015f * (float) sampleRate));   // the old note fades out over about 1.5 ms at a retrigger
+        carry = lastGain = 0.0f;
     }
 
     // rootHz: pitch; wave: 0/1/2; sub 0..1; cut Hz; res 0..1; env 0..1 (filter env depth);
@@ -63,7 +65,7 @@ public:
     }
 
     // Silence the voice + clear the filter ring immediately (e.g. transport stop).
-    void reset() noexcept { active = false; restart = false; releasing = false; gliding = false; gateLeft = 0; filter.reset(); }
+    void reset() noexcept { carry = lastGain = 0.0f; active = false; restart = false; releasing = false; gliding = false; gateLeft = 0; filter.reset(); }
 
     // The filter's drive smoothing back to where prepare() leaves it (0), so the next block ramps the drive in
     // as a freshly prepared engine's does (a track arriving in another slot). Allocation-free.
@@ -99,7 +101,13 @@ public:
                 }
                 else
                 {
-                    active = true; phase = 0.0f; subPhase = 0.0f; t = 0.0f; amp = 0.0f; vel = velTarget = pendingVel; decayEnv.reset(1.0f);
+                    // A new note on a voice still sounding (a step with no gate holds until the next trigger) would drop from its
+                    // held level to zero and restart the phase: a step the ear hears as a click, plainest on a sine. Keep the phase
+                    // and let the old level fade out (carry) under the new note's attack.
+                    const bool wasSounding = active;
+                    carry = wasSounding ? lastGain : 0.0f;
+                    if (! wasSounding) { phase = 0.0f; subPhase = 0.0f; }
+                    active = true; t = 0.0f; amp = 0.0f; vel = velTarget = pendingVel; decayEnv.reset(1.0f);
                     curFreq = rootFreq * stepMul; gliding = false; releasing = false; relGain = 1.0f; gateLeft = pendingGate;
                 }
             }
@@ -128,7 +136,9 @@ public:
 
                 const float main = osc(phase, wave);
                 const float subS = std::sin(subPhase);
-                s = (main + sub * subS) * amp;
+                s = (main + sub * subS) * (amp + carry);
+                carry *= carryMul;
+                lastGain = amp;
 
                 phase    += twoPi * curFreq / (float) sampleRate;         if (phase    > twoPi) phase    -= twoPi;
                 subPhase += twoPi * (curFreq * 0.5f) / (float) sampleRate;  if (subPhase > twoPi) subPhase -= twoPi;
@@ -164,6 +174,7 @@ private:
     float  filterEnvInv = 0.004f, atkInv = 0.2f, sustain = 0.0f;
     mu_core::ExpDecay decayEnv;   // amp decay toward the sustain floor
     float  phase = 0.0f, subPhase = 0.0f, t = 0.0f, amp = 0.0f, vel = 1.0f, pendingVel = 1.0f;
+    float  carry = 0.0f, lastGain = 0.0f, carryMul = 0.99f;   // the previous note's level at a retrigger, fading out under the new one
     int    pendingOnset = 0, pendingGate = 0, gateLeft = 0;
     float  stepMul = 1.0f, pendingMul = 1.0f, velTarget = 1.0f;   // the step's transposition (now, and for the trigger waiting); the level the velocity eases to
     float  curFreq = 41.2f, relGain = 1.0f, relMul = 0.999f, glideCoef = 0.0f;   // the sounding pitch; the release level and its per-sample step; the glide step
