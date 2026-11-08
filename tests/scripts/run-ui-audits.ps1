@@ -9,8 +9,10 @@
 #   pwsh tests/scripts/run-ui-audits.ps1 -Products mu-on    # just one
 #   pwsh tests/scripts/run-ui-audits.ps1 -NoBuild           # run what is built
 #
-# A new control reports by (a) being a knob (it reports through the shell), (b) having a status name (DropdownSelect::setStatusName /
-# NudgeInput::setStatusName), or (c) calling its content's onStatusUpdate. See mu-core/UI/StatusSink.h.
+# A new control reports by (a) being a knob (it reports through the shell), (b) being a juce::Button (the shell binds every button; a
+# glyph-only one needs mu_ui::setStatusName), (c) having a status name (DropdownSelect / NudgeInput::setStatusName, SegmentControl via
+# mu_ui::setStatusName), or (d) a custom control calling mu_ui::reportStatus itself. See mu-core/UI/StatusSink.h and
+# docs/design-ui-family.md "Status bar: every control reports".
 param(
     [string[]]$Products = @('mu-clid', 'mu-tant', 'mu-toni', 'mu-on', 'mu-tilate', 'mu-tronic', 'mu-host', 'mu-toni-midi', 'mu-clid-midi'),
     [string]$Config = 'Debug',
@@ -26,6 +28,10 @@ if (-not $NoBuild) {
     & cmake --build $BuildDir --config $Config --target @targets
     if ($LASTEXITCODE -ne 0) { throw 'build failed' }
 }
+
+# The static half first: every file that handles the mouse reports to the status bar or says why not.
+& pwsh -NoProfile -File (Join-Path $PSScriptRoot 'check-status-controls.ps1')
+if ($LASTEXITCODE -ne 0) { exit 1 }
 
 $failed = @()
 foreach ($p in $Products) {

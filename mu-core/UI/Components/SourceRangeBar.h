@@ -1,4 +1,5 @@
 #pragma once
+// status-ok: the owner reports each change to the status bar (onChange -> status), proven by the ui-audit.
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <juce_audio_basics/juce_audio_basics.h>

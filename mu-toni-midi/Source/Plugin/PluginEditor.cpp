@@ -175,6 +175,7 @@ void PluginEditor::addSwitch(const juce::String& id, const juce::String& label)
 
 void PluginEditor::timerCallback()
 {
+    mu_ui::bindButtonsIn(*this);   // every button reports its clicks to the status bar
     modulatorPanel.setPlayheadBeat(proc.getCore().lastBeat());
     // Host automation and preset loads change parameters behind the controls' backs; pull them in.
     for (auto& c : choices)

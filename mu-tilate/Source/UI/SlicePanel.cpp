@@ -120,6 +120,8 @@ SlicePanel::SlicePanel()
     addAndMakeVisible(band);
 
     // How the slice plays: direction, and the pre-fade (a quiet reversed copy of its start that swells into the hit).
+    mu_ui::setStatusName(reverseSwitch, "Slice Direction");
+    mu_ui::setStatusName(preSwitch, "Slice Pre-Fade");
     addSwitch(reverseSwitch);
     addSwitch(preSwitch);
     addKnob(nullptr, 0, 0, "Level", &SliceSettings::preLevelDb, -36.0, 0.0, 0.1, LF::knobFxSend, "Pre-fade Level: how loud the reversed swell is, below the slice",

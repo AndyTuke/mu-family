@@ -15,6 +15,7 @@
 #include "UI/Components/NudgeInput.h"
 #include "UI/Components/StatusBar.h"
 #include "UI/LayerContent.h"
+#include "UI/StatusSink.h"
 #include "Plugin/ProcessorBase.h"
 #include "Sequencer/LayerTypeInfo.h"
 #include <functional>
@@ -34,9 +35,8 @@ struct Finding { juce::String kind, label, where; };
 
 void pump(int ms)
 {
-    struct Stopper : juce::Timer { void timerCallback() override { juce::MessageManager::getInstance()->stopDispatchLoop(); } } stopper;
-    stopper.startTimer(ms);
-    juce::MessageManager::getInstance()->runDispatchLoop();
+    // Runs the message loop (timers, async callbacks) for `ms` milliseconds.
+    juce::MessageManager::getInstance()->runDispatchLoopUntil(ms);
 }
 
 juce::String typeName(const juce::Component& c)
@@ -133,6 +133,10 @@ struct Audit
     }
 
     void auditDropdown(DropdownSelect& d, bool stepThroughChoices);
+    void auditButton(juce::Button& b);
+    void probe(juce::Component& c);
+    void sweepCustom(juce::Component& c);
+    int unnamedButtons = 0, switchesClicked = 0;
 
     // The controls not yet audited, in the tree now.
     void sweep(bool stepThroughChoices)
@@ -143,8 +147,105 @@ struct Audit
         for (auto* k : knobs)   if (done.insert(k).second && visibleChain(k, root) && ! deniedAncestor(k)) auditKnob(*k);
         for (auto* n : nudges)  if (done.insert(n).second && visibleChain(n, root) && ! deniedAncestor(n)) auditNudge(*n);
         for (auto* d : boxes)   if (done.insert(d).second && visibleChain(d, root) && ! deniedAncestor(d)) auditDropdown(*d, stepThroughChoices);
+        std::vector<juce::Button*> buttons;  collect(*root, buttons);
+        for (auto* b : buttons) if (done.insert(b).second && visibleChain(b, root) && b->isEnabled()) auditButton(*b);
+        sweepCustom(*root);
     }
 };
+
+// A switch (or any button): it must have a name for the status bar, and a toggle or radio choice is clicked and must report.
+// A plain action button is only checked for its name (clicking it could open a dialog or add something).
+void Audit::auditButton(juce::Button& b)
+{
+    // A button inside another audited control (a dropdown's arrow, a knob's reset) belongs to that control.
+    for (auto* p = b.getParentComponent(); p != nullptr; p = p->getParentComponent())
+        if (dynamic_cast<KnobWithLabel*>(p) || dynamic_cast<DropdownSelect*>(p) || dynamic_cast<NudgeInput*>(p)) return;
+
+    if (mu_ui::statusNameOf(b).isEmpty())
+    {
+        ++unnamedButtons;
+        missing.push_back({ "button (no name)", b.getButtonText().isNotEmpty() ? b.getButtonText() : b.getName(), where(&b) });
+        return;
+    }
+    if (! b.getClickingTogglesState() && b.getRadioGroupId() == 0) return;
+
+    // The shell binds buttons on its refresh timer: the pump before the sweep has given this one its reporter.
+    juce::Button* previouslyOn = nullptr;
+    if (b.getRadioGroupId() != 0 && ! b.getToggleState())
+        if (auto* parent = b.getParentComponent())
+            for (auto* sibling : parent->getChildren())
+                if (auto* other = dynamic_cast<juce::Button*>(sibling))
+                    if (other != &b && other->getRadioGroupId() == b.getRadioGroupId() && other->getToggleState()) previouslyOn = other;
+
+    clearBar();
+    b.triggerClick();   // asynchronous: the button goes down, up, then clicks
+    pump(220);
+    ++checked;
+    ++switchesClicked;
+    if (verbose) std::printf("  switch [%s] bound=%d toggles=%d radio=%d\n", b.getButtonText().toRawUTF8(), (int) b.getProperties().contains(mu_ui::kStatusBoundProperty), (int) b.getClickingTogglesState(), b.getRadioGroupId());
+    if (silent()) missing.push_back({ "switch", mu_ui::statusNameOf(b), where(&b) });
+
+    if (previouslyOn != nullptr) { previouslyOn->triggerClick(); pump(220); }   // put a radio choice back
+    else if (b.getRadioGroupId() == 0) { b.triggerClick(); pump(220); }          // put a toggle back
+}
+
+// A custom control: a visible leaf component that takes mouse clicks and is not one of the standard controls audited above.
+bool isCustomCandidate(juce::Component& c, const juce::Component* root)
+{
+    bool onThis = false, onChildren = false;
+    c.getInterceptsMouseClicks(onThis, onChildren);
+    // A custom control that holds child components (a step row with its own cells over a bar) is probed on its own surface.
+    static const char* composites[] = { "GatingDesigner", "StepRows", "TrackStepRow" };
+    bool composite = false;
+    for (auto* n : composites) composite = composite || typeName(c).contains(n);
+    if ((c.getNumChildComponents() != 0 && ! composite) || ! onThis || c.getWidth() < 6 || c.getHeight() < 6) return false;
+    if (! visibleChain(&c, root) || deniedAncestor(&c)) return false;
+    if (c.getProperties().contains(mu_ui::kStatusExemptProperty)) return false;
+    if (dynamic_cast<juce::Button*>(&c) || dynamic_cast<juce::Slider*>(&c) || dynamic_cast<juce::ComboBox*>(&c)
+        || dynamic_cast<juce::Label*>(&c) || dynamic_cast<juce::TextEditor*>(&c) || dynamic_cast<StatusBar*>(&c)) return false;
+    for (auto* p = c.getParentComponent(); p != nullptr; p = p->getParentComponent())
+        if (dynamic_cast<KnobWithLabel*>(p) || dynamic_cast<DropdownSelect*>(p) || dynamic_cast<NudgeInput*>(p) || dynamic_cast<StatusBar*>(p)
+            || dynamic_cast<juce::Slider*>(p) || dynamic_cast<juce::ComboBox*>(p) || dynamic_cast<juce::TextEditor*>(p))
+            return false;
+    return true;
+}
+
+// Presses, drags and releases the mouse on a custom control at a few points of its own surface; the status bar must say something.
+void Audit::probe(juce::Component& c)
+{
+    const auto bounds = c.getLocalBounds().toFloat();
+    static const juce::Point<float> at[] = { { 0.5f, 0.5f }, { 0.2f, 0.3f }, { 0.8f, 0.3f }, { 0.3f, 0.75f }, { 0.75f, 0.75f },
+                                                { 0.5f, 0.08f }, { 0.25f, 0.15f }, { 0.8f, 0.12f }, { 0.12f, 0.5f }, { 0.9f, 0.9f } };   // the top rows, a left label strip, a corner
+    const auto source = juce::Desktop::getInstance().getMainMouseSource();
+    const auto now = juce::Time::getCurrentTime();
+    const juce::ModifierKeys left(juce::ModifierKeys::leftButtonModifier), none;
+    bool tried = false;
+
+    for (auto f : at)
+    {
+        const auto pos = juce::Point<float>(bounds.getX() + bounds.getWidth() * f.x, bounds.getY() + bounds.getHeight() * f.y);
+        if (c.getNumChildComponents() > 0 && c.getComponentAt(pos.toInt()) != &c) continue;   // a child is there: it is audited itself
+        tried = true;
+        if (verbose) std::printf("  probe %s at %d,%d of %dx%d\n", typeName(c).toRawUTF8(), (int) pos.x, (int) pos.y, c.getWidth(), c.getHeight());
+        clearBar();
+        const auto moved = pos + juce::Point<float>(6.0f, 0.0f);
+        c.mouseDown(juce::MouseEvent(source, pos, left, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &c, &c, now, pos, now, 1, false));
+        c.mouseDrag(juce::MouseEvent(source, moved, left, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &c, &c, now, pos, now, 1, true));
+        c.mouseUp(juce::MouseEvent(source, moved, none, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &c, &c, now, pos, now, 1, true));
+        pump(30);
+        if (! silent()) { ++checked; return; }
+    }
+    if (tried) { ++checked; missing.push_back({ "custom control", typeName(c), where(&c) }); }
+}
+
+void Audit::sweepCustom(juce::Component& c)
+{
+    for (auto* child : c.getChildren())
+    {
+        if (isCustomCandidate(*child, root) && done.insert(child).second) probe(*child);
+        sweepCustom(*child);
+    }
+}
 
 // A pick in the popup: the item is selected and the combo's own change handler runs (this JUCE delivers a requested notification
 // later, on the message loop, so it is called here directly: the same handler, at a known moment).
@@ -173,13 +274,13 @@ void Audit::auditDropdown(DropdownSelect& d, bool stepThroughChoices)
     ++checked;
     if (silent())
         missing.push_back({ "dropdown", combo.getText().isNotEmpty() ? combo.getText() : juce::String("(item ") + juce::String(ids.front()) + ")", where(&d) });
-    pump(30);
+    pump(150);
     sweep(false);
     if (stepThroughChoices)
         for (size_t i = 1; i < ids.size(); ++i)
         {
             pick(combo, ids[i]);
-            pump(30);
+            pump(150);
             sweep(false);
         }
     pick(combo, original);
@@ -196,7 +297,7 @@ int auditOne(const juce::String& product, const juce::String& tag, const std::fu
     if (prepare) prepare(*processor);
     std::unique_ptr<juce::AudioProcessorEditor> editor(processor->createEditorIfNeeded());   // the way a host asks
     if (editor == nullptr) { std::fprintf(stderr, "%s: createEditor returned null\n", product.toRawUTF8()); failure = 3; return 0; }
-    pump(300);
+    pump(700);   // long enough for the shell's refresh timer to give every button its status reporter
 
     Audit audit;
     audit.root = editor.get();

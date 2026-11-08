@@ -1,4 +1,5 @@
 #include "TrackStepRow.h"
+#include "UI/StatusSink.h"
 #include "Audio/MusicalScales.h"   // mu-core: note names, scale membership
 #include "Audio/ChordVoicing.h"      // a Chord step's name
 #include "Sequencer/StepClock.h"   // currentStep
@@ -329,6 +330,10 @@ void TrackStepRow::mouseDown(const juce::MouseEvent& e)
         selectedStep = step;
         if (onStepSelected) onStepSelected(step);
     }
+    // The status bar names the step and whether it is on now (to the owner's hook if it set one, else straight to the editor).
+    const auto stepName = "Step " + juce::String(step + 1);
+    const juce::String stepValue = host.getTrack(slot).row.isOn(step) ? "On" : "Off";
+    if (onStatusUpdate) onStatusUpdate(stepName, stepValue); else mu_ui::reportStatus(*this, stepName, stepValue);
     repaint();
 }
 
@@ -338,7 +343,7 @@ void TrackStepRow::mouseDrag(const juce::MouseEvent& e)
     juce::String name, value;
     if (dragStepValue(host, slot, dragStep, stepDrag, e, name, value))
     {
-        if (onStatusUpdate) onStatusUpdate(name, value);
+        if (onStatusUpdate) onStatusUpdate(name, value); else mu_ui::reportStatus(*this, name, value);
         if (onStepSelected) onStepSelected(dragStep);   // the Step panel shows the new value
         repaint();
         return;

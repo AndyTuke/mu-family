@@ -289,6 +289,26 @@ Used only for enable/disable toggles on FX/Delay/Reverb rows. Size 36×22px. Sta
 
 One global StatusBar per plugin. All controls report to it; a tooltip never carries a parameter name or value. The only tooltips are the one-line hints allowed in §1 (icon-only buttons and a few non-obvious controls), shown by the single `juce::TooltipWindow` the editor shell owns (700 ms delay). `onStatusUpdate(name, valueString)` fires on `mouseEnter` (hover) and on value change.
 
+#### Every control reports to the status bar (hard rule, owner 2026-11-08)
+
+**In every app, the status bar shows the name and value of the last control touched, without fail.** A control that does not report is a defect, not a nicety. The rule covers every knob, number box, dropdown, switch, button, segment control and custom control (step cells, the gate designer, curve and timeline editors, sidebar items), including each new one. The mechanism is in `mu-core`, so a product writes next to no code for it ([StatusSink.h](../mu-core/UI/StatusSink.h)):
+
+| Control | How it reports | What the product does |
+|---|---|---|
+| Knob (`KnobWithLabel`) | through the shell (`forwardKnobStatus`, `LayerPanel::onStatusUpdate`) | nothing |
+| Dropdown, number box | `setStatusName("Name")` on the control; a change reports to the nearest `mu_ui::StatusSink` (the editor) | name it (`addChoiceItems` names parameter-backed ones itself) |
+| Switch or button (any `juce::Button`) | the shell gives every button a `ButtonStatusReporter` on its refresh timer; the name is the `mu_ui::setStatusName` property, else the button text, tooltip or component name | nothing, unless the button is glyph-only (give it `mu_ui::setStatusName`) |
+| `SegmentControl` | `mu_ui::setStatusName(control, "Name")`; the chosen label is the value | name it |
+| Custom control (own `mouseDown` / `mouseDrag`) | calls `mu_ui::reportStatus(*this, name, value)` where it changes something | report; or, if it is a display or overlay and not a control, add a `// status-ok: <reason>` comment (or `mu_ui::exemptFromStatus`) |
+
+The common property is a component property, `muStatusName` (`mu_ui::setStatusName` / `statusNameOf`), read by the one reporting path; nothing else may talk to the status bar directly. Name and value follow section 6.4 (no units on labels beyond the value formatters, "On" / "Off" for switches, "Selected" for a radio choice, "Clicked" for an action).
+
+**Checked two ways, both required before a control or panel change is done:**
+1. `pwsh tests/scripts/run-ui-audits.ps1`: one `<product>-ui-audit` app per product builds the product's real editor and changes every knob, number box and dropdown (stepping through each engine and mode), clicks every switch and radio choice, names-checks every action button, and presses, drags and releases the mouse on every custom control; it fails on any that leaves the status bar empty. A glyph-only button with no name also fails.
+2. `pwsh tests/scripts/check-status-controls.ps1` (run by the first): every UI source file that handles the mouse must report or carry a `status-ok:` reason.
+
+**The `ux-controller` checks this on every UI change:** a new control type, panel, overlay or product is not accepted until both checks pass and its name and value read well in the bar. A new product is added to the audit (`mu_add_ui_audit` in the root `CMakeLists.txt`).
+
 #### Update notice (ruled 2026-10-19; backlog #1612)
 
 One quiet surface: **a text link at the right edge of the StatusBar**. It replaces the full-width `upgradeBanner` strip (20 px, always shown, no way to dismiss it), which is retired together with `kUpgradeBannerH`. No modal, no dismissible prompt, no About notice (About stays as ruled in section 5), no sound, no animation.

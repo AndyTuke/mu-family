@@ -1,4 +1,5 @@
 #include "UI/Components/LoopWaveform.h"
+#include "UI/StatusSink.h"
 
 #include "UI/Components/MuLookAndFeel.h"
 
@@ -344,6 +345,7 @@ void LoopWaveform::mouseDown(const juce::MouseEvent& e)
     }
     if (hovered > 0 && hovered < (int) markers.size() && crossOf(hovered).contains(e.getPosition()))
     {
+        mu_ui::reportStatus(*this, "Marker", "Removed");
         if (onMarkerDeleteRequested) onMarkerDeleteRequested(hovered);
         hovered = -1;
         return;
@@ -353,6 +355,7 @@ void LoopWaveform::mouseDown(const juce::MouseEvent& e)
     const int m = markerNear(e.x);
     if (m > 0 && (e.mods.isAltDown()))
     {
+        mu_ui::reportStatus(*this, "Marker", "Removed");
         if (onMarkerDeleteRequested) onMarkerDeleteRequested(m);
         return;
     }
@@ -365,6 +368,7 @@ void LoopWaveform::mouseDown(const juce::MouseEvent& e)
     }
     pressedRegion = r;
     regionDragging = false;
+    if (r >= 0) mu_ui::reportStatus(*this, "Region", juce::String(r + 1));
     if (r >= 0 && onRegionClicked) onRegionClicked(r);
 }
 
@@ -395,6 +399,7 @@ void LoopWaveform::mouseDrag(const juce::MouseEvent& e)
         if (draggingRange == 0) rangeStart = std::clamp(pos, 0, std::max(0, getPlayEnd() - minSpan));
         else                    rangeEnd = std::clamp(pos, std::min(length(), rangeStart + minSpan), length());
         repaint();
+        mu_ui::reportStatus(*this, draggingRange == 0 ? "Play Range Start" : "Play Range End", juce::String(draggingRange == 0 ? rangeStart : getPlayEnd()) + " samples");
         if (onPlayRangeChanged) onPlayRangeChanged(rangeStart, getPlayEnd());
         return;
     }
@@ -409,6 +414,7 @@ void LoopWaveform::mouseDrag(const juce::MouseEvent& e)
     int pos = sampleAt(e.x);
     if (snapMarker && ! e.mods.isShiftDown()) pos = snapMarker(pos, samplesPerPixel());
     pos = std::clamp(pos, 1, std::max(1, length() - 1));
+    mu_ui::reportStatus(*this, "Marker " + juce::String(dragging), juce::String(pos) + " samples");
     if (onMarkerMoved) onMarkerMoved(dragging, pos);
 }
 
@@ -432,6 +438,7 @@ void LoopWaveform::mouseDoubleClick(const juce::MouseEvent& e)
         if (labelOf(i).contains(e.getPosition())) { beginRename(i); return; }
     int pos = sampleAt(e.x);
     if (snapNewMarker) pos = snapNewMarker(pos);
+    mu_ui::reportStatus(*this, "Marker", "Added");
     if (onMarkerAddRequested) onMarkerAddRequested(std::clamp(pos, 1, std::max(1, length() - 1)));
 }
 

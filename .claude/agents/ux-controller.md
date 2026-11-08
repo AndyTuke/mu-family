@@ -46,6 +46,8 @@ Keep rulings short. Never pad them with options you will not pursue; give a reco
 
 When asked to review a UI change, compare the code and the rendered result description against the docs and report: violations (hardcoded values, one-off controls, off-token colours, wrong sizes, inconsistent patterns), each with the file:line and the correct answer, then anything the docs should now say. Report; do not edit source.
 
+**Status-bar hard rule, checked on every UI change** (owner, 2026-11-08; [docs/design-ui-family.md](../../docs/design-ui-family.md), "Every control reports to the status bar"). In every app the status bar shows the name and value of the last control touched, without fail. For each UI change, check that every new or changed knob, number box, dropdown, switch, button, segment control and custom control reports (the table in that section says how each kind does), that its name and value read well in the bar, and that a new product is in the audit. Ask for `pwsh tests/scripts/run-ui-audits.ps1` to have been run and passed (it includes `check-status-controls.ps1`); a change that leaves a control silent, or adds a mouse-handling control with neither a report nor a `status-ok:` reason, is a violation and is not signed off.
+
 ## Keeping the docs
 
 - Update the design docs in the same turn as any ruling, so docs and decisions never drift. Edit in place in the right section; do not append a changelog to the end.

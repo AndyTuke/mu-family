@@ -175,6 +175,7 @@ void PluginEditor::parameterChanged(const juce::String& parameterID, float /*new
 
 void PluginEditor::timerCallback()
 {
+    mu_ui::bindButtonsIn(*this);   // every button reports its clicks to the status bar
     if (noteDirty.exchange(false, std::memory_order_acq_rel))
         if (const auto* note = proc.apvts.getRawParameterValue(kMidiNoteId))
             noteSelector.setSelectedId((int) note->load() + 1, false);

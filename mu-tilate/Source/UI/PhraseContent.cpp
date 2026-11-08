@@ -167,6 +167,7 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
 
     addAndMakeVisible(waveform);
     addAndMakeVisible(viewSwitch);
+    mu_ui::setStatusName(viewSwitch, "View");
     viewSwitch.onChange = [this](int) { updateView(); };
     addChildComponent(slicePanel);
     slicePanel.onStatusUpdate = [this](const juce::String& n, const juce::String& v) { if (onStatusUpdate) onStatusUpdate(n, v); };

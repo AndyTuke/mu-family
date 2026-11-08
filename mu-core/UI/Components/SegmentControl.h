@@ -1,6 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "MuLookAndFeel.h"
+#include "UI/StatusSink.h"
 
 // 2–5 option toggle bar. Each segment is mutually exclusive.
 // activeStyle controls the colour of the selected segment.

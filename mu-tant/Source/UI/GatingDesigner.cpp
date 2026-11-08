@@ -1,5 +1,6 @@
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "GatingDesigner.h"
+#include "UI/StatusSink.h"
 
 #include <cmath>
 #include <thread>
@@ -543,18 +544,24 @@ void GatingDesigner::mouseDown(const juce::MouseEvent& e)
             withLock(pat, [&] { GateEnvelope env; env.startCell = cell; env.lengthCells = 1; pat->addEnvelope(env); });
             markPathsDirty();
             repaint();
+            mu_ui::reportStatus(*this, "Gate Envelope", "Added at step " + juce::String(cell + 1));
             break;
         }
         case GateTool::Eraser:
             withLock(pat, [&] { pat->removeEnvelopeCovering(cell); });
             markPathsDirty();
             repaint();
+            mu_ui::reportStatus(*this, "Gate Envelope", "Removed at step " + juce::String(cell + 1));
             break;
         case GateTool::Reverse:
-            withLock(pat, [&] { for (auto& env : pat->envelopes) if (env.covers(cell)) { env.reverse = !env.reverse; break; } });
+        {
+            bool reversed = false;
+            withLock(pat, [&] { for (auto& env : pat->envelopes) if (env.covers(cell)) { env.reverse = !env.reverse; reversed = env.reverse; break; } });
             markPathsDirty();
             repaint();
+            mu_ui::reportStatus(*this, "Gate Direction", reversed ? "Reversed" : "Forward");
             break;
+        }
     }
 }
 
@@ -582,6 +589,7 @@ void GatingDesigner::mouseDrag(const juce::MouseEvent& e)
             withLock(pat, [&] { auto& env = pat->envelopes[(size_t)dragEnvIndex]; env.split = env.reverse ? (1.0f - pf) : pf; });
             markPathsDirty();
             repaint();
+            mu_ui::reportStatus(*this, "Gate Peak", juce::String(juce::roundToInt(pf * 100.0f)) + " %");
             break;
         }
         case DragKind::RiseBend:
@@ -597,6 +605,7 @@ void GatingDesigner::mouseDrag(const juce::MouseEvent& e)
             });
             markPathsDirty();
             repaint();
+            mu_ui::reportStatus(*this, dragKind == DragKind::RiseBend ? "Gate Rise Bend" : "Gate Fall Bend", juce::String(juce::roundToInt(nb * 100.0f)) + " %");
             break;
         }
         case DragKind::StartEdge:
@@ -610,6 +619,7 @@ void GatingDesigner::mouseDrag(const juce::MouseEvent& e)
             });
             markPathsDirty();
             repaint();
+            mu_ui::reportStatus(*this, "Gate Start", "Step " + juce::String(newStart + 1));
             break;
         }
         case DragKind::EndEdge:
@@ -622,6 +632,7 @@ void GatingDesigner::mouseDrag(const juce::MouseEvent& e)
             });
             markPathsDirty();
             repaint();
+            mu_ui::reportStatus(*this, "Gate Length", juce::String(newEnd - curStart + 1) + (newEnd == curStart ? " step" : " steps"));
             break;
         }
         case DragKind::None: break;

@@ -1,4 +1,5 @@
 #include "RhythmCircle.h"
+#include "UI/StatusSink.h"
 
 namespace mu_ui {
 
@@ -20,6 +21,7 @@ namespace
 RhythmCircle::RhythmCircle()
 {
     arcPulses.fill({});
+    mu_ui::exemptFromStatus(*this, "display only: the circle shows the pattern and takes no clicks");
     startTimerHz((int) kTimerHz);
 }
 

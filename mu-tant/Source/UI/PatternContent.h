@@ -107,7 +107,7 @@ private:
     class NoteModeSelector : public SegmentControl, public juce::SettableTooltipClient
     {
     public:
-        NoteModeSelector() : SegmentControl({ "Free", "Note" }, ActiveStyle::General, DrawStyle::Lcd) {}
+        NoteModeSelector() : SegmentControl({ "Free", "Note" }, ActiveStyle::General, DrawStyle::Lcd) { mu_ui::setStatusName(*this, "Note Mode"); }
         std::function<void(int segment)> onHover;
         void mouseMove(const juce::MouseEvent& e) override
         {

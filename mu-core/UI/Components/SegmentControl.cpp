@@ -1,4 +1,5 @@
 #include "SegmentControl.h"
+#include "UI/StatusSink.h"
 
 SegmentControl::SegmentControl(std::initializer_list<juce::String> labels,
                                ActiveStyle s, DrawStyle d)
@@ -161,4 +162,7 @@ void SegmentControl::mouseDown(const juce::MouseEvent& e)
     if (n == 0) return;
     const int idx = juce::jlimit(0, n - 1, (int)(e.x / ((float)getWidth() / n)));
     setSelectedIndex(idx, true);
+    // A segment control with a status name (mu_ui::setStatusName) shows its choice on the status bar.
+    if (const auto named = mu_ui::statusNameOf(*this); named.isNotEmpty() && idx < (int) options.size())
+        mu_ui::reportStatus(*this, named, options[(size_t) idx]);
 }

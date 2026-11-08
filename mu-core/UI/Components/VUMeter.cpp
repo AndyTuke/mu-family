@@ -1,4 +1,5 @@
 #include "VUMeter.h"
+#include "UI/StatusSink.h"
 #include "MuLookAndFeel.h"
 #include <cmath>
 
@@ -88,6 +89,7 @@ void VUMeter::mouseDown(const juce::MouseEvent&)
 {
     for (auto& b : bars) { b.clipLit = false; b.clipHold = 0; }
     repaint();
+    mu_ui::reportStatus(*this, "Clip Lights", "Cleared");
 }
 
 void VUMeter::paint(juce::Graphics& g)

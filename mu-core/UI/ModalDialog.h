@@ -1,4 +1,5 @@
 #pragma once
+// status-ok: a modal overlay or dialog, not a control on the editor; its own controls are the standard ones.
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 #include <limits>

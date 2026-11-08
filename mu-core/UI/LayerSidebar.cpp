@@ -14,6 +14,7 @@ LayerSidebar::LayerSidebar(ProcessorBase& processor, const juce::String& addButt
     sceneGrid.bind(proc.getLiveView(), proc.getControlSink());
 
     addButton.onClick = [this] { if (onAddLayer) onAddLayer(); };
+    mu_ui::setStatusName(pageSwitch, "Layer Page");
     pageSwitch.onChange = [this](int page) { showPage(page); };
 
     // Metal style: every visible item's raised box, all shadows first, then the faces.

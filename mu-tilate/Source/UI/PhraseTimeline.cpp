@@ -1,4 +1,5 @@
 #include "UI/PhraseTimeline.h"
+#include "UI/StatusSink.h"
 
 #include "UI/Components/MuLookAndFeel.h"
 
@@ -439,6 +440,7 @@ void PhraseTimeline::mouseDown(const juce::MouseEvent& e)
     {
         panning = true;
         panStartBeat = viewStart;
+        mu_ui::reportStatus(*this, "Timeline View", "Panning");
         return;
     }
     if (! rowArea().contains(e.getPosition())) return;
@@ -458,6 +460,7 @@ void PhraseTimeline::mouseDown(const juce::MouseEvent& e)
         dragEdge = Edge::None;
         dragOrigin = timeline;
         dragOriginIndex = cornerBlock;
+        mu_ui::reportStatus(*this, curveBlock >= 0 ? "Block Curve" : "Block Envelope", "Block " + juce::String(cornerBlock + 1));
         if (onBlockSelected) onBlockSelected(cornerBlock);
         repaint();
         return;
@@ -476,6 +479,7 @@ void PhraseTimeline::mouseDown(const juce::MouseEvent& e)
         grabOffset = beatAt(e.x) - timeline.blocks()[(size_t) hit].start;
         dragOrigin = timeline;
         dragOriginIndex = hit;
+        mu_ui::reportStatus(*this, levelBlock >= 0 ? "Block Level" : edgeBlock >= 0 ? "Block Edge" : "Block", "Block " + juce::String(hit + 1));
         if (onBlockSelected) onBlockSelected(hit);
         repaint();
         return;
@@ -490,6 +494,7 @@ void PhraseTimeline::mouseDown(const juce::MouseEvent& e)
         const double beat = e.mods.isShiftDown() ? beatAt(e.x) : Timeline::snap(beatAt(e.x), gridBeats);
         const auto start = settingsOfSlice ? settingsOfSlice(slice) : SliceSettings();
         onEdit([slice, beat, start](Timeline& t) { t.place(slice, beat, 0.0, start); });
+        mu_ui::reportStatus(*this, "Block", "Placed at beat " + juce::String(beat + 1.0, 2));
         selected = timeline.indexAt(beat);   // the edit has been published: the new hit is the one at this beat
         if (selected >= 0 && std::abs(timeline.blocks()[(size_t) selected].start - beat) > 1.0e-6) selected = -1;
         if (onBlockSelected) onBlockSelected(selected);

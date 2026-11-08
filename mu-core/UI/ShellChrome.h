@@ -10,6 +10,7 @@
 #include "Control/LiveView.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/StatusBar.h"
+#include "UI/StatusSink.h"
 #include "UI/TransportBar.h"
 #include "UI/AboutOverlay.h"
 #include "UI/SaveDialog.h"
@@ -244,6 +245,9 @@ private:
     private:
         void timerCallback() override
         {
+            // Every button in the editor reports its clicks to the status bar (new ones included): no per-product wiring.
+            mu_ui::bindButtonsIn(host);
+
             juce::String text;
             if (auto* c = juce::Desktop::getInstance().getMainMouseSource().getComponentUnderMouse())
             {

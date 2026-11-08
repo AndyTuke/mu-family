@@ -1,4 +1,5 @@
 #pragma once
+// status-ok: a modal overlay or dialog, not a control on the editor; its own controls are the standard ones.
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "UI/ModalCard.h"   // shared dim backdrop

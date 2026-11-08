@@ -1,4 +1,5 @@
 #include "LFOEditor.h"
+#include "UI/StatusSink.h"
 #include "Modulation/SmoothCurve.h"   // the shared Smooth curve tangents
 
 static constexpr float kPointRadius  = 5.0f;
@@ -461,4 +462,7 @@ void LFOEditor::notifyChanged()
 {
     repaint();
     if (onChange) onChange(points);
+    // The status bar shows the curve being drawn (a name from setStatusName if the owner gave one).
+    const auto named = mu_ui::statusNameOf(*this);
+    mu_ui::reportStatus(*this, named.isNotEmpty() ? named : juce::String("Curve"), juce::String((int) points.size()) + " points");
 }

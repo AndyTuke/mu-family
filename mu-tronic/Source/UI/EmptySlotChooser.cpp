@@ -1,4 +1,5 @@
 #include "UI/EmptySlotChooser.h"
+#include "UI/StatusSink.h"
 
 #include <algorithm>
 
@@ -215,6 +216,7 @@ void EmptySlotChooser::mouseUp(const juce::MouseEvent& e)
     for (const auto& c : cards)
         if (c.box.contains(e.getPosition()))
         {
+            mu_ui::reportStatus(*this, "New Layer", c.name);
             if (onChoose) onChoose(c.id);
             return;
         }

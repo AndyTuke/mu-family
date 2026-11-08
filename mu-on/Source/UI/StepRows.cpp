@@ -130,6 +130,7 @@ void StepRows::mouseDown(const juce::MouseEvent& e)
     const int row = e.getPosition().y / rh;
     if (row < 0 || row >= host.getTrackCount()) return;
     if (onRowClicked) onRowClicked(row);
+    if (onStatusUpdate) onStatusUpdate("Track", "Row " + juce::String(row + 1));   // a click outside a cell still selects the row
 
     // A Rumble row is not editable; a click on a cell of any other row edits it.
     int r = 0, s = 0;
@@ -149,6 +150,9 @@ void StepRows::mouseDown(const juce::MouseEvent& e)
         selectedStep = s;
         if (onStepSelected) onStepSelected(r, s);
     }
+    // The status bar names the step and whether it is on after the click.
+    if (onStatusUpdate)
+        onStatusUpdate("Step " + juce::String(s + 1), host.getTrack(r).row.isOn(s) ? "On" : "Off");
     repaint(rowArea(r));
 }
 

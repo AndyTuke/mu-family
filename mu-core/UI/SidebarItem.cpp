@@ -1,4 +1,5 @@
 #include "SidebarItem.h"
+#include "UI/StatusSink.h"
 
 SidebarItem::SidebarItem(int idx)
     : index(idx)
@@ -235,6 +236,7 @@ void SidebarItem::mouseUp(const juce::MouseEvent& e)
     const bool wasDragging = isDragging;
     isDragging = false;
     const int idx = index;
+    mu_ui::reportStatus(*this, wasDragging ? "Layer Moved" : "Layer", name);   // before any callback: they can rebuild the sidebar and free this item
     if (wasDragging)
     {
         if (auto cb = onDragEnd) cb(idx, e);

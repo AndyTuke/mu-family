@@ -1,5 +1,6 @@
 #include "UI/PresetDropdown.h"   // shared preset scan + selector fill
 #include "TransportBar.h"
+#include "UI/StatusSink.h"
 
 static const juce::String kPlay = juce::String(juce::CharPointer_UTF8("\xe2\x96\xb6"));
 static const juce::String kStop = juce::String(juce::CharPointer_UTF8("\xe2\x96\xa0"));
@@ -15,6 +16,7 @@ TransportBar::TransportBar(mu_core::ShellBackend& backend)
         proc.toggleInternalPlay();
         refreshPlayBtn();
     };
+    mu_ui::setStatusName(playBtn, "Play / Stop");   // glyph-only buttons name themselves for the status bar
     playBtn.setEnabled(true); // always enabled so colour reflects state; click is no-op in plugin
     addAndMakeVisible(playBtn);
 
@@ -129,6 +131,7 @@ TransportBar::TransportBar(mu_core::ShellBackend& backend)
     addAndMakeVisible(mixerBtn);
 
     gearBtn.setButtonText(kGear);
+    mu_ui::setStatusName(gearBtn, "Settings");
     gearBtn.onClick = [this] { if (onSettingsToggle) onSettingsToggle(); };
     addAndMakeVisible(gearBtn);
 

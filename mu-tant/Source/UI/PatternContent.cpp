@@ -193,6 +193,8 @@ void PatternContent::setupSourceControls()
     // X-Mod mode switches — manually wired to the choice params (item index = choice
     // index) in setLayer(); the amp-mode change also rebinds the Depth knob's target.
     xmodDepthKnob.getSlider().setDoubleClickReturnValue(true, 0.0);
+    mu_ui::setStatusName(phaseModeCtrl, "X-Mod Phase Mode");
+    mu_ui::setStatusName(ampModeCtrl, "X-Mod Amp Mode");
     addAndMakeVisible(phaseModeCtrl);
     addAndMakeVisible(ampModeCtrl);
     phaseModeCtrl.onChange = [this](int idx) {
