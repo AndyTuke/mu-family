@@ -108,7 +108,7 @@ struct RenderContextLayoutTests : juce::UnitTest
         expectEquals((int) offsetof(RenderContext, retiring), 76);
         expectEquals((int) offsetof(RenderContext, frozen), 77);
         expectEquals((int) offsetof(RenderContext, stoppedUnrendered), 78);
-        expectEquals((int) offsetof(RenderContext, reserved), 79);
+        expectEquals((int) offsetof(RenderContext, fill), 79);
         expectEquals((int) offsetof(RenderContext, midi), 80);
         expectEquals((int) offsetof(RenderContext, midiOut), 104);
         expectEquals((int) offsetof(RenderContext, peers), 128);

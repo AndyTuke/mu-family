@@ -103,6 +103,8 @@ namespace
 
         bool   isTrackTransportPlaying() const noexcept override { return proc.isInternalPlaying(); }
         double getTrackTransportBeat() const noexcept override   { return proc.getInternalBeatPos(); }
+        bool   isTrackFillHeld() const noexcept override         { return proc.isFillHeld(); }
+        void   setTrackFillHeld(bool held) noexcept override     { proc.setFillHeld(held); }
 
     private:
         ProcessorBase& proc;

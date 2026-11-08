@@ -101,6 +101,7 @@ private:
     int slot         = 0;
     int playheadStep = -1;
     long long shownPass = -2;          // the pass the dimmed steps were drawn for
+    bool shownFill = false;            // whether Fill was held when the dimmed steps were drawn
     juce::uint64 shownSignature = 0;   // the colour and engine the row was last drawn with
     int hoverStep    = -1;
     int firstStep    = 0;      // the page shown

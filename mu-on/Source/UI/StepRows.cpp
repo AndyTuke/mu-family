@@ -202,6 +202,7 @@ void StepRows::timerCallback()
             pass = StepClock::passOfBeat(beat, length);
         }
         if (pass != shownPasses[(size_t) i]) { shownPasses[(size_t) i] = pass; changed = true; }
+        if (const bool fill = host.isTrackFillHeld(); fill != shownFill) { shownFill = fill; changed = true; }   // Fill steps change while it is held
         if (step != playheadSteps[(size_t) i]) { playheadSteps[(size_t) i] = step; changed = true; }
     }
     if (changed) repaint(getLocalBounds().withTrimmedBottom(mu_ui::s(kControlsH)));

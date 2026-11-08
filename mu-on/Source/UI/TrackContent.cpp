@@ -239,7 +239,7 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     addAndMakeVisible(ghostKnob);
     for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob, &levelKnob }) addAndMakeVisible(*k);
     // The STEP panel's controls edit the selected step of the shown track's row.
-    for (auto* cap : { &barsCaption, &lengthCaption, &voiceCaption, &octaveCaption, &noteCaption, &chordCaption })
+    for (auto* cap : { &condCaption, &barsCaption, &lengthCaption, &voiceCaption, &octaveCaption, &noteCaption, &chordCaption })
     {
         cap->setJustificationType(juce::Justification::centred);
         cap->setInterceptsMouseClicks(false, false);
@@ -250,6 +250,25 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     stepProbKnob.onValueChanged = [this](double v) { host.getTrack(currentLayer).row.setStepProb(selectedStepOf[(size_t) currentLayer], juce::roundToInt(v)); };
     stepProbKnob.onStatusUpdate = [this](const juce::String&, const juce::String& value) { if (onStatusUpdate) onStatusUpdate("Step Probability", value); };
     addAndMakeVisible(stepProbKnob);
+    // A step's condition: it plays only if this holds (after its loop, before its probability).
+    condSelect.addItem("Always play", 1);
+    condSelect.addItem("Play on Fill", 2);
+    condSelect.addItem("Play if prev. played", 3);
+    condSelect.addItem("Play if prev. didn't", 4);
+    condSelect.setStatusName("Step Condition");
+    condSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setStepCondition(selectedStepOf[(size_t) currentLayer], id - 1); };
+    // Fill is held, never latched: it is on while the button is down. It reports its own states (the button reporter skips it).
+    fillButton.getProperties().set(mu_ui::kStatusManualProperty, true);
+    fillButton.setTriggeredOnMouseDown(true);
+    fillButton.setTooltip("Hold to play the steps set to Play on Fill");
+    fillButton.onStateChange = [this]
+    {
+        const bool down = fillButton.isDown();
+        if (host.isTrackFillHeld() == down) return;
+        host.setTrackFillHeld(down);
+        mu_ui::reportStatus(*this, "Fill", down ? "On" : "Off");
+    };
+    addAndMakeVisible(fillButton);
     // A step's loop: Length is how many bars it spans (a bar is one pass through the row), Bars which of them it plays in.
     // Length 6 with Bars 1, 2 and 5 ticked plays the step in those three bars of every six.
     for (int n = 1; n <= StepRow::kMaxLoopBars; ++n) lengthSelect.addItem(juce::String(n) + (n == 1 ? " bar" : " bars"), n);
@@ -277,6 +296,7 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     for (int o = -2; o <= 2; ++o) octaveSelect.addItem((o > 0 ? "+" : "") + juce::String(o), o + 3);
     octaveSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setStepOctave(selectedStepOf[(size_t) currentLayer], id - 3); refreshNoteItems(); if (onStatusUpdate) onStatusUpdate("Step Octave", octaveSelect.getText()); };
     noteSelect.onChange   = [this](int id) { host.getTrack(currentLayer).row.setStepNote(selectedStepOf[(size_t) currentLayer], id - 13); if (onStatusUpdate) onStatusUpdate("Step Note", noteSelect.getText()); };
+    addAndMakeVisible(condSelect);
     addAndMakeVisible(barsSelect);
     addAndMakeVisible(lengthSelect);
     addChildComponent(voiceSelect);
@@ -480,6 +500,7 @@ void TrackContent::refreshStepPanel()
     }
     const int step = selected;
     stepProbKnob.setValue(row.stepProb(step), juce::dontSendNotification);
+    condSelect.setSelectedId(row.stepCondition(step) + 1, false);
     lengthSelect.setSelectedId(row.stepLoopLength(step), false);
     refreshBarsSelect(row, step);
     const bool hat = shownEngine == EngineType::Hat;
@@ -559,7 +580,7 @@ void TrackContent::rebuild()
     // Ghost steps are for the drum, percussion and Chord engines.
     ghostKnob.setVisible(shownEngine == EngineType::Kick || shownEngine == EngineType::Hat || shownEngine == EngineType::Snare || shownEngine == EngineType::FmPerc || shownEngine == EngineType::Chord);
     for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob, &levelKnob }) k->setVisible(! rumble);   // a Rumble's box holds its envelope
-    for (auto* c : { (juce::Component*) &stepProbKnob, (juce::Component*) &barsCaption, (juce::Component*) &barsSelect, (juce::Component*) &lengthCaption, (juce::Component*) &lengthSelect }) c->setVisible(! rumble);
+    for (auto* c : { (juce::Component*) &stepProbKnob, (juce::Component*) &condCaption, (juce::Component*) &condSelect, (juce::Component*) &barsCaption, (juce::Component*) &barsSelect, (juce::Component*) &lengthCaption, (juce::Component*) &lengthSelect }) c->setVisible(! rumble);
     refreshStepPanel();
     soloBtn.setVisible(! rumble);
     rumbleLength.setVisible(rumble);
@@ -773,7 +794,11 @@ void TrackContent::resized()
     rows.setBounds(stepsInner);
     // The lone row is as tall as one of the rows above is, top-aligned (the rest of the box stays blank metal).
     soloRow.setBounds(stepsInner.withHeight(stepsInner.getHeight() / mu_limits::kLayersPerPage));
-    soloPager.setBounds(stepsInner.withTop(stepsInner.getBottom() - s(StepPager::kHeight)));
+    // The Fill button takes the strip's free left end (the label column, which StepRows' own pager leaves clear).
+    const auto pagerStrip = stepsInner.withTop(stepsInner.getBottom() - s(StepPager::kHeight));
+    const int fillW = s(StepRows::kLabelW);
+    fillButton.setBounds(pagerStrip.withWidth(fillW).withTrimmedRight(s(LF::kSpaceS)).reduced(0, s(LF::kPagerPad)));
+    soloPager.setBounds(pagerStrip.withTrimmedLeft(fillW));
 
     auto g = grooveBoxR.reduced(clear, s(LF::kSpaceS));
     if (rumble)
@@ -840,6 +865,7 @@ void TrackContent::layoutStepPanel()
         placeDropdown(octaveCaption, octaveSelect, left, y);
         placeDropdown(chordCaption, chordSelect, left, y);
         placeLoopPair(left, y);
+        placeDropdown(condCaption, condSelect, left, y);
         int ky = in.getY();
         for (auto* k : { &stepProbKnob, &invKnob, &spreadKnob })
         {
@@ -857,6 +883,7 @@ void TrackContent::layoutStepPanel()
     placeDropdown(voiceCaption, voiceSelect, in, yHat);
     placeDropdown(octaveCaption, octaveSelect, in, y);
     placeDropdown(noteCaption, noteSelect, in, y);
+    placeDropdown(condCaption, condSelect, in, y);
 }
 
 void TrackContent::paint(juce::Graphics& g)

@@ -41,6 +41,7 @@ inline juce::String statusNameOfParameter(const juce::String& parameterName)
 // those cannot report, and the ui-audit lists it: give it a name.
 inline constexpr const char* kStatusNameProperty  = "muStatusName";
 inline constexpr const char* kStatusBoundProperty = "muStatusBound";
+inline constexpr const char* kStatusManualProperty = "muStatusManual";   // a button that reports its own states (a momentary one): the reporter leaves it alone
 
 // Names any control for the status bar (the one common property the bar reads); a button's own text/tooltip is the fallback.
 inline void setStatusName(juce::Component& control, const juce::String& name) { control.getProperties().set(kStatusNameProperty, name); }
@@ -82,6 +83,7 @@ public:
 private:
     void buttonClicked(juce::Button* b) override
     {
+        if (b->getProperties().contains(kStatusManualProperty)) return;
         const auto name = statusNameOf(*b);
         if (name.isNotEmpty()) reportStatus(*b, name, statusValueOf(*b));
     }

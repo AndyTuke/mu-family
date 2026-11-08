@@ -419,6 +419,7 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
     base.justStopped     = firstChunk && renderState.edgeStopped ? 1 : 0;
     base.transportJumped = firstChunk && renderState.edgeJumped  ? 1 : 0;
     base.stoppedUnrendered = firstChunk && renderState.edgeHiddenStop ? 1 : 0;
+    base.fill            = fillHeld.load(std::memory_order_relaxed) ? 1 : 0;   // every chunk of the block sees the button as it is now
 
     // Which slots have a live, non-Empty layer this block (Empty is never called).
     for (int s = 0; s < K; ++s)

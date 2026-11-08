@@ -615,6 +615,11 @@ public:
     // torn down. Message thread. One request at a time: false when none is set or one is already running.
     bool activateOnlineAsync(const juce::String& licenseKey,
                              std::function<void(const mu_core::OnlineActivationOutcome&)> done);
+    // Fill: a momentary performance button (held, never latched, not saved). The message thread sets it; every layer sees it as
+    // RenderContext::fill, so steps conditioned on Fill can play while it is held.
+    void setFillHeld(bool held) noexcept { fillHeld.store(held, std::memory_order_relaxed); }
+    bool isFillHeld() const noexcept     { return fillHeld.load(std::memory_order_relaxed); }
+    std::atomic<bool> fillHeld { false };
     std::atomic<bool> onlineActivated { false };
     bool isOnlineActivated() const noexcept { return onlineActivated.load(std::memory_order_relaxed); }
 

@@ -66,6 +66,7 @@ private:
     TrackStepRow::StepDrag stepDrag;   // a vertical drag on a step edits it (note, octave, accent, Hat open / closed)
     std::array<int, mu_limits::kMaxLayers> playheadSteps;                 // each row's playhead step (-1: none)
     std::array<long long, mu_limits::kMaxLayers> shownPasses;             // each row's pass the dimmed steps were drawn for
+    bool shownFill = false;                                                // whether Fill was held when the dimmed steps were drawn
     StepPager pager;                   // the page every row shows, and the selected row's length
     juce::uint64 shownSignature = 0;
 

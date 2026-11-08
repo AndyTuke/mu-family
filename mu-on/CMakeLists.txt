@@ -181,6 +181,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/ChordTests.cpp   # Chord voicing, the Chord engine and a step's chord data
     Source/Tests/StepPagingTests.cpp   # step row paging, Length and the page-edge tie the paged Steps grid rests on
     Source/Tests/StepLoopBarsTests.cpp   # a step's loop: Length in bars and the Bars it plays in
+    Source/Tests/StepConditionTests.cpp   # a step's condition: Always, Fill, Pre, NotPre
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp

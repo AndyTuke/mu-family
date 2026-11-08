@@ -46,7 +46,7 @@ public:
     // `base` is for the shared mu-core sections that take the processor (this content uses none yet);
     // everything the content itself reads comes through `host`.
     TrackContent(ProcessorBase& base, TrackHost& host);
-    ~TrackContent() override { stopTimer(); }
+    ~TrackContent() override { host.setTrackFillHeld(false); stopTimer(); }   // never leave Fill held behind a closed editor
 
     // Show track `idx`: its engine's controls, its Rumble source and envelope, its row selected.
     void setLayer(int idx) override;
@@ -106,8 +106,9 @@ private:
     // The STEP panel: the selected step's own probability (multiplied with the layer's), loop ratio (the Nth of every M
     // passes of the row) and, on a Hat, which sound it plays. Not parameters: they edit the track's step row.
     KnobWithLabel  stepProbKnob { "Prob" };
-    juce::Label    barsCaption { {}, "Bars" }, lengthCaption { {}, "Length" }, voiceCaption { {}, "Sound" }, octaveCaption { {}, "Octave" }, noteCaption { {}, "Note" };
-    DropdownSelect barsSelect, lengthSelect, voiceSelect, octaveSelect, noteSelect;
+    juce::Label    condCaption { {}, "Condition" }, barsCaption { {}, "Bars" }, lengthCaption { {}, "Length" }, voiceCaption { {}, "Sound" }, octaveCaption { {}, "Octave" }, noteCaption { {}, "Note" };
+    DropdownSelect condSelect, barsSelect, lengthSelect, voiceSelect, octaveSelect, noteSelect;
+    juce::TextButton fillButton { "Fill" };                           // held, never latched: steps conditioned on Fill play while it is down
     // A Chord track's step: the chord (a dropdown), its inversion and its spread (knobs); the root is the Note list (scale degrees).
     juce::Label    chordCaption { {}, "Chord" };
     DropdownSelect chordSelect;

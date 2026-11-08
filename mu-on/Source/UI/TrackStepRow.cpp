@@ -66,7 +66,7 @@ TrackStepRow::CellOptions TrackStepRow::optionsFor(TrackHost& host, int slot, in
     {
         const long long pass = StepClock::passOfBeat(host.getTrackTransportBeat(), track.row.numSteps());
         for (int s = 0; s < StepRow::kNumSteps; ++s)
-            if (track.row.isOn(firstStep + s) && ! track.stepPlays(firstStep + s, pass)) o.dimMask = (std::uint16_t) (o.dimMask | (1u << s));
+            if (track.row.isOn(firstStep + s) && ! track.stepPlays(firstStep + s, pass, host.isTrackFillHeld())) o.dimMask = (std::uint16_t) (o.dimMask | (1u << s));
     }
     return o;
 }
@@ -383,6 +383,7 @@ void TrackStepRow::timerCallback()
     // A new pass draws new skips: redraw the dimmed steps.
     const long long pass = step >= 0 ? StepClock::passOfBeat(host.getTrackTransportBeat(), length) : -1;
     if (pass != shownPass) { shownPass = pass; repaint(); }
+    if (const bool fill = host.isTrackFillHeld(); fill != shownFill) { shownFill = fill; repaint(); }   // Fill steps light up while it is held
     if (step == playheadStep) return;
     playheadStep = step;
     repaint();

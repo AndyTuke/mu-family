@@ -116,6 +116,8 @@ public:
     juce::String getTrackName(int layer) const override         { return getLayerName(layer); }
     int          getTrackColourIndex(int layer) const override  { return getLayerColourIndex(layer); }
     bool         isTrackTransportPlaying() const noexcept override { return isInternalPlaying(); }
+    bool         isTrackFillHeld() const noexcept override         { return isFillHeld(); }
+    void         setTrackFillHeld(bool held) noexcept override     { setFillHeld(held); }
     double       getTrackTransportBeat() const noexcept override   { return getInternalBeatPos(); }
 
     // The first live track running Kick, or 0 when there is none (a Rumble's default source).

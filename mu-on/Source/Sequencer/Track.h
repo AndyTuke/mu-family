@@ -186,7 +186,14 @@ public:
     // Whether `step` plays in `pass` of the row: its loop ratio, then the draw against the step's probability times the
     // layer's. The draw is a hash of (seed, pass, step), so the audio thread and the display agree on every note of a pass
     // before it plays, and a pass always draws the same.
-    bool stepPlays(int step, long long pass) const noexcept;
+    // `fill` is whether the Fill button is held: a step conditioned on Fill plays only then. A step conditioned on Pre (NotPre)
+    // plays only if the previous step on the row played (did not): see previousPlayed.
+    bool stepPlays(int step, long long pass, bool fill = false) const noexcept;
+private:
+    // Whether the nearest earlier on-step whose own condition is not Pre or NotPre (looking back across the row's wrap, up to
+    // one full pass) actually played in its pass. With no such step it is false, so Pre does not play and NotPre does.
+    bool previousPlayed(int step, long long pass, bool fill) const noexcept;
+public:
 private:
     std::array<EngineMod, kNumEngineTypes> mods;
 

@@ -745,7 +745,7 @@ struct RenderContext
     uint8_t  retiring;           // 1 in renderRetiring (midi empty, midiOut valid from the note-off reserve, no peers)
     uint8_t  frozen;             // 1: render from the last resolved values, read no APVTS or matrix (C7 provision, C12 rule)
     uint8_t  stoppedUnrendered;  // 1 with transportJumped: the transport stopped in a host block that rendered nothing between the last rendered block and this one (below)
-    uint8_t  reserved;
+    uint8_t  fill;               // 1 while the performer holds Fill (a momentary performance control; formerly the reserved byte, layout unchanged)
     MidiView midi;
     MidiSink midiOut;
     const PeerTap* peers;        // kMaxLayers entries in the priority-1 pass, else nullptr

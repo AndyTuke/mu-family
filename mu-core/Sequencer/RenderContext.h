@@ -87,7 +87,7 @@ namespace mu_core
         uint8_t  stoppedUnrendered;  // playing in this and the last rendered block, but the transport stopped in a host
                                      // block between them that rendered nothing (0 frames, a missed lock, an edit): the
                                      // stop edge those blocks could not carry (transportJumped is 1 too)
-        uint8_t  reserved;
+        uint8_t  fill;               // 1 while the performer holds Fill (a momentary performance control: a layer may play Fill steps)
         MidiView midi;
         MidiSink midiOut;
         const PeerTap* peers;        // kMaxLayers entries in the priority-1 pass, else nullptr

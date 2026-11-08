@@ -368,19 +368,27 @@ void Track::clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, i
     if (! ctx.playing) return;
     if (ctx.justStarted) clock.seek(ctx.startBeat);   // the step the transport starts in fires, even on a quick replay
     clock.processSpan(row, ctx.startBeat, n, ctx.beatsPerSample, row.swingAmount(), row.accentVelocity(),
-                      [this, fireInto, e](const StepEvent& ev)
+                      [this, fireInto, e, fill = ctx.fill != 0](const StepEvent& ev)
                       {
                           if (fireInto == nullptr || e == toIndex(EngineType::Rumble)) return;
-                          if (! stepPlays(ev.step, ev.pass)) return;   // the probability draw of this pass
+                          if (! stepPlays(ev.step, ev.pass, fill)) return;   // the loop, condition and probability draw of this pass
                           fireInto->trigger(ev.velocity, ev.offset, ev.open, ev.tied, ev.gateSamples, ev.semitones, &ev.chord);
                           if (drumTrigCount < 16) drumTrigOffsets[drumTrigCount++] = ev.offset;   // the filter envelope restarts here
                           triggers.fetch_add(1, std::memory_order_relaxed);
                       });
 }
 
-bool Track::stepPlays(int step, long long pass) const noexcept
+bool Track::stepPlays(int step, long long pass, bool fill) const noexcept
 {
     if (! StepClock::loopPlays(row, step, pass)) return false;
+    // The condition: Fill needs the button held; Pre / NotPre look at whether the step before it played.
+    switch (row.stepCondition(step))
+    {
+        case StepRow::kCondFill:   if (! fill) return false; break;
+        case StepRow::kCondPre:    if (! previousPlayed(step, pass, fill)) return false; break;
+        case StepRow::kCondNotPre: if (previousPlayed(step, pass, fill)) return false; break;
+        default: break;
+    }
     // The layer's Probability (percent) multiplies the step's own to give the chance the note plays.
     const float chance = juce::jlimit(0.0f, 1.0f, probRow.load(100.0f) * 0.01f) * (float) row.stepProb(step) * 0.01f;
     if (chance >= 1.0f) return true;
@@ -388,6 +396,22 @@ bool Track::stepPlays(int step, long long pass) const noexcept
     uint32_t x = seed ^ (uint32_t) (pass * 2654435761ll) ^ ((uint32_t) step * 0x9E3779B9u);
     x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
     return (float) (x >> 8) * (1.0f / 16777216.0f) < chance;
+}
+
+bool Track::previousPlayed(int step, long long pass, bool fill) const noexcept
+{
+    const int length = row.numSteps();
+    for (int back = 1; back <= length; ++back)
+    {
+        int s = step - back;
+        long long p = pass;
+        if (s < 0) { s += length; p -= 1; }   // the row wrapped: the same step of the pass before
+        if (! row.isOn(s)) continue;
+        const int cond = row.stepCondition(s);
+        if (cond == StepRow::kCondPre || cond == StepRow::kCondNotPre) continue;   // a Pre never decides another Pre
+        return stepPlays(s, p, fill);
+    }
+    return false;
 }
 
 void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n)
