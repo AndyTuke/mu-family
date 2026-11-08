@@ -349,8 +349,9 @@ struct MuToniLayerPinTests : juce::UnitTest
             }
         }
         // Depth is a percentage of the target's range in proportion space, so the skewed cutoff moves far
-        // more at the top of its range than at the bottom. Recorded values (steps 0, 80, 30, 100 percent):
-        const float cutExpected[4]   = { 1500.0f, 9499.33f, 3321.88f, 13520.1f };
+        // more at the top of its range than at the bottom. Recorded values (steps 0, 80, 30, 100 percent) at the
+        // state's 40 percent depth, re-recorded 2026-11-08 when the stale values (an older depth mapping) were found:
+        const float cutExpected[4]   = { 1500.0f, 11889.8f, 3617.96f, 17832.2f };
         const float chordExpected[4] = { 3.0f, 8.44f, 5.04f, 9.8f };
         for (int i = 0; i < 4; ++i)
         {
