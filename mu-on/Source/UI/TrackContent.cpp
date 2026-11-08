@@ -300,6 +300,26 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     addAndMakeVisible(soloBtn);
     insertSub.onStatusUpdate = [this](const juce::String& name, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
     insertSub.onInsertAlgorithmChanged = [this](int algo) { if (onInsertAlgorithmChanged) onInsertAlgorithmChanged(algo); };
+    // The insert knobs show their live modulation arc like every other modulated knob: the track's matrix says which of the
+    // four are assigned, the audio thread publishes each one's value (its row in the shown engine's target table).
+    insertSub.isPlaying = [this] { return host.isTrackTransportPlaying(); };
+    insertSub.isSlotModulated = [this](int slot) -> bool
+    {
+        static const char* const destId[4] = { "insert.p1", "insert.p2", "insert.p3", "insert.p4" };
+        const auto snap = host.getTrack(currentLayer).modulationMatrix.assignedSnapshot();   // lock-free published copy
+        if (snap == nullptr) return false;
+        for (const auto& d : snap->destinations)
+            if (d == destId[slot]) return true;
+        return false;
+    };
+    insertSub.slotModValue = [this](int slot) -> float
+    {
+        static const char* const param[4] = { "insP1", "insP2", "insP3", "insP4" };
+        int count = 0;
+        const ModDestEntry* table = destsForEngine(shownEngine, count);
+        const int dest = mu_mod::indexOfParam(table, (std::size_t) count, param[slot]);
+        return dest >= 0 ? host.getModLive(currentLayer, shownEngine, dest) : std::numeric_limits<float>::quiet_NaN();
+    };
     addAndMakeVisible(insertSub);
 
     // The Rumble track's drawable bar-volume envelope, edited under the track's own lock.
