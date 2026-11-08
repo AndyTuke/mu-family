@@ -1,10 +1,19 @@
 #include "Persistence/TrackParams.h"
+#include "Audio/AlgorithmNames.h"   // mu-core: kFilterTypeNames
 #include "MuLimits.h"   // mu-core: mu_limits::kMaxLayers (the Rumble source's range)
 #include "Persistence/InsertParams.h"   // mu-core: mu_mixfx::addInsertParams
 #include "Persistence/ParamText.h"   // mu-core: mu_fmt::floatUnit
 
 namespace mu_on
 {
+
+// The family's sixteen filters, in MultiModeFilter's order (the first four are the ones a drum filter had before, so saved indices keep meaning).
+static juce::StringArray familyFilterTypes()
+{
+    juce::StringArray types;
+    for (const char* const* n = mu_audio::kFilterTypeNames; *n != nullptr; ++n) types.add(*n);
+    return types;
+}
 
 void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot)
 {
@@ -159,7 +168,7 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     // cutoff at its top, low-pass) leaves the sound untouched.
     auto drumFilter = [&](EngineType e, const String& name)
     {
-        layout.add(std::make_unique<AudioParameterChoice>(id(e, "ftype"), lbl + name + " Filter Type", juce::StringArray{ "LP12", "HP12", "BP12", "Notch12" }, 0));
+        layout.add(std::make_unique<AudioParameterChoice>(id(e, "ftype"), lbl + name + " Filter Type", familyFilterTypes(), 0));
         flt(e, "fcut", name + " Filter Cutoff",    centred(20.0f, 20000.0f, 1.0f, 640.0f), 20000.0f, mu_fmt::Unit::Hz);
         flt(e, "fres", name + " Filter Resonance", f(0.0f, 0.99f, 0.001f), 0.2f, mu_fmt::Unit::Percent01);
         // The filter's AD envelope, restarted by every step: the attack and decay times and the depth it moves the cutoff by

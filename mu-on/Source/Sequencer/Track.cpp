@@ -286,7 +286,7 @@ void Track::applyDrumFilter(juce::AudioBuffer<float>& out, int n, int e) noexcep
     const auto k = (size_t) e;
     if (! filterCutRow[k].isBound()) return;   // not a drum or percussion engine
     constexpr int kIdle = 1 << 30, kSub = 32;
-    const int type = juce::jlimit(0, 3, juce::roundToInt(filterTypeRow[k].load(0.0f)));
+    const int type = juce::jlimit(0, decltype(drumFilter)::kNumFilterAlgos - 1, juce::roundToInt(filterTypeRow[k].load(0.0f)));
     const float cut = juce::jlimit(20.0f, 20000.0f, filterNow[0]);
     const float depthOct = filterNow[4] * kDrumFilterEnvOctaves;
     if (type == 0 && cut >= 19990.0f && std::abs(depthOct) < 0.01f) { drumEnvAge = kIdle; return; }

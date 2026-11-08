@@ -157,7 +157,7 @@ namespace
         const juce::String nm(name);
         Spec type { id("ftype"), "Type" };
         type.statusName = nm + " Filter Type";
-        type.tooltip = "LP12, HP12, BP12 or Notch12. LP12 at full cutoff is off.";
+        type.tooltip = "Any of the family's sixteen filters. LP12 at full cutoff is off.";
         Spec cut { id("fcut"), "Cutoff" };  cut.statusName = nm + " Filter Cutoff";
         Spec res { id("fres"), "Reso" };    res.statusName = nm + " Filter Resonance";
         Spec atk { id("fatk"), "Atk" };     atk.statusName = nm + " Filter Env Attack";   atk.newRow = true;  atk.small = true;
