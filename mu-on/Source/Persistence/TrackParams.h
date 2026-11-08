@@ -121,10 +121,6 @@ inline constexpr float kDrumFilterEnvOctaves = 6.0f;
 inline bool isBassTuneRoot(float tuneHz) noexcept { return tuneHz > kBassTuneRootHz - 0.05f && tuneHz < kBassTuneRootHz + 0.05f; }
 inline int  bassRootMidi(int root) noexcept        { return 28 + ((root % 12) - 4 + 12) % 12; }
 
-// Loop ratio choices: "play the `play`th of every `of` passes of the row" (1:1 plays every pass).
-struct LoopRatio { int play, of; };
-inline constexpr LoopRatio kLoopRatios[] = { {1,1}, {1,2}, {2,2}, {1,3}, {2,3}, {3,3}, {1,4}, {2,4}, {3,4}, {4,4} };
-juce::StringArray loopRatioNames();
 
 inline const std::vector<const char*>& engineParamNames(EngineType e)
 {

@@ -14,7 +14,82 @@ DropdownSelect::DropdownSelect()
 
 void DropdownSelect::addItem(const juce::String& text, int id)
 {
+    if (multiSelect) { multiItems.push_back({ id, text }); refreshMultiSummary(); return; }
     combo.addItem(text, id);
+}
+
+// ── Multi-select mode ──────────────────────────────────────────────────────────────────────
+
+void DropdownSelect::setMultiSelect(bool on)
+{
+    multiSelect = on;
+    combo.popupOverride = on ? std::function<void()>([this] { showMultiPopup(); }) : std::function<void()>();
+    refreshMultiSummary();
+}
+
+void DropdownSelect::setTicked(int id, bool ticked)
+{
+    for (auto& it : multiItems) if (it.id == id) it.ticked = ticked;
+    refreshMultiSummary();
+}
+
+bool DropdownSelect::isTicked(int id) const
+{
+    for (const auto& it : multiItems) if (it.id == id) return it.ticked;
+    return false;
+}
+
+void DropdownSelect::setItemEnabled(int id, bool enabled)
+{
+    for (auto& it : multiItems) if (it.id == id) it.enabled = enabled;
+    refreshMultiSummary();
+}
+
+void DropdownSelect::toggle(int id)
+{
+    for (auto& it : multiItems)
+        if (it.id == id && it.enabled)
+        {
+            it.ticked = ! it.ticked;
+            refreshMultiSummary();
+            if (onToggle) onToggle(id, it.ticked);
+            if (statusName.isNotEmpty()) mu_ui::reportStatus(*this, statusName, combo.getText());
+            return;
+        }
+}
+
+// The box's text: the ticked items joined by commas, All when every enabled item is ticked, None when none is.
+void DropdownSelect::refreshMultiSummary()
+{
+    if (! multiSelect) return;
+    juce::StringArray ticked;
+    int enabledCount = 0;
+    for (const auto& it : multiItems)
+    {
+        if (it.enabled) ++enabledCount;
+        if (it.ticked && it.enabled) ticked.add(it.text);
+    }
+    const juce::String text = ticked.isEmpty() ? juce::String("None")
+                            : (ticked.size() == enabledCount && enabledCount > 1) ? juce::String("All")
+                            : ticked.joinIntoString(", ");
+    combo.setSelectedId(0, juce::dontSendNotification);
+    combo.setText(text, juce::dontSendNotification);
+}
+
+// The popup: one ticked row per item. A pick toggles it and the popup comes back so more can be ticked.
+void DropdownSelect::showMultiPopup()
+{
+    juce::PopupMenu menu;
+    for (const auto& it : multiItems)
+        menu.addItem(juce::PopupMenu::Item(it.text).setID(it.id).setTicked(it.ticked).setEnabled(it.enabled));
+    juce::Component::SafePointer<DropdownSelect> safe(this);
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&combo).withMinimumWidth(combo.getWidth()),
+                       [safe](int picked)
+                       {
+                           if (safe == nullptr || picked <= 0) return;
+                           safe->toggle(picked);
+                           juce::MessageManager::callAsync([safe] { if (safe != nullptr) safe->showMultiPopup(); });
+                       });
 }
 
 void DropdownSelect::setDisplayOverride(const juce::String& text, bool queued)
@@ -77,6 +152,8 @@ void DropdownSelect::addItem(const juce::String& text, int id, juce::Colour text
 void DropdownSelect::clear()
 {
     combo.clear(juce::dontSendNotification);
+    multiItems.clear();
+    refreshMultiSummary();
     applyOverride();
 }
 

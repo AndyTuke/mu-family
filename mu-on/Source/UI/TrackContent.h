@@ -106,8 +106,8 @@ private:
     // The STEP panel: the selected step's own probability (multiplied with the layer's), loop ratio (the Nth of every M
     // passes of the row) and, on a Hat, which sound it plays. Not parameters: they edit the track's step row.
     KnobWithLabel  stepProbKnob { "Prob" };
-    juce::Label    loopCaption { {}, "Play" }, voiceCaption { {}, "Sound" }, octaveCaption { {}, "Octave" }, noteCaption { {}, "Note" };
-    DropdownSelect loopSelect, voiceSelect, octaveSelect, noteSelect;
+    juce::Label    barsCaption { {}, "Bars" }, lengthCaption { {}, "Length" }, voiceCaption { {}, "Sound" }, octaveCaption { {}, "Octave" }, noteCaption { {}, "Note" };
+    DropdownSelect barsSelect, lengthSelect, voiceSelect, octaveSelect, noteSelect;
     // A Chord track's step: the chord (a dropdown), its inversion and its spread (knobs); the root is the Note list (scale degrees).
     juce::Label    chordCaption { {}, "Chord" };
     DropdownSelect chordSelect;
@@ -115,6 +115,7 @@ private:
     std::array<int, mu_limits::kMaxLayers> selectedStepOf {};   // each layer's selected step (right-click), shown in the panel
     void refreshNoteItems();                                    // the Note list names the notes the key and tune give
     int  noteSignature = -1;                                    // what the list was last built for
+    void refreshBarsSelect(const StepRow& row, int step);        // the Bars list: the bars the Length offers, ticked as the step has them
     void refreshStepPanel();                                    // the controls follow the shown layer's selected step
     void selectStep(int step);
     void layoutStepPanel();

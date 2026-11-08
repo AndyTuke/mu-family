@@ -1,5 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <functional>
+#include <vector>
 #include "MuLookAndFeel.h"
 #include "UI/StatusSink.h"
 
@@ -43,13 +45,38 @@ public:
     // ComboBoxAttachment. Visual styling stays driven by DropdownSelect.
     juce::ComboBox& getComboBox() noexcept { return combo; }
 
+    // ── Multi-select mode ───────────────────────────────────────────────────────────────────
+    // Every item is a tick box: picking one toggles it and the popup opens again so several can be ticked in one visit. The
+    // box shows the ticked items' texts joined by commas ("1, 2, 5"), "All" when every enabled item is ticked and "None" when
+    // none is. Items are added with addItem as usual; the pick reports "<status name>: <summary>" to the status bar.
+    void setMultiSelect(bool on);
+    bool isMultiSelect() const noexcept { return multiSelect; }
+    void setTicked(int id, bool ticked);          // no callback
+    bool isTicked(int id) const;
+    void setItemEnabled(int id, bool enabled);    // a disabled item cannot be picked and is not counted by "All"
+    void toggle(int id);                          // what a pick does: flips the tick, refreshes the box, reports, calls onToggle
+    std::function<void(int id, bool ticked)> onToggle;
+
     void resized() override;
 
 private:
+    // The ComboBox with its popup replaced in multi-select mode.
+    class Combo : public juce::ComboBox
+    {
+    public:
+        std::function<void()> popupOverride;
+        void showPopup() override { if (popupOverride) popupOverride(); else juce::ComboBox::showPopup(); }
+    };
+    struct MultiItem { int id; juce::String text; bool ticked = false, enabled = true; };
+
     void applyOverride();
     void refreshTextColour();
+    void showMultiPopup();
+    void refreshMultiSummary();
 
-    juce::ComboBox combo;
+    Combo combo;
+    bool  multiSelect = false;
+    std::vector<MultiItem> multiItems;
     juce::String   statusName;
     juce::String   overrideText;
     bool           overrideQueued = false;

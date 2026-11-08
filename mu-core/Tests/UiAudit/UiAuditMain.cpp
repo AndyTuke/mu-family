@@ -257,6 +257,16 @@ void pick(juce::ComboBox& combo, int id)
 
 void Audit::auditDropdown(DropdownSelect& d, bool stepThroughChoices)
 {
+    // A multi-select drop-down (its items are tick boxes, not combo items): tick the first item and put it back.
+    if (d.isMultiSelect())
+    {
+        clearBar();
+        d.toggle(1);
+        ++checked;
+        if (silent()) missing.push_back({ "multi-select dropdown", d.getText(), where(&d) });
+        d.toggle(1);
+        return;
+    }
     auto& combo = d.getComboBox();
     const int n = combo.getNumItems();
     if (n < 2 || n > 40 || ! combo.isEnabled()) return;
@@ -298,6 +308,17 @@ int auditOne(const juce::String& product, const juce::String& tag, const std::fu
     std::unique_ptr<juce::AudioProcessorEditor> editor(processor->createEditorIfNeeded());   // the way a host asks
     if (editor == nullptr) { std::fprintf(stderr, "%s: createEditor returned null\n", product.toRawUTF8()); failure = 3; return 0; }
     pump(700);   // long enough for the shell's refresh timer to give every button its status reporter
+
+    // UIAUDIT_SHOT=<folder>: a PNG of the real editor as it stands (a look at the layout without opening the app).
+    if (const char* shotDir = std::getenv("UIAUDIT_SHOT"))
+    {
+        juce::File dir(shotDir);
+        dir.createDirectory();
+        const auto img = editor->createComponentSnapshot(editor->getLocalBounds(), true, 1.0f);
+        auto file = dir.getChildFile(product + (tag.isNotEmpty() ? "-" + tag : juce::String()) + ".png");
+        file.deleteFile();
+        if (auto out = file.createOutputStream()) juce::PNGImageFormat().writeImageToStream(img, *out);
+    }
 
     Audit audit;
     audit.root = editor.get();

@@ -58,15 +58,17 @@ public:
     // states Closed / Closed Accent / Open / Open Accent.
     bool isOpen  (int step) const noexcept { return valid(step) && cells[(size_t) step].open.load(std::memory_order_relaxed); }
     void setOpen  (int step, bool v) noexcept { if (valid(step)) cells[(size_t) step].open.store(v, std::memory_order_relaxed); }
-    // Per step: the chance it plays (0..100 %, 100 default; the layer's own probability multiplies it) and the loop
-    // ratio, an index into kLoopRatios (0 = 1:1, every pass; 1:2 plays the first of every two passes of the row).
+    // Per step: the chance it plays (0..100 %, 100 default; the layer's own probability multiplies it) and the bars it plays in.
+    // The loop is Length bars long (1..8; a bar is one pass through the row, one bar of sixteenths at the default length) and the
+    // Bars mask says which of them the step plays in: bit n set = bar n + 1. Length 1 (the default) plays every pass.
+    static constexpr int kMaxLoopBars = 8;
+    static constexpr int kAllBars = (1 << kMaxLoopBars) - 1;
     int  stepProb(int step) const noexcept { return valid(step) ? cells[(size_t) step].prob.load(std::memory_order_relaxed) : 100; }
-    int  stepLoop(int step) const noexcept { return valid(step) ? cells[(size_t) step].loop.load(std::memory_order_relaxed) : 0; }
+    int  stepLoopLength(int step) const noexcept { return valid(step) ? cells[(size_t) step].loopLen.load(std::memory_order_relaxed) : 1; }
+    int  stepLoopBars(int step) const noexcept { return valid(step) ? cells[(size_t) step].loopBars.load(std::memory_order_relaxed) : kAllBars; }
     void setStepProb(int step, int percent) noexcept { if (valid(step)) cells[(size_t) step].prob.store(juce::jlimit(0, 100, percent), std::memory_order_relaxed); }
-    void setStepLoop(int step, int ratioIndex) noexcept
-    {
-        if (valid(step)) cells[(size_t) step].loop.store(juce::jlimit(0, (int) std::size(kLoopRatios) - 1, ratioIndex), std::memory_order_relaxed);
-    }
+    void setStepLoopLength(int step, int bars) noexcept { if (valid(step)) cells[(size_t) step].loopLen.store(juce::jlimit(1, kMaxLoopBars, bars), std::memory_order_relaxed); }
+    void setStepLoopBars(int step, int mask) noexcept { if (valid(step)) cells[(size_t) step].loopBars.store(mask & kAllBars, std::memory_order_relaxed); }
 
     // Per step pitch (a Kick or Bass): the octave (-2 to +2) and the note offset (-12 to +12 semitones) from the Tune.
     int  stepOctave(int step) const noexcept { return valid(step) ? cells[(size_t) step].oct.load(std::memory_order_relaxed) : 0; }
@@ -101,7 +103,7 @@ public:
 
     void clear() noexcept
     {
-        for (auto& c : cells) { c.on.store(false, std::memory_order_relaxed); c.accent.store(false, std::memory_order_relaxed); c.ghost.store(false, std::memory_order_relaxed); c.open.store(false, std::memory_order_relaxed); c.prob.store(100, std::memory_order_relaxed); c.loop.store(0, std::memory_order_relaxed); c.tie.store(false, std::memory_order_relaxed); c.oct.store(0, std::memory_order_relaxed); c.note.store(0, std::memory_order_relaxed);
+        for (auto& c : cells) { c.on.store(false, std::memory_order_relaxed); c.accent.store(false, std::memory_order_relaxed); c.ghost.store(false, std::memory_order_relaxed); c.open.store(false, std::memory_order_relaxed); c.prob.store(100, std::memory_order_relaxed); c.loopLen.store(1, std::memory_order_relaxed); c.loopBars.store(kAllBars, std::memory_order_relaxed); c.tie.store(false, std::memory_order_relaxed); c.oct.store(0, std::memory_order_relaxed); c.note.store(0, std::memory_order_relaxed);
                     c.chord.store(kDefaultChord, std::memory_order_relaxed); c.inv.store(0, std::memory_order_relaxed); c.spread.store(0, std::memory_order_relaxed); }
     }
 
@@ -154,12 +156,12 @@ public:
         if (gh.containsChar('1')) row.setProperty("ghost", gh, nullptr);  // absent = no ghost steps
         if (op.containsChar('1')) row.setProperty("open", op, nullptr);   // absent = every step closed
         if (tie.containsChar('1')) row.setProperty("tie", tie, nullptr);  // absent = no tied steps
-        // Probability as a comma list and the loop ratio as one digit per step, each only when a step leaves its default.
-        juce::StringArray probs; juce::String loops; bool anyProb = false, anyLoop = false;
+        // Probability and the loop (its Length in bars and its Bars mask) as comma lists, each only when a step leaves its default.
+        juce::StringArray probs, loopLens, loopBars; bool anyProb = false, anyLoop = false;
         for (int s = 0; s < n; ++s)
         {
-            probs.add(juce::String(stepProb(s))); loops += juce::String(stepLoop(s));
-            anyProb = anyProb || stepProb(s) != 100; anyLoop = anyLoop || stepLoop(s) != 0;
+            probs.add(juce::String(stepProb(s))); loopLens.add(juce::String(stepLoopLength(s))); loopBars.add(juce::String(stepLoopBars(s)));
+            anyProb = anyProb || stepProb(s) != 100; anyLoop = anyLoop || stepLoopLength(s) != 1 || stepLoopBars(s) != kAllBars;
         }
         juce::StringArray octs, notes; bool anyPitch = false;
         for (int s = 0; s < n; ++s) { octs.add(juce::String(stepOctave(s))); notes.add(juce::String(stepNote(s))); anyPitch = anyPitch || stepSemitones(s) != 0; }
@@ -172,7 +174,7 @@ public:
         if (anyChord) { row.setProperty("chord", chords.joinIntoString(","), nullptr); row.setProperty("inv", invs.joinIntoString(","), nullptr); row.setProperty("spread", spreads.joinIntoString(","), nullptr); }
         if (anyPitch) { row.setProperty("oct", octs.joinIntoString(","), nullptr); row.setProperty("note", notes.joinIntoString(","), nullptr); }
         if (anyProb) row.setProperty("prob", probs.joinIntoString(","), nullptr);
-        if (anyLoop) row.setProperty("loop", loops, nullptr);
+        if (anyLoop) { row.setProperty("loopLen", loopLens.joinIntoString(","), nullptr); row.setProperty("loopBars", loopBars.joinIntoString(","), nullptr); }
         return row;
     }
 
@@ -191,7 +193,9 @@ public:
         const auto invList = juce::StringArray::fromTokens(row.getProperty("inv").toString(), ",", "");
         const auto spreadList = juce::StringArray::fromTokens(row.getProperty("spread").toString(), ",", "");
         const auto probs = juce::StringArray::fromTokens(row.getProperty("prob").toString(), ",", "");
-        const juce::String loops = row.getProperty("loop").toString();
+        const auto loopLens = juce::StringArray::fromTokens(row.getProperty("loopLen").toString(), ",", "");
+        const auto loopBars = juce::StringArray::fromTokens(row.getProperty("loopBars").toString(), ",", "");
+        const juce::String legacyLoops = row.getProperty("loop").toString();   // older files: one digit per step, an N:M ratio
         // The audio thread may be reading this row, so each cell is stored directly (setOn would clear the neighbouring
         // ties, which flickers a Bass retrigger) and the length is written last, so a longer row never exposes cells
         // that are not loaded yet.
@@ -201,7 +205,19 @@ public:
             const bool isAcc = s < ac.length() && ac[s] == '1';
             c.open.store(s < op.length() && op[s] == '1', std::memory_order_relaxed);
             setStepProb(s, s < probs.size() ? probs[s].getIntValue() : 100);
-            setStepLoop(s, s < loops.length() && juce::CharacterFunctions::isDigit(loops[s]) ? (int) (loops[s] - '0') : 0);
+            // A step's loop: the Length and Bars lists, else an older file's N:M ratio digit (it plays bar N of every M).
+            if (s < loopLens.size())
+            {
+                setStepLoopLength(s, loopLens[s].getIntValue());
+                setStepLoopBars(s, s < loopBars.size() ? loopBars[s].getIntValue() : kAllBars);
+            }
+            else
+            {
+                static constexpr int legacyPlay[] = { 1, 1, 2, 1, 2, 3, 1, 2, 3, 4 }, legacyOf[] = { 1, 2, 2, 3, 3, 3, 4, 4, 4, 4 };
+                const int d = s < legacyLoops.length() && juce::CharacterFunctions::isDigit(legacyLoops[s]) ? (int) (legacyLoops[s] - '0') : 0;
+                setStepLoopLength(s, legacyOf[d]);
+                setStepLoopBars(s, d == 0 ? kAllBars : 1 << (legacyPlay[d] - 1));
+            }
             c.on.store(s < on.length() && on[s] == '1', std::memory_order_relaxed);
             c.accent.store(isAcc, std::memory_order_relaxed);
             c.ghost.store(s < gh.length() && gh[s] == '1' && ! isAcc, std::memory_order_relaxed);
@@ -216,7 +232,7 @@ public:
     }
 
 private:
-    struct Cell { std::atomic<bool> on { false }; std::atomic<bool> accent { false }; std::atomic<bool> ghost { false }; std::atomic<bool> open { false }; std::atomic<int> prob { 100 }; std::atomic<int> loop { 0 }; std::atomic<bool> tie { false }; std::atomic<int> oct { 0 }; std::atomic<int> note { 0 };
+    struct Cell { std::atomic<bool> on { false }; std::atomic<bool> accent { false }; std::atomic<bool> ghost { false }; std::atomic<bool> open { false }; std::atomic<int> prob { 100 }; std::atomic<int> loopLen { 1 }; std::atomic<int> loopBars { 0xFF }; std::atomic<bool> tie { false }; std::atomic<int> oct { 0 }; std::atomic<int> note { 0 };
                   std::atomic<int> chord { kDefaultChord }; std::atomic<int> inv { 0 }; std::atomic<int> spread { 0 }; };
     static bool valid(int s) noexcept { return s >= 0 && s < kMaxSteps; }
 

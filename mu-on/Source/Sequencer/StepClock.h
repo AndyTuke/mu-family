@@ -39,14 +39,17 @@ public:
     template <class Row>
     static int lengthOf(const Row&, long) noexcept { return StepRow::kNumSteps; }
 
-    // The pass (one run through a row's `length` steps) a beat falls in, and whether step `step`'s loop ratio plays in it
-    // ("N:M" plays the Nth of every M passes).
+    // The pass (one run through a row's `length` steps) a beat falls in, and whether step `step` plays in it: the step's loop is
+    // Length bars long and its Bars mask names the bars it plays in (a loop of 6 with bars 1, 2 and 5 ticked plays in passes
+    // 1, 2 and 5 of every six).
     static long long passOfBeat(double beat, int length = StepRow::kNumSteps) noexcept { return (long long) std::floor(beat / (kStepBeats * length)); }
     template <class Row>
     static bool loopPlays(const Row& row, int step, long long pass) noexcept
     {
-        const auto ratio = kLoopRatios[(size_t) row.stepLoop(step)];
-        return ratio.of <= 1 || (((pass % ratio.of) + ratio.of) % ratio.of) == ratio.play - 1;
+        const int bars = row.stepLoopLength(step);
+        if (bars <= 1) return true;
+        const int bar = (int) (((pass % bars) + bars) % bars);   // 0-based, whole numbers also for a negative pass
+        return (row.stepLoopBars(step) >> bar & 1) != 0;
     }
 
     // A ghost step's velocity (the Ghost level's share of a normal note) for a row that has ghosts; any other row keeps `v`.
@@ -71,8 +74,8 @@ public:
     // Under MIDI clock the transport hands each block the exact span the clock's beat model moved (not always
     // tempo x length); using it keeps consecutive blocks contiguous, so no step falls in a gap.
     // Audio thread: no allocation, `fire` is called inline.
-    // A step's loop ratio (the row's own, when the Row has one) picks which passes (16 steps, from the transport
-    // start) it plays: "N:M" plays the Nth of every M. A firing that takes more arguments gets the step's Open flag
+    // A step's loop (the row's own, when the Row has one) picks which passes (16 steps, from the transport
+    // start) it plays: its Length in bars and the Bars ticked within it. A firing that takes more arguments gets the step's Open flag
     // and its probability (0..1), which the caller combines with the layer's and draws against; one that takes a StepEvent gets all
     // of it: tie, hold, transposition and which pass and step it is.
     template <class Row, class Fire>

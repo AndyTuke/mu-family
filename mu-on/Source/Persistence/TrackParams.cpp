@@ -6,13 +6,6 @@
 namespace mu_on
 {
 
-juce::StringArray loopRatioNames()
-{
-    juce::StringArray names;
-    for (const auto& r : kLoopRatios) names.add(juce::String(r.play) + ":" + juce::String(r.of));
-    return names;
-}
-
 void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot)
 {
     using namespace juce;

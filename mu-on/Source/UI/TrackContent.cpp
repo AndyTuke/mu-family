@@ -239,7 +239,7 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     addAndMakeVisible(ghostKnob);
     for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob, &levelKnob }) addAndMakeVisible(*k);
     // The STEP panel's controls edit the selected step of the shown track's row.
-    for (auto* cap : { &loopCaption, &voiceCaption, &octaveCaption, &noteCaption, &chordCaption })
+    for (auto* cap : { &barsCaption, &lengthCaption, &voiceCaption, &octaveCaption, &noteCaption, &chordCaption })
     {
         cap->setJustificationType(juce::Justification::centred);
         cap->setInterceptsMouseClicks(false, false);
@@ -250,15 +250,35 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     stepProbKnob.onValueChanged = [this](double v) { host.getTrack(currentLayer).row.setStepProb(selectedStepOf[(size_t) currentLayer], juce::roundToInt(v)); };
     stepProbKnob.onStatusUpdate = [this](const juce::String&, const juce::String& value) { if (onStatusUpdate) onStatusUpdate("Step Probability", value); };
     addAndMakeVisible(stepProbKnob);
-    for (int i = 0; i < (int) std::size(kLoopRatios); ++i) loopSelect.addItem(juce::String(kLoopRatios[i].play) + ":" + juce::String(kLoopRatios[i].of), i + 1);
-    loopSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setStepLoop(selectedStepOf[(size_t) currentLayer], id - 1); if (onStatusUpdate) onStatusUpdate("Step Play", loopSelect.getText()); };
+    // A step's loop: Length is how many bars it spans (a bar is one pass through the row), Bars which of them it plays in.
+    // Length 6 with Bars 1, 2 and 5 ticked plays the step in those three bars of every six.
+    for (int n = 1; n <= StepRow::kMaxLoopBars; ++n) lengthSelect.addItem(juce::String(n) + (n == 1 ? " bar" : " bars"), n);
+    lengthSelect.setStatusName("Step Loop Length");
+    lengthSelect.onChange = [this](int bars)
+    {
+        auto& row = host.getTrack(currentLayer).row;
+        const int step = selectedStepOf[(size_t) currentLayer];
+        row.setStepLoopLength(step, bars);
+        refreshBarsSelect(row, step);
+    };
+    barsSelect.setMultiSelect(true);
+    barsSelect.setStatusName("Step Bars");
+    for (int n = 1; n <= StepRow::kMaxLoopBars; ++n) barsSelect.addItem(juce::String(n), n);
+    barsSelect.onToggle = [this](int bar, bool on)
+    {
+        auto& row = host.getTrack(currentLayer).row;
+        const int step = selectedStepOf[(size_t) currentLayer];
+        const int bit = 1 << (bar - 1);
+        row.setStepLoopBars(step, on ? (row.stepLoopBars(step) | bit) : (row.stepLoopBars(step) & ~bit));
+    };
     voiceSelect.addItem("Closed", 1);
     voiceSelect.addItem("Open", 2);
     voiceSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setOpen(selectedStepOf[(size_t) currentLayer], id == 2); if (onStatusUpdate) onStatusUpdate("Step Sound", voiceSelect.getText()); };
     for (int o = -2; o <= 2; ++o) octaveSelect.addItem((o > 0 ? "+" : "") + juce::String(o), o + 3);
     octaveSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setStepOctave(selectedStepOf[(size_t) currentLayer], id - 3); refreshNoteItems(); if (onStatusUpdate) onStatusUpdate("Step Octave", octaveSelect.getText()); };
     noteSelect.onChange   = [this](int id) { host.getTrack(currentLayer).row.setStepNote(selectedStepOf[(size_t) currentLayer], id - 13); if (onStatusUpdate) onStatusUpdate("Step Note", noteSelect.getText()); };
-    addAndMakeVisible(loopSelect);
+    addAndMakeVisible(barsSelect);
+    addAndMakeVisible(lengthSelect);
     addChildComponent(voiceSelect);
     addChildComponent(octaveSelect);
     addChildComponent(noteSelect);
@@ -416,6 +436,17 @@ void TrackContent::refreshNoteItems()
     noteSelect.setSelectedId(row.stepNote(step) + 13, false);
 }
 
+// The Bars list offers the bars within the step's Length and ticks the ones the step plays in.
+void TrackContent::refreshBarsSelect(const StepRow& row, int step)
+{
+    const int length = row.stepLoopLength(step), mask = row.stepLoopBars(step);
+    for (int n = 1; n <= StepRow::kMaxLoopBars; ++n)
+    {
+        barsSelect.setItemEnabled(n, n <= length);
+        barsSelect.setTicked(n, (mask >> (n - 1) & 1) != 0);
+    }
+}
+
 void TrackContent::refreshStepPanel()
 {
     const auto& row = host.getTrack(currentLayer).row;
@@ -429,7 +460,8 @@ void TrackContent::refreshStepPanel()
     }
     const int step = selected;
     stepProbKnob.setValue(row.stepProb(step), juce::dontSendNotification);
-    loopSelect.setSelectedId(row.stepLoop(step) + 1, false);
+    lengthSelect.setSelectedId(row.stepLoopLength(step), false);
+    refreshBarsSelect(row, step);
     const bool hat = shownEngine == EngineType::Hat;
     voiceCaption.setVisible(hat);
     voiceSelect.setVisible(hat);
@@ -507,7 +539,7 @@ void TrackContent::rebuild()
     // Ghost steps are for the drum, percussion and Chord engines.
     ghostKnob.setVisible(shownEngine == EngineType::Kick || shownEngine == EngineType::Hat || shownEngine == EngineType::Snare || shownEngine == EngineType::FmPerc || shownEngine == EngineType::Chord);
     for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob, &levelKnob }) k->setVisible(! rumble);   // a Rumble's box holds its envelope
-    for (auto* c : { (juce::Component*) &stepProbKnob, (juce::Component*) &loopCaption, (juce::Component*) &loopSelect }) c->setVisible(! rumble);
+    for (auto* c : { (juce::Component*) &stepProbKnob, (juce::Component*) &barsCaption, (juce::Component*) &barsSelect, (juce::Component*) &lengthCaption, (juce::Component*) &lengthSelect }) c->setVisible(! rumble);
     refreshStepPanel();
     soloBtn.setVisible(! rumble);
     rumbleLength.setVisible(rumble);
@@ -768,6 +800,15 @@ void TrackContent::layoutStepPanel()
         select.setBounds(column.getX(), y + labelH + s(2), column.getWidth(), dd);
         y += labelH + s(2) + dd + gap;
     };
+    // The step's loop takes one row: Bars (the wider, it lists the ticked bars) beside Length.
+    auto placeLoopPair = [&](juce::Rectangle<int> column, int& y)
+    {
+        const int pairGap = gap;
+        const int barsW = (column.getWidth() - pairGap) * 11 / 20;
+        int yLength = y;
+        placeDropdown(barsCaption, barsSelect, column.withWidth(barsW), y);
+        placeDropdown(lengthCaption, lengthSelect, column.withTrimmedLeft(barsW + pairGap), yLength);
+    };
 
     // A Chord step has two columns: the Root, Octave, Chord and Play lists, then the Probability, Inversion and Spread knobs.
     if (shownEngine == EngineType::Chord)
@@ -778,7 +819,7 @@ void TrackContent::layoutStepPanel()
         placeDropdown(noteCaption, noteSelect, left, y);
         placeDropdown(octaveCaption, octaveSelect, left, y);
         placeDropdown(chordCaption, chordSelect, left, y);
-        placeDropdown(loopCaption, loopSelect, left, y);
+        placeLoopPair(left, y);
         int ky = in.getY();
         for (auto* k : { &stepProbKnob, &invKnob, &spreadKnob })
         {
@@ -790,7 +831,7 @@ void TrackContent::layoutStepPanel()
 
     stepProbKnob.setBounds(in.getX() + (in.getWidth() - s(LF::kKnobSize2W)) / 2, in.getY(), s(LF::kKnobSize2W), knobH);
     int y = in.getY() + knobH + gap;
-    placeDropdown(loopCaption, loopSelect, in, y);
+    placeLoopPair(in, y);
     // A Hat's Sound, or a Kick or Bass step's Octave then Note, in the slots after Play.
     int yHat = y;
     placeDropdown(voiceCaption, voiceSelect, in, yHat);
