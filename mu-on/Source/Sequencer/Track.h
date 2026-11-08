@@ -170,6 +170,12 @@ private:
     int drumEnvAge = 1 << 30;                                    // samples since the filter envelope last restarted (huge: idle)
     int drumTrigOffsets[16] {};                                  // where in this block steps fired (the envelope restarts there)
     int drumTrigCount = 0;
+    // Repeats still to play for steps that have fired: the beat of each and the step's event (its velocity carries the Level).
+    struct PendingRepeat { double beat = 0.0; int hit = 0; StepEvent ev {}; };
+    std::array<PendingRepeat, 32> pendingRepeats;
+    int numPendingRepeats = 0;
+    void scheduleRepeats(const StepEvent& ev, double firstBeat) noexcept;
+    void fireRepeats(const mu_core::RenderContext& ctx, TrackEngine* fireInto, int n) noexcept;
     void applyDrumFilter(juce::AudioBuffer<float>& out, int n, int e) noexcept;
     // The track's insert effect (the shared InsertProcessor, as a mixer bus insert): algorithm and four generic knobs,
     // run on the engine's block after it renders. Algorithm 0 (None) skips it.

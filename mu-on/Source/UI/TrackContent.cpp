@@ -239,7 +239,7 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     addAndMakeVisible(ghostKnob);
     for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob, &levelKnob }) addAndMakeVisible(*k);
     // The STEP panel's controls edit the selected step of the shown track's row.
-    for (auto* cap : { &condCaption, &barsCaption, &lengthCaption, &voiceCaption, &octaveCaption, &noteCaption, &chordCaption })
+    for (auto* cap : { &repeatCaption, &rateCaption, &condCaption, &barsCaption, &lengthCaption, &voiceCaption, &octaveCaption, &noteCaption, &chordCaption })
     {
         cap->setJustificationType(juce::Justification::centred);
         cap->setInterceptsMouseClicks(false, false);
@@ -250,6 +250,25 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     stepProbKnob.onValueChanged = [this](double v) { host.getTrack(currentLayer).row.setStepProb(selectedStepOf[(size_t) currentLayer], juce::roundToInt(v)); };
     stepProbKnob.onStatusUpdate = [this](const juce::String&, const juce::String& value) { if (onStatusUpdate) onStatusUpdate("Step Probability", value); };
     addAndMakeVisible(stepProbKnob);
+    // A step's Level, and its repeats: how many extra hits, the note value between them, and the fade across them.
+    stepLevelKnob.setRange(0.0, 100.0, 1.0);
+    stepLevelKnob.getSlider().setTextValueSuffix(" %");
+    stepLevelKnob.onValueChanged = [this](double v) { host.getTrack(currentLayer).row.setStepLevel(selectedStepOf[(size_t) currentLayer], juce::roundToInt(v)); };
+    stepLevelKnob.onStatusUpdate = [this](const juce::String&, const juce::String& value) { if (onStatusUpdate) onStatusUpdate("Step Level", value); };
+    stepFadeKnob.setRange(-100.0, 100.0, 1.0);
+    stepFadeKnob.getSlider().setTextValueSuffix(" %");
+    stepFadeKnob.onValueChanged = [this](double v) { host.getTrack(currentLayer).row.setStepRepeatFade(selectedStepOf[(size_t) currentLayer], juce::roundToInt(v)); };
+    stepFadeKnob.onStatusUpdate = [this](const juce::String&, const juce::String& value) { if (onStatusUpdate) onStatusUpdate("Step Repeat Fade", value); };
+    addChildComponent(stepLevelKnob);
+    addChildComponent(stepFadeKnob);
+    for (int n = 0; n <= step_repeats::kMaxRepeats; ++n) repeatSelect.addItem(juce::String(n), n + 1);
+    repeatSelect.setStatusName("Step Repeats");
+    repeatSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setStepRepeats(selectedStepOf[(size_t) currentLayer], id - 1); };
+    for (int i = 0; i < step_repeats::kNumRates; ++i) rateSelect.addItem(step_repeats::rateName(i), i + 1);
+    rateSelect.setStatusName("Step Repeat Rate");
+    rateSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setStepRepeatRate(selectedStepOf[(size_t) currentLayer], id - 1); };
+    addChildComponent(repeatSelect);
+    addChildComponent(rateSelect);
     // A step's condition: it plays only if this holds (after its loop, before its probability).
     condSelect.addItem("Always play", 1);
     condSelect.addItem("Play on Fill", 2);
@@ -271,8 +290,8 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     addAndMakeVisible(fillButton);
     // A step's loop: Length is how many bars it spans (a bar is one pass through the row), Bars which of them it plays in.
     // Length 6 with Bars 1, 2 and 5 ticked plays the step in those three bars of every six.
-    for (int n = 1; n <= StepRow::kMaxLoopBars; ++n) lengthSelect.addItem(juce::String(n) + (n == 1 ? " bar" : " bars"), n);
-    lengthSelect.setStatusName("Step Loop Length");
+    for (int n = 1; n <= StepRow::kMaxLoopBars; ++n) lengthSelect.addItem(juce::String(n), n);   // the number of bars; the box is too narrow for a unit
+    lengthSelect.setStatusName("Step Loop Length (bars)");
     lengthSelect.onChange = [this](int bars)
     {
         auto& row = host.getTrack(currentLayer).row;
@@ -500,6 +519,10 @@ void TrackContent::refreshStepPanel()
     }
     const int step = selected;
     stepProbKnob.setValue(row.stepProb(step), juce::dontSendNotification);
+    stepLevelKnob.setValue(row.stepLevel(step), juce::dontSendNotification);
+    stepFadeKnob.setValue(row.stepRepeatFade(step), juce::dontSendNotification);
+    repeatSelect.setSelectedId(row.stepRepeats(step) + 1, false);
+    rateSelect.setSelectedId(row.stepRepeatRate(step) + 1, false);
     condSelect.setSelectedId(row.stepCondition(step) + 1, false);
     lengthSelect.setSelectedId(row.stepLoopLength(step), false);
     refreshBarsSelect(row, step);
@@ -508,6 +531,10 @@ void TrackContent::refreshStepPanel()
     voiceSelect.setVisible(hat);
     voiceSelect.setSelectedId(row.isOpen(step) ? 2 : 1, false);
     const bool chordEng = shownEngine == EngineType::Chord;
+    // Level and the repeats are for every engine but a Chord (its column has no room) and a Rumble (it has no steps).
+    for (auto* c : { (juce::Component*) &stepLevelKnob, (juce::Component*) &stepFadeKnob, (juce::Component*) &repeatCaption, (juce::Component*) &repeatSelect,
+                     (juce::Component*) &rateCaption, (juce::Component*) &rateSelect })
+        c->setVisible(! chordEng && shownEngine != EngineType::Rumble);
     const bool pitched = shownEngine == EngineType::Kick || shownEngine == EngineType::Bass || chordEng;
     for (auto* c : { (juce::Component*) &octaveCaption, (juce::Component*) &octaveSelect, (juce::Component*) &noteCaption, (juce::Component*) &noteSelect }) c->setVisible(pitched);
     for (auto* c : { (juce::Component*) &chordCaption, (juce::Component*) &chordSelect, (juce::Component*) &invKnob, (juce::Component*) &spreadKnob }) c->setVisible(chordEng);
@@ -846,14 +873,16 @@ void TrackContent::layoutStepPanel()
         y += labelH + s(2) + dd + gap;
     };
     // The step's loop takes one row: Bars (the wider, it lists the ticked bars) beside Length.
-    auto placeLoopPair = [&](juce::Rectangle<int> column, int& y)
+    auto placePair = [&](juce::Label& capA, DropdownSelect& selA, juce::Label& capB, DropdownSelect& selB, juce::Rectangle<int> column, int& y)
     {
         const int pairGap = gap;
-        const int barsW = (column.getWidth() - pairGap) * 11 / 20;
-        int yLength = y;
-        placeDropdown(barsCaption, barsSelect, column.withWidth(barsW), y);
-        placeDropdown(lengthCaption, lengthSelect, column.withTrimmedLeft(barsW + pairGap), yLength);
+        const int aW = (column.getWidth() - pairGap) * 11 / 20;
+        int yB = y;
+        placeDropdown(capA, selA, column.withWidth(aW), y);
+        placeDropdown(capB, selB, column.withTrimmedLeft(aW + pairGap), yB);
     };
+    auto placeLoopPair = [&](juce::Rectangle<int> column, int& y) { placePair(barsCaption, barsSelect, lengthCaption, lengthSelect, column, y); };
+    auto placeRepeatPair = [&](juce::Rectangle<int> column, int& y) { placePair(repeatCaption, repeatSelect, rateCaption, rateSelect, column, y); };
 
     // A Chord step has two columns: the Root, Octave, Chord and Play lists, then the Probability, Inversion and Spread knobs.
     if (shownEngine == EngineType::Chord)
@@ -875,15 +904,24 @@ void TrackContent::layoutStepPanel()
         return;
     }
 
-    stepProbKnob.setBounds(in.getX() + (in.getWidth() - s(LF::kKnobSize2W)) / 2, in.getY(), s(LF::kKnobSize2W), knobH);
-    int y = in.getY() + knobH + gap;
-    placeLoopPair(in, y);
-    // A Hat's Sound, or a Kick or Bass step's Octave then Note, in the slots after Play.
+    // Every other engine: the lists on the left (the loop, the repeats, then a Hat's Sound or a Kick or Bass step's Octave and
+    // Note, then the Condition), the Prob, Level and Fade knobs in the column beside them.
+    auto left = in.withWidth(s(LF::kDropdownW));
+    const int knobX = left.getRight() + gap;
+    int y = in.getY();
+    placeLoopPair(left, y);
+    placeRepeatPair(left, y);
     int yHat = y;
-    placeDropdown(voiceCaption, voiceSelect, in, yHat);
-    placeDropdown(octaveCaption, octaveSelect, in, y);
-    placeDropdown(noteCaption, noteSelect, in, y);
-    placeDropdown(condCaption, condSelect, in, y);
+    placeDropdown(voiceCaption, voiceSelect, left, yHat);
+    placeDropdown(octaveCaption, octaveSelect, left, y);
+    placeDropdown(noteCaption, noteSelect, left, y);
+    placeDropdown(condCaption, condSelect, left, y);
+    int ky = in.getY();
+    for (auto* k : { &stepProbKnob, &stepLevelKnob, &stepFadeKnob })
+    {
+        k->setBounds(knobX, ky, s(LF::kKnobSize2W), knobH);
+        ky += knobH + gap;
+    }
 }
 
 void TrackContent::paint(juce::Graphics& g)

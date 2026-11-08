@@ -18,6 +18,9 @@ struct StepEvent
 {
     float velocity; int offset; bool open; float probability; bool tied; int gateSamples; float semitones; int step; long long pass;
     ChordHit chord;   // a Chord track's step: chord, inversion, spread, root degree and octave
+    // The step's repeats: how many extra hits follow, the beats between them, the Fade across them, and the beat of the next
+    // step that is on (a repeat run ends before it). `velocity` already carries the step's Level.
+    int repeats = 0; double repeatBeats = 0.25; int repeatFade = 0; double limitBeat = 0.0;
 };
 
 class StepClock
@@ -60,6 +63,35 @@ public:
     }
     template <class Row>
     static float ghostAdjusted(const Row&, int, float v, long) noexcept { return v; }
+
+    // A step's Level (0..1), and its repeat settings, for a row that has them; any other row plays every step at full level, once.
+    template <class Row>
+    static auto levelOf(const Row& r, int step, int) noexcept -> decltype(r.stepLevel(step), float()) { return (float) r.stepLevel(step) * 0.01f; }
+    template <class Row>
+    static float levelOf(const Row&, int, long) noexcept { return 1.0f; }
+    template <class Row>
+    static auto repeatsOf(const Row& r, int step, int) noexcept -> decltype(r.stepRepeats(step), int()) { return r.stepRepeats(step); }
+    template <class Row>
+    static int repeatsOf(const Row&, int, long) noexcept { return 0; }
+    template <class Row>
+    static auto repeatRateOf(const Row& r, int step, int) noexcept -> decltype(r.stepRepeatRate(step), int()) { return r.stepRepeatRate(step); }
+    template <class Row>
+    static int repeatRateOf(const Row&, int, long) noexcept { return step_repeats::kDefaultRate; }
+    template <class Row>
+    static auto repeatFadeOf(const Row& r, int step, int) noexcept -> decltype(r.stepRepeatFade(step), int()) { return r.stepRepeatFade(step); }
+    template <class Row>
+    static int repeatFadeOf(const Row&, int, long) noexcept { return 0; }
+
+    // The beat of the next step after local step `step` that is on (looking forward across the row's wrap, at most one pass), which
+    // ends a repeat run; `firstBeat` + one pass if none is.
+    template <class Row>
+    static double nextOnStepBeat(const Row& row, int step, int length, double stepBeatNow) noexcept
+    {
+        for (int ahead = 1; ahead <= length; ++ahead)
+            if (row.isOn(localStep(step + ahead, length)))
+                return stepBeatNow + (double) ahead * kStepBeats;
+        return stepBeatNow + (double) length * kStepBeats;
+    }
 
     // Realign to the top of the pattern.
     void reset() noexcept { nextGlobalStep = 0; }
@@ -112,12 +144,15 @@ public:
                 {
                     float velocity = row.isAccent(local) ? accentedVelocity(accentVelocity) : kNormalVelocity;
                     velocity = ghostAdjusted(row, local, velocity, 0);   // a ghost step: a share of the normal note
+                    velocity *= levelOf(row, local, 0);                  // the step's own Level
                     // A tied run: how long the note is held (to the end of the last step tied to this one), for a Bass's release.
                     int runSteps = 1;
                     while (local + runSteps < length && row.tiedFrom(local + runSteps)) ++runSteps;
                     if constexpr (std::is_invocable_v<Fire&, const StepEvent&>)
                         fire(StepEvent { velocity, sampleOffset, row.isOpen(local), (float) row.stepProb(local) * 0.01f, row.tiedFrom(local),
-                                         (int) (runSteps * kStepBeats / beatsPerSample), (float) row.stepSemitones(local), local, pass, row.stepChordHit(local) });
+                                         (int) (runSteps * kStepBeats / beatsPerSample), (float) row.stepSemitones(local), local, pass, row.stepChordHit(local),
+                                         repeatsOf(row, local, 0), step_repeats::rateBeats(repeatRateOf(row, local, 0)), repeatFadeOf(row, local, 0),
+                                         nextOnStepBeat(row, local, length, t) });
                     else if constexpr (std::is_invocable_v<Fire&, float, int, bool, float>) fire(velocity, sampleOffset, row.isOpen(local), (float) row.stepProb(local) * 0.01f);
                     else if constexpr (std::is_invocable_v<Fire&, float, int, bool>)   fire(velocity, sampleOffset, row.isOpen(local));
                     else                                                                fire(velocity, sampleOffset);

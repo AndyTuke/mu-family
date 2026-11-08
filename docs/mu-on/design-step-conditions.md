@@ -27,8 +27,13 @@ Andy's request (testing mu-On, v1.1.1468): a Repeat setting 0-16 that repeats a 
 
 **Level**: a per-step level 0-100 percent of the step's velocity (default 100), multiplied with accent / ghost, the Fade and the layer Level. It sits with the other per-step values in the Step panel.
 
+## Built (2026-11-08) and where it differs from the proposal
+- **Conditions and Fill** (#1792): as proposed. Fill travels as `ProcessorBase::setFillHeld` -> `RenderContext::fill` (the old reserved byte) -> `Track::stepPlays(step, pass, fill)`. The button sits at the bottom-left of the steps box.
+- **Repeats, Rate, Fade, Level** (#1791): in `StepRow` (`stepRepeats` 0..16, `stepRepeatRate`, `stepRepeatFade` -100..+100, `stepLevel` 0..100); `StepClock` multiplies the step's velocity by its Level and hands the Track the repeat settings and the beat of the next step that is on; `Track` plans the hits (`step_repeats::plan`, `Sequencer/StepRepeats.h`), plays them as retriggers at the level the Fade gives, and a repeat run ends before the next step that is on. A repeat is `tied = false`, and a Bass or percussion gate is cut to 0.9 of the gap.
+- **Step panel:** Bars | Length, Repeat | Rate, then Octave, Note and Condition on the left; Prob, Level and Fade as knobs in the column beside them. A **Chord** step has no room for Level and the repeats in its column (they keep their defaults); Andy to say whether the Chord engine should get them.
+- **Known limit:** an engine takes one trigger per audio block, so two repeats landing in the same block (a 1/64 repeat on a host block longer than about 1500 samples at 120 bpm) play as one, the later.
+
 ## Open points for Andy
 1. Names: **Repeat**, **Rate**, **Fade**, **Level**, **Condition**; the Fill button called **Fill**.
-2. Whether repeats are allowed to run past the next step's start (proposed: they stop there).
-3. The Step panel needs more room than the current column: proposed a second column for Repeat, Rate, Fade and Level beside the existing Prob, Bars, Length, Octave and Note.
-4. Fade range: -100..+100 percent is proposed; Elektron's curve is -128..+127.
+2. Chord steps: Level and the repeats are not offered (no room); worth a rethink of that column?
+3. Fade is -100..+100 percent (Elektron's curve is -128..+127).

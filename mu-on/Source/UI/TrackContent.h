@@ -105,9 +105,9 @@ private:
     KnobWithLabel probKnob { "Prob" };                       // the layer's Probability: the share of its notes that play
     // The STEP panel: the selected step's own probability (multiplied with the layer's), loop ratio (the Nth of every M
     // passes of the row) and, on a Hat, which sound it plays. Not parameters: they edit the track's step row.
-    KnobWithLabel  stepProbKnob { "Prob" };
-    juce::Label    condCaption { {}, "Condition" }, barsCaption { {}, "Bars" }, lengthCaption { {}, "Length" }, voiceCaption { {}, "Sound" }, octaveCaption { {}, "Octave" }, noteCaption { {}, "Note" };
-    DropdownSelect condSelect, barsSelect, lengthSelect, voiceSelect, octaveSelect, noteSelect;
+    KnobWithLabel  stepProbKnob { "Prob" }, stepLevelKnob { "Level" }, stepFadeKnob { "Fade" };   // a step's chance, its level and the fade across its repeats
+    juce::Label    repeatCaption { {}, "Repeat" }, rateCaption { {}, "Rate" }, condCaption { {}, "Condition" }, barsCaption { {}, "Bars" }, lengthCaption { {}, "Length" }, voiceCaption { {}, "Sound" }, octaveCaption { {}, "Octave" }, noteCaption { {}, "Note" };
+    DropdownSelect repeatSelect, rateSelect, condSelect, barsSelect, lengthSelect, voiceSelect, octaveSelect, noteSelect;
     juce::TextButton fillButton { "Fill" };                           // held, never latched: steps conditioned on Fill play while it is down
     // A Chord track's step: the chord (a dropdown), its inversion and its spread (knobs); the root is the Note list (scale degrees).
     juce::Label    chordCaption { {}, "Chord" };

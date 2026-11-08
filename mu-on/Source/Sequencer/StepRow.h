@@ -2,6 +2,7 @@
 
 #include "Persistence/TrackParams.h"   // EngineType (the default grooves)
 #include "Audio/ChordVoicing.h"        // kDefaultChord, the chord limits
+#include "Sequencer/StepRepeats.h"     // the repeat rates, fade and planning
 #include <juce_data_structures/juce_data_structures.h>
 #include <array>
 #include <atomic>
@@ -70,6 +71,18 @@ public:
     void setStepLoopLength(int step, int bars) noexcept { if (valid(step)) cells[(size_t) step].loopLen.store(juce::jlimit(1, kMaxLoopBars, bars), std::memory_order_relaxed); }
     void setStepLoopBars(int step, int mask) noexcept { if (valid(step)) cells[(size_t) step].loopBars.store(mask & kAllBars, std::memory_order_relaxed); }
 
+    // Per step: its Level (0..100 percent of its velocity, 100 default) and its repeats: how many extra hits follow the first
+    // (0..16, 0 = none), the time between them (an index into step_repeats::rateBeats, 1/16 default) and the Fade across them
+    // (-100..+100 percent: negative fades out, positive fades in, 0 flat).
+    int  stepLevel(int step) const noexcept { return valid(step) ? cells[(size_t) step].level.load(std::memory_order_relaxed) : 100; }
+    int  stepRepeats(int step) const noexcept { return valid(step) ? cells[(size_t) step].repeats.load(std::memory_order_relaxed) : 0; }
+    int  stepRepeatRate(int step) const noexcept { return valid(step) ? cells[(size_t) step].repRate.load(std::memory_order_relaxed) : step_repeats::kDefaultRate; }
+    int  stepRepeatFade(int step) const noexcept { return valid(step) ? cells[(size_t) step].repFade.load(std::memory_order_relaxed) : 0; }
+    void setStepLevel(int step, int percent) noexcept { if (valid(step)) cells[(size_t) step].level.store(juce::jlimit(0, 100, percent), std::memory_order_relaxed); }
+    void setStepRepeats(int step, int count) noexcept { if (valid(step)) cells[(size_t) step].repeats.store(juce::jlimit(0, step_repeats::kMaxRepeats, count), std::memory_order_relaxed); }
+    void setStepRepeatRate(int step, int index) noexcept { if (valid(step)) cells[(size_t) step].repRate.store(juce::jlimit(0, step_repeats::kNumRates - 1, index), std::memory_order_relaxed); }
+    void setStepRepeatFade(int step, int percent) noexcept { if (valid(step)) cells[(size_t) step].repFade.store(juce::jlimit(-100, 100, percent), std::memory_order_relaxed); }
+
     // Per step: the condition it must meet to play (after its loop, before its probability): Always, only while Fill is held,
     // only if the previous step on the row played (Pre), or only if it did not (NotPre).
     static constexpr int kCondAlways = 0, kCondFill = 1, kCondPre = 2, kCondNotPre = 3, kNumConds = 4;
@@ -109,7 +122,8 @@ public:
 
     void clear() noexcept
     {
-        for (auto& c : cells) { c.on.store(false, std::memory_order_relaxed); c.accent.store(false, std::memory_order_relaxed); c.ghost.store(false, std::memory_order_relaxed); c.open.store(false, std::memory_order_relaxed); c.prob.store(100, std::memory_order_relaxed); c.loopLen.store(1, std::memory_order_relaxed); c.loopBars.store(kAllBars, std::memory_order_relaxed); c.cond.store(kCondAlways, std::memory_order_relaxed); c.tie.store(false, std::memory_order_relaxed); c.oct.store(0, std::memory_order_relaxed); c.note.store(0, std::memory_order_relaxed);
+        for (auto& c : cells) { c.on.store(false, std::memory_order_relaxed); c.accent.store(false, std::memory_order_relaxed); c.ghost.store(false, std::memory_order_relaxed); c.open.store(false, std::memory_order_relaxed); c.prob.store(100, std::memory_order_relaxed); c.loopLen.store(1, std::memory_order_relaxed); c.loopBars.store(kAllBars, std::memory_order_relaxed); c.cond.store(kCondAlways, std::memory_order_relaxed);
+                    c.level.store(100, std::memory_order_relaxed); c.repeats.store(0, std::memory_order_relaxed); c.repRate.store(step_repeats::kDefaultRate, std::memory_order_relaxed); c.repFade.store(0, std::memory_order_relaxed); c.tie.store(false, std::memory_order_relaxed); c.oct.store(0, std::memory_order_relaxed); c.note.store(0, std::memory_order_relaxed);
                     c.chord.store(kDefaultChord, std::memory_order_relaxed); c.inv.store(0, std::memory_order_relaxed); c.spread.store(0, std::memory_order_relaxed); }
     }
 
@@ -163,12 +177,16 @@ public:
         if (op.containsChar('1')) row.setProperty("open", op, nullptr);   // absent = every step closed
         if (tie.containsChar('1')) row.setProperty("tie", tie, nullptr);  // absent = no tied steps
         // Probability and the loop (its Length in bars and its Bars mask) as comma lists, each only when a step leaves its default.
-        juce::StringArray probs, loopLens, loopBars, conds; bool anyProb = false, anyLoop = false, anyCond = false;
+        juce::StringArray probs, loopLens, loopBars, conds, levels, reps, repRates, repFades;
+        bool anyProb = false, anyLoop = false, anyCond = false, anyLevel = false, anyRep = false;
         for (int s = 0; s < n; ++s)
         {
             probs.add(juce::String(stepProb(s))); loopLens.add(juce::String(stepLoopLength(s))); loopBars.add(juce::String(stepLoopBars(s)));
             anyProb = anyProb || stepProb(s) != 100; anyLoop = anyLoop || stepLoopLength(s) != 1 || stepLoopBars(s) != kAllBars;
             conds.add(juce::String(stepCondition(s))); anyCond = anyCond || stepCondition(s) != kCondAlways;
+            levels.add(juce::String(stepLevel(s))); anyLevel = anyLevel || stepLevel(s) != 100;
+            reps.add(juce::String(stepRepeats(s))); repRates.add(juce::String(stepRepeatRate(s))); repFades.add(juce::String(stepRepeatFade(s)));
+            anyRep = anyRep || stepRepeats(s) != 0 || stepRepeatRate(s) != step_repeats::kDefaultRate || stepRepeatFade(s) != 0;
         }
         juce::StringArray octs, notes; bool anyPitch = false;
         for (int s = 0; s < n; ++s) { octs.add(juce::String(stepOctave(s))); notes.add(juce::String(stepNote(s))); anyPitch = anyPitch || stepSemitones(s) != 0; }
@@ -182,6 +200,8 @@ public:
         if (anyPitch) { row.setProperty("oct", octs.joinIntoString(","), nullptr); row.setProperty("note", notes.joinIntoString(","), nullptr); }
         if (anyProb) row.setProperty("prob", probs.joinIntoString(","), nullptr);
         if (anyCond) row.setProperty("cond", conds.joinIntoString(","), nullptr);
+        if (anyLevel) row.setProperty("level", levels.joinIntoString(","), nullptr);
+        if (anyRep) { row.setProperty("repeats", reps.joinIntoString(","), nullptr); row.setProperty("repRate", repRates.joinIntoString(","), nullptr); row.setProperty("repFade", repFades.joinIntoString(","), nullptr); }
         if (anyLoop) { row.setProperty("loopLen", loopLens.joinIntoString(","), nullptr); row.setProperty("loopBars", loopBars.joinIntoString(","), nullptr); }
         return row;
     }
@@ -202,6 +222,10 @@ public:
         const auto spreadList = juce::StringArray::fromTokens(row.getProperty("spread").toString(), ",", "");
         const auto probs = juce::StringArray::fromTokens(row.getProperty("prob").toString(), ",", "");
         const auto condList = juce::StringArray::fromTokens(row.getProperty("cond").toString(), ",", "");
+        const auto levelList = juce::StringArray::fromTokens(row.getProperty("level").toString(), ",", "");
+        const auto repList = juce::StringArray::fromTokens(row.getProperty("repeats").toString(), ",", "");
+        const auto repRateList = juce::StringArray::fromTokens(row.getProperty("repRate").toString(), ",", "");
+        const auto repFadeList = juce::StringArray::fromTokens(row.getProperty("repFade").toString(), ",", "");
         const auto loopLens = juce::StringArray::fromTokens(row.getProperty("loopLen").toString(), ",", "");
         const auto loopBars = juce::StringArray::fromTokens(row.getProperty("loopBars").toString(), ",", "");
         const juce::String legacyLoops = row.getProperty("loop").toString();   // older files: one digit per step, an N:M ratio
@@ -215,6 +239,10 @@ public:
             c.open.store(s < op.length() && op[s] == '1', std::memory_order_relaxed);
             setStepProb(s, s < probs.size() ? probs[s].getIntValue() : 100);
             setStepCondition(s, s < condList.size() ? condList[s].getIntValue() : kCondAlways);
+            setStepLevel(s, s < levelList.size() ? levelList[s].getIntValue() : 100);
+            setStepRepeats(s, s < repList.size() ? repList[s].getIntValue() : 0);
+            setStepRepeatRate(s, s < repRateList.size() ? repRateList[s].getIntValue() : step_repeats::kDefaultRate);
+            setStepRepeatFade(s, s < repFadeList.size() ? repFadeList[s].getIntValue() : 0);
             // A step's loop: the Length and Bars lists, else an older file's N:M ratio digit (it plays bar N of every M).
             if (s < loopLens.size())
             {
@@ -242,7 +270,7 @@ public:
     }
 
 private:
-    struct Cell { std::atomic<bool> on { false }; std::atomic<bool> accent { false }; std::atomic<bool> ghost { false }; std::atomic<bool> open { false }; std::atomic<int> prob { 100 }; std::atomic<int> loopLen { 1 }; std::atomic<int> loopBars { 0xFF }; std::atomic<int> cond { 0 }; std::atomic<bool> tie { false }; std::atomic<int> oct { 0 }; std::atomic<int> note { 0 };
+    struct Cell { std::atomic<bool> on { false }; std::atomic<bool> accent { false }; std::atomic<bool> ghost { false }; std::atomic<bool> open { false }; std::atomic<int> prob { 100 }; std::atomic<int> loopLen { 1 }; std::atomic<int> loopBars { 0xFF }; std::atomic<int> cond { 0 }; std::atomic<int> level { 100 }; std::atomic<int> repeats { 0 }; std::atomic<int> repRate { step_repeats::kDefaultRate }; std::atomic<int> repFade { 0 }; std::atomic<bool> tie { false }; std::atomic<int> oct { 0 }; std::atomic<int> note { 0 };
                   std::atomic<int> chord { kDefaultChord }; std::atomic<int> inv { 0 }; std::atomic<int> spread { 0 }; };
     static bool valid(int s) noexcept { return s >= 0 && s < kMaxSteps; }
 

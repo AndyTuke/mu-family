@@ -365,17 +365,29 @@ void Track::clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, i
 {
     row.setGroove(swingRow.load(0.0f), accentRow.load(1.0f));
     row.setGhostLevel(filterCutRow[(size_t) e].isBound() || e == toIndex(EngineType::Chord) ? ghostNow : ghostRow.load(0.35f));
-    if (! ctx.playing) return;
-    if (ctx.justStarted) clock.seek(ctx.startBeat);   // the step the transport starts in fires, even on a quick replay
+    if (! ctx.playing) { numPendingRepeats = 0; return; }
+    if (ctx.justStarted) { clock.seek(ctx.startBeat); numPendingRepeats = 0; }   // the step the transport starts in fires, even on a quick replay
+    if (fireInto != nullptr && e != toIndex(EngineType::Rumble)) fireRepeats(ctx, fireInto, n);   // repeats owed by steps that fired earlier
     clock.processSpan(row, ctx.startBeat, n, ctx.beatsPerSample, row.swingAmount(), row.accentVelocity(),
-                      [this, fireInto, e, fill = ctx.fill != 0](const StepEvent& ev)
+                      [this, fireInto, e, fill = ctx.fill != 0, startBeat = ctx.startBeat, beatsPerSample = ctx.beatsPerSample](const StepEvent& ev)
                       {
                           if (fireInto == nullptr || e == toIndex(EngineType::Rumble)) return;
                           if (! stepPlays(ev.step, ev.pass, fill)) return;   // the loop, condition and probability draw of this pass
-                          fireInto->trigger(ev.velocity, ev.offset, ev.open, ev.tied, ev.gateSamples, ev.semitones, &ev.chord);
+                          // A step with repeats plays its first hit at the Fade's start level and holds it no longer than the gap to the next.
+                          float firstVelocity = ev.velocity;
+                          int firstGate = ev.gateSamples;
+                          if (ev.repeats > 0)
+                          {
+                              firstVelocity *= step_repeats::gain(0, ev.repeats, ev.repeatFade);
+                              const int gap = (int) (ev.repeatBeats / beatsPerSample * 0.9);
+                              if (firstGate > 0) firstGate = juce::jmin(firstGate, gap);
+                          }
+                          fireInto->trigger(firstVelocity, ev.offset, ev.open, ev.tied, firstGate, ev.semitones, &ev.chord);
+                          if (ev.repeats > 0) scheduleRepeats(ev, startBeat + (double) ev.offset * beatsPerSample);
                           if (drumTrigCount < 16) drumTrigOffsets[drumTrigCount++] = ev.offset;   // the filter envelope restarts here
                           triggers.fetch_add(1, std::memory_order_relaxed);
                       });
+    if (fireInto != nullptr && e != toIndex(EngineType::Rumble)) fireRepeats(ctx, fireInto, n);   // repeats a step planned inside this very block
 }
 
 bool Track::stepPlays(int step, long long pass, bool fill) const noexcept
@@ -396,6 +408,43 @@ bool Track::stepPlays(int step, long long pass, bool fill) const noexcept
     uint32_t x = seed ^ (uint32_t) (pass * 2654435761ll) ^ ((uint32_t) step * 0x9E3779B9u);
     x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
     return (float) (x >> 8) * (1.0f / 16777216.0f) < chance;
+}
+
+// The repeats of a step that has just fired: each is a retrigger of the same note, planned at the step's rate up to the next step
+// that is on, at the level the Fade gives it. A full list drops the extras.
+void Track::scheduleRepeats(const StepEvent& ev, double firstBeat) noexcept
+{
+    double beats[step_repeats::kMaxRepeats];
+    const int planned = step_repeats::plan(firstBeat, ev.repeats, ev.repeatBeats, ev.limitBeat, beats);
+    for (int k = 1; k <= planned && numPendingRepeats < (int) pendingRepeats.size(); ++k)
+    {
+        auto& p = pendingRepeats[(size_t) numPendingRepeats++];
+        p.beat = beats[k - 1];
+        p.hit = k;
+        p.ev = ev;
+    }
+}
+
+// Plays the repeats whose beat falls in this block (a retrigger: not tied), and forgets any the transport has already passed.
+void Track::fireRepeats(const mu_core::RenderContext& ctx, TrackEngine* fireInto, int n) noexcept
+{
+    const double start = ctx.startBeat, end = start + ctx.beatsPerSample * (double) n;
+    for (int i = 0; i < numPendingRepeats;)
+    {
+        auto& p = pendingRepeats[(size_t) i];
+        if (p.beat >= end) { ++i; continue; }
+        if (p.beat >= start - 1.0e-9)
+        {
+            const int offset = juce::jlimit(0, juce::jmax(0, n - 1), (int) std::round((p.beat - start) / ctx.beatsPerSample));
+            const float velocity = p.ev.velocity * step_repeats::gain(p.hit, p.ev.repeats, p.ev.repeatFade);
+            int gate = p.ev.gateSamples;
+            if (gate > 0) gate = juce::jmin(gate, (int) (p.ev.repeatBeats / ctx.beatsPerSample * 0.9));
+            fireInto->trigger(velocity, offset, p.ev.open, false, gate, p.ev.semitones, &p.ev.chord);
+            if (drumTrigCount < 16) drumTrigOffsets[drumTrigCount++] = offset;   // the filter envelope restarts here too
+            triggers.fetch_add(1, std::memory_order_relaxed);
+        }
+        pendingRepeats[(size_t) i] = pendingRepeats[(size_t) --numPendingRepeats];   // played, or already past: drop it
+    }
 }
 
 bool Track::previousPlayed(int step, long long pass, bool fill) const noexcept
