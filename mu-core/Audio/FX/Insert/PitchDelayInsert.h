@@ -112,7 +112,11 @@ private:
         {
             float rp = (float) write - delay;
             while (rp < 0.0f) rp += (float) size;
-            const int i0 = (int) rp;
+            // A tiny negative position plus the size rounds to exactly the size in float: wrap again, and never leave the buffer
+            // (a NaN position, from a NaN pitch ratio, also falls back to the start).
+            while (rp >= (float) size) rp -= (float) size;
+            if (! (rp >= 0.0f && rp < (float) size)) rp = 0.0f;
+            const int i0 = juce::jmin((int) rp, size - 1);
             const float fr = rp - (float) i0;
             const int i1 = i0 + 1 >= size ? 0 : i0 + 1;
             return buf[(size_t) i0] * (1.0f - fr) + buf[(size_t) i1] * fr;

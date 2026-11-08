@@ -85,6 +85,20 @@ struct NewInsertTests : juce::UnitTest
                     }
         }
 
+        beginTest("Pitch Delay across the whole Pitch range stays inside its buffer and finite (a read position that rounded up to the size once indexed one past the end)");
+        {
+            std::mt19937 rng(11);
+            std::uniform_real_distribution<float> noise(-0.6f, 0.6f);
+            for (int step = 0; step <= 32; ++step)
+            {
+                auto p = make(PitchDelay, (float) step / 32.0f, 0.1f, 0.6f, 1.0f);
+                auto out = run(p, 1.0, [&](int) { return noise(rng); });
+                bool ok = true;
+                for (float v : out) ok = ok && std::isfinite(v);
+                expect(ok, "Pitch Delay stays finite at Pitch step " + juce::String(step));
+            }
+        }
+
         beginTest("with Mix at zero the Chorus, Flanger, Phaser and Pitch Delay leave the signal untouched; Tremolo at zero depth too");
         {
             auto sine = [](int i) { return 0.4f * std::sin(0.07f * (float) i); };
