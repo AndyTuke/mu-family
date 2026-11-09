@@ -62,7 +62,7 @@ Br
 # ── 1. Introduction ──────────────────────────────────────────────────────────
 H1 "1. Introduction"
 P "mu-Tronic is a performance unit from Transwarp Development Project. It is a standalone application: there is no VST3 or CLAP version. mu-Tronic is Pay What You Want: pay what you like from £0 (suggested £25), and nothing is limited either way (see Supporting mu-Tronic)."
-P "mu-Tronic starts empty. It has sixteen layer slots, shown eight at a time on two pages. Into each slot you put one layer, chosen from the instruments of the other mu apps: a Rhythm from mu-Clid, a Pattern from mu-Tant, an Arp from mu-Toni, or one of mu-On's seven engines (Kick, Bass, Hat, Snare, Rumble, FM Perc and Chord). A layer in mu-Tronic is the same instrument you know from its own app, with the same controls, modulators and presets. Mix and match as you like: sixteen layers, any combination."
+P "mu-Tronic starts empty. It has sixteen layer slots, shown eight at a time on two pages. Into each slot you put one layer, chosen from the instruments of the other mu apps: a Rhythm from mu-Clid, a Pattern from mu-Tant, an Arp from mu-Toni, a Phrase from mu-Tilate (a loop slicer), or one of mu-On's seven engines (Kick, Bass, Hat, Snare, Rumble, FM Perc and Chord). A layer in mu-Tronic is the same instrument you know from its own app, with the same controls, modulators and presets. Mix and match as you like: sixteen layers, any combination."
 P "Around the layers is the family you may know from the other apps: the same mixer, effects, modulators, presets and transport bar. mu-Tronic adds three buses to the mixer, so you can group layers and process the group, and scenes, so you can change the clip on every layer with one press."
 P "Because mu-Tronic hosts several instruments at once, it can stand in for mu-link as a performance tool: one window, one tempo, one mix."
 
@@ -70,11 +70,12 @@ H2 "The Layer Types"
 Bullet "Rhythm (from mu-Clid)  -  a Euclidean sample rhythm. It can also send MIDI notes instead of sound."
 Bullet "Pattern (from mu-Tant)  -  a wavetable drone with a gate pattern."
 Bullet "Arp (from mu-Toni)  -  a generative arpeggiator."
-Bullet "Kick, Bass, Hat and Snare (from mu-On)  -  a 909-style drum or bass sound with its own row of up to 64 steps (16 by default)."
+Bullet "Phrase (from mu-Tilate)  -  a loop slicer: one audio loop cut into slices at its hits, played by a timeline sequencer."
+Bullet "Kick, Bass, Hat, Snare, FM Perc and Chord (from mu-On)  -  a 909-style drum, bass, percussion or chord sound with its own row of up to 64 steps (16 by default)."
 Bullet "Rumble (from mu-On)  -  a long, dark tail made from another layer's sound, usually a Kick."
 P "Each of these is described in the manual of the app it comes from. This manual covers what is different in mu-Tronic."
 
-Pic "The mu-Tronic window: transport bar, layer sidebar with scene pads and page switch, a layer in the main area." "main-window.png"
+Pic "The mu-Tronic window: transport bar, layer sidebar with scene pads and page switch, a Bass layer of mu-On in the main area, with its OSC/AMP, Filter, Insert, Layer, Step and Steps boxes and a Stepped modulator below." "main-window.png"
 
 # ── 2. Installation ──────────────────────────────────────────────────────────
 H1 "2. Installation"
@@ -103,7 +104,8 @@ Bullet "Layer Editor (centre)  -  the header, the controls and the modulators of
 Bullet "Mixer overlay  -  opened from the transport bar, replacing the editor"
 Bullet "Status Bar (bottom)  -  the name and value of the control you last touched, a Support link (until a licence key is entered), and the CPU readout at the right-hand end"
 P "The window has two sizes, Medium and Large, chosen in Settings (Display, Size). Everything scales with it."
-P "The main area takes the colour of the selected layer's type: purple for Rhythm, green for Pattern, blue for Arp and yellow for the seven mu-On layers. The transport bar, sidebar, mixer and settings keep mu-Tronic's own ice-white and steel."
+P "The main area takes the colour of the selected layer's type: purple for Rhythm, green for Pattern, blue for Arp and Phrase, and yellow for the seven mu-On layers. The transport bar, sidebar, mixer and settings keep mu-Tronic's own ice-white and steel."
+P "Every control reports to the Status Bar: touch any knob, drop-down, switch or button and the bar shows its name and value, so you always see what you last changed."
 
 H2 "CPU Readout"
 P "At the right-hand end of the Status Bar, mu-Tronic shows CPU followed by a percentage. It is how hard the audio engine is working, with all sixteen layers, the buses and the effects counted. The figure is the worst moment of the last second, because it is the brief spike that causes clicks. The number turns amber from 70 percent and red from 90 percent. If it goes red, remove a layer or a heavy effect. The readout stays visible in Performance mode."
@@ -147,11 +149,12 @@ P "Select an empty slot and the main area shows the layer chooser, titled Add a 
 Bullet "mu-Clid  -  Rhythm: Euclidean sample rhythm."
 Bullet "mu-Tant  -  Pattern: wavetable drone, gate pattern."
 Bullet "mu-Toni  -  Arp: generative arpeggiator."
+Bullet "mu-Tilate  -  Phrase: loop slicer with a timeline sequencer."
 Bullet "mu-On  -  a framed group of seven cards: Kick (909 kick drum), Bass (bass line), Hat (hi-hat), Snare (snare), Rumble (rumble tail from a kick), FM Perc (FM toms and percussion) and Chord (a chord player for dub-techno stabs)."
-P "Click a card, or its Add button, to put that layer in the slot. The new layer starts from the default for its type (see Presets). The status bar confirms with Added followed by the layer's name."
+P "The cards run in that order: the four products first, then the mu-On group. Click a card, or its Add button, to put that layer in the slot. The new layer starts from the default for its type (see Presets). The status bar confirms with Added followed by the layer's name."
 P "You can also load a layer preset into an empty slot: open the preset dropdown in the layer header and choose any layer preset. The slot takes the type of the preset you chose."
 P "Rumble works on the sound of another layer, called its Source. A new Rumble listens to the first Kick layer if there is one. If there is no Kick yet, the Rumble is added with no Source and the status bar says Source needed: add a Kick layer. Choose a Source in the Rumble's own Source dropdown. A Rumble can listen to any other layer that is not a Rumble."
-Pic "The layer chooser for an empty slot: three product cards and the mu-On group of seven engine cards (Kick, Bass, Hat, Snare, Rumble, FM Perc and Chord)." "chooser.png"
+Pic "The layer chooser for an empty slot: four product cards (mu-Clid, mu-Tant, mu-Toni and mu-Tilate) and the mu-On group of seven engine cards (Kick, Bass, Hat, Snare, Rumble, FM Perc and Chord)." "chooser.png"
 
 # ── 7. The Layers ────────────────────────────────────────────────────────────
 H1 "7. The Layers"
@@ -159,7 +162,7 @@ P "A layer in mu-Tronic has the controls of its type, in the same place as in th
 
 H2 "The Layer Header"
 P "The strip across the top of the layer editor holds:"
-Bullet "Layer colour dot and a small type tag: Clid, Tant, Toni or On."
+Bullet "Layer colour dot and a small type tag naming the app the layer comes from: mu-Clid, mu-Tant, mu-Toni, mu-Tilate or mu-On."
 Bullet "Layer name  -  click to edit."
 Bullet "Layer preset dropdown  -  lists the layer presets for this layer's type only (see Presets). An empty slot lists every type."
 Bullet "Notes In  -  for Arp and Pattern layers only. See below."
@@ -168,7 +171,7 @@ Bullet "Save  -  saves the layer as a layer preset of its type."
 Bullet "Reset (circular arrow) / Delete (x)  -  reset the layer to its defaults, or empty the slot. Both ask first. Reset also clears the layer's clips."
 
 H2 "Notes In (MIDI channel per layer)"
-P "Arp and Pattern layers can be played from a MIDI keyboard. Each of these layers has its own Notes In setting in the header, so different layers can listen to different channels. Choose Omni (every channel, the default) or Channel 1 to Channel 16. The setting is saved with the layer and with the full preset. Loading a layer preset or a clip never changes it, because it describes your MIDI setup rather than the sound. A Pattern layer shows the control in Free mode too; it takes effect when you switch that layer to Note mode. Rhythm, Kick, Bass, Hat, Snare and Rumble layers do not read notes and show no Notes In control."
+P "Arp and Pattern layers can be played from a MIDI keyboard. Each of these layers has its own Notes In setting in the header, so different layers can listen to different channels. Choose Omni (every channel, the default) or Channel 1 to Channel 16. The setting is saved with the layer and with the full preset. Loading a layer preset or a clip never changes it, because it describes your MIDI setup rather than the sound. A Pattern layer shows the control in Free mode too; it takes effect when you switch that layer to Note mode. Rhythm, Phrase and the mu-On layers do not read notes and show no Notes In control."
 
 H2 "Rhythm"
 Bullet "The Save button opens the same Save Rhythm Preset card as in mu-Clid: Name, Description, Category and Embed sample in file. Tick Embed sample in file if you will open the preset on another computer."
@@ -178,9 +181,24 @@ Bullet "A Rhythm set to send MIDI instead of sound makes no audio. Its mixer str
 H2 "Pattern"
 P "On the Root and Scale row, at the right, is a MIDI switch with two choices, Free and Note. In Free, the drone plays on its own. In Note, it sounds while a key is held, at the key's pitch. Each Pattern layer has its own setting; it is saved with the layer but is not part of a layer preset. Free is the default."
 
-H2 "Kick, Bass, Hat and Snare"
-P "These are mu-On's engines, each with its own row of steps. Because the layer is a Kick, Bass, Hat or Snare, there is no Engine selector: to change the sound family, empty the slot and add a different layer. The Groove box holds Swing and Accent for this layer alone. The step row shows 16 steps at a time; click a step to turn it on or off, right-click for an accent."
+H2 "Phrase"
+P "A Phrase layer is mu-Tilate's loop slicer. Load a loop into the layer; mu-Tilate finds the hits in it, cuts the loop into slices at those points, and its timeline sequencer places the slices as blocks so you can rearrange, repeat, reverse or thin out the loop. The layer has its own sound controls, mixer strip and modulators like every other layer. Loops are taken from mu-Tilate's own sample folder and are shared with it, never copied. See the mu-Tilate manual for the loop editor, the slices and the timeline."
+
+H2 "mu-On Layers (Kick, Bass, Hat, Snare, FM Perc and Chord)"
+P "These are mu-On's engines, each with its own row of steps. Because the layer is one of them, there is no Engine selector: to change the sound family, empty the slot and add a different layer. The Groove box holds Swing and Accent for this layer alone. The step row shows 16 steps at a time; click a step to turn it on or off, right-click for an accent."
 P "A row can be up to 64 steps long. Under the row, Prev and Next show the previous or next sixteen steps, a label such as Page 2 / 4 says where you are, and the Length control (1 to 64, default 16) sets how many steps the row plays before it starts again. Use its arrows to change it by one, or double-click it and type a number. Steps past the Length are shaded with diagonal hatching and do not play; they keep their settings if you lengthen the row again. A tie that crosses a page edge shows as a short stub at the start of the next page. If you shorten the row past the selected step, the selection moves back to the last step, so the Step panel always edits a step you can see. The Layer box is narrow, leaving room for a wide Steps box. Paging and Length work the same way as in mu-On."
+H3 "The Step Panel"
+P "These layers share mu-On's Step panel, which edits the selected step (the one you last clicked). Everything in it belongs to that one step."
+Bullet "Prob and Level (knobs)  -  Prob is the chance that the step plays, 0 to 100 percent (default 100). Level is the step's own volume, 0 to 100 percent (default 100)."
+Bullet "Bars and Length  -  let a step play only in some bars of a longer loop. Length (1 to 8, default 1) is the loop length in bars. Bars is a drop-down where you tick which of those bars the step plays in; its box shows the ticked bars, or All, or None."
+Bullet "Repeat, Rate and Fade  -  repeat the step's note quickly, like a roll. Repeat (0 to 16, default 0 = off) is how many extra hits follow the first, Rate is the time between hits, and Fade shapes their level: Flat, Out 50, Out, In 50 or In."
+Bullet "Condition  -  a rule the step must also pass: Always play (the default), Play on Fill, Play if previous played, or Play if previous didn't play."
+P "Fill is a press-and-hold button under the step rows. While you hold it, steps set to Play on Fill play; let go and they stop. Fill is also a modulation target, so a modulator can press it for you. A Chord step has Prob, Bars, Length and Condition but no Level, Repeat, Rate or Fade. Details are in the mu-On manual."
+H3 "Sound Panels"
+Bullet "Bass  -  two panels, OSC/AMP (oscillator, sub and amp envelope) and Filter, which has its own attack, decay, sustain and release envelope."
+Bullet "Filters  -  Kick, Hat, Snare and FM Perc have a Filter panel, and the Bass and Chord have filters of their own. All offer the same sixteen filter types."
+Bullet "Hat tune link  -  a lamp under the Hat's Cl.Tune and Op.Tune. When on, the two tune knobs move together."
+P "The insert knobs in each layer show a live arc when a modulator is moving them."
 
 H2 "Rumble"
 P "Rumble has an envelope and a Source dropdown instead of a step row. The envelope curve shows a baseline, level lines at 25, 50 and 75 percent, and beat lines that follow its loop length."
@@ -189,7 +207,7 @@ H2 "Effect Send Names"
 P "The mixer's Effect return is named after its algorithm, for example Chorus or Echo. The Effect send knob in each layer, and the modulation target for it, carry the same name."
 
 H2 "Modulators"
-P "Every layer has its own modulators exactly as in its own app. Modulators can only move the controls of their own layer. See the manual of the layer's app."
+P "Every layer has its own modulators exactly as in its own app. A Step panel's Fill button is a target too. Modulators can only move the controls of their own layer. See the manual of the layer's app."
 
 # ── 8. Scenes and Clips ──────────────────────────────────────────────────────
 H1 "8. Scenes and Clips"
@@ -272,7 +290,8 @@ P "mu-Tronic does not keep a separate set of layer presets. Each layer type read
 Bullet "Rhythm  -  Documents\TDP\muClid\Rhythms, files ending .muRhythm."
 Bullet "Pattern  -  Documents\TDP\muTant\Voices, files ending .muPattern."
 Bullet "Arp  -  Documents\TDP\muToni\Arps, files ending .muArp."
-Bullet "Kick, Bass, Hat, Snare and Rumble  -  Documents\TDP\muOn\Tracks, files ending .muTrack. A .muTrack file knows which engine it is for, so a Kick preset shows only in Kick slots."
+Bullet "Phrase  -  Documents\TDP\muTilate\Phrases, files ending .muPhrase."
+Bullet "Kick, Bass, Hat, Snare, Rumble, FM Perc and Chord  -  Documents\TDP\muOn\Tracks, files ending .muTrack. A .muTrack file knows which engine it is for, so a Kick preset shows only in Kick slots."
 P "In a slot that holds a layer, the layer preset dropdown lists only presets of that layer's type (for example only .muArp files in an Arp slot). To use a preset of another type, choose it in an empty slot. Presets from the other apps' factory and user folders both appear."
 
 H2 "Defaults for New Layers"
@@ -334,12 +353,12 @@ Bullet "Keep an eye on the CPU readout as you add layers."
 H1 "15. Technical Specifications"
 Bullet "Format: Standalone (Windows). No VST3 or CLAP. Pay What You Want; every feature works with or without a key."
 Bullet "Layers: 16 slots on two pages of 8, starting empty"
-Bullet "Layer types: Rhythm, Pattern, Arp, Kick, Bass, Hat, Snare, Rumble, FM Perc, Chord"
+Bullet "Layer types: Rhythm, Pattern, Arp, Phrase, Kick, Bass, Hat, Snare, Rumble, FM Perc, Chord"
 Bullet "Mixer: 16 channel strips, 3 buses with 2 inserts each, Effect / Delay / Reverb returns, master with 2 inserts"
 Bullet "Insert effects: 14 plus None, on every layer, bus and the master"
 Bullet "Clips: 8 per layer (none for Rumble), with copy, cut, paste and auto-save; scenes 1 to 8"
 Bullet "Modulators per layer: 8, plus a matrix view"
-Bullet "Full preset format: .muTronic. Layer presets: .muRhythm, .muPattern, .muArp, .muTrack (shared with the other apps)"
+Bullet "Full preset format: .muTronic. Layer presets: .muRhythm, .muPattern, .muArp, .muPhrase, .muTrack (shared with the other apps)"
 Bullet "Import: .muClid, .muTant, .muToni, .muOn full presets"
 Bullet "Third-party libraries: JUCE, Signalsmith Reverb (MIT)"
 
