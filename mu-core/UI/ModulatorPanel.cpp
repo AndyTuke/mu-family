@@ -84,6 +84,22 @@ void ModulatorPanel::setLayer(Layer* slot)
     }
     matrixPanel.setLayer(slot);
     matrixPanel.onChange = [this] { if (onChange) onChange(); };
+
+    // Show a modulator that has targets: a layer opened on an empty tab reads as "no modulation" while its other
+    // modulators drive knobs.
+    if (activeTab < kNumMods)
+    {
+        auto targetsOf = [slot](int i)
+        {
+            const auto source = slot->controlSequences[(size_t) i].id + "_output";
+            int n = 0;
+            for (const auto& a : slot->modulationMatrix.getAssignments()) if (a.sourceId == source) ++n;
+            return n;
+        };
+        if (targetsOf(activeTab) == 0)
+            for (int i = 0; i < kNumMods; ++i)
+                if (targetsOf(i) > 0) { tabBar.setSelectedIndex(i, true); break; }
+    }
 }
 
 void ModulatorPanel::resized()

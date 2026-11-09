@@ -50,9 +50,7 @@ void DropdownSelect::setItemGlyph(GlyphDrawer draw)
 {
     glyphDrawer = std::move(draw);
     combo.popupOverride = glyphDrawer ? std::function<void()>([this] { showGlyphPopup(); }) : std::function<void()>();
-    // The box shows the picture alone (the name is in the list and on the status bar): the combo's own text label is hidden.
-    for (auto* child : combo.getChildren())
-        if (dynamic_cast<juce::Label*>(child) != nullptr) child->setVisible(! glyphDrawer);
+    // The box keeps its text; the picture is drawn faintly over it (paintOverChildren) so both read.
     repaint();
 }
 
@@ -75,10 +73,11 @@ void DropdownSelect::showGlyphPopup()
 void DropdownSelect::paintOverChildren(juce::Graphics& g)
 {
     if (! glyphDrawer || combo.getSelectedId() <= 0) return;
-    // Centred in the box, left of the drop-down arrow.
+    // Centred in the box, left of the drop-down arrow, faint so the text under it stays readable.
     const auto box = getLocalBounds().toFloat().withTrimmedRight(18.0f);
     const auto area = box.withSizeKeepingCentre(juce::jmin(30.0f, box.getWidth() - 6.0f), box.getHeight() - 10.0f);
-    glyphDrawer(g, area, combo.getSelectedId(), MuLookAndFeel::lcdCombo(combo) ? MuLookAndFeel::lcdLitColour(combo) : MuLookAndFeel::colour(MuLookAndFeel::statusBarValue));
+    const auto colour = MuLookAndFeel::lcdCombo(combo) ? MuLookAndFeel::lcdLitColour(combo) : MuLookAndFeel::colour(MuLookAndFeel::statusBarValue);
+    glyphDrawer(g, area, combo.getSelectedId(), colour.withMultipliedAlpha(0.22f));
 }
 
 // ── Multi-select mode ──────────────────────────────────────────────────────────────────────
