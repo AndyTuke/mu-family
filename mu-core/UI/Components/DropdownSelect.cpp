@@ -67,7 +67,12 @@ void DropdownSelect::showGlyphPopup()
     }
     juce::Component::SafePointer<DropdownSelect> safe(this);
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&combo).withMinimumWidth(combo.getWidth()),
-                       [safe](int picked) { if (safe != nullptr && picked > 0) safe->setSelectedId(picked, true); });
+                       [safe](int picked)
+                       {
+                           if (safe == nullptr) return;
+                           safe->combo.hidePopup();   // the combo marked itself open when clicked; only its own popup callback clears that, and this popup bypasses it
+                           if (picked > 0) safe->setSelectedId(picked, true);
+                       });
 }
 
 void DropdownSelect::paintOverChildren(juce::Graphics& g)
@@ -148,7 +153,9 @@ void DropdownSelect::showMultiPopup()
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&combo).withMinimumWidth(combo.getWidth()),
                        [safe](int picked)
                        {
-                           if (safe == nullptr || picked <= 0) return;
+                           if (safe == nullptr) return;
+                           safe->combo.hidePopup();   // clear the combo's "open" mark (see showGlyphPopup) so the next click opens the list
+                           if (picked <= 0) return;
                            safe->toggle(picked);
                            juce::MessageManager::callAsync([safe] { if (safe != nullptr) safe->showMultiPopup(); });
                        });

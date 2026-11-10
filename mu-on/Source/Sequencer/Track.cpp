@@ -395,10 +395,11 @@ void Track::clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, i
 bool Track::stepPlays(int step, long long pass, bool fill) const noexcept
 {
     if (! StepClock::loopPlays(row, step, pass)) return false;
-    // The condition: Fill needs the button held; Pre / NotPre look at whether the step before it played.
+    // The condition: Fill needs the button held, NotFill needs it up; Pre / NotPre look at whether the step before it played.
     switch (row.stepCondition(step))
     {
         case StepRow::kCondFill:   if (! fill) return false; break;
+        case StepRow::kCondNotFill: if (fill) return false; break;
         case StepRow::kCondPre:    if (! previousPlayed(step, pass, fill)) return false; break;
         case StepRow::kCondNotPre: if (previousPlayed(step, pass, fill)) return false; break;
         default: break;

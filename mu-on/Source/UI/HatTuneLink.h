@@ -24,7 +24,7 @@ public:
     {
         const bool on = isOn && isOn();
         const auto b = getLocalBounds().toFloat();
-        const float left = b.getX() + 3.0f, right = b.getRight() - 3.0f, y = b.getBottom() - 5.0f;
+        const float left = b.getX() + 1.0f, right = b.getRight() - 1.0f, y = b.getBottom() - 10.0f;   // clear of the bottom edge: the lamp and its ring must not be cut off
         const auto line = on ? MuLookAndFeel::colour(MuLookAndFeel::segmentActiveBorder) : MuLookAndFeel::colour(MuLookAndFeel::labelText);
         juce::Path bracket;
         bracket.startNewSubPath(left, b.getY());

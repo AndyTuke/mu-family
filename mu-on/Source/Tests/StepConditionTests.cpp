@@ -35,6 +35,13 @@ namespace
                 row.setStepCondition(0, StepRow::kCondAlways);
             }
 
+            beginTest("NotFill plays only while Fill is not held");
+            {
+                row.setStepCondition(0, StepRow::kCondNotFill);
+                for (long long pass = 0; pass < 8; ++pass) { expect(track.stepPlays(0, pass, false)); expect(! track.stepPlays(0, pass, true)); }
+                row.setStepCondition(0, StepRow::kCondAlways);
+            }
+
             beginTest("Pre plays if the previous step played, NotPre if it did not");
             {
                 // Step 0 plays in bar 1 of a two-bar loop; step 4 is Pre, step 8 is NotPre.

@@ -84,8 +84,8 @@ public:
     void setStepRepeatFade(int step, int percent) noexcept { if (valid(step)) cells[(size_t) step].repFade.store(juce::jlimit(-100, 100, percent), std::memory_order_relaxed); }
 
     // Per step: the condition it must meet to play (after its loop, before its probability): Always, only while Fill is held,
-    // only if the previous step on the row played (Pre), or only if it did not (NotPre).
-    static constexpr int kCondAlways = 0, kCondFill = 1, kCondPre = 2, kCondNotPre = 3, kNumConds = 4;
+    // only if the previous step on the row played (Pre), or only if it did not (NotPre), or only while Fill is NOT held (NotFill).
+    static constexpr int kCondAlways = 0, kCondFill = 1, kCondPre = 2, kCondNotPre = 3, kCondNotFill = 4, kNumConds = 5;   // NotFill: plays unless Fill is held (added last so saved values keep their meaning)
     int  stepCondition(int step) const noexcept { return valid(step) ? cells[(size_t) step].cond.load(std::memory_order_relaxed) : kCondAlways; }
     void setStepCondition(int step, int cond) noexcept { if (valid(step)) cells[(size_t) step].cond.store(juce::jlimit(0, kNumConds - 1, cond), std::memory_order_relaxed); }
 

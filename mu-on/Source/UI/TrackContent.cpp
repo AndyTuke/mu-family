@@ -264,7 +264,7 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     addAndMakeVisible(ghostKnob);
     for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob, &levelKnob }) addAndMakeVisible(*k);
     // The STEP panel's controls edit the selected step of the shown track's row.
-    for (auto* cap : { &repeatCaption, &rateCaption, &condCaption, &barsCaption, &lengthCaption, &fadeCaption, &octaveCaption, &noteCaption, &chordCaption })
+    for (auto* cap : { &repeatCaption, &rateCaption, &condCaption, &barsCaption, &fadeCaption, &octaveCaption, &noteCaption, &chordCaption })
     {
         cap->setJustificationType(juce::Justification::centred);
         cap->setInterceptsMouseClicks(false, false);
@@ -312,6 +312,7 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     condSelect.addItem("Play on Fill", 2);
     condSelect.addItem("Play if prev. played", 3);
     condSelect.addItem("Play if prev. didn't", 4);
+    condSelect.addItem("Don't play on Fill", 5);
     condSelect.setStatusName("Step Condition");
     condSelect.onChange = [this](int id) { host.getTrack(currentLayer).row.setStepCondition(selectedStepOf[(size_t) currentLayer], id - 1); };
     // Fill is held, never latched: it is on while the button is down. It reports its own states (the button reporter skips it).
@@ -328,18 +329,13 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     addAndMakeVisible(fillButton);
     // A step's loop: Length is how many bars it spans (a bar is one pass through the row), Bars which of them it plays in.
     // Length 6 with Bars 1, 2 and 5 ticked plays the step in those three bars of every six.
-    for (int n = 1; n <= StepRow::kMaxLoopBars; ++n) lengthSelect.addItem(juce::String(n), n);   // the number of bars; the box is too narrow for a unit
-    lengthSelect.setStatusName("Step Loop Length (bars)");
-    lengthSelect.onChange = [this](int bars)
+    barsSelect.onLength = [this](int bars)
     {
         auto& row = host.getTrack(currentLayer).row;
         const int step = selectedStepOf[(size_t) currentLayer];
         row.setStepLoopLength(step, bars);
         refreshBarsSelect(row, step);
     };
-    barsSelect.setMultiSelect(true);
-    barsSelect.setStatusName("Step Bars");
-    for (int n = 1; n <= StepRow::kMaxLoopBars; ++n) barsSelect.addItem(juce::String(n), n);
     barsSelect.onToggle = [this](int bar, bool on)
     {
         auto& row = host.getTrack(currentLayer).row;
@@ -352,7 +348,6 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     noteSelect.onChange   = [this](int id) { host.getTrack(currentLayer).row.setStepNote(selectedStepOf[(size_t) currentLayer], id - 13); if (onStatusUpdate) onStatusUpdate("Step Note", noteSelect.getText()); };
     addAndMakeVisible(condSelect);
     addAndMakeVisible(barsSelect);
-    addAndMakeVisible(lengthSelect);
     addChildComponent(octaveSelect);
     addChildComponent(noteSelect);
     for (int i = 0; i < kNumChords; ++i) chordSelect.addItem(kChords[(size_t) i].name, i + 1);
@@ -529,15 +524,10 @@ void TrackContent::refreshNoteItems()
     noteSelect.setSelectedId(row.stepNote(step) + 13, false);
 }
 
-// The Bars list offers the bars within the step's Length and ticks the ones the step plays in.
+// The Bars graphic shows the eight bars: those within the step's Length are live, lit for the ones the step plays in.
 void TrackContent::refreshBarsSelect(const StepRow& row, int step)
 {
-    const int length = row.stepLoopLength(step), mask = row.stepLoopBars(step);
-    for (int n = 1; n <= StepRow::kMaxLoopBars; ++n)
-    {
-        barsSelect.setItemEnabled(n, n <= length);
-        barsSelect.setTicked(n, (mask >> (n - 1) & 1) != 0);
-    }
+    barsSelect.set(row.stepLoopLength(step), row.stepLoopBars(step));
 }
 
 void TrackContent::refreshStepPanel()
@@ -563,7 +553,6 @@ void TrackContent::refreshStepPanel()
     repeatSelect.setSelectedId(row.stepRepeats(step) + 1, false);
     rateSelect.setSelectedId(row.stepRepeatRate(step) + 1, false);
     condSelect.setSelectedId(row.stepCondition(step) + 1, false);
-    lengthSelect.setSelectedId(row.stepLoopLength(step), false);
     refreshBarsSelect(row, step);
     const bool chordEng = shownEngine == EngineType::Chord;
     // Level and the repeats are for every engine but a Chord (its column has no room) and a Rumble (it has no steps).
@@ -642,7 +631,7 @@ void TrackContent::rebuild()
     // Ghost steps are for the drum, percussion and Chord engines.
     ghostKnob.setVisible(shownEngine == EngineType::Kick || shownEngine == EngineType::Hat || shownEngine == EngineType::Snare || shownEngine == EngineType::FmPerc || shownEngine == EngineType::Chord);
     for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob, &levelKnob }) k->setVisible(! rumble);   // a Rumble's box holds its envelope
-    for (auto* c : { (juce::Component*) &stepProbKnob, (juce::Component*) &condCaption, (juce::Component*) &condSelect, (juce::Component*) &barsCaption, (juce::Component*) &barsSelect, (juce::Component*) &lengthCaption, (juce::Component*) &lengthSelect }) c->setVisible(! rumble);
+    for (auto* c : { (juce::Component*) &stepProbKnob, (juce::Component*) &condCaption, (juce::Component*) &condSelect, (juce::Component*) &barsCaption, (juce::Component*) &barsSelect }) c->setVisible(! rumble);
     refreshStepPanel();
     soloBtn.setVisible(! rumble);
     rumbleLength.setVisible(rumble);
@@ -841,21 +830,22 @@ void TrackContent::resized()
     grid.setMinSizeIndex(0);
     filterGrid.setMinSizeIndex(0);
     grid.setBounds(voiceBoxR.reduced(clear, s(LF::kSpaceS)));
+    filterGrid.setBounds(filterBoxR.reduced(clear, s(LF::kSpaceS)));
+    // The two grids draw their knobs at one size: the smaller either needs to fit.
+    const int knobSize = juce::jmax(grid.fitIndex(), hasFilter ? filterGrid.fitIndex() : 0);
+    grid.setMinSizeIndex(knobSize);
+    filterGrid.setMinSizeIndex(knobSize);
     {   // The Hat's link joins the Closed Tune (the first knob) and the Open Tune (the third) from below.
+        // Placed after the knob size is final, so it follows the knobs as they are drawn.
         const auto a = grid.getControlBounds(0), b = grid.getControlBounds(2);
         const bool show = shownEngine == EngineType::Hat && ! a.isEmpty() && ! b.isEmpty();
         tuneLink.setVisible(show);
         if (show)
         {
             const int top = a.getY() + s(LF::kKnobSize2H) + s(4);   // just under the knob itself (its component runs on below)
-            tuneLink.setBounds(a.getCentreX() + grid.getX(), top + grid.getY(), b.getCentreX() - a.getCentreX(), s(16));
+            tuneLink.setBounds(a.getCentreX() + grid.getX(), top + grid.getY(), b.getCentreX() - a.getCentreX(), s(20));
         }
     }
-    filterGrid.setBounds(filterBoxR.reduced(clear, s(LF::kSpaceS)));
-    // The two grids draw their knobs at one size: the smaller either needs to fit.
-    const int knobSize = juce::jmax(grid.fitIndex(), hasFilter ? filterGrid.fitIndex() : 0);
-    grid.setMinSizeIndex(knobSize);
-    filterGrid.setMinSizeIndex(knobSize);
     insertSub.setBounds(insertBoxR.getX() + clear, insertBoxR.getY() + s(LF::kSpaceS), insertW, insertH);
 
     // Panel 2 (flex): Groove | Steps, both the full height left under their plates.
@@ -927,7 +917,7 @@ void TrackContent::layoutStepPanel()
     const auto in = stepBoxR.reduced(s(LF::kSubPanelScrewClear), s(LF::kSpaceS));
     const int labelH = s(mu_ui::ParamKnobGrid::kLabelH), knobH = s(LF::kKnobSize2H), dd = s(LF::kDropdownH), gap = s(LF::kSpaceS);
     const juce::Font captionFont(MuLookAndFeel::uiFont(mu_ui::sf(LF::kKnobLabelFont)));
-    auto placeDropdown = [&](juce::Label& caption, DropdownSelect& select, juce::Rectangle<int> column, int& y)
+    auto placeDropdown = [&](juce::Label& caption, juce::Component& select, juce::Rectangle<int> column, int& y)
     {
         caption.setFont(captionFont);
         caption.setBounds(column.getX(), y, column.getWidth(), labelH);
@@ -935,7 +925,7 @@ void TrackContent::layoutStepPanel()
         y += labelH + s(2) + dd + gap;
     };
     // The step's loop takes one row: Bars (the wider, it lists the ticked bars) beside Length.
-    auto placePair = [&](juce::Label& capA, DropdownSelect& selA, juce::Label& capB, DropdownSelect& selB, juce::Rectangle<int> column, int& y, int aPercent = 55)
+    auto placePair = [&](juce::Label& capA, juce::Component& selA, juce::Label& capB, juce::Component& selB, juce::Rectangle<int> column, int& y, int aPercent = 55)
     {
         const int pairGap = gap;
         const int aW = (column.getWidth() - pairGap) * aPercent / 100;
@@ -943,7 +933,7 @@ void TrackContent::layoutStepPanel()
         placeDropdown(capA, selA, column.withWidth(aW), y);
         placeDropdown(capB, selB, column.withTrimmedLeft(aW + pairGap), yB);
     };
-    auto placeLoopPair = [&](juce::Rectangle<int> column, int& y) { placePair(barsCaption, barsSelect, lengthCaption, lengthSelect, column, y); };
+    auto placeLoopPair = [&](juce::Rectangle<int> column, int& y) { placeDropdown(barsCaption, barsSelect, column, y); };
 
     // A Chord step has two columns: the Root, Octave, Chord and Play lists, then the Probability, Inversion and Spread knobs.
     if (shownEngine == EngineType::Chord)
