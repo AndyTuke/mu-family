@@ -16,6 +16,14 @@ class SettingsOverlayBase : public juce::Component
 {
 public:
     std::function<void()> onClose;
+    // The footer's "Bounce to WAV..." button (Standalone only): shown when set, so a plugin, which has the host's own bounce,
+    // never offers it.
+    void setOnBounce(std::function<void()> f)
+    {
+        onBounce = std::move(f);
+        bounceBtn.setVisible(onBounce != nullptr);
+    }
+    std::function<void()> onBounce;
 
     SettingsOverlayBase();
     ~SettingsOverlayBase() override = default;
@@ -86,6 +94,7 @@ private:
 
     juce::TextButton closeBtn { "Close" };
     mu_core::ExternalLinkButton supportLink;   // "Contact Support" → mailto:support@transwarp.me (footer)
+    juce::TextButton bounceBtn { "Bounce to WAV..." };   // Standalone only: renders the current sound to a WAV (footer, right)
     mu_core::ExternalLinkButton feedbackLink;  // "Send Feedback" → mailto:feedback@transwarp.me (footer, beside it)
     int colX = 0;
     int colW = 0;

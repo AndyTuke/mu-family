@@ -4,6 +4,8 @@
 #include "UI/Voice/InsertSubsection.h"
 #include "UI/ParamKnobGrid.h"
 #include "UI/LayerPanel.h"              // its clip strip reports to the status bar
+#include "UI/BounceDialog.h"
+#include "UI/SettingsOverlayBase.h"
 #include "UI/StandardSettingsOverlay.h" // wires its program-change buttons
 #include "UI/MixerOverlay.h"            // forwards its status messages
 #include "UI/ModalDialog.h"             // the support prompt
@@ -210,6 +212,16 @@ void EditorShellBase::setScrews(bool on)
 void EditorShellBase::setSettingsOverlay(juce::Component* overlay)
 {
     chrome.setSettingsOverlay(overlay);
+
+    // A standalone offers "Bounce to WAV..." on its Settings page.
+    if (auto* base = dynamic_cast<mu_ui::SettingsOverlayBase*>(overlay))
+        if (processorRef.canBounce())
+            base->setOnBounce([this]
+            {
+                showSettings(false);
+                const auto loaded = transportBar.getLoadedPresetFile();
+                mu_ui::BounceDialog::show(this, processorRef, loaded.getFileNameWithoutExtension());
+            });
 
     // The standard page's program-change buttons swap it for the matching program-change table.
     if (auto* standard = dynamic_cast<mu_ui::StandardSettingsOverlay*>(overlay))

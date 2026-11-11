@@ -26,6 +26,9 @@ SettingsOverlayBase::SettingsOverlayBase()
     feedbackLink.setColour(juce::HyperlinkButton::textColourId,
                            MuLookAndFeel::colour(MuLookAndFeel::ColourIds::globalAccent));
     addAndMakeVisible(feedbackLink);
+
+    bounceBtn.onClick = [this] { if (onBounce) onBounce(); };
+    addChildComponent(bounceBtn);   // hidden until the shell says this is a standalone with a bounce
 }
 
 void SettingsOverlayBase::computeColumn()
@@ -60,6 +63,7 @@ void SettingsOverlayBase::resized()
     const int linkH = s(20);
     supportLink.setBounds(columnX(0), getHeight() - s(kPad) - linkH, s(110), linkH);
     feedbackLink.setBounds(supportLink.getRight() + s(16), supportLink.getY(), s(110), linkH);
+    bounceBtn.setBounds(getWidth() - s(kPad) - s(150), supportLink.getY() - s(4), s(150), linkH + s(8));
 
     layoutContent();
 }

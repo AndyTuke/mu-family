@@ -542,6 +542,19 @@ public:
     // name for display on the mu-link mixer. Null in plugin builds / when mu-link isn't wired.
     // Products call publishPresetName(...) from their loadPreset override.
     std::function<void(const juce::String&)> onPresetNameChanged;
+
+    // ─── Bounce to WAV (Standalone only) ─────────────────────────────────────
+    // Set by the standalone app: renders the current state offline to a WAV, on the calling (message) thread, and returns an
+    // empty string on success or the error text. Empty in a plugin, whose host has its own bounce; the UI offers Bounce only when set.
+    struct BounceSettings
+    {
+        juce::File file;
+        double     seconds    = 8.0;    // how long the transport plays
+        double     tailSeconds = 1.0;   // extra time after it stops, so FX tails ring out
+        double     sampleRate = 48000.0;
+    };
+    std::function<juce::String(const BounceSettings&)> bounceToWav;
+    bool canBounce() const noexcept { return bounceToWav != nullptr; }
     void publishPresetName(const juce::String& name) { if (onPresetNameChanged) onPresetNameChanged(name); }
 
     // Content directory — where preset / sample-library / keybindings folders live:
