@@ -55,7 +55,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     const int numSamples = buffer.getNumSamples();
     const auto transport = deriveTransport(numSamples);
 
-    core.processBlock(transport.playing, transport.beatPos, midiMessages, numSamples);
+    core.processBlock(transport.playing, transport.beatPos, midiMessages, numSamples, transport.beatsPerSample);
 }
 
 void PluginProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
@@ -76,7 +76,7 @@ PluginProcessor::BlockTransport PluginProcessor::deriveTransport(int numSamples)
 
     sequencerPlaying.store(t.playing);
     lastBeatPos.store(t.startBeat);
-    return { t.playing, t.startBeat };
+    return { t.playing, t.startBeat, t.beatsPerSample };
 }
 
 //==============================================================================

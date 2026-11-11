@@ -89,7 +89,7 @@ private:
     void timerCallback() override { core.servicePendingRebuild(); }
 
     // Reads the host transport and publishes it for the UI.
-    struct BlockTransport { bool playing; double beatPos; };
+    struct BlockTransport { bool playing; double beatPos; double beatsPerSample; };
     BlockTransport deriveTransport(int numSamples);
 
     double currentSampleRate = 44100.0;

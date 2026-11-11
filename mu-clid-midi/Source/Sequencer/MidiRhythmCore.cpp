@@ -63,7 +63,7 @@ void MidiRhythmCore::prepare(double sampleRate, int samplesPerBlock)
 }
 
 //==============================================================================
-void MidiRhythmCore::processBlock(bool playing, double beatPos, juce::MidiBuffer& midi, int numSamples)
+void MidiRhythmCore::processBlock(bool playing, double beatPos, juce::MidiBuffer& midi, int numSamples, double beatsPerSample)
 {
     // A restore replaces the parameters, loop length and pattern as a set: skip the block rather than
     // play half of it, but still let a pending note-off out.
@@ -74,7 +74,7 @@ void MidiRhythmCore::processBlock(bool playing, double beatPos, juce::MidiBuffer
         return;
     }
 
-    advanceSequencer(playing, beatPos, midi, numSamples);
+    advanceSequencer(playing, beatPos, midi, numSamples, beatsPerSample);
 }
 
 void MidiRhythmCore::flushPendingNoteOff(juce::MidiBuffer& midi, int numSamples)
@@ -82,24 +82,42 @@ void MidiRhythmCore::flushPendingNoteOff(juce::MidiBuffer& midi, int numSamples)
     midiEngine.processBlock(midi, juce::jmax(1, numSamples));
 }
 
-void MidiRhythmCore::advanceSequencer(bool playing, double beatPos, juce::MidiBuffer& midi, int numSamples)
+void MidiRhythmCore::advanceSequencer(bool playing, double beatPos, juce::MidiBuffer& midi, int numSamples, double beatsPerSample)
 {
     if (playing)
     {
-        const auto blockResult = sequencer.processBlock(beatPos);
-
-        // Phase 1: a fired hit becomes one note-on, louder when the hit is accented.
-        if (blockResult.firedMask & 1)
+        // A fired hit becomes one note-on at `sampleOffset`, louder when the hit is accented.
+        const auto fire = [&](const mu_core::BlockResult& result, int sampleOffset)
         {
+            if (! (result.firedMask & 1)) return;
             const int  midiNote = (int) midiNotePtr->load();
             const auto vel      = accentVelocities(accentAmtPtr->load());
-            const bool accented = (blockResult.accentMask & 1) != 0;
-            midiEngine.trigger(midi, 0, midiNote, 1, accented ? vel.accented : vel.normal);
+            const bool accented = (result.accentMask & 1) != 0;
+            midiEngine.trigger(midi, sampleOffset, midiNote, 1, accented ? vel.accented : vel.normal);
             rhythmPlayState.hitCount.store(rhythmPlayState.hitCount.load() + 1);
+        };
+
+        // Phase 1: the step at the block's start, then one pass of the sequencer for every further 1/16 boundary inside the
+        // block, each fired at the sample the boundary falls on (sample-accurate, so a big buffer or a fast tempo neither shifts
+        // nor drops notes).
+        fire(sequencer.processBlock(beatPos), 0);
+        double endBeat = beatPos;
+        if (beatsPerSample > 0.0 && numSamples > 1)
+        {
+            constexpr double step = RhythmSequencer::StepLengthBeats;
+            endBeat = beatPos + beatsPerSample * (double) numSamples;
+            double boundary = (std::floor(beatPos / step + 1e-9) + 1.0) * step;
+            for (int guard = 0; boundary < endBeat - 1e-9 && guard < 1024; ++guard, boundary += step)
+            {
+                // The first sample at or after the boundary; one that falls past this block's last sample belongs to the next block.
+                const int offset = juce::jmax(1, (int) std::ceil((boundary - beatPos) / beatsPerSample - 1e-9));
+                if (offset >= numSamples) break;
+                fire(sequencer.processBlock(boundary), offset);
+            }
         }
 
-        // Phase 2: publish the play position for the editor's circle.
-        const float frac = static_cast<float>(std::fmod(beatPos / RhythmSequencer::StepLengthBeats, 1.0));
+        // Phase 2: publish the play position for the editor's circle (the last step reached, with how far into it the block ends).
+        const float frac = static_cast<float>(std::fmod(endBeat / RhythmSequencer::StepLengthBeats, 1.0));
         beatFraction.store(frac);
         // Step and fraction go out as one snapshot so the ring never pairs a new fraction with an old step.
         rhythmPlayState.publishPosition({ sequencer.getLastStepIndex(0),

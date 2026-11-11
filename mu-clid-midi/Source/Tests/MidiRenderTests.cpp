@@ -51,7 +51,7 @@ struct RenderStub : tests::StubProcessor
     void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) override
     {
         const int n = buffer.getNumSamples();
-        core.processBlock(playing, beatAt(hostSample), midi, n);
+        core.processBlock(playing, beatAt(hostSample), midi, n, bpm / 60.0 / sampleRate);
         if (playing) hostSample += n;
     }
 
@@ -277,6 +277,8 @@ public:
                     expect(r.runUntilNoteOn(1.0), "a note started");
                     p.setStateInformation(state.data(), (int) state.size());
                     r.run(1.2);
+                    p.playing = false;
+                    r.run(0.1);   // a note that started late in the last block still owes its off
 
                     expectEquals(p.core.sequencer.getRhythm(0).genA.steps, 12);
                     bool newNote = false;
@@ -546,7 +548,8 @@ public:
                 mu_core::HitGenerator g;
                 g.steps = 8; g.hits = hits; g.rotate = rot;
                 expect(played == stepsOf(g.getPattern(), 16),
-                       "hits " + juce::String(hits) + " rotation " + juce::String(rot));
+                       "hits " + juce::String(hits) + " rotation " + juce::String(rot) + ": played " + describe(played)
+                           + "expected " + describe(stepsOf(g.getPattern(), 16)));
                 expectEquals((int) played.size(), hits * 2);
             }
 
@@ -636,6 +639,35 @@ public:
             for (size_t i = 1; i < ons.size(); ++i)
                 expect(std::abs((double) (ons[i] - ons[i - 1]) - expectedGap) <= kBlock,
                        juce::String(bpm) + " BPM gap " + juce::String(ons[i] - ons[i - 1]));
+        }
+
+        beginTest("Notes land on their own sample whatever the block size (a big buffer neither shifts nor drops steps)");
+        for (const double bpm : { 90.0, 140.0, 240.0 })
+        {
+            auto noteOns = [&](int block)
+            {
+                RenderStub p;
+                p.bpm = bpm;
+                p.setActual("r0_stepsA", 4.0f); p.setActual("r0_hitsA", 4.0f);   // every step
+                Renderer r(p, kRate, block);
+                p.playing = true;
+                r.run(2.0);
+                std::vector<juce::int64> ons;
+                for (const auto& e : r.events) if (e.on && e.time < (juce::int64) (1.9 * kRate)) ons.push_back(e.time);   // the big block renders a little past 2 s
+                return ons;
+            };
+            const auto small = noteOns(64);
+            const auto big   = noteOns(4096);
+            const double gap = kRate * 60.0 / bpm / 4.0;
+            expect(small.size() > 8);
+            expectEquals((int) big.size(), (int) small.size());
+            for (size_t i = 0; i < small.size() && i < big.size(); ++i)
+                expect(std::abs((double) (big[i] - small[i])) <= 1.0,
+                       juce::String(bpm) + " BPM note " + juce::String((int) i) + ": block 4096 at " + juce::String(big[i])
+                           + ", block 64 at " + juce::String(small[i]));
+            for (size_t i = 1; i < big.size(); ++i)
+                expect(std::abs((double) (big[i] - big[i - 1]) - gap) <= 1.5,
+                       juce::String(bpm) + " BPM gap in block 4096: " + juce::String(big[i] - big[i - 1]));
         }
     }
 };
