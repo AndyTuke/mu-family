@@ -1,6 +1,6 @@
 # Issues
 
-**Tally (updated 2026-11-11): Open 8 · On Hold 4 · Closed 1736 · Total 1748**
+**Tally (updated 2026-11-11): Open 7 · On Hold 4 · Closed 1737 · Total 1748**
 
 **Status key:** ✅ Closed | 🔴 Open | 🟡 On Hold (deferred, blocked, or pending external action)
 
