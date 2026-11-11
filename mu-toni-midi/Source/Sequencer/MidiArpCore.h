@@ -41,7 +41,8 @@ public:
     // Message thread, not processing: sizes the scratch buffers for the host's block size.
     void prepare(double sampleRate, int maxBlock);
 
-    // Back to the silent start state (a transport stop, a state restore). Does not write a note-off: use flushNoteOff for that.
+    // Back to the silent start state (a transport stop, a state restore). A note still sounding gets its note-off at the start of
+    // the next block, so the instrument it drives never keeps a stuck note.
     void reset() noexcept;
 
     // Audio thread. `midi` holds the block's input and is replaced by the block's output.
@@ -86,6 +87,7 @@ private:
     mu_mod::LastResolved<kNumModDests>                        lastResolved;
 
     std::atomic<int>  uiLastStep { -1 }, uiNote { -1 };
+    std::atomic<int>  pendingOffNote { -1 }, pendingOffChannel { 1 };   // a note reset() silenced, whose off is still to be sent
     std::atomic<double> uiBeat { 0.0 };
     std::atomic<bool> uiPlaying { false };
 };

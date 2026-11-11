@@ -51,6 +51,7 @@ private:
     std::vector<mu_core::LayerTypeId> allEngineTypes;   // every engine, in the chooser's order
     std::vector<mu_core::LayerTypeId> engineTypes;      // the ones the drop-down lists now (drop-down id = index + 1)
     bool engineListBuilt = false;
+    int  tickCount = 0;
     bool noticeChecked = false;
     Refresher        refresher;
 

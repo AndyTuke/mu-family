@@ -11,7 +11,7 @@
 #include <functional>
 
 // StepPager — the strip under a step grid: Prev / Next through the 16-step pages, the page, and the Length of the row it
-// edits (1 to 64 steps). The one implementation for mu-On's StepRows and for the single row of a mu-Tronic Track layer, so
+// edits (1 to 128 steps). The one implementation for mu-On's StepRows and for the single row of a mu-Tronic Track layer, so
 // the two products page and set the length the same way. The owner says how many pages there are and which row the Length
 // edits, calls refresh() when either may have changed, and shows page() through its callback. Metal style only.
 namespace mu_on

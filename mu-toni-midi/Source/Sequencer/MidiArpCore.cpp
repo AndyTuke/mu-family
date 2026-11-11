@@ -41,6 +41,12 @@ void MidiArpCore::prepare(double sr, int blockSize)
 
 void MidiArpCore::reset() noexcept
 {
+    // Remember a sounding note so the next block ends it (a state restore or a prepare must not strand it).
+    if (const int note = runner.getVoice().soundingNote(); note >= 0)
+    {
+        pendingOffChannel.store(runner.getVoice().soundingChannel());
+        pendingOffNote.store(note);
+    }
     runner.reset();
     heldNotes.clear();
     lastResolved.reset();
@@ -57,6 +63,7 @@ void MidiArpCore::flushNoteOff(juce::MidiBuffer& midi)
     if (note < 0) return;
     midi.addEvent(juce::MidiMessage::noteOff(voice.soundingChannel(), note), 0);
     runner.reset();
+    heldNotes.clear();   // a key released while bypassed is never seen, so forget the held keys with the note
     uiNote.store(-1);
 }
 
@@ -69,6 +76,9 @@ void MidiArpCore::processBlock(bool playing, double startBeat, double bpm, juce:
 
     // 1. The block's input: notes feed the held keys and are consumed; anything else passes through.
     outBuf.clear();
+    // A note a state restore silenced gets its note-off first, so the instrument it drives never keeps it.
+    if (const int pending = pendingOffNote.exchange(-1); pending >= 0)
+        outBuf.addEvent(juce::MidiMessage::noteOff(pendingOffChannel.load(), pending), 0);
     bool noteOnEdge = false;
     for (const auto meta : midi)
     {

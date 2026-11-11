@@ -15,7 +15,7 @@
 // the selected layer's row is outlined in that colour. Left-click toggles a step on/off, the corner button its accent,
 // right-click selects it, and a click anywhere in a row selects that layer. A Rumble layer has no steps: its row is
 // dimmed, not editable, and labelled with the engine name. A moving playhead column tracks the transport. A strip under
-// the rows pages through the steps (Prev / Next) and sets the selected row's length (1 to 64 steps). Metal style only.
+// the rows pages through the steps (Prev / Next) and sets the selected row's length (1 to 128 steps). Metal style only.
 namespace mu_on
 {
 

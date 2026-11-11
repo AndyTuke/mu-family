@@ -1,4 +1,6 @@
 #include "PluginEditor.h"
+
+#include <algorithm>
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/ModalDialog.h"
 #include "License/EngineLicensing.h"
@@ -50,7 +52,18 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     // The shell showed slot 0 while it was being built, before this class existed: do its licence and the drop-down now.
     slotShown(0, hostProc.getLayerTypeId(0));
-    refresher.tick = [this] { rebuildEngineList(); refreshEngineBox(); };
+    // Empty-slot cards offer only the engines the drop-down lists.
+    getChooser().isOffered = [this](mu_core::LayerTypeId type)
+    {
+        return std::find(engineTypes.begin(), engineTypes.end(), type) != engineTypes.end();
+    };
+    getChooser().rebuild();
+    // The licence files are re-read about once a second (each read verifies a signature), the drop-down follows the slot at 4 Hz.
+    refresher.tick = [this]
+    {
+        if (tickCount++ % 4 == 0) rebuildEngineList();
+        refreshEngineBox();
+    };
     refresher.startTimerHz(4);
     maybeShowNoEnginesNotice();
 }
@@ -82,6 +95,7 @@ void PluginEditor::rebuildEngineList()
 
     engineListBuilt = true;
     engineTypes = wanted;
+    getChooser().rebuild();
     engineBox.clear();
     for (size_t i = 0; i < engineTypes.size(); ++i)
         if (const auto* info = hostProc.getLayerTypes().find(engineTypes[i]))
@@ -105,8 +119,8 @@ void PluginEditor::maybeShowNoEnginesNotice()
         if (self == nullptr || ! self->isShowing() || ! self->engineTypes.empty()) return;
         auto* dlg = new mu_ui::ModalDialog();
         dlg->width(440)
-            .title(juce::String(juce::CharPointer_UTF8("Î¼-Host")) + ": no engines to show")
-            .message(juce::String(juce::CharPointer_UTF8("Î¼-Host")) + " is a lightweight way to run one mu instrument "
+            .title(juce::String(juce::CharPointer_UTF8("\xce\xbc-Host")) + ": no engines to show")
+            .message(juce::String(juce::CharPointer_UTF8("\xce\xbc-Host")) + " is a lightweight way to run one mu instrument "
                      "inside your DAW, with the sound, inserts, sequencer and modulation of the full app and its output going "
                      "straight to your mixer. It is free, but it only offers the instruments you have a licence for, and none "
                      "was found. Once you have licensed a mu instrument (activate it in its own app, or put its licence file "

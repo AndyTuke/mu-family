@@ -43,6 +43,10 @@ void EmptySlotChooser::rebuild()
         if (const auto* info = types.find(id)) ordered.push_back(info);
     for (int i = 0; i < types.size(); ++i)
         if (std::find(ordered.begin(), ordered.end(), &types.at(i)) == ordered.end()) ordered.push_back(&types.at(i));
+    if (isOffered)
+        ordered.erase(std::remove_if(ordered.begin(), ordered.end(),
+                                     [this](const mu_core::LayerTypeInfo* info) { return ! isOffered(info->id); }),
+                      ordered.end());
 
     // The groups in the order of their first card, each with its cards in that same order.
     juce::StringArray groups;

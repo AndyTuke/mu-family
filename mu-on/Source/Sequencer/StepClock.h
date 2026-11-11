@@ -7,7 +7,7 @@
 #include <type_traits>
 
 // The 909 step clock of one row: it fires sample-accurate triggers at each 16th-note step boundary of the
-// host/internal transport beat. 16 steps = one bar (each step = a 16th = 0.25 beat); a row may be longer (its numSteps, up to 64). Swing delays the odd
+// host/internal transport beat. 16 steps = one bar (each step = a 16th = 0.25 beat); a row may be longer (its numSteps, up to 128). Swing delays the odd
 // 16ths; accented cells fire at accentedVelocity(the row's Accent knob). A Track owns one and clocks its own row with the
 // beat it renders at. Pure logic, so it is unit-tested headless.
 namespace mu_on

@@ -187,6 +187,30 @@ struct MidiArpTests : juce::UnitTest
             expect(balanced(b.events), "bypass ended it");
         }
 
+        beginTest("a state restore (reset) while a note sounds still ends it in the next block, and bypass forgets the held keys");
+        {
+            Rig r;
+            r.set(arp("gate"), 100.0f);
+            r.set(arp("leg"), 1.0f);
+            r.holdKey(48);
+            r.run(0.3, true);
+            expect(count(r.events, true) > count(r.events, false), "a note is sounding");
+            r.core.reset();   // what setStateInformation / prepareToPlay do
+            r.run(0.02, false);
+            expect(balanced(r.events), "the reset note got its note-off");
+
+            Rig b;
+            b.set(arp("gate"), 100.0f);
+            b.set(arp("leg"), 1.0f);
+            b.set(arp("trig"), 1.0f);   // Keys: the arp plays only while a key is held
+            b.holdKey(48);
+            b.run(0.3, true);
+            b.bypassBlock();   // the key is released while bypassed: that release is never seen
+            const auto before = b.events.size();
+            b.run(0.5, true);
+            expect(b.events.size() == before, "no held key is left behind to arp from");
+        }
+
         beginTest("the output channel is used, and a note-off still goes to the channel its note-on used when the setting moves");
         {
             Rig r;

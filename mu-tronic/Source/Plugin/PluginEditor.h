@@ -41,6 +41,8 @@ protected:
     virtual void slotShown(int slot, mu_core::LayerTypeId type) { juce::ignoreUnused(slot, type); }
     // Gives the slot being shown the chosen type, exactly as the chooser's cards do.
     void chooseType(mu_core::LayerTypeId type) { if (chooser.onChoose) chooser.onChoose(type); }
+    // For a product built on this shell: the Empty-slot chooser (mu-Host limits its cards to licensed engines).
+    EmptySlotChooser& getChooser() noexcept { return chooser; }
     PluginProcessor& proc;
     const bool singleSlot;
 
