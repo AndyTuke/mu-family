@@ -10,8 +10,8 @@ namespace mu_on
     // (LS product id 1441785).
     inline constexpr const char* kLicenseProductId = "mu-On";
 
-    // Lemon Squeezy pay-what-you-want page the support prompt opens (the same link the website uses).
-    inline constexpr const char* kCheckoutUrl = "https://transwarp.lemonsqueezy.com/checkout/buy/3dd813d9-56a5-4e5b-99b4-09a14f48cf9b";
+    // Lemon Squeezy fixed-price checkout page the support prompt opens (the same link the website uses).
+    inline constexpr const char* kCheckoutUrl = "https://transwarp.lemonsqueezy.com/checkout/buy/417bf72a-bbe7-4d11-8d0c-6bd960928164";
 
     // License file the user drops into the content dir (getContentDir()).
     inline constexpr const char* kLicenseFilename  = "muon.lic";

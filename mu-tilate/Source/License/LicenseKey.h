@@ -9,8 +9,8 @@ namespace mu_tilate
     // Must match the `product=` field the signer writes + the Lemon Squeezy product.
     inline constexpr const char* kLicenseProductId = "mu-Tilate";
 
-    // Lemon Squeezy pay-what-you-want page the support prompt opens (the same link the website uses).
-    inline constexpr const char* kCheckoutUrl = "https://transwarp.lemonsqueezy.com/checkout/buy/1121cfce-b13f-466e-9dcc-6414508840dd";
+    // Lemon Squeezy fixed-price checkout page the support prompt opens (the same link the website uses).
+    inline constexpr const char* kCheckoutUrl = "https://transwarp.lemonsqueezy.com/checkout/buy/c86e4101-7c9e-4628-bfcb-dd927a64b494";
 
     // Suggested amount (GBP) the support prompt quotes; matches the Lemon Squeezy product.
     inline constexpr int kSuggestedPrice = 20;

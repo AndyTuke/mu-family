@@ -105,12 +105,12 @@ struct MuHostTests : juce::UnitTest
                 expect(p.getCheckoutUrl().contains(urlPart), juce::String(productId) + " opens its own checkout page");
                 expectEquals(p.getSuggestedPrice(), price);
             };
-            checkAs(mu_core::LayerTypeId::Kick,    "mu-On",    "3dd813d9", 20);
-            checkAs(mu_core::LayerTypeId::Rumble,  "mu-On",    "3dd813d9", 20);   // another engine of the same product: the same licence
-            checkAs(mu_core::LayerTypeId::Rhythm,  "mu-Clid",  "12d18415", 20);
-            checkAs(mu_core::LayerTypeId::Pattern, "mu-Tant",  "a0354b49", 20);
-            checkAs(mu_core::LayerTypeId::Arp,     "mu-Toni",  "dbecc900", 20);
-            checkAs(mu_core::LayerTypeId::Phrase,  "mu-Tilate", "1121cfce", 20);
+            checkAs(mu_core::LayerTypeId::Kick,    "mu-On",    "417bf72a", 20);
+            checkAs(mu_core::LayerTypeId::Rumble,  "mu-On",    "417bf72a", 20);   // another engine of the same product: the same licence
+            checkAs(mu_core::LayerTypeId::Rhythm,  "mu-Clid",  "fcef084d", 20);
+            checkAs(mu_core::LayerTypeId::Pattern, "mu-Tant",  "4777a038", 20);
+            checkAs(mu_core::LayerTypeId::Arp,     "mu-Toni",  "e26972bb", 20);
+            checkAs(mu_core::LayerTypeId::Phrase,  "mu-Tilate", "c86e4101", 20);
             p.licenseEngine(mu_core::LayerTypeId::Empty);
             expect(! p.hasLicensing() && p.isLicensed(), "an Empty slot has no licensing and no prompt");
         }

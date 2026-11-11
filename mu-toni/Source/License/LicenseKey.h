@@ -10,8 +10,8 @@ namespace mu_toni
     // (LS product id 1441505).
     inline constexpr const char* kLicenseProductId = "mu-Toni";
 
-    // Lemon Squeezy pay-what-you-want page the support prompt opens (the same link the website uses).
-    inline constexpr const char* kCheckoutUrl = "https://transwarp.lemonsqueezy.com/checkout/buy/dbecc900-4745-4b37-a349-4afef07adcc3";
+    // Lemon Squeezy fixed-price checkout page the support prompt opens (the same link the website uses).
+    inline constexpr const char* kCheckoutUrl = "https://transwarp.lemonsqueezy.com/checkout/buy/e26972bb-2be3-44f2-bebc-88e24724acda";
 
     // License file the user drops into the content dir (getContentDir()).
     inline constexpr const char* kLicenseFilename  = "mutoni.lic";
