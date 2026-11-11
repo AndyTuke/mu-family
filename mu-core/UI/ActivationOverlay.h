@@ -33,7 +33,7 @@ private:
     juce::Label      keyLabel;
     juce::TextEditor keyEditor;
     juce::TextButton activateBtn { "Activate" };
-    juce::TextButton getKeyBtn   { "Pay what you like" };   // opens the checkout page (hidden when none)
+    juce::TextButton getKeyBtn   { "Get a licence" };   // opens the checkout page (hidden when none)
     juce::TextButton closeBtn    { "Close" };
     juce::Label      statusLabel;
 

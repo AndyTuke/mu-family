@@ -247,6 +247,7 @@ void EditorShellBase::licenseChanged(const juce::String& supportProductName)
     productDisplayName = supportProductName;
     refreshSupportAffordances();
     supportPromptChecked = false;
+    processorRef.setSupportPromptDismissed(false);   // a new product's licence: its reminder starts afresh
     if (isShowing())
         maybeShowSupportPromptOnStart();
 }
@@ -256,14 +257,13 @@ void EditorShellBase::refreshSupportAffordances()
     statusBar.setSupportLinkVisible(processorRef.hasLicensing() && ! processorRef.isSupporter());
 }
 
-// Policy: an unlicensed, un-hidden copy asks once per process (mu_core::support_prompt). A short
-// delay lets the editor settle first, and the prompt waits if another overlay is already open.
+// Policy: an unlicensed copy asks every time an instance loads, until "Maybe later" is pressed on that instance
+// (mu_core::support_prompt). A short delay lets the editor settle first, and the prompt waits if another overlay is open.
 void EditorShellBase::maybeShowSupportPromptOnStart()
 {
     supportPromptChecked = true;
     namespace sp = mu_core::support_prompt;
-    if (! sp::shouldShowNowFor(processorRef.getLicensingProductKey().toStdString(), processorRef.hasLicensing(),
-                               processorRef.isSupporter(), processorRef.isSupportPromptHidden()))
+    if (! sp::shouldShow(processorRef.hasLicensing(), processorRef.isSupporter(), processorRef.isSupportPromptDismissed()))
         return;
 
     juce::Component::SafePointer<EditorShellBase> safe(this);
@@ -281,29 +281,24 @@ void EditorShellBase::showSupportPrompt(bool userRequested)
     if (supportDialogOpen || ! processorRef.hasLicensing() || processorRef.isSupporter())
         return;
 
-    // The automatic prompt never interrupts: skip it if an overlay is up or it has already
-    // been shown or switched off meanwhile.
-    if (! userRequested)
-    {
-        if (chrome.anyOverlayVisible()
-            || ! sp::shouldShowNowFor(processorRef.getLicensingProductKey().toStdString(), true, false, processorRef.isSupportPromptHidden()))
-            return;
-        sp::markShownFor(processorRef.getLicensingProductKey().toStdString());
-    }
+    // The automatic prompt never interrupts: skip it if an overlay is up or it was dismissed meanwhile.
+    if (! userRequested
+        && (chrome.anyOverlayVisible() || ! sp::shouldShow(true, false, processorRef.isSupportPromptDismissed())))
+        return;
 
     supportDialogOpen = true;
 
-    // There is no way to switch the prompt off for good: Maybe later only dismisses it for this session.
+    // There is no way to switch the reminder off short of a licence: Maybe later only closes it for this instance.
     enum { maybeLater = 0, enterKey = 1, pay = 2 };
     auto* dlg = new mu_ui::ModalDialog();
     dlg->width(400)
         .title("Support " + productDisplayName)
-        .message(productDisplayName + " is free, with every feature. If it's useful to you, pay what you "
-                 "like (suggested \xC2\xA3" + juce::String(processorRef.getSuggestedPrice()) + ", \xC2\xA3" "0 is fine) and you'll get a licence key that "
-                 "stops this reminder. Your support helps me keep building these.")
+        .message(productDisplayName + " is free to use, with every feature. If it's useful to you, a licence "
+                 "(Â£" + juce::String(processorRef.getSuggestedPrice()) + ", one-off) removes this reminder. "
+                 "Your support helps me keep building these.")
         .icon(mu_ui::ModalDialog::Icon::Info);
     dlg->button("Maybe later", maybeLater).button("Enter licence key", enterKey)
-        .button("Pay what you like", pay, true).cancelResult(maybeLater);
+        .button("Get a licence", pay, true).cancelResult(maybeLater);
 
     juce::Component::SafePointer<EditorShellBase> safe(this);
     dlg->onResult = [safe](int result)
@@ -311,6 +306,7 @@ void EditorShellBase::showSupportPrompt(bool userRequested)
         auto* shell = safe.getComponent();
         if (shell == nullptr) return;
         shell->supportDialogOpen = false;
+        shell->processorRef.setSupportPromptDismissed(true);   // asked once for this instance, whatever was pressed
         if (result == enterKey)
             shell->showActivation(true);
         else if (result == pay)

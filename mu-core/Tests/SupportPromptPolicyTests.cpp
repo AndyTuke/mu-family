@@ -1,9 +1,9 @@
+#include <juce_core/juce_core.h>
 #include "License/SupportPromptPolicy.h"
 
 namespace sp = mu_core::support_prompt;
 
-// When the polite "support mu" prompt appears, who counts as a supporter, and the saved
-// "Don't show again" flag.
+// When the licence reminder appears and who counts as a supporter.
 struct SupportPromptPolicyTests : juce::UnitTest
 {
     SupportPromptPolicyTests() : juce::UnitTest("Support prompt policy", "mu-core") {}
@@ -19,61 +19,15 @@ struct SupportPromptPolicyTests : juce::UnitTest
             expect(! sp::isSupporter(false, true,  true));   // no licensing model: never a supporter
         }
 
-        beginTest("the prompt shows only for an unlicensed, unhidden, not-yet-shown licensing product");
+        beginTest("the reminder shows for every unlicensed instance until it is dismissed on that instance");
         {
-            // hasLicensing, isSupporter, hiddenForever, alreadyShown
-            expect(  sp::shouldShow(true,  false, false, false));
-            expect(! sp::shouldShow(false, false, false, false));   // product has no licensing
-            expect(! sp::shouldShow(true,  true,  false, false));   // supporter
-            expect(! sp::shouldShow(true,  false, true,  false));   // "Don't show again"
-            expect(! sp::shouldShow(true,  false, false, true));    // already shown this process
+            // hasLicensing, isSupporter, dismissedThisInstance
+            expect(  sp::shouldShow(true,  false, false));
+            expect(! sp::shouldShow(false, false, false));   // product has no licensing
+            expect(! sp::shouldShow(true,  true,  false));   // licensed
+            expect(! sp::shouldShow(true,  false, true));    // "Maybe later" on this instance
+            expect(  sp::shouldShow(true,  false, false));   // another instance has its own flag and asks again
         }
-
-        beginTest("once per process: markShown suppresses the prompt until reset");
-        {
-            sp::resetShownThisProcessForTesting();
-            expect(sp::shouldShowNow(true, false, false));
-            sp::markShown();
-            expect(! sp::shouldShowNow(true, false, false));
-            sp::resetShownThisProcessForTesting();
-            expect(sp::shouldShowNow(true, false, false));
-        }
-
-        beginTest("once per product: a host that carries several products' engines asks once for each, never twice for one");
-        {
-            sp::resetShownThisProcessForTesting();
-            expect(sp::shouldShowNowFor("mu-On", true, false, false));
-            sp::markShownFor("mu-On");
-            expect(! sp::shouldShowNowFor("mu-On", true, false, false), "mu-On has been asked");
-            expect(sp::shouldShowNowFor("mu-Clid", true, false, false), "mu-Clid has not");
-            expect(! sp::shouldShowNowFor("mu-Clid", false, true, false), "a supporter of the product is never asked");
-            expect(! sp::shouldShowNowFor("mu-Clid", true, false, true), "nor after Don't show again");
-            sp::resetShownThisProcessForTesting();
-            expect(sp::shouldShowNowFor("mu-On", true, false, false), "a reset forgets every product");
-        }
-
-        beginTest("the hidden flag round-trips through a settings file and defaults to not hidden");
-        {
-            juce::TemporaryFile tmp(".settings");
-            juce::PropertiesFile::Options opts;
-            opts.filenameSuffix = "";
-            {
-                juce::PropertiesFile file(tmp.getFile(), opts);
-                expect(! sp::isHidden(&file));
-                sp::setHidden(&file, true);
-                expect(sp::isHidden(&file));
-            }
-            {
-                juce::PropertiesFile reopened(tmp.getFile(), opts);
-                expect(sp::isHidden(&reopened));   // survived a save and reload
-                sp::setHidden(&reopened, false);
-                expect(! sp::isHidden(&reopened));
-            }
-            expect(! sp::isHidden(nullptr));
-            sp::setHidden(nullptr, true);   // a missing settings file is ignored, not a crash
-        }
-
-        sp::resetShownThisProcessForTesting();
     }
 };
 

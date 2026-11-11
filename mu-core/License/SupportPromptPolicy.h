@@ -1,25 +1,10 @@
 #pragma once
 
-#include <juce_data_structures/juce_data_structures.h>
-
-#include <atomic>
-#include <mutex>
-#include <set>
-#include <string>
-
-// When the "support mu" prompt is shown. The apps are free and fully functional; an unlicensed
-// copy asks politely, once per session, for a pay-what-you-want contribution. Header-only and
-// free of any product or UI types so it can be unit-tested on its own (mu-core/Tests).
+// When the licence reminder is shown. The apps are free and fully functional; an unlicensed copy shows the
+// polite reminder every time an instance loads (a fixed-price licence removes it). "Maybe later" closes it for
+// that instance only. Header-only and free of any product or UI types so it can be unit-tested on its own.
 namespace mu_core::support_prompt
 {
-
-// Settings-file key: set once the user ticks "Don't show this again". It lives in the app
-// settings file (not APVTS) so it survives across sessions and never travels in a preset.
-inline constexpr const char* kHiddenKey = "supportPromptHidden";
-
-// The tip page a supporter's About card links to ("Want to give more?"): one shared pay-what-you-want
-// product with no licence key, so a tip never uses up a key or an activation.
-inline constexpr const char* kTipUrl = "https://transwarp.lemonsqueezy.com/checkout/buy/a6bc15b0-9e2d-4aad-a4d2-7327a8e56e7b";
 
 // A supporter holds a valid licence key: the offline signed .lic or an online activation.
 // A product with no licensing model (never called initLicensing) has no supporters.
@@ -28,76 +13,11 @@ inline bool isSupporter(bool licensingEnabled, bool offlineLicensed, bool online
     return licensingEnabled && (offlineLicensed || onlineActivated);
 }
 
-// "Once per session" means once per process: every editor opened in this process shares it.
-inline std::atomic<bool>& shownThisProcess() noexcept
+// Should the reminder appear now? Only a licensing product's unlicensed copy sees it, and not again once the user
+// has dismissed it ("Maybe later") in this instance.
+inline bool shouldShow(bool hasLicensing, bool isSupporterNow, bool dismissedThisInstance) noexcept
 {
-    static std::atomic<bool> shown { false };
-    return shown;
-}
-
-// The same rule per product: "once per session" for a host that carries several products' engines (mu-Host) is once per
-// product, as if each engine ran in its own app. A normal product has one key (its product id), so nothing changes for it.
-inline std::set<std::string>& shownProducts() noexcept
-{
-    static std::set<std::string> shown;
-    return shown;
-}
-inline std::mutex& shownProductsLock() noexcept
-{
-    static std::mutex m;
-    return m;
-}
-inline bool alreadyShownFor(const std::string& productKey)
-{
-    std::lock_guard<std::mutex> lock(shownProductsLock());
-    return shownProducts().count(productKey) != 0;
-}
-inline void markShownFor(const std::string& productKey)
-{
-    std::lock_guard<std::mutex> lock(shownProductsLock());
-    shownProducts().insert(productKey);
-}
-
-// Test-only: forget that the prompt was shown, so a test can exercise the first-show path again.
-inline void resetShownThisProcessForTesting() noexcept
-{
-    shownThisProcess().store(false);
-    std::lock_guard<std::mutex> lock(shownProductsLock());
-    shownProducts().clear();
-}
-
-// Should the prompt appear now? Only a licensing product's unlicensed copy sees it, never after
-// "Don't show again", and never twice in one process.
-inline bool shouldShow(bool hasLicensing, bool isSupporterNow, bool hiddenForever, bool alreadyShown) noexcept
-{
-    return hasLicensing && ! isSupporterNow && ! hiddenForever && ! alreadyShown;
-}
-
-inline bool shouldShowNow(bool hasLicensing, bool isSupporterNow, bool hiddenForever) noexcept
-{
-    return shouldShow(hasLicensing, isSupporterNow, hiddenForever, shownThisProcess().load());
-}
-
-// As shouldShowNow, for the product `productKey` (the licensing product id): shown at most once per product per process.
-inline bool shouldShowNowFor(const std::string& productKey, bool hasLicensing, bool isSupporterNow, bool hiddenForever)
-{
-    return shouldShow(hasLicensing, isSupporterNow, hiddenForever, alreadyShownFor(productKey));
-}
-
-// Record that the prompt is on screen for this process.
-inline void markShown() noexcept { shownThisProcess().store(true); }
-
-// "Don't show again" persistence in the app settings file. A null file reads as not hidden.
-inline bool isHidden(const juce::PropertiesFile* settings)
-{
-    return settings != nullptr && settings->getBoolValue(kHiddenKey, false);
-}
-
-inline void setHidden(juce::PropertiesFile* settings, bool hidden)
-{
-    if (settings == nullptr) return;
-    settings->setValue(kHiddenKey, hidden);
-    settings->saveIfNeeded();
+    return hasLicensing && ! isSupporterNow && ! dismissedThisInstance;
 }
 
 } // namespace mu_core::support_prompt

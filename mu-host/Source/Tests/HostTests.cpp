@@ -3,6 +3,7 @@
 // thread that survives engine changes.
 
 #include "../Plugin/PluginProcessor.h"
+#include "../License/EngineLicensing.h"
 #include "Tests/ProcessorSeamHelpers.h"
 
 #include <cmath>
@@ -109,9 +110,18 @@ struct MuHostTests : juce::UnitTest
             checkAs(mu_core::LayerTypeId::Rhythm,  "mu-Clid",  "12d18415", 20);
             checkAs(mu_core::LayerTypeId::Pattern, "mu-Tant",  "a0354b49", 20);
             checkAs(mu_core::LayerTypeId::Arp,     "mu-Toni",  "dbecc900", 20);
-            checkAs(mu_core::LayerTypeId::Phrase,  "mu-Tilate", "1121cfce", 25);
+            checkAs(mu_core::LayerTypeId::Phrase,  "mu-Tilate", "1121cfce", 20);
             p.licenseEngine(mu_core::LayerTypeId::Empty);
             expect(! p.hasLicensing() && p.isLicensed(), "an Empty slot has no licensing and no prompt");
+        }
+
+        beginTest("the engine list offers only engines of licensed products (none here), and an Empty slot belongs to no product");
+        {
+            mu_seam_test::TempStorage storage;
+            const auto dir = juce::File::createTempFile("muHostLic");
+            for (const auto type : { mu_core::LayerTypeId::Rhythm, mu_core::LayerTypeId::Kick, mu_core::LayerTypeId::Phrase,
+                                     mu_core::LayerTypeId::Empty })
+                expect(! mu_host::isEngineLicensed(type, dir, "muHost"), "no key, so not offered");
         }
 
         beginTest("changing the engine while the audio thread renders is safe");

@@ -90,7 +90,7 @@ public:
     void showMidiFullPresets(bool show);
     void hideAllOverlays();
 
-    // The polite pay-what-you-want prompt for an unlicensed copy (docs/design-ui-family.md).
+    // The polite licence reminder for an unlicensed copy (docs/design-ui-family.md).
     // `userRequested` is true from the About panel / status-bar link, which always show it
     // (without the "Don't show again" tick); false for the once-per-session auto-show.
     void showSupportPrompt(bool userRequested);

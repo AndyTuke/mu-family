@@ -13,7 +13,7 @@ namespace mu_tilate
     inline constexpr const char* kCheckoutUrl = "https://transwarp.lemonsqueezy.com/checkout/buy/1121cfce-b13f-466e-9dcc-6414508840dd";
 
     // Suggested amount (GBP) the support prompt quotes; matches the Lemon Squeezy product.
-    inline constexpr int kSuggestedPrice = 25;
+    inline constexpr int kSuggestedPrice = 20;
 
     // License file the user drops into the content dir (getContentDir()).
     inline constexpr const char* kLicenseFilename  = "mutilate.lic";

@@ -1,5 +1,8 @@
 #include "PluginEditor.h"
 #include "UI/Components/MuLookAndFeel.h"
+#include "UI/ModalDialog.h"
+#include "License/EngineLicensing.h"
+#include "Persistence/HostState.h"
 
 namespace mu_host
 {
@@ -11,15 +14,11 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     setProductIdentity(juce::String(juce::CharPointer_UTF8("\xce\xbc-Host")));
 
     // The engines, in the chooser's order; each item names its product.
-    engineTypes = { mu_core::LayerTypeId::Rhythm, mu_core::LayerTypeId::Pattern, mu_core::LayerTypeId::Arp,
+    allEngineTypes = { mu_core::LayerTypeId::Rhythm, mu_core::LayerTypeId::Pattern, mu_core::LayerTypeId::Arp,
                     mu_core::LayerTypeId::Kick, mu_core::LayerTypeId::Bass, mu_core::LayerTypeId::Hat,
                     mu_core::LayerTypeId::Snare, mu_core::LayerTypeId::Rumble, mu_core::LayerTypeId::FmPerc,
                     mu_core::LayerTypeId::Chord, mu_core::LayerTypeId::Phrase };
-    for (size_t i = 0; i < engineTypes.size(); ++i)
-        if (const auto* info = hostProc.getLayerTypes().find(engineTypes[i]))
-            engineBox.addItem(juce::String::fromUTF8(info->name)
-                                  + (juce::String(info->group).isNotEmpty() ? "  (" + juce::String::fromUTF8(info->group) + ")" : juce::String()),
-                              (int) i + 1);
+    rebuildEngineList();
     engineBox.onChange = [this](int id)
     {
         const size_t i = (size_t) (id - 1);
@@ -51,8 +50,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     // The shell showed slot 0 while it was being built, before this class existed: do its licence and the drop-down now.
     slotShown(0, hostProc.getLayerTypeId(0));
-    refresher.tick = [this] { refreshEngineBox(); };
+    refresher.tick = [this] { rebuildEngineList(); refreshEngineBox(); };
     refresher.startTimerHz(4);
+    maybeShowNoEnginesNotice();
 }
 
 PluginEditor::~PluginEditor()
@@ -66,6 +66,55 @@ void PluginEditor::slotShown(int /*slot*/, mu_core::LayerTypeId type)
     // product's own (an unlicensed engine shows the polite prompt once per product per session, as in its own app).
     licenseChanged(hostProc.licenseEngine(type));
     refreshEngineBox();
+}
+
+void PluginEditor::rebuildEngineList()
+{
+    // Only licensed engines are offered; the engine already in the slot stays listed so the box can show it.
+    const auto current = hostProc.getLayerTypeId(0);
+    const auto hostDir = hostProc.getContentDir();
+    std::vector<mu_core::LayerTypeId> wanted;
+    for (const auto type : allEngineTypes)
+        if (type == current || isEngineLicensed(type, hostDir, kAppName))
+            wanted.push_back(type);
+    if (engineListBuilt && wanted == engineTypes)
+        return;
+
+    engineListBuilt = true;
+    engineTypes = wanted;
+    engineBox.clear();
+    for (size_t i = 0; i < engineTypes.size(); ++i)
+        if (const auto* info = hostProc.getLayerTypes().find(engineTypes[i]))
+            engineBox.addItem(juce::String::fromUTF8(info->name)
+                                  + (juce::String(info->group).isNotEmpty() ? "  (" + juce::String::fromUTF8(info->group) + ")" : juce::String()),
+                              (int) i + 1);
+    engineBox.setPlaceholderText(engineTypes.empty() ? "No licensed engines" : "Choose an engine");
+}
+
+void PluginEditor::maybeShowNoEnginesNotice()
+{
+    // Every instance that opens with nothing to show explains itself once; the wait lets the editor settle first.
+    if (noticeChecked) return;
+    noticeChecked = true;
+    if (! engineTypes.empty()) return;
+
+    juce::Component::SafePointer<PluginEditor> safe(this);
+    Refresher::callAfterDelay(1500, [safe]
+    {
+        auto* self = safe.getComponent();
+        if (self == nullptr || ! self->isShowing() || ! self->engineTypes.empty()) return;
+        auto* dlg = new mu_ui::ModalDialog();
+        dlg->width(440)
+            .title(juce::String(juce::CharPointer_UTF8("Î¼-Host")) + ": no engines to show")
+            .message(juce::String(juce::CharPointer_UTF8("Î¼-Host")) + " is a lightweight way to run one mu instrument "
+                     "inside your DAW, with the sound, inserts, sequencer and modulation of the full app and its output going "
+                     "straight to your mixer. It is free, but it only offers the instruments you have a licence for, and none "
+                     "was found. Once you have licensed a mu instrument (activate it in its own app, or put its licence file "
+                     "in its folder under Documents/TDP), it appears in the engine list here.")
+            .icon(mu_ui::ModalDialog::Icon::Info);
+        dlg->button("OK", 0, true).cancelResult(0);
+        dlg->show(self);
+    });
 }
 
 void PluginEditor::refreshEngineBox()

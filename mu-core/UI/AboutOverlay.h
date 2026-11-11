@@ -17,8 +17,8 @@ public:
     void setProductInfo(const juce::String& displayName,
                         const juce::StringArray& credits);
 
-    // Support entry points. An unlicensed copy shows "Support" (opens the pay-what-you-want
-    // prompt) and "Enter a key"; a supporter sees a thank-you line and a "Want to give more?" tip link instead; a product with no
+    // Support entry points. An unlicensed copy shows "Support" (opens the licence
+    // prompt) and "Enter a key"; a supporter sees a thank-you line instead; a product with no
     // licensing shows neither. Set each time the panel opens.
     enum class SupportState { None, Unlicensed, Supporter };
     void setSupportState(SupportState state);
@@ -39,7 +39,6 @@ private:
     juce::TextButton supportBtn { "Support" };
     juce::TextButton keyBtn     { "Enter a key" };
     juce::ToggleButton updateToggle { "Check for updates" };
-    mu_core::ExternalLinkButton tipLink;   // supporters only: opens the shared tip page
     SupportState     supportState = SupportState::None;
 
     juce::String      productName;

@@ -39,11 +39,19 @@ private:
     };
 
     void refreshEngineBox();
+    // Refills the drop-down with the engines of the products the user holds a key for (plus the engine already in the slot, so a
+    // saved project still shows what it holds); a no-op when that list has not changed.
+    void rebuildEngineList();
+    // Free / demo mode (no product licensed, nothing in the slot): explains what mu-Host is and why the list is empty.
+    void maybeShowNoEnginesNotice();
 
     PluginProcessor& hostProc;
     EngineHolder     engineHolder;
     DropdownSelect&  engineBox = engineHolder.box;
-    std::vector<mu_core::LayerTypeId> engineTypes;
+    std::vector<mu_core::LayerTypeId> allEngineTypes;   // every engine, in the chooser's order
+    std::vector<mu_core::LayerTypeId> engineTypes;      // the ones the drop-down lists now (drop-down id = index + 1)
+    bool engineListBuilt = false;
+    bool noticeChecked = false;
     Refresher        refresher;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)

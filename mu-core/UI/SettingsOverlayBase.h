@@ -86,6 +86,7 @@ private:
 
     juce::TextButton closeBtn { "Close" };
     mu_core::ExternalLinkButton supportLink;   // "Contact Support" → mailto:support@transwarp.me (footer)
+    mu_core::ExternalLinkButton feedbackLink;  // "Send Feedback" → mailto:feedback@transwarp.me (footer, beside it)
     int colX = 0;
     int colW = 0;
     int cols = 1;

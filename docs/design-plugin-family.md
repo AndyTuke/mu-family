@@ -1998,6 +1998,8 @@ product only has to override/​wire those.
 
 ## Licensing and the support prompt — family standard (ruled 2026-10-11)
 
+> **Superseded in part (Andy, 2026-11-11, #1803).** The model is now a free download that shows the licence reminder **every time an instance loads**; a **fixed-price licence (£20, mu-Tronic £30)** removes it. Pay-what-you-want and the once-per-process rule are gone, and so is "Don't show again" (and its `supportPromptHidden` setting). The policy is `shouldShow(hasLicensing, isSupporter, dismissedThisInstance)`; "Maybe later" sets a per-instance flag on the processor (`isSupportPromptDismissed`, not saved), so the next instance asks again. mu-Host lists only the engines whose product is licensed and, with none, explains itself in a pop-up. The text below is the original 2026-10-11 ruling and is kept for the placement and testing reasoning.
+
 **Owner decision.** The source is GPLv3. mu-Clid, mu-Tant, mu-Toni and mu-On are pay-what-you-want on Lemon Squeezy (minimum £0, suggested £20; a key is issued even at £0). mu-Clid MIDI and mu-Link are freeware. An unlicensed copy is **fully functional**: no track, step, save or preset limits, no demo banner, and no "Lite" free tier (the former mu-Clid Lite is now a separate MIDI-effect product, see "The MIDI-effect product" below). Instead it shows one polite support dialog per session. A licence key still exists and still activates (a key marks a supporter, removes the prompt, and unlocks nothing). The four Pay What You Want products call `initLicensing`; the freeware mu-Clid MIDI and mu-Link never do, so they never show the dialog.
 
 ### What is deleted, what is kept

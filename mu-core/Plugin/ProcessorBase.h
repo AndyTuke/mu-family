@@ -583,7 +583,7 @@ public:
     {
         return mu_core::support_prompt::isSupporter(licensingEnabled, offlineLicensed, isOnlineActivated());
     }
-    // Where the prompt's "Pay what you like" button opens (empty when the product supplies none).
+    // Where the prompt's "Get a licence" button opens (empty when the product supplies none).
     juce::String getCheckoutUrl() const { return checkoutUrl; }
     // The suggested amount (GBP) the prompt quotes.
     int getSuggestedPrice() const noexcept { return suggestedPrice; }
@@ -596,9 +596,9 @@ public:
         onlineActivated.store(false, std::memory_order_relaxed);
         activateOnlineFn = nullptr;
     }
-    // "Don't show this again": kept in the app settings file, not APVTS, so it is never in a preset.
-    bool isSupportPromptHidden() const { return mu_core::support_prompt::isHidden(appSettings.get()); }
-    void setSupportPromptHidden(bool hidden) { mu_core::support_prompt::setHidden(appSettings.get(), hidden); }
+    // "Maybe later": the licence reminder is closed for this instance (not saved, so the next instance asks again).
+    bool isSupportPromptDismissed() const noexcept { return supportPromptDismissed.load(std::memory_order_relaxed); }
+    void setSupportPromptDismissed(bool dismissed) noexcept { supportPromptDismissed.store(dismissed, std::memory_order_relaxed); }
     juce::PropertiesFile* getAppSettingsFile() noexcept override { return appSettings.get(); }
 
     // ─── Online activation (Lemon Squeezy, Phase 1) ──────────────────────────
@@ -621,6 +621,7 @@ public:
     bool isFillHeld() const noexcept     { return fillHeld.load(std::memory_order_relaxed); }
     std::atomic<bool> fillHeld { false };
     std::atomic<bool> onlineActivated { false };
+    std::atomic<bool> supportPromptDismissed { false };   // "Maybe later" pressed on this instance
     bool isOnlineActivated() const noexcept { return onlineActivated.load(std::memory_order_relaxed); }
 
     // The machine "challenge" code shown in the overlay's offline path (and what a `.lic` is
@@ -1232,7 +1233,7 @@ protected:
         const char*    licenceFile;
         const uint8_t* publicKey;
         const char*    activationFile;
-        const char*    checkoutUrl = nullptr;   // pay-what-you-want page the support prompt opens
+        const char*    checkoutUrl = nullptr;   // checkout page the support prompt opens
         int            suggestedPrice = 20;     // the amount (GBP) the prompt suggests; matches the store
         juce::File     contentDir {};           // where the licence file and the activation record live; empty = this app's content folder
         juce::File     alsoCheckDir {};         // a second folder whose licence file counts too (mu-Host: its own folder beside the product's)
