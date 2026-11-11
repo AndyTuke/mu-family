@@ -72,6 +72,8 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px;
 .btn-cyan:hover { background: var(--cyan-b) !important; box-shadow: 0 0 32px var(--cyan-glow) !important; }
 .btn-secondary { display: inline-flex; align-items: center; gap: 8px; background: transparent; color: var(--text); font-family: var(--ff-mono); font-size: 12px; letter-spacing: 0.08em; padding: 13px 22px; border-radius: 4px; border: 1px solid var(--border2); cursor: pointer; transition: all .2s; }
 .btn-secondary:hover { border-color: var(--teal); color: var(--teal-b); transform: translateY(-1px); }
+.rn-pill { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 18px; padding: 7px 16px; border-radius: 999px; border: 1px solid var(--prod-b, var(--accent-b)); background: rgba(255,255,255,0.04); color: var(--prod-b, var(--accent-b)); font-family: var(--ff-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; transition: all .2s; }
+.rn-pill:hover { background: var(--prod-b, var(--accent-b)); color: var(--bg); transform: translateY(-1px); }
 .btn-price { opacity: 0.7; font-size: 10px; }
 
 /* ── FEATURE GRID ── */
@@ -295,6 +297,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
     <div class="container">
       <div class="hero-inner">
         <div>
+          <a class="rn-pill fade-1" href="mu-tant-releases.html">Release notes &middot; what&rsquo;s new &rarr;</a>
           <div class="hero-eyebrow fade-1">Wavetable Drone &amp; Envelope Gate Sequencer</div>
           <h1 class="hero-title fade-2"><span class="mu">μ</span>-tant<span class="sub">Drone. Sculpted by sequence.</span></h1>
           <p class="hero-sub fade-3">A two-oscillator wavetable drone that never stops, with FM and ring modulation between the oscillators, cut into rhythm by a gate sequencer. Each step has its own envelope for gate, filter cutoff and pitch, across up to 16 bars.</p>
