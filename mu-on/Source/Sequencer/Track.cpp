@@ -528,7 +528,7 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
     // Phase 1: a slot that has just gone live (or was prepared since) starts from silence, so a tail left by
     // an earlier state (a sustaining bass has no note-off) never resumes; an engine change stops the old one dead.
     // Both silence every engine the track holds, as the per-slot engines' reset always did.
-    if (parked) { resetEngines(); current = -1; lastResolved.reset(); activeLockStep = -1; parked = false; }
+    if (parked) { resetEngines(); current = -1; lastResolved.reset(); activeLockStep = -1; modeNow.store(juce::jlimit(0, 2, juce::roundToInt(modeRow.load(0.0f))), std::memory_order_relaxed); parked = false; }   // the first block's look-ahead plays the parameter's mode
     if (current != e) { resetEngines(); current = e; }
 
     // Phase 2: this block's parameters through the modulation matrix, at the call's beat.
