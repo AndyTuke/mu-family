@@ -170,11 +170,23 @@ void TrackStepRow::paintCells(juce::Graphics& g, juce::Rectangle<int> cells, con
             }
         }
 
+        // A step with parameter locks: a small red LED, bottom left (the beat number moves to the bottom right to make room).
+        const bool hasLocks = ! beyond && row.lockCount(s) > 0;
+        if (hasLocks)
+        {
+            const float d = juce::jmax(4.0f, juce::jmin(cell.getWidth(), cell.getHeight()) * 0.16f);
+            const auto led = juce::Rectangle<float>(d, d).withPosition(cell.getX() + 2.5f, cell.getBottom() - d - 2.5f);
+            const auto lockCol = MuLookAndFeel::colour(MuLookAndFeel::indicatorLockTint);
+            g.setColour(lockCol.withAlpha(0.35f));
+            g.fillEllipse(led.expanded(1.5f));
+            g.setColour(lockCol);
+            g.fillEllipse(led);
+        }
         if (isBeat && beatNumbers)   // step numbers on the beat-group starts (1/5/9/13), bottom left
         {
             g.setFont(MuLookAndFeel::uiFont(mu_ui::sf(9.0f)));
             MuLookAndFeel::drawEngravedText(g, mu_ui::cachedIntLabel(s + 1), cell.reduced(2.0f).toNearestInt(),
-                                            juce::Justification::bottomLeft, labelColour, false);
+                                            hasLocks ? juce::Justification::bottomRight : juce::Justification::bottomLeft, labelColour, false);
         }
 
         if (beyond)   // a step past the row's length is not part of the pattern: shaded out

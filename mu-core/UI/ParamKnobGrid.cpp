@@ -16,6 +16,8 @@ void ParamKnobGrid::setSpecs(const std::vector<Spec>& specs)
         ctl->newRow = spec.newRow;
         ctl->groupStart = spec.groupStart;
         ctl->small = spec.small;
+        ctl->lockKey = spec.lockKey;
+        ctl->paramId = spec.id;
         ctl->statusName = spec.statusName.isNotEmpty() ? spec.statusName : spec.label;
 
         ctl->name.setText(spec.label, juce::dontSendNotification);
@@ -43,7 +45,19 @@ void ParamKnobGrid::setSpecs(const std::vector<Spec>& specs)
             ctl->knobAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
                 apvts, spec.id, ctl->knob->getSlider());
             ctl->knob->onStatusUpdate = [this, c = ctl.get()](const juce::String&, const juce::String&) { reportStatus(*c); };
-            ctl->knob->onValueChanged = [this, c = ctl.get()](double) { reportStatus(*c); };
+            ctl->knob->onValueChanged = [this, c = ctl.get()](double)
+            {
+                if (c->detached && ! refreshingLocks) lockEdited(*c);   // a detached knob edits the step's lock, not the parameter
+                reportStatus(*c);
+            };
+            ctl->knob->doubleClickOverride = [this, c = ctl.get()]
+            {
+                float v = 0.0f;
+                if (! lockMode || c->lockKey < 0 || ! onLockRemove || ! lockOf || ! lockOf(c->lockKey, v)) return false;
+                onLockRemove(c->lockKey);   // double-click a locked knob in lock mode: back to the track's value
+                refreshLocks();
+                return true;
+            };
             if (spec.tooltip.isNotEmpty())
                 ctl->knob->getSlider().setTooltip(spec.tooltip);
             if (spec.modDestId != nullptr)
@@ -52,6 +66,56 @@ void ParamKnobGrid::setSpecs(const std::vector<Spec>& specs)
         controls.push_back(std::move(ctl));
     }
     resized();
+}
+
+// A detached knob was turned: write its value as the step's lock. The host may refuse (the step is full): the knob goes back.
+void ParamKnobGrid::lockEdited(Control& c)
+{
+    auto& slider = c.knob->getSlider();
+    const auto* atom = apvts.getRawParameterValue(c.paramId);
+    const double own = atom != nullptr ? (double) atom->load() : slider.getValue();
+    if (onLockEdit && onLockEdit(c.lockKey, (float) slider.valueToProportionOfLength(slider.getValue())))
+    {
+        c.knob->setLockMarks(true, own);
+        return;
+    }
+    refreshingLocks = true;
+    slider.setValue(own, juce::dontSendNotification);
+    refreshingLocks = false;
+    if (onStatusUpdate) onStatusUpdate(c.statusName, "Step has no free locks");
+}
+
+void ParamKnobGrid::refreshLocks()
+{
+    for (auto& ctl : controls)
+    {
+        auto* c = ctl.get();
+        if (c->knob == nullptr || c->lockKey < 0) continue;
+        float lock = 0.0f;
+        const bool locked = lockOf && lockOf(c->lockKey, lock);
+        const bool wantDetached = locked || lockMode;
+        auto& slider = c->knob->getSlider();
+        refreshingLocks = true;
+        if (wantDetached && ! c->detached) { c->knobAtt.reset(); c->detached = true; }
+        else if (! wantDetached && c->detached)
+        {
+            c->knobAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, c->paramId, slider);
+            c->detached = false;
+            c->knob->setLockMarks(false, std::numeric_limits<double>::quiet_NaN());
+        }
+        if (c->detached)
+        {
+            const auto* atom = apvts.getRawParameterValue(c->paramId);
+            const double own = atom != nullptr ? (double) atom->load() : slider.getValue();
+            if (! slider.isMouseButtonDown())
+            {
+                const double shown = locked ? slider.proportionOfLengthToValue((double) lock) : own;
+                if (std::abs(slider.getValue() - shown) > 1.0e-9) slider.setValue(shown, juce::dontSendNotification);
+            }
+            c->knob->setLockMarks(locked, locked ? own : std::numeric_limits<double>::quiet_NaN());
+        }
+        refreshingLocks = false;
+    }
 }
 
 void ParamKnobGrid::clearModBindings()

@@ -44,6 +44,8 @@ public:
         juce::String            statusName;
         // A smaller knob (the family's Size 4) in the same cell, for a secondary row such as an envelope under a filter.
         bool                    small = false;
+        // The host's id for this knob as a step lock target (-1: the knob cannot be locked). See setLockMode.
+        int                     lockKey = -1;
     };
 
     explicit ParamKnobGrid(juce::AudioProcessorValueTreeState& state);
@@ -71,6 +73,19 @@ public:
         return c.knob != nullptr ? c.knob->getBounds() : c.combo != nullptr ? c.combo->getBounds() : juce::Rectangle<int>();
     }
 
+    // ── Parameter locks (a step's own values for chosen knobs) ──────────────────────────────────────────────────────
+    // The host says what the shown step has locked (lockOf: the lock's proportion 0..1 on a key) and takes edits (onLockEdit,
+    // onLockRemove). A knob with a lock shows the locked value, a red LED in its centre and a ghost line at the track's own value;
+    // while lock mode is on, turning a lockable knob writes a lock instead of changing the track's parameter. Such a knob is
+    // detached from its parameter until the lock is gone and the mode is off. Call refreshLocks when the step, its locks or the
+    // mode change (it is cheap; the host's timer may call it).
+    std::function<bool(int key, float& proportion)> lockOf;
+    std::function<bool(int key, float proportion)>  onLockEdit;   // false: refused (the step is full)
+    std::function<void(int key)>                    onLockRemove;
+    void setLockMode(bool on) { lockMode = on; refreshLocks(); }
+    bool isLockMode() const noexcept { return lockMode; }
+    void refreshLocks();
+
     // The width (pixels) the controls need on a single row — a selector takes two cells.
     int getPreferredWidth() const;
 
@@ -92,6 +107,9 @@ private:
         bool                            groupStart = false;   // starts a group (see Spec)
         juce::String                    statusName;
         bool                            small = false;   // a Size 4 knob (see Spec)
+        int                             lockKey = -1;    // see Spec
+        juce::String                    paramId;
+        bool                            detached = false;   // not attached to the parameter: it shows (and edits) a step's lock
         std::unique_ptr<KnobWithLabel>  knob;
         std::unique_ptr<juce::ComboBox> combo;
         juce::Label                     name;
@@ -100,6 +118,9 @@ private:
     };
 
     void reportStatus(const Control&) const;
+    void lockEdited(Control&);
+    bool lockMode = false;
+    bool refreshingLocks = false;
     int  heightAt(int sizeIndex, int areaWidth) const;   // the height the controls need at a size index, wrapped at the width
     int  minSizeIndex = 0;
 

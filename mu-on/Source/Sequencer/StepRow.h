@@ -3,6 +3,7 @@
 #include "Persistence/TrackParams.h"   // EngineType (the default grooves)
 #include "Audio/ChordVoicing.h"        // kDefaultChord, the chord limits
 #include "Sequencer/StepRepeats.h"     // the repeat rates, fade and planning
+#include "Sequencer/StepLocks.h"       // mu-core: a step's parameter locks
 #include <juce_data_structures/juce_data_structures.h>
 #include <array>
 #include <atomic>
@@ -120,8 +121,25 @@ public:
     void setStepSpread   (int step, int v) noexcept { if (valid(step)) cells[(size_t) step].spread.store(juce::jlimit(0, kMaxChordSpread, v), std::memory_order_relaxed); }
     ChordHit stepChordHit(int step) const noexcept { return { stepChord(step), stepInversion(step), stepSpread(step), stepNote(step), stepOctave(step) }; }
 
+    // Per step parameter locks (p-locks): up to mu_core::kMaxStepLocks absolute values for engine parameters that apply only
+    // while this step is the one last triggered. A lock's key is the host's id for the parameter (see lockKey); its value is the
+    // knob's proportion 0..1. With Mod on, modulation still moves a locked parameter from its lock; with Mod off it is ignored.
+    static constexpr unsigned lockKey(int engine, int dest) noexcept { return (unsigned) engine * 256u + (unsigned) dest; }
+    const mu_core::StepLockSet& stepLocks(int step) const noexcept { return valid(step) ? cells[(size_t) step].locks : noLocks(); }
+    int  lockCount(int step) const noexcept { return valid(step) ? cells[(size_t) step].locks.count() : 0; }
+    bool findLock(int step, int engine, int dest, float& value01) const noexcept { return valid(step) && cells[(size_t) step].locks.find((uint16_t) lockKey(engine, dest), value01); }
+    bool setLock(int step, int engine, int dest, float value01) noexcept { return valid(step) && cells[(size_t) step].locks.set((uint16_t) lockKey(engine, dest), value01); }
+    void removeLock(int step, int engine, int dest) noexcept { if (valid(step)) cells[(size_t) step].locks.remove((uint16_t) lockKey(engine, dest)); }
+    void clearLocks(int step) noexcept { if (valid(step)) { cells[(size_t) step].locks.clear(); cells[(size_t) step].lockMod.store(false, std::memory_order_relaxed); } }
+    // The same by the host's key (engine * 256 + destination), for the editor's knobs.
+    bool setLockByKey(int step, unsigned key, float value01) noexcept { return valid(step) && cells[(size_t) step].locks.set((uint16_t) key, value01); }
+    void removeLockByKey(int step, unsigned key) noexcept { if (valid(step)) cells[(size_t) step].locks.remove((uint16_t) key); }
+    bool lockModulated(int step) const noexcept { return valid(step) && cells[(size_t) step].lockMod.load(std::memory_order_relaxed); }
+    void setLockModulated(int step, bool on) noexcept { if (valid(step)) cells[(size_t) step].lockMod.store(on, std::memory_order_relaxed); }
+
     void clear() noexcept
     {
+        for (int s = 0; s < kMaxSteps; ++s) clearLocks(s);
         for (auto& c : cells) { c.on.store(false, std::memory_order_relaxed); c.accent.store(false, std::memory_order_relaxed); c.ghost.store(false, std::memory_order_relaxed); c.open.store(false, std::memory_order_relaxed); c.prob.store(100, std::memory_order_relaxed); c.loopLen.store(1, std::memory_order_relaxed); c.loopBars.store(kAllBars, std::memory_order_relaxed); c.cond.store(kCondAlways, std::memory_order_relaxed);
                     c.level.store(100, std::memory_order_relaxed); c.repeats.store(0, std::memory_order_relaxed); c.repRate.store(step_repeats::kDefaultRate, std::memory_order_relaxed); c.repFade.store(0, std::memory_order_relaxed); c.tie.store(false, std::memory_order_relaxed); c.oct.store(0, std::memory_order_relaxed); c.note.store(0, std::memory_order_relaxed);
                     c.chord.store(kDefaultChord, std::memory_order_relaxed); c.inv.store(0, std::memory_order_relaxed); c.spread.store(0, std::memory_order_relaxed); }
@@ -202,6 +220,19 @@ public:
         if (anyCond) row.setProperty("cond", conds.joinIntoString(","), nullptr);
         if (anyLevel) row.setProperty("level", levels.joinIntoString(","), nullptr);
         if (anyRep) { row.setProperty("repeats", reps.joinIntoString(","), nullptr); row.setProperty("repRate", repRates.joinIntoString(","), nullptr); row.setProperty("repFade", repFades.joinIntoString(","), nullptr); }
+        // Locks, sparse: "step:key=value|key=value" for each step that has any (a value is the 16-bit word), and the steps whose
+        // locks let modulation through.
+        juce::StringArray lockEntries, lockMods;
+        for (int s = 0; s < n; ++s)
+        {
+            if (lockCount(s) == 0) continue;
+            juce::StringArray parts;
+            stepLocks(s).forEach([&](uint16_t key, float v) { parts.add(juce::String((int) key) + "=" + juce::String((int) (mu_core::StepLockSet::pack(0, v) & 0xffffu))); });
+            lockEntries.add(juce::String(s) + ":" + parts.joinIntoString("|"));
+            if (lockModulated(s)) lockMods.add(juce::String(s));
+        }
+        if (! lockEntries.isEmpty()) row.setProperty("lock", lockEntries.joinIntoString(","), nullptr);
+        if (! lockMods.isEmpty()) row.setProperty("lockMod", lockMods.joinIntoString(","), nullptr);
         if (anyLoop) { row.setProperty("loopLen", loopLens.joinIntoString(","), nullptr); row.setProperty("loopBars", loopBars.joinIntoString(","), nullptr); }
         return row;
     }
@@ -266,12 +297,28 @@ public:
             setStepInversion(s, s < invList.size() ? invList[s].getIntValue() : 0);
             setStepSpread   (s, s < spreadList.size() ? spreadList[s].getIntValue() : 0);
         }
+        for (int s = 0; s < kMaxSteps; ++s) clearLocks(s);
+        for (const auto& entry : juce::StringArray::fromTokens(row.getProperty("lock").toString(), ",", ""))
+        {
+            const int colon = entry.indexOfChar(':');
+            if (colon < 0) continue;
+            const int s = entry.substring(0, colon).getIntValue();
+            for (const auto& pair : juce::StringArray::fromTokens(entry.substring(colon + 1), "|", ""))
+            {
+                const int eq = pair.indexOfChar('=');
+                if (eq > 0) cellLockSet(s, (uint16_t) pair.substring(0, eq).getIntValue(), (float) pair.substring(eq + 1).getIntValue() / 65535.0f);
+            }
+        }
+        for (const auto& t : juce::StringArray::fromTokens(row.getProperty("lockMod").toString(), ",", "")) setLockModulated(t.getIntValue(), true);
         setNumSteps(row.hasProperty("len") ? (int) row.getProperty("len") : kNumSteps);
     }
 
 private:
     struct Cell { std::atomic<bool> on { false }; std::atomic<bool> accent { false }; std::atomic<bool> ghost { false }; std::atomic<bool> open { false }; std::atomic<int> prob { 100 }; std::atomic<int> loopLen { 1 }; std::atomic<int> loopBars { 0xFF }; std::atomic<int> cond { 0 }; std::atomic<int> level { 100 }; std::atomic<int> repeats { 0 }; std::atomic<int> repRate { step_repeats::kDefaultRate }; std::atomic<int> repFade { 0 }; std::atomic<bool> tie { false }; std::atomic<int> oct { 0 }; std::atomic<int> note { 0 };
-                  std::atomic<int> chord { kDefaultChord }; std::atomic<int> inv { 0 }; std::atomic<int> spread { 0 }; };
+                  std::atomic<int> chord { kDefaultChord }; std::atomic<int> inv { 0 }; std::atomic<int> spread { 0 };
+                  mu_core::StepLockSet locks; std::atomic<bool> lockMod { false }; };
+    void cellLockSet(int step, uint16_t key, float value01) noexcept { if (valid(step)) cells[(size_t) step].locks.set(key, value01); }
+    static const mu_core::StepLockSet& noLocks() noexcept { static const mu_core::StepLockSet none; return none; }
     static bool valid(int s) noexcept { return s >= 0 && s < kMaxSteps; }
 
     std::array<Cell, kMaxSteps> cells;

@@ -1,6 +1,6 @@
 # mu-On parameter locks (p-locks): design note, 2026-11-10
 
-Backlog row #1798. Andy's rulings are in the row; this note turns them into a design. Status: **design only, nothing built**. Needs the reviews listed at the end before code.
+Backlog row #1798. Andy's rulings are in the row; this note turns them into a design. Status (2026-11-11): **built** (stages 1 to 3), reviews still outstanding. Differences from the design: the editor locks the knobs of the Voice and Filter sections only (the engine applies a lock on any modulation destination, so Level, Pan, Ghost, sends and Insert knobs only need their editor hook); removal is double-click on a locked knob with P-Lock on, or Clear; the step's red LED is bottom-left with the beat number moved to the bottom-right on a locked step; the audio peek treats a modulated Fill as last block's value.
 
 ## What we want (Andy, 2026-11-10)
 

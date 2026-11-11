@@ -162,6 +162,7 @@ struct MuTheme
     {
         juce::Colour modulationTint    { 0xff89e0ff };  // soft cyan ring around modulated knob
         juce::Colour grTint            { 0xffff6633 };  // orange GR arc on compressor/limiter
+        juce::Colour lockTint          { 0xffff3b30 };  // red: a parameter lock's LED (knob centre, step corner) and the ghost line marking the unlocked value
         juce::Colour grMeterBg         { 0xff111111 };  // GRMeter strip background
         juce::Colour grMeterBar        { 0xaa7799cc };  // semi-transparent blue-grey bar
         juce::Colour fault             { 0xffE24B4A };  // status lamp: a fault (clock lost)

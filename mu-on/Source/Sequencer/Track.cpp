@@ -320,10 +320,10 @@ void Track::applyDrumFilter(juce::AudioBuffer<float>& out, int n, int e) noexcep
 
 // The engine's parameters through the track's modulation matrix (the shared range-based resolve: proportion
 // seed, try-locked matrix, back to parameter units), then published for the knobs' live arcs.
-void Track::resolve(int e, double beat, float* outValues) noexcept
+void Track::resolve(int e, double beat, float* outValues, const mu_core::LockSeed* lock) noexcept
 {
     auto& L = mods[(size_t) e];
-    const bool resolved = mu_mod::resolveLane(this, beat, L.count, L.ids.data(), L.atoms.data(), L.ranges.data(), L.map, outValues);
+    const bool resolved = mu_mod::resolveLane(this, beat, L.count, L.ids.data(), L.atoms.data(), L.ranges.data(), L.map, outValues, lock);
 
     // A block that misses the matrix lock (the message thread is editing this track's modulators) holds the last
     // values resolved for this engine, so no target snaps back to its unmodulated knob for a block (C12). Before
@@ -390,6 +390,20 @@ void Track::clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, i
                           triggers.fetch_add(1, std::memory_order_relaxed);
                       });
     if (fireInto != nullptr && e != toIndex(EngineType::Rumble)) fireRepeats(ctx, fireInto, n);   // repeats a step planned inside this very block
+}
+
+// The first step that plays in this block, found on a copy of the clock (the real one moves when clockRow fires the steps), with the
+// same checks the firing makes. A modulated Fill is last block's value here, as the modulation has not resolved yet.
+int Track::peekFiringStep(const mu_core::RenderContext& ctx, int e, int n) const noexcept
+{
+    if (! ctx.playing || e == toIndex(EngineType::Rumble)) return -1;
+    StepClock probe = clock;
+    if (ctx.justStarted) probe.seek(ctx.startBeat);
+    int found = -1;
+    const bool fill = ctx.fill != 0 || fillModNow.load(std::memory_order_relaxed);
+    probe.processSpan(row, ctx.startBeat, n, ctx.beatsPerSample, row.swingAmount(), row.accentVelocity(),
+                      [&](const StepEvent& ev) { if (found < 0 && stepPlays(ev.step, ev.pass, fill)) found = ev.step; });
+    return found;
 }
 
 bool Track::stepPlays(int step, long long pass, bool fill) const noexcept
@@ -486,12 +500,22 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
     // Phase 1: a slot that has just gone live (or was prepared since) starts from silence, so a tail left by
     // an earlier state (a sustaining bass has no note-off) never resumes; an engine change stops the old one dead.
     // Both silence every engine the track holds, as the per-slot engines' reset always did.
-    if (parked) { resetEngines(); current = -1; lastResolved.reset(); parked = false; }
+    if (parked) { resetEngines(); current = -1; lastResolved.reset(); activeLockStep = -1; parked = false; }
     if (current != e) { resetEngines(); current = e; }
 
     // Phase 2: this block's parameters through the modulation matrix, at the call's beat.
+    // A step that fires in this block sets which locks apply (an unlocked one ends the previous lock's tail); with none firing the
+    // last one holds. A stopped transport goes back to the track's own values.
+    if (! ctx.playing || ctx.justStopped || ctx.stoppedUnrendered) activeLockStep = -1;
+    if (const int firing = peekFiringStep(ctx, e, n); firing >= 0) activeLockStep = firing;
+    mu_core::LockSeed lockSeed;
+    if (activeLockStep >= 0 && row.lockCount(activeLockStep) > 0)
+    {
+        lockSeed.load(row.stepLocks(activeLockStep), (unsigned) e, mods[(size_t) e].count);
+        lockSeed.modulate = row.lockModulated(activeLockStep);
+    }
     float p[kMaxDests] {};
-    resolve(e, ctx.startBeat, p);
+    resolve(e, ctx.startBeat, p, lockSeed.mask != 0 ? &lockSeed : nullptr);
     const bool rumble = e == toIndex(EngineType::Rumble);
     // The engine's own choice row: the Bass or Chord wave, or the FM Perc algorithm (none is a modulation target).
     const int engineChoice = juce::roundToInt(e == toIndex(EngineType::FmPerc) ? algoRow.load(0.0f)

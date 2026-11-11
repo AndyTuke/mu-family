@@ -361,6 +361,31 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     spreadKnob.onStatusUpdate = [this](const juce::String&, const juce::String& v) { if (onStatusUpdate) onStatusUpdate("Step Spread", v); };
     addChildComponent(chordCaption);
     addChildComponent(chordSelect);
+    wireLocks(grid);
+    wireLocks(filterGrid);
+    lockButton.setClickingTogglesState(true);
+    lockButton.setTooltip("On: turning a knob in the Voice or Filter section locks it to this step; double-click a locked knob to release it");
+    lockButton.onClick = [this]
+    {
+        const bool on = lockButton.getToggleState();
+        grid.setLockMode(on);
+        filterGrid.setLockMode(on);
+        refreshLockControls();
+    };
+    lockModButton.setClickingTogglesState(true);
+    lockModButton.setTooltip("On: modulation still moves this step's locked knobs. Off: they stay at the lock");
+    lockModButton.onClick = [this]
+    {
+        host.getTrack(currentLayer).row.setLockModulated(selectedStepOf[(size_t) currentLayer], lockModButton.getToggleState());
+        if (onStatusUpdate) onStatusUpdate("Step Lock Mod", lockModButton.getToggleState() ? "On" : "Off");
+    };
+    lockClearButton.setTooltip("Remove every lock from this step");
+    lockClearButton.onClick = [this]
+    {
+        host.getTrack(currentLayer).row.clearLocks(selectedStepOf[(size_t) currentLayer]);
+        refreshLockControls();
+    };
+    for (auto* b : { &lockButton, &lockModButton, &lockClearButton }) addChildComponent(*b);
     rows.onStepSelected = [this](int, int step) { selectStep(step); };
     rows.onLengthChanged = [this] { refreshStepPanel(); };
     soloRow.onStepSelected = [this](int step) { selectStep(step); };
@@ -443,6 +468,7 @@ void TrackContent::bindModulationArcs(std::vector<mu_ui::ParamKnobGrid::Spec>& s
         if (dest < 0) continue;
 
         spec.modDestId = table[dest].id;
+        if (engine != EngineType::Rumble) spec.lockKey = (int) StepRow::lockKey(toIndex(engine), dest);   // lockable on a step
         spec.modMatrix = matrix;
         spec.modLive   = [this, layer, engine, dest]() -> float
                          { return host.isTrackTransportPlaying() ? host.getModLive(layer, engine, dest) : kNaN; };
@@ -483,6 +509,7 @@ void TrackContent::rebuildGrid()
                                      [this, layer, engine, dest]() -> float { return host.isTrackTransportPlaying() ? host.getModLive(layer, engine, dest) : kNaN; });
         }
     }
+    refreshLockControls();   // the new knobs show the selected step's locks
     resized();   // the filter section comes and goes with the engine
 }
 
@@ -570,7 +597,44 @@ void TrackContent::refreshStepPanel()
     refreshNoteItems();
     rows.setSelectedStep(step);
     soloRow.setSelectedStep(step);
+    refreshLockControls();
     repaint();
+}
+
+// The knob grids ask the shown step's row for its locks and write edits back to it.
+void TrackContent::wireLocks(mu_ui::ParamKnobGrid& g)
+{
+    g.lockOf = [this](int key, float& v)
+    {
+        return host.getTrack(currentLayer).row.stepLocks(selectedStepOf[(size_t) currentLayer]).find((uint16_t) key, v);
+    };
+    g.onLockEdit = [this](int key, float v)
+    {
+        const bool ok = host.getTrack(currentLayer).row.setLockByKey(selectedStepOf[(size_t) currentLayer], (unsigned) key, v);
+        if (ok) { lockModButton.setEnabled(true); lockClearButton.setEnabled(true); rows.repaint(); soloRow.repaint(); }
+        return ok;
+    };
+    g.onLockRemove = [this](int key)
+    {
+        host.getTrack(currentLayer).row.removeLockByKey(selectedStepOf[(size_t) currentLayer], (unsigned) key);
+        refreshLockControls();
+    };
+}
+
+void TrackContent::refreshLockControls()
+{
+    const auto& row = host.getTrack(currentLayer).row;
+    const int step = selectedStepOf[(size_t) currentLayer];
+    const bool has = row.lockCount(step) > 0;
+    const bool show = shownEngine != EngineType::Rumble;
+    for (auto* b : { &lockButton, &lockModButton, &lockClearButton }) b->setVisible(show);
+    lockModButton.setEnabled(has);
+    lockClearButton.setEnabled(has);
+    lockModButton.setToggleState(row.lockModulated(step), juce::dontSendNotification);
+    grid.refreshLocks();
+    filterGrid.refreshLocks();
+    rows.repaint();
+    soloRow.repaint();
 }
 
 // A right-click selected `step` in the shown layer's row (the row clicked has become the shown layer).
@@ -720,6 +784,7 @@ void TrackContent::timerCallback()
         return;
     }
     if (shownEngine == EngineType::Hat) followTuneLink();
+    if (shownEngine != EngineType::Rumble) { grid.refreshLocks(); filterGrid.refreshLocks(); }   // a knob's own value moves (automation) while it shows a lock
     // The Note list follows the tune, key and scale (a knob, automation or a preset moves them).
     if (shownEngine == EngineType::Kick || shownEngine == EngineType::Bass)
     {
@@ -934,6 +999,14 @@ void TrackContent::layoutStepPanel()
         placeDropdown(capB, selB, column.withTrimmedLeft(aW + pairGap), yB);
     };
     auto placeLoopPair = [&](juce::Rectangle<int> column, int& y) { placeDropdown(barsCaption, barsSelect, column, y); };
+
+    // The lock row sits at the bottom of the box: P-Lock, Mod and Clear.
+    {
+        const int bh = s(LF::kClientButtonH), by = in.getBottom() - bh, w = (in.getWidth() - 2 * gap) / 3;
+        lockButton.setBounds(in.getX(), by, w, bh);
+        lockModButton.setBounds(in.getX() + w + gap, by, w, bh);
+        lockClearButton.setBounds(in.getX() + 2 * (w + gap), by, in.getRight() - (in.getX() + 2 * (w + gap)), bh);
+    }
 
     // A Chord step has two columns: the Root, Octave, Chord and Play lists, then the Probability, Inversion and Spread knobs.
     if (shownEngine == EngineType::Chord)

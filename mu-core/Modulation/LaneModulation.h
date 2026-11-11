@@ -2,6 +2,7 @@
 
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "Sequencer/Layer.h"
+#include "Sequencer/StepLocks.h"   // LockSeed: a step's locks for this block
 #include "Modulation/LastResolved.h"
 
 #include <juce_audio_basics/juce_audio_basics.h>
@@ -22,6 +23,8 @@
 // parallel arrays of length `count`; `out` must hold `count` floats. Returns false when the slot's
 // matrix lock was missed (its modulators are being edited), so `out` holds the unmodulated values: a
 // caller that keeps its last resolved values holds them for the block instead (C12).
+// `lock` (optional): the destinations a step has locked. Their seed is the lock's proportion instead of the knob's; when the lock
+// says modulation is off for them they are set back to the lock after the matrix runs.
 namespace mu_mod {
 
 inline bool resolveLane(Layer* slot, double beat, int count,
@@ -29,13 +32,14 @@ inline bool resolveLane(Layer* slot, double beat, int count,
                         const std::atomic<float>* const* atoms,
                         const juce::NormalisableRange<float>* ranges,
                         std::unordered_map<std::string_view, float>& map,
-                        float* out)
+                        float* out,
+                        const mu_core::LockSeed* lock = nullptr)
 {
     for (int i = 0; i < count; ++i)
     {
         const float v = atoms[i] != nullptr ? atoms[i]->load(std::memory_order_relaxed)
                                             : ranges[i].start;
-        map[ids[i]] = ranges[i].convertTo0to1(v);
+        map[ids[i]] = lock != nullptr && i < 32 && (lock->mask >> i & 1u) ? lock->value01[(size_t) i] : ranges[i].convertTo0to1(v);
     }
 
     bool resolved = true;
@@ -48,6 +52,10 @@ inline bool resolveLane(Layer* slot, double beat, int count,
         }
         else resolved = false;
     }
+
+    if (lock != nullptr && ! lock->modulate)   // locked and unmodulated: the lock itself, whatever the matrix did
+        for (int i = 0; i < count && i < 32; ++i)
+            if (lock->mask >> i & 1u) map[ids[i]] = lock->value01[(size_t) i];
 
     for (int i = 0; i < count; ++i)
         out[i] = ranges[i].convertFrom0to1(juce::jlimit(0.0f, 1.0f, map[ids[i]]));

@@ -153,7 +153,10 @@ private:
         std::unordered_map<std::string_view, float>           map;
     };
 
-    void  resolve(int engine, double beat, float* outValues) noexcept;   // modulation, then the modLive publish
+    void  resolve(int engine, double beat, float* outValues, const mu_core::LockSeed* lock = nullptr) noexcept;   // modulation (a step's locks as the seed), then the modLive publish
+    // The step the block's clock will fire (the first that plays), looked at without moving the clock: -1 if none. Locks need it
+    // before the modulation resolve, which comes first in the block.
+    int   peekFiringStep(const mu_core::RenderContext& ctx, int engine, int n) const noexcept;
     float evaluateRumbleEnv(double beat) noexcept;                       // the bar envelope, under its try-lock
     void  clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, int engine, int n) noexcept;
     void  resetEngines() noexcept;   // every held engine's voice silenced (the per-slot engines' reset rule)
@@ -225,6 +228,7 @@ private:
     juce::AudioBuffer<float> sourceView;       // a Rumble's view of its source's block (no allocation)
 
     int   current = -1;          // the engine the last rendered block resolved (-1: none, the next block resets)
+    int   activeLockStep = -1;   // the step whose locks apply: the last step that fired (-1: none, the track's own values). Audio thread only.
     float lastRumbleEnv = 1.0f;  // reused while the envelope's lock is contended
     bool  parked = true;         // not rendered live in the last rendered block (or prepared since)
 

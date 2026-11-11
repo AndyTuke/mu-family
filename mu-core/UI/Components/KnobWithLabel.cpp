@@ -118,6 +118,16 @@ void KnobWithLabel::setModulatedActual(float actualValue) noexcept
     setModulatedNorm((float) slider.valueToProportionOfLength((double) actualValue));
 }
 
+void KnobWithLabel::setLockMarks(bool locked, double ghostValue)
+{
+    const float ghost = std::isnan(ghostValue) ? std::numeric_limits<float>::quiet_NaN()
+                                               : (float) slider.valueToProportionOfLength(ghostValue);
+    if (locked == lockLed && ((std::isnan(ghost) && std::isnan(lockGhostNorm)) || ghost == lockGhostNorm)) return;
+    lockLed = locked;
+    lockGhostNorm = ghost;
+    repaint();
+}
+
 void KnobWithLabel::resized()
 {
     using mu_ui::s;
@@ -128,6 +138,7 @@ void KnobWithLabel::resized()
 
 void KnobWithLabel::mouseDoubleClick(const juce::MouseEvent&)
 {
+    if (doubleClickOverride && doubleClickOverride()) return;
     showInlineEditor();
 }
 
@@ -321,7 +332,7 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
                                isSteppedControl());
 
     // Modulation indicator ring and GR arc overlay.
-    if (! isModulated && std::isnan(modulatedNorm) && grDisplay <= 0.005f) return;
+    if (! isModulated && std::isnan(modulatedNorm) && grDisplay <= 0.005f && ! lockLed && std::isnan(lockGhostNorm)) return;
 
     using mu_ui::sf;
 
@@ -405,5 +416,23 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
         g.setColour(MuLookAndFeel::colour(MuLookAndFeel::indicatorGRTint).withAlpha(0.85f));
         g.strokePath(grArc, juce::PathStrokeType(sf(2.5f), juce::PathStrokeType::curved,
                                                        juce::PathStrokeType::rounded));
+    }
+
+    // Parameter lock: the red LED in the centre, and the ghost line on the outside at the unlocked value.
+    const auto lockCol = MuLookAndFeel::colour(MuLookAndFeel::indicatorLockTint);
+    if (lockLed)
+    {
+        const float r = juce::jmax(sf(2.0f), radius * 0.1f);
+        g.setColour(lockCol.withAlpha(0.3f));
+        g.fillEllipse(cx - r * 1.8f, cy - r * 1.8f, r * 3.6f, r * 3.6f);
+        g.setColour(lockCol);
+        g.fillEllipse(cx - r, cy - r, r * 2.0f, r * 2.0f);
+    }
+    if (! std::isnan(lockGhostNorm))
+    {
+        const float a = startAngle + lockGhostNorm * (endAngle - startAngle);
+        const float r0 = radius + ringOff * 0.5f, r1 = arcR + juce::jmax(sf(2.0f), radius * 0.08f);
+        g.setColour(lockCol.withAlpha(0.9f));
+        g.drawLine(cx + r0 * std::sin(a), cy - r0 * std::cos(a), cx + r1 * std::sin(a), cy - r1 * std::cos(a), sf(1.6f));
     }
 }

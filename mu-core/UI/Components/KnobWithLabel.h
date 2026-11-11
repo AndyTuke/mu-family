@@ -76,11 +76,19 @@ public:
     // where 1 ≡ 24 dB). Pass nullptr to disable.
     void setGRSource(const std::atomic<float>* gr);
 
+    // Parameter-lock marks (a step's lock shown on the knob): `locked` lights a small red LED in the knob's centre, and
+    // `ghostValue` (in the slider's units; NaN = none) draws a short red line on the outside of the knob where the
+    // unlocked value sits. Both clear with setLockMarks(false, NaN).
+    void setLockMarks(bool locked, double ghostValue);
+
     void resized() override;
     void paint(juce::Graphics& g) override;
     void paintOverChildren(juce::Graphics& g) override;
     void mouseEnter(const juce::MouseEvent& e) override;
     void mouseDoubleClick(const juce::MouseEvent& e) override;
+
+    // Optional: asked first on a double-click; true means the host handled it (the inline value editor does not open).
+    std::function<bool()> doubleClickOverride;
 
 private:
     juce::Slider slider;
@@ -89,6 +97,8 @@ private:
 
     bool  isModulated   = false;
     float modulatedNorm = std::numeric_limits<float>::quiet_NaN();
+    bool  lockLed       = false;                                      // a lock is shown: red LED in the centre
+    float lockGhostNorm = std::numeric_limits<float>::quiet_NaN();    // the unlocked value's proportion, NaN = no ghost line
 
     bool                    hasModBind   = false;
     bool                    modNormMode  = false;

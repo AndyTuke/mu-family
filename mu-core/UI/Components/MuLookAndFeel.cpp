@@ -109,6 +109,7 @@ juce::Colour MuLookAndFeel::colour(ColourIds id) noexcept
         // Knob overlay indicators
         case indicatorModulationTint: return t.indicators.modulationTint;
         case indicatorGRTint:         return t.indicators.grTint;
+        case indicatorLockTint:       return t.indicators.lockTint;
         case indicatorGRMeterBg:      return t.indicators.grMeterBg;
         case indicatorGRMeterBar:     return t.indicators.grMeterBar;
         // Mixer extras

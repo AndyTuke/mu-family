@@ -127,6 +127,11 @@ private:
     void refreshStepPanel();                                    // the controls follow the shown layer's selected step
     void selectStep(int step);
     void layoutStepPanel();
+    // Parameter locks (p-locks). P-Lock: while on, turning a knob in the voice or filter section locks that knob for the selected
+    // step instead of changing the track. Mod: whether modulation still moves this step's locked knobs. Clear: drop its locks.
+    juce::TextButton lockButton { "P-Lock" }, lockModButton { "Mod" }, lockClearButton { "Clear" };
+    void wireLocks(mu_ui::ParamKnobGrid& g);
+    void refreshLockControls();                                 // the buttons, the knobs' lock marks and the step LEDs follow the selected step
     juce::TextButton soloBtn { "Solo" };                                                      // the strip's solo
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> swingAtt, accentAtt, ghostAtt, sendEffAtt, sendDlyAtt, sendRevAtt, probAtt, levelAtt;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> soloAtt;
