@@ -112,18 +112,13 @@ namespace
         mu_on::Track standIn;   // see getTrack
     };
 
-    // mu-On's Track content with its host adapter and the engine's modulation destinations: the one content instance
-    // the editor keeps per Track type. The adapter is the first base so it exists before the content is built over it.
+    // mu-On's Track content with its host adapter: the one content instance the editor keeps per Track type (its modulation
+    // destinations come from the registry: the type publishes the engine's table). The adapter is the first base so it exists before the content is built over it.
     class TrackSlotContent : private TrackSlotHost, public mu_on::TrackContent
     {
     public:
         TrackSlotContent(ProcessorBase& p, mu_on::EngineType e)
-            : TrackSlotHost(p, e), mu_on::TrackContent(p, static_cast<TrackSlotHost&>(*this)), destinations(mu_on::makeModDestProvider(e)) {}
-
-        const ModDestProvider* getModDestProvider() const noexcept override { return &destinations; }
-
-    private:
-        ModDestProvider destinations;
+            : TrackSlotHost(p, e), mu_on::TrackContent(p, static_cast<TrackSlotHost&>(*this)) {}
     };
 
     mu_on::EngineType engineOfSlot(ProcessorBase& host, int slot)

@@ -4,6 +4,7 @@
 #include "Sequencer/LayerTypeInfo.h"   // mu-core: mu_core::LayerTypeId, LayerTypeInfo
 #include "Persistence/LayerState.h"    // mu-core: the saved row tag
 #include "Persistence/TrackParams.h"
+#include "Modulation/MuOnModDest.h"   // the engine's modulation targets
 
 #include <memory>
 
@@ -90,6 +91,9 @@ inline mu_core::LayerTypeInfo makeTrackTypeInfo(EngineType engine) noexcept
     info.typeFromPreset = &typeFromPreset;   // the seven types share .muTrack: the engine a preset saved names its type
     info.addLayerParams = &addLayerParams;   // one table per prefix: every engine's rows exist on every track
     info.create = &createTrack;
+    int numTargets = 0;
+    info.modTargets = destsForEngine(engine, numTargets);   // the engine's own table, published through the registry
+    info.numModTargets = numTargets;
     return info;
 }
 

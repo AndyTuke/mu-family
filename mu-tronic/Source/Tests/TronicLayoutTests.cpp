@@ -8,6 +8,7 @@
 #include "Plugin/PluginProcessor.h"
 #include "Persistence/TronicState.h"
 #include "Tests/ProcessorSeamHelpers.h"
+#include "UI/TableModDestProvider.h"
 
 #include <chrono>
 #include <set>
@@ -148,6 +149,39 @@ struct MuTronicLayoutTests : juce::UnitTest
             expectEquals(types.discInitial(LayerTypeId::FmPerc), juce::String("F"));
             expectEquals(types.discInitial(LayerTypeId::Chord), juce::String("C"));
             expectEquals(seen.size(), 11, "eleven choices");
+        }
+
+        beginTest("every layer type but the Rhythm publishes its modulation targets in the registry, as a table the shared provider resolves both ways");
+        {
+            mu_seam_test::TempStorage storage;
+            mu_tronic::PluginProcessor p;
+            const auto& types = p.getLayerTypes();
+            int published = 0;
+            for (int t = 0; t < types.size(); ++t)
+            {
+                const auto& info = types.at(t);
+                if (info.id == mu_core::LayerTypeId::Rhythm)
+                {
+                    expect(info.modTargets == nullptr, "the Rhythm's targets depend on its effect and step counts: built by its own provider");
+                    continue;
+                }
+                expect(info.modTargets != nullptr && info.numModTargets > 0, juce::String(info.name) + " publishes its targets");
+                if (info.modTargets == nullptr) continue;
+                ++published;
+
+                const auto provider = mu_mod::makeTableDestProvider(info.modTargets, info.numModTargets);
+                std::set<std::string> ids;
+                for (int i = 0; i < info.numModTargets; ++i)
+                {
+                    const auto& row = info.modTargets[i];
+                    expect(row.id != nullptr && row.label != nullptr, juce::String(info.name) + " row " + juce::String(i) + " has an id and a label");
+                    if (row.id == nullptr) continue;
+                    expect(ids.insert(row.id).second, juce::String(info.name) + " id " + row.id + " is unique");
+                    expectEquals(provider.resolveId(i + 1), std::string(row.id), juce::String(info.name) + " resolves dropdown id " + juce::String(i + 1));
+                    expectEquals(provider.findDropdownId(row.id), i + 1, juce::String(info.name) + " finds " + row.id);
+                }
+            }
+            expectEquals(published, 10, "Pattern, Arp, the seven mu-On types and Phrase");
         }
 
         beginTest("a strip's sidechain source reaches every slot and the external bus");

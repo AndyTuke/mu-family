@@ -1,4 +1,5 @@
 #pragma once
+#include <deque>
 
 #include "UI/EditorShellBase.h"
 #include "UI/LayerSidebar.h"          // mu-core shared sidebar (select / delete / pages)
@@ -51,6 +52,9 @@ private:
     void showSlot(int idx);
     // The content instance for `type`, built on first use through the registry (null for a type with none).
     LayerContent* contentFor(mu_core::LayerTypeId type);
+    // The destination provider for the shown slot: the content's own when it has one (mu-Clid's, mu-Tant's), else one built from the
+    // targets its layer type publishes in the registry.
+    const ModDestProvider* destProviderFor(mu_core::LayerTypeId type, const LayerContent* content);
     // Every content lets go of its modulation arcs (before a layer is replaced or removed).
     void releaseContentArcs();
     // The slot's layer was given a type: rebuild what depends on it.
@@ -74,6 +78,7 @@ private:
     MixerOverlay     mixerOverlay;
     TronicSettingsOverlay settingsOverlay;
     std::vector<std::pair<mu_core::LayerTypeId, std::unique_ptr<LayerContent>>> contents;   // one per type shown so far
+    std::deque<std::pair<mu_core::LayerTypeId, ModDestProvider>> registryProviders;          // built from a type's published targets, once per type (a deque: the panel holds the pointers)
     LayerContent* shownContent = nullptr;
     juce::String  effectSendName;   // the mixer effect's current name; empty until the mixer reports it
     std::unique_ptr<juce::FileChooser> importChooser;   // alive while the import file dialog is open

@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include "Sequencer/LayerServices.h"
+#include "Modulation/ModTarget.h"
 
 #include <cstring>
 #include <functional>
@@ -109,6 +110,11 @@ namespace mu_core
         const char* descriptor = "";           // one short line for the chooser card ("Generative arpeggiator")
         const char* discInitial = "";          // one character on the type's disc (sidebar and chooser card); unique across a host's choices
         bool        takesNotes = false;        // the type plays from MIDI notes, so a slot of it shows the Notes In channel control
+        // The type's modulation targets: the one table the modulator panel's dropdown, the id checks and the serialiser read
+        // through the registry, so a new type's targets appear everywhere with no framework edit. Null = the type publishes
+        // none here (mu-Clid's depend on the effect and step counts and are built by its own provider).
+        const mu_mod::ModTarget* modTargets = nullptr;
+        int         numModTargets = 0;
         bool        hasClipBank = true;        // a slot of the type stores clips; false (a type that processes another layer's audio) hides the strip
     };
 }
