@@ -64,6 +64,7 @@ jobs:
           mu-toni_VST3 mu-toni_CLAP mu-toni_Standalone
           mu-tilate_VST3 mu-tilate_CLAP mu-tilate_Standalone
           mu-tronic_Standalone
+          mu-host_VST3 mu-host_CLAP
 
       # mu-link is a Windows desktop app (freeware); built and zipped on the Windows runner only.
       - name: Build mu-link (Windows)
@@ -89,6 +90,9 @@ jobs:
           Copy-Item "$r\mu-clid\mu-clid_artefacts\Release\VST3\mu-Clid.vst3" staging\mu-Clid\ -Recurse
           Copy-Item "$r\mu-clid\mu-clid_artefacts\Release\CLAP\mu-Clid.clap" staging\mu-Clid\
           Copy-Item "$r\mu-clid\mu-clid_artefacts\Release\Standalone\mu-Clid.exe" staging\mu-Clid\
+          # mu-Host (free, in every paid app's zip): one mu instrument channel as a plug-in; lists only the engines you have a licence for
+          Copy-Item "$r\mu-host\mu-host_artefacts\Release\VST3\mu-Host.vst3" staging\mu-Clid\ -Recurse
+          Copy-Item "$r\mu-host\mu-host_artefacts\Release\CLAP\mu-Host.clap" staging\mu-Clid\
           Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Clid\"
           Compress-Archive -Path staging\mu-Clid\* -DestinationPath dist\mu-Clid-Windows.zip
           # mu-Clid MIDI (VST3 + CLAP)
@@ -102,6 +106,9 @@ jobs:
           Copy-Item "$r\mu-tant\mu-tant_artefacts\Release\VST3\mu-Tant.vst3" staging\mu-Tant\ -Recurse
           Copy-Item "$r\mu-tant\mu-tant_artefacts\Release\CLAP\mu-Tant.clap" staging\mu-Tant\
           Copy-Item "$r\mu-tant\mu-tant_artefacts\Release\Standalone\mu-Tant.exe" staging\mu-Tant\
+          # mu-Host (free, in every paid app's zip): one mu instrument channel as a plug-in; lists only the engines you have a licence for
+          Copy-Item "$r\mu-host\mu-host_artefacts\Release\VST3\mu-Host.vst3" staging\mu-Tant\ -Recurse
+          Copy-Item "$r\mu-host\mu-host_artefacts\Release\CLAP\mu-Host.clap" staging\mu-Tant\
           Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Tant\"
           Compress-Archive -Path staging\mu-Tant\* -DestinationPath dist\mu-Tant-Windows.zip
           # mu-Toni (VST3 + CLAP + Standalone)
@@ -109,6 +116,9 @@ jobs:
           Copy-Item "$r\mu-toni\mu-toni_artefacts\Release\VST3\mu-Toni.vst3" staging\mu-Toni\ -Recurse
           Copy-Item "$r\mu-toni\mu-toni_artefacts\Release\CLAP\mu-Toni.clap" staging\mu-Toni\
           Copy-Item "$r\mu-toni\mu-toni_artefacts\Release\Standalone\mu-Toni.exe" staging\mu-Toni\
+          # mu-Host (free, in every paid app's zip): one mu instrument channel as a plug-in; lists only the engines you have a licence for
+          Copy-Item "$r\mu-host\mu-host_artefacts\Release\VST3\mu-Host.vst3" staging\mu-Toni\ -Recurse
+          Copy-Item "$r\mu-host\mu-host_artefacts\Release\CLAP\mu-Host.clap" staging\mu-Toni\
           Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Toni\"
           Compress-Archive -Path staging\mu-Toni\* -DestinationPath dist\mu-Toni-Windows.zip
           # mu-Tilate (VST3 + CLAP + Standalone + factory loops)
@@ -117,6 +127,9 @@ jobs:
           Copy-Item "$r\mu-tilate\mu-tilate_artefacts\Release\CLAP\mu-Tilate.clap" staging\mu-Tilate\
           Copy-Item "$r\mu-tilate\mu-tilate_artefacts\Release\Standalone\mu-Tilate.exe" staging\mu-Tilate\
           Copy-Item mu-tilate\factory "staging\mu-Tilate\Factory Loops" -Recurse
+          # mu-Host (free, in every paid app's zip): one mu instrument channel as a plug-in; lists only the engines you have a licence for
+          Copy-Item "$r\mu-host\mu-host_artefacts\Release\VST3\mu-Host.vst3" staging\mu-Tilate\ -Recurse
+          Copy-Item "$r\mu-host\mu-host_artefacts\Release\CLAP\mu-Host.clap" staging\mu-Tilate\
           Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Tilate\"
           Compress-Archive -Path staging\mu-Tilate\* -DestinationPath dist\mu-Tilate-Windows.zip
           # mu-On (VST3 + CLAP + Standalone)
@@ -124,11 +137,17 @@ jobs:
           Copy-Item "$r\mu-on\mu-on_artefacts\Release\VST3\mu-On.vst3" staging\mu-On\ -Recurse
           Copy-Item "$r\mu-on\mu-on_artefacts\Release\CLAP\mu-On.clap" staging\mu-On\
           Copy-Item "$r\mu-on\mu-on_artefacts\Release\Standalone\mu-On.exe" staging\mu-On\
+          # mu-Host (free, in every paid app's zip): one mu instrument channel as a plug-in; lists only the engines you have a licence for
+          Copy-Item "$r\mu-host\mu-host_artefacts\Release\VST3\mu-Host.vst3" staging\mu-On\ -Recurse
+          Copy-Item "$r\mu-host\mu-host_artefacts\Release\CLAP\mu-Host.clap" staging\mu-On\
           Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-On\"
           Compress-Archive -Path staging\mu-On\* -DestinationPath dist\mu-On-Windows.zip
           # mu-Tronic (Standalone only)
           New-Item -ItemType Directory -Path staging\mu-Tronic -Force | Out-Null
           Copy-Item "$r\mu-tronic\mu-tronic_artefacts\Release\Standalone\mu-Tronic.exe" staging\mu-Tronic\
+          # mu-Host (free, in every paid app's zip): one mu instrument channel as a plug-in; lists only the engines you have a licence for
+          Copy-Item "$r\mu-host\mu-host_artefacts\Release\VST3\mu-Host.vst3" staging\mu-Tronic\ -Recurse
+          Copy-Item "$r\mu-host\mu-host_artefacts\Release\CLAP\mu-Host.clap" staging\mu-Tronic\
           Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Tronic\"
           Compress-Archive -Path staging\mu-Tronic\* -DestinationPath dist\mu-Tronic-Windows.zip
           # mu-Link (desktop app)
