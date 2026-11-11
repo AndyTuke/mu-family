@@ -11,6 +11,7 @@
 #include "UI/LayerContent.h"                // mu-core: the base every layer type's content derives from
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/KnobWithLabel.h"
+#include "UI/Components/NudgeInput.h"
 #include "UI/Components/LFOEditor.h"          // mu-core: drawable smooth-curve editor
 #include "UI/Components/NoteLengthControl.h"  // mu-core: the Loop-style length row
 #include "UI/Components/MuLookAndFeel.h"
@@ -105,6 +106,13 @@ private:
     KnobWithLabel sendEffKnob { "FX" }, sendDlyKnob { "Delay" }, sendRevKnob { "Reverb" };   // the strip's three sends
     KnobWithLabel levelKnob { "Level" };                     // the track's own level (a modulation target; the mixer fader is separate)
     KnobWithLabel probKnob { "Prob" };                       // the layer's Probability: the share of its notes that play
+    // The layer's own clock: how many steps it plays before it starts over (1 to the sequence's length), the order it plays them in (a
+    // modulation target) and how long a step lasts.
+    NudgeInput     layerLengthInput { "", 1, StepRow::kMaxSteps, StepRow::kNumSteps };
+    DropdownSelect modeSelect, speedSelect;
+    juce::Label    layerLengthCaption { {}, "Length" }, modeCaption { {}, "Play Mode" }, speedCaption { {}, "Speed" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> modeAtt, speedAtt;
+    void refreshLayerClock();                                // the Layer Length shown follows the row and the sequence's length
     // The STEP panel: the selected step's own probability (multiplied with the layer's), loop ratio (the Nth of every M
     // passes of the row) and, on a Hat, which sound it plays. Not parameters: they edit the track's step row.
     KnobWithLabel  stepProbKnob { "Prob" }, stepLevelKnob { "Level" };   // a step's chance to play and its level

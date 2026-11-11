@@ -263,6 +263,25 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     addAndMakeVisible(accentKnob);
     addAndMakeVisible(ghostKnob);
     for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob, &levelKnob }) addAndMakeVisible(*k);
+    // The layer's clock: Layer Length (an LED number with arrows), Play Mode and Speed.
+    layerLengthInput.setShowStepButtons(false);   // the arrows step by one; a double-click types a length
+    layerLengthInput.onChange = [this](int n)
+    {
+        host.getTrack(currentLayer).row.setNumSteps(n);
+        refreshLayerClock();
+        rows.refreshPager();
+        rows.repaint();
+        soloPager.refresh();
+        soloRow.repaint();
+        if (onStatusUpdate) onStatusUpdate("Layer Length", juce::String(n) + (n == 1 ? " step" : " steps"));
+    };
+    mu_ui::addChoiceItems(modeSelect, host.getTrackParameters(), layerParamId(0, "mode"));
+    mu_ui::addChoiceItems(speedSelect, host.getTrackParameters(), layerParamId(0, "speed"));
+    modeSelect.setStatusName("Play Mode");
+    speedSelect.setStatusName("Layer Speed");
+    layerLengthInput.setStatusName("Layer Length");
+    for (auto* c : { (juce::Component*) &layerLengthCaption, (juce::Component*) &modeCaption, (juce::Component*) &speedCaption }) { static_cast<juce::Label*>(c)->setJustificationType(juce::Justification::centred); addAndMakeVisible(*c); }
+    for (auto* c : { (juce::Component*) &layerLengthInput, (juce::Component*) &modeSelect, (juce::Component*) &speedSelect }) addAndMakeVisible(*c);
     // The STEP panel's controls edit the selected step of the shown track's row.
     for (auto* cap : { &repeatCaption, &rateCaption, &condCaption, &barsCaption, &fadeCaption, &octaveCaption, &noteCaption, &chordCaption })
     {
@@ -671,6 +690,11 @@ void TrackContent::rebuild()
     soloAtt    = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, strip + "solo", soloBtn);
     probAtt    = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerParamId(currentLayer, "prob"), probKnob.getSlider());
     levelAtt   = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerParamId(currentLayer, "level"), levelKnob.getSlider());
+    modeAtt.reset();
+    speedAtt.reset();
+    modeAtt  = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, layerParamId(currentLayer, "mode"),  modeSelect.getComboBox());
+    speedAtt = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, layerParamId(currentLayer, "speed"), speedSelect.getComboBox());
+    refreshLayerClock();
     insertSub.setChannel(currentLayer);
 
     // A host that fixes the track's engine (engineLocked) hides the Engine selector and shows the track's one
@@ -695,6 +719,8 @@ void TrackContent::rebuild()
     // Ghost steps are for the drum, percussion and Chord engines.
     ghostKnob.setVisible(shownEngine == EngineType::Kick || shownEngine == EngineType::Hat || shownEngine == EngineType::Snare || shownEngine == EngineType::FmPerc || shownEngine == EngineType::Chord);
     for (auto* k : { &sendEffKnob, &sendDlyKnob, &sendRevKnob, &probKnob, &levelKnob }) k->setVisible(! rumble);   // a Rumble's box holds its envelope
+    for (auto* c : { (juce::Component*) &layerLengthCaption, (juce::Component*) &modeCaption, (juce::Component*) &speedCaption,
+                     (juce::Component*) &layerLengthInput, (juce::Component*) &modeSelect, (juce::Component*) &speedSelect }) c->setVisible(! rumble);   // a Rumble does not step
     for (auto* c : { (juce::Component*) &stepProbKnob, (juce::Component*) &condCaption, (juce::Component*) &condSelect, (juce::Component*) &barsCaption, (juce::Component*) &barsSelect }) c->setVisible(! rumble);
     refreshStepPanel();
     soloBtn.setVisible(! rumble);
@@ -772,6 +798,16 @@ void TrackContent::followTuneLink()
     linkedTune[1] = otune->convertFrom0to1(otune->getValue());
 }
 
+// The Layer Length runs from 1 to the sequence's length and shows the length the layer plays.
+void TrackContent::refreshLayerClock()
+{
+    if (currentLayer >= host.getTrackCount()) return;
+    const auto& row = host.getTrack(currentLayer).row;
+    const int cap = row.getStepCap();
+    layerLengthInput.setRange(1, cap);
+    layerLengthInput.setValue(row.numSteps(), false);
+}
+
 void TrackContent::timerCallback()
 {
     if (currentLayer >= host.getTrackCount()) return;   // between a delete and the editor reselecting
@@ -784,6 +820,7 @@ void TrackContent::timerCallback()
         return;
     }
     if (shownEngine == EngineType::Hat) followTuneLink();
+    if (shownEngine != EngineType::Rumble) refreshLayerClock();   // the sequence's length or a loaded state moves the Layer Length
     if (shownEngine != EngineType::Rumble) { grid.refreshLocks(); filterGrid.refreshLocks(); }   // a knob's own value moves (automation) while it shows a lock
     // The Note list follows the tune, key and scale (a knob, automation or a preset moves them).
     if (shownEngine == EngineType::Kick || shownEngine == EngineType::Bass)
@@ -970,6 +1007,19 @@ void TrackContent::resized()
         probKnob.setBounds(blockX, row2Y + knobH + rowGap, knobW, knobH);
         levelKnob.setBounds(blockX + knobW + gap, row2Y + knobH + rowGap, knobW, knobH);
         ghostKnob.setBounds(blockX + 2 * (knobW + gap), row2Y + knobH + rowGap, knobW, knobH);
+        // Fourth row: the layer's own clock. Layer Length takes the first cell and Speed the other two; Play Mode runs the full width below.
+        const int capH = s(mu_ui::ParamKnobGrid::kLabelH), ddH = s(LF::kDropdownH);
+        const int row4Y = row2Y + 2 * (knobH + rowGap);
+        const juce::Font capFont(MuLookAndFeel::uiFont(mu_ui::sf(LF::kKnobLabelFont)));
+        for (auto* l : { &layerLengthCaption, &modeCaption, &speedCaption }) l->setFont(capFont);
+        layerLengthCaption.setBounds(blockX, row4Y, knobW, capH);
+        layerLengthInput.setBounds(blockX, row4Y + capH + s(2), knobW, ddH);
+        const int wideX = blockX + knobW + gap, wideW = 2 * knobW + gap;
+        speedCaption.setBounds(wideX, row4Y, wideW, capH);
+        speedSelect.setBounds(wideX, row4Y + capH + s(2), wideW, ddH);
+        const int row5Y = row4Y + capH + s(2) + ddH + gap;
+        modeCaption.setBounds(blockX, row5Y, blockW, capH);
+        modeSelect.setBounds(blockX, row5Y + capH + s(2), blockW, ddH);
     }
     layoutStepPanel();
 }

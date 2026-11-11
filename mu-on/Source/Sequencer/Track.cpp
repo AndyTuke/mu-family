@@ -158,6 +158,10 @@ void Track::bindParams(juce::AudioProcessorValueTreeState& apvts, int s)
     for (int k = 0; k < VoiceParams::kInsertSlotCount; ++k)
         insParamRow[k] = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "insP" + juce::String(k + 1))), this);
     probRow     = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "prob")), this);
+    speedRow    = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "speed")), this);
+    modeRow     = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "mode")), this);
+    seqBarsRow  = mu_core::ParamBinding(apvts.getRawParameterValue(kSeqBarsParamId), this);     // global; null where the host has none
+    seqResetRow = mu_core::ParamBinding(apvts.getRawParameterValue(kSeqResetParamId), this);
     swingRow    = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "swing")), this);
     accentRow   = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "accent")), this);
     ghostRow    = mu_core::ParamBinding(apvts.getRawParameterValue(layerParamId(s, "ghost")), this);
@@ -332,17 +336,18 @@ void Track::resolve(int e, double beat, float* outValues, const mu_core::LockSee
     lastResolved.apply(resolved, outValues, (std::size_t) L.count);
     lastResolvedEngine = e;
 
-    // The last ten targets of every engine's table (Level, Pan, Insert P1..P4, the three sends, Fill): the track's Level and insert
-    // knobs for this block's render, the mixer strip's Pan and sends for the host, and Fill for the step clock.
-    levelNow = outValues[L.count - 10];
-    // A drum or percussion table has six rows before those ten: the filter's Cutoff, Resonance, Env Attack, Env Decay and
+    // The last eleven targets of every engine's table (Level, Pan, Insert P1..P4, the three sends, Fill, Play Mode): the track's Level and
+    // insert knobs for this block's render, the mixer strip's Pan and sends for the host, Fill and Play Mode for the step clock.
+    levelNow = outValues[L.count - 11];
+    // A drum or percussion table has six rows before those eleven: the filter's Cutoff, Resonance, Env Attack, Env Decay and
     // Env Depth, then the Ghost level (see MuOnModDest.h). Any other engine has no ghosts and no drum filter.
     const bool drum = filterCutRow[(size_t) e].isBound();
-    if (drum) for (int k = 0; k < 5; ++k) filterNow[k] = outValues[L.count - 16 + k];
-    if (drum || e == toIndex(EngineType::Chord)) ghostNow = juce::jlimit(0.0f, 1.0f, outValues[L.count - 11]);   // a Chord has ghosts too
-    for (int k = 0; k < VoiceParams::kInsertSlotCount; ++k) insertNow[k] = outValues[L.count - 8 + k];
-    stripMod.publish(outValues[L.count - 9], outValues[L.count - 4], outValues[L.count - 3], outValues[L.count - 2]);
-    fillModNow.store(outValues[L.count - 1] >= 0.5f, std::memory_order_relaxed);   // modulated Fill: on while the target is half or more
+    if (drum) for (int k = 0; k < 5; ++k) filterNow[k] = outValues[L.count - 17 + k];
+    if (drum || e == toIndex(EngineType::Chord)) ghostNow = juce::jlimit(0.0f, 1.0f, outValues[L.count - 12]);   // a Chord has ghosts too
+    for (int k = 0; k < VoiceParams::kInsertSlotCount; ++k) insertNow[k] = outValues[L.count - 9 + k];
+    stripMod.publish(outValues[L.count - 10], outValues[L.count - 5], outValues[L.count - 4], outValues[L.count - 3]);
+    fillModNow.store(outValues[L.count - 2] >= 0.5f, std::memory_order_relaxed);   // modulated Fill: on while the target is half or more
+    modeNow.store(juce::jlimit(0, 2, juce::roundToInt(outValues[L.count - 1])), std::memory_order_relaxed);   // modulated Play Mode: the nearest of the three
 
     for (int k = 0; k < L.count; ++k)
         modLive[(size_t) k].store(outValues[k], std::memory_order_relaxed);
@@ -361,11 +366,35 @@ float Track::evaluateRumbleEnv(double beat) noexcept
     return lastRumbleEnv;
 }
 
+// One step's length in beats: the Speed choice (an index into the repeat rates: 1/4 .. 1/64, 1/16 by default).
+double Track::stepBeatsNow() const noexcept
+{
+    return step_repeats::rateBeats(juce::roundToInt(speedRow.load((float) step_repeats::kDefaultRate)));
+}
+
+ClockSetup Track::clockSetupNow() const noexcept
+{
+    ClockSetup c;
+    c.stepBeats  = stepBeatsNow();
+    c.resetBeats = juce::jmax(0.0f, seqResetRow.load(0.0f)) * 4.0;   // the Reset is in bars of four beats
+    c.mode       = modeNow.load(std::memory_order_relaxed);
+    c.seed       = seed;
+    return c;
+}
+
+// This block's step clock setup, and the row held to the sequence's length (a layer cannot be longer than the sequence).
+void Track::applyClockSetup() noexcept
+{
+    row.setStepCap(seqBarsRow.isBound() ? juce::jlimit(1, 8, juce::roundToInt(seqBarsRow.load(1.0f))) * StepRow::kNumSteps : StepRow::kMaxSteps);
+    clock.setup(clockSetupNow());
+}
+
 // The row follows the track's own groove rows (swing, accent), then (while playing) its clock fires the steps of this call into the
 // engine (`fireInto` null: the clock only keeps step, nothing sounds). A Rumble's row does not step.
 void Track::clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, int e, int n) noexcept
 {
     row.setGroove(swingRow.load(0.0f), accentRow.load(1.0f));
+    applyClockSetup();
     row.setGhostLevel(filterCutRow[(size_t) e].isBound() || e == toIndex(EngineType::Chord) ? ghostNow : ghostRow.load(0.35f));
     if (! ctx.playing) { numPendingRepeats = 0; return; }
     if (ctx.justStarted) { clock.seek(ctx.startBeat); numPendingRepeats = 0; }   // the step the transport starts in fires, even on a quick replay
@@ -397,8 +426,7 @@ void Track::clockRow(const mu_core::RenderContext& ctx, TrackEngine* fireInto, i
 int Track::peekFiringStep(const mu_core::RenderContext& ctx, int e, int n) const noexcept
 {
     if (! ctx.playing || e == toIndex(EngineType::Rumble)) return -1;
-    StepClock probe = clock;
-    if (ctx.justStarted) probe.seek(ctx.startBeat);
+    const StepClock& probe = clock;   // the clock holds no position, so a look ahead changes nothing
     int found = -1;
     const bool fill = ctx.fill != 0 || fillModNow.load(std::memory_order_relaxed);
     probe.processSpan(row, ctx.startBeat, n, ctx.beatsPerSample, row.swingAmount(), row.accentVelocity(),
@@ -506,6 +534,7 @@ void Track::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& 
     // Phase 2: this block's parameters through the modulation matrix, at the call's beat.
     // A step that fires in this block sets which locks apply (an unlocked one ends the previous lock's tail); with none firing the
     // last one holds. A stopped transport goes back to the track's own values.
+    applyClockSetup();
     if (! ctx.playing || ctx.justStopped || ctx.stoppedUnrendered) activeLockStep = -1;
     if (const int firing = peekFiringStep(ctx, e, n); firing >= 0) activeLockStep = firing;
     mu_core::LockSeed lockSeed;

@@ -30,6 +30,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         layout.add(std::make_unique<AudioParameterChoice>(ParameterID{ kScaleParamId, 1 }, "Scale", scales, mu_audio::kNumScales - 1));   // Chromatic: the old free tuning, to the nearest semitone
     }
 
+    // ── The sequence: its length in bars and the bars after which every layer starts over ───────────────
+    layout.add(std::make_unique<AudioParameterInt>(ParameterID{ kSeqBarsParamId,  1 }, "Sequence Length", 1, 8, 1,
+                                                   AudioParameterIntAttributes().withStringFromValueFunction([](int v, int) { return String(v) + (v == 1 ? " bar" : " bars"); })));
+    layout.add(std::make_unique<AudioParameterInt>(ParameterID{ kSeqResetParamId, 1 }, "Sequence Reset", 0, 32, 0,
+                                                   AudioParameterIntAttributes().withStringFromValueFunction([](int v, int) { return v == 0 ? String("Off") : String(v) + (v == 1 ? " bar" : " bars"); })));
+
     // ── Shared global FX rack + returns + master (mu-core) ────────────────────
     mu_mixfx::addGlobalFxParams(layout, 2);   // no loop of its own: swaps land on the bar
 

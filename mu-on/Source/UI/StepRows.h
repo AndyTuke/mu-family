@@ -27,6 +27,7 @@ public:
 
     // Outline the row of layer `idx` (the layer shown by the rest of the panel).
     void setSelected(int idx);
+    void refreshPager() { pager.refresh(); }   // a row's length changed outside the strip (the layer's own Layer Length)
     // The step outlined in the selected row (-1: none), and the callback for a right-click that selects a step: (row, step).
     void setSelectedStep(int step) { selectedStep = step; repaint(); }
     std::function<void(int row, int step)> onStepSelected;

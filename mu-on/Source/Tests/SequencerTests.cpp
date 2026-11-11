@@ -152,9 +152,9 @@ public:
 
             // 2400 samples at 120 BPM = 0.1 beat: step 0 fires and the sequencer waits for step 1.
             expectEquals((int) run(seq, 0.0, 2400, 120.0).size(), 1, "the first play fires step 0");
-            // Stop and play again within the same sixteenth. Without a seek the sequencer still waits for step 1
-            // (inside the resync window) and the new play loses its first step.
-            expectEquals((int) run(seq, 0.0, 2400, 120.0).size(), 0, "premise: without a seek the replay drops step 0");
+            // Stop and play again within the same sixteenth. The clock keeps no position of its own (it reads it from the beat), so the
+            // replay fires step 0 again with or without a seek.
+            expectEquals((int) run(seq, 0.0, 2400, 120.0).size(), 1, "the replay fires step 0 without a seek");
             seq.seek(0.0);
             const auto replay = run(seq, 0.0, 2400, 120.0);
             expectEquals((int) replay.size(), 1, "after seek(0) the replay fires step 0");

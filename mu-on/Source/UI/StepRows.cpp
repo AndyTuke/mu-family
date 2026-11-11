@@ -16,6 +16,7 @@ StepRows::StepRows(TrackHost& trackHost)
     pager.lengthRow = [this]() -> StepRow* { return selected >= 0 && selected < host.getTrackCount() ? &host.getTrack(selected).row : nullptr; };
     pager.onChanged = [this] { repaint(); if (onLengthChanged) onLengthChanged(); };
     pager.onStatusUpdate = [this](const juce::String& name, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
+    pager.useSequenceParams(host.getTrackParameters());   // the strip sets the sequence's length and Reset (where the host has them)
     addAndMakeVisible(pager);
     refreshControls();
     startTimerHz(mu_ui::kUiRefreshHz);   // playhead
@@ -28,9 +29,12 @@ void StepRows::setSelected(int idx)
     repaint();
 }
 
-// The pages the longest live row needs: every row shows the same page.
+// The pages the sequence has (its length in bars), or where the host has no sequence length the longest live row's: every row shows the same page.
 int StepRows::numPages() const
 {
+    if (pager.inSequenceMode())
+        if (auto* bars = host.getTrackParameters().getRawParameterValue(kSeqBarsParamId))
+            return juce::jlimit(1, 8, juce::roundToInt(bars->load()));
     int pages = 1;
     for (int i = 0; i < host.getTrackCount(); ++i)
         pages = juce::jmax(pages, host.getTrack(i).row.numPages());
@@ -187,6 +191,9 @@ void StepRows::timerCallback()
         repaint();
     }
 
+    const int pageBefore = pager.page();
+    pager.refresh();   // the sequence's length or Reset may have changed by automation or a loaded state
+    if (pageBefore != pager.page()) { repaint(); if (onLengthChanged) onLengthChanged(); }
     // Each row's playhead step (rows have their own lengths). A moved playhead, or a new pass drawing new skips, redraws the rows.
     bool changed = false;
     const bool playing = host.isTrackTransportPlaying();
@@ -197,9 +204,9 @@ void StepRows::timerCallback()
         long long pass = -1;
         if (playing && i < host.getTrackCount())
         {
-            const int length = host.getTrack(i).row.numSteps();
-            step = StepClock::currentStep(beat, length);
-            pass = StepClock::passOfBeat(beat, length);
+            const auto pos = host.getTrack(i).positionAt(beat);   // the layer's own place: its length, Speed, Play Mode and the sequence's Reset
+            step = pos.step;
+            pass = pos.pass;
         }
         if (pass != shownPasses[(size_t) i]) { shownPasses[(size_t) i] = pass; changed = true; }
         if (const bool fill = host.isTrackFillHeld() || (i < host.getTrackCount() && host.getTrack(i).isFillModulated()); fill != shownFill) { shownFill = fill; changed = true; }   // Fill steps change while it is held

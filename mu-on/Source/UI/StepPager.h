@@ -1,6 +1,8 @@
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_audio_processors/juce_audio_processors.h>
+#include "Persistence/TrackParams.h"   // the sequence parameters' ids
 #include "Sequencer/StepRow.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/NudgeInput.h"
@@ -26,6 +28,10 @@ public:
     std::function<int()>      pageCount;    // pages the shown rows need (at least 1)
     std::function<StepRow*()> lengthRow;    // the row the Length edits (null: none)
     std::function<void()>     onChanged;    // the page or a length changed: redraw the grid
+    // Sequence mode (mu-On): the strip's Length becomes the whole sequence's length in bars (1..8) and a Reset control joins it, both the
+    // sequence's own parameters. The layers' lengths are set in their own LAYER box. Without it (a mu-Tronic layer) the Length is the row's.
+    void useSequenceParams(juce::AudioProcessorValueTreeState& apvts);
+    bool inSequenceMode() const noexcept { return sequence != nullptr; }
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;   // the Length box reports to the status bar
 
     int  page() const noexcept { return currentPage; }
@@ -39,6 +45,10 @@ private:
     juce::TextButton prevButton { "Prev" }, nextButton { "Next" };
     juce::Label      pageLabel;
     NudgeInput       lengthInput { "Length", 1, StepRow::kMaxSteps, StepRow::kNumSteps };
+    NudgeInput       resetInput  { "Reset (bars)", 0, 32, 0 };   // sequence mode only
+    juce::AudioProcessorValueTreeState* sequence = nullptr;
+    void setSequenceParam(const char* id, int value);
+    int  sequenceParam(const char* id, int fallback) const;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StepPager)
 };

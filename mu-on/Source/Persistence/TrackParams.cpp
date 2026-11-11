@@ -3,6 +3,7 @@
 #include "MuLimits.h"   // mu-core: mu_limits::kMaxLayers (the Rumble source's range)
 #include "Persistence/InsertParams.h"   // mu-core: mu_mixfx::addInsertParams
 #include "Persistence/ParamText.h"   // mu-core: mu_fmt::floatUnit
+#include "Sequencer/StepRepeats.h"   // the Speed choice lists the repeat rates
 
 namespace mu_on
 {
@@ -126,6 +127,14 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     // Fill as a modulation target: the track plays its Fill steps while this is half or more (the Fill button does the same).
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{ layerParamId(slot, "fill"), 1 }, lbl + "Fill", f(0.0f, 1.0f, 0.001f), 0.0f,
                                                      AudioParameterFloatAttributes().withStringFromValueFunction([](float v, int) { return v >= 0.5f ? String("On") : String("Off"); })));
+    // The layer's own clock: how long one step lasts (the repeat rates, 1/16 by default) and the order it plays its steps in. The Play Mode is
+    // a modulation target (the nearest of the three); the Speed is a choice, not one.
+    {
+        StringArray speeds;
+        for (int r = 0; r < step_repeats::kNumRates; ++r) speeds.add(step_repeats::rateName(r));
+        layout.add(std::make_unique<AudioParameterChoice>(ParameterID{ layerParamId(slot, "speed"), 1 }, lbl + "Speed", speeds, step_repeats::kDefaultRate));
+        layout.add(std::make_unique<AudioParameterChoice>(ParameterID{ layerParamId(slot, "mode"), 1 }, lbl + "Play Mode", StringArray { "Forwards", "Backwards", "Random" }, 0));
+    }
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{ layerParamId(slot, "prob"), 1 }, lbl + "Probability",
                                                      NormalisableRange<float>(0.0f, 100.0f, 1.0f), 100.0f,
                                                      AudioParameterFloatAttributes().withStringFromValueFunction(

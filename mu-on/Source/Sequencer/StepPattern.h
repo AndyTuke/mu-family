@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "Sequencer/StepRow.h"
 #include <array>
 
@@ -18,7 +20,7 @@ public:
     static constexpr int kNumTracks = 8;                    // one row per layer slot (mu_limits::kMaxLayers)
     static constexpr int kNumSteps  = StepRow::kNumSteps;
 
-    StepPattern() { for (int t = 0; t < kNumTracks; ++t) bound[(size_t) t] = &owned[(size_t) t]; }
+    StepPattern() : ownedRows(std::make_unique<std::array<StepRow, kNumTracks>>()), owned(*ownedRows) { for (int t = 0; t < kNumTracks; ++t) bound[(size_t) t] = &owned[(size_t) t]; }
 
     // Point slot `slot` at `row` (a track's own row); null returns it to the pattern's own row.
     // Message thread, with the processor's layer lock held when the audio thread may be reading.
@@ -81,7 +83,9 @@ public:
 private:
     static bool valid(int t) noexcept { return t >= 0 && t < kNumTracks; }
 
-    std::array<StepRow, kNumTracks>  owned;
+    // On the heap: eight rows of up to 128 steps are over a hundred kilobytes, too much for a pattern living on a stack.
+    std::unique_ptr<std::array<StepRow, kNumTracks>> ownedRows;
+    std::array<StepRow, kNumTracks>& owned;
     std::array<StepRow*, kNumTracks> bound {};
 };
 

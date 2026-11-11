@@ -111,6 +111,10 @@ inline juce::String engineParamId(int track, EngineType e, const juce::String& p
 // The master key and scale (global, the ids mu-Tant uses): the Kick and Bass tune snaps to them.
 inline constexpr const char* kRootParamId  = "root";
 inline constexpr const char* kScaleParamId = "scale";
+// The sequence's own settings (global): its length in bars (1..8, sixteen steps each; no layer is longer) and how many bars pass before every
+// layer starts over together (0 = never, then 1..32).
+inline constexpr const char* kSeqBarsParamId  = "seqBars";
+inline constexpr const char* kSeqResetParamId = "seqReset";
 
 // A Bass track's Tune left at its default (kBassTuneRootHz, E1) plays the master key's root note instead, in the octave
 // from MIDI 28 (E1) to 39, so a new Bass sequence starts on the key's root whatever the key. Turn the Tune away from it

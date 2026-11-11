@@ -20,11 +20,16 @@ class StepRow
 {
 public:
     static constexpr int kNumSteps = 16;   // steps per page: what the grid shows at once, and the default length
-    static constexpr int kMaxSteps = 64;   // the longest a row can be (four pages)
+    static constexpr int kMaxSteps = 128;   // the longest a row can be: the sequence's longest Length, eight bars of sixteen steps
 
-    // How many steps the row plays before it wraps (1..kMaxSteps). Steps past it keep their settings for when the row grows.
-    int  numSteps() const noexcept { return length.load(std::memory_order_relaxed); }
+    // How many steps the row plays before it wraps (1..kMaxSteps): the layer's own length, held to the sequence's length (the cap).
+    // Steps past it keep their settings for when the row grows. The set value is kept when the cap is lower, so a longer sequence
+    // brings the layer's full length back.
+    int  numSteps() const noexcept { return juce::jmin(length.load(std::memory_order_relaxed), stepCap.load(std::memory_order_relaxed)); }
+    int  ownNumSteps() const noexcept { return length.load(std::memory_order_relaxed); }
     void setNumSteps(int n) noexcept { length.store(juce::jlimit(1, kMaxSteps, n), std::memory_order_relaxed); }
+    void setStepCap(int n) noexcept { stepCap.store(juce::jlimit(1, kMaxSteps, n), std::memory_order_relaxed); }
+    int  getStepCap() const noexcept { return stepCap.load(std::memory_order_relaxed); }
     int  numPages() const noexcept { return (numSteps() + kNumSteps - 1) / kNumSteps; }
 
     StepRow() { clear(); }
@@ -184,13 +189,13 @@ public:
     juce::ValueTree serialise(int slot) const
     {
         juce::ValueTree row("Track");
-        const int n = numPages() * kNumSteps;   // whole pages; a longer row's hidden steps past its length are kept to the page end
+        const int n = ((ownNumSteps() + kNumSteps - 1) / kNumSteps) * kNumSteps;   // whole pages; a longer row's hidden steps past its length are kept to the page end
         row.setProperty("i", slot, nullptr);
         juce::String on, ac, op, tie, gh;
         for (int s = 0; s < n; ++s) { on += isOn(s) ? '1' : '0'; ac += isAccent(s) ? '1' : '0'; op += isOpen(s) ? '1' : '0'; tie += tiedFrom(s) ? '1' : '0'; gh += isGhost(s) ? '1' : '0'; }
         row.setProperty("on", on, nullptr);
         row.setProperty("accent", ac, nullptr);
-        if (numSteps() != kNumSteps) row.setProperty("len", numSteps(), nullptr);   // absent = the default 16
+        if (ownNumSteps() != kNumSteps) row.setProperty("len", ownNumSteps(), nullptr);   // absent = the default 16
         if (gh.containsChar('1')) row.setProperty("ghost", gh, nullptr);  // absent = no ghost steps
         if (op.containsChar('1')) row.setProperty("open", op, nullptr);   // absent = every step closed
         if (tie.containsChar('1')) row.setProperty("tie", tie, nullptr);  // absent = no tied steps
@@ -323,6 +328,7 @@ private:
 
     std::array<Cell, kMaxSteps> cells;
     std::atomic<int> length { kNumSteps };
+    std::atomic<int> stepCap { kMaxSteps };   // the sequence's length in steps; a row longer than it plays this many
     std::atomic<float> swing { 0.0f }, accent { 1.0f }, ghostShare { 0.35f };   // the parameters' defaults
 };
 

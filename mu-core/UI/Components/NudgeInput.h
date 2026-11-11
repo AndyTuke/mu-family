@@ -15,6 +15,10 @@ public:
     NudgeInput(const juce::String& label, int minValue, int maxValue, int defaultValue = 0);
 
     void setValue(int v, bool notify = false);
+    // Shown instead of the number when the value is 0 ("Off"); typing it back is read as 0.
+    void setRange(int minValue, int maxValue) { minVal = minValue; maxVal = maxValue; setValueD(juce::jlimit(minVal, maxVal, value)); }
+    void setLabel(const juce::String& text) { label = text; repaint(); }
+    void setZeroText(const juce::String& text) { zeroText = text; repaint(); }
     // The name the status bar shows with the value when the user changes it ("Bars", "Step Length"): reported to the nearest
     // StatusSink above this control. Empty = this control reports nothing by itself.
     void setStatusName(const juce::String& name) { statusName = name; }
@@ -55,6 +59,7 @@ private:
     bool showStepBtns  = true;
     bool labelInline   = false;
     juce::String statusName;
+    juce::String zeroText;
 
     enum class HitZone { None, Up, Down, Step1, Step5, Step10, Display };
     HitZone getZone(juce::Point<int> p) const;

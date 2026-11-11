@@ -183,6 +183,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/StepLoopBarsTests.cpp   # a step's loop: Length in bars and the Bars it plays in
     Source/Tests/StepConditionTests.cpp   # a step's condition: Always, Fill, Pre, NotPre
     Source/Tests/StepLockTests.cpp   # step parameter locks: the set, the row and its saved form, a Track applying and holding a lock
+    Source/Tests/LayerClockTests.cpp   # the layer clock: speed, length, play mode, reset
     Source/Tests/StepRepeatTests.cpp   # a step's repeats, Level and Fade
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp

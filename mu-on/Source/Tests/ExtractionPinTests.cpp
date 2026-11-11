@@ -529,12 +529,8 @@ struct MuOnExtractionPinTests : juce::UnitTest
             logMessage("restart in place: rms " + juce::String(rmsOf(resumed, 0, 2048), 6));
             expectEquals(peakOf(resumed, 0, 2048), 0.0f, "no step lands, so the reset bass stays silent (the note was killed, not paused)");
 
-            // The sequencer resyncs only when the position jumps more than one 16th from where it expects
-            // to be, so a locate back to the start from inside the first 16th does not refire step 0.
-            rig.host.ppq = 0.0;
-            const auto nearStart = rig.render(2 * 512);
-            expectEquals(peakOf(nearStart, 0, 1024), 0.0f, "a locate to beat 0 from within the first 16th does not retrigger step 0");
-
+            // The clock reads its place from the beat, so a locate back to the start fires step 0 again (an older clock kept a cursor and
+            // skipped it inside the first 16th); the jump below is the case this test is about.
             rig.host.ppq = 8.0;                                                // a real jump: resync, step 0 of bar 3 fires
             const auto relocated = rig.render(24000);
             logMessage("after locate to beat 8: crossingHz " + juce::String(crossingHz(relocated, 6000, 24000), 2));

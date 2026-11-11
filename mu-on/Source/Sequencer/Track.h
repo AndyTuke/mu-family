@@ -97,7 +97,14 @@ struct Track : Layer
     // Audio thread: a parked spare's row clock keeps step with the transport, so it fires on time once live.
     void onParkedBlock(const mu_core::RenderContext& ctx) override;
     // A staged track preset lands on the row's wrap: its length in steps (16 steps is the bar).
-    double loopBeats() const override { return row.numSteps() * StepClock::kStepBeats; }
+    double loopBeats() const override { return row.numSteps() * stepBeatsNow(); }
+
+    // ── The layer's own clock ────────────────────────────────────────────────
+    // The time one step lasts (the Speed choice), the setup the step clock walks the row with (that, the sequence's Reset, and the
+    // Play Mode this block resolved), and where a beat falls on this layer's timeline (the grid's playhead). Any thread.
+    double                 stepBeatsNow() const noexcept;
+    ClockSetup             clockSetupNow() const noexcept;
+    StepClock::Position    positionAt(double beat) const noexcept { return StepClock::positionAt(beat, row.numSteps(), clockSetupNow()); }
 
     // ── How the track leaves its slot ────────────────────────────────────────
     // Fade (the family defaults, 25 ms and 2 s): the engine that last sounded keeps the parameters it was last
@@ -139,7 +146,7 @@ struct Track : Layer
     float getModLive(EngineType engine, int dest) const noexcept;
 
     // The most targets any engine's table holds (Bass: 10).
-    static constexpr int kMaxDests = 32;   // the engine's targets plus the six drum rows and the ten closing rows
+    static constexpr int kMaxDests = 32;   // the engine's targets plus the six drum rows and the eleven closing rows
 
 private:
     // Cached modulation inputs for one engine: the destination ids (proportion-space keys), their backing
@@ -187,6 +194,11 @@ private:
     mu_core::ParamBinding insAlgoRow, insSyncRow, insParamRow[VoiceParams::kInsertSlotCount];
     // The layer's Probability (percent, multiplies each step's own) and the audio thread's noise for the draw.
     mu_core::ParamBinding probRow;
+    // The layer's Speed (an index into step_repeats::rateBeats) and Play Mode (0 forwards, 1 backwards, 2 random), and the sequence's
+    // length in bars and Reset in bars (global; unbound where the host has none: the row then plays its own length, never resets).
+    mu_core::ParamBinding speedRow, modeRow, seqBarsRow, seqResetRow;
+    std::atomic<int>      modeNow { 0 };   // this block's Play Mode after modulation (the audio thread writes it; the playhead reads it)
+    void applyClockSetup() noexcept;       // the step clock's setup and the row's length cap for this block
     float                 lastLevel = 1.0f;   // the Level the previous block ended at (the gain ramps from it)
     // This block's Level and insert knobs after modulation (the closing rows of the engine's table), read by the render.
     float                 levelNow = 1.0f, insertNow[VoiceParams::kInsertSlotCount] {};

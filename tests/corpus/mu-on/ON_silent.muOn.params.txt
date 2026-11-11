@@ -1,8 +1,8 @@
 # frozen load result for fixture: ON_silent.muOn
 layers=5
 load_errors=0
-resave_bytes=54113
-resave_sha256=c5322ae14351c8d676cebd925ffecd891614729c1091512be4e235cc781cb1d3
+resave_bytes=54876
+resave_sha256=2c59ca7ff2b4a3f3c76ded1fc84c8a5478525b0a02cab2e5ca0b94aaf3ebd488
 --- parameters differing from default (id=plain value)
 mstr_lvl=0
 rev_decay=7.5

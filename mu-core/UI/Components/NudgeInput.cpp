@@ -34,6 +34,7 @@ void NudgeInput::setValueD(double v, bool notify)
 
 juce::String NudgeInput::valueText() const
 {
+    if (zeroText.isNotEmpty() && value == 0.0) return zeroText;
     const auto text = decimals > 0 ? juce::String(value, decimals) : juce::String((int) std::lround(value));
     return showSign && value > 0.0 ? "+" + text : text;
 }

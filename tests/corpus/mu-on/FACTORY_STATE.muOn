@@ -101,6 +101,8 @@
       <p id="ch7_outBus" x="0.0"/>
       <p id="root" x="0.0" c="C"/>
       <p id="scale" x="11.0" c="Chromatic"/>
+      <p id="seqBars" x="1.0"/>
+      <p id="seqReset" x="0.0"/>
       <p id="eff_algo" x="0.0"/>
       <p id="eff_en" x="1.0"/>
       <p id="eff_p0" x="0.5"/>
@@ -237,6 +239,8 @@
         <p id="insSync" x="0.0"/>
         <p id="level" x="1.0"/>
         <p id="fill" x="0.0"/>
+        <p id="speed" x="3.0" c="1/16"/>
+        <p id="mode" x="0.0" c="Forwards"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -364,6 +368,8 @@
         <p id="insSync" x="0.0"/>
         <p id="level" x="1.0"/>
         <p id="fill" x="0.0"/>
+        <p id="speed" x="3.0" c="1/16"/>
+        <p id="mode" x="0.0" c="Forwards"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -491,6 +497,8 @@
         <p id="insSync" x="0.0"/>
         <p id="level" x="1.0"/>
         <p id="fill" x="0.0"/>
+        <p id="speed" x="3.0" c="1/16"/>
+        <p id="mode" x="0.0" c="Forwards"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -618,6 +626,8 @@
         <p id="insSync" x="0.0"/>
         <p id="level" x="1.0"/>
         <p id="fill" x="0.0"/>
+        <p id="speed" x="3.0" c="1/16"/>
+        <p id="mode" x="0.0" c="Forwards"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -745,6 +755,8 @@
         <p id="insSync" x="0.0"/>
         <p id="level" x="1.0"/>
         <p id="fill" x="0.0"/>
+        <p id="speed" x="3.0" c="1/16"/>
+        <p id="mode" x="0.0" c="Forwards"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -872,6 +884,8 @@
         <p id="insSync" x="0.0"/>
         <p id="level" x="1.0"/>
         <p id="fill" x="0.0"/>
+        <p id="speed" x="3.0" c="1/16"/>
+        <p id="mode" x="0.0" c="Forwards"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -999,6 +1013,8 @@
         <p id="insSync" x="0.0"/>
         <p id="level" x="1.0"/>
         <p id="fill" x="0.0"/>
+        <p id="speed" x="3.0" c="1/16"/>
+        <p id="mode" x="0.0" c="Forwards"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>
@@ -1126,6 +1142,8 @@
         <p id="insSync" x="0.0"/>
         <p id="level" x="1.0"/>
         <p id="fill" x="0.0"/>
+        <p id="speed" x="3.0" c="1/16"/>
+        <p id="mode" x="0.0" c="Forwards"/>
         <p id="prob" x="100.0"/>
         <p id="swing" x="0.0"/>
         <p id="accent" x="1.0"/>

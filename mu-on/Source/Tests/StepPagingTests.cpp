@@ -25,7 +25,7 @@ namespace
                 expectEquals(row.numSteps(), 16);   // a new row is one page
                 expectEquals(row.numPages(), 1);
                 // Each pair is a Length and the pages it needs: a partial last page still counts.
-                const int cases[][2] = { { 1, 1 }, { 15, 1 }, { 16, 1 }, { 17, 2 }, { 32, 2 }, { 33, 3 }, { 48, 3 }, { 49, 4 }, { 64, 4 } };
+                const int cases[][2] = { { 1, 1 }, { 15, 1 }, { 16, 1 }, { 17, 2 }, { 32, 2 }, { 33, 3 }, { 48, 3 }, { 49, 4 }, { 64, 4 }, { 65, 5 }, { 128, 8 } };
                 for (auto& c : cases)
                 {
                     row.setNumSteps(c[0]);
@@ -33,12 +33,12 @@ namespace
                 }
             }
 
-            beginTest("Length is held to 1..64, so there is always one page and never a fifth");
+            beginTest("Length is held to 1..128, so there is always one page and never a ninth");
             {
                 StepRow row;
                 row.setNumSteps(0);    expectEquals(row.numSteps(), 1);  expectEquals(row.numPages(), 1);
                 row.setNumSteps(-5);   expectEquals(row.numSteps(), 1);
-                row.setNumSteps(65);   expectEquals(row.numSteps(), StepRow::kMaxSteps);  expectEquals(row.numPages(), 4);
+                row.setNumSteps(129);  expectEquals(row.numSteps(), StepRow::kMaxSteps);  expectEquals(row.numPages(), 8);
                 row.setNumSteps(1000); expectEquals(row.numSteps(), StepRow::kMaxSteps);
             }
 
