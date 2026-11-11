@@ -1371,7 +1371,7 @@ void MuLookAndFeel::positionComboBoxText(juce::ComboBox& box, juce::Label& label
 {
     label.setBounds(6, 0, box.getWidth() - 24, box.getHeight());
     if (lcdCombo(box)) label.setColour(juce::Label::textColourId, lcdLitColour(box));
-    label.setFont(lcdCombo(box) ? lcdFont(mu_ui::sf((float) kLcdTextH)) : uiFont(12.0f));
+    label.setFont(lcdCombo(box) ? lcdFont(mu_ui::sf((float) lcdComboTextH)) : uiFont(12.0f));
 }
 
 void MuLookAndFeel::drawLabel(juce::Graphics& g, juce::Label& label)

@@ -108,7 +108,7 @@ private:
     // The STEP panel: the selected step's own probability (multiplied with the layer's), loop ratio (the Nth of every M
     // passes of the row) and, on a Hat, which sound it plays. Not parameters: they edit the track's step row.
     KnobWithLabel  stepProbKnob { "Prob" }, stepLevelKnob { "Level" };   // a step's chance to play and its level
-    juce::Label    fadeCaption { {}, "Fade" }, repeatCaption { {}, "Repeat" }, rateCaption { {}, "Rate" }, condCaption { {}, "Condition" }, barsCaption { {}, "Bars" }, octaveCaption { {}, "Octave" }, noteCaption { {}, "Note" };
+    juce::Label    fadeCaption { {}, "Fade" }, repeatCaption { {}, "Repeat" }, rateCaption { {}, "Rate" }, condCaption { {}, "Condition" }, barsCaption { {}, "Plays on Loop" }, octaveCaption { {}, "Octave" }, noteCaption { {}, "Note" };
     StepBarsSelector barsSelect;                                      // the step's Bars: eight segments, those within its Length clicked on or off
     HatTuneLink tuneLink;                                             // a Hat: the line and lamp joining its Closed and Open tune
     float linkedTune[2] { 0.0f, 0.0f };                               // the two tunes as last seen, for the link

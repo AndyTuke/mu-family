@@ -90,6 +90,12 @@ public:
     // Optional: asked first on a double-click; true means the host handled it (the inline value editor does not open).
     std::function<bool()> doubleClickOverride;
 
+    // Optional: asked on a right-click anywhere on the knob (children included); returns the menu items to show, or none.
+    // Each item runs its own action when picked.
+    struct MenuEntry { juce::String text; std::function<void()> action; };
+    std::function<std::vector<MenuEntry>()> contextMenuProvider;
+    void mouseDown(const juce::MouseEvent& e) override;
+
 private:
     juce::Slider slider;
     juce::String labelText;

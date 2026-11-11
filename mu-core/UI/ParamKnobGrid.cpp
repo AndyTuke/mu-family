@@ -58,6 +58,12 @@ void ParamKnobGrid::setSpecs(const std::vector<Spec>& specs)
                 refreshLocks();
                 return true;
             };
+            ctl->knob->contextMenuProvider = [this, c = ctl.get()]() -> std::vector<KnobWithLabel::MenuEntry>
+            {
+                float v = 0.0f;
+                if (c->lockKey < 0 || ! onLockRemove || ! lockOf || ! lockOf(c->lockKey, v)) return {};
+                return { { "Remove p-lock", [this, c] { onLockRemove(c->lockKey); refreshLocks(); } } };
+            };
             if (spec.tooltip.isNotEmpty())
                 ctl->knob->getSlider().setTooltip(spec.tooltip);
             if (spec.modDestId != nullptr)

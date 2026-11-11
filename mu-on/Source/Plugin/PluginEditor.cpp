@@ -82,6 +82,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     clearPresetDirty();
 
     // The family metal look.
+    MuLookAndFeel::lcdComboTextH = 12;   // mu-On trial: crisper LCD dropdown text than the family 11
     setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appYellow));
     setScrews(true);
 

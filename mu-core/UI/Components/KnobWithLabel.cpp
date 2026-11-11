@@ -5,6 +5,7 @@ KnobWithLabel::KnobWithLabel(const juce::String& label,
     : labelText(label), knobColour(categoryColour)
 {
     slider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    addMouseListener(this, true);   // sees the slider's clicks too, for the right-click menu
     slider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     // State the sweep explicitly rather than inheriting JUCE's default, so the angle
     // the rotary is drawn against and the one the overlays below use are the same
@@ -134,6 +135,20 @@ void KnobWithLabel::resized()
     const int labelH = s(MuLookAndFeel::kKnobLabelH);
     const int topPad = s(MuLookAndFeel::kKnobTopPad);
     slider.setBounds(0, topPad, getWidth(), getHeight() - labelH - topPad);
+}
+
+void KnobWithLabel::mouseDown(const juce::MouseEvent& e)
+{
+    if (! e.mods.isPopupMenu() || ! contextMenuProvider) return;
+    const auto entries = contextMenuProvider();
+    if (entries.empty()) return;
+    auto actions = std::make_shared<std::vector<MenuEntry>>(entries);
+    juce::PopupMenu menu;
+    for (size_t i = 0; i < actions->size(); ++i) menu.addItem((int) i + 1, (*actions)[i].text);
+    menu.showMenuAsync(juce::PopupMenu::Options(), [actions](int picked)
+    {
+        if (picked > 0 && (*actions)[(size_t) picked - 1].action) (*actions)[(size_t) picked - 1].action();
+    });
 }
 
 void KnobWithLabel::mouseDoubleClick(const juce::MouseEvent&)

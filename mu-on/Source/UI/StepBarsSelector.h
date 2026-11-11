@@ -21,7 +21,7 @@ public:
     std::function<void(int bar, bool on)> onToggle;   // bar is 1-based
     std::function<void(int lengthBars)>   onLength;
 
-    StepBarsSelector() { setMouseCursor(juce::MouseCursor::PointingHandCursor); setTooltip("Loop length in bars (drag the number) and the bars the step plays in (click a bar)"); }
+    StepBarsSelector() { setMouseCursor(juce::MouseCursor::PointingHandCursor); setTooltip("Loops the step spans (drag the number) and the loops it plays in (click one). A loop is one pass through the whole step row"); }
 
     void set(int lengthBars, int mask)
     {
@@ -67,7 +67,7 @@ public:
         bits = on ? (bits | (1 << bar)) : (bits & ~(1 << bar));
         repaint();
         if (onToggle) onToggle(bar + 1, on);
-        mu_ui::reportStatus(*this, "Step Bars", describe());
+        mu_ui::reportStatus(*this, "Step Loops", describe());
     }
 
     // Dragging the number up lengthens the loop, down shortens it, one bar per few pixels.
@@ -79,7 +79,7 @@ public:
         length = next;
         repaint();
         if (onLength) onLength(length);
-        mu_ui::reportStatus(*this, "Step Loop Length (bars)", juce::String(length));
+        mu_ui::reportStatus(*this, "Step Loops", juce::String(length));
     }
     void mouseUp(const juce::MouseEvent&) override { dragging = false; }
     void mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override
@@ -90,9 +90,9 @@ public:
         length = next;
         repaint();
         if (onLength) onLength(length);
-        mu_ui::reportStatus(*this, "Step Loop Length (bars)", juce::String(length));
+        mu_ui::reportStatus(*this, "Step Loops", juce::String(length));
     }
-    void mouseEnter(const juce::MouseEvent&) override { mu_ui::reportStatus(*this, "Step Bars", describe() + " of " + juce::String(length)); }
+    void mouseEnter(const juce::MouseEvent&) override { mu_ui::reportStatus(*this, "Step Loops", describe() + " of " + juce::String(length)); }
 
 private:
     juce::Rectangle<int> numberArea() const { return getLocalBounds().removeFromLeft(juce::jmax(18, getHeight())); }

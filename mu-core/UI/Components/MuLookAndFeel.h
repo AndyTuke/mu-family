@@ -825,6 +825,8 @@ public:
     static constexpr double kBpmFineStep = 0.1;
 
     // LCD text fields (metal style): lettering heights, side padding, the browse mark's width.
+    // Text size of the LCD dropdowns; an app may raise it (set before its editor builds) when 11 renders too soft.
+    static inline int    lcdComboTextH = 11;
     static constexpr int kLcdTextH     = 11;   // selectors (ComboBox LCDs) and single-line readouts, e.g. a sample bar
     static constexpr int kLcdNameTextH = 13;   // the channel name display in the header bar
     static constexpr int kLcdTextPadX  = 6;
