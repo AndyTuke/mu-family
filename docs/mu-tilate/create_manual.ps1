@@ -65,7 +65,7 @@ H1 "1. Introduction"
 P "mu-Tilate is a loop slicer and sample-loop phrase player from Transwarp Development Project. It runs as a VST3 plug-in, a CLAP plug-in, and a standalone application."
 P "You load a loop, usually a drum loop but any audio will do. mu-Tilate finds the hits in it (the transients) and cuts the loop into slices at those points. A sequencer then places the slices as blocks on a timeline, so you can rearrange the loop, repeat slices, play them backwards, thin them out, re-pitch them, or match the whole loop to the tempo of your song."
 P "mu-Tilate stacks up to eight layers. Each layer holds one loop, its slices and one sample player, and has its own timeline, sound controls, mixer strip, effect sends and modulators. To layer sounds, use another layer. Everything else is the family you may know from mu-Clid, mu-Tant, mu-Toni and mu-On: the same mixer, effects, modulators, presets and transport bar."
-P "mu-Tilate is Pay What You Want: pay what you like from £0, and nothing is limited either way (see Supporting mu-Tilate)."
+P "mu-Tilate is free to download and use, with every feature, and a one-off £20 licence removes the licence reminder (see Supporting mu-Tilate)."
 
 H2 "Who Is This For?"
 P "mu-Tilate is for producers who want to chop up and re-sequence a loop without a sampler's menus: re-cut a break, stutter a snare, drop out half the hits, or run a loop at your song's tempo with the pitch left alone. It works in a DAW session, fully automatable and synchronised to the host transport, or as a standalone instrument for sketching and live use."
@@ -103,14 +103,14 @@ P "The download includes a folder called Factory Loops with six short drum loops
 
 
 H2 "Supporting mu-Tilate"
-P "mu-Tilate is Pay What You Want. You choose what to pay, from £0 upwards (the suggested amount is £25), and nothing is limited either way: every feature works for everyone. Whatever you pay, even £0, you are sent a licence key by email from Lemon Squeezy, our payment provider. Entering the key removes the Support window. The key changes nothing else; mu-Tilate works the same with or without it."
-P "A copy without a key shows a polite 'Support mu-Tilate' window once per session, the first time you open mu-Tilate after starting your DAW or the app. It has three buttons:"
-Bullet "Maybe later  —  closes the window and carries on. It will appear again next session."
+P "mu-Tilate is free to download and use, and every feature works for everyone. A copy without a licence shows a polite reminder each time it loads. A one-off licence for £20 removes the reminder: after you pay, a licence key is sent by email from Lemon Squeezy, our payment provider, and entering the key removes the reminder for good. The key changes nothing else; mu-Tilate works the same with or without it."
+P "A copy without a key shows a polite 'Support mu-Tilate' window every time you load mu-Tilate: each new instance in your DAW, and each time the standalone app starts. It has three buttons:"
+Bullet "Maybe later  —  closes the window for that instance and carries on. It appears again the next time you load mu-Tilate."
 Bullet "Enter licence key  —  opens the 'Enter licence key - mu-Tilate' panel, where you type in your key."
-Bullet "Pay what you like  —  opens the checkout page in your web browser. The suggested amount is £25, but £0 is fine. You receive a key either way."
-P "The window cannot be switched off for good. To bring it back at any time, click the Support link at the right of the Status Bar, or the Support button in the About panel."
-P "To enter your key, click Enter licence key in the Support window, or click the mu-Tilate logo to open the About panel and click Enter a key. In the 'Enter licence key - mu-Tilate' panel (it reads 'Enter your licence key to remove the support reminder. Everything works either way.'), paste your key into the Licence key box and click Activate (or press Return). If you do not have a key yet, click Pay what you like to open the checkout page in your web browser. mu-Tilate needs an internet connection the first time, to register the key. One key can be used on up to 5 machines. When the key is accepted the panel shows a confirmation and closes, the About panel thanks you for your support, and the Support window and Support link no longer appear."
-P "A licensed copy, even one with a £0 key, shows 'Thank you for supporting mu-Tilate.' in the About panel, with a 'Want to give more?' link beneath it. The link opens the tip page in your web browser, where you can give any amount you like. It does not use up your key, and you do not have to give anything."
+Bullet "Get a licence  —  opens the checkout page in your web browser. A licence is a one-off payment of £20, and a key is emailed to you."
+P "The reminder cannot be switched off without a licence. To bring the window back at any time, click the Support link at the right of the Status Bar, or the Support button in the About panel."
+P "To enter your key, click Enter licence key in the Support window, or click the mu-Tilate logo to open the About panel and click Enter a key. In the 'Enter licence key - mu-Tilate' panel (it reads 'Enter your licence key to remove the support reminder. Everything works either way.'), paste your key into the Licence key box and click Activate (or press Return). If you do not have a key yet, click Get a licence to open the checkout page in your web browser. mu-Tilate needs an internet connection the first time, to register the key. One key can be used on up to 5 machines. When the key is accepted the panel shows a confirmation and closes, the About panel thanks you for your support, and the Support window and Support link no longer appear."
+P "A licensed copy shows 'Thank you for supporting mu-Tilate.' in the About panel."
 P "Once activated, mu-Tilate checks your key with the server now and then when it starts. If you are offline at that moment it carries on working as normal for up to 30 days."
 P "If activation fails, the panel tells you why. Check that you pasted the whole key and that you are online, then try again. A key that has already been used on 5 machines needs one of them released first; use Contact Support at the bottom of the Settings page. If the computer has no internet connection at all, the licence key panel shows a machine code at the bottom. Send that code to Contact Support and you can be sent an offline licence file for that computer, to place in the mu-Tilate content folder."
 
@@ -375,7 +375,7 @@ Bullet "Updates, Check for updates — a tick box, ticked by default. Whether th
 P "MIDI (right column):"
 Bullet "MIDI Clock, Source (standalone) — Internal, or MIDI In to follow an external MIDI clock, with a Sync Offset to compensate for audio latency (see below)."
 Bullet "MIDI Program Change — the Layer Presets and Full Presets buttons open the tables that map incoming program-change messages to presets."
-P "A Contact Support link sits at the bottom of the page."
+P "A Contact Support link sits at the bottom of the page. The Settings page also has a Send Feedback link (feedback@transwarp.me) beside Contact Support."
 
 Pic "Settings overlay open over the main window." "settings.png"
 
