@@ -57,13 +57,6 @@
             "command": "powershell -NonInteractive -File \".claude/hooks/post_build_todo.ps1\""
           },
           {
-            "type": "command",
-            "shell": "powershell",
-            "if": "Bash(cmake --build *)",
-            "statusMessage": "Copying artifacts to OneDrive Windows folder...",
-            "command": "$data = $input | ConvertFrom-Json; if ($data.tool_response.exitCode -eq 0 -and $data.tool_input.command -match '--config\\s+Release') { $dst = 'D:\\Andy Tuke\\Music - Music Software\\TDP\\Windows\\'; Copy-Item (Join-Path $env:CLAUDE_PROJECT_DIR 'build\\mu-clid\\mu-clid_artefacts\\Release\\Standalone\\mu-Clid.exe') $dst -Force 2>$null; Copy-Item (Join-Path $env:CLAUDE_PROJECT_DIR 'build\\mu-clid\\mu-clid_artefacts\\Release\\VST3\\mu-Clid.vst3') $dst -Recurse -Force 2>$null; Copy-Item (Join-Path $env:CLAUDE_PROJECT_DIR 'build\\mu-clid\\mu-clid_artefacts\\Release\\CLAP\\mu-Clid.clap') $dst -Force 2>$null }"
-          },
-          {
             "type": "agent",
             "if": "Bash(cmake --build *)",
             "statusMessage": "Scanning build output for compiler warnings...",
