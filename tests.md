@@ -319,7 +319,7 @@ Target `mu-tilate-tests` (console, no editor, no host). Build and run:
 cmake --build build --target mu-tilate-tests --config Debug && build/mu-tilate/mu-tilate-tests_artefacts/Debug/mu-tilate-tests.exe
 ```
 
-**Current status:** Pass, 81 results, 0 failures (Debug, build PC, 2026-11-01; mu-core-tests 883 pass the same day). The layer-preset target `mu-tilate-layer-tests` from the design is not built. Shared analysis, loader and voice DSP are tested in `mu-core-tests` (see the mu-core section).
+**Current status:** Pass, 114 results, 0 failures (Debug, build PC, 2026-11-12; run reported by the main conversation, not re-run by the test-steward). Since 2026-11-01 `PhraseStateTests.cpp` gained the Slice-knob Absolute cases (round trip incl. value 0, kept offset, old file reads as Offset, NaN sanitised, effectiveValue / resolvedOffset maths) and `PhraseTests.cpp` gained insert / send Absolute (values and masks reach the insert) and Absolute amp attack (replaces the layer's, offset ignored). Not tested: the SlicePanel right-click menu and Clear, `KnobWithLabel::setOverrideMode`, cutoff / resonance Absolute resolution in `paramsFor`. (Earlier line: 81 results, 2026-11-01; mu-core-tests 883 pass the same day.) The layer-preset target `mu-tilate-layer-tests` from the design is not built. Shared analysis, loader and voice DSP are tested in `mu-core-tests` (see the mu-core section).
 
 | Coverage | File | Status |
 |---|---|---|
