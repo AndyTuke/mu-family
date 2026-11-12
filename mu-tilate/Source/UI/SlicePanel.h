@@ -75,6 +75,8 @@ private:
     void applyKnob(Knob& k);                      // puts a knob into the mode its settings say: range, text, ring, value
     void setKnobMode(Knob& k, Mode mode);         // the menu's actions
     juce::String absoluteText(const Knob& k, double v) const;
+    juce::String readoutText(const Knob& k, double v) const;         // the number on the knob while it is Absolute (no unit: it must fit)
+    double       readoutValue(const Knob& k, const juce::String& text) const;   // and its inverse, for typing a value in
     juce::String knobStatusText(const Knob& k, double v) const;
     void reportKnob(const Knob& k);
     void addSwitch(SegmentControl& control);

@@ -228,6 +228,48 @@ juce::String SlicePanel::absoluteText(const Knob& k, double v) const
     }
 }
 
+// What the knob itself shows while Absolute: the actual value as a plain number in the control's own unit (the unit is on the status bar).
+// Fractions are shown as percent, and an insert knob with a linear range in the effect's own units.
+juce::String SlicePanel::readoutText(const Knob& k, double v) const
+{
+    switch ((OverrideField) k.ovField)
+    {
+        case OverrideField::PitchSemi: case OverrideField::FineCents: return juce::String((int) std::lround(v));
+        case OverrideField::CutoffOct:    return v >= 1000.0 ? juce::String(v / 1000.0, 1) + "k" : juce::String((int) std::lround(v));
+        case OverrideField::FltA: case OverrideField::FltD: case OverrideField::FltR:
+        case OverrideField::AmpA: case OverrideField::AmpD: case OverrideField::AmpR: return juce::String((int) std::lround(v));
+        case OverrideField::LevelDb: case OverrideField::FadeIn: case OverrideField::FadeOut: return juce::String(v, 1);
+        case OverrideField::Ins0: case OverrideField::Ins1: case OverrideField::Ins2: case OverrideField::Ins3:
+        {
+            const auto& cfg = mu_ui::kInsertAlgoSlots[juce::jlimit(0, mu_ui::kInsertAlgoCount - 1, insertAlgo)][k.insSlot];
+            if (cfg.label != nullptr && cfg.skew == mu_ui::SkewMode::Linear && cfg.maxVal > cfg.minVal)
+                return juce::String((double) cfg.minVal + v * (double) (cfg.maxVal - cfg.minVal), 1);
+            return juce::String((int) std::lround(v * 100.0));
+        }
+        default:                          return juce::String((int) std::lround(v * 100.0));   // resonance, depth, sustains, pan, sends: percent
+    }
+}
+
+double SlicePanel::readoutValue(const Knob& k, const juce::String& text) const
+{
+    const double x = text.getDoubleValue() * (text.trimEnd().endsWithIgnoreCase("k") ? 1000.0 : 1.0);
+    switch ((OverrideField) k.ovField)
+    {
+        case OverrideField::PitchSemi: case OverrideField::FineCents: case OverrideField::CutoffOct:
+        case OverrideField::FltA: case OverrideField::FltD: case OverrideField::FltR:
+        case OverrideField::AmpA: case OverrideField::AmpD: case OverrideField::AmpR:
+        case OverrideField::LevelDb: case OverrideField::FadeIn: case OverrideField::FadeOut: return x;
+        case OverrideField::Ins0: case OverrideField::Ins1: case OverrideField::Ins2: case OverrideField::Ins3:
+        {
+            const auto& cfg = mu_ui::kInsertAlgoSlots[juce::jlimit(0, mu_ui::kInsertAlgoCount - 1, insertAlgo)][k.insSlot];
+            if (cfg.label != nullptr && cfg.skew == mu_ui::SkewMode::Linear && cfg.maxVal > cfg.minVal)
+                return (x - (double) cfg.minVal) / (double) (cfg.maxVal - cfg.minVal);
+            return x / 100.0;
+        }
+        default:                          return x / 100.0;
+    }
+}
+
 juce::String SlicePanel::knobStatusText(const Knob& k, double v) const
 {
     return k.ovField >= 0 && settings.ov[k.ovField].absolute ? absoluteText(k, v) : k.offFormat(v);
@@ -275,6 +317,9 @@ void SlicePanel::applyKnob(Knob& k)
         const auto m = absMeta(f);
         c.setRange(m.lo, m.hi, m.step);
         if (m.skewMid > 0.0) c.getSlider().setSkewFactorFromMidPoint(m.skewMid); else c.getSlider().setSkewFactor(1.0);
+        // The knob's own number is the actual value, so the knob always shows what the slice plays.
+        c.getSlider().textFromValueFunction = [this, kp = &k](double v) { return readoutText(*kp, v); };
+        c.getSlider().valueFromTextFunction = [this, kp = &k](const juce::String& t) { return readoutValue(*kp, t); };
         c.setValue((double) settings.ov[k.ovField].absValue);
         c.setOverrideMode(KnobWithLabel::OverrideMode::absolute);
     }
@@ -282,6 +327,8 @@ void SlicePanel::applyKnob(Knob& k)
     {
         c.setRange(k.offLo, k.offHi, k.offStep);
         c.getSlider().setSkewFactor(1.0);
+        c.getSlider().textFromValueFunction = nullptr;   // back to the slider's own number
+        c.getSlider().valueFromTextFunction = nullptr;
         c.setValue((double) offsetOf(settings, f));
         c.setOverrideMode(KnobWithLabel::OverrideMode::offset);
     }

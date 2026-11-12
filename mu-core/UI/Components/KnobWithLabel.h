@@ -81,9 +81,9 @@ public:
     // unlocked value sits. Both clear with setLockMarks(false, NaN).
     void setLockMarks(bool locked, double ghostValue);
 
-    // A knob that can hold either an offset from some base value or an absolute value shows which: Offset keeps the category colour, Absolute
-    // fills the ring in the lock tint and marks the top of the ring with a dot, so the mode shows without relying on colour alone. None (the
-    // default) draws nothing extra.
+    // A knob that can hold either an offset from some base value or an absolute value shows which by its ring colour: Offset keeps the
+    // category colour, Absolute fills the ring in the amber absolute tint (it stays apart from the usual blue for colour-blind users).
+    // None (the default) draws nothing extra.
     enum class OverrideMode { none, offset, absolute };
     void setOverrideMode(OverrideMode mode);
     OverrideMode getOverrideMode() const noexcept { return overrideMode; }

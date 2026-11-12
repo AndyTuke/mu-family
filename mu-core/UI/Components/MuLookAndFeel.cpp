@@ -110,6 +110,7 @@ juce::Colour MuLookAndFeel::colour(ColourIds id) noexcept
         case indicatorModulationTint: return t.indicators.modulationTint;
         case indicatorGRTint:         return t.indicators.grTint;
         case indicatorLockTint:       return t.indicators.lockTint;
+        case indicatorAbsoluteTint:   return t.indicators.absoluteTint;
         case indicatorGRMeterBg:      return t.indicators.grMeterBg;
         case indicatorGRMeterBar:     return t.indicators.grMeterBar;
         // Mixer extras

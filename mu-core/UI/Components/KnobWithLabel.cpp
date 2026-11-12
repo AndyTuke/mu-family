@@ -135,7 +135,7 @@ void KnobWithLabel::setOverrideMode(OverrideMode mode)
     overrideMode = mode;
     // The ring fill is the category colour, or the lock tint in Absolute.
     slider.setColour(juce::Slider::rotarySliderFillColourId,
-                     MuLookAndFeel::colour(mode == OverrideMode::absolute ? MuLookAndFeel::indicatorLockTint : knobColour));
+                     MuLookAndFeel::colour(mode == OverrideMode::absolute ? MuLookAndFeel::indicatorAbsoluteTint : knobColour));
     if (mode == OverrideMode::absolute) slider.getProperties().set(MuLookAndFeel::kKnobOwnTint, true);   // over the app colour
     else                                slider.getProperties().remove(MuLookAndFeel::kKnobOwnTint);
     repaint();
@@ -360,11 +360,10 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
     if (auto* mlf = dynamic_cast<MuLookAndFeel*>(&getLookAndFeel()))
         mlf->drawKnobValueText(g, slider.getBounds(),
                                slider.getTextFromValue(slider.getValue()),
-                               isSteppedControl());
+                               isSteppedControl() || overrideMode == OverrideMode::absolute);   // an Absolute knob always shows its actual value
 
     // Modulation indicator ring and GR arc overlay.
-    if (! isModulated && std::isnan(modulatedNorm) && grDisplay <= 0.005f && ! lockLed && std::isnan(lockGhostNorm)
-        && overrideMode != OverrideMode::absolute) return;
+    if (! isModulated && std::isnan(modulatedNorm) && grDisplay <= 0.005f && ! lockLed && std::isnan(lockGhostNorm)) return;
 
     using mu_ui::sf;
 
@@ -466,13 +465,5 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
         const float r0 = radius + ringOff * 0.5f, r1 = arcR + juce::jmax(sf(2.0f), radius * 0.08f);
         g.setColour(lockCol.withAlpha(0.9f));
         g.drawLine(cx + r0 * std::sin(a), cy - r0 * std::cos(a), cx + r1 * std::sin(a), cy - r1 * std::cos(a), sf(1.6f));
-    }
-
-    // Absolute: a dot at 12 o'clock outside the ring, so the mode reads without the colour.
-    if (overrideMode == OverrideMode::absolute)
-    {
-        const float r = juce::jmax(sf(1.8f), radius * 0.07f);
-        g.setColour(lockCol);
-        g.fillEllipse(cx - r, cy - arcR - r, r * 2.0f, r * 2.0f);
     }
 }
