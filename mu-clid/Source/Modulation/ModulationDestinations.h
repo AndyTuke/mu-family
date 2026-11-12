@@ -173,7 +173,7 @@ namespace ModDest
 
     inline bool isValidDestinationId(const std::string& destId) noexcept
     {
-        return aliasFor(destId) != nullptr;
+        return mu_mod::isValidTarget(kTable, destId);   // a live row: a reserved slot is never a destination
     }
 
     // source-ID validator. Sources come in two shapes:

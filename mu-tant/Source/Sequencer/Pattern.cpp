@@ -23,12 +23,7 @@ namespace
 {
     // Drops assignments to destinations this layer type does not expose (source ids are ControlSequence
     // ids, left unchecked).
-    bool isValidModDest(const std::string& id)
-    {
-        for (int i = 0; i < kModDestCount; ++i)
-            if (id == kModDestTable[i].id) return true;
-        return false;
-    }
+    bool isValidModDest(const std::string& id) { return mu_mod::isValidTarget(kModDestTable, id); }
 
     // True if a Stepped ControlSequence of `layer` is assigned to `destId`: those snap pitch to semitones
     // (melodies); smooth sources and the envelope glide. Compares "csN_output" against each sequence id

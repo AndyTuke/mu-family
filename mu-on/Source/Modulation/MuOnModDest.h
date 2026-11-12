@@ -300,9 +300,7 @@ inline bool isValidEngineDest(EngineType engine, const std::string& id) noexcept
 {
     int n = 0;
     const ModDestEntry* t = destsForEngine(engine, n);
-    for (int i = 0; i < n; ++i)
-        if (id == t[i].id) return true;
-    return false;
+    return mu_mod::isValidTarget(t, (std::size_t) n, id);
 }
 
 // Build the mu-core ModDestProvider for one engine (drives the destination dropdown +

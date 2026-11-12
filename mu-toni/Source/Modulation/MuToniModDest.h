@@ -96,11 +96,7 @@ enum ModDestIndex
 static_assert((int) (sizeof(kModDestTable) / sizeof(kModDestTable[0])) == kNumModDests,
               "kModDestTable size must equal kNumModDests");
 
-inline bool isValidModDest(const std::string& id)
-{
-    for (const auto& d : kModDestTable) if (id == d.id) return true;
-    return false;
-}
+inline bool isValidModDest(const std::string& id) { return mu_mod::isValidTarget(kModDestTable, id); }
 
 inline ModDestProvider makeModDestProvider()
 {

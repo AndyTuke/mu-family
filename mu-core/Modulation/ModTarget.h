@@ -59,6 +59,15 @@ constexpr int indexOfParam(const ModTarget (&table)[N], std::string_view param) 
     return indexOfParam(table, N, param);
 }
 
+// True if `id` names a live (non-reserved) target among the first `n` rows (a table reached through a pointer, such as a
+// per-engine table). The one id check every product's validator and the serialiser use.
+constexpr bool isValidTarget(const ModTarget* table, std::size_t n, std::string_view id) noexcept
+{
+    for (std::size_t i = 0; i < n; ++i)
+        if (table[i].param != nullptr && id == table[i].id) return true;
+    return false;
+}
+
 // True if `id` names a live (non-reserved) target in the table.
 template <std::size_t N>
 constexpr bool isValidTarget(const ModTarget (&table)[N], std::string_view id) noexcept
