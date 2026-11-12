@@ -85,7 +85,7 @@ namespace ModDest
         // The id below intentionally doesn't match any valid destination string,
         // so `isValidDestinationId("pitch.fine")` returns false and legacy preset
         // assignments are rejected at load.
-        { "pitch.octave",     "Pitch Octave", "Pitch", "pitchOct" },
+        { "pitch.octave",     "Pitch Octave", "Pitch", "pitchOct", 0, true },   // stepped only: no smooth octave glide
         { "_reserved.pitch.fine", "(reserved)", nullptr, nullptr },   // formerly "pitch.fine"
         // ── Euclid C pattern (idx 22–23) ──────────────────────────────────────
         { "euclid.c.hits",    "Euclid C Hits", "Euclid C", "hitsC" },

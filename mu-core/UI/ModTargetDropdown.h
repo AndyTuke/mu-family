@@ -13,7 +13,8 @@
 // Modulation/ModTarget.h). One shared builder, so every product's list behaves the same:
 //   - item id = row index + 1 (the family contract; saved assignments resolve by id string,
 //     so a hidden row never shifts another row's id)
-//   - a section heading whenever the section changes; reserved rows (param == nullptr) skipped
+//   - one section heading per section (a section's rows are listed together even where the table interleaves them);
+//     reserved rows (param == nullptr) skipped
 //   - the shared insert slots (insert.p1..p4) appear only when an insert effect is active,
 //     labelled with that effect's slot names under the effect's name (hidden slots omitted)
 //   - the mixer's effect send (sendEff) is labelled with the effect bus's current effect
@@ -64,10 +65,25 @@ inline void populateDropdown(DropdownSelect& dd, const ModTarget* table, int cou
         dd.addItem(label, i + 1);
     };
 
-    if (options.order.empty())
-        for (int i = 0; i < count; ++i) addRow(i);
-    else
+    if (! options.order.empty())
+    {
         for (int i : options.order) addRow(i);
+        return;
+    }
+
+    // Table order, but one heading per section: a table whose rows are not kept in section order (rows are only ever appended) is listed
+    // with each section's rows together, sections in the order they first appear. Item ids are row index + 1 whatever the display order.
+    std::vector<const char*> sections;
+    auto sectionOf = [&](int i) { return table[i].section != nullptr ? table[i].section : ""; };
+    for (int i = 0; i < count; ++i)
+    {
+        bool known = false;
+        for (const char* s : sections) known = known || std::strcmp(s, sectionOf(i)) == 0;
+        if (! known) sections.push_back(sectionOf(i));
+    }
+    for (const char* s : sections)
+        for (int i = 0; i < count; ++i)
+            if (std::strcmp(s, sectionOf(i)) == 0) addRow(i);
 }
 
 template <std::size_t N>

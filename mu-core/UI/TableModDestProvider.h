@@ -3,7 +3,9 @@
 #include "UI/ModulatorEditor.h"    // ModDestProvider
 #include "UI/ModTargetDropdown.h"  // mu_mod::populateDropdown
 
+#include <functional>
 #include <string>
+#include <vector>
 
 // A destination provider built from nothing but a target table (the family standard, Modulation/ModTarget.h): the dropdown, the
 // id <-> dropdown-id plumbing and the reverse lookup. A layer type that publishes its targets in the LayerTypeInfo (modTargets /
@@ -12,7 +14,10 @@
 namespace mu_mod
 {
 
-inline ModDestProvider makeTableDestProvider(const ModTarget* table, int count)
+// `effectName` (optional) returns the mixer effect bus's current effect, which names the effect-send target; `order` (optional) is a
+// display order of row indices for a table whose own order is not the one to show (see DropdownOptions::order).
+inline ModDestProvider makeTableDestProvider(const ModTarget* table, int count,
+                                             std::function<juce::String()> effectName = {}, std::vector<int> order = {})
 {
     ModDestProvider p;
     // Stepped-snap units come from the row (0 = continuous, no snapping).
@@ -23,10 +28,11 @@ inline ModDestProvider makeTableDestProvider(const ModTarget* table, int count)
     };
 
     // In Smooth mode, stepped-only targets (octave) are left out of the list.
-    p.populate = [table, count](DropdownSelect& dd, int driveChar, bool steppedMode)
+    p.populate = [table, count, effectName, order](DropdownSelect& dd, int driveChar, bool steppedMode)
     {
         populateDropdown(dd, table, count,
-            { driveChar, [steppedMode](const ModTarget& t) { return steppedMode || ! t.steppedOnly; } });   // driveChar = the active insert effect
+            { driveChar, [steppedMode](const ModTarget& t) { return steppedMode || ! t.steppedOnly; },   // driveChar = the active insert effect
+              order, effectName ? effectName() : juce::String() });
     };
 
     wireTableModDestResolve(p, [table](int i) { return std::string(table[i].id); }, count);
