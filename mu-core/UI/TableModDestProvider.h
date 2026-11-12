@@ -18,9 +18,8 @@ inline ModDestProvider makeTableDestProvider(const ModTarget* table, int count)
     // Stepped-snap units come from the row (0 = continuous, no snapping).
     p.unitsPerDirection = [table, count](const std::string& id)
     {
-        for (int i = 0; i < count; ++i)
-            if (table[i].param != nullptr && id == table[i].id) return table[i].unitsPerDirection;
-        return 0;
+        const auto* row = findTarget(table, (std::size_t) count, id);
+        return row != nullptr ? row->unitsPerDirection : 0;
     };
 
     // In Smooth mode, stepped-only targets (octave) are left out of the list.

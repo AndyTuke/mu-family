@@ -285,6 +285,24 @@ struct PhraseTests : public juce::UnitTest
             expectGreaterThan(opened, 1.5 * closed);                      // three octaves up lets much more of the noise through
             expectLessThan(closed, 0.7 * off);                            // the layer's low-pass takes level off the noise
             expectWithinAbsoluteError(off, offMoved, 1.0e-6);             // with the layer's filter off the offsets do nothing
+
+            // Absolute: the hit's own cutoff in Hz replaces the layer's, wherever the layer's is and whatever offset is kept beside it.
+            auto levelAbsolute = [lp12](float layerHz, float absHz)
+            {
+                Rig r;
+                r.hitsStartWithSliceSettings = false;
+                juce::Random rng(5);
+                for (int i = 0; i < 24000; ++i) r.audio.setSample(0, i, 0.5f * (rng.nextFloat() * 2.0f - 1.0f));
+                r.timeline.place(0, 0.0, 0.0);
+                SliceSettings own; own.cutoffOct = -3.0f;                 // kept for switching back: must not act
+                own.ov[(int) OverrideField::CutoffOct] = { true, absHz };
+                r.timeline.setSettings(0, own);
+                r.settings.filterType = lp12; r.settings.cutoffHz = layerHz; r.settings.resonance = 0.0f;
+                return rms(r.run(24000, 256), 4000, 16000);
+            };
+            expectWithinAbsoluteError(levelAbsolute(500.0f, 4000.0f), levelAbsolute(9000.0f, 4000.0f), 0.01);   // the layer's cutoff no longer matters
+            expectGreaterThan(levelAbsolute(500.0f, 4000.0f), 1.5 * closed);                                       // 4 kHz lets more through than the layer's 500 Hz
+            expectLessThan(levelAbsolute(500.0f, 300.0f), 0.8 * levelAbsolute(500.0f, 4000.0f));                   // and 300 Hz less
         }
 
         beginTest("a pre-fade of a slice that plays backwards swells in the end of the slice");

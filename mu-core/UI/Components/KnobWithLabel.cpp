@@ -133,7 +133,7 @@ void KnobWithLabel::setOverrideMode(OverrideMode mode)
 {
     if (mode == overrideMode) return;
     overrideMode = mode;
-    // The ring fill is the category colour, or the lock tint in Absolute.
+    // The ring fill is the category colour, or the absolute (amber) tint in Absolute.
     slider.setColour(juce::Slider::rotarySliderFillColourId,
                      MuLookAndFeel::colour(mode == OverrideMode::absolute ? MuLookAndFeel::indicatorAbsoluteTint : knobColour));
     if (mode == OverrideMode::absolute) slider.getProperties().set(MuLookAndFeel::kKnobOwnTint, true);   // over the app colour
