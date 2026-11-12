@@ -149,7 +149,8 @@ void SlicePanel::addKnob(VoiceBandSection* section, int row, int col, const char
     k->offLo = lo; k->offHi = hi; k->offStep = step;
     k->comp->setRange(lo, hi, step);
     k->offFormat = std::move(format);
-    k->statusBase = statusName.upToFirstOccurrenceOf(":", false, false);   // "Slice Pitch: semitones added ..." -> "Slice Pitch"
+    k->statusBase = statusName.upToFirstOccurrenceOf(":", false, false).trim();   // "Slice Pitch: semitones added ..." -> "Slice Pitch"
+    if (k->statusBase.endsWith(" Offset")) k->statusBase = k->statusBase.dropLastCharacters(7);   // the mode is added when it is shown
     if (ovField >= 0)
         setupOverride(*k);
     else   // the pre-fade's own knobs: absolute by nature, no menu
@@ -270,9 +271,18 @@ double SlicePanel::readoutValue(const Knob& k, const juce::String& text) const
     }
 }
 
+// An Absolute knob reads as its value. An Offset knob reads as the offset and, after an equals sign, what it comes to on the layer's
+// value ("+3 st = 8 st"), taken from the knob's live value so it follows a drag.
 juce::String SlicePanel::knobStatusText(const Knob& k, double v) const
 {
-    return k.ovField >= 0 && settings.ov[k.ovField].absolute ? absoluteText(k, v) : k.offFormat(v);
+    if (k.ovField < 0) return k.offFormat(v);
+    if (settings.ov[k.ovField].absolute) return absoluteText(k, v);
+    if (! layerValues) return k.offFormat(v);
+    const auto f = (OverrideField) k.ovField;
+    const double base = (double) layerValueOf(layerValues(), f);
+    const auto m = absMeta(f);
+    const double total = juce::jlimit(m.lo, m.hi, f == OverrideField::CutoffOct ? base * std::exp2(v) : base + v);
+    return k.offFormat(v) + " = " + absoluteText(k, total);
 }
 
 // What the status bar shows for a knob: its name with the mode, and its value in that mode.
