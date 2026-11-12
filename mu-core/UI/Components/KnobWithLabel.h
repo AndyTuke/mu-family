@@ -81,6 +81,13 @@ public:
     // unlocked value sits. Both clear with setLockMarks(false, NaN).
     void setLockMarks(bool locked, double ghostValue);
 
+    // A knob that can hold either an offset from some base value or an absolute value shows which: Offset keeps the category colour, Absolute
+    // fills the ring in the lock tint and marks the top of the ring with a dot, so the mode shows without relying on colour alone. None (the
+    // default) draws nothing extra.
+    enum class OverrideMode { none, offset, absolute };
+    void setOverrideMode(OverrideMode mode);
+    OverrideMode getOverrideMode() const noexcept { return overrideMode; }
+
     void resized() override;
     void paint(juce::Graphics& g) override;
     void paintOverChildren(juce::Graphics& g) override;
@@ -92,7 +99,8 @@ public:
 
     // Optional: asked on a right-click anywhere on the knob (children included); returns the menu items to show, or none.
     // Each item runs its own action when picked.
-    struct MenuEntry { juce::String text; std::function<void()> action; };
+    // `ticked` shows a check mark; `separatorBefore` draws a line above the item.
+    struct MenuEntry { juce::String text; std::function<void()> action; bool ticked = false; bool separatorBefore = false; };
     std::function<std::vector<MenuEntry>()> contextMenuProvider;
     void mouseDown(const juce::MouseEvent& e) override;
 
@@ -103,6 +111,7 @@ private:
 
     bool  isModulated   = false;
     float modulatedNorm = std::numeric_limits<float>::quiet_NaN();
+    OverrideMode overrideMode = OverrideMode::none;
     bool  lockLed       = false;                                      // a lock is shown: red LED in the centre
     float lockGhostNorm = std::numeric_limits<float>::quiet_NaN();    // the unlocked value's proportion, NaN = no ghost line
 

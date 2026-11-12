@@ -90,10 +90,11 @@ public:
     // How the newest sounding slice moves the layer's filter: octaves added to its cutoff (the slice's offset plus its filter
     // envelope) and the resonance added. False, with no movement, when no slice sounds. Audio thread.
     bool filterModulation(float& octaves, float& resAdd) const noexcept;
-    // How far the newest sounding slice moves the layer's four insert knobs (fractions of their travel). False, with zeros, when none sounds.
-    bool insertOffsets(float (&out)[4]) const noexcept;
-    // The same newest hit's offsets to the three FX sends.
-    bool sendOffsets(float (&out)[3]) const noexcept;
+    // How the newest sounding slice sets the layer's four insert knobs (fractions of their travel): out[i] is an offset to add to the layer's
+    // knob, or, when bit i of `absMask` is set, the knob's absolute value (it replaces the layer's). False, with zeros, when none sounds.
+    bool insertOffsets(float (&out)[4], unsigned& absMask) const noexcept;
+    // The same newest hit's values for the three FX sends (offsets, or absolute where `absMask` says so).
+    bool sendOffsets(float (&out)[3], unsigned& absMask) const noexcept;
 
 private:
     struct StretchState;   // the two Signalsmith Stretch instances and their scratch (SlicePlayer.cpp)

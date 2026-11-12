@@ -16,7 +16,9 @@
 #include <vector>
 
 // The Slice view's control panel (docs/mu-tilate/design-ui.md, "Slice player"): the settings of one hit or slice, laid out exactly
-// like the Layer view (Pitch | Filter | Amp | Effects), but every knob is an OFFSET, -x to +x, added to the layer's own value. Below
+// like the Layer view (Pitch | Filter | Amp | Effects). Each knob is an OFFSET, -x to +x, added to the layer's own value, or, from its
+// right-click menu, ABSOLUTE: it then sets the parameter's actual value for this slice and ignores the layer's (Clear puts it back to
+// no override). A knob in Absolute fills its ring in the lock tint and jumps to what it sounds like now. Below
 // the band: how the slice plays (direction) and its pre-fade, each in its own box. It shows the settings it is given and reports every
 // change as a whole SliceSettings; it edits no data itself.
 namespace mu_tilate
@@ -36,6 +38,9 @@ public:
     void setLayerFilterType(int choice);
     void setLayerInsertAlgorithm(int algo);
 
+    // The layer's own values in the knobs' absolute units, asked when a knob is switched to Absolute so it can start where it sounds now.
+    std::function<LayerValues()> layerValues;
+
     // The user changed a setting of the shown slice.
     std::function<void(const SliceSettings&)> onChange;
     // The user asked for the previous (-1) or next (+1) slice.
@@ -53,13 +58,25 @@ private:
     struct Knob
     {
         std::unique_ptr<KnobWithLabel> comp;
-        float SliceSettings::* field = nullptr;   // null for an insert offset (SliceSettings::insOff[insSlot])
-        int insSlot = -1;
+        float SliceSettings::* field = nullptr;   // the pre-fade's own knobs (absolute by nature); null for an overridable knob (ovField)
+        int insSlot = -1;                         // >= 0: an insert knob (SliceSettings::insOff[insSlot])
         int sendSlot = -1;                        // >= 0: SliceSettings::sendOff[sendSlot], the Effect / Delay / Reverb send offset
+        int ovField = -1;                         // >= 0: an OverrideField: the knob can be Offset or Absolute
+        double offLo = 0.0, offHi = 0.0, offStep = 0.0;   // the Offset range
+        juce::String statusBase;                  // "Slice Pitch": the status bar name before the mode
+        std::function<juce::String(double)> offFormat;   // the status text in each mode
     };
+    enum class Mode { offset, absolute, clear };
 
     void addKnob(VoiceBandSection* section, int row, int col, const char* label, float SliceSettings::* field, double lo, double hi,
-                 double step, MuLookAndFeel::ColourIds colour, const juce::String& statusName, std::function<juce::String(double)> format);
+                 double step, MuLookAndFeel::ColourIds colour, const juce::String& statusName, std::function<juce::String(double)> format,
+                 int ovField = -1);
+    void setupOverride(Knob& k);                  // the right-click menu, tooltip and status reporting of an overridable knob
+    void applyKnob(Knob& k);                      // puts a knob into the mode its settings say: range, text, ring, value
+    void setKnobMode(Knob& k, Mode mode);         // the menu's actions
+    juce::String absoluteText(const Knob& k, double v) const;
+    juce::String knobStatusText(const Knob& k, double v) const;
+    void reportKnob(const Knob& k);
     void addSwitch(SegmentControl& control);
     juce::String insertOffsetText(int slot, double v) const;
     void changed();   // reads every control into `settings` and reports it

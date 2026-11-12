@@ -362,6 +362,8 @@ public:
 
     // Static palette helpers
     static juce::Colour colour(ColourIds id) noexcept;
+    // A slider property: set, the knob is drawn in its own fill colour even inside an app-coloured page (an Absolute override's tint).
+    static inline const juce::Identifier kKnobOwnTint { "muKnobOwnTint" };
 
     // Fixed 8-colour voice palette (Red / Cyan / Orange / Magenta / Lime / Rose / Silver /
     // Blue), index = the voice's colour index. Every entry is a Launchpad X palette colour, so
