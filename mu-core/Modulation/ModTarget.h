@@ -30,6 +30,10 @@ struct ModTarget
     const char* label;
     const char* section;
     const char* param;
+    // Stepped-modulator snap: discrete units per direction (octave 3, scale degree 12); 0 = continuous, no snapping.
+    int unitsPerDirection = 0;
+    // True for a target that is only musical as discrete jumps; hidden from the list while the modulator is Smooth.
+    bool steppedOnly = false;
 };
 
 // The row whose id matches, or nullptr.
