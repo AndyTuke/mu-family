@@ -75,13 +75,14 @@ target_compile_definitions(mu-toni
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
-        "MU_VERSION_BASE=\"${MUFAMILY_PRE_VERSION_BASE}\""   # pre-release 0.1 line shown in About
 )
 
+# The compiled mu-core library for this product's settings (see mu_core_variant in mu-core/CMakeLists.txt).
+mu_core_variant(MU_CORE_LIB VERSION_BASE "${MUFAMILY_PRE_VERSION_BASE}")
 target_link_libraries(mu-toni
     PRIVATE
         mu-toni-layer
-        mu-core
+        ${MU_CORE_LIB}
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_gui_basics
