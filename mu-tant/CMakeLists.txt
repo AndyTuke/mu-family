@@ -104,10 +104,12 @@ target_compile_definitions(mu-tant
         JUCE_VST3_CAN_REPLACE_VST2=0
 )
 
+# The compiled mu-core library for this product's settings (see mu_core_variant in mu-core/CMakeLists.txt).
+mu_core_variant(MU_CORE_LIB)
 target_link_libraries(mu-tant
     PRIVATE
         mu-tant-layer
-        mu-core
+        ${MU_CORE_LIB}
         mu-tant-resources
         juce::juce_audio_utils
         juce::juce_dsp

@@ -153,5 +153,102 @@ target_include_directories(mu-core SYSTEM INTERFACE
     "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher"
 )
 
+# mu-core as compiled static libraries, built once per configuration instead of being recompiled inside every consumer (an
+# INTERFACE library adds its sources to each target that links it, ~95 files and most of a target's compile time).
+# The sources read per-binary settings (MU_MAX_LAYERS, MU_MAX_BUSES, MU_BUS_INSERTS, MU_EXT_SIDECHAIN, MU_VERSION_BASE), and those
+# change the layout of shared types, so there is one library per distinct set of settings ("variant"). A product asks for its
+# variant with mu_core_variant() and gets the settings from it, so the library and the product can never disagree.
+# The INTERFACE mu-core above stays for the test apps that compile the sources they need themselves.
+
+
+# JUCE's include paths, definitions and options WITHOUT its module sources. A JUCE module target adds its source wrapper to whatever
+# target links it, so linking one here would compile JUCE inside the library as well as in each consumer; this target carries only
+# what the compiler needs to read JUCE headers, and the consumers (which link the modules themselves) provide the compiled code.
+set(MU_JUCE_MODULES juce::juce_audio_utils juce::juce_dsp juce::juce_gui_basics juce::juce_gui_extra juce::juce_audio_formats juce::juce_animation)
+set(_mu_todo ${MU_JUCE_MODULES})
+set(_mu_seen "")
+while(_mu_todo)
+    list(POP_FRONT _mu_todo _mu_t)
+    if(_mu_t IN_LIST _mu_seen)
+        continue()
+    endif()
+    list(APPEND _mu_seen ${_mu_t})
+    get_target_property(_mu_deps ${_mu_t} INTERFACE_LINK_LIBRARIES)
+    foreach(_mu_d IN LISTS _mu_deps)
+        if(_mu_d MATCHES "^juce::juce_[a-z_0-9]+$")
+            list(APPEND _mu_todo ${_mu_d})
+        endif()
+    endforeach()
+endwhile()
+add_library(mu-juce-usage INTERFACE)
+foreach(_mu_t IN LISTS _mu_seen)
+    target_include_directories(mu-juce-usage INTERFACE "$<TARGET_PROPERTY:${_mu_t},INTERFACE_INCLUDE_DIRECTORIES>")
+    target_include_directories(mu-juce-usage SYSTEM INTERFACE "$<TARGET_PROPERTY:${_mu_t},INTERFACE_SYSTEM_INCLUDE_DIRECTORIES>")
+    target_compile_definitions(mu-juce-usage INTERFACE "$<TARGET_PROPERTY:${_mu_t},INTERFACE_COMPILE_DEFINITIONS>")
+    target_compile_options(mu-juce-usage INTERFACE "$<TARGET_PROPERTY:${_mu_t},INTERFACE_COMPILE_OPTIONS>")
+endforeach()
+# The library itself links no JUCE target (so it holds no JUCE code); it reads the embedded-asset header through the usage target.
+target_include_directories(mu-juce-usage INTERFACE "$<TARGET_PROPERTY:mu-core-assets,INTERFACE_INCLUDE_DIRECTORIES>")
+
+
+
+# mu_core_variant(<out-var> [LAYERS n] [BUSES n] [INSERTS n] [EXT_SIDECHAIN 0|1] [VERSION_BASE x.y])
+# Creates (once) the compiled library for these settings and sets <out-var> to the target a product links. Omitted settings keep the
+# MuLimits.h / BuildNumber.h defaults. The settings are public on the library, so every product that links it is compiled with the
+# same values the library was; a product must not define them itself.
+function(mu_core_variant out_var)
+    cmake_parse_arguments(V "" "LAYERS;BUSES;INSERTS;EXT_SIDECHAIN;VERSION_BASE" "" ${ARGN})
+    set(key "")
+    set(defs "")
+    foreach(pair LAYERS:MU_MAX_LAYERS BUSES:MU_MAX_BUSES INSERTS:MU_BUS_INSERTS EXT_SIDECHAIN:MU_EXT_SIDECHAIN)
+        string(REPLACE ":" ";" pair "${pair}")
+        list(GET pair 0 arg)
+        list(GET pair 1 macro)
+        if(NOT "${V_${arg}}" STREQUAL "")
+            string(APPEND key "-${arg}${V_${arg}}")
+            list(APPEND defs "${macro}=${V_${arg}}")
+        endif()
+    endforeach()
+    # A base equal to the live one is the default, so products on the same version share a library; it only splits when they differ.
+    if("${V_VERSION_BASE}" STREQUAL "${MUFAMILY_VERSION_BASE}")
+        set(V_VERSION_BASE "")
+    endif()
+    if(NOT "${V_VERSION_BASE}" STREQUAL "")
+        string(APPEND key "-v${V_VERSION_BASE}")
+        list(APPEND defs "MU_VERSION_BASE=\"${V_VERSION_BASE}\"")
+    endif()
+    string(REPLACE "." "_" key "${key}")
+    set(lib "mu-core-lib${key}")
+    if(NOT TARGET ${lib})
+        get_target_property(mu_srcs mu-core INTERFACE_SOURCES)
+        set(stat "mu-core-static${key}")
+        add_library(${stat} STATIC)
+        target_sources(${stat} PRIVATE ${mu_srcs})
+        target_include_directories(${stat} PUBLIC "${CMAKE_CURRENT_FUNCTION_LIST_DIR}")
+        target_include_directories(${stat} SYSTEM PUBLIC
+            "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher"
+            "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
+            "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+            "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-linear/include"
+            "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-stretch/include")
+        target_compile_features(${stat} PUBLIC cxx_std_17)
+        # The JUCE settings every consumer uses (they are the same for all targets), then this variant's own.
+        target_compile_definitions(${stat} PUBLIC JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0 JUCE_USE_MP3AUDIOFORMAT=1 MU_CORE_STATIC=1 ${defs})
+        add_dependencies(${stat} mu-core-assets)
+        # ProcessorBase gains a CLAP base class when the CLAP header is visible (MU_CORE_HAS_CLAP), which changes its layout; every product
+        # target already sees that header, so the library does too, and its code and the products agree on one layout.
+        target_link_libraries(${stat} PUBLIC clap_juce_extensions)
+        target_link_libraries(${stat}
+            PRIVATE mu-juce-usage
+                $<COMPILE_ONLY:juce::juce_recommended_config_flags> $<COMPILE_ONLY:juce::juce_recommended_lto_flags>
+                $<COMPILE_ONLY:juce::juce_recommended_warning_flags>)
+        # What a product links: the compiled library plus the embedded assets (which bring juce_animation and, through it, the
+        # JUCE modules the product then compiles itself, as before).
+        add_library(${lib} INTERFACE)
+        target_link_libraries(${lib} INTERFACE ${stat} mu-core-assets)
+    endif()
+    set(${out_var} ${lib} PARENT_SCOPE)
+endfunction()
+
 # Unit tests for shared mu-core code (no product linked).
 add_subdirectory(Tests)

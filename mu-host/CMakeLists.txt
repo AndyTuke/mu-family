@@ -75,15 +75,16 @@ target_include_directories(mu-host
 )
 
 target_compile_definitions(mu-host PUBLIC
-    MU_MAX_LAYERS=1 MU_MAX_BUSES=0 MU_EXT_SIDECHAIN=0 MU_TRONIC_WITH_UI=1
+    MU_TRONIC_WITH_UI=1
     JUCE_WEB_BROWSER=0 JUCE_USE_MP3AUDIOFORMAT=1 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0
-    "MU_VERSION_BASE=\"${MUFAMILY_PRE_VERSION_BASE}\""
 )
 
+# The compiled mu-core library for this product's settings (see mu_core_variant in mu-core/CMakeLists.txt).
+mu_core_variant(MU_CORE_LIB LAYERS 1 BUSES 0 EXT_SIDECHAIN 0 VERSION_BASE "${MUFAMILY_PRE_VERSION_BASE}")
 target_link_libraries(mu-host
     PRIVATE
         mu-toni-layer mu-on-layer mu-tant-layer mu-clid-layer mu-tilate-layer
-        mu-core
+        ${MU_CORE_LIB}
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_gui_basics

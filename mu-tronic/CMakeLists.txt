@@ -69,23 +69,19 @@ if(MSVC)
         PROPERTIES COMPILE_OPTIONS "/wd4244")
 endif()
 
-# 16 layer slots and 3 group buses with 2 inserts each: MU_MAX_LAYERS / MU_MAX_BUSES / MU_BUS_INSERTS are
-# per-target capacities (mu-core is an INTERFACE library, so each binary compiles its own copy); the four
-# other products keep 8 layers and no buses.
+# Capacities (layers, buses, inserts) and the version base come from the compiled mu-core library this target links
+# (mu_core_variant below), so the library and this binary always agree.
 target_compile_definitions(mu-tronic
     PUBLIC
-        MU_MAX_LAYERS=16
-        MU_MAX_BUSES=3
-        MU_BUS_INSERTS=2
-        MU_EXT_SIDECHAIN=0
         MU_TRONIC_WITH_UI=1   # the layer types build their content and sidebar pictures (Persistence/ArpLayerType.cpp, TrackLayerTypes.cpp, PatternLayerType.cpp)
         JUCE_WEB_BROWSER=0
         JUCE_USE_MP3AUDIOFORMAT=1   # the Rhythm type loads the same sample formats as mu-Clid
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
-        "MU_VERSION_BASE=\"${MUFAMILY_PRE_VERSION_BASE}\""   # pre-release 0.1 line shown in About
 )
 
+# The compiled mu-core library for this product's settings (see mu_core_variant in mu-core/CMakeLists.txt).
+mu_core_variant(MU_CORE_LIB LAYERS 16 BUSES 3 INSERTS 2 EXT_SIDECHAIN 0 VERSION_BASE "${MUFAMILY_PRE_VERSION_BASE}")
 target_link_libraries(mu-tronic
     PRIVATE
         mu-toni-layer   # the Arp type: its engine sources and the Source/ include path
@@ -93,7 +89,7 @@ target_link_libraries(mu-tronic
         mu-tant-layer   # the Pattern type: the same
         mu-clid-layer   # the Rhythm type: the same
         mu-tilate-layer # the Phrase type: the same
-        mu-core
+        ${MU_CORE_LIB}
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_gui_basics

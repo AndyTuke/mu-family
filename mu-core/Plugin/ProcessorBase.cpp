@@ -5,6 +5,8 @@
 #include "Audio/FX/Slots/FXAlgorithmDef.h"   // FXAlgorithmRegistry
 #include "Audio/AlgorithmNames.h"             // mu_audio::kInsertAlgorithmCount
 #include <cstring>                            // std::strcmp — alloc-free suffix compare
+#include <cstdio>
+#include <cstdlib>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -254,4 +256,19 @@ bool ProcessorBase::isBusesLayoutSupported(const BusesLayout& layouts) const
         return false;
     // Main output: stereo.
     return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
+}
+
+namespace mu_core
+{
+    void verifyProcessorBaseLayout(std::size_t callerSize, const char* where) noexcept
+    {
+        if (callerSize == sizeof(ProcessorBase)) return;
+        // Fail loudly in every build: a mismatched layout corrupts memory long before any symptom shows.
+        juce::String msg = "mu-core library and product disagree on ProcessorBase (library " + juce::String((int) sizeof(ProcessorBase))
+                         + " bytes, " + juce::String(where) + " sees " + juce::String((int) callerSize)
+                         + "): check mu_core_variant() settings and the CLAP header in the product's CMake";
+        juce::Logger::writeToLog(msg);
+        std::fprintf(stderr, "%s\n", msg.toRawUTF8());
+        std::_Exit(70);   // not abort(): a Debug CRT abort opens a dialog that hangs a headless run
+    }
 }
