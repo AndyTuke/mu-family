@@ -167,7 +167,7 @@ struct BusStateResetTests : juce::UnitTest
             mu_mixfx::addBusParams(layout);
             StubProcessor stub;
             juce::AudioProcessorValueTreeState apvts(stub, nullptr, "BusCount", std::move(layout));
-            const int perBus = 12 + MixerEngine::kBusInserts * 5;   // 12 strip suffixes + (algorithm + 4 knobs) per insert
+            const int perBus = 11 + MixerEngine::kBusInserts * 6;   // 11 strip suffixes (no outBus, no bus) + (algorithm + 4 knobs + tempo sync) per insert
             expectEquals((int) stub.getParameters().size(), mu_limits::kMaxBuses * perBus);
         }
     }

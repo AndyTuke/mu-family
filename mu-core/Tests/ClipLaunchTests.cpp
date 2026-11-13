@@ -1,3 +1,4 @@
+#include <memory>
 #include "Plugin/ProcessorBase.h"
 #include "Plugin/MixerFxParams.h"
 #include "Sequencer/ClipClipboard.h"
@@ -129,7 +130,8 @@ struct ClipLaunchTests : juce::UnitTest
         beginTest("copy then paste moves a clip between two layers, keeps its name, and the clipboard survives several pastes");
         {
             mu_core::clipClipboard().clear();
-            ClipProcessor p;
+            auto pOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& p = *pOwner;
             p.setParam("v0_a", 0.9f);
             expect(p.storeClip(0, 2, "loud"));
             expect(! p.canPasteClip(1), "nothing on the clipboard yet");
@@ -160,7 +162,8 @@ struct ClipLaunchTests : juce::UnitTest
         beginTest("an empty clip cannot be copied or cut, a bad index or layer is refused, and a clip of another kind cannot be pasted");
         {
             mu_core::clipClipboard().clear();
-            ClipProcessor p;
+            auto pOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& p = *pOwner;
             expect(! p.copyClip(0, 3) && ! p.cutClip(0, 3), "empty");
             expect(! mu_core::clipClipboard().hasClip(), "a refused copy puts nothing on the clipboard");
             expect(! p.copyClip(0, 8) && ! p.copyClip(9, 0) && ! p.pasteClip(0, 8) && ! p.pasteClip(9, 0));
@@ -184,7 +187,8 @@ struct ClipLaunchTests : juce::UnitTest
         beginTest("cut copies then clears; the clipboard keeps the data and pastes more than once");
         {
             mu_core::clipClipboard().clear();
-            ClipProcessor p;
+            auto pOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& p = *pOwner;
             p.setParam("v0_a", 0.8f);
             p.storeClip(0, 4, "cutme");
             const auto stored = p.layers[0]->clips->get(4);
@@ -216,7 +220,8 @@ struct ClipLaunchTests : juce::UnitTest
             dir.createDirectory();
 
             juce::AudioProcessor::setTypeOfNextNewPlugin(juce::AudioProcessor::wrapperType_Standalone);
-            ClipProcessor p;
+            auto pOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& p = *pOwner;
             juce::AudioProcessor::setTypeOfNextNewPlugin(juce::AudioProcessor::wrapperType_Undefined);
 
             p.setParam("v0_a", 0.9f);
@@ -233,7 +238,8 @@ struct ClipLaunchTests : juce::UnitTest
 
             // A staged full preset refuses all three and changes nothing.
             {
-                ClipProcessor q;
+                auto qOwner = std::make_unique<ClipProcessor>();
+                ClipProcessor& q = *qOwner;
                 q.storeClip(0, 1);
                 q.layerSwapper.stageFull(juce::ValueTree("Full"));
                 expect(! q.perform(act(T::CopyClip, 0, 1)) && ! q.perform(act(T::CutClip, 0, 1)) && ! q.perform(act(T::PasteClip, 1, 0)));
@@ -269,7 +275,8 @@ struct ClipLaunchTests : juce::UnitTest
 
             // Stopped: the pasted data is live at once, and the lit pad is still the pasted clip.
             {
-                ClipProcessor p;
+                auto pOwner = std::make_unique<ClipProcessor>();
+                ClipProcessor& p = *pOwner;
                 p.setParam("v0_a", 0.9f);
                 p.storeClip(0, 0, "src");
                 p.setParam("v1_a", 0.2f);
@@ -288,7 +295,8 @@ struct ClipLaunchTests : juce::UnitTest
 
             // Playing: a staged launch with the usual serial; the layer swaps at the boundary and the pad stays lit.
             {
-                ClipProcessor p;
+                auto pOwner = std::make_unique<ClipProcessor>();
+                ClipProcessor& p = *pOwner;
                 p.setParam("v0_a", 0.9f);
                 p.storeClip(0, 0);
                 p.setParam("v1_a", 0.2f);
@@ -311,7 +319,8 @@ struct ClipLaunchTests : juce::UnitTest
 
             // A clip that is not the lit one is just written: nothing is staged and the lit pad does not move.
             {
-                ClipProcessor p;
+                auto pOwner = std::make_unique<ClipProcessor>();
+                ClipProcessor& p = *pOwner;
                 p.setParam("v0_a", 0.9f);
                 p.storeClip(0, 0);
                 p.setParam("v1_a", 0.2f);
@@ -336,7 +345,8 @@ struct ClipLaunchTests : juce::UnitTest
             using T = mu_core::ControlActionType;
             mu_core::ControlAction store; store.type = T::StoreClip; store.layer = 1; store.index = 2;
             mu_core::clipClipboard().clear();
-            ClipProcessor p;
+            auto pOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& p = *pOwner;
             p.setParam("v0_a", 0.9f);
             p.storeClip(0, 0);
             p.setParam("v1_a", 0.2f);
@@ -355,7 +365,8 @@ struct ClipLaunchTests : juce::UnitTest
     {
         beginTest("storeClip then launchClip (stopped) restores the layer, leaves the strip and identity alone, and never writes the bank");
         {
-            ClipProcessor p;
+            auto pOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& p = *pOwner;
             p.layers[0]->name = "keep"; p.layers[0]->colourIndex = 3;
             p.setParam("v0_a", 0.9f);
             expect(p.storeClip(0, 2, "loud"));
@@ -376,7 +387,8 @@ struct ClipLaunchTests : juce::UnitTest
 
         beginTest("launchClip returns false and changes nothing for an empty clip, bad indices, or a staged full preset");
         {
-            ClipProcessor p;
+            auto pOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& p = *pOwner;
             p.storeClip(0, 0);
             p.setParam("v0_a", 0.6f);
             expect(! p.launchClip(0, 1), "empty clip");
@@ -391,7 +403,8 @@ struct ClipLaunchTests : juce::UnitTest
 
         beginTest("launch while playing is pending and applies only at the boundary, firing onLayerPresetCommitted");
         {
-            ClipProcessor p;
+            auto pOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& p = *pOwner;
             p.setParam("v0_a", 0.8f);
             p.storeClip(0, 0);
             p.setParam("v0_a", 0.2f);
@@ -412,13 +425,15 @@ struct ClipLaunchTests : juce::UnitTest
 
         beginTest("storing right after a playing preset load keeps that preset in the clip and lets it land");
         {
-            ClipProcessor src;
+            auto srcOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& src = *srcOwner;
             src.setParam("v0_a", 0.9f);
             const auto presetA = src.captureLayerPresetTree(0);
             src.setParam("v0_a", 0.6f);
             const auto presetB = src.captureLayerPresetTree(0);
 
-            ClipProcessor p;
+            auto pOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& p = *pOwner;
             p.setParam("v0_a", 0.1f);
             p.startPlaying();
             p.stageNonClip(0, presetA);
@@ -442,7 +457,8 @@ struct ClipLaunchTests : juce::UnitTest
             auto dir = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("mu-clip-launch-test");
             dir.createDirectory();
 
-            ClipProcessor src;
+            auto srcOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& src = *srcOwner;
             src.setParam("v0_a", 0.7f);
             const auto file = writeTree(dir, "x.muTest", src.captureLayerPresetTree(0));
 
@@ -461,7 +477,8 @@ struct ClipLaunchTests : juce::UnitTest
             auto dir = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("mu-clip-launch-test2");
             dir.createDirectory();
 
-            ClipProcessor p;
+            auto pOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& p = *pOwner;
             p.storeClip(0, 1, "kept");
             juce::StringArray errors;
             p.onLoadError = [&errors](const juce::String& e) { errors.add(e); };
@@ -484,7 +501,8 @@ struct ClipLaunchTests : juce::UnitTest
             auto dir = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("mu-clip-launch-test3");
             dir.createDirectory();
 
-            ClipProcessor p;
+            auto pOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& p = *pOwner;
             const auto file = writeTree(dir, "x.muTest", p.captureLayerPresetTree(0));
             p.storeClip(0, 4);
             p.layers[0]->activeClip = 4;
@@ -498,7 +516,8 @@ struct ClipLaunchTests : juce::UnitTest
 
         beginTest("clearClip empties one clip, drops it as the active clip, and the mask follows");
         {
-            ClipProcessor p;
+            auto pOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& p = *pOwner;
             p.storeClip(0, 0); p.storeClip(0, 3); p.storeClip(1, 3);
             p.layers[0]->activeClip = 3;
             expectEquals((int) p.clipMask(0), 0x09);
@@ -519,7 +538,8 @@ struct ClipLaunchTests : juce::UnitTest
                 a.type = type; a.layer = layer; a.index = index;
                 return a;
             };
-            ClipProcessor p;
+            auto pOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& p = *pOwner;
             p.setParam("v0_a", 0.9f);
             expect(p.perform(act(T::StoreClip, 0, 2)), "store");
             expectEquals((int) p.clipMask(0), 1 << 2);
@@ -560,7 +580,8 @@ struct ClipLaunchTests : juce::UnitTest
             dir.createDirectory();
 
             juce::AudioProcessor::setTypeOfNextNewPlugin(juce::AudioProcessor::wrapperType_Standalone);
-            ClipProcessor p;
+            auto pOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& p = *pOwner;
             juce::AudioProcessor::setTypeOfNextNewPlugin(juce::AudioProcessor::wrapperType_Undefined);
 
             p.setParam("v0_a", 0.9f);  p.storeClip(0, 1);
@@ -595,7 +616,8 @@ struct ClipLaunchTests : juce::UnitTest
             // A staged non-clip layer preset is what the store captures, and it still lands: the clip, the layer
             // and the lit pad all agree.
             {
-                ClipProcessor p;
+                auto pOwner = std::make_unique<ClipProcessor>();
+                ClipProcessor& p = *pOwner;
                 p.setParam("v0_a", 0.3f);
                 const auto older = p.captureLayerPresetTree(0);
                 p.setParam("v0_a", 0.7f);
@@ -615,7 +637,8 @@ struct ClipLaunchTests : juce::UnitTest
 
             // A staged full preset refuses both writes and leaves the bank alone.
             {
-                ClipProcessor p;
+                auto pOwner = std::make_unique<ClipProcessor>();
+                ClipProcessor& p = *pOwner;
                 p.storeClip(0, 1);
                 p.layerSwapper.stageFull(juce::ValueTree("Full"));
                 expect(! p.perform(act(T::StoreClip, 0, 2)) && ! p.perform(act(T::ClearClip, 0, 1)), "refused");
@@ -624,7 +647,8 @@ struct ClipLaunchTests : juce::UnitTest
 
             // Another clip queued: storing into a different pad drops that launch and lights the stored pad.
             {
-                ClipProcessor p;
+                auto pOwner = std::make_unique<ClipProcessor>();
+                ClipProcessor& p = *pOwner;
                 p.setParam("v0_a", 0.9f);  p.storeClip(0, 1);
                 p.setParam("v0_a", 0.2f);
                 p.startPlaying();
@@ -639,7 +663,8 @@ struct ClipLaunchTests : juce::UnitTest
 
             // A mapped LaunchClip needs no Performance mode.
             {
-                ClipProcessor p;
+                auto pOwner = std::make_unique<ClipProcessor>();
+                ClipProcessor& p = *pOwner;
                 p.setParam("v0_a", 0.8f);  p.storeClip(0, 0);
                 p.setParam("v0_a", 0.1f);
                 expect(! p.getLiveState().isPerformanceMode());
@@ -657,7 +682,8 @@ struct ClipLaunchTests : juce::UnitTest
 
         beginTest("a clip survives the layer's own parameter edits and is independent of the live layer");
         {
-            ClipProcessor p;
+            auto pOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& p = *pOwner;
             p.setParam("v0_a", 0.5f);
             p.storeClip(0, 0);
             const auto stored = p.layers[0]->clips->get(0);
@@ -669,7 +695,8 @@ struct ClipLaunchTests : juce::UnitTest
         {
             using T = mu_core::ControlActionType;
             mu_core::ControlAction mute; mute.type = T::MuteSelectedLayer;
-            ClipProcessor p;
+            auto pOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& p = *pOwner;
             expectEquals(p.getLiveState().getSelectedLayer(), 0);
             expect(! p.getLiveState().isLayerMuted(0));
             expect(p.perform(mute), "mute");
@@ -683,7 +710,8 @@ struct ClipLaunchTests : juce::UnitTest
 
         beginTest("a scene launches clip n on every layer that stores one, together at the boundary, and leaves the others playing");
         {
-            ClipProcessor p;
+            auto pOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& p = *pOwner;
             p.setParam("v0_a", 0.9f); p.setParam("v1_a", 0.8f); p.setParam("v2_a", 0.7f);
             p.storeClip(0, 3); p.storeClip(1, 3);          // layer 2 stores no clip 3
             p.setParam("v0_a", 0.1f); p.setParam("v1_a", 0.2f); p.setParam("v2_a", 0.3f);
@@ -715,7 +743,8 @@ struct ClipLaunchTests : juce::UnitTest
 
         beginTest("a scene is one staging batch: a boundary inside it flags no layer, and a full preset staged refuses it");
         {
-            ClipProcessor p;
+            auto pOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& p = *pOwner;
             p.storeClip(0, 1); p.storeClip(1, 1);
             p.startPlaying();
             p.layerSwapper.beginBatch();
@@ -735,7 +764,8 @@ struct ClipLaunchTests : juce::UnitTest
         {
             using T = mu_core::ControlActionType;
             expect(mu_core::actionFromName(mu_core::actionName(T::LaunchScene)) == T::LaunchScene);
-            ClipProcessor p;
+            auto pOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& p = *pOwner;
             p.storeClip(0, 2);
             mu_core::ControlAction a; a.type = T::LaunchScene; a.index = 2;
             expect(p.perform(a));
@@ -745,7 +775,8 @@ struct ClipLaunchTests : juce::UnitTest
         {
             using T = mu_core::ControlActionType;
             mu_core::ControlAction toggle; toggle.type = T::TransportToggle;
-            ClipProcessor p;
+            auto pOwner = std::make_unique<ClipProcessor>();
+            ClipProcessor& p = *pOwner;
             const mu_core::LiveView& view = *p.getLiveView();
             expect(! view.isTransportPlaying() && ! view.isTransportOwnedOutside());
             expect(p.perform(toggle));

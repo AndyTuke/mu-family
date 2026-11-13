@@ -198,7 +198,7 @@ struct BusInsertTests : juce::UnitTest
         beginTest("a Clipper on a bus insert reports how hard it clips; a signal under the threshold reports none");
         {
             Rig r;
-            r.dc[0] = 0.8f;
+            r.dc[0] = 0.8f / bus_test::kTrim;   // the insert sees 0.8 after the channel's headroom trim
             r.mixer.channels[0].busAssign.store(1);
             setInsert(r.insertAt(0, 0), 5, 0.5f);   // Clipper, threshold at half scale: a 0.8 input is about 4 dB over
             float gr = 0.0f;
@@ -240,7 +240,7 @@ struct BusInsertTests : juce::UnitTest
             r.dc[0] = std::numeric_limits<float>::quiet_NaN();
             r.mixer.channels[0].busAssign.store(1);
             r.run();
-            expectEquals(r.mixer.nonFiniteBlocks.load(), 1, "the block was silenced");
+            expectEquals(r.mixer.nonFiniteBlocks.load(), 0, "contained at the insert stage: the master probe saw none");
             expectEquals(r.outMax(), 0.0f, "silent output");
             r.dc[0] = 0.5f;
             r.run();

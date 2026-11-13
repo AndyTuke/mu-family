@@ -48,11 +48,11 @@ struct BusRoutingTests : juce::UnitTest
             r.run(2);
             expectEquals(r.outL(), 0.8f * kTrim * 0.5f, "on bus 1");
             r.mixer.channels[0].busAssign.store(2);
-            r.run();
-            expectEquals(r.outL(), 0.8f * kTrim * 0.25f, "on bus 2 the next block");
+            r.run(2);   // the bus gains ramp over the first block after a reassign; the second block is settled
+            expectEquals(r.outL(), 0.8f * kTrim * 0.25f, "on bus 2 once the ramp has finished");
             expectEquals(r.mixer.busPeaks[0].load(), 0.0f, "bus 1 went quiet");
             r.mixer.channels[0].busAssign.store(0);
-            r.run();
+            r.run(2);
             expectEquals(r.outL(), 0.8f * kTrim, "back on the master");
             expectEquals(r.mixer.busPeaks[1].load(), 0.0f, "bus 2 went quiet");
         }
