@@ -2,18 +2,26 @@
 
 Written only by the build PC. The laptop reads it and answers in [laptop-to-build.md](laptop-to-build.md). Protocol: [README.md](README.md).
 
-Next id: B-006
+Next id: B-007
 
 (B-001 resolved and removed: see the Extra entry below.)
 
 ## Status (build PC)
 
-- Written: 2026-11-05, end of the mu-Tilate session. Build number 1457 (`mu-core/BuildNumber.h`, focused Debug builds, no increment). Everything is committed and pushed (`5f57b642` plus the handover and backlog commits after it).
+- Written: 2026-11-14, end of the architecture and site session. Build number 1489 (`mu-core/BuildNumber.h`; a full Debug of every product at 1489, then focused rebuilds of mu-Clid and mu-Clid MIDI, no increment). Everything is committed and pushed (HEAD `6c743f15`). Closed this session: #1811 (one compiled mu-core library, version family 1.2), #1812 (one shared JUCE library, `mu-juce`), #1805, #1813. Open rows: 4. No Release build and no pluginval run since the library changes; nothing was listened to beyond Andy's own Debug standalone and Bitwig checks (all fine). Next for Andy: repoint `transwarp.me` DNS (GoDaddy) to GitHub Pages; the site preview is at `andytuke.github.io/mu-family`.
+- (The earlier 2026-11-05 mu-Tilate status below it is older; B-002 to B-005 are still open from those sessions.)
+- Older status, 2026-11-05: Build number 1457 (focused Debug builds, no increment). Everything was committed and pushed (`5f57b642` plus the handover and backlog commits after it).
 - mu-Tilate: `mu-tilate-tests` 110 results, 0 failures (Debug). New this session and not yet seen or heard by Andy: rows #1759 to #1765 (see B-005). JUCE is now 9.0.5 (`D:\JUCE`, pin bumped, the local MIDI patch dropped); only mu-Tilate and its tests were rebuilt on it. No Release build, no pluginval run.
 - Other products: not rebuilt on JUCE 9.0.5 yet; their golden and pin failures are the stale ones in B-002, #1751 (mu-Tronic Pattern hash) is open.
 - `D:\JUCE-dev` is a scratch clone of JUCE `develop` for upstream work (L-012 is answered below).
 
 ## Open
+
+### B-006 · 2026-11-14 · Build structure changed, and the site is moving to GitHub Pages: what source writers and the web-designer must know
+Rows: #1811, #1812 (closed), #1803, #1804 · Commits: `634e52d4`, `a64b2f2c`, `2fe5269e`, `8200ae94`, `c3df6178`, `6c743f15` · Needs: review | decide
+Do: (1) Source written without a build: every `CMakeLists.txt` that creates a target must end with `mu_use_shared_juce()` (new products and tools too), otherwise the link fails with duplicate JUCE symbols; products link `mu-core-lib` and pass their own `ProcessorLimits` (`kLimits`) to `ProcessorBase`, the parameter layout and the mixfx helpers (no defaults, no `mu_core_variant()`, no `MU_MAX_LAYERS` macros; `check-core-boundary.ps1` fails on them). Reference: `docs/design-runtime-counts.md` and `docs/design-plugin-family.md` ("Shared libraries: mu-core and mu-juce"). (2) Ring fraction: use `RhythmSequencer::stepFraction(beat)`, never a bare `fmod`, wherever a position inside a step is published (`mu-core/Sequencer/RhythmSequencer.h`, test `StepFractionTests.cpp`). (3) Site: the live site is being moved from Netlify to GitHub Pages (about £10 a month saved, no deploy credits). The preview is the `gh-pages` branch (a copy of `site/` from `site-local` `e62adfed`, worktree `D:\Dev\mu-pages`), Pages source `gh-pages` `/`, custom domain not set until Andy repoints the DNS. Decide how the web-designer publishes after the move (copy `site/` to `gh-pages`, or a `workflow_dispatch`-only workflow from `main`) and whether `site-local` and the Netlify batching rules in the web-designer notes and CLAUDE.md can be dropped. #1804's release step still does not re-run `scripts/write-prices-json.ps1`.
+Report: the site publishing decision, and any source that conflicts with (1).
+Not done on this PC: no Release build, no pluginval on the shared-JUCE plug-ins, no check of the 22 site pages for leftover hard-coded prices, the mu-Tilate manual (`c3df6178`) was regenerated but not read in full, mu-Clid MIDI and the mu-Clid VST3 were built but not watched for the ring fix.
 
 ### B-005 · 2026-11-05 · mu-Tilate: look and listen to this session's changes, and measure one thing
 Rows: #1759 to #1765 (and #1745) · Commits: `c25d298f`, `7dfe426f`, `bb168712`, `ef4f5fdb`, `cc03ef84`, `26e4726b`, `9d13a47e`, `ff8ae934` · Needs: look | listen | measure
