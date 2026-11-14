@@ -522,11 +522,9 @@ public:
     // insert column beside it, a divider after each unit, then the Master. The strip width is whatever the
     // page leaves after the units' insert columns; it must stay at least one channel strip wide, which holds
     // for three buses (138) and not for four, by design: a fourth needs a layout ruling, not squeezed strips.
-    static constexpr int kMixerNumBuses    = mu_limits::kMaxBuses;
-    static constexpr int kMixerBusStripW   = kMixerNumBuses > 0
-        ? (kMixerOverlayW - kMixerLabelPanelW - kMixerMasterTotalW - kMixerNumBuses * kMixerDivW) / kMixerNumBuses - kMixerInsertPanelW
-        : 0;
-    static_assert(kMixerNumBuses == 0 || kMixerBusStripW >= kMixerChanW,
+    static constexpr int kMixerMaxBuses    = 3;   // the most buses the page lays out (MixerOverlay asserts a mixer has no more)
+    static constexpr int kMixerBusStripW   = (kMixerOverlayW - kMixerLabelPanelW - kMixerMasterTotalW - kMixerMaxBuses * kMixerDivW) / kMixerMaxBuses - kMixerInsertPanelW;
+    static_assert(kMixerBusStripW >= kMixerChanW,
                   "the Buses page cannot fit this many buses at the strip width: it needs a layout ruling");
 
     // ── Canonical knob sizes ──────────────────────────────────────────────

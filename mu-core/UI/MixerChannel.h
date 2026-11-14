@@ -30,7 +30,9 @@ public:
     // The name of group bus `index` (0-based) as the strips and the Out selector show it.
     static juce::String busName(int index) { return "Bus " + juce::String(index + 1); }
 
-    MixerChannel(Type type, const juce::String& name, juce::Colour colour);
+    // `limits` are the owning mixer's counts (buses, layers, external sidechain): they decide the Out selector and the sidechain list.
+    MixerChannel(Type type, const juce::String& name, juce::Colour colour,
+                 const mu_limits::ProcessorLimits& limits = mu_limits::ProcessorLimits::fromBuildSettings());
     ~MixerChannel() override;
 
     // status-bar coverage for outBus + scSource dropdowns. Colour is the
@@ -149,6 +151,7 @@ private:
 
     using Id = MuLookAndFeel::ColourIds;
 
+    mu_limits::ProcessorLimits limits_;
     Type         channelType;
     juce::String channelName;
     juce::Colour channelColour;

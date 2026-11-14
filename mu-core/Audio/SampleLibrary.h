@@ -2,6 +2,7 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "Audio/SamplePreview.h"
+#include "MuLimits.h"
 
 class VoiceEngine;
 
@@ -30,7 +31,7 @@ public:
 class SampleLibrary
 {
 public:
-    explicit SampleLibrary(SampleSlotHost& host);
+    explicit SampleLibrary(SampleSlotHost& host, int numSlots = mu_limits::kMaxLayers);   // one path slot per layer slot
 
     // Loads a file into the rhythm's voice engine and records its path.
     void load(int rhythmIndex, const juce::File& file);

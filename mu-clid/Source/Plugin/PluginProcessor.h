@@ -108,7 +108,7 @@ public:
     void    updatePattern (int index)      { updateRhythmPattern(index); }
 
     // Per-rhythm sample paths, load / missing queries, preview player and primary sample folder.
-    mu_core::SampleLibrary samples { *this };
+    mu_core::SampleLibrary samples { *this, getLimits().layers };
 
     // Hot-swap staging: stages a rhythm preset for atomic commit at the next loop boundary.
     // If the sequencer is not playing, applies the preset immediately instead.

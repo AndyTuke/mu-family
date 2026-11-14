@@ -51,7 +51,7 @@ public:
     // sidebar's once open; `pageOnOpen` (optional) names the sidebar's page to show each time the mixer opens.
     int  getNumPages() const noexcept;           // channel pages, plus the Buses page where there are buses
     int  getNumChannelPages() const noexcept;    // pages of channel strips only
-    bool isBusPage(int page) const noexcept { return mu_limits::kMaxBuses > 0 && page == getNumChannelPages(); }
+    bool isBusPage(int page) const noexcept { return mixer.numBuses > 0 && page == getNumChannelPages(); }
     int  getShownPage() const noexcept { return shownPage; }
     void showPage(int page);
     bool showAdjacentPage(int delta);   // PageUp / PageDown among the channel pages: no wrap; false when there is nowhere to go

@@ -7,8 +7,8 @@
 #include "UI/InsertSlotUi.h"        // configureKnobFromSlot (client EQ stack)
 #include <cmath>
 
-MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
-    : channelType(t), channelName(name), channelColour(col)
+MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col, const mu_limits::ProcessorLimits& limits)
+    : limits_(limits), channelType(t), channelName(name), channelColour(col)
 {
     fader.setSliderStyle(juce::Slider::LinearVertical);
     fader.setRange(0.0, 1.0, 0.001);
@@ -73,8 +73,8 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
         // Item id = value + 1: 0 -> Main. A product with group buses lists them ("Bus 1" ...); the others keep
         // the DAW direct outs ("Out 1" ... "Out 8").
         outBusBox.addItem("Main", 1);
-        if (mu_limits::kMaxBuses > 0)
-            for (int i = 0; i < mu_limits::kMaxBuses; ++i)
+        if (limits_.buses > 0)
+            for (int i = 0; i < limits_.buses; ++i)
                 outBusBox.addItem(busName(i), i + 2);
         else
             for (int i = 1; i <= 8; ++i)

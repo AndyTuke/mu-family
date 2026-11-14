@@ -50,7 +50,7 @@ public:
     static juce::String syncParamId(int bus, int insert);
 
     // The boxes shown: the bus's inserts, up to what the panel holds.
-    static int numSlots() noexcept;
+    int numSlots() const noexcept;   // the processor's inserts per bus, at most the panel's boxes
 
 private:
     void write(const juce::String& parameterId, float plainValue);

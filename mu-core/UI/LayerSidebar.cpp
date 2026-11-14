@@ -184,10 +184,10 @@ void LayerSidebar::followLiveState()
 
 void LayerSidebar::updateAddEnabled()
 {
-    const bool room = proc.getNumLayers() < mu_limits::kMaxLayers;
+    const bool room = proc.getNumLayers() < proc.getLimits().layers;
     if (addButton.isEnabled() == room) return;
     addButton.setEnabled(room);
-    addButton.setTooltip(room ? juce::String() : "Maximum of " + juce::String(mu_limits::kMaxLayers) + " " + noun + "s");
+    addButton.setTooltip(room ? juce::String() : "Maximum of " + juce::String(proc.getLimits().layers) + " " + noun + "s");
 }
 
 void LayerSidebar::layoutItems(bool animate, int newItemIndex)
