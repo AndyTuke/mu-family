@@ -19,7 +19,7 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
                              juce::AudioProcessorValueTreeState::ParameterLayout layout,
                              const juce::Identifier& stateTreeType,
                              mu_limits::ProcessorLimits limits)
-    : ProcessorCore(props),
+    : ProcessorCore(props, limits.layers),
       apvts(*this, nullptr, stateTreeType, std::move(layout)),
       mixerEngine(limits),
       limits_(limits)

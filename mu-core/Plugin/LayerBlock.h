@@ -3,6 +3,7 @@
 #include "Plugin/AudioEpoch.h"
 #include "Sequencer/Layer.h"
 #include "MuLimits.h"
+#include "Audio/FlatArray.h"
 
 #include <juce_audio_basics/juce_audio_basics.h>
 
@@ -33,7 +34,7 @@ namespace mu_core
         uint32_t serial  = 0;                           // layout serial: changes on every structural edit and publication
         int32_t  numLive = 0;                           // slots 0..numLive-1 render
         uint32_t frozenMask = 0;                        // bit s: slot s renders from its last resolved values (scene provision)
-        std::array<Layer*, mu_limits::kMaxLayers> layer {};   // every slot, spares included; null = no object
+        std::array<Layer*, mu_limits::kAbsoluteMaxLayers> layer {};   // every slot, spares included; null = no object
     };
 
     // The packed layout word: the live layer count in the low 32 bits and the layout serial in the high 32,
@@ -140,7 +141,7 @@ namespace mu_core
     {
     public:
         LayerBlock(LayerAccessState& state, juce::CriticalSection& layersLock, const std::atomic<bool>& editInFlight,
-                   const std::array<std::unique_ptr<Layer>, mu_limits::kMaxLayers>& layers) noexcept
+                   const mu_core::FlatArray<std::unique_ptr<Layer>>& layers) noexcept
             : access(state), lock(layersLock)
         {
             access.epoch.enter();   // rt-ok: epoch counter, not a lock
@@ -151,9 +152,9 @@ namespace mu_core
                 if (editInFlight.load(std::memory_order_seq_cst)) { lock.exit(); locked = false; return; }
                 const uint64_t w = access.layout.load(std::memory_order_seq_cst);
                 local.serial = LayoutWord::serial(w);
-                local.numLive = (int32_t) juce::jmin<uint32_t>(LayoutWord::count(w), (uint32_t) mu_limits::kMaxLayers);
+                local.numLive = (int32_t) juce::jmin<uint32_t>(LayoutWord::count(w), (uint32_t) layers.size());
                 local.frozenMask = 0;
-                for (int s = 0; s < mu_limits::kMaxLayers; ++s) local.layer[(size_t) s] = layers[(size_t) s].get();
+                for (int s = 0; s < layers.size(); ++s) local.layer[(size_t) s] = layers[s].get();
                 current = &local;
             }
             else

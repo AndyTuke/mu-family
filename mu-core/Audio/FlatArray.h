@@ -37,6 +37,10 @@ public:
     T&       operator[](int i)       noexcept { assert(i >= 0 && i < count_); return items_[(size_t) i]; }
     const T& operator[](int i) const noexcept { assert(i >= 0 && i < count_); return items_[(size_t) i]; }
 
+    // The same for code that holds an index as size_t (kept so a std::array call site moves over unchanged).
+    T&       operator[](size_t i)       noexcept { assert(i < (size_t) count_); return items_[i]; }
+    const T& operator[](size_t i) const noexcept { assert(i < (size_t) count_); return items_[i]; }
+
     T*       data()       noexcept { return items_.get(); }
     const T* data() const noexcept { return items_.get(); }
     T*       begin()       noexcept { return items_.get(); }

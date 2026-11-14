@@ -20,7 +20,11 @@
 class ProcessorCore : public juce::AudioProcessor
 {
 public:
-    explicit ProcessorCore(const BusesProperties& props) : juce::AudioProcessor(props) {}
+    // `numLayers` is the slot count (live layers plus spares) this processor was built with.
+    explicit ProcessorCore(const BusesProperties& props, int numLayers = mu_limits::kMaxLayers) : juce::AudioProcessor(props)
+    {
+        layers.reset(numLayers);
+    }
 
     // ─── Channel metadata for shared mixer UI ────────────────────────────────
     // Each mu-family plugin has some N "channels" (rhythms in mu-clid; whatever
@@ -84,7 +88,7 @@ public:
     // every Debug block, so the product checks the type once when it builds its layers.
     template <class T> T& layerAs(int i) noexcept
     {
-        jassert(i >= 0 && i < mu_limits::kMaxLayers && layers[(size_t) i] != nullptr);
+        jassert(i >= 0 && i < layers.size() && layers[i] != nullptr);
         return static_cast<T&>(*layers[(size_t) i]);
     }
     template <class T> const T& layerAs(int i) const noexcept
@@ -108,7 +112,7 @@ protected:
     // runtime must have its audio thread take a ScopedTryLock on `layersLock` once per block and read
     // layers only inside it (mu-Clid, mu-Tant, mu-Toni and mu-On all do, through LayerBlock); the message thread holds it
     // only to change the count or move layers, and constructs and destroys layers outside it.
-    std::array<std::unique_ptr<Layer>, mu_limits::kMaxLayers> layers;
+    mu_core::FlatArray<std::unique_ptr<Layer>> layers;   // one per slot, sized at construction (getLimits().layers)
     std::atomic<int>      numLayers { 0 };
 public:
     // True for the whole of a structural layer edit (pointer moves and the parameter moves after
@@ -139,7 +143,7 @@ protected:
     std::unique_ptr<Layer> publishLayerLocked(std::unique_ptr<Layer> fresh)
     {
         const int n = numLayers.load(std::memory_order_relaxed);
-        jassert(n < mu_limits::kMaxLayers);
+        jassert(n < layers.size());
         auto replaced = std::move(layers[(size_t) n]);
         layers[(size_t) n] = std::move(fresh);
         storeLayerCount(n + 1, std::memory_order_release);
@@ -172,7 +176,7 @@ protected:
     // layoutWriteLock, layersLock, binMutex). Returns the serial it stored.
     uint32_t storeLayerCount(int n, std::memory_order mirrorOrder = std::memory_order_seq_cst) noexcept
     {
-        jassert(n >= 0 && n <= mu_limits::kMaxLayers);
+        jassert(n >= 0 && n <= layers.size());
         uint64_t w = layerAccess.layout.load(std::memory_order_seq_cst);
         uint64_t next;
         do
