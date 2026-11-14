@@ -17,10 +17,13 @@
 
 ProcessorBase::ProcessorBase(const BusesProperties& props,
                              juce::AudioProcessorValueTreeState::ParameterLayout layout,
-                             const juce::Identifier& stateTreeType)
+                             const juce::Identifier& stateTreeType,
+                             mu_limits::ProcessorLimits limits)
     : ProcessorCore(props),
-      apvts(*this, nullptr, stateTreeType, std::move(layout))
+      apvts(*this, nullptr, stateTreeType, std::move(layout)),
+      limits_(limits)
 {
+    jassert(limits_.valid());
     // The block driver's mixer hook: channel r is slot r's scratch, copied exactly (raw pointers, so a
     // buffer's "cleared" flag can never turn the copy into a clear). A slot that nothing wrote this call (its
     // view still carries the cleared flag) is not copied: the mixer's channel stays cleared, as a voice that

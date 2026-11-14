@@ -76,8 +76,12 @@ class ProcessorBase : public ProcessorCore,
 public:
     ProcessorBase(const BusesProperties& props,
                   juce::AudioProcessorValueTreeState::ParameterLayout layout,
-                  const juce::Identifier& stateTreeType = juce::Identifier("MuFamilyState"));
+                  const juce::Identifier& stateTreeType = juce::Identifier("MuFamilyState"),
+                  mu_limits::ProcessorLimits limits = mu_limits::ProcessorLimits::fromBuildSettings());
     ~ProcessorBase() override;
+
+    // The layer, bus and insert counts this processor was built with (docs/design-runtime-counts.md). Fixed for its lifetime.
+    const mu_limits::ProcessorLimits& getLimits() const noexcept { return limits_; }
 
     // Public so UI panels (MixerOverlay, FXRow, MixerChannel, etc.) can access
     // them directly — matches the layout PluginProcessor had before extraction.
@@ -1420,6 +1424,8 @@ private:
     void captureSidechainRegion(juce::AudioBuffer<float>& buffer, int offset, int numSamples) noexcept;
     void renderLayers(const mu_core::LayerBlock& block, const mu_core::BlockTransport& t,
                       int offset, int numSamples, bool firstChunk, bool lastChunk) noexcept;
+
+    const mu_limits::ProcessorLimits limits_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ProcessorBase)
 };

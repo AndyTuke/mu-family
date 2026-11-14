@@ -49,6 +49,36 @@ namespace mu_limits
     // (no host sidechain bus) sets MU_EXT_SIDECHAIN=0 so the mixer does not list a source that can never carry audio.
     inline constexpr bool kExternalSidechain = MU_EXT_SIDECHAIN != 0;
 
+    // Fixed ceilings. A count a product chooses (below) can never exceed these: the layer masks are 32-bit and the
+    // parameter ids carry one digit for a bus and one for a bus insert. They bound the few small fixed arrays that
+    // stay fixed; every loop runs to the runtime count, never to a ceiling.
+    inline constexpr int kAbsoluteMaxLayers = 32;
+    inline constexpr int kAbsoluteMaxBuses  = 9;
+    inline constexpr int kAbsoluteBusInserts = 9;
+
+    // The counts one processor is built with. Each product owns one constant and passes it to its parameter layout and to
+    // ProcessorBase, so the two cannot disagree; ProcessorBase keeps it (getLimits()) and everything that needs a count
+    // reads it from there. fromBuildSettings() is the value the MU_* macros above give, until they are retired.
+    struct ProcessorLimits
+    {
+        int  layers = 8;
+        int  buses = 0;
+        int  busInserts = 2;
+        bool externalSidechain = true;
+
+        static constexpr ProcessorLimits fromBuildSettings() noexcept
+        {
+            return { MU_MAX_LAYERS, MU_MAX_BUSES, MU_BUS_INSERTS, MU_EXT_SIDECHAIN != 0 };
+        }
+
+        constexpr bool valid() const noexcept
+        {
+            return layers >= 1 && layers <= kAbsoluteMaxLayers
+                && buses >= 0 && buses <= kAbsoluteMaxBuses
+                && busInserts >= 1 && busInserts <= kAbsoluteBusInserts;
+        }
+    };
+
     // Layers shown at once in the sidebar and the mixer (a 16-layer host pages them in two).
     inline constexpr int kLayersPerPage = 8;
 

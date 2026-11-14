@@ -36,6 +36,7 @@ set(MU_CORE_TEST_SOURCES
     LayerEquivalence.h
     LayerAccessTests.cpp
     ClipBankTests.cpp
+    ProcessorLimitsTests.cpp        # runtime-count types: FlatArray, ProcessorLimits, ProcessorBase::getLimits
     HeldNoteStackTests.cpp          # the shared held-key stack and its two overflow policies
     ClipLaunchTests.cpp
     ClipAutoSaveTests.cpp           # clip auto-save: settle, flush, skips, trackers
