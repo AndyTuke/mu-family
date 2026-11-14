@@ -1,6 +1,7 @@
 // The Phrase parameter table: every row the suffix table names exists under the slot's prefix (and only there),
 // the rows' defaults are what the design says, and every modulation target names a real row with a proportional depth.
 
+#include "Plugin/MuTilateLimits.h"
 #include "Plugin/MixerFxParams.h"   // mu-core: addChannelStripParams
 #include "Modulation/ModTargetChecks.h"   // mu-core: missingParams, depthNotProportional
 #include "Modulation/MuTilateModDest.h"
@@ -20,8 +21,8 @@ struct PhraseParamsTests : public juce::UnitTest
     void runTest() override
     {
         juce::AudioProcessorValueTreeState::ParameterLayout layout;
-        addLayerParams(layout, 0);
-        addLayerParams(layout, 3);
+        addLayerParams(layout, 0, mu_tilate::kLimits.layers);
+        addLayerParams(layout, 3, mu_tilate::kLimits.layers);
         ParamHost host(std::move(layout));
         auto& apvts = host.apvts;
 
@@ -54,7 +55,7 @@ struct PhraseParamsTests : public juce::UnitTest
             {
                 // The layer's rows plus its mixer strip (the pan and send targets are the strip's parameters).
                 juce::AudioProcessorValueTreeState::ParameterLayout withStrip;
-                addLayerParams(withStrip, 0);
+                addLayerParams(withStrip, 0, mu_tilate::kLimits.layers);
                 mu_mixfx::addChannelStripParams(withStrip, "ch0_", "Layer 1 Ch ");
                 ParamHost stripHost(std::move(withStrip));
                 expectEquals(mu_mod::checks::missingParams(kModDestTable, stripHost.apvts, "p0_").size(), 0);

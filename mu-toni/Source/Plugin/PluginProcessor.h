@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Plugin/MuToniLimits.h"
 #include "Plugin/ProcessorBase.h"        // mu-core base
 #include "Persistence/LayerParamIds.h"   // layerParamPrefix / layerParamId
 #include "Persistence/ArpParams.h"       // the Arp type's parameter table (vpi, addLayerParams)
@@ -64,12 +65,12 @@ public:
     // `numLayers`, 1..kMaxLayers).
     juce::String getLayerName(int idx)       const override
     {
-        return (idx >= 0 && idx < mu_limits::kMaxLayers) ? "Layer " + juce::String(idx + 1) : juce::String();
+        return (idx >= 0 && idx < mu_toni::kLimits.layers) ? "Layer " + juce::String(idx + 1) : juce::String();
     }
     // The palette colour is allocated per layer and follows it through delete / reorder.
     int          getLayerColourIndex(int idx) const override
     {
-        return (idx >= 0 && idx < mu_limits::kMaxLayers) ? layers[(size_t) idx]->colourIndex : 0;
+        return (idx >= 0 && idx < mu_toni::kLimits.layers) ? layers[(size_t) idx]->colourIndex : 0;
     }
 
     // Add / delete / reorder / reset are ProcessorBase::addLayer / removeLayer / swapLayers /
@@ -143,7 +144,7 @@ public:
     // target knob's parameter units. Written each block by the layer; read by the knobs' live arcs.
     float getModLive(int layer, int dest) const noexcept override
     {
-        return getArp(juce::jlimit(0, mu_limits::kMaxLayers - 1, layer)).getModLive(dest);
+        return getArp(juce::jlimit(0, mu_toni::kLimits.layers - 1, layer)).getModLive(dest);
     }
     // ── ArpHost: what ArpContent reads (message thread) ───────────────────────
     juce::AudioProcessorValueTreeState& getArpParameters() noexcept override { return apvts; }

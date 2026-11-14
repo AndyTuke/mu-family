@@ -17,7 +17,7 @@ namespace mu_on
 class StepPattern
 {
 public:
-    static constexpr int kNumTracks = 8;                    // one row per layer slot (mu_limits::kMaxLayers)
+    static constexpr int kNumTracks = 8;                    // one row per layer slot (mu_limits::kAbsoluteMaxLayers)
     static constexpr int kNumSteps  = StepRow::kNumSteps;
 
     StepPattern() : ownedRows(std::make_unique<std::array<StepRow, kNumTracks>>()), owned(*ownedRows) { for (int t = 0; t < kNumTracks; ++t) bound[(size_t) t] = &owned[(size_t) t]; }

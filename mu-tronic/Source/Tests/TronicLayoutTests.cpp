@@ -91,7 +91,7 @@ struct MuTronicLayoutTests : juce::UnitTest
         {
             mu_seam_test::TempStorage storage;
             mu_tronic::PluginProcessor p;
-            const auto layout = mu_pp::LayerLayout::withPrefixSets(p, mu_tronic::slotPrefixSets());   // the layout the processor saves by
+            const auto layout = mu_pp::LayerLayout::withPrefixSets(p, mu_tronic::slotPrefixSets(p.getLimits().layers));   // the layout the processor saves by
 
             // The ids of every parameter, once.
             juce::StringArray ids;

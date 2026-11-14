@@ -1,3 +1,4 @@
+#include "Plugin/MuClidLimits.h"
 #include "PluginEditor.h"
 #include "Audio/FX/Slots/FXAlgorithmDef.h"
 #include <BinaryData.h>
@@ -98,7 +99,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // refreshed when the shown rhythm's mode changes and, for host automation of any rhythm, below.
     mixerOverlay.isChannelSilent = [this](int r) { return isRhythmMidiOutput(r); };
     rhythmContent.onOutputModeChanged = [this] { if (isMixerVisible()) mixerOverlay.loadFromApvts(); };
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < mu_clid::kLimits.layers; ++i)
         proc.apvts.addParameterListener("r" + juce::String(i) + "_outMode", this);
     startTimerHz(mu_ui::kUiRefreshHz);   // drains the flags the parameter listener raises
 
@@ -142,7 +143,7 @@ PluginEditor::~PluginEditor()
     // contract as the shell base's destructor.
     stopTimer();
     proc.apvts.removeParameterListener("eff_algo", this);
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < mu_clid::kLimits.layers; ++i)
         proc.apvts.removeParameterListener("r" + juce::String(i) + "_outMode", this);
     proc.onLayerPresetCommitted = nullptr;
 }

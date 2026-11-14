@@ -2,7 +2,7 @@
 #define BUILD_NUMBER 1487
 // Live products use this base; pre-release products override MU_VERSION_BASE per target.
 #ifndef MU_VERSION_BASE
-#define MU_VERSION_BASE "1.1"
+#define MU_VERSION_BASE "1.2"
 #endif
 #define MU_STR_(x) #x
 #define MU_STR(x) MU_STR_(x)

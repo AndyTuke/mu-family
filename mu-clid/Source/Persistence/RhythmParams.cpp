@@ -13,7 +13,7 @@ namespace mu_clid {
 static_assert(mu_clid::mod_skew::kPad.hi == (float) HitGenerator::kMaxPrePad && HitGenerator::kMaxPrePad == HitGenerator::kMaxPostPad, "kPad must match the pad parameters");
 static_assert(mu_clid::mod_skew::kInsertLength.hi == (float) HitGenerator::kMaxInsertLength, "kInsertLength must match insLen");
 
-void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int i)
+void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int i, int /*numLayers*/)
 {
     auto addF = [&](const juce::String& id, const juce::String& name, float mn, float mx, float def)
     {

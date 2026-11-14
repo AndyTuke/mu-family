@@ -5,7 +5,7 @@
 namespace mu_tilate
 {
 
-void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot)
+void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot, int /*numLayers*/)
 {
     const auto prefix = layerParamPrefix(slot);
     auto id = [&](int row) { return juce::ParameterID { prefix + ppi::suffix[row], 1 }; };

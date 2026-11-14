@@ -24,11 +24,16 @@ namespace mu_tronic
 
 // What a product built on this shell names itself (mu-Host is the one that does): the saved state's root tag, the settings /
 // content folder, and whether the shell asks for mu-Tronic's own licence (a product that licenses per engine switches it off).
+// The counts mu-Tronic itself is built with: 16 slots, 3 group buses of 2 inserts, no host sidechain (a Standalone-only product).
+inline constexpr mu_limits::ProcessorLimits kLimits { 16, 3, 2, false };
+
 struct ProcessorIdentity
 {
     const char* stateType = kStateType;
     const char* appName   = kAppName;
     bool        ownLicence = true;
+    // The slot, bus and insert counts this build has: mu-Tronic's 16 slots and 3 buses of 2 inserts; mu-Host passes one slot and no buses.
+    mu_limits::ProcessorLimits limits = kLimits;
 };
 
 class PluginProcessor : public ProcessorBase
@@ -141,7 +146,7 @@ protected:
     int getNumActiveLayers() const override;
 
 private:
-    static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+    static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout(const mu_limits::ProcessorLimits& limits);
 
     // Cleared by prepareToPlay; the first block after it gives the host's MIDI buffer room for the layers' output, so the
     // one allocation a MIDI merge can cost happens at start-up, before any note.

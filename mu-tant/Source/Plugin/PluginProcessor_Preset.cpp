@@ -1,3 +1,4 @@
+#include "Plugin/MuTantLimits.h"
 #include "Plugin/PluginProcessor.h"
 #include "Modulation/MuTantModDest.h"
 #include "Modulation/ModulatorSerialise.h"   // mu-core: shared modulator (de)serialise
@@ -90,7 +91,7 @@ namespace
 void PluginProcessor::initVoiceState()
 {
     juce::StringArray prefixes;
-    for (int v = 0; v < mu_limits::kMaxLayers; ++v) prefixes.add(layerParamPrefix(v));
+    for (int v = 0; v < mu_tant::kLimits.layers; ++v) prefixes.add(layerParamPrefix(v));
     initLayerState(prefixes);
 }
 
@@ -130,7 +131,7 @@ juce::ValueTree PluginProcessor::toVoiceState(const juce::ValueTree& tree) const
 // A .muPattern: the voice's node (prefix-free param rows + its extras), so it loads into any voice.
 juce::ValueTree PluginProcessor::captureLayerPresetTree(int voice)
 {
-    if (voice < 0 || voice >= mu_limits::kMaxLayers) return {};
+    if (voice < 0 || voice >= mu_tant::kLimits.layers) return {};
     return captureLayerNode(voice, kPatternPresetTag);
 }
 
@@ -144,7 +145,7 @@ void PluginProcessor::saveLayerPreset(int voice, const juce::String& name)
 
 void PluginProcessor::loadLayerPreset(int voice, const juce::File& file)
 {
-    if (voice < 0 || voice >= mu_limits::kMaxLayers || ! file.existsAsFile()) return;
+    if (voice < 0 || voice >= mu_tant::kLimits.layers || ! file.existsAsFile()) return;
     auto xml = juce::XmlDocument::parse(file);
     if (xml == nullptr || ! xml->hasTagName(kPatternPresetTag))
     {
@@ -158,7 +159,7 @@ void PluginProcessor::loadLayerPreset(int voice, const juce::File& file)
 void PluginProcessor::stageLayerPresetTree(int voice, juce::ValueTree tree, bool keepIdentity)
 {
     juce::ignoreUnused(keepIdentity);   // a voice node carries no name or colour
-    if (voice < 0 || voice >= mu_limits::kMaxLayers || ! tree.isValid()) return;
+    if (voice < 0 || voice >= mu_tant::kLimits.layers || ! tree.isValid()) return;
     migrateXModVoice(tree);
 
     // Hot-swap: while the resolved transport plays (host, MIDI clock or internal), stage and commit
@@ -174,7 +175,7 @@ void PluginProcessor::stageLayerPresetTree(int voice, juce::ValueTree tree, bool
 // back to its default, as in every product.
 void PluginProcessor::applyVoicePresetTree(int voice, const juce::ValueTree& tree)
 {
-    if (voice < 0 || voice >= mu_limits::kMaxLayers) return;
+    if (voice < 0 || voice >= mu_tant::kLimits.layers) return;
     applyLayerNode(voice, tree);
 }
 

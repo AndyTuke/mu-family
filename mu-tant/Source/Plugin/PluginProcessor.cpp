@@ -1,3 +1,4 @@
+#include "Plugin/MuTantLimits.h"
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/SwapBoundary.h"   // mu-tant: the hot-swap boundary rule (the host's policy)
 #include "Plugin/MidiRaw.h"        // mu-core: note tests on raw MIDI bytes (no allocation)
@@ -12,12 +13,13 @@ PluginProcessor::PluginProcessor()
                         .withInput ("Sidechain", juce::AudioChannelSet::stereo(), false)
                         .withOutput("Output",    juce::AudioChannelSet::stereo(), true),
                     createParameterLayout(),
-                    juce::Identifier("MuTantState"))
+                    juce::Identifier("MuTantState"),
+                    kLimits)
 {
     // All eight Patterns exist for the processor's lifetime (capacity is fixed, only the count is
     // runtime), so a preset can fill a slot above the live count before the count grows.
     keepSpareLayers = true;
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < mu_tant::kLimits.layers; ++i)
     {
         layers[(size_t) i] = createLayer(i);
         layers[(size_t) i]->colourIndex = i;   // each voice starts on its own palette colour
@@ -50,7 +52,7 @@ PluginProcessor::PluginProcessor()
 
     // The slot engines: one per slot, handed to the Pattern in that slot (PatternHost::getPatternEngine).
     bank.loadFactoryBank();      // multi-table, mip-mapped factory wavetable bank
-    for (int v = 0; v < mu_limits::kMaxLayers; ++v)
+    for (int v = 0; v < mu_tant::kLimits.layers; ++v)
     {
         voices[(size_t) v] = std::make_unique<VoiceEngine>();
         voices[(size_t) v]->setBank(&bank);
@@ -70,7 +72,7 @@ PluginProcessor::PluginProcessor()
     setRegrowCutsInPlaceTails(false);
     // Every slot's Pattern binds now that the slot engines exist, and starts in the restored Note mode with an
     // input state of its own (it hears every block from the first).
-    for (int v = 0; v < mu_limits::kMaxLayers; ++v)
+    for (int v = 0; v < mu_tant::kLimits.layers; ++v)
     {
         auto& p = getPattern(v);
         p.bindParams(apvts, v);
@@ -136,8 +138,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     renderAndMix(buffer, midiMessages, t);
     applyNoteModeGate(buffer, numSamples);
 
-    std::array<double, mu_limits::kMaxLayers> beats {};
-    for (int s = 0; s < mu_limits::kMaxLayers; ++s) beats[(size_t) s] = layerLoopBeats(s);
+    std::array<double, mu_tant::kLimits.layers> beats {};
+    for (int s = 0; s < mu_tant::kLimits.layers; ++s) beats[(size_t) s] = layerLoopBeats(s);
     flagPatternSwapBoundaries(t.playing, t.startBeat, t.blockBeats, beats.data());
 }
 
@@ -211,7 +213,7 @@ std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
 // reset by the edit itself. Under layersLock with processing suspended: allocation-free resets only.
 void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
 {
-    for (int d = juce::jmax(0, firstIndex); d <= juce::jmin(lastIndex, mu_limits::kMaxLayers - 1); ++d)
+    for (int d = juce::jmax(0, firstIndex); d <= juce::jmin(lastIndex, mu_tant::kLimits.layers - 1); ++d)
     {
         if (voices[(size_t) d] != nullptr) { voices[(size_t) d]->setSlotIndex(d, noiseSeedSalt); voices[(size_t) d]->reset(); }
         auto& ins = *getPattern(d).insert;   // the Pattern now in slot d brings its own insert along
@@ -232,7 +234,7 @@ void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
 // reads or writes either Pattern meanwhile, and the lock orders the audio thread's last writes before this.
 void PluginProcessor::seedInputState(int slot) noexcept
 {
-    for (int s = 0; s < mu_limits::kMaxLayers; ++s)
+    for (int s = 0; s < mu_tant::kLimits.layers; ++s)
         if (s != slot && layers[(size_t) s] != nullptr && getPattern(s).hasInputState())
         {
             getPattern(slot).takeInputStateFrom(getPattern(s));
@@ -250,7 +252,7 @@ int PluginProcessor::bankIndexFor(const juce::File& file)
 
 void PluginProcessor::loadUserWavetable(int voice, int oscIndex, const juce::File& file)
 {
-    if (voice < 0 || voice >= mu_limits::kMaxLayers || ! file.existsAsFile()) return;
+    if (voice < 0 || voice >= mu_tant::kLimits.layers || ! file.existsAsFile()) return;
     const int idx = bankIndexFor(file);
     if (idx < 0) { if (onLoadError) onLoadError("Could not load wavetable \"" + file.getFileName() + "\""); return; }
     const juce::String path = file.getFullPathName();
@@ -260,14 +262,14 @@ void PluginProcessor::loadUserWavetable(int voice, int oscIndex, const juce::Fil
 
 void PluginProcessor::clearUserWavetable(int voice, int oscIndex)
 {
-    if (voice < 0 || voice >= mu_limits::kMaxLayers) return;
+    if (voice < 0 || voice >= mu_tant::kLimits.layers) return;
     if (oscIndex == 0) { getPattern(voice).osc1UserPath.clear(); getPattern(voice).osc1UserIndex.store(-1); }
     else             { getPattern(voice).osc2UserPath.clear(); getPattern(voice).osc2UserIndex.store(-1); }
 }
 
 juce::String PluginProcessor::userWavetablePath(int voice, int oscIndex) const
 {
-    if (voice < 0 || voice >= mu_limits::kMaxLayers) return {};
+    if (voice < 0 || voice >= mu_tant::kLimits.layers) return {};
     return (oscIndex == 0) ? getPattern(voice).osc1UserPath : getPattern(voice).osc2UserPath;
 }
 
@@ -281,7 +283,7 @@ bool PluginProcessor::userWavetableMissing(int voice, int oscIndex) const
 void PluginProcessor::setMidiNoteMode(int mode)
 {
     midiNoteMode.store(mode, std::memory_order_relaxed);
-    for (int v = 0; v < mu_limits::kMaxLayers; ++v)
+    for (int v = 0; v < mu_tant::kLimits.layers; ++v)
         if (layers[(size_t) v] != nullptr) getPattern(v).setNoteMode(mode);   // each layer resets its keys on its next block
     if (appSettings != nullptr) { appSettings->setValue("midiNoteMode", mode); appSettings->saveIfNeeded(); }
 }

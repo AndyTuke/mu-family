@@ -18,7 +18,7 @@ TrackStepRow::TrackStepRow(TrackHost& trackHost)
 
 void TrackStepRow::setLayer(int layer)
 {
-    slot = juce::jlimit(0, mu_limits::kMaxLayers - 1, layer);
+    slot = juce::jlimit(0, mu_limits::kAbsoluteMaxLayers - 1, layer);
     shownSignature = 0;
     playheadStep = -1;
     repaint();

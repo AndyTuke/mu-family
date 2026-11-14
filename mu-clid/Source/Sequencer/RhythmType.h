@@ -169,7 +169,7 @@ public:
     explicit RhythmSlotServices(juce::AudioProcessorValueTreeState& apvts)
         : ownerThread(std::this_thread::get_id())
     {
-        for (int s = 0; s < mu_limits::kMaxLayers; ++s)
+        for (int s = 0; s < mu_limits::kAbsoluteMaxLayers; ++s)
             for (int d = 0; d < kRhythmParamCount; ++d)
             {
                 const auto id = "r" + juce::String(s) + "_" + kRhythmParamDefs[d].suffix;
@@ -219,7 +219,7 @@ public:
     void deferredWork() override
     {
         // Rows that changed on another thread: each read from the parameter itself, so the newest value wins.
-        for (int s = 0; s < mu_limits::kMaxLayers; ++s)
+        for (int s = 0; s < mu_limits::kAbsoluteMaxLayers; ++s)
             if (slotDirty[(size_t) s].exchange(false, std::memory_order_acq_rel))
                 for (int d = 0; d < kRhythmParamCount; ++d)
                     if (dirty[(size_t) s][(size_t) d].exchange(false, std::memory_order_acq_rel))
@@ -227,7 +227,7 @@ public:
     }
 
     // ── SampleSlotHost: the engines and the settings file the sample library uses ──
-    int getSampleSlotCount() const noexcept override { return mu_limits::kMaxLayers; }
+    int getSampleSlotCount() const noexcept override { return mu_limits::kAbsoluteMaxLayers; }
     VoiceEngine*       getSampleSlotEngine(int slot) noexcept override
     {
         auto* r = rhythmAt(slot);
@@ -273,10 +273,10 @@ private:
         return mm != nullptr ? mm->isThisTheMessageThread() : std::this_thread::get_id() == ownerThread;
     }
 
-    std::array<std::array<juce::RangedAudioParameter*, (size_t) kRhythmParamCount>, (size_t) mu_limits::kMaxLayers> params {};
+    std::array<std::array<juce::RangedAudioParameter*, (size_t) kRhythmParamCount>, (size_t) mu_limits::kAbsoluteMaxLayers> params {};
     std::unordered_map<int, Entry> byIndex;   // built once; the listener only looks it up
-    std::array<std::array<std::atomic<bool>, (size_t) kRhythmParamCount>, (size_t) mu_limits::kMaxLayers> dirty {};
-    std::array<std::atomic<bool>, (size_t) mu_limits::kMaxLayers> slotDirty {};
+    std::array<std::array<std::atomic<bool>, (size_t) kRhythmParamCount>, (size_t) mu_limits::kAbsoluteMaxLayers> dirty {};
+    std::array<std::atomic<bool>, (size_t) mu_limits::kAbsoluteMaxLayers> slotDirty {};
     const std::thread::id ownerThread;
 };
 

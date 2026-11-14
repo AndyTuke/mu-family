@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Plugin/MuOnLimits.h"
 #include "UI/EditorShellBase.h"
 #include "UI/LayerSidebar.h"          // mu-core shared sidebar (select/add/delete/reorder)
 #include "UI/LayerEditController.h"   // mu-core: add / delete / reorder glue
@@ -48,7 +49,7 @@ private:
     SettingsOverlay settingsOverlay;
 
     // Last-seen per-track trigger counts — diffed each animation tick to pulse the sidebar.
-    std::array<int, mu_limits::kMaxLayers> lastTriggers { };
+    std::array<int, mu_on::kLimits.layers> lastTriggers { };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };

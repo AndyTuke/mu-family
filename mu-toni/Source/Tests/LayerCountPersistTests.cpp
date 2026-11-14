@@ -3,6 +3,7 @@
 // the count and palette colours round-trip, and add / remove / swap carry a layer's parameters,
 // colour and mixer strip with it. (createEditor is defined in ProcessorSeamTests.cpp.)
 
+#include "Plugin/MuToniLimits.h"
 #include "Plugin/PluginProcessor.h"
 #include "Tests/ProcessorSeamHelpers.h"
 
@@ -76,7 +77,7 @@ struct MuToniLayerCountPersistTests : juce::UnitTest
             ExposedPluginProcessor p;
             expectEquals(p.numLayers.load(), 1);
             expectEquals(p.getNumLayers(), 1);
-            for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            for (int i = 0; i < mu_toni::kLimits.layers; ++i)
             {
                 expect(p.layers[(size_t) i] != nullptr, "slot " + juce::String(i) + " is allocated");
                 expectEquals(p.getLayerColourIndex(i), i, "slot " + juce::String(i) + " starts on palette colour " + juce::String(i));
@@ -161,7 +162,7 @@ struct MuToniLayerCountPersistTests : juce::UnitTest
         {
             TempStorage storage;
             ExposedPluginProcessor p;
-            while (p.getNumLayers() < mu_limits::kMaxLayers) expect(p.addLayer() >= 0, "addLayer below the limit");
+            while (p.getNumLayers() < mu_toni::kLimits.layers) expect(p.addLayer() >= 0, "addLayer below the limit");
             expectEquals(p.addLayer(), -1, "addLayer at eight is refused");
             const int colours[8] = { 4, 1, 6, 2, 7, 0, 3, 5 };
             for (int i = 0; i < 8; ++i) p.layers[(size_t) i]->colourIndex = colours[i];

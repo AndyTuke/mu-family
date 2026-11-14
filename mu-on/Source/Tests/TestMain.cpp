@@ -7,6 +7,7 @@
 //         and the channel engines, plus the real PluginProcessor built headless
 //         (createEditor lives in PluginEditor.cpp, which is not linked).
 
+#include "Tests/TestSelection.h"
 #include <juce_core/juce_core.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <cstdio>
@@ -26,10 +27,11 @@ int main(int argc, char** argv)
     StdoutLogger logger;
     juce::Logger::setCurrentLogger(&logger);
 
-    juce::UnitTestRunner runner;
+    mu_test::TimedRunner runner;
     runner.setAssertOnFailure(false);
-    if (argc > 1) runner.runTestsInCategory(argv[1]);   // optional: run only one category
-    else          runner.runAllTests();
+    mu_test::runSelected(runner, argc, argv);   // default: everything but the slow golden renders; --goldens, --all, or one category (Tests/TestSelection.h)
+
+    runner.printSlowest();
 
     int totalFailures = 0;
     for (int i = 0; i < runner.getNumResults(); ++i)

@@ -47,7 +47,7 @@ public:
     // rt-ok-fn: message thread; the audio thread reads the bank through BankTryLock, never the blocking engineLock/bankLock
     VoiceEngine* engineForNewLayer(int slot)
     {
-        if (slot < 0 || slot >= mu_limits::kMaxLayers) return nullptr;
+        if (slot < 0 || slot >= mu_limits::kAbsoluteMaxLayers) return nullptr;
         const juce::ScopedLock sl(engineLock);
         auto& pair = engines[(size_t) slot];
         for (auto& e : pair)
@@ -68,7 +68,7 @@ public:
     // rt-ok-fn: message thread; the audio thread reads the bank through BankTryLock, never the blocking engineLock/bankLock
     void slotsSwapped(int a, int b) override
     {
-        if (a < 0 || b < 0 || a >= mu_limits::kMaxLayers || b >= mu_limits::kMaxLayers || a == b) return;
+        if (a < 0 || b < 0 || a >= mu_limits::kAbsoluteMaxLayers || b >= mu_limits::kAbsoluteMaxLayers || a == b) return;
         const juce::ScopedLock sl(engineLock);
         std::swap(engines[(size_t) a], engines[(size_t) b]);
         std::swap(current[(size_t) a], current[(size_t) b]);
@@ -82,7 +82,7 @@ public:
     // bindParams is handed. Allocates nothing and takes no lock, as a bindParams under layersLock requires.
     VoiceEngine* findEngine(int slot) const noexcept
     {
-        return slot >= 0 && slot < mu_limits::kMaxLayers ? engines[(size_t) slot][(size_t) current[(size_t) slot]].get() : nullptr;
+        return slot >= 0 && slot < mu_limits::kAbsoluteMaxLayers ? engines[(size_t) slot][(size_t) current[(size_t) slot]].get() : nullptr;
     }
 
     // The bank index of a wavetable file: found by path, else decoded OFF the lock (file read, WAV decode and FFT
@@ -119,8 +119,8 @@ private:
 
     const juce::int64 noiseSalt = mu_core::makeNoiseSalt();   // per processor: slots of two instances do not share noise
     juce::CriticalSection engineLock;                          // the table of engines (creation, prepare)
-    std::array<std::array<std::unique_ptr<VoiceEngine>, 2>, (size_t) mu_limits::kMaxLayers> engines;
-    std::array<int, (size_t) mu_limits::kMaxLayers> current {};   // which of the slot's two engines the newest Pattern uses
+    std::array<std::array<std::unique_ptr<VoiceEngine>, 2>, (size_t) mu_limits::kAbsoluteMaxLayers> engines;
+    std::array<int, (size_t) mu_limits::kAbsoluteMaxLayers> current {};   // which of the slot's two engines the newest Pattern uses
     double rate = 0.0;
     int    block = 0;
 };

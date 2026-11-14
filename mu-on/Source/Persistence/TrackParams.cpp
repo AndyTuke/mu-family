@@ -1,6 +1,6 @@
 #include "Persistence/TrackParams.h"
 #include "Audio/AlgorithmNames.h"   // mu-core: kFilterTypeNames
-#include "MuLimits.h"   // mu-core: mu_limits::kMaxLayers (the Rumble source's range)
+#include "MuLimits.h"   // mu-core: mu_limits::kAbsoluteMaxLayers (the Rumble source's range)
 #include "Persistence/InsertParams.h"   // mu-core: mu_mixfx::addInsertParams
 #include "Persistence/ParamText.h"   // mu-core: mu_fmt::floatUnit
 #include "Sequencer/StepRepeats.h"   // the Speed choice lists the repeat rates
@@ -16,7 +16,7 @@ static juce::StringArray familyFilterTypes()
     return types;
 }
 
-void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot)
+void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot, int numLayers)
 {
     using namespace juce;
     auto f = [](float lo, float hi, float step) { return NormalisableRange<float>(lo, hi, step); };
@@ -48,7 +48,7 @@ void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
     using E = EngineType;
 
     layout.add(std::make_unique<AudioParameterChoice>(ParameterID{ layerParamId(slot, "eng"), 1 }, lbl + "Engine", engineNames(), 0));
-    layout.add(std::make_unique<AudioParameterInt>   (ParameterID{ layerParamId(slot, "src"), 1 }, lbl + "Rumble Source", 0, mu_limits::kMaxLayers - 1, 0));
+    layout.add(std::make_unique<AudioParameterInt>   (ParameterID{ layerParamId(slot, "src"), 1 }, lbl + "Rumble Source", 0, numLayers - 1, 0));
 
     // Kick engine (synthesis)
     flt(E::Kick, "tune",  "Kick Tune",        pitchRange(30.0f, 120.0f), 50.0f, mu_fmt::Unit::HzNote);   // snapped to the master key and scale by the engine
@@ -207,7 +207,7 @@ void remapRumbleSources(juce::AudioProcessorValueTreeState& apvts, int liveCount
     // The first fallback candidate in the new order (a source that is gone falls back to it): a Kick unless the host
     // names its own candidates.
     int fallback = liveCount;
-    for (int j = 0; j < mu_limits::kMaxLayers; ++j)
+    for (int j = 0; j < mu_limits::kAbsoluteMaxLayers; ++j)
         if (fallbackCandidate ? fallbackCandidate(j) : engineOfSlot(j) == EngineType::Kick)
         {
             const int nj = oldToNew(j);
@@ -216,7 +216,7 @@ void remapRumbleSources(juce::AudioProcessorValueTreeState& apvts, int liveCount
     if (fallback >= liveCount) fallback = 0;
 
     // Every Rumble slot's source, rewritten at its old slot.
-    for (int j = 0; j < mu_limits::kMaxLayers; ++j)
+    for (int j = 0; j < mu_limits::kAbsoluteMaxLayers; ++j)
     {
         if (engineOfSlot(j) != EngineType::Rumble) continue;
         auto* p = apvts.getParameter(layerParamId(j, "src"));

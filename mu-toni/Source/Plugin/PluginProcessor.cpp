@@ -1,3 +1,4 @@
+#include "Plugin/MuToniLimits.h"
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
@@ -15,20 +16,20 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     // ── Mixer channel strips (one per layer slot, all eight) — shared `ch{N}_`
     //    binding the MixerChannel / MixerOverlay use: level/pan/mute/solo + FX
     //    sends + sidechain + output bus. Synced via ProcessorBase::syncGlobalFxParam.
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < mu_toni::kLimits.layers; ++i)
     {
         const juce::String c = "ch" + juce::String(i) + "_";
         const juce::String n = "Layer " + juce::String(i + 1) + " Ch ";
-        mu_mixfx::addChannelStripParams(layout, c, n);
+        mu_mixfx::addChannelStripParams(layout, c, n, {}, kLimits);
     }
 
     // ── The Arp type's rows for every layer slot (a{N}_*), then the MIDI-in channel ──
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
-        addLayerParams(layout, i);
+    for (int i = 0; i < mu_toni::kLimits.layers; ++i)
+        addLayerParams(layout, i, kLimits.layers);
     addArpGlobalParams(layout);
 
     // ── Shared global FX rack + returns + master (mu-core) ────────────────────
-    mu_mixfx::addGlobalFxParams(layout, 2);   // no loop of its own: swaps land on the bar
+    mu_mixfx::addGlobalFxParams(layout, 2, kLimits);   // no loop of its own: swaps land on the bar
 
     return layout;
 }
@@ -38,12 +39,13 @@ PluginProcessor::PluginProcessor()
                         .withInput ("Sidechain", juce::AudioChannelSet::stereo(), false)
                         .withOutput("Output",    juce::AudioChannelSet::stereo(), true),
                     createParameterLayout(),
-                    juce::Identifier("MuToniState"))
+                    juce::Identifier("MuToniState"),
+                    kLimits)
 {
     // All eight Arps exist for the processor's lifetime (capacity is fixed, only the count is
     // runtime), so a preset can fill a slot above the live count before the count grows.
     keepSpareLayers = true;
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < mu_toni::kLimits.layers; ++i)
     {
         layers[(size_t) i] = createLayer(i);
         layers[(size_t) i]->colourIndex = i;   // each layer starts on its own palette colour
@@ -57,7 +59,7 @@ PluginProcessor::PluginProcessor()
     // is the default and never decides anything here.
 
     // A saved MIDI map written under the old "v{N}_" ids is renamed as it loads (set before initAppSettings loads it).
-    getMidiControlMap().setIdPrefixRenames(layerParamPrefixRenames(mu_limits::kMaxLayers));
+    getMidiControlMap().setIdPrefixRenames(layerParamPrefixRenames(mu_toni::kLimits.layers));
     initAppSettings("muToni");   // settings file + saved UI size / MIDI clock (ProcessorBase)
 
     // Offline licence + online activation (shared; after initAppSettings for getContentDir).
@@ -66,7 +68,7 @@ PluginProcessor::PluginProcessor()
     // The shared wavetable bank (procedural factory set), read by every voice's oscillators.
     bank.loadFactoryBank();
 
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i) layers[(size_t) i]->bindParams(apvts, i);   // every slot's rows
+    for (int i = 0; i < mu_toni::kLimits.layers; ++i) layers[(size_t) i]->bindParams(apvts, i);   // every slot's rows
     setupLayerState();       // the layer layout every preset / session save and load uses
     layerSwapper.setAppliers([this](juce::ValueTree& t) { applyStateTree(t); },
                         [this](int i, juce::ValueTree& t) { applyLayerTree(i, t); });
@@ -147,7 +149,7 @@ std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
 void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
 {
     jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);
-    for (int d = juce::jmax(0, firstIndex); d <= juce::jmin(lastIndex, mu_limits::kMaxLayers - 1); ++d)
+    for (int d = juce::jmax(0, firstIndex); d <= juce::jmin(lastIndex, mu_toni::kLimits.layers - 1); ++d)
     {
         auto& arp = getArp(d);
         arp.runner.setSlotIndex(d, noiseSeedSalt);

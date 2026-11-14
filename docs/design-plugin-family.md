@@ -2232,7 +2232,7 @@ Eight JUCE features the family does not use yet, checked against the JUCE 9.0.4 
 
 ### Version numbering
 
-The live products (mu-Clid, mu-Tant, mu-link, mu-Clid MIDI) use [version.txt](version.txt), currently 1.1 (the UI rework, build 972). The pre-release products (mu-On, mu-Toni) use [version-pre.txt](version-pre.txt), currently 0.1 (the .1 marks the metal-panel design upgrade, Andy 2026-10-11). Plugins show `v1.1.0.NNN` / `v0.1.0.NNN`, commits `v1.1.NNN`. The build number never resets on a major/minor change (the Release ≤ Debug guard and the in-plugin update check rely on it). Change a base **only** by editing its file, and only when Andy says so.
+The live products (mu-Clid, mu-Tant, mu-link, mu-Clid MIDI) use [version.txt](version.txt), currently 1.2 (1.1 was the UI rework, build 972; 1.2 is the compiled shared mu-core library with runtime counts, Andy 2026-11-14, #1811). [version-pre.txt](version-pre.txt) is 1.2 too since 2026-10-15 when every product moved to one family version. Plugins show `v1.2.0.NNN`, commits `v1.2.NNN`. The build number never resets on a major/minor change (the Release ≤ Debug guard and the in-plugin update check rely on it). Change a base **only** by editing its file, and only when Andy says so.
 
 ### Shipping a Release (two ways, every time)
 

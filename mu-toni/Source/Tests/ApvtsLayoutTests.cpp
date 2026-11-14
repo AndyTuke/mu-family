@@ -7,6 +7,7 @@
 // mu-tant-tests, it does NOT construct the full PluginProcessor (its createEditor()
 // drags the editor/UI tree into a console app - see the backlog).
 
+#include "Plugin/MuToniLimits.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Plugin/MixerFxParams.h"   // mu-core: mu_mixfx::addGlobalFxParams
 #include "Persistence/ArpParams.h"  // the Arp type's per-slot table
@@ -86,7 +87,7 @@ public:
         beginTest ("addLayerParams adds exactly the vpi suffix rows of one slot, under its prefix");
         StubProcessor proc;
         juce::AudioProcessorValueTreeState::ParameterLayout layout;
-        mu_toni::addLayerParams (layout, 3);
+        mu_toni::addLayerParams (layout, 3, mu_toni::kLimits.layers);
         juce::AudioProcessorValueTreeState apvts (proc, nullptr, "PARAMS", std::move (layout));
 
         expectEquals (proc.getParameters().size(), mu_toni::kNumVoiceParams);

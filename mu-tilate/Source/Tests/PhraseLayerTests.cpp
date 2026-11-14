@@ -2,6 +2,7 @@
 // RenderContext. The loop data is swapped in from the message thread's side, a replaced loop drops the voices
 // that point into the old one, a layer with no loop is silent, and the block allocates nothing.
 
+#include "Plugin/MuTilateLimits.h"
 #include "AllocationProbe.h"   // mu-core/Tests
 
 #include "Sequencer/Phrase.h"
@@ -48,7 +49,7 @@ mu_core::RenderContext contextAt(double startBeat, bool playing = true)
 
 struct Rig
 {
-    juce::AudioProcessorValueTreeState::ParameterLayout layoutOf() { juce::AudioProcessorValueTreeState::ParameterLayout l; addLayerParams(l, 0); return l; }
+    juce::AudioProcessorValueTreeState::ParameterLayout layoutOf() { juce::AudioProcessorValueTreeState::ParameterLayout l; addLayerParams(l, 0, mu_tilate::kLimits.layers); return l; }
     ParamHost host { layoutOf() };
     Phrase layer;
     juce::AudioBuffer<float> out { 2, kBlock };

@@ -14,6 +14,7 @@
 // out for that reason (the modulator/gate serialise round-trip is covered by
 // MuTantPersistTests; the sync is exercised at runtime in both products).
 
+#include "Plugin/MuTantLimits.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Plugin/PluginProcessor.h"   // mu_tant::PluginProcessor::createParameterLayout
 #include "Modulation/MuTantModDest.h"
@@ -68,7 +69,7 @@ public:
                 "flt_type","flt_cut","flt_res","level","gate_gap","gate_bypass",
                 "drvChar","insP1","insP2","insP3","insP4","insSync",
             };
-            for (int v = 0; v < mu_limits::kMaxLayers; ++v)
+            for (int v = 0; v < mu_tant::kLimits.layers; ++v)
                 for (const char* b : base)
                 {
                     const juce::String id = mu_tant::layerParamId(v, b);
@@ -88,7 +89,7 @@ public:
                 "lvl","pan","mute","solo","sendEff","sendDly","sendRev",
                 "scSrc","scAmt","scAtk","scRel","outBus",
             };
-            for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            for (int i = 0; i < mu_tant::kLimits.layers; ++i)
                 for (const char* b : base)
                 {
                     const juce::String id = "ch" + juce::String(i) + "_" + b;
@@ -165,7 +166,7 @@ public:
         beginTest ("addLayerParams adds exactly the product layout's v3_ rows, in order");
         StubProcessor table, product;
         juce::AudioProcessorValueTreeState::ParameterLayout layout;
-        mu_tant::addLayerParams (layout, 3);
+        mu_tant::addLayerParams (layout, 3, mu_tant::kLimits.layers);
         juce::AudioProcessorValueTreeState slotOnly (table, nullptr, "PARAMS", std::move (layout));
         juce::AudioProcessorValueTreeState whole (product, nullptr, "PARAMS", mu_tant::PluginProcessor::createParameterLayout());
 

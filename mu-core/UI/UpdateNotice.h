@@ -90,7 +90,7 @@ private:
         auto* settings = backend.getAppSettingsFile();
         const bool wanted = settings != nullptr
                             && uc::shouldShow(uc::isEnabled(settings), entry.build, uc::dismissedBuild(settings), BUILD_NUMBER);
-        const juce::String tip = juce::String(entry.version.isNotEmpty() ? entry.version : "v1.1." + juce::String(entry.build))
+        const juce::String tip = juce::String(entry.version.isNotEmpty() ? entry.version : "v" + juce::String(MU_VERSION_BASE) + "." + juce::String(entry.build))
                                  + " is out (you have v" + juce::String(MU_VERSION_STRING)
                                  + "). Click to open the download page.";
         statusBar.setUpdateLinkVisible(wanted && ! isSuppressed, tip);

@@ -2,6 +2,7 @@
 // construction under a temp storage root, rhythm-slot edits against processBlock on a worker
 // thread, and the loop-boundary hot-swap commit against processBlock.
 
+#include "Plugin/MuClidLimits.h"
 #include "Plugin/PluginProcessor.h"
 #include "Tests/ProcessorSeamHelpers.h"
 #include "Audio/InsertSlotConfig.h"
@@ -282,7 +283,7 @@ struct MuClidProcessorSeamTests : juce::UnitTest
             for (size_t s = 0; s < expected.size(); ++s)
                 for (size_t i = 0; i < (size_t) kTails; ++i)
                     expect(rowHolds((int) s, expected[s][i]), "each tail sits on the slot its rhythm moved to");
-            for (int s = 1; s < mu_limits::kMaxLayers; ++s)
+            for (int s = 1; s < mu_clid::kLimits.layers; ++s)
                 expectEquals(p.retiredCountForTest(s), 0, "vacated slots hold no sounding tail");
         }
         tone.deleteFile();
@@ -371,7 +372,7 @@ struct MuClidProcessorSeamTests : juce::UnitTest
         std::mt19937 rng(4242u);
         for (int round = 0; round < 6; ++round)
         {
-            while (p.getNumRhythms() < mu_limits::kMaxLayers)
+            while (p.getNumRhythms() < mu_clid::kLimits.layers)
             {
                 p.addLayer();
                 const int live = p.getNumRhythms();
@@ -434,14 +435,14 @@ struct MuClidProcessorSeamTests : juce::UnitTest
             std::mt19937 rng(777u + (unsigned) k);
             for (int round = 0; round < 4; ++round)
             {
-                while (p.getNumRhythms() < mu_limits::kMaxLayers)
+                while (p.getNumRhythms() < mu_clid::kLimits.layers)
                 {
                     p.addLayer();
                     const int live = p.getNumRhythms();
                     if (live > 1) p.swapLayers((int) (rng() % (unsigned) live), (int) (rng() % (unsigned) live));
                     p.resetLayer((int) (rng() % (unsigned) live));
                 }
-                expectEquals(p.getNumRhythms(), (int) mu_limits::kMaxLayers);
+                expectEquals(p.getNumRhythms(), (int) mu_clid::kLimits.layers);
                 while (p.getNumRhythms() > 1)
                     p.removeLayer((int) (rng() % (unsigned) p.getNumRhythms()));
                 expectEquals(p.getNumRhythms(), 1);

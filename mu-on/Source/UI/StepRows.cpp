@@ -49,7 +49,7 @@ void StepRows::resized()
 
 int StepRows::rowHeight() const noexcept
 {
-    return (getHeight() - mu_ui::s(kControlsH)) / mu_limits::kMaxLayers;
+    return (getHeight() - mu_ui::s(kControlsH)) / mu_limits::kAbsoluteMaxLayers;
 }
 
 juce::Rectangle<int> StepRows::rowArea(int row) const
@@ -198,7 +198,7 @@ void StepRows::timerCallback()
     bool changed = false;
     const bool playing = host.isTrackTransportPlaying();
     const double beat = playing ? host.getTrackTransportBeat() : 0.0;
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < mu_limits::kAbsoluteMaxLayers; ++i)
     {
         int step = -1;
         long long pass = -1;

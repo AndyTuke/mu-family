@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Plugin/MuTantLimits.h"
 #include "Plugin/ProcessorBase.h"            // mu-core base
 #include "Plugin/MixerFxParams.h"            // mu-core: shared global-FX/mixer APVTS layout
 #include "Sequencer/Pattern.h"           // mu-Tant layer type (derives mu-core Layer)
@@ -99,11 +100,11 @@ public:
     // ── ProcessorBase channel metadata ───────────────────────────────────────
     // mu-tant manages a dynamic set of voices ("layers") exactly like mu-clid's
     // rhythms — there are no inactive voices, only the ones that exist. The
-    // count is `numLayers` (1..mu_limits::kMaxLayers, owned by ProcessorCore, which also supplies
+    // count is `numLayers` (1..mu_tant::kLimits.layers, owned by ProcessorCore, which also supplies
     // getNumLayers / getLayer over its layer storage); add/delete adjust it.
     juce::String getLayerName(int idx)       const override
     {
-        return (idx >= 0 && idx < mu_limits::kMaxLayers) ? juce::String("Voice ") + juce::String(idx + 1)
+        return (idx >= 0 && idx < mu_tant::kLimits.layers) ? juce::String("Voice ") + juce::String(idx + 1)
                                               : juce::String();
     }
     // Each voice carries an allocated palette-colour index (mu-clid's rule:
@@ -111,7 +112,7 @@ public:
     // so layers are distinctly + stably coloured. It lives on the Layer, so it moves with the voice.
     int          getLayerColourIndex(int idx) const override
     {
-        return (idx >= 0 && idx < mu_limits::kMaxLayers) ? layers[(size_t) idx]->colourIndex : 0;
+        return (idx >= 0 && idx < mu_tant::kLimits.layers) ? layers[(size_t) idx]->colourIndex : 0;
     }
 
     // ── Dynamic voice management (message-thread) ──
@@ -125,8 +126,8 @@ public:
     // Recompute the cached stepped-pitch flags for one voice / all voices (Pattern::refreshPitchQuantFlags).
     // Call on the message thread whenever a voice's modulators change (editor edit, preset load,
     // voice add/remove/swap/reset); the audio thread reads the flags lock-free.
-    void refreshPitchQuantFlags(int v) { if (v >= 0 && v < mu_limits::kMaxLayers) getPattern(v).refreshPitchQuantFlags(); }
-    void refreshAllPitchQuantFlags()   { for (int v = 0; v < mu_limits::kMaxLayers; ++v) refreshPitchQuantFlags(v); }
+    void refreshPitchQuantFlags(int v) { if (v >= 0 && v < mu_tant::kLimits.layers) getPattern(v).refreshPitchQuantFlags(); }
+    void refreshAllPitchQuantFlags()   { for (int v = 0; v < mu_tant::kLimits.layers; ++v) refreshPitchQuantFlags(v); }
 
     // Per-voice ("layer") presets — the voice's `v{N}_*` subtree saved/loaded as
     // a `.muPattern` file (voice-agnostic base IDs, so a preset loads into any
@@ -176,7 +177,7 @@ public:
     // Modulation snapshot accessor for PatternContent knob live-arc indicators.
     float getTantSnap(int voice, int snapIndex) const noexcept
     {
-        if (voice < 0 || voice >= mu_limits::kMaxLayers) return 0.0f;
+        if (voice < 0 || voice >= mu_tant::kLimits.layers) return 0.0f;
         return getPattern(voice).getModLive(snapIndex);
     }
 
@@ -202,7 +203,7 @@ private:
     // keeps it), as it always did. The per-voice insert (shared mu-core InsertProcessor) is Pattern::insert — it
     // runs after the gate, before the pan/sum into the mixer (engine → insert → mixer, the family signal flow).
     // A count-reducing preset's retire fade is the Pattern's own, in the shared retire bin (applyFullPresetTree).
-    std::array<std::unique_ptr<VoiceEngine>, mu_limits::kMaxLayers>   voices;
+    std::array<std::unique_ptr<VoiceEngine>, mu_tant::kLimits.layers>   voices;
 
 public:
     // ── PatternHost: what the Pattern layer and PatternContent read (message thread) ──────────
@@ -220,7 +221,7 @@ public:
     int          resolvePatternWavetable(const juce::String& path) override;
     VoiceEngine* getPatternEngine(int slot) noexcept override
     {
-        return slot >= 0 && slot < mu_limits::kMaxLayers ? voices[(size_t) slot].get() : nullptr;
+        return slot >= 0 && slot < mu_tant::kLimits.layers ? voices[(size_t) slot].get() : nullptr;
     }
     const juce::CriticalSection* getPatternBankLock() const noexcept override { return &bankLock; }
 

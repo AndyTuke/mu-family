@@ -128,7 +128,7 @@ private:
     juce::Label    chordCaption { {}, "Chord" };
     DropdownSelect chordSelect;
     KnobWithLabel  invKnob { "Inv" }, spreadKnob { "Spread" };   // Octave -2..+2 and Note -12..+12 (a Kick or Bass step's pitch)
-    std::array<int, mu_limits::kMaxLayers> selectedStepOf {};   // each layer's selected step (right-click), shown in the panel
+    std::array<int, mu_limits::kAbsoluteMaxLayers> selectedStepOf {};   // each layer's selected step (right-click), shown in the panel
     void refreshNoteItems();                                    // the Note list names the notes the key and tune give
     int  noteSignature = -1;                                    // what the list was last built for
     void refreshBarsSelect(const StepRow& row, int step);        // the Bars list: the bars the Length offers, ticked as the step has them

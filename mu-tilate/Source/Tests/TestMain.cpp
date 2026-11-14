@@ -5,6 +5,7 @@
 // Run:    build/mu-tilate/mu-tilate-tests_artefacts/Debug/mu-tilate-tests.exe
 // Scope:  the engine pieces that run without a processor (slice player; later the stretch voice, slice list, timeline).
 
+#include "Tests/TestSelection.h"
 #include <juce_core/juce_core.h>
 #include <juce_events/juce_events.h>
 #include <cstdio>
@@ -23,10 +24,11 @@ int main(int argc, char** argv)
     StdoutLogger logger;
     juce::Logger::setCurrentLogger(&logger);
 
-    juce::UnitTestRunner runner;
+    mu_test::TimedRunner runner;
     runner.setAssertOnFailure(false);
-    if (argc > 1) runner.runTestsInCategory(argv[1]);   // optional: run only one category
-    else          runner.runAllTests();
+    mu_test::runSelected(runner, argc, argv);   // default: everything but the slow golden renders; --goldens, --all, or one category (Tests/TestSelection.h)
+
+    runner.printSlowest();
 
     int totalFailures = 0;
     for (int i = 0; i < runner.getNumResults(); ++i)

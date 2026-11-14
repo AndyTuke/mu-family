@@ -1,3 +1,4 @@
+#include "Plugin/MuOnLimits.h"
 #include "Plugin/PluginProcessor.h"
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 #include "License/LicenseKey.h"
@@ -15,12 +16,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
 
     // ── Mixer channel strips — one per track slot (shared `ch{N}_` binding the MixerChannel /
     //    MixerOverlay use). Sidechains start unset; ducking is set up in the mixer.
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
-        mu_mixfx::addChannelStripParams(layout, "ch" + String(i) + "_", "Track " + String(i + 1) + " Ch ");
+    for (int i = 0; i < mu_on::kLimits.layers; ++i)
+        mu_mixfx::addChannelStripParams(layout, "ch" + String(i) + "_", "Track " + String(i + 1) + " Ch ", {}, kLimits);
 
     // ── Per track: the engine, the Rumble source, the groove, then every engine's parameters (t{N}_*) ──────
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
-        addLayerParams(layout, i);
+    for (int i = 0; i < mu_on::kLimits.layers; ++i)
+        addLayerParams(layout, i, kLimits.layers);
 
     // ── Master key and scale: the Kick and Bass tune snaps to them (the tonal row, as mu-Tant's) ────────────
     {
@@ -37,7 +38,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
                                                    AudioParameterIntAttributes().withStringFromValueFunction([](int v, int) { return v == 0 ? String("Off") : String(v) + (v == 1 ? " bar" : " bars"); })));
 
     // ── Shared global FX rack + returns + master (mu-core) ────────────────────
-    mu_mixfx::addGlobalFxParams(layout, 2);   // no loop of its own: swaps land on the bar
+    mu_mixfx::addGlobalFxParams(layout, 2, kLimits);   // no loop of its own: swaps land on the bar
 
     return layout;
 }
@@ -47,12 +48,13 @@ PluginProcessor::PluginProcessor()
                         .withInput ("Sidechain", juce::AudioChannelSet::stereo(), false)
                         .withOutput("Output",    juce::AudioChannelSet::stereo(), true),
                     createParameterLayout(),
-                    juce::Identifier("MuOnState"))
+                    juce::Identifier("MuOnState"),
+                    kLimits)
 {
     // All eight Tracks exist for the processor's lifetime (capacity is fixed, only the count is
     // runtime), so a preset can fill a slot above the live count before the count grows.
     keepSpareLayers = true;
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < mu_on::kLimits.layers; ++i)
     {
         layers[(size_t) i] = createLayer(i);
         layers[(size_t) i]->colourIndex = i;   // each track starts on its own palette colour
@@ -63,11 +65,11 @@ PluginProcessor::PluginProcessor()
     getTrack(0).row.loadDefaultGroove(EngineType::Kick);   // ...with the four-on-the-floor row
     unsavedLayerCount = kNumLegacyLanes;                   // a state saved before layers were variable held five lanes
 
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i) engineParam[(size_t) i] = apvts.getRawParameterValue(layerParamId(i, "eng"));
+    for (int i = 0; i < mu_on::kLimits.layers; ++i) engineParam[(size_t) i] = apvts.getRawParameterValue(layerParamId(i, "eng"));
 
     // Each track holds exactly one engine, the one its `t{N}_eng` parameter names: a change of that parameter
     // builds the new engine (message thread) and swaps it into the track.
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < mu_on::kLimits.layers; ++i)
     {
         engineListeners[(size_t) i] = std::make_unique<EngineParamListener>(*this, i);
         apvts.addParameterListener(layerParamId(i, "eng"), engineListeners[(size_t) i].get());
@@ -90,7 +92,7 @@ PluginProcessor::PluginProcessor()
 PluginProcessor::~PluginProcessor()
 {
     prepareForDestruction();   // first: no deferred-work tick may reach this half-destroyed object
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < mu_on::kLimits.layers; ++i)
         apvts.removeParameterListener(layerParamId(i, "eng"), engineListeners[(size_t) i].get());
 }
 
@@ -111,7 +113,7 @@ void PluginProcessor::engineParamChanged(int slot)
 void PluginProcessor::commitDeferredWork()
 {
     const unsigned pending = enginesPending.exchange(0u, std::memory_order_acq_rel);
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < mu_on::kLimits.layers; ++i)
         if ((pending >> (unsigned) i) & 1u) getTrack(i).syncEngine();
 }
 
@@ -172,7 +174,7 @@ std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
 // Under layersLock: allocation-free resets only.
 void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
 {
-    for (int d = juce::jmax(0, firstIndex); d <= juce::jmin(lastIndex, mu_limits::kMaxLayers - 1); ++d)
+    for (int d = juce::jmax(0, firstIndex); d <= juce::jmin(lastIndex, mu_on::kLimits.layers - 1); ++d)
     {
         getTrack(d).resetEngineToPrepared();
         stepPattern.bind(d, &getTrack(d).row);
@@ -212,7 +214,7 @@ void PluginProcessor::layerAdded(int index)
 
 void PluginProcessor::ensureRumbleSource(int track)
 {
-    if (track < 0 || track >= mu_limits::kMaxLayers || getTrackEngine(track) != EngineType::Rumble) return;
+    if (track < 0 || track >= mu_on::kLimits.layers || getTrackEngine(track) != EngineType::Rumble) return;
     if (auto* p = apvts.getParameter(layerParamId(track, "src")))
     {
         const int src = juce::roundToInt(p->convertFrom0to1(p->getValue()));
@@ -223,7 +225,7 @@ void PluginProcessor::ensureRumbleSource(int track)
 
 void PluginProcessor::selectTrackEngine(int i, EngineType engine)
 {
-    if (i < 0 || i >= mu_limits::kMaxLayers || getTrackEngine(i) == engine) return;
+    if (i < 0 || i >= mu_on::kLimits.layers || getTrackEngine(i) == engine) return;
 
     if (auto* p = apvts.getParameter(layerParamId(i, "eng")))
     {

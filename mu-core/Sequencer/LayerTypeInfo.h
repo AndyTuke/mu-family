@@ -64,7 +64,8 @@ namespace mu_core
     // builds its own UI (the four list products); mu-Tronic's editor builds the shown slot's UI through them.
     struct LayerTypeInfo
     {
-        using AddParamsFn = void (*)(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot);
+        // `numLayers` is the host's slot count, for a row whose range depends on it (a layer index).
+        using AddParamsFn = void (*)(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot, int numLayers);
         // `type` lets one function make several types of one class (the five mu-On Track types).
         using CreateFn    = std::unique_ptr<Layer> (*)(int slot, LayerTypeId type);
         // The type a layer-preset tree holds; Empty when the tree names none.

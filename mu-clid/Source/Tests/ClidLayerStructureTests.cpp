@@ -3,6 +3,7 @@
 // where the slot's audio state belongs. Slots are tagged (steps, level, colour, sample path, engine, tail,
 // sidechain source) so each moved piece can be traced to the slot it must land on.
 
+#include "Plugin/MuClidLimits.h"
 #include "Plugin/PluginProcessor.h"
 #include "Sequencer/SampleRhythm.h"
 #include "Tests/ProcessorSeamHelpers.h"
@@ -22,7 +23,7 @@ namespace
         using mu_clid::PluginProcessor::drainDeferredWork;
     };
 
-    constexpr int kMax = mu_limits::kMaxLayers;
+    constexpr int kMax = mu_clid::kLimits.layers;
 
     // What each slot held before an edit, to compare with where it ends up.
     struct Snapshot

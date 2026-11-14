@@ -7,7 +7,7 @@ namespace mu_host
 
 // No licence of its own (the identity says so); the engine the restored state holds counts at once, before any editor opens.
 PluginProcessor::PluginProcessor()
-    : mu_tronic::PluginProcessor({ kStateType, kAppName, false })
+    : mu_tronic::PluginProcessor({ kStateType, kAppName, false, kLimits })
 {
     licenseEngine(getLayerTypeId(0));
 }

@@ -13,6 +13,6 @@ inline constexpr const char* kRhythmPresetTag = "MuClidRhythm";
 
 // The Rhythm type's rows for one layer slot (r{slot}_*). Slots below mu_limits::kMaxAutomatedChannels get
 // the long "Rhythm N" names the DAW's automation lanes show; the others the short "RN".
-void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot);
+void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot, int /*numLayers*/);
 
 } // namespace mu_clid

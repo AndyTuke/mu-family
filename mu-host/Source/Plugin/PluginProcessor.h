@@ -6,6 +6,9 @@
 namespace mu_host
 {
 
+// The counts mu-Host is built with: one slot, no group buses, no host sidechain.
+inline constexpr mu_limits::ProcessorLimits kLimits { 1, 0, 2, false };
+
 // mu-Host: one mu instrument channel as a plug-in. It is the mu-Tronic shell with one slot (MU_MAX_LAYERS=1): the engine in the slot is
 // picked from a drop-down, its voice, inserts, sequencer, modulation and layer presets are shown, and its output goes straight to the
 // host. It has no scenes, pages, clips, mixer or full-preset controls (the DAW mixes and saves).

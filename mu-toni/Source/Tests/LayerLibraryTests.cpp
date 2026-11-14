@@ -4,6 +4,7 @@
 // with the one mu-toni-tests records through the real processor (Tests/ArpLayerFixture.h). A layer that
 // secretly needed the processor would fail to link here; one the processor fed differently would not match.
 
+#include "Plugin/MuToniLimits.h"
 #include "Sequencer/Arp.h"
 #include "Persistence/ArpParams.h"
 #include "Audio/Wavetable/WavetableBank.h"   // mu-core: the shared bank (a service the host owns)
@@ -34,7 +35,7 @@ namespace
         static juce::AudioProcessorValueTreeState::ParameterLayout layout()
         {
             juce::AudioProcessorValueTreeState::ParameterLayout l;
-            mu_toni::addLayerParams(l, 0);
+            mu_toni::addLayerParams(l, 0, mu_toni::kLimits.layers);
             mu_toni::addArpGlobalParams(l);
             return l;
         }

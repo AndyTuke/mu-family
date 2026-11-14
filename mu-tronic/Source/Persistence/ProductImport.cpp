@@ -272,7 +272,7 @@ ProductImport readProductPreset(const juce::File& file, const mu_core::LayerType
     return out;
 }
 
-int remapImportedSidechain(int productParam, int ownSlot, const std::vector<int>& slotOfSource)
+int remapImportedSidechain(int productParam, int ownSlot, const std::vector<int>& slotOfSource, const mu_limits::ProcessorLimits& limits)
 {
     if (productParam <= 0) return 0;
     const int source = productParam - 1;   // the engine's encoding: a channel, or kProductLayers for the external input
@@ -281,10 +281,10 @@ int remapImportedSidechain(int productParam, int ownSlot, const std::vector<int>
     if (source < kProductLayers)
         mapped = source < (int) slotOfSource.size() ? slotOfSource[(size_t) source] : -1;
     else if (source == kProductLayers)
-        mapped = MixerEngine::kExtSidechainSrc;   // the product's external input is this binary's
+        mapped = limits.layers;   // the product's external input is this binary's
     // Any other value is a bus the products do not have.
 
-    if (! mu_mix::isLegalSidechainSource(mu_mix::StripKind::Channel, ownSlot, mapped, mu_limits::kMaxLayers, mu_limits::kMaxBuses))
+    if (! mu_mix::isLegalSidechainSource(mu_mix::StripKind::Channel, ownSlot, mapped, limits.layers, limits.buses))
         mapped = -1;
     return mapped + 1;
 }

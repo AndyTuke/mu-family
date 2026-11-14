@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Plugin/MuClidLimits.h"
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "Sequencer/GeneratorAliases.h"
 #include "Sequencer/RhythmCursor.h"   // RhythmCursor::kAnyFrameEpoch
@@ -34,13 +35,13 @@ public:
     struct PreparedFullPreset
     {
         int numRhythms = 0;
-        std::array<Rhythm, mu_limits::kMaxLayers>                       rhythms     {};
-        std::array<std::unique_ptr<VoiceEngine>, mu_limits::kMaxLayers> voices      {};
-        std::array<juce::String, mu_limits::kMaxLayers>                 samplePaths {};
+        std::array<Rhythm, mu_clid::kLimits.layers>                       rhythms     {};
+        std::array<std::unique_ptr<VoiceEngine>, mu_clid::kLimits.layers> voices      {};
+        std::array<juce::String, mu_clid::kLimits.layers>                 samplePaths {};
         // Each rhythm's clip bank and playing clip as the preset's nodes carried them. Read at stage
         // time; the commit moves them onto the live layers (the Rhythm install leaves a layer's bank alone).
-        std::array<mu_core::ClipBank, mu_limits::kMaxLayers>            clipBanks   {};
-        std::array<int, mu_limits::kMaxLayers>                          activeClips {};
+        std::array<mu_core::ClipBank, mu_clid::kLimits.layers>            clipBanks   {};
+        std::array<int, mu_clid::kLimits.layers>                          activeClips {};
         juce::ValueTree                                       tree;
     };
 
@@ -101,15 +102,15 @@ private:
         std::unique_ptr<VoiceEngine> voice;
     };
 
-    mu_hotswap::Stager<PendingRhythm, PreparedFullPreset, mu_limits::kMaxLayers> stager;
+    mu_hotswap::Stager<PendingRhythm, PreparedFullPreset, mu_clid::kLimits.layers> stager;
 
     PluginProcessor& proc;
 
     // Where each staged swap's loop boundary fell, written by the audio thread just before it flags
     // the swap (the flag's release publishes them) and read by the committing thread after it
     // takes the flag. Meaningless for a swap that is not flagged.
-    std::array<std::atomic<int>,      mu_limits::kMaxLayers> flaggedOrigin {};
-    std::array<std::atomic<uint32_t>, mu_limits::kMaxLayers> flaggedEpoch  {};
+    std::array<std::atomic<int>,      mu_clid::kLimits.layers> flaggedOrigin {};
+    std::array<std::atomic<uint32_t>, mu_clid::kLimits.layers> flaggedEpoch  {};
     std::atomic<int>      fullFlaggedOrigin { 0 };
     std::atomic<uint32_t> fullFlaggedEpoch  { 0 };
 };

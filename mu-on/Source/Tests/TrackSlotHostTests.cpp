@@ -3,6 +3,7 @@
 // the type-aware folder listing. The host is a minimal Published-mode ProcessorBase (the shape mu-Tronic gives them),
 // so these run before mu-Tronic registers a Track type.
 
+#include "Plugin/MuOnLimits.h"
 #include "Plugin/ProcessorBase.h"
 #include "Plugin/MixerFxParams.h"
 #include "Sequencer/TrackTypes.h"
@@ -29,10 +30,10 @@ namespace
             for (const auto* info : { &mu_on::kKickType, &mu_on::kBassType, &mu_on::kHatType, &mu_on::kSnareType, &mu_on::kRumbleType })
                 layerTypes.add(*info);
             std::vector<juce::StringArray> sets;
-            for (int s = 0; s < mu_limits::kMaxLayers; ++s) sets.push_back(juce::StringArray { mu_on::layerParamPrefix(s) });
+            for (int s = 0; s < mu_on::kLimits.layers; ++s) sets.push_back(juce::StringArray { mu_on::layerParamPrefix(s) });
             initLayerStatePrefixSets(sets);
             initAppSettings("muTronicTest");   // a content folder, so the typed preset folders resolve
-            for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            for (int i = 0; i < mu_on::kLimits.layers; ++i)
             {
                 layers[(size_t) i] = std::make_unique<Layer>();
                 layers[(size_t) i]->colourIndex = i;
@@ -52,9 +53,9 @@ namespace
         static juce::AudioProcessorValueTreeState::ParameterLayout makeLayout()
         {
             juce::AudioProcessorValueTreeState::ParameterLayout layout;
-            for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            for (int i = 0; i < mu_on::kLimits.layers; ++i)
             {
-                mu_on::addLayerParams(layout, i);
+                mu_on::addLayerParams(layout, i, mu_on::kLimits.layers);
                 mu_mixfx::addChannelStripParams(layout, "ch" + juce::String(i) + "_", "Ch ");
             }
             return layout;
@@ -114,7 +115,7 @@ namespace
         explicit AppendTap(int frames) { for (auto& b : bufs) b.setSize(2, frames); written.fill(0); }
         void capture(int ch, const juce::AudioBuffer<float>& buf, int n) noexcept override
         {
-            if (ch < 0 || ch >= MixerEngine::MaxChannels) return;
+            if (ch < 0 || ch >= mu_on::kLimits.layers) return;
             auto& dst = bufs[(size_t) ch];
             const int at = written[(size_t) ch];
             const int len = juce::jmin(n, dst.getNumSamples() - at);
@@ -126,8 +127,8 @@ namespace
         {
             return bufs[(size_t) ch].getMagnitude(block * blockSize, blockSize);
         }
-        std::array<juce::AudioBuffer<float>, MixerEngine::MaxChannels> bufs;
-        std::array<int, MixerEngine::MaxChannels> written {};
+        std::array<juce::AudioBuffer<float>, mu_on::kLimits.layers> bufs;
+        std::array<int, mu_on::kLimits.layers> written {};
     };
 
     // Plays a SlotHost at 120 bpm, 48 kHz, blocks of 512, with the channel tap attached.
@@ -346,7 +347,7 @@ struct MuOnTrackSlotHostTests : juce::UnitTest
         p.setSelectedSlot(-5);
         expectEquals(p.getSelectedSlot(), 0);
         p.setSelectedSlot(99);
-        expectEquals(p.getSelectedSlot(), mu_limits::kMaxLayers - 1);
+        expectEquals(p.getSelectedSlot(), mu_on::kLimits.layers - 1);
     }
 };
 

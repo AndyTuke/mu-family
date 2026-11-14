@@ -3,6 +3,7 @@
 // swap-defer decision (wrap detection incl. non-divisor pattern lengths,
 // apply-on-stop, supersede, and per-voice vs full-preset boundaries).
 
+#include "Plugin/MuTantLimits.h"
 #include <juce_data_structures/juce_data_structures.h>
 #include <array>
 #include "Plugin/HotSwap.h"   // mu-core: the shared loop-wrap predicates
@@ -53,7 +54,7 @@ public:
 
         // The swapper as mu-tant drives it: the boundary rule is swapLoopBeats over the per-voice
         // gate-pattern lengths. Payload = ValueTree, as in the processor.
-        using Swapper = LayerSwapper<juce::ValueTree, mu_limits::kMaxLayers>;
+        using Swapper = LayerSwapper<juce::ValueTree, mu_tant::kLimits.layers>;
         struct Applied { int fullId = -1; std::vector<std::pair<int, int>> slots; };   // slot, id
         auto wire = [](Swapper& sw, Applied& a)
         {
@@ -61,13 +62,13 @@ public:
                            [&a](int v, juce::ValueTree& t) { a.slots.push_back({ v, (int) t.getProperty("id") }); });
         };
         auto flag = [](Swapper& sw, int numActive, bool playing, double start, double beats,
-                       bool onMaster, double master, const std::array<double, mu_limits::kMaxLayers>& pat)
+                       bool onMaster, double master, const std::array<double, mu_tant::kLimits.layers>& pat)
         {
             return sw.flagBoundaries(playing, start, beats, [&](int slot) noexcept
                                      { return swapLoopBeats(slot, numActive, onMaster ? SwapTiming::OnMasterLoop : SwapTiming::OnLayerLoop,
                                                             master, pat.data()); });
         };
-        std::array<double, mu_limits::kMaxLayers> eight {}; eight.fill(8.0);
+        std::array<double, mu_tant::kLimits.layers> eight {}; eight.fill(8.0);
 
         beginTest("Swapper: full-preset swap commits at voice-0 boundary");
         {
@@ -145,7 +146,7 @@ public:
         // OnBar through the swapper: a staged swap waits for the 4-beat bar line, not the voice's 8-beat
         // loop nor a 16-beat master loop, and a full preset follows the same rule.
         auto flagBar = [](Swapper& sw, double start, double beats, double master,
-                          const std::array<double, mu_limits::kMaxLayers>& pat)
+                          const std::array<double, mu_tant::kLimits.layers>& pat)
         {
             return sw.flagBoundaries(true, start, beats, [&](int slot) noexcept
                                      { return swapLoopBeats(slot, 2, SwapTiming::OnBar, master, pat.data()); });
@@ -184,7 +185,7 @@ public:
         beginTest("Swapper OnBar: a voice pattern not yet locked (length 0) still commits on the bar");
         {
             Swapper sw; Applied got; wire(sw, got);
-            std::array<double, mu_limits::kMaxLayers> unlocked {};
+            std::array<double, mu_tant::kLimits.layers> unlocked {};
             flagBar(sw, 0.0, 0.5, 0.0, unlocked);
             juce::ValueTree v("Voice"); v.setProperty("id", 6, nullptr);
             sw.stageSlot(0, std::move(v));
@@ -195,7 +196,7 @@ public:
 
         beginTest("swapLoopBeats: the mu-tant boundary rule");
         {
-            std::array<double, mu_limits::kMaxLayers> pat {}; pat.fill(8.0); pat[0] = 12.0; pat[1] = 4.0;
+            std::array<double, mu_tant::kLimits.layers> pat {}; pat.fill(8.0); pat[0] = 12.0; pat[1] = 4.0;
             const auto master = SwapTiming::OnMasterLoop, own = SwapTiming::OnLayerLoop, bar = SwapTiming::OnBar;
             expectEquals(swapLoopBeats(kFullPreset, 2, own, 0.0, pat.data()), 12.0, "full: voice 0 with no master loop");
             expectEquals(swapLoopBeats(kFullPreset, 2, own, 16.0, pat.data()), 16.0, "full: the master loop when one is set");
@@ -204,7 +205,7 @@ public:
             expectEquals(swapLoopBeats(1, 2, master, 0.0, pat.data()), 4.0, "voice: OnMasterLoop with no master loop uses its own");
             expect(swapLoopBeats(2, 2, own, 0.0, pat.data()) < 0.0, "an inactive voice never commits");
             expect(swapLoopBeats(2, 2, bar, 0.0, pat.data()) < 0.0, "an inactive voice never commits on a bar either");
-            std::array<double, mu_limits::kMaxLayers> unlocked {};
+            std::array<double, mu_tant::kLimits.layers> unlocked {};
             expectEquals(swapLoopBeats(0, 1, own, 0.0, unlocked.data()), 0.0, "length 0 before the first locked block: stop edge only");
             expectEquals(swapLoopBeats(1, 2, bar, 16.0, pat.data()), kBarBeats, "OnBar: a voice swap lands on the bar line");
             expectEquals(swapLoopBeats(kFullPreset, 2, bar, 16.0, pat.data()), kBarBeats, "OnBar: a full preset lands on the bar line");

@@ -6,6 +6,7 @@
 // here; one the processor fed differently would not match. It also checks the layer's own Note-mode gate, which
 // the standalone leaves off (decision A3).
 
+#include "Plugin/MuTantLimits.h"
 #include "Sequencer/Pattern.h"
 #include "Persistence/PatternParams.h"
 #include "UI/PatternHost.h"
@@ -39,7 +40,7 @@ namespace
         {
             juce::AudioProcessorValueTreeState::ParameterLayout l;
             mu_tant::addPatternGlobalParams(l);
-            mu_tant::addLayerParams(l, 0);
+            mu_tant::addLayerParams(l, 0, mu_tant::kLimits.layers);
             return l;
         }
         juce::AudioProcessorValueTreeState apvts { *this, nullptr, "PatternLayer", layout() };

@@ -27,7 +27,7 @@ Phrase& PhraseSlotHost::getPhrase(int layer) noexcept
 {
     // The content's constructor binds slot 0 before the editor rebinds it to the shown slot, and a content kept for its
     // type can be asked about a slot that has since become another type.
-    if (auto* p = phraseAt(juce::jlimit(0, mu_limits::kMaxLayers - 1, layer))) return *p;
+    if (auto* p = phraseAt(juce::jlimit(0, mu_limits::kAbsoluteMaxLayers - 1, layer))) return *p;
     if (standIn == nullptr) standIn = std::make_unique<Phrase>();
     return *standIn;
 }
@@ -299,7 +299,7 @@ void PhraseSlotHost::reloadLoopIfNeeded(int layer)
 
 void PhraseSlotHost::reloadMissingLoops()
 {
-    for (int l = 0; l < mu_limits::kMaxLayers; ++l)
+    for (int l = 0; l < mu_limits::kAbsoluteMaxLayers; ++l)
     {
         const auto* ph = phraseAt(l);
         auto& last = tried[(size_t) l];

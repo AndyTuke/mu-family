@@ -66,7 +66,7 @@ protected:
 private:
     // The slot's Phrase, or null when the slot holds another type.
     Phrase* phraseAt(int layer) const noexcept;
-    bool    validSlot(int layer) const noexcept { return layer >= 0 && layer < mu_limits::kMaxLayers; }
+    bool    validSlot(int layer) const noexcept { return layer >= 0 && layer < mu_limits::kAbsoluteMaxLayers; }
     // The detection settings from layer `layer`'s parameters (any thread: reads the raw atomics).
     DetectSettings detectSettingsOf(int layer) const;
     double loopTempoOf(int layer) const;
@@ -76,11 +76,11 @@ private:
     // Loop loading: a generation per layer (a newer request supersedes an older one), the status line, and a flag the
     // worker's completion checks so it never touches a host that is gone. Detect has its own count, so it neither cancels a
     // loop being loaded nor is cancelled by a load's start.
-    std::array<std::atomic<int>, (size_t) mu_limits::kMaxLayers> loopGeneration {};
-    std::array<std::atomic<int>, (size_t) mu_limits::kMaxLayers> detectGeneration {};
-    std::array<juce::String, (size_t) mu_limits::kMaxLayers>     loopStatus;
+    std::array<std::atomic<int>, (size_t) mu_limits::kAbsoluteMaxLayers> loopGeneration {};
+    std::array<std::atomic<int>, (size_t) mu_limits::kAbsoluteMaxLayers> detectGeneration {};
+    std::array<juce::String, (size_t) mu_limits::kAbsoluteMaxLayers>     loopStatus;
     // The Phrase object and path reloadMissingLoops last tried for each slot.
-    std::array<std::pair<const Phrase*, juce::String>, (size_t) mu_limits::kMaxLayers> tried;
+    std::array<std::pair<const Phrase*, juce::String>, (size_t) mu_limits::kAbsoluteMaxLayers> tried;
     std::shared_ptr<std::atomic<bool>> alive = std::make_shared<std::atomic<bool>>(true);
     std::unique_ptr<Phrase> standIn;   // built on first need
 

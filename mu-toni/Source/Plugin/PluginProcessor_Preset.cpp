@@ -1,3 +1,4 @@
+#include "Plugin/MuToniLimits.h"
 #include "Plugin/PluginProcessor.h"
 #include "Modulation/ModulatorSerialise.h"   // mu-core: modulator (de)serialise + per-voice session data
 #include "Persistence/PresetFiles.h"         // mu-core: shared preset-file handling
@@ -20,8 +21,8 @@ namespace
 void PluginProcessor::setupLayerState()
 {
     juce::StringArray prefixes;
-    for (int l = 0; l < mu_limits::kMaxLayers; ++l) prefixes.add(layerParamPrefix(l));
-    initLayerState(prefixes, legacyLayerParamPrefixes(mu_limits::kMaxLayers));   // older APVTS dumps used "v{N}_"
+    for (int l = 0; l < mu_toni::kLimits.layers; ++l) prefixes.add(layerParamPrefix(l));
+    initLayerState(prefixes, legacyLayerParamPrefixes(mu_toni::kLimits.layers));   // older APVTS dumps used "v{N}_"
 }
 
 // Any saved state (host session or full preset, either format) in the composed shape. Sessions
@@ -60,7 +61,7 @@ void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
 // A layer preset: the layer's node (prefix-free param rows + modulators), so it loads into any layer.
 juce::ValueTree PluginProcessor::captureLayerPresetTree(int layer)
 {
-    if (layer < 0 || layer >= mu_limits::kMaxLayers) return {};
+    if (layer < 0 || layer >= mu_toni::kLimits.layers) return {};
     return captureLayerNode(layer, kLayerPresetTag);
 }
 
@@ -74,7 +75,7 @@ void PluginProcessor::saveLayerPreset(int layer, const juce::String& name)
 
 void PluginProcessor::loadLayerPreset(int layer, const juce::File& file)
 {
-    if (layer < 0 || layer >= mu_limits::kMaxLayers || ! file.existsAsFile()) return;
+    if (layer < 0 || layer >= mu_toni::kLimits.layers || ! file.existsAsFile()) return;
     auto xml = juce::XmlDocument::parse(file);
     if (xml == nullptr || ! xml->hasTagName(kLayerPresetTag))
     {
@@ -89,7 +90,7 @@ void PluginProcessor::loadLayerPreset(int layer, const juce::File& file)
 void PluginProcessor::stageLayerPresetTree(int layer, juce::ValueTree tree, bool keepIdentity)
 {
     juce::ignoreUnused(keepIdentity);   // a layer node carries no name or colour
-    if (layer < 0 || layer >= mu_limits::kMaxLayers || ! tree.isValid()) return;
+    if (layer < 0 || layer >= mu_toni::kLimits.layers || ! tree.isValid()) return;
     layerSwapper.useSlot(layer, std::move(tree));
 }
 
