@@ -240,3 +240,6 @@ target_link_libraries(mu-clid-midi-shot
 )
 
 set_target_properties(mu-clid-midi-shot PROPERTIES EXCLUDE_FROM_ALL TRUE)
+
+# The JUCE modules come from the one shared mu-juce library.
+mu_use_shared_juce()

@@ -2199,6 +2199,15 @@ signing (the Apple side of #99).
 > no Mac build is shipped and `release.yml` no longer runs a macOS runner. The `APPLE` / AU
 > plumbing above is kept intact so the work can resume without re-plumbing.
 
+### Shared libraries: mu-core and mu-juce
+
+Two static libraries are compiled once per configuration and linked by every product, wrapper and test app:
+
+- **`mu-core-lib`** (mu-core's own sources). It reads no per-product setting: a product's layer, bus and insert counts are its `kLimits` given to `ProcessorBase`, and its version string is its `getVersionString()`.
+- **`mu-juce`** (the JUCE modules: core, events, graphics, gui, audio, dsp, animation and the rest; 44 source files). A JUCE module target adds its source wrapper to every target that links it, so before this each of ~40 targets recompiled JUCE. Now a directory's `CMakeLists.txt` ends with `mu_use_shared_juce()`: that links `mu-juce` into the directory's targets and marks the module wrappers header-only there, so the targets still link `juce::juce_*` for include paths and definitions but do not compile them. **A new product or tool directory must call it** or it recompiles JUCE and the link fails with duplicate symbols. `juce_audio_plugin_client` and the CLAP wrapper are not in the set: they stay per target.
+- **What is shared, so what must not differ per target:** the JUCE flags every target already agrees on (`JUCE_WEB_BROWSER=0`, `JUCE_USE_CURL=0`, `JUCE_VST3_CAN_REPLACE_VST2=0`, `JUCE_USE_MP3AUDIOFORMAT=1`), plus `JUCE_MODAL_LOOPS_PERMITTED=1` (only adds methods, so tests that use modal loops and products that do not agree on the class layout) and `JUCE_ASIO=1` when `MUFAMILY_WITH_ASIO` is ON. The one JUCE code path that read a per-product define, `JucePlugin_Name` (the accessibility application name), reads `mu_core_shared_product_name()` instead (`SharedJuceName.h`, registered by `AboutOverlay::setProductInfo`; `SharedJuceNameTests` pins it). Nothing else in the compiled modules reads a `JucePlugin_*` or `JUCE_STANDALONE_APPLICATION` value (audited against the pinned JUCE; re-check on a JUCE bump).
+- **Measured** (clean full Debug, this PC): 923 s and 26.7 GB before, 442 s and 17.6 GB after. Binary sizes unchanged within 1 percent; Release `mu-juce` plus bench link 67 s; mixer benchmark unchanged.
+
 ### Build-number policy (owner rules, [cmake/IncrementBuildNumber.cmake](../cmake/IncrementBuildNumber.cmake))
 
 1. A build is a **Debug** build unless the owner asks for Release (when to build: CLAUDE.md, "Keep working until a build is worth it"). Every full Debug build **increments the number by

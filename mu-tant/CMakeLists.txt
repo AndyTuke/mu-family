@@ -329,3 +329,6 @@ target_link_libraries(mu-tant-wavetable-gen PRIVATE
     juce::juce_recommended_warning_flags)
 target_compile_definitions(mu-tant-wavetable-gen PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
 set_target_properties(mu-tant-wavetable-gen PROPERTIES EXCLUDE_FROM_ALL TRUE)
+
+# The JUCE modules come from the one shared mu-juce library.
+mu_use_shared_juce()

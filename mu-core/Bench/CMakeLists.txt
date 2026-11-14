@@ -10,3 +10,5 @@ target_link_libraries(mu-core-bench PRIVATE mu-core-lib
     juce::juce_graphics juce::juce_gui_basics juce::juce_dsp
     juce::juce_recommended_config_flags juce::juce_recommended_lto_flags juce::juce_recommended_warning_flags)
 target_compile_definitions(mu-core-bench PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+
+mu_use_shared_juce()

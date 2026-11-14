@@ -1,3 +1,4 @@
+#include "SharedJuceName.h"
 #include "AboutOverlay.h"
 #include "License/SupportPromptPolicy.h"
 #include "UI/ModalCard.h"   // shared dim + card chrome
@@ -27,6 +28,7 @@ void AboutOverlay::setProductInfo(const juce::String& displayName,
                                 const juce::StringArray& credits)
 {
     productName    = displayName;
+    mu_core::setSharedProductName(displayName.toRawUTF8());   // JUCE names the accessibility application after it (SharedJuceName.h)
     productCredits = credits;
     repaint();
 }

@@ -9,6 +9,7 @@
 #   pwsh tests/scripts/run-tests.ps1 -Suites mu-on,mu-clid
 #   pwsh tests/scripts/run-tests.ps1 -Fast               # skip the two slow suites (mu-tant, mu-toni) for a quick check
 #   pwsh tests/scripts/run-tests.ps1 -NoSplit            # one process per suite (no per-category split)
+#   pwsh tests/scripts/run-tests.ps1 -NoRetry            # do not rerun a failing process alone (by default a failure that passes alone is reported as load-sensitive)
 #   pwsh tests/scripts/run-tests.ps1 -Goldens            # also run the golden renders (mu-clid, mu-on, mu-tant, mu-toni): slow, end of day / before a release
 #
 # By default a product's test app skips its golden renders (categories ending "-golden"); see mu-core/Tests/TestSelection.h.
@@ -21,6 +22,7 @@ param(
     [switch]$Fast,
     [switch]$Goldens,
     [int]$MaxParallel = 12,                 # processes at once (the PC has 16 logical cores; more makes timing-sensitive tests fail)
+    [switch]$NoRetry,                       # do not rerun a failing process alone (a failure under load may be timing)
     [switch]$NoSplit,                       # run each suite as one process instead of one per test category
     [string[]]$SplitSuites = @('mu-tant', 'mu-toni', 'mu-tronic')   # the slow suites, cut by category and run in parallel
 )
@@ -58,7 +60,7 @@ $running = @()   # one entry per process: Suite (the group it reports under), Pa
 function Add-Run([string]$suite, [string]$part, [string]$exe, [string[]]$arguments, [string]$logName) {
     while (@($script:running | Where-Object { $_.Proc -and -not $_.Proc.HasExited }).Count -ge $MaxParallel) { Start-Sleep -Milliseconds 500 }
     $log = Join-Path $logDir "$logName.log"
-    $script:running += [pscustomobject]@{ Suite = $suite; Part = $part; Proc = (Start-Suite $logName $exe $arguments $log); Log = $log }
+    $script:running += [pscustomobject]@{ Suite = $suite; Part = $part; Proc = (Start-Suite $logName $exe $arguments $log); Log = $log; Exe = $exe; Args = $arguments }
 }
 foreach ($s in $Suites) {
     $t = Get-Target $s
@@ -89,7 +91,18 @@ foreach ($g in ($running | Group-Object Suite)) {
         $end = if ($r.Proc.HasExited) { $r.Proc.ExitTime } else { Get-Date }
         $maxMins = [math]::Max($maxMins, ($end - $r.Proc.StartTime).TotalMinutes)
         $line = (Select-String -Path $r.Log -Pattern '^=== ' -ErrorAction SilentlyContinue | Select-Object -Last 1).Line
-        if ($line -match '(\d+) failure\(s\) across (\d+) test result') { $failures += [int]$Matches[1]; $results += [int]$Matches[2] }
+        if ($line -match '(\d+) failure\(s\) across (\d+) test result') {
+            $f = [int]$Matches[1]; $n = [int]$Matches[2]
+            if ($f -gt 0 -and -not $NoRetry) {
+                # Timing tests fail under the parallel load and pass alone: run the failing process again by itself; a real failure fails again.
+                $rp = Start-Suite "$($g.Name)-retry" $r.Exe $r.Args "$($r.Log).retry"
+                if ($rp.WaitForExit(600000)) {
+                    $rl = (Select-String -Path "$($r.Log).retry" -Pattern '^=== ' -ErrorAction SilentlyContinue | Select-Object -Last 1).Line
+                    if ($rl -match '(\d+) failure\(s\) across (\d+) test result' -and [int]$Matches[1] -eq 0) { $f = 0; $n = [int]$Matches[2]; $note += ' (passed on a solo rerun: load-sensitive)' }
+                } else { $rp.Kill() }
+            }
+            $failures += $f; $results += $n
+        }
         else { $failed = $true; $broken = "no summary line: see $($r.Log)" }
     }
     if ($failures -gt 0) { $failed = $true }

@@ -397,3 +397,6 @@ set_target_properties(mu-clid-layer-tests PROPERTIES EXCLUDE_FROM_ALL TRUE)
 
 # A link regression in the layer shows up in a normal build (as mu-tant does).
 add_dependencies(mu-clid mu-clid-layer-tests)
+
+# The JUCE modules come from the one shared mu-juce library.
+mu_use_shared_juce()

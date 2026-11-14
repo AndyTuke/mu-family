@@ -208,3 +208,6 @@ add_custom_command(TARGET mu-link POST_BUILD
     VERBATIM
 )
 endif()
+
+# The JUCE modules come from the one shared mu-juce library.
+mu_use_shared_juce()

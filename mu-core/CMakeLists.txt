@@ -174,8 +174,12 @@ while(_mu_todo)
     list(APPEND _mu_seen ${_mu_t})
     get_target_property(_mu_deps ${_mu_t} INTERFACE_LINK_LIBRARIES)
     foreach(_mu_d IN LISTS _mu_deps)
-        if(_mu_d MATCHES "^juce::juce_[a-z_0-9]+$")
-            list(APPEND _mu_todo ${_mu_d})
+        # JUCE's modules name their dependencies without the juce:: prefix ("juce_graphics"), so accept both and normalise.
+        if(_mu_d MATCHES "^(juce::)?(juce_[a-z_0-9]+)$")
+            set(_mu_name "${CMAKE_MATCH_2}")
+            if(NOT _mu_name MATCHES "^juce_recommended")
+                list(APPEND _mu_todo "juce::${_mu_name}")
+            endif()
         endif()
     endforeach()
 endwhile()
@@ -188,6 +192,55 @@ foreach(_mu_t IN LISTS _mu_seen)
 endforeach()
 # The library itself links no JUCE target (so it holds no JUCE code); it reads the embedded-asset header through the usage target.
 target_include_directories(mu-juce-usage INTERFACE "$<TARGET_PROPERTY:mu-core-assets,INTERFACE_INCLUDE_DIRECTORIES>")
+
+# ── mu-juce: the JUCE modules compiled ONCE per configuration ──────────────────────────────────────────────────────────
+# A JUCE module target adds its source wrapper (juce_core.cpp, juce_gui_basics.cpp, ...) to every target that links it, so each
+# product, wrapper and test app recompiled the same JUCE code. mu-juce compiles it once. A directory that wants the shared copy
+# calls mu_use_shared_juce() at the END of its CMakeLists: that links mu-juce into the directory's targets and marks the module
+# wrappers as header-only in that directory, so the targets still link the juce:: modules (for include paths and definitions) but no
+# longer compile them. The plug-in wrapper (juce_audio_plugin_client) and the CLAP wrapper are not in the set: they stay per target.
+set(MU_JUCE_SHARED_SOURCES "")
+foreach(_mu_t IN LISTS _mu_seen)
+    get_target_property(_mu_s ${_mu_t} INTERFACE_SOURCES)
+    foreach(_mu_f IN LISTS _mu_s)
+        string(REGEX REPLACE "^\\$<BUILD_INTERFACE:(.*)>$" "\\1" _mu_f "${_mu_f}")
+        if(_mu_f MATCHES "\\.(cpp|mm|c)$")
+            list(APPEND MU_JUCE_SHARED_SOURCES "${_mu_f}")
+        endif()
+    endforeach()
+endforeach()
+list(REMOVE_DUPLICATES MU_JUCE_SHARED_SOURCES)
+set(MU_JUCE_SHARED_SOURCES "${MU_JUCE_SHARED_SOURCES}" CACHE INTERNAL "JUCE module wrappers compiled into mu-juce")
+list(LENGTH MU_JUCE_SHARED_SOURCES _mu_n)
+message(STATUS "mu-juce: ${_mu_n} JUCE module sources compiled once")
+add_library(mu-juce STATIC)
+target_link_libraries(mu-juce PRIVATE ${_mu_seen}
+    juce::juce_recommended_config_flags juce::juce_recommended_lto_flags juce::juce_recommended_warning_flags)
+# The settings every product shares, plus the superset of the test flag (modal loops only add methods, no data).
+target_compile_definitions(mu-juce PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0 JUCE_USE_MP3AUDIOFORMAT=1 JUCE_MODAL_LOOPS_PERMITTED=1)
+# JUCE names the accessibility application after JucePlugin_Name, which is per product; here it is the registered display name
+# (SharedJuceName.h, force-included into this library's sources; it declares nothing for C).
+target_compile_definitions(mu-juce PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:JucePlugin_Name=juce::CharPointer_UTF8(mu_core_shared_product_name())>")
+if(MSVC)
+    target_compile_options(mu-juce PRIVATE "/FI${CMAKE_CURRENT_SOURCE_DIR}/SharedJuceName.h")
+endif()
+# ASIO devices (Windows, off by default): the audio-device code is compiled here, once, so the switch belongs here.
+if(MUFAMILY_WITH_ASIO AND WIN32)
+    target_compile_definitions(mu-juce PRIVATE JUCE_ASIO=1)
+endif()
+
+# Call at the end of a directory's CMakeLists: every target created in this directory links mu-juce and stops compiling the modules.
+function(mu_use_shared_juce)
+    get_property(_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
+    foreach(_t IN LISTS _targets)
+        get_target_property(_type ${_t} TYPE)
+        if(_type MATCHES "^(EXECUTABLE|STATIC_LIBRARY|SHARED_LIBRARY|MODULE_LIBRARY)$" AND NOT _t STREQUAL "mu-juce")
+            # The wrappers reach the target through the juce:: modules it links, so the property is set in the target's own scope.
+            set_source_files_properties(${MU_JUCE_SHARED_SOURCES} TARGET_DIRECTORY ${_t} PROPERTIES HEADER_FILE_ONLY ON)
+            target_link_libraries(${_t} PRIVATE mu-juce)
+        endif()
+    endforeach()
+endfunction()
 
 
 

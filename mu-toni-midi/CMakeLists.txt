@@ -177,3 +177,6 @@ target_link_libraries(mu-toni-midi-shot
         juce::juce_recommended_warning_flags
 )
 set_target_properties(mu-toni-midi-shot PROPERTIES EXCLUDE_FROM_ALL TRUE)
+
+# The JUCE modules come from the one shared mu-juce library.
+mu_use_shared_juce()

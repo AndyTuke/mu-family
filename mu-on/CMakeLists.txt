@@ -273,3 +273,6 @@ target_link_libraries(mu-on-layer-tests PRIVATE
 target_compile_definitions(mu-on-layer-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
 
 add_dependencies(mu-on mu-on-layer-tests)
+
+# The JUCE modules come from the one shared mu-juce library.
+mu_use_shared_juce()

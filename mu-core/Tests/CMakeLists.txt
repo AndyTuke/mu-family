@@ -37,6 +37,7 @@ set(MU_CORE_TEST_SOURCES
     LayerAccessTests.cpp
     ClipBankTests.cpp
     ProcessorLimitsTests.cpp        # runtime-count types: FlatArray, ProcessorLimits, ProcessorBase::getLimits
+    SharedJuceNameTests.cpp         # the shared JUCE build: the accessibility name follows the product
     HeldNoteStackTests.cpp          # the shared held-key stack and its two overflow policies
     ClipLaunchTests.cpp
     ClipAutoSaveTests.cpp           # clip auto-save: settle, flush, skips, trackers
@@ -183,3 +184,6 @@ endfunction()
 mu_core_add_test_target(mu-core-tests "" "" "")                # the default: no group buses
 mu_core_add_test_target(mu-core-tests-16 16 3 2)               # the 16-layer build of the same sources, as mu-Tronic: 3 buses, 2 inserts each
 mu_core_add_test_target(mu-core-tests-bus1 "" 3 1)             # 3 buses with 1 insert each (MU_TEST_BUS_INSERTS is real), 8 layers
+
+# The JUCE modules come from the one shared mu-juce library.
+mu_use_shared_juce()

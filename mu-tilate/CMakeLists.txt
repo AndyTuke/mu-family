@@ -194,3 +194,6 @@ target_link_libraries(mu-tilate-tests PRIVATE mu-core-assets
 
 target_compile_definitions(mu-tilate-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0 JUCE_USE_MP3AUDIOFORMAT=1
     JUCE_MODAL_LOOPS_PERMITTED=1)   # the processor tests pump the message loop while a loop loads
+
+# The JUCE modules come from the one shared mu-juce library.
+mu_use_shared_juce()

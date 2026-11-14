@@ -56,3 +56,6 @@ target_link_libraries(mu-layer-link-test PRIVATE
 target_compile_definitions(mu-layer-link-test PRIVATE JUCE_USE_MP3AUDIOFORMAT=1 JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
 
 set_target_properties(mu-layer-link-test PROPERTIES EXCLUDE_FROM_ALL TRUE)
+
+# The JUCE modules come from the one shared mu-juce library.
+mu_use_shared_juce()

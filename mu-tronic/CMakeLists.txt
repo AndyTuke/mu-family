@@ -248,3 +248,6 @@ target_link_libraries(mu-tronic-uisoak
 target_compile_definitions(mu-tronic-uisoak_Standalone PRIVATE JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1)
 target_sources(mu-tronic-uisoak_Standalone PRIVATE Source/Tests/UiSoakApp.cpp)
 set_target_properties(mu-tronic-uisoak mu-tronic-uisoak_Standalone PROPERTIES EXCLUDE_FROM_ALL TRUE)
+
+# The JUCE modules come from the one shared mu-juce library.
+mu_use_shared_juce()

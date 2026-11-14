@@ -1,0 +1,62 @@
+{
+  "label": "shared",
+  "date": "2026-11-14T18:22:00",
+  "machine": "LACUTUSOFBORG",
+  "commit": "4131eb89",
+  "results": [
+    {
+      "shape": "clid",
+      "block": 64,
+      "layers": 8,
+      "buses": 0,
+      "medianUs": 17.0,
+      "p99Us": 18.5,
+      "spreadPct": 1.18
+    },
+    {
+      "shape": "clid",
+      "block": 256,
+      "layers": 8,
+      "buses": 0,
+      "medianUs": 64.7,
+      "p99Us": 69.4,
+      "spreadPct": 1.55
+    },
+    {
+      "shape": "host",
+      "block": 64,
+      "layers": 1,
+      "buses": 0,
+      "medianUs": 11.0,
+      "p99Us": 11.7,
+      "spreadPct": 0.0
+    },
+    {
+      "shape": "host",
+      "block": 256,
+      "layers": 1,
+      "buses": 0,
+      "medianUs": 41.6,
+      "p99Us": 43.6,
+      "spreadPct": 0.72
+    },
+    {
+      "shape": "tronic",
+      "block": 64,
+      "layers": 16,
+      "buses": 3,
+      "medianUs": 24.4,
+      "p99Us": 25.9,
+      "spreadPct": 0.41
+    },
+    {
+      "shape": "tronic",
+      "block": 256,
+      "layers": 16,
+      "buses": 3,
+      "medianUs": 93.2,
+      "p99Us": 101.6,
+      "spreadPct": 1.07
+    }
+  ]
+}
