@@ -22,6 +22,7 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
     : ProcessorCore(props, limits.layers),
       apvts(*this, nullptr, stateTreeType, std::move(layout)),
       mixerEngine(limits),
+      liveState(limits.layers),
       retireBinStorage(std::make_unique<mu_core::RetireBin>(layerAccess.epoch, layerAccess.layout, limits.layers)),
       retireBin(*retireBinStorage),
       limits_(limits)

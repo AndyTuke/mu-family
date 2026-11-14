@@ -52,8 +52,8 @@ inline SceneInfo sceneInfoFor(const SceneLayerClip* layers, int count) noexcept
 inline SceneInfo sceneInfo(const LiveView& view, int clip) noexcept
 {
     if (clip < 0 || clip >= mu_limits::kClipsPerLayer) return {};
-    const int layers = view.getLayerCount() < (int) mu_limits::kMaxLayers ? view.getLayerCount() : (int) mu_limits::kMaxLayers;
-    SceneLayerClip perLayer[mu_limits::kMaxLayers] {};
+    const int layers = view.getLayerCount() < (int) mu_limits::kAbsoluteMaxLayers ? view.getLayerCount() : (int) mu_limits::kAbsoluteMaxLayers;
+    SceneLayerClip perLayer[mu_limits::kAbsoluteMaxLayers] {};
     for (int layer = 0; layer < layers; ++layer)
     {
         auto& c   = perLayer[layer];

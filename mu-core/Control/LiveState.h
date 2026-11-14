@@ -3,6 +3,7 @@
 #include "Control/ControlAction.h"
 #include "Control/LiveView.h"
 #include "MuLimits.h"
+#include "Audio/FlatArray.h"
 #include <juce_data_structures/juce_data_structures.h>
 #include <array>
 #include <functional>
@@ -28,6 +29,9 @@ class LiveState : public LiveView
 public:
     // What staging an item did: it failed to load, it is waiting for its boundary, or it was applied at once.
     enum class Stage { Failed, Queued, Applied };
+
+    // `numLayers` is how many layer slots the owning processor has (its getLimits().layers).
+    explicit LiveState(int numLayers = mu_limits::kMaxLayers) : numLayers_(numLayers) { clipState.reset(numLayers); }
 
     struct Callbacks
     {
@@ -80,11 +84,11 @@ public:
     { return cb.layerColourIndex ? cb.layerColourIndex(layer) : (layer < 0 ? 0 : layer % 8); }
     bool                          isItemPlayable(int item) const override    { return itemLoadable(item); }
     uint32_t                      getRevision()       const noexcept override { return revision; }
-    int                           getPlayingClip(int layer) const override { return inRange(layer) ? clipState[(size_t) layer].playing : -1; }
-    int                           getQueuedClip(int layer)  const override { return inRange(layer) ? clipState[(size_t) layer].queued : -1; }
-    uint8_t                       getClipMask(int layer)    const override { return inRange(layer) ? clipState[(size_t) layer].mask : (uint8_t) 0; }
+    int                           getPlayingClip(int layer) const override { return inRange(layer) ? clipState[layer].playing : -1; }
+    int                           getQueuedClip(int layer)  const override { return inRange(layer) ? clipState[layer].queued : -1; }
+    uint8_t                       getClipMask(int layer)    const override { return inRange(layer) ? clipState[layer].mask : (uint8_t) 0; }
     juce::String                  getClipName(int layer, int clip) const override
-    { return inRange(layer) && clip >= 0 && clip < mu_limits::kClipsPerLayer ? clipState[(size_t) layer].names[(size_t) clip] : juce::String(); }
+    { return inRange(layer) && clip >= 0 && clip < mu_limits::kClipsPerLayer ? clipState[layer].names[(size_t) clip] : juce::String(); }
     bool                          isLayerMuted(int layer)   const override
     { return layer >= 0 && layer < getLayerCount() && cb.layerMuted && cb.layerMuted(layer); }
     bool                          isClipForLayer(int layer, int clip) const override
@@ -190,7 +194,7 @@ private:
         uint8_t  mask         = 0;    // bit n = clip n is stored
         std::array<juce::String, mu_limits::kClipsPerLayer> names {};   // clip n's stored name
     };
-    static bool inRange(int layer) noexcept { return layer >= 0 && layer < mu_limits::kMaxLayers; }
+    bool inRange(int layer) const noexcept { return layer >= 0 && layer < numLayers_; }
     bool startClip(int layer, int clip);
     bool launchAndTrack(int layer, int clip);
     bool stepClip(int direction);
@@ -214,7 +218,8 @@ private:
     int                    selectedLayer   = 0;
     uint32_t               queuedSerial    = 0;   // the stage serial when the queued item was staged
     uint32_t               revision        = 0;
-    std::array<ClipState, (size_t) mu_limits::kMaxLayers> clipState {};
+    int                    numLayers_;
+    mu_core::FlatArray<ClipState> clipState;
     SceneLaunch            lastScene;             // what the last LaunchScene did
     uint32_t               seenFullCommits = 0;   // the full-preset commit count the clip state was last settled against
     mutable juce::ListenerList<Listener> listeners;

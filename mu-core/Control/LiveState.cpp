@@ -240,7 +240,7 @@ bool LiveState::seedClipsFromLayers()
 {
     if (! cb.savedClip) return false;
     bool any = false;
-    const int layers = std::min(getLayerCount(), (int) mu_limits::kMaxLayers);
+    const int layers = std::min(getLayerCount(), (int) numLayers_);
     for (int layer = 0; layer < layers; ++layer)
     {
         const int clip = cb.savedClip(layer);
@@ -307,7 +307,7 @@ bool LiveState::launchScene(int clip)
     if (clip < 0 || clip >= mu_limits::kClipsPerLayer) return false;
     reconcileClips();   // first drop anything a full preset applied since the last settle has made stale
 
-    const int layers = std::min(getLayerCount(), (int) mu_limits::kMaxLayers);
+    const int layers = std::min(getLayerCount(), (int) numLayers_);
 
     // Everything slow first (a clip's files), so the batch window below holds only the staging calls.
     if (cb.preloadClip)
@@ -382,7 +382,7 @@ void LiveState::reconcileClips()
 
     // A queued clip: still staged and still ours = waiting; gone with our serial = it landed; otherwise
     // another load or a cancel replaced it.
-    for (int layer = 0; layer < mu_limits::kMaxLayers; ++layer)
+    for (int layer = 0; layer < numLayers_; ++layer)
     {
         auto& c = clipState[(size_t) layer];
         if (c.queued < 0) continue;
@@ -463,8 +463,8 @@ void LiveState::clipCleared(int layer, int clip)
 
 void LiveState::remapLayers(const std::function<int(int)>& oldToNew)
 {
-    std::array<ClipState, (size_t) mu_limits::kMaxLayers> moved {};
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    mu_core::FlatArray<ClipState> moved(numLayers_);
+    for (int i = 0; i < numLayers_; ++i)
     {
         const int j = oldToNew(i);
         if (! inRange(j)) continue;   // the layer is gone
@@ -480,7 +480,7 @@ void LiveState::remapLayers(const std::function<int(int)>& oldToNew)
     for (size_t i = 0; i < moved.size(); ++i)
         differs |= moved[i].playing != clipState[i].playing || moved[i].queued != clipState[i].queued
                 || moved[i].mask != clipState[i].mask || moved[i].names != clipState[i].names;
-    clipState = moved;
+    clipState = std::move(moved);
     if (differs) changed();
 }
 
@@ -511,7 +511,7 @@ void LiveState::restoreFrom(const juce::ValueTree& state)
     currentItem = queuedItem = -1;
     // A launch staged before the restore would land on the restored layers unlit.
     if (cb.cancelSlot)
-        for (int layer = 0; layer < mu_limits::kMaxLayers; ++layer) cb.cancelSlot(layer);
+        for (int layer = 0; layer < numLayers_; ++layer) cb.cancelSlot(layer);
     resetClips();   // a restored session replaced the layers: the pads show the clips it saved as playing
     syncFullCommits();
     performance = {};
