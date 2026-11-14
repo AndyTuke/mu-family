@@ -66,6 +66,7 @@ set(MU_CORE_TEST_SOURCES
     AlgorithmNameTableTests.cpp
     BarPositionTests.cpp
     RhythmPlayStateTests.cpp
+    StepFractionTests.cpp
     RhythmCircleStepTests.cpp
     HotSwapTests.cpp
     DeferredWorkTests.cpp

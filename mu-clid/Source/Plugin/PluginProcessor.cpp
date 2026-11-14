@@ -274,7 +274,7 @@ void PluginProcessor::layersBlockStarting(const mu_core::LayerView& view, const 
             requestDeferredWork();
 
         // Update UI play-state atomics.
-        const float frac = static_cast<float>(std::fmod(t.startBeat / RhythmSequencer::StepLengthBeats, 1.0));
+        const float frac = RhythmSequencer::stepFraction(t.startBeat);
         for (int r = 0; r < numRhythms; ++r)
         {
             const auto& cs = cursorSteps[(size_t) r];

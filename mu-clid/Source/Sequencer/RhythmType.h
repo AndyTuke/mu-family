@@ -350,7 +350,7 @@ inline void SlotRhythm::startBlock(const mu_core::RenderContext& ctx)
             midiScratch.clear();
             takeHit(hit.accented, hit.tied, midiScratch);   // MIDI mode: a note-on now; otherwise the hit waits for render
         }
-        const float frac = (float) std::fmod(resolved.beat / RhythmSequencer::StepLengthBeats, 1.0);
+        const float frac = RhythmSequencer::stepFraction(resolved.beat);
         publishPlayState(cursor.lastStep(), cursor.lastAccentStep(), cursor.patternLength(), frac, fired);
     }
 

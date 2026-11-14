@@ -91,14 +91,27 @@ public:
     // The step a beat position falls in (0 for negative or non-finite input). The 1e-9 tolerance stops a
     // beat that is a rounding hair below a step boundary from flooring to the previous step, and the
     // clamp keeps the double-to-int cast defined for any host value.
+    static constexpr double kStepEpsilon = 1e-9;
+
     static int beatToStep(double beat) noexcept
     {
-        constexpr double kStepEpsilon = 1e-9;
         constexpr double kMaxStep     = 1073741824.0;   // 2^30 steps, far beyond any real song
         if (! std::isfinite(beat))
             return 0;
         const double step = std::floor(beat / StepLengthBeats + kStepEpsilon);
         return step <= 0.0 ? 0 : static_cast<int>(std::min(step, kMaxStep));
+    }
+
+    // The position inside the step beatToStep() names, 0 up to just under 1. It uses the same epsilon as
+    // beatToStep, so a beat a rounding hair below a boundary reads as step N + 0, never as step N with a
+    // fraction near 1 (which would draw the ring a whole step ahead for one block).
+    static float stepFraction(double beat) noexcept
+    {
+        if (! std::isfinite(beat) || beat <= 0.0)
+            return 0.0f;
+        const double pos  = beat / StepLengthBeats;
+        const double frac = pos - std::floor(pos + kStepEpsilon);
+        return frac <= 0.0 ? 0.0f : static_cast<float>(frac);
     }
 
     // True when the playhead moved back to an earlier step between two blocks of a running

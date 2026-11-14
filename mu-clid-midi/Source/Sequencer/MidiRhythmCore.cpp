@@ -117,7 +117,7 @@ void MidiRhythmCore::advanceSequencer(bool playing, double beatPos, juce::MidiBu
         }
 
         // Phase 2: publish the play position for the editor's circle (the last step reached, with how far into it the block ends).
-        const float frac = static_cast<float>(std::fmod(endBeat / RhythmSequencer::StepLengthBeats, 1.0));
+        const float frac = RhythmSequencer::stepFraction(endBeat);
         beatFraction.store(frac);
         // Step and fraction go out as one snapshot so the ring never pairs a new fraction with an old step.
         rhythmPlayState.publishPosition({ sequencer.getLastStepIndex(0),
