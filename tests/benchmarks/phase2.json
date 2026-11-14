@@ -1,0 +1,62 @@
+{
+  "label": "phase2",
+  "date": "2026-11-14T10:51:57",
+  "machine": "LACUTUSOFBORG",
+  "commit": "95699183",
+  "results": [
+    {
+      "shape": "clid",
+      "block": 64,
+      "layers": 8,
+      "buses": 0,
+      "medianUs": 17.0,
+      "p99Us": 18.3,
+      "spreadPct": 0.59
+    },
+    {
+      "shape": "clid",
+      "block": 256,
+      "layers": 8,
+      "buses": 0,
+      "medianUs": 64.6,
+      "p99Us": 68.7,
+      "spreadPct": 0.93
+    },
+    {
+      "shape": "host",
+      "block": 64,
+      "layers": 1,
+      "buses": 0,
+      "medianUs": 10.9,
+      "p99Us": 12.5,
+      "spreadPct": 0.92
+    },
+    {
+      "shape": "host",
+      "block": 256,
+      "layers": 1,
+      "buses": 0,
+      "medianUs": 41.3,
+      "p99Us": 43.4,
+      "spreadPct": 1.69
+    },
+    {
+      "shape": "tronic",
+      "block": 64,
+      "layers": 16,
+      "buses": 3,
+      "medianUs": 24.2,
+      "p99Us": 25.6,
+      "spreadPct": 0.83
+    },
+    {
+      "shape": "tronic",
+      "block": 256,
+      "layers": 16,
+      "buses": 3,
+      "medianUs": 93.0,
+      "p99Us": 101.1,
+      "spreadPct": 0.75
+    }
+  ]
+}

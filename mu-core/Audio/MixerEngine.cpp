@@ -3,8 +3,30 @@
 #include "Audio/FX/Slots/FXChain.h"
 #include <cmath>
 
-MixerEngine::MixerEngine()
+MixerEngine::MixerEngine(const mu_limits::ProcessorLimits& limits)
+    : numChannels(limits.layers),
+      numBuses(limits.buses),
+      numBusInserts(limits.busInserts),
+      externalSidechainOffered(limits.externalSidechain)
 {
+    jassert(limits.valid());
+    // Every per-layer and per-bus array is sized once here, never on the audio thread.
+    channels.reset(numChannels);
+    channelRamp.reset(numChannels);
+    channelLastBus.reset(numChannels);
+    channelPeaks.reset(numChannels);
+    channelPeaksL.reset(numChannels);
+    channelPeaksR.reset(numChannels);
+    sidechainGR.reset(numChannels);
+    scEnv.reset(numChannels);
+    scEnvResetRequest.reset(numChannels);
+    channelBufs.reset(numChannels);
+    buses.reset(numBuses);
+    busRamp.reset(numBuses);
+    scBusEnv.reset(numBuses);
+    busPeaks.reset(numBuses);  busPeaksL.reset(numBuses);  busPeaksR.reset(numBuses);  busSidechainGR.reset(numBuses);
+    busBufs.reset(numBuses);   busTap.reset(numBuses);     busScSource.reset(numBuses);
+
     for (auto& b : channelLastBus)    b = kBusUnset;
     for (auto& p : channelPeaks)       p.store(0.0f);
     for (auto& p : returnPeaks)        p.store(0.0f);
@@ -17,13 +39,15 @@ MixerEngine::MixerEngine()
     masterPeakR.store(0.0f);
     for (auto& g : sidechainGR)        g.store(0.0f);
     for (auto& g : returnSidechainGR)  g.store(0.0f);
-    for (size_t b = 0; b < buses.size(); ++b)
+    for (auto& r : scEnvResetRequest)  r.store(false);
+    for (int b = 0; b < numBuses; ++b)
     {
         busPeaks[b].store(0.0f);  busPeaksL[b].store(0.0f);  busPeaksR[b].store(0.0f);
         busSidechainGR[b].store(0.0f);
+        buses[b].insert.reset(numBusInserts);
         // Each bus insert seeds its noise from its own index, apart from every layer's.
-        for (int i = 0; i < kBusInserts; ++i)
-            buses[b].insert[i].processor.setSlotIndex(MaxChannels + (int) b * kBusInserts + i);
+        for (int i = 0; i < numBusInserts; ++i)
+            buses[b].insert[i].processor.setSlotIndex(numChannels + b * numBusInserts + i);
     }
 }
 
@@ -51,7 +75,7 @@ void MixerEngine::prepare(double sr, int blockSize)
     masterInsert.prepare(sr, blockSize);
     masterInsert2.prepare(sr, blockSize);
     // Everything a bus needs is sized here, so the audio thread never allocates for one.
-    for (size_t b = 0; b < buses.size(); ++b)
+    for (int b = 0; b < numBuses; ++b)
     {
         busBufs[b]    .setSize(2, blockSize, false, true, true);
         busTap[b]     .setSize(2, blockSize, false, true, true);
@@ -167,7 +191,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     // Strips whose follower a type change asked to be zeroed start this block from silence.
     for (auto& request : scEnvResetRequest)
         if (request.load(std::memory_order_acquire) && request.exchange(false, std::memory_order_acq_rel))
-            scEnv[&request - scEnvResetRequest] = 0.0f;
+            scEnv[(int) (&request - scEnvResetRequest.data())] = 0.0f;
 
     output.clear();
     effectSendBuf.clear();
@@ -180,20 +204,21 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     // strip is on a soloed path when it, its bus or (for a bus) any of its channels is soloed, and with any
     // solo active every strip off such a path is cut. A muted bus is cut from the output only: the channels'
     // own sends are taken before it and are unaffected.
-    int  chBus[MaxChannels];
-    int  chOut[MaxChannels];
-    bool chAudible[MaxChannels];
-    int   busSrc[kNumBuses > 0 ? kNumBuses : 1] {};
-    float busAmt[kNumBuses > 0 ? kNumBuses : 1] {};
-    bool busAudible[kNumBuses > 0 ? kNumBuses : 1] {};
-    bool busSoloMember[kNumBuses > 0 ? kNumBuses : 1] {};
+    // Small fixed scratch at the ceilings (a few hundred bytes on the stack); every loop runs to the runtime count.
+    int  chBus[mu_limits::kAbsoluteMaxLayers];
+    int  chOut[mu_limits::kAbsoluteMaxLayers];
+    bool chAudible[mu_limits::kAbsoluteMaxLayers];
+    int   busSrc[mu_limits::kAbsoluteMaxBuses] {};
+    float busAmt[mu_limits::kAbsoluteMaxBuses] {};
+    bool busAudible[mu_limits::kAbsoluteMaxBuses] {};
+    bool busSoloMember[mu_limits::kAbsoluteMaxBuses] {};
     bool anySolo = false;
     for (int r = 0; r < numActiveChannels; ++r)
     {
         const auto& ch = channels[r];
         const int assign = ch.busAssign.load(std::memory_order_relaxed);
         chOut[r] = ch.outputBus.load(std::memory_order_relaxed);
-        chBus[r] = (kNumBuses > 0 && chOut[r] == 0 && assign >= 1 && assign <= kNumBuses)
+        chBus[r] = (numBuses > 0 && chOut[r] == 0 && assign >= 1 && assign <= numBuses)
                      ? assign - 1 : -1;
         if (ch.solo.load(std::memory_order_relaxed))
         {
@@ -201,7 +226,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
             if (chBus[r] >= 0) busSoloMember[chBus[r]] = true;
         }
     }
-    for (size_t b = 0; b < buses.size(); ++b)
+    for (int b = 0; b < numBuses; ++b)
     {
         if (buses[b].solo.load(std::memory_order_relaxed)) anySolo = true;
         // A bus's sidechain source and amount are read once here, so phases 2c and 3b agree on them.
@@ -215,7 +240,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
                              || (chBus[r] >= 0 && buses[(size_t) chBus[r]].solo.load(std::memory_order_relaxed));
         chAudible[r] = ! ch.mute.load(std::memory_order_relaxed) && ! (anySolo && ! onSoloPath);
     }
-    for (size_t b = 0; b < buses.size(); ++b)
+    for (int b = 0; b < numBuses; ++b)
         busAudible[b] = ! buses[b].mute.load(std::memory_order_relaxed)
                      && ! (anySolo && ! (buses[b].solo.load(std::memory_order_relaxed) || busSoloMember[b]));
 
@@ -230,7 +255,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     // Clear peaks for inactive channels this block so their VUs go silent.
     // Same for sidechainGR so a removed channel cannot leave a ghost reading on the
     // inactive slot's GR meter.
-    for (int r = numActiveChannels; r < MaxChannels; ++r)
+    for (int r = numActiveChannels; r < numChannels; ++r)
     {
         clearPeak(channelPeaks[r], channelPeaksL[r], channelPeaksR[r]);
         sidechainGR  [r].store(0.0f);
@@ -320,7 +345,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
 
     // Phase 2c: a bus that ducks from a channel listens to it before the channel's fader and pan, so keep a
     // copy now too (a bus that ducks from a lower bus reads that bus's tap instead).
-    for (size_t b = 0; b < buses.size(); ++b)
+    for (int b = 0; b < numBuses; ++b)
     {
         const int src = busSrc[b];
         if (busAmt[b] <= 0.0f) continue;
@@ -368,7 +393,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
             auto routeTo = [&](int dest, float g0, float g1)
             {
                 if (dest < 0 && skipMaster) return;
-                auto& dst = dest >= 0 ? busBufs[(size_t) dest] : output;
+                auto& dst = dest >= 0 ? busBufs[dest] : output;
                 for (int c = 0; c < numOutCh; ++c)
                     dst.addFromWithRamp(c, 0, buf.getReadPointer(c), numSamples, g0, g1);
             };
@@ -406,24 +431,24 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     // Phase 3b: the group buses, in index order (channels -> buses -> returns -> master is the fixed order, so
     // no loop can form). Per bus: sidechain duck, the insert chain, then fader / pan, peak, sends and the
     // add to the output. First mark which buses a later strip ducks from, so only those keep a tap.
-    bool busTapNeeded[kNumBuses > 0 ? kNumBuses : 1] {};
+    bool busTapNeeded[mu_limits::kAbsoluteMaxBuses] {};
     {
         auto markIfBus = [&](int src, float amount)
         {
             int sb = 0;
-            if (amount > 0.0f && mu_mix::isBusSource(src, MaxChannels, kNumBuses, &sb)) busTapNeeded[sb] = true;
+            if (amount > 0.0f && mu_mix::isBusSource(src, numChannels, numBuses, &sb)) busTapNeeded[sb] = true;
         };
-        for (size_t b = 0; b < buses.size(); ++b)
+        for (int b = 0; b < numBuses; ++b)
             markIfBus(busSrc[b], busAmt[b]);
         for (const auto& ret : returns)
             markIfBus(ret.sidechainSource.load(std::memory_order_relaxed), ret.sidechainAmount.load(std::memory_order_relaxed));
     }
 
-    for (int b = 0; b < kNumBuses; ++b)
+    for (int b = 0; b < numBuses; ++b)
     {
-        auto& bus = buses[(size_t) b];
-        auto& buf = busBufs[(size_t) b];
-        busSidechainGR[(size_t) b].store(0.0f);
+        auto& bus = buses[b];
+        auto& buf = busBufs[b];
+        busSidechainGR[b].store(0.0f);
 
         // Duck from a channel (its pre-fader copy), a LOWER bus (that bus's tap, already complete) or the
         // external input; any other source (a later bus, itself) is ignored, which keeps the graph acyclic.
@@ -433,17 +458,17 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
         {
             int srcBus = -1;
             const bool isExt = (src == kExtSidechainSrc);
-            const bool isBus = mu_mix::isBusSource(src, MaxChannels, kNumBuses, &srcBus) && srcBus < b;
+            const bool isBus = mu_mix::isBusSource(src, numChannels, numBuses, &srcBus) && srcBus < b;
             const bool isCh  = src >= 0 && src < numActiveChannels;
             if ((isExt && extScL != nullptr) || isBus || isCh)
             {
-                const auto& scBuf = isBus ? busTap[(size_t) srcBus] : busScSource[(size_t) b];
+                const auto& scBuf = isBus ? busTap[srcBus] : busScSource[b];
                 const float* srcL = isExt ? extScL : scBuf.getReadPointer(0);
                 const float* srcR = isExt ? extScR : (scBuf.getNumChannels() > 1 ? scBuf.getReadPointer(1) : srcL);
                 float* tgtL = buf.getWritePointer(0);
                 float* tgtR = buf.getNumChannels() > 1 ? buf.getWritePointer(1) : nullptr;
                 const bool sourceActive = isExt || (isBus ? busAudible[srcBus] : chAudible[src]);
-                busSidechainGR[(size_t) b].store(applySidechainDuck(srcL, srcR, sourceActive, tgtL, tgtR, numSamples, scAmt,
+                busSidechainGR[b].store(applySidechainDuck(srcL, srcR, sourceActive, tgtL, tgtR, numSamples, scAmt,
                                                                     bus.sidechainAttackMs.load(std::memory_order_relaxed),
                                                                     bus.sidechainReleaseMs.load(std::memory_order_relaxed),
                                                                     sampleRate, scBusEnv[b]));
@@ -456,24 +481,24 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
             ins.processor.process(buf, numSamples, buf.getNumChannels(), ins.snapshot());
 
         if (busTapNeeded[b])
-            for (int c = 0; c < busTap[(size_t) b].getNumChannels(); ++c)
-                busTap[(size_t) b].copyFrom(c, 0, buf, juce::jmin(c, buf.getNumChannels() - 1), 0, numSamples);
+            for (int c = 0; c < busTap[b].getNumChannels(); ++c)
+                busTap[b].copyFrom(c, 0, buf, juce::jmin(c, buf.getNumChannels() - 1), 0, numSamples);
 
         // A muted bus (or one off the soloed path) is cut from the output and its sends; the channels'
         // sends were taken in Phase 3 and are not touched.
         // A bus that just went silent ramps to zero over this block first, as a channel does.
-        auto& busGain = busRamp[(size_t) b];
+        auto& busGain = busRamp[b];
         const bool busFading = ! busAudible[b] && busGain.primed && (busGain.l > 0.0f || busGain.r > 0.0f);
         if (! busAudible[b] && ! busFading)
         {
             if (! busGain.primed) { busGain.l = busGain.r = 0.0f; busGain.primed = true; }
-            clearPeak(busPeaks[(size_t) b], busPeaksL[(size_t) b], busPeaksR[(size_t) b]);
+            clearPeak(busPeaks[b], busPeaksL[b], busPeaksR[b]);
             continue;
         }
 
         applyPanGainRamped(buf, busAudible[b] ? bus.level.load(std::memory_order_relaxed) : 0.0f,
                                 ChannelState::effective(bus.pan, bus.panMod), numSamples, busGain);
-        storePeak(buf, numSamples, busPeaks[(size_t) b], busPeaksL[(size_t) b], busPeaksR[(size_t) b]);
+        storePeak(buf, numSamples, busPeaks[b], busPeaksL[b], busPeaksR[b]);
 
         if (! anyReturnSolo)
             for (int c = 0; c < numOutCh; ++c)
@@ -533,7 +558,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
 
         const bool isExt = (src == kExtSidechainSrc);
         int srcBus = -1;
-        const bool isBus = mu_mix::isBusSource(src, MaxChannels, kNumBuses, &srcBus);
+        const bool isBus = mu_mix::isBusSource(src, numChannels, numBuses, &srcBus);
         if (!isExt && !isBus && (src < 0 || src >= numActiveChannels))
         {
             returnSidechainGR[ri].store(0.0f);
@@ -550,7 +575,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
                                  : reverbSendBuf;
 
         // Internal sources come from the pre-fader copy taken in Phase 2b (a channel) or the bus's tap (a bus).
-        const auto& scBuf = isBus ? busTap[(size_t) srcBus] : returnScSource[ri];
+        const auto& scBuf = isBus ? busTap[srcBus] : returnScSource[ri];
         const float* srcL = isExt ? extScL : scBuf.getReadPointer(0);
         const float* srcR = isExt ? extScR
                           : (scBuf.getNumChannels() > 1 ? scBuf.getReadPointer(1) : srcL);

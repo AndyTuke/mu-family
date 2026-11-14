@@ -21,6 +21,7 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
                              mu_limits::ProcessorLimits limits)
     : ProcessorCore(props),
       apvts(*this, nullptr, stateTreeType, std::move(layout)),
+      mixerEngine(limits),
       limits_(limits)
 {
     jassert(limits_.valid());
