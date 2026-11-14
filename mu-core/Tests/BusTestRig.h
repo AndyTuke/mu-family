@@ -52,7 +52,7 @@ struct Rig
         {
             if (direct0 != nullptr)
             {
-                std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels> d {};
+                MixerEngine::DirectOuts d {};
                 d[0] = direct0;
                 mixer.processBlock(out, numActive, nullptr, fx, kBlock, &d, nullptr, nullptr, &render);
             }

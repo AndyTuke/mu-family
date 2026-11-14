@@ -183,7 +183,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
                                 std::unique_ptr<VoiceEngine>* voices,
                                 FXChain&                     fxChain,
                                 int                          numSamples,
-                                std::array<juce::AudioBuffer<float>*, MaxChannels>* directOuts,
+                                DirectOuts* directOuts,
                                 juce::AudioBuffer<float>*    fxReturnsOut,
                                 const RetiredVoices*         retired,
                                 const RenderChannelFn*       renderChannel)

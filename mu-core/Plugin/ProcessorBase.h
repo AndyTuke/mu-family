@@ -1008,7 +1008,7 @@ protected:
     // out stays in the block's storage for mergeLayerMidiOut. A 0-frame block renders nothing and calls no hook;
     // its edges reach the next rendered block. The host's beat bound is t.beatWrap.
     void renderAndMix(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi, const mu_core::BlockTransport& t,
-                      std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels>* directOuts = nullptr,
+                      MixerEngine::DirectOuts* directOuts = nullptr,
                       juce::AudioBuffer<float>* fxReturnsOut = nullptr) noexcept;
 
     // Audio thread, called by renderAndMix only in a host block that renders (its LayerBlock succeeded), with
@@ -1194,7 +1194,7 @@ protected:
                           int                                      numVoices,
                           int                                      numSamples,
                           double                                   effectiveBpm,
-                          std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels>* directOuts = nullptr,
+                          MixerEngine::DirectOuts* directOuts = nullptr,
                           juce::AudioBuffer<float>*                fxReturnsOut = nullptr,
                           const RetiredVoices*                     retired      = nullptr,
                           const MixerEngine::RenderChannelFn*      renderChannel = nullptr);
@@ -1359,6 +1359,7 @@ private:
         int    mixCount = 0;            // channels handed to the mixer this block (the count policy)
 
         mu_core::FlatArray<juce::AudioBuffer<float>> scratch;   // per slot, 2 x prepared
+        mu_core::FlatArray<juce::AudioBuffer<float>> directViews;   // per-call views of the host's direct-out buffers (no storage)
         mu_core::FlatArray<juce::AudioBuffer<float>> view;      // per-call views of scratch (no storage)
         mu_core::FlatArray<mu_core::PeerTap> peers;
         mu_core::FlatArray<bool> live;

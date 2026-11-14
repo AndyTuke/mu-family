@@ -37,6 +37,7 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
     midiInRaw.reset(limits_.layers);
     renderState.scratch.reset(limits_.layers);
     renderState.view.reset(limits_.layers);
+    renderState.directViews.reset(limits_.layers);
     renderState.peers.reset(limits_.layers);
     renderState.live.reset(limits_.layers);
     renderState.loopBeats.reset(limits_.layers);
@@ -254,7 +255,7 @@ void ProcessorBase::processCoreBlock(juce::AudioBuffer<float>&                ma
                                      int                                      numVoices,
                                      int                                      numSamples,
                                      double                                   effectiveBpm,
-                                     std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels>* directOuts,
+                                     MixerEngine::DirectOuts* directOuts,
                                      juce::AudioBuffer<float>*                fxReturnsOut,
                                      const RetiredVoices*                     retired,
                                      const MixerEngine::RenderChannelFn*      renderChannel)

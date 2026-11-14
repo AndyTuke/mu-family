@@ -132,7 +132,7 @@ namespace
         }
 
         void run(int channels, int n,
-                 std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels>* directOuts = nullptr,
+                 MixerEngine::DirectOuts* directOuts = nullptr,
                  juce::AudioBuffer<float>* fxReturns = nullptr)
         {
             mixer.processBlock(out, channels, nullptr, fx, n, directOuts, fxReturns, nullptr, &render);
@@ -292,7 +292,7 @@ struct MixerBlockValueTests : juce::UnitTest
             r.mixer.channels[0].sendEffect.store(1.0f);     // ignored on a direct bus
             juce::AudioBuffer<float> bus(2, kPrepared);
             bus.clear();
-            std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels> outs {};
+            MixerEngine::DirectOuts outs {};
             outs[0] = &bus;
             r.run(2, 64, &outs);
             expectChannel(bus, 0, 64, [&](int i) { return trimmed(r.src[0].left(i)) * 0.5f; }, "bus L");

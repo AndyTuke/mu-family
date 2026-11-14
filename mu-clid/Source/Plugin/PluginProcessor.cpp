@@ -213,7 +213,7 @@ void PluginProcessor::driveLayers(juce::AudioBuffer<float>& buffer, juce::MidiBu
 
     auto masterBus = getBusBuffer(buffer, false, kMasterBusIndex);
     std::array<juce::AudioBuffer<float>, MixerEngine::MaxChannels> directBufs;
-    std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels> directPtrs {};
+    MixerEngine::DirectOuts directPtrs {};
     for (int i = 0; i < MixerEngine::MaxChannels; ++i)
     {
         const int busIndex = kFirstDirectOutBus + i;

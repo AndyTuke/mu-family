@@ -35,6 +35,8 @@ class MixerEngine
 public:
     // One mixer channel per layer — must equal mu_limits::kMaxLayers.
     static constexpr int MaxChannels = mu_limits::kMaxLayers;
+    // The direct-out buffer table a block is given: one slot per channel up to the 32-layer ceiling; the first numChannels are read.
+    using DirectOuts = std::array<juce::AudioBuffer<float>*, mu_limits::kAbsoluteMaxLayers>;
 
     // Optional per-channel render hook. When supplied, Phase 1 invokes it to fill
     // channel r's buffer (channel index, target buffer, sample count) INSTEAD of
@@ -262,6 +264,7 @@ public:
     const int  numBuses;
     const int  numBusInserts;
     const bool externalSidechainOffered;
+    mu_limits::ProcessorLimits limits() const noexcept { return { numChannels, numBuses, numBusInserts, externalSidechainOffered }; }
     int extSidechainSrc() const noexcept { return numChannels; }   // the source value that means the DAW sidechain input
 
     explicit MixerEngine(const mu_limits::ProcessorLimits& limits = mu_limits::ProcessorLimits::fromBuildSettings());
@@ -304,7 +307,7 @@ public:
                       std::unique_ptr<VoiceEngine>* voices,
                       FXChain&                    fxChain,
                       int                         numSamples,
-                      std::array<juce::AudioBuffer<float>*, MaxChannels>* directOuts = nullptr,
+                      DirectOuts* directOuts = nullptr,
                       juce::AudioBuffer<float>*    fxReturnsOut = nullptr,
                       const RetiredVoices*        retired      = nullptr,
                       const RenderChannelFn*      renderChannel = nullptr);

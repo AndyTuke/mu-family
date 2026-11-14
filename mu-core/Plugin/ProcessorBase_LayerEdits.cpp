@@ -60,7 +60,7 @@ std::vector<juce::RangedAudioParameter*> ProcessorBase::sidechainSourceParams()
         add("ch" + juce::String(c) + "_scSrc");
     for (const char* ret : { "ret_eff_scSrc", "ret_dly_scSrc", "ret_rev_scSrc" })
         add(ret);
-    for (int b = 0; b < mu_limits::kMaxBuses; ++b)
+    for (int b = 0; b < limits_.buses; ++b)
         add("bus" + juce::String(b) + "_scSrc");
     return out;
 }
@@ -75,7 +75,7 @@ void ProcessorBase::remapSidechainSources(const std::vector<juce::RangedAudioPar
     for (auto* p : params)
     {
         const int v  = juce::roundToInt(p->convertFrom0to1(p->getValue()));
-        const int nv = juce::jlimit(0, mu_mixfx::kScSrcMax, remap(v));   // 0 off, 1..kMaxLayers a channel, then external, then the buses
+        const int nv = juce::jlimit(0, mu_mixfx::scSrcMax(limits_), remap(v));   // 0 off, 1..kMaxLayers a channel, then external, then the buses
         if (nv != v) p->setValueNotifyingHost(p->convertTo0to1((float) nv));
     }
 }
