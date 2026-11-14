@@ -41,6 +41,8 @@ public:
     T&       operator[](size_t i)       noexcept { assert(i < (size_t) count_); return items_[i]; }
     const T& operator[](size_t i) const noexcept { assert(i < (size_t) count_); return items_[i]; }
 
+    void fill(const T& v) { for (int i = 0; i < count_; ++i) items_[(size_t) i] = v; }
+
     T*       data()       noexcept { return items_.get(); }
     const T* data() const noexcept { return items_.get(); }
     T*       begin()       noexcept { return items_.get(); }

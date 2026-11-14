@@ -183,7 +183,7 @@ public:
     // (typedLayerPresetDir); for the four list products it is a harmless store.
     void setSelectedSlot(int slot) noexcept
     {
-        selectedSlot.store(juce::jlimit(0, mu_limits::kMaxLayers - 1, slot), std::memory_order_relaxed);
+        selectedSlot.store(juce::jlimit(0, limits_.layers - 1, slot), std::memory_order_relaxed);
     }
     int  getSelectedSlot() const noexcept { return selectedSlot.load(std::memory_order_relaxed); }
     // The shell's delete: a list product removes the layer (the ones above shift down); a slot host empties it.
@@ -537,7 +537,7 @@ public:
     void cancelAllStagedSwaps()
     {
         cancelPendingFullPreset();
-        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+        for (int i = 0; i < limits_.layers; ++i)
             cancelPendingSwap(i);
     }
     std::function<void(int slot)> onLayerPresetCommitted;
@@ -732,7 +732,7 @@ protected:
     // filled (keepSpareLayers) reaches the spares too; any other reaches the live layers.
     Layer* slotLayer(int i)
     {
-        if (keepSpareLayers) return (i >= 0 && i < mu_limits::kMaxLayers) ? layers[(size_t) i].get() : nullptr;
+        if (keepSpareLayers) return (i >= 0 && i < limits_.layers) ? layers[(size_t) i].get() : nullptr;
         return getLayer(i);
     }
     // `legacyPrefixes` (same slot order) are the prefixes a renamed product used before; only the
@@ -851,13 +851,13 @@ protected:
     // constructor and calls flagSwapBoundaries from processBlock; the commit runs in
     // runDeferredWork. A product with its own stager (mu-Clid) overrides the three swap queries.
     // Audio-thread flagging uses atomics only; the appliers run on the message thread.
-    mu_hotswap::LayerSwapper<juce::ValueTree, mu_limits::kMaxLayers> layerSwapper;
+    mu_hotswap::LayerSwapper<juce::ValueTree, mu_limits::kAbsoluteMaxLayers> layerSwapper;   // slots in use: getLimits().layers
     mu_core::ControlAttachment* controlAttachment = nullptr;   // message thread only
     mu_core::LiveState liveState;   // Performance mode (message thread only; never read on the audio thread)
     uint32_t productFullCommits = 0;                       // full presets applied outside layerSwapper (message thread only)
     // The tree of each layer's last non-clip stage that is still waiting for its boundary (invalid when none).
     // A store captures it instead of the live layer, which does not show that preset yet.
-    std::array<juce::ValueTree, mu_limits::kMaxLayers> pendingPresetTree;
+    mu_core::FlatArray<juce::ValueTree> pendingPresetTree;
 
     // Clip auto-save tracker of one layer (message thread only, never saved).
     struct ClipWatch
@@ -872,7 +872,7 @@ protected:
         int             wait   = 0;       // rounds still to skip before the next visit
         void reset() { *this = ClipWatch(); }
     };
-    std::array<ClipWatch, mu_limits::kMaxLayers> clipWatch;
+    mu_core::FlatArray<ClipWatch> clipWatch;
     int      clipWatchCursor     = 0;       // the next layer the round robin looks at
     double   nextClipStepMs      = 0.0;     // when the poll next takes a step
     uint32_t clipWatchFullCommits = 0;      // the full-commit count the trackers were last valid for
@@ -896,13 +896,13 @@ protected:
     bool writeWatchedClip(int slot, int clip, const juce::ValueTree& capture);
     // Per slot, the preset (file stem or clip name) the layer's state last came from; empty = none known.
     // Message thread only; follows its layer through remove / swap, and is forgotten by a non-clip stage and a reset.
-    std::array<juce::String, mu_limits::kMaxLayers> presetLabels;
+    mu_core::FlatArray<juce::String> presetLabels;
     int lastTransportState = 0;                            // message thread: the transport state the live state was last told about
     std::atomic<bool> muteChanged { false };               // a strip mute parameter changed on some thread; the poll tells the live state
-    std::array<juce::RangedAudioParameter*, mu_limits::kMaxLayers> muteParams {};   // ch{N}_mute, cached (null = none)
+    mu_core::FlatArray<juce::RangedAudioParameter*> muteParams;   // ch{N}_mute, cached (null = none)
     // ch{N}_midiIn raw values, cached (null = the product declares none: every layer hears every channel). The rows
     // move with a layer through swap / remove, so slot N's atomic is always the channel of the layer now in slot N.
-    std::array<std::atomic<float>*, mu_limits::kMaxLayers> midiInRaw {};
+    mu_core::FlatArray<std::atomic<float>*> midiInRaw;
     // Audio thread. Sets the call's channel mask for the layer in slot `s`, and raises MidiView::inputReset for the one call
     // after the mask changed: the keys the layer holds were filtered under the old mask, so a note-off the new mask no longer
     // passes would strand them. On that call, and on a layer's first call, the keys physically held on the channels the mask
@@ -981,7 +981,7 @@ protected:
     // layer (live or a parked spare) caches its layer's loopBeats(); an empty slot the default bar.
     double layerLoopBeats(int slot) const noexcept
     {
-        return slot >= 0 && slot < mu_limits::kMaxLayers ? renderState.loopBeats[(size_t) slot] : -1.0;
+        return slot >= 0 && slot < limits_.layers ? renderState.loopBeats[(size_t) slot] : -1.0;
     }
 
     // prepareToPlay (message or host thread, not processing; call it OUTSIDE layersLock): sizes the per-slot
@@ -1358,11 +1358,11 @@ private:
         int    prepared = 0;            // prepared block size: the longest call any layer or the mixer gets
         int    mixCount = 0;            // channels handed to the mixer this block (the count policy)
 
-        std::array<juce::AudioBuffer<float>, mu_limits::kMaxLayers> scratch;   // per slot, 2 x prepared
-        std::array<juce::AudioBuffer<float>, mu_limits::kMaxLayers> view;      // per-call views of scratch (no storage)
-        std::array<mu_core::PeerTap, mu_limits::kMaxLayers> peers {};
-        std::array<bool, mu_limits::kMaxLayers> live {};
-        std::array<double, mu_limits::kMaxLayers> loopBeats {};                // cached per slot, last rendered block
+        mu_core::FlatArray<juce::AudioBuffer<float>> scratch;   // per slot, 2 x prepared
+        mu_core::FlatArray<juce::AudioBuffer<float>> view;      // per-call views of scratch (no storage)
+        mu_core::FlatArray<mu_core::PeerTap> peers;
+        mu_core::FlatArray<bool> live;
+        mu_core::FlatArray<double> loopBeats;                // cached per slot, last rendered block
 
         // The block's MIDI: input decoded at the front, the live layers' output after it, the note-off
         // reserve (tails' owed note-offs) in the last kMidiNoteOffReserve entries.

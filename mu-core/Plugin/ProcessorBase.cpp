@@ -25,6 +25,18 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
       limits_(limits)
 {
     jassert(limits_.valid());
+    // Every per-slot array is sized once, here (never on the audio thread).
+    layerSwapper.setCount(limits_.layers);
+    pendingPresetTree.reset(limits_.layers);
+    clipWatch.reset(limits_.layers);
+    presetLabels.reset(limits_.layers);
+    muteParams.reset(limits_.layers);
+    midiInRaw.reset(limits_.layers);
+    renderState.scratch.reset(limits_.layers);
+    renderState.view.reset(limits_.layers);
+    renderState.peers.reset(limits_.layers);
+    renderState.live.reset(limits_.layers);
+    renderState.loopBeats.reset(limits_.layers);
     // The block driver's mixer hook: channel r is slot r's scratch, copied exactly (raw pointers, so a
     // buffer's "cleared" flag can never turn the copy into a clear). A slot that nothing wrote this call (its
     // view still carries the cleared flag) is not copied: the mixer's channel stays cleared, as a voice that
@@ -32,7 +44,7 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
     // later channel's -0 into +0). Built once here: no allocation per block.
     renderState.copyToMixer = [this](int r, juce::AudioBuffer<float>& buf, int n)
     {
-        if (r < 0 || r >= mu_limits::kMaxLayers) return;
+        if (r < 0 || r >= limits_.layers) return;
         if (renderState.view[(size_t) r].hasBeenCleared()) return;
         const auto& src = renderState.scratch[(size_t) r];
         const int nCh = juce::jmin(buf.getNumChannels(), src.getNumChannels());
@@ -87,13 +99,13 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
         mute.layer = layer;
         return perform(mute);
     };
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < limits_.layers; ++i)
         midiInRaw[(size_t) i] = apvts.getRawParameterValue("ch" + juce::String(i) + "_midiIn");
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < limits_.layers; ++i)
         muteParams[(size_t) i] = apvts.getParameter("ch" + juce::String(i) + "_mute");   // cached: the lamps ask per pad per frame
     cb.layerMuted   = [this](int layer)
     {
-        const auto* p = layer >= 0 && layer < mu_limits::kMaxLayers ? muteParams[(size_t) layer] : nullptr;
+        const auto* p = layer >= 0 && layer < limits_.layers ? muteParams[(size_t) layer] : nullptr;
         return p != nullptr && p->getValue() > 0.5f;
     };
     cb.savedClip    = [this](int layer)

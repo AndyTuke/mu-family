@@ -140,7 +140,11 @@ template <typename SlotPayload, typename FullPayload, int N>
 class Stager
 {
 public:
-    static constexpr int kSlots = N;
+    static constexpr int kSlots = N;   // the capacity; the slots in use are count()
+
+    // How many slots a processor actually uses (1..N, default N). Loops in hot paths run to this, not to the capacity.
+    int  count() const noexcept { return count_; }
+    void setCount(int n) noexcept { jassert(n >= 1 && n <= N); count_ = n < 1 ? 1 : (n > N ? N : n); }
 
     // What the audio thread read about a slot: non-zero only for a ready, not-yet-flagged swap.
     using Token = uint32_t;
@@ -336,7 +340,8 @@ private:
         return true;
     }
 
-    static constexpr bool valid(int i) noexcept { return i >= 0 && i < N; }
+    bool valid(int i) const noexcept { return i >= 0 && i < count_; }
+    int  count_ = N;
 
     std::array<Slot<SlotPayload>, (size_t) N> slots;
     Slot<FullPayload>                         full;
@@ -358,6 +363,9 @@ class LayerSwapper
 public:
     using ApplyFull = std::function<void(Payload&)>;
     using ApplySlot = std::function<void(int, Payload&)>;
+
+    // How many slots are in use (the template argument is the capacity). Owner's constructor, message thread.
+    void setCount(int n) noexcept { stager.setCount(n); }
 
     // Set once in the owner's constructor (message thread).
     void setAppliers(ApplyFull full, ApplySlot slot) { applyFull = std::move(full); applySlot = std::move(slot); }
@@ -451,7 +459,7 @@ public:
     bool commit()
     {
         const bool full = stager.consumeFull([this](Payload& p) { runApplyFull(p); });
-        for (int i = 0; i < N; ++i)
+        for (int i = 0; i < stager.count(); ++i)
             if (stager.consume(i, [this, i](Payload& p) { if (applySlot) applySlot(i, p); }))
                 clearScene(i);
         return full;
@@ -497,12 +505,12 @@ public:
         // Pass 1: read every token and decide its boundary. Pass 2: flag them only if no batch began meanwhile.
         std::array<typename Stager<Payload, Payload, N>::Token, (size_t) N> tokens {};
         std::array<bool, (size_t) N> atBoundary {};
-        for (int i = 0; i < N; ++i)
+        for (int i = 0; i < stager.count(); ++i)
             if ((tokens[(size_t) i] = stager.pendingToken(i)) != 0)
                 atBoundary[(size_t) i] = reached(i);
         if (! stager.batchSteady(seq))
             return flagged;   // a batch began or ended meanwhile: the decisions above may predate it; wasPlaying stays (see above)
-        for (int i = 0; i < N; ++i)
+        for (int i = 0; i < stager.count(); ++i)
             if (tokens[(size_t) i] != 0)
                 flagged |= stager.flagIfReady(i, tokens[(size_t) i], atBoundary[(size_t) i]);
         wasPlaying = isPlaying;

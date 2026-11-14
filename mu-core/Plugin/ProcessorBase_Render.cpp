@@ -381,7 +381,7 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
                                  int offset, int numSamples, bool firstChunk, bool lastChunk) noexcept
 {
     const auto& v = block.view();
-    constexpr int K = mu_limits::kMaxLayers;
+    const int K = limits_.layers;
     const int reserveStart = mu_limits::kMaxBlockMidiEvents - mu_limits::kMidiNoteOffReserve;
 
     // The call's context template (design 2.1.5). A chunk starts where the previous one ended in beats; the
@@ -476,7 +476,7 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
     // priority is read once per call (`priority1`) and phase 3 uses that reading: a type whose priority follows a
     // parameter (mu-On's engine) is rendered exactly once even when the parameter moves between the two passes.
     for (auto& p : renderState.peers) p = {};
-    std::array<bool, (size_t) K> priority1 {};
+    std::array<bool, mu_limits::kAbsoluteMaxLayers> priority1 {};   // slots 0..K-1 used
     for (int s = 0; s < K; ++s)
     {
         if (! renderState.live[(size_t) s])

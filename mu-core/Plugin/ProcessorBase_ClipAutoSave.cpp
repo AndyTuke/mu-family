@@ -49,10 +49,10 @@ void ProcessorBase::flushClipAutoSave(int slot)
     if (! clipAutoSaveActive()) return;
     if (slot >= 0)
     {
-        if (slot < mu_limits::kMaxLayers) visitClipWatch(slot, false);
+        if (slot < limits_.layers) visitClipWatch(slot, false);
         return;
     }
-    for (int s = 0; s < mu_limits::kMaxLayers; ++s)
+    for (int s = 0; s < limits_.layers; ++s)
         visitClipWatch(s, false);
 }
 
@@ -133,7 +133,7 @@ bool ProcessorBase::visitClipWatch(int slot, bool settle)
 // the live layer, never write. A launch that was superseded or cancelled drops the tracker.
 void ProcessorBase::resolveClipLaunches()
 {
-    for (int slot = 0; slot < mu_limits::kMaxLayers; ++slot)
+    for (int slot = 0; slot < limits_.layers; ++slot)
     {
         auto& w = clipWatch[(size_t) slot];
         if (! w.expectSwap) continue;
@@ -168,9 +168,9 @@ bool ProcessorBase::stepClipAutoSave()
     resolveClipLaunches();
 
     // One layer per step, round robin over the layers that have a lit clip.
-    for (int n = 0; n < mu_limits::kMaxLayers; ++n)
+    for (int n = 0; n < limits_.layers; ++n)
     {
-        const int slot = (clipWatchCursor + n) % mu_limits::kMaxLayers;
+        const int slot = (clipWatchCursor + n) % limits_.layers;
         auto& w = clipWatch[(size_t) slot];
         if (liveState.getPlayingClip(slot) < 0)
         {
@@ -182,7 +182,7 @@ bool ProcessorBase::stepClipAutoSave()
             --w.wait;
             continue;
         }
-        clipWatchCursor = (slot + 1) % mu_limits::kMaxLayers;
+        clipWatchCursor = (slot + 1) % limits_.layers;
         w.wait = w.period - 1;
         return visitClipWatch(slot, true);
     }
@@ -193,7 +193,7 @@ void ProcessorBase::pollClipAutoSave()
 {
     // Cheap exit for the common case: no lit clip and no launch waiting to land.
     bool any = false;
-    for (int s = 0; s < mu_limits::kMaxLayers && ! any; ++s)
+    for (int s = 0; s < limits_.layers && ! any; ++s)
         any = liveState.getPlayingClip(s) >= 0 || clipWatch[(size_t) s].expectSwap;
     if (! any)
     {

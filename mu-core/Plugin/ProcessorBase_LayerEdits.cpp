@@ -56,7 +56,7 @@ std::vector<juce::RangedAudioParameter*> ProcessorBase::sidechainSourceParams()
     {
         if (auto* p = apvts.getParameter(id)) out.push_back(p);
     };
-    for (int c = 0; c < mu_limits::kMaxLayers; ++c)
+    for (int c = 0; c < limits_.layers; ++c)
         add("ch" + juce::String(c) + "_scSrc");
     for (const char* ret : { "ret_eff_scSrc", "ret_dly_scSrc", "ret_rev_scSrc" })
         add(ret);
@@ -88,7 +88,7 @@ juce::ValueTree ProcessorBase::captureComposedState()
 
     // Each slot node gains its layer's clip bank and playing clip. Not part of captureLayer, so a layer
     // preset never carries a bank. An empty bank writes nothing, keeping a clip-free file unchanged.
-    for (int i = 0; i < layerLayout.numLayers() && i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < layerLayout.numLayers() && i < limits_.layers; ++i)
         if (layers[(size_t) i] != nullptr)
             if (auto node = mu_pp::findLayerNode(state, i); node.isValid())
             {
@@ -101,7 +101,7 @@ juce::ValueTree ProcessorBase::captureComposedState()
     {
         // The colour is a slot's identity, not part of its sound, so it lives on the full state, not in a layer node.
         juce::StringArray colours;
-        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+        for (int i = 0; i < limits_.layers; ++i)
             colours.add(juce::String(layers[(size_t) i] != nullptr ? layers[(size_t) i]->colourIndex : i));
         state.setProperty("numVoices", numLayers.load(std::memory_order_relaxed), nullptr);
         state.setProperty("voiceColours", colours.joinIntoString(","), nullptr);
@@ -137,7 +137,7 @@ void ProcessorBase::applyComposedState(const juce::ValueTree& state)
 
     // Every slot takes its node's clips: a node without a <Clips> child (an older file, or a slot the
     // state lacks) empties the bank, so a smaller state leaves no stale clips past its layer count.
-    for (int i = 0; i < layerLayout.numLayers() && i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < layerLayout.numLayers() && i < limits_.layers; ++i)
         if (layers[(size_t) i] != nullptr)
         {
             const auto node = mu_pp::findLayerNode(state, i);
@@ -166,9 +166,9 @@ void ProcessorBase::applyComposedState(const juce::ValueTree& state)
     if (layersAreSlots())
     {
         const auto slotToks = juce::StringArray::fromTokens(state.getProperty("voiceColours", "").toString(), ",", "");
-        for (int i = 0; i < mu_limits::kMaxLayers && i < slotToks.size(); ++i)
+        for (int i = 0; i < limits_.layers && i < slotToks.size(); ++i)
             if (layers[(size_t) i] != nullptr)
-                layers[(size_t) i]->colourIndex = juce::jlimit(0, mu_limits::kMaxLayers - 1, slotToks[i].getIntValue());
+                layers[(size_t) i]->colourIndex = juce::jlimit(0, limits_.layers - 1, slotToks[i].getIntValue());
         return;
     }
 
@@ -191,27 +191,27 @@ void ProcessorBase::applyComposedState(const juce::ValueTree& state)
     if (! shrinkStored && retireBin.countPolicy() == mu_core::RetireBin::CountPolicy::CutAtCount)
         retireBin.cutAtOrAbove(newCount);
     const auto toks = juce::StringArray::fromTokens(state.getProperty("voiceColours", "").toString(), ",", "");
-    for (int i = 0; i < mu_limits::kMaxLayers && i < toks.size(); ++i)
+    for (int i = 0; i < limits_.layers && i < toks.size(); ++i)
         if (layers[(size_t) i] != nullptr)
-            layers[(size_t) i]->colourIndex = juce::jlimit(0, mu_limits::kMaxLayers - 1, toks[i].getIntValue());
+            layers[(size_t) i]->colourIndex = juce::jlimit(0, limits_.layers - 1, toks[i].getIntValue());
 }
 
 int ProcessorBase::savedLayerCount(const juce::ValueTree& state) const
 {
-    return juce::jlimit(1, mu_limits::kMaxLayers, (int) state.getProperty("numVoices", unsavedLayerCount));
+    return juce::jlimit(1, limits_.layers, (int) state.getProperty("numVoices", unsavedLayerCount));
 }
 
 int ProcessorBase::firstUnusedColourIndex() const
 {
-    std::array<bool, mu_limits::kMaxLayers> used {};
+    std::array<bool, mu_limits::kAbsoluteMaxLayers> used {};
     const int n = numLayers.load(std::memory_order_relaxed);
     for (int i = 0; i < n; ++i)
         if (layers[(size_t) i] != nullptr)
         {
             const int c = layers[(size_t) i]->colourIndex;
-            if (c >= 0 && c < mu_limits::kMaxLayers) used[(size_t) c] = true;
+            if (c >= 0 && c < limits_.layers) used[(size_t) c] = true;
         }
-    for (int c = 0; c < mu_limits::kMaxLayers; ++c)
+    for (int c = 0; c < limits_.layers; ++c)
         if (! used[(size_t) c]) return c;
     return 0;
 }
@@ -220,7 +220,7 @@ int ProcessorBase::firstUnusedColourIndex() const
 int ProcessorBase::addLayer()
 {
     const int n = numLayers.load(std::memory_order_relaxed);
-    if (! canEditLayers() || n >= mu_limits::kMaxLayers) return -1;
+    if (! canEditLayers() || n >= limits_.layers) return -1;
     if (getLayerAccess() != mu_core::LayerAccess::TryLock) return -1;   // refused, never half done: a Published host uses setLayerType
     prepareClipWatchesForStructuralEdit();
 
@@ -282,7 +282,7 @@ bool ProcessorBase::removeLayer(int idx)
 
     // Phase 1: the down-shift renumbers every layer from idx upward, so every staged per-layer swap
     // (keyed by index) would land on the wrong slot. A staged full preset replaces all slots and wins.
-    for (int s = 0; s < mu_limits::kMaxLayers; ++s) cancelPendingSwap(s);
+    for (int s = 0; s < limits_.layers; ++s) cancelPendingSwap(s);
 
     // The slot the shift vacates stays filled when the product keeps spares; built before locking.
     std::unique_ptr<Layer> spare;
@@ -331,8 +331,8 @@ bool ProcessorBase::removeLayer(int idx)
 
     // Phase 3: parameter values. Strips that ducked from the removed layer now duck from nothing and
     // the others follow their layer down (translated before the values shift).
-    remapSidechainSources([idx](int v) { return mu_mix::sidechainParamAfterRemove(v, idx, mu_limits::kMaxLayers); });
-    remapLayerReferences([idx](int i) { return mu_mix::sidechainAfterRemove(i, idx, mu_limits::kMaxLayers); });
+    remapSidechainSources([idx, this](int v) { return mu_mix::sidechainParamAfterRemove(v, idx, limits_.layers); });
+    remapLayerReferences([idx, this](int i) { return mu_mix::sidechainAfterRemove(i, idx, limits_.layers); });
     if (layerHoldsParamTruth())
     {
         suspend.release();                                 // the audio never reads these parameters: resume first
@@ -348,7 +348,7 @@ bool ProcessorBase::removeLayer(int idx)
     // top slot holds a spare or nothing and must start empty. Last, with processing resumed and the parameters
     // shifted, so the notification a surface acts on sees the finished edit. Remap first: the clear names the new index.
     suspend.release();
-    liveState.remapLayers([idx](int i) { return mu_mix::sidechainAfterRemove(i, idx, mu_limits::kMaxLayers); });
+    liveState.remapLayers([idx, this](int i) { return mu_mix::sidechainAfterRemove(i, idx, limits_.layers); });
     for (int d = idx; d < n - 1; ++d) presetLabels[(size_t) d] = presetLabels[(size_t) (d + 1)];   // labels follow their layer down
     clearLayerClips(n - 1);
     return true;
@@ -390,8 +390,8 @@ bool ProcessorBase::swapLayers(int a, int b)
 
     // Phase 3: parameter values. A strip that ducked from one swapped layer now ducks from the other
     // (translated before the values swap, so each strip's own source moves with it).
-    remapSidechainSources([a, b](int v) { return mu_mix::sidechainParamAfterSwap(v, a, b, mu_limits::kMaxLayers); });
-    remapLayerReferences([a, b](int i) { return mu_mix::sidechainAfterSwap(i, a, b, mu_limits::kMaxLayers); });
+    remapSidechainSources([a, b, this](int v) { return mu_mix::sidechainParamAfterSwap(v, a, b, limits_.layers); });
+    remapLayerReferences([a, b, this](int i) { return mu_mix::sidechainAfterSwap(i, a, b, limits_.layers); });
     if (layerHoldsParamTruth())
     {
         suspend.release();                                 // the audio never reads these parameters: resume first
@@ -404,7 +404,7 @@ bool ProcessorBase::swapLayers(int a, int b)
     // The banks and playing clips swapped with their layers. Last, after the parameters moved and processing
     // resumed, so the notification a surface acts on sees the finished edit.
     suspend.release();
-    liveState.remapLayers([a, b](int i) { return mu_mix::sidechainAfterSwap(i, a, b, mu_limits::kMaxLayers); });
+    liveState.remapLayers([a, b, this](int i) { return mu_mix::sidechainAfterSwap(i, a, b, limits_.layers); });
     std::swap(presetLabels[(size_t) a], presetLabels[(size_t) b]);
     publishClipMasks();
     return true;
@@ -445,7 +445,7 @@ bool ProcessorBase::swapLayersPublished(int a, int b)
 
     // A parameter that names a layer (a Rumble's source) is rewritten now, at the old slots and before any pointer
     // moves, because the hook reads each slot's layer type: after the move the old indices would name the wrong layers.
-    const auto oldToNew = [a, b](int i) { return mu_mix::sidechainAfterSwap(i, a, b, mu_limits::kMaxLayers); };
+    const auto oldToNew = [a, b, this](int i) { return mu_mix::sidechainAfterSwap(i, a, b, limits_.layers); };
     remapLayerReferences(oldToNew);
 
     // Phase 2: pointers, strip state, tails and the one published view, under the writers' locks (the count store
@@ -490,7 +490,7 @@ bool ProcessorBase::swapLayersPublished(int a, int b)
 
     // Phase 3: parameter values. A strip that ducked from one swapped layer now ducks from the other (translated
     // before the rows move, so each strip's own source moves with it), then each layer's rows follow it to its new slot.
-    remapSidechainSources(sidechainParams, [a, b](int v) { return mu_mix::sidechainParamAfterSwap(v, a, b, mu_limits::kMaxLayers); });
+    remapSidechainSources(sidechainParams, [a, b, this](int v) { return mu_mix::sidechainParamAfterSwap(v, a, b, limits_.layers); });
     if (layerHoldsParamTruth())
     {
         syncSlotParams(a);

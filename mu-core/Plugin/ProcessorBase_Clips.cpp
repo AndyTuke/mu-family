@@ -13,7 +13,7 @@
 
 void ProcessorBase::clearLayerClips(int slot)
 {
-    if (slot < 0 || slot >= mu_limits::kMaxLayers || layers[(size_t) slot] == nullptr) return;
+    if (slot < 0 || slot >= limits_.layers || layers[(size_t) slot] == nullptr) return;
     layers[(size_t) slot]->clips->clearAll();
     layers[(size_t) slot]->activeClip = -1;
     clipWatch[(size_t) slot].reset();
@@ -25,7 +25,7 @@ void ProcessorBase::clearLayerClips(int slot)
 void ProcessorBase::noteNonClipStage(int slot)
 {
     cancelPendingSwap(slot);   // even if this stage is then aborted, an earlier queued clip must not land unlit
-    if (slot >= 0 && slot < mu_limits::kMaxLayers && layers[(size_t) slot] != nullptr)
+    if (slot >= 0 && slot < limits_.layers && layers[(size_t) slot] != nullptr)
     {
         layers[(size_t) slot]->activeClip = -1;
         presetLabels[(size_t) slot] = juce::String();   // the product re-notes the new preset's label after staging it
@@ -36,13 +36,13 @@ void ProcessorBase::noteNonClipStage(int slot)
 
 void ProcessorBase::notePendingPresetTree(int slot, const juce::ValueTree& staged)
 {
-    if (slot < 0 || slot >= mu_limits::kMaxLayers) return;
+    if (slot < 0 || slot >= limits_.layers) return;
     pendingPresetTree[(size_t) slot] = hasPendingSwap(slot) ? staged : juce::ValueTree();
 }
 
 void ProcessorBase::publishClipMasks()
 {
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < limits_.layers; ++i)
     {
         liveState.setClipMask(i, clipMask(i));
         const auto* layer = getLayer(i);
@@ -53,14 +53,14 @@ void ProcessorBase::publishClipMasks()
 
 juce::String ProcessorBase::clipLabel(int slot) const
 {
-    if (slot >= 0 && slot < mu_limits::kMaxLayers && presetLabels[(size_t) slot].isNotEmpty())
+    if (slot >= 0 && slot < limits_.layers && presetLabels[(size_t) slot].isNotEmpty())
         return presetLabels[(size_t) slot];
     return getLayerName(slot);
 }
 
 void ProcessorBase::noteLayerPresetLabel(int slot, const juce::String& label)
 {
-    if (slot >= 0 && slot < mu_limits::kMaxLayers)
+    if (slot >= 0 && slot < limits_.layers)
         presetLabels[(size_t) slot] = label;
 }
 
