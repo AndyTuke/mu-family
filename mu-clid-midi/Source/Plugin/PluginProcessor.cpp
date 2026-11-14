@@ -7,9 +7,11 @@
 
 namespace mu_clid_midi {
 
-// A MIDI effect: no audio buses at all.
+// A MIDI effect: no audio buses at all, so its mixer is never used; the counts are the family's usual 8 layers.
+static constexpr mu_limits::ProcessorLimits kLimits { 8, 0, 2, true };
+
 PluginProcessor::PluginProcessor()
-    : ProcessorBase(BusesProperties(), createParameterLayout(), juce::Identifier("MuClidState")),
+    : ProcessorBase(BusesProperties(), createParameterLayout(), juce::Identifier("MuClidState"), kLimits),
       core(apvts),
       rhythmPlayState(core.rhythmPlayState),
       beatFraction(core.beatFraction),

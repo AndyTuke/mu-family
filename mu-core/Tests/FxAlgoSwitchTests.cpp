@@ -13,6 +13,7 @@
 #include "Audio/FX/Slots/EffectSlot.h"
 #include "Audio/FX/Slots/ReverbSlot.h"
 #include "TestProcessorBase.h"
+#include "TestLimits.h"
 
 namespace
 {
@@ -21,7 +22,7 @@ namespace
         static juce::AudioProcessorValueTreeState::ParameterLayout makeLayout()
         {
             juce::AudioProcessorValueTreeState::ParameterLayout layout;
-            mu_mixfx::addGlobalFxParams(layout);
+            mu_mixfx::addGlobalFxParams(layout, 0, mu_test::kLimits);
             return layout;
         }
         FxParamProcessor() : TestProcessorBase(WrapperType::wrapperType_Undefined, makeLayout()) { startFxParamSync(); }

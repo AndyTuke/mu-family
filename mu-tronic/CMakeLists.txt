@@ -69,8 +69,7 @@ if(MSVC)
         PROPERTIES COMPILE_OPTIONS "/wd4244")
 endif()
 
-# Capacities (layers, buses, inserts) and the version base come from the compiled mu-core library this target links
-# (mu_core_variant below), so the library and this binary always agree.
+# Capacities (layers, buses, inserts) are mu-Tronic's own kLimits (Source/Plugin/); the one compiled mu-core library takes them at construction.
 target_compile_definitions(mu-tronic
     PUBLIC
         MU_TRONIC_WITH_UI=1   # the layer types build their content and sidebar pictures (Persistence/ArpLayerType.cpp, TrackLayerTypes.cpp, PatternLayerType.cpp)
@@ -80,8 +79,7 @@ target_compile_definitions(mu-tronic
         JUCE_VST3_CAN_REPLACE_VST2=0
 )
 
-# The compiled mu-core library for this product's settings (see mu_core_variant in mu-core/CMakeLists.txt).
-mu_core_variant(MU_CORE_LIB LAYERS 16 BUSES 3 INSERTS 2 EXT_SIDECHAIN 0 VERSION_BASE "${MUFAMILY_PRE_VERSION_BASE}")
+# The one compiled mu-core library (mu-core/CMakeLists.txt); this product's counts are its kLimits constant.
 target_link_libraries(mu-tronic
     PRIVATE
         mu-toni-layer   # the Arp type: its engine sources and the Source/ include path
@@ -89,7 +87,7 @@ target_link_libraries(mu-tronic
         mu-tant-layer   # the Pattern type: the same
         mu-clid-layer   # the Rhythm type: the same
         mu-tilate-layer # the Phrase type: the same
-        ${MU_CORE_LIB}
+        mu-core-lib
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_gui_basics
@@ -209,7 +207,7 @@ target_link_libraries(mu-tronic-tests PRIVATE mu-core-assets
 target_compile_definitions(mu-tronic-tests PRIVATE "MU_TRONIC_FIXTURE_DIR=\"${CMAKE_SOURCE_DIR}/tests/presets/mu-tronic-slot\"")
 # Full presets written by the real mu-Clid, mu-Tant, mu-Toni and mu-On, imported into slots (Tests/TronicImportTests.cpp).
 target_compile_definitions(mu-tronic-tests PRIVATE "MU_TRONIC_IMPORT_FIXTURE_DIR=\"${CMAKE_SOURCE_DIR}/tests/presets/mu-tronic-import\"")
-target_compile_definitions(mu-tronic-tests PRIVATE MU_MAX_LAYERS=16 MU_MAX_BUSES=3 MU_BUS_INSERTS=2 JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0 JUCE_MODAL_LOOPS_PERMITTED=1)   # the Phrase tests pump the message loop while a loop loads
+target_compile_definitions(mu-tronic-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0 JUCE_MODAL_LOOPS_PERMITTED=1)   # the Phrase tests pump the message loop while a loop loads
 
 add_dependencies(mu-tronic mu-tronic-tests)
 
@@ -241,9 +239,8 @@ target_include_directories(mu-tronic-uisoak
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
         "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher")
 target_compile_definitions(mu-tronic-uisoak PUBLIC
-    MU_MAX_LAYERS=16 MU_MAX_BUSES=3 MU_BUS_INSERTS=2 MU_EXT_SIDECHAIN=0 MU_TRONIC_WITH_UI=1
-    JUCE_WEB_BROWSER=0 JUCE_USE_MP3AUDIOFORMAT=1 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0
-    "MU_VERSION_BASE=\"${MUFAMILY_PRE_VERSION_BASE}\"")
+    MU_TRONIC_WITH_UI=1
+    JUCE_WEB_BROWSER=0 JUCE_USE_MP3AUDIOFORMAT=1 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0)
 target_link_libraries(mu-tronic-uisoak
     PRIVATE mu-toni-layer mu-on-layer mu-tant-layer mu-clid-layer mu-tilate-layer mu-core
         juce::juce_audio_utils juce::juce_dsp juce::juce_gui_basics juce::juce_gui_extra juce::juce_audio_formats

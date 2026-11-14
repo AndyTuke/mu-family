@@ -77,12 +77,11 @@ target_compile_definitions(mu-toni
         JUCE_VST3_CAN_REPLACE_VST2=0
 )
 
-# The compiled mu-core library for this product's settings (see mu_core_variant in mu-core/CMakeLists.txt).
-mu_core_variant(MU_CORE_LIB VERSION_BASE "${MUFAMILY_PRE_VERSION_BASE}")
+# The one compiled mu-core library (mu-core/CMakeLists.txt); this product's counts are its kLimits constant.
 target_link_libraries(mu-toni
     PRIVATE
         mu-toni-layer
-        ${MU_CORE_LIB}
+        mu-core-lib
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_gui_basics

@@ -38,7 +38,7 @@ MixerPanel::MixerPanel(AudioServer& serverToDrive)
     // Eight client strips: each control writes straight to the server.
     for (int i = 0; i < kClients; ++i)
     {
-        auto strip = std::make_unique<MixerChannel>(MixerChannel::Type::Client, "", MuLookAndFeel::layerPalette[i]);
+        auto strip = std::make_unique<MixerChannel>(MixerChannel::Type::Client, "", MuLookAndFeel::layerPalette[i], kStripLimits);
         auto& st = *strip;
         st.setClientSlot(i);
         st.setActive(false);

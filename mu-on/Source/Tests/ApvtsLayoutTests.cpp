@@ -45,7 +45,7 @@ public:
     {
         StubProcessor proc;
         juce::AudioProcessorValueTreeState::ParameterLayout layout;
-        mu_mixfx::addGlobalFxParams (layout);
+        mu_mixfx::addGlobalFxParams (layout, 0, mu_on::kLimits);
         juce::AudioProcessorValueTreeState apvts (proc, nullptr, "PARAMS", std::move (layout));
 
         beginTest ("Core global-FX / return / master params exist");

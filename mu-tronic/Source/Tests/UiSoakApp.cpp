@@ -178,7 +178,7 @@ private:
                 static const mu_core::LayerTypeId types[] = { mu_core::LayerTypeId::Empty, mu_core::LayerTypeId::Rhythm, mu_core::LayerTypeId::Pattern,
                     mu_core::LayerTypeId::Arp, mu_core::LayerTypeId::Kick, mu_core::LayerTypeId::Bass, mu_core::LayerTypeId::Hat,
                     mu_core::LayerTypeId::Snare, mu_core::LayerTypeId::Rumble, mu_core::LayerTypeId::FmPerc, mu_core::LayerTypeId::Chord, mu_core::LayerTypeId::Phrase };
-                const int slot = (int) (rng() % (unsigned) mu_limits::kMaxLayers);
+                const int slot = (int) (rng() % (unsigned) processor->getLimits().layers);
                 const auto type = types[rng() % (sizeof(types) / sizeof(types[0]))];
                 processor->setLayerType(slot, type);
                 if (type == mu_core::LayerTypeId::Phrase) loadLoopInto(slot);

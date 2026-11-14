@@ -78,7 +78,7 @@ namespace mu_core
 
         // `layoutWord`: the processor's packed count | serial word (LayoutWord), read to know when the store that
         // unpublishes a parked layer has landed (an outgoing tail the bin did not take is freed only after it).
-        RetireBin(const AudioEpoch& e, const std::atomic<uint64_t>& layoutWord, int numRows = mu_limits::kMaxLayers) noexcept
+        RetireBin(const AudioEpoch& e, const std::atomic<uint64_t>& layoutWord, int numRows) noexcept
             : epoch(e), layout(layoutWord), rowCount(numRows), entryCount(numRows * kDepth), reclaimCapacity(2 * entryCount * 1)
         {
             // The reclaim list holds twice the bin's entries: everything evicted under layersLock in one pass plus

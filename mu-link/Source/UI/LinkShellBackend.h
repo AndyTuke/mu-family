@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Plugin/ShellBackend.h"
+#include "BuildNumber.h"               // MU_VERSION_STRING
 #include "Persistence/PresetFiles.h"     // replaceFileAtomically
 #include "Plugin/TransportResolver.h"   // kNudgeBendPercent
 #include "Link/MuLinkProtocol.h"        // readTransport
@@ -46,6 +47,7 @@ public:
     // ─── Update check ────────────────────────────────────────────────────────
     juce::PropertiesFile* getAppSettingsFile() noexcept override { return updateProps.get(); }
     juce::String          getProductSlug() const override { return "mu-link"; }   // key in latest.json
+    juce::String          getVersionString() const override { return MU_VERSION_STRING; }
 
     static juce::File defaultRoot()
     {

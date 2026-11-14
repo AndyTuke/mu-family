@@ -12,6 +12,7 @@
 #include <atomic>
 #include <cmath>
 #include <thread>
+#include "TestLimits.h"
 
 namespace
 {
@@ -240,7 +241,7 @@ struct AuditMinorsTests : juce::UnitTest
     {
         beginTest("the mixer prepares at least one sample per block");
         {
-            MixerEngine m;
+            MixerEngine m { mu_test::kLimits };
             m.prepare(kRate, 0);
             expectEquals(m.getPreparedBlockSize(), 1);
         }
@@ -250,7 +251,7 @@ struct AuditMinorsTests : juce::UnitTest
     {
         beginTest("a NaN in the master bus silences that block and the tails recover");
         {
-            MixerEngine mixer;
+            MixerEngine mixer { mu_test::kLimits };
             FXChain fx;
             mixer.prepare(kRate, kBlock);
             fx.prepare(kRate, kBlock);
@@ -289,7 +290,7 @@ struct AuditMinorsTests : juce::UnitTest
     {
         beginTest("a return's sidechain hears the channel before its fader");
         {
-            MixerEngine mixer;
+            MixerEngine mixer { mu_test::kLimits };
             FXChain fx;
             mixer.prepare(kRate, kBlock);
             fx.prepare(kRate, kBlock);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Plugin/ProcessorCore.h"
+#include "TestLimits.h"
 
 #include <array>
 
@@ -36,7 +37,7 @@ struct TestProcessorCore : ProcessorCore
     static constexpr int kLayers = 3;
     TestProcessorCore() : TestProcessorCore(kLayers) {}
     explicit TestProcessorCore(int liveLayers)
-        : ProcessorCore(BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo()))
+        : ProcessorCore(BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo()), mu_test::kLimits.layers)
     {
         for (int i = 0; i < liveLayers; ++i) layers[(size_t) i] = std::make_unique<Layer>();
         numLayers.store(liveLayers);

@@ -31,7 +31,7 @@ public:
     enum class Stage { Failed, Queued, Applied };
 
     // `numLayers` is how many layer slots the owning processor has (its getLimits().layers).
-    explicit LiveState(int numLayers = mu_limits::kMaxLayers) : numLayers_(numLayers) { clipState.reset(numLayers); }
+    explicit LiveState(int numLayers) : numLayers_(numLayers) { clipState.reset(numLayers); }
 
     struct Callbacks
     {

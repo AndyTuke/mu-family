@@ -1,6 +1,7 @@
 #include "Plugin/ProcessorBase.h"
 #include "Plugin/MixerFxParams.h"
 #include "Sequencer/ClipClipboard.h"
+#include "TestLimits.h"
 
 // Clip auto-save on ProcessorBase through a small test backend whose layer preset is a "TestLayer" node, staged
 // like a real product's. Each case is its own member function (the cases build several processors).
@@ -9,10 +10,10 @@ namespace
     struct AutoSaveProcessor : ProcessorBase
     {
         AutoSaveProcessor()
-            : ProcessorBase(BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo()), makeLayout())
+            : ProcessorBase(BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo()), makeLayout(), juce::Identifier("MuFamilyState"), mu_test::kLimits)
         {
             juce::StringArray prefixes;
-            for (int i = 0; i < mu_limits::kMaxLayers; ++i) prefixes.add("v" + juce::String(i) + "_");
+            for (int i = 0; i < mu_test::kLimits.layers; ++i) prefixes.add("v" + juce::String(i) + "_");
             initLayerState(prefixes);
             layers[0] = createLayer(0);
             numLayers.store(1);
@@ -31,12 +32,12 @@ namespace
         static juce::AudioProcessorValueTreeState::ParameterLayout makeLayout()
         {
             juce::AudioProcessorValueTreeState::ParameterLayout layout;
-            for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            for (int i = 0; i < mu_test::kLimits.layers; ++i)
             {
                 layout.add(std::make_unique<juce::AudioParameterFloat>(
                     juce::ParameterID { "v" + juce::String(i) + "_a", 1 }, "A",
                     juce::NormalisableRange<float>(0.0f, 1.0f), 0.25f));
-                mu_mixfx::addChannelStripParams(layout, "ch" + juce::String(i) + "_", "Ch ");
+                mu_mixfx::addChannelStripParams(layout, "ch" + juce::String(i) + "_", "Ch ", {}, mu_test::kLimits);
             }
             return layout;
         }

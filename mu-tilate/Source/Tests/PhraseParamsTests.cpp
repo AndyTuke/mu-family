@@ -56,7 +56,7 @@ struct PhraseParamsTests : public juce::UnitTest
                 // The layer's rows plus its mixer strip (the pan and send targets are the strip's parameters).
                 juce::AudioProcessorValueTreeState::ParameterLayout withStrip;
                 addLayerParams(withStrip, 0, mu_tilate::kLimits.layers);
-                mu_mixfx::addChannelStripParams(withStrip, "ch0_", "Layer 1 Ch ");
+                mu_mixfx::addChannelStripParams(withStrip, "ch0_", "Layer 1 Ch ", {}, mu_tilate::kLimits);
                 ParamHost stripHost(std::move(withStrip));
                 expectEquals(mu_mod::checks::missingParams(kModDestTable, stripHost.apvts, "p0_").size(), 0);
             }

@@ -49,6 +49,7 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow, juce::File 
     chrome.getTransportBar().setLogoText(kProductName);
     chrome.getAboutOverlay().setProductInfo(kProductName,
         { juce::String(juce::CharPointer_UTF8("JUCE \xe2\x80\x94 AGPLv3")) });
+    chrome.getAboutOverlay().setVersion(backend.getVersionString());
 
     chrome.setMainArea(nullptr, &page);
     wireTransportBar();

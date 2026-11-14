@@ -110,7 +110,7 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
     const juce::ScopedLock lw(layoutWriteLock);   // first: the count stores below advance the layout serial
     const juce::ScopedLock sl(layersLock);
 
-    // Expand to MaxRhythms so parameterChanged can write to all 8 rhythm slots.
+    // Expand to the layer count so parameterChanged can write to every rhythm slot.
     setRhythmCount(mu_clid::kLimits.layers);
 
     // migrate legacy state in-place before pushing it into APVTS so the

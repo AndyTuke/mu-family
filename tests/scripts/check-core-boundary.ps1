@@ -64,6 +64,9 @@ $includeCoreUi  = [regex]'#\s*include\s*[<"](mu-core/)?UI/'
 $includeSurfaceBrain = [regex]'#\s*include\s*[<"][^">]*\bSurface(Mapping|Model)\.h'
 # ... and the other way round: the surface layer and the manager reach a device only through SurfaceDriver, never by including Devices/.
 $includeDevice = [regex]'#\s*include\s*[<"][^">]*\bDevices/'
+# mu-core is ONE compiled library: it must hold no per-product setting. A product's counts are its own ProcessorLimits (passed at
+# construction) and its version string is its own getVersionString(); the old build-setting macros and constants may not come back.
+$buildSetting = [regex]'\b(MU_MAX_LAYERS|MU_MAX_BUSES|MU_BUS_INSERTS|MU_EXT_SIDECHAIN|MU_VERSION_BASE|MU_VERSION_STRING|fromBuildSettings|mu_core_variant)\b|\bmu_limits::(kMaxLayers|kMaxBuses|kBusInserts|kExternalSidechain)\b'
 
 # Blank a block comment but keep its newlines, so line numbers after it stay accurate.
 $blankBlock = [System.Text.RegularExpressions.MatchEvaluator] {
@@ -129,6 +132,10 @@ foreach ($root in $roots) {
                     if (-not $Quiet) { Write-Host "  [FAIL] ${rel}:${lineNo} — a Surface/ or Manager/ file includes a Devices/ header (go through SurfaceDriver): $snippet" }
                     $fails++
                 }
+            }
+            if ($root.ForbidControl -and $file.Name -ne 'BuildNumber.h' -and $buildSetting.IsMatch($line)) {
+                if (-not $Quiet) { Write-Host "  [FAIL] ${rel}:${lineNo} — mu-core reads a per-product build setting (counts come from ProcessorLimits, the version from getVersionString()): $snippet" }
+                $fails++
             }
             if ($root.ForbidControl -and $includeControl.IsMatch($line)) {
                 if (-not $Quiet) { Write-Host "  [FAIL] ${rel}:${lineNo} — mu-core includes mu-control (the dependency must be mu-control -> mu-core): $snippet" }

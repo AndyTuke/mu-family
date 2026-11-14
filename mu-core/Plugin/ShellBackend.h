@@ -135,6 +135,9 @@ public:
     virtual bool isClipAutoSaveOn() const noexcept { return true; }
     virtual void setClipAutoSave(bool) {}
     virtual juce::String          getProductSlug() const { return {}; }
+    // The product's full version, "<major>.<minor>.0.<build>" (the About panel and the update notice show it). Each product returns
+    // MU_VERSION_STRING or MU_VERSION_STRING_PRE from BuildNumber.h; the shared library holds no version of its own.
+    virtual juce::String          getVersionString() const { return {}; }
 
     // ─── Shell callbacks (message thread, set by the shell) ──────────────────
     // The shell MUST clear these in its destructor: the backend can outlive it, and a deferred

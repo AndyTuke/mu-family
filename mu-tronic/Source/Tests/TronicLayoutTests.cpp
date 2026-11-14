@@ -36,7 +36,7 @@ namespace
     juce::AudioProcessorValueTreeState::ParameterLayout syntheticLayout(int perSlot)
     {
         juce::AudioProcessorValueTreeState::ParameterLayout layout;
-        for (int s = 0; s < mu_limits::kMaxLayers; ++s)
+        for (int s = 0; s < mu_tronic::kLimits.layers; ++s)
             for (int p = 0; p < perSlot; ++p)
                 layout.add(std::make_unique<juce::AudioParameterFloat>(
                     juce::ParameterID { "x" + juce::String(s) + "_p" + juce::String(p), 1 }, "Parameter " + juce::String(p),
@@ -108,7 +108,7 @@ struct MuTronicLayoutTests : juce::UnitTest
                 expect(letter != 0 && juce::String(mu_tronic::kPrefixLetters).containsChar((juce::juce_wchar) letter),
                        juce::String(info.name) + " names a letter missing from kPrefixLetters (its rows would be saved as globals)");
 
-                for (int slot = 0; slot < mu_limits::kMaxLayers; ++slot)
+                for (int slot = 0; slot < mu_tronic::kLimits.layers; ++slot)
                 {
                     const auto prefix = mu_tronic::slotPrefix(letter, slot);
                     int rows = 0;
@@ -190,10 +190,10 @@ struct MuTronicLayoutTests : juce::UnitTest
             mu_tronic::PluginProcessor p;
             auto* sc = dynamic_cast<juce::AudioParameterInt*>(p.apvts.getParameter("ch0_scSrc"));
             expect(sc != nullptr);
-            if (sc != nullptr) expectEquals(sc->getNormalisableRange().end, (float) (mu_limits::kMaxLayers + 1 + mu_limits::kMaxBuses), "0 off, 1..16 slots, 17 external, 18.. the buses");
+            if (sc != nullptr) expectEquals(sc->getNormalisableRange().end, (float) (mu_tronic::kLimits.layers + 1 + mu_tronic::kLimits.buses), "0 off, 1..16 slots, 17 external, 18.. the buses");
             auto* ret = dynamic_cast<juce::AudioParameterInt*>(p.apvts.getParameter("ret_eff_scSrc"));
             expect(ret != nullptr);
-            if (ret != nullptr) expectEquals(ret->getNormalisableRange().end, (float) (mu_limits::kMaxLayers + 1 + mu_limits::kMaxBuses));
+            if (ret != nullptr) expectEquals(ret->getNormalisableRange().end, (float) (mu_tronic::kLimits.layers + 1 + mu_tronic::kLimits.buses));
         }
 
         beginTest("cost check on the real layout: the processor with every registered type's rows builds inside the budget");

@@ -1,4 +1,5 @@
 #include "BusTestRig.h"
+#include "TestLimits.h"
 
 // Group-bus routing in the shared mixer (design: docs/mu-tronic/design.md section 5): a channel's dry signal
 // goes to its bus (ChannelState::busAssign) or the master, the bus sums and feeds the master through its own
@@ -202,7 +203,7 @@ struct BusRoutingTests : juce::UnitTest
         {
             Rig r;
             r.dc[0] = 0.8f;
-            r.mixer.channels[0].busAssign.store(mu_limits::kMaxBuses + 1);
+            r.mixer.channels[0].busAssign.store(mu_test::kLimits.buses + 1);
             r.run();
             expectEquals(r.outL(), 0.8f * kTrim, "master mix");
         }

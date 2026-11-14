@@ -17,6 +17,7 @@
 #include <cmath>
 #include <functional>
 #include <thread>
+#include "TestLimits.h"
 
 using namespace mu_contract_test;
 
@@ -88,7 +89,7 @@ namespace
         static juce::AudioProcessorValueTreeState::ParameterLayout layout()
         {
             auto l = makeLayout();
-            for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            for (int i = 0; i < mu_test::kLimits.layers; ++i)
                 l.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID { "x" + juce::String(i) + "_b", 1 }, "B",
                                                                   juce::NormalisableRange<float>(0.0f, 1.0f), 0.25f));
             return l;
@@ -97,7 +98,7 @@ namespace
         explicit SwapHost(int live = 8) : FakeLayerHost(live, mu_core::LayerAccess::Published, false, layout())
         {
             std::vector<juce::StringArray> sets;
-            for (int s = 0; s < mu_limits::kMaxLayers; ++s)
+            for (int s = 0; s < mu_test::kLimits.layers; ++s)
                 sets.push_back(juce::StringArray { "v" + juce::String(s) + "_", "x" + juce::String(s) + "_" });
             initLayerStatePrefixSets(sets);
 
@@ -110,7 +111,7 @@ namespace
             offer(LayerTypeId::Kick, "Kick", 'v', [](int slot, LayerTypeId) -> std::unique_ptr<Layer> { return std::make_unique<TagLayer>(LayerTypeId::Kick, toneOf(slot)); });
             offer(LayerTypeId::Hat,  "Hat",  'x', [](int slot, LayerTypeId) -> std::unique_ptr<Layer> { return std::make_unique<HatLayer>(toneOf(slot)); });
 
-            for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            for (int i = 0; i < mu_test::kLimits.layers; ++i)
             {
                 std::unique_ptr<TagLayer> l = typeOf(i) == LayerTypeId::Hat ? std::make_unique<HatLayer>(toneOf(i))
                                                                            : std::make_unique<TagLayer>(LayerTypeId::Kick, toneOf(i));
@@ -145,7 +146,7 @@ namespace
         {
             ++hookCalls;
             hookFlagUp = layerEditInFlight.load();
-            for (int j = 0; j < mu_limits::kMaxLayers; ++j)
+            for (int j = 0; j < mu_test::kLimits.layers; ++j)
             {
                 hookTone[(size_t) j] = layers[(size_t) j] != nullptr ? static_cast<TagLayer&>(*layers[(size_t) j]).tone : -1.0f;
                 hookMap[(size_t) j] = oldToNew(j);
@@ -160,8 +161,8 @@ namespace
 
         int hookCalls = 0;
         bool hookFlagUp = false, movedFlagUp = false;
-        std::array<float, mu_limits::kMaxLayers> hookTone {};
-        std::array<int, mu_limits::kMaxLayers> hookMap {};
+        std::array<float, mu_test::kLimits.layers> hookTone {};
+        std::array<int, mu_test::kLimits.layers> hookMap {};
         std::vector<std::pair<int, int>> movedCalls;
         std::function<void()> inEdit;
     };
@@ -217,7 +218,7 @@ struct LayerSwapPublishedTests : juce::UnitTest
         expectEquals((int) view->numLive, 8);
         expect(view->layer[1] == l3 && view->layer[3] == l1, "the view lists the exchanged layers");
         expect(p.getLayer(1) == l3 && p.getLayer(3) == l1);
-        for (int s = 0; s < mu_limits::kMaxLayers; ++s) expect(view->layer[(size_t) s] == p.layers[(size_t) s].get(), "slot " + juce::String(s));
+        for (int s = 0; s < mu_test::kLimits.layers; ++s) expect(view->layer[(size_t) s] == p.layers[(size_t) s].get(), "slot " + juce::String(s));
         expect(! p.layerEditInFlight.load());
         expectEquals(p.layoutWordCountForTest(), 8);
         expectEquals(p.layerCountMirrorForTest(), 8);

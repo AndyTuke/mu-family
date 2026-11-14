@@ -21,7 +21,7 @@ class ProcessorCore : public juce::AudioProcessor
 {
 public:
     // `numLayers` is the slot count (live layers plus spares) this processor was built with.
-    explicit ProcessorCore(const BusesProperties& props, int numLayers = mu_limits::kMaxLayers) : juce::AudioProcessor(props)
+    explicit ProcessorCore(const BusesProperties& props, int numLayers) : juce::AudioProcessor(props)
     {
         layers.reset(numLayers);
     }

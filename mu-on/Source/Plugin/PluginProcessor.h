@@ -1,5 +1,7 @@
 #pragma once
 
+#include "BuildNumber.h"   // MU_VERSION_STRING
+
 #include "Plugin/MuOnLimits.h"
 #include "Plugin/ProcessorBase.h"        // mu-core base
 #include "Plugin/MixerFxParams.h"         // mu-core: shared global-FX / mixer APVTS layout

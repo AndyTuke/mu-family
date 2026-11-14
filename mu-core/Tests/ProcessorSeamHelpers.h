@@ -14,6 +14,7 @@
 #include <functional>
 #include <random>
 #include <thread>
+#include "TestLimits.h"
 
 namespace mu_seam_test
 {
@@ -287,7 +288,7 @@ namespace mu_seam_test
             for (int r = 0; r < rounds; ++r)
             {
                 // Grow to the maximum, shuffling as we go.
-                while (p.getNumLayers() < mu_limits::kMaxLayers)
+                while (p.getNumLayers() < mu_test::kLimits.layers)
                 {
                     const int idx = p.addLayer();
                     t.expect(idx >= 0, "addLayer succeeds below the limit");

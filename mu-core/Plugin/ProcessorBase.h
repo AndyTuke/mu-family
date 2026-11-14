@@ -76,8 +76,8 @@ class ProcessorBase : public ProcessorCore,
 public:
     ProcessorBase(const BusesProperties& props,
                   juce::AudioProcessorValueTreeState::ParameterLayout layout,
-                  const juce::Identifier& stateTreeType = juce::Identifier("MuFamilyState"),
-                  mu_limits::ProcessorLimits limits = mu_limits::ProcessorLimits::fromBuildSettings());
+                  const juce::Identifier& stateTreeType,
+                  mu_limits::ProcessorLimits limits);
     ~ProcessorBase() override;
 
     // The layer, bus and insert counts this processor was built with (docs/design-runtime-counts.md). Fixed for its lifetime.
@@ -1432,8 +1432,7 @@ private:
 };
 
 // Layout guard. ProcessorBase's code is compiled once into the mu-core library, while a product compiles the class's inline code
-// and its own members against this header. If the two disagree on a setting that changes the class (MU_MAX_LAYERS, MU_MAX_BUSES,
-// MU_EXT_SIDECHAIN, the CLAP base class, ...), members sit at different offsets and the program corrupts memory. Each translation
+// and its own members against this header. If the two disagree on a setting that changes the class (the CLAP base class, ...), members sit at different offsets and the program corrupts memory. Each translation
 // unit that includes this header checks its own sizeof against the library's at startup and stops with a message if they differ.
 // Only targets built against the library see MU_CORE_STATIC; test apps that compile the mu-core sources themselves have nothing to check.
 #ifdef MU_CORE_STATIC

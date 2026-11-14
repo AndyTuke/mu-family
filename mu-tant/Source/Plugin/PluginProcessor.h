@@ -1,5 +1,7 @@
 #pragma once
 
+#include "BuildNumber.h"   // MU_VERSION_STRING
+
 #include "Plugin/MuTantLimits.h"
 #include "Plugin/ProcessorBase.h"            // mu-core base
 #include "Plugin/MixerFxParams.h"            // mu-core: shared global-FX/mixer APVTS layout
@@ -52,6 +54,7 @@ public:
 
     const juce::String getName() const override { return juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Tant")); }
     juce::String getProductSlug() const override { return "mu-tant"; }   // key in latest.json
+    juce::String getVersionString() const override { return MU_VERSION_STRING; }
     bool acceptsMidi()  const override { return true; }
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "BuildNumber.h"   // MU_VERSION_STRING
+
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "Plugin/ProcessorBase.h"
 #include "Sequencer/MidiArpCore.h"
@@ -34,6 +36,7 @@ public:
 
     const juce::String getName() const override;
     juce::String getProductSlug() const override { return "mu-toni-midi"; }   // key in latest.json
+    juce::String getVersionString() const override { return MU_VERSION_STRING; }
     bool acceptsMidi() const override { return true; }
     bool producesMidi() const override { return true; }
     bool isMidiEffect() const override { return true; }

@@ -1,6 +1,7 @@
 #include "UI/MasterInsertBinding.h"
 #include "Plugin/MixerFxParams.h"
 #include "TestProcessorBase.h"
+#include "TestLimits.h"
 
 // The plugin half of the master insert column: MasterInsertPanel <-> mst_ins* / mst_ins2* parameters,
 // on a processor that carries the shared mixer parameter layout.
@@ -11,7 +12,7 @@ struct MixerParamProcessor : TestProcessorBase
     static juce::AudioProcessorValueTreeState::ParameterLayout makeLayout()
     {
         juce::AudioProcessorValueTreeState::ParameterLayout layout;
-        mu_mixfx::addGlobalFxParams(layout);
+        mu_mixfx::addGlobalFxParams(layout, 0, mu_test::kLimits);
         return layout;
     }
     MixerParamProcessor() : TestProcessorBase(WrapperType::wrapperType_Undefined, makeLayout()) { startFxParamSync(); }

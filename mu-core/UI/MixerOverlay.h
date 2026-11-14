@@ -76,10 +76,8 @@ private:
     std::vector<std::unique_ptr<mu_ui::MasterInsertPanel>>   busInsertPanels;
     std::vector<std::unique_ptr<mu_ui::BusInsertBinding>>    busInsertBindings;
 
-    MixerChannel effectReturn  { MixerChannel::Type::EffectReturn, "Effect",  juce::Colour(0xffD85A30) };
-    MixerChannel delayReturn   { MixerChannel::Type::DelayReturn,  "Delay",   juce::Colour(0xffD85A30) };
-    MixerChannel reverbReturn  { MixerChannel::Type::ReverbReturn, "Reverb",  juce::Colour(0xff378ADD) };
-    MixerChannel masterChannel { MixerChannel::Type::Master,       "Master",  juce::Colours::white    };
+    // Built in the constructor, which gives each the mixer's counts.
+    MixerChannel effectReturn, delayReturn, reverbReturn, masterChannel;
     // The master insert column sits right of the Master strip (strip, then panel, as in mu-link).
     mu_ui::MasterInsertPanel   masterInsertPanel;
     mu_ui::MasterInsertBinding masterInsertBinding { proc, masterInsertPanel };

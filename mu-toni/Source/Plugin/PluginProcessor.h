@@ -1,5 +1,7 @@
 #pragma once
 
+#include "BuildNumber.h"   // MU_VERSION_STRING
+
 #include "Plugin/MuToniLimits.h"
 #include "Plugin/ProcessorBase.h"        // mu-core base
 #include "Persistence/LayerParamIds.h"   // layerParamPrefix / layerParamId
@@ -46,6 +48,7 @@ public:
 
     const juce::String getName() const override { return juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Toni")); }
     juce::String getProductSlug() const override { return "mu-toni"; }   // key in latest.json
+    juce::String getVersionString() const override { return MU_VERSION_STRING_PRE; }
     bool acceptsMidi()  const override { return true; }
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }

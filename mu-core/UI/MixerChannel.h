@@ -32,7 +32,7 @@ public:
 
     // `limits` are the owning mixer's counts (buses, layers, external sidechain): they decide the Out selector and the sidechain list.
     MixerChannel(Type type, const juce::String& name, juce::Colour colour,
-                 const mu_limits::ProcessorLimits& limits = mu_limits::ProcessorLimits::fromBuildSettings());
+                 const mu_limits::ProcessorLimits& limits);
     ~MixerChannel() override;
 
     // status-bar coverage for outBus + scSource dropdowns. Colour is the

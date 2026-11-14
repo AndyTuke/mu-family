@@ -199,7 +199,7 @@ public:
     virtual void reportLoadError(const juce::String& message) = 0;
 
     // ── Shared state ─────────────────────────────────────────────────────────
-    mu_core::SampleLibrary samples { *this };
+    mu_core::SampleLibrary samples { *this, mu_limits::kAbsoluteMaxLayers };   // layer-library code sizes to the ceiling (the host has its own count)
     // Written by every Rhythm layer's render (the transport as the last rendered block saw it), read by the UI.
     std::atomic<bool> transportPlaying { false };
     // While set, a changed row is applied to the layer but its pattern and voice are not refreshed: the code that set it

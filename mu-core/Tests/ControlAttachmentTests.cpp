@@ -3,6 +3,7 @@
 
 #include "Control/ControlAttachment.h"
 #include "Control/LiveState.h"
+#include "TestLimits.h"
 
 namespace
 {
@@ -52,7 +53,7 @@ public:
                 return std::unique_ptr<ControlAttachment>(new FakeAttachment());
             };
             NullSink sink;
-            LiveState view;
+            LiveState view { mu_test::kLimits.layers };
             auto a = controlAttachmentFactory()(sink, view, SurfaceLook{}, juce::File());
             expect(called && a != nullptr);
             controlAttachmentFactory() = nullptr;   // leave the slot as found

@@ -17,6 +17,7 @@
 #include <cmath>
 #include <map>
 #include <vector>
+#include "TestLimits.h"
 
 namespace mu_frozen
 {
@@ -248,7 +249,7 @@ namespace mu_frozen
         mu_seam_test::TempStorage storage;
         Proc p;
         const int layersAtStart = p.getNumLayers();
-        const auto text = manifestText(product, p.apvts, layersAtStart, mu_limits::kMaxLayers);
+        const auto text = manifestText(product, p.apvts, layersAtStart, mu_test::kLimits.layers);
         checkFrozen(t, frozen, text, "parameter manifest");
 
         t.beginTest(juce::String(product) + " parameter ids do not depend on the layer count");
@@ -256,7 +257,7 @@ namespace mu_frozen
         for (auto* q : sortedParams(p.apvts)) before.push_back(q->paramID + "|" + manifestLine(*q));
         int guard = 0;
         while (p.addLayer() >= 0 && ++guard < 64) {}
-        t.expectEquals(p.getNumLayers(), mu_limits::kMaxLayers, "grew to the layer capacity");
+        t.expectEquals(p.getNumLayers(), mu_test::kLimits.layers, "grew to the layer capacity");
         std::vector<juce::String> after;
         for (auto* q : sortedParams(p.apvts)) after.push_back(q->paramID + "|" + manifestLine(*q));
         t.expect(before == after, "the parameter set at " + juce::String(layersAtStart) + " layer(s) and at "

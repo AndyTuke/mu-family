@@ -30,7 +30,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         mu_mixfx::addChannelStripParams(layout, c, n, strip, limits);
     }
 
-    // ── The group buses (mu_limits::kMaxBuses, defined for this target): bus{B}_ strips and their inserts.
+    // ── The group buses (kLimits.buses): bus{B}_ strips and their inserts.
     mu_mixfx::addBusParams(layout, {}, limits);
 
     // ── Every registered type's own rows, for every slot. A type's table is added once per prefix (the five mu-On

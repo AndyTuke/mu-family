@@ -21,13 +21,13 @@ Static layer libraries compiled into the binary, registered in [Source/Persisten
 ## Rules
 
 - A layer library never includes `Plugin/` or `License/` (`tests/scripts/check-layer-boundary.ps1`); mu-Tronic-only code lives in `mu_tronic::` under `Source/`.
-- Capacities are per-target compile definitions (`MU_MAX_LAYERS=16`, `MU_MAX_BUSES=3`, `MU_BUS_INSERTS=2`); the other products keep 8 layers and no buses. No code may assume 8 or 2 literally (`kLayersPerPage`).
+- Capacities are mu-Tronic's own `mu_tronic::kLimits` (16 layers, 3 buses of 2 inserts, no host sidechain), given to `ProcessorBase` and the parameter layout when the processor is built; mu-core is one compiled library and reads no per-product setting. The other products pass 8 layers and no buses. No code may assume 8 or 2 literally (`kLayersPerPage`).
 - Layer state is text, `RenderContext` mirrors a C struct, `render` makes no host callback (keeps a module ABI possible, design section 2).
 - Tests: `mu-tronic-tests` (builds every default build).
 
 ## mu-Host builds on this shell
 
-[mu-Host](../mu-host/CLAUDE.md) is a product of its own that compiles this product's sources with one slot (`MU_MAX_LAYERS=1`). The seams are `ProcessorIdentity` on `PluginProcessor`, `EditorOptions` and the `slotShown` hook on `PluginEditor`, and `PluginFactory.cpp` (the plug-in factory, its own file so mu-Host can leave it out). Keep them working when the shell changes; `mu-host-tests` covers them.
+[mu-Host](../mu-host/CLAUDE.md) is a product of its own that compiles this product's sources with one slot (`mu_host::kLimits`, 1 layer). The seams are `ProcessorIdentity` on `PluginProcessor`, `EditorOptions` and the `slotShown` hook on `PluginEditor`, and `PluginFactory.cpp` (the plug-in factory, its own file so mu-Host can leave it out). Keep them working when the shell changes; `mu-host-tests` covers them.
 
 ## Mirror rule with mu-On (Andy 2026-10-29)
 

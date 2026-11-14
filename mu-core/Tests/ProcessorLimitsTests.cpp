@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <juce_core/juce_core.h>
+#include "TestLimits.h"
 
 struct ProcessorLimitsTests : juce::UnitTest
 {
@@ -50,7 +51,7 @@ struct ProcessorLimitsTests : juce::UnitTest
         beginTest("ProcessorLimits: valid ranges and the ceilings");
         {
             expect(ProcessorLimits {}.valid());
-            expect(ProcessorLimits::fromBuildSettings().valid());
+            expect(mu_test::kLimits.valid());
             expect((ProcessorLimits { mu_limits::kAbsoluteMaxLayers, mu_limits::kAbsoluteMaxBuses, mu_limits::kAbsoluteBusInserts, false }).valid());
             expect(! (ProcessorLimits { 0, 0, 2, true }).valid());                                        // at least one layer
             expect(! (ProcessorLimits { mu_limits::kAbsoluteMaxLayers + 1, 0, 2, true }).valid());        // layer masks are 32-bit
@@ -58,13 +59,9 @@ struct ProcessorLimitsTests : juce::UnitTest
             expect(! (ProcessorLimits { 8, 3, 0, true }).valid());                                         // a bus has at least one insert
         }
 
-        beginTest("ProcessorLimits: the build settings are what the macros say");
+        beginTest("ProcessorLimits: the test build's counts are inside the ceilings");
         {
-            const auto l = ProcessorLimits::fromBuildSettings();
-            expectEquals(l.layers, mu_limits::kMaxLayers);
-            expectEquals(l.buses, mu_limits::kMaxBuses);
-            expectEquals(l.busInserts, mu_limits::kBusInserts);
-            expect(l.externalSidechain == mu_limits::kExternalSidechain);
+            expect(mu_test::kLimits.valid());
         }
 
         beginTest("MixerEngine: a mixer built with counts other than the build settings runs every channel and bus");
@@ -98,8 +95,8 @@ struct ProcessorLimitsTests : juce::UnitTest
         beginTest("ProcessorBase: keeps the limits it is built with (default = the build settings)");
         {
             TestProcessorBase p(juce::AudioProcessor::wrapperType_Undefined);
-            expectEquals(p.getLimits().layers, mu_limits::kMaxLayers);
-            expectEquals(p.getLimits().buses, mu_limits::kMaxBuses);
+            expectEquals(p.getLimits().layers, mu_test::kLimits.layers);
+            expectEquals(p.getLimits().buses, mu_test::kLimits.buses);
         }
     }
 };

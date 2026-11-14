@@ -1,5 +1,7 @@
 #pragma once
 
+#include "BuildNumber.h"   // MU_VERSION_STRING
+
 #include "Plugin/MuClidLimits.h"
 #include <array>
 #include <juce_audio_utils/juce_audio_utils.h>
@@ -52,6 +54,7 @@ public:
 
     const juce::String getName() const override;
     juce::String getProductSlug() const override { return "mu-clid"; }   // key in latest.json
+    juce::String getVersionString() const override { return MU_VERSION_STRING; }
     // True for both DAW and standalone:
     //   - Standalone: MIDI clock sync.
     //   - DAW (VST3/CLAP): program-change → preset hot-swap.

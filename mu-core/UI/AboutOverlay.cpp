@@ -1,6 +1,5 @@
 #include "AboutOverlay.h"
 #include "License/SupportPromptPolicy.h"
-#include "BuildNumber.h"
 #include "UI/ModalCard.h"   // shared dim + card chrome
 
 AboutOverlay::AboutOverlay()
@@ -104,7 +103,7 @@ void AboutOverlay::paint(juce::Graphics& g)
 
     g.setFont(MuLookAndFeel::uiFont(sf(11.0f)));
     g.setColour(MuLookAndFeel::colour(Id::mutedText));
-    g.drawText("v" + juce::String(MU_VERSION_STRING), tx, ty, textW, s(18),
+    g.drawText("v" + versionText, tx, ty, textW, s(18),
                juce::Justification::centredLeft, false);
     ty += s(20);
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "BuildNumber.h"   // MU_VERSION_STRING
+
 #include "Plugin/MuTilateLimits.h"
 #include "Plugin/ProcessorBase.h"        // mu-core base
 #include "Persistence/PhraseParams.h"    // the Phrase type's parameter table (ppi, addLayerParams)
@@ -36,6 +38,7 @@ public:
 
     const juce::String getName() const override { return juce::String(juce::CharPointer_UTF8("\xce\xbc-Tilate")); }
     juce::String getProductSlug() const override { return "mu-tilate"; }   // key in latest.json
+    juce::String getVersionString() const override { return MU_VERSION_STRING_PRE; }
     bool acceptsMidi()  const override { return true; }    // program changes and the standalone's MIDI clock
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }

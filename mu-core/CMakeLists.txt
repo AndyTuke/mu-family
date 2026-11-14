@@ -153,11 +153,10 @@ target_include_directories(mu-core SYSTEM INTERFACE
     "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher"
 )
 
-# mu-core as compiled static libraries, built once per configuration instead of being recompiled inside every consumer (an
-# INTERFACE library adds its sources to each target that links it, ~95 files and most of a target's compile time).
-# The sources read per-binary settings (MU_MAX_LAYERS, MU_MAX_BUSES, MU_BUS_INSERTS, MU_EXT_SIDECHAIN, MU_VERSION_BASE), and those
-# change the layout of shared types, so there is one library per distinct set of settings ("variant"). A product asks for its
-# variant with mu_core_variant() and gets the settings from it, so the library and the product can never disagree.
+# mu-core as ONE compiled static library, built once per configuration instead of being recompiled inside every consumer (an
+# INTERFACE library adds its sources to each target that links it, ~95 files and most of a target's compile time). Nothing in the
+# sources depends on a per-product setting: a product's layer, bus and insert counts are chosen when its processor is constructed
+# (mu_limits::ProcessorLimits), and its version string comes from its getVersionString(). So every product links this one library.
 # The INTERFACE mu-core above stays for the test apps that compile the sources they need themselves.
 
 
@@ -192,63 +191,31 @@ target_include_directories(mu-juce-usage INTERFACE "$<TARGET_PROPERTY:mu-core-as
 
 
 
-# mu_core_variant(<out-var> [LAYERS n] [BUSES n] [INSERTS n] [EXT_SIDECHAIN 0|1] [VERSION_BASE x.y])
-# Creates (once) the compiled library for these settings and sets <out-var> to the target a product links. Omitted settings keep the
-# MuLimits.h / BuildNumber.h defaults. The settings are public on the library, so every product that links it is compiled with the
-# same values the library was; a product must not define them itself.
-function(mu_core_variant out_var)
-    cmake_parse_arguments(V "" "LAYERS;BUSES;INSERTS;EXT_SIDECHAIN;VERSION_BASE" "" ${ARGN})
-    set(key "")
-    set(defs "")
-    foreach(pair LAYERS:MU_MAX_LAYERS BUSES:MU_MAX_BUSES INSERTS:MU_BUS_INSERTS EXT_SIDECHAIN:MU_EXT_SIDECHAIN)
-        string(REPLACE ":" ";" pair "${pair}")
-        list(GET pair 0 arg)
-        list(GET pair 1 macro)
-        if(NOT "${V_${arg}}" STREQUAL "")
-            string(APPEND key "-${arg}${V_${arg}}")
-            list(APPEND defs "${macro}=${V_${arg}}")
-        endif()
-    endforeach()
-    # A base equal to the live one is the default, so products on the same version share a library; it only splits when they differ.
-    if("${V_VERSION_BASE}" STREQUAL "${MUFAMILY_VERSION_BASE}")
-        set(V_VERSION_BASE "")
-    endif()
-    if(NOT "${V_VERSION_BASE}" STREQUAL "")
-        string(APPEND key "-v${V_VERSION_BASE}")
-        list(APPEND defs "MU_VERSION_BASE=\"${V_VERSION_BASE}\"")
-    endif()
-    string(REPLACE "." "_" key "${key}")
-    set(lib "mu-core-lib${key}")
-    if(NOT TARGET ${lib})
-        get_target_property(mu_srcs mu-core INTERFACE_SOURCES)
-        set(stat "mu-core-static${key}")
-        add_library(${stat} STATIC)
-        target_sources(${stat} PRIVATE ${mu_srcs})
-        target_include_directories(${stat} PUBLIC "${CMAKE_CURRENT_FUNCTION_LIST_DIR}")
-        target_include_directories(${stat} SYSTEM PUBLIC
-            "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher"
-            "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
-            "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
-            "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-linear/include"
-            "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-stretch/include")
-        target_compile_features(${stat} PUBLIC cxx_std_17)
-        # The JUCE settings every consumer uses (they are the same for all targets), then this variant's own.
-        target_compile_definitions(${stat} PUBLIC JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0 JUCE_USE_MP3AUDIOFORMAT=1 MU_CORE_STATIC=1 ${defs})
-        add_dependencies(${stat} mu-core-assets)
-        # ProcessorBase gains a CLAP base class when the CLAP header is visible (MU_CORE_HAS_CLAP), which changes its layout; every product
-        # target already sees that header, so the library does too, and its code and the products agree on one layout.
-        target_link_libraries(${stat} PUBLIC clap_juce_extensions)
-        target_link_libraries(${stat}
-            PRIVATE mu-juce-usage
-                $<COMPILE_ONLY:juce::juce_recommended_config_flags> $<COMPILE_ONLY:juce::juce_recommended_lto_flags>
-                $<COMPILE_ONLY:juce::juce_recommended_warning_flags>)
-        # What a product links: the compiled library plus the embedded assets (which bring juce_animation and, through it, the
-        # JUCE modules the product then compiles itself, as before).
-        add_library(${lib} INTERFACE)
-        target_link_libraries(${lib} INTERFACE ${stat} mu-core-assets)
-    endif()
-    set(${out_var} ${lib} PARENT_SCOPE)
-endfunction()
+get_target_property(mu_srcs mu-core INTERFACE_SOURCES)
+add_library(mu-core-static STATIC)
+target_sources(mu-core-static PRIVATE ${mu_srcs})
+target_include_directories(mu-core-static PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(mu-core-static SYSTEM PUBLIC
+    "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher"
+    "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
+    "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+    "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-linear/include"
+    "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-stretch/include")
+target_compile_features(mu-core-static PUBLIC cxx_std_17)
+# The JUCE settings every consumer uses (they are the same for all targets).
+target_compile_definitions(mu-core-static PUBLIC JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0 JUCE_USE_MP3AUDIOFORMAT=1 MU_CORE_STATIC=1)
+add_dependencies(mu-core-static mu-core-assets)
+# ProcessorBase gains a CLAP base class when the CLAP header is visible (MU_CORE_HAS_CLAP), which changes its layout; every product
+# target already sees that header, so the library does too, and its code and the products agree on one layout.
+target_link_libraries(mu-core-static PUBLIC clap_juce_extensions)
+target_link_libraries(mu-core-static
+    PRIVATE mu-juce-usage
+        $<COMPILE_ONLY:juce::juce_recommended_config_flags> $<COMPILE_ONLY:juce::juce_recommended_lto_flags>
+        $<COMPILE_ONLY:juce::juce_recommended_warning_flags>)
+# What a product links: the compiled library plus the embedded assets (which bring juce_animation and, through it, the
+# JUCE modules the product then compiles itself, as before).
+add_library(mu-core-lib INTERFACE)
+target_link_libraries(mu-core-lib INTERFACE mu-core-static mu-core-assets)
 
 # Unit tests for shared mu-core code (no product linked).
 add_subdirectory(Tests)

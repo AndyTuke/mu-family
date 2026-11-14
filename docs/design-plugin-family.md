@@ -930,9 +930,9 @@ each**; every mu-On engine (Kick, Bass, Hat, Snare, Rumble) is its own layer typ
   `PluginProcessor&` (the UI uses a `<Type>Host` interface), and every relative path is unique across `mu-core` and the libraries
   (`tests/scripts/check-layer-boundary.ps1`, to be written in Stage T0). Each product's parameter table is `addLayerParams(layout, slot)` in its `Persistence/`.
 - **Each standalone product moves onto the shared render path** in the same stage in which its layer is extracted, so per-block glue exists once.
-- **Capacity:** `mu_limits::kMaxLayers` is a per-target compile-time constant (`MU_MAX_LAYERS`, default 8; mu-Tronic 16). One constant, one value per binary.
-- **Buses:** `MixerEngine::BusState` (a `ChannelState` plus a chain of `kBusInserts` layer inserts), opt-in compile-time counts `MU_MAX_BUSES` (default 0, mu-Tronic 3) and
-  `MU_BUS_INSERTS` (default 2), `ChannelState::busAssign`,
+- **Capacity:** a product's counts are its own `mu_limits::ProcessorLimits` constant (`kLimits`: layers, buses, inserts per bus, host sidechain), given to `ProcessorBase` and to the parameter layout when the processor is built; mu-core is ONE compiled library and reads no per-product setting (`check-core-boundary.ps1` forbids the old `MU_MAX_*` macros). Clid/Tant/Toni/On/Tilate 8 layers, mu-Tronic 16 with 3 buses, mu-Host 1. Fixed ceilings (`kAbsoluteMaxLayers` 32, buses and inserts 9) bound the few fixed arrays; layer-library code shared with the hosts sizes to the ceiling.
+- **Buses:** `MixerEngine::BusState` (a `ChannelState` plus a chain of `kBusInserts` layer inserts), opt-in counts `ProcessorLimits::buses` (0 except mu-Tronic's 3) and
+  `busInserts` (2), `ChannelState::busAssign`,
   graph channels -> buses -> returns -> master, no bus-to-bus, a channel's sidechain source is never a bus. The existing `outputBus` is the DAW direct out and is relabelled
   "Out" in the UI (not offered in mu-Tronic). All of it is `mu-core`.
 - **Layer types are finer than products:** the registry lists each mu-On engine (Kick, Bass, Hat, Snare, Rumble, and from 2026-10-21 FM Perc) as its own `LayerTypeId` over the one `Track` class

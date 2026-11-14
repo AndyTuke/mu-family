@@ -71,11 +71,10 @@ target_compile_definitions(mu-toni-midi
         JUCE_USE_MP3AUDIOFORMAT=1
 )
 
-# The compiled mu-core library for this product's settings (see mu_core_variant in mu-core/CMakeLists.txt).
-mu_core_variant(MU_CORE_LIB)
+# The one compiled mu-core library (mu-core/CMakeLists.txt); this product's counts are its kLimits constant.
 target_link_libraries(mu-toni-midi
     PRIVATE
-        ${MU_CORE_LIB}
+        mu-core-lib
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_gui_basics

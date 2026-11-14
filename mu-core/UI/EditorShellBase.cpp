@@ -199,6 +199,7 @@ void EditorShellBase::setProductIdentity(const juce::String& displayName, const 
 
     productDisplayName = displayName;
     aboutOverlay.setProductInfo(displayName, credits);
+    aboutOverlay.setVersion(processorRef.getVersionString());
     transportBar.setLogoText(displayName);
     if (processorRef.hasLicensing())
         activationOverlay.setProductName(displayName);

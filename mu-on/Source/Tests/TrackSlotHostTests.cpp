@@ -23,7 +23,7 @@ namespace
     struct SlotHost : ProcessorBase
     {
         SlotHost()
-            : ProcessorBase(BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo()), makeLayout())
+            : ProcessorBase(BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo()), makeLayout(), juce::Identifier("MuFamilyState"), mu_on::kLimits)
         {
             setLayerAccess(mu_core::LayerAccess::Published);
             keepSpareLayers = true;
@@ -56,7 +56,7 @@ namespace
             for (int i = 0; i < mu_on::kLimits.layers; ++i)
             {
                 mu_on::addLayerParams(layout, i, mu_on::kLimits.layers);
-                mu_mixfx::addChannelStripParams(layout, "ch" + juce::String(i) + "_", "Ch ");
+                mu_mixfx::addChannelStripParams(layout, "ch" + juce::String(i) + "_", "Ch ", {}, mu_on::kLimits);
             }
             return layout;
         }

@@ -419,7 +419,7 @@ public:
                 mu_core::LiveState* live = nullptr;
                 bool perform(const mu_core::ControlAction& a) override { return live->perform(a); }
             };
-            mu_core::LiveState live;
+            mu_core::LiveState live { 16 };   // the 16-layer surface these tests drive
             int staged = -1, cancels = 0;
             bool pending = false;
             uint32_t serial = 0;

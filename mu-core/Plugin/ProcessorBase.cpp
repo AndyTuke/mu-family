@@ -286,7 +286,7 @@ namespace mu_core
         // Fail loudly in every build: a mismatched layout corrupts memory long before any symptom shows.
         juce::String msg = "mu-core library and product disagree on ProcessorBase (library " + juce::String((int) sizeof(ProcessorBase))
                          + " bytes, " + juce::String(where) + " sees " + juce::String((int) callerSize)
-                         + "): check mu_core_variant() settings and the CLAP header in the product's CMake";
+                         + "): check the CLAP header in the product's CMake";
         juce::Logger::writeToLog(msg);
         std::fprintf(stderr, "%s\n", msg.toRawUTF8());
         std::_Exit(70);   // not abort(): a Debug CRT abort opens a dialog that hangs a headless run

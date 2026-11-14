@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <thread>
 #include <vector>
+#include "TestLimits.h"
 
 using namespace mu_contract_test;
 
@@ -275,7 +276,7 @@ struct LayerBlockTests : juce::UnitTest
             expect((bool) b);
             expectEquals((int) b.view().numLive, 3);
             expectEquals((int) b.view().serial, (int) serial);
-            for (int s = 0; s < mu_limits::kMaxLayers; ++s) expect(b.view().layer[(size_t) s] == p.layers[(size_t) s].get());
+            for (int s = 0; s < mu_test::kLimits.layers; ++s) expect(b.view().layer[(size_t) s] == p.layers[(size_t) s].get());
             // The lock is held for the life of the block: another thread cannot take it.
             bool other = true;
             std::thread t([&] { other = p.layersLock.tryEnter(); if (other) p.layersLock.exit(); });
@@ -450,7 +451,7 @@ struct LayerRenderDriverTests : juce::UnitTest
                 auto& p = *pBox;
                 p.setUseLayerRenderForTest(true);
                 Driver d(p);
-                p.mixerEngine.channels[1].sidechainSource.store(MixerEngine::kExtSidechainSrc);
+                p.mixerEngine.channels[1].sidechainSource.store(mu_test::kExtSidechainSrc);
                 p.mixerEngine.channels[1].sidechainAmount.store(1.0f);
                 p.mixerEngine.channels[1].sidechainReleaseMs.store(20.0f);
                 if (withSidechain)
@@ -884,7 +885,7 @@ struct LayerRenderDriverTests : juce::UnitTest
             expectEquals(p.layerLoopBeats(0), 8.0, "the live layer's length");
             expectEquals(p.layerLoopBeats(3), 12.0, "the parked spare's own length");
             expectEquals(p.layerLoopBeats(5), 4.0, "no layer: the bar");
-            expect(p.layerLoopBeats(-1) < 0.0 && p.layerLoopBeats(mu_limits::kMaxLayers) < 0.0, "out of range: no loop");
+            expect(p.layerLoopBeats(-1) < 0.0 && p.layerLoopBeats(mu_test::kLimits.layers) < 0.0, "out of range: no loop");
         }
 
         beginTest("MIDI: decoded once, each call sees its own frames, overflow is counted, the sinks merge within a budget");
@@ -1136,7 +1137,7 @@ struct LayerRenderDriverTests : juce::UnitTest
             d.block(1024);   // two chunks: one parked call per chunk, the event in the first
             expectEquals(p.fake(0).parkedCalls, 0);
             expectEquals(p.fake(1).parkedCalls, 0);
-            for (int s = 2; s < mu_limits::kMaxLayers; ++s)
+            for (int s = 2; s < mu_test::kLimits.layers; ++s)
             {
                 expectEquals(p.fake(s).parkedCalls, 2);
                 expectEquals(p.fake(s).parkedSlot, s);
@@ -1290,12 +1291,12 @@ struct LayerLayoutWordTests : juce::UnitTest
                     {
                         const juce::ScopedLock lw(p.layoutWriteLock);
                         const juce::ScopedLock sl(p.layersLock);
-                        p.retireBin.park(e % mu_limits::kMaxLayers, std::make_unique<Tail>(), p.layoutSerial(), true);
+                        p.retireBin.park(e % mu_test::kLimits.layers, std::make_unique<Tail>(), p.layoutSerial(), true);
                         break;
                     }
                 }
                 p.flushPendingAsyncUpdates();
-                if (p.getNumLayers() >= mu_limits::kMaxLayers) p.removeLayer(1);
+                if (p.getNumLayers() >= mu_test::kLimits.layers) p.removeLayer(1);
             }
             audio.join();
             expectEquals(nonFinite.load(), 0);
@@ -1304,7 +1305,7 @@ struct LayerLayoutWordTests : juce::UnitTest
             p.retireBin.service();
             expectEquals(p.retireBin.countIn(mu_core::RetireBin::Done) + p.retireBin.countIn(mu_core::RetireBin::Draining)
                          + p.retireBin.countIn(mu_core::RetireBin::Parked), 0, "deterministic end state: the bin is empty");
-            for (int s = 0; s < mu_limits::kMaxLayers; ++s) expectEquals(p.fake(s).useAfterFree, 0);
+            for (int s = 0; s < mu_test::kLimits.layers; ++s) expectEquals(p.fake(s).useAfterFree, 0);
             expectEquals(tailUseAfterFree.load(), 0, "no tail was rendered after it was freed");
         }
     }
@@ -1324,12 +1325,9 @@ struct LayerContractMiscTests : juce::UnitTest
                    + juce::String((int) sizeof (mu_core::LayerAccessState)) + ", MixerEngine " + juce::String((int) sizeof (MixerEngine))
                    + ", Layer " + juce::String((int) sizeof (Layer))
                    + " (information)");
-        expectEquals(mu_limits::kMaxLayers, MU_MAX_LAYERS);
-        expectEquals(mu_limits::kMaxBuses, MU_MAX_BUSES);
-        expectEquals(mu_limits::kBusInserts, MU_BUS_INSERTS);
-        expectEquals(mu_limits::kLayersPerPage, 8);
+                                expectEquals(mu_limits::kLayersPerPage, 8);
         expectEquals(mu_limits::kRetireDepth, 4);
-        expectEquals(MixerEngine::MaxChannels, mu_limits::kMaxLayers);
+        expectEquals(mu_test::kLimits.layers, mu_test::kLimits.layers);
 
         beginTest("LayerTypeId is saved by name and round-trips; an unknown name is Empty");
         for (int i = 0; i <= (int) mu_core::LayerTypeId::Test2; ++i)

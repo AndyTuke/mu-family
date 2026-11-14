@@ -15,11 +15,11 @@ juce::AudioProcessorEditor* mu_tronic::PluginProcessor::createEditor() { return 
 
 namespace
 {
-    static_assert(mu_limits::kMaxLayers == 16, "mu-tronic compiles with MU_MAX_LAYERS=16");
+    static_assert(mu_tronic::kLimits.layers == 16, "mu-tronic has 16 layers");
 
     // The test layer's type: one the product does not register, so it never meets the real Arp.
     constexpr mu_core::LayerTypeId kToneType = mu_core::LayerTypeId::Test;
-    static_assert(mu_limits::kMaxLayers % mu_limits::kLayersPerPage == 0, "the pages are whole");
+    static_assert(mu_tronic::kLimits.layers % mu_limits::kLayersPerPage == 0, "the pages are whole");
 
     // A layer type the build does not have: a constant tone, so a type change is heard in the output.
     struct ToneLayer : Layer
@@ -101,7 +101,7 @@ struct MuTronicProcessorTests : juce::UnitTest
     // mix, a muted bus silences it, and the whole bus state survives a saved-state round trip.
     void busChain()
     {
-        static_assert(mu_limits::kMaxBuses == 3 && mu_limits::kBusInserts == 2, "mu-tronic compiles with 3 buses of 2 inserts");
+        static_assert(mu_tronic::kLimits.buses == 3 && mu_tronic::kLimits.busInserts == 2, "mu-tronic compiles with 3 buses of 2 inserts");
         beginTest("layers routed through a bus and its two inserts, by parameters, then saved and restored");
         mu_seam_test::TempStorage storage;
         ExposedProcessor p;

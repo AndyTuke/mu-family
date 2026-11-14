@@ -1,4 +1,4 @@
-// Tests of mu-Host: the mu-Tronic shell built with ONE slot (MU_MAX_LAYERS=1, no buses), on the REAL mu_host::PluginProcessor, headless.
+// Tests of mu-Host: the mu-Tronic shell built with ONE slot (one layer, no buses), on the REAL mu_host::PluginProcessor, headless.
 // One slot that starts Empty, every engine the editor's drop-down offers, saved state under mu-Host's own names, and a rendering audio
 // thread that survives engine changes.
 
@@ -14,8 +14,8 @@ juce::AudioProcessorEditor* mu_host::PluginProcessor::createEditor() { return nu
 
 namespace
 {
-    static_assert(mu_limits::kMaxLayers == 1, "mu-host compiles with MU_MAX_LAYERS=1");
-    static_assert(mu_limits::kMaxBuses == 0, "mu-host has no buses");
+    static_assert(mu_host::kLimits.layers == 1, "mu-host has one layer");
+    static_assert(mu_host::kLimits.buses == 0, "mu-host has no buses");
 
     struct HostProcessor : mu_host::PluginProcessor
     {

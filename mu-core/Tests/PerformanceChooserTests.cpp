@@ -8,6 +8,7 @@
 #include "UI/PerformanceChooser.h"
 #include "UI/PerformanceChooserModel.h"
 #include "UI/ShellChrome.h"
+#include "TestLimits.h"
 
 namespace
 {
@@ -301,7 +302,7 @@ struct PerformanceChooserTests : juce::UnitTest
     struct Rig
     {
         Folders folders;
-        mu_core::LiveState live;
+        mu_core::LiveState live { mu_test::kLimits.layers };
         Sink sink { live };
         TestShellBackend b { true };
         Host host;
@@ -775,7 +776,7 @@ struct PerformanceChooserTests : juce::UnitTest
             ScaleGuard g;
             Folders f;
             TestShellBackend b(true);
-            mu_core::LiveState live;
+            mu_core::LiveState live { mu_test::kLimits.layers };
             mu_core::LiveState::Callbacks cb;
             cb.supportsPerformanceMode = [] { return true; };
             cb.canLoad    = [](int) { return true; };

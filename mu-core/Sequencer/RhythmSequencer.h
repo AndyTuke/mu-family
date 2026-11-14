@@ -30,7 +30,7 @@ struct BlockResult
 class RhythmSequencer : public juce::ChangeBroadcaster
 {
 public:
-    static constexpr int    MaxRhythms      = mu_limits::kMaxLayers;
+    static constexpr int    MaxRhythms      = mu_limits::kAbsoluteMaxLayers;
     static constexpr double StepLengthBeats = 0.25; // 1/16th note default
 
     RhythmSequencer();

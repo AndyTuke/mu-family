@@ -2,7 +2,7 @@
 # (ProcessorCore host transport + layer access). Built as part of ALL_BUILD like the
 # per-product test targets. Tests of shared mu-core code live here, not in a product.
 #
-# mu-core-tests-16 is the same executable built with MU_MAX_LAYERS=16 (the 16-layer host's capacity): one
+# mu-core-tests-16 is the same executable built with MU_TEST_LAYERS=16 (the 16-layer host's capacity): one
 # source list, one function, so the two can never drift apart (docs/mu-tronic/design.md 3.4).
 include("${CMAKE_CURRENT_SOURCE_DIR}/../cmake/ProcessorTestSources.cmake")
 
@@ -138,8 +138,9 @@ foreach(_f ${MU_CORE_CHROME_SOURCES})
     endif()
 endforeach()
 
-# One mu-core test executable; `max_layers` is the MU_MAX_LAYERS it is built with, `max_buses` the MU_MAX_BUSES
-# and `bus_inserts` the MU_BUS_INSERTS (each empty = the default).
+# One mu-core test executable; `max_layers` is the MU_TEST_LAYERS it is built with, `max_buses` the MU_TEST_BUSES
+# and `bus_inserts` the MU_TEST_BUS_INSERTS (each empty = the default; see TestLimits.h). They are the counts the tests give the
+# processors they build; mu-core itself reads no such setting.
 function(mu_core_add_test_target name max_layers max_buses bus_inserts)
     juce_add_console_app(${name} PRODUCT_NAME "${name}")
     target_sources(${name} PRIVATE ${MU_CORE_TEST_SOURCES} ${_chrome_extra})
@@ -169,16 +170,16 @@ function(mu_core_add_test_target name max_layers max_buses bus_inserts)
         JUCE_MODAL_LOOPS_PERMITTED=1   # the teardown tests pump the message loop to let timers run
         MU_VOICE_ENGINE_TEST_SEAM=1)   # exposes VoiceEngine::setParamsHoldHook to VoiceEngineParamsTests only
     if(NOT "${max_layers}" STREQUAL "")
-        target_compile_definitions(${name} PRIVATE MU_MAX_LAYERS=${max_layers})
+        target_compile_definitions(${name} PRIVATE MU_TEST_LAYERS=${max_layers})
     endif()
     if(NOT "${max_buses}" STREQUAL "")
-        target_compile_definitions(${name} PRIVATE MU_MAX_BUSES=${max_buses})
+        target_compile_definitions(${name} PRIVATE MU_TEST_BUSES=${max_buses})
     endif()
     if(NOT "${bus_inserts}" STREQUAL "")
-        target_compile_definitions(${name} PRIVATE MU_BUS_INSERTS=${bus_inserts})
+        target_compile_definitions(${name} PRIVATE MU_TEST_BUS_INSERTS=${bus_inserts})
     endif()
 endfunction()
 
 mu_core_add_test_target(mu-core-tests "" "" "")                # the default: no group buses
 mu_core_add_test_target(mu-core-tests-16 16 3 2)               # the 16-layer build of the same sources, as mu-Tronic: 3 buses, 2 inserts each
-mu_core_add_test_target(mu-core-tests-bus1 "" 3 1)             # 3 buses with 1 insert each (MU_BUS_INSERTS is real), 8 layers
+mu_core_add_test_target(mu-core-tests-bus1 "" 3 1)             # 3 buses with 1 insert each (MU_TEST_BUS_INSERTS is real), 8 layers

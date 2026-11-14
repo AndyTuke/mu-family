@@ -1,5 +1,7 @@
 #pragma once
 
+#include "BuildNumber.h"   // MU_VERSION_STRING
+
 #include "Plugin/ProcessorBase.h"        // mu-core base
 #include "Plugin/CpuLoadMeter.h"        // mu-core: the processing-load readout
 #include "Plugin/MixerFxParams.h"        // mu-core: shared global-FX / mixer APVTS layout
@@ -52,6 +54,7 @@ public:
 
     const juce::String getName() const override { return juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Tronic")); }
     juce::String getProductSlug() const override { return "mu-tronic"; }
+    juce::String getVersionString() const override { return MU_VERSION_STRING_PRE; }
     bool acceptsMidi()  const override { return true; }
     bool producesMidi() const override { return true; }   // a Rhythm layer in MIDI output mode sends notes
     bool isMidiEffect() const override { return false; }

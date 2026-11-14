@@ -33,8 +33,6 @@ struct RetiredVoices
 class MixerEngine
 {
 public:
-    // One mixer channel per layer — must equal mu_limits::kMaxLayers.
-    static constexpr int MaxChannels = mu_limits::kMaxLayers;
     // The direct-out buffer table a block is given: one slot per channel up to the 32-layer ceiling; the first numChannels are read.
     using DirectOuts = std::array<juce::AudioBuffer<float>*, mu_limits::kAbsoluteMaxLayers>;
 
@@ -66,18 +64,9 @@ public:
     // around −14 dBFS at the master output (≈ +4 dB on the calibrated VU).
     static constexpr float kHeadroomTrim = 0.5f;
 
-    // Group buses (mu_limits::kMaxBuses, 0 in a product without them) and the inserts on each.
-    static constexpr int kNumBuses   = mu_limits::kMaxBuses;
-    static constexpr int kBusInserts = mu_limits::kBusInserts;
-    // Bus and insert indices are one digit in the parameter ids (bus{B}_i{I}_), which ProcessorBase parses.
-    static_assert(kNumBuses <= 9 && kBusInserts <= 9, "bus parameter ids carry one-digit bus and insert indices");
-    static_assert(kNumBuses >= 0 && kBusInserts >= 1, "MU_MAX_BUSES must be >= 0 and MU_BUS_INSERTS >= 1");
-
-    // Sidechain source encoding (a plain int): -1 = off, 0..MaxChannels-1 = a channel, kExtSidechainSrc =
+    // Sidechain source encoding (a plain int): -1 = off, 0..numChannels-1 = a channel, extSidechainSrc() =
     // the DAW sidechain input (bus pointers supplied via setExternalSidechain() before each processBlock
-    // call), kExtSidechainSrc + 1 + b = group bus b. See SidechainRemap.h for which strip may take which.
-    static constexpr int kExtSidechainSrc = MaxChannels;
-    static constexpr int busSidechainSource(int bus) noexcept { return mu_mix::busSource(bus, MaxChannels); }
+    // call), extSidechainSrc() + 1 + b = group bus b. See SidechainRemap.h for which strip may take which.
 
     // Per-channel and per-return state.  All fields are atomics so they can be
     // written by the message thread (via syncChannelStripParam / parameterChanged)
@@ -109,16 +98,16 @@ public:
         std::atomic<bool>  mute       { false };
         std::atomic<bool>  solo       { false };
         // Sidechain ducking
-        std::atomic<int>   sidechainSource   { -1 };     // -1=off, 0-7=channel index, kExtSidechainSrc=DAW bus
+        std::atomic<int>   sidechainSource   { -1 };     // -1=off, 0..numChannels-1=channel index, extSidechainSrc()=DAW bus
         std::atomic<float> sidechainAmount   { 0.0f };   // 0-1 ducking depth
         std::atomic<float> sidechainAttackMs  { 0.0f };
         std::atomic<float> sidechainReleaseMs { 0.0f };
         // Multi-bus output routing (DAW only): 0 = Master mix (default, applies master fader + FX),
         // 1..8 = direct out to Bus 1..8 (post-channel-fader, no master fader, no FX sends).
         std::atomic<int>   outputBus { 0 };
-        // Group bus this channel's dry signal feeds: 0 = master, 1..kNumBuses = bus 1.... A non-zero
+        // Group bus this channel's dry signal feeds: 0 = master, 1..numBuses = bus 1.... A non-zero
         // outputBus (a DAW direct out) wins: that channel feeds neither a bus nor the master. Never used
-        // where kNumBuses is 0. Part of the strip, so it moves with it; not in a layer preset or clip.
+        // where numBuses is 0. Part of the strip, so it moves with it; not in a layer preset or clip.
         std::atomic<int>   busAssign { 0 };
 
         // Copy all fields from another ChannelState. Use instead of `= other`
@@ -200,7 +189,7 @@ public:
         std::atomic<float> pan   { 0.0f };
         std::atomic<bool>  mute  { false };
         std::atomic<bool>  solo  { false };
-        // Sidechain ducking (source = channel index, -1=off, kExtSidechainSrc=DAW bus)
+        // Sidechain ducking (source = channel index, -1=off, extSidechainSrc()=DAW bus)
         std::atomic<int>   sidechainSource   { -1 };
         std::atomic<float> sidechainAmount   { 0.0f };
         std::atomic<float> sidechainAttackMs  { 0.0f };
@@ -258,16 +247,16 @@ public:
     // inserts were reset with them). Written by the audio thread; read by tests and diagnostics.
     std::atomic<int> nonFiniteBlocks { 0 };
 
-    // The counts this mixer is built with, fixed for its lifetime (docs/design-runtime-counts.md). Every loop runs to these;
-    // MaxChannels, kNumBuses and kBusInserts above are the build-setting values, kept only for code not yet moved (phase 4).
+    // The counts this mixer is built with, fixed for its lifetime (docs/design-runtime-counts.md). Every loop runs to these.
     const int  numChannels;
     const int  numBuses;
     const int  numBusInserts;
     const bool externalSidechainOffered;
     mu_limits::ProcessorLimits limits() const noexcept { return { numChannels, numBuses, numBusInserts, externalSidechainOffered }; }
     int extSidechainSrc() const noexcept { return numChannels; }   // the source value that means the DAW sidechain input
+    int busSidechainSource(int bus) const noexcept { return mu_mix::busSource(bus, numChannels); }   // the source value that means group bus `bus`
 
-    explicit MixerEngine(const mu_limits::ProcessorLimits& limits = mu_limits::ProcessorLimits::fromBuildSettings());
+    explicit MixerEngine(const mu_limits::ProcessorLimits& limits);
 
     void prepare(double sampleRate, int blockSize);
     // The block size prepare() sized the channel and send buffers for: the longest block processBlock may get.

@@ -3,11 +3,12 @@
 #include "Audio/AlgorithmNames.h"
 #include "Audio/InsertProcessor.h"
 #include <cstring>
+#include "TestLimits.h"
 
 // The group bus insert chain (MixerEngine::BusState::insert): each insert is the layer's insert, so a bus
 // insert must produce, bit for bit, what the shared InsertProcessor produces for the same input and
 // parameters; the chain runs insert 0 then insert 1; an unused insert changes nothing. These tests run in a
-// build that has buses with whatever MU_BUS_INSERTS it was built with (mu-core-tests-16: 2, mu-core-tests-bus1: 1).
+// build that has buses with whatever MU_TEST_BUS_INSERTS it was built with (mu-core-tests-16: 2, mu-core-tests-bus1: 1).
 struct BusInsertTests : juce::UnitTest
 {
     BusInsertTests() : juce::UnitTest("Group bus inserts", "mu-core") {}
@@ -44,7 +45,7 @@ struct BusInsertTests : juce::UnitTest
     // Reference insert seeded exactly as the engine seeds bus b's insert i.
     static void prepareRef(InsertProcessor& ip, int bus, int slot)
     {
-        ip.setSlotIndex(MixerEngine::MaxChannels + bus * MixerEngine::kBusInserts + slot);
+        ip.setSlotIndex(mu_test::kLimits.layers + bus * mu_test::kLimits.busInserts + slot);
         ip.prepare(bus_test::kRate, bus_test::kBlock);
     }
 
@@ -88,15 +89,15 @@ struct BusInsertTests : juce::UnitTest
     void runTest() override
     {
         if (! bus_test::hasBuses(*this)) { beginTest("no buses in this build"); expect(true); return; }
-        logMessage("buses " + juce::String(mu_limits::kMaxBuses) + ", inserts per bus " + juce::String(MixerEngine::kBusInserts));
+        logMessage("buses " + juce::String(mu_test::kLimits.buses) + ", inserts per bus " + juce::String(mu_test::kLimits.busInserts));
 
         beginTest("each bus insert algorithm is the layer insert: bit-identical to InsertProcessor on the same input");
         for (int algo = 0; algo < mu_audio::kInsertAlgorithmCount; ++algo)
             expect(chainMatches({ { algo, 0.5f } }), "algorithm " + juce::String(algo) + " (" + mu_audio::kInsertAlgorithmNames[algo] + ")");
 
         beginTest("every bus and every insert slot carries the same insert behaviour");
-        for (int b = 0; b < mu_limits::kMaxBuses; ++b)
-            for (int slot = 0; slot < MixerEngine::kBusInserts; ++slot)
+        for (int b = 0; b < mu_test::kLimits.buses; ++b)
+            for (int slot = 0; slot < mu_test::kLimits.busInserts; ++slot)
             {
                 // Fill the slots before `slot` with the pass-through None insert.
                 std::vector<std::pair<int, float>> chain(slot + 1, { 0, 0.0f });
@@ -121,17 +122,17 @@ struct BusInsertTests : juce::UnitTest
             Rig r;
             r.tone[0] = 0.8f; r.tone[1] = 0.8f;
             r.mixer.channels[0].busAssign.store(1);
-            r.mixer.channels[1].busAssign.store(juce::jmin(2, mu_limits::kMaxBuses));
+            r.mixer.channels[1].busAssign.store(juce::jmin(2, mu_test::kLimits.buses));
             setInsert(r.insertAt(0, 0), 2, 0.9f);   // HardClip on bus 1 only
             r.run(3);
-            if (mu_limits::kMaxBuses >= 2)
+            if (mu_test::kLimits.buses >= 2)
             {
                 // Bus 2 carries a plain trimmed tone (peak at most 0.8 x trim), bus 1 is clipped lower.
                 expect(r.mixer.busPeaks[1].load() > r.mixer.busPeaks[0].load() + 1.0e-3f, "bus 1 is clipped, bus 2 is not");
             }
         }
 
-        if (MixerEngine::kBusInserts >= 2)
+        if (mu_test::kLimits.busInserts >= 2)
         {
             beginTest("insert 1 sees insert 0's output: the chain equals the two reference inserts in order");
             expect(chainMatches({ { 2, 0.7f }, { 4, 0.7f } }), "HardClip then Bitcrusher");
@@ -189,7 +190,7 @@ struct BusInsertTests : juce::UnitTest
             float gr = 0.0f;
             for (int b = 0; b < 40; ++b) { r.run(); gr = juce::jmax(gr, r.insertAt(0, 0).processor.grReduction.load()); }
             expect(gr > 0.05f, "compressor GR " + juce::String(gr, 4));
-            expectEquals(r.insertAt(mu_limits::kMaxBuses - 1, 0).processor.grReduction.load(), 0.0f, "an idle insert reads zero");
+            expectEquals(r.insertAt(mu_test::kLimits.buses - 1, 0).processor.grReduction.load(), 0.0f, "an idle insert reads zero");
             setInsert(r.insertAt(0, 0), 0, 0.0f);
             r.run(2);
             expectEquals(r.insertAt(0, 0).processor.grReduction.load(), 0.0f, "None reports no reduction");
@@ -214,17 +215,17 @@ struct BusInsertTests : juce::UnitTest
             Rig r;
             r.tone[0] = 0.8f; r.tone[1] = 0.8f;
             r.mixer.channels[0].busAssign.store(1);
-            r.mixer.channels[1].busAssign.store(juce::jmin(2, mu_limits::kMaxBuses));
-            for (int b = 0; b < mu_limits::kMaxBuses; ++b)
-                for (int i = 0; i < MixerEngine::kBusInserts; ++i)
+            r.mixer.channels[1].busAssign.store(juce::jmin(2, mu_test::kLimits.buses));
+            for (int b = 0; b < mu_test::kLimits.buses; ++b)
+                for (int i = 0; i < mu_test::kLimits.busInserts; ++i)
                     setInsert(r.insertAt(b, i), 7 + (i % 2), 0.6f);
-            if (mu_limits::kMaxBuses >= 2)
+            if (mu_test::kLimits.buses >= 2)
             {
                 auto& b2 = r.mixer.buses[1];
-                b2.sidechainSource.store(MixerEngine::busSidechainSource(0));
+                b2.sidechainSource.store(mu_test::busSidechainSource(0));
                 b2.sidechainAmount.store(0.5f);
             }
-            r.mixer.returns[2].sidechainSource.store(MixerEngine::busSidechainSource(0));
+            r.mixer.returns[2].sidechainSource.store(mu_test::busSidechainSource(0));
             r.mixer.returns[2].sidechainAmount.store(0.5f);
             r.mixer.buses[0].sendReverb.store(0.5f);
             r.run(4);   // warm up

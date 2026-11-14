@@ -5,7 +5,7 @@
 #include "UI/ModalDialog.h"
 #include "Persistence/PresetFiles.h"    // mu_pp::safePresetFileName, readPresetMeta
 #include "UI/PerformanceChooserModel.h" // perf::performancesDir
-#include "BuildNumber.h"        // BUILD_NUMBER, MU_VERSION_STRING: local version for the update check
+#include "BuildNumber.h"        // BUILD_NUMBER: local build for the update check
 
 namespace mu_ui
 {

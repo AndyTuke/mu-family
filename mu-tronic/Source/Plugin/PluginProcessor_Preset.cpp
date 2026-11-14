@@ -44,7 +44,7 @@ juce::ValueTree PluginProcessor::captureState()
 // not offer becomes Empty. A changed type is a setLayerType: published without muting, the old layer sounding out.
 void PluginProcessor::applyStateTree(const juce::ValueTree& state)
 {
-    for (int s = 0; s < mu_limits::kMaxLayers; ++s)
+    for (int s = 0; s < getLimits().layers; ++s)
     {
         const auto node = mu_pp::findLayerNode(state, s);
         auto type = slotNodeType(node);

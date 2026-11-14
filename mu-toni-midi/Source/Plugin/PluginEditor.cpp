@@ -45,6 +45,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
             juce::String(juce::CharPointer_UTF8("JUCE \xe2\x80\x94 AGPLv3")),
             juce::String(juce::CharPointer_UTF8("clap-juce-extensions \xe2\x80\x94 MIT")),
         });
+    aboutOverlay.setVersion(proc.getVersionString());
     aboutOverlay.onDismiss = [this] { aboutOverlay.setVisible(false); };
     addChildComponent(aboutOverlay);
     aboutOverlay.setUpdateCheck(true, mu_core::update_check::isEnabled(proc.getAppSettingsFile()));

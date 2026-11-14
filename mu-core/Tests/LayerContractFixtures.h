@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include "TestLimits.h"
 
 namespace mu_contract_test
 {
@@ -156,14 +157,14 @@ namespace mu_contract_test
             : ProcessorBase(sidechainInput ? BusesProperties().withInput("Sidechain", juce::AudioChannelSet::stereo(), true)
                                                               .withOutput("Out", juce::AudioChannelSet::stereo())
                                            : BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo()),
-                            std::move(layout))
+                            std::move(layout), juce::Identifier("MuFamilyState"), mu_test::kLimits)
         {
             setLayerAccess(access);
             keepSpareLayers = true;
             juce::StringArray prefixes;
-            for (int i = 0; i < mu_limits::kMaxLayers; ++i) prefixes.add("v" + juce::String(i) + "_");
+            for (int i = 0; i < mu_test::kLimits.layers; ++i) prefixes.add("v" + juce::String(i) + "_");
             initLayerState(prefixes);
-            for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            for (int i = 0; i < mu_test::kLimits.layers; ++i)
             {
                 layers[(size_t) i] = std::make_unique<FakeBeatLayer>();
                 layers[(size_t) i]->bindParams(apvts, i);
@@ -183,12 +184,12 @@ namespace mu_contract_test
         static juce::AudioProcessorValueTreeState::ParameterLayout makeLayout()
         {
             juce::AudioProcessorValueTreeState::ParameterLayout layout;
-            for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            for (int i = 0; i < mu_test::kLimits.layers; ++i)
             {
                 layout.add(std::make_unique<juce::AudioParameterFloat>(
                     juce::ParameterID { "v" + juce::String(i) + "_a", 1 }, "A",
                     juce::NormalisableRange<float>(0.0f, 1.0f), 0.25f));
-                mu_mixfx::addChannelStripParams(layout, "ch" + juce::String(i) + "_", "Ch ");
+                mu_mixfx::addChannelStripParams(layout, "ch" + juce::String(i) + "_", "Ch ", {}, mu_test::kLimits);
             }
             return layout;
         }
@@ -357,7 +358,7 @@ namespace mu_contract_test
         void capture(int ch, const juce::AudioBuffer<float>& buf, int n) noexcept override
         {
             maxCall = juce::jmax(maxCall, n);
-            if (ch < 0 || ch >= MixerEngine::MaxChannels) return;
+            if (ch < 0 || ch >= mu_test::kLimits.layers) return;
             auto& dst = bufs[(size_t) ch];
             const int at = written[(size_t) ch];
             const int len = juce::jmin(n, dst.getNumSamples() - at);
@@ -365,8 +366,8 @@ namespace mu_contract_test
                 if (len > 0) juce::FloatVectorOperations::copy(dst.getWritePointer(c) + at, buf.getReadPointer(c), len);
             written[(size_t) ch] = at + juce::jmax(0, len);
         }
-        std::array<juce::AudioBuffer<float>, MixerEngine::MaxChannels> bufs;
-        std::array<int, MixerEngine::MaxChannels> written {};
+        std::array<juce::AudioBuffer<float>, mu_test::kLimits.layers> bufs;
+        std::array<int, mu_test::kLimits.layers> written {};
         int maxCall = 0;
     };
 }

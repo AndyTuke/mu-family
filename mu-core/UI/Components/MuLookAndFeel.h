@@ -1,7 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "MuTheme.h"
-#include "MuLimits.h"   // mu_limits::kMaxBuses: the mixer's Buses page
+#include "MuLimits.h"   // the mixer's Buses page
 #include <cmath>
 #include <vector>
 

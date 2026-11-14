@@ -8,13 +8,14 @@
 
 #include <array>
 #include <utility>
+#include "Plugin/MuClidLimits.h"
 
 class TestSequencer : public mu_clid::RhythmSequencer
 {
 public:
     TestSequencer()
     {
-        for (int i = 0; i < MaxRhythms; ++i)
+        for (int i = 0; i < mu_clid::kLimits.layers; ++i)
             bindRhythm(i, &store[(size_t) i]);
     }
 
@@ -22,7 +23,7 @@ public:
     void addRhythm(const mu_clid::Rhythm& r)
     {
         const int n = getNumRhythms();
-        if (n >= MaxRhythms) return;
+        if (n >= mu_clid::kLimits.layers) return;
         store[(size_t) n] = r;
         setNumRhythms(n + 1);
         updatePattern(n);
@@ -50,5 +51,5 @@ public:
     }
 
 private:
-    std::array<mu_clid::Rhythm, MaxRhythms> store;
+    std::array<mu_clid::Rhythm, mu_clid::kLimits.layers> store;
 };

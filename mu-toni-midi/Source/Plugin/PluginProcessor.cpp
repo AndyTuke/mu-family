@@ -6,9 +6,11 @@
 namespace mu_toni_midi
 {
 
-// A MIDI effect: no audio buses at all.
+// A MIDI effect: no audio buses at all, so its mixer is never used; the counts are the family's usual 8 layers.
+static constexpr mu_limits::ProcessorLimits kLimits { 8, 0, 2, true };
+
 PluginProcessor::PluginProcessor()
-    : ProcessorBase(BusesProperties(), createParameterLayout(), juce::Identifier("MuToniMidiState")),
+    : ProcessorBase(BusesProperties(), createParameterLayout(), juce::Identifier("MuToniMidiState"), kLimits),
       core(apvts)
 {
     initAppSettings("muToniMidi");   // settings file + saved UI size / MIDI clock (ProcessorBase)

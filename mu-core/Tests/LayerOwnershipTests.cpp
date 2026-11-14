@@ -5,6 +5,7 @@
 #include <thread>
 #include <utility>
 #include <vector>
+#include "TestLimits.h"
 
 namespace
 {
@@ -39,13 +40,13 @@ namespace
     struct EditableProcessor : ProcessorBase
     {
         explicit EditableProcessor(bool spares)
-            : ProcessorBase(BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo()), makeLayout())
+            : ProcessorBase(BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo()), makeLayout(), juce::Identifier("MuFamilyState"), mu_test::kLimits)
         {
             keepSpareLayers = spares;
             juce::StringArray prefixes;
-            for (int i = 0; i < mu_limits::kMaxLayers; ++i) prefixes.add("v" + juce::String(i) + "_");
+            for (int i = 0; i < mu_test::kLimits.layers; ++i) prefixes.add("v" + juce::String(i) + "_");
             initLayerState(prefixes);
-            for (int i = 0; i < (spares ? mu_limits::kMaxLayers : 1); ++i)
+            for (int i = 0; i < (spares ? mu_test::kLimits.layers : 1); ++i)
                 layers[(size_t) i] = createLayer(i);
             numLayers.store(1);
             destroyed = underLock = resets = 0;   // the setup built layers and destroyed none
@@ -54,12 +55,12 @@ namespace
         static juce::AudioProcessorValueTreeState::ParameterLayout makeLayout()
         {
             juce::AudioProcessorValueTreeState::ParameterLayout layout;
-            for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            for (int i = 0; i < mu_test::kLimits.layers; ++i)
             {
                 layout.add(std::make_unique<juce::AudioParameterFloat>(
                     juce::ParameterID { "v" + juce::String(i) + "_a", 1 }, "A",
                     juce::NormalisableRange<float>(0.0f, 1.0f), 0.25f));
-                mu_mixfx::addChannelStripParams(layout, "ch" + juce::String(i) + "_", "Ch ");
+                mu_mixfx::addChannelStripParams(layout, "ch" + juce::String(i) + "_", "Ch ", {}, mu_test::kLimits);
             }
             return layout;
         }
@@ -371,29 +372,29 @@ struct LayerOwnershipTests : juce::UnitTest
         {
             EditableProcessor p(false);
             p.getLayer(0)->colourIndex = 0;
-            for (int i = 1; i < mu_limits::kMaxLayers; ++i)
+            for (int i = 1; i < mu_test::kLimits.layers; ++i)
             {
                 p.cancelled.clear();
                 expectEquals(p.addLayer(), i);
                 expectEquals((int) p.cancelled.size(), 1, "one staged swap cancelled");
                 expectEquals(p.cancelled[0], i, "the new slot's");
             }
-            expectEquals(p.getNumLayers(), mu_limits::kMaxLayers);
+            expectEquals(p.getNumLayers(), mu_test::kLimits.layers);
             expectEquals(p.addLayer(), -1);
-            std::array<bool, mu_limits::kMaxLayers> seen {};
-            for (int i = 0; i < mu_limits::kMaxLayers; ++i) seen[(size_t) p.getLayer(i)->colourIndex] = true;
+            std::array<bool, mu_test::kLimits.layers> seen {};
+            for (int i = 0; i < mu_test::kLimits.layers; ++i) seen[(size_t) p.getLayer(i)->colourIndex] = true;
             for (bool b : seen) expect(b, "all eight palette colours used once");
             expectEquals(p.destroyed, 0, "nothing was replaced, so nothing was destroyed");
-            expectEquals((int) p.moved.size(), mu_limits::kMaxLayers - 1, "one layersMoved per add");
-            expect(p.moved.front() == std::make_pair(1, 1) && p.moved.back() == std::make_pair(mu_limits::kMaxLayers - 1, mu_limits::kMaxLayers - 1),
+            expectEquals((int) p.moved.size(), mu_test::kLimits.layers - 1, "one layersMoved per add");
+            expect(p.moved.front() == std::make_pair(1, 1) && p.moved.back() == std::make_pair(mu_test::kLimits.layers - 1, mu_test::kLimits.layers - 1),
                    "the new slot only");
             for (int h : p.movedHoldingLock) expectEquals(h, 1, "called under layersLock");
-            expectEquals((int) p.added.size(), mu_limits::kMaxLayers - 1, "one layerAdded per add");
+            expectEquals((int) p.added.size(), mu_test::kLimits.layers - 1, "one layerAdded per add");
             expectEquals(p.added.front(), 1);
-            expectEquals(p.added.back(), mu_limits::kMaxLayers - 1);
+            expectEquals(p.added.back(), mu_test::kLimits.layers - 1);
             for (int h : p.addedHoldingLock) expectEquals(h, 0, "layerAdded runs outside layersLock");
             p.removeLayer(0); p.swapLayers(0, 1); p.resetLayer(0);
-            expectEquals((int) p.added.size(), mu_limits::kMaxLayers - 1, "delete, reorder and reset do not call layerAdded");
+            expectEquals((int) p.added.size(), mu_test::kLimits.layers - 1, "delete, reorder and reset do not call layerAdded");
         }
 
         beginTest("addLayer replaces a spare, destroys it outside the lock, and gives the slot default values");
@@ -447,7 +448,7 @@ struct LayerOwnershipTests : juce::UnitTest
             expectEquals(p.probe(1)->movedTo, 1);
             expectEquals(p.destroyed, 1, "only the removed layer is destroyed");
             expectEquals(p.underLock, 0, "and after layersLock was dropped");
-            expectEquals((int) p.cancelled.size(), mu_limits::kMaxLayers, "every staged swap cancelled");
+            expectEquals((int) p.cancelled.size(), mu_test::kLimits.layers, "every staged swap cancelled");
             expectEquals((int) p.moved.size(), 3 + 1, "three adds, then the removal");
             expect(p.moved.back() == std::make_pair(1, 3), "the shifted slots and the vacated top one");
             expectEquals(p.movedHoldingLock.back(), 1, "called under layersLock");
@@ -612,7 +613,7 @@ struct LayerOwnershipTests : juce::UnitTest
             expectEquals(dst.layers[1]->colourIndex, 5, "a state without colours keeps the current ones");
 
             state.setProperty("numVoices", 99, nullptr);
-            expectEquals(dst.savedLayerCount(state), mu_limits::kMaxLayers, "the count is clamped");
+            expectEquals(dst.savedLayerCount(state), mu_test::kLimits.layers, "the count is clamped");
             state.setProperty("numVoices", 0, nullptr);
             expectEquals(dst.savedLayerCount(state), 1);
 
@@ -919,7 +920,7 @@ struct LayerOwnershipTests : juce::UnitTest
             src.addLayer();
             src.layers[0]->clips->store(0, clipPayload(1));
             auto state = src.captureComposedState();
-            for (int s = 0; s < mu_limits::kMaxLayers; ++s)
+            for (int s = 0; s < mu_test::kLimits.layers; ++s)
                 if (auto node = mu_pp::findLayerNode(state, s); node.isValid())
                 {
                     node.removeChild(node.getChildWithName("Clips"), nullptr);

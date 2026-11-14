@@ -15,6 +15,7 @@
 #include <array>
 #include <cstring>
 #include <memory>
+#include "TestLimits.h"
 
 namespace mu_layer_equiv
 {
@@ -25,7 +26,7 @@ namespace mu_layer_equiv
         explicit ChannelStreamTap(int frames) { for (auto& b : bufs) b.setSize(2, juce::jmax(1, frames)); }
         void capture(int ch, const juce::AudioBuffer<float>& buf, int n) noexcept override
         {
-            if (ch < 0 || ch >= MixerEngine::MaxChannels) return;
+            if (ch < 0 || ch >= mu_test::kLimits.layers) return;
             auto& dst = bufs[(size_t) ch];
             const int at = written[(size_t) ch];
             const int len = juce::jmin(n, dst.getNumSamples() - at);
@@ -34,8 +35,8 @@ namespace mu_layer_equiv
                 juce::FloatVectorOperations::copy(dst.getWritePointer(c) + at, buf.getReadPointer(c), len);
             written[(size_t) ch] = at + len;
         }
-        std::array<juce::AudioBuffer<float>, MixerEngine::MaxChannels> bufs;
-        std::array<int, MixerEngine::MaxChannels> written {};
+        std::array<juce::AudioBuffer<float>, mu_test::kLimits.layers> bufs;
+        std::array<int, mu_test::kLimits.layers> written {};
         bool overflow = false;
     };
 
@@ -159,7 +160,7 @@ namespace mu_layer_equiv
         }
 
         // Each channel's pre-mixer stream, whole render.
-        for (int ch = 0; ch < numChannels && ch < MixerEngine::MaxChannels && res.ok; ++ch)
+        for (int ch = 0; ch < numChannels && ch < mu_test::kLimits.layers && res.ok; ++ch)
         {
             if (tapA.written[(size_t) ch] != tapB.written[(size_t) ch])
             {

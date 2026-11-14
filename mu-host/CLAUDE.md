@@ -16,7 +16,7 @@ Artefacts are `mu-Host.vst3` / `.clap` in `build/mu-host/mu-host_artefacts/<Conf
 
 ## It builds on the mu-Tronic shell
 
-mu-Host is a product of its own on mu-Tronic's shell. Its target compiles mu-Tronic's sources (the shell, with `MU_MAX_LAYERS=1` and no buses; everything but mu-Tronic's `PluginFactory.cpp`) plus its own `Source/`. Nothing is copied. The seams are small and live in mu-Tronic's files:
+mu-Host is a product of its own on mu-Tronic's shell. Its target compiles mu-Tronic's sources (the shell, built with one layer and no buses through `mu_host::kLimits`; everything but mu-Tronic's `PluginFactory.cpp`) plus its own `Source/`. Nothing is copied. The seams are small and live in mu-Tronic's files:
 - `mu_tronic::PluginProcessor` takes a `ProcessorIdentity` (state tag, settings folder, whether it asks for mu-Tronic's own licence); mu-Host passes its own names and no licence.
 - `mu_tronic::PluginEditor` takes `EditorOptions { singleSlot }` (no sidebar, scenes, clips, mixer toggle or full-preset controls) and calls a `slotShown` hook whenever a slot is shown.
 - This product's `PluginProcessor` / `PluginEditor` derive from those and add what makes it mu-Host: its names, the engine drop-down, the window size (the standard one less the sidebar's width, so the voice panels keep their standard size), and the licensing below.

@@ -55,6 +55,10 @@ static bool isMixerRelevantParam(const juce::String& id) noexcept
 
 MixerOverlay::MixerOverlay(ProcessorBase& p, MixerEngine& m)
     : proc(p), mixer(m),
+      effectReturn(MixerChannel::Type::EffectReturn, "Effect", juce::Colour(0xffD85A30), m.limits()),
+      delayReturn(MixerChannel::Type::DelayReturn, "Delay", juce::Colour(0xffD85A30), m.limits()),
+      reverbReturn(MixerChannel::Type::ReverbReturn, "Reverb", juce::Colour(0xff378ADD), m.limits()),
+      masterChannel(MixerChannel::Type::Master, "Master", juce::Colours::white, m.limits()),
       effectRow("Effect", FXAlgorithmRegistry::effectAlgorithms(), MuLookAndFeel::knobFxSend),
       reverbRow("Reverb", FXAlgorithmRegistry::reverbAlgorithms(), MuLookAndFeel::knobReverb)
 {

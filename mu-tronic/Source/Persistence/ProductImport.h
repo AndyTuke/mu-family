@@ -66,7 +66,7 @@ struct ProductImport
     bool ok() const noexcept { return error.isEmpty() && ! entries.empty(); }
 };
 
-// How many layers the products hold at most (their MU_MAX_LAYERS); a product's sidechain parameter is
+// How many layers the products hold at most (their kLimits.layers); a product's sidechain parameter is
 // 0 off, 1..kProductLayers channels, kProductLayers + 1 the external input.
 inline constexpr int kProductLayers = 8;
 

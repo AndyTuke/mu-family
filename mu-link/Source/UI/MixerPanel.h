@@ -23,6 +23,8 @@ class MixerPanel : public juce::Component,
 {
 public:
     static constexpr int kClients = ClientColumns::kClients;
+    // Its strips are client strips with no layers, buses or host sidechain: only the shared strip needs the counts to be valid.
+    static constexpr mu_limits::ProcessorLimits kStripLimits { kClients, 0, 2, false };
 
     explicit MixerPanel(AudioServer& serverToDrive);
     ~MixerPanel() override;
@@ -77,7 +79,7 @@ private:
 
     SegmentControl labels { { "Names", "Presets" } };
     std::array<std::unique_ptr<MixerChannel>, kClients> strips;
-    MixerChannel master { MixerChannel::Type::Master, "Master", juce::Colours::white };
+    MixerChannel master { MixerChannel::Type::Master, "Master", juce::Colours::white, kStripLimits };
     mu_ui::MasterInsertPanel inserts;
 
     std::array<juce::String, kClients> shownNames;
