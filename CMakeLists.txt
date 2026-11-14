@@ -178,6 +178,7 @@ add_subdirectory(mu-on)       # 909-style groove sequencer: Kick/Bass/Hat/Snare 
 add_subdirectory(mu-tilate)   # loop slicer, built in stages: layer library + tests (docs/mu-tilate/design-buildplan.md)
 add_subdirectory(mu-tronic)   # performance unit: 16 layer slots (Standalone only, £30 licence); after the products whose layers it will host
 add_subdirectory(mu-host)     # one mu instrument channel as a plug-in (VST3 + CLAP): the mu-Tronic shell with one slot; after mu-tronic, whose sources it builds on
+add_subdirectory(mu-core/Bench) # mu-core-bench-*: mixer timing for the runtime-counts work (on demand, not in ALL); after the products whose library variants it reuses
 
 # The status-bar hard rule, checked on each product's real editor (on demand: cmake --build build --target <product>-ui-audit).
 include(cmake/UiAudit.cmake)
