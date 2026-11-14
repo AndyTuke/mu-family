@@ -68,7 +68,7 @@ public:
 
     // ── ProcessorBase channel metadata (drives sidebar + mixer) ───────────────
     // getNumLayers / getLayer are the base defaults over the owned layer storage (the count is
-    // `numLayers`, 1..kMaxLayers).
+    // `numLayers`, 1..kLimits.layers).
     // A track is named after the engine it runs; the name is not saved, it follows the engine.
     juce::String getLayerName(int idx)       const override
     {

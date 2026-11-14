@@ -13,7 +13,7 @@ struct Layer;
 class ProcessorBase;
 class LayerContent;   // mu-core/UI/LayerContent.h: a type's content component for the shown slot
 
-// Layer types: family vocabulary (as kMaxLayers is), so the ids live in mu-core. docs/mu-tronic/design.md
+// Layer types: family vocabulary (as the layer count is), so the ids live in mu-core. docs/mu-tronic/design.md
 // 2.5. A type is described and constructed by its LayerTypeInfo; it is never dispatched through it
 // (rendering stays virtual on Layer). A host of several types lists them in a LayerTypeRegistry; a product
 // that hosts one type uses create / addLayerParams itself.

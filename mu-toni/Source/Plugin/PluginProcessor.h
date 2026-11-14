@@ -65,7 +65,7 @@ public:
 
     // ── ProcessorBase channel metadata (drives sidebar + mixer) ───────────────
     // getNumLayers / getLayer are the base defaults over the owned layer storage (the count is
-    // `numLayers`, 1..kMaxLayers).
+    // `numLayers`, 1..kLimits.layers).
     juce::String getLayerName(int idx)       const override
     {
         return (idx >= 0 && idx < mu_toni::kLimits.layers) ? "Layer " + juce::String(idx + 1) : juce::String();

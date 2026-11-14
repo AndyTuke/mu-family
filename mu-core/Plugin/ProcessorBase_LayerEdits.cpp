@@ -75,7 +75,7 @@ void ProcessorBase::remapSidechainSources(const std::vector<juce::RangedAudioPar
     for (auto* p : params)
     {
         const int v  = juce::roundToInt(p->convertFrom0to1(p->getValue()));
-        const int nv = juce::jlimit(0, mu_mixfx::scSrcMax(limits_), remap(v));   // 0 off, 1..kMaxLayers a channel, then external, then the buses
+        const int nv = juce::jlimit(0, mu_mixfx::scSrcMax(limits_), remap(v));   // 0 off, 1..layers a channel, then external, then the buses
         if (nv != v) p->setValueNotifyingHost(p->convertTo0to1((float) nv));
     }
 }

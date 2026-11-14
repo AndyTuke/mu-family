@@ -23,7 +23,7 @@ public:
     // A per-layer channel strip (Channel) vs the FX-return / master strips. The
     // product's layer is a rhythm in mu-clid, a voice in mu-tant.
     // Client is an external-app strip (mu-link): name LCD, four-knob EQ, fader, no sends or sidechain.
-    // Bus is a group bus (mu_limits::kMaxBuses): a channel strip without a layer, its insert column
+    // Bus is a group bus (limits.buses): a channel strip without a layer, its insert column
     // beside it, and no Out selector (a bus goes to the master).
     enum class Type { Channel, EffectReturn, DelayReturn, ReverbReturn, Master, Client, Bus };
 

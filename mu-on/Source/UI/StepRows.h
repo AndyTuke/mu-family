@@ -10,7 +10,7 @@
 #include <functional>
 
 // StepRows — the 909 step editor: one row of steps per live layer (16 at a time; a longer row is paged), in sidebar
-// order. Every row has the same height (the component's height less the control strip, over kMaxLayers), top-aligned,
+// order. Every row has the same height (the component's height less the control strip, over the layer count), top-aligned,
 // so adding a layer never resizes the others. Each row opens with the layer's number and engine name in its colour;
 // the selected layer's row is outlined in that colour. Left-click toggles a step on/off, the corner button its accent,
 // right-click selects it, and a click anywhere in a row selects that layer. A Rumble layer has no steps: its row is

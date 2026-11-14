@@ -27,7 +27,15 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
       retireBin(*retireBinStorage),
       limits_(limits)
 {
-    jassert(limits_.valid());
+    if (! limits_.valid())
+    {
+        // A product's counts are a compile-time constant it owns, so this is a programming error: fail loudly in every build.
+        const juce::String msg = "ProcessorLimits outside the ceilings: layers " + juce::String(limits_.layers) + ", buses " + juce::String(limits_.buses)
+                               + ", inserts " + juce::String(limits_.busInserts);
+        juce::Logger::writeToLog(msg);
+        std::fprintf(stderr, "%s\n", msg.toRawUTF8());
+        std::_Exit(70);   // not abort(): a Debug CRT abort opens a dialog that hangs a headless run
+    }
     // Every per-slot array is sized once, here (never on the audio thread).
     layerSwapper.setCount(limits_.layers);
     pendingPresetTree.reset(limits_.layers);
@@ -278,17 +286,3 @@ bool ProcessorBase::isBusesLayoutSupported(const BusesLayout& layouts) const
     return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
 }
 
-namespace mu_core
-{
-    void verifyProcessorBaseLayout(std::size_t callerSize, const char* where) noexcept
-    {
-        if (callerSize == sizeof(ProcessorBase)) return;
-        // Fail loudly in every build: a mismatched layout corrupts memory long before any symptom shows.
-        juce::String msg = "mu-core library and product disagree on ProcessorBase (library " + juce::String((int) sizeof(ProcessorBase))
-                         + " bytes, " + juce::String(where) + " sees " + juce::String((int) callerSize)
-                         + "): check the CLAP header in the product's CMake";
-        juce::Logger::writeToLog(msg);
-        std::fprintf(stderr, "%s\n", msg.toRawUTF8());
-        std::_Exit(70);   // not abort(): a Debug CRT abort opens a dialog that hangs a headless run
-    }
-}

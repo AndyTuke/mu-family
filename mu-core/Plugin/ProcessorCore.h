@@ -82,7 +82,7 @@ public:
         juce::AudioProcessor::processBlockBypassed(buffer, midi);
     }
 
-    // Layer `i` as the product's concrete type, for any slot 0..kMaxLayers-1 whether or not it is
+    // Layer `i` as the product's concrete type, for any slot 0..layers-1 whether or not it is
     // live yet (a preset can load data into a slot above the current count). The slot must be filled.
     // Only bounds and non-null are asserted: a dynamic_cast here would run on the audio thread in
     // every Debug block, so the product checks the type once when it builds its layers.
@@ -124,7 +124,7 @@ public:
 protected:
     juce::CriticalSection layersLock;
 
-    // True when the product keeps every slot up to kMaxLayers filled for the processor's lifetime
+    // True when the product keeps every slot up to the layer count filled for the processor's lifetime
     // (a preset can load data into a slot above the count). Structural edits then refill the slot
     // they vacate. Set once in the product's constructor.
     bool keepSpareLayers = false;

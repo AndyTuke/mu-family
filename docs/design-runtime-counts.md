@@ -69,7 +69,7 @@ With the counts out of the types' dimensions and out of the macros, the only rem
 
 1. `MU_CORE_HAS_CLAP` is decided once in `mu-core/CMakeLists.txt` and defined PUBLIC on the one library, so every product and the library see the same value (the library already links `clap_juce_extensions` PUBLIC). `mu-clid-midi`, `mu-toni-midi` and the tests link the same library; there is no INTERFACE-source path left to disagree.
 2. `ProcessorLimits::valid()` is checked in the `ProcessorBase` constructor in every build (log, then stop), covering the runtime equivalent of a wrong setting.
-3. The `_Exit(70)` sizeof guard, `verifyProcessorBaseLayout`, and the `MU_CORE_STATIC` machinery are removed in the last phase, once only one library exists. Until then the guard stays and protects every intermediate phase.
+3. The `_Exit(70)` sizeof guard, `verifyProcessorBaseLayout`, and the `MU_CORE_STATIC` machinery are removed in the last phase, once only one library exists (done in phase 6; `ProcessorLimits::valid()` is the check that remains).
 
 ### 2.5 Library and tests
 

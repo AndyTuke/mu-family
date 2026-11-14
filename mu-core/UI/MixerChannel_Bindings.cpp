@@ -247,10 +247,10 @@ void MixerChannel::setSidechainSources(int ownIndex, const juce::StringArray& na
                                                       : names[i];
         scSourceBox.addItem(label, i + 2);  // ID = channel index + 2
     }
-    // External DAW sidechain bus — ID = MaxChannels + 2 (maps to apvts = kMaxLayers + 1, engine = kExtSidechainSrc).
+    // External DAW sidechain bus — ID = layers + 2 (maps to apvts = layers + 1, engine = extSidechainSrc()).
     if (limits_.externalSidechain)
         scSourceBox.addItem("Ext In", limits_.layers + 2);
-    // Group buses follow the external input — ID = MaxChannels + 3 + b (apvts = kMaxLayers + 2 + b, engine = kExtSidechainSrc + 1 + b).
+    // Group buses follow the external input — ID = layers + 3 + b (apvts = layers + 2 + b, engine = extSidechainSrc() + 1 + b).
     for (int b = 0; b < limits_.buses; ++b)
         if (legal(mu_mix::busSource(b, limits_.layers)))
             scSourceBox.addItem(b < busNames.size() && busNames[b].isNotEmpty() ? busNames[b] : busName(b),

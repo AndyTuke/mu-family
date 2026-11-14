@@ -90,7 +90,7 @@ namespace mu_core
         uint8_t  fill;               // 1 while the performer holds Fill (a momentary performance control: a layer may play Fill steps)
         MidiView midi;
         MidiSink midiOut;
-        const PeerTap* peers;        // kMaxLayers entries in the priority-1 pass, else nullptr
+        const PeerTap* peers;        // one entry per layer in the priority-1 pass, else nullptr
         int32_t  numPeers;
         int32_t  reserved2;
 

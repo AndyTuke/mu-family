@@ -203,10 +203,10 @@ target_include_directories(mu-core-static SYSTEM PUBLIC
     "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-stretch/include")
 target_compile_features(mu-core-static PUBLIC cxx_std_17)
 # The JUCE settings every consumer uses (they are the same for all targets).
-target_compile_definitions(mu-core-static PUBLIC JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0 JUCE_USE_MP3AUDIOFORMAT=1 MU_CORE_STATIC=1)
+target_compile_definitions(mu-core-static PUBLIC JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0 JUCE_USE_MP3AUDIOFORMAT=1 MU_CORE_HAS_CLAP=1)
 add_dependencies(mu-core-static mu-core-assets)
-# ProcessorBase gains a CLAP base class when the CLAP header is visible (MU_CORE_HAS_CLAP), which changes its layout; every product
-# target already sees that header, so the library does too, and its code and the products agree on one layout.
+# ProcessorBase gains a CLAP base class under MU_CORE_HAS_CLAP, which changes its layout; the library defines it (PUBLIC, with the CLAP
+# header) so the library and every product that links it compile one layout.
 target_link_libraries(mu-core-static PUBLIC clap_juce_extensions)
 target_link_libraries(mu-core-static
     PRIVATE mu-juce-usage

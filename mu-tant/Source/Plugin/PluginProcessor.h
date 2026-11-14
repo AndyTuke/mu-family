@@ -229,7 +229,7 @@ public:
     const juce::CriticalSection* getPatternBankLock() const noexcept override { return &bankLock; }
 
     // Voice `i`'s Pattern (modulators, gate / filter / pitch envelopes, user wavetables, level tap),
-    // valid for every slot 0..kMaxLayers-1. Public so the UI (ModulatorPanel, PatternContent) can point
+    // valid for every slot 0..layers-1. Public so the UI (ModulatorPanel, PatternContent) can point
     // at the currently-edited voice.
     Pattern&       getPattern(int i) noexcept       { return layerAs<Pattern>(i); }
     const Pattern& getPattern(int i) const noexcept { return layerAs<Pattern>(i); }

@@ -16,7 +16,7 @@
 
 // Full mixer view: rhythm channel strips | Effect/Delay/Reverb returns | Master
 // + three FX rows (Effect, Delay, Reverb) below the strips. A product with group buses
-// (mu_limits::kMaxBuses > 0) adds a last "Buses" page: one unit per bus (strip + insert column) and the Master.
+// (buses > 0) adds a last "Buses" page: one unit per bus (strip + insert column) and the Master.
 // Replaces the RhythmPanel in the editor when the mixer button is toggled.
 class MixerOverlay : public juce::Component,
                      public juce::AudioProcessorValueTreeState::Listener,

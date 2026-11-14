@@ -9,10 +9,16 @@
 // sidechain. The header is only on the include path when this TU is compiled into a `_CLAP`
 // target (clap_juce_extensions is PUBLIC there), so guard with __has_include — the VST3/Standalone
 // builds compile with no CLAP dependency at all.
-#if __has_include(<clap-juce-extensions/clap-juce-extensions.h>)
+// The compiled mu-core library defines MU_CORE_HAS_CLAP=1 for every target that links it (so the library and its products see one
+// class layout); a test app that compiles the sources itself falls back to __has_include.
+#if defined(MU_CORE_HAS_CLAP) && MU_CORE_HAS_CLAP
  #include <clap-juce-extensions/clap-juce-extensions.h>
+#elif __has_include(<clap-juce-extensions/clap-juce-extensions.h>)
+ #include <clap-juce-extensions/clap-juce-extensions.h>
+ #undef MU_CORE_HAS_CLAP
  #define MU_CORE_HAS_CLAP 1
 #else
+ #undef MU_CORE_HAS_CLAP
  #define MU_CORE_HAS_CLAP 0
 #endif
 
@@ -751,7 +757,7 @@ protected:
     // Applies the parameters and extras, then (canEditLayers only) stores the count last and restores
     // the colours, so the audio thread never sees a count ahead of the data.
     void            applyComposedState(const juce::ValueTree& state);
-    // The live layer count a composed state carries, clamped to 1..kMaxLayers; `unsavedLayerCount`
+    // The live layer count a composed state carries, clamped to 1..the layer count; `unsavedLayerCount`
     // when the state has none (an older file). A product that must act on the old and the new count
     // before the apply reads it here.
     int             savedLayerCount(const juce::ValueTree& state) const;
@@ -985,7 +991,7 @@ protected:
     }
 
     // prepareToPlay (message or host thread, not processing; call it OUTSIDE layersLock): sizes the per-slot
-    // scratch (kMaxLayers x 2 x blockSize) and the block's MIDI storage, prepares every slot's layer (spares
+    // scratch (layers x 2 x blockSize) and the block's MIDI storage, prepares every slot's layer (spares
     // included), flushes the bin (cutAll then service) and resets the transport latches. Nothing it sizes is
     // ever grown on the audio thread: a longer host block is chunked.
     void prepareLayerRender(double sampleRate, int maxBlockSize);
@@ -1431,19 +1437,3 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ProcessorBase)
 };
 
-// Layout guard. ProcessorBase's code is compiled once into the mu-core library, while a product compiles the class's inline code
-// and its own members against this header. If the two disagree on a setting that changes the class (the CLAP base class, ...), members sit at different offsets and the program corrupts memory. Each translation
-// unit that includes this header checks its own sizeof against the library's at startup and stops with a message if they differ.
-// Only targets built against the library see MU_CORE_STATIC; test apps that compile the mu-core sources themselves have nothing to check.
-#ifdef MU_CORE_STATIC
-namespace mu_core
-{
-    // Defined in ProcessorBase.cpp: logs and aborts when `callerSize` is not the library's sizeof(ProcessorBase).
-    void verifyProcessorBaseLayout(std::size_t callerSize, const char* where) noexcept;
-
-    namespace
-    {
-        [[maybe_unused]] const bool processorBaseLayoutChecked = (verifyProcessorBaseLayout(sizeof(::ProcessorBase), __FILE__), true);
-    }
-}
-#endif
