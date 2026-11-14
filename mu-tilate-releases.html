@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>μ-tilate Release Notes | Transwarp Development Project</title>
+  <meta name="description" content="What's new in μ-tilate: release notes and change history for each version.">
+  <link rel="canonical" href="https://transwarp.me/mu-tilate-releases">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://transwarp.me/mu-tilate-releases">
+  <meta property="og:title" content="μ-tilate Release Notes | Transwarp Development Project">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #07060E; --bg2: #0D0B18; --bg3: #131128; --bg4: #1A1834;
+  --accent: #6B5FE4; --accent-b: #8B80F0; --glow: rgba(107,95,228,0.35);
+  --teal: #1DB880; --teal-b: #2ECFA0; --glow2: rgba(29,184,128,0.25);
+  --amber: #D4895C; --amber-b: #E8A878;
+  --cyan: #3CB8D4; --cyan-b: #5CCEE8;
+  --text: #E8E4D8; --text2: #7A758F; --text3: #4A4565;
+  --border: #1E1C32; --border2: #2A2745;
+  --ff-disp: 'Syne', sans-serif; --ff-mono: 'Space Mono', monospace; --ff-body: 'Outfit', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--ff-body); font-size: 16px; line-height: 1.6; overflow-x: hidden; }
+a { color: inherit; text-decoration: none; }
+.container { max-width: 880px; margin: 0 auto; padding: 0 40px; }
+nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px; height: 56px; display: flex; align-items: center; justify-content: space-between; background: rgba(7,6,14,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+.nav-logo { display: flex; flex-direction: column; line-height: 1; gap: 2px; }
+.nav-logo .brand { font-family: var(--ff-disp); font-size: 17px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
+.nav-logo .sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.14em; color: var(--text3); text-transform: uppercase; }
+.nav-links { display: flex; align-items: center; gap: 26px; }
+.nav-links a { font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text2); text-transform: uppercase; transition: color .2s; }
+.nav-links a:hover, .nav-links a.active { color: var(--text); }
+.nav-links .nav-clid { color: var(--accent-b); text-transform: none; }
+.nav-links .nav-tant { color: var(--amber-b); text-transform: none; }
+.nav-links .nav-free { color: var(--cyan-b); text-transform: none; }
+.nav-links .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 16px; border-radius: 4px; font-size: 11px; letter-spacing: 0.08em; text-transform: none; }
+
+/* ── RELEASE NOTES ── */
+.rn-hero { padding-top: 130px; padding-bottom: 10px; }
+.rn-eyebrow { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.22em; color: var(--amber-b); text-transform: uppercase; margin-bottom: 14px; }
+.rn-hero h1 { font-family: var(--ff-disp); font-size: clamp(30px,4vw,46px); font-weight: 800; line-height: 1.0; letter-spacing: -0.03em; margin-bottom: 14px; }
+.rn-hero h1 .mu { color: var(--amber-b); }
+.rn-hero p { font-size: 16px; font-weight: 300; color: var(--text2); max-width: 620px; }
+.rn-hero .rn-links { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px 18px; font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.06em; }
+.rn-hero .rn-links a { color: var(--amber-b); }
+
+.release { padding: 38px 0; border-top: 1px solid var(--border); }
+.release:first-of-type { border-top: none; }
+.rel-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+.rel-ver { font-family: var(--ff-disp); font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+.rel-date { font-family: var(--ff-mono); font-size: 11px; color: var(--text3); letter-spacing: 0.08em; }
+.rel-pill { font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; padding: 3px 9px; border-radius: 3px; }
+.rel-pill.testing { color: var(--amber-b); border: 1px solid var(--amber); }
+.rel-pill.current { color: var(--teal-b); border: 1px solid var(--teal); }
+.rel-note { font-size: 13px; color: var(--text2); margin: -10px 0 22px; font-style: italic; }
+
+.rn-group { margin-bottom: 20px; }
+.rn-group h3 { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 10px; }
+.rn-group.new h3 { color: var(--teal-b); }
+.rn-group.improved h3 { color: var(--cyan-b); }
+.rn-group.fixed h3 { color: var(--amber-b); }
+.rn-group ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.rn-group li { position: relative; padding-left: 18px; font-size: 15px; color: var(--text); line-height: 1.55; }
+.rn-group li::before { content: ''; position: absolute; left: 2px; top: 10px; width: 5px; height: 5px; border-radius: 50%; background: var(--border2); }
+.rn-group.new li::before { background: var(--teal); }
+.rn-group.improved li::before { background: var(--cyan); }
+.rn-group.fixed li::before { background: var(--amber); }
+.ref { font-family: var(--ff-mono); font-size: 11px; color: var(--text3); }
+
+footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 60px; }
+.footer-bottom { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.footer-bottom .copy { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text3); }
+.footer-social { display: flex; gap: 16px; }
+.footer-social a { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--text3); text-transform: uppercase; }
+@media (max-width: 600px) { .container { padding: 0 20px; } nav { padding: 0 20px; } .nav-links { gap: 16px; } }
+</style>
+  <style>
+    [aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.4); }
+    [aria-disabled="true"]:hover { box-shadow: none !important; transform: none !important; }
+  </style>
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+  <nav>
+    <a href="index.html" class="nav-logo">
+      <span class="brand"><span class="mu">μ</span>-series</span>
+      <span class="sub">Transwarp Development Project</span>
+    </a>
+    <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links"><span></span><span></span><span></span></button>
+    <div class="nav-links" id="nav-links">
+      <div class="nav-dd">
+        <button class="nav-dd-btn active" type="button" aria-haspopup="true" aria-expanded="false">Products <span class="caret">▾</span></button>
+        <div class="nav-menu"><div class="nm-list">
+          <a href="mu-clid.html" class="nm nm-clid"><span class="nm-name"><span class="mu-d">μ</span>-clid</span><span class="nm-tag ">Licence <span data-price="mu-clid">£20</span></span><span class="nm-desc">Euclidean rhythm sequencer</span></a>
+          <a href="mu-tant.html" class="nm nm-tant"><span class="nm-name"><span class="mu-d">μ</span>-tant</span><span class="nm-tag ">Licence <span data-price="mu-tant">£20</span></span><span class="nm-desc">Wavetable drone sequencer</span></a>
+          <a href="mu-toni.html" class="nm nm-toni"><span class="nm-name"><span class="mu-d">μ</span>-toni</span><span class="nm-tag ">Licence <span data-price="mu-toni">£20</span></span><span class="nm-desc">Generative arpeggiator</span></a>
+          <a href="mu-on.html" class="nm nm-on"><span class="nm-name"><span class="mu-d">μ</span>-on</span><span class="nm-tag ">Licence <span data-price="mu-on">£20</span></span><span class="nm-desc">909-style groove sequencer</span></a>
+          <a href="mu-tilate.html" class="nm nm-tilate active" aria-current="page"><span class="nm-name"><span class="mu-d">μ</span>-tilate</span><span class="nm-tag ">Licence <span data-price="mu-tilate">£20</span></span><span class="nm-desc">Loop slicer</span></a>
+          <a href="mu-clid-midi.html" class="nm nm-midi"><span class="nm-name"><span class="mu-d">μ</span>-clid MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Euclidean MIDI effect</span></a>
+          <a href="mu-toni-midi.html" class="nm nm-toni-midi"><span class="nm-name"><span class="mu-d">μ</span>-toni MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Arpeggiator MIDI effect</span></a>
+          <a href="mu-link.html" class="nm nm-link"><span class="nm-name"><span class="mu-d">μ</span>-link</span><span class="nm-tag free">Free</span><span class="nm-desc">Sync hub and performance mixer</span></a>
+          <a href="mu-tronic.html" class="nm nm-tronic"><span class="nm-name"><span class="mu-d">μ</span>-tronic</span><span class="nm-tag ">Licence <span data-price="mu-tronic">£30</span></span><span class="nm-desc">A performance instrument for live play</span></a>
+        </div></div>
+      </div>
+      <a href="index.html#live">Live</a>
+      <a href="index.html#pricing">Pricing</a>
+      <a href="index.html#community">Community</a>
+      <a href="download.html" class="nav-cta">Download</a>
+    </div>
+  </nav>
+
+  <main>
+    <section class="rn-hero">
+      <div class="container">
+        <div class="rn-eyebrow">Release Notes</div>
+        <h1><span class="mu">μ</span>-tilate — what's new</h1>
+        <p>Every change that affects you, version by version. Numbers in brackets are our internal tracking references.</p>
+        <div class="rn-links">
+          <a href="manuals/mu-Tilate-User-Manual.pdf" target="_blank" rel="noopener">User manual (PDF) &darr;</a>
+          <a href="download.html#mu-tilate">Download &darr;</a>
+          <a href="mu-tilate.html">About &mu;-tilate &rarr;</a>
+        </div>
+      </div>
+    </section>
+
+    <div class="container">
+
+      <!-- ── Next release · In testing ── -->
+      <section class="release">
+        <div class="rel-head">
+          <span class="rel-ver">Next release</span>
+          <span class="rel-date">in testing</span>
+          <span class="rel-pill testing">In testing</span>
+        </div>
+        <div class="rn-group new">
+          <h3>New</h3>
+          <ul>
+            <li>Slice view knobs can be set to an absolute value: right-click any knob and choose Offset, Absolute or Clear. An Absolute knob has an amber ring, always shows its actual value and the status bar shows the value; an Offset knob shows the offset and what it comes to (for example +3 st = 8 st). Clear puts the knob back as it was. <span class="ref">(1805)</span></li>
+            <li>Bounce to WAV: Settings now has a Bounce to WAV button. Pick a length, a tail so effects can ring out, a sample rate and a file, and the app renders what you have built to a 24-bit WAV, with the live transport paused while it works. <span class="ref">(1772)</span></li>
+          </ul>
+        </div>
+        <div class="rn-group improved">
+          <h3>Improved</h3>
+          <ul>
+            <li>The whole family moves to version 1.2. Under the hood, the shared engine has been rebuilt on a faster, more flexible foundation. No change is intended to how your sessions, presets or sounds behave; if you hear a difference, please tell us.</li>
+            <li>The modulation target list for Phrase layers now shows each section once instead of repeating Playback and Stretch. <span class="ref">(1771)</span></li>
+            <li>Licensing is simpler. The download is free with every feature. A polite licence reminder shows every time an instance loads; Maybe later closes it for that instance only. A one-off £20 licence removes it, and existing licence keys stay valid. Settings also has a Send Feedback link. <span class="ref">(1803)</span></li>
+            <li>μ-host is free with any install and lists only the engines you have licensed. In free mode it explains that it is a lightweight single-channel host.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ── v1.1.0.1484 ── -->
+      <section class="release">
+        <div class="rel-head">
+          <span class="rel-ver">v1.1.0.1484</span>
+          <span class="rel-date">released 9 November 2026</span>
+          <span class="rel-pill current">Current</span>
+        </div>
+        <div class="rn-group new">
+          <h3>New</h3>
+          <ul>
+            <li>New insert effects: Chorus, Flanger, Phaser, Pitch Delay and Tremolo. Pitch Delay is a delay whose repeats are pitch-shifted from &minus;12 to +12 semitones. Tremolo can be sine, triangle or square, has an auto-pan phase control, and both can sync to tempo. Find them in the insert slots. <span class="ref">(1776, 1777, 1778)</span></li>
+          </ul>
+        </div>
+        <div class="rn-group improved">
+          <h3>Improved</h3>
+          <ul>
+            <li>The status bar now shows the name and value of the last control you touched, for every knob, dropdown, number box, switch, button and slider. Some controls, notably in mu-On, used to leave it blank. <span class="ref">(1782)</span></li>
+          </ul>
+        </div>
+        <div class="rn-group fixed">
+          <h3>Fixed</h3>
+          <ul>
+            <li>Fixed the Bars and Beats labels on number boxes, which were cut off and not indented. <span class="ref">(1781)</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ── v1.1.0.1458 ── -->
+      <section class="release">
+        <div class="rel-head">
+          <span class="rel-ver">v1.1.0.1458</span>
+          <span class="rel-date">released 7 November 2026</span>
+        </div>
+        <div class="rn-group new">
+          <h3>New</h3>
+          <ul>
+            <li>First release of μ-tilate, the loop slicer. Load a loop, cut it into slices on its transients, and arrange the slices as blocks on a timeline.</li>
+            <li>Eight layers, each with its own loop, timeline and mixer strip.</li>
+            <li>Match the loop to your tempo by re-pitching it or by time-stretching it.</li>
+            <li>Each slice has its own pitch, filter, amp envelope, direction, effect and sends.</li>
+            <li>The shared μ-series mixer, effects, modulators and presets.</li>
+            <li>Six factory loops to start with.</li>
+            <li>Pay what you want, from £0 and suggested £25 (GBP). A licence key removes the support prompt; nothing is limited without one.</li>
+            <li>Comes as VST3, CLAP and Standalone for Windows.</li>
+          </ul>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-bottom">
+        <span class="copy">© 2026 Transwarp Development Project · transwarp.me · Bath, UK</span>
+        <div class="footer-social"><a href="download.html">Download</a><a href="mu-clid-releases.html"><span class="mu-d">μ</span>-clid notes</a><a href="mu-tant-releases.html"><span class="mu-d">μ</span>-tant notes</a><a href="mu-toni-releases.html"><span class="mu-d">μ</span>-toni notes</a><a href="mu-on-releases.html"><span class="mu-d">μ</span>-on notes</a><a href="mu-clid-midi-releases.html"><span class="mu-d">μ</span>-clid MIDI notes</a><a href="mu-toni-midi-releases.html"><span class="mu-d">μ</span>-toni MIDI notes</a><a href="mu-link-releases.html"><span class="mu-d">μ</span>-link notes</a><a href="mu-tronic-releases.html"><span class="mu-d">μ</span>-tronic notes</a><a href="contact.html">Contact</a><a href="https://github.com/AndyTuke/mu-family">GitHub</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="site.js"></script>
+  <script src="prices.js" defer></script>
+</body>
+</html>

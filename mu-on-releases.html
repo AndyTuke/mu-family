@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>μ-on Release Notes | Transwarp Development Project</title>
+  <meta name="description" content="What's new in μ-on: release notes and change history for each version.">
+  <link rel="canonical" href="https://transwarp.me/mu-on-releases">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://transwarp.me/mu-on-releases">
+  <meta property="og:title" content="μ-on Release Notes | Transwarp Development Project">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #07060E; --bg2: #0D0B18; --bg3: #131128; --bg4: #1A1834;
+  --accent: #6B5FE4; --accent-b: #8B80F0; --glow: rgba(107,95,228,0.35);
+  --teal: #1DB880; --teal-b: #2ECFA0; --glow2: rgba(29,184,128,0.25);
+  --amber: #D4895C; --amber-b: #E8A878;
+  --cyan: #3CB8D4; --cyan-b: #5CCEE8;
+  --text: #E8E4D8; --text2: #7A758F; --text3: #4A4565;
+  --border: #1E1C32; --border2: #2A2745;
+  --ff-disp: 'Syne', sans-serif; --ff-mono: 'Space Mono', monospace; --ff-body: 'Outfit', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--ff-body); font-size: 16px; line-height: 1.6; overflow-x: hidden; }
+a { color: inherit; text-decoration: none; }
+.container { max-width: 880px; margin: 0 auto; padding: 0 40px; }
+nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px; height: 56px; display: flex; align-items: center; justify-content: space-between; background: rgba(7,6,14,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+.nav-logo { display: flex; flex-direction: column; line-height: 1; gap: 2px; }
+.nav-logo .brand { font-family: var(--ff-disp); font-size: 17px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
+.nav-logo .sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.14em; color: var(--text3); text-transform: uppercase; }
+.nav-links { display: flex; align-items: center; gap: 26px; }
+.nav-links a { font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text2); text-transform: uppercase; transition: color .2s; }
+.nav-links a:hover, .nav-links a.active { color: var(--text); }
+.nav-links .nav-clid { color: var(--accent-b); text-transform: none; }
+.nav-links .nav-tant { color: var(--amber-b); text-transform: none; }
+.nav-links .nav-free { color: var(--cyan-b); text-transform: none; }
+.nav-links .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 16px; border-radius: 4px; font-size: 11px; letter-spacing: 0.08em; text-transform: none; }
+
+/* ── RELEASE NOTES ── */
+.rn-hero { padding-top: 130px; padding-bottom: 10px; }
+.rn-eyebrow { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.22em; color: var(--amber-b); text-transform: uppercase; margin-bottom: 14px; }
+.rn-hero h1 { font-family: var(--ff-disp); font-size: clamp(30px,4vw,46px); font-weight: 800; line-height: 1.0; letter-spacing: -0.03em; margin-bottom: 14px; }
+.rn-hero h1 .mu { color: var(--amber-b); }
+.rn-hero p { font-size: 16px; font-weight: 300; color: var(--text2); max-width: 620px; }
+.rn-hero .rn-links { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px 18px; font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.06em; }
+.rn-hero .rn-links a { color: var(--amber-b); }
+
+.release { padding: 38px 0; border-top: 1px solid var(--border); }
+.release:first-of-type { border-top: none; }
+.rel-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+.rel-ver { font-family: var(--ff-disp); font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+.rel-date { font-family: var(--ff-mono); font-size: 11px; color: var(--text3); letter-spacing: 0.08em; }
+.rel-pill { font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; padding: 3px 9px; border-radius: 3px; }
+.rel-pill.testing { color: var(--amber-b); border: 1px solid var(--amber); }
+.rel-pill.current { color: var(--teal-b); border: 1px solid var(--teal); }
+.rel-note { font-size: 13px; color: var(--text2); margin: -10px 0 22px; font-style: italic; }
+
+.rn-group { margin-bottom: 20px; }
+.rn-group h3 { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 10px; }
+.rn-group.new h3 { color: var(--teal-b); }
+.rn-group.improved h3 { color: var(--cyan-b); }
+.rn-group.fixed h3 { color: var(--amber-b); }
+.rn-group ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.rn-group li { position: relative; padding-left: 18px; font-size: 15px; color: var(--text); line-height: 1.55; }
+.rn-group li::before { content: ''; position: absolute; left: 2px; top: 10px; width: 5px; height: 5px; border-radius: 50%; background: var(--border2); }
+.rn-group.new li::before { background: var(--teal); }
+.rn-group.improved li::before { background: var(--cyan); }
+.rn-group.fixed li::before { background: var(--amber); }
+.ref { font-family: var(--ff-mono); font-size: 11px; color: var(--text3); }
+
+footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 60px; }
+.footer-bottom { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.footer-bottom .copy { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text3); }
+.footer-social { display: flex; gap: 16px; }
+.footer-social a { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--text3); text-transform: uppercase; }
+@media (max-width: 600px) { .container { padding: 0 20px; } nav { padding: 0 20px; } .nav-links { gap: 16px; } }
+</style>
+  <style>
+    [aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.4); }
+    [aria-disabled="true"]:hover { box-shadow: none !important; transform: none !important; }
+  </style>
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+  <nav>
+    <a href="index.html" class="nav-logo">
+      <span class="brand"><span class="mu">μ</span>-series</span>
+      <span class="sub">Transwarp Development Project</span>
+    </a>
+    <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links"><span></span><span></span><span></span></button>
+    <div class="nav-links" id="nav-links">
+      <div class="nav-dd">
+        <button class="nav-dd-btn active" type="button" aria-haspopup="true" aria-expanded="false">Products <span class="caret">▾</span></button>
+        <div class="nav-menu"><div class="nm-list">
+          <a href="mu-clid.html" class="nm nm-clid"><span class="nm-name"><span class="mu-d">μ</span>-clid</span><span class="nm-tag ">Licence <span data-price="mu-clid">£20</span></span><span class="nm-desc">Euclidean rhythm sequencer</span></a>
+          <a href="mu-tant.html" class="nm nm-tant"><span class="nm-name"><span class="mu-d">μ</span>-tant</span><span class="nm-tag ">Licence <span data-price="mu-tant">£20</span></span><span class="nm-desc">Wavetable drone sequencer</span></a>
+          <a href="mu-toni.html" class="nm nm-toni"><span class="nm-name"><span class="mu-d">μ</span>-toni</span><span class="nm-tag ">Licence <span data-price="mu-toni">£20</span></span><span class="nm-desc">Generative arpeggiator</span></a>
+          <a href="mu-on.html" class="nm nm-on active"><span class="nm-name"><span class="mu-d">μ</span>-on</span><span class="nm-tag ">Licence <span data-price="mu-on">£20</span></span><span class="nm-desc">909-style groove sequencer</span></a>
+          <a href="mu-tilate.html" class="nm nm-tilate"><span class="nm-name"><span class="mu-d">μ</span>-tilate</span><span class="nm-tag ">Licence <span data-price="mu-tilate">£20</span></span><span class="nm-desc">Loop slicer</span></a>
+          <a href="mu-clid-midi.html" class="nm nm-midi"><span class="nm-name"><span class="mu-d">μ</span>-clid MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Euclidean MIDI effect</span></a>
+          <a href="mu-toni-midi.html" class="nm nm-toni-midi"><span class="nm-name"><span class="mu-d">μ</span>-toni MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Arpeggiator MIDI effect</span></a>
+          <a href="mu-link.html" class="nm nm-link"><span class="nm-name"><span class="mu-d">μ</span>-link</span><span class="nm-tag free">Free</span><span class="nm-desc">Sync hub and performance mixer</span></a>
+          <a href="mu-tronic.html" class="nm nm-tronic"><span class="nm-name"><span class="mu-d">μ</span>-tronic</span><span class="nm-tag ">Licence <span data-price="mu-tronic">£30</span></span><span class="nm-desc">A performance instrument for live play</span></a>
+        </div></div>
+      </div>
+      <a href="index.html#live">Live</a>
+      <a href="index.html#pricing">Pricing</a>
+      <a href="index.html#community">Community</a>
+      <a href="download.html" class="nav-cta">Download</a>
+    </div>
+  </nav>
+
+  <main>
+    <section class="rn-hero">
+      <div class="container">
+        <div class="rn-eyebrow">Release Notes</div>
+        <h1><span class="mu">μ</span>-on — what's new</h1>
+        <p>Every change that affects you, version by version. Numbers in brackets are our internal tracking references.</p>
+        <div class="rn-links">
+          <a href="manuals/mu-On-User-Manual.pdf" target="_blank" rel="noopener">User manual (PDF) &darr;</a>
+          <a href="download.html#mu-on">Download &darr;</a>
+          <a href="mu-on.html">About &mu;-on &rarr;</a>
+        </div>
+      </div>
+    </section>
+
+    <div class="container">
+
+      <!-- ── Next release · In testing ── -->
+      <section class="release">
+        <div class="rel-head">
+          <span class="rel-ver">Next release</span>
+          <span class="rel-date">in testing</span>
+          <span class="rel-pill testing">In testing</span>
+        </div>
+        <div class="rn-group new">
+          <h3>New</h3>
+          <ul>
+            <li>Bounce to WAV: Settings now has a Bounce to WAV button. Pick a length, a tail so effects can ring out, a sample rate and a file, and the app renders what you have built to a 24-bit WAV, with the live transport paused while it works. <span class="ref">(1772)</span></li>
+            <li>Layers can now run out of step with each other for polyrhythms. In the Layer box each layer has its own <b>Length</b> (from 1 step up to the length of the sequence), a <b>Speed</b> for how long each step lasts (1/4 down to 1/64, with triplets) and a <b>Play Mode</b> (Forwards, Backwards or Random) that can also be moved by a modulator. <span class="ref">(1802)</span></li>
+            <li>The Steps strip now sets the length of the whole sequence in bars (1 to 8) and a <b>Reset</b> that sends every layer back to its first step together after a chosen number of bars (Off, or 1 to 32). Each row shows its own playhead, so you can watch layers drift apart. <span class="ref">(1802)</span></li>
+            <li>Right-click a locked knob to get a Remove p-lock menu. The step setting &ldquo;Bars&rdquo; is now called &ldquo;Plays on Loop&rdquo;, and the text in mu-On&rsquo;s drop-downs is slightly larger and crisper. <span class="ref">(1798)</span></li>
+            <li>Parameter locks: give a step its own value for any knob in the Voice or Filter section, including Tune. Switch on P-Lock under the step settings, select a step and turn a knob; that step plays the locked value and holds it until the next step that plays. A locked knob shows a red centre light and a red mark where the track&rsquo;s own value sits, and a locked step has a small red light in its corner. Mod decides whether modulation still moves the locked knobs; Clear removes a step&rsquo;s locks. <span class="ref">(1798)</span></li>
+            <li>A step&rsquo;s Bars are now a clickable graphic: drag the number to set the Length (1 to 8 bars), and click a bar to switch it on or off for that step. <span class="ref">(1799)</span></li>
+            <li>New step condition &ldquo;Don&rsquo;t play on Fill&rdquo;: the step plays unless the Fill button is held. <span class="ref">(1801)</span></li>
+            <li>The Hat has a link between its Closed and Open tune: click the lamp under the two knobs and turning one turns the other with it. <span class="ref">(1794)</span></li>
+          </ul>
+        </div>
+        <div class="rn-group improved">
+          <h3>Improved</h3>
+          <ul>
+            <li>The whole family moves to version 1.2. Under the hood, the shared engine has been rebuilt on a faster, more flexible foundation. No change is intended to how your sessions, presets or sounds behave; if you hear a difference, please tell us.</li>
+            <li>The modulation target list is tidier: each section of targets now appears once under its own heading, and each layer type lists its own targets. <span class="ref">(1771)</span></li>
+            <li>Licensing is simpler. The download is free with every feature. A polite licence reminder shows every time an instance loads; Maybe later closes it for that instance only. A one-off £20 licence removes it, and existing licence keys stay valid. Settings also has a Send Feedback link. <span class="ref">(1803)</span></li>
+            <li>μ-host is free with any install and lists only the engines you have licensed. In free mode it explains that it is a lightweight single-channel host.</li>
+          </ul>
+        </div>
+        <div class="rn-group fixed">
+          <h3>Fixed</h3>
+          <ul>
+            <li>Dropdowns with a picture or tick list, such as the step Fade, no longer ignore a second click after you pick something. <span class="ref">(1800)</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ── v1.1.0.1484 ── -->
+      <section class="release">
+        <div class="rel-head">
+          <span class="rel-ver">v1.1.0.1484</span>
+          <span class="rel-date">released 9 November 2026</span>
+          <span class="rel-pill current">Current</span>
+        </div>
+        <div class="rn-group new">
+          <h3>New</h3>
+          <ul>
+            <li>New insert effects: Chorus, Flanger, Phaser, Pitch Delay and Tremolo. Pitch Delay is a delay whose repeats are pitch-shifted from &minus;12 to +12 semitones. Tremolo can be sine, triangle or square, has an auto-pan phase control, and both can sync to tempo. Find them in the insert slots. <span class="ref">(1776, 1777, 1778)</span></li>
+            <li>The Rumble has a new Feedback knob that sends its output back into its delay lines, and a Feedback Filter next to it (centre is off, turn left for a low-pass, right for a high-pass). <span class="ref">(1779)</span></li>
+            <li>A step&rsquo;s Play ratio is now two drop-downs, Bars and Length. Length (1 to 8 bars) sets how long the loop is, and Bars lets you tick which of those bars the step plays in, for example bars 1, 2 and 5 of a six-bar loop. Older presets keep their ratios. <span class="ref">(1787)</span></li>
+            <li>Steps can repeat their note: Repeat (0 to 16 extra hits), a Rate from 1/4 down to 1/64 with triplets, a Fade that makes the repeats get louder or quieter, and a Level for each step. The repeats stop when the next step comes in. <span class="ref">(1791)</span></li>
+            <li>Each step has a Condition: always play, play on Fill, play if the previous step played, or play if it did not. Hold the Fill button under the step grid to play the steps set to Fill. <span class="ref">(1792)</span></li>
+          </ul>
+        </div>
+        <div class="rn-group improved">
+          <h3>Improved</h3>
+          <ul>
+            <li>The status bar now shows the name and value of the last control you touched, for every knob, dropdown, number box, switch, button and slider. Some controls, notably in mu-On, used to leave it blank. <span class="ref">(1782)</span></li>
+            <li>The drum and percussion filters, including FM Perc, now offer all sixteen of the family&rsquo;s filter types. <span class="ref">(1789)</span></li>
+          </ul>
+        </div>
+        <div class="rn-group fixed">
+          <h3>Fixed</h3>
+          <ul>
+            <li>Fixed the Bars and Beats labels on number boxes, which were cut off and not indented. <span class="ref">(1781)</span></li>
+            <li>The Bass no longer clicks when a new note starts while the last one is still held, most noticeable on the sine wave. <span class="ref">(1786)</span></li>
+            <li>Modulated insert knobs now show their modulation arc. <span class="ref">(1788)</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ── v1.1.0.1458 ── -->
+      <section class="release">
+        <div class="rel-head">
+          <span class="rel-ver">v1.1.0.1458</span>
+          <span class="rel-date">released 7 November 2026</span>
+        </div>
+        <div class="rn-group fixed">
+          <h3>Fixed</h3>
+          <ul>
+            <li>Clicking or dragging layers in the sidebar could crash the app. That is fixed. <span class="ref">(1767)</span></li>
+            <li>Loading a preset while the plugin is bypassed in your host now takes effect at once, so un-bypassing no longer makes the sound jump. <span class="ref">(1715)</span></li>
+            <li>Turning an insert&rsquo;s Tone knob to its fully open end no longer clicks as the filter switches in and out. <span class="ref">(1702)</span></li>
+            <li>The Karplus insert&rsquo;s feedback is now limited more gently, so high feedback settings ring on a sustained note without harsh clipping. <span class="ref">(1714)</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ── v1.1.0.1452 ── -->
+      <section class="release">
+        <div class="rel-head">
+          <span class="rel-ver">v1.1.0.1452</span>
+          <span class="rel-date">released 27 October 2026</span>
+        </div>
+        <div class="rn-group improved">
+          <h3>Improved</h3>
+          <ul>
+            <li>Insert effect parameters now appear in the modulation destination list for every track, and follow the insert effect you choose.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ── v1.1.0.1451 ── -->
+      <section class="release">
+        <div class="rel-head">
+          <span class="rel-ver">v1.1.0.1451</span>
+          <span class="rel-date">released 26 October 2026</span>
+        </div>
+        <div class="rn-group new">
+          <h3>New</h3>
+          <ul>
+            <li>New Tape Delay insert effect: a tape echo with Time, Feedback, Mix and Wear. Each repeat gets darker and softer, and Wear adds tape wobble and saturation. Turn Feedback past 100 % to let it self-oscillate. Time glides when you change it, so turning it bends the echoes like a tape machine. All four knobs can be modulated. Find it in the insert slots.</li>
+            <li>The Chord engine&rsquo;s filter has a full attack, decay, sustain and release envelope with a depth control, laid out like the drum filter. Chord steps can be ghost notes too. <span class="ref">(1672)</span></li>
+            <li>Ghost notes for Kick, Hat, Snare and FM Perc: Alt+drag a step down to play it softly. A Ghost knob sets how soft, it can be modulated, and a ghost step is drawn as an outline that fills out as the Ghost level rises.<span class="ref">(1669)</span></li>
+            <li>A filter on Kick, Hat, Snare and FM Perc: LP12, HP12, BP12 or Notch12 with Cutoff and Resonance, plus an attack and decay envelope with a depth control that moves the cutoff on every step. Cutoff, Resonance and the envelope can all be modulated. <span class="ref">(1670, 1671)</span></li>
+            <li>Drag the mouse up or down on a Bass step to move its note up or down through the key&rsquo;s scale. Shift+drag changes its octave. Alt+drag up accents a step on any engine (Alt+drag down ghosts a drum step). On a Hat, drag up or down switches open and closed. <span class="ref">(1665)</span></li>
+            <li>New Overdrive insert effect: a warm, tube-style drive with Drive, Output, Bias and Tone controls. Find it in the insert slots. Presets made before it keep the insert they had. <span class="ref">(1650)</span></li>
+            <li>An &ldquo;Update available&rdquo; link appears at the right of the status bar when a newer version is out. The app checks once a day, sends nothing about you, and you can turn it off in Settings (Update check). Click it to open the download page. <span class="ref">(1612)</span></li>
+          </ul>
+        </div>
+        <div class="rn-group improved">
+          <h3>Improved</h3>
+          <ul>
+            <li>The key and scale now have their own KEY section next to the engine selector on every engine. <span class="ref">(1672)</span></li>
+            <li>A new Bass sequence starts on the key&rsquo;s root note. The Bass Tune knob reads Root until you turn it. <span class="ref">(1668)</span></li>
+            <li>Decay, attack, release and cutoff knobs give more of their travel to the short and low settings where you play. <span class="ref">(1664)</span></li>
+            <li>Every knob shows its name, value and unit (ms, Hz, %, dB, notes) in the status bar. <span class="ref">(1664)</span></li>
+            <li>The Clipper insert now shows how hard it is clipping, like the Compressor. <span class="ref">(1666)</span></li>
+            <li>The mixer&rsquo;s sidechain Attack and Release start at 0 and can go down to 0. <span class="ref">(1667)</span></li>
+            <li>The Effect, Delay and Reverb time and rate knobs spend more of their travel on short times. <span class="ref">(1664)</span></li>
+            <li>The Smooth modulator curve now passes through every point without looping or humping past points that sit close together. It is a smooth line that never overshoots its neighbours.</li>
+            <li>The Accent knob now runs from the plain-step level up to full, so an accented step is never quieter than a plain step. <span class="ref">(1625)</span></li>
+          </ul>
+        </div>
+        <div class="rn-group fixed">
+          <h3>Fixed</h3>
+          <ul>
+            <li>The mixer&rsquo;s Pan, Send and Sidechain knobs, Level fader, Mute and Solo, and the Effect and Delay switches now show their name and value in the status bar. <span class="ref">(1664)</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ── v1.1.0.1415 ── -->
+      <section class="release">
+        <div class="rel-head">
+          <span class="rel-ver">v1.1.0.1415</span>
+          <span class="rel-date">released 17 October 2026</span>
+        </div>
+        <div class="rn-group improved">
+          <h3>Improved</h3>
+          <ul>
+            <li>The reverb now has a Decay control. The default Hall tail is shorter than before, and older projects are converted to sound the same.</li>
+          </ul>
+        </div>
+        <div class="rn-group fixed">
+          <h3>Fixed</h3>
+          <ul>
+            <li>Fixed the loudness of the Fold, Soft Clip and Hard Clip effects, and fixed the sidechain ducking, the Compressor and the 12 dB band-pass filter.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ── v1.1.0.1412 ── -->
+      <section class="release">
+        <div class="rel-head">
+          <span class="rel-ver">v1.1.0.1412</span>
+          <span class="rel-date">released 15 October 2026</span>
+        </div>
+        <div class="rn-group new">
+          <h3>New</h3>
+          <ul>
+            <li>Pay What You Want, from £0 and suggested £20 (GBP).</li>
+            <li>New Support window and licence-key entry. The key you get by email, even if you pay £0, removes the Support window. Nothing in the app is limited either way.</li>
+            <li>This is the first build of μ-on with licensing.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ── v1.1.0.1411 ── -->
+      <section class="release">
+        <div class="rel-head">
+          <span class="rel-ver">v1.1.0.1411</span>
+          <span class="rel-date">released 15 October 2026 · replaced by v1.1.0.1412</span>
+        </div>
+        <div class="rn-group new">
+          <h3>New</h3>
+          <ul>
+            <li>First release of μ-on, the 909-style groove sequencer. Kick, bass, hat, snare and rumble tracks on a 16-step grid, with bass-to-kick sidechain.</li>
+            <li>Pay what you want, from £0. A licence key removes the support prompt; nothing is limited without one.</li>
+            <li>Comes as VST3, CLAP and Standalone for Windows, with Linux in beta.</li>
+          </ul>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-bottom">
+        <span class="copy">© 2026 Transwarp Development Project · transwarp.me · Bath, UK</span>
+        <div class="footer-social"><a href="download.html">Download</a><a href="mu-clid-releases.html"><span class="mu-d">μ</span>-clid notes</a><a href="mu-tant-releases.html"><span class="mu-d">μ</span>-tant notes</a><a href="mu-toni-releases.html"><span class="mu-d">μ</span>-toni notes</a><a href="mu-tilate-releases.html"><span class="mu-d">μ</span>-tilate notes</a><a href="mu-clid-midi-releases.html"><span class="mu-d">μ</span>-clid MIDI notes</a><a href="mu-toni-midi-releases.html"><span class="mu-d">μ</span>-toni MIDI notes</a><a href="mu-link-releases.html"><span class="mu-d">μ</span>-link notes</a><a href="mu-tronic-releases.html"><span class="mu-d">μ</span>-tronic notes</a><a href="contact.html">Contact</a><a href="https://github.com/AndyTuke/mu-family">GitHub</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="site.js"></script>
+  <script src="prices.js" defer></script>
+</body>
+</html>
