@@ -11,7 +11,7 @@
 #include <atomic>
 #include <memory>
 
-// mu-Tronic — a performance unit of 16 layer slots (Standalone only, pay what you want).
+// mu-Tronic — a performance unit of 16 layer slots (Standalone only, £30 licence).
 //
 // The ProcessorBase subclass owning the shared platform (the APVTS mixer / FX layout, the MixerEngine and FXChain)
 // and sixteen slots, each holding one layer. A slot starts Empty and takes a layer of any type the build

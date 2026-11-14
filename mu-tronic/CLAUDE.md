@@ -10,7 +10,7 @@ Design: [docs/mu-tronic/design.md](../docs/mu-tronic/design.md) (architecture ru
 
 ## Release status
 
-A live release product (backlog #1678), released with the rest of the series: **pay what you want**, same terms as mu-Clid / mu-Tant / mu-Toni / mu-On; Windows Standalone only (Linux is no longer built; macOS on hold). Version base and build number are the family's (`version-pre.txt` carries the same base as `version.txt`; the shared build number never resets). Manual: [docs/mu-tronic/create_manual.ps1](../docs/mu-tronic/create_manual.ps1) (edit the script, not the `.docx`). Site pages: `site/mu-tronic.html`, `site/mu-tronic-releases.html`.
+A live release product (backlog #1678), released with the rest of the series: **free download with a licence reminder on every load; a £30 licence removes it** (others £20); Windows Standalone only (Linux is no longer built; macOS on hold). Version base and build number are the family's (`version-pre.txt` carries the same base as `version.txt`; the shared build number never resets). Manual: [docs/mu-tronic/create_manual.ps1](../docs/mu-tronic/create_manual.ps1) (edit the script, not the `.docx`). Site pages: `site/mu-tronic.html`, `site/mu-tronic-releases.html`.
 
 **Licensing is wired** like the other pay-what-you-want products: `Source/License/LicenseKey.h` (product id `mu-Tronic`, `mutronic.lic`, embedded public key; the private key `mutronic.key` is in the OneDrive secrets `keys` folder), one `initLicensing` call in the processor, and the shared Support prompt / activation overlay from the shell. This replaces the freeware ruling of the 2026-10-15 design doc (decided 2026-10-27). Lemon Squeezy product id 1478475 (checkout link in `kCheckoutUrl`).
 

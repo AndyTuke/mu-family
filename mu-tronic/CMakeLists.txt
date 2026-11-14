@@ -1,5 +1,5 @@
 # mu-tronic — μ-family performance unit: 16 layer slots, each holding a layer taken from the other products
-# (Standalone only, pay what you want). docs/mu-tronic/design.md.
+# (Standalone only, £30 licence). docs/mu-tronic/design.md.
 #
 # The target combines the product's shell (the 16-slot processor, the empty-slot chooser) with the shared
 # platform (ProcessorBase + MixerEngine + FXChain + the shared editor shell / sidebar / mixer). Shared

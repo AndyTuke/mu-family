@@ -26,9 +26,9 @@ The editor inherits `mu-core/UI/EditorShellBase.h`, so TransportBar, StatusBar, 
 - **`mu-toni-tests`** — arp engine, oscillator, and global-FX APVTS layout coverage; builds every default build.
 - **Presets** — dirs + extensions wired: full = `.muToni`, per-slot = `.muArp`.
 
-### Licensing — pay what you want
+### Licensing — free with a reminder, £20 licence
 
-μ-Toni is pay-what-you-want like mu-Clid, mu-Tant, mu-On and mu-Tronic: nothing is limited, and a licence key (issued even for £0) only removes the Support prompt. It is wired the family way: `Source/License/LicenseKey.h` (product id, `mutoni.lic`, embedded public key, checkout URL), one `initLicensing` call in the processor, and the shared Support prompt / activation overlay from the shell. (Until 2026-10-15 it was freeware with no licence code; superseded when the pricing model was set.)
+μ-Toni is free to download with nothing limited; the Support reminder shows every time an instance loads, and a one-off £20 licence key removes it (same as mu-Clid, mu-Tant, mu-On, mu-Tilate; mu-Tronic £30). It is wired the family way: `Source/License/LicenseKey.h` (product id, `mutoni.lic`, embedded public key, checkout URL), one `initLicensing` call in the processor, and the shared Support prompt / activation overlay from the shell. (Until 2026-10-15 it was freeware with no licence code; superseded when the pricing model was set.)
 
 ### Current placeholders / not yet wired
 

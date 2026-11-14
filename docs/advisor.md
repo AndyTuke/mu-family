@@ -52,7 +52,7 @@ Facts about this repo for the scheduled advisor routines. Each fact names the fi
 **Website and services**
 - Static HTML site in `site/`, hosted on Netlify. Netlify builds only when `site/` or `netlify.toml` changes (`netlify.toml`). Local preview: `tests/scripts/serve-site.ps1`.
 - Site work happens on the local branch `site-local` in a separate worktree (`D:\Dev\mu-site`) and is merged to `main` in one batch (`.claude/agents/web-designer.md`).
-- Sales and downloads: Lemon Squeezy pay-what-you-want checkout; zips from GitHub Releases (`site/download.html`, each product's `Source/License/LicenseKey.h`). Mailing list: MailerLite embedded form (`site/download.html`).
+- Sales and downloads: Lemon Squeezy fixed-price checkout (£20, mu-Tronic £30); zips from GitHub Releases (`site/download.html`, each product's `Source/License/LicenseKey.h`). Mailing list: MailerLite embedded form (`site/download.html`).
 
 ## Claude Code setup
 
@@ -81,7 +81,7 @@ Decisions the owner has made that the advisor must respect and not re-suggest. A
 - Release builds only when the owner asks; Debug is the working build (repo: `CLAUDE.md`).
 - The backlog (`backlog.md`) is written only by the `backlog-administrator` agent (repo: `CLAUDE.md`).
 - The owner edits `CLAUDE.md` files himself; the advisor must not propose edits to them as ready-to-apply changes (stated in session, 2026-10-14).
-- The website stays on its local `site-local` branch until a batched publish; the four paid apps are Pay What You Want, mu-Clid MIDI and mu-link are freeware (repo and session, 2026-10-15).
+- The website stays on its local `site-local` branch until a batched publish; the paid apps are free downloads with a licence reminder and a fixed-price licence (£20, mu-Tronic £30); mu-Clid MIDI and mu-link are freeware (repo and session, 2026-10-15).
 
 Answers from the owner (2026-10-15):
 - **Scope:** workflow and tooling only (Claude Code setup, agents, hooks, CI, build and test process). No product, DSP, UI, pricing or website feature ideas.
