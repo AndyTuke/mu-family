@@ -13,6 +13,7 @@
 //   (none)        every test except the golden renders (categories ending "-golden"): the quick check after a change
 //   --goldens     only the golden renders (they render audio offline twice each and are slow: end of day, before a release)
 //   --all         everything
+//   --list        print the categories, one per line, and run nothing (run-tests.ps1 uses it to split a slow suite across processes)
 //   <category>    that one category, as before
 // The golden renders are the bulk of a Debug sweep (mu-Tant: ~60 of its 320 results, most of its 20 minutes).
 namespace mu_test
@@ -68,6 +69,13 @@ namespace mu_test
     {
         const juce::String arg = argc > 1 ? juce::String(argv[1]) : juce::String();
         if (arg == "--all") { runner.runAllTests(); return; }
+        if (arg == "--list")
+        {
+            juce::StringArray categories;
+            for (auto* t : juce::UnitTest::getAllTests()) categories.addIfNotAlreadyThere(t->getCategory());
+            for (const auto& c : categories) std::printf("%s\n", c.toRawUTF8());
+            return;
+        }
 
         const bool onlyGoldens = arg == "--goldens";
         if (arg.isNotEmpty() && ! onlyGoldens) { runner.runTestsInCategory(arg); return; }
