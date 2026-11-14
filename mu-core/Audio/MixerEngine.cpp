@@ -313,7 +313,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
         const float scAmt  = ch.sidechainAmount.load(std::memory_order_relaxed);
         if (scAmt <= 0.0f) continue;
 
-        const bool isExt = (src == kExtSidechainSrc);
+        const bool isExt = (src == extSidechainSrc());
         if (!isExt && (src < 0 || src >= numActiveChannels || src == r)) continue;
         if  (isExt && extScL == nullptr) continue;
 
@@ -457,7 +457,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
         if (scAmt > 0.0f)
         {
             int srcBus = -1;
-            const bool isExt = (src == kExtSidechainSrc);
+            const bool isExt = (src == extSidechainSrc());
             const bool isBus = mu_mix::isBusSource(src, numChannels, numBuses, &srcBus) && srcBus < b;
             const bool isCh  = src >= 0 && src < numActiveChannels;
             if ((isExt && extScL != nullptr) || isBus || isCh)
@@ -556,7 +556,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
             continue;
         }
 
-        const bool isExt = (src == kExtSidechainSrc);
+        const bool isExt = (src == extSidechainSrc());
         int srcBus = -1;
         const bool isBus = mu_mix::isBusSource(src, numChannels, numBuses, &srcBus);
         if (!isExt && !isBus && (src < 0 || src >= numActiveChannels))

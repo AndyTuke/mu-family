@@ -316,8 +316,8 @@ public:
     void swapChannelState(int i, int j) noexcept
     {
         if (i == j) return;
-        auto& a = channels[(size_t)i];
-        auto& b = channels[(size_t)j];
+        auto& a = channels[i];
+        auto& b = channels[j];
         auto swapF = [](std::atomic<float>& x, std::atomic<float>& y) noexcept {
             const float t = x.load(std::memory_order_relaxed);
             x.store(y.load(std::memory_order_relaxed), std::memory_order_relaxed);
