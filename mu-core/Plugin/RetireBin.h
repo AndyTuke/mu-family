@@ -3,6 +3,7 @@
 #include "Sequencer/RetireTail.h"
 #include "Plugin/AudioEpoch.h"
 #include "MuLimits.h"
+#include "Audio/FlatArray.h"
 
 #include <juce_audio_basics/juce_audio_basics.h>
 
@@ -68,16 +69,24 @@ namespace mu_core
             Invalid          // slot out of range or no tail
         };
 
-        static constexpr int kRows = mu_limits::kMaxLayers;
         static constexpr int kDepth = mu_limits::kRetireDepth;
-        static constexpr int kEntries = kRows * kDepth;
+        // The most entries any bin can hold (the 32-layer ceiling); a call's stack FreeList is sized to it. A bin built for fewer
+        // rows (the processor's layer count) uses less: see rowCount / entryCount / reclaimCapacity below.
+        static constexpr int kMaxEntries = mu_limits::kAbsoluteMaxLayers * kDepth;
         // The reclaim list holds twice the bin's entries: everything evicted under layersLock in one pass plus
         // every NotParked or dropped tail can wait there for a service pass.
-        static constexpr int kReclaimCapacity = 2 * kEntries;
 
         // `layoutWord`: the processor's packed count | serial word (LayoutWord), read to know when the store that
         // unpublishes a parked layer has landed (an outgoing tail the bin did not take is freed only after it).
-        RetireBin(const AudioEpoch& e, const std::atomic<uint64_t>& layoutWord) noexcept : epoch(e), layout(layoutWord) {}
+        RetireBin(const AudioEpoch& e, const std::atomic<uint64_t>& layoutWord, int numRows = mu_limits::kMaxLayers) noexcept
+            : epoch(e), layout(layoutWord), rowCount(numRows), entryCount(numRows * kDepth), reclaimCapacity(2 * entryCount * 1)
+        {
+            // The reclaim list holds twice the bin's entries: everything evicted under layersLock in one pass plus
+            // every NotParked or dropped tail can wait there for a service pass. Sized once, here.
+            rows.reset(rowCount);
+            reclaim.reset(reclaimCapacity);
+            budget = entryCount;
+        }
         ~RetireBin() = default;   // owners call cutAll + service from prepareForDestruction first
         RetireBin(const RetireBin&) = delete;
         RetireBin& operator=(const RetireBin&) = delete;
@@ -86,7 +95,7 @@ namespace mu_core
         void        setCountPolicy(CountPolicy p) noexcept { policy = p; }
         CountPolicy countPolicy() const noexcept           { return policy; }
         // Tails sounding at once in this instance; when reached, a park evicts the oldest active entry.
-        void setGlobalBudget(int maxLive) { BinLock g(binMutex); budget = juce::jlimit(1, kEntries, maxLive); }
+        void setGlobalBudget(int maxLive) { BinLock g(binMutex); budget = juce::jlimit(1, entryCount, maxLive); }
         // How long an eviction outside layersLock waits (with binMutex released) for the grace period before
         // dropping the incoming tail. The caller of such a park usually holds layoutWriteLock (its park and its count
         // store share one hold), so a host thread's setStateInformation can be held up by up to this long.
@@ -113,7 +122,7 @@ namespace mu_core
         // has reached `activation`, then for a grace period stamped after that, and only then is it freed.
         ParkResult park(int slot, std::unique_ptr<RetireTail> owned, uint32_t activation, bool audioExcluded)
         {
-            if (slot < 0 || slot >= kRows || owned == nullptr) return ParkResult::Invalid;
+            if (slot < 0 || slot >= rowCount || owned == nullptr) return ParkResult::Invalid;
             FreeList frees;                   // destroyed after the lock below is released
             BinLock g(binMutex);
             if (owned->retirePolicy().kind == RetirePolicy::Kind::None)
@@ -137,7 +146,7 @@ namespace mu_core
         // holds at most one active in-place entry: a second park is a no-op and the running fade continues.
         ParkResult parkInPlace(int slot, RetireTail& spare, uint32_t activation, bool audioExcluded)
         {
-            if (slot < 0 || slot >= kRows) return ParkResult::Invalid;
+            if (slot < 0 || slot >= rowCount) return ParkResult::Invalid;
             FreeList frees;
             BinLock g(binMutex);
             if (hasActiveInPlaceLocked(slot)) return ParkResult::AlreadyActive;
@@ -153,7 +162,7 @@ namespace mu_core
         // store), before a spare is destroyed.
         void cutSlot(int slot)
         {
-            if (slot < 0 || slot >= kRows) return;
+            if (slot < 0 || slot >= rowCount) return;
             BinLock g(binMutex);
             for (auto& e : rows[(size_t) slot]) cutLocked(e);
         }
@@ -162,7 +171,7 @@ namespace mu_core
         void cutAtOrAbove(int count)
         {
             BinLock g(binMutex);
-            for (int s = juce::jmax(0, count); s < kRows; ++s)
+            for (int s = juce::jmax(0, count); s < rowCount; ++s)
                 for (auto& e : rows[(size_t) s]) cutLocked(e);
         }
 
@@ -170,7 +179,7 @@ namespace mu_core
         // owned tails follow their slot; in-place entries are CUT, never moved (their spare does not move).
         void swapRows(int a, int b)
         {
-            if (a == b || a < 0 || b < 0 || a >= kRows || b >= kRows) return;
+            if (a == b || a < 0 || b < 0 || a >= rowCount || b >= rowCount) return;
             BinLock g(binMutex);
             for (int s : { a, b })
                 for (auto& e : rows[(size_t) s])
@@ -184,10 +193,10 @@ namespace mu_core
         // where service frees it. Rows at or above liveCount (spares past the count) do not move.
         void removeRow(int index, int liveCount)
         {
-            if (index < 0 || index >= kRows) return;
+            if (index < 0 || index >= rowCount) return;
             BinLock g(binMutex);
             for (auto& e : rows[(size_t) index]) cutLocked(e);
-            const int top = juce::jmin(kRows, liveCount) - 1;
+            const int top = juce::jmin(rowCount, liveCount) - 1;
             for (int s = index + 1; s <= top; ++s)
                 for (auto& e : rows[(size_t) s])
                     if (e.inPlace != 0) cutLocked(e);
@@ -253,7 +262,7 @@ namespace mu_core
         // The highest slot with an entry that renders under `viewSerial`, or -1 (RenderPastCount's mixCount).
         int highestActiveSlot(uint32_t viewSerial) const noexcept
         {
-            for (int s = kRows - 1; s >= 0; --s)
+            for (int s = rowCount - 1; s >= 0; --s)
                 for (const auto& e : rows[(size_t) s])
                     if (isActive(e.state.load(std::memory_order_seq_cst)) && reached(viewSerial, e.activation))
                         return s;
@@ -267,7 +276,7 @@ namespace mu_core
         bool render(int slot, RenderContext ctx, juce::AudioBuffer<float>& slotOut, int n,
                     uint32_t viewSerial, bool slotHasLive) noexcept
         {
-            if (slot < 0 || slot >= kRows || n <= 0) return false;
+            if (slot < 0 || slot >= rowCount || n <= 0) return false;
             ctx.retiring = 1;
             ctx.midi.events = nullptr;
             ctx.midi.count = 0;
@@ -312,7 +321,7 @@ namespace mu_core
         template <class Fn>
         void forEachActive(int slot, Fn&& fn)
         {
-            if (slot < 0 || slot >= kRows) return;
+            if (slot < 0 || slot >= rowCount) return;
             BinLock g(binMutex);
             for (auto& e : rows[(size_t) slot])
                 if (e.tail != nullptr && isActive(e.state.load(std::memory_order_seq_cst)))
@@ -404,7 +413,7 @@ namespace mu_core
                 else t.release();   // unreachable by construction; leaking beats freeing under the mutex
             }
         private:
-            std::array<std::unique_ptr<RetireTail>, (size_t) (kEntries + kReclaimCapacity)> items;
+            std::array<std::unique_ptr<RetireTail>, (size_t) (kMaxEntries * 3)> items;   // every entry plus every reclaim slot at the ceiling
             int count = 0;
         };
 
@@ -459,7 +468,7 @@ namespace mu_core
         {
             juce::ignoreUnused(frees);
             if (t == nullptr) return;
-            if (reclaimCount >= kReclaimCapacity) { jassertfalse; t.release(); return; }
+            if (reclaimCount >= reclaimCapacity) { jassertfalse; t.release(); return; }
             auto& r = reclaim[(size_t) reclaimCount++];
             r.owned = std::move(t);
             r.needsGrace = true;
@@ -476,7 +485,7 @@ namespace mu_core
         {
             if (t == nullptr) return;
             if (! needsGrace && ! audioExcluded) { frees.add(std::move(t)); return; }
-            if (reclaimCount < kReclaimCapacity)
+            if (reclaimCount < reclaimCapacity)
             {
                 auto& r = reclaim[(size_t) reclaimCount++];
                 r.owned = std::move(t);
@@ -541,7 +550,7 @@ namespace mu_core
 
             // An eviction may release binMutex for its wait, so the budget and the row are re-checked after each one
             // (another park may have filled them meanwhile); bounded, a failed eviction ends the attempt.
-            for (int attempt = 0; attempt < kEntries + 1; ++attempt)
+            for (int attempt = 0; attempt < entryCount + 1; ++attempt)
             {
                 if (activeCountLocked() >= budget)
                 {
@@ -685,12 +694,13 @@ namespace mu_core
         // The serial half of the layout word (LayoutWord::serial: the high 32 bits).
         uint32_t publishedSerial() const noexcept { return (uint32_t) (layout.load(std::memory_order_seq_cst) >> 32); }
         CountPolicy policy = CountPolicy::RenderPastCount;
-        std::array<std::array<Entry, kDepth>, kRows> rows;
-        std::array<Reclaim, kReclaimCapacity> reclaim;
+        const int rowCount, entryCount, reclaimCapacity;   // the bin's shape, fixed at construction
+        mu_core::FlatArray<std::array<Entry, kDepth>> rows;
+        mu_core::FlatArray<Reclaim> reclaim;
         int reclaimCount = 0;                // guarded by binMutex
         mutable std::mutex binMutex;         // message and host threads only, rt-ok
         double preparedRate = 0.0;           // guarded by binMutex
-        int    budget = kEntries;            // guarded by binMutex
+        int    budget = 0;                   // guarded by binMutex (set to entryCount in the constructor)
         int    evictTimeoutMs = 50;          // guarded by binMutex
         uint64_t parkCounter = 0;            // guarded by binMutex
         juce::AudioBuffer<float> declick;    // audio thread's after prepare; sized at prepare only

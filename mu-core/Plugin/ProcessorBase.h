@@ -926,8 +926,8 @@ protected:
     // poll is gone first on destruction; prepareForDestruction empties it before any product member goes.
     // Held on the heap (built with the processor, on the constructing thread) so ProcessorBase stays small
     // for hosts and tests that construct it on a stack.
-    std::unique_ptr<mu_core::RetireBin> retireBinStorage = std::make_unique<mu_core::RetireBin>(layerAccess.epoch, layerAccess.layout);
-    mu_core::RetireBin& retireBin = *retireBinStorage;
+    std::unique_ptr<mu_core::RetireBin> retireBinStorage;   // built in the constructor with the layer count
+    mu_core::RetireBin& retireBin;
     // The layer types this host offers a slot (see getLayerTypes). Filled in the product's constructor.
     mu_core::LayerTypeRegistry layerTypes;
 
