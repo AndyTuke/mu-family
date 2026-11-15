@@ -429,6 +429,12 @@ public:
     static constexpr int kSpaceM  = 8;    // divider between control groups
     static constexpr int kSpaceL  = 12;   // section margin
 
+    // MIDI mapping editor (docs/design-ui-family.md section 15).
+    static constexpr int kMidiMapRowH       = 28;      // one mapping row
+    static constexpr int kMidiMapSourceW    = 130;     // the source field ("CC 21  Ch 1")
+    static constexpr int kMidiMapActionW    = 170;     // the Action drop-down
+    static constexpr int kMidiLearnTimeoutMs = 10000;  // learn gives up after this long
+
     // Knob-cluster gaps. Role-specific rather than scale steps: both were tuned by
     // eye so a row of knobs breathes and a labelled pair still reads as one pair.
     static constexpr int kKnobGapRow  = 18;   // between knobs in a row (Steps / Hits / Rotate)

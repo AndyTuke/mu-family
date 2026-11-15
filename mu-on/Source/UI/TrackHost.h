@@ -24,6 +24,8 @@ public:
     virtual Track& getTrack(int layer) noexcept = 0;
     // How many layers are live, and what the list calls layer `layer` (its engine's name).
     virtual int          getTrackCount() const = 0;
+    // The most layer slots the product can hold (what the step rows divide their height by, so a row keeps its size as layers are added).
+    virtual int          getTrackCapacity() const = 0;
     virtual juce::String getTrackName(int layer) const = 0;
     // The layer's palette colour index (MuLookAndFeel::layerPalette).
     virtual int getTrackColourIndex(int layer) const = 0;

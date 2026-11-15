@@ -16,9 +16,9 @@ namespace
         {
             beginTest("the registered display name reaches JUCE's accessibility name (non-ASCII intact)");
             {
-                const juce::String name = juce::String(juce::CharPointer_UTF8("\xce\xbc-Test"));
-                mu_core::setSharedProductName(name.toRawUTF8());
-                expectEquals(juce::detail::AccessibilityHelpers::getApplicationOrPluginName(), name);
+                const juce::String shownName = juce::String(juce::CharPointer_UTF8("\xce\xbc-Test"));
+                mu_core::setSharedProductName(shownName.toRawUTF8());
+                expectEquals(juce::detail::AccessibilityHelpers::getApplicationOrPluginName(), shownName);
             }
         }
     };

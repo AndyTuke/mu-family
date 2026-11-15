@@ -116,6 +116,7 @@ public:
     // ── TrackHost: what TrackContent and StepRows read (message thread) ──────────
     juce::AudioProcessorValueTreeState& getTrackParameters() noexcept override { return apvts; }
     int          getTrackCount() const override                 { return getNumLayers(); }
+    int          getTrackCapacity() const override              { return getMaxLayers(); }
     juce::String getTrackName(int layer) const override         { return getLayerName(layer); }
     int          getTrackColourIndex(int layer) const override  { return getLayerColourIndex(layer); }
     bool         isTrackTransportPlaying() const noexcept override { return isInternalPlaying(); }

@@ -23,12 +23,14 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
       statusBar(chrome.getStatusBar()),
       activationOverlay(proc),
       midiPresetsOverlay(proc),
-      midiFullPresetsOverlay(proc)
+      midiFullPresetsOverlay(proc),
+      midiMapOverlay(proc)
 {
     // The plugin-only screens join the chrome's state machine and layout, at their original z-order.
     chrome.addExtraScreen(activationOverlay,      mu_ui::ShellChrome::ExtraKind::Modal, &saveDialog);
     chrome.addExtraScreen(midiPresetsOverlay,     mu_ui::ShellChrome::ExtraKind::Page,  &statusBar);
     chrome.addExtraScreen(midiFullPresetsOverlay, mu_ui::ShellChrome::ExtraKind::Page,  &statusBar);
+    chrome.addExtraScreen(midiMapOverlay,         mu_ui::ShellChrome::ExtraKind::Page,  &statusBar);
 
     wirePresetHooks();
     wireOverlays();
@@ -80,6 +82,7 @@ void EditorShellBase::wireOverlays()
     // The Save card, the preset browser and the processor's load / swap notifications are the chrome's.
     midiPresetsOverlay.onClose     = [this] { showMidiPresets(false);     showSettings(true); };
     midiFullPresetsOverlay.onClose = [this] { showMidiFullPresets(false); showSettings(true); };
+    midiMapOverlay.onClose         = [this] { showMidiMap(false);         showSettings(true); };
 
     // Deferred full-preset swaps commit at the loop boundary — refresh chrome
     // once they land. Product overrides onPresetLoaded to refresh its panels.
@@ -229,6 +232,7 @@ void EditorShellBase::setSettingsOverlay(juce::Component* overlay)
     {
         standard->onMidiPresetsClicked = [this] { showSettings(false); showMidiPresets(true); };
         standard->onFullPresetsClicked = [this] { showSettings(false); showMidiFullPresets(true); };
+        standard->onMidiMapClicked     = [this] { showSettings(false); showMidiMap(true); };
         standard->onStatusUpdate = [this](const juce::String& name, const juce::String& value)
         { if (transportBar.onStatusUpdate) transportBar.onStatusUpdate(name, value); };
     }
@@ -341,6 +345,7 @@ void EditorShellBase::showPresetBrowser(bool show) { chrome.showPresetBrowser(sh
 void EditorShellBase::showSettings(bool show)      { chrome.showSettings(show); }
 void EditorShellBase::showMidiPresets(bool show)   { chrome.showExtraScreen(midiPresetsOverlay, show); }
 void EditorShellBase::showMidiFullPresets(bool show) { chrome.showExtraScreen(midiFullPresetsOverlay, show); }
+void EditorShellBase::showMidiMap(bool show)         { chrome.showExtraScreen(midiMapOverlay, show); }
 
 void EditorShellBase::paint(juce::Graphics& g)
 {

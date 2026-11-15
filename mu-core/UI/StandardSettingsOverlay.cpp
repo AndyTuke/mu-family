@@ -279,12 +279,18 @@ void StandardSettingsOverlay::addProgramChangeSection(const juce::String& layerT
     fullPresetsBtn.setButtonText(fullTableName);
     midiPresetsBtn.onClick = [this] { if (onMidiPresetsClicked) onMidiPresetsClicked(); };
     fullPresetsBtn.onClick = [this] { if (onFullPresetsClicked) onFullPresetsClicked(); };
+    midiMapBtn.setButtonText("MIDI Mapping...");
+    midiMapBtn.onClick = [this] { if (onMidiMapClicked) onMidiMapClicked(); };
     addAndMakeVisible(midiPresetsBtn);
     addAndMakeVisible(fullPresetsBtn);
+    addAndMakeVisible(midiMapBtn);
     addSection(Where::MidiAfterClock, { "MIDI Program Change", kRowH, [this](const Rows& r) {
-        const int btnW = s(180), gap = s(MuLookAndFeel::kSpaceM);
+        const int gap = s(MuLookAndFeel::kSpaceM);
+        // Three buttons share the column: up to 180 wide each, narrower when the column is.
+        const int btnW = juce::jmin(s(180), (r.area.getRight() - r.labelX - 2 * gap) / 3);
         midiPresetsBtn.setBounds(r.labelX,              r.area.getY(), btnW, r.rowH);
-        fullPresetsBtn.setBounds(r.labelX + btnW + gap, r.area.getY(), btnW, r.rowH); } });
+        fullPresetsBtn.setBounds(r.labelX + btnW + gap, r.area.getY(), btnW, r.rowH);
+        midiMapBtn    .setBounds(r.labelX + 2 * (btnW + gap), r.area.getY(), btnW, r.rowH); } });
 }
 
 void StandardSettingsOverlay::addSection(Where where, Section section, const juce::String& group)

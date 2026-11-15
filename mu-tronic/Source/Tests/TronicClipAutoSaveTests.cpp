@@ -57,8 +57,8 @@ struct MuTronicClipAutoSaveTests : juce::UnitTest
         for (const auto type : { LayerTypeId::Rhythm, LayerTypeId::Pattern, LayerTypeId::Arp, LayerTypeId::Kick,
                                  LayerTypeId::Bass, LayerTypeId::Hat, LayerTypeId::Snare, LayerTypeId::Rumble })
         {
-            const juce::String name = mu_core::layerTypeName(type);
-            beginTest("mu-Tronic " + name + " capture is idempotent: two captures with no edit between are identical");
+            const juce::String typeLabel = mu_core::layerTypeName(type);
+            beginTest("mu-Tronic " + typeLabel + " capture is idempotent: two captures with no edit between are identical");
             mu_seam_test::TempStorage storage;
             AutoSaveProcessor p;
             expect(p.setLayerType(1, type));
@@ -66,8 +66,8 @@ struct MuTronicClipAutoSaveTests : juce::UnitTest
             const auto twice = [&](const char* when)
             {
                 const auto first = p.captureLayerPresetTree(1);
-                expect(first.isValid(), name + " has a capture " + when);
-                expect(first.isEquivalentTo(p.captureLayerPresetTree(1)), name + " two captures are identical " + when);
+                expect(first.isValid(), typeLabel + " has a capture " + when);
+                expect(first.isEquivalentTo(p.captureLayerPresetTree(1)), typeLabel + " two captures are identical " + when);
             };
             twice("at the defaults");
             setFirstRow(p, 1, 0.3f);
@@ -79,7 +79,7 @@ struct MuTronicClipAutoSaveTests : juce::UnitTest
             p.flushPendingAsyncUpdates();
             twice("after a launch");
             expect(p.captureLayerPresetTree(1).isEquivalentTo(p.getLayer(1)->clips->get(0)),
-                   name + " a launched clip captures back as the clip (no feedback rewrite)");
+                   typeLabel + " a launched clip captures back as the clip (no feedback rewrite)");
         }
     }
 

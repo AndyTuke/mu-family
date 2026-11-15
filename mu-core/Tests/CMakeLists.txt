@@ -103,6 +103,7 @@ set(MU_CORE_TEST_SOURCES
     FaderThumbRenderTests.cpp
     ../UI/Components/BipolarSliderRow.cpp
     TransportBarTests.cpp
+    MidiMapOverlayTests.cpp
     ShellChromeTests.cpp
     PerformanceModeShellTests.cpp
     ClipStripTests.cpp
@@ -148,6 +149,8 @@ function(mu_core_add_test_target name max_layers max_buses bus_inserts)
     target_sources(${name} PRIVATE ${MU_CORE_TEST_SOURCES} ${_chrome_extra})
     # The analysis and loop-decode sources under test (the mu-core library is sources compiled into each consumer).
     target_sources(${name} PRIVATE "${CMAKE_SOURCE_DIR}/mu-core/Analysis/OnsetDetector.cpp" "${CMAKE_SOURCE_DIR}/mu-core/Audio/LoopLoader.cpp")
+    # The MIDI mapping editor (a shell overlay, so not in the processor-free chrome list).
+    target_sources(${name} PRIVATE "${CMAKE_SOURCE_DIR}/mu-core/UI/MidiMapOverlay.cpp")
     target_compile_features(${name} PRIVATE cxx_std_17)
     target_include_directories(${name} PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}"

@@ -90,6 +90,7 @@ namespace
         void selectTrackEngine(int, mu_on::EngineType) override {}   // the Engine selector is hidden for a locked track
 
         int          getTrackCount() const override                 { return proc.getNumLayers(); }
+        int          getTrackCapacity() const override              { return proc.getMaxLayers(); }
         juce::String getTrackName(int layer) const override         { return proc.getLayerName(layer); }
         int          getTrackColourIndex(int layer) const override  { return proc.getLayerColourIndex(layer); }
 

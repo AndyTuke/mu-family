@@ -9,7 +9,7 @@ param(
 
 $root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $bundles = Get-ChildItem (Join-Path $root 'build') -Directory -Recurse -Filter '*.vst3' |
-    Where-Object { $_.FullName -match '\\Release\\VST3\\[^\\]+\.vst3$' }
+    Where-Object { $_.FullName -match '\\Release\\VST3\\[^\\]+\.vst3$' -and (Test-Path (Join-Path $_.FullName 'Contents')) }   # a bundle with no Contents is a stale leftover: mirroring it would empty the real one of the same name
 
 if (-not $bundles) { Write-Host 'deploy-vst3: no Release VST3 bundles found (build Release first)'; exit 1 }
 if (-not (Test-Path $Dest)) { New-Item -ItemType Directory -Force $Dest | Out-Null }

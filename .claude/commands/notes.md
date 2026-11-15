@@ -35,4 +35,4 @@ Do **not** create a new dated `v1.1.NNN` section — that promotion happens only
 
 ## Finish
 
-Commit the site locally; it goes live only when `publish-site.yml` is dispatched (batched, on Andy's word). The In-Testing section is public, so it must always be current and pushed live.
+Commit the site files on main (by explicit path), push, then `gh workflow run publish-site.yml --ref main` so the notes go live straight away (Andy 2026-11-15: no Netlify limit any more, keep the In-Testing section always current and published).

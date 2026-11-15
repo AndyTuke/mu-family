@@ -76,6 +76,7 @@ public:
     void addProgramChangeSection(const juce::String& layerTableName, const juce::String& fullTableName);
     std::function<void()> onMidiPresetsClicked;   // the editor opens showMidiPresets
     std::function<void()> onFullPresetsClicked;   // the editor opens showMidiFullPresets
+    std::function<void()> onMidiMapClicked;       // the editor opens showMidiMap (the MIDI mapping editor)
 
     // The status-bar line for the controller lamp on hover (name, value); the editor shell forwards it.
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
@@ -116,7 +117,7 @@ private:
     void setUpControllerGroup();
     void refreshController();
     bool controllerShown() const { return controllerWatch.get() != nullptr; }
-    juce::TextButton midiPresetsBtn, fullPresetsBtn;   // program-change tables (added on request)
+    juce::TextButton midiPresetsBtn, fullPresetsBtn, midiMapBtn;   // program-change tables (added on request)
 
     std::vector<Section> general, midiBefore, midiClock, midiAfter;
     struct GroupSection { juce::String group; Section section; };

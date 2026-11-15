@@ -11,6 +11,7 @@
 #include "UI/SaveDialog.h"
 #include "UI/PresetBrowser.h"
 #include "UI/MidiPresetsOverlay.h"
+#include "UI/MidiMapOverlay.h"
 #include "UI/MidiFullPresetsOverlay.h"
 #include "UI/ShellChrome.h"
 #include "UI/StatusSink.h"
@@ -77,6 +78,7 @@ public:
     PresetBrowser&        getPresetBrowser()        { return chrome.getPresetBrowser(); }
     MidiPresetsOverlay&     getMidiPresetsPanel()     { return midiPresetsOverlay; }
     MidiFullPresetsOverlay& getMidiFullPresetsPanel() { return midiFullPresetsOverlay; }
+    mu_ui::MidiMapOverlay&  getMidiMapPanel()         { return midiMapOverlay; }
 
     // Overlay control — used by the shell's own callbacks and by the product
     // when it needs to drive overlay state from its own panels.
@@ -87,6 +89,7 @@ public:
     void showPresetBrowser(bool show);
     void showSettings(bool show);
     void showMidiPresets(bool show);
+    void showMidiMap(bool show);
     void showMidiFullPresets(bool show);
     void hideAllOverlays();
 
@@ -153,6 +156,7 @@ protected:
     ActivationOverlay      activationOverlay;
     MidiPresetsOverlay     midiPresetsOverlay;
     MidiFullPresetsOverlay midiFullPresetsOverlay;
+    mu_ui::MidiMapOverlay  midiMapOverlay;
 
     // Support prompt state. The first-show check runs once per editor, when it first shows.
     juce::String productDisplayName;

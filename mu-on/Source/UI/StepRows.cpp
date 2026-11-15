@@ -49,7 +49,7 @@ void StepRows::resized()
 
 int StepRows::rowHeight() const noexcept
 {
-    return (getHeight() - mu_ui::s(kControlsH)) / mu_limits::kAbsoluteMaxLayers;
+    return (getHeight() - mu_ui::s(kControlsH)) / juce::jmax(1, host.getTrackCapacity());   // one row per layer slot the product can hold
 }
 
 juce::Rectangle<int> StepRows::rowArea(int row) const
